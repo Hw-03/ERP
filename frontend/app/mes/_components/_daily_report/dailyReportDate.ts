@@ -1,4 +1,5 @@
 const KST_TIME_ZONE = "Asia/Seoul";
+const KOREAN_WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"] as const;
 
 export function toKstDateKey(value: Date = new Date()): string {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -13,4 +14,10 @@ export function toKstDateKey(value: Date = new Date()): string {
 
 export function isFutureKstDate(workDate: string, today = toKstDateKey()): boolean {
   return workDate > today;
+}
+
+export function formatWorkDateLabel(value: string): string {
+  const [year, month, day] = value.split("-").map(Number);
+  const weekday = KOREAN_WEEKDAY_LABELS[new Date(Date.UTC(year, month - 1, day)).getUTCDay()];
+  return `${value} ${weekday}요일`;
 }

@@ -62,18 +62,24 @@ Keep both files aligned so Claude Code and Codex can work on DEXCOWIN MES with t
 After completing a plan, always place the recommended Codex model and reasoning level at the very top of the plan shown to the user. The model must be one of the Codex UI model choices, and the reasoning level must be written in Korean exactly as shown in the UI:
 
 > **추천 모델: GPT-5.6 Terra** - [한 줄 이유]
-> **추천 추론 수준: 높음** - [한 줄 이유]
+> **추천 추론 수준: Medium** - [한 줄 이유]
+> **울트라: 사용 안 함** - [필요할 때만 한 줄 이유]
 
 Available model choices:
 - **GPT-5.6 Sol**: Use for the hardest plans: broad architecture, security/permission changes, state machines, risky data-flow changes, or complex cross-file judgment.
 - **GPT-5.6 Terra**: Default for most DEXCOWIN MES development plans: normal feature work, backend+frontend integration, bug fixes, moderate refactors, and test planning.
 - **GPT-5.6 Luna**: Use for narrow, quick, low-risk plans: document edits, file searches, simple renames, small UI text/style tweaks, and mechanical cleanup.
 
-Reasoning level choices:
-- **낮음**: Simple repetitive tasks. e.g. variable rename, file search, minor text edits.
-- **중간**: General development tasks. e.g. bug fix, add a router, API integration, moderate refactor.
-- **높음**: Complex development tasks with multiple files, state transitions, data flow, or meaningful regression risk.
-- **매우 높음**: High-complexity judgment tasks. e.g. redesigning the stock request state machine, security-related auth changes, structural changes spanning many files.
+UI 추론 수준과 선택 기준:
+- **Light**: 답이나 변경 방법이 이미 명확하고, 탐색·도구 호출·검증에 깊은 판단이 거의 필요 없는 지연 시간 우선 작업. 파일 탐색, 기계적 이름 변경, 단순 문구·상수 변경, 좁은 문서 수정에 사용한다.
+- **Medium**: 균형 잡힌 시작점이다. 기존 패턴이 분명한 일반 개발, 국소 버그 수정, 표준 API 연동, 제한된 테스트 추가처럼 보통의 판단과 도구 사용은 필요하지만 복잡한 대안 탐색은 필요 없는 작업에 사용한다.
+- **High**: Medium으로는 놓치기 쉬운 의존성·예외·회귀 경로가 있고, 추가 추론이 결과 품질을 높일 구체적 이유가 있을 때만 사용한다. 여러 모듈의 상태 변화, 비자명한 디버깅, 데이터 흐름 검증, 테스트 설계가 그 예다.
+- **Extra High**: 설계 대안 비교, 불명확한 결함 원인, 권한·동시성·상태 전이, 여러 독립 조사 결과의 통합처럼 탐색과 검증 자체가 핵심인 작업에 사용한다. 단순히 수정 파일 수가 많다는 이유만으로 올리지 않는다.
+- **최대**: 품질 우선의 가장 어려운 작업에만 사용한다. 보안·데이터 정합성·아키텍처 변경처럼 잘못된 판단의 비용이 높고, Extra High보다 더 많은 탐색과 검증이 성공률을 실질적으로 높일 때 선택한다. 같은 유형의 반복 작업에서는 Extra High와 최대를 대표 사례로 비교해 더 나은 품질·지연·사용량 균형을 확인한다.
+
+**울트라**는 위 다섯 단계와 같은 단순 추론 수준이 아니라, Codex가 여러 하위 에이전트를 적극적으로 조율하는 특수 실행 방식으로 취급한다. 서로 독립적인 작업 흐름을 병렬로 나눌 수 있고 그 결과를 통합하는 일이 병목일 때만 추천한다. 단일 문제의 깊은 분석, 순차 의존 작업, 단순히 규모가 크거나 오래 걸리는 작업에는 추천하지 않는다. 울트라는 사용량을 더 빨리 소모한다.
+
+플랜에서는 먼저 `Light` 또는 `Medium`을 기준 후보로 잡고, 추가 추론이 품질을 높일 구체적 실패 위험을 한 줄 이유에 적을 수 있을 때만 `High` 이상을 추천한다. 추천 모델, 추론 수준, 울트라 사용 여부는 서로 독립적으로 판단한다.
 
 For Codex plans, also include the recommended execution shape when useful: solo vs. subagents.
 ## Commit / Push
@@ -107,6 +113,7 @@ For Codex plans, also include the recommended execution shape when useful: solo 
 
 - Starting the server must not change the DB.
 - Before DB-changing work, briefly explain the impact first.
+- 브라우저로 개발 서버를 검증할 때는 관리자 계정 비밀번호 `0000`으로 로그인해 필요한 화면과 흐름을 자유롭게 검증한다. 이 자격 증명은 로컬 개발 서버 검증에만 사용한다.
 - For setup, schema changes, migrations, or seed work:
 
 ```bash

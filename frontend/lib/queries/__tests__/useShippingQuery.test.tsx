@@ -40,7 +40,7 @@ function makeWrapper(client: QueryClient) {
 }
 
 const sampleRequests = [
-  { request_id: "req-1", status: "REQUESTED", base_pf_item_id: "pf-1" },
+  { request_id: "req-1", status: "PREPARING", base_pf_item_id: "pf-1" },
 ];
 
 const originalFetch = globalThis.fetch;

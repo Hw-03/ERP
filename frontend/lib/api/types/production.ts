@@ -26,6 +26,8 @@ export interface TransactionLog {
   quantity_after: number | null;
   warehouse_qty_before: number | null;
   warehouse_qty_after: number | null;
+  department_qty_before?: number | null;
+  department_qty_after?: number | null;
   transfer_qty: number | null;
   reference_no: string | null;
   produced_by: string | null;
@@ -41,6 +43,14 @@ export interface TransactionLog {
   reason_category?: string | null;
   reason_memo?: string | null;
   operation_batch_id: string | null;
+  operation_line_id?: string | null;
+  operation_id?: string | null;
+  operation_role?: string | null;
+  operation_kind?: "BUSINESS" | "CANCELLATION" | null;
+  operation_display_label?: string | null;
+  operation_effective_status?: "active" | "cancelled" | "cancellation" | null;
+  reversal_operation_id?: string | null;
+  reverses_log_id?: string | null;
   shipping_phase?: string | null;
   created_at: string;
   edit_count?: number;
@@ -49,6 +59,83 @@ export interface TransactionLog {
   cancelled_by: string | null;
   cancelled_at: string | null;
   inventory_effect?: InventoryEffectCell[] | null;
+}
+
+export interface InventoryOperationLine {
+  logId: string;
+  itemId: string;
+  itemName: string | null;
+  mesCode: string | null;
+  transactionType: TransactionType;
+  quantityChange: number;
+  quantityBefore: number | null;
+  quantityAfter: number | null;
+  transferQty: number | null;
+  department: string | null;
+  operationRole: string | null;
+  reversesLogId: string | null;
+  referenceNo: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface InventoryOperationEffect {
+  effectId: string;
+  effectKind: string;
+  subjectType: string;
+  subjectId: string;
+  role: string;
+  beforeState: Record<string, unknown>;
+  afterState: Record<string, unknown>;
+  reversesEffectId: string | null;
+}
+
+export interface InventoryOperation {
+  operationId: string;
+  kind: "BUSINESS" | "CANCELLATION";
+  domain: string;
+  action: string;
+  displayLabel: string;
+  effectiveStatus: "active" | "cancelled" | "cancellation";
+  actorEmployeeId: string | null;
+  actorName: string;
+  department: string | null;
+  reason: string | null;
+  effectiveAt: string;
+  reversesOperationId: string | null;
+  reversalOperationId: string | null;
+  canCancel: boolean;
+  cancelBlockers: string[];
+  lines: InventoryOperationLine[];
+  matchingLines: InventoryOperationLine[];
+  effects: InventoryOperationEffect[];
+}
+
+export interface InventoryOperationPage {
+  items: InventoryOperation[];
+  nextCursor: string | null;
+}
+
+export interface InventoryOperationCancellationCell {
+  itemId: string;
+  scope: string;
+  department: string | null;
+  status: string | null;
+  boxId: string | null;
+  quantityChange: number;
+  currentQuantity: number;
+  reservedQuantity: number;
+  quantityAfter: number;
+}
+
+export interface InventoryOperationCancellationPreview {
+  operationId: string;
+  planHash: string;
+  canCancel: boolean;
+  blockers: string[];
+  cells: InventoryOperationCancellationCell[];
+  defectRecords: Array<Record<string, unknown>>;
+  effects: Array<Record<string, unknown>>;
 }
 
 /** 거래 수정 이력 (3차 메타 수정 + 4차 수량 보정 공통). */
@@ -115,7 +202,7 @@ export type ProductionCapacityAfStatus =
 export interface ProductionCapacityAfSummary {
   /** 출하 대기 — 창고에 있는 완성 PF 재고. */
   ship_ready: number;
-  /** 빠른 생산 — AF재고 + AF 직계 1단계 부품 → PF 환산 (포장 구간 포함). */
+  /** 빠른 생산 — 현재 AF 재고와 포장 자재로 PA·PF까지 완성 가능한 수량. */
   fast_production: number;
   /** 총생산 — PF 루트로 BOM 전체 재귀 이론 최대. */
   total_production: number;
@@ -150,7 +237,7 @@ export interface ProductionCapacityPfVariant {
   af_item_id: string | null;
   /** 출하 대기 — 이 PF 완성 재고. */
   ship_ready: number;
-  /** 빠른 생산 — AF재고 + 1단계 부품 → 이 PF로 환산. */
+  /** 빠른 생산 — 현재 AF 재고와 포장 자재로 이 PF까지 완성 가능한 수량. */
   fast_production: number;
   /** 총생산 — 이 PF 루트로 BOM 전체 재귀 이론 최대. */
   total_production: number;

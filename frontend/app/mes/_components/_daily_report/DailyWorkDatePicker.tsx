@@ -4,7 +4,7 @@ import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from "lucide-rea
 import { useEffect, useRef, useState } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
-import { isFutureKstDate } from "./dailyReportDate";
+import { formatWorkDateLabel, isFutureKstDate } from "./dailyReportDate";
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -18,6 +18,12 @@ function toDateKey(date: Date): string {
 function parseDateKey(value: string): Date {
   const [year, month, day] = value.split("-").map(Number);
   return new Date(year, month - 1, day);
+}
+
+function shiftDate(value: string, days: number): string {
+  const next = parseDateKey(value);
+  next.setDate(next.getDate() + days);
+  return toDateKey(next);
 }
 
 function monthStart(date: Date): Date {
@@ -49,6 +55,7 @@ export function DailyWorkDatePicker({ value, maxDate, onChange }: DailyWorkDateP
   const rootRef = useRef<HTMLDivElement>(null);
   const maxMonth = monthStart(parseDateKey(maxDate));
   const canNextMonth = calMonth < maxMonth;
+  const canNextDay = value < maxDate;
 
   useEffect(() => {
     setCalMonth(monthStart(parseDateKey(value)));
@@ -71,39 +78,51 @@ export function DailyWorkDatePicker({ value, maxDate, onChange }: DailyWorkDateP
   }, [open]);
 
   return (
-    <div ref={rootRef} className="relative">
+    <div className="flex items-center gap-2">
       <button
         type="button"
-        aria-label="일보 날짜 선택"
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
-        className="flex min-h-11 items-center gap-2 rounded-[12px] border px-3 text-sm font-black transition-colors hover:brightness-110"
-        style={{
-          background: open ? tint(LEGACY_COLORS.blue, 10, LEGACY_COLORS.s2) : LEGACY_COLORS.s2,
-          borderColor: open ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-          color: LEGACY_COLORS.text,
-        }}
+        aria-label="전일"
+        title="전일"
+        onClick={() => onChange(shiftDate(value, -1))}
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] border transition-colors hover:brightness-110 lg:h-8 lg:w-8"
+        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}
       >
-        <CalendarDays className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
-        <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>작성일</span>
-        <span className="whitespace-nowrap">{value}</span>
-        <ChevronDown className="h-3.5 w-3.5 shrink-0 transition-transform" style={{ color: LEGACY_COLORS.muted, transform: open ? "rotate(180deg)" : "rotate(0deg)" }} />
+        <ChevronLeft className="h-4 w-4" />
       </button>
 
-      {open && (
-        <div
-          role="dialog"
+      <div ref={rootRef} className="relative">
+        <button
+          type="button"
           aria-label="일보 날짜 선택"
-          className="absolute right-0 top-full z-50 mt-2 rounded-[16px] border p-4"
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          onClick={() => setOpen((current) => !current)}
+          className="flex min-h-11 items-center gap-2 rounded-[12px] border px-3 text-sm font-black transition-colors hover:brightness-110"
           style={{
-            background: LEGACY_COLORS.s1,
-            borderColor: LEGACY_COLORS.border,
-            boxShadow: "var(--c-card-shadow)",
-            minWidth: 280,
-            maxWidth: "calc(100vw - 32px)",
+            background: open ? tint(LEGACY_COLORS.blue, 10, LEGACY_COLORS.s2) : LEGACY_COLORS.s2,
+            borderColor: open ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+            color: LEGACY_COLORS.text,
           }}
         >
+          <CalendarDays className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
+          <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>작성일</span>
+          <span className="whitespace-nowrap">{formatWorkDateLabel(value)}</span>
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 transition-transform" style={{ color: LEGACY_COLORS.muted, transform: open ? "rotate(180deg)" : "rotate(0deg)" }} />
+        </button>
+
+        {open && (
+          <div
+            role="dialog"
+            aria-label="일보 날짜 선택"
+            className="absolute right-0 top-full z-50 mt-2 rounded-[16px] border p-4"
+            style={{
+              background: LEGACY_COLORS.s1,
+              borderColor: LEGACY_COLORS.border,
+              boxShadow: "var(--c-card-shadow)",
+              minWidth: 280,
+              maxWidth: "calc(100vw - 32px)",
+            }}
+          >
           <div className="mb-3 flex items-center justify-center gap-3">
             <button
               type="button"
@@ -169,8 +188,21 @@ export function DailyWorkDatePicker({ value, maxDate, onChange }: DailyWorkDateP
               );
             })}
           </div>
-        </div>
-      )}
+          </div>
+        )}
+      </div>
+
+      <button
+        type="button"
+        aria-label="다음 날"
+        title={canNextDay ? "다음 날" : "미래 날짜는 선택할 수 없습니다."}
+        disabled={!canNextDay}
+        onClick={() => onChange(shiftDate(value, 1))}
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] border transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-30 lg:h-8 lg:w-8"
+        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}
+      >
+        <ChevronRight className="h-4 w-4" />
+      </button>
     </div>
   );
 }

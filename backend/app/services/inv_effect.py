@@ -13,6 +13,7 @@ delta 는 "정방향에서 그 셀이 얼마나 변했는가"(부호 포함). �
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import NamedTuple, TypedDict
 import uuid
 
 from sqlalchemy.orm import Session
@@ -30,6 +31,23 @@ from app.models import (
 #   ("location", dept_str, status_str)   — 부서×상태 재고
 #   ("warehouse_box", box_id_str, None)  — 박스별 수량 (박스 추적용)
 _WAREHOUSE_KEY = ("warehouse", None, None)
+
+
+class StockTotals(NamedTuple):
+    """한 품목의 창고와 정상 부서 재고 합계."""
+
+    warehouse: int
+    department: int
+
+
+class TransactionStockSnapshot(TypedDict):
+    """TransactionLog에 저장할 위치 재고 전·후 스냅샷 계약."""
+
+    warehouse_qty_before: int
+    warehouse_qty_after: int
+    department_qty_before: int
+    department_qty_after: int
+    inventory_effect: list[dict]
 
 
 def _snapshot_cells(db: Session, item_id: uuid.UUID) -> dict[tuple, int]:
@@ -96,9 +114,46 @@ def effect_diff(before: dict[tuple, int], after: dict[tuple, int]) -> list[dict]
     return out
 
 
-def _capture_effect(db: Session, item_id: uuid.UUID, before: dict[tuple, int]) -> list[dict]:
-    """mutation 직후 호출 — before 스냅샷과 현재 상태 차이를 효과로 반환."""
-    return effect_diff(before, _snapshot_cells(db, item_id))
+def summarize_stock_cells(cells: dict[tuple, int]) -> StockTotals:
+    """셀 스냅샷을 창고와 모든 정상(PRODUCTION) 부서 합계로 요약한다."""
+    department = sum(
+        int(quantity)
+        for (scope, _department, status), quantity in cells.items()
+        if scope == "location"
+        and getattr(status, "value", status) == LocationStatusEnum.PRODUCTION.value
+    )
+    return StockTotals(
+        warehouse=int(cells.get(_WAREHOUSE_KEY, 0)),
+        department=department,
+    )
+
+
+def _capture_log_stock_snapshot(
+    db: Session,
+    item_id: uuid.UUID,
+    before: dict[tuple, int],
+) -> TransactionStockSnapshot:
+    """거래 직후 셀을 한 번 읽어 효과와 위치별 전·후 수량을 함께 만든다."""
+    after = _snapshot_cells(db, item_id)
+    before_totals = summarize_stock_cells(before)
+    after_totals = summarize_stock_cells(after)
+    return {
+        "warehouse_qty_before": before_totals.warehouse,
+        "warehouse_qty_after": after_totals.warehouse,
+        "department_qty_before": before_totals.department,
+        "department_qty_after": after_totals.department,
+        "inventory_effect": _capture_effect(db, item_id, before, after),
+    }
+
+
+def _capture_effect(
+    db: Session,
+    item_id: uuid.UUID,
+    before: dict[tuple, int],
+    after: dict[tuple, int] | None = None,
+) -> list[dict]:
+    """mutation 직후 효과를 계산하되 이미 읽은 after 셀이 있으면 재사용한다."""
+    return effect_diff(before, after if after is not None else _snapshot_cells(db, item_id))
 
 
 def _apply_effect_reverse(db: Session, item_id: uuid.UUID, effect: list[dict] | None) -> None:

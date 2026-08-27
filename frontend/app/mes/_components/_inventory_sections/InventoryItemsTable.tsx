@@ -130,7 +130,7 @@ export function InventoryItemsTable({
           <div
             aria-hidden
             data-testid="inventory-table-corner-mask"
-            className="pointer-events-none sticky top-[74px] z-20 -mb-6 flex h-6 justify-between"
+            className="pointer-events-none sticky top-[71px] z-20 -mb-6 flex h-6 justify-between"
           >
             <span
               className="h-6 w-6"
@@ -143,7 +143,7 @@ export function InventoryItemsTable({
           </div>
         )}
         <table className="min-w-full border-separate border-spacing-0 text-sm">
-          <thead className={`sticky ${compact ? "top-0" : "top-[74px]"} z-10`}>
+          <thead className={`sticky ${compact ? "top-0" : "top-[71px]"} z-10`}>
             <tr>
               {headerColumns.map(({ label, nowrap, width, minWidth, center, hidden }, columnIndex) => (
                 <th
@@ -166,7 +166,7 @@ export function InventoryItemsTable({
                 className={`border-b px-4 py-2.5 text-sm font-bold whitespace-nowrap ${compact ? "rounded-tr-[24px] text-center" : "text-right sm:text-center"}`}
                 style={{ background: compact ? LEGACY_COLORS.s2 : "var(--c-inventory-table-header)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: compact ? "104px" : "160px" }}
               >
-                총재고
+                사용 가능 재고
               </th>
               {!compact && (
                 <th

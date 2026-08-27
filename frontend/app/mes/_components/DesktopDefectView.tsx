@@ -124,9 +124,8 @@ function DefectViewInner({
             if (currentView.kind !== "process") return currentView;
             const freshLocation = locData.find(
               (location) =>
-                location.item_id === currentView.location.item_id &&
-                location.department === currentView.location.department &&
-                Number(location.quantity) > 0,
+                location.record_id === currentView.location.record_id &&
+                Number(location.available_quantity) > 0,
             );
             return freshLocation ? { kind: "process", location: freshLocation } : { kind: "list" };
           });
@@ -269,6 +268,12 @@ function DefectViewInner({
     setView({ kind: "process", location: loc });
   }
 
+  function handleMemoUpdated(recordId: string, memo: string) {
+    setLocations((current) => current.map((location) =>
+      location.record_id === recordId ? { ...location, reason_memo: memo } : location,
+    ));
+  }
+
   const isFullWidthWork = view.kind !== "list" && view.kind !== "hub";
 
   return (
@@ -375,6 +380,8 @@ function DefectViewInner({
             ) : (
               <DefectDepartmentList
                 locations={filteredLocations}
+                currentEmployee={employee}
+                onMemoUpdated={handleMemoUpdated}
                 onProcess={handleProcessRow}
                 priorityDept={operator.department}
               />

@@ -13,6 +13,7 @@ import { AdminExportSection } from "./AdminExportSection";
 import { AdminDangerZone } from "./AdminDangerZone";
 import { AdminDepartmentsProvider } from "./AdminDepartmentsContext";
 import { AdminDepartmentsSection } from "./AdminDepartmentsSection";
+import { AdminIntegritySection } from "./AdminIntegritySection";
 import type { AdminPinForm } from "../_admin_hooks/adminPinValidation";
 
 /**
@@ -140,6 +141,9 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
   }
   if (section === "export") {
     return <AdminExportSection />;
+  }
+  if (section === "integrity") {
+    return <AdminIntegritySection />;
   }
   if (section === "settings") {
     return (

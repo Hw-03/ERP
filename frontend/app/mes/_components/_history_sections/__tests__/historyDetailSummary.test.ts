@@ -109,6 +109,30 @@ describe("buildHistoryDetailSummary", () => {
     });
   });
 
+  it("uses the cancellation actor and time instead of the original batch requester", () => {
+    const summary = buildHistoryDetailSummary(
+      [makeLog({
+        operation_batch_id: "batch-1",
+        operation_kind: "CANCELLATION",
+        operation_effective_status: "cancellation",
+        produced_by: "김현우",
+        requester_name: "김현우",
+        requested_at: "2026-08-26T01:43:46Z",
+        created_at: "2026-08-26T01:43:47Z",
+      })],
+      makeBatch({
+        requester_name: "김지현",
+        submitted_at: "2026-08-25T05:15:59Z",
+      }),
+    );
+
+    expect(summary.requester).toEqual({
+      label: "취소자",
+      name: "김현우",
+      at: "2026-08-26T01:43:46Z",
+    });
+  });
+
   it("shows quarantine-to-disposal for a direct defect scrap", () => {
     const summary = buildHistoryDetailSummary([
       makeLog({ transaction_type: "DEFECT_SCRAP", department: "조립" }),

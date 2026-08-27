@@ -12,11 +12,13 @@ from datetime import UTC, date, datetime, time, timedelta
 from typing import NamedTuple, Optional
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import ColumnElement, and_, case, false, func, not_, or_
+from sqlalchemy import ColumnElement, and_, case, false, func, not_, or_, select
 from sqlalchemy.orm import Query, Session
 
 from app.models import (
     IoBatch,
+    InventoryOperation,
+    InventoryOperationKindEnum,
     Item,
     ProductSymbol,
     StockRequest,
@@ -61,6 +63,7 @@ def is_legacy_defect_rework_reference(reference_no: Optional[str]) -> bool:
 def _history_visibility_filter() -> ColumnElement:
     """완료·부분 처리 배치 또는 배치 없는 기존 로그를 입출고 이력에 노출한다."""
     return or_(
+        TransactionLog.operation_id.isnot(None),
         TransactionLog.operation_batch_id.is_(None),
         IoBatch.status.in_(("completed", "partially_completed")),
     )
@@ -68,10 +71,28 @@ def _history_visibility_filter() -> ColumnElement:
 
 def _history_request_date_expr() -> ColumnElement:
     """입출고 이력의 정렬·기간·달력에 공통으로 쓰는 최초 요청 시각."""
-    return func.coalesce(
-        IoBatch.submitted_at,
-        IoBatch.created_at,
-        TransactionLog.created_at,
+    operation_effective_at = (
+        select(InventoryOperation.effective_at)
+        .where(InventoryOperation.operation_id == TransactionLog.operation_id)
+        .correlate(TransactionLog)
+        .scalar_subquery()
+    )
+    operation_kind = (
+        select(InventoryOperation.kind)
+        .where(InventoryOperation.operation_id == TransactionLog.operation_id)
+        .correlate(TransactionLog)
+        .scalar_subquery()
+    )
+    return case(
+        (
+            operation_kind == InventoryOperationKindEnum.CANCELLATION,
+            operation_effective_at,
+        ),
+        else_=func.coalesce(
+            IoBatch.submitted_at,
+            IoBatch.created_at,
+            TransactionLog.created_at,
+        ),
     )
 
 
@@ -451,6 +472,44 @@ class _BatchInfo(NamedTuple):
     approved_at: Optional[datetime]
 
 
+class _OperationInfo(NamedTuple):
+    operation: InventoryOperation
+    reversal: Optional[InventoryOperation]
+
+
+def _operation_info_map(
+    db: Session,
+    operation_ids: set[uuid.UUID],
+) -> dict[uuid.UUID, _OperationInfo]:
+    """작업 ID 집합에 원 작업과 성공 역전 작업의 화면 메타데이터를 붙인다."""
+    if not operation_ids:
+        return {}
+    operations = (
+        db.query(InventoryOperation)
+        .filter(
+            or_(
+                InventoryOperation.operation_id.in_(operation_ids),
+                InventoryOperation.reverses_operation_id.in_(operation_ids),
+            )
+        )
+        .all()
+    )
+    by_id = {operation.operation_id: operation for operation in operations}
+    reversal_by_original = {
+        operation.reverses_operation_id: operation
+        for operation in operations
+        if operation.reverses_operation_id is not None
+    }
+    return {
+        operation_id: _OperationInfo(
+            operation=operation,
+            reversal=reversal_by_original.get(operation_id),
+        )
+        for operation_id in operation_ids
+        if (operation := by_id.get(operation_id)) is not None
+    }
+
+
 def _batch_name_map(
     db: Session, batch_ids: set
 ) -> dict[uuid.UUID, _BatchInfo]:
@@ -562,7 +621,23 @@ def _to_log_response(
     approver_name: Optional[str] = None,
     requested_at: Optional[datetime] = None,
     approved_at: Optional[datetime] = None,
+    operation: Optional[InventoryOperation] = None,
+    reversal: Optional[InventoryOperation] = None,
 ) -> TransactionLogResponse:
+    is_cancellation = bool(
+        operation and operation.kind == InventoryOperationKindEnum.CANCELLATION
+    )
+    is_reversed = bool(
+        operation
+        and operation.kind == InventoryOperationKindEnum.BUSINESS
+        and reversal is not None
+    )
+    effective_cancelled = bool(log.cancelled) or is_reversed
+    effective_requested_at = (
+        operation.effective_at
+        if is_cancellation and operation is not None
+        else requested_at if requested_at is not None else log.created_at
+    )
     return TransactionLogResponse(
         log_id=log.log_id,
         item_id=log.item_id,
@@ -576,25 +651,45 @@ def _to_log_response(
         quantity_after=log.quantity_after,
         warehouse_qty_before=log.warehouse_qty_before,
         warehouse_qty_after=log.warehouse_qty_after,
+        department_qty_before=log.department_qty_before,
+        department_qty_after=log.department_qty_after,
         transfer_qty=log.transfer_qty,
         department=log.department,
         reference_no=log.reference_no,
         produced_by=log.produced_by,
         producer_employee_id=log.producer_employee_id,
-        requester_name=requester_name,
-        approver_name=approver_name,
-        requested_at=requested_at if requested_at is not None else log.created_at,
-        approved_at=approved_at if approved_at is not None else log.created_at,
+        requester_name=operation.actor_name if is_cancellation and operation else requester_name,
+        approver_name=None if is_cancellation else approver_name,
+        requested_at=effective_requested_at,
+        approved_at=effective_requested_at if is_cancellation else approved_at if approved_at is not None else log.created_at,
         notes=log.notes,
         reason_category=log.reason_category,
         reason_memo=log.reason_memo,
         operation_batch_id=log.operation_batch_id,
+        operation_line_id=log.operation_line_id,
+        operation_id=log.operation_id,
+        operation_role=log.operation_role.value if log.operation_role else None,
+        operation_kind=operation.kind.value if operation else None,
+        operation_display_label=operation.display_label if operation else None,
+        operation_effective_status=(
+            "cancellation"
+            if is_cancellation
+            else "cancelled"
+            if is_reversed
+            else "active"
+            if operation is not None
+            else None
+        ),
+        reversal_operation_id=reversal.operation_id if reversal else None,
+        reverses_log_id=log.reverses_log_id,
         shipping_phase=log.shipping_phase,
         created_at=log.created_at,
         edit_count=edit_count,
-        cancelled=bool(log.cancelled),
-        cancel_reason=log.cancel_reason,
-        cancelled_by=log.cancelled_by,
-        cancelled_at=log.cancelled_at,
+        cancelled=effective_cancelled,
+        cancel_reason=reversal.reason if is_reversed and reversal else log.cancel_reason,
+        cancelled_by=(
+            reversal.actor_employee_id if is_reversed and reversal else log.cancelled_by
+        ),
+        cancelled_at=reversal.effective_at if is_reversed and reversal else log.cancelled_at,
         inventory_effect=log.inventory_effect,
     )

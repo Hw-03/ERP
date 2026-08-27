@@ -6,6 +6,7 @@
  */
 import type { Department, TransactionType } from "@/lib/api/types/shared";
 import type { IoBatch, IoBundle, IoLine } from "@/lib/api/types/io";
+import type { TransactionLog } from "@/lib/api/types/production";
 import { formatQty } from "@/lib/mes/format";
 import {
   SUB_TYPE_LABEL as _SUB_LABEL,
@@ -658,6 +659,15 @@ export interface LineSignedQty {
   isApplied: boolean;
 }
 
+/** operation_line_id가 정확히 하나인 실행 거래만 이력 수량의 근거로 사용한다. */
+export function getHistoryLineExecutionLog(
+  line: Pick<IoLine, "line_id">,
+  logs?: readonly TransactionLog[],
+): TransactionLog | null {
+  const matches = logs?.filter((log) => log.operation_line_id === line.line_id) ?? [];
+  return matches.length === 1 ? matches[0] : null;
+}
+
 function _quantityFormat(q: number | string): string {
   return formatQty(typeof q === "number" ? q : Number(q));
 }
@@ -684,14 +694,20 @@ export function getHistoryLineSignedQuantity(
     bom_stock_exempt?: boolean;
     origin: string;
     direction: string;
+    from_bucket?: string | null;
+    to_bucket?: string | null;
     quantity: number | string;
     unit?: string | null;
   },
   batch?: { sub_type?: string | null } | null,
   bundle?: { source_kind?: string | null } | null,
+  executionLog?: Pick<TransactionLog, "quantity_change" | "transaction_type" | "item_unit" | "transfer_qty"> | null,
 ): LineSignedQty {
-  const qty = _quantityFormat(line.quantity);
-  const unit = line.unit ?? null;
+  const executedQty = executionLog
+    ? Math.abs(_toNum(executionLog.quantity_change)) || Math.abs(_toNum(executionLog.transfer_qty)) || Math.abs(_toNum(line.quantity))
+    : null;
+  const qty = _quantityFormat(executedQty ?? line.quantity);
+  const unit = executionLog?.item_unit ?? line.unit ?? null;
   const isBomParent = bundle?.source_kind === "bom_parent" && line.origin === "direct";
   const isBomChild = bundle?.source_kind === "bom_parent" && line.origin !== "direct";
   const sub = batch?.sub_type;
@@ -703,6 +719,20 @@ export function getHistoryLineSignedQuantity(
   const setIncrease = () => { sign = "+"; tone = "increase"; label = _signed("+", qty, unit); };
   const setDecrease = () => { sign = "-"; tone = "decrease"; label = _signed("-", qty, unit); };
   const setMove = () => { sign = ""; tone = "move"; label = `이동 ${_withUnit(qty, unit)}`; };
+  const setQuarantine = () => { sign = ""; tone = "decrease"; label = `격리 ${_withUnit(qty, unit)}`; };
+
+  // 완료된 작업은 계획 IoLine보다 실제 실행 로그를 우선한다.
+  if (executionLog) {
+    const delta = _toNum(executionLog.quantity_change);
+    if (delta > 0) setIncrease();
+    else if (delta < 0) setDecrease();
+    else if (line.direction === "defective" || executionLog.transaction_type === "MARK_DEFECTIVE") setQuarantine();
+    else if (line.direction === "move" || executionLog.transaction_type.startsWith("TRANSFER_")) setMove();
+    else { sign = ""; tone = "muted"; label = _withUnit(qty, unit); }
+
+    if (!line.included) tone = "muted";
+    return { sign, label, tone, isApplied: line.included };
+  }
 
   // 1) sub_type 우선 분기.
   let matched = true;
@@ -743,10 +773,11 @@ export function getHistoryLineSignedQuantity(
       case "in": setIncrease(); break;
       case "out": setDecrease(); break;
       case "move": setMove(); break;
-      case "defective": setDecrease(); break;
+      case "defective": setQuarantine(); break;
       case "adjust":
-        if (Number(line.quantity) >= 0) setIncrease();
-        else setDecrease();
+        if (line.from_bucket !== "none" && line.to_bucket === "none") setDecrease();
+        else if (line.from_bucket === "none" && line.to_bucket !== "none") setIncrease();
+        else { sign = ""; tone = "muted"; label = `조정 ${_withUnit(qty, unit)}`; }
         break;
       default:
         sign = "+"; tone = "muted"; label = _signed("+", qty, unit);
@@ -837,6 +868,7 @@ export function getHistoryMovementSummary(
   log: { transaction_type: string },
   batch?: IoBatch | null,
   fallbackLogCount?: number,
+  executedLogs?: readonly TransactionLog[],
 ): MovementSummary {
   if (!batch) {
     return {
@@ -875,47 +907,51 @@ export function getHistoryMovementSummary(
     if (rejected.length > 0) parts.push(_verbItemPart("반려/미반영", "muted", rejected));
   } else if (sub === "produce" || tx === "PRODUCE" || sub === "disassemble" || tx === "DISASSEMBLE") {
     const isRework = sub === "disassemble" || tx === "DISASSEMBLE";
-    let topSum = 0, childSum = 0;
-    let topUnit: string | null = null, childUnit: string | null = null;
-    let topUnitMixed = false, childUnitMixed = false;
+    const hasLinkedExecutionLogs = executedLogs?.some((entry) => !!entry.operation_line_id) ?? false;
+    type QuantityGroup = { sum: number; unit: string | null; unitMixed: boolean; itemIds: Set<string> };
+    const groups = new Map<string, QuantityGroup>();
+    const add = (key: string, line: IoLine, delta: number, unit: string | null) => {
+      const group = groups.get(key) ?? { sum: 0, unit: null, unitMixed: false, itemIds: new Set<string>() };
+      group.sum += Math.abs(delta);
+      const normalizedUnit = unit?.trim() ?? "";
+      if (group.unit === null) group.unit = normalizedUnit;
+      else if (group.unit !== normalizedUnit) group.unitMixed = true;
+      group.itemIds.add(line.item_id);
+      groups.set(key, group);
+    };
 
     for (const b of batch.bundles) {
       const parent = getHistoryBomParentLine(b);
       for (const l of b.lines) {
         if (!l.included) continue;
-        const qty = Math.abs(_toNum(l.quantity));
-        const u = (l.unit ?? "").trim();
+        const executionLog = getHistoryLineExecutionLog(l, executedLogs);
+        if (hasLinkedExecutionLogs && !executionLog) continue;
+        const signed = getHistoryLineSignedQuantity(l, batch, b, executionLog);
+        const delta = executionLog ? _toNum(executionLog.quantity_change) : Math.abs(_toNum(l.quantity)) * (signed.sign === "-" ? -1 : 1);
+        const signKey = delta < 0 ? "negative" : delta > 0 ? "positive" : "neutral";
+        const unit = executionLog?.item_unit ?? l.unit;
         if (parent && l === parent) {
-          topSum += qty;
-          if (topUnit === null) topUnit = u;
-          else if (topUnit !== u) topUnitMixed = true;
+          add(`parent:${signKey}`, l, delta, unit);
         } else if (b.source_kind === "bom_parent") {
-          childSum += qty;
-          if (childUnit === null) childUnit = u;
-          else if (childUnit !== u) childUnitMixed = true;
+          add(`child:${signKey}`, l, delta, unit);
+        } else if (signed.sign) {
+          add(`direct:${signed.sign === "-" ? "negative" : "positive"}`, l, delta, unit);
         }
       }
     }
 
-    if (topSum === 0) {
-      topSum = batch.bundles.reduce(
-        (s, b) => s + (b.source_kind === "bom_parent" ? _toNum(b.quantity) : 0),
-        0,
-      );
-      topUnit = null;
-    }
-
-    const topUnitLabel = topUnit && !topUnitMixed ? ` ${topUnit}` : "";
-    const childUnitLabel = childUnit && !childUnitMixed ? ` ${childUnit}` : "";
-
-    if (topSum > 0) parts.push({
-      label: `${isRework ? "재작업" : "생산"} ${isRework ? "-" : "+"}${_formatNumber(topSum)}${topUnitLabel}`,
-      tone: isRework ? "danger" : "primary",
-    });
-    if (childSum > 0) parts.push({
-      label: `부품 ${isRework ? "+" : "-"}${_formatNumber(childSum)}${childUnitLabel}`,
-      tone: isRework ? "primary" : "danger",
-    });
+    const append = (key: string, label: string, sign: "+" | "-", tone: MovementTone) => {
+      const group = groups.get(key);
+      if (!group || group.sum === 0) return;
+      const unit = group.unit && !group.unitMixed ? ` ${group.unit}` : "";
+      parts.push({ label: `${label} ${sign}${_formatNumber(group.sum)}${unit}`, tone });
+    };
+    append("parent:negative", isRework ? "재작업" : "생산", "-", "danger");
+    append("parent:positive", isRework ? "재작업" : "생산", "+", "primary");
+    append("child:negative", "부품", "-", "danger");
+    append("child:positive", "부품", "+", "primary");
+    append("direct:negative", "단품 출고", "-", "danger");
+    append("direct:positive", "단품 입고", "+", "success");
   } else if (sub === "warehouse_to_dept" || sub === "dept_to_warehouse" || sub === "dept_transfer"
     || tx === "TRANSFER_TO_PROD" || tx === "TRANSFER_TO_WH" || tx === "TRANSFER_DEPT") {
     parts.push(_verbItemPart("이동", "info", included));
@@ -990,6 +1026,7 @@ const _SINGLE_OP: Record<string, { verb: string; tone: MovementTone; signed?: bo
 
 export function getSingleLogMovement(log: {
   transaction_type: string;
+  operation_kind?: string | null;
   transfer_qty?: number | null;
   quantity_change: number | string;
   item_unit?: string | null;
@@ -999,7 +1036,9 @@ export function getSingleLogMovement(log: {
   const suffix = unit ? ` ${unit}` : "";
   const qc = Number(log.quantity_change);
 
-  if (conf.signed) {
+  const showSignedReversal = log.operation_kind === "CANCELLATION"
+    && !log.transaction_type.startsWith("TRANSFER_");
+  if (conf.signed || showSignedReversal) {
     const sign = qc >= 0 ? "+" : "-";
     return { label: `${conf.verb} ${sign}${formatQty(Math.abs(qc))}${suffix}`, tone: conf.tone };
   }

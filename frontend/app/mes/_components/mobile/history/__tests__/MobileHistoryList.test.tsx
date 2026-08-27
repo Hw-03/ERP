@@ -34,6 +34,30 @@ function log(id: string, phase: string): TransactionLog {
 }
 
 describe("MobileHistoryList", () => {
+  it("opens a new-ledger operation group with its operation id", () => {
+    const onSelectBatch = vi.fn();
+    const first = { ...log("operation-1", ""), operation_id: "operation-id" };
+    const second = { ...log("operation-2", ""), operation_id: "operation-id" };
+
+    render(
+      <MobileHistoryList
+        loading={false}
+        error={null}
+        filteredLogs={[first, second]}
+        selectedKey={null}
+        onSelectLog={vi.fn()}
+        onSelectBatch={onSelectBatch}
+        onRetry={vi.fn()}
+        canLoadMore={false}
+        loadingMore={false}
+        onLoadMore={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button"));
+    expect(onSelectBatch).toHaveBeenCalledWith("operation-id", [first, second]);
+  });
+
   it("selects only the original defect-mark log for a visual defect lifecycle group", () => {
     const onSelectLog = vi.fn();
     const onSelectBatch = vi.fn();

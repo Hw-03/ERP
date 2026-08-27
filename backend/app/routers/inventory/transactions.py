@@ -14,7 +14,7 @@ from typing import List, Optional
 
 from fastapi import Depends, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import and_, case, func, or_, select
+from sqlalchemy import String, and_, case, cast, func, literal, or_, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -26,6 +26,8 @@ from app.dependencies.verified_actor import (
 )
 from app.models import (
     Employee,
+    InventoryOperation,
+    InventoryOperationKindEnum,
     IoBatch,
     Item,
     TransactionEditLog,
@@ -44,6 +46,8 @@ from app.schemas import (
 )
 from app.services import transaction_actions as transaction_actions_svc
 from app.services import rate_limit
+from app.services import inventory_operation_cancellation as operation_cancellation_svc
+from app.services import legacy_inventory_operation_adoption as legacy_adoption_svc
 from app.services.transaction_display_groups import build_display_groups as _build_display_groups
 from app.services.export_helpers import csv_streaming_response
 from app.utils.search import build_normalized_search_filter
@@ -58,6 +62,7 @@ from app.routers.inventory._tx_filters import (
     _history_request_date_expr,
     _kst_date_to_utc_naive_bounds,
     _batch_name_map,
+    _operation_info_map,
     _stock_request_info_map,
     _to_log_response,
 )
@@ -295,6 +300,7 @@ def monthly_counts(
 @router.get("/transactions", response_model=List[TransactionLogResponse])
 def list_transactions(
     item_id: Optional[uuid.UUID] = Query(None),
+    operation_id: Optional[uuid.UUID] = Query(None),
     operation_batch_id: Optional[uuid.UUID] = Query(None),
     transaction_type: Optional[TransactionTypeEnum] = Query(None),
     transaction_types: Optional[str] = Query(None, description="쉼표 구분 복수 타입. 예: RECEIVE,SHIP"),
@@ -311,6 +317,7 @@ def list_transactions(
     date_from: Optional[date] = Query(None, description="포함 시작일 YYYY-MM-DD"),
     date_to: Optional[date] = Query(None, description="포함 종료일 YYYY-MM-DD"),
     include_archived: bool = Query(False, description="archived_at 이 있는 레코드 포함 여부"),
+    unlinked_only: bool = Query(False, description="재고 작업 원장에 연결되지 않은 기존 거래만 조회"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=2000),
     db: Session = Depends(get_db),
@@ -333,8 +340,14 @@ def list_transactions(
     if item_id:
         query = query.filter(TransactionLog.item_id == item_id)
 
+    if operation_id:
+        query = query.filter(TransactionLog.operation_id == operation_id)
+
     if operation_batch_id:
         query = query.filter(TransactionLog.operation_batch_id == operation_batch_id)
+
+    if unlinked_only:
+        query = query.filter(TransactionLog.operation_id.is_(None))
 
     if transaction_type:
         query = query.filter(TransactionLog.transaction_type == transaction_type)
@@ -373,12 +386,17 @@ def list_transactions(
     batch_map = _batch_name_map(db, batch_ids)
     reference_nos = {log.reference_no for log, _, _ in rows if log.reference_no}
     sr_map = _stock_request_info_map(db, reference_nos)
+    operation_map = _operation_info_map(
+        db,
+        {log.operation_id for log, _, _ in rows if log.operation_id},
+    )
 
     result = []
     for log, item, edit_count in rows:
         info = sr_map.get(log.reference_no) if log.reference_no else None
         if info is None:
             info = batch_map.get(log.operation_batch_id)
+        operation_info = operation_map.get(log.operation_id)
         result.append(
             _to_log_response(
                 log,
@@ -388,6 +406,8 @@ def list_transactions(
                 approver_name=info.approver_name if info else None,
                 requested_at=info.requested_at if info else None,
                 approved_at=info.approved_at if info else None,
+                operation=operation_info.operation if operation_info else None,
+                reversal=operation_info.reversal if operation_info else None,
             )
         )
     return result
@@ -458,11 +478,16 @@ def list_transaction_display_groups(
     batch_map = _batch_name_map(db, batch_ids)
     reference_nos = {log.reference_no for log, _, _ in rows if log.reference_no}
     stock_request_map = _stock_request_info_map(db, reference_nos)
+    operation_map = _operation_info_map(
+        db,
+        {log.operation_id for log, _, _ in rows if log.operation_id},
+    )
     logs = []
     for log, item, edit_count in rows:
         info = stock_request_map.get(log.reference_no) if log.reference_no else None
         if info is None:
             info = batch_map.get(log.operation_batch_id)
+        operation_info = operation_map.get(log.operation_id)
         logs.append(
             _to_log_response(
                 log,
@@ -472,6 +497,8 @@ def list_transaction_display_groups(
                 approver_name=info.approver_name if info else None,
                 requested_at=info.requested_at if info else None,
                 approved_at=info.approved_at if info else None,
+                operation=operation_info.operation if operation_info else None,
+                reversal=operation_info.reversal if operation_info else None,
             )
         )
     groups = _build_display_groups(logs)
@@ -581,6 +608,10 @@ def get_transactions_summary(
         db.query(TransactionLog)
         .join(Item, TransactionLog.item_id == Item.item_id)
         .outerjoin(IoBatch, TransactionLog.operation_batch_id == IoBatch.batch_id)
+        .outerjoin(
+            InventoryOperation,
+            TransactionLog.operation_id == InventoryOperation.operation_id,
+        )
     )
 
     # list_transactions 와 동일한 공통 필터 빌더로 위임.
@@ -598,11 +629,43 @@ def get_transactions_summary(
         include_archived=include_archived,
     )
 
-    # 한 번의 집계 쿼리로 4개 카운트.
+    # 신규 원장은 operation_id, 레거시 묶음은 operation_batch_id를 한 작업으로 센다.
+    # 취소 시 레거시 묶음이 원장 작업으로 편입되어도 원 작업 카운트가 흔들리지 않는다.
+    work_key = case(
+        (
+            TransactionLog.operation_id.is_not(None),
+            literal("operation:") + cast(TransactionLog.operation_id, String),
+        ),
+        (
+            TransactionLog.operation_batch_id.is_not(None),
+            literal("batch:") + cast(TransactionLog.operation_batch_id, String),
+        ),
+        (
+            and_(
+                TransactionLog.shipping_request_id.is_not(None),
+                TransactionLog.transaction_type == TransactionTypeEnum.SHIP,
+                TransactionLog.reference_no.like("SHIP-%"),
+            ),
+            literal("shipping:")
+            + cast(TransactionLog.shipping_request_id, String)
+            + literal(":")
+            + TransactionLog.reference_no,
+        ),
+        else_=literal("log:") + cast(TransactionLog.log_id, String),
+    )
+    is_adjustment = and_(
+        TransactionLog.transaction_type.in_(_SUMMARY_ADJUST_TYPES),
+        or_(
+            InventoryOperation.kind.is_(None),
+            InventoryOperation.kind != InventoryOperationKindEnum.CANCELLATION,
+        ),
+    )
+
+    # 한 번의 집계 쿼리로 4개 작업 카운트.
     agg = query.with_entities(
-        func.count(TransactionLog.log_id).label("total"),
-        func.coalesce(
-            func.sum(
+        func.count(func.distinct(work_key)).label("total"),
+        func.count(
+            func.distinct(
                 case(
                     (
                         or_(
@@ -612,20 +675,20 @@ def get_transactions_summary(
                                 & IoBatch.sub_type.in_(_WAREHOUSE_ADJUST_SUBTYPES)
                             ),
                         ),
-                        1,
-                    ),
-                    else_=0,
+                        work_key,
+                    )
                 )
-            ),
-            0,
+            )
         ).label("warehouse_count"),
-        func.coalesce(
-            func.sum(case((TransactionLog.transaction_type.in_(_SUMMARY_DEPT_TYPES), 1), else_=0)),
-            0,
+        func.count(
+            func.distinct(
+                case(
+                    (TransactionLog.transaction_type.in_(_SUMMARY_DEPT_TYPES), work_key)
+                )
+            )
         ).label("dept_count"),
-        func.coalesce(
-            func.sum(case((TransactionLog.transaction_type.in_(_SUMMARY_ADJUST_TYPES), 1), else_=0)),
-            0,
+        func.count(
+            func.distinct(case((is_adjustment, work_key)))
         ).label("adjust_count"),
     ).one()
 
@@ -633,7 +696,10 @@ def get_transactions_summary(
     # 마이그레이션 전/비정상 미분류 NULL은 UI 분류값으로 만들지 않고 건너뛴다.
     dexpr = _department_label_expr()
     dept_rows = (
-        query.with_entities(dexpr.label("dept"), func.count(TransactionLog.log_id).label("c"))
+        query.with_entities(
+            dexpr.label("dept"),
+            func.count(func.distinct(work_key)).label("c"),
+        )
         .group_by(dexpr)
         .all()
     )
@@ -1097,6 +1163,30 @@ def cancel_transaction(
     if not (is_self or is_approver):
         raise http_error(403, ErrorCode.FORBIDDEN, "본인 거래 또는 결재 권한자만 취소할 수 있습니다.")
 
+    if log.operation_id is not None:
+        try:
+            preview = operation_cancellation_svc.preview_cancellation(
+                db,
+                log.operation_id,
+            )
+            operation_cancellation_svc.cancel_operation(
+                db,
+                operation_id=log.operation_id,
+                canceller=canceller,
+                reason=payload.reason,
+                plan_hash=preview.plan_hash,
+            )
+        except operation_cancellation_svc.CancellationPlanChanged as exc:
+            raise http_error(409, ErrorCode.CONFLICT, str(exc)) from exc
+        except operation_cancellation_svc.CancellationNotAllowed as exc:
+            raise http_error(422, ErrorCode.BUSINESS_RULE, str(exc)) from exc
+        reversal_log = (
+            db.query(TransactionLog)
+            .filter(TransactionLog.reverses_log_id == log.log_id)
+            .one()
+        )
+        return _to_log_response(reversal_log, item, 0)
+
     try:
         transaction_actions_svc.cancel_transaction(
             db,
@@ -1107,6 +1197,10 @@ def cancel_transaction(
         )
     except transaction_actions_svc.TransactionInventoryNotFound as exc:
         raise http_error(404, ErrorCode.NOT_FOUND, str(exc))
+    except operation_cancellation_svc.CancellationPlanChanged as exc:
+        raise http_error(409, ErrorCode.CONFLICT, str(exc)) from exc
+    except legacy_adoption_svc.LegacyCancellationAdoptionError as exc:
+        raise http_error(422, ErrorCode.BUSINESS_RULE, str(exc)) from exc
     except ValueError as exc:
         raise http_error(422, ErrorCode.BUSINESS_RULE, str(exc))
     db.refresh(log)
@@ -1117,4 +1211,18 @@ def cancel_transaction(
         .scalar()
         or 0
     )
+    if log.operation_id is not None:
+        operation = db.get(InventoryOperation, log.operation_id)
+        reversal = (
+            db.query(InventoryOperation)
+            .filter(InventoryOperation.reverses_operation_id == log.operation_id)
+            .one_or_none()
+        )
+        return _to_log_response(
+            log,
+            item,
+            int(edit_count),
+            operation=operation,
+            reversal=reversal,
+        )
     return _to_log_response(log, item, int(edit_count))

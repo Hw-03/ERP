@@ -11,7 +11,10 @@ from app.models import (
     EmployeeLevelEnum,
     Inventory,
     InventoryLocation,
+    InventoryOperation,
+    InventoryOperationRoleEnum,
     LocationStatusEnum,
+    SystemSetting,
     TransactionLog,
     TransactionTypeEnum,
 )
@@ -128,6 +131,45 @@ def test_production_receipt_uses_process_department_locations(
     assert all(_effect_scopes(log) <= {"location"} for log in logs)
     assert all(log.produced_by == production_actor.name for log in logs)
     assert all(log.producer_employee_id == production_actor.employee_id for log in logs)
+
+
+def test_production_receipt_records_one_operation_with_explicit_line_roles(
+    db_session, make_item, make_bom, make_location, production_actor
+):
+    component = make_item(name="operation component", process_type_code="TR")
+    produced = make_item(name="operation PF", process_type_code="PF")
+    make_bom(produced.item_id, component.item_id, Decimal("1"))
+    make_location(component.item_id, department=DepartmentEnum.TUBE, quantity=Decimal("2"))
+    db_session.add(
+        SystemSetting(
+            setting_key="inventory_operation_cutover_at",
+            setting_value="2026-01-01T00:00:00",
+        )
+    )
+    db_session.commit()
+
+    execute_production_receipt(
+        db_session,
+        ProductionReceiptRequest(
+            item_id=produced.item_id,
+            quantity=1,
+            produced_by="operator",
+            reference_no="PROD-OP-1",
+        ),
+        produced,
+        actor=production_actor,
+    )
+
+    operation = db_session.query(InventoryOperation).one()
+    assert operation.domain == "production"
+    assert operation.action == "receipt"
+    assert operation.display_label == "생산"
+    logs = db_session.query(TransactionLog).order_by(TransactionLog.created_at).all()
+    assert {log.operation_id for log in logs} == {operation.operation_id}
+    assert [log.operation_role for log in logs] == [
+        InventoryOperationRoleEnum.COMPONENT_INPUT,
+        InventoryOperationRoleEnum.PRODUCT_OUTPUT,
+    ]
 
 
 def test_production_receipt_prelocks_produced_and_component_items_together(

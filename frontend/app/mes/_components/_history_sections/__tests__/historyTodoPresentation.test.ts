@@ -92,7 +92,7 @@ describe("history follow-up presentation contracts", () => {
   it("explains why consecutive rows for the same item remain separate", () => {
     const previous = log({ item_id: "same", created_at: "2026-07-10T08:00:00Z" });
 
-    expect(getHistorySeparationHint(previous, log({ item_id: "same", cancelled: true }))).toBe("\uCDE8\uC18C \uC774\uB825");
+    expect(getHistorySeparationHint(previous, log({ item_id: "same", cancelled: true }))).toBeNull();
     expect(getHistorySeparationHint(previous, log({ item_id: "same", requester_name: "\uB2E4\uB978 \uC694\uCCAD\uC790" }))).toBe("\uB2E4\uB978 \uC694\uCCAD");
     expect(getHistorySeparationHint(previous, log({ item_id: "same", created_at: "2026-07-10T08:01:00Z" }))).toBe("\uBCC4\uB3C4 \uC2DC\uAC01");
   });

@@ -44,7 +44,7 @@ export function MobileDefectProcessPanel({
   onCancel: () => void;
 }) {
   const isWarehouse = location.department === "창고";
-  const maxQty = Math.max(1, Number(location.quantity) || 1);
+  const maxQty = Math.max(1, Number(location.available_quantity) || 1);
 
   const [step, setStep] = useState<1 | 2>(1);
   const [action, setAction] = useState<ProcessAction>("unquarantine");
@@ -56,25 +56,15 @@ export function MobileDefectProcessPanel({
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const locationIdentityRef = useRef({
-    itemId: location.item_id,
-    department: location.department,
-  });
+  const locationIdentityRef = useRef(location.record_id);
   const boundedProcessQty = Math.max(1, Math.min(maxQty, processQty));
 
   useEffect(() => {
-    const previousIdentity = locationIdentityRef.current;
-    if (
-      previousIdentity.itemId === location.item_id &&
-      previousIdentity.department === location.department
-    ) return;
-    locationIdentityRef.current = {
-      itemId: location.item_id,
-      department: location.department,
-    };
+    if (locationIdentityRef.current === location.record_id) return;
+    locationIdentityRef.current = location.record_id;
     setStep(1);
     setAction("unquarantine");
-    setProcessQty(Math.max(1, Number(location.quantity) || 1));
+    setProcessQty(Math.max(1, Number(location.available_quantity) || 1));
     setCategory("");
     setMemo("");
     setDecisions([]);
@@ -82,12 +72,12 @@ export function MobileDefectProcessPanel({
     setBusy(false);
     setErrorMsg(null);
     setConfirmOpen(false);
-  }, [location.item_id, location.department, location.quantity]);
+  }, [location.record_id, location.available_quantity]);
 
   useEffect(() => {
-    const freshMax = Math.max(1, Number(location.quantity) || 1);
+    const freshMax = Math.max(1, Number(location.available_quantity) || 1);
     setProcessQty((currentQty) => Math.max(1, Math.min(freshMax, currentQty)));
-  }, [location.quantity]);
+  }, [location.available_quantity]);
 
   useEffect(() => {
     if (action !== "disassemble") {
@@ -120,6 +110,7 @@ export function MobileDefectProcessPanel({
     try {
       if (action === "unquarantine") {
         await defectsApi.unquarantine({
+          record_id: location.record_id,
           item_id: location.item_id,
           qty: boundedProcessQty,
           dept: location.department,
@@ -136,6 +127,7 @@ export function MobileDefectProcessPanel({
           notes: memo || null,
           lines: [
             {
+              record_id: location.record_id,
               item_id: location.item_id,
               quantity: boundedProcessQty,
               from_bucket: "defective",
@@ -154,6 +146,7 @@ export function MobileDefectProcessPanel({
           notes: JSON.stringify({ child_decisions: childDecisions }),
           lines: [
             {
+              record_id: location.record_id,
               item_id: location.item_id,
               quantity: boundedProcessQty,
               from_bucket: "defective",
@@ -205,7 +198,7 @@ export function MobileDefectProcessPanel({
               {location.mes_code} {location.item_name}
             </span>
             <span className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
-              재작업 {formatQty(boundedProcessQty)} / {formatQty(location.quantity)}개
+              재작업 {formatQty(boundedProcessQty)} / 처리 가능 {formatQty(maxQty)}개
               {category ? ` · ${category}` : ""}
             </span>
           </div>
@@ -248,8 +241,8 @@ export function MobileDefectProcessPanel({
           open={confirmOpen}
           title="재작업 확인"
           tone="danger"
-          cautionMessage="이 작업은 즉시 반영됩니다."
-          confirmLabel="즉시 처리"
+          cautionMessage="승인 완료 후 재고에 반영됩니다."
+          confirmLabel="처리 요청"
           busy={busy}
           onClose={() => setConfirmOpen(false)}
           onConfirm={() => {
@@ -295,7 +288,8 @@ export function MobileDefectProcessPanel({
             </span>
           </div>
           <div className={clsx(TYPO.caption, "flex flex-wrap gap-x-4 gap-y-1 font-bold")} style={{ color: LEGACY_COLORS.muted }}>
-            <span>격리 {formatQty(location.quantity)}개</span>
+            <span>남음 {formatQty(location.quantity)}개</span>
+            <span>처리 가능 {formatQty(location.available_quantity)}개</span>
             <span>{location.department}</span>
             <span>격리일 {formatDate(location.defective_at)}</span>
           </div>
@@ -316,7 +310,7 @@ export function MobileDefectProcessPanel({
             danger={action === "scrap"}
           />
           <span className={clsx(TYPO.caption, "font-bold whitespace-nowrap")} style={{ color: LEGACY_COLORS.muted2 }}>
-            / {formatQty(location.quantity)}
+            / {formatQty(maxQty)}
           </span>
         </div>
       </div>
@@ -336,7 +330,7 @@ export function MobileDefectProcessPanel({
         {location.has_bom && (
           <ActionRow
             label="재작업"
-            desc="BOM 재작업 후 처리"
+            desc="승인 후 BOM 재작업 처리"
             color={LEGACY_COLORS.yellow}
             selected={action === "disassemble"}
             onClick={() => setAction("disassemble")}
@@ -344,7 +338,7 @@ export function MobileDefectProcessPanel({
         )}
         <ActionRow
           label="전체 폐기"
-          desc="재고 차감, 되돌릴 수 없음"
+          desc="승인 후 격리 재고 차감"
           color={LEGACY_COLORS.red}
           selected={action === "scrap"}
           onClick={() => setAction("scrap")}
@@ -352,7 +346,7 @@ export function MobileDefectProcessPanel({
         {isWarehouse && (
           <ActionRow
             label="반품"
-            desc="창고 재고에서 차감"
+            desc="승인 후 반품 처리"
             color={LEGACY_COLORS.muted2}
             selected={action === "return"}
             onClick={() => setAction("return")}
@@ -427,8 +421,8 @@ export function MobileDefectProcessPanel({
             : action === "unquarantine"
             ? "정상 복귀 →"
             : action === "scrap"
-            ? "전체 폐기 →"
-            : "반품 →"}
+            ? "폐기 요청 →"
+            : "반품 요청 →"}
         </button>
       </StickyFooter>
 
@@ -436,8 +430,8 @@ export function MobileDefectProcessPanel({
         open={confirmOpen}
         title={action === "unquarantine" ? "정상 복귀 확인" : action === "scrap" ? "폐기 확인" : "반품 확인"}
         tone="danger"
-        cautionMessage="이 작업은 즉시 반영됩니다."
-        confirmLabel="즉시 처리"
+        cautionMessage={action === "unquarantine" ? "이 작업은 즉시 반영됩니다." : "승인 완료 후 재고에 반영됩니다."}
+        confirmLabel={action === "unquarantine" ? "즉시 복귀" : "처리 요청"}
         busy={busy}
         onClose={() => setConfirmOpen(false)}
         onConfirm={() => {

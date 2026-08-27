@@ -45,7 +45,8 @@ global teardown에서 삭제한다. 결재 2-세션 테스트는 `code`(employee
 | `io-process-produce.spec.ts` | 생산(BOM 자동 전개, **즉시 반영**) + 자식 강제 잠김 | BOM 분기. produce 는 자식 제외 불가(`isBomForced`) |
 | `io-warehouse-adjust.spec.ts` | 창고 보정 입고·출고(**즉시 반영**) | 창고 정·부 권한, 데스크톱·모바일, ADJUST 이력 |
 | `io-approval-cycle.spec.ts` | 제출(E01) → 창고 승인함 PIN 승인(E22) → 큐 소멸 | **2-세션 결재 풀사이클** |
-| `io-defect.spec.ts` | 불량 격리 → 정상 복귀 | 불량 흐름(즉시 처리) |
+| `io-defect.spec.ts` | 불량 격리 → 정상 복귀 | 격리·정상 복귀 즉시 처리 |
+| `defect-quarantine-records.spec.ts` | 동일 품목 2건 → 부분 처리·메모·예약 승인/취소 | 건별 원장과 승인 예약 생명주기 |
 | `io-history-labels.spec.ts` | 같은 작업이 화면에서 같은 라벨로 보임 | P0-1 라벨 회귀 방어 |
 | `shipping-request-to-prep.spec.ts` | 출하 목록 → 요청 상세 → 준비 중 전환 | 실제 출하 화면과 API 상태 전이 smoke |
 | `operator-session-ui.spec.ts` | 기본 PIN challenge → 새 PIN → 재로그인·새로고침·로그아웃·강제 폐기 | 실제 로그인 UI와 401 로그인 복귀 |

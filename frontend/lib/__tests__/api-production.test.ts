@@ -16,6 +16,30 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
 });
 
+function inventoryOperationWire(overrides: Record<string, unknown> = {}) {
+  return {
+    operation_id: "operation-1",
+    kind: "BUSINESS",
+    domain: "DEPARTMENT",
+    action: "ADJUST",
+    display_label: "부서 입출고",
+    effective_status: "active",
+    actor_employee_id: "employee-1",
+    actor_name: "김현우",
+    department: "고압",
+    reason: null,
+    effective_at: "2026-08-25T06:00:00Z",
+    reverses_operation_id: null,
+    reversal_operation_id: null,
+    can_cancel: true,
+    cancel_blockers: [],
+    lines: [],
+    matching_lines: [],
+    effects: [],
+    ...overrides,
+  };
+}
+
 describe("productionApi", () => {
   it("productionReceipt POST /api/production/receipt", async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
@@ -42,6 +66,16 @@ describe("productionApi", () => {
     expect(url).toContain("limit=50");
   });
 
+  it("getTransactions forwards the legacy-only filter", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse([])));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await productionApi.getTransactions({ itemId: "I-1", unlinkedOnly: true, limit: 5 });
+
+    const url = String(fetchSpy.mock.calls[0][0]);
+    expect(url).toContain("unlinked_only=true");
+  });
+
   it("getTransactions forwards history operation keys", async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse([])));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
@@ -57,6 +91,79 @@ describe("productionApi", () => {
     await productionApi.getTransactions({ operationBatchId: "batch-1" });
 
     expect(String(fetchSpy.mock.calls[0][0])).toContain("operation_batch_id=batch-1");
+  });
+
+  it("getTransactions forwards an exact inventory operation id", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse([])));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await productionApi.getTransactions({ operationId: "operation-1" });
+
+    expect(String(fetchSpy.mock.calls[0][0])).toContain("operation_id=operation-1");
+  });
+
+  it("previews an inventory operation cancellation and maps numeric cells", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({
+      operation_id: "operation-1",
+      plan_hash: "a".repeat(64),
+      can_cancel: true,
+      blockers: [],
+      cells: [{
+        item_id: "item-1",
+        scope: "location",
+        department: "고압",
+        status: "PRODUCTION",
+        box_id: null,
+        quantity_change: "7",
+        current_quantity: "89",
+        reserved_quantity: "0",
+        quantity_after: "96",
+      }],
+      defect_records: [],
+      effects: [],
+    })));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    const preview = await productionApi.previewInventoryOperationCancellation("operation-1");
+
+    expect(String(fetchSpy.mock.calls[0][0])).toContain(
+      "/api/inventory/operations/operation-1/cancel/preview",
+    );
+    expect(preview).toMatchObject({
+      operationId: "operation-1",
+      planHash: "a".repeat(64),
+      canCancel: true,
+      cells: [{ quantityChange: 7, currentQuantity: 89, quantityAfter: 96 }],
+    });
+  });
+
+  it("cancels an inventory operation with the reviewed plan hash", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse(inventoryOperationWire({
+      operation_id: "cancellation-1",
+      kind: "CANCELLATION",
+      effective_status: "cancellation",
+      reverses_operation_id: "operation-1",
+    }))));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    const result = await productionApi.cancelInventoryOperation("operation-1", {
+      reason: "작업 전체 취소",
+      employee_code: "E06",
+      pin: "0305",
+      plan_hash: "a".repeat(64),
+    });
+
+    expect(result).toMatchObject({
+      operationId: "cancellation-1",
+      kind: "CANCELLATION",
+      reversesOperationId: "operation-1",
+    });
+    expect(JSON.parse(String((fetchSpy.mock.calls[0][1] as RequestInit).body))).toMatchObject({
+      reason: "작업 전체 취소",
+      employee_code: "E06",
+      pin: "0305",
+      plan_hash: "a".repeat(64),
+    });
   });
 
   it("getTransactionsSummary forwards history operation keys", async () => {

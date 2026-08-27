@@ -120,7 +120,10 @@ describe("ReworkBatchHeader", () => {
 
     expect(cells[1].firstElementChild).toHaveClass("px-3");
     expect(cells[2]).toHaveClass("px-2");
-    expect(cells[4]).toHaveClass("px-2");
+    expect(cells[3]).toHaveAttribute("colspan", "2");
+    expect(cells[3]).not.toHaveAttribute("data-history-collapsible-group");
+    expect(cells[3].firstElementChild?.children[1]).toHaveClass("justify-start", "px-1");
+    expect(cells[4]).toHaveClass("px-1");
     expect(cells[5]).toHaveClass("px-2");
     expect(quantityPill).toHaveClass("min-w-[12.75rem]");
     expect(quantityPill).not.toHaveClass("min-w-0", "flex-1");
@@ -333,7 +336,7 @@ describe("ReworkBatchDetail", () => {
     expect(screen.getByText(label)).toHaveStyle({ color });
   });
 
-  it("keeps each cancelled result part struck through", () => {
+  it("marks every cancelled result row for selective strike styling", () => {
     render(
       <table>
         <tbody>
@@ -350,8 +353,8 @@ describe("ReworkBatchDetail", () => {
       </table>,
     );
 
-    expect(screen.getByText("폐기 5 EA")).toHaveClass("line-through");
-    expect(screen.getByText("회수 2 EA")).toHaveClass("line-through");
+    expect(screen.getByText("폐기 5 EA").closest("tr")).toHaveAttribute("data-history-cancelled", "true");
+    expect(screen.getByText("회수 2 EA").closest("tr")).toHaveAttribute("data-history-cancelled", "true");
   });
 
   it("shows the full overflowing item name on hover and focus", async () => {

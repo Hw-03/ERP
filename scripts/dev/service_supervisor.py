@@ -22,6 +22,7 @@ RESTART_WINDOW = timedelta(minutes=5)
 RESTART_DELAYS_SECONDS = (1, 5)
 MAX_FAILURES_IN_WINDOW = 3
 HEARTBEAT_SECONDS = 5.0
+CHILD_TEXT_ENCODING = "utf-8"
 
 
 class RestartDecision(NamedTuple):
@@ -252,6 +253,8 @@ class ServiceSupervisor:
         creation_flags = 0
         if os.name == "nt":
             creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
+        child_environment = os.environ.copy()
+        child_environment["PYTHONIOENCODING"] = CHILD_TEXT_ENCODING
         self.stdout_tail.clear()
         self.stderr_tail.clear()
         self.child = None
@@ -259,11 +262,11 @@ class ServiceSupervisor:
         self.child = subprocess.Popen(
             self.command,
             cwd=self.cwd,
-            env=os.environ.copy(),
+            env=child_environment,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            encoding="utf-8",
+            encoding=CHILD_TEXT_ENCODING,
             errors="replace",
             bufsize=1,
             creationflags=creation_flags,

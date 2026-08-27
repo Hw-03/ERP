@@ -119,7 +119,7 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
                 child 너비에 따라 가운데 child 위치가 흔들려 카드 간 정렬이 깨짐(예: 출하 전부 0
                 vs 조립 현재 25,200). 각 셀 안에서 left/center/right 정렬로 컬럼처럼 줄세움. */}
             <div
-              className="grid grid-cols-3 items-center border-t px-2.5 py-1 text-[11px] leading-none tabular-nums"
+                className="grid grid-cols-4 items-center border-t px-2.5 py-1 text-[11px] leading-none tabular-nums"
               style={{ borderColor: tint(LEGACY_COLORS.border, 60, "transparent") }}
             >
               <span
@@ -143,6 +143,17 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
                 }}
               >
                 출고 {formatQty(g.out_qty)}
+              </span>
+              <span
+                className={`text-center ${(g.defect_qty ?? 0) > 0 ? "font-semibold" : "font-medium"}`}
+                style={{
+                  color:
+                    (g.defect_qty ?? 0) > 0
+                      ? `color-mix(in srgb, ${LEGACY_COLORS.red} 55%, ${LEGACY_COLORS.text})`
+                      : ZERO_FADE,
+                }}
+              >
+                불량 {formatQty(g.defect_qty ?? 0)}
               </span>
               <span
                 className={`text-right ${g.current_qty > 0 ? "font-semibold" : "font-medium"}`}

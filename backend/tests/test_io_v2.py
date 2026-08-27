@@ -203,7 +203,6 @@ def test_shipping_request_id_is_rejected_for_new_io_submission_and_draft(
         },
         requester,
     )
-    shipping_actions_svc.send_to_prep(db_session, request.request_id, requester)
     db_session.commit()
 
     preview = client.post(
@@ -2328,6 +2327,8 @@ def test_warehouse_adjust_in_immediately_increases_warehouse_stock(
     assert log.department == "창고"
     assert log.warehouse_qty_before == Decimal("5")
     assert log.warehouse_qty_after == Decimal("8")
+    assert log.department_qty_before == Decimal("0")
+    assert log.department_qty_after == Decimal("0")
 
     history = client.get(
         "/api/inventory/transactions",
@@ -2335,6 +2336,10 @@ def test_warehouse_adjust_in_immediately_increases_warehouse_stock(
     )
     assert history.status_code == 200, history.text
     assert [row["log_id"] for row in history.json()] == [str(log.log_id)]
+    assert history.json()[0]["warehouse_qty_before"] == 5
+    assert history.json()[0]["warehouse_qty_after"] == 8
+    assert history.json()[0]["department_qty_before"] == 0
+    assert history.json()[0]["department_qty_after"] == 0
 
     warehouse_history = client.get(
         "/api/inventory/transactions",

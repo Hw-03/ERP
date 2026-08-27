@@ -76,6 +76,7 @@ def build_display_groups(
     logs: list[TransactionLogResponse],
 ) -> list[TransactionDisplayGroupResponse]:
     """기존 입출고 이력과 동일한 논리 단위로 거래 상세를 묶는다."""
+    operations: dict[uuid.UUID, list[TransactionLogResponse]] = {}
     op_batches: dict[uuid.UUID, list[TransactionLogResponse]] = {}
     reference_batches: dict[str, list[TransactionLogResponse]] = {}
     pairs = _find_defect_lifecycle_pairs(logs)
@@ -89,15 +90,31 @@ def build_display_groups(
         pair_by_log_id[parent.log_id] = (parent, child, anchor_id)
         pair_by_log_id[child.log_id] = (parent, child, anchor_id)
     for log in logs:
-        if log.operation_batch_id:
+        if log.operation_id:
+            operations.setdefault(log.operation_id, []).append(log)
+        elif log.operation_batch_id:
             op_batches.setdefault(log.operation_batch_id, []).append(log)
         elif log.reference_no:
             reference_batches.setdefault(_reference_group_key(log), []).append(log)
 
     groups: list[TransactionDisplayGroupResponse] = []
     seen_operation_batches: set[uuid.UUID] = set()
+    seen_operations: set[uuid.UUID] = set()
     seen_reference_batches: set[str] = set()
     for log in logs:
+        if log.operation_id:
+            if log.operation_id in seen_operations:
+                continue
+            seen_operations.add(log.operation_id)
+            operation_logs = operations[log.operation_id]
+            groups.append(
+                TransactionDisplayGroupResponse(
+                    type="operation",
+                    key=str(log.operation_id),
+                    logs=operation_logs,
+                )
+            )
+            continue
         pair = pair_by_log_id.get(log.log_id)
         if pair:
             parent, child, anchor_id = pair

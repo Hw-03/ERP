@@ -26,6 +26,8 @@ from app.models import (
     Inventory,
     InventoryLocation,
     IoBatch,
+    IoBundle,
+    IoLine,
     LocationStatusEnum,
     ShippingRequest,
     ShippingRequestStatusEnum,
@@ -138,6 +140,42 @@ def _prod_qty(db_session, item_id, dept: DepartmentEnum = ASSEMBLY) -> Decimal:
         .first()
     )
     return loc.quantity if loc else D("0")
+
+
+def _make_process_adjust_batch(
+    db_session,
+    *,
+    requester: Employee,
+    items: list,
+    sub_type: str = "adjust_out",
+) -> IoBatch:
+    """부서 낱개 조정 요청과 연결할, 내용 보존 검증용 다품목 batch."""
+    batch = IoBatch(
+        work_type="process", sub_type=sub_type, status="reserved",
+        requester_employee_id=requester.employee_id, requester_name=requester.name,
+        requester_department=requester.department.value,
+        from_department=ASSEMBLY.value, to_department=ASSEMBLY.value,
+        requires_approval=True, reference_no="ADJ-REF-01",
+        notes="반려 후 수정할 다품목 메모",
+    )
+    db_session.add(batch)
+    db_session.flush()
+    for index, item in enumerate(items, start=1):
+        bundle = IoBundle(
+            batch_id=batch.batch_id, source_kind="direct_item",
+            title_snapshot=f"조정 품목 {index}", quantity=D(str(index)), expanded_level=0,
+        )
+        db_session.add(bundle)
+        db_session.flush()
+        db_session.add(IoLine(
+            bundle_id=bundle.bundle_id, item_id=item.item_id,
+            item_name_snapshot=item.item_name, mes_code_snapshot=item.mes_code, unit="EA",
+            direction="adjust", from_bucket="production", from_department=ASSEMBLY.value,
+            to_bucket="none", to_department=None, quantity=D(str(index)),
+            included=True, origin=sub_type,
+        ))
+    db_session.flush()
+    return batch
 
 
 # ════════════════════════ approve_request ════════════════════════
@@ -511,6 +549,187 @@ def test_department_reject_releases_location_pending(
     assert request.status == StockRequestStatusEnum.REJECTED
     assert location.pending_quantity == D("0")
     assert location.quantity == D("5")
+
+
+def test_department_reject_returns_process_single_adjustment_to_same_draft(
+    db_session, make_item, make_location
+):
+    """부서 낱개 조정 반려는 요청 이력은 남기고 기존 다품목 batch만 draft로 되돌린다."""
+    first = make_item(name="반려 복귀 A")
+    second = make_item(name="반려 복귀 B")
+    first_location = make_location(first.item_id, department=ASSEMBLY, quantity=D("5"))
+    second_location = make_location(second.item_id, department=ASSEMBLY, quantity=D("5"))
+    requester = _make_employee(db_session, code="ADJ-REQ")
+    other = _make_employee(db_session, code="ADJ-OTHER")
+    approver = _make_employee(
+        db_session, code="ADJ-APP", name="조립 부서장", department_role="primary"
+    )
+    batch = _make_process_adjust_batch(db_session, requester=requester, items=[first, second])
+    request = sr_svc.create_manual_adjustment_request(
+        db_session,
+        requester=requester,
+        lines_input=[
+            LineInput(
+                item_id=first.item_id, quantity=D("1"), from_bucket="production",
+                from_department=ASSEMBLY.value, to_bucket="none", to_department=None,
+            ),
+            LineInput(
+                item_id=second.item_id, quantity=D("2"), from_bucket="production",
+                from_department=ASSEMBLY.value, to_bucket="none", to_department=None,
+            ),
+        ],
+        reference_no=batch.reference_no,
+        notes=batch.notes,
+        approval_department=ASSEMBLY.value,
+    )
+    request.operation_batch_id = batch.batch_id
+    db_session.flush()
+    assert request.status == StockRequestStatusEnum.RESERVED
+    assert first_location.pending_quantity == D("1")
+    assert second_location.pending_quantity == D("2")
+
+    svc.reject_request_department(
+        db_session, request, approver=approver, pin="0000", reason="수량 근거 확인 필요"
+    )
+    db_session.flush()
+    db_session.refresh(batch)
+
+    assert request.status == StockRequestStatusEnum.REJECTED
+    assert request.rejected_by_name == "조립 부서장"
+    assert request.rejected_at is not None
+    assert request.rejected_reason == "수량 근거 확인 필요"
+    assert first_location.pending_quantity == D("0")
+    assert second_location.pending_quantity == D("0")
+    assert batch.status == "draft"
+    assert batch.completed_at is None
+    assert batch.notes == "반려 후 수정할 다품목 메모"
+    assert batch.reference_no == "ADJ-REF-01"
+    assert [(line.item_name_snapshot, line.quantity) for bundle in batch.bundles for line in bundle.lines] == [
+        ("반려 복귀 A", D("1")), ("반려 복귀 B", D("2")),
+    ]
+
+    from app.services import io_draft
+
+    drafts = io_draft.list_drafts(db_session, requester_employee_id=requester.employee_id)
+    assert [draft["batch_id"] for draft in drafts] == [batch.batch_id]
+    assert drafts[0]["stock_requests"][0]["rejected_reason"] == "수량 근거 확인 필요"
+    assert io_draft.list_drafts(db_session, requester_employee_id=other.employee_id) == []
+
+    # 같은 batch 재제출은 새 결재 요청을 만들고, 더는 작성 중 반려 배너 대상이 아니다.
+    from app.services import io_dispatch
+
+    result = io_dispatch.submit_existing_draft(
+        db_session,
+        batch_id=batch.batch_id,
+        requester_employee_id=requester.employee_id,
+    )
+    db_session.flush()
+    db_session.refresh(batch)
+    linked_requests = (
+        db_session.query(type(request))
+        .filter(type(request).operation_batch_id == batch.batch_id)
+        .order_by(type(request).created_at)
+        .all()
+    )
+    assert len(linked_requests) == 2
+    assert linked_requests[0].request_id == request.request_id
+    assert linked_requests[1].request_id != request.request_id
+    assert batch.status == "reserved"
+    assert result["batch"]["status"] == "reserved"
+    assert result["batch"]["stock_requests"][0]["rejected_reason"] == "수량 근거 확인 필요"
+
+    svc.approve_request_department(
+        db_session, linked_requests[1], approver=approver, pin="0000"
+    )
+    db_session.refresh(batch)
+    db_session.refresh(first_location)
+    db_session.refresh(second_location)
+    assert batch.status == "completed"
+    assert batch.completed_at is not None
+    assert first_location.quantity == D("4")
+    assert second_location.quantity == D("3")
+
+    active_request = sr_svc.create_manual_adjustment_request(
+        db_session,
+        requester=requester,
+        lines_input=[LineInput(
+            item_id=first.item_id, quantity=D("1"), from_bucket="production",
+            from_department=ASSEMBLY.value, to_bucket="none", to_department=None,
+        )],
+        reference_no=batch.reference_no,
+        notes=batch.notes,
+        approval_department=ASSEMBLY.value,
+    )
+    active_request.operation_batch_id = batch.batch_id
+    db_session.flush()
+    from app.services.io_persist import sync_batch_from_stock_requests
+
+    sync_batch_from_stock_requests(db_session, batch)
+    db_session.refresh(batch)
+    assert active_request.status == StockRequestStatusEnum.RESERVED
+    assert batch.status == "partially_completed"
+
+
+def test_department_reject_keeps_non_adjust_process_batch_rejected(db_session, make_item):
+    """BOM 등 다른 부서 결재 반려에는 draft 복귀 규칙을 적용하지 않는다."""
+    item = make_item(name="BOM 반려 유지", warehouse_qty=D("10"))
+    requester = _make_employee(db_session, code="BOM-REQ")
+    approver = _make_employee(db_session, code="BOM-APP", department_role="primary")
+    batch = _make_process_adjust_batch(
+        db_session, requester=requester, items=[item], sub_type="produce"
+    )
+    request = _make_dual_reserved_request(db_session, requester, item, qty=D("1"))
+    request.operation_batch_id = batch.batch_id
+    db_session.flush()
+
+    svc.reject_request_department(
+        db_session, request, approver=approver, pin="0000", reason="BOM 반려"
+    )
+    db_session.flush()
+    db_session.refresh(batch)
+
+    assert request.status == StockRequestStatusEnum.REJECTED
+    assert batch.status == "rejected"
+    assert batch.completed_at is None
+
+
+def test_department_reject_does_not_restore_adjust_batch_with_non_department_request(
+    db_session, make_item, make_location
+):
+    """같은 batch에 부서 결재가 아닌 반려 요청이 섞이면 draft 복귀 대상이 아니다."""
+    item = make_item(name="혼합 결재 반려", warehouse_qty=D("5"))
+    make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
+    requester = _make_employee(db_session, code="MIX-REQ")
+    approver = _make_employee(db_session, code="MIX-APP", department_role="primary")
+    batch = _make_process_adjust_batch(db_session, requester=requester, items=[item])
+    department_request = sr_svc.create_manual_adjustment_request(
+        db_session,
+        requester=requester,
+        lines_input=[LineInput(
+            item_id=item.item_id, quantity=D("1"), from_bucket="production",
+            from_department=ASSEMBLY.value, to_bucket="none", to_department=None,
+        )],
+        reference_no=batch.reference_no,
+        notes=batch.notes,
+        approval_department=ASSEMBLY.value,
+    )
+    department_request.operation_batch_id = batch.batch_id
+    other_request = _make_reserved_request(db_session, requester, item, qty=D("1"))
+    other_request.operation_batch_id = batch.batch_id
+    db_session.flush()
+
+    svc.reject_request_department(
+        db_session, department_request, approver=approver, pin="0000", reason="부서 반려"
+    )
+    other_request.status = StockRequestStatusEnum.REJECTED
+    for line in other_request.lines:
+        line.status = StockRequestStatusEnum.REJECTED
+    from app.services.io_persist import sync_batch_from_stock_requests
+
+    sync_batch_from_stock_requests(db_session, batch)
+    db_session.refresh(batch)
+
+    assert batch.status == "rejected"
 
 
 def test_failed_approval_releases_location_pending(

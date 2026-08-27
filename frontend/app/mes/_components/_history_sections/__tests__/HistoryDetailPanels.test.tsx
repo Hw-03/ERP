@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useState } from "react";
 import { api, type TransactionEditLog, type TransactionLog } from "@/lib/api";
@@ -40,6 +40,8 @@ vi.mock("@/lib/api/io", () => ({
 vi.mock("@/lib/api/production", () => ({
   productionApi: {
     getTransactions: vi.fn(),
+    previewInventoryOperationCancellation: vi.fn(),
+    cancelInventoryOperation: vi.fn(),
   },
 }));
 
@@ -173,9 +175,64 @@ beforeEach(() => {
   vi.clearAllMocks();
   realtimeState.revision = 1;
   vi.mocked(productionApi.getTransactions).mockResolvedValue([]);
+  vi.mocked((productionApi as any).previewInventoryOperationCancellation).mockResolvedValue({
+    operationId: "operation-1",
+    planHash: "a".repeat(64),
+    canCancel: true,
+    blockers: [],
+    cells: [],
+    defectRecords: [],
+    effects: [],
+  });
+  vi.mocked((productionApi as any).cancelInventoryOperation).mockResolvedValue({
+    operationId: "cancellation-1",
+    actorEmployeeId: "employee-1",
+    effectiveAt: "2026-08-25T06:10:00Z",
+  });
 });
 
 describe("desktop history detail panels", () => {
+  it("모바일 상세는 묶음의 실행 로그를 사용해 단품 출고를 감소로 표시한다", async () => {
+    const batch = makeBatch({
+      sub_type: "disassemble",
+      bundles: [{
+        bundle_id: "shipment-bundle",
+        source_kind: "manual",
+        title: "단품 출고",
+        source_item_id: "item-finished",
+        source_mes_code: "PF-001",
+        quantity: 1,
+        expanded_level: 0,
+        lines: [{
+          ...makeBatch().bundles[0].lines[0],
+          line_id: "shipment-line",
+          direction: "adjust",
+          from_bucket: "production",
+          to_bucket: "none",
+          quantity: 1,
+          origin: "manual",
+        }],
+      }],
+    });
+    const selected = makeLog({
+      operation_batch_id: batch.batch_id,
+      operation_line_id: "shipment-line",
+      transaction_type: "ADJUST",
+      quantity_change: -1,
+      quantity_before: 4,
+      quantity_after: 3,
+      inventory_effect: [{ scope: "location", department: "조립", status: "PRODUCTION", delta: -1 }],
+    });
+    vi.mocked(ioApi.getBatch).mockResolvedValue(batch);
+    vi.mocked(productionApi.getTransactions).mockResolvedValue([selected]);
+
+    render(
+      <HistoryDetailPanel panelOpen selected={selected} onSelectLog={() => {}} onLogUpdated={() => {}} />,
+    );
+
+    expect(await screen.findByText("단품 출고 -1 EA")).toBeInTheDocument();
+  });
+
   it("keeps loaded edit history visible while a realtime refresh is pending", async () => {
     const existingEdit = { edit_id: "existing", original_log_id: "same-log", edited_by_employee_id: "e1", edited_by_name: "Existing editor", reason: "existing", before_payload: "{}", after_payload: "{}", correction_log_id: null, created_at: "2026-08-04T00:00:00Z" };
     const refresh = deferred<TransactionEditLog[]>();
@@ -1060,6 +1117,69 @@ describe("desktop history detail panels", () => {
     fireEvent.click(screen.getByRole("button", { name: "이 내역 취소" }));
     expect(screen.getByText("대상 1건")).toBeInTheDocument();
     expect(screen.getByText("되돌릴 실제 영향")).toBeInTheDocument();
+  });
+
+  it("previews and cancels every line of a new-ledger operation with the reviewed plan hash", async () => {
+    const selected = makeLog({
+      operation_id: "operation-1",
+      operation_kind: "BUSINESS",
+      operation_effective_status: "active",
+      quantity_change: -3,
+      inventory_effect: [
+        { scope: "location", department: "고압", status: "PRODUCTION", delta: -3 },
+      ],
+    });
+    const child = makeLog({
+      log_id: "child-log",
+      item_id: "child-item",
+      item_name: "하위 자재 B",
+      mes_code: "8-HR-0049",
+      operation_id: "operation-1",
+      operation_kind: "BUSINESS",
+      operation_effective_status: "active",
+      quantity_change: -7,
+      inventory_effect: [
+        { scope: "location", department: "고압", status: "PRODUCTION", delta: -7 },
+      ],
+    });
+    vi.mocked(productionApi.getTransactions).mockResolvedValue([selected, child]);
+    const onLogUpdated = vi.fn();
+
+    render(
+      <HistoryDetailPanel
+        panelOpen
+        selected={selected}
+        onSelectLog={() => {}}
+        onLogUpdated={onLogUpdated}
+        variant="desktop"
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "이 내역 취소" }));
+    expect(await screen.findByText("대상 2건")).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("history-cancel-confirmation")).getByText("하위 자재 B"),
+    ).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("취소 사유"), { target: { value: "작업 전체 취소" } });
+    fireEvent.change(screen.getByLabelText("PIN"), { target: { value: "0305" } });
+    fireEvent.click(screen.getByRole("button", { name: "취소 확정" }));
+
+    await waitFor(() => {
+      expect((productionApi as any).cancelInventoryOperation).toHaveBeenCalledWith(
+        "operation-1",
+        {
+          reason: "작업 전체 취소",
+          employee_code: "E001",
+          pin: "0305",
+          plan_hash: "a".repeat(64),
+        },
+      );
+    });
+    expect(api.cancelTransaction).not.toHaveBeenCalled();
+    expect(onLogUpdated).toHaveBeenCalledWith(expect.objectContaining({
+      operation_effective_status: "cancelled",
+      reversal_operation_id: "cancellation-1",
+    }));
   });
 
   it("uses the common CTA and confirmation details for a mobile batch", async () => {

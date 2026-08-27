@@ -95,6 +95,47 @@ def test_runtime_store_writes_atomic_state_and_jsonl_event(tmp_path: Path) -> No
     }
 
 
+def test_supervisor_forces_utf8_for_child_text_streams(
+    tmp_path: Path, monkeypatch
+) -> None:
+    child_script = tmp_path / "korean_output.py"
+    child_script.write_text(
+        "import sys\n"
+        "message = chr(0xD55C) + chr(0xAE00)\n"
+        "print(message, flush=True)\n"
+        "print(message, file=sys.stderr, flush=True)\n",
+        encoding="utf-8",
+    )
+    stdout_path = tmp_path / "service.out.log"
+    stderr_path = tmp_path / "service.err.log"
+    monkeypatch.setenv("PYTHONIOENCODING", "cp949")
+    supervisor = service_supervisor.ServiceSupervisor(
+        profile="test",
+        service="backend",
+        port=_free_port(),
+        cwd=tmp_path,
+        command=[sys.executable, str(child_script)],
+        state_path=tmp_path / "runtime.json",
+        event_path=tmp_path / "runtime-events.jsonl",
+        control_path=tmp_path / "runtime-control.json",
+        stdout_log=stdout_path,
+        stderr_log=stderr_path,
+        poll_seconds=0.01,
+        port_check_seconds=0.01,
+        port_failure_threshold=1,
+    )
+
+    supervisor._start_child()
+
+    assert supervisor.child is not None
+    assert supervisor.child.wait(timeout=5) == 0
+    supervisor._join_streams()
+
+    expected = chr(0xD55C) + chr(0xAE00) + "\n"
+    assert stdout_path.read_text(encoding="utf-8") == expected
+    assert stderr_path.read_text(encoding="utf-8") == expected
+
+
 def _free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(("127.0.0.1", 0))

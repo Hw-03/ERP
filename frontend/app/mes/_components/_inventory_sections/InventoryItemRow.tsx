@@ -11,8 +11,8 @@ import { formatQty } from "@/lib/mes/format";
 import { ImageLightbox } from "@/lib/ui/ImageLightbox";
 import { useDeptColorLookup } from "../DepartmentsContext";
 
-function safeQty(item: Item) {
-  const n = Number(item.quantity);
+function safeAvailableQty(item: Item) {
+  const n = Number(item.available_quantity);
   return isNaN(n) ? 0 : n;
 }
 
@@ -33,8 +33,8 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename, compact
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [hovered, setHovered] = useState(false);
   const minStock = getMinStock(item);
-  const stock = getStockState(safeQty(item), minStock === 0 ? null : minStock);
-  const qty = safeQty(item);
+  const qty = safeAvailableQty(item);
+  const stock = getStockState(qty, minStock === 0 ? null : minStock);
   const pendingQty = totalApprovalPending(item);
   const isCritical = qty <= 0 || (minStock > 0 && qty < minStock);
 

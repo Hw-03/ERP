@@ -10,8 +10,8 @@ from alembic import context, op
 import sqlalchemy as sa
 
 
-revision: str = "20260819_0023"
-down_revision: Union[str, None] = "20260818_0022"
+revision: str = "20260827_0030"
+down_revision: Union[str, None] = "20260826_0029"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -419,6 +419,8 @@ def _purpose_check_is_exact(sqltext: object) -> bool:
 
 def _assert_operator_session_schema(
     inspector: sa.Inspector,
+    *,
+    allow_missing_indexes: bool = False,
 ) -> None:
     columns = {
         column["name"]: column for column in inspector.get_columns("operator_sessions")
@@ -466,7 +468,8 @@ def _assert_operator_session_schema(
     for name, expected_columns, expected_unique in _SESSION_INDEXES:
         index = indexes.get(name)
         if index is None:
-            issues.append(f"missing index {name}")
+            if not allow_missing_indexes:
+                issues.append(f"missing index {name}")
             continue
         if index.get("column_names") != expected_columns:
             issues.append(f"{name} columns={index.get('column_names')}")
@@ -622,8 +625,162 @@ def _ensure_shipping_event_actor_schema(inspector: sa.Inspector | None) -> None:
     _assert_shipping_event_actor_schema(sa.inspect(op.get_bind()))
 
 
+def _preflight_upgrade(inspector: sa.Inspector) -> None:
+    """거부할 부분 schema를 SQLite DDL보다 먼저 읽기 전용으로 검증한다."""
+    employee_columns = {
+        column["name"]: column for column in inspector.get_columns("employees")
+    }
+    pin_state = employee_columns.get(_PIN_STATE_COLUMN)
+    if pin_state is not None and not isinstance(pin_state.get("type"), sa.Boolean):
+        raise RuntimeError(
+            "employees pin state schema is partially present: "
+            f"{_PIN_STATE_COLUMN} type={pin_state.get('type')!s}"
+        )
+
+    audit_columns = {
+        column["name"]: column
+        for column in inspector.get_columns("admin_audit_logs")
+    }
+    actor_code = audit_columns.get("actor_employee_code")
+    if actor_code is None:
+        raise RuntimeError(
+            "admin_audit_logs schema is partially present: missing actor_employee_code"
+        )
+    actor_code_type = actor_code.get("type")
+    actor_code_nullable = bool(actor_code.get("nullable"))
+    actor_code_length = getattr(actor_code_type, "length", None)
+    if (
+        not isinstance(actor_code_type, sa.String)
+        or not actor_code_nullable
+        or actor_code_length not in {16, _ADMIN_AUDIT_ACTOR_CODE_LENGTH}
+    ):
+        raise RuntimeError(
+            "admin_audit_logs schema is partially present: "
+            f"actor_employee_code type={actor_code_type!s} "
+            f"nullable={actor_code_nullable}"
+        )
+
+    bootstrap_column = audit_columns.get(_ADMIN_AUDIT_BOOTSTRAP_COLUMN)
+    if bootstrap_column is not None:
+        bootstrap_type = bootstrap_column.get("type")
+        if not isinstance(bootstrap_type, sa.String):
+            raise RuntimeError(
+                "admin_audit_logs bootstrap schema is partially present: "
+                f"{_ADMIN_AUDIT_BOOTSTRAP_COLUMN} type={bootstrap_type!s}"
+            )
+        bootstrap_length = getattr(bootstrap_type, "length", None)
+        if bootstrap_length is None or bootstrap_length > 32:
+            oversized = op.get_bind().execute(
+                sa.text(
+                    "SELECT COUNT(*) FROM admin_audit_logs "
+                    f"WHERE length({_ADMIN_AUDIT_BOOTSTRAP_COLUMN}) > 32"
+                )
+            ).scalar_one()
+            if oversized:
+                raise RuntimeError(
+                    "admin_audit_logs bootstrap schema is partially present: "
+                    f"{_ADMIN_AUDIT_BOOTSTRAP_COLUMN} contains values longer than 32"
+                )
+
+    event_columns = {
+        column["name"]: column
+        for column in inspector.get_columns("shipping_request_events")
+    }
+    event_issues: list[str] = []
+    for name, expected_shape in _SHIPPING_EVENT_ACTOR_COLUMN_SHAPES.items():
+        column = event_columns.get(name)
+        if column is not None:
+            event_issues.extend(
+                _column_shape_issues({name: column}, {name: expected_shape})
+            )
+    if event_issues:
+        raise RuntimeError(
+            "shipping_request_events actor schema is partially present: "
+            + "; ".join(event_issues)
+        )
+
+    actor_column_present = "actor_employee_id" in event_columns
+    if actor_column_present:
+        actor_foreign_keys = [
+            foreign_key
+            for foreign_key in inspector.get_foreign_keys("shipping_request_events")
+            if foreign_key.get("constrained_columns") == ["actor_employee_id"]
+        ]
+        valid_actor_fk = next(
+            (
+                foreign_key
+                for foreign_key in actor_foreign_keys
+                if foreign_key.get("referred_table") == "employees"
+                and foreign_key.get("referred_columns") == ["employee_id"]
+                and str(
+                    (foreign_key.get("options") or {}).get("ondelete", "")
+                ).upper()
+                == "SET NULL"
+            ),
+            None,
+        )
+        if actor_foreign_keys and valid_actor_fk is None:
+            raise RuntimeError(
+                "shipping_request_events actor schema is partially present: "
+                "actor_employee_id FK must reference employees.employee_id "
+                "ON DELETE SET NULL"
+            )
+        if valid_actor_fk is None:
+            orphan_count = op.get_bind().execute(
+                sa.text(
+                    "SELECT COUNT(*) FROM shipping_request_events AS event "
+                    "LEFT JOIN employees AS employee "
+                    "ON employee.employee_id = event.actor_employee_id "
+                    "WHERE event.actor_employee_id IS NOT NULL "
+                    "AND employee.employee_id IS NULL"
+                )
+            ).scalar_one()
+            if orphan_count:
+                raise RuntimeError(
+                    "shipping_request_events actor schema is partially present: "
+                    f"actor_employee_id has {orphan_count} orphan rows"
+                )
+        event_indexes = {
+            index["name"]: index
+            for index in inspector.get_indexes("shipping_request_events")
+        }
+        actor_index = event_indexes.get(_SHIPPING_EVENT_ACTOR_INDEX)
+        if actor_index is not None and (
+            actor_index.get("column_names") != ["actor_employee_id"]
+            or bool(actor_index.get("unique"))
+        ):
+            raise RuntimeError(
+                "shipping_request_events actor schema is partially present: "
+                f"{_SHIPPING_EVENT_ACTOR_INDEX} shape="
+                f"{actor_index.get('column_names')}/{actor_index.get('unique')}"
+            )
+
+    if inspector.has_table("operator_sessions"):
+        _assert_operator_session_schema(inspector, allow_missing_indexes=True)
+        existing_session_indexes = {
+            index["name"]
+            for index in inspector.get_indexes("operator_sessions")
+        }
+        if "uq_operator_sessions_token_hash" not in existing_session_indexes:
+            duplicate_tokens = op.get_bind().execute(
+                sa.text(
+                    "SELECT COUNT(*) FROM ("
+                    "SELECT token_hash FROM operator_sessions "
+                    "GROUP BY token_hash HAVING COUNT(*) > 1"
+                    ") AS duplicate_tokens"
+                )
+            ).scalar_one()
+            if duplicate_tokens:
+                raise RuntimeError(
+                    "operator_sessions schema is partially present: "
+                    f"token_hash has {duplicate_tokens} duplicate values"
+                )
+
+
 def upgrade() -> None:
     inspector = None if context.is_offline_mode() else sa.inspect(op.get_bind())
+    if inspector is not None:
+        _preflight_upgrade(inspector)
     pin_state_added = _ensure_pin_state_shape(inspector)
     if inspector is not None:
         inspector = sa.inspect(op.get_bind())

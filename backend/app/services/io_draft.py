@@ -37,7 +37,7 @@ from app.services.io_persist import (
 
 def _draft_to_current_stock_payload(db: Session, batch: IoBatch) -> dict:
     """저장 내용은 보존하고 부족 수량만 현재 출발 위치 재고로 계산한다."""
-    payload = _batch_to_payload(batch)
+    payload = _batch_to_payload(batch, db=db)
     for bundle in payload["bundles"]:
         for line in bundle["lines"]:
             if not line["included"] or line["from_bucket"] == "none":

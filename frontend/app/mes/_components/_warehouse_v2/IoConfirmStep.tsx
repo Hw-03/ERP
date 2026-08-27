@@ -15,7 +15,9 @@ import { tint } from "@/lib/mes/colorUtils";
 import type { IoBundle, IoLine, IoSubType, IoWorkType } from "./types";
 import {
   deptIoDisplayLabel,
+  isCustomProcessBomBundle,
   isWarehouseAdjustSubType,
+  processBomEffectLine,
   requiresMemoForDepartmentSingleAdjustment,
   subTypeLabel,
   type ApprovalKind,
@@ -204,12 +206,17 @@ export function IoConfirmStep({
       : APPROVAL_META[approvalKind];
   // BOM 부모 라인(생산 결과품 등)은 묶음 카드 헤더에서 이미 표시되므로 표시 라인 목록에선 숨긴다.
   const bomParentLineIds = new Set<string>();
+  const effectLineById = new Map<string, IoLine>();
   for (const b of bundles) {
-    if (b.source_kind !== "bom_parent") continue;
     for (const l of b.lines) {
-      if (l.origin === "direct") bomParentLineIds.add(l.line_id);
+      const effectLine = processBomEffectLine(subType, b, l);
+      if (effectLine) effectLineById.set(l.line_id, effectLine);
+      if (b.source_kind === "bom_parent" && l.origin === "direct") {
+        bomParentLineIds.add(l.line_id);
+      }
     }
   }
+  const effectIncludedLines = Array.from(effectLineById.values());
   const visibleIncludedLines = includedLines.filter(
     (line) => !bomParentLineIds.has(line.line_id),
   );
@@ -227,14 +234,14 @@ export function IoConfirmStep({
     subType === "internal_use_out" && hasUnselectedInternalUseBomMode(bundles);
 
   const submitDisabled =
-    submitting || saving || includedLines.length === 0 || hasShortage || hasInvalidQuantity || memoMissing || missingInternalUseBomMode;
+    submitting || saving || effectIncludedLines.length === 0 || hasShortage || hasInvalidQuantity || memoMissing || missingInternalUseBomMode;
   const saveDisabled = submitting || saving || bundles.length === 0;
   const accent = directionAccent(subType);
   const blockerText = hasShortage
     ? "재고 부족 라인이 있어 제출할 수 없습니다. Step 4에서 라인을 다시 확인하세요."
     : hasInvalidQuantity
     ? "0 이하 수량 라인이 있어 제출할 수 없습니다."
-    : includedLines.length === 0
+    : effectIncludedLines.length === 0
     ? "체크된 라인이 없어 제출할 수 없습니다."
     : missingInternalUseBomMode
     ? "차감 방식을 선택하지 않은 BOM 묶음이 있습니다. Step 4에서 방식을 선택하세요."
@@ -284,6 +291,11 @@ export function IoConfirmStep({
             key={bundle.bundle_id}
             bundle={bundle}
             bomParentLineIds={bomParentLineIds}
+            customProcessBom={isCustomProcessBomBundle(subType, bundle)}
+            customDisassemble={
+              subType === "disassemble" && isCustomProcessBomBundle(subType, bundle)
+            }
+            effectLineById={effectLineById}
             showDeductionSource={subType === "internal_use_out"}
           />
         ))}
@@ -341,7 +353,7 @@ export function IoConfirmStep({
             style={{ background: accent }}
           >
             <ClipboardCheck className="h-4 w-4 lg:h-6 lg:w-6" />
-            {submitting ? "처리 중..." : meta.submitText(includedLines.length)}
+            {submitting ? "처리 중..." : meta.submitText(effectIncludedLines.length)}
           </button>
         </div>
       </div>
@@ -376,10 +388,16 @@ export function IoConfirmStep({
 function ConfirmBundleCard({
   bundle,
   bomParentLineIds,
+  customProcessBom,
+  customDisassemble,
+  effectLineById,
   showDeductionSource,
 }: {
   bundle: IoBundle;
   bomParentLineIds: Set<string>;
+  customProcessBom: boolean;
+  customDisassemble: boolean;
+  effectLineById: Map<string, IoLine>;
   showDeductionSource: boolean;
 }) {
   // Hook 규칙: 모든 hook 은 early-return 위에서 호출.
@@ -456,7 +474,7 @@ function ConfirmBundleCard({
   //   하위만 차감 BOM → 상위 변동이 없으므로 수량을 표시하지 않음
   //   단품  → 그 자체 단일 included 라인
   //   패키지 → 첫 included 라인
-  const headerLine = childrenOnlyBom
+  const headerLine = childrenOnlyBom || customProcessBom
     ? null
     : directParentLine ?? bundle.lines.find((line) => line.included) ?? null;
   const headerDir = headerLine
@@ -561,7 +579,9 @@ function ConfirmBundleCard({
           <span>반영 {visibleLines.filter((line) => line.included).length}개</span>
           <span>·</span>
           <span>
-            BOM 자동 전개 · {bundle.internal_use_bom_mode === "children_only" ? "상위 변동 없음 · " : ""}
+            {customDisassemble
+              ? "BOM 참고 출고 · 상위 미반영 · "
+              : `BOM 자동 전개 · ${childrenOnlyBom || customProcessBom ? "상위 변동 없음 · " : ""}`}
             하위 {visibleLines.length}
           </span>
         </div>
@@ -576,7 +596,7 @@ function ConfirmBundleCard({
           {visibleLines.map((line) => (
             <ConfirmLineRow
               key={line.line_id}
-              line={line}
+              line={effectLineById.get(line.line_id) ?? line}
               isChild={line.origin === "bom_auto" || line.origin === "package_auto"}
               showDeductionSource={showDeductionSource}
               showInternalUseEffect={showDeductionSource}

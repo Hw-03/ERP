@@ -15,6 +15,7 @@ from app.schemas.common import UtcDatetime
 
 
 class StockRequestLineCreate(BaseModel):
+    record_id: Optional[uuid.UUID] = None
     item_id: uuid.UUID
     quantity: int = Field(..., gt=0)
     from_bucket: RequestBucketEnum
@@ -61,6 +62,7 @@ class StockRequestLineResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     line_id: uuid.UUID
+    record_id: Optional[uuid.UUID] = None
     request_id: uuid.UUID
     item_id: uuid.UUID
     item_name_snapshot: str

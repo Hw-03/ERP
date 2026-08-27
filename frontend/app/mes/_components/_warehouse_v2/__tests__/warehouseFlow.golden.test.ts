@@ -23,6 +23,8 @@ import {
   requiresDepartments,
   requiresApproval,
   hasManualLine,
+  hasCustomBomQuantity,
+  processBomEffectLine,
   approvalKind,
   isBomForced,
   deptIoSubType,
@@ -353,6 +355,19 @@ describe("approvalKind", () => {
     const direct = [makeBundle({ lines: [makeLine({ origin: "direct" })] })];
     expect(approvalKind("produce", direct)).toBe("none");
     expect(approvalKind("receive_supplier", [])).toBe("none");
+  });
+
+  it("부서 BOM 하위 수량이 기준과 다르면 부서 결재로 표시한다", () => {
+    const customBom = [makeBundle({
+      quantity: 2,
+      lines: [
+        makeLine({ line_id: "P", origin: "direct", quantity: 2 }),
+        makeLine({ line_id: "C", origin: "bom_auto", quantity: 3, bom_expected: 4, edited: false }),
+      ],
+    })];
+
+    expect(hasCustomBomQuantity(customBom)).toBe(true);
+    expect(approvalKind("produce", customBom)).toBe("department");
   });
 });
 
@@ -833,6 +848,118 @@ describe("useIoWorkState canAdvance[3]/[4]", () => {
     expect(result.current.excludedLines).toHaveLength(1);
     expect(result.current.canAdvance[4]).toBe(false);
   });
+
+  it("커스텀 부서 BOM은 미반영 상위의 부족을 무시하고 하위만 실행 대상으로 판정한다", () => {
+    const { result } = renderHook(() => useIoWorkState());
+    act(() => result.current.setWorkType("process"));
+    act(() => result.current.setDeptIoDirection("out"));
+    act(() => {
+      result.current.setBundles([
+        makeBundle({
+          source_kind: "bom_parent",
+          quantity: 1,
+          lines: [
+            makeLine({ line_id: "P", origin: "direct", quantity: 1, shortage: 3 }),
+            makeLine({ line_id: "C", origin: "bom_auto", quantity: 2, bom_expected: 1 }),
+          ],
+        }),
+      ]);
+    });
+
+    expect(result.current.hasShortage).toBe(false);
+    expect(result.current.canAdvance[4]).toBe(true);
+  });
+
+  it("커스텀 출고 BOM은 포함된 모든 하위를 소속 부서 선택 출고로 판정한다", () => {
+    const parent = makeLine({
+      line_id: "P",
+      item_id: "PARENT",
+      origin: "direct",
+      direction: "out",
+      from_bucket: "production",
+      from_department: "조립",
+      to_bucket: "none",
+      quantity: 1,
+    });
+    const changedChild = makeLine({
+      line_id: "C1",
+      item_id: "CHILD-1",
+      origin: "bom_auto",
+      direction: "in",
+      from_bucket: "none",
+      to_bucket: "production",
+      to_department: "조립",
+      quantity: 2,
+      bom_expected: 1,
+    });
+    const unchangedChild = makeLine({
+      line_id: "C2",
+      item_id: "CHILD-2",
+      origin: "bom_auto",
+      direction: "in",
+      from_bucket: "none",
+      to_bucket: "production",
+      to_department: "튜닝",
+      quantity: 1,
+      bom_expected: 1,
+    });
+    const customBundle = makeBundle({
+      source_kind: "bom_parent",
+      source_item_id: "PARENT",
+      quantity: 1,
+      lines: [parent, changedChild, unchangedChild],
+    });
+
+    expect(processBomEffectLine("disassemble", customBundle, parent)).toBeNull();
+    expect(processBomEffectLine("disassemble", customBundle, changedChild)).toMatchObject({
+      direction: "out",
+      from_bucket: "production",
+      from_department: "조립",
+      to_bucket: "none",
+      to_department: null,
+    });
+    expect(processBomEffectLine("disassemble", customBundle, unchangedChild)).toMatchObject({
+      direction: "out",
+      from_bucket: "production",
+      from_department: "튜닝",
+      to_bucket: "none",
+      to_department: null,
+    });
+  });
+
+  it("커스텀 출고 BOM 하위의 파생 출고 재고가 부족하면 진행을 차단한다", () => {
+    const getAvailable = (line: IoLine) => line.item_id === "C" ? 1 : 99;
+    const { result } = renderHook(() => useIoWorkState(undefined, "조립", getAvailable));
+    act(() => result.current.setWorkType("process"));
+    act(() => result.current.setDeptIoDirection("out"));
+    act(() => {
+      result.current.setBundles([
+        makeBundle({
+          source_kind: "bom_parent",
+          source_item_id: "P",
+          quantity: 1,
+          lines: [
+            makeLine({ line_id: "P", item_id: "P", origin: "direct", quantity: 1 }),
+            makeLine({
+              line_id: "C",
+              item_id: "C",
+              origin: "bom_auto",
+              direction: "in",
+              from_bucket: "none",
+              to_bucket: "production",
+              to_department: "조립",
+              quantity: 2,
+              bom_expected: 1,
+              shortage: 0,
+            }),
+          ],
+        }),
+      ]);
+    });
+
+    expect(result.current.hasShortage).toBe(true);
+    expect(result.current.canAdvance[4]).toBe(false);
+  });
 });
 
 // ──────────────────────────────────────────────────────────────────
@@ -1194,18 +1321,43 @@ describe("[bomSync] applyToggleLine", () => {
     expect(mm.included).toBe(true); // manual 은 동기화 안 됨
   });
 
-  it("자식 단독 토글(다시 포함) → shortage 재계산", () => {
+  it("일반 자동 BOM 자식 단독 토글(다시 포함) → shortage 재계산", () => {
     const bundles = [
       makeBundle({
         bundle_id: "B",
         lines: [makeLine({ line_id: "C", origin: "bom_auto", bom_expected: 2, included: false, quantity: 10, from_bucket: "production" })],
       }),
     ];
-    const next = applyToggleLine(bundles, "B", "C", "produce", availMap({ C: 7 }));
+    const next = applyToggleLine(bundles, "B", "C", "warehouse_to_dept", availMap({ C: 7 }));
     const c = next[0].lines[0];
     expect(c.included).toBe(true);
     expect(c.shortage).toBe(3); // max(0, 10 - 7)
     expect(c.exclusion_note).toBeNull();
+  });
+
+  it("부서 BOM 자동 하위를 체크 해제하면 수량 0으로 제외한다", () => {
+    const bundles = [
+      makeBundle({
+        bundle_id: "B",
+        lines: [
+          makeLine({
+            line_id: "C",
+            origin: "bom_auto",
+            bom_expected: 2,
+            included: true,
+            quantity: 2,
+            from_bucket: "production",
+          }),
+        ],
+      }),
+    ];
+
+    const next = applyToggleLine(bundles, "B", "C", "produce", availMap({ C: 1 }));
+    const child = next[0].lines[0];
+    expect(child.quantity).toBe(0);
+    expect(child.included).toBe(false);
+    expect(child.edited).toBe(true);
+    expect(child.shortage).toBe(0);
   });
 
   it("BOM 재고 미반영 자식은 부모·자체 토글로 다시 포함되지 않는다", () => {
@@ -1245,10 +1397,11 @@ describe("[bomSync] applyToggleLine", () => {
 });
 
 describe("[bomSync] applyLineQuantityChange", () => {
-  it("상위(direct) 변경 → produce(forced) 자식 강제 비례 재계산", () => {
+  it("상위(direct) 변경 → produce에서 커스텀 자식 수량을 보존", () => {
     const bundles = [
       makeBundle({
         bundle_id: "B",
+        quantity: 1,
         lines: [
           makeLine({ line_id: "P", origin: "direct", quantity: 1 }),
           makeLine({ line_id: "C", origin: "bom_auto", bom_expected: 3, included: true, edited: true, quantity: 3 }),
@@ -1259,15 +1412,16 @@ describe("[bomSync] applyLineQuantityChange", () => {
     const [p, c] = next[0].lines;
     expect(p.quantity).toBe(5);
     expect(p.edited).toBe(false);
-    expect(c.quantity).toBe(15); // 5 * 3, forced 이므로 edited 무시
+    expect(c.quantity).toBe(3); // 커스텀 수량 보존
     expect(c.shortage).toBe(0);
-    expect(c.edited).toBe(false);
+    expect(c.edited).toBe(true);
   });
 
   it("상위 변경 → disassemble 회수 자식은 현재 재고와 무관하게 부족이 아니다", () => {
     const bundles = [
       makeBundle({
         bundle_id: "B",
+        quantity: 1,
         lines: [
           makeLine({ line_id: "P", origin: "direct", quantity: 1 }),
           makeLine({
@@ -1307,6 +1461,7 @@ describe("[bomSync] applyLineQuantityChange", () => {
     const bundles = [
       makeBundle({
         bundle_id: "B",
+        quantity: 1,
         lines: [
           makeLine({ line_id: "P", origin: "direct", quantity: 1 }),
           makeLine({
@@ -1367,7 +1522,7 @@ describe("[bomSync] applyBundleQuantityChange", () => {
     expect(b.lines[2].quantity).toBe(7); // manual 보존
   });
 
-  it("forced(produce) → edited 자식도 강제 재계산", () => {
+  it("produce 기준수량 변경도 커스텀 자식은 보존한다", () => {
     const bundles = [
       makeBundle({
         bundle_id: "B",
@@ -1376,9 +1531,9 @@ describe("[bomSync] applyBundleQuantityChange", () => {
     ];
     const next = applyBundleQuantityChange(bundles, "B", 5, "produce", availMap({ C: 3 }));
     const c = next[0].lines[0];
-    expect(c.quantity).toBe(10); // 5 * 2 강제
-    expect(c.shortage).toBe(7); // max(0, 10 - 3)
-    expect(c.edited).toBe(false);
+    expect(c.quantity).toBe(10); // 커스텀 수량 보존
+    expect(c.shortage).toBe(0);
+    expect(c.edited).toBe(true);
   });
 });
 
@@ -1398,13 +1553,13 @@ describe("[bomSync] qty=0 자동 체크 해제", () => {
     expect(next[0].lines[0].shortage).toBe(0);
   });
 
-  it("상위(direct) qty=0 → 부모 + 비례 자식 모두 included=false", () => {
+  it("상위(direct) qty=0 → 커스텀 자식을 포함해 모두 0/제외/비커스텀으로 초기화", () => {
     const bundles = [
       makeBundle({
         bundle_id: "B",
         lines: [
           makeLine({ line_id: "P", origin: "direct", quantity: 3, included: true }),
-          makeLine({ line_id: "C", origin: "bom_auto", bom_expected: 2, quantity: 6, included: true, edited: false }),
+          makeLine({ line_id: "C", origin: "bom_auto", bom_expected: 2, quantity: 9, included: true, edited: true }),
         ],
       }),
     ];
@@ -1414,6 +1569,7 @@ describe("[bomSync] qty=0 자동 체크 해제", () => {
     expect(p.included).toBe(false);
     expect(c.quantity).toBe(0);
     expect(c.included).toBe(false);
+    expect(c.edited).toBe(false);
   });
 
   it("번들 qty=0 → 미편집 자식 included=false", () => {

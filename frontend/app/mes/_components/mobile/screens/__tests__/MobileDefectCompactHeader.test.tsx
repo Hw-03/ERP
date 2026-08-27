@@ -67,14 +67,21 @@ const item = {
 };
 
 const location: DefectLocation = {
+  record_id: "record-1",
   item_id: "item-1",
   item_name: "Long item",
   mes_code: "MES-001",
   department: "Assembly",
   quantity: 3,
+  original_quantity: 3,
+  pending_quantity: 0,
+  available_quantity: 3,
   defective_at: null,
   reason_category: null,
   reason_memo: null,
+  quarantined_by: "Kim",
+  quarantined_by_employee_id: "emp-1",
+  is_legacy: false,
   has_bom: true,
 };
 
@@ -196,7 +203,7 @@ describe("mobile defect compact headers", () => {
     const payload = vi.mocked(stockRequestsApi.createStockRequest).mock.calls[0][0];
     expect(payload).toMatchObject({
       request_type: "defect_disassemble",
-      lines: [expect.objectContaining({ item_id: "item-1", quantity: 3, from_bucket: "defective" })],
+      lines: [expect.objectContaining({ record_id: "record-1", item_id: "item-1", quantity: 3, from_bucket: "defective" })],
     });
     expect(JSON.parse(payload.notes ?? "{}")).toEqual({
       child_decisions: [{ child_item_id: "child-1", action: "recover" }],

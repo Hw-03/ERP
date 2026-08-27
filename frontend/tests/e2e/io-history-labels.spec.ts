@@ -78,7 +78,7 @@ test.describe("입출고 내역 PC 정보 위계", () => {
   });
 
   test("목록 테이블에 현장 판단 컬럼을 노출한다", async ({ browser }) => {
-    const submitContext = await browser.newContext();
+    const submitContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const submitPage = await submitContext.newPage();
     await loginAsOperator(submitPage, { code: "E01" });
     await gotoWarehouseCompose(submitPage);
@@ -97,7 +97,7 @@ test.describe("입출고 내역 PC 정보 위계", () => {
     await expect(submitPage.getByRole("dialog", { name: /창고 결재 요청 완료/ })).toBeVisible();
     await submitContext.close();
 
-    const approveContext = await browser.newContext();
+    const approveContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const approvePage = await approveContext.newPage();
     await loginAsOperator(approvePage, { code: "E22" });
     await approvePage.goto("/mes?tab=warehouse");
@@ -114,8 +114,15 @@ test.describe("입출고 내역 PC 정보 위계", () => {
     });
     await expect(table).toBeVisible();
 
-    for (const name of ["일시", "작업", "대상", "품목코드", "수량", "담당자"]) {
-      await expect(table.getByRole("columnheader", { name })).toBeVisible();
+    for (const name of [
+      "일시",
+      "작업",
+      "대상",
+      "품목코드 · 수량",
+      "재고 변동",
+      "담당자",
+    ]) {
+      await expect(table.getByRole("columnheader", { name, exact: true })).toBeVisible();
     }
     await approveContext.close();
   });

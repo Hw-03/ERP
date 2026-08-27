@@ -10,7 +10,7 @@
 #
 # exit code: 0 성공 / 2 접속자 있음 / 3 스키마 검수 필요 / 4 동기화 실패 /
 #            5 마이그레이션 실패 / 6 헬스체크 실패 / 7 백업 실패 / 8 사후 검증 실패 /
-#            9 프론트엔드 운영 빌드 실패
+#            9 프론트엔드 운영 빌드 실패 / 10 주간 스냅샷 예약 작업 실패
 
 param(
     [switch] $DryRun,
@@ -32,6 +32,23 @@ $EmpLog = Join-Path $EmpRoot "_attic\runtime\logs\backend\mes.log"
 $EmpLegacyLog = Join-Path $EmpBackend "logs\mes.log"
 $EmpDb = Join-Path $EmpBackend "mes.db"
 $EmpPreviousFrontendBuild = Join-Path $EmpRuntimeRoot "frontend-build\previous.next-prod"
+$runtimeScripts = @(
+    "resolve-server-profile.ps1",
+    "ensure-schema-ready.ps1",
+    "checked-command.ps1",
+    "runtime-paths.ps1",
+    "runtime-control.ps1",
+    "service_supervisor.py",
+    "start-backend.ps1",
+    "stop-backend.ps1",
+    "start-frontend.ps1",
+    "stop-frontend.ps1",
+    "stop-servers.ps1",
+    "open-watch.ps1",
+    "watch-service.ps1",
+    "watch-servers.ps1",
+    "status-servers.ps1"
+)
 
 . (Join-Path $DevRoot "scripts\dev\checked-command.ps1")
 
@@ -95,9 +112,11 @@ function Invoke-EmployeeFrontendBuild {
 
     $previousBackendUrl = $env:BACKEND_INTERNAL_URL
     $previousTelemetry = $env:NEXT_TELEMETRY_DISABLED
+    $previousMesEnv = $env:NEXT_PUBLIC_MES_ENV
     try {
         $env:BACKEND_INTERNAL_URL = "http://localhost:8010"
         $env:NEXT_TELEMETRY_DISABLED = "1"
+        $env:NEXT_PUBLIC_MES_ENV = "employee"
         $result = Invoke-CheckedExternalCommand `
             -FilePath "npm.cmd" `
             -ArgumentList @("run", "build") `
@@ -106,6 +125,7 @@ function Invoke-EmployeeFrontendBuild {
     finally {
         $env:BACKEND_INTERNAL_URL = $previousBackendUrl
         $env:NEXT_TELEMETRY_DISABLED = $previousTelemetry
+        $env:NEXT_PUBLIC_MES_ENV = $previousMesEnv
     }
 
     $buildIdPath = Join-Path $activeBuild "BUILD_ID"
@@ -139,10 +159,58 @@ function Write-RecoveryInstructions {
     Write-Host "  py `"$EmpRoot\scripts\ops\restore_db.py`" --sqlite `"$ValidatedBackupPath`" --target `"$EmpDb`" --check"
 }
 
+function Get-SyncFileSha256 {
+    param([string] $Path)
+
+    $stream = [System.IO.File]::OpenRead($Path)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        return [System.BitConverter]::ToString($sha.ComputeHash($stream)).Replace("-", "")
+    }
+    finally {
+        $sha.Dispose()
+        $stream.Dispose()
+    }
+}
+
+function Test-SyncFileDifferent {
+    param(
+        [string] $Source,
+        [string] $Target
+    )
+
+    if (-not (Test-Path -LiteralPath $Source -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $Target -PathType Leaf)) {
+        return $true
+    }
+    $sourceFile = Get-Item -LiteralPath $Source
+    $targetFile = Get-Item -LiteralPath $Target
+    if ($sourceFile.Length -ne $targetFile.Length) {
+        return $true
+    }
+    return (Get-SyncFileSha256 -Path $Source) -ne (Get-SyncFileSha256 -Path $Target)
+}
+
 Write-Host "===================================================="
 Write-Host " DEXCOWIN MES 직원 서버 동기화"
 Write-Host " $DevRoot -> $EmpRoot"
 Write-Host "===================================================="
+
+Write-Host "[snapshot-preflight] 주간 재고 스냅샷 실행 환경 확인 중..."
+$snapshotRegistrationSource = Join-Path $DevRoot "scripts\ops\register-weekly-inventory-snapshot.ps1"
+$snapshotPreflightResult = Invoke-CheckedExternalCommand `
+    -FilePath "powershell.exe" `
+    -ArgumentList @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $snapshotRegistrationSource,
+        "-PreflightOnly"
+    )
+Write-CheckedCommandResult -Label "snapshot-preflight" -Result $snapshotPreflightResult
+if (-not $snapshotPreflightResult.Success) {
+    Write-Host "[snapshot-preflight] 실패 - 직원 DB와 서버를 변경하지 않았습니다."
+    exit 10
+}
 
 # ---------------------------------------------------------------
 # 1) 접속자 가드
@@ -181,12 +249,70 @@ $schemaPatterns = @(
     'bootstrap_db\.py'
 )
 $backendDryRun = robocopy "$DevRoot\backend" $EmpBackend /L /MIR `
-    /XF mes.db mes.db-shm mes.db-wal "mes.db.backup-*" "*.pyc" `
-    /XD __pycache__ .git .venv data logs .pytest_cache _backup `
+    /XF mes.db mes.db-shm mes.db-wal "mes.db.backup-*" "*.pyc" ".testmondata" ".testmondata-*" `
+    /XD __pycache__ .git .venv data logs .pytest_cache .ruff_cache _backup `
     /NJH /NDL /NP 2>&1 | Out-String -Stream
+$backendDryRunExit = $LASTEXITCODE
+if ($backendDryRunExit -ge 8) {
+    Write-Host "[dry-run] 백엔드 비교 실패 (robocopy exit $backendDryRunExit)"
+    if ($DryRun) { Write-Host "SYNC_CHANGES=ERROR" }
+    exit 4
+}
 $schemaHits = $backendDryRun | Where-Object {
     $line = $_
     $schemaPatterns | Where-Object { $line -match $_ }
+}
+
+$frontendDryRun = @()
+$opsDryRun = @()
+$hasCodeChanges = $false
+if ($DryRun) {
+    $frontendDryRun = robocopy "$DevRoot\frontend" $EmpFrontend /L /MIR `
+        /XD .next .next-prod node_modules _archive coverage test-results logs `
+        /XF .env.local "tsconfig.tsbuildinfo" `
+        /NJH /NDL /NP 2>&1 | Out-String -Stream
+    $frontendDryRunExit = $LASTEXITCODE
+    $opsDryRun = robocopy (Join-Path $DevRoot "scripts\ops") (Join-Path $EmpRoot "scripts\ops") /L /MIR `
+        /XD __pycache__ /XF "*.pyc" /NJH /NDL /NP 2>&1 | Out-String -Stream
+    $opsDryRunExit = $LASTEXITCODE
+    if ($frontendDryRunExit -ge 8 -or $opsDryRunExit -ge 8) {
+        Write-Host "[dry-run] 코드 비교 실패 - frontend=$frontendDryRunExit ops=$opsDryRunExit"
+        Write-Host "SYNC_CHANGES=ERROR"
+        exit 4
+    }
+
+    $manualFileChanges = $false
+    foreach ($scriptName in $runtimeScripts) {
+        if (Test-SyncFileDifferent `
+            -Source (Join-Path $DevRoot "scripts\dev\$scriptName") `
+            -Target (Join-Path $EmpRoot "scripts\dev\$scriptName")) {
+            $manualFileChanges = $true
+            break
+        }
+    }
+    if (-not $manualFileChanges) {
+        foreach ($relativePath in @(
+            "scripts\runtime_paths.py",
+            "start.bat",
+            "watch.bat",
+            "stop.bat",
+            "status.bat"
+        )) {
+            if (Test-SyncFileDifferent `
+                -Source (Join-Path $DevRoot $relativePath) `
+                -Target (Join-Path $EmpRoot $relativePath)) {
+                $manualFileChanges = $true
+                break
+            }
+        }
+    }
+    $hasCodeChanges = (
+        $backendDryRunExit -ne 0 -or
+        $frontendDryRunExit -ne 0 -or
+        $opsDryRunExit -ne 0 -or
+        $manualFileChanges
+    )
+    Write-Host "SYNC_CHANGES=$(if ($hasCodeChanges) { 1 } else { 0 })"
 }
 
 if ($schemaHits -and -not $AllowSchemaChange) {
@@ -231,12 +357,10 @@ else {
 if ($DryRun) {
     Write-Host "[dry-run] 백엔드 변경 예정 파일:"
     $backendDryRun | Where-Object { $_ -match '^\s*(New File|newer|older|\*EXTRA)' } | ForEach-Object { Write-Host "  $_" }
-    $frontendDryRun = robocopy "$DevRoot\frontend" $EmpFrontend /L /MIR `
-        /XD .next .next-prod node_modules _archive coverage test-results logs `
-        /XF .env.local `
-        /NJH /NDL /NP 2>&1 | Out-String -Stream
     Write-Host "[dry-run] 프론트엔드 변경 예정 파일:"
     $frontendDryRun | Where-Object { $_ -match '^\s*(New File|newer|older|\*EXTRA)' } | ForEach-Object { Write-Host "  $_" }
+    Write-Host "[dry-run] 운영 스크립트 변경 예정 파일:"
+    $opsDryRun | Where-Object { $_ -match '^\s*(New File|newer|older|\*EXTRA)' } | ForEach-Object { Write-Host "  $_" }
     Write-Host "[dry-run] 아무것도 변경하지 않았습니다."
     exit 0
 }
@@ -317,7 +441,7 @@ Write-Host "[backup] 검증된 백업: $backupPath"
 Write-Host "[sync-frontend] 프론트엔드 동기화 중..."
 robocopy "$DevRoot\frontend" $EmpFrontend /MIR `
     /XD .next .next-prod node_modules _archive coverage test-results logs `
-    /XF .env.local `
+    /XF .env.local "tsconfig.tsbuildinfo" `
     /NJH /NDL /NP /NS /NC | Out-Null
 $frontendExit = $LASTEXITCODE
 if ($frontendExit -ge 8) {
@@ -343,23 +467,6 @@ Write-Host "[build-frontend] 완료"
 Write-Host "[sync] 직원 실행·운영 스크립트 갱신 중..."
 $EmpDevScriptDir = Join-Path $EmpRoot "scripts\dev"
 New-Item -ItemType Directory -Force -Path $EmpDevScriptDir | Out-Null
-$runtimeScripts = @(
-    "resolve-server-profile.ps1",
-    "ensure-schema-ready.ps1",
-    "checked-command.ps1",
-    "runtime-paths.ps1",
-    "runtime-control.ps1",
-    "service_supervisor.py",
-    "start-backend.ps1",
-    "stop-backend.ps1",
-    "start-frontend.ps1",
-    "stop-frontend.ps1",
-    "stop-servers.ps1",
-    "open-watch.ps1",
-    "watch-service.ps1",
-    "watch-servers.ps1",
-    "status-servers.ps1"
-)
 foreach ($scriptName in $runtimeScripts) {
     Copy-Item (Join-Path $DevRoot "scripts\dev\$scriptName") (Join-Path $EmpDevScriptDir $scriptName) -Force
 }
@@ -380,8 +487,8 @@ foreach ($batName in @("start.bat", "watch.bat", "stop.bat", "status.bat")) {
 
 Write-Host "[sync] 백엔드 동기화 중..."
 robocopy "$DevRoot\backend" $EmpBackend /MIR `
-    /XF mes.db mes.db-shm mes.db-wal "mes.db.backup-*" "*.pyc" `
-    /XD __pycache__ .git .venv data logs .pytest_cache _backup `
+    /XF mes.db mes.db-shm mes.db-wal "mes.db.backup-*" "*.pyc" ".testmondata" ".testmondata-*" `
+    /XD __pycache__ .git .venv data logs .pytest_cache .ruff_cache _backup `
     /NJH /NDL /NP /NS /NC | Out-Null
 $backendExit = $LASTEXITCODE
 if ($backendExit -ge 8) {
@@ -439,6 +546,57 @@ if (-not $inventoryVerifyResult.Success) {
     Write-RecoveryInstructions -FailedStage "post-verify" -ValidatedBackupPath $backupPath
     exit 8
 }
+
+$operationIntegrityTool = Join-Path $EmpRoot "scripts\ops\inventory_operation_admin.py"
+$operationDiagnoseResult = Invoke-CheckedExternalCommand `
+    -FilePath "py.exe" `
+    -ArgumentList @(
+        $operationIntegrityTool,
+        "diagnose",
+        "--db-url", $inventoryDbUrl
+    )
+Write-CheckedCommandResult -Label "post-verify-operation-integrity" -Result $operationDiagnoseResult
+if (-not $operationDiagnoseResult.Success) {
+    Write-Host "[post-verify] 취소 원장 정합성 진단 실패 - 신규 원장을 활성화하지 않아 기존 동작을 유지합니다."
+    Write-RecoveryInstructions -FailedStage "post-verify" -ValidatedBackupPath $backupPath
+    exit 8
+}
+
+$operationActivateResult = Invoke-CheckedExternalCommand `
+    -FilePath "py.exe" `
+    -ArgumentList @(
+        $operationIntegrityTool,
+        "activate",
+        "--db-url", $inventoryDbUrl,
+        "--approved-by", "sync-to-employee",
+        "--validated-backup", $backupPath,
+        "--apply"
+    )
+Write-CheckedCommandResult -Label "post-verify-operation-activate" -Result $operationActivateResult
+if (-not $operationActivateResult.Success) {
+    Write-Host "[post-verify] 취소 원장 활성화 실패 - 설정 트랜잭션을 롤백하고 서버를 시작하지 않습니다."
+    Write-RecoveryInstructions -FailedStage "post-verify" -ValidatedBackupPath $backupPath
+    exit 8
+}
+
+Write-Host "[snapshot-task] 주간 재고 스냅샷 예약 작업 등록·검증 중..."
+$snapshotRegistrationTool = Join-Path $EmpRoot "scripts\ops\register-weekly-inventory-snapshot.ps1"
+$snapshotRegistrationResult = Invoke-CheckedExternalCommand `
+    -FilePath "powershell.exe" `
+    -ArgumentList @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $snapshotRegistrationTool
+    )
+Write-CheckedCommandResult -Label "snapshot-task" -Result $snapshotRegistrationResult
+if (-not $snapshotRegistrationResult.Success) {
+    Write-Host "[snapshot-task] 주간 재고 스냅샷 예약 작업 등록 또는 검증에 실패했습니다. 직원 서비스를 재기동하고 동기화를 실패로 종료합니다."
+    $restartAfterSnapshotTaskFailure = Restart-EmployeeServices
+    if (-not $restartAfterSnapshotTaskFailure.Success) {
+        Write-Host "[snapshot-task] 직원 서비스 재기동도 실패했습니다. backend=$($restartAfterSnapshotTaskFailure.Backend.Success) frontend=$($restartAfterSnapshotTaskFailure.Frontend.Success)"
+    }
+    exit 10
+}
 Write-Host "[post-verify] 완료"
 
 # ---------------------------------------------------------------
@@ -488,6 +646,7 @@ Write-Host " 백엔드 robocopy exit  : $backendExit"
 Write-Host " 프론트 robocopy exit  : $frontendExit"
 Write-Host " 마이그레이션          : 성공"
 Write-Host " 사후 검증             : 성공"
+Write-Host " 주간 스냅샷 예약 작업 : 등록·검증 성공"
 Write-Host " 헬스체크 8010/3000    : OK"
 Write-Host " DB 백업               : $backupPath"
 Write-Host " 접속 주소             : http://192.168.0.63:3000"

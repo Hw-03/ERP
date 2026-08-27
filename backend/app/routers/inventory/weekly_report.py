@@ -1,10 +1,13 @@
 """주간보고: GET /weekly-report — ?F 계열 품목의 주차별 재고 변화 집계.
 
 ⛔ 동결(완성) — 2026-05-29 / 2026-06-16 '생산' 정의 변경
+- 2026-08-24 사용자 승인 예외: 과거 주차는 기존 산식을 보존하고, 연속 주말
+  스냅샷이 확보된 신규 주차만 일요일 KST 확정 재고를 사용한다. 신규 구간의
+  거래 집계는 기준 시각 전에 취소된 로그를 제외한다.
 - 명시적 수정 요청이 있을 때만 손댈 것. 주변 리팩터·전역 변경에서는 우회.
 - '생산'(produce_qty)=PRODUCE 전용 — 입출고 내역 '생산'과 동일 기준. 입고(receive_qty)
-  =RECEIVE 로 분리 표시. 전주재고/증감은 기간 내 '전체 거래' 합(net_all)으로 역산 —
-  폐기·분해·조정까지 반영해 정확. 생산 매트릭스(PRODUCTION_TX_TYPES)도 PRODUCE 전용.
+  =RECEIVE 로 분리 표시. 과거 주차의 전주재고/증감은 기간 내 '전체 거래' 합(net_all)으로
+  기존과 동일하게 역산한다. 생산 매트릭스(PRODUCTION_TX_TYPES)도 PRODUCE 전용.
 - 신규 TransactionTypeEnum 멤버 추가 시 PRODUCTION_TX_TYPES 또는
   NON_PRODUCTION_TX_TYPES 둘 중 하나에 명시 분류 필수
   (test_all_transaction_types_classified 가 누락 검출).
@@ -14,16 +17,26 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, time, timedelta
+from dataclasses import dataclass
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import case, func
+from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Inventory, Item, ProductSymbol, TransactionLog, TransactionTypeEnum
+from app.models import (
+    Inventory,
+    Item,
+    ProductSymbol,
+    TransactionLog,
+    TransactionTypeEnum,
+    WeeklyInventorySnapshot,
+)
+from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     WeeklyGroupReport,
     WeeklyItemReport,
@@ -32,10 +45,17 @@ from app.schemas import (
     WeeklyReportSummary,
     WeeklyWarning,
 )
+from app.services.weekly_inventory_snapshot import (
+    load_dashboard_finished_stock,
+    sunday_cutoff_utc,
+)
+from app.services import weekly_report_contract
 
 from ._shared import PROCESS_TYPE_LABELS
 
 router = APIRouter()
+
+_KST = ZoneInfo("Asia/Seoul")
 
 _F_CODES = ["TF", "HF", "VF", "NF", "AF", "PF"]
 
@@ -84,6 +104,177 @@ NON_PRODUCTION_TX_TYPES: frozenset[TransactionTypeEnum] = frozenset({
 })
 
 
+@dataclass(frozen=True)
+class _SnapshotReportItem:
+    item_id: object
+    mes_code: str | None
+    item_name: str
+    process_type_code: str
+    prev_qty: Decimal
+    current_qty: Decimal
+
+
+@dataclass(frozen=True)
+class _SnapshotReportContext:
+    items: list[_SnapshotReportItem]
+    tx_start_utc: datetime
+    tx_end_utc_exclusive: datetime
+    transaction_as_of_utc: datetime
+
+
+@dataclass(frozen=True)
+class _InventoryPointItem:
+    item_id: object
+    mes_code: str | None
+    item_name: str
+    process_type_code: str
+    quantity: Decimal
+
+
+def _today_kst() -> date:
+    return datetime.now(_KST).date()
+
+
+def _kst_date_start_utc(value: date) -> datetime:
+    return datetime.combine(value, time.min, tzinfo=_KST).astimezone(UTC).replace(tzinfo=None)
+
+
+def _snapshot_items_by_id(
+    snapshot: WeeklyInventorySnapshot,
+) -> dict[object, _InventoryPointItem]:
+    return {
+        line.item_id: _InventoryPointItem(
+            item_id=line.item_id,
+            mes_code=line.mes_code,
+            item_name=line.item_name,
+            process_type_code=line.process_type_code,
+            quantity=Decimal(str(line.quantity)),
+        )
+        for line in snapshot.items
+    }
+
+
+def _live_items_by_id(db: Session) -> dict[object, _InventoryPointItem]:
+    return {
+        row.item.item_id: _InventoryPointItem(
+            item_id=row.item.item_id,
+            mes_code=row.item.mes_code,
+            item_name=row.item.item_name,
+            process_type_code=row.item.process_type_code,
+            quantity=row.quantity,
+        )
+        for row in load_dashboard_finished_stock(db)
+    }
+
+
+def _merge_inventory_points(
+    previous_by_id: dict[object, _InventoryPointItem],
+    current_by_id: dict[object, _InventoryPointItem],
+) -> list[_SnapshotReportItem]:
+    items: list[_SnapshotReportItem] = []
+    for item_id in set(previous_by_id) | set(current_by_id):
+        current = current_by_id.get(item_id)
+        previous = previous_by_id.get(item_id)
+        metadata = current if current is not None else previous
+        if metadata is None:
+            continue
+        items.append(
+            _SnapshotReportItem(
+                item_id=item_id,
+                mes_code=metadata.mes_code,
+                item_name=metadata.item_name,
+                process_type_code=metadata.process_type_code,
+                prev_qty=previous.quantity if previous is not None else Decimal("0"),
+                current_qty=current.quantity if current is not None else Decimal("0"),
+            )
+        )
+    items.sort(key=lambda row: (row.mes_code or "", str(row.item_id)))
+    return items
+
+
+def _load_snapshot_report_context(
+    db: Session,
+    *,
+    week_start: date,
+    week_end: date,
+) -> _SnapshotReportContext | None:
+    """과거 레거시 주차와 정확 적용 주차의 경계를 데이터로 판정한다."""
+
+    if week_start.weekday() != 0 or week_end != week_start + timedelta(days=6):
+        return None
+
+    first_snapshot = (
+        db.query(WeeklyInventorySnapshot)
+        .order_by(WeeklyInventorySnapshot.week_end.asc())
+        .first()
+    )
+    if first_snapshot is None:
+        return None
+
+    today = _today_kst()
+    previous_week_end = week_start - timedelta(days=1)
+    is_current_week = week_start <= today <= week_end
+    is_closed_week = week_end < today
+
+    if is_current_week:
+        previous_snapshot = (
+            db.query(WeeklyInventorySnapshot)
+            .filter(WeeklyInventorySnapshot.week_end == previous_week_end)
+            .one_or_none()
+        )
+        if previous_snapshot is None:
+            if previous_week_end > first_snapshot.week_end:
+                raise http_error(
+                    503,
+                    ErrorCode.DB_UNAVAILABLE,
+                    "주간 재고 확정 데이터가 누락되었습니다.",
+                )
+            return None
+
+        items = _merge_inventory_points(
+            _snapshot_items_by_id(previous_snapshot),
+            _live_items_by_id(db),
+        )
+        now_utc = datetime.now(UTC).replace(tzinfo=None)
+        return _SnapshotReportContext(
+            items=items,
+            tx_start_utc=_kst_date_start_utc(week_start),
+            tx_end_utc_exclusive=_kst_date_start_utc(week_end + timedelta(days=1)),
+            transaction_as_of_utc=now_utc,
+        )
+
+    if not is_closed_week or week_end < first_snapshot.week_end + timedelta(days=7):
+        return None
+
+    previous_snapshot = (
+        db.query(WeeklyInventorySnapshot)
+        .filter(WeeklyInventorySnapshot.week_end == previous_week_end)
+        .one_or_none()
+    )
+    current_snapshot = (
+        db.query(WeeklyInventorySnapshot)
+        .filter(WeeklyInventorySnapshot.week_end == week_end)
+        .one_or_none()
+    )
+    if previous_snapshot is None or current_snapshot is None:
+        raise http_error(
+            503,
+            ErrorCode.DB_UNAVAILABLE,
+            "주간 재고 확정 데이터가 누락되었습니다.",
+        )
+
+    items = _merge_inventory_points(
+        _snapshot_items_by_id(previous_snapshot),
+        _snapshot_items_by_id(current_snapshot),
+    )
+    return _SnapshotReportContext(
+        items=items,
+        tx_start_utc=_kst_date_start_utc(week_start),
+        tx_end_utc_exclusive=_kst_date_start_utc(week_end + timedelta(days=1)),
+        transaction_as_of_utc=sunday_cutoff_utc(week_end),
+    )
+
+
 def _load_model_symbols(db: Session) -> tuple[dict[str, str], list[str]]:
     """ProductSymbol 테이블에서 단일-글자 symbol → model_name 매핑과
     slot 순 model_name 목록을 반환. 새 모델 추가는 이 테이블에 row 추가만.
@@ -130,16 +321,39 @@ def get_weekly_report(
     if week_start is None or week_end is None:
         week_start, week_end = _current_week_bounds()
 
-    dt_start = datetime.combine(week_start, time.min)
-    dt_end = datetime.combine(week_end, time.max)
-
-    rows = (
-        db.query(Item, Inventory)
-        .outerjoin(Inventory, Item.item_id == Inventory.item_id)
-        .filter(Item.process_type_code.in_(_F_CODES))
-        .order_by(Item.mes_code)
-        .all()
+    contract_state = weekly_report_contract.weekly_contract_state(
+        db,
+        week_start=week_start,
+        week_end=week_end,
+        today=_today_kst(),
     )
+    if contract_state.report_status == "verified":
+        return weekly_report_contract.build_verified_weekly_report(
+            db,
+            week_start=week_start,
+            week_end=week_end,
+            today=_today_kst(),
+        )
+
+    snapshot_context = _load_snapshot_report_context(
+        db,
+        week_start=week_start,
+        week_end=week_end,
+    )
+    if snapshot_context is None:
+        dt_start = datetime.combine(week_start, time.min)
+        dt_end = datetime.combine(week_end, time.max)
+        rows: list[object] = (
+            db.query(Item, Inventory)
+            .outerjoin(Inventory, Item.item_id == Inventory.item_id)
+            .filter(Item.process_type_code.in_(_F_CODES))
+            .order_by(Item.mes_code)
+            .all()
+        )
+    else:
+        dt_start = snapshot_context.tx_start_utc
+        dt_end = snapshot_context.tx_end_utc_exclusive
+        rows = list(snapshot_context.items)
 
     if not rows:
         return WeeklyReportResponse(
@@ -173,9 +387,31 @@ def get_weekly_report(
                 groups_unchanged=0,
             ),
             warnings=[],
+            report_status=contract_state.report_status,
+            transition_notice=contract_state.transition_notice,
         )
 
-    item_ids = [item.item_id for item, _ in rows]
+    item_ids = (
+        [item.item_id for item, _ in rows]
+        if snapshot_context is None
+        else [row.item_id for row in snapshot_context.items]
+    )
+
+    tx_filters = [
+        TransactionLog.item_id.in_(item_ids),
+        TransactionLog.created_at >= dt_start,
+    ]
+    if snapshot_context is None:
+        tx_filters.append(TransactionLog.created_at <= dt_end)
+    else:
+        tx_filters.extend([
+            TransactionLog.created_at < dt_end,
+            or_(
+                TransactionLog.cancelled.is_(False),
+                TransactionLog.cancelled_at.is_(None),
+                TransactionLog.cancelled_at > snapshot_context.transaction_as_of_utc,
+            ),
+        ])
 
     tx_rows = (
         db.query(
@@ -201,11 +437,7 @@ def get_weekly_report(
                 0,
             ).label("decrease_sum"),
         )
-        .filter(
-            TransactionLog.item_id.in_(item_ids),
-            TransactionLog.created_at >= dt_start,
-            TransactionLog.created_at <= dt_end,
-        )
+        .filter(*tx_filters)
         .group_by(TransactionLog.item_id, TransactionLog.transaction_type)
         .all()
     )
@@ -231,24 +463,37 @@ def get_weekly_report(
 
     group_items: dict[str, list[WeeklyItemReport]] = {code: [] for code in _F_CODES}
 
-    for item, inv in rows:
-        code = item.process_type_code or "??"
+    for row in rows:
+        if snapshot_context is None:
+            item, inv = row
+            item_id = item.item_id
+            mes_code = item.mes_code
+            item_name = item.item_name
+            code = item.process_type_code or "??"
+            current_qty = Decimal(str(inv.quantity if inv else 0))
+            snapshot_prev_qty: Decimal | None = None
+        else:
+            item_id = row.item_id
+            mes_code = row.mes_code
+            item_name = row.item_name
+            code = row.process_type_code or "??"
+            current_qty = row.current_qty
+            snapshot_prev_qty = row.prev_qty
         if code not in group_items:
             continue
-        iid = str(item.item_id)
-        current_qty = Decimal(str(inv.quantity if inv else 0))
+        iid = str(item_id)
         produce_qty = produce_map.get(iid, Decimal("0"))
         receive_qty = receive_map.get(iid, Decimal("0"))
         out_qty = out_map.get(iid, Decimal("0"))
         net_all = net_map.get(iid, Decimal("0"))  # 전체 거래 합 — 폐기·분해·조정 포함
-        prev_qty = current_qty - net_all
-        delta = net_all  # = current_qty - prev_qty
+        prev_qty = current_qty - net_all if snapshot_prev_qty is None else snapshot_prev_qty
+        delta = current_qty - prev_qty
 
         group_items[code].append(
             WeeklyItemReport(
                 item_id=iid,
-                mes_code=item.mes_code,
-                item_name=item.item_name,
+                mes_code=mes_code,
+                item_name=item_name,
                 prev_qty=prev_qty,
                 produce_qty=produce_qty,
                 receive_qty=receive_qty,
@@ -290,15 +535,28 @@ def get_weekly_report(
         )
 
     # ── 생산 매트릭스 집계 ────────────────────────────────────────
+    production_filters = [
+        Item.process_type_code.in_(_PROD_CODES),
+        TransactionLog.transaction_type.in_(PRODUCTION_TX_TYPES),
+        TransactionLog.created_at >= dt_start,
+    ]
+    if snapshot_context is None:
+        production_filters.append(TransactionLog.created_at <= dt_end)
+    else:
+        production_filters.extend([
+            TransactionLog.item_id.in_(item_ids),
+            TransactionLog.created_at < dt_end,
+            or_(
+                TransactionLog.cancelled.is_(False),
+                TransactionLog.cancelled_at.is_(None),
+                TransactionLog.cancelled_at > snapshot_context.transaction_as_of_utc,
+            ),
+        ])
+
     prod_items = (
         db.query(Item, func.coalesce(func.sum(TransactionLog.quantity_change), 0))
         .join(TransactionLog, Item.item_id == TransactionLog.item_id)
-        .filter(
-            Item.process_type_code.in_(_PROD_CODES),
-            TransactionLog.transaction_type.in_(PRODUCTION_TX_TYPES),
-            TransactionLog.created_at >= dt_start,
-            TransactionLog.created_at <= dt_end,
-        )
+        .filter(*production_filters)
         .group_by(Item.item_id)
         .all()
     )
@@ -395,4 +653,6 @@ def get_weekly_report(
         summary=summary,
         warnings=warnings,
         production_matrix=production_matrix,
+        report_status=contract_state.report_status,
+        transition_notice=contract_state.transition_notice,
     )

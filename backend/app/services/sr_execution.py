@@ -12,6 +12,9 @@ from sqlalchemy.orm import Session
 from app.database import _is_sqlite
 from app.models import (
     Employee,
+    InventoryOperation,
+    InventoryOperationEffectKindEnum,
+    InventoryOperationRoleEnum,
     RequestBucketEnum,
     StockRequest,
     StockRequestLine,
@@ -21,6 +24,7 @@ from app.models import (
 )
 from app.services import inventory as inventory_svc
 from app.services import inv_effect
+from app.services import inventory_operations as operation_svc
 from app.services.dept_hierarchy import can_approve_department as _can_approve_department
 from app.services.sr_validation import (
     _TX_TYPE_BY_REQUEST,
@@ -286,7 +290,16 @@ def _request_inventory_item_ids(
     return sorted(item_ids)
 
 
-def _handle_defect_disassemble(db, request, line, approver, qty, item_id) -> Decimal:
+def _handle_defect_disassemble(
+    db,
+    request,
+    line,
+    approver,
+    qty,
+    item_id,
+    *,
+    operation: InventoryOperation | None = None,
+) -> Decimal:
     from app.services.dept_adjustment import submit_defective_disassemble
 
     if line.from_department is None:
@@ -302,11 +315,22 @@ def _handle_defect_disassemble(db, request, line, approver, qty, item_id) -> Dec
         reason_category=reason_cat,
         reason_memo=reason_memo_val,
         actor=approver,
+        defect_quarantine_record_id=line.defect_quarantine_record_id,
+        operation=operation,
     )
     return -qty
 
 
-def _handle_rework_normal(db, request, line, approver, qty, item_id) -> Decimal:
+def _handle_rework_normal(
+    db,
+    request,
+    line,
+    approver,
+    qty,
+    item_id,
+    *,
+    operation: InventoryOperation | None = None,
+) -> Decimal:
     from app.services.dept_adjustment import submit_normal_disassemble
 
     source = _source_from_bucket(line)
@@ -326,6 +350,7 @@ def _handle_rework_normal(db, request, line, approver, qty, item_id) -> Decimal:
         reason_category=request.reason_category or _DEFAULT_REASON_CATEGORY,
         reason_memo=request.reason_memo or "",
         actor=approver,
+        operation=operation,
     )
     return -qty
 
@@ -358,6 +383,7 @@ def _execute_line(
     *,
     approver: Employee,
     is_approval: bool,
+    operation: InventoryOperation | None = None,
 ) -> None:
     """단일 라인의 재고 이동 + TransactionLog 생성.
 
@@ -367,22 +393,109 @@ def _execute_line(
     qty = line.quantity or Decimal("0")
     item_id = line.item_id
     rt = request.request_type
+    record = None
+    if line.from_bucket == RequestBucketEnum.DEFECTIVE:
+        from app.services import defect_records as defect_records_svc
+
+        record = defect_records_svc._get_record_for_action(
+            db,
+            record_id=line.defect_quarantine_record_id,
+            item_id=item_id,
+            department=line.from_department,
+        )
+        if record is not None:
+            defect_records_svc._ensure_available(
+                db,
+                record,
+                qty,
+                exclude_line_id=line.line_id,
+            )
 
     # 이동 전 수량과 위치 셀을 기록한다.
     inv = inventory_svc._get_or_create_inventory(db, item_id)
     qty_before = inv.quantity or Decimal("0")
-    warehouse_qty_before = inv.warehouse_qty or Decimal("0")
     cells_before = inv_effect._snapshot_cells(db, item_id)
 
     handler = _LINE_HANDLERS.get(rt)
     if handler is None:
         raise ValueError(f"지원하지 않는 요청 유형: {rt}")
-    quantity_change: Decimal = handler(db, request, line, approver, qty, item_id)
+    if rt == StockRequestTypeEnum.DEFECT_DISASSEMBLE:
+        quantity_change = _handle_defect_disassemble(
+            db,
+            request,
+            line,
+            approver,
+            qty,
+            item_id,
+            operation=operation,
+        )
+    elif rt == StockRequestTypeEnum.REWORK_NORMAL:
+        quantity_change = _handle_rework_normal(
+            db,
+            request,
+            line,
+            approver,
+            qty,
+            item_id,
+            operation=operation,
+        )
+    else:
+        quantity_change = handler(db, request, line, approver, qty, item_id)
+
+    created_record = None
+    if rt in {
+        StockRequestTypeEnum.MARK_DEFECTIVE_WH,
+        StockRequestTypeEnum.MARK_DEFECTIVE_PROD,
+    }:
+        from app.services import defect_records as defect_records_svc
+
+        created_record = defect_records_svc._create_record(
+            db,
+            item_id=item_id,
+            department=line.to_department,
+            quantity=qty,
+            actor_employee_id=approver.employee_id,
+            actor_name=approver.name,
+            reason_category=request.reason_category,
+            memo=request.reason_memo,
+        )
+
+    if record is not None:
+        defect_records_svc._decrement_record(
+            db,
+            record,
+            qty,
+            exclude_line_id=line.line_id,
+        )
+        operation_svc._record_defect_movement(
+            db,
+            operation=operation,
+            record_id=record.record_id,
+            item_id=item_id,
+            department=str(line.from_department),
+            movement_type=rt.value,
+            quantity_delta=-qty,
+            role="DEFECTIVE_SOURCE",
+            actor_name=approver.name,
+            actor_employee_id=approver.employee_id,
+        )
+    if created_record is not None:
+        operation_svc._record_defect_movement(
+            db,
+            operation=operation,
+            record_id=created_record.record_id,
+            item_id=item_id,
+            department=str(line.to_department),
+            movement_type="QUARANTINE",
+            quantity_delta=qty,
+            role="REQUEST_DEFECTIVE",
+            actor_name=approver.name,
+            actor_employee_id=approver.employee_id,
+        )
 
     db.flush()
     inv = inventory_svc._get_or_create_inventory(db, item_id)
     qty_after = inv.quantity or Decimal("0")
-    warehouse_qty_after = inv.warehouse_qty or Decimal("0")
 
     # TransactionLog 작성 — 결재 흐름 맥락을 notes 에 기록.
     from_label = _bucket_label(line.from_bucket, line.from_department)
@@ -406,17 +519,31 @@ def _execute_line(
     producer_employee_id = (
         request.requester_employee_id if is_internal_use else approver.employee_id
     )
-    department = line.to_department if is_internal_use else line.from_department
+    department = line.to_department if (
+        is_internal_use
+        or rt in {
+            StockRequestTypeEnum.MARK_DEFECTIVE_WH,
+            StockRequestTypeEnum.MARK_DEFECTIVE_PROD,
+        }
+    ) else line.from_department
+    linked_record = record or created_record
 
+    role = (
+        InventoryOperationRoleEnum.TRANSFER
+        if rt in {
+            StockRequestTypeEnum.WAREHOUSE_TO_DEPT,
+            StockRequestTypeEnum.DEPT_TO_WAREHOUSE,
+            StockRequestTypeEnum.DEPT_INTERNAL,
+        }
+        else InventoryOperationRoleEnum.PRIMARY
+    )
     db.add(
-        TransactionLog(
+        operation_svc._attach_transaction(TransactionLog(
             item_id=item_id,
             transaction_type=_TX_TYPE_BY_REQUEST[rt],
             quantity_change=quantity_change,
             quantity_before=qty_before,
             quantity_after=qty_after,
-            warehouse_qty_before=warehouse_qty_before if is_internal_use else None,
-            warehouse_qty_after=warehouse_qty_after if is_internal_use else None,
             reference_no=request.request_code,
             produced_by=producer_name,
             producer_employee_id=producer_employee_id,
@@ -424,9 +551,13 @@ def _execute_line(
             reason_category=request.reason_category,
             reason_memo=request.reason_memo,
             operation_batch_id=getattr(request, "operation_batch_id", None),
+            operation_line_id=line.operation_line_id,
             department=str(department) if department else None,
-            inventory_effect=inv_effect._capture_effect(db, item_id, cells_before),
-        )
+            defect_quarantine_record_id=(
+                linked_record.record_id if linked_record else None
+            ),
+            **inv_effect._capture_log_stock_snapshot(db, item_id, cells_before),
+        ), operation, role)
     )
 
 
@@ -440,12 +571,40 @@ def _execute_all_lines(
     is_approval: bool = False,
 ) -> None:
     lines = list(lines)
+    operation = operation_svc._create_business_operation(
+        db,
+        domain="stock_request",
+        action=request.request_type.value,
+        display_label=request.request_type.value,
+        actor_name=approver.name,
+        actor_employee_id=approver.employee_id,
+        department=str(approver.department),
+        reason=request.reason_memo or request.notes,
+        idempotency_key=f"stock_request:{request.request_id}:execute",
+    )
     # 정렬된 순서로 모든 아이템 선락 → 교착 방지 (PostgreSQL only; SQLite는 WAL 직렬화)
     if not _is_sqlite:
         all_item_ids = _request_inventory_item_ids(db, request, lines)
         inventory_svc._ensure_and_lock_inventories(db, all_item_ids)
     for line in lines:
-        _execute_line(db, request, line, approver=approver, is_approval=is_approval)
+        _execute_line(
+            db,
+            request,
+            line,
+            approver=approver,
+            is_approval=is_approval,
+            operation=operation,
+        )
+    operation_svc._record_effect(
+        db,
+        operation=operation,
+        effect_kind=InventoryOperationEffectKindEnum.WORKFLOW,
+        subject_type="StockRequest",
+        subject_id=request.request_id,
+        role="EXECUTION_STATUS",
+        before_state={"status": request.status.value},
+        after_state={"status": StockRequestStatusEnum.COMPLETED.value},
+    )
 
 
 # ---------------------------------------------------------------------------

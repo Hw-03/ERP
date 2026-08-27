@@ -12,9 +12,10 @@ import {
   HISTORY_MAIN_CELL_CLASS,
   HISTORY_MAIN_ROW_CLASS,
   HISTORY_STATUS_CELL_CLASS,
-  ItemCodeCell,
+  ItemCodeQuantityCell,
   PeopleStatusCell,
   QuantityStockCell,
+  StockSnapshotCell,
   TargetSummaryBlock,
   type LogGroup,
 } from "./historyTableHelpers";
@@ -35,8 +36,7 @@ type Props = {
 export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelect, compact, controlsId }: Props) {
   const padX = compact ? "px-2" : "px-4";
   const targetPadX = compact ? "px-2" : "px-4";
-  const quantityPadX = compact ? "px-2" : "px-4";
-  const statusPadX = compact ? "px-2" : "px-4";
+  const statusPadX = "px-2";
   const parentLog = group.logs.find((l) => l.transaction_type === "DISASSEMBLE") ?? group.logs[0];
   const childCount = group.logs.filter((l) => l.transaction_type !== "DISASSEMBLE").length;
   const cancelled = group.logs.some((log) => log.cancelled);
@@ -73,6 +73,7 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
   return (
     <tr
       data-history-main-row="true"
+      data-history-cancelled={cancelled || undefined}
       onClick={onSelect}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -84,7 +85,7 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
       aria-selected={selected}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]${cancelled ? " opacity-60" : ""}`}
+      className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]`}
       style={{
         background: rowBackground,
         outline: selected ? `1.5px solid ${LEGACY_COLORS.red}` : "none",
@@ -110,13 +111,14 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
         <TargetSummaryBlock
           presentation={presentation}
           icon={<Wrench className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.red }} />}
-          cancelled={cancelled}
         />
       </td>
-      <ItemCodeCell code={presentation.target.code} compact={compact} />
-      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${quantityPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <QuantityStockCell presentation={presentation} cancelled={cancelled} />
-      </td>
+      <ItemCodeQuantityCell
+        code={presentation.target.code}
+        compact={compact}
+        quantity={<QuantityStockCell presentation={presentation} />}
+      />
+      <StockSnapshotCell log={parentLog} />
       <td className={`${HISTORY_STATUS_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <PeopleStatusCell presentation={presentation} />
       </td>

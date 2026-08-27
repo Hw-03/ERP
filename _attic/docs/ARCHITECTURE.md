@@ -103,6 +103,20 @@ available = (warehouse_qty - warehouse_pending)
 
 `InventoryLocation` 은 (item, department, status) 단위 보관량과 위치별 예약량 기록이다.
 
+### 작업·취소 역전 원장
+
+신규 재고 업무는 사용자 실행 한 번마다 `InventoryOperation(kind=BUSINESS)` 하나를 만들고 부모·하위 `TransactionLog`, 불량 이동, 예약·출하배정과 연결 업무 상태 효과를 같은 `operation_id`로 묶는다.
+
+- `InventoryOperationEffect`: 예약·배정·업무 상태의 전·후 스냅샷
+- `DefectInventoryMovement`: 격리·복귀·재작업·폐기와 역전을 append-only로 기록
+- `TransactionLog.operation_role`: BOM 투입·산출과 재작업 정상/불량 부모·자식 역할을 명시
+
+취소는 원 작업을 수정하지 않고 `InventoryOperation(kind=CANCELLATION, reverses_operation_id=...)`과 정확히 반대인 로그·효과를 새로 추가한다. 고유 역전 관계, 재고 셀 잠금과 동일 트랜잭션 재검사로 한 원 작업에는 성공 취소 하나만 허용한다. 정상·불량재고, 예약·배정, 불량 원장 또는 연결 업무 중 하나라도 역전할 수 없으면 전체를 롤백한다.
+
+원장 활성화 전에 생성됐지만 아직 취소되지 않은 같은 주 레거시 거래는 취소 요청 시점에만 안전 편입한다. 배치·지원 출하 참조·단일 로그 범위를 잠근 뒤 전체 재고 효과와 역할, 처리자, 완료된 연결 업무를 확정할 수 있으면 원래 시각의 `BUSINESS` 작업을 만들고 같은 트랜잭션에서 공통 역전 취소를 실행한다. 기존 방식으로 이미 취소된 로그와 불량 계보를 확정할 수 없는 레거시 거래는 변환하지 않는다.
+
+주간보고 v2는 명시적 작업 역할로 F 품목의 `생산·입고·출고·불량`을 분류하고 같은 주 원 작업·취소 작업 쌍을 활동 열에서 제외한다. 정상 실재고와 활동 증감 두 식이 일치하지 않으면 표를 공개하지 않는다.
+
 ### 주요 엔드포인트
 
 | 메서드 | 경로 | 의미 |
@@ -117,6 +131,11 @@ available = (warehouse_qty - warehouse_pending)
 | POST | `/api/inventory/mark-defective` | 불량 격리 |
 | POST | `/api/inventory/return-to-supplier` | 공급업체 반품 |
 | GET | `/api/inventory/transactions` | 거래 이력 |
+| GET | `/api/inventory/operations` | 작업 단위 이력·품목 필터 |
+| GET | `/api/inventory/operations/{operation_id}` | 부모·하위 로그와 업무 효과 상세 |
+| POST | `/api/inventory/operations/{operation_id}/cancel/preview` | 원자 취소 영향 사전검사 |
+| POST | `/api/inventory/operations/{operation_id}/cancel` | 별도 역전 작업 생성 |
+| GET | `/api/admin/inventory-integrity` | 관리자 읽기 전용 취소·불량 정합성 진단 |
 
 응답·에러 detail의 표준화는 다음 작업에서 진행 예정. 현재는 단순 문자열 detail 95% + 일부 dict detail (shortages 등) 5% 가 공존한다.
 
@@ -189,7 +208,8 @@ DesktopWarehouseView.submit()
             │
             ├─ 비즈니스 규칙 검증 (재고 부족 등)
             ├─ Inventory + InventoryLocation 갱신
-            ├─ TransactionLog 추가
+            ├─ InventoryOperation + TransactionLog 추가
+            ├─ 불량 이동·예약·배정·업무 상태 효과 추가
             └─ db.commit() / db.refresh()
             │
             ▼

@@ -147,8 +147,15 @@ def test_manual_pf_pin_removal_declares_its_data_change_contract(tmp_path: Path)
         "20260813_0020_add_activity_audit.py",
         "20260818_0021_add_bom_stock_exempt.py",
         "20260818_0022_add_io_bom_auto_tokens.py",
-        "20260819_0023_add_operator_sessions.py",
-        "20260820_0024_add_internal_use_bom_modes.py",
+        "20260820_0023_add_internal_use_bom_modes.py",
+        "20260821_0024_remove_shipping_requested_status.py",
+        "20260824_0024_weekly_inventory_snapshots.py",
+        "20260824_0025_add_transaction_stock_snapshots.py",
+        "20260824_0026_add_transaction_operation_line_link.py",
+        "20260824_0027_defect_quarantine_records.py",
+        "20260825_0028_reconstruct_legacy_defect_records.py",
+        "20260826_0029_inventory_operations.py",
+        "20260827_0030_add_operator_sessions.py",
     ],
 )
 def test_current_employee_schema_migrations_declare_auto_deploy_policy(filename: str) -> None:

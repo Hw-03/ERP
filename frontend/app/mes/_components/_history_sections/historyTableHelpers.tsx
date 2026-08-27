@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import {
   Activity, AlertCircle, ArrowDownToLine, ArrowRightLeft, ArrowUpFromLine,
   BookmarkMinus, BookmarkPlus, ChevronDown, ChevronRight, Hammer, Layers,
@@ -38,8 +38,7 @@ const TX_ICON = {
 } as const;
 
 /**
- * 우측 SlidePanel(160ms width transition)에 맞춰 셀 width/padding 변경을 부드럽게.
- * 평상시 ↔ 우측 패널 열림 시 일시/구분/품목명 컬럼이 jump 없이 따라간다.
+ * 우측 SlidePanel(160ms width transition)에 맞춰 표 셀의 레이아웃 변화도 부드럽게 한다.
  */
 export const HISTORY_CELL_TRANSITION =
   "padding 160ms cubic-bezier(0.4, 0, 0.2, 1), width 160ms cubic-bezier(0.4, 0, 0.2, 1)";
@@ -49,6 +48,13 @@ export const HISTORY_STATUS_CELL_CLASS = "border-b py-0 align-middle";
 export const HISTORY_CHILD_ROW_CLASS = "h-[40px]";
 export const HISTORY_CHILD_CELL_CLASS = "h-[40px] overflow-hidden border-b py-0 align-middle";
 export const HISTORY_TABLE_OPERATION_PILL_CLASS = "w-32 max-w-full min-w-0 overflow-hidden";
+export const HISTORY_ITEM_CODE_WIDTH_PX = 144;
+export const HISTORY_QUANTITY_WIDTH_PX = 220;
+export const HISTORY_CODE_QUANTITY_CONTENT_WIDTH_PX = HISTORY_ITEM_CODE_WIDTH_PX + HISTORY_QUANTITY_WIDTH_PX;
+export const HISTORY_STOCK_SNAPSHOT_GUTTER_WIDTH_PX = 0;
+export const HISTORY_CODE_QUANTITY_WIDTH_PX = HISTORY_CODE_QUANTITY_CONTENT_WIDTH_PX + HISTORY_STOCK_SNAPSHOT_GUTTER_WIDTH_PX;
+const STOCK_SNAPSHOT_MIN_QUANTITY_WIDTH = formatQty(10_000).length;
+const STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH = formatQty(100).length;
 
 export function FlowBadge({
   type,
@@ -291,30 +297,66 @@ export function TargetSummaryBlock({
   );
 }
 
-export function ItemCodeCell({
+function AlignedItemCode({ code }: { code: string }) {
+  const match = code.match(/^([^-]+)-([A-Z]{2})-([^-]+)$/);
+  if (!match) {
+    return <span className="block min-w-0 truncate text-right">{code}</span>;
+  }
+
+  const [, model, process, serial] = match;
+  return (
+    <span className="flex w-full justify-center">
+      <span className="inline-grid grid-cols-[auto_auto_auto] items-center">
+        <span className="relative before:invisible before:content-['0-']">
+          <span className="absolute right-0 top-0 whitespace-nowrap text-right">{model}-</span>
+        </span>
+        <span>{process}</span>
+        <span className="text-left">-{serial}</span>
+      </span>
+    </span>
+  );
+}
+
+export function ItemCodeQuantityCell({
   code,
   sourceCode,
+  quantity,
   compact,
   dense = false,
 }: {
   code?: string | null;
   sourceCode?: string | null;
+  quantity: ReactNode;
   compact?: boolean;
   dense?: boolean;
 }) {
   const padX = compact ? "px-1" : "px-3";
   return (
     <td
-      className={`whitespace-nowrap ${dense ? HISTORY_CHILD_CELL_CLASS : HISTORY_MAIN_CELL_CLASS} ${padX} text-center text-xs font-semibold`}
-      style={{ borderColor: LEGACY_COLORS.border, color: code ? LEGACY_COLORS.muted2 : LEGACY_COLORS.muted, transition: HISTORY_CELL_TRANSITION }}
+      colSpan={2}
+      className={`${dense ? "h-[40px]" : "h-[64px]"} overflow-hidden border-b p-0 align-middle`}
+      style={{ borderColor: LEGACY_COLORS.border, width: `${HISTORY_CODE_QUANTITY_WIDTH_PX}px`, transition: HISTORY_CELL_TRANSITION }}
     >
-      {sourceCode ? (
-        <div className="flex min-w-0 flex-col items-center leading-tight">
-          <span className="max-w-full truncate">{sourceCode}</span>
-          <span aria-hidden className="leading-none">↓</span>
-          <span className="max-w-full truncate">{code ?? "-"}</span>
+      <div
+        className={`grid ${dense ? "h-[40px]" : "h-[64px]"}`}
+        style={{ gridTemplateColumns: `${HISTORY_ITEM_CODE_WIDTH_PX}px ${HISTORY_QUANTITY_WIDTH_PX}px`, width: `${HISTORY_CODE_QUANTITY_CONTENT_WIDTH_PX}px` }}
+      >
+        <div
+          className={`flex min-w-0 items-center justify-end overflow-hidden whitespace-nowrap ${padX} text-right text-xs font-semibold`}
+          style={{ color: code ? LEGACY_COLORS.muted2 : LEGACY_COLORS.muted }}
+        >
+          {sourceCode ? (
+            <div className="flex w-full min-w-0 flex-col items-stretch leading-tight">
+              <AlignedItemCode code={sourceCode} />
+              <span aria-hidden className="self-end leading-none">↓</span>
+              <AlignedItemCode code={code ?? "-"} />
+            </div>
+          ) : <AlignedItemCode code={code || "-"} />}
         </div>
-      ) : (code || "-")}
+        <div className="flex min-w-0 items-center justify-start overflow-hidden whitespace-nowrap px-1 text-center">
+          {quantity}
+        </div>
+      </div>
     </td>
   );
 }
@@ -334,6 +376,99 @@ export function QuantityStockCell({
     <div className={`flex items-center justify-center overflow-hidden ${dense ? "h-10" : "h-11"}`}>
       <MovementSummaryCell summary={summary ?? presentation.movement} cancelled={cancelled} />
     </div>
+  );
+}
+
+export function StockSnapshotCell({
+  log,
+  dense = false,
+  quantityWidth,
+}: {
+  log?: TransactionLog | null;
+  dense?: boolean;
+  /** 같은 작업 묶음의 최장 재고 표기 폭. */
+  quantityWidth?: number;
+}) {
+  const cellClass = dense ? HISTORY_CHILD_CELL_CLASS : HISTORY_MAIN_CELL_CLASS;
+  if (!log) {
+    return (
+      <td className={`${cellClass} px-1 text-center text-xs font-semibold`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+        —
+      </td>
+    );
+  }
+
+  const { warehouse_qty_before: warehouseBefore, warehouse_qty_after: warehouseAfter, department_qty_before: departmentBefore, department_qty_after: departmentAfter } = log;
+  if (warehouseBefore == null || warehouseAfter == null || departmentBefore == null || departmentAfter == null) {
+    return (
+      <td className={`${cellClass} px-1 text-center text-xs font-semibold`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+        기록 없음
+      </td>
+    );
+  }
+  const warehouseBeforeText = formatQty(warehouseBefore);
+  const warehouseAfterText = formatQty(warehouseAfter);
+  const departmentBeforeText = formatQty(departmentBefore);
+  const departmentAfterText = formatQty(departmentAfter);
+  const chipQuantityWidth = Math.max(
+    STOCK_SNAPSHOT_MIN_QUANTITY_WIDTH,
+    quantityWidth ?? Math.max(warehouseBeforeText.length, warehouseAfterText.length, departmentBeforeText.length, departmentAfterText.length),
+  );
+  const beforeQuantityWidth = chipQuantityWidth;
+
+  return (
+    <td className={`${cellClass} px-1 text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
+      <div
+        aria-label={`재고 변동: 창고 ${warehouseBeforeText} → ${warehouseAfterText}, 부서 ${departmentBeforeText} → ${departmentAfterText}`}
+        className={`mx-auto flex w-fit min-w-0 flex-col items-start ${dense ? "gap-0" : "gap-0.5"}`}
+      >
+        <StockSnapshotLine label="창고" beforeText={warehouseBeforeText} afterText={warehouseAfterText} beforeQuantityWidth={beforeQuantityWidth} afterQuantityWidth={STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH} increased={warehouseAfter > warehouseBefore} decreased={warehouseAfter < warehouseBefore} cancelled={log.cancelled} />
+        <StockSnapshotLine label="부서" beforeText={departmentBeforeText} afterText={departmentAfterText} beforeQuantityWidth={beforeQuantityWidth} afterQuantityWidth={STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH} increased={departmentAfter > departmentBefore} decreased={departmentAfter < departmentBefore} cancelled={log.cancelled} />
+      </div>
+    </td>
+  );
+}
+
+/** 묶음 안의 전·후 창고/부서 수량 중 가장 긴 화면 표기 폭을 구한다. */
+export function getStockSnapshotQuantityWidth(logs: TransactionLog[]): number | undefined {
+  const quantities = logs.flatMap((log) => [
+    log.warehouse_qty_before,
+    log.warehouse_qty_after,
+    log.department_qty_before,
+    log.department_qty_after,
+  ]).filter((quantity): quantity is number => quantity != null);
+  return quantities.length > 0
+    ? Math.max(STOCK_SNAPSHOT_MIN_QUANTITY_WIDTH, ...quantities.map((quantity) => formatQty(quantity).length))
+    : undefined;
+}
+
+function StockSnapshotLine({
+  label,
+  beforeText,
+  afterText,
+  beforeQuantityWidth,
+  afterQuantityWidth,
+  increased,
+  decreased,
+  cancelled,
+}: {
+  label: string;
+  beforeText: string;
+  afterText: string;
+  beforeQuantityWidth: number;
+  afterQuantityWidth: number;
+  increased: boolean;
+  decreased: boolean;
+  cancelled: boolean;
+}) {
+  const afterColor = increased ? LEGACY_COLORS.blue : decreased ? LEGACY_COLORS.red : LEGACY_COLORS.muted2;
+  return (
+    <span aria-label={`${label} ${beforeText} → ${afterText}`} className="inline-flex items-center whitespace-nowrap text-xs font-semibold leading-4">
+      <span className="w-7 text-left" style={{ color: LEGACY_COLORS.muted }}>{label}</span>
+      <span className="text-right tabular-nums" style={{ color: LEGACY_COLORS.muted2, width: `${beforeQuantityWidth}ch` }}>{beforeText}</span>
+      <span style={{ color: LEGACY_COLORS.muted }}>→</span>
+      <span data-history-after-stock={cancelled || undefined} className="min-w-0 shrink-0 text-left font-bold tabular-nums" style={{ color: afterColor, width: `${afterQuantityWidth}ch` }}>{afterText}</span>
+    </span>
   );
 }
 
@@ -368,6 +503,7 @@ export function PeopleStatusCell({
 }
 export type LogGroup =
   | { type: "solo"; log: TransactionLog }
+  | { type: "operation"; operationId: string; logs: TransactionLog[] }
   | { type: "batch"; refKey: string; refNo: string; logs: TransactionLog[] }
   | { type: "op_batch"; batchId: string; refNo: string | null; logs: TransactionLog[] }
   | { type: "defect_lifecycle"; key: string; parent: TransactionLog; child: TransactionLog };
@@ -379,6 +515,10 @@ export function toHistoryLogGroups(groups: TransactionDisplayGroup[]): LogGroup[
     if (!first) return result;
     if (group.type === "solo") {
       result.push({ type: "solo", log: first });
+      return result;
+    }
+    if (group.type === "operation") {
+      result.push({ type: "operation", operationId: group.key, logs: group.logs });
       return result;
     }
     if (group.type === "op_batch") {
@@ -410,6 +550,7 @@ function referenceGroupKey(log: TransactionLog): string {
 }
 
 export function buildGroups(logs: TransactionLog[]): LogGroup[] {
+  const operations = new Map<string, TransactionLog[]>();
   const opBatches = new Map<string, TransactionLog[]>();
   const refBatches = new Map<string, TransactionLog[]>();
   const defectPairs = findDefectLifecyclePairs(logs);
@@ -423,7 +564,11 @@ export function buildGroups(logs: TransactionLog[]): LogGroup[] {
   }
 
   for (const log of logs) {
-    if (log.operation_batch_id) {
+    if (log.operation_id) {
+      const group = operations.get(log.operation_id) ?? [];
+      group.push(log);
+      operations.set(log.operation_id, group);
+    } else if (log.operation_batch_id) {
       const g = opBatches.get(log.operation_batch_id) ?? [];
       g.push(log);
       opBatches.set(log.operation_batch_id, g);
@@ -437,9 +582,20 @@ export function buildGroups(logs: TransactionLog[]): LogGroup[] {
 
   const groups: LogGroup[] = [];
   const seenOp = new Set<string>();
+  const seenOperations = new Set<string>();
   const seenRef = new Set<string>();
 
   for (const log of logs) {
+    if (log.operation_id) {
+      if (seenOperations.has(log.operation_id)) continue;
+      seenOperations.add(log.operation_id);
+      groups.push({
+        type: "operation",
+        operationId: log.operation_id,
+        logs: operations.get(log.operation_id) ?? [log],
+      });
+      continue;
+    }
     const defectPair = defectPairByLogId.get(log.log_id);
     if (defectPair) {
       if (defectPair.anchorLogId === log.log_id) {
@@ -488,7 +644,7 @@ export function getHistorySeparationHint(
   current: TransactionLog,
 ): string | null {
   if (!previous || previous.item_id !== current.item_id) return null;
-  if (current.cancelled) return "취소 이력";
+  if (current.cancelled) return null;
 
   const previousReference = previous.reference_no?.trim();
   const currentReference = current.reference_no?.trim();
@@ -671,10 +827,10 @@ export function BatchHeader({
 }) {
   const padX = "px-4";
   const targetPadX = "px-4";
-  const quantityPadX = "px-4";
-  const statusPadX = "px-4";
+  const statusPadX = "px-2";
   const first = group.logs[0];
   const referencePresentation = getReferenceBatchPresentation(group.logs, referenceSummary);
+  const representativeLog = group.logs.find((log) => log.log_id === referencePresentation.representativeLogId) ?? first;
   const primaryType = (group.logs.find((l) => l.transaction_type !== "BACKFLUSH") ?? first).transaction_type;
   const flowColor = isReworkOperation(first) ? LEGACY_COLORS.red : transactionColor(primaryType);
   const summary = referenceSummary === null
@@ -714,6 +870,7 @@ export function BatchHeader({
   return (
     <tr
       data-history-main-row="true"
+      data-history-cancelled={cancelled || undefined}
       onClick={onSelect}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -725,7 +882,7 @@ export function BatchHeader({
       aria-selected={selected}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]${cancelled ? " opacity-60" : ""}`}
+      className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]`}
       style={{
         background: rowBackground,
         outline: selected ? `1.5px solid ${flowColor}` : "none",
@@ -746,14 +903,15 @@ export function BatchHeader({
           <TargetSummaryBlock
             presentation={presentation}
             icon={<Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
-            cancelled={cancelled}
           />
         </div>
       </td>
-      <ItemCodeCell code={presentation.target.code} sourceCode={presentation.target.sourceCode} />
-      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${quantityPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <QuantityStockCell presentation={presentation} summary={summary} cancelled={cancelled} />
-      </td>
+      <ItemCodeQuantityCell
+        code={presentation.target.code}
+        sourceCode={presentation.target.sourceCode}
+        quantity={<QuantityStockCell presentation={presentation} summary={summary} />}
+      />
+      <StockSnapshotCell log={representativeLog} />
       <td className={`${HISTORY_STATUS_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <PeopleStatusCell presentation={presentation} />
       </td>
@@ -767,16 +925,36 @@ export function ReferenceBatchDetail({
   highlightLogId,
   onSelectLog,
   controlsId,
+  flat = false,
 }: {
   logs: TransactionLog[];
   compact?: boolean;
   highlightLogId?: string | null;
   onSelectLog?: (log: TransactionLog) => void;
   controlsId?: string;
+  flat?: boolean;
 }) {
   const presentation = getReferenceBatchPresentation(logs);
 
   const sortedLogs = [...logs].sort((a, b) => getReferenceBatchLineOrder(a, presentation.kind) - getReferenceBatchLineOrder(b, presentation.kind));
+
+  if (flat) {
+    return (
+      <>
+        {sortedLogs.map((log, index) => (
+          <ReferenceBatchLineRow
+            key={log.log_id}
+            log={log}
+            kind={presentation.kind}
+            compact={compact}
+            highlightLogId={highlightLogId}
+            onSelectLog={onSelectLog}
+            rowId={index === 0 ? controlsId : undefined}
+          />
+        ))}
+      </>
+    );
+  }
 
   if (presentation.phase === "COMPONENT_CHANGE") {
     return (
@@ -991,8 +1169,7 @@ function ReferenceBatchLineRow({
 }) {
   const padX = compact ? "px-2" : "px-4";
   const targetPadX = compact ? "px-2" : "px-4";
-  const quantityPadX = compact ? "px-2" : "px-4";
-  const statusPadX = compact ? "px-2" : "px-4";
+  const statusPadX = "px-2";
   const presentation = getHistoryRowPresentation(log);
   const linePresentation = getReferenceBatchLinePresentation(log, kind);
   const fullLineLabel = linePresentation.label;
@@ -1005,6 +1182,7 @@ function ReferenceBatchLineRow({
   return (
     <tr
       id={rowId}
+      data-history-cancelled={log.cancelled || undefined}
       tabIndex={onRowAction ? 0 : undefined}
       aria-expanded={canToggle ? expanded ?? false : undefined}
       aria-controls={canToggle ? controlsId : undefined}
@@ -1045,19 +1223,24 @@ function ReferenceBatchLineRow({
           <Package className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
           <TruncatedText
             accessibilityLabel={log.item_name}
-            className={`truncate text-xs font-semibold${log.cancelled ? " line-through" : ""}`}
+            className="truncate text-xs font-semibold"
             style={{ color: LEGACY_COLORS.text }}
           >
             {log.item_name}
           </TruncatedText>
         </div>
       </td>
-      <ItemCodeCell code={presentation.target.code} compact={compact} dense />
-      <td className={`whitespace-nowrap ${HISTORY_CHILD_CELL_CLASS} ${quantityPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <div className="flex h-10 items-center justify-center overflow-hidden">
-          <MovementSummaryCell summary={getHistoryLogSignedQuantity(log)} compact={compact} cancelled={log.cancelled} />
-        </div>
-      </td>
+      <ItemCodeQuantityCell
+        code={presentation.target.code}
+        compact={compact}
+        dense
+        quantity={(
+          <div className="flex h-10 items-center justify-center overflow-hidden">
+            <MovementSummaryCell summary={getHistoryLogSignedQuantity(log)} compact={compact} />
+          </div>
+        )}
+      />
+      <StockSnapshotCell log={log} dense />
       <td className={`${HISTORY_CHILD_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }} />
     </tr>
   );
@@ -1105,6 +1288,7 @@ export function OpBatchHeader({
   compact,
   controlsId,
   separationHint,
+  snapshotQuantityWidth,
 }: {
   group: Extract<LogGroup, { type: "op_batch" }>;
   expanded: boolean;
@@ -1118,12 +1302,13 @@ export function OpBatchHeader({
   compact?: boolean;
   controlsId?: string;
   separationHint?: string | null;
+  snapshotQuantityWidth?: number;
 }) {
   const padX = compact ? "px-2" : "px-4";
   const targetPadX = compact ? "px-2" : "px-4";
-  const quantityPadX = compact ? "px-2" : "px-4";
-  const statusPadX = compact ? "px-2" : "px-4";
+  const statusPadX = "px-2";
   const first = group.logs[0];
+  const representativeLog = getOpBatchRepresentativeLog(group.logs, batch);
   const rawPrimaryType = (group.logs.find((l) => l.transaction_type !== "BACKFLUSH") ?? first).transaction_type;
   const primaryType = getHistoryDisplayTransactionType({ transaction_type: rawPrimaryType }, batch);
   const basePresentation = getHistoryRowPresentation(first, batch ?? undefined);
@@ -1141,7 +1326,7 @@ export function OpBatchHeader({
     titleText = `${first.item_name} 외 ${group.logs.length - 1}건`;
   }
 
-  const summary = getHistoryMovementSummary(first, batch, group.logs.length);
+  const summary = getHistoryMovementSummary(first, batch, group.logs.length, group.logs);
   const presentation: HistoryRowPresentation = {
     ...basePresentation,
     movement: summary,
@@ -1167,6 +1352,7 @@ export function OpBatchHeader({
       ref={rowRef}
       data-batch-id={group.batchId}
       data-history-main-row="true"
+      data-history-cancelled={cancelled || undefined}
       onClick={onSelect}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -1178,7 +1364,7 @@ export function OpBatchHeader({
       aria-selected={selected}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]${cancelled ? " opacity-60" : ""}`}
+      className={`${HISTORY_MAIN_ROW_CLASS} cursor-pointer select-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]`}
       style={{
         background: rowBackground,
         outline: selected ? `1.5px solid ${flowColor}` : "none",
@@ -1203,23 +1389,37 @@ export function OpBatchHeader({
           <TargetSummaryBlock
             presentation={presentation}
             icon={<Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
-            cancelled={cancelled}
           />
         </div>
       </td>
-      <ItemCodeCell code={presentation.target.code} compact={compact} />
-      <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${quantityPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
-        {batch ? (
-          <QuantityStockCell presentation={presentation} summary={summary} cancelled={cancelled} />
+      <ItemCodeQuantityCell
+        code={presentation.target.code}
+        compact={compact}
+        quantity={batch ? (
+          <QuantityStockCell presentation={presentation} summary={summary} />
         ) : (
           <HistoryBatchMetadataPlaceholder widthClass={compact ? "w-28" : "w-48"} />
         )}
-      </td>
+      />
+      <StockSnapshotCell log={representativeLog} quantityWidth={snapshotQuantityWidth} />
       <td className={`${HISTORY_STATUS_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <PeopleStatusCell presentation={presentation} compact={compact} />
       </td>
     </tr>
   );
+}
+
+function getOpBatchRepresentativeLog(logs: TransactionLog[], batch?: IoBatch | null): TransactionLog | null {
+  const first = logs[0] ?? null;
+  if (!batch) return logs.length === 1 ? first : null;
+  const targets = getDisplayBundles(batch);
+  if (targets.length === 0) return logs.length === 1 ? first : null;
+  if (targets.length > 1) return null;
+  const target = targets[0];
+  return logs.find((log) => target.source_item_id && log.item_id === target.source_item_id)
+    ?? logs.find((log) => target.source_mes_code && log.mes_code === target.source_mes_code)
+    ?? logs.find((log) => log.item_name === target.title)
+    ?? null;
 }
 
 function HistoryBatchMetadataPlaceholder({ widthClass }: { widthClass: string }) {

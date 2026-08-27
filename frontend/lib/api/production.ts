@@ -15,6 +15,10 @@ import type {
   TransactionEditLog,
   TransactionLog,
   TransactionType,
+  InventoryOperation,
+  InventoryOperationLine,
+  InventoryOperationPage,
+  InventoryOperationCancellationPreview,
 } from "./types";
 
 /** 입출고 내역 KPI 응답 — 카운트 4개. */
@@ -36,7 +40,7 @@ export interface TransactionReferenceSummary {
   unit: string | null;
 }
 
-export type TransactionDisplayGroupType = "solo" | "batch" | "op_batch" | "defect_lifecycle";
+export type TransactionDisplayGroupType = "solo" | "batch" | "op_batch" | "operation" | "defect_lifecycle";
 
 export interface TransactionDisplayGroup {
   type: TransactionDisplayGroupType;
@@ -50,7 +54,145 @@ export interface TransactionDisplayGroupPage {
   hasMore: boolean;
 }
 
+type InventoryOperationLineWire = {
+  log_id: string;
+  item_id: string;
+  item_name: string | null;
+  mes_code: string | null;
+  transaction_type: TransactionType;
+  quantity_change: string | number;
+  quantity_before: string | number | null;
+  quantity_after: string | number | null;
+  transfer_qty: string | number | null;
+  department: string | null;
+  operation_role: string | null;
+  reverses_log_id: string | null;
+  reference_no: string | null;
+  notes: string | null;
+  created_at: string;
+};
+
+type InventoryOperationWire = {
+  operation_id: string;
+  kind: "BUSINESS" | "CANCELLATION";
+  domain: string;
+  action: string;
+  display_label: string;
+  effective_status: "active" | "cancelled" | "cancellation";
+  actor_employee_id: string | null;
+  actor_name: string;
+  department: string | null;
+  reason: string | null;
+  effective_at: string;
+  reverses_operation_id: string | null;
+  reversal_operation_id: string | null;
+  can_cancel: boolean;
+  cancel_blockers: string[];
+  lines: InventoryOperationLineWire[];
+  matching_lines: InventoryOperationLineWire[];
+  effects: Array<{
+    effect_id: string;
+    effect_kind: string;
+    subject_type: string;
+    subject_id: string;
+    role: string;
+    before_state: Record<string, unknown>;
+    after_state: Record<string, unknown>;
+    reverses_effect_id: string | null;
+  }>;
+};
+
+type InventoryOperationCancellationPreviewWire = {
+  operation_id: string;
+  plan_hash: string;
+  can_cancel: boolean;
+  blockers: string[];
+  cells: Array<{
+    item_id: string;
+    scope: string;
+    department: string | null;
+    status: string | null;
+    box_id: string | null;
+    quantity_change: string | number;
+    current_quantity: string | number;
+    reserved_quantity: string | number;
+    quantity_after: string | number;
+  }>;
+  defect_records: Array<Record<string, unknown>>;
+  effects: Array<Record<string, unknown>>;
+};
+
+function mapWire<T>(wire: object): T {
+  return Object.fromEntries(Object.entries(wire).map(([key, value]) => [
+    key.replace(/_./g, (part) => part[1].toUpperCase()),
+    value != null && (key.includes("quantity") || key === "transfer_qty")
+      ? Number(value)
+      : value,
+  ])) as T;
+}
+
+function apiQuery<T extends object>(path: string, params?: T): string {
+  const query = new URLSearchParams();
+  Object.entries(params ?? {}).forEach(([key, value]) => {
+    if (value == null || value === false || value === "") return;
+    query.set(key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`), String(value));
+  });
+  const suffix = query.toString();
+  return toApiUrl(`${path}${suffix ? `?${suffix}` : ""}`);
+}
+
+function mapInventoryOperation(operation: InventoryOperationWire): InventoryOperation {
+  const mapped = mapWire<InventoryOperation>(operation);
+  mapped.lines = operation.lines.map((line) => mapWire<InventoryOperationLine>(line));
+  mapped.matchingLines = operation.matching_lines.map((line) => mapWire<InventoryOperationLine>(line));
+  mapped.effects = operation.effects.map((effect) => mapWire(effect));
+  return mapped;
+}
+
+function mapInventoryOperationCancellationPreview(
+  preview: InventoryOperationCancellationPreviewWire,
+): InventoryOperationCancellationPreview {
+  const mapped = mapWire<InventoryOperationCancellationPreview>(preview);
+  mapped.cells = preview.cells.map((cell) => mapWire(cell));
+  return mapped;
+}
+
 export const productionApi = {
+  getInventoryOperations: (
+    params?: { itemId?: string; limit?: number; cursor?: string | null },
+    opts?: { signal?: AbortSignal },
+  ): Promise<InventoryOperationPage> => {
+    return fetcher<{ items: InventoryOperationWire[]; next_cursor: string | null }>(
+      apiQuery("/api/inventory/operations", params),
+      opts?.signal,
+    ).then((page) => ({
+      items: page.items.map(mapInventoryOperation),
+      nextCursor: page.next_cursor,
+    }));
+  },
+
+  previewInventoryOperationCancellation: (
+    operationId: string,
+  ): Promise<InventoryOperationCancellationPreview> =>
+    postJson<InventoryOperationCancellationPreviewWire>(
+      toApiUrl(`/api/inventory/operations/${encodeURIComponent(operationId)}/cancel/preview`),
+      {},
+    ).then(mapInventoryOperationCancellationPreview),
+
+  cancelInventoryOperation: (
+    operationId: string,
+    payload: {
+      reason: string;
+      employee_code: string;
+      pin: string;
+      plan_hash: string;
+    },
+  ): Promise<InventoryOperation> =>
+    postJson<InventoryOperationWire>(
+      toApiUrl(`/api/inventory/operations/${encodeURIComponent(operationId)}/cancel`),
+      payload,
+    ).then(mapInventoryOperation),
+
   productionReceipt: (payload: {
     item_id: string;
     quantity: number;
@@ -73,6 +215,7 @@ export const productionApi = {
       transactionType?: TransactionType;
       transactionTypes?: string; // 쉼표 구분 복수값. 예: "RECEIVE,SHIP"
       operationKeys?: string; // 화면 거래 종류. 예: "item_conversion,shipping_prepare"
+      operationId?: string;
       operationBatchId?: string;
       referenceNo?: string;
       search?: string;
@@ -82,29 +225,14 @@ export const productionApi = {
       dateFrom?: string; // YYYY-MM-DD
       dateTo?: string;   // YYYY-MM-DD
       includeArchived?: boolean;
+      unlinkedOnly?: boolean;
       limit?: number;
       skip?: number;
     },
     opts?: { signal?: AbortSignal },
   ) => {
-    const query = new URLSearchParams();
-    if (params?.itemId) query.set("item_id", params.itemId);
-    if (params?.transactionType) query.set("transaction_type", params.transactionType);
-    if (params?.transactionTypes) query.set("transaction_types", params.transactionTypes);
-    if (params?.operationKeys) query.set("operation_keys", params.operationKeys);
-    if (params?.operationBatchId) query.set("operation_batch_id", params.operationBatchId);
-    if (params?.referenceNo) query.set("reference_no", params.referenceNo);
-    if (params?.search) query.set("search", params.search);
-    if (params?.department) query.set("department", params.department);
-    if (params?.model) query.set("model", params.model);
-    if (params?.processStep) query.set("process_step", params.processStep);
-    if (params?.dateFrom) query.set("date_from", params.dateFrom);
-    if (params?.dateTo) query.set("date_to", params.dateTo);
-    if (params?.includeArchived) query.set("include_archived", "true");
-    if (params?.limit !== undefined) query.set("limit", String(params.limit));
-    if (params?.skip !== undefined) query.set("skip", String(params.skip));
     return fetcher<TransactionLog[]>(
-      toApiUrl(`/api/inventory/transactions?${query}`),
+      apiQuery("/api/inventory/transactions", params),
       opts?.signal,
     );
   },
@@ -124,17 +252,6 @@ export const productionApi = {
     },
     opts?: { signal?: AbortSignal },
   ): Promise<TransactionSummary> => {
-    const query = new URLSearchParams();
-    if (params?.transactionTypes) query.set("transaction_types", params.transactionTypes);
-    if (params?.operationKeys) query.set("operation_keys", params.operationKeys);
-    if (params?.search) query.set("search", params.search);
-    if (params?.department) query.set("department", params.department);
-    if (params?.model) query.set("model", params.model);
-    if (params?.processStep) query.set("process_step", params.processStep);
-    if (params?.dateFrom) query.set("date_from", params.dateFrom);
-    if (params?.dateTo) query.set("date_to", params.dateTo);
-    if (params?.includeArchived) query.set("include_archived", "true");
-    const qs = query.toString();
     return fetcher<{
       total: number;
       warehouse_count: number;
@@ -142,15 +259,9 @@ export const productionApi = {
       adjust_count: number;
       department_counts: Record<string, number>;
     }>(
-      toApiUrl(`/api/inventory/transactions/summary${qs ? `?${qs}` : ""}`),
+      apiQuery("/api/inventory/transactions/summary", params),
       opts?.signal,
-    ).then((res) => ({
-      total: res.total,
-      warehouseCount: res.warehouse_count,
-      deptCount: res.dept_count,
-      adjustCount: res.adjust_count,
-      departmentCounts: res.department_counts ?? {},
-    }));
+    ).then((result) => mapWire<TransactionSummary>(result));
   },
 
   getTransactionDisplayGroups: (
@@ -169,31 +280,14 @@ export const productionApi = {
     },
     opts?: { signal?: AbortSignal },
   ): Promise<TransactionDisplayGroupPage> => {
-    const query = new URLSearchParams();
-    if (params?.transactionTypes) query.set("transaction_types", params.transactionTypes);
-    if (params?.operationKeys) query.set("operation_keys", params.operationKeys);
-    if (params?.search) query.set("search", params.search);
-    if (params?.department) query.set("department", params.department);
-    if (params?.model) query.set("model", params.model);
-    if (params?.processStep) query.set("process_step", params.processStep);
-    if (params?.dateFrom) query.set("date_from", params.dateFrom);
-    if (params?.dateTo) query.set("date_to", params.dateTo);
-    if (params?.includeArchived) query.set("include_archived", "true");
-    if (params?.limit !== undefined) query.set("limit", String(params.limit));
-    if (params?.cursor) query.set("cursor", params.cursor);
-    const qs = query.toString();
     return fetcher<{
       groups: TransactionDisplayGroup[];
       next_cursor: string | null;
       has_more: boolean;
     }>(
-      toApiUrl(`/api/inventory/transactions/display-groups${qs ? `?${qs}` : ""}`),
+      apiQuery("/api/inventory/transactions/display-groups", params),
       opts?.signal,
-    ).then((page) => ({
-      groups: page.groups,
-      nextCursor: page.next_cursor,
-      hasMore: page.has_more,
-    }));
+    ).then((page) => mapWire<TransactionDisplayGroupPage>(page));
   },
 
   /** 페이지네이션과 무관한 참조번호 묶음별 전체 요약. */
@@ -211,17 +305,6 @@ export const productionApi = {
     },
     opts?: { signal?: AbortSignal },
   ): Promise<TransactionReferenceSummary[]> => {
-    const query = new URLSearchParams();
-    if (params?.transactionTypes) query.set("transaction_types", params.transactionTypes);
-    if (params?.operationKeys) query.set("operation_keys", params.operationKeys);
-    if (params?.search) query.set("search", params.search);
-    if (params?.department) query.set("department", params.department);
-    if (params?.model) query.set("model", params.model);
-    if (params?.processStep) query.set("process_step", params.processStep);
-    if (params?.dateFrom) query.set("date_from", params.dateFrom);
-    if (params?.dateTo) query.set("date_to", params.dateTo);
-    if (params?.includeArchived) query.set("include_archived", "true");
-    const qs = query.toString();
     return fetcher<Array<{
       reference_no: string;
       shipping_phase: string | null;
@@ -230,16 +313,9 @@ export const productionApi = {
       total_quantity: number;
       unit: string | null;
     }>>(
-      toApiUrl(`/api/inventory/transactions/reference-summaries${qs ? `?${qs}` : ""}`),
+      apiQuery("/api/inventory/transactions/reference-summaries", params),
       opts?.signal,
-    ).then((rows) => rows.map((row) => ({
-      referenceNo: row.reference_no,
-      shippingPhase: row.shipping_phase,
-      logCount: row.log_count,
-      itemCount: row.item_count,
-      totalQuantity: row.total_quantity,
-      unit: row.unit,
-    })));
+    ).then((rows) => rows.map((row) => mapWire<TransactionReferenceSummary>(row)));
   },
 
   /** 거래 메타데이터(notes/reference_no/produced_by) 수정. reason + PIN 필수. */

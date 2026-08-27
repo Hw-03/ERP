@@ -496,7 +496,7 @@ def test_multiline_approval_rolls_back_first_line_after_second_line_late_failure
     request_id = created.json()["request_id"]
     _login(client, approver)
 
-    original__capture_effect = sr_execution_svc.inv_effect._capture_effect
+    original_capture_snapshot = sr_execution_svc.inv_effect._capture_log_stock_snapshot
     capture_calls = 0
     observed_first_line: dict[str, object] = {}
 
@@ -524,11 +524,11 @@ def test_multiline_approval_rolls_back_first_line_after_second_line_late_failure
                 ),
             )
             raise RuntimeError("second line capture failure")
-        return original__capture_effect(db, item_id, cells_before)
+        return original_capture_snapshot(db, item_id, cells_before)
 
     monkeypatch.setattr(
         sr_execution_svc.inv_effect,
-        "_capture_effect",
+        "capture_log_stock_snapshot",
         fail_during_second_line_capture,
     )
 

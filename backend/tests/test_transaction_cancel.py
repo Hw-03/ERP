@@ -12,6 +12,8 @@ import pytest
 from sqlalchemy.orm import Session
 
 from app.models import (
+    DefectQuarantineRecord,
+    DefectQuarantineReconstructionAllocation,
     DepartmentEnum,
     Employee,
     EmployeeLevelEnum,
@@ -149,6 +151,234 @@ def test_cancel_quarantine_restores_warehouse_and_defective(client, db_session, 
     assert wh == 100  # 창고 복귀
     assert locs.get((DepartmentEnum.ASSEMBLY.value, "DEFECTIVE"), 0) == 0
     assert total == 100
+    record = db_session.query(DefectQuarantineRecord).one()
+    assert record.remaining_quantity == Decimal("0")
+
+
+def test_cancel_direct_defect_outgoing_restores_selected_record(
+    db_session,
+    make_item,
+    make_location,
+):
+    item = make_item(name="직접 격리 취소품", warehouse_qty=Decimal("2"))
+    location = make_location(
+        item.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        status=LocationStatusEnum.DEFECTIVE,
+        quantity=Decimal("3"),
+    )
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    inventory.quantity = Decimal("5")
+    actor = _make_employee(db_session, code="DEFECT-DIRECT-CANCEL")
+    record = DefectQuarantineRecord(
+        item_id=item.item_id,
+        department=DepartmentEnum.ASSEMBLY.value,
+        original_quantity=Decimal("5"),
+        remaining_quantity=Decimal("3"),
+        quarantined_by_name=actor.name,
+    )
+    db_session.add(record)
+    db_session.flush()
+    outgoing = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.UNMARK_DEFECTIVE,
+        quantity_change=Decimal("0"),
+        produced_by=actor.name,
+        producer_employee_id=actor.employee_id,
+        department=DepartmentEnum.ASSEMBLY.value,
+        defect_quarantine_record_id=record.record_id,
+        inventory_effect=[
+            {"scope": "warehouse", "delta": 2},
+            {
+                "scope": "location",
+                "department": DepartmentEnum.ASSEMBLY.value,
+                "status": LocationStatusEnum.DEFECTIVE.value,
+                "delta": -2,
+            },
+        ],
+    )
+    db_session.add(outgoing)
+    db_session.commit()
+
+    transaction_actions.cancel_transaction(
+        db_session,
+        log=outgoing,
+        canceller=actor,
+        reason="직접 기록 차감 취소",
+        request=None,
+    )
+
+    db_session.expire_all()
+    assert db_session.get(DefectQuarantineRecord, record.record_id).remaining_quantity == Decimal("5")
+    assert _cells(db_session, item.item_id) == (
+        0,
+        5,
+        {(DepartmentEnum.ASSEMBLY.value, LocationStatusEnum.DEFECTIVE.value): 5},
+    )
+    assert db_session.get(InventoryLocation, location.location_id).quantity == Decimal("5")
+
+
+def test_cancel_reconstructed_fifo_outgoing_restores_each_allocated_child(
+    db_session,
+    make_item,
+    make_location,
+):
+    item = make_item(name="FIFO 격리 취소품", warehouse_qty=Decimal("2"))
+    make_location(
+        item.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        status=LocationStatusEnum.DEFECTIVE,
+        quantity=Decimal("2"),
+    )
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    inventory.quantity = Decimal("4")
+    actor = _make_employee(db_session, code="DEFECT-FIFO-CANCEL")
+    first = DefectQuarantineRecord(
+        item_id=item.item_id,
+        department=DepartmentEnum.ASSEMBLY.value,
+        original_quantity=Decimal("1"),
+        remaining_quantity=Decimal("0"),
+        quarantined_by_name=actor.name,
+        is_legacy=True,
+    )
+    second = DefectQuarantineRecord(
+        item_id=item.item_id,
+        department=DepartmentEnum.ASSEMBLY.value,
+        original_quantity=Decimal("3"),
+        remaining_quantity=Decimal("2"),
+        quarantined_by_name=actor.name,
+        is_legacy=True,
+    )
+    db_session.add_all([first, second])
+    db_session.flush()
+    outgoing = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.UNMARK_DEFECTIVE,
+        quantity_change=Decimal("0"),
+        produced_by=actor.name,
+        producer_employee_id=actor.employee_id,
+        department=DepartmentEnum.ASSEMBLY.value,
+        inventory_effect=[
+            {"scope": "warehouse", "delta": 2},
+            {
+                "scope": "location",
+                "department": DepartmentEnum.ASSEMBLY.value,
+                "status": LocationStatusEnum.DEFECTIVE.value,
+                "delta": -2,
+            },
+        ],
+    )
+    db_session.add(outgoing)
+    db_session.flush()
+    db_session.add_all(
+        [
+            DefectQuarantineReconstructionAllocation(
+                transaction_log_id=outgoing.log_id,
+                record_id=first.record_id,
+                quantity=Decimal("1"),
+            ),
+            DefectQuarantineReconstructionAllocation(
+                transaction_log_id=outgoing.log_id,
+                record_id=second.record_id,
+                quantity=Decimal("1"),
+            ),
+        ]
+    )
+    db_session.commit()
+
+    transaction_actions.cancel_transaction(
+        db_session,
+        log=outgoing,
+        canceller=actor,
+        reason="FIFO 할당 취소",
+        request=None,
+    )
+
+    db_session.expire_all()
+    assert db_session.get(DefectQuarantineRecord, first.record_id).remaining_quantity == Decimal("1")
+    assert db_session.get(DefectQuarantineRecord, second.record_id).remaining_quantity == Decimal("3")
+    assert _cells(db_session, item.item_id) == (
+        0,
+        4,
+        {(DepartmentEnum.ASSEMBLY.value, LocationStatusEnum.DEFECTIVE.value): 4},
+    )
+
+
+def test_cancel_source_quarantine_rejects_when_record_has_downstream_usage(
+    db_session,
+    make_item,
+    make_location,
+):
+    item = make_item(name="후속 처리 격리품", warehouse_qty=Decimal("9"))
+    make_location(
+        item.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        status=LocationStatusEnum.DEFECTIVE,
+        quantity=Decimal("1"),
+    )
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    inventory.quantity = Decimal("10")
+    actor = _make_employee(db_session, code="DEFECT-SOURCE-BLOCK")
+    record = DefectQuarantineRecord(
+        item_id=item.item_id,
+        department=DepartmentEnum.ASSEMBLY.value,
+        original_quantity=Decimal("2"),
+        remaining_quantity=Decimal("1"),
+        quarantined_by_name=actor.name,
+    )
+    db_session.add(record)
+    db_session.flush()
+    source = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.MARK_DEFECTIVE,
+        quantity_change=Decimal("0"),
+        produced_by=actor.name,
+        producer_employee_id=actor.employee_id,
+        department=DepartmentEnum.ASSEMBLY.value,
+        defect_quarantine_record_id=record.record_id,
+        inventory_effect=[
+            {"scope": "warehouse", "delta": -2},
+            {
+                "scope": "location",
+                "department": DepartmentEnum.ASSEMBLY.value,
+                "status": LocationStatusEnum.DEFECTIVE.value,
+                "delta": 2,
+            },
+        ],
+    )
+    downstream = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.UNMARK_DEFECTIVE,
+        quantity_change=Decimal("0"),
+        produced_by=actor.name,
+        producer_employee_id=actor.employee_id,
+        department=DepartmentEnum.ASSEMBLY.value,
+        defect_quarantine_record_id=record.record_id,
+        inventory_effect=[
+            {"scope": "warehouse", "delta": 1},
+            {
+                "scope": "location",
+                "department": DepartmentEnum.ASSEMBLY.value,
+                "status": LocationStatusEnum.DEFECTIVE.value,
+                "delta": -1,
+            },
+        ],
+    )
+    db_session.add_all([source, downstream])
+    db_session.commit()
+
+    with pytest.raises(ValueError, match="후속 처리"):
+        transaction_actions.cancel_transaction(
+            db_session,
+            log=source,
+            canceller=actor,
+            reason="원본 격리 취소 시도",
+            request=None,
+        )
+
+    db_session.expire_all()
+    assert db_session.get(DefectQuarantineRecord, record.record_id).remaining_quantity == Decimal("1")
+    assert db_session.get(TransactionLog, source.log_id).cancelled is False
 
 
 # ---------------------------------------------------------------------------

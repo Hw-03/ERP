@@ -102,6 +102,28 @@ describe("DesktopTopbar", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
+  it("전일·다음 날 화살표로 날짜를 하루씩 이동하고 오늘 이후 이동은 막는다", () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <DailyWorkDatePicker value="2026-08-01" maxDate="2026-08-01" onChange={onChange} />,
+    );
+
+    expect(screen.getByRole("button", { name: "다음 날" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "전일" }));
+    expect(onChange).toHaveBeenLastCalledWith("2026-07-31");
+
+    rerender(
+      <DailyWorkDatePicker value="2026-07-31" maxDate="2026-08-01" onChange={onChange} />,
+    );
+
+    const nextButton = screen.getByRole("button", { name: "다음 날" });
+    expect(nextButton).toBeEnabled();
+
+    fireEvent.click(nextButton);
+    expect(onChange).toHaveBeenLastCalledWith("2026-08-01");
+  });
+
   it("uses an opaque popup surface for the user menu", () => {
     notificationBellState.operator = {
       employee_id: "emp-1",

@@ -55,14 +55,24 @@
 
 ## Plan Mode — Model Recommendation
 
-After completing a plan, always place the recommended model at the very top of the plan shown to the user:
+After completing a plan, always place the recommended model and reasoning level at the very top of the plan shown to the user:
 
 > **Recommended model: Sonnet** — [one-line reason]
+> **Recommended reasoning level: Medium** — [one-line reason]
 
-Criteria:
+Model criteria:
 - **Haiku**: Simple repetitive tasks. e.g. variable rename, file search, minor text edits.
 - **Sonnet**: General development tasks. e.g. bug fix, add a router, API integration, moderate refactor.
 - **Opus**: High-complexity judgment tasks. e.g. redesigning the stock request state machine, security-related auth changes, structural changes spanning many files.
+
+Reasoning criteria:
+- **Light**: Latency-first work where the answer and change are already clear and need little deep judgment: searches, mechanical renames, minor wording, or narrow documentation edits.
+- **Medium**: Balanced starting point for normal development, localized bug fixes, standard API integration, and routine tests where the existing pattern is clear.
+- **High**: Use only when additional reasoning has a concrete quality benefit, such as non-obvious dependencies, data-flow validation, or regression-sensitive state changes.
+- **Extra High**: Use when exploration and verification are central: competing design options, ambiguous root causes, permissions, concurrency, state transitions, or synthesizing independent investigations. Do not select it merely because many files change.
+- **Max**: Reserve for the hardest quality-first work, where security, data integrity, architecture, or another high-cost failure mode makes additional exploration and verification materially valuable.
+
+Start from Light or Medium. Recommend High or above only when the plan can state the specific failure risk that the added reasoning addresses. Model strength, reasoning level, and multi-agent execution remain separate decisions.
 
 ---
 
@@ -97,6 +107,7 @@ Criteria:
 
 - Starting the server must not change the DB.
 - Before DB-changing work, briefly explain the impact first.
+- For browser verification against the development server, sign in as an administrator with password `0000` and freely verify the required screens and flows. Use this credential only for local development-server verification.
 - For setup, schema changes, migrations, or seed work:
 
 ```bash

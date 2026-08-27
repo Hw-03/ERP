@@ -103,6 +103,8 @@ export function MobileWeeklyScreen({
   const activeDepts = data?.groups.filter((g) => g.produce_qty > 0).length ?? 0;
   const totalDepts = data?.groups.length ?? 0;
   const selectedGroup = data?.groups.find((g) => g.process_code === selectedCode);
+  const stockBasis =
+    data?.report_status === "verified" && data.basis_version === 2 ? "normal" : "legacy";
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col" style={{ background: LEGACY_COLORS.bg }}>
@@ -177,7 +179,10 @@ export function MobileWeeklyScreen({
             <div className={clsx(TYPO.overline, "mb-2 px-1")} style={{ color: LEGACY_COLORS.muted2 }}>
               {selectedGroup ? `${selectedGroup.dept_name} 품목 상세` : "품목 상세"}
             </div>
-            <WeeklyDetailTable group={selectedGroup} />
+            <WeeklyDetailTable
+              group={selectedGroup}
+              stockBasis={stockBasis}
+            />
           </section>
         </AsyncState>
       </div>

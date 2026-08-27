@@ -8,7 +8,6 @@ import { Button } from "@/lib/ui/Button";
 import { Toast, type ToastState } from "@/lib/ui/Toast";
 import { tint } from "@/lib/mes/colorUtils";
 import { api, type BOMDetailEntry, type IoBundle, type IoInternalUseBomMode, type IoLine, type IoSourceKind, type IoSourceLocation, type IoSubType, type IoWorkType, type Item } from "@/lib/api";
-import { ApiError } from "@/lib/api-core";
 import { WizardStepCard } from "./_atoms";
 import { IoWorkTypeStep, IoSubTypeStep } from "./IoWorkTypeStep";
 import { IoTargetPicker } from "./IoTargetPicker";
@@ -28,14 +27,24 @@ import { useIoPreselect } from "./useIoPreselect";
 import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import { setAuditScreen } from "@/lib/activity-audit-context";
 import { sendClientEvent } from "@/lib/client-events";
-import type { IoComposeViewProps } from "./types";
+import {
+  INITIAL_IO_TARGET_PICKER_FILTERS,
+  type IoComposeViewProps,
+  type IoTargetPickerFilters,
+} from "./types";
 import { ItemConversionWorkView } from "./ItemConversionView";
 import { StatusTargetNotice, type StatusTargetNotice as StatusTargetNoticeState } from "../common/StatusTargetNotice";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
+import {
+  runWarehousePull,
+  runCompositionSubmit,
+  refreshInternalUseBundle,
+  saveCompositionDraft,
+  useIoComposeOperationState,
+} from "./ioComposeOperations";
 import { ioLineAvailable } from "@/lib/mes/inventory";
 import {
   buildInternalUseBomPreviewTarget,
-  hasUnselectedInternalUseBomMode,
   isInternalUseBomBundle,
 } from "./internalUseBom";
 import { useInternalUseBomPreviewLock } from "./useInternalUseBomPreviewLock";
@@ -126,8 +135,13 @@ export function IoComposeView({
   onDraftSaved,
 }: IoComposeViewProps) {
   const revision = useRealtimeRevision();
-  const [employeeId, setEmployeeId] = useState(operator?.employee_id ?? "");
+  // 제출·임시저장·미리보기는 현재 로그인 작업자의 ID로만 수행한다.
+  // 로컬 state로 보관하면 작업자 전환 뒤 이전 결재권자 ID가 남을 수 있다.
+  const employeeId = operator?.employee_id ?? "";
   const [search, setSearch] = useState(globalSearch);
+  const [pickerFilters, setPickerFilters] = useState<IoTargetPickerFilters>(
+    INITIAL_IO_TARGET_PICKER_FILTERS,
+  );
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<IoSubmitResultState | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -149,14 +163,35 @@ export function IoComposeView({
   const [hasDraftOnServer, setHasDraftOnServer] = useState(false);
   const dirtyEffectMountedRef = useRef(false);
   const absorbedRestoreRef = useRef<string | null>(null);
+  const state = useIoWorkState(defaultWorkType, operator?.department, getAvailable);
   // 항목 7 — '창고에서 가져오기' 대상으로 선택한 부족 라인 line_id 집합. 0개면 부족 라인 전체 대상.
-  const [pullSelected, setPullSelected] = useState<Set<string>>(() => new Set());
+  const [
+    pullSelected,
+    setPullSelected,
+    togglePull,
+    pulling,
+    setPulling,
+    pullingRef,
+    operationRefs,
+    bumpOperationGeneration,
+  ] = useIoComposeOperationState([
+    employeeId,
+    operator?.department,
+    state.bundles,
+    state.deptIoDirection,
+    state.fromDepartment,
+    state.notes,
+    state.referenceNo,
+    state.step,
+    state.subType,
+    state.toDepartment,
+    state.workType,
+  ], draftToRestore?.batch_id, restoreNonce);
   const [itemConversionView, setItemConversionView] = useState<"compose" | "work">("compose");
   const [itemConversionHistoryStep, setItemConversionHistoryStep] = useState<ItemConversionHistoryStep>(1);
   const itemConversionViewRef = useRef(itemConversionView);
   const previousAuditScreenRef = useRef<string | null>(null);
 
-  const state = useIoWorkState(defaultWorkType, operator?.department);
   const latestBundlesRef = useRef<IoBundle[]>(state.bundles);
   latestBundlesRef.current = state.bundles;
   const internalUsePreviewLock = useInternalUseBomPreviewLock();
@@ -238,10 +273,6 @@ export function IoComposeView({
   }, [entryIntent]);
 
   useEffect(() => {
-    if (operator?.employee_id && !employeeId) setEmployeeId(operator.employee_id);
-  }, [operator?.employee_id, employeeId]);
-
-  useEffect(() => {
     setSearch(globalSearch);
   }, [globalSearch]);
 
@@ -290,6 +321,10 @@ export function IoComposeView({
   useEffect(() => {
     if (draftToRestore?.batch_id) setHasDraftOnServer(true);
   }, [draftToRestore?.batch_id]);
+
+  useEffect(() => {
+    if (draftToRestore?.batch_id) resetTargetPickerFilters();
+  }, [draftToRestore?.batch_id, restoreNonce]);
 
   // 사용자가 작업 내용(번들/메모/참조/부서/유형)을 바꾸면 contentDirty=true.
   // - 마운트 첫 실행은 건너뛴다(초기 빈 상태).
@@ -460,52 +495,41 @@ export function IoComposeView({
     bundleId: string,
     options: Parameters<typeof buildInternalUseBomPreviewTarget>[1],
   ) {
-    const bundle = latestBundlesRef.current.find((row) => row.bundle_id === bundleId);
-    if (
-      state.subType !== "internal_use_out" ||
-      !bundle ||
-      !isInternalUseBomBundle(bundle)
-    ) {
-      return;
-    }
-    await internalUsePreviewLock.run(bundleId, async () => {
-      setError(null);
-      try {
-        const departments = ioDepartmentPayload(
-          state.subType,
-          state.fromDepartment,
-          state.toDepartment,
-        );
-        const response = await previewTarget({
-          employeeId,
-          workType: state.workType,
-          subType: state.subType,
-          fromDepartment: departments.fromDepartment,
-          toDepartment: departments.toDepartment,
-          target: buildInternalUseBomPreviewTarget(bundle, options),
-        });
-        const replacement = response.bundles[0];
-        if (!replacement) throw new Error("사용출고 BOM 미리보기 결과가 없습니다.");
-        const nextBundles = latestBundlesRef.current.map((row) =>
-          row.bundle_id === bundleId ? replacement : row,
-        );
+    await refreshInternalUseBundle(
+      bundleId,
+      options,
+      employeeId,
+      state.workType,
+      state.subType,
+      state.fromDepartment,
+      state.toDepartment,
+      () => latestBundlesRef.current,
+      internalUsePreviewLock.run,
+      previewTarget,
+      (nextBundles) => {
         latestBundlesRef.current = nextBundles;
         state.setBundles(nextBundles);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "사용출고 BOM 재계산에 실패했습니다.");
-      }
-    });
+      },
+      setError,
+    );
   }
 
   // 새 작업 시작(작업유형/세부작업/부서 변경) — 진행 중 임시저장 슬롯과의 연결을 끊는다.
   // 그래야 다음 저장이 기존 슬롯을 덮지 않고 새 슬롯으로 쌓여 '작업 중' 탭에 누적된다.
   function beginNewCompositionSlot() {
+    bumpOperationGeneration();
     autosaveBatchIdRef.current = null;
     setHasDraftOnServer(false);
     // 새 작업 슬롯 시작 — 복원 추적 해제. 이래야 같은 '이어서 작업'을 다시 골랐을 때
     // (1단계로 빠졌다가 재선택) 복원 effect 가 다시 발동한다.
     restoredDraftRef.current = null;
     restoredNonceRef.current = null;
+    resetTargetPickerFilters();
+  }
+
+  function resetTargetPickerFilters() {
+    setPickerFilters(INITIAL_IO_TARGET_PICKER_FILTERS);
+    setSearch("");
   }
 
   function changeFromDepartment(next: string) {
@@ -514,7 +538,9 @@ export function IoComposeView({
       state.setBundles([]);
       beginNewCompositionSlot();
       onStatusChange("부서 변경으로 작업 묶음을 초기화했습니다.");
+      return;
     }
+    resetTargetPickerFilters();
   }
 
   function changeToDepartment(next: string) {
@@ -523,7 +549,9 @@ export function IoComposeView({
       state.setBundles([]);
       beginNewCompositionSlot();
       onStatusChange("부서 변경으로 작업 묶음을 초기화했습니다.");
+      return;
     }
+    resetTargetPickerFilters();
   }
 
   function handleSubTypeChange(next: IoSubType) {
@@ -576,50 +604,52 @@ export function IoComposeView({
     setItemConversionHistoryStep(step);
   }
 
-  async function handleSaveDraft() {
+  async function saveCurrentDraft(persistInUrl = true): Promise<string | null> {
     if (!employeeId) {
       setError("작업자를 선택하세요.");
-      return;
+      return null;
     }
-    await internalUsePreviewLock.waitForIdle();
-    const currentBundles = latestBundlesRef.current;
-    if (currentBundles.length === 0) return;
     try {
-      const response = await saveDraft({
-        employeeId,
-        workType: state.workType,
-        subType: state.subType,
-        ...ioDepartmentPayload(state.subType, state.fromDepartment, state.toDepartment),
-        referenceNo: state.referenceNo,
-        notes: state.notes,
-        batchId: autosaveBatchIdRef.current,
-        bundles: currentBundles,
-      });
-      autosaveBatchIdRef.current = response.batch_id;
-      onDraftSaved?.(response.batch_id, state.step);
-      setContentDirty(false); // 저장 버튼으로 명시적 저장 → 이후 수정 전까지 경고 없음
-      const now = new Date();
-      const hh = String(now.getHours()).padStart(2, "0");
-      const mm = String(now.getMinutes()).padStart(2, "0");
-      draftSaveNoticeIdRef.current += 1;
-      setDraftSaveNotice({
-        id: draftSaveNoticeIdRef.current,
-        message: "저장되었습니다. 나중에 이어서 진행할 수 있습니다.",
-        status: `저장됨 · ${hh}:${mm}`,
-      });
+      const batchId = await saveCompositionDraft(
+        operationRefs,
+        internalUsePreviewLock.waitForIdle,
+        () => latestBundlesRef.current,
+        (bundles) => saveDraft({
+          employeeId,
+          workType: state.workType,
+          subType: state.subType,
+          ...ioDepartmentPayload(state.subType, state.fromDepartment, state.toDepartment),
+          referenceNo: state.referenceNo,
+          notes: state.notes,
+          batchId: autosaveBatchIdRef.current,
+          bundles,
+        }),
+        (nextBatchId) => { autosaveBatchIdRef.current = nextBatchId; },
+      );
+      if (!batchId) return null;
+      if (persistInUrl) {
+        onDraftSaved?.(batchId, state.step);
+        setContentDirty(false); // 저장 버튼으로 명시적 저장 → 이후 수정 전까지 경고 없음
+        const now = new Date();
+        const hh = String(now.getHours()).padStart(2, "0");
+        const mm = String(now.getMinutes()).padStart(2, "0");
+        draftSaveNoticeIdRef.current += 1;
+        setDraftSaveNotice({
+          id: draftSaveNoticeIdRef.current,
+          message: "저장되었습니다. 나중에 이어서 진행할 수 있습니다.",
+          status: `저장됨 · ${hh}:${mm}`,
+        });
+      }
+      return batchId;
     } catch (err) {
       const message = err instanceof Error ? err.message : "저장 중 오류가 발생했습니다.";
       setToast({ message, type: "error" });
+      return null;
     }
   }
 
-  function togglePull(lineId: string) {
-    setPullSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(lineId)) next.delete(lineId);
-      else next.add(lineId);
-      return next;
-    });
+  async function handleSaveDraft() {
+    await saveCurrentDraft();
   }
 
   // 항목 7 — 부족 품목을 창고 반출(warehouse_to_dept) 새 작업으로 가져오기.
@@ -628,6 +658,7 @@ export function IoComposeView({
   //   setToDepartment→setBundles→goTo(4)) — setWorkType 이 bundles 를 리셋하므로
   //   setBundles 는 반드시 그 뒤. 새 슬롯은 beginNewCompositionSlot.
   async function pullFromWarehouse() {
+    if (pullingRef.current) return;
     if (!employeeId) {
       setError("작업자를 선택하세요.");
       return;
@@ -640,101 +671,70 @@ export function IoComposeView({
     const itemIds = collectShortageItemIds(state.bundles, pullSelected);
     if (itemIds.length === 0) return;
     try {
-      // 현재 작업 저장(작업 중) — 기존 handleSaveDraft 재사용.
-      await handleSaveDraft();
-      // 새 카트 — 손으로 만들지 않고 품목마다 previewTarget(낱개=manual, 수량1).
-      const newBundles: IoBundle[] = [];
-      for (const itemId of itemIds) {
-        const response = await previewTarget({
+      await runWarehousePull(
+        operationRefs,
+        pullingRef,
+        setPulling,
+        itemIds,
+        () => saveCurrentDraft(false),
+        async (itemId) => (await previewTarget({
           employeeId,
           workType: "warehouse_io",
           subType: "warehouse_to_dept",
           toDepartment: targetDept,
           target: { source_kind: "manual", item_id: itemId, quantity: 1 },
-        });
-        newBundles.push(...response.bundles);
-      }
-      // 상태 전이 — setWorkType 이 bundles/subType/step 을 리셋하므로 setBundles 는 그 뒤.
-      state.setWorkType("warehouse_io");
-      state.setSubType("warehouse_to_dept");
-      state.setToDepartment(targetDept);
-      beginNewCompositionSlot();
-      state.setBundles(newBundles);
-      setPullSelected(new Set());
-      state.goTo(4);
-      onStatusChange("부족 품목을 창고 반출 작업으로 가져왔습니다.");
+        })).bundles,
+        (savedDraftId, newBundles) => {
+          onDraftSaved?.(savedDraftId, state.step, false);
+          state.setWorkType("warehouse_io");
+          state.setSubType("warehouse_to_dept");
+          state.setToDepartment(targetDept);
+          beginNewCompositionSlot();
+          state.setBundles(newBundles);
+          setPullSelected(new Set());
+          state.goTo(4);
+          onStatusChange("부족 품목을 창고 반출 작업으로 가져왔습니다.");
+        },
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "창고에서 가져오기에 실패했습니다.");
     }
   }
 
   async function handleSubmit() {
-    if (!employeeId) {
-      setError("작업자를 선택하세요.");
-      return;
-    }
-    await internalUsePreviewLock.waitForIdle();
-    const currentBundles = latestBundlesRef.current;
-    if (
-      state.subType === "internal_use_out" &&
-      hasUnselectedInternalUseBomMode(currentBundles)
-    ) {
-      setError("각 BOM 묶음의 차감 방식을 선택하세요.");
-      state.goTo(4);
-      return;
-    }
-    if (autosaveBatchIdRef.current) {
-      const staleId = autosaveBatchIdRef.current;
-      autosaveBatchIdRef.current = null;
-      try {
-        await api.deleteDraft(staleId, employeeId);
-      } catch {
-        /* 이미 없거나 권한 변동 — submit 으로 진행 */
-      }
-    }
-    try {
-      const kind = approvalKind(state.subType, currentBundles, state.fromDepartment);
-      const response = await submit({
+    await runCompositionSubmit(
+      employeeId,
+      state.subType,
+      state.fromDepartment,
+      internalUsePreviewLock.waitForIdle,
+      () => latestBundlesRef.current,
+      autosaveBatchIdRef,
+      (bundles) => submit({
         employeeId,
         workType: state.workType,
         subType: state.subType,
         ...ioDepartmentPayload(state.subType, state.fromDepartment, state.toDepartment),
         referenceNo: state.referenceNo,
         notes: state.notes,
-        bundles: currentBundles,
-      });
-      // 서버가 멱등 응답(409 → 기존 batch)이든 신규 처리든 동일한 IoSubmitResponse 모양 → 같은 흐름.
-      // 결재 종류별로 토스트 문구 분기 (백엔드 response.message 는 fallback).
-      const requestSummaries = response.stock_requests ?? [];
-      const responseApprovalKind = requestSummaries[0]?.approval_kind ?? kind;
-      const successTitle = response.requires_approval
-        ? state.subType === "internal_use_out" && requestSummaries.length > 1
-          ? "위치별 결재 요청 완료"
-          : responseApprovalKind === "department"
-            ? "부서 결재 요청 완료"
-            : "창고 결재 요청 완료"
-        : "입출고 반영 완료";
-      setResult({
-        kind: "success",
-        title: successTitle,
-        message: response.message,
-      });
-      state.reset();
-      onStatusChange(response.message);
-      try {
-        const refreshed = await api.getItems({ limit: 2000, search: globalSearch.trim() || undefined });
-        setItems(refreshed);
-      } catch {
-        /* ignore refresh failure */
-      }
-      onSubmitSuccess?.();
-    } catch (err) {
-      // 503 과부하 → 친화 메시지 + 같은 client_request_id 유지(useIoSubmit)로 재시도 안전
-      const message = err instanceof ApiError && err.isUnavailable
-        ? "서버가 다른 작업을 처리 중입니다. 잠시 후 다시 시도하세요."
-        : err instanceof Error ? err.message : "제출 중 오류가 발생했습니다.";
-      setResult({ kind: "error", title: "제출 실패", message });
-    }
+        bundles,
+      }),
+      setError,
+      state.goTo,
+      setResult,
+      state.reset,
+      resetTargetPickerFilters,
+      onStatusChange,
+      () => api.getItems({ limit: 2000, search: globalSearch.trim() || undefined }),
+      setItems,
+      onSubmitSuccess,
+      (draftId) => api.submitDraft(draftId, employeeId),
+      (draftId) => {
+        restoredDraftRef.current = null;
+        restoredNonceRef.current = null;
+        setHasDraftOnServer(false);
+        onDraftSaved?.(draftId, state.step, false);
+      },
+    );
   }
 
   const step = state.step;
@@ -1121,6 +1121,7 @@ export function IoComposeView({
                     onDeptIoDirectionChange={(dir) => {
                       const had = state.bundles.length > 0;
                       state.setDeptIoDirection(dir);
+                      beginNewCompositionSlot();
                       if (had) onStatusChange("방향 변경으로 작업 묶음을 초기화했습니다.");
                     }}
                   />
@@ -1172,6 +1173,8 @@ export function IoComposeView({
               items={items}
               productModels={productModels}
               bundles={state.bundles}
+              filters={pickerFilters}
+              onFiltersChange={setPickerFilters}
               search={search}
               onSearchChange={setSearch}
               highlightItemId={highlightItemId}
@@ -1273,6 +1276,7 @@ export function IoComposeView({
               onTogglePull={togglePull}
               onPullFromWarehouse={pullFromWarehouse}
               pullCount={pullCount}
+              pulling={pulling}
               onSaveDraft={handleSaveDraft}
             />
           </WizardStepCard>

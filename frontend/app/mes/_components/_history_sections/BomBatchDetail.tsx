@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, GitBranch, Package, Recycle } from "lucide-react";
 import { ioApi } from "@/lib/api/io";
+import type { TransactionLog } from "@/lib/api";
 import type { IoBatch, IoBundle, IoLine } from "@/lib/api/types";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -15,6 +16,7 @@ import {
   getInternalUseHistoryLineEffectLabel,
   getHistoryBomParentLine,
   getDisplayBundles,
+  getHistoryLineExecutionLog,
   getHistoryLineSignedQuantity,
   isManualOnlyProductionBatch,
   type LineSignTone,
@@ -25,8 +27,9 @@ import {
   HISTORY_CHILD_ROW_CLASS,
   HISTORY_TABLE_OPERATION_PILL_CLASS,
   InternalUseEffectBadge,
-  ItemCodeCell,
+  ItemCodeQuantityCell,
   MovementSummaryCell,
+  StockSnapshotCell,
 } from "./historyTableHelpers";
 
 const SIGN_TONE_HEX: Record<LineSignTone, string> = {
@@ -46,6 +49,10 @@ type Props = {
   compact?: boolean;
   highlightItemId?: string | null;
   controlsId?: string;
+  /** 같은 operation_batch의 실제 거래 로그. BOM 줄별 스냅샷 표시용. */
+  logs?: TransactionLog[];
+  /** 작업 묶음 전체에 맞춘 재고 수량 표기 폭. */
+  snapshotQuantityWidth?: number;
 };
 
 const SIGN_TONE_MOVEMENT = {
@@ -55,7 +62,7 @@ const SIGN_TONE_MOVEMENT = {
   muted: "muted",
 } as const;
 
-export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact, highlightItemId, controlsId }: Props) {
+export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact, highlightItemId, controlsId, logs = [], snapshotQuantityWidth }: Props) {
   const realtimeRevision = useRealtimeRevision();
   const [batch, setBatch] = useState<IoBatch | null>(cache.get(batchId) ?? null);
   const [loading, setLoading] = useState(!cache.has(batchId));
@@ -135,10 +142,9 @@ export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact, hig
   }
 
   if (!batch || batch.bundles.length === 0) return null;
-  const displayBundles = getAdjustmentDisplayBundles(batch).filter((bundle) => {
-    const parentLine = getHistoryBomParentLine(bundle);
-    return parentLine?.included ?? bundle.lines.some((line) => line.included);
-  });
+  const displayBundles = getAdjustmentDisplayBundles(batch).filter((bundle) =>
+    bundle.lines.some((line) => line.included),
+  );
 
   return (
     <>
@@ -152,6 +158,8 @@ export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact, hig
           compact={compact}
           highlightItemId={highlightItemId}
           rowId={index === 0 ? controlsId : undefined}
+          logs={logs}
+          snapshotQuantityWidth={snapshotQuantityWidth}
         />
       ))}
     </>
@@ -213,6 +221,8 @@ function BundleRows({
   compact,
   highlightItemId,
   rowId,
+  logs,
+  snapshotQuantityWidth,
 }: {
   bundle: IoBundle;
   batch: IoBatch;
@@ -221,27 +231,41 @@ function BundleRows({
   compact?: boolean;
   highlightItemId?: string | null;
   rowId?: string;
+  logs: TransactionLog[];
+  snapshotQuantityWidth?: number;
 }) {
   const padX = compact ? "px-2" : "px-4";
+  const cancelled = batch.status === "cancelled";
   const isBomParent = bundle.source_kind === "bom_parent";
   const parentLine = getHistoryBomParentLine(bundle);
+  const isAdjustmentSummary = bundle.bundle_id === `history-adjustment-${batch.batch_id}`;
+  const parentLog = parentLine
+    ? getBomLineSnapshotLog(parentLine, logs, batch)
+    : isAdjustmentSummary
+      ? null
+      : bundle.lines.length === 1
+        ? getBomLineSnapshotLog(bundle.lines[0], logs, batch)
+        : null;
   const isInternalUseBom = batch.sub_type === "internal_use_out" && isBomParent;
+  const parentNotExecuted = !!parentLine && !parentLine.included;
   const childLines = (parentLine ? bundle.lines.filter((l) => l !== parentLine) : bundle.lines)
     .filter((line) => isInternalUseBom || line.included);
   const isSingleLineDirect = !isBomParent && childLines.length === 1;
   const singleLineCode = isSingleLineDirect ? childLines[0].mes_code : null;
   const canExpand = isBomParent || (!isSingleLineDirect && childLines.length > 0);
 
-  const headerSigned = parentLine
-    ? getHistoryLineSignedQuantity(parentLine, batch, bundle)
+  const headerSigned = parentLine && !parentNotExecuted
+    ? getHistoryLineSignedQuantity(parentLine, batch, bundle, getHistoryLineExecutionLog(parentLine, logs))
     : bundle.lines.length === 1
-      ? getHistoryLineSignedQuantity(bundle.lines[0], batch, bundle)
+      ? getHistoryLineSignedQuantity(bundle.lines[0], batch, bundle, getHistoryLineExecutionLog(bundle.lines[0], logs))
       : null;
   const bundleUnit = (() => {
     const units = new Set(bundle.lines.map((l) => (l.unit ?? "").trim()).filter(Boolean));
     return units.size === 1 ? Array.from(units)[0] : null;
   })();
-  const headerQtyText = headerSigned
+  const headerQtyText = parentNotExecuted
+    ? "상위 미반영"
+    : headerSigned
     ? headerSigned.label
     : bundleUnit
       ? `${formatQty(bundle.quantity)} ${bundleUnit}`
@@ -256,13 +280,13 @@ function BundleRows({
     ? INTERNAL_USE_BOM_MODE_LABEL[bundle.internal_use_bom_mode]
     : null;
   const targetPadX = compact ? "px-2" : "px-4";
-  const quantityPadX = compact ? "px-2" : "px-4";
-  const statusPadX = compact ? "px-2" : "px-4";
+  const statusPadX = "px-2";
 
   return (
     <>
       <tr
         id={rowId}
+        data-history-cancelled={cancelled || undefined}
         tabIndex={canExpand ? 0 : undefined}
         aria-label={canExpand ? `${isBomParent ? "BOM 구성" : "라인 구성"} ${displayTitle}` : undefined}
         aria-expanded={canExpand ? expanded : undefined}
@@ -343,15 +367,22 @@ function BundleRows({
             )}
           </div>
         </td>
-        <ItemCodeCell code={bundle.source_mes_code ?? singleLineCode} compact={compact} dense />
-        <td className={`whitespace-nowrap ${HISTORY_CHILD_CELL_CLASS} ${quantityPadX} text-center text-xs font-bold`} style={{ borderColor: LEGACY_COLORS.border, color: headerQtyColor }}>
-          {headerSigned ? (
-            <MovementSummaryCell
-              summary={{ parts: [{ label: headerSigned.label, tone: SIGN_TONE_MOVEMENT[headerSigned.tone] }] }}
-              compact={compact}
-            />
-          ) : headerQtyText}
-        </td>
+        <ItemCodeQuantityCell
+          code={bundle.source_mes_code ?? singleLineCode}
+          compact={compact}
+          dense
+          quantity={(
+            <div className="text-xs font-bold" style={{ color: headerQtyColor }}>
+              {headerSigned ? (
+                <MovementSummaryCell
+                  summary={{ parts: [{ label: headerSigned.label, tone: SIGN_TONE_MOVEMENT[headerSigned.tone] }] }}
+                  compact={compact}
+                />
+              ) : headerQtyText}
+            </div>
+          )}
+        />
+        <StockSnapshotCell log={parentLog} dense quantityWidth={snapshotQuantityWidth} />
         <td className={`${HISTORY_CHILD_CELL_CLASS} ${statusPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
           <div className="flex flex-wrap justify-center gap-1">
             {shortageCount > 0 && <StatusBadge shortage={shortageCount} />}
@@ -371,6 +402,8 @@ function BundleRows({
           compact={compact}
           highlightItemId={highlightItemId}
           rowId={index === 0 ? detailId : undefined}
+          log={getBomLineSnapshotLog(line, logs, batch)}
+          snapshotQuantityWidth={snapshotQuantityWidth}
         />
       ))}
     </>
@@ -384,6 +417,8 @@ function BomLineRow({
   compact,
   highlightItemId,
   rowId,
+  log,
+  snapshotQuantityWidth,
 }: {
   line: IoLine;
   batch: IoBatch;
@@ -391,13 +426,19 @@ function BomLineRow({
   compact?: boolean;
   highlightItemId?: string | null;
   rowId?: string;
+  log: TransactionLog | null;
+  snapshotQuantityWidth?: number;
 }) {
   const padX = compact ? "px-2" : "px-4";
   const targetPadX = compact ? "px-2" : "px-4";
-  const quantityPadX = compact ? "px-2" : "px-4";
-  const statusPadX = compact ? "px-2" : "px-4";
+  const statusPadX = "px-2";
   const cancelled = batch.status === "cancelled";
-  const signed = getHistoryLineSignedQuantity(line, batch, bundle);
+  const signed = getHistoryLineSignedQuantity(
+    line,
+    batch,
+    bundle,
+    log?.operation_line_id === line.line_id ? log : null,
+  );
   const qtyColor = SIGN_TONE_HEX[signed.tone];
   const highlighted = highlightItemId === line.item_id;
   const internalUseEffect = batch.sub_type === "internal_use_out" && bundle.source_kind === "bom_parent"
@@ -406,6 +447,7 @@ function BomLineRow({
   return (
     <tr
       id={rowId}
+      data-history-cancelled={cancelled || undefined}
       className={HISTORY_CHILD_ROW_CLASS}
       data-history-focus-line={highlighted ? "true" : undefined}
       style={{
@@ -413,7 +455,6 @@ function BomLineRow({
           ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
           : "color-mix(in srgb, var(--c-blue) 3%, transparent)",
         boxShadow: highlighted ? `inset 3px 0 0 ${LEGACY_COLORS.blue}` : undefined,
-        opacity: cancelled ? 0.58 : 1,
       }}
     >
       <td className={`${HISTORY_CHILD_CELL_CLASS} ${padX}`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }} />
@@ -426,21 +467,27 @@ function BomLineRow({
           <Package className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
           <TruncatedText
             accessibilityLabel={line.item_name}
-            className={`truncate text-xs font-semibold leading-snug${cancelled ? " line-through" : ""}`}
+            className="truncate text-xs font-semibold leading-snug"
             style={{ color: LEGACY_COLORS.text }}
           >
             {line.item_name}
           </TruncatedText>
         </div>
       </td>
-      <ItemCodeCell code={line.mes_code} compact={compact} dense />
-      <td className={`whitespace-nowrap ${HISTORY_CHILD_CELL_CLASS} ${quantityPadX} text-center text-xs font-bold`} style={{ borderColor: LEGACY_COLORS.border, color: qtyColor }}>
-        <MovementSummaryCell
-          summary={{ parts: [{ label: signed.label, tone: SIGN_TONE_MOVEMENT[signed.tone] }] }}
-          compact={compact}
-          cancelled={cancelled}
-        />
-      </td>
+      <ItemCodeQuantityCell
+        code={line.mes_code}
+        compact={compact}
+        dense
+        quantity={(
+          <div className="text-xs font-bold" style={{ color: qtyColor }}>
+            <MovementSummaryCell
+              summary={{ parts: [{ label: signed.label, tone: SIGN_TONE_MOVEMENT[signed.tone] }] }}
+              compact={compact}
+            />
+          </div>
+        )}
+      />
+      <StockSnapshotCell log={log} dense quantityWidth={snapshotQuantityWidth} />
       <td className={`${HISTORY_CHILD_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="flex flex-wrap justify-center gap-1">
           {internalUseEffect && <InternalUseEffectBadge label={internalUseEffect} />}
@@ -449,6 +496,22 @@ function BomLineRow({
       </td>
     </tr>
   );
+}
+
+function getBomLineSnapshotLog(line: IoLine, logs: TransactionLog[], batch: IoBatch): TransactionLog | null {
+  const exactMatches = logs.filter((log) => log.operation_line_id === line.line_id);
+  if (exactMatches.length === 1) return exactMatches[0];
+
+  const matchingLines = batch.bundles
+    .flatMap((bundle) => bundle.lines)
+    .filter((candidate) => candidate.item_id === line.item_id);
+  if (matchingLines.length !== 1) return null;
+
+  const legacyMatches = logs.filter(
+    (log) => log.item_id === line.item_id
+      && (log.operation_line_id === null || log.operation_line_id === undefined),
+  );
+  return legacyMatches.length === 1 ? legacyMatches[0] : null;
 }
 
 function LineKindBadge({ line, compact }: { line: IoLine; compact?: boolean }) {

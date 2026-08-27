@@ -1,6 +1,14 @@
+from datetime import datetime
 from decimal import Decimal
 
-from app.models import Employee, IoBatch, TransactionLog, TransactionTypeEnum
+from app.models import (
+    Employee,
+    InventoryOperation,
+    InventoryOperationKindEnum,
+    IoBatch,
+    TransactionLog,
+    TransactionTypeEnum,
+)
 
 
 def _make_batch(db_session, suffix: str) -> IoBatch:
@@ -58,6 +66,58 @@ def test_list_transactions_filters_exact_operation_batch_id(client, db_session, 
     assert response.status_code == 200, response.text
     assert {row["log_id"] for row in response.json()} == {
         str(log.log_id) for log in target_logs
+    }
+
+
+def test_list_transactions_filters_unlinked_legacy_logs(client, db_session, make_item):
+    item = make_item(name="legacy-filter-item", warehouse_qty=Decimal("0"))
+    legacy_log = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.RECEIVE,
+        quantity_change=Decimal("1"),
+        quantity_before=Decimal("0"),
+        quantity_after=Decimal("1"),
+        created_at=datetime(2026, 7, 28, 13, 51),
+    )
+    operation = InventoryOperation(
+        kind=InventoryOperationKindEnum.BUSINESS,
+        domain="inventory_io",
+        action="receive_supplier",
+        display_label="원자재 입고",
+        actor_name="테스트 작업자",
+        effective_at=datetime(2026, 8, 1, 9, 0),
+    )
+    db_session.add_all([legacy_log, operation])
+    db_session.flush()
+    linked_log = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.RECEIVE,
+        quantity_change=Decimal("2"),
+        quantity_before=Decimal("1"),
+        quantity_after=Decimal("3"),
+        operation_id=operation.operation_id,
+        created_at=datetime(2026, 8, 1, 9, 0),
+    )
+    db_session.add(linked_log)
+    db_session.commit()
+
+    response = client.get(
+        "/api/inventory/transactions",
+        params={"item_id": str(item.item_id), "unlinked_only": True},
+    )
+
+    assert response.status_code == 200, response.text
+    assert [row["log_id"] for row in response.json()] == [str(legacy_log.log_id)]
+
+    default_response = client.get(
+        "/api/inventory/transactions",
+        params={"item_id": str(item.item_id)},
+    )
+
+    assert default_response.status_code == 200, default_response.text
+    assert {row["log_id"] for row in default_response.json()} == {
+        str(legacy_log.log_id),
+        str(linked_log.log_id),
     }
 
 

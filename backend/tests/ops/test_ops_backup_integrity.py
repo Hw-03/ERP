@@ -615,6 +615,52 @@ def test_backup_db_keeps_latest_ten_regular_sqlite_backups_and_preserves_pre_sna
     assert not old_backups[1].exists()
 
 
+def test_backup_db_integrity_only_snapshots_a_migration_eligible_legacy_schema(tmp_path: Path) -> None:
+    source = tmp_path / "legacy.db"
+    runtime_root = tmp_path / "runtime"
+    _create_ops_schema_db(source, omit_stock_request_lines=True)
+
+    result = _run_script(
+        BACKUP_DB,
+        "--sqlite",
+        str(source),
+        "--integrity-only",
+        env={"MES_RUNTIME_ROOT": str(runtime_root)},
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    snapshot = _backup_path_from_stdout(result.stdout)
+    assert snapshot.parent == (runtime_root / "backups" / "sqlite").resolve()
+    with sqlite3.connect(snapshot) as connection:
+        assert connection.execute("PRAGMA integrity_check").fetchone() == ("ok",)
+        assert connection.execute(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='stock_request_lines'"
+        ).fetchone() == (0,)
+
+
+def test_restore_db_source_integrity_only_prepares_legacy_candidate_for_migration(tmp_path: Path) -> None:
+    source = tmp_path / "legacy-snapshot.db"
+    candidate = tmp_path / "staging" / "candidate.db"
+    _create_ops_schema_db(source, omit_stock_request_lines=True)
+
+    result = _run_script(
+        RESTORE_DB,
+        "--sqlite",
+        str(source),
+        "--target",
+        str(candidate),
+        "--source-integrity-only",
+        env={"MES_RUNTIME_ROOT": str(tmp_path / "runtime")},
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    with sqlite3.connect(candidate) as connection:
+        assert connection.execute("PRAGMA integrity_check").fetchone() == ("ok",)
+        assert connection.execute(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='stock_request_lines'"
+        ).fetchone() == (0,)
+
+
 def test_restore_db_py_keeps_pre_restore_snapshot_under_runtime_root(tmp_path: Path) -> None:
     backup = tmp_path / "backup.db"
     target = tmp_path / "target.db"
@@ -635,6 +681,166 @@ def test_restore_db_py_keeps_pre_restore_snapshot_under_runtime_root(tmp_path: P
     assert result.returncode == 0, result.stdout + result.stderr
     assert len(snapshots) == 1
     assert not list(tmp_path.glob("target.pre-restore.*.db"))
+
+
+def test_restore_db_uses_preverified_rollback_without_duplicate_snapshot(tmp_path: Path) -> None:
+    backup = tmp_path / "backup.db"
+    target = tmp_path / "target.db"
+    runtime_root = tmp_path / "runtime"
+    rollback_dir = runtime_root / "backups" / "sqlite"
+    rollback_dir.mkdir(parents=True)
+    rollback = rollback_dir / "mes_20990101_000000.db"
+    _create_ops_schema_db(backup)
+    _create_ops_schema_db(target)
+    _create_ops_schema_db(rollback)
+
+    result = _run_script(
+        RESTORE_DB,
+        "--sqlite",
+        str(backup),
+        "--target",
+        str(target),
+        "--preverified-rollback",
+        str(rollback),
+        env={"MES_RUNTIME_ROOT": str(runtime_root)},
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert f"ROLLBACK_PATH={rollback.resolve()}" in result.stdout
+    assert not list(rollback_dir.glob("mes_PRE-RESTORE_*.db"))
+    assert not list(tmp_path.rglob("*.digest-*.tmp"))
+
+
+def test_restore_db_rejects_preverified_rollback_that_does_not_match_target(tmp_path: Path) -> None:
+    backup = tmp_path / "backup.db"
+    target = tmp_path / "target.db"
+    runtime_root = tmp_path / "runtime"
+    rollback_dir = runtime_root / "backups" / "sqlite"
+    rollback_dir.mkdir(parents=True)
+    rollback = rollback_dir / "mes_20990101_000000.db"
+    _create_ops_schema_db(backup)
+    _create_ops_schema_db(target)
+    _create_ops_schema_db(rollback)
+    connection = sqlite3.connect(rollback)
+    try:
+        connection.execute("UPDATE items SET item_name = 'wrong rollback'")
+        connection.commit()
+    finally:
+        connection.close()
+
+    original_target = target.read_bytes()
+    result = _run_script(
+        RESTORE_DB,
+        "--sqlite",
+        str(backup),
+        "--target",
+        str(target),
+        "--preverified-rollback",
+        str(rollback),
+        env={"MES_RUNTIME_ROOT": str(runtime_root)},
+    )
+
+    assert result.returncode == 3
+    assert "RESTORE_RESULT=TARGET_CHANGED_AFTER_ROLLBACK" in result.stderr
+    assert "does not match current target" in result.stderr
+    assert target.read_bytes() == original_target
+    assert not list(tmp_path.rglob("*.digest-*.tmp"))
+
+
+def test_restore_db_detects_changed_target_before_rejecting_invalid_candidate(tmp_path: Path) -> None:
+    candidate = tmp_path / "invalid-candidate.db"
+    target = tmp_path / "target.db"
+    runtime_root = tmp_path / "runtime"
+    rollback_dir = runtime_root / "backups" / "sqlite"
+    rollback_dir.mkdir(parents=True)
+    rollback = rollback_dir / "mes_20990101_000000.db"
+    candidate.write_bytes(b"not a sqlite database")
+    _create_ops_schema_db(target)
+    _create_ops_schema_db(rollback)
+    with sqlite3.connect(rollback) as connection:
+        connection.execute("UPDATE items SET item_name = 'stale rollback'")
+        connection.commit()
+
+    original_target = target.read_bytes()
+    result = _run_script(
+        RESTORE_DB,
+        "--sqlite",
+        str(candidate),
+        "--target",
+        str(target),
+        "--preverified-rollback",
+        str(rollback),
+        env={"MES_RUNTIME_ROOT": str(runtime_root)},
+    )
+
+    assert result.returncode == 3
+    assert "RESTORE_RESULT=TARGET_CHANGED_AFTER_ROLLBACK" in result.stderr
+    assert target.read_bytes() == original_target
+
+
+def test_restore_db_detects_changed_target_before_rejecting_missing_candidate(tmp_path: Path) -> None:
+    missing_candidate = tmp_path / "missing-candidate.db"
+    target = tmp_path / "target.db"
+    runtime_root = tmp_path / "runtime"
+    rollback_dir = runtime_root / "backups" / "sqlite"
+    rollback_dir.mkdir(parents=True)
+    rollback = rollback_dir / "mes_20990101_000000.db"
+    _create_ops_schema_db(target)
+    _create_ops_schema_db(rollback)
+    with sqlite3.connect(rollback) as connection:
+        connection.execute("UPDATE items SET item_name = 'stale rollback'")
+        connection.commit()
+
+    original_target = target.read_bytes()
+    result = _run_script(
+        RESTORE_DB,
+        "--sqlite",
+        str(missing_candidate),
+        "--target",
+        str(target),
+        "--preverified-rollback",
+        str(rollback),
+        env={"MES_RUNTIME_ROOT": str(runtime_root)},
+    )
+
+    assert result.returncode == 3
+    assert "RESTORE_RESULT=TARGET_CHANGED_AFTER_ROLLBACK" in result.stderr
+    assert target.read_bytes() == original_target
+
+
+def test_restore_db_can_install_the_preverified_rollback_without_duplicate_snapshot(tmp_path: Path) -> None:
+    target = tmp_path / "target.db"
+    runtime_root = tmp_path / "runtime"
+    rollback_dir = runtime_root / "backups" / "sqlite"
+    rollback_dir.mkdir(parents=True)
+    rollback = rollback_dir / "mes_20990101_000000.db"
+    _create_ops_schema_db(target)
+    _create_ops_schema_db(rollback)
+    connection = sqlite3.connect(target)
+    try:
+        connection.execute("UPDATE items SET item_name = 'failed candidate'")
+        connection.commit()
+    finally:
+        connection.close()
+
+    result = _run_script(
+        RESTORE_DB,
+        "--sqlite",
+        str(rollback),
+        "--target",
+        str(target),
+        "--preverified-rollback",
+        str(rollback),
+        env={"MES_RUNTIME_ROOT": str(runtime_root)},
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert not list(rollback_dir.glob("mes_PRE-RESTORE_*.db"))
+    assert not list(tmp_path.rglob("*.digest-*.tmp"))
+    with sqlite3.connect(target) as connection:
+        assert connection.execute("SELECT item_name FROM items WHERE item_id = 'item-1'").fetchone() == (
+            "Part A",
+        )
 
 
 def test_pre_restore_snapshot_includes_wal_commit_and_never_collides(

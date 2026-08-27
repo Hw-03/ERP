@@ -23,6 +23,7 @@ sys.path.insert(0, str(BACKEND_DIR))
 from app.database import SessionLocal
 from app.models import (
     BOM,
+    DefectQuarantineRecord,
     DepartmentEnum,
     Employee,
     EmployeeLevelEnum,
@@ -36,6 +37,7 @@ from app.models import (
     RequestBucketEnum,
     ShippingRequest,
     StockRequest,
+    StockRequestStatusEnum,
     StockRequestTypeEnum,
     TransactionLog,
 )
@@ -46,6 +48,7 @@ from app.services import (
     inventory as inventory_svc,
     shipping as shipping_svc,
     shipping_actions as shipping_actions_svc,
+    sr_reservation,
     stock_requests,
 )
 from app.services import io_dispatch
@@ -251,7 +254,7 @@ def _run_io_line(
     to_bucket: str,
     from_department: DepartmentEnum | None = None,
     to_department: DepartmentEnum | None = None,
-) -> None:
+) -> uuid.UUID | None:
     batch, bundle = _new_batch(db, plan, marker, label, item)
     line = IoLine(
         bundle_id=bundle.bundle_id,
@@ -273,6 +276,15 @@ def _run_io_line(
     batch.status = "completed"
     batch.completed_at = datetime.now(UTC).replace(tzinfo=None)
     db.flush()
+    log = (
+        db.query(TransactionLog)
+        .filter(
+            TransactionLog.operation_batch_id == batch.batch_id,
+            TransactionLog.item_id == item.item_id,
+        )
+        .one()
+    )
+    return log.defect_quarantine_record_id
 
 
 def _run_basic_io(db, plan: ShowcasePlan, marker: str) -> None:
@@ -330,12 +342,7 @@ def _run_shipping(db, plan: ShowcasePlan, marker: str) -> None:
         },
         plan.actor,
     )
-    request = shipping_actions_svc.send_to_prep(db, request.request_id, plan.actor)
-    if request.final_pf_item_id is None:
-        raise RuntimeError("출하 준비 전환 결과에 최종 PF 품목이 없습니다.")
-    final_pf = db.get(Item, request.final_pf_item_id)
-    if final_pf is None:
-        raise RuntimeError("출하 준비 전환의 최종 PF 품목을 찾을 수 없습니다.")
+    _final_pa, final_pf = shipping_svc._require_final_items(db, request)
     batch, bundle = _new_batch(db, plan, marker, "shipping_prepare_produce", final_pf)
     batch.work_type = "process"
     batch.sub_type = "produce"
@@ -381,6 +388,7 @@ def _run_stock_request(
     to_bucket: RequestBucketEnum,
     from_department: DepartmentEnum | None = None,
     to_department: DepartmentEnum | None = None,
+    record_id: uuid.UUID | None = None,
     notes: str | None = None,
 ) -> None:
     stock_requests.create_request(
@@ -395,6 +403,7 @@ def _run_stock_request(
                 from_department=from_department,
                 to_bucket=to_bucket,
                 to_department=to_department,
+                record_id=record_id,
             )
         ],
         reference_no=marker,
@@ -405,9 +414,17 @@ def _run_stock_request(
     )
 
 
-def _run_unquarantine(db, plan: ShowcasePlan, marker: str, item: Item, department: DepartmentEnum) -> None:
+def _run_unquarantine(
+    db,
+    plan: ShowcasePlan,
+    marker: str,
+    item: Item,
+    department: DepartmentEnum,
+    record_id: uuid.UUID,
+) -> None:
     defect_actions_svc.unquarantine_inventory(
         db,
+        record_id=record_id,
         item_id=item.item_id,
         qty=DEMO_QUANTITY,
         dept=department,
@@ -415,18 +432,23 @@ def _run_unquarantine(db, plan: ShowcasePlan, marker: str, item: Item, departmen
         reason_category=DEMO_REASON_CATEGORY,
         reason_memo=marker,
     )
-    db.flush()
 
 
 def _run_defects(db, plan: ShowcasePlan, marker: str) -> None:
     item = plan.general_item
     assembly = DepartmentEnum.ASSEMBLY
-    _run_io_line(db, plan, marker, "defect_quarantine", item, direction="defective", from_bucket="warehouse", to_bucket="defective", to_department=assembly)
-    _run_unquarantine(db, plan, marker, item, assembly)
-    _run_io_line(db, plan, marker, "defect_quarantine_scrap", item, direction="defective", from_bucket="warehouse", to_bucket="defective", to_department=assembly)
-    _run_stock_request(db, plan, marker, StockRequestTypeEnum.DEFECT_SCRAP, item, from_bucket=RequestBucketEnum.DEFECTIVE, to_bucket=RequestBucketEnum.NONE, from_department=assembly)
-    _run_io_line(db, plan, marker, "defect_quarantine_return", item, direction="defective", from_bucket="warehouse", to_bucket="defective", to_department=assembly)
-    _run_stock_request(db, plan, marker, StockRequestTypeEnum.DEFECT_RETURN, item, from_bucket=RequestBucketEnum.DEFECTIVE, to_bucket=RequestBucketEnum.NONE, from_department=assembly)
+    restore_record_id = _run_io_line(db, plan, marker, "defect_quarantine", item, direction="defective", from_bucket="warehouse", to_bucket="defective", to_department=assembly)
+    if restore_record_id is None:
+        raise RuntimeError("[HISTORY-DEMO] 정상 복귀할 격리 기록을 만들지 못했습니다.")
+    _run_unquarantine(db, plan, marker, item, assembly, restore_record_id)
+    scrap_record_id = _run_io_line(db, plan, marker, "defect_quarantine_scrap", item, direction="defective", from_bucket="warehouse", to_bucket="defective", to_department=assembly)
+    if scrap_record_id is None:
+        raise RuntimeError("[HISTORY-DEMO] 폐기할 격리 기록을 만들지 못했습니다.")
+    _run_stock_request(db, plan, marker, StockRequestTypeEnum.DEFECT_SCRAP, item, from_bucket=RequestBucketEnum.DEFECTIVE, to_bucket=RequestBucketEnum.NONE, from_department=assembly, record_id=scrap_record_id)
+    return_record_id = _run_io_line(db, plan, marker, "defect_quarantine_return", item, direction="defective", from_bucket="warehouse", to_bucket="defective", to_department=assembly)
+    if return_record_id is None:
+        raise RuntimeError("[HISTORY-DEMO] 반품할 격리 기록을 만들지 못했습니다.")
+    _run_stock_request(db, plan, marker, StockRequestTypeEnum.DEFECT_RETURN, item, from_bucket=RequestBucketEnum.DEFECTIVE, to_bucket=RequestBucketEnum.NONE, from_department=assembly, record_id=return_record_id)
     _run_stock_request(db, plan, marker, StockRequestTypeEnum.SCRAP_NORMAL, item, from_bucket=RequestBucketEnum.WAREHOUSE, to_bucket=RequestBucketEnum.NONE)
     _run_stock_request(db, plan, marker, StockRequestTypeEnum.RETURN_NORMAL, item, from_bucket=RequestBucketEnum.WAREHOUSE, to_bucket=RequestBucketEnum.NONE)
 
@@ -542,7 +564,7 @@ def remove_showcase(db, marker: str) -> ShowcaseCleanupResult:
         .filter(IoBatch.reference_no.contains(marker) | IoBatch.notes.contains(marker))
         .all()
     )
-    stock_requests = (
+    marked_stock_requests = (
         db.query(StockRequest)
         .filter(
             StockRequest.reference_no.contains(marker)
@@ -552,6 +574,11 @@ def remove_showcase(db, marker: str) -> ShowcaseCleanupResult:
         .all()
     )
     shipping_requests = db.query(ShippingRequest).filter(ShippingRequest.notes.contains(marker)).all()
+    quarantine_records = (
+        db.query(DefectQuarantineRecord)
+        .filter(DefectQuarantineRecord.current_memo.contains(marker))
+        .all()
+    )
     marked_ids = {log.log_id for log in logs}
     for batch in batches:
         attached = db.query(TransactionLog.log_id).filter(TransactionLog.operation_batch_id == batch.batch_id).all()
@@ -561,6 +588,16 @@ def remove_showcase(db, marker: str) -> ShowcaseCleanupResult:
         attached = db.query(TransactionLog.log_id).filter(TransactionLog.shipping_request_id == request.request_id).all()
         if any(log_id not in marked_ids for (log_id,) in attached):
             raise ValueError(f"Unmarked transaction is attached to showcase shipping request: {request.request_id}")
+
+    reserved_lines = [
+        line
+        for request in marked_stock_requests
+        if request.status == StockRequestStatusEnum.RESERVED
+        for line in request.lines
+    ]
+    if reserved_lines:
+        sr_reservation.release_lines(db, reserved_lines)
+    db.flush()
 
     effects, location_cells = _combined_effects(logs)
     for item_id, effect in effects.items():
@@ -590,17 +627,20 @@ def remove_showcase(db, marker: str) -> ShowcaseCleanupResult:
     db.flush()
     for batch in batches:
         db.delete(batch)
-    for request in stock_requests:
+    for request in marked_stock_requests:
         db.delete(request)
     for request in shipping_requests:
         db.delete(request)
+    db.flush()
+    for record in quarantine_records:
+        db.delete(record)
     db.flush()
 
     return ShowcaseCleanupResult(
         marker=marker,
         log_count=len(logs),
         batch_count=len(batches),
-        stock_request_count=len(stock_requests),
+        stock_request_count=len(marked_stock_requests),
         shipping_request_count=len(shipping_requests),
     )
 

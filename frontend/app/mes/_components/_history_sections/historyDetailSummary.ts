@@ -50,7 +50,7 @@ export type HistoryDetailSummary = {
     target: HistoryConversionEndpoint;
   } | null;
   requester: {
-    label: "요청자" | "담당자";
+    label: "요청자" | "담당자" | "취소자";
     name: string;
     at: string;
   };
@@ -275,6 +275,8 @@ export function buildHistoryDetailSummary(
   const primary = getPrimaryLog(logs, batch);
   const presentation = getHistoryRowPresentation(primary, batch);
   const reworkFlow = getLegacyReworkFlow(logs);
+  const isCancellationOperation = primary.operation_kind === "CANCELLATION"
+    || primary.operation_effective_status === "cancellation";
 
   return {
     target: {
@@ -287,11 +289,17 @@ export function buildHistoryDetailSummary(
     impactGroups: buildImpactGroups(logs, batch),
     conversion: getItemConversion(logs),
     requester: {
-      label: primary.transaction_type === "SHIP" ? "담당자" : "요청자",
-      name: primary.transaction_type === "SHIP"
-        ? presentation.people.requester
-        : batch?.requester_name?.trim() || presentation.people.requester,
-      at: batch?.submitted_at ?? primary.requested_at ?? primary.created_at,
+      label: isCancellationOperation
+        ? "취소자"
+        : primary.transaction_type === "SHIP" ? "담당자" : "요청자",
+      name: isCancellationOperation
+        ? primary.produced_by?.trim() || primary.requester_name?.trim() || presentation.people.requester
+        : primary.transaction_type === "SHIP"
+          ? presentation.people.requester
+          : batch?.requester_name?.trim() || presentation.people.requester,
+      at: isCancellationOperation
+        ? primary.requested_at ?? primary.created_at
+        : batch?.submitted_at ?? primary.requested_at ?? primary.created_at,
     },
     flow: reworkFlow ?? (presentation.flow.label
       ? {

@@ -71,7 +71,7 @@ test.describe("불량 — 격리 / 해제", () => {
     await page.getByRole("button", { name: "정상 복귀 →" }).click();
     await page
       .getByRole("dialog")
-      .getByRole("button", { name: "즉시 처리", exact: true })
+      .getByRole("button", { name: "즉시 복귀", exact: true })
       .click();
 
     // 처리 후 hub 자동 복귀를 명시적으로 기다린 뒤 "격리 목록" 카드 재진입 (재로드 경합 flaky 방지)

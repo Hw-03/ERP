@@ -11,9 +11,10 @@ const ZERO_FADE = LEGACY_COLORS.muted2;
 
 interface Props {
   group: WeeklyGroupReport | undefined;
+  stockBasis: "legacy" | "normal";
 }
 
-function WeeklyDetailTableImpl({ group }: Props) {
+function WeeklyDetailTableImpl({ group, stockBasis }: Props) {
   if (!group || group.items.length === 0) {
     return (
       <EmptyState
@@ -25,11 +26,16 @@ function WeeklyDetailTableImpl({ group }: Props) {
     );
   }
 
+  const usesNormalStock = stockBasis === "normal";
+  const previousStockLabel = usesNormalStock ? "전주 정상재고" : "전주 재고";
+  const currentStockLabel = usesNormalStock ? "현재 정상재고" : "현재 재고";
+
   return (
     <div className="flex flex-col gap-0 min-w-0">
       {/* 공정 요약 */}
       <div
-        className="mb-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 pb-1.5"
+        data-testid="weekly-detail-summary"
+        className="mb-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 pb-1.5 pt-2"
         style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
       >
         <span className="text-[13px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -42,7 +48,7 @@ function WeeklyDetailTableImpl({ group }: Props) {
           </span>
         </span>
         <span className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
-          현재 재고 {formatQty(group.current_qty)}
+          {currentStockLabel} {formatQty(group.current_qty)}
         </span>
         <span
           className="text-[12px]"
@@ -61,6 +67,12 @@ function WeeklyDetailTableImpl({ group }: Props) {
           style={{ color: group.out_qty > 0 ? LEGACY_COLORS.red : ZERO_FADE }}
         >
           출고 {formatQty(group.out_qty)}
+        </span>
+        <span
+          className="text-[12px]"
+          style={{ color: (group.defect_qty ?? 0) > 0 ? LEGACY_COLORS.red : ZERO_FADE }}
+        >
+          불량 {formatQty(group.defect_qty ?? 0)}
         </span>
         <span
           className="text-[12px]"
@@ -127,14 +139,15 @@ function WeeklyDetailTableImpl({ group }: Props) {
                 </div>
               </div>
               <div
-                className="mt-2 grid grid-cols-5 gap-1 text-center text-[11px] font-bold tabular-nums"
+                className="mt-2 grid grid-cols-6 gap-1 text-center text-[11px] font-bold tabular-nums"
               >
                 {[
-                  { l: "전주", v: row.prev_qty, c: LEGACY_COLORS.muted2 },
+                  { l: usesNormalStock ? "전주 정상" : "전주", v: row.prev_qty, c: LEGACY_COLORS.muted2 },
                   { l: "생산", v: row.produce_qty, c: LEGACY_COLORS.green },
                   { l: "입고", v: row.receive_qty, c: LEGACY_COLORS.blue },
                   { l: "출고", v: row.out_qty, c: LEGACY_COLORS.red },
-                  { l: "현재", v: row.current_qty, c: LEGACY_COLORS.text },
+                  { l: "불량", v: row.defect_qty ?? 0, c: LEGACY_COLORS.red },
+                  { l: usesNormalStock ? "현재 정상" : "현재", v: row.current_qty, c: LEGACY_COLORS.text },
                 ].map((x) => (
                   <div key={x.l}>
                     <div style={{ color: LEGACY_COLORS.muted2 }}>{x.l}</div>
@@ -153,12 +166,10 @@ function WeeklyDetailTableImpl({ group }: Props) {
       </div>
 
       <div
-        className="hidden overflow-x-auto lg:block"
-        role="region"
-        aria-label={`${group.dept_name} 품목 상세`}
-        tabIndex={0}
+        className="hidden lg:block"
+        data-testid="weekly-detail-table"
       >
-        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "0 2px", minWidth: 680, tableLayout: "fixed" }}>
+        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "0 2px", minWidth: 760, tableLayout: "fixed" }}>
           <colgroup>
             <col style={{ width: "100px" }} />
             <col />
@@ -167,25 +178,28 @@ function WeeklyDetailTableImpl({ group }: Props) {
             <col style={{ width: "9%" }} />
             <col style={{ width: "9%" }} />
             <col style={{ width: "9%" }} />
+            <col style={{ width: "9%" }} />
             <col style={{ width: "10%" }} />
           </colgroup>
-          <thead>
+          <thead className="sticky top-0 z-10">
             <tr>
-              {["품목 코드", "품명", "전주 재고", "생산", "입고", "출고", "현재 재고", "증감"].map(
+              {["품목 코드", "품명", previousStockLabel, "생산", "입고", "출고", "불량", currentStockLabel, "증감"].map(
                 (h, i) => (
                   <th
                     key={h}
                     scope="col"
-                    className="text-[13px] font-bold"
+                    className="border-b text-[13px] font-bold"
                     style={{
+                      background: "var(--c-inventory-table-header)",
+                      borderColor: LEGACY_COLORS.border,
                       color: LEGACY_COLORS.muted2,
                       textAlign: i < 2 ? "left" : "center",
                       padding: "4px 12px 6px",
                       whiteSpace: "nowrap",
                     }}
                     title={
-                      h === "전주 재고"
-                        ? "현재 재고와 선택 주차 입출고 내역을 기준으로 계산한 값입니다."
+                      h === previousStockLabel
+                        ? `${currentStockLabel}와 선택 주차 입출고 내역을 기준으로 계산한 값입니다.`
                         : undefined
                     }
                   >
@@ -259,6 +273,14 @@ function WeeklyDetailTableImpl({ group }: Props) {
                   {/* 출고 내역 */}
                   <Num
                     val={row.out_qty}
+                    bg={rowBg}
+                    border={rowBorder}
+                    color={LEGACY_COLORS.red}
+                    highlightColor={LEGACY_COLORS.red}
+                  />
+                  {/* 불량 */}
+                  <Num
+                    val={row.defect_qty ?? 0}
                     bg={rowBg}
                     border={rowBorder}
                     color={LEGACY_COLORS.red}

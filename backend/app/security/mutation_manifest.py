@@ -40,6 +40,7 @@ SERVICE_ACTOR_CONSUMERS: dict[str, str] = {
     "app.services.handover_actions.submit_handover": "author",
     "app.services.integrity.repair_inventory_totals": "actor",
     "app.services.inventory.reserve": "employee",
+    "app.services.inventory_operation_cancellation.cancel_operation": "canceller",
     "app.services.io_actions.submit": "requester",
     "app.services.io_actions.submit_existing_draft": "requester",
     "app.services.io_dispatch.execute_batch_after_dept_approval": "approver",
@@ -50,6 +51,7 @@ SERVICE_ACTOR_CONSUMERS: dict[str, str] = {
     "app.services.io_draft.save_draft": "requester",
     "app.services.io_preview.validate_internal_use_requester": "requester",
     "app.services.io_preview.validate_warehouse_adjust_requester": "requester",
+    "app.services.legacy_inventory_operation_adoption.adopt_and_cancel": "canceller",
     "app.services.production_receipt.execute_production_receipt": "actor",
     "app.services.rate_limit.verify_operator_pin": "actor",
     "app.services.shipping_actions.clear_checklist": "actor",
@@ -62,7 +64,6 @@ SERVICE_ACTOR_CONSUMERS: dict[str, str] = {
     "app.services.shipping_actions.pickup_complete": "actor",
     "app.services.shipping_actions.prepare_cancel": "actor",
     "app.services.shipping_actions.prepare_complete": "actor",
-    "app.services.shipping_actions.send_to_prep": "actor",
     "app.services.shipping_actions.update_checklist": "actor",
     "app.services.shipping_actions.update_invoice": "actor",
     "app.services.shipping_actions.update_request": "actor",
@@ -148,6 +149,7 @@ SERVICE_READ_ONLY_EXPORTS: frozenset[str] = frozenset(
         "app.services.inv_calc.defective_total",
         "app.services.inv_calc.production_total",
         "app.services.inv_effect.effect_diff",
+        "app.services.inv_effect.summarize_stock_cells",
         "app.services.inv_transfer.department_for_item",
         "app.services.inv_transfer.format_item_location_shortage",
         "app.services.inv_transfer.item_department_stock",
@@ -162,6 +164,12 @@ SERVICE_READ_ONLY_EXPORTS: frozenset[str] = frozenset(
         "app.services.io_preview.validate_internal_use_operation",
         "app.services.io_preview.validate_operation_sources",
         "app.services.io_preview.validate_warehouse_adjust_operation",
+        "app.services.inventory_integrity.diagnose_inventory_integrity",
+        "app.services.inventory_operation_cancellation.is_same_kst_week",
+        "app.services.inventory_operation_cancellation.normalized_effect_for_cancellation",
+        "app.services.inventory_operation_cancellation.preview_cancellation",
+        "app.services.inventory_operations.cutover_at",
+        "app.services.inventory_operations.is_ledger_active",
         "app.services.item_display_order.default_item_display_order",
         "app.services.notifications.recipients_for_department_approval",
         "app.services.notifications.recipients_for_handover",
@@ -210,6 +218,11 @@ SERVICE_READ_ONLY_EXPORTS: frozenset[str] = frozenset(
         "app.services.warehouse_map.is_box_tracking_enabled",
         "app.services.warehouse_map.lock_warehouse_map_rows",
         "app.services.warehouse_map.reconcile_inventory",
+        "app.services.weekly_inventory_snapshot.latest_completed_sunday",
+        "app.services.weekly_inventory_snapshot.load_dashboard_finished_stock",
+        "app.services.weekly_inventory_snapshot.sunday_cutoff_utc",
+        "app.services.weekly_report_contract.classify_inventory_activity",
+        "app.services.weekly_report_contract.weekly_contract_state",
     }
 )
 
@@ -222,6 +235,12 @@ _AUTH_INFRASTRUCTURE_REASON = (
 )
 _RUNTIME_INFRASTRUCTURE_REASON = (
     "프로세스 lifecycle listener 또는 명시적 운영 import를 담당하는 기반 경계"
+)
+_INVENTORY_OPERATION_MAINTENANCE_REASON = (
+    "명시적 재고 원장 운영 CLI의 진단 보정·전향 활성화를 담당하는 기반 경계"
+)
+_WEEKLY_SNAPSHOT_INFRASTRUCTURE_REASON = (
+    "첫 write 또는 예약 작업에서 주간 재고 snapshot을 원자적으로 확정하는 기반 경계"
 )
 
 
@@ -238,6 +257,8 @@ SERVICE_INFRASTRUCTURE_MUTATION_REASONS: dict[str, str] = {
     "app.services.audit_csv.list_available_months": _AUDIT_INFRASTRUCTURE_REASON,
     "app.services.audit_csv.path_for_month": _AUDIT_INFRASTRUCTURE_REASON,
     "app.services.audit_csv.register_session_listeners": _AUDIT_INFRASTRUCTURE_REASON,
+    "app.services.inventory_integrity_repair.repair_inventory_integrity_issue": _INVENTORY_OPERATION_MAINTENANCE_REASON,
+    "app.services.inventory_operation_activation.activate_inventory_operation_contract": _INVENTORY_OPERATION_MAINTENANCE_REASON,
     "app.services.operator_session.create_session": _AUTH_INFRASTRUCTURE_REASON,
     "app.services.operator_session.revoke_employee_sessions": _AUTH_INFRASTRUCTURE_REASON,
     "app.services.operator_session.revoke_session": _AUTH_INFRASTRUCTURE_REASON,
@@ -251,6 +272,10 @@ SERVICE_INFRASTRUCTURE_MUTATION_REASONS: dict[str, str] = {
     "app.services.realtime.suppress_realtime_revision": _RUNTIME_INFRASTRUCTURE_REASON,
     "app.services.realtime.unregister_session_listeners": _RUNTIME_INFRASTRUCTURE_REASON,
     "app.services.seed_cleanup.run_cleanup_import": _RUNTIME_INFRASTRUCTURE_REASON,
+    "app.services.weekly_inventory_snapshot.capture_due_weekly_inventory_snapshot": _WEEKLY_SNAPSHOT_INFRASTRUCTURE_REASON,
+    "app.services.weekly_inventory_snapshot.capture_weekly_inventory_snapshot": _WEEKLY_SNAPSHOT_INFRASTRUCTURE_REASON,
+    "app.services.weekly_inventory_snapshot.ensure_due_snapshot_committed": _WEEKLY_SNAPSHOT_INFRASTRUCTURE_REASON,
+    "app.services.weekly_report_contract.build_verified_weekly_report": _WEEKLY_SNAPSHOT_INFRASTRUCTURE_REASON,
 }
 
 

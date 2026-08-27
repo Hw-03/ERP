@@ -13,12 +13,13 @@ import {
   HISTORY_MAIN_CELL_CLASS,
   HISTORY_MAIN_ROW_CLASS,
   FlowBadge,
-  ItemCodeCell,
+  ItemCodeQuantityCell,
   MovementSummaryCell,
   PeopleStatusCell,
   ReferenceBatchDetail,
   TargetSummaryBlock,
   buildGroups,
+  getStockSnapshotQuantityWidth,
   toHistoryLogGroups,
 } from "../historyTableHelpers";
 
@@ -68,6 +69,19 @@ function makeLog(overrides: Partial<TransactionLog> = {}): TransactionLog {
   };
 }
 
+describe("getStockSnapshotQuantityWidth", () => {
+  it("묶음 내 재고가 더 짧아도 쉼표 포함 5자리 수량 폭을 미리 확보한다", () => {
+    expect(getStockSnapshotQuantityWidth([
+      makeLog({
+        warehouse_qty_before: 800,
+        warehouse_qty_after: 800,
+        department_qty_before: 76,
+        department_qty_after: 75,
+      }),
+    ])).toBe(6);
+  });
+});
+
 describe("buildGroups shipping phase grouping", () => {
   it("separates prepare and pickup logs that share a shipping request reference", () => {
     const groups = buildGroups([
@@ -93,12 +107,14 @@ describe("toHistoryLogGroups", () => {
     const parent = makeLog({ log_id: "defect-parent", transaction_type: "MARK_DEFECTIVE" });
     const child = makeLog({ log_id: "defect-child", transaction_type: "DISASSEMBLE" });
     const groups = toHistoryLogGroups([
+      { type: "operation", key: "operation-1", logs: [makeLog({ operation_id: "operation-1" })] },
       { type: "op_batch", key: "batch-1", logs: [makeLog({ operation_batch_id: "batch-1" })] },
       { type: "batch", key: "REF-1::PICKUP", logs: [makeLog({ reference_no: "REF-1", shipping_phase: "PICKUP" })] },
       { type: "defect_lifecycle", key: "defect-lifecycle:defect-parent:defect-child", logs: [parent, child] },
     ]);
 
     expect(groups).toEqual([
+      expect.objectContaining({ type: "operation", operationId: "operation-1" }),
       expect.objectContaining({ type: "op_batch", batchId: "batch-1" }),
       expect.objectContaining({ type: "batch", refKey: "REF-1::PICKUP", refNo: "REF-1" }),
       expect.objectContaining({ type: "defect_lifecycle", parent, child }),
@@ -489,8 +505,8 @@ describe("history table helper rendering policies", () => {
     expect(screen.queryByText(/표시 .*건/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "현재 묶음 접기" })).not.toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "일시" })).toHaveClass("sticky", "top-0", "z-10");
-    expect(screen.getByRole("columnheader", { name: "작업" })).toHaveStyle({ width: "228px" });
-    expect(screen.getByRole("columnheader", { name: "담당자" })).toHaveStyle({ width: "160px" });
+    expect(screen.getByRole("columnheader", { name: "작업" })).toHaveStyle({ width: "184px" });
+    expect(screen.getByRole("columnheader", { name: "담당자" })).toHaveStyle({ width: "132px" });
   });
 
   it("defines a single fixed rhythm for main history rows", () => {
@@ -546,13 +562,15 @@ describe("history table helper rendering policies", () => {
     const target = screen.getByRole("columnheader", { name: "대상" });
     expect(target.style.width).toBe("");
     expect(target.style.minWidth).toBe("");
-    expect(screen.getByRole("columnheader", { name: "일시" }).style.width).toBe("120px");
-    expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("228px");
-    expect(screen.getByRole("columnheader", { name: "품목코드" }).style.width).toBe("118px");
+    expect(screen.getByRole("columnheader", { name: "일시" }).style.width).toBe("116px");
+    expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("184px");
+    const codeQuantityHeader = screen.getByRole("columnheader", { name: "품목코드 · 수량" });
+    expect(codeQuantityHeader.style.width).toBe("364px");
+    expect(codeQuantityHeader).toHaveAttribute("colspan", "2");
     expect(screen.queryByRole("columnheader", { name: "흐름" })).not.toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "수량" }).style.width).toBe("270px");
+    expect(screen.getByRole("columnheader", { name: "재고 변동" }).style.width).toBe("172px");
     const statusHeader = screen.getByRole("columnheader", { name: "담당자" });
-    expect(statusHeader.style.width).toBe("160px");
+    expect(statusHeader.style.width).toBe("132px");
     expect(statusHeader).toHaveClass("text-center");
 
     const row = screen.getByRole("button");
@@ -651,11 +669,12 @@ describe("history table helper rendering policies", () => {
       />,
     );
 
-    expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("228px");
+    expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("184px");
     expect(screen.queryByRole("columnheader", { name: "흐름" })).not.toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "수량" }).style.width).toBe("270px");
+    expect(screen.getByRole("columnheader", { name: "품목코드 · 수량" }).style.width).toBe("364px");
+    expect(screen.getByRole("columnheader", { name: "재고 변동" }).style.width).toBe("172px");
     const statusHeader = screen.getByRole("columnheader", { name: "담당자" });
-    expect(statusHeader.style.width).toBe("160px");
+    expect(statusHeader.style.width).toBe("132px");
     expect(statusHeader).toHaveClass("text-center");
   });
 
@@ -869,20 +888,45 @@ describe("history table helper rendering policies", () => {
     expect(screen.getByText("재작업").parentElement).toHaveClass("w-32", "max-w-full", "px-3");
   });
 
-  it("renders conversion item codes as source, arrow, and target on separate lines", () => {
+  it("aligns conversion process codes on the shared center line", () => {
     render(
       <table>
         <tbody>
           <tr>
-            <ItemCodeCell code="46-AR-0093" sourceCode="4-AA-0077" />
+            <ItemCodeQuantityCell code="46-AR-0093" sourceCode="4-AA-0077" quantity={<span>수량</span>} />
           </tr>
         </tbody>
       </table>,
     );
 
-    const cell = screen.getByText("4-AA-0077").closest("td");
+    const cell = screen.getByText("수량").closest("td");
+    expect(cell).toHaveAttribute("colspan", "2");
+    expect(cell).not.toHaveAttribute("data-history-collapsible-group");
     expect(cell).toHaveTextContent("4-AA-0077↓46-AR-0093");
     expect(within(cell!).getByText("↓")).toBeInTheDocument();
+    expect(within(cell!).getByText("AA").parentElement?.parentElement).toHaveClass("justify-center");
+    expect(within(cell!).getByText("AR").parentElement?.parentElement).toHaveClass("justify-center");
+    expect(within(cell!).getByText("수량").parentElement).toHaveClass("justify-start", "px-1");
+  });
+
+  it("centers one-digit code frames while longer model symbols extend left", () => {
+    render(
+      <table>
+        <tbody>
+          <tr>
+            <ItemCodeQuantityCell code="8-AR-0285" quantity={<span>수량 A</span>} />
+          </tr>
+          <tr>
+            <ItemCodeQuantityCell code="346789-VR-0040" quantity={<span>수량</span>} />
+          </tr>
+        </tbody>
+      </table>,
+    );
+
+    expect(screen.getByText("AR").parentElement?.parentElement).toHaveClass("w-full", "justify-center");
+    expect(screen.getByText("8-")).toHaveClass("absolute", "right-0");
+    expect(screen.getByText("346789-")).toHaveClass("absolute", "right-0");
+    expect(screen.getByText("-0040")).toHaveClass("text-left");
   });
 
   it("shows an unapproved requester name without a requester prefix in compact cells", () => {

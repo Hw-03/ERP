@@ -1,11 +1,21 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MobileWeeklyScreen } from "../MobileWeeklyScreen";
+
+const state = vi.hoisted(() => ({
+  getWeeklyReport: vi.fn(() => new Promise(() => {})),
+}));
 
 vi.mock("@/lib/api", () => ({
   api: {
-    getWeeklyReport: vi.fn(() => new Promise(() => {})),
+    getWeeklyReport: state.getWeeklyReport,
   },
+}));
+
+vi.mock("../../../_weekly_sections/WeeklyDetailTable", () => ({
+  WeeklyDetailTable: ({ stockBasis }: { stockBasis: string }) => (
+    <div data-testid="mobile-weekly-detail" data-stock-basis={stockBasis} />
+  ),
 }));
 
 vi.mock("../../../DepartmentsContext", () => ({
@@ -13,6 +23,11 @@ vi.mock("../../../DepartmentsContext", () => ({
 }));
 
 describe("MobileWeeklyScreen", () => {
+  beforeEach(() => {
+    state.getWeeklyReport.mockReset();
+    state.getWeeklyReport.mockReturnValue(new Promise(() => {}));
+  });
+
   it("centers the week picker and returns to the More menu", () => {
     const onExit = vi.fn();
 
@@ -29,5 +44,21 @@ describe("MobileWeeklyScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "더보기 메뉴로 돌아가기" }));
 
     expect(onExit).toHaveBeenCalledTimes(1);
+  });
+
+  it("passes the normal-stock basis to verified weekly details", async () => {
+    state.getWeeklyReport.mockResolvedValue({
+      groups: [],
+      production_matrix: [],
+      report_status: "verified",
+      basis_version: 2,
+    });
+
+    render(<MobileWeeklyScreen weekMon={new Date("2026-08-31T00:00:00")} />);
+
+    expect(await screen.findByTestId("mobile-weekly-detail")).toHaveAttribute(
+      "data-stock-basis",
+      "normal",
+    );
   });
 });

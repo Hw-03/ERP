@@ -7,6 +7,7 @@ const currentWizardProps = vi.hoisted(() => ({
     onStepChange?: (step: number) => void;
     restoreDraft?: { batch_id: string } | null;
     restoreStep?: number;
+    onDraftSaved?: (batchId: string, step: number, persistInUrl?: boolean) => void;
   },
 }));
 
@@ -72,6 +73,7 @@ vi.mock("../../warehouse/MobileIoComposeWizard", () => ({
     onStepChange?: (step: number) => void;
     restoreDraft?: { batch_id: string } | null;
     restoreStep?: number;
+    onDraftSaved?: (batchId: string, step: number, persistInUrl?: boolean) => void;
   }) => {
     currentWizardProps.value = props;
     return <div data-testid="compose-wizard" />;
@@ -90,6 +92,33 @@ describe("MobileWarehouseScreen compact step header", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it("새 작업 전환용 원 초안 저장은 URL과 복원 상태를 함께 지운다", async () => {
+    window.history.replaceState({}, "", "/mes?tab=warehouse&section=compose&step=4&draftId=source-draft");
+    apiMocks.listStockRequestDrafts.mockResolvedValue([]);
+    apiMocks.listDrafts.mockResolvedValue([{ batch_id: "source-draft" }]);
+    render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(currentWizardProps.value?.restoreDraft?.batch_id).toBe("source-draft"));
+    act(() => currentWizardProps.value?.onDraftSaved?.("source-draft", 4, false));
+
+    expect(new URLSearchParams(window.location.search).get("draftId")).toBeNull();
+    expect(currentWizardProps.value?.restoreDraft).toBeNull();
+  });
+
+  it("늦게 끝난 A 전환은 현재 B draftId와 복원 상태를 지우지 않는다", async () => {
+    window.history.replaceState({}, "", "/mes?tab=warehouse&section=compose&step=4&draftId=draft-a");
+    apiMocks.listStockRequestDrafts.mockResolvedValue([]);
+    apiMocks.listDrafts.mockResolvedValue([{ batch_id: "draft-a" }, { batch_id: "draft-b" }]);
+    const { rerender } = render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />);
+    await waitFor(() => expect(currentWizardProps.value?.restoreDraft?.batch_id).toBe("draft-a"));
+    window.history.replaceState({}, "", "/mes?tab=warehouse&section=compose&step=4&draftId=draft-b");
+    rerender(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />);
+    await waitFor(() => expect(currentWizardProps.value?.restoreDraft?.batch_id).toBe("draft-b"));
+    act(() => currentWizardProps.value?.onDraftSaved?.("draft-a", 4, false));
+    expect(new URLSearchParams(window.location.search).get("draftId")).toBe("draft-b");
+    expect(currentWizardProps.value?.restoreDraft?.batch_id).toBe("draft-b");
   });
 
   it("hides section tabs only while compose is past step 1", () => {

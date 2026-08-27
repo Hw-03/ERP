@@ -121,14 +121,21 @@ scripts\ops\cleanup_backups.bat 20     rem 정식 백업 최신 20개 유지
 
 `scripts/dev/sync-to-employee.ps1`은 다음 순서를 고정한다.
 
-1. 접속자 활동과 스키마 변경 가드
+1. KST·Python·주간 재고 스냅샷 실행 파일 사전검사 후 접속자 활동과 스키마 변경 가드
 2. 백엔드·프론트 정지 명령의 종료 코드와 8010/3000 포트 해제를 확인
 3. `C:\ERP-dev\_attic\runtime\backups\sqlite`에 `sqlite3.backup` 백업 생성·검증(최신 10개 유지)
 4. 코드 동기화 후 `bootstrap_db.py --migrate`로 Alembic upgrade 또는 승인된 레거시 기준선 등록
 5. 실제 직원 DB의 SQLite/필수 테이블 검증과 재고 무결성 검증
-6. 서버 시작과 백엔드·프론트 헬스체크
+6. 취소 원장 정합성 읽기 전용 진단
+7. 진단 통과 시 취소 원장은 즉시, 새 주간보고 기준은 다음 KST 월요일 00:00부터 활성화
+8. `DEXCOWIN MES Weekly Inventory Snapshot`을 직원 경로 기준으로 등록·갱신하고 월요일 00:00, 지연 실행, 중복 방지, 10분 제한을 재검증
+9. 서버 시작과 백엔드·프론트 헬스체크
 
-백업 실패 시 아직 코드가 바뀌지 않은 기존 서버를 재기동하고 배포를 중단한다. 마이그레이션 또는 사후 검증 실패 시 서버와 DB를 자동 복원하지 않으며, 콘솔에 검증된 백업 절대 경로와 `restore_db.py --sqlite ... --target ... --check` 수동 명령을 출력한다.
+백업 실패 시 아직 코드가 바뀌지 않은 기존 서버를 재기동하고 배포를 중단한다. 마이그레이션, 사후 검증, 취소 원장 진단 또는 활성화가 실패하면 서버와 DB를 자동 복원하지 않고 기존 설정을 유지한다. 주간 스냅샷 예약 작업 등록·검증만 실패하면 직원 서비스를 다시 기동하되 동기화는 실패로 종료한다. 콘솔에는 검증된 백업 절대 경로와 `restore_db.py --sqlite ... --target ... --check` 수동 명령을 출력한다.
+
+주중 동기화가 끝난 주간보고에는 아래 안내가 표시되고, 새 7열 검산 기준은 다음 KST 월요일부터 공개된다.
+
+> 주간보고 계산 기준을 개선 중입니다. 이번 주 수치는 실제 재고와 다를 수 있으며, 다음 주부터 새 기준으로 정확한 정보가 표시됩니다.
 
 미버전 SQLite DB는 검토·고정된 개발/직원 스키마 지문과 정확히 일치할 때만 등록한다. 등록 전 검증 백업을 만들고 업무 데이터 지문을 전후 비교하며, 알 수 없는 구조·데이터 변경·Alembic revision과 상태표 불일치는 모두 서버 시작 전에 중단한다. 임의의 `alembic stamp`로 이 검사를 우회하지 않는다.
 
@@ -204,14 +211,18 @@ scripts\ops\healthcheck.bat
 ### 파일 로그 (Phase 4 추가)
 - 위치: `_attic/runtime/logs/backend/mes.log`
 - 런타임 stdout/stderr 및 상태 파일: `_attic/runtime/logs/backend/`, `_attic/runtime/logs/frontend/`
-- 프런트 개발 서버 종료 원인 추적 로그: `_attic/runtime/logs/frontend/dev-server.log` — `NEXT_SIGNAL_RECEIVED`가 기록되면 `watch-service.ps1 -Service frontend`가 `[FRONTEND ERROR]`로 강조하며, `NEXT_SIGNAL_PROBE_READY`와 `NEXT_PROCESS_EXIT`는 프로세스 수명 연결에 사용한다.
+- 프런트 개발 서버 종료 원인 추적 로그: `_attic/runtime/logs/frontend/dev-server.log` — `NEXT_SIGNAL_RECEIVED`가 기록되면 `watch-service.ps1 -Service frontend`가 `[FRONTEND ERROR]`로 강조하며, `NEXT_SIGNAL_PROBE_READY`, `NEXT_WORKER_CHILD_EXIT`, `NEXT_PROCESS_EXIT`는 프로세스 수명과 워커 원시 종료 결과 연결에 사용한다.
 - 회전: `ConcurrentRotatingFileHandler` 기반 다중 프로세스 안전 회전, 5MiB × 기본 5 backup (`mes.log.1` ~ `mes.log.5`)
 - 환경 변수: `LOG_LEVEL` (기본 INFO), `LOG_BACKUP_COUNT` (1 이상의 정수, 기본 5; 잘못된 값은 기본값 사용), `MES_RUNTIME_ROOT` (전체 런타임 루트 재정의)
 - 내용: 전역 예외 핸들러가 잡은 ValueError/IntegrityError/Exception + INFO 레벨 메시지
 
 ### 프런트 개발 서버 종료 원인 추적
 
-프런트 개발 서버가 예기치 않게 종료되면 먼저 `_attic/runtime/logs/frontend/dev-server.log`의 수명 기록을 확인한다. preload는 `NODE_OPTIONS`를 상속받은 일반 Node 자식에는 기록기나 신호 처리기를 붙이지 않고, 정확한 Next CLI 엔트리(`next/dist/bin/next`)와 `NEXT_PRIVATE_WORKER=1`인 Next worker 엔트리(`next/dist/server/lib/start-server.js`)만 기록한다. `NEXT_SIGNAL_RECEIVED`는 해당 Node 프로세스의 JavaScript 런타임이 `SIGINT` 또는 `SIGTERM`을 실제로 받은 신호 증거다. Windows에서 Next private worker가 JavaScript 신호 처리 없이 강제 종료되면 worker의 종료 기록 자체가 남지 않을 수 있다. 이때 조회 도구는 PID와 PPID가 모두 같은 부모 Next CLI 수명 안에서 기록된 worker의 `NEXT_SIGNAL_PROBE_READY`와 CLI의 `NEXT_PROCESS_EXIT`를 연결하여 CLI 종료 시각을 `worker_exit_without_signal` 후보 기준점으로 사용한다. 해당 CLI나 매핑된 worker의 같은 수명 신호 기록이 하나라도 있으면 신호 결과만 표시하고 fallback은 만들지 않는다. fallback의 `cliUptimeMs`는 CLI 종료 시점의 가동 시간이고, `workerReadyUptimeMs`는 worker가 probe를 붙인 시점의 가동 시간이며 worker의 전체 가동 시간이 아니다. Sysmon 수집기를 설치한 뒤에는 저장소 루트에서 다음처럼 추적 도구를 실행한다.
+프런트 개발 서버가 예기치 않게 종료되면 먼저 `_attic/runtime/logs/frontend/dev-server.log`의 수명 기록을 확인한다. preload는 `NODE_OPTIONS`를 상속받은 일반 Node 자식에는 기록기나 신호 처리기를 붙이지 않고, 정확한 Next CLI 엔트리(`next/dist/bin/next`)와 `NEXT_PRIVATE_WORKER=1`인 Next worker 엔트리(`next/dist/server/lib/start-server.js`)만 기록한다. `NEXT_SIGNAL_RECEIVED`는 해당 Node 프로세스의 JavaScript 런타임이 `SIGINT` 또는 `SIGTERM`을 실제로 받은 신호 증거다. 부모 Next CLI는 정확한 `start-server.js` 자식의 `exit` 이벤트만 읽기 전용으로 관찰하고 `NEXT_WORKER_CHILD_EXIT`에 워커 PID·부모 PID·원시 `exitCode`·`signal`을 기록한다. 자식의 종료·재시작·종료 코드는 변경하지 않는다.
+
+정확한 private worker에는 Node 진단 보고서도 켠다. 보고서는 `_attic/runtime/logs/frontend/node-reports/`에 최대 3개만 남기며, `reportOnFatalError`와 `reportOnUncaughtException`으로 OOM·미처리 JavaScript 예외 후보를 남긴다. 환경 변수와 네트워크 정보는 제외한다. `NEXT_NODE_REPORT_READY`가 있어야 수집 설정이 완료된 것이며, `NEXT_NODE_REPORT_SETUP_FAILED`는 서버 시작·종료 동작을 바꾸지 않고 설정 실패만 기록한다. CLI·직원 프로필·일반 Node 자식에는 이 설정을 적용하지 않는다.
+
+Windows에서 Next private worker가 JavaScript 신호 처리 없이 종료되면 worker 자신의 `NEXT_PROCESS_EXIT`가 남지 않을 수 있지만, 부모 CLI의 `NEXT_WORKER_CHILD_EXIT`는 이 경우에도 원시 자식 종료 결과를 보존한다. 조회 도구는 PID와 PPID가 모두 같은 부모 Next CLI 수명 안에서 이 기록을 연결해 `workerExitObservedUtc`, `workerExitCode`, `workerSignal`로 출력하고, 해당 관찰 시각을 Sysmon·덤프 조회 기준점으로 사용한다. 이전 로그처럼 관찰 기록이 없으면 CLI의 `NEXT_PROCESS_EXIT` 시각을 `worker_exit_without_signal` 기준점으로 계속 사용하며 세 필드는 `null`이다. 해당 CLI나 매핑된 worker의 같은 수명 신호 기록이 하나라도 있으면 신호 결과만 표시하고 fallback은 만들지 않는다. fallback의 `cliUptimeMs`는 CLI 종료 시점의 가동 시간이고, `workerReadyUptimeMs`는 worker가 probe를 붙인 시점의 가동 시간이며 worker의 전체 가동 시간이 아니다. 원시 종료 코드는 충돌 유형을 좁히는 직접 증거지만, 단독으로 오류 모듈이나 외부 발신 프로세스를 확정하지는 않으므로 WER 덤프·Node 진단 보고서·Sysmon 후보를 함께 대조한다. `nodeReportStatus=node_report_captured`면 `nodeReportPath`, `nodeReportCapturedUtc`, `nodeReportEvent`, `nodeReportTrigger`, `nodeReportJavaScriptMessage`, 최대 10개 `nodeReportNativeStack`을 함께 확인한다. WER 덤프와 Node 보고서가 같은 worker 수명에 함께 있으면 둘 다 보존하며, 두 증거가 모두 없다는 사실만으로 외부 종료를 단정하지 않는다. Sysmon 수집기를 설치한 뒤에는 저장소 루트에서 다음처럼 추적 도구를 실행한다.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\dev\get-frontend-stop-attribution.ps1
@@ -219,7 +230,34 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev\get-frontend-stop-attribu
 
 Sysmon Event 10(Process access)은 종료 시각에 접근한 프로세스를 좁히는 **후보 접근 증거**일 뿐이며, 그 이벤트만으로 종료 신호의 발신자를 확정할 수 없다. 특히 `worker_exit_without_signal`은 신호 없이 사라진 worker와 부모 CLI 종료의 시간 관계를 보완하는 후보 증거이지, worker가 강제 종료되었다거나 Sysmon 발신 프로세스가 종료시켰음을 단독으로 증명하지 않는다. 개발 서버 로그의 신호·종료 시각, 프로세스 수명, Sysmon 후보를 함께 대조한다.
 
-기본 조회 범위는 최근 2시간과 신호 또는 fallback 기준점 시각 전후 5초이며, `-Since`, `-WindowSeconds`(1~60), `-AsJson`을 선택할 수 있다. Sysmon 이벤트는 이벤트 뷰어의 `Applications and Services Logs > Microsoft > Windows > Sysmon > Operational` (`Microsoft-Windows-Sysmon/Operational`)에서 확인한다. 조회 도구는 그중 Event ID 10만 읽으며, 전역 ProcessCreate/발신 명령줄 수집은 사용하지 않는다. Sysmon 자체 서비스·구성 변화(Event ID 4·16)는 필터할 수 없어 채널에 남을 수 있지만, 후보 분석에는 사용하지 않는다.
+Windows Error Reporting(WER) 미니덤프 수집은 개발 PC에서만 관리자 PowerShell로 명시적으로 켠다. 기존 `node.exe` LocalDumps 설정 또는 DEXCOWIN MES 관리 표식이 있으면 덮어쓰지 않고 중단한다. 실제 적용 전에 `-WhatIf`로 대상을 확인하고, 확인 프롬프트에서 `Y`를 선택한다. 재부팅은 필요 없다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\enable-frontend-crash-dumps.ps1 -WhatIf
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\enable-frontend-crash-dumps.ps1
+```
+
+설정은 `HKLM\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\node.exe`에 `DumpType=1`, `DumpCount=3`, `DumpFolder=C:\ERP\_attic\runtime\logs\frontend\crashdumps`를 기록한다. WER 미니덤프는 Windows 네이티브 미처리 충돌의 후보 증거다. 이 Windows 설정은 실행 파일 이름이 `node.exe`인 프로세스 전체에 적용되므로, 다른 Node 프로세스가 실제로 충돌해도 최대 3개의 덤프가 만들어질 수 있다. 조회 도구는 덤프 파일명의 PID와 종료 기준점 전후 시간창을 모두 맞춰 Next worker 증거로 다시 좁힌다. 출력의 `dumpStatus=process_crash_dump_captured`이면 `dumpPath`, `dumpCapturedUtc`, `dumpSizeBytes`를 함께 확인한다. `dumpStatus=dump_not_captured`는 해당 PID·시간창에서 덤프를 찾지 못했다는 뜻일 뿐이며, 외부 강제 종료 또는 비충돌 종료를 확정하는 증거가 아니다. 현재 Node 24.15/Windows 환경에서 `process.abort()`는 WER 덤프와 Node 보고서의 수집 검증 수단이 아니므로, 이 결과를 외부 종료 증거로 해석하지 않는다.
+
+덤프와 Node 보고서는 비밀번호·토큰·업무 데이터가 들어 있을 수 있으므로 `_attic/runtime` 밖으로 복사하거나 커밋·업로드하지 않는다. 공식 WinDbg 설치 후 승인된 crashdumps 디렉터리의 `.dmp`만 다음 도구로 분석한다. 분석기는 GUI를 열지 않고 공식 `Microsoft.WinDbg` 패키지의 `amd64\cdb.exe`를 사용하며, 분석 보고서는 같은 런타임 디렉터리에 `*.analysis.txt`로 남는다.
+
+```powershell
+winget install --id Microsoft.WinDbg -e --source winget
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\analyze-frontend-crash-dump.ps1
+# 또는 특정 덤프
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\analyze-frontend-crash-dump.ps1 -DumpPath 'C:\ERP\_attic\runtime\logs\frontend\crashdumps\node.exe.<PID>.dmp'
+```
+
+분석 보고서에서는 `ExceptionCode`, `PROCESS_NAME`, `MODULE_NAME`/`IMAGE_NAME`, `FAILURE_BUCKET_ID`, `STACK_TEXT`를 먼저 확인하고 같은 시각의 `dev-server.log`와 Sysmon 후보를 대조한다. 수집을 끌 때는 다음 명령을 사용한다. 제거 도구는 자체 표식과 정확히 일치하는 레지스트리 설정만 제거하며, 이미 수집한 덤프와 분석 보고서는 보존한다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\disable-frontend-crash-dumps.ps1 -WhatIf
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\disable-frontend-crash-dumps.ps1
+```
+
+기본 조회 범위는 최근 2시간과 신호 또는 fallback 기준점 시각 전후 5초이며, `-Since`, `-WindowSeconds`(1~60), `-AsJson`을 선택할 수 있다. Sysmon 이벤트는 이벤트 뷰어의 `Applications and Services Logs > Microsoft > Windows > Sysmon > Operational` (`Microsoft-Windows-Sysmon/Operational`)에서 확인한다. 조회 도구는 각 기준점의 대상 PID와 시간창을 XPath에 넣어 Event ID 10만 읽으며, 전역 ProcessCreate/발신 명령줄 수집은 사용하지 않는다. Sysmon 자체 서비스·구성 변화(Event ID 4·16)는 필터할 수 없어 채널에 남을 수 있지만, 후보 분석에는 사용하지 않는다.
+
+이벤트 접근량이 많으면 Operational 채널의 과거 레코드가 빠르게 덮어써질 수 있다. 예기치 않은 종료를 발견하면 즉시 관리자 PowerShell에서 조회하고, 필요한 `-AsJson` 결과를 `_attic/runtime/logs/frontend/`에 보존한다.
 
 현재 Windows 11 개발 호스트에는 Microsoft의 **내장 Sysmon**을 사용한다. standalone `Sysmon64.exe` v15.21이 이 호스트에서 `0xC0000409`로 중단되어, Microsoft가 지원하는 내장 기능으로 전환했다. 내장 Sysmon과 standalone Sysmon은 함께 설치할 수 없다.
 
@@ -384,7 +422,48 @@ schtasks /Create /TN "MES Cleanup Monthly" /TR "cmd /d /c `"$(Join-Path $ops 'cl
 
 등록 후 작업 스케줄러 GUI 에서 "가장 높은 권한으로 실행" 옵션 체크 권장. 1회 등록하고 그대로 두면 365일 자동 운영.
 
-## 보안 후속 경계
+### NAS 이중 백업 (매일 22:00 KST)
+
+로컬 백업은 PC 장애에 대비할 수 없으므로, 검증이 끝난 SQLite 백업을 NAS에도 보관한다. NAS의 기존 `mes.db`는 건드리지 않으며 자동 백업은 아래 `scheduled` 폴더에만 날짜·UUID 파일명으로 저장한다.
+
+```powershell
+# 운영 체크아웃 C:\ERP 에 코드가 통합된 뒤 실행한다. .worktrees 경로를 예약 작업에 등록하지 않는다.
+$repoRoot = "C:\ERP"
+$batch = Join-Path $repoRoot "scripts\ops\backup_to_nas.bat"
+$nasDir = "\\192.168.0.45\Nas 문서\03. 생산부\20. 조립공정\4. 김현우\MES\Data Base Beckup\scheduled"
+$taskName = "DEXCOWIN MES DB Backup to NAS"
+$argument = "/d /c call `"$batch`" --nas-dir `"$nasDir`" --keep 30"
+$action = New-ScheduledTaskAction -Execute "cmd.exe" -Argument $argument
+$trigger = New-ScheduledTaskTrigger -Daily -At 10:00PM
+$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -WakeToRun -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 30) -MultipleInstances IgnoreNew
+$credential = Get-Credential -UserName "$env:USERDOMAIN\$env:USERNAME" -Message "Windows 로그인 계정 암호 입력"
+Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -User $credential.UserName -Password $credential.GetNetworkCredential().Password -Force
+```
+
+- 등록 계정은 NAS 쓰기 권한을 가진 Windows 계정이어야 한다. NAS 계정이 별도라면 작업 등록 전 해당 계정의 Windows 자격 증명 관리자에 `NAS` 접근 자격 증명을 저장한다. 암호를 저장소·스크립트·로그에 기록하지 않는다.
+- 백업은 사용자 쓰기 권한만 사용하므로 관리자 권한으로 실행하지 않는다. 일반 사용자로 등록하면 UAC 승격 없이도 매일 실행된다.
+- 작업 트리에서 검증한 변경은 운영 체크아웃 `C:\ERP`에 통합한 뒤에만 이 작업을 등록한다. 예약 작업이 `.worktrees`를 가리키면 작업 트리 정리 뒤 백업이 중단될 수 있다.
+- 예약 작업은 비대화형 세션에서 `NAS` 이름 해석이 실패하지 않도록 NAS의 고정 IP `192.168.0.45`를 사용한다. 공유 폴더와 NAS 접근 자격 증명은 기존과 같다.
+- 이 설정은 로그아웃 상태와 절전 상태에서도 실행한다. PC가 꺼져 있던 경우에는 다음 부팅 뒤 지연 실행하며, NAS 연결·복사·검증 실패 시 30분 간격으로 최대 3회 재시도한다.
+- 로컬 검증 뒤 NAS 임시 파일에 복사하고 SHA-256 및 DB 검증을 통과할 때만 최종 파일명으로 바꾼다. NAS에는 자동 생성 백업 30개만 남기며 기존 `mes.db`와 수동 파일은 정리하지 않는다.
+
+등록 직후에는 작업을 한 번 즉시 실행하고 결과를 확인한다.
+
+```powershell
+Start-ScheduledTask -TaskName "DEXCOWIN MES DB Backup to NAS"
+Get-ScheduledTaskInfo -TaskName "DEXCOWIN MES DB Backup to NAS"
+Get-Content "_attic\runtime\logs\ops\backup-to-nas.log" -Tail 50
+```
+
+NAS 백업으로 복구할 때는 백엔드·프론트를 먼저 정지한 뒤 NAS 파일을 직접 입력으로 사용한다.
+
+```powershell
+py scripts\ops\restore_db.py --sqlite "\\NAS\Nas 문서\03. 생산부\20. 조립공정\4. 김현우\MES\Data Base Beckup\scheduled\mes_YYYYMMDD_HHMMSS_ffffff_UUID.db" --target "backend\mes.db" --check
+```
+
+복구가 끝나면 백엔드를 다시 시작하고 `operational_readiness.bat`와 `healthcheck.bat`를 실행한다.
+
+## 보안·권한·CI 관련
 
 CP3의 작업자 session·actor 운영은 위 절차를 따른다. 부서별 권한 matrix 재설계, 계정 잠금 정책, SSO/외부 IdP, HTTPS·인증서는 별도 승인 설계와 후속 카드에서 다룬다.
 
@@ -410,6 +489,37 @@ python scripts\ops\check_inventory_integrity.py
 ```
 
 직접 실행하면 거래 유형별 `count`, `sample_log_id`, `sample_mes_code`가 함께 출력된다. 운영자는 `sample_log_id`를 기준으로 히스토리/DB 로그를 확인하고, 같은 유형의 과거 로그가 현재 재고에 영향을 줄 수 있는지 판단한다. `operational_readiness.bat`는 아침 점검용 요약만 보여주므로 샘플 ID가 필요하면 직접 진단 스크립트를 실행한다.
+
+## 취소 역전 원장 진단·활성화·복구
+
+취소 정합성 도구는 저장소 루트에서 실행한다. `diagnose`는 읽기 전용이며 물리 불량재고와 불량 이동 원장, 부분·중복 취소, 연결 업무 상태, 출하배정과 주간 미분류 효과를 검사한다.
+
+```bat
+python scripts\ops\inventory_operation_admin.py diagnose
+```
+
+관리자 화면의 `정합성` 탭도 같은 진단 결과만 보여주며 복구 버튼은 제공하지 않는다. 문제 ID, 원인 거래, 현재값, 기대값과 자동 복구 가능 여부를 확인한다.
+
+복구는 한 번에 문제 ID 하나만 선택한다. 기본 명령은 dry-run이고 DB를 변경하지 않는다.
+
+```bat
+python scripts\ops\inventory_operation_admin.py repair --problem-id <문제_ID> --approved-by <승인자>
+```
+
+실제 적용에는 검증된 백업, 승인자와 `--apply`가 모두 필요하다. 도구가 안전하게 결정할 수 있는 업무 상태·출하배정 불일치에만 적용되며 불량 수량처럼 원인을 추정해야 하는 문제는 거부한다.
+
+```bat
+python scripts\ops\inventory_operation_admin.py repair --problem-id <문제_ID> --approved-by <승인자> --validated-backup <백업_절대경로> --apply
+```
+
+활성화도 기본은 dry-run이다. 진단이 0건일 때만 취소 원장 기준 시각과 주간보고 시작 시각을 한 트랜잭션으로 저장한다. `--weekly-start`를 생략하면 다음 KST 월요일 00:00을 사용한다.
+
+```bat
+python scripts\ops\inventory_operation_admin.py activate --approved-by <승인자>
+python scripts\ops\inventory_operation_admin.py activate --approved-by <승인자> --validated-backup <백업_절대경로> --apply
+```
+
+취소 원장 활성화 뒤 신규 작업은 `InventoryOperation`을 필수로 사용한다. 활성화 전에 생성된 같은 주 미취소 거래는 취소 요청 시 전체 재고 효과와 연결 업무를 확정할 수 있는 경우에만 원 작업으로 편입하고 별도 역전 작업을 생성한다. 불량 계보·효과·묶음 범위를 확정할 수 없는 거래는 아무 값도 바꾸지 않고 차단한다. 이미 기존 방식으로 취소된 거래와 과거 주간 스냅샷은 자동 변환하거나 재계산하지 않는다. 활성화와 복구의 전후 값·승인자는 관리자 감사로그에 남는다.
 
 ## Inventory Cutover
 

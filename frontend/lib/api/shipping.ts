@@ -80,9 +80,6 @@ export const shippingApi = {
   deleteShippingRequest: (requestId: string) =>
     deleteJson(toApiUrl(`/api/shipping/requests/${requestId}`)),
 
-  sendShippingToPrep: (requestId: string) =>
-    postJson<ShippingRequest>(toApiUrl(`/api/shipping/requests/${requestId}/send-to-prep`), {}),
-
   updateShippingChecklist: (requestId: string, payload: ShippingChecklistUpdatePayload) =>
     patchJson<ShippingRequest>(toApiUrl(`/api/shipping/requests/${requestId}/checklist`), payload),
 

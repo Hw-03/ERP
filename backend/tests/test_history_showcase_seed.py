@@ -182,6 +182,18 @@ def test_showcase_apply_creates_searchable_real_inventory_history(db_session, ma
         batch.shipping_request_id is None
         for batch in db_session.query(module.IoBatch).all()
     )
+    quarantine_records = db_session.query(module.DefectQuarantineRecord).filter(
+        module.DefectQuarantineRecord.current_memo.contains(result.marker)
+    ).all()
+    assert len(quarantine_records) == 3
+    assert {
+        log.defect_quarantine_record_id
+        for log in logs
+        if log.transaction_type in {
+            module.TransactionTypeEnum.MARK_DEFECTIVE,
+            module.TransactionTypeEnum.UNMARK_DEFECTIVE,
+        }
+    } == {record.record_id for record in quarantine_records}
     shipping_request = db_session.query(module.ShippingRequest).filter(
         module.ShippingRequest.notes.contains(result.marker)
     ).one()
@@ -250,6 +262,9 @@ def test_showcase_remove_restores_inventory_and_deletes_marked_records(db_sessio
     assert db_session.query(module.IoBatch).filter(module.IoBatch.reference_no.contains(marker)).count() == 0
     assert db_session.query(module.StockRequest).filter(module.StockRequest.reference_no.contains(marker)).count() == 0
     assert db_session.query(module.ShippingRequest).filter(module.ShippingRequest.notes.contains(marker)).count() == 0
+    assert db_session.query(module.DefectQuarantineRecord).filter(
+        module.DefectQuarantineRecord.current_memo.contains(marker)
+    ).count() == 0
     assert {
         item_id: module.inv_effect._snapshot_cells(db_session, item_id)
         for item_id in before_cells

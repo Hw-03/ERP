@@ -185,6 +185,41 @@ def reserve_lines(
 ) -> None:
     if not isinstance(employee, Employee):
         raise TypeError("employee must be an Employee")
+    lines = list(lines)
+    from app.services import defect_records as defect_records_svc
+
+    record_groups: dict[uuid.UUID, tuple[object, Decimal]] = {}
+    for line in lines:
+        record_id = getattr(
+            line,
+            "defect_quarantine_record_id",
+            getattr(line, "record_id", None),
+        )
+        if (
+            RequestBucketEnum(line.from_bucket) != RequestBucketEnum.DEFECTIVE
+            or record_id is None
+        ):
+            continue
+        exemplar, quantity = record_groups.get(
+            record_id,
+            (line, Decimal("0")),
+        )
+        record_groups[record_id] = (
+            exemplar,
+            quantity + Decimal(str(line.quantity)),
+        )
+
+    for record_id in sorted(record_groups, key=str):
+        line, quantity = record_groups[record_id]
+        record = defect_records_svc._get_record_for_action(
+            db,
+            record_id=record_id,
+            item_id=line.item_id,
+            department=line.from_department,
+        )
+        if record is None:
+            raise ValueError("선택한 격리 기록을 찾을 수 없습니다.")
+        defect_records_svc._ensure_available(db, record, quantity)
     groups = aggregate_reservations(lines)
     _prelock_inventories(db, groups)
     for group in groups:

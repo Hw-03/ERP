@@ -16,8 +16,8 @@ from bootstrap.schema import schema_differences
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
-PREVIOUS_REVISION = "20260818_0022"
-MIGRATION_REVISION = "20260819_0023"
+PREVIOUS_REVISION = "20260826_0029"
+MIGRATION_REVISION = "20260827_0030"
 RESET_PBKDF2_HASH = "pbkdf2_sha256$600000$reset-salt$reset-digest"
 
 
@@ -25,6 +25,17 @@ def _config(path: Path) -> Config:
     config = Config(str(ALEMBIC_INI))
     config.set_main_option("sqlalchemy.url", f"sqlite:///{path.as_posix()}")
     return config
+
+
+def _sqlite_schema_snapshot(path: Path) -> tuple[tuple[object, ...], ...]:
+    """거부된 migration이 SQLite DDL을 일부 남기지 않았는지 비교한다."""
+    with sqlite3.connect(path) as db:
+        return tuple(
+            db.execute(
+                "SELECT type, name, tbl_name, sql FROM sqlite_master "
+                "WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name"
+            ).fetchall()
+        )
 
 
 def _legacy_hash(pin: str) -> str:
@@ -395,9 +406,12 @@ def test_operator_session_migration_rejects_wrong_bootstrap_audit_type(
             "ALTER TABLE admin_audit_logs ADD COLUMN bootstrap_employee_id INTEGER"
         )
         db.commit()
+    before = _sqlite_schema_snapshot(path)
 
     with pytest.raises(RuntimeError, match="bootstrap_employee_id type=INTEGER"):
         command.upgrade(config, MIGRATION_REVISION)
+
+    assert _sqlite_schema_snapshot(path) == before
 
 
 def test_operator_session_migration_rejects_named_but_structurally_invalid_table(
@@ -431,6 +445,42 @@ def test_operator_session_migration_rejects_named_but_structurally_invalid_table
 
     with pytest.raises(RuntimeError, match="operator_sessions schema is partially present"):
         command.upgrade(config, MIGRATION_REVISION)
+
+
+def test_operator_session_migration_rejection_leaves_sqlite_schema_unchanged(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "operator-session-rejection-rollback.db"
+    config = _config(path)
+    command.upgrade(config, PREVIOUS_REVISION)
+    with sqlite3.connect(path) as db:
+        db.executescript(
+            """
+            CREATE TABLE operator_sessions (
+                session_id TEXT,
+                token_hash TEXT,
+                employee_id TEXT,
+                purpose TEXT,
+                issued_at TEXT,
+                expires_at TEXT,
+                revoked_at TEXT,
+                consumed_at TEXT,
+                boot_id TEXT
+            );
+            CREATE INDEX uq_operator_sessions_token_hash
+                ON operator_sessions (token_hash);
+            """
+        )
+    before = _sqlite_schema_snapshot(path)
+
+    with pytest.raises(RuntimeError, match="operator_sessions schema is partially present"):
+        command.upgrade(config, MIGRATION_REVISION)
+
+    assert _sqlite_schema_snapshot(path) == before
+    with sqlite3.connect(path) as db:
+        assert db.execute("SELECT version_num FROM alembic_version").fetchone() == (
+            PREVIOUS_REVISION,
+        )
 
 
 @pytest.mark.parametrize(

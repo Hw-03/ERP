@@ -130,7 +130,15 @@ def _generate_request_code(ts: datetime) -> str:
 class LineInput:
     """라우터 ↔ 서비스 인터페이스용 단순 컨테이너."""
 
-    __slots__ = ("item_id", "quantity", "from_bucket", "from_department", "to_bucket", "to_department")
+    __slots__ = (
+        "item_id",
+        "quantity",
+        "from_bucket",
+        "from_department",
+        "to_bucket",
+        "to_department",
+        "record_id",
+    )
 
     def __init__(
         self,
@@ -141,6 +149,7 @@ class LineInput:
         from_department: Optional[DepartmentEnum],
         to_bucket: RequestBucketEnum,
         to_department: Optional[DepartmentEnum],
+        record_id: Optional[uuid.UUID] = None,
     ) -> None:
         self.item_id = item_id
         self.quantity = Decimal(str(quantity))
@@ -148,6 +157,7 @@ class LineInput:
         self.from_department = from_department
         self.to_bucket = to_bucket
         self.to_department = to_department
+        self.record_id = record_id
 
 
 # ---------------------------------------------------------------------------
@@ -387,11 +397,32 @@ def _preflight_defective_check(
     DEFECT_SCRAP / DEFECT_RETURN / DEFECT_DISASSEMBLE 처럼 from_bucket=DEFECTIVE
     인 라인이 격리되지 않은 항목을 폐기/반품/분해 하려는 케이스 차단.
     """
+    from app.services import defect_records as defect_records_svc
+
     needed: dict[tuple, Decimal] = {}
+    record_needed: dict[uuid.UUID, Decimal] = {}
+    records = {}
     for li in lines_input:
         if li.from_bucket == RequestBucketEnum.DEFECTIVE and li.from_department is not None:
-            key = (li.item_id, li.from_department)
-            needed[key] = needed.get(key, Decimal("0")) + li.quantity
+            record = defect_records_svc._get_record_for_action(
+                db,
+                record_id=li.record_id,
+                item_id=li.item_id,
+                department=li.from_department,
+                lock=False,
+            )
+            if record is not None:
+                li.record_id = record.record_id
+                records[record.record_id] = record
+                record_needed[record.record_id] = (
+                    record_needed.get(record.record_id, Decimal("0")) + li.quantity
+                )
+            else:
+                key = (li.item_id, li.from_department)
+                needed[key] = needed.get(key, Decimal("0")) + li.quantity
+
+    for record_id, qty in record_needed.items():
+        defect_records_svc._ensure_available(db, records[record_id], qty)
 
     if not needed:
         return

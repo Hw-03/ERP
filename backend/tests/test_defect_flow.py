@@ -18,6 +18,9 @@ import pytest
 
 from app.models import (
     DepartmentEnum,
+    DefectQuarantineMemoRevision,
+    DefectQuarantineRecord,
+    DefectQuarantineReconstruction,
     Employee,
     EmployeeLevelEnum,
     Inventory,
@@ -127,6 +130,10 @@ def test_quarantine_sets_defective_at_and_logs(db_session, client, make_item):
     ).first()
     assert log is not None
     assert log.reason_category == "외관불량"
+    assert log.warehouse_qty_before == Decimal("10")
+    assert log.warehouse_qty_after == Decimal("7")
+    assert log.department_qty_before == Decimal("0")
+    assert log.department_qty_after == Decimal("0")
 
 
 def test_quarantine_rejects_client_request_id_owned_by_other_operation(
@@ -546,6 +553,75 @@ def test_unquarantine_clears_defective_at_and_logs(db_session, client, make_item
     assert unmark_log.reason_category == "검사통과"
 
 
+def test_unquarantine_partially_updates_only_the_selected_record(
+    db_session, client, make_item
+):
+    item = make_item(name="R002-RECORD", warehouse_qty=Decimal("10"))
+    actor = _make_employee(db_session, code="E02-RECORD", name="건별 복귀 작업자")
+    db_session.commit()
+
+    for qty, memo in (("2", "선택할 기록"), ("3", "유지할 기록")):
+        response = client.post(
+            "/api/defects/quarantine",
+            json={
+                "item_id": str(item.item_id),
+                "qty": qty,
+                "source": "warehouse",
+                "target_dept": DepartmentEnum.VACUUM.value,
+                "reason_memo": memo,
+                "actor_employee_id": str(actor.employee_id),
+            },
+        )
+        assert response.status_code == 200, response.json()
+
+    rows = [
+        row
+        for row in client.get("/api/defects/locations").json()
+        if row["item_id"] == str(item.item_id)
+    ]
+    selected = next(row for row in rows if row["reason_memo"] == "선택할 기록")
+    untouched = next(row for row in rows if row["reason_memo"] == "유지할 기록")
+
+    response = client.post(
+        "/api/defects/unquarantine",
+        json={
+            "record_id": selected["record_id"],
+            "item_id": str(item.item_id),
+            "qty": "1",
+            "dept": DepartmentEnum.VACUUM.value,
+            "reason_category": "재검사 통과",
+            "actor_employee_id": str(actor.employee_id),
+        },
+    )
+
+    assert response.status_code == 200, response.json()
+    refreshed = {
+        row["record_id"]: row
+        for row in client.get("/api/defects/locations").json()
+        if row["item_id"] == str(item.item_id)
+    }
+    assert refreshed[selected["record_id"]]["quantity"] == "1"
+    assert refreshed[untouched["record_id"]]["quantity"] == "3"
+
+    db_session.expire_all()
+    location = (
+        db_session.query(InventoryLocation)
+        .filter(
+            InventoryLocation.item_id == item.item_id,
+            InventoryLocation.department == DepartmentEnum.VACUUM.value,
+            InventoryLocation.status == LocationStatusEnum.DEFECTIVE,
+        )
+        .one()
+    )
+    assert location.quantity == Decimal("4")
+    log = (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.transaction_type == TransactionTypeEnum.UNMARK_DEFECTIVE)
+        .one()
+    )
+    assert str(log.defect_quarantine_record_id) == selected["record_id"]
+
+
 # ---------------------------------------------------------------------------
 # 시나리오 3: 격리 → DEFECT_SCRAP 결재 → 차감
 # ---------------------------------------------------------------------------
@@ -636,7 +712,12 @@ def test_quarantine_then_scrap_preserves_two_audit_logs(
 ):
     """격리 후 폐기는 격리와 최종 처리의 감사 로그를 각각 남긴다."""
     item = make_item(name="QUARANTINE-SCRAP", process_type_code="TR", warehouse_qty=Decimal("5"))
-    requester = _make_employee(db_session, code="QS01", name="quarantine actor")
+    requester = _make_employee(
+        db_session,
+        code="QS01",
+        name="quarantine actor",
+        department_role="primary",
+    )
     db_session.commit()
 
     quarantine_res = client.post("/api/defects/quarantine", json={
@@ -708,7 +789,7 @@ def test_defect_scrap_via_stock_request(db_session, client, make_item):
     inv_before = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
     qty_before = inv_before.quantity
 
-    # DEFECT_SCRAP 제출 — 불량 작업은 자동결재(즉시 완료)
+    # DEFECT_SCRAP 제출 — 발의 수량을 예약하고 부서 승인 후 완료
     res = client.post("/api/stock-requests", json={
         "requester_employee_id": str(requester.employee_id),
         "request_type": "defect_scrap",
@@ -722,7 +803,14 @@ def test_defect_scrap_via_stock_request(db_session, client, make_item):
         "notes": "폐기 처리",
     })
     assert res.status_code == 201, res.json()
-    assert res.json()["status"] == "completed"  # 즉시 완료
+    assert res.json()["status"] == "reserved"
+
+    approved = client.post(
+        f"/api/stock-requests/{res.json()['request_id']}/department-approve",
+        json={"actor_employee_id": str(approver.employee_id), "pin": "1234"},
+    )
+    assert approved.status_code == 200, approved.json()
+    assert approved.json()["status"] == "completed"
 
     db_session.expire_all()
     inv_after = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
@@ -734,6 +822,136 @@ def test_defect_scrap_via_stock_request(db_session, client, make_item):
         TransactionLog.transaction_type == TransactionTypeEnum.DEFECT_SCRAP,
     ).first()
     assert scrap_log is not None
+
+
+def test_defect_request_reserves_selected_record_then_releases_or_completes(
+    db_session, client, make_item
+):
+    item = make_item(name="R003-RECORD", warehouse_qty=Decimal("10"))
+    requester = _make_employee(db_session, code="E03-RECORD", name="건별 처리 발의자")
+    approver = _make_employee(
+        db_session,
+        code="E04-RECORD",
+        name="건별 처리 결재자",
+        department=DepartmentEnum.ASSEMBLY,
+        department_role="primary",
+        pin="1234",
+    )
+    db_session.commit()
+
+    for qty, memo in (("2", "처리 대상"), ("3", "별도 유지")):
+        response = client.post(
+            "/api/defects/quarantine",
+            json={
+                "item_id": str(item.item_id),
+                "qty": qty,
+                "source": "warehouse",
+                "target_dept": DepartmentEnum.ASSEMBLY.value,
+                "reason_memo": memo,
+                "actor_employee_id": str(requester.employee_id),
+            },
+        )
+        assert response.status_code == 200, response.json()
+
+    rows = [
+        row
+        for row in client.get("/api/defects/locations").json()
+        if row["item_id"] == str(item.item_id)
+    ]
+    selected = next(row for row in rows if row["reason_memo"] == "처리 대상")
+    untouched = next(row for row in rows if row["reason_memo"] == "별도 유지")
+
+    def create_scrap(quantity: str):
+        return client.post(
+            "/api/stock-requests",
+            json={
+                "requester_employee_id": str(requester.employee_id),
+                "request_type": "defect_scrap",
+                "reason_category": "폐기",
+                "reason_memo": "건별 폐기",
+                "lines": [
+                    {
+                        "record_id": selected["record_id"],
+                        "item_id": str(item.item_id),
+                        "quantity": quantity,
+                        "from_bucket": "defective",
+                        "from_department": DepartmentEnum.ASSEMBLY.value,
+                        "to_bucket": "none",
+                    }
+                ],
+            },
+        )
+
+    reserved = create_scrap("1")
+    assert reserved.status_code == 201, reserved.json()
+    assert reserved.json()["status"] == "reserved"
+    assert reserved.json()["requires_department_approval"] is True
+    assert reserved.json()["approval_department"] == DepartmentEnum.ASSEMBLY.value
+    assert reserved.json()["lines"][0]["record_id"] == selected["record_id"]
+
+    listed = {
+        row["record_id"]: row
+        for row in client.get("/api/defects/locations").json()
+        if row["item_id"] == str(item.item_id)
+    }
+    assert listed[selected["record_id"]]["pending_quantity"] == "1"
+    assert listed[selected["record_id"]]["available_quantity"] == "1"
+    assert listed[untouched["record_id"]]["pending_quantity"] == "0"
+    assert listed[untouched["record_id"]]["available_quantity"] == "3"
+
+    conflict = create_scrap("2")
+    assert conflict.status_code == 422
+
+    cancelled = client.post(
+        f"/api/stock-requests/{reserved.json()['request_id']}/cancel",
+        json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
+    )
+    assert cancelled.status_code == 200, cancelled.json()
+    assert cancelled.json()["status"] == "cancelled"
+
+    approved_request = create_scrap("1")
+    assert approved_request.status_code == 201, approved_request.json()
+    approved = client.post(
+        f"/api/stock-requests/{approved_request.json()['request_id']}/department-approve",
+        json={"actor_employee_id": str(approver.employee_id), "pin": "1234"},
+    )
+    assert approved.status_code == 200, approved.json()
+    assert approved.json()["status"] == "completed"
+
+    rejected_request = create_scrap("1")
+    assert rejected_request.status_code == 201, rejected_request.json()
+    rejected = client.post(
+        f"/api/stock-requests/{rejected_request.json()['request_id']}/department-reject",
+        json={
+            "actor_employee_id": str(approver.employee_id),
+            "pin": "1234",
+            "reason": "폐기 취소",
+        },
+    )
+    assert rejected.status_code == 200, rejected.json()
+    assert rejected.json()["status"] == "rejected"
+
+    final_rows = {
+        row["record_id"]: row
+        for row in client.get("/api/defects/locations").json()
+        if row["item_id"] == str(item.item_id)
+    }
+    assert final_rows[selected["record_id"]]["quantity"] == "1"
+    assert final_rows[selected["record_id"]]["pending_quantity"] == "0"
+    assert final_rows[selected["record_id"]]["available_quantity"] == "1"
+    assert final_rows[untouched["record_id"]]["quantity"] == "3"
+
+    db_session.expire_all()
+    linked_log = (
+        db_session.query(TransactionLog)
+        .filter(
+            TransactionLog.transaction_type == TransactionTypeEnum.DEFECT_SCRAP,
+            TransactionLog.defect_quarantine_record_id
+            == uuid.UUID(selected["record_id"]),
+        )
+        .one()
+    )
+    assert linked_log.quantity_change == Decimal("-1")
 
 
 # ---------------------------------------------------------------------------
@@ -851,7 +1069,12 @@ def test_defect_disassemble_stale_bom_payload_returns_422_and_rolls_back(
     stale_child = make_item(name="STALE-CHILD", process_type_code="VR", warehouse_qty=Decimal("0"))
     make_bom(parent.item_id, child.item_id, Decimal("1"))
     _make_defective_location(db_session, parent.item_id, DepartmentEnum.ASSEMBLY, Decimal("2"))
-    requester = _make_employee(db_session, code="RB01", name="rollback actor")
+    requester = _make_employee(
+        db_session,
+        code="RB01",
+        name="rollback actor",
+        department_role="primary",
+    )
     db_session.commit()
     request_count_before = db_session.query(StockRequest).count()
 
@@ -1033,6 +1256,42 @@ def test_kpi_returns_counts(db_session, client, make_item):
     assert all(isinstance(v, int) for v in body.values())
 
 
+def test_kpi_counts_active_quarantine_records_and_record_age(
+    db_session, client, make_item
+):
+    item = make_item(name="KPI-RECORDS", warehouse_qty=Decimal("10"))
+    actor = _make_employee(db_session, code="EKPI-RECORD", name="KPI 건별 작업자")
+    db_session.commit()
+
+    for qty in ("2", "3"):
+        response = client.post(
+            "/api/defects/quarantine",
+            json={
+                "item_id": str(item.item_id),
+                "qty": qty,
+                "source": "warehouse",
+                "target_dept": DepartmentEnum.ASSEMBLY.value,
+                "reason_memo": f"격리 {qty}",
+                "actor_employee_id": str(actor.employee_id),
+            },
+        )
+        assert response.status_code == 200, response.json()
+
+    oldest = (
+        db_session.query(DefectQuarantineRecord)
+        .filter(DefectQuarantineRecord.item_id == item.item_id)
+        .order_by(DefectQuarantineRecord.quarantined_at.asc())
+        .first()
+    )
+    oldest.quarantined_at = datetime.utcnow() - timedelta(days=366)
+    db_session.commit()
+
+    response = client.get("/api/defects/kpi")
+
+    assert response.status_code == 200, response.json()
+    assert response.json() == {"quarantined": 2, "over_one_year": 1}
+
+
 # ---------------------------------------------------------------------------
 # 추가: locations 엔드포인트 기본 동작
 # ---------------------------------------------------------------------------
@@ -1066,6 +1325,252 @@ def test_locations_returns_defective_list(db_session, client, make_item):
     assert res2.status_code == 200
     for loc in res2.json():
         assert loc["department"] == DepartmentEnum.ASSEMBLY.value
+
+
+def test_locations_distinguishes_aggregate_reconstructed_and_normal_records(
+    db_session,
+    client,
+    make_item,
+):
+    aggregate_item = make_item(name="기존 합산 품목", warehouse_qty=Decimal("0"))
+    reconstructed_item = make_item(name="기존 복원 품목", warehouse_qty=Decimal("0"))
+    normal_item = make_item(name="일반 격리 품목", warehouse_qty=Decimal("0"))
+
+    aggregate = DefectQuarantineRecord(
+        item_id=aggregate_item.item_id,
+        department=DepartmentEnum.ASSEMBLY.value,
+        original_quantity=Decimal("2"),
+        remaining_quantity=Decimal("2"),
+        is_legacy=True,
+    )
+    parent = DefectQuarantineRecord(
+        item_id=reconstructed_item.item_id,
+        department=DepartmentEnum.ASSEMBLY.value,
+        original_quantity=Decimal("1"),
+        remaining_quantity=Decimal("0"),
+        is_legacy=True,
+    )
+    child = DefectQuarantineRecord(
+        item_id=reconstructed_item.item_id,
+        department=DepartmentEnum.ASSEMBLY.value,
+        original_quantity=Decimal("1"),
+        remaining_quantity=Decimal("1"),
+        is_legacy=True,
+    )
+    normal = DefectQuarantineRecord(
+        item_id=normal_item.item_id,
+        department=DepartmentEnum.ASSEMBLY.value,
+        original_quantity=Decimal("3"),
+        remaining_quantity=Decimal("3"),
+        is_legacy=False,
+    )
+    db_session.add_all([aggregate, parent, child, normal])
+    db_session.flush()
+    source = TransactionLog(
+        item_id=reconstructed_item.item_id,
+        transaction_type=TransactionTypeEnum.MARK_DEFECTIVE,
+        quantity_change=Decimal("1"),
+        department=DepartmentEnum.ASSEMBLY.value,
+        defect_quarantine_record_id=child.record_id,
+        inventory_effect=[
+            {
+                "scope": "location",
+                "department": DepartmentEnum.ASSEMBLY.value,
+                "status": LocationStatusEnum.DEFECTIVE.value,
+                "delta": 1,
+            }
+        ],
+    )
+    db_session.add(source)
+    db_session.flush()
+    db_session.add(
+        DefectQuarantineReconstruction(
+            child_record_id=child.record_id,
+            parent_record_id=parent.record_id,
+            source_transaction_log_id=source.log_id,
+        )
+    )
+    db_session.commit()
+
+    response = client.get("/api/defects/locations")
+
+    assert response.status_code == 200, response.json()
+    origins = {
+        row["item_id"]: row["legacy_origin"]
+        for row in response.json()
+        if row["item_id"]
+        in {
+            str(aggregate_item.item_id),
+            str(reconstructed_item.item_id),
+            str(normal_item.item_id),
+        }
+    }
+    assert origins == {
+        str(aggregate_item.item_id): "aggregate",
+        str(reconstructed_item.item_id): "reconstructed",
+        str(normal_item.item_id): None,
+    }
+
+
+def test_locations_keeps_repeated_quarantines_as_separate_records(
+    db_session, client, make_item
+):
+    item = make_item(
+        name="REPEATED-QUARANTINE",
+        process_type_code="TR",
+        warehouse_qty=Decimal("10"),
+    )
+    first_actor = _make_employee(db_session, code="ELOC-FIRST", name="첫 격리자")
+    second_actor = _make_employee(db_session, code="ELOC-SECOND", name="두 번째 격리자")
+    db_session.commit()
+
+    for qty, actor, memo in [
+        ("2", first_actor, "첫 번째 메모"),
+        ("3", second_actor, "두 번째 메모"),
+    ]:
+        response = client.post(
+            "/api/defects/quarantine",
+            json={
+                "item_id": str(item.item_id),
+                "qty": qty,
+                "source": "warehouse",
+                "target_dept": DepartmentEnum.ASSEMBLY.value,
+                "reason_category": "외관 불량",
+                "reason_memo": memo,
+                "actor_employee_id": str(actor.employee_id),
+            },
+        )
+        assert response.status_code == 200, response.json()
+
+    response = client.get("/api/defects/locations")
+
+    assert response.status_code == 200, response.json()
+    records = [row for row in response.json() if row["item_id"] == str(item.item_id)]
+    assert len(records) == 2
+    assert {record["quantity"] for record in records} == {"2", "3"}
+    assert len({record["record_id"] for record in records}) == 2
+    assert {record["quarantined_by"] for record in records} == {
+        first_actor.name,
+        second_actor.name,
+    }
+    assert {record["reason_memo"] for record in records} == {
+        "첫 번째 메모",
+        "두 번째 메모",
+    }
+
+
+def test_quarantine_memo_edit_history_allows_any_employee_with_pin_and_empty_value(
+    db_session, client, make_item
+):
+    item = make_item(name="MEMO-HISTORY", warehouse_qty=Decimal("5"))
+    quarantiner = _make_employee(db_session, code="EMEMO-Q", name="최초 격리자")
+    editor = _make_employee(db_session, code="EMEMO-E", name="같은 부서 수정자")
+    outsider = _make_employee(
+        db_session,
+        code="EMEMO-X",
+        name="다른 부서 수정자",
+        department=DepartmentEnum.RESEARCH,
+        pin="2468",
+    )
+    db_session.commit()
+
+    quarantine = client.post(
+        "/api/defects/quarantine",
+        json={
+            "item_id": str(item.item_id),
+            "qty": "2",
+            "source": "warehouse",
+            "target_dept": DepartmentEnum.ASSEMBLY.value,
+            "reason_category": "외관 불량",
+            "reason_memo": "최초 메모",
+            "actor_employee_id": str(quarantiner.employee_id),
+        },
+    )
+    assert quarantine.status_code == 200, quarantine.json()
+    record_id = next(
+        row["record_id"]
+        for row in client.get("/api/defects/locations").json()
+        if row["item_id"] == str(item.item_id)
+    )
+
+    first_edit = client.put(
+        f"/api/defects/records/{record_id}/memo",
+        json={
+            "memo": "수정 메모",
+            "actor_employee_id": str(editor.employee_id),
+            "pin": "0000",
+        },
+    )
+    no_change = client.put(
+        f"/api/defects/records/{record_id}/memo",
+        json={
+            "memo": "수정 메모",
+            "actor_employee_id": str(editor.employee_id),
+            "pin": "0000",
+        },
+    )
+    clear = client.put(
+        f"/api/defects/records/{record_id}/memo",
+        json={"memo": "", "actor_employee_id": str(editor.employee_id), "pin": "0000"},
+    )
+    wrong_pin = client.put(
+        f"/api/defects/records/{record_id}/memo",
+        json={
+            "memo": "잘못된 PIN 메모",
+            "actor_employee_id": str(outsider.employee_id),
+            "pin": "1111",
+        },
+    )
+    cross_department = client.put(
+        f"/api/defects/records/{record_id}/memo",
+        json={
+            "memo": "다른 부서 메모",
+            "actor_employee_id": str(outsider.employee_id),
+            "pin": "2468",
+        },
+    )
+    history = client.get(f"/api/defects/records/{record_id}/memo-history")
+
+    assert first_edit.status_code == 200, first_edit.json()
+    assert first_edit.json() == {"memo": "수정 메모", "changed": True}
+    assert no_change.status_code == 200, no_change.json()
+    assert no_change.json() == {"memo": "수정 메모", "changed": False}
+    assert clear.status_code == 200, clear.json()
+    assert clear.json() == {"memo": "", "changed": True}
+    assert wrong_pin.status_code == 403
+    assert wrong_pin.json()["detail"]["code"] == "FORBIDDEN"
+    assert cross_department.status_code == 200, cross_department.json()
+    assert cross_department.json() == {"memo": "다른 부서 메모", "changed": True}
+    assert history.status_code == 200, history.json()
+    assert [row["previous_memo"] for row in history.json()] == [
+        None,
+        "최초 메모",
+        "수정 메모",
+        "",
+    ]
+    assert [row["next_memo"] for row in history.json()] == [
+        "최초 메모",
+        "수정 메모",
+        "",
+        "다른 부서 메모",
+    ]
+    assert [row["edited_by_name"] for row in history.json()] == [
+        quarantiner.name,
+        editor.name,
+        editor.name,
+        outsider.name,
+    ]
+    assert [row["is_initial"] for row in history.json()] == [True, False, False, False]
+
+    db_session.expire_all()
+    record = db_session.get(DefectQuarantineRecord, uuid.UUID(record_id))
+    assert record.current_memo == "다른 부서 메모"
+    assert (
+        db_session.query(DefectQuarantineMemoRevision)
+        .filter(DefectQuarantineMemoRevision.record_id == record.record_id)
+        .count()
+        == 4
+    )
 
 
 def test_locations_uses_latest_quarantine_actor_and_keeps_unknown_actor_null(

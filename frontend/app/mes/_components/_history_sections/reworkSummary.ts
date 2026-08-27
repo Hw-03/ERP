@@ -16,6 +16,7 @@ export interface ReworkItemSummary {
   scrapQty: number;
   recoverQty: number;
   excluded: boolean;
+  representativeLog: TransactionLog;
   resultParts: ReworkResultPart[];
 }
 
@@ -32,6 +33,7 @@ export function buildReworkItemSummaries(logs: TransactionLog[]): ReworkItemSumm
       scrapQty: 0,
       recoverQty: 0,
       excluded: false,
+      representativeLog: log,
       resultParts: [],
     };
 

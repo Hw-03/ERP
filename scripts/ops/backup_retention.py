@@ -28,7 +28,14 @@ def retain_latest_backups(directory: Path, *, suffix: str, keep: int = DEFAULT_K
             continue
 
     candidates = [entry[2] for entry in sorted(snapshots, reverse=True)]
-    removed = candidates[keep:]
-    for path in removed:
-        path.unlink(missing_ok=True)
+    removed: list[Path] = []
+    for path in candidates[keep:]:
+        try:
+            path.unlink(missing_ok=True)
+        except PermissionError:
+            # Windows can report access denied when another backup process
+            # removes the same retention candidate concurrently.
+            if path.exists():
+                continue
+        removed.append(path)
     return removed

@@ -501,6 +501,7 @@ describe("history immediate UX presentation policies", () => {
     expect(shipment.operationLabel).toBe("출하");
     expect(shipment.targetTitle).toBe("DX3000_60kV, 2mA_러시아_IP Tsizina S. A");
     expect(shipment.targetCode).toBe("7-PF-0099");
+    expect(shipment.representativeLogId).toBe("pickup-1");
     expect(shipment.targetMeta).toEqual([]);
     expect(shipment.movement.parts[0]?.label).toContain("출하");
   });
@@ -585,6 +586,7 @@ describe("shipping phase history presentation", () => {
     expect(componentChange.flowLabel).toBe("\uC870\uB9BD");
     expect(componentChange.targetTitle).toBe("\uBCC0\uACBD PA");
     expect(componentChange.targetCode).toBe("3-PA-0002");
+    expect(componentChange.representativeLogId).toBe("target-pa");
     expect(componentChange.movement.parts[0]?.label).toContain("\uBCC0\uACBD");
   });
 
@@ -672,12 +674,14 @@ describe("shipping phase history presentation", () => {
     expect(prepare.flowLabel).toBe("\uCD9C\uD558 \uC900\uBE44");
     expect(prepare.targetTitle).toBe("\uCD5C\uC885 PF");
     expect(prepare.targetCode).toBe("3-PF-0002");
+    expect(prepare.representativeLogId).toBe("prepare-pf");
     expect(prepare.movement.parts[0]?.label).toContain("\uC900\uBE44");
     expect(getReferenceBatchLinePresentation(makeLog({ transaction_type: "BACKFLUSH", shipping_phase: "PREPARE" }), "shipment").label).toBe("\uAD6C\uC131\uD488 \uCC28\uAC10");
     expect(getReferenceBatchLinePresentation(makeLog({ transaction_type: "PRODUCE", shipping_phase: "PREPARE" }), "shipment").label).toBe("\uCD9C\uD558\uD488 \uC900\uBE44");
     expect(pickup.operationLabel).toBe("\uCD9C\uD558");
     expect(pickup.targetTitle).toBe("\uCD5C\uC885 PF");
     expect(pickup.targetCode).toBe("3-PF-0002");
+    expect(pickup.representativeLogId).toBe("pickup-pf");
     expect(getReferenceBatchLinePresentation(makeLog({ transaction_type: "SHIP", shipping_phase: "PICKUP" }), "shipment").label).toBe("\uCD9C\uD558\uD488 \uCD9C\uACE0");
   });
 });

@@ -26,6 +26,33 @@ export interface AuditTerminal {
 
 export type ActivityAuditFile = AuditCsvFile;
 
+export type InventoryIntegrityCategory =
+  | "DEFECT_STOCK_MISMATCH"
+  | "PARTIAL_CANCELLATION"
+  | "WORKFLOW_STATE_RESIDUE"
+  | "SHIPPING_ALLOCATION_MISMATCH"
+  | "DUPLICATE_REVERSAL"
+  | "WEEKLY_UNCLASSIFIED_EFFECT";
+
+export interface InventoryIntegrityIssue {
+  problem_id: string;
+  category: InventoryIntegrityCategory;
+  title: string;
+  description: string;
+  cause_ids: string[];
+  current_value: string;
+  expected_value: string;
+  repairable: boolean;
+}
+
+export interface InventoryIntegrityResult {
+  generated_at: string;
+  is_consistent: boolean;
+  issue_count: number;
+  category_counts: Record<InventoryIntegrityCategory, number>;
+  issues: InventoryIntegrityIssue[];
+}
+
 export const adminApi = {
   verifyAdminPin: (pin: string) =>
     postJson<{ message: string }>(toApiUrl("/api/settings/verify-pin"), { pin }),
@@ -56,4 +83,7 @@ export const adminApi = {
 
   triggerAuditCsvBackfill: () =>
     postJson<AuditCsvBackfillResult>(toApiUrl("/api/admin/audit-csv/backfill")),
+
+  getInventoryIntegrity: () =>
+    fetcher<InventoryIntegrityResult>(toApiUrl("/api/admin/inventory-integrity")),
 };

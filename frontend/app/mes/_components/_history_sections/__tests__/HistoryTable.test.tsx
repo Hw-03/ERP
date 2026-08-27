@@ -1,8 +1,12 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { TransactionLog } from "@/lib/api";
 import type { IoBatch } from "@/lib/api/types/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { tint } from "@/lib/mes/colorUtils";
+import { transactionColor } from "@/lib/mes-status";
 import { HistoryTable } from "../HistoryTable";
 import type { LogGroup } from "../historyTableHelpers";
 
@@ -39,6 +43,342 @@ function renderTable(groups: LogGroup[], batchCache = new Map<string, IoBatch>()
 }
 
 describe("HistoryTable hierarchy", () => {
+  it("keeps before-stock and status visible while marking only after-stock for cancelled source rows", () => {
+    const css = readFileSync(resolve(process.cwd(), "app", "globals.css"), "utf8");
+    expect(css).toMatch(
+      /tr\[data-history-cancelled\] > :is\(td:nth-child\(1\), td:nth-child\(2\), td:nth-child\(3\), td:nth-child\(4\)\)\s*\{[\s\S]*?opacity: \.55;[\s\S]*?position: relative;/,
+    );
+    expect(css).toMatch(
+      /tr\[data-history-cancelled\] \[data-history-after-stock="true"\]\s*\{[^}]*opacity: \.55;[^}]*text-decoration: line-through;/,
+    );
+  });
+
+  it("keeps the legacy hover strength for regular rows and uses 20 percent only for cancellation rows", () => {
+    renderTable([{ type: "solo", log: makeLog() }]);
+    const regularRow = screen.getByText("대표 품목").closest("tr")!;
+
+    fireEvent.mouseEnter(regularRow);
+
+    expect(regularRow).toHaveStyle({ background: tint(transactionColor("PRODUCE"), 14) });
+
+    const css = readFileSync(resolve(process.cwd(), "app", "globals.css"), "utf8");
+    expect(css).toMatch(
+      /tr\[data-history-cancellation="true"\]\s*\{\s*background: color-mix\(in srgb, var\(--c-red\) 10%, transparent\) !important;/,
+    );
+    expect(css).toMatch(
+      /tr\[data-history-cancellation="true"\]:hover\s*\{\s*background: color-mix\(in srgb, var\(--c-red\) 20%, transparent\) !important;/,
+    );
+    expect(css).toMatch(
+      /tr\[data-history-cancellation="true"\]\[aria-pressed="true"\]\s*\{\s*outline: 1\.5px solid var\(--c-red\) !important;/,
+    );
+    expect(css).toContain('tr[data-history-cancellation="true"] > td:nth-child(2) > span');
+  });
+
+  it("combines location snapshots into one compact before-and-after cell", () => {
+    const log = makeLog({
+      cancelled: true,
+      warehouse_qty_before: 0,
+      warehouse_qty_after: 4,
+      department_qty_before: 0,
+      department_qty_after: 7,
+    });
+
+    renderTable([{ type: "solo", log }]);
+
+    expect(screen.getAllByRole("columnheader").map((header) => header.textContent)).toEqual([
+      "일시",
+      "작업",
+      "대상",
+      "품목코드수량",
+      "재고 변동",
+      "담당자",
+    ]);
+    const groupedHeader = screen.getByRole("columnheader", { name: "품목코드 · 수량" });
+    expect(within(groupedHeader).getByText("품목코드")).toBeInTheDocument();
+    expect(within(groupedHeader).getByText("수량")).toBeInTheDocument();
+    const row = screen.getByText("대표 품목").closest("tr")!;
+    const inventory = within(row).getByLabelText("재고 변동: 창고 0 → 4, 부서 0 → 7");
+    expect(within(inventory).getByLabelText("창고 0 → 4")).toBeInTheDocument();
+    expect(within(inventory).getByLabelText("부서 0 → 7")).toBeInTheDocument();
+    expect(row).not.toHaveClass("opacity-60");
+    expect(row).toHaveAttribute("data-history-cancelled", "true");
+    expect(inventory.closest("td")).toBe(row.children[4]);
+    expect(within(row.children[5] as HTMLElement).getByText("취소")).toBeInTheDocument();
+    expect(within(inventory).getByLabelText("창고 0 → 4").children.item(3)).toHaveAttribute("data-history-after-stock", "true");
+  });
+
+  it("renders operation and cancellation groups as separate expandable rows", () => {
+    const originalParent = makeLog({
+      log_id: "original-parent",
+      operation_id: "operation-1",
+      operation_role: "PRIMARY",
+      operation_kind: "BUSINESS",
+      operation_effective_status: "cancelled",
+      cancelled: true,
+    });
+    const originalChild = makeLog({
+      log_id: "original-child",
+      item_id: "CHILD-1",
+      item_name: "원 작업 하위 자재",
+      operation_id: "operation-1",
+      operation_role: "COMPONENT_INPUT",
+      operation_kind: "BUSINESS",
+      operation_effective_status: "cancelled",
+      cancelled: true,
+    });
+    const cancellationParent = makeLog({
+      ...originalParent,
+      log_id: "cancel-parent",
+      operation_id: "operation-2",
+      operation_kind: "CANCELLATION",
+      operation_effective_status: "cancellation",
+      quantity_change: -originalParent.quantity_change,
+      cancelled: false,
+    });
+    const cancellationChild = makeLog({
+      ...originalChild,
+      log_id: "cancel-child",
+      operation_id: "operation-2",
+      operation_kind: "CANCELLATION",
+      operation_effective_status: "cancellation",
+      quantity_change: -originalChild.quantity_change,
+      cancelled: false,
+    });
+
+    renderTable([
+      { type: "operation", operationId: "operation-2", logs: [cancellationParent, cancellationChild] },
+      { type: "operation", operationId: "operation-1", logs: [originalParent, originalChild] },
+    ]);
+
+    const cancellationRow = screen.getByText("부서 입출고 취소").closest("tr");
+    expect(cancellationRow).not.toHaveAttribute("data-history-cancelled");
+    expect(cancellationRow).toHaveAttribute("data-history-cancellation", "true");
+    expect(within(cancellationRow as HTMLElement).getByText("생산 -1 EA")).toBeInTheDocument();
+    const originalRow = screen.getByText("부서 입출고").closest("tr");
+    expect(originalRow).toHaveAttribute("data-history-cancelled", "true");
+    expect(originalRow).not.toHaveAttribute("data-history-cancellation");
+    const toggles = screen.getAllByRole("button", { name: "작업 구성 펼치기" });
+    fireEvent.click(toggles[0]);
+    expect(screen.getByText("원 작업 하위 자재").closest("tr")).not.toHaveAttribute("data-history-cancelled");
+    fireEvent.click(toggles[1]);
+    expect(screen.getByText("원 작업 하위 자재").closest("tr")).toHaveAttribute("data-history-cancelled", "true");
+  });
+
+  it("centers typical three-digit location changes on fixed baselines", () => {
+    const log = makeLog({
+      warehouse_qty_before: 472,
+      warehouse_qty_after: 472,
+      department_qty_before: 41,
+      department_qty_after: 20,
+    });
+    const shortLog = makeLog({
+      log_id: "log-2",
+      warehouse_qty_before: 0,
+      warehouse_qty_after: 0,
+      department_qty_before: 8,
+      department_qty_after: 8,
+    });
+    const longAfterLog = makeLog({
+      log_id: "log-3",
+      warehouse_qty_before: 1000,
+      warehouse_qty_after: 1000,
+      department_qty_before: 471,
+      department_qty_after: 455,
+    });
+
+    renderTable([{ type: "solo", log }, { type: "solo", log: shortLog }, { type: "solo", log: longAfterLog }]);
+
+    const warehouseLine = screen.getByLabelText("창고 472 → 472");
+    const departmentLine = screen.getByLabelText("부서 41 → 20");
+    const shortWarehouseLine = screen.getByLabelText("창고 0 → 0");
+    const longWarehouseLine = screen.getByLabelText("창고 1,000 → 1,000");
+    const warehouseLabel = warehouseLine.children.item(0) as HTMLElement;
+    const warehouseBefore = warehouseLine.children.item(1) as HTMLElement;
+    const warehouseArrow = warehouseLine.children.item(2) as HTMLElement;
+    const warehouseAfter = warehouseLine.children.item(3) as HTMLElement;
+    const departmentLabel = departmentLine.children.item(0) as HTMLElement;
+    const departmentBefore = departmentLine.children.item(1) as HTMLElement;
+    const shortWarehouseBefore = shortWarehouseLine.children.item(1) as HTMLElement;
+    const longWarehouseAfter = longWarehouseLine.children.item(3) as HTMLElement;
+
+    expect(warehouseLine.style.paddingLeft).toBe("");
+    expect(departmentLine.style.paddingLeft).toBe("");
+    expect(warehouseLabel).toHaveClass("w-7", "text-left");
+    expect(departmentLabel).toHaveClass("w-7", "text-left");
+    expect(warehouseBefore).toHaveClass("text-right", "tabular-nums");
+    expect(departmentBefore).toHaveClass("text-right", "tabular-nums");
+    expect(warehouseBefore).toHaveStyle({ width: "6ch" });
+    expect(departmentBefore).toHaveStyle({ width: "6ch" });
+    expect(shortWarehouseBefore).toHaveStyle({ width: "6ch" });
+    expect(warehouseArrow.className).toBe("");
+    expect(warehouseAfter).toHaveClass("min-w-0", "shrink-0", "text-left", "font-bold", "tabular-nums");
+    expect(warehouseAfter).toHaveStyle({ width: "3ch" });
+    expect(longWarehouseAfter).toHaveTextContent("1,000");
+    expect(longWarehouseAfter).toHaveStyle({ width: "3ch" });
+  });
+
+  it("keeps item code and quantity visible when the detail panel opens", () => {
+    const log = makeLog();
+    const groups: LogGroup[] = [{ type: "solo", log }];
+    const view = renderTable(groups);
+    const table = screen.getByRole("table");
+    const itemMovementHeader = screen.getByRole("columnheader", { name: "품목코드 · 수량" });
+    const row = screen.getByText("대표 품목").closest("tr")!;
+    const itemMovementCell = row.querySelector("td[colspan='2']");
+
+    expect(table).toHaveClass("history-table-panel-motion");
+    expect(table).toHaveAttribute("data-panel-open", "false");
+    expect(itemMovementHeader).toHaveAttribute("colspan", "2");
+    expect(itemMovementHeader).toHaveStyle({ width: "364px" });
+    expect(itemMovementCell).toHaveAttribute("colspan", "2");
+    expect(itemMovementCell).toHaveStyle({ width: "364px" });
+    expect(itemMovementCell).toHaveTextContent("3-AA-0005");
+
+    view.rerender(
+      <HistoryTable loading={false} displayGroups={groups} selection={{ kind: "log", log }} onSelectLog={vi.fn()} onSelectBatch={vi.fn()} batchCache={new Map()} setBatchCache={vi.fn()} canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} />,
+    );
+
+    expect(table).toHaveAttribute("data-panel-open", "true");
+    expect(itemMovementHeader).toHaveStyle({ width: "364px" });
+    expect(itemMovementCell).toHaveStyle({ width: "364px" });
+    expect(screen.getByText("대표 품목").closest("tr")).toHaveTextContent("3-AA-0005");
+
+    view.rerender(
+      <HistoryTable loading={false} displayGroups={groups} selection={null} onSelectLog={vi.fn()} onSelectBatch={vi.fn()} batchCache={new Map()} setBatchCache={vi.fn()} canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} />,
+    );
+
+    expect(table).toHaveAttribute("data-panel-open", "false");
+    expect(itemMovementHeader).not.toHaveAttribute("aria-hidden");
+  });
+
+  it("shows unrecorded for legacy logs without a complete location snapshot", () => {
+    renderTable([{ type: "solo", log: makeLog() }]);
+
+    expect(screen.getAllByText("기록 없음")).toHaveLength(1);
+  });
+
+  it("uses the displayed shipment target log for the summary snapshots", () => {
+    const source = makeLog({
+      log_id: "source-pa",
+      item_id: "SOURCE",
+      item_name: "기존 PA",
+      mes_code: "3-PA-0001",
+      transaction_type: "BACKFLUSH",
+      quantity_change: -1,
+      shipping_phase: "COMPONENT_CHANGE",
+      notes: "품목 전환 소스 PA 사용: 기존 PA x 1",
+      warehouse_qty_before: 1,
+      warehouse_qty_after: 0,
+      department_qty_before: 2,
+      department_qty_after: 2,
+    });
+    const target = makeLog({
+      log_id: "target-pa",
+      item_id: "TARGET",
+      item_name: "변경 PA",
+      mes_code: "3-PA-0002",
+      transaction_type: "PRODUCE",
+      shipping_phase: "COMPONENT_CHANGE",
+      notes: "품목 전환 대상 PA 입고: 변경 PA x 1",
+      warehouse_qty_before: 30,
+      warehouse_qty_after: 31,
+      department_qty_before: 40,
+      department_qty_after: 40,
+    });
+
+    renderTable([{ type: "batch", refKey: "conversion", refNo: "ITEM-CONV-1", logs: [source, target] }]);
+
+    const row = screen.getByLabelText("기존 PA → 변경 PA").closest("tr")!;
+    expect(within(row).getByLabelText("재고 변동: 창고 30 → 31, 부서 40 → 40")).toBeInTheDocument();
+  });
+
+  it("uses the log matching the operation batch target for summary snapshots", () => {
+    const component = makeLog({
+      log_id: "component",
+      item_id: "COMP-1",
+      item_name: "BOM 구성품",
+      mes_code: "3-AR-0001",
+      transaction_type: "BACKFLUSH",
+      operation_batch_id: "batch-1",
+      warehouse_qty_before: 1,
+      warehouse_qty_after: 1,
+      department_qty_before: 9,
+      department_qty_after: 8,
+    });
+    const target = makeLog({
+      log_id: "target",
+      operation_batch_id: "batch-1",
+      warehouse_qty_before: 20,
+      warehouse_qty_after: 20,
+      department_qty_before: 4,
+      department_qty_after: 5,
+    });
+
+    renderTable(
+      [{ type: "op_batch", batchId: "batch-1", refNo: null, logs: [component, target] }],
+      new Map([["batch-1", makeBatch()]]),
+    );
+
+    const row = screen.getByText("대표 품목").closest("tr")!;
+    expect(within(row).getByLabelText("재고 변동: 창고 20 → 20, 부서 4 → 5")).toBeInTheDocument();
+  });
+
+  it("does not reuse a component snapshot when a custom BOM parent was not executed", () => {
+    const batch = makeBatch();
+    batch.bundles[0].lines[0] = {
+      ...batch.bundles[0].lines[0],
+      quantity: 5,
+      included: false,
+      exclusion_note: "커스텀 BOM 상위 미반영",
+    };
+    batch.bundles[0].lines[1] = {
+      ...batch.bundles[0].lines[1],
+      quantity: 5,
+      edited: true,
+    };
+    const component = makeLog({
+      log_id: "component-only",
+      item_id: "COMP-1",
+      item_name: "BOM 구성품",
+      mes_code: "3-AR-0001",
+      transaction_type: "BACKFLUSH",
+      quantity_change: -5,
+      operation_batch_id: "batch-1",
+      operation_line_id: "child",
+      warehouse_qty_before: 339,
+      warehouse_qty_after: 339,
+      department_qty_before: 8,
+      department_qty_after: 3,
+    });
+
+    renderTable(
+      [{ type: "op_batch", batchId: "batch-1", refNo: null, logs: [component] }],
+      new Map([["batch-1", batch]]),
+    );
+
+    const row = screen.getByText("대표 품목").closest("tr")!;
+    expect(within(row).queryByLabelText("재고 변동: 창고 339 → 339, 부서 8 → 3")).not.toBeInTheDocument();
+    expect(within(row).getAllByText("—")).toHaveLength(1);
+  });
+
+  it("shows the matching transaction snapshot on the BOM parent row", () => {
+    const parent = makeLog({
+      operation_batch_id: "batch-1",
+      warehouse_qty_before: 0,
+      warehouse_qty_after: 0,
+      department_qty_before: 0,
+      department_qty_after: 1,
+    });
+    renderTable(
+      [{ type: "op_batch", batchId: "batch-1", refNo: null, logs: [parent] }],
+      new Map([["batch-1", makeBatch()]]),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "묶음 펼치기" }));
+    const bomRow = screen.getByText("BOM").closest("tr")!;
+    expect(within(bomRow).getByLabelText("재고 변동: 창고 0 → 0, 부서 0 → 1")).toBeInTheDocument();
+  });
+
   it("keeps the final table geometry while the first page is loading", () => {
     const { container } = render(
       <HistoryTable loading displayGroups={[]} selection={null} onSelectLog={vi.fn()} onSelectBatch={vi.fn()} batchCache={new Map()} setBatchCache={vi.fn()} canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} />,
@@ -46,7 +386,7 @@ describe("HistoryTable hierarchy", () => {
 
     expect(screen.getByRole("table", { name: "입출고 내역 불러오는 중" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "작업" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "수량" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "품목코드 · 수량" })).toBeInTheDocument();
     const surface = screen.getByTestId("history-table-surface");
     expect(surface).toHaveClass(
       "min-w-0",
@@ -141,6 +481,10 @@ describe("HistoryTable hierarchy", () => {
       item_name: "보정 품목 A",
       transaction_type: "ADJUST",
       operation_batch_id: "batch-adjust",
+      warehouse_qty_before: 7,
+      warehouse_qty_after: 8,
+      department_qty_before: 2,
+      department_qty_after: 3,
     });
     const second = makeLog({
       log_id: "adjust-b",
@@ -148,6 +492,10 @@ describe("HistoryTable hierarchy", () => {
       item_name: "보정 품목 B",
       transaction_type: "ADJUST",
       operation_batch_id: "batch-adjust",
+      warehouse_qty_before: 40,
+      warehouse_qty_after: 41,
+      department_qty_before: 4,
+      department_qty_after: 5,
     });
     const batch = { ...makeBatch(), batch_id: "batch-adjust", sub_type: "adjust_in", bundles: [] };
 
@@ -158,6 +506,9 @@ describe("HistoryTable hierarchy", () => {
 
     expect(screen.queryByText("보정 품목 B")).not.toBeInTheDocument();
     expect(document.querySelectorAll("[data-history-main-row='true']")).toHaveLength(1);
+    const summaryRow = screen.getByText("보정 품목 A 외 1건").closest("tr")!;
+    expect(within(summaryRow).queryByLabelText(/^재고 변동:/)).not.toBeInTheDocument();
+    expect(within(summaryRow).getAllByText("—")).toHaveLength(1);
     const toggle = screen.getByRole("button", { name: "묶음 펼치기" });
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-expanded", "true");

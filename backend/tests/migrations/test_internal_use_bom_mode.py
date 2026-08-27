@@ -11,8 +11,8 @@ from alembic.config import Config
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
-PREVIOUS_REVISION = "20260819_0023"
-MIGRATION_REVISION = "20260820_0024"
+PREVIOUS_REVISION = "20260818_0022"
+MIGRATION_REVISION = "20260820_0023"
 
 
 def _config(path: Path) -> Config:

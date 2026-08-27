@@ -14,8 +14,10 @@ class WeeklyItemReport(BaseModel):
     produce_qty: int   # 진짜 생산(PRODUCE)만 — 입출고 내역 '생산'과 동일 기준
     receive_qty: int   # 입고(RECEIVE) — 생산과 분리 표시
     out_qty: int
+    defect_qty: int = 0
     current_qty: int
     delta: int
+    activity_evidence: List["WeeklyActivityEvidence"] = []
 
 
 class WeeklyGroupReport(BaseModel):
@@ -29,6 +31,7 @@ class WeeklyGroupReport(BaseModel):
     produce_qty: int
     receive_qty: int
     out_qty: int
+    defect_qty: int = 0
     current_qty: int
     delta: int
     items: List[WeeklyItemReport]
@@ -45,6 +48,7 @@ class WeeklyReportSummary(BaseModel):
     total_produce_qty: int
     total_receive_qty: int
     total_out_qty: int
+    total_defect_qty: int = 0
     groups_increasing: int
     groups_decreasing: int
     groups_unchanged: int
@@ -62,6 +66,31 @@ class WeeklyProductionModelRow(BaseModel):
     total_qty: int
 
 
+class WeeklyActivityEvidence(BaseModel):
+    column: Literal["produce", "receive", "out", "defect"]
+    operation_id: str
+    log_id: str
+    quantity: int
+    label: str
+
+
+class WeeklyValidationFailure(BaseModel):
+    problem_id: str
+    item_id: Optional[str] = None
+    mes_code: Optional[str] = None
+    reason: str
+    inventory_delta: int = 0
+    activity_delta: int = 0
+    operation_ids: List[str] = []
+    log_ids: List[str] = []
+
+
+class WeeklyReportValidation(BaseModel):
+    status: Literal["legacy", "verified", "failed"] = "legacy"
+    message: str = "기존 기준·검산 전 자료입니다."
+    failures: List[WeeklyValidationFailure] = []
+
+
 class WeeklyReportResponse(BaseModel):
     week_start: str
     week_end: str
@@ -69,6 +98,10 @@ class WeeklyReportResponse(BaseModel):
     summary: WeeklyReportSummary
     warnings: List[WeeklyWarning]
     production_matrix: List[WeeklyProductionModelRow] = []
+    basis_version: int = 1
+    report_status: Literal["legacy", "transition", "verified", "failed"] = "legacy"
+    transition_notice: Optional[str] = None
+    validation: WeeklyReportValidation = Field(default_factory=WeeklyReportValidation)
 
 
 class ProcessTypeResponse(BaseModel):
@@ -159,7 +192,7 @@ CapacityAfStatus = Literal[
 
 class CapacityAfSummary(BaseModel):
     ship_ready: int = Field(..., description="출하 대기 — 창고에 있는 완성 PF 재고 합계.")
-    fast_production: int = Field(..., description="빠른 생산 — AF재고 + AF 직계 1단계 부품 → PF 환산 합계.")
+    fast_production: int = Field(..., description="빠른 생산 — 현재 AF 재고와 포장 자재로 PA·PF까지 완성 가능한 수량 합계.")
     total_production: int = Field(..., description="총생산 — PF 루트 BOM 전체 재귀 이론 최대 합계.")
 
 
@@ -178,7 +211,7 @@ class CapacityAfItem(BaseModel):
     )
     fast_production: int = Field(
         ...,
-        description="빠른 생산 — AF재고 + AF 직계 1단계 부품 → 이 PF 환산. 포장 구간 포함.",
+        description="빠른 생산 — 현재 AF 재고와 포장 자재로 이 PF까지 완성 가능한 수량.",
     )
     total_production: int = Field(
         ..., description="총생산 — 이 PF 루트로 BOM 전체 재귀 이론 최대."
@@ -201,7 +234,7 @@ class CapacityPfVariant(BaseModel):
     model_symbol: Optional[str] = None
     af_item_id: Optional[str] = None
     ship_ready: int = Field(..., description="출하 대기 — 이 PF 완성 재고.")
-    fast_production: int = Field(..., description="빠른 생산 — AF재고 + 1단계 부품 → 이 PF 환산.")
+    fast_production: int = Field(..., description="빠른 생산 — 현재 AF 재고와 포장 자재로 이 PF까지 완성 가능한 수량.")
     total_production: int = Field(..., description="총생산 — 이 PF 루트로 BOM 전체 재귀 이론 최대.")
     fast_production_limiting_item: Optional[str] = None
     total_production_limiting_item: Optional[str] = None

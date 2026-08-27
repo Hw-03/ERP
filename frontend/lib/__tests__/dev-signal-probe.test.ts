@@ -10,6 +10,7 @@ const require = createRequire(import.meta.url);
 
 const {
   attachNextSignalProbe,
+  attachNextWorkerExitObserver,
   buildNextSignalProbeEnv,
   initializeNextSignalProbe,
 } = require("../../scripts/next-signal-probe.js");
@@ -21,6 +22,13 @@ function createFakeProcess(env: Record<string, string | undefined>) {
     argv: string[];
     cwd: () => string;
     env: Record<string, string | undefined>;
+    report?: {
+      directory: string;
+      reportOnFatalError: boolean;
+      reportOnUncaughtException: boolean;
+      excludeEnv: boolean;
+      excludeNetwork: boolean;
+    };
     exit: ReturnType<typeof vi.fn>;
     kill: ReturnType<typeof vi.fn>;
   };
@@ -43,6 +51,13 @@ function writeNextWorkerScript(repoRoot: string, source: string) {
     "lib",
     "start-server.js",
   );
+  fs.mkdirSync(path.dirname(scriptPath), { recursive: true });
+  fs.writeFileSync(scriptPath, source, "utf8");
+  return scriptPath;
+}
+
+function writeNextCliScript(repoRoot: string, source: string) {
+  const scriptPath = path.join(repoRoot, "next", "dist", "bin", "next");
   fs.mkdirSync(path.dirname(scriptPath), { recursive: true });
   fs.writeFileSync(scriptPath, source, "utf8");
   return scriptPath;
@@ -178,6 +193,239 @@ describe("Next signal probe", () => {
     expect(processRef.kill).not.toHaveBeenCalled();
   });
 
+  it("records the exact Next private worker raw exit code without changing fork behavior", () => {
+    const processRef = createFakeProcess({ PORT: "3001" });
+    const child = new EventEmitter() as EventEmitter & { pid: number };
+    child.pid = 5678;
+    const originalFork = vi.fn(() => child);
+    const childProcessModule = { fork: originalFork };
+    const log = vi.fn();
+    const observedAt = new Date("2026-08-21T02:03:04.000Z");
+    const workerPath = "C:\\ERP\\frontend\\node_modules\\next\\dist\\server\\lib\\start-server.js";
+
+    attachNextWorkerExitObserver({
+      processRef,
+      diagnostics: { log },
+      childProcessModule,
+      now: () => observedAt,
+    });
+    const returnedChild = childProcessModule.fork(workerPath, ["--turbo"], { silent: true });
+    child.emit("exit", 3221226505, null);
+
+    expect(returnedChild).toBe(child);
+    expect(originalFork).toHaveBeenCalledWith(workerPath, ["--turbo"], { silent: true });
+    expect(log).toHaveBeenCalledWith("NEXT_WORKER_CHILD_EXIT", {
+      observedAtUtc: "2026-08-21T02:03:04.000Z",
+      targetPid: 5678,
+      targetPpid: 1234,
+      exitCode: 3221226505,
+      signal: null,
+      port: "3001",
+    });
+  });
+
+  it("does not observe ordinary forked children", () => {
+    const processRef = createFakeProcess({ PORT: "3001" });
+    const child = new EventEmitter() as EventEmitter & { pid: number };
+    child.pid = 5678;
+    const childProcessModule = { fork: vi.fn(() => child) };
+    const log = vi.fn();
+
+    attachNextWorkerExitObserver({
+      processRef,
+      diagnostics: { log },
+      childProcessModule,
+    });
+    childProcessModule.fork("C:\\ERP\\frontend\\scripts\\ordinary-child.js");
+    child.emit("exit", 23, null);
+
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it("patches fork only in the exact Next CLI, not inside the private worker", () => {
+    const cliProcess = createFakeProcess({
+      MES_RUNTIME_PROFILE: "development",
+      MES_NEXT_SIGNAL_PROBE: "1",
+      PORT: "3001",
+    });
+    const cliFork = vi.fn();
+    const cliChildProcessModule = { fork: cliFork };
+
+    initializeNextSignalProbe({
+      processRef: cliProcess,
+      createDiagnosticsFactory: () => ({ log: vi.fn() }),
+      childProcessModule: cliChildProcessModule,
+      rootDir: "C:\\ERP\\frontend",
+    });
+
+    const workerProcess = createFakeProcess({
+      MES_RUNTIME_PROFILE: "development",
+      MES_NEXT_SIGNAL_PROBE: "1",
+      NEXT_PRIVATE_WORKER: "1",
+      PORT: "3001",
+    });
+    workerProcess.argv[1] =
+      "C:\\ERP\\frontend\\node_modules\\next\\dist\\server\\lib\\start-server.js";
+    const workerFork = vi.fn();
+    const workerChildProcessModule = { fork: workerFork };
+
+    initializeNextSignalProbe({
+      processRef: workerProcess,
+      createDiagnosticsFactory: () => ({ log: vi.fn() }),
+      childProcessModule: workerChildProcessModule,
+      rootDir: "C:\\ERP\\frontend",
+    });
+
+    expect(cliChildProcessModule.fork).not.toBe(cliFork);
+    expect(workerChildProcessModule.fork).toBe(workerFork);
+  });
+
+  it("configures sanitized Node reports only for the exact Next private worker", () => {
+    const cliProcess = createFakeProcess({
+      MES_RUNTIME_PROFILE: "development",
+      MES_NEXT_SIGNAL_PROBE: "1",
+      PORT: "3001",
+    });
+    cliProcess.report = {
+      directory: "",
+      reportOnFatalError: false,
+      reportOnUncaughtException: false,
+      excludeEnv: false,
+      excludeNetwork: false,
+    };
+    const workerProcess = createFakeProcess({
+      MES_RUNTIME_PROFILE: "development",
+      MES_NEXT_SIGNAL_PROBE: "1",
+      NEXT_PRIVATE_WORKER: "1",
+      PORT: "3001",
+    });
+    workerProcess.argv[1] =
+      "C:\\ERP\\frontend\\node_modules\\next\\dist\\server\\lib\\start-server.js";
+    workerProcess.report = {
+      directory: "",
+      reportOnFatalError: false,
+      reportOnUncaughtException: false,
+      excludeEnv: false,
+      excludeNetwork: false,
+    };
+    const prepareNodeReportDirectory = vi.fn(() => "C:\\runtime\\logs\\frontend\\node-reports");
+
+    initializeNextSignalProbe({
+      processRef: cliProcess,
+      createDiagnosticsFactory: () => ({ log: vi.fn(), prepareNodeReportDirectory }),
+      rootDir: "C:\\ERP\\frontend",
+    });
+    initializeNextSignalProbe({
+      processRef: workerProcess,
+      createDiagnosticsFactory: () => ({ log: vi.fn(), prepareNodeReportDirectory }),
+      rootDir: "C:\\ERP\\frontend",
+    });
+
+    expect(cliProcess.report).toEqual({
+      directory: "",
+      reportOnFatalError: false,
+      reportOnUncaughtException: false,
+      excludeEnv: false,
+      excludeNetwork: false,
+    });
+    expect(prepareNodeReportDirectory).toHaveBeenCalledTimes(1);
+    expect(prepareNodeReportDirectory).toHaveBeenCalledWith({ maxReports: 3, reserveSlots: 1 });
+    expect(workerProcess.report).toEqual({
+      directory: "C:\\runtime\\logs\\frontend\\node-reports",
+      reportOnFatalError: true,
+      reportOnUncaughtException: true,
+      excludeEnv: true,
+      excludeNetwork: true,
+    });
+  });
+
+  it("keeps Next lifecycle handlers active when Node report setup fails", () => {
+    const processRef = createFakeProcess({
+      MES_RUNTIME_PROFILE: "development",
+      MES_NEXT_SIGNAL_PROBE: "1",
+      NEXT_PRIVATE_WORKER: "1",
+      PORT: "3001",
+    });
+    processRef.argv[1] =
+      "C:\\ERP\\frontend\\node_modules\\next\\dist\\server\\lib\\start-server.js";
+    processRef.report = {
+      directory: "",
+      reportOnFatalError: false,
+      reportOnUncaughtException: false,
+      excludeEnv: false,
+      excludeNetwork: false,
+    };
+    const log = vi.fn();
+
+    expect(initializeNextSignalProbe({
+      processRef,
+      createDiagnosticsFactory: () => ({
+        log,
+        prepareNodeReportDirectory: () => {
+          throw new Error("directory unavailable");
+        },
+      }),
+      rootDir: "C:\\ERP\\frontend",
+    })).toBe(true);
+
+    expect(processRef.listenerCount("SIGINT")).toBe(1);
+    expect(processRef.listenerCount("SIGTERM")).toBe(1);
+    expect(log).toHaveBeenCalledWith("NEXT_NODE_REPORT_SETUP_FAILED", {
+      message: "directory unavailable",
+    });
+  });
+
+  it("writes the exact private worker exit code from a preloaded Next CLI integration", () => {
+    const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "mes-next-worker-exit-"));
+    const runtimeRoot = path.join(repoRoot, "runtime");
+    const probePath = path.resolve("scripts", "next-signal-probe.js");
+    const workerPath = writeNextWorkerScript(repoRoot, "process.exit(23);");
+    const cliPath = writeNextCliScript(repoRoot, `
+      const { fork } = require("child_process");
+      const child = fork(process.env.TEST_WORKER_PATH, [], {
+        env: { ...process.env, NEXT_PRIVATE_WORKER: "1" },
+        stdio: "ignore",
+      });
+      child.on("exit", () => process.exit(0));
+    `);
+
+    try {
+      const env = buildNextSignalProbeEnv(
+        {
+          ...process.env,
+          MES_RUNTIME_ROOT: runtimeRoot,
+          MES_RUNTIME_PROFILE: "development",
+          TEST_WORKER_PATH: workerPath,
+          PORT: "3001",
+        },
+        probePath,
+      );
+      const result = spawnSync(process.execPath, [cliPath], {
+        env,
+        encoding: "utf8",
+      });
+
+      expect(result.status).toBe(0);
+      expect(result.stderr).toBe("");
+      const logPath = path.join(runtimeRoot, "logs", "frontend", "dev-server.log");
+      const workerExitLine = fs
+        .readFileSync(logPath, "utf8")
+        .split(/\r?\n/)
+        .find((line) => line.includes("NEXT_WORKER_CHILD_EXIT"));
+      expect(workerExitLine).toBeDefined();
+      const payload = JSON.parse(
+        workerExitLine!.replace(/^.*?NEXT_WORKER_CHILD_EXIT\s+/, ""),
+      );
+      expect(payload.targetPid).toBeGreaterThan(0);
+      expect(payload.targetPpid).toBeGreaterThan(0);
+      expect(payload.exitCode).toBe(23);
+      expect(payload.signal).toBeNull();
+      expect(payload.port).toBe("3001");
+    } finally {
+      fs.rmSync(repoRoot, { recursive: true, force: true });
+    }
+  });
+
   it("writes the preloaded signal event to frontend dev-server.log without environment secrets", () => {
     const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "mes-next-signal-probe-"));
     const runtimeRoot = path.join(repoRoot, "runtime");
@@ -298,6 +546,50 @@ describe("Next signal probe", () => {
       expect(
         fs.existsSync(path.join(employeeRuntimeRoot, "logs", "frontend", "dev-server.log")),
       ).toBe(false);
+    } finally {
+      fs.rmSync(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("writes a sanitized Node diagnostic report for an opted-in private worker exception", () => {
+    const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "mes-next-worker-report-"));
+    const runtimeRoot = path.join(repoRoot, "runtime");
+    const probePath = path.resolve("scripts", "next-signal-probe.js");
+    const workerScriptPath = writeNextWorkerScript(repoRoot, 'throw new Error("worker-report-probe");');
+
+    try {
+      const env = buildNextSignalProbeEnv(
+        {
+          ...process.env,
+          MES_RUNTIME_ROOT: runtimeRoot,
+          MES_RUNTIME_PROFILE: "development",
+          MES_TEST_SECRET: "must-not-be-logged",
+          NEXT_PRIVATE_WORKER: "1",
+          PORT: "3001",
+        },
+        probePath,
+      );
+      const result = spawnSync(process.execPath, [workerScriptPath], {
+        env,
+        encoding: "utf8",
+      });
+      const reportsDir = path.join(runtimeRoot, "logs", "frontend", "node-reports");
+      const logText = fs.readFileSync(
+        path.join(runtimeRoot, "logs", "frontend", "dev-server.log"),
+        "utf8",
+      );
+      expect(logText).toContain("NEXT_NODE_REPORT_READY");
+      const reports = fs.readdirSync(reportsDir).filter((name) => /^report\..+\.json$/.test(name));
+
+      expect(result.status).toBe(1);
+      expect(reports).toHaveLength(1);
+      const reportText = fs.readFileSync(path.join(reportsDir, reports[0]), "utf8");
+      const report = JSON.parse(reportText);
+      expect(report.header.processId).toBeGreaterThan(0);
+      expect(report.header.event).toBe("Exception");
+      expect(report.header.networkInterfaces).toBeUndefined();
+      expect(report.environmentVariables).toBeUndefined();
+      expect(reportText).not.toContain("must-not-be-logged");
     } finally {
       fs.rmSync(repoRoot, { recursive: true, force: true });
     }

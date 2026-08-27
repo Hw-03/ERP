@@ -50,13 +50,6 @@ def update_invoice(
         return shipping_svc._update_invoice(db, request_id, invoice_number, actor)
 
 
-def send_to_prep(db: Session, request_id: uuid.UUID, actor: Employee) -> ShippingRequest:
-    """준비 전환과 체크리스트·이벤트 변경을 원자적으로 확정한다."""
-    with transactional(db):
-        actor = shipping_svc._require_actor(actor)
-        return shipping_svc._send_to_prep(db, request_id, actor)
-
-
 def update_checklist(
     db: Session,
     request_id: uuid.UUID,
@@ -187,4 +180,4 @@ def pickup_cancel(db: Session, request_id: uuid.UUID, actor: Employee) -> Shippi
     """픽업 완료를 재고·원장·배정까지 원자적으로 되돌린다."""
     with transactional(db):
         actor = shipping_svc._require_actor(actor)
-        return shipping_svc._pickup_cancel(db, request_id, actor)
+        return shipping_svc._pickup_cancel(db, request_id, actor=actor)

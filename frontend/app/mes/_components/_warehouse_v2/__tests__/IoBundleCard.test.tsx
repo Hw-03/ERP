@@ -84,6 +84,85 @@ function makeInternalUseBundle(
 const itemMap = new Map<string, Item>();
 
 describe("IoBundleCard", () => {
+  it("커스텀 출고 BOM은 상위를 유지하고 하위를 선택 출고로 표시한다", () => {
+    const customBundle = {
+      ...bundle,
+      quantity: 1,
+      lines: [
+        {
+          ...parentLine,
+          direction: "out" as const,
+          from_bucket: "production" as const,
+          from_department: "조립",
+          to_bucket: "none" as const,
+          to_department: null,
+          quantity: 1,
+        },
+        {
+          ...childLine,
+          direction: "in" as const,
+          from_bucket: "none" as const,
+          from_department: null,
+          to_bucket: "production" as const,
+          to_department: "조립",
+          quantity: 1,
+          bom_expected: 2,
+          edited: true,
+        },
+      ],
+    } satisfies IoBundle;
+    render(
+      <IoBundleCard
+        bundle={customBundle}
+        subType="disassemble"
+        itemMap={itemMap}
+        getAvailable={() => 45}
+        onToggleLine={() => {}}
+        onQuantityChange={() => {}}
+        onBundleQuantityChange={vi.fn()}
+        onRemoveLine={() => {}}
+        onRemoveBundle={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("BOM 참고 출고 · 상위 미반영")).toBeInTheDocument();
+    const header = screen.getAllByRole("button", { name: /ADX6000 80KV 5mA/ })
+      .find((element) => element.hasAttribute("aria-expanded"));
+    if (!header) throw new Error("묶음 접기/펼치기 영역을 찾을 수 없습니다.");
+    fireEvent.click(header);
+    expect(screen.getByText("선택 출고")).toBeInTheDocument();
+    expect(screen.getByText("44")).toBeInTheDocument();
+  });
+
+  it("커스텀 부서 BOM은 상위 재고를 미반영으로 안내한다", () => {
+    const customBundle = {
+      ...bundle,
+      lines: [
+        parentLine,
+        { ...childLine, quantity: 3, bom_expected: 2, edited: true },
+      ],
+    } satisfies IoBundle;
+    render(
+      <IoBundleCard
+        bundle={customBundle}
+        subType="produce"
+        itemMap={itemMap}
+        getAvailable={() => 10}
+        onToggleLine={() => {}}
+        onQuantityChange={() => {}}
+        onBundleQuantityChange={vi.fn()}
+        onRemoveLine={() => {}}
+        onRemoveBundle={() => {}}
+      />,
+    );
+
+    const composition = screen.getByText("BOM 자동 전개 · 상위 미반영 · 하위 1");
+    expect(composition).toBeInTheDocument();
+    expect(composition.parentElement).toHaveTextContent("반영 1개");
+    expect(screen.getByText("상위 미반영")).toBeInTheDocument();
+    expect(screen.queryByText("실행 후")).not.toBeInTheDocument();
+  });
+
   it("모바일에서는 품목 확인 정보를 단일 열로, 데스크톱에서는 기존 다섯 열로 배치한다", () => {
     render(
       <IoBundleCard

@@ -70,7 +70,9 @@ def concurrent_engine(tmp_path):
 
     yield eng
 
-    Base.metadata.drop_all(bind=eng)
+    # 각 테스트가 고유한 tmp_path DB를 사용한다. transaction_logs의 자기참조
+    # 역전 FK에 실제 행이 있으면 SQLite가 DROP TABLE을 거부하므로 파일 정리는
+    # pytest tmp_path에 맡기고 연결만 확실히 닫는다.
     eng.dispose()
 
 

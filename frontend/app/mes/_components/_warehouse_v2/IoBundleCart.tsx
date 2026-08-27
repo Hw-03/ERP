@@ -35,6 +35,7 @@ interface Props {
   onPullFromWarehouse?: () => void;
   /** 가져오기 버튼 라벨용 — 선택 0이면 부족 라인 전체 개수. */
   pullCount?: number;
+  pulling?: boolean;
 }
 
 export function IoBundleCart({
@@ -58,6 +59,7 @@ export function IoBundleCart({
   onTogglePull,
   onPullFromWarehouse,
   pullCount,
+  pulling,
 }: Props) {
   const pullSelectedCount = pullSelected?.size ?? 0;
   const hasMissingInternalUseBomMode =
@@ -138,7 +140,7 @@ export function IoBundleCart({
             <button
               type="button"
               onClick={onPullFromWarehouse}
-              disabled={internalUseBomBusy}
+              disabled={internalUseBomBusy || pulling}
               className="w-full rounded-[14px] border px-5 py-3 text-sm font-black transition-colors hover:brightness-110"
               style={{
                 background: tint(LEGACY_COLORS.red, 10),

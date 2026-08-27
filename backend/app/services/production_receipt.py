@@ -16,10 +16,19 @@ from typing import Dict, List, Tuple
 
 from sqlalchemy.orm import Session
 
-from app.models import Employee, Inventory, Item, TransactionLog, TransactionTypeEnum
+from app.models import (
+    Employee,
+    Inventory,
+    InventoryOperation,
+    InventoryOperationRoleEnum,
+    Item,
+    TransactionLog,
+    TransactionTypeEnum,
+)
 from app.schemas import BackflushDetail, ProductionReceiptRequest
 from app.services import inventory as inventory_svc
 from app.services import inv_effect
+from app.services import inventory_operations as operation_svc
 from app.services._tx import transactional
 from app.services.bom import explode_bom, merge_requirements
 from app.services.bom_stock_policy import should_skip_bom_inventory
@@ -143,6 +152,7 @@ def _backflush_components(
     producer_id: uuid.UUID,
     transaction_ids: List[uuid.UUID],
     backflushed: List[BackflushDetail],
+    operation: InventoryOperation | None,
 ) -> None:
     """각 부품의 창고 차감 + BACKFLUSH 로그 기록 (transaction_ids/backflushed 누적)."""
     for comp_item_id, required_qty in merged.items():
@@ -154,7 +164,7 @@ def _backflush_components(
         comp_cells_before = inv_effect._snapshot_cells(db, comp_item_id)
         inv, qty_before, dept = inventory_svc._consume_from_item_department(db, comp_item, required_qty)
 
-        log = TransactionLog(
+        log = operation_svc._attach_transaction(TransactionLog(
             item_id=comp_item_id,
             transaction_type=TransactionTypeEnum.BACKFLUSH,
             quantity_change=-required_qty,
@@ -165,8 +175,8 @@ def _backflush_components(
             producer_employee_id=producer_id,
             department=dept.value,
             notes=f"생산 입고 Backflush: {produced_item.item_name} x {payload.quantity}",
-            inventory_effect=inv_effect._capture_effect(db, comp_item_id, comp_cells_before),
-        )
+            **inv_effect._capture_log_stock_snapshot(db, comp_item_id, comp_cells_before),
+        ), operation, InventoryOperationRoleEnum.COMPONENT_INPUT)
         db.add(log)
         db.flush()
 
@@ -191,6 +201,7 @@ def _record_production(
     producer_name: str,
     producer_id: uuid.UUID,
     transaction_ids: List[uuid.UUID],
+    operation: InventoryOperation | None,
 ) -> None:
     """Receive produced item into its process-code PRODUCTION location and log PRODUCE."""
     prod_cells_before = inv_effect._snapshot_cells(db, payload.item_id)
@@ -198,7 +209,7 @@ def _record_production(
         db, produced_item, payload.quantity
     )
 
-    produce_log = TransactionLog(
+    produce_log = operation_svc._attach_transaction(TransactionLog(
         item_id=payload.item_id,
         transaction_type=TransactionTypeEnum.PRODUCE,
         quantity_change=payload.quantity,
@@ -209,8 +220,8 @@ def _record_production(
         producer_employee_id=producer_id,
         department=dept.value,
         notes=payload.notes or f"생산 입고: {produced_item.item_name} x {payload.quantity}",
-        inventory_effect=inv_effect._capture_effect(db, payload.item_id, prod_cells_before),
-    )
+        **inv_effect._capture_log_stock_snapshot(db, payload.item_id, prod_cells_before),
+    ), operation, InventoryOperationRoleEnum.PRODUCT_OUTPUT)
     db.add(produce_log)
     db.flush()
     transaction_ids.append(produce_log.log_id)
@@ -238,12 +249,21 @@ def _execute_production_receipt(
 
     transaction_ids: List[uuid.UUID] = []
     backflushed: List[BackflushDetail] = []
+    operation = operation_svc._create_business_operation(
+        db,
+        domain="production",
+        action="receipt",
+        display_label="생산",
+        actor_name=producer_name or payload.produced_by or "시스템",
+        actor_employee_id=producer_id,
+        reason=payload.notes,
+    )
     _backflush_components(
         db, payload, produced_item, tracked_requirements, items_map,
-        producer_name, producer_id, transaction_ids, backflushed,
+        producer_name, producer_id, transaction_ids, backflushed, operation,
     )
     _record_production(
-        db, payload, produced_item, producer_name, producer_id, transaction_ids,
+        db, payload, produced_item, producer_name, producer_id, transaction_ids, operation,
     )
     return {"transaction_ids": transaction_ids, "backflushed": backflushed}
 

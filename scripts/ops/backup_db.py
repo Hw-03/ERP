@@ -65,7 +65,29 @@ def _verify_sqlite_backup(path: Path) -> None:
         raise SystemExit(result.returncode)
 
 
-def backup_sqlite(db_path: str, *, label: str | None = None) -> Path:
+def _verify_sqlite_integrity(path: Path) -> None:
+    """Verify a snapshot is structurally sound before current-schema migration."""
+    connection = None
+    try:
+        connection = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)
+        rows = connection.execute("PRAGMA integrity_check").fetchall()
+    except sqlite3.Error as exc:
+        print(f"[BACKUP] SQLite integrity check failed: {exc}", file=sys.stderr)
+        raise SystemExit(1) from exc
+    finally:
+        if connection is not None:
+            connection.close()
+    if rows != [("ok",)]:
+        print(f"[BACKUP] SQLite integrity check failed: {rows}", file=sys.stderr)
+        raise SystemExit(1)
+
+
+def backup_sqlite(
+    db_path: str,
+    *,
+    label: str | None = None,
+    integrity_only: bool = False,
+) -> Path:
     _reject_legacy_backup_override()
     src = Path(db_path).resolve()
     if not src.exists():
@@ -99,14 +121,18 @@ def backup_sqlite(db_path: str, *, label: str | None = None) -> Path:
         if not staged.exists():
             print(f"[BACKUP] backup file was not created: {staged}", file=sys.stderr)
             raise SystemExit(1)
-        _verify_sqlite_backup(staged)
+        if integrity_only:
+            _verify_sqlite_integrity(staged)
+        else:
+            _verify_sqlite_backup(staged)
         os.replace(staged, published)
     finally:
         _remove_private_sqlite_backup(staged)
 
     removed = retain_latest_backups(backup_dir, suffix=".db", keep=DEFAULT_KEEP)
     size_kb = published.stat().st_size // 1024
-    print("[BACKUP] OK (python sqlite3.backup + verify)")
+    verification = "SQLite integrity" if integrity_only else "schema/SQLite/FK"
+    print(f"[BACKUP] OK (python sqlite3.backup + {verification} verify)")
     print(f"  from : {src}")
     print(f"  to   : {published} ({size_kb} KB)")
     for removed_path in removed:
@@ -157,6 +183,11 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Back up DEXCOWIN MES DB")
     parser.add_argument("--sqlite", metavar="PATH", help="SQLite DB file path")
     parser.add_argument("--label", help="Descriptive lowercase-hyphen backup label")
+    parser.add_argument(
+        "--integrity-only",
+        action="store_true",
+        help="Verify SQLite integrity only; intended for a pre-migration source snapshot",
+    )
     parser.add_argument("--postgres", action="store_true", help="Run PostgreSQL backup")
     parser.add_argument("--container", help="Docker container name for PostgreSQL")
     parser.add_argument("--host", default="localhost")
@@ -173,15 +204,18 @@ def main() -> int:
     print("=" * 50)
 
     if args.sqlite:
-        backup_sqlite(args.sqlite, label=args.label)
+        backup_sqlite(args.sqlite, label=args.label, integrity_only=args.integrity_only)
     elif args.postgres:
+        if args.integrity_only:
+            print("[BACKUP] --integrity-only is only valid for SQLite", file=sys.stderr)
+            return 2
         backup_postgres(args.container, args.host, args.port, args.user, args.dbname)
     else:
         default_path = PROJECT_ROOT / "backend" / "mes.db"
         if not default_path.exists():
             print("[BACKUP] pass --sqlite <path> or --postgres", file=sys.stderr)
             return 1
-        backup_sqlite(str(default_path), label=args.label)
+        backup_sqlite(str(default_path), label=args.label, integrity_only=args.integrity_only)
     return 0
 
 

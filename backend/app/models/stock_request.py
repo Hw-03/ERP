@@ -194,10 +194,21 @@ class StockRequestLine(Base):
         nullable=True,
         index=True,
     )
+    defect_quarantine_record_id = Column(
+        UUIDString,
+        ForeignKey("defect_quarantine_records.record_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
 
     request = relationship("StockRequest", back_populates="lines")
     item = relationship("Item")
+
+    @property
+    def record_id(self):
+        """API에서 사용하는 짧은 건별 격리 기록 식별자 이름."""
+        return self.defect_quarantine_record_id
 
     __table_args__ = (
         CheckConstraint("quantity > 0", name="ck_stock_request_line_qty_positive"),

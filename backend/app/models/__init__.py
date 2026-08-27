@@ -65,6 +65,15 @@ from app.models.stock_request import (
     StockRequestTypeEnum,
 )
 from app.models.system import DataRevision, SystemSetting
+from app.models.inventory_operation import (
+    DefectInventoryMovement,
+    InventoryOperation,
+    InventoryOperationEffect,
+    InventoryOperationEffectKindEnum,
+    InventoryOperationKindEnum,
+    InventoryOperationRoleEnum,
+    InventoryOperationStatusEnum,
+)
 from app.models.transaction import (
     TransactionEditLog,
     TransactionLog,
@@ -86,6 +95,16 @@ from app.models.assembly_checklist import (
     AssemblyChecklistSection,
 )
 from app.models.daily_work_report import DailyWorkReport
+from app.models.weekly_inventory_snapshot import (
+    WeeklyInventorySnapshot,
+    WeeklyInventorySnapshotItem,
+)
+from app.models.defect import (
+    DefectQuarantineMemoRevision,
+    DefectQuarantineRecord,
+    DefectQuarantineReconstruction,
+    DefectQuarantineReconstructionAllocation,
+)
 
 __all__ = [
     # Base / 공통
@@ -112,6 +131,13 @@ __all__ = [
     "TransactionLog",
     "TransactionEditLog",
     "TransactionTypeEnum",
+    "InventoryOperation",
+    "InventoryOperationEffect",
+    "DefectInventoryMovement",
+    "InventoryOperationKindEnum",
+    "InventoryOperationStatusEnum",
+    "InventoryOperationEffectKindEnum",
+    "InventoryOperationRoleEnum",
     # shipping
     "ShippingAllocation",
     "ShippingRequest",
@@ -162,4 +188,11 @@ __all__ = [
     "AssemblyChecklistItem",
     # daily work reports
     "DailyWorkReport",
+    "WeeklyInventorySnapshot",
+    "WeeklyInventorySnapshotItem",
+    # defect quarantine records
+    "DefectQuarantineRecord",
+    "DefectQuarantineMemoRevision",
+    "DefectQuarantineReconstruction",
+    "DefectQuarantineReconstructionAllocation",
 ]

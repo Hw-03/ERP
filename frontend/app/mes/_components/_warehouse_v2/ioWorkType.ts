@@ -131,6 +131,58 @@ export function hasManualLine(bundles: IoBundle[]): boolean {
   return false;
 }
 
+/** process BOM 자동 하위의 수량이 현재 기준과 다르면 부서 결재를 안내한다.
+ * 서버는 저장된 부모 수량과 DB BOM으로 같은 판단을 다시 수행한다. */
+export function hasCustomBomQuantity(bundles: IoBundle[]): boolean {
+  return bundles.some((bundle) => {
+    const parent = bundle.lines.find((line) => line.origin === "direct");
+    const baseQuantity = Number(bundle.quantity) || 0;
+    if (!parent || baseQuantity <= 0) return false;
+    const parentQuantity = Number(parent.quantity) || 0;
+    return bundle.lines.some((line) => {
+      if (line.origin !== "bom_auto" || line.bom_stock_exempt) return false;
+      const expected = parentQuantity * ((Number(line.bom_expected) || 0) / baseQuantity);
+      return Math.abs((Number(line.quantity) || 0) - expected) > 0.0001;
+    });
+  });
+}
+
+/** 하위 수량을 바꾼 부서 BOM은 상위를 실행 대상에서 제외하고 하위만 반영한다. */
+export function isCustomProcessBomBundle(
+  subType: IoSubType,
+  bundle: IoBundle,
+): boolean {
+  return isBomForced(subType) && hasCustomBomQuantity([bundle]);
+}
+
+/** 커스텀 출고 BOM의 원본 회수 라인을 실제 선택 출고 효과로 해석한다.
+ * 원본은 BOM 토큰 검증과 제출을 위해 변경하지 않는다. */
+export function processBomEffectLine(
+  subType: IoSubType,
+  bundle: IoBundle,
+  line: IoLine,
+): IoLine | null {
+  if (!line.included) return null;
+  const customProcessBom = isCustomProcessBomBundle(subType, bundle);
+  if (!customProcessBom) {
+    return line;
+  }
+  if (line.origin === "direct") {
+    return null;
+  }
+  if (subType !== "disassemble") return line;
+  if (Number(line.quantity) <= 0 || line.bom_stock_exempt) return null;
+  if (line.origin !== "bom_auto") return line;
+  return {
+    ...line,
+    direction: "out",
+    from_bucket: "production",
+    from_department: line.to_department,
+    to_bucket: "none",
+    to_department: null,
+  };
+}
+
 export type ApprovalKind = "none" | "warehouse" | "department";
 
 /** subType + 라인 origin 으로 결재 종류 판정.
@@ -153,12 +205,12 @@ export function approvalKind(
   }
   // 불량 관련 작업은 항상 즉시 처리 — manual line 여부 무관하게 "none".
   if (_DEFECT_SUB_TYPES.includes(subType)) return "none";
+  if (isBomForced(subType) && hasCustomBomQuantity(bundles)) return "department";
   if (hasManualLine(bundles)) return "department";
   return "none";
 }
 
-// BOM 강제 모드: 부서 입출고 BOM(produce/disassemble) 에서만 하위 라인 잠금 (체크/수량 편집 차단).
-// 창고 입출고와 사용출고는 묶음 선택 후 내부 자유 편집을 허용한다.
+// BOM 강제 모드: 부서 입출고 BOM(produce/disassemble)에서 BOM 기준 판정과 결재 정책을 적용한다.
 export function isBomForced(subType: IoSubType) {
   return subType === "produce" || subType === "disassemble";
 }
@@ -353,7 +405,11 @@ export function lineTagLabel(line: IoLine, subType: IoSubType): { text: string; 
   }
   if (subType === "disassemble") {
     if (line.origin === "direct") return { text: "분해 대상", tone: "red" };
-    if (line.origin === "bom_auto") return { text: "회수 품목", tone: "green" };
+    if (line.origin === "bom_auto") {
+      return line.direction === "out"
+        ? { text: "선택 출고", tone: "red" }
+        : { text: "회수 품목", tone: "green" };
+    }
   }
   if (subType === "warehouse_to_dept" || subType === "dept_to_warehouse") {
     if (line.origin === "direct") return { text: "상위", tone: "blue" };

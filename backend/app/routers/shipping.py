@@ -474,12 +474,6 @@ def list_revisions(request_id: uuid.UUID, db: Session = Depends(get_db)):
     )
     return [_revision_response(row) for row in rows]
 
-@router.post("/requests/{request_id}/send-to-prep", response_model=ShippingRequestResponse)
-def send_to_prep(request_id: uuid.UUID, actor: VerifiedActor, db: Session = Depends(get_db)):
-    req = _action_or_422(db, shipping_actions_svc.send_to_prep, request_id, actor)
-    return _to_response(db, req)
-
-
 @router.patch("/requests/{request_id}/checklist", response_model=ShippingRequestResponse)
 def update_checklist(request_id: uuid.UUID, payload: ShippingChecklistUpdate, actor: VerifiedActor, db: Session = Depends(get_db)):
     checks = {line.item_id: line.checked for line in payload.checks}

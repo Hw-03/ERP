@@ -16,14 +16,15 @@ describe("matchesInventoryCategoryFilters", () => {
   const assemblyItem = {
     item_id: "assembly-item",
     department: "조립",
-    mes_code: "6-AF/01.2",
+    mes_code: "ITM-AF-00001",
     model_slots: [1],
     process_type_code: "R",
-    locations: [],
+    locations: [{ department: "조립", status: "PRODUCTION", quantity: 1 }],
   } as Item;
 
   const noFilters = {
     selectedDepts: [],
+    departmentFilterBasis: "location" as const,
     selectedSlots: new Set<number>(),
     showUnclassified: false,
     showDisused: false,
@@ -35,6 +36,56 @@ describe("matchesInventoryCategoryFilters", () => {
       (inventoryFilter as { DEFAULT_INVENTORY_FILTER_LOGIC?: string })
         .DEFAULT_INVENTORY_FILTER_LOGIC,
     ).toBe("AND");
+  });
+
+  it("재고 위치 기준은 품목 코드가 아닌 실제 위치 수량으로만 판별한다", () => {
+    const assemblyCodeStoredInTube = {
+      ...assemblyItem,
+      department: "not-owner",
+      mes_code: "ITM-AF-00001",
+      locations: [{ department: "튜브", status: "PRODUCTION", quantity: 1 }],
+    } as Item;
+
+    expect(
+      matchesInventoryCategoryFilters(assemblyCodeStoredInTube, {
+        ...noFilters,
+        selectedDepts: ["조립"],
+        departmentFilterBasis: "location",
+        logic: "AND",
+      } as Parameters<typeof matchesInventoryCategoryFilters>[1]),
+    ).toBe(false);
+  });
+
+  it("품목 코드 기준은 위치와 소유 부서를 무시한다", () => {
+    const highVoltageCodeStoredInAssembly = {
+      ...assemblyItem,
+      department: "조립",
+      mes_code: "ITM-HF-00001",
+      locations: [{ department: "조립", status: "PRODUCTION", quantity: 1 }],
+    } as Item;
+
+    expect(
+      matchesInventoryCategoryFilters(highVoltageCodeStoredInAssembly, {
+        ...noFilters,
+        selectedDepts: ["조립"],
+        departmentFilterBasis: "code",
+        logic: "AND",
+      } as Parameters<typeof matchesInventoryCategoryFilters>[1]),
+    ).toBe(false);
+  });
+
+  it("품목 코드 기준에서 창고는 일치하는 품목이 없다", () => {
+    expect(
+      matchesInventoryCategoryFilters(
+        { ...assemblyItem, warehouse_qty: 1 } as Item,
+        {
+          ...noFilters,
+          selectedDepts: ["창고"],
+          departmentFilterBasis: "code",
+          logic: "AND",
+        } as Parameters<typeof matchesInventoryCategoryFilters>[1],
+      ),
+    ).toBe(false);
   });
 
   it("불용은 불용 필터를 켜기 전에는 항상 제외한다", () => {
@@ -56,12 +107,15 @@ describe("matchesInventoryCategoryFilters", () => {
     ).toBe(false);
   });
 
-  it("AND는 같은 구분을 포함한 모든 선택 칩을 만족해야 한다", () => {
+  it("AND는 부서 칩에만 적용하고 모델 칩은 하나만 일치해도 통과한다", () => {
     const fullyMatchedItem = {
       ...assemblyItem,
       warehouse_qty: 1,
       model_slots: [1, 2],
-      locations: [{ department: "출하", status: "DEFECTIVE", quantity: 1 }],
+      locations: [
+        { department: "조립", status: "PRODUCTION", quantity: 1 },
+        { department: "출하", status: "DEFECTIVE", quantity: 1 },
+      ],
       legacy_item_type: "불용",
     } as Item;
 
@@ -84,10 +138,10 @@ describe("matchesInventoryCategoryFilters", () => {
         showDisused: true,
         logic: "AND",
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  it("AND는 동시에 성립하지 않는 공정 선택을 제외한다", () => {
+  it("공정 칩은 AND여도 하나만 일치하면 통과한다", () => {
     expect(
       matchesInventoryCategoryFilters(
         assemblyItem,
@@ -98,7 +152,7 @@ describe("matchesInventoryCategoryFilters", () => {
           logic: "AND",
         },
       ),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("OR는 서로 다른 구분을 모두 만족해야 한다", () => {
@@ -151,7 +205,7 @@ describe("matchesInventoryCategoryFilters", () => {
     ).toBe(true);
   });
 
-  it("부서의 기존 일치 원본은 유지한다", () => {
+  it("재고 위치 기준은 실제 부서 위치와 창고만 판별한다", () => {
     const matchDepartment = (item: Item, selectedDept: string) =>
       matchesInventoryCategoryFilters(item, {
         ...noFilters,
@@ -161,27 +215,20 @@ describe("matchesInventoryCategoryFilters", () => {
 
     expect(
       matchDepartment({ ...assemblyItem, department: "owner-dept", locations: [] }, "owner-dept"),
-    ).toBe(true);
-    expect(
-      matchDepartment(
-        { ...assemblyItem, department: "not-owner", mes_code: "ITM-AA-00001", locations: [] },
-        "\uC870\uB9BD",
-      ),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       matchDepartment(
         {
           ...assemblyItem,
-          department: "not-owner",
           mes_code: "",
-          locations: [{ department: "location-dept" }],
+          locations: [{ department: "location-dept", status: "PRODUCTION", quantity: 1 }],
         } as Item,
         "location-dept",
       ),
     ).toBe(true);
     expect(
       matchDepartment(
-        { ...assemblyItem, department: "not-owner", warehouse_qty: 1 },
+        { ...assemblyItem, warehouse_qty: 1 },
         "\uCC3D\uACE0",
       ),
     ).toBe(true);

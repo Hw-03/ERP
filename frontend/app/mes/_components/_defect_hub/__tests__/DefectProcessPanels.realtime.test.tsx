@@ -51,14 +51,21 @@ type PanelProps = {
 
 const employee = { employee_id: "employee-1", name: "Operator", department: "Assembly" };
 const location = {
+  record_id: "record-1",
   item_id: "item-1",
   item_name: "Defect item",
   mes_code: "D-001",
   department: "Assembly",
   quantity: 10,
+  original_quantity: 10,
+  pending_quantity: 0,
+  available_quantity: 10,
   defective_at: null,
   reason_category: null,
   reason_memo: null,
+  quarantined_by: "Operator",
+  quarantined_by_employee_id: "employee-1",
+  is_legacy: false,
   has_bom: true,
 } satisfies DefectLocation;
 
@@ -80,12 +87,12 @@ describe.each(panels)("%s defect process panel realtime location updates", (_nam
     fireEvent.change(screen.getByRole("combobox"), { target: { value: REASON_CATEGORIES[0] } });
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "Unsaved memo" } });
 
-    rerender(<Panel {...props} location={{ ...location, quantity: 12 }} />);
+    rerender(<Panel {...props} location={{ ...location, quantity: 12, available_quantity: 12 }} />);
     expect(screen.getByRole("spinbutton")).toHaveValue(4);
     expect(screen.getByRole("combobox")).toHaveValue(REASON_CATEGORIES[0]);
     expect(screen.getByRole("textbox")).toHaveValue("Unsaved memo");
 
-    rerender(<Panel {...props} location={{ ...location, quantity: 3 }} />);
+    rerender(<Panel {...props} location={{ ...location, quantity: 3, available_quantity: 3 }} />);
     await waitFor(() => expect(screen.getByRole("spinbutton")).toHaveValue(3));
     expect(screen.getByRole("combobox")).toHaveValue(REASON_CATEGORIES[0]);
     expect(screen.getByRole("textbox")).toHaveValue("Unsaved memo");
@@ -96,6 +103,7 @@ describe.each(panels)("%s defect process panel realtime location updates", (_nam
     fireEvent.click(Array.from(dialog.querySelectorAll("button")).at(-1)!);
     await waitFor(() => {
       expect(apiMocks.unquarantine).toHaveBeenCalledWith(expect.objectContaining({
+        record_id: "record-1",
         item_id: "item-1",
         qty: 3,
         reason_category: REASON_CATEGORIES[0],
@@ -114,7 +122,7 @@ describe.each(panels)("%s defect process panel realtime location updates", (_nam
     fireEvent.click(await screen.findByRole("button", { name: "Add decision" }));
     expect(screen.getByTestId("decision-count")).toHaveTextContent("1");
 
-    rerender(<Panel {...props} location={{ ...location, quantity: 12 }} />);
+    rerender(<Panel {...props} location={{ ...location, quantity: 12, available_quantity: 12 }} />);
     expect(screen.getByTestId("decision-tree")).toBeInTheDocument();
     expect(screen.getByTestId("decision-parent-qty")).toHaveTextContent("4");
     expect(screen.getByTestId("decision-count")).toHaveTextContent("1");
@@ -128,7 +136,7 @@ describe.each(panels)("%s defect process panel realtime location updates", (_nam
     fireEvent.click(await screen.findByRole("button", { name: "Add decision" }));
     expect(screen.getByTestId("decision-count")).toHaveTextContent("1");
 
-    rerender(<Panel {...props} location={{ ...location, quantity: 8 }} />);
+    rerender(<Panel {...props} location={{ ...location, quantity: 8, available_quantity: 8 }} />);
 
     await waitFor(() => expect(screen.getByTestId("decision-parent-qty")).toHaveTextContent("8"));
     expect(screen.getByTestId("decision-count")).toHaveTextContent("0");
@@ -137,7 +145,7 @@ describe.each(panels)("%s defect process panel realtime location updates", (_nam
     expect(apiMocks.createStockRequest).not.toHaveBeenCalled();
   });
 
-  it("fully resets drafts when the item identity actually changes", async () => {
+  it("fully resets drafts when the quarantine record identity changes", async () => {
     const props = { currentEmployee: employee, onDone: vi.fn(), onCancel: vi.fn() };
     const { rerender } = render(<Panel {...props} location={location} />);
     fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "4" } });
@@ -147,12 +155,39 @@ describe.each(panels)("%s defect process panel realtime location updates", (_nam
     rerender(
       <Panel
         {...props}
-        location={{ ...location, item_id: "item-2", mes_code: "D-002", quantity: 7 }}
+        location={{ ...location, record_id: "record-2", quantity: 7, available_quantity: 7 }}
       />,
     );
 
     await waitFor(() => expect(screen.getByRole("spinbutton")).toHaveValue(7));
     expect(screen.getByRole("combobox")).toHaveValue("");
     expect(screen.getByRole("textbox")).toHaveValue("");
+  });
+
+  it("limits processing to the unreserved quantity and links approval requests to the record", async () => {
+    const props = { currentEmployee: employee, onDone: vi.fn(), onCancel: vi.fn() };
+    const { container } = render(
+      <Panel
+        {...props}
+        location={{ ...location, quantity: 10, pending_quantity: 4, available_quantity: 6 }}
+      />,
+    );
+
+    expect(screen.getByRole("spinbutton")).toHaveValue(6);
+    fireEvent.click(screen.getByRole("button", { name: /전체 폐기/ }));
+    fireEvent.click(Array.from(container.querySelectorAll("button")).at(-1)!);
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("승인 완료 후 재고에 반영됩니다.");
+    fireEvent.click(Array.from(dialog.querySelectorAll("button")).at(-1)!);
+
+    await waitFor(() => {
+      expect(apiMocks.createStockRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          request_type: "defect_scrap",
+          lines: [expect.objectContaining({ record_id: "record-1", quantity: 6 })],
+        }),
+      );
+    });
   });
 });

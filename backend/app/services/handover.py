@@ -20,6 +20,8 @@ from app.models import (
     HandoverDoc,
     HandoverLine,
     HandoverStatusEnum,
+    InventoryOperationEffectKindEnum,
+    InventoryOperationRoleEnum,
     Item,
     TransactionLog,
     TransactionTypeEnum,
@@ -27,6 +29,7 @@ from app.models import (
 from app.services import inventory as inventory_svc
 from app.services import inv_effect
 from app.services import rate_limit
+from app.services import inventory_operations as operation_svc
 from app.services._tx import transactional
 
 _FROM_DEPARTMENT = "튜브"
@@ -199,6 +202,17 @@ def _receive_handover(
 
     from_dept = DepartmentEnum(doc.from_department)
     to_dept = DepartmentEnum(doc.to_department)
+    operation = operation_svc._create_business_operation(
+        db,
+        domain="handover",
+        action="receive",
+        display_label="인수인계",
+        actor_name=actor.name,
+        actor_employee_id=actor.employee_id,
+        department=doc.to_department,
+        reason=doc.notes,
+        idempotency_key=f"handover:{doc.handover_id}:receive",
+    )
 
     item_ids = sorted({line.item_id for line in doc.lines})
     inventory_svc._ensure_and_lock_inventories(db, item_ids)
@@ -210,7 +224,7 @@ def _receive_handover(
         # 튜브 PRODUCTION 부족 시 ValueError → 라우터가 422 변환(상태 불변).
         inventory_svc._transfer_between_departments(db, line.item_id, qty, from_dept, to_dept)
         db.add(
-            TransactionLog(
+            operation_svc._attach_transaction(TransactionLog(
                 item_id=line.item_id,
                 transaction_type=TransactionTypeEnum.TRANSFER_DEPT,
                 quantity_change=Decimal("0"),
@@ -222,14 +236,24 @@ def _receive_handover(
                 department=doc.to_department,
                 reference_no=doc.handover_code,
                 notes=f"인수인계 {doc.from_department}→{doc.to_department}",
-                inventory_effect=inv_effect._capture_effect(db, line.item_id, cells_before),
-            )
+                **inv_effect._capture_log_stock_snapshot(db, line.item_id, cells_before),
+            ), operation, InventoryOperationRoleEnum.TRANSFER)
         )
 
     doc.status = HandoverStatusEnum.RECEIVED
     doc.received_by_employee_id = actor.employee_id
     doc.received_by_name = actor.name
     doc.received_at = datetime.utcnow()
+    operation_svc._record_effect(
+        db,
+        operation=operation,
+        effect_kind=InventoryOperationEffectKindEnum.WORKFLOW,
+        subject_type="HandoverDoc",
+        subject_id=doc.handover_id,
+        role="RECEIVE_STATUS",
+        before_state={"status": HandoverStatusEnum.SUBMITTED.value},
+        after_state={"status": HandoverStatusEnum.RECEIVED.value},
+    )
     db.flush()
     return doc
 

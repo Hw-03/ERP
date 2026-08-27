@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -12,11 +13,16 @@ from app.models import (
     Employee,
     EmployeeLevelEnum,
     Inventory,
+    InventoryOperation,
+    InventoryOperationRoleEnum,
+    Item,
+    SystemSetting,
     TransactionEditLog,
     TransactionLog,
     TransactionTypeEnum,
 )
 from app.routers.inventory import transactions as transactions_router
+from app.services import inventory_operation_cancellation as cancellation_svc
 from app.services.pin_auth import DEFAULT_PIN_HASH, hash_pin
 
 
@@ -271,6 +277,10 @@ def test_quantity_correct_adjust_log_records_effect_and_editor_id(client, db_ses
     )
     assert correction.producer_employee_id == editor.employee_id
     assert correction.inventory_effect is not None
+    assert correction.warehouse_qty_before == Decimal("100")
+    assert correction.warehouse_qty_after == Decimal("80")
+    assert correction.department_qty_before == Decimal("0")
+    assert correction.department_qty_after == Decimal("0")
     deltas = {
         (cell["scope"], cell.get("department"), cell.get("status")): cell["delta"]
         for cell in correction.inventory_effect
@@ -284,6 +294,68 @@ def test_quantity_correct_adjust_log_records_effect_and_editor_id(client, db_ses
     assert cancel.status_code == 200, cancel.text
     inv = db_session.query(Inventory).filter(Inventory.item_id == log.item_id).one()
     assert inv.warehouse_qty == Decimal("100")
+
+
+def test_legacy_previous_week_cancel_is_blocked_after_ledger_cutover(
+    client, db_session, receive_log, editor
+) -> None:
+    log, _item = receive_log
+    log.producer_employee_id = editor.employee_id
+    log.inventory_effect = [{"scope": "warehouse", "delta": 100}]
+    log.created_at = datetime.utcnow() - timedelta(days=8)
+    db_session.add(
+        SystemSetting(
+            setting_key="inventory_operation_cutover_at",
+            setting_value=(datetime.utcnow() - timedelta(days=1)).isoformat(),
+        )
+    )
+    db_session.commit()
+
+    response = client.post(
+        f"/api/inventory/transactions/{log.log_id}/cancel",
+        json={
+            "reason": "전주 거래 취소 시도",
+            "employee_code": editor.employee_code,
+            "pin": "0000",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"]["message"] == cancellation_svc.PREVIOUS_WEEK_MESSAGE
+    db_session.refresh(log)
+    assert log.cancelled is False
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == log.item_id).one()
+    assert inventory.warehouse_qty == Decimal("100")
+
+
+def test_quantity_correction_records_operation(client, db_session, receive_log, editor):
+    log, _item = receive_log
+    db_session.add(
+        SystemSetting(
+            setting_key="inventory_operation_cutover_at",
+            setting_value="2026-01-01T00:00:00",
+        )
+    )
+    db_session.commit()
+
+    response = client.post(
+        f"/api/inventory/transactions/{log.log_id}/quantity-correction",
+        json={
+            "quantity_change": 80,
+            "reason": "원장 보정",
+            "edited_by_employee_id": str(editor.employee_id),
+            "edited_by_pin": "0000",
+        },
+    )
+
+    assert response.status_code == 200, response.json()
+    operation = db_session.query(InventoryOperation).one()
+    correction = db_session.get(
+        TransactionLog,
+        uuid.UUID(response.json()["correction"]["log_id"]),
+    )
+    assert correction.operation_id == operation.operation_id
+    assert correction.operation_role == InventoryOperationRoleEnum.CORRECTION
 
 def test_quantity_correct_ship_must_be_negative(client, receive_log, editor):
     """SHIP 부호 검증은 수량 보정에서도 적용."""

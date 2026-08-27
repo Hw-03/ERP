@@ -36,6 +36,7 @@ from app.routers import (
     admin_audit_csv,
     admin_audit_ledger,
     admin_activity_audit,
+    admin_inventory_integrity,
     admin_production_log,
     assembly_checklists,
     bom,
@@ -98,6 +99,7 @@ app = FastAPI(
         {"name": "Models", "description": "제품 모델 슬롯."},
         {"name": "Codes", "description": "코드 마스터 (제품기호/옵션/공정)."},
         {"name": "Admin Audit", "description": "관리자 액션 감사로그 조회 (마스터/설정 변경)."},
+        {"name": "Admin Integrity", "description": "관리자용 재고·취소 원장 정합성 읽기 전용 진단."},
         {"name": "Admin Export", "description": "관리자용 생산 이력 내보내기."},
         {"name": "Assembly Checklists", "description": "조립 체크리스트 관리."},
         {"name": "Client Events", "description": "클라이언트 이벤트 수집."},
@@ -337,6 +339,7 @@ app.include_router(admin_audit.router, prefix="/api/admin", tags=["Admin Audit"]
 app.include_router(admin_audit_csv.router, prefix="/api/admin", tags=["Admin Audit"])
 app.include_router(admin_audit_ledger.router, prefix="/api/admin", tags=["Admin Audit"])
 app.include_router(admin_activity_audit.router, prefix="/api/admin", tags=["Admin Audit"])
+app.include_router(admin_inventory_integrity.router, prefix="/api/admin", tags=["Admin Integrity"])
 app.include_router(admin_production_log.router, prefix="/api/admin", tags=["Admin Export"])
 app.include_router(stock_requests.router, prefix="/api/stock-requests", tags=["Stock Requests"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])

@@ -21,6 +21,7 @@ import {
   getHistoryBomParentLine,
   getHistoryDisplayLabel,
   getHistoryDisplayTransactionType,
+  getHistoryLineExecutionLog,
   getInternalUseHistoryLineEffectLabel,
   getHistoryLineSignedQuantity,
   getHistoryLineStatusLabel,
@@ -313,6 +314,7 @@ export function HistoryBatchDetailPanel({
                     key={bundle.bundle_id}
                     bundle={bundle}
                     batch={batch}
+                    logs={logs}
                     onLineClick={handleLineClick}
                     isLineClickable={(line) => logByItemId.has(line.item_id)}
                     framed
@@ -353,7 +355,7 @@ function HistoryBatchHero({
     borderColor: `color-mix(in srgb, ${tcolor} 22%, ${LEGACY_COLORS.border})`,
   };
 
-  const summary = getHistoryMovementSummary(first, batch ?? undefined, logs.length);
+  const summary = getHistoryMovementSummary(first, batch ?? undefined, logs.length, logs);
   const eps = batch ? getBatchFlowEndpoints(batch) : null;
   const flow = batch ? describeBatchFlow(first, batch) : null;
 
@@ -500,12 +502,14 @@ function HistoryBatchHero({
 function BundleBlock({
   bundle,
   batch,
+  logs,
   onLineClick,
   isLineClickable,
   framed = false,
 }: {
   bundle: IoBundle;
   batch: IoBatch;
+  logs: TransactionLog[];
   onLineClick: (line: IoLine) => void;
   isLineClickable: (line: IoLine) => boolean;
   framed?: boolean;
@@ -514,14 +518,19 @@ function BundleBlock({
   const isInternalUseBom = batch.sub_type === "internal_use_out" && isBomParent;
   const parentLine = getHistoryBomParentLine(bundle);
   const childLines = parentLine ? bundle.lines.filter((l) => l !== parentLine) : bundle.lines;
-  const headerSigned = parentLine ? getHistoryLineSignedQuantity(parentLine, batch, bundle) : null;
+  const parentNotExecuted = !!parentLine && !parentLine.included;
+  const headerSigned = parentLine && !parentNotExecuted
+    ? getHistoryLineSignedQuantity(parentLine, batch, bundle, getHistoryLineExecutionLog(parentLine, logs))
+    : null;
   // parentLine 없는 경로(BOM warehouse_to_dept 등)는 bundle.quantity 만으론 단위가 빠져
   // 자식 라인 "N EA" 와 헤더가 어색하게 갈림. 라인 unit 단일이면 그 unit 을 헤더에도 붙임.
   const bundleUnit = (() => {
     const units = new Set(bundle.lines.map((l) => (l.unit ?? "").trim()).filter(Boolean));
     return units.size === 1 ? Array.from(units)[0] : null;
   })();
-  const headerQtyText = headerSigned
+  const headerQtyText = parentNotExecuted
+    ? "상위 미반영"
+    : headerSigned
     ? headerSigned.label
     : bundleUnit
       ? `${formatQty(bundle.quantity)} ${bundleUnit}`
@@ -577,7 +586,12 @@ function BundleBlock({
       <div>
         {childLines.filter((line) => isInternalUseBom || line.included).map((line) => {
           const clickable = isLineClickable(line);
-          const signed = getHistoryLineSignedQuantity(line, batch, bundle);
+          const signed = getHistoryLineSignedQuantity(
+            line,
+            batch,
+            bundle,
+            getHistoryLineExecutionLog(line, logs),
+          );
           const qtyColor = SIGN_TONE_HEX[signed.tone];
           const internalUseEffect = isInternalUseBom
             ? getInternalUseHistoryLineEffectLabel(line, batch)
