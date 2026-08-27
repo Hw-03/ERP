@@ -12,7 +12,6 @@ import {
 import { WarehouseDraftPanelTabs } from "../../_warehouse_sections/WarehouseDraftPanelTabs";
 import { readCurrentOperator } from "../../login/useCurrentOperator";
 import type { IoEntryIntent } from "../../_warehouse_v2/types";
-import type { IoStep } from "../../_warehouse_v2/useIoWorkState";
 import {
   clearWarehouseDraftRestore,
   parseWarehouseStep,
@@ -334,7 +333,7 @@ export function MobileWarehouseScreen({
                 setRestoreIoDraft(draft);
                 setRestoreNonce((n) => n + 1);
                 setSectionTab("compose");
-                persistWarehouseDraftUrl(draft.batch_id, defaultDraftStep(draft));
+                persistWarehouseDraftUrl(draft.batch_id, 4);
               }}
               bumpRefresh={() => setPanelRefreshNonce((n) => n + 1)}
               onSubmitSuccess={onSubmitSuccess}
@@ -368,13 +367,4 @@ export function MobileWarehouseScreen({
       />
     </div>
   );
-}
-
-function defaultDraftStep(draft: IoBatch): IoStep {
-  return draft.sub_type === "adjust_in"
-    || draft.sub_type === "adjust_out"
-    || draft.sub_type === "warehouse_adjust_in"
-    || draft.sub_type === "warehouse_adjust_out"
-    ? 3
-    : 4;
 }

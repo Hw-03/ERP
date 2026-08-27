@@ -56,7 +56,7 @@ vi.mock("@/app/mes/_components/_warehouse_sections/WarehouseDraftPanelTabs", () 
       <>
         <button
           type="button"
-          onClick={() => onContinueIoDraft?.({ batch_id: "draft-2" } as never)}
+          onClick={() => onContinueIoDraft?.({ batch_id: "draft-2", sub_type: "adjust_out" } as never)}
         >
           continue draft
         </button>

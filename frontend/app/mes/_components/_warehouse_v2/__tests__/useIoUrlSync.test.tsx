@@ -24,6 +24,7 @@ const ALL_TRUE: Record<IoStep, boolean> = { 1: true, 2: true, 3: true, 4: true, 
 
 describe("useIoUrlSync", () => {
   it("state.step 이 URL 과 다르면 router.push 로 ?step=N 갱신", () => {
+    window.history.replaceState(null, "", "/wh?step=1");
     const push = vi.fn();
     const router = { push };
     const { rerender } = renderHook(
@@ -71,7 +72,9 @@ describe("useIoUrlSync", () => {
   });
 
   it("도달 불가 step 은 마지막 통과 가능 step 으로 clamp", () => {
+    window.history.replaceState(null, "", "/wh?step=1");
     const goTo = vi.fn();
+    const push = vi.fn();
     // step=3 으로 점프 시도하지만 canAdvance[2]=false → 2 로 clamp
     const canAdvance: Record<IoStep, boolean> = { 1: true, 2: false, 3: true, 4: true, 5: true };
     const { rerender } = renderHook(
@@ -80,15 +83,17 @@ describe("useIoUrlSync", () => {
           step: 1 as IoStep,
           goTo,
           canAdvance,
-          router: { push: vi.fn() },
+          router: { push },
           searchParams,
           pathname: "/wh",
         }),
       { initialProps: { searchParams: makeSearchParams("step=1") } },
     );
 
+    window.history.replaceState(null, "", "/wh?step=3");
     rerender({ searchParams: makeSearchParams("step=3") });
     expect(goTo).toHaveBeenCalledWith(2);
+    expect(push).toHaveBeenCalledWith("/wh?step=2", { scroll: false });
   });
 
   it("urlStep === state.step 이면 goTo 호출 없음 (재귀 차단)", () => {
@@ -162,5 +167,33 @@ describe("useIoUrlSync", () => {
 
     expect(goTo).not.toHaveBeenCalled();
     expect(push).toHaveBeenCalledWith("/wh?tab=warehouse&step=4", { scroll: false });
+  });
+
+  it("실제 URL에서 제거된 제출 완료 draftId를 지연된 searchParams로 되살리지 않는다", () => {
+    window.history.replaceState(null, "", "/wh?tab=warehouse&section=compose&step=5");
+    const push = vi.fn();
+    const staleSearchParams = makeSearchParams(
+      "tab=warehouse&section=compose&step=5&draftId=submitted-draft",
+    );
+    const { rerender } = renderHook(
+      ({ step }: { step: IoStep }) =>
+        useIoUrlSync({
+          step,
+          goTo: vi.fn(),
+          canAdvance: ALL_TRUE,
+          router: { push },
+          searchParams: staleSearchParams,
+          pathname: "/wh",
+          tabParam: "warehouse",
+        }),
+      { initialProps: { step: 5 as IoStep } },
+    );
+
+    rerender({ step: 1 as IoStep });
+
+    expect(push).toHaveBeenCalledWith(
+      "/wh?tab=warehouse&section=compose&step=1",
+      { scroll: false },
+    );
   });
 });
