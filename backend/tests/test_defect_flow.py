@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
 
@@ -766,7 +767,7 @@ def test_quarantine_then_scrap_preserves_two_audit_logs(
 def test_defect_scrap_via_stock_request(db_session, client, make_item):
     item = make_item(name="R003", process_type_code="TR", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="E03", name="발의자C")
-    _make_employee(
+    approver = _make_employee(
         db_session, code="E04", name="결재자D",
         department=DepartmentEnum.ASSEMBLY,
         department_role="primary",

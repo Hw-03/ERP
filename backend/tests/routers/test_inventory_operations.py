@@ -37,6 +37,7 @@ from app.services import inventory as inventory_svc
 from app.services import inventory_operation_cancellation as operation_cancellation_svc
 from app.services import legacy_inventory_operation_adoption as legacy_adoption_svc
 from app.services import inventory_operations as operation_svc
+from app.services import rate_limit
 from app.services.pin_auth import DEFAULT_PIN_HASH
 
 
@@ -171,6 +172,44 @@ def test_operation_list_preview_cancel_and_summary(client, db_session, make_item
     assert summary.json()["total"] == 2
     assert summary.json()["business_count"] == 1
     assert summary.json()["cancellation_count"] == 1
+
+
+def test_operation_cancel_pin_uses_shared_actor_rate_limit(
+    client,
+    db_session,
+    make_item,
+) -> None:
+    _item, actor, operation, _original_log = _seed_operation(db_session, make_item)
+    preview = client.post(
+        f"/api/inventory/operations/{operation.operation_id}/cancel/preview"
+    )
+    assert preview.status_code == 200, preview.text
+    payload = {
+        "reason": "잘못된 PIN 취소",
+        "employee_code": actor.employee_code,
+        "pin": "9999",
+        "plan_hash": preview.json()["plan_hash"],
+    }
+
+    for _ in range(rate_limit.DEFAULT_MAX_FAILURES):
+        rejected = client.post(
+            f"/api/inventory/operations/{operation.operation_id}/cancel",
+            json=payload,
+        )
+        assert rejected.status_code == 403, rejected.text
+
+    blocked = client.post(
+        f"/api/inventory/operations/{operation.operation_id}/cancel",
+        json=payload,
+    )
+    assert blocked.status_code == 429, blocked.text
+    assert blocked.json()["detail"]["code"] == "TOO_MANY_REQUESTS"
+    assert (
+        db_session.query(InventoryOperation)
+        .filter(InventoryOperation.reverses_operation_id == operation.operation_id)
+        .count()
+        == 0
+    )
 
 
 def test_legacy_log_cancel_endpoint_delegates_new_logs_to_operation_reversal(

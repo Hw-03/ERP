@@ -186,7 +186,6 @@ def _assert_terminal_shipping_commands_fail(
     actor: Employee,
 ) -> None:
     commands = (
-        lambda: shipping_actions.send_to_prep(db, request_id, actor),
         lambda: shipping_actions.prepare_cancel(db, request_id, actor=actor),
         lambda: shipping_actions.pickup_complete(db, request_id, actor),
         lambda: shipping_actions.pickup_cancel(db, request_id, actor),
@@ -322,7 +321,6 @@ _ALLOCATION_MATRIX = [
     ("MYSTERY",),
 ]
 _VALID_PERSISTED_STATES = {
-    "REQUESTED": {(): "FUTURE_DELTA"},
     "PREPARING": {(): "FUTURE_DELTA", ("RELEASED",): "FUTURE_DELTA"},
     "PREPARED": {
         (): "FUTURE_DELTA",
@@ -440,7 +438,7 @@ def test_run_cutover_dry_run_rejects_future_shipping_without_mutation(db_session
         model_symbol="3",
         serial_no=1,
     )
-    request = _shipping_request(db_session, item, ShippingRequestStatusEnum.REQUESTED)
+    request = _shipping_request(db_session, item, ShippingRequestStatusEnum.PREPARING)
     db_session.commit()
     before = (
         db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one().warehouse_qty,
@@ -470,7 +468,7 @@ def test_run_cutover_apply_rejects_future_shipping_without_mutation(cutover_sess
             warehouse_qty=Decimal("10"),
             serial_no=1,
         )
-        request = _shipping_request(seed, item, ShippingRequestStatusEnum.REQUESTED)
+        request = _shipping_request(seed, item, ShippingRequestStatusEnum.PREPARING)
         item_id = item.item_id
         mes_code = item.mes_code
         request_id = request.request_id
@@ -486,7 +484,7 @@ def test_run_cutover_apply_rejects_future_shipping_without_mutation(cutover_sess
 
     [entry] = caught.value.shipping_report
     assert entry.request_id == str(request_id)
-    assert entry.status == "REQUESTED"
+    assert entry.status == "PREPARING"
     assert entry.disposition.value == "FUTURE_DELTA"
     assert entry.allocation_quantities == ()
 
@@ -890,7 +888,7 @@ def test_terminal_safe_shipping_cannot_change_inventory_after_apply(cutover_sess
     ("status", "expected_code", "expected_disposition", "stream_name"),
     [
         (ShippingRequestStatusEnum.CANCELLED, 0, "TERMINAL_SAFE", "out"),
-        (ShippingRequestStatusEnum.REQUESTED, 1, "FUTURE_DELTA", "err"),
+        (ShippingRequestStatusEnum.PREPARING, 1, "FUTURE_DELTA", "err"),
     ],
 )
 def test_cli_preserves_safe_and_unsafe_shipping_preflight_evidence(

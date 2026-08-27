@@ -621,7 +621,7 @@ def test_department_reject_returns_process_single_adjustment_to_same_draft(
     result = io_dispatch.submit_existing_draft(
         db_session,
         batch_id=batch.batch_id,
-        requester_employee_id=requester.employee_id,
+        requester=requester,
     )
     db_session.flush()
     db_session.refresh(batch)
@@ -662,9 +662,9 @@ def test_department_reject_returns_process_single_adjustment_to_same_draft(
     )
     active_request.operation_batch_id = batch.batch_id
     db_session.flush()
-    from app.services.io_persist import sync_batch_from_stock_requests
+    from app.services.io_persist import _sync_batch_from_stock_requests
 
-    sync_batch_from_stock_requests(db_session, batch)
+    _sync_batch_from_stock_requests(db_session, batch)
     db_session.refresh(batch)
     assert active_request.status == StockRequestStatusEnum.RESERVED
     assert batch.status == "partially_completed"
@@ -724,9 +724,9 @@ def test_department_reject_does_not_restore_adjust_batch_with_non_department_req
     other_request.status = StockRequestStatusEnum.REJECTED
     for line in other_request.lines:
         line.status = StockRequestStatusEnum.REJECTED
-    from app.services.io_persist import sync_batch_from_stock_requests
+    from app.services.io_persist import _sync_batch_from_stock_requests
 
-    sync_batch_from_stock_requests(db_session, batch)
+    _sync_batch_from_stock_requests(db_session, batch)
     db_session.refresh(batch)
 
     assert batch.status == "rejected"

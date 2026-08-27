@@ -528,7 +528,7 @@ def test_multiline_approval_rolls_back_first_line_after_second_line_late_failure
 
     monkeypatch.setattr(
         sr_execution_svc.inv_effect,
-        "capture_log_stock_snapshot",
+        "_capture_log_stock_snapshot",
         fail_during_second_line_capture,
     )
 

@@ -8,7 +8,13 @@ from unittest.mock import Mock
 
 from sqlalchemy import event
 
-from app.models import DepartmentEnum, Employee, EmployeeLevelEnum, InventoryLocation
+from app.models import (
+    DepartmentEnum,
+    Employee,
+    EmployeeLevelEnum,
+    InventoryLocation,
+    TransactionTypeEnum,
+)
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "dev" / "seed_history_showcase.py"
@@ -190,8 +196,8 @@ def test_showcase_apply_creates_searchable_real_inventory_history(db_session, ma
         log.defect_quarantine_record_id
         for log in logs
         if log.transaction_type in {
-            module.TransactionTypeEnum.MARK_DEFECTIVE,
-            module.TransactionTypeEnum.UNMARK_DEFECTIVE,
+            TransactionTypeEnum.MARK_DEFECTIVE,
+            TransactionTypeEnum.UNMARK_DEFECTIVE,
         }
     } == {record.record_id for record in quarantine_records}
     shipping_request = db_session.query(module.ShippingRequest).filter(

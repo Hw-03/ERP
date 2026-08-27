@@ -18,6 +18,8 @@ from app.models import (
     InventoryLocation,
     LocationStatusEnum,
     TransactionEditLog,
+    DefectQuarantineMemoRevision,
+    DefectQuarantineRecord,
     TransactionLog,
     TransactionTypeEnum,
 )
@@ -145,6 +147,48 @@ def test_defect_mutation_uses_session_actor_and_rejects_spoof_without_writes(
     assert _production_qty(
         db_session, item.item_id, DepartmentEnum.ASSEMBLY
     ) == Decimal("2")
+
+
+def test_defect_memo_edit_rejects_body_actor_different_from_session_actor(
+    client, db_session, make_item
+):
+    actor = _make_actor(db_session, code="SEC-M01", name="메모 작업자")
+    imposter = _make_actor(db_session, code="SEC-M02", name="메모 위조자")
+    item = make_item(name="actor-defect-memo", warehouse_qty=Decimal("10"))
+    db_session.commit()
+
+    with _authenticated_as(actor):
+        quarantine = client.post(
+            "/api/defects/quarantine",
+            json={
+                "item_id": str(item.item_id),
+                "qty": "2",
+                "source": "warehouse",
+                "target_dept": DepartmentEnum.ASSEMBLY.value,
+                "reason_category": "외관불량",
+                "reason_memo": "원본 메모",
+                "actor_employee_id": str(actor.employee_id),
+            },
+        )
+    assert quarantine.status_code == 200, quarantine.text
+    record = db_session.query(DefectQuarantineRecord).one()
+    revision_count = db_session.query(DefectQuarantineMemoRevision).count()
+
+    with _authenticated_as(actor):
+        rejected = client.put(
+            f"/api/defects/records/{record.record_id}/memo",
+            json={
+                "memo": "위조 메모",
+                "actor_employee_id": str(imposter.employee_id),
+                "pin": PIN,
+            },
+        )
+
+    assert rejected.status_code == 403
+    assert rejected.json()["detail"]["code"] == "ACTOR_MISMATCH"
+    db_session.expire_all()
+    assert db_session.get(DefectQuarantineRecord, record.record_id).current_memo == "원본 메모"
+    assert db_session.query(DefectQuarantineMemoRevision).count() == revision_count
 
 
 def test_production_mutation_uses_session_actor_and_rejects_spoof_without_writes(

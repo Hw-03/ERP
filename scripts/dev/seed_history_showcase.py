@@ -48,7 +48,6 @@ from app.services import (
     inventory as inventory_svc,
     shipping as shipping_svc,
     shipping_actions as shipping_actions_svc,
-    sr_reservation,
     stock_requests,
 )
 from app.services import io_dispatch
@@ -342,7 +341,11 @@ def _run_shipping(db, plan: ShowcasePlan, marker: str) -> None:
         },
         plan.actor,
     )
-    _final_pa, final_pf = shipping_svc._require_final_items(db, request)
+    if request.final_pf_item_id is None:
+        raise RuntimeError("출하 요청 결과에 최종 PF 품목이 없습니다.")
+    final_pf = db.get(Item, request.final_pf_item_id)
+    if final_pf is None:
+        raise RuntimeError("출하 요청의 최종 PF 품목을 찾을 수 없습니다.")
     batch, bundle = _new_batch(db, plan, marker, "shipping_prepare_produce", final_pf)
     batch.work_type = "process"
     batch.sub_type = "produce"
@@ -589,14 +592,17 @@ def remove_showcase(db, marker: str) -> ShowcaseCleanupResult:
         if any(log_id not in marked_ids for (log_id,) in attached):
             raise ValueError(f"Unmarked transaction is attached to showcase shipping request: {request.request_id}")
 
-    reserved_lines = [
-        line
-        for request in marked_stock_requests
-        if request.status == StockRequestStatusEnum.RESERVED
-        for line in request.lines
-    ]
-    if reserved_lines:
-        sr_reservation.release_lines(db, reserved_lines)
+    for request in marked_stock_requests:
+        if request.status != StockRequestStatusEnum.RESERVED:
+            continue
+        requester = db.get(Employee, request.requester_employee_id)
+        if requester is None:
+            raise ValueError(f"Showcase request actor is missing: {request.request_id}")
+        stock_requests.release_reservation(db, request, actor=requester)
+        request.status = StockRequestStatusEnum.CANCELLED
+        for line in request.lines:
+            line.status = StockRequestStatusEnum.CANCELLED
+        db.flush()
     db.flush()
 
     effects, location_cells = _combined_effects(logs)

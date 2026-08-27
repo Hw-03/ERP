@@ -6,7 +6,7 @@ import uuid
 from dataclasses import asdict
 from typing import Optional
 
-from fastapi import Depends, Query
+from fastapi import Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -27,7 +27,7 @@ from app.models import (
 )
 from app.routers._errors import ErrorCode, http_error
 from app.services import inventory_operation_cancellation as cancellation_svc
-from app.services.pin_auth import verify_pin
+from app.services import rate_limit
 
 
 router = VerifiedActorRouter()
@@ -264,10 +264,15 @@ def _verified_canceller(
     operation: InventoryOperation,
     actor: Employee,
     pin: str,
+    http_request: Request,
 ) -> Employee:
     if not bool(actor.is_active):
         raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원은 작업을 취소할 수 없습니다.")
-    if not verify_pin(actor.pin_hash, pin):
+    try:
+        pin_is_valid = rate_limit.verify_operator_pin(actor, pin, http_request)
+    except rate_limit.OperatorPinRateLimitExceeded as exc:
+        raise http_error(429, ErrorCode.TOO_MANY_REQUESTS, str(exc)) from exc
+    if not pin_is_valid:
         raise http_error(403, ErrorCode.FORBIDDEN, "PIN이 올바르지 않습니다.")
     is_self = operation.actor_employee_id == actor.employee_id
     is_approver = (
@@ -283,6 +288,7 @@ def _verified_canceller(
 def cancel_operation(
     operation_id: uuid.UUID,
     payload: OperationCancelRequest,
+    http_request: Request,
     actor: VerifiedActor,
     db: Session = Depends(get_db),
 ) -> dict:
@@ -294,6 +300,7 @@ def cancel_operation(
         operation=operation,
         actor=actor,
         pin=payload.pin,
+        http_request=http_request,
     )
     try:
         cancellation = cancellation_svc.cancel_operation(

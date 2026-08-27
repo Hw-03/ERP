@@ -32,7 +32,6 @@ from app.models import (
     DefectQuarantineMemoRevision,
     DefectQuarantineRecord,
     DefectQuarantineReconstruction,
-    Employee,
     InventoryLocation,
     Item,
     LocationStatusEnum,
@@ -44,7 +43,7 @@ from app.models import (
 from app.routers._errors import ErrorCode, http_error
 from app.services import rate_limit
 from app.services import defect_actions as defect_actions_svc
-from app.services.pin_auth import validate_pin, verify_pin
+from app.services.pin_auth import validate_pin
 from app._evt import emit as _evt_emit
 from app.repositories import item_repository
 
@@ -452,6 +451,7 @@ def update_defect_memo(
     record_id: uuid.UUID,
     payload: DefectMemoUpdateRequest,
     http_request: Request,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
 ):
     """PIN으로 확인한 직원이 격리 메모를 수정하고 변경 전후를 보존한다."""
@@ -459,30 +459,23 @@ def update_defect_memo(
     if record is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "격리 기록을 찾을 수 없습니다.")
 
-    actor = db.get(Employee, payload.actor_employee_id)
-    if actor is None:
-        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
-    if not bool(actor.is_active):
-        raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원입니다.")
+    ensure_actor_employee_id(actor, payload.actor_employee_id)
 
     validate_pin(payload.pin)
-    client_ip = getattr(getattr(http_request, "client", None), "host", None) or "unknown"
-    rate_limit_key = f"verify_pin:{actor.employee_id}:{client_ip}"
-    if rate_limit.is_blocked(rate_limit_key):
+    try:
+        pin_is_valid = rate_limit.verify_operator_pin(actor, payload.pin, http_request)
+    except rate_limit.OperatorPinRateLimitExceeded as exc:
         raise http_error(
             429,
             ErrorCode.TOO_MANY_REQUESTS,
-            "PIN 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.",
+            str(exc),
         )
-    if not verify_pin(actor.pin_hash, payload.pin):
-        rate_limit.record_failure(rate_limit_key)
+    if not pin_is_valid:
         raise http_error(
             403,
             ErrorCode.FORBIDDEN,
             "PIN이 올바르지 않습니다.",
         )
-    rate_limit.record_success(rate_limit_key)
-    set_actor(http_request, actor)
 
     if record.current_memo == payload.memo:
         return DefectMemoUpdateResult(memo=payload.memo, changed=False)
