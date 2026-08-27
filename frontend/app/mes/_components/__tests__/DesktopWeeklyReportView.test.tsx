@@ -1,5 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 const state = vi.hoisted(() => ({
   downloadF705ProductionLog: vi.fn(),
@@ -19,7 +21,9 @@ vi.mock("../_weekly_sections/WeeklyGroupCards", () => ({
 }));
 
 vi.mock("../_weekly_sections/WeeklyDetailTable", () => ({
-  WeeklyDetailTable: () => <div>품목 상세</div>,
+  WeeklyDetailTable: ({ stockBasis }: { stockBasis: string }) => (
+    <div data-testid="weekly-detail-table" data-stock-basis={stockBasis}>품목 상세</div>
+  ),
 }));
 
 vi.mock("../_weekly_sections/WeeklyProductionMatrix", () => ({
@@ -159,6 +163,77 @@ describe("DesktopWeeklyReportView F705-02 다운로드", () => {
     renderWeekly();
 
     expect(screen.getByRole("status")).toHaveTextContent("다음 주부터 새 기준으로 정확한 정보가 표시됩니다");
+  });
+
+  it("검증 보고만 정상재고 문구를 사용하고 상세 패널이 단일 스크롤 영역을 제공한다", () => {
+    state.useWeeklyReportQuery.mockReturnValue({
+      data: {
+        groups: [{
+          process_code: "TF",
+          dept_name: "튜브",
+          label: "튜브 완료품",
+          item_count: 0,
+          prev_qty: 0,
+          increase_qty: 0,
+          decrease_qty: 0,
+          produce_qty: 0,
+          receive_qty: 0,
+          out_qty: 0,
+          defect_qty: 0,
+          current_qty: 0,
+          delta: 0,
+          items: [],
+        }],
+        production_matrix: [],
+        report_status: "verified",
+        basis_version: 2,
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderWeekly();
+
+    expect(screen.getByTestId("weekly-detail-table")).toHaveAttribute("data-stock-basis", "normal");
+    const region = screen.getByRole("region", { name: "튜브 품목 상세" });
+    expect(region).toHaveClass("weekly-detail-content");
+    expect(region).toHaveAttribute("tabindex", "0");
+
+    const css = readFileSync(resolve(process.cwd(), "app", "globals.css"), "utf8");
+    expect(css).toMatch(/\.weekly-detail-content\s*\{[^}]*padding:\s*0 1rem \.75rem;/);
+  });
+
+  it("전환 보고는 기존 재고 문구를 유지한다", () => {
+    state.useWeeklyReportQuery.mockReturnValue({
+      data: {
+        groups: [],
+        production_matrix: [],
+        report_status: "transition",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderWeekly();
+
+    expect(screen.getByTestId("weekly-detail-table")).toHaveAttribute("data-stock-basis", "legacy");
+  });
+
+  it("검증 상태라도 정상재고 기준 버전이 아니면 기존 재고 문구를 유지한다", () => {
+    state.useWeeklyReportQuery.mockReturnValue({
+      data: {
+        groups: [],
+        production_matrix: [],
+        report_status: "verified",
+        basis_version: 1,
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderWeekly();
+
+    expect(screen.getByTestId("weekly-detail-table")).toHaveAttribute("data-stock-basis", "legacy");
   });
 
   it("검산 실패 시 숫자 표를 숨기고 원인 거래 안내만 표시한다", () => {

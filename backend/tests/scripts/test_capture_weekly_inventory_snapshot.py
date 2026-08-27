@@ -60,7 +60,14 @@ def test_registration_script_pins_monday_midnight_kst_and_python_command():
     source = REGISTER_SCRIPT.read_text(encoding="utf-8")
 
     assert '"Korea Standard Time"' in source
+    assert "[switch] $PreflightOnly" in source
     assert "-DaysOfWeek Monday" in source
     assert "-At \"00:00\"" in source
     assert "capture_weekly_inventory_snapshot.py" in source
     assert "-StartWhenAvailable" in source
+    assert "-MultipleInstances IgnoreNew" in source
+    assert "New-TimeSpan -Minutes 10" in source
+    assert "Export-ScheduledTask" in source
+    assert "MultipleInstancesPolicy" in source
+    assert "ExecutionTimeLimit" in source
+    assert "Weekly snapshot task verified" in source

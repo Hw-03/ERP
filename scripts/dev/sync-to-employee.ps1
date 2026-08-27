@@ -10,7 +10,7 @@
 #
 # exit code: 0 성공 / 2 접속자 있음 / 3 스키마 검수 필요 / 4 동기화 실패 /
 #            5 마이그레이션 실패 / 6 헬스체크 실패 / 7 백업 실패 / 8 사후 검증 실패 /
-#            9 프론트엔드 운영 빌드 실패
+#            9 프론트엔드 운영 빌드 실패 / 10 주간 스냅샷 예약 작업 실패
 
 param(
     [switch] $DryRun,
@@ -195,6 +195,22 @@ Write-Host "===================================================="
 Write-Host " DEXCOWIN MES 직원 서버 동기화"
 Write-Host " $DevRoot -> $EmpRoot"
 Write-Host "===================================================="
+
+Write-Host "[snapshot-preflight] 주간 재고 스냅샷 실행 환경 확인 중..."
+$snapshotRegistrationSource = Join-Path $DevRoot "scripts\ops\register-weekly-inventory-snapshot.ps1"
+$snapshotPreflightResult = Invoke-CheckedExternalCommand `
+    -FilePath "powershell.exe" `
+    -ArgumentList @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $snapshotRegistrationSource,
+        "-PreflightOnly"
+    )
+Write-CheckedCommandResult -Label "snapshot-preflight" -Result $snapshotPreflightResult
+if (-not $snapshotPreflightResult.Success) {
+    Write-Host "[snapshot-preflight] 실패 - 직원 DB와 서버를 변경하지 않았습니다."
+    exit 10
+}
 
 # ---------------------------------------------------------------
 # 1) 접속자 가드
@@ -562,6 +578,25 @@ if (-not $operationActivateResult.Success) {
     Write-RecoveryInstructions -FailedStage "post-verify" -ValidatedBackupPath $backupPath
     exit 8
 }
+
+Write-Host "[snapshot-task] 주간 재고 스냅샷 예약 작업 등록·검증 중..."
+$snapshotRegistrationTool = Join-Path $EmpRoot "scripts\ops\register-weekly-inventory-snapshot.ps1"
+$snapshotRegistrationResult = Invoke-CheckedExternalCommand `
+    -FilePath "powershell.exe" `
+    -ArgumentList @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $snapshotRegistrationTool
+    )
+Write-CheckedCommandResult -Label "snapshot-task" -Result $snapshotRegistrationResult
+if (-not $snapshotRegistrationResult.Success) {
+    Write-Host "[snapshot-task] 주간 재고 스냅샷 예약 작업 등록 또는 검증에 실패했습니다. 직원 서비스를 재기동하고 동기화를 실패로 종료합니다."
+    $restartAfterSnapshotTaskFailure = Restart-EmployeeServices
+    if (-not $restartAfterSnapshotTaskFailure.Success) {
+        Write-Host "[snapshot-task] 직원 서비스 재기동도 실패했습니다. backend=$($restartAfterSnapshotTaskFailure.Backend.Success) frontend=$($restartAfterSnapshotTaskFailure.Frontend.Success)"
+    }
+    exit 10
+}
 Write-Host "[post-verify] 완료"
 
 # ---------------------------------------------------------------
@@ -611,6 +646,7 @@ Write-Host " 백엔드 robocopy exit  : $backendExit"
 Write-Host " 프론트 robocopy exit  : $frontendExit"
 Write-Host " 마이그레이션          : 성공"
 Write-Host " 사후 검증             : 성공"
+Write-Host " 주간 스냅샷 예약 작업 : 등록·검증 성공"
 Write-Host " 헬스체크 8010/3000    : OK"
 Write-Host " DB 백업               : $backupPath"
 Write-Host " 접속 주소             : http://192.168.0.63:3000"

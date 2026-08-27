@@ -400,7 +400,7 @@
   .weekly-detail-panel { display: flex; min-width: 0; min-height: 280px; flex: 1; flex-direction: column; }
   .weekly-detail-panel > div { display: flex; min-height: 0; flex: 1; flex-direction: column; }
   .weekly-detail-panel header { padding-right: 1rem; padding-left: 1rem; }
-  .weekly-detail-content { min-height: 0; flex: 1; overflow-y: auto; padding: .5rem 1rem .75rem; }
+  .weekly-detail-content { min-height: 0; flex: 1; overflow-y: auto; padding: 0 1rem .75rem; }
 
   @media (min-width: 1024px) {
     .weekly-report { overflow: hidden; }
@@ -409,6 +409,7 @@
     .weekly-report-body { min-height: 0; flex: 1; flex-direction: row; }
     .weekly-group-panel { min-height: 0; max-height: 100%; width: 330px; }
     .weekly-detail-panel { min-height: 0; }
+    .weekly-detail-content { overflow: auto; }
   }
 
   .card {

@@ -113,6 +113,20 @@ def _fake_inventory_operation_admin_tool() -> str:
     )
 
 
+def _fake_weekly_snapshot_registration_script() -> str:
+    return textwrap.dedent(
+        """
+        param([switch] $PreflightOnly)
+        $event = if ($PreflightOnly) { "snapshot-preflight" } else { "snapshot-register" }
+        Add-Content -LiteralPath $env:SYNC_EVENT_LOG -Value $event
+        $exitName = if ($PreflightOnly) { "FAKE_SNAPSHOT_PREFLIGHT_EXIT" } else { "FAKE_SNAPSHOT_REGISTER_EXIT" }
+        $exitValue = [Environment]::GetEnvironmentVariable($exitName)
+        if ([string]::IsNullOrEmpty($exitValue)) { $exitValue = "0" }
+        exit [int] $exitValue
+        """
+    )
+
+
 def _prepare_sync_sandbox(tmp_path: Path, overrides: dict[str, str]) -> tuple[Path, dict[str, str], Path]:
     dev_root = tmp_path / "dev"
     emp_root = tmp_path / "employee"
@@ -199,6 +213,11 @@ def _prepare_sync_sandbox(tmp_path: Path, overrides: dict[str, str]) -> tuple[Pa
         emp_root / "scripts" / "ops" / "inventory_operation_admin.py",
         _fake_inventory_operation_admin_tool(),
     )
+    for runtime_root in (dev_root, emp_root):
+        _write(
+            runtime_root / "scripts" / "ops" / "register-weekly-inventory-snapshot.ps1",
+            _fake_weekly_snapshot_registration_script(),
+        )
     _write(emp_root / "backend" / "mes.db", "fake employee database\n")
 
     _write(
@@ -272,6 +291,8 @@ def _prepare_sync_sandbox(tmp_path: Path, overrides: dict[str, str]) -> tuple[Pa
             "FAKE_INVENTORY_VERIFY_EXIT": "0",
             "FAKE_OPERATION_DIAGNOSE_EXIT": "0",
             "FAKE_OPERATION_ACTIVATE_EXIT": "0",
+            "FAKE_SNAPSHOT_PREFLIGHT_EXIT": "0",
+            "FAKE_SNAPSHOT_REGISTER_EXIT": "0",
         }
     )
     environment.update(overrides)
@@ -892,12 +913,14 @@ def test_employee_data_sync_uses_online_backup_and_never_raw_copies_source() -> 
 
 
 def test_code_sync_dry_run_reports_machine_readable_no_change(tmp_path: Path) -> None:
-    sync_path, environment, _ = _prepare_sync_sandbox(tmp_path, {})
+    sync_path, environment, event_log = _prepare_sync_sandbox(tmp_path, {})
 
     result = _run_sync(sync_path, environment, "-Force", "-DryRun")
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "SYNC_CHANGES=0" in result.stdout
+    assert "snapshot-preflight" in _event_kinds(event_log)
+    assert "snapshot-register" not in _event_kinds(event_log)
 
 
 @pytest.mark.parametrize(
@@ -1004,6 +1027,7 @@ def test_employee_sync_stop_failure_restarts_services_without_backup_or_sync(tmp
 
     assert result.returncode == 7, result.stdout + result.stderr
     assert events == [
+        "snapshot-preflight",
         "robocopy-dryrun",
         "stop-backend",
         "stop-frontend",
@@ -1025,6 +1049,7 @@ def test_employee_sync_backup_failure_restarts_services_without_sync_or_migratio
 
     assert result.returncode == 7, result.stdout + result.stderr
     assert events == [
+        "snapshot-preflight",
         "robocopy-dryrun",
         "stop-backend",
         "stop-frontend",
@@ -1046,6 +1071,7 @@ def test_employee_sync_frontend_build_failure_restores_services_before_backend_s
 
     assert result.returncode == 9, result.stdout + result.stderr
     assert events == [
+        "snapshot-preflight",
         "robocopy-dryrun",
         "stop-backend",
         "stop-frontend",
@@ -1069,6 +1095,7 @@ def test_employee_sync_post_verify_failure_keeps_services_stopped_and_prints_rec
 
     assert result.returncode == 8, output
     assert events == [
+        "snapshot-preflight",
         "robocopy-dryrun",
         "stop-backend",
         "stop-frontend",
@@ -1096,6 +1123,7 @@ def test_employee_sync_success_uses_migrate_then_read_only_head_check(tmp_path: 
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert events == [
+        "snapshot-preflight",
         "robocopy-dryrun",
         "stop-backend",
         "stop-frontend",
@@ -1110,9 +1138,41 @@ def test_employee_sync_success_uses_migrate_then_read_only_head_check(tmp_path: 
         "verify-inventory",
         "diagnose-operation-integrity",
         "activate-operation-integrity",
+        "snapshot-register",
         "start-backend",
         "start-frontend",
     ]
+
+
+def test_employee_sync_snapshot_preflight_failure_stops_before_employee_mutation(
+    tmp_path: Path,
+) -> None:
+    sync_path, environment, event_log = _prepare_sync_sandbox(
+        tmp_path, {"FAKE_SNAPSHOT_PREFLIGHT_EXIT": "20"}
+    )
+
+    result = _run_sync(sync_path, environment)
+    events = _event_kinds(event_log)
+
+    assert result.returncode == 10, result.stdout + result.stderr
+    assert events == ["snapshot-preflight"]
+    assert "stop-backend" not in events
+    assert "backup" not in events
+
+
+def test_employee_sync_snapshot_registration_failure_restarts_services_and_fails(
+    tmp_path: Path,
+) -> None:
+    sync_path, environment, event_log = _prepare_sync_sandbox(
+        tmp_path, {"FAKE_SNAPSHOT_REGISTER_EXIT": "21"}
+    )
+
+    result = _run_sync(sync_path, environment)
+    events = _event_kinds(event_log)
+
+    assert result.returncode == 10, result.stdout + result.stderr
+    assert events[-3:] == ["snapshot-register", "start-backend", "start-frontend"]
+    assert "주간 재고 스냅샷 예약 작업" in result.stdout
 
 
 def test_employee_sync_migrate_failure_keeps_services_stopped_and_prints_recovery(tmp_path: Path) -> None:
@@ -1246,14 +1306,25 @@ def test_employee_sync_runs_schema_and_inventory_verification_before_start() -> 
     inventory_verify = script.index('$inventoryVerifyTool = Join-Path $EmpRoot "scripts\\ops\\check_inventory_integrity.py"')
     operation_diagnose = script.index('"diagnose"', inventory_verify)
     operation_activate = script.index('"activate"', operation_diagnose)
+    snapshot_register = script.index("register-weekly-inventory-snapshot.ps1", operation_activate)
     start = script.index('Write-Host "[start]')
 
-    assert migrate < schema_check < schema_verify < inventory_verify < operation_diagnose < operation_activate < start
+    assert migrate < schema_check < schema_verify < inventory_verify < operation_diagnose < operation_activate < snapshot_register < start
     assert '"--db-url"' in script[inventory_verify:start]
     assert '"--validated-backup"' in script[operation_activate:start]
     assert '"--approved-by"' in script[operation_activate:start]
     assert "Write-RecoveryInstructions" in script[inventory_verify:start]
     assert "exit 8" in script[inventory_verify:start]
+
+
+def test_employee_sync_preflights_weekly_snapshot_before_stopping_services() -> None:
+    script = SYNC_SCRIPT.read_text(encoding="utf-8-sig")
+
+    preflight = script.index('"-PreflightOnly"')
+    stop = script.index('Write-Host "[stop] 직원 서버 정지 중..."')
+
+    assert preflight < stop
+    assert "exit 10" in script[preflight:stop]
 
 
 def test_employee_sync_uses_checked_alembic_commands_and_schema_patterns() -> None:

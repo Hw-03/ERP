@@ -888,6 +888,136 @@ def test_verified_week_excludes_same_week_original_and_cancellation_pair(client,
     assert row["delta"] == 0
 
 
+def test_verified_week_matches_nf_production_cancelled_scrap_and_quarantine(client, db_session):
+    item = _make_prod_item(
+        db_session,
+        name="CSGR + CSCB 70KV 2mA",
+        process_code="NF",
+        model_symbol="8",
+        serial_no=10,
+        qty=_dec(20),
+    )
+    _activate_verified_weekly_report(db_session)
+    _add_operation_log(
+        db_session,
+        item=item,
+        tx_type=TransactionTypeEnum.PRODUCE,
+        role=InventoryOperationRoleEnum.PRODUCT_OUTPUT,
+        quantity_change=11,
+        effects=[{"scope": "location", "department": "튜닝", "status": "PRODUCTION", "delta": 11}],
+        action="produce",
+        display_label="생산",
+    )
+    _add_operation_log(
+        db_session,
+        item=item,
+        tx_type=TransactionTypeEnum.BACKFLUSH,
+        role=InventoryOperationRoleEnum.COMPONENT_INPUT,
+        quantity_change=-1,
+        effects=[{"scope": "location", "department": "튜닝", "status": "PRODUCTION", "delta": -1}],
+        action="backflush",
+        display_label="BOM 투입",
+    )
+    scrap = _add_operation_log(
+        db_session,
+        item=item,
+        tx_type=TransactionTypeEnum.DEFECT_SCRAP,
+        role=InventoryOperationRoleEnum.PRIMARY,
+        quantity_change=-1,
+        effects=[{"scope": "location", "department": "튜닝", "status": "DEFECTIVE", "delta": -1}],
+        action="scrap",
+        display_label="불량 폐기",
+    )
+    scrap_operation = db_session.get(InventoryOperation, scrap.operation_id)
+    cancellation = InventoryOperation(
+        kind=InventoryOperationKindEnum.CANCELLATION,
+        domain=scrap_operation.domain,
+        action=scrap_operation.action,
+        status=InventoryOperationStatusEnum.COMMITTED,
+        display_label="불량 폐기 취소",
+        actor_name="관리자",
+        effective_at=datetime(2026, 5, 6, 13, 0, 0),
+        contract_version=1,
+        reverses_operation_id=scrap_operation.operation_id,
+    )
+    db_session.add(cancellation)
+    db_session.flush()
+    db_session.add(
+        TransactionLog(
+            item_id=item.item_id,
+            transaction_type=TransactionTypeEnum.DEFECT_SCRAP,
+            quantity_change=1,
+            quantity_before=0,
+            quantity_after=1,
+            operation_id=cancellation.operation_id,
+            operation_role=InventoryOperationRoleEnum.PRIMARY,
+            reverses_log_id=scrap.log_id,
+            inventory_effect=[{"scope": "location", "department": "튜닝", "status": "DEFECTIVE", "delta": 1}],
+            created_at=datetime(2026, 5, 6, 13, 0, 0),
+        )
+    )
+    _add_operation_log(
+        db_session,
+        item=item,
+        tx_type=TransactionTypeEnum.MARK_DEFECTIVE,
+        role=InventoryOperationRoleEnum.PRIMARY,
+        quantity_change=0,
+        effects=[
+            {"scope": "location", "department": "튜닝", "status": "PRODUCTION", "delta": -1},
+            {"scope": "location", "department": "튜닝", "status": "DEFECTIVE", "delta": 1},
+        ],
+        action="mark_defective",
+        display_label="불량 격리",
+        at=datetime(2026, 5, 6, 14, 0, 0),
+    )
+    _add_snapshot(
+        db_session,
+        week_end=date(2026, 5, 3),
+        item_quantities=[(item, _dec(11))],
+        verified=True,
+    )
+    current_snapshot = _add_snapshot(
+        db_session,
+        week_end=date(2026, 5, 10),
+        item_quantities=[(item, _dec(20))],
+        verified=True,
+    )
+    current_snapshot.total_quantity = _dec(21)
+    current_snapshot.defective_total_quantity = _dec(1)
+    current_snapshot.items[0].quantity = _dec(21)
+    current_snapshot.items[0].defective_quantity = _dec(1)
+    db_session.commit()
+
+    response = client.get(
+        f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}"
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["report_status"] == "verified"
+    assert body["validation"]["status"] == "verified"
+    row = {
+        item_row["item_id"]: item_row
+        for group in body["groups"]
+        for item_row in group["items"]
+    }[str(item.item_id)]
+    assert row["mes_code"] == "8-NF-0010"
+    assert row["prev_qty"] == 11
+    assert row["produce_qty"] == 11
+    assert row["receive_qty"] == 0
+    assert row["out_qty"] == 1
+    assert row["defect_qty"] == 1
+    assert row["current_qty"] == 20
+    assert row["delta"] == 9
+    assert row["current_qty"] - row["prev_qty"] == row["delta"]
+    assert (
+        row["produce_qty"]
+        + row["receive_qty"]
+        - row["out_qty"]
+        - row["defect_qty"]
+    ) == row["delta"]
+
+
 def test_verified_week_matches_rework_quarantine_restore_examples(client, db_session):
     rebuilt = _make_prod_item(db_session, name="정상 재작업 VF", process_code="VF", qty=_dec(1))
     recovered = _make_prod_item(db_session, name="정상 회수 VF", process_code="VF", qty=_dec(1))

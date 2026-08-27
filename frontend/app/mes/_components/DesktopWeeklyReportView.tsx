@@ -43,6 +43,8 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
   }, [data]);
 
   const selectedGroup = data?.groups.find((g) => g.process_code === selectedCode);
+  const stockBasis =
+    data?.report_status === "verified" && data.basis_version === 2 ? "normal" : "legacy";
 
   const matrixRows = data?.production_matrix ?? [];
   const hasProduction = matrixRows.some((r) => r.total_qty > 0);
@@ -209,11 +211,19 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
                 {selectedGroup ? `${selectedGroup.dept_name} 품목 상세` : "품목 상세"}
               </h2>
             </header>
-            <div className="weekly-detail-content">
+            <div
+              className="weekly-detail-content"
+              role="region"
+              aria-label={`${selectedGroup?.dept_name ?? "선택 공정"} 품목 상세`}
+              tabIndex={0}
+            >
               {loading && !data ? (
                 <LoadingSkeleton variant="list" rows={8} />
               ) : (
-                <WeeklyDetailTable group={selectedGroup} />
+                <WeeklyDetailTable
+                  group={selectedGroup}
+                  stockBasis={stockBasis}
+                />
               )}
             </div>
           </div>
