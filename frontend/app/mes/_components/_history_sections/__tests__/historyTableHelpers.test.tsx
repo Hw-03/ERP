@@ -70,11 +70,11 @@ function makeLog(overrides: Partial<TransactionLog> = {}): TransactionLog {
 }
 
 describe("getStockSnapshotQuantityWidth", () => {
-  it("묶음 내 재고가 더 짧아도 쉼표 포함 5자리 수량 폭을 미리 확보한다", () => {
+  it("숨긴 미변동 재고의 큰 수량은 묶음 수량 폭에 포함하지 않는다", () => {
     expect(getStockSnapshotQuantityWidth([
       makeLog({
-        warehouse_qty_before: 800,
-        warehouse_qty_after: 800,
+        warehouse_qty_before: 9_999_999,
+        warehouse_qty_after: 9_999_999,
         department_qty_before: 76,
         department_qty_after: 75,
       }),
