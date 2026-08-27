@@ -41,6 +41,11 @@ $TotalWatch = [System.Diagnostics.Stopwatch]::StartNew()
 $GateTimings = New-Object System.Collections.Generic.List[object]
 $Plan = $null
 $FailureMessage = $null
+$PostgresTestEnvironmentNames = @(
+    "TEST_POSTGRES_URL",
+    "DATABASE_URL",
+    "DEXCOWIN_POSTGRES_TEST_ACK"
+)
 
 function Invoke-Check {
     param(
@@ -62,7 +67,19 @@ function Invoke-Check {
     $watch = [System.Diagnostics.Stopwatch]::StartNew()
     $status = "passed"
     $pushed = $false
+    $ScopePostgresTestEnvironment = (
+        $GateId.StartsWith("backend-") -and
+        $GateId -ne "backend-postgres-concurrency"
+    )
+    $PreviousPostgresTestEnvironment = @{}
     try {
+        if ($ScopePostgresTestEnvironment) {
+            foreach ($EnvironmentName in $PostgresTestEnvironmentNames) {
+                $PreviousPostgresTestEnvironment[$EnvironmentName] =
+                    [Environment]::GetEnvironmentVariable($EnvironmentName, "Process")
+                [Environment]::SetEnvironmentVariable($EnvironmentName, $null, "Process")
+            }
+        }
         Push-Location $WorkingDirectory
         $pushed = $true
         $global:LASTEXITCODE = 0
@@ -76,6 +93,15 @@ function Invoke-Check {
         throw
     }
     finally {
+        if ($ScopePostgresTestEnvironment) {
+            foreach ($EnvironmentName in $PostgresTestEnvironmentNames) {
+                [Environment]::SetEnvironmentVariable(
+                    $EnvironmentName,
+                    $PreviousPostgresTestEnvironment[$EnvironmentName],
+                    "Process"
+                )
+            }
+        }
         if ($pushed) {
             Pop-Location
         }

@@ -80,18 +80,32 @@ def _mock_full_gate_runtime(
 
     fake_bin = tmp_path / "fake-bin"
     fake_bin.mkdir()
+    gate_env_log = tmp_path / "full-gate-env.log"
     real_python = Path(sys.executable)
     (fake_bin / "python.cmd").write_text(
         "\r\n".join(
             [
                 "@echo off",
                 'if /I "%~nx1"=="verification_policy.py" (',
+                "  if defined DEXCOWIN_MOCK_POLICY_FILE (",
+                '    type "%DEXCOWIN_MOCK_POLICY_FILE%"',
+                "    exit /b 0",
+                "  )",
                 f'  "{real_python}" %*',
                 "  exit /b %ERRORLEVEL%",
                 ")",
+                'if /I "%~nx1"=="verify_postgres_concurrency.py" (',
+                '  >>"%DEXCOWIN_MOCK_GATE_ENV_LOG%" echo backend-postgres-concurrency TEST_POSTGRES_URL=%TEST_POSTGRES_URL% DATABASE_URL=%DATABASE_URL% DEXCOWIN_POSTGRES_TEST_ACK=%DEXCOWIN_POSTGRES_TEST_ACK%',
+                "  exit /b 0",
+                ")",
                 'if "%~1"=="-" (',
+                '  >>"%DEXCOWIN_MOCK_GATE_ENV_LOG%" echo backend-openapi TEST_POSTGRES_URL=%TEST_POSTGRES_URL% DATABASE_URL=%DATABASE_URL% DEXCOWIN_POSTGRES_TEST_ACK=%DEXCOWIN_POSTGRES_TEST_ACK%',
                 "  more >nul",
                 '  >"%~2" echo {}',
+                "  exit /b 0",
+                ")",
+                'if /I "%~2"=="pytest" (',
+                '  >>"%DEXCOWIN_MOCK_GATE_ENV_LOG%" echo backend-pytest-full TEST_POSTGRES_URL=%TEST_POSTGRES_URL% DATABASE_URL=%DATABASE_URL% DEXCOWIN_POSTGRES_TEST_ACK=%DEXCOWIN_POSTGRES_TEST_ACK%',
                 "  exit /b 0",
                 ")",
                 "exit /b 0",
@@ -109,6 +123,7 @@ def _mock_full_gate_runtime(
     return repo, {
         "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
         "DEXCOWIN_VERIFY_PARALLEL_CPU_THRESHOLD": "1",
+        "DEXCOWIN_MOCK_GATE_ENV_LOG": str(gate_env_log),
     }
 
 
@@ -388,6 +403,67 @@ def test_full_mode_runs_both_areas_in_parallel_and_merges_timings(tmp_path: Path
         "frontend-bundle-size",
         "git-status",
     }
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="PowerShell runtime test is Windows-only")
+def test_full_mode_scopes_postgres_environment_to_concurrency_gate(tmp_path: Path) -> None:
+    repo, extra_env = _mock_full_gate_runtime(tmp_path)
+    policy_file = tmp_path / "postgres-env-policy.json"
+    gate_ids = [
+        "backend-postgres-concurrency",
+        "backend-pytest-full",
+        "backend-openapi",
+        "backend-postgres-concurrency",
+    ]
+    policy_file.write_text(
+        json.dumps(
+            {
+                "mode": "full",
+                "change_set": "all",
+                "selected_files": [],
+                "ignored_files": [],
+                "conflicts": [],
+                "escalations": [],
+                "gates": [
+                    {
+                        "id": gate_id,
+                        "area": "backend",
+                        "kind": "contract",
+                        "reason": "PostgreSQL environment scope contract",
+                        "files": [],
+                    }
+                    for gate_id in gate_ids
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    postgres_env = {
+        "TEST_POSTGRES_URL": "postgres-test-url",
+        "DATABASE_URL": "postgres-database-url",
+        "DEXCOWIN_POSTGRES_TEST_ACK": "acknowledged",
+    }
+    extra_env.update({**postgres_env, "DEXCOWIN_MOCK_POLICY_FILE": str(policy_file)})
+
+    result = _run_verify(repo, "-Mode", "full", extra_env=extra_env)
+
+    output = _output(result)
+    assert result.returncode == 0, output
+    gate_env_log = Path(extra_env["DEXCOWIN_MOCK_GATE_ENV_LOG"])
+    lines = gate_env_log.read_text(encoding="utf-8").splitlines()
+    assert lines == [
+        "backend-postgres-concurrency "
+        "TEST_POSTGRES_URL=postgres-test-url "
+        "DATABASE_URL=postgres-database-url "
+        "DEXCOWIN_POSTGRES_TEST_ACK=acknowledged",
+        "backend-pytest-full TEST_POSTGRES_URL= DATABASE_URL= DEXCOWIN_POSTGRES_TEST_ACK=",
+        "backend-openapi TEST_POSTGRES_URL= DATABASE_URL= DEXCOWIN_POSTGRES_TEST_ACK=",
+        "backend-postgres-concurrency "
+        "TEST_POSTGRES_URL=postgres-test-url "
+        "DATABASE_URL=postgres-database-url "
+        "DEXCOWIN_POSTGRES_TEST_ACK=acknowledged",
+    ]
+    assert {name: extra_env[name] for name in postgres_env} == postgres_env
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="PowerShell runtime test is Windows-only")
