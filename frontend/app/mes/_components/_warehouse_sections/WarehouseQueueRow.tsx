@@ -4,8 +4,13 @@ import type { StockRequest } from "@/lib/api";
 import { PIN_LENGTH } from "@/lib/auth/constants";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
-import { formatKstDateTime, formatQty } from "@/lib/mes/format";
-import { REQUEST_TYPE_LABEL, formatRequestNotes } from "./ioRequestLabels";
+import { formatKstDateTime } from "@/lib/mes/format";
+import {
+  REQUEST_TYPE_LABEL,
+  formatRequestNotes,
+  getRequestStatusPresentation,
+} from "./ioRequestLabels";
+import { StockRequestLineTable } from "./StockRequestLineTable";
 
 function normalizePin(value: string) {
   return value.replace(/\D/g, "").slice(0, PIN_LENGTH);
@@ -52,6 +57,13 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
   } = props;
 
   const noteText = formatRequestNotes(req.notes);
+  const typeLabel = REQUEST_TYPE_LABEL[req.request_type] ?? req.request_type;
+  const status = getRequestStatusPresentation(req.status);
+  const firstLine = req.lines[0];
+  const fromDept = firstLine?.from_department ? normalizeDepartment(firstLine.from_department) : null;
+  const toDept = firstLine?.to_department ? normalizeDepartment(firstLine.to_department) : null;
+  const flowLabel =
+    fromDept && toDept ? `${fromDept} → ${toDept}` : fromDept ?? toDept ?? null;
 
   return (
     <div
@@ -60,24 +72,42 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
       className={`rounded-[14px] border px-5 py-4${highlighted ? " ring-2 ring-[var(--c-blue)]" : ""}`}
       style={{ background: LEGACY_COLORS.s2, borderColor: highlighted ? LEGACY_COLORS.blue : LEGACY_COLORS.border }}
     >
-      <div className="flex flex-wrap items-center gap-2 text-sm" style={{ color: LEGACY_COLORS.text }}>
-        <span
-          className="rounded-full px-2 py-0.5 text-[11px] font-bold"
-          style={{
-            background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 18%, transparent)`,
-            color: LEGACY_COLORS.yellow,
-          }}
-        >
-          {req.status === "reserved" ? "승인 대기" : "제출됨"}
-        </span>
-        <span className="text-xs" style={{ color: LEGACY_COLORS.muted }}>
-          {REQUEST_TYPE_LABEL[req.request_type] ?? req.request_type}
-        </span>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className="text-xl font-black leading-tight"
+              style={{ color: LEGACY_COLORS.text }}
+            >
+              {typeLabel}
+            </span>
+            {(flowLabel || req.lines.length > 0) && (
+              <span
+                data-testid="warehouse-request-summary"
+                className="inline-flex flex-wrap items-center gap-1.5 text-sm font-medium"
+                style={{ color: LEGACY_COLORS.muted }}
+              >
+                {flowLabel && <span>{flowLabel}</span>}
+                {flowLabel && req.lines.length > 0 && <span aria-hidden="true"> · </span>}
+                {req.lines.length > 0 && <span>{req.lines.length}건</span>}
+              </span>
+            )}
+            <span
+              className="rounded-full px-2 py-0.5 text-[11px] font-bold"
+              style={{
+                background: `color-mix(in srgb, ${status.color} 18%, transparent)`,
+                color: status.color,
+              }}
+            >
+              {status.label}
+            </span>
+          </div>
+        </div>
         <div
-          className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-x-3 gap-y-1 text-xs"
+          className="flex max-w-full flex-wrap items-center justify-end gap-x-3 gap-y-1 pt-0.5 text-sm"
           style={{ color: LEGACY_COLORS.muted }}
         >
-          <span className="whitespace-nowrap tabular-nums">
+          <span className="whitespace-nowrap text-base font-bold tabular-nums">
             {formatKstDateTime(req.submitted_at ?? req.created_at)}
           </span>
           <span className="whitespace-nowrap">
@@ -86,31 +116,11 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
         </div>
       </div>
 
-      <div className="mt-2 flex flex-col gap-1 text-sm" style={{ color: LEGACY_COLORS.text }}>
-        {req.lines.map((line) => (
-          <div key={line.line_id} className="flex flex-wrap items-center gap-2">
-            <span style={{ color: LEGACY_COLORS.muted2 }}>{line.mes_code_snapshot ?? "-"}</span>
-            <span>{line.item_name_snapshot}</span>
-            <span className="ml-auto font-bold">{formatQty(line.quantity)} 개</span>
-            <span className="text-xs" style={{ color: LEGACY_COLORS.muted }}>
-              {line.from_bucket === "warehouse"
-                ? "창고"
-                : line.from_department
-                  ? `${normalizeDepartment(line.from_department)} ${line.from_bucket === "defective" ? "불량" : "생산"}`
-                  : "외부"}
-              {" → "}
-              {line.to_bucket === "warehouse"
-                ? "창고"
-                : line.to_department
-                  ? `${normalizeDepartment(line.to_department)} ${line.to_bucket === "defective" ? "불량" : "생산"}`
-                  : "외부"}
-            </span>
-          </div>
-        ))}
-      </div>
+      <StockRequestLineTable lines={req.lines} />
 
-      {noteText && (
-        <div className="mt-2 text-xs" style={{ color: LEGACY_COLORS.muted }}>
+      {noteText &&
+        (approvePinFor === req.request_id || showRejectFor === req.request_id) && (
+        <div className="mt-3 text-base" style={{ color: LEGACY_COLORS.muted }}>
           비고: {noteText}
         </div>
       )}
@@ -222,35 +232,48 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
           </div>
         </div>
       ) : (
-        <div className="mt-3 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              closeReject();
-              setApprovePinFor(req.request_id);
-              setApprovePin("");
-            }}
-            className="rounded-[10px] px-3 py-1.5 text-xs font-bold"
-            style={{ background: LEGACY_COLORS.greenSolid, color: "white" }}
+        <div
+          data-testid="warehouse-queue-footer"
+          className="mt-3 flex flex-wrap items-center gap-3"
+        >
+          {noteText && (
+            <div className="min-w-0 flex-1 text-base" style={{ color: LEGACY_COLORS.muted }}>
+              비고: {noteText}
+            </div>
+          )}
+          <div
+            data-testid="warehouse-queue-actions"
+            className="ml-auto flex shrink-0 items-center gap-2"
           >
-            승인
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              closeApprove();
-              setShowRejectFor(req.request_id);
-              setRejectReason("");
-              setRejectPin("");
-            }}
-            className="rounded-[10px] border px-3 py-1.5 text-xs"
-            style={{
-              borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 40%, transparent)`,
-              color: LEGACY_COLORS.red,
-            }}
-          >
-            반려
-          </button>
+            <button
+              type="button"
+              onClick={() => {
+                closeReject();
+                setApprovePinFor(req.request_id);
+                setApprovePin("");
+              }}
+              className="rounded-[10px] px-3 py-1.5 text-xs font-bold"
+              style={{ background: LEGACY_COLORS.greenSolid, color: "white" }}
+            >
+              승인
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                closeApprove();
+                setShowRejectFor(req.request_id);
+                setRejectReason("");
+                setRejectPin("");
+              }}
+              className="rounded-[10px] border px-3 py-1.5 text-xs"
+              style={{
+                borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 40%, transparent)`,
+                color: LEGACY_COLORS.red,
+              }}
+            >
+              반려
+            </button>
+          </div>
         </div>
       )}
     </div>
