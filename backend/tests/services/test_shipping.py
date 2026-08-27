@@ -6,7 +6,7 @@ from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
-from sqlalchemy import event
+from sqlalchemy import event, update
 
 from app.models import (
     BOM,
@@ -466,6 +466,164 @@ def test_create_request_starts_preparing_with_checklist_and_creation_event(
     assert [line.item_id for line in request.checklist_lines] == [pa.item_id]
     assert request.events[-1].event_type == "REQUEST_CREATED"
     assert request.events[-1].message == "출하 요청 생성 및 준비 시작"
+
+
+def test_create_request_locks_complete_item_graph_once_in_uuid_order(
+    db_session,
+    make_item,
+    make_bom,
+    monkeypatch,
+):
+    af = make_item(name="Single lock AF", process_type_code="AF", model_symbol="3")
+    pa = make_item(name="Single lock PA", process_type_code="PA", model_symbol="3")
+    pf = make_item(name="Single lock PF", process_type_code="PF", model_symbol="3")
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    calls: list[list[uuid.UUID]] = []
+    real_lock = shipping_svc.item_repository.lock_active_many
+
+    def lock_active_many(db, item_ids):
+        calls.append(sorted(set(item_ids)))
+        return real_lock(db, item_ids)
+
+    monkeypatch.setattr(
+        shipping_svc.item_repository,
+        "lock_active_many",
+        lock_active_many,
+    )
+
+    _create_request(db_session, {"base_pf_item_id": pf.item_id})
+
+    assert calls == [sorted({af.item_id, pa.item_id, pf.item_id})]
+
+
+def test_update_request_locks_current_and_new_item_graph_once_in_uuid_order(
+    db_session,
+    make_item,
+    make_bom,
+    monkeypatch,
+):
+    af = make_item(name="Update lock AF", process_type_code="AF", model_symbol="3")
+    pa = make_item(name="Update lock PA", process_type_code="PA", model_symbol="3")
+    pf = make_item(name="Update lock PF", process_type_code="PF", model_symbol="3")
+    companion = make_item(name="Update lock companion", process_type_code="PR")
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    request = _create_request(db_session, {"base_pf_item_id": pf.item_id})
+    calls: list[list[uuid.UUID]] = []
+    real_lock = shipping_svc.item_repository.lock_active_many
+
+    def lock_active_many(db, item_ids):
+        calls.append(sorted(set(item_ids)))
+        return real_lock(db, item_ids)
+
+    monkeypatch.setattr(
+        shipping_svc.item_repository,
+        "lock_active_many",
+        lock_active_many,
+    )
+
+    shipping_actions_svc.update_request(
+        db_session,
+        request.request_id,
+        {
+            "bom_lines": [
+                {
+                    "parent_stage": "PA",
+                    "child_item_id": af.item_id,
+                    "quantity": 1,
+                    "unit": "EA",
+                },
+                {
+                    "parent_stage": "PF",
+                    "child_item_id": pa.item_id,
+                    "quantity": 1,
+                    "unit": "EA",
+                },
+            ],
+            "companion_lines": [
+                {"item_id": companion.item_id, "quantity": 1, "unit": "EA"}
+            ],
+        },
+        _shipping_actor(db_session),
+    )
+
+    assert calls == [
+        sorted({af.item_id, pa.item_id, pf.item_id, companion.item_id})
+    ]
+
+
+def test_create_request_reloads_bom_after_waiting_for_item_locks(
+    db_session,
+    make_item,
+    make_bom,
+    monkeypatch,
+):
+    af = make_item(name="Fresh BOM AF", process_type_code="AF", model_symbol="3")
+    pa = make_item(name="Fresh BOM PA", process_type_code="PA", model_symbol="3")
+    pf = make_item(name="Fresh BOM PF", process_type_code="PF", model_symbol="3")
+    pa_bom = make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    real_lock = shipping_svc.item_repository.lock_active_many
+
+    def lock_then_change_bom(db, item_ids):
+        locked = real_lock(db, item_ids)
+        db.execute(
+            update(BOM)
+            .where(BOM.bom_id == pa_bom.bom_id)
+            .values(quantity=Decimal("2")),
+            execution_options={"synchronize_session": False},
+        )
+        return locked
+
+    monkeypatch.setattr(
+        shipping_svc.item_repository,
+        "lock_active_many",
+        lock_then_change_bom,
+    )
+
+    with pytest.raises(shipping_svc.ShippingError, match="BOM이 변경"):
+        _create_request(db_session, {"base_pf_item_id": pf.item_id})
+
+    assert db_session.query(ShippingRequest).count() == 0
+
+
+def test_require_final_items_reloads_candidate_after_item_lock(
+    db_session,
+    make_item,
+    make_bom,
+    monkeypatch,
+):
+    af = make_item(name="Fallback fresh AF", process_type_code="AF", model_symbol="3")
+    pa = make_item(name="Fallback fresh PA", process_type_code="PA", model_symbol="3")
+    pf = make_item(name="Fallback fresh PF", process_type_code="PF", model_symbol="3")
+    pa_bom = make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    request = _create_request(db_session, {"base_pf_item_id": pf.item_id})
+    request.final_pa_item_id = None
+    request.final_pf_item_id = None
+    db_session.flush()
+    db_session.expire(request, ["final_pa_item", "final_pf_item"])
+    real_lock = shipping_svc.item_repository.lock_active_many
+
+    def lock_then_change_bom(db, item_ids):
+        locked = real_lock(db, item_ids)
+        db.execute(
+            update(BOM)
+            .where(BOM.bom_id == pa_bom.bom_id)
+            .values(quantity=Decimal("2")),
+            execution_options={"synchronize_session": False},
+        )
+        return locked
+
+    monkeypatch.setattr(
+        shipping_svc.item_repository,
+        "lock_active_many",
+        lock_then_change_bom,
+    )
+
+    with pytest.raises(shipping_svc.ShippingError, match="BOM이 변경"):
+        shipping_svc._require_final_items(db_session, request)
 
 
 @pytest.mark.parametrize(

@@ -12,6 +12,7 @@ from threading import Barrier
 from time import monotonic, sleep
 import uuid
 
+from fastapi import HTTPException, Request
 import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Connection, Engine
@@ -39,6 +40,7 @@ from app.services import inventory_operation_cancellation as cancellation_svc
 from app.services import inventory_operations as operation_svc
 from app.services import transaction_actions
 from app.services.pin_auth import DEFAULT_PIN_HASH
+from app.routers.inventory import transactions as transactions_router
 
 
 POSTGRES_URL = os.environ.get("TEST_POSTGRES_URL", "").strip()
@@ -69,6 +71,21 @@ def _force_postgresql_lock_paths(monkeypatch: pytest.MonkeyPatch) -> None:
 def _session_factory() -> tuple[Engine, sessionmaker[Session]]:
     engine = create_engine(POSTGRES_URL, poolclass=NullPool)
     return engine, sessionmaker(bind=engine, expire_on_commit=False)
+
+
+def _request(path: str) -> Request:
+    return Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "path": path,
+            "headers": [],
+            "query_string": b"",
+            "scheme": "http",
+            "server": ("testserver", 80),
+            "client": ("127.0.0.1", 1),
+        }
+    )
 
 
 def _hold_source_operation(
@@ -347,13 +364,6 @@ def test_postgres_concurrent_corrections_have_one_winner_and_no_loser_orphans() 
 def test_postgres_correction_and_cancel_have_one_winner_and_no_loser_orphans() -> None:
     engine, make_session = _session_factory()
     case = _seed_case(make_session)
-    now = datetime.utcnow()
-    with make_session() as preview_session:
-        preview = cancellation_svc.preview_cancellation(
-            preview_session,
-            case.source_operation_id,
-            now=now,
-        )
     barrier = Barrier(2)
     worker_pid_queue: Queue[int] = Queue()
 
@@ -384,16 +394,21 @@ def test_postgres_correction_and_cancel_have_one_winner_and_no_loser_orphans() -
             worker_pid_queue.put(pid)
             barrier.wait(timeout=10)
             try:
-                cancellation_svc.cancel_operation(
+                transactions_router.cancel_transaction(
+                    case.source_log_id,
+                    transactions_router.TransactionCancelRequest(
+                        reason="PostgreSQL correction-vs-cancel",
+                        employee_code=actor.employee_code,
+                        pin="0000",
+                    ),
+                    _request(
+                        f"/api/inventory/transactions/{case.source_log_id}/cancel"
+                    ),
+                    actor,
                     db,
-                    operation_id=case.source_operation_id,
-                    canceller=actor,
-                    reason="PostgreSQL correction-vs-cancel",
-                    plan_hash=preview.plan_hash,
-                    now=now,
                 )
                 return "cancel", "success", pid
-            except cancellation_svc.CancellationError:
+            except HTTPException:
                 db.rollback()
                 return "cancel", "conflict", pid
 

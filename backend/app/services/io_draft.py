@@ -31,6 +31,7 @@ from app.services.io_persist import (
     _batch_to_payload,
     ensure_batch_is_mutable,
     _persist_batch,
+    _lock_active_payload_items,
     _normalize_payload_bom_stock_exempt,
 )
 
@@ -66,6 +67,7 @@ def save_draft(
     """
     if not bool(requester.is_active):
         raise PermissionError("비활성 직원은 입출고 작업을 제출할 수 없습니다.")
+    _lock_active_payload_items(db, payload)
     _normalize_payload_bom_stock_exempt(db, payload)
     validate_operation_sources(
         payload.sub_type,

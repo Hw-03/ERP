@@ -525,7 +525,7 @@ def quarantine(
                 return DefectActionResult(item_id=payload.item_id, quantity=payload.qty, message="격리 완료")
             raise http_error(409, ErrorCode.CONFLICT, "이미 다른 요청에 사용된 요청 식별자입니다.")
 
-    item = item_repository.get(db, payload.item_id)
+    item = item_repository.get_active(db, payload.item_id, for_update=True)
     if item is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
@@ -591,7 +591,7 @@ def unquarantine(
     ensure_actor_employee_id(actor, payload.actor_employee_id)
     payload = payload.model_copy(update={"actor_employee_id": actor.employee_id})
 
-    item = item_repository.get(db, payload.item_id)
+    item = item_repository.get_active(db, payload.item_id, for_update=True)
     if item is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 

@@ -22,6 +22,7 @@ from app.models import (
     StockRequest,
     StockRequestStatusEnum,
 )
+from app.repositories import item_repository
 from app.schemas.io import IoBundlePayload
 from app.services.bom_stock_policy import (
     BOM_STOCK_EXEMPT_NOTE,
@@ -43,6 +44,40 @@ from app.services.io_preview import (
 
 
 LEGACY_SHIPPING_LINK_READ_ONLY_MESSAGE = "폐기된 출하 준비 연결 작업은 조회만 가능합니다."
+
+
+def _lock_active_item_ids(db: Session, item_ids: set[uuid.UUID]) -> None:
+    """새 IO 참조가 가리킬 모든 품목을 INSERT 전에 잠근다."""
+    active = item_repository.lock_active_many(db, item_ids)
+    missing = sorted(item_ids - set(active), key=str)
+    if missing:
+        raise ValueError(f"품목을 찾을 수 없습니다: {missing[0]}")
+
+
+def _lock_active_payload_items(db: Session, payload: object) -> None:
+    item_ids = {
+        item_id
+        for bundle in getattr(payload, "bundles", ())
+        for item_id in (
+            getattr(bundle, "source_item_id", None),
+            *(getattr(line, "item_id", None) for line in bundle.lines),
+        )
+        if item_id is not None
+    }
+    _lock_active_item_ids(db, item_ids)
+
+
+def _lock_active_batch_items(db: Session, batch: IoBatch) -> None:
+    item_ids = {
+        item_id
+        for bundle in batch.bundles
+        for item_id in (
+            bundle.source_item_id,
+            *(line.item_id for line in bundle.lines),
+        )
+        if item_id is not None
+    }
+    _lock_active_item_ids(db, item_ids)
 
 
 def _normalize_bom_stock_exempt_line(
@@ -130,7 +165,11 @@ def _normalize_bom_stock_exempt_lines(
         for _, line in bundle_lines:
             line.bom_stock_exempt = False
         return
-    items = db.query(Item).filter(Item.item_id.in_(item_ids)).all()
+    items = (
+        db.query(Item)
+        .filter(Item.item_id.in_(item_ids), Item.deleted_at.is_(None))
+        .all()
+    )
     items_by_id = {item.item_id: item for item in items}
     for bundle, line in bundle_lines:
         item = items_by_id.get(line.item_id)
@@ -378,6 +417,7 @@ def _persist_batch(
     submitted_at: Optional[datetime] = None,
     request_fingerprint: Optional[str] = None,
 ) -> IoBatch:
+    _lock_active_payload_items(db, payload)
     validate_internal_use_requester(
         requester,
         work_type=payload.work_type,

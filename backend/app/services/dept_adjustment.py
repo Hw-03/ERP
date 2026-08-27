@@ -77,8 +77,13 @@ def _enrich(db: Session, lines: list[AdjLine]) -> list[AdjLine]:
     ids = list({ln.item_id for ln in lines})
     items_map: dict[uuid.UUID, Item] = {
         i.item_id: i
-        for i in db.query(Item).filter(Item.item_id.in_(ids)).all()
+        for i in db.query(Item)
+        .filter(Item.item_id.in_(ids), Item.deleted_at.is_(None))
+        .all()
     }
+    missing = sorted(set(ids) - set(items_map), key=str)
+    if missing:
+        raise ValueError(f"품목을 찾을 수 없습니다: {missing[0]}")
     for ln in lines:
         item = items_map.get(ln.item_id)
         if item:
@@ -140,7 +145,7 @@ def build_production_template(
     결과품: direction="in", 마지막 라인.
     BOM 직계 구성품: direction="out".
     """
-    item = item_repository.get(db, item_id)
+    item = item_repository.get_active(db, item_id)
     if item is None:
         raise ValueError(f"품목을 찾을 수 없습니다: {item_id}")
 
@@ -149,8 +154,10 @@ def build_production_template(
 
     lines: list[AdjLine] = []
     for row in bom_rows:
-        child = item_repository.get(db, row.child_item_id)
-        child_dept = base_dept or (_dept_for_item(child) if child else result_dept)
+        child = item_repository.get_active(db, row.child_item_id)
+        if child is None:
+            raise ValueError(f"품목을 찾을 수 없습니다: {row.child_item_id}")
+        child_dept = base_dept or _dept_for_item(child)
         lines.append(AdjLine(
             item_id=row.child_item_id,
             direction="out",
@@ -186,7 +193,7 @@ def build_disassembly_template(
     BOM 직계 구성품: direction="in" (일반 부서조정에서는 in/defective로 변경 가능).
     폐기는 별도 재작업의 scrap_qty 흐름에서 처리한다.
     """
-    item = item_repository.get(db, item_id)
+    item = item_repository.get_active(db, item_id)
     if item is None:
         raise ValueError(f"품목을 찾을 수 없습니다: {item_id}")
 
@@ -203,8 +210,10 @@ def build_disassembly_template(
     ]
 
     for row in bom_rows:
-        child = item_repository.get(db, row.child_item_id)
-        child_dept = base_dept or (_dept_for_item(child) if child else target_dept)
+        child = item_repository.get_active(db, row.child_item_id)
+        if child is None:
+            raise ValueError(f"품목을 찾을 수 없습니다: {row.child_item_id}")
+        child_dept = base_dept or _dept_for_item(child)
         lines.append(AdjLine(
             item_id=row.child_item_id,
             direction="in",
@@ -506,8 +515,13 @@ def submit_adjustment(
     if not isinstance(actor, Employee):
         raise TypeError("actor must be an Employee")
     _validate_adjustment_lines(lines)
-    tracked_lines = _stock_tracked_adjustment_lines(db, sub_type, lines)
     with transactional(db):
+        item_ids = {line.item_id for line in lines}
+        active_items = item_repository.lock_active_many(db, item_ids)
+        missing = sorted(item_ids - set(active_items), key=str)
+        if missing:
+            raise ValueError(f"품목을 찾을 수 없습니다: {missing[0]}")
+        tracked_lines = _stock_tracked_adjustment_lines(db, sub_type, lines)
         operation = operation_svc._create_business_operation(
             db,
             domain="department_inventory",
@@ -544,8 +558,10 @@ def submit_adjustment(
 
 
 def _rework_dept_for_item(db: Session, item_id: uuid.UUID, fallback: DepartmentEnum) -> DepartmentEnum:
-    item = db.query(Item).filter(Item.item_id == item_id).first()
-    code = (item.process_type_code or "").strip().upper() if item else ""
+    item = item_repository.get_active(db, item_id)
+    if item is None:
+        raise ValueError(f"품목을 찾을 수 없습니다: {item_id}")
+    code = (item.process_type_code or "").strip().upper()
     prefix_map = {
         "T": DepartmentEnum.TUBE,
         "H": DepartmentEnum.HIGH_VOLTAGE,
@@ -704,6 +720,11 @@ def _submit_rework_disassemble(
         raise ValueError("재작업 수량은 0보다 커야 합니다.")
     if not child_decisions:
         raise ValueError("자식 결정이 비어 있습니다.")
+    item_ids = {parent_item_id, *_rework_decision_item_ids(child_decisions)}
+    active_items = item_repository.lock_active_many(db, item_ids)
+    missing = sorted(item_ids - set(active_items), key=str)
+    if missing:
+        raise ValueError(f"품목을 찾을 수 없습니다: {missing[0]}")
     if parent_source == "defective":
         _validate_decision_tree_against_bom(
             db,

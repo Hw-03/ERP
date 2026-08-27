@@ -50,6 +50,7 @@ from app.services.command_idempotency import (
     lock_idempotency_key,
     require_matching_fingerprint,
 )
+from app.services.io_persist import _lock_active_batch_items
 from app._evt import emit as _evt_emit
 
 
@@ -739,7 +740,14 @@ def revert_stock_request_to_draft(
     if request.requester_employee_id != actor.employee_id:
         raise http_error(403, ErrorCode.FORBIDDEN, "본인 요청만 수정할 수 있습니다.")
 
+    batch = None
+    batch_id = request.operation_batch_id
+    if batch_id:
+        batch = db.query(IoBatch).filter(IoBatch.batch_id == batch_id).first()
+
     try:
+        if batch:
+            _lock_active_batch_items(db, batch)
         svc.cancel_request(db, request, requester=actor, pin=payload.pin, http_request=http_request)
     except rate_limit.OperatorPinRateLimitExceeded as exc:
         db.rollback()
@@ -752,13 +760,10 @@ def revert_stock_request_to_draft(
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
 
     # _sync_batch_from_stock_request 가 "cancelled" 로 설정한 것을 "draft" 로 덮어씀
-    batch_id = request.operation_batch_id
-    if batch_id:
-        batch = db.query(IoBatch).filter(IoBatch.batch_id == batch_id).first()
-        if batch:
-            batch.status = "draft"
-            batch.updated_at = _dt.utcnow()
-            db.flush()
+    if batch:
+        batch.status = "draft"
+        batch.updated_at = _dt.utcnow()
+        db.flush()
 
     commit_only(db)
     return Response(status_code=204)

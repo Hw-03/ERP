@@ -30,10 +30,10 @@ from app.utils.mes_code import (
     slots_to_model_symbol,
 )
 from app.utils.search import build_normalized_search_filter
-from app.services import audit
+from app.services import audit, item_lifecycle
 from app.services import stock_math
 from app.services.item_display_order import _insert_item_at_process_end
-from app.services._tx import commit_and_refresh
+from app.services._tx import commit_and_refresh, transactional
 from app._evt import emit as _evt_emit
 from app.services.export_helpers import csv_streaming_response
 from app.services.reorder import _reorder_by_display_order
@@ -508,7 +508,7 @@ def update_item(
     _admin: Annotated[None, Depends(require_admin_pin)],
     db: Session = Depends(get_db),
 ):
-    item = item_repository.get(db, item_id)
+    item = item_repository.get_active(db, item_id, for_update=True)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
@@ -611,7 +611,7 @@ def update_bom_completion(
     db: Session = Depends(get_db),
 ):
     """BOM 완료 상태 토글 — 사용자가 명시적으로 누를 때만 set/clear."""
-    item = item_repository.get(db, item_id)
+    item = item_repository.get_active(db, item_id, for_update=True)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
@@ -638,30 +638,42 @@ def soft_delete_item(
     _admin: Annotated[None, Depends(require_admin_pin)],
     db: Session = Depends(get_db),
 ):
-    """품목 소프트 삭제 — deleted_at 세팅 + BOM 연결 제거. 입출고 내역은 보존."""
-    item = item_repository.get(db, item_id)
-    if not item:
-        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
-    if item.deleted_at is not None:
-        raise http_error(409, ErrorCode.CONFLICT, "이미 삭제된 품목입니다.")
+    """활성 업무와 BOM 참조가 없는 품목만 소프트 삭제한다."""
+    with transactional(db):
+        item = item_repository.get_including_deleted(
+            db,
+            item_id,
+            for_update=True,
+        )
+        if not item:
+            raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
+        if item.deleted_at is not None:
+            raise http_error(409, ErrorCode.CONFLICT, "이미 삭제된 품목입니다.")
 
-    db.query(BOM).filter(
-        (BOM.parent_item_id == item_id) | (BOM.child_item_id == item_id)
-    ).delete(synchronize_session=False)
+        total, refs = item_lifecycle.active_item_references(db, item_id)
+        if total:
+            raise http_error(
+                409,
+                ErrorCode.ITEM_IN_USE,
+                "진행 중인 업무 또는 BOM에서 사용 중인 품목입니다.",
+                total=total,
+                refs=refs,
+            )
 
-    item.deleted_at = datetime.now(UTC).replace(tzinfo=None)
-    item.updated_at = datetime.now(UTC).replace(tzinfo=None)
+        now = datetime.now(UTC).replace(tzinfo=None)
+        item.deleted_at = now
+        item.updated_at = now
 
-    audit.record(
-        db,
-        request=request,
-        action="item.delete",
-        target_type="item",
-        target_id=str(item.item_id),
-        payload_summary=f"{item.item_name} ({item.mes_code or 'no-code'})",
-    )
+        audit.record(
+            db,
+            request=request,
+            action="item.delete",
+            target_type="item",
+            target_id=str(item.item_id),
+            payload_summary=f"{item.item_name} ({item.mes_code or 'no-code'})",
+        )
 
-    commit_and_refresh(db, item)
+    db.refresh(item)
     _evt_emit(
         "item_delete",
         request=request,
@@ -679,7 +691,7 @@ def restore_item(
     db: Session = Depends(get_db),
 ):
     """삭제된 품목 복구 — deleted_at 초기화."""
-    item = item_repository.get(db, item_id)
+    item = item_repository.get_including_deleted(db, item_id, for_update=True)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
     if item.deleted_at is None:

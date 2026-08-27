@@ -4,8 +4,10 @@ import inspect
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import update
 
 from app.models import (
+    BOM,
     DepartmentEnum,
     Employee,
     EmployeeLevelEnum,
@@ -20,6 +22,7 @@ from app.models import (
 )
 from app.schemas import ProductionReceiptRequest
 from app.services.production_receipt import (
+    ProductionBadRequest,
     ProductionShortage,
     execute_production_receipt,
 )
@@ -188,16 +191,27 @@ def test_production_receipt_prelocks_produced_and_component_items_together(
     make_bom(produced.item_id, component.item_id, Decimal("1"))
     make_location(component.item_id, department=DepartmentEnum.TUBE, quantity=Decimal("2"))
     events = []
+    item_lock_events = []
     real_lock = production_receipt_svc.inventory_svc.lock_inventories
+    real_item_lock = production_receipt_svc.item_repository.lock_active_many
 
     def lock_inventories(db, item_ids):
         events.append(item_ids)
         return real_lock(db, item_ids)
 
+    def lock_active_many(db, item_ids):
+        item_lock_events.append(sorted(set(item_ids)))
+        return real_item_lock(db, item_ids)
+
     monkeypatch.setattr(
         production_receipt_svc.inventory_svc,
         "lock_inventories",
         lock_inventories,
+    )
+    monkeypatch.setattr(
+        production_receipt_svc.item_repository,
+        "lock_active_many",
+        lock_active_many,
     )
 
     execute_production_receipt(
@@ -207,7 +221,57 @@ def test_production_receipt_prelocks_produced_and_component_items_together(
         actor=production_actor,
     )
 
-    assert events[0] == sorted({component.item_id, produced.item_id})
+    expected_ids = sorted({component.item_id, produced.item_id})
+    assert item_lock_events == [expected_ids]
+    assert events[0] == expected_ids
+
+
+def test_production_receipt_reloads_bom_after_item_lock(
+    db_session,
+    make_item,
+    make_bom,
+    monkeypatch,
+    production_actor,
+):
+    component = make_item(name="receipt-reload-component", process_type_code="TR")
+    produced = make_item(name="receipt-reload-produced", process_type_code="PF")
+    bom = make_bom(produced.item_id, component.item_id, Decimal("1"))
+    real_lock = production_receipt_svc.item_repository.lock_active_many
+
+    def lock_then_change_bom(db, item_ids):
+        locked = real_lock(db, item_ids)
+        db.execute(
+            update(BOM)
+            .where(BOM.bom_id == bom.bom_id)
+            .values(quantity=Decimal("2")),
+            execution_options={"synchronize_session": False},
+        )
+        return locked
+
+    monkeypatch.setattr(
+        production_receipt_svc.item_repository,
+        "lock_active_many",
+        lock_then_change_bom,
+    )
+    monkeypatch.setattr(
+        production_receipt_svc,
+        "_preload_components",
+        lambda *_args, **_kwargs: pytest.fail(
+            "BOM 재검증 실패 뒤에는 재고를 잠그면 안 됩니다."
+        ),
+    )
+
+    with pytest.raises(ProductionBadRequest, match="BOM이 변경"):
+        execute_production_receipt(
+            db_session,
+            ProductionReceiptRequest(
+                item_id=produced.item_id,
+                quantity=1,
+                produced_by="operator",
+            ),
+            produced,
+            actor=production_actor,
+        )
 
 
 def test_production_receipt_blocks_when_department_location_is_short(

@@ -53,6 +53,7 @@ from app.services.io_persist import (
     _batch_to_payload,
     ensure_batch_is_mutable,
     _persist_batch,
+    _lock_active_batch_items,
     _normalize_batch_bom_stock_exempt,
     _sync_batch_from_stock_requests,
 )
@@ -1160,6 +1161,7 @@ def submit_existing_draft(
     )
     if not bool(requester.is_active):
         raise PermissionError("비활성 직원은 입출고 작업을 제출할 수 없습니다.")
+    _lock_active_batch_items(db, batch)
     _normalize_batch_bom_stock_exempt(db, batch)
     batch.status = "submitted"
     batch.submitted_at = datetime.utcnow()

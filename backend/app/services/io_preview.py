@@ -21,6 +21,7 @@ from app.models import (
     Item,
     LocationStatusEnum,
 )
+from app.repositories import item_repository
 from app.services import bom as bom_svc
 from app.services import inventory as inventory_svc
 from app.services import stock_math
@@ -366,7 +367,7 @@ def _enum_value(value) -> Optional[str]:
 
 
 def _get_item(db: Session, item_id: uuid.UUID) -> Item:
-    item = db.query(Item).filter(Item.item_id == item_id).first()
+    item = item_repository.get_active(db, item_id)
     if item is None:
         raise ValueError(f"품목을 찾을 수 없습니다: {item_id}")
     return item

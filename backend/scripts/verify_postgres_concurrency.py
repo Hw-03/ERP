@@ -44,6 +44,7 @@ REQUIRED_TESTS = [
     "tests/concurrency/test_cp4_command_postgres.py::test_postgres_handover_cancel_race_has_one_winner_and_no_orphans",
     "tests/concurrency/test_cp4_command_postgres.py::test_postgres_handover_rollback_then_retry_has_one_physical_result",
     "tests/concurrency/test_cp4_command_postgres.py::test_postgres_lost_response_retries_replay_io_and_stock_without_duplication",
+    "tests/concurrency/test_cp4_command_postgres.py::test_postgres_item_delete_vs_io_submit_has_one_winner_and_no_orphans",
 ]
 
 

@@ -41,6 +41,7 @@ from app.models import (
     TransactionLog,
 )
 from app.routers import io as io_router
+from app.routers import items as items_router
 from app.routers import stock_requests as stock_request_router
 from app.schemas import IoSubmitRequest, StockRequestCreate
 from app.services import handover as handover_svc
@@ -992,5 +993,108 @@ def test_postgres_lost_response_retries_replay_io_and_stock_without_duplication(
             assert verify.query(func.count(InventoryOperationEffect.effect_id)).filter(
                 InventoryOperationEffect.operation_id == io_operation_id
             ).scalar() == 1
+    finally:
+        engine.dispose()
+
+
+def test_postgres_item_delete_vs_io_submit_has_one_winner_and_no_orphans() -> None:
+    engine, make_session = _session_factory()
+    case = _seed_command(make_session, prefix="ITEMDEL", warehouse_qty=Decimal("0"))
+    start_barrier = Barrier(2)
+    worker_pid_queue: Queue[int] = Queue()
+
+    def delete_item() -> tuple[str, int, str | None]:
+        with make_session() as db:
+            pid = db.execute(text("SELECT pg_backend_pid()")).scalar_one()
+            worker_pid_queue.put(pid)
+            start_barrier.wait(timeout=10)
+            try:
+                items_router.soft_delete_item(
+                    case.item_id,
+                    _request(f"/api/items/{case.item_id}/soft-delete"),
+                    None,
+                    db,
+                )
+                return "delete", 200, None
+            except HTTPException as exc:
+                detail = exc.detail if isinstance(exc.detail, dict) else {}
+                return "delete", exc.status_code, detail.get("code")
+
+    def submit_io() -> tuple[str, int, str | None]:
+        with make_session() as db:
+            pid = db.execute(text("SELECT pg_backend_pid()")).scalar_one()
+            actor = db.get(Employee, case.actor_id)
+            worker_pid_queue.put(pid)
+            start_barrier.wait(timeout=10)
+            try:
+                io_router.submit_io(
+                    payload=_io_payload(case),
+                    http_request=_request("/api/io/submit"),
+                    actor=actor,
+                    db=db,
+                )
+                return "submit", 201, None
+            except HTTPException as exc:
+                detail = exc.detail if isinstance(exc.detail, dict) else {}
+                return "submit", exc.status_code, detail.get("code")
+
+    try:
+        with engine.connect() as holder, ThreadPoolExecutor(max_workers=2) as executor:
+            holder_transaction = holder.begin()
+            holder_pid = _hold_row(
+                holder,
+                table_name="items",
+                id_column="item_id",
+                row_id=case.item_id,
+            )
+            futures = (executor.submit(delete_item), executor.submit(submit_io))
+            worker_pids = (
+                worker_pid_queue.get(timeout=10),
+                worker_pid_queue.get(timeout=10),
+            )
+            try:
+                _assert_workers_wait_for_holder(engine, worker_pids, holder_pid)
+            finally:
+                holder_transaction.rollback()
+            outcomes = [future.result() for future in futures]
+
+        assert sum(status < 300 for _command, status, _code in outcomes) == 1
+        loser = next(outcome for outcome in outcomes if outcome[1] >= 300)
+        assert loser in {
+            ("delete", 409, "ITEM_IN_USE"),
+            ("submit", 422, "UNPROCESSABLE"),
+        }
+
+        with make_session() as verify:
+            item = verify.get(Item, case.item_id)
+            inventory = _inventory(verify, case.item_id)
+            batch_count = verify.query(IoBatch).filter(
+                IoBatch.client_request_id == case.client_request_id
+            ).count()
+            logs = verify.query(TransactionLog).filter(
+                TransactionLog.item_id == case.item_id
+            ).all()
+            operation_ids = {log.operation_id for log in logs if log.operation_id}
+            operation_count = verify.query(InventoryOperation).filter(
+                InventoryOperation.operation_id.in_(operation_ids)
+            ).count() if operation_ids else 0
+            effect_count = verify.query(InventoryOperationEffect).filter(
+                InventoryOperationEffect.operation_id.in_(operation_ids)
+            ).count() if operation_ids else 0
+
+            if item.deleted_at is not None:
+                assert (batch_count, inventory.warehouse_qty, len(logs)) == (
+                    0,
+                    Decimal("0"),
+                    0,
+                )
+                assert (operation_count, effect_count) == (0, 0)
+            else:
+                assert (batch_count, inventory.warehouse_qty, len(logs)) == (
+                    1,
+                    Decimal("2"),
+                    1,
+                )
+                assert (operation_count, effect_count) == (1, 1)
     finally:
         engine.dispose()

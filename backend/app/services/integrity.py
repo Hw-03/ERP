@@ -146,7 +146,7 @@ def repair_inventory_totals(
             continue
         mismatched += 1
         if len(samples) < 20:
-            item = item_repository.get(db, inv.item_id)
+            item = item_repository.get_including_deleted(db, inv.item_id)
             samples.append(
                 InventoryMismatch(
                     item_id=inv.item_id,

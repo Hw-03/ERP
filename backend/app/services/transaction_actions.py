@@ -137,7 +137,7 @@ def edit_transaction_metadata(
         if log is None:
             raise TransactionLogNotFound("거래를 찾을 수 없습니다.")
 
-        item = item_repository.get(db, log.item_id)
+        item = item_repository.get_active(db, log.item_id, for_update=True)
         if item is None:
             raise TransactionItemNotFound("품목을 찾을 수 없습니다.")
 
@@ -212,11 +212,11 @@ def _lock_correction_log(
     return log
 
 
-def _correction_operation_and_log(
+def lock_transaction_operation_and_log(
     db: Session,
     log_id: uuid.UUID,
 ) -> tuple[InventoryOperation | None, TransactionLog]:
-    """기존 operation 거래는 취소와 같은 lock order로, legacy는 log부터 잠근다."""
+    """거래 command가 operation → log 순서로 소유권을 잠그게 한다."""
     operation_id = db.query(TransactionLog.operation_id).filter(
         TransactionLog.log_id == log_id
     ).scalar()
@@ -381,8 +381,8 @@ def correct_transaction_quantity(
     """재고 보정과 보정 원장·수정 이력·감사를 원자적으로 확정한다."""
     try:
         with transactional(db):
-            owning_operation, log = _correction_operation_and_log(db, log_id)
-            item = item_repository.get(db, log.item_id)
+            owning_operation, log = lock_transaction_operation_and_log(db, log_id)
+            item = item_repository.get_active(db, log.item_id, for_update=True)
             if item is None:
                 raise TransactionItemNotFound("품목을 찾을 수 없습니다.")
             if log.transaction_type not in {

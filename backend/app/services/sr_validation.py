@@ -378,7 +378,7 @@ def _preflight_inventory_check(
         )
         avail = loc.quantity if loc else Decimal("0")
         if avail < qty:
-            item = item_repository.get(db, item_id)
+            item = item_repository.get_active(db, item_id)
             item_name = item.item_name if item else str(item_id)
             raise ValueError(
                 f"부서 생산 재고 부족: {item_name} / {dept} 생산 {avail}개, 요청 {qty}개."
@@ -439,7 +439,7 @@ def _preflight_defective_check(
         )
         avail = loc.quantity if loc else Decimal("0")
         if avail < qty:
-            item = item_repository.get(db, item_id)
+            item = item_repository.get_active(db, item_id)
             item_name = item.item_name if item else str(item_id)
             dept_label = getattr(dept, "value", str(dept))
             raise ValueError(

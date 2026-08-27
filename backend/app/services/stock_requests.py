@@ -30,7 +30,6 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     Employee,
-    Item,
     RequestBucketEnum,
     StockRequest,
     StockRequestLine,
@@ -126,6 +125,12 @@ def _build_request_and_lines(
 
     inventory_svc 호출 / TransactionLog 생성은 절대 하지 않는다 (DRAFT 안전성 보장).
     """
+    item_ids = {line.item_id for line in lines_input}
+    active_items = item_repository.lock_active_many(db, item_ids)
+    missing = sorted(item_ids - set(active_items), key=str)
+    if missing:
+        raise ValueError(f"품목을 찾을 수 없습니다: {missing[0]}")
+
     if requires_warehouse_approval_override is None:
         requires_approval = any(
             line_requires_approval(li.from_bucket, li.to_bucket) for li in lines_input
@@ -159,9 +164,7 @@ def _build_request_and_lines(
     db.flush()
 
     for li in lines_input:
-        item = item_repository.get(db, li.item_id)
-        if item is None:
-            raise ValueError(f"품목을 찾을 수 없습니다: {li.item_id}")
+        item = active_items[li.item_id]
         line = StockRequestLine(
             request_id=request.request_id,
             item_id=li.item_id,

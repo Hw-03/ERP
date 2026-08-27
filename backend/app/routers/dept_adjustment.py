@@ -133,7 +133,7 @@ def get_bom_template(
     db: Session = Depends(get_db),
 ):
     """BOM 기반 초기 라인 세트 반환."""
-    item = item_repository.get(db, item_id)
+    item = item_repository.get_active(db, item_id)
     if item is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 

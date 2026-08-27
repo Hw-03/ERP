@@ -54,6 +54,11 @@ def upsert_draft_request(
         allow_internal_use=False,
     )
     _validate_lines(request_type, lines_input, allow_empty=True)
+    item_ids = {line.item_id for line in lines_input}
+    active_items = item_repository.lock_active_many(db, item_ids)
+    missing = sorted(item_ids - set(active_items), key=str)
+    if missing:
+        raise ValueError(f"품목을 찾을 수 없습니다: {missing[0]}")
 
     existing = (
         db.query(StockRequest)
@@ -83,9 +88,7 @@ def upsert_draft_request(
         # request_code 는 DRAFT 동안 NULL 유지 — submit 시점에만 발급.
 
         for li in lines_input:
-            item = item_repository.get(db, li.item_id)
-            if item is None:
-                raise ValueError(f"품목을 찾을 수 없습니다: {li.item_id}")
+            item = active_items[li.item_id]
             db.add(
                 StockRequestLine(
                     request_id=existing.request_id,

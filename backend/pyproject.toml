@@ -6,7 +6,9 @@ exclude = ["alembic/versions"]
 # or transaction ownership을 새 모듈로 옮길 때 Ruff와 mypy의 files/include를
 # 같은 변경에서 함께 넓히고, 기존 항목은 해당 모듈의 debt가 0이 된 뒤 추가한다.
 include = [
+  "app/repositories/item_repository.py",
   "app/services/_tx.py",
+  "app/services/item_lifecycle.py",
   "app/services/shipping_actions.py",
   "app/services/warehouse_map.py",
 ]
@@ -17,7 +19,9 @@ select = ["E4", "E7", "E9", "F"]
 [tool.mypy]
 python_version = "3.11"
 files = [
+  "app/repositories/item_repository.py",
   "app/services/_tx.py",
+  "app/services/item_lifecycle.py",
   "app/services/shipping_actions.py",
 ]
 follow_imports = "skip"

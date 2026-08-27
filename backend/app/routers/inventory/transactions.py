@@ -1058,14 +1058,25 @@ def cancel_transaction(
     ensure_actor_employee_code(actor, payload.employee_code)
     canceller = _verify_actor_pin(request, actor, payload.pin)
 
-    log = db.query(TransactionLog).filter(TransactionLog.log_id == log_id).first()
-    if not log:
+    try:
+        _operation, log = transaction_actions_svc.lock_transaction_operation_and_log(
+            db,
+            log_id,
+        )
+    except transaction_actions_svc.TransactionLogNotFound:
         raise http_error(404, ErrorCode.NOT_FOUND, "거래를 찾을 수 없습니다.")
+    except transaction_actions_svc.CorrectionConflict as exc:
+        raise http_error(
+            409,
+            ErrorCode.COMMAND_CONFLICT,
+            "거래 상태가 변경되어 취소할 수 없습니다.",
+            reason=exc.reason,
+        )
 
     if bool(getattr(log, "cancelled", False)):
         raise http_error(422, ErrorCode.BUSINESS_RULE, "이미 취소된 거래입니다.")
 
-    item = item_repository.get(db, log.item_id)
+    item = item_repository.get_active(db, log.item_id, for_update=True)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 

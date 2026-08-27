@@ -26,6 +26,7 @@ from app.models import (
     TransactionLog,
     TransactionTypeEnum,
 )
+from app.repositories import item_repository
 from app.services import inventory as inventory_svc
 from app.services import inv_effect
 from app.services import rate_limit
@@ -57,6 +58,18 @@ def _gen_code() -> str:
     return f"HO-{now:%Y%m%d-%H%M%S}-{uuid.uuid4().hex[:6]}"
 
 
+def _lock_active_items(
+    db: Session,
+    item_ids: list[uuid.UUID],
+) -> dict[uuid.UUID, Item]:
+    unique_ids = set(item_ids)
+    items = item_repository.lock_active_many(db, unique_ids)
+    missing = sorted(unique_ids - set(items), key=str)
+    if missing:
+        raise ValueError(f"품목을 찾을 수 없습니다: {missing[0]}")
+    return items
+
+
 def create_handover(db: Session, *, author: Employee, payload) -> HandoverDoc:
     """인수인계서 작성 + 제출(status=submitted)."""
     if not payload.lines:
@@ -65,7 +78,7 @@ def create_handover(db: Session, *, author: Employee, payload) -> HandoverDoc:
         raise ValueError("인수 부서는 튜브가 아니어야 합니다.")
 
     item_ids = [ln.item_id for ln in payload.lines]
-    items = {i.item_id: i for i in db.query(Item).filter(Item.item_id.in_(item_ids)).all()}
+    items = _lock_active_items(db, item_ids)
 
     doc = HandoverDoc(
         handover_code=_gen_code(),
@@ -115,13 +128,13 @@ def _apply_doc_fields(doc: HandoverDoc, payload) -> None:
 
 def _replace_lines(db: Session, doc: HandoverDoc, payload_lines) -> None:
     """기존 라인 전부 제거 후 payload 라인으로 재생성 (draft 갱신용)."""
+    item_ids = [ln.item_id for ln in payload_lines]
+    items = _lock_active_items(db, item_ids)
     for ln in list(doc.lines):
         db.delete(ln)
     db.flush()
     if not payload_lines:
         return
-    item_ids = [ln.item_id for ln in payload_lines]
-    items = {i.item_id: i for i in db.query(Item).filter(Item.item_id.in_(item_ids)).all()}
     for ln in payload_lines:
         item = items.get(ln.item_id)
         if item is None:
@@ -227,6 +240,7 @@ def _receive_handover(
     )
 
     item_ids = sorted({line.item_id for line in doc.lines})
+    _lock_active_items(db, item_ids)
     inventory_svc._ensure_and_lock_inventories(db, item_ids)
     for line in doc.lines:
         qty = Decimal(line.quantity)

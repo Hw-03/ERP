@@ -25,7 +25,7 @@ router = VerifiedActorRouter()
 
 def _require_editable_bom_parent(db: Session, parent_item_id: uuid.UUID) -> Item:
     """완료 상태가 아닌 BOM 부모 품목을 반환한다."""
-    parent = item_repository.get(db, parent_item_id)
+    parent = item_repository.get_active(db, parent_item_id, for_update=True)
     if not parent:
         raise http_error(404, ErrorCode.NOT_FOUND, "상위 품목을 찾을 수 없습니다.")
     if parent.bom_completed_at is not None:
@@ -47,7 +47,12 @@ def get_all_bom(db: Session = Depends(get_db)):
     needed_ids = {e.parent_item_id for e in entries} | {e.child_item_id for e in entries}
     items_map = {
         i.item_id: i
-        for i in db.query(Item).filter(Item.item_id.in_(list(needed_ids))).all()
+        for i in db.query(Item)
+        .filter(
+            Item.item_id.in_(list(needed_ids)),
+            Item.deleted_at.is_(None),
+        )
+        .all()
     }
 
     result = []
@@ -86,11 +91,16 @@ def create_bom(
             "상위 품목과 하위 품목은 같을 수 없습니다.",
         )
 
-    parent = _require_editable_bom_parent(db, payload.parent_item_id)
-
-    child = item_repository.get(db, payload.child_item_id)
-    if not child:
+    locked_items = item_repository.lock_active_many(
+        db,
+        {payload.parent_item_id, payload.child_item_id},
+    )
+    if payload.parent_item_id not in locked_items:
+        raise http_error(404, ErrorCode.NOT_FOUND, "상위 품목을 찾을 수 없습니다.")
+    if payload.child_item_id not in locked_items:
         raise http_error(404, ErrorCode.NOT_FOUND, "하위 품목을 찾을 수 없습니다.")
+    parent = _require_editable_bom_parent(db, payload.parent_item_id)
+    child = locked_items[payload.child_item_id]
 
     existing = (
         db.query(BOM)
@@ -193,7 +203,7 @@ def update_bom(
 def get_bom_flat(parent_item_id: uuid.UUID, db: Session = Depends(get_db)):
     """Return direct child BOM rows for a given parent item."""
 
-    item = item_repository.get(db, parent_item_id)
+    item = item_repository.get_active(db, parent_item_id)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
@@ -222,7 +232,12 @@ def get_bom_tree(
 
     items_map = {
         i.item_id: i
-        for i in db.query(Item).filter(Item.item_id.in_(list(needed_ids))).all()
+        for i in db.query(Item)
+        .filter(
+            Item.item_id.in_(list(needed_ids)),
+            Item.deleted_at.is_(None),
+        )
+        .all()
     }
     if parent_item_id not in items_map:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
@@ -285,7 +300,7 @@ def get_where_used(item_id: uuid.UUID, db: Session = Depends(get_db)):
     - 직접 사용처만 반환 (1단계). 다단계 추적은 호출측에서 재귀.
     - 응답은 `BOMDetailResponse` 배열 — 기존 BOM 조회와 동일 모양.
     """
-    item = item_repository.get(db, item_id)
+    item = item_repository.get_active(db, item_id)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 

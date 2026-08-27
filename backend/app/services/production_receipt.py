@@ -17,6 +17,7 @@ from typing import Dict, List, Tuple
 from sqlalchemy.orm import Session
 
 from app.models import (
+    BOM,
     Employee,
     Inventory,
     InventoryOperation,
@@ -25,6 +26,7 @@ from app.models import (
     TransactionLog,
     TransactionTypeEnum,
 )
+from app.repositories import item_repository
 from app.schemas import BackflushDetail, ProductionReceiptRequest
 from app.services import inventory as inventory_svc
 from app.services import inv_effect
@@ -75,18 +77,91 @@ def _load_and_merge_requirements(
     return merge_requirements(component_requirements)
 
 
+def _bom_graph_snapshot(
+    db: Session,
+    produced_item_id: uuid.UUID,
+) -> tuple[set[uuid.UUID], tuple[tuple[str, str, Decimal, str], ...]]:
+    """생산품부터 도달 가능한 BOM 품목과 정확한 edge fingerprint를 만든다."""
+    rows = db.query(
+        BOM.parent_item_id,
+        BOM.child_item_id,
+        BOM.quantity,
+        BOM.unit,
+    ).all()
+    children: dict[uuid.UUID, list[tuple[uuid.UUID, Decimal, str]]] = {}
+    for parent_id, child_id, quantity, unit in rows:
+        children.setdefault(parent_id, []).append(
+            (child_id, Decimal(str(quantity)), unit or "EA")
+        )
+    item_ids = {produced_item_id}
+    edges: set[tuple[str, str, Decimal, str]] = set()
+    visited: set[uuid.UUID] = set()
+    stack = [produced_item_id]
+    while stack:
+        parent_id = stack.pop()
+        if parent_id in visited:
+            continue
+        visited.add(parent_id)
+        for child_id, quantity, unit in children.get(parent_id, []):
+            edges.add((str(parent_id), str(child_id), quantity, unit))
+            item_ids.add(child_id)
+            if child_id in children:
+                stack.append(child_id)
+    return item_ids, tuple(sorted(edges))
+
+
+def _lock_and_reload_requirements(
+    db: Session,
+    payload: ProductionReceiptRequest,
+    produced_item: Item,
+    initial_graph_item_ids: set[uuid.UUID],
+    initial_bom_fingerprint: tuple[tuple[str, str, Decimal, str], ...],
+) -> tuple[Item, Dict[uuid.UUID, Decimal], dict[uuid.UUID, Item]]:
+    """전체 BOM 품목을 한 번에 잠근 뒤 최신 BOM 소요량을 다시 계산한다."""
+    active_items = item_repository.lock_active_many(
+        db,
+        initial_graph_item_ids,
+    )
+    if produced_item.item_id not in active_items:
+        raise ProductionItemNotFound("생산 대상 품목을 찾을 수 없습니다.")
+    missing = sorted(initial_graph_item_ids - set(active_items), key=str)
+    if missing:
+        raise ProductionItemNotFound(f"구성품을 찾을 수 없습니다: {missing[0]}")
+
+    db.expire_all()
+    locked_produced_item = item_repository.get_active(db, produced_item.item_id)
+    if locked_produced_item is None:
+        raise ProductionItemNotFound("생산 대상 품목을 찾을 수 없습니다.")
+    current_graph_item_ids, current_bom_fingerprint = _bom_graph_snapshot(
+        db,
+        produced_item.item_id,
+    )
+    if (
+        current_graph_item_ids != initial_graph_item_ids
+        or current_bom_fingerprint != initial_bom_fingerprint
+    ):
+        raise ProductionBadRequest("BOM이 변경되었습니다. 다시 시도해 주세요.")
+    current_merged = _load_and_merge_requirements(
+        db,
+        payload,
+        locked_produced_item,
+    )
+    return locked_produced_item, current_merged, active_items
+
+
 def _preload_components(
     db: Session,
     merged: Dict[uuid.UUID, Decimal],
     produced_item_id: uuid.UUID,
+    active_items: dict[uuid.UUID, Item],
 ) -> Tuple[Dict[uuid.UUID, Item], Dict[uuid.UUID, Inventory]]:
-    """부품 Item / Inventory 를 bulk 로드.
+    """잠근 부품 Item을 재사용하고 Inventory를 한 번에 잠근다.
 
-    Items / Inventory 각 1회 IN 쿼리. Inventory 는 다품목 동시 backflush
-    TOCTOU 방지를 위해 한 번에 FOR UPDATE 로 잠근다.
+    Inventory 는 다품목 동시 backflush TOCTOU 방지를 위해 한 번에
+    FOR UPDATE 로 잠근다.
     """
-    comp_ids = list(merged.keys())
-    items_map = {i.item_id: i for i in db.query(Item).filter(Item.item_id.in_(comp_ids)).all()}
+    comp_ids = set(merged)
+    items_map = {item_id: active_items[item_id] for item_id in comp_ids}
     invs_map = inventory_svc._ensure_and_lock_inventories(
         db,
         sorted({*comp_ids, produced_item_id}),
@@ -103,7 +178,9 @@ def _stock_tracked_requirements(
         return {}
     items_map = {
         item.item_id: item
-        for item in db.query(Item).filter(Item.item_id.in_(merged)).all()
+        for item in db.query(Item)
+        .filter(Item.item_id.in_(merged), Item.deleted_at.is_(None))
+        .all()
     }
     return {
         item_id: quantity
@@ -242,9 +319,25 @@ def _execute_production_receipt(
       - ProductionItemNotFound: 부품 미존재 (→ 404)
       - ValueError            : ?? ?? ?? ??? ?? ?? ?? (? 422)
     """
-    merged = _load_and_merge_requirements(db, payload, produced_item)
+    _load_and_merge_requirements(db, payload, produced_item)
+    initial_graph_item_ids, initial_bom_fingerprint = _bom_graph_snapshot(
+        db,
+        produced_item.item_id,
+    )
+    produced_item, merged, active_items = _lock_and_reload_requirements(
+        db,
+        payload,
+        produced_item,
+        initial_graph_item_ids,
+        initial_bom_fingerprint,
+    )
     tracked_requirements = _stock_tracked_requirements(db, merged)
-    items_map, invs_map = _preload_components(db, tracked_requirements, produced_item.item_id)
+    items_map, invs_map = _preload_components(
+        db,
+        tracked_requirements,
+        produced_item.item_id,
+        active_items,
+    )
     _assert_no_shortage(db, tracked_requirements, items_map, invs_map)
 
     transaction_ids: List[uuid.UUID] = []

@@ -105,6 +105,7 @@ def test_postgres_job_bootstraps_head_and_runs_real_two_connection_tests() -> No
     assert "test_postgres_handover_cancel_race_has_one_winner_and_no_orphans" in runner
     assert "test_postgres_handover_rollback_then_retry_has_one_physical_result" in runner
     assert "test_postgres_lost_response_retries_replay_io_and_stock_without_duplication" in runner
+    assert "test_postgres_item_delete_vs_io_submit_has_one_winner_and_no_orphans" in runner
 
     verify_local = _text("scripts/dev/verify_local.ps1")
     assert "backend-postgres-concurrency" in verify_local

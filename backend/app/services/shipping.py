@@ -73,11 +73,69 @@ def get_request(db: Session, request_id: uuid.UUID) -> ShippingRequest:
     return _get_request(db, request_id)
 
 
-def _get_item(db: Session, item_id: uuid.UUID) -> Item:
-    item = item_repository.get(db, item_id)
+def _get_item(
+    db: Session,
+    item_id: uuid.UUID,
+) -> Item:
+    item = item_repository.get_active(db, item_id)
     if item is None:
         raise ShippingError("품목을 찾을 수 없습니다.")
     return item
+
+
+def _lock_active_items(
+    db: Session,
+    item_ids: Iterable[uuid.UUID | str | None],
+) -> dict[uuid.UUID, Item]:
+    """출하 참조를 쓰기 전에 대상 품목을 결정적 순서로 잠근다."""
+    normalized = {
+        uuid.UUID(str(item_id)) for item_id in item_ids if item_id is not None
+    }
+    active = item_repository.lock_active_many(db, normalized)
+    missing = sorted(normalized - set(active), key=str)
+    if missing:
+        raise ShippingError("품목을 찾을 수 없습니다.")
+    return active
+
+
+def _payload_reference_item_ids(payload: dict) -> set[uuid.UUID]:
+    values = {
+        payload.get("base_pf_item_id"),
+        payload.get("reuse_pf_item_id"),
+        *(line.get("child_item_id") for line in payload.get("bom_lines") or ()),
+        *(line.get("item_id") for line in payload.get("companion_lines") or ()),
+    }
+    return {uuid.UUID(str(value)) for value in values if value is not None}
+
+
+def _request_reference_item_ids(req: ShippingRequest) -> set[uuid.UUID]:
+    values = {
+        req.base_pf_item_id,
+        req.final_pa_item_id,
+        req.final_pf_item_id,
+        req.reuse_pf_item_id,
+        *(line.child_item_id for line in req.bom_lines),
+        *(line.item_id for line in req.companion_lines),
+        *(allocation.item_id for allocation in req.allocations),
+        *(line.item_id for line in req.checklist_lines),
+    }
+    return {item_id for item_id in values if item_id is not None}
+
+
+def _candidate_reference_item_ids(
+    db: Session,
+    normalized_bom_lines: list[dict],
+    pf_item_ids: Iterable[uuid.UUID | str | None],
+) -> set[uuid.UUID]:
+    target_pf_ids = {
+        uuid.UUID(str(item_id)) for item_id in pf_item_ids if item_id is not None
+    }
+    return {
+        item_id
+        for candidate in _matching_pf_candidates(db, normalized_bom_lines)
+        if candidate["pf_item_id"] in target_pf_ids
+        for item_id in (candidate["pa_item_id"], candidate["pf_item_id"])
+    }
 
 
 def _record_event(
@@ -556,9 +614,36 @@ def _create_request(
     actor: Employee,
 ) -> ShippingRequest:
     invoice_number = _normalize_invoice_number(payload.get("invoice_number"))
-    base_pf = _get_item(db, payload["base_pf_item_id"])
+    base_pf_id = uuid.UUID(str(payload["base_pf_item_id"]))
+    base_pf = _get_item(db, base_pf_id)
     if base_pf.process_type_code != "PF":
         raise ShippingError("기준 품목은 PF여야 합니다.")
+    normalized_bom_lines = _normalize_bom_lines(
+        db,
+        base_pf,
+        payload.get("bom_lines"),
+    )
+    reference_item_ids = _payload_reference_item_ids(payload)
+    reference_item_ids.update(
+        line["child_item_id"] for line in normalized_bom_lines
+    )
+    reference_item_ids.update(
+        _candidate_reference_item_ids(
+            db,
+            normalized_bom_lines,
+            (base_pf_id, payload.get("reuse_pf_item_id")),
+        )
+    )
+    locked_items = _lock_active_items(db, reference_item_ids)
+    db.expire_all()
+    base_pf = _get_item(db, base_pf_id)
+    locked_bom_lines = _normalize_bom_lines(
+        db,
+        base_pf,
+        payload.get("bom_lines"),
+    )
+    if locked_bom_lines != normalized_bom_lines:
+        raise ShippingError("BOM이 변경되었습니다. 다시 시도해 주세요.")
     req = ShippingRequest(
         status=ShippingRequestStatusEnum.PREPARING,
         base_pf_item_id=base_pf.item_id,
@@ -571,12 +656,12 @@ def _create_request(
     )
     db.add(req)
     db.flush()
-    _replace_bom_lines(db, req, _normalize_bom_lines(db, base_pf, payload.get("bom_lines")))
+    _replace_bom_lines(db, req, normalized_bom_lines)
     _apply_finalization_choice(db, req, payload, infer_when_missing=True)
     if payload.get("companion_lines") is not None:
         _replace_companions(db, req, payload.get("companion_lines") or [])
     db.refresh(req)
-    _resolve_final_items(db, req)
+    _resolve_final_items(db, req, prelocked_item_ids=set(locked_items))
     db.refresh(req)
     _sync_checklist(db, req)
     _record_event(
@@ -600,6 +685,44 @@ def _update_request(
     req = _get_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PREPARING:
         raise ShippingError("준비 중 상태에서만 출하 요청을 수정할 수 있습니다.")
+    normalized_bom_lines = (
+        _normalize_bom_lines(
+            db,
+            req.base_pf_item,
+            payload.get("bom_lines"),
+        )
+        if "bom_lines" in payload
+        else _request_bom_payload(req)
+    )
+    reference_item_ids = _request_reference_item_ids(req)
+    reference_item_ids.update(_payload_reference_item_ids(payload))
+    reference_item_ids.update(
+        line["child_item_id"] for line in normalized_bom_lines
+    )
+    reference_item_ids.update(
+        _candidate_reference_item_ids(
+            db,
+            normalized_bom_lines,
+            (
+                req.base_pf_item_id,
+                req.reuse_pf_item_id,
+                payload.get("reuse_pf_item_id"),
+            ),
+        )
+    )
+    locked_items = _lock_active_items(db, reference_item_ids)
+    db.expire_all()
+    req = _get_request(db, request_id)
+    if req.status != ShippingRequestStatusEnum.PREPARING:
+        raise ShippingError("준비 중 상태에서만 출하 요청을 수정할 수 있습니다.")
+    if "bom_lines" in payload:
+        locked_bom_lines = _normalize_bom_lines(
+            db,
+            req.base_pf_item,
+            payload.get("bom_lines"),
+        )
+        if locked_bom_lines != normalized_bom_lines:
+            raise ShippingError("BOM이 변경되었습니다. 다시 시도해 주세요.")
     before = _revision_snapshot(req)
     if "request_quantity" in payload:
         req.request_quantity = _payload_request_quantity(payload)
@@ -616,7 +739,7 @@ def _update_request(
         _ensure_invoice_can_be_cleared(req, invoice_number)
         req.invoice_number = invoice_number
     if "bom_lines" in payload:
-        _replace_bom_lines(db, req, _normalize_bom_lines(db, req.base_pf_item, payload.get("bom_lines")))
+        _replace_bom_lines(db, req, normalized_bom_lines)
         db.refresh(req)
         _sync_checklist(db, req)
     if "finalization_mode" in payload or "reuse_pf_item_id" in payload:
@@ -627,7 +750,7 @@ def _update_request(
         _replace_companions(db, req, payload.get("companion_lines") or [])
     db.flush()
     db.refresh(req)
-    _resolve_final_items(db, req)
+    _resolve_final_items(db, req, prelocked_item_ids=set(locked_items))
     db.refresh(req)
     after = _revision_snapshot(req)
     changes = _snapshot_changes(before, after)
@@ -931,19 +1054,50 @@ def _create_or_update_request_pf(db: Session, req: ShippingRequest, final_pa: It
     return pf
 
 
-def _resolve_final_items(db: Session, req: ShippingRequest) -> tuple[Item, Item]:
+def _resolve_final_items(
+    db: Session,
+    req: ShippingRequest,
+    *,
+    prelocked_item_ids: set[uuid.UUID] | None = None,
+) -> tuple[Item, Item]:
+    request_id = req.request_id
+    candidate: dict | None = None
+    target_pf_id: uuid.UUID | None = None
     if req.finalization_mode == ShippingFinalizationModeEnum.KEEP_BASE:
-        candidate = _matching_candidate_for_pf(db, req, req.base_pf_item_id)
+        target_pf_id = req.base_pf_item_id
+        candidate = _matching_candidate_for_pf(db, req, target_pf_id)
         if candidate is None:
             raise ShippingError("기준 PF의 BOM이 변경되었습니다. 기존 품목 재사용 또는 신규 생성을 선택하세요.")
-        final_pa = _get_item(db, candidate["pa_item_id"])
-        final_pf = req.base_pf_item
     elif req.finalization_mode == ShippingFinalizationModeEnum.REUSE_CANDIDATE:
         if req.reuse_pf_item_id is None:
             raise ShippingError("재사용할 기존 품목을 선택하세요.")
-        candidate = _matching_candidate_for_pf(db, req, req.reuse_pf_item_id)
+        target_pf_id = req.reuse_pf_item_id
+        candidate = _matching_candidate_for_pf(db, req, target_pf_id)
         if candidate is None:
             raise ShippingError("선택한 기존 품목의 BOM이 변경되었습니다. 후보를 다시 선택하세요.")
+
+    required_item_ids = (
+        {candidate["pa_item_id"], candidate["pf_item_id"]}
+        if candidate is not None
+        else {
+            item_id
+            for item_id in (req.final_pa_item_id, req.final_pf_item_id)
+            if item_id is not None
+        }
+    )
+    if prelocked_item_ids is None:
+        _lock_active_items(db, required_item_ids)
+        db.expire_all()
+        req = _get_request(db, request_id)
+        if target_pf_id is not None:
+            locked_candidate = _matching_candidate_for_pf(db, req, target_pf_id)
+            if locked_candidate != candidate:
+                raise ShippingError("BOM이 변경되었습니다. 다시 시도해 주세요.")
+            candidate = locked_candidate
+    elif not required_item_ids.issubset(prelocked_item_ids):
+        raise ShippingError("BOM이 변경되었습니다. 다시 시도해 주세요.")
+
+    if candidate is not None:
         final_pa = _get_item(db, candidate["pa_item_id"])
         final_pf = _get_item(db, candidate["pf_item_id"])
     else:

@@ -62,7 +62,7 @@ def production_receipt(
         }
     )
 
-    produced_item = item_repository.get(db, payload.item_id)
+    produced_item = item_repository.get_active(db, payload.item_id)
     if not produced_item:
         raise http_error(404, ErrorCode.NOT_FOUND, "생산 대상 품목을 찾을 수 없습니다.")
 
@@ -131,7 +131,7 @@ def check_production_feasibility(
     quantity: Decimal = 1,
     db: Session = Depends(get_db),
 ):
-    item = item_repository.get(db, item_id)
+    item = item_repository.get_active(db, item_id)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
@@ -144,8 +144,12 @@ def check_production_feasibility(
     comp_ids = list(merged.keys())
     comps_map = {
         c.item_id: c
-        for c in db.query(Item).filter(Item.item_id.in_(comp_ids)).all()
+        for c in db.query(Item)
+        .filter(Item.item_id.in_(comp_ids), Item.deleted_at.is_(None))
+        .all()
     }
+    if set(comp_ids) != set(comps_map):
+        raise http_error(404, ErrorCode.NOT_FOUND, "BOM 구성품을 찾을 수 없습니다.")
 
     for comp_item_id, required_qty in merged.items():
         comp_item = comps_map.get(comp_item_id)
