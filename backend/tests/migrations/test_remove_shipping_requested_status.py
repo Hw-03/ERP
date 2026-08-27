@@ -47,6 +47,27 @@ def _load_migration():
     return module
 
 
+def _prepare_postgresql_0023_shipping_schema(
+    connection: sa.Connection,
+    config: Config,
+) -> None:
+    """Create the exact shipping-status contract consumed by revision 0024."""
+    connection.exec_driver_sql(
+        "CREATE TYPE shipping_request_status_enum AS ENUM "
+        "('REQUESTED', 'PREPARING', 'PREPARED', 'PICKED_UP', 'CANCELLED')"
+    )
+    connection.exec_driver_sql(
+        "CREATE TABLE shipping_requests ("
+        "request_id TEXT PRIMARY KEY, "
+        "status shipping_request_status_enum NOT NULL DEFAULT 'REQUESTED'"
+        ")"
+    )
+    connection.exec_driver_sql(
+        "CREATE INDEX ix_shipping_requests_status ON shipping_requests (status)"
+    )
+    command.stamp(config, PREVIOUS_REVISION)
+
+
 def _seed_shipping_dependents(db: sqlite3.Connection) -> None:
     db.execute("PRAGMA foreign_keys = ON")
     db.execute(
@@ -366,6 +387,100 @@ def test_postgresql_online_branch_uses_the_complete_enum_replacement_sequence(
     migration.upgrade()
 
     assert executed == list(statements)
+
+
+def test_postgresql_enum_dependency_queries_only_scan_tables() -> None:
+    migration = _load_migration()
+    dependency_guard = " ".join(
+        migration._postgresql_enum_replacement_statements()[0].lower().split()
+    )
+
+    assert dependency_guard.count("relation.relkind in ('r', 'p')") == 2
+
+
+@pytest.mark.skipif(
+    not os.getenv("TEST_POSTGRES_URL"),
+    reason="TEST_POSTGRES_URL이 설정된 전용 PostgreSQL에서만 실행",
+)
+def test_postgresql_online_upgrade_ignores_status_index_attributes() -> None:
+    engine = sa.create_engine(os.environ["TEST_POSTGRES_URL"])
+    try:
+        with engine.connect() as connection:
+            transaction = connection.begin()
+            try:
+                config = Config(str(ALEMBIC_INI))
+                config.set_main_option("sqlalchemy.url", os.environ["TEST_POSTGRES_URL"])
+                config.attributes["connection"] = connection
+                _prepare_postgresql_0023_shipping_schema(connection, config)
+
+                status_index_kind = connection.execute(
+                    sa.text(
+                        "SELECT relation.relkind "
+                        "FROM pg_attribute AS attribute "
+                        "JOIN pg_class AS relation ON relation.oid = attribute.attrelid "
+                        "WHERE relation.relname = 'ix_shipping_requests_status' "
+                        "AND attribute.attname = 'status'"
+                    )
+                ).scalar_one()
+                assert status_index_kind == "i"
+
+                command.upgrade(config, MIGRATION_REVISION)
+                revision = connection.execute(
+                    sa.text("SELECT version_num FROM alembic_version")
+                ).scalar_one()
+                assert revision == MIGRATION_REVISION
+            finally:
+                transaction.rollback()
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.skipif(
+    not os.getenv("TEST_POSTGRES_URL"),
+    reason="TEST_POSTGRES_URL이 설정된 전용 PostgreSQL에서만 실행",
+)
+@pytest.mark.parametrize(
+    ("relation_sql", "expected_relation"),
+    [
+        (
+            "CREATE TABLE unexpected_shipping_status_table "
+            "(status shipping_request_status_enum NOT NULL)",
+            "public.unexpected_shipping_status_table.status",
+        ),
+        (
+            "CREATE TABLE unexpected_shipping_status_partitioned "
+            "(status shipping_request_status_enum NOT NULL) "
+            "PARTITION BY LIST (status)",
+            "public.unexpected_shipping_status_partitioned.status",
+        ),
+    ],
+    ids=("table", "partitioned-table"),
+)
+def test_postgresql_dependency_guard_rejects_unexpected_enum_table_columns(
+    relation_sql: str,
+    expected_relation: str,
+) -> None:
+    engine = sa.create_engine(os.environ["TEST_POSTGRES_URL"])
+    try:
+        with engine.connect() as connection:
+            transaction = connection.begin()
+            try:
+                config = Config(str(ALEMBIC_INI))
+                config.set_main_option("sqlalchemy.url", os.environ["TEST_POSTGRES_URL"])
+                config.attributes["connection"] = connection
+                _prepare_postgresql_0023_shipping_schema(connection, config)
+                connection.execute(sa.text(relation_sql))
+
+                with pytest.raises(sa.exc.DBAPIError) as exc_info:
+                    command.upgrade(config, MIGRATION_REVISION)
+
+                error_message = str(exc_info.value)
+                assert expected_relation in error_message
+                assert "ix_shipping_requests_status" not in error_message
+            finally:
+                transaction.rollback()
+    finally:
+        engine.dispose()
 
 
 @pytest.mark.skipif(
