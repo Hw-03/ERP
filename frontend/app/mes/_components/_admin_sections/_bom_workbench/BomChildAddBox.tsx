@@ -277,7 +277,7 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
                         type="button"
                         disabled={busy}
                         onClick={() => void commit(c)}
-                        className="rounded-md px-3 py-1 text-xs font-bold transition-colors hover:brightness-110 disabled:opacity-60"
+                        className="standard-hover rounded-md px-3 py-1 text-xs font-bold transition-colors disabled:opacity-60"
                         style={{ background: LEGACY_COLORS.blueSolid, color: LEGACY_COLORS.white }}
                       >
                         {busy ? "추가 중…" : "추가 (Enter)"}
@@ -286,7 +286,7 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
                         type="button"
                         disabled={busy}
                         onClick={closeRow}
-                        className="rounded-md border px-3 py-1 text-xs font-semibold transition-colors hover:brightness-110 disabled:opacity-60"
+                        className="standard-hover rounded-md border px-3 py-1 text-xs font-semibold transition-colors disabled:opacity-60"
                         style={{
                           background: LEGACY_COLORS.s1,
                           borderColor: LEGACY_COLORS.border,

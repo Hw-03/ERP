@@ -116,7 +116,7 @@ export function AdminDetailCard({
                   tabIndex={active ? 0 : -1}
                   onClick={() => onTabChange?.(tab.id)}
                   onKeyDown={(event) => handleTabKeyDown(event, index)}
-                  className="flex h-10 shrink-0 items-center justify-center rounded-[12px] border px-3 text-[14px] font-bold transition-colors hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/30 active:scale-[0.98]"
+                  className="standard-hover flex h-10 shrink-0 items-center justify-center rounded-[12px] border px-3 text-[14px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/30 active:scale-[0.98]"
                   style={{
                     background: active
                       ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`

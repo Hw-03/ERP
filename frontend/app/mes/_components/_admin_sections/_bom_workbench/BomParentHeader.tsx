@@ -80,7 +80,7 @@ export function BomParentHeader({
             type="button"
             onClick={onOpenReview}
             disabled={childCount === 0 && !isCompleted}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-md border px-3 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+            className="standard-hover inline-flex shrink-0 items-center gap-1.5 rounded-md border px-3 py-1.5 text-[12px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             style={{
               background: `color-mix(in srgb, ${LEGACY_COLORS.green} 12%, transparent)`,
               borderColor: `color-mix(in srgb, ${LEGACY_COLORS.green} 40%, transparent)`,

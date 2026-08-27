@@ -388,7 +388,7 @@ export function DefectHubPanel({
           <button
             type="button"
             onClick={() => setView("hub")}
-            className="flex items-center gap-1 self-start rounded-[10px] border px-3 py-1.5 text-xs font-bold transition-colors hover:brightness-110"
+            className="standard-hover flex items-center gap-1 self-start rounded-[10px] border px-3 py-1.5 text-xs font-bold transition-colors"
             style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
           >
             ← 작업 선택

@@ -52,7 +52,7 @@ export function ImageLightbox({
         type="button"
         onClick={onClose}
         aria-label="닫기"
-        className="absolute right-6 top-6 flex h-10 w-10 items-center justify-center rounded-full border transition-colors hover:brightness-125"
+        className="standard-hover absolute right-6 top-6 flex h-10 w-10 items-center justify-center rounded-full border transition-colors"
         style={{
           background: LEGACY_COLORS.s1,
           borderColor: LEGACY_COLORS.border,

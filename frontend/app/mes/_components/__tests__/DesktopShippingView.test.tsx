@@ -2783,7 +2783,8 @@ describe("DesktopShippingView", () => {
 
     expect(row).toHaveAttribute("data-shipping-card-layout", "requestBoard");
     expect(emptyCard).toHaveClass("min-h-[136px]");
-    expect(row).toHaveClass("h-[136px]", "rounded-[16px]", "py-2", "hover:brightness-105", "active:scale-[0.995]", "focus-visible:ring-2");
+    expect(row).toHaveClass("h-[136px]", "rounded-[16px]", "py-2", "standard-hover", "active:scale-[0.995]", "focus-visible:ring-2");
+    expect(row).not.toHaveClass("hover:brightness-105");
     expect(row).not.toHaveClass("h-[168px]");
     expect(title).toHaveClass("truncate");
     expect(title).not.toHaveClass("line-clamp-2", "min-h-10");
@@ -4244,7 +4245,8 @@ describe("DesktopShippingView", () => {
     const title = within(row).getByText(finalPfName);
 
     expect(row).toHaveAttribute("data-shipping-card-layout", "historyList");
-    expect(row).toHaveClass("h-[112px]", "rounded-[16px]", "hover:brightness-105", "active:scale-[0.995]", "focus-visible:ring-2");
+    expect(row).toHaveClass("h-[112px]", "rounded-[16px]", "standard-hover", "active:scale-[0.995]", "focus-visible:ring-2");
+    expect(row).not.toHaveClass("hover:brightness-105");
     expect(row.parentElement).toHaveClass("grid", "xl:grid-cols-2", "gap-2", "p-2");
     expect(title).toHaveClass("truncate");
     expect(title).not.toHaveClass("line-clamp-2");

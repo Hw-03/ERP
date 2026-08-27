@@ -28,7 +28,7 @@ describe("DesktopWorkHubCard", () => {
     expect(onClick).toHaveBeenCalledOnce();
   });
 
-  it("uses a theme-aware hover hook instead of fixed brightening", () => {
+  it("uses the shared standard hover hook instead of fixed brightening", () => {
     render(
       <DesktopWorkHubCard
         dataTestId="hub-card"
@@ -41,7 +41,7 @@ describe("DesktopWorkHubCard", () => {
     );
 
     const card = screen.getByTestId("hub-card");
-    expect(card).toHaveClass("desktop-work-hub-card");
+    expect(card).toHaveClass("desktop-work-hub-card", "standard-hover");
     expect(card).not.toHaveClass("hover:brightness-110");
   });
 

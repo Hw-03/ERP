@@ -202,7 +202,7 @@ export function DefectItemPicker({
                 <button
                   type="button"
                   onClick={cancelEditMode}
-                  className="rounded-[10px] border px-2.5 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110"
+                  className="standard-hover rounded-[10px] border px-2.5 py-1.5 text-[12px] font-bold transition-colors"
                   style={{
                     background: LEGACY_COLORS.s2,
                     borderColor: LEGACY_COLORS.border,
@@ -215,7 +215,7 @@ export function DefectItemPicker({
                 <button
                   type="button"
                   onClick={enterEditMode}
-                  className="flex items-center gap-1 rounded-[10px] border px-2.5 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110"
+                  className="standard-hover flex items-center gap-1 rounded-[10px] border px-2.5 py-1.5 text-[12px] font-bold transition-colors"
                   style={{
                     background: LEGACY_COLORS.s2,
                     borderColor: LEGACY_COLORS.border,
@@ -238,7 +238,7 @@ export function DefectItemPicker({
               type="button"
               onClick={() => void handleResetOrder()}
               disabled={resetMyOrder.isPending}
-              className="flex items-center gap-1 rounded-[10px] border px-2.5 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110 disabled:opacity-50"
+              className="standard-hover flex items-center gap-1 rounded-[10px] border px-2.5 py-1.5 text-[12px] font-bold transition-colors disabled:opacity-50"
               style={{
                 background: LEGACY_COLORS.s2,
                 borderColor: LEGACY_COLORS.border,
@@ -252,7 +252,7 @@ export function DefectItemPicker({
               type="button"
               onClick={() => void handleSaveOrder()}
               disabled={putMyOrder.isPending}
-              className="flex items-center gap-1 rounded-[10px] px-2.5 py-1.5 text-[12px] font-black text-white transition-colors hover:brightness-110 disabled:opacity-50"
+              className="standard-hover flex items-center gap-1 rounded-[10px] px-2.5 py-1.5 text-[12px] font-black text-white transition-colors disabled:opacity-50"
               style={{ background: LEGACY_COLORS.redSolid }}
             >
               <Save className="h-3 w-3" />
@@ -383,7 +383,7 @@ export function DefectItemPicker({
                       type="button"
                       onClick={() => added ? onRemove(item) : onAdd(item)}
                       aria-label={added ? `${item.item_name} 장바구니에서 제거` : `${item.item_name} 장바구니에 추가`}
-                      className={`inline-flex items-center gap-1 rounded-[10px] border px-2.5 py-1 text-[12px] font-black transition-colors hover:brightness-110 active:scale-[0.98] ${
+                      className={`standard-hover inline-flex items-center gap-1 rounded-[10px] border px-2.5 py-1 text-[12px] font-black transition-colors active:scale-[0.98] ${
                         added
                           ? "border-[var(--c-blue)] bg-[color-mix(in_srgb,var(--c-blue)_12%,transparent)] text-[var(--c-blue)]"
                           : "border-[var(--c-red)] bg-[var(--c-red)] text-white"
@@ -428,7 +428,7 @@ export function DefectItemPicker({
             <button
               type="button"
               onClick={() => setDisplayLimit((prev) => prev + PAGE_SIZE)}
-              className="w-full rounded-[12px] border py-2.5 text-sm font-semibold transition-colors hover:brightness-110"
+              className="standard-hover w-full rounded-[12px] border py-2.5 text-sm font-semibold transition-colors"
               style={{
                 background: LEGACY_COLORS.s1,
                 borderColor: LEGACY_COLORS.border,

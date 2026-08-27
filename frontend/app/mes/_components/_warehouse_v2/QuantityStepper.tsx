@@ -107,7 +107,7 @@ function StepButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="h-11 min-h-[44px] rounded-[10px] border px-3 py-2 text-sm font-black transition-colors hover:brightness-110 disabled:opacity-40"
+      className="standard-hover h-11 min-h-[44px] rounded-[10px] border px-3 py-2 text-sm font-black transition-colors disabled:opacity-40"
       style={{
         background: tint(tone, 10),
         borderColor: tint(tone, 30),

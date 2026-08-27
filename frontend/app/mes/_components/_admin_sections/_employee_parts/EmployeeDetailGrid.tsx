@@ -203,7 +203,7 @@ export function EmployeeDetailGrid({
           <button
             type="button"
             onClick={() => onRequestPinReset(employee)}
-            className="min-h-11 rounded-[10px] border px-3 py-2 text-[12px] font-bold transition-colors hover:brightness-110 active:scale-[0.98]"
+            className="standard-hover min-h-11 rounded-[10px] border px-3 py-2 text-[12px] font-bold transition-colors active:scale-[0.98]"
             style={{
               background: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 8%, transparent)`,
               borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 35%, transparent)`,
@@ -219,7 +219,7 @@ export function EmployeeDetailGrid({
             <button
               type="button"
               onClick={() => onToggle(employee)}
-              className="min-h-11 flex-1 rounded-[10px] px-3 py-2 text-[12px] font-bold text-white transition-colors hover:brightness-110 active:scale-[0.98]"
+              className="standard-hover min-h-11 flex-1 rounded-[10px] px-3 py-2 text-[12px] font-bold text-white transition-colors active:scale-[0.98]"
               style={{ background: employee.is_active ? LEGACY_COLORS.red : LEGACY_COLORS.green }}
             >
               {employee.is_active ? "직원 비활성화" : "직원 활성화"}
@@ -227,7 +227,7 @@ export function EmployeeDetailGrid({
             <button
               type="button"
               onClick={() => onRequestDelete(employee)}
-              className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-[10px] border px-3 py-2 text-[12px] font-bold transition-colors hover:brightness-110 active:scale-[0.98]"
+              className="standard-hover flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-[10px] border px-3 py-2 text-[12px] font-bold transition-colors active:scale-[0.98]"
               style={{
                 background: `color-mix(in srgb, ${LEGACY_COLORS.red} 8%, transparent)`,
                 borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 35%, transparent)`,

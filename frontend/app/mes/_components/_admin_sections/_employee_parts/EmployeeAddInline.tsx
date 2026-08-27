@@ -105,7 +105,7 @@ export function EmployeeAddInline({ form, setForm, departments, productModels, o
       </div>
       <button
         type="submit"
-        className="rounded-[12px] py-2.5 text-[14px] font-bold text-white transition-colors hover:brightness-110"
+        className="standard-hover rounded-[12px] py-2.5 text-[14px] font-bold text-white transition-colors"
         style={{ background: LEGACY_COLORS.blueSolid }}
       >
         직원 추가

@@ -155,7 +155,7 @@ export function DefectBatchConfirm({
           type="button"
           onClick={onCancel}
           disabled={busy}
-          className="flex items-center gap-1 rounded-[10px] border px-3 py-1.5 text-sm font-bold transition-colors hover:brightness-110 disabled:opacity-50"
+          className="standard-hover flex items-center gap-1 rounded-[10px] border px-3 py-1.5 text-sm font-bold transition-colors disabled:opacity-50"
           style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
         >
           <ArrowLeft className="h-4 w-4" />

@@ -504,7 +504,7 @@ function ConfirmBundleCard({
           setCollapsed((v) => !v);
         }
       }}
-      className="rounded-[18px] px-5 py-4 outline-none transition-[filter] focus-visible:ring-2 focus-visible:ring-[var(--c-blue)] hover:brightness-[1.01]"
+      className="standard-hover rounded-[18px] px-5 py-4 outline-none transition-[filter] focus-visible:ring-2 focus-visible:ring-[var(--c-blue)]"
       style={{
         background: tint(tone, 6),
         cursor: isCollapsible ? "pointer" : "default",

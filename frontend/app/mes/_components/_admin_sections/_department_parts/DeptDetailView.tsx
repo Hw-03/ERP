@@ -206,7 +206,7 @@ export function DeptDetailView({
               aria-expanded={isPaletteOpen}
               aria-controls="department-color-palette"
               onClick={() => setIsPaletteOpen((open) => !open)}
-              className="flex h-11 w-full items-center justify-between rounded-[12px] border px-3 text-[12px] font-bold transition-colors hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/30"
+              className="standard-hover flex h-11 w-full items-center justify-between rounded-[12px] border px-3 text-[12px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--c-blue)]/30"
               style={{
                 background: isPaletteOpen
                   ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 10%, transparent)`
@@ -298,7 +298,7 @@ export function DeptDetailView({
               onToggleActive();
             }
           }}
-          className="flex-1 rounded-[10px] border px-3 py-2 text-[12px] font-bold transition-colors hover:brightness-110"
+          className="standard-hover flex-1 rounded-[10px] border px-3 py-2 text-[12px] font-bold transition-colors"
           style={{
             background: dept.is_active
               ? `color-mix(in srgb, ${LEGACY_COLORS.red} 8%, transparent)`
@@ -314,7 +314,7 @@ export function DeptDetailView({
         <button
           type="button"
           onClick={onRequestDelete}
-          className="flex items-center justify-center gap-1.5 rounded-[10px] border px-3 py-2 text-[12px] font-bold transition-colors hover:brightness-110"
+          className="standard-hover flex items-center justify-center gap-1.5 rounded-[10px] border px-3 py-2 text-[12px] font-bold transition-colors"
           style={{
             background: `color-mix(in srgb, ${LEGACY_COLORS.red} 8%, transparent)`,
             borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 35%, transparent)`,

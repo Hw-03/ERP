@@ -270,7 +270,7 @@ export function IoBundleCard({
                     aria-pressed={active}
                     disabled={internalUseBomBusy || !onInternalUseBomModeChange}
                     onClick={() => onInternalUseBomModeChange?.(mode)}
-                    className="h-11 min-h-[44px] rounded-[10px] border px-2 py-2 text-sm font-black whitespace-nowrap transition-[transform,filter,opacity] active:scale-[0.98] hover:brightness-110 disabled:opacity-50"
+                    className="standard-hover h-11 min-h-[44px] rounded-[10px] border px-2 py-2 text-sm font-black whitespace-nowrap transition-[transform,filter,opacity] active:scale-[0.98] disabled:opacity-50"
                     style={{
                       background: active ? tint(LEGACY_COLORS.blue, 16) : LEGACY_COLORS.s2,
                       borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,

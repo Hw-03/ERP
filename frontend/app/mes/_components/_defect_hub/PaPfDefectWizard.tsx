@@ -286,7 +286,7 @@ export function PaPfDefectWizard({
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="rounded-[14px] border px-5 py-2.5 text-sm font-bold transition-colors hover:brightness-125 disabled:opacity-50"
+            className="standard-hover rounded-[14px] border px-5 py-2.5 text-sm font-bold transition-colors disabled:opacity-50"
             style={{
               borderColor: LEGACY_COLORS.border,
               color: LEGACY_COLORS.muted2,

@@ -109,6 +109,7 @@
     --c-text-body: 14px;
     --c-text-title: 16px;
     --c-text-display: 20px;
+    --c-standard-hover-brightness: 0.94;
     --c-action: var(--c-blue);
     --c-ok: var(--c-green);
     --c-warn: var(--c-yellow);
@@ -198,6 +199,7 @@
     --c-department-tuning: #b5b5b5;
     --c-department-assembly: #78a7d8;
     --c-department-shipping: #b68e6c;
+    --c-standard-hover-brightness: 1.15;
   }
 
   html {
@@ -418,12 +420,16 @@
     background-image: none;
   }
 
-  .desktop-work-hub-card:hover {
-    filter: brightness(0.94);
+  .standard-hover {
+    transition-property: filter, transform;
+    transition-duration: 150ms;
+    transition-timing-function: cubic-bezier(.4, 0, .2, 1);
   }
 
-  :root[data-theme="dark"] .desktop-work-hub-card:hover {
-    filter: brightness(1.15);
+  @media (hover: hover) {
+    .standard-hover:not(:disabled):not([aria-disabled="true"]):hover {
+      filter: brightness(var(--c-standard-hover-brightness));
+    }
   }
 
   .badge {

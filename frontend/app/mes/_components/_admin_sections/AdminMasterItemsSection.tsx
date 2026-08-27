@@ -381,7 +381,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                       restoreDeleteFocusRef.current = true;
                       setDeleteConfirm(false);
                     }}
-                    className="rounded-[8px] px-3 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110"
+                    className="standard-hover rounded-[8px] px-3 py-1.5 text-[12px] font-bold transition-colors"
                     style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted }}
                   >
                     취소
@@ -393,7 +393,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                       setDeleteConfirm(false);
                       void deleteItem(selectedItem.item_id);
                     }}
-                    className="rounded-[8px] px-3 py-1.5 text-[12px] font-bold text-white transition-colors hover:brightness-110"
+                    className="standard-hover rounded-[8px] px-3 py-1.5 text-[12px] font-bold text-white transition-colors"
                     style={{ background: LEGACY_COLORS.redSolid }}
                   >
                     삭제 확인
@@ -407,7 +407,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                     restoreDeleteFocusRef.current = false;
                     setDeleteConfirm(true);
                   }}
-                  className="flex items-center gap-1 rounded-[10px] px-3 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110"
+                  className="standard-hover flex items-center gap-1 rounded-[10px] px-3 py-1.5 text-[12px] font-bold transition-colors"
                   style={{
                     background: LEGACY_COLORS.s2,
                     color: LEGACY_COLORS.red,
@@ -429,7 +429,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                 <button
                   type="button"
                   onClick={() => void restoreItem(selectedItem.item_id)}
-                  className="flex w-full items-center justify-center gap-2 rounded-[10px] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:brightness-110"
+                  className="standard-hover flex w-full items-center justify-center gap-2 rounded-[10px] px-4 py-2 text-[13px] font-bold text-white transition-colors"
                   style={{ background: LEGACY_COLORS.greenSolid }}
                 >
                   복구
@@ -438,7 +438,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                 <button
                   type="button"
                   onClick={() => void saveItem()}
-                  className="flex w-full items-center justify-center gap-2 rounded-[10px] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:brightness-110"
+                  className="standard-hover flex w-full items-center justify-center gap-2 rounded-[10px] px-4 py-2 text-[13px] font-bold text-white transition-colors"
                   style={{ background: LEGACY_COLORS.blueSolid }}
                 >
                   <Save className="h-3.5 w-3.5" />
@@ -632,7 +632,7 @@ function BomList({
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            className="w-full px-4 py-2 text-left text-[12px] font-bold transition-colors hover:brightness-105"
+            className="standard-hover w-full px-4 py-2 text-left text-[12px] font-bold transition-colors"
             style={{
               borderTop: `1px solid ${LEGACY_COLORS.border}`,
               color: LEGACY_COLORS.blue,

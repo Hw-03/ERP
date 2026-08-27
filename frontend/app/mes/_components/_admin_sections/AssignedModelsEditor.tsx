@@ -115,7 +115,7 @@ export function AssignedModelsEditor({
                 key={m.slot}
                 type="button"
                 onClick={() => add(m.slot)}
-                className="rounded-full border px-2 py-[3px] text-[12px] transition-colors hover:brightness-110"
+                className="standard-hover rounded-full border px-2 py-[3px] text-[12px] transition-colors"
                 style={{
                   background: LEGACY_COLORS.s1,
                   borderColor: LEGACY_COLORS.border,

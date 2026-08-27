@@ -141,7 +141,7 @@ export function IoBundleCart({
               type="button"
               onClick={onPullFromWarehouse}
               disabled={internalUseBomBusy || pulling}
-              className="w-full rounded-[14px] border px-5 py-3 text-sm font-black transition-colors hover:brightness-110"
+              className="standard-hover w-full rounded-[14px] border px-5 py-3 text-sm font-black transition-colors"
               style={{
                 background: tint(LEGACY_COLORS.red, 10),
                 borderColor: tint(LEGACY_COLORS.red, 40),

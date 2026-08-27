@@ -555,7 +555,7 @@ function ModelDetailView({ model, linkedItems, linkedBomCount, editForm, setEdit
       <button
         type="button"
         onClick={onRequestDelete}
-        className="mt-auto flex w-full items-center justify-center gap-2 rounded-[12px] border px-4 py-3 text-[14px] font-bold transition-colors hover:brightness-110"
+        className="standard-hover mt-auto flex w-full items-center justify-center gap-2 rounded-[12px] border px-4 py-3 text-[14px] font-bold transition-colors"
         style={{
           background: `color-mix(in srgb, ${LEGACY_COLORS.red} 10%, transparent)`,
           borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 35%, transparent)`,

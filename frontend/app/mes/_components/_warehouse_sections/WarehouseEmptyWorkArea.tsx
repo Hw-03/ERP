@@ -33,7 +33,7 @@ export function WarehouseEmptyWorkArea({
       {action && (
         <button
           type="button"
-          className="min-h-11 rounded-[12px] px-4 py-2 text-sm font-bold transition-colors hover:brightness-110 active:scale-[0.98]"
+          className="standard-hover min-h-11 rounded-[12px] px-4 py-2 text-sm font-bold transition-colors active:scale-[0.98]"
           style={{ background: LEGACY_COLORS.blueSolid, color: LEGACY_COLORS.white }}
           onClick={action.onClick}
         >
