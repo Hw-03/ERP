@@ -576,7 +576,7 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 | `CQ-021` | `CONFIRMED` | production deploy를 주장하는 orphan `scripts/prod/deploy.ps1`이 pull exit, backup, migration, post-verify, health/restart를 보장하지 않는다. | `scripts/prod/deploy.ps1:1-20`; repo consumer 0 |
 | `CQ-022` | `CONFIRMED` | active 운영/온보딩 문서에 깨진 상대 링크, PostgreSQL 필수 서술과 현 SQLite 운영 충돌, `/legacy` URL drift가 있다. | `_attic/docs/operations/DAILY_OPERATION_CHECKLIST.md:37-45,129-135`, `_attic/ONBOARDING.md:41-54` |
 | `CQ-023` | `CONFIRMED` | 현재 dependency audit에 20건이 보고됐고 production Next와 dev tooling 취약점을 분리해 올려야 한다. | `frontend/package.json:19-40`, 감사 `npm audit --json` evidence |
-| `CQ-026` | `CONFIRMED` | handoff는 이미 열린 결과에서 다른 작성자로 바꿀 때만 animation을 요구하지만 구현·테스트는 첫 작성자 선택에도 적용한다. | `_attic/handoff/2026-07-24-shipping-sales-followup-todo.md:262-275`, `_daily_report/DailyWorkReportScreen.tsx:278-298`, 관련 test `:155-166` |
+| `CQ-026` | `CONFIRMED` | handoff는 이미 열린 결과에서 다른 작성자로 바꿀 때만 animation을 요구하지만 구현·테스트는 첫 작성자 선택에도 적용한다. | `_attic/handoff/archive/2026-08-28-todo-baseline/2026-07-24-shipping-sales-followup-todo.md:262-275`, `_daily_report/DailyWorkReportScreen.tsx:278-298`, 관련 test `:155-166` |
 | `CQ-029` | `RESOLVED_CHECKPOINT_1` | schema readiness는 `0=READY`, `2=NOT_READY`, `3=CHECK_ERROR`로 분리되고 status/watch가 이를 다른 label로 표시한다. | Start/Report × ready/not-ready/check-error/malformed/missing·wrong path/launch-error behavior matrix와 상시 Windows pytest wrapper |
 | `CQ-030` | `MITIGATED_CHECKPOINT_1` | 로컬 E2E가 Node 20을 강제하지 않아 Node 24 PATH에서 Next worker 조기 종료와 연결 거부 연쇄 실패가 발생할 수 있었음 | Gate 0에서 Node 24 실패와 무계측 Node 20 14/14를 비교한 뒤 정본 `verify_e2e.ps1`과 `verify_local -IncludeE2E`가 Node major 20을 Playwright 전에 강제하도록 보강했다. Windows behavior test가 Node 20에서는 npx 호출, Node 24에서는 호출 0과 fail-closed, full gate의 wrapper 위임을 검증한다. `npm run test:e2e` 같은 보조 진입점과 `.nvmrc`·`engines.node` 설치 안내는 `IC-20` 후속 범위다. |
 
@@ -1014,9 +1014,9 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 | one-off data/Excel | `scripts/dev/rewrite_output_with_a_as_truth.py` | `_attic/scripts/dev/rewrite_output_with_a_as_truth.py` | 참조 0 재확인 |
 | one-off data/Excel | `scripts/dev/seed_history_cases.py` | `_attic/scripts/dev/seed_history_cases.py` | 참조 0 재확인 |
 | unsafe orphan deploy | `scripts/prod/deploy.ps1` | `_attic/scripts/prod/deploy.ps1` | consumer 0, 안전한 현 sync 경로 문서화 |
-| 완료 handoff | `_attic/handoff/2026-07-28-dashboard-admin-ui-todo.md` | `_attic/handoff/archive/2026-07-28-dashboard-admin-ui-todo.md` | active handoff와 `docs/superpowers/plans/`의 실제 참조 갱신 |
-| 완료 handoff | `_attic/handoff/2026-07-28-history-admin-bom-todo.md` | `_attic/handoff/archive/2026-07-28-history-admin-bom-todo.md` | active handoff와 `docs/superpowers/plans/`의 실제 참조 갱신 |
-| 완료 handoff | `_attic/handoff/2026-08-03-admin-export-followup-todo.md` | `_attic/handoff/archive/2026-08-03-admin-export-followup-todo.md` | active handoff와 `docs/superpowers/plans/`의 실제 참조 갱신 |
+| 완료 handoff | `_attic/handoff/archive/2026-08-28-todo-baseline/2026-07-28-dashboard-admin-ui-todo.md` | `_attic/handoff/archive/2026-07-28-dashboard-admin-ui-todo.md` | active handoff와 `docs/superpowers/plans/`의 실제 참조 갱신 |
+| 완료 handoff | `_attic/handoff/archive/2026-08-28-todo-baseline/2026-07-28-history-admin-bom-todo.md` | `_attic/handoff/archive/2026-07-28-history-admin-bom-todo.md` | active handoff와 `docs/superpowers/plans/`의 실제 참조 갱신 |
+| 완료 handoff | `_attic/handoff/archive/2026-08-28-todo-baseline/2026-08-03-admin-export-followup-todo.md` | `_attic/handoff/archive/2026-08-03-admin-export-followup-todo.md` | active handoff와 `docs/superpowers/plans/`의 실제 참조 갱신 |
 
 이동 절차와 합격 조건:
 
@@ -1685,7 +1685,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1 -Mode fu
 | 변경 경로 | delta 판정 |
 |---|---|
 | `_attic/docs/research/2026-08-13-full-code-quality-audit-and-improvement-plan.md` | 역사적 전수 감사 산출물. 최신 SHA·finding·결정·첫 체크포인트 증거를 이 절에 추가하되 원 감사 증거를 덮어쓰지 않음 |
-| `_attic/handoff/2026-07-24-shipping-sales-followup-todo.md` | KPI 모집단 정책 근거와 일보 animation drift 확인. 직원 서버 재확인 지시는 `DOC-01` 정리 대상 |
+| `_attic/handoff/archive/2026-08-28-todo-baseline/2026-07-24-shipping-sales-followup-todo.md` | KPI 모집단 정책 근거와 일보 animation drift 확인. 직원 서버 재확인 지시는 `DOC-01` 정리 대상 |
 | `backend/alembic/versions/20260812_0018_drop_model_pf_pins.py` | data-change/allowed table/완료 validator/fail-closed downgrade는 positive delta. isolated preflight E2E는 미검증 |
 | `backend/tests/ops/test_employee_schema_preflight.py` | migration 정책 단위 근거는 강화됐으나 실제 preflight 전체 경로 대신 직접 table 제거를 사용 |
 | `backend/tests/ops/test_employee_sync_safety.py` | helper 배포·start delegation의 문자열 계약만 검증하고 DB target·exit·실제 동작은 미검증 |

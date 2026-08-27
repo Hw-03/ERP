@@ -377,7 +377,7 @@ Expected: PASS — 최상위 카드 3개, 지연 조회, 상태 보존과 기존
 **Files:**
 - Modify: `docs/superpowers/specs/2026-08-04-admin-export-unified-card-design.md`
 - Modify: `docs/superpowers/specs/2026-08-03-admin-export-independent-cards-design.md`
-- Modify: `_attic/handoff/2026-08-03-admin-export-followup-todo.md`
+- Modify: `_attic/handoff/archive/2026-08-28-todo-baseline/2026-08-03-admin-export-followup-todo.md`
 
 - [x] **Step 1: 새 설계 문서 상태를 구현 완료로 갱신**
 

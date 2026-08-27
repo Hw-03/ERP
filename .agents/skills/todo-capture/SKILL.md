@@ -53,11 +53,12 @@ Then replace it with `확정 정책` once the user decides.
 ## Destination Rules
 
 1. If the user names a file, use that file.
-2. In DEXCOWIN MES, prefer the newest relevant `_attic/handoff/*todo*.md`.
-3. Continue an existing TODO when the tab/domain matches.
-4. If the user moves across tabs, keep one document but group items by section such as `공통`, `입출고내역`, `입출고`, `출하`, `불량`, `대시보드`.
-5. Create a new dated TODO only when the topic is clearly a different workstream.
-6. In other repos, inspect local handoff/docs/TODO conventions before choosing a path.
+2. In DEXCOWIN MES, write only under `_attic/handoff/active/`.
+3. Create a dated topic file named `YYYY-MM-DD-<topic>-todo.md` for each new workstream; never select `_attic/handoff/archive/` or `_attic/handoff/deferred/` as a write destination.
+4. Continue an existing file only when it is under `active/` and the tab/domain is the same workstream.
+5. If the user moves across tabs, keep one active document but group items by section such as `공통`, `입출고내역`, `입출고`, `출하`, `불량`, `대시보드`.
+6. Documents marked `정리 완료` are historical references even when they are outside `archive/`; do not append to them.
+7. In other repos, inspect local handoff/docs/TODO conventions before choosing a path.
 
 ## Document Shape
 
@@ -154,3 +155,13 @@ When the user says TODO collection is done:
 - Name the TODO file path.
 - Check that each item has `증상`, `사용자 불편`, `확정 정책` or `정책 확인 필요`, `구현 방향`, `수용 기준`, `브라우저 확인 시나리오`, and `우선순위`.
 - Do not start implementation in the same step.
+
+## Implementation Completion Contract
+
+When an active TODO is later implemented, the implementing agent must update the same active TODO document before committing:
+
+1. Mark each implemented heading as `[완료]` and add the implementation date, verification command/result, and commit hash when available.
+2. Recalculate every affected dashboard count, including completed, open follow-up, total, priority, and policy-confirmation counts.
+3. Verify the headings and summary agree. Do not leave an implemented item open because the work session is ending or the change is small.
+
+`active/` TODOs are the only documents that receive these lifecycle updates. Archived and deferred documents remain read-only unless the user explicitly reopens an item into a new active TODO.

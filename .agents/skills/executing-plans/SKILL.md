@@ -41,6 +41,14 @@ For each task:
 
 ### Step 4: Complete Development
 
+Before calling the finishing skill or committing, synchronize the active TODO source when the plan came from one:
+
+1. Mark each implemented source heading as `[완료]` with date, verification evidence, and commit hash when available.
+2. Recalculate the source document's completed, open follow-up, total, priority, and policy-confirmation counts.
+3. Re-read the document to prove its headings and dashboard agree.
+
+**No exceptions:** passing tests, a small change, a time limit, or a planned commit never justify leaving an implemented active TODO open. If the source is archived or deferred, do not edit it; record the outcome in a new active TODO only when the user explicitly reopens the item.
+
 After all tasks complete and verified:
 - Announce: "I'm using the finishing-a-development-branch skill to complete this work."
 - **REQUIRED SUB-SKILL:** Use superpowers:finishing-a-development-branch

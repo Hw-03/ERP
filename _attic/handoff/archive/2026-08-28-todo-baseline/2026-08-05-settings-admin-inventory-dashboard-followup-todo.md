@@ -4,13 +4,19 @@
 - 최초 수집: 2026-08-05
 - 목적: 사용자 요청을 구현 전 검증 가능한 단위로 보존하고, 화면 간 탐색·수량 표기·내보내기·대시보드 구성을 함께 정리한다.
 
+## 2026-08-28 최신 판정
+
+- 상태: 정리 완료
+- 현재 관리: 완료 4개 / 보류 2개 / 미채택 1개 / 구현 필요 0개
+- 항목 판정: 완료: #1, #2, #5, #6; 보류: #3 부적합품 이력 내보내기, #4 모델 코드 설명; 미채택: #7 BOM 구성 보기 재구성
+- 기준: 현재 HEAD 구현·회귀 테스트와 사용자 확정 결정을 우선한다. 아래 원문은 수집 당시 요구와 근거로 보존한다.
 ## 전체 현황
 
-- 구현 완료를 기준으로 한 TODO: 0개
-- 구현해야 할 후속 TODO: 7개
+- 구현 완료된 기준 TODO: 4개
+- 구현해야 할 후속 TODO: 0개
 - 총 관리 TODO: 7개
-- 확정 후속 TODO: 5개
-- 정책 확인 필요: 3개
+- 확정 후속 TODO: 0개
+- 보류·정책 확인 TODO: 2개
 - 사용자 추가 TODO: 7개
 - 공통: 1개
 - 설정: 1개
@@ -23,7 +29,7 @@
 
 ## 참고 기준과 근거
 
-- 기존 후속 TODO: `_attic/handoff/2026-08-03-admin-export-followup-todo.md`, `_attic/handoff/2026-07-28-dashboard-admin-ui-todo.md`, `_attic/handoff/2026-07-28-history-admin-bom-todo.md`
+- 기존 후속 TODO: `_attic/handoff/archive/2026-08-28-todo-baseline/2026-08-03-admin-export-followup-todo.md`, `_attic/handoff/archive/2026-08-28-todo-baseline/2026-07-28-dashboard-admin-ui-todo.md`, `_attic/handoff/archive/2026-08-28-todo-baseline/2026-07-28-history-admin-bom-todo.md`
 - 코드 확인:
   - 상단바의 PIN 변경 모달과 알림 벨은 각각 `frontend/app/mes/_components/DesktopTopbar.tsx:57-63, 186-220, 248-303`, `frontend/app/mes/_components/notifications/NotificationBell.tsx:183-316`에 있다.
   - 모델 목록은 코드 열을 표시하고 `M-${slot}` 형식으로 노출한다: `frontend/app/mes/_components/_admin_sections/AdminModelsSection.tsx:213-250`.
