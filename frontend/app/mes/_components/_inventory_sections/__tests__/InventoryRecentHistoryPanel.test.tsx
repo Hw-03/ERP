@@ -1,11 +1,18 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
-import type { InventoryOperation, Item } from "@/lib/api";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { InventoryOperation, Item, TransactionLog } from "@/lib/api";
 
 const testState = vi.hoisted(() => ({
   queryArgs: undefined as unknown,
+  legacyQueryArgs: undefined as unknown,
   queryResult: {
     data: { items: [], nextCursor: null } as { items: InventoryOperation[]; nextCursor: string | null },
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  },
+  legacyQueryResult: {
+    data: [] as TransactionLog[],
     isLoading: false,
     isError: false,
     refetch: vi.fn(),
@@ -16,6 +23,13 @@ vi.mock("@/lib/queries/useInventoryOperationsQuery", () => ({
   useInventoryOperationsQuery: (...args: unknown[]) => {
     testState.queryArgs = args;
     return testState.queryResult;
+  },
+}));
+
+vi.mock("@/lib/queries/useTransactionsQuery", () => ({
+  useTransactionsQuery: (...args: unknown[]) => {
+    testState.legacyQueryArgs = args;
+    return testState.legacyQueryResult;
   },
 }));
 
@@ -65,7 +79,78 @@ function makeOperation(overrides: Partial<InventoryOperation> = {}): InventoryOp
   };
 }
 
+function makeLegacyLog(overrides: Partial<TransactionLog> = {}): TransactionLog {
+  return {
+    log_id: "legacy-log-1",
+    item_id: "item-1",
+    mes_code: "46-AA-0080",
+    item_name: "테스트 품목",
+    item_process_type_code: null,
+    item_unit: "EA",
+    transaction_type: "SHIP",
+    quantity_change: -50,
+    quantity_before: 50,
+    quantity_after: 0,
+    warehouse_qty_before: 50,
+    warehouse_qty_after: 0,
+    transfer_qty: null,
+    reference_no: null,
+    produced_by: "김민재",
+    requester_name: null,
+    approver_name: null,
+    department: "조립",
+    notes: null,
+    operation_batch_id: null,
+    operation_id: null,
+    created_at: "2026-07-28T04:51:00Z",
+    cancelled: false,
+    cancel_reason: null,
+    cancelled_by: null,
+    cancelled_at: null,
+    ...overrides,
+  } as TransactionLog;
+}
+
 describe("InventoryRecentHistoryPanel", () => {
+  beforeEach(() => {
+    testState.queryArgs = undefined;
+    testState.legacyQueryArgs = undefined;
+    testState.queryResult = {
+      data: { items: [], nextCursor: null },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    };
+    testState.legacyQueryResult = {
+      data: [],
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    };
+  });
+
+  it("원장과 기존 거래 사이를 제목 없이 구분선으로 나눈다", () => {
+    testState.queryResult = { data: { items: [makeOperation()], nextCursor: null }, isLoading: false, isError: false, refetch: vi.fn() };
+    testState.legacyQueryResult = { data: [makeLegacyLog()], isLoading: false, isError: false, refetch: vi.fn() };
+
+    const { container } = render(<InventoryRecentHistoryPanel item={makeItem()} />);
+
+    expect(screen.queryByText("원장 작업 내역")).not.toBeInTheDocument();
+    expect(screen.queryByText("기존 입출고 내역")).not.toBeInTheDocument();
+    expect(container.querySelector(".inventory-recent-divider")).not.toBeNull();
+    expect(screen.getByText("-50 EA")).toBeInTheDocument();
+    expect(screen.getByText("조립 · 김민재")).toBeInTheDocument();
+    expect(testState.legacyQueryArgs).toEqual([{ itemId: "item-1", unlinkedOnly: true, limit: 5 }]);
+  });
+
+  it("기존 거래만 있으면 구분선 없이 표시한다", () => {
+    testState.legacyQueryResult = { data: [makeLegacyLog()], isLoading: false, isError: false, refetch: vi.fn() };
+
+    const { container } = render(<InventoryRecentHistoryPanel item={makeItem()} />);
+
+    expect(container.querySelector(".inventory-recent-divider")).toBeNull();
+  });
+
   it("현재 품목의 최근 5건만 조회하고 거래 구분·수량·일시·업무 맥락을 표시한다", () => {
     testState.queryResult = { data: { items: [makeOperation()], nextCursor: null }, isLoading: false, isError: false, refetch: vi.fn() };
     render(<InventoryRecentHistoryPanel item={makeItem()} />);
@@ -75,6 +160,8 @@ describe("InventoryRecentHistoryPanel", () => {
     expect(screen.getByText("+12 EA")).toBeInTheDocument();
     expect(screen.getByText("08/14 10:30")).toBeInTheDocument();
     expect(screen.getByText("조립 · 김작업")).toBeInTheDocument();
+    expect(screen.queryByText("원장 작업 내역")).not.toBeInTheDocument();
+    expect(screen.queryByText("기존 입출고 내역")).not.toBeInTheDocument();
   });
 
   it("서버가 준 최신순을 유지하면서 최대 5건만 표시한다", () => {
@@ -100,11 +187,14 @@ describe("InventoryRecentHistoryPanel", () => {
 
   it("조회 실패를 알리고 재시도한다", () => {
     const refetch = vi.fn();
+    const legacyRefetch = vi.fn();
     testState.queryResult = { data: { items: [], nextCursor: null }, isLoading: false, isError: true, refetch };
+    testState.legacyQueryResult = { data: [], isLoading: false, isError: false, refetch: legacyRefetch };
     render(<InventoryRecentHistoryPanel item={makeItem()} />);
 
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
     expect(refetch).toHaveBeenCalledOnce();
+    expect(legacyRefetch).toHaveBeenCalledOnce();
   });
 
   it("내역이 없을 때 빈 상태를 표시한다", () => {
@@ -175,6 +265,37 @@ describe("InventoryRecentHistoryPanel", () => {
     expect(screen.getByText("부서 입출고")).toBeInTheDocument();
     expect(screen.getByText("부서 입출고 취소")).toBeInTheDocument();
     expect(screen.queryByText("수량 보정")).not.toBeInTheDocument();
+  });
+
+  it("원장 입출고 조정의 내부 작업명 대신 현장 메뉴명으로 표시한다", () => {
+    testState.queryResult = {
+      data: {
+        items: [
+          makeOperation({
+            operationId: "io-adjust-original",
+            action: "adjust_in",
+            displayLabel: "adjust_in",
+          }),
+          makeOperation({
+            operationId: "io-adjust-cancel",
+            kind: "CANCELLATION",
+            action: "adjust_in",
+            displayLabel: "adjust_in",
+            effectiveStatus: "cancellation",
+          }),
+        ],
+        nextCursor: null,
+      },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    };
+
+    render(<InventoryRecentHistoryPanel item={makeItem()} />);
+
+    expect(screen.getByText("부서 입출고")).toBeInTheDocument();
+    expect(screen.getByText("부서 입출고 취소")).toBeInTheDocument();
+    expect(screen.queryByText("adjust_in")).not.toBeInTheDocument();
   });
 
   it("취소된 원 작업은 작업명·수량·시각만 선택적으로 취소 표시한다", () => {

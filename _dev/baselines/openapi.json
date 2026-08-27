@@ -16892,6 +16892,18 @@
             }
           },
           {
+            "description": "재고 작업 원장에 연결되지 않은 기존 거래만 조회",
+            "in": "query",
+            "name": "unlinked_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "재고 작업 원장에 연결되지 않은 기존 거래만 조회",
+              "title": "Unlinked Only",
+              "type": "boolean"
+            }
+          },
+          {
             "in": "query",
             "name": "skip",
             "required": false,

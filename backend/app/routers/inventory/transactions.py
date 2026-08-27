@@ -304,6 +304,7 @@ def list_transactions(
     date_from: Optional[date] = Query(None, description="포함 시작일 YYYY-MM-DD"),
     date_to: Optional[date] = Query(None, description="포함 종료일 YYYY-MM-DD"),
     include_archived: bool = Query(False, description="archived_at 이 있는 레코드 포함 여부"),
+    unlinked_only: bool = Query(False, description="재고 작업 원장에 연결되지 않은 기존 거래만 조회"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=2000),
     db: Session = Depends(get_db),
@@ -331,6 +332,9 @@ def list_transactions(
 
     if operation_batch_id:
         query = query.filter(TransactionLog.operation_batch_id == operation_batch_id)
+
+    if unlinked_only:
+        query = query.filter(TransactionLog.operation_id.is_(None))
 
     if transaction_type:
         query = query.filter(TransactionLog.transaction_type == transaction_type)

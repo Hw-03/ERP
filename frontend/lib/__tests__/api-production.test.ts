@@ -66,6 +66,16 @@ describe("productionApi", () => {
     expect(url).toContain("limit=50");
   });
 
+  it("getTransactions forwards the legacy-only filter", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse([])));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await productionApi.getTransactions({ itemId: "I-1", unlinkedOnly: true, limit: 5 });
+
+    const url = String(fetchSpy.mock.calls[0][0]);
+    expect(url).toContain("unlinked_only=true");
+  });
+
   it("getTransactions forwards history operation keys", async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse([])));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;

@@ -225,6 +225,7 @@ export const productionApi = {
       dateFrom?: string; // YYYY-MM-DD
       dateTo?: string;   // YYYY-MM-DD
       includeArchived?: boolean;
+      unlinkedOnly?: boolean;
       limit?: number;
       skip?: number;
     },
