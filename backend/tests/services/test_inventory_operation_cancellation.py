@@ -23,6 +23,7 @@ from app.models import (
     InventoryOperationRoleEnum,
     InventoryOperationEffect,
     SystemSetting,
+    TransactionEditLog,
     TransactionLog,
     TransactionTypeEnum,
     LocationStatusEnum,
@@ -33,6 +34,7 @@ from app.services import defect_actions as defect_actions_svc
 from app.services import inventory_operation_cancellation as cancellation_svc
 from app.services import inventory_operations as operation_svc
 from app.services import handover as handover_svc
+from app.services import transaction_actions
 from app.services.pin_auth import DEFAULT_PIN_HASH
 
 
@@ -139,6 +141,60 @@ def test_cancel_creates_separate_reversal_operation_and_opposite_log(
     assert logs[1].quantity_change == Decimal("-7")
     inventory = inventory_svc._get_or_create_inventory(db_session, item.item_id)
     assert inventory.warehouse_qty == Decimal("0")
+
+
+def test_cancel_blocks_original_operation_after_quantity_correction(
+    db_session,
+    make_item,
+) -> None:
+    item = make_item(name="보정 뒤 원작업 취소", warehouse_qty=Decimal("0"))
+    actor = _actor(db_session)
+    db_session.add(
+        SystemSetting(
+            setting_key="inventory_operation_cutover_at",
+            setting_value="2026-01-01T00:00:00",
+        )
+    )
+    db_session.commit()
+    original = _receive_operation(db_session, item, actor, 10)
+    source_log = (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.operation_id == original.operation_id)
+        .one()
+    )
+
+    transaction_actions.correct_transaction_quantity(
+        db_session,
+        log_id=source_log.log_id,
+        editor=actor,
+        new_quantity=Decimal("12"),
+        reason="입고 수량 보정",
+        request=None,
+    )
+
+    preview = cancellation_svc.preview_cancellation(
+        db_session,
+        original.operation_id,
+        now=datetime(2026, 8, 25, 3, 0),
+    )
+    assert preview.can_cancel is False
+    assert cancellation_svc.CORRECTED_OPERATION_MESSAGE in preview.blockers
+    with pytest.raises(cancellation_svc.CancellationNotAllowed):
+        cancellation_svc.cancel_operation(
+            db_session,
+            operation_id=original.operation_id,
+            canceller=actor,
+            reason="보정된 원작업 취소 시도",
+            plan_hash=preview.plan_hash,
+            now=datetime(2026, 8, 25, 3, 0),
+        )
+
+    db_session.expire_all()
+    inventory = inventory_svc._get_or_create_inventory(db_session, item.item_id)
+    assert inventory.warehouse_qty == Decimal("12")
+    assert db_session.query(InventoryOperation).count() == 2
+    assert db_session.query(TransactionLog).count() == 2
+    assert db_session.query(TransactionEditLog).count() == 1
 
 
 def test_cancel_rejects_stale_plan_without_partial_change(db_session, make_item) -> None:

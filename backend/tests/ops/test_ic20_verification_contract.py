@@ -89,6 +89,12 @@ def test_postgres_job_bootstraps_head_and_runs_real_two_connection_tests() -> No
     assert "test_postgres_foreign_operator_preflight_stays_fail_closed_after_rotation" in runner
     assert "test_postgres_same_cookie_login_then_logout_leaves_no_reissued_session" in runner
     assert "test_postgres_same_cookie_logout_then_login_fails_after_revalidation" in runner
+    assert "test_transaction_correction_postgres.py" in runner
+    assert "test_postgres_cp4_partial_unique_index_is_present" in runner
+    assert "test_postgresql_head_0031_downgrade_and_reupgrade" in runner
+    assert "test_postgres_concurrent_corrections_have_one_winner_and_no_loser_orphans" in runner
+    assert "test_postgres_correction_and_cancel_have_one_winner_and_no_loser_orphans" in runner
+    assert "test_postgres_corrected_operation_rejects_fresh_cancellation_preview" in runner
 
     verify_local = _text("scripts/dev/verify_local.ps1")
     assert "backend-postgres-concurrency" in verify_local

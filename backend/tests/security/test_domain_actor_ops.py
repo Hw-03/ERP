@@ -17,6 +17,7 @@ from app.models import (
     Inventory,
     InventoryLocation,
     LocationStatusEnum,
+    SystemSetting,
     TransactionEditLog,
     DefectQuarantineMemoRevision,
     DefectQuarantineRecord,
@@ -282,8 +283,17 @@ def test_transaction_correction_and_cancel_use_session_actor_and_rollback_spoof(
         quantity_after=Decimal("100"),
         produced_by=actor.name,
         producer_employee_id=actor.employee_id,
+        inventory_effect=[{"scope": "warehouse", "delta": 100}],
     )
-    db_session.add(original)
+    db_session.add_all(
+        (
+            original,
+            SystemSetting(
+                setting_key="inventory_operation_cutover_at",
+                setting_value="2026-01-01T00:00:00",
+            ),
+        )
+    )
     db_session.commit()
 
     spoof_correction = {

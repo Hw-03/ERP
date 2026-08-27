@@ -8,7 +8,6 @@ import csv
 import json
 import uuid
 from datetime import date, datetime
-from decimal import Decimal
 from io import StringIO
 from typing import List, Optional
 
@@ -66,7 +65,7 @@ from app.routers.inventory._tx_filters import (
     _stock_request_info_map,
     _to_log_response,
 )
-from app.repositories import item_repository, inventory_repository
+from app.repositories import item_repository
 
 
 router = VerifiedActorRouter()
@@ -79,14 +78,6 @@ OPERATION_KEYS_DESCRIPTION = (
     "화면 작업 종류 키. 예: warehouse,process,defect,item_conversion,shipping"
 )
 
-
-# 수량 보정이 허용되는 거래 타입.
-# ADJUST 제외: 절대값 지정 방식이라 delta 보정 정책 애매 (별도 정책 확정 필요).
-# TRANSFER_*: 부서 버킷 정보가 TransactionLog에 없어 1차 미지원.
-QUANTITY_CORRECTABLE = {
-    TransactionTypeEnum.RECEIVE,
-    TransactionTypeEnum.SHIP,
-}
 
 class TransactionSummaryResponse(BaseModel):
     """입출고 내역 화면 KPI — 조건 전체 카운트(페이지네이션과 무관)."""
@@ -206,17 +197,6 @@ _TX_ROW_COLOR = {
     "SUPPLIER_RETURN":  "F4C7C3",
     "INTERNAL_USE":     "FCE8B2",
 }
-
-
-def _log_snapshot(log: TransactionLog) -> dict:
-    """TransactionLog의 가변 필드 스냅샷 (JSON 직렬화 가능 형태)."""
-    return {
-        "transaction_type": log.transaction_type.value if log.transaction_type else None,
-        "quantity_change": str(log.quantity_change) if log.quantity_change is not None else None,
-        "reference_no": log.reference_no,
-        "produced_by": log.produced_by,
-        "notes": log.notes,
-    }
 
 
 def _verify_editor(
@@ -1006,86 +986,36 @@ def quantity_correct_transaction(
     """
     editor = _verify_editor(request, actor, payload.edited_by_employee_id, payload.edited_by_pin)
 
-    log = db.query(TransactionLog).filter(TransactionLog.log_id == log_id).first()
-    if not log:
-        raise http_error(404, ErrorCode.NOT_FOUND, "거래를 찾을 수 없습니다.")
-    item = item_repository.get(db, log.item_id)
-    if not item:
-        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
-
-    if log.transaction_type not in QUANTITY_CORRECTABLE:
+    try:
+        result = transaction_actions_svc.correct_transaction_quantity(
+            db,
+            log_id=log_id,
+            editor=editor,
+            new_quantity=payload.quantity_change,
+            reason=payload.reason,
+            request=request,
+        )
+    except (
+        transaction_actions_svc.TransactionLogNotFound,
+        transaction_actions_svc.TransactionItemNotFound,
+        transaction_actions_svc.TransactionInventoryNotFound,
+    ) as exc:
+        raise http_error(404, ErrorCode.NOT_FOUND, str(exc))
+    except transaction_actions_svc.CorrectionConflict as exc:
         raise http_error(
-            422,
-            ErrorCode.BUSINESS_RULE,
-            f"수량 보정은 RECEIVE / SHIP 유형만 지원합니다 (현재: {log.transaction_type.value}).",
+            409,
+            ErrorCode.CORRECTION_CONFLICT,
+            str(exc),
+            reason=exc.reason,
         )
+    except transaction_actions_svc.TransactionQuantityCorrectionShortage as exc:
+        raise http_error(422, ErrorCode.STOCK_SHORTAGE, str(exc))
+    except transaction_actions_svc.UnsupportedTransactionQuantityCorrection as exc:
+        raise http_error(422, ErrorCode.BUSINESS_RULE, str(exc))
 
-    new_qty = payload.quantity_change
-
-    # SHIP 부호 검증: SHIP은 음수여야 함
-    if log.transaction_type == TransactionTypeEnum.SHIP and new_qty >= 0:
-        raise http_error(
-            422,
-            ErrorCode.BUSINESS_RULE,
-            "SHIP의 수량 변화량은 음수여야 합니다 (UI에서 양수 입력 시 자동 음수 변환 필요).",
-        )
-    if log.transaction_type == TransactionTypeEnum.RECEIVE and new_qty <= 0:
-        raise http_error(
-            422,
-            ErrorCode.BUSINESS_RULE,
-            "RECEIVE의 수량 변화량은 양수여야 합니다.",
-        )
-
-    # 동일 거래에 이미 수량 보정 이력이 있으면 추가 보정 차단 (정책 미확정)
-    existing_correction = (
-        db.query(TransactionEditLog.edit_id)
-        .filter(
-            TransactionEditLog.original_log_id == log.log_id,
-            TransactionEditLog.correction_log_id.isnot(None),
-        )
-        .first()
-    )
-    if existing_correction is not None:
-        raise http_error(
-            422,
-            ErrorCode.BUSINESS_RULE,
-            "이미 수량 보정된 거래입니다. 추가 보정은 별도 정책 확정 후 가능합니다.",
-        )
-
-    delta = new_qty - log.quantity_change
-
-    # 재고 검증: 보정 후 warehouse_qty >= max(0, pending_quantity)
-    inv = inventory_repository.get(db, log.item_id)
-    if not inv:
-        raise http_error(404, ErrorCode.NOT_FOUND, "재고 레코드를 찾을 수 없습니다.")
-
-    new_warehouse = inv.warehouse_qty + delta
-    if new_warehouse < 0:
-        raise http_error(
-            422,
-            ErrorCode.STOCK_SHORTAGE,
-            f"재고 부족: 보정 후 창고 재고가 {float(new_warehouse)}로 음수가 됩니다.",
-        )
-    # pending_quantity가 None인 레거시 레코드 방어
-    pending = inv.pending_quantity or Decimal("0")
-    if new_warehouse < pending:
-        raise http_error(
-            422,
-            ErrorCode.STOCK_SHORTAGE,
-            "예약 수량보다 창고 재고가 낮아질 수 없습니다.",
-        )
-
-    before = _log_snapshot(log)
-    correction_log = transaction_actions_svc.correct_transaction_quantity(
-        db,
-        log=log,
-        editor=editor,
-        new_warehouse=new_warehouse,
-        delta=delta,
-        reason=payload.reason,
-        before=before,
-        request=request,
-    )
+    log = result.original
+    correction_log = result.correction
+    item = result.item
     db.refresh(log)
     db.refresh(correction_log)
 

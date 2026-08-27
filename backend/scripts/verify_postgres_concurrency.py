@@ -16,6 +16,7 @@ from sqlalchemy.pool import NullPool
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 TEST_DB_ACK = "ALLOW_TEST_DB_MUTATION"
 REQUIRED_TESTS = [
+    "tests/migrations/test_cp4_integrity.py::test_postgresql_head_0031_downgrade_and_reupgrade",
     "tests/concurrency/test_operator_session_postgres.py::test_postgres_foreign_operator_preflight_stays_fail_closed_after_rotation",
     "tests/concurrency/test_operator_session_postgres.py::test_postgres_same_cookie_login_then_logout_leaves_no_reissued_session",
     "tests/concurrency/test_operator_session_postgres.py::test_postgres_same_cookie_logout_then_login_fails_after_revalidation",
@@ -30,6 +31,10 @@ REQUIRED_TESTS = [
     "tests/services/test_warehouse_map_postgres_locking.py::test_postgres_head_public_tables_serialize_two_connections",
     "tests/services/test_warehouse_map_postgres_locking.py::test_postgres_concurrent_admin_moves_serialize_target_capacity_and_stack_order",
     "tests/services/test_warehouse_map_postgres_locking.py::test_postgres_outbound_blocks_actual_admin_move_until_commit",
+    "tests/concurrency/test_transaction_correction_postgres.py::test_postgres_cp4_partial_unique_index_is_present",
+    "tests/concurrency/test_transaction_correction_postgres.py::test_postgres_concurrent_corrections_have_one_winner_and_no_loser_orphans",
+    "tests/concurrency/test_transaction_correction_postgres.py::test_postgres_correction_and_cancel_have_one_winner_and_no_loser_orphans",
+    "tests/concurrency/test_transaction_correction_postgres.py::test_postgres_corrected_operation_rejects_fresh_cancellation_preview",
 ]
 
 

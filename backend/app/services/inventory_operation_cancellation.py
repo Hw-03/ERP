@@ -33,6 +33,7 @@ from app.models import (
     StockRequest,
     StockRequestStatusEnum,
     StockRequestLine,
+    TransactionEditLog,
     TransactionLog,
     TransactionTypeEnum,
     WarehouseBoxItem,
@@ -54,6 +55,7 @@ INSUFFICIENT_STOCK_MESSAGE = (
     "현재 재고가 부족하여 취소할 수 없습니다. "
     "현재 재고를 확인한 뒤 다시 시도해 주세요."
 )
+CORRECTED_OPERATION_MESSAGE = "수량 보정된 거래를 포함한 원작업은 취소할 수 없습니다."
 
 
 class CancellationError(ValueError):
@@ -353,6 +355,17 @@ def preview_cancellation(
         .order_by(TransactionLog.created_at.asc(), TransactionLog.log_id.asc())
         .all()
     )
+    log_ids = [log.log_id for log in logs]
+    if log_ids and (
+        db.query(TransactionEditLog.edit_id)
+        .filter(
+            TransactionEditLog.original_log_id.in_(log_ids),
+            TransactionEditLog.correction_log_id.isnot(None),
+        )
+        .first()
+        is not None
+    ):
+        blockers.append(CORRECTED_OPERATION_MESSAGE)
     movements = (
         db.query(DefectInventoryMovement)
         .filter(DefectInventoryMovement.operation_id == operation.operation_id)
