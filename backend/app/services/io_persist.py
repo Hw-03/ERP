@@ -376,6 +376,7 @@ def _persist_batch(
     payload,
     status: str,
     submitted_at: Optional[datetime] = None,
+    request_fingerprint: Optional[str] = None,
 ) -> IoBatch:
     validate_internal_use_requester(
         requester,
@@ -428,6 +429,7 @@ def _persist_batch(
         reference_no=payload.reference_no,
         notes=payload.notes,
         client_request_id=getattr(payload, "client_request_id", None),
+        request_fingerprint=request_fingerprint,
         submitted_at=submitted_at,
         created_at=now,
         updated_at=now,

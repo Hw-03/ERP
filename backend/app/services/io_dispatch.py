@@ -1118,6 +1118,7 @@ def submit(
     payload: IoSubmitRequest,
     *,
     requester: Employee,
+    request_fingerprint: str | None = None,
 ) -> dict:
     _validate_required_memo(
         work_type=payload.work_type,
@@ -1132,6 +1133,7 @@ def submit(
         payload=payload,
         status="submitted",
         submitted_at=datetime.utcnow(),
+        request_fingerprint=request_fingerprint,
     )
     return _execute_submission(db, requester=requester, batch=batch)
 

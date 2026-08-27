@@ -35,6 +35,15 @@ REQUIRED_TESTS = [
     "tests/concurrency/test_transaction_correction_postgres.py::test_postgres_concurrent_corrections_have_one_winner_and_no_loser_orphans",
     "tests/concurrency/test_transaction_correction_postgres.py::test_postgres_correction_and_cancel_have_one_winner_and_no_loser_orphans",
     "tests/concurrency/test_transaction_correction_postgres.py::test_postgres_corrected_operation_rejects_fresh_cancellation_preview",
+    "tests/concurrency/test_cp4_command_postgres.py::test_postgres_cp4_fingerprint_columns_are_nullable_varchar_64",
+    "tests/concurrency/test_cp4_command_postgres.py::test_postgres_io_same_key_collision_applies_once_and_replays",
+    "tests/concurrency/test_cp4_command_postgres.py::test_postgres_stock_request_same_key_collision_reserves_once_and_replays",
+    "tests/concurrency/test_cp4_command_postgres.py::test_postgres_stock_request_code_retry_reacquires_idempotency_lock",
+    "tests/concurrency/test_cp4_command_postgres.py::test_postgres_cross_route_same_key_race_has_one_owner",
+    "tests/concurrency/test_cp4_command_postgres.py::test_postgres_handover_receive_race_has_one_winner_and_no_orphans",
+    "tests/concurrency/test_cp4_command_postgres.py::test_postgres_handover_cancel_race_has_one_winner_and_no_orphans",
+    "tests/concurrency/test_cp4_command_postgres.py::test_postgres_handover_rollback_then_retry_has_one_physical_result",
+    "tests/concurrency/test_cp4_command_postgres.py::test_postgres_lost_response_retries_replay_io_and_stock_without_duplication",
 ]
 
 

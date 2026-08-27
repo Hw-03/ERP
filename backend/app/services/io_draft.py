@@ -181,30 +181,29 @@ def delete_draft(db: Session, *, batch_id: uuid.UUID, requester: Employee) -> No
 def find_by_client_request_id(
     db: Session,
     client_request_id: str,
-    *,
-    requester: Employee,
 ) -> Optional[IoBatch]:
-    """멱등 retry 시 기존 batch 조회. submit IntegrityError 후 라우터가 사용."""
+    """멱등 retry 시 key의 전역 소유 batch를 조회한다."""
     return (
         db.query(IoBatch)
-        .filter(
-            IoBatch.client_request_id == client_request_id,
-            IoBatch.requester_employee_id == requester.employee_id,
-        )
+        .filter(IoBatch.client_request_id == client_request_id)
         .first()
     )
 
 
-def build_idempotent_response(batch: IoBatch) -> dict:
+def build_idempotent_response(batch: IoBatch, *, db: Session) -> dict:
     """이미 처리 완료된 batch에 대해 IoSubmitResponse 모양 dict 생성 (재제출 멱등 응답)."""
-    if batch.requires_approval:
+    if batch.status in {"submitted", "reserved"}:
         message = "승인 요청이 생성되었습니다."
+    elif not any(line.included for bundle in batch.bundles for line in bundle.lines):
+        message = "BOM 재고 미반영 품목만 포함되어 재고 변동 없이 처리되었습니다."
     else:
         message = "입출고가 반영되었습니다."
+    batch_payload = _batch_to_payload(batch, db=db)
     return {
-        "batch": _batch_to_payload(batch),
+        "batch": batch_payload,
         "status": batch.status,
         "requires_approval": batch.requires_approval,
         "stock_request_id": batch.stock_request_id,
+        "stock_requests": batch_payload["stock_requests"],
         "message": message,
     }

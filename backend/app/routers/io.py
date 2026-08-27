@@ -37,10 +37,55 @@ from app.services import shipping as shipping_svc
 from app.services import shipping_actions as shipping_actions_svc
 from app.services.shipping import ShippingError
 from app.services._tx import commit_only
-from app.models import Employee, TransactionLog
+from app.models import Employee, StockRequest, TransactionLog
+from app.services.command_idempotency import (
+    IdempotencyConflict,
+    fingerprint_io_submit,
+    lock_idempotency_key,
+    require_matching_fingerprint,
+)
 
 
 router = VerifiedActorRouter()
+
+
+def _idempotency_conflict(reason: str) -> Exception:
+    return http_error(
+        409,
+        ErrorCode.IDEMPOTENCY_CONFLICT,
+        "같은 요청 키를 다른 명령에 사용할 수 없습니다.",
+        reason=reason,
+    )
+
+
+def _resolve_io_idempotency(
+    db: Session,
+    *,
+    client_request_id: str,
+    request_fingerprint: str,
+    actor: Employee,
+) -> dict | None:
+    """key의 전역 소유자를 확인하고 exact IO retry만 응답으로 재생한다."""
+    cross_route = (
+        db.query(StockRequest.request_id)
+        .filter(StockRequest.client_request_id == client_request_id)
+        .first()
+    )
+    if cross_route is not None:
+        raise _idempotency_conflict("route_mismatch")
+    existing = io_svc.find_by_client_request_id(db, client_request_id)
+    if existing is None:
+        return None
+    if existing.requester_employee_id != actor.employee_id:
+        raise _idempotency_conflict("actor_mismatch")
+    try:
+        require_matching_fingerprint(
+            existing.request_fingerprint,
+            request_fingerprint,
+        )
+    except IdempotencyConflict as exc:
+        raise _idempotency_conflict(exc.reason)
+    return io_svc.build_idempotent_response(existing, db=db)
 
 
 def _load_item_conversion_requester(db: Session, employee_id: uuid.UUID) -> Employee:
@@ -266,8 +311,34 @@ def submit_io(
     db: Session = Depends(get_db),
 ) -> dict:
     ensure_actor_employee_id(actor, payload.requester_employee_id)
+    request_fingerprint: str | None = None
+    client_request_id = getattr(payload, "client_request_id", None)
+    if client_request_id:
+        request_fingerprint = fingerprint_io_submit(actor.employee_id, payload)
+        replay = _resolve_io_idempotency(
+            db,
+            client_request_id=client_request_id,
+            request_fingerprint=request_fingerprint,
+            actor=actor,
+        )
+        if replay is not None:
+            return replay
+        lock_idempotency_key(db, client_request_id)
+        replay = _resolve_io_idempotency(
+            db,
+            client_request_id=client_request_id,
+            request_fingerprint=request_fingerprint,
+            actor=actor,
+        )
+        if replay is not None:
+            return replay
     try:
-        result = io_actions_svc.submit(db, payload, requester=actor)
+        submit_kwargs = (
+            {"request_fingerprint": request_fingerprint}
+            if request_fingerprint is not None
+            else {}
+        )
+        result = io_actions_svc.submit(db, payload, requester=actor, **submit_kwargs)
         _batch = result.get("batch") or {}
         http_request.state.activity_audit_related_id = str(_batch.get("batch_id") or "")[:120] or None
         http_request.state.activity_audit_target_summary = (
@@ -290,15 +361,18 @@ def submit_io(
     except ValueError as exc:
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
     except IntegrityError as exc:
-        # client_request_id 중복 → 기존 batch 멱등 반환 (더블클릭/네트워크 retry 보호)
-        if payload.client_request_id and "client_request_id" in str(exc).lower():
-            existing = io_svc.find_by_client_request_id(
+        # failed transaction 정리 뒤 winner를 재조회해야 PostgreSQL 세션을 다시 쓸 수 있다.
+        db.rollback()
+        db.expire_all()
+        if client_request_id and request_fingerprint is not None:
+            replay = _resolve_io_idempotency(
                 db,
-                payload.client_request_id,
-                requester=actor,
+                client_request_id=client_request_id,
+                request_fingerprint=request_fingerprint,
+                actor=actor,
             )
-            if existing is not None:
-                return io_svc.build_idempotent_response(existing)
+            if replay is not None:
+                return replay
             raise http_error(
                 409,
                 ErrorCode.CONFLICT,

@@ -17,6 +17,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[2]
 PREVIOUS_REVISION = "20260827_0030"
 MIGRATION_REVISION = "20260828_0031"
 CORRECTION_UNIQUE_INDEX = "uq_transaction_edit_log_quantity_correction"
+FINGERPRINT_TABLES = ("io_batches", "stock_requests")
 
 
 def _config(database_path: Path) -> Config:
@@ -59,6 +60,12 @@ def test_0030_to_0031_adds_and_rollback_removes_correction_unique_index(
     }
     assert indexes[CORRECTION_UNIQUE_INDEX]["column_names"] == ["original_log_id"]
     assert bool(indexes[CORRECTION_UNIQUE_INDEX]["unique"]) is True
+    for table_name in FINGERPRINT_TABLES:
+        columns = {column["name"]: column for column in inspector.get_columns(table_name)}
+        fingerprint = columns["request_fingerprint"]
+        assert fingerprint["nullable"] is True
+        assert isinstance(fingerprint["type"], sa.String)
+        assert fingerprint["type"].length == 64
     with engine.connect() as connection:
         index_sql = connection.execute(
             sa.text(
@@ -78,6 +85,10 @@ def test_0030_to_0031_adds_and_rollback_removes_correction_unique_index(
         index["name"]
         for index in inspector.get_indexes("transaction_edit_logs")
     }
+    for table_name in FINGERPRINT_TABLES:
+        assert "request_fingerprint" not in {
+            column["name"] for column in inspector.get_columns(table_name)
+        }
     with engine.connect() as connection:
         assert connection.execute(
             sa.text("SELECT version_num FROM alembic_version")
@@ -97,6 +108,11 @@ def test_fresh_upgrade_contains_cp4_correction_unique_index(tmp_path: Path) -> N
         for index in sa.inspect(engine).get_indexes("transaction_edit_logs")
     }
     assert CORRECTION_UNIQUE_INDEX in indexes
+    inspector = sa.inspect(engine)
+    for table_name in FINGERPRINT_TABLES:
+        assert "request_fingerprint" in {
+            column["name"] for column in inspector.get_columns(table_name)
+        }
     engine.dispose()
 
 
@@ -239,6 +255,67 @@ def test_upgrade_accepts_exact_preexisting_correction_index(
     engine.dispose()
 
 
+def test_upgrade_accepts_exact_preexisting_fingerprint_columns(
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "cp4-preexisting-fingerprints.db"
+    config = _config(database_path)
+    command.upgrade(config, PREVIOUS_REVISION)
+    engine = sa.create_engine(f"sqlite:///{database_path.as_posix()}")
+    with engine.begin() as connection:
+        for table_name in FINGERPRINT_TABLES:
+            connection.execute(
+                sa.text(
+                    f"ALTER TABLE {table_name} "
+                    "ADD COLUMN request_fingerprint VARCHAR(64) NULL"
+                )
+            )
+
+    command.upgrade(config, MIGRATION_REVISION)
+
+    inspector = sa.inspect(engine)
+    for table_name in FINGERPRINT_TABLES:
+        columns = [
+            column
+            for column in inspector.get_columns(table_name)
+            if column["name"] == "request_fingerprint"
+        ]
+        assert len(columns) == 1
+        assert columns[0]["type"].length == 64
+    engine.dispose()
+
+
+@pytest.mark.parametrize("table_name", FINGERPRINT_TABLES)
+def test_upgrade_rejects_incompatible_preexisting_fingerprint_column(
+    tmp_path: Path,
+    table_name: str,
+) -> None:
+    database_path = tmp_path / f"cp4-incompatible-{table_name}.db"
+    config = _config(database_path)
+    command.upgrade(config, PREVIOUS_REVISION)
+    engine = sa.create_engine(f"sqlite:///{database_path.as_posix()}")
+    with engine.begin() as connection:
+        connection.execute(
+            sa.text(
+                f"ALTER TABLE {table_name} "
+                "ADD COLUMN request_fingerprint VARCHAR(32) NULL"
+            )
+        )
+
+    with pytest.raises(RuntimeError, match="incompatible contract"):
+        command.upgrade(config, MIGRATION_REVISION)
+
+    with engine.connect() as connection:
+        assert connection.execute(
+            sa.text("SELECT version_num FROM alembic_version")
+        ).scalar_one() == PREVIOUS_REVISION
+    assert CORRECTION_UNIQUE_INDEX not in {
+        index["name"]
+        for index in sa.inspect(engine).get_indexes("transaction_edit_logs")
+    }
+    engine.dispose()
+
+
 @pytest.mark.parametrize(
     "index_sql",
     [
@@ -292,6 +369,12 @@ def test_postgresql_offline_upgrade_emits_partial_unique_index() -> None:
         "ON transaction_edit_logs (original_log_id) "
         "WHERE correction_log_id IS NOT NULL"
     ) in sql
+    assert "ALTER TABLE io_batches ADD COLUMN request_fingerprint VARCHAR(64)" in sql
+    assert "ALTER TABLE stock_requests ADD COLUMN request_fingerprint VARCHAR(64)" in sql
+    assert (
+        "ALTER TYPE handover_status_enum ADD VALUE IF NOT EXISTS 'CANCELLED'"
+        in sql
+    )
 
 
 @pytest.mark.skipif(
@@ -299,7 +382,7 @@ def test_postgresql_offline_upgrade_emits_partial_unique_index() -> None:
     reason="TEST_POSTGRES_URL이 설정된 전용 PostgreSQL에서만 실행",
 )
 def test_postgresql_fresh_upgrade_0030_to_0031_and_rollback() -> None:
-    """빈 전용 DB에서 CP4 전후 revision과 partial unique index를 왕복한다."""
+    """head 전용 DB에서 0030→0031과 rollback을 한 transaction으로 왕복한다."""
     database_url = os.environ["TEST_POSTGRES_URL"]
     engine = sa.create_engine(database_url, poolclass=sa.pool.NullPool)
     try:
@@ -309,7 +392,7 @@ def test_postgresql_fresh_upgrade_0030_to_0031_and_rollback() -> None:
                 config = _postgres_config(database_url)
                 config.attributes["connection"] = connection
 
-                command.upgrade(config, PREVIOUS_REVISION)
+                command.downgrade(config, PREVIOUS_REVISION)
                 assert connection.execute(
                     sa.text("SELECT version_num FROM alembic_version")
                 ).scalar_one() == PREVIOUS_REVISION
@@ -329,6 +412,14 @@ def test_postgresql_fresh_upgrade_0030_to_0031_and_rollback() -> None:
                 ).scalar_one().endswith(
                     "WHERE (correction_log_id IS NOT NULL)"
                 )
+                assert connection.execute(
+                    sa.text(
+                        "SELECT count(*) FROM information_schema.columns "
+                        "WHERE table_schema = current_schema() "
+                        "AND column_name = 'request_fingerprint' "
+                        "AND table_name IN ('io_batches', 'stock_requests')"
+                    )
+                ).scalar_one() == 2
 
                 command.downgrade(config, PREVIOUS_REVISION)
                 assert connection.execute(
@@ -341,6 +432,14 @@ def test_postgresql_fresh_upgrade_0030_to_0031_and_rollback() -> None:
                         "AND indexname = :name"
                     ),
                     {"name": CORRECTION_UNIQUE_INDEX},
+                ).scalar_one() == 0
+                assert connection.execute(
+                    sa.text(
+                        "SELECT count(*) FROM information_schema.columns "
+                        "WHERE table_schema = current_schema() "
+                        "AND column_name = 'request_fingerprint' "
+                        "AND table_name IN ('io_batches', 'stock_requests')"
+                    )
                 ).scalar_one() == 0
 
                 connection.execute(

@@ -29,6 +29,7 @@ def create_request(
     reference_no: Optional[str],
     notes: Optional[str],
     client_request_id: Optional[str] = None,
+    request_fingerprint: Optional[str] = None,
     reason_category: Optional[str] = None,
     reason_memo: Optional[str] = None,
 ) -> StockRequest:
@@ -42,6 +43,7 @@ def create_request(
             reference_no=reference_no,
             notes=notes,
             client_request_id=client_request_id,
+            request_fingerprint=request_fingerprint,
             reason_category=reason_category,
             reason_memo=reason_memo,
         )

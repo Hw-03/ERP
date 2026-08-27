@@ -1931,11 +1931,212 @@ def test_io_submit_idempotent_with_client_request_id(client, db_session, make_it
     second = client.post("/api/io/submit", json=payload)
     assert second.status_code == 201, second.json()
     assert second.json()["batch"]["batch_id"] == first_batch_id
+    assert second.json() == first.json()
 
     # batch가 1건만 존재하고 재고도 4 한 번만 증가
     assert db_session.query(IoBatch).count() == 1
     inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
     assert inv.warehouse_qty == Decimal("4")
+
+
+def test_io_submit_idempotent_replay_preserves_approval_response(
+    client, db_session, make_item
+):
+    item = make_item(name="Idem approval raw", warehouse_qty=Decimal("10"))
+    requester = _make_employee(
+        db_session,
+        code="IO-IDEM-APPROVAL",
+        department=DepartmentEnum.AS,
+    )
+    db_session.commit()
+    preview = _preview_internal_use(client, requester, item)
+    assert preview.status_code == 200, preview.json()
+    payload = {
+        "requester_employee_id": str(requester.employee_id),
+        "work_type": "internal_use",
+        "sub_type": "internal_use_out",
+        "to_department": "AS",
+        "client_request_id": "test-idem-key-approval",
+        "bundles": preview.json()["bundles"],
+    }
+
+    first = client.post("/api/io/submit", json=payload)
+    second = client.post("/api/io/submit", json=payload)
+
+    assert first.status_code == 201, first.json()
+    assert second.status_code == 201, second.json()
+    assert second.json() == first.json()
+    assert first.json()["status"] == "reserved"
+    assert len(first.json()["stock_requests"]) == 1
+    assert first.json()["batch"]["stock_requests"] == first.json()["stock_requests"]
+    assert db_session.query(IoBatch).count() == 1
+    assert db_session.query(StockRequest).count() == 1
+    db_session.expire_all()
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("10")
+    assert inventory.pending_quantity == Decimal("3")
+
+
+def test_io_submit_same_key_changed_payload_conflicts_without_mutation(
+    client, db_session, make_item
+):
+    item = make_item(name="Semantic Idem Raw", warehouse_qty=Decimal("0"))
+    requester = _make_employee(db_session, code="IO-IDEM-CHANGED")
+    db_session.commit()
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "receive",
+            "sub_type": "receive_supplier",
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "item_id": str(item.item_id),
+                    "quantity": "4",
+                }
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.json()
+    payload = {
+        "requester_employee_id": str(requester.employee_id),
+        "work_type": "receive",
+        "sub_type": "receive_supplier",
+        "client_request_id": "test-idem-key-changed",
+        "bundles": preview.json()["bundles"],
+    }
+    first = client.post("/api/io/submit", json=payload)
+    assert first.status_code == 201, first.json()
+    logs_before = db_session.query(TransactionLog).count()
+
+    changed = {**payload, "notes": "different inventory command"}
+    changed["bundles"] = [dict(bundle) for bundle in payload["bundles"]]
+    changed["bundles"][0]["quantity"] = 5
+    changed["bundles"][0]["lines"] = [
+        {**line, "quantity": 5} for line in payload["bundles"][0]["lines"]
+    ]
+    conflict = client.post("/api/io/submit", json=changed)
+
+    assert conflict.status_code == 409, conflict.json()
+    assert conflict.json()["detail"]["code"] == "IDEMPOTENCY_CONFLICT"
+    assert conflict.json()["detail"]["extra"]["reason"] == "fingerprint_mismatch"
+    assert db_session.query(IoBatch).count() == 1
+    assert db_session.query(TransactionLog).count() == logs_before
+    db_session.expire_all()
+    inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inv.warehouse_qty == Decimal("4")
+
+
+def test_io_submit_legacy_null_fingerprint_conflicts_without_mutation(
+    client, db_session, make_item
+):
+    item = make_item(name="Legacy Idem Raw", warehouse_qty=Decimal("0"))
+    requester = _make_employee(db_session, code="IO-IDEM-LEGACY")
+    db_session.commit()
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "receive",
+            "sub_type": "receive_supplier",
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "item_id": str(item.item_id),
+                    "quantity": "2",
+                }
+            ],
+        },
+    )
+    payload = {
+        "requester_employee_id": str(requester.employee_id),
+        "work_type": "receive",
+        "sub_type": "receive_supplier",
+        "client_request_id": "test-idem-key-legacy-null",
+        "bundles": preview.json()["bundles"],
+    }
+    first = client.post("/api/io/submit", json=payload)
+    assert first.status_code == 201, first.json()
+    batch = db_session.query(IoBatch).one()
+    batch.request_fingerprint = None
+    db_session.commit()
+    logs_before = db_session.query(TransactionLog).count()
+
+    conflict = client.post("/api/io/submit", json=payload)
+
+    assert conflict.status_code == 409, conflict.json()
+    assert conflict.json()["detail"]["code"] == "IDEMPOTENCY_CONFLICT"
+    assert conflict.json()["detail"]["extra"]["reason"] == "legacy_fingerprint_missing"
+    assert db_session.query(IoBatch).count() == 1
+    assert db_session.query(TransactionLog).count() == logs_before
+
+
+def test_io_submit_same_key_other_actor_and_route_conflict_without_mutation(
+    client, db_session, make_item
+):
+    item = make_item(name="Scoped Idem Raw", warehouse_qty=Decimal("0"))
+    requester = _make_employee(db_session, code="IO-IDEM-SCOPE-1")
+    other = _make_employee(db_session, code="IO-IDEM-SCOPE-2")
+    db_session.commit()
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "receive",
+            "sub_type": "receive_supplier",
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "item_id": str(item.item_id),
+                    "quantity": "3",
+                }
+            ],
+        },
+    )
+    key = "test-idem-key-actor-route"
+    payload = {
+        "requester_employee_id": str(requester.employee_id),
+        "work_type": "receive",
+        "sub_type": "receive_supplier",
+        "client_request_id": key,
+        "bundles": preview.json()["bundles"],
+    }
+    first = client.post("/api/io/submit", json=payload)
+    assert first.status_code == 201, first.json()
+    logs_before = db_session.query(TransactionLog).count()
+
+    actor_conflict = client.post(
+        "/api/io/submit",
+        json={**payload, "requester_employee_id": str(other.employee_id)},
+    )
+    route_conflict = client.post(
+        "/api/stock-requests",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "request_type": "warehouse_to_dept",
+            "client_request_id": key,
+            "lines": [
+                {
+                    "item_id": str(item.item_id),
+                    "quantity": 1,
+                    "from_bucket": "warehouse",
+                    "to_bucket": "production",
+                    "to_department": DepartmentEnum.ASSEMBLY.value,
+                }
+            ],
+        },
+    )
+
+    assert actor_conflict.status_code == 409, actor_conflict.json()
+    assert actor_conflict.json()["detail"]["code"] == "IDEMPOTENCY_CONFLICT"
+    assert actor_conflict.json()["detail"]["extra"]["reason"] == "actor_mismatch"
+    assert route_conflict.status_code == 409, route_conflict.json()
+    assert route_conflict.json()["detail"]["code"] == "IDEMPOTENCY_CONFLICT"
+    assert route_conflict.json()["detail"]["extra"]["reason"] == "route_mismatch"
+    assert db_session.query(IoBatch).count() == 1
+    assert db_session.query(StockRequest).count() == 0
+    assert db_session.query(TransactionLog).count() == logs_before
 
 
 def test_io_immediate_adjust_in_increases_production_quantity(

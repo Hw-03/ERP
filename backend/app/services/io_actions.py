@@ -18,10 +18,16 @@ def submit(
     payload: IoSubmitRequest,
     *,
     requester: Employee,
+    request_fingerprint: str | None = None,
 ) -> dict[str, Any]:
     """새 배치의 다라인 재고·박스·요청·로그를 원자적으로 확정한다."""
     with transactional(db):
-        return io_dispatch.submit(db, payload, requester=requester)
+        return io_dispatch.submit(
+            db,
+            payload,
+            requester=requester,
+            request_fingerprint=request_fingerprint,
+        )
 
 
 def submit_existing_draft(

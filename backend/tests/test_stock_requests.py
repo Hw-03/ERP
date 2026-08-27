@@ -73,6 +73,7 @@ def _create_request_via_api(
     request_type: str,
     lines: list[dict],
     notes: str | None = None,
+    client_request_id: str | None = None,
 ) -> dict:
     payload = {
         "requester_employee_id": requester_id,
@@ -81,8 +82,125 @@ def _create_request_via_api(
     }
     if notes is not None:
         payload["notes"] = notes
+    if client_request_id is not None:
+        payload["client_request_id"] = client_request_id
     res = client.post("/api/stock-requests", json=payload)
     return {"status_code": res.status_code, "body": res.json()}
+
+
+def test_stock_request_semantic_idempotency_replays_exact_and_rejects_change(
+    db_session, client, make_item
+):
+    item = make_item(name="Stock semantic idem", warehouse_qty=Decimal("10"))
+    requester = _make_employee(
+        db_session, code="SR-IDEM-01", name="요청자-IDEM"
+    )
+    db_session.commit()
+    line = {
+        "item_id": str(item.item_id),
+        "quantity": "1",
+        "from_bucket": "warehouse",
+        "to_bucket": "production",
+        "to_department": DepartmentEnum.ASSEMBLY.value,
+    }
+    key = "stock-semantic-idem-001"
+
+    first = _create_request_via_api(
+        client,
+        requester_id=str(requester.employee_id),
+        request_type="warehouse_to_dept",
+        lines=[line],
+        notes="same",
+        client_request_id=key,
+    )
+    exact = _create_request_via_api(
+        client,
+        requester_id=str(requester.employee_id),
+        request_type="warehouse_to_dept",
+        lines=[line],
+        notes="same",
+        client_request_id=key,
+    )
+    changed = _create_request_via_api(
+        client,
+        requester_id=str(requester.employee_id),
+        request_type="warehouse_to_dept",
+        lines=[{**line, "quantity": "2"}],
+        notes="changed",
+        client_request_id=key,
+    )
+
+    assert first["status_code"] == 201, first["body"]
+    assert exact["status_code"] == 201, exact["body"]
+    assert exact["body"]["request_id"] == first["body"]["request_id"]
+    assert changed["status_code"] == 409, changed["body"]
+    assert changed["body"]["detail"]["code"] == "IDEMPOTENCY_CONFLICT"
+    assert changed["body"]["detail"]["extra"]["reason"] == "fingerprint_mismatch"
+    assert db_session.query(StockRequest).count() == 1
+    db_session.expire_all()
+    inventory = db_session.query(Inventory).filter_by(item_id=item.item_id).one()
+    assert inventory.pending_quantity == Decimal("1")
+
+
+def test_stock_request_same_key_other_actor_and_legacy_null_are_fail_closed(
+    db_session, client, make_item
+):
+    item = make_item(name="Stock scoped idem", warehouse_qty=Decimal("10"))
+    requester = _make_employee(
+        db_session, code="SR-IDEM-SCOPE-1", name="요청자-IDEM-1"
+    )
+    other = _make_employee(
+        db_session, code="SR-IDEM-SCOPE-2", name="요청자-IDEM-2"
+    )
+    db_session.commit()
+    line = {
+        "item_id": str(item.item_id),
+        "quantity": "1",
+        "from_bucket": "warehouse",
+        "to_bucket": "production",
+        "to_department": DepartmentEnum.ASSEMBLY.value,
+    }
+    key = "stock-semantic-idem-scope"
+    first = _create_request_via_api(
+        client,
+        requester_id=str(requester.employee_id),
+        request_type="warehouse_to_dept",
+        lines=[line],
+        client_request_id=key,
+    )
+    assert first["status_code"] == 201, first["body"]
+
+    actor_conflict = _create_request_via_api(
+        client,
+        requester_id=str(other.employee_id),
+        request_type="warehouse_to_dept",
+        lines=[line],
+        client_request_id=key,
+    )
+    assert actor_conflict["status_code"] == 409, actor_conflict["body"]
+    assert actor_conflict["body"]["detail"]["code"] == "IDEMPOTENCY_CONFLICT"
+    assert actor_conflict["body"]["detail"]["extra"]["reason"] == "actor_mismatch"
+
+    request = db_session.query(StockRequest).one()
+    request.request_fingerprint = None
+    db_session.commit()
+    legacy_conflict = _create_request_via_api(
+        client,
+        requester_id=str(requester.employee_id),
+        request_type="warehouse_to_dept",
+        lines=[line],
+        client_request_id=key,
+    )
+    assert legacy_conflict["status_code"] == 409, legacy_conflict["body"]
+    assert legacy_conflict["body"]["detail"]["code"] == "IDEMPOTENCY_CONFLICT"
+    assert (
+        legacy_conflict["body"]["detail"]["extra"]["reason"]
+        == "legacy_fingerprint_missing"
+    )
+    assert db_session.query(StockRequest).count() == 1
+    db_session.expire_all()
+    inventory = db_session.query(Inventory).filter_by(item_id=item.item_id).one()
+    assert inventory.pending_quantity == Decimal("1")
 
 
 def test_internal_use_direct_request_rejects_unauthorized_requester(

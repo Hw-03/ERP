@@ -95,6 +95,16 @@ def test_postgres_job_bootstraps_head_and_runs_real_two_connection_tests() -> No
     assert "test_postgres_concurrent_corrections_have_one_winner_and_no_loser_orphans" in runner
     assert "test_postgres_correction_and_cancel_have_one_winner_and_no_loser_orphans" in runner
     assert "test_postgres_corrected_operation_rejects_fresh_cancellation_preview" in runner
+    assert "test_cp4_command_postgres.py" in runner
+    assert "test_postgres_cp4_fingerprint_columns_are_nullable_varchar_64" in runner
+    assert "test_postgres_io_same_key_collision_applies_once_and_replays" in runner
+    assert "test_postgres_stock_request_same_key_collision_reserves_once_and_replays" in runner
+    assert "test_postgres_stock_request_code_retry_reacquires_idempotency_lock" in runner
+    assert "test_postgres_cross_route_same_key_race_has_one_owner" in runner
+    assert "test_postgres_handover_receive_race_has_one_winner_and_no_orphans" in runner
+    assert "test_postgres_handover_cancel_race_has_one_winner_and_no_orphans" in runner
+    assert "test_postgres_handover_rollback_then_retry_has_one_physical_result" in runner
+    assert "test_postgres_lost_response_retries_replay_io_and_stock_without_duplication" in runner
 
     verify_local = _text("scripts/dev/verify_local.ps1")
     assert "backend-postgres-concurrency" in verify_local

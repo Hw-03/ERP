@@ -597,7 +597,7 @@ def test_cancel_handover_closes_workflow_instead_of_restoring_waiting_state(
 
     handover_svc.receive_handover(
         db_session,
-        document,
+        document.handover_id,
         actor=receiver,
         pin="0000",
     )

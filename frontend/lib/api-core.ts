@@ -58,11 +58,12 @@ export class ApiError extends Error {
 }
 
 /** 쓰기 요청의 연결 거절·시간 초과를 구분하는 오류 클래스. */
-export class ApiConnectionError extends Error {
-  constructor() {
-    super("연결 실패");
-  }
+export class ResultUnknownError extends Error {
+  constructor() { super("연결 실패"); }
 }
+
+/** 기존 연결 오류 계약과 전송 결과 불명 오류를 같은 전용 타입으로 유지한다. */
+export { ResultUnknownError as ApiConnectionError };
 
 export function extractErrorMessage(detail: unknown, fallback = "처리 실패"): string {
   if (typeof detail === "string") return detail;
@@ -110,7 +111,7 @@ interface ParsedApiError {
 }
 
 async function parseApiError(res: Response): Promise<ParsedApiError> {
-  const text = await res.text();
+  const text = await res.text().catch(() => "");
   try {
     const json = JSON.parse(text);
     const detail = json?.detail;
@@ -329,16 +330,21 @@ async function writeJson<T>(
   try {
     res = await fetch(url, init);
   } catch {
-    throw new ApiConnectionError();
+    throw new ResultUnknownError();
   } finally {
     clearTimeout(timeoutId);
     callerSignal?.removeEventListener("abort", abortFromCaller);
   }
+  if (controller.signal.aborted) throw new ResultUnknownError();
   if (!res.ok) throw await apiErrorFromResponse(res, requestAuthGeneration);
   if (res.status === 204) return undefined as T;
-  const text = await res.text();
-  if (!text) return undefined as T;
-  return JSON.parse(text) as T;
+  try {
+    const text = await res.text();
+    if (!text) return undefined as T;
+    return JSON.parse(text) as T;
+  } catch {
+    throw new ResultUnknownError();
+  }
 }
 
 export const postJson = <T>(

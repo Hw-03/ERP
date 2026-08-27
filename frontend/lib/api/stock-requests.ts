@@ -4,7 +4,15 @@
  * Round-6 (R6-D8) 분리. 창고 결재 흐름 + draft 장바구니. 11 메소드.
  */
 
-import { deleteJson, fetcher, postJson, putJson, toApiUrl } from "../api-core";
+import {
+  deleteJson,
+  fetcher,
+  postJson,
+  putJson,
+  toApiUrl,
+} from "../api-core";
+import { makeClientRequestId } from "../uuid";
+import { runPendingCommand } from "../pending-command-storage";
 import type {
   StockRequest,
   StockRequestActionPayload,
@@ -14,10 +22,31 @@ import type {
   StockRequestType,
 } from "./types";
 
+function pendingCreateScope(payload: StockRequestCreatePayload): string {
+  const commandScope = payload.client_request_id ?? JSON.stringify(
+    payload,
+    (key, value) => /^(quantity|notes|reference_no|reason_)/.test(key) ? undefined : value,
+  );
+  return `${payload.requester_employee_id}:${commandScope}`;
+}
+
+function createStockRequest(
+  payload: StockRequestCreatePayload,
+): Promise<StockRequest> {
+  const scope = pendingCreateScope(payload);
+  return runPendingCommand(
+    `s:${scope}`,
+    {
+      ...payload,
+      client_request_id: payload.client_request_id ?? makeClientRequestId(),
+    } as StockRequestCreatePayload,
+    (request) => postJson<StockRequest>(toApiUrl("/api/stock-requests"), request),
+  );
+}
+
 export const stockRequestsApi = {
   // Stock requests (창고 결재 흐름) -----------------------------------------
-  createStockRequest: (payload: StockRequestCreatePayload) =>
-    postJson<StockRequest>(toApiUrl("/api/stock-requests"), payload),
+  createStockRequest,
 
   listMyStockRequests: (employeeId: string) =>
     fetcher<StockRequest[]>(

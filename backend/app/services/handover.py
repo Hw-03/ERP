@@ -35,6 +35,18 @@ from app.services._tx import transactional
 _FROM_DEPARTMENT = "튜브"
 
 
+class HandoverNotFound(Exception):
+    """잠금 시점에 대상 인수인계서가 존재하지 않는다."""
+
+
+class HandoverCommandConflict(Exception):
+    """최신 상태에서 receive 명령을 더 이상 실행할 수 없다."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
 def can_receive(actor: Employee, to_department: str) -> bool:
     """인수 확인 권한 — 받는 부서 소속만(고압/진공). 현장 물리 인수 행위이므로 결재권자는 제외."""
     return (actor.department or "").strip() == (to_department or "").strip()
@@ -196,9 +208,9 @@ def _receive_handover(
     if not can_receive(actor, doc.to_department):
         raise PermissionError("해당 부서의 인수 확인 권한이 없습니다.")
     if doc.status == HandoverStatusEnum.RECEIVED:
-        return doc  # 멱등 — 이중 이동 방지
+        raise HandoverCommandConflict("already_received")
     if doc.status != HandoverStatusEnum.SUBMITTED:
-        raise ValueError("제출된 인수인계서만 인수할 수 있습니다.")
+        raise HandoverCommandConflict("invalid_status")
 
     from_dept = DepartmentEnum(doc.from_department)
     to_dept = DepartmentEnum(doc.to_department)
@@ -260,14 +272,22 @@ def _receive_handover(
 
 def receive_handover(
     db: Session,
-    doc: HandoverDoc,
+    handover_id: uuid.UUID,
     *,
     actor: Employee,
     pin: str,
     http_request: Request | None = None,
 ) -> HandoverDoc:
-    """PIN 검증, 재고 이동, 원장과 인수 상태를 원자적으로 확정한다."""
+    """문서 선점 뒤 PIN·상태·재고 이동·원장을 원자적으로 확정한다."""
     with transactional(db):
+        query = db.query(HandoverDoc).filter(
+            HandoverDoc.handover_id == handover_id
+        )
+        if db.get_bind().dialect.name != "sqlite":
+            query = query.with_for_update()
+        doc = query.one_or_none()
+        if doc is None:
+            raise HandoverNotFound
         return _receive_handover(
             db,
             doc,

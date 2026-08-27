@@ -47,7 +47,6 @@ SERVICE_ACTOR_CONSUMERS: dict[str, str] = {
     "app.services.io_dispatch.submit": "requester",
     "app.services.io_dispatch.submit_existing_draft": "requester",
     "app.services.io_draft.delete_draft": "requester",
-    "app.services.io_draft.find_by_client_request_id": "requester",
     "app.services.io_draft.save_draft": "requester",
     "app.services.io_preview.validate_internal_use_requester": "requester",
     "app.services.io_preview.validate_warehouse_adjust_requester": "requester",
@@ -130,6 +129,9 @@ SERVICE_READ_ONLY_EXPORTS: frozenset[str] = frozenset(
         "app.services.codes.next_serial",
         "app.services.codes.parse_mes_code",
         "app.services.codes.validate_code",
+        "app.services.command_idempotency.fingerprint_io_submit",
+        "app.services.command_idempotency.fingerprint_stock_request_create",
+        "app.services.command_idempotency.require_matching_fingerprint",
         "app.services.dept_adjustment.build_disassembly_template",
         "app.services.dept_adjustment.build_production_template",
         "app.services.dept_adjustment.expand_component",
@@ -154,6 +156,7 @@ SERVICE_READ_ONLY_EXPORTS: frozenset[str] = frozenset(
         "app.services.inv_transfer.format_item_location_shortage",
         "app.services.inv_transfer.item_department_stock",
         "app.services.io_draft.build_idempotent_response",
+        "app.services.io_draft.find_by_client_request_id",
         "app.services.io_draft.get_draft",
         "app.services.io_draft.list_drafts",
         "app.services.io_persist.ensure_batch_is_mutable",
@@ -236,6 +239,9 @@ _AUTH_INFRASTRUCTURE_REASON = (
 _RUNTIME_INFRASTRUCTURE_REASON = (
     "프로세스 lifecycle listener 또는 명시적 운영 import를 담당하는 기반 경계"
 )
+_IDEMPOTENCY_LOCK_INFRASTRUCTURE_REASON = (
+    "인증된 업무 명령 transaction의 route 공통 key 직렬화를 담당하는 기반 경계"
+)
 _INVENTORY_OPERATION_MAINTENANCE_REASON = (
     "명시적 재고 원장 운영 CLI의 진단 보정·전향 활성화를 담당하는 기반 경계"
 )
@@ -248,6 +254,7 @@ _WEEKLY_SNAPSHOT_INFRASTRUCTURE_REASON = (
 # This is an exact, reasoned set: no module/name heuristic can auto-admit additions.
 SERVICE_INFRASTRUCTURE_MUTATION_REASONS: dict[str, str] = {
     "app.services._tx.transactional": _RUNTIME_INFRASTRUCTURE_REASON,
+    "app.services.command_idempotency.lock_idempotency_key": _IDEMPOTENCY_LOCK_INFRASTRUCTURE_REASON,
     "app.services.activity_audit.record": _AUDIT_INFRASTRUCTURE_REASON,
     "app.services.audit.record": _AUDIT_INFRASTRUCTURE_REASON,
     "app.services.audit_actor_session.clear_audit_actor_cookie": _AUTH_INFRASTRUCTURE_REASON,

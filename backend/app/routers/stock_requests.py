@@ -44,10 +44,59 @@ from app.services import stock_request_actions as action_svc
 from app.services._tx import commit_and_refresh, commit_only
 from app.services import notifications as notif_svc
 from app.services import rate_limit
+from app.services.command_idempotency import (
+    IdempotencyConflict,
+    fingerprint_stock_request_create,
+    lock_idempotency_key,
+    require_matching_fingerprint,
+)
 from app._evt import emit as _evt_emit
 
 
 router = VerifiedActorRouter()
+
+
+def _idempotency_conflict(reason: str) -> Exception:
+    return http_error(
+        409,
+        ErrorCode.IDEMPOTENCY_CONFLICT,
+        "같은 요청 키를 다른 명령에 사용할 수 없습니다.",
+        reason=reason,
+    )
+
+
+def _resolve_stock_request_idempotency(
+    db: Session,
+    *,
+    client_request_id: str,
+    request_fingerprint: str,
+    actor: Employee,
+) -> StockRequest | None:
+    """exact StockRequest retry만 반환하고 다른 key 소유권은 거부한다."""
+    cross_route = (
+        db.query(IoBatch.batch_id)
+        .filter(IoBatch.client_request_id == client_request_id)
+        .first()
+    )
+    if cross_route is not None:
+        raise _idempotency_conflict("route_mismatch")
+    existing = (
+        db.query(StockRequest)
+        .filter(StockRequest.client_request_id == client_request_id)
+        .first()
+    )
+    if existing is None:
+        return None
+    if existing.requester_employee_id != actor.employee_id:
+        raise _idempotency_conflict("actor_mismatch")
+    try:
+        require_matching_fingerprint(
+            existing.request_fingerprint,
+            request_fingerprint,
+        )
+    except IdempotencyConflict as exc:
+        raise _idempotency_conflict(exc.reason)
+    return existing
 
 
 # ---------------------------------------------------------------------------
@@ -62,6 +111,29 @@ def create_stock_request(
     db: Session = Depends(get_db),
 ) -> StockRequest:
     ensure_actor_employee_id(actor, payload.requester_employee_id)
+    request_fingerprint: str | None = None
+    if payload.client_request_id:
+        request_fingerprint = fingerprint_stock_request_create(
+            actor.employee_id,
+            payload,
+        )
+        replay = _resolve_stock_request_idempotency(
+            db,
+            client_request_id=payload.client_request_id,
+            request_fingerprint=request_fingerprint,
+            actor=actor,
+        )
+        if replay is not None:
+            return replay
+        lock_idempotency_key(db, payload.client_request_id)
+        replay = _resolve_stock_request_idempotency(
+            db,
+            client_request_id=payload.client_request_id,
+            request_fingerprint=request_fingerprint,
+            actor=actor,
+        )
+        if replay is not None:
+            return replay
 
     lines_input = [
         svc.LineInput(
@@ -86,21 +158,27 @@ def create_stock_request(
                 reference_no=payload.reference_no,
                 notes=payload.notes,
                 client_request_id=payload.client_request_id,
+                request_fingerprint=request_fingerprint,
                 reason_category=payload.reason_category,
                 reason_memo=payload.reason_memo,
             )
             return request
         except IntegrityError as exc:
             exc_str = str(exc).lower()
-            # client_request_id 중복 → 기존 요청 멱등 반환
-            if payload.client_request_id and "client_request_id" in exc_str:
-                existing = (
-                    db.query(StockRequest)
-                    .filter(StockRequest.client_request_id == payload.client_request_id)
-                    .first()
+            # failed transaction 정리 뒤 unique winner를 조회한다.
+            db.rollback()
+            db.expire_all()
+            if payload.client_request_id and request_fingerprint is not None:
+                # request_code 재시도까지 같은 route 공통 key lock으로 직렬화한다.
+                lock_idempotency_key(db, payload.client_request_id)
+                replay = _resolve_stock_request_idempotency(
+                    db,
+                    client_request_id=payload.client_request_id,
+                    request_fingerprint=request_fingerprint,
+                    actor=actor,
                 )
-                if existing:
-                    return existing
+                if replay is not None:
+                    return replay
             if attempt == 1 or "request_code" not in exc_str:
                 raise http_error(409, ErrorCode.CONFLICT, "요청 코드 충돌, 다시 시도해 주세요.")
             # attempt=0, request_code 충돌 → 재시도 (새 suffix 자동 생성)

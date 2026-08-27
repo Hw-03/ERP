@@ -211,7 +211,9 @@ def test_handover_receive_prelocks_sorted_unique_inventories(
         handover_svc.inventory_svc, "_transfer_between_departments", transfer
     )
 
-    handover_svc.receive_handover(db_session, doc, actor=receiver, pin="0000")
+    handover_svc.receive_handover(
+        db_session, doc.handover_id, actor=receiver, pin="0000"
+    )
 
     assert events[0] == ("lock", sorted({first.item_id, second.item_id}))
 
@@ -238,7 +240,9 @@ def test_handover_receive_rolls_back_inventory_when_ledger_capture_fails(
     monkeypatch.setattr(handover_svc.inv_effect, "_capture_effect", fail_capture)
 
     with pytest.raises(RuntimeError, match="ledger failure"):
-        handover_svc.receive_handover(db_session, doc, actor=receiver, pin="0000")
+        handover_svc.receive_handover(
+            db_session, doc.handover_id, actor=receiver, pin="0000"
+        )
 
     db_session.expire_all()
     persisted = db_session.query(HandoverDoc).filter(HandoverDoc.handover_id == handover_id).one()
@@ -357,7 +361,7 @@ def test_handover_receive_by_other_dept_approver_403(client, db_session, make_it
     assert _prod_qty(db_session, item.item_id, "튜브") == Decimal("5")  # 이동 없음
 
 
-def test_handover_receive_idempotent(client, db_session, make_item):
+def test_handover_receive_has_single_successful_command(client, db_session, make_item):
     item = make_item(name="8TF Idem", warehouse_qty=Decimal("0"))
     _seed_production(db_session, item.item_id, "튜브", Decimal("5"))
     author = _make_employee(db_session, code="TUBE5", department=DepartmentEnum.TUBE)
@@ -403,7 +407,9 @@ def test_handover_receive_idempotent(client, db_session, make_item):
         f"/api/handovers/{hid}/receive",
         json={"actor_employee_id": str(receiver_2.employee_id), "pin": "0000"},
     )
-    assert second.status_code == 200  # 멱등 — 이미 received
+    assert second.status_code == 409
+    assert second.json()["detail"]["code"] == "COMMAND_CONFLICT"
+    assert second.json()["detail"]["extra"]["reason"] == "already_received"
 
     db_session.expire_all()
     # 이중 이동 없음 — 고압 3 이 아니라 2

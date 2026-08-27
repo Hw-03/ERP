@@ -13,6 +13,7 @@ import {
   registerAdminPinProvider,
   registerOperatorCredsProvider,
   ApiConnectionError,
+  ResultUnknownError,
   ApiError,
 } from "../api-core";
 import { adminApi } from "../api/admin";
@@ -180,20 +181,21 @@ describe("fetcher / write helpers", () => {
     expect(JSON.parse(init.body as string)).toEqual({ name: "X" });
   });
 
-  it("postJson converts a network rejection into ApiConnectionError", async () => {
+  it("postJson converts a network rejection into ResultUnknownError", async () => {
     globalThis.fetch = vi.fn(() =>
       Promise.reject(new TypeError("Failed to fetch")),
     ) as unknown as typeof fetch;
 
     const error = await postJson("/api/items", { name: "X" }).catch((failure: unknown) => failure);
 
+    expect(error).toBeInstanceOf(ResultUnknownError);
     expect(error).toBeInstanceOf(ApiConnectionError);
     expect(error).toMatchObject({
       message: "연결 실패",
     });
   });
 
-  it("postJson converts a timeout into ApiConnectionError", async () => {
+  it("postJson converts a timeout into ResultUnknownError", async () => {
     let requestSignal: AbortSignal | undefined;
     globalThis.fetch = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
       requestSignal = init?.signal ?? undefined;
@@ -211,6 +213,7 @@ describe("fetcher / write helpers", () => {
     await vi.advanceTimersByTimeAsync(15_000);
     const error = await failure;
 
+    expect(error).toBeInstanceOf(ResultUnknownError);
     expect(error).toBeInstanceOf(ApiConnectionError);
     expect(error).toMatchObject({
       message: "연결 실패",
@@ -239,11 +242,61 @@ describe("fetcher / write helpers", () => {
     caller.abort();
     await vi.advanceTimersByTimeAsync(15_000);
 
-    expect(await result).toBeInstanceOf(ApiConnectionError);
+    expect(await result).toBeInstanceOf(ResultUnknownError);
     expect(requestSignal).toBeDefined();
     expect(requestSignal).not.toBe(caller.signal);
     expect(requestSignal?.aborted).toBe(true);
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("postJson rejects a late success after its timeout as ResultUnknownError", async () => {
+    globalThis.fetch = vi.fn(() =>
+      new Promise<Response>((resolve) => {
+        setTimeout(
+          () => resolve(makeResponse({ ok: true, body: { id: "late" } })),
+          20_000,
+        );
+      }),
+    ) as unknown as typeof fetch;
+
+    const result = postJson("/api/items", { name: "X" }).catch(
+      (error: unknown) => error,
+    );
+    await vi.advanceTimersByTimeAsync(20_000);
+
+    expect(await result).toBeInstanceOf(ResultUnknownError);
+  });
+
+  it("postJson treats a lost success body as ResultUnknownError", async () => {
+    globalThis.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        text: () => Promise.reject(new TypeError("body connection lost")),
+      } as Response),
+    ) as unknown as typeof fetch;
+
+    await expect(postJson("/api/items", { name: "X" })).rejects.toBeInstanceOf(
+      ResultUnknownError,
+    );
+  });
+
+  it("postJson preserves a known 422 even when its error body is lost", async () => {
+    globalThis.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: false,
+        status: 422,
+        statusText: "Unprocessable Entity",
+        text: () => Promise.reject(new TypeError("body connection lost")),
+      } as Response),
+    ) as unknown as typeof fetch;
+
+    const error = await postJson("/api/items", { name: "X" }).catch(
+      (failure: unknown) => failure,
+    );
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ status: 422 });
   });
 
   it("postJson clears its timeout after a successful response", async () => {

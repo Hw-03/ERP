@@ -186,16 +186,22 @@ def receive_handover(
     db: Session = Depends(get_db),
 ) -> HandoverDoc:
     ensure_actor_employee_id(actor, payload.actor_employee_id)
-    doc = db.query(HandoverDoc).filter(HandoverDoc.handover_id == handover_id).first()
-    if doc is None:
-        raise http_error(404, ErrorCode.NOT_FOUND, "인수인계서를 찾을 수 없습니다.")
     try:
-        handover_svc.receive_handover(
+        return handover_svc.receive_handover(
             db,
-            doc,
+            handover_id,
             actor=actor,
             pin=payload.pin,
             http_request=http_request,
+        )
+    except handover_svc.HandoverNotFound:
+        raise http_error(404, ErrorCode.NOT_FOUND, "인수인계서를 찾을 수 없습니다.")
+    except handover_svc.HandoverCommandConflict as exc:
+        raise http_error(
+            409,
+            ErrorCode.COMMAND_CONFLICT,
+            "이미 처리되었거나 현재 상태에서 실행할 수 없는 인수 명령입니다.",
+            reason=exc.reason,
         )
     except rate_limit.OperatorPinRateLimitExceeded as exc:
         raise http_error(429, ErrorCode.TOO_MANY_REQUESTS, str(exc))
@@ -203,7 +209,6 @@ def receive_handover(
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
     except ValueError as exc:
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
-    return doc
 
 
 @router.get("/{handover_id}", response_model=HandoverResponse)

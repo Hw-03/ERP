@@ -56,6 +56,7 @@ class IoBatch(Base):
     reference_no = Column(String(100), nullable=True, index=True)
     notes = Column(Text, nullable=True)
     client_request_id = Column(String(64), nullable=True, unique=True, index=True)
+    request_fingerprint = Column(String(64), nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now(), index=True)
     updated_at = Column(
         DateTime,
