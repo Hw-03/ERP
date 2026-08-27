@@ -205,7 +205,7 @@ function ProductCard({
       type="button"
       aria-label={`${checklist.model_name} 체크리스트 열기`}
       onClick={onClick}
-      className="flex items-center gap-4 rounded-[18px] border p-4 text-left transition-[transform] active:scale-[0.99]"
+      className="flex flex-1 items-center gap-4 rounded-[18px] border p-4 text-left transition-[transform] active:scale-[0.99]"
       style={CARD_STYLE}
     >
       <span
@@ -1389,7 +1389,7 @@ export function MobileAssemblyChecklistScreen({ onExit }: { onExit?: () => void 
   }
 
   return (
-    <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pb-6 pt-3">
+    <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pb-3 pt-3">
       <section className="rounded-[20px] border p-4" style={CARD_STYLE}>
         <div className="flex items-center gap-3">
           {onExit && (
@@ -1428,7 +1428,7 @@ export function MobileAssemblyChecklistScreen({ onExit }: { onExit?: () => void 
       ) : error ? (
         <p role="alert" className={TYPO.body} style={{ color: LEGACY_COLORS.red }}>체크리스트를 불러오지 못했습니다.</p>
       ) : (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-1 flex-col gap-2">
           {checklists.map((checklist) => <ProductCard key={checklist.checklist_id} checklist={checklist} onClick={() => openChecklist(checklist)} />)}
         </div>
       )}

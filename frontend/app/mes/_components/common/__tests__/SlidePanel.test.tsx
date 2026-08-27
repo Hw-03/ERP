@@ -43,6 +43,7 @@ describe("SlidePanel", () => {
           onClose={onClose}
           hideCloseButton
           labelledBy="history-panel-title"
+          contentClassName="pl-0"
         >
           <h2 id="history-panel-title">선택 품목명</h2>
           <button type="button">패널 동작</button>
@@ -54,6 +55,7 @@ describe("SlidePanel", () => {
     const action = screen.getByRole("button", { name: "패널 동작" });
     expect(panel).not.toHaveAttribute("aria-modal");
     expect(panel).toHaveAttribute("aria-labelledby", "history-panel-title");
+    expect(panel).toHaveClass("pl-0");
 
     action.focus();
     expect(fireEvent.keyDown(action, { key: "Tab" })).toBe(true);

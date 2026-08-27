@@ -123,9 +123,14 @@ describe("MobileAssemblyChecklistScreen", () => {
   it("체크리스트가 등록된 모델만 선택 화면에 표시한다", () => {
     renderChecklistScreen();
 
-    expect(screen.getByRole("button", { name: "DX3000 체크리스트 열기" })).toBeInTheDocument();
+    const dx3000Card = screen.getByRole("button", { name: "DX3000 체크리스트 열기" });
+
+    expect(dx3000Card).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "ADX6000FB 체크리스트 열기" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "ADX4000W 체크리스트 열기" })).not.toBeInTheDocument();
+    expect(dx3000Card.parentElement).toHaveClass("flex-1", "flex", "flex-col", "gap-2");
+    expect(dx3000Card).toHaveClass("flex-1");
+    expect(dx3000Card.parentElement?.parentElement).toHaveClass("pb-3");
   });
 
   it("기존 체크 수행 화면은 완료 상태를 로컬에서 유지한다", () => {
