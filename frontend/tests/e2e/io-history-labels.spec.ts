@@ -119,8 +119,7 @@ test.describe("입출고 내역 PC 정보 위계", () => {
       "작업",
       "대상",
       "품목코드 · 수량",
-      "작업 전 재고",
-      "작업 후 재고",
+      "재고 변동",
       "담당자",
     ]) {
       await expect(table.getByRole("columnheader", { name, exact: true })).toBeVisible();

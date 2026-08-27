@@ -46,9 +46,8 @@ test.describe("입출고 V2 — 부서 입출고(생산)", () => {
     await expect(page.getByRole("dialog", { name: /완료/ })).toBeVisible();
   });
 
-  test("생산 BOM 자식 라인은 강제 잠김 — 제외/수량편집 불가", async ({ page }) => {
-    // isBomForced("produce")=true → 자식(bom_auto) 라인의 포함 토글·수량이 잠긴다.
-    // README 의 "BOM 자동 전개 / 포함·제외" 중 produce 분기는 '제외 불가(잠김)'가 정답.
+  test("생산 BOM 자식 라인은 투입 자재로 표시하고 수량 조정을 허용한다", async ({ page }) => {
+    // BOM 자식은 수량 0으로 제외하거나 수량을 조절할 수 있으며, 부서 결재에서 검증한다.
     await gotoWarehouseCompose(page);
     await pickWorkType(page, /부서 입출고/);
     await page.getByRole("button", { name: "생산 입고" }).first().click();
@@ -63,9 +62,8 @@ test.describe("입출고 V2 — 부서 입출고(생산)", () => {
     // (76e4ffd2 — BOM 상위에 mes_code span 추가로 accessible name 사이에 코드가 끼어듦)
     await page.getByRole("button", { name: /E2E조립튜브.*기준 수량/ }).click();
 
-    // 자식은 "상위 품목과 함께 자동 처리" + 수량 잠김(disabled)
-    await expect(page.getByText("상위 품목과 함께 자동 처리")).toBeVisible();
-    const childLine = page.getByRole("listitem").filter({ hasText: "상위 품목과 함께 자동 처리" });
-    await expect(childLine.getByRole("spinbutton", { name: /수량/ })).toBeDisabled();
+    await expect(page.getByText("투입 자재")).toBeVisible();
+    await expect(page.getByRole("button", { name: "재고 반영 변경" }).last()).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("spinbutton", { name: /수량/ }).last()).toBeEnabled();
   });
 });
