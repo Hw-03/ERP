@@ -11,8 +11,8 @@
 세 PF 수량 정의 (모두 PF 기준):
 
 - **ship_ready**(출하 대기) : PF 완성 재고. 부품 확인 없이 즉시 출하 가능.
-- **fast_production**(빠른 생산) : AF재고 ＋ AF 직계 1단계 부품으로 만들 수 있는 AF 수
-  를 PF로 환산. 포장 구간 부품도 확인한다.
+- **fast_production**(빠른 생산) : 현재 AF 재고와 포장 자재로 PA·PF까지
+  완성할 수 있는 수. AF 자체는 추가 조립하지 않는다.
 - **total_production**(총생산) : PF 루트로 BOM 전체 재귀 이론 최대.
 
 모든 수량은 `StockFigures.available`(warehouse＋production−pending)을 기준으로 한다.
@@ -40,6 +40,7 @@ _BUILDABLE_MAX_DEPTH = 10
 _NF_STAGE_ORDER = 60
 
 _AF_CODE = "AF"
+_PA_CODE = "PA"
 _PF_CODE = "PF"
 _AF_CAPACITY_IGNORED_MES_CODES: frozenset[str] = frozenset({"4-PR-0058"})
 
@@ -355,24 +356,6 @@ def compute_legacy_capacity(
 # ─────────────────────────────────────────────────────────────────────────────
 # AF 기준 (신규)
 # ─────────────────────────────────────────────────────────────────────────────
-def _fast_assembly(
-    af_id: uuid.UUID,
-    *,
-    bom_cache: BomCache,
-    fig_by_id: FigById,
-) -> Tuple[int, uuid.UUID | None]:
-    """기존 AF 재고 ＋ 직계 자재로 추가 조립 가능한 수 (1레벨, 총 대응량)."""
-    own = _own_available(af_id, fig_by_id)
-    children = bom_cache.get(af_id, [])
-    if not children:
-        return own, None
-    extra, bottleneck = _reduce_children(
-        children,
-        recurse=lambda cid: _own_available(cid, fig_by_id),
-    )
-    return own + extra, bottleneck
-
-
 def _max_buildable(
     root_id: uuid.UUID,
     *,
@@ -461,59 +444,73 @@ def _max_buildable(
     return lo, shortage_node(lo + 1)
 
 
-def _requirements_below(
+def _fast_packaging_requirements(
     root_id: uuid.UUID,
-    af_ids: set[uuid.UUID],
+    *,
     bom_cache: BomCache,
-) -> Dict[uuid.UUID, Decimal]:
-    """root 1개를 만들 때 각 하위 노드의 소요 수량.
+    items_map: Dict[uuid.UUID, Item],
+) -> Tuple[Dict[uuid.UUID, Decimal], uuid.UUID | None]:
+    """PF를 AF 재고와 포장 자재만으로 완성할 때의 소요량을 수집한다.
 
-    `af_ids`(=모든 AF) 중 어느 것에 도달하면 그 아래로는 더 내려가지 않는다
-    (AF 는 재고 leaf 로 취급). AF 하위 자재는 AF 재고로 이미 대표되므로 제외 —
-    한 PF/PA 아래 형제 AF 가 둘 이상일 때 형제 AF 의 하위 자재가 누설되지 않게 한다.
-    같은 노드가 여러 경로로 나오면 소요량을 합산한다.
+    PA는 재고로 갖춰야 하는 완제품이 아니라 포장 공정으로 본다. 따라서 PA
+    노드 자체는 소요량에 넣지 않고 직계 구성품으로 전개한다. AF와 그 밖의
+    구성품은 현재 재고로 충당해야 하며, AF 아래 BOM은 전개하지 않는다.
     """
     req: Dict[uuid.UUID, Decimal] = {}
+    unresolved_pa_id: uuid.UUID | None = None
 
-    def dfs(node: uuid.UUID, mult: Decimal, visiting: frozenset, depth: int) -> None:
+    def visit_pa(node: uuid.UUID, mult: Decimal, visiting: frozenset, depth: int) -> None:
+        nonlocal unresolved_pa_id
         if depth > _BUILDABLE_MAX_DEPTH or node in visiting:
+            unresolved_pa_id = unresolved_pa_id or node
             return
         nv = visiting | frozenset([node])
-        for child, per_unit in bom_cache.get(node, []):
+        children = bom_cache.get(node, [])
+        if not children:
+            unresolved_pa_id = unresolved_pa_id or node
+            return
+        for child, per_unit in children:
             m = mult * per_unit
-            req[child] = req.get(child, Decimal("0")) + m
-            if child in af_ids:
-                continue  # 모든 AF 아래로는 내려가지 않음(재고 leaf)
-            dfs(child, m, nv, depth + 1)
+            child_item = items_map.get(child)
+            if child_item and child_item.process_type_code == _PA_CODE:
+                visit_pa(child, m, nv, depth + 1)
+            else:
+                req[child] = req.get(child, Decimal("0")) + m
 
-    dfs(root_id, Decimal("1"), frozenset(), 0)
-    return req
+    for child, per_unit in bom_cache.get(root_id, []):
+        child_item = items_map.get(child)
+        if child_item and child_item.process_type_code == _PA_CODE:
+            visit_pa(child, per_unit, frozenset([root_id]), 1)
+        else:
+            req[child] = req.get(child, Decimal("0")) + per_unit
+
+    return req, unresolved_pa_id
 
 
 def _fast_production_variant(
     pf_id: uuid.UUID,
     af_id: uuid.UUID,
-    af_ids: set[uuid.UUID],
     *,
     bom_cache: BomCache,
     fig_by_id: FigById,
+    items_map: Dict[uuid.UUID, Item],
 ) -> Tuple[int, uuid.UUID | None]:
-    """AF재고 + AF 직계 1단계 부품 → PF로 환산 (포장 구간 부품 cap 포함).
-
-    빠른 생산: _fast_assembly 로 구한 AF 총량을 PF 요구량으로 나누고
-    포장 구간 부품이 추가로 제한하면 그 값으로 cap 한다.
-    형제 AF 는 cap 대상에서 제외.
-    """
-    fast_af_qty, fast_af_btl = _fast_assembly(af_id, bom_cache=bom_cache, fig_by_id=fig_by_id)
-    req = _requirements_below(pf_id, af_ids, bom_cache)
+    """현재 AF 재고와 포장 자재로 PA·PF까지 완성 가능한 수를 계산한다."""
+    req, unresolved_pa_id = _fast_packaging_requirements(
+        pf_id,
+        bom_cache=bom_cache,
+        items_map=items_map,
+    )
+    if unresolved_pa_id is not None:
+        return 0, unresolved_pa_id
     af_req = req.get(af_id)
     if not af_req or af_req <= 0:
         return 0, None
-    best = int(Decimal(fast_af_qty) / af_req)
-    # AF 조립 병목을 기본으로 사용(없으면 AF 자체). 포장 구간 부품이 더 타이트하면 교체.
-    bottleneck: uuid.UUID | None = fast_af_btl if fast_af_btl is not None else af_id
+
+    best = int(Decimal(_own_available(af_id, fig_by_id)) / af_req)
+    bottleneck: uuid.UUID | None = af_id
     for node, qty in req.items():
-        if node == af_id or qty <= 0 or node in af_ids:
+        if node == af_id or qty <= 0:
             continue
         can = int(Decimal(_own_available(node, fig_by_id)) / qty)
         if can < best:
@@ -577,7 +574,6 @@ def compute_af_capacity(
             "auto_representatives": [],
         }
 
-    af_id_set = {it.item_id for it in af_items}
     af_rows: List[dict] = []
     variant_rows: List[dict] = []
     any_incomplete = False
@@ -605,7 +601,11 @@ def compute_af_capacity(
         for pf_id in pf_ids:
             pf_own = _own_available(pf_id, fig_by_id)
             fast_qty, fast_btl = _fast_production_variant(
-                pf_id, af_id, af_id_set, bom_cache=bom_cache, fig_by_id=fig_by_id
+                pf_id,
+                af_id,
+                bom_cache=bom_cache,
+                fig_by_id=fig_by_id,
+                items_map=items_map,
             )
             total_qty, total_btl = _max_buildable(
                 pf_id, bom_cache=bom_cache, fig_by_id=fig_by_id
@@ -628,7 +628,7 @@ def compute_af_capacity(
             })
             if pf_own > best_ship:
                 best_ship = pf_own
-            if fast_qty > best_fast:
+            if fast_qty > best_fast or best_fast_btl is None:
                 best_fast = fast_qty
                 best_fast_btl = fast_btl
             if total_qty > best_total:

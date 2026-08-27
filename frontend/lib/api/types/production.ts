@@ -202,7 +202,7 @@ export type ProductionCapacityAfStatus =
 export interface ProductionCapacityAfSummary {
   /** 출하 대기 — 창고에 있는 완성 PF 재고. */
   ship_ready: number;
-  /** 빠른 생산 — AF재고 + AF 직계 1단계 부품 → PF 환산 (포장 구간 포함). */
+  /** 빠른 생산 — 현재 AF 재고와 포장 자재로 PA·PF까지 완성 가능한 수량. */
   fast_production: number;
   /** 총생산 — PF 루트로 BOM 전체 재귀 이론 최대. */
   total_production: number;
@@ -237,7 +237,7 @@ export interface ProductionCapacityPfVariant {
   af_item_id: string | null;
   /** 출하 대기 — 이 PF 완성 재고. */
   ship_ready: number;
-  /** 빠른 생산 — AF재고 + 1단계 부품 → 이 PF로 환산. */
+  /** 빠른 생산 — 현재 AF 재고와 포장 자재로 이 PF까지 완성 가능한 수량. */
   fast_production: number;
   /** 총생산 — 이 PF 루트로 BOM 전체 재귀 이론 최대. */
   total_production: number;

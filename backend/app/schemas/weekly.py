@@ -192,7 +192,7 @@ CapacityAfStatus = Literal[
 
 class CapacityAfSummary(BaseModel):
     ship_ready: int = Field(..., description="출하 대기 — 창고에 있는 완성 PF 재고 합계.")
-    fast_production: int = Field(..., description="빠른 생산 — AF재고 + AF 직계 1단계 부품 → PF 환산 합계.")
+    fast_production: int = Field(..., description="빠른 생산 — 현재 AF 재고와 포장 자재로 PA·PF까지 완성 가능한 수량 합계.")
     total_production: int = Field(..., description="총생산 — PF 루트 BOM 전체 재귀 이론 최대 합계.")
 
 
@@ -211,7 +211,7 @@ class CapacityAfItem(BaseModel):
     )
     fast_production: int = Field(
         ...,
-        description="빠른 생산 — AF재고 + AF 직계 1단계 부품 → 이 PF 환산. 포장 구간 포함.",
+        description="빠른 생산 — 현재 AF 재고와 포장 자재로 이 PF까지 완성 가능한 수량.",
     )
     total_production: int = Field(
         ..., description="총생산 — 이 PF 루트로 BOM 전체 재귀 이론 최대."
@@ -234,7 +234,7 @@ class CapacityPfVariant(BaseModel):
     model_symbol: Optional[str] = None
     af_item_id: Optional[str] = None
     ship_ready: int = Field(..., description="출하 대기 — 이 PF 완성 재고.")
-    fast_production: int = Field(..., description="빠른 생산 — AF재고 + 1단계 부품 → 이 PF 환산.")
+    fast_production: int = Field(..., description="빠른 생산 — 현재 AF 재고와 포장 자재로 이 PF까지 완성 가능한 수량.")
     total_production: int = Field(..., description="총생산 — 이 PF 루트로 BOM 전체 재귀 이론 최대.")
     fast_production_limiting_item: Optional[str] = None
     total_production_limiting_item: Optional[str] = None

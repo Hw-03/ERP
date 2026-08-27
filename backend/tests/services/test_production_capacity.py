@@ -4,7 +4,7 @@ compute_capacity() 를 직접 호출해 ship_ready / fast_production / total_pro
 및 bom_status·pf_variants·legacy 보존을 검증한다.
 
 설계 변경(2026-06): 3수량 전부 PF 기준으로 통일.
-- fast_production  : AF재고 + AF 직계 1단계 부품 → PF 환산 (포장 구간 포함)
+- fast_production  : 현재 AF 재고와 포장 자재로 PA·PF까지 완성 가능한 수량
 - total_production : PF 루트로 BOM 전체 재귀 이론 최대
 - ship_ready       : PF 완성 재고만 (즉시 출하 가능)
 
@@ -174,8 +174,8 @@ def test_af_without_children_included_as_incomplete(
     assert result["af"]["status"] == "bom_not_registered"
 
 
-def test_fast_production_limited_by_direct_nf_shortage(db_session, make_item, make_bom):
-    """② AF 직계 NF 재고 부족 시 fast_production 이 제한된다."""
+def test_fast_production_requires_existing_af_stock(db_session, make_item, make_bom):
+    """② AF 직계 자재가 있어도 현재 AF 재고가 없으면 빠른 생산은 0이다."""
     af = make_item(name="조립완제품", process_type_code="AF", warehouse_qty=Decimal("0"))
     nf = make_item(name="튜닝완료품", process_type_code="NF", warehouse_qty=Decimal("2"))
     aa = make_item(name="조립중간품", process_type_code="AA", warehouse_qty=Decimal("10"))
@@ -188,16 +188,15 @@ def test_fast_production_limited_by_direct_nf_shortage(db_session, make_item, ma
     result = compute_capacity(db_session)
     row = _af_row(result, af.item_id)
 
-    # AF재고(0) + min(NF=2, AA=10) = 2 → PF 환산 /1 = 2
-    assert row["fast_production"] == 2
-    assert row["fast_production_limiting_item"] == _item_label(nf)
+    assert row["fast_production"] == 0
+    assert row["fast_production_limiting_item"] == _item_label(af)
     assert row["total_production"] == 2  # NF=2 가 여전히 제한
     assert row["bom_status"] == "complete"
     assert result["af"]["status"] == "producible"
 
 
-def test_fast_production_includes_existing_af_stock(db_session, make_item, make_bom):
-    """③ fast_production 은 기존 AF 재고를 포함한 총 대응량 (5 + 3 = 8)."""
+def test_fast_production_starts_from_existing_af_stock_only(db_session, make_item, make_bom):
+    """③ 빠른 생산은 AF 직계 부품으로 AF를 추가 조립하지 않는다."""
     af = make_item(name="조립완제품", process_type_code="AF", warehouse_qty=Decimal("5"))
     child = make_item(name="조립자재", process_type_code="AA", warehouse_qty=Decimal("3"))
     make_bom(af.item_id, child.item_id, Decimal("1"))
@@ -208,8 +207,47 @@ def test_fast_production_includes_existing_af_stock(db_session, make_item, make_
     result = compute_capacity(db_session)
     row = _af_row(result, af.item_id)
 
-    assert row["fast_production"] == 8  # AF재고 5 + 부품 3
+    assert row["fast_production"] == 5  # 현재 AF 재고만 빠른 생산의 시작점
     assert row["total_production"] == 8
+
+
+def test_fast_production_builds_pa_from_packing_materials(db_session, make_item, make_bom):
+    """PA 재고가 없어도 AF와 포장 자재가 있으면 빠른 생산을 계산한다."""
+    af = make_item(name="테스트 완료 AF", process_type_code="AF", warehouse_qty=Decimal("5"))
+    pa = make_item(name="포장 완료품", process_type_code="PA", warehouse_qty=Decimal("0"))
+    packing = make_item(name="포장 자재", process_type_code="PR", warehouse_qty=Decimal("3"))
+    pf = make_item(name="출하 완제품", process_type_code="PF", warehouse_qty=Decimal("0"))
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pa.item_id, packing.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    db_session.commit()
+
+    result = compute_capacity(db_session)
+    row = _af_row(result, af.item_id)
+
+    assert row["fast_production"] == 3
+    assert row["fast_production_limiting_item"] == _item_label(packing)
+
+
+def test_fast_production_keeps_af_stock_cap_when_total_can_build_more(db_session, make_item, make_bom):
+    """직원 서버와 같은 PA 경로에서 빠른 생산은 AF 43, 총생산은 106이다."""
+    af = make_item(name="직원 서버 AF", process_type_code="AF", warehouse_qty=Decimal("43"))
+    af_part = make_item(name="AF 추가 조립 부품", process_type_code="AA", warehouse_qty=Decimal("83"))
+    pa = make_item(name="직원 서버 PA", process_type_code="PA", warehouse_qty=Decimal("0"))
+    packing = make_item(name="포장 내부폼", process_type_code="PR", warehouse_qty=Decimal("106"))
+    pf = make_item(name="직원 서버 PF", process_type_code="PF", warehouse_qty=Decimal("0"))
+    make_bom(af.item_id, af_part.item_id, Decimal("1"))
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pa.item_id, packing.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    db_session.commit()
+
+    result = compute_capacity(db_session)
+    row = _af_row(result, af.item_id)
+
+    assert row["fast_production"] == 43
+    assert row["fast_production_limiting_item"] == _item_label(af)
+    assert row["total_production"] == 106
 
 
 def test_license_label_is_ignored_for_af_capacity_calculation(
@@ -219,7 +257,7 @@ def test_license_label_is_ignored_for_af_capacity_calculation(
     af = make_item(
         name="ADX4000W 조립 완제품",
         process_type_code="AF",
-        warehouse_qty=Decimal("0"),
+        warehouse_qty=Decimal("3"),
         model_symbol="4",
         serial_no=1,
     )
@@ -266,7 +304,7 @@ def test_license_label_is_ignored_for_af_capacity_calculation(
     assert result["maximum"] == 0
     assert row["ship_ready"] == 0
     assert row["fast_production"] == 3
-    assert row["total_production"] == 3
+    assert row["total_production"] == 6
 
 
 def test_license_label_only_bom_preserves_af_metadata(
@@ -372,8 +410,8 @@ def test_fast_production_capped_by_af_stock(db_session, make_item, make_bom):
     assert row["fast_production_limiting_item"] == _item_label(af)
 
 
-def test_fast_production_ignores_sibling_af_materials(db_session, make_item, make_bom):
-    """⑦ 한 PF 아래 형제 AF 가 있어도, 형제 AF 하위 자재는 fast_production 에 영향 없음."""
+def test_fast_production_uses_existing_sibling_af_stock_only(db_session, make_item, make_bom):
+    """⑦ 형제 AF의 하위 자재가 아니라 현재 AF 재고만 빠른 생산에 반영한다."""
     pf = make_item(name="출하완제품", process_type_code="PF", warehouse_qty=Decimal("0"))
     pa = make_item(name="출하중간품", process_type_code="PA", warehouse_qty=Decimal("100"))
     af1 = make_item(name="조립A", process_type_code="AF", warehouse_qty=Decimal("5"))
@@ -390,8 +428,8 @@ def test_fast_production_ignores_sibling_af_materials(db_session, make_item, mak
     result = compute_capacity(db_session)
     row1 = _af_row(result, af1.item_id)
 
-    # AF1 fast_production = AF1재고(5) + X(10) = 15. 형제 AF2의 자재Y(0)가 throttle하면 안 됨.
-    assert row1["fast_production"] == 15
+    # AF1·AF2 재고가 각각 5이므로 AF1 기준 PF 완성 가능 수량은 5.
+    assert row1["fast_production"] == 5
     assert row1["fast_production_limiting_item"] != _item_label(y)
 
 
@@ -458,24 +496,20 @@ def test_total_production_preserves_intermediate_stock(db_session, make_item, ma
     assert row["total_production"] == 8
 
 
-def test_fast_production_floor_and_per_unit(db_session, make_item, make_bom):
-    """⑪ fast_production per_unit>1 floor 절삭 — 후순위 자식이 병목이어도 내부적으로 정확."""
-    af = make_item(name="조립완제품", process_type_code="AF", warehouse_qty=Decimal("0"))
-    plenty = make_item(name="여유자재", process_type_code="AA", warehouse_qty=Decimal("100"))
-    tight = make_item(name="빠듯자재", process_type_code="AA", warehouse_qty=Decimal("7"))
-    make_bom(af.item_id, plenty.item_id, Decimal("1"))
-    make_bom(af.item_id, tight.item_id, Decimal("3"))  # 후순위 자식이 병목
+def test_fast_production_floors_packaging_material_per_unit(db_session, make_item, make_bom):
+    """⑪ 포장 자재 소요량이 3이면 재고 7은 빠른 생산 2대로 절삭한다."""
+    af = make_item(name="조립완제품", process_type_code="AF", warehouse_qty=Decimal("100"))
+    packing = make_item(name="포장 자재", process_type_code="PR", warehouse_qty=Decimal("7"))
     pf = make_item(name="출하완제품", process_type_code="PF", warehouse_qty=Decimal("0"))
     make_bom(pf.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, packing.item_id, Decimal("3"))
     db_session.commit()
 
     result = compute_capacity(db_session)
     row = _af_row(result, af.item_id)
 
-    # _fast_assembly(af): own(0) + min(floor(100/1)=100, floor(7/3)=2) = 2 → PF 환산 /1 = 2
-    # AF 내부 병목(빠듯자재)이 fast_production_limiting_item 으로 전파됨
     assert row["fast_production"] == 2
-    assert row["fast_production_limiting_item"] == _item_label(tight)
+    assert row["fast_production_limiting_item"] == _item_label(packing)
 
 
 def test_legacy_fields_preserved(db_session, make_item, make_bom):
