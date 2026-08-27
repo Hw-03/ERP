@@ -3,8 +3,8 @@ import { expect, test } from "@playwright/test";
 import { loginAsOperator, readSeed } from "./_helpers";
 
 
-test.describe("출하 — 요청을 준비 중으로 전환", () => {
-  test("작업자가 출하 목록에서 요청을 열고 준비 작업으로 넘긴다", async ({ page }) => {
+test.describe("출하 — 요청 생성 즉시 준비 시작", () => {
+  test("작업자가 새 요청을 준비 중 목록에서 열고 준비 작업을 계속한다", async ({ page }) => {
     const operator = await loginAsOperator(page);
     const { shippingItem: basePf } = readSeed() as ReturnType<typeof readSeed> & {
       shippingItem: { item_id: string };
@@ -22,23 +22,14 @@ test.describe("출하 — 요청을 준비 중으로 전환", () => {
     const createBody = await createResponse.text();
     expect(createResponse.status(), createBody).toBe(201);
     const created: { request_id: string; status: string } = JSON.parse(createBody);
-    expect(created.status).toBe("REQUESTED");
+    expect(created.status).toBe("PREPARING");
 
     await page.goto("/mes?tab=shipping");
     await page.getByRole("button", { name: /출하 관리/ }).filter({ visible: true }).click();
     await page.locator(`[data-shipping-request-id="${created.request_id}"]`).click();
 
-    const transitionResponse = page.waitForResponse((response) => (
-      response.request().method() === "POST"
-      && response.url().endsWith(`/api/shipping/requests/${created.request_id}/send-to-prep`)
-    ));
-    await page.getByRole("button", { name: "출하 요청", exact: true }).filter({ visible: true }).click();
-
-    const response = await transitionResponse;
-    expect(response.ok()).toBe(true);
-    const transitioned: { status: string } = await response.json();
-    expect(transitioned.status).toBe("PREPARING");
-    await expect(page.getByText("준비 체크", { exact: true }).filter({ visible: true })).toBeVisible();
+    await expect(page.getByTestId("shipping-request-detail")).toBeVisible();
+    await expect(page.getByRole("button", { name: "준비 완료", exact: true })).toBeVisible();
 
     const persistedResponse = await page.request.get(`/api/shipping/requests/${created.request_id}`);
     expect(persistedResponse.ok()).toBe(true);

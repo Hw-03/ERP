@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import codecs
 import os
+import socket
 import shutil
 import subprocess
 import sys
@@ -17,6 +18,12 @@ VERIFY_LOCAL = ROOT / "scripts" / "dev" / "verify_local.ps1"
 
 def _write_fake_command(path: Path, body: str) -> None:
     path.write_text("@echo off\r\n" + body, encoding="ascii")
+
+
+def _quote_powershell_literal(value: str) -> str:
+    """Quote a value for a single-quoted PowerShell string literal."""
+
+    return value.replace("'", "''")
 
 
 def test_verify_e2e_has_utf8_bom_for_windows_powershell() -> None:
@@ -77,3 +84,69 @@ def test_verify_local_include_e2e_uses_the_runtime_guard() -> None:
     assert "verify_e2e.ps1" in script
     assert "$VerifyE2EScript" in include_e2e_block
     assert "npx playwright test" not in include_e2e_block
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Port fallback is Windows-only")
+@pytest.mark.parametrize("npm_exit_code", [0, 7])
+def test_verify_e2e_falls_back_from_busy_port_and_restores_environment(
+    tmp_path: Path,
+    npm_exit_code: int,
+) -> None:
+    """Keep port fallback deterministic and restore the caller environment on every exit."""
+
+    powershell = shutil.which("powershell.exe")
+    assert powershell is not None
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    selected_port_marker = tmp_path / "selected-port.txt"
+    restored_port_marker = tmp_path / "restored-port.txt"
+    _write_fake_command(fake_bin / "node.cmd", "echo v20.19.0\r\nexit /b 0\r\n")
+    _write_fake_command(
+        fake_bin / "npm.cmd",
+        f"> \"{selected_port_marker}\" echo %E2E_FRONTEND_PORT%\r\n"
+        f"exit /b {npm_exit_code}\r\n",
+    )
+
+    listener: socket.socket | None = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 0)
+        listener.bind(("127.0.0.1", 3100))
+        listener.listen(1)
+    except OSError:
+        listener.close()
+        listener = None
+
+    command = (
+        "$env:E2E_FRONTEND_PORT = 'before-test'; "
+        f"try {{ & '{_quote_powershell_literal(str(VERIFY_E2E))}' }} catch {{ }}; "
+        "[System.IO.File]::WriteAllText("
+        f"'{_quote_powershell_literal(str(restored_port_marker))}', "
+        "[string]$env:E2E_FRONTEND_PORT); exit 0"
+    )
+    env = os.environ.copy()
+    env["PATH"] = str(fake_bin) + os.pathsep + env["PATH"]
+    try:
+        result = subprocess.run(
+            [
+                powershell,
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                command,
+            ],
+            cwd=ROOT,
+            env=env,
+            capture_output=True,
+            timeout=30,
+            check=False,
+        )
+    finally:
+        if listener is not None:
+            listener.close()
+
+    output = (result.stdout + result.stderr).decode("utf-8", errors="replace")
+    assert result.returncode == 0, output
+    selected_port = int(selected_port_marker.read_text(encoding="utf-8").strip())
+    assert 3300 <= selected_port <= 3399
+    assert restored_port_marker.read_text(encoding="utf-8") == "before-test"

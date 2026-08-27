@@ -12,14 +12,25 @@
  *   npm run test:e2e:ui       # UI 모드
  *
  * 전용 DB·전용 백엔드(포트 8021)·시드는 globalSetup 이 자동 처리한다(실 mes.db 미접촉).
- * 프론트는 전용 포트 3100의 custom Next server로 띄우고, /api/* 는 BACKEND_INTERNAL_URL로 8021에 프록시.
+ * 프론트는 기본 전용 포트 3100의 custom Next server로 띄운다. 로컬 OS가 3100을
+ * 예약한 경우 verify_e2e.ps1이 E2E_FRONTEND_PORT로 대체 포트를 전달한다.
+ * /api/* 는 BACKEND_INTERNAL_URL로 8021에 프록시.
  */
 import { defineConfig, devices } from "@playwright/test";
 import { assertSupportedNodeVersion } from "./scripts/require-node-20.cjs";
 
 assertSupportedNodeVersion(process.version);
 
-const FRONT_PORT = 3100;
+function portFromEnvironment(value: string | undefined, fallback: number): number {
+  if (value === undefined) return fallback;
+  const port = Number(value);
+  if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+    throw new Error(`E2E_FRONTEND_PORT must be an integer between 1 and 65535 (received: ${value})`);
+  }
+  return port;
+}
+
+const FRONT_PORT = portFromEnvironment(process.env.E2E_FRONTEND_PORT, 3100);
 const BACKEND_PORT = 8021;
 
 export default defineConfig({
@@ -44,7 +55,7 @@ export default defineConfig({
     timezoneId: "Asia/Seoul",
   },
   webServer: {
-    // 전용 custom Next server(3100). /api/* → 전용 백엔드(8021) 프록시.
+    // 전용 custom Next server(기본 3100). /api/* → 전용 백엔드(8021) 프록시.
     command: `node scripts/next-server.js dev --hostname 127.0.0.1 --port ${FRONT_PORT}`,
     url: `http://127.0.0.1:${FRONT_PORT}`,
     reuseExistingServer: false,

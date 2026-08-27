@@ -497,9 +497,11 @@ describe("MesLoginGate server session", () => {
     act(() => dispatchLogoutMarker(null));
 
     await waitFor(() => expect(state.getOperatorSession).toHaveBeenCalledTimes(2));
-    expect(screen.getByText("Operator login form")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "로그아웃 재시도" })).not.toBeInTheDocument();
-    expect(screen.queryByText("Authenticated content")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("Operator login form")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "로그아웃 재시도" })).not.toBeInTheDocument();
+      expect(screen.queryByText("Authenticated content")).not.toBeInTheDocument();
+    });
   });
 
   it("keeps pending on a failed server recheck and retries the recheck before restoring B", async () => {

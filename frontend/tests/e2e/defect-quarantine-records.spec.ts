@@ -95,13 +95,14 @@ async function cleanupItemRecords(
 }
 
 test.describe("불량 격리 건별 원장", () => {
-  test.afterEach(async ({ request }) => {
+  test.afterEach(async ({ page }) => {
     const seed = readSeed();
+    const cleanupActor = await loginAsOperator(page, { role: "department" });
     await cleanupItemRecords(
-      request,
+      page.request,
       seed.rawItem.item_id,
-      seed.departmentEmployee.department,
-      seed.departmentEmployee.employee_id,
+      cleanupActor.department,
+      cleanupActor.employee_id,
     );
   });
 
@@ -121,6 +122,7 @@ test.describe("불량 격리 건별 원장", () => {
       reason_memo: "첫 격리 메모",
       actor_employee_id: operator.employee_id,
     });
+    const secondOperator = await loginAsOperator(page);
     await postJson(page.request, "/api/defects/quarantine", {
       item_id: item.item_id,
       qty: 4,
@@ -128,8 +130,9 @@ test.describe("불량 격리 건별 원장", () => {
       target_dept: department,
       reason_category: "기능 불량",
       reason_memo: "둘째 격리 메모",
-      actor_employee_id: seed.plainEmployee.employee_id,
+      actor_employee_id: secondOperator.employee_id,
     });
+    await loginAsOperator(page, { role: "department" });
 
     const listResponse = await page.request.get(
       `/api/defects/locations?department=${encodeURIComponent(department)}`,
@@ -171,7 +174,7 @@ test.describe("불량 격리 건별 원장", () => {
     await expect(firstRow).toContainText("2026-07-01 09:00");
     await expect(firstRow).toContainText(operator.name);
     await expect(secondRow).toContainText("2026-07-02 10:30");
-    await expect(secondRow).toContainText(seed.plainEmployee.name);
+    await expect(secondRow).toContainText(secondOperator.name);
     await expect(firstRow.getByText("5개", { exact: true })).toBeVisible();
     await expect(secondRow.getByText("4개", { exact: true })).toBeVisible();
 
@@ -195,8 +198,14 @@ test.describe("불량 격리 건별 원장", () => {
     await editableRow.getByRole("textbox", { name: "격리 메모" }).fill(
       "수정된 긴 메모 — 보관 중 가장 하단에 깔린 제품이라 외관 손상이 확인됨",
     );
-    await editableRow.getByRole("textbox", { name: "직원 PIN" }).fill("0000");
+    await editableRow.getByRole("textbox", { name: "직원 PIN" }).fill(seed.operatorPin);
+    const memoResponsePromise = page.waitForResponse(
+      (response) =>
+        response.request().method() === "PUT"
+        && response.url().includes(`/api/defects/records/${secondRecord.record_id}/memo`),
+    );
     await editableRow.getByRole("button", { name: "저장", exact: true }).click();
+    expect((await memoResponsePromise).ok()).toBeTruthy();
     await expect(editableRow).toContainText("수정된 긴 메모");
 
     await page.reload();
@@ -211,8 +220,9 @@ test.describe("불량 격리 건별 원장", () => {
     await expect(refreshedSecondRow).toContainText("변경 전: 둘째 격리 메모");
     await expect(refreshedSecondRow).toContainText("변경 후: 수정된 긴 메모");
 
+    const requester = await loginAsOperator(page);
     const createReservedRequest = () => postJson(page.request, "/api/stock-requests", {
-      requester_employee_id: seed.plainEmployee.employee_id,
+      requester_employee_id: requester.employee_id,
       request_type: "defect_scrap",
       reason_category: "외관 불량",
       reason_memo: "승인 예약 검증",
@@ -244,7 +254,7 @@ test.describe("불량 격리 건별 원장", () => {
     const cancelled = await postJson(
       page.request,
       `/api/stock-requests/${cancelledRequest.request_id}/cancel`,
-      { actor_employee_id: seed.plainEmployee.employee_id, pin: "0000" },
+      { actor_employee_id: requester.employee_id, pin: seed.operatorPin },
     );
     expect(cancelled.status).toBe("cancelled");
     await page.reload();
@@ -261,10 +271,11 @@ test.describe("불량 격리 건별 원장", () => {
     expect(Number(firstRecordState.available_quantity)).toBe(3);
 
     const approvedRequest = await createReservedRequest();
+    await loginAsOperator(page, { role: "department" });
     const approved = await postJson(
       page.request,
       `/api/stock-requests/${approvedRequest.request_id}/department-approve`,
-      { actor_employee_id: operator.employee_id, pin: "0000" },
+      { actor_employee_id: operator.employee_id, pin: seed.operatorPin },
     );
     expect(approved.status).toBe("completed");
     firstRecordState = await recordState(firstRecord.record_id);
