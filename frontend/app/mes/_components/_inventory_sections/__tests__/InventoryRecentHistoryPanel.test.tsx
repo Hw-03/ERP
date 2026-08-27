@@ -138,7 +138,7 @@ describe("InventoryRecentHistoryPanel", () => {
     expect(screen.queryByText("원장 작업 내역")).not.toBeInTheDocument();
     expect(screen.queryByText("기존 입출고 내역")).not.toBeInTheDocument();
     expect(container.querySelector(".inventory-recent-divider")).not.toBeNull();
-    expect(screen.getByText("-50 EA")).toBeInTheDocument();
+    expect(screen.getByText("50 EA")).toBeInTheDocument();
     expect(screen.getByText("조립 · 김민재")).toBeInTheDocument();
     expect(testState.legacyQueryArgs).toEqual([{ itemId: "item-1", unlinkedOnly: true, limit: 5 }]);
   });
@@ -157,11 +157,77 @@ describe("InventoryRecentHistoryPanel", () => {
 
     expect(testState.queryArgs).toEqual([{ itemId: "item-1", limit: 5 }]);
     expect(screen.getByText("원자재 입고")).toBeInTheDocument();
-    expect(screen.getByText("+12 EA")).toBeInTheDocument();
+    expect(screen.getByText("12 EA")).toBeInTheDocument();
     expect(screen.getByText("08/14 10:30")).toBeInTheDocument();
     expect(screen.getByText("조립 · 김작업")).toBeInTheDocument();
     expect(screen.queryByText("원장 작업 내역")).not.toBeInTheDocument();
     expect(screen.queryByText("기존 입출고 내역")).not.toBeInTheDocument();
+  });
+
+  it("부서 이동은 실제 작업명과 이동 수량으로 표시한다", () => {
+    testState.queryResult = {
+      data: {
+        items: [makeOperation({
+          action: "dept_transfer",
+          displayLabel: "dept_transfer",
+          matchingLines: [{
+            ...makeOperation().matchingLines[0],
+            transactionType: "TRANSFER_DEPT",
+            quantityChange: 0,
+            transferQty: 30,
+          }],
+        })],
+        nextCursor: null,
+      },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    };
+
+    render(<InventoryRecentHistoryPanel item={makeItem()} />);
+
+    expect(screen.getByText("부서 이동")).toBeInTheDocument();
+    expect(screen.getByText("30 EA")).toBeInTheDocument();
+    expect(screen.getByText("조립 · 김작업")).toBeInTheDocument();
+    expect(screen.getByText("08/14 10:30")).toBeInTheDocument();
+    expect(screen.queryByText("부서 입출고")).not.toBeInTheDocument();
+    expect(screen.queryByText("0 EA")).not.toBeInTheDocument();
+  });
+
+  it("기존 이력도 포괄 분류 대신 실제 처리 작업과 수량을 표시한다", () => {
+    testState.legacyQueryResult = {
+      data: [makeLegacyLog({ transaction_type: "BACKFLUSH", quantity_change: -60 })],
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    };
+
+    render(<InventoryRecentHistoryPanel item={makeItem()} />);
+
+    expect(screen.getByText("자동 차감")).toBeInTheDocument();
+    expect(screen.getByText("60 EA")).toBeInTheDocument();
+    expect(screen.queryByText("부서 입출고")).not.toBeInTheDocument();
+    expect(screen.queryByText("-60 EA")).not.toBeInTheDocument();
+  });
+
+  it("기존 이동 이력은 자동 기록된 수량으로 0 대신 실제 이동량을 표시한다", () => {
+    testState.legacyQueryResult = {
+      data: [makeLegacyLog({
+        transaction_type: "TRANSFER_TO_PROD",
+        quantity_change: 0,
+        transfer_qty: null,
+        notes: "요청 승인 처리: SR-001 / 창고 → 조립 이동 / 30.0000개 / 요청자 김민재",
+      })],
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    };
+
+    render(<InventoryRecentHistoryPanel item={makeItem()} />);
+
+    expect(screen.getByText("창고 → 부서 이동")).toBeInTheDocument();
+    expect(screen.getByText("30 EA")).toBeInTheDocument();
+    expect(screen.queryByText("0 EA")).not.toBeInTheDocument();
   });
 
   it("서버가 준 최신순을 유지하면서 최대 5건만 표시한다", () => {
@@ -204,7 +270,7 @@ describe("InventoryRecentHistoryPanel", () => {
     expect(screen.getByText("최근 입출고 내역이 없습니다.")).toBeInTheDocument();
   });
 
-  it("취소 작업을 별도 최근 행으로 정상 명도와 반대 수량으로 표시한다", () => {
+  it("취소 작업을 별도 최근 행으로 실제 작업명과 처리 수량으로 표시한다", () => {
     testState.queryResult = {
       data: {
         items: [makeOperation({
@@ -229,12 +295,12 @@ describe("InventoryRecentHistoryPanel", () => {
 
     render(<InventoryRecentHistoryPanel item={makeItem()} />);
 
-    expect(screen.getByText("부서 입출고 취소")).toBeInTheDocument();
-    expect(screen.getByText("+7 EA")).toBeInTheDocument();
-    expect(screen.getByText("부서 입출고 취소").closest("li")).not.toHaveAttribute("data-cancelled");
+    expect(screen.getByText("원자재 입고 취소")).toBeInTheDocument();
+    expect(screen.getByText("7 EA")).toBeInTheDocument();
+    expect(screen.getByText("원자재 입고 취소").closest("li")).not.toHaveAttribute("data-cancelled");
   });
 
-  it("부서 재고 작업의 내부 세부명 대신 현장 메뉴명으로 표시한다", () => {
+  it("부서 재고 보정은 실제 작업명으로 표시한다", () => {
     testState.queryResult = {
       data: {
         items: [
@@ -262,12 +328,11 @@ describe("InventoryRecentHistoryPanel", () => {
 
     render(<InventoryRecentHistoryPanel item={makeItem()} />);
 
-    expect(screen.getByText("부서 입출고")).toBeInTheDocument();
-    expect(screen.getByText("부서 입출고 취소")).toBeInTheDocument();
-    expect(screen.queryByText("수량 보정")).not.toBeInTheDocument();
+    expect(screen.getByText("수량 보정")).toBeInTheDocument();
+    expect(screen.getByText("수량 보정 취소")).toBeInTheDocument();
   });
 
-  it("원장 입출고 조정의 내부 작업명 대신 현장 메뉴명으로 표시한다", () => {
+  it("원장 입출고 조정은 실제 세부 작업명으로 표시한다", () => {
     testState.queryResult = {
       data: {
         items: [
@@ -293,8 +358,8 @@ describe("InventoryRecentHistoryPanel", () => {
 
     render(<InventoryRecentHistoryPanel item={makeItem()} />);
 
-    expect(screen.getByText("부서 입출고")).toBeInTheDocument();
-    expect(screen.getByText("부서 입출고 취소")).toBeInTheDocument();
+    expect(screen.getByText("수량보정 입고")).toBeInTheDocument();
+    expect(screen.getByText("수량보정 입고 취소")).toBeInTheDocument();
     expect(screen.queryByText("adjust_in")).not.toBeInTheDocument();
   });
 
@@ -315,10 +380,10 @@ describe("InventoryRecentHistoryPanel", () => {
 
     render(<InventoryRecentHistoryPanel item={makeItem()} />);
 
-    const row = screen.getByText("부서 입출고").closest("li");
+    const row = screen.getByText("원자재 입고").closest("li");
     expect(row).toHaveAttribute("data-cancelled", "true");
-    expect(screen.getByText("부서 입출고").parentElement).toHaveClass("inventory-recent-main");
-    expect(screen.getByText("+12 EA")).toBeInTheDocument();
+    expect(screen.getByText("원자재 입고").parentElement).toHaveClass("inventory-recent-main");
+    expect(screen.getByText("12 EA")).toBeInTheDocument();
     expect(screen.getByText("08/14 10:30")).toBeInTheDocument();
     expect(screen.getByText("조립 · 원 작업자").parentElement).toHaveClass("inventory-recent-meta");
   });

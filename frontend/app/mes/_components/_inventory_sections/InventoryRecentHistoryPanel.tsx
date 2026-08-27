@@ -5,10 +5,63 @@ import { useInventoryOperationsQuery } from "@/lib/queries/useInventoryOperation
 import { useTransactionsQuery } from "@/lib/queries/useTransactionsQuery";
 import { EmptyState, LoadFailureCard, LoadingSkeleton } from "../common";
 import { formatHistoryDate } from "../_history_sections/historyFormat";
-import { getHistoryListOperationLabel } from "../_history_sections/historyPresentation";
-import { getHistoryLogSignedQuantity } from "../_history_sections/historyTableHelpers";
-import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
+import { SUB_TYPE_LABEL, TRANSACTION_TYPE_LABEL } from "@/lib/io/glossary";
+
+type RecentLine = {
+  transactionType: TransactionLog["transaction_type"];
+  quantityChange: number;
+  transferQty?: number | null;
+  notes?: string | null;
+};
+
+const LEGACY_NOTE_QUANTITY_PATTERN = /\/\s*(-?\d+(?:\.\d+)?)개\s*(?:\/|$)/;
+
+function appendCancellation(label: string, isCancellation: boolean): string {
+  return isCancellation && !label.endsWith(" 취소") ? `${label} 취소` : label;
+}
+
+function getTransferLabel(transactionType: RecentLine["transactionType"]): string | null {
+  if (transactionType === "TRANSFER_TO_PROD") return "창고 → 부서 이동";
+  if (transactionType === "TRANSFER_TO_WH") return "부서 → 창고 이동";
+  if (transactionType === "TRANSFER_DEPT") return "부서 이동";
+  return null;
+}
+
+function getLegacyOperationLabel(log: TransactionLog): string {
+  const label = getTransferLabel(log.transaction_type)
+    ?? TRANSACTION_TYPE_LABEL[log.transaction_type];
+  return appendCancellation(label, log.operation_kind === "CANCELLATION");
+}
+
+function getOperationLabel(operation: InventoryOperation): string {
+  const ioLabel = SUB_TYPE_LABEL[operation.action as keyof typeof SUB_TYPE_LABEL];
+  const label = operation.domain === "inventory_io" && operation.action === "dept_transfer"
+    ? "부서 이동"
+    : operation.domain === "inventory_io" && ioLabel
+      ? ioLabel
+      : operation.domain === "department_inventory" && operation.action === "correction"
+        ? "수량 보정"
+        : operation.displayLabel;
+  return appendCancellation(label, operation.kind === "CANCELLATION");
+}
+
+function getLegacyNoteQuantity(notes: string | null | undefined): number | null {
+  const match = notes?.match(LEGACY_NOTE_QUANTITY_PATTERN);
+  const quantity = match?.[1] == null ? NaN : Number(match[1]);
+  return Number.isFinite(quantity) && quantity !== 0 ? Math.abs(quantity) : null;
+}
+
+function formatProcessedQuantity(line: RecentLine, unit: string): string {
+  const transferQty = Number(line.transferQty);
+  const quantityChange = Number(line.quantityChange);
+  const quantity = Number.isFinite(transferQty) && transferQty !== 0
+    ? Math.abs(transferQty)
+    : Number.isFinite(quantityChange) && quantityChange !== 0
+      ? Math.abs(quantityChange)
+      : getLegacyNoteQuantity(line.notes);
+  return quantity == null ? "수량 미기록" : `${formatQty(quantity)} ${unit}`;
+}
 
 function getWorkContext(operation: InventoryOperation): string {
   const context = [operation.department, operation.actorName]
@@ -16,18 +69,6 @@ function getWorkContext(operation: InventoryOperation): string {
     .join(" · ");
 
   return context || operation.matchingLines[0]?.referenceNo || "업무 정보 없음";
-}
-
-function getOperationLabel(operation: InventoryOperation): string {
-  if (operation.domain === "inventory_io" && ["adjust_in", "adjust_out"].includes(operation.action)) {
-    return operation.kind === "CANCELLATION" ? "부서 입출고 취소" : "부서 입출고";
-  }
-
-  if (operation.domain === "department_inventory" && operation.action === "correction") {
-    return operation.kind === "CANCELLATION" ? "부서 입출고 취소" : "부서 입출고";
-  }
-
-  return operation.displayLabel;
 }
 
 function getLegacyWorkContext(log: TransactionLog): string {
@@ -45,11 +86,7 @@ function OperationRows({ item, operations }: { item: Item; operations: Inventory
         const line = operation.matchingLines[0];
         if (!line) return null;
         const cancelledOriginal = operation.effectiveStatus === "cancelled";
-        const quantityValue = line.transferQty == null
-          ? line.quantityChange
-          : Math.sign(line.quantityChange) * Math.abs(line.transferQty);
-        const sign = quantityValue > 0 ? "+" : quantityValue < 0 ? "-" : "";
-        const quantity = `${sign}${formatQty(Math.abs(quantityValue))} ${item.unit}`;
+        const quantity = formatProcessedQuantity(line, item.unit);
         return (
           <li key={operation.operationId} data-cancelled={cancelledOriginal || undefined}>
             <div className="inventory-recent-main">
@@ -73,11 +110,16 @@ function LegacyRows({ logs }: { logs: TransactionLog[] }) {
   return (
     <ul className="inventory-recent">
       {logs.map((log) => {
-        const quantity = getHistoryLogSignedQuantity(log).parts.map((part) => part.label).join(" ");
+        const quantity = formatProcessedQuantity({
+          transactionType: log.transaction_type,
+          quantityChange: log.quantity_change,
+          transferQty: log.transfer_qty,
+          notes: log.notes,
+        }, log.item_unit);
         return (
           <li key={log.log_id}>
             <div className="inventory-recent-main">
-              <span>{getHistoryListOperationLabel(log)}</span>
+              <span>{getLegacyOperationLabel(log)}</span>
               <b>{quantity}</b>
             </div>
             <div className="inventory-recent-meta">
