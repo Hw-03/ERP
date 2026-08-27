@@ -55,6 +55,7 @@ export function DesktopRightPanel({
   backButton,
   topContent,
   onClose,
+  fillAvailableWidth = false,
   children,
 }: {
   title: string;
@@ -65,6 +66,8 @@ export function DesktopRightPanel({
   backButton?: React.ReactNode;
   topContent?: ReactNode;
   onClose?: () => void;
+  /** SlidePanel 내부의 사용 가능한 전체 폭을 사용할지 여부. */
+  fillAvailableWidth?: boolean;
   children: React.ReactNode;
 }) {
   const [body, setBody] = useState<HTMLDivElement | null>(null);
@@ -74,7 +77,7 @@ export function DesktopRightPanel({
     <DesktopRightPanelBodyContext.Provider value={body}>
       <DesktopRightPanelFooterContext.Provider value={footer}>
         <div
-          className="flex h-full min-h-0 w-[420px] shrink-0 flex-col overflow-hidden rounded-[32px] border px-5 py-5"
+          className={`flex h-full min-h-0 ${fillAvailableWidth ? "w-full" : "w-[420px]"} shrink-0 flex-col overflow-hidden rounded-[32px] border px-5 py-5`}
           style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
         >
           {topContent}

@@ -69,6 +69,7 @@ export function DesktopHistoryRightPanel({
       hideCloseButton
       modal={false}
       labelledBy={HISTORY_DETAIL_TITLE_ID}
+      contentClassName="pl-0"
     >
       {displaySelection?.kind === "log" && (
         <DesktopRightPanel
@@ -77,6 +78,7 @@ export function DesktopHistoryRightPanel({
           subtitle={displaySelection.log.mes_code ?? undefined}
           backButton={backButtonNode}
           onClose={onClose}
+          fillAvailableWidth
         >
           <HistoryDetailPanel
             panelOpen={!!selection}
@@ -114,6 +116,7 @@ export function DesktopHistoryRightPanel({
             subtitle={subtitleText}
             backButton={backButtonNode}
             onClose={onClose}
+            fillAvailableWidth
           >
             <HistoryBatchDetailPanel
               panelOpen={!!selection}

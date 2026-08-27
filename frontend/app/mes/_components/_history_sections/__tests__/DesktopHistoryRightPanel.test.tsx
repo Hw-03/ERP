@@ -12,11 +12,12 @@ const detailLifecycle = vi.hoisted(() => ({
 }));
 
 vi.mock("../../common", () => ({
-  SlidePanel: ({ modal, labelledBy, children }: any) => (
+  SlidePanel: ({ modal, labelledBy, contentClassName, children }: any) => (
     <aside
       data-testid="desktop-history-slide-panel"
       data-modal={modal === false ? "false" : "unset"}
       data-labelled-by={labelledBy ?? ""}
+      data-content-class={contentClassName ?? ""}
     >
       {children}
     </aside>
@@ -24,8 +25,8 @@ vi.mock("../../common", () => ({
 }));
 
 vi.mock("../../DesktopRightPanel", () => ({
-  DesktopRightPanel: ({ title, titleId, children }: any) => (
-    <div data-testid="desktop-history-right-panel">
+  DesktopRightPanel: ({ title, titleId, fillAvailableWidth, children }: any) => (
+    <div data-testid="desktop-history-right-panel" data-fill-width={fillAvailableWidth ? "true" : "false"}>
       <h2 id={titleId}>{title}</h2>
       {children}
     </div>
@@ -180,6 +181,8 @@ describe("DesktopHistoryRightPanel", () => {
     expect(slidePanel).toHaveAttribute("data-modal", "false");
     expect(title.id).not.toBe("");
     expect(slidePanel).toHaveAttribute("data-labelled-by", title.id);
+    expect(slidePanel).toHaveAttribute("data-content-class", "pl-0");
+    expect(screen.getByTestId("desktop-history-right-panel")).toHaveAttribute("data-fill-width", "true");
   });
 
   it("hides cancellation for a detail opened from a grouped child row", () => {

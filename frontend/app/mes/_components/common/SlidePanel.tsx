@@ -15,6 +15,8 @@ interface Props {
   modal?: boolean;
   /** 패널 제목 요소의 id. */
   labelledBy?: string;
+  /** 패널 콘텐츠의 좌측 inset 클래스. 기본값은 공통 상세 패널의 16px inset이다. */
+  contentClassName?: string;
   children: React.ReactNode;
 }
 
@@ -30,6 +32,7 @@ function SlidePanelImpl({
   hideCloseButton,
   modal = true,
   labelledBy,
+  contentClassName = "pl-4",
   children,
 }: Props) {
   const panelRef = useFocusTrap<HTMLDivElement>(open && !!onClose && modal);
@@ -67,7 +70,7 @@ function SlidePanelImpl({
     >
       <div
         ref={panelRef}
-        className="relative flex h-full min-h-0 flex-col pl-4"
+        className={`relative flex h-full min-h-0 flex-col ${contentClassName}`}
         style={{
           opacity: open ? 1 : 0,
           transform: open ? "translateX(0)" : "translateX(18px)",
