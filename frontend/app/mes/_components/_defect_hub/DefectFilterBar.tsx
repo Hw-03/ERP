@@ -11,9 +11,11 @@ interface Props {
   scope: DefectScope;
   actorScope: DefectActorScope;
   sort: DefectSort;
+  filterLocked: boolean;
   onScopeChange: (scope: DefectScope) => void;
   onActorScopeChange: (scope: DefectActorScope) => void;
   onSortChange: (sort: DefectSort) => void;
+  onFilterLockedChange: (locked: boolean) => void;
   currentDept: string;
 }
 
@@ -21,9 +23,11 @@ export function DefectFilterBar({
   scope,
   actorScope,
   sort,
+  filterLocked,
   onScopeChange,
   onActorScopeChange,
   onSortChange,
+  onFilterLockedChange,
   currentDept,
 }: Props) {
   return (
@@ -79,7 +83,7 @@ export function DefectFilterBar({
       <div className="h-5 w-px" style={{ background: LEGACY_COLORS.border }} />
 
       {/* 정렬 */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
           정렬
         </span>
@@ -96,6 +100,19 @@ export function DefectFilterBar({
           <option value="oldest">오래된 순</option>
           <option value="newest">최신 순</option>
         </select>
+        <label
+          className="-my-2 flex min-h-11 cursor-pointer select-none items-center gap-2 rounded-[8px] px-2 text-xs font-bold"
+          style={{ color: LEGACY_COLORS.muted2 }}
+        >
+          <input
+            type="checkbox"
+            checked={filterLocked}
+            onChange={(event) => onFilterLockedChange(event.target.checked)}
+            className="h-4 w-4 cursor-pointer rounded border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-blue)] focus-visible:ring-offset-2"
+            style={{ accentColor: LEGACY_COLORS.blue }}
+          />
+          <span>필터 고정</span>
+        </label>
       </div>
     </div>
   );

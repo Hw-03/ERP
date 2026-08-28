@@ -12,7 +12,8 @@ export interface DefectHubEmployee {
 }
 import { DEFECT_HUB_CARDS, type DefectHubCardId } from "./defectHubCards";
 import { DefectKpiCards, type DefectKpiKind } from "./DefectKpiCards";
-import { DefectFilterBar, type DefectActorScope, type DefectScope, type DefectSort } from "./DefectFilterBar";
+import { DefectFilterBar, type DefectScope } from "./DefectFilterBar";
+import { useDefectFilterPreferences } from "./useDefectFilterPreferences";
 import { DefectDepartmentList } from "./DefectDepartmentList";
 import { MobileDefectProcessPanel } from "../mobile/screens/MobileDefectProcessPanel";
 import { MobileDefectCartFlow } from "../mobile/screens/MobileDefectCartFlow";
@@ -50,17 +51,27 @@ export function DefectHubPanel({
   const hasLoadedRef = useRef(false);
   const requestGenerationRef = useRef(0);
 
-  // defectDeptFilter prop 이 있으면 내 부서 필터로 초기 설정,
-  // 없으면 생산 라인이면 "my", 아니면 "all"
-  const initialScope = (): DefectScope => {
-    if (defectDeptFilter) return "my";
-    return PRODUCTION_LINES.has(currentEmployee.department) ? "my" : "all";
-  };
-
   const [view, setView] = useState<"hub" | "list" | "process" | "cart">("hub");
-  const [scope, setScope] = useState<DefectScope>(initialScope);
-  const [actorScope, setActorScope] = useState<DefectActorScope>("all");
-  const [sort, setSort] = useState<DefectSort>("oldest");
+  const defaultScope: DefectScope = defectDeptFilter
+    ? "my"
+    : PRODUCTION_LINES.has(currentEmployee.department)
+      ? "my"
+      : "all";
+  const {
+    scope,
+    actorScope,
+    sort,
+    filterLocked,
+    setScope,
+    setActorScope,
+    setSort,
+    setFilterLocked,
+  } = useDefectFilterPreferences({
+    employeeId: currentEmployee.employee_id,
+    defaultScope,
+    defaultSort: "oldest",
+    defectDeptFilter,
+  });
   const [kpiFilter, setKpiFilter] = useState<DefectKpiKind | null>(null);
   const [processingLocation, setProcessingLocation] = useState<DefectLocation | null>(null);
   const [cartMode, setCartMode] = useState<DefectCartMode>("add");
@@ -281,6 +292,7 @@ export function DefectHubPanel({
         scope={scope}
         actorScope={actorScope}
         sort={sort}
+        filterLocked={filterLocked}
         onScopeChange={(next) => {
           setScope(next);
           setKpiFilter(null);
@@ -290,6 +302,7 @@ export function DefectHubPanel({
           setKpiFilter(null);
         }}
         onSortChange={setSort}
+        onFilterLockedChange={setFilterLocked}
         currentDept={currentEmployee.department}
       />
 

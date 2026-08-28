@@ -91,6 +91,7 @@ describe("DesktopDefectView realtime refresh", () => {
     mocks.revision = null;
     mocks.listDefects.mockReset().mockResolvedValue([]);
     window.history.replaceState(null, "");
+    window.localStorage.clear();
   });
 
   it("reloads locations on revision while preserving the current list view", async () => {
@@ -228,5 +229,55 @@ describe("DesktopDefectView realtime refresh", () => {
     expect(screen.queryByRole("button", { name: "Process MINE-VACUUM" })).not.toBeInTheDocument();
     expect(screen.getByText("격리 중").parentElement).toHaveTextContent("1건");
     expect(screen.getByText("1년 이상 ⚠").parentElement).toHaveTextContent("0건");
+  });
+
+  it("restores the employee's locked filters into the desktop list, KPI, and ordering", async () => {
+    const day = 24 * 60 * 60 * 1000;
+    window.localStorage.setItem(
+      `dexcowin_mes_defect_filters:${operator.employee_id}`,
+      JSON.stringify({ version: 1, scope: "my", actorScope: "mine", sort: "oldest" }),
+    );
+    mocks.listDefects.mockResolvedValueOnce([
+      {
+        ...location,
+        record_id: "record-recent",
+        item_id: "recent",
+        mes_code: "RECENT-MINE",
+        defective_at: new Date(Date.now() - 10 * day).toISOString(),
+      },
+      {
+        ...location,
+        record_id: "record-old",
+        item_id: "old",
+        mes_code: "OLD-MINE",
+        defective_at: new Date(Date.now() - 100 * day).toISOString(),
+      },
+      {
+        ...location,
+        record_id: "record-other",
+        item_id: "other",
+        mes_code: "OTHER-ACTOR",
+        quarantined_by_employee_id: "employee-2",
+      },
+      {
+        ...location,
+        record_id: "record-other-dept",
+        item_id: "other-dept",
+        mes_code: "OTHER-DEPT",
+        department: "vacuum",
+      },
+    ]);
+
+    render(<DesktopDefectView operator={operator} />);
+    fireEvent.click(screen.getByRole("button", { name: "Open list" }));
+
+    expect(await screen.findByRole("checkbox", { name: "필터 고정" })).toBeChecked();
+    expect(screen.getByRole("combobox")).toHaveValue("oldest");
+    expect(screen.getByRole("button", { name: "내 부서" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "내가 격리" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("격리 중").parentElement).toHaveTextContent("2건");
+
+    const rows = within(screen.getByTestId("defect-list")).getAllByRole("button");
+    expect(rows.map((row) => row.textContent)).toEqual(["Process OLD-MINE", "Process RECENT-MINE"]);
   });
 });
