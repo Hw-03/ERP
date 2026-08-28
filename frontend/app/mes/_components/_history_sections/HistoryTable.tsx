@@ -528,6 +528,7 @@ export function HistoryTable({
                   const childLogs = group.logs.filter((log) => log.log_id !== primaryLog.log_id);
                   const expanded = expandedGroupKey === group.operationId;
                   const controlsId = historyGroupPanelId(group.operationId);
+                  const primarySelected = selectedLogId === primaryLog.log_id;
                   const selected = selectedLogId === primaryLog.log_id
                     || childLogs.some((log) => log.log_id === selectedLogId);
                   return (
@@ -535,7 +536,11 @@ export function HistoryTable({
                       <HistoryLogRow
                         log={primaryLog}
                         selected={selected}
-                        onSelect={onSelectLog}
+                        onSelect={() => {
+                          onSelectLog(primaryLog);
+                          if (primarySelected) collapseGroup(group.operationId);
+                          else expandGroup(group.operationId);
+                        }}
                         expanded={expanded}
                         onToggle={childLogs.length > 0 ? () => toggleGroup(group.operationId) : undefined}
                         controlsId={childLogs.length > 0 ? controlsId : undefined}

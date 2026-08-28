@@ -43,6 +43,7 @@ const sampleBomTree: BOMTreeNode = {
   unit: "EA",
   required_quantity: 1,
   current_stock: 5,
+  additional_producible_quantity: 7,
   children: [
     {
       item_id: "child-1",

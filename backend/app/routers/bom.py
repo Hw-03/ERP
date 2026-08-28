@@ -16,7 +16,11 @@ from app.services import audit, stock_math
 from app.services._tx import commit_and_refresh, commit_only
 from app._evt import emit as _evt_emit
 from app.services.bom import BomCache, bom_child_item_ordering, bom_modal_tree_child_ordering_key, build_bom_cache
-from app.services.production_capacity import is_production_capacity_ignored
+from app.services.production_capacity import (
+    build_af_capacity_bom_cache,
+    compute_additional_producible_quantity,
+    is_production_capacity_ignored,
+)
 from app.repositories import item_repository
 
 router = APIRouter()
@@ -205,7 +209,10 @@ def get_bom_flat(parent_item_id: uuid.UUID, db: Session = Depends(get_db)):
     )
 
 
-@router.get("/{parent_item_id}/tree", response_model=BOMTreeNode)
+@router.get(
+    "/{parent_item_id}/tree",
+    response_model=BOMTreeNode,
+)
 def get_bom_tree(
     parent_item_id: uuid.UUID,
     department_order: Literal["desc"] | None = Query(None),
@@ -226,12 +233,13 @@ def get_bom_tree(
     if parent_item_id not in items_map:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
+    fig_by_id = stock_math.bulk_compute(db, needed_ids)
     normal_stock_by_item = {
         item_id: figure.warehouse_qty + figure.production_total
-        for item_id, figure in stock_math.bulk_compute(db, needed_ids).items()
+        for item_id, figure in fig_by_id.items()
     }
 
-    return _build_tree_cached(
+    tree = _build_tree_cached(
         items_map[parent_item_id],
         Decimal("1"),
         items_map,
@@ -241,6 +249,13 @@ def get_bom_tree(
         visited=set(),
         department_order=department_order,
     )
+    capacity_bom_cache = build_af_capacity_bom_cache(bom_cache, items_map)
+    tree.additional_producible_quantity = compute_additional_producible_quantity(
+        parent_item_id,
+        bom_cache=capacity_bom_cache,
+        fig_by_id=fig_by_id,
+    )
+    return tree
 
 
 @router.delete("/{bom_id}", status_code=status.HTTP_204_NO_CONTENT)

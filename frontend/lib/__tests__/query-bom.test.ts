@@ -72,6 +72,7 @@ describe("useBomTreeQuery (MSW)", () => {
     const { result } = renderHook(() => useBomTreeQuery("parent-1"), { wrapper: Wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.item_id).toBe("parent-1");
+    expect(result.current.data?.additional_producible_quantity).toBe(7);
     expect(result.current.data?.children).toHaveLength(1);
     expect(result.current.data?.children[0].item_id).toBe("child-1");
   });

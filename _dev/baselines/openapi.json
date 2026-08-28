@@ -807,6 +807,17 @@
       },
       "BOMTreeNode": {
         "properties": {
+          "additional_producible_quantity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Additional Producible Quantity"
+          },
           "children": {
             "default": [],
             "items": {
