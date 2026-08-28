@@ -99,6 +99,28 @@ describe("OperatorLoginCard", () => {
     expect(screen.queryByText("관리자에게 문의해 주세요")).not.toBeInTheDocument();
   });
 
+  it("clears the PIN and restores focus after login fails", async () => {
+    state.verifyEmployeePin.mockRejectedValue(new Error("invalid PIN"));
+
+    render(<OperatorLoginCard onLogin={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "직원 선택" }));
+
+    const pinInput = screen.getByLabelText(/PIN/);
+    await waitFor(() => expect(pinInput).toHaveFocus());
+
+    fireEvent.change(pinInput, { target: { value: "1234" } });
+    const loginButton = screen.getByRole("button", { name: /로그인/ });
+    loginButton.focus();
+    fireEvent.click(loginButton);
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("PIN 번호가 올바르지 않습니다.");
+      expect(pinInput).toHaveValue("");
+      expect(pinInput).not.toBeDisabled();
+      expect(pinInput).toHaveFocus();
+    });
+  });
+
   it("marks the login notification popup pending when the login response has the setting enabled", async () => {
     state.verifyEmployeePin.mockResolvedValue(makeEmployee({ login_notification_popup_enabled: true }));
 

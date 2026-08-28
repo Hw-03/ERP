@@ -82,6 +82,7 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
     } catch {
       setError("PIN 번호가 올바르지 않습니다.");
       setPin("");
+      requestAnimationFrame(() => pinInputRef.current?.focus());
     } finally {
       setLoading(false);
     }
