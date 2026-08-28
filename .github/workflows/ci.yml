@@ -27,6 +27,11 @@ jobs:
       - name: Verify smart policy and PowerShell orchestration
         run: python -m pytest backend/tests/ops/test_verification_policy.py backend/tests/ops/test_verify_local_runtime.py backend/tests/ops/test_verify_local_parallel_contract.py backend/tests/ops/test_verify_e2e_runtime.py --confcutdir=backend/tests/ops -q
 
+      - name: Verify runtime task ownership contracts
+        run: |
+          python -m pytest backend/tests/ops/test_runtime_task_control.py --confcutdir=backend/tests/ops -q
+          python -m pytest backend/tests/ops/test_employee_sync_safety.py::test_employee_sync_runtime_task_validation_failure_stops_before_server_shutdown --confcutdir=backend/tests/ops -q
+
   backend:
     name: Backend (pytest + compile + openapi-drift)
     runs-on: ubuntu-latest

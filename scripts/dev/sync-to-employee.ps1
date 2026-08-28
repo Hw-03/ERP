@@ -10,7 +10,8 @@
 #
 # exit code: 0 성공 / 2 접속자 있음 / 3 스키마 검수 필요 / 4 동기화 실패 /
 #            5 마이그레이션 실패 / 6 헬스체크 실패 / 7 백업 실패 / 8 사후 검증 실패 /
-#            9 프론트엔드 운영 빌드 실패 / 10 주간 스냅샷 예약 작업 실패
+#            9 프론트엔드 운영 빌드 실패 / 10 주간 스냅샷 예약 작업 실패 /
+#            11 직원 런타임 예약 작업 누락 또는 오구성
 
 param(
     [switch] $DryRun,
@@ -38,6 +39,9 @@ $runtimeScripts = @(
     "checked-command.ps1",
     "runtime-paths.ps1",
     "runtime-control.ps1",
+    "runtime-task-control.ps1",
+    "runtime-task-host.vbs",
+    "register-runtime-tasks.ps1",
     "service_supervisor.py",
     "start-backend.ps1",
     "stop-backend.ps1",
@@ -51,6 +55,7 @@ $runtimeScripts = @(
 )
 
 . (Join-Path $DevRoot "scripts\dev\checked-command.ps1")
+. (Join-Path $DevRoot "scripts\dev\runtime-task-control.ps1")
 
 function Write-CheckedCommandResult {
     param(
@@ -364,6 +369,17 @@ if ($DryRun) {
     Write-Host "[dry-run] 아무것도 변경하지 않았습니다."
     exit 0
 }
+
+Write-Host "[runtime-task] 직원 런타임 예약 작업 구성 확인 중..."
+try {
+    Assert-RuntimeTasksConfigured -RepoRoot $EmpRoot
+}
+catch {
+    Write-Host "[runtime-task] 검증 실패 - 직원 서버를 정지하지 않았습니다."
+    Write-Host "[runtime-task] $($_.Exception.Message)"
+    exit 11
+}
+Write-Host "[runtime-task] 직원 런타임 예약 작업 구성 확인 완료"
 
 $env:MES_RUNTIME_ROOT = $EmpRuntimeRoot
 

@@ -203,7 +203,18 @@ scripts\ops\healthcheck.bat
 ## 로그 확인
 
 ### 실행·관제 로그
-- `start.bat`는 백엔드와 프론트를 background 프로세스로 시작하며 서버별 콘솔 창을 열지 않는다.
+- 개발·직원 환경의 백엔드·프론트 감독 프로세스는 트리거 없는 Windows 예약 작업이 소유한다. 예약 작업은 콘솔과 독립된 숨김 런처에서 PowerShell 호스트를 유지하므로 Codex나 터미널을 닫아도 서버 프로세스는 유지된다.
+- 최초 1회 다음 명령으로 각 환경의 작업을 등록한다. 작업은 현재 로그인 사용자·제한 권한으로 등록되며 부팅·로그인 시 자동 시작하지 않는다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\register-runtime-tasks.ps1 -RepoRoot C:\ERP
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\register-runtime-tasks.ps1 -RepoRoot C:\ERP-dev
+```
+
+- 이후에는 기존 `start.bat`, `stop.bat` 또는 `start-backend.ps1`, `start-frontend.ps1` 사용법을 그대로 유지한다. 시작 명령은 예약 작업에 실행을 요청하고 HTTP 준비 완료까지 기다린다.
+- 작업 이름은 `DEXCOWIN MES Development Backend`, `DEXCOWIN MES Development Frontend`, `DEXCOWIN MES Employee Backend`, `DEXCOWIN MES Employee Frontend`으로 고정한다.
+- `status.bat` 또는 `scripts\dev\status-servers.ps1`의 `task` 필드에서 `running`, `ready`, `missing`, `misconfigured`를 확인한다. `missing`이나 `misconfigured`면 출력된 재등록 명령을 실행하며 직접 실행으로 우회하지 않는다.
+- 직원 코드 동기화는 직원 예약 작업 구성을 서버 정지 전에 읽기 전용으로 검증한다. 누락·오구성이면 서버를 건드리지 않고 종료 코드 `11`로 중단한다.
 - 실행 중 로그는 `watch.bat`로 연 관제 창에서 확인한다. 관제 창을 닫아도 서버는 계속 실행된다.
 - 중지·재시작 전 정리는 루트의 `stop.bat`를 사용한다.
 - 브라우저: F12 → Console / Network 탭

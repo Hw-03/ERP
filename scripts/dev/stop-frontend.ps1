@@ -5,11 +5,13 @@ $ErrorActionPreference = "Stop"
 $Profile = & (Join-Path $PSScriptRoot "resolve-server-profile.ps1")
 . (Join-Path $PSScriptRoot "runtime-paths.ps1")
 . (Join-Path $PSScriptRoot "runtime-control.ps1")
+. (Join-Path $PSScriptRoot "runtime-task-control.ps1")
 
 $LogDir = Get-MesRuntimePath -RepoRoot $Profile.RepoRoot -RelativePath "logs\frontend" -CreateDirectory
 $StatePath = Join-Path $LogDir "frontend-runtime.json"
 $EventPath = Join-Path $LogDir "frontend-runtime-events.jsonl"
 $ControlPath = Join-Path $LogDir "frontend-runtime-control.json"
+$LaunchRequestPath = Join-Path $LogDir "frontend-runtime-launch-request.json"
 
 Stop-SupervisedService `
     -Profile $Profile `
@@ -19,5 +21,10 @@ Stop-SupervisedService `
     -EventPath $EventPath `
     -ControlPath $ControlPath `
     -Source "stop-frontend.ps1"
+
+Stop-RuntimeScheduledTask `
+    -RepoRoot $Profile.RepoRoot `
+    -Service "frontend" `
+    -LaunchRequestPath $LaunchRequestPath
 
 Write-Host "[stop-frontend] OK - $($Profile.Label) port $($Profile.FrontendPort) free"
