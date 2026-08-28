@@ -162,6 +162,24 @@ export function MobileIoComposeWizard({
 
   const latestBundlesRef = useRef<IoBundle[]>(state.bundles);
   latestBundlesRef.current = state.bundles;
+  const latestDraftFieldsRef = useRef({
+    employeeId,
+    workType: state.workType,
+    subType: state.subType,
+    fromDepartment: state.fromDepartment,
+    toDepartment: state.toDepartment,
+    referenceNo: state.referenceNo,
+    notes: state.notes,
+  });
+  latestDraftFieldsRef.current = {
+    employeeId,
+    workType: state.workType,
+    subType: state.subType,
+    fromDepartment: state.fromDepartment,
+    toDepartment: state.toDepartment,
+    referenceNo: state.referenceNo,
+    notes: state.notes,
+  };
   const internalUsePreviewLock = useInternalUseBomPreviewLock();
   const intentAppliedRef = useRef(false);
   useEffect(() => {
@@ -179,7 +197,7 @@ export function MobileIoComposeWizard({
 
   const { previewing, previewTarget } = useIoPreview();
   const { drafting, saveDraft } = useIoDraft();
-  const { submitting, submit } = useIoSubmit();
+  const { submitting, run, submit } = useIoSubmit();
 
   useEffect(() => {
     setSearch(globalSearch);
@@ -490,7 +508,7 @@ export function MobileIoComposeWizard({
   }
 
   async function handleSubmit() {
-    await runCompositionSubmit(
+    await run(() => runCompositionSubmit(
       employeeId,
       state.subType,
       state.fromDepartment,
@@ -521,7 +539,21 @@ export function MobileIoComposeWizard({
         restoredNonceRef.current = null;
         onDraftSaved?.(draftId, state.step, false);
       },
-    );
+      operationRefs,
+      (bundles) => {
+        const fields = latestDraftFieldsRef.current;
+        return saveDraft({
+          employeeId: fields.employeeId,
+          workType: fields.workType,
+          subType: fields.subType,
+          ...ioDepartmentPayload(fields.subType, fields.fromDepartment, fields.toDepartment),
+          referenceNo: fields.referenceNo,
+          notes: fields.notes,
+          batchId: autosaveBatchIdRef.current,
+          bundles,
+        });
+      },
+    ));
   }
 
   const step = state.step;

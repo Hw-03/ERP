@@ -10,6 +10,7 @@ from decimal import Decimal
 from typing import Iterable, Optional, Sequence
 import uuid
 
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -1142,17 +1143,30 @@ def submit_existing_draft(
         raise ValueError("작업 묶음을 찾을 수 없습니다.")
     if batch.requester_employee_id != requester_employee_id:
         raise PermissionError("본인 임시저장 작업만 제출할 수 있습니다.")
-    if batch.status != "draft":
-        raise ValueError("임시저장 상태가 아닙니다.")
     ensure_batch_is_mutable(batch)
+    requester = _load_requester(db, requester_employee_id)
+    submitted_at = datetime.utcnow()
+    transition = db.execute(
+        update(IoBatch)
+        .where(
+            IoBatch.batch_id == batch_id,
+            IoBatch.requester_employee_id == requester_employee_id,
+            IoBatch.status == "draft",
+        )
+        .values(
+            status="submitted",
+            submitted_at=submitted_at,
+            updated_at=submitted_at,
+        )
+    )
+    if transition.rowcount != 1:
+        raise ValueError("임시저장 상태가 아닙니다.")
+    db.flush()
+    db.refresh(batch)
     _validate_required_memo(
         work_type=batch.work_type,
         sub_type=batch.sub_type,
         notes=batch.notes,
     )
-    requester = _load_requester(db, requester_employee_id)
     normalize_batch_bom_stock_exempt(db, batch)
-    batch.status = "submitted"
-    batch.submitted_at = datetime.utcnow()
-    db.flush()
     return _execute_submission(db, requester=requester, batch=batch)

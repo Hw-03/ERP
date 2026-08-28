@@ -8,8 +8,6 @@ from __future__ import annotations
 import uuid
 from typing import List, Optional
 
-from datetime import datetime as _dt
-
 from fastapi import APIRouter, Depends, Query, Request, Response, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -24,7 +22,6 @@ from app.models import (
     StockRequestStatusEnum,
     StockRequestTypeEnum,
 )
-from app.models.io_batch import IoBatch
 from app.routers._errors import ErrorCode, http_error
 from app.services.dept_hierarchy import approvable_departments
 from app.schemas import (
@@ -636,17 +633,20 @@ def revert_stock_request_to_draft(
     http_request: Request,
     db: Session = Depends(get_db),
 ):
-    """제출된 요청을 취소하고 연결된 IoBatch를 draft로 복원 — 수정 후 재제출용.
-    권한: 요청자 본인만.
-    """
-    request = _load_request_for_action(db, request_id)
+    """연결된 미결 요청을 취소하고 IoBatch 전체를 draft로 복원한다."""
+    request = db.query(StockRequest).filter(StockRequest.request_id == request_id).first()
+    if request is None:
+        raise http_error(404, ErrorCode.NOT_FOUND, "요청을 찾을 수 없습니다.")
     requester = _load_actor(db, payload.actor_employee_id)
 
-    if request.requester_employee_id != requester.employee_id:
-        raise http_error(403, ErrorCode.FORBIDDEN, "본인 요청만 수정할 수 있습니다.")
-
     try:
-        svc.cancel_request(db, request, requester=requester, pin=payload.pin, http_request=http_request)
+        action_svc.revert_to_draft(
+            db,
+            request=request,
+            requester=requester,
+            pin=payload.pin,
+            http_request=http_request,
+        )
     except PermissionError as exc:
         db.rollback()
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
@@ -654,14 +654,4 @@ def revert_stock_request_to_draft(
         db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
 
-    # sync_batch_from_stock_request 가 "cancelled" 로 설정한 것을 "draft" 로 덮어씀
-    batch_id = request.operation_batch_id
-    if batch_id:
-        batch = db.query(IoBatch).filter(IoBatch.batch_id == batch_id).first()
-        if batch:
-            batch.status = "draft"
-            batch.updated_at = _dt.utcnow()
-            db.flush()
-
-    commit_only(db)
     return Response(status_code=204)

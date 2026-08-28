@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
 import { MobileIoComposeWizard } from "../MobileIoComposeWizard";
@@ -10,6 +10,7 @@ const wizardState = vi.hoisted(() => ({
   fromDepartment: null,
   toDepartment: "조립",
   bundles: [],
+  referenceNo: null,
   notes: "",
   hasShortage: false,
   hasInvalidQuantity: false,
@@ -20,6 +21,13 @@ const wizardState = vi.hoisted(() => ({
   goPrev: vi.fn(),
   reset: vi.fn(),
 }));
+const saveDraft = vi.hoisted(() => vi.fn());
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+}
 
 vi.mock("@/lib/api", () => ({
   api: {
@@ -43,7 +51,10 @@ vi.mock("../../../_warehouse_v2/useIoDraftRestore", () => ({
 }));
 
 vi.mock("../../../_warehouse_v2/useIoDraft", () => ({
-  useIoDraft: () => ({ drafting: false, saveDraft: vi.fn() }),
+  useIoDraft: () => ({
+    drafting: false,
+    saveDraft,
+  }),
 }));
 
 vi.mock("../../../_warehouse_v2/useIoPreview", () => ({
@@ -51,7 +62,7 @@ vi.mock("../../../_warehouse_v2/useIoPreview", () => ({
 }));
 
 vi.mock("../../../_warehouse_v2/useIoSubmit", () => ({
-  useIoSubmit: () => ({ submitting: false, submit: vi.fn() }),
+  useIoSubmit: () => ({ submitting: false, run: (work: () => Promise<unknown>) => work(), submit: vi.fn() }),
 }));
 
 vi.mock("../../../_warehouse_v2/IoConfirmStep", () => ({
@@ -62,6 +73,7 @@ vi.mock("../../../_warehouse_v2/IoConfirmStep", () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  saveDraft.mockImplementation(async ({ batchId }: { batchId: string | null }) => ({ batch_id: batchId }));
   vi.mocked(api.submitDraft).mockResolvedValue({
     requires_approval: true,
     message: "부서 결재 요청이 생성되었습니다.",
@@ -211,10 +223,99 @@ describe("MobileIoComposeWizard Step 5 헤더", () => {
     fireEvent.click(screen.getByRole("button", { name: "모바일 제출" }));
 
     await waitFor(() => {
+      expect(saveDraft).toHaveBeenCalledWith(expect.objectContaining({
+        employeeId: currentOperator.employee_id,
+        batchId: "mobile-operator-switch-draft",
+        workType: "warehouse_io",
+        subType: "warehouse_to_dept",
+        bundles: wizardState.bundles,
+      }));
       expect(api.submitDraft).toHaveBeenCalledWith(
         "mobile-operator-switch-draft",
         currentOperator.employee_id,
       );
     });
+  });
+
+  it("복원 draft의 최종 수량과 메모를 저장한 뒤 같은 batch를 제출한다", async () => {
+    const currentOperator = {
+      employee_id: "mobile-staff",
+      name: "모바일 작업자",
+      department: "조립",
+      warehouse_role: "none" as const,
+    };
+    const originalState = {
+      workType: wizardState.workType,
+      subType: wizardState.subType,
+      fromDepartment: wizardState.fromDepartment,
+      toDepartment: wizardState.toDepartment,
+      bundles: wizardState.bundles,
+      referenceNo: wizardState.referenceNo,
+      notes: wizardState.notes,
+    };
+    const save = deferred<{ batch_id: string }>();
+    const finalBundles = [{
+      bundle_id: "mobile-final-bundle",
+      source_kind: "direct_item",
+      title: "모바일 최종 추가 품목",
+      source_item_id: "mobile-added",
+      source_mes_code: "MOBILE-1",
+      quantity: 3,
+      expanded_level: 0,
+      lines: [{
+        line_id: "mobile-added-line", item_id: "mobile-added", item_name: "모바일 추가 품목", mes_code: "MOBILE-1", unit: "EA",
+        direction: "out", from_bucket: "warehouse", from_department: null, to_bucket: "production", to_department: "조립",
+        quantity: 3, bom_expected: null, included: true, origin: "direct", edited: true, has_children: false,
+        shortage: 0, exclusion_note: null,
+      }],
+    }] as never;
+    wizardState.workType = "warehouse_io";
+    wizardState.subType = "warehouse_to_dept";
+    wizardState.fromDepartment = "원자재";
+    wizardState.toDepartment = "조립";
+    wizardState.referenceNo = "MOBILE-REF-3";
+    wizardState.notes = "모바일 최종 메모";
+    wizardState.bundles = finalBundles;
+    saveDraft.mockImplementation(() => save.promise);
+    try {
+      render(
+        <MobileIoComposeWizard
+          globalSearch=""
+          operator={currentOperator}
+          items={[]}
+          setItems={vi.fn()}
+          onStatusChange={vi.fn()}
+          restoreDraft={{ batch_id: "edited-mobile-draft" } as never}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "모바일 제출" }));
+
+      await waitFor(() => {
+        expect(saveDraft).toHaveBeenCalledWith({
+          employeeId: currentOperator.employee_id,
+          workType: "warehouse_io",
+          subType: "warehouse_to_dept",
+          fromDepartment: "원자재",
+          toDepartment: "조립",
+          referenceNo: "MOBILE-REF-3",
+          notes: "모바일 최종 메모",
+          batchId: "edited-mobile-draft",
+          bundles: finalBundles,
+        });
+      });
+      expect(api.submitDraft).not.toHaveBeenCalled();
+
+      await act(async () => {
+        save.resolve({ batch_id: "edited-mobile-draft" });
+        await save.promise;
+      });
+
+      await waitFor(() => {
+        expect(api.submitDraft).toHaveBeenCalledWith("edited-mobile-draft", currentOperator.employee_id);
+      });
+    } finally {
+      Object.assign(wizardState, originalState);
+    }
   });
 });

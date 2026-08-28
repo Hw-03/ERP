@@ -5,7 +5,20 @@ import { makeClientRequestId } from "@/lib/uuid";
 
 export function useIoSubmit() {
   const [submitting, setSubmitting] = useState(false);
+  const inFlightRef = useRef(false);
   const clientRequestIdRef = useRef<string | null>(null);
+
+  async function run<T>(work: () => Promise<T>): Promise<T | undefined> {
+    if (inFlightRef.current) return undefined;
+    inFlightRef.current = true;
+    setSubmitting(true);
+    try {
+      return await work();
+    } finally {
+      inFlightRef.current = false;
+      setSubmitting(false);
+    }
+  }
 
   async function submit(payload: {
     employeeId: string;
@@ -17,7 +30,6 @@ export function useIoSubmit() {
     notes?: string | null;
     bundles: IoBundle[];
   }) {
-    setSubmitting(true);
     // 폼 세션 멱등 키: 동일 시도 재전송 시 서버가 기존 batch 멱등 반환 → 재고 이중 차감 방지
     if (!clientRequestIdRef.current) {
       clientRequestIdRef.current = makeClientRequestId();
@@ -43,10 +55,8 @@ export function useIoSubmit() {
         clientRequestIdRef.current = null;
       }
       throw err;
-    } finally {
-      setSubmitting(false);
     }
   }
 
-  return { submitting, submit };
+  return { submitting, run, submit };
 }

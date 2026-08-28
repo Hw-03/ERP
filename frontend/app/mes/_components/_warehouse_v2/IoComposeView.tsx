@@ -194,12 +194,30 @@ export function IoComposeView({
 
   const latestBundlesRef = useRef<IoBundle[]>(state.bundles);
   latestBundlesRef.current = state.bundles;
+  const latestDraftFieldsRef = useRef({
+    employeeId,
+    workType: state.workType,
+    subType: state.subType,
+    fromDepartment: state.fromDepartment,
+    toDepartment: state.toDepartment,
+    referenceNo: state.referenceNo,
+    notes: state.notes,
+  });
+  latestDraftFieldsRef.current = {
+    employeeId,
+    workType: state.workType,
+    subType: state.subType,
+    fromDepartment: state.fromDepartment,
+    toDepartment: state.toDepartment,
+    referenceNo: state.referenceNo,
+    notes: state.notes,
+  };
   const internalUsePreviewLock = useInternalUseBomPreviewLock();
   const intentAppliedRef = useRef(false);
 
   const { previewing, previewTarget } = useIoPreview();
   const { drafting, saveDraft } = useIoDraft();
-  const { submitting, submit } = useIoSubmit();
+  const { submitting, run, submit } = useIoSubmit();
 
   // 브라우저 뒤로/앞으로 ↔ step 동기화. URL ?step=N 으로 history 엔트리를 쌓아 입출고 위저드 내부에서도
   // 뒤/앞 버튼이 작동하게 함. effect 는 useIoUrlSync 로 격리.
@@ -702,7 +720,7 @@ export function IoComposeView({
   }
 
   async function handleSubmit() {
-    await runCompositionSubmit(
+    await run(() => runCompositionSubmit(
       employeeId,
       state.subType,
       state.fromDepartment,
@@ -734,7 +752,21 @@ export function IoComposeView({
         setHasDraftOnServer(false);
         onDraftSaved?.(draftId, state.step, false);
       },
-    );
+      operationRefs,
+      (bundles) => {
+        const fields = latestDraftFieldsRef.current;
+        return saveDraft({
+          employeeId: fields.employeeId,
+          workType: fields.workType,
+          subType: fields.subType,
+          ...ioDepartmentPayload(fields.subType, fields.fromDepartment, fields.toDepartment),
+          referenceNo: fields.referenceNo,
+          notes: fields.notes,
+          batchId: autosaveBatchIdRef.current,
+          bundles,
+        });
+      },
+    ));
   }
 
   const step = state.step;

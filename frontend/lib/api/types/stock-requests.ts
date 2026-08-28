@@ -81,6 +81,7 @@ export interface StockRequest {
   completed_at: string | null;
   reference_no: string | null;
   notes: string | null;
+  operation_batch_id: string | null;
   reason_category: string | null;
   reason_memo: string | null;
   created_at: string;

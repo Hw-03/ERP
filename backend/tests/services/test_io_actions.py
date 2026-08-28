@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from decimal import Decimal
+from types import SimpleNamespace
 
 import pytest
 
@@ -596,11 +597,15 @@ def test_submit_existing_draft_rolls_back_all_lines_and_restores_draft_on_failur
     original_execute_line = sr_execution._execute_line
     boom = RuntimeError("두 번째 draft 라인 후속 단계 실패")
     line_calls = 0
+    status_during_failure = []
 
     def fail_on_second_line(*args, **kwargs):
         nonlocal line_calls
         line_calls += 1
         if line_calls == 2:
+            status_during_failure.append(
+                db_session.query(IoBatch).filter(IoBatch.batch_id == draft_id).one().status
+            )
             raise boom
         return original_execute_line(*args, **kwargs)
 
@@ -615,6 +620,7 @@ def test_submit_existing_draft_rolls_back_all_lines_and_restores_draft_on_failur
 
     assert raised.value is boom
     assert line_calls == 2
+    assert status_during_failure == ["submitted"]
     assert boundaries == {"commit": 0, "rollback": 1}
     db_session.expire_all()
     restored = db_session.query(IoBatch).filter(IoBatch.batch_id == draft_id).one()
@@ -656,3 +662,59 @@ def test_submit_existing_draft_commits_once(
 
     assert result["status"] == "completed"
     assert boundaries == {"commit": 1, "rollback": 0}
+
+
+def test_submit_existing_draft_rejects_when_conditional_draft_transition_loses_race(
+    db_session, make_item, monkeypatch
+):
+    item = make_item(name="IO draft conditional transition", warehouse_qty=Decimal("0"))
+    requester = _make_requester(db_session)
+    draft = io_draft.save_draft(
+        db_session,
+        IoSubmitRequest(
+            requester_employee_id=requester.employee_id,
+            work_type="receive",
+            sub_type="receive_supplier",
+            bundles=[{
+                "bundle_id": str(uuid.uuid4()),
+                "source_kind": "direct_item",
+                "title": item.item_name,
+                "source_item_id": str(item.item_id),
+                "quantity": 1,
+                "lines": [{
+                    "line_id": str(uuid.uuid4()),
+                    "item_id": str(item.item_id),
+                    "item_name": item.item_name,
+                    "mes_code": item.mes_code,
+                    "direction": "in",
+                    "from_bucket": "none",
+                    "to_bucket": "warehouse",
+                    "quantity": 1,
+                    "origin": "direct",
+                }],
+            }],
+        ),
+    )
+    db_session.commit()
+    real_execute = db_session.execute
+
+    def lose_draft_transition(statement, *args, **kwargs):
+        if str(statement).startswith("UPDATE io_batches SET status"):
+            return SimpleNamespace(rowcount=0)
+        return real_execute(statement, *args, **kwargs)
+
+    monkeypatch.setattr(db_session, "execute", lose_draft_transition)
+
+    with pytest.raises(ValueError, match="임시저장 상태가 아닙니다"):
+        actions.submit_existing_draft(
+            db_session,
+            batch_id=draft["batch_id"],
+            requester_employee_id=requester.employee_id,
+        )
+
+    db_session.expire_all()
+    batch = db_session.query(IoBatch).filter(IoBatch.batch_id == draft["batch_id"]).one()
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert batch.status == "draft"
+    assert inventory.warehouse_qty == Decimal("0")
+    assert db_session.query(TransactionLog).count() == 0

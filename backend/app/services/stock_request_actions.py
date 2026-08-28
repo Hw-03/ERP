@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Optional, Sequence
 
 from fastapi import Request
@@ -10,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     Employee,
+    IoBatch,
     StockRequest,
     StockRequestStatusEnum,
     StockRequestTypeEnum,
@@ -17,6 +19,8 @@ from app.models import (
 from app.services import notifications as notification_svc
 from app.services import stock_requests as stock_request_svc
 from app.services._tx import transactional
+from app.services.io_persist import ensure_batch_is_mutable
+from app.services.pin_auth import verify_pin
 from app.services.sr_validation import LineInput
 
 
@@ -173,3 +177,86 @@ def cancel_request(
             http_request=http_request,
         )
     return request
+
+
+def revert_to_draft(
+    db: Session,
+    *,
+    request: StockRequest,
+    requester: Employee,
+    pin: str,
+    http_request: Optional[Request] = None,
+) -> IoBatch:
+    """연결 batch의 미결 요청을 모두 취소하고 하나의 draft로 되돌린다."""
+    with transactional(db):
+        batch_id = request.operation_batch_id
+        if batch_id is None:
+            raise ValueError("연결된 입출고 작업 묶음이 없습니다.")
+
+        requests_query = (
+            db.query(StockRequest)
+            .filter(StockRequest.operation_batch_id == batch_id)
+            .order_by(StockRequest.created_at.asc(), StockRequest.request_id.asc())
+            .populate_existing()
+        )
+        batch_query = db.query(IoBatch).filter(IoBatch.batch_id == batch_id)
+        if db.bind is not None and db.bind.dialect.name != "sqlite":
+            requests_query = requests_query.with_for_update()
+        linked_requests = requests_query.all()
+        if db.bind is not None and db.bind.dialect.name != "sqlite":
+            batch_query = batch_query.with_for_update()
+        batch = batch_query.first()
+        if batch is None:
+            raise ValueError("연결된 입출고 작업 묶음을 찾을 수 없습니다.")
+        clicked_request = next(
+            (linked for linked in linked_requests if linked.request_id == request.request_id),
+            None,
+        )
+        if clicked_request is None:
+            raise ValueError("요청과 입출고 작업 묶음의 연결 정보가 올바르지 않습니다.")
+        if clicked_request.requester_employee_id != requester.employee_id:
+            raise PermissionError("본인 요청만 수정할 수 있습니다.")
+        if batch.requester_employee_id != requester.employee_id:
+            raise PermissionError("본인 작업 묶음만 수정할 수 있습니다.")
+        if not verify_pin(requester.pin_hash, pin):
+            raise PermissionError("PIN이 일치하지 않습니다.")
+        ensure_batch_is_mutable(batch)
+        if batch.status in {"completed", "partially_completed"}:
+            raise ValueError("완료된 작업 묶음은 수정할 수 없습니다.")
+
+        open_statuses = {
+            StockRequestStatusEnum.SUBMITTED,
+            StockRequestStatusEnum.RESERVED,
+        }
+        preserved_statuses = {
+            StockRequestStatusEnum.CANCELLED,
+            StockRequestStatusEnum.REJECTED,
+            StockRequestStatusEnum.FAILED_APPROVAL,
+        }
+        if clicked_request.status not in open_statuses:
+            raise ValueError(f"수정할 수 없는 요청 상태입니다: {clicked_request.status.value}")
+        if any(
+            linked.requester_employee_id != requester.employee_id
+            for linked in linked_requests
+        ):
+            raise PermissionError("본인 요청만 수정할 수 있습니다.")
+        if any(linked.status == StockRequestStatusEnum.COMPLETED for linked in linked_requests):
+            raise ValueError("완료된 연결 요청이 있어 작업을 수정할 수 없습니다.")
+        if any(linked.status not in open_statuses | preserved_statuses for linked in linked_requests):
+            raise ValueError("수정할 수 없는 연결 요청 상태가 있습니다.")
+
+        for linked_request in linked_requests:
+            if linked_request.status in open_statuses:
+                stock_request_svc.cancel_request(
+                    db,
+                    linked_request,
+                    requester=requester,
+                    pin=pin,
+                    http_request=http_request,
+                )
+
+        batch.status = "draft"
+        batch.completed_at = None
+        batch.updated_at = datetime.utcnow()
+        db.flush()
+    return batch

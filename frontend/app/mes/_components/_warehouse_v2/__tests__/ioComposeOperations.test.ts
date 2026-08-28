@@ -97,6 +97,8 @@ describe("ioComposeOperations", () => {
       undefined,
       submitExisting,
       onDraftSubmitted,
+      operationRefs(),
+      async () => ({ batch_id: "draft-1" }),
     );
 
     expect(deleteDraft).not.toHaveBeenCalled();
@@ -119,12 +121,104 @@ describe("ioComposeOperations", () => {
       "employee-1", "adjust_out", "조립", async () => {},
       () => [{ bundle_id: "bundle-1", lines: [] } as never], batchRef,
       vi.fn(), vi.fn(), vi.fn(), setResult, vi.fn(), vi.fn(), vi.fn(), async () => [], vi.fn(),
-      undefined, submitExisting,
+      undefined, submitExisting, undefined,
+      operationRefs(), async () => ({ batch_id: "draft-1" }),
     );
 
     expect(batchRef.current).toBe("draft-1");
     expect(submitExisting).toHaveBeenCalledWith("draft-1");
     expect(setResult).toHaveBeenCalledWith(expect.objectContaining({ kind: "error" }));
+  });
+
+  it("기존 초안은 현재 snapshot을 먼저 저장한 뒤 같은 batch를 제출한다", async () => {
+    const batchRef = { current: "draft-1" as string | null };
+    const refs = operationRefs();
+    const events: string[] = [];
+    const bundles = [
+      { bundle_id: "bundle-1", lines: [] },
+      { bundle_id: "bundle-2", lines: [] },
+    ] as never[];
+    const saveExisting = vi.fn(async (snapshot: never[]) => {
+      events.push("save");
+      expect(snapshot).toBe(bundles);
+      return { batch_id: "draft-1" };
+    });
+    const submitExisting = vi.fn(async () => {
+      events.push("submit");
+      return { requires_approval: false, message: "완료" } as never;
+    });
+
+    await runCompositionSubmit(
+      "employee-1", "adjust_in", "조립", async () => {}, () => bundles, batchRef,
+      vi.fn(), vi.fn(), vi.fn(), vi.fn(), vi.fn(), vi.fn(), vi.fn(), async () => [], vi.fn(),
+      undefined, submitExisting, undefined, refs, saveExisting,
+    );
+
+    expect(saveExisting).toHaveBeenCalledWith(bundles);
+    expect(submitExisting).toHaveBeenCalledWith("draft-1");
+    expect(events).toEqual(["save", "submit"]);
+    expect(batchRef.current).toBeNull();
+  });
+
+  it("기존 초안 저장 실패 시 제출하지 않고 재확인 오류와 draft 연결을 유지한다", async () => {
+    const batchRef = { current: "draft-1" as string | null };
+    const submitExisting = vi.fn();
+    const setResult = vi.fn();
+
+    await runCompositionSubmit(
+      "employee-1", "adjust_in", "조립", async () => {}, () => [{ bundle_id: "bundle-1", lines: [] } as never], batchRef,
+      vi.fn(), vi.fn(), vi.fn(), setResult, vi.fn(), vi.fn(), vi.fn(), async () => [], vi.fn(),
+      undefined, submitExisting, undefined, operationRefs(), async () => { throw new Error("저장 실패"); },
+    );
+
+    expect(submitExisting).not.toHaveBeenCalled();
+    expect(batchRef.current).toBe("draft-1");
+    expect(setResult).toHaveBeenCalledWith(expect.objectContaining({
+      kind: "error",
+      message: expect.stringContaining("저장 실패"),
+    }));
+  });
+
+  it("기존 초안 저장 중 내용이 바뀌면 제출하지 않고 draft 연결을 유지한다", async () => {
+    const batchRef = { current: "draft-1" as string | null };
+    const refs = operationRefs();
+    const submitExisting = vi.fn();
+    const setResult = vi.fn();
+
+    await runCompositionSubmit(
+      "employee-1", "adjust_in", "조립", async () => {}, () => [{ bundle_id: "bundle-1", lines: [] } as never], batchRef,
+      vi.fn(), vi.fn(), vi.fn(), setResult, vi.fn(), vi.fn(), vi.fn(), async () => [], vi.fn(),
+      undefined, submitExisting, undefined, refs, async () => {
+        refs.contentRevision.current += 1;
+        return { batch_id: "draft-1" };
+      },
+    );
+
+    expect(submitExisting).not.toHaveBeenCalled();
+    expect(batchRef.current).toBe("draft-1");
+    expect(setResult).toHaveBeenCalledWith(expect.objectContaining({
+      kind: "error",
+      message: expect.stringContaining("내용이 변경"),
+    }));
+  });
+
+  it("기존 초안 저장 응답 ID가 다르면 제출하지 않고 draft 연결을 유지한다", async () => {
+    const batchRef = { current: "draft-1" as string | null };
+    const submitExisting = vi.fn();
+    const setResult = vi.fn();
+
+    await runCompositionSubmit(
+      "employee-1", "adjust_in", "조립", async () => {}, () => [{ bundle_id: "bundle-1", lines: [] } as never], batchRef,
+      vi.fn(), vi.fn(), vi.fn(), setResult, vi.fn(), vi.fn(), vi.fn(), async () => [], vi.fn(),
+      undefined, submitExisting, undefined, operationRefs(), async () => ({ batch_id: "other-draft" }),
+    );
+
+    expect(submitExisting).not.toHaveBeenCalled();
+    expect(batchRef.current).toBe("draft-1");
+    expect(setResult).toHaveBeenCalledWith(expect.objectContaining({
+      kind: "error",
+      message: expect.stringContaining("다른 작업"),
+    }));
   });
 
   it("새 작업은 기존 일반 제출 경로를 유지한다", async () => {
