@@ -64,6 +64,8 @@ type Props = {
   onFocusLineInList?: (target: Omit<HistoryTableFocusTarget, "nonce">) => void;
   onSelectLog?: (log: TransactionLog) => void;
   variant?: "default" | "desktop";
+  desktopCancellationOpen?: boolean;
+  onDesktopCancellationOpenChange?: (open: boolean) => void;
 };
 
 type FetchState =
@@ -85,6 +87,8 @@ export function HistoryBatchDetailPanel({
   onFocusLineInList,
   onSelectLog,
   variant = "default",
+  desktopCancellationOpen = false,
+  onDesktopCancellationOpenChange,
 }: Props) {
   const operator = useCurrentOperator();
   const realtimeRevision = useRealtimeRevision();
@@ -216,20 +220,28 @@ export function HistoryBatchDetailPanel({
   }
 
   if (variant === "desktop") {
+    const isDesktopCancellationOpen = desktopCancellationOpen;
     return (
-      <div className="flex min-h-full min-h-0 flex-col gap-4">
-        <HistoryKeyPointSummary
-          summary={summary}
-          impactStatus={cancellationScope.status}
-          onRetryImpact={cancellationScope.retry}
-          fillHeight
-        />
-        {excludedLineCount > 0 && (
-          <div className="px-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-            제외 {excludedLineCount}개
-          </div>
+      <div className={isDesktopCancellationOpen
+        ? "flex h-full min-h-0 flex-1 flex-col"
+        : "flex min-h-full min-h-0 flex-col gap-4"}
+      >
+        {!isDesktopCancellationOpen && (
+          <>
+            <HistoryKeyPointSummary
+              summary={summary}
+              impactStatus={cancellationScope.status}
+              onRetryImpact={cancellationScope.retry}
+              fillHeight
+            />
+            {excludedLineCount > 0 && (
+              <div className="px-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                제외 {excludedLineCount}개
+              </div>
+            )}
+            <HistoryDetailMemo notes={first.notes} transactionType={first.transaction_type} />
+          </>
         )}
-        <HistoryDetailMemo notes={first.notes} transactionType={first.transaction_type} />
 
         <HistoryCancelAction
           panelOpen={panelOpen}
@@ -242,7 +254,9 @@ export function HistoryBatchDetailPanel({
           onSubmit={handleCancelSubmit}
           triggerLabel="이 내역 취소"
           scopeCount={cancellationScopeStatus === "ready" ? cancellationLogs.length : undefined}
-          pinToDesktopFooter
+          pinToDesktopFooter={!isDesktopCancellationOpen}
+          desktopCancellationOpen={desktopCancellationOpen}
+          onDesktopCancellationOpenChange={onDesktopCancellationOpenChange}
         />
       </div>
     );

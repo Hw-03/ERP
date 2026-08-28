@@ -158,12 +158,15 @@ describe("HistoryCancelAction", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "이 이력 1건 취소" }));
-    expect(screen.getByText("취소 범위 확인")).toBeInTheDocument();
+    expect(screen.getByText("취소 내용 확인")).toBeInTheDocument();
+    expect(screen.getByText("이 내역을 취소하고, 아래 재고 변동을 원래 상태로 되돌립니다.")).toBeInTheDocument();
     expect(screen.getByText("조립 생산")).toBeInTheDocument();
     expect(screen.getByText("-2 EA")).toBeInTheDocument();
     expect(screen.getByLabelText("취소 사유")).toBeInTheDocument();
     expect(screen.getByLabelText("PIN")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "취소 확정" })).toBeInTheDocument();
+    const incompleteSubmit = screen.getByRole("button", { name: "취소 확정" });
+    expect(incompleteSubmit).toBeDisabled();
+    expect(incompleteSubmit).toHaveClass("hc-submit");
 
     rerender(
       <HistoryCancelAction
@@ -177,7 +180,8 @@ describe("HistoryCancelAction", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "이 작업 묶음 전체 취소" }));
-    expect(screen.getByText("취소 범위 확인")).toBeInTheDocument();
+    expect(screen.getByText("취소 내용 확인")).toBeInTheDocument();
+    expect(screen.getByText("이 작업 묶음을 취소하고, 아래 재고 변동을 원래 상태로 되돌립니다.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "취소 확정" })).toBeInTheDocument();
   });
 

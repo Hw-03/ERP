@@ -1,5 +1,6 @@
 "use client";
 
+import { useLayoutEffect, useState } from "react";
 import { ChevronLeft } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
 import type { IoBatch } from "@/lib/api/types/io";
@@ -48,6 +49,17 @@ export function DesktopHistoryRightPanel({
   onFocusLineInList,
   onClose,
 }: DesktopHistoryRightPanelProps) {
+  const [desktopCancellationOpen, setDesktopCancellationOpen] = useState(false);
+  const selectionKey = selection?.kind === "log"
+    ? `log:${selection.log.log_id}`
+    : selection?.kind === "batch"
+      ? `batch:${selection.batchId}`
+      : "none";
+
+  useLayoutEffect(() => {
+    setDesktopCancellationOpen(false);
+  }, [selectionKey]);
+
   const backButtonNode = canGoBack ? (
     <button
       type="button"
@@ -61,6 +73,24 @@ export function DesktopHistoryRightPanel({
       <ChevronLeft className="h-3.5 w-3.5" /> 뒤로
     </button>
   ) : undefined;
+  const cancellationReturnButton = (
+    <button
+      type="button"
+      aria-label="상세로 돌아가기"
+      onClick={() => setDesktopCancellationOpen(false)}
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:brightness-110"
+      style={{
+        background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 15%, transparent)`,
+        color: LEGACY_COLORS.blue,
+      }}
+    >
+      <ChevronLeft className="h-4 w-4" />
+    </button>
+  );
+  const handleClose = () => {
+    setDesktopCancellationOpen(false);
+    onClose();
+  };
 
   return (
     <SlidePanel
@@ -73,12 +103,14 @@ export function DesktopHistoryRightPanel({
     >
       {displaySelection?.kind === "log" && (
         <DesktopRightPanel
-          title={displaySelection.log.item_name}
+          title={desktopCancellationOpen ? "내역 취소" : displaySelection.log.item_name}
           titleId={HISTORY_DETAIL_TITLE_ID}
-          subtitle={displaySelection.log.mes_code ?? undefined}
-          backButton={backButtonNode}
-          onClose={onClose}
+          subtitle={desktopCancellationOpen ? displaySelection.log.item_name : displaySelection.log.mes_code ?? undefined}
+          backButton={desktopCancellationOpen ? undefined : backButtonNode}
+          headerAction={desktopCancellationOpen ? cancellationReturnButton : undefined}
+          onClose={handleClose}
           fillAvailableWidth
+          tone={desktopCancellationOpen ? "danger" : "default"}
         >
           <HistoryDetailPanel
             panelOpen={!!selection}
@@ -87,6 +119,8 @@ export function DesktopHistoryRightPanel({
             onSelectLog={onSelectLog}
             onLogUpdated={onLogUpdated}
             variant="desktop"
+            desktopCancellationOpen={desktopCancellationOpen}
+            onDesktopCancellationOpenChange={setDesktopCancellationOpen}
           />
         </DesktopRightPanel>
       )}
@@ -111,12 +145,14 @@ export function DesktopHistoryRightPanel({
           ?? undefined;
         return (
           <DesktopRightPanel
-            title={titleText}
+            title={desktopCancellationOpen ? "내역 취소" : titleText}
             titleId={HISTORY_DETAIL_TITLE_ID}
-            subtitle={subtitleText}
-            backButton={backButtonNode}
-            onClose={onClose}
+            subtitle={desktopCancellationOpen ? titleText : subtitleText}
+            backButton={desktopCancellationOpen ? undefined : backButtonNode}
+            headerAction={desktopCancellationOpen ? cancellationReturnButton : undefined}
+            onClose={handleClose}
             fillAvailableWidth
+            tone={desktopCancellationOpen ? "danger" : "default"}
           >
             <HistoryBatchDetailPanel
               panelOpen={!!selection}
@@ -127,6 +163,8 @@ export function DesktopHistoryRightPanel({
               onBatchCancelled={onBatchCancelled}
               onFocusLineInList={onFocusLineInList}
               variant="desktop"
+              desktopCancellationOpen={desktopCancellationOpen}
+              onDesktopCancellationOpenChange={setDesktopCancellationOpen}
             />
           </DesktopRightPanel>
         );

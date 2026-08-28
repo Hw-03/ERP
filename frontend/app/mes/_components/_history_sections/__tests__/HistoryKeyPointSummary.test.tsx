@@ -62,7 +62,7 @@ describe("HistoryKeyPointSummary", () => {
     expect(screen.queryByText(/처리 전|처리 후|창고 401/)).not.toBeInTheDocument();
   });
 
-  it("renders 담당자 for shipment history metadata", () => {
+  it("renders the requester name without a redundant requester label", () => {
     render(
       <HistoryKeyPointSummary
         summary={summary({
@@ -75,9 +75,31 @@ describe("HistoryKeyPointSummary", () => {
       />,
     );
 
-    expect(screen.getByText("담당자")).toBeInTheDocument();
     expect(screen.getByText("준비 완료자 B")).toBeInTheDocument();
+    expect(screen.queryByText("담당자")).not.toBeInTheDocument();
     expect(screen.queryByText("요청자")).not.toBeInTheDocument();
+  });
+
+  it("keeps the operation and location route on their section title lines", () => {
+    render(
+      <HistoryKeyPointSummary
+        summary={summary({
+          operationLabel: "불량 격리",
+          flow: { label: "불량 재고", from: "불량 재고", to: "조립 재고" },
+        })}
+      />,
+    );
+
+    const operation = screen.getByTestId("history-operation-summary");
+    const flow = screen.getByTestId("history-flow-summary");
+
+    expect(operation).toHaveClass("items-center");
+    expect(within(operation).getByText("불량 격리")).toBeInTheDocument();
+    expect(within(operation).queryByText("작업")).not.toBeInTheDocument();
+    expect(flow).toHaveClass("items-center", "flex-nowrap");
+    expect(within(flow).getByText("위치 / 이동 경로")).toBeInTheDocument();
+    expect(within(flow).getByText("불량 재고")).toBeInTheDocument();
+    expect(within(flow).getByText("조립 재고")).toBeInTheDocument();
   });
 
   it("groups production output and components without merging their rows", () => {

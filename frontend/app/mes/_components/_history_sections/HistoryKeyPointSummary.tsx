@@ -74,12 +74,9 @@ export function HistoryKeyPointSummary({
       className={`${fillHeight ? "min-h-0 flex-1 " : ""}overflow-hidden rounded-[20px] border`}
       style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
     >
-      <div className="flex items-start justify-between gap-3 px-4 py-3.5">
-        <div className="min-w-0">
-          <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-            작업
-          </div>
-          <div className="mt-1 text-base font-black" style={{ color: LEGACY_COLORS.text }}>
+      <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+        <div data-testid="history-operation-summary" className="flex min-w-0 items-center gap-2">
+          <div className="truncate text-base font-black" style={{ color: LEGACY_COLORS.text }}>
             {summary.operationLabel}
           </div>
         </div>
@@ -100,7 +97,6 @@ export function HistoryKeyPointSummary({
       >
         <div className="flex min-w-0 items-center gap-2">
           <UserRound className="h-4 w-4 shrink-0" />
-          <span>{summary.requester.label}</span>
           <span className="truncate font-bold" style={{ color: LEGACY_COLORS.text }}>
             {summary.requester.name}
           </span>
@@ -113,18 +109,18 @@ export function HistoryKeyPointSummary({
 
       {summary.flow && (
         <div className="border-t px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-          <div className="mb-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-            위치 / 이동 경로
-          </div>
-          <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs">
+          <div data-testid="history-flow-summary" className="flex min-w-0 flex-nowrap items-center gap-2 text-xs">
+            <span className="shrink-0 font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+              위치 / 이동 경로
+            </span>
             <MapPin className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
-            <span className="rounded-full border px-2.5 py-0.5 font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
+            <span className="min-w-0 truncate rounded-full border px-2.5 py-0.5 font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
               {summary.flow.from ?? summary.flow.label}
             </span>
             {summary.flow.from && summary.flow.to && summary.flow.from !== summary.flow.to && (
               <>
                 <ArrowRight className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
-                <span className="rounded-full border px-2.5 py-0.5 font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
+                <span className="min-w-0 truncate rounded-full border px-2.5 py-0.5 font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
                   {summary.flow.to}
                 </span>
               </>

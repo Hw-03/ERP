@@ -312,6 +312,12 @@
   .hc-idle > button:active { transform: scale(.98); }
   .hc-confirm,
   .hc-mobile { display: flex; flex-direction: column; gap: .75rem; }
+  .hc-confirm--desktop { min-height: 0; flex: 1; border-top: 0; padding-top: 0; }
+  .hc-confirm--desktop-safe-focus { margin-inline: 3px; }
+  .hc-confirm--desktop-panel-surface { border: 1px solid var(--c-border); border-radius: 20px; padding: 1rem; background: var(--c-s2); }
+  .hc-confirm-summary--desktop { display: flex; min-height: 0; flex: 1; flex-direction: column; }
+  .hc-confirm-summary--desktop .hc-impact { min-height: 0; flex: 1; overflow-y: auto; }
+  .hc-confirm--desktop .hc-impact { border-color: color-mix(in srgb, var(--c-red) 22%, var(--c-border)); background: transparent; }
   .hc-confirm strong,
   .hc-mobile > strong { color: var(--c-text); font-size: .875rem; font-weight: 900; }
   .hc-confirm > div:first-child > p { margin-top: .25rem; color: var(--c-muted2); font-size: .75rem; line-height: 1.25rem; }
@@ -321,8 +327,9 @@
   .hc-error { color: var(--c-red); font-size: .75rem; }
   .hc-actions { display: flex; gap: .5rem; }
   .hc-actions button { min-height: 2.75rem; border-radius: 12px; padding: .5rem .75rem; font-size: .875rem; font-weight: 700; }
-  .hc-actions button:disabled { opacity: .5; }
+  .hc-actions button:disabled { cursor: not-allowed; opacity: .5; }
   .hc-actions button:first-child { flex: 1; background: var(--c-red-solid); color: white; }
+  .hc-actions .hc-submit:disabled { background: color-mix(in srgb, var(--c-red) 26%, var(--c-s1)); color: var(--c-text); opacity: 1; }
   .hc-actions button:last-child { border: 1px solid var(--c-border); color: var(--c-muted2); }
   .hc-count { margin-top: .5rem; color: var(--c-text); font-size: .75rem; font-weight: 700; }
   .hc-impact { margin-top: .75rem; overflow: hidden; border: 1px solid var(--c-border); border-radius: 12px; background: var(--c-s2); }
