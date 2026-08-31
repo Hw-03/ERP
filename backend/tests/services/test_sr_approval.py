@@ -162,7 +162,7 @@ def _make_process_adjust_batch(
     db_session.flush()
     for index, item in enumerate(items, start=1):
         bundle = IoBundle(
-            batch_id=batch.batch_id, source_kind="direct_item",
+            batch_id=batch.batch_id, source_kind="manual",
             title_snapshot=f"조정 품목 {index}", quantity=D(str(index)), expanded_level=0,
         )
         db_session.add(bundle)

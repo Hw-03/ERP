@@ -1086,11 +1086,12 @@ def test_submit_dept_out_then_approve_releases_and_consumes(
 
 
 def test_mixed_process_manual_waits_for_department_approval_then_applies_all_lines(
-    make_item, make_location, db_session
+    make_bom, make_item, make_location, db_session
 ):
     component = make_item(name="Mixed Component")
     result_item = make_item(name="Mixed Result", process_type_code="AF")
     manual_item = make_item(name="Mixed Manual")
+    make_bom(result_item.item_id, component.item_id, D("2"))
     make_location(component.item_id, department=ASSEMBLY, quantity=D("10"))
     make_location(result_item.item_id, department=ASSEMBLY, quantity=D("0"))
     make_location(manual_item.item_id, department=ASSEMBLY, quantity=D("0"))
@@ -1100,7 +1101,7 @@ def test_mixed_process_manual_waits_for_department_approval_then_applies_all_lin
         requester=requester,
         sub_type="produce",
         to_department=ASSEMBLY.value,
-        source_kind="direct_item",
+        source_item_id=result_item.item_id,
         lines=[
             {
                 "item_id": component.item_id,
@@ -1120,16 +1121,46 @@ def test_mixed_process_manual_waits_for_department_approval_then_applies_all_lin
                 "quantity": D("1"),
                 "origin": "direct",
             },
-            {
-                "item_id": manual_item.item_id,
-                "direction": "in",
-                "from_bucket": "none",
-                "to_bucket": "production",
-                "to_department": ASSEMBLY.value,
-                "quantity": D("3"),
-                "origin": "manual",
-            },
         ],
+    )
+    manual_bundle = IoBundle(
+        bundle_id=uuid.uuid4(),
+        batch_id=batch.batch_id,
+        source_kind="manual",
+        source_item_id=manual_item.item_id,
+        title_snapshot="수동 낱개",
+        quantity=D("3"),
+        expanded_level=1,
+    )
+    db_session.add(manual_bundle)
+    db_session.flush()
+    db_session.add(
+        IoLine(
+            line_id=uuid.uuid4(),
+            bundle_id=manual_bundle.bundle_id,
+            item_id=manual_item.item_id,
+            item_name_snapshot=manual_item.item_name,
+            mes_code_snapshot=manual_item.mes_code,
+            unit="EA",
+            direction="adjust",
+            from_bucket="none",
+            from_department=None,
+            to_bucket="production",
+            to_department=ASSEMBLY.value,
+            quantity=D("3"),
+            included=True,
+            origin="manual",
+            edited=False,
+            has_children_snapshot=False,
+            shortage=D("0"),
+        )
+    )
+    db_session.flush()
+    db_session.refresh(batch)
+    _issue_bom_auto_token(
+        db_session,
+        batch,
+        next(line for line in batch.bundles[0].lines if line.origin == "bom_auto"),
     )
     result = svc._execute_submission(db_session, requester=requester, batch=batch)
 
@@ -1811,7 +1842,7 @@ def test_execute_submission_skips_flagged_bom_component_but_keeps_result_invento
 def test_execute_submission_keeps_flagged_line_without_matching_bom_relation(
     make_item, make_location, db_session
 ):
-    """클라이언트 origin 표시만으로 수동 라인을 BOM 자동 자재로 취급하지 않는다."""
+    """재고 미반영 품목의 direct BOM-auto 특례는 BOM 관계 없이 재고를 건드리지 않는다."""
     component = make_item(name="수동 처리 대상")
     unrelated_parent = make_item(name="무관한 부모", process_type_code="AF")
     component.bom_stock_exempt = True
@@ -1840,16 +1871,16 @@ def test_execute_submission_keeps_flagged_line_without_matching_bom_relation(
     svc._execute_submission(db_session, requester=requester, batch=batch)
 
     line = _single_line(batch)
-    assert line.bom_stock_exempt is False
-    assert line.included is True
-    assert _prod_qty(db_session, component.item_id) == D("0")
-    assert [log.item_id for log in db_session.query(TransactionLog).all()] == [component.item_id]
+    assert line.bom_stock_exempt is True
+    assert line.included is False
+    assert _prod_qty(db_session, component.item_id) == D("2")
+    assert db_session.query(TransactionLog).count() == 0
 
 
 def test_execute_submission_keeps_flagged_line_without_server_issued_bom_token(
     make_bom, make_item, make_location, db_session
 ):
-    """실제 BOM 관계를 흉내 내도 미리보기 발급 토큰 없이는 수동 처리로 남는다."""
+    """재고 미반영 품목의 direct BOM-auto 특례는 서버 BOM 토큰 없이도 재고를 건드리지 않는다."""
     component = make_item(name="토큰 없는 수동 BOM 형태 자재")
     parent = make_item(name="토큰 없는 수동 BOM 형태 부모", process_type_code="AF")
     component.bom_stock_exempt = True
@@ -1879,10 +1910,10 @@ def test_execute_submission_keeps_flagged_line_without_server_issued_bom_token(
     svc._execute_submission(db_session, requester=requester, batch=batch)
 
     line = _single_line(batch)
-    assert line.bom_stock_exempt is False
-    assert line.included is True
-    assert _prod_qty(db_session, component.item_id) == D("0")
-    assert [log.item_id for log in db_session.query(TransactionLog).all()] == [component.item_id]
+    assert line.bom_stock_exempt is True
+    assert line.included is False
+    assert _prod_qty(db_session, component.item_id) == D("2")
+    assert db_session.query(TransactionLog).count() == 0
 
 
 def test_execute_batch_after_dept_approval_applies_inventory(

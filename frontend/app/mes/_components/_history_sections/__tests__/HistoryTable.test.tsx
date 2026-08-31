@@ -93,6 +93,44 @@ function makeOperationGroup() {
   return { primary, child, groups: [{ type: "operation" as const, operationId: "operation-1", logs: [primary, child] }] };
 }
 
+function makeMixedProductionOperationGroup() {
+  const productOutput = makeLog({
+    log_id: "mixed-product-output",
+    item_name: "혼합 생산 완제품",
+    operation_id: "mixed-operation-1",
+    operation_role: "PRODUCT_OUTPUT",
+    operation_kind: "BUSINESS",
+  });
+  const componentInput = makeLog({
+    log_id: "mixed-component-input",
+    item_id: "MIXED-COMPONENT",
+    item_name: "혼합 생산 구성품",
+    transaction_type: "BACKFLUSH",
+    quantity_change: -1,
+    operation_id: "mixed-operation-1",
+    operation_role: "COMPONENT_INPUT",
+    operation_kind: "BUSINESS",
+  });
+  const correction = makeLog({
+    log_id: "mixed-correction",
+    item_id: "MIXED-ADJUST",
+    item_name: "혼합 생산 단품 보정",
+    transaction_type: "ADJUST",
+    quantity_change: 1,
+    operation_id: "mixed-operation-1",
+    operation_role: "CORRECTION",
+    operation_kind: "BUSINESS",
+  });
+  return {
+    productOutput,
+    groups: [{
+      type: "operation" as const,
+      operationId: "mixed-operation-1",
+      logs: [componentInput, correction, productOutput],
+    }],
+  };
+}
+
 describe("HistoryTable hierarchy", () => {
   it("opens the selected operation detail and child rows on the first primary-row click", () => {
     const { primary, groups } = makeOperationGroup();
@@ -154,6 +192,19 @@ describe("HistoryTable hierarchy", () => {
 
     expect(screen.getByTestId("selected-history-log")).toHaveTextContent("none");
     expect(screen.getByText("작업 하위 자재")).toBeInTheDocument();
+  });
+
+  it("keeps the product output primary and distinguishes BOM input from single-item correction children", () => {
+    const { productOutput, groups } = makeMixedProductionOperationGroup();
+    render(<OperationSelectionHarness groups={groups} />);
+
+    fireEvent.click(screen.getByText(productOutput.item_name).closest("tr")!);
+
+    expect(screen.getByTestId("selected-history-log")).toHaveTextContent(productOutput.log_id);
+    const componentRow = screen.getByText("혼합 생산 구성품").closest("tr")!;
+    expect(within(componentRow).getByText("구성품")).toBeInTheDocument();
+    const correctionRow = screen.getByText("혼합 생산 단품 보정").closest("tr")!;
+    expect(within(correctionRow).getByText("단품 입고")).toBeInTheDocument();
   });
 
   it("keeps before-stock and status visible while marking only after-stock for cancelled source rows", () => {

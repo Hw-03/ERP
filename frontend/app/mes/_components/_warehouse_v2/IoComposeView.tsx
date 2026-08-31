@@ -14,7 +14,7 @@ import { IoTargetPicker } from "./IoTargetPicker";
 import { IoBundleCart } from "./IoBundleCart";
 import { IoConfirmStep } from "./IoConfirmStep";
 import { IoSubmitModals, type IoSubmitResultState } from "./IoSubmitModals";
-import { IO_WORK_TYPES, approvalKind, deptVisibility, directionWord, ioDepartmentPayload, isExitWorkType, pickerDirectionLabel, requiresDepartments, subTypeLabel, targetDepartmentOf } from "./ioWorkType";
+import { IO_WORK_TYPES, approvalKind, deptVisibility, directionWord, ioDepartmentPayload, isExitWorkType, mergePreviewBundles, pickerDirectionLabel, requiresDepartments, subTypeLabel, targetDepartmentOf } from "./ioWorkType";
 import { applyBundleQuantityChange, applyLineQuantityChange, applyToggleLine } from "./bomSync";
 import { collectShortageItemIds, shortageLines } from "./pullFromWarehouse";
 import { useIoDraftRestore } from "./useIoDraftRestore";
@@ -388,12 +388,6 @@ export function IoComposeView({
         state.fromDepartment,
         state.toDepartment,
       );
-      // 선택 단계에서는 수량을 늘리지 않고 같은 선택 경로의 미리보기만 교체한다.
-      const existingIdx = state.bundles.findIndex((bundle) =>
-        bundle.source_item_id === item.item_id &&
-        (effectiveSubType === "internal_use_out" ||
-          (sourceKind === "manual" ? bundle.source_kind === "manual" : bundle.source_kind !== "manual")),
-      );
       const response = await previewTarget({
         employeeId,
         workType: state.workType,
@@ -408,21 +402,9 @@ export function IoComposeView({
         },
       });
       const newBundles = response.bundles;
-      if (existingIdx !== -1) {
-        state.setBundles((prev) => {
-          if (effectiveSubType === "internal_use_out") {
-            return [
-              ...prev.filter((bundle) => bundle.source_item_id !== item.item_id),
-              ...newBundles,
-            ];
-          }
-          const next = [...prev];
-          next.splice(existingIdx, 1, ...newBundles);
-          return next;
-        });
-      } else {
-        state.setBundles((prev) => [...prev, ...newBundles]);
-      }
+      state.setBundles((prev) =>
+        mergePreviewBundles(prev, item.item_id, sourceKind, effectiveSubType, newBundles),
+      );
       onStatusChange(`${item.item_name} 작업 묶음 생성`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "품목 전개에 실패했습니다.");

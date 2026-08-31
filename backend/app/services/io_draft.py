@@ -18,10 +18,12 @@ from app.services.io_preview import (
     APPROVAL_SUB_TYPES,
     _bucket_available,
     _d,
+    has_included_manual_line,
+    normalize_process_sub_type,
     validate_internal_use_bundles,
     validate_internal_use_operation,
     validate_internal_use_requester,
-    validate_operation_sources,
+    validate_saved_operation_sources,
     validate_warehouse_adjust_operation,
     validate_warehouse_adjust_requester,
 )
@@ -59,12 +61,19 @@ def save_draft(db: Session, payload) -> dict:
     덮어쓰기(이전 동작) 제거 — 같은 (work_type, sub_type) 라도 batch_id 가 없으면
     새 draft 가 쌓여 '작업 중' 탭에서 여러 작업을 이어서 진행할 수 있다.
     """
-    normalize_payload_bom_stock_exempt(db, payload)
-    validate_operation_sources(
-        payload.sub_type,
-        (bundle.source_kind for bundle in payload.bundles),
+    payload.sub_type = normalize_process_sub_type(
+        work_type=payload.work_type,
+        sub_type=payload.sub_type,
+        bundles=payload.bundles,
     )
+    normalize_payload_bom_stock_exempt(db, payload)
     requester = _load_requester(db, payload.requester_employee_id)
+    validate_saved_operation_sources(
+        work_type=payload.work_type,
+        sub_type=payload.sub_type,
+        bundles=payload.bundles,
+        requested_department=payload.to_department,
+    )
     validate_internal_use_requester(
         requester,
         work_type=payload.work_type,
@@ -113,7 +122,10 @@ def save_draft(db: Session, payload) -> dict:
         batch.sub_type = payload.sub_type
         batch.from_department = payload.from_department
         batch.to_department = payload.to_department
-        batch.requires_approval = payload.sub_type in APPROVAL_SUB_TYPES
+        batch.requires_approval = (
+            payload.sub_type in APPROVAL_SUB_TYPES
+            or has_included_manual_line(payload.bundles)
+        )
         batch.reference_no = payload.reference_no
         batch.notes = payload.notes
         batch.updated_at = datetime.utcnow()
