@@ -4,16 +4,18 @@
 - 품질 worktree: `C:\ERP\.worktrees\full-code-quality-checkpoint-2`
 - 품질 branch: `codex/full-code-quality-improvement`
 - 시작 HEAD/upstream: `e64a9a12da16f8502ab1a1e82dbed2b1d2648a01`
+- S0 merge commit: `deafc335502b46f9ed068bbb11175361826615ea`
+- GitHub CI: run `33368657382`, 6/6 success
 - 고정 main: `78e8023f41ef59528d9d8c07498e7653f9bee247`
 - merge-base: `759067e031aaf8245347952be3e86474981cab29`
-- 판정: **S0 GREEN — 품질 브랜치 commit·push·CI 대기, CP5 제품 구현 미착수**
+- 판정: **S0 COMPLETE — W1 `IC-06` read-only preflight 진입 가능, CP5 제품 mutation 미착수**
 
 ## 1. S0 범위와 Git 상태
 
 - 고정 main은 `git merge --no-ff --no-commit`으로 품질 worktree 방향에만 통합했다.
 - main 전용 15개 commit·175경로, 양쪽 교집합 24경로, 충돌 11경로를 재감사했다.
 - conflict marker와 unmerged entry는 0이다.
-- merge는 아직 commit하지 않았고 push·branch 변경·PR도 수행하지 않았다.
+- merge는 `deafc335502b46f9ed068bbb11175361826615ea`로 commit해 기존 품질 브랜치에만 push했다. 새 branch·PR·force-push·main push는 수행하지 않았다.
 - `C:\ERP` main worktree는 시작 경계의 SHA·clean 상태만 읽기 전용으로 확인했다.
 - `C:\ERP-dev`는 파일·검색·해시·DB·process·port를 포함해 접근하지 않았다.
 
@@ -85,7 +87,8 @@
   - 이번 실행 중 `backend/mes.db`는 `0FC2AE454B6724413C9E27AFB2CB156C8B35D3817DB0BA4DB17313EC39E2BAA6`(1,347,584 bytes)로 전후 불변이었다. 이는 당시 파일의 불변 증거이며, 아래 사용자 승인 재생성 뒤 현재 기준선은 `D0419D...`다.
 - **DB baseline 차단 해소:** 잘못된 경로로 실행된 bootstrap 명령이 품질 worktree 전용 `backend/mes.db`를 `90FA...`에서 `0FC2...`로 바꿨고, 정확한 옛 바이트는 로컬 backup·snapshot·임시·휴지통에서 찾지 못했다. 사용자는 2026-08-31에 개발 환경 `C:\ERP`와 직원 환경 `C:\ERP-dev`에 영향이 없다는 조건으로 격리된 품질 worktree 내부의 DB 재생성을 승인했다. `0FC2...` 사고 파일은 `_attic/runtime/code-quality-improvement/20260831-120815/s0-main-sync/mes-db-after-accidental-bootstrap.db`와 `mes-db-before-user-approved-reset-20260831-162216.db`에 보존하고, 명시적 품질 DB URL로 fresh→`20260828_0031` 부트스트랩을 실행했다. 새 기준선은 `D0419DC051B881DA145B466AF99490570D18C47BCAAE990C57FFD4476FE28147`이며 read-only check 전후 동일하다. `items=0`, `inventory_operations=0`, `transaction_logs=0`, `stock_requests=0`, `shipping_requests=0`인 격리 기준선이고, `C:\ERP\backend\mes.db`는 전후 `E468424B11DCCCF26B14C1850AB498072FEB94E1D9CFE71A9F0A5BD8442AFC23`으로 불변이다. `C:\ERP-dev`는 접근하지 않았다.
 - 독립 리뷰 Minor 1건은 잔여 위험으로 남긴다. `MesLoginGate`가 주 시작일을 브라우저 local timezone에서 계산한 뒤 KST 문자열로 바꾸므로 비-KST 브라우저의 일요일 15:00Z 이후에는 이전 주를 prefetch할 수 있다. 제품 화면의 현재 주 표시와 동결 주간보고 경로를 함께 통일하려면 별도 승인 범위에서 처리한다.
-- 전체 gate는 GREEN이지만 independent rereview와 완료 판정은 supervisor 몫이므로 내부 승인으로 간주하지 않는다.
+- 최종 독립 재검토는 Critical 0·Important 0이며 S0 merge commit·push를 승인했다.
+- GitHub CI run `33368657382`는 Verification policy, PostgreSQL concurrency, Windows ops profile, frontend, Playwright E2E, backend의 6개 job이 모두 success다. Playwright는 17/17 PASS다.
 - ignored 증거 root: `_attic/runtime/code-quality-improvement/20260831-120815/s0-main-sync/`
 
 ## 5. CP5 재판정
@@ -102,13 +105,13 @@
 
 ## 6. Supervisor 검토 항목
 
-- [ ] staged merge diff가 고정 main 기능과 CP4 보안·멱등성·삭제 보호를 모두 유지하는지 확인
-- [ ] StockRequest/IO의 lock order·conditional transition·actor 계약 확인
-- [ ] bundle 한도 0.001MB 증액이 실제 통합 산출물만 수용하는 최소 변경인지 확인
-- [ ] OpenAPI·Alembic·동결 blob exact 증거 확인
-- [ ] 최종 full gate와 E2E·PostgreSQL skip 0·종료 자원 확인
+- [x] staged merge diff가 고정 main 기능과 CP4 보안·멱등성·삭제 보호를 모두 유지하는지 확인
+- [x] StockRequest/IO의 lock order·conditional transition·actor 계약 확인
+- [x] bundle 한도 0.001MB 증액이 실제 통합 산출물만 수용하는 최소 변경인지 확인
+- [x] OpenAPI·Alembic·동결 blob exact 증거 확인
+- [x] 최종 full gate와 E2E·PostgreSQL skip 0·종료 자원 확인
 - [x] DB baseline hard blocker 해소: 사용자 승인에 따라 사고 DB를 보존하고 품질 worktree DB만 fresh→`0031`로 재생성, 새 기준선 `D0419D...`와 read-only 불변 확인
-- [ ] independent review의 Critical 0, Important 보완 완료, KST 주 경계 Minor 잔여 위험 확인
-- [ ] 승인 전 commit·push하지 않음
+- [x] independent review의 Critical 0, Important 보완 완료, KST 주 경계 Minor 잔여 위험 확인
+- [x] 승인 후 기존 품질 브랜치에만 merge commit·push하고 GitHub CI 6/6 success 확인
 
 이 문서는 역사 기준 `_attic/handoff/2026-08-28-cp4-complete-cp5-handoff.md`를 참조하며, 해당 CP4 완료 기록을 수정하거나 대체하지 않는다.
