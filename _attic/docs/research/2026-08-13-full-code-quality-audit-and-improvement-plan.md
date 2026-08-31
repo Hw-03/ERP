@@ -1942,6 +1942,7 @@ Gate 0은 CI 정본과 같은 Node 20에서 닫고 정본 로컬 검증 entrypoi
 - **fail-closed 계약:** 필수 table·column과 PostgreSQL `BASE TABLE`을 강제한다. 동명 view, schema drift, 비정수·비정상 활성값, driver·연결·query 오류는 성공 보고서를 만들지 않으며 DB 접근 예외는 연결 정보와 SQL을 노출하지 않는다.
 - **격리 DB 결과:** 승인된 품질 worktree DB의 snapshot SHA-256은 `545b3864293b0d920ed8f48b5c37b590af34118b027b4249b5dbfd2958140abe`, report SHA-256은 `02ffdf0518d28bfa62186194c9e24910c4b1a8444862b3b6181fd919a1f83fe5`다. 이 fresh 품질 DB에는 inventory row와 anomaly가 모두 0이며, 이는 직원 환경의 실제 재고 판정이 아니다.
 - **검증:** SQLite focused 9/9, 실제 PostgreSQL 16.15 focused 15/15, 필수 PostgreSQL runner 38/38(skip 0), 검증 runner 계약 12/12, Ruff·mypy·`git diff --check`가 통과했다. 품질 `backend/mes.db` SHA-256은 전후 `D0419DC051B881DA145B466AF99490570D18C47BCAAE990C57FFD4476FE28147`로 불변이다.
+- **구현·원격 증거:** W1 구현 commit은 `1c7bb1538ca18c88d3dbdeb8d1621eb72b396051`이며 기존 품질 branch에만 push했다. GitHub CI run `33396543900`의 PostgreSQL concurrency, Windows ops profile, frontend, verification policy, Playwright E2E 17/17, backend 전체 6개 job이 모두 success다.
 - **독립 리뷰:** 최종 명세 리뷰와 운영·품질 리뷰 모두 Critical 0, Important 0, Minor 0이다.
 - **격리·종료:** 55432 listener와 postmaster PID는 0이다. 폐기 가능한 중지 cluster는 ignored evidence 경로에만 보존했으며 개발·직원 서버는 시작·연결·변경하지 않았다. `C:\ERP-dev`는 접근하지 않았다.
 - **증거:** `_attic/runtime/code-quality-improvement/20260831-170648/cp5-ic06-preflight/`.

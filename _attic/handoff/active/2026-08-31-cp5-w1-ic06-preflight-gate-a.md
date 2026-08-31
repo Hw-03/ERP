@@ -4,6 +4,7 @@
 - 품질 worktree: `C:\ERP\.worktrees\full-code-quality-checkpoint-2`
 - 품질 branch: `codex/full-code-quality-improvement`
 - 시작 HEAD: `f49a0b2bf837704f81ef98fe2e7ecf3be4305786`
+- W1 구현 commit: `1c7bb1538ca18c88d3dbdeb8d1621eb72b396051`
 - 기준 main: `78e8023f41ef59528d9d8c07498e7653f9bee247` (S0에서 통합 완료)
 - 상태: **W1 APPROVAL-READY / Gate A 사용자 승인 대기**
 
@@ -38,6 +39,7 @@ API·model·migration·제품 runtime·frontend 변경은 없다.
 - 필수 PostgreSQL runner: 38 passed, skip 0
 - verification runner 계약: 12 passed
 - Ruff·mypy·`git diff --check`: PASS
+- GitHub CI run `33396543900`: 6/6 success (PostgreSQL, Windows ops, frontend, verification policy, Playwright E2E 17/17, backend)
 - 독립 명세 리뷰: Critical 0, Important 0, Minor 0
 - 독립 운영·품질 리뷰: Critical 0, Important 0, Minor 0
 - evidence: `_attic/runtime/code-quality-improvement/20260831-170648/cp5-ic06-preflight/`
@@ -49,7 +51,7 @@ API·model·migration·제품 runtime·frontend 변경은 없다.
 - 폐기 가능한 PostgreSQL cluster는 stopped 상태로 ignored evidence 경로에 보존
 - 개발·직원 서버 시작·연결·변경 0
 - `C:\ERP-dev` 접근 0
-- branch 생성·전환, commit, push, PR은 아직 0
+- 기존 품질 branch에 W1 commit·push 완료. branch 생성·전환, PR, main push·merge는 0
 
 ## 5. Gate A 이후 고정 정책
 
