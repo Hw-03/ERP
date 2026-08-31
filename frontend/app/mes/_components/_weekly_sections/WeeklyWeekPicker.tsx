@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
+import { formatKstDate } from "@/lib/mes/date";
 
 const CAL_MIN = new Date(2026, 0, 1);
 
@@ -20,10 +21,6 @@ function getWeekStartSun(d: Date): Date {
   sun.setDate(d.getDate() - d.getDay());
   sun.setHours(0, 0, 0, 0);
   return sun;
-}
-
-function toDateStr(d: Date): string {
-  return d.toISOString().slice(0, 10);
 }
 
 function getWeeksOfMonth(year: number, month: number): Date[][] {
@@ -95,8 +92,8 @@ export function WeeklyWeekPicker({ weekMon, onChange }: Props) {
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
-  const weekStartStr = toDateStr(weekMon);
-  const isThisWeek = toDateStr(getWeekStartMonday(new Date())) === weekStartStr;
+  const weekStartStr = formatKstDate(weekMon);
+  const isThisWeek = formatKstDate(getWeekStartMonday(new Date())) === weekStartStr;
 
   const today = new Date();
   const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -260,11 +257,11 @@ export function WeeklyWeekPicker({ weekMon, onChange }: Props) {
               const sun = week[0];
               // 일~토 구성이므로 월(index 1)이 주차 기준 시작일
               const mon = new Date(sun.getTime() + 86400000);
-              const weekKey = toDateStr(mon);
+              const weekKey = formatKstDate(mon);
               const isSelectedWeek = weekKey === weekStartStr;
               const isHovered = hoveredWeek === weekKey;
               const isFuture =
-                toDateStr(mon) > toDateStr(getWeekStartMonday(new Date()));
+                formatKstDate(mon) > formatKstDate(getWeekStartMonday(new Date()));
               return (
                 <button
                   key={weekKey}

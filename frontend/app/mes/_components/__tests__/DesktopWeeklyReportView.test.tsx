@@ -62,6 +62,15 @@ describe("DesktopWeeklyReportView F705-02 다운로드", () => {
     vi.restoreAllMocks();
   });
 
+  it("KST 월요일부터 일요일까지를 주간보고 조회 기간으로 사용한다", () => {
+    renderWeekly(new Date("2026-08-31T00:00:00+09:00"));
+
+    expect(state.useWeeklyReportQuery).toHaveBeenLastCalledWith({
+      week_start: "2026-08-31",
+      week_end: "2026-09-06",
+    });
+  });
+
   it("선택한 주의 연도로 F705-02를 요청한다", async () => {
     state.downloadF705ProductionLog.mockResolvedValue(new Blob(["xlsx"]));
     stubObjectUrl();
@@ -87,7 +96,7 @@ describe("DesktopWeeklyReportView F705-02 다운로드", () => {
     expect(screen.getAllByRole("button", { name: "F705-02 생산일지 다운로드" })).toHaveLength(1);
   });
 
-  it("생산 기록 유무와 관계없이 F705-02 버튼을 같은 데스크톱 우상단 앵커에 둔다", () => {
+  it("생산 기록이 있는 카드만 F705-02 버튼을 데스크톱 우상단에 절대 배치한다", () => {
     const { rerender } = renderWeekly();
     const populatedCard = screen.getByTestId("weekly-production-card");
     const populatedAnchor = screen.getByTestId("weekly-f705-download-anchor");
@@ -106,6 +115,16 @@ describe("DesktopWeeklyReportView F705-02 다운로드", () => {
     const emptyAnchor = screen.getByTestId("weekly-f705-download-anchor");
     expect(emptyCard).toHaveClass("weekly-card", "weekly-production-empty");
     expect(emptyAnchor).toHaveClass("weekly-download");
+
+    const css = readFileSync(resolve(process.cwd(), "app", "globals.css"), "utf8");
+    const desktopRules = css.match(/@media \(min-width: 1024px\) \{([\s\S]*?)\n  \}/)?.[1] ?? "";
+    expect(desktopRules).toContain(
+      ".weekly-production .weekly-download { position: absolute; top: .5rem; right: 1rem; }",
+    );
+    expect(desktopRules).not.toMatch(/^\s*\.weekly-download\s*\{[^}]*position:\s*absolute/m);
+    expect(css).toMatch(
+      /\.weekly-download\s*\{[^}]*display:\s*flex;[^}]*align-items:\s*center;[^}]*margin-left:\s*auto;/,
+    );
   });
 
   it("성공하면 파일명을 설정한 앵커를 정리하고 Blob URL을 해제한다", async () => {

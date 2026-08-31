@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
 import { adminApi } from "@/lib/api/admin";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { formatKstDate } from "@/lib/mes/date";
 import { Button } from "@/lib/ui/Button";
 import type { WeeklyProductionModelRow } from "@/lib/api/types/weekly";
 import { useWeeklyReportQuery } from "@/lib/queries/useWeeklyQuery";
@@ -11,10 +12,6 @@ import { WeeklyGroupCards } from "./_weekly_sections/WeeklyGroupCards";
 import { WeeklyDetailTable } from "./_weekly_sections/WeeklyDetailTable";
 import { WeeklyProductionMatrix } from "./_weekly_sections/WeeklyProductionMatrix";
 import { LoadingSkeleton } from "./common";
-
-function toDateStr(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
 
 interface Props {
   weekMon: Date;
@@ -25,8 +22,8 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
   const [f705Downloading, setF705Downloading] = useState(false);
   const [f705DownloadError, setF705DownloadError] = useState<string | null>(null);
 
-  const weekStart = toDateStr(weekMon);
-  const weekEnd = toDateStr(new Date(weekMon.getTime() + 6 * 86400000));
+  const weekStart = formatKstDate(weekMon);
+  const weekEnd = formatKstDate(new Date(weekMon.getTime() + 6 * 86400000));
   const reportQuery = useWeeklyReportQuery({ week_start: weekStart, week_end: weekEnd });
   const data = reportQuery.data ?? null;
   const loading = reportQuery.isLoading && !data;

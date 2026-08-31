@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { ArrowLeft } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { formatKstDate } from "@/lib/mes/date";
 import { api } from "@/lib/api";
 import type {
   WeeklyReportResponse,
@@ -33,10 +34,6 @@ const CARD_STYLE = {
   boxShadow: "var(--c-card-shadow)",
 } as const;
 
-function toDateStr(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
 function Kpi({ label, tone }: { label: string; tone?: string }) {
   return (
     <span
@@ -63,8 +60,8 @@ export function MobileWeeklyScreen({
   const [selectedCode, setSelectedCode] = useState("TF");
   const [reloadNonce, setReloadNonce] = useState(0);
 
-  const weekStart = toDateStr(weekMon);
-  const weekEnd = toDateStr(new Date(weekMon.getTime() + 6 * 86400000));
+  const weekStart = formatKstDate(weekMon);
+  const weekEnd = formatKstDate(new Date(weekMon.getTime() + 6 * 86400000));
 
   useEffect(() => {
     let cancelled = false;
