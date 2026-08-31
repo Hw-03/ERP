@@ -23,6 +23,7 @@ import { InlineErrorNote } from "./InlineErrorNote";
 import { tint } from "@/lib/mes/colorUtils";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { LoadFailureCard } from "../common/LoadFailureCard";
+import { matchesDefectSearch } from "./defectSearch";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 const PRODUCTION_LINES = new Set(["튜브", "고압", "진공", "튜닝", "조립", "출하"]);
@@ -73,6 +74,7 @@ export function DefectHubPanel({
     defectDeptFilter,
   });
   const [kpiFilter, setKpiFilter] = useState<DefectKpiKind | null>(null);
+  const [search, setSearch] = useState("");
   const [processingLocation, setProcessingLocation] = useState<DefectLocation | null>(null);
   const [cartMode, setCartMode] = useState<DefectCartMode>("add");
   const [reloadNonce, setReloadNonce] = useState(0);
@@ -180,8 +182,10 @@ export function DefectHubPanel({
       return sort === "oldest" ? ta - tb : tb - ta;
     });
 
+    result = result.filter((loc) => matchesDefectSearch(loc, search));
+
     return result;
-  }, [scopedLocations, sort, kpiFilter]);
+  }, [scopedLocations, sort, kpiFilter, search]);
 
   const departmentScopeLabel =
     scope === "my"
@@ -304,6 +308,8 @@ export function DefectHubPanel({
         onSortChange={setSort}
         onFilterLockedChange={setFilterLocked}
         currentDept={currentEmployee.department}
+        search={search}
+        setSearch={setSearch}
       />
 
       {/* KPI 필터 활성 표시 */}
@@ -349,6 +355,7 @@ export function DefectHubPanel({
           currentEmployee={currentEmployee}
           onMemoUpdated={handleMemoUpdated}
           onProcess={handleProcess}
+          searchActive={search.trim().length > 0}
         />
       )}
     </>

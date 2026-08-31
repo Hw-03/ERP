@@ -65,7 +65,15 @@ function renderConfirmStep() {
   );
 }
 
-function DepartmentSingleAdjustHarness({ initialNotes = "" }: { initialNotes?: string }) {
+function DepartmentSingleAdjustHarness({
+  initialNotes = "",
+  onSubmit = vi.fn(),
+  onValidationError = vi.fn(),
+}: {
+  initialNotes?: string;
+  onSubmit?: () => void;
+  onValidationError?: (message: string) => void;
+}) {
   const [notes, setNotes] = useState(initialNotes);
   const adjustmentLine = {
     ...parentLine,
@@ -89,6 +97,30 @@ function DepartmentSingleAdjustHarness({ initialNotes = "" }: { initialNotes?: s
       saving={false}
       approvalKind="department"
       onNotesChange={setNotes}
+      onValidationError={onValidationError}
+      onSubmit={onSubmit}
+      onSaveDraft={vi.fn()}
+    />
+  );
+}
+
+function NoEffectCustomBomHarness({ onValidationError = vi.fn() }: {
+  onValidationError?: (message: string) => void;
+}) {
+  const [notes, setNotes] = useState("");
+  return (
+    <IoConfirmStep
+      workType="process"
+      subType="produce"
+      bundles={[{ ...bundle, lines: [parentLine, { ...childLine, included: false }] }]}
+      notes={notes}
+      hasShortage={false}
+      hasInvalidQuantity={false}
+      submitting={false}
+      saving={false}
+      approvalKind="department"
+      onNotesChange={setNotes}
+      onValidationError={onValidationError}
       onSubmit={() => {}}
       onSaveDraft={vi.fn()}
     />
@@ -219,21 +251,81 @@ describe("IoConfirmStep", () => {
     expect(within(card).getByText(/BOM 참고 출고 · 상위 미반영 · 하위 1/)).toBeInTheDocument();
   });
 
-  it("빈 메모 안내를 입력칸 안에 표시하고 제출은 차단한다", () => {
-    render(<DepartmentSingleAdjustHarness />);
+  it("빈 부서 결재 메모를 클릭으로 차단하고 인라인 오류와 부모 toast를 전달한다", () => {
+    const onSubmit = vi.fn();
+    const onValidationError = vi.fn();
+    render(<DepartmentSingleAdjustHarness onSubmit={onSubmit} onValidationError={onValidationError} />);
 
     expect(screen.getByText("메모 (필수)")).toBeInTheDocument();
     const memoInput = screen.getByRole("textbox");
     expect(memoInput).toHaveAttribute("aria-required", "true");
-    expect(memoInput).toHaveAttribute("placeholder", "메모를 입력해야 부서 결재 요청을 할 수 있습니다.");
+    expect(memoInput).toHaveAttribute("placeholder", "결재 사유를 입력하세요");
     expect(screen.queryByText("메모를 입력해야 부서 결재 요청을 할 수 있습니다.")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "부서 결재 요청 1건" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "부서 결재 요청 1건" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "저장" })).toBeEnabled();
 
+    fireEvent.click(screen.getByRole("button", { name: "부서 결재 요청 1건" }));
+
+    expect(onValidationError).toHaveBeenCalledWith("메모가 없어 부서 결재 요청을 진행할 수 없습니다.");
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(memoInput).toHaveFocus();
+    expect(memoInput).toHaveAttribute("aria-invalid", "true");
+    expect(memoInput).toHaveAttribute("aria-describedby", "department-approval-memo-error");
+    expect(screen.getByText("메모를 입력해야 부서 결재 요청을 할 수 있습니다.")).toBeInTheDocument();
+    expect(screen.queryByText("부서 출고를 요청하시겠습니까?")).not.toBeInTheDocument();
+  });
+
+  it("모든 커스텀 BOM 하위가 제외돼도 메모 검증 뒤 부서 결재 제출을 연다", () => {
+    const onValidationError = vi.fn();
+    render(<NoEffectCustomBomHarness onValidationError={onValidationError} />);
+
+    const submitButton = screen.getByRole("button", { name: "부서 결재 요청 0건" });
+    expect(submitButton).toBeEnabled();
+    fireEvent.click(submitButton);
+    expect(onValidationError).toHaveBeenCalledWith("메모가 없어 부서 결재 요청을 진행할 수 없습니다.");
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "구성품 전체 제외" } });
+    fireEvent.click(submitButton);
+    expect(screen.getByText("부서 입고를 요청하시겠습니까?")).toBeInTheDocument();
+  });
+
+  it("일반 빈 effect 작업은 계속 제출을 막는다", () => {
+    render(
+      <IoConfirmStep
+        workType="process"
+        subType="produce"
+        bundles={[{ ...bundle, lines: [{ ...parentLine, included: false }] }]}
+        notes=""
+        hasShortage={false}
+        hasInvalidQuantity={false}
+        submitting={false}
+        saving={false}
+        approvalKind="none"
+        onNotesChange={() => {}}
+        onSubmit={() => {}}
+        onSaveDraft={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "즉시 반영하기 0건" })).toBeDisabled();
+  });
+
+  it("유효 메모 입력 후 오류를 해제하고 다시 공백이면 다음 클릭에서 차단한다", () => {
+    render(<DepartmentSingleAdjustHarness />);
+    const memoInput = screen.getByRole("textbox");
+    const submitButton = screen.getByRole("button", { name: "부서 결재 요청 1건" });
+
+    fireEvent.click(submitButton);
     fireEvent.change(memoInput, { target: { value: "재고 실사 차이" } });
 
-    expect(memoInput).toHaveAttribute("placeholder", "작업 메모");
-    expect(screen.getByRole("button", { name: "부서 결재 요청 1건" })).toBeEnabled();
+    expect(memoInput).not.toHaveAttribute("aria-invalid");
+    expect(screen.queryByText("메모를 입력해야 부서 결재 요청을 할 수 있습니다.")).not.toBeInTheDocument();
+    fireEvent.click(submitButton);
+    expect(screen.getByText("부서 출고를 요청하시겠습니까?")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    fireEvent.change(memoInput, { target: { value: "  " } });
+    fireEvent.click(submitButton);
+    expect(screen.getByText("메모를 입력해야 부서 결재 요청을 할 수 있습니다.")).toBeInTheDocument();
   });
 
   it.each(["produce", "disassemble"] as const)("혼합 %s 작업은 낱개가 있으면 메모 없이 제출할 수 없다", (subType) => {
@@ -241,7 +333,7 @@ describe("IoConfirmStep", () => {
 
     expect(screen.getByText("메모 (필수)")).toBeInTheDocument();
     const memoInput = screen.getByRole("textbox");
-    expect(screen.getByRole("button", { name: /부서 결재 요청 3건/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /부서 결재 요청 3건/ })).toBeEnabled();
 
     fireEvent.change(memoInput, { target: { value: "낱개 처리 사유" } });
 

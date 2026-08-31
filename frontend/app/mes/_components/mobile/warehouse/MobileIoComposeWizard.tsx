@@ -829,6 +829,7 @@ export function MobileIoComposeWizard({
             saving={drafting}
             approvalKind={approvalKind(state.subType, state.bundles, state.fromDepartment)}
             onNotesChange={state.setNotes}
+            onValidationError={(message) => setToast({ message, type: "error" })}
             onSubmit={handleSubmit}
             onSaveDraft={handleSaveDraft}
           />

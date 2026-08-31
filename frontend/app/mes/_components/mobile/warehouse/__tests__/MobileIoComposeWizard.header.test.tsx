@@ -66,8 +66,17 @@ vi.mock("../../../_warehouse_v2/useIoSubmit", () => ({
 }));
 
 vi.mock("../../../_warehouse_v2/IoConfirmStep", () => ({
-  IoConfirmStep: ({ onSubmit }: { onSubmit: () => void }) => (
-    <button type="button" onClick={onSubmit}>모바일 제출</button>
+  IoConfirmStep: ({
+    onSubmit,
+    onValidationError,
+  }: {
+    onSubmit: () => void;
+    onValidationError?: (message: string) => void;
+  }) => (
+    <>
+      <button type="button" onClick={onSubmit}>모바일 제출</button>
+      <button type="button" onClick={() => onValidationError?.("메모가 없어 부서 결재 요청을 진행할 수 없습니다.")}>메모 오류</button>
+    </>
   ),
 }));
 
@@ -81,6 +90,24 @@ beforeEach(() => {
 });
 
 describe("MobileIoComposeWizard Step 5 헤더", () => {
+  it("최종 확인의 메모 검증 오류를 기존 mobile toast로 표시한다", async () => {
+    render(
+      <MobileIoComposeWizard
+        globalSearch=""
+        operator={null}
+        items={[]}
+        setItems={vi.fn()}
+        onStatusChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "메모 오류" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "메모가 없어 부서 결재 요청을 진행할 수 없습니다.",
+    );
+  });
+
   it("4단계를 수량 조정으로 안내한다", () => {
     const originalStep = wizardState.step;
     wizardState.step = 4;

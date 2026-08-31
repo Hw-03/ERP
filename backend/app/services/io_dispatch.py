@@ -20,6 +20,7 @@ from app.models import (
     InventoryOperationEffectKindEnum,
     InventoryOperationRoleEnum,
     IoBatch,
+    IoBundle,
     IoLine,
     RequestBucketEnum,
     StockRequest,
@@ -33,7 +34,12 @@ from app.services import inv_effect
 from app.services import inventory_operations as operation_svc
 from app.services import stock_requests as stock_request_svc
 from app.services import notifications as notif_svc
-from app.services.bom_stock_policy import is_bom_generated_line
+from app.services.bom_stock_policy import (
+    BOM_PARENT_SOURCE_KIND,
+    has_valid_bom_auto_token,
+    io_bom_auto_claims,
+    is_bom_generated_line,
+)
 from app.services.io_preview import (
     APPROVAL_SUB_TYPES,
     INTERNAL_USE_SUB_TYPE,
@@ -41,7 +47,6 @@ from app.services.io_preview import (
     _bucket_available,
     _d,
     _get_item,
-    has_included_manual_line,
     normalize_process_sub_type,
     validate_process_bom_parent_lines,
     validate_saved_operation_sources,
@@ -61,20 +66,11 @@ from app.services.io_persist import (
 )
 
 
+CUSTOM_BOM_REFERENCE_EXCLUSION_NOTE = "커스텀 BOM 상위 미반영"
+
+
 def _included_lines(batch: IoBatch) -> list[IoLine]:
     return [line for bundle in batch.bundles for line in bundle.lines if line.included]
-
-
-def _validate_required_memo(
-    *, work_type: str, notes: str | None, bundles: Iterable[object]
-) -> None:
-    """부서 낱개 입출고 제출은 공백이 아닌 메모를 요구한다."""
-    if (
-        work_type == "process"
-        and has_included_manual_line(bundles)
-        and not (notes or "").strip()
-    ):
-        raise ValueError("낱개 부서 입출고는 메모를 입력해야 합니다.")
 
 
 def _fmt_qty(d: Decimal) -> str:
@@ -192,7 +188,7 @@ def _has_manual_line(lines: Iterable[IoLine]) -> bool:
 
 
 def _normalize_process_bom_auto_inclusion(batch: IoBatch) -> None:
-    """process BOM 자동 하위의 포함 상태는 수량에서만 결정해 checkbox payload를 무력화한다."""
+    """0 상위의 자동 비활성화만 정규화하고, 양수 자동 하위의 명시적 제외는 보존한다."""
     if batch.sub_type not in {"produce", "disassemble"}:
         return
     for bundle in batch.bundles:
@@ -208,7 +204,7 @@ def _normalize_process_bom_auto_inclusion(batch: IoBatch) -> None:
                 line.included = False
                 line.edited = False
                 line.shortage = Decimal("0")
-            elif not line.bom_stock_exempt:
+            elif not line.bom_stock_exempt and line.included:
                 line.included = _d(line.quantity) > 0
 
 
@@ -245,7 +241,12 @@ def _custom_process_bom_bundle_ids(db: Session, batch: IoBatch) -> set[uuid.UUID
             if line.origin != "bom_auto" or line.bom_stock_exempt:
                 continue
             unit_quantity = bom_rows.get(line.item_id)
-            if unit_quantity is None or _d(line.quantity) != _d(parent.quantity) * unit_quantity:
+            expected_quantity = _d(parent.quantity) * unit_quantity if unit_quantity is not None else None
+            if (
+                unit_quantity is None
+                or _d(line.quantity) != expected_quantity
+                or (expected_quantity > 0 and not line.included)
+            ):
                 custom_bundle_ids.add(bundle.bundle_id)
                 break
     return custom_bundle_ids
@@ -282,24 +283,77 @@ def _mark_custom_process_bom_parents_reference_only(
                 continue
             line.included = False
             line.shortage = Decimal("0")
-            line.exclusion_note = "커스텀 BOM 상위 미반영"
+            line.exclusion_note = CUSTOM_BOM_REFERENCE_EXCLUSION_NOTE
 
 
-def _normalize_custom_disassemble_effects(
+def _custom_process_bom_reference_lines(
+    batch: IoBatch,
+    custom_bundle_ids: set[uuid.UUID],
+) -> list[IoLine]:
+    """실제 반영 행이 없는 커스텀 BOM 결재를 표현할 서버 확정 상위 참조 행을 반환한다."""
+    return [
+        line
+        for bundle in batch.bundles
+        if bundle.bundle_id in custom_bundle_ids and bundle.source_kind == BOM_PARENT_SOURCE_KIND
+        for line in bundle.lines
+        if (
+            line.origin == "direct"
+            and line.item_id == bundle.source_item_id
+            and not line.included
+            and _d(line.quantity) > 0
+            and line.exclusion_note == CUSTOM_BOM_REFERENCE_EXCLUSION_NOTE
+        )
+    ]
+
+
+def _has_valid_stale_bom_auto_token(
+    db: Session,
+    *,
+    batch: IoBatch,
+    bundle: IoBundle,
+    line: IoLine,
+) -> bool:
+    """현재 BOM 관계가 삭제됐어도 미리보기 당시 서버가 발급한 자동 행만 신뢰한다."""
+    if (
+        bundle.source_kind != BOM_PARENT_SOURCE_KIND
+        or bundle.source_item_id is None
+        or line.item_id is None
+    ):
+        return False
+    return has_valid_bom_auto_token(
+        db,
+        flow="io",
+        claims=io_bom_auto_claims(
+            bundle_id=bundle.bundle_id,
+            line_id=line.line_id,
+            source_kind=bundle.source_kind,
+            source_item_id=bundle.source_item_id,
+            item_id=line.item_id,
+            work_type=batch.work_type,
+            sub_type=batch.sub_type,
+            direction=line.direction,
+            from_bucket=line.from_bucket,
+            from_department=line.from_department,
+            to_bucket=line.to_bucket,
+            to_department=line.to_department,
+        ),
+        token=line.bom_auto_token,
+    )
+
+
+def _validate_custom_process_bom_auto_lines(
     db: Session,
     batch: IoBatch,
     custom_bundle_ids: set[uuid.UUID],
 ) -> None:
-    """커스텀 분해의 서버 발급 회수 라인을 소속 부서 선택 출고로 확정한다."""
-    if batch.sub_type != "disassemble":
-        return
+    """커스텀 생산·분해 BOM 자동 행은 현재 관계 또는 원본 서버 토큰으로만 신뢰한다."""
     for bundle in batch.bundles:
         if bundle.bundle_id not in custom_bundle_ids:
             continue
         for line in bundle.lines:
             if line.origin != "bom_auto":
                 continue
-            if not is_bom_generated_line(
+            is_current_bom_line = is_bom_generated_line(
                 db,
                 bundle_id=bundle.bundle_id,
                 line_id=line.line_id,
@@ -314,8 +368,29 @@ def _normalize_custom_disassemble_effects(
                 to_bucket=line.to_bucket,
                 to_department=line.to_department,
                 bom_auto_token=line.bom_auto_token,
+            )
+            if not is_current_bom_line and not _has_valid_stale_bom_auto_token(
+                db,
+                batch=batch,
+                bundle=bundle,
+                line=line,
             ):
                 raise ValueError("BOM 자동 하위 품목의 원본 정보가 올바르지 않습니다.")
+
+
+def _normalize_custom_disassemble_effects(
+    batch: IoBatch,
+    custom_bundle_ids: set[uuid.UUID],
+) -> None:
+    """검증된 커스텀 분해 회수 라인을 소속 부서 선택 출고로 확정한다."""
+    if batch.sub_type != "disassemble":
+        return
+    for bundle in batch.bundles:
+        if bundle.bundle_id not in custom_bundle_ids:
+            continue
+        for line in bundle.lines:
+            if line.origin != "bom_auto":
+                continue
             if line.bom_stock_exempt or not line.included or _d(line.quantity) <= 0:
                 line.included = False
                 line.shortage = Decimal("0")
@@ -506,6 +581,7 @@ def _submit_dept_only_approval(
     requester: Employee,
     batch: IoBatch,
     lines: Sequence[IoLine] | None = None,
+    reference_lines: Sequence[IoLine] = (),
 ) -> None:
     """낱개(manual/adjust) 라인이 포함된 비-APPROVAL_SUB_TYPES 배치 — 부서 결재만 필요.
 
@@ -513,17 +589,30 @@ def _submit_dept_only_approval(
     요청자 본인이 부서 결재 정/부 권한자라면 즉시 실행한다.
     """
     effect_lines = list(lines) if lines is not None else _included_lines(batch)
-    _validate_included_lines(db, effect_lines)
+    request_lines = effect_lines or list(reference_lines)
+    if effect_lines:
+        _validate_included_lines(db, effect_lines)
+    elif not request_lines:
+        raise ValueError("실제 반영할 품목이 없습니다.")
+    reference_line_ids = {line.line_id for line in reference_lines}
     inputs = [
         stock_request_svc.LineInput(
             item_id=line.item_id,
             quantity=line.quantity,
-            from_bucket=_request_bucket(line.from_bucket),
-            from_department=line.from_department,
-            to_bucket=_request_bucket(line.to_bucket),
-            to_department=line.to_department,
+            from_bucket=(
+                RequestBucketEnum.NONE
+                if line.line_id in reference_line_ids
+                else _request_bucket(line.from_bucket)
+            ),
+            from_department=None if line.line_id in reference_line_ids else line.from_department,
+            to_bucket=(
+                RequestBucketEnum.NONE
+                if line.line_id in reference_line_ids
+                else _request_bucket(line.to_bucket)
+            ),
+            to_department=None if line.line_id in reference_line_ids else line.to_department,
         )
-        for line in effect_lines
+        for line in request_lines
     ]
     request = stock_request_svc.create_manual_adjustment_request(
         db,
@@ -533,10 +622,15 @@ def _submit_dept_only_approval(
         notes=batch.notes,
         approval_department=batch.to_department,
     )
-    _link_stock_request(db, batch=batch, request=request, lines=effect_lines)
+    _link_stock_request(db, batch=batch, request=request, lines=request_lines)
 
     # 자가승인 경로 — create_manual_adjustment_request 가 dept_approved 를 이미 마크했으면 즉시 실행.
     if request.department_approved_by_employee_id is not None:
+        if not effect_lines:
+            _complete_no_effect_department_approval(batch=batch, request=request)
+            db.flush()
+            notif_svc.notify_request_arrived(db, request)
+            return
         batch_status_before = batch.status
         request_status_before = request.status
         _prelock_line_inventories(db, effect_lines)
@@ -577,6 +671,56 @@ def _submit_dept_only_approval(
     notif_svc.notify_request_arrived(db, request)
 
 
+def _complete_no_effect_department_approval(*, batch: IoBatch, request: StockRequest) -> None:
+    """서버가 확정한 커스텀 BOM 참조 요청을 재고·로그 변동 없이 완료한다."""
+    now = datetime.utcnow()
+    request.status = StockRequestStatusEnum.COMPLETED
+    request.completed_at = now
+    for request_line in request.lines:
+        request_line.status = StockRequestStatusEnum.COMPLETED
+    batch.status = "completed"
+    batch.completed_at = now
+    batch.updated_at = now
+
+
+def _is_no_effect_custom_bom_reference_request(batch: IoBatch, request: StockRequest) -> bool:
+    """요청 연결과 BOM 상위 구조를 함께 검증해 서버가 만든 무반영 참조 요청만 식별한다."""
+    if (
+        batch.work_type != "process"
+        or batch.sub_type not in {"produce", "disassemble"}
+        or not request.lines
+        or _included_lines(batch)
+    ):
+        return False
+    lines_by_id = {
+        line.line_id: (bundle, line)
+        for bundle in batch.bundles
+        for line in bundle.lines
+    }
+    for request_line in request.lines:
+        if request_line.operation_line_id is None:
+            return False
+        saved = lines_by_id.get(request_line.operation_line_id)
+        if saved is None:
+            return False
+        bundle, line = saved
+        if (
+            request_line.item_id != line.item_id
+            or _d(request_line.quantity) != _d(line.quantity)
+            or request_line.from_bucket != RequestBucketEnum.NONE
+            or request_line.to_bucket != RequestBucketEnum.NONE
+            or request_line.from_department is not None
+            or request_line.to_department is not None
+            or bundle.source_kind != BOM_PARENT_SOURCE_KIND
+            or line.origin != "direct"
+            or line.item_id != bundle.source_item_id
+            or line.included
+            or line.exclusion_note != CUSTOM_BOM_REFERENCE_EXCLUSION_NOTE
+        ):
+            return False
+    return True
+
+
 def execute_batch_after_dept_approval(
     db: Session, *, request: StockRequest, approver: Employee
 ) -> None:
@@ -595,6 +739,11 @@ def execute_batch_after_dept_approval(
         batch.stock_request_id = request.request_id
     if request.request_code and not batch.reference_no:
         batch.reference_no = request.request_code
+
+    if _is_no_effect_custom_bom_reference_request(batch, request):
+        _complete_no_effect_department_approval(batch=batch, request=request)
+        db.flush()
+        return
 
     if request.lines:
         operation_line_ids = {
@@ -1055,40 +1204,61 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
         bundles=batch.bundles,
         requested_department=batch.to_department,
     )
+    custom_process_bom_bundle_ids = _custom_process_bom_bundle_ids(db, batch)
+    custom_process_bom = bool(custom_process_bom_bundle_ids)
+    included_lines = _included_lines(batch)
+    department_approval_required = (
+        batch.work_type == "process"
+        and (_has_manual_line(included_lines) or custom_process_bom)
+    )
+    if department_approval_required and not (batch.notes or "").strip():
+        raise ValueError("부서 결재 요청에는 메모를 입력해야 합니다.")
+
     try:
-        custom_process_bom_bundle_ids = _custom_process_bom_bundle_ids(db, batch)
-        custom_process_bom = bool(custom_process_bom_bundle_ids)
         if custom_process_bom:
             _mark_custom_process_bom_parents_reference_only(
                 batch,
                 custom_process_bom_bundle_ids,
             )
-            _normalize_custom_disassemble_effects(
+            _validate_custom_process_bom_auto_lines(
                 db,
                 batch,
                 custom_process_bom_bundle_ids,
             )
+            _normalize_custom_disassemble_effects(
+                batch,
+                custom_process_bom_bundle_ids,
+            )
         included_lines = _included_lines(batch)
-        if not included_lines:
-            _complete_without_inventory(batch)
-        elif batch.sub_type in APPROVAL_SUB_TYPES:
-            # 창고 승인 sub_type — manual line 유무 무관, 창고 승인 1회로만.
-            # 새 정책: 모든 요청은 창고 또는 부서 중 하나로만 결재.
-            _submit_approval(db, requester=requester, batch=batch)
-        elif _has_manual_line(included_lines) or custom_process_bom:
-            # 부서 승인만 필요 — manual_adjustment 또는 기준과 다른 BOM 자동 하위.
+        if department_approval_required:
+            # process 부서 승인만 필요 — 낱개 또는 기준과 다른 BOM 자동 하위.
             effect_lines = included_lines
             if custom_process_bom:
                 effect_lines = _custom_process_bom_effect_lines(
                     batch,
                     custom_process_bom_bundle_ids,
                 )
+            reference_lines = (
+                _custom_process_bom_reference_lines(
+                    batch,
+                    custom_process_bom_bundle_ids,
+                )
+                if custom_process_bom and not effect_lines
+                else ()
+            )
             _submit_dept_only_approval(
                 db,
                 requester=requester,
                 batch=batch,
                 lines=effect_lines,
+                reference_lines=reference_lines,
             )
+        elif not included_lines:
+            _complete_without_inventory(batch)
+        elif batch.sub_type in APPROVAL_SUB_TYPES:
+            # 창고 승인 sub_type — manual line 유무 무관, 창고 승인 1회로만.
+            # 새 정책: 모든 요청은 창고 또는 부서 중 하나로만 결재.
+            _submit_approval(db, requester=requester, batch=batch)
         else:
             _submit_immediate(db, requester=requester, batch=batch)
     except Exception:
@@ -1121,11 +1291,6 @@ def submit(db: Session, payload) -> dict:
     payload.sub_type = normalize_process_sub_type(
         work_type=payload.work_type,
         sub_type=payload.sub_type,
-        bundles=payload.bundles,
-    )
-    _validate_required_memo(
-        work_type=payload.work_type,
-        notes=payload.notes,
         bundles=payload.bundles,
     )
     requester = _load_requester(db, payload.requester_employee_id)
@@ -1171,10 +1336,5 @@ def submit_existing_draft(
         raise ValueError("임시저장 상태가 아닙니다.")
     db.flush()
     db.refresh(batch)
-    _validate_required_memo(
-        work_type=batch.work_type,
-        notes=batch.notes,
-        bundles=batch.bundles,
-    )
     normalize_batch_bom_stock_exempt(db, batch)
     return _execute_submission(db, requester=requester, batch=batch)

@@ -47,6 +47,15 @@ describe("DefectDepartmentList", () => {
     apiMocks.getMemoHistory.mockReset();
   });
 
+  it("distinguishes an empty search result from an empty defect list", () => {
+    const { rerender } = render(<DefectDepartmentList locations={[]} onProcess={vi.fn()} searchActive />);
+    expect(screen.getByText("검색 결과가 없습니다.")).toBeInTheDocument();
+
+    rerender(<DefectDepartmentList locations={[]} onProcess={vi.fn()} />);
+    expect(screen.getByText("격리된 불량 재고가 없습니다.")).toBeInTheDocument();
+    expect(screen.queryByText("검색 결과가 없습니다.")).not.toBeInTheDocument();
+  });
+
   it("renders only the defect reason in the row summary", () => {
     render(
       <DefectDepartmentList

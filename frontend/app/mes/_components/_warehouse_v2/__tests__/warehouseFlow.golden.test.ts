@@ -22,7 +22,7 @@ import {
   subTypeLabel,
   requiresDepartments,
   requiresApproval,
-  requiresMemoForDepartmentSingleAdjustment,
+  requiresDepartmentApprovalMemo,
   hasManualLine,
   hasCustomBomQuantity,
   processBomEffectLine,
@@ -372,6 +372,25 @@ describe("approvalKind", () => {
     expect(hasCustomBomQuantity(customBom)).toBe(true);
     expect(approvalKind("produce", customBom)).toBe("department");
   });
+
+  it("상위 0에 따라 자동 0·제외된 BOM 하위는 커스텀 결재로 오인하지 않는다", () => {
+    const zeroParentBom = [makeBundle({
+      quantity: 1,
+      lines: [
+        makeLine({ line_id: "P", origin: "direct", quantity: 0, included: false }),
+        makeLine({
+          line_id: "C",
+          origin: "bom_auto",
+          quantity: 0,
+          bom_expected: 2,
+          included: false,
+        }),
+      ],
+    })];
+
+    expect(hasCustomBomQuantity(zeroParentBom)).toBe(false);
+    expect(approvalKind("produce", zeroParentBom)).toBe("none");
+  });
 });
 
 // ──────────────────────────────────────────────────────────────────
@@ -460,9 +479,9 @@ describe("canonicalProcessSubType", () => {
 });
 
 // ──────────────────────────────────────────────────────────────────
-// requiresMemoForDepartmentSingleAdjustment
+// requiresDepartmentApprovalMemo
 // ──────────────────────────────────────────────────────────────────
-describe("requiresMemoForDepartmentSingleAdjustment", () => {
+describe("requiresDepartmentApprovalMemo", () => {
   const bom = makeBundle({
     source_kind: "bom_parent",
     lines: [makeLine({ origin: "direct" })],
@@ -472,15 +491,34 @@ describe("requiresMemoForDepartmentSingleAdjustment", () => {
     lines: [makeLine({ origin: "manual" })],
   });
 
-  it("대표 subtype이 생산·분해여도 포함된 낱개가 있으면 메모가 필요하다", () => {
-    expect(requiresMemoForDepartmentSingleAdjustment("process", "produce", [bom, manual])).toBe(true);
-    expect(requiresMemoForDepartmentSingleAdjustment("process", "disassemble", [bom, manual])).toBe(true);
+  it("기본 BOM과 상위 수량 비례 재계산은 메모 없이 즉시 처리한다", () => {
+    const scaledBom = makeBundle({
+      source_kind: "bom_parent",
+      quantity: 2,
+      lines: [
+        makeLine({ origin: "direct", quantity: 4 }),
+        makeLine({ origin: "bom_auto", quantity: 8, bom_expected: 4 }),
+      ],
+    });
+
+    expect(requiresDepartmentApprovalMemo("process", "produce", [bom])).toBe(false);
+    expect(requiresDepartmentApprovalMemo("process", "produce", [scaledBom])).toBe(false);
+    expect(approvalKind("produce", [scaledBom])).toBe("none");
   });
 
-  it("기존 낱개 단독 수량보정 메모 규칙을 유지한다", () => {
-    expect(requiresMemoForDepartmentSingleAdjustment("process", "adjust_in", [manual])).toBe(true);
-    expect(requiresMemoForDepartmentSingleAdjustment("process", "adjust_out", [manual])).toBe(true);
-    expect(requiresMemoForDepartmentSingleAdjustment("process", "produce", [bom])).toBe(false);
+  it("커스텀 BOM과 낱개가 섞인 process 작업은 부서 결재 메모가 필요하다", () => {
+    const customBom = makeBundle({
+      source_kind: "bom_parent",
+      lines: [
+        makeLine({ origin: "direct", quantity: 1 }),
+        makeLine({ origin: "bom_auto", quantity: 0, bom_expected: 1, included: false }),
+      ],
+    });
+
+    expect(requiresDepartmentApprovalMemo("process", "produce", [customBom])).toBe(true);
+    expect(requiresDepartmentApprovalMemo("process", "disassemble", [bom, manual])).toBe(true);
+    expect(requiresDepartmentApprovalMemo("process", "adjust_in", [manual])).toBe(true);
+    expect(requiresDepartmentApprovalMemo("warehouse_io", "warehouse_to_dept", [manual])).toBe(false);
   });
 });
 

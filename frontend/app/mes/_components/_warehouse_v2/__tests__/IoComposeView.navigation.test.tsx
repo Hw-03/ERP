@@ -43,13 +43,16 @@ vi.mock("../IoConfirmStep", () => ({
   IoConfirmStep: ({
     onSaveDraft,
     onSubmit,
+    onValidationError,
   }: {
     onSaveDraft: () => void;
     onSubmit: () => void;
+    onValidationError?: (message: string) => void;
   }) => (
     <>
       <button type="button" data-testid="draft-save" onClick={onSaveDraft}>save</button>
       <button type="button" data-testid="confirm-submit" onClick={onSubmit}>submit</button>
+      <button type="button" data-testid="confirm-memo-error" onClick={() => onValidationError?.("메모가 없어 부서 결재 요청을 진행할 수 없습니다.")}>memo error</button>
     </>
   ),
 }));
@@ -160,6 +163,37 @@ beforeEach(() => {
 });
 
 describe("IoComposeView navigation chrome", () => {
+  it("최종 확인의 메모 검증 오류를 기존 desktop toast로 표시한다", async () => {
+    render(
+      <IoComposeView
+        globalSearch=""
+        operator={operator}
+        employees={[]}
+        items={[]}
+        productModels={[]}
+        setItems={() => {}}
+        onStatusChange={() => {}}
+        restoreStep={5}
+        restoreDraft={{
+          batch_id: "memo-validation-draft",
+          work_type: "process",
+          sub_type: "adjust_in",
+          from_department: null,
+          to_department: "조립",
+          reference_no: null,
+          notes: null,
+          bundles: [],
+        } as never}
+      />,
+    );
+
+    fireEvent.click(await screen.findByTestId("confirm-memo-error"));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "메모가 없어 부서 결재 요청을 진행할 수 없습니다.",
+    );
+  });
+
   it("작성 중으로 복귀한 작업의 반려 사유를 조합 화면 상단에 표시하지 않는다", () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },

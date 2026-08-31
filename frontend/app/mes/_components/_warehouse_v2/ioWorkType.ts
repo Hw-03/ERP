@@ -16,7 +16,6 @@ import {
 } from "@/lib/io/glossary";
 
 const MANUAL_ORIGINS = new Set(["manual", "adjust_in", "adjust_out"]);
-const MEMO_REQUIRED_SUB_TYPES = new Set(["adjust_in", "adjust_out"]);
 
 export const IO_WORK_TYPES: Array<{
   id: IoWorkType;
@@ -113,14 +112,14 @@ export function requiresApproval(subType: IoSubType) {
   return ["warehouse_to_dept", "dept_to_warehouse", "internal_use_out"].includes(subType);
 }
 
-export function requiresMemoForDepartmentSingleAdjustment(
+/** process 흐름에서 실제 부서 결재로 분기되는 작업만 결재 사유 메모를 요구한다. */
+export function requiresDepartmentApprovalMemo(
   workType: IoWorkType,
   subType: IoSubType,
   bundles: IoBundle[] = [],
+  fromDepartment?: string | null,
 ): boolean {
-  return workType === "process" && (
-    MEMO_REQUIRED_SUB_TYPES.has(subType) || hasManualLine(bundles)
-  );
+  return workType === "process" && approvalKind(subType, bundles, fromDepartment) === "department";
 }
 
 /** 백엔드 MANUAL_LINE_ORIGINS 와 동기 — 1라인이라도 낱개면 부서 결재 필요. */
@@ -142,9 +141,12 @@ export function hasCustomBomQuantity(bundles: IoBundle[]): boolean {
     const baseQuantity = Number(bundle.quantity) || 0;
     if (!parent || baseQuantity <= 0) return false;
     const parentQuantity = Number(parent.quantity) || 0;
+    if (parentQuantity <= 0) return false;
     return bundle.lines.some((line) => {
       if (line.origin !== "bom_auto" || line.bom_stock_exempt) return false;
+      if (line.bom_expected == null) return true;
       const expected = parentQuantity * ((Number(line.bom_expected) || 0) / baseQuantity);
+      if (expected > 0 && !line.included) return true;
       return Math.abs((Number(line.quantity) || 0) - expected) > 0.0001;
     });
   });

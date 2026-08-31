@@ -25,6 +25,7 @@ interface Props {
   onMemoUpdated?: (recordId: string, memo: string) => void;
   /** 전체 보기 시 이 부서를 가장 위에 표시. */
   priorityDept?: string;
+  searchActive?: boolean;
 }
 
 function parseBackendTimestamp(value: string | null): Date | null {
@@ -65,6 +66,7 @@ export function DefectDepartmentList({
   currentEmployee,
   onMemoUpdated,
   priorityDept,
+  searchActive = false,
 }: Props) {
   const grouped = groupByDepartment(locations);
   const depts = Object.keys(grouped).sort((a, b) => {
@@ -99,7 +101,7 @@ export function DefectDepartmentList({
   if (depts.length === 0) {
     return (
       <div className="rounded-[14px] border px-6 py-8 text-center" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}>
-        <p className="text-base font-bold">격리된 불량 재고가 없습니다.</p>
+        <p className="text-base font-bold">{searchActive ? "검색 결과가 없습니다." : "격리된 불량 재고가 없습니다."}</p>
       </div>
     );
   }

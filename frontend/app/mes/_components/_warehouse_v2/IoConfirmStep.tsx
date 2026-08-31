@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, type LegacyRef } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -15,10 +15,12 @@ import { tint } from "@/lib/mes/colorUtils";
 import type { IoBundle, IoLine, IoSubType, IoWorkType } from "./types";
 import {
   deptIoDisplayLabel,
+  hasCustomBomQuantity,
+  isBomForced,
   isCustomProcessBomBundle,
   isWarehouseAdjustSubType,
   processBomEffectLine,
-  requiresMemoForDepartmentSingleAdjustment,
+  requiresDepartmentApprovalMemo,
   subTypeLabel,
   type ApprovalKind,
 } from "./ioWorkType";
@@ -46,6 +48,7 @@ interface Props {
   saving: boolean;
   approvalKind: ApprovalKind;
   onNotesChange: (value: string) => void;
+  onValidationError?: (message: string) => void;
   onSubmit: () => void;
   onSaveDraft: () => void;
 }
@@ -181,10 +184,13 @@ export function IoConfirmStep({
   saving,
   approvalKind,
   onNotesChange,
+  onValidationError,
   onSubmit,
   onSaveDraft,
 }: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [memoValidationAttempted, setMemoValidationAttempted] = useState(false);
+  const memoInputRef = useRef<HTMLInputElement>(null);
   const isApproval = approvalKind !== "none";
   const copy = confirmCopy(subType, approvalKind);
   const headerLabel = workType === "process"
@@ -228,20 +234,29 @@ export function IoConfirmStep({
       ? b.lines.some((line) => !bomParentLineIds.has(line.line_id))
       : b.lines.some((line) => line.included && !bomParentLineIds.has(line.line_id)),
   );
-  const memoRequired = requiresMemoForDepartmentSingleAdjustment(workType, subType, bundles);
+  const memoRequired = requiresDepartmentApprovalMemo(workType, subType, bundles);
   const memoMissing = memoRequired && !notes.trim();
+  const showMemoError = memoValidationAttempted && memoMissing;
+  const allowsNoEffectCustomBomApproval =
+    approvalKind === "department" &&
+    workType === "process" &&
+    isBomForced(subType) &&
+    hasCustomBomQuantity(bundles) &&
+    effectIncludedLines.length === 0;
   const missingInternalUseBomMode =
     subType === "internal_use_out" && hasUnselectedInternalUseBomMode(bundles);
 
   const submitDisabled =
-    submitting || saving || effectIncludedLines.length === 0 || hasShortage || hasInvalidQuantity || memoMissing || missingInternalUseBomMode;
+    submitting || saving ||
+    (effectIncludedLines.length === 0 && !allowsNoEffectCustomBomApproval) ||
+    hasShortage || hasInvalidQuantity || missingInternalUseBomMode;
   const saveDisabled = submitting || saving || bundles.length === 0;
   const accent = directionAccent(subType);
   const blockerText = hasShortage
     ? "재고 부족 라인이 있어 제출할 수 없습니다. Step 4에서 라인을 다시 확인하세요."
     : hasInvalidQuantity
     ? "0 이하 수량 라인이 있어 제출할 수 없습니다."
-    : effectIncludedLines.length === 0
+    : effectIncludedLines.length === 0 && !allowsNoEffectCustomBomApproval
     ? "체크된 라인이 없어 제출할 수 없습니다."
     : missingInternalUseBomMode
     ? "차감 방식을 선택하지 않은 BOM 묶음이 있습니다. Step 4에서 방식을 선택하세요."
@@ -306,10 +321,14 @@ export function IoConfirmStep({
       <Field
         label={memoRequired ? "메모 (필수)" : "메모 (선택)"}
         value={notes}
-        onChange={onNotesChange}
-        placeholder={memoMissing ? "메모를 입력해야 부서 결재 요청을 할 수 있습니다." : "작업 메모"}
+        onChange={(value) => {
+          if (value.trim()) setMemoValidationAttempted(false);
+          onNotesChange(value);
+        }}
+        placeholder={memoRequired ? "결재 사유를 입력하세요" : "작업 메모"}
         required={memoRequired}
-        invalid={memoMissing}
+        invalid={showMemoError}
+        inputRef={memoInputRef}
       />
 
       {/* 액션 푸터 — Step4(IoBundleCart 126줄) 와 동일: 모바일 하단 sticky + 페이지 배경, PC(lg)는 정적·대형 그대로. */}
@@ -347,7 +366,15 @@ export function IoConfirmStep({
           </button>
           <button
             type="button"
-            onClick={() => setConfirmOpen(true)}
+            onClick={() => {
+              if (memoMissing) {
+                setMemoValidationAttempted(true);
+                onValidationError?.("메모가 없어 부서 결재 요청을 진행할 수 없습니다.");
+                memoInputRef.current?.focus();
+                return;
+              }
+              setConfirmOpen(true);
+            }}
             disabled={submitDisabled}
             className="flex flex-1 items-center justify-center gap-2 rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50 lg:gap-3 lg:px-7"
             style={{ background: accent }}
@@ -698,6 +725,7 @@ function Field({
   placeholder,
   required = false,
   invalid = false,
+  inputRef,
 }: {
   label: string;
   value: string;
@@ -705,26 +733,40 @@ function Field({
   placeholder: string;
   required?: boolean;
   invalid?: boolean;
+  inputRef?: LegacyRef<HTMLInputElement>;
 }) {
+  const errorId = "department-approval-memo-error";
   return (
-    <label className="flex flex-col gap-2">
+    <label className="flex flex-col gap-2" htmlFor="department-approval-memo">
       <div className="text-xs font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
         {label}
       </div>
       <input
+        ref={inputRef}
+        id="department-approval-memo"
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         required={required}
         aria-required={required}
         aria-invalid={invalid || undefined}
-        className="h-14 rounded-[16px] border px-4 text-base font-bold outline-none focus:border-[var(--c-blue)]"
+        aria-describedby={invalid ? errorId : undefined}
+        className={`h-14 rounded-[16px] border px-4 text-base font-bold outline-none focus-visible:ring-2 ${
+          invalid
+            ? "focus-visible:ring-[var(--c-red)]"
+            : "focus-visible:border-[var(--c-blue)] focus-visible:ring-[var(--c-blue)]"
+        }`}
         style={{
           background: LEGACY_COLORS.s2,
-          borderColor: LEGACY_COLORS.border,
+          borderColor: invalid ? LEGACY_COLORS.red : LEGACY_COLORS.border,
           color: LEGACY_COLORS.text,
         }}
       />
+      {invalid && (
+        <span id={errorId} className="text-sm font-bold" style={{ color: LEGACY_COLORS.red }}>
+          메모를 입력해야 부서 결재 요청을 할 수 있습니다.
+        </span>
+      )}
     </label>
   );
 }

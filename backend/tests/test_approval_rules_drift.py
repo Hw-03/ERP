@@ -42,14 +42,12 @@ def test_manual_origins_fe_be_parity():
     )
 
 
-def test_memo_required_sub_types_fe_be_parity():
-    """FE memo-required subtype set matches the backend policy."""
-    fe = _strings_in(_match(r"MEMO_REQUIRED_SUB_TYPES\s*=\s*new Set\(\[(.*?)\]\)"))
-    be = set(getattr(approval_rules, "MEMO_REQUIRED_SUB_TYPES", ()))
-    assert fe == be, (
-        f"memo-required subtype drift: FE {sorted(fe)} != BE {sorted(be)}. "
-        "Update approval_rules.MEMO_REQUIRED_SUB_TYPES and ioWorkType.MEMO_REQUIRED_SUB_TYPES together."
-    )
+def test_department_memo_policy_uses_approval_outcome_not_subtype_set():
+    """메모는 고정 subtype 집합이 아니라 process 부서 결재 판정에만 묶인다."""
+    source = _ts()
+    assert "MEMO_REQUIRED_SUB_TYPES" not in source
+    assert not hasattr(approval_rules, "MEMO_REQUIRED_SUB_TYPES")
+    assert "requiresDepartmentApprovalMemo" in source
 
 
 def test_warehouse_approval_sub_types_fe_be_parity():
