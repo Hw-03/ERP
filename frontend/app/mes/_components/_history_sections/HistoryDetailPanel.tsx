@@ -45,6 +45,8 @@ type Props = {
   onSelectLog: (log: TransactionLog) => void;
   onLogUpdated: (updated: TransactionLog) => void;
   variant?: "default" | "desktop";
+  desktopCancellationOpen?: boolean;
+  onDesktopCancellationOpenChange?: (open: boolean) => void;
 };
 
 type FlowState =
@@ -60,6 +62,8 @@ export function HistoryDetailPanel({
   onSelectLog,
   onLogUpdated,
   variant = "default",
+  desktopCancellationOpen = false,
+  onDesktopCancellationOpenChange,
 }: Props) {
   const operator = useCurrentOperator();
   const realtimeRevision = useRealtimeRevision();
@@ -245,17 +249,27 @@ export function HistoryDetailPanel({
     onSubmit: handleCancelSubmit,
     triggerLabel: "이 내역 취소",
     scopeCount: cancellationScopeStatus === "ready" ? cancellationLogs.length : undefined,
+    desktopCancellationOpen,
+    onDesktopCancellationOpenChange,
   };
+  const isDesktopCancellationOpen = variant === "desktop" && desktopCancellationOpen;
 
   return (
-    <div className={variant === "desktop" ? "flex min-h-full min-h-0 flex-col gap-4" : "space-y-4"}>
+    <div className={variant === "desktop"
+      ? isDesktopCancellationOpen
+        ? "flex h-full min-h-0 flex-1 flex-col"
+        : "flex min-h-full min-h-0 flex-col gap-4"
+      : "space-y-4"}
+    >
       {variant === "desktop" ? (
-        <HistoryKeyPointSummary
-          summary={summary}
-          impactStatus={cancellationScope.status}
-          onRetryImpact={cancellationScope.retry}
-          fillHeight
-        />
+        !isDesktopCancellationOpen && (
+          <HistoryKeyPointSummary
+            summary={summary}
+            impactStatus={cancellationScope.status}
+            onRetryImpact={cancellationScope.retry}
+            fillHeight
+          />
+        )
       ) : (
         <HistoryDetailHero
           log={selected}
@@ -279,9 +293,12 @@ export function HistoryDetailPanel({
         </div>
       )}
 
-      <HistoryDetailReason log={selected} />
-
-      <HistoryDetailMemo notes={selected.notes} transactionType={selected.transaction_type} />
+      {!isDesktopCancellationOpen && (
+        <>
+          <HistoryDetailReason log={selected} />
+          <HistoryDetailMemo notes={selected.notes} transactionType={selected.transaction_type} />
+        </>
+      )}
 
       {variant !== "desktop" && (
         <HistoryInventoryEffectPanel log={selected} />
@@ -289,7 +306,7 @@ export function HistoryDetailPanel({
 
       {variant === "desktop" ? (
         <>
-          {editsLoaded && edits.length > 0 && (
+          {!isDesktopCancellationOpen && editsLoaded && edits.length > 0 && (
             <Collapsible
               icon={<History className="h-3.5 w-3.5" />}
               title="수정 이력"
@@ -301,7 +318,7 @@ export function HistoryDetailPanel({
           {allowCancellation && (
             <HistoryCancelAction
               {...cancelActionProps}
-              pinToDesktopFooter
+              pinToDesktopFooter={!isDesktopCancellationOpen}
             />
           )}
         </>

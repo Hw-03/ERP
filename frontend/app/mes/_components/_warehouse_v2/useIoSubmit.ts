@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   api,
   type IoBundle,
@@ -11,6 +11,19 @@ import { makeClientRequestId } from "@/lib/uuid";
 
 export function useIoSubmit() {
   const [submitting, setSubmitting] = useState(false);
+  const inFlightRef = useRef(false);
+
+  async function run<T>(work: () => Promise<T>): Promise<T | undefined> {
+    if (inFlightRef.current) return undefined;
+    inFlightRef.current = true;
+    setSubmitting(true);
+    try {
+      return await work();
+    } finally {
+      inFlightRef.current = false;
+      setSubmitting(false);
+    }
+  }
 
   async function submit(payload: {
     employeeId: string;
@@ -22,27 +35,22 @@ export function useIoSubmit() {
     notes?: string | null;
     bundles: IoBundle[];
   }) {
-    setSubmitting(true);
-    try {
-      return await runPendingCommand(
-        `i:${payload.employeeId}`,
-        {
-          requester_employee_id: payload.employeeId,
-          work_type: payload.workType,
-          sub_type: payload.subType,
-          from_department: payload.fromDepartment || null,
-          to_department: payload.toDepartment || null,
-          reference_no: payload.referenceNo || null,
-          notes: payload.notes || null,
-          client_request_id: makeClientRequestId(),
-          bundles: payload.bundles,
-        } as IoDraftPayload,
-        (request) => api.submit(request),
-      );
-    } finally {
-      setSubmitting(false);
-    }
+    return runPendingCommand(
+      `i:${payload.employeeId}`,
+      {
+        requester_employee_id: payload.employeeId,
+        work_type: payload.workType,
+        sub_type: payload.subType,
+        from_department: payload.fromDepartment || null,
+        to_department: payload.toDepartment || null,
+        reference_no: payload.referenceNo || null,
+        notes: payload.notes || null,
+        client_request_id: makeClientRequestId(),
+        bundles: payload.bundles,
+      } as IoDraftPayload,
+      (request) => api.submit(request),
+    );
   }
 
-  return { submitting, submit };
+  return { submitting, run, submit };
 }

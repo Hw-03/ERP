@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 
 from app.services.command_idempotency import (
+    fingerprint_io_draft_submit,
     fingerprint_io_submit,
     fingerprint_stock_request_create,
 )
@@ -94,6 +95,29 @@ def test_io_fingerprint_includes_actor_route_and_inventory_semantics() -> None:
         reversed(reversed_lines["bundles"][0]["lines"])
     )
     assert fingerprint_io_submit(actor, reversed_lines) != baseline
+
+
+def test_io_draft_submit_fingerprint_scopes_actor_route_batch_and_contents() -> None:
+    actor = uuid.uuid4()
+    batch_id = uuid.uuid4()
+    payload = _io_payload()
+    baseline = fingerprint_io_draft_submit(actor, batch_id, payload)
+
+    assert fingerprint_io_draft_submit(actor, batch_id, payload) == baseline
+    assert fingerprint_io_draft_submit(uuid.uuid4(), batch_id, payload) != baseline
+    assert fingerprint_io_draft_submit(actor, uuid.uuid4(), payload) != baseline
+    assert (
+        fingerprint_io_draft_submit(
+            actor,
+            batch_id,
+            payload,
+            route="/api/io/submit",
+        )
+        != baseline
+    )
+
+    changed = {**payload, "notes": "changed after the original command"}
+    assert fingerprint_io_draft_submit(actor, batch_id, changed) != baseline
 
 
 def test_stock_request_fingerprint_preserves_order_and_excludes_transport_key() -> None:

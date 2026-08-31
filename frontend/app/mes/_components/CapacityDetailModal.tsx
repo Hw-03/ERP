@@ -159,7 +159,7 @@ export function CapacityDetailModal({
                 </div>
                 <button
                   onClick={onClose}
-                  className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:brightness-110"
+                  className="standard-hover ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors"
                   style={{
                     background: `color-mix(in srgb, ${LEGACY_COLORS.red} 15%, transparent)`,
                     color: LEGACY_COLORS.red,
@@ -696,7 +696,7 @@ function PfVariants({
                     <button
                       type="button"
                       onClick={() => onOpenBom(v)}
-                      className="hidden min-h-11 items-center rounded-[10px] border px-3 text-sm font-bold transition-[filter] hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)] sm:inline-flex"
+                      className="standard-hover hidden min-h-11 items-center rounded-[10px] border px-3 text-sm font-bold transition-[filter] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)] sm:inline-flex"
                       style={{
                         background: LEGACY_COLORS.s2,
                         borderColor: LEGACY_COLORS.border,
@@ -719,7 +719,7 @@ function PfVariants({
                   <button
                     type="button"
                     onClick={() => onOpenBom(v)}
-                    className="min-h-11 rounded-[10px] border px-3 text-sm font-bold transition-[filter] hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
+                    className="standard-hover min-h-11 rounded-[10px] border px-3 text-sm font-bold transition-[filter] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
                     style={{
                       background: LEGACY_COLORS.s2,
                       borderColor: LEGACY_COLORS.border,

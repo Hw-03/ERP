@@ -23,7 +23,9 @@ export function BomDetailModal({ itemId, open, onClose }: Props) {
   const [mounted, setMounted] = useState(false);
   const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(() => new Set());
   const { tree, retry } = useBomTree(itemId, open, "desc");
-  const branchItemIds = tree ? getBomBranchItemIds(tree) : [];
+  const currentTree = tree && tree.item_id === itemId ? tree : null;
+  const isTreeLoading = tree === null || (tree !== false && currentTree === null);
+  const branchItemIds = currentTree ? getBomBranchItemIds(currentTree) : [];
   const hasExpandedItems = branchItemIds.some((branchItemId) => expandedItemIds.has(branchItemId));
   const hasCollapsedItems = branchItemIds.some((branchItemId) => !expandedItemIds.has(branchItemId));
 
@@ -89,7 +91,7 @@ export function BomDetailModal({ itemId, open, onClose }: Props) {
               읽기 전용 · 구성품별 현재 재고
             </p>
           </div>
-          {tree && <div className="flex min-w-0 flex-1 items-center gap-3 border-l pl-4" style={{ borderColor: LEGACY_COLORS.border }}>
+          {currentTree && <div className="flex min-w-0 flex-1 items-center gap-3 border-l pl-4" style={{ borderColor: LEGACY_COLORS.border }}>
             <span
               className="flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-xs font-black"
               style={{ color: LEGACY_COLORS.blue, background: tint(LEGACY_COLORS.blue, 12) }}
@@ -98,13 +100,33 @@ export function BomDetailModal({ itemId, open, onClose }: Props) {
               BOM
             </span>
             <div className="min-w-0">
-              <p className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{tree.item_name}</p>
-              <p className="font-mono text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{tree.mes_code}</p>
+              <p className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{currentTree.item_name}</p>
+              <p className="font-mono text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{currentTree.mes_code}</p>
             </div>
+            <span
+              data-testid="bom-current-stock-badge"
+              className="ml-auto shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold tabular-nums"
+              style={{ color: currentTree.current_stock === 0 ? LEGACY_COLORS.red : LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
+            >
+              현재 재고 {formatQty(currentTree.current_stock)} {currentTree.unit}
+            </span>
           </div>}
           <div className="ml-auto flex shrink-0 items-center gap-2">
-            {tree && <span className="whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold tabular-nums" style={{ color: tree.current_stock === 0 ? LEGACY_COLORS.red : LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}>
-              현재 재고 {formatQty(tree.current_stock)} {tree.unit}
+            {currentTree && <span
+              data-testid="bom-additional-producible-badge"
+              className="whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold tabular-nums"
+              style={{
+                color: currentTree.additional_producible_quantity && currentTree.additional_producible_quantity > 0
+                  ? LEGACY_COLORS.purple
+                  : LEGACY_COLORS.muted2,
+                background: currentTree.additional_producible_quantity && currentTree.additional_producible_quantity > 0
+                  ? tint(LEGACY_COLORS.purple, 12)
+                  : LEGACY_COLORS.s2,
+              }}
+            >
+              {typeof currentTree.additional_producible_quantity === "number"
+                ? `추가 생산 가능 ${formatQty(currentTree.additional_producible_quantity)} ${currentTree.unit}`
+                : "추가 생산 가능 계산 불가"}
             </span>}
             <button
               type="button"
@@ -132,7 +154,7 @@ export function BomDetailModal({ itemId, open, onClose }: Props) {
           </div>
         </div>
         <div className="flex min-h-0 flex-1 flex-col px-6 py-4">
-          {tree === null && <div
+          {isTreeLoading && <div
             className="flex flex-1 items-center justify-center rounded-[18px] border px-4 py-8 text-center text-sm"
             style={{ color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
           >
@@ -154,14 +176,14 @@ export function BomDetailModal({ itemId, open, onClose }: Props) {
               다시 시도
             </button>
           </div>}
-          {tree && (tree.children.length === 0 ? (
+          {currentTree && (currentTree.children.length === 0 ? (
             <div
               className="flex flex-1 items-center justify-center rounded-[18px] border px-4 py-8 text-center text-sm"
               style={{ color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
             >
               하위 품목이 없습니다.
             </div>
-          ) : <ModalBomTree tree={tree} expandedItemIds={expandedItemIds} onToggleItem={toggleItem} />)}
+          ) : <ModalBomTree tree={currentTree} expandedItemIds={expandedItemIds} onToggleItem={toggleItem} />)}
         </div>
       </div>
     </div>,

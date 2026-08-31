@@ -444,6 +444,28 @@ def _max_buildable(
     return lo, shortage_node(lo + 1)
 
 
+def compute_additional_producible_quantity(
+    root_id: uuid.UUID,
+    *,
+    bom_cache: BomCache,
+    fig_by_id: FigById,
+) -> int | None:
+    """루트 보유분을 제외하고 BOM으로 추가 생산할 수 있는 정수 수량을 계산한다.
+
+    계산용 BOM에 유효한 직계 제약이 없으면 ``None``을 반환한다. 공유 자재와
+    중간재 재고의 네팅은 `_max_buildable`의 검증된 전체 BOM 로직을 그대로 쓴다.
+    """
+    if not bom_cache.get(root_id):
+        return None
+
+    total_buildable, _bottleneck = _max_buildable(
+        root_id,
+        bom_cache=bom_cache,
+        fig_by_id=fig_by_id,
+    )
+    return max(total_buildable - _own_available(root_id, fig_by_id), 0)
+
+
 def _fast_packaging_requirements(
     root_id: uuid.UUID,
     *,

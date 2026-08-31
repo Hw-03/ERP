@@ -41,7 +41,7 @@ export function DesktopWorkHubCard({
       data-shipping-hub-card={shippingHubCardId}
       aria-pressed={active}
       onClick={onClick}
-      className={`desktop-work-hub-card no-btn-inset flex h-full min-h-0 min-w-0 flex-col items-start justify-between gap-6 rounded-[22px] border p-7 text-left transition-all active:scale-[0.99] xl:p-8 ${className ?? ""}`}
+      className={`desktop-work-hub-card standard-hover no-btn-inset flex h-full min-h-0 min-w-0 flex-col items-start justify-between gap-6 rounded-[22px] border p-7 text-left transition-all active:scale-[0.99] xl:p-8 ${className ?? ""}`}
       style={{
         background: active ? tint(tone, 14) : LEGACY_COLORS.s2,
         borderColor: active ? tone : LEGACY_COLORS.border,

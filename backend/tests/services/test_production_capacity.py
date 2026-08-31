@@ -35,6 +35,59 @@ def _item_label(item: Item) -> str:
     return f"{item.item_name} ({item.mes_code})"
 
 
+def test_additional_producible_quantity_uses_available_stock_and_excludes_root_stock():
+    """예약을 뺀 자재 가용분만 쓰며, 기존 루트 재고는 추가분에서 제외한다."""
+    from app.services.production_capacity import compute_additional_producible_quantity
+    from app.services.stock_math import StockFigures
+
+    root = __import__("uuid").uuid4()
+    component = __import__("uuid").uuid4()
+    result = compute_additional_producible_quantity(
+        root,
+        bom_cache={root: [(component, Decimal("2"))]},
+        fig_by_id={
+            root: StockFigures(warehouse_qty=Decimal("5")),
+            component: StockFigures(warehouse_qty=Decimal("10"), pending=Decimal("4")),
+        },
+    )
+
+    assert result == 3
+
+
+def test_additional_producible_quantity_nets_shared_components_once():
+    """형제 중간재가 공유하는 자재는 합산 수요로 한 번만 배분한다."""
+    from app.services.production_capacity import compute_additional_producible_quantity
+    from app.services.stock_math import StockFigures
+
+    root, left, right, shared = (__import__("uuid").uuid4() for _ in range(4))
+    result = compute_additional_producible_quantity(
+        root,
+        bom_cache={
+            root: [(left, Decimal("1")), (right, Decimal("1"))],
+            left: [(shared, Decimal("1"))],
+            right: [(shared, Decimal("1"))],
+        },
+        fig_by_id={shared: StockFigures(warehouse_qty=Decimal("10"))},
+    )
+
+    assert result == 5
+
+
+def test_additional_producible_quantity_returns_none_without_calculable_bom_and_zero_when_short():
+    """계산 제약이 없으면 미계산, 유효 BOM의 실제 부족은 0이다."""
+    from app.services.production_capacity import compute_additional_producible_quantity
+    from app.services.stock_math import StockFigures
+
+    root, component = (__import__("uuid").uuid4() for _ in range(2))
+
+    assert compute_additional_producible_quantity(root, bom_cache={}, fig_by_id={}) is None
+    assert compute_additional_producible_quantity(
+        root,
+        bom_cache={root: [(component, Decimal("1"))]},
+        fig_by_id={component: StockFigures()},
+    ) == 0
+
+
 def test_auto_representatives_choose_largest_sum_then_stable_tie_breaker():
     """모델별 자동 기준은 세 수량 합계와 확정된 동점 규칙으로 하나만 고른다."""
     from app.services import production_capacity

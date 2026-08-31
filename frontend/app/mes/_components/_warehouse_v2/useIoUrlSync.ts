@@ -78,9 +78,7 @@ export function useIoUrlSync(args: UseIoUrlSyncArgs): UseIoUrlSyncApi {
     const forceInitialStepPush = forceInitialStepPushRef.current;
     if (!forceInitialStepPush && urlStep === step) return;
     const next = new URLSearchParams(
-      forceInitialStepPush && typeof window !== "undefined"
-        ? window.location.search
-        : searchParams.toString(),
+      typeof window !== "undefined" ? window.location.search : searchParams.toString(),
     );
     next.set("step", String(step));
     // lagged searchParams 로 인한 stale tab 보존을 차단 — 위저드가 속한 탭으로 고정.
@@ -112,6 +110,14 @@ export function useIoUrlSync(args: UseIoUrlSyncArgs): UseIoUrlSyncApi {
     // URL 으로 들어온 변경은 pending 을 취소 (사용자가 뒤로/앞으로 누른 경우 자동 advance 중단).
     pendingFinalStepRef.current = null;
     skipNextPushRef.current = true;
+    if (target !== urlStep) {
+      const next = new URLSearchParams(
+        typeof window !== "undefined" ? window.location.search : searchParams.toString(),
+      );
+      next.set("step", String(target));
+      if (tabParam) next.set("tab", tabParam);
+      router.push(`${pathname}?${next.toString()}`, { scroll: false });
+    }
     goTo(target);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlStep]);

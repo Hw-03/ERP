@@ -11,6 +11,7 @@ import {
   establishAuthRequiredBoundary,
 } from "@/lib/api-core";
 import { warehouseMapApi } from "@/lib/api/warehouse-map";
+import { formatKstDate } from "@/lib/mes/date";
 import { queryKeys } from "@/lib/queries/keys";
 import { OperatorLoginCard } from "./OperatorLoginCard";
 import {
@@ -44,10 +45,6 @@ const CENTER_TRANSFORM = "scale(1) translateY(0)";
 // 항목 5-2 — 모바일만 인트로를 작게 시작(작게→크게 반전). 데스크톱은 CENTER_TRANSFORM(scale 1) 유지.
 const MOBILE_CENTER_TRANSFORM = "scale(0.33) translateY(0)";
 const MS_PER_DAY = 86400000;
-
-function toDateStr(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
 
 function getWeekStartMonday(d: Date): Date {
   const date = new Date(d);
@@ -89,8 +86,8 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
       setLogoutPending(false);
       restoreCurrentOperator(operatorFromEmployee(session.employee), session.boot_id);
       const weekMon = getWeekStartMonday(new Date());
-      const weekStart = toDateStr(weekMon);
-      const weekEnd = toDateStr(new Date(weekMon.getTime() + 6 * MS_PER_DAY));
+      const weekStart = formatKstDate(weekMon);
+      const weekEnd = formatKstDate(new Date(weekMon.getTime() + 6 * MS_PER_DAY));
       void queryClientRef.current.prefetchQuery({
         queryKey: queryKeys.weekly.report(weekStart, weekEnd),
         queryFn: () => api.getWeeklyReport({ week_start: weekStart, week_end: weekEnd }),

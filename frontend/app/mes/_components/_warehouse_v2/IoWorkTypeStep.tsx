@@ -177,7 +177,7 @@ export function IoSubTypeStep({
                 type="button"
                 onClick={() => onSubTypeChange(row.id)}
                 title={row.description}
-                className="flex h-full min-h-[120px] items-center justify-center rounded-[20px] border px-6 py-6 text-center transition-all hover:brightness-110"
+                className="standard-hover flex h-full min-h-[120px] items-center justify-center rounded-[20px] border px-6 py-6 text-center transition-all"
                 style={{
                   background: active ? tint(LEGACY_COLORS.blue, 14) : LEGACY_COLORS.s2,
                   borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
@@ -277,7 +277,7 @@ function DeptGrid({
               aria-label={d}
               aria-pressed={active}
               onClick={() => onChange(d)}
-              className={`border font-black transition-all hover:brightness-110 ${
+              className={`standard-hover border font-black transition-all ${
                 fill
                   ? "h-full min-h-[96px] rounded-[18px] px-2 py-6 text-3xl"
                   : "min-h-[60px] rounded-[16px] px-2 py-4 text-base"
@@ -314,7 +314,7 @@ function DirectionCard({
     <button
       type="button"
       onClick={onClick}
-      className="flex h-full min-h-[96px] items-center justify-center gap-5 rounded-[18px] border p-6 text-left transition-all hover:brightness-110"
+      className="standard-hover flex h-full min-h-[96px] items-center justify-center gap-5 rounded-[18px] border p-6 text-left transition-all"
       style={{
         background: active ? tint(activeColor, 14) : LEGACY_COLORS.s2,
         borderColor: active ? activeColor : LEGACY_COLORS.border,

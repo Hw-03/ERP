@@ -11,7 +11,8 @@ import type { Operator } from "./login/useCurrentOperator";
 import { DefectKpiCards, type DefectKpiKind } from "./_defect_hub/DefectKpiCards";
 import { DefectHubEntry } from "./_defect_hub/DefectHubEntry";
 import type { DefectHubCardId } from "./_defect_hub/defectHubCards";
-import { DefectFilterBar, type DefectActorScope, type DefectScope, type DefectSort } from "./_defect_hub/DefectFilterBar";
+import { DefectFilterBar, type DefectScope } from "./_defect_hub/DefectFilterBar";
+import { useDefectFilterPreferences } from "./_defect_hub/useDefectFilterPreferences";
 import { DefectDepartmentList } from "./_defect_hub/DefectDepartmentList";
 import { DefectCartFlow, type DefectCartMode } from "./_defect_hub/DefectCartFlow";
 import { DefectProcessPanel } from "./_defect_hub/DefectProcessPanel";
@@ -90,16 +91,28 @@ function DefectViewInner({
   const hasLoadedRef = useRef(false);
   const requestGenerationRef = useRef(0);
 
-  const initialScope = (): DefectScope => {
-    if (defectDeptFilter) return "my";
-    // 창고 담당자는 "창고" 부서 그룹을 보기 위해 전체 기본
-    if (isWarehouseStaff(operator)) return "all";
-    return PRODUCTION_LINES.has(operator.department) ? "my" : "all";
-  };
-
-  const [scope, setScope] = useState<DefectScope>(initialScope);
-  const [actorScope, setActorScope] = useState<DefectActorScope>("all");
-  const [sort, setSort] = useState<DefectSort>("newest");
+  const defaultScope: DefectScope = defectDeptFilter
+    ? "my"
+    : isWarehouseStaff(operator)
+      ? "all"
+      : PRODUCTION_LINES.has(operator.department)
+        ? "my"
+        : "all";
+  const {
+    scope,
+    actorScope,
+    sort,
+    filterLocked,
+    setScope,
+    setActorScope,
+    setSort,
+    setFilterLocked,
+  } = useDefectFilterPreferences({
+    employeeId: operator.employee_id,
+    defaultScope,
+    defaultSort: "newest",
+    defectDeptFilter,
+  });
   const [kpiFilter, setKpiFilter] = useState<DefectKpiKind | null>(null);
   const [view, setView] = useState<ViewMode>({ kind: "hub" });
   const [reloadNonce, setReloadNonce] = useState(0);
@@ -326,7 +339,7 @@ function DefectViewInner({
               <button
                 type="button"
                 onClick={() => window.history.back()}
-                className="flex items-center gap-1 rounded-[10px] border px-3 py-1.5 text-sm font-bold transition-colors hover:brightness-110"
+                className="standard-hover flex items-center gap-1 rounded-[10px] border px-3 py-1.5 text-sm font-bold transition-colors"
                 style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -348,6 +361,7 @@ function DefectViewInner({
               scope={scope}
               actorScope={actorScope}
               sort={sort}
+              filterLocked={filterLocked}
               onScopeChange={(next) => {
                 setScope(next);
                 setKpiFilter(null);
@@ -357,6 +371,7 @@ function DefectViewInner({
                 setKpiFilter(null);
               }}
               onSortChange={setSort}
+              onFilterLockedChange={setFilterLocked}
               currentDept={operator.department}
             />
 

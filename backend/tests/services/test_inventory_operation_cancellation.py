@@ -65,6 +65,7 @@ def _receive_operation(db_session, item, actor: Employee, quantity: int) -> Inve
         actor_name=actor.name,
         actor_employee_id=actor.employee_id,
         department="창고",
+        effective_at=datetime(2026, 8, 25, 3, 0),
     )
     assert operation is not None
     before = inv_effect._snapshot_cells(db_session, item.item_id)
@@ -514,6 +515,8 @@ def test_cancel_quarantine_reverses_physical_stock_and_defect_ledger(
         .filter(InventoryOperation.kind == InventoryOperationKindEnum.BUSINESS)
         .one()
     )
+    original.effective_at = datetime(2026, 8, 25, 3, 0)
+    db_session.commit()
     preview = cancellation_svc.preview_cancellation(
         db_session,
         original.operation_id,
@@ -606,6 +609,8 @@ def test_cancel_handover_closes_workflow_instead_of_restoring_waiting_state(
         .filter(InventoryOperation.domain == "handover")
         .one()
     )
+    original.effective_at = datetime(2026, 8, 25, 3, 0)
+    db_session.commit()
     preview = cancellation_svc.preview_cancellation(
         db_session,
         original.operation_id,

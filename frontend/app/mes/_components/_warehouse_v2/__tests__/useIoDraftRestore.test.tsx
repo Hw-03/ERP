@@ -373,9 +373,16 @@ describe("useIoDraftRestore", () => {
     await waitFor(() => expect(screen.getByTestId("restored-shortage")).toHaveTextContent("2"));
   });
 
-  it("restores single adjust drafts to the inline item form step", async () => {
+  it("restores single adjust drafts to the quantity adjustment step", async () => {
     const goTo = vi.fn();
     render(<Harness subType="adjust_out" goTo={goTo} />);
+
+    await waitFor(() => expect(goTo).toHaveBeenCalledWith(4));
+  });
+
+  it("respects an explicit URL restore step for a single adjust draft", async () => {
+    const goTo = vi.fn();
+    render(<Harness subType="adjust_out" goTo={goTo} restoreStep={3} />);
 
     await waitFor(() => expect(goTo).toHaveBeenCalledWith(3));
   });

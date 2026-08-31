@@ -427,7 +427,7 @@ function DefectRecordRow({
               type="button"
               onClick={() => onProcess(location)}
               disabled={availableQty <= 0}
-              className="ml-auto min-h-11 shrink-0 rounded-[10px] border px-4 text-sm font-black transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45"
+              className="standard-hover ml-auto min-h-11 shrink-0 rounded-[10px] border px-4 text-sm font-black transition-colors disabled:cursor-not-allowed disabled:opacity-45"
               style={{ background: tint(LEGACY_COLORS.red, 8), borderColor: tint(LEGACY_COLORS.red, 40), color: LEGACY_COLORS.red }}
             >
               처리
@@ -498,7 +498,7 @@ function SmallActionButton({ label, onClick, icon, disabled = false }: { label: 
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border px-3 text-xs font-black transition-colors hover:brightness-110 disabled:opacity-50"
+      className="standard-hover inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border px-3 text-xs font-black transition-colors disabled:opacity-50"
       style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2 }}
     >
       {icon}{label}

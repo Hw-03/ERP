@@ -21,6 +21,9 @@ RUNTIME_SCRIPTS = (
     "ensure-schema-ready.ps1",
     "runtime-paths.ps1",
     "runtime-control.ps1",
+    "runtime-task-control.ps1",
+    "runtime-task-host.vbs",
+    "register-runtime-tasks.ps1",
     "service_supervisor.py",
     "start-backend.ps1",
     "stop-backend.ps1",
@@ -127,6 +130,20 @@ def _fake_weekly_snapshot_registration_script() -> str:
     )
 
 
+def _fake_runtime_task_control_script() -> str:
+    return textwrap.dedent(
+        """
+        function Assert-RuntimeTasksConfigured {
+            param([string] $RepoRoot)
+            Add-Content -LiteralPath $env:SYNC_EVENT_LOG -Value "runtime-task-validate"
+            if ([int] $env:FAKE_RUNTIME_TASK_VALIDATION_EXIT -ne 0) {
+                throw "fake runtime task validation failure"
+            }
+        }
+        """
+    )
+
+
 def _prepare_sync_sandbox(tmp_path: Path, overrides: dict[str, str]) -> tuple[Path, dict[str, str], Path]:
     dev_root = tmp_path / "dev"
     emp_root = tmp_path / "employee"
@@ -169,6 +186,14 @@ def _prepare_sync_sandbox(tmp_path: Path, overrides: dict[str, str]) -> tuple[Pa
     for script_name in RUNTIME_SCRIPTS:
         _write(dev_root / "scripts" / "dev" / script_name, "# fake runtime script\n")
         _write(emp_root / "scripts" / "dev" / script_name, "# fake runtime script\n")
+    _write(
+        dev_root / "scripts" / "dev" / "runtime-task-control.ps1",
+        _fake_runtime_task_control_script(),
+    )
+    _write(
+        emp_root / "scripts" / "dev" / "runtime-task-control.ps1",
+        _fake_runtime_task_control_script(),
+    )
     _write(dev_root / "scripts" / "dev" / "checked-command.ps1", checked_command)
     _write(emp_root / "scripts" / "dev" / "checked-command.ps1", checked_command)
     for runtime_root in (dev_root, emp_root):
@@ -293,6 +318,7 @@ def _prepare_sync_sandbox(tmp_path: Path, overrides: dict[str, str]) -> tuple[Pa
             "FAKE_OPERATION_ACTIVATE_EXIT": "0",
             "FAKE_SNAPSHOT_PREFLIGHT_EXIT": "0",
             "FAKE_SNAPSHOT_REGISTER_EXIT": "0",
+            "FAKE_RUNTIME_TASK_VALIDATION_EXIT": "0",
         }
     )
     environment.update(overrides)
@@ -1029,6 +1055,7 @@ def test_employee_sync_stop_failure_restarts_services_without_backup_or_sync(tmp
     assert events == [
         "snapshot-preflight",
         "robocopy-dryrun",
+        "runtime-task-validate",
         "stop-backend",
         "stop-frontend",
         "start-backend",
@@ -1051,6 +1078,7 @@ def test_employee_sync_backup_failure_restarts_services_without_sync_or_migratio
     assert events == [
         "snapshot-preflight",
         "robocopy-dryrun",
+        "runtime-task-validate",
         "stop-backend",
         "stop-frontend",
         "backup",
@@ -1073,6 +1101,7 @@ def test_employee_sync_frontend_build_failure_restores_services_before_backend_s
     assert events == [
         "snapshot-preflight",
         "robocopy-dryrun",
+        "runtime-task-validate",
         "stop-backend",
         "stop-frontend",
         "backup",
@@ -1097,6 +1126,7 @@ def test_employee_sync_post_verify_failure_keeps_services_stopped_and_prints_rec
     assert events == [
         "snapshot-preflight",
         "robocopy-dryrun",
+        "runtime-task-validate",
         "stop-backend",
         "stop-frontend",
         "backup",
@@ -1125,6 +1155,7 @@ def test_employee_sync_success_uses_migrate_then_read_only_head_check(tmp_path: 
     assert events == [
         "snapshot-preflight",
         "robocopy-dryrun",
+        "runtime-task-validate",
         "stop-backend",
         "stop-frontend",
         "backup",
@@ -1157,6 +1188,23 @@ def test_employee_sync_snapshot_preflight_failure_stops_before_employee_mutation
     assert result.returncode == 10, result.stdout + result.stderr
     assert events == ["snapshot-preflight"]
     assert "stop-backend" not in events
+    assert "backup" not in events
+
+
+def test_employee_sync_runtime_task_validation_failure_stops_before_server_shutdown(
+    tmp_path: Path,
+) -> None:
+    sync_path, environment, event_log = _prepare_sync_sandbox(
+        tmp_path, {"FAKE_RUNTIME_TASK_VALIDATION_EXIT": "1"}
+    )
+
+    result = _run_sync(sync_path, environment)
+    events = _event_kinds(event_log)
+
+    assert result.returncode == 11, result.stdout + result.stderr
+    assert events == ["snapshot-preflight", "robocopy-dryrun", "runtime-task-validate"]
+    assert "stop-backend" not in events
+    assert "stop-frontend" not in events
     assert "backup" not in events
 
 

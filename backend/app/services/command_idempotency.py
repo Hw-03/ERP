@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 
 IO_SUBMIT_ROUTE = "/api/io/submit"
+IO_DRAFT_SUBMIT_ROUTE = "/api/io/draft/{batch_id}/submit"
 STOCK_REQUEST_CREATE_ROUTE = "/api/stock-requests"
 _ADVISORY_LOCK_NAMESPACE = "dexcowin-mes:command-idempotency:"
 
@@ -113,6 +114,34 @@ def fingerprint_io_submit(
             "actor_employee_id": actor_employee_id,
             "route": route,
             "command": "submit",
+            "payload": {
+                "work_type": data.get("work_type"),
+                "sub_type": data.get("sub_type"),
+                "from_department": data.get("from_department"),
+                "to_department": data.get("to_department"),
+                "reference_no": data.get("reference_no"),
+                "notes": data.get("notes"),
+                "bundles": [_io_bundle(bundle) for bundle in data.get("bundles", ())],
+            },
+        }
+    )
+
+
+def fingerprint_io_draft_submit(
+    actor_employee_id: uuid.UUID,
+    batch_id: uuid.UUID,
+    payload: BaseModel | Mapping[str, Any],
+    *,
+    route: str = IO_DRAFT_SUBMIT_ROUTE,
+) -> str:
+    """기존 draft 제출을 actor·route·batch·저장 내용에 묶는다."""
+    data = _plain(payload)
+    return _sha256(
+        {
+            "actor_employee_id": actor_employee_id,
+            "route": route,
+            "command": "submit_existing_draft",
+            "batch_id": batch_id,
             "payload": {
                 "work_type": data.get("work_type"),
                 "sub_type": data.get("sub_type"),

@@ -5,6 +5,7 @@ $ErrorActionPreference = "Continue"
 $Profile = & (Join-Path $PSScriptRoot "resolve-server-profile.ps1")
 . (Join-Path $PSScriptRoot "runtime-paths.ps1")
 . (Join-Path $PSScriptRoot "runtime-control.ps1")
+. (Join-Path $PSScriptRoot "runtime-task-control.ps1")
 $BackendLogDir = Get-MesRuntimePath -RepoRoot $Profile.RepoRoot -RelativePath "logs\backend"
 $FrontendLogDir = Get-MesRuntimePath -RepoRoot $Profile.RepoRoot -RelativePath "logs\frontend"
 $SchemaReadinessScript = Join-Path $PSScriptRoot "ensure-schema-ready.ps1"
@@ -30,6 +31,7 @@ function Show-ServiceStatus {
         [string] $HealthUrl
     )
 
+    $task = Get-RuntimeTaskRegistration -RepoRoot $Profile.RepoRoot -Service $Service
     $state = Get-RuntimeState -Path $StatePath
     $supervisorPid = if ($state -and $state.supervisorPid) { [int] $state.supervisorPid } else { $null }
     $supervisorAlive = $false
@@ -101,6 +103,9 @@ function Show-ServiceStatus {
     }
 
     Write-Host "[$Service]"
+    Write-Host "  task        : $($task.Status) ($($task.State))"
+    Write-Host "  task name   : $($task.TaskName)"
+    if (-not $task.Valid) { Write-Host "  task error  : $($task.Errors -join '; ')" }
     Write-Host "  status      : $displayStatus"
     Write-Host "  supervisor  : $supervisorPid (alive=$supervisorAlive)"
     Write-Host "  child       : $childPid (alive=$childAlive)"

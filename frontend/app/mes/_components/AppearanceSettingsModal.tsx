@@ -291,7 +291,7 @@ export function DesktopSettingsView({
                       type="button"
                       disabled={pinSubmitDisabled}
                       onClick={() => void handlePinChange()}
-                      className="min-h-11 rounded-xl px-4 text-[14px] font-black text-white transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 sm:col-span-3"
+                      className="standard-hover min-h-11 rounded-xl px-4 text-[14px] font-black text-white transition-all disabled:cursor-not-allowed disabled:opacity-40 sm:col-span-3"
                       style={{ background: LEGACY_COLORS.blueSolid }}
                     >
                       {pinSaving ? "PIN 변경 중…" : "PIN 변경 저장"}
@@ -423,7 +423,7 @@ export function DesktopSettingsView({
             type="button"
             disabled={busy}
             onClick={handleSave}
-            className="rounded-xl px-5 py-3 text-sm font-black transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+            className="standard-hover rounded-xl px-5 py-3 text-sm font-black transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             style={{ color: LEGACY_COLORS.white, background: LEGACY_COLORS.blueSolid }}
           >
             {saving ? "저장 중…" : "저장"}

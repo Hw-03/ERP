@@ -144,8 +144,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1 -Mode sm
 At the start of a new session:
 
 1. Read `_attic/ai/prompt_context.md` for the shared context order and current reference paths.
-2. Check the most recent relevant file in `_attic/handoff/` by the date in its filename. This remains the active location for task-specific handoffs.
+2. Check `_attic/handoff/active/` for the most recent relevant active handoff. `archive/` is historical and `deferred/` is read-only review material; never append new TODOs to either location.
 3. Treat `_attic/ai/AI_HANDOVER.md` as historical archive material, not current context.
+
+When work originates from an active TODO, update that document before committing: mark implemented headings complete with date and verification evidence, recalculate its dashboard counts, and verify the headings match the summary. Never leave an implemented active TODO open because the change is small or the session is ending.
 
 Repository files above are the canonical shared context. Tool-private memory may supplement them but must not replace or override them.
 

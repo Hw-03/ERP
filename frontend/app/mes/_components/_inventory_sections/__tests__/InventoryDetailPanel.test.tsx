@@ -6,6 +6,7 @@ import { formatQty } from "@/lib/mes/format";
 import { DesktopRightPanel } from "../../DesktopRightPanel";
 import { SlidePanel } from "../../common/SlidePanel";
 import { BomSubExpander } from "../../_warehouse_v2/BomSubExpander";
+import { BomDetailModal } from "../BomDetailModal";
 
 const realtimeState = vi.hoisted(() => ({
   revision: 1 as number | null,
@@ -533,6 +534,97 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     expect(dialog).toHaveTextContent(bomTree.mes_code);
   });
 
+  it("shows current and additional production badges before the modal actions", async () => {
+    vi.spyOn(api, "getBOMTree").mockResolvedValue({
+      ...bomTree,
+      item_name: "매우 긴 상위 품목명도 생산 가능 수량 배지와 작업 버튼 영역을 밀어내지 않아야 합니다",
+      additional_producible_quantity: 8,
+    });
+    render(<InventoryDetailPanel item={makeBomItem()} onGoToWarehouse={() => {}} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "하위 구성 보기" }));
+
+    const header = await screen.findByTestId("bom-modal-header");
+    const current = within(header).getByTestId("bom-current-stock-badge");
+    const additional = within(header).getByTestId("bom-additional-producible-badge");
+    const expand = within(header).getByRole("button", { name: "모두 펼치기" });
+    const collapse = within(header).getByRole("button", { name: "모두 접기" });
+    const close = within(header).getByRole("button", { name: "닫기" });
+
+    expect(current).toHaveTextContent("현재 재고 3 EA");
+    expect(additional).toHaveTextContent("추가 생산 가능 8 EA");
+    expect(within(header).getByText("매우 긴 상위 품목명도 생산 가능 수량 배지와 작업 버튼 영역을 밀어내지 않아야 합니다")).toHaveClass("truncate");
+    expect(current).toHaveClass("ml-auto", "shrink-0");
+    expect(current.compareDocumentPosition(additional) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(additional.compareDocumentPosition(expand) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(expand.compareDocumentPosition(collapse) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(collapse.compareDocumentPosition(close) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(current).toHaveClass("ml-auto");
+    expect(additional).toHaveStyle({ color: LEGACY_COLORS.purple });
+  });
+
+  it("shows muted zero and unavailable additional production states", async () => {
+    vi.spyOn(api, "getBOMTree")
+      .mockResolvedValueOnce({ ...bomTree, additional_producible_quantity: 0 })
+      .mockResolvedValueOnce(bomTree);
+    const { rerender } = render(<BomDetailModal itemId="item-1" open onClose={() => {}} />);
+
+    const zeroBadge = await screen.findByTestId("bom-additional-producible-badge");
+    expect(zeroBadge).toHaveTextContent("추가 생산 가능 0 EA");
+    expect(zeroBadge).toHaveStyle({ color: LEGACY_COLORS.muted2 });
+
+    realtimeState.revision = 2;
+    rerender(<BomDetailModal itemId="item-1" open onClose={() => {}} />);
+    const unavailableBadge = await screen.findByTestId("bom-additional-producible-badge");
+    expect(unavailableBadge).toHaveTextContent("추가 생산 가능 계산 불가");
+    expect(unavailableBadge).toHaveStyle({ color: LEGACY_COLORS.muted2 });
+    expect(screen.queryByText("추가 생산 가능 0 EA")).not.toBeInTheDocument();
+  });
+
+  it("hides previous header badge values immediately while a new item tree loads", async () => {
+    const nextTree = deferred<BOMTreeNode>();
+    vi.spyOn(api, "getBOMTree")
+      .mockResolvedValueOnce({ ...bomTree, additional_producible_quantity: 8 })
+      .mockReturnValueOnce(nextTree.promise);
+    const { rerender } = render(<BomDetailModal itemId="item-1" open onClose={() => {}} />);
+
+    expect(await screen.findByText("현재 재고 3 EA")).toBeInTheDocument();
+    expect(screen.getByText("추가 생산 가능 8 EA")).toBeInTheDocument();
+
+    rerender(<BomDetailModal itemId="item-2" open onClose={() => {}} />);
+
+    expect(screen.queryByText("현재 재고 3 EA")).not.toBeInTheDocument();
+    expect(screen.queryByText("추가 생산 가능 8 EA")).not.toBeInTheDocument();
+
+    await act(async () => {
+      nextTree.resolve({
+        ...bomTree,
+        item_id: "item-1",
+      });
+      await nextTree.promise;
+    });
+    expect(screen.queryByText("현재 재고 3 EA")).not.toBeInTheDocument();
+    expect(screen.queryByText("추가 생산 가능 8 EA")).not.toBeInTheDocument();
+  });
+
+  it("replaces current stock and additional production together on a realtime refresh", async () => {
+    vi.spyOn(api, "getBOMTree")
+      .mockResolvedValueOnce({ ...bomTree, current_stock: 3, additional_producible_quantity: 1 })
+      .mockResolvedValueOnce({ ...bomTree, current_stock: 9, additional_producible_quantity: 6 });
+    const { rerender } = render(<BomDetailModal itemId="item-1" open onClose={() => {}} />);
+
+    expect(await screen.findByText("현재 재고 3 EA")).toBeInTheDocument();
+    expect(screen.getByText("추가 생산 가능 1 EA")).toBeInTheDocument();
+
+    realtimeState.revision = 2;
+    rerender(<BomDetailModal itemId="item-1" open onClose={() => {}} />);
+
+    expect(await screen.findByText("현재 재고 9 EA")).toBeInTheDocument();
+    expect(screen.getByText("추가 생산 가능 6 EA")).toBeInTheDocument();
+    expect(screen.queryByText("현재 재고 3 EA")).not.toBeInTheDocument();
+    expect(screen.queryByText("추가 생산 가능 1 EA")).not.toBeInTheDocument();
+  });
+
   it("retries the same BOM request after a load error", async () => {
     vi.spyOn(api, "getBOMTree")
       .mockRejectedValueOnce(new Error("network failure"))
@@ -545,6 +637,27 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
 
     await waitFor(() => expect(api.getBOMTree).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.getByRole("dialog")).toHaveTextContent(bomTree.item_name));
+  });
+
+  it("keeps modal actions right-aligned while the BOM tree is loading or failed", async () => {
+    const request = deferred<BOMTreeNode>();
+    vi.spyOn(api, "getBOMTree").mockReturnValueOnce(request.promise);
+    render(<BomDetailModal itemId="item-1" open onClose={() => {}} />);
+
+    await screen.findByText("불러오는 중…");
+    const close = screen.getByRole("button", { name: "닫기" });
+    expect(close.parentElement).toHaveClass("ml-auto");
+
+    await act(async () => {
+      request.reject(new Error("network failure"));
+      try {
+        await request.promise;
+      } catch {
+        // useBomTree가 오류 UI로 전환하는 정상 흐름.
+      }
+    });
+    await screen.findByRole("button", { name: "다시 시도" });
+    expect(close.parentElement).toHaveClass("ml-auto");
   });
 
   it("closes the BOM modal with Escape, its X button, or the backdrop and returns focus to its trigger", async () => {

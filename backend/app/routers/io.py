@@ -58,6 +58,11 @@ def _idempotency_conflict(reason: str) -> Exception:
     )
 
 
+def _mark_idempotent_replay(request: Request) -> None:
+    """동일 업무 명령 재생은 새 사용자 감사 행을 만들지 않는다."""
+    request.state.activity_audit_skip = True
+
+
 def _resolve_io_idempotency(
     db: Session,
     *,
@@ -322,6 +327,7 @@ def submit_io(
             actor=actor,
         )
         if replay is not None:
+            _mark_idempotent_replay(http_request)
             return replay
         lock_idempotency_key(db, client_request_id)
         replay = _resolve_io_idempotency(
@@ -331,6 +337,7 @@ def submit_io(
             actor=actor,
         )
         if replay is not None:
+            _mark_idempotent_replay(http_request)
             return replay
     try:
         submit_kwargs = (
@@ -372,6 +379,7 @@ def submit_io(
                 actor=actor,
             )
             if replay is not None:
+                _mark_idempotent_replay(http_request)
                 return replay
             raise http_error(
                 409,
@@ -405,10 +413,16 @@ def submit_io_draft(
             batch_id=batch_id,
             requester=actor,
         )
+    except IdempotencyConflict as exc:
+        raise _idempotency_conflict(exc.reason)
     except PermissionError as exc:
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
     except ValueError as exc:
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
+    is_replay = bool(result.pop("_idempotent_replay", False))
+    if is_replay:
+        _mark_idempotent_replay(http_request)
+        return result
     _batch = result.get("batch") or {}
     http_request.state.activity_audit_related_id = str(_batch.get("batch_id") or "")[:120] or None
     http_request.state.activity_audit_target_summary = (

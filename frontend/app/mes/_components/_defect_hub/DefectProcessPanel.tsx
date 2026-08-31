@@ -171,7 +171,7 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
             type="button"
             onClick={() => setStep(1)}
             disabled={busy}
-            className="flex items-center gap-2 rounded-[12px] border px-4 py-2 text-sm font-bold transition-colors hover:brightness-110 disabled:opacity-50"
+            className="standard-hover flex items-center gap-2 rounded-[12px] border px-4 py-2 text-sm font-bold transition-colors disabled:opacity-50"
             style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
           >
             <ArrowLeft className="h-4 w-4" />
@@ -298,7 +298,7 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
           type="button"
           onClick={onCancel}
           disabled={busy}
-          className="flex items-center gap-2 rounded-[12px] border px-4 py-2 text-sm font-bold transition-colors hover:brightness-110 disabled:opacity-50"
+          className="standard-hover flex items-center gap-2 rounded-[12px] border px-4 py-2 text-sm font-bold transition-colors disabled:opacity-50"
           style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
         >
           <ArrowLeft className="h-4 w-4" />

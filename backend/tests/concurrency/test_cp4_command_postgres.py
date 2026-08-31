@@ -8,7 +8,7 @@ from datetime import datetime
 from decimal import Decimal
 import os
 from queue import Queue
-from threading import Barrier, local
+from threading import Barrier, Event, local
 from time import monotonic, sleep
 import uuid
 
@@ -31,6 +31,8 @@ from app.models import (
     InventoryOperation,
     InventoryOperationEffect,
     IoBatch,
+    IoBundle,
+    IoLine,
     Item,
     LocationStatusEnum,
     StockRequest,
@@ -43,11 +45,13 @@ from app.models import (
 from app.routers import io as io_router
 from app.routers import items as items_router
 from app.routers import stock_requests as stock_request_router
-from app.schemas import IoSubmitRequest, StockRequestCreate
+from app.schemas import IoDraftUpsert, IoSubmitRequest, StockRequestCreate
 from app.services import handover as handover_svc
 from app.services import inv_base, inv_effect
 from app.services import inventory_operation_cancellation as cancellation_svc
 from app.services import inventory_operations as operation_svc
+from app.services import io_dispatch as io_dispatch_svc
+from app.services import io_draft as io_draft_svc
 from app.services import stock_requests as stock_request_svc
 from app.services.pin_auth import DEFAULT_PIN_HASH
 
@@ -74,6 +78,13 @@ class _CommandCase:
     actor_id: uuid.UUID
     item_id: uuid.UUID
     client_request_id: str
+
+
+@dataclass(frozen=True)
+class _DraftCommandCase:
+    batch_id: uuid.UUID
+    actor_id: uuid.UUID
+    item_id: uuid.UUID
 
 
 @pytest.fixture(autouse=True)
@@ -250,6 +261,80 @@ def _seed_command(
         )
 
 
+def _seed_existing_draft(
+    make_session: sessionmaker[Session],
+) -> _DraftCommandCase:
+    suffix = uuid.uuid4().hex[:10]
+    with make_session() as db:
+        _ensure_cutover(db)
+        actor = _employee(
+            f"IOD-{suffix}",
+            department=DepartmentEnum.WAREHOUSE,
+            warehouse_role="primary",
+        )
+        item = Item(
+            item_name=f"PostgreSQL existing draft {suffix}",
+            process_type_code="TR",
+            unit="EA",
+            model_symbol=f"ID{suffix}",
+            serial_no=1,
+        )
+        db.add_all((actor, item))
+        db.flush()
+        db.add(
+            Inventory(
+                item_id=item.item_id,
+                quantity=Decimal("0"),
+                warehouse_qty=Decimal("0"),
+                pending_quantity=Decimal("0"),
+            )
+        )
+        batch = IoBatch(
+            work_type="receive",
+            sub_type="receive_supplier",
+            status="draft",
+            requester_employee_id=actor.employee_id,
+            requester_name=actor.name,
+            requester_department=actor.department,
+            requires_approval=False,
+            notes="PostgreSQL existing draft replay",
+        )
+        db.add(batch)
+        db.flush()
+        bundle = IoBundle(
+            batch_id=batch.batch_id,
+            source_kind="direct_item",
+            source_item_id=item.item_id,
+            title_snapshot=item.item_name,
+            quantity=Decimal("2"),
+            expanded_level=1,
+        )
+        db.add(bundle)
+        db.flush()
+        db.add(
+            IoLine(
+                bundle_id=bundle.bundle_id,
+                item_id=item.item_id,
+                item_name_snapshot=item.item_name,
+                mes_code_snapshot=item.mes_code,
+                unit=item.unit,
+                direction="in",
+                from_bucket="none",
+                to_bucket="warehouse",
+                quantity=Decimal("2"),
+                included=True,
+                selected=True,
+                origin="direct",
+            )
+        )
+        db.commit()
+        return _DraftCommandCase(
+            batch_id=batch.batch_id,
+            actor_id=actor.employee_id,
+            item_id=item.item_id,
+        )
+
+
 def _hold_row(
     connection: Connection,
     *,
@@ -317,6 +402,34 @@ def _assert_workers_wait_for_holder(
     )
 
 
+def _assert_worker_waits_for_holder(
+    engine: Engine,
+    *,
+    worker_pid: int,
+    holder_pid: int,
+) -> None:
+    deadline = monotonic() + 10
+    last_row: tuple[int, str | None, list[int]] | None = None
+    while monotonic() < deadline:
+        with engine.connect() as connection:
+            row = connection.execute(
+                text(
+                    "SELECT pid, wait_event_type, pg_blocking_pids(pid) AS blockers "
+                    "FROM pg_stat_activity WHERE pid = :worker_pid"
+                ),
+                {"worker_pid": worker_pid},
+            ).one_or_none()
+        if row is not None:
+            last_row = (row.pid, row.wait_event_type, list(row.blockers or []))
+            if row.wait_event_type == "Lock" and holder_pid in set(row.blockers or []):
+                return
+        sleep(0.05)
+    pytest.fail(
+        "PostgreSQL worker가 선점 transaction을 기다리지 않았습니다: "
+        f"holder={holder_pid}, worker={worker_pid}, activity={last_row}"
+    )
+
+
 def _location_quantity(
     db: Session,
     *,
@@ -363,6 +476,47 @@ def _io_payload(case: _CommandCase) -> IoSubmitRequest:
                             "from_bucket": "none",
                             "to_bucket": "warehouse",
                             "quantity": 2,
+                            "included": True,
+                            "selected": True,
+                            "origin": "direct",
+                        }
+                    ],
+                }
+            ],
+        }
+    )
+
+
+def _draft_update_payload(
+    case: _DraftCommandCase,
+    *,
+    quantity: int,
+) -> IoDraftUpsert:
+    return IoDraftUpsert.model_validate(
+        {
+            "requester_employee_id": str(case.actor_id),
+            "batch_id": str(case.batch_id),
+            "work_type": "receive",
+            "sub_type": "receive_supplier",
+            "notes": "PostgreSQL concurrent draft save",
+            "bundles": [
+                {
+                    "bundle_id": str(uuid.uuid5(case.batch_id, "save-bundle")),
+                    "source_kind": "direct_item",
+                    "title": "PostgreSQL concurrent draft save",
+                    "source_item_id": str(case.item_id),
+                    "quantity": quantity,
+                    "expanded_level": 1,
+                    "lines": [
+                        {
+                            "line_id": str(uuid.uuid5(case.batch_id, "save-line")),
+                            "item_id": str(case.item_id),
+                            "item_name": "PostgreSQL concurrent draft save",
+                            "unit": "EA",
+                            "direction": "in",
+                            "from_bucket": "none",
+                            "to_bucket": "warehouse",
+                            "quantity": quantity,
                             "included": True,
                             "selected": True,
                             "origin": "direct",
@@ -475,6 +629,293 @@ def test_postgres_io_same_key_collision_applies_once_and_replays(
                 InventoryOperation.operation_id == logs[0].operation_id
             ).count() == 1
     finally:
+        engine.dispose()
+
+
+def test_postgres_existing_draft_submit_race_and_lost_response_apply_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine, make_session = _session_factory()
+    case = _seed_existing_draft(make_session)
+    start_barrier = Barrier(2)
+    emitted_events: list[str] = []
+    monkeypatch.setattr(
+        io_router,
+        "_evt_emit",
+        lambda event, **_kwargs: emitted_events.append(event),
+    )
+
+    def submit() -> dict:
+        with make_session() as db:
+            actor = db.get(Employee, case.actor_id)
+            start_barrier.wait(timeout=10)
+            return io_router.submit_io_draft(
+                batch_id=case.batch_id,
+                http_request=_request(
+                    f"/api/io/draft/{case.batch_id}/submit"
+                ),
+                actor=actor,
+                requester_employee_id=case.actor_id,
+                db=db,
+            )
+
+    try:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            responses = [
+                future.result()
+                for future in (executor.submit(submit), executor.submit(submit))
+            ]
+        assert responses[0] == responses[1]
+
+        # 첫 응답이 유실된 뒤 동일 actor·route·batch로 다시 보낸 요청도 결과만 재생한다.
+        with make_session() as db:
+            actor = db.get(Employee, case.actor_id)
+            retried = io_router.submit_io_draft(
+                batch_id=case.batch_id,
+                http_request=_request(
+                    f"/api/io/draft/{case.batch_id}/submit"
+                ),
+                actor=actor,
+                requester_employee_id=case.actor_id,
+                db=db,
+            )
+        assert retried == responses[0]
+
+        with make_session() as verify:
+            batch = verify.get(IoBatch, case.batch_id)
+            logs = verify.query(TransactionLog).filter(
+                TransactionLog.item_id == case.item_id
+            ).all()
+            assert batch.status == "completed"
+            assert batch.request_fingerprint is not None
+            assert _inventory(verify, case.item_id).warehouse_qty == Decimal("2")
+            assert len(logs) == 1
+            assert logs[0].operation_id is not None
+            assert verify.query(InventoryOperation).filter(
+                InventoryOperation.operation_id == logs[0].operation_id
+            ).count() == 1
+            assert verify.query(InventoryOperationEffect).filter(
+                InventoryOperationEffect.operation_id == logs[0].operation_id
+            ).count() == 1
+            assert verify.query(StockRequest).filter(
+                StockRequest.operation_batch_id == case.batch_id
+            ).count() == 0
+        assert emitted_events == ["io_submit"]
+    finally:
+        engine.dispose()
+
+
+def _assert_save_submit_result(
+    make_session: sessionmaker[Session],
+    *,
+    case: _DraftCommandCase,
+    expected_quantity: Decimal,
+    expected_notes: str,
+    emitted_events: list[str],
+    expected_events: list[str],
+) -> None:
+    with make_session() as verify:
+        batch = verify.get(IoBatch, case.batch_id)
+        logs = verify.query(TransactionLog).filter(
+            TransactionLog.operation_batch_id == case.batch_id
+        ).all()
+        operations = verify.query(InventoryOperation).filter(
+            InventoryOperation.idempotency_key
+            == f"io:{case.batch_id}:immediate"
+        ).all()
+        assert batch.status == "completed"
+        assert batch.request_fingerprint is not None
+        assert batch.notes == expected_notes
+        assert _inventory(verify, case.item_id).warehouse_qty == expected_quantity
+        assert verify.query(IoBundle).filter(IoBundle.batch_id == case.batch_id).count() == 1
+        assert verify.query(IoLine).join(IoBundle).filter(
+            IoBundle.batch_id == case.batch_id
+        ).count() == 1
+        assert len(logs) == 1
+        assert len(operations) == 1
+        assert logs[0].operation_id == operations[0].operation_id
+        assert verify.query(InventoryOperationEffect).filter(
+            InventoryOperationEffect.operation_id == operations[0].operation_id
+        ).count() == 1
+        assert verify.query(StockRequest).filter(
+            StockRequest.operation_batch_id == case.batch_id
+        ).count() == 0
+    assert emitted_events == expected_events
+
+
+def test_postgres_existing_draft_save_then_submit_is_deadlock_free(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine, make_session = _session_factory()
+    case = _seed_existing_draft(make_session)
+    save_reached_item_lock = Event()
+    release_save = Event()
+    save_pid: Queue[int] = Queue()
+    submit_pid: Queue[int] = Queue()
+    emitted_events: list[str] = []
+    real_lock_payload_items = io_draft_svc._lock_active_payload_items
+
+    def pause_save_after_item_lock(db: Session, payload: object) -> None:
+        real_lock_payload_items(db, payload)
+        save_reached_item_lock.set()
+        assert release_save.wait(timeout=10)
+
+    monkeypatch.setattr(io_draft_svc, "_lock_active_payload_items", pause_save_after_item_lock)
+    monkeypatch.setattr(
+        io_router,
+        "_evt_emit",
+        lambda event, **_kwargs: emitted_events.append(event),
+    )
+
+    def save() -> tuple[str, object]:
+        with make_session() as db:
+            actor = db.get(Employee, case.actor_id)
+            save_pid.put(db.execute(text("SELECT pg_backend_pid()")).scalar_one())
+            try:
+                return (
+                    "ok",
+                    io_router.save_io_draft(
+                        payload=_draft_update_payload(case, quantity=3),
+                        http_request=_request("/api/io/draft"),
+                        actor=actor,
+                        db=db,
+                    ),
+                )
+            except HTTPException as exc:
+                return "http", exc.status_code
+
+    def submit() -> tuple[str, object]:
+        with make_session() as db:
+            actor = db.get(Employee, case.actor_id)
+            submit_pid.put(db.execute(text("SELECT pg_backend_pid()")).scalar_one())
+            return (
+                "ok",
+                io_router.submit_io_draft(
+                    batch_id=case.batch_id,
+                    http_request=_request(f"/api/io/draft/{case.batch_id}/submit"),
+                    actor=actor,
+                    requester_employee_id=case.actor_id,
+                    db=db,
+                ),
+            )
+
+    try:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            save_future = executor.submit(save)
+            assert save_reached_item_lock.wait(timeout=10)
+            holder_pid = save_pid.get(timeout=10)
+            submit_future = executor.submit(submit)
+            worker_pid = submit_pid.get(timeout=10)
+            try:
+                _assert_worker_waits_for_holder(
+                    engine,
+                    worker_pid=worker_pid,
+                    holder_pid=holder_pid,
+                )
+            finally:
+                release_save.set()
+            save_result = save_future.result(timeout=20)
+            submit_result = submit_future.result(timeout=20)
+        assert save_result[0] == "ok"
+        assert submit_result[0] == "ok"
+        _assert_save_submit_result(
+            make_session,
+            case=case,
+            expected_quantity=Decimal("3"),
+            expected_notes="PostgreSQL concurrent draft save",
+            emitted_events=emitted_events,
+            expected_events=["io_draft", "io_submit"],
+        )
+    finally:
+        release_save.set()
+        engine.dispose()
+
+
+def test_postgres_existing_draft_submit_then_save_is_deadlock_free(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine, make_session = _session_factory()
+    case = _seed_existing_draft(make_session)
+    submit_reached_item_lock = Event()
+    release_submit = Event()
+    save_pid: Queue[int] = Queue()
+    submit_pid: Queue[int] = Queue()
+    emitted_events: list[str] = []
+    real_lock_batch_items = io_dispatch_svc._lock_active_batch_items
+
+    def pause_submit_before_item_lock(db: Session, batch: IoBatch) -> None:
+        submit_reached_item_lock.set()
+        assert release_submit.wait(timeout=10)
+        real_lock_batch_items(db, batch)
+
+    monkeypatch.setattr(io_dispatch_svc, "_lock_active_batch_items", pause_submit_before_item_lock)
+    monkeypatch.setattr(
+        io_router,
+        "_evt_emit",
+        lambda event, **_kwargs: emitted_events.append(event),
+    )
+
+    def save() -> tuple[str, object]:
+        with make_session() as db:
+            actor = db.get(Employee, case.actor_id)
+            save_pid.put(db.execute(text("SELECT pg_backend_pid()")).scalar_one())
+            try:
+                return (
+                    "ok",
+                    io_router.save_io_draft(
+                        payload=_draft_update_payload(case, quantity=3),
+                        http_request=_request("/api/io/draft"),
+                        actor=actor,
+                        db=db,
+                    ),
+                )
+            except HTTPException as exc:
+                return "http", exc.status_code
+
+    def submit() -> tuple[str, object]:
+        with make_session() as db:
+            actor = db.get(Employee, case.actor_id)
+            submit_pid.put(db.execute(text("SELECT pg_backend_pid()")).scalar_one())
+            return (
+                "ok",
+                io_router.submit_io_draft(
+                    batch_id=case.batch_id,
+                    http_request=_request(f"/api/io/draft/{case.batch_id}/submit"),
+                    actor=actor,
+                    requester_employee_id=case.actor_id,
+                    db=db,
+                ),
+            )
+
+    try:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            submit_future = executor.submit(submit)
+            assert submit_reached_item_lock.wait(timeout=10)
+            holder_pid = submit_pid.get(timeout=10)
+            save_future = executor.submit(save)
+            worker_pid = save_pid.get(timeout=10)
+            try:
+                _assert_worker_waits_for_holder(
+                    engine,
+                    worker_pid=worker_pid,
+                    holder_pid=holder_pid,
+                )
+            finally:
+                release_submit.set()
+            submit_result = submit_future.result(timeout=20)
+            save_result = save_future.result(timeout=20)
+        assert submit_result[0] == "ok"
+        assert save_result == ("http", 422)
+        _assert_save_submit_result(
+            make_session,
+            case=case,
+            expected_quantity=Decimal("2"),
+            expected_notes="PostgreSQL existing draft replay",
+            emitted_events=emitted_events,
+            expected_events=["io_submit"],
+        )
+    finally:
+        release_submit.set()
         engine.dispose()
 
 

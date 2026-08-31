@@ -61,7 +61,16 @@ vi.mock("../../../_warehouse_sections/WarehouseSectionTabs", () => ({
 }));
 
 vi.mock("../../../_warehouse_sections/WarehouseDraftPanelTabs", () => ({
-  WarehouseDraftPanelTabs: () => <div data-testid="draft-panels" />,
+  WarehouseDraftPanelTabs: ({ onContinueIoDraft }: { onContinueIoDraft?: (draft: never) => void }) => (
+    <div data-testid="draft-panels">
+      <button
+        type="button"
+        onClick={() => onContinueIoDraft?.({ batch_id: "adjust-draft", sub_type: "adjust_out" } as never)}
+      >
+        continue adjust draft
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock("../../warehouse/MobileDirtyLeaveSheet", () => ({
@@ -105,6 +114,19 @@ describe("MobileWarehouseScreen compact step header", () => {
 
     expect(new URLSearchParams(window.location.search).get("draftId")).toBeNull();
     expect(currentWizardProps.value?.restoreDraft).toBeNull();
+  });
+
+  it("수동 입출고 초안 이어서 작업은 수량 조정 단계로 이동한다", () => {
+    window.history.replaceState({}, "", "/mes?tab=warehouse&section=mine");
+    render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "mine" }));
+    fireEvent.click(screen.getByRole("button", { name: "continue adjust draft" }));
+
+    const params = new URLSearchParams(window.location.search);
+    expect(params.get("section")).toBe("compose");
+    expect(params.get("step")).toBe("4");
+    expect(params.get("draftId")).toBe("adjust-draft");
   });
 
   it("늦게 끝난 A 전환은 현재 B draftId와 복원 상태를 지우지 않는다", async () => {

@@ -57,7 +57,7 @@ npm test -- app/mes/_components/_admin_sections/__tests__/AdminExportSection.tes
 ### Task 3: 문서와 수용 검증 `[GPT-5.6 Terra] [순차]`
 
 **Files:**
-- Modify: `_attic/handoff/2026-08-03-admin-export-followup-todo.md`
+- Modify: `_attic/handoff/archive/2026-08-28-todo-baseline/2026-08-03-admin-export-followup-todo.md`
 
 - [x] 기존 “원본 로그 기본 닫힘·데이터 카드 내부 수납” 정책을 독립 카드·항상 펼침 정책으로 갱신한다.
 - [x] `git diff --check`와 관련 Vitest를 실행한다.

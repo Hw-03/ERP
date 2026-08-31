@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TransactionLog } from "@/lib/api";
 import type { IoBatch } from "@/lib/api/types/io";
@@ -25,9 +25,15 @@ vi.mock("../../common", () => ({
 }));
 
 vi.mock("../../DesktopRightPanel", () => ({
-  DesktopRightPanel: ({ title, titleId, fillAvailableWidth, children }: any) => (
-    <div data-testid="desktop-history-right-panel" data-fill-width={fillAvailableWidth ? "true" : "false"}>
+  DesktopRightPanel: ({ title, titleId, fillAvailableWidth, backButton, headerAction, tone, children }: any) => (
+    <div
+      data-testid="desktop-history-right-panel"
+      data-fill-width={fillAvailableWidth ? "true" : "false"}
+      data-tone={tone ?? "default"}
+    >
       <h2 id={titleId}>{title}</h2>
+      {backButton}
+      {headerAction}
       {children}
     </div>
   ),
@@ -36,14 +42,15 @@ vi.mock("../../DesktopRightPanel", () => ({
 vi.mock("../HistoryDetailPanel", async () => {
   const { useEffect } = await import("react");
   return {
-    HistoryDetailPanel: ({ selected, allowCancellation }: any) => {
+    HistoryDetailPanel: ({ selected, allowCancellation, desktopCancellationOpen, onDesktopCancellationOpenChange }: any) => {
       useEffect(() => {
         detailLifecycle.logMounted();
         return () => detailLifecycle.logUnmounted();
       }, []);
       return (
         <div data-testid="history-detail-panel" data-allow-cancellation={allowCancellation === false ? "false" : "true"}>
-          {selected.item_name}
+          {desktopCancellationOpen ? "취소 확인 내용" : selected.item_name}
+          <button type="button" onClick={() => onDesktopCancellationOpenChange?.(true)}>취소 화면 열기</button>
         </div>
       );
     },
@@ -53,12 +60,17 @@ vi.mock("../HistoryDetailPanel", async () => {
 vi.mock("../HistoryBatchDetailPanel", async () => {
   const { useEffect } = await import("react");
   return {
-    HistoryBatchDetailPanel: ({ logs }: any) => {
+    HistoryBatchDetailPanel: ({ logs, desktopCancellationOpen, onDesktopCancellationOpenChange }: any) => {
       useEffect(() => {
         detailLifecycle.batchMounted();
         return () => detailLifecycle.batchUnmounted();
       }, []);
-      return <div data-testid="history-batch-detail-panel">{logs[0].item_name}</div>;
+      return (
+        <div data-testid="history-batch-detail-panel">
+          {desktopCancellationOpen ? "묶음 취소 확인 내용" : logs[0].item_name}
+          <button type="button" onClick={() => onDesktopCancellationOpenChange?.(true)}>묶음 취소 화면 열기</button>
+        </div>
+      );
     },
   };
 });
@@ -244,5 +256,35 @@ describe("DesktopHistoryRightPanel", () => {
     expect(screen.getByRole("heading")).toHaveTextContent("Batch B");
     expect(detailLifecycle.batchMounted).toHaveBeenCalledTimes(1);
     expect(detailLifecycle.batchUnmounted).not.toHaveBeenCalled();
+  });
+
+  it("switches a log detail to a danger-tinted cancellation panel with a header return action", () => {
+    const selection = { kind: "log" as const, log: makeLog({ item_name: "단일 품목" }) };
+    render(panel(selection));
+
+    fireEvent.click(screen.getByRole("button", { name: "취소 화면 열기" }));
+
+    expect(screen.getByRole("heading", { name: "내역 취소" })).toBeInTheDocument();
+    expect(screen.getByText("취소 확인 내용")).toBeInTheDocument();
+    expect(screen.getByTestId("desktop-history-right-panel")).toHaveAttribute("data-tone", "danger");
+    expect(screen.getByRole("button", { name: "상세로 돌아가기" })).toHaveClass("h-8", "w-8");
+
+    fireEvent.click(screen.getByRole("button", { name: "상세로 돌아가기" }));
+    expect(screen.getByRole("heading", { name: "단일 품목" })).toBeInTheDocument();
+  });
+
+  it("switches a batch detail to the dedicated cancellation panel", () => {
+    const selection = {
+      kind: "batch" as const,
+      batchId: "batch-1",
+      logs: [makeLog({ item_name: "묶음 품목", operation_batch_id: "batch-1" })],
+    };
+    render(panel(selection));
+
+    fireEvent.click(screen.getByRole("button", { name: "묶음 취소 화면 열기" }));
+
+    expect(screen.getByRole("heading", { name: "내역 취소" })).toBeInTheDocument();
+    expect(screen.getByText("묶음 취소 확인 내용")).toBeInTheDocument();
+    expect(screen.getByTestId("desktop-history-right-panel")).toHaveAttribute("data-tone", "danger");
   });
 });

@@ -75,6 +75,7 @@ def _setup(make_session) -> tuple[object, object]:
         actor_name=actor.name,
         actor_employee_id=actor.employee_id,
         department="창고",
+        effective_at=datetime(2026, 8, 25, 3, 0),
     )
     assert operation is not None
     before = inv_effect._snapshot_cells(session, item.item_id)

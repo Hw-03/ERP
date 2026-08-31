@@ -142,7 +142,7 @@ vi.mock("../DesktopWarehouseMapTab", () => ({ DesktopWarehouseMapTab: () => <mai
 vi.mock("../CapacityDetailModal", () => ({ CapacityDetailModal: () => <div /> }));
 vi.mock("../_weekly_sections/WeeklyWeekPicker", () => ({
   WeeklyWeekPicker: () => <div />,
-  getWeekStartMonday: () => new Date("2026-07-02T00:00:00.000Z"),
+  getWeekStartMonday: () => new Date("2026-08-31T00:00:00+09:00"),
 }));
 
 describe("DesktopMesShell tab transition", () => {
@@ -212,6 +212,14 @@ describe("DesktopMesShell tab transition", () => {
         "summary",
         expect.objectContaining({ dateFrom: expect.any(String) }),
       ],
+    }));
+  });
+
+  it("prefetches the current KST Monday through Sunday", () => {
+    render(<DesktopMesShell />);
+
+    expect(queryClientMock.prefetchQuery).toHaveBeenCalledWith(expect.objectContaining({
+      queryKey: ["weekly", "report", "2026-08-31", "2026-09-06"],
     }));
   });
 

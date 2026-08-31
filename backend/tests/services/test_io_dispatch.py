@@ -38,6 +38,7 @@ from app.models import (
 )
 from app.services import io_dispatch as svc
 from app.services.bom_stock_policy import _issue_bom_auto_token, io_bom_auto_claims
+from app.services.command_idempotency import IdempotencyConflict
 from app.services.pin_auth import DEFAULT_PIN_HASH
 from app.routers.inventory._tx_filters import _batch_name_map
 
@@ -2201,7 +2202,7 @@ def test_submit_existing_draft_wrong_owner_raises(make_item, db_session):
 
 
 def test_submit_existing_draft_non_draft_status_raises(make_item, db_session):
-    """draft 가 아닌 batch 재제출 시 ValueError."""
+    """지문 없는 과거 완료 batch 재제출은 모호하므로 실패 폐쇄한다."""
     item = make_item(name="이미제출", warehouse_qty=D("0"))
     requester = _make_employee(db_session)
     batch = _build_batch(
@@ -2214,9 +2215,10 @@ def test_submit_existing_draft_non_draft_status_raises(make_item, db_session):
                 "to_bucket": "warehouse", "quantity": D("3")}],
     )
     db_session.flush()
-    with pytest.raises(ValueError, match="임시저장 상태가 아닙니다"):
+    with pytest.raises(IdempotencyConflict) as raised:
         svc.submit_existing_draft(
             db_session,
             batch_id=batch.batch_id,
             requester=requester,
         )
+    assert raised.value.reason == "legacy_fingerprint_missing"

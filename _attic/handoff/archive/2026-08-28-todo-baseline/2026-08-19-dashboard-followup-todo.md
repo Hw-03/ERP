@@ -1,22 +1,28 @@
 # 대시보드 후속 TODO 핸드오프
 
+## 2026-08-28 최신 판정
+
+- 상태: 정리 완료
+- 현재 관리: 완료 6개 / 보류 0개 / 미채택 0개 / 구현 필요 0개
+- 항목 판정: 완료: #1-6
+- 기준: 현재 HEAD 구현·회귀 테스트와 사용자 확정 결정을 우선한다. 아래 원문은 수집 당시 요구와 근거로 보존한다.
 ## 전체 현황
 
-- 구현 완료된 기준 TODO: 0개
-- 구현해야 할 후속 TODO: 6개
+- 구현 완료된 기준 TODO: 6개
+- 구현해야 할 후속 TODO: 0개
 - 총 관리 TODO: 6개
-- 확정 후속 TODO: 6개
+- 확정 후속 TODO: 0개
 - 자율 점검 추가 TODO: 0개
 - 사용자 추가 TODO: 6개
 - 대시보드: 6개
 - 우선순위: 높음 2개 / 중간 3개 / 낮음 1개
-- 구현 전 정책 확인 필요: 0개
+- 보류·정책 확인 TODO: 0개
 - 문서 목적: 대시보드 화면에서 수집하는 후속 UX·동작 개선 사항을 구현 준비 상태로 인계한다.
 
 ## 참고한 기준과 근거
 
 - 기존 완료 문서: `_attic/handoff/archive/2026-07-21-dashboard-bom-modal-todo.md`
-- 다른 세션 TODO 기준: `_attic/handoff/2026-08-19-dashboard-table-header-todo.md`
+- 다른 세션 TODO 기준: `_attic/handoff/archive/2026-08-28-todo-baseline/2026-08-19-dashboard-table-header-todo.md`
 - 브라우저 확인: 대시보드 탭에서 TODO 수집을 시작함.
 - 코드 확인:
   - `frontend/app/mes/_components/CapacityDetailModal.tsx:76-90` — 생산 가능수량 모달은 `rgba(0,0,0,.55)` 반투명 오버레이와 별도 패널 셸을 사용한다.

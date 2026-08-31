@@ -146,7 +146,7 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete, isLocked = 
               if (!isLocked) setEditing(true);
             }}
             {...actionTooltipProps}
-            className="h-[30px] rounded-md border px-3 py-1 text-sm font-semibold transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+            className="standard-hover h-[30px] rounded-md border px-3 py-1 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             style={{
               background: LEGACY_COLORS.s1,
               borderColor: LEGACY_COLORS.border,
@@ -166,7 +166,7 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete, isLocked = 
             if (!isLocked) onRequestDelete(row, childName);
           }}
           {...actionTooltipProps}
-          className="flex h-7 w-7 items-center justify-center rounded-md p-0 transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+          className="standard-hover flex h-7 w-7 items-center justify-center rounded-md p-0 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           style={{
             color: LEGACY_COLORS.red,
             background: `color-mix(in srgb, ${LEGACY_COLORS.red} 8%, transparent)`,

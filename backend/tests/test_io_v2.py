@@ -6,10 +6,12 @@ from decimal import Decimal
 import pytest
 
 from app.models import (
+    ActivityAuditLog,
     DepartmentEnum,
     Employee,
     EmployeeLevelEnum,
     Inventory,
+    InventoryOperation,
     InventoryLocation,
     IoBatch,
     IoBundle,
@@ -1774,7 +1776,11 @@ def test_io_submit_warehouse_to_dept_links_all_logs_to_batch(
     )
 
 
-def test_io_submit_draft_endpoint_completes_batch(client, db_session, make_item):
+def test_io_submit_draft_endpoint_replays_without_duplicate_effects(
+    client, db_session, make_item, monkeypatch
+):
+    from app.routers import io as io_router
+
     item = make_item(name="Raw Draft", warehouse_qty=Decimal("0"))
     requester = _make_employee(db_session)
     db_session.commit()
@@ -1813,12 +1819,30 @@ def test_io_submit_draft_endpoint_completes_batch(client, db_session, make_item)
     )
     assert any(d["batch_id"] == batch_id for d in drafts_before.json())
 
+    emitted_events: list[str] = []
+    monkeypatch.setattr(
+        io_router,
+        "_evt_emit",
+        lambda event, **_kwargs: emitted_events.append(event),
+    )
+
     submit_res = client.post(
         f"/api/io/draft/{batch_id}/submit"
         f"?requester_employee_id={requester.employee_id}",
     )
+    physical_counts_after_first = (
+        db_session.query(TransactionLog).count(),
+        db_session.query(InventoryOperation).count(),
+        db_session.query(StockRequest).count(),
+    )
+    replay_res = client.post(
+        f"/api/io/draft/{batch_id}/submit"
+        f"?requester_employee_id={requester.employee_id}",
+    )
     assert submit_res.status_code == 201, submit_res.json()
+    assert replay_res.status_code == 201, replay_res.json()
     assert submit_res.json()["status"] == "completed"
+    assert replay_res.json() == submit_res.json()
 
     detail = client.get(f"/api/io/{batch_id}")
     assert detail.status_code == 200
@@ -1832,6 +1856,103 @@ def test_io_submit_draft_endpoint_completes_batch(client, db_session, make_item)
     inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
     assert inv.warehouse_qty == Decimal("7")
     assert db_session.query(IoBatch).count() == 1
+    assert physical_counts_after_first[0] == 1
+    assert physical_counts_after_first[1] <= 1
+    assert physical_counts_after_first[2] == 0
+    assert (
+        db_session.query(TransactionLog).count(),
+        db_session.query(InventoryOperation).count(),
+        db_session.query(StockRequest).count(),
+    ) == physical_counts_after_first
+    assert emitted_events == ["io_submit"]
+    assert (
+        db_session.query(ActivityAuditLog)
+        .filter(ActivityAuditLog.action_key == "http.post.io.draft.id.submit")
+        .count()
+        == 1
+    )
+
+
+def test_io_submit_draft_replay_fails_closed_for_actor_content_and_legacy_state(
+    client, db_session, make_item
+):
+    item = make_item(name="Scoped Draft", warehouse_qty=Decimal("0"))
+    requester = _make_employee(db_session, code="IO-DRAFT-SCOPE-1")
+    other = _make_employee(db_session, code="IO-DRAFT-SCOPE-2")
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "receive",
+            "sub_type": "receive_supplier",
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "item_id": str(item.item_id),
+                    "quantity": "2",
+                }
+            ],
+        },
+    )
+    draft = client.put(
+        "/api/io/draft",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "receive",
+            "sub_type": "receive_supplier",
+            "notes": "original",
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    batch_id = draft.json()["batch_id"]
+    route = f"/api/io/draft/{batch_id}/submit"
+    first = client.post(
+        route,
+        params={"requester_employee_id": str(requester.employee_id)},
+    )
+    assert first.status_code == 201, first.json()
+    physical_counts = (
+        db_session.query(TransactionLog).count(),
+        db_session.query(InventoryOperation).count(),
+    )
+
+    other_actor = client.post(
+        route,
+        params={"requester_employee_id": str(other.employee_id)},
+        headers={"X-Actor-Employee-Id": str(other.employee_id)},
+    )
+    assert other_actor.status_code == 403, other_actor.json()
+
+    batch = db_session.query(IoBatch).filter(IoBatch.batch_id == batch_id).one()
+    batch.notes = "changed after submit"
+    db_session.commit()
+    changed = client.post(
+        route,
+        params={"requester_employee_id": str(requester.employee_id)},
+    )
+    assert changed.status_code == 409, changed.json()
+    assert changed.json()["detail"]["code"] == "IDEMPOTENCY_CONFLICT"
+    assert changed.json()["detail"]["extra"]["reason"] == "fingerprint_mismatch"
+
+    batch.notes = "original"
+    batch.request_fingerprint = None
+    db_session.commit()
+    legacy = client.post(
+        route,
+        params={"requester_employee_id": str(requester.employee_id)},
+    )
+    assert legacy.status_code == 409, legacy.json()
+    assert legacy.json()["detail"]["code"] == "IDEMPOTENCY_CONFLICT"
+    assert legacy.json()["detail"]["extra"]["reason"] == "legacy_fingerprint_missing"
+    assert (
+        db_session.query(TransactionLog).count(),
+        db_session.query(InventoryOperation).count(),
+    ) == physical_counts
+    db_session.expire_all()
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("2")
 
 
 def test_io_draft_recomputes_department_shortage_with_pending(
@@ -1937,6 +2058,12 @@ def test_io_submit_idempotent_with_client_request_id(client, db_session, make_it
     assert db_session.query(IoBatch).count() == 1
     inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
     assert inv.warehouse_qty == Decimal("4")
+    assert (
+        db_session.query(ActivityAuditLog)
+        .filter(ActivityAuditLog.action_key == "http.post.io.submit")
+        .count()
+        == 1
+    )
 
 
 def test_io_submit_idempotent_replay_preserves_approval_response(

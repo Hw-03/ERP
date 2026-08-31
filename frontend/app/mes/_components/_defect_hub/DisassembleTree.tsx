@@ -298,7 +298,7 @@ function TreeNode({
             type="button"
             onClick={expanded ? handleCollapse : handleExpand}
             disabled={expanding}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] transition-colors hover:brightness-110"
+            className="standard-hover flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] transition-colors"
             style={{ background: tint(LEGACY_COLORS.blue, 12), border: `1px solid ${tint(LEGACY_COLORS.blue, 30)}` }}
             aria-label={expanded ? "접기" : "펼치기"}
           >

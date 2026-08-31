@@ -8,7 +8,7 @@
 
 ## 범위와 기준
 
-- 기준 TODO: `_attic/handoff/2026-07-22-admin-layout-followup-todo.md`
+- 기준 TODO: `_attic/handoff/archive/2026-08-28-todo-baseline/2026-07-22-admin-layout-followup-todo.md`
 - 구현 대상: 1, 3, 6, 7, 8, 10, 13, 14번.
 - 구현 완료로 제외: 4, 5, 9, 11, 12번. 라이브 코드와 테스트로 확인했으며 재구현하지 않는다.
 - 정책 미확정으로 제외: 2번(품목 상세 헤더의 선택 품목명·상태 제거 여부). 사용자가 정책을 확정하기 전에는 건드리지 않는다.
@@ -25,7 +25,7 @@ if (-not (Test-Path node_modules)) { npm ci }
 npm test -- app/mes/_components/_admin_sections/__tests__/AdminSectionTabs.test.tsx
 ```
 
-기존 체크아웃에 있는 사용자 변경(`_attic/handoff/2026-07-22-admin-layout-followup-todo.md`)은 워크트리 생성 전에 커밋·stash·복사하지 않는다. 이 계획 문서와 TODO 문서를 새 워크트리에서 읽을 수 있도록, 사용자가 추후 원하는 방식으로 현재 문서 변경을 포함시킨다.
+기존 체크아웃에 있는 사용자 변경(`_attic/handoff/archive/2026-08-28-todo-baseline/2026-07-22-admin-layout-followup-todo.md`)은 워크트리 생성 전에 커밋·stash·복사하지 않는다. 이 계획 문서와 TODO 문서를 새 워크트리에서 읽을 수 있도록, 사용자가 추후 원하는 방식으로 현재 문서 변경을 포함시킨다.
 
 ## 변경 파일 구조
 

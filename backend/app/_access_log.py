@@ -130,6 +130,8 @@ def _audit_session(app) -> Iterator:
 def _build_write_audit_entry(
     request: Request, *, method: str, path: str, status: int
 ) -> _WriteAuditEntry | None:
+    if bool(getattr(request.state, "activity_audit_skip", False)):
+        return None
     if method not in _WRITE_METHODS or path == _CLIENT_EVENT_PATH:
         return None
     actor_employee_code = get_actor_emp(request)

@@ -129,7 +129,7 @@ export function MyRequestRow({
           )}
           {cancelable && (
             <div data-testid="my-request-actions" className="ml-auto flex shrink-0 items-center gap-2">
-              {onRevertToDraft && (
+              {onRevertToDraft && req.operation_batch_id && (
                 <button
                   type="button"
                   className="rounded-[10px] border px-3 py-1.5 text-xs font-bold"

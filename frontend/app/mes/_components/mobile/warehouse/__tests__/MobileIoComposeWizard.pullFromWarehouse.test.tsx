@@ -47,7 +47,9 @@ vi.mock("../../../_warehouse_v2/useIoWorkState", () => ({ useIoWorkState: () => 
 vi.mock("../../../_warehouse_v2/useIoDraftRestore", () => ({ useIoDraftRestore: () => {} }));
 vi.mock("../../../_warehouse_v2/useIoDraft", () => ({ useIoDraft: () => ({ drafting: false, saveDraft }) }));
 vi.mock("../../../_warehouse_v2/useIoPreview", () => ({ useIoPreview: () => ({ previewing: false, previewTarget }) }));
-vi.mock("../../../_warehouse_v2/useIoSubmit", () => ({ useIoSubmit: () => ({ submitting: false, submit }) }));
+vi.mock("../../../_warehouse_v2/useIoSubmit", () => ({
+  useIoSubmit: () => ({ submitting: false, run: (work: () => Promise<unknown>) => work(), submit }),
+}));
 vi.mock("../MobileWorkTypeStep", () => ({
   MobileWorkTypeStep: () => null,
   MobileSubTypeStep: ({ onSubTypeChange }: { onSubTypeChange: (subType: "disassemble") => void }) => (

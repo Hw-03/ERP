@@ -1116,8 +1116,10 @@ describe("toDateKey", () => {
 // getPeriodStart
 // ──────────────────────────────────────────────────────────────────
 describe("getPeriodStart", () => {
-  it("TODAY → 오늘 자정 Date", () => {
-    const result = getPeriodStart("TODAY", new Date("2026-08-27T16:15:00Z"));
+  const kstNextDay = new Date("2026-08-27T22:58:00Z");
+
+  it("TODAY → KST 오늘 자정 Date", () => {
+    const result = getPeriodStart("TODAY", kstNextDay);
     expect(result?.getFullYear()).toBe(2026);
     expect(result?.getMonth()).toBe(7);
     expect(result?.getDate()).toBe(28);
@@ -1125,16 +1127,16 @@ describe("getPeriodStart", () => {
   });
 
   it("WEEK → 이번 주 일요일 자정", () => {
-    const result = getPeriodStart("WEEK", new Date("2026-08-27T16:15:00Z"));
+    const result = getPeriodStart("WEEK", kstNextDay);
     expect(result?.getFullYear()).toBe(2026);
     expect(result?.getMonth()).toBe(7);
-    expect(result?.getDate()).toBe(23);
     expect(result?.getDay()).toBe(0);
+    expect(result?.getDate()).toBe(23);
     expect(result?.getHours()).toBe(0);
   });
 
   it("MONTH → 이번 달 1일 자정", () => {
-    const result = getPeriodStart("MONTH", new Date("2026-08-27T16:15:00Z"));
+    const result = getPeriodStart("MONTH", kstNextDay);
     expect(result?.getFullYear()).toBe(2026);
     expect(result?.getDate()).toBe(1);
     expect(result?.getMonth()).toBe(7);

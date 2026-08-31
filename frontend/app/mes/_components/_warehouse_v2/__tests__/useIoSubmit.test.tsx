@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, ResultUnknownError } from "@/lib/api-core";
@@ -37,6 +39,12 @@ function hasPendingStorage(namespace: string): boolean {
   const prefix = `${namespace}:`;
   return Array.from({ length: sessionStorage.length }, (_, index) =>
     sessionStorage.key(index)).some((key) => key?.startsWith(prefix));
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
 }
 
 describe("useIoSubmit", () => {
@@ -157,5 +165,29 @@ describe("useIoSubmit", () => {
     expect(submitMock.mock.calls[0][0].client_request_id).toBe("key-1");
     expect(submitMock.mock.calls[1][0].client_request_id).toBe("key-2");
     expect(submitMock.mock.calls[2][0]).toEqual(submitMock.mock.calls[1][0]);
+  });
+
+  it("진행 중인 저장·제출 실행에는 동기적으로 한 번만 진입한다", async () => {
+    const pending = deferred<void>();
+    const work = vi.fn(async () => pending.promise);
+    const { result } = renderHook(() => useIoSubmit());
+
+    let first!: Promise<void | undefined>;
+    let second!: Promise<void | undefined>;
+    act(() => {
+      first = result.current.run(work);
+      second = result.current.run(work);
+    });
+
+    expect(work).toHaveBeenCalledTimes(1);
+    expect(result.current.submitting).toBe(true);
+    await expect(second).resolves.toBeUndefined();
+
+    await act(async () => {
+      pending.resolve();
+      await first;
+    });
+
+    expect(result.current.submitting).toBe(false);
   });
 });

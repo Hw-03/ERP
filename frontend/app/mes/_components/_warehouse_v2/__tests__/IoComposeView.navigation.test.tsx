@@ -139,10 +139,19 @@ function workTypeCards(): HTMLButtonElement[] {
   return screen.getAllByRole("button").filter((button): button is HTMLButtonElement => button.hasAttribute("aria-pressed"));
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(api.getAllBOM).mockResolvedValue([]);
   vi.mocked(api.getItems).mockResolvedValue([]);
+  vi.mocked(api.saveDraft).mockImplementation(async (payload) => ({
+    batch_id: payload.batch_id,
+  } as never));
   vi.mocked(api.getItemConversionPreview).mockResolvedValue(conversionResult);
   vi.mocked(api.executeItemConversion).mockResolvedValue(conversionResult);
   routerPush.mockClear();
@@ -461,10 +470,100 @@ describe("IoComposeView navigation chrome", () => {
     fireEvent.click(await screen.findByTestId("confirm-submit"));
 
     await waitFor(() => {
+      expect(api.saveDraft).toHaveBeenCalledWith(expect.objectContaining({
+        requester_employee_id: currentOperator.employee_id,
+        batch_id: "operator-switch-draft",
+        work_type: "process",
+        sub_type: "produce",
+        bundles: [],
+      }));
       expect(api.submitDraft).toHaveBeenCalledWith(
         "operator-switch-draft",
         currentOperator.employee_id,
       );
+    });
+  });
+
+  it("복원 draft의 최종 편집 snapshot을 같은 batch에 저장한 뒤 한 번만 제출한다", async () => {
+    const save = deferred<{ batch_id: string }>();
+    vi.mocked(api.saveDraft).mockImplementation(() => save.promise as never);
+    vi.mocked(api.submitDraft).mockResolvedValue({
+      batch: {}, status: "submitted", requires_approval: false, stock_request_id: null,
+      stock_requests: [], message: "완료",
+    } as never);
+    const finalBundles = [{
+      bundle_id: "bundle-final",
+      source_kind: "direct_item",
+      title: "추가·제외·삭제 후 최종 구성",
+      source_item_id: "added-item",
+      source_mes_code: "ADDED-1",
+      quantity: 7,
+      expanded_level: 0,
+      lines: [
+        {
+          line_id: "added-line", item_id: "added-item", item_name: "추가 품목", mes_code: "ADDED-1", unit: "EA",
+          direction: "out", from_bucket: "warehouse", from_department: null, to_bucket: "production", to_department: "조립",
+          quantity: 7, bom_expected: null, included: true, origin: "direct", edited: true, has_children: false,
+          shortage: 0, exclusion_note: null,
+        },
+        {
+          line_id: "excluded-line", item_id: "bom-item", item_name: "제외 품목", mes_code: "BOM-1", unit: "EA",
+          direction: "out", from_bucket: "warehouse", from_department: null, to_bucket: "production", to_department: "조립",
+          quantity: 2, bom_expected: 2, included: false, origin: "bom", edited: true, has_children: false,
+          shortage: 0, exclusion_note: "대체 품목 사용",
+        },
+      ],
+    }] as never;
+
+    render(
+      <IoComposeView
+        globalSearch=""
+        operator={operator}
+        employees={[]}
+        items={[]}
+        productModels={[]}
+        setItems={() => {}}
+        onStatusChange={() => {}}
+        restoreStep={5}
+        restoreDraft={{
+          batch_id: "edited-desktop-draft", work_type: "warehouse_io", sub_type: "warehouse_to_dept",
+          from_department: "원자재", to_department: "조립", reference_no: "EDIT-REF-7", notes: "최종 메모",
+          bundles: finalBundles,
+        } as never}
+      />,
+    );
+
+    const submit = await screen.findByTestId("confirm-submit");
+    fireEvent.click(submit);
+    fireEvent.click(submit);
+
+    await waitFor(() => {
+      expect(api.saveDraft).toHaveBeenCalledTimes(1);
+    });
+    expect(api.saveDraft).toHaveBeenCalledWith({
+      requester_employee_id: operator.employee_id,
+      work_type: "warehouse_io",
+      sub_type: "warehouse_to_dept",
+      from_department: "원자재",
+      to_department: "조립",
+      reference_no: "EDIT-REF-7",
+      notes: "최종 메모",
+      batch_id: "edited-desktop-draft",
+      bundles: finalBundles,
+    });
+    expect(vi.mocked(api.saveDraft).mock.calls[0]?.[0]?.bundles[0]?.lines).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ line_id: "deleted-line" }),
+    ]));
+    expect(api.submitDraft).not.toHaveBeenCalled();
+
+    await act(async () => {
+      save.resolve({ batch_id: "edited-desktop-draft" });
+      await save.promise;
+    });
+
+    await waitFor(() => {
+      expect(api.submitDraft).toHaveBeenCalledTimes(1);
+      expect(api.submitDraft).toHaveBeenCalledWith("edited-desktop-draft", operator.employee_id);
     });
   });
 

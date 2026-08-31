@@ -32,11 +32,11 @@ export function getHistoryCancelCopy(scope: HistoryCancelScope): {
   return scope === "batch"
     ? {
         trigger: "이 작업 묶음 전체 취소",
-        description: "같은 작업 묶음에 포함된 모든 실제 재고 영향을 함께 되돌립니다.",
+        description: "이 작업 묶음을 취소하고, 아래 재고 변동을 원래 상태로 되돌립니다.",
       }
     : {
         trigger: "이 이력 1건 취소",
-        description: "선택한 이력 1건의 실제 재고 영향만 되돌립니다.",
+        description: "이 내역을 취소하고, 아래 재고 변동을 원래 상태로 되돌립니다.",
       };
 }
 

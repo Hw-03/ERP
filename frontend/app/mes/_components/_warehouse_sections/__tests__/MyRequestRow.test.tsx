@@ -36,6 +36,7 @@ function makeRequest(overrides: Partial<StockRequest> = {}): StockRequest {
     submitted_at: "2026-08-04T00:05:00Z",
     created_at: "2026-07-02T00:00:00Z",
     notes: null,
+    operation_batch_id: null,
     rejected_reason: null,
     lines: [],
     ...overrides,
@@ -173,7 +174,11 @@ describe("MyRequestRow presentation", () => {
   it("비고와 수정·요청 취소 버튼을 같은 줄에 두고 버튼을 오른쪽 정렬", () => {
     render(
       <MyRequestRow
-        req={makeRequest({ status: "submitted", notes: "출고 테스트" })}
+        req={makeRequest({
+          status: "submitted",
+          notes: "출고 테스트",
+          operation_batch_id: "batch-1",
+        })}
         onCancelRequest={vi.fn()}
         onRevertToDraft={vi.fn()}
       />,
@@ -185,5 +190,18 @@ describe("MyRequestRow presentation", () => {
     expect(within(footer).getByRole("button", { name: "수정" })).toBeInTheDocument();
     expect(within(footer).getByRole("button", { name: "요청 취소" })).toBeInTheDocument();
     expect(actions).toHaveClass("ml-auto");
+  });
+
+  it("연결 batch가 없는 열린 요청은 수정만 숨기고 취소는 유지한다", () => {
+    render(
+      <MyRequestRow
+        req={makeRequest({ status: "reserved", operation_batch_id: null })}
+        onCancelRequest={vi.fn()}
+        onRevertToDraft={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "수정" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "요청 취소" })).toBeInTheDocument();
   });
 });

@@ -818,6 +818,17 @@
       },
       "BOMTreeNode": {
         "properties": {
+          "additional_producible_quantity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Additional Producible Quantity"
+          },
           "children": {
             "default": [],
             "items": {
@@ -22123,7 +22134,7 @@
     },
     "/api/stock-requests/{request_id}/revert-to-draft": {
       "post": {
-        "description": "제출된 요청을 취소하고 연결된 IoBatch를 draft로 복원 — 수정 후 재제출용.\n권한: 요청자 본인만.",
+        "description": "연결된 미결 요청을 모두 취소하고 IoBatch 전체를 draft로 복원한다.",
         "operationId": "revert_stock_request_to_draft_api_stock_requests__request_id__revert_to_draft_post",
         "parameters": [
           {

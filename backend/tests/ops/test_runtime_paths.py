@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -396,12 +397,63 @@ def test_profile_resolver_test_root_covers_development_worktree_with_spaces_and_
 
 
 @pytest.mark.skipif(os.name != "nt", reason="server profile resolver is a Windows PowerShell script")
-def test_profile_resolver_test_root_rejects_unknown_runtime_root() -> None:
+def test_profile_resolver_test_root_treats_arbitrary_ci_checkout_as_development(
+    tmp_path: Path,
+) -> None:
+    checkout_root = tmp_path / "actions" / "workspace" / "dexcowin-mes"
+    checkout_root.mkdir(parents=True)
     result = _run_profile_resolver(
         "-TestRepoRoot",
-        r"C:\unknown-mes-root",
+        str(checkout_root),
         "-Property",
         "BackendInternalUrl",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "http://localhost:8011"
+
+
+@pytest.mark.skipif(os.name != "nt", reason="server profile resolver is a Windows PowerShell script")
+def test_profile_resolver_runtime_root_rejects_arbitrary_checkout(
+    tmp_path: Path,
+) -> None:
+    checkout_root = tmp_path / "actions" / "workspace" / "dexcowin-mes"
+    checkout_root.mkdir(parents=True)
+    result = _run_profile_resolver(
+        "-RuntimeRepoRoot",
+        str(checkout_root),
+        "-Property",
+        "BackendInternalUrl",
+    )
+
+    assert result.returncode != 0
+    assert "Unknown DEXCOWIN MES runtime root" in result.stderr
+
+
+@pytest.mark.skipif(os.name != "nt", reason="server profile resolver is a Windows PowerShell script")
+def test_profile_resolver_without_test_override_rejects_unknown_runtime_root(
+    tmp_path: Path,
+) -> None:
+    copied_root = tmp_path / "unknown-runtime"
+    copied_script = copied_root / "scripts" / "dev" / "resolve-server-profile.ps1"
+    copied_script.parent.mkdir(parents=True)
+    shutil.copy2(ROOT / "scripts" / "dev" / "resolve-server-profile.ps1", copied_script)
+
+    result = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(copied_script),
+            "-Property",
+            "BackendInternalUrl",
+        ],
+        cwd=copied_root,
+        text=True,
+        capture_output=True,
+        check=False,
     )
 
     assert result.returncode != 0

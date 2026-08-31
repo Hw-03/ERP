@@ -459,7 +459,7 @@ export function IoTargetPicker({
                 <button
                   type="button"
                   onClick={cancelEditMode}
-                  className="rounded-[10px] border px-2.5 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110"
+                  className="standard-hover rounded-[10px] border px-2.5 py-1.5 text-[12px] font-bold transition-colors"
                   style={{
                     background: LEGACY_COLORS.s2,
                     borderColor: LEGACY_COLORS.border,
@@ -472,7 +472,7 @@ export function IoTargetPicker({
                 <button
                   type="button"
                   onClick={enterEditMode}
-                  className="flex items-center gap-1 rounded-[10px] border px-2.5 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110"
+                  className="standard-hover flex items-center gap-1 rounded-[10px] border px-2.5 py-1.5 text-[12px] font-bold transition-colors"
                   style={{
                     background: LEGACY_COLORS.s2,
                     borderColor: LEGACY_COLORS.border,
@@ -495,7 +495,7 @@ export function IoTargetPicker({
               type="button"
               onClick={() => void handleResetOrder()}
               disabled={resetMyOrder.isPending}
-              className="flex items-center gap-1 rounded-[10px] border px-2.5 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110 disabled:opacity-50"
+              className="standard-hover flex items-center gap-1 rounded-[10px] border px-2.5 py-1.5 text-[12px] font-bold transition-colors disabled:opacity-50"
               style={{
                 background: LEGACY_COLORS.s2,
                 borderColor: LEGACY_COLORS.border,
@@ -509,7 +509,7 @@ export function IoTargetPicker({
               type="button"
               onClick={() => void handleSaveOrder()}
               disabled={putMyOrder.isPending}
-              className="flex items-center gap-1 rounded-[10px] px-2.5 py-1.5 text-[12px] font-black text-white transition-colors hover:brightness-110 disabled:opacity-50"
+              className="standard-hover flex items-center gap-1 rounded-[10px] px-2.5 py-1.5 text-[12px] font-black text-white transition-colors disabled:opacity-50"
               style={{ background: LEGACY_COLORS.blueSolid }}
             >
               <Save className="h-3 w-3" />
@@ -612,7 +612,7 @@ export function IoTargetPicker({
           type="button"
           onClick={onAdvance}
           disabled={bundles.length === 0}
-          className="flex w-full items-center justify-between rounded-[12px] border px-4 py-3 text-sm font-black transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+          className="standard-hover flex w-full items-center justify-between rounded-[12px] border px-4 py-3 text-sm font-black transition-all disabled:cursor-not-allowed disabled:opacity-60"
           style={{
             background: bundles.length > 0 ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
             borderColor: bundles.length > 0 ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
@@ -699,7 +699,7 @@ function InternalUseSourceControl({
           event.stopPropagation();
           onOpen();
         }}
-        className={`flex items-center justify-center rounded-[10px] border px-2 text-xs font-black outline-none transition-colors hover:brightness-110 focus-visible:ring-2 focus-visible:ring-[var(--c-blue)] disabled:opacity-50 ${
+        className={`standard-hover flex items-center justify-center rounded-[10px] border px-2 text-xs font-black outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--c-blue)] disabled:opacity-50 ${
           variant === "desktop" ? "mx-auto h-8 min-h-8 w-24" : "min-h-11 w-full"
         }`}
         style={{
@@ -1153,7 +1153,7 @@ function ItemTable({
           <button
             type="button"
             onClick={onShowMore}
-            className="w-full rounded-[12px] border py-2.5 text-sm font-semibold transition-colors hover:brightness-110"
+            className="standard-hover w-full rounded-[12px] border py-2.5 text-sm font-semibold transition-colors"
             style={{
               background: LEGACY_COLORS.s1,
               borderColor: LEGACY_COLORS.border,

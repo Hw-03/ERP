@@ -25,6 +25,7 @@ import {
   getWeekStartMonday,
 } from "./_weekly_sections/WeeklyWeekPicker";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { formatKstDate } from "@/lib/mes/date";
 import { api } from "@/lib/api";
 import type { Item, ProductionCapacity } from "@/lib/api";
 import { productionApi } from "@/lib/api/production";
@@ -50,10 +51,6 @@ const DEFAULT_STATUS = "DEXCOWIN MES";
 const MS_PER_DAY = 86400000;
 
 type DesktopTabNavigation = "push" | "replace" | "none";
-
-function toDateStr(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
 
 const TAB_META: Record<DesktopTabId, { title: string; icon: ElementType }> = {
   dashboard: { title: "대시보드", icon: Boxes },
@@ -324,8 +321,8 @@ function DesktopMesShellInner({
   }, [queryClient]);
 
   useEffect(() => {
-    const weekStart = toDateStr(weekMon);
-    const weekEnd = toDateStr(new Date(weekMon.getTime() + 6 * MS_PER_DAY));
+    const weekStart = formatKstDate(weekMon);
+    const weekEnd = formatKstDate(new Date(weekMon.getTime() + 6 * MS_PER_DAY));
 
     void queryClient.prefetchQuery({
       queryKey: queryKeys.weekly.report(weekStart, weekEnd),

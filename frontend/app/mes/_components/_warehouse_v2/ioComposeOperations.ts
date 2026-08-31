@@ -199,6 +199,15 @@ async function submitComposition(
     const response = draftId
       ? await submitExistingDraft(draftId)
       : await submit(bundles);
+    if (
+      draftId
+      && response.batch?.batch_id
+      && response.batch.batch_id !== draftId
+    ) {
+      throw new Error(
+        "이전 결과 불명 작업이 먼저 완료되었습니다. 현재 작업은 보존했으니 다시 제출하세요.",
+      );
+    }
     const requests = response.stock_requests ?? [];
     const responseKind = requests[0]?.approval_kind ?? fallbackKind;
     const title = response.requires_approval
@@ -215,6 +224,32 @@ async function submitComposition(
       throw new Error("서버가 다른 작업을 처리 중입니다. 잠시 후 다시 시도하세요.");
     }
     throw error;
+  }
+}
+
+async function saveExistingDraftBeforeSubmit(
+  draftId: string,
+  bundles: IoBundle[],
+  refs: IoOperationRefs | undefined,
+  version: OperationVersion | undefined,
+  draftIdRef: MutableRefObject<string | null>,
+  saveExistingDraft: ((bundles: IoBundle[]) => Promise<{ batch_id: string }>) | undefined,
+): Promise<void> {
+  if (!saveExistingDraft || !refs || !version) {
+    throw new Error("기존 작업을 저장할 수 없습니다. 내용을 확인한 뒤 다시 제출하세요.");
+  }
+  let saved: { batch_id: string };
+  try {
+    saved = await saveExistingDraft(bundles);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "저장에 실패했습니다.";
+    throw new Error(`현재 작업을 저장하지 못했습니다. 내용을 확인한 뒤 다시 제출하세요. (${message})`);
+  }
+  if (saved.batch_id !== draftId || draftIdRef.current !== draftId) {
+    throw new Error("저장 응답이 다른 작업을 가리킵니다. 내용을 확인한 뒤 다시 제출하세요.");
+  }
+  if (refs && version && !isCurrentIoOperation(refs, version)) {
+    throw new Error("저장 중 내용이 변경되었습니다. 내용을 확인한 뒤 다시 제출하세요.");
   }
 }
 
@@ -238,12 +273,15 @@ export async function runCompositionSubmit(
   submitExistingDraft: (draftId: string) => Promise<IoSubmitResponse> = () =>
     Promise.reject(new Error("기존 임시저장 제출 경로가 없습니다.")),
   onDraftSubmitted?: (draftId: string) => void,
+  operationRefs?: IoOperationRefs,
+  saveExistingDraft?: (bundles: IoBundle[]) => Promise<{ batch_id: string }>,
 ): Promise<void> {
   if (!employeeId) {
     setError("작업자를 선택하세요.");
     return;
   }
   await waitForIdle();
+  const operationVersion = operationRefs ? captureIoOperation(operationRefs) : undefined;
   const bundles = getBundles();
   if (subType === "internal_use_out" && hasUnselectedInternalUseBomMode(bundles)) {
     setError("각 BOM 묶음의 차감 방식을 선택하세요.");
@@ -251,6 +289,17 @@ export async function runCompositionSubmit(
     return;
   }
   try {
+    const draftId = draftIdRef.current;
+    if (draftId) {
+      await saveExistingDraftBeforeSubmit(
+        draftId,
+        bundles,
+        operationRefs,
+        operationVersion,
+        draftIdRef,
+        saveExistingDraft,
+      );
+    }
     const { response, title, submittedDraftId } = await submitComposition(
       subType,
       fromDepartment,

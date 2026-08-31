@@ -65,6 +65,20 @@ def save_draft(
     덮어쓰기(이전 동작) 제거 — 같은 (work_type, sub_type) 라도 batch_id 가 없으면
     새 draft 가 쌓여 '작업 중' 탭에서 여러 작업을 이어서 진행할 수 있다.
     """
+    incoming_batch_id = getattr(payload, "batch_id", None)
+    batch: IoBatch | None = None
+    if incoming_batch_id is not None:
+        batch = (
+            db.query(IoBatch)
+            .filter(IoBatch.batch_id == incoming_batch_id)
+            .with_for_update()
+            .first()
+        )
+        if batch is None or batch.status != "draft":
+            raise ValueError("임시저장 작업을 찾을 수 없습니다.")
+        if batch.requester_employee_id != requester.employee_id:
+            raise PermissionError("본인 임시저장 작업만 수정할 수 있습니다.")
+        ensure_batch_is_mutable(batch)
     if not bool(requester.is_active):
         raise PermissionError("비활성 직원은 입출고 작업을 제출할 수 없습니다.")
     _lock_active_payload_items(db, payload)
@@ -103,20 +117,9 @@ def save_draft(
         to_department=payload.to_department,
         lines=(line for bundle in payload.bundles for line in bundle.lines),
     )
-    incoming_batch_id = getattr(payload, "batch_id", None)
 
-    if incoming_batch_id is not None:
-        batch = (
-            db.query(IoBatch)
-            .filter(IoBatch.batch_id == incoming_batch_id)
-            .first()
-        )
-        if batch is None or batch.status != "draft":
-            raise ValueError("임시저장 작업을 찾을 수 없습니다.")
-        if batch.requester_employee_id != requester.employee_id:
-            raise PermissionError("본인 임시저장 작업만 수정할 수 있습니다.")
-        ensure_batch_is_mutable(batch)
-        # 메타 갱신 + 자식 교체. client_request_id 는 보존(submit 멱등성).
+    if batch is not None:
+        # 메타 갱신 + 자식 교체. transport key는 보존하되 새 제출 지문은 다시 만든다.
         batch.work_type = payload.work_type
         batch.sub_type = payload.sub_type
         batch.from_department = payload.from_department
@@ -124,6 +127,7 @@ def save_draft(
         batch.requires_approval = payload.sub_type in APPROVAL_SUB_TYPES
         batch.reference_no = payload.reference_no
         batch.notes = payload.notes
+        batch.request_fingerprint = None
         batch.updated_at = datetime.utcnow()
         # cascade='all, delete-orphan' — 비우고 flush 해서 기존 자식을 INSERT 전에 DELETE.
         batch.bundles.clear()

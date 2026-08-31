@@ -797,10 +797,41 @@ describe("desktop history detail panels", () => {
       />,
     );
 
-    expect(screen.queryByText("대상 1건")).not.toBeInTheDocument();
+    expect(screen.queryByText("취소할 내역 1건")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "이 내역 취소" }));
-    expect(screen.getByText("대상 1건")).toBeInTheDocument();
+    expect(screen.getByText("취소할 내역 1건")).toBeInTheDocument();
     expect(screen.getAllByText("조립 재고")).toHaveLength(2);
+  });
+
+  it("hides single-log desktop detail content while the dedicated cancellation panel is open", () => {
+    function DesktopCancellationHarness() {
+      const [desktopCancellationOpen, setDesktopCancellationOpen] = useState(false);
+      return (
+        <HistoryDetailPanel
+          panelOpen
+          selected={makeLog()}
+          onSelectLog={() => {}}
+          onLogUpdated={() => {}}
+          variant="desktop"
+          desktopCancellationOpen={desktopCancellationOpen}
+          onDesktopCancellationOpenChange={setDesktopCancellationOpen}
+        />
+      );
+    }
+
+    render(<DesktopCancellationHarness />);
+    fireEvent.click(screen.getByRole("button", { name: "이 내역 취소" }));
+
+    const confirmation = screen.getByTestId("history-cancel-confirmation");
+    expect(confirmation).toBeInTheDocument();
+    expect(confirmation).toHaveClass("flex-1");
+    expect(confirmation).toHaveClass("hc-confirm--desktop-safe-focus");
+    expect(confirmation).toHaveClass("hc-confirm--desktop-panel-surface");
+    expect(confirmation.parentElement).toHaveClass("flex-1");
+    expect(within(confirmation).queryByRole("button", { name: "상세로 돌아가기" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("history-key-point-summary")).not.toBeInTheDocument();
+    expect(screen.queryByText(/처리 전/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/처리 후 기준 재고/)).not.toBeInTheDocument();
   });
 
   it("uses the shared summary without a duplicate desktop composition card", async () => {
@@ -1100,7 +1131,7 @@ describe("desktop history detail panels", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "이 내역 취소" }));
-    expect(screen.getByText("대상 1건")).toBeInTheDocument();
+    expect(screen.getByText("취소할 내역 1건")).toBeInTheDocument();
     expect(productionApi.getTransactions).not.toHaveBeenCalled();
   });
 
@@ -1115,8 +1146,8 @@ describe("desktop history detail panels", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "이 내역 취소" }));
-    expect(screen.getByText("대상 1건")).toBeInTheDocument();
-    expect(screen.getByText("되돌릴 실제 영향")).toBeInTheDocument();
+    expect(screen.getByText("취소할 내역 1건")).toBeInTheDocument();
+    expect(screen.getByText("되돌릴 재고 변동")).toBeInTheDocument();
   });
 
   it("previews and cancels every line of a new-ledger operation with the reviewed plan hash", async () => {
@@ -1156,7 +1187,7 @@ describe("desktop history detail panels", () => {
     );
 
     fireEvent.click(await screen.findByRole("button", { name: "이 내역 취소" }));
-    expect(await screen.findByText("대상 2건")).toBeInTheDocument();
+    expect(await screen.findByText("취소할 내역 2건")).toBeInTheDocument();
     expect(
       within(screen.getByTestId("history-cancel-confirmation")).getByText("하위 자재 B"),
     ).toBeInTheDocument();
@@ -1197,8 +1228,8 @@ describe("desktop history detail panels", () => {
     );
 
     fireEvent.click(await screen.findByRole("button", { name: "이 내역 취소" }));
-    expect(screen.getByText("대상 1건")).toBeInTheDocument();
-    expect(screen.getByText("되돌릴 실제 영향")).toBeInTheDocument();
+    expect(screen.getByText("취소할 내역 1건")).toBeInTheDocument();
+    expect(screen.getByText("되돌릴 재고 변동")).toBeInTheDocument();
   });
 
   it("does not let a late batch cancellation response overwrite a newly selected batch", async () => {

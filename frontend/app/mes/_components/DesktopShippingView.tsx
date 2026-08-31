@@ -2968,7 +2968,7 @@ function RequestSection(props: {
                             data-testid={`shipping-pf-option-${item.item_id}`}
                             onClick={() => props.onBasePfChange(item.item_id)}
                             disabled={locked || props.pending !== null}
-                            className="flex min-h-12 items-center justify-between gap-3 rounded-[12px] border px-3 py-2 text-left transition-all hover:brightness-110 disabled:opacity-50"
+                            className="standard-hover flex min-h-12 items-center justify-between gap-3 rounded-[12px] border px-3 py-2 text-left transition-all disabled:opacity-50"
                             style={{ background: selected ? tint(LEGACY_COLORS.blue, 14) : LEGACY_COLORS.s1, borderColor: selected ? tint(LEGACY_COLORS.blue, 45) : LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
                           >
                             <span className="min-w-0">
@@ -3194,7 +3194,7 @@ function RequestSection(props: {
                 aria-disabled={!canGoNext && !nameChangePromptActive}
                 onClick={goNext}
                 disabled={!canGoNext && !nameChangePromptActive}
-                className={`inline-flex min-h-11 items-center justify-center rounded-[12px] border px-5 py-2 text-sm font-black transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 ${nameChangePromptActive ? "opacity-40" : ""}`}
+                className={`standard-hover inline-flex min-h-11 items-center justify-center rounded-[12px] border px-5 py-2 text-sm font-black transition-all disabled:cursor-not-allowed disabled:opacity-40 ${nameChangePromptActive ? "opacity-40" : ""}`}
                 style={{ background: tint(LEGACY_COLORS.blue, 16), borderColor: tint(LEGACY_COLORS.blue, 48), color: LEGACY_COLORS.blue }}
               >다음</button>
             ) : (
@@ -3625,7 +3625,7 @@ function ItemSearchAdd({
           {filtered.length === 0 ? (
             <div className="px-3 py-3 text-center text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>검색 결과 없음</div>
           ) : filtered.map((item) => (
-            <button key={item.item_id} type="button" data-testid={`${buttonTestPrefix}-${item.item_id}`} onClick={() => { onAdd(item.item_id); setQuery(""); }} disabled={disabled} className="flex min-h-10 min-w-0 items-center justify-between gap-2 overflow-hidden rounded-[10px] px-2 text-left text-xs font-bold hover:brightness-110 disabled:opacity-45" style={{ background: LEGACY_COLORS.s1, color: LEGACY_COLORS.text }}>
+            <button key={item.item_id} type="button" data-testid={`${buttonTestPrefix}-${item.item_id}`} onClick={() => { onAdd(item.item_id); setQuery(""); }} disabled={disabled} className="standard-hover flex min-h-10 min-w-0 items-center justify-between gap-2 overflow-hidden rounded-[10px] px-2 text-left text-xs font-bold disabled:opacity-45" style={{ background: LEGACY_COLORS.s1, color: LEGACY_COLORS.text }}>
               <span className="min-w-0"><span className="block truncate">{item.item_name}</span><SummaryCode code={item.mes_code ?? item.process_type_code ?? "-"} testId={`shipping-item-search-code-${item.item_id}`} className="block truncate" /></span>
               <span className="shrink-0 rounded-full px-2 py-1 font-black" style={{ background: tint(tone, 14), color: tone }}>추가</span>
             </button>
@@ -4053,9 +4053,9 @@ function RequestRow({ request, active, layout = "default", onClick }: { request:
   ] as const;
   const requestBoardMetadata = [metadata[1], metadata[0], metadata[3]];
   const rowClassName = layout === "requestBoard"
-    ? "flex h-[136px] flex-col overflow-hidden rounded-[16px] border px-4 py-2 text-left outline-none transition-all hover:brightness-105 active:scale-[0.995] focus-visible:ring-2"
+    ? "standard-hover flex h-[136px] flex-col overflow-hidden rounded-[16px] border px-4 py-2 text-left outline-none transition-all active:scale-[0.995] focus-visible:ring-2"
     : layout === "historyList"
-      ? "h-[112px] overflow-hidden rounded-[16px] border px-4 py-3 text-left outline-none transition-all hover:brightness-105 active:scale-[0.995] focus-visible:ring-2"
+      ? "standard-hover h-[112px] overflow-hidden rounded-[16px] border px-4 py-3 text-left outline-none transition-all active:scale-[0.995] focus-visible:ring-2"
       : "min-h-[136px] rounded-[14px] border px-4 py-3 text-left transition-colors";
   return (
     <button
@@ -4528,7 +4528,7 @@ function PrimaryActionButton({
       data-testid={dataTestId}
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] border px-4 py-2 font-black transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-45 ${large ? "text-base" : "text-sm"} ${className}`}
+      className={`standard-hover inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] border px-4 py-2 font-black transition-all active:scale-[0.98] disabled:opacity-45 ${large ? "text-base" : "text-sm"} ${className}`}
       style={{ background: tint(tone, 16), borderColor: tint(tone, 48), color: tone }}
     >
       <Icon className={large ? "h-5 w-5" : "h-4 w-4"} />

@@ -248,7 +248,7 @@ export function DefectCartFlow({
           <button
             type="button"
             onClick={onCancel}
-            className="flex items-center gap-1 rounded-[10px] border px-3 py-1.5 text-sm font-bold transition-colors hover:brightness-110"
+            className="standard-hover flex items-center gap-1 rounded-[10px] border px-3 py-1.5 text-sm font-bold transition-colors"
             style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
           >
             <ArrowLeft className="h-4 w-4" />
@@ -325,7 +325,7 @@ export function DefectCartFlow({
           type="button"
           onClick={goBack}
           disabled={busy}
-          className="flex items-center gap-1 rounded-[10px] border px-3 py-1.5 text-sm font-bold transition-colors hover:brightness-110 disabled:opacity-50"
+          className="standard-hover flex items-center gap-1 rounded-[10px] border px-3 py-1.5 text-sm font-bold transition-colors disabled:opacity-50"
           style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
         >
           <ArrowLeft className="h-4 w-4" />
@@ -358,7 +358,7 @@ export function DefectCartFlow({
                   const label = s === "warehouse" ? "창고 재고" : "부서 재고";
                   const desc = s === "warehouse" ? "창고 보관 중인 정상 재고에서 처리합니다" : "생산 부서에서 사용 중인 재고에서 처리합니다";
                   return (
-                    <button key={s} type="button" onClick={() => setSource(s)} className="flex h-full flex-col justify-between rounded-[22px] border p-7 text-left transition-all hover:brightness-110 active:scale-[0.99]" style={{ background: active ? tint(LEGACY_COLORS.red, 7) : LEGACY_COLORS.s2, borderColor: active ? LEGACY_COLORS.red : LEGACY_COLORS.border, borderWidth: active ? 2 : 1 }}>
+                    <button key={s} type="button" onClick={() => setSource(s)} className="standard-hover flex h-full flex-col justify-between rounded-[22px] border p-7 text-left transition-all active:scale-[0.99]" style={{ background: active ? tint(LEGACY_COLORS.red, 7) : LEGACY_COLORS.s2, borderColor: active ? LEGACY_COLORS.red : LEGACY_COLORS.border, borderWidth: active ? 2 : 1 }}>
                       <div className="flex items-center gap-4">
                         <Icon className="h-9 w-9 shrink-0" style={{ color: active ? LEGACY_COLORS.red : LEGACY_COLORS.muted2 }} />
                         <span className="text-3xl font-black" style={{ color: active ? LEGACY_COLORS.red : LEGACY_COLORS.text }}>{label}</span>
@@ -386,7 +386,7 @@ export function DefectCartFlow({
                     const active = dept === d;
                     const deptColor = departmentDisplayColor(MES_DEPARTMENT_COLORS[d] ?? LEGACY_COLORS.muted2, d);
                     return (
-                      <button key={d} type="button" onClick={() => setDept(d)} className="h-full rounded-[18px] border text-3xl font-black transition-all hover:brightness-110 active:scale-[0.99]" style={{ background: active ? tint(deptColor, 14) : LEGACY_COLORS.s2, borderColor: active ? deptColor : LEGACY_COLORS.border, borderWidth: active ? 2 : 1, color: active ? deptColor : LEGACY_COLORS.muted2 }}>
+                      <button key={d} type="button" onClick={() => setDept(d)} className="standard-hover h-full rounded-[18px] border text-3xl font-black transition-all active:scale-[0.99]" style={{ background: active ? tint(deptColor, 14) : LEGACY_COLORS.s2, borderColor: active ? deptColor : LEGACY_COLORS.border, borderWidth: active ? 2 : 1, color: active ? deptColor : LEGACY_COLORS.muted2 }}>
                         {d}
                       </button>
                     );
@@ -438,7 +438,7 @@ export function DefectCartFlow({
                             <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{line.item.mes_code ?? "(코드 없음)"}</div>
                             <div className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{line.item.item_name}</div>
                           </div>
-                          <button type="button" onClick={() => removeLine(line.key)} className="no-btn-inset flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:brightness-110" style={{ color: LEGACY_COLORS.red, background: tint(LEGACY_COLORS.red, 10) }} aria-label="삭제">
+                          <button type="button" onClick={() => removeLine(line.key)} className="standard-hover no-btn-inset flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors" style={{ color: LEGACY_COLORS.red, background: tint(LEGACY_COLORS.red, 10) }} aria-label="삭제">
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
@@ -554,7 +554,7 @@ export function DefectCartFlow({
 
 function ActionCard({ icon: Icon, title, desc, tone, onClick }: { icon: LucideIcon; title: string; desc: string; tone: string; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="flex h-full min-h-0 flex-col justify-between gap-6 rounded-[22px] border p-10 text-left transition-all hover:brightness-110 active:scale-[0.99]" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, borderWidth: 1, color: LEGACY_COLORS.text }}>
+    <button type="button" onClick={onClick} className="standard-hover flex h-full min-h-0 flex-col justify-between gap-6 rounded-[22px] border p-10 text-left transition-all active:scale-[0.99]" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, borderWidth: 1, color: LEGACY_COLORS.text }}>
       <div className="flex items-center gap-5">
         <Icon className="h-10 w-10 shrink-0" style={{ color: tone }} />
         <span className="text-4xl font-black leading-tight" style={{ color: tone }}>{title}</span>

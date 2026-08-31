@@ -1,6 +1,7 @@
 import { createRef } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { DesktopPanelCloseButton, DesktopRightPanel, DesktopRightPanelFooter } from "../DesktopRightPanel";
 
 describe("DesktopRightPanel", () => {
@@ -42,6 +43,20 @@ describe("DesktopRightPanel", () => {
     const title = screen.getByText("선택 품목");
     expect(topContent.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING)
       .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it("keeps a danger panel surface neutral and signals warning through its border only", () => {
+    render(
+      <DesktopRightPanel title="내역 취소" tone="danger">
+        상세 내용
+      </DesktopRightPanel>,
+    );
+
+    expect(screen.getByTestId("desktop-right-panel")).toHaveStyle({ background: LEGACY_COLORS.s1 });
+    expect(screen.getByTestId("desktop-right-panel-header")).toHaveStyle({
+      background: "transparent",
+    });
+    expect(screen.getByTestId("desktop-right-panel-header")).not.toHaveClass("-mx-5");
   });
 
   it("keeps the detail body scrollbar visible and draggable", () => {

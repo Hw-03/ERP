@@ -410,20 +410,30 @@ export function StockSnapshotCell({
   const warehouseAfterText = formatQty(warehouseAfter);
   const departmentBeforeText = formatQty(departmentBefore);
   const departmentAfterText = formatQty(departmentAfter);
+  const changedSnapshots = [
+    { label: "창고", before: warehouseBefore, after: warehouseAfter, beforeText: warehouseBeforeText, afterText: warehouseAfterText },
+    { label: "부서", before: departmentBefore, after: departmentAfter, beforeText: departmentBeforeText, afterText: departmentAfterText },
+  ].filter((snapshot) => snapshot.before !== snapshot.after);
   const chipQuantityWidth = Math.max(
     STOCK_SNAPSHOT_MIN_QUANTITY_WIDTH,
-    quantityWidth ?? Math.max(warehouseBeforeText.length, warehouseAfterText.length, departmentBeforeText.length, departmentAfterText.length),
+    quantityWidth ?? Math.max(...changedSnapshots.flatMap((snapshot) => [snapshot.beforeText.length, snapshot.afterText.length])),
   );
   const beforeQuantityWidth = chipQuantityWidth;
+  const snapshotLabel = changedSnapshots.length === 0
+    ? "재고 변동 없음"
+    : `재고 변동: ${changedSnapshots.map((snapshot) => `${snapshot.label} ${snapshot.beforeText} → ${snapshot.afterText}`).join(", ")}`;
 
   return (
     <td className={`${cellClass} px-1 text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
       <div
-        aria-label={`재고 변동: 창고 ${warehouseBeforeText} → ${warehouseAfterText}, 부서 ${departmentBeforeText} → ${departmentAfterText}`}
+        aria-label={snapshotLabel}
         className={`mx-auto flex w-fit min-w-0 flex-col items-start ${dense ? "gap-0" : "gap-0.5"}`}
       >
-        <StockSnapshotLine label="창고" beforeText={warehouseBeforeText} afterText={warehouseAfterText} beforeQuantityWidth={beforeQuantityWidth} afterQuantityWidth={STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH} increased={warehouseAfter > warehouseBefore} decreased={warehouseAfter < warehouseBefore} cancelled={log.cancelled} />
-        <StockSnapshotLine label="부서" beforeText={departmentBeforeText} afterText={departmentAfterText} beforeQuantityWidth={beforeQuantityWidth} afterQuantityWidth={STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH} increased={departmentAfter > departmentBefore} decreased={departmentAfter < departmentBefore} cancelled={log.cancelled} />
+        {changedSnapshots.length === 0 ? (
+          <span aria-hidden="true" className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>—</span>
+        ) : changedSnapshots.map((snapshot) => (
+          <StockSnapshotLine key={snapshot.label} label={snapshot.label} beforeText={snapshot.beforeText} afterText={snapshot.afterText} beforeQuantityWidth={beforeQuantityWidth} afterQuantityWidth={STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH} increased={snapshot.after > snapshot.before} decreased={snapshot.after < snapshot.before} cancelled={log.cancelled} />
+        ))}
       </div>
     </td>
   );
@@ -431,12 +441,18 @@ export function StockSnapshotCell({
 
 /** 묶음 안의 전·후 창고/부서 수량 중 가장 긴 화면 표기 폭을 구한다. */
 export function getStockSnapshotQuantityWidth(logs: TransactionLog[]): number | undefined {
-  const quantities = logs.flatMap((log) => [
-    log.warehouse_qty_before,
-    log.warehouse_qty_after,
-    log.department_qty_before,
-    log.department_qty_after,
-  ]).filter((quantity): quantity is number => quantity != null);
+  const quantities = logs.flatMap((log) => {
+    const warehouseChanged = log.warehouse_qty_before != null
+      && log.warehouse_qty_after != null
+      && log.warehouse_qty_before !== log.warehouse_qty_after;
+    const departmentChanged = log.department_qty_before != null
+      && log.department_qty_after != null
+      && log.department_qty_before !== log.department_qty_after;
+    return [
+      ...(warehouseChanged ? [log.warehouse_qty_before, log.warehouse_qty_after] : []),
+      ...(departmentChanged ? [log.department_qty_before, log.department_qty_after] : []),
+    ];
+  });
   return quantities.length > 0
     ? Math.max(STOCK_SNAPSHOT_MIN_QUANTITY_WIDTH, ...quantities.map((quantity) => formatQty(quantity).length))
     : undefined;

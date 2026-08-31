@@ -61,7 +61,7 @@ function EmptyStateImpl({
         <button
           type="button"
           onClick={action.onClick}
-          className="mt-2 rounded-[12px] border px-3 py-1.5 text-xs font-bold transition-colors hover:brightness-125"
+          className="standard-hover mt-2 rounded-[12px] border px-3 py-1.5 text-xs font-bold transition-colors"
           style={{
             borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 30%, ${LEGACY_COLORS.border})`,
             color: LEGACY_COLORS.blue,

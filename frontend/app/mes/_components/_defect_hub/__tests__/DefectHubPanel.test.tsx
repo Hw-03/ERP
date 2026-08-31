@@ -91,6 +91,7 @@ beforeEach(() => {
   realtime.revision = null;
   vi.mocked(defectsApi.listDefects).mockClear();
   vi.mocked(defectsApi.listDefects).mockResolvedValue(mockLocations);
+  window.localStorage.clear();
 });
 
 describe("DefectHubPanel", () => {
@@ -283,6 +284,23 @@ describe("DefectHubPanel", () => {
     expect(screen.getByText("MINE-VACUUM")).toBeInTheDocument();
     expect(screen.getByText("격리 중").parentElement).toHaveTextContent("2건");
     expect(screen.getByText("1년 이상 ⚠").parentElement).toHaveTextContent("1건");
+  });
+
+  it("restores the employee's locked filters into the mobile list and KPI", async () => {
+    window.localStorage.setItem(
+      `dexcowin_mes_defect_filters:${mockEmployee.employee_id}`,
+      JSON.stringify({ version: 1, scope: "all", actorScope: "mine", sort: "newest" }),
+    );
+
+    render(<DefectHubPanel currentEmployee={mockEmployee} />);
+    openList();
+
+    expect(await screen.findByRole("checkbox", { name: "필터 고정" })).toBeChecked();
+    expect(screen.getByRole("combobox")).toHaveValue("newest");
+    expect(screen.getByRole("button", { name: "내가 격리" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("7-TR-0001")).toBeInTheDocument();
+    expect(screen.queryByText("7-TR-0003")).not.toBeInTheDocument();
+    expect(screen.getByText("격리 중").parentElement).toHaveTextContent("1건");
   });
 });
 

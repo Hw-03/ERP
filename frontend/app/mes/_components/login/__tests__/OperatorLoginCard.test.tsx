@@ -115,7 +115,13 @@ describe("OperatorLoginCard", () => {
     render(<OperatorLoginCard onLogin={() => {}} />);
     await selectAndSubmit("9999");
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("직원 또는 PIN 정보가 올바르지 않습니다.");
+    const pinInput = screen.getByLabelText("PIN 번호");
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("직원 또는 PIN 정보가 올바르지 않습니다.");
+      expect(pinInput).toHaveValue("");
+      expect(pinInput).not.toBeDisabled();
+      expect(pinInput).toHaveFocus();
+    });
   });
 
   it("changes a default PIN and logs in again with the new PIN", async () => {

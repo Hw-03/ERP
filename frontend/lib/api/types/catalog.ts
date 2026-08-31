@@ -33,6 +33,7 @@ export interface BOMTreeNode {
   unit: string;
   required_quantity: number;
   current_stock: number;
+  additional_producible_quantity?: number;
   production_capacity_ignored?: boolean;
   children: BOMTreeNode[];
 }

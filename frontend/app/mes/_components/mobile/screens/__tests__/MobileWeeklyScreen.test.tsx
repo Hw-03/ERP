@@ -46,6 +46,15 @@ describe("MobileWeeklyScreen", () => {
     expect(onExit).toHaveBeenCalledTimes(1);
   });
 
+  it("requests the selected KST Monday through Sunday", () => {
+    render(<MobileWeeklyScreen weekMon={new Date("2026-08-31T00:00:00+09:00")} />);
+
+    expect(state.getWeeklyReport).toHaveBeenLastCalledWith({
+      week_start: "2026-08-31",
+      week_end: "2026-09-06",
+    });
+  });
+
   it("passes the normal-stock basis to verified weekly details", async () => {
     state.getWeeklyReport.mockResolvedValue({
       groups: [],

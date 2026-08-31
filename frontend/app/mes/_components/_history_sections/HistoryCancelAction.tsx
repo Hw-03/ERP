@@ -221,6 +221,8 @@ export function HistoryCancelAction({
   scopeCount,
   children,
   pinToDesktopFooter = false,
+  desktopCancellationOpen = false,
+  onDesktopCancellationOpenChange,
 }: {
   panelOpen: boolean;
   identity: string;
@@ -235,6 +237,8 @@ export function HistoryCancelAction({
   scopeCount?: number;
   children?: (controller: HistoryCancelController) => ReactNode;
   pinToDesktopFooter?: boolean;
+  desktopCancellationOpen?: boolean;
+  onDesktopCancellationOpenChange?: (open: boolean) => void;
 }) {
   const copy = getHistoryCancelCopy(scope);
   const [step, setStep] = useState<CancelStep>("idle");
@@ -252,12 +256,22 @@ export function HistoryCancelAction({
     setError("");
   }, [panelOpen, identity, cancelled]);
 
+  useLayoutEffect(() => {
+    if (desktopCancellationOpen) return;
+    lifecycleTokenRef.current += 1;
+    setStep("idle");
+    setReason("");
+    setPin("");
+    setError("");
+  }, [desktopCancellationOpen]);
+
   function closeConfirmation(): void {
     lifecycleTokenRef.current += 1;
     setStep("idle");
     setReason("");
     setPin("");
     setError("");
+    onDesktopCancellationOpenChange?.(false);
   }
 
   async function submitCancellation(): Promise<void> {
@@ -284,6 +298,7 @@ export function HistoryCancelAction({
       setReason("");
       setPin("");
       setStep("idle");
+      onDesktopCancellationOpenChange?.(false);
     } catch (err: unknown) {
       submittingRef.current = false;
       inFlightCancellationIdentities.delete(requestIdentity);
@@ -308,7 +323,9 @@ export function HistoryCancelAction({
     error,
     scopeStatus,
     openConfirmation: () => {
-      if (available) setStep("confirm");
+      if (!available) return;
+      setStep("confirm");
+      onDesktopCancellationOpenChange?.(true);
     },
     closeConfirmation,
     retryScope: () => onRetryScope?.(),
@@ -338,10 +355,10 @@ export function HistoryCancelAction({
     content = (
     <section
       data-testid="history-cancel-confirmation"
-      className="hc-confirm"
+      className={desktopCancellationOpen ? "hc-confirm hc-confirm--desktop hc-confirm--desktop-safe-focus hc-confirm--desktop-panel-surface flex-1" : "hc-confirm"}
     >
-      <div>
-        <strong>취소 범위 확인</strong>
+      <div className={desktopCancellationOpen ? "hc-confirm-summary--desktop" : undefined}>
+        <strong>취소 내용 확인</strong>
         <p>{copy.description}</p>
         <HistoryCancelImpactPreview effects={effects} scopeCount={scopeCount} />
       </div>
@@ -367,24 +384,27 @@ export function HistoryCancelAction({
       <div className="hc-actions">
         <button
           type="button"
+          className="hc-submit"
           onClick={() => void submitCancellation()}
           disabled={step === "submitting" || !reason.trim() || !pin}
         >
           {step === "submitting" ? "처리 중…" : step === "error" ? "다시 시도" : "취소 확정"}
         </button>
-        <button
-          type="button"
-          onClick={closeConfirmation}
-          disabled={step === "submitting"}
-        >
-          닫기
-        </button>
+        {!desktopCancellationOpen && (
+          <button
+            type="button"
+            onClick={closeConfirmation}
+            disabled={step === "submitting"}
+          >
+            닫기
+          </button>
+        )}
       </div>
     </section>
     );
   }
 
-  return pinToDesktopFooter ? <DesktopRightPanelFooter>{content}</DesktopRightPanelFooter> : content;
+  return pinToDesktopFooter && !desktopCancellationOpen ? <DesktopRightPanelFooter>{content}</DesktopRightPanelFooter> : content;
 }
 
 function HistoryCancelImpactPreview({
@@ -397,10 +417,10 @@ function HistoryCancelImpactPreview({
   return (
     <>
       {scopeCount != null && (
-        <div className="hc-count">대상 {scopeCount}건</div>
+        <div className="hc-count">취소할 내역 {scopeCount}건</div>
       )}
       <div className="hc-impact">
-        <strong>되돌릴 실제 영향</strong>
+        <strong>되돌릴 재고 변동</strong>
         {effects.length > 0 ? effects.map((effect) => {
           return (
             <div key={effect.key} className="hc-impact-row">

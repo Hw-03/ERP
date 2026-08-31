@@ -11,6 +11,7 @@ from app.models import (
     Employee,
     EmployeeLevelEnum,
     Inventory,
+    IoBatch,
     Notification,
     StockRequest,
     StockRequestLine,
@@ -22,7 +23,10 @@ from app.models import (
 )
 from app.services.pin_auth import hash_pin
 from app.services import sr_execution as sr_execution_svc
+from app.services import stock_request_actions as action_svc
+from app.services import stock_requests as stock_request_svc
 from app.services import warehouse_map as warehouse_map_svc
+from app.routers import stock_requests as stock_request_router
 
 
 @pytest.fixture()
@@ -95,6 +99,371 @@ def _box_quantity(db_session, box_id) -> int:
         .one()
     )
     return int(content.quantity)
+
+
+def _linked_batch(db_session, requester: Employee, *, status: str = "reserved") -> IoBatch:
+    batch = IoBatch(
+        work_type="warehouse_io",
+        sub_type="warehouse_to_dept",
+        status=status,
+        requester_employee_id=requester.employee_id,
+        requester_name=requester.name,
+        requester_department=requester.department.value,
+        requires_approval=True,
+    )
+    db_session.add(batch)
+    db_session.flush()
+    return batch
+
+
+def _open_linked_request(client, db_session, *, requester: Employee, batch: IoBatch | None, item_id, quantity: str = "2") -> StockRequest:
+    _login(client, requester)
+    created = client.post(
+        "/api/stock-requests",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "request_type": "warehouse_to_dept",
+            "lines": [{
+                "item_id": str(item_id),
+                "quantity": quantity,
+                "from_bucket": "warehouse",
+                "to_bucket": "production",
+                "to_department": DepartmentEnum.ASSEMBLY.value,
+            }],
+        },
+    )
+    assert created.status_code == 201, created.text
+    request = db_session.query(StockRequest).filter(
+        StockRequest.request_id == created.json()["request_id"]
+    ).one()
+    if batch is not None:
+        request.operation_batch_id = batch.batch_id
+    db_session.commit()
+    return request
+
+
+def test_revert_to_draft_rejects_unlinked_request_without_mutation(
+    client, db_session, make_item
+) -> None:
+    item = make_item(name="Unlinked revert", warehouse_qty=Decimal("5"))
+    requester = _employee(db_session, code="SR-REV-UNLINKED", name="요청자")
+    db_session.commit()
+    request = _open_linked_request(
+        client,
+        db_session,
+        requester=requester,
+        batch=None,
+        item_id=item.item_id,
+    )
+
+    response = client.post(
+        f"/api/stock-requests/{request.request_id}/revert-to-draft",
+        json={"actor_employee_id": str(requester.employee_id), "pin": "2468"},
+    )
+
+    assert response.status_code == 422, response.text
+    db_session.expire_all()
+    persisted = db_session.query(StockRequest).filter(StockRequest.request_id == request.request_id).one()
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert persisted.status == StockRequestStatusEnum.RESERVED
+    assert inventory.pending_quantity == Decimal("2")
+
+
+def test_revert_to_draft_cancels_all_open_linked_requests_and_releases_reservations(
+    client, db_session, make_item
+) -> None:
+    first = make_item(name="Multi revert first", warehouse_qty=Decimal("5"))
+    second = make_item(name="Multi revert second", warehouse_qty=Decimal("5"))
+    requester = _employee(db_session, code="SR-REV-MULTI", name="요청자")
+    batch = _linked_batch(db_session, requester)
+    db_session.commit()
+    clicked = _open_linked_request(
+        client, db_session, requester=requester, batch=batch, item_id=first.item_id
+    )
+    sibling = _open_linked_request(
+        client, db_session, requester=requester, batch=batch, item_id=second.item_id
+    )
+
+    response = client.post(
+        f"/api/stock-requests/{clicked.request_id}/revert-to-draft",
+        json={"actor_employee_id": str(requester.employee_id), "pin": "2468"},
+    )
+
+    assert response.status_code == 204, response.text
+    db_session.expire_all()
+    persisted_batch = db_session.query(IoBatch).filter(IoBatch.batch_id == batch.batch_id).one()
+    requests = db_session.query(StockRequest).filter(
+        StockRequest.operation_batch_id == batch.batch_id
+    ).order_by(StockRequest.created_at, StockRequest.request_id).all()
+    inventories = db_session.query(Inventory).filter(
+        Inventory.item_id.in_([first.item_id, second.item_id])
+    ).all()
+    assert [request.status for request in requests] == [
+        StockRequestStatusEnum.CANCELLED,
+        StockRequestStatusEnum.CANCELLED,
+    ]
+    assert persisted_batch.status == "draft"
+    assert all(inventory.pending_quantity == Decimal("0") for inventory in inventories)
+
+
+def test_revert_to_draft_rejects_completed_sibling_without_mutation(
+    client, db_session, make_item
+) -> None:
+    first = make_item(name="Completed sibling first", warehouse_qty=Decimal("5"))
+    second = make_item(name="Completed sibling second", warehouse_qty=Decimal("5"))
+    requester = _employee(db_session, code="SR-REV-COMPLETE", name="요청자")
+    batch = _linked_batch(db_session, requester)
+    db_session.commit()
+    clicked = _open_linked_request(
+        client, db_session, requester=requester, batch=batch, item_id=first.item_id
+    )
+    completed = _open_linked_request(
+        client, db_session, requester=requester, batch=batch, item_id=second.item_id
+    )
+    completed.status = StockRequestStatusEnum.COMPLETED
+    for line in completed.lines:
+        line.status = StockRequestStatusEnum.COMPLETED
+    db_session.commit()
+
+    response = client.post(
+        f"/api/stock-requests/{clicked.request_id}/revert-to-draft",
+        json={"actor_employee_id": str(requester.employee_id), "pin": "2468"},
+    )
+
+    assert response.status_code == 422, response.text
+    db_session.expire_all()
+    persisted_batch = db_session.query(IoBatch).filter(IoBatch.batch_id == batch.batch_id).one()
+    requests = db_session.query(StockRequest).filter(
+        StockRequest.operation_batch_id == batch.batch_id
+    ).order_by(StockRequest.created_at, StockRequest.request_id).all()
+    assert persisted_batch.status == "reserved"
+    assert [request.status for request in requests] == [
+        StockRequestStatusEnum.RESERVED,
+        StockRequestStatusEnum.COMPLETED,
+    ]
+
+
+def test_revert_to_draft_rolls_back_all_cancellations_when_later_cancel_fails(
+    client, db_session, make_item, monkeypatch
+) -> None:
+    first = make_item(name="Rollback revert first", warehouse_qty=Decimal("5"))
+    second = make_item(name="Rollback revert second", warehouse_qty=Decimal("5"))
+    requester = _employee(db_session, code="SR-REV-ROLLBACK", name="요청자")
+    batch = _linked_batch(db_session, requester)
+    db_session.commit()
+    clicked = _open_linked_request(
+        client, db_session, requester=requester, batch=batch, item_id=first.item_id
+    )
+    _open_linked_request(client, db_session, requester=requester, batch=batch, item_id=second.item_id)
+    real_cancel = stock_request_svc.cancel_request
+    calls = 0
+
+    def fail_second_cancel(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("second cancellation failure")
+        return real_cancel(*args, **kwargs)
+
+    monkeypatch.setattr(stock_request_svc, "cancel_request", fail_second_cancel)
+
+    with pytest.raises(RuntimeError, match="second cancellation failure"):
+        action_svc.revert_to_draft(
+            db_session,
+            request=clicked,
+            requester=requester,
+            pin="2468",
+        )
+
+    db_session.expire_all()
+    persisted_batch = db_session.query(IoBatch).filter(IoBatch.batch_id == batch.batch_id).one()
+    requests = db_session.query(StockRequest).filter(
+        StockRequest.operation_batch_id == batch.batch_id
+    ).all()
+    inventories = db_session.query(Inventory).filter(
+        Inventory.item_id.in_([first.item_id, second.item_id])
+    ).all()
+    assert persisted_batch.status == "reserved"
+    assert all(request.status == StockRequestStatusEnum.RESERVED for request in requests)
+    assert all(inventory.pending_quantity == Decimal("2") for inventory in inventories)
+
+
+def test_revert_to_draft_cancels_single_open_linked_request(
+    client, db_session, make_item
+) -> None:
+    item = make_item(name="Single revert", warehouse_qty=Decimal("5"))
+    requester = _employee(db_session, code="SR-REV-SINGLE", name="요청자")
+    batch = _linked_batch(db_session, requester)
+    db_session.commit()
+    request = _open_linked_request(
+        client, db_session, requester=requester, batch=batch, item_id=item.item_id
+    )
+
+    response = client.post(
+        f"/api/stock-requests/{request.request_id}/revert-to-draft",
+        json={"actor_employee_id": str(requester.employee_id), "pin": "2468"},
+    )
+
+    assert response.status_code == 204, response.text
+    db_session.expire_all()
+    persisted_batch = db_session.query(IoBatch).filter(IoBatch.batch_id == batch.batch_id).one()
+    persisted_request = db_session.query(StockRequest).filter(
+        StockRequest.request_id == request.request_id
+    ).one()
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert persisted_batch.status == "draft"
+    assert persisted_request.status == StockRequestStatusEnum.CANCELLED
+    assert inventory.pending_quantity == Decimal("0")
+
+
+def test_revert_to_draft_rejects_wrong_pin_without_mutation(
+    client, db_session, make_item
+) -> None:
+    item = make_item(name="Wrong PIN revert", warehouse_qty=Decimal("5"))
+    requester = _employee(db_session, code="SR-REV-WRONG-PIN", name="요청자")
+    batch = _linked_batch(db_session, requester)
+    db_session.commit()
+    request = _open_linked_request(
+        client, db_session, requester=requester, batch=batch, item_id=item.item_id
+    )
+
+    response = client.post(
+        f"/api/stock-requests/{request.request_id}/revert-to-draft",
+        json={"actor_employee_id": str(requester.employee_id), "pin": "9999"},
+    )
+
+    assert response.status_code == 403, response.text
+    db_session.expire_all()
+    persisted_batch = db_session.query(IoBatch).filter(IoBatch.batch_id == batch.batch_id).one()
+    persisted_request = db_session.query(StockRequest).filter(
+        StockRequest.request_id == request.request_id
+    ).one()
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert persisted_batch.status == "reserved"
+    assert persisted_request.status == StockRequestStatusEnum.RESERVED
+    assert inventory.pending_quantity == Decimal("2")
+
+
+@pytest.mark.parametrize("batch_status", ["completed", "partially_completed"])
+def test_revert_to_draft_rejects_completed_batch_without_mutation(
+    client, db_session, make_item, batch_status
+) -> None:
+    item = make_item(name=f"Completed batch {batch_status}", warehouse_qty=Decimal("5"))
+    requester = _employee(db_session, code=f"SR-REV-{batch_status}", name="요청자")
+    batch = _linked_batch(db_session, requester, status=batch_status)
+    db_session.commit()
+    request = _open_linked_request(
+        client, db_session, requester=requester, batch=batch, item_id=item.item_id
+    )
+
+    response = client.post(
+        f"/api/stock-requests/{request.request_id}/revert-to-draft",
+        json={"actor_employee_id": str(requester.employee_id), "pin": "2468"},
+    )
+
+    assert response.status_code == 422, response.text
+    db_session.expire_all()
+    persisted_batch = db_session.query(IoBatch).filter(IoBatch.batch_id == batch.batch_id).one()
+    persisted_request = db_session.query(StockRequest).filter(
+        StockRequest.request_id == request.request_id
+    ).one()
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert persisted_batch.status == batch_status
+    assert persisted_request.status == StockRequestStatusEnum.RESERVED
+    assert inventory.pending_quantity == Decimal("2")
+
+
+def test_revert_to_draft_cancels_submitted_and_preserves_terminal_siblings(
+    client, db_session, make_item
+) -> None:
+    submitted_item = make_item(name="Submitted revert", warehouse_qty=Decimal("5"))
+    rejected_item = make_item(name="Rejected sibling", warehouse_qty=Decimal("5"))
+    failed_item = make_item(name="Failed sibling", warehouse_qty=Decimal("5"))
+    requester = _employee(db_session, code="SR-REV-PRESERVE", name="요청자")
+    batch = _linked_batch(db_session, requester)
+    db_session.commit()
+    submitted = _open_linked_request(
+        client, db_session, requester=requester, batch=batch, item_id=submitted_item.item_id
+    )
+    rejected = _open_linked_request(
+        client, db_session, requester=requester, batch=batch, item_id=rejected_item.item_id
+    )
+    failed = _open_linked_request(
+        client, db_session, requester=requester, batch=batch, item_id=failed_item.item_id
+    )
+    submitted.status = StockRequestStatusEnum.SUBMITTED
+    for line in submitted.lines:
+        line.status = StockRequestStatusEnum.SUBMITTED
+    rejected.status = StockRequestStatusEnum.REJECTED
+    failed.status = StockRequestStatusEnum.FAILED_APPROVAL
+    db_session.commit()
+
+    response = client.post(
+        f"/api/stock-requests/{submitted.request_id}/revert-to-draft",
+        json={"actor_employee_id": str(requester.employee_id), "pin": "2468"},
+    )
+
+    assert response.status_code == 204, response.text
+    db_session.expire_all()
+    requests = db_session.query(StockRequest).filter(
+        StockRequest.operation_batch_id == batch.batch_id
+    ).order_by(StockRequest.created_at, StockRequest.request_id).all()
+    assert [request.status for request in requests] == [
+        StockRequestStatusEnum.CANCELLED,
+        StockRequestStatusEnum.REJECTED,
+        StockRequestStatusEnum.FAILED_APPROVAL,
+    ]
+
+
+def test_revert_to_draft_requires_matching_batch_requester(
+    client, db_session, make_item
+) -> None:
+    item = make_item(name="Batch owner mismatch", warehouse_qty=Decimal("5"))
+    requester = _employee(db_session, code="SR-REV-BATCH-REQUESTER", name="요청자")
+    batch_owner = _employee(db_session, code="SR-REV-BATCH-OWNER", name="다른작성자")
+    batch = _linked_batch(db_session, batch_owner)
+    db_session.commit()
+    request = _open_linked_request(
+        client, db_session, requester=requester, batch=batch, item_id=item.item_id
+    )
+
+    response = client.post(
+        f"/api/stock-requests/{request.request_id}/revert-to-draft",
+        json={"actor_employee_id": str(requester.employee_id), "pin": "2468"},
+    )
+
+    assert response.status_code == 403, response.text
+    db_session.expire_all()
+    persisted_batch = db_session.query(IoBatch).filter(IoBatch.batch_id == batch.batch_id).one()
+    persisted_request = db_session.query(StockRequest).filter(
+        StockRequest.request_id == request.request_id
+    ).one()
+    assert persisted_batch.status == "reserved"
+    assert persisted_request.status == StockRequestStatusEnum.RESERVED
+
+
+def test_revert_to_draft_does_not_take_clicked_request_lock_before_batch_lock(
+    client, db_session, make_item, monkeypatch
+) -> None:
+    item = make_item(name="Revert lock order", warehouse_qty=Decimal("5"))
+    requester = _employee(db_session, code="SR-REV-LOCK-ORDER", name="요청자")
+    batch = _linked_batch(db_session, requester)
+    db_session.commit()
+    request = _open_linked_request(
+        client, db_session, requester=requester, batch=batch, item_id=item.item_id
+    )
+
+    def clicked_lock_must_not_run(*_args, **_kwargs):
+        raise AssertionError("revert must lock batch and linked requests in its service transaction")
+
+    monkeypatch.setattr(stock_request_router, "_load_request_for_action", clicked_lock_must_not_run)
+
+    response = client.post(
+        f"/api/stock-requests/{request.request_id}/revert-to-draft",
+        json={"actor_employee_id": str(requester.employee_id), "pin": "2468"},
+    )
+
+    assert response.status_code == 204, response.text
 
 
 def test_create_rolls_back_request_lines_and_pending_when_notification_fails(

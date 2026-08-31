@@ -10,6 +10,7 @@ from decimal import Decimal
 from typing import Iterable, Optional, Sequence
 import uuid
 
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -35,6 +36,12 @@ from app.services import stock_requests as stock_request_svc
 from app.services import notifications as notif_svc
 from app.services.approval_rules import MEMO_REQUIRED_SUB_TYPES
 from app.services.bom_stock_policy import is_bom_generated_line
+from app.services.command_idempotency import (
+    IdempotencyConflict,
+    fingerprint_io_draft_submit,
+    require_matching_fingerprint,
+)
+from app.services import io_draft
 from app.services.io_preview import (
     APPROVAL_SUB_TYPES,
     INTERNAL_USE_SUB_TYPE,
@@ -1145,15 +1152,26 @@ def submit_existing_draft(
     batch_id: uuid.UUID,
     requester: Employee,
 ) -> dict:
-    """저장된 draft를 재제출. 새 batch 생성 없이 기존 라인을 그대로 실행."""
+    """저장된 draft를 한 번 실행하고 동일 명령 재시도에는 결과만 재생한다."""
     batch = db.query(IoBatch).filter(IoBatch.batch_id == batch_id).first()
     if batch is None:
         raise ValueError("작업 묶음을 찾을 수 없습니다.")
     if batch.requester_employee_id != requester.employee_id:
         raise PermissionError("본인 임시저장 작업만 제출할 수 있습니다.")
-    if batch.status != "draft":
-        raise ValueError("임시저장 상태가 아닙니다.")
     ensure_batch_is_mutable(batch)
+    if batch.status != "draft":
+        expected_fingerprint = fingerprint_io_draft_submit(
+            requester.employee_id,
+            batch_id,
+            _batch_to_payload(batch),
+        )
+        require_matching_fingerprint(
+            batch.request_fingerprint,
+            expected_fingerprint,
+        )
+        replay = io_draft.build_idempotent_response(batch, db=db)
+        replay["_idempotent_replay"] = True
+        return replay
     _validate_required_memo(
         work_type=batch.work_type,
         sub_type=batch.sub_type,
@@ -1161,9 +1179,55 @@ def submit_existing_draft(
     )
     if not bool(requester.is_active):
         raise PermissionError("비활성 직원은 입출고 작업을 제출할 수 없습니다.")
+    if batch.request_fingerprint is not None:
+        raise IdempotencyConflict("draft_command_ambiguous")
+    submitted_at = datetime.utcnow()
+    transition = db.execute(
+        update(IoBatch)
+        .where(
+            IoBatch.batch_id == batch_id,
+            IoBatch.requester_employee_id == requester.employee_id,
+            IoBatch.status == "draft",
+            IoBatch.request_fingerprint.is_(None),
+        )
+        .values(
+            status="submitted",
+            submitted_at=submitted_at,
+            updated_at=submitted_at,
+        )
+    )
+    if transition.rowcount != 1:
+        db.expire_all()
+        winner = db.query(IoBatch).filter(IoBatch.batch_id == batch_id).first()
+        if winner is None:
+            raise ValueError("작업 묶음을 찾을 수 없습니다.")
+        if winner.requester_employee_id != requester.employee_id:
+            raise PermissionError("본인 임시저장 작업만 제출할 수 있습니다.")
+        if winner.status == "draft" and winner.request_fingerprint is None:
+            raise ValueError("임시저장 상태가 아닙니다.")
+        winner_fingerprint = fingerprint_io_draft_submit(
+            requester.employee_id,
+            batch_id,
+            _batch_to_payload(winner),
+        )
+        require_matching_fingerprint(
+            winner.request_fingerprint,
+            winner_fingerprint,
+        )
+        replay = io_draft.build_idempotent_response(winner, db=db)
+        replay["_idempotent_replay"] = True
+        return replay
+    db.flush()
+    db.refresh(batch)
     _lock_active_batch_items(db, batch)
     _normalize_batch_bom_stock_exempt(db, batch)
-    batch.status = "submitted"
-    batch.submitted_at = datetime.utcnow()
+    _execute_submission(db, requester=requester, batch=batch)
+    batch.request_fingerprint = fingerprint_io_draft_submit(
+        requester.employee_id,
+        batch_id,
+        _batch_to_payload(batch),
+    )
     db.flush()
-    return _execute_submission(db, requester=requester, batch=batch)
+    result = io_draft.build_idempotent_response(batch, db=db)
+    result["_idempotent_replay"] = False
+    return result

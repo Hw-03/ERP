@@ -145,7 +145,7 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged, targetReq
         onConfirm={submitRevert}
       >
         <p className="mb-3 text-sm" style={{ color: LEGACY_COLORS.text }}>
-          요청이 취소되고 작업 중 목록으로 이동합니다. 내용을 수정한 뒤 다시 제출하세요.
+          이 작업 묶음에 진행 중인 결재 요청이 모두 취소되고 작업 중 목록으로 이동합니다. 내용을 수정한 뒤 다시 제출하세요.
         </p>
         {revertError && (
           <p className="mb-2 text-xs" style={{ color: LEGACY_COLORS.red }}>

@@ -53,9 +53,11 @@ export function DesktopRightPanel({
   subtitleBadge,
   headerBadge,
   backButton,
+  headerAction,
   topContent,
   onClose,
   fillAvailableWidth = false,
+  tone = "default",
   children,
 }: {
   title: string;
@@ -64,10 +66,12 @@ export function DesktopRightPanel({
   subtitleBadge?: React.ReactNode;
   headerBadge?: React.ReactNode;
   backButton?: React.ReactNode;
+  headerAction?: React.ReactNode;
   topContent?: ReactNode;
   onClose?: () => void;
   /** SlidePanel 내부의 사용 가능한 전체 폭을 사용할지 여부. */
   fillAvailableWidth?: boolean;
+  tone?: "default" | "danger";
   children: React.ReactNode;
 }) {
   const [body, setBody] = useState<HTMLDivElement | null>(null);
@@ -77,11 +81,26 @@ export function DesktopRightPanel({
     <DesktopRightPanelBodyContext.Provider value={body}>
       <DesktopRightPanelFooterContext.Provider value={footer}>
         <div
+          data-testid="desktop-right-panel"
           className={`flex h-full min-h-0 ${fillAvailableWidth ? "w-full" : "w-[420px]"} shrink-0 flex-col overflow-hidden rounded-[32px] border px-5 py-5`}
-          style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+          style={{
+            background: LEGACY_COLORS.s1,
+            borderColor: tone === "danger"
+              ? `color-mix(in srgb, ${LEGACY_COLORS.red} 32%, ${LEGACY_COLORS.border})`
+              : LEGACY_COLORS.border,
+          }}
         >
           {topContent}
-          <div className="mb-4 px-1 pb-4 border-b" style={{ borderColor: LEGACY_COLORS.border }}>
+          <div
+            data-testid="desktop-right-panel-header"
+            className="mb-4 px-1 pb-4 border-b"
+            style={{
+              background: "transparent",
+              borderColor: tone === "danger"
+                ? `color-mix(in srgb, ${LEGACY_COLORS.red} 24%, ${LEGACY_COLORS.border})`
+                : LEGACY_COLORS.border,
+            }}
+          >
             <div className="flex items-start gap-3">
               {backButton ? <div className="shrink-0 pt-0.5">{backButton}</div> : null}
               <div className="min-w-0 flex-1 pr-1">
@@ -100,7 +119,7 @@ export function DesktopRightPanel({
                 ) : null}
               </div>
               {headerBadge ? <div className="shrink-0 pt-1">{headerBadge}</div> : null}
-              {onClose && <DesktopPanelCloseButton onClick={onClose} />}
+              {headerAction ?? (onClose && <DesktopPanelCloseButton onClick={onClose} />)}
             </div>
           </div>
           <div ref={setBody} data-testid="desktop-right-panel-body" className="sg min-h-0 flex-1 overflow-y-auto">{children}</div>

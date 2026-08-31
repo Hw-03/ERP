@@ -128,11 +128,12 @@ describe("다크 테마 색상 계약", () => {
     expect(styles).toMatch(/@media \(min-width: 1024px\)\s*\{[\s\S]*?button[\s\S]*?box-shadow:\s*none;/);
   });
 
-  it("업무 허브 카드의 호버 대비를 라이트와 다크에서 강하게 구분한다", () => {
+  it("일반 조작 호버는 라이트와 다크 테마에서 서로 다른 명암을 사용한다", () => {
     const styles = globalStyles();
 
-    expect(styles).toMatch(/\.desktop-work-hub-card:hover\s*\{\s*filter:\s*brightness\(0\.94\);\s*\}/);
-    expect(styles).toMatch(/:root\[data-theme="dark"\] \.desktop-work-hub-card:hover\s*\{\s*filter:\s*brightness\(1\.15\);\s*\}/);
+    expect(styles).toMatch(/--c-standard-hover-brightness:\s*0\.94;/);
+    expect(styles).toMatch(/:root\[data-theme="dark"\]\s*\{[\s\S]*?--c-standard-hover-brightness:\s*1\.15;/);
+    expect(styles).toMatch(/@media \(hover: hover\)\s*\{[\s\S]*?\.standard-hover:not\(:disabled\):not\(\[aria-disabled="true"\]\):hover\s*\{[\s\S]*?filter:\s*brightness\(var\(--c-standard-hover-brightness\)\);/);
   });
 
   it("사이드바 탭 버튼은 데스크톱 평면화 규칙에서 제외한다", () => {

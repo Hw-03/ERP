@@ -53,7 +53,7 @@ function getVariantStyle(variant: ButtonVariant): React.CSSProperties {
  * variants: primary / secondary / ghost / danger
  * sizes: sm / md / lg
  * - shadow-sm 로 박스(카드)와 시각 분리
- * - hover: brightness-110 / active: scale-[0.98]
+ * - 공용 테마 호버 / active: scale-[0.98]
  * - LEGACY_COLORS CSS 변수 → light/dark 자동 전환
  */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
@@ -86,7 +86,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       className={[
         "inline-flex shrink-0 items-center justify-center font-bold transition-[filter,transform]",
         "shadow-sm",
-        "hover:brightness-110 active:scale-[0.98]",
+        "standard-hover active:scale-[0.98]",
         "disabled:cursor-not-allowed disabled:opacity-40",
         hasBorder ? "border" : "",
         sizeClass,

@@ -109,7 +109,7 @@ function DirtyModal({
             type="button"
             onClick={onCancel}
             disabled={modal.busy}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-all hover:brightness-105 disabled:opacity-50"
+            className="standard-hover flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-all disabled:opacity-50"
             style={{
               borderColor: LEGACY_COLORS.border,
               background: LEGACY_COLORS.s2,
@@ -127,7 +127,7 @@ function DirtyModal({
                 type="button"
                 onClick={onSaveAndProceed}
                 disabled={modal.busy}
-                className="flex w-full items-center justify-center gap-2 rounded-[16px] px-5 py-3.5 text-base font-black text-white transition-all hover:brightness-105 disabled:opacity-50"
+                className="standard-hover flex w-full items-center justify-center gap-2 rounded-[16px] px-5 py-3.5 text-base font-black text-white transition-all disabled:opacity-50"
                 style={{ background: LEGACY_COLORS.blueSolid }}
               >
                 <Save className="h-5 w-5" />
@@ -137,7 +137,7 @@ function DirtyModal({
                 type="button"
                 onClick={onProceedWithoutSave}
                 disabled={modal.busy}
-                className="w-full rounded-[16px] border px-5 py-3.5 text-base font-black transition-all hover:brightness-105 disabled:opacity-50"
+                className="standard-hover w-full rounded-[16px] border px-5 py-3.5 text-base font-black transition-all disabled:opacity-50"
                 style={{
                   borderColor: tint(LEGACY_COLORS.red, 38),
                   color: LEGACY_COLORS.red,
@@ -150,7 +150,7 @@ function DirtyModal({
                 type="button"
                 onClick={onCancel}
                 disabled={modal.busy}
-                className="w-full rounded-[16px] border px-5 py-3.5 text-base font-black transition-all hover:brightness-105 disabled:opacity-50"
+                className="standard-hover w-full rounded-[16px] border px-5 py-3.5 text-base font-black transition-all disabled:opacity-50"
                 style={{
                   borderColor: LEGACY_COLORS.border,
                   color: LEGACY_COLORS.muted2,
@@ -166,7 +166,7 @@ function DirtyModal({
                 type="button"
                 onClick={onProceedWithoutSave}
                 disabled={modal.busy}
-                className="w-full rounded-[16px] px-5 py-3.5 text-base font-black text-white transition-all hover:brightness-105 disabled:opacity-50"
+                className="standard-hover w-full rounded-[16px] px-5 py-3.5 text-base font-black text-white transition-all disabled:opacity-50"
                 style={{ background: LEGACY_COLORS.redSolid }}
               >
                 나가기
@@ -175,7 +175,7 @@ function DirtyModal({
                 type="button"
                 onClick={onCancel}
                 disabled={modal.busy}
-                className="w-full rounded-[16px] border px-5 py-3.5 text-base font-black transition-all hover:brightness-105 disabled:opacity-50"
+                className="standard-hover w-full rounded-[16px] border px-5 py-3.5 text-base font-black transition-all disabled:opacity-50"
                 style={{
                   borderColor: LEGACY_COLORS.border,
                   color: LEGACY_COLORS.muted2,

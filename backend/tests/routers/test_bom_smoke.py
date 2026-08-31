@@ -90,6 +90,75 @@ def test_bom_tree_current_stock_excludes_defective_locations(
     assert response.json()["children"][0]["current_stock"] == 6
 
 
+def test_bom_tree_exposes_additional_producible_quantity_from_available_stock(
+    client, make_item, make_bom, monkeypatch
+):
+    """새 필드만 생략하고, 기존 nullable 키는 null로 유지한다."""
+    parent = make_item(name="추가 생산 상위", process_type_code="AF", warehouse_qty=Decimal("5"))
+    component = make_item(
+        name="예약 자재", process_type_code="AR", warehouse_qty=Decimal("10"), pending=Decimal("4")
+    )
+    make_bom(parent.item_id, component.item_id, Decimal("2"))
+
+    from app.routers import bom as bom_router
+    from app.schemas.item import BOMTreeNode
+
+    def nullable_tree(*_args, **_kwargs):
+        return BOMTreeNode(
+            item_id=parent.item_id,
+            mes_code=None,
+            item_name=parent.item_name,
+            process_type_code=None,
+            unit="EA",
+            required_quantity=1,
+            current_stock=5,
+            children=[
+                BOMTreeNode(
+                    item_id=component.item_id,
+                    mes_code=None,
+                    item_name=component.item_name,
+                    process_type_code=None,
+                    unit="EA",
+                    required_quantity=2,
+                    current_stock=6,
+                    children=[],
+                )
+            ],
+        )
+
+    monkeypatch.setattr(bom_router, "_build_tree_cached", nullable_tree)
+
+    response = client.get(f"/api/bom/{parent.item_id}/tree")
+
+    assert response.status_code == 200, response.text
+    tree = response.json()
+    assert tree["current_stock"] == 5
+    assert tree["mes_code"] is None
+    assert tree["process_type_code"] is None
+    assert tree["additional_producible_quantity"] == 3
+    child = tree["children"][0]
+    assert child["mes_code"] is None
+    assert child["process_type_code"] is None
+    assert "additional_producible_quantity" not in child
+
+
+def test_bom_tree_omits_additional_quantity_without_calculable_bom_and_ignores_excluded_component(
+    client, make_item, make_bom
+):
+    """BOM이 없으면 필드를 생략하고, 제외 품목은 계산 병목이 아니다."""
+    no_bom = make_item(name="계산 제약 없음", process_type_code="AF")
+    assert "additional_producible_quantity" not in client.get(f"/api/bom/{no_bom.item_id}/tree").json()
+
+    parent = make_item(name="제외 정책 상위", process_type_code="AF", model_symbol="4", serial_no=1)
+    ignored = make_item(name="제외 라벨", process_type_code="PR", model_symbol="4", serial_no=58)
+    required = make_item(name="필수 자재", process_type_code="AR", warehouse_qty=Decimal("3"), model_symbol="4", serial_no=59)
+    make_bom(parent.item_id, ignored.item_id, Decimal("1"))
+    make_bom(parent.item_id, required.item_id, Decimal("1"))
+
+    tree = client.get(f"/api/bom/{parent.item_id}/tree").json()
+    assert tree["additional_producible_quantity"] == 3
+
+
 def test_bom_flat_orders_children_by_department_stage_and_serial(client, make_item, make_bom):
     parent = make_item(name="Sort parent", process_type_code="AF", model_symbol="9", serial_no=1)
     tf_first = make_item(name="TF first", process_type_code="TF", model_symbol="6", serial_no=1)
