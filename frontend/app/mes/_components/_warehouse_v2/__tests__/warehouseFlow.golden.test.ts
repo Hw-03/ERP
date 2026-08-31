@@ -838,6 +838,34 @@ describe("useIoWorkState canAdvance[3]/[4]", () => {
     expect(result.current.hasInvalidQuantity).toBe(true);
   });
 
+  it.each([1.5, Number.NaN, Number.POSITIVE_INFINITY])(
+    "bundle quantity=%s → [4]=false, hasInvalidQuantity=true",
+    (quantity) => {
+      const { result } = renderHook(() => useIoWorkState());
+      act(() => {
+        result.current.setBundles([
+          makeBundle({ quantity, lines: [makeLine({ included: true, quantity: 1 })] }),
+        ]);
+      });
+      expect(result.current.canAdvance[4]).toBe(false);
+      expect(result.current.hasInvalidQuantity).toBe(true);
+    },
+  );
+
+  it.each([1.5, Number.NaN, Number.POSITIVE_INFINITY])(
+    "included line quantity=%s → [4]=false, hasInvalidQuantity=true",
+    (quantity) => {
+      const { result } = renderHook(() => useIoWorkState());
+      act(() => {
+        result.current.setBundles([
+          makeBundle({ quantity: 1, lines: [makeLine({ included: true, quantity })] }),
+        ]);
+      });
+      expect(result.current.canAdvance[4]).toBe(false);
+      expect(result.current.hasInvalidQuantity).toBe(true);
+    },
+  );
+
   it("included line 0개(전부 제외) → [4]=false", () => {
     const { result } = renderHook(() => useIoWorkState());
     act(() => {
@@ -1519,6 +1547,61 @@ describe("[bomSync] applyBundleQuantityChange", () => {
     expect(b.lines[0].shortage).toBe(0);
     expect(b.lines[1].quantity).toBe(10); // edited → 미강제이므로 원본 보존
     expect(b.lines[2].quantity).toBe(7); // manual 보존
+  });
+
+  it("기준수량을 연속 증감해도 최초 BOM 비율을 유지한다", () => {
+    let bundles = [
+      makeBundle({
+        bundle_id: "B",
+        quantity: 1,
+        lines: [
+          makeLine({ line_id: "C1", origin: "bom_auto", quantity: 1, bom_expected: 1, edited: false }),
+          makeLine({ line_id: "C2", origin: "bom_auto", quantity: 2, bom_expected: 2, edited: false }),
+          makeLine({ line_id: "C5", origin: "bom_auto", quantity: 5, bom_expected: 5, edited: false }),
+        ],
+      }),
+    ];
+
+    for (const [bundleQuantity, expectedChildren] of [
+      [2, [2, 4, 10]],
+      [3, [3, 6, 15]],
+      [4, [4, 8, 20]],
+      [3, [3, 6, 15]],
+    ] as const) {
+      bundles = applyBundleQuantityChange(
+        bundles,
+        "B",
+        bundleQuantity,
+        "warehouse_to_dept",
+        availMap({ C1: 100, C2: 100, C5: 100 }),
+      );
+
+      expect(bundles[0].quantity).toBe(bundleQuantity);
+      expect(bundles[0].lines.map((line) => line.quantity)).toEqual(expectedChildren);
+      expect(bundles[0].lines.every((line) => Number.isInteger(line.quantity))).toBe(true);
+    }
+  });
+
+  it("복원된 기준수량에서 다음 수량으로 올려도 직전 수량을 분모로 쓰지 않는다", () => {
+    const bundles = [
+      makeBundle({
+        bundle_id: "B",
+        quantity: 3,
+        lines: [
+          makeLine({ line_id: "C", origin: "bom_auto", quantity: 3, bom_expected: 1, edited: false }),
+        ],
+      }),
+    ];
+
+    const next = applyBundleQuantityChange(
+      bundles,
+      "B",
+      4,
+      "warehouse_to_dept",
+      availMap({ C: 100 }),
+    );
+
+    expect(next[0].lines[0].quantity).toBe(4);
   });
 
   it("produce 기준수량 변경도 커스텀 자식은 보존한다", () => {

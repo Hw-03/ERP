@@ -224,7 +224,9 @@ export function applyBundleQuantityChange(
           Number(line.bom_expected) > 0 &&
           (isBomStockExempt(line) || newQty === 0 || !line.edited)
         ) {
-          const childQty = expectedBomChildQuantity(bundle, line, newQty);
+          // bundle.quantity 는 stepper 의 현재값이라 호출마다 바뀐다.
+          // preview(parent_qty=1)의 bom_expected 를 1개당 기준으로 직접 곱한다.
+          const childQty = newQty * Number(line.bom_expected);
           if (isBomStockExempt(line)) {
             return {
               ...line,

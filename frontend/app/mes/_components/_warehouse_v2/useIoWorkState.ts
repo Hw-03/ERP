@@ -19,6 +19,11 @@ export const IO_STEP_LABELS: Record<IoStep, string> = {
 
 type GetAvailable = (line: IoLine) => number | null;
 
+function isWholeQuantity(value: number, minimum: number): boolean {
+  const quantity = Number(value);
+  return Number.isFinite(quantity) && Number.isInteger(quantity) && quantity >= minimum;
+}
+
 export function useIoWorkState(
   initialWorkType?: IoWorkType,
   initialDepartment?: string | null,
@@ -90,7 +95,9 @@ export function useIoWorkState(
       ? line.shortage > 0
       : Number(line.quantity) > available;
   });
-  const hasInvalidQuantity = effectIncludedLines.some((line) => line.quantity <= 0);
+  const hasInvalidQuantity =
+    bundles.some((bundle) => !isWholeQuantity(bundle.quantity, 0)) ||
+    effectIncludedLines.some((line) => !isWholeQuantity(line.quantity, 1));
   const hasMissingInternalUseBomMode =
     workType === "internal_use" && hasUnselectedInternalUseBomMode(bundles);
 

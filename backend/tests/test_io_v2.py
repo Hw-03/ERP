@@ -2754,6 +2754,76 @@ def _put_receive_draft(client, requester, bundles, batch_id=None):
     return client.put("/api/io/draft", json=body)
 
 
+def test_io_preview_rejects_fractional_quantity_without_persisting(
+    client, db_session, make_item
+):
+    item = make_item(name="소수 미리보기 거부품")
+    requester = _make_employee(db_session, code="IO-FRAC-PREVIEW")
+    db_session.commit()
+
+    response = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "receive",
+            "sub_type": "receive_supplier",
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "item_id": str(item.item_id),
+                    "quantity": 1.3333,
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 422, response.text
+    assert "quantity" in response.text
+    assert db_session.query(IoBatch).count() == 0
+    assert db_session.query(IoLine).count() == 0
+
+
+@pytest.mark.parametrize(
+    ("path", "method"),
+    [("/api/io/draft", "put"), ("/api/io/submit", "post")],
+)
+@pytest.mark.parametrize("fractional_field", ["bundle", "line"])
+def test_io_write_rejects_fractional_quantity_without_persisting(
+    client,
+    db_session,
+    make_item,
+    path,
+    method,
+    fractional_field,
+):
+    item = make_item(name=f"소수 {fractional_field} 거부품")
+    requester = _make_employee(
+        db_session,
+        code=f"IO-FRAC-{method.upper()}-{fractional_field.upper()}",
+    )
+    db_session.commit()
+    bundles = _preview_receive_bundles(client, requester, item, qty="1")
+    if fractional_field == "bundle":
+        bundles[0]["quantity"] = 1.3333
+    else:
+        bundles[0]["lines"][0]["quantity"] = 1.3333
+
+    response = getattr(client, method)(
+        path,
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "receive",
+            "sub_type": "receive_supplier",
+            "bundles": bundles,
+        },
+    )
+
+    assert response.status_code == 422, response.text
+    assert "quantity" in response.text
+    assert db_session.query(IoBatch).count() == 0
+    assert db_session.query(IoLine).count() == 0
+
+
 def test_io_draft_reads_recalculate_shortage_from_current_inventory(
     client, db_session, make_item, make_location, make_bom
 ):

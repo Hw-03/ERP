@@ -36,7 +36,7 @@ export function QuantityStepper({
   decrementDisabled = false,
   incrementDisabled = false,
   min = 0,
-  step = "any",
+  step = 1,
   inputRef,
   className = "",
 }: QuantityStepperProps) {
@@ -50,7 +50,9 @@ export function QuantityStepper({
   }
 
   function changeInput(nextValue: string) {
-    onChange(safeQuantity(Number(nextValue), minimum));
+    const next = Number(nextValue);
+    if (step === 1 && !Number.isInteger(next)) return;
+    onChange(safeQuantity(next, minimum));
   }
 
   return (
