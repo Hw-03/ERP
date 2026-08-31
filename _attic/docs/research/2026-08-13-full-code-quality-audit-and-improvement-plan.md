@@ -10,9 +10,9 @@
 - 최신 `main` 동기화 대상 SHA: `78e8023f41ef59528d9d8c07498e7653f9bee247`
 - 현재 실행 위치: `C:\ERP\.worktrees\full-code-quality-checkpoint-2`
 - Git 상태: 장기 품질 브랜치 `codex/full-code-quality-improvement`. CP4 완료 HEAD `e64a9a12da16f8502ab1a1e82dbed2b1d2648a01`에서 고정 `main` `78e8023f41ef59528d9d8c07498e7653f9bee247`을 품질 worktree 방향에만 통합했고, merge commit `deafc335502b46f9ed068bbb11175361826615ea`를 기존 품질 브랜치에 push했다. `main` 역병합·push·PR·force-push는 없음
-- 실행 진척: 체크포인트 1·3·4 완료. 체크포인트 2의 `IC-04`·`IC-20`은 저장소 구현·로컬 PostgreSQL 실증과 품질 브랜치 CI 실행까지 통과했지만 required-check 설정 증거는 별도 외부 경계로 남긴다. CP4는 workflow 거래 보정 차단, semantic idempotency, handover/correction/cancel 경합, 삭제 품목 참조 보호를 세 hard stop으로 완료했다. 2026-08-31 S0는 최신 main delta 재감사·충돌 통합·생성물 갱신만 수행했으며 CP5 제품 구현은 시작하지 않았다.
+- 실행 진척: 체크포인트 1·3·4 완료. 체크포인트 2의 `IC-04`·`IC-20`은 저장소 구현·로컬 PostgreSQL 실증과 품질 브랜치 CI 실행까지 통과했지만 required-check 설정 증거는 별도 외부 경계로 남긴다. CP4는 workflow 거래 보정 차단, semantic idempotency, handover/correction/cancel 경합, 삭제 품목 참조 보호를 세 hard stop으로 완료했다. 2026-08-31 S0 최신 main 통합 뒤 CP5 W1 `IC-06` read-only preflight를 구현·실증했으며 runtime·schema·재고 mutation은 시작하지 않았다.
 - 잔여 작업: 엄격한 완료 판정상 `IC` 20개가 남는다. `IC-09`, `IC-10`, `IC-11`은 완료했고 `IC-03`은 correction 안전막이 완료된 `PARTIAL`로서 `IC-03-B` 전용 workflow cancel만 남는다. `IC-04`·`IC-20`의 required-check 외부 증거와 최종 closeout `DOC-01`, `AT-01`, `AT-02`도 남아 있다.
-- 최종 판정: **S0 COMPLETE — GitHub CI 6/6 success, W1 `IC-06` read-only preflight 진입 가능**
+- 최종 판정: **CP5 W1 APPROVAL-READY — Gate A 사용자 승인 전 runtime migration 금지**
 - 문서 성격: 현행 코드의 감사 결과이자 후속 구현 순서의 단일 정본
 
 > **증거 시점 안내:** 2~7절의 코드 줄번호와 실패 서술은 2026-08-13 원 감사 snapshot을 보존한다. 이후 `main`이 바꾼 계약과 충돌하는 문장은 `[STALE]` 역사 증거이며, 현재 판정·구현 경계는 8.9.5절과 12.18절이 우선한다.
@@ -1094,7 +1094,7 @@ flowchart LR
 | 체크포인트 2 | `로컬 구현·리뷰·커밋·PostgreSQL 실증 완료 / GitHub 증거 보류` | `IC-04`, `IC-20` | 외부 증거 전 24, 통과 후 22 |
 | 체크포인트 3 | `완료 / PostgreSQL 경합 NOT_VERIFIED` | `IC-01` | 외부 증거 전 23, 통과 후 21 |
 | 체크포인트 4 | `완료` | `IC-09`, `IC-10`, `IC-11`; `IC-03`은 correction 안전막까지 완료된 `PARTIAL` | 외부 증거 전 20, 통과 후 18 |
-| 체크포인트 5 | `대기` | `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-17`, `IC-18`, `IC-19` | 외부 증거 전 13, 통과 후 11 |
+| 체크포인트 5 | `진행 중 — W1 완료, Gate A 승인 대기` | `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-17`, `IC-18`, `IC-19` | 외부 증거 전 13, 통과 후 11 |
 | 체크포인트 6 | `대기` | `IC-12`, `IC-13`, `IC-14`, `IC-15`, `IC-16`, `IC-25`, `IC-26` | 외부 증거 전 6, 통과 후 4 |
 | 체크포인트 7 | `대기` | `IC-21`, `IC-22`, `IC-23`, `IC-24`; 이후 `DOC-01`, `AT-01`, `AT-02` closeout | 외부 증거 전 2, 통과 후 0 |
 
@@ -1187,7 +1187,7 @@ flowchart LR
 
 **GOAL:** 창고 물리 원장, 공통 availability, shipping 상태기계, 전용 workflow 취소, blocking integrity, backup, health를 하나의 검증 사슬로 완성한다.
 
-- [ ] **`IC-06` read-only preflight:** tracking 품목의 `W`, box `B`, special zone `Z`, unplaced `U`, duplicate·orphan을 mutation 없이 보고하고 input snapshot과 report hash를 고정한다. runtime·schema·재고 mutation은 이 change에서 0이다.
+- [x] **`IC-06` read-only preflight (2026-08-31):** 모든 활성 품목의 `W`, box `B`, 활성 special zone `Z`, unplaced 후보 `U=W-B-Z`, duplicate·orphan·음수·초과배치를 mutation 없이 보고하고 input snapshot과 report hash를 고정했다. SQLite와 PostgreSQL의 repeatable read-only snapshot, 교차 dialect canonical hash, schema drift fail-closed를 검증했으며 runtime·schema·재고 mutation은 0이다.
 - [ ] **`IC-06` 승인 후 완료:** preflight 결과와 outbound source·duplicate 처리 ADR을 사용자가 승인한 뒤에만 `B+Z+U=W`와 stable row effect identity를 적용한다.
 - [ ] **`IC-07` + `IC-08` 같은 release:** 모든 소비 primitive가 stock pending과 active shipping allocation을 함께 보는 공통 availability를 사용하고, shipping prepare/pickup/cancel은 request lock·deterministic inventory lock·expected-state·command receipt를 같은 release에서 적용한다.
 - [ ] **`IC-03-B` 완료:** shipping pickup, production receipt, IO batch, StockRequest, defect disassembly의 전용 workflow cancel이 effects, allocation/pending, request/batch status, event를 한 transaction으로 되돌리고 history router는 `CancelPolicy` 결과만 소비한다.
@@ -1919,7 +1919,7 @@ Gate 0은 CI 정본과 같은 Node 20에서 닫고 정본 로컬 검증 entrypoi
 
 | 잔여 카드 | S0 재판정 | 최신 main 반영 뒤 남은 정확한 경계 |
 |---|---|---|
-| `IC-06` | `OPEN` | read-only duplicate/placement preflight, mutation 0, input snapshot·report hash를 아직 시작하지 않았다. runtime·schema·재고 mutation도 0이다. |
+| `IC-06` | `PREFLIGHT_COMPLETE / RUNTIME_OPEN` | read-only preflight가 W/B/active-Z/U 후보, duplicate stable row identity, inactive zone, placement orphan, 음수·초과배치를 보고한다. SQLite·PostgreSQL의 repeatable read-only snapshot과 교차 dialect hash를 실증했고 runtime·schema·재고 mutation은 0이다. Gate A 승인 뒤에만 `0032` 물리 원장을 시작한다. |
 | `IC-07` | `OPEN` | 공통 availability와 pending+active shipping allocation 적용은 미구현이다. BOM tree의 추가 생산 가능 수량이 production capacity 소비자를 하나 더 드러내 적용·검증 표면이 넓어졌다. |
 | `IC-08` | `OPEN` | IO draft 조건부 전이와 StockRequest 연결 복귀는 국소 hardening이다. shipping request/allocation lock·expected state·command receipt와 prepare/pickup/cancel 경합 계약은 미구현이다. |
 | `IC-03-B` | `PARTIAL` | CP4 correction 안전막은 유지된다. shipping pickup, production receipt, IO batch, StockRequest, defect disassembly 전용 cancel의 effect·allocation/pending·상태·event 단일 transaction 복원은 미구현이다. |
@@ -1933,5 +1933,19 @@ Gate 0은 CI 정본과 같은 Node 20에서 닫고 정본 로컬 검증 entrypoi
 - **DB baseline 차단 해소:** 위 현재 gate는 실행 중 품질 worktree 전용 `backend/mes.db`가 `0FC2AE454B6724413C9E27AFB2CB156C8B35D3817DB0BA4DB17313EC39E2BAA6`(1,347,584 bytes)로 전후 불변임을 확인했지만, 사고 전 기준선 `90FA7ABE83D2A8BF545531C15CDB75FDA2A3B9F519AA86F6EC396B8DE616C71E`의 정확한 바이트는 backup·snapshot·임시·휴지통에서 찾지 못했다. 사용자는 2026-08-31에 `C:\ERP` 개발 환경과 `C:\ERP-dev` 직원 환경에 영향이 없다는 조건으로 격리 품질 DB의 재생성을 승인했다. `0FC2...` 사고 파일은 `_attic/runtime/code-quality-improvement/20260831-120815/s0-main-sync/mes-db-after-accidental-bootstrap.db`와 `mes-db-before-user-approved-reset-20260831-162216.db`에 보존했다. 명시적 품질 DB URL로 fresh→`20260828_0031`을 부트스트랩한 새 기준선은 `D0419DC051B881DA145B466AF99490570D18C47BCAAE990C57FFD4476FE28147`이며 read-only check 전후 동일하다. `items=0`, `inventory_operations=0`, `transaction_logs=0`, `stock_requests=0`, `shipping_requests=0`이고, `C:\ERP\backend\mes.db`는 전후 `E468424B11DCCCF26B14C1850AB498072FEB94E1D9CFE71A9F0A5BD8442AFC23`으로 불변이다. `C:\ERP-dev`는 접근하지 않았다.
 
 **S0 종료 판정:** 코드·PostgreSQL·전체 gate·동결 UI·격리 DB 기준선은 GREEN이다. merge commit `deafc335502b46f9ed068bbb11175361826615ea`를 기존 품질 브랜치에 push했고 GitHub CI run `33368657382`의 Verification policy, PostgreSQL concurrency, Windows ops profile, frontend, Playwright E2E, backend 6개 job이 모두 success다. 다음 단일 작업은 8.9.6의 `IC-06 read-only preflight`다. preflight의 snapshot/report hash와 mutation 0 증거를 만든 직후 Gate A에서 정지하고, 사용자 승인 전에는 `IC-06` runtime·schema·재고 mutation 및 후속 `IC-07+IC-08`을 시작하지 않는다.
+
+### 12.20 CP5 W1 `IC-06` read-only preflight와 Gate A
+
+- **변경 경계:** `backend/scripts/inventory_location_preflight.py`, 전용 테스트, PostgreSQL 필수 runner 등록만 변경했다. API·model·migration·제품 runtime·화면 변경은 0이다.
+- **read-only 계약:** SQLite는 파일 `mode=ro`, `query_only`, 명시적 transaction을 사용한다. PostgreSQL은 `REPEATABLE READ READ ONLY` transaction을 사용한다. 양쪽 모두 예외 경로까지 rollback·close/dispose하며 여러 SELECT가 하나의 snapshot만 본다.
+- **보고 계약:** 모든 활성 품목에 대해 `W=Inventory.warehouse_qty`, `B=box row 합`, `Z=활성 special-zone row 합`, `U 후보=W-B-Z`를 계산한다. W-only, inactive-zone 수량, container/item duplicate와 stable row ID, item·container·box-angle orphan, 음수, `B+Z>W`를 canonical 순서로 보고한다.
+- **fail-closed 계약:** 필수 table·column과 PostgreSQL `BASE TABLE`을 강제한다. 동명 view, schema drift, 비정수·비정상 활성값, driver·연결·query 오류는 성공 보고서를 만들지 않으며 DB 접근 예외는 연결 정보와 SQL을 노출하지 않는다.
+- **격리 DB 결과:** 승인된 품질 worktree DB의 snapshot SHA-256은 `545b3864293b0d920ed8f48b5c37b590af34118b027b4249b5dbfd2958140abe`, report SHA-256은 `02ffdf0518d28bfa62186194c9e24910c4b1a8444862b3b6181fd919a1f83fe5`다. 이 fresh 품질 DB에는 inventory row와 anomaly가 모두 0이며, 이는 직원 환경의 실제 재고 판정이 아니다.
+- **검증:** SQLite focused 9/9, 실제 PostgreSQL 16.15 focused 15/15, 필수 PostgreSQL runner 38/38(skip 0), 검증 runner 계약 12/12, Ruff·mypy·`git diff --check`가 통과했다. 품질 `backend/mes.db` SHA-256은 전후 `D0419DC051B881DA145B466AF99490570D18C47BCAAE990C57FFD4476FE28147`로 불변이다.
+- **독립 리뷰:** 최종 명세 리뷰와 운영·품질 리뷰 모두 Critical 0, Important 0, Minor 0이다.
+- **격리·종료:** 55432 listener와 postmaster PID는 0이다. 폐기 가능한 중지 cluster는 ignored evidence 경로에만 보존했으며 개발·직원 서버는 시작·연결·변경하지 않았다. `C:\ERP-dev`는 접근하지 않았다.
+- **증거:** `_attic/runtime/code-quality-improvement/20260831-170648/cp5-ic06-preflight/`.
+
+**Gate A 판정:** W1은 `APPROVAL-READY`다. 사용자 승인 전에는 `20260831_0032` migration, `warehouse_unplaced_items`, B/Z/U runtime mutation, `IC-07+IC-08`을 시작하지 않는다. 승인 시 이미 결정된 정책인 `박스 → 활성 특수구역 → 미배치` 출고 우선순위, duplicate·orphan·`B+Z>W` fail-closed, 전체 활성 품목 적용, legacy 위치 자동 backfill 금지를 그대로 구현한다.
 
 ---
