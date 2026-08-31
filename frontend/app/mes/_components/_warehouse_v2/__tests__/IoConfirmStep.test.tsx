@@ -95,6 +95,38 @@ function DepartmentSingleAdjustHarness({ initialNotes = "" }: { initialNotes?: s
   );
 }
 
+function MixedProcessMemoHarness({ subType }: { subType: "produce" | "disassemble" }) {
+  const [notes, setNotes] = useState("");
+  const manualLine = {
+    ...parentLine,
+    line_id: "manual-line",
+    item_id: "manual-item",
+    origin: "manual" as const,
+    direction: "adjust" as const,
+    from_bucket: subType === "produce" ? "none" as const : "production" as const,
+    from_department: subType === "produce" ? null : "조립",
+    to_bucket: subType === "produce" ? "production" as const : "none" as const,
+    to_department: subType === "produce" ? "조립" : null,
+  };
+
+  return (
+    <IoConfirmStep
+      workType="process"
+      subType={subType}
+      bundles={[bundle, { ...bundle, bundle_id: "manual-bundle", source_kind: "manual", lines: [manualLine] }]}
+      notes={notes}
+      hasShortage={false}
+      hasInvalidQuantity={false}
+      submitting={false}
+      saving={false}
+      approvalKind="department"
+      onNotesChange={setNotes}
+      onSubmit={() => {}}
+      onSaveDraft={vi.fn()}
+    />
+  );
+}
+
 describe("IoConfirmStep", () => {
   it("커스텀 출고 BOM의 원본 회수 라인을 선택 출고 음수로 표시한다", () => {
     const customChild = {
@@ -202,6 +234,18 @@ describe("IoConfirmStep", () => {
 
     expect(memoInput).toHaveAttribute("placeholder", "작업 메모");
     expect(screen.getByRole("button", { name: "부서 결재 요청 1건" })).toBeEnabled();
+  });
+
+  it.each(["produce", "disassemble"] as const)("혼합 %s 작업은 낱개가 있으면 메모 없이 제출할 수 없다", (subType) => {
+    render(<MixedProcessMemoHarness subType={subType} />);
+
+    expect(screen.getByText("메모 (필수)")).toBeInTheDocument();
+    const memoInput = screen.getByRole("textbox");
+    expect(screen.getByRole("button", { name: /부서 결재 요청 3건/ })).toBeDisabled();
+
+    fireEvent.change(memoInput, { target: { value: "낱개 처리 사유" } });
+
+    expect(screen.getByRole("button", { name: /부서 결재 요청 3건/ })).toBeEnabled();
   });
 
   it("창고 보정 입고는 BOM 없이 즉시 반영 확인 문구를 사용한다", () => {

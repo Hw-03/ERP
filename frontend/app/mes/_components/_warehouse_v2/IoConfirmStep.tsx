@@ -228,7 +228,7 @@ export function IoConfirmStep({
       ? b.lines.some((line) => !bomParentLineIds.has(line.line_id))
       : b.lines.some((line) => line.included && !bomParentLineIds.has(line.line_id)),
   );
-  const memoRequired = requiresMemoForDepartmentSingleAdjustment(workType, subType);
+  const memoRequired = requiresMemoForDepartmentSingleAdjustment(workType, subType, bundles);
   const memoMissing = memoRequired && !notes.trim();
   const missingInternalUseBomMode =
     subType === "internal_use_out" && hasUnselectedInternalUseBomMode(bundles);

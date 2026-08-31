@@ -6,9 +6,9 @@ const state = vi.hoisted(() => ({
   step: 4,
   workType: "process",
   subType: "produce",
+  deptIoDirection: "in",
   fromDepartment: "조립",
   toDepartment: "조립",
-  deptIoDirection: "in",
   bundles: [{
     bundle_id: "source-bundle",
     lines: [
@@ -90,14 +90,18 @@ vi.mock("../../../_warehouse_v2/IoBundleCart", () => ({
   ),
 }));
 vi.mock("../../../_warehouse_v2/IoTargetPicker", () => ({
-  IoTargetPicker: ({ filters, onFiltersChange, search, onSearchChange }: {
+  IoTargetPicker: ({ bundles, filters, onAddItem, onFiltersChange, search, onSearchChange }: {
+    bundles: { source_kind?: string }[];
     filters: { department: string; model: string; stage: string };
+    onAddItem: (item: { item_id: string; item_name: string }, sourceKind: "direct_item", subType: "produce") => void;
     onFiltersChange: (filters: { department: string; model: string; stage: string }) => void;
     search: string;
     onSearchChange: (search: string) => void;
   }) => (
     <>
       <output data-testid="mobile-picker-filter-state">{`${filters.department}|${filters.model}|${filters.stage}|${search}`}</output>
+      <output data-testid="mobile-picker-bundle-kinds">{bundles.map((bundle) => bundle.source_kind).join(",")}</output>
+      <button type="button" onClick={() => onAddItem({ item_id: "same-item", item_name: "BOM 품목" }, "direct_item", "produce")}>BOM 품목 추가</button>
       <button type="button" onClick={() => onFiltersChange({ department: "조립", model: "MODEL-1", stage: "DONE" })}>필터 적용</button>
       <button type="button" onClick={() => onSearchChange("검색어")}>검색 적용</button>
     </>
@@ -132,6 +136,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.setBundles.mockReset();
   state.step = 4;
+  state.workType = "process";
+  state.subType = "produce";
+  state.deptIoDirection = "in";
   state.bundles = [{
     bundle_id: "source-bundle",
     lines: [
@@ -141,10 +148,91 @@ beforeEach(() => {
   }];
   saveDraft.mockResolvedValue({ batch_id: "source-draft" });
   submit.mockResolvedValue({ requires_approval: false, message: "제출 완료" });
+  previewTarget.mockReset();
   previewTarget.mockImplementation(({ target }: { target: { item_id: string } }) => Promise.resolve({ bundles: [{ bundle_id: `warehouse-${target.item_id}`, lines: [] }] }));
 });
 
 describe("MobileIoComposeWizard 부족 품목 가져오기", () => {
+  it("process 단품 폼에서 picker로 전환해 기존 낱개를 보존한 채 BOM을 추가한다", async () => {
+    state.step = 3;
+    state.workType = "process";
+    state.subType = "adjust_in";
+    state.deptIoDirection = "in";
+    state.bundles = [{
+      bundle_id: "manual-bundle",
+      source_kind: "manual",
+      source_item_id: "same-item",
+      title: "낱개 품목",
+      quantity: 1,
+      lines: [{ line_id: "manual-line", item_id: "same-item", included: true, quantity: 1 }],
+    }];
+    applyBundleUpdates();
+    previewTarget.mockResolvedValueOnce({
+      bundles: [{
+        bundle_id: "bom-bundle",
+        source_kind: "bom_parent",
+        source_item_id: "same-item",
+        title: "BOM 품목",
+        quantity: 1,
+        lines: [{ line_id: "bom-line", item_id: "same-item", included: true, quantity: 1 }],
+      }],
+    });
+    const view = renderWizard();
+
+    expect(screen.getByRole("button", { name: "증가" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /작성 중 저장/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /최종 검토/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "BOM·품목 더 담기" }));
+
+    expect(screen.getByRole("button", { name: "BOM 품목 추가" })).toBeInTheDocument();
+    expect(screen.getByTestId("mobile-picker-bundle-kinds")).toHaveTextContent("manual");
+    fireEvent.click(screen.getByRole("button", { name: "BOM 품목 추가" }));
+    await waitFor(() => expect(previewTarget).toHaveBeenCalledWith(expect.objectContaining({ subType: "produce" })));
+    view.rerender(<MobileIoComposeWizard globalSearch="" operator={operator} items={[]} setItems={vi.fn()} onStatusChange={vi.fn()} />);
+
+    expect(screen.getByTestId("mobile-picker-bundle-kinds")).toHaveTextContent("manual,bom_parent");
+  });
+
+  it("warehouse_adjust는 기존 단품 폼을 유지하고 picker 전환을 노출하지 않는다", () => {
+    state.step = 3;
+    state.workType = "warehouse_adjust";
+    state.subType = "warehouse_adjust_in";
+    state.bundles = [];
+
+    renderWizard();
+
+    expect(screen.getByRole("button", { name: /작성 중 저장/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /최종 검토/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "BOM·품목 더 담기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "BOM 품목 추가" })).not.toBeInTheDocument();
+  });
+
+  it("process picker 전환은 새 세부작업을 시작하면 초기화한다", () => {
+    state.step = 3;
+    state.workType = "process";
+    state.subType = "adjust_in";
+    state.bundles = [{
+      bundle_id: "manual-bundle",
+      source_kind: "manual",
+      source_item_id: "same-item",
+      title: "낱개 품목",
+      quantity: 1,
+      lines: [{ line_id: "manual-line", item_id: "same-item", included: true, quantity: 1 }],
+    }];
+    const view = renderWizard();
+
+    fireEvent.click(screen.getByRole("button", { name: "BOM·품목 더 담기" }));
+    expect(screen.getByRole("button", { name: "BOM 품목 추가" })).toBeInTheDocument();
+
+    state.step = 2;
+    view.rerender(<MobileIoComposeWizard globalSearch="" operator={operator} items={[]} setItems={vi.fn()} onStatusChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "모바일 세부 유형 변경" }));
+
+    state.step = 3;
+    view.rerender(<MobileIoComposeWizard globalSearch="" operator={operator} items={[]} setItems={vi.fn()} onStatusChange={vi.fn()} />);
+    expect(screen.getByRole("button", { name: /작성 중 저장/ })).toBeInTheDocument();
+  });
+
   it("저장 실패 시 원 작업을 유지하고 preview를 시작하지 않는다", async () => {
     saveDraft.mockRejectedValue(new Error("초안 저장 실패"));
     renderWizard();

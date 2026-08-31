@@ -33,10 +33,12 @@ from app.services.io_preview import (
     APPROVAL_SUB_TYPES,
     _enum_value,
     _new_id,
+    has_included_manual_line,
+    normalize_process_sub_type,
     validate_internal_use_bundles,
     validate_internal_use_operation,
     validate_internal_use_requester,
-    validate_operation_sources,
+    validate_saved_operation_sources,
     validate_warehouse_adjust_operation,
     validate_warehouse_adjust_requester,
 )
@@ -70,6 +72,9 @@ def _normalize_bom_stock_exempt_line(
         to_bucket=getattr(line, "to_bucket", None),
         to_department=getattr(line, "to_department", None),
         bom_auto_token=getattr(line, "bom_auto_token", None),
+    ) or (
+        getattr(bundle, "source_kind", None) == "direct_item"
+        and getattr(line, "origin", None) == BOM_AUTO_ORIGIN
     )
     was_auto_excluded = (
         bool(getattr(line, "bom_stock_exempt", False))
@@ -123,8 +128,12 @@ def _normalize_bom_stock_exempt_lines(
 ) -> None:
     item_ids = {
         line.item_id
-        for _, line in bundle_lines
+        for bundle, line in bundle_lines
         if getattr(line, "bom_auto_token", None)
+        or (
+            getattr(bundle, "source_kind", None) == "direct_item"
+            and getattr(line, "origin", None) == BOM_AUTO_ORIGIN
+        )
     }
     if not item_ids:
         for _, line in bundle_lines:
@@ -377,6 +386,11 @@ def _persist_batch(
     status: str,
     submitted_at: Optional[datetime] = None,
 ) -> IoBatch:
+    payload.sub_type = normalize_process_sub_type(
+        work_type=payload.work_type,
+        sub_type=payload.sub_type,
+        bundles=payload.bundles,
+    )
     validate_internal_use_requester(
         requester,
         work_type=payload.work_type,
@@ -409,9 +423,11 @@ def _persist_batch(
         to_department=payload.to_department,
         lines=(line for bundle in payload.bundles for line in bundle.lines),
     )
-    validate_operation_sources(
-        payload.sub_type,
-        (bundle.source_kind for bundle in payload.bundles),
+    validate_saved_operation_sources(
+        work_type=payload.work_type,
+        sub_type=payload.sub_type,
+        bundles=payload.bundles,
+        requested_department=payload.to_department,
     )
     now = datetime.utcnow()
     batch = IoBatch(
@@ -424,7 +440,10 @@ def _persist_batch(
         requester_department=_enum_value(requester.department) or "",
         from_department=payload.from_department,
         to_department=payload.to_department,
-        requires_approval=payload.sub_type in APPROVAL_SUB_TYPES,
+        requires_approval=(
+            payload.sub_type in APPROVAL_SUB_TYPES
+            or has_included_manual_line(payload.bundles)
+        ),
         reference_no=payload.reference_no,
         notes=payload.notes,
         client_request_id=getattr(payload, "client_request_id", None),

@@ -49,6 +49,16 @@ def can_approve_department(actor, target_dept: str | None) -> bool:
     return False
 
 
+def can_approve_manual_adjustment(actor: object, target_dept: str | None) -> bool:
+    """낱개 수량보정은 대상 부서 소속 정·부만 승인·반려·자가승인할 수 있다."""
+    actor_department = getattr(actor, "department", None)
+    actor_department_value = getattr(actor_department, "value", actor_department)
+    return (
+        can_approve_department(actor, target_dept)
+        and actor_department_value == target_dept
+    )
+
+
 def approvable_departments(actor) -> Iterable[str] | None:
     """결재자가 부서 결재 큐에서 볼 수 있는 부서명 목록 (큐 조회/카운트용).
 

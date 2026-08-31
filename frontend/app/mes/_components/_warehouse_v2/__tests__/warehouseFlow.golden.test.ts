@@ -22,11 +22,14 @@ import {
   subTypeLabel,
   requiresDepartments,
   requiresApproval,
+  requiresMemoForDepartmentSingleAdjustment,
   hasManualLine,
   hasCustomBomQuantity,
   processBomEffectLine,
   approvalKind,
   isBomForced,
+  canonicalProcessSubType,
+  mergePreviewBundles,
   deptIoSubType,
   deptIoDirectionOf,
   pickerDirectionLabel,
@@ -41,6 +44,7 @@ import {
   directionWord,
   deptVisibility,
   exclusionNoteFor,
+  usesMobileSingleAdjustForm,
 } from "../ioWorkType";
 import { useIoWorkState, IO_STEP_LABELS, type IoStep } from "../useIoWorkState";
 import {
@@ -407,6 +411,116 @@ describe("deptIoSubType", () => {
 });
 
 // ──────────────────────────────────────────────────────────────────
+// canonicalProcessSubType
+// ──────────────────────────────────────────────────────────────────
+describe("canonicalProcessSubType", () => {
+  const bom = makeBundle({
+    bundle_id: "bom",
+    source_kind: "bom_parent",
+    lines: [makeLine({ origin: "direct" })],
+  });
+  const manual = makeBundle({
+    bundle_id: "manual",
+    source_kind: "manual",
+    lines: [makeLine({ origin: "manual" })],
+  });
+
+  it("BOM과 낱개를 어느 순서로 담아도 방향별 BOM 대표 subtype을 사용한다", () => {
+    expect(canonicalProcessSubType("process", "in", [bom, manual], "adjust_in")).toBe("produce");
+    expect(canonicalProcessSubType("process", "in", [manual, bom], "adjust_in")).toBe("produce");
+    expect(canonicalProcessSubType("process", "out", [bom, manual], "adjust_out")).toBe("disassemble");
+    expect(canonicalProcessSubType("process", "out", [manual, bom], "adjust_out")).toBe("disassemble");
+  });
+
+  it("BOM 없이 포함된 낱개만 남으면 방향별 수량보정 subtype을 사용한다", () => {
+    expect(canonicalProcessSubType("process", "in", [manual], "produce")).toBe("adjust_in");
+    expect(canonicalProcessSubType("process", "out", [manual], "disassemble")).toBe("adjust_out");
+  });
+
+  it("모든 BOM 라인이 제외되어도 BOM 묶음 자체가 있으면 BOM 대표 subtype을 사용한다", () => {
+    const excludedBom = {
+      ...bom,
+      lines: [makeLine({ origin: "direct", included: false })],
+    };
+    expect(canonicalProcessSubType("process", "in", [excludedBom, manual], "adjust_in")).toBe("produce");
+    expect(canonicalProcessSubType("process", "out", [excludedBom, manual], "adjust_out")).toBe("disassemble");
+  });
+
+  it("마지막 BOM 묶음이 사라지면 남은 낱개 기준으로 다시 정규화한다", () => {
+    const mixed = [bom, manual];
+    expect(canonicalProcessSubType("process", "in", mixed, "produce")).toBe("produce");
+    expect(canonicalProcessSubType("process", "in", mixed.filter((bundle) => bundle.source_kind !== "bom_parent"), "produce")).toBe("adjust_in");
+  });
+
+  it("process가 아니거나 방향·관련 묶음이 없으면 현재 subtype을 보존한다", () => {
+    expect(canonicalProcessSubType("warehouse_io", "in", [bom], "warehouse_to_dept")).toBe("warehouse_to_dept");
+    expect(canonicalProcessSubType("process", null, [bom], "produce")).toBe("produce");
+    expect(canonicalProcessSubType("process", "in", [], "adjust_in")).toBe("adjust_in");
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────
+// requiresMemoForDepartmentSingleAdjustment
+// ──────────────────────────────────────────────────────────────────
+describe("requiresMemoForDepartmentSingleAdjustment", () => {
+  const bom = makeBundle({
+    source_kind: "bom_parent",
+    lines: [makeLine({ origin: "direct" })],
+  });
+  const manual = makeBundle({
+    source_kind: "manual",
+    lines: [makeLine({ origin: "manual" })],
+  });
+
+  it("대표 subtype이 생산·분해여도 포함된 낱개가 있으면 메모가 필요하다", () => {
+    expect(requiresMemoForDepartmentSingleAdjustment("process", "produce", [bom, manual])).toBe(true);
+    expect(requiresMemoForDepartmentSingleAdjustment("process", "disassemble", [bom, manual])).toBe(true);
+  });
+
+  it("기존 낱개 단독 수량보정 메모 규칙을 유지한다", () => {
+    expect(requiresMemoForDepartmentSingleAdjustment("process", "adjust_in", [manual])).toBe(true);
+    expect(requiresMemoForDepartmentSingleAdjustment("process", "adjust_out", [manual])).toBe(true);
+    expect(requiresMemoForDepartmentSingleAdjustment("process", "produce", [bom])).toBe(false);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────
+// mergePreviewBundles / usesMobileSingleAdjustForm
+// ──────────────────────────────────────────────────────────────────
+describe("작성 화면 공통 선택 규칙", () => {
+  const bom = makeBundle({
+    bundle_id: "bom",
+    source_kind: "bom_parent",
+    source_item_id: "same-item",
+    lines: [makeLine({ origin: "direct" })],
+  });
+  const manual = makeBundle({
+    bundle_id: "manual",
+    source_kind: "manual",
+    source_item_id: "same-item",
+    lines: [makeLine({ origin: "manual" })],
+  });
+
+  it("process는 같은 품목의 BOM과 낱개 preview 결과를 함께 보존한다", () => {
+    expect(mergePreviewBundles([bom], "same-item", "manual", "produce", [manual]))
+      .toEqual([bom, manual]);
+  });
+
+  it("internal_use는 기존처럼 같은 품목 preview 결과를 교체한다", () => {
+    expect(mergePreviewBundles([bom], "same-item", "manual", "internal_use_out", [manual]))
+      .toEqual([manual]);
+  });
+
+  it("모바일 process 낱개는 기본 단품 폼을 쓰되 명시적 picker 전환 뒤에는 유지한다", () => {
+    expect(usesMobileSingleAdjustForm("process", "adjust_in")).toBe(true);
+    expect(usesMobileSingleAdjustForm("process", "adjust_out")).toBe(true);
+    expect(usesMobileSingleAdjustForm("process", "adjust_in", true)).toBe(false);
+    expect(usesMobileSingleAdjustForm("warehouse_adjust", "warehouse_adjust_in")).toBe(true);
+    expect(usesMobileSingleAdjustForm("warehouse_adjust", "warehouse_adjust_in", true)).toBe(true);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────
 // deptIoDirectionOf
 // ──────────────────────────────────────────────────────────────────
 describe("deptIoDirectionOf", () => {
@@ -517,17 +631,17 @@ describe("getItemActionMode", () => {
 });
 
 // ──────────────────────────────────────────────────────────────────
-// allowsMixedBundles — 창고 입출고·사용출고만 BOM·낱개 혼합 허용
+// allowsMixedBundles — 창고 입출고·부서 입출고·사용출고는 BOM·낱개 혼합 허용
 // ──────────────────────────────────────────────────────────────────
 describe("allowsMixedBundles", () => {
-  it("창고 입출고와 사용출고 sub_type만 true", () => {
+  it("창고 입출고·부서 입출고·사용출고 sub_type만 true", () => {
     const map = Object.fromEntries(ALL_SUB_TYPES.map((s) => [s, allowsMixedBundles(s)]));
     expect(map).toEqual({
       receive_supplier: false,
       warehouse_to_dept: true,
       dept_to_warehouse: true,
-      produce: false,
-      disassemble: false,
+      produce: true,
+      disassemble: true,
       dept_transfer: false,
       adjust_in: false,
       adjust_out: false,
@@ -1052,6 +1166,60 @@ describe("useIoWorkState step/line 조작", () => {
     expect(result.current.step).toBe(1);
     expect(result.current.workType).toBe("warehouse_io"); // 보존
     expect(result.current.subType).toBe("warehouse_to_dept"); // 보존
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────
+// useIoWorkState — process 대표 subtype 정규화
+// ──────────────────────────────────────────────────────────────────
+describe("useIoWorkState process 대표 subtype 정규화", () => {
+  const bom = makeBundle({
+    bundle_id: "bom",
+    source_kind: "bom_parent",
+    lines: [makeLine({ line_id: "bom-line", origin: "direct" })],
+  });
+  const manual = makeBundle({
+    bundle_id: "manual",
+    source_kind: "manual",
+    lines: [makeLine({ line_id: "manual-line", origin: "manual" })],
+  });
+
+  it("setBundles로 낱개 뒤 BOM을 추가해도 대표 subtype을 BOM으로 정규화한다", () => {
+    const { result } = renderHook(() => useIoWorkState());
+    act(() => {
+      result.current.setWorkType("process");
+      result.current.setDeptIoDirection("in");
+      result.current.setBundles([manual]);
+    });
+    expect(result.current.subType).toBe("adjust_in");
+
+    act(() => result.current.setBundles((bundles) => [...bundles, bom]));
+    expect(result.current.subType).toBe("produce");
+  });
+
+  it("raw 선택값이 BOM이어도 manual-only bundle 상태에서는 즉시 canonical subtype을 노출한다", () => {
+    const { result } = renderHook(() => useIoWorkState());
+    act(() => {
+      result.current.setWorkType("process");
+      result.current.setDeptIoDirection("in");
+      result.current.setSubType("produce");
+      result.current.setBundles([manual]);
+    });
+
+    expect(result.current.subType).toBe("adjust_in");
+  });
+
+  it("마지막 BOM 묶음 또는 라인이 삭제되면 남은 낱개 기준으로 정규화한다", () => {
+    const { result } = renderHook(() => useIoWorkState());
+    act(() => {
+      result.current.setWorkType("process");
+      result.current.setDeptIoDirection("out");
+      result.current.setBundles([bom, manual]);
+    });
+    expect(result.current.subType).toBe("disassemble");
+
+    act(() => result.current.removeLine("bom", "bom-line"));
+    expect(result.current.subType).toBe("adjust_out");
   });
 });
 

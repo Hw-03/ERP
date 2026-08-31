@@ -566,10 +566,14 @@ def _route_for_sub_type(
 
 # source_kind == "manual" 은 BOM 전개를 건너뛰고 낱개 라인으로 처리한다.
 MANUAL_SOURCE_KIND = "manual"
+PROCESS_SOURCE_KINDS = frozenset({"bom_parent", "direct_item", MANUAL_SOURCE_KIND})
+PROCESS_BOM_LINE_ORIGINS = frozenset({"direct", BOM_AUTO_ORIGIN})
+PROCESS_DIRECT_LINE_ORIGINS = frozenset({"direct"})
+PROCESS_SUB_TYPES = frozenset({"produce", "disassemble", "adjust_in", "adjust_out"})
 
 
 def validate_operation_sources(sub_type: str, source_kinds: Iterable[str]) -> None:
-    """낱개 증가는 생산이 아닌 수량보정으로만 기록되도록 강제한다."""
+    """직접 미리보기의 source_kind 조합을 검증한다."""
     kinds = tuple(source_kinds)
     if sub_type == "produce" and MANUAL_SOURCE_KIND in kinds:
         raise ValueError("낱개 품목 입고는 생산이 아니라 수량보정 입고로 처리하세요.")
@@ -577,6 +581,177 @@ def validate_operation_sources(sub_type: str, source_kinds: Iterable[str]) -> No
         source_kind != "direct_item" for source_kind in kinds
     ):
         raise ValueError("창고 수량보정은 단품 품목만 처리할 수 있습니다.")
+
+
+def _bundle_value(bundle: object, name: str, default: object = None) -> object:
+    """Pydantic payload와 저장된 ORM bundle에서 공통 필드를 읽는다."""
+    return getattr(bundle, name, default)
+
+
+def _line_value(line: object, name: str, default: object = None) -> object:
+    return getattr(line, name, default)
+
+
+def has_included_manual_line(bundles: Iterable[object]) -> bool:
+    """저장·제출 payload에 실제 반영 대상인 낱개 라인이 있는지 반환한다."""
+    return any(
+        _line_value(line, "included", True)
+        and _line_value(line, "origin") in MANUAL_LINE_ORIGINS
+        for bundle in bundles
+        for line in _bundle_value(bundle, "lines", ())
+    )
+
+
+def normalize_process_sub_type(
+    *, work_type: str, sub_type: str, bundles: Iterable[object]
+) -> str:
+    """BOM 묶음의 실제 방향을 대표 subtype으로 고정한다.
+
+    미리보기는 한 종류의 target만 받으므로 기존 source 차단 규칙을 유지한다.
+    반면 저장 payload는 여러 preview 결과를 합칠 수 있어, BOM parent의 결과 방향으로
+    produce/disassemble을 결정한다. BOM 없는 낱개는 기존 adjust_in/adjust_out만 허용한다.
+    """
+    if work_type != "process":
+        return sub_type
+    if sub_type not in PROCESS_SUB_TYPES:
+        raise ValueError("process 작업의 세부 유형이 올바르지 않습니다.")
+
+    bundle_list = list(bundles)
+    manual_bundles = [
+        bundle
+        for bundle in bundle_list
+        if _bundle_value(bundle, "source_kind") == MANUAL_SOURCE_KIND
+    ]
+    bom_bundles = [
+        bundle
+        for bundle in bundle_list
+        if _bundle_value(bundle, "source_kind") == "bom_parent"
+    ]
+    if not manual_bundles and not bom_bundles:
+        return sub_type
+    if manual_bundles and not bom_bundles and sub_type in {"produce", "disassemble"}:
+        if sub_type == "produce":
+            raise ValueError("낱개 품목 입고는 생산이 아니라 수량보정 입고로 처리하세요.")
+        raise ValueError("낱개 품목 출고는 분해가 아니라 수량보정 출고로 처리하세요.")
+    if not bom_bundles:
+        return sub_type
+
+    bom_directions = {
+        _line_value(line, "direction")
+        for bundle in bom_bundles
+        for line in _bundle_value(bundle, "lines", ())
+        if _line_value(line, "origin") == "direct"
+    }
+    if bom_directions == {"in"}:
+        return "produce"
+    if bom_directions == {"out"}:
+        return "disassemble"
+    if not bom_directions:
+        return sub_type
+    raise ValueError("BOM 작업의 대표 방향 구성이 올바르지 않습니다.")
+
+
+def validate_process_bom_parent_lines(bundles: Iterable[object]) -> None:
+    """process BOM 묶음은 상위 결과 라인을 정확히 하나만 포함해야 한다."""
+    for bundle in bundles:
+        if _bundle_value(bundle, "source_kind") != "bom_parent":
+            continue
+        direct_lines = [
+            line
+            for line in _bundle_value(bundle, "lines", ())
+            if _line_value(line, "origin") == "direct"
+        ]
+        if (
+            len(direct_lines) != 1
+            or _bundle_value(bundle, "source_item_id") is None
+            or _line_value(direct_lines[0], "item_id")
+            != _bundle_value(bundle, "source_item_id")
+        ):
+            raise ValueError("BOM 상위 결과 라인 구성이 올바르지 않습니다.")
+
+
+def validate_saved_operation_sources(
+    *,
+    work_type: str,
+    sub_type: str,
+    bundles: Iterable[object],
+    requested_department: Optional[str],
+) -> None:
+    """저장된 bundle 조합에서만 허용되는 생산/분해+낱개 구성을 검증한다."""
+    bundle_list = list(bundles)
+    kinds = tuple(str(_bundle_value(bundle, "source_kind")) for bundle in bundle_list)
+    if sub_type in WAREHOUSE_ADJUST_SUB_TYPES and any(
+        source_kind != "direct_item" for source_kind in kinds
+    ):
+        raise ValueError("창고 수량보정은 단품 품목만 처리할 수 있습니다.")
+    if work_type != "process":
+        validate_operation_sources(sub_type, kinds)
+        return
+    if sub_type not in PROCESS_SUB_TYPES:
+        raise ValueError("process 작업의 세부 유형이 올바르지 않습니다.")
+    if any(kind not in PROCESS_SOURCE_KINDS for kind in kinds):
+        raise ValueError("process 작업의 품목 묶음 종류가 올바르지 않습니다.")
+    validate_process_bom_parent_lines(bundle_list)
+    if sub_type in {"adjust_in", "adjust_out"} and any(
+        kind != MANUAL_SOURCE_KIND for kind in kinds
+    ):
+        raise ValueError("process 수량보정은 낱개 manual 묶음만 저장할 수 있습니다.")
+    if any(kind == MANUAL_SOURCE_KIND for kind in kinds) and not (
+        requested_department and requested_department.strip()
+    ):
+        raise ValueError("process 낱개 작업은 요청 대상 부서를 선택해야 합니다.")
+
+    for bundle in bundle_list:
+        lines = list(_bundle_value(bundle, "lines", ()))
+        source_kind = str(_bundle_value(bundle, "source_kind"))
+        for line in lines:
+            origin = _line_value(line, "origin")
+            if source_kind == "bom_parent" and origin not in PROCESS_BOM_LINE_ORIGINS:
+                raise ValueError("BOM 품목 라인의 원본 구성이 올바르지 않습니다.")
+            if source_kind == "direct_item" and not (
+                origin in PROCESS_DIRECT_LINE_ORIGINS
+                or (origin == BOM_AUTO_ORIGIN and bool(_line_value(line, "bom_stock_exempt")))
+            ):
+                raise ValueError("직접 품목 라인의 원본 구성이 올바르지 않습니다.")
+            if origin in MANUAL_LINE_ORIGINS and source_kind != MANUAL_SOURCE_KIND:
+                raise ValueError("manual origin 라인은 manual 품목 묶음에만 저장할 수 있습니다.")
+            if _line_value(line, "direction") == "adjust" and (
+                source_kind != MANUAL_SOURCE_KIND or origin not in MANUAL_LINE_ORIGINS
+            ):
+                raise ValueError("process 조정 라인은 manual 품목으로만 저장할 수 있습니다.")
+        if source_kind != MANUAL_SOURCE_KIND:
+            continue
+        if len(lines) != 1:
+            raise ValueError("낱개 품목은 한 묶음에 한 라인만 저장할 수 있습니다.")
+        line = lines[0]
+        if _line_value(line, "direction") != "adjust":
+            raise ValueError("낱개 품목은 조정(adjust) 라인으로만 저장할 수 있습니다.")
+        if _line_value(line, "origin") not in MANUAL_LINE_ORIGINS:
+            raise ValueError("낱개 품목 라인의 원본 구성이 올바르지 않습니다.")
+
+        if sub_type in {"produce", "adjust_in"}:
+            valid_route = (
+                _line_value(line, "from_bucket") == "none"
+                and _line_value(line, "from_department") is None
+                and _line_value(line, "to_bucket") == "production"
+                and _line_value(line, "to_department") == requested_department
+            )
+        elif sub_type in {"disassemble", "adjust_out"}:
+            valid_route = (
+                _line_value(line, "from_bucket") == "production"
+                and _line_value(line, "from_department") == requested_department
+                and _line_value(line, "to_bucket") == "none"
+                and _line_value(line, "to_department") is None
+            )
+        else:
+            valid_route = False
+        if not valid_route:
+            raise ValueError("낱개 품목의 조정 부서 또는 재고 버킷 구성이 올바르지 않습니다.")
+
+    if "bom_parent" in kinds and any(
+        kind not in {"bom_parent", MANUAL_SOURCE_KIND} for kind in kinds
+    ):
+        raise ValueError("생산·분해 혼합 작업에는 BOM과 낱개 묶음만 포함할 수 있습니다.")
 
 
 def _target_source_location(target: object, *, sub_type: str) -> str:
