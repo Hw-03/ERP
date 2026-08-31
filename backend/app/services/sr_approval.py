@@ -17,10 +17,7 @@ from app.models import (
     StockRequestTypeEnum,
 )
 from app.services import inventory as inventory_svc
-from app.services.dept_hierarchy import (
-    can_approve_department,
-    can_approve_manual_adjustment,
-)
+from app.services.dept_hierarchy import can_approve_department
 from app.services.io_persist import ensure_stock_request_batch_is_mutable, sync_batch_from_stock_request
 from app.services.pin_auth import verify_pin
 from app.services.sr_execution import (
@@ -133,13 +130,7 @@ def approve_request_department(
     #   - admin level 단독: 결재 권한 없음
     # 사람 이름 박지 않음. 자세한 룰은 `dept_hierarchy.can_approve_department`.
     approval_department = request.approval_department or request.requester_department
-    is_manual_adjustment = request.request_type == StockRequestTypeEnum.MANUAL_ADJUSTMENT
-    can_approve = (
-        can_approve_manual_adjustment(approver, approval_department)
-        if is_manual_adjustment
-        else can_approve_department(approver, approval_department)
-    )
-    if not can_approve:
+    if not can_approve_department(approver, approval_department):
         raise PermissionError(
             "결재 권한이 없습니다 (부서 정/부 또는 창고 정/부 필요)."
         )
@@ -296,13 +287,7 @@ def reject_request_department(
         raise ValueError("부서 결재가 필요하지 않은 요청입니다.")
 
     approval_department = request.approval_department or request.requester_department
-    is_manual_adjustment = request.request_type == StockRequestTypeEnum.MANUAL_ADJUSTMENT
-    can_approve = (
-        can_approve_manual_adjustment(approver, approval_department)
-        if is_manual_adjustment
-        else can_approve_department(approver, approval_department)
-    )
-    if not can_approve:
+    if not can_approve_department(approver, approval_department):
         raise PermissionError(
             "결재 권한이 없습니다 (부서 정/부 또는 창고 정/부 필요)."
         )

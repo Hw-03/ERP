@@ -562,7 +562,11 @@ def test_department_reject_returns_process_single_adjustment_to_same_draft(
     requester = _make_employee(db_session, code="ADJ-REQ")
     other = _make_employee(db_session, code="ADJ-OTHER")
     approver = _make_employee(
-        db_session, code="ADJ-APP", name="조립 부서장", department_role="primary"
+        db_session,
+        code="ADJ-APP",
+        name="출하 생산부 부담당",
+        department=DepartmentEnum.SHIPPING,
+        department_role="deputy",
     )
     batch = _make_process_adjust_batch(db_session, requester=requester, items=[first, second])
     request = sr_svc.create_manual_adjustment_request(
@@ -595,7 +599,7 @@ def test_department_reject_returns_process_single_adjustment_to_same_draft(
     db_session.refresh(batch)
 
     assert request.status == StockRequestStatusEnum.REJECTED
-    assert request.rejected_by_name == "조립 부서장"
+    assert request.rejected_by_name == approver.name
     assert request.rejected_at is not None
     assert request.rejected_reason == "수량 근거 확인 필요"
     assert first_location.pending_quantity == D("0")

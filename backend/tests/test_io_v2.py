@@ -2773,17 +2773,17 @@ def test_io_draft_mixed_production_uses_requested_target_department(
 def test_io_mixed_production_department_approval_uses_target_department(
     client, db_session, make_item, make_bom, make_location
 ):
-    """타부서 생산입고의 결재 권한은 요청자 소속이 아닌 대상 부서에 있다."""
+    """생산부 정·부는 타 공정 요청을 승인하되 재고는 대상 공정에 반영한다."""
     parent = make_item(name="Approval Target Parent", process_type_code="AF")
     component = make_item(name="Approval Target Component", process_type_code="NR")
     manual_item = make_item(name="Approval Target Manual", process_type_code="AF")
     make_bom(parent.item_id, component.item_id, Decimal("1"))
     requester = _make_employee(db_session, code="TARGET-REQ", department=DepartmentEnum.ASSEMBLY)
-    assembly_approver = _make_employee(
-        db_session, code="TARGET-ASM", department=DepartmentEnum.ASSEMBLY, department_role="primary"
-    )
-    tuning_approver = _make_employee(
-        db_session, code="TARGET-TUN", department=DepartmentEnum.TUNING, department_role="primary"
+    production_deputy = _make_employee(
+        db_session,
+        code="TARGET-SHIP",
+        department=DepartmentEnum.SHIPPING,
+        department_role="deputy",
     )
     make_location(component.item_id, department=DepartmentEnum.TUNING, quantity=Decimal("1"))
     db_session.flush()
@@ -2822,12 +2822,14 @@ def test_io_mixed_production_department_approval_uses_target_department(
     assert request.approval_department == DepartmentEnum.TUNING
     assert db_session.query(TransactionLog).count() == 0
 
-    wrong_approval = _approve_department_request(client, request.request_id, assembly_approver)
-    assert wrong_approval.status_code == 403, wrong_approval.text
-    db_session.expire_all()
-    assert db_session.query(TransactionLog).count() == 0
+    queue = client.get(
+        "/api/stock-requests/department-queue",
+        params={"actor_employee_id": str(production_deputy.employee_id)},
+    )
+    assert queue.status_code == 200, queue.text
+    assert str(request.request_id) in {entry["request_id"] for entry in queue.json()}
 
-    approved = _approve_department_request(client, request.request_id, tuning_approver)
+    approved = _approve_department_request(client, request.request_id, production_deputy)
     assert approved.status_code == 200, approved.text
     db_session.expire_all()
     for item in (parent, manual_item):
@@ -2843,10 +2845,10 @@ def test_io_mixed_production_department_approval_uses_target_department(
         assert location.quantity == Decimal("1")
 
 
-def test_io_mixed_target_department_primary_requester_cannot_self_approve(
+def test_io_mixed_target_department_primary_requester_can_self_approve(
     client, db_session, make_item, make_bom, make_location
 ):
-    """조립 primary 요청자는 튜닝 대상 혼합 작업을 자가승인할 수 없다."""
+    """생산부 정·부는 다른 공정의 혼합 작업도 자가승인할 수 있다."""
     parent = make_item(name="Self Approval Parent", process_type_code="AF")
     component = make_item(name="Self Approval Component", process_type_code="NR")
     manual_item = make_item(name="Self Approval Manual", process_type_code="AF")
@@ -2890,18 +2892,29 @@ def test_io_mixed_target_department_primary_requester_cannot_self_approve(
         json={
             "requester_employee_id": str(requester.employee_id), "work_type": "process",
             "sub_type": "adjust_in", "to_department": DepartmentEnum.TUNING.value,
-            "notes": "타부서 자가승인 차단",
+            "notes": "타부서 자가승인",
             "bundles": bom_preview.json()["bundles"] + manual_preview.json()["bundles"],
         },
     )
 
     assert submitted.status_code == 201, submitted.text
-    assert submitted.json()["status"] in {"submitted", "reserved"}
+    assert submitted.json()["status"] == "completed"
     request = db_session.query(StockRequest).one()
-    assert request.department_approved_by_employee_id is None
-    assert db_session.query(TransactionLog).count() == 0
+    assert request.department_approved_by_employee_id == requester.employee_id
+    assert request.status == StockRequestStatusEnum.COMPLETED
     db_session.refresh(component_location)
-    assert component_location.quantity == Decimal("1")
+    assert component_location.quantity == Decimal("0")
+    for item in (parent, manual_item):
+        location = (
+            db_session.query(InventoryLocation)
+            .filter(
+                InventoryLocation.item_id == item.item_id,
+                InventoryLocation.department == DepartmentEnum.TUNING,
+                InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+            )
+            .one()
+        )
+        assert location.quantity == Decimal("1")
 
 
 @pytest.mark.parametrize("endpoint", ["draft", "submit"])
