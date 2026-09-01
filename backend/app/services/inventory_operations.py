@@ -79,7 +79,7 @@ def _create_business_operation(
         reason=reason,
         idempotency_key=idempotency_key,
         effective_at=occurred_at,
-        contract_version=1,
+        contract_version=2,
     )
     db.add(operation)
     db.flush()

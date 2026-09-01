@@ -184,6 +184,19 @@ def test_unversioned_onboarding_stamps_0002_then_runs_department_backfill(
         )
         connection.execute(
             sa.text(
+                "INSERT INTO inventory "
+                "(inventory_id, item_id, quantity, warehouse_qty, pending_quantity) "
+                "VALUES ('inventory-1', 'item-1', 0, 0, 0)"
+            )
+        )
+        connection.execute(
+            sa.text(
+                "INSERT INTO warehouse_unplaced_items (id, item_id, quantity) "
+                "VALUES ('unplaced-1', 'item-1', 0)"
+            )
+        )
+        connection.execute(
+            sa.text(
                 "INSERT INTO transaction_logs "
                 "(log_id, item_id, transaction_type, quantity_change, inventory_effect) "
                 "VALUES ('log-1', 'item-1', 'BACKFLUSH', -1, :effects)"
@@ -212,7 +225,7 @@ def test_unversioned_onboarding_stamps_0002_then_runs_department_backfill(
             ) == "창고"
             assert connection.scalar(
                 sa.text("SELECT version_num FROM alembic_version")
-            ) == "20260828_0031"
+            ) == "20260831_0032"
         assert result.business_data_unchanged is True
     finally:
         engine.dispose()

@@ -26,7 +26,7 @@ from decimal import Decimal
 from typing import Iterable, Optional
 import uuid
 
-from sqlalchemy import update as sa_update
+from sqlalchemy import select, update as sa_update
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
@@ -37,7 +37,9 @@ from app.models import (
     Employee,
     Inventory,
     InventoryLocation,
+    Item,
     LocationStatusEnum,
+    WarehouseUnplacedItem,
 )
 
 # ---------------------------------------------------------------------------
@@ -85,6 +87,23 @@ from app.services.inv_defective import (  # noqa: F401
 )
 
 
+def _lock_required_unplaced(
+    db: Session,
+    item_ids: list[uuid.UUID],
+) -> None:
+    """Lock every required U row and reject a structurally incomplete ledger."""
+    query = (
+        db.query(WarehouseUnplacedItem)
+        .filter(WarehouseUnplacedItem.item_id.in_(item_ids))
+        .order_by(WarehouseUnplacedItem.item_id.asc())
+    )
+    if db.get_bind().dialect.name == "postgresql":
+        query = query.with_for_update()
+    unplaced_ids = {row.item_id for row in query.all()}
+    if unplaced_ids != set(item_ids):
+        raise ValueError("물리 위치 원장 불일치 — 미배치(U) 행이 없습니다.")
+
+
 def _ensure_and_lock_inventories(
     db: Session,
     item_ids: Iterable[uuid.UUID],
@@ -95,9 +114,20 @@ def _ensure_and_lock_inventories(
     same deterministic order and repeat the bulk lock once.
     """
     ordered_item_ids = sorted(set(item_ids))
+    if not ordered_item_ids:
+        return {}
+    dialect_name = db.get_bind().dialect.name
+    if dialect_name == "postgresql":
+        db.execute(
+            select(Item)
+            .where(Item.item_id.in_(ordered_item_ids))
+            .order_by(Item.item_id.asc())
+            .with_for_update(of=Item.__table__)
+        ).scalars().all()
     locked = lock_inventories(db, ordered_item_ids)
     missing_item_ids = [item_id for item_id in ordered_item_ids if item_id not in locked]
     if not missing_item_ids:
+        _lock_required_unplaced(db, ordered_item_ids)
         return locked
 
     values = [
@@ -109,7 +139,6 @@ def _ensure_and_lock_inventories(
         }
         for item_id in missing_item_ids
     ]
-    dialect_name = db.get_bind().dialect.name
     if dialect_name == "postgresql":
         statement = postgresql_insert(Inventory).values(values)
     elif dialect_name == "sqlite":
@@ -119,8 +148,31 @@ def _ensure_and_lock_inventories(
     db.execute(
         statement.on_conflict_do_nothing(index_elements=[Inventory.item_id])
     )
+    unplaced_values = [
+        {
+            "id": uuid.uuid4(),
+            "item_id": item_id,
+            "quantity": 0,
+        }
+        for item_id in missing_item_ids
+    ]
+    if dialect_name == "postgresql":
+        unplaced_statement = postgresql_insert(WarehouseUnplacedItem).values(
+            unplaced_values
+        )
+    else:
+        unplaced_statement = sqlite_insert(WarehouseUnplacedItem).values(
+            unplaced_values
+        )
+    db.execute(
+        unplaced_statement.on_conflict_do_nothing(
+            index_elements=[WarehouseUnplacedItem.item_id]
+        )
+    )
     db.flush()
-    return lock_inventories(db, ordered_item_ids)
+    locked = lock_inventories(db, ordered_item_ids)
+    _lock_required_unplaced(db, ordered_item_ids)
+    return locked
 
 
 # ---------------------------------------------------------------------------
@@ -301,15 +353,15 @@ def _consume_pending(db: Session, item_id: uuid.UUID, qty: Decimal) -> Inventory
     if qty <= 0:
         raise ValueError("차감 수량은 0보다 커야 합니다.")
 
-    inv = _lock_inventory(db, item_id)
-    pending = inv.pending_quantity or Decimal("0")
-    wh = inv.warehouse_qty or Decimal("0")
-    if pending < qty:
-        raise ValueError(f"예약 수량이 부족합니다 (Pending {pending}, 차감 요청 {qty}).")
-    if wh < qty:
-        raise ValueError(f"창고 재고가 부족합니다 (Warehouse {wh}, 차감 요청 {qty}).")
-    inv.pending_quantity = pending - qty
-    inv.warehouse_qty = wh - qty
+    from app.services.warehouse_map import _apply_warehouse_ledger_delta
+
+    _lock_inventory(db, item_id)
+    inv = _apply_warehouse_ledger_delta(
+        db,
+        item_id,
+        -qty,
+        consume_mode="reserved",
+    )
     _sync_total(db, inv)
     return inv
 
@@ -338,11 +390,18 @@ def _adjust_warehouse(
             attempted=str(new_warehouse_qty),
         )
         raise ValueError("창고 수량은 음수일 수 없습니다.")
+    from app.services.warehouse_map import _apply_warehouse_ledger_delta
+
     inv = _lock_inventory(db, item_id)
     qty_before = inv.quantity or Decimal("0")
     wh_before = inv.warehouse_qty or Decimal("0")
     delta = new_warehouse_qty - wh_before
-    inv.warehouse_qty = new_warehouse_qty
+    inv = _apply_warehouse_ledger_delta(
+        db,
+        item_id,
+        delta,
+        consume_mode="absolute",
+    )
     if location is not None:
         inv.location = location
     _sync_total(db, inv)

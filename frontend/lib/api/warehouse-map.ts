@@ -4,7 +4,8 @@
  * 보기(GET)는 공개. 박스·구조 편집은 창고 정/부 관리자(warehouse_role) 인증
  * — api-core 가 mutation 요청에만 현재 session actor의 X-Employee-Code +
  *   X-Operator-Pin step-up 자격증명을 자동 주입(편집 모드 진입 시 등록).
- * box-tracking 토글만 admin PIN.
+ * box-tracking `enabled`는 하위 호환용 박스 배치 UI 표시 선호도이며,
+ * 물리 원장 차감에는 영향을 주지 않는다. 변경은 admin PIN 필요.
  */
 
 import { deleteJson, fetcher, patchJson, postJson, putJson, toApiUrl } from "../api-core";
@@ -78,6 +79,15 @@ export interface WarehouseMap {
   angles: WarehouseAngle[];
   boxes: WarehouseBox[];
   special_zones: WarehouseSpecialZone[];
+  unplaced_items: WarehouseUnplacedItem[];
+}
+
+export interface WarehouseUnplacedItem {
+  row_id: string;
+  item_id: string;
+  mes_code: string | null;
+  item_name: string;
+  quantity: number;
 }
 
 export interface ReconcileRow {
@@ -88,11 +98,27 @@ export interface ReconcileRow {
   warehouse_qty: number;
   diff: number;
   status: "ok" | "over" | "under";
+  box_total: number;
+  zone_total: number;
+  unplaced_total: number;
+  inactive_zone_total: number;
+  ledger_total: number;
+  ledger_diff: number;
+  ledger_status: "ok" | "over" | "under" | "invalid";
+  inventory_present: boolean;
+  unplaced_present: boolean;
+  ledger_issues: string[];
 }
 
 export interface ReconcileResult {
   rows: ReconcileRow[];
   mismatch_count: number;
+  ledger_mismatch_count: number;
+}
+
+/** 하위 호환용 박스 배치 UI 표시 선호도. 물리 원장 차감과 무관하다. */
+export interface BoxTrackingUiPreference {
+  enabled: boolean;
 }
 
 export interface BoxItemPayload {
@@ -102,6 +128,10 @@ export interface BoxItemPayload {
 
 export const warehouseMapApi = {
   getMap: () => fetcher<WarehouseMap>(toApiUrl("/api/warehouse-map/map")),
+  getBoxTracking: () =>
+    fetcher<BoxTrackingUiPreference>(toApiUrl("/api/warehouse-map/box-tracking")),
+  setBoxTracking: (payload: BoxTrackingUiPreference) =>
+    putJson<BoxTrackingUiPreference>(toApiUrl("/api/warehouse-map/box-tracking"), payload),
   getStructure: () => fetcher<WarehouseAngle[]>(toApiUrl("/api/warehouse-map/structure")),
   reconcile: (itemId?: string) => {
     const q = itemId ? `?item_id=${encodeURIComponent(itemId)}` : "";

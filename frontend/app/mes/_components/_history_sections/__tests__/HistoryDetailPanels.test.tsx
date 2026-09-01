@@ -180,6 +180,7 @@ beforeEach(() => {
     planHash: "a".repeat(64),
     canCancel: true,
     blockers: [],
+    warnings: [],
     cells: [],
     defectRecords: [],
     effects: [],
@@ -1151,6 +1152,16 @@ describe("desktop history detail panels", () => {
   });
 
   it("previews and cancels every line of a new-ledger operation with the reviewed plan hash", async () => {
+    vi.mocked((productionApi as any).previewInventoryOperationCancellation).mockResolvedValue({
+      operationId: "operation-1",
+      planHash: "a".repeat(64),
+      canCancel: true,
+      blockers: [],
+      warnings: ["레거시 효과 위치는 추정하지 않습니다."],
+      cells: [],
+      defectRecords: [],
+      effects: [],
+    });
     const selected = makeLog({
       operation_id: "operation-1",
       operation_kind: "BUSINESS",
@@ -1188,6 +1199,9 @@ describe("desktop history detail panels", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "이 내역 취소" }));
     expect(await screen.findByText("취소할 내역 2건")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "레거시 효과 위치는 추정하지 않습니다.",
+    );
     expect(
       within(screen.getByTestId("history-cancel-confirmation")).getByText("하위 자재 B"),
     ).toBeInTheDocument();

@@ -7,6 +7,7 @@ import { DesktopWarehouseMapView } from "../DesktopWarehouseMapView";
 
 const mapApiMock = vi.hoisted(() => ({
   getMap: vi.fn(),
+  getBoxTracking: vi.fn(() => Promise.resolve({ enabled: true })),
 }));
 
 vi.mock("@/lib/api/warehouse-map", async () => {
@@ -16,6 +17,7 @@ vi.mock("@/lib/api/warehouse-map", async () => {
     warehouseMapApi: {
       ...actual.warehouseMapApi,
       getMap: mapApiMock.getMap,
+      getBoxTracking: mapApiMock.getBoxTracking,
     },
   };
 });
@@ -39,6 +41,7 @@ const mapFixture: WarehouseMap = {
   ],
   boxes: [],
   special_zones: [],
+  unplaced_items: [],
 };
 
 beforeAll(() => {
@@ -83,6 +86,39 @@ describe("DesktopWarehouseMapView fullscreen", () => {
 
     expect(await screen.findByText("앵글 1")).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/품목명.*코드 검색/)).toBeInTheDocument();
+  });
+
+  it("hides box placement details when the UI display preference is disabled", async () => {
+    const mapWithBox: WarehouseMap = {
+      ...mapFixture,
+      boxes: [{
+        box_id: "hidden-box",
+        angle_id: 1,
+        row_no: 1,
+        layer_no: 1,
+        jari_index: 0,
+        size: "SMALL",
+        stack_order: 0,
+        items: [{
+          item_id: "hidden-item",
+          item_name: "숨김 품목",
+          mes_code: "HIDDEN-1",
+          quantity: 1,
+          department: null,
+          color_hex: null,
+        }],
+      }],
+    };
+    mapApiMock.getMap.mockResolvedValueOnce(mapWithBox);
+    mapApiMock.getBoxTracking.mockResolvedValueOnce({ enabled: false });
+
+    renderWithClient(<DesktopWarehouseMapView />);
+
+    await screen.findByText("앵글 1");
+    await waitFor(() => expect(mapApiMock.getBoxTracking).toHaveBeenCalled());
+    const search = screen.getByPlaceholderText(/품목명.*코드 검색/);
+    fireEvent.change(search, { target: { value: "숨김 품목" } });
+    expect(await screen.findByText(/위치를 찾을 수 없습니다/)).toBeInTheDocument();
   });
 
   it("uses a rounded flat surface in regular mode", async () => {

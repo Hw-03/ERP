@@ -20,7 +20,7 @@ from bootstrap.legacy_profiles import (
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
-HEAD_REVISION = "20260828_0031"
+HEAD_REVISION = "20260831_0032"
 
 
 def _config(url: str, *, output_buffer: io.StringIO | None = None) -> Config:
@@ -80,7 +80,7 @@ def test_postgresql_offline_head_contains_data_revision_contract() -> None:
             "postgresql+psycopg2://migration-test:unused@invalid/migration-test",
             output_buffer=output,
         ),
-        "head",
+        "20260804_0013",
         sql=True,
     )
 

@@ -34,13 +34,14 @@ def _postgres_config(database_url: str) -> Config:
     return config
 
 
-def test_cp4_revision_is_the_single_head() -> None:
+def test_cp4_revision_is_the_direct_predecessor_of_the_single_head() -> None:
     config = Config(str(BACKEND_DIR / "alembic.ini"))
     config.set_main_option("script_location", str(BACKEND_DIR / "alembic"))
 
     script = ScriptDirectory.from_config(config)
 
-    assert script.get_heads() == [MIGRATION_REVISION]
+    assert script.get_heads() == ["20260831_0032"]
+    assert script.get_revision("20260831_0032").down_revision == MIGRATION_REVISION
 
 
 def test_0030_to_0031_adds_and_rollback_removes_correction_unique_index(
@@ -449,7 +450,7 @@ def test_postgresql_fresh_upgrade_0030_to_0031_and_rollback() -> None:
                         "WHERE correction_log_id IS NOT NULL"
                     )
                 )
-                command.upgrade(config, "head")
+                command.upgrade(config, MIGRATION_REVISION)
                 assert connection.execute(
                     sa.text("SELECT version_num FROM alembic_version")
                 ).scalar_one() == MIGRATION_REVISION
@@ -464,62 +465,74 @@ def test_postgresql_fresh_upgrade_0030_to_0031_and_rollback() -> None:
     reason="TEST_POSTGRES_URL이 설정된 전용 PostgreSQL에서만 실행",
 )
 def test_postgresql_head_0031_downgrade_and_reupgrade() -> None:
-    """CI의 head DB에서 CP4 rollback/re-upgrade를 실제 PostgreSQL로 강제한다."""
-    database_url = os.environ["TEST_POSTGRES_URL"]
-    engine = sa.create_engine(database_url, poolclass=sa.pool.NullPool)
-    try:
-        with engine.connect() as connection:
-            outer = connection.begin()
-            try:
-                config = _postgres_config(database_url)
-                config.attributes["connection"] = connection
-                assert connection.execute(
-                    sa.text("SELECT version_num FROM alembic_version")
-                ).scalar_one() == MIGRATION_REVISION
+    """빈 head DB에서 CP4 rollback/re-upgrade를 실제 PostgreSQL로 강제한다."""
+    from tests.migrations.test_inventory_location_ledger import _postgres_database
 
-                command.downgrade(config, PREVIOUS_REVISION)
-                assert connection.execute(
-                    sa.text("SELECT version_num FROM alembic_version")
-                ).scalar_one() == PREVIOUS_REVISION
-                assert connection.execute(
-                    sa.text(
-                        "SELECT count(*) FROM pg_indexes "
-                        "WHERE schemaname = current_schema() AND indexname = :name"
-                    ),
-                    {"name": CORRECTION_UNIQUE_INDEX},
-                ).scalar_one() == 0
+    with _postgres_database("test_cp4_integrity") as database_url:
+        command.upgrade(_postgres_config(database_url), "head")
+        engine = sa.create_engine(database_url, poolclass=sa.pool.NullPool)
+        try:
+            with engine.connect() as connection:
+                outer = connection.begin()
+                try:
+                    config = _postgres_config(database_url)
+                    config.attributes["connection"] = connection
+                    assert connection.execute(
+                        sa.text("SELECT version_num FROM alembic_version")
+                    ).scalar_one() == "20260831_0032"
 
-                connection.execute(
-                    sa.text(
-                        f"CREATE UNIQUE INDEX {CORRECTION_UNIQUE_INDEX} "
-                        "ON transaction_edit_logs (original_log_id) "
-                        "WHERE correction_log_id IS NOT NULL"
+                    command.downgrade(config, MIGRATION_REVISION)
+                    assert connection.execute(
+                        sa.text("SELECT version_num FROM alembic_version")
+                    ).scalar_one() == MIGRATION_REVISION
+
+                    command.downgrade(config, PREVIOUS_REVISION)
+                    assert connection.execute(
+                        sa.text("SELECT version_num FROM alembic_version")
+                    ).scalar_one() == PREVIOUS_REVISION
+                    assert connection.execute(
+                        sa.text(
+                            "SELECT count(*) FROM pg_indexes "
+                            "WHERE schemaname = current_schema() AND indexname = :name"
+                        ),
+                        {"name": CORRECTION_UNIQUE_INDEX},
+                    ).scalar_one() == 0
+
+                    connection.execute(
+                        sa.text(
+                            f"CREATE UNIQUE INDEX {CORRECTION_UNIQUE_INDEX} "
+                            "ON transaction_edit_logs (original_log_id) "
+                            "WHERE correction_log_id IS NOT NULL"
+                        )
                     )
-                )
-                command.upgrade(config, MIGRATION_REVISION)
-                assert connection.execute(
+                    command.upgrade(config, MIGRATION_REVISION)
+                    assert connection.execute(
+                        sa.text("SELECT version_num FROM alembic_version")
+                    ).scalar_one() == MIGRATION_REVISION
+                    command.upgrade(config, "head")
+                    assert connection.execute(
+                        sa.text("SELECT version_num FROM alembic_version")
+                    ).scalar_one() == "20260831_0032"
+                    assert connection.execute(
+                        sa.text(
+                            "SELECT count(*) FROM pg_indexes "
+                            "WHERE schemaname = current_schema() AND indexname = :name"
+                        ),
+                        {"name": CORRECTION_UNIQUE_INDEX},
+                    ).scalar_one() == 1
+                finally:
+                    outer.rollback()
+
+            with engine.connect() as verify:
+                assert verify.execute(
                     sa.text("SELECT version_num FROM alembic_version")
-                ).scalar_one() == MIGRATION_REVISION
-                assert connection.execute(
+                ).scalar_one() == "20260831_0032"
+                assert verify.execute(
                     sa.text(
                         "SELECT count(*) FROM pg_indexes "
                         "WHERE schemaname = current_schema() AND indexname = :name"
                     ),
                     {"name": CORRECTION_UNIQUE_INDEX},
                 ).scalar_one() == 1
-            finally:
-                outer.rollback()
-
-        with engine.connect() as verify:
-            assert verify.execute(
-                sa.text("SELECT version_num FROM alembic_version")
-            ).scalar_one() == MIGRATION_REVISION
-            assert verify.execute(
-                sa.text(
-                    "SELECT count(*) FROM pg_indexes "
-                    "WHERE schemaname = current_schema() AND indexname = :name"
-                ),
-                {"name": CORRECTION_UNIQUE_INDEX},
-            ).scalar_one() == 1
-    finally:
-        engine.dispose()
+        finally:
+            engine.dispose()

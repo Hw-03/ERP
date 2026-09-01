@@ -70,7 +70,9 @@ describe("DesktopTopbar", () => {
       />,
     );
 
-    expect(screen.getByTestId("desktop-status-target")).toHaveTextContent("DEXCOWIN MES");
+    const target = screen.getByTestId("desktop-status-target");
+    expect(target).toHaveTextContent("DEXCOWIN MES");
+    expect(target).toHaveAttribute("data-status-target", "desktop");
   });
 
   it("enables the login notification dialog for the desktop top bar", () => {

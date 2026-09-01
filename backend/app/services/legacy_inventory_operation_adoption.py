@@ -433,10 +433,27 @@ def _validate_scope(
             raise LegacyCancellationAdoptionError(
                 INCOMPLETE_LEGACY_EFFECT_MESSAGE
             ) from exc
-        deltas = [int(effect["delta"]) for effect in effects]
+        deltas = [
+            int(effect["delta"])
+            for effect in effects
+            if effect.get("scope") in {"warehouse", "location"}
+        ]
+        warehouse_delta = sum(
+            int(effect["delta"])
+            for effect in effects
+            if effect.get("scope") == "warehouse"
+        )
+        physical_delta = sum(
+            int(effect["delta"])
+            for effect in effects
+            if effect.get("scope")
+            in {"warehouse_box", "warehouse_zone", "warehouse_unplaced"}
+        )
         if _is_rework_scrap_child(log):
             continue
         if not deltas or any(delta == 0 for delta in deltas):
+            raise LegacyCancellationAdoptionError(INCOMPLETE_LEGACY_EFFECT_MESSAGE)
+        if physical_delta and physical_delta != warehouse_delta:
             raise LegacyCancellationAdoptionError(INCOMPLETE_LEGACY_EFFECT_MESSAGE)
         if log.transaction_type in _TRANSFER_TYPES:
             if len(deltas) < 2 or min(deltas) >= 0 or max(deltas) <= 0 or sum(deltas) != 0:

@@ -27,6 +27,7 @@ from app.models import (  # noqa: E402
     StockRequestLine,
     StockRequestStatusEnum,
     StockRequestTypeEnum,
+    WarehouseUnplacedItem,
 )
 from app.services import stock_requests as svc  # noqa: E402
 
@@ -60,6 +61,9 @@ def _setup(make_session):
         pending_quantity=Decimal("0"),
     )
     session.add(inv)
+    session.add(
+        WarehouseUnplacedItem(item_id=item.item_id, quantity=Decimal("100"))
+    )
 
     # DRAFT 1개 생성 (라인 포함)
     req = StockRequest(

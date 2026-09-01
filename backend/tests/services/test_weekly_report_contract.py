@@ -139,3 +139,26 @@ def test_production_shipping_and_normal_scrap_have_nonnegative_columns() -> None
     assert production.as_tuple() == (5, 0, 0, 0)
     assert shipping.as_tuple() == (0, 0, 3, 0)
     assert normal_scrap.as_tuple() == (0, 0, 0, 2)
+
+
+def test_v2_physical_location_effects_do_not_double_count_warehouse_delta() -> None:
+    activity = classify_inventory_activity(
+        _log(
+            TransactionTypeEnum.SHIP,
+            role=InventoryOperationRoleEnum.PRIMARY,
+            quantity_change=-3,
+            effects=[
+                {"scope": "warehouse", "delta": -3},
+                {"scope": "warehouse_box", "row_id": "box-row", "delta": -1},
+                {"scope": "warehouse_zone", "row_id": "zone-row", "delta": -1},
+                {
+                    "scope": "warehouse_unplaced",
+                    "row_id": "unplaced-row",
+                    "delta": -1,
+                },
+            ],
+        )
+    )
+
+    assert activity.as_tuple() == (0, 0, 3, 0)
+    assert activity.normal_delta == -3

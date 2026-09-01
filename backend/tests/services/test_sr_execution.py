@@ -811,6 +811,72 @@ def test_execute_all_lines_records_one_operation_for_request(db_session, make_it
     assert effect.after_state == {"status": "completed"}
 
 
+def test_execute_all_lines_prelocks_physical_ledger_before_line_execution(
+    db_session,
+    make_item,
+    monkeypatch,
+):
+    """승인 라인이 격리 레코드에 접근하기 전에 B/Z/U 잠금까지 끝내야 한다."""
+    from app.services import warehouse_map as warehouse_map_svc
+
+    item = make_item(name="physical-prelock-before-record", warehouse_qty=D("1"))
+    employee = _make_employee(db_session, code="SR-PHYSICAL-PRELOCK")
+    request = _make_request(
+        db_session,
+        employee,
+        request_type=StockRequestTypeEnum.DEFECT_SCRAP,
+    )
+    line = _add_line(
+        db_session,
+        request,
+        item,
+        quantity=D("1"),
+        from_bucket=RequestBucketEnum.DEFECTIVE,
+        to_bucket=RequestBucketEnum.NONE,
+        from_department=ASSEMBLY.value,
+    )
+    events: list[tuple[str, object]] = []
+
+    monkeypatch.setattr(svc, "_uses_row_locks", lambda _db: True)
+    monkeypatch.setattr(
+        svc.inventory_svc,
+        "_ensure_and_lock_inventories",
+        lambda _db, item_ids: events.append(("inventory", item_ids)) or {},
+    )
+
+    def lock_physical(_db, **kwargs):
+        events.append(("physical", kwargs))
+
+    monkeypatch.setattr(warehouse_map_svc, "lock_warehouse_map_rows", lock_physical)
+    monkeypatch.setattr(
+        svc,
+        "_execute_line",
+        lambda *_args, **_kwargs: events.append(("record", line.item_id)),
+    )
+
+    svc._execute_all_lines(
+        db_session,
+        request,
+        [line],
+        operator_name=employee.name,
+        approver=employee,
+        is_approval=True,
+    )
+
+    assert events == [
+        ("inventory", [item.item_id]),
+        (
+            "physical",
+            {
+                "item_ids": [item.item_id],
+                "include_boxes_for_item_ids": True,
+                "include_zones_for_item_ids": True,
+            },
+        ),
+        ("record", item.item_id),
+    ]
+
+
 # ══════════════════════════ _finalize_submission ══════════════════════════
 
 
@@ -1162,7 +1228,7 @@ def test_release_reservation_locks_sorted_unique_inventories_before_source_relea
     def _release_lines_stub(_db, _lines, **_kwargs):
         events.append(("release", None))
 
-    monkeypatch.setattr(svc, "_is_sqlite", False)
+    monkeypatch.setattr(svc, "_uses_row_locks", lambda _db: True)
     monkeypatch.setattr(svc.inventory_svc, "lock_inventories", lock_inventories)
     monkeypatch.setattr(sr_reservation, "_release_lines", _release_lines_stub)
 
@@ -1240,7 +1306,7 @@ def test_rework_first_prelock_includes_recursive_child_tree(
     )
     events = []
 
-    monkeypatch.setattr(svc, "_is_sqlite", False)
+    monkeypatch.setattr(svc, "_uses_row_locks", lambda _db: True)
     monkeypatch.setattr(
         svc.inventory_svc,
         "_ensure_and_lock_inventories",

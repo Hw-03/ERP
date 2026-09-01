@@ -16,6 +16,9 @@ from app.models import (
     EmployeeLevelEnum,
     WarehouseBox,
     WarehouseBoxItem,
+    WarehouseSpecialZone,
+    WarehouseSpecialZoneItem,
+    WarehouseUnplacedItem,
 )
 from app.services import warehouse_map as warehouse_map_service
 from app.services.pin_auth import hash_pin
@@ -87,6 +90,21 @@ def _make_zone(client, *, label="PL-1", zone_type="pallet", items=None):
     )
     assert resp.status_code == 201, resp.text
     return resp.json()
+
+
+def _set_unplaced(db_session, item_id, quantity: int) -> WarehouseUnplacedItem:
+    row = (
+        db_session.query(WarehouseUnplacedItem)
+        .filter(WarehouseUnplacedItem.item_id == item_id)
+        .one_or_none()
+    )
+    if row is None:
+        row = WarehouseUnplacedItem(item_id=item_id, quantity=quantity)
+        db_session.add(row)
+    else:
+        row.quantity = quantity
+    db_session.flush()
+    return row
 
 
 # ──────────────────────────── 앵글 CRUD ────────────────────────────
@@ -192,6 +210,77 @@ def test_delete_box(client, make_item):
     assert len(client.get(f"{BASE}/map").json()["boxes"]) == 0
 
 
+def test_box_item_delta_uses_unplaced_and_preserves_existing_row_id(
+    client,
+    db_session,
+    make_item,
+):
+    angle = _make_angle(client)
+    item = make_item(warehouse_qty=D("10"))
+    unplaced = _set_unplaced(db_session, item.item_id, 10)
+
+    created = _put_box(
+        client,
+        angle["id"],
+        items=[{"item_id": str(item.item_id), "quantity": 4}],
+    )
+    assert created.status_code == 201, created.text
+    box_id = created.json()["box_id"]
+    original_row = (
+        db_session.query(WarehouseBoxItem)
+        .filter(WarehouseBoxItem.box_id == box_id)
+        .one()
+    )
+    original_row_id = original_row.id
+    db_session.refresh(unplaced)
+    assert int(unplaced.quantity) == 6
+
+    updated = client.put(
+        f"{BASE}/boxes/{box_id}",
+        json={"items": [{"item_id": str(item.item_id), "quantity": 6}]},
+        headers=MGR,
+    )
+    assert updated.status_code == 200, updated.text
+    current_row = (
+        db_session.query(WarehouseBoxItem)
+        .filter(WarehouseBoxItem.box_id == box_id)
+        .one()
+    )
+    db_session.refresh(unplaced)
+    assert current_row.id == original_row_id
+    assert int(current_row.quantity) == 6
+    assert int(unplaced.quantity) == 4
+
+    deleted = client.delete(f"{BASE}/boxes/{box_id}", headers=MGR)
+    assert deleted.status_code == 204, deleted.text
+    db_session.refresh(unplaced)
+    assert int(unplaced.quantity) == 10
+
+
+def test_box_rejects_duplicate_item_payload_without_mutation(
+    client,
+    db_session,
+    make_item,
+):
+    angle = _make_angle(client)
+    item = make_item(warehouse_qty=D("10"))
+    unplaced = _set_unplaced(db_session, item.item_id, 10)
+
+    response = _put_box(
+        client,
+        angle["id"],
+        items=[
+            {"item_id": str(item.item_id), "quantity": 2},
+            {"item_id": str(item.item_id), "quantity": 3},
+        ],
+    )
+
+    assert response.status_code == 422, response.text
+    assert db_session.query(WarehouseBox).count() == 0
+    db_session.refresh(unplaced)
+    assert int(unplaced.quantity) == 10
+
+
 def test_box_mutations_lock_affected_rows_before_writes(
     client,
     db_session,
@@ -210,7 +299,9 @@ def test_box_mutations_lock_affected_rows_before_writes(
         item_ids=(),
         angle_ids=(),
         box_ids=(),
+        zone_ids=(),
         include_boxes_for_item_ids=False,
+        include_zones_for_item_ids=False,
     ):
         selected_box_ids = {str(value) for value in box_ids}
         boxes = db.query(WarehouseBox).all()
@@ -221,6 +312,7 @@ def test_box_mutations_lock_affected_rows_before_writes(
                 "angle_ids": set(angle_ids),
                 "box_ids": selected_box_ids,
                 "include_boxes_for_item_ids": include_boxes_for_item_ids,
+                "include_zones_for_item_ids": include_zones_for_item_ids,
                 "boxes": {
                     str(box.box_id): (
                         box.angle_id,
@@ -252,10 +344,10 @@ def test_box_mutations_lock_affected_rows_before_writes(
     )
     assert created.status_code == 201, created.text
     first_box = created.json()
-    assert calls[-1]["item_ids"] == {str(old_item.item_id)}
-    assert calls[-1]["angle_ids"] == {angle["id"]}
-    assert calls[-1]["box_ids"] == set()
-    assert calls[-1]["boxes"] == {}
+    assert calls[0]["item_ids"] == {str(old_item.item_id)}
+    assert calls[0]["angle_ids"] == {angle["id"]}
+    assert calls[0]["box_ids"] == set()
+    assert calls[0]["boxes"] == {}
 
     calls.clear()
     updated = client.put(
@@ -371,6 +463,36 @@ def test_reconcile_ok_when_match(client, make_item):
     assert data["rows"][0]["status"] == "ok"
 
 
+def test_map_and_reconcile_expose_unplaced_ledger_additively(client, make_item):
+    item = make_item(name="W only", warehouse_qty=D("5"))
+
+    mapped = client.get(f"{BASE}/map")
+    assert mapped.status_code == 200, mapped.text
+    assert mapped.json()["unplaced_items"] == [
+        {
+            "row_id": str(
+                mapped.json()["unplaced_items"][0]["row_id"]
+            ),
+            "item_id": str(item.item_id),
+            "mes_code": item.mes_code,
+            "item_name": "W only",
+            "quantity": 5,
+        }
+    ]
+
+    reconciled = client.get(f"{BASE}/reconcile")
+    assert reconciled.status_code == 200, reconciled.text
+    body = reconciled.json()
+    assert body["ledger_mismatch_count"] == 0
+    row = body["rows"][0]
+    assert row["box_total"] == 0
+    assert row["zone_total"] == 0
+    assert row["unplaced_total"] == 5
+    assert row["ledger_total"] == 5
+    assert row["ledger_diff"] == 0
+    assert row["ledger_status"] == "ok"
+
+
 def test_create_special_zone_requires_warehouse_manager(client):
     resp = client.post(
         f"{BASE}/zones",
@@ -405,6 +527,119 @@ def test_create_special_zone_and_map_includes_items(client, make_item):
     mapped = data["special_zones"][0]
     assert mapped["label"] == "PL-1"
     assert mapped["items"][0]["quantity"] == 3
+
+
+def test_zone_item_delta_preserves_row_id_and_positive_zone_cannot_deactivate(
+    client,
+    db_session,
+    make_item,
+):
+    item = make_item(name="Zone ledger", warehouse_qty=D("10"))
+    unplaced = _set_unplaced(db_session, item.item_id, 10)
+    zone = _make_zone(
+        client,
+        items=[{"item_id": str(item.item_id), "quantity": 4}],
+    )
+    zone_row = (
+        db_session.query(WarehouseSpecialZoneItem)
+        .filter(WarehouseSpecialZoneItem.zone_id == zone["id"])
+        .one()
+    )
+    original_row_id = zone_row.id
+    db_session.refresh(unplaced)
+    assert int(unplaced.quantity) == 6
+
+    replaced = client.put(
+        f"{BASE}/zones/{zone['id']}/items",
+        json={"items": [{"item_id": str(item.item_id), "quantity": 6}]},
+        headers=MGR,
+    )
+    assert replaced.status_code == 200, replaced.text
+    current_row = (
+        db_session.query(WarehouseSpecialZoneItem)
+        .filter(WarehouseSpecialZoneItem.zone_id == zone["id"])
+        .one()
+    )
+    db_session.refresh(unplaced)
+    assert current_row.id == original_row_id
+    assert int(current_row.quantity) == 6
+    assert int(unplaced.quantity) == 4
+
+    blocked = client.put(
+        f"{BASE}/zones/{zone['id']}",
+        json={"is_active": False},
+        headers=MGR,
+    )
+    assert blocked.status_code == 409, blocked.text
+    db_session.expire_all()
+    stored_zone = db_session.get(WarehouseSpecialZone, zone["id"])
+    assert stored_zone is not None and stored_zone.is_active is True
+    assert int(db_session.get(WarehouseSpecialZoneItem, original_row_id).quantity) == 6
+    assert int(db_session.get(WarehouseUnplacedItem, unplaced.id).quantity) == 4
+
+    cleared = client.put(
+        f"{BASE}/zones/{zone['id']}/items",
+        json={"items": []},
+        headers=MGR,
+    )
+    assert cleared.status_code == 200, cleared.text
+    deactivated = client.put(
+        f"{BASE}/zones/{zone['id']}",
+        json={"is_active": False},
+        headers=MGR,
+    )
+    assert deactivated.status_code == 200, deactivated.text
+    db_session.refresh(unplaced)
+    assert int(unplaced.quantity) == 10
+
+
+def test_zone_deactivation_rechecks_contents_after_shared_lock(
+    client,
+    db_session,
+    make_item,
+    monkeypatch,
+):
+    item = make_item(name="Zone deactivation race", warehouse_qty=D("1"))
+    unplaced = _set_unplaced(db_session, item.item_id, 1)
+    zone = _make_zone(client, items=[])
+    injected = False
+
+    def simulate_committed_placement(_db, **kwargs):
+        nonlocal injected
+        if zone["id"] not in kwargs.get("zone_ids", ()) or injected:
+            return
+        unplaced.quantity = 0
+        db_session.add(
+            WarehouseSpecialZoneItem(
+                zone_id=zone["id"],
+                item_id=item.item_id,
+                quantity=1,
+            )
+        )
+        db_session.commit()
+        injected = True
+
+    monkeypatch.setattr(
+        warehouse_map_service,
+        "lock_warehouse_map_rows",
+        simulate_committed_placement,
+    )
+
+    response = client.put(
+        f"{BASE}/zones/{zone['id']}",
+        json={"is_active": False},
+        headers=MGR,
+    )
+
+    assert injected is True
+    assert response.status_code == 409, response.text
+    db_session.expire_all()
+    stored = db_session.get(WarehouseSpecialZone, zone["id"])
+    assert stored is not None and stored.is_active is True
+    assert db_session.query(WarehouseSpecialZoneItem).filter_by(
+        zone_id=zone["id"], item_id=item.item_id
+    ).one().quantity == 1
+    assert db_session.get(WarehouseUnplacedItem, unplaced.id).quantity == 0
 
 
 def test_reconcile_counts_boxes_and_special_zones(client, make_item):

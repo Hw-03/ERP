@@ -106,7 +106,12 @@ def _normal_delta(inventory_effect: object) -> Decimal:
             total += delta
         elif scope == "location" and effect.get("status") == LocationStatusEnum.PRODUCTION.value:
             total += delta
-        elif scope in {"warehouse_box", "location"}:
+        elif scope in {
+            "warehouse_box",
+            "warehouse_zone",
+            "warehouse_unplaced",
+            "location",
+        }:
             continue
         else:
             raise WeeklyActivityClassificationError("지원하지 않는 재고 효과가 포함되어 있습니다.")

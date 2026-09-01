@@ -83,6 +83,39 @@ function deferred<T>() {
 }
 
 describe("DesktopWarehouseMapTab realtime refresh", () => {
+  it("shows structurally invalid ledgers even when the legacy placement subtotal matches", async () => {
+    testState.reconcile.mockResolvedValueOnce({
+      rows: [{
+        item_id: "invalid-ledger-1",
+        mes_code: "M-INVALID",
+        item_name: "invalid-ledger-item",
+        placed_total: 0,
+        warehouse_qty: 0,
+        diff: 0,
+        status: "ok",
+        box_total: 0,
+        zone_total: 0,
+        inactive_zone_total: 0,
+        unplaced_total: 0,
+        ledger_total: 0,
+        ledger_diff: 0,
+        ledger_status: "invalid",
+        inventory_present: false,
+        unplaced_present: false,
+        ledger_issues: ["missing_inventory", "missing_unplaced"],
+      }],
+      mismatch_count: 0,
+      ledger_mismatch_count: 1,
+    });
+    render(<DesktopWarehouseMapTab />);
+
+    await enterEditMode();
+
+    expect(await screen.findByText(/재고 위치 원장 구조 또는 수량이 올바르지 않습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/M-INVALID\(B 0 · Z 0 · U 0 \/ W 0 · 재고 행 없음 · 미배치\(U\) 행 없음\)/)).toBeInTheDocument();
+    expect(screen.queryByText(/박스 관리에서 정리하기/)).not.toBeInTheDocument();
+  });
+
   it("uses the current session actor for mutation step-up without a second login request", async () => {
     render(<DesktopWarehouseMapTab />);
 
@@ -115,7 +148,7 @@ describe("DesktopWarehouseMapTab realtime refresh", () => {
     testState.revision = 2;
     rerender(<DesktopWarehouseMapTab />);
 
-    expect(await screen.findByText(/M-1\(0\/4\)/)).toBeInTheDocument();
+    expect(await screen.findByText(/M-1\(B 0 · Z 0 · U 0 \/ W 4\)/)).toBeInTheDocument();
   });
 
   it("applies item results when the concurrent reconcile refresh fails", async () => {
@@ -213,7 +246,7 @@ describe("DesktopWarehouseMapTab realtime refresh", () => {
       });
       await newerReconcile.promise;
     });
-    expect(await screen.findByText(/F-1\(0\/4\)/)).toBeInTheDocument();
+    expect(await screen.findByText(/F-1\(B 0 · Z 0 · U 0 \/ W 4\)/)).toBeInTheDocument();
 
     await act(async () => {
       olderReconcile.resolve({
@@ -231,7 +264,7 @@ describe("DesktopWarehouseMapTab realtime refresh", () => {
       await olderReconcile.promise;
     });
     await waitFor(() => {
-      expect(screen.getByText(/F-1\(0\/4\)/)).toBeInTheDocument();
+      expect(screen.getByText(/F-1\(B 0 · Z 0 · U 0 \/ W 4\)/)).toBeInTheDocument();
       expect(screen.queryByText(/S-1\(0\/7\)/)).not.toBeInTheDocument();
     });
   });

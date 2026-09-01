@@ -12,6 +12,7 @@ from alembic.config import Config
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
 PREVIOUS_HEAD = "20260727_0007"
+MIGRATION_REVISION = "20260727_0008"
 
 
 def _config(path: Path) -> Config:
@@ -47,7 +48,7 @@ def test_head_upgrade_enables_sales_review_for_all_af_items(tmp_path: Path) -> N
             ],
         )
 
-    command.upgrade(config, "head")
+    command.upgrade(config, MIGRATION_REVISION)
 
     with sqlite3.connect(path) as db:
         flags = dict(db.execute("SELECT item_id, sales_review_required FROM items"))

@@ -30,6 +30,13 @@ router = VerifiedActorRouter()
 
 
 def _validate_items(db: Session, items: List[WarehouseBoxItemPayload]) -> None:
+    item_ids = [item.item_id for item in items]
+    if len(item_ids) != len(set(item_ids)):
+        raise http_error(
+            422,
+            ErrorCode.VALIDATION_ERROR,
+            "같은 특수구역에 중복 품목을 입력할 수 없습니다.",
+        )
     for it in items:
         item = db.query(Item).filter(Item.item_id == it.item_id, Item.deleted_at.is_(None)).first()
         if not item:
@@ -37,9 +44,7 @@ def _validate_items(db: Session, items: List[WarehouseBoxItemPayload]) -> None:
 
 
 def _replace_items(db: Session, zone_id: int, items: List[WarehouseBoxItemPayload]) -> None:
-    db.query(WarehouseSpecialZoneItem).filter(WarehouseSpecialZoneItem.zone_id == zone_id).delete()
-    for it in items:
-        db.add(WarehouseSpecialZoneItem(zone_id=zone_id, item_id=it.item_id, quantity=it.quantity))
+    wm_service._replace_zone_items(db, zone_id, items)
 
 
 def _audit(db: Session, zone: WarehouseSpecialZone, action: str, mgr: Employee) -> None:
@@ -75,6 +80,11 @@ def create_zone(
     db: Session = Depends(get_db),
 ):
     _validate_items(db, payload.items)
+    wm_service.lock_warehouse_map_rows(
+        db,
+        item_ids=[item.item_id for item in payload.items],
+    )
+    _validate_items(db, payload.items)
     order = payload.display_order
     if order is None:
         max_order = db.query(func.max(WarehouseSpecialZone.display_order)).scalar()
@@ -108,11 +118,40 @@ def update_zone(
     zone = _get_zone(db, zone_id)
     data = payload.model_dump(exclude_unset=True)
     items = data.pop("items", None)
-    for field, value in data.items():
-        setattr(zone, field, value)
+    deactivating = data.get("is_active") is False and zone.is_active
+    if deactivating:
+        if items is None:
+            zone, remaining = wm_service.lock_zone_for_deactivation(db, zone_id)
+            if zone is None:
+                raise http_error(404, ErrorCode.NOT_FOUND, "Zone not found.")
+        else:
+            remaining = sum(int(item.quantity) for item in items)
+        if remaining > 0:
+            raise http_error(
+                409,
+                ErrorCode.CONFLICT,
+                "수량이 남은 특수구역은 비활성화할 수 없습니다. 먼저 미배치로 이동하세요.",
+            )
     if items is not None:
         _validate_items(db, items)
+        existing_item_ids = [
+            row[0]
+            for row in db.query(WarehouseSpecialZoneItem.item_id)
+            .filter(WarehouseSpecialZoneItem.zone_id == zone.id)
+            .all()
+        ]
+        wm_service.lock_warehouse_map_rows(
+            db,
+            item_ids=[*existing_item_ids, *(item.item_id for item in items)],
+            zone_ids=[zone.id],
+        )
+        _validate_items(db, items)
+    if data.get("is_active") is True:
+        zone.is_active = True
+    if items is not None:
         _replace_items(db, zone.id, items)
+    for field, value in data.items():
+        setattr(zone, field, value)
     _audit(db, zone, "update", mgr)
     db.commit()
     return _zone_response(db, zone.id)
@@ -127,6 +166,21 @@ def replace_zone_items(
 ):
     zone = _get_zone(db, zone_id)
     _validate_items(db, payload.items)
+    existing_item_ids = [
+        row[0]
+        for row in db.query(WarehouseSpecialZoneItem.item_id)
+        .filter(WarehouseSpecialZoneItem.zone_id == zone.id)
+        .all()
+    ]
+    wm_service.lock_warehouse_map_rows(
+        db,
+        item_ids=[
+            *existing_item_ids,
+            *(item.item_id for item in payload.items),
+        ],
+        zone_ids=[zone.id],
+    )
+    _validate_items(db, payload.items)
     _replace_items(db, zone.id, payload.items)
     _audit(db, zone, "items_replace", mgr)
     db.commit()
@@ -140,6 +194,7 @@ def delete_zone(
     db: Session = Depends(get_db),
 ):
     zone = _get_zone(db, zone_id)
+    _replace_items(db, zone.id, [])
     _audit(db, zone, "delete", mgr)
     db.delete(zone)
     db.commit()

@@ -10,7 +10,7 @@ export type StatusTargetNotice = {
 
 function statusTargetOffset(): { offsetX: number; offsetY: number } {
   if (typeof document === "undefined") return { offsetX: 0, offsetY: 0 };
-  const target = document.querySelector<HTMLElement>('[data-testid="desktop-status-target"]');
+  const target = document.querySelector<HTMLElement>('[data-status-target="desktop"]');
   const rect = target?.getBoundingClientRect();
   if (!rect) return { offsetX: 0, offsetY: 0 };
   return {

@@ -2,9 +2,23 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
 
-from app.models import ProductSymbol
+from app.models import (
+    DepartmentEnum,
+    Employee,
+    EmployeeLevelEnum,
+    Inventory,
+    InventoryOperation,
+    InventoryOperationRoleEnum,
+    ProductSymbol,
+    SystemSetting,
+    TransactionLog,
+    WarehouseUnplacedItem,
+)
+from app.services.pin_auth import DEFAULT_PIN_HASH
 
 
 ADMIN_HEADERS = {"X-Admin-Pin": "0000"}
@@ -23,7 +37,7 @@ def seed_symbol(db_session):
 
 def _create_item(client, *, name="테스트품목", process_type_code="HR",
                  initial_quantity=1, initial_locations=None, sales_review_required=None,
-                 legacy_item_type="원자재", min_stock=0, model_slots=[1]):
+                 legacy_item_type="원자재", min_stock=0, model_slots=[1], headers=None):
     payload = {
         "item_name": name,
         "process_type_code": process_type_code,
@@ -40,7 +54,11 @@ def _create_item(client, *, name="테스트품목", process_type_code="HR",
         payload["initial_locations"] = initial_locations
     if sales_review_required is not None:
         payload["sales_review_required"] = sales_review_required
-    return client.post("/api/items", headers=ADMIN_HEADERS, json=payload)
+    return client.post(
+        "/api/items",
+        headers={**ADMIN_HEADERS, **(headers or {})},
+        json=payload,
+    )
 
 
 def _get_item(client, item_id):
@@ -62,6 +80,148 @@ def test_create_no_locations_all_warehouse(client, seed_symbol):
     assert body["warehouse_qty"] == 2000
     assert body["production_total"] == 0
     assert body["locations"] == []
+
+
+def test_create_item_initializes_unplaced_with_the_warehouse_remainder(
+    client,
+    db_session,
+    seed_symbol,
+):
+    response = _create_item(
+        client,
+        name="Physical ledger item",
+        initial_quantity=12,
+        initial_locations=[{"department": "고압", "quantity": 5}],
+    )
+    assert response.status_code == 201, response.text
+
+    row = (
+        db_session.query(WarehouseUnplacedItem)
+        .filter(WarehouseUnplacedItem.item_id == response.json()["item_id"])
+        .one()
+    )
+    assert int(row.quantity) == 7
+
+
+def test_create_item_positive_warehouse_records_v2_exact_physical_effect(
+    client,
+    db_session,
+    seed_symbol,
+):
+    actor = Employee(
+        employee_code="ITEM-INITIAL-V2",
+        name="초기 재고 작업자",
+        role="창고/staff",
+        department=DepartmentEnum.WAREHOUSE,
+        level=EmployeeLevelEnum.STAFF,
+        warehouse_role="primary",
+        department_role="none",
+        display_order=0,
+        is_active="true",
+        pin_hash=DEFAULT_PIN_HASH,
+    )
+    db_session.add(actor)
+    db_session.add(
+        SystemSetting(
+            setting_key="inventory_operation_cutover_at",
+            setting_value="2026-01-01T00:00:00",
+        )
+    )
+    db_session.commit()
+
+    response = _create_item(
+        client,
+        name="Initial stock v2 effect",
+        initial_quantity=12,
+        headers={"X-Actor-Employee-Id": str(actor.employee_id)},
+    )
+
+    assert response.status_code == 201, response.text
+    item_id = response.json()["item_id"]
+    inventory = db_session.query(Inventory).filter_by(item_id=item_id).one()
+    unplaced = db_session.query(WarehouseUnplacedItem).filter_by(item_id=item_id).one()
+    operation = db_session.query(InventoryOperation).one()
+    log = db_session.query(TransactionLog).one()
+    assert operation.contract_version == 2
+    assert (operation.domain, operation.action) == ("items", "initial_stock")
+    assert log.operation_id == operation.operation_id
+    assert log.operation_role == InventoryOperationRoleEnum.PRIMARY
+    assert log.quantity_change == Decimal("12")
+    assert log.inventory_effect == [
+        {
+            "scope": "warehouse",
+            "row_id": str(inventory.inventory_id),
+            "before_quantity": 0,
+            "after_quantity": 12,
+            "delta": 12,
+        },
+        {
+            "scope": "warehouse_unplaced",
+            "row_id": str(unplaced.id),
+            "before_quantity": 0,
+            "after_quantity": 12,
+            "delta": 12,
+        },
+    ]
+    assert log.warehouse_qty_after - log.warehouse_qty_before == Decimal("12")
+    assert sum(
+        cell["delta"]
+        for cell in log.inventory_effect
+        if cell["scope"] in {"warehouse_box", "warehouse_zone", "warehouse_unplaced"}
+    ) == 12
+
+
+def test_create_item_full_location_allocation_records_v2_location_effect(
+    client,
+    db_session,
+    seed_symbol,
+):
+    actor = Employee(
+        employee_code="ITEM-INITIAL-LOCATION-V2",
+        name="초기 위치 작업자",
+        role="창고/staff",
+        department=DepartmentEnum.WAREHOUSE,
+        level=EmployeeLevelEnum.STAFF,
+        warehouse_role="primary",
+        department_role="none",
+        display_order=0,
+        is_active="true",
+        pin_hash=DEFAULT_PIN_HASH,
+    )
+    db_session.add(actor)
+    db_session.add(
+        SystemSetting(
+            setting_key="inventory_operation_cutover_at",
+            setting_value="2026-01-01T00:00:00",
+        )
+    )
+    db_session.commit()
+
+    response = _create_item(
+        client,
+        name="Initial location v2 effect",
+        initial_quantity=7,
+        initial_locations=[{"department": "고압", "quantity": 7}],
+        headers={"X-Actor-Employee-Id": str(actor.employee_id)},
+    )
+
+    assert response.status_code == 201, response.text
+    operation = db_session.query(InventoryOperation).one()
+    log = db_session.query(TransactionLog).one()
+    assert operation.contract_version == 2
+    assert (operation.domain, operation.action) == ("items", "initial_stock")
+    assert log.operation_id == operation.operation_id
+    assert log.inventory_effect == [
+        {
+            "scope": "location",
+            "department": "고압",
+            "status": "PRODUCTION",
+            "before_quantity": 0,
+            "after_quantity": 7,
+            "delta": 7,
+        }
+    ]
+    assert log.department_qty_after - log.department_qty_before == Decimal("7")
 
 
 def test_create_zero_initial_quantity_allows_item_creation(client, seed_symbol):
@@ -148,7 +308,9 @@ def test_create_two_departments_split(client, seed_symbol):
 
     locs = body["locations"]
     assert len(locs) == 2
-    by_dept = {l["department"]: l["quantity"] for l in locs}
+    by_dept = {
+        location["department"]: location["quantity"] for location in locs
+    }
     assert by_dept["고압"] == 1000
     assert by_dept["진공"] == 1000
 

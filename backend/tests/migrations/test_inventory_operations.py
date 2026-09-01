@@ -22,7 +22,7 @@ ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
 POSTGRES_PREREQUISITE_REVISION = "20260807_0015"
 PREVIOUS_REVISION = "20260825_0028"
 MIGRATION_REVISION = "20260826_0029"
-HEAD_REVISION = "20260828_0031"
+HEAD_REVISION = "20260831_0032"
 ROLE_ENUM_NAME = "inventory_operation_role_enum"
 ROLE_ENUM_LABELS = tuple(member.value for member in InventoryOperationRoleEnum)
 
@@ -475,6 +475,14 @@ def test_inventory_operation_migration_preserves_0028_defect_dependents(
             )
             connection.execute(
                 sa.text(
+                    "INSERT INTO inventory "
+                    "(inventory_id, item_id, quantity, warehouse_qty, pending_quantity) "
+                    "VALUES (:inventory_id, :item_id, 0, 0, 0)"
+                ),
+                {"inventory_id": "5" * 32, "item_id": item_id},
+            )
+            connection.execute(
+                sa.text(
                     "INSERT INTO transaction_logs "
                     "(log_id, item_id, transaction_type, quantity_change) "
                     "VALUES (:log_id, :item_id, 'UNMARK_DEFECTIVE', 0)"
@@ -560,6 +568,14 @@ def test_inventory_operation_migration_preserves_handover_lines(
                     "VALUES (:item_id, 'migration item', 'EA', 'T', 'F', 1)"
                 ),
                 {"item_id": item_id},
+            )
+            connection.execute(
+                sa.text(
+                    "INSERT INTO inventory "
+                    "(inventory_id, item_id, quantity, warehouse_qty, pending_quantity) "
+                    "VALUES (:inventory_id, :item_id, 0, 0, 0)"
+                ),
+                {"inventory_id": "5" * 32, "item_id": item_id},
             )
             connection.execute(
                 sa.text(

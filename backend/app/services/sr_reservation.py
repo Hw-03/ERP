@@ -188,6 +188,8 @@ def reserve_lines(
     lines = list(lines)
     from app.services import defect_records as defect_records_svc
 
+    groups = aggregate_reservations(lines)
+    _prelock_inventories(db, groups)
     record_groups: dict[uuid.UUID, tuple[object, Decimal]] = {}
     for line in lines:
         record_id = getattr(
@@ -220,8 +222,6 @@ def reserve_lines(
         if record is None:
             raise ValueError("선택한 격리 기록을 찾을 수 없습니다.")
         defect_records_svc._ensure_available(db, record, quantity)
-    groups = aggregate_reservations(lines)
-    _prelock_inventories(db, groups)
     for group in groups:
         if group.bucket == RequestBucketEnum.WAREHOUSE:
             inventory_svc.reserve(

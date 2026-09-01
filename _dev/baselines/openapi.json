@@ -1145,9 +1145,10 @@
         "type": "object"
       },
       "BoxTrackingResponse": {
-        "description": "창고 박스 자동 차감 활성 여부.",
+        "description": "하위 호환용 박스 배치 UI 표시 선호도.",
         "properties": {
           "enabled": {
+            "description": "박스 배치 UI 표시 선호도입니다. 물리 원장 차감에는 영향을 주지 않습니다.",
             "title": "Enabled",
             "type": "boolean"
           }
@@ -1159,9 +1160,10 @@
         "type": "object"
       },
       "BoxTrackingUpdate": {
-        "description": "박스 추적 토글 (admin PIN 은 X-Admin-Pin 헤더로).",
+        "description": "박스 배치 UI 표시 선호도 변경(admin PIN은 X-Admin-Pin 헤더).",
         "properties": {
           "enabled": {
+            "description": "박스 배치 UI 표시 선호도입니다. 물리 원장 차감에는 영향을 주지 않습니다.",
             "title": "Enabled",
             "type": "boolean"
           }
@@ -6640,6 +6642,10 @@
       },
       "ReconcileResponse": {
         "properties": {
+          "ledger_mismatch_count": {
+            "title": "Ledger Mismatch Count",
+            "type": "integer"
+          },
           "mismatch_count": {
             "title": "Mismatch Count",
             "type": "integer"
@@ -6654,16 +6660,29 @@
         },
         "required": [
           "rows",
-          "mismatch_count"
+          "mismatch_count",
+          "ledger_mismatch_count"
         ],
         "title": "ReconcileResponse",
         "type": "object"
       },
       "ReconcileRow": {
         "properties": {
+          "box_total": {
+            "title": "Box Total",
+            "type": "integer"
+          },
           "diff": {
             "title": "Diff",
             "type": "integer"
+          },
+          "inactive_zone_total": {
+            "title": "Inactive Zone Total",
+            "type": "integer"
+          },
+          "inventory_present": {
+            "title": "Inventory Present",
+            "type": "boolean"
           },
           "item_id": {
             "format": "uuid",
@@ -6673,6 +6692,31 @@
           "item_name": {
             "title": "Item Name",
             "type": "string"
+          },
+          "ledger_diff": {
+            "title": "Ledger Diff",
+            "type": "integer"
+          },
+          "ledger_issues": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ledger Issues",
+            "type": "array"
+          },
+          "ledger_status": {
+            "enum": [
+              "ok",
+              "over",
+              "under",
+              "invalid"
+            ],
+            "title": "Ledger Status",
+            "type": "string"
+          },
+          "ledger_total": {
+            "title": "Ledger Total",
+            "type": "integer"
           },
           "mes_code": {
             "anyOf": [
@@ -6698,8 +6742,20 @@
             "title": "Status",
             "type": "string"
           },
+          "unplaced_present": {
+            "title": "Unplaced Present",
+            "type": "boolean"
+          },
+          "unplaced_total": {
+            "title": "Unplaced Total",
+            "type": "integer"
+          },
           "warehouse_qty": {
             "title": "Warehouse Qty",
+            "type": "integer"
+          },
+          "zone_total": {
+            "title": "Zone Total",
             "type": "integer"
           }
         },
@@ -6709,7 +6765,17 @@
           "placed_total",
           "warehouse_qty",
           "diff",
-          "status"
+          "status",
+          "box_total",
+          "zone_total",
+          "unplaced_total",
+          "inactive_zone_total",
+          "ledger_total",
+          "ledger_diff",
+          "ledger_status",
+          "inventory_present",
+          "unplaced_present",
+          "ledger_issues"
         ],
         "title": "ReconcileRow",
         "type": "object"
@@ -11219,12 +11285,20 @@
             },
             "title": "Special Zones",
             "type": "array"
+          },
+          "unplaced_items": {
+            "items": {
+              "$ref": "#/components/schemas/WarehouseUnplacedItemResponse"
+            },
+            "title": "Unplaced Items",
+            "type": "array"
           }
         },
         "required": [
           "angles",
           "boxes",
-          "special_zones"
+          "special_zones",
+          "unplaced_items"
         ],
         "title": "WarehouseMapResponse",
         "type": "object"
@@ -11483,6 +11557,47 @@
           }
         },
         "title": "WarehouseSpecialZoneUpdate",
+        "type": "object"
+      },
+      "WarehouseUnplacedItemResponse": {
+        "properties": {
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "row_id": {
+            "format": "uuid",
+            "title": "Row Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "row_id",
+          "item_id",
+          "item_name",
+          "quantity"
+        ],
+        "title": "WarehouseUnplacedItemResponse",
         "type": "object"
       },
       "WeeklyActivityEvidence": {
@@ -22532,7 +22647,7 @@
     },
     "/api/warehouse-map/box-tracking": {
       "get": {
-        "description": "창고 박스 자동 차감 활성 여부 — 프론트가 편집/경고 UI 노출 결정에 사용.",
+        "description": "박스 배치 UI 표시 선호도. 물리 원장 차감에는 영향을 주지 않는다.",
         "operationId": "get_box_tracking_api_warehouse_map_box_tracking_get",
         "responses": {
           "200": {
@@ -22552,7 +22667,7 @@
         ]
       },
       "put": {
-        "description": "창고 박스 자동 차감 기능 켜기/끄기 (전환 운영 스위치, admin PIN).\n\n켜기 전 전 품목 박스 배치가 끝나 있어야 한다 — 안 그러면 R5가 창고 출고를 막는다.",
+        "description": "박스 배치 UI 표시 선호도 변경. 물리 원장 차감에는 영향을 주지 않는다.",
         "operationId": "set_box_tracking_api_warehouse_map_box_tracking_put",
         "parameters": [
           {

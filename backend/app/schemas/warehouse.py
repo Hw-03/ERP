@@ -147,10 +147,19 @@ class WarehouseSpecialZoneResponse(BaseModel):
     is_active: bool
     items: List[WarehouseBoxItemResponse]
 
+
+class WarehouseUnplacedItemResponse(BaseModel):
+    row_id: uuid.UUID
+    item_id: uuid.UUID
+    mes_code: Optional[str] = None
+    item_name: str
+    quantity: int
+
 class WarehouseMapResponse(BaseModel):
     angles: List[WarehouseAngleResponse]
     boxes: List[WarehouseBoxResponse]
     special_zones: List[WarehouseSpecialZoneResponse]
+    unplaced_items: List[WarehouseUnplacedItemResponse]
 
 
 class WarehouseBoxMove(BaseModel):
@@ -175,10 +184,24 @@ class JariRestackPayload(BaseModel):
 
 
 class BoxTrackingResponse(BaseModel):
-    """창고 박스 자동 차감 활성 여부."""
-    enabled: bool
+    """하위 호환용 박스 배치 UI 표시 선호도."""
+
+    enabled: bool = Field(
+        ...,
+        description=(
+            "박스 배치 UI 표시 선호도입니다. "
+            "물리 원장 차감에는 영향을 주지 않습니다."
+        ),
+    )
 
 
 class BoxTrackingUpdate(BaseModel):
-    """박스 추적 토글 (admin PIN 은 X-Admin-Pin 헤더로)."""
-    enabled: bool
+    """박스 배치 UI 표시 선호도 변경(admin PIN은 X-Admin-Pin 헤더)."""
+
+    enabled: bool = Field(
+        ...,
+        description=(
+            "박스 배치 UI 표시 선호도입니다. "
+            "물리 원장 차감에는 영향을 주지 않습니다."
+        ),
+    )

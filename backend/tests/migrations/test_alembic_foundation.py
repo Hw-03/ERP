@@ -112,7 +112,7 @@ def test_empty_sqlite_upgrade_creates_current_schema_and_is_rerunnable(tmp_path)
         with engine.connect() as connection:
             assert connection.scalar(
                 sa.text("SELECT version_num FROM alembic_version")
-            ) == "20260828_0031"
+            ) == "20260831_0032"
             location_columns = {
                 column["name"]: column
                 for column in inspector.get_columns("inventory_locations")
@@ -367,7 +367,7 @@ def test_inventory_location_pending_migration_backfills_and_enforces_constraints
         )
         db.commit()
 
-    command.upgrade(_config(url), "head")
+    command.upgrade(_config(url), "20260812_0019")
 
     with sqlite3.connect(path) as db:
         assert db.execute(
@@ -452,7 +452,7 @@ def test_postgresql_offline_upgrade_compiles_without_sqlite_functions():
         output_buffer=output,
     )
 
-    command.upgrade(config, "head", sql=True)
+    command.upgrade(config, "20260828_0031", sql=True)
 
     sql = output.getvalue().lower()
     assert "create table items" in sql

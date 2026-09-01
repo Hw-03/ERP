@@ -48,6 +48,7 @@ from app.models import (
     LocationStatusEnum,
     TransactionLog,
     TransactionTypeEnum,
+    WarehouseUnplacedItem,
 )
 from app.runtime_identity import current_boot_id
 from app.services.operator_session import OPERATOR_SESSION_COOKIE, create_session
@@ -94,6 +95,7 @@ def _setup(make_session, component_wh_qty: Decimal):
             quantity=component_wh_qty,
         )
     )
+    session.add(WarehouseUnplacedItem(item_id=child.item_id, quantity=0))
     # 완제품 P: 0 재고
     session.add(
         Inventory(
@@ -103,6 +105,7 @@ def _setup(make_session, component_wh_qty: Decimal):
             pending_quantity=Decimal("0"),
         )
     )
+    session.add(WarehouseUnplacedItem(item_id=parent.item_id, quantity=0))
     actors = [
         Employee(
             employee_code=f"CONCURRENT-PROD-{index}",

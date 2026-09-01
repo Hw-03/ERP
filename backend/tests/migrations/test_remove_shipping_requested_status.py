@@ -27,7 +27,7 @@ MIGRATION_PATH = (
 )
 PREVIOUS_REVISION = "20260820_0023"
 MIGRATION_REVISION = "20260821_0024"
-HEAD_REVISION = "20260828_0031"
+HEAD_REVISION = "20260831_0032"
 
 
 def _config(path: Path) -> Config:
@@ -81,6 +81,15 @@ def _seed_shipping_dependents(db: sqlite3.Connection) -> None:
         [
             ("pf-item", "PF 품목", 1),
             ("child-item", "자식 품목", 2),
+        ],
+    )
+    db.executemany(
+        "INSERT INTO inventory "
+        "(inventory_id, item_id, quantity, warehouse_qty, pending_quantity) "
+        "VALUES (?, ?, 0, 0, 0)",
+        [
+            ("pf-inventory", "pf-item"),
+            ("child-inventory", "child-item"),
         ],
     )
     db.execute(

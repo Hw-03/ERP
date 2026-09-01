@@ -810,20 +810,24 @@ def test_pickup_cancel_creates_reversal_operation_and_closes_request(
         }
     )
     lock_calls = []
-    real_lock = shipping_svc.inventory_svc.lock_inventories
+    real_lock = shipping_svc.warehouse_map_svc.lock_warehouse_map_rows
 
-    def lock_inventories(db, item_ids):
-        lock_calls.append(item_ids)
-        return real_lock(db, item_ids)
+    def lock_warehouse_map_rows(db, **kwargs):
+        lock_calls.append(kwargs)
+        return real_lock(db, **kwargs)
 
     monkeypatch.setattr(
-        shipping_svc.inventory_svc,
-        "lock_inventories",
-        lock_inventories,
+        shipping_svc.warehouse_map_svc,
+        "lock_warehouse_map_rows",
+        lock_warehouse_map_rows,
     )
     cancelled = shipping_actions_svc.pickup_cancel(db_session, request_id, actor)
 
-    assert lock_calls == [pickup_item_ids]
+    assert lock_calls[0] == {
+        "item_ids": pickup_item_ids,
+        "include_boxes_for_item_ids": True,
+        "include_zones_for_item_ids": True,
+    }
     assert cancelled.status == ShippingRequestStatusEnum.CANCELLED
     assert cancelled.picked_up_at is not None
     assert cancelled.serial_numbers == "SN-001"

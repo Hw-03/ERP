@@ -182,6 +182,28 @@ describe("buildHistoryDetailSummary", () => {
     ]);
   });
 
+  it("groups special-zone and unplaced effects by their physical ledger scopes", () => {
+    const summary = buildHistoryDetailSummary([
+      makeLog({
+        inventory_effect: [
+          { scope: "warehouse_zone", row_id: "zone-row", zone_id: 7, delta: -2 },
+          { scope: "warehouse_unplaced", row_id: "unplaced-row", delta: -3 },
+        ],
+      }),
+    ], null);
+
+    expect(summary.impactGroups).toEqual([
+      expect.objectContaining({
+        key: "warehouse_zone",
+        label: "특수구역 재고",
+      }),
+      expect.objectContaining({
+        key: "warehouse_unplaced",
+        label: "미배치 재고",
+      }),
+    ]);
+  });
+
   it("keeps different component items separate even at the same location", () => {
     const logs = [
       makeLog({

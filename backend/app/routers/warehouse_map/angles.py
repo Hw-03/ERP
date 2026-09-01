@@ -11,6 +11,7 @@ from app.dependencies.verified_actor import VerifiedActorRouter
 from app.dependencies.warehouse_manager import require_warehouse_manager
 from app.models import Employee, WarehouseAngle, WarehouseBox
 from app.routers._errors import ErrorCode, http_error
+from app.services import warehouse_map as wm_service
 from app.services.reorder import _reorder_by_display_order
 from app.schemas import (
     WarehouseAngleCreate,
@@ -89,7 +90,13 @@ def delete_angle(
     _mgr: Annotated[Employee, Depends(require_warehouse_manager)],
     db: Session = Depends(get_db),
 ):
-    angle = db.query(WarehouseAngle).filter(WarehouseAngle.id == angle_id).first()
+    wm_service.lock_warehouse_map_rows(db, angle_ids=[angle_id])
+    angle = (
+        db.query(WarehouseAngle)
+        .execution_options(populate_existing=True)
+        .filter(WarehouseAngle.id == angle_id)
+        .one_or_none()
+    )
     if not angle:
         raise http_error(404, ErrorCode.NOT_FOUND, "앵글을 찾을 수 없습니다.")
     # 박스가 남아 있으면 실수 삭제 방지 (배치 전소 방지)

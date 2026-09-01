@@ -19,6 +19,7 @@ function packageScripts() {
 function loadNextConfig() {
   delete require.cache[require.resolve(NEXT_CONFIG_PATH)];
   return require(NEXT_CONFIG_PATH) as (phase: string) => {
+    compiler: { reactRemoveProperties: boolean };
     rewrites: () => Promise<Array<{ destination: string }>>;
   };
 }
@@ -141,6 +142,22 @@ describe("개발 서버 실행 경로", () => {
     await expect(rewriteDestination(PHASE_PRODUCTION_BUILD)).resolves.toBe(
       "http://localhost:8010/api/:path*"
     );
+  });
+
+  it("운영 빌드만 테스트 전용 React 속성을 제거한다", () => {
+    const {
+      PHASE_DEVELOPMENT_SERVER,
+      PHASE_PRODUCTION_BUILD,
+      PHASE_TEST,
+    } = require("next/constants");
+
+    expect(
+      loadNextConfig()(PHASE_DEVELOPMENT_SERVER).compiler.reactRemoveProperties,
+    ).toBe(false);
+    expect(
+      loadNextConfig()(PHASE_PRODUCTION_BUILD).compiler.reactRemoveProperties,
+    ).toBe(true);
+    expect(loadNextConfig()(PHASE_TEST).compiler.reactRemoveProperties).toBe(false);
   });
 
   it.each([

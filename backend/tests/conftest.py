@@ -313,7 +313,7 @@ def client(db_session):
 @pytest.fixture()
 def make_item(db_session):
     """간단한 Item 생성 헬퍼. inventory 까지 함께 만들어준다."""
-    from app.models import Item, Inventory
+    from app.models import Inventory, Item, WarehouseUnplacedItem
 
     next_serial = 1
 
@@ -344,6 +344,12 @@ def make_item(db_session):
             pending_quantity=pending,
         )
         db_session.add(inv)
+        db_session.add(
+            WarehouseUnplacedItem(
+                item_id=item.item_id,
+                quantity=warehouse_qty,
+            )
+        )
         db_session.flush()
         return item
 

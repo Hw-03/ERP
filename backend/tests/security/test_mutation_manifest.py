@@ -442,6 +442,10 @@ def test_read_only_service_surfaces_have_no_persistent_write_reachability() -> N
         ("app.services.notifications", "notify_request_decided"),
         ("app.services.reorder", "reorder_by_display_order"),
         ("app.services.warehouse_map", "deplete_boxes_by_order"),
+        ("app.services.warehouse_map", "apply_warehouse_ledger_delta"),
+        ("app.services.warehouse_map", "lock_warehouse_ledger"),
+        ("app.services.warehouse_map", "replace_box_items"),
+        ("app.services.warehouse_map", "replace_zone_items"),
         ("app.services.warehouse_map", "set_box_tracking_enabled"),
     ],
 )

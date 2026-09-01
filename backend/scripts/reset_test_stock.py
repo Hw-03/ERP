@@ -6,6 +6,7 @@
 - transaction_logs / transaction_edit_logs : 입출고 내역
 - io_batches / io_bundles / io_lines       : 입출고 2.0 배치
 - inventory_locations                       : 부서×상태별 재고 분포
+- warehouse_box/special_zone/unplaced       : 물리 위치 원장 0으로 리셋
 - inventory                                 : 수치(quantity/warehouse_qty/pending_quantity) 0으로 리셋
 
 그 후 품목 코드의 process_type_code 를 보고:
@@ -24,6 +25,8 @@ import sys
 from decimal import Decimal
 from pathlib import Path
 
+from sqlalchemy.orm import Session
+
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_DIR))
 
@@ -40,12 +43,43 @@ from app.models import (  # noqa: E402
     StockRequestStatusEnum,
     TransactionEditLog,
     TransactionLog,
+    WarehouseBoxItem,
+    WarehouseSpecialZoneItem,
+    WarehouseUnplacedItem,
 )
 from app.services.inventory import PROCESS_TYPE_TO_DEPT  # noqa: E402
 from app.services.sr_approval import _cancel_open_stock_requests  # noqa: E402
 
 
 R_CODES = {"TR", "HR", "VR", "NR", "AR", "PR"}
+
+
+def _reset_physical_warehouse(db: Session) -> None:
+    """Reset W/B/Z/U together so the QA database keeps the ledger invariant."""
+    item_ids = [row[0] for row in db.query(Inventory.item_id).all()]
+    from app.services import warehouse_map
+
+    warehouse_map.lock_warehouse_map_rows(
+        db,
+        item_ids=item_ids,
+        include_boxes_for_item_ids=True,
+        include_zones_for_item_ids=True,
+    )
+    db.query(WarehouseBoxItem).delete(synchronize_session=False)
+    db.query(WarehouseSpecialZoneItem).delete(synchronize_session=False)
+    db.query(WarehouseUnplacedItem).delete(synchronize_session=False)
+    db.query(Inventory).update(
+        {
+            Inventory.pending_quantity: Decimal("0"),
+            Inventory.warehouse_qty: Decimal("0"),
+            Inventory.quantity: Decimal("0"),
+        },
+        synchronize_session=False,
+    )
+    db.add_all(
+        [WarehouseUnplacedItem(item_id=item_id, quantity=0) for item_id in item_ids]
+    )
+    db.flush()
 
 
 def parse_args() -> argparse.Namespace:
@@ -117,16 +151,8 @@ def main() -> int:
         # 2. 위치 재고 삭제
         db.query(InventoryLocation).delete(synchronize_session=False)
 
-        # 3. inventory 수치 모두 0 (check 제약 warehouse>=pending 위해 pending 함께 0)
-        db.query(Inventory).update(
-            {
-                Inventory.pending_quantity: Decimal("0"),
-                Inventory.warehouse_qty: Decimal("0"),
-                Inventory.quantity: Decimal("0"),
-            },
-            synchronize_session=False,
-        )
-        db.flush()
+        # 3. W/B/Z/U 물리 원장과 inventory 수치를 함께 0으로 리셋
+        _reset_physical_warehouse(db)
 
         # 4. 품목 순회: 코드 기반 랜덤 재고 채움
         items = db.query(Item).all()
@@ -149,11 +175,17 @@ def main() -> int:
                 )
                 db.add(inv)
                 db.flush()
+                db.add(WarehouseUnplacedItem(item_id=item.item_id, quantity=0))
+                db.flush()
 
             if code in R_CODES:
                 qty = Decimal(random.randint(100, 200))
                 inv.warehouse_qty = qty
                 inv.quantity = qty
+                unplaced = db.query(WarehouseUnplacedItem).filter_by(
+                    item_id=item.item_id
+                ).one()
+                unplaced.quantity = int(qty)
                 r_count += 1
                 continue
 

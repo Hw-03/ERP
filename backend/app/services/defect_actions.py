@@ -24,6 +24,7 @@ from app.services import inv_effect
 from app.services import inventory as inventory_svc
 from app.services import defect_records as defect_records_svc
 from app.services import inventory_operations as operation_svc
+from app.services import warehouse_map as warehouse_map_svc
 from app.services._tx import transactional
 
 
@@ -140,6 +141,12 @@ def unquarantine_inventory(
 ) -> Inventory:
     """정상 복귀와 원장 기록을 하나의 업무 트랜잭션으로 확정한다."""
     with transactional(db):
+        warehouse_map_svc.lock_warehouse_map_rows(
+            db,
+            item_ids=[item_id],
+            include_boxes_for_item_ids=True,
+            include_zones_for_item_ids=True,
+        )
         record = defect_records_svc._get_record_for_action(
             db,
             record_id=record_id,

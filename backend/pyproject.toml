@@ -23,6 +23,7 @@ files = [
   "app/services/_tx.py",
   "app/services/item_lifecycle.py",
   "app/services/shipping_actions.py",
+  "app/services/warehouse_map.py",
 ]
 follow_imports = "skip"
 ignore_missing_imports = true

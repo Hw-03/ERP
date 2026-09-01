@@ -24,6 +24,7 @@ from app.models import (
     WarehouseAngle,
     WarehouseBox,
     WarehouseBoxItem,
+    WarehouseUnplacedItem,
 )
 from app.schemas import IoSubmitRequest
 from app.services import io_actions as actions
@@ -80,6 +81,8 @@ def _add_tracked_box(db_session, item_id: uuid.UUID, quantity: int) -> None:
     db_session.add(
         WarehouseBoxItem(box_id=box.box_id, item_id=item_id, quantity=quantity)
     )
+    unplaced = db_session.query(WarehouseUnplacedItem).filter_by(item_id=item_id).one()
+    unplaced.quantity -= quantity
     db_session.flush()
 
 

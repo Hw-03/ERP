@@ -38,6 +38,7 @@ from app.services import inv_effect
 from app.services import inventory_operations as operation_svc
 from app.services import inventory_operation_cancellation as cancellation_svc
 from app.services import inventory as inventory_svc
+from app.services import warehouse_map as warehouse_map_svc
 from app.services.bom import bom_child_item_ordering
 from app.services.bom_stock_policy import should_skip_bom_inventory
 from app.services.inv_calc import _sync_total
@@ -2065,9 +2066,11 @@ def _prepare_cancel(
         .all()
     )
     legacy_logs = [log for log in logs if log.operation_batch_id is None]
-    inventory_svc.lock_inventories(
+    warehouse_map_svc.lock_warehouse_map_rows(
         db,
-        sorted({log.item_id for log in legacy_logs}),
+        item_ids=sorted({log.item_id for log in legacy_logs}),
+        include_boxes_for_item_ids=True,
+        include_zones_for_item_ids=True,
     )
     for log in legacy_logs:
         inv_effect._apply_effect_reverse(db, log.item_id, log.inventory_effect)
@@ -2224,9 +2227,11 @@ def _pickup_cancel(
     if not pickup_logs:
         raise ShippingError("취소할 픽업 완료 재고 이력이 없습니다.")
 
-    inventory_svc.lock_inventories(
+    warehouse_map_svc.lock_warehouse_map_rows(
         db,
-        sorted({log.item_id for log in pickup_logs}),
+        item_ids=sorted({log.item_id for log in pickup_logs}),
+        include_boxes_for_item_ids=True,
+        include_zones_for_item_ids=True,
     )
     now = datetime.utcnow()
     for log in pickup_logs:

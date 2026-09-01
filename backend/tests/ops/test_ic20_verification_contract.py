@@ -95,6 +95,10 @@ def test_postgres_job_bootstraps_head_and_runs_real_two_connection_tests() -> No
     assert "test_postgres_concurrent_corrections_have_one_winner_and_no_loser_orphans" in runner
     assert "test_postgres_correction_and_cancel_have_one_winner_and_no_loser_orphans" in runner
     assert "test_postgres_corrected_operation_rejects_fresh_cancellation_preview" in runner
+    assert "test_postgresql_fresh_and_0031_to_0032_preserve_rows" in runner
+    assert "test_postgresql_0032_source_lock_serializes_a_concurrent_writer" in runner
+    assert "test_postgresql_anomaly_rolls_back_without_orphan_ddl" in runner
+    assert "test_postgres_v2_cancel_and_outbound_have_one_physical_winner" in runner
     assert "test_cp4_command_postgres.py" in runner
     assert "test_postgres_cp4_fingerprint_columns_are_nullable_varchar_64" in runner
     assert "test_postgres_io_same_key_collision_applies_once_and_replays" in runner

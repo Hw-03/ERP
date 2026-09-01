@@ -132,8 +132,19 @@ class ReconcileRow(BaseModel):
     warehouse_qty: int
     diff: int  # placed_total − warehouse_qty
     status: Literal["ok", "over", "under"]
+    box_total: int
+    zone_total: int
+    unplaced_total: int
+    inactive_zone_total: int
+    ledger_total: int
+    ledger_diff: int
+    ledger_status: Literal["ok", "over", "under", "invalid"]
+    inventory_present: bool
+    unplaced_present: bool
+    ledger_issues: List[str]
 
 
 class ReconcileResponse(BaseModel):
     rows: List[ReconcileRow]
     mismatch_count: int
+    ledger_mismatch_count: int

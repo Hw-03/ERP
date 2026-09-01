@@ -10,9 +10,22 @@ from fastapi import Depends, Query, Request, status
 from sqlalchemy.orm import Query as SAQuery, Session
 
 from app.database import get_db
-from app.dependencies.verified_actor import VerifiedActorRouter
+from app.dependencies.verified_actor import VerifiedActor, VerifiedActorRouter
 from app.dependencies.admin import require_admin_pin
-from app.models import BOM, DepartmentEnum, Inventory, InventoryLocation, Item, LocationStatusEnum
+from app.models import (
+    BOM,
+    DepartmentEnum,
+    Inventory,
+    InventoryLocation,
+    InventoryOperationRoleEnum,
+    Item,
+    LocationStatusEnum,
+    TransactionLog,
+    TransactionTypeEnum,
+    WarehouseBoxItem,
+    WarehouseSpecialZoneItem,
+    WarehouseUnplacedItem,
+)
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     BomCompletionUpdate,
@@ -30,7 +43,8 @@ from app.utils.mes_code import (
     slots_to_model_symbol,
 )
 from app.utils.search import build_normalized_search_filter
-from app.services import audit, item_lifecycle
+from app.services import audit, inv_effect, item_lifecycle
+from app.services import inventory_operations as operation_svc
 from app.services import stock_math
 from app.services.item_display_order import _insert_item_at_process_end
 from app.services._tx import commit_and_refresh, transactional
@@ -130,6 +144,7 @@ def _to_item_with_inventory(
 def create_item(
     payload: ItemCreate,
     request: Request,
+    actor: VerifiedActor,
     _admin: Annotated[None, Depends(require_admin_pin)],
     db: Session = Depends(get_db),
 ):
@@ -209,8 +224,20 @@ def create_item(
         raise http_error(422, ErrorCode.UNPROCESSABLE, f"배분 합계({alloc_sum})가 초기 수량({init_qty})을 초과합니다.")
 
     warehouse = init_qty - alloc_sum
+    operation = None
+    if init_qty > 0:
+        operation = operation_svc._create_business_operation(
+            db,
+            domain="items",
+            action="initial_stock",
+            display_label="품목 초기 재고",
+            actor_name=actor.name,
+            actor_employee_id=actor.employee_id,
+            department=DepartmentEnum.WAREHOUSE.value,
+        )
     inventory = Inventory(item_id=item.item_id, quantity=init_qty, warehouse_qty=warehouse)
     db.add(inventory)
+    db.add(WarehouseUnplacedItem(item_id=item.item_id, quantity=warehouse))
 
     for ln in locs:
         db.add(InventoryLocation(
@@ -219,6 +246,27 @@ def create_item(
             status=LocationStatusEnum.PRODUCTION,
             quantity=ln.quantity,
         ))
+
+    if operation is not None:
+        db.flush()
+        db.add(
+            operation_svc._attach_transaction(
+                TransactionLog(
+                    item_id=item.item_id,
+                    transaction_type=TransactionTypeEnum.RECEIVE,
+                    quantity_change=init_qty,
+                    quantity_before=0,
+                    quantity_after=init_qty,
+                    produced_by=actor.name,
+                    producer_employee_id=actor.employee_id,
+                    department=DepartmentEnum.WAREHOUSE.value,
+                    notes="품목 등록 초기 재고",
+                    **inv_effect._capture_log_stock_snapshot(db, item.item_id, {}),
+                ),
+                operation,
+                InventoryOperationRoleEnum.PRIMARY,
+            )
+        )
 
     audit.record(
         db,
@@ -696,6 +744,58 @@ def restore_item(
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
     if item.deleted_at is None:
         raise http_error(409, ErrorCode.CONFLICT, "삭제되지 않은 품목입니다.")
+
+    inventory = db.query(Inventory).filter(Inventory.item_id == item.item_id).one_or_none()
+    unplaced = (
+        db.query(WarehouseUnplacedItem)
+        .filter(WarehouseUnplacedItem.item_id == item.item_id)
+        .one_or_none()
+    )
+    if inventory is None and unplaced is None:
+        has_physical_rows = (
+            db.query(WarehouseBoxItem.id)
+            .filter(WarehouseBoxItem.item_id == item.item_id)
+            .first()
+            is not None
+            or db.query(WarehouseSpecialZoneItem.id)
+            .filter(WarehouseSpecialZoneItem.item_id == item.item_id)
+            .first()
+            is not None
+        )
+        if has_physical_rows:
+            raise http_error(
+                409,
+                ErrorCode.CONFLICT,
+                "삭제 품목의 물리 위치 원장이 불완전하여 복구할 수 없습니다.",
+            )
+        location_total = sum(
+            int(quantity or 0)
+            for (quantity,) in db.query(InventoryLocation.quantity)
+            .filter(InventoryLocation.item_id == item.item_id)
+            .all()
+        )
+        db.add(
+            Inventory(
+                item_id=item.item_id,
+                quantity=location_total,
+                warehouse_qty=0,
+            )
+        )
+        db.add(WarehouseUnplacedItem(item_id=item.item_id, quantity=0))
+        db.flush()
+    elif inventory is None or unplaced is None:
+        raise http_error(
+            409,
+            ErrorCode.CONFLICT,
+            "삭제 품목의 창고 원장이 불완전하여 복구할 수 없습니다.",
+        )
+    else:
+        try:
+            from app.services import warehouse_map
+
+            warehouse_map._lock_warehouse_ledger(db, item.item_id)
+        except ValueError as exc:
+            raise http_error(409, ErrorCode.CONFLICT, str(exc)) from exc
 
     item.deleted_at = None
     item.updated_at = datetime.now(UTC).replace(tzinfo=None)

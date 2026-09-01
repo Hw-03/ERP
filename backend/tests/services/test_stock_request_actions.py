@@ -20,6 +20,7 @@ from app.models import (
     WarehouseAngle,
     WarehouseBox,
     WarehouseBoxItem,
+    WarehouseUnplacedItem,
 )
 from app.services.pin_auth import hash_pin
 from app.services import sr_execution as sr_execution_svc
@@ -88,6 +89,12 @@ def _warehouse_box(db_session, *, item_id, quantity: int) -> WarehouseBox:
     db_session.add(
         WarehouseBoxItem(box_id=box.box_id, item_id=item_id, quantity=quantity)
     )
+    unplaced = (
+        db_session.query(WarehouseUnplacedItem)
+        .filter(WarehouseUnplacedItem.item_id == item_id)
+        .one()
+    )
+    unplaced.quantity = int(unplaced.quantity) - quantity
     db_session.flush()
     return box
 
@@ -786,6 +793,14 @@ def test_failed_approval_rolls_back_execution_then_commits_only_failure_state(
 
     monkeypatch.setattr(db_session, "commit", counted_commit)
     monkeypatch.setattr(db_session, "rollback", counted_rollback)
+
+    def fail_execution(*_args, **_kwargs) -> None:
+        raise ValueError("forced approval failure")
+
+    monkeypatch.setattr(
+        "app.services.sr_approval._execute_all_lines",
+        fail_execution,
+    )
 
     response = client.post(
         f"/api/stock-requests/{request_id}/approve",

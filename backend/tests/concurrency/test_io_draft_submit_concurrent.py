@@ -24,6 +24,7 @@ from app.models import (
     StockRequestStatusEnum,
     StockRequestTypeEnum,
     TransactionLog,
+    WarehouseUnplacedItem,
 )
 from app.services import io_actions
 from app.services import stock_request_actions
@@ -50,13 +51,16 @@ def _setup_draft(make_session):
     )
     session.add_all([requester, item])
     session.flush()
-    session.add(
-        Inventory(
-            item_id=item.item_id,
-            quantity=Decimal("0"),
-            warehouse_qty=Decimal("0"),
-            pending_quantity=Decimal("0"),
-        )
+    session.add_all(
+        [
+            Inventory(
+                item_id=item.item_id,
+                quantity=Decimal("0"),
+                warehouse_qty=Decimal("0"),
+                pending_quantity=Decimal("0"),
+            ),
+            WarehouseUnplacedItem(item_id=item.item_id, quantity=0),
+        ]
     )
     batch = IoBatch(
         batch_id=uuid.uuid4(),
@@ -124,13 +128,16 @@ def _setup_reserved_revert_request(make_session):
     )
     session.add_all([requester, item])
     session.flush()
-    session.add(
-        Inventory(
-            item_id=item.item_id,
-            quantity=Decimal("5"),
-            warehouse_qty=Decimal("5"),
-            pending_quantity=Decimal("2"),
-        )
+    session.add_all(
+        [
+            Inventory(
+                item_id=item.item_id,
+                quantity=Decimal("5"),
+                warehouse_qty=Decimal("5"),
+                pending_quantity=Decimal("2"),
+            ),
+            WarehouseUnplacedItem(item_id=item.item_id, quantity=5),
+        ]
     )
     batch = IoBatch(
         batch_id=uuid.uuid4(),

@@ -87,6 +87,7 @@ from app.models.warehouse import (
     WarehouseSpecialZone,
     WarehouseSpecialZoneItem,
     WarehouseSpecialZoneAudit,
+    WarehouseUnplacedItem,
 )
 from app.models.employee_item_order import EmployeeItemOrder
 from app.models.assembly_checklist import (
@@ -179,6 +180,7 @@ __all__ = [
     "WarehouseSpecialZone",
     "WarehouseSpecialZoneItem",
     "WarehouseSpecialZoneAudit",
+    "WarehouseUnplacedItem",
     "BoxSizeEnum",
     # employee item order
     "EmployeeItemOrder",

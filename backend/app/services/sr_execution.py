@@ -9,7 +9,6 @@ from typing import Iterable, Optional
 
 from sqlalchemy.orm import Session
 
-from app.database import _is_sqlite
 from app.models import (
     Employee,
     InventoryOperation,
@@ -25,6 +24,7 @@ from app.models import (
 from app.services import inventory as inventory_svc
 from app.services import inv_effect
 from app.services import inventory_operations as operation_svc
+from app.services import warehouse_map as warehouse_map_svc
 from app.services.dept_hierarchy import can_approve_department as _can_approve_department
 from app.services.sr_validation import (
     _TX_TYPE_BY_REQUEST,
@@ -34,6 +34,11 @@ from app.services.sr_validation import (
 # ---------------------------------------------------------------------------
 # 점유 해제
 # ---------------------------------------------------------------------------
+
+
+def _uses_row_locks(db: Session) -> bool:
+    """현재 세션이 PostgreSQL 행 잠금을 지원하는지 판정한다."""
+    return db.get_bind().dialect.name != "sqlite"
 
 
 def release_reservation(
@@ -50,7 +55,7 @@ def release_reservation(
     from app.services import sr_reservation
 
     lines = list(request.lines)
-    if not _is_sqlite:
+    if _uses_row_locks(db):
         inventory_svc._ensure_and_lock_inventories(
             db,
             _request_inventory_item_ids(db, request, lines),
@@ -583,9 +588,15 @@ def _execute_all_lines(
         idempotency_key=f"stock_request:{request.request_id}:execute",
     )
     # 정렬된 순서로 모든 아이템 선락 → 교착 방지 (PostgreSQL only; SQLite는 WAL 직렬화)
-    if not _is_sqlite:
+    if _uses_row_locks(db):
         all_item_ids = _request_inventory_item_ids(db, request, lines)
         inventory_svc._ensure_and_lock_inventories(db, all_item_ids)
+        warehouse_map_svc.lock_warehouse_map_rows(
+            db,
+            item_ids=all_item_ids,
+            include_boxes_for_item_ids=True,
+            include_zones_for_item_ids=True,
+        )
     for line in lines:
         _execute_line(
             db,

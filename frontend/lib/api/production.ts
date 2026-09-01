@@ -88,6 +88,7 @@ type InventoryOperationWire = {
   reversal_operation_id: string | null;
   can_cancel: boolean;
   cancel_blockers: string[];
+  cancel_warnings: string[];
   lines: InventoryOperationLineWire[];
   matching_lines: InventoryOperationLineWire[];
   effects: Array<{
@@ -107,12 +108,15 @@ type InventoryOperationCancellationPreviewWire = {
   plan_hash: string;
   can_cancel: boolean;
   blockers: string[];
+  warnings: string[];
   cells: Array<{
     item_id: string;
     scope: string;
     department: string | null;
     status: string | null;
+    row_id: string | null;
     box_id: string | null;
+    zone_id: string | number | null;
     quantity_change: string | number;
     current_quantity: string | number;
     reserved_quantity: string | number;

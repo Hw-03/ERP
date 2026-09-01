@@ -90,7 +90,7 @@ def test_location_write_locks_parent_inventory_before_location(
             events.append(entity)
         return real_with_for_update(query, *args, **kwargs)
 
-    monkeypatch.setattr(inv_base, "_is_sqlite", False)
+    monkeypatch.setattr(inv_base, "_uses_row_locks", lambda _db: True)
     monkeypatch.setattr(Query, "with_for_update", track_with_for_update)
 
     svc._consume_from_department(db_session, item.item_id, D("1"), ASSEMBLY)

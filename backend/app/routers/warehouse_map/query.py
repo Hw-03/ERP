@@ -21,7 +21,7 @@ router = APIRouter()
 
 @router.get("/box-tracking", response_model=BoxTrackingResponse)
 def get_box_tracking(db: Session = Depends(get_db)):
-    """창고 박스 자동 차감 활성 여부 — 프론트가 편집/경고 UI 노출 결정에 사용."""
+    """박스 배치 UI 표시 선호도. 물리 원장 차감에는 영향을 주지 않는다."""
     return BoxTrackingResponse(enabled=wm_service.is_box_tracking_enabled(db))
 
 

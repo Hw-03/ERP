@@ -94,38 +94,26 @@ def _mark_defective(
         raise ValueError(f"알 수 없는 source: {kind} (warehouse 또는 production)")
 
     _get_or_create_inventory(db, item_id)
-    locations = [(target_dept, LocationStatusEnum.DEFECTIVE)]
-    if kind == "production":
-        locations.append((source_dept, LocationStatusEnum.PRODUCTION))
-    for department, status in sorted(
-        locations,
-        key=lambda location: (
-            location[0].value if hasattr(location[0], "value") else str(location[0]),
-            location[1].value,
-        ),
-    ):
-        _lock_location(db, item_id, department, status)
-    db.flush()
-
     if kind == "warehouse":
-        result = db.execute(
-            sa_update(Inventory)
-            .where(Inventory.item_id == item_id)
-            .where(
-                Inventory.warehouse_qty - func.coalesce(Inventory.pending_quantity, 0) >= qty
-            )
-            .values(warehouse_qty=Inventory.warehouse_qty - qty)
-            .execution_options(synchronize_session=False)
-        )
+        _consume_warehouse(db, item_id, qty)
+        _lock_location(db, item_id, target_dept, LocationStatusEnum.DEFECTIVE)
         db.flush()
-        if result.rowcount == 0:
-            inv_check = inventory_repository.get(db, item_id)
-            wh = inv_check.warehouse_qty or Decimal("0")
-            pending = inv_check.pending_quantity or Decimal("0")
-            raise ValueError(
-                f"창고 가용 재고 부족 (창고 {wh}, 예약중 {pending}, 불량 처리 요청 {qty})."
-            )
     else:  # source == "production"
+        locations = [
+            (target_dept, LocationStatusEnum.DEFECTIVE),
+            (source_dept, LocationStatusEnum.PRODUCTION),
+        ]
+        for department, status in sorted(
+            locations,
+            key=lambda location: (
+                location[0].value
+                if hasattr(location[0], "value")
+                else str(location[0]),
+                location[1].value,
+            ),
+        ):
+            _lock_location(db, item_id, department, status)
+        db.flush()
         result = db.execute(
             sa_update(InventoryLocation)
             .where(InventoryLocation.item_id == item_id)

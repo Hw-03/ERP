@@ -29,6 +29,23 @@ const EDITOR_TABS = [
   { id: "structure" as const, label: "구조 편집" },
 ];
 
+function ledgerIssueLabels(row: ReconcileRow): string[] {
+  return (row.ledger_issues ?? []).map((issue) => {
+    if (issue === "missing_inventory") return "재고 행 없음";
+    if (issue === "missing_unplaced") return "미배치(U) 행 없음";
+    if (issue === "inactive_zone_stock") {
+      return `비활성 구역 재고 ${row.inactive_zone_total ?? 0}`;
+    }
+    return "원장 구조 이상";
+  });
+}
+
+function reconcileRowLabel(row: ReconcileRow): string {
+  const issues = ledgerIssueLabels(row);
+  const issueSuffix = issues.length > 0 ? ` · ${issues.join(" · ")}` : "";
+  return `${row.mes_code ?? row.item_name}(B ${row.box_total ?? row.placed_total} · Z ${row.zone_total ?? 0} · U ${row.unplaced_total ?? 0} / W ${row.warehouse_qty}${issueSuffix})`;
+}
+
 export function DesktopWarehouseMapTab({
   onStatusChange,
   fullscreen = false,
@@ -86,7 +103,9 @@ export function DesktopWarehouseMapTab({
       ) {
         return false;
       }
-      setMismatches(res.rows.filter((r) => r.status !== "ok"));
+      setMismatches(
+        res.rows.filter((row) => row.status !== "ok" || row.ledger_status !== "ok"),
+      );
       if (editModeRef.current) {
         appliedReconcileRevisionRef.current = requestRevision;
       }
@@ -151,6 +170,10 @@ export function DesktopWarehouseMapTab({
     setEditorError(null);
     onStatusChange?.("창고 지도");
   }
+
+  const hasStructuralMismatch = mismatches.some(
+    (row) => (row.ledger_issues ?? []).length > 0,
+  );
 
   if (fullscreen) {
     return (
@@ -282,11 +305,14 @@ export function DesktopWarehouseMapTab({
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.yellow }} />
                 <div className="min-w-0">
                   <div className="text-[13px] font-bold" style={{ color: LEGACY_COLORS.text }}>
-                    배치 확인 필요 {mismatches.length}건 — 박스 합과 창고 재고가 다릅니다
+                    {hasStructuralMismatch
+                      ? `원장 확인 필요 ${mismatches.length}건 — 재고 위치 원장 구조 또는 수량이 올바르지 않습니다`
+                      : `배치 확인 필요 ${mismatches.length}건 — B·Z·U 합과 W 재고가 다릅니다`}
                   </div>
                   <div className="mt-0.5 truncate text-[12px] font-medium" style={{ color: LEGACY_COLORS.muted2 }}>
-                    {mismatches.slice(0, 4).map((r) => `${r.mes_code ?? r.item_name}(${r.placed_total}/${r.warehouse_qty})`).join("  ·  ")}
-                    {mismatches.length > 4 ? "  …" : ""} — 박스 관리에서 정리하기 →
+                    {mismatches.slice(0, 4).map(reconcileRowLabel).join("  ·  ")}
+                    {mismatches.length > 4 ? "  …" : ""}
+                    {hasStructuralMismatch ? " — 관리자 점검 필요" : " — 박스 관리에서 정리하기 →"}
                   </div>
                 </div>
               </button>

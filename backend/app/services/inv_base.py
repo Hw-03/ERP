@@ -11,13 +11,18 @@ import uuid
 
 from sqlalchemy.orm import Session
 
-from app.database import _is_sqlite
 from app.models import (
     DepartmentEnum,
     Inventory,
     InventoryLocation,
     LocationStatusEnum,
+    WarehouseUnplacedItem,
 )
+
+
+def _uses_row_locks(db: Session) -> bool:
+    """현재 세션이 PostgreSQL 행 잠금을 지원하는지 판정한다."""
+    return db.get_bind().dialect.name != "sqlite"
 
 
 # ---------------------------------------------------------------------------
@@ -63,6 +68,7 @@ def _get_or_create_inventory(db: Session, item_id: uuid.UUID) -> Inventory:
             pending_quantity=Decimal("0"),
         )
         db.add(inv)
+        db.add(WarehouseUnplacedItem(item_id=item_id, quantity=0))
         db.flush()
     return inv
 
@@ -70,7 +76,7 @@ def _get_or_create_inventory(db: Session, item_id: uuid.UUID) -> Inventory:
 def _lock_inventory(db: Session, item_id: uuid.UUID) -> Inventory:
     """쓰기 경로용 — PostgreSQL: FOR UPDATE 행 잠금. SQLite: 일반 SELECT."""
     q = db.query(Inventory).filter(Inventory.item_id == item_id)
-    if not _is_sqlite:
+    if _uses_row_locks(db):
         q = q.with_for_update()
     inv = q.first()
     if inv is None:
@@ -81,6 +87,7 @@ def _lock_inventory(db: Session, item_id: uuid.UUID) -> Inventory:
             pending_quantity=Decimal("0"),
         )
         db.add(inv)
+        db.add(WarehouseUnplacedItem(item_id=item_id, quantity=0))
         db.flush()
     return inv
 
@@ -98,7 +105,7 @@ def _lock_location(
         InventoryLocation.department == dept,
         InventoryLocation.status == status,
     )
-    if not _is_sqlite:
+    if _uses_row_locks(db):
         q = q.with_for_update()
     loc = q.first()
     if loc is None:
@@ -150,6 +157,6 @@ def lock_inventories(db: Session, item_ids: list[uuid.UUID]) -> dict[uuid.UUID, 
     if not item_ids:
         return {}
     q = db.query(Inventory).filter(Inventory.item_id.in_(item_ids))
-    if not _is_sqlite:
+    if _uses_row_locks(db):
         q = q.with_for_update()
     return {inv.item_id: inv for inv in q.order_by(Inventory.item_id).all()}

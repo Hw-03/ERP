@@ -104,7 +104,7 @@ def test_pickup_consumption_prelocks_sorted_unique_inventories(
     )
     monkeypatch.setattr(
         shipping_svc.inventory_svc,
-        "lock_inventories",
+        "_ensure_and_lock_inventories",
         lambda _db, item_ids: events.append(("lock", item_ids))
         or {item_id: object() for item_id in item_ids},
     )
@@ -1478,22 +1478,26 @@ def test_prepare_cancel_reverses_prepare_logs_and_releases_allocations(
         }
     )
     lock_calls = []
-    real_lock = shipping_svc.inventory_svc.lock_inventories
+    real_lock = shipping_svc.warehouse_map_svc.lock_warehouse_map_rows
 
-    def lock_inventories(db, item_ids):
-        lock_calls.append(item_ids)
-        return real_lock(db, item_ids)
+    def lock_warehouse_rows(db, **kwargs):
+        lock_calls.append(kwargs)
+        return real_lock(db, **kwargs)
 
     monkeypatch.setattr(
-        shipping_svc.inventory_svc,
-        "lock_inventories",
-        lock_inventories,
+        shipping_svc.warehouse_map_svc,
+        "lock_warehouse_map_rows",
+        lock_warehouse_rows,
     )
 
     actor = _shipping_actor(db_session)
     _prepare_cancel(db_session, req.request_id, reason="change", actor=actor)
 
-    assert lock_calls == [legacy_item_ids]
+    assert lock_calls[0] == {
+        "item_ids": legacy_item_ids,
+        "include_boxes_for_item_ids": True,
+        "include_zones_for_item_ids": True,
+    }
 
     actor = _shipping_actor(db_session)
     with pytest.raises(shipping_svc.ShippingError, match="인보이스"):

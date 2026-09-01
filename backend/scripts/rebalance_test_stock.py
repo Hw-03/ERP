@@ -31,6 +31,8 @@ import sys
 from decimal import Decimal
 from pathlib import Path
 
+from sqlalchemy.orm import Session
+
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_DIR))
 
@@ -44,6 +46,7 @@ from app.models import (  # noqa: E402
     StockRequest,
     StockRequestStatusEnum,
 )
+from app.services import warehouse_map  # noqa: E402
 from app.services.inventory import PROCESS_TYPE_TO_DEPT  # noqa: E402
 from app.services.sr_approval import _cancel_open_stock_requests  # noqa: E402
 
@@ -61,6 +64,16 @@ R_PREFIX_TO_DEPT: dict[str, DepartmentEnum] = {
 R_CODES = set(R_PREFIX_TO_DEPT.keys())
 
 SAFETY_STOCK = 200  # 모든 item.min_stock 이 사실상 200 (NULL 2건 제외)
+
+
+def _clear_warehouse_stock(db: Session, inventory: Inventory) -> None:
+    """Zero one item's W through the locked B→Z→U physical ledger path."""
+    warehouse_map._apply_warehouse_ledger_delta(
+        db,
+        inventory.item_id,
+        -int(inventory.warehouse_qty or 0),
+        consume_mode="absolute",
+    )
 
 
 def parse_args() -> argparse.Namespace:
@@ -160,14 +173,20 @@ def main() -> int:
             inv = db.query(Inventory).filter_by(item_id=it.item_id).first()
             if inv is None:
                 continue
+            warehouse_map._apply_warehouse_ledger_delta(
+                db,
+                it.item_id,
+                0,
+                consume_mode="absolute",
+            )
             inv.pending_quantity = Decimal("0")
             inv.quantity = inv.warehouse_qty  # location 0
         for it in af_items:
             inv = db.query(Inventory).filter_by(item_id=it.item_id).first()
             if inv is None:
                 continue
+            _clear_warehouse_stock(db, inv)
             inv.pending_quantity = Decimal("0")
-            inv.warehouse_qty = Decimal("0")
             inv.quantity = Decimal("0")
         db.flush()
 

@@ -184,6 +184,8 @@ function buildImpactGroups(logs: TransactionLog[], batch: IoBatch | null): Histo
 function getImpactLocationGroup(effect: InventoryEffectRow): Pick<HistoryImpactGroup, "key" | "label"> {
   if (effect.scope === "warehouse") return { key: "warehouse", label: "창고 재고" };
   if (effect.scope === "warehouse_box") return { key: "warehouse_box", label: "박스 재고" };
+  if (effect.scope === "warehouse_zone") return { key: "warehouse_zone", label: "특수구역 재고" };
+  if (effect.scope === "warehouse_unplaced") return { key: "warehouse_unplaced", label: "미배치 재고" };
   if (effect.status === "DEFECTIVE") return { key: "defective", label: "불량 재고" };
   if (effect.department) return { key: `department:${effect.department}`, label: `${effect.department} 재고` };
   return { key: `location:${effect.locationId ?? "unknown"}`, label: "재고" };

@@ -12,7 +12,6 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
-from app.database import _is_sqlite
 from app.models import (
     Employee,
     DefectInventoryMovement,
@@ -37,9 +36,11 @@ from app.models import (
     TransactionLog,
     TransactionTypeEnum,
     WarehouseBoxItem,
+    WarehouseSpecialZone,
+    WarehouseSpecialZoneItem,
+    WarehouseUnplacedItem,
 )
 from app.services import inv_effect
-from app.services import inventory as inventory_svc
 from app.services import inventory_operations as operation_svc
 from app.services import defect_records as defect_records_svc
 from app.services._tx import transactional
@@ -56,6 +57,15 @@ INSUFFICIENT_STOCK_MESSAGE = (
     "현재 재고를 확인한 뒤 다시 시도해 주세요."
 )
 CORRECTED_OPERATION_MESSAGE = "수량 보정된 거래를 포함한 원작업은 취소할 수 없습니다."
+LEGACY_EFFECT_WARNING = (
+    "레거시 재고 효과는 W/B/Z/U 실제 행 ID가 없어 위치를 추정하지 않습니다."
+)
+LEGACY_EFFECT_BLOCKER = (
+    "레거시 재고 효과에는 정확한 B/Z/U 위치 정보가 없어 취소할 수 없습니다."
+)
+PHYSICAL_ROW_CHANGED_MESSAGE = (
+    "재고 행이 작업 이후 변경되어 정확히 취소할 수 없습니다."
+)
 
 
 class CancellationError(ValueError):
@@ -82,7 +92,9 @@ class CancellationCell:
     scope: str
     department: Optional[str]
     status: Optional[str]
+    row_id: Optional[str]
     box_id: Optional[str]
+    zone_id: Optional[str]
     quantity_change: int
     current_quantity: int
     reserved_quantity: int
@@ -123,6 +135,7 @@ class CancellationPlan:
     plan_hash: str
     can_cancel: bool
     blockers: tuple[str, ...]
+    warnings: tuple[str, ...]
     cells: tuple[CancellationCell, ...]
     defect_records: tuple[CancellationDefectRecord, ...]
     effects: tuple[CancellationEffectSubject, ...]
@@ -167,11 +180,54 @@ def normalized_effect_for_cancellation(log: TransactionLog) -> list[dict]:
         except (KeyError, TypeError, ValueError) as exc:
             raise CancellationNotAllowed("재고 효과 기록 형식이 올바르지 않습니다.") from exc
         scope = cell.get("scope")
+        quantities = {}
+        if "before_quantity" in cell or "after_quantity" in cell:
+            try:
+                quantities = {
+                    "before_quantity": int(cell["before_quantity"]),
+                    "after_quantity": int(cell["after_quantity"]),
+                }
+            except (KeyError, TypeError, ValueError) as exc:
+                raise CancellationNotAllowed(
+                    "재고 효과 기록 형식이 올바르지 않습니다."
+                ) from exc
         if scope == "warehouse":
-            normalized.append({"scope": scope, "delta": delta})
+            normalized.append(
+                {
+                    "scope": scope,
+                    "row_id": str(cell["row_id"]) if cell.get("row_id") else None,
+                    "delta": delta,
+                    **quantities,
+                }
+            )
         elif scope == "warehouse_box" and cell.get("box_id"):
             normalized.append(
-                {"scope": scope, "box_id": str(cell["box_id"]), "delta": delta}
+                {
+                    "scope": scope,
+                    "row_id": str(cell["row_id"]) if cell.get("row_id") else None,
+                    "box_id": str(cell["box_id"]),
+                    "delta": delta,
+                    **quantities,
+                }
+            )
+        elif scope == "warehouse_zone" and cell.get("row_id") and cell.get("zone_id"):
+            normalized.append(
+                {
+                    "scope": scope,
+                    "row_id": str(cell["row_id"]),
+                    "zone_id": str(cell["zone_id"]),
+                    "delta": delta,
+                    **quantities,
+                }
+            )
+        elif scope == "warehouse_unplaced" and cell.get("row_id"):
+            normalized.append(
+                {
+                    "scope": scope,
+                    "row_id": str(cell["row_id"]),
+                    "delta": delta,
+                    **quantities,
+                }
             )
         elif scope == "location" and cell.get("department") and cell.get("status"):
             try:
@@ -184,6 +240,7 @@ def normalized_effect_for_cancellation(log: TransactionLog) -> list[dict]:
                     "department": str(cell["department"]),
                     "status": status,
                     "delta": delta,
+                    **quantities,
                 }
             )
         else:
@@ -191,38 +248,82 @@ def normalized_effect_for_cancellation(log: TransactionLog) -> list[dict]:
     return normalized
 
 
-def _cell_key(item_id: uuid.UUID, cell: dict) -> tuple[str, str, str, str, str]:
+def _cell_key(
+    item_id: uuid.UUID,
+    cell: dict,
+) -> tuple[str, str, str, str, str, str, str]:
     return (
         str(item_id),
         str(cell["scope"]),
         str(cell.get("department") or ""),
         str(cell.get("status") or ""),
+        str(cell.get("row_id") or ""),
         str(cell.get("box_id") or ""),
+        str(cell.get("zone_id") or ""),
     )
 
 
 def _current_cell(
     db: Session,
-    key: tuple[str, str, str, str, str],
+    key: tuple[str, str, str, str, str, str, str],
 ) -> tuple[int, int]:
-    item_id, scope, department, status, box_id = key
+    item_id, scope, department, status, row_id, box_id, zone_id = key
     if scope == "warehouse":
-        inventory = db.query(Inventory).filter(Inventory.item_id == item_id).one_or_none()
+        query = db.query(Inventory).filter(Inventory.item_id == item_id)
+        if row_id:
+            query = query.filter(Inventory.inventory_id == row_id)
+        inventory = query.one_or_none()
         if inventory is None:
+            if row_id:
+                raise CancellationNotAllowed(PHYSICAL_ROW_CHANGED_MESSAGE)
             raise CancellationNotAllowed("재고 레코드를 찾을 수 없습니다.")
         return int(inventory.warehouse_qty or 0), int(inventory.pending_quantity or 0)
     if scope == "warehouse_box":
-        box_item = (
-            db.query(WarehouseBoxItem)
-            .filter(
-                WarehouseBoxItem.item_id == item_id,
+        query = db.query(WarehouseBoxItem).filter(
+            WarehouseBoxItem.item_id == item_id
+        )
+        query = (
+            query.filter(
+                WarehouseBoxItem.id == row_id,
                 WarehouseBoxItem.box_id == box_id,
+            )
+            if row_id
+            else query.filter(WarehouseBoxItem.box_id == box_id)
+        )
+        box_item = query.one_or_none()
+        if box_item is None:
+            raise CancellationNotAllowed(PHYSICAL_ROW_CHANGED_MESSAGE)
+        return int(box_item.quantity or 0), 0
+    if scope == "warehouse_zone":
+        zone_item = (
+            db.query(WarehouseSpecialZoneItem)
+            .join(
+                WarehouseSpecialZone,
+                WarehouseSpecialZoneItem.zone_id == WarehouseSpecialZone.id,
+            )
+            .filter(
+                WarehouseSpecialZoneItem.id == row_id,
+                WarehouseSpecialZoneItem.item_id == item_id,
+                WarehouseSpecialZoneItem.zone_id == zone_id,
+                WarehouseSpecialZone.is_active.is_(True),
             )
             .one_or_none()
         )
-        if box_item is None:
-            raise CancellationNotAllowed("취소 원복할 박스 항목을 찾을 수 없습니다.")
-        return int(box_item.quantity or 0), 0
+        if zone_item is None:
+            raise CancellationNotAllowed(PHYSICAL_ROW_CHANGED_MESSAGE)
+        return int(zone_item.quantity or 0), 0
+    if scope == "warehouse_unplaced":
+        unplaced = (
+            db.query(WarehouseUnplacedItem)
+            .filter(
+                WarehouseUnplacedItem.id == row_id,
+                WarehouseUnplacedItem.item_id == item_id,
+            )
+            .one_or_none()
+        )
+        if unplaced is None:
+            raise CancellationNotAllowed(PHYSICAL_ROW_CHANGED_MESSAGE)
+        return int(unplaced.quantity or 0), 0
     location = (
         db.query(InventoryLocation)
         .filter(
@@ -244,6 +345,7 @@ def _plan_payload(
     defect_records: tuple[CancellationDefectRecord, ...],
     effects: tuple[CancellationEffectSubject, ...],
     blockers: tuple[str, ...],
+    warnings: tuple[str, ...],
 ) -> dict:
     return {
         "operation_id": str(operation.operation_id),
@@ -253,6 +355,7 @@ def _plan_payload(
         "defect_records": [asdict(record) for record in defect_records],
         "effects": [asdict(effect) for effect in effects],
         "blockers": list(blockers),
+        "warnings": list(warnings),
     }
 
 
@@ -335,6 +438,7 @@ def preview_cancellation(
         raise CancellationOperationNotFound("취소할 작업을 찾을 수 없습니다.")
 
     blockers: list[str] = []
+    warnings: list[str] = []
     if operation.kind != InventoryOperationKindEnum.BUSINESS:
         blockers.append("취소 작업은 다시 취소할 수 없습니다.")
     existing_reversal = (
@@ -384,29 +488,85 @@ def preview_cancellation(
         )
         .all()
     )
-    changes: dict[tuple[str, str, str, str, str], int] = {}
+    if int(operation.contract_version or 1) < 2:
+        warnings.append(LEGACY_EFFECT_WARNING)
+
+    changes: dict[tuple[str, str, str, str, str, str, str], int] = {}
+    expected_after: dict[tuple[str, str, str, str, str, str, str], int] = {}
+    previous_after: dict[tuple[str, str, str, str, str, str, str], int] = {}
     try:
         for log in logs:
-            for effect in normalized_effect_for_cancellation(log):
+            normalized = normalized_effect_for_cancellation(log)
+            legacy_physical = int(operation.contract_version or 1) < 2 and any(
+                effect["scope"]
+                in {"warehouse_box", "warehouse_zone", "warehouse_unplaced"}
+                for effect in normalized
+            )
+            warehouse_delta = sum(
+                int(effect["delta"])
+                for effect in normalized
+                if effect["scope"] == "warehouse"
+            )
+            physical_delta = sum(
+                int(effect["delta"])
+                for effect in normalized
+                if effect["scope"]
+                in {"warehouse_box", "warehouse_zone", "warehouse_unplaced"}
+            )
+            if legacy_physical or warehouse_delta != physical_delta:
+                blockers.append(LEGACY_EFFECT_BLOCKER)
+            for effect in normalized:
+                if legacy_physical and effect["scope"] in {
+                    "warehouse_box",
+                    "warehouse_zone",
+                    "warehouse_unplaced",
+                }:
+                    continue
                 key = _cell_key(log.item_id, effect)
                 changes[key] = changes.get(key, 0) - int(effect["delta"])
+                if int(operation.contract_version or 1) >= 2:
+                    if "before_quantity" not in effect or "after_quantity" not in effect:
+                        blockers.append("v2 재고 효과의 전후 수량 기록이 없습니다.")
+                        continue
+                    if effect["scope"] in {
+                        "warehouse",
+                        "warehouse_box",
+                        "warehouse_zone",
+                        "warehouse_unplaced",
+                    } and not effect.get("row_id"):
+                        blockers.append("v2 재고 효과의 실제 행 ID 기록이 없습니다.")
+                        continue
+                    if key in previous_after and previous_after[key] != int(
+                        effect["before_quantity"]
+                    ):
+                        blockers.append("v2 재고 효과의 연속 전후 수량이 일치하지 않습니다.")
+                    previous_after[key] = int(effect["after_quantity"])
+                    expected_after[key] = int(effect["after_quantity"])
     except CancellationNotAllowed as exc:
         blockers.append(str(exc))
 
     cell_plans: list[CancellationCell] = []
     for key, quantity_change in sorted(changes.items()):
-        current, reserved = _current_cell(db, key)
+        try:
+            current, reserved = _current_cell(db, key)
+        except CancellationNotAllowed as exc:
+            blockers.append(str(exc))
+            continue
+        if key in expected_after and current != expected_after[key]:
+            blockers.append(PHYSICAL_ROW_CHANGED_MESSAGE)
         after = current + quantity_change
         if after < reserved:
             blockers.append(INSUFFICIENT_STOCK_MESSAGE)
-        item_id, scope, department, status, box_id = key
+        item_id, scope, department, status, row_id, box_id, zone_id = key
         cell_plans.append(
             CancellationCell(
                 item_id=item_id,
                 scope=scope,
                 department=department or None,
                 status=status or None,
+                row_id=row_id or None,
                 box_id=box_id or None,
+                zone_id=zone_id or None,
                 quantity_change=quantity_change,
                 current_quantity=current,
                 reserved_quantity=reserved,
@@ -482,6 +642,7 @@ def preview_cancellation(
         effect_plans.append(effect_plan)
 
     unique_blockers = tuple(dict.fromkeys(blockers))
+    unique_warnings = tuple(dict.fromkeys(warnings))
     cells = tuple(cell_plans)
     defect_records = tuple(defect_plans)
     effects = tuple(effect_plans)
@@ -492,6 +653,7 @@ def preview_cancellation(
         defect_records,
         effects,
         unique_blockers,
+        unique_warnings,
     )
     plan_hash = hashlib.sha256(
         json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(
@@ -503,6 +665,7 @@ def preview_cancellation(
         plan_hash=plan_hash,
         can_cancel=not unique_blockers,
         blockers=unique_blockers,
+        warnings=unique_warnings,
         cells=cells,
         defect_records=defect_records,
         effects=effects,
@@ -513,7 +676,7 @@ def _lock_original_operation(db: Session, operation_id: uuid.UUID) -> InventoryO
     query = db.query(InventoryOperation).filter(
         InventoryOperation.operation_id == operation_id
     )
-    if not _is_sqlite:
+    if db.get_bind().dialect.name != "sqlite":
         query = query.with_for_update()
     operation = query.one_or_none()
     if operation is None:
@@ -580,7 +743,7 @@ def _reverse_defect_movement(
     query = db.query(DefectQuarantineRecord).filter(
         DefectQuarantineRecord.record_id == original.record_id
     )
-    if not _is_sqlite:
+    if db.get_bind().dialect.name != "sqlite":
         query = query.with_for_update()
     record = query.one_or_none()
     if record is None:
@@ -709,7 +872,9 @@ def _assert_plan_applied(
                 cell.scope,
                 cell.department or "",
                 cell.status or "",
+                cell.row_id or "",
                 cell.box_id or "",
+                cell.zone_id or "",
             ),
         )
         if current != cell.quantity_after or reserved != cell.reserved_quantity:
@@ -818,7 +983,33 @@ def cancel_operation(
             )
             .all()
         )
-        inventory_svc.lock_inventories(db, sorted({log.item_id for log in logs}))
+        defect_record_ids = sorted(
+            {movement.record_id for movement in movements},
+            key=str,
+        )
+        from app.services import warehouse_map as warehouse_map_svc
+
+        warehouse_map_svc.lock_warehouse_map_rows(
+            db,
+            item_ids=sorted(
+                {
+                    *{log.item_id for log in logs},
+                    *{movement.item_id for movement in movements},
+                },
+                key=str,
+            ),
+            include_boxes_for_item_ids=True,
+            include_zones_for_item_ids=True,
+        )
+        if defect_record_ids:
+            defect_query = (
+                db.query(DefectQuarantineRecord)
+                .filter(DefectQuarantineRecord.record_id.in_(defect_record_ids))
+                .order_by(DefectQuarantineRecord.record_id.asc())
+            )
+            if db.get_bind().dialect.name != "sqlite":
+                defect_query = defect_query.with_for_update()
+            defect_query.all()
         current_plan = preview_cancellation(db, operation_id, now=now)
         if current_plan.plan_hash != plan_hash:
             raise CancellationPlanChanged(

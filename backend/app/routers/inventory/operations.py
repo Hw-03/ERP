@@ -113,9 +113,11 @@ def _operation_payload(
         )
         can_cancel = cancel_plan.can_cancel
         cancel_blockers = list(cancel_plan.blockers)
+        cancel_warnings = list(cancel_plan.warnings)
     except cancellation_svc.CancellationError as exc:
         can_cancel = False
         cancel_blockers = [str(exc)]
+        cancel_warnings = []
     return {
         "operation_id": str(operation.operation_id),
         "kind": operation.kind.value,
@@ -138,6 +140,7 @@ def _operation_payload(
         "reversal_operation_id": str(reversal.operation_id) if reversal else None,
         "can_cancel": can_cancel,
         "cancel_blockers": cancel_blockers,
+        "cancel_warnings": cancel_warnings,
         "lines": [_line_payload(log, items.get(log.item_id)) for log in logs],
         "matching_lines": matching_lines,
         "effects": [

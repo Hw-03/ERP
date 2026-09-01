@@ -28,16 +28,23 @@ from app.services.inv_calc import _sync_total
 from app.repositories import inventory_repository
 
 
-def _deplete_boxes_if_tracking(db: Session, item_id: uuid.UUID, qty: Decimal) -> None:
-    """창고 박스 추적이 켜져 있으면 warehouse_qty 감소분만큼 박스도 R1 순서로 차감.
-
-    플래그 OFF면 무동작(현행 동작 유지). 박스 합 부족 시 ValueError → 호출 측 롤백.
-    순환 import 회피를 위해 warehouse_map 서비스를 지역 import 한다.
-    """
+def _apply_warehouse_ledger_delta(
+    db: Session,
+    item_id: uuid.UUID,
+    delta: Decimal,
+    *,
+    consume_mode: str = "available",
+) -> Inventory:
+    """Apply W and B/Z/U together without introducing a module import cycle."""
     from app.services import warehouse_map as _wm
 
-    if _wm.is_box_tracking_enabled(db):
-        _wm._deplete_boxes_by_order(db, item_id, qty)
+    _get_or_create_inventory(db, item_id)
+    return _wm._apply_warehouse_ledger_delta(
+        db,
+        item_id,
+        delta,
+        consume_mode=consume_mode,
+    )
 
 
 def _receive_confirmed(
@@ -54,13 +61,12 @@ def _receive_confirmed(
     """
     if qty <= 0:
         raise ValueError("입고 수량은 0보다 커야 합니다.")
-    inv = _lock_inventory(db, item_id)
-
     if bucket == "production" and dept is not None:
+        inv = _lock_inventory(db, item_id)
         loc = _lock_location(db, item_id, dept, LocationStatusEnum.PRODUCTION)
         loc.quantity = (loc.quantity or Decimal("0")) + qty
     else:
-        inv.warehouse_qty = (inv.warehouse_qty or Decimal("0")) + qty
+        inv = _apply_warehouse_ledger_delta(db, item_id, qty)
 
     _sync_total(db, inv)
     return inv
@@ -75,27 +81,9 @@ def _transfer_to_production(
     """창고 → 부서 PRODUCTION 이동. 총량 변동 없음."""
     if qty <= 0:
         raise ValueError("이동 수량은 0보다 커야 합니다.")
-    _get_or_create_inventory(db, item_id)
+    inv = _apply_warehouse_ledger_delta(db, item_id, -qty)
     _lock_location(db, item_id, dept, LocationStatusEnum.PRODUCTION)
     db.flush()
-
-    result = db.execute(
-        sa_update(Inventory)
-        .where(Inventory.item_id == item_id)
-        .where(
-            Inventory.warehouse_qty - func.coalesce(Inventory.pending_quantity, 0) >= qty
-        )
-        .values(warehouse_qty=Inventory.warehouse_qty - qty)
-        .execution_options(synchronize_session=False)
-    )
-    db.flush()
-    if result.rowcount == 0:
-        inv_check = inventory_repository.get(db, item_id)
-        wh = inv_check.warehouse_qty or Decimal("0")
-        pending = inv_check.pending_quantity or Decimal("0")
-        raise ValueError(
-            f"창고 가용 재고 부족 (창고 {wh}, 예약중 {pending}, 이동 요청 {qty})."
-        )
 
     db.execute(
         sa_update(InventoryLocation)
@@ -109,7 +97,6 @@ def _transfer_to_production(
     db.expire_all()
     inv = inventory_repository.get(db, item_id)
     _sync_total(db, inv)
-    _deplete_boxes_if_tracking(db, item_id, qty)
     return inv
 
 
@@ -122,7 +109,9 @@ def _transfer_to_warehouse(
     """부서 PRODUCTION → 창고 복귀. 총량 변동 없음."""
     if qty <= 0:
         raise ValueError("이동 수량은 0보다 커야 합니다.")
-    _get_or_create_inventory(db, item_id)
+    from app.services import warehouse_map as _wm
+
+    _wm._lock_warehouse_ledger(db, item_id)
     _lock_location(db, item_id, dept, LocationStatusEnum.PRODUCTION)
     db.flush()
 
@@ -150,12 +139,7 @@ def _transfer_to_warehouse(
         dept_name = dept.value if isinstance(dept, DepartmentEnum) else dept
         raise ValueError(f"{dept_name} 생산 재고 부족 (현재 {cur}, 요청 {qty}).")
 
-    db.execute(
-        sa_update(Inventory)
-        .where(Inventory.item_id == item_id)
-        .values(warehouse_qty=func.coalesce(Inventory.warehouse_qty, 0) + qty)
-        .execution_options(synchronize_session=False)
-    )
+    _apply_warehouse_ledger_delta(db, item_id, qty)
     db.flush()
     db.expire_all()
     inv = inventory_repository.get(db, item_id)
@@ -285,35 +269,9 @@ def _consume_warehouse(
     if qty <= 0:
         raise ValueError("차감 수량은 0보다 커야 합니다.")
 
-    _get_or_create_inventory(db, item_id)
+    inv = _apply_warehouse_ledger_delta(db, item_id, -qty)
     db.flush()
-
-    available_expr = Inventory.warehouse_qty - func.coalesce(
-        Inventory.pending_quantity,
-        0,
-    )
-
-    result = db.execute(
-        sa_update(Inventory)
-        .where(Inventory.item_id == item_id)
-        .where(available_expr >= qty)
-        .values(warehouse_qty=Inventory.warehouse_qty - qty)
-        .execution_options(synchronize_session=False)
-    )
-    db.flush()
-
-    if result.rowcount == 0:
-        inv_check = inventory_repository.get(db, item_id)
-        wh = inv_check.warehouse_qty if inv_check else Decimal("0")
-        pending = inv_check.pending_quantity if inv_check else Decimal("0")
-        raise ValueError(
-            f"창고 가용 재고 부족 (창고 {wh}, 예약중 {pending}, 차감 요청 {qty})."
-        )
-
-    db.expire_all()
-    inv = inventory_repository.get(db, item_id)
     _sync_total(db, inv)
-    _deplete_boxes_if_tracking(db, item_id, qty)
     qty_before = inv.quantity + qty
     return inv, qty_before
 

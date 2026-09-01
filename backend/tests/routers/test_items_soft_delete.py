@@ -19,10 +19,12 @@ from app.models import (
     HandoverLine,
     HandoverStatusEnum,
     Inventory,
+    InventoryLocation,
     IoBatch,
     IoBundle,
     IoLine,
     Item,
+    LocationStatusEnum,
     RequestBucketEnum,
     ShippingAllocation,
     ShippingFinalizationModeEnum,
@@ -37,6 +39,12 @@ from app.models import (
     StockRequestTypeEnum,
     TransactionLog,
     TransactionTypeEnum,
+    WarehouseAngle,
+    WarehouseBox,
+    WarehouseBoxItem,
+    WarehouseSpecialZone,
+    WarehouseSpecialZoneItem,
+    WarehouseUnplacedItem,
 )
 from app.repositories import item_repository
 from app.routers import items as items_router
@@ -402,6 +410,87 @@ def test_soft_delete_returns_total_but_caps_refs_at_fifty_without_deleting_bom(
     assert db_session.query(BOM).filter(BOM.bom_id.in_(bom_ids)).count() == 55
 
 
+def test_soft_delete_rejects_item_with_positive_box_placement(
+    client,
+    db_session,
+    make_item,
+) -> None:
+    target = make_item(name="placed delete target", warehouse_qty=Decimal("1"))
+    angle = WarehouseAngle(
+        label="placed-delete",
+        rows=1,
+        layers=1,
+        jaris_per_cell=1,
+        display_order=1,
+    )
+    db_session.add(angle)
+    db_session.flush()
+    box = WarehouseBox(
+        angle_id=angle.id,
+        row_no=1,
+        layer_no=1,
+        jari_index=0,
+        size="SMALL",
+        stack_order=1,
+    )
+    db_session.add(box)
+    db_session.flush()
+    db_session.add(
+        WarehouseBoxItem(box_id=box.box_id, item_id=target.item_id, quantity=1)
+    )
+    db_session.query(WarehouseUnplacedItem).filter_by(
+        item_id=target.item_id
+    ).one().quantity = 0
+    db_session.commit()
+
+    response = client.patch(
+        f"/api/items/{target.item_id}/soft-delete",
+        headers=ADMIN_HEADERS,
+    )
+
+    refs = _assert_item_in_use(response, total=1)
+    assert refs == [
+        {"kind": "warehouse_box", "id": str(box.box_id), "status": "active"}
+    ]
+
+
+def test_soft_delete_rejects_corrupt_positive_inactive_zone_placement(
+    client,
+    db_session,
+    make_item,
+) -> None:
+    target = make_item(name="inactive zone delete target", warehouse_qty=Decimal("1"))
+    zone = WarehouseSpecialZone(
+        label="inactive-delete",
+        zone_type="pallet",
+        display_order=1,
+        is_active=False,
+    )
+    db_session.add(zone)
+    db_session.flush()
+    db_session.add(
+        WarehouseSpecialZoneItem(
+            zone_id=zone.id,
+            item_id=target.item_id,
+            quantity=1,
+        )
+    )
+    db_session.query(WarehouseUnplacedItem).filter_by(
+        item_id=target.item_id
+    ).one().quantity = 0
+    db_session.commit()
+
+    response = client.patch(
+        f"/api/items/{target.item_id}/soft-delete",
+        headers=ADMIN_HEADERS,
+    )
+
+    refs = _assert_item_in_use(response, total=1)
+    assert refs == [
+        {"kind": "warehouse_zone", "id": str(zone.id), "status": "inactive"}
+    ]
+
+
 def test_delete_with_only_closed_references_preserves_history_and_rejects_new_commands(
     client,
     db_session,
@@ -614,6 +703,81 @@ def test_delete_with_only_closed_references_preserves_history_and_rejects_new_co
     assert restored.status_code == 200, restored.text
     assert restored.json()["deleted_at"] is None
     assert db_session.query(TransactionLog).filter(TransactionLog.log_id == log.log_id).count() == 1
+
+
+def test_restore_deleted_item_recreates_missing_zero_inventory_and_unplaced(
+    client,
+    db_session,
+    make_item,
+) -> None:
+    target = make_item(name="restore missing ledger", warehouse_qty=Decimal("0"))
+    target.deleted_at = datetime(2026, 8, 31)
+    inventory = db_session.query(Inventory).filter_by(item_id=target.item_id).one()
+    unplaced = db_session.query(WarehouseUnplacedItem).filter_by(
+        item_id=target.item_id
+    ).one()
+    db_session.delete(unplaced)
+    db_session.delete(inventory)
+    db_session.commit()
+
+    restored = client.patch(
+        f"/api/items/{target.item_id}/restore",
+        headers=ADMIN_HEADERS,
+    )
+
+    assert restored.status_code == 200, restored.text
+    assert restored.json()["deleted_at"] is None
+    recreated_inventory = db_session.query(Inventory).filter_by(
+        item_id=target.item_id
+    ).one()
+    recreated_unplaced = db_session.query(WarehouseUnplacedItem).filter_by(
+        item_id=target.item_id
+    ).one()
+    assert int(recreated_inventory.quantity) == 0
+    assert int(recreated_inventory.warehouse_qty) == 0
+    assert int(recreated_unplaced.quantity) == 0
+
+
+def test_restore_deleted_item_recreates_total_from_existing_locations(
+    client,
+    db_session,
+    make_item,
+) -> None:
+    target = make_item(name="restore locations", warehouse_qty=Decimal("0"))
+    target.deleted_at = datetime(2026, 8, 31)
+    db_session.add(
+        InventoryLocation(
+            item_id=target.item_id,
+            department=DepartmentEnum.ASSEMBLY,
+            status=LocationStatusEnum.PRODUCTION,
+            quantity=7,
+            pending_quantity=2,
+        )
+    )
+    inventory = db_session.query(Inventory).filter_by(item_id=target.item_id).one()
+    unplaced = db_session.query(WarehouseUnplacedItem).filter_by(
+        item_id=target.item_id
+    ).one()
+    db_session.delete(unplaced)
+    db_session.delete(inventory)
+    db_session.commit()
+
+    restored = client.patch(
+        f"/api/items/{target.item_id}/restore",
+        headers=ADMIN_HEADERS,
+    )
+
+    assert restored.status_code == 200, restored.text
+    recreated_inventory = db_session.query(Inventory).filter_by(
+        item_id=target.item_id
+    ).one()
+    recreated_unplaced = db_session.query(WarehouseUnplacedItem).filter_by(
+        item_id=target.item_id
+    ).one()
+    assert int(recreated_inventory.quantity) == 7
+    assert int(recreated_inventory.warehouse_qty) == 0
+    assert int(recreated_inventory.pending_quantity) == 0
+    assert int(recreated_unplaced.quantity) == 0
 
 
 def test_revert_cancelled_stock_request_does_not_reactivate_deleted_item_batch(

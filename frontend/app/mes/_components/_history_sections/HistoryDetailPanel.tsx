@@ -245,6 +245,9 @@ export function HistoryDetailPanel({
     cancelled: isCancelled,
     scopeStatus: cancellationScopeStatus,
     blocker: cancellationBlocker,
+    warnings: selected.operation_id && cancellationScope.status === "ready"
+      ? cancellationScope.warnings
+      : [],
     onRetryScope: cancellationScope.retry,
     onSubmit: handleCancelSubmit,
     triggerLabel: "이 내역 취소",

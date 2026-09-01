@@ -41,13 +41,14 @@ from app.models import (
     StockRequestTypeEnum,
     SystemSetting,
     TransactionLog,
+    WarehouseUnplacedItem,
 )
 from app.routers import io as io_router
 from app.routers import items as items_router
 from app.routers import stock_requests as stock_request_router
 from app.schemas import IoDraftUpsert, IoSubmitRequest, StockRequestCreate
 from app.services import handover as handover_svc
-from app.services import inv_base, inv_effect
+from app.services import inv_effect
 from app.services import inventory_operation_cancellation as cancellation_svc
 from app.services import inventory_operations as operation_svc
 from app.services import io_dispatch as io_dispatch_svc
@@ -90,9 +91,7 @@ class _DraftCommandCase:
 @pytest.fixture(autouse=True)
 def _force_postgresql_lock_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     """공용 conftest의 SQLite import 상태와 무관하게 실제 PG 잠금을 사용한다."""
-    monkeypatch.setattr(inv_base, "_is_sqlite", False)
-    monkeypatch.setattr(inv_effect, "_is_sqlite", False)
-    monkeypatch.setattr(cancellation_svc, "_is_sqlite", False)
+    monkeypatch.setattr(inv_effect, "_uses_row_locks", lambda _db: True)
 
 
 def _session_factory() -> tuple[Engine, sessionmaker[Session]]:
@@ -165,13 +164,16 @@ def _seed_handover(make_session: sessionmaker[Session]) -> _HandoverCase:
         )
         db.add_all((author, receiver, item))
         db.flush()
-        db.add(
-            Inventory(
+        db.add_all(
+            [
+                Inventory(
                 item_id=item.item_id,
                 quantity=Decimal("5"),
                 warehouse_qty=Decimal("0"),
                 pending_quantity=Decimal("0"),
-            )
+                ),
+                WarehouseUnplacedItem(item_id=item.item_id, quantity=0),
+            ]
         )
         db.add_all(
             (
@@ -245,13 +247,19 @@ def _seed_command(
         )
         db.add_all((actor, item))
         db.flush()
-        db.add(
-            Inventory(
+        db.add_all(
+            [
+                Inventory(
                 item_id=item.item_id,
                 quantity=warehouse_qty,
                 warehouse_qty=warehouse_qty,
                 pending_quantity=Decimal("0"),
-            )
+                ),
+                WarehouseUnplacedItem(
+                    item_id=item.item_id,
+                    quantity=int(warehouse_qty),
+                ),
+            ]
         )
         db.commit()
         return _CommandCase(
@@ -281,13 +289,16 @@ def _seed_existing_draft(
         )
         db.add_all((actor, item))
         db.flush()
-        db.add(
-            Inventory(
+        db.add_all(
+            [
+                Inventory(
                 item_id=item.item_id,
                 quantity=Decimal("0"),
                 warehouse_qty=Decimal("0"),
                 pending_quantity=Decimal("0"),
-            )
+                ),
+                WarehouseUnplacedItem(item_id=item.item_id, quantity=0),
+            ]
         )
         batch = IoBatch(
             work_type="receive",

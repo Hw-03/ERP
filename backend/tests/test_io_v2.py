@@ -25,6 +25,7 @@ from app.models import (
     StockRequestTypeEnum,
     TransactionLog,
     TransactionTypeEnum,
+    WarehouseUnplacedItem,
 )
 from app.services import shipping_actions as shipping_actions_svc
 from app.services.pin_auth import DEFAULT_PIN_HASH
@@ -583,7 +584,28 @@ def test_internal_use_submit_reserves_then_approval_consumes_only_warehouse(
     assert log.producer_employee_id == requester.employee_id
     assert log.warehouse_qty_before == Decimal("10")
     assert log.warehouse_qty_after == Decimal("7")
-    assert log.inventory_effect == [{"scope": "warehouse", "delta": -3}]
+    unplaced = (
+        db_session.query(WarehouseUnplacedItem)
+        .filter(WarehouseUnplacedItem.item_id == item.item_id)
+        .one()
+    )
+    assert unplaced.quantity == 7
+    assert log.inventory_effect == [
+        {
+            "scope": "warehouse",
+            "before_quantity": 10,
+            "after_quantity": 7,
+            "delta": -3,
+            "row_id": str(inv.inventory_id),
+        },
+        {
+            "scope": "warehouse_unplaced",
+            "before_quantity": 10,
+            "after_quantity": 7,
+            "delta": -3,
+            "row_id": str(unplaced.id),
+        },
+    ]
 
 
 def test_internal_use_bom_preview_round_trips_mode_source_and_component_selection(

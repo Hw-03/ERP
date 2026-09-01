@@ -57,6 +57,9 @@ POST_LEGACY_ADDITIVE_SCHEMA_MARKERS = (
     "cancelled_by_employee_id",
     "cancelled_by_name",
     "data_revision",
+    "warehouse_unplaced_items",
+    "uq_warehouse_box_items_box_item",
+    "uq_warehouse_zone_items_zone_item",
 )
 SCHEMA_STATE_METADATA = sa.MetaData()
 SCHEMA_STATE = sa.Table(

@@ -41,10 +41,7 @@ def set_box_tracking(
     _admin: Annotated[None, Depends(require_admin_pin)],
     db: Session = Depends(get_db),
 ):
-    """창고 박스 자동 차감 기능 켜기/끄기 (전환 운영 스위치, admin PIN).
-
-    켜기 전 전 품목 박스 배치가 끝나 있어야 한다 — 안 그러면 R5가 창고 출고를 막는다.
-    """
+    """박스 배치 UI 표시 선호도 변경. 물리 원장 차감에는 영향을 주지 않는다."""
     wm_service._set_box_tracking_enabled(db, payload.enabled)
     db.commit()
     return BoxTrackingResponse(enabled=wm_service.is_box_tracking_enabled(db))
@@ -88,6 +85,13 @@ def _jari_used_units(db: Session, angle_id: int, row_no: int, layer_no: int, jar
 
 
 def _validate_items(db: Session, items: List[WarehouseBoxItemPayload]) -> None:
+    item_ids = [item.item_id for item in items]
+    if len(item_ids) != len(set(item_ids)):
+        raise http_error(
+            422,
+            ErrorCode.VALIDATION_ERROR,
+            "같은 박스에 중복 품목을 입력할 수 없습니다.",
+        )
     for it in items:
         item = db.query(Item).filter(Item.item_id == it.item_id, Item.deleted_at.is_(None)).first()
         if not item:
@@ -129,6 +133,14 @@ def create_box(
         item_ids=[item.item_id for item in payload.items],
         angle_ids=[payload.angle_id],
     )
+    _validate_items(db, payload.items)
+    angle = _validate_coords(
+        db,
+        payload.angle_id,
+        payload.row_no,
+        payload.layer_no,
+        payload.jari_index,
+    )
 
     used = _jari_used_units(db, payload.angle_id, payload.row_no, payload.layer_no, payload.jari_index)
     new_unit = SIZE_UNIT[payload.size]
@@ -158,8 +170,7 @@ def create_box(
     )
     db.add(box)
     db.flush()
-    for it in payload.items:
-        db.add(WarehouseBoxItem(box_id=box.box_id, item_id=it.item_id, quantity=it.quantity))
+    wm_service._replace_box_items(db, box.box_id, payload.items)
     db.commit()
     return _box_response(db, box.box_id)
 
@@ -175,18 +186,24 @@ def update_box(
     if not box:
         raise http_error(404, ErrorCode.NOT_FOUND, "박스를 찾을 수 없습니다.")
 
-    existing_item_ids = _box_item_ids(db, [box.box_id])
     new_item_ids = []
     if payload.items is not None:
         _validate_items(db, payload.items)
         new_item_ids = [item.item_id for item in payload.items]
-    wm_service.lock_warehouse_map_rows(
+    locked_box = wm_service.lock_box_with_stable_contents(
         db,
-        item_ids=[*existing_item_ids, *new_item_ids],
-        angle_ids=[box.angle_id],
-        box_ids=[box.box_id],
+        box,
+        additional_item_ids=new_item_ids,
     )
-    db.refresh(box)
+    if locked_box is None:
+        raise http_error(
+            409,
+            ErrorCode.CONFLICT,
+            "박스 내용 또는 위치가 동시에 변경되었습니다. 다시 시도하세요.",
+        )
+    box = locked_box
+    if payload.items is not None:
+        _validate_items(db, payload.items)
 
     if payload.size is not None and payload.size != (box.size.value if hasattr(box.size, "value") else box.size):
         angle = db.query(WarehouseAngle).filter(WarehouseAngle.id == box.angle_id).first()
@@ -199,9 +216,7 @@ def update_box(
         box.size = BoxSizeEnum(payload.size)
 
     if payload.items is not None:
-        db.query(WarehouseBoxItem).filter(WarehouseBoxItem.box_id == box.box_id).delete()
-        for it in payload.items:
-            db.add(WarehouseBoxItem(box_id=box.box_id, item_id=it.item_id, quantity=it.quantity))
+        wm_service._replace_box_items(db, box.box_id, payload.items)
 
     db.commit()
     return _box_response(db, box.box_id)
@@ -319,12 +334,14 @@ def delete_box(
     box = db.query(WarehouseBox).filter(WarehouseBox.box_id == box_id).first()
     if not box:
         raise http_error(404, ErrorCode.NOT_FOUND, "박스를 찾을 수 없습니다.")
-    wm_service.lock_warehouse_map_rows(
-        db,
-        item_ids=_box_item_ids(db, [box.box_id]),
-        angle_ids=[box.angle_id],
-        box_ids=[box.box_id],
-    )
-    db.refresh(box)
+    locked_box = wm_service.lock_box_with_stable_contents(db, box)
+    if locked_box is None:
+        raise http_error(
+            409,
+            ErrorCode.CONFLICT,
+            "박스 내용 또는 위치가 동시에 변경되었습니다. 다시 시도하세요.",
+        )
+    box = locked_box
+    wm_service._replace_box_items(db, box.box_id, [])
     db.delete(box)
     db.commit()

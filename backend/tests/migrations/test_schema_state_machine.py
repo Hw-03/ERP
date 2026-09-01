@@ -32,7 +32,7 @@ from bootstrap.schema import (
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
-HEAD_REVISION = "20260828_0031"
+HEAD_REVISION = "20260831_0032"
 
 
 def test_schema_state_exposes_explicit_legacy_onboarding_state():
@@ -179,6 +179,9 @@ def _create_independent_legacy_items_database(path: Path) -> None:
 
     with sqlite3.connect(path) as db:
         db.execute("PRAGMA foreign_keys=OFF")
+        db.execute("DROP TABLE warehouse_unplaced_items")
+        db.execute("DROP INDEX uq_warehouse_box_items_box_item")
+        db.execute("DROP INDEX uq_warehouse_zone_items_zone_item")
         db.execute("DROP TABLE items")
         db.execute(
             """

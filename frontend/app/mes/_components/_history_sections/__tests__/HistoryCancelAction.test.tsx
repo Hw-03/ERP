@@ -31,7 +31,9 @@ const effects: InventoryEffectRow[] = [
     itemName: "부품 A",
     unit: "EA",
     locationId: null,
+    rowId: null,
     boxId: null,
+    zoneId: null,
     department: "조립",
     status: "PRODUCTION",
     label: "조립 생산",
@@ -182,6 +184,27 @@ describe("HistoryCancelAction", () => {
     fireEvent.click(screen.getByRole("button", { name: "이 작업 묶음 전체 취소" }));
     expect(screen.getByText("취소 내용 확인")).toBeInTheDocument();
     expect(screen.getByText("이 작업 묶음을 취소하고, 아래 재고 변동을 원래 상태로 되돌립니다.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "취소 확정" })).toBeInTheDocument();
+  });
+
+  it("shows non-blocking cancellation warnings in the confirmation", () => {
+    render(
+      <HistoryCancelAction
+        panelOpen
+        identity="operation:legacy-1"
+        scope="single"
+        effects={effects}
+        warnings={["레거시 효과 위치는 추정하지 않습니다."]}
+        cancelled={false}
+        onSubmit={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "이 이력 1건 취소" }));
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "레거시 효과 위치는 추정하지 않습니다.",
+    );
     expect(screen.getByRole("button", { name: "취소 확정" })).toBeInTheDocument();
   });
 

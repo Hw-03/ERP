@@ -25,6 +25,9 @@ from app.models import (
     StockRequest,
     StockRequestLine,
     StockRequestStatusEnum,
+    WarehouseBoxItem,
+    WarehouseSpecialZone,
+    WarehouseSpecialZoneItem,
 )
 
 
@@ -64,7 +67,7 @@ def active_item_references(
     """삭제를 막는 참조 전체 수와 안정 정렬된 앞 50개를 반환한다."""
     references: dict[tuple[str, str, str], dict[str, str]] = {}
 
-    def add(kind: str, owner_id: uuid.UUID, status: Any) -> None:
+    def add(kind: str, owner_id: object, status: Any) -> None:
         ref = {
             "kind": kind,
             "id": str(owner_id),
@@ -131,6 +134,37 @@ def active_item_references(
     )
     for (owner_id,) in defect_rows:
         add("defect_quarantine", owner_id, "active")
+
+    box_rows = (
+        db.query(WarehouseBoxItem.box_id)
+        .filter(
+            WarehouseBoxItem.item_id == item_id,
+            WarehouseBoxItem.quantity > 0,
+        )
+        .distinct()
+        .all()
+    )
+    for (owner_id,) in box_rows:
+        add("warehouse_box", owner_id, "active")
+
+    zone_rows = (
+        db.query(
+            WarehouseSpecialZoneItem.zone_id,
+            WarehouseSpecialZone.is_active,
+        )
+        .join(
+            WarehouseSpecialZone,
+            WarehouseSpecialZone.id == WarehouseSpecialZoneItem.zone_id,
+        )
+        .filter(
+            WarehouseSpecialZoneItem.item_id == item_id,
+            WarehouseSpecialZoneItem.quantity > 0,
+        )
+        .distinct()
+        .all()
+    )
+    for owner_id, is_active in zone_rows:
+        add("warehouse_zone", owner_id, "active" if is_active else "inactive")
 
     shipping_direct_fields = (
         ("shipping_base", ShippingRequest.base_pf_item_id),

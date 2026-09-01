@@ -1,4 +1,7 @@
-const { PHASE_DEVELOPMENT_SERVER } = require("next/constants");
+const {
+  PHASE_DEVELOPMENT_SERVER,
+  PHASE_PRODUCTION_BUILD,
+} = require("next/constants");
 
 /**
  * dev (npm run dev) 와 production build/start 가 같은 `.next/` 를 공유하면
@@ -17,6 +20,7 @@ module.exports = (phase) => {
   /** @type {import('next').NextConfig} */
   const config = {
     devIndicators: { buildActivity: false },
+    compiler: { reactRemoveProperties: phase === PHASE_PRODUCTION_BUILD },
     eslint: {
       dirs: ["app", "lib", "features", "components"],
     },

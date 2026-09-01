@@ -111,6 +111,7 @@ export function DesktopWarehouseMapView({
   const queryClient = useQueryClient();
   const mapQuery = useWarehouseMapQuery();
   const [map, setMap] = useState<WarehouseMap | null>(() => mapQuery.data ?? null);
+  const [boxTrackingEnabled, setBoxTrackingEnabled] = useState(true);
   const loading = mapQuery.isLoading && !map;
   const error = mapQuery.error
     ? mapQuery.error instanceof Error
@@ -151,6 +152,26 @@ export function DesktopWarehouseMapView({
   const searchInputRef = useRef<HTMLInputElement>(null);
   // history drill depth — 드릴다운을 browser history에 쌓아 브라우저 뒤로가기 지원 (DesktopHistoryView 선례)
   const wmDepthRef = useRef(0);
+
+  const visibleBoxes = useMemo(
+    () => (editable || boxTrackingEnabled ? map?.boxes ?? [] : []),
+    [boxTrackingEnabled, editable, map],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    warehouseMapApi
+      .getBoxTracking()
+      .then((preference) => {
+        if (!cancelled) setBoxTrackingEnabled(preference.enabled);
+      })
+      .catch(() => {
+        // 하위 호환 설정을 읽지 못하면 기존처럼 박스를 표시한다.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const nextMap = mapQuery.data;
@@ -206,7 +227,13 @@ export function DesktopWarehouseMapView({
     const selectedItemId = selectedItemRef.current?.item_id;
     if (!selectedItemId) return;
 
-    const nextSelectedItem = findItemMatch(nextMap, selectedItemId);
+    const nextSelectedItem = findItemMatch(
+      {
+        ...nextMap,
+        boxes: editable || boxTrackingEnabled ? nextMap.boxes : [],
+      },
+      selectedItemId,
+    );
     setSelectedItem(nextSelectedItem);
     if (!nextSelectedItem) {
       setLocGuide(null);
@@ -217,13 +244,13 @@ export function DesktopWarehouseMapView({
     setMatchQuery(nextSelectedItem.mes_code ?? nextSelectedItem.item_name);
     setLocGuide(buildLocGuide(nextSelectedItem, nextMap.angles));
     setHitAngles(buildHitAngles(nextSelectedItem.hits));
-  }, [mapQuery.data]);
+  }, [boxTrackingEnabled, editable, mapQuery.data]);
 
   useEffect(() => {
     if (error) onStatusChange?.(error);
   }, [error, onStatusChange]);
 
-  const cellIndex = useMemo(() => buildCellIndex(map?.boxes ?? []), [map]);
+  const cellIndex = useMemo(() => buildCellIndex(visibleBoxes), [visibleBoxes]);
   const angles = map?.angles ?? [];
 
   function setAnimatedStage(next: Stage) {
@@ -573,7 +600,7 @@ export function DesktopWarehouseMapView({
     }
     // item_id 로 1차 그룹핑(품목 단위), 그 안에서 칸(cellKey)으로 2차 그룹핑.
     const byItem = new Map<string, { name: string; code: string | null; cells: Map<string, SearchHit> }>();
-    for (const b of map.boxes) {
+    for (const b of visibleBoxes) {
       for (const it of b.items) {
         if (
           matchesSearchText(it.item_name, q) ||

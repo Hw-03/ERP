@@ -14,6 +14,7 @@ transaction_logs.shipping_request_id 만 NULL 처리한다.
 """
 import sqlite3
 import sys
+import uuid
 from pathlib import Path
 
 
@@ -79,6 +80,66 @@ def sync_inventory_quantities(dev, emp) -> int:
     return updated
 
 
+def sync_warehouse_unplaced(dev) -> int:
+    """Reconcile target items to U=W-B-Z after imported W changes."""
+    rows = dev.execute(
+        """
+        SELECT
+            inventory.item_id,
+            inventory.warehouse_qty,
+            COALESCE((
+                SELECT SUM(box_item.quantity)
+                FROM warehouse_box_items AS box_item
+                WHERE box_item.item_id = inventory.item_id
+            ), 0) AS box_total,
+            COALESCE((
+                SELECT SUM(zone_item.quantity)
+                FROM warehouse_special_zone_items AS zone_item
+                JOIN warehouse_special_zones AS zone
+                  ON zone.id = zone_item.zone_id
+                WHERE zone_item.item_id = inventory.item_id
+                  AND zone.is_active = 1
+            ), 0) AS zone_total,
+            COALESCE((
+                SELECT SUM(zone_item.quantity)
+                FROM warehouse_special_zone_items AS zone_item
+                JOIN warehouse_special_zones AS zone
+                  ON zone.id = zone_item.zone_id
+                WHERE zone_item.item_id = inventory.item_id
+                  AND zone.is_active = 0
+            ), 0) AS inactive_zone_total
+        FROM inventory
+        JOIN items ON items.item_id = inventory.item_id
+        ORDER BY inventory.item_id
+        """
+    ).fetchall()
+    reconciled: list[tuple[str, str, int]] = []
+    for item_id, warehouse_qty, box_total, zone_total, inactive_zone_total in rows:
+        if int(inactive_zone_total):
+            raise RuntimeError(
+                "창고 위치 원장 불일치(비활성 특수구역 잔량): "
+                f"item_id={item_id}, inactive_Z={inactive_zone_total}"
+            )
+        residual = int(warehouse_qty) - int(box_total) - int(zone_total)
+        if residual < 0:
+            raise RuntimeError(
+                f"창고 위치 원장 불일치(B+Z>W): item_id={item_id}, "
+                f"W={warehouse_qty}, B={box_total}, Z={zone_total}"
+            )
+        reconciled.append((uuid.uuid4().hex, item_id, residual))
+
+    dev.executemany(
+        """
+        INSERT INTO warehouse_unplaced_items (id, item_id, quantity)
+        VALUES (?, ?, ?)
+        ON CONFLICT(item_id) DO UPDATE SET quantity = excluded.quantity
+        """,
+        reconciled,
+    )
+    print(f"[warehouse_unplaced_items] 원장 대조 {len(reconciled)}건")
+    return len(reconciled)
+
+
 def copy_transaction_logs(dev, emp) -> int:
     cols = [r[1] for r in dev.execute("PRAGMA table_info(transaction_logs)").fetchall()]
     pk_idx = cols.index("log_id")
@@ -124,6 +185,7 @@ def main():
         copy_missing_rows(dev, emp, "items", "item_id", EXCLUDED_TEST_ITEM_IDS)
         copy_missing_rows(dev, emp, "inventory", "item_id", EXCLUDED_TEST_ITEM_IDS)
         sync_inventory_quantities(dev, emp)
+        sync_warehouse_unplaced(dev)
         copy_missing_rows(dev, emp, "io_batches", "batch_id")
         copy_missing_rows(dev, emp, "io_bundles", "bundle_id")
         copy_missing_rows(dev, emp, "io_lines", "line_id")

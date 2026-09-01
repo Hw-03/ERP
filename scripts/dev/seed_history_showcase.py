@@ -530,10 +530,20 @@ def _combined_effects(logs: list[TransactionLog]) -> tuple[dict[uuid.UUID, list[
                 status = str(effect["status"])
                 location_cells.add((log.item_id, value, status))
             elif scope == "warehouse_box":
-                value = str(effect["box_id"])
+                value = str(effect.get("row_id") or "")
+                status = str(effect["box_id"])
+            elif scope == "warehouse_zone":
+                value = str(effect.get("row_id") or "")
+                status = str(effect["zone_id"])
+            elif scope in {"warehouse", "warehouse_unplaced"}:
+                value = str(effect.get("row_id") or "")
                 status = ""
             else:
-                scope, value, status = "warehouse", "", ""
+                raise ValueError(f"Unsupported showcase inventory effect scope: {scope}")
+            if scope != "location" and not value:
+                raise ValueError(
+                    "Showcase cleanup requires v2 inventory effects with stable row IDs."
+                )
             key = (scope, value, status)
             cells[key] = cells.get(key, 0) + int(effect["delta"])
 
@@ -547,7 +557,11 @@ def _combined_effects(logs: list[TransactionLog]) -> tuple[dict[uuid.UUID, list[
             if scope == "location":
                 entry.update(department=value, status=status)
             elif scope == "warehouse_box":
-                entry["box_id"] = value
+                entry.update(row_id=value, box_id=status)
+            elif scope == "warehouse_zone":
+                entry.update(row_id=value, zone_id=int(status))
+            elif scope in {"warehouse", "warehouse_unplaced"}:
+                entry["row_id"] = value
             entries.append(entry)
         combined[item_id] = entries
     return combined, location_cells

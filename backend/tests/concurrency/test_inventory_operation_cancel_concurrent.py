@@ -19,6 +19,7 @@ from app.models import (
     SystemSetting,
     TransactionLog,
     TransactionTypeEnum,
+    WarehouseUnplacedItem,
 )
 from app.services import inv_effect
 from app.services import inventory as inventory_svc
@@ -60,6 +61,7 @@ def _setup(make_session) -> tuple[object, object]:
             pending_quantity=Decimal("0"),
         )
     )
+    session.add(WarehouseUnplacedItem(item_id=item.item_id, quantity=0))
     session.add(
         SystemSetting(
             setting_key=operation_svc.CUTOVER_SETTING_KEY,
@@ -159,6 +161,7 @@ def test_same_operation_concurrent_cancel_has_exactly_one_success(
         assert cancellation_count == 1
         assert verify.query(TransactionLog).count() == 2
         assert inventory.warehouse_qty == Decimal("0")
+        assert verify.query(WarehouseUnplacedItem).one().quantity == 0
     finally:
         verify.close()
 
@@ -194,6 +197,7 @@ def _setup_legacy(make_session) -> tuple[object, object]:
             pending_quantity=Decimal("0"),
         )
     )
+    session.add(WarehouseUnplacedItem(item_id=item.item_id, quantity=7))
     session.add(
         SystemSetting(
             setting_key=operation_svc.CUTOVER_SETTING_KEY,
@@ -220,7 +224,7 @@ def _setup_legacy(make_session) -> tuple[object, object]:
 
 
 @pytest.mark.usefixtures("concurrent_engine")
-def test_same_legacy_log_concurrent_cancel_has_exactly_one_adoption(
+def test_same_legacy_log_concurrent_cancel_remains_quarantined(
     concurrent_engine, make_session
 ) -> None:
     log_id, actor_id = _setup_legacy(make_session)
@@ -261,12 +265,13 @@ def test_same_legacy_log_concurrent_cancel_has_exactly_one_adoption(
             .filter(InventoryOperation.kind == InventoryOperationKindEnum.CANCELLATION)
             .count()
         )
-        assert sorted(outcomes) == ["conflict", "success"]
-        assert verify.query(InventoryOperation).count() == 2
-        assert cancellation_count == 1
-        assert verify.query(TransactionLog).count() == 2
+        assert outcomes == ["conflict", "conflict"]
+        assert verify.query(InventoryOperation).count() == 0
+        assert cancellation_count == 0
+        assert verify.query(TransactionLog).count() == 1
         assert source.cancelled is False
-        assert source.operation_id is not None
-        assert verify.query(Inventory).one().warehouse_qty == Decimal("0")
+        assert source.operation_id is None
+        assert verify.query(Inventory).one().warehouse_qty == Decimal("7")
+        assert verify.query(WarehouseUnplacedItem).one().quantity == 7
     finally:
         verify.close()

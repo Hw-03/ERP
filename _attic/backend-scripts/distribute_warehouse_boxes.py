@@ -1,123 +1,260 @@
-"""대표 품목을 '같은 앵글의 한 셀'에 여러 박스로 바짝 붙여 분산 — R1 차감 시연용.
+"""대표 품목의 기존 B 합계를 같은 앵글의 한 셀에 여러 박스로 재배치한다.
 
-설계 가정 R8: 한 품목은 한 앵글 안에만 둔다. 현장에서도 같은 부품이 여러 박스면
-서로 붙어(같은 줄.층의 자리/스택) 있다. 이 스크립트는 대표 품목을 그 품목이 가장
-많이 있던 앵글에서 '빈 공간이 가장 많은 셀' 하나에 자리/스택으로 모아 분산한다.
-이전에 여러 앵글로 흩어진 배치가 있으면 먼저 거둬들이고(idempotent) 다시 깐다.
-박스 수량 합은 보존하므로 정합성(placed_total == warehouse_qty)은 유지된다.
+기존 박스 수량 합을 보존하고 원장 서비스를 통해 이동하므로 W=B+Z+U를 유지한다.
 
 실행:
   cd backend
   python ../_attic/backend-scripts/distribute_warehouse_boxes.py          # dry-run
   python ../_attic/backend-scripts/distribute_warehouse_boxes.py --apply
 """
+
+from __future__ import annotations
+
+from collections import Counter, defaultdict
 import sys
+from types import SimpleNamespace
+from uuid import uuid4
+
 sys.path.insert(0, ".")
 
-from uuid import uuid4
-from collections import Counter, defaultdict
-from app.database import SessionLocal
-from app.models import (
-    WarehouseBox, WarehouseBoxItem, Item, Inventory, WarehouseAngle, BoxSizeEnum,
+from sqlalchemy.orm import Session  # noqa: E402
+
+from app.database import SessionLocal  # noqa: E402
+from app.models import (  # noqa: E402
+    BoxSizeEnum,
+    Item,
+    WarehouseAngle,
+    WarehouseBox,
+    WarehouseBoxItem,
 )
-from app.services.warehouse_map import SIZE_UNIT, JARI_CAPACITY
+from app.services.warehouse_map import (  # noqa: E402
+    JARI_CAPACITY,
+    SIZE_UNIT,
+    reconcile_inventory,
+    _replace_box_items,
+)
 
-apply_mode = "--apply" in sys.argv
-# distribute 가 이전에 흩어놓은 대표 6품목 — 같은 셀로 재배치 대상
-TARGET_CODES = ["9-HR-0057", "46-AR-0075", "7-AF-0028", "78-PR-0042", "7-AR-0212", "8-AA-0070"]
+
+TARGET_CODES = (
+    "9-HR-0057",
+    "46-AR-0075",
+    "7-AF-0028",
+    "78-PR-0042",
+    "7-AR-0212",
+    "8-AA-0070",
+)
 SPLIT = 4
-print(f"{'[APPLY]' if apply_mode else '[DRY-RUN]'} 대표 품목 같은-앵글 한 셀 분산\n")
-
-db = SessionLocal()
-angles = {a.id: a for a in db.query(WarehouseAngle).all()}
 
 
-def cell_state(angle_id):
-    """(row,layer,jari) -> 점유 유닛 / 스택(박스) 수."""
-    used = defaultdict(int)
-    stack = defaultdict(int)
-    for b in db.query(WarehouseBox).filter(WarehouseBox.angle_id == angle_id).all():
-        k = (b.row_no, b.layer_no, b.jari_index)
-        sz = b.size.value if hasattr(b.size, "value") else b.size
-        used[k] += SIZE_UNIT.get(sz, 1)
-        stack[k] += 1
-    return used, stack
+def _cell_state(
+    db: Session,
+    angle_id: int,
+    *,
+    ignored_box_ids: set[object],
+) -> tuple[dict[tuple[int, int, int], int], dict[tuple[int, int, int], int]]:
+    """Return occupied units and the next safe stack order per position."""
+    used: dict[tuple[int, int, int], int] = defaultdict(int)
+    next_stack: dict[tuple[int, int, int], int] = defaultdict(int)
+    boxes = db.query(WarehouseBox).filter(WarehouseBox.angle_id == angle_id).all()
+    for box in boxes:
+        if box.box_id in ignored_box_ids:
+            continue
+        key = (box.row_no, box.layer_no, box.jari_index)
+        size = box.size.value if hasattr(box.size, "value") else box.size
+        used[key] += SIZE_UNIT.get(size, 1)
+        next_stack[key] = max(next_stack[key], int(box.stack_order) + 1)
+    return used, next_stack
 
 
-for code in TARGET_CODES:
-    item = db.query(Item).filter(Item.mes_code == code).first()
-    if item is None:
-        print(f"  [skip] {code} 없음")
-        continue
-    iid = item.item_id
-    wq = int(db.query(Inventory.warehouse_qty).filter(Inventory.item_id == iid).scalar() or 0)
+def _contents_by_box(
+    db: Session,
+    boxes: list[WarehouseBox],
+) -> dict[object, list[WarehouseBoxItem]]:
+    box_ids = [box.box_id for box in boxes]
+    rows = (
+        db.query(WarehouseBoxItem)
+        .filter(WarehouseBoxItem.box_id.in_(box_ids))
+        .order_by(
+            WarehouseBoxItem.box_id,
+            WarehouseBoxItem.item_id,
+            WarehouseBoxItem.id,
+        )
+        .all()
+    )
+    result: dict[object, list[WarehouseBoxItem]] = defaultdict(list)
+    for row in rows:
+        result[row.box_id].append(row)
+    return result
 
+
+def _distribute_item(
+    db: Session,
+    *,
+    item: Item,
+    angles: dict[int, WarehouseAngle],
+) -> bool:
     boxes = (
         db.query(WarehouseBox)
         .join(WarehouseBoxItem, WarehouseBoxItem.box_id == WarehouseBox.box_id)
-        .filter(WarehouseBoxItem.item_id == iid)
+        .filter(WarehouseBoxItem.item_id == item.item_id)
+        .order_by(WarehouseBox.box_id)
         .all()
     )
     if not boxes:
-        print(f"  [skip] {code} 박스 없음")
-        continue
-    angle_use = Counter(b.angle_id for b in boxes).most_common(1)[0][0]
+        print(f"  [skip] {item.mes_code} 박스 없음")
+        return False
 
-    # 1) 현 배치 거둬들이기 — 이 품목 박스아이템 삭제 + 비게 된 박스 삭제
-    box_ids = [b.box_id for b in boxes]
-    db.query(WarehouseBoxItem).filter(WarehouseBoxItem.item_id == iid).delete(synchronize_session=False)
-    for bid in box_ids:
-        if db.query(WarehouseBoxItem).filter(WarehouseBoxItem.box_id == bid).count() == 0:
-            db.query(WarehouseBox).filter(WarehouseBox.box_id == bid).delete(synchronize_session=False)
-    db.flush()
+    contents_by_box = _contents_by_box(db, boxes)
+    target_rows = [
+        row
+        for rows in contents_by_box.values()
+        for row in rows
+        if row.item_id == item.item_id
+    ]
+    placed_total = sum(int(row.quantity) for row in target_rows)
+    split_count = min(SPLIT, placed_total)
+    if split_count == 0:
+        print(f"  [skip] {item.mes_code} 박스 수량 0")
+        return False
 
-    # 2) angle_use 에서 빈 공간 가장 많은 셀 한 개 선택
-    a = angles[angle_use]
-    used, stack = cell_state(angle_use)
+    angle_id = Counter(box.angle_id for box in boxes).most_common(1)[0][0]
+    angle = angles[angle_id]
+    emptied_box_ids = {
+        box.box_id
+        for box in boxes
+        if all(row.item_id == item.item_id for row in contents_by_box[box.box_id])
+    }
+    used, next_stack = _cell_state(
+        db,
+        angle_id,
+        ignored_box_ids=emptied_box_ids,
+    )
     cells = sorted(
         (
-            (sum(JARI_CAPACITY - used.get((r, l, j), 0) for j in range(a.jaris_per_cell)), r, l)
-            for r in range(1, a.rows + 1)
-            for l in range(1, a.layers + 1)
+            (
+                sum(
+                    JARI_CAPACITY - used.get((row, layer, jari), 0)
+                    for jari in range(angle.jaris_per_cell)
+                ),
+                row,
+                layer,
+            )
+            for row in range(1, angle.rows + 1)
+            for layer in range(1, angle.layers + 1)
         ),
         reverse=True,
     )
-    free_top, row, layer = cells[0]
-    if free_top < SPLIT:
-        print(f"  [skip] 앵글{angle_use} 한 셀 빈 공간 부족(최대 {free_top}<{SPLIT}) — {code}")
-        continue
+    free_units, row_no, layer_no = cells[0]
+    if free_units < split_count:
+        print(
+            f"  [skip] 앵글{angle_id} 한 셀 빈 공간 부족"
+            f"(최대 {free_units}<{split_count}) — {item.mes_code}"
+        )
+        return False
 
-    # 3) 그 셀 안에서 자리별 용량(3유닛) 지키며 SPLIT 배치 — 바짝 붙임
-    base, rem = divmod(wq, SPLIT)
-    parts = [base + (1 if i < rem else 0) for i in range(SPLIT)]
-    placed = []
-    pi = 0
-    # 빈 자리 우선 — 같은 품목 박스가 다른 품목과 자리를 덜 섞이게
-    for j in sorted(range(a.jaris_per_cell), key=lambda j: used.get((row, layer, j), 0)):
-        while used.get((row, layer, j), 0) < JARI_CAPACITY and pi < SPLIT:
-            so = stack.get((row, layer, j), 0)
-            nb = WarehouseBox(
-                box_id=str(uuid4()), angle_id=angle_use, row_no=row, layer_no=layer,
-                jari_index=j, size=BoxSizeEnum.SMALL, stack_order=so,
-            )
-            db.add(nb)
-            db.flush()
-            db.add(WarehouseBoxItem(box_id=nb.box_id, item_id=iid, quantity=parts[pi]))
-            used[(row, layer, j)] = used.get((row, layer, j), 0) + 1
-            stack[(row, layer, j)] = so + 1
-            placed.append((j, so, parts[pi]))
-            pi += 1
-        if pi >= SPLIT:
-            break
+    for box in boxes:
+        remaining = [
+            SimpleNamespace(item_id=row.item_id, quantity=int(row.quantity))
+            for row in contents_by_box[box.box_id]
+            if row.item_id != item.item_id
+        ]
+        _replace_box_items(db, box.box_id, remaining)
+        if not remaining:
+            db.delete(box)
     db.flush()
-    loc = "  ".join(f"자리{j}.스택{s}={q}" for j, s, q in placed)
-    print(f"{code} (총 {wq}) -> 앵글{angle_use}.{row}줄.{layer}층")
-    print(f"    {loc}")
 
-if apply_mode:
-    db.commit()
-    print("\n완료: 같은 앵글 한 셀로 재배치 (합 보존, 정합성 유지)")
-else:
-    db.rollback()
-    print("\n[DRY-RUN] --apply 없이는 변경되지 않습니다.")
-db.close()
+    base, remainder = divmod(placed_total, split_count)
+    parts = [base + (1 if index < remainder else 0) for index in range(split_count)]
+    placed: list[tuple[int, int, int]] = []
+    part_index = 0
+    jari_order = sorted(
+        range(angle.jaris_per_cell),
+        key=lambda jari: used.get((row_no, layer_no, jari), 0),
+    )
+    for jari in jari_order:
+        key = (row_no, layer_no, jari)
+        while used.get(key, 0) < JARI_CAPACITY and part_index < split_count:
+            stack_order = next_stack.get(key, 0)
+            box = WarehouseBox(
+                box_id=str(uuid4()),
+                angle_id=angle_id,
+                row_no=row_no,
+                layer_no=layer_no,
+                jari_index=jari,
+                size=BoxSizeEnum.SMALL,
+                stack_order=stack_order,
+            )
+            db.add(box)
+            db.flush()
+            _replace_box_items(
+                db,
+                box.box_id,
+                [
+                    SimpleNamespace(
+                        item_id=item.item_id,
+                        quantity=parts[part_index],
+                    )
+                ],
+            )
+            used[key] = used.get(key, 0) + 1
+            next_stack[key] = stack_order + 1
+            placed.append((jari, stack_order, parts[part_index]))
+            part_index += 1
+        if part_index >= split_count:
+            break
+
+    location = "  ".join(
+        f"자리{jari}.스택{stack}={quantity}"
+        for jari, stack, quantity in placed
+    )
+    print(
+        f"{item.mes_code} (B 총 {placed_total}) -> "
+        f"앵글{angle_id}.{row_no}줄.{layer_no}층"
+    )
+    print(f"    {location}")
+    return True
+
+
+def main() -> None:
+    apply_mode = "--apply" in sys.argv
+    print(
+        f"{'[APPLY]' if apply_mode else '[DRY-RUN]'} "
+        "대표 품목 같은-앵글 한 셀 분산\n"
+    )
+    db = SessionLocal()
+    try:
+        angles = {angle.id: angle for angle in db.query(WarehouseAngle).all()}
+        changed = 0
+        for code in TARGET_CODES:
+            item = (
+                db.query(Item)
+                .filter(Item.mes_code == code, Item.deleted_at.is_(None))
+                .first()
+            )
+            if item is None:
+                print(f"  [skip] {code} 없음")
+                continue
+            changed += int(_distribute_item(db, item=item, angles=angles))
+
+        report = reconcile_inventory(db)
+        if report["ledger_mismatch_count"]:
+            raise RuntimeError(
+                "W=B+Z+U 원장 대조 실패: "
+                f"{report['ledger_mismatch_count']}개 품목"
+            )
+
+        if apply_mode:
+            db.commit()
+            print(f"\n완료: {changed}개 품목 재배치, W=B+Z+U 대조 통과")
+        else:
+            db.rollback()
+            print(f"\n[DRY-RUN] 예상 재배치: {changed}개 품목")
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+if __name__ == "__main__":
+    main()

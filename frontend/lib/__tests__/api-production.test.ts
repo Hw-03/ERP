@@ -33,6 +33,7 @@ function inventoryOperationWire(overrides: Record<string, unknown> = {}) {
     reversal_operation_id: null,
     can_cancel: true,
     cancel_blockers: [],
+    cancel_warnings: [],
     lines: [],
     matching_lines: [],
     effects: [],
@@ -108,12 +109,15 @@ describe("productionApi", () => {
       plan_hash: "a".repeat(64),
       can_cancel: true,
       blockers: [],
+      warnings: ["레거시 효과 위치는 추정하지 않습니다."],
       cells: [{
         item_id: "item-1",
         scope: "location",
         department: "고압",
         status: "PRODUCTION",
+        row_id: "location-row-1",
         box_id: null,
+        zone_id: null,
         quantity_change: "7",
         current_quantity: "89",
         reserved_quantity: "0",
@@ -133,8 +137,25 @@ describe("productionApi", () => {
       operationId: "operation-1",
       planHash: "a".repeat(64),
       canCancel: true,
+      warnings: ["레거시 효과 위치는 추정하지 않습니다."],
       cells: [{ quantityChange: 7, currentQuantity: 89, quantityAfter: 96 }],
     });
+  });
+
+  it("maps inventory operation cancellation warnings", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({
+      items: [inventoryOperationWire({
+        cancel_warnings: ["레거시 효과 위치는 추정하지 않습니다."],
+      })],
+      next_cursor: null,
+    })));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    const page = await productionApi.getInventoryOperations();
+
+    expect(page.items[0].cancelWarnings).toEqual([
+      "레거시 효과 위치는 추정하지 않습니다.",
+    ]);
   });
 
   it("cancels an inventory operation with the reviewed plan hash", async () => {

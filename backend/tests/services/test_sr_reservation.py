@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from decimal import Decimal
 import inspect
+from types import SimpleNamespace
 from typing import get_type_hints
+import uuid
 
 import pytest
 from sqlalchemy import event
@@ -14,6 +16,7 @@ from app.models import (
     InventoryLocation,
     LocationStatusEnum,
     RequestBucketEnum,
+    WarehouseUnplacedItem,
 )
 from app.services import inventory as inventory_svc
 from app.services.sr_validation import LineInput
@@ -62,6 +65,45 @@ def test_reserve_lines_requires_keyword_only_employee_actor() -> None:
     assert parameter.kind is inspect.Parameter.KEYWORD_ONLY
     assert parameter.default is inspect.Parameter.empty
     assert get_type_hints(sr_reservation.reserve_lines)["employee"] is Employee
+
+
+def test_defect_reservation_locks_item_before_defect_record(
+    db_session,
+    monkeypatch,
+) -> None:
+    """격리 예약도 전역 Item→Inventory→U→record 잠금 순서를 따른다."""
+    from app.services import defect_records as defect_records_svc
+    from app.services import sr_reservation
+
+    employee = _employee(db_session, code="RESERVE-DEFECT-LOCK")
+    item_id = uuid.uuid4()
+    record_id = uuid.uuid4()
+    events: list[str] = []
+    line = SimpleNamespace(
+        item_id=item_id,
+        quantity=D("1"),
+        from_bucket=RequestBucketEnum.DEFECTIVE,
+        from_department=ASSEMBLY.value,
+        defect_quarantine_record_id=record_id,
+    )
+
+    monkeypatch.setattr(
+        sr_reservation,
+        "_prelock_inventories",
+        lambda _db, _groups: events.append("item"),
+    )
+    monkeypatch.setattr(
+        defect_records_svc,
+        "_get_record_for_action",
+        lambda *_args, **_kwargs: events.append("record")
+        or SimpleNamespace(record_id=record_id, remaining_quantity=D("1")),
+    )
+    monkeypatch.setattr(defect_records_svc, "_ensure_available", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(inventory_svc, "_reserve_location", lambda *_args, **_kwargs: None)
+
+    sr_reservation.reserve_lines(db_session, [line], employee=employee)
+
+    assert events == ["item", "record"]
 
 
 def test_reserve_lines_rejects_non_employee_before_location_mutation(
@@ -260,6 +302,31 @@ def test_ensure_and_lock_inventories_tolerates_concurrent_insert_winner(
     assert db_session.query(Inventory).filter(
         Inventory.item_id == item.item_id
     ).count() == 1
+
+
+def test_ensure_and_lock_inventories_creates_zero_unplaced_with_missing_inventory(
+    make_item,
+    db_session,
+):
+    item = make_item(name="missing-inventory-and-unplaced")
+    inventory = db_session.query(Inventory).filter_by(item_id=item.item_id).one()
+    unplaced = db_session.query(WarehouseUnplacedItem).filter_by(
+        item_id=item.item_id
+    ).one()
+    db_session.delete(unplaced)
+    db_session.delete(inventory)
+    db_session.flush()
+
+    locked = inventory_svc._ensure_and_lock_inventories(
+        db_session,
+        [item.item_id],
+    )
+
+    assert int(locked[item.item_id].warehouse_qty) == 0
+    recreated = db_session.query(WarehouseUnplacedItem).filter_by(
+        item_id=item.item_id
+    ).one()
+    assert int(recreated.quantity) == 0
 
 
 @pytest.mark.parametrize("operation", ["_reserve_location", "_release_location"])
