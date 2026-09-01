@@ -18,7 +18,7 @@ export type UseAdminMasterItemsArgs = {
   globalSearch: string;
   onStatusChange: (msg: string) => void;
   onError: (msg: string) => void;
-  /** 짧은 토스트(상단 우측 비공식 메시지) — DesktopAdminView 의 showSave 와 호환 */
+  /** 짧은 상태 대상 알림 — DesktopAdminView 의 showSave 와 호환 */
   onShowSave?: (msg: string) => void;
   adminPin: string;
   productModels: ProductModel[];

@@ -9,11 +9,11 @@ import { useAdminBootstrap } from "./_admin_hooks/useAdminBootstrap";
 import { useAdminSettings } from "./_admin_hooks/useAdminSettings";
 import { useAdminViewState, type AdminSection } from "./_admin_hooks/useAdminViewState";
 import { useConfirmNavigation } from "@/lib/ui/dirty-guard";
-import { Toast, type ToastState } from "@/lib/ui/Toast";
+import { StatusTargetNotice, useStatusTargetNotice } from "./common/StatusTargetNotice";
 
 /**
  * 섹션 헤더와 KPI는 각 섹션이 직접 그린다 (AdminPageHeader / AdminKpiBar 사용).
- * 본 파일은 PIN gate, 상단 섹션 탐색, 작업 영역 wrapper, 토스트 영역만 담당.
+ * 본 파일은 PIN gate, 상단 섹션 탐색, 작업 영역 wrapper, 상태 대상 알림 영역만 담당.
  */
 export function DesktopAdminView({
   globalSearch,
@@ -35,7 +35,11 @@ export function DesktopAdminView({
   } = useAdminViewState("models");
 
   const [message, setMessage] = useState("");
-  const [toast, setToast] = useState<ToastState | null>(null);
+  const {
+    notice: feedbackNotice,
+    showNotice: showFeedbackNotice,
+    dismissNotice: dismissFeedbackNotice,
+  } = useStatusTargetNotice();
   const confirmAdminNavigation = useConfirmNavigation();
 
   useEffect(() => {
@@ -77,13 +81,13 @@ export function DesktopAdminView({
     onError: setMessage,
   });
 
-  // message / saveMessage → toast 동기화. inline 박스 제거하고 우상단 토스트로 통일.
+  // message / saveMessage → 공통 상태 대상 알림으로 동기화.
   useEffect(() => {
-    if (message) setToast({ message, type: "error" });
-  }, [message]);
+    if (message) showFeedbackNotice(message, "error");
+  }, [message, showFeedbackNotice]);
   useEffect(() => {
-    if (saveMessage) setToast({ message: saveMessage, type: "success" });
-  }, [saveMessage]);
+    if (saveMessage) showFeedbackNotice(saveMessage, "success");
+  }, [saveMessage, showFeedbackNotice]);
 
   if (!unlocked) {
     return (
@@ -135,7 +139,13 @@ export function DesktopAdminView({
         </section>
       </div>
 
-      <Toast toast={toast} onClose={() => setToast(null)} />
+      {feedbackNotice && (
+        <StatusTargetNotice
+          key={feedbackNotice.id}
+          notice={feedbackNotice}
+          onArrive={dismissFeedbackNotice}
+        />
+      )}
     </div>
   );
 }

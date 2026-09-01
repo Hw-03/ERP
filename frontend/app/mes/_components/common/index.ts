@@ -6,5 +6,10 @@ export { StatusPill, type StatusPillTone, inferToneFromStatus } from "./StatusPi
 export { FilterChip } from "./FilterChip";
 export { SlidePanel } from "./SlidePanel";
 export { KpiCard } from "./KpiCard";
-export { StatusTargetNotice, type StatusTargetNotice as StatusTargetNoticeState } from "./StatusTargetNotice";
+export {
+  StatusTargetNotice,
+  useStatusTargetNotice,
+  type StatusTargetNotice as StatusTargetNoticeState,
+  type StatusTargetNoticeTone,
+} from "./StatusTargetNotice";
 export { QuantityInput, type QuantityInputProps } from "./QuantityInput";

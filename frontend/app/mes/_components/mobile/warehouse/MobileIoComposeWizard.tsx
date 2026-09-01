@@ -24,7 +24,7 @@ import { IoTargetPicker } from "../../_warehouse_v2/IoTargetPicker";
 import { IoBundleCart } from "../../_warehouse_v2/IoBundleCart";
 import { IoConfirmStep } from "../../_warehouse_v2/IoConfirmStep";
 import { IoSubmitModals, type IoSubmitResultState } from "../../_warehouse_v2/IoSubmitModals";
-import { Toast, type ToastState } from "@/lib/ui/Toast";
+import { StatusTargetNotice, useStatusTargetNotice } from "../../common/StatusTargetNotice";
 import {
   IO_WORK_TYPES,
   approvalKind,
@@ -125,7 +125,11 @@ export function MobileIoComposeWizard({
   );
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<IoSubmitResultState | null>(null);
-  const [toast, setToast] = useState<ToastState | null>(null);
+  const {
+    notice: feedbackNotice,
+    showNotice: showFeedbackNotice,
+    dismissNotice: dismissFeedbackNotice,
+  } = useStatusTargetNotice();
   const [bomParents, setBomParents] = useState<Set<string>>(() => new Set());
   const state = useIoWorkState(defaultWorkType, operator?.department, getAvailable);
   const [
@@ -260,7 +264,7 @@ export function MobileIoComposeWizard({
         await saveCurrentDraft();
       } catch (err) {
         const message = err instanceof Error ? err.message : "저장 중 오류가 발생했습니다.";
-        setToast({ message, type: "error" });
+        showFeedbackNotice(message, "error");
         throw err;
       }
     };
@@ -461,10 +465,10 @@ export function MobileIoComposeWizard({
     try {
       const batchId = await saveCurrentDraft();
       if (!batchId) return;
-      setToast({ message: "저장되었습니다. 나중에 이어서 진행할 수 있습니다.", type: "success" });
+      showFeedbackNotice("저장되었습니다. 나중에 이어서 진행할 수 있습니다.", "success");
     } catch (err) {
       const message = err instanceof Error ? err.message : "저장 중 오류가 발생했습니다.";
-      setToast({ message, type: "error" });
+      showFeedbackNotice(message, "error");
     }
   }
 
@@ -829,7 +833,7 @@ export function MobileIoComposeWizard({
             saving={drafting}
             approvalKind={approvalKind(state.subType, state.bundles, state.fromDepartment)}
             onNotesChange={state.setNotes}
-            onValidationError={(message) => setToast({ message, type: "error" })}
+            onValidationError={(message) => showFeedbackNotice(message, "error")}
             onSubmit={handleSubmit}
             onSaveDraft={handleSaveDraft}
           />
@@ -856,7 +860,13 @@ export function MobileIoComposeWizard({
       )}
 
       <IoSubmitModals result={result} onClose={() => setResult(null)} />
-      <Toast toast={toast} onClose={() => setToast(null)} />
+      {feedbackNotice && (
+        <StatusTargetNotice
+          key={feedbackNotice.id}
+          notice={feedbackNotice}
+          onArrive={dismissFeedbackNotice}
+        />
+      )}
 
       {scanOpen && (
         <BarcodeScannerModal

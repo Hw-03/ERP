@@ -121,7 +121,8 @@
 
 ### 데스크탑↔모바일 공유
 
-- `lib/ui/` — 데스크탑·모바일 공용 (예: `BottomSheet`·`ConfirmModal`·`Toast`·`TruncatedText`·`Tooltip`·`Button`·`ImageLightbox`·`dirty-guard`). 현재 목록은 [lib/ui/ 폴더](frontend/lib/ui/) 기준
+- `lib/ui/` — 데스크탑·모바일 공용 (예: `BottomSheet`·`ConfirmModal`·`TruncatedText`·`Tooltip`·`Button`·`ImageLightbox`·`dirty-guard`). 현재 목록은 [lib/ui/ 폴더](frontend/lib/ui/) 기준
+- 짧은 성공·오류·정보 알림은 공용 `common/StatusTargetNotice`를 사용
 - 모바일 primitives 는 대부분 데스크탑에서 직접 호출되지 않음 (모바일 전용)
 - 예외: `IconButton sm` 이 데스크탑 [DesktopRightPanel](frontend/app/legacy/_components/DesktopRightPanel.tsx) 등에서 호출될 수 있음 — 변경 시 데스크탑 시각 영향 확인 필수
 

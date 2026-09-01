@@ -163,7 +163,7 @@ beforeEach(() => {
 });
 
 describe("IoComposeView navigation chrome", () => {
-  it("최종 확인의 메모 검증 오류를 기존 desktop toast로 표시한다", async () => {
+  it("최종 확인의 메모 검증 오류를 상태 대상 알림으로 표시한다", async () => {
     render(
       <IoComposeView
         globalSearch=""
@@ -189,7 +189,9 @@ describe("IoComposeView navigation chrome", () => {
 
     fireEvent.click(await screen.findByTestId("confirm-memo-error"));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
+    const notice = await screen.findByRole("alert");
+    expect(notice).toHaveClass("status-target-notice");
+    expect(notice).toHaveTextContent(
       "메모가 없어 부서 결재 요청을 진행할 수 없습니다.",
     );
   });

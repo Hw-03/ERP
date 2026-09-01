@@ -7,32 +7,23 @@
   to   { opacity: 1;   transform: translateY(0);    }
 }
 
-@keyframes statusTargetNoticeCollect {
-  0% {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.94);
-  }
-  12%, 66% {
+@keyframes statusTargetNoticeFade {
+  0%, 70% {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
   }
   100% {
     opacity: 0;
-    transform: translate(
-      calc(-50% + var(--status-target-notice-x)),
-      calc(-50% + var(--status-target-notice-y))
-    ) scale(0.18);
   }
 }
 
 .status-target-notice {
-  animation: statusTargetNoticeCollect 1.2s cubic-bezier(0.4, 0, 0.2, 1) both;
-  transform-origin: center;
+  animation: statusTargetNoticeFade 1.2s cubic-bezier(0.4, 0, 0.2, 1) both;
+  transform: translate(-50%, -50%);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .status-target-notice {
-    animation: statusFlash 0.35s ease-out both;
+    animation: statusTargetNoticeFade 0.35s ease-out both;
   }
 }
 

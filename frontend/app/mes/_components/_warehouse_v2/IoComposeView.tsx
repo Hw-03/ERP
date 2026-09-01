@@ -5,7 +5,6 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { Button } from "@/lib/ui/Button";
-import { Toast, type ToastState } from "@/lib/ui/Toast";
 import { tint } from "@/lib/mes/colorUtils";
 import { api, type BOMDetailEntry, type IoBundle, type IoInternalUseBomMode, type IoLine, type IoSourceKind, type IoSourceLocation, type IoSubType, type IoWorkType, type Item } from "@/lib/api";
 import { WizardStepCard } from "./_atoms";
@@ -33,7 +32,11 @@ import {
   type IoTargetPickerFilters,
 } from "./types";
 import { ItemConversionWorkView } from "./ItemConversionView";
-import { StatusTargetNotice, type StatusTargetNotice as StatusTargetNoticeState } from "../common/StatusTargetNotice";
+import {
+  StatusTargetNotice,
+  useStatusTargetNotice,
+  type StatusTargetNotice as StatusTargetNoticeState,
+} from "../common/StatusTargetNotice";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import {
   runWarehousePull,
@@ -144,7 +147,11 @@ export function IoComposeView({
   );
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<IoSubmitResultState | null>(null);
-  const [toast, setToast] = useState<ToastState | null>(null);
+  const {
+    notice: feedbackNotice,
+    showNotice: showFeedbackNotice,
+    dismissNotice: dismissFeedbackNotice,
+  } = useStatusTargetNotice();
   const [draftSaveNotice, setDraftSaveNotice] = useState<DraftSaveNotice | null>(null);
   const draftSaveNoticeIdRef = useRef(0);
   // BOM 부모 item_id 집합 — process workType에서 "BOM 적용" 버튼 활성 판단용. 마운트 시 1회 fetch.
@@ -637,13 +644,14 @@ export function IoComposeView({
         setDraftSaveNotice({
           id: draftSaveNoticeIdRef.current,
           message: "저장되었습니다. 나중에 이어서 진행할 수 있습니다.",
+          tone: "success",
           status: `저장됨 · ${hh}:${mm}`,
         });
       }
       return batchId;
     } catch (err) {
       const message = err instanceof Error ? err.message : "저장 중 오류가 발생했습니다.";
-      setToast({ message, type: "error" });
+      showFeedbackNotice(message, "error");
       return null;
     }
   }
@@ -1323,7 +1331,7 @@ export function IoComposeView({
               saving={drafting}
               approvalKind={approvalKind(state.subType, state.bundles, state.fromDepartment)}
               onNotesChange={state.setNotes}
-              onValidationError={(message) => setToast({ message, type: "error" })}
+              onValidationError={(message) => showFeedbackNotice(message, "error")}
               onSubmit={handleSubmit}
               onSaveDraft={handleSaveDraft}
             />
@@ -1349,7 +1357,13 @@ export function IoComposeView({
           }}
         />
       )}
-      <Toast toast={toast} onClose={() => setToast(null)} />
+      {feedbackNotice && (
+        <StatusTargetNotice
+          key={feedbackNotice.id}
+          notice={feedbackNotice}
+          onArrive={dismissFeedbackNotice}
+        />
+      )}
     </div>
   );
 }

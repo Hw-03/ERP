@@ -190,7 +190,7 @@ export function MobileWarehouseMapScreen({
   return (
     // 강제 가로 전체 오버레이. top:0/left:0 + transform-origin top-left + rotate(90deg) translateY(-100%)
     // 로 (100vh×100vw) 박스를 뷰포트에 꽉 채운다. position:fixed 라 MobileShell 의 overflow-hidden·헤더·
-    // 네비를 덮는다. z-index 250 = 토스트(300) 아래 · 네비 위.
+    // 네비를 덮는다. z-index 250 = 상태 대상 알림(80)과 네비 위.
     <div
       style={{
         position: "fixed",
