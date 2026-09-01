@@ -6,7 +6,7 @@
 - 시작 HEAD: `f49a0b2bf837704f81ef98fe2e7ecf3be4305786`
 - W1 구현 commit: `1c7bb1538ca18c88d3dbdeb8d1621eb72b396051`
 - 기준 main: `78e8023f41ef59528d9d8c07498e7653f9bee247` (S0에서 통합 완료)
-- 상태: **W1 APPROVAL-READY / Gate A 사용자 승인 대기**
+- 상태: **W1 COMPLETE / Gate A 승인 및 W2 `IC-06` runtime 완료**
 
 ## 1. 구현 범위
 
@@ -64,4 +64,4 @@ API·model·migration·제품 runtime·frontend 변경은 없다.
 5. 기존 B/Z UUID 보존, contract v2는 실제 row ID effect 필수
 6. legacy effect 위치 추정 backfill 금지
 
-Gate A 승인 전 W2 migration/runtime과 W3 `IC-07+IC-08`은 시작하지 않는다.
+Gate A는 승인됐고 W2 구현 commit `e1a55b835137aa0092c41c1340263e77b0829a3c` 및 GitHub CI run `33478159021` 6/6 success로 `IC-06` runtime을 완료했다. 현재 정본 인계는 `2026-09-01-cp5-w2-ic06-runtime-to-w3.md`다.
