@@ -9,13 +9,13 @@
 - 두 번째 개선 체크포인트 기준 SHA: `90ce42d9fef0505ccbd7f5b7ea86b60760cb09dd`
 - 최신 `main` 동기화 대상 SHA: `78e8023f41ef59528d9d8c07498e7653f9bee247`
 - 현재 실행 위치: `C:\ERP\.worktrees\full-code-quality-checkpoint-2`
-- Git 상태: 장기 품질 브랜치 `codex/full-code-quality-improvement`. CP4 완료 HEAD `e64a9a12da16f8502ab1a1e82dbed2b1d2648a01`에서 고정 `main` `78e8023f41ef59528d9d8c07498e7653f9bee247`을 품질 worktree 방향에만 통합했고, merge commit `deafc335502b46f9ed068bbb11175361826615ea`를 기존 품질 브랜치에 push했다. `main` 역병합·push·PR·force-push는 없음
-- 실행 진척: 체크포인트 1·3·4 완료. 체크포인트 2의 `IC-04`·`IC-20`은 저장소 구현·로컬 PostgreSQL 실증과 품질 브랜치 CI 실행까지 통과했지만 required-check 설정 증거는 별도 외부 경계로 남긴다. CP4는 workflow 거래 보정 차단, semantic idempotency, handover/correction/cancel 경합, 삭제 품목 참조 보호를 세 hard stop으로 완료했다. CP5는 S0 최신 main 통합, W1 read-only preflight, Gate A 승인, W2 `IC-06` 물리 위치 원장까지 완료했으며 다음 순서는 W3 `IC-07+IC-08`이다.
-- 잔여 작업: 엄격한 완료 판정상 `IC` 19개가 남는다. `IC-06`, `IC-09`, `IC-10`, `IC-11`은 완료했고 `IC-03`은 correction 안전막이 완료된 `PARTIAL`로서 `IC-03-B` 전용 workflow cancel만 남는다. `IC-04`·`IC-20`의 required-check 외부 증거와 최종 closeout `DOC-01`, `AT-01`, `AT-02`도 남아 있다.
-- 최종 판정: **CP5 W2 COMPLETE — W3 `IC-07+IC-08` 진입 가능**
+- Git 상태: 장기 품질 브랜치 `codex/full-code-quality-improvement`. CP4 완료 HEAD `e64a9a12da16f8502ab1a1e82dbed2b1d2648a01`에서 고정 `main` `78e8023f41ef59528d9d8c07498e7653f9bee247`을 품질 worktree 방향에만 통합했고, merge commit `deafc335502b46f9ed068bbb11175361826615ea` 뒤 CP5 W3 제품 commit `530a29ec3a8c315b07004e69b7ab1d6dc17ed4a3`까지 기존 품질 브랜치에 push했다. `main` 역병합·push·PR·force-push는 없음
+- 실행 진척: 체크포인트 1·3·4 완료. 체크포인트 2의 `IC-04`·`IC-20`은 저장소 구현·로컬 PostgreSQL 실증과 품질 브랜치 CI 실행까지 통과했지만 required-check 설정 증거는 별도 외부 경계로 남긴다. CP4는 workflow 거래 보정 차단, semantic idempotency, handover/correction/cancel 경합, 삭제 품목 참조 보호를 세 hard stop으로 완료했다. CP5는 S0 최신 main 통합, W1 read-only preflight, Gate A 승인, W2 `IC-06` 물리 위치 원장, W3 `IC-07+IC-08` 공통 예약·출하 상태기계와 Gate B까지 완료했으며 다음 순서는 W4 `IC-03-B`다.
+- 잔여 작업: 엄격한 완료 판정상 `IC` 17개가 남는다. `IC-06`, `IC-07`, `IC-08`, `IC-09`, `IC-10`, `IC-11`은 완료했고 `IC-03`은 correction 안전막이 완료된 `PARTIAL`로서 `IC-03-B` 전용 workflow cancel만 남는다. `IC-04`·`IC-20`의 required-check 외부 증거가 확보되면 15개로 줄며, 최종 closeout `DOC-01`, `AT-01`, `AT-02`도 남아 있다.
+- 최종 판정: **CP5 GATE B COMPLETE — W4 `IC-03-B` 진입 가능**
 - 문서 성격: 현행 코드의 감사 결과이자 후속 구현 순서의 단일 정본
 
-> **증거 시점 안내:** 2~7절의 코드 줄번호와 실패 서술은 2026-08-13 원 감사 snapshot을 보존한다. 이후 `main`이 바꾼 계약과 충돌하는 문장은 `[STALE]` 역사 증거이며, 현재 판정·구현 경계는 8.9.5절과 12.18절이 우선한다.
+> **증거 시점 안내:** 2~7절의 코드 줄번호와 실패 서술은 2026-08-13 원 감사 snapshot을 보존한다. 이후 `main`이 바꾼 계약과 충돌하는 문장은 `[STALE]` 역사 증거이며, 현재 판정·구현 경계는 8.9.6절과 12.21절이 우선한다.
 
 ---
 
@@ -619,7 +619,7 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 | `QP-003` 운영 DB·dialect 정합 | **부분 해결** | production mode SQLite guard와 SQLite WAL lock이 있고 `IC-27`로 startup check의 DB identity 분리는 해소됐다. 체크포인트 2 로컬 커밋에 Alembic-head PostgreSQL 2-connection 공통 runner와 필수 CI job을 추가했고, 폐기 가능한 로컬 PostgreSQL 16에서 clean migration과 4개 잠금 행을 실제 실행했다. GitHub 필수 job과 후속 업무별 경합은 남는다. | `IC-08`, `IC-18`; `IC-20` GitHub 증거 대기, `IC-27` 완료 |
 | `QP-004` 승인 정책 단일 진실 | **부분 해결** | 입출고 subtype 상수와 drift test는 생겼지만 role/self/admin/list/count/button 판정은 같은 policy를 쓰지 않는다. `approval_rules.py:1-29`, `sr_execution.py:453-483` | `IC-24`; IO defect 표시/실행은 별도 `RV-007` 결정 |
 | `QP-005` 불량 idempotency·actor | **해결** | 기존 same-key/different-payload semantic matcher·중복 race 보호에 더해, 불량 격리·해제·재작업이 세션 `Employee` actor만 서비스와 원장에 전달하고 위조 요청은 delta 0으로 거부한다. | `IC-01` 완료 |
-| `QP-006` 출하 원자 상태 전이 | **미해결** | action transaction은 생겼지만 request/allocation 상태 직렬화, command receipt, 공통 예약은 없다. | `IC-07`, `IC-08` |
+| `QP-006` 출하 원자 상태 전이 | **해결** | CP5 W3에서 request/allocation·재고 위치를 결정적 순서로 잠그고, 공통 availability와 shipping command receipt·expected status/version·동일 결과 replay를 한 transaction에 연결했다. 준비·픽업·각 취소와 예약-vs-타 업무 PostgreSQL 경합은 winner 1·loser mutation 0으로 증명했다. | `IC-07`, `IC-08` 완료 |
 | `QP-007` 거래 정정·취소 수명주기 | **부분 해결** | main operation 원장·원자 취소·레거시 증거 편입에 더해 CP4가 workflow-linked·wrong-bucket correction을 차단하고 correction/handover/cancel PostgreSQL 경합을 1승자화했다. 남은 범위는 각 업무의 effects·allocation/pending·상태·event를 함께 되돌리는 `IC-03-B` 전용 workflow cancel이다. | `IC-03` PARTIAL, `IC-10` 완료 |
 | `QP-008` integrity repair 단일 commit | **해결** | `IC-05`에서 service 내부 commit을 제거하고 router가 repair→audit flush→한 commit을 소유한다. audit summary는 `report.repaired`를 사용하며 audit/flush/commit 실패가 재고·audit를 함께 rollback함을 독립 SQL로 증명했다. | `IC-05` 완료 |
 | `QP-009` soft-deleted 품목 계약 | **해결** | repository의 active/deleted-inclusive 조회를 분리하고 command·preview는 active만 사용한다. soft-delete는 item 선잠금 뒤 활성 IO·StockRequest·ShippingRequest·양방향 BOM 참조를 `ITEM_IN_USE`로 거부하며 history/audit/restore는 삭제 품목을 보존한다. | `IC-11` 완료 |
@@ -762,6 +762,7 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 
 #### `IC-07` 출하 예약을 모든 소비 경로가 존중하는 공통 availability
 
+- **체크포인트 상태:** `완료`. CP5 W3 commit `530a29ec3a8c315b07004e69b7ab1d6dc17ed4a3`에서 공통 availability와 동일 transaction 재검산을 적용했다.
 - **작업자 영향:** 준비 완료한 출하가 다른 작업 때문에 픽업 직전에 부족해지는 일을 막는다.
 - **근거/근본 원인:** `CQ-006`. StockRequest pending과 ShippingAllocation이 분리되고 primitive마다 보는 예약이 다르다.
 - **수정 경계:** 순수 `stock_availability` policy module을 만들고 warehouse/department consume, production backflush, IO, defect, shipping prepare가 같은 계산과 lock order를 사용한다. `ShippingAllocation`은 상세 예약 ledger로 유지하되 공통 blocked quantity에 포함한다.
@@ -773,6 +774,7 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 
 #### `IC-08` 출하 command receipt와 조건부 상태 전이
 
+- **체크포인트 상태:** `완료`. additive `20260831_0033`과 CP5 W3 commit `530a29ec3a8c315b07004e69b7ab1d6dc17ed4a3`에서 command receipt, semantic replay, expected status/version, 원자 취소를 적용했다.
 - **작업자 영향:** 중복 클릭·네트워크 재시도·동시 작업자가 준비/픽업을 두 번 실행하지 못한다.
 - **근거/근본 원인:** `RV-003`. transaction wrapper는 있지만 request/allocation 직렬화와 command identity가 없다.
 - **수정 경계:** `shipping_workflow` module 뒤에 request lock, deterministic inventory lock, expected-state transition, command receipt/fingerprint를 모은다. router는 입력과 오류 mapping만 한다.
@@ -1083,11 +1085,11 @@ flowchart LR
 >
 > **추천 실행 형태: 부모 통합 + 경계가 겹치지 않는 카드별 하위 에이전트** - 구현 파일 소유권을 분리하고 최종 통합·검증·상태 갱신은 부모가 맡습니다.
 
-**남은 실행 GOAL:** 체크포인트 4까지 확립한 작업자 신뢰 경계, correction 안전막, semantic idempotency, command 경합, 삭제 품목 참조 보호를 기반으로 남은 20개 IC 카드를 의존 순서대로 구현해 잘못된 취소, 예약 선점, 운영 false-green을 제거한다. `IC-04`·`IC-20`은 저장소·로컬 PostgreSQL 구현과 품질 브랜치 CI 실행이 끝났지만 required-check 외부 증거 대기 상태이므로 이 수에 포함한다.
+**남은 실행 GOAL:** 체크포인트 5 Gate B까지 확립한 작업자 신뢰 경계, 물리 위치 원장, 공통 예약, 출하 조건부 상태 전이, semantic idempotency, command 경합, 삭제 품목 참조 보호를 기반으로 남은 17개 IC 카드를 의존 순서대로 구현해 잘못된 취소와 운영 false-green을 제거한다. `IC-04`·`IC-20`은 저장소·로컬 PostgreSQL 구현과 품질 브랜치 CI 실행이 끝났지만 required-check 외부 증거 대기 상태이므로 이 수에 포함한다.
 
 #### 8.9.1 카드 수와 체크포인트 수
 
-`IC-01`~`IC-27` 중 체크포인트 1에서 `IC-02`, `IC-05`, `IC-27`, 체크포인트 3에서 `IC-01`, 체크포인트 4에서 `IC-09`, `IC-10`, `IC-11`, 체크포인트 5 W2에서 `IC-06`을 완료했다. `IC-03`은 correction 안전막만 완료한 `PARTIAL`이므로 남은 수에 포함한다. 체크포인트 2의 `IC-04`·`IC-20`은 저장소 구현·이중 리뷰·로컬 PostgreSQL 실증과 품질 브랜치 CI 성공까지 확보했지만 required-check 설정 증거가 없어 엄격한 완료 상태로 올리지 않는다. 따라서 **남은 IC는 19개**이며, 체크포인트 2 외부 증거가 확보되는 즉시 17개로 줄어든다. `DOC-01`, `AT-01`, `AT-02`는 IC 수에 포함하지 않고 마지막 closeout으로 수행한다.
+`IC-01`~`IC-27` 중 체크포인트 1에서 `IC-02`, `IC-05`, `IC-27`, 체크포인트 3에서 `IC-01`, 체크포인트 4에서 `IC-09`, `IC-10`, `IC-11`, 체크포인트 5 W2에서 `IC-06`, W3에서 `IC-07`, `IC-08`을 완료했다. `IC-03`은 correction 안전막만 완료한 `PARTIAL`이므로 남은 수에 포함한다. 체크포인트 2의 `IC-04`·`IC-20`은 저장소 구현·이중 리뷰·로컬 PostgreSQL 실증과 품질 브랜치 CI 성공까지 확보했지만 required-check 설정 증거가 없어 엄격한 완료 상태로 올리지 않는다. 따라서 **남은 IC는 17개**이며, 체크포인트 2 외부 증거가 확보되는 즉시 15개로 줄어든다. `DOC-01`, `AT-01`, `AT-02`는 IC 수에 포함하지 않고 마지막 closeout으로 수행한다.
 
 | 구간 | 상태 | 이 구간에서 완전히 닫는 IC | 구간 종료 후 남은 IC |
 |---|---|---|---:|
@@ -1095,7 +1097,7 @@ flowchart LR
 | 체크포인트 2 | `로컬 구현·리뷰·커밋·PostgreSQL 실증 완료 / GitHub 증거 보류` | `IC-04`, `IC-20` | 외부 증거 전 24, 통과 후 22 |
 | 체크포인트 3 | `완료 / PostgreSQL 경합 NOT_VERIFIED` | `IC-01` | 외부 증거 전 23, 통과 후 21 |
 | 체크포인트 4 | `완료` | `IC-09`, `IC-10`, `IC-11`; `IC-03`은 correction 안전막까지 완료된 `PARTIAL` | 외부 증거 전 20, 통과 후 18 |
-| 체크포인트 5 | `진행 중 — W2 IC-06 완료, W3 IC-07+IC-08 대기` | `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-17`, `IC-18`, `IC-19` | 외부 증거 전 13, 통과 후 11 |
+| 체크포인트 5 | `진행 중 — Gate B 완료, W4 IC-03-B 대기` | `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-17`, `IC-18`, `IC-19` | 외부 증거 전 13, 통과 후 11 |
 | 체크포인트 6 | `대기` | `IC-12`, `IC-13`, `IC-14`, `IC-15`, `IC-16`, `IC-25`, `IC-26` | 외부 증거 전 6, 통과 후 4 |
 | 체크포인트 7 | `대기` | `IC-21`, `IC-22`, `IC-23`, `IC-24`; 이후 `DOC-01`, `AT-01`, `AT-02` closeout | 외부 증거 전 2, 통과 후 0 |
 
@@ -1190,7 +1192,7 @@ flowchart LR
 
 - [x] **`IC-06` read-only preflight (2026-08-31):** 모든 활성 품목의 `W`, box `B`, 활성 special zone `Z`, unplaced 후보 `U=W-B-Z`, duplicate·orphan·음수·초과배치를 mutation 없이 보고하고 input snapshot과 report hash를 고정했다. SQLite와 PostgreSQL의 repeatable read-only snapshot, 교차 dialect canonical hash, schema drift fail-closed를 검증했으며 runtime·schema·재고 mutation은 0이다.
 - [x] **`IC-06` runtime 완료 (2026-09-01):** Gate A 승인 뒤 additive `0032`, 전체 활성 품목 `B+활성 Z+U=W`, 결정적 출고 순서, stable row UUID effect, 정확 취소·정정, anomaly fail-closed를 구현했다. fresh PostgreSQL 최초 runner 52/52·skip 0, 전체 gate와 GitHub CI 6/6, 독립 리뷰 Critical/Important/Minor 0으로 완료했다.
-- [ ] **`IC-07` + `IC-08` 같은 release:** 모든 소비 primitive가 stock pending과 active shipping allocation을 함께 보는 공통 availability를 사용하고, shipping prepare/pickup/cancel은 request lock·deterministic inventory lock·expected-state·command receipt를 같은 release에서 적용한다.
+- [x] **`IC-07` + `IC-08` 같은 release 완료 (2026-09-02):** 모든 소비 primitive가 stock pending과 active shipping allocation을 함께 보는 공통 availability를 사용한다. shipping prepare/pickup/cancel은 request lock·deterministic inventory/location/allocation lock·expected status/version·command receipt를 같은 transaction에 적용한다. 실제 PostgreSQL 필수 runner 79/79, 최종 full gate 18/18, Playwright 17/17, GitHub CI 6/6, 독립 리뷰 Critical/Important/Minor 0으로 Gate B를 통과했다.
 - [ ] **`IC-03-B` 완료:** shipping pickup, production receipt, IO batch, StockRequest, defect disassembly의 전용 workflow cancel이 effects, allocation/pending, request/batch status, event를 한 transaction으로 되돌리고 history router는 `CancelPolicy` 결과만 소비한다.
 - [ ] **`IC-17` 완료:** location pending, StockRequest, ShippingAllocation, box/zone/unplaced, orphan, effect cutoff를 안정된 check ID/severity로 검사하고 blocking mismatch는 exit 1로 만든다.
 - [ ] **`IC-18` 완료:** backup artifact가 snapshot metadata·Alembic head·전체 schema·WAL 시점을 증명하고 restore는 verify와 post-check를 기본값으로 한다.
@@ -1949,5 +1951,21 @@ Gate 0은 CI 정본과 같은 Node 20에서 닫고 정본 로컬 검증 entrypoi
 - **증거:** `_attic/runtime/code-quality-improvement/20260831-170648/cp5-ic06-preflight/`.
 
 **Gate A 판정:** W1은 `APPROVAL-READY`다. 사용자 승인 전에는 `20260831_0032` migration, `warehouse_unplaced_items`, B/Z/U runtime mutation, `IC-07+IC-08`을 시작하지 않는다. 승인 시 이미 결정된 정책인 `박스 → 활성 특수구역 → 미배치` 출고 우선순위, duplicate·orphan·`B+Z>W` fail-closed, 전체 활성 품목 적용, legacy 위치 자동 backfill 금지를 그대로 구현한다.
+
+---
+
+### 12.21 CP5 W3 `IC-07+IC-08` 공통 예약·출하 상태기계와 Gate B
+
+- **구현·Git:** 품질 worktree의 기존 branch `codex/full-code-quality-improvement`에서만 구현했고 제품 commit `530a29ec3a8c315b07004e69b7ab1d6dc17ed4a3`을 같은 원격 branch에 push했다. 새 branch·force-push·PR·main push/merge는 없었다.
+- **공통 availability:** 물리 수량에서 StockRequest pending과 active ShippingAllocation을 함께 차감하고, shipping pickup만 자기 request의 `RESERVED` allocation을 owner exemption으로 소비한다. 생산 backflush, IO, StockRequest, 부서조정, 불량, 출하 준비, BOM 추가 생산가능수량이 같은 계산과 transaction 내 재검산을 사용한다.
+- **조건부 명령:** additive `20260831_0033`의 `shipping_command_receipts`가 actor·route·client request ID·semantic fingerprint·expected/result status·operation·response snapshot을 보존한다. 동일 key·동일 의미는 원 결과를 replay하고, 다른 payload는 `IDEMPOTENCY_CONFLICT`, 상태·version drift는 `SHIPPING_STATE_CONFLICT`로 mutation 0 거부한다.
+- **상태·취소:** 준비·픽업·각 취소는 request→item/inventory→B/Z/U/location→allocation/receipt 순서로 잠그고 재고·allocation·effect·event·receipt를 한 transaction으로 commit 또는 rollback한다. 준비 취소는 allocation을 해제하고 `PREPARING`, 픽업 취소는 재고와 allocation을 복원해 `PREPARED`로 돌아간다.
+- **Gate RED와 보완:** 첫 full gate가 신규 public service 11개의 보안 분류 누락, StockRequest 재작업 예약 해제의 재귀 item 선잠금 회귀, legacy shipping 취소 테스트 기대값 drift로 backend 6건을 검출했다. 보안 manifest를 exact 분류하고 재귀 부모·자식을 pending 해제 전에 정렬 선잠금했으며 generic 취소의 출하 전용 blocker 우선순위를 테스트에 반영했다. 실패 6건과 backend 전체 gate를 다시 통과했고 최종 patch 독립 리뷰는 Critical/Important/Minor 0이다.
+- **PostgreSQL·집중 검증:** 실제 PostgreSQL 16.15 필수 runner 79/79, 실패·오류·skip 0이다. prepare×2, pickup×2, prepare-vs-cancel, pickup-vs-cancel, 저장-vs-제출 양방향, 예약-vs-생산/IO/부서조정/불량에서 winner 1, replay 물리 반영 최대 1회, loser mutation·orphan·부분 effect/event 0을 확인했다. W3 backend 집중 회귀는 247 PASS·PG 전용 5 SKIP이며 그 5건은 실제 PostgreSQL runner에서 별도 통과했다. Node 20 focused frontend는 179/179이고 신규 type 진단은 0이다.
+- **최종 로컬 gate:** `verify_local.ps1 -Mode full -DbReadOnlyCheck -IncludeE2E`는 972.998초, 18/18 PASS다. backend Ruff·mypy·PostgreSQL concurrency·full pytest·OpenAPI, frontend lint·app/test/E2E type·coverage·production build·bundle, docs 3/3, DB read-only, Playwright 17/17이 모두 통과했다. 정본 로그는 `_attic/runtime/code-quality-improvement/20260902-cp5-w3-gateb/verify-full-gate-final.log`다.
+- **GitHub CI:** run `33578029469`에서 Verification policy, PostgreSQL concurrency, Windows ops profile, frontend, Playwright E2E, backend 6개 job이 모두 success다.
+- **불변·동결·종료:** 품질 `backend/mes.db` SHA-256은 전후 `D0419DC051B881DA145B466AF99490570D18C47BCAAE990C57FFD4476FE28147`로 불변이다. 일회용 PostgreSQL DB는 drop했고 cluster는 정상 종료했으며 55432·8021·3100·3300 listener는 0이다. 중지한 cluster 파일은 ignored evidence 경로에만 남고 실행 영향은 없다. 주간보고, 모바일 하단 tab, desktop shipping step 5 카드 크기·grid·overflow 추가 변경은 0이며 `C:\ERP-dev`에는 접근하지 않았다.
+
+**Gate B 판정:** `IC-07`, `IC-08`은 `완료`다. 다음 단일 구현 범위는 W4 `IC-03-B` 전용 workflow 취소이며, W5 `IC-17` 이후 카드는 W4 증거·리뷰가 GREEN이 된 뒤에만 시작한다.
 
 ---
