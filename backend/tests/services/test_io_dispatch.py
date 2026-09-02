@@ -1270,7 +1270,7 @@ def test_custom_bom_child_quantity_requires_department_approval_even_when_edited
         approver=approver,
     )
 
-    assert _prod_qty(db_session, component.item_id) == D("7")
+    assert _prod_qty(db_session, component.item_id) == D("13")
     assert _prod_qty(db_session, result_item.item_id) == D("0")
     logs = db_session.query(TransactionLog).all()
     assert len(logs) == 1
@@ -1425,6 +1425,104 @@ def test_custom_disassemble_normalizes_every_included_child_to_department_out(
     assert sorted(log.quantity_change for log in db_session.query(TransactionLog).all()) == [
         D("-2"),
         D("-1"),
+    ]
+
+
+def test_custom_produce_normalizes_every_included_child_to_department_in(
+    make_bom, make_item, make_location, db_session
+):
+    """하위 하나만 수정해도 커스텀 생산 묶음의 포함 하위 전체를 선택 입고한다."""
+    parent = make_item(name="선택 입고 기준 BOM", process_type_code="AF")
+    changed_child = make_item(name="수정한 선택 입고 자재")
+    unchanged_child = make_item(name="수정하지 않은 선택 입고 자재")
+    make_bom(parent.item_id, changed_child.item_id, D("1"))
+    make_bom(parent.item_id, unchanged_child.item_id, D("1"))
+    make_location(parent.item_id, department=ASSEMBLY, quantity=D("0"))
+    make_location(changed_child.item_id, department=ASSEMBLY, quantity=D("0"))
+    make_location(unchanged_child.item_id, department=TUNING, quantity=D("0"))
+    requester = _make_employee(db_session, department_role="none")
+    batch = _build_batch(
+        db_session,
+        requester=requester,
+        sub_type="produce",
+        to_department=ASSEMBLY.value,
+        source_item_id=parent.item_id,
+        lines=[
+            {
+                "item_id": parent.item_id,
+                "direction": "in",
+                "from_bucket": "none",
+                "to_bucket": "production",
+                "to_department": ASSEMBLY.value,
+                "quantity": D("1"),
+                "origin": "direct",
+            },
+            {
+                "item_id": changed_child.item_id,
+                "direction": "out",
+                "from_bucket": "production",
+                "from_department": ASSEMBLY.value,
+                "to_bucket": "none",
+                "quantity": D("2"),
+                "origin": "bom_auto",
+            },
+            {
+                "item_id": unchanged_child.item_id,
+                "direction": "out",
+                "from_bucket": "production",
+                "from_department": TUNING.value,
+                "to_bucket": "none",
+                "quantity": D("1"),
+                "origin": "bom_auto",
+            },
+        ],
+    )
+    for line in batch.bundles[0].lines:
+        if line.origin == "bom_auto":
+            _issue_bom_auto_token(db_session, batch, line)
+
+    batch.notes = "생산 구성품 선택 입고"
+    result = svc._execute_submission(db_session, requester=requester, batch=batch)
+
+    assert result["requires_approval"] is True
+    request = db_session.query(StockRequest).one()
+    assert batch.status == "submitted"
+    assert _loc_pending(db_session, changed_child.item_id) == D("0")
+    assert _loc_pending(db_session, unchanged_child.item_id, TUNING) == D("0")
+    assert {
+        (
+            line.item_id,
+            line.from_bucket.value,
+            getattr(line.from_department, "value", line.from_department),
+            line.to_bucket.value,
+            getattr(line.to_department, "value", line.to_department),
+        )
+        for line in request.lines
+    } == {
+        (changed_child.item_id, "none", None, "production", ASSEMBLY.value),
+        (unchanged_child.item_id, "none", None, "production", TUNING.value),
+    }
+
+    approver = _make_employee(
+        db_session,
+        code="CUSTOM-PRODUCE-APPROVER",
+        name="선택 입고 결재자",
+        department_role="primary",
+    )
+    request.department_approved_by_employee_id = approver.employee_id
+    request.department_approved_by_name = approver.name
+    svc.execute_batch_after_dept_approval(
+        db_session,
+        request=request,
+        approver=approver,
+    )
+
+    assert _prod_qty(db_session, parent.item_id) == D("0")
+    assert _prod_qty(db_session, changed_child.item_id) == D("2")
+    assert _prod_qty(db_session, unchanged_child.item_id, TUNING) == D("1")
+    assert sorted(log.quantity_change for log in db_session.query(TransactionLog).all()) == [
+        D("1"),
+        D("2"),
     ]
 
 
@@ -1706,7 +1804,7 @@ def test_only_custom_bom_bundle_uses_child_only_execution(
     svc.execute_batch_after_dept_approval(db_session, request=request, approver=approver)
 
     assert _prod_qty(db_session, custom_parent.item_id) == D("0")
-    assert _prod_qty(db_session, custom_child.item_id) == D("7")
+    assert _prod_qty(db_session, custom_child.item_id) == D("13")
     assert _prod_qty(db_session, default_parent.item_id) == D("1")
     assert _prod_qty(db_session, default_child.item_id) == D("9")
 

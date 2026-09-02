@@ -194,7 +194,7 @@ describe("IoConfirmStep", () => {
     expect(screen.queryByText("+2")).not.toBeInTheDocument();
   });
 
-  it("커스텀 부서 BOM은 상위를 제외한 하위 품목 수로 결재를 안내한다", () => {
+  it("커스텀 입고 BOM은 최종 확인에서도 참고 입고와 선택 입고를 안내한다", () => {
     const customChild = {
       ...childLine,
       direction: "out" as const,
@@ -225,8 +225,11 @@ describe("IoConfirmStep", () => {
 
     expect(screen.getByRole("button", { name: "부서 결재 요청 1건" })).toBeEnabled();
     const card = screen.getByRole("button", { name: /히팅 싱크 \+ 방열팬/ });
-    expect(within(card).getByText(/상위 변동 없음 · 하위 1/)).toBeInTheDocument();
+    expect(within(card).getByText(/BOM 참고 입고 · 상위 미반영 · 하위 1/)).toBeInTheDocument();
     expect(within(card).queryByText("-1")).not.toBeInTheDocument();
+    fireEvent.click(card);
+    expect(within(card).getByText("선택 입고")).toBeInTheDocument();
+    expect(within(card).getByText("· 조립")).toBeInTheDocument();
   });
 
   it("커스텀 분해 BOM은 최종 확인에서도 참고 출고와 상위 미반영을 안내한다", () => {
@@ -249,6 +252,37 @@ describe("IoConfirmStep", () => {
 
     const card = screen.getByRole("button", { name: /히팅 싱크 \+ 방열팬/ });
     expect(within(card).getByText(/BOM 참고 출고 · 상위 미반영 · 하위 1/)).toBeInTheDocument();
+  });
+
+  it("BOM 이동 최종 확인은 창고 출발과 도착 부서를 각각 표시한다", () => {
+    const moveChild = {
+      ...childLine,
+      direction: "move" as const,
+      from_bucket: "warehouse" as const,
+      from_department: null,
+      to_bucket: "production" as const,
+      to_department: "조립",
+    };
+    render(
+      <IoConfirmStep
+        workType="warehouse_io"
+        subType="warehouse_to_dept"
+        bundles={[{ ...bundle, lines: [parentLine, moveChild] }]}
+        notes=""
+        hasShortage={false}
+        hasInvalidQuantity={false}
+        submitting={false}
+        saving={false}
+        approvalKind="warehouse"
+        onNotesChange={() => {}}
+        onSubmit={() => {}}
+        onSaveDraft={vi.fn()}
+      />,
+    );
+
+    const card = screen.getByRole("button", { name: /히팅 싱크 \+ 방열팬/ });
+    fireEvent.click(card);
+    expect(within(card).getByText("· 창고 → 조립")).toBeInTheDocument();
   });
 
   it("빈 부서 결재 메모를 클릭으로 차단하고 인라인 오류와 부모 toast를 전달한다", () => {

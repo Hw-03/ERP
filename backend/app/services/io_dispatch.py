@@ -378,12 +378,12 @@ def _validate_custom_process_bom_auto_lines(
                 raise ValueError("BOM 자동 하위 품목의 원본 정보가 올바르지 않습니다.")
 
 
-def _normalize_custom_disassemble_effects(
+def _normalize_custom_process_bom_effects(
     batch: IoBatch,
     custom_bundle_ids: set[uuid.UUID],
 ) -> None:
-    """검증된 커스텀 분해 회수 라인을 소속 부서 선택 출고로 확정한다."""
-    if batch.sub_type != "disassemble":
+    """검증된 커스텀 BOM 하위를 선택한 생산·분해 방향의 부서 반영으로 확정한다."""
+    if batch.sub_type not in {"produce", "disassemble"}:
         return
     for bundle in batch.bundles:
         if bundle.bundle_id not in custom_bundle_ids:
@@ -395,14 +395,25 @@ def _normalize_custom_disassemble_effects(
                 line.included = False
                 line.shortage = Decimal("0")
                 continue
-            source_department = line.to_department
-            if not source_department:
-                raise ValueError("BOM 선택 출고 품목의 소속 부서를 찾을 수 없습니다.")
-            line.direction = "out"
-            line.from_bucket = "production"
-            line.from_department = source_department
-            line.to_bucket = "none"
-            line.to_department = None
+            department = (
+                line.from_department
+                if batch.sub_type == "produce"
+                else line.to_department
+            )
+            if not department:
+                raise ValueError("BOM 선택 입출고 품목의 소속 부서를 찾을 수 없습니다.")
+            if batch.sub_type == "produce":
+                line.direction = "in"
+                line.from_bucket = "none"
+                line.from_department = None
+                line.to_bucket = "production"
+                line.to_department = department
+            else:
+                line.direction = "out"
+                line.from_bucket = "production"
+                line.from_department = department
+                line.to_bucket = "none"
+                line.to_department = None
             line.shortage = Decimal("0")
 
 
@@ -1225,7 +1236,7 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
                 batch,
                 custom_process_bom_bundle_ids,
             )
-            _normalize_custom_disassemble_effects(
+            _normalize_custom_process_bom_effects(
                 batch,
                 custom_process_bom_bundle_ids,
             )

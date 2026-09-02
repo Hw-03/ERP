@@ -134,12 +134,22 @@ describe("IoBundleCard", () => {
     expect(screen.getByText("44")).toBeInTheDocument();
   });
 
-  it("커스텀 부서 BOM은 상위 재고를 미반영으로 안내한다", () => {
+  it("커스텀 입고 BOM은 상위 미반영과 하위 선택 입고를 안내한다", () => {
     const customBundle = {
       ...bundle,
       lines: [
         parentLine,
-        { ...childLine, quantity: 3, bom_expected: 2, edited: true },
+        {
+          ...childLine,
+          direction: "out" as const,
+          from_bucket: "production" as const,
+          from_department: "조립",
+          to_bucket: "none" as const,
+          to_department: null,
+          quantity: 3,
+          bom_expected: 2,
+          edited: true,
+        },
       ],
     } satisfies IoBundle;
     render(
@@ -156,11 +166,16 @@ describe("IoBundleCard", () => {
       />,
     );
 
-    const composition = screen.getByText("BOM 자동 전개 · 상위 미반영 · 하위 1");
+    const composition = screen.getByText("BOM 참고 입고 · 상위 미반영");
     expect(composition).toBeInTheDocument();
     expect(composition.parentElement).toHaveTextContent("반영 1개");
     expect(screen.getByText("상위 미반영")).toBeInTheDocument();
     expect(screen.queryByText("실행 후")).not.toBeInTheDocument();
+    const header = screen.getAllByRole("button", { name: /ADX6000 80KV 5mA/ })
+      .find((element) => element.hasAttribute("aria-expanded"));
+    if (!header) throw new Error("묶음 접기/펼치기 영역을 찾을 수 없습니다.");
+    fireEvent.click(header);
+    expect(screen.getByText("선택 입고")).toBeInTheDocument();
   });
 
   it("모바일에서는 품목 확인 정보를 단일 열로, 데스크톱에서는 기존 다섯 열로 배치한다", () => {

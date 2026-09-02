@@ -711,9 +711,9 @@ describe("lineTagLabel", () => {
     expect(lineTagLabel(makeLine({ origin: "manual" }), "warehouse_to_dept")).toEqual({ text: "이 품목만", tone: "muted" });
   });
 
-  it("produce: direct=생산 결과품 green, bom_auto=투입 자재 red", () => {
+  it("produce: direct=생산 결과품 green, 표준 bom_auto 출고=투입 자재 red", () => {
     expect(lineTagLabel(makeLine({ origin: "direct" }), "produce")).toEqual({ text: "생산 결과품", tone: "green" });
-    expect(lineTagLabel(makeLine({ origin: "bom_auto" }), "produce")).toEqual({ text: "투입 자재", tone: "red" });
+    expect(lineTagLabel(makeLine({ origin: "bom_auto", direction: "out" }), "produce")).toEqual({ text: "투입 자재", tone: "red" });
   });
 
   it("disassemble: direct=분해 대상 red, bom_auto=회수 품목 green", () => {
@@ -1101,6 +1101,91 @@ describe("useIoWorkState canAdvance[3]/[4]", () => {
       direction: "out",
       from_bucket: "production",
       from_department: "튜닝",
+      to_bucket: "none",
+      to_department: null,
+    });
+  });
+
+  it("커스텀 입고 BOM은 원본을 보존하고 유효한 모든 하위만 소속 부서 선택 입고로 판정한다", () => {
+    const parent = makeLine({
+      line_id: "P",
+      item_id: "PARENT",
+      origin: "direct",
+      direction: "in",
+      from_bucket: "none",
+      to_bucket: "production",
+      to_department: "조립",
+      quantity: 1,
+    });
+    const changedChild = makeLine({
+      line_id: "C1",
+      item_id: "CHILD-1",
+      origin: "bom_auto",
+      direction: "out",
+      from_bucket: "production",
+      from_department: "조립",
+      to_bucket: "none",
+      to_department: null,
+      quantity: 2,
+      bom_expected: 1,
+    });
+    const unchangedChild = makeLine({
+      line_id: "C2",
+      item_id: "CHILD-2",
+      origin: "bom_auto",
+      direction: "out",
+      from_bucket: "production",
+      from_department: "튜닝",
+      to_bucket: "none",
+      to_department: null,
+      quantity: 1,
+      bom_expected: 1,
+    });
+    const zeroChild = makeLine({
+      line_id: "C3",
+      origin: "bom_auto",
+      direction: "out",
+      from_bucket: "production",
+      quantity: 0,
+      bom_expected: 1,
+    });
+    const exemptChild = makeLine({
+      line_id: "C4",
+      origin: "bom_auto",
+      direction: "out",
+      from_bucket: "production",
+      quantity: 1,
+      bom_expected: 1,
+      bom_stock_exempt: true,
+    });
+    const customBundle = makeBundle({
+      source_kind: "bom_parent",
+      source_item_id: "PARENT",
+      quantity: 1,
+      lines: [parent, changedChild, unchangedChild, zeroChild, exemptChild],
+    });
+
+    expect(processBomEffectLine("produce", customBundle, parent)).toBeNull();
+    expect(processBomEffectLine("produce", customBundle, changedChild)).toMatchObject({
+      direction: "in",
+      from_bucket: "none",
+      from_department: null,
+      to_bucket: "production",
+      to_department: "조립",
+    });
+    expect(processBomEffectLine("produce", customBundle, unchangedChild)).toMatchObject({
+      direction: "in",
+      from_bucket: "none",
+      from_department: null,
+      to_bucket: "production",
+      to_department: "튜닝",
+    });
+    expect(processBomEffectLine("produce", customBundle, zeroChild)).toBeNull();
+    expect(processBomEffectLine("produce", customBundle, exemptChild)).toBeNull();
+    expect(changedChild).toMatchObject({
+      direction: "out",
+      from_bucket: "production",
+      from_department: "조립",
       to_bucket: "none",
       to_department: null,
     });

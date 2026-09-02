@@ -121,7 +121,7 @@ export function IoBundleCard({
       if (customProcessBom) {
         return subType === "disassemble"
           ? "BOM 참고 출고 · 상위 미반영"
-          : `BOM 자동 전개 · 상위 미반영 · 하위 ${autoCount}`;
+          : "BOM 참고 입고 · 상위 미반영";
       }
       return hasDirectLine
         ? `BOM 자동 전개 · 상위 1 + 하위 ${autoCount}`

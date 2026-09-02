@@ -160,7 +160,7 @@ export function isCustomProcessBomBundle(
   return isBomForced(subType) && hasCustomBomQuantity([bundle]);
 }
 
-/** 커스텀 출고 BOM의 원본 회수 라인을 실제 선택 출고 효과로 해석한다.
+/** 커스텀 부서 BOM의 원본 하위를 선택한 입출고 효과로 해석한다.
  * 원본은 BOM 토큰 검증과 제출을 위해 변경하지 않는다. */
 export function processBomEffectLine(
   subType: IoSubType,
@@ -175,9 +175,18 @@ export function processBomEffectLine(
   if (line.origin === "direct") {
     return null;
   }
-  if (subType !== "disassemble") return line;
-  if (Number(line.quantity) <= 0 || line.bom_stock_exempt) return null;
   if (line.origin !== "bom_auto") return line;
+  if (Number(line.quantity) <= 0 || line.bom_stock_exempt) return null;
+  if (subType === "produce") {
+    return {
+      ...line,
+      direction: "in",
+      from_bucket: "none",
+      from_department: null,
+      to_bucket: "production",
+      to_department: line.from_department,
+    };
+  }
   return {
     ...line,
     direction: "out",
@@ -465,7 +474,11 @@ export function lineTagLabel(line: IoLine, subType: IoSubType): { text: string; 
   if (line.origin === "manual") return { text: "이 품목만", tone: "muted" };
   if (subType === "produce") {
     if (line.origin === "direct") return { text: "생산 결과품", tone: "green" };
-    if (line.origin === "bom_auto") return { text: "투입 자재", tone: "red" };
+    if (line.origin === "bom_auto") {
+      return line.direction === "in"
+        ? { text: "선택 입고", tone: "green" }
+        : { text: "투입 자재", tone: "red" };
+    }
   }
   if (subType === "disassemble") {
     if (line.origin === "direct") return { text: "분해 대상", tone: "red" };

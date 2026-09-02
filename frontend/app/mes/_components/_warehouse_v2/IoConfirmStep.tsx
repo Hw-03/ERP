@@ -305,6 +305,7 @@ export function IoConfirmStep({
           <ConfirmBundleCard
             key={bundle.bundle_id}
             bundle={bundle}
+            subType={subType}
             bomParentLineIds={bomParentLineIds}
             customProcessBom={isCustomProcessBomBundle(subType, bundle)}
             customDisassemble={
@@ -414,6 +415,7 @@ export function IoConfirmStep({
 
 function ConfirmBundleCard({
   bundle,
+  subType,
   bomParentLineIds,
   customProcessBom,
   customDisassemble,
@@ -421,6 +423,7 @@ function ConfirmBundleCard({
   showDeductionSource,
 }: {
   bundle: IoBundle;
+  subType: IoSubType;
   bomParentLineIds: Set<string>;
   customProcessBom: boolean;
   customDisassemble: boolean;
@@ -608,6 +611,8 @@ function ConfirmBundleCard({
           <span>
             {customDisassemble
               ? "BOM 참고 출고 · 상위 미반영 · "
+              : customProcessBom
+              ? "BOM 참고 입고 · 상위 미반영 · "
               : `BOM 자동 전개 · ${childrenOnlyBom || customProcessBom ? "상위 변동 없음 · " : ""}`}
             하위 {visibleLines.length}
           </span>
@@ -625,6 +630,12 @@ function ConfirmBundleCard({
               key={line.line_id}
               line={effectLineById.get(line.line_id) ?? line}
               isChild={line.origin === "bom_auto" || line.origin === "package_auto"}
+              customProcessBom={
+                customProcessBom &&
+                line.origin === "bom_auto" &&
+                effectLineById.has(line.line_id)
+              }
+              subType={subType}
               showDeductionSource={showDeductionSource}
               showInternalUseEffect={showDeductionSource}
             />
@@ -638,16 +649,23 @@ function ConfirmBundleCard({
 function ConfirmLineRow({
   line,
   isChild,
+  customProcessBom,
+  subType,
   showDeductionSource,
   showInternalUseEffect,
 }: {
   line: IoLine;
   isChild: boolean;
+  customProcessBom: boolean;
+  subType: IoSubType;
   showDeductionSource: boolean;
   showInternalUseEffect: boolean;
 }) {
   const effectLabel = showInternalUseEffect
     ? internalUseLineEffectLabel(line)
+    : null;
+  const customBomEffectLabel = customProcessBom
+    ? subType === "produce" ? "선택 입고" : "선택 출고"
     : null;
   const dir = showInternalUseEffect && !line.included
     ? { sign: null as null, color: LEGACY_COLORS.muted2 }
@@ -690,10 +708,25 @@ function ConfirmLineRow({
               {effectLabel}
             </span>
           )}
+          {customBomEffectLabel && (
+            <span
+              className="rounded-full px-2 py-0.5 text-xs font-black"
+              style={{
+                background: tint(
+                  subType === "produce" ? LEGACY_COLORS.green : LEGACY_COLORS.red,
+                  14,
+                ),
+                color: subType === "produce" ? LEGACY_COLORS.green : LEGACY_COLORS.red,
+              }}
+            >
+              {customBomEffectLabel}
+            </span>
+          )}
           {!showDeductionSource && (line.from_department || line.to_department) && (
             <span>
-              · {line.from_department ?? "-"}
-              {line.direction === "move" ? ` → ${line.to_department ?? "-"}` : ""}
+              {line.direction === "move"
+                ? `· ${line.from_department ?? "창고"} → ${line.to_department ?? "창고"}`
+                : `· ${line.from_department ?? line.to_department}`}
             </span>
           )}
         </div>
