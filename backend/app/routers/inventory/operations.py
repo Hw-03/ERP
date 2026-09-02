@@ -313,6 +313,8 @@ def cancel_operation(
             reason=payload.reason,
             plan_hash=payload.plan_hash,
         )
+    except cancellation_svc.WorkflowCancellationConflict as exc:
+        raise http_error(409, exc.reason_code, str(exc)) from exc
     except cancellation_svc.CancellationPlanChanged as exc:
         raise http_error(409, ErrorCode.CONFLICT, str(exc)) from exc
     except cancellation_svc.CancellationNotAllowed as exc:

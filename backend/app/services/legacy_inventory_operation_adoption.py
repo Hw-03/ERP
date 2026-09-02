@@ -720,6 +720,11 @@ def adopt_and_cancel(
         now=now,
     )
     if not preview.can_cancel:
+        if preview.reason_code is not None:
+            raise cancellation_svc.WorkflowCancellationConflict(
+                preview.reason_code,
+                preview.blockers[0],
+            )
         raise cancellation_svc.CancellationNotAllowed(preview.blockers[0])
     cancellation = cancellation_svc.cancel_operation(
         db,

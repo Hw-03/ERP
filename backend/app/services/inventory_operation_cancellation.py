@@ -28,10 +28,12 @@ from app.models import (
     IoBatch,
     ShippingAllocation,
     ShippingRequest,
+    ShippingRequestEvent,
     ShippingRequestStatusEnum,
     StockRequest,
     StockRequestStatusEnum,
     StockRequestLine,
+    StockRequestTypeEnum,
     TransactionEditLog,
     TransactionLog,
     TransactionTypeEnum,
@@ -68,7 +70,17 @@ PHYSICAL_ROW_CHANGED_MESSAGE = (
     "재고 행이 작업 이후 변경되어 정확히 취소할 수 없습니다."
 )
 SHIPPING_DEDICATED_CANCEL_MESSAGE = (
-    "출하 준비·픽업 작업은 출하 전용 취소 명령으로만 취소할 수 있습니다."
+    "출하 준비 작업은 출하 전용 취소 명령으로만 취소할 수 있습니다."
+)
+WORKFLOW_CANCEL_UNSUPPORTED = "WORKFLOW_CANCEL_UNSUPPORTED"
+WORKFLOW_STATE_CONFLICT = "WORKFLOW_STATE_CONFLICT"
+WORKFLOW_ALREADY_CANCELLED = "WORKFLOW_ALREADY_CANCELLED"
+WORKFLOW_DEPENDENCY_CONFLICT = "WORKFLOW_DEPENDENCY_CONFLICT"
+WORKFLOW_EVIDENCE_MESSAGE = (
+    "원래 업무 상태를 정확히 복원할 증거가 없어 이 작업을 취소할 수 없습니다."
+)
+IO_BATCH_DEPENDENCY_MESSAGE = (
+    "같은 입출고 배치의 다른 실행이 남아 있어 이 작업만 취소할 수 없습니다."
 )
 
 
@@ -83,9 +95,89 @@ class CancellationOperationNotFound(CancellationError):
 class CancellationPlanChanged(CancellationError):
     """미리보기 이후 현재 재고·예약·업무 상태가 달라짐."""
 
+    reason_code = WORKFLOW_STATE_CONFLICT
+
 
 class CancellationNotAllowed(CancellationError):
     """현재 불변식으로는 전체 작업을 안전하게 역전할 수 없음."""
+
+
+class WorkflowCancellationConflict(CancellationNotAllowed):
+    """업무 취소가 안정된 충돌 사유로 원자적으로 거부됨."""
+
+    def __init__(self, reason_code: str, message: str) -> None:
+        super().__init__(message)
+        self.reason_code = reason_code
+
+
+@dataclass(frozen=True)
+class CancelPolicy:
+    """한 업무 action의 소유 상태와 부수 효과 복원 계약."""
+
+    domain: str
+    action: str
+    workflow_subject_types: frozenset[str] = frozenset()
+    allocation_subject_types: frozenset[str] = frozenset()
+    requires_workflow_effect: bool = False
+    requires_allocation_effect: bool = False
+    creates_pickup_cancel_event: bool = False
+
+
+_IO_CANCEL_ACTIONS = (
+    "receive_supplier",
+    "warehouse_to_dept",
+    "dept_to_warehouse",
+    "produce",
+    "disassemble",
+    "dept_transfer",
+    "adjust_in",
+    "adjust_out",
+    "warehouse_adjust_in",
+    "warehouse_adjust_out",
+    "defect_quarantine",
+    "defect_restore",
+    "defect_process",
+    "supplier_return",
+    "internal_use_out",
+)
+
+
+def _cancel_policy_registry() -> dict[tuple[str, str], CancelPolicy]:
+    policies = [
+        CancelPolicy(
+            domain="shipping",
+            action="pickup",
+            workflow_subject_types=frozenset({"ShippingRequest"}),
+            allocation_subject_types=frozenset({"ShippingAllocation"}),
+            requires_workflow_effect=True,
+            requires_allocation_effect=True,
+            creates_pickup_cancel_event=True,
+        ),
+        CancelPolicy(domain="production", action="receipt"),
+        CancelPolicy(domain="defect", action="rework_defective"),
+    ]
+    policies.extend(
+        CancelPolicy(
+            domain="inventory_io",
+            action=action,
+            workflow_subject_types=frozenset({"IoBatch", "StockRequest"}),
+            requires_workflow_effect=True,
+        )
+        for action in _IO_CANCEL_ACTIONS
+    )
+    policies.extend(
+        CancelPolicy(
+            domain="stock_request",
+            action=request_type.value,
+            workflow_subject_types=frozenset({"StockRequest"}),
+            requires_workflow_effect=True,
+        )
+        for request_type in StockRequestTypeEnum
+    )
+    return {(policy.domain, policy.action): policy for policy in policies}
+
+
+CANCEL_POLICY_REGISTRY = _cancel_policy_registry()
 
 
 @dataclass(frozen=True)
@@ -143,6 +235,369 @@ class CancellationPlan:
     cells: tuple[CancellationCell, ...]
     defect_records: tuple[CancellationDefectRecord, ...]
     effects: tuple[CancellationEffectSubject, ...]
+    reason_code: Optional[str] = None
+
+
+def _cancel_policy(operation: InventoryOperation) -> CancelPolicy | None:
+    return CANCEL_POLICY_REGISTRY.get((operation.domain, operation.action))
+
+
+def _exact_status_state(state: object) -> bool:
+    return (
+        isinstance(state, dict)
+        and set(state) == {"status"}
+        and isinstance(state.get("status"), str)
+        and bool(state["status"])
+    )
+
+
+def _policy_contract_error(
+    operation: InventoryOperation,
+    policy: CancelPolicy,
+    effects: list[InventoryOperationEffect],
+) -> str | None:
+    """정책이 해석할 수 있는 v2 효과만 허용하고 나머지는 추정 없이 닫는다."""
+    if int(operation.contract_version or 1) < 2:
+        return WORKFLOW_EVIDENCE_MESSAGE
+
+    workflow_effects = [
+        effect
+        for effect in effects
+        if effect.effect_kind == InventoryOperationEffectKindEnum.WORKFLOW
+    ]
+    allocation_effects = [
+        effect
+        for effect in effects
+        if effect.effect_kind == InventoryOperationEffectKindEnum.ALLOCATION
+    ]
+    if len(workflow_effects) + len(allocation_effects) != len(effects):
+        return WORKFLOW_EVIDENCE_MESSAGE
+    if policy.requires_workflow_effect and not workflow_effects:
+        return WORKFLOW_EVIDENCE_MESSAGE
+    if policy.requires_allocation_effect and not allocation_effects:
+        return WORKFLOW_EVIDENCE_MESSAGE
+    if any(
+        effect.subject_type not in policy.workflow_subject_types
+        for effect in workflow_effects
+    ):
+        return WORKFLOW_EVIDENCE_MESSAGE
+    if any(
+        effect.subject_type not in policy.allocation_subject_types
+        for effect in allocation_effects
+    ):
+        return WORKFLOW_EVIDENCE_MESSAGE
+    if any(
+        not _exact_status_state(effect.before_state)
+        or not _exact_status_state(effect.after_state)
+        for effect in effects
+    ):
+        return WORKFLOW_EVIDENCE_MESSAGE
+
+    if policy.domain == "shipping":
+        request_effects = [
+            effect
+            for effect in workflow_effects
+            if effect.subject_type == "ShippingRequest"
+        ]
+        if len(request_effects) != 1:
+            return WORKFLOW_EVIDENCE_MESSAGE
+        request_effect = request_effects[0]
+        if (
+            request_effect.role != "PICKUP_STATUS"
+            or request_effect.before_state["status"]
+            != ShippingRequestStatusEnum.PREPARED.value
+            or request_effect.after_state["status"]
+            != ShippingRequestStatusEnum.PICKED_UP.value
+        ):
+            return WORKFLOW_EVIDENCE_MESSAGE
+        if any(
+            effect.role != "CONSUME"
+            or effect.before_state["status"] != "RESERVED"
+            or effect.after_state["status"] != "CONSUMED"
+            for effect in allocation_effects
+        ):
+            return WORKFLOW_EVIDENCE_MESSAGE
+
+    if policy.domain == "inventory_io":
+        batch_effects = [
+            effect for effect in workflow_effects if effect.subject_type == "IoBatch"
+        ]
+        if len(batch_effects) != 1:
+            return WORKFLOW_EVIDENCE_MESSAGE
+        if any(
+            effect.role != "EXECUTION_STATUS"
+            or effect.after_state["status"] != "completed"
+            or effect.before_state["status"] in {"completed", "cancelled"}
+            for effect in batch_effects
+        ):
+            return WORKFLOW_EVIDENCE_MESSAGE
+        request_effects = [
+            effect
+            for effect in workflow_effects
+            if effect.subject_type == "StockRequest"
+        ]
+        if len(request_effects) > 1 or any(
+            effect.role != "EXECUTION_STATUS"
+            or effect.after_state["status"]
+            != StockRequestStatusEnum.COMPLETED.value
+            for effect in request_effects
+        ):
+            return WORKFLOW_EVIDENCE_MESSAGE
+
+    if policy.domain == "stock_request":
+        if len(workflow_effects) != 1:
+            return WORKFLOW_EVIDENCE_MESSAGE
+        request_effect = workflow_effects[0]
+        if (
+            request_effect.subject_type != "StockRequest"
+            or request_effect.role != "EXECUTION_STATUS"
+            or request_effect.after_state["status"]
+            != StockRequestStatusEnum.COMPLETED.value
+        ):
+            return WORKFLOW_EVIDENCE_MESSAGE
+
+    for effect in workflow_effects:
+        if effect.subject_type != "StockRequest":
+            continue
+        try:
+            before_status = StockRequestStatusEnum(effect.before_state["status"])
+        except ValueError:
+            return WORKFLOW_EVIDENCE_MESSAGE
+        if before_status in {
+            StockRequestStatusEnum.COMPLETED,
+            StockRequestStatusEnum.CANCELLED,
+            StockRequestStatusEnum.REJECTED,
+            StockRequestStatusEnum.FAILED_APPROVAL,
+        }:
+            return WORKFLOW_EVIDENCE_MESSAGE
+    return None
+
+
+def _policy_subject_error(
+    db: Session,
+    operation: InventoryOperation,
+    policy: CancelPolicy,
+    effects: list[InventoryOperationEffect],
+) -> str | None:
+    """effect가 가리키는 실제 owner와 action 관계가 현재 계약과 같은지 확인한다."""
+    workflow_effects = [
+        effect
+        for effect in effects
+        if effect.effect_kind == InventoryOperationEffectKindEnum.WORKFLOW
+    ]
+    subjects: dict[str, list[object]] = {}
+    for effect in workflow_effects:
+        model = {
+            "IoBatch": IoBatch,
+            "ShippingRequest": ShippingRequest,
+            "StockRequest": StockRequest,
+        }[effect.subject_type]
+        subject = db.get(model, effect.subject_id)
+        if subject is None:
+            return "연결된 업무를 찾을 수 없습니다."
+        subjects.setdefault(effect.subject_type, []).append(subject)
+
+    batches = [subject for subject in subjects.get("IoBatch", []) if isinstance(subject, IoBatch)]
+    requests = [
+        subject
+        for subject in subjects.get("StockRequest", [])
+        if isinstance(subject, StockRequest)
+    ]
+    shipping_requests = [
+        subject
+        for subject in subjects.get("ShippingRequest", [])
+        if isinstance(subject, ShippingRequest)
+    ]
+    if batches and any(batch.sub_type != operation.action for batch in batches):
+        return WORKFLOW_EVIDENCE_MESSAGE
+    if policy.domain == "inventory_io":
+        batch = batches[0]
+        if any(request.operation_batch_id != batch.batch_id for request in requests):
+            return WORKFLOW_EVIDENCE_MESSAGE
+        linked_request_exists = (
+            db.query(StockRequest.request_id)
+            .filter(StockRequest.operation_batch_id == batch.batch_id)
+            .first()
+            is not None
+        )
+        if linked_request_exists and not requests:
+            return WORKFLOW_EVIDENCE_MESSAGE
+        sibling_operation_ids = {
+            sibling_operation_id
+            for (sibling_operation_id,) in db.query(
+                InventoryOperationEffect.operation_id
+            )
+            .join(
+                InventoryOperation,
+                InventoryOperation.operation_id
+                == InventoryOperationEffect.operation_id,
+            )
+            .filter(
+                InventoryOperationEffect.effect_kind
+                == InventoryOperationEffectKindEnum.WORKFLOW,
+                InventoryOperationEffect.subject_type == "IoBatch",
+                InventoryOperationEffect.subject_id == str(batch.batch_id),
+                InventoryOperationEffect.operation_id != operation.operation_id,
+                InventoryOperation.kind == InventoryOperationKindEnum.BUSINESS,
+            )
+            .all()
+        }
+        for sibling_operation_id in sibling_operation_ids:
+            sibling_reversed = (
+                db.query(InventoryOperation.operation_id)
+                .filter(
+                    InventoryOperation.reverses_operation_id
+                    == sibling_operation_id
+                )
+                .first()
+                is not None
+            )
+            if not sibling_reversed:
+                return IO_BATCH_DEPENDENCY_MESSAGE
+    if policy.domain == "stock_request" and any(
+        request.request_type.value != operation.action for request in requests
+    ):
+        return WORKFLOW_EVIDENCE_MESSAGE
+    for effect, request in zip(
+        (
+            effect
+            for effect in workflow_effects
+            if effect.subject_type == "StockRequest"
+        ),
+        requests,
+        strict=True,
+    ):
+        expected_status = StockRequestStatusEnum(effect.after_state["status"])
+        if any(line.status != expected_status for line in request.lines):
+            return "연결 업무 상태가 변경되어 이 작업만 취소할 수 없습니다."
+
+    if policy.domain == "shipping":
+        request = shipping_requests[0]
+        allocation_effects = [
+            effect
+            for effect in effects
+            if effect.effect_kind == InventoryOperationEffectKindEnum.ALLOCATION
+        ]
+        for effect in allocation_effects:
+            allocation = db.get(ShippingAllocation, effect.subject_id)
+            if allocation is None:
+                return "연결된 업무를 찾을 수 없습니다."
+            if allocation.request_id != request.request_id:
+                return WORKFLOW_EVIDENCE_MESSAGE
+        picked_up_event = (
+            db.query(ShippingRequestEvent.event_id)
+            .filter(
+                ShippingRequestEvent.request_id == request.request_id,
+                ShippingRequestEvent.event_type == "PICKED_UP",
+            )
+            .first()
+        )
+        if picked_up_event is None:
+            return WORKFLOW_EVIDENCE_MESSAGE
+    return None
+
+
+def _workflow_reason_code(
+    operation: InventoryOperation,
+    effects: list[InventoryOperationEffect],
+    blockers: tuple[str, ...],
+) -> str | None:
+    """업무 취소 blocker를 네 개의 공개 충돌 코드 중 하나로 축약한다."""
+    if not blockers:
+        return None
+    if (
+        _cancel_policy(operation) is None
+        and not effects
+        and WORKFLOW_EVIDENCE_MESSAGE not in blockers
+    ):
+        return None
+    if "이미 취소된 작업입니다." in blockers:
+        return WORKFLOW_ALREADY_CANCELLED
+    unsupported_messages = {
+        SHIPPING_DEDICATED_CANCEL_MESSAGE,
+        WORKFLOW_EVIDENCE_MESSAGE,
+        "지원하지 않는 연결 업무 효과가 포함되어 있습니다.",
+        "아직 취소를 지원하지 않는 작업 효과가 포함되어 있습니다.",
+    }
+    if any(message in unsupported_messages for message in blockers):
+        return WORKFLOW_CANCEL_UNSUPPORTED
+    state_messages = {
+        "취소 작업은 다시 취소할 수 없습니다.",
+        PREVIOUS_WEEK_MESSAGE,
+        "연결 업무 상태가 변경되어 이 작업만 취소할 수 없습니다.",
+        "연결된 업무를 찾을 수 없습니다.",
+    }
+    if any(message in state_messages for message in blockers):
+        return WORKFLOW_STATE_CONFLICT
+    return WORKFLOW_DEPENDENCY_CONFLICT
+
+
+ReservationIdentity = tuple[str, str, str, str]
+
+
+def _reservation_identity_for_allocation(
+    allocation: ShippingAllocation,
+) -> ReservationIdentity:
+    if allocation.department is None:
+        return str(allocation.item_id), "warehouse", "", ""
+    return (
+        str(allocation.item_id),
+        "location",
+        str(allocation.department),
+        LocationStatusEnum.PRODUCTION.value,
+    )
+
+
+def _policy_reservation_increases(
+    db: Session,
+    policy: CancelPolicy | None,
+    effects: list[InventoryOperationEffect],
+) -> dict[ReservationIdentity, int]:
+    """정책 복원 뒤 다시 활성화될 pending/allocation 수량을 셀별로 계산한다."""
+    if policy is None:
+        return {}
+    increases: dict[ReservationIdentity, int] = {}
+    for effect in effects:
+        target_status = (effect.before_state or {}).get("status")
+        if (
+            effect.effect_kind == InventoryOperationEffectKindEnum.ALLOCATION
+            and target_status == "RESERVED"
+        ):
+            allocation = db.get(ShippingAllocation, effect.subject_id)
+            if allocation is None:
+                raise CancellationNotAllowed("연결된 업무를 찾을 수 없습니다.")
+            key = _reservation_identity_for_allocation(allocation)
+            increases[key] = increases.get(key, 0) + int(allocation.quantity or 0)
+        if (
+            effect.effect_kind == InventoryOperationEffectKindEnum.WORKFLOW
+            and effect.subject_type == "StockRequest"
+            and target_status == StockRequestStatusEnum.RESERVED.value
+        ):
+            request = db.get(StockRequest, effect.subject_id)
+            if request is None:
+                raise CancellationNotAllowed("연결된 업무를 찾을 수 없습니다.")
+            from app.services import sr_reservation
+
+            for group in sr_reservation.aggregate_reservations(request.lines):
+                if group.bucket.value == "warehouse":
+                    key = str(group.item_id), "warehouse", "", ""
+                else:
+                    key = (
+                        str(group.item_id),
+                        "location",
+                        str(group.department or ""),
+                        group.status.value if group.status is not None else "",
+                    )
+                increases[key] = increases.get(key, 0) + int(group.quantity)
+    return increases
+
+
+def _cell_reservation_increase(
+    cell_key: tuple[str, str, str, str, str, str, str],
+    increases: dict[ReservationIdentity, int],
+) -> int:
+    item_id, scope, department, status, _row_id, _box_id, _zone_id = cell_key
+    return increases.get((item_id, scope, department, status), 0)
 
 
 def _as_kst(value: datetime) -> datetime:
@@ -422,19 +877,26 @@ def _workflow_subject_state(
 def _effect_subject_plan(
     db: Session,
     effect: InventoryOperationEffect,
+    *,
+    policy: CancelPolicy | None = None,
 ) -> CancellationEffectSubject:
     if effect.effect_kind == InventoryOperationEffectKindEnum.WORKFLOW:
-        current, target = _workflow_subject_state(
+        current, fallback_target = _workflow_subject_state(
             db,
             effect.subject_type,
             effect.subject_id,
         )
+        target = dict(effect.before_state) if policy is not None else fallback_target
     elif effect.effect_kind == InventoryOperationEffectKindEnum.ALLOCATION:
         allocation = db.get(ShippingAllocation, effect.subject_id)
         if allocation is None:
             raise CancellationNotAllowed("연결된 출하 배정을 찾을 수 없습니다.")
         current = {"status": allocation.status}
-        target = {"status": "RELEASED"}
+        target = (
+            dict(effect.before_state)
+            if policy is not None
+            else {"status": "RELEASED"}
+        )
     else:
         raise CancellationNotAllowed("아직 취소를 지원하지 않는 작업 효과가 포함되어 있습니다.")
     return CancellationEffectSubject(
@@ -467,7 +929,7 @@ def preview_cancellation(
     if (
         not allow_shipping_workflow
         and operation.domain == "shipping"
-        and operation.action in {"prepare", "pickup"}
+        and operation.action == "prepare"
     ):
         blockers.append(SHIPPING_DEDICATED_CANCEL_MESSAGE)
     existing_reversal = (
@@ -517,8 +979,60 @@ def preview_cancellation(
         )
         .all()
     )
+    policy = _cancel_policy(operation)
+    workflow_linked_without_policy = policy is None and any(
+        log.operation_batch_id is not None or log.shipping_request_id is not None
+        for log in logs
+    )
+    dedicated_prepare = (
+        allow_shipping_workflow
+        and operation.domain == "shipping"
+        and operation.action == "prepare"
+    )
+    if policy is not None:
+        contract_error = _policy_contract_error(operation, policy, operation_effects)
+        if contract_error is not None:
+            blockers.append(contract_error)
+        else:
+            subject_error = _policy_subject_error(
+                db,
+                operation,
+                policy,
+                operation_effects,
+            )
+            if subject_error is not None:
+                blockers.append(subject_error)
+    elif (
+        (
+            workflow_linked_without_policy
+            or any(
+                effect.effect_kind
+                in {
+                    InventoryOperationEffectKindEnum.WORKFLOW,
+                    InventoryOperationEffectKindEnum.ALLOCATION,
+                }
+                for effect in operation_effects
+            )
+        )
+        and not (
+            operation.domain == "shipping" and operation.action == "prepare"
+        )
+        and not dedicated_prepare
+    ):
+        blockers.append(WORKFLOW_EVIDENCE_MESSAGE)
     if int(operation.contract_version or 1) < 2:
         warnings.append(LEGACY_EFFECT_WARNING)
+
+    reservation_increases: dict[ReservationIdentity, int] = {}
+    if policy is not None and WORKFLOW_EVIDENCE_MESSAGE not in blockers:
+        try:
+            reservation_increases = _policy_reservation_increases(
+                db,
+                policy,
+                operation_effects,
+            )
+        except CancellationNotAllowed as exc:
+            blockers.append(str(exc))
 
     changes: dict[tuple[str, str, str, str, str, str, str], int] = {}
     expected_after: dict[tuple[str, str, str, str, str, str, str], int] = {}
@@ -584,7 +1098,11 @@ def preview_cancellation(
         if key in expected_after and current != expected_after[key]:
             blockers.append(PHYSICAL_ROW_CHANGED_MESSAGE)
         after = current + quantity_change
-        if after < reserved:
+        reserved_after = reserved + _cell_reservation_increase(
+            key,
+            reservation_increases,
+        )
+        if after < reserved_after:
             blockers.append(INSUFFICIENT_STOCK_MESSAGE)
         item_id, scope, department, status, row_id, box_id, zone_id = key
         cell_plans.append(
@@ -602,6 +1120,16 @@ def preview_cancellation(
                 quantity_after=after,
             )
         )
+
+    planned_reservation_identities = {
+        (cell.item_id, cell.scope, cell.department or "", cell.status or "")
+        for cell in cell_plans
+    }
+    if any(
+        identity not in planned_reservation_identities
+        for identity in reservation_increases
+    ):
+        blockers.append(WORKFLOW_EVIDENCE_MESSAGE)
 
     movement_changes: dict[str, int] = {}
     for movement in movements:
@@ -660,7 +1188,7 @@ def preview_cancellation(
     effect_plans: list[CancellationEffectSubject] = []
     for effect in operation_effects:
         try:
-            effect_plan = _effect_subject_plan(db, effect)
+            effect_plan = _effect_subject_plan(db, effect, policy=policy)
         except CancellationNotAllowed as exc:
             blockers.append(str(exc))
             continue
@@ -675,6 +1203,11 @@ def preview_cancellation(
     cells = tuple(cell_plans)
     defect_records = tuple(defect_plans)
     effects = tuple(effect_plans)
+    reason_code = _workflow_reason_code(
+        operation,
+        operation_effects,
+        unique_blockers,
+    )
     payload = _plan_payload(
         operation,
         logs,
@@ -684,6 +1217,11 @@ def preview_cancellation(
         unique_blockers,
         unique_warnings,
     )
+    payload["reason_code"] = reason_code
+    payload["reservation_increases"] = {
+        "|".join(key): quantity
+        for key, quantity in sorted(reservation_increases.items())
+    }
     plan_hash = hashlib.sha256(
         json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(
             "utf-8"
@@ -698,6 +1236,7 @@ def preview_cancellation(
         cells=cells,
         defect_records=defect_records,
         effects=effects,
+        reason_code=reason_code,
     )
 
 
@@ -711,6 +1250,94 @@ def _lock_original_operation(db: Session, operation_id: uuid.UUID) -> InventoryO
     if operation is None:
         raise CancellationOperationNotFound("취소할 작업을 찾을 수 없습니다.")
     return operation
+
+
+def _lock_policy_owner_rows(
+    db: Session,
+    operation: InventoryOperation,
+    policy: CancelPolicy | None,
+) -> None:
+    """업무 명령과 같은 owner-first 순서로 request/batch와 요청 라인을 잠근다."""
+    if policy is None or db.get_bind().dialect.name == "sqlite":
+        return
+    effects = (
+        db.query(InventoryOperationEffect)
+        .filter(
+            InventoryOperationEffect.operation_id == operation.operation_id,
+            InventoryOperationEffect.effect_kind
+            == InventoryOperationEffectKindEnum.WORKFLOW,
+        )
+        .order_by(
+            InventoryOperationEffect.subject_type.asc(),
+            InventoryOperationEffect.subject_id.asc(),
+        )
+        .all()
+    )
+    subject_ids: dict[str, list[str]] = {}
+    for effect in effects:
+        subject_ids.setdefault(effect.subject_type, []).append(effect.subject_id)
+    owner_specs = (
+        ("StockRequest", StockRequest, StockRequest.request_id),
+        ("IoBatch", IoBatch, IoBatch.batch_id),
+        ("ShippingRequest", ShippingRequest, ShippingRequest.request_id),
+    )
+    for subject_type, model, primary_key in owner_specs:
+        ids = sorted(set(subject_ids.get(subject_type, [])))
+        if not ids:
+            continue
+        rows = (
+            db.query(model)
+            .filter(primary_key.in_(ids))
+            .order_by(primary_key.asc())
+            .with_for_update()
+            .all()
+        )
+        if len(rows) != len(ids):
+            raise WorkflowCancellationConflict(
+                WORKFLOW_STATE_CONFLICT,
+                "연결된 업무를 찾을 수 없습니다.",
+            )
+    request_ids = sorted(set(subject_ids.get("StockRequest", [])))
+    if request_ids:
+        (
+            db.query(StockRequestLine)
+            .filter(StockRequestLine.request_id.in_(request_ids))
+            .order_by(
+                StockRequestLine.request_id.asc(),
+                StockRequestLine.line_id.asc(),
+            )
+            .with_for_update()
+            .all()
+        )
+
+
+def _lock_policy_allocations(
+    db: Session,
+    effects: list[InventoryOperationEffect],
+) -> None:
+    if db.get_bind().dialect.name == "sqlite":
+        return
+    allocation_ids = sorted(
+        {
+            effect.subject_id
+            for effect in effects
+            if effect.effect_kind == InventoryOperationEffectKindEnum.ALLOCATION
+        }
+    )
+    if not allocation_ids:
+        return
+    rows = (
+        db.query(ShippingAllocation)
+        .filter(ShippingAllocation.allocation_id.in_(allocation_ids))
+        .order_by(ShippingAllocation.allocation_id.asc())
+        .with_for_update()
+        .all()
+    )
+    if len(rows) != len(allocation_ids):
+        raise WorkflowCancellationConflict(
+            WORKFLOW_STATE_CONFLICT,
+            "연결된 업무를 찾을 수 없습니다.",
+        )
 
 
 def _reverse_log(
@@ -841,6 +1468,63 @@ def _close_workflow_subject(
     return before, target
 
 
+def _restore_workflow_subject(
+    db: Session,
+    *,
+    original: InventoryOperationEffect,
+    cancellation: InventoryOperation,
+    canceller: Employee,
+) -> tuple[dict, dict]:
+    """정책이 검증한 effect.before_state의 정확한 상태로 소유 업무를 복원한다."""
+    before, _fallback_target = _workflow_subject_state(
+        db,
+        original.subject_type,
+        original.subject_id,
+    )
+    target = dict(original.before_state)
+    target_status = target["status"]
+    if original.subject_type == "ShippingRequest":
+        subject = db.get(ShippingRequest, original.subject_id)
+        if subject is None:
+            raise CancellationNotAllowed("연결된 업무를 찾을 수 없습니다.")
+        subject.status = ShippingRequestStatusEnum(target_status)
+        subject.picked_up_at = None
+        subject.cancelled_at = None
+        subject.cancelled_by_employee_id = None
+        subject.cancelled_by_name = None
+        subject.updated_at = cancellation.effective_at
+    elif original.subject_type == "StockRequest":
+        subject = db.get(StockRequest, original.subject_id)
+        if subject is None:
+            raise CancellationNotAllowed("연결된 업무를 찾을 수 없습니다.")
+        restored_status = StockRequestStatusEnum(target_status)
+        lines = (
+            db.query(StockRequestLine)
+            .filter(StockRequestLine.request_id == subject.request_id)
+            .order_by(StockRequestLine.line_id.asc())
+            .all()
+        )
+        if restored_status == StockRequestStatusEnum.RESERVED:
+            from app.services import sr_reservation
+
+            sr_reservation.reserve_lines(db, lines, employee=canceller)
+        subject.status = restored_status
+        subject.completed_at = None
+        subject.cancelled_at = None
+        for line in lines:
+            line.status = restored_status
+    elif original.subject_type == "IoBatch":
+        subject = db.get(IoBatch, original.subject_id)
+        if subject is None:
+            raise CancellationNotAllowed("연결된 업무를 찾을 수 없습니다.")
+        subject.status = target_status
+        subject.completed_at = None
+        subject.updated_at = cancellation.effective_at
+    else:
+        raise CancellationNotAllowed(WORKFLOW_EVIDENCE_MESSAGE)
+    return before, target
+
+
 def _reverse_operation_effect(
     db: Session,
     *,
@@ -848,24 +1532,41 @@ def _reverse_operation_effect(
     cancellation: InventoryOperation,
     canceller: Employee,
     reason: str,
+    policy: CancelPolicy | None = None,
 ) -> InventoryOperationEffect:
-    """연결 업무는 최종 취소로 닫고 배정은 해제한 뒤 역전 효과를 추가한다."""
+    """정책 업무는 원 상태로, 기존 전용 경로는 기존 종료 상태로 역전한다."""
     if original.effect_kind == InventoryOperationEffectKindEnum.WORKFLOW:
-        before, after = _close_workflow_subject(
-            db,
-            subject_type=original.subject_type,
-            subject_id=original.subject_id,
-            cancellation=cancellation,
-            canceller=canceller,
-        )
+        if policy is None:
+            before, after = _close_workflow_subject(
+                db,
+                subject_type=original.subject_type,
+                subject_id=original.subject_id,
+                cancellation=cancellation,
+                canceller=canceller,
+            )
+        else:
+            before, after = _restore_workflow_subject(
+                db,
+                original=original,
+                cancellation=cancellation,
+                canceller=canceller,
+            )
     elif original.effect_kind == InventoryOperationEffectKindEnum.ALLOCATION:
         allocation = db.get(ShippingAllocation, original.subject_id)
         if allocation is None:
             raise CancellationNotAllowed("연결된 출하 배정을 찾을 수 없습니다.")
         before = {"status": allocation.status}
-        allocation.status = "RELEASED"
-        allocation.released_at = cancellation.effective_at
-        allocation.released_reason = reason
+        target_status = (
+            original.before_state["status"] if policy is not None else "RELEASED"
+        )
+        allocation.status = target_status
+        if target_status == "RESERVED":
+            allocation.consumed_at = None
+            allocation.released_at = None
+            allocation.released_reason = None
+        else:
+            allocation.released_at = cancellation.effective_at
+            allocation.released_reason = reason
         after = {"status": allocation.status}
     else:
         raise CancellationNotAllowed("아직 취소를 지원하지 않는 작업 효과가 포함되어 있습니다.")
@@ -884,6 +1585,35 @@ def _reverse_operation_effect(
     return reversal
 
 
+def _record_policy_cancel_event(
+    db: Session,
+    *,
+    policy: CancelPolicy | None,
+    effects: list[InventoryOperationEffect],
+    canceller: Employee,
+    reason: str,
+) -> None:
+    if policy is None or not policy.creates_pickup_cancel_event:
+        return
+    request_effect = next(
+        effect
+        for effect in effects
+        if effect.effect_kind == InventoryOperationEffectKindEnum.WORKFLOW
+        and effect.subject_type == "ShippingRequest"
+    )
+    db.add(
+        ShippingRequestEvent(
+            request_id=request_effect.subject_id,
+            event_type="PICKUP_CANCELLED",
+            message=reason,
+            actor_employee_id=canceller.employee_id,
+            actor_employee_code=canceller.employee_code,
+            actor_name=canceller.name,
+        )
+    )
+    db.flush()
+
+
 def _assert_plan_applied(
     db: Session,
     *,
@@ -893,6 +1623,18 @@ def _assert_plan_applied(
 ) -> None:
     """역전 직후 원장·물리 상태가 미리보기의 최종값과 같은지 검산한다."""
     db.flush()
+    policy = _cancel_policy(original)
+    original_operation_effects = (
+        db.query(InventoryOperationEffect)
+        .filter(InventoryOperationEffect.operation_id == original.operation_id)
+        .order_by(InventoryOperationEffect.effect_id.asc())
+        .all()
+    )
+    reservation_increases = _policy_reservation_increases(
+        db,
+        policy,
+        original_operation_effects,
+    )
     for cell in plan.cells:
         current, reserved = _current_cell(
             db,
@@ -906,7 +1648,16 @@ def _assert_plan_applied(
                 cell.zone_id or "",
             ),
         )
-        if current != cell.quantity_after or reserved != cell.reserved_quantity:
+        expected_reserved = cell.reserved_quantity + reservation_increases.get(
+            (
+                cell.item_id,
+                cell.scope,
+                cell.department or "",
+                cell.status or "",
+            ),
+            0,
+        )
+        if current != cell.quantity_after or reserved != expected_reserved:
             raise CancellationNotAllowed("취소 적용 후 재고 검산에 실패했습니다.")
 
     affected_defect_locations: set[tuple[str, str]] = set()
@@ -953,9 +1704,7 @@ def _assert_plan_applied(
         DefectInventoryMovement.operation_id == cancellation.operation_id,
         DefectInventoryMovement.reverses_movement_id.isnot(None),
     ).count()
-    original_effects = db.query(InventoryOperationEffect).filter(
-        InventoryOperationEffect.operation_id == original.operation_id
-    ).count()
+    original_effects = len(original_operation_effects)
     reversed_effects = db.query(InventoryOperationEffect).filter(
         InventoryOperationEffect.operation_id == cancellation.operation_id,
         InventoryOperationEffect.reverses_effect_id.isnot(None),
@@ -971,8 +1720,12 @@ def _assert_plan_applied(
         original_effect = db.get(InventoryOperationEffect, effect.effect_id)
         if original_effect is None:
             raise CancellationNotAllowed("취소 적용 후 업무 상태 검산에 실패했습니다.")
-        current = _effect_subject_plan(db, original_effect).current_state
-        if current != effect.target_state:
+        current_state = _effect_subject_plan(
+            db,
+            original_effect,
+            policy=policy,
+        ).current_state
+        if current_state != effect.target_state:
             raise CancellationNotAllowed("취소 적용 후 업무 상태 검산에 실패했습니다.")
 
 
@@ -1025,6 +1778,11 @@ def cancel_operation(
 ) -> InventoryOperation:
     """잠금 후 계획을 재검산하고 전체 역전 작업을 한 트랜잭션으로 확정한다."""
     with transactional(db):
+        candidate = db.get(InventoryOperation, operation_id)
+        if candidate is None:
+            raise CancellationOperationNotFound("취소할 작업을 찾을 수 없습니다.")
+        policy = _cancel_policy(candidate)
+        _lock_policy_owner_rows(db, candidate, policy)
         original = _lock_original_operation(db, operation_id)
         logs = (
             db.query(TransactionLog)
@@ -1074,6 +1832,7 @@ def cancel_operation(
             key=str,
         )
         _lock_inventory_allocation_graph(db, affected_item_ids)
+        _lock_policy_allocations(db, operation_effects)
         if defect_record_ids:
             defect_query = (
                 db.query(DefectQuarantineRecord)
@@ -1090,10 +1849,25 @@ def cancel_operation(
             allow_shipping_workflow=allow_shipping_workflow,
         )
         if current_plan.plan_hash != plan_hash:
+            if current_plan.reason_code is not None:
+                raise WorkflowCancellationConflict(
+                    current_plan.reason_code,
+                    current_plan.blockers[0],
+                )
+            if policy is not None:
+                raise WorkflowCancellationConflict(
+                    WORKFLOW_STATE_CONFLICT,
+                    "취소 미리보기 이후 업무 상태가 변경되었습니다. 다시 확인해 주세요.",
+                )
             raise CancellationPlanChanged(
                 "취소 미리보기 이후 재고 또는 예약 상태가 변경되었습니다. 다시 확인해 주세요."
             )
         if not current_plan.can_cancel:
+            if current_plan.reason_code is not None:
+                raise WorkflowCancellationConflict(
+                    current_plan.reason_code,
+                    current_plan.blockers[0],
+                )
             raise CancellationNotAllowed(current_plan.blockers[0])
 
         cancellation = operation_svc._create_cancellation_operation(
@@ -1126,7 +1900,15 @@ def cancel_operation(
                 cancellation=cancellation,
                 canceller=canceller,
                 reason=reason,
+                policy=policy,
             )
+        _record_policy_cancel_event(
+            db,
+            policy=policy,
+            effects=operation_effects,
+            canceller=canceller,
+            reason=reason,
+        )
         _assert_plan_applied(
             db,
             original=original,

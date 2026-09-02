@@ -231,8 +231,19 @@ def _lock_correction_log(
 def lock_transaction_operation_and_log(
     db: Session,
     log_id: uuid.UUID,
+    *,
+    legacy_only: bool = False,
 ) -> tuple[InventoryOperation | None, TransactionLog]:
-    """거래 command가 operation → log 순서로 소유권을 잠그게 한다."""
+    """거래 command가 operation → log 순서로 소유권을 잠그게 한다.
+
+    Legacy 취소는 log만 잠근 뒤 workflow operation으로 바뀌지 않았음을 재확인한다.
+    """
+    if legacy_only:
+        log = _lock_correction_log(db, log_id)
+        if log.operation_id is not None:
+            raise CorrectionConflict("workflow_linked")
+        return None, log
+
     operation_id = db.query(TransactionLog.operation_id).filter(
         TransactionLog.log_id == log_id
     ).scalar()

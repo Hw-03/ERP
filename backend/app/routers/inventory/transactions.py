@@ -1049,7 +1049,7 @@ def cancel_transaction(
     request: Request,
     actor: VerifiedActor,
     db: Session = Depends(get_db),
-):
+) -> TransactionLogResponse:
     """거래 취소 — 내역 유지 + 재고 자동 롤백 + '취소됨' 표시.
 
     권한: 요청자 본인(producer_employee_id) 또는 결재 권한자(warehouse_role / department_role != none).
@@ -1058,25 +1058,35 @@ def cancel_transaction(
     ensure_actor_employee_code(actor, payload.employee_code)
     canceller = _verify_actor_pin(request, actor, payload.pin)
 
-    try:
-        _operation, log = transaction_actions_svc.lock_transaction_operation_and_log(
-            db,
-            log_id,
-        )
-    except transaction_actions_svc.TransactionLogNotFound:
+    log = db.get(TransactionLog, log_id)
+    if log is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "거래를 찾을 수 없습니다.")
-    except transaction_actions_svc.CorrectionConflict as exc:
-        raise http_error(
-            409,
-            ErrorCode.COMMAND_CONFLICT,
-            "거래 상태가 변경되어 취소할 수 없습니다.",
-            reason=exc.reason,
-        )
+    operation_id = log.operation_id
+    if operation_id is None:
+        try:
+            _operation, log = transaction_actions_svc.lock_transaction_operation_and_log(
+                db,
+                log_id,
+                legacy_only=True,
+            )
+        except transaction_actions_svc.TransactionLogNotFound:
+            raise http_error(404, ErrorCode.NOT_FOUND, "거래를 찾을 수 없습니다.")
+        except transaction_actions_svc.CorrectionConflict as exc:
+            raise http_error(
+                409,
+                ErrorCode.COMMAND_CONFLICT,
+                "거래 상태가 변경되어 취소할 수 없습니다.",
+                reason=exc.reason,
+            )
 
     if bool(getattr(log, "cancelled", False)):
         raise http_error(422, ErrorCode.BUSINESS_RULE, "이미 취소된 거래입니다.")
 
-    item = item_repository.get_active(db, log.item_id, for_update=True)
+    item = item_repository.get_active(
+        db,
+        log.item_id,
+        for_update=operation_id is None,
+    )
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
@@ -1104,19 +1114,21 @@ def cancel_transaction(
     if not (is_self or is_approver):
         raise http_error(403, ErrorCode.FORBIDDEN, "본인 거래 또는 결재 권한자만 취소할 수 있습니다.")
 
-    if log.operation_id is not None:
+    if operation_id is not None:
         try:
             preview = operation_cancellation_svc.preview_cancellation(
                 db,
-                log.operation_id,
+                operation_id,
             )
             operation_cancellation_svc.cancel_operation(
                 db,
-                operation_id=log.operation_id,
+                operation_id=operation_id,
                 canceller=canceller,
                 reason=payload.reason,
                 plan_hash=preview.plan_hash,
             )
+        except operation_cancellation_svc.WorkflowCancellationConflict as exc:
+            raise http_error(409, exc.reason_code, str(exc)) from exc
         except operation_cancellation_svc.CancellationPlanChanged as exc:
             raise http_error(409, ErrorCode.CONFLICT, str(exc)) from exc
         except operation_cancellation_svc.CancellationNotAllowed as exc:
@@ -1138,6 +1150,8 @@ def cancel_transaction(
         )
     except transaction_actions_svc.TransactionInventoryNotFound as exc:
         raise http_error(404, ErrorCode.NOT_FOUND, str(exc))
+    except operation_cancellation_svc.WorkflowCancellationConflict as exc:
+        raise http_error(409, exc.reason_code, str(exc)) from exc
     except operation_cancellation_svc.CancellationPlanChanged as exc:
         raise http_error(409, ErrorCode.CONFLICT, str(exc)) from exc
     except legacy_adoption_svc.LegacyCancellationAdoptionError as exc:

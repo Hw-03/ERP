@@ -874,7 +874,7 @@ def test_cancel_quarantine_reverses_physical_stock_and_defect_ledger(
     assert inventory.warehouse_qty == Decimal("5")
 
 
-def test_cancel_handover_closes_workflow_instead_of_restoring_waiting_state(
+def test_generic_cancel_rejects_handover_without_a_cancel_policy(
     db_session, make_item, make_location
 ) -> None:
     item = make_item(name="인수인계 취소", warehouse_qty=Decimal("0"))
@@ -945,17 +945,21 @@ def test_cancel_handover_closes_workflow_instead_of_restoring_waiting_state(
         original.operation_id,
         now=datetime(2026, 8, 25, 3, 0),
     )
-    cancellation_svc.cancel_operation(
-        db_session,
-        operation_id=original.operation_id,
-        canceller=receiver,
-        reason="인수 처리 취소",
-        plan_hash=preview.plan_hash,
-        now=datetime(2026, 8, 25, 3, 0),
-    )
+    assert preview.can_cancel is False
+    assert preview.reason_code == cancellation_svc.WORKFLOW_CANCEL_UNSUPPORTED
+    with pytest.raises(cancellation_svc.WorkflowCancellationConflict) as caught:
+        cancellation_svc.cancel_operation(
+            db_session,
+            operation_id=original.operation_id,
+            canceller=receiver,
+            reason="인수 처리 취소",
+            plan_hash=preview.plan_hash,
+            now=datetime(2026, 8, 25, 3, 0),
+        )
+    assert caught.value.reason_code == cancellation_svc.WORKFLOW_CANCEL_UNSUPPORTED
 
     db_session.refresh(document)
-    assert document.status == HandoverStatusEnum.CANCELLED
+    assert document.status == HandoverStatusEnum.RECEIVED
     tube_stock = (
         db_session.query(InventoryLocation.quantity)
         .filter(
@@ -974,8 +978,9 @@ def test_cancel_handover_closes_workflow_instead_of_restoring_waiting_state(
         )
         .scalar()
     )
-    assert tube_stock == Decimal("2")
-    assert high_voltage_stock in {None, Decimal("0")}
+    assert tube_stock == Decimal("0")
+    assert high_voltage_stock == Decimal("2")
     effects = db_session.query(InventoryOperationEffect).all()
-    assert len(effects) == 2
-    assert effects[1].reverses_effect_id == effects[0].effect_id
+    assert len(effects) == 1
+    assert effects[0].reverses_effect_id is None
+    assert db_session.query(InventoryOperation).count() == 1

@@ -1086,7 +1086,7 @@ def test_pickup_cancel_rolls_back_when_event_recording_fails(
     def fail_event(*_args, **_kwargs):
         raise RuntimeError("pickup cancel event failure")
 
-    monkeypatch.setattr(shipping_svc, "_record_event", fail_event)
+    monkeypatch.setattr(cancellation_svc, "_record_policy_cancel_event", fail_event)
 
     with pytest.raises(RuntimeError, match="pickup cancel event failure"):
         shipping_actions_svc.pickup_cancel(db_session, request_id, actor)

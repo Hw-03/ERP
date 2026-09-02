@@ -324,6 +324,134 @@ def test_operation_cancel_pin_uses_shared_actor_rate_limit(
     )
 
 
+@pytest.mark.parametrize(
+    "reason_code",
+    [
+        "WORKFLOW_CANCEL_UNSUPPORTED",
+        "WORKFLOW_STATE_CONFLICT",
+        "WORKFLOW_ALREADY_CANCELLED",
+        "WORKFLOW_DEPENDENCY_CONFLICT",
+    ],
+)
+def test_operation_cancel_returns_stable_workflow_conflict_code(
+    client,
+    db_session,
+    make_item,
+    monkeypatch,
+    reason_code,
+) -> None:
+    _item, actor, operation, _original_log = _seed_operation(db_session, make_item)
+
+    def reject_workflow_cancel(*args, **kwargs):
+        raise operation_cancellation_svc.WorkflowCancellationConflict(
+            reason_code,
+            "workflow 취소 충돌",
+        )
+
+    monkeypatch.setattr(
+        operation_cancellation_svc,
+        "cancel_operation",
+        reject_workflow_cancel,
+    )
+
+    response = client.post(
+        f"/api/inventory/operations/{operation.operation_id}/cancel",
+        json={
+            "reason": "업무 취소",
+            "employee_code": actor.employee_code,
+            "pin": "0000",
+            "plan_hash": "a" * 64,
+        },
+    )
+
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"]["code"] == reason_code
+
+
+@pytest.mark.parametrize(
+    "reason_code",
+    [
+        "WORKFLOW_CANCEL_UNSUPPORTED",
+        "WORKFLOW_STATE_CONFLICT",
+        "WORKFLOW_ALREADY_CANCELLED",
+        "WORKFLOW_DEPENDENCY_CONFLICT",
+    ],
+)
+def test_transaction_history_cancel_returns_stable_workflow_conflict_code(
+    client,
+    db_session,
+    make_item,
+    monkeypatch,
+    reason_code,
+) -> None:
+    _item, actor, _operation, original_log = _seed_operation(db_session, make_item)
+
+    def reject_workflow_cancel(*args, **kwargs):
+        raise operation_cancellation_svc.WorkflowCancellationConflict(
+            reason_code,
+            "workflow 취소 충돌",
+        )
+
+    monkeypatch.setattr(
+        operation_cancellation_svc,
+        "cancel_operation",
+        reject_workflow_cancel,
+    )
+
+    response = client.post(
+        f"/api/inventory/transactions/{original_log.log_id}/cancel",
+        json={
+            "reason": "기존 이력 업무 취소",
+            "employee_code": actor.employee_code,
+            "pin": "0000",
+        },
+    )
+
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"]["code"] == reason_code
+
+
+def test_transaction_history_blocks_request_linked_component_change(
+    client,
+    db_session,
+    make_item,
+) -> None:
+    item, actor, operation, original_log = _seed_operation(db_session, make_item)
+    request = ShippingRequest(
+        status=ShippingRequestStatusEnum.PREPARING,
+        base_pf_item_id=item.item_id,
+        final_pf_item_id=item.item_id,
+        request_quantity=1,
+    )
+    db_session.add(request)
+    db_session.flush()
+    operation.domain = "shipping"
+    operation.action = "component_change"
+    original_log.shipping_request_id = request.request_id
+    original_log.shipping_phase = "component_change"
+    db_session.commit()
+
+    response = client.post(
+        f"/api/inventory/transactions/{original_log.log_id}/cancel",
+        json={
+            "reason": "구성 변경 generic 취소 차단",
+            "employee_code": actor.employee_code,
+            "pin": "0000",
+        },
+    )
+
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"]["code"] == "WORKFLOW_CANCEL_UNSUPPORTED"
+    db_session.expire_all()
+    assert db_session.get(TransactionLog, original_log.log_id).cancelled is False
+    assert db_session.get(ShippingRequest, request.request_id).status == (
+        ShippingRequestStatusEnum.PREPARING
+    )
+    assert db_session.query(InventoryOperation).filter(
+        InventoryOperation.reverses_operation_id == operation.operation_id
+    ).count() == 0
+
+
 def test_legacy_log_cancel_endpoint_delegates_new_logs_to_operation_reversal(
     client, db_session, make_item
 ) -> None:
@@ -352,7 +480,7 @@ def test_legacy_log_cancel_endpoint_delegates_new_logs_to_operation_reversal(
     assert inventory.warehouse_qty == Decimal("0")
 
 
-def test_same_week_legacy_production_batch_is_adopted_before_cancellation(
+def test_same_week_legacy_production_batch_without_before_state_fails_closed(
     client, db_session, make_item
 ) -> None:
     parent = make_item(name="레거시 생산 완제품", warehouse_qty=Decimal("0"))
@@ -473,72 +601,34 @@ def test_same_week_legacy_production_batch_is_adopted_before_cancellation(
         },
     )
 
-    assert response.status_code == 200, response.text
-    assert response.json()["operation_kind"] == InventoryOperationKindEnum.BUSINESS.value
-    assert response.json()["operation_effective_status"] == "cancelled"
-    assert response.json()["reversal_operation_id"] is not None
-    operations = db_session.query(InventoryOperation).all()
-    assert len(operations) == 2
-    original = next(
-        operation
-        for operation in operations
-        if operation.kind == InventoryOperationKindEnum.BUSINESS
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"]["code"] == "WORKFLOW_CANCEL_UNSUPPORTED"
+    assert response.json()["detail"]["message"] == (
+        operation_cancellation_svc.WORKFLOW_EVIDENCE_MESSAGE
     )
-    cancellation = next(
-        operation
-        for operation in operations
-        if operation.kind == InventoryOperationKindEnum.CANCELLATION
-    )
-    assert cancellation.reverses_operation_id == original.operation_id
-    assert original.display_label == "부서 입출고"
-    assert cancellation.display_label == "부서 입출고 취소"
-    assert original.idempotency_key == f"legacy-cancel-source:batch:{batch.batch_id}"
-    assert original.effective_at == legacy_at
-    assert original.actor_employee_id == actor.employee_id
-    assert original.actor_name == actor.name
-    assert original.department == DepartmentEnum.HIGH_VOLTAGE.value
+    assert db_session.query(InventoryOperation).count() == 0
     db_session.refresh(component_log)
     db_session.refresh(parent_log)
-    assert component_log.operation_id == original.operation_id
-    assert component_log.operation_role == InventoryOperationRoleEnum.COMPONENT_INPUT
-    assert parent_log.operation_id == original.operation_id
-    assert parent_log.operation_role == InventoryOperationRoleEnum.PRODUCT_OUTPUT
+    assert component_log.operation_id is None
+    assert component_log.operation_role is None
+    assert parent_log.operation_id is None
+    assert parent_log.operation_role is None
     assert component_log.cancelled is False
     assert parent_log.cancelled is False
-    reversal_logs = (
-        db_session.query(TransactionLog)
-        .filter(TransactionLog.operation_id == cancellation.operation_id)
-        .all()
-    )
-    assert {log.quantity_change for log in reversal_logs} == {
-        Decimal("-7"),
-        Decimal("7"),
-    }
-    assert {log.reverses_log_id for log in reversal_logs} == {
-        component_log.log_id,
-        parent_log.log_id,
-    }
     db_session.refresh(batch)
-    assert batch.status == "cancelled"
+    assert batch.status == "completed"
     db_session.refresh(stock_request)
-    assert stock_request.status == StockRequestStatusEnum.CANCELLED
+    assert stock_request.status == StockRequestStatusEnum.COMPLETED
     assert inventory_svc._get_or_create_inventory(
         db_session, parent.item_id
-    ).quantity == Decimal("0")
+    ).quantity == Decimal("7")
     assert inventory_svc._get_or_create_inventory(
         db_session, component.item_id
-    ).quantity == Decimal("20")
+    ).quantity == Decimal("13")
 
     after_summary = client.get("/api/inventory/transactions/summary")
     assert after_summary.status_code == 200, after_summary.text
-    assert after_summary.json()["total"] == 2
-
-    groups = client.get("/api/inventory/transactions/display-groups").json()["groups"]
-    assert [group["type"] for group in groups] == ["operation", "operation"]
-    assert {group["logs"][0]["operation_kind"] for group in groups} == {
-        InventoryOperationKindEnum.BUSINESS.value,
-        InventoryOperationKindEnum.CANCELLATION.value,
-    }
+    assert after_summary.json()["total"] == 1
 
 
 def test_legacy_defect_transaction_is_blocked_without_any_adoption(
@@ -835,7 +925,7 @@ def test_legacy_fifo_restore_without_physical_row_effect_is_blocked(
     assert db_session.query(DefectInventoryMovement).count() == 0
 
 
-def test_evidence_backed_legacy_defect_disassembly_is_adopted_as_one_operation(
+def test_legacy_defect_disassembly_without_v2_before_state_fails_closed(
     client, db_session, make_item, make_location
 ) -> None:
     parent = make_item(name="근거 있는 레거시 분해 부모", warehouse_qty=Decimal("0"))
@@ -959,26 +1049,26 @@ def test_evidence_backed_legacy_defect_disassembly_is_adopted_as_one_operation(
         },
     )
 
-    assert response.status_code == 200, response.text
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"]["code"] == "WORKFLOW_CANCEL_UNSUPPORTED"
+    assert response.json()["detail"]["message"] == (
+        operation_cancellation_svc.WORKFLOW_EVIDENCE_MESSAGE
+    )
     db_session.expire_all()
-    assert db_session.get(InventoryLocation, parent_location.location_id).quantity == Decimal("1")
-    assert db_session.get(InventoryLocation, normal_location.location_id).quantity == Decimal("0")
-    assert db_session.get(InventoryLocation, defect_location.location_id).quantity == Decimal("0")
-    assert db_session.get(DefectQuarantineRecord, parent_record.record_id).remaining_quantity == Decimal("1")
-    assert db_session.get(DefectQuarantineRecord, child_record.record_id).remaining_quantity == Decimal("0")
-    assert db_session.query(InventoryOperation).count() == 2
-    assert db_session.query(DefectInventoryMovement).count() == 4
+    assert db_session.get(InventoryLocation, parent_location.location_id).quantity == Decimal("0")
+    assert db_session.get(InventoryLocation, normal_location.location_id).quantity == Decimal("1")
+    assert db_session.get(InventoryLocation, defect_location.location_id).quantity == Decimal("1")
+    assert db_session.get(DefectQuarantineRecord, parent_record.record_id).remaining_quantity == Decimal("0")
+    assert db_session.get(DefectQuarantineRecord, child_record.record_id).remaining_quantity == Decimal("1")
+    assert db_session.query(InventoryOperation).count() == 0
+    assert db_session.query(DefectInventoryMovement).count() == 0
     originals = (
         db_session.query(TransactionLog)
         .filter(TransactionLog.log_id.in_([log.log_id for log in logs]))
         .all()
     )
-    assert {log.operation_role for log in originals} == {
-        InventoryOperationRoleEnum.REWORK_PARENT_DEFECTIVE,
-        InventoryOperationRoleEnum.REWORK_CHILD_NORMAL,
-        InventoryOperationRoleEnum.REWORK_CHILD_DEFECTIVE,
-        InventoryOperationRoleEnum.REWORK_CHILD_SCRAP,
-    }
+    assert {log.operation_id for log in originals} == {None}
+    assert {log.operation_role for log in originals} == {None}
 
 
 def test_legacy_disassembly_batch_is_blocked_even_without_legacy_note_markers(
@@ -1340,7 +1430,7 @@ def test_same_week_legacy_warehouse_transfer_is_quarantined_without_mutation(
     assert location.quantity == Decimal("7")
 
 
-def test_same_week_legacy_department_transfer_batch_is_adopted(
+def test_same_week_legacy_department_transfer_without_before_state_fails_closed(
     client, db_session, make_item
 ) -> None:
     item = make_item(name="레거시 부서 이동", warehouse_qty=Decimal("0"))
@@ -1400,10 +1490,16 @@ def test_same_week_legacy_department_transfer_batch_is_adopted(
         },
     )
 
-    assert response.status_code == 200, response.text
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"]["code"] == "WORKFLOW_CANCEL_UNSUPPORTED"
+    assert response.json()["detail"]["message"] == (
+        operation_cancellation_svc.WORKFLOW_EVIDENCE_MESSAGE
+    )
     db_session.refresh(log)
-    assert log.operation_role == InventoryOperationRoleEnum.TRANSFER
-    assert batch.status == "cancelled"
+    assert log.operation_id is None
+    assert log.operation_role is None
+    assert batch.status == "completed"
+    assert db_session.query(InventoryOperation).count() == 0
     locations = {
         location.department: location.quantity
         for location in db_session.query(InventoryLocation)
@@ -1413,8 +1509,8 @@ def test_same_week_legacy_department_transfer_batch_is_adopted(
         )
         .all()
     }
-    assert locations[DepartmentEnum.HIGH_VOLTAGE] == Decimal("5")
-    assert locations[DepartmentEnum.ASSEMBLY] == Decimal("0")
+    assert locations[DepartmentEnum.HIGH_VOLTAGE] == Decimal("0")
+    assert locations[DepartmentEnum.ASSEMBLY] == Decimal("5")
 
 
 def test_mixed_legacy_and_operation_batch_is_blocked_without_new_rows(
@@ -1656,9 +1752,10 @@ def test_legacy_shipping_reference_bundle_is_adopted_as_one_operation(
         },
     )
 
-    assert response.status_code == 422, response.text
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"]["code"] == "WORKFLOW_CANCEL_UNSUPPORTED"
     assert response.json()["detail"]["message"] == (
-        operation_cancellation_svc.SHIPPING_DEDICATED_CANCEL_MESSAGE
+        operation_cancellation_svc.WORKFLOW_EVIDENCE_MESSAGE
     )
     assert db_session.query(InventoryOperation).count() == 0
     db_session.refresh(request)

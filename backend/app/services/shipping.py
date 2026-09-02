@@ -2321,13 +2321,6 @@ def _pickup_cancel(
             return_status=ShippingRequestStatusEnum.PREPARED,
             allocation_status=ALLOCATION_RESERVED,
         )
-        _record_event(
-            db,
-            req,
-            "PICKUP_CANCELLED",
-            "픽업 완료 취소",
-            actor=actor,
-        )
         db.flush()
         return req
 
