@@ -45,7 +45,19 @@ export interface InventoryIntegrityIssue {
   repairable: boolean;
 }
 
+export interface InventoryIntegrityCheck {
+  check_id: string;
+  severity: "blocking" | "warning";
+  count: number;
+  samples: Array<Record<string, unknown>>;
+}
+
 export interface InventoryIntegrityResult {
+  contract: "inventory-integrity/v1";
+  status: "pass" | "warning" | "fail";
+  blocking_count: number;
+  warning_count: number;
+  checks: InventoryIntegrityCheck[];
   generated_at: string;
   is_consistent: boolean;
   issue_count: number;

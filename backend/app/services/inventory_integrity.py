@@ -15,6 +15,7 @@ from app.models import (
     DefectInventoryMovement,
     DefectQuarantineRecord,
     HandoverDoc,
+    Inventory,
     InventoryLocation,
     InventoryOperation,
     InventoryOperationEffect,
@@ -26,11 +27,36 @@ from app.models import (
     ShippingAllocation,
     ShippingRequest,
     StockRequest,
+    StockRequestLine,
     TransactionLog,
+    WarehouseAngle,
+    WarehouseBox,
+    WarehouseBoxItem,
+    WarehouseSpecialZone,
+    WarehouseSpecialZoneItem,
+    WarehouseUnplacedItem,
 )
 from app.schemas.inventory_integrity import (
+    InventoryIntegrityCheck,
+    InventoryIntegrityCategory,
     InventoryIntegrityIssue,
     InventoryIntegrityResponse,
+)
+from app.services.inventory_integrity_engine import (
+    IntegrityFinding,
+    InventoryIntegritySnapshot,
+    InventoryState,
+    LocationState,
+    OperationEvidenceState,
+    OperationState,
+    ShippingAllocationState,
+    ShippingRequestState,
+    StockRequestLineState,
+    StockRequestState,
+    TransactionEffectState,
+    WarehouseBoxState,
+    WarehousePlacementState,
+    evaluate_inventory_integrity,
 )
 from app.services.inventory_operations import cutover_at
 from app.services.weekly_report_contract import (
@@ -40,7 +66,7 @@ from app.services.weekly_report_contract import (
 )
 
 
-CATEGORIES = (
+CATEGORIES: tuple[InventoryIntegrityCategory, ...] = (
     "DEFECT_STOCK_MISMATCH",
     "PARTIAL_CANCELLATION",
     "WORKFLOW_STATE_RESIDUE",
@@ -423,6 +449,231 @@ def _weekly_unclassified_issues(db: Session) -> list[InventoryIntegrityIssue]:
     return issues
 
 
+def _enum_value(value: object) -> str:
+    return str(getattr(value, "value", value))
+
+
+def _collect_integrity_snapshot(db: Session) -> InventoryIntegritySnapshot:
+    """Read and normalize the database state without mutating it."""
+    items = db.query(Item.item_id, Item.deleted_at).all()
+    inventories = db.query(Inventory).all()
+    locations = db.query(InventoryLocation).all()
+    stock_requests = db.query(StockRequest).all()
+    stock_request_lines = db.query(StockRequestLine).all()
+    shipping_requests = db.query(ShippingRequest).all()
+    shipping_allocations = db.query(ShippingAllocation).all()
+    angle_ids = {str(row[0]) for row in db.query(WarehouseAngle.id).all()}
+    boxes = [
+        (str(box_id), str(angle_id))
+        for box_id, angle_id in db.query(
+            WarehouseBox.box_id,
+            WarehouseBox.angle_id,
+        ).all()
+    ]
+    box_ids = {box_id for box_id, _angle_id in boxes}
+    zones = {
+        str(zone_id): bool(is_active)
+        for zone_id, is_active in db.query(
+            WarehouseSpecialZone.id,
+            WarehouseSpecialZone.is_active,
+        ).all()
+    }
+    box_items = db.query(WarehouseBoxItem).all()
+    zone_items = db.query(WarehouseSpecialZoneItem).all()
+    unplaced_items = db.query(WarehouseUnplacedItem).all()
+    operations = db.query(InventoryOperation).all()
+    transactions = db.query(TransactionLog).all()
+    operation_effects = db.query(InventoryOperationEffect).all()
+    defect_movements = db.query(DefectInventoryMovement).all()
+
+    placements = [
+        *(
+            WarehousePlacementState(
+                row_id=str(row.id),
+                item_id=str(row.item_id),
+                scope="box",
+                quantity=Decimal(str(row.quantity or 0)),
+                container_id=str(row.box_id),
+                container_exists=str(row.box_id) in box_ids,
+            )
+            for row in box_items
+        ),
+        *(
+            WarehousePlacementState(
+                row_id=str(row.id),
+                item_id=str(row.item_id),
+                scope="special_zone",
+                quantity=Decimal(str(row.quantity or 0)),
+                container_id=str(row.zone_id),
+                container_exists=str(row.zone_id) in zones,
+                active=zones.get(str(row.zone_id), False),
+            )
+            for row in zone_items
+        ),
+        *(
+            WarehousePlacementState(
+                row_id=str(row.id),
+                item_id=str(row.item_id),
+                scope="unplaced",
+                quantity=Decimal(str(row.quantity or 0)),
+            )
+            for row in unplaced_items
+        ),
+    ]
+    evidence = [
+        *(
+            OperationEvidenceState(
+                evidence_id=str(row.effect_id),
+                operation_id=str(row.operation_id),
+                kind="operation_effect",
+                valid=(
+                    isinstance(row.before_state, dict)
+                    and isinstance(row.after_state, dict)
+                    and bool(row.before_state)
+                    and bool(row.after_state)
+                    and bool(row.subject_type)
+                    and bool(row.subject_id)
+                    and bool(row.role)
+                ),
+            )
+            for row in operation_effects
+        ),
+        *(
+            OperationEvidenceState(
+                evidence_id=str(row.movement_id),
+                operation_id=str(row.operation_id),
+                kind="defect_movement",
+                valid=Decimal(str(row.quantity_delta or 0)) != 0,
+            )
+            for row in defect_movements
+        ),
+    ]
+    item_ids = frozenset(str(item_id) for item_id, _deleted_at in items)
+    active_item_ids = frozenset(
+        str(item_id)
+        for item_id, deleted_at in items
+        if deleted_at is None
+    )
+    return InventoryIntegritySnapshot(
+        item_ids=item_ids,
+        active_item_ids=active_item_ids,
+        inventories=tuple(
+            InventoryState(
+                row_id=str(row.inventory_id),
+                item_id=str(row.item_id),
+                quantity=Decimal(str(row.quantity or 0)),
+                warehouse_quantity=Decimal(str(row.warehouse_qty or 0)),
+                pending_quantity=Decimal(str(row.pending_quantity or 0)),
+            )
+            for row in inventories
+        ),
+        locations=tuple(
+            LocationState(
+                row_id=str(row.location_id),
+                item_id=str(row.item_id),
+                department=_enum_value(row.department),
+                status=_enum_value(row.status),
+                quantity=Decimal(str(row.quantity or 0)),
+                pending_quantity=Decimal(str(row.pending_quantity or 0)),
+            )
+            for row in locations
+        ),
+        stock_requests=tuple(
+            StockRequestState(
+                request_id=str(row.request_id),
+                request_code=row.request_code,
+                status=_enum_value(row.status),
+                created_at=row.created_at,
+            )
+            for row in stock_requests
+        ),
+        stock_request_lines=tuple(
+            StockRequestLineState(
+                line_id=str(row.line_id),
+                request_id=str(row.request_id),
+                item_id=str(row.item_id),
+                status=_enum_value(row.status),
+                from_bucket=_enum_value(row.from_bucket),
+                from_department=(
+                    _enum_value(row.from_department)
+                    if row.from_department is not None
+                    else None
+                ),
+                quantity=Decimal(str(row.quantity or 0)),
+            )
+            for row in stock_request_lines
+        ),
+        shipping_requests=tuple(
+            ShippingRequestState(
+                request_id=str(row.request_id),
+                status=_enum_value(row.status),
+            )
+            for row in shipping_requests
+        ),
+        shipping_allocations=tuple(
+            ShippingAllocationState(
+                allocation_id=str(row.allocation_id),
+                request_id=str(row.request_id),
+                item_id=str(row.item_id),
+                department=(
+                    _enum_value(row.department)
+                    if row.department is not None
+                    else None
+                ),
+                status=str(row.status),
+                quantity=Decimal(str(row.quantity or 0)),
+            )
+            for row in shipping_allocations
+        ),
+        warehouse_boxes=tuple(
+            WarehouseBoxState(
+                box_id=box_id,
+                angle_id=angle_id,
+                angle_exists=angle_id in angle_ids,
+            )
+            for box_id, angle_id in boxes
+        ),
+        warehouse_placements=tuple(placements),
+        operations=tuple(
+            OperationState(
+                operation_id=str(row.operation_id),
+                contract_version=int(row.contract_version or 1),
+                effective_at=row.effective_at,
+                reverses_operation_id=(
+                    str(row.reverses_operation_id)
+                    if row.reverses_operation_id is not None
+                    else None
+                ),
+            )
+            for row in operations
+        ),
+        transactions=tuple(
+            TransactionEffectState(
+                log_id=str(row.log_id),
+                item_id=str(row.item_id),
+                operation_id=(
+                    str(row.operation_id) if row.operation_id is not None else None
+                ),
+                created_at=row.created_at,
+                transaction_type=_enum_value(row.transaction_type),
+                operation_role=(
+                    _enum_value(row.operation_role)
+                    if row.operation_role is not None
+                    else None
+                ),
+                quantity_change=Decimal(str(row.quantity_change or 0)),
+                reference_no=row.reference_no,
+                notes=row.notes,
+                inventory_effect=row.inventory_effect,
+            )
+            for row in transactions
+        ),
+        operation_evidence=tuple(evidence),
+        cutover_at=cutover_at(db),
+        evaluated_at=datetime.utcnow(),
+    )
+
+
 def diagnose_inventory_integrity(db: Session) -> InventoryIntegrityResponse:
     """모든 진단기를 읽기 전용으로 실행하고 안정적인 순서로 반환한다."""
     issues = [
@@ -434,9 +685,37 @@ def diagnose_inventory_integrity(db: Session) -> InventoryIntegrityResponse:
     ]
     issues.sort(key=lambda issue: (issue.category, issue.problem_id))
     counts = Counter(issue.category for issue in issues)
+    evaluation = evaluate_inventory_integrity(
+        _collect_integrity_snapshot(db),
+        supplemental_findings=tuple(
+            IntegrityFinding(
+                check_id=issue.category,
+                sample={
+                    "problem_id": issue.problem_id,
+                    "cause_ids": issue.cause_ids,
+                    "current_value": issue.current_value,
+                    "expected_value": issue.expected_value,
+                },
+            )
+            for issue in issues
+        ),
+    )
     return InventoryIntegrityResponse(
+        contract=evaluation.contract,
+        status=evaluation.status,
+        blocking_count=evaluation.blocking_count,
+        warning_count=evaluation.warning_count,
+        checks=[
+            InventoryIntegrityCheck(
+                check_id=check.check_id,
+                severity=check.severity,
+                count=check.count,
+                samples=check.samples,
+            )
+            for check in evaluation.checks
+        ],
         generated_at=datetime.utcnow(),
-        is_consistent=not issues,
+        is_consistent=evaluation.blocking_count == 0,
         issue_count=len(issues),
         category_counts={category: counts[category] for category in CATEGORIES},
         issues=issues,

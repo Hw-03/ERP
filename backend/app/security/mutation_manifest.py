@@ -175,6 +175,7 @@ SERVICE_READ_ONLY_EXPORTS: frozenset[str] = frozenset(
         "app.services.io_preview.validate_operation_sources",
         "app.services.io_preview.validate_warehouse_adjust_operation",
         "app.services.inventory_integrity.diagnose_inventory_integrity",
+        "app.services.inventory_integrity_engine.evaluate_inventory_integrity",
         "app.services.inventory_operation_cancellation.is_same_kst_week",
         "app.services.inventory_operation_cancellation.normalized_effect_for_cancellation",
         "app.services.inventory_operation_cancellation.preview_cancellation",

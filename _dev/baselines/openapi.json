@@ -3565,6 +3565,42 @@
         "title": "IntegrityRepairResponse",
         "type": "object"
       },
+      "InventoryIntegrityCheck": {
+        "properties": {
+          "check_id": {
+            "title": "Check Id",
+            "type": "string"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "samples": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Samples",
+            "type": "array"
+          },
+          "severity": {
+            "enum": [
+              "blocking",
+              "warning"
+            ],
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "check_id",
+          "severity",
+          "count",
+          "samples"
+        ],
+        "title": "InventoryIntegrityCheck",
+        "type": "object"
+      },
       "InventoryIntegrityIssue": {
         "properties": {
           "category": {
@@ -3626,6 +3662,10 @@
       },
       "InventoryIntegrityResponse": {
         "properties": {
+          "blocking_count": {
+            "title": "Blocking Count",
+            "type": "integer"
+          },
           "category_counts": {
             "additionalProperties": {
               "type": "integer"
@@ -3642,6 +3682,18 @@
             },
             "title": "Category Counts",
             "type": "object"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/InventoryIntegrityCheck"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "contract": {
+            "const": "inventory-integrity/v1",
+            "title": "Contract",
+            "type": "string"
           },
           "generated_at": {
             "format": "date-time",
@@ -3662,9 +3714,27 @@
             },
             "title": "Issues",
             "type": "array"
+          },
+          "status": {
+            "enum": [
+              "pass",
+              "warning",
+              "fail"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "warning_count": {
+            "title": "Warning Count",
+            "type": "integer"
           }
         },
         "required": [
+          "contract",
+          "status",
+          "blocking_count",
+          "warning_count",
+          "checks",
           "generated_at",
           "is_consistent",
           "issue_count",
@@ -23820,7 +23890,7 @@
     },
     "/health/detailed": {
       "get": {
-        "description": "운영 점검용 상세 헬스. 프론트엔드는 /health 만 사용.\n\n- DB ping\n- 주요 테이블 row count\n- inventory mismatch count (불변식 위반)\n- open queue batch count\n- 최근 transaction_log created_at",
+        "description": "운영 점검용 상세 헬스. 프론트엔드는 /health 만 사용.\n\n- DB ping\n- 주요 테이블 row count\n- inventory-integrity/v1 공통 업무 불변식과 기존 total mismatch count\n- open queue batch count\n- 최근 transaction_log created_at",
         "operationId": "health_detailed_health_detailed_get",
         "responses": {
           "200": {

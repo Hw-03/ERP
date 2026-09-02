@@ -8,8 +8,14 @@ import sys
 import time
 from pathlib import Path
 
+from sqlalchemy import create_engine
+
+from app import models as _models  # noqa: F401
+from app.database import Base
+
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / "scripts" / "ops" / "operational_readiness.py"
+CURRENT_ITEM_ID = "00000000000000000000000000000001"
 
 
 def _run(*args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -27,35 +33,11 @@ def _run(*args: str, env: dict[str, str] | None = None) -> subprocess.CompletedP
 
 
 def _create_minimal_mes_db(path: Path) -> None:
-    conn = sqlite3.connect(path)
+    engine = create_engine(f"sqlite:///{path.as_posix()}")
     try:
-        conn.executescript(
-            """
-            CREATE TABLE items (item_id TEXT PRIMARY KEY, mes_code TEXT, item_name TEXT);
-            CREATE TABLE inventory (item_id TEXT PRIMARY KEY, quantity NUMERIC NOT NULL DEFAULT 0, warehouse_qty NUMERIC NOT NULL DEFAULT 0, pending_quantity NUMERIC NOT NULL DEFAULT 0);
-            CREATE TABLE inventory_locations (item_id TEXT, department TEXT, status TEXT, quantity NUMERIC NOT NULL DEFAULT 0);
-            CREATE TABLE stock_requests (request_id TEXT PRIMARY KEY, request_code TEXT, status TEXT, created_at TEXT);
-            CREATE TABLE stock_request_lines (line_id TEXT PRIMARY KEY, request_id TEXT, item_id TEXT, quantity NUMERIC NOT NULL DEFAULT 0, from_bucket TEXT, status TEXT);
-            CREATE TABLE transaction_logs (log_id TEXT PRIMARY KEY, item_id TEXT, transaction_type TEXT, quantity_change NUMERIC NOT NULL DEFAULT 0, created_at TEXT, inventory_effect TEXT);
-            CREATE TABLE bom (bom_id TEXT PRIMARY KEY);
-            CREATE TABLE admin_audit_logs (audit_id TEXT PRIMARY KEY);
-            CREATE TABLE warehouse_angles (id INTEGER PRIMARY KEY);
-            CREATE TABLE warehouse_boxes (box_id TEXT PRIMARY KEY, angle_id INTEGER REFERENCES warehouse_angles(id));
-            CREATE TABLE warehouse_box_items (id INTEGER PRIMARY KEY, box_id TEXT REFERENCES warehouse_boxes(box_id), item_id TEXT REFERENCES items(item_id));
-            CREATE TABLE io_batches (batch_id TEXT PRIMARY KEY);
-            CREATE TABLE io_bundles (bundle_id TEXT PRIMARY KEY);
-            CREATE TABLE io_lines (line_id TEXT PRIMARY KEY);
-            CREATE TABLE shipping_requests (request_id TEXT PRIMARY KEY);
-            CREATE TABLE shipping_request_bom_lines (line_id TEXT PRIMARY KEY);
-            CREATE TABLE shipping_request_companion_lines (line_id TEXT PRIMARY KEY);
-            CREATE TABLE shipping_allocations (allocation_id TEXT PRIMARY KEY);
-            CREATE TABLE shipping_request_checklist_lines (line_id TEXT PRIMARY KEY);
-            CREATE TABLE shipping_request_events (event_id TEXT PRIMARY KEY);
-            """
-        )
-        conn.commit()
+        Base.metadata.create_all(engine)
     finally:
-        conn.close()
+        engine.dispose()
 
 
 def test_operational_readiness_fails_when_no_verified_backup_exists(tmp_path):
@@ -115,9 +97,33 @@ def test_operational_readiness_surfaces_inventory_integrity_warnings(tmp_path):
     _create_minimal_mes_db(db_path)
     conn = sqlite3.connect(db_path)
     try:
-        conn.execute("INSERT INTO items VALUES ('item-1', 'AA-0001', 'Part A')")
-        conn.execute("INSERT INTO inventory VALUES ('item-1', 1, 1, 0)")
-        conn.execute("INSERT INTO transaction_logs VALUES ('tx-1', 'item-1', 'RECEIVE', 1, '2099-01-01', NULL)")
+        conn.execute(
+            "INSERT INTO process_types (code, prefix, suffix, stage_order) "
+            "VALUES ('TR', 'T', 'R', 0)"
+        )
+        conn.execute(
+            "INSERT INTO items "
+            "(item_id, item_name, unit, model_symbol, process_type_code, serial_no) "
+            "VALUES (?, 'Part A', 'EA', '9', 'TR', 1)",
+            (CURRENT_ITEM_ID,),
+        )
+        conn.execute(
+            "INSERT INTO inventory "
+            "(inventory_id, item_id, quantity, warehouse_qty, pending_quantity) "
+            "VALUES ('inventory-1', ?, 1, 1, 0)",
+            (CURRENT_ITEM_ID,),
+        )
+        conn.execute(
+            "INSERT INTO warehouse_unplaced_items (id, item_id, quantity) "
+            "VALUES ('unplaced-1', ?, 1)",
+            (CURRENT_ITEM_ID,),
+        )
+        conn.execute(
+            "INSERT INTO transaction_logs "
+            "(log_id, item_id, transaction_type, quantity_change, created_at, inventory_effect) "
+            "VALUES ('tx-1', ?, 'RECEIVE', 1, '2099-01-01', NULL)",
+            (CURRENT_ITEM_ID,),
+        )
         conn.commit()
     finally:
         conn.close()
@@ -126,7 +132,7 @@ def test_operational_readiness_surfaces_inventory_integrity_warnings(tmp_path):
     result = _run("--db", str(db_path), env={"MES_RUNTIME_ROOT": str(runtime_root)})
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "WARN missing transaction effects" in result.stdout
+    assert "WARN OPERATION_V1_EFFECT_MISSING" in result.stdout
     assert "PASS operational readiness" in result.stdout
 
 

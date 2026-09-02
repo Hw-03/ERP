@@ -115,6 +115,8 @@ def test_postgres_job_bootstraps_head_and_runs_real_two_connection_tests() -> No
     assert "test_postgresql_0033_late_failure_rolls_back_and_retry_succeeds" in runner
     assert "test_postgres_shipping_transition_races_have_one_mutation_winner" in runner
     assert "test_postgres_shipping_reservation_vs_consumer_has_one_physical_winner" in runner
+    assert "test_postgresql_engine_and_cli_detect_each_blocking_invariant" in runner
+    assert "test_postgresql_v1_missing_effect_is_warning_only" in runner
 
     verify_local = _text("scripts/dev/verify_local.ps1")
     assert "backend-postgres-concurrency" in verify_local

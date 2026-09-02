@@ -29,7 +29,7 @@ from app.models import (
     TransactionLog,
 )
 from app.routers._errors import ErrorCode
-from app.services import integrity as integrity_svc
+from app.services import inventory_integrity as inventory_integrity_svc
 
 from app.routers import (
     admin_audit,
@@ -420,7 +420,7 @@ def health_detailed(request: Request, db: Session = Depends(get_db)):
 
     - DB ping
     - 주요 테이블 row count
-    - inventory mismatch count (불변식 위반)
+    - inventory-integrity/v1 공통 업무 불변식과 기존 total mismatch count
     - open queue batch count
     - 최근 transaction_log created_at
     """
@@ -444,9 +444,14 @@ def health_detailed(request: Request, db: Session = Depends(get_db)):
             "transaction_logs": db.query(TransactionLog).count(),
         }
 
-        # 3) inventory mismatch — 가벼운 검사
-        mismatches = integrity_svc.check_inventory_consistency(db)
-        mismatch_count = len(mismatches)
+        # 3) 모든 표현 계층이 공유하는 버전 고정 무결성 계약
+        integrity = inventory_integrity_svc.diagnose_inventory_integrity(db)
+        integrity_payload = integrity.contract_payload()
+        mismatch_count = next(
+            check.count
+            for check in integrity.checks
+            if check.check_id == "INVENTORY_TOTAL_MISMATCH"
+        )
 
         # 4) 최근 transaction log 시간
         last_tx = db.query(func.max(TransactionLog.created_at)).scalar()
@@ -459,10 +464,11 @@ def health_detailed(request: Request, db: Session = Depends(get_db)):
         )
 
     return {
-        "status": "ok" if mismatch_count == 0 else "degraded",
+        "status": "degraded" if integrity.status == "fail" else "ok",
         "db": {"ok": True},
         "rows": rows,
         "inventory_mismatch_count": mismatch_count,
+        "inventory_integrity": integrity_payload,
         "last_transaction_at": last_tx.isoformat() if last_tx else None,
     }
 

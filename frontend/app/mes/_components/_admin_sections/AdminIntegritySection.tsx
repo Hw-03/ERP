@@ -13,6 +13,19 @@ const CATEGORY_LABELS: Record<InventoryIntegrityCategory, string> = {
   WEEKLY_UNCLASSIFIED_EFFECT: "주간 미분류",
 };
 
+const CHECK_LABELS: Record<string, string> = {
+  INVENTORY_TOTAL_MISMATCH: "재고 총량 불일치",
+  NEGATIVE_INVENTORY: "음수 재고",
+  NEGATIVE_LOCATION: "음수 위치 재고",
+  PENDING_RESERVATION_MISMATCH: "예약 수량 불일치",
+  STOCK_REQUEST_STATE_MISMATCH: "재고 요청 상태 불일치",
+  SHIPPING_ALLOCATION_MISMATCH: "출하 배정 불일치",
+  WAREHOUSE_PHYSICAL_MISMATCH: "창고 물리 원장 불일치",
+  ORPHAN_REFERENCE: "고아 참조",
+  OPERATION_V2_EFFECT_INVALID: "v2 재고 효과 손상",
+  OPERATION_V1_EFFECT_MISSING: "레거시 재고 효과 경고",
+};
+
 export function AdminIntegritySection() {
   const [result, setResult] = useState<InventoryIntegrityResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -33,6 +46,20 @@ export function AdminIntegritySection() {
   useEffect(() => void load(), [load]);
 
   const repairableCount = result?.issues.filter((issue) => issue.repairable).length ?? 0;
+  const findingCount = (result?.blocking_count ?? 0) + (result?.warning_count ?? 0);
+  const contractOnlyChecks = result?.checks.flatMap((check) => {
+    const hasLegacyCategory = Object.prototype.hasOwnProperty.call(CATEGORY_LABELS, check.check_id);
+    const legacyCount = hasLegacyCategory
+      ? result.category_counts[check.check_id as InventoryIntegrityCategory]
+      : 0;
+    const count = Math.max(0, check.count - legacyCount);
+    if (count === 0) return [];
+    return [{
+      ...check,
+      count,
+      samples: check.samples.filter((sample) => !("problem_id" in sample)),
+    }];
+  }) ?? [];
 
   return (
     <section className="admin-integrity">
@@ -51,7 +78,7 @@ export function AdminIntegritySection() {
       {result && <>
         <div className="admin-integrity-summary">
           <span>검사 결과: {result.is_consistent ? "정상" : "확인 필요"}</span>
-          <span>· 발견 문제 {result.issue_count}건</span>
+          <span>· 발견 문제 {findingCount}건</span>
           <span>· <b>CLI 복구 가능</b> {repairableCount}건</span>
           <span>· {new Date(result.generated_at).toLocaleString("ko-KR")}</span>
         </div>
@@ -66,9 +93,22 @@ export function AdminIntegritySection() {
         </div>
 
         <div className="admin-integrity-results">
-          {result.issues.length === 0 ? <p className="admin-integrity-empty">
+          {result.issues.length === 0 && contractOnlyChecks.length === 0 ? <p className="admin-integrity-empty">
             발견된 정합성 문제가 없습니다.
           </p> : <ul>
+            {contractOnlyChecks.map((check) => <li key={`contract-${check.check_id}`}>
+              <div className="admin-integrity-issue-meta">
+                <span>{CHECK_LABELS[check.check_id] ?? "정합성 계약"}</span>
+                <span>{check.check_id}</span>
+                <span data-repairable={check.severity === "warning"}>
+                  {check.severity === "warning" ? "경고" : "차단"} · {check.count}건
+                </span>
+              </div>
+              <p>CLI·관리자 API·상세 헬스에 공통 적용되는 검사입니다.</p>
+              {check.samples.length > 0 && <small>
+                샘플: {check.samples.map((sample) => JSON.stringify(sample)).join(" · ")}
+              </small>}
+            </li>)}
             {result.issues.map((issue) => <li key={issue.problem_id}>
               <div className="admin-integrity-issue-meta">
                 <span>{CATEGORY_LABELS[issue.category]}</span>

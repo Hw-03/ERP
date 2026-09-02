@@ -81,6 +81,8 @@ REQUIRED_TESTS = [
     "tests/scripts/test_inventory_location_preflight.py::test_postgresql_cli_fails_closed_without_traceback_for_schema_error",
     "tests/scripts/test_inventory_location_preflight.py::test_postgresql_cli_rejects_required_view_even_with_matching_columns_and_data",
     "tests/scripts/test_inventory_location_preflight.py::test_postgresql_cli_fails_closed_without_traceback_for_snapshot_query_error",
+    "tests/ops/test_inventory_integrity_postgres.py::test_postgresql_engine_and_cli_detect_each_blocking_invariant",
+    "tests/ops/test_inventory_integrity_postgres.py::test_postgresql_v1_missing_effect_is_warning_only",
 ]
 
 

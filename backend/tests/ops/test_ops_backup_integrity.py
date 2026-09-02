@@ -8,15 +8,28 @@ import time
 from pathlib import Path
 
 import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
 
 
 ROOT = Path(__file__).resolve().parents[3]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.ops import backup_db as backup_db_module
-from scripts.ops import restore_db as restore_db_module
-from scripts.ops.backup_retention import REGULAR_BACKUP_NAME, retain_latest_backups
+from scripts.ops import backup_db as backup_db_module  # noqa: E402
+from scripts.ops import restore_db as restore_db_module  # noqa: E402
+from scripts.ops.backup_retention import (  # noqa: E402
+    REGULAR_BACKUP_NAME,
+    retain_latest_backups,
+)
+from app import models as _models  # noqa: E402, F401
+from app.database import Base  # noqa: E402
+from app.models import (  # noqa: E402
+    Inventory,
+    InventoryLocation,
+    Item,
+    WarehouseUnplacedItem,
+)
 
 
 VERIFY_BACKUP = ROOT / "scripts" / "ops" / "_verify_backup.py"
@@ -26,6 +39,7 @@ RESTORE_DB = ROOT / "scripts" / "ops" / "restore_db.py"
 CLEANUP_BACKUPS = ROOT / "scripts" / "ops" / "cleanup_backups.py"
 BACKUP_DB_BAT = ROOT / "scripts" / "ops" / "backup_db.bat"
 RESTORE_DB_BAT = ROOT / "scripts" / "ops" / "restore_db.bat"
+CURRENT_ITEM_ID = "00000000000000000000000000000001"
 
 
 def _run_script(script: Path, *args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -145,6 +159,68 @@ def _create_ops_schema_db(
         con.close()
 
 
+def _create_current_integrity_db(
+    path: Path,
+    *,
+    mismatch: bool = False,
+    orphan_location: bool = False,
+    orphan_inventory: bool = False,
+    orphan_transaction: bool = False,
+) -> None:
+    """Create the real current schema used by the ORM-backed integrity checker."""
+    engine = create_engine(f"sqlite:///{path.as_posix()}")
+    try:
+        Base.metadata.create_all(engine)
+        with Session(engine) as session:
+            item = Item(
+                item_id=CURRENT_ITEM_ID,
+                item_name="Part A",
+                unit="EA",
+                model_symbol="9",
+                process_type_code="TR",
+                serial_no=1,
+            )
+            session.add(item)
+            session.flush()
+            if not orphan_location:
+                session.add_all(
+                    [
+                        Inventory(
+                            item_id=item.item_id,
+                            quantity=8 if mismatch else 7,
+                            warehouse_qty=5,
+                            pending_quantity=0,
+                        ),
+                        WarehouseUnplacedItem(item_id=item.item_id, quantity=5),
+                    ]
+                )
+            session.add(
+                InventoryLocation(
+                    item_id=item.item_id,
+                    department="조립",
+                    status="PRODUCTION",
+                    quantity=2,
+                    pending_quantity=0,
+                )
+            )
+            session.commit()
+        with engine.begin() as connection:
+            if orphan_inventory:
+                connection.exec_driver_sql(
+                    "INSERT INTO inventory "
+                    "(inventory_id, item_id, quantity, warehouse_qty, pending_quantity) "
+                    "VALUES ('orphan-inventory', 'missing-item', 1, 1, 0)"
+                )
+            if orphan_transaction:
+                connection.exec_driver_sql(
+                    "INSERT INTO transaction_logs "
+                    "(log_id, item_id, transaction_type, quantity_change, inventory_effect) "
+                    "VALUES ('orphan-transaction', 'missing-item', 'RECEIVE', 1, '[{}]')"
+                )
+    finally:
+        engine.dispose()
+
+
 def test_verify_backup_rejects_empty_sqlite_file(tmp_path: Path) -> None:
     db_path = tmp_path / "empty.db"
     sqlite3.connect(db_path).close()
@@ -262,7 +338,7 @@ def test_verify_backup_rejects_foreign_key_violations(tmp_path: Path) -> None:
 
 def test_check_inventory_integrity_accepts_current_schema(tmp_path: Path) -> None:
     db_path = tmp_path / "valid.db"
-    _create_ops_schema_db(db_path)
+    _create_current_integrity_db(db_path)
 
     result = _run_script(CHECK_INTEGRITY, "--db-url", f"sqlite:///{db_path.as_posix()}")
 
@@ -272,21 +348,37 @@ def test_check_inventory_integrity_accepts_current_schema(tmp_path: Path) -> Non
 
 def test_check_inventory_integrity_rejects_total_mismatch(tmp_path: Path) -> None:
     db_path = tmp_path / "mismatch.db"
-    _create_ops_schema_db(db_path, mismatch=True)
+    _create_current_integrity_db(db_path, mismatch=True)
 
     result = _run_script(CHECK_INTEGRITY, "--db-url", f"sqlite:///{db_path.as_posix()}")
 
     assert result.returncode == 1
-    assert "total mismatch" in result.stdout
+    assert "INVENTORY_TOTAL_MISMATCH" in result.stdout
 
 def test_check_inventory_integrity_rejects_pending_not_matching_reserved_lines(tmp_path: Path) -> None:
     db_path = tmp_path / "pending-mismatch.db"
-    _create_ops_schema_db(db_path)
+    _create_current_integrity_db(db_path)
     con = sqlite3.connect(db_path)
     try:
-        con.execute("UPDATE inventory SET pending_quantity = 5 WHERE item_id = 'item-1'")
-        con.execute("INSERT INTO stock_requests VALUES ('req-1', 'SR-1', 'reserved', '2099-01-01')")
-        con.execute("INSERT INTO stock_request_lines VALUES ('line-1', 'req-1', 'item-1', 3, 'warehouse', 'reserved')")
+        con.execute(
+            "UPDATE inventory SET pending_quantity = 5 WHERE item_id = ?",
+            (CURRENT_ITEM_ID,),
+        )
+        con.execute(
+            "INSERT INTO stock_requests "
+            "(request_id, requester_employee_id, requester_name, requester_department, "
+            "request_type, status, requires_warehouse_approval, requires_department_approval) "
+            "VALUES ('req-1', 'employee-1', 'Tester', '조립', "
+            "'WAREHOUSE_TO_DEPT', 'RESERVED', 1, 0)"
+        )
+        con.execute(
+            "INSERT INTO stock_request_lines "
+            "(line_id, request_id, item_id, item_name_snapshot, quantity, "
+            "from_bucket, to_bucket, status) "
+            "VALUES ('line-1', 'req-1', ?, 'Part A', 3, "
+            "'WAREHOUSE', 'PRODUCTION', 'RESERVED')",
+            (CURRENT_ITEM_ID,),
+        )
         con.commit()
     finally:
         con.close()
@@ -294,64 +386,47 @@ def test_check_inventory_integrity_rejects_pending_not_matching_reserved_lines(t
     result = _run_script(CHECK_INTEGRITY, "--db-url", f"sqlite:///{db_path.as_posix()}")
 
     assert result.returncode == 1
-    assert "pending reservation mismatch" in result.stdout
+    assert "PENDING_RESERVATION_MISMATCH" in result.stdout
 
 def test_check_inventory_integrity_rejects_orphan_location_without_inventory_row(tmp_path: Path) -> None:
     db_path = tmp_path / "orphan-location.db"
-    _create_ops_schema_db(db_path, orphan_location=True)
+    _create_current_integrity_db(db_path, orphan_location=True)
 
     result = _run_script(CHECK_INTEGRITY, "--db-url", f"sqlite:///{db_path.as_posix()}")
 
     assert result.returncode == 1
-    assert "orphan locations" in result.stdout
+    assert "ORPHAN_REFERENCE" in result.stdout
 
 
 def test_check_inventory_integrity_rejects_inventory_without_item_master(tmp_path: Path) -> None:
     db_path = tmp_path / "orphan-inventory.db"
-    _create_ops_schema_db(db_path, orphan_inventory=True)
+    _create_current_integrity_db(db_path, orphan_inventory=True)
 
     result = _run_script(CHECK_INTEGRITY, "--db-url", f"sqlite:///{db_path.as_posix()}")
 
     assert result.returncode == 1
-    assert "orphan inventory" in result.stdout
+    assert "ORPHAN_REFERENCE" in result.stdout
 
 
 def test_check_inventory_integrity_rejects_transaction_without_item_master(tmp_path: Path) -> None:
     db_path = tmp_path / "orphan-transaction.db"
-    _create_ops_schema_db(db_path, orphan_transaction=True)
+    _create_current_integrity_db(db_path, orphan_transaction=True)
 
     result = _run_script(CHECK_INTEGRITY, "--db-url", f"sqlite:///{db_path.as_posix()}")
 
     assert result.returncode == 1
-    assert "orphan transactions" in result.stdout
+    assert "ORPHAN_REFERENCE" in result.stdout
 
 def test_check_inventory_integrity_warns_for_transaction_without_inventory_effect(tmp_path: Path) -> None:
     db_path = tmp_path / "missing-effect.db"
-    _create_ops_schema_db(db_path)
-    con = sqlite3.connect(db_path)
-    try:
-        con.execute("INSERT INTO transaction_logs VALUES ('tx-2', 'item-1', 'RECEIVE', NULL)")
-        con.commit()
-    finally:
-        con.close()
-
-    result = _run_script(CHECK_INTEGRITY, "--db-url", f"sqlite:///{db_path.as_posix()}")
-
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert "WARN missing transaction effects" in result.stdout
-    assert "transaction_type=RECEIVE" in result.stdout
-    assert "count=1" in result.stdout
-    assert "sample_log_id=tx-2" in result.stdout
-    assert "sample_mes_code=AA-0001" in result.stdout
-
-
-def test_check_inventory_integrity_warns_for_zero_delta_inventory_effect(tmp_path: Path) -> None:
-    db_path = tmp_path / "zero-effect.db"
-    _create_ops_schema_db(db_path)
+    _create_current_integrity_db(db_path)
     con = sqlite3.connect(db_path)
     try:
         con.execute(
-            "INSERT INTO transaction_logs VALUES ('tx-3', 'item-1', 'RECEIVE', '[{\"scope\":\"warehouse\",\"delta\":0}]')"
+            "INSERT INTO transaction_logs "
+            "(log_id, item_id, transaction_type, quantity_change, inventory_effect) "
+            "VALUES ('tx-2', ?, 'RECEIVE', 1, NULL)",
+            (CURRENT_ITEM_ID,),
         )
         con.commit()
     finally:
@@ -360,7 +435,30 @@ def test_check_inventory_integrity_warns_for_zero_delta_inventory_effect(tmp_pat
     result = _run_script(CHECK_INTEGRITY, "--db-url", f"sqlite:///{db_path.as_posix()}")
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "WARN ineffective transaction effects" in result.stdout
+    assert "WARN OPERATION_V1_EFFECT_MISSING: 1" in result.stdout
+    assert '"log_id": "tx-2"' in result.stdout
+
+
+def test_check_inventory_integrity_warns_for_zero_delta_inventory_effect(tmp_path: Path) -> None:
+    db_path = tmp_path / "zero-effect.db"
+    _create_current_integrity_db(db_path)
+    con = sqlite3.connect(db_path)
+    try:
+        con.execute(
+            "INSERT INTO transaction_logs "
+            "(log_id, item_id, transaction_type, quantity_change, inventory_effect) "
+            "VALUES ('tx-3', ?, 'RECEIVE', 1, "
+            "'[{\"scope\":\"warehouse\",\"delta\":0}]')",
+            (CURRENT_ITEM_ID,),
+        )
+        con.commit()
+    finally:
+        con.close()
+
+    result = _run_script(CHECK_INTEGRITY, "--db-url", f"sqlite:///{db_path.as_posix()}")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "WARN OPERATION_V1_EFFECT_MISSING: 1" in result.stdout
 
 
 def test_backup_db_py_creates_verified_backup_under_runtime_root(tmp_path: Path) -> None:

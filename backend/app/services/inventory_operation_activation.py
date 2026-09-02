@@ -80,7 +80,13 @@ def activate_inventory_operation_contract(
 
     diagnostic = diagnose_inventory_integrity(db)
     if not diagnostic.is_consistent:
-        sample = ", ".join(issue.problem_id for issue in diagnostic.issues[:5])
+        sample_ids = [
+            check.check_id
+            for check in diagnostic.checks
+            if check.severity == "blocking" and check.count
+        ]
+        sample_ids.extend(issue.problem_id for issue in diagnostic.issues)
+        sample = ", ".join(list(dict.fromkeys(sample_ids))[:5])
         raise InventoryOperationActivationError(
             f"정합성 진단이 통과하지 않아 활성화할 수 없습니다: {sample}"
         )
