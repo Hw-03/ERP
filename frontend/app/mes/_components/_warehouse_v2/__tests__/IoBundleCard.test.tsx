@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { IoBundle, Item } from "@/lib/api";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { IoBundleCard } from "../IoBundleCard";
 
 vi.mock("../../DepartmentsContext", () => ({
@@ -168,6 +169,8 @@ describe("IoBundleCard", () => {
 
     const composition = screen.getByText("BOM 참고 입고 · 상위 미반영");
     expect(composition).toBeInTheDocument();
+    expect(composition).toHaveClass("rounded-full");
+    expect(screen.getByText("반영 1개")).toHaveClass("rounded-full");
     expect(composition.parentElement).toHaveTextContent("반영 1개");
     expect(screen.getByText("상위 미반영")).toBeInTheDocument();
     expect(screen.queryByText("실행 후")).not.toBeInTheDocument();
@@ -176,6 +179,48 @@ describe("IoBundleCard", () => {
     if (!header) throw new Error("묶음 접기/펼치기 영역을 찾을 수 없습니다.");
     fireEvent.click(header);
     expect(screen.getByText("선택 입고")).toBeInTheDocument();
+  });
+
+  it("BOM 하위를 처음 변경하면 출고 낱개 처리 안내를 한 번만 확인시킨다", () => {
+    const onToggleLine = vi.fn();
+    render(
+      <IoBundleCard
+        bundle={bundle}
+        subType="disassemble"
+        itemMap={itemMap}
+        getAvailable={() => 45}
+        onToggleLine={onToggleLine}
+        onQuantityChange={vi.fn()}
+        onBundleQuantityChange={vi.fn()}
+        onRemoveLine={vi.fn()}
+        onRemoveBundle={vi.fn()}
+      />,
+    );
+
+    const header = screen.getAllByRole("button", { name: /ADX6000 80KV 5mA/ })
+      .find((element) => element.hasAttribute("aria-expanded"));
+    if (!header) throw new Error("묶음 접기/펼치기 영역을 찾을 수 없습니다.");
+    fireEvent.click(header);
+
+    const childRow = screen.getByText(childLine.item_name).closest("li");
+    if (!childRow) throw new Error("BOM 하위 행을 찾을 수 없습니다.");
+    const toggle = within(childRow).getByRole("button", { name: "재고 반영 변경" });
+    fireEvent.click(toggle);
+
+    expect(onToggleLine).toHaveBeenCalledWith("child-line");
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(
+      screen.getByText("BOM 구성을 변경하면 선택한 하위 품목만 낱개로 처리합니다."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("낱개 출고")).toHaveStyle({ color: LEGACY_COLORS.red });
+    expect(screen.queryByRole("button", { name: "취소" })).not.toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "Enter" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(onToggleLine).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("모바일에서는 품목 확인 정보를 단일 열로, 데스크톱에서는 기존 다섯 열로 배치한다", () => {

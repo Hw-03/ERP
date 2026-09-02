@@ -375,6 +375,36 @@ describe("IoLineRow quantity", () => {
     expect(screen.getByRole("button", { name: "+1" })).toBeEnabled();
   });
 
+  it("제외된 부서 BOM 자동 하위의 체크를 다시 눌러 수량 1 포함을 요청할 수 있다", () => {
+    const onToggle = vi.fn();
+    render(
+      <IoLineRow
+        line={makeLine({
+          direction: "out",
+          from_bucket: "production",
+          from_department: "조립",
+          to_bucket: "none",
+          quantity: 0,
+          included: false,
+          edited: true,
+          bom_expected: 2,
+          origin: "bom_auto",
+        })}
+        subType="produce"
+        isChild
+        available={10}
+        onToggle={onToggle}
+        onQuantityChange={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+
+    const stockToggle = screen.getByRole("button", { name: "재고 반영 변경" });
+    expect(stockToggle).toBeEnabled();
+    fireEvent.click(stockToggle);
+    expect(onToggle).toHaveBeenCalledOnce();
+  });
+
   it("연구 사용출고 재고 미반영 행의 추가 설명은 유지한다", () => {
     render(
       <IoLineRow

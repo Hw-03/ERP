@@ -52,18 +52,18 @@ export function applyToggleLine(
       target.bom_expected != null &&
       Number(target.bom_expected) > 0;
     if (isForcedBomChild) {
-      if (!target.included) return bundle;
+      const newIncluded = !target.included;
       return {
         ...bundle,
         lines: bundle.lines.map((line) =>
           line.line_id === lineId
             ? {
                 ...line,
-                quantity: 0,
-                included: false,
+                quantity: newIncluded ? 1 : 0,
+                included: newIncluded,
                 edited: true,
                 shortage: 0,
-                exclusion_note: exclusionNoteFor(subType, line.origin, false),
+                exclusion_note: exclusionNoteFor(subType, line.origin, newIncluded),
               }
             : line,
         ),

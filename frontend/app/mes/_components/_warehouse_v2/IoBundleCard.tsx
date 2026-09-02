@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronDown, ChevronUp, Layers } from "lucide-react";
+import { useRef, useState } from "react";
+import { ArrowDownToLine, ArrowUpFromLine, ChevronDown, ChevronUp, Equal, Layers } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import type { IoBundle, IoInternalUseBomMode, IoLine, IoSubType, Item } from "./types";
@@ -14,7 +14,8 @@ import { deductionSourceSummary, IoDeductionSourceBadge } from "./IoDeductionSou
 import { QuantityStepper } from "./QuantityStepper";
 import { IoRemoveButton } from "./IoRemoveButton";
 import { INTERNAL_USE_BOM_MODE_LABEL } from "./internalUseBom";
-import { isCustomProcessBomBundle, processBomEffectLine } from "./ioWorkType";
+import { isBomForced, isCustomProcessBomBundle, processBomEffectLine } from "./ioWorkType";
+import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 
 interface Props {
   bundle: IoBundle;
@@ -56,6 +57,8 @@ export function IoBundleCard({
   // React Hook 규칙: 조건부 early return 전에 호출해야 하므로 항상 선언.
   // 단품 분기에서는 사용되지 않지만 hook 호출 순서를 안정시키려는 용도.
   const [collapsed, setCollapsed] = useState(true);
+  const customBomGuideShownRef = useRef(false);
+  const [customBomGuideOpen, setCustomBomGuideOpen] = useState(false);
 
   // 단일 라인 비-BOM 묶음(낱개 manual + "이 품목만" direct_item) 은 헤더/카드 래퍼 생략하고
   // IoLineRow 만 단독 노출. trash 는 forceShowRemove 로 항상 보이게 하고 onRemoveBundle 연결.
@@ -92,6 +95,21 @@ export function IoBundleCard({
       ? bundle.lines.find((line) => line.origin === "direct")
       : undefined;
   const customProcessBom = isCustomProcessBomBundle(subType, bundle);
+  const customDirectionLabel = subType === "produce" ? "입고" : "출고";
+  const customDirectionColor = subType === "disassemble" ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
+  const CustomDirectionIcon = subType === "produce" ? ArrowDownToLine : ArrowUpFromLine;
+  function showCustomBomGuideOnce(line: IoLine) {
+    if (
+      !isBomForced(subType) ||
+      bundle.source_kind !== "bom_parent" ||
+      line.origin !== "bom_auto" ||
+      customBomGuideShownRef.current
+    ) {
+      return;
+    }
+    customBomGuideShownRef.current = true;
+    setCustomBomGuideOpen(true);
+  }
   const displayedIncluded = customProcessBom
     ? included.filter((line) => line.origin !== "direct")
     : included;
@@ -224,23 +242,50 @@ export function IoBundleCard({
               ))}
           </div>
           <div
-            className="mt-1 flex flex-wrap items-center gap-1 text-xs font-semibold"
-            style={{ color: LEGACY_COLORS.muted2 }}
+            className="mt-2 flex flex-wrap items-center gap-1.5 text-xs font-bold"
           >
-            {bundleCode && <span>{bundleCode}</span>}
-            {bundleCode && <span>·</span>}
-            <span>반영 {displayedIncluded.length}개</span>
+            {bundleCode && (
+              <span
+                className="rounded-full border px-2 py-1 tabular-nums"
+                style={{
+                  background: LEGACY_COLORS.s2,
+                  borderColor: LEGACY_COLORS.borderStrong,
+                  color: LEGACY_COLORS.muted2,
+                }}
+              >
+                {bundleCode}
+              </span>
+            )}
+            <span
+              className="rounded-full px-2 py-1"
+              style={{
+                background: tint(LEGACY_COLORS.green, 14),
+                color: LEGACY_COLORS.green,
+              }}
+            >
+              반영 {displayedIncluded.length}개
+            </span>
             {excluded > 0 && (
-              <>
-                <span>·</span>
-                <span>제외 {excluded}개</span>
-              </>
+              <span
+                className="rounded-full px-2 py-1"
+                style={{
+                  background: tint(LEGACY_COLORS.red, 14),
+                  color: LEGACY_COLORS.red,
+                }}
+              >
+                제외 {excluded}개
+              </span>
             )}
             {compositionLabel && (
-              <>
-                <span>·</span>
-                <span>{compositionLabel}</span>
-              </>
+              <span
+                className="rounded-full px-2 py-1"
+                style={{
+                  background: tint(LEGACY_COLORS.blue, 12),
+                  color: LEGACY_COLORS.blue,
+                }}
+              >
+                {compositionLabel}
+              </span>
             )}
           </div>
         </div>
@@ -422,8 +467,14 @@ export function IoBundleCard({
                 pullSelectable={linePullSelectable(line)}
                 pullSelected={pullSelected?.has(line.line_id)}
                 onTogglePull={onTogglePull ? () => onTogglePull(line.line_id) : undefined}
-                onToggle={() => onToggleLine(line.line_id)}
-                onQuantityChange={(quantity, shortage) => onQuantityChange(line.line_id, quantity, shortage)}
+                onToggle={() => {
+                  showCustomBomGuideOnce(line);
+                  onToggleLine(line.line_id);
+                }}
+                onQuantityChange={(quantity, shortage) => {
+                  showCustomBomGuideOnce(line);
+                  onQuantityChange(line.line_id, quantity, shortage);
+                }}
                 onRemove={() => onRemoveLine(line.line_id)}
                 editingDisabled={internalUseBomBusy}
               />
@@ -432,6 +483,61 @@ export function IoBundleCard({
           })}
         </ul>
       )}
+      <ConfirmModal
+        open={customBomGuideOpen}
+        acknowledgeOnly
+        wide
+        title="BOM 구성을 변경하면 선택한 하위 품목만 낱개로 처리합니다."
+        confirmLabel="확인"
+        onClose={() => setCustomBomGuideOpen(false)}
+        onConfirm={() => setCustomBomGuideOpen(false)}
+      >
+        <div className="grid grid-cols-2 gap-3">
+          <div
+            className="flex min-h-[160px] flex-col items-center justify-center rounded-[16px] border p-4 text-center"
+            style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+          >
+            <span
+              className="mb-3 flex h-11 w-11 items-center justify-center rounded-full"
+              style={{ background: LEGACY_COLORS.s3, color: LEGACY_COLORS.muted2 }}
+            >
+              <Equal className="h-6 w-6" aria-hidden="true" />
+            </span>
+            <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+              상위 품목
+            </span>
+            <strong className="mt-1 text-xl font-black" style={{ color: LEGACY_COLORS.text }}>
+              그대로
+            </strong>
+            <span className="mt-1 text-sm font-semibold" style={{ color: LEGACY_COLORS.muted }}>
+              재고 변동 없음
+            </span>
+          </div>
+          <div
+            className="flex min-h-[160px] flex-col items-center justify-center rounded-[16px] border p-4 text-center"
+            style={{
+              background: tint(customDirectionColor, 12),
+              borderColor: tint(customDirectionColor, 40),
+            }}
+          >
+            <span
+              className="mb-3 flex h-11 w-11 items-center justify-center rounded-full"
+              style={{ background: tint(customDirectionColor, 18), color: customDirectionColor }}
+            >
+              <CustomDirectionIcon className="h-6 w-6" aria-hidden="true" />
+            </span>
+            <span className="text-sm font-bold" style={{ color: customDirectionColor }}>
+              선택한 하위
+            </span>
+            <strong className="mt-1 text-xl font-black" style={{ color: customDirectionColor }}>
+              낱개 {customDirectionLabel}
+            </strong>
+            <span className="mt-1 text-sm font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+              체크·입력 수량만 반영
+            </span>
+          </div>
+        </div>
+      </ConfirmModal>
     </article>
   );
 }

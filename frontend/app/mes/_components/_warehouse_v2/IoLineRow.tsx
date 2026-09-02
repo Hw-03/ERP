@@ -113,9 +113,8 @@ export function IoLineRow({
     Number(line.bom_expected) > 0;
   const bomStockExempt = line.origin === "bom_auto" && line.bom_stock_exempt;
   const fixedInternalUseBomQuantity = isInternalUse && line.origin === "bom_auto";
-  // 부서 BOM 자동 하위는 포함 상태에서만 체크 해제로 수량 0 제외를 허용한다.
-  // 제외 뒤 재포함은 기존 수량 + 조절기로만 가능하다.
-  const interactionLocked = bomStockExempt || (bomCheckboxLocked && !selected);
+  // 부서 BOM 자동 하위는 체크로 수량 0 제외와 수량 1 재포함을 전환한다.
+  const interactionLocked = bomStockExempt;
   const stepperDisabled = (!isInternalUse && disabled) || bomStockExempt;
   // 조절기를 사용하는 기존 행은 미체크 상태에서도 + 버튼으로 다시 포함할 수 있다.
   const incrementDisabled = bomStockExempt;
@@ -239,14 +238,10 @@ export function IoLineRow({
               BOM 재고 미반영
             </span>
           )}
-          {(bomStockExempt || !isInternalUse) && (
+          {(bomStockExempt || (!isInternalUse && !bomCheckboxLocked)) && (
             <span className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
               {bomStockExempt
                 ? "BOM 자동 처리 시 재고 미반영"
-                : bomCheckboxLocked
-                ? line.included
-                  ? "클릭하면 수량 0으로 제외"
-                  : "수량을 늘리면 재고 반영에 포함"
                 : line.included
                   ? "재고 반영 포함"
                   : line.exclusion_note || "이번 작업 제외"}

@@ -116,6 +116,32 @@ describe("ConfirmModal", () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
+  it("확인 전용 안내는 취소와 Escape를 막고 넓은 패널에서 Enter로 확인한다", () => {
+    const onClose = vi.fn();
+    const onConfirm = vi.fn();
+    render(
+      <ConfirmModal
+        open
+        acknowledgeOnly
+        wide
+        title="기능 안내"
+        onClose={onClose}
+        onConfirm={onConfirm}
+      />,
+    );
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.firstElementChild).toHaveClass("max-w-[640px]");
+    expect(screen.queryByRole("button", { name: "취소" })).not.toBeInTheDocument();
+
+    fireEvent.click(dialog);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(window, { key: "Enter" });
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
   it("busy=true 면 Enter 무시", () => {
     const onConfirm = vi.fn();
     render(
