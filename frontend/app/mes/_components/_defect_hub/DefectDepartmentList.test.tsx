@@ -70,6 +70,14 @@ describe("DefectDepartmentList", () => {
     expect(screen.getByText("left bracket scratched")).toBeInTheDocument();
   });
 
+  it("uses a subtle surface color when a quarantine record is hovered", () => {
+    render(<DefectDepartmentList locations={[makeLocation()]} onProcess={vi.fn()} />);
+
+    const record = screen.getByLabelText("AX-100 격리 기록");
+    expect(record).toHaveClass("hover:bg-[var(--c-s3)]");
+    expect(record).not.toHaveClass("hover:bg-[var(--c-s4)]");
+  });
+
   it("renders a muted missing value with a wrapping reason value area", () => {
     render(
       <DefectDepartmentList

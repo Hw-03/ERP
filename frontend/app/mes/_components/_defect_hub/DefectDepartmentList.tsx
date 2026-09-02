@@ -328,7 +328,7 @@ function DefectRecordRow({
   return (
     <article
       aria-label={`${location.item_name} 격리 기록`}
-      className="px-4 py-4 transition-colors hover:bg-[var(--c-s4)] sm:px-5"
+      className="px-4 py-4 transition-colors hover:bg-[var(--c-s3)] sm:px-5"
     >
       <div
         data-testid="defect-record-grid"
