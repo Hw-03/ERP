@@ -202,7 +202,7 @@ beforeEach(() => {
 });
 
 describe("BomBatchDetail", () => {
-  it("커스텀 BOM 이력은 실행되지 않은 상위를 미반영으로 표시한다", () => {
+  it("커스텀 BOM 이력은 실행되지 않은 상위의 수량 문구를 목록에서 숨긴다", () => {
     const batch = makeBatch();
     batch.bundles[0].lines[0] = {
       ...batch.bundles[0].lines[0],
@@ -226,7 +226,7 @@ describe("BomBatchDetail", () => {
 
     const parentRow = screen.getByText("아주 긴 완제품 구성 묶음 이름").closest("tr");
     expect(parentRow).not.toBeNull();
-    expect(within(parentRow!).getByText("상위 미반영")).toBeInTheDocument();
+    expect(within(parentRow!).queryByText("상위 미반영")).not.toBeInTheDocument();
     expect(within(parentRow!).queryByText("+1 EA")).not.toBeInTheDocument();
   });
 
@@ -268,8 +268,8 @@ describe("BomBatchDetail", () => {
       <table><tbody><BomBatchDetail batchId={directBatch.batch_id} colSpan={8} cache={new Map([[directBatch.batch_id, directBatch]])} onCached={vi.fn()} logs={[log]} /></tbody></table>,
     );
 
-    expect(screen.getByText("-1 EA")).toBeInTheDocument();
-    expect(screen.getByLabelText("재고 변동: 부서 4 → 3")).toBeInTheDocument();
+    expect(screen.queryByText("-1 EA")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("재고 변동: 부서 4 −1→3")).toBeInTheDocument();
   });
 
   it("shows unique batch logs on the BOM parent and component rows", () => {
@@ -299,11 +299,11 @@ describe("BomBatchDetail", () => {
       <table><tbody><BomBatchDetail batchId={batch.batch_id} colSpan={8} cache={new Map([[batch.batch_id, batch]])} onCached={vi.fn()} logs={logs} /></tbody></table>,
     );
 
-    expect(screen.getByLabelText("재고 변동: 부서 15 → 16")).toBeInTheDocument();
+    expect(screen.getByLabelText("재고 변동: 부서 15 +1→16")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "BOM 구성 펼치기" }));
 
-    expect(screen.getByLabelText("재고 변동: 부서 3 → 2")).toBeInTheDocument();
+    expect(screen.getByLabelText("재고 변동: 부서 3 −1→2")).toBeInTheDocument();
   });
 
   it("prefers the exact operation line log when a BOM component is duplicated", () => {
@@ -335,7 +335,7 @@ describe("BomBatchDetail", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "BOM 구성 펼치기" }));
 
-    expect(screen.getByLabelText("재고 변동: 부서 3 → 2")).toBeInTheDocument();
+    expect(screen.getByLabelText("재고 변동: 부서 3 −1→2")).toBeInTheDocument();
     expect(screen.queryByLabelText("재고 변동: 창고 90 → 90, 부서 9 → 9")).not.toBeInTheDocument();
   });
 
@@ -505,7 +505,7 @@ describe("BomBatchDetail", () => {
     expect(document.getElementById(controlsId)).toBeInTheDocument();
   });
 
-  it("merges duplicate manual item bundles into one displayed quantity", () => {
+  it("merges duplicate manual item bundles without displaying their quantity", () => {
     const batch = makeDuplicateManualBatch();
     const { container } = render(
       <table>
@@ -521,7 +521,7 @@ describe("BomBatchDetail", () => {
     );
 
     expect(container.querySelectorAll("tbody > tr")).toHaveLength(1);
-    expect(screen.getByText("+2 EA")).toBeInTheDocument();
+    expect(screen.queryByText("+2 EA")).not.toBeInTheDocument();
   });
 
   it("keeps shortage badges but never renders excluded badges in BOM summary or child rows", () => {
@@ -723,8 +723,8 @@ describe("BomBatchDetail", () => {
       <table><tbody><BomBatchDetail batchId={batch.batch_id} colSpan={8} cache={new Map([[batch.batch_id, batch]])} onCached={vi.fn()} logs={logs} /></tbody></table>,
     );
 
-    expect(screen.getByLabelText("재고 변동: 창고 7 → 8, 부서 2 → 3")).toBeInTheDocument();
-    expect(screen.getByLabelText("재고 변동: 창고 40 → 41, 부서 4 → 5")).toBeInTheDocument();
+    expect(screen.getByLabelText("재고 변동: 창고 7 +1→8, 부서 2 +1→3")).toBeInTheDocument();
+    expect(screen.getByLabelText("재고 변동: 창고 40 +1→41, 부서 4 +1→5")).toBeInTheDocument();
   });
 
   it("keeps both stock snapshot cells unavailable for configuration-only rows", () => {

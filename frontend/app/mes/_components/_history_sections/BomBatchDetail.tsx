@@ -17,9 +17,7 @@ import {
   getHistoryBomParentLine,
   getDisplayBundles,
   getHistoryLineExecutionLog,
-  getHistoryLineSignedQuantity,
   isManualOnlyProductionBatch,
-  type LineSignTone,
 } from "./historyBatchInterpreter";
 import {
   HISTORY_CELL_TRANSITION,
@@ -27,17 +25,9 @@ import {
   HISTORY_CHILD_ROW_CLASS,
   HISTORY_TABLE_OPERATION_PILL_CLASS,
   InternalUseEffectBadge,
-  ItemCodeQuantityCell,
-  MovementSummaryCell,
+  ItemCodeCell,
   StockSnapshotCell,
 } from "./historyTableHelpers";
-
-const SIGN_TONE_HEX: Record<LineSignTone, string> = {
-  increase: LEGACY_COLORS.blue,
-  decrease: LEGACY_COLORS.red,
-  move: LEGACY_COLORS.cyan,
-  muted: LEGACY_COLORS.muted2,
-};
 
 type Props = {
   batchId: string;
@@ -54,13 +44,6 @@ type Props = {
   /** 작업 묶음 전체에 맞춘 재고 수량 표기 폭. */
   snapshotQuantityWidth?: number;
 };
-
-const SIGN_TONE_MOVEMENT = {
-  increase: "primary",
-  decrease: "danger",
-  move: "info",
-  muted: "muted",
-} as const;
 
 export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact, highlightItemId, controlsId, logs = [], snapshotQuantityWidth }: Props) {
   const realtimeRevision = useRealtimeRevision();
@@ -254,23 +237,6 @@ function BundleRows({
   const singleLineCode = isSingleLineDirect ? childLines[0].mes_code : null;
   const canExpand = isBomParent || (!isSingleLineDirect && childLines.length > 0);
 
-  const headerSigned = parentLine && !parentNotExecuted
-    ? getHistoryLineSignedQuantity(parentLine, batch, bundle, getHistoryLineExecutionLog(parentLine, logs))
-    : bundle.lines.length === 1
-      ? getHistoryLineSignedQuantity(bundle.lines[0], batch, bundle, getHistoryLineExecutionLog(bundle.lines[0], logs))
-      : null;
-  const bundleUnit = (() => {
-    const units = new Set(bundle.lines.map((l) => (l.unit ?? "").trim()).filter(Boolean));
-    return units.size === 1 ? Array.from(units)[0] : null;
-  })();
-  const headerQtyText = parentNotExecuted
-    ? "상위 미반영"
-    : headerSigned
-    ? headerSigned.label
-    : bundleUnit
-      ? `${formatQty(bundle.quantity)} ${bundleUnit}`
-      : `${formatQty(bundle.quantity)}`;
-  const headerQtyColor = headerSigned ? SIGN_TONE_HEX[headerSigned.tone] : LEGACY_COLORS.muted2;
   const shortageCount = childLines.filter((line) => line.included && line.shortage > 0).length;
   const detailId = `history-bom-${encodeURIComponent(bundle.bundle_id).replaceAll("%", "_")}`;
   const displayTitle = isBomParent && (batch.sub_type === "warehouse_to_dept" || batch.sub_type === "dept_to_warehouse")
@@ -367,20 +333,10 @@ function BundleRows({
             )}
           </div>
         </td>
-        <ItemCodeQuantityCell
+        <ItemCodeCell
           code={bundle.source_mes_code ?? singleLineCode}
           compact={compact}
           dense
-          quantity={(
-            <div className="text-xs font-bold" style={{ color: headerQtyColor }}>
-              {headerSigned ? (
-                <MovementSummaryCell
-                  summary={{ parts: [{ label: headerSigned.label, tone: SIGN_TONE_MOVEMENT[headerSigned.tone] }] }}
-                  compact={compact}
-                />
-              ) : headerQtyText}
-            </div>
-          )}
         />
         <StockSnapshotCell log={parentLog} dense quantityWidth={snapshotQuantityWidth} />
         <td className={`${HISTORY_CHILD_CELL_CLASS} ${statusPadX} text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
@@ -433,13 +389,6 @@ function BomLineRow({
   const targetPadX = compact ? "px-2" : "px-4";
   const statusPadX = "px-2";
   const cancelled = batch.status === "cancelled";
-  const signed = getHistoryLineSignedQuantity(
-    line,
-    batch,
-    bundle,
-    log?.operation_line_id === line.line_id ? log : null,
-  );
-  const qtyColor = SIGN_TONE_HEX[signed.tone];
   const highlighted = highlightItemId === line.item_id;
   const internalUseEffect = batch.sub_type === "internal_use_out" && bundle.source_kind === "bom_parent"
     ? getInternalUseHistoryLineEffectLabel(line, batch)
@@ -474,18 +423,10 @@ function BomLineRow({
           </TruncatedText>
         </div>
       </td>
-      <ItemCodeQuantityCell
+      <ItemCodeCell
         code={line.mes_code}
         compact={compact}
         dense
-        quantity={(
-          <div className="text-xs font-bold" style={{ color: qtyColor }}>
-            <MovementSummaryCell
-              summary={{ parts: [{ label: signed.label, tone: SIGN_TONE_MOVEMENT[signed.tone] }] }}
-              compact={compact}
-            />
-          </div>
-        )}
       />
       <StockSnapshotCell log={log} dense quantityWidth={snapshotQuantityWidth} />
       <td className={`${HISTORY_CHILD_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
