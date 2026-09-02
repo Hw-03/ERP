@@ -1,4 +1,6 @@
-# CP5 W3 완료 · W4 `IC-03-B` 진입 TODO
+# CP5 W3 완료 · W4 `IC-03-B` 실행 계약
+
+> **완료(2026-09-02):** 이 TODO에서 지시한 W4는 제품 commit `ac8f26d570e728f193c1b2b40b8efdae7fe2363e`와 CI 회귀 수정 commit `8a66907014cfa7c5cd5de90e7d3b42d599a56ccf`로 완료됐다. 최종 GitHub CI run `33589486541`은 6/6 success이며, 현재 후속 정본은 `2026-09-02-cp5-w4-complete-w5-ready-todo.md`다. 아래 내용은 W4 진입 당시의 실행 계약으로 보존한다.
 
 ## 현재 정본
 
@@ -23,7 +25,7 @@
 - 주간보고·모바일 하단 tab·desktop shipping step 5 카드 배치 추가 변경 0.
 - `C:\ERP-dev` 접근 0, `C:\ERP` main 수정·서버·DB 작업 0.
 
-## 다음 단일 작업: W4 `IC-03-B`
+## 완료된 단일 작업: W4 `IC-03-B`
 
 별도 구현 작업 한 개가 다음 범위만 TDD로 수행한다.
 
