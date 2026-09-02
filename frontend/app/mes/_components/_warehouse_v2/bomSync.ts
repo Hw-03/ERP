@@ -61,7 +61,7 @@ export function applyToggleLine(
                 ...line,
                 quantity: newIncluded ? 1 : 0,
                 included: newIncluded,
-                edited: true,
+                edited: !newIncluded,
                 shortage: 0,
                 exclusion_note: exclusionNoteFor(subType, line.origin, newIncluded),
               }

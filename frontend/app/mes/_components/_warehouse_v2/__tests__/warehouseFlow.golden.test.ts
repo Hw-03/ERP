@@ -1678,15 +1678,23 @@ describe("[bomSync] applyToggleLine", () => {
     expect(child.shortage).toBe(0);
   });
 
-  it("제외된 부서 BOM 자동 하위를 다시 누르면 수량 1로 포함한다", () => {
+  it("제외된 부서 BOM 자동 하위를 다시 포함하면 다음 기준 수량 변경을 따른다", () => {
     const bundles = [
       makeBundle({
         bundle_id: "B",
+        quantity: 1,
         lines: [
+          makeLine({
+            line_id: "P",
+            origin: "direct",
+            quantity: 1,
+            from_bucket: "production",
+            to_bucket: "none",
+          }),
           makeLine({
             line_id: "C",
             origin: "bom_auto",
-            bom_expected: 2,
+            bom_expected: 1,
             included: false,
             quantity: 0,
             edited: true,
@@ -1698,13 +1706,24 @@ describe("[bomSync] applyToggleLine", () => {
       }),
     ];
 
-    const next = applyToggleLine(bundles, "B", "C", "produce", availMap({ C: 0 }));
-    const child = next[0].lines[0];
+    const next = applyToggleLine(bundles, "B", "C", "disassemble", availMap({ C: 44 }));
+    const child = next[0].lines[1];
     expect(child.quantity).toBe(1);
     expect(child.included).toBe(true);
-    expect(child.edited).toBe(true);
+    expect(child.edited).toBe(false);
     expect(child.shortage).toBe(0);
     expect(child.exclusion_note).toBeNull();
+
+    const resized = applyLineQuantityChange(
+      next,
+      "B",
+      "P",
+      4,
+      0,
+      "disassemble",
+      availMap({ C: 44 }),
+    );
+    expect(resized[0].lines[1].quantity).toBe(4);
   });
 
   it("BOM 재고 미반영 자식은 부모·자체 토글로 다시 포함되지 않는다", () => {
