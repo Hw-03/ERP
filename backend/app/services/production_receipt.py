@@ -23,6 +23,7 @@ from app.models import (
     InventoryOperation,
     InventoryOperationRoleEnum,
     Item,
+    LocationStatusEnum,
     TransactionLog,
     TransactionTypeEnum,
 )
@@ -30,6 +31,7 @@ from app.repositories import item_repository
 from app.schemas import BackflushDetail, ProductionReceiptRequest
 from app.services import inventory as inventory_svc
 from app.services import inv_effect
+from app.services import stock_availability
 from app.services import inventory_operations as operation_svc
 from app.services._tx import transactional
 from app.services.bom import explode_bom, merge_requirements
@@ -196,22 +198,51 @@ def _assert_no_shortage(
     items_map: Dict[uuid.UUID, Item],
     invs_map: Dict[uuid.UUID, Inventory],
 ) -> None:
-    """Check process-code department PRODUCTION stock before backflush."""
-    shortage_errors = []
-    for comp_item_id, required_qty in merged.items():
+    """Lock production cells and reservations, then check canonical availability."""
+    shortage_errors: list[str] = []
+    cells_by_item: dict[uuid.UUID, stock_availability.AvailabilityCell] = {}
+    departments = {}
+    for comp_item_id in sorted(merged):
         comp_item = items_map.get(comp_item_id)
         if comp_item is None:
             shortage_errors.append(f"구성품 {comp_item_id} 을 찾을 수 없습니다.")
             continue
         try:
-            dept, current_avail = inventory_svc.item_department_stock(db, comp_item)
+            dept = inventory_svc.department_for_item(comp_item)
         except ValueError as exc:
             shortage_errors.append(str(exc))
             continue
+        inventory_svc._lock_location(
+            db,
+            comp_item_id,
+            dept,
+            LocationStatusEnum.PRODUCTION,
+        )
+        departments[comp_item_id] = dept
+        cells_by_item[comp_item_id] = stock_availability.AvailabilityCell.location(
+            comp_item_id,
+            dept,
+            LocationStatusEnum.PRODUCTION,
+        )
+
+    figures = stock_availability.figures_for_cells(
+        db,
+        cells_by_item.values(),
+        lock_allocations=True,
+    )
+    for comp_item_id, required_qty in merged.items():
+        comp_item = items_map.get(comp_item_id)
+        cell = cells_by_item.get(comp_item_id)
+        if comp_item is None or cell is None:
+            continue
+        current_avail = figures[cell].available
         if current_avail < required_qty:
             shortage_errors.append(
                 inventory_svc.format_item_location_shortage(
-                    comp_item, dept, current_avail, required_qty
+                    comp_item,
+                    departments[comp_item_id],
+                    current_avail,
+                    required_qty,
                 )
             )
 

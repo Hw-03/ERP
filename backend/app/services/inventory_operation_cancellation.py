@@ -7,7 +7,7 @@ import json
 import uuid
 from dataclasses import asdict, dataclass
 from datetime import UTC, date, datetime, timedelta
-from typing import Optional
+from typing import Iterable, Optional
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
@@ -43,6 +43,7 @@ from app.models import (
 from app.services import inv_effect
 from app.services import inventory_operations as operation_svc
 from app.services import defect_records as defect_records_svc
+from app.services import stock_availability
 from app.services._tx import transactional
 from app.services.inv_calc import _sync_total
 
@@ -65,6 +66,9 @@ LEGACY_EFFECT_BLOCKER = (
 )
 PHYSICAL_ROW_CHANGED_MESSAGE = (
     "재고 행이 작업 이후 변경되어 정확히 취소할 수 없습니다."
+)
+SHIPPING_DEDICATED_CANCEL_MESSAGE = (
+    "출하 준비·픽업 작업은 출하 전용 취소 명령으로만 취소할 수 있습니다."
 )
 
 
@@ -277,7 +281,13 @@ def _current_cell(
             if row_id:
                 raise CancellationNotAllowed(PHYSICAL_ROW_CHANGED_MESSAGE)
             raise CancellationNotAllowed("재고 레코드를 찾을 수 없습니다.")
-        return int(inventory.warehouse_qty or 0), int(inventory.pending_quantity or 0)
+        figure = stock_availability.figure_for_cell(
+            db,
+            stock_availability.AvailabilityCell.warehouse(uuid.UUID(item_id)),
+        )
+        return int(inventory.warehouse_qty or 0), int(
+            figure.stock_request_pending + figure.active_shipping_reserved
+        )
     if scope == "warehouse_box":
         query = db.query(WarehouseBoxItem).filter(
             WarehouseBoxItem.item_id == item_id
@@ -333,6 +343,18 @@ def _current_cell(
         )
         .one_or_none()
     )
+    if status == LocationStatusEnum.PRODUCTION.value:
+        figure = stock_availability.figure_for_cell(
+            db,
+            stock_availability.AvailabilityCell.location(
+                uuid.UUID(item_id),
+                department,
+                LocationStatusEnum.PRODUCTION,
+            ),
+        )
+        return int(location.quantity if location is not None else 0), int(
+            figure.stock_request_pending + figure.active_shipping_reserved
+        )
     if location is None:
         return 0, 0
     return int(location.quantity or 0), int(location.pending_quantity or 0)
@@ -431,6 +453,7 @@ def preview_cancellation(
     operation_id: uuid.UUID,
     *,
     now: Optional[datetime] = None,
+    allow_shipping_workflow: bool = False,
 ) -> CancellationPlan:
     """현재 상태를 읽어 실행과 동일한 합산 역전 계획을 만든다."""
     operation = db.get(InventoryOperation, operation_id)
@@ -441,6 +464,12 @@ def preview_cancellation(
     warnings: list[str] = []
     if operation.kind != InventoryOperationKindEnum.BUSINESS:
         blockers.append("취소 작업은 다시 취소할 수 없습니다.")
+    if (
+        not allow_shipping_workflow
+        and operation.domain == "shipping"
+        and operation.action in {"prepare", "pickup"}
+    ):
+        blockers.append(SHIPPING_DEDICATED_CANCEL_MESSAGE)
     existing_reversal = (
         db.query(InventoryOperation.operation_id)
         .filter(InventoryOperation.reverses_operation_id == operation.operation_id)
@@ -947,6 +976,43 @@ def _assert_plan_applied(
             raise CancellationNotAllowed("취소 적용 후 업무 상태 검산에 실패했습니다.")
 
 
+def _lock_inventory_allocation_graph(
+    db: Session,
+    item_ids: Iterable[uuid.UUID],
+) -> None:
+    """취소가 건드릴 품목의 물리 재고와 활성 출하 배정을 공통 순서로 잠근다."""
+    ordered_item_ids = sorted(set(item_ids), key=str)
+    from app.services import warehouse_map as warehouse_map_svc
+
+    warehouse_map_svc.lock_warehouse_map_rows(
+        db,
+        item_ids=ordered_item_ids,
+        include_boxes_for_item_ids=True,
+        include_zones_for_item_ids=True,
+    )
+    if ordered_item_ids:
+        location_query = (
+            db.query(InventoryLocation)
+            .filter(InventoryLocation.item_id.in_(ordered_item_ids))
+            .order_by(
+                InventoryLocation.item_id.asc(),
+                InventoryLocation.department.asc(),
+                InventoryLocation.status.asc(),
+            )
+        )
+        if db.get_bind().dialect.name != "sqlite":
+            location_query = location_query.with_for_update()
+        location_query.all()
+    stock_availability.figures_for_cells(
+        db,
+        (
+            stock_availability.AvailabilityCell.warehouse(item_id)
+            for item_id in ordered_item_ids
+        ),
+        lock_allocations=True,
+    )
+
+
 def cancel_operation(
     db: Session,
     *,
@@ -955,6 +1021,7 @@ def cancel_operation(
     reason: str,
     plan_hash: str,
     now: Optional[datetime] = None,
+    allow_shipping_workflow: bool = False,
 ) -> InventoryOperation:
     """잠금 후 계획을 재검산하고 전체 역전 작업을 한 트랜잭션으로 확정한다."""
     with transactional(db):
@@ -987,20 +1054,26 @@ def cancel_operation(
             {movement.record_id for movement in movements},
             key=str,
         )
-        from app.services import warehouse_map as warehouse_map_svc
-
-        warehouse_map_svc.lock_warehouse_map_rows(
-            db,
-            item_ids=sorted(
-                {
-                    *{log.item_id for log in logs},
-                    *{movement.item_id for movement in movements},
-                },
-                key=str,
-            ),
-            include_boxes_for_item_ids=True,
-            include_zones_for_item_ids=True,
+        allocation_subject_ids = [
+            effect.subject_id
+            for effect in operation_effects
+            if effect.effect_kind == InventoryOperationEffectKindEnum.ALLOCATION
+        ]
+        allocation_item_ids = {
+            item_id
+            for (item_id,) in db.query(ShippingAllocation.item_id)
+            .filter(ShippingAllocation.allocation_id.in_(allocation_subject_ids))
+            .all()
+        }
+        affected_item_ids = sorted(
+            {
+                *{log.item_id for log in logs},
+                *{movement.item_id for movement in movements},
+                *allocation_item_ids,
+            },
+            key=str,
         )
+        _lock_inventory_allocation_graph(db, affected_item_ids)
         if defect_record_ids:
             defect_query = (
                 db.query(DefectQuarantineRecord)
@@ -1010,7 +1083,12 @@ def cancel_operation(
             if db.get_bind().dialect.name != "sqlite":
                 defect_query = defect_query.with_for_update()
             defect_query.all()
-        current_plan = preview_cancellation(db, operation_id, now=now)
+        current_plan = preview_cancellation(
+            db,
+            operation_id,
+            now=now,
+            allow_shipping_workflow=allow_shipping_workflow,
+        )
         if current_plan.plan_hash != plan_hash:
             raise CancellationPlanChanged(
                 "취소 미리보기 이후 재고 또는 예약 상태가 변경되었습니다. 다시 확인해 주세요."

@@ -23,6 +23,9 @@ from app.models import (
     InventoryOperationKindEnum,
     InventoryOperationRoleEnum,
     InventoryOperationEffect,
+    ShippingAllocation,
+    ShippingRequest,
+    ShippingRequestStatusEnum,
     SystemSetting,
     TransactionEditLog,
     TransactionLog,
@@ -102,6 +105,26 @@ def _receive_operation(db_session, item, actor: Employee, quantity: int) -> Inve
     return operation
 
 
+def _reserve_shipping(db_session, item, quantity: int) -> None:
+    request = ShippingRequest(
+        status=ShippingRequestStatusEnum.PREPARED,
+        base_pf_item_id=item.item_id,
+        request_quantity=1,
+    )
+    db_session.add(request)
+    db_session.flush()
+    db_session.add(
+        ShippingAllocation(
+            request_id=request.request_id,
+            item_id=item.item_id,
+            quantity=quantity,
+            department=None,
+            status="RESERVED",
+        )
+    )
+    db_session.commit()
+
+
 def test_cancel_creates_separate_reversal_operation_and_opposite_log(
     db_session, make_item
 ) -> None:
@@ -148,6 +171,70 @@ def test_cancel_creates_separate_reversal_operation_and_opposite_log(
     assert logs[1].quantity_change == Decimal("-7")
     inventory = inventory_svc._get_or_create_inventory(db_session, item.item_id)
     assert inventory.warehouse_qty == Decimal("0")
+
+
+def test_quantity_correction_cannot_reduce_below_active_shipping_reservation(
+    db_session,
+    make_item,
+) -> None:
+    item = make_item(name="출하 예약 보정 차단", warehouse_qty=Decimal("0"))
+    actor = _actor(db_session)
+    db_session.add(
+        SystemSetting(
+            setting_key=operation_svc.CUTOVER_SETTING_KEY,
+            setting_value="2026-01-01T00:00:00",
+        )
+    )
+    db_session.commit()
+    operation = _receive_operation(db_session, item, actor, 10)
+    source_log = db_session.query(TransactionLog).filter_by(
+        operation_id=operation.operation_id
+    ).one()
+    _reserve_shipping(db_session, item, 10)
+
+    with pytest.raises(transaction_actions.TransactionQuantityCorrectionShortage):
+        transaction_actions.correct_transaction_quantity(
+            db_session,
+            log_id=source_log.log_id,
+            editor=actor,
+            new_quantity=Decimal("1"),
+            reason="출하 예약 침범 보정",
+            request=None,
+        )
+
+    db_session.expire_all()
+    inventory = db_session.query(Inventory).filter_by(item_id=item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("10")
+    assert db_session.query(InventoryOperation).count() == 1
+    assert db_session.query(TransactionEditLog).count() == 0
+
+
+def test_cancellation_preview_counts_active_shipping_reservation(
+    db_session,
+    make_item,
+) -> None:
+    item = make_item(name="출하 예약 취소 차단", warehouse_qty=Decimal("0"))
+    actor = _actor(db_session)
+    db_session.add(
+        SystemSetting(
+            setting_key=operation_svc.CUTOVER_SETTING_KEY,
+            setting_value="2026-01-01T00:00:00",
+        )
+    )
+    db_session.commit()
+    operation = _receive_operation(db_session, item, actor, 10)
+    _reserve_shipping(db_session, item, 10)
+
+    preview = cancellation_svc.preview_cancellation(
+        db_session,
+        operation.operation_id,
+        now=datetime(2026, 8, 25, 3, 0),
+    )
+
+    assert preview.can_cancel is False
+    assert cancellation_svc.INSUFFICIENT_STOCK_MESSAGE in preview.blockers
+    warehouse_cell = next(cell for cell in preview.cells if cell.scope == "warehouse")
+    assert warehouse_cell.reserved_quantity == 10
 
 
 def test_v2_preview_rejects_stock_used_after_the_recorded_physical_effect(

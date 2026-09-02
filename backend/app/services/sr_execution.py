@@ -9,6 +9,7 @@ from typing import Iterable, Optional
 
 from sqlalchemy.orm import Session
 
+from app.repositories import item_repository
 from app.models import (
     Employee,
     InventoryOperation,
@@ -590,6 +591,10 @@ def _execute_all_lines(
     # 정렬된 순서로 모든 아이템 선락 → 교착 방지 (PostgreSQL only; SQLite는 WAL 직렬화)
     if _uses_row_locks(db):
         all_item_ids = _request_inventory_item_ids(db, request, lines)
+        active_items = item_repository.lock_active_many(db, all_item_ids)
+        missing = sorted(set(all_item_ids) - set(active_items), key=str)
+        if missing:
+            raise ValueError(f"품목을 찾을 수 없습니다: {missing[0]}")
         inventory_svc._ensure_and_lock_inventories(db, all_item_ids)
         warehouse_map_svc.lock_warehouse_map_rows(
             db,

@@ -27,6 +27,7 @@ from app.models import (
     WarehouseSpecialZoneItem,
     WarehouseUnplacedItem,
 )
+from app.services import stock_availability
 
 # process_type_code prefix → 부서명 (bootstrap/seed.py _PROCESS_TYPES 와 일치)
 _PREFIX_TO_DEPT: dict[str, str] = {
@@ -433,8 +434,9 @@ def _apply_warehouse_ledger_delta(
     """Apply one W delta and its exact B/Z/U delta in a single locked unit.
 
     Positive stock always enters U. Negative stock consumes B, then active Z,
-    then U. ``reserved`` also consumes pending quantity; ``absolute`` is used by
-    an explicit stock adjustment and deliberately ignores pending availability.
+    then U. ``reserved`` consumes an existing StockRequest reservation;
+    ``absolute`` is used by an explicit stock adjustment but still protects all
+    active reservations.
     """
     change = _quantity_as_int(delta, label="변경")
     if change == 0:
@@ -450,15 +452,28 @@ def _apply_warehouse_ledger_delta(
         ledger.unplaced.quantity = int(ledger.unplaced.quantity) + change
     else:
         need = -change
-        if consume_mode == "available" and warehouse - pending < need:
+        figure = stock_availability.figure_for_cell(
+            db,
+            stock_availability.AvailabilityCell.warehouse(inventory.item_id),
+            lock_allocations=True,
+        )
+        if consume_mode in {"available", "absolute"} and figure.available < need:
             raise ValueError(
                 "창고 가용 재고 부족 "
-                f"(창고 {warehouse}, 예약중 {pending}, 차감 요청 {need})."
+                f"(물리 {figure.physical}, 요청예약 {figure.stock_request_pending}, "
+                f"출하예약 {figure.active_shipping_reserved}, "
+                f"가용 {figure.available}, 차감 요청 {need})."
             )
         if consume_mode == "reserved":
             if pending < need:
                 raise ValueError(
                     f"예약 수량이 부족합니다 (Pending {pending}, 차감 요청 {need})."
+                )
+            if figure.physical - figure.active_shipping_reserved < need:
+                raise ValueError(
+                    "창고 가용 재고 부족 "
+                    f"(물리 {figure.physical}, 출하예약 "
+                    f"{figure.active_shipping_reserved}, 차감 요청 {need})."
                 )
             inventory.pending_quantity = pending - need
         if warehouse < need:

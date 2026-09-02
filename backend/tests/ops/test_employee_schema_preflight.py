@@ -169,6 +169,7 @@ def test_inventory_location_ledger_declares_data_preserving_employee_policy() ->
         "20260827_0030_add_operator_sessions.py",
         "20260828_0031_cp4_command_integrity.py",
         "20260831_0032_inventory_location_ledger.py",
+        "20260831_0033_shipping_command_receipts.py",
     ],
 )
 def test_current_employee_schema_migrations_declare_auto_deploy_policy(filename: str) -> None:

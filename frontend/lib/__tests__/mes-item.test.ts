@@ -28,6 +28,8 @@ const stubItem = (overrides: Partial<Item> = {}): Item => ({
   model_slots: [],
   process_type_code: null,
   serial_no: null,
+  bom_completed_at: null,
+  deleted_at: null,
   created_at: "2026-01-01T00:00:00",
   updated_at: "2026-01-01T00:00:00",
   department: null,

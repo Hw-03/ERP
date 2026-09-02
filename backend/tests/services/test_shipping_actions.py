@@ -30,6 +30,7 @@ from app.models import (
 )
 from app.services import shipping as shipping_svc
 from app.services import shipping_actions as shipping_actions_svc
+from app.services import inventory_operation_cancellation as cancellation_svc
 from app.services import io as io_svc
 from app.services import io_actions as io_actions_svc
 from app.schemas.io import IoPreviewTarget, IoSubmitRequest
@@ -779,7 +780,7 @@ def test_pickup_complete_restores_inventory_logs_allocation_and_status_when_even
     assert boundaries == {"commit": 0, "rollback": 1}
 
 
-def test_pickup_cancel_creates_reversal_operation_and_closes_request(
+def test_pickup_cancel_creates_reversal_operation_and_restores_prepared_request(
     db_session,
     make_item,
     make_bom,
@@ -828,14 +829,14 @@ def test_pickup_cancel_creates_reversal_operation_and_closes_request(
         "include_boxes_for_item_ids": True,
         "include_zones_for_item_ids": True,
     }
-    assert cancelled.status == ShippingRequestStatusEnum.CANCELLED
-    assert cancelled.picked_up_at is not None
+    assert cancelled.status == ShippingRequestStatusEnum.PREPARED
+    assert cancelled.picked_up_at is None
     assert cancelled.serial_numbers == "SN-001"
     assert _location_qty(db_session, final_pf_id, DepartmentEnum.SHIPPING) == prepared_final_pf_qty
     assert _location_qty(db_session, companion_id, DepartmentEnum.SHIPPING) == prepared_companion_qty
     allocations = db_session.query(ShippingAllocation).filter_by(request_id=request_id).all()
     assert allocations
-    assert {row.status for row in allocations} == {"RELEASED"}
+    assert {row.status for row in allocations} == {"RESERVED"}
     pickup_logs = (
         db_session.query(TransactionLog)
         .filter_by(shipping_request_id=request_id, shipping_phase="PICKUP")
@@ -968,7 +969,7 @@ def test_pickup_and_cancel_logs_use_current_actor_not_preparer(
     assert legacy_event.actor_name is None
 
 
-def test_prepare_cancel_closes_request_and_releases_allocations(
+def test_prepare_cancel_restores_preparing_request_and_releases_allocations(
     db_session,
     make_item,
     make_bom,
@@ -989,8 +990,8 @@ def test_prepare_cancel_closes_request_and_releases_allocations(
         actor=actor,
     )
 
-    assert cancelled.status == ShippingRequestStatusEnum.CANCELLED
-    assert cancelled.prepared_at is not None
+    assert cancelled.status == ShippingRequestStatusEnum.PREPARING
+    assert cancelled.prepared_at is None
     allocations = db_session.query(ShippingAllocation).filter_by(request_id=request_id).all()
     assert allocations
     assert {row.status for row in allocations} == {"RELEASED"}
@@ -1002,13 +1003,61 @@ def test_prepare_cancel_closes_request_and_releases_allocations(
     original = db_session.get(InventoryOperation, cancellation.reverses_operation_id)
     assert original is not None
     assert original.action == "prepare"
-    with pytest.raises(shipping_svc.ShippingError, match="준비 중"):
-        shipping_actions_svc.prepare_complete(
-            db_session,
-            request_id,
-            "SN-002",
-            actor=actor,
+    prepared_again = shipping_actions_svc.prepare_complete(
+        db_session,
+        request_id,
+        "SN-002",
+        actor=actor,
+    )
+    assert prepared_again.status == ShippingRequestStatusEnum.PREPARED
+
+
+def test_generic_operation_cancel_rejects_shipping_workflow_operation(
+    db_session,
+    make_item,
+    make_bom,
+    make_location,
+) -> None:
+    request_id, _final_pa_id, _final_pf_id, _companion_id = _make_prepared_request(
+        db_session,
+        make_item,
+        make_bom,
+        make_location,
+    )
+    actor = _active_shipping_actor(db_session)
+    operation = (
+        db_session.query(InventoryOperation)
+        .filter(
+            InventoryOperation.domain == "shipping",
+            InventoryOperation.action == "prepare",
         )
+        .one()
+    )
+
+    plan = cancellation_svc.preview_cancellation(
+        db_session,
+        operation.operation_id,
+    )
+
+    assert plan.can_cancel is False
+    assert any("출하 전용 취소" in blocker for blocker in plan.blockers)
+    with pytest.raises(cancellation_svc.CancellationNotAllowed, match="출하 전용 취소"):
+        cancellation_svc.cancel_operation(
+            db_session,
+            operation_id=operation.operation_id,
+            canceller=actor,
+            reason="generic cancel must fail closed",
+            plan_hash=plan.plan_hash,
+        )
+    request = db_session.get(ShippingRequest, request_id)
+    assert request is not None
+    assert request.status == ShippingRequestStatusEnum.PREPARED
+    assert {
+        allocation.status
+        for allocation in db_session.query(ShippingAllocation).filter_by(
+            request_id=request_id
+        )
+    } == {"RESERVED"}
 
 
 def test_pickup_cancel_rolls_back_when_event_recording_fails(

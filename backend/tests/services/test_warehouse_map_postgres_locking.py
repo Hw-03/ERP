@@ -1829,6 +1829,26 @@ def test_postgres_outbound_blocks_actual_admin_move_until_commit(monkeypatch):
             setup.execute(
                 text(
                     """
+                    CREATE TABLE shipping_allocations (
+                        allocation_id VARCHAR(32) PRIMARY KEY,
+                        request_id VARCHAR(32) NOT NULL,
+                        item_id VARCHAR(32) NOT NULL,
+                        quantity INTEGER NOT NULL,
+                        unit VARCHAR(20),
+                        department VARCHAR(50),
+                        status VARCHAR(20) NOT NULL,
+                        reference_no VARCHAR(100),
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        released_at TIMESTAMP,
+                        consumed_at TIMESTAMP,
+                        released_reason VARCHAR(300)
+                    )
+                    """
+                )
+            )
+            setup.execute(
+                text(
+                    """
                     CREATE TABLE system_settings (
                         setting_key VARCHAR(100) PRIMARY KEY,
                         setting_value TEXT NOT NULL,

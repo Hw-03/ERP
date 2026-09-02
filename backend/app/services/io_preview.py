@@ -16,15 +16,13 @@ from sqlalchemy.orm import Session
 from app.models import (
     DepartmentEnum,
     Employee,
-    Inventory,
-    InventoryLocation,
     Item,
     LocationStatusEnum,
 )
 from app.repositories import item_repository
 from app.services import bom as bom_svc
 from app.services import inventory as inventory_svc
-from app.services import stock_math
+from app.services import stock_availability
 from app.services.bom_stock_policy import (
     BOM_AUTO_ORIGIN,
     BOM_STOCK_EXEMPT_NOTE,
@@ -392,40 +390,22 @@ def _bucket_available(
     department: Optional[str],
 ) -> Decimal:
     if bucket == "warehouse":
-        inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
-        # 가용 정의(warehouse - pending)는 stock_math 단일 소스를 따른다.
-        return stock_math.figures_from_inventory(inv).warehouse_available
+        cell = stock_availability.AvailabilityCell.warehouse(item_id)
     if bucket == "production" and department:
-        loc = (
-            db.query(InventoryLocation)
-            .filter(
-                InventoryLocation.item_id == item_id,
-                InventoryLocation.department == department,
-                InventoryLocation.status == LocationStatusEnum.PRODUCTION,
-            )
-            .first()
+        cell = stock_availability.AvailabilityCell.location(
+            item_id,
+            department,
+            LocationStatusEnum.PRODUCTION,
         )
-        return (
-            _d(loc.quantity) - _d(loc.pending_quantity)
-            if loc
-            else Decimal("0")
+    elif bucket == "defective" and department:
+        cell = stock_availability.AvailabilityCell.location(
+            item_id,
+            department,
+            LocationStatusEnum.DEFECTIVE,
         )
-    if bucket == "defective" and department:
-        loc = (
-            db.query(InventoryLocation)
-            .filter(
-                InventoryLocation.item_id == item_id,
-                InventoryLocation.department == department,
-                InventoryLocation.status == LocationStatusEnum.DEFECTIVE,
-            )
-            .first()
-        )
-        return (
-            _d(loc.quantity) - _d(loc.pending_quantity)
-            if loc
-            else Decimal("0")
-        )
-    return Decimal("0")
+    elif bucket != "warehouse":
+        return Decimal("0")
+    return stock_availability.figure_for_cell(db, cell).available
 
 
 def _default_production_dept(item: Item, fallback: Optional[str]) -> str:

@@ -15,7 +15,7 @@ from app.dependencies.verified_actor import (
     ensure_actor_employee_code,
     ensure_actor_employee_name,
 )
-from app.models import Item
+from app.models import Item, LocationStatusEnum
 from app.schemas import (
     BomCheckResponse,
     CapacityResponse,
@@ -24,6 +24,7 @@ from app.schemas import (
 )
 from app.services import production_receipt as production_receipt_svc
 from app.services import inventory as inventory_svc
+from app.services import stock_availability
 from app.services.production_receipt import (
     ProductionBadRequest,
     ProductionItemNotFound,
@@ -156,15 +157,26 @@ def check_production_feasibility(
         if comp_item is None:
             continue
         try:
-            dept, current_avail = inventory_svc.item_department_stock(db, comp_item)
+            dept = inventory_svc.department_for_item(comp_item)
+            figure = stock_availability.figure_for_cell(
+                db,
+                stock_availability.AvailabilityCell.location(
+                    comp_item.item_id,
+                    dept,
+                    LocationStatusEnum.PRODUCTION,
+                ),
+            )
+            current_total = figure.physical
+            current_pending = figure.stock_request_pending
+            current_avail = figure.available
         except ValueError:
             dept = None
+            current_total = Decimal("0")
+            current_pending = Decimal("0")
             current_avail = Decimal("0")
         ok = current_avail >= required_qty
         if not ok:
             all_ok = False
-        current_total = current_avail
-        current_pending = Decimal("0")
         result.append(
             {
                 "mes_code": comp_item.mes_code,

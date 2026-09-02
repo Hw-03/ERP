@@ -1477,12 +1477,20 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     setError(null);
     try {
       if (action.kind === "prepare") {
-        const next = await api.prepareShippingComplete(action.request.request_id, { serial_numbers: serialNumbers });
+        const next = await api.prepareShippingComplete(action.request.request_id, {
+          serial_numbers: serialNumbers,
+          expected_status: action.request.status,
+          expected_updated_at: action.request.updated_at,
+        }, operator?.employee_id);
         upsertRequest(next);
         setSelectedPrepId(next.request_id);
         onStatusChange("출하 준비 완료 처리했습니다.");
       } else if (action.kind === "cancel") {
-        const next = await api.cancelShippingPrepare(action.request.request_id, { reason: "출하 준비 변경" });
+        const next = await api.cancelShippingPrepare(action.request.request_id, {
+          reason: "출하 준비 변경",
+          expected_status: action.request.status,
+          expected_updated_at: action.request.updated_at,
+        }, operator?.employee_id);
         upsertRequest(next);
         setSelectedPrepId(next.request_id);
         onStatusChange("준비 완료를 취소했습니다. 요청과 BOM을 다시 수정할 수 있습니다.");
@@ -1500,7 +1508,10 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         navigateView("requestList");
         onStatusChange("출하 요청을 취소했습니다.");
       } else if (action.kind === "pickupCancel") {
-        const next = await api.cancelShippingPickup(action.request.request_id);
+        const next = await api.cancelShippingPickup(action.request.request_id, {
+          expected_status: action.request.status,
+          expected_updated_at: action.request.updated_at,
+        }, operator?.employee_id);
         upsertRequest(next);
         setHistoryRows((current) => current.filter((row) => row.request_id !== next.request_id));
         setSelectedHistoryId(null);
@@ -1508,7 +1519,10 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         navigateView("prepWork", next.request_id);
         onStatusChange("픽업 완료를 취소했습니다. 출하 준비에서 다시 확인하세요.");
       } else {
-        const next = await api.completeShippingPickup(action.request.request_id);
+        const next = await api.completeShippingPickup(action.request.request_id, {
+          expected_status: action.request.status,
+          expected_updated_at: action.request.updated_at,
+        }, operator?.employee_id);
         upsertRequest(next);
         setHistoryStatus("PICKED_UP");
         setHistoryRows((current) => [next, ...current.filter((row) => row.request_id !== next.request_id)]);

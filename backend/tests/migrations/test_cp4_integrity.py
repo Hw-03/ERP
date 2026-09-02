@@ -34,14 +34,15 @@ def _postgres_config(database_url: str) -> Config:
     return config
 
 
-def test_cp4_revision_is_the_direct_predecessor_of_the_single_head() -> None:
+def test_cp4_revision_remains_in_the_single_head_chain() -> None:
     config = Config(str(BACKEND_DIR / "alembic.ini"))
     config.set_main_option("script_location", str(BACKEND_DIR / "alembic"))
 
     script = ScriptDirectory.from_config(config)
 
-    assert script.get_heads() == ["20260831_0032"]
+    assert script.get_heads() == ["20260831_0033"]
     assert script.get_revision("20260831_0032").down_revision == MIGRATION_REVISION
+    assert script.get_revision("20260831_0033").down_revision == "20260831_0032"
 
 
 def test_0030_to_0031_adds_and_rollback_removes_correction_unique_index(
@@ -479,7 +480,7 @@ def test_postgresql_head_0031_downgrade_and_reupgrade() -> None:
                     config.attributes["connection"] = connection
                     assert connection.execute(
                         sa.text("SELECT version_num FROM alembic_version")
-                    ).scalar_one() == "20260831_0032"
+                    ).scalar_one() == "20260831_0033"
 
                     command.downgrade(config, MIGRATION_REVISION)
                     assert connection.execute(
@@ -512,7 +513,7 @@ def test_postgresql_head_0031_downgrade_and_reupgrade() -> None:
                     command.upgrade(config, "head")
                     assert connection.execute(
                         sa.text("SELECT version_num FROM alembic_version")
-                    ).scalar_one() == "20260831_0032"
+                    ).scalar_one() == "20260831_0033"
                     assert connection.execute(
                         sa.text(
                             "SELECT count(*) FROM pg_indexes "
@@ -526,7 +527,7 @@ def test_postgresql_head_0031_downgrade_and_reupgrade() -> None:
             with engine.connect() as verify:
                 assert verify.execute(
                     sa.text("SELECT version_num FROM alembic_version")
-                ).scalar_one() == "20260831_0032"
+                ).scalar_one() == "20260831_0033"
                 assert verify.execute(
                     sa.text(
                         "SELECT count(*) FROM pg_indexes "

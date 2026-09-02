@@ -45,7 +45,7 @@ from app.utils.mes_code import (
 from app.utils.search import build_normalized_search_filter
 from app.services import audit, inv_effect, item_lifecycle
 from app.services import inventory_operations as operation_svc
-from app.services import stock_math
+from app.services import stock_availability, stock_math
 from app.services.item_display_order import _insert_item_at_process_end
 from app.services._tx import commit_and_refresh, transactional
 from app._evt import emit as _evt_emit
@@ -86,14 +86,20 @@ def _to_item_with_inventory(
             .filter(InventoryLocation.item_id == item.item_id, InventoryLocation.quantity > 0)
             .all()
         )
+        reserved_by_cell = stock_availability.bulk_reserved_by_cell(
+            db,
+            [item.item_id],
+        )
         locations = [
             InventoryLocationResponse(
                 department=row.department,
                 status=row.status,
                 quantity=row.quantity or _D("0"),
                 pending_quantity=row.pending_quantity or _D("0"),
-                available_quantity=(row.quantity or _D("0"))
-                - (row.pending_quantity or _D("0")),
+                available_quantity=stock_availability.location_available_quantity(
+                    row,
+                    reserved_by_cell,
+                ),
             )
             for row in loc_rows
         ]
@@ -133,6 +139,7 @@ def _to_item_with_inventory(
         defective_total=fig.defective_total,
         pending_quantity=fig.pending,
         department_pending_quantity=fig.department_pending,
+        warehouse_available_quantity=fig.warehouse_available,
         available_quantity=fig.available,
         last_reserver_name=inventory.last_reserver_name if inventory else None,
         location=inventory.location if inventory else None,
@@ -348,6 +355,7 @@ def list_items(
     # bulk prefetch — N+1 제거. 기존에는 item 1건당 4 쿼리씩 나갔음.
     item_ids = [it.item_id for it, _ in rows]
     figures_map = stock_math.bulk_compute(db, item_ids)
+    reserved_by_cell = stock_availability.bulk_reserved_by_cell(db, item_ids)
 
     from decimal import Decimal as _D
 
@@ -366,8 +374,10 @@ def list_items(
                 status=row.status,
                 quantity=row.quantity or _D("0"),
                 pending_quantity=row.pending_quantity or _D("0"),
-                available_quantity=(row.quantity or _D("0"))
-                - (row.pending_quantity or _D("0")),
+                available_quantity=stock_availability.location_available_quantity(
+                    row,
+                    reserved_by_cell,
+                ),
             )
         )
 

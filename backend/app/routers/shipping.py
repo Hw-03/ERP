@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Optional
 
-from fastapi import Depends, Query, status
+from fastapi import Depends, Query, Response, status
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session, aliased
 
@@ -45,6 +45,8 @@ from app.schemas.shipping import (
     ShippingCompanionLineResponse,
     ShippingPrepareCancelRequest,
     ShippingPrepareCompleteRequest,
+    ShippingPickupCancelRequest,
+    ShippingPickupCompleteRequest,
     ShippingInvoiceUpdate,
     ShippingHistoryMonthResponse,
     ShippingHistoryPageResponse,
@@ -278,12 +280,39 @@ def _to_response(
 def _action_or_422(db: Session, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
     try:
         return func(db, *args, **kwargs)
+    except shipping_actions_svc.ShippingIdempotencyConflict as exc:
+        raise http_error(
+            status.HTTP_409_CONFLICT,
+            ErrorCode.IDEMPOTENCY_CONFLICT,
+            str(exc),
+        )
+    except shipping_actions_svc.ShippingStateConflict as exc:
+        raise http_error(
+            status.HTTP_409_CONFLICT,
+            ErrorCode.SHIPPING_STATE_CONFLICT,
+            str(exc),
+            current_status=exc.current_status,
+        )
     except ShippingConflictError as exc:
         raise http_error(status.HTTP_409_CONFLICT, ErrorCode.CONFLICT, str(exc))
     except ShippingError as exc:
         raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.BUSINESS_RULE, str(exc))
     except ValueError as exc:
         raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.STOCK_SHORTAGE, str(exc))
+
+
+def _shipping_command_response(
+    outcome: shipping_actions_svc.ShippingCommandOutcome,
+    response: Response,
+) -> dict[str, Any]:
+    """Expose the legacy keyless transport deprecation without changing its body."""
+
+    if outcome.legacy_transport:
+        response.headers["Deprecation"] = "true"
+        response.headers["Warning"] = (
+            '299 DEXCOWIN-MES "client_request_id is required for reliable retries"'
+        )
+    return outcome.response_snapshot
 
 
 def _validate_component_change_actor(requester: Employee) -> None:
@@ -536,40 +565,89 @@ def prepare_complete(
     request_id: uuid.UUID,
     payload: ShippingPrepareCompleteRequest,
     actor: VerifiedActor,
+    response: Response,
     db: Session = Depends(get_db),
 ):
-    req = _action_or_422(
+    outcome = _action_or_422(
         db,
-        shipping_actions_svc.prepare_complete,
+        shipping_actions_svc.prepare_complete_command,
         request_id,
         payload.serial_numbers,
+        _companion_payload(payload.companion_lines) or [],
         actor=actor,
+        client_request_id=payload.client_request_id,
+        expected_status=payload.expected_status,
+        response_factory=_to_response,
+        expected_updated_at=payload.expected_updated_at,
     )
-    return _to_response(db, req)
+    return _shipping_command_response(outcome, response)
 
 
 @router.post("/requests/{request_id}/prepare-cancel", response_model=ShippingRequestResponse)
-def prepare_cancel(request_id: uuid.UUID, payload: ShippingPrepareCancelRequest, actor: VerifiedActor, db: Session = Depends(get_db)):
-    req = _action_or_422(
+def prepare_cancel(
+    request_id: uuid.UUID,
+    actor: VerifiedActor,
+    response: Response,
+    payload: ShippingPrepareCancelRequest | None = None,
+    db: Session = Depends(get_db),
+):
+    command = payload or ShippingPrepareCancelRequest()
+    outcome = _action_or_422(
         db,
-        shipping_actions_svc.prepare_cancel,
+        shipping_actions_svc.prepare_cancel_command,
         request_id,
-        payload.reason,
+        command.reason,
         actor=actor,
+        client_request_id=command.client_request_id,
+        expected_status=command.expected_status,
+        response_factory=_to_response,
+        expected_updated_at=command.expected_updated_at,
     )
-    return _to_response(db, req)
+    return _shipping_command_response(outcome, response)
 
 
 @router.post("/requests/{request_id}/pickup-complete", response_model=ShippingRequestResponse)
-def pickup_complete(request_id: uuid.UUID, actor: VerifiedActor, db: Session = Depends(get_db)):
-    req = _action_or_422(db, shipping_actions_svc.pickup_complete, request_id, actor)
-    return _to_response(db, req)
+def pickup_complete(
+    request_id: uuid.UUID,
+    actor: VerifiedActor,
+    response: Response,
+    payload: ShippingPickupCompleteRequest | None = None,
+    db: Session = Depends(get_db),
+):
+    command = payload or ShippingPickupCompleteRequest()
+    outcome = _action_or_422(
+        db,
+        shipping_actions_svc.pickup_complete_command,
+        request_id,
+        actor=actor,
+        client_request_id=command.client_request_id,
+        expected_status=command.expected_status,
+        response_factory=_to_response,
+        expected_updated_at=command.expected_updated_at,
+    )
+    return _shipping_command_response(outcome, response)
 
 
 @router.post("/requests/{request_id}/pickup-cancel", response_model=ShippingRequestResponse)
-def pickup_cancel(request_id: uuid.UUID, actor: VerifiedActor, db: Session = Depends(get_db)):
-    req = _action_or_422(db, shipping_actions_svc.pickup_cancel, request_id, actor)
-    return _to_response(db, req)
+def pickup_cancel(
+    request_id: uuid.UUID,
+    actor: VerifiedActor,
+    response: Response,
+    payload: ShippingPickupCancelRequest | None = None,
+    db: Session = Depends(get_db),
+):
+    command = payload or ShippingPickupCancelRequest()
+    outcome = _action_or_422(
+        db,
+        shipping_actions_svc.pickup_cancel_command,
+        request_id,
+        actor=actor,
+        client_request_id=command.client_request_id,
+        expected_status=command.expected_status,
+        response_factory=_to_response,
+        expected_updated_at=command.expected_updated_at,
+    )
+    return _shipping_command_response(outcome, response)
 
 
 def _history_cursor(request: ShippingRequest, sort_at: datetime) -> str:

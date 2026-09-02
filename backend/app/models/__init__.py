@@ -54,6 +54,7 @@ from app.models.shipping import (
     ShippingRequestCompanionLine,
     ShippingRequestEvent,
     ShippingRequestRevision,
+    ShippingCommandReceipt,
     ShippingFinalizationModeEnum,
     ShippingRequestStatusEnum,
 )
@@ -147,6 +148,7 @@ __all__ = [
     "ShippingRequestCompanionLine",
     "ShippingRequestEvent",
     "ShippingRequestRevision",
+    "ShippingCommandReceipt",
     "ShippingFinalizationModeEnum",
     "ShippingRequestStatusEnum",
     # stock requests

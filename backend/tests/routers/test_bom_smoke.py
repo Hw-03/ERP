@@ -142,6 +142,57 @@ def test_bom_tree_exposes_additional_producible_quantity_from_available_stock(
     assert "additional_producible_quantity" not in child
 
 
+def test_bom_tree_additional_quantity_tracks_active_shipping_reservations(
+    client,
+    db_session,
+    make_item,
+    make_bom,
+):
+    from app.models import (
+        ShippingAllocation,
+        ShippingRequest,
+        ShippingRequestStatusEnum,
+    )
+
+    parent = make_item(name="출하 예약 생산 상위", process_type_code="AF")
+    component = make_item(
+        name="출하 예약 구성품",
+        process_type_code="AR",
+        warehouse_qty=Decimal("10"),
+        pending=Decimal("2"),
+    )
+    make_bom(parent.item_id, component.item_id, Decimal("2"))
+    request = ShippingRequest(
+        status=ShippingRequestStatusEnum.PREPARED,
+        base_pf_item_id=parent.item_id,
+        request_quantity=1,
+        requested_by_name="BOM capacity test",
+    )
+    db_session.add(request)
+    db_session.flush()
+    allocation = ShippingAllocation(
+        request_id=request.request_id,
+        item_id=component.item_id,
+        quantity=Decimal("3"),
+        department=None,
+        status="RESERVED",
+    )
+    db_session.add(allocation)
+    db_session.commit()
+
+    reserved = client.get(f"/api/bom/{parent.item_id}/tree")
+
+    assert reserved.status_code == 200, reserved.text
+    assert reserved.json()["additional_producible_quantity"] == 2
+
+    allocation.status = "RELEASED"
+    db_session.commit()
+    released = client.get(f"/api/bom/{parent.item_id}/tree")
+
+    assert released.status_code == 200, released.text
+    assert released.json()["additional_producible_quantity"] == 4
+
+
 def test_bom_tree_omits_additional_quantity_without_calculable_bom_and_ignores_excluded_component(
     client, make_item, make_bom
 ):

@@ -339,13 +339,26 @@ def test_location_reservation_mutation_prelocks_parent_inventory(
         location.pending_quantity = D("1")
         db_session.flush()
     calls = []
-    real_lock_inventory = inventory_svc._lock_inventory
+    if operation == "_reserve_location":
+        real_ensure = inventory_svc._ensure_and_lock_inventories
 
-    def track_lock_inventory(db, item_id):
-        calls.append(item_id)
-        return real_lock_inventory(db, item_id)
+        def track_parent_locks(db, item_ids):
+            calls.extend(item_ids)
+            return real_ensure(db, item_ids)
 
-    monkeypatch.setattr(inventory_svc, "_lock_inventory", track_lock_inventory)
+        monkeypatch.setattr(
+            inventory_svc,
+            "_ensure_and_lock_inventories",
+            track_parent_locks,
+        )
+    else:
+        real_lock_inventory = inventory_svc._lock_inventory
+
+        def track_lock_inventory(db, item_id):
+            calls.append(item_id)
+            return real_lock_inventory(db, item_id)
+
+        monkeypatch.setattr(inventory_svc, "_lock_inventory", track_lock_inventory)
 
     getattr(inventory_svc, operation)(
         db_session,

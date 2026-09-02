@@ -6,7 +6,7 @@ from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
-from sqlalchemy import event, update
+from sqlalchemy import event, select, update
 
 from app.models import (
     BOM,
@@ -36,7 +36,6 @@ from app.services import shipping as shipping_svc
 from app.services import shipping_actions as shipping_actions_svc
 from app.services import io as io_svc
 from app.services import io_actions as io_actions_svc
-from app.services import inventory_operation_cancellation as cancellation_svc
 from app.schemas.io import IoPreviewTarget, IoSubmitRequest
 
 
@@ -103,6 +102,12 @@ def test_pickup_consumption_prelocks_sorted_unique_inventories(
         lambda *_args: None,
     )
     monkeypatch.setattr(
+        shipping_svc.item_repository,
+        "lock_active_many",
+        lambda _db, item_ids: events.append(("item_lock", item_ids))
+        or {item_id: object() for item_id in item_ids},
+    )
+    monkeypatch.setattr(
         shipping_svc.inventory_svc,
         "_ensure_and_lock_inventories",
         lambda _db, item_ids: events.append(("lock", item_ids))
@@ -119,9 +124,28 @@ def test_pickup_consumption_prelocks_sorted_unique_inventories(
     shipping_svc._consume_pickup_allocations(db_session, request, final_pf, 1, actor)
 
     assert events[0] == (
+        "item_lock",
+        sorted({first.item_id, second.item_id, final_pf.item_id}),
+    )
+    assert events[1] == (
         "lock",
         sorted({first.item_id, second.item_id, final_pf.item_id}),
     )
+
+
+def test_generic_effect_reverse_rejects_shipping_owner_exemption(
+    db_session,
+    make_item,
+):
+    item = make_item(name="No reverse owner exemption", process_type_code="PR")
+
+    with pytest.raises(TypeError, match="owner_request_id"):
+        shipping_svc.inv_effect._apply_effect_reverse(
+            db_session,
+            item.item_id,
+            [],
+            owner_request_id=uuid.uuid4(),
+        )
 
 
 def _effect_scopes(log):
@@ -466,6 +490,26 @@ def test_create_request_starts_preparing_with_checklist_and_creation_event(
     assert [line.item_id for line in request.checklist_lines] == [pa.item_id]
     assert request.events[-1].event_type == "REQUEST_CREATED"
     assert request.events[-1].message == "출하 요청 생성 및 준비 시작"
+
+
+def test_clear_checklist_advances_request_updated_at(
+    db_session,
+    make_item,
+    make_bom,
+):
+    pa = make_item(name="Checklist version PA", process_type_code="PA")
+    pf = make_item(name="Checklist version PF", process_type_code="PF")
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    request = _create_request(db_session, {"base_pf_item_id": pf.item_id})
+    request.checklist_lines[0].checked = True
+    request.updated_at = datetime(2020, 1, 1)
+    db_session.commit()
+    previous_updated_at = request.updated_at
+
+    cleared = _clear_checklist(db_session, request.request_id)
+
+    assert cleared.updated_at > previous_updated_at
+    assert all(line.checked is False for line in cleared.checklist_lines)
 
 
 def test_create_request_locks_complete_item_graph_once_in_uuid_order(
@@ -847,6 +891,69 @@ def test_prepare_cancel_keeps_linked_io_inventory_log_active(db_session, make_it
     assert linked_log.cancelled is False
 
 
+def test_operation_prepare_cancel_prelocks_allocation_items(
+    db_session, make_item, make_bom, make_location, monkeypatch
+):
+    af = make_item(name="Cancel lock AF", process_type_code="AF", model_symbol="8", serial_no=9)
+    pa = make_item(name="Cancel lock PA", process_type_code="PA", model_symbol="8", serial_no=9)
+    pf = make_item(name="Cancel lock PF", process_type_code="PF", model_symbol="8", serial_no=10)
+    companion = make_item(
+        name="Cancel lock companion",
+        process_type_code="PR",
+        model_symbol="8",
+        serial_no=11,
+    )
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    make_location(pf.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
+    make_location(
+        companion.item_id,
+        department=DepartmentEnum.SHIPPING,
+        quantity=Decimal("1"),
+    )
+    request = _create_request(
+        db_session,
+        {
+            "base_pf_item_id": pf.item_id,
+            "invoice_number": "CANCEL-LOCK-001",
+            "companion_lines": [
+                {"item_id": companion.item_id, "quantity": 1, "unit": "EA"}
+            ],
+        },
+    )
+    _prepare_complete(db_session, request.request_id, "SN-CANCEL-LOCK")
+    allocation_item_ids = sorted(
+        {
+            allocation.item_id
+            for allocation in db_session.query(ShippingAllocation)
+            .filter(ShippingAllocation.request_id == request.request_id)
+            .all()
+        }
+    )
+    assert allocation_item_ids == sorted({pf.item_id, companion.item_id})
+
+    lock_calls = []
+    real_lock = shipping_svc.warehouse_map_svc.lock_warehouse_map_rows
+
+    def lock_warehouse_rows(db, **kwargs):
+        lock_calls.append(kwargs)
+        return real_lock(db, **kwargs)
+
+    monkeypatch.setattr(
+        shipping_svc.warehouse_map_svc,
+        "lock_warehouse_map_rows",
+        lock_warehouse_rows,
+    )
+
+    _prepare_cancel(db_session, request.request_id, reason="lock graph")
+
+    assert lock_calls[0] == {
+        "item_ids": allocation_item_ids,
+        "include_boxes_for_item_ids": True,
+        "include_zones_for_item_ids": True,
+    }
+
+
 def test_default_shipping_bom_lines_use_standard_child_order(db_session, make_item, make_bom):
     af = make_item(name="AF", process_type_code="AF", model_symbol="3", serial_no=1)
     aa = make_item(name="AA", process_type_code="AA", model_symbol="3", serial_no=1)
@@ -1181,19 +1288,13 @@ def test_component_change_then_prepare_and_pickup_reserves_companions(
         ("PREPARING", "PREPARED"),
         ("PREPARED", "PICKED_UP"),
     }
-    preview = cancellation_svc.preview_cancellation(
+    shipping_actions_svc.pickup_cancel(
         db_session,
-        pickup_operation.operation_id,
-    )
-    cancellation_svc.cancel_operation(
-        db_session,
-        operation_id=pickup_operation.operation_id,
-        canceller=shipping_actor,
-        reason="픽업 처리 취소",
-        plan_hash=preview.plan_hash,
+        req.request_id,
+        actor=shipping_actor,
     )
     db_session.refresh(req)
-    assert req.status == ShippingRequestStatusEnum.CANCELLED
+    assert req.status == ShippingRequestStatusEnum.PREPARED
     assert _location_qty(db_session, final_pf, DepartmentEnum.SHIPPING) == 1
     assert _location_qty(db_session, carton, DepartmentEnum.SHIPPING) == 5
     assert {
@@ -1201,7 +1302,7 @@ def test_component_change_then_prepare_and_pickup_reserves_companions(
         for allocation in db_session.query(ShippingAllocation)
         .filter(ShippingAllocation.request_id == req.request_id)
         .all()
-    } == {"RELEASED"}
+    } == {"RESERVED"}
 
 
 def test_component_change_preview_does_not_lazy_create_final_items(
@@ -1477,6 +1578,16 @@ def test_prepare_cancel_reverses_prepare_logs_and_releases_allocations(
             if log.operation_batch_id is None
         }
     )
+    allocation_item_ids = {
+        allocation.item_id
+        for allocation in db_session.query(ShippingAllocation)
+        .filter(
+            ShippingAllocation.request_id == req.request_id,
+            ShippingAllocation.status == "RESERVED",
+        )
+        .all()
+    }
+    expected_lock_item_ids = sorted({*legacy_item_ids, *allocation_item_ids})
     lock_calls = []
     real_lock = shipping_svc.warehouse_map_svc.lock_warehouse_map_rows
 
@@ -1489,12 +1600,38 @@ def test_prepare_cancel_reverses_prepare_logs_and_releases_allocations(
         "lock_warehouse_map_rows",
         lock_warehouse_rows,
     )
+    reverse_observations = []
+    real_reverse = shipping_svc.inv_effect._apply_effect_reverse
+
+    def reverse_after_owner_release(
+        db,
+        item_id,
+        effect,
+    ):
+        persisted_statuses = db.connection().execute(
+            select(ShippingAllocation.status)
+            .where(ShippingAllocation.request_id == req.request_id)
+            .order_by(ShippingAllocation.allocation_id.asc())
+        ).scalars().all()
+        reverse_observations.append(persisted_statuses)
+        return real_reverse(db, item_id, effect)
+
+    monkeypatch.setattr(
+        shipping_svc.inv_effect,
+        "_apply_effect_reverse",
+        reverse_after_owner_release,
+    )
 
     actor = _shipping_actor(db_session)
     _prepare_cancel(db_session, req.request_id, reason="change", actor=actor)
 
+    assert reverse_observations
+    assert all(
+        statuses and set(statuses) == {"RELEASED"}
+        for statuses in reverse_observations
+    )
     assert lock_calls[0] == {
-        "item_ids": legacy_item_ids,
+        "item_ids": expected_lock_item_ids,
         "include_boxes_for_item_ids": True,
         "include_zones_for_item_ids": True,
     }

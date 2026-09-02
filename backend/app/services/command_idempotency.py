@@ -16,6 +16,10 @@ from sqlalchemy.orm import Session
 IO_SUBMIT_ROUTE = "/api/io/submit"
 IO_DRAFT_SUBMIT_ROUTE = "/api/io/draft/{batch_id}/submit"
 STOCK_REQUEST_CREATE_ROUTE = "/api/stock-requests"
+SHIPPING_PREPARE_COMPLETE_ROUTE = "/api/shipping/requests/{request_id}/prepare-complete"
+SHIPPING_PREPARE_CANCEL_ROUTE = "/api/shipping/requests/{request_id}/prepare-cancel"
+SHIPPING_PICKUP_COMPLETE_ROUTE = "/api/shipping/requests/{request_id}/pickup-complete"
+SHIPPING_PICKUP_CANCEL_ROUTE = "/api/shipping/requests/{request_id}/pickup-cancel"
 _ADVISORY_LOCK_NAMESPACE = "dexcowin-mes:command-idempotency:"
 
 
@@ -203,3 +207,27 @@ def require_matching_fingerprint(
         raise IdempotencyConflict("legacy_fingerprint_missing")
     if stored_fingerprint != expected_fingerprint:
         raise IdempotencyConflict("fingerprint_mismatch")
+
+
+def fingerprint_shipping_command(
+    actor_employee_id: uuid.UUID,
+    request_id: uuid.UUID,
+    *,
+    route: str,
+    command_kind: str,
+    expected_status: str | None,
+    expected_updated_at: str | None,
+    payload: Mapping[str, Any],
+) -> str:
+    """Bind a shipping transport key to one actor, request and semantic command."""
+    return _sha256(
+        {
+            "actor_employee_id": actor_employee_id,
+            "route": route,
+            "command_kind": command_kind,
+            "request_id": request_id,
+            "expected_status": expected_status,
+            "expected_updated_at": expected_updated_at,
+            "payload": payload,
+        }
+    )

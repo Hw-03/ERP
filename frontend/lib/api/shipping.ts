@@ -1,4 +1,6 @@
 import { deleteJson, fetcher, patchJson, postJson, toApiUrl } from "../api-core";
+import { clearPendingCommand, runPendingCommand } from "../pending-command-storage";
+import { makeClientRequestId } from "../uuid";
 import type {
   ShippingBomLineInput,
   ShippingBomMatchResponse,
@@ -9,12 +11,99 @@ import type {
   ShippingHistoryStatus,
   ShippingPrepareCancelPayload,
   ShippingPrepareCompletePayload,
+  ShippingPickupCommandPayload,
   ShippingRequest,
   ShippingRequestCreatePayload,
   ShippingRequestStatus,
   ShippingRequestRevision,
   ShippingRequestUpdatePayload,
 } from "./types/shipping";
+
+const actorScope = (actorEmployeeId?: string) => actorEmployeeId?.trim() || "verified-session";
+const prepareCompleteScope = (requestId: string, actorEmployeeId?: string) =>
+  `shipping:${actorScope(actorEmployeeId)}:prepare-complete:${requestId}`;
+const prepareCancelScope = (requestId: string, actorEmployeeId?: string) =>
+  `shipping:${actorScope(actorEmployeeId)}:prepare-cancel:${requestId}`;
+const pickupCompleteScope = (requestId: string, actorEmployeeId?: string) =>
+  `shipping:${actorScope(actorEmployeeId)}:pickup-complete:${requestId}`;
+const pickupCancelScope = (requestId: string, actorEmployeeId?: string) =>
+  `shipping:${actorScope(actorEmployeeId)}:pickup-cancel:${requestId}`;
+
+async function prepareShippingComplete(
+  requestId: string,
+  payload: ShippingPrepareCompletePayload,
+  actorEmployeeId?: string,
+): Promise<ShippingRequest> {
+  const command = {
+    ...payload,
+    client_request_id: payload.client_request_id ?? makeClientRequestId(),
+    expected_status: payload.expected_status ?? "PREPARING",
+  } satisfies ShippingPrepareCompletePayload;
+  const result = await runPendingCommand(
+    prepareCompleteScope(requestId, actorEmployeeId),
+    command,
+    (request) => postJson<ShippingRequest>(
+      toApiUrl(`/api/shipping/requests/${requestId}/prepare-complete`),
+      request,
+    ),
+  );
+  clearPendingCommand(prepareCancelScope(requestId, actorEmployeeId));
+  return result;
+}
+
+async function cancelShippingPrepare(
+  requestId: string,
+  payload: ShippingPrepareCancelPayload,
+  actorEmployeeId?: string,
+): Promise<ShippingRequest> {
+  const command = {
+    ...payload,
+    client_request_id: payload.client_request_id ?? makeClientRequestId(),
+    expected_status: payload.expected_status ?? "PREPARED",
+  } satisfies ShippingPrepareCancelPayload;
+  const result = await runPendingCommand(
+    prepareCancelScope(requestId, actorEmployeeId),
+    command,
+    (request) => postJson<ShippingRequest>(
+      toApiUrl(`/api/shipping/requests/${requestId}/prepare-cancel`),
+      request,
+    ),
+  );
+  clearPendingCommand(prepareCompleteScope(requestId, actorEmployeeId));
+  return result;
+}
+
+async function runPickupCommand(
+  requestId: string,
+  kind: "complete" | "cancel",
+  payload: ShippingPickupCommandPayload,
+  actorEmployeeId?: string,
+): Promise<ShippingRequest> {
+  const expectedStatus: ShippingRequestStatus = kind === "complete" ? "PREPARED" : "PICKED_UP";
+  const command = {
+    ...payload,
+    client_request_id: payload.client_request_id ?? makeClientRequestId(),
+    expected_status: payload.expected_status ?? expectedStatus,
+  } satisfies ShippingPickupCommandPayload;
+  const suffix = kind === "complete" ? "pickup-complete" : "pickup-cancel";
+  const scope = kind === "complete"
+    ? pickupCompleteScope(requestId, actorEmployeeId)
+    : pickupCancelScope(requestId, actorEmployeeId);
+  const result = await runPendingCommand(
+    scope,
+    command,
+    (request) => postJson<ShippingRequest>(
+      toApiUrl(`/api/shipping/requests/${requestId}/${suffix}`),
+      request,
+    ),
+  );
+  clearPendingCommand(
+    kind === "complete"
+      ? pickupCancelScope(requestId, actorEmployeeId)
+      : pickupCompleteScope(requestId, actorEmployeeId),
+  );
+  return result;
+}
 
 function historyQuery(params?: ShippingHistoryParams): string {
   const qs = new URLSearchParams();
@@ -86,17 +175,21 @@ export const shippingApi = {
   clearShippingChecklist: (requestId: string) =>
     postJson<ShippingRequest>(toApiUrl(`/api/shipping/requests/${requestId}/checklist/clear`), {}),
 
-  prepareShippingComplete: (requestId: string, payload: ShippingPrepareCompletePayload) =>
-    postJson<ShippingRequest>(toApiUrl(`/api/shipping/requests/${requestId}/prepare-complete`), payload),
+  prepareShippingComplete,
 
-  cancelShippingPrepare: (requestId: string, payload: ShippingPrepareCancelPayload) =>
-    postJson<ShippingRequest>(toApiUrl(`/api/shipping/requests/${requestId}/prepare-cancel`), payload),
+  cancelShippingPrepare,
 
-  completeShippingPickup: (requestId: string) =>
-    postJson<ShippingRequest>(toApiUrl(`/api/shipping/requests/${requestId}/pickup-complete`), {}),
+  completeShippingPickup: (
+    requestId: string,
+    payload: ShippingPickupCommandPayload = {},
+    actorEmployeeId?: string,
+  ) => runPickupCommand(requestId, "complete", payload, actorEmployeeId),
 
-  cancelShippingPickup: (requestId: string) =>
-    postJson<ShippingRequest>(toApiUrl(`/api/shipping/requests/${requestId}/pickup-cancel`), {}),
+  cancelShippingPickup: (
+    requestId: string,
+    payload: ShippingPickupCommandPayload = {},
+    actorEmployeeId?: string,
+  ) => runPickupCommand(requestId, "cancel", payload, actorEmployeeId),
 
   getShippingHistory,
 

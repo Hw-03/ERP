@@ -31,6 +31,7 @@ __all__ = [
     "ShippingAllocation",
     "ShippingRequestEvent",
     "ShippingRequestRevision",
+    "ShippingCommandReceipt",
     "ShippingFinalizationModeEnum",
     "ShippingRequestStatusEnum",
 ]
@@ -261,4 +262,47 @@ class ShippingRequestRevision(Base):
 
     __table_args__ = (
         Index("ix_shipping_request_revisions_request_created", "request_id", "created_at"),
+    )
+
+
+class ShippingCommandReceipt(Base):
+    """A committed shipping command and the exact response returned for it."""
+
+    __tablename__ = "shipping_command_receipts"
+
+    receipt_id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
+    actor_employee_id = Column(
+        UUIDString,
+        ForeignKey("employees.employee_id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    route = Column(String(200), nullable=False)
+    command_kind = Column(String(40), nullable=False)
+    client_request_id = Column(UUIDString, nullable=False)
+    semantic_fingerprint = Column(String(64), nullable=False)
+    expected_status = Column(String(20), nullable=True)
+    result_status = Column(String(20), nullable=False)
+    operation_id = Column(
+        UUIDString,
+        ForeignKey("inventory_operations.operation_id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    response_snapshot = Column(JSON, nullable=False)
+    created_at = Column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        server_default=func.now(),
+        index=True,
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "actor_employee_id",
+            "route",
+            "client_request_id",
+            name="uq_shipping_command_receipt_actor_route_key",
+        ),
     )

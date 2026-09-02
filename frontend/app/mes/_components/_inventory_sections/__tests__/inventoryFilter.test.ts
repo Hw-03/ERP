@@ -19,7 +19,15 @@ describe("matchesInventoryCategoryFilters", () => {
     mes_code: "ITM-AF-00001",
     model_slots: [1],
     process_type_code: "R",
-    locations: [{ department: "조립", status: "PRODUCTION", quantity: 1 }],
+    locations: [
+      {
+        department: "조립",
+        status: "PRODUCTION",
+        quantity: 1,
+        pending_quantity: 0,
+        available_quantity: 1,
+      },
+    ],
   } as Item;
 
   const noFilters = {
@@ -43,7 +51,15 @@ describe("matchesInventoryCategoryFilters", () => {
       ...assemblyItem,
       department: "not-owner",
       mes_code: "ITM-AF-00001",
-      locations: [{ department: "튜브", status: "PRODUCTION", quantity: 1 }],
+      locations: [
+        {
+          department: "튜브",
+          status: "PRODUCTION",
+          quantity: 1,
+          pending_quantity: 0,
+          available_quantity: 1,
+        },
+      ],
     } as Item;
 
     expect(
@@ -61,7 +77,15 @@ describe("matchesInventoryCategoryFilters", () => {
       ...assemblyItem,
       department: "조립",
       mes_code: "ITM-HF-00001",
-      locations: [{ department: "조립", status: "PRODUCTION", quantity: 1 }],
+      locations: [
+        {
+          department: "조립",
+          status: "PRODUCTION",
+          quantity: 1,
+          pending_quantity: 0,
+          available_quantity: 1,
+        },
+      ],
     } as Item;
 
     expect(
@@ -113,8 +137,20 @@ describe("matchesInventoryCategoryFilters", () => {
       warehouse_qty: 1,
       model_slots: [1, 2],
       locations: [
-        { department: "조립", status: "PRODUCTION", quantity: 1 },
-        { department: "출하", status: "DEFECTIVE", quantity: 1 },
+        {
+          department: "조립",
+          status: "PRODUCTION",
+          quantity: 1,
+          pending_quantity: 0,
+          available_quantity: 1,
+        },
+        {
+          department: "출하",
+          status: "DEFECTIVE",
+          quantity: 1,
+          pending_quantity: 0,
+          available_quantity: 1,
+        },
       ],
       legacy_item_type: "불용",
     } as Item;
@@ -221,9 +257,17 @@ describe("matchesInventoryCategoryFilters", () => {
         {
           ...assemblyItem,
           mes_code: "",
-          locations: [{ department: "location-dept", status: "PRODUCTION", quantity: 1 }],
+          locations: [
+            {
+              department: "조립",
+              status: "PRODUCTION",
+              quantity: 1,
+              pending_quantity: 0,
+              available_quantity: 1,
+            },
+          ],
         } as Item,
-        "location-dept",
+        "조립",
       ),
     ).toBe(true);
     expect(

@@ -2260,13 +2260,51 @@ describe("DesktopShippingView", () => {
     fireEvent.click(await screen.findByTestId("shipping-pickup-from-detail"));
     fireEvent.click(await screen.findByRole("button", { name: "확인 후 실행" }));
 
-    await waitFor(() => expect(api.completeShippingPickup).toHaveBeenCalledWith("prepared-1"));
+    await waitFor(() => expect(api.completeShippingPickup).toHaveBeenCalledWith(
+      "prepared-1",
+      {
+        expected_status: "PREPARED",
+        expected_updated_at: "2026-06-26T00:00:00Z",
+      },
+      undefined,
+    ));
     const detailUrls = navigationMock.push.mock.calls
       .map(([url]) => String(url))
       .filter((url) => url.includes("shippingView=historyWork") && url.includes("shippingRequestId=prepared-1"));
     expect(detailUrls.at(-1)).toContain("shippingHistoryStatus=PICKED_UP");
     rerender(<DesktopShippingView onStatusChange={() => {}} />);
     expect(detailUrls.some((url) => url.includes("shippingHistoryStatus=CANCELLED"))).toBe(false);
+  });
+
+  it("sends the request version and operator when cancelling preparation", async () => {
+    const prepared = request({
+      request_id: "prepared-1",
+      status: "PREPARED",
+      prepared_at: "2026-06-26T01:00:00Z",
+    });
+    navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=prepared-1";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([prepared]);
+    vi.mocked(api.getShippingRequest).mockResolvedValue(prepared);
+
+    render(
+      <DesktopShippingView
+        operator={{ employee_id: "operator-1", name: "출하 담당자" } as any}
+        onStatusChange={() => {}}
+      />,
+    );
+
+    fireEvent.click(await screen.findByTestId("shipping-prepare-cancel-from-detail"));
+    fireEvent.click(await screen.findByRole("button", { name: "확인 후 실행" }));
+
+    await waitFor(() => expect(api.cancelShippingPrepare).toHaveBeenCalledWith(
+      "prepared-1",
+      {
+        reason: "출하 준비 변경",
+        expected_status: "PREPARED",
+        expected_updated_at: "2026-06-26T00:00:00Z",
+      },
+      "operator-1",
+    ));
   });
 
   it("normalizes a mismatched history detail URL to the request status once", async () => {
@@ -2350,7 +2388,14 @@ describe("DesktopShippingView", () => {
     fireEvent.click(await screen.findByTestId("shipping-pickup-cancel-from-history"));
     fireEvent.click(await screen.findByRole("button", { name: "확인 후 실행" }));
 
-    await waitFor(() => expect(api.cancelShippingPickup).toHaveBeenCalledWith("hist-picked"));
+    await waitFor(() => expect(api.cancelShippingPickup).toHaveBeenCalledWith(
+      "hist-picked",
+      {
+        expected_status: "PICKED_UP",
+        expected_updated_at: "2026-06-26T00:00:00Z",
+      },
+      undefined,
+    ));
     expect(navigationMock.push).toHaveBeenCalledWith(
       expect.stringContaining("shippingView=prepWork"),
       { scroll: false },
@@ -2500,7 +2545,11 @@ describe("DesktopShippingView", () => {
     fireEvent.click(await screen.findByRole("button", { name: "확인 후 실행" }));
 
     await waitFor(() => {
-      expect(api.prepareShippingComplete).toHaveBeenCalledWith("req-1", { serial_numbers: "DETAIL-SN" });
+      expect(api.prepareShippingComplete).toHaveBeenCalledWith("req-1", {
+        serial_numbers: "DETAIL-SN",
+        expected_status: "PREPARING",
+        expected_updated_at: "2026-06-26T00:00:00Z",
+      }, undefined);
     });
   });
 
@@ -2521,7 +2570,9 @@ describe("DesktopShippingView", () => {
 
     await waitFor(() => expect(api.prepareShippingComplete).toHaveBeenCalledWith("req-1", {
       serial_numbers: "SN-001\nSN-002",
-    }));
+      expected_status: "PREPARING",
+      expected_updated_at: "2026-06-26T00:00:00Z",
+    }, undefined));
   });
 
   it("prefills an existing serial number and sends its edited replacement", async () => {
@@ -2540,7 +2591,9 @@ describe("DesktopShippingView", () => {
 
     await waitFor(() => expect(api.prepareShippingComplete).toHaveBeenCalledWith("req-1", {
       serial_numbers: "NEW-SN",
-    }));
+      expected_status: "PREPARING",
+      expected_updated_at: "2026-06-26T00:00:00Z",
+    }, undefined));
   });
 
   it("shows product serial numbers in prepared details and omits an empty history serial card", async () => {

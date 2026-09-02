@@ -9,6 +9,7 @@ import uuid
 
 from sqlalchemy.orm import Session
 
+from app.repositories import item_repository
 from app.models import (
     Employee,
     Inventory,
@@ -91,8 +92,12 @@ def _prelock_inventories(
     db: Session,
     groups: Sequence[ReservationGroup],
 ) -> None:
-    """Ensure then lock every source item's Inventory before any source mutation."""
+    """Lock source Items, then ensure and lock Inventory rows in UUID order."""
     item_ids = sorted({group.item_id for group in groups})
+    active_items = item_repository.lock_active_many(db, item_ids)
+    missing = sorted(set(item_ids) - set(active_items), key=str)
+    if missing:
+        raise ValueError(f"품목을 찾을 수 없습니다: {missing[0]}")
     inventory_svc._ensure_and_lock_inventories(db, item_ids)
 
 

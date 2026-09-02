@@ -39,6 +39,7 @@ from app.repositories import inventory_repository, item_repository
 from app.services import audit, inv_effect, inventory as inventory_svc
 from app.services import inventory_operations as operation_svc
 from app.services import legacy_inventory_operation_adoption as legacy_adoption_svc
+from app.services import stock_availability
 from app.services import warehouse_map as warehouse_map_svc
 from app.services._tx import transactional
 from app.services.inv_calc import _sync_total
@@ -596,10 +597,18 @@ def correct_transaction_quantity(
                 raise TransactionQuantityCorrectionShortage(
                     f"재고 부족: 보정 후 창고 재고가 {float(new_warehouse)}로 음수가 됩니다."
                 )
-            pending = Decimal(str(locked_inventory.pending_quantity or 0))
-            if new_warehouse < pending:
+            warehouse_figure = stock_availability.figure_for_cell(
+                db,
+                stock_availability.AvailabilityCell.warehouse(log.item_id),
+                lock_allocations=True,
+            )
+            reserved_floor = (
+                warehouse_figure.stock_request_pending
+                + warehouse_figure.active_shipping_reserved
+            )
+            if new_warehouse < reserved_floor:
                 raise TransactionQuantityCorrectionShortage(
-                    "예약 수량보다 창고 재고가 낮아질 수 없습니다."
+                    "재고 요청·출하 예약 수량보다 창고 재고가 낮아질 수 없습니다."
                 )
 
             before = _metadata_snapshot(log)

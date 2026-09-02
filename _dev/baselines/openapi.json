@@ -1175,7 +1175,7 @@
         "type": "object"
       },
       "CapacityAfBlock": {
-        "description": "AF(조립 완제품) 기준 생산 가능 수량.\n\n재고 기준은 available(=warehouse+production-pending)이며 **계획/대응 수량 지표**다.\n생산 등록 가능성 검증(backflush, warehouse_available)이 아니다.\n\n주의: summary.ship_ready / fast_production / total_production 은 'AF별 독립 계산의 합계'다.\n여러 AF 가 같은 하위 자재를 공유하면 모든 AF 수량을 동시에 보장하지는 않는다.",
+        "description": "AF(조립 완제품) 기준 생산 가능 수량.\n\n재고 기준은 available(=warehouse+production-재고 요청 예약-활성 출하 예약)이며\n**계획/대응 수량 지표**다.\n생산 등록 가능성 검증(backflush, warehouse_available)이 아니다.\n\n주의: summary.ship_ready / fast_production / total_production 은 'AF별 독립 계산의 합계'다.\n여러 AF 가 같은 하위 자재를 공유하면 모든 AF 수량을 동시에 보장하지는 않는다.",
         "properties": {
           "auto_representatives": {
             "description": "모델별 PF 후보 중 출하 대기+빠른 생산+총생산 합계가 가장 큰 자동 기준 PF. 동점은 총생산, 빠른 생산, 출하 대기, PF 코드, 품목 ID 순으로 결정.",
@@ -1473,7 +1473,7 @@
         "type": "object"
       },
       "CapacityResponse": {
-        "description": "전체 생산 가능 수량 응답.\n\n- **immediate**: BOM 직계 자식 1단계(AA/TF/HF/VF 등 중간재·반제품)의 가용 재고만으로\n  빠르게 만들 수 있는 수량. 각 직계 자식의 available(=warehouse+PRODUCTION-pending)\n  을 per-unit 수량으로 나눈 값의 최솟값.\n- **maximum**: leaf 까지 전개한 전체 하위 자재의 available 합계 기준 이론적 최대.\n  불량(DEFECTIVE) 재고는 제외.\n- **af**: AF(조립 완제품) 기준 신규 블록. immediate/maximum 은 전환 기간 호환용으로 유지.",
+        "description": "전체 생산 가능 수량 응답.\n\n- **immediate**: BOM 직계 자식 1단계(AA/TF/HF/VF 등 중간재·반제품)의 가용 재고만으로\n  빠르게 만들 수 있는 수량. 각 직계 자식의\n  available(=warehouse+PRODUCTION-재고 요청 예약-활성 출하 예약)\n  을 per-unit 수량으로 나눈 값의 최솟값.\n- **maximum**: leaf 까지 전개한 전체 하위 자재의 available 합계 기준 이론적 최대.\n  불량(DEFECTIVE) 재고는 제외.\n- **af**: AF(조립 완제품) 기준 신규 블록. immediate/maximum 은 전환 기간 호환용으로 유지.",
         "properties": {
           "af": {
             "anyOf": [
@@ -3791,6 +3791,11 @@
             "title": "Updated At",
             "type": "string"
           },
+          "warehouse_available_quantity": {
+            "default": 0,
+            "title": "Warehouse Available Quantity",
+            "type": "integer"
+          },
           "warehouse_qty": {
             "default": 0,
             "title": "Warehouse Qty",
@@ -5603,6 +5608,11 @@
             "format": "date-time",
             "title": "Updated At",
             "type": "string"
+          },
+          "warehouse_available_quantity": {
+            "default": 0,
+            "title": "Warehouse Available Quantity",
+            "type": "integer"
           },
           "warehouse_qty": {
             "default": 0,
@@ -8114,8 +8124,122 @@
         "title": "ShippingInvoiceUpdate",
         "type": "object"
       },
+      "ShippingPickupCancelRequest": {
+        "properties": {
+          "client_request_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Request Id"
+          },
+          "expected_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShippingRequestStatusEnum"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expected_updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Updated At"
+          }
+        },
+        "title": "ShippingPickupCancelRequest",
+        "type": "object"
+      },
+      "ShippingPickupCompleteRequest": {
+        "properties": {
+          "client_request_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Request Id"
+          },
+          "expected_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShippingRequestStatusEnum"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expected_updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Updated At"
+          }
+        },
+        "title": "ShippingPickupCompleteRequest",
+        "type": "object"
+      },
       "ShippingPrepareCancelRequest": {
         "properties": {
+          "client_request_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Request Id"
+          },
+          "expected_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShippingRequestStatusEnum"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expected_updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Updated At"
+          },
           "reason": {
             "anyOf": [
               {
@@ -8134,13 +8258,48 @@
       },
       "ShippingPrepareCompleteRequest": {
         "properties": {
+          "client_request_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Request Id"
+          },
           "companion_lines": {
-            "default": [],
+            "deprecated": true,
+            "description": "하위 호환용 입력입니다. 준비 완료에는 출하 요청에 저장된 동반 출하품을 사용하며 이 값은 무시됩니다.",
             "items": {
               "$ref": "#/components/schemas/ShippingCompanionLineInput"
             },
             "title": "Companion Lines",
             "type": "array"
+          },
+          "expected_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShippingRequestStatusEnum"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expected_updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Updated At"
           },
           "serial_numbers": {
             "minLength": 1,
@@ -21167,6 +21326,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ShippingPickupCancelRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -21210,6 +21386,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ShippingPickupCompleteRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -21257,11 +21450,18 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ShippingPrepareCancelRequest"
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ShippingPrepareCancelRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {

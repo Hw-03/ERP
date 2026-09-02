@@ -54,22 +54,21 @@ def upsert_draft_request(
         allow_internal_use=False,
     )
     _validate_lines(request_type, lines_input, allow_empty=True)
-    item_ids = {line.item_id for line in lines_input}
-    active_items = item_repository.lock_active_many(db, item_ids)
-    missing = sorted(item_ids - set(active_items), key=str)
-    if missing:
-        raise ValueError(f"품목을 찾을 수 없습니다: {missing[0]}")
-
-    existing = (
-        db.query(StockRequest)
-        .filter(
-            StockRequest.requester_employee_id == requester.employee_id,
-            StockRequest.request_type == request_type,
-            StockRequest.status == StockRequestStatusEnum.DRAFT,
-        )
-        .first()
+    existing_query = db.query(StockRequest).filter(
+        StockRequest.requester_employee_id == requester.employee_id,
+        StockRequest.request_type == request_type,
+        StockRequest.status == StockRequestStatusEnum.DRAFT,
     )
+    if db.get_bind().dialect.name != "sqlite":
+        existing_query = existing_query.with_for_update()
+    existing = existing_query.first()
     if existing is not None:
+        item_ids = {line.item_id for line in lines_input}
+        active_items = item_repository.lock_active_many(db, item_ids)
+        missing = sorted(item_ids - set(active_items), key=str)
+        if missing:
+            raise ValueError(f"품목을 찾을 수 없습니다: {missing[0]}")
+
         # 기존 lines 명시 삭제 (cascade 의존하지 않음).
         # bulk delete 로 ORM 추적 우회 → cascade 재진입에 의한 중복 DELETE 회피.
         db.query(StockRequestLine).filter(
@@ -168,9 +167,12 @@ def delete_draft_request(
     requester: Employee,
 ) -> None:
     """DRAFT 삭제. cascade 의존하지 않고 lines 명시 삭제 후 request 삭제."""
-    request = (
-        db.query(StockRequest).filter(StockRequest.request_id == request_id).first()
+    request_query = db.query(StockRequest).filter(
+        StockRequest.request_id == request_id
     )
+    if db.get_bind().dialect.name != "sqlite":
+        request_query = request_query.with_for_update()
+    request = request_query.first()
     if request is None:
         raise ValueError("장바구니를 찾을 수 없습니다.")
     if request.requester_employee_id != requester.employee_id:
@@ -196,9 +198,12 @@ def submit_draft_request(
     requester: Employee,
 ) -> StockRequest:
     """DRAFT 제출. 본인 검증 → shape 재검증 → request_code 발급 → _finalize_submission."""
-    request = (
-        db.query(StockRequest).filter(StockRequest.request_id == request_id).first()
+    request_query = db.query(StockRequest).filter(
+        StockRequest.request_id == request_id
     )
+    if db.get_bind().dialect.name != "sqlite":
+        request_query = request_query.with_for_update()
+    request = request_query.first()
     if request is None:
         raise RequestNotFoundError("요청을 찾을 수 없습니다.")
     if request.requester_employee_id != requester.employee_id:

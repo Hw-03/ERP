@@ -50,7 +50,8 @@ class InventoryResponse(BaseModel):
     defective_total: int = 0
     pending_quantity: int = 0
     department_pending_quantity: int = 0
-    available_quantity: int = 0     # (warehouse - 창고 예약) + (production - 생산 예약), defective 제외
+    warehouse_available_quantity: int = 0
+    available_quantity: int = 0     # 정상 재고 - 재고 요청 예약 - 활성 출하 예약, defective 제외
     last_reserver_name: Optional[str] = None
     location: Optional[str]
     updated_at: UtcDatetime

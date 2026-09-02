@@ -110,6 +110,11 @@ def test_postgres_job_bootstraps_head_and_runs_real_two_connection_tests() -> No
     assert "test_postgres_handover_rollback_then_retry_has_one_physical_result" in runner
     assert "test_postgres_lost_response_retries_replay_io_and_stock_without_duplication" in runner
     assert "test_postgres_item_delete_vs_io_submit_has_one_winner_and_no_orphans" in runner
+    assert "test_postgresql_upgrade_to_0033_creates_exact_receipt_schema" in runner
+    assert "test_postgresql_0033_downgrade_and_reupgrade" in runner
+    assert "test_postgresql_0033_late_failure_rolls_back_and_retry_succeeds" in runner
+    assert "test_postgres_shipping_transition_races_have_one_mutation_winner" in runner
+    assert "test_postgres_shipping_reservation_vs_consumer_has_one_physical_winner" in runner
 
     verify_local = _text("scripts/dev/verify_local.ps1")
     assert "backend-postgres-concurrency" in verify_local

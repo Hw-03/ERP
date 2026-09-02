@@ -4,20 +4,18 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-import pytest
-
 from app.models import DepartmentEnum, LocationStatusEnum
 from app.models import Inventory
 from app.routers.inventory._shared import to_response
-from app.services.stock_math import (
-    StockFigures,
-    bulk_compute,
-    compute_for,
-    figures_from_inventory,
-)
+from app.services import stock_math
+from app.services.stock_math import bulk_compute, compute_for
 
 
 D = Decimal
+
+
+def test_stock_math_does_not_expose_context_free_availability_helper():
+    assert not hasattr(stock_math, "figures_from_inventory")
 
 
 def test_compute_for_inventory_missing(db_session):
@@ -170,6 +168,7 @@ def test_inventory_response_exposes_department_and_location_pending(
 
     assert response.pending_quantity == 1
     assert response.department_pending_quantity == 3
+    assert response.warehouse_available_quantity == 5
     assert response.available_quantity == 8
     by_status = {location.status: location for location in response.locations}
     assert by_status[LocationStatusEnum.PRODUCTION].pending_quantity == 2
@@ -187,32 +186,3 @@ def test_bulk_compute_unknown_id_zero_filled(make_item, db_session):
     assert result[a.item_id].warehouse_qty == D("4")
     assert result[unknown].warehouse_qty == D("0")
     assert result[unknown].total == D("0")
-
-
-def test_figures_from_inventory_helper_with_none():
-    """inv=None 도 안전 (모두 0)."""
-    figs = figures_from_inventory(None)
-    assert figs.total == D("0")
-    assert figs.available == D("0")
-
-
-def test_figures_from_inventory_with_values():
-    """이미 외부에서 prod/defect 계산된 케이스."""
-    class _Stub:
-        warehouse_qty = D("8")
-        pending_quantity = D("2")
-    figs = figures_from_inventory(_Stub(), prod=D("3"), defect=D("1"))
-    assert all(
-        isinstance(value, Decimal)
-        for value in (
-            figs.warehouse_qty,
-            figs.production_total,
-            figs.defective_total,
-            figs.pending,
-        )
-    )
-    assert figs.warehouse_qty == D("8")
-    assert figs.production_total == D("3")
-    assert figs.defective_total == D("1")
-    assert figs.total == D("12")
-    assert figs.warehouse_available == D("6")  # 8 - 2

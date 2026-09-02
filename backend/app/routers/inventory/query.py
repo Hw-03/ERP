@@ -25,6 +25,7 @@ from app.schemas import (
     InventorySummaryResponse,
     ProcessTypeSummary,
 )
+from app.services import stock_availability
 
 from ._shared import PROCESS_TYPE_LABELS, PROCESS_TYPE_ORDER
 
@@ -111,14 +112,17 @@ def get_item_locations(item_id: uuid.UUID, db: Session = Depends(get_db)):
         .filter(InventoryLocation.item_id == item_id)
         .all()
     )
+    reserved_by_cell = stock_availability.bulk_reserved_by_cell(db, [item_id])
     return [
         InventoryLocationResponse(
             department=row.department,
             status=row.status,
             quantity=row.quantity or Decimal("0"),
             pending_quantity=row.pending_quantity or Decimal("0"),
-            available_quantity=(row.quantity or Decimal("0"))
-            - (row.pending_quantity or Decimal("0")),
+            available_quantity=stock_availability.location_available_quantity(
+                row,
+                reserved_by_cell,
+            ),
         )
         for row in rows
     ]

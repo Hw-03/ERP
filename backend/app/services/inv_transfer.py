@@ -25,6 +25,7 @@ from app.services.inv_base import (
     _get_or_create_inventory,
 )
 from app.services.inv_calc import _sync_total
+from app.services import stock_availability
 from app.repositories import inventory_repository
 
 
@@ -81,9 +82,12 @@ def _transfer_to_production(
     """창고 → 부서 PRODUCTION 이동. 총량 변동 없음."""
     if qty <= 0:
         raise ValueError("이동 수량은 0보다 커야 합니다.")
-    inv = _apply_warehouse_ledger_delta(db, item_id, -qty)
+    from app.services import warehouse_map as _wm
+
+    _wm._lock_warehouse_ledger(db, item_id)
     _lock_location(db, item_id, dept, LocationStatusEnum.PRODUCTION)
     db.flush()
+    inv = _apply_warehouse_ledger_delta(db, item_id, -qty)
 
     db.execute(
         sa_update(InventoryLocation)
@@ -114,6 +118,7 @@ def _transfer_to_warehouse(
     _wm._lock_warehouse_ledger(db, item_id)
     _lock_location(db, item_id, dept, LocationStatusEnum.PRODUCTION)
     db.flush()
+    _require_location_available(db, item_id, qty, dept)
 
     result = db.execute(
         sa_update(InventoryLocation)
@@ -159,10 +164,11 @@ def _transfer_between_departments(
         raise ValueError("이동 수량은 0보다 커야 합니다.")
     if from_dept == to_dept:
         raise ValueError("출발/도착 부서가 동일합니다.")
-    _get_or_create_inventory(db, item_id)
+    _lock_inventory(db, item_id)
     for d in sorted([from_dept, to_dept], key=lambda x: x.value if hasattr(x, "value") else str(x)):
         _lock_location(db, item_id, d, LocationStatusEnum.PRODUCTION)
     db.flush()
+    _require_location_available(db, item_id, qty, from_dept)
 
     result = db.execute(
         sa_update(InventoryLocation)
@@ -237,14 +243,26 @@ def format_item_location_shortage(item: Item, dept: DepartmentEnum, current: Dec
     )
 
 
-def _consume_from_item_department(db: Session, item: Item, qty: Decimal) -> tuple[Inventory, Decimal, DepartmentEnum]:
+def _consume_from_item_department(
+    db: Session,
+    item: Item,
+    qty: Decimal,
+    *,
+    shipping_owner_request_id: uuid.UUID | None = None,
+) -> tuple[Inventory, Decimal, DepartmentEnum]:
     """Consume from the item's process-code PRODUCTION location only."""
     dept, current = item_department_stock(db, item)
     if current < qty:
         raise ValueError(format_item_location_shortage(item, dept, current, qty))
     inv_before = _get_or_create_inventory(db, item.item_id)
     qty_before = inv_before.quantity or Decimal("0")
-    inv = _consume_from_department(db, item.item_id, qty, dept)
+    inv = _consume_from_department(
+        db,
+        item.item_id,
+        qty,
+        dept,
+        shipping_owner_request_id=shipping_owner_request_id,
+    )
     return inv, qty_before, dept
 
 
@@ -281,12 +299,19 @@ def _consume_from_department(
     item_id: uuid.UUID,
     qty: Decimal,
     dept: DepartmentEnum,
+    *,
+    shipping_owner_request_id: uuid.UUID | None = None,
 ) -> Inventory:
     """특정 부서 PRODUCTION에서 직접 차감 (출고/부서출고용). 총량 감소. 원자적 조건부 UPDATE."""
     if qty <= 0:
         raise ValueError("차감 수량은 0보다 커야 합니다.")
-    _lock_location(db, item_id, dept, LocationStatusEnum.PRODUCTION)
-    db.flush()
+    _require_location_available(
+        db,
+        item_id,
+        qty,
+        dept,
+        shipping_owner_request_id=shipping_owner_request_id,
+    )
 
     result = db.execute(
         sa_update(InventoryLocation)
@@ -316,3 +341,35 @@ def _consume_from_department(
     inv = _lock_inventory(db, item_id)
     _sync_total(db, inv)
     return inv
+
+
+def _require_location_available(
+    db: Session,
+    item_id: uuid.UUID,
+    qty: Decimal,
+    dept: DepartmentEnum | str,
+    *,
+    shipping_owner_request_id: uuid.UUID | None = None,
+) -> stock_availability.AvailabilityFigure:
+    """Lock one production cell and reject consumption of either reservation."""
+    _lock_location(db, item_id, dept, LocationStatusEnum.PRODUCTION)
+    db.flush()
+    figure = stock_availability.figure_for_cell(
+        db,
+        stock_availability.AvailabilityCell.location(
+            item_id,
+            dept,
+            LocationStatusEnum.PRODUCTION,
+        ),
+        owner_request_id=shipping_owner_request_id,
+        lock_allocations=True,
+    )
+    if figure.available < qty:
+        department_name = getattr(dept, "value", str(dept))
+        raise ValueError(
+            f"{department_name} 생산 재고 부족 "
+            f"(물리 {figure.physical}, 요청예약 {figure.stock_request_pending}, "
+            f"출하예약 {figure.active_shipping_reserved}, "
+            f"가용 {figure.available}, 요청 {qty})."
+        )
+    return figure

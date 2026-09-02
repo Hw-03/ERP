@@ -7,9 +7,10 @@
 
 Inventory.quantity = warehouse_qty + Σ InventoryLocation.quantity (불변식).
 가용 재고 available = (warehouse_qty − Inventory.pending_quantity)
-                   + Σ(PRODUCTION.quantity − PRODUCTION.pending_quantity). 불량 제외.
+                   + Σ(PRODUCTION.quantity − PRODUCTION.pending_quantity)
+                   − 활성 출하 배정. 불량 제외.
 Inventory.pending_quantity는 창고 예약만, InventoryLocation.pending_quantity는
-생산/불량 부서 위치 예약만 나타낸다.
+생산/불량 부서 위치 요청 예약만 나타낸다. 출하 예약은 ShippingAllocation이 나타낸다.
 
 내부 구현은 하위 모듈로 분리됨:
   inv_base.py      — 기반 헬퍼 + 부서 매핑
@@ -85,6 +86,7 @@ from app.services.inv_defective import (  # noqa: F401
     _return_to_supplier,
     _return_to_supplier_from_normal,
 )
+from app.services import stock_availability
 
 
 def _lock_required_unplaced(
@@ -196,8 +198,22 @@ def reserve(
     if qty <= 0:
         raise ValueError("예약 수량은 0보다 커야 합니다.")
 
-    _get_or_create_inventory(db, item_id)
-    db.flush()
+    _ensure_and_lock_inventories(db, [item_id])
+    from app.services import warehouse_map as warehouse_map_svc
+
+    warehouse_map_svc._load_warehouse_ledger_rows(db, item_id)
+    figure = stock_availability.figure_for_cell(
+        db,
+        stock_availability.AvailabilityCell.warehouse(item_id),
+        lock_allocations=True,
+    )
+    if figure.available < qty:
+        raise ValueError(
+            "창고 가용 재고 부족 "
+            f"(물리 {figure.physical}, 요청예약 {figure.stock_request_pending}, "
+            f"출하예약 {figure.active_shipping_reserved}, "
+            f"가용 {figure.available}, 요청 {qty})."
+        )
 
     result = db.execute(
         sa_update(Inventory)
@@ -253,7 +269,20 @@ def _reserve_location(
     if qty <= 0:
         raise ValueError("예약 수량은 0보다 커야 합니다.")
 
-    _lock_inventory(db, item_id)
+    _ensure_and_lock_inventories(db, [item_id])
+    _lock_location(db, item_id, department, status)
+    figure = stock_availability.figure_for_cell(
+        db,
+        stock_availability.AvailabilityCell.location(item_id, department, status),
+        lock_allocations=True,
+    )
+    if figure.available < qty:
+        raise ValueError(
+            "부서 가용 재고 부족 "
+            f"(물리 {figure.physical}, 요청예약 {figure.stock_request_pending}, "
+            f"출하예약 {figure.active_shipping_reserved}, "
+            f"가용 {figure.available}, 요청 {qty})."
+        )
     result = db.execute(
         sa_update(InventoryLocation)
         .where(

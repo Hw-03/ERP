@@ -21,12 +21,13 @@ from app.models import (
     LocationStatusEnum,
 )
 from app.services.inv_base import (
+    _lock_inventory,
     _lock_location,
     _get_or_create_inventory,
 )
 from app.services.inv_calc import _sync_total
 from app.repositories import inventory_repository
-from app.services.inv_transfer import _consume_warehouse
+from app.services.inv_transfer import _consume_warehouse, _require_location_available
 
 
 # ---------------------------------------------------------------------------
@@ -95,10 +96,14 @@ def _mark_defective(
 
     _get_or_create_inventory(db, item_id)
     if kind == "warehouse":
-        _consume_warehouse(db, item_id, qty)
+        from app.services import warehouse_map as warehouse_map_svc
+
+        warehouse_map_svc._lock_warehouse_ledger(db, item_id)
         _lock_location(db, item_id, target_dept, LocationStatusEnum.DEFECTIVE)
         db.flush()
+        _consume_warehouse(db, item_id, qty)
     else:  # source == "production"
+        _lock_inventory(db, item_id)
         locations = [
             (target_dept, LocationStatusEnum.DEFECTIVE),
             (source_dept, LocationStatusEnum.PRODUCTION),
@@ -114,6 +119,7 @@ def _mark_defective(
         ):
             _lock_location(db, item_id, department, status)
         db.flush()
+        _require_location_available(db, item_id, qty, source_dept)
         result = db.execute(
             sa_update(InventoryLocation)
             .where(InventoryLocation.item_id == item_id)
@@ -344,8 +350,10 @@ def _consume_normal_source(
     if source == "warehouse":
         _consume_warehouse(db, item_id, qty)
     else:
+        _lock_inventory(db, item_id)
         _lock_location(db, item_id, dept_or_warehouse, LocationStatusEnum.PRODUCTION)
         db.flush()
+        _require_location_available(db, item_id, qty, dept_or_warehouse)
         result = db.execute(
             sa_update(InventoryLocation)
             .where(InventoryLocation.item_id == item_id)

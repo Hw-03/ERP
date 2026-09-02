@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+import secrets
 import uuid
 from decimal import Decimal
 from typing import Optional, Sequence
@@ -13,13 +15,13 @@ from app.models import (
     DepartmentEnum,
     Employee,
     InventoryLocation,
-    Item,
     LocationStatusEnum,
     RequestBucketEnum,
     StockRequestLine,
     StockRequestTypeEnum,
     TransactionTypeEnum,
 )
+from app.services import stock_availability
 
 
 # ---------------------------------------------------------------------------
@@ -106,10 +108,6 @@ def validate_request_entrypoint(
 # ---------------------------------------------------------------------------
 # request_code 생성
 # ---------------------------------------------------------------------------
-
-
-import secrets
-from datetime import datetime
 
 
 def _generate_request_code(ts: datetime) -> str:
@@ -366,17 +364,17 @@ def _preflight_inventory_check(
     if not needed:
         return
 
-    for (item_id, dept), qty in needed.items():
-        loc = (
-            db.query(InventoryLocation)
-            .filter(
-                InventoryLocation.item_id == item_id,
-                InventoryLocation.department == dept,
-                InventoryLocation.status == LocationStatusEnum.PRODUCTION,
-            )
-            .first()
+    cells = {
+        key: stock_availability.AvailabilityCell.location(
+            key[0],
+            key[1],
+            LocationStatusEnum.PRODUCTION,
         )
-        avail = loc.quantity if loc else Decimal("0")
+        for key in needed
+    }
+    figures = stock_availability.figures_for_cells(db, cells.values())
+    for (item_id, dept), qty in needed.items():
+        avail = figures[cells[(item_id, dept)]].available
         if avail < qty:
             item = item_repository.get_active(db, item_id)
             item_name = item.item_name if item else str(item_id)

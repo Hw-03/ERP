@@ -90,6 +90,7 @@ class ItemWithInventory(ItemResponse):
     defective_total: int = 0
     pending_quantity: int = 0
     department_pending_quantity: int = 0
+    warehouse_available_quantity: int = 0
     available_quantity: int = 0
     last_reserver_name: Optional[str] = None
     location: Optional[str] = None

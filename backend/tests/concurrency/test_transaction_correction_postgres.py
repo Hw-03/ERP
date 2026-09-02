@@ -513,7 +513,7 @@ def test_postgres_cp4_partial_unique_index_is_present() -> None:
                     "AND indexname = 'uq_transaction_edit_log_quantity_correction'"
                 )
             ).scalar_one()
-        assert revision == "20260831_0032"
+        assert revision == "20260831_0033"
         assert "UNIQUE INDEX" in indexdef
         assert "WHERE (correction_log_id IS NOT NULL)" in indexdef
     finally:

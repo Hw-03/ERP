@@ -20,6 +20,7 @@ from app.models import (
     TransactionLog,
     TransactionTypeEnum,
 )
+from app.repositories import item_repository
 from app.services import inv_effect
 from app.services import inventory as inventory_svc
 from app.services import defect_records as defect_records_svc
@@ -43,6 +44,8 @@ def quarantine_inventory(
 ) -> Inventory:
     """재고 격리와 원장 기록을 하나의 업무 트랜잭션으로 확정한다."""
     with transactional(db):
+        if item_id not in item_repository.lock_active_many(db, [item_id]):
+            raise ValueError(f"품목을 찾을 수 없습니다: {item_id}")
         operation = operation_svc._create_business_operation(
             db,
             domain="defect",

@@ -1658,7 +1658,7 @@ def test_legacy_shipping_reference_bundle_is_adopted_as_one_operation(
 
     assert response.status_code == 422, response.text
     assert response.json()["detail"]["message"] == (
-        operation_cancellation_svc.LEGACY_EFFECT_BLOCKER
+        operation_cancellation_svc.SHIPPING_DEDICATED_CANCEL_MESSAGE
     )
     assert db_session.query(InventoryOperation).count() == 0
     db_session.refresh(request)

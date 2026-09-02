@@ -26,6 +26,9 @@ from app.models import (
     Inventory,
     InventoryLocation,
     LocationStatusEnum,
+    ShippingAllocation,
+    ShippingRequest,
+    ShippingRequestStatusEnum,
     StockRequest,
     StockRequestLine,
     StockRequestStatusEnum,
@@ -1589,6 +1592,109 @@ def test_submit_dept_to_warehouse_fails_when_production_stock_insufficient(
     )
     assert res.status_code == 422, res.json()
     assert "재고 부족" in res.json().get("detail", {}).get("message", "")
+
+
+def _add_active_shipping_reservation(db_session, item_id, quantity: Decimal) -> None:
+    request = ShippingRequest(
+        status=ShippingRequestStatusEnum.PREPARED,
+        base_pf_item_id=item_id,
+        request_quantity=1,
+    )
+    db_session.add(request)
+    db_session.flush()
+    db_session.add(
+        ShippingAllocation(
+            request_id=request.request_id,
+            item_id=item_id,
+            quantity=quantity,
+            department=DepartmentEnum.ASSEMBLY.value,
+            status="RESERVED",
+        )
+    )
+
+
+def test_create_dept_to_warehouse_preflight_counts_shipping_reservation(
+    db_session, client, make_item, make_location, monkeypatch
+):
+    item = make_item(name="canonical create preflight", warehouse_qty=Decimal("0"))
+    make_location(
+        item.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        status=LocationStatusEnum.PRODUCTION,
+        quantity=Decimal("5"),
+    )
+    requester = _make_employee(db_session, code="SR-CAN-C", name="canonical create")
+    _add_active_shipping_reservation(db_session, item.item_id, Decimal("4"))
+    db_session.commit()
+
+    from app.services import sr_reservation
+
+    monkeypatch.setattr(
+        sr_reservation,
+        "reserve_lines",
+        lambda *_args, **_kwargs: pytest.fail("canonical preflight was bypassed"),
+    )
+    result = _create_request_via_api(
+        client,
+        requester_id=str(requester.employee_id),
+        request_type="dept_to_warehouse",
+        lines=[
+            {
+                "item_id": str(item.item_id),
+                "quantity": "2",
+                "from_bucket": "production",
+                "from_department": DepartmentEnum.ASSEMBLY.value,
+                "to_bucket": "warehouse",
+            }
+        ],
+    )
+
+    assert result["status_code"] == 422, result["body"]
+    assert db_session.query(StockRequest).count() == 0
+
+
+def test_submit_draft_preflight_counts_shipping_reservation(
+    db_session, client, make_item, make_location, monkeypatch
+):
+    item = make_item(name="canonical draft preflight", warehouse_qty=Decimal("0"))
+    make_location(
+        item.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        status=LocationStatusEnum.PRODUCTION,
+        quantity=Decimal("5"),
+    )
+    requester = _make_employee(db_session, code="SR-CAN-D", name="canonical draft")
+    _add_active_shipping_reservation(db_session, item.item_id, Decimal("4"))
+    db_session.commit()
+    draft = _upsert_draft(
+        client,
+        requester_id=str(requester.employee_id),
+        request_type="dept_to_warehouse",
+        lines=[
+            {
+                "item_id": str(item.item_id),
+                "quantity": "2",
+                "from_bucket": "production",
+                "from_department": DepartmentEnum.ASSEMBLY.value,
+                "to_bucket": "warehouse",
+            }
+        ],
+    )
+    assert draft["status_code"] == 200, draft["body"]
+
+    from app.services import sr_reservation
+
+    monkeypatch.setattr(
+        sr_reservation,
+        "reserve_lines",
+        lambda *_args, **_kwargs: pytest.fail("canonical preflight was bypassed"),
+    )
+    response = client.post(
+        f"/api/stock-requests/{draft['body']['request_id']}/submit",
+        json={"requester_employee_id": str(requester.employee_id)},
+    )
+
+    assert response.status_code == 422, response.text
 
 
 # ---------------------------------------------------------------------------

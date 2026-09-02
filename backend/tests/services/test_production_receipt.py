@@ -16,6 +16,8 @@ from app.models import (
     InventoryOperation,
     InventoryOperationRoleEnum,
     LocationStatusEnum,
+    ShippingAllocation,
+    ShippingRequest,
     SystemSetting,
     TransactionLog,
     TransactionTypeEnum,
@@ -309,6 +311,50 @@ def test_production_receipt_blocks_when_department_location_is_short(
     assert "0" in message
     assert "1" in message
     assert _warehouse_qty(db_session, component) == Decimal("10")
+
+
+def test_production_receipt_precheck_blocks_active_shipping_reservation(
+    db_session,
+    make_item,
+    make_bom,
+    make_location,
+    production_actor,
+):
+    component = make_item(name="Reserved component", process_type_code="TR")
+    produced = make_item(name="Reserved output", process_type_code="PF")
+    make_bom(produced.item_id, component.item_id, Decimal("1"))
+    make_location(
+        component.item_id,
+        department=DepartmentEnum.TUBE,
+        quantity=Decimal("1"),
+    )
+    request = ShippingRequest(
+        base_pf_item_id=component.item_id,
+        request_quantity=1,
+        requested_by_name="production-receipt",
+    )
+    db_session.add(request)
+    db_session.flush()
+    db_session.add(
+        ShippingAllocation(
+            request_id=request.request_id,
+            item_id=component.item_id,
+            quantity=1,
+            department=DepartmentEnum.TUBE.value,
+            status="RESERVED",
+        )
+    )
+    db_session.commit()
+
+    with pytest.raises(ProductionShortage):
+        execute_production_receipt(
+            db_session,
+            ProductionReceiptRequest(item_id=produced.item_id, quantity=1),
+            produced,
+            actor=production_actor,
+        )
+
+    assert _location_qty(db_session, component, DepartmentEnum.TUBE) == Decimal("1")
 
 
 def test_production_receipt_skips_flagged_bom_component_inventory(

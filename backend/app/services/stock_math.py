@@ -13,10 +13,12 @@
 - `defective_pending`: DEFECTIVE 위치 OUT 예약 합계 (InventoryLocation.pending_quantity)
 - `department_pending`: production_pending + defective_pending
 - `total`: warehouse + production + defective (Inventory.quantity 와 같아야 함)
+- `shipping_reserved`: 활성 출하 배정 합계
 - `available`: (warehouse - pending) + (production_total - production_pending)
+  - shipping_reserved
   — 불량 버킷과 defective_pending은 제외한 UI "재고 가용"
-- `warehouse_available`: warehouse - pending — 생산 backflush / 창고 출고에서
-  실제 소비 가능한 분량. BOM feasibility 검사는 이 값을 써야 한다.
+- `warehouse_available`: warehouse - pending - warehouse shipping_reserved
+  — 창고에서 실제 소비 가능한 분량.
 """
 
 from __future__ import annotations
@@ -31,6 +33,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Inventory, InventoryLocation, LocationStatusEnum
 from app.repositories import inventory_repository
+from app.services import stock_availability
 
 
 _D0 = Decimal("0")
@@ -51,6 +54,8 @@ class StockFigures:
     pending: Decimal = _D0
     production_pending: Decimal = _D0
     defective_pending: Decimal = _D0
+    shipping_reserved: Decimal = _D0
+    warehouse_shipping_reserved: Decimal = _D0
 
     @property
     def total(self) -> Decimal:
@@ -65,6 +70,7 @@ class StockFigures:
             - self.pending
             + self.production_total
             - self.production_pending
+            - self.shipping_reserved
         )
 
     @property
@@ -73,8 +79,12 @@ class StockFigures:
 
     @property
     def warehouse_available(self) -> Decimal:
-        """창고 소비 가능분: warehouse - pending. BOM backflush / 창고 출고 검사용."""
-        return self.warehouse_qty - self.pending
+        """창고 소비 가능분: 물리 재고에서 요청·출하 예약을 차감."""
+        return (
+            self.warehouse_qty
+            - self.pending
+            - self.warehouse_shipping_reserved
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -110,6 +120,9 @@ def compute_for(db: Session, item_id: uuid.UUID) -> StockFigures:
             defect = val
             defect_pending = pending_val
 
+    reserved_by_item, warehouse_reserved_by_item = (
+        stock_availability.bulk_reserved_by_item(db, [item_id])
+    )
     return StockFigures(
         warehouse_qty=wh,
         production_total=prod,
@@ -117,6 +130,8 @@ def compute_for(db: Session, item_id: uuid.UUID) -> StockFigures:
         pending=pending,
         production_pending=prod_pending,
         defective_pending=defect_pending,
+        shipping_reserved=reserved_by_item.get(item_id, _D0),
+        warehouse_shipping_reserved=warehouse_reserved_by_item.get(item_id, _D0),
     )
 
 
@@ -124,13 +139,16 @@ def compute_for(db: Session, item_id: uuid.UUID) -> StockFigures:
 # 다건 bulk 계산 (items list / inventory list 용)
 # ---------------------------------------------------------------------------
 def bulk_compute(db: Session, item_ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, StockFigures]:
-    """여러 품목을 bulk 로. N개 품목 -> 2 쿼리 (Inventory IN + InventoryLocation GROUP BY).
+    """여러 품목을 3개 bulk 쿼리로 계산한다(출하 예약 + Inventory + Location).
 
     item_ids 에 없는 건 dict 에 포함하지 않는다. 호출측에서 default 처리.
     """
     ids = list(item_ids)
     if not ids:
         return {}
+    shipping_reserved_by_id, warehouse_shipping_reserved_by_id = (
+        stock_availability.bulk_reserved_by_item(db, ids)
+    )
 
     # 1) Inventory IN
     invs = {
@@ -174,18 +192,7 @@ def bulk_compute(db: Session, item_ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, 
             pending=_as_decimal(inv.pending_quantity if inv else None),
             production_pending=_as_decimal(prod_pending_by_id.get(iid, _D0)),
             defective_pending=_as_decimal(defect_pending_by_id.get(iid, _D0)),
+            shipping_reserved=shipping_reserved_by_id.get(iid, _D0),
+            warehouse_shipping_reserved=warehouse_shipping_reserved_by_id.get(iid, _D0),
         )
     return result
-
-
-def figures_from_inventory(inv: Inventory | None, prod: Decimal = _D0, defect: Decimal = _D0) -> StockFigures:
-    """이미 Inventory + prod/defect 가 계산돼 있을 때 StockFigures 로 포장하는 thin wrapper.
-
-    (라우터 조립 경로에서 쿼리 중복을 피하려고 쓴다.)
-    """
-    return StockFigures(
-        warehouse_qty=_as_decimal(inv.warehouse_qty if inv else None),
-        production_total=_as_decimal(prod),
-        defective_total=_as_decimal(defect),
-        pending=_as_decimal(inv.pending_quantity if inv else None),
-    )

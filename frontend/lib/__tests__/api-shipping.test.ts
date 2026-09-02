@@ -1,5 +1,7 @@
 ﻿import { describe, it, expect, vi, afterEach } from "vitest";
+// @vitest-environment jsdom
 import { shippingApi } from "../api/shipping";
+import { ResultUnknownError } from "../api-core";
 
 function makeResponse(body: unknown, ok = true): Response {
   return {
@@ -12,8 +14,10 @@ function makeResponse(body: unknown, ok = true): Response {
 }
 
 const originalFetch = globalThis.fetch;
+const expectedUpdatedAt = "2026-09-01T00:00:00Z";
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  sessionStorage.clear();
 });
 
 describe("shippingApi", () => {
@@ -43,13 +47,173 @@ describe("shippingApi", () => {
     await shippingApi.updateShippingChecklist("req-1", {
       checks: [{ item_id: "item-1", checked: true }],
     });
-    await shippingApi.prepareShippingComplete("req-1", { serial_numbers: "SN-001\nSN-002" });
+    await shippingApi.prepareShippingComplete("req-1", {
+      serial_numbers: "SN-001\nSN-002",
+      companion_lines: [{ item_id: "item-legacy", quantity: 1, unit: "EA" }],
+      expected_updated_at: expectedUpdatedAt,
+    });
 
     expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/shipping/requests/req-1/checklist");
     expect(String(fetchSpy.mock.calls[1][0])).toContain("/api/shipping/requests/req-1/prepare-complete");
     expect(JSON.parse((fetchSpy.mock.calls[1][1] as RequestInit).body as string)).toEqual({
       serial_numbers: "SN-001\nSN-002",
+      companion_lines: [{ item_id: "item-legacy", quantity: 1, unit: "EA" }],
+      client_request_id: expect.any(String),
+      expected_status: "PREPARING",
+      expected_updated_at: expectedUpdatedAt,
     });
+  });
+
+  it("sends a key and expected state for every shipping workflow command", async () => {
+    const fetchSpy = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
+      Promise.resolve(makeResponse({})),
+    );
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await shippingApi.cancelShippingPrepare("req-1", {
+      reason: "retry",
+      expected_updated_at: expectedUpdatedAt,
+    });
+    await shippingApi.completeShippingPickup("req-1", {
+      expected_updated_at: expectedUpdatedAt,
+    });
+    await shippingApi.cancelShippingPickup("req-1", {
+      expected_updated_at: expectedUpdatedAt,
+    });
+
+    const bodies = fetchSpy.mock.calls.map((call) =>
+      JSON.parse(String(call[1]?.body)),
+    );
+    expect(bodies).toEqual([
+      {
+        reason: "retry",
+        client_request_id: expect.any(String),
+        expected_status: "PREPARED",
+        expected_updated_at: expectedUpdatedAt,
+      },
+      {
+        client_request_id: expect.any(String),
+        expected_status: "PREPARED",
+        expected_updated_at: expectedUpdatedAt,
+      },
+      {
+        client_request_id: expect.any(String),
+        expected_status: "PICKED_UP",
+        expected_updated_at: expectedUpdatedAt,
+      },
+    ]);
+  });
+
+  it("retries an unknown preparation result with the exact transport payload", async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    let call = 0;
+    globalThis.fetch = vi.fn((_url, init) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      call += 1;
+      return call === 1
+        ? Promise.reject(new TypeError("lost response"))
+        : Promise.resolve(makeResponse({ request_id: "req-1" }));
+    }) as unknown as typeof fetch;
+
+    await expect(
+      shippingApi.prepareShippingComplete("req-1", {
+        serial_numbers: "SN-ORIGINAL",
+        expected_updated_at: expectedUpdatedAt,
+      }),
+    ).rejects.toBeInstanceOf(ResultUnknownError);
+    await shippingApi.prepareShippingComplete("req-1", {
+      serial_numbers: "SN-CHANGED",
+      expected_updated_at: "2026-09-01T00:01:00Z",
+    });
+
+    expect(bodies[1]).toEqual(bodies[0]);
+    expect(bodies[0]).toEqual({
+      serial_numbers: "SN-ORIGINAL",
+      client_request_id: expect.any(String),
+      expected_status: "PREPARING",
+      expected_updated_at: expectedUpdatedAt,
+    });
+  });
+
+  it("discards an unknown prepare key after the inverse transition succeeds", async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    let call = 0;
+    globalThis.fetch = vi.fn((_url, init) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      call += 1;
+      return call === 1
+        ? Promise.reject(new TypeError("lost prepare response"))
+        : Promise.resolve(makeResponse({ request_id: "req-1" }));
+    }) as unknown as typeof fetch;
+
+    await expect(
+      shippingApi.prepareShippingComplete("req-1", { serial_numbers: "SN-OLD" }),
+    ).rejects.toBeInstanceOf(ResultUnknownError);
+    await shippingApi.cancelShippingPrepare("req-1", { reason: "confirmed inverse" });
+    await shippingApi.prepareShippingComplete("req-1", { serial_numbers: "SN-NEW" });
+
+    expect(bodies[2]).toEqual({
+      serial_numbers: "SN-NEW",
+      client_request_id: expect.any(String),
+      expected_status: "PREPARING",
+    });
+    expect(bodies[2].client_request_id).not.toBe(bodies[0].client_request_id);
+  });
+
+  it("discards an unknown pickup key after the inverse transition succeeds", async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    let call = 0;
+    globalThis.fetch = vi.fn((_url, init) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      call += 1;
+      return call === 1
+        ? Promise.reject(new TypeError("lost pickup response"))
+        : Promise.resolve(makeResponse({ request_id: "req-1" }));
+    }) as unknown as typeof fetch;
+
+    await expect(
+      shippingApi.completeShippingPickup("req-1"),
+    ).rejects.toBeInstanceOf(ResultUnknownError);
+    await shippingApi.cancelShippingPickup("req-1");
+    await shippingApi.completeShippingPickup("req-1");
+
+    expect(bodies[2]).toEqual({
+      client_request_id: expect.any(String),
+      expected_status: "PREPARED",
+    });
+    expect(bodies[2].client_request_id).not.toBe(bodies[0].client_request_id);
+  });
+
+  it("does not reuse another operator's unknown shipping command", async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    let call = 0;
+    globalThis.fetch = vi.fn((_url, init) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      call += 1;
+      return call === 1
+        ? Promise.reject(new TypeError("lost actor A response"))
+        : Promise.resolve(makeResponse({ request_id: "req-1" }));
+    }) as unknown as typeof fetch;
+
+    await expect(
+      shippingApi.prepareShippingComplete(
+        "req-1",
+        { serial_numbers: "SN-A" },
+        "actor-a",
+      ),
+    ).rejects.toBeInstanceOf(ResultUnknownError);
+    await shippingApi.prepareShippingComplete(
+      "req-1",
+      { serial_numbers: "SN-B" },
+      "actor-b",
+    );
+
+    expect(bodies[1]).toEqual({
+      serial_numbers: "SN-B",
+      client_request_id: expect.any(String),
+      expected_status: "PREPARING",
+    });
+    expect(bodies[1].client_request_id).not.toBe(bodies[0].client_request_id);
   });
 
   it("lists history and filters request status", async () => {

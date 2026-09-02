@@ -29,6 +29,7 @@ from app.models import (
     WarehouseSpecialZoneItem,
     WarehouseUnplacedItem,
 )
+from app.services import stock_availability
 
 # 스냅샷 키:
 #   ("warehouse", inventory_id_str, None) — 창고 총재고 행
@@ -224,7 +225,11 @@ def _capture_effect(
     return effect_diff(before, after if after is not None else _snapshot_cells(db, item_id))
 
 
-def _apply_effect_reverse(db: Session, item_id: uuid.UUID, effect: list[dict] | None) -> None:
+def _apply_effect_reverse(
+    db: Session,
+    item_id: uuid.UUID,
+    effect: list[dict] | None,
+) -> None:
     """효과를 부호 반전해 재고에 적용(취소 역재생). 적용 후 음수면 ValueError.
 
     창고는 Inventory.warehouse_qty, location 은 (dept,status) 행을 ORM 속성으로 갱신한다.
@@ -393,6 +398,40 @@ def _apply_effect_reverse(db: Session, item_id: uuid.UUID, effect: list[dict] | 
         raise ValueError(
             "레거시 재고 효과에는 정확한 B/Z/U 위치 정보가 없어 취소할 수 없습니다."
         )
+
+    proposed_physical: dict[stock_availability.AvailabilityCell, int] = {}
+    for cell, _target, new_val in resolved:
+        scope = cell.get("scope")
+        if scope == "warehouse":
+            proposed_physical[stock_availability.AvailabilityCell.warehouse(item_id)] = (
+                new_val
+            )
+        elif (
+            scope == "location"
+            and cell.get("status") == LocationStatusEnum.PRODUCTION.value
+        ):
+            proposed_physical[
+                stock_availability.AvailabilityCell.location(
+                    item_id,
+                    cell["department"],
+                    LocationStatusEnum.PRODUCTION,
+                )
+            ] = new_val
+    figures = stock_availability.figures_for_cells(
+        db,
+        proposed_physical,
+        lock_allocations=True,
+    )
+    for availability_cell, new_val in proposed_physical.items():
+        figure = figures[availability_cell]
+        reserved_floor = (
+            figure.stock_request_pending
+            + figure.active_shipping_reserved
+        )
+        if Decimal(new_val) < reserved_floor:
+            raise ValueError(
+                "취소 후 재고가 재고 요청·출하 예약 수량보다 작아집니다."
+            )
 
     for cell, target, new_val in resolved:
         if cell.get("scope") == "warehouse":

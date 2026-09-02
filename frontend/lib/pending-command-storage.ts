@@ -39,3 +39,8 @@ export function runPendingCommand<T, R>(
   inFlight[key] = pending;
   return pending;
 }
+
+/** A confirmed inverse transition makes an older unknown command obsolete. */
+export function clearPendingCommand(key: string): void {
+  storage(key, null);
+}

@@ -113,3 +113,64 @@ def test_operator_session_delete_advertises_scoped_pin_change_cancellation():
         "uuid",
         None,
     }
+
+
+def test_shipping_commands_advertise_optional_idempotency_and_state_fields():
+    schema = app.openapi()
+    request_schemas = {
+        "prepare-complete": "ShippingPrepareCompleteRequest",
+        "prepare-cancel": "ShippingPrepareCancelRequest",
+        "pickup-complete": "ShippingPickupCompleteRequest",
+        "pickup-cancel": "ShippingPickupCancelRequest",
+    }
+
+    for suffix, schema_name in request_schemas.items():
+        component = schema["components"]["schemas"][schema_name]
+        properties = component["properties"]
+        assert properties["client_request_id"]["anyOf"] == [
+            {"type": "string", "format": "uuid"},
+            {"type": "null"},
+        ]
+        assert properties["expected_status"]["anyOf"] == [
+            {"$ref": "#/components/schemas/ShippingRequestStatusEnum"},
+            {"type": "null"},
+        ]
+        assert properties["expected_updated_at"]["anyOf"] == [
+            {"type": "string", "format": "date-time"},
+            {"type": "null"},
+        ]
+        assert "client_request_id" not in component.get("required", [])
+        assert "expected_status" not in component.get("required", [])
+        assert "expected_updated_at" not in component.get("required", [])
+
+        operation = schema["paths"][
+            f"/api/shipping/requests/{{request_id}}/{suffix}"
+        ]["post"]
+        assert "requestBody" in operation
+
+    prepare_properties = schema["components"]["schemas"][
+        "ShippingPrepareCompleteRequest"
+    ]["properties"]
+    assert prepare_properties["companion_lines"]["deprecated"] is True
+
+    assert schema["paths"][
+        "/api/shipping/requests/{request_id}/prepare-complete"
+    ]["post"]["requestBody"]["required"] is True
+    for suffix in ("prepare-cancel", "pickup-complete", "pickup-cancel"):
+        request_body = schema["paths"][
+            f"/api/shipping/requests/{{request_id}}/{suffix}"
+        ]["post"]["requestBody"]
+        assert request_body.get("required") is not True
+
+
+def test_inventory_responses_advertise_canonical_warehouse_availability():
+    schema = app.openapi()
+
+    for schema_name in ("InventoryResponse", "ItemWithInventory"):
+        assert schema["components"]["schemas"][schema_name]["properties"][
+            "warehouse_available_quantity"
+        ] == {
+            "type": "integer",
+            "title": "Warehouse Available Quantity",
+            "default": 0,
+        }

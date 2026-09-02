@@ -10,7 +10,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.models import DepartmentEnum, LocationStatusEnum
+from app.models import (
+    DepartmentEnum,
+    LocationStatusEnum,
+    ShippingAllocation,
+    ShippingRequest,
+)
 from app.services import io_preview as iop
 
 D = Decimal
@@ -505,6 +510,50 @@ def test_bucket_available_excludes_location_pending(
         item_id=item.item_id,
         bucket=bucket,
         department=DepartmentEnum.ASSEMBLY.value,
+    )
+
+    assert available == D("7")
+
+
+@pytest.mark.parametrize("bucket", ["warehouse", "production"])
+def test_bucket_available_excludes_active_shipping_reservation(
+    db_session,
+    make_item,
+    make_location,
+    bucket,
+):
+    item = make_item(name=f"{bucket}-shipping-reserved", warehouse_qty=D("10"))
+    department = None
+    if bucket == "production":
+        make_location(
+            item.item_id,
+            department=DepartmentEnum.ASSEMBLY,
+            quantity=D("10"),
+        )
+        department = DepartmentEnum.ASSEMBLY.value
+    request = ShippingRequest(
+        base_pf_item_id=item.item_id,
+        request_quantity=1,
+        requested_by_name="shipping-preview",
+    )
+    db_session.add(request)
+    db_session.flush()
+    db_session.add(
+        ShippingAllocation(
+            request_id=request.request_id,
+            item_id=item.item_id,
+            quantity=3,
+            department=department,
+            status="RESERVED",
+        )
+    )
+    db_session.flush()
+
+    available = iop._bucket_available(
+        db_session,
+        item_id=item.item_id,
+        bucket=bucket,
+        department=department,
     )
 
     assert available == D("7")

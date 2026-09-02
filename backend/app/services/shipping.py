@@ -20,6 +20,7 @@ from app.models import (
     InventoryOperationKindEnum,
     InventoryOperationRoleEnum,
     Item,
+    LocationStatusEnum,
     ShippingAllocation,
     ShippingRequest,
     ShippingRequestBomLine,
@@ -38,6 +39,7 @@ from app.services import inv_effect
 from app.services import inventory_operations as operation_svc
 from app.services import inventory_operation_cancellation as cancellation_svc
 from app.services import inventory as inventory_svc
+from app.services import stock_availability
 from app.services import warehouse_map as warehouse_map_svc
 from app.services.bom import bom_child_item_ordering
 from app.services.bom_stock_policy import should_skip_bom_inventory
@@ -207,22 +209,67 @@ def _cancel_shipping_operation(
     operation: InventoryOperation,
     actor: Employee | None,
     reason: str,
-) -> None:
-    """공통 미리보기와 동일한 계획으로 출하 작업 전체를 역전한다."""
+    return_status: ShippingRequestStatusEnum,
+    allocation_status: str,
+) -> InventoryOperation:
+    """Reverse inventory effects while returning shipping to its previous state."""
     resolved_actor = _resolve_cancellation_actor(db, operation, actor)
-    plan = cancellation_svc.preview_cancellation(db, operation.operation_id)
+    plan = cancellation_svc.preview_cancellation(
+        db,
+        operation.operation_id,
+        allow_shipping_workflow=True,
+    )
     if not plan.can_cancel:
         raise ShippingError(plan.blockers[0])
     try:
-        cancellation_svc.cancel_operation(
+        cancellation = cancellation_svc.cancel_operation(
             db,
             operation_id=operation.operation_id,
             canceller=resolved_actor,
             reason=reason,
             plan_hash=plan.plan_hash,
+            allow_shipping_workflow=True,
         )
     except cancellation_svc.CancellationError as exc:
         raise ShippingError(str(exc)) from exc
+    reversal_effects = (
+        db.query(InventoryOperationEffect)
+        .filter(InventoryOperationEffect.operation_id == cancellation.operation_id)
+        .order_by(InventoryOperationEffect.effect_id.asc())
+        .all()
+    )
+    for effect in reversal_effects:
+        if (
+            effect.effect_kind == InventoryOperationEffectKindEnum.WORKFLOW
+            and effect.subject_type == "ShippingRequest"
+        ):
+            subject = db.get(ShippingRequest, effect.subject_id)
+            if subject is None:
+                raise ShippingError("연결된 출하 요청을 찾을 수 없습니다.")
+            subject.status = return_status
+            subject.cancelled_at = None
+            subject.cancelled_by_employee_id = None
+            subject.cancelled_by_name = None
+            if return_status == ShippingRequestStatusEnum.PREPARING:
+                subject.prepared_at = None
+                subject.prepared_by_employee_id = None
+                subject.prepared_by_name = None
+            if return_status == ShippingRequestStatusEnum.PREPARED:
+                subject.picked_up_at = None
+            subject.updated_at = cancellation.effective_at
+            effect.after_state = {"status": return_status.value}
+        elif effect.effect_kind == InventoryOperationEffectKindEnum.ALLOCATION:
+            allocation = db.get(ShippingAllocation, effect.subject_id)
+            if allocation is None:
+                raise ShippingError("연결된 출하 배정을 찾을 수 없습니다.")
+            allocation.status = allocation_status
+            if allocation_status == ALLOCATION_RESERVED:
+                allocation.consumed_at = None
+                allocation.released_at = None
+                allocation.released_reason = None
+            effect.after_state = {"status": allocation_status}
+    db.flush()
+    return cancellation
 
 
 def _normalize_invoice_number(value: str | None) -> str | None:
@@ -831,9 +878,12 @@ def _clear_checklist(db: Session, request_id: uuid.UUID) -> ShippingRequest:
     req = _get_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PREPARING:
         raise ShippingError("준비 중 상태에서만 체크리스트를 전체 해제할 수 있습니다. 준비 완료 후에는 먼저 준비 완료 취소가 필요합니다.")
-    db.query(ShippingRequestChecklistLine).filter(
-        ShippingRequestChecklistLine.request_id == req.request_id
+    changed = db.query(ShippingRequestChecklistLine).filter(
+        ShippingRequestChecklistLine.request_id == req.request_id,
+        ShippingRequestChecklistLine.checked.is_(True),
     ).update({"checked": False}, synchronize_session=False)
+    if changed:
+        req.updated_at = datetime.utcnow()
     db.flush()
     return req
 
@@ -1141,9 +1191,12 @@ def _active_allocations_for_request(db: Session, req: ShippingRequest) -> list[S
 
 
 def _item_location_available_after_shipping_allocations(db: Session, item: Item) -> tuple[DepartmentEnum, int, int]:
-    dept, current = inventory_svc.item_department_stock(db, item)
-    reserved = _active_allocation_quantity(db, item.item_id)
-    return dept, int(current or 0), int(current or 0) - reserved
+    dept = inventory_svc.department_for_item(item)
+    figure = stock_availability.figure_for_cell(
+        db,
+        stock_availability.AvailabilityCell.location(item.item_id, dept),
+    )
+    return dept, int(figure.physical), int(figure.available)
 
 
 def _require_item_location_available(db: Session, item: Item, required: int) -> DepartmentEnum:
@@ -1638,6 +1691,12 @@ def _execute_component_change_core(
             *(line["item_id"] for line in applied_lines),
         }
     )
+    locked_items = item_repository.lock_active_many(db, item_ids)
+    missing_item_ids = sorted(set(item_ids) - set(locked_items), key=str)
+    if missing_item_ids:
+        raise ShippingError(f"품목을 찾을 수 없습니다: {missing_item_ids[0]}")
+    source_pa = locked_items[source_pa_item_id]
+    target_pa = locked_items[target_pa_item_id]
     inventory_svc._ensure_and_lock_inventories(db, item_ids)
     operation = operation_svc._create_business_operation(
         db,
@@ -1814,10 +1873,50 @@ def _reserve_pickup_items(
             continue
         item_by_id[item.item_id] = item
         required_by_item[item.item_id] = required_by_item.get(item.item_id, 0) + quantity
+    ordered_item_ids = sorted(required_by_item)
+    locked_items = item_repository.lock_active_many(db, ordered_item_ids)
+    missing_item_ids = sorted(set(ordered_item_ids) - set(locked_items), key=str)
+    if missing_item_ids:
+        raise ShippingError(f"출하 대상 품목을 찾을 수 없습니다: {missing_item_ids[0]}")
+    item_by_id.update(locked_items)
+    inventory_svc._ensure_and_lock_inventories(db, ordered_item_ids)
     departments = {
-        item_id: _require_item_location_available(db, item_by_id[item_id], quantity)
-        for item_id, quantity in required_by_item.items()
+        item_id: inventory_svc.department_for_item(item_by_id[item_id])
+        for item_id in ordered_item_ids
     }
+    cells = [
+        stock_availability.AvailabilityCell.location(
+            item_id,
+            departments[item_id],
+            LocationStatusEnum.PRODUCTION,
+        )
+        for item_id in ordered_item_ids
+    ]
+    for cell in cells:
+        inventory_svc._lock_location(
+            db,
+            cell.item_id,
+            cell.department,
+            LocationStatusEnum.PRODUCTION,
+        )
+    figures = stock_availability.figures_for_cells(
+        db,
+        cells,
+        lock_allocations=True,
+    )
+    for item_id, cell in zip(ordered_item_ids, cells):
+        figure = figures[cell]
+        required = Decimal(required_by_item[item_id])
+        if figure.available < required:
+            item = item_by_id[item_id]
+            code = item.mes_code or str(item.item_id)
+            raise ShippingError(
+                f"출하 준비 재고 부족: {code} / {item.item_name} / "
+                f"부서 {departments[item_id].value} / 물리 {figure.physical} / "
+                f"요청예약 {figure.stock_request_pending} / "
+                f"출하예약 {figure.active_shipping_reserved} / "
+                f"가용 {figure.available} / 필요 {required}"
+            )
     created_allocations: list[ShippingAllocation] = []
     for item, quantity, unit, item_reference in reservations:
         if quantity <= 0:
@@ -1876,6 +1975,10 @@ def _consume_pickup_allocations(
     if not allocations:
         item_ids.update(line.item_id for line in req.companion_lines)
     sorted_item_ids = sorted(item_ids)
+    locked_items = item_repository.lock_active_many(db, sorted_item_ids)
+    missing_item_ids = sorted(set(sorted_item_ids) - set(locked_items), key=str)
+    if missing_item_ids:
+        raise ShippingError(f"출하 대상 품목을 찾을 수 없습니다: {missing_item_ids[0]}")
     inventory_svc._ensure_and_lock_inventories(db, sorted_item_ids)
     if not allocations:
         _ship_from_item_location(
@@ -1973,6 +2076,7 @@ def _prepare_complete(
     serial_numbers: str,
     *,
     actor: Employee,
+    command_idempotency_key: str | None = None,
 ) -> ShippingRequest:
     actor = _require_actor(actor)
     normalized_serial_numbers = serial_numbers.strip()
@@ -1994,7 +2098,7 @@ def _prepare_complete(
         actor_name=actor.name,
         actor_employee_id=actor.employee_id,
         reason=req.notes,
-        idempotency_key=f"shipping:{req.request_id}:prepare",
+        idempotency_key=command_idempotency_key,
     )
 
     _reserve_pickup_items(
@@ -2045,6 +2149,8 @@ def _prepare_cancel(
             operation=operation,
             actor=actor,
             reason=cancellation_reason,
+            return_status=ShippingRequestStatusEnum.PREPARING,
+            allocation_status=ALLOCATION_RELEASED,
         )
         _record_event(
             db,
@@ -2066,14 +2172,21 @@ def _prepare_cancel(
         .all()
     )
     legacy_logs = [log for log in logs if log.operation_batch_id is None]
-    warehouse_map_svc.lock_warehouse_map_rows(
+    active_allocations = _active_allocations_for_request(db, req)
+    cancellation_svc._lock_inventory_allocation_graph(
         db,
-        item_ids=sorted({log.item_id for log in legacy_logs}),
-        include_boxes_for_item_ids=True,
-        include_zones_for_item_ids=True,
+        {
+            *{log.item_id for log in legacy_logs},
+            *{allocation.item_id for allocation in active_allocations},
+        },
     )
+    _release_pickup_allocations(db, req, reason)
     for log in legacy_logs:
-        inv_effect._apply_effect_reverse(db, log.item_id, log.inventory_effect)
+        inv_effect._apply_effect_reverse(
+            db,
+            log.item_id,
+            log.inventory_effect,
+        )
         inv = db.query(Inventory).filter(Inventory.item_id == log.item_id).first()
         if inv is not None:
             _sync_total(db, inv)
@@ -2081,7 +2194,6 @@ def _prepare_cancel(
         log.cancel_reason = reason or "출하 준비 취소"
         log.cancelled_by = actor.employee_id
         log.cancelled_at = datetime.utcnow()
-    _release_pickup_allocations(db, req, reason)
     req.status = ShippingRequestStatusEnum.PREPARING
     req.prepared_at = None
     req.prepared_by_employee_id = None
@@ -2113,6 +2225,7 @@ def _ship_from_item_location(
         db,
         item,
         Decimal(qty),
+        shipping_owner_request_id=req.request_id,
     )
     _log_inventory_change(
         db,
@@ -2138,6 +2251,8 @@ def _pickup_complete(
     db: Session,
     request_id: uuid.UUID,
     actor: Employee,
+    *,
+    command_idempotency_key: str | None = None,
 ) -> ShippingRequest:
     actor = _require_actor(actor)
     req = _get_request(db, request_id)
@@ -2154,7 +2269,7 @@ def _pickup_complete(
         actor_name=actor.name,
         actor_employee_id=actor.employee_id,
         reason=req.notes,
-        idempotency_key=f"shipping:{req.request_id}:pickup",
+        idempotency_key=command_idempotency_key,
     )
     _consume_pickup_allocations(
         db,
@@ -2203,6 +2318,8 @@ def _pickup_cancel(
             operation=operation,
             actor=actor,
             reason="픽업 완료 취소",
+            return_status=ShippingRequestStatusEnum.PREPARED,
+            allocation_status=ALLOCATION_RESERVED,
         )
         _record_event(
             db,
