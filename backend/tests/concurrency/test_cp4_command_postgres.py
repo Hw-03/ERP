@@ -1240,7 +1240,7 @@ def test_postgres_handover_cancel_race_has_one_winner_and_no_orphans() -> None:
     barrier = Barrier(2)
     worker_pid_queue: Queue[int] = Queue()
 
-    def cancel() -> tuple[str, int]:
+    def cancel() -> tuple[str, int, str | None, str | None]:
         with make_session() as db:
             pid = db.execute(text("SELECT pg_backend_pid()")).scalar_one()
             actor = db.get(Employee, case.actor_id)
@@ -1255,10 +1255,15 @@ def test_postgres_handover_cancel_race_has_one_winner_and_no_orphans() -> None:
                     plan_hash=preview.plan_hash,
                     now=now,
                 )
-                return "success", pid
-            except cancellation_svc.CancellationError:
+                return "success", pid, None, None
+            except cancellation_svc.CancellationError as exc:
                 db.rollback()
-                return "conflict", pid
+                return (
+                    "conflict",
+                    pid,
+                    type(exc).__name__,
+                    getattr(exc, "reason_code", None),
+                )
 
     try:
         with engine.connect() as holder, ThreadPoolExecutor(max_workers=2) as executor:
@@ -1280,8 +1285,14 @@ def test_postgres_handover_cancel_race_has_one_winner_and_no_orphans() -> None:
                 holder_transaction.rollback()
             outcomes = [future.result() for future in futures]
 
-        assert sorted(outcome[0] for outcome in outcomes) == ["conflict", "success"]
+        summaries = [(outcome[0], outcome[2], outcome[3]) for outcome in outcomes]
+        assert sorted(outcome[0] for outcome in outcomes) == [
+            "conflict",
+            "success",
+        ], summaries
         assert len({outcome[1] for outcome in outcomes}) == 2
+        loser = next(outcome for outcome in outcomes if outcome[0] == "conflict")
+        assert loser[3] == cancellation_svc.WORKFLOW_ALREADY_CANCELLED
         with make_session() as verify:
             document = verify.get(HandoverDoc, case.handover_id)
             assert document.status == HandoverStatusEnum.CANCELLED

@@ -242,6 +242,28 @@ def _cancel_policy(operation: InventoryOperation) -> CancelPolicy | None:
     return CANCEL_POLICY_REGISTRY.get((operation.domain, operation.action))
 
 
+def _has_legacy_handover_cancel_contract(
+    operation: InventoryOperation,
+    effects: list[InventoryOperationEffect],
+) -> bool:
+    """기존 handover receive의 최종 CANCELLED 취소 계약만 좁게 보존한다."""
+    if (
+        operation.domain != "handover"
+        or operation.action != "receive"
+        or int(operation.contract_version or 1) < 2
+        or len(effects) != 1
+    ):
+        return False
+    effect = effects[0]
+    return (
+        effect.effect_kind == InventoryOperationEffectKindEnum.WORKFLOW
+        and effect.subject_type == "HandoverDoc"
+        and effect.role == "RECEIVE_STATUS"
+        and effect.before_state == {"status": HandoverStatusEnum.SUBMITTED.value}
+        and effect.after_state == {"status": HandoverStatusEnum.RECEIVED.value}
+    )
+
+
 def _exact_status_state(state: object) -> bool:
     return (
         isinstance(state, dict)
@@ -980,9 +1002,21 @@ def preview_cancellation(
         .all()
     )
     policy = _cancel_policy(operation)
+    legacy_handover_cancel = _has_legacy_handover_cancel_contract(
+        operation,
+        operation_effects,
+    )
     workflow_linked_without_policy = policy is None and any(
         log.operation_batch_id is not None or log.shipping_request_id is not None
         for log in logs
+    )
+    workflow_effect_without_policy = any(
+        effect.effect_kind
+        in {
+            InventoryOperationEffectKindEnum.WORKFLOW,
+            InventoryOperationEffectKindEnum.ALLOCATION,
+        }
+        for effect in operation_effects
     )
     dedicated_prepare = (
         allow_shipping_workflow
@@ -1005,13 +1039,9 @@ def preview_cancellation(
     elif (
         (
             workflow_linked_without_policy
-            or any(
-                effect.effect_kind
-                in {
-                    InventoryOperationEffectKindEnum.WORKFLOW,
-                    InventoryOperationEffectKindEnum.ALLOCATION,
-                }
-                for effect in operation_effects
+            or (
+                workflow_effect_without_policy
+                and not legacy_handover_cancel
             )
         )
         and not (

@@ -874,7 +874,7 @@ def test_cancel_quarantine_reverses_physical_stock_and_defect_ledger(
     assert inventory.warehouse_qty == Decimal("5")
 
 
-def test_generic_cancel_rejects_handover_without_a_cancel_policy(
+def test_handover_cancel_requires_exact_legacy_contract_and_closes_workflow(
     db_session, make_item, make_location
 ) -> None:
     item = make_item(name="인수인계 취소", warehouse_qty=Decimal("0"))
@@ -940,26 +940,98 @@ def test_generic_cancel_rejects_handover_without_a_cancel_policy(
     )
     original.effective_at = datetime(2026, 8, 25, 3, 0)
     db_session.commit()
+
+    effect = (
+        db_session.query(InventoryOperationEffect)
+        .filter(InventoryOperationEffect.operation_id == original.operation_id)
+        .one()
+    )
+    effect.after_state = {"status": HandoverStatusEnum.SUBMITTED.value}
+    db_session.commit()
+    malformed_preview = cancellation_svc.preview_cancellation(
+        db_session,
+        original.operation_id,
+        now=datetime(2026, 8, 25, 3, 0),
+    )
+    assert malformed_preview.can_cancel is False
+    assert malformed_preview.reason_code == cancellation_svc.WORKFLOW_CANCEL_UNSUPPORTED
+    with pytest.raises(cancellation_svc.WorkflowCancellationConflict) as malformed:
+        cancellation_svc.cancel_operation(
+            db_session,
+            operation_id=original.operation_id,
+            canceller=receiver,
+            reason="변형된 인수인계 효과 취소 차단",
+            plan_hash=malformed_preview.plan_hash,
+            now=datetime(2026, 8, 25, 3, 0),
+        )
+    assert malformed.value.reason_code == cancellation_svc.WORKFLOW_CANCEL_UNSUPPORTED
+
+    effect.after_state = {"status": HandoverStatusEnum.RECEIVED.value}
+    linked_request = ShippingRequest(
+        status=ShippingRequestStatusEnum.PREPARING,
+        base_pf_item_id=item.item_id,
+        request_quantity=1,
+    )
+    db_session.add(linked_request)
+    db_session.flush()
+    original_log = (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.operation_id == original.operation_id)
+        .one()
+    )
+    original_log.shipping_request_id = linked_request.request_id
+    db_session.commit()
+    linked_preview = cancellation_svc.preview_cancellation(
+        db_session,
+        original.operation_id,
+        now=datetime(2026, 8, 25, 3, 0),
+    )
+    assert linked_preview.can_cancel is False
+    assert linked_preview.reason_code == cancellation_svc.WORKFLOW_CANCEL_UNSUPPORTED
+    with pytest.raises(cancellation_svc.WorkflowCancellationConflict) as linked:
+        cancellation_svc.cancel_operation(
+            db_session,
+            operation_id=original.operation_id,
+            canceller=receiver,
+            reason="연결된 인수인계 로그 취소 차단",
+            plan_hash=linked_preview.plan_hash,
+            now=datetime(2026, 8, 25, 3, 0),
+        )
+    assert linked.value.reason_code == cancellation_svc.WORKFLOW_CANCEL_UNSUPPORTED
+    assert db_session.query(InventoryOperation).count() == 1
+    assert db_session.query(InventoryOperationEffect).count() == 1
+    db_session.refresh(document)
+    assert document.status == HandoverStatusEnum.RECEIVED
+    location_quantities = dict(
+        db_session.query(InventoryLocation.department, InventoryLocation.quantity)
+        .filter(
+            InventoryLocation.item_id == item.item_id,
+            InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+        )
+        .all()
+    )
+    assert location_quantities[DepartmentEnum.TUBE] == Decimal("0")
+    assert location_quantities[DepartmentEnum.HIGH_VOLTAGE] == Decimal("2")
+
+    original_log.shipping_request_id = None
+    db_session.commit()
     preview = cancellation_svc.preview_cancellation(
         db_session,
         original.operation_id,
         now=datetime(2026, 8, 25, 3, 0),
     )
-    assert preview.can_cancel is False
-    assert preview.reason_code == cancellation_svc.WORKFLOW_CANCEL_UNSUPPORTED
-    with pytest.raises(cancellation_svc.WorkflowCancellationConflict) as caught:
-        cancellation_svc.cancel_operation(
-            db_session,
-            operation_id=original.operation_id,
-            canceller=receiver,
-            reason="인수 처리 취소",
-            plan_hash=preview.plan_hash,
-            now=datetime(2026, 8, 25, 3, 0),
-        )
-    assert caught.value.reason_code == cancellation_svc.WORKFLOW_CANCEL_UNSUPPORTED
+    assert preview.can_cancel is True
+    cancellation_svc.cancel_operation(
+        db_session,
+        operation_id=original.operation_id,
+        canceller=receiver,
+        reason="인수 처리 취소",
+        plan_hash=preview.plan_hash,
+        now=datetime(2026, 8, 25, 3, 0),
+    )
 
     db_session.refresh(document)
-    assert document.status == HandoverStatusEnum.RECEIVED
+    assert document.status == HandoverStatusEnum.CANCELLED
     tube_stock = (
         db_session.query(InventoryLocation.quantity)
         .filter(
@@ -978,9 +1050,8 @@ def test_generic_cancel_rejects_handover_without_a_cancel_policy(
         )
         .scalar()
     )
-    assert tube_stock == Decimal("0")
-    assert high_voltage_stock == Decimal("2")
+    assert tube_stock == Decimal("2")
+    assert high_voltage_stock in {None, Decimal("0")}
     effects = db_session.query(InventoryOperationEffect).all()
-    assert len(effects) == 1
-    assert effects[0].reverses_effect_id is None
-    assert db_session.query(InventoryOperation).count() == 1
+    assert len(effects) == 2
+    assert effects[1].reverses_effect_id == effects[0].effect_id
