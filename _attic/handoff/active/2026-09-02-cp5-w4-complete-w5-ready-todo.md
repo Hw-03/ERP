@@ -1,5 +1,7 @@
 # CP5 W4 완료 · W5 `IC-17` 진입 TODO
 
+> **상태 갱신(2026-09-02):** 이 TODO의 W5 범위는 제품 commit `fb339b5dc29013fc97af5035905431177ec54aea`와 GitHub CI run `33606010198` 6/6 success로 완료됐다. 아래 내용은 W5 진입 당시의 역사적 계약으로 보존하며, 현재 재개 정본은 `2026-09-02-cp5-w5-complete-w6-ready-todo.md`다. W6는 아직 시작하지 않았다.
+
 ## 현재 정본
 
 - 작업 위치: `C:\ERP\.worktrees\full-code-quality-checkpoint-2`
