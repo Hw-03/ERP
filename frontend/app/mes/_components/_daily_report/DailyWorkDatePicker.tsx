@@ -20,9 +20,13 @@ function parseDateKey(value: string): Date {
   return new Date(year, month - 1, day);
 }
 
-function shiftDate(value: string, days: number): string {
+/** 화살표 이동 방향에서 가장 가까운 평일 날짜를 반환한다. */
+function shiftDate(value: string, days: -1 | 1): string {
   const next = parseDateKey(value);
   next.setDate(next.getDate() + days);
+  while (next.getDay() === 0 || next.getDay() === 6) {
+    next.setDate(next.getDate() + days);
+  }
   return toDateKey(next);
 }
 
@@ -55,7 +59,8 @@ export function DailyWorkDatePicker({ value, maxDate, onChange }: DailyWorkDateP
   const rootRef = useRef<HTMLDivElement>(null);
   const maxMonth = monthStart(parseDateKey(maxDate));
   const canNextMonth = calMonth < maxMonth;
-  const canNextDay = value < maxDate;
+  const nextWorkDate = shiftDate(value, 1);
+  const canNextDay = nextWorkDate <= maxDate;
 
   useEffect(() => {
     setCalMonth(monthStart(parseDateKey(value)));
@@ -197,7 +202,7 @@ export function DailyWorkDatePicker({ value, maxDate, onChange }: DailyWorkDateP
         aria-label="다음 날"
         title={canNextDay ? "다음 날" : "미래 날짜는 선택할 수 없습니다."}
         disabled={!canNextDay}
-        onClick={() => onChange(shiftDate(value, 1))}
+        onClick={() => onChange(nextWorkDate)}
         className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] border transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-30 lg:h-8 lg:w-8"
         style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}
       >
