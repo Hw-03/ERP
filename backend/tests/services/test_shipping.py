@@ -937,6 +937,122 @@ def test_shipping_bom_stock_exempt_child_is_skipped_in_prepare_and_component_cha
     assert {log.item_id for log in result["transactions"]} == {source_pa.item_id, target_pa.item_id}
 
 
+def test_component_change_moves_only_direct_children_when_nested_leaves_match(
+    db_session, make_item, make_bom, make_location
+):
+    shared_leaf = make_item(name="direct-shared-leaf", process_type_code="AR")
+    source_aa = make_item(name="direct-source-aa", process_type_code="AA")
+    target_aa = make_item(name="direct-target-aa", process_type_code="AA")
+    source_af = make_item(name="direct-source-af", process_type_code="AF")
+    target_af = make_item(name="direct-target-af", process_type_code="AF")
+    make_bom(source_aa.item_id, shared_leaf.item_id, Decimal("2"))
+    make_bom(target_aa.item_id, shared_leaf.item_id, Decimal("2"))
+    make_bom(source_af.item_id, source_aa.item_id, Decimal("1"))
+    make_bom(target_af.item_id, target_aa.item_id, Decimal("1"))
+    make_location(source_af.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("2"))
+    make_location(target_aa.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("2"))
+    db_session.commit()
+
+    preview = shipping_svc.component_change_preview_independent(
+        db_session,
+        source_af.item_id,
+        target_af.item_id,
+        2,
+    )
+
+    lines_by_item_id = {line["item_id"]: line for line in preview["lines"]}
+    assert preview["resolved_mode"] == "BOM"
+    assert preview["executable"] is True
+    assert set(lines_by_item_id) == {source_aa.item_id, target_aa.item_id}
+    assert lines_by_item_id[source_aa.item_id]["total_delta"] == -2
+    assert lines_by_item_id[target_aa.item_id]["total_delta"] == 2
+    assert lines_by_item_id[target_aa.item_id]["available_quantity"] == 2
+    assert shared_leaf.item_id not in lines_by_item_id
+
+    result = shipping_svc.execute_component_change_independent(
+        db_session,
+        source_af.item_id,
+        target_af.item_id,
+        2,
+        memo="직계 구성품 전환",
+    )
+
+    assert _location_qty(db_session, source_af, DepartmentEnum.ASSEMBLY) == 0
+    assert _location_qty(db_session, target_af, DepartmentEnum.ASSEMBLY) == 2
+    assert _location_qty(db_session, source_aa, DepartmentEnum.ASSEMBLY) == 2
+    assert _location_qty(db_session, target_aa, DepartmentEnum.ASSEMBLY) == 0
+    assert _location_qty(db_session, shared_leaf, DepartmentEnum.ASSEMBLY) == 0
+    assert {log.item_id for log in result["transactions"]} == {
+        source_af.item_id,
+        target_af.item_id,
+        source_aa.item_id,
+        target_aa.item_id,
+    }
+
+
+def test_component_change_scales_direct_child_quantity_differences(
+    db_session, make_item, make_bom, make_location
+):
+    common_leaf = make_item(name="direct-common-leaf", process_type_code="AR")
+    added_leaf = make_item(name="direct-added-leaf", process_type_code="AR")
+    common_aa = make_item(name="direct-common-aa", process_type_code="AA")
+    added_aa = make_item(name="direct-added-aa", process_type_code="AA")
+    source_af = make_item(name="direct-quantity-source", process_type_code="AF")
+    target_af = make_item(name="direct-quantity-target", process_type_code="AF")
+    make_bom(common_aa.item_id, common_leaf.item_id, Decimal("1"))
+    make_bom(added_aa.item_id, added_leaf.item_id, Decimal("1"))
+    make_bom(source_af.item_id, common_aa.item_id, Decimal("3"))
+    make_bom(target_af.item_id, common_aa.item_id, Decimal("1"))
+    make_bom(target_af.item_id, added_aa.item_id, Decimal("2"))
+    make_location(source_af.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("2"))
+    make_location(added_aa.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("4"))
+    db_session.commit()
+
+    preview = shipping_svc.component_change_preview_independent(
+        db_session,
+        source_af.item_id,
+        target_af.item_id,
+        2,
+    )
+
+    lines_by_item_id = {line["item_id"]: line for line in preview["lines"]}
+    assert set(lines_by_item_id) == {common_aa.item_id, added_aa.item_id}
+    assert lines_by_item_id[common_aa.item_id]["delta_per_unit"] == -2
+    assert lines_by_item_id[common_aa.item_id]["total_delta"] == -4
+    assert lines_by_item_id[added_aa.item_id]["delta_per_unit"] == 2
+    assert lines_by_item_id[added_aa.item_id]["total_delta"] == 4
+    assert common_leaf.item_id not in lines_by_item_id
+    assert added_leaf.item_id not in lines_by_item_id
+
+
+def test_component_change_mechanically_compares_nested_same_stage_items(
+    db_session, make_item, make_bom, make_location
+):
+    inner_part = make_item(name="nested-inner-part", process_type_code="PR")
+    extra_part = make_item(name="nested-extra-part", process_type_code="PR")
+    source_pa = make_item(name="nested-source-pa", process_type_code="PA")
+    target_pa = make_item(name="nested-target-pa", process_type_code="PA")
+    make_bom(source_pa.item_id, inner_part.item_id, Decimal("1"))
+    make_bom(target_pa.item_id, source_pa.item_id, Decimal("1"))
+    make_bom(target_pa.item_id, extra_part.item_id, Decimal("1"))
+    make_location(source_pa.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("2"))
+    make_location(extra_part.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
+    db_session.commit()
+
+    preview = shipping_svc.component_change_preview_independent(
+        db_session,
+        source_pa.item_id,
+        target_pa.item_id,
+        1,
+    )
+
+    lines_by_item_id = {line["item_id"]: line for line in preview["lines"]}
+    assert set(lines_by_item_id) == {inner_part.item_id, source_pa.item_id, extra_part.item_id}
+    assert lines_by_item_id[inner_part.item_id]["total_delta"] == -1
+    assert lines_by_item_id[source_pa.item_id]["total_delta"] == 1
+    assert lines_by_item_id[extra_part.item_id]["total_delta"] == 1
+
+
 def test_shipping_prepare_keeps_custom_flagged_bom_line_in_shortage_check(
     db_session, make_item, make_bom, make_location
 ):

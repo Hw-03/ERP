@@ -1172,44 +1172,13 @@ def _bom_qty_map(rows: list[tuple[uuid.UUID, int, str]]) -> dict[uuid.UUID, tupl
     return out
 
 
-def _expanded_leaf_qty_map(
-    db: Session,
-    item_id: uuid.UUID,
-    *,
-    multiplier: int = 1,
-    seen: tuple[uuid.UUID, ...] = (),
-) -> dict[uuid.UUID, tuple[int, str]]:
-    if item_id in seen:
-        item = _get_item(db, item_id)
-        raise ShippingError(f"BOM 순환 참조가 있어 품목 전환을 할 수 없습니다: {item.item_name}")
-    children = _direct_children(db, item_id)
-    if not children:
-        item = _get_item(db, item_id)
-        return {item_id: (int(multiplier), item.unit or "EA")}
-    out: dict[uuid.UUID, tuple[int, str]] = {}
-    for child_id, qty, unit in children:
-        child_children = _direct_children(db, child_id)
-        if not child_children:
-            out[child_id] = (out.get(child_id, (0, unit))[0] + int(qty) * multiplier, unit or "EA")
-            continue
-        nested = _expanded_leaf_qty_map(
-            db,
-            child_id,
-            multiplier=int(qty) * multiplier,
-            seen=seen + (item_id,),
-        )
-        for nested_id, (nested_qty, nested_unit) in nested.items():
-            out[nested_id] = (out.get(nested_id, (0, nested_unit))[0] + nested_qty, nested_unit)
-    return out
-
-
 def _item_has_bom(db: Session, item_id: uuid.UUID) -> bool:
     return bool(_direct_children(db, item_id))
 
 
 def _component_change_lines(db: Session, source_pa: Item, target_pa: Item, quantity: int) -> list[dict]:
-    source_map = _expanded_leaf_qty_map(db, source_pa.item_id)
-    target_map = _expanded_leaf_qty_map(db, target_pa.item_id)
+    source_map = _bom_qty_map(_direct_children(db, source_pa.item_id))
+    target_map = _bom_qty_map(_direct_children(db, target_pa.item_id))
     item_ids = sorted(set(source_map) | set(target_map), key=lambda item_id: _get_item(db, item_id).item_name)
     lines: list[dict] = []
     for item_id in item_ids:
