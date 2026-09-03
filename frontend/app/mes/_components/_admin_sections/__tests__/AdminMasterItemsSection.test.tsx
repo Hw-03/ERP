@@ -35,7 +35,13 @@ const context: any = {
     item_name: item.item_name,
     legacy_item_type: "",
     supplier: "",
+    supplier_item_code: "",
+    standard_purchase_price: "",
+    purchase_price_effective_date: "",
     min_stock: "",
+    reorder_point: "",
+    procurement_lead_time_days: "",
+    minimum_order_quantity: "",
     process_type_code: "TR",
     unit: "EA",
     model_slots: [],
@@ -85,7 +91,13 @@ describe("AdminMasterItemsSection", () => {
       item_name: "",
       legacy_item_type: "",
       supplier: "",
+      supplier_item_code: "",
+      standard_purchase_price: "",
+      purchase_price_effective_date: "",
       min_stock: "",
+      reorder_point: "",
+      procurement_lead_time_days: "",
+      minimum_order_quantity: "",
       process_type_code: "TR",
       unit: "EA",
       model_slots: [],
@@ -190,7 +202,7 @@ describe("AdminMasterItemsSection", () => {
     expect(tablist).not.toContainElement(deleteButton);
   });
 
-  it("모든 상세 탭에서 삭제 동작을 탭 작업 행에 두고 재고와 BOM 탭에는 삭제 footer를 렌더링하지 않는다", async () => {
+  it("재고·구매 탭은 저장 footer를 유지하고 기존 재고 카드 없이 기준 입력을 표시한다", async () => {
     context.selectedItem = item;
     const { container } = render(
       <DirtyGuardProvider>
@@ -198,14 +210,17 @@ describe("AdminMasterItemsSection", () => {
       </DirtyGuardProvider>,
     );
 
-    await waitFor(() => expect(screen.getByRole("tab", { name: "재고 정보" })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("tab", { name: "재고 정보" }));
+    await waitFor(() => expect(screen.getByRole("tab", { name: "재고·구매" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("tab", { name: "재고·구매" }));
 
     const tabActionsRow = screen.getByRole("button", { name: "삭제" }).closest("div.border-b");
     expect(tabActionsRow).toBeTruthy();
     expect(within(tabActionsRow!).getByRole("button", { name: "삭제" })).toBeInTheDocument();
-    expect(container.querySelector("[data-admin-detail-content]")?.nextElementSibling).toBeNull();
-    expect(findByClasses(container, "h-full", "min-h-[9rem]", "grid-rows-2")).toHaveClass("h-full");
+    expect(screen.getByRole("button", { name: "저장" })).toBeInTheDocument();
+    expect(screen.getByText("구매 기준")).toBeInTheDocument();
+    expect(screen.getByRole("tabpanel").firstElementChild).toHaveClass("h-full");
+    expect(screen.queryByText("현재 재고")).not.toBeInTheDocument();
+    expect(screen.queryByText("창고 보관")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "BOM / 사용처" }));
     expect(within(tabActionsRow!).getByRole("button", { name: "삭제" })).toBeInTheDocument();

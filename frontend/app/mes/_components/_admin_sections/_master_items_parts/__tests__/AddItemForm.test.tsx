@@ -15,7 +15,13 @@ vi.mock("../../AdminMasterItemsContext", () => ({
       sales_review_required: false,
       legacy_item_type: "",
       supplier: "",
+      supplier_item_code: "",
+      standard_purchase_price: "",
+      purchase_price_effective_date: "",
       min_stock: "",
+      reorder_point: "",
+      procurement_lead_time_days: "",
+      minimum_order_quantity: "",
       initial_quantity: "",
       initial_locations: [],
     },
@@ -51,5 +57,13 @@ describe("AddItemForm", () => {
       process_type_code: "AF",
       sales_review_required: true,
     });
+  });
+
+  it("새 품목 폼에 선택 가능한 구매·재고 발주 기준 전체를 포함한다", () => {
+    render(<AddItemForm />);
+
+    for (const label of ["주 공급사", "공급사 품번", "기준 매입단가", "단가 기준일", "안전재고", "발주점", "조달 리드타임", "최소 발주수량(MOQ)"]) {
+      expect(screen.getByLabelText(label)).toBeInTheDocument();
+    }
   });
 });

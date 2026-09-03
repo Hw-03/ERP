@@ -6,8 +6,9 @@
 
 import enum
 import uuid as _uuid
+from decimal import Decimal
 
-from sqlalchemy import Integer, String
+from sqlalchemy import Integer, Numeric, String
 from sqlalchemy.types import TypeDecorator
 
 from app.database import Base  # noqa: F401 — re-export
@@ -15,6 +16,7 @@ from app.database import Base  # noqa: F401 — re-export
 __all__ = [
     "Base",
     "BoolAsString",
+    "ExactPrice",
     "IntQuantity",
     "UUIDString",
     "DepartmentEnum",
@@ -64,6 +66,43 @@ class IntQuantity(TypeDecorator):
         if value is None:
             return None
         return int(value)
+
+
+class ExactPrice(TypeDecorator):
+    """SQLite 가격을 센트 정수로 저장해 NUMERIC의 부동소수점 손실을 막는다.
+
+    선언 타입은 Numeric(18, 2)로 유지해 PostgreSQL DDL·동작과 Alembic 계약을
+    바꾸지 않는다. SQLite의 NUMERIC affinity는 18자리 금액을 REAL로 바꿀 수 있어
+    앱 경계에서만 최저단위 정수로 변환한다.
+    """
+
+    impl = Numeric(18, 2)
+    cache_ok = True
+    _SCALE = Decimal("100")
+
+    def bind_processor(self, dialect):
+        if dialect.name != "sqlite":
+            return super().bind_processor(dialect)
+
+        def process(value):
+            if value is None:
+                return None
+            return int(Decimal(str(value)) * self._SCALE)
+
+        return process
+
+    def result_processor(self, dialect, coltype):
+        if dialect.name != "sqlite":
+            return super().result_processor(dialect, coltype)
+
+        def process(value):
+            if value is None:
+                return None
+            if isinstance(value, int):
+                return Decimal(value).scaleb(-2)
+            return Decimal(str(value))
+
+        return process
 
 
 class UUIDString(TypeDecorator):

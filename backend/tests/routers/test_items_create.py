@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-import pytest
+from decimal import Decimal
 
-from app.models import ProductSymbol
+import pytest
+from sqlalchemy import text
+
+from app.models import Item, ProductSymbol
 
 
 ADMIN_HEADERS = {"X-Admin-Pin": "0000"}
@@ -89,6 +92,12 @@ def test_create_item_allows_optional_material_classification_and_minimum_stock(c
     assert missing_initial_stock.status_code == 422
 
 
+def test_create_item_rejects_negative_min_stock(client, seed_symbol):
+    response = _create_item(client, name="음수 안전재고", min_stock=-1)
+
+    assert response.status_code == 422, response.text
+
+
 def test_create_item_preserves_explicit_sales_review_and_defaults_af_to_required(client, seed_symbol):
     flagged = _create_item(client, name="Sales review", sales_review_required=True)
     assert flagged.status_code == 201, flagged.text
@@ -110,6 +119,120 @@ def test_create_item_preserves_explicit_sales_review_and_defaults_af_to_required
     defaulted_non_af = _create_item(client, name="Non-AF default")
     assert defaulted_non_af.status_code == 201, defaulted_non_af.text
     assert _get_item(client, defaulted_non_af.json()["item_id"]).json()["sales_review_required"] is False
+
+
+def test_create_item_round_trips_procurement_master_fields(client, seed_symbol):
+    response = client.post(
+        "/api/items",
+        headers=ADMIN_HEADERS,
+        json={
+            "item_name": "구매 마스터 품목",
+            "process_type_code": "HR",
+            "model_slots": [1],
+            "initial_quantity": 0,
+            "supplier": "DEX Supplier",
+            "min_stock": 12,
+            "supplier_item_code": "SUP-ITEM-001",
+            "standard_purchase_price": "1234.50",
+            "purchase_price_effective_date": "2026-09-02",
+            "procurement_lead_time_days": 14,
+            "minimum_order_quantity": 5,
+            "reorder_point": 9,
+            "purchase_memo": "첫 거래는 현금 결제",
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["supplier"] == "DEX Supplier"
+    assert body["min_stock"] == 12
+    assert body["supplier_item_code"] == "SUP-ITEM-001"
+    assert body["standard_purchase_price"] == "1234.50"
+    assert body["purchase_price_effective_date"] == "2026-09-02"
+    assert body["procurement_lead_time_days"] == 14
+    assert body["minimum_order_quantity"] == 5
+    assert body["reorder_point"] == 9
+    assert body["purchase_memo"] == "첫 거래는 현금 결제"
+
+
+def test_create_item_preserves_max_purchase_price_through_api_and_orm(client, db_session, seed_symbol):
+    price = "9999999999999999.99"
+    response = client.post(
+        "/api/items",
+        headers=ADMIN_HEADERS,
+        json={
+            "item_name": "최대 구매단가",
+            "process_type_code": "HR",
+            "model_slots": [1],
+            "initial_quantity": 0,
+            "standard_purchase_price": price,
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    item_id = response.json()["item_id"]
+    raw_value, raw_type = db_session.execute(
+        text(
+            "SELECT standard_purchase_price, typeof(standard_purchase_price) "
+            "FROM items WHERE item_id = :item_id"
+        ),
+        {"item_id": item_id.replace("-", "")},
+    ).one()
+    assert (raw_value, raw_type) == (999999999999999999, "integer")
+    assert response.json()["standard_purchase_price"] == price
+
+    db_session.expire_all()
+    stored = db_session.query(Item).filter(Item.item_id == item_id).one()
+    assert stored.standard_purchase_price == Decimal(price)
+
+    reread = _get_item(client, item_id)
+    assert reread.status_code == 200, reread.text
+    assert reread.json()["standard_purchase_price"] == price
+
+
+def test_create_item_omits_procurement_master_fields_as_null(client, seed_symbol):
+    response = _create_item(client, name="구매 마스터 미입력")
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    for field in (
+        "supplier_item_code",
+        "standard_purchase_price",
+        "purchase_price_effective_date",
+        "procurement_lead_time_days",
+        "minimum_order_quantity",
+        "reorder_point",
+        "purchase_memo",
+    ):
+        assert body[field] is None
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("standard_purchase_price", "-0.01"),
+        ("procurement_lead_time_days", -1),
+        ("minimum_order_quantity", 0),
+        ("reorder_point", -1),
+        ("purchase_price_effective_date", "2026-99-99"),
+        ("supplier_item_code", "X" * 101),
+        ("purchase_memo", "X" * 1001),
+    ],
+)
+def test_create_item_rejects_invalid_procurement_master_fields(client, seed_symbol, field, value):
+    response = client.post(
+        "/api/items",
+        headers=ADMIN_HEADERS,
+        json={
+            "item_name": f"구매 검증 {field}",
+            "process_type_code": "HR",
+            "model_slots": [1],
+            "initial_quantity": 0,
+            field: value,
+        },
+    )
+
+    assert response.status_code == 422, response.text
 
 
 def test_create_item_places_new_process_code_in_common_display_order(client, seed_symbol):
