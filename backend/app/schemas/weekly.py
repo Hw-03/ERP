@@ -11,8 +11,8 @@ class WeeklyItemReport(BaseModel):
     mes_code: Optional[str]
     item_name: str
     prev_qty: int
-    produce_qty: int   # 진짜 생산(PRODUCE)만 — 입출고 내역 '생산'과 동일 기준
-    receive_qty: int   # 입고(RECEIVE) — 생산과 분리 표시
+    produce_qty: int   # 품목 전환 대상을 제외한 실제 생산(PRODUCE)
+    receive_qty: int   # 입고(RECEIVE) + 품목 전환 대상
     out_qty: int
     defect_qty: int = 0
     current_qty: int

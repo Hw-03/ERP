@@ -119,6 +119,7 @@ def classify_inventory_activity(log: object) -> WeeklyInventoryActivity:
     tx_type = TransactionTypeEnum(getattr(log, "transaction_type"))
     role = _role_value(getattr(log, "operation_role", None))
     quantity = abs(Decimal(str(getattr(log, "quantity_change", 0) or 0)))
+    shipping_phase = getattr(log, "shipping_phase", None)
 
     if role in {
         InventoryOperationRoleEnum.REWORK_CHILD_DEFECTIVE.value,
@@ -143,6 +144,8 @@ def classify_inventory_activity(log: object) -> WeeklyInventoryActivity:
         return WeeklyInventoryActivity(defect_qty=-normal_delta, normal_delta=normal_delta)
 
     if tx_type == TransactionTypeEnum.PRODUCE and normal_delta > 0:
+        if shipping_phase == "COMPONENT_CHANGE":
+            return WeeklyInventoryActivity(receive_qty=normal_delta, normal_delta=normal_delta)
         return WeeklyInventoryActivity(produce_qty=normal_delta, normal_delta=normal_delta)
 
     if role == InventoryOperationRoleEnum.REWORK_CHILD_NORMAL.value or tx_type in {

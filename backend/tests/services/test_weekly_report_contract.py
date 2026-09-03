@@ -12,12 +12,14 @@ def _log(
     role: InventoryOperationRoleEnum,
     quantity_change: int,
     effects: list[dict],
+    shipping_phase: str | None = None,
 ):
     return SimpleNamespace(
         transaction_type=tx_type,
         operation_role=role,
         quantity_change=quantity_change,
         inventory_effect=effects,
+        shipping_phase=shipping_phase,
     )
 
 
@@ -139,3 +141,29 @@ def test_production_shipping_and_normal_scrap_have_nonnegative_columns() -> None
     assert production.as_tuple() == (5, 0, 0, 0)
     assert shipping.as_tuple() == (0, 0, 3, 0)
     assert normal_scrap.as_tuple() == (0, 0, 0, 2)
+
+
+def test_component_change_target_is_receive_and_source_is_out() -> None:
+    target = classify_inventory_activity(
+        _log(
+            TransactionTypeEnum.PRODUCE,
+            role=InventoryOperationRoleEnum.PRODUCT_OUTPUT,
+            quantity_change=1,
+            effects=[{"scope": "location", "department": "진공", "status": "PRODUCTION", "delta": 1}],
+            shipping_phase="COMPONENT_CHANGE",
+        )
+    )
+    source = classify_inventory_activity(
+        _log(
+            TransactionTypeEnum.BACKFLUSH,
+            role=InventoryOperationRoleEnum.COMPONENT_INPUT,
+            quantity_change=-1,
+            effects=[{"scope": "location", "department": "진공", "status": "PRODUCTION", "delta": -1}],
+            shipping_phase="COMPONENT_CHANGE",
+        )
+    )
+
+    assert target.as_tuple() == (0, 1, 0, 0)
+    assert target.normal_delta == 1
+    assert source.as_tuple() == (0, 0, 1, 0)
+    assert source.normal_delta == -1

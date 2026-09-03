@@ -18,7 +18,7 @@ from typing import Mapping
 from xml.etree import ElementTree as ET
 
 import holidays
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.models import Item, ProductSymbol, TransactionLog, TransactionTypeEnum
@@ -34,6 +34,7 @@ _CELL_REF_RE = re.compile(r"([A-Z]+)(\d+)$")
 _Q = lambda name: f"{{{_XLSX_NS}}}{name}"
 _PROCESS_CODES = ("HF", "VF", "NF", "AF", "PF")
 _MODELS = ("DX3000", "ADX4000W", "ADX6000FB", "COCOON", "SOLO")
+_COMPONENT_CHANGE_PHASE = "COMPONENT_CHANGE"
 _ROW_MAP = {
     "HF": {"DX3000": 3, "ADX4000W": 4, "ADX6000FB": 5, "COCOON": 6, "SOLO": 7},
     "VF": {"DX3000": 9, "ADX4000W": 10, "ADX6000FB": 11, "COCOON": 12, "SOLO": 13},
@@ -67,7 +68,7 @@ def _resolve_model(item: Item, symbols: Mapping[str, str]) -> str | None:
 
 
 def collect_daily_quantities(db: Session, year: int) -> DailyQuantities:
-    """Return F705 model/process quantities using the frozen weekly production rule.
+    """Return F705 production, excluding item-conversion target receipts.
 
     The sum is first calculated for each item on each calendar day, then made
     absolute.  This matches the weekly matrix's item-level aggregation when a
@@ -81,6 +82,10 @@ def collect_daily_quantities(db: Session, year: int) -> DailyQuantities:
         .filter(
             Item.process_type_code.in_(_PROCESS_CODES),
             TransactionLog.transaction_type == TransactionTypeEnum.PRODUCE,
+            or_(
+                TransactionLog.shipping_phase.is_(None),
+                TransactionLog.shipping_phase != _COMPONENT_CHANGE_PHASE,
+            ),
             TransactionLog.created_at >= start,
             TransactionLog.created_at < end,
         )

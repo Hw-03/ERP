@@ -5,9 +5,9 @@
   스냅샷이 확보된 신규 주차만 일요일 KST 확정 재고를 사용한다. 신규 구간의
   거래 집계는 기준 시각 전에 취소된 로그를 제외한다.
 - 명시적 수정 요청이 있을 때만 손댈 것. 주변 리팩터·전역 변경에서는 우회.
-- '생산'(produce_qty)=PRODUCE 전용 — 입출고 내역 '생산'과 동일 기준. 입고(receive_qty)
+- '생산'(produce_qty)=품목 전환 대상을 제외한 PRODUCE. 품목 전환 대상은 입고(receive_qty)
   =RECEIVE 로 분리 표시. 과거 주차의 전주재고/증감은 기간 내 '전체 거래' 합(net_all)으로
-  기존과 동일하게 역산한다. 생산 매트릭스(PRODUCTION_TX_TYPES)도 PRODUCE 전용.
+  기존과 동일하게 역산한다. 생산 매트릭스도 품목 전환 대상을 제외한 PRODUCE 전용.
 - 신규 TransactionTypeEnum 멤버 추가 시 PRODUCTION_TX_TYPES 또는
   NON_PRODUCTION_TX_TYPES 둘 중 하나에 명시 분류 필수
   (test_all_transaction_types_classified 가 누락 검출).
@@ -78,13 +78,13 @@ _OUT_TYPES = {
     TransactionTypeEnum.BACKFLUSH,
 }
 
-# 생산 현황 매트릭스(production_matrix) 셀에 합산하는 "생산" 거래 타입 = PRODUCE 전용.
-# 입출고 내역 화면의 '생산'(PRODUCE)과 동일 기준으로 통일(2026-06-16).
+# 생산 현황 매트릭스는 품목 전환 대상을 제외한 PRODUCE만 합산한다.
 # ※ 신규 TransactionTypeEnum 멤버 추가 시 본 set 또는 NON_PRODUCTION_TX_TYPES
 #   둘 중 하나에 명시 분류 필수 — test_all_transaction_types_classified 가 누락 검출.
 PRODUCTION_TX_TYPES: frozenset[TransactionTypeEnum] = frozenset({
     TransactionTypeEnum.PRODUCE,
 })
+_COMPONENT_CHANGE_PHASE = "COMPONENT_CHANGE"
 
 # 매트릭스에서 명시적으로 제외하는 거래 타입 (PRODUCE 외 전부).
 NON_PRODUCTION_TX_TYPES: frozenset[TransactionTypeEnum] = frozenset({
@@ -417,6 +417,7 @@ def get_weekly_report(
         db.query(
             TransactionLog.item_id,
             TransactionLog.transaction_type,
+            TransactionLog.shipping_phase,
             func.coalesce(func.sum(TransactionLog.quantity_change), 0).label("qty_sum"),
             func.coalesce(
                 func.sum(
@@ -438,24 +439,31 @@ def get_weekly_report(
             ).label("decrease_sum"),
         )
         .filter(*tx_filters)
-        .group_by(TransactionLog.item_id, TransactionLog.transaction_type)
+        .group_by(
+            TransactionLog.item_id,
+            TransactionLog.transaction_type,
+            TransactionLog.shipping_phase,
+        )
         .all()
     )
 
-    produce_map: dict[str, Decimal] = {}   # PRODUCE 만 — '생산' 칸
-    receive_map: dict[str, Decimal] = {}   # RECEIVE — '입고' 칸 (생산과 분리)
+    produce_map: dict[str, Decimal] = {}   # 품목 전환 대상을 제외한 PRODUCE — '생산' 칸
+    receive_map: dict[str, Decimal] = {}   # RECEIVE + 품목 전환 대상 — '입고' 칸
     out_map: dict[str, Decimal] = {}       # SHIP+BACKFLUSH — '출고' 칸
     net_map: dict[str, Decimal] = {}       # 전체 거래 합 — 전주재고/증감 역산용(폐기·분해 포함)
     increase_map: dict[str, Decimal] = {}  # 양수 거래 합 — 상쇄 전 증가량
     decrease_map: dict[str, Decimal] = {}  # 음수 거래 절댓값 합 — 상쇄 전 감소량
-    for item_id, tx_type, qty_sum, increase_sum, decrease_sum in tx_rows:
+    for item_id, tx_type, shipping_phase, qty_sum, increase_sum, decrease_sum in tx_rows:
         iid = str(item_id)
         val = Decimal(str(qty_sum))
         net_map[iid] = net_map.get(iid, Decimal("0")) + val
         increase_map[iid] = increase_map.get(iid, Decimal("0")) + Decimal(str(increase_sum))
         decrease_map[iid] = decrease_map.get(iid, Decimal("0")) + Decimal(str(decrease_sum))
         if tx_type == TransactionTypeEnum.PRODUCE:
-            produce_map[iid] = produce_map.get(iid, Decimal("0")) + val
+            if shipping_phase == _COMPONENT_CHANGE_PHASE:
+                receive_map[iid] = receive_map.get(iid, Decimal("0")) + val
+            else:
+                produce_map[iid] = produce_map.get(iid, Decimal("0")) + val
         elif tx_type == TransactionTypeEnum.RECEIVE:
             receive_map[iid] = receive_map.get(iid, Decimal("0")) + val
         elif tx_type in _OUT_TYPES or (tx_type == TransactionTypeEnum.ADJUST and val < 0):
@@ -538,6 +546,10 @@ def get_weekly_report(
     production_filters = [
         Item.process_type_code.in_(_PROD_CODES),
         TransactionLog.transaction_type.in_(PRODUCTION_TX_TYPES),
+        or_(
+            TransactionLog.shipping_phase.is_(None),
+            TransactionLog.shipping_phase != _COMPONENT_CHANGE_PHASE,
+        ),
         TransactionLog.created_at >= dt_start,
     ]
     if snapshot_context is None:

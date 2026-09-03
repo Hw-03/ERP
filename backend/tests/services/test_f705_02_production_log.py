@@ -20,6 +20,7 @@ def _add_log(
     quantity: int,
     occurred_at: datetime,
     transaction_type: TransactionTypeEnum = TransactionTypeEnum.PRODUCE,
+    shipping_phase: str | None = None,
 ) -> None:
     db_session.add(
         TransactionLog(
@@ -30,6 +31,7 @@ def _add_log(
             quantity_before=Decimal("0"),
             quantity_after=Decimal(str(quantity)),
             created_at=occurred_at,
+            shipping_phase=shipping_phase,
         )
     )
 
@@ -61,6 +63,30 @@ def test_collect_daily_quantities_uses_produce_only_and_abs_item_day_sum(db_sess
             ("AF", "SOLO"): 4,
         }
     }
+
+
+def test_collect_daily_quantities_excludes_component_change_targets_across_dates(db_session, make_item):
+    db_session.add(ProductSymbol(slot=8, symbol="8", model_name="SOLO"))
+    source = make_item(name="iM3 AF SOLO", process_type_code="AF", model_symbol="8")
+    target = make_item(name="20cm AF SOLO", process_type_code="AF", model_symbol="8")
+    _add_log(db_session, source, quantity=21, occurred_at=datetime(2026, 1, 3, 9, 0))
+    for occurred_at in (
+        datetime(2026, 1, 3, 10, 0),
+        datetime(2026, 1, 4, 10, 0),
+        datetime(2026, 1, 12, 10, 0),
+    ):
+        _add_log(
+            db_session,
+            target,
+            quantity=1,
+            occurred_at=occurred_at,
+            shipping_phase="COMPONENT_CHANGE",
+        )
+    db_session.commit()
+
+    quantities = collect_daily_quantities(db_session, 2026)
+
+    assert quantities == {date(2026, 1, 3): {("AF", "SOLO"): 21}}
 
 
 def test_render_workbook_keeps_compact_template_formulas_and_blank_zero_inputs():
