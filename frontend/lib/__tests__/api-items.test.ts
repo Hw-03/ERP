@@ -155,4 +155,44 @@ describe("itemsApi.createItem / updateItem", () => {
       sales_review_required: false,
     });
   });
+
+  it("accepts nullable stock and purchase master fields for create and update", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({ body: { item_id: "abc" } })));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await itemsApi.createItem({
+      item_name: "A",
+      supplier_item_code: "SUP-1",
+      standard_purchase_price: "1234.50",
+      purchase_price_effective_date: "2026-09-01",
+      reorder_point: 10,
+      procurement_lead_time_days: 7,
+      minimum_order_quantity: 20,
+      purchase_memo: "납기 전 연락",
+    });
+    await itemsApi.updateItem("abc", {
+      supplier: null,
+      supplier_item_code: null,
+      standard_purchase_price: null,
+      purchase_price_effective_date: null,
+      min_stock: null,
+      reorder_point: null,
+      procurement_lead_time_days: null,
+      minimum_order_quantity: null,
+      purchase_memo: null,
+    });
+
+    expect(JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string)).toMatchObject({
+      supplier_item_code: "SUP-1",
+      standard_purchase_price: "1234.50",
+      minimum_order_quantity: 20,
+      purchase_memo: "납기 전 연락",
+    });
+    expect(JSON.parse((fetchSpy.mock.calls[1][1] as RequestInit).body as string)).toMatchObject({
+      supplier: null,
+      standard_purchase_price: null,
+      minimum_order_quantity: null,
+      purchase_memo: null,
+    });
+  });
 });

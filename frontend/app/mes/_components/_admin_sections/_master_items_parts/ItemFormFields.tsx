@@ -12,8 +12,6 @@ import { modelSlotsToSymbolPrefix, sortModelsBySymbol } from "@/lib/mes/item-cod
 export type ItemFormData = {
   item_name: string;
   legacy_item_type: string;
-  supplier: string;
-  min_stock: string;
   process_type_code: string;
   unit: string;
   model_slots: number[];
@@ -22,6 +20,15 @@ export type ItemFormData = {
   initial_quantity?: string;
   mes_code?: string;
   initial_locations?: { department: string; quantity: string }[];
+  supplier: string;
+  supplier_item_code: string;
+  standard_purchase_price: string;
+  purchase_price_effective_date: string;
+  min_stock: string;
+  reorder_point: string;
+  procurement_lead_time_days: string;
+  minimum_order_quantity: string;
+  purchase_memo: string;
 };
 
 interface Props {
@@ -307,33 +314,6 @@ export function ItemFormFields({ form, setForm, showInitialQuantity, showInitial
             triggerStyle={{ background: LEGACY_COLORS.s1 }}
             options={materialOptions}
             placeholder="선택"
-          />
-        </div>
-
-        <div>
-          <FieldLabel label="안전재고" badge="선택" />
-          <QuantityInput
-            min={0}
-            step={1}
-            value={form.min_stock ?? ""}
-            onChange={(e) => setForm((f) => ({ ...f, min_stock: e.target.value }))}
-            placeholder="0"
-            className="w-full rounded-[18px] border px-4 py-3 text-base !text-left"
-            style={inputStyle}
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <FieldLabel label="공급사" badge="선택" />
-          <input
-            type="text"
-            value={form.supplier ?? ""}
-            onChange={(e) => setForm((f) => ({ ...f, supplier: e.target.value }))}
-            placeholder="예: 삼성특수금속"
-            className="w-full rounded-[18px] border px-4 py-3 text-base outline-none"
-            style={inputStyle}
           />
         </div>
 

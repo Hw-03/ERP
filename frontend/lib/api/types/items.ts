@@ -24,7 +24,14 @@ export interface Item {
   legacy_part: string | null;
   legacy_item_type: string | null;
   supplier: string | null;
+  supplier_item_code: string | null;
+  standard_purchase_price: string | null;
+  purchase_price_effective_date: string | null;
   min_stock: number | null;
+  reorder_point: number | null;
+  procurement_lead_time_days: number | null;
+  minimum_order_quantity: number | null;
+  purchase_memo: string | null;
   mes_code: string | null;
   model_symbol: string | null;
   model_slots: number[];

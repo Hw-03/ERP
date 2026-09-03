@@ -155,6 +155,8 @@ def test_manual_pf_pin_removal_declares_its_data_change_contract(tmp_path: Path)
         "20260824_0027_defect_quarantine_records.py",
         "20260825_0028_reconstruct_legacy_defect_records.py",
         "20260826_0029_inventory_operations.py",
+        "20260902_0030_add_item_procurement_fields.py",
+        "20260903_0031_add_item_purchase_memo.py",
     ],
 )
 def test_current_employee_schema_migrations_declare_auto_deploy_policy(filename: str) -> None:

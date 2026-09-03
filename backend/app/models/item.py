@@ -13,6 +13,7 @@ from sqlalchemy import (
     CheckConstraint,
     Column,
     Computed,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -26,7 +27,7 @@ from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.elements import ColumnElement
 
-from app.models.base import Base, IntQuantity, UUIDString
+from app.models.base import Base, ExactPrice, IntQuantity, UUIDString
 
 __all__ = [
     "Item",
@@ -72,6 +73,22 @@ class Item(Base):
     __tablename__ = "items"
     __table_args__ = (
         CheckConstraint("min_stock >= 0 OR min_stock IS NULL", name="ck_items_min_stock_nonneg"),
+        CheckConstraint(
+            "standard_purchase_price >= 0 OR standard_purchase_price IS NULL",
+            name="ck_items_standard_purchase_price_nonneg",
+        ),
+        CheckConstraint(
+            "procurement_lead_time_days >= 0 OR procurement_lead_time_days IS NULL",
+            name="ck_items_procurement_lead_time_days_nonneg",
+        ),
+        CheckConstraint(
+            "minimum_order_quantity >= 1 OR minimum_order_quantity IS NULL",
+            name="ck_items_minimum_order_quantity_positive",
+        ),
+        CheckConstraint(
+            "reorder_point >= 0 OR reorder_point IS NULL",
+            name="ck_items_reorder_point_nonneg",
+        ),
     )
 
     item_id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
@@ -94,6 +111,13 @@ class Item(Base):
     legacy_item_type = Column(String(50), nullable=True)              # part_type from CSV
     supplier = Column(String(200), nullable=True)
     min_stock = Column(IntQuantity, nullable=True)
+    supplier_item_code = Column(String(100), nullable=True)
+    standard_purchase_price = Column(ExactPrice, nullable=True)
+    purchase_price_effective_date = Column(Date, nullable=True)
+    procurement_lead_time_days = Column(Integer, nullable=True)
+    minimum_order_quantity = Column(Integer, nullable=True)
+    reorder_point = Column(Integer, nullable=True)
+    purchase_memo = Column(String(1000), nullable=True)
     sales_review_required = Column(Boolean, nullable=False, default=False, server_default="0")
     bom_stock_exempt = Column(Boolean, nullable=False, default=False, server_default="0")
 

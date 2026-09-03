@@ -51,6 +51,13 @@ POST_LEGACY_ADDITIVE_SCHEMA_MARKERS = (
     "shipping_request_revisions",
     "sales_review_required",
     "bom_stock_exempt",
+    "supplier_item_code",
+    "standard_purchase_price",
+    "purchase_price_effective_date",
+    "procurement_lead_time_days",
+    "minimum_order_quantity",
+    "reorder_point",
+    "purchase_memo",
     "bom_auto_token",
     "invoice_number",
     "cancelled_at",
@@ -665,6 +672,20 @@ def validate_unversioned_data(connection: Connection) -> None:
 
 def _is_expected_post_legacy_addition(difference: str) -> bool:
     """기존 무버전 DB에 Alembic이 안전하게 추가할 차이만 허용한다."""
+    if difference.startswith("check constraint mismatch: items "):
+        return (
+            all(
+                check_name in difference
+                for check_name in (
+                    "ck_items_standard_purchase_price_nonneg",
+                    "ck_items_procurement_lead_time_days_nonneg",
+                    "ck_items_minimum_order_quantity_positive",
+                    "ck_items_reorder_point_nonneg",
+                )
+            )
+            and "actual=[('ck_items_min_stock_nonneg', "
+            "'min_stock>=0 or min_stock is null')]" in difference
+        )
     if not any(marker in difference for marker in POST_LEGACY_ADDITIVE_SCHEMA_MARKERS):
         return False
     return difference.startswith("Alembic metadata diff: ('add_") or (

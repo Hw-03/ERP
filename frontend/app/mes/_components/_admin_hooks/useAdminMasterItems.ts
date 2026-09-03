@@ -28,8 +28,15 @@ type UpdateItemPayload = {
   item_name?: string;
   spec?: string;
   legacy_item_type?: string;
-  supplier?: string;
-  min_stock?: number;
+  supplier?: string | null;
+  supplier_item_code?: string | null;
+  standard_purchase_price?: string | null;
+  purchase_price_effective_date?: string | null;
+  min_stock?: number | null;
+  reorder_point?: number | null;
+  procurement_lead_time_days?: number | null;
+  minimum_order_quantity?: number | null;
+  purchase_memo?: string | null;
   process_type_code?: string;
   unit?: string;
   model_slots?: number[];

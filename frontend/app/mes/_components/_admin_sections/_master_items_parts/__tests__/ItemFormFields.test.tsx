@@ -11,7 +11,13 @@ function baseForm(overrides: Partial<ItemFormData> = {}): ItemFormData {
     item_name: "테스트 품목",
     legacy_item_type: "",
     supplier: "",
+    supplier_item_code: "",
+    standard_purchase_price: "",
+    purchase_price_effective_date: "",
     min_stock: "",
+    reorder_point: "",
+    procurement_lead_time_days: "",
+    minimum_order_quantity: "",
     process_type_code: "TR",
     unit: "EA",
     model_slots: [],
@@ -32,7 +38,7 @@ describe("ItemFormFields", () => {
       />,
     );
 
-    const labels = ["품목명", "카테고리", "사용 제품", "자재분류", "안전재고", "공급사", "단위", "품목 코드"]
+    const labels = ["품목명", "카테고리", "사용 제품", "자재분류", "단위", "품목 코드"]
       .map((label) => screen.getByText(label, { selector: "div" }));
 
     for (let index = 0; index < labels.length - 1; index += 1) {
@@ -176,17 +182,12 @@ describe("ItemFormFields", () => {
     expect((updater(baseForm()) as ItemFormData & { bom_stock_exempt?: boolean }).bom_stock_exempt).toBe(true);
   });
 
-  it("left-aligns the minimum-stock quantity input", () => {
-    render(<ItemFormFields form={baseForm()} setForm={vi.fn()} />);
-
-    expect(screen.getByRole("spinbutton")).toHaveClass("!text-left");
-  });
-
-  it("marks material classification and minimum stock as optional outside item registration", () => {
+  it("keeps material classification optional while purchase and stock criteria live in the separate shared section", () => {
     render(<ItemFormFields form={baseForm()} setForm={vi.fn()} />);
 
     expect(screen.getByText("자재분류", { selector: "div" }).parentElement).toHaveTextContent("선택");
-    expect(screen.getByText("안전재고", { selector: "div" }).parentElement).toHaveTextContent("선택");
+    expect(screen.queryByText("안전재고", { selector: "div" })).not.toBeInTheDocument();
+    expect(screen.queryByText("공급사", { selector: "div" })).not.toBeInTheDocument();
   });
 
   it("marks product selection and initial stock location as required with centered badges", () => {
@@ -202,29 +203,17 @@ describe("ItemFormFields", () => {
     expect(screen.getByText("사용 제품", { selector: "div" }).parentElement).toHaveTextContent("필수");
     expect(screen.getByText("초기 재고 위치", { selector: "div" }).parentElement).toHaveTextContent("필수");
     expect(screen.getByText("자재분류", { selector: "div" }).parentElement).toHaveTextContent("선택");
-    expect(screen.getByText("안전재고", { selector: "div" }).parentElement).toHaveTextContent("선택");
     for (const badge of screen.getAllByText("필수", { selector: "span" })) {
       expect(badge).toHaveClass("inline-flex", "items-center", "justify-center", "text-center");
     }
   });
 
-  it("places material classification and minimum stock in an even two-column row", () => {
+  it("places material classification and unit in an even two-column row", () => {
     render(<ItemFormFields form={baseForm()} setForm={vi.fn()} />);
 
     const materialField = screen.getByText("자재분류", { selector: "div" }).parentElement;
-    const stockField = screen.getByText("안전재고", { selector: "div" }).parentElement;
-    const pairRow = materialField?.parentElement;
-
-    expect(pairRow).toHaveClass("grid", "sm:grid-cols-2", "gap-4");
-    expect(pairRow).toContainElement(stockField);
-  });
-
-  it("places supplier and unit in an even two-column row", () => {
-    render(<ItemFormFields form={baseForm()} setForm={vi.fn()} />);
-
-    const supplierField = screen.getByText("공급사", { selector: "div" }).parentElement;
     const unitField = screen.getByText("단위", { selector: "div" }).parentElement;
-    const pairRow = supplierField?.parentElement;
+    const pairRow = materialField?.parentElement;
 
     expect(pairRow).toHaveClass("grid", "sm:grid-cols-2", "gap-4");
     expect(pairRow).toContainElement(unitField);

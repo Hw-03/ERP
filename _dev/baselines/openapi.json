@@ -4933,6 +4933,7 @@
           "min_stock": {
             "anyOf": [
               {
+                "minimum": 0.0,
                 "type": "integer"
               },
               {
@@ -4940,6 +4941,18 @@
               }
             ],
             "title": "Min Stock"
+          },
+          "minimum_order_quantity": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Order Quantity"
           },
           "model_slots": {
             "description": "사용 제품 슬롯 목록. 현재 등록된 슬롯은 GET /api/models 응답을 참조하세요.",
@@ -4963,6 +4976,54 @@
             "description": "공정 코드. 현재 사용 가능한 코드는 GET /api/codes/process-types 응답을 참조하세요.",
             "title": "Process Type Code"
           },
+          "procurement_lead_time_days": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Procurement Lead Time Days"
+          },
+          "purchase_memo": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purchase Memo"
+          },
+          "purchase_price_effective_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purchase Price Effective Date"
+          },
+          "reorder_point": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reorder Point"
+          },
           "sales_review_required": {
             "anyOf": [
               {
@@ -4973,6 +5034,22 @@
               }
             ],
             "title": "Sales Review Required"
+          },
+          "standard_purchase_price": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,16}|(?=[\\d.]{1,19}0*$)\\d{0,16}\\.\\d{0,2}0*$)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Standard Purchase Price"
           },
           "supplier": {
             "anyOf": [
@@ -4985,6 +5062,18 @@
               }
             ],
             "title": "Supplier"
+          },
+          "supplier_item_code": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supplier Item Code"
           },
           "unit": {
             "default": "EA",
@@ -5136,6 +5225,17 @@
             ],
             "title": "Min Stock"
           },
+          "minimum_order_quantity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Order Quantity"
+          },
           "model_slots": {
             "default": [],
             "items": {
@@ -5166,6 +5266,51 @@
             ],
             "title": "Process Type Code"
           },
+          "procurement_lead_time_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Procurement Lead Time Days"
+          },
+          "purchase_memo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purchase Memo"
+          },
+          "purchase_price_effective_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purchase Price Effective Date"
+          },
+          "reorder_point": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reorder Point"
+          },
           "sales_review_required": {
             "default": false,
             "title": "Sales Review Required",
@@ -5182,6 +5327,18 @@
             ],
             "title": "Serial No"
           },
+          "standard_purchase_price": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Standard Purchase Price"
+          },
           "supplier": {
             "anyOf": [
               {
@@ -5192,6 +5349,17 @@
               }
             ],
             "title": "Supplier"
+          },
+          "supplier_item_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supplier Item Code"
           },
           "unit": {
             "title": "Unit",
@@ -5277,6 +5445,7 @@
           "min_stock": {
             "anyOf": [
               {
+                "minimum": 0.0,
                 "type": "integer"
               },
               {
@@ -5284,6 +5453,18 @@
               }
             ],
             "title": "Min Stock"
+          },
+          "minimum_order_quantity": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Order Quantity"
           },
           "model_slots": {
             "anyOf": [
@@ -5312,6 +5493,54 @@
             "description": "공정 코드. 현재 사용 가능한 코드는 GET /api/codes/process-types 응답을 참조하세요.",
             "title": "Process Type Code"
           },
+          "procurement_lead_time_days": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Procurement Lead Time Days"
+          },
+          "purchase_memo": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purchase Memo"
+          },
+          "purchase_price_effective_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purchase Price Effective Date"
+          },
+          "reorder_point": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reorder Point"
+          },
           "sales_review_required": {
             "anyOf": [
               {
@@ -5322,6 +5551,22 @@
               }
             ],
             "title": "Sales Review Required"
+          },
+          "standard_purchase_price": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,16}|(?=[\\d.]{1,19}0*$)\\d{0,16}\\.\\d{0,2}0*$)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Standard Purchase Price"
           },
           "supplier": {
             "anyOf": [
@@ -5334,6 +5579,18 @@
               }
             ],
             "title": "Supplier"
+          },
+          "supplier_item_code": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supplier Item Code"
           },
           "unit": {
             "anyOf": [
@@ -5501,6 +5758,17 @@
             ],
             "title": "Min Stock"
           },
+          "minimum_order_quantity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Order Quantity"
+          },
           "model_slots": {
             "default": [],
             "items": {
@@ -5536,10 +5804,44 @@
             ],
             "title": "Process Type Code"
           },
+          "procurement_lead_time_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Procurement Lead Time Days"
+          },
           "production_total": {
             "default": 0,
             "title": "Production Total",
             "type": "integer"
+          },
+          "purchase_memo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purchase Memo"
+          },
+          "purchase_price_effective_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purchase Price Effective Date"
           },
           "quantity": {
             "anyOf": [
@@ -5552,6 +5854,17 @@
             ],
             "default": 0,
             "title": "Quantity"
+          },
+          "reorder_point": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reorder Point"
           },
           "sales_review_required": {
             "default": false,
@@ -5569,6 +5882,18 @@
             ],
             "title": "Serial No"
           },
+          "standard_purchase_price": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Standard Purchase Price"
+          },
           "supplier": {
             "anyOf": [
               {
@@ -5579,6 +5904,17 @@
               }
             ],
             "title": "Supplier"
+          },
+          "supplier_item_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supplier Item Code"
           },
           "unit": {
             "title": "Unit",

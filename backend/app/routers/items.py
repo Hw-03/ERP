@@ -103,6 +103,13 @@ def _to_item_with_inventory(
         legacy_item_type=item.legacy_item_type,
         supplier=item.supplier,
         min_stock=item.min_stock,
+        supplier_item_code=item.supplier_item_code,
+        standard_purchase_price=item.standard_purchase_price,
+        purchase_price_effective_date=item.purchase_price_effective_date,
+        procurement_lead_time_days=item.procurement_lead_time_days,
+        minimum_order_quantity=item.minimum_order_quantity,
+        reorder_point=item.reorder_point,
+        purchase_memo=item.purchase_memo,
         sales_review_required=bool(item.sales_review_required),
         bom_stock_exempt=bool(item.bom_stock_exempt),
         mes_code=item.mes_code,
@@ -180,6 +187,13 @@ def create_item(
         legacy_item_type=payload.legacy_item_type,
         supplier=payload.supplier,
         min_stock=payload.min_stock,
+        supplier_item_code=payload.supplier_item_code,
+        standard_purchase_price=payload.standard_purchase_price,
+        purchase_price_effective_date=payload.purchase_price_effective_date,
+        procurement_lead_time_days=payload.procurement_lead_time_days,
+        minimum_order_quantity=payload.minimum_order_quantity,
+        reorder_point=payload.reorder_point,
+        purchase_memo=payload.purchase_memo,
         sales_review_required=sales_review_required,
         bom_stock_exempt=bool(payload.bom_stock_exempt),
         process_type_code=pt,
@@ -521,10 +535,26 @@ def update_item(
     for field in (
         "item_name", "unit",
         "legacy_part", "legacy_item_type",
-        "supplier", "min_stock",
     ):
         new_val = getattr(payload, field)
         if new_val is not None and getattr(item, field) != new_val:
+            setattr(item, field, new_val)
+            changed.append(field)
+    for field in (
+        "supplier",
+        "min_stock",
+        "supplier_item_code",
+        "standard_purchase_price",
+        "purchase_price_effective_date",
+        "procurement_lead_time_days",
+        "minimum_order_quantity",
+        "reorder_point",
+        "purchase_memo",
+    ):
+        if field not in payload.model_fields_set:
+            continue
+        new_val = getattr(payload, field)
+        if getattr(item, field) != new_val:
             setattr(item, field, new_val)
             changed.append(field)
     if payload.sales_review_required is not None and item.sales_review_required != payload.sales_review_required:

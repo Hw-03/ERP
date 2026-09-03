@@ -1,5 +1,7 @@
 """품목·BOM·제품심볼·생산입고 schema."""
 
+from datetime import date
+from decimal import Decimal
 from typing import List, Optional
 import uuid
 
@@ -26,7 +28,16 @@ class ItemCreate(BaseModel):
     legacy_part: Optional[str] = Field(None, max_length=50)
     legacy_item_type: Optional[str] = Field(None, max_length=50)
     supplier: Optional[str] = Field(None, max_length=200)
-    min_stock: Optional[int] = None
+    min_stock: Optional[int] = Field(None, ge=0)
+    supplier_item_code: Optional[str] = Field(None, max_length=100)
+    standard_purchase_price: Optional[Decimal] = Field(
+        None, ge=Decimal("0"), max_digits=18, decimal_places=2
+    )
+    purchase_price_effective_date: Optional[date] = None
+    procurement_lead_time_days: Optional[int] = Field(None, ge=0)
+    minimum_order_quantity: Optional[int] = Field(None, ge=1)
+    reorder_point: Optional[int] = Field(None, ge=0)
+    purchase_memo: Optional[str] = Field(None, max_length=1000)
     sales_review_required: Optional[bool] = None
     bom_stock_exempt: Optional[bool] = None
     initial_quantity: int = Field(..., ge=0, description="초기 재고 수량")
@@ -51,7 +62,16 @@ class ItemUpdate(BaseModel):
     legacy_part: Optional[str] = Field(None, max_length=50)
     legacy_item_type: Optional[str] = Field(None, max_length=50)
     supplier: Optional[str] = Field(None, max_length=200)
-    min_stock: Optional[int] = None
+    min_stock: Optional[int] = Field(None, ge=0)
+    supplier_item_code: Optional[str] = Field(None, max_length=100)
+    standard_purchase_price: Optional[Decimal] = Field(
+        None, ge=Decimal("0"), max_digits=18, decimal_places=2
+    )
+    purchase_price_effective_date: Optional[date] = None
+    procurement_lead_time_days: Optional[int] = Field(None, ge=0)
+    minimum_order_quantity: Optional[int] = Field(None, ge=1)
+    reorder_point: Optional[int] = Field(None, ge=0)
+    purchase_memo: Optional[str] = Field(None, max_length=1000)
     sales_review_required: Optional[bool] = None
     bom_stock_exempt: Optional[bool] = None
     mes_code: Optional[str] = Field(None, max_length=40)
@@ -68,6 +88,13 @@ class ItemResponse(BaseModel):
     legacy_item_type: Optional[str] = None
     supplier: Optional[str] = None
     min_stock: Optional[int] = None
+    supplier_item_code: Optional[str] = None
+    standard_purchase_price: Optional[Decimal] = None
+    purchase_price_effective_date: Optional[date] = None
+    procurement_lead_time_days: Optional[int] = None
+    minimum_order_quantity: Optional[int] = None
+    reorder_point: Optional[int] = None
+    purchase_memo: Optional[str] = None
     sales_review_required: bool = False
     bom_stock_exempt: bool = False
     # item code fields
