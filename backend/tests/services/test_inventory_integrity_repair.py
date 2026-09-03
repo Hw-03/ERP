@@ -10,6 +10,7 @@ import pytest
 
 from app.models import (
     AdminAuditLog,
+    DefectInventoryMovement,
     DefectQuarantineRecord,
     DepartmentEnum,
     InventoryLocation,
@@ -202,6 +203,67 @@ def test_activation_dry_run_then_sets_ledger_now_and_weekly_next_monday(db_sessi
     )
 
 
+def test_activation_seeds_existing_defect_opening_balance_once(
+    db_session,
+    make_item,
+):
+    now = datetime(2026, 8, 25, 6, 30, tzinfo=UTC)
+    item = make_item(name="전환 기준선", process_type_code="VF")
+    db_session.add_all(
+        [
+            InventoryLocation(
+                item_id=item.item_id,
+                department=DepartmentEnum.VACUUM,
+                status=LocationStatusEnum.DEFECTIVE,
+                quantity=Decimal("2"),
+            ),
+            DefectQuarantineRecord(
+                item_id=item.item_id,
+                department=DepartmentEnum.VACUUM.value,
+                original_quantity=Decimal("5"),
+                remaining_quantity=Decimal("2"),
+                quarantined_at=datetime(2026, 8, 24, 5, 44),
+                quarantined_by_name="기존 작업자",
+            ),
+        ]
+    )
+    db_session.commit()
+
+    preview = activate_inventory_operation_contract(
+        db_session,
+        approved_by="배포 관리자",
+        now=now,
+        apply=False,
+    )
+    assert preview.applied is False
+    assert db_session.query(DefectInventoryMovement).count() == 0
+
+    activate_inventory_operation_contract(
+        db_session,
+        approved_by="배포 관리자",
+        now=now,
+        apply=True,
+    )
+    db_session.commit()
+    activate_inventory_operation_contract(
+        db_session,
+        approved_by="배포 관리자",
+        now=now,
+        apply=True,
+    )
+    db_session.commit()
+
+    movement = db_session.query(DefectInventoryMovement).one()
+    operation = db_session.get(InventoryOperation, movement.operation_id)
+    assert movement.quantity_delta == Decimal("2")
+    assert movement.movement_type == "CUTOVER_BASELINE"
+    assert movement.role == "OPENING_BALANCE"
+    assert operation is not None
+    assert operation.domain == "inventory_integrity"
+    assert operation.action == "defect_cutover_baseline"
+    assert diagnose_inventory_integrity(db_session).is_consistent is True
+
+
 def test_activation_fails_closed_when_diagnostic_has_issue(db_session, make_item):
     item = make_item(name="활성화 차단", process_type_code="VF")
     db_session.add(
@@ -224,3 +286,41 @@ def test_activation_fails_closed_when_diagnostic_has_issue(db_session, make_item
 
     assert db_session.get(SystemSetting, CUTOVER_SETTING_KEY) is None
     assert db_session.get(SystemSetting, WEEKLY_V2_SETTING_KEY) is None
+
+
+def test_activation_rolls_back_seeded_baseline_when_diagnostic_fails(
+    db_session,
+    make_item,
+):
+    item = make_item(name="기준선 롤백", process_type_code="VF")
+    db_session.add_all(
+        [
+            InventoryLocation(
+                item_id=item.item_id,
+                department=DepartmentEnum.VACUUM,
+                status=LocationStatusEnum.DEFECTIVE,
+                quantity=Decimal("2"),
+            ),
+            DefectQuarantineRecord(
+                item_id=item.item_id,
+                department=DepartmentEnum.VACUUM.value,
+                original_quantity=Decimal("1"),
+                remaining_quantity=Decimal("1"),
+                quarantined_at=datetime(2026, 8, 24, 5, 44),
+                quarantined_by_name="기존 작업자",
+            ),
+        ]
+    )
+    db_session.commit()
+
+    with pytest.raises(InventoryOperationActivationError, match="정합성 진단"):
+        activate_inventory_operation_contract(
+            db_session,
+            approved_by="배포 관리자",
+            now=datetime(2026, 8, 25, 6, 30, tzinfo=UTC),
+            apply=True,
+        )
+
+    assert db_session.query(DefectInventoryMovement).count() == 0
+    assert db_session.query(InventoryOperation).count() == 0
+    assert db_session.get(SystemSetting, CUTOVER_SETTING_KEY) is None
