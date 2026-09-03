@@ -16,6 +16,7 @@ import type { Operator } from "../login/useCurrentOperator";
  * (compose 콘텐츠는 본 sub-component 외부에 위치).
  */
 export interface WarehouseDraftPanelTabsProps {
+  layout: "desktop" | "mobile";
   sectionTab: WarehouseSectionTab;
   canSeeQueue: boolean;
   canSeeDeptQueue: boolean;
@@ -38,6 +39,7 @@ export interface WarehouseDraftPanelTabsProps {
 }
 
 export function WarehouseDraftPanelTabs({
+  layout,
   sectionTab,
   canSeeQueue,
   canSeeDeptQueue,
@@ -61,6 +63,7 @@ export function WarehouseDraftPanelTabs({
   if (sectionTab === "cart") {
     return (
       <DraftCartPanel
+        layout={layout}
         employeeId={operatorEmployeeId ?? employeeId ?? null}
         refreshNonce={refreshNonce}
         onContinue={(draft) => {
