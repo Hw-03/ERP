@@ -7,36 +7,15 @@ import sys
 from pathlib import Path
 
 import pytest
+from sqlalchemy import create_engine
 
 ROOT = Path(__file__).resolve().parents[3]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.ops.maintenance_backup import create_sqlite_snapshot
-
-
-REQUIRED_TABLES = (
-    "items",
-    "inventory",
-    "inventory_locations",
-    "stock_requests",
-    "stock_request_lines",
-    "transaction_logs",
-    "bom",
-    "admin_audit_logs",
-    "warehouse_angles",
-    "warehouse_boxes",
-    "warehouse_box_items",
-    "io_batches",
-    "io_bundles",
-    "io_lines",
-    "shipping_requests",
-    "shipping_request_bom_lines",
-    "shipping_request_companion_lines",
-    "shipping_allocations",
-    "shipping_request_checklist_lines",
-    "shipping_request_events",
-)
+from bootstrap.schema import ensure_schema  # noqa: E402
+from scripts.ops import backup_manifest  # noqa: E402
+from scripts.ops.maintenance_backup import create_sqlite_snapshot  # noqa: E402
 
 
 def _load_module(relative_path: str):
@@ -55,11 +34,15 @@ def _load_module(relative_path: str):
 
 
 def _create_sqlite(path: Path, *, operational_schema: bool = False) -> None:
+    if operational_schema:
+        engine = create_engine(f"sqlite:///{path.as_posix()}")
+        try:
+            ensure_schema(engine=engine)
+        finally:
+            engine.dispose()
+        return
     with sqlite3.connect(path) as connection:
         connection.execute("CREATE TABLE marker (id INTEGER PRIMARY KEY)")
-        if operational_schema:
-            for table in REQUIRED_TABLES:
-                connection.execute(f'CREATE TABLE "{table}" (id INTEGER PRIMARY KEY)')
 
 
 @pytest.mark.parametrize(
@@ -83,7 +66,7 @@ def test_maintenance_script_backup_is_created_under_runtime_root(
 ) -> None:
     runtime_root = tmp_path / "runtime"
     source = tmp_path / "source.db"
-    _create_sqlite(source)
+    _create_sqlite(source, operational_schema=True)
     monkeypatch.setenv("MES_RUNTIME_ROOT", str(runtime_root))
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{source.as_posix()}")
     module = _load_module(relative_path)
@@ -93,6 +76,11 @@ def test_maintenance_script_backup_is_created_under_runtime_root(
     assert created.is_file()
     assert created.parent == runtime_root / "backups" / "sqlite"
     assert created.name.startswith("mes_PRE-")
+    assert backup_manifest.manifest_path_for(created).is_file()
+    assert (
+        backup_manifest.verify_sqlite_backup(created).status
+        is backup_manifest.BackupStatus.PASS
+    )
     assert not list(tmp_path.glob("source.db.backup-*"))
     assert not (tmp_path / "_backup").exists()
 
@@ -127,6 +115,10 @@ def test_attic_backup_wrapper_creates_verified_regular_runtime_backup(
     assert created.parent == runtime_root / "backups" / "sqlite"
     assert created.name.startswith("mes_")
     assert "PRE-" not in created.name
+    assert (
+        backup_manifest.verify_sqlite_backup(created).status
+        is backup_manifest.BackupStatus.PASS
+    )
 
 
 def test_failed_maintenance_snapshot_leaves_no_runtime_artifact(
@@ -141,3 +133,43 @@ def test_failed_maintenance_snapshot_leaves_no_runtime_artifact(
         create_sqlite_snapshot(corrupt, "corrupt-contract")
 
     assert not list((runtime_root / "backups" / "sqlite").glob("*.db"))
+
+
+def test_maintenance_snapshot_records_generation_and_detects_wal_round_trip(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime_root = tmp_path / "runtime"
+    source = tmp_path / "maintenance-source.db"
+    _create_sqlite(source, operational_schema=True)
+    monkeypatch.setenv("MES_RUNTIME_ROOT", str(runtime_root))
+
+    writer = sqlite3.connect(source)
+    try:
+        assert writer.execute("PRAGMA journal_mode=WAL").fetchone() == ("wal",)
+        writer.execute("PRAGMA wal_autocheckpoint=0")
+        created = create_sqlite_snapshot(source, "generation-contract")
+        manifest = backup_manifest.verify_manifest_receipt(
+            created,
+            expected_engine="sqlite",
+        ).manifest
+        assert manifest is not None
+        assert len(str(manifest["source_snapshot"]["physical_generation"])) == 64
+
+        writer.execute(
+            "INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?)",
+            ("maintenance-round-trip", "temporary"),
+        )
+        writer.commit()
+        writer.execute(
+            "DELETE FROM system_settings WHERE setting_key = ?",
+            ("maintenance-round-trip",),
+        )
+        writer.commit()
+
+        result = backup_manifest.verify_sqlite_backup(created, source_path=source)
+    finally:
+        writer.close()
+
+    assert result.status is backup_manifest.BackupStatus.STALE
+    assert "source physical generation changed" in result.errors

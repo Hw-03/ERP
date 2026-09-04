@@ -42,6 +42,7 @@ $runtimeScripts = @(
     "runtime-task-control.ps1",
     "runtime-task-host.vbs",
     "register-runtime-tasks.ps1",
+    "verify-runtime-tasks.ps1",
     "service_supervisor.py",
     "start-backend.ps1",
     "stop-backend.ps1",
@@ -161,7 +162,7 @@ function Write-RecoveryInstructions {
     Write-Host "[$FailedStage] 서버를 재기동하지 않습니다. DB를 자동 복원하지 않았습니다."
     Write-Host "[$FailedStage] 검증된 백업: $ValidatedBackupPath"
     Write-Host "[$FailedStage] 검토 후 다음 명령으로 수동 복원하세요:"
-    Write-Host "  py `"$EmpRoot\scripts\ops\restore_db.py`" --sqlite `"$ValidatedBackupPath`" --target `"$EmpDb`" --check"
+    Write-Host "  py `"$EmpRoot\scripts\ops\restore_db.py`" --sqlite `"$ValidatedBackupPath`" --target `"$EmpDb`" --structural-rollback"
 }
 
 function Get-SyncFileSha256 {
@@ -417,7 +418,7 @@ Write-Host "[stop] 정지 명령 및 8010/3000 포트 확인 완료"
 # ---------------------------------------------------------------
 Write-Host "[backup] 직원 DB 백업·검증 중..."
 $backupTool = Join-Path $DevRoot "scripts\ops\backup_db.py"
-$backupResult = Invoke-CheckedExternalCommand -FilePath "py.exe" -ArgumentList @($backupTool, "--sqlite", $EmpDb)
+$backupResult = Invoke-CheckedExternalCommand -FilePath "py.exe" -ArgumentList @($backupTool, "--sqlite", $EmpDb, "--integrity-only")
 Write-CheckedCommandResult -Label "backup" -Result $backupResult
 if (-not $backupResult.Success) {
     Write-Host "[backup] 실패 - 기존 서버를 재기동하고 배포를 중단합니다."
@@ -543,7 +544,7 @@ if (-not $schemaCheckResult.Success) {
 }
 
 $verifyTool = Join-Path $EmpRoot "scripts\ops\_verify_backup.py"
-$verifyResult = Invoke-CheckedExternalCommand -FilePath "py.exe" -ArgumentList @($verifyTool, $EmpDb)
+$verifyResult = Invoke-CheckedExternalCommand -FilePath "py.exe" -ArgumentList @($verifyTool, "--database", $EmpDb)
 Write-CheckedCommandResult -Label "post-verify-schema" -Result $verifyResult
 if (-not $verifyResult.Success) {
     Write-Host "[post-verify] 스키마·SQLite 검증 실패"

@@ -117,6 +117,35 @@ def test_postgres_job_bootstraps_head_and_runs_real_two_connection_tests() -> No
     assert "test_postgres_shipping_reservation_vs_consumer_has_one_physical_winner" in runner
     assert "test_postgresql_engine_and_cli_detect_each_blocking_invariant" in runner
     assert "test_postgresql_v1_missing_effect_is_warning_only" in runner
+    assert "test_postgres_restore_recovers_cutover_before_missing_source_validation" in runner
+    assert (
+        "test_postgres_restore_recovers_created_candidate_before_missing_source_validation"
+        in runner
+    )
+    assert "test_postgres_evidence_inventory_uses_one_repeatable_read_snapshot" in runner
+    assert "test_postgres_candidate_is_admission_fenced_before_evidence" in runner
+    assert "test_postgres_cutover_holds_admission_and_advisory_fences" in runner
+    assert "test_postgres_operation_scope_holds_cluster_lock_across_runtime_roots" in runner
+    assert "test_postgres_cutover_rejects_wrong_live_cluster_before_mutation" in runner
+    assert "test_postgres_cutover_recovers_finalization_failure_in_same_run" in runner
+    assert (
+        "test_postgres_prepared_marker_recovers_when_first_local_receipt_publish_failed"
+        in runner
+    )
+    assert "test_postgres_restore_recovers_cross_root_crash_before_oid_marker" in runner
+    assert (
+        "test_postgres_backup_validation_recovers_cross_root_crash_before_oid_marker"
+        in runner
+    )
+    assert (
+        "test_postgres_cutover_recovers_cross_root_hard_crash_from_cluster_marker"
+        in runner
+    )
+    assert "test_postgres_cutover_rejects_marker_mismatch_before_catalog_mutation" in runner
+    assert (
+        "test_postgres_cutover_rejects_local_receipt_identity_mismatch_before_mutation"
+        in runner
+    )
 
     verify_local = _text("scripts/dev/verify_local.ps1")
     assert "backend-postgres-concurrency" in verify_local

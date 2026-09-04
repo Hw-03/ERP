@@ -24,6 +24,7 @@ RUNTIME_SCRIPTS = (
     "runtime-task-control.ps1",
     "runtime-task-host.vbs",
     "register-runtime-tasks.ps1",
+    "verify-runtime-tasks.ps1",
     "service_supervisor.py",
     "start-backend.ps1",
     "stop-backend.ps1",
@@ -365,10 +366,18 @@ def _fake_data_backup_tool() -> str:
 
         source = Path(sys.argv[sys.argv.index("--sqlite") + 1]).resolve()
         source_db = Path(os.environ["FAKE_SOURCE_DB"]).resolve()
-        event = "snapshot-source" if source == source_db else "backup-target"
+        target_db = Path(os.environ["FAKE_TARGET_DB"]).resolve()
+        if source == source_db:
+            event = "snapshot-source"
+            failure = "FAKE_SOURCE_BACKUP_EXIT"
+        elif source == target_db:
+            event = "backup-target"
+            failure = "FAKE_TARGET_BACKUP_EXIT"
+        else:
+            event = "backup-candidate"
+            failure = "FAKE_CANDIDATE_BACKUP_EXIT"
         with Path(os.environ["SYNC_EVENT_LOG"]).open("a", encoding="utf-8") as handle:
             handle.write(f"{event}\\n")
-        failure = "FAKE_SOURCE_BACKUP_EXIT" if event == "snapshot-source" else "FAKE_TARGET_BACKUP_EXIT"
         exit_code = int(os.environ.get(failure, "0"))
         if exit_code:
             raise SystemExit(exit_code)
@@ -662,6 +671,7 @@ def test_employee_data_sync_defaults_to_verified_dry_run_without_target_mutation
         "check-stage",
         "stage-sqlite-fk",
         "stage-inventory",
+        "backup-candidate",
     ]
     assert source_db.read_bytes() == original_source
     assert target_db.read_bytes() == original_target
@@ -692,6 +702,7 @@ def test_employee_data_sync_rejects_apply_and_dry_run_together(tmp_path: Path) -
         ({"FAKE_STAGE_CHECK_EXIT": "13"}, "check-stage"),
         ({"FAKE_STAGE_VERIFY_EXIT": "14"}, "stage-sqlite-fk"),
         ({"FAKE_STAGE_INVENTORY_EXIT": "15"}, "stage-inventory"),
+        ({"FAKE_CANDIDATE_BACKUP_EXIT": "16"}, "backup-candidate"),
     ],
 )
 def test_employee_data_sync_preflight_failure_never_backs_up_or_installs_target(
@@ -907,6 +918,7 @@ def test_employee_data_sync_apply_success_uses_safe_order_and_preserves_source(t
         "check-stage",
         "stage-sqlite-fk",
         "stage-inventory",
+        "backup-candidate",
         "backup-target",
         "stop-backend",
         "stop-frontend",
@@ -1142,7 +1154,7 @@ def test_employee_sync_post_verify_failure_keeps_services_stopped_and_prints_rec
     assert "start-frontend" not in events
     assert "verify-inventory" not in events
     assert "restore_db.py" in output
-    assert "--check" in output
+    assert "--structural-rollback" in output
 
 
 def test_employee_sync_success_uses_migrate_then_read_only_head_check(tmp_path: Path) -> None:

@@ -940,7 +940,10 @@ def take_verified_backup(
 
         def provider(_connection: Connection) -> BackupReceipt:
             try:
-                path = backup_sqlite(str(Path(database).resolve()))
+                path = backup_sqlite(
+                    str(Path(database).resolve()),
+                    integrity_only=True,
+                )
             except SystemExit as exc:
                 raise BackupError(f"SQLite backup failed with exit code {exc.code}") from exc
             return BackupReceipt(path=path, verified=True)

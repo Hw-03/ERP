@@ -243,7 +243,11 @@ def run_preflight(args: argparse.Namespace) -> Path:
     backend = args.backend_dir.resolve()
     _run_checked([sys.executable, "bootstrap_db.py", "--migrate"], backend, environment)
     _run_checked([sys.executable, "bootstrap_db.py", "--check"], backend, environment)
-    _run_checked([sys.executable, str(args.verify_tool.resolve()), str(snapshot)], backend, environment)
+    _run_checked(
+        [sys.executable, str(args.verify_tool.resolve()), "--database", str(snapshot)],
+        backend,
+        environment,
+    )
     _run_checked(
         [sys.executable, str(args.inventory_tool.resolve()), "--db-url", environment["DATABASE_URL"]],
         backend,

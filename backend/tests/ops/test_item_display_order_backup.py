@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[3]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.ops import backup_db
+from scripts.ops import backup_db, backup_manifest  # noqa: E402
 
 
 def test_backup_sqlite_labels_item_display_order_snapshot(tmp_path, monkeypatch):
@@ -21,10 +21,39 @@ def test_backup_sqlite_labels_item_display_order_snapshot(tmp_path, monkeypatch)
         connection.execute("INSERT INTO items VALUES ('item-1', 7)")
 
     monkeypatch.setenv("MES_RUNTIME_ROOT", str(tmp_path / "runtime"))
-    monkeypatch.setattr(backup_db, "_verify_sqlite_backup", lambda _path: None)
+    monkeypatch.setattr(
+        backup_db,
+        "_verify_sqlite_backup",
+        lambda _path: {
+            "engine": "sqlite",
+            "alembic_revision": "20260831_0033",
+            "schema_fingerprint": "1" * 64,
+            "data_revision": {"revision": 1, "updated_at": "2026-09-04T00:00:00"},
+            "snapshot_hash": "2" * 64,
+            "oracle_hash": "3" * 64,
+            "snapshot_metadata": {
+                "journal_mode": "delete",
+                "page_count": 1,
+                "freelist_count": 0,
+                "schema_version": 1,
+                "user_version": 0,
+            },
+            "verification": {
+                "status": "PASS",
+                "schema": "PASS",
+                "sqlite_integrity": "PASS",
+                "foreign_keys": "PASS",
+                "inventory": {
+                    "contract": "inventory-integrity/v1",
+                    "blocking_count": 0,
+                },
+            },
+        },
+    )
 
     backup = backup_db.backup_sqlite(str(source), label="item-display-order")
 
     assert backup.name.startswith("mes-before-item-display-order-")
+    assert backup_manifest.manifest_path_for(backup).is_file()
     with sqlite3.connect(backup) as connection:
         assert connection.execute("SELECT item_id, sort_order FROM items").fetchall() == [("item-1", 7)]

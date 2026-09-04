@@ -46,7 +46,7 @@ UPDATE inventory SET quantity = warehouse_qty + (
 ### 재개 조건
 
 - `check_inventory_integrity.py` 전체 PASS
-- preflight 전체 PASS
+- 현재 [운영 절차](../OPERATIONS.md)의 preflight 재개 계약 충족: FAIL 0건, PostgreSQL이면 다른 항목은 모두 PASS이고 `백업 존재`의 `disposable restore 검증 NOT_VERIFIED` WARN만 남은 상태에서 직전 실제 임시 복원 성공 증거를 운영자가 별도 확인
 
 ---
 
@@ -121,11 +121,11 @@ python scripts/ops/preflight_30_users.py --url http://localhost:8010
 ### SQLite 복구 (권장: restore_db.bat 사용)
 
 ```bash
-# 최신 정식 백업 확인·검증 (mes_PRE-* 제외)
+# 최신 정식 artifact/manifest 쌍 확인·검증 (mes-before-* 제외)
 scripts\ops\verify_backup.bat
 
-# 복구 (현재 DB를 런타임의 mes_PRE-RESTORE_* 스냅샷으로 보존 후 복구)
-scripts\ops\restore_db.bat mes_YYYYMMDD_HHMMSS.db
+# 복구 (현재 DB를 런타임의 mes-before-pre-restore-* 쌍으로 보존 후 복구)
+scripts\ops\restore_db.bat mes_YYYYMMDD_HHMMSS_ffffff_UUID.db
 
 # 무결성 자동 확인됨 (--check 플래그)
 ```
@@ -139,13 +139,13 @@ ls -lt _attic/runtime/backups/postgres/mes_*.sql | head -5
 # Docker 컨테이너 기준 복구
 CONTAINER=$(docker ps --filter "name=postgres" --format "{{.Names}}" | head -1)
 python scripts/ops/restore_db.py \
-    --postgres _attic/runtime/backups/postgres/mes_YYYYMMDD_HHMMSS.sql \
+    --postgres _attic/runtime/backups/postgres/mes_YYYYMMDD_HHMMSS_ffffff_UUID.sql \
     --container $CONTAINER \
     --check
 
 # 직접 호스트 기준
 python scripts/ops/restore_db.py \
-    --postgres _attic/runtime/backups/postgres/mes_YYYYMMDD_HHMMSS.sql \
+    --postgres _attic/runtime/backups/postgres/mes_YYYYMMDD_HHMMSS_ffffff_UUID.sql \
     --host localhost --port 5432 --user mes_user --dbname mes_db \
     --check
 ```
@@ -156,7 +156,7 @@ python scripts/ops/restore_db.py \
 # 무결성 점검
 python scripts/ops/check_inventory_integrity.py
 
-# preflight 전체 통과 확인
+# preflight FAIL 0건 및 현재 운영 절차의 WARN 승인 조건 확인
 python scripts/ops/preflight_30_users.py --url http://localhost:8010
 ```
 
@@ -166,18 +166,21 @@ python scripts/ops/preflight_30_users.py --url http://localhost:8010
 # 1. 현재 상태 백업
 scripts\ops\backup_db.bat
 
-# 2. 위 명령의 BACKUP_PATH에서 실제 timestamp 파일명을 복사해 명시적으로 선택
-set "BACKUP_FILE=_attic\runtime\backups\sqlite\mes_20260715_180000.db"
+# 2. 위 명령의 BACKUP_PATH에서 실제 timestamp+UUID 파일명을 복사해 명시적으로 선택
+set "BACKUP_FILE=_attic\runtime\backups\sqlite\mes_YYYYMMDD_HHMMSS_ffffff_UUID.db"
 if not exist "%BACKUP_FILE%" exit /b 1
+if not exist "%BACKUP_FILE%.manifest.json" exit /b 1
 
-# 3. 임시 경로에 복구 테스트 (운영 DB 미변경)
-python scripts/ops/restore_db.py --sqlite "%BACKUP_FILE%" --target C:/tmp/mes_rehearsal_test.db --check
+# 3. 이번 실행 전용 새 임시 경로에 복구 테스트 (운영 DB 미변경)
+set "REHEARSAL_TARGET=C:\tmp\mes_rehearsal_%RANDOM%_%RANDOM%.db"
+if exist "%REHEARSAL_TARGET%" exit /b 1
+python scripts/ops/restore_db.py --sqlite "%BACKUP_FILE%" --target "%REHEARSAL_TARGET%" --check
 
 # 4. 임시 DB 무결성 직접 확인
-python scripts/ops/check_inventory_integrity.py --db-url sqlite:///C:/tmp/mes_rehearsal_test.db
+python scripts/ops/check_inventory_integrity.py --db-url "sqlite:///%REHEARSAL_TARGET:\=/%"
 
 # 5. 정상 확인 후 임시 파일 삭제
-del C:\tmp\mes_rehearsal_test.db
+del "%REHEARSAL_TARGET%"
 echo "복구 리허설 완료"
 ```
 

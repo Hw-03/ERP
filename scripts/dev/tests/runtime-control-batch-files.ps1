@@ -176,7 +176,8 @@ Assert-ContentMatch $SyncToEmployeeScript 'migration_type_compare\\\.py' "schema
 Assert-ContentMatch $SyncToEmployeeScript '(?s)\$backendDryRun\s*=\s*robocopy.*?/NJH\s+/NDL\s+/NP\s+2>&1' "backend dry-run must retain robocopy file classes for schema detection and reporting."
 Assert-ContentMatch $SyncToEmployeeScript '(?s)\$frontendDryRun\s*=\s*robocopy.*?/NJH\s+/NDL\s+/NP\s+2>&1' "frontend dry-run must retain robocopy file classes for change reporting."
 Assert-ContentMatch $SyncToEmployeeScript '(?s)_verify_backup\.py.*check_inventory_integrity\.py.*--db-url.*Write-RecoveryInstructions.*exit\s+8' "post-verification must run schema and inventory checks and leave recovery guidance on failure."
-Assert-ContentMatch $SyncToEmployeeScript 'restore_db\.py.*--sqlite.*--target.*--check' "migration or post-verification failure must print the exact restore_db.py command."
+Assert-ContentMatch $SyncToEmployeeScript 'restore_db\.py.*--sqlite.*--target.*--structural-rollback' "migration or post-verification failure must print the structural rollback command."
+Assert-ContentNotMatch $SyncToEmployeeScript 'restore_db\.py[^\r\n]*--check' "structural employee rollback must not request the current-schema inventory check."
 Assert-ContentNotMatch $SyncToEmployeeScript '&\s+.*restore_db\.py' "employee deployment must never auto-restore the database."
 
 Assert-ContentMatch $StartBackendScript 'Start-ServiceSupervisor' "start-backend.ps1 must launch the shared supervisor."

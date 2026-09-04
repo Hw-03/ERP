@@ -35,6 +35,54 @@ def _write_workbook(path: Path, rows: list[tuple[str, Any, str, str, str]]) -> N
     workbook.close()
 
 
+def _create_current_head_dev_db(
+    path: Path,
+    *,
+    item_id: uuid.UUID,
+    item_name: str,
+    warehouse_qty: int,
+) -> str:
+    from app.models import Inventory, Item, ProcessType, WarehouseUnplacedItem
+    from bootstrap.schema import ensure_schema
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    engine = create_engine(f"sqlite:///{path.as_posix()}")
+    try:
+        ensure_schema(engine=engine)
+        with Session(engine) as session:
+            session.add(ProcessType(code="TR", prefix="T", suffix="R", stage_order=1))
+            item = Item(
+                item_id=item_id,
+                item_name=item_name,
+                process_type_code="TR",
+                unit="EA",
+                model_symbol="3",
+                serial_no=1,
+            )
+            session.add(item)
+            session.flush()
+            mes_code = str(item.mes_code)
+            session.add(
+                Inventory(
+                    item_id=item.item_id,
+                    quantity=warehouse_qty,
+                    warehouse_qty=warehouse_qty,
+                    pending_quantity=0,
+                )
+            )
+            session.add(
+                WarehouseUnplacedItem(
+                    item_id=item.item_id,
+                    quantity=warehouse_qty,
+                )
+            )
+            session.commit()
+        return mes_code
+    finally:
+        engine.dispose()
+
+
 def test_parse_workbook_aggregates_duplicate_mes_codes(tmp_path: Path) -> None:
     from scripts.ops.sync_warehouse_inventory import parse_workbook
 
@@ -613,22 +661,26 @@ def test_run_sync_rejects_mes_code_owned_by_another_dev_item(
 
 def test_execute_sync_requires_confirmation_and_backs_up_before_apply(
     tmp_path: Path,
-    db_session,
-    make_item,
 ) -> None:
+    from scripts.ops import backup_manifest
     from scripts.ops.sync_warehouse_inventory import WarehouseSyncError, execute_sync
 
-    item = make_item(name="현재 품명", warehouse_qty=10, model_symbol="3", serial_no=1)
-    db_session.commit()
+    item_id = uuid.uuid4()
+    item_name = "현재 품명"
     dev_db = tmp_path / "dev.db"
-    dev_db.write_bytes(db_session.connection().connection.driver_connection.serialize())
+    mes_code = _create_current_head_dev_db(
+        dev_db,
+        item_id=item_id,
+        item_name=item_name,
+        warehouse_qty=10,
+    )
     employee_db = tmp_path / "employee.db"
     _write_employee_db(
         employee_db,
-        [_employee_item(item_id=str(item.item_id), mes_code=item.mes_code, item_name=item.item_name)],
+        [_employee_item(item_id=item_id.hex, mes_code=mes_code, item_name=item_name)],
     )
     workbook = tmp_path / "warehouse.xlsx"
-    _write_workbook(workbook, [(item.mes_code, 20, item.item_name, "O", "확인완료")])
+    _write_workbook(workbook, [(mes_code, 20, item_name, "O", "확인완료")])
     dev_before = dev_db.read_bytes()
     backup_calls: list[str] = []
 
@@ -671,10 +723,20 @@ def test_execute_sync_requires_confirmation_and_backs_up_before_apply(
     assert backup_calls == [str(dev_db.resolve())]
     with sqlite3.connect(dev_db) as connection:
         assert connection.execute(
-            "SELECT warehouse_qty FROM inventory WHERE item_id = ?", (item.item_id.hex,)
+            "SELECT warehouse_qty FROM inventory WHERE item_id = ?", (item_id.hex,)
         ).fetchone() == (20,)
 
-    _write_workbook(workbook, [(item.mes_code, 21, item.item_name, "O", "확인완료")])
+    cli_dev_db = tmp_path / "cli-dev.db"
+    assert (
+        _create_current_head_dev_db(
+            cli_dev_db,
+            item_id=item_id,
+            item_name=item_name,
+            warehouse_qty=20,
+        )
+        == mes_code
+    )
+    _write_workbook(workbook, [(mes_code, 21, item_name, "O", "확인완료")])
     environment = os.environ.copy()
     environment["MES_RUNTIME_ROOT"] = str(tmp_path / "runtime")
     result = subprocess.run(
@@ -683,7 +745,7 @@ def test_execute_sync_requires_confirmation_and_backs_up_before_apply(
             str(Path(__file__).resolve().parents[3] / "scripts" / "ops" / "sync_warehouse_inventory.py"),
             str(workbook),
             "--dev-db",
-            str(dev_db),
+            str(cli_dev_db),
             "--employee-db",
             str(employee_db),
             "--apply",
@@ -698,7 +760,18 @@ def test_execute_sync_requires_confirmation_and_backs_up_before_apply(
     )
 
     assert result.returncode == 0, result.stderr
-    with sqlite3.connect(dev_db) as connection:
+    with sqlite3.connect(cli_dev_db) as connection:
         assert connection.execute(
-            "SELECT warehouse_qty FROM inventory WHERE item_id = ?", (item.item_id.hex,)
+            "SELECT warehouse_qty FROM inventory WHERE item_id = ?", (item_id.hex,)
         ).fetchone() == (21,)
+    artifacts = list((tmp_path / "runtime" / "backups" / "sqlite").glob("mes_*.db"))
+    assert len(artifacts) == 1
+    assert backup_manifest.manifest_path_for(artifacts[0]).is_file()
+    assert (
+        backup_manifest.verify_sqlite_backup(artifacts[0]).status
+        is backup_manifest.BackupStatus.PASS
+    )
+    with sqlite3.connect(artifacts[0]) as connection:
+        assert connection.execute(
+            "SELECT warehouse_qty FROM inventory WHERE item_id = ?", (item_id.hex,)
+        ).fetchone() == (20,)

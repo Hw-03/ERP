@@ -58,6 +58,8 @@ python scripts\ops\load_test_30_users.py --url http://localhost:8011 --dry-run
 
 Preflight의 DB 엔진 결과는 한 점검 항목일 뿐이다. PostgreSQL 확인만으로 준비 완료를 선언하지 않으며, 최종 readiness는 모든 preflight PASS/WARN/FAIL 결과로 판단한다. 실제 부하 테스트는 테스트 데이터를 만들 수 있으므로 `--confirm` 요구 사항을 확인한 뒤 별도 승인된 환경에서 실행한다.
 
+PostgreSQL의 `백업 존재` 항목은 유효한 `backup-manifest/v1` 영수증이 있어도 preflight가 실제 복원을 다시 수행하지 않으므로 의도적으로 `disposable restore 검증 NOT_VERIFIED` WARN과 종료 코드 2를 반환한다. 이를 PASS로 바꾸거나 종료 코드를 무시하지 않는다. 장애 후 운영 재개는 FAIL이 0건이고 다른 항목이 모두 PASS이며, 이 WARN만 남은 상태에서 직전에 실제 PostgreSQL 환경 값으로 `scripts\ops\backup_db.bat --postgres --host <host> --port <port> --user <user> --dbname <dbname> --validation-url <host-reachable-postgresql-url>`가 임시 DB 실제 복원·동일 스냅샷 증거 수집까지 성공한 경우에만 수동 승인한다. 이 명령이 출력한 `BACKUP_PATH`와 preflight가 출력한 `PREFLIGHT_BACKUP_PATH`가 절대 경로 기준으로 정확히 같고, `PREFLIGHT_MANIFEST_PATH`의 PASS 영수증도 함께 확인해야 한다. 인자 없는 `backup_db.bat`는 `backend/mes.db`가 있으면 SQLite 백업을 수행하므로 PostgreSQL 재개 증거로 사용할 수 없다. 역사 보관 문서의 “preflight 전체 PASS” 문구보다 이 현재 절차가 우선한다.
+
 ## DB 백업
 
 - DB 파일: `backend/mes.db` (단일 SQLite 파일, WAL 모드)
@@ -68,9 +70,9 @@ Preflight의 DB 엔진 결과는 한 점검 항목일 뿐이다. PostgreSQL 확�
 scripts\ops\backup_db.bat
 ```
 
-→ `_attic/runtime/backups/sqlite/mes_YYYYMMDD_HHMMSS.db` 로 생성되고 즉시 검증된다. 성공할 때마다 정식 백업 최신 10개만 유지하며 `mes_PRE-*` 스냅샷은 이 개수에 포함하지 않는다.
+→ `_attic/runtime/backups/sqlite/mes_YYYYMMDD_HHMMSS_ffffff_UUID.db`와 같은 이름으로 생성되며, 같은 이름의 `.manifest.json` 영수증과 한 쌍으로 공개된다. 성공할 때마다 검증된 정식 백업 최신 10개만 유지하며 `mes-before-*` 스냅샷은 이 개수에 포함하지 않는다.
 
-- **백업 안전성**: Python `sqlite3.backup` 온라인 백업 API를 사용하고 `_verify_backup.py`가 통과해야만 성공으로 종료한다. 검증 실패 파일은 삭제하고 실패 코드를 반환한다.
+- **백업 안전성**: Python `sqlite3.backup` 온라인 백업 API로 WAL의 커밋 상태를 포함한 스냅샷을 만들고, 스키마·SQLite·FK·재고 검증과 물리 세대 증거를 담은 `backup-manifest/v1` 영수증을 artifact 다음에 공개한다. 검증 실패 파일은 공개하지 않고 실패 코드를 반환한다.
 - **권장 주기**: 입출고가 많은 날 일과 종료 후 1회. 외부 디스크 보관이 필요하면 `_attic/runtime/backups/sqlite/`를 복사한다.
 - 기존 `backend/_backup/` 파일은 자동 이동·삭제하지 않으며 필요하면 복구 입력으로 직접 지정한다.
 - 운영 DB는 `backend/mes.db` 한 개만 사용한다. 루트나 하위 폴더에 생긴 0바이트 `mes.db`·`erp.db`는 활성 DB가 아니며 생성 원인을 확인한 뒤 제거한다.
@@ -81,11 +83,7 @@ scripts\ops\backup_db.bat
 scripts\ops\verify_backup.bat
 ```
 
-가장 최근 정식 백업(`mes_PRE-*` 제외) 1건에 대해:
-- `PRAGMA integrity_check` 결과 (`ok` 면 정상)
-- `PRAGMA foreign_key_check` 결과
-- `items / inventory / inventory_locations / stock_requests / stock_request_lines / transaction_logs / bom / admin_audit_logs / warehouse_angles / warehouse_boxes / warehouse_box_items` 존재 및 행 수 조회
-- `io_batches / io_bundles / io_lines` 입출고 테이블과 `shipping_requests / shipping_request_bom_lines / shipping_request_companion_lines / shipping_allocations / shipping_request_checklist_lines / shipping_request_events` 출하 테이블 존재 및 행 수 조회
+가장 최근 정식 백업(`mes-before-*` 제외) 1건에 대해 artifact/manifest 이름·크기·SHA-256, `sqlite3.backup` 출처와 물리 세대, 스키마 지문, SQLite/FK 무결성, 재고 불변식 및 스냅샷 증거를 다시 확인한다. 둘 중 하나가 없거나 증거가 달라지면 `PASS`가 아니다.
 
 운영 PC 에서 주 1회 정도 수행 권장.
 
@@ -96,7 +94,7 @@ scripts\ops\cleanup_backups.bat        rem 정식 백업 최신 10개 유지
 scripts\ops\cleanup_backups.bat 20     rem 정식 백업 최신 20개 유지
 ```
 
-`_attic/runtime/backups/sqlite/`의 정식 `mes_YYYYMMDD_HHMMSS.db` 중 지정 개수를 넘는 오래된 파일을 제거한다. `mes_PRE-*` 스냅샷과 기존 `backend/_backup/`은 건드리지 않는다.
+`_attic/runtime/backups/sqlite/`의 검증된 정식 `mes_YYYYMMDD_HHMMSS_ffffff_UUID.db`/`.manifest.json` 쌍 중 지정 개수를 넘는 오래된 쌍을 제거한다. 영수증이 없거나 유효하지 않은 artifact, `mes-before-*` 스냅샷, 기존 `backend/_backup/`은 보존 순위와 삭제 대상에 넣지 않는다.
 
 ## DB 복구 (Phase 5.2)
 
@@ -105,17 +103,18 @@ scripts\ops\cleanup_backups.bat 20     rem 정식 백업 최신 20개 유지
 1. **백엔드·프론트 정지** — 루트에서 `stop.bat` 실행
 2. 복구 명령 실행 (백업 파일명만 인자로 전달):
    ```bat
-   scripts\ops\restore_db.bat mes_20260426_101530.db
+   scripts\ops\restore_db.bat mes_YYYYMMDD_HHMMSS_ffffff_UUID.db
    ```
    스크립트가 자동으로 수행:
-   - 현재 `mes.db` 를 `mes_PRE-RESTORE_TS.db` 로 보존
-   - 복구 대상 파일에 `PRAGMA integrity_check` (실패 시 중단)
-   - `mes.db` 교체 + 잔여 `mes.db-wal / .db-shm` 제거
+   - artifact/manifest 쌍을 비공개 임시 경로에 복사하고 영수증·스키마·SQLite·FK·재고 증거를 다시 검증
+   - 현재 `mes.db`를 `mes-before-pre-restore-YYYYMMDD-HHMMSS-xxxxxxxx.db`/`.manifest.json` 롤백 쌍으로 보존
+   - SQLite writer exclusive fence 안에서 현재 target digest를 다시 확인하고 backup API로 설치
+   - 설치본 사후 검증까지 통과한 뒤 fence를 해제하며, 실패하면 같은 fence 안에서 직전 target을 복원
 3. **백엔드 재기동** — `start.bat`
 4. `scripts\ops\operational_readiness.bat` 로 DB/백업/재고 무결성 확인
 5. `scripts\ops\healthcheck.bat` 로 서버 정상성 확인
 
-복구 후에도 PRE-RESTORE 스냅샷이 `_attic/runtime/backups/sqlite/`에 남아 있어 되돌릴 수 있다.
+복구 후에도 `mes-before-pre-restore-*` 롤백 쌍이 `_attic/runtime/backups/sqlite/`에 남아 있어 되돌릴 수 있다.
 
 ## 직원 서버 코드 동기화
 
@@ -131,7 +130,7 @@ scripts\ops\cleanup_backups.bat 20     rem 정식 백업 최신 20개 유지
 8. `DEXCOWIN MES Weekly Inventory Snapshot`을 직원 경로 기준으로 등록·갱신하고 월요일 00:00, 지연 실행, 중복 방지, 10분 제한을 재검증
 9. 서버 시작과 백엔드·프론트 헬스체크
 
-백업 실패 시 아직 코드가 바뀌지 않은 기존 서버를 재기동하고 배포를 중단한다. 마이그레이션, 사후 검증, 취소 원장 진단 또는 활성화가 실패하면 서버와 DB를 자동 복원하지 않고 기존 설정을 유지한다. 주간 스냅샷 예약 작업 등록·검증만 실패하면 직원 서비스를 다시 기동하되 동기화는 실패로 종료한다. 콘솔에는 검증된 백업 절대 경로와 `restore_db.py --sqlite ... --target ... --check` 수동 명령을 출력한다.
+백업 실패 시 아직 코드가 바뀌지 않은 기존 서버를 재기동하고 배포를 중단한다. 마이그레이션, 사후 검증, 취소 원장 진단 또는 활성화가 실패하면 서버와 DB를 자동 복원하지 않고 기존 설정을 유지한다. 주간 스냅샷 예약 작업 등록·검증만 실패하면 직원 서비스를 다시 기동하되 동기화는 실패로 종료한다. 콘솔에는 검증된 `STRUCTURAL_ONLY` 백업 절대 경로와 `restore_db.py --sqlite ... --target ... --structural-rollback` 수동 명령을 출력한다.
 
 주중 동기화가 끝난 주간보고에는 아래 안내가 표시되고, 새 7열 검산 기준은 다음 KST 월요일부터 공개된다.
 

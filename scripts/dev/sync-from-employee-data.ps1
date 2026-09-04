@@ -192,7 +192,7 @@ function Invoke-DatabaseVerification {
         return $false
     }
 
-    $sqlite = Invoke-CheckedExternalCommand -FilePath "py.exe" -ArgumentList @($VerifyTool, $Database)
+    $sqlite = Invoke-CheckedExternalCommand -FilePath "py.exe" -ArgumentList @($VerifyTool, "--database", $Database)
     Write-CheckedCommandResult -Label "$Phase-sqlite-fk" -Result $sqlite
     if (-not $sqlite.Success) {
         return $false
@@ -392,8 +392,18 @@ function Invoke-EmployeeDataSync {
         return 12
     }
 
+    Write-Host "[staging] 검증된 후보 DB backup-manifest/v1 발행 중..."
+    $verifiedCandidate = Invoke-DatabaseBackup `
+        -Database $candidate `
+        -RuntimeRoot $StageRuntimeRoot `
+        -Label "employee-data-candidate"
+    if (-not $verifiedCandidate.Success) {
+        Write-Host "SYNC_DATA_RESULT=STAGING_VERIFICATION_FAILED"
+        return 12
+    }
+
     Write-Host "SYNC_DATA_SOURCE_SNAPSHOT=$($sourceSnapshot.Path)"
-    Write-Host "SYNC_DATA_STAGING=$candidate"
+    Write-Host "SYNC_DATA_STAGING=$($verifiedCandidate.Path)"
     Write-Host "SYNC_DATA_SOURCE_MUTATION=NONE"
     if (-not $isApply) {
         Write-Host "[dry-run] 개발 DB와 8011/3001 서비스를 변경하지 않았습니다."
@@ -434,7 +444,7 @@ function Invoke-EmployeeDataSync {
         try {
             $env:MES_RUNTIME_ROOT = $DevRuntimeRoot
             $install = Invoke-RestoreDatabase `
-                -Source $candidate `
+                -Source $verifiedCandidate.Path `
                 -Target $DevDb `
                 -PreverifiedRollback $targetBackup.Path
         }

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 import subprocess
@@ -17,6 +18,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.ops import backup_db as backup_db_module  # noqa: E402
+from scripts.ops import backup_manifest  # noqa: E402
 from scripts.ops import restore_db as restore_db_module  # noqa: E402
 from scripts.ops.backup_retention import (  # noqa: E402
     REGULAR_BACKUP_NAME,
@@ -28,8 +30,10 @@ from app.models import (  # noqa: E402
     Inventory,
     InventoryLocation,
     Item,
+    ProcessType,
     WarehouseUnplacedItem,
 )
+from bootstrap.schema import ensure_schema  # noqa: E402
 
 
 VERIFY_BACKUP = ROOT / "scripts" / "ops" / "_verify_backup.py"
@@ -221,41 +225,152 @@ def _create_current_integrity_db(
         engine.dispose()
 
 
+def _create_head_schema_db(path: Path, *, item_name: str = "Part A") -> None:
+    """Create one Alembic-head SQLite DB that passes the W5 integrity contract."""
+
+    engine = create_engine(f"sqlite:///{path.as_posix()}")
+    try:
+        ensure_schema(engine=engine)
+        with Session(engine) as session:
+            item = Item(
+                item_id=CURRENT_ITEM_ID,
+                item_name=item_name,
+                unit="EA",
+                model_symbol="9",
+                process_type_code="TR",
+                serial_no=1,
+            )
+            session.add_all(
+                [
+                    ProcessType(code="TR", prefix="T", suffix="R", stage_order=1),
+                    item,
+                    Inventory(
+                        inventory_id="00000000000000000000000000000002",
+                        item_id=item.item_id,
+                        quantity=7,
+                        warehouse_qty=5,
+                        pending_quantity=0,
+                    ),
+                    InventoryLocation(
+                        location_id="00000000000000000000000000000003",
+                        item_id=item.item_id,
+                        department="조립",
+                        status="PRODUCTION",
+                        quantity=2,
+                        pending_quantity=0,
+                    ),
+                    WarehouseUnplacedItem(
+                        id="00000000000000000000000000000004",
+                        item_id=item.item_id,
+                        quantity=5,
+                    ),
+                ]
+            )
+            session.commit()
+    finally:
+        engine.dispose()
+
+
+def _write_pass_manifest(
+    path: Path,
+    *,
+    source_generation: str | None = None,
+) -> None:
+    evidence = backup_manifest.collect_database_evidence(
+        f"sqlite:///{path.as_posix()}",
+        expected_engine="sqlite",
+    )
+    manifest = backup_manifest.build_manifest(
+        path,
+        published_name=path.name,
+        evidence=evidence,
+        source_snapshot={
+            "method": "sqlite3.backup",
+            "journal_mode": "delete",
+            "wal_included": True,
+            "physical_generation": source_generation
+            or backup_manifest.sqlite_file_generation(path),
+        },
+    )
+    backup_manifest.manifest_path_for(path).write_text(
+        json.dumps(manifest),
+        encoding="utf-8",
+    )
+
+
+def _create_pass_backup(path: Path, *, item_name: str = "Part A") -> None:
+    _create_head_schema_db(path, item_name=item_name)
+    _write_pass_manifest(path)
+
+
+def _copy_as_pass_backup(source: Path, destination: Path) -> None:
+    restore_db_module._copy_live_sqlite(source, destination)
+    _write_pass_manifest(
+        destination,
+        source_generation=backup_manifest.sqlite_file_generation(source),
+    )
+
+
+def _fake_postgres_evidence() -> dict[str, object]:
+    return {
+        "engine": "postgresql",
+        "alembic_revision": "20260831_0033",
+        "schema_fingerprint": "2" * 64,
+        "data_revision": {"revision": 1, "updated_at": "2026-09-04T00:00:00"},
+        "snapshot_hash": "1" * 64,
+        "oracle_hash": "3" * 64,
+        "snapshot_metadata": {"server_version": "16.15"},
+        "verification": {
+            "status": "PASS",
+            "schema": "PASS",
+            "sqlite_integrity": "NOT_APPLICABLE",
+            "foreign_keys": "PASS",
+            "inventory": {
+                "contract": "inventory-integrity/v1",
+                "status": "pass",
+                "blocking_count": 0,
+                "warning_count": 0,
+                "checks": [],
+            },
+        },
+    }
+
+
 def test_verify_backup_rejects_empty_sqlite_file(tmp_path: Path) -> None:
     db_path = tmp_path / "empty.db"
     sqlite3.connect(db_path).close()
 
-    result = _run_script(VERIFY_BACKUP, str(db_path))
+    result = _run_script(VERIFY_BACKUP, "--database", str(db_path))
 
     assert result.returncode == 1
-    assert "missing required table" in result.stdout
+    assert "DATABASE_STATUS=FAIL" in result.stdout
 
 
 def test_verify_backup_accepts_current_schema_backup(tmp_path: Path) -> None:
     db_path = tmp_path / "valid.db"
-    _create_ops_schema_db(db_path)
+    _create_head_schema_db(db_path)
 
-    result = _run_script(VERIFY_BACKUP, str(db_path))
+    result = _run_script(VERIFY_BACKUP, "--database", str(db_path))
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "items" in result.stdout
-    assert "inventory_locations" in result.stdout
-    assert "foreign_key_check: ok" in result.stdout
-    assert "warehouse_box_items" in result.stdout
+    assert "DATABASE_STATUS=PASS" in result.stdout
 
 def test_verify_backup_rejects_missing_stock_request_lines(tmp_path: Path) -> None:
     db_path = tmp_path / "missing-lines.db"
-    _create_ops_schema_db(db_path, omit_stock_request_lines=True)
+    _create_head_schema_db(db_path)
+    with sqlite3.connect(db_path) as connection:
+        connection.execute("DROP TABLE stock_request_lines")
 
-    result = _run_script(VERIFY_BACKUP, str(db_path))
+    result = _run_script(VERIFY_BACKUP, "--database", str(db_path))
 
     assert result.returncode == 1
-    assert "stock_request_lines" in result.stdout
+    assert "DATABASE_STATUS=FAIL" in result.stdout
+    assert "failed" in result.stdout.lower()
 
 
 def test_verify_backup_rejects_missing_warehouse_box_table(tmp_path: Path) -> None:
     db_path = tmp_path / "missing-box-items.db"
-    _create_ops_schema_db(db_path)
+    _create_head_schema_db(db_path)
     con = sqlite3.connect(db_path)
     try:
         con.execute("DROP TABLE warehouse_box_items")
@@ -263,10 +378,10 @@ def test_verify_backup_rejects_missing_warehouse_box_table(tmp_path: Path) -> No
     finally:
         con.close()
 
-    result = _run_script(VERIFY_BACKUP, str(db_path))
+    result = _run_script(VERIFY_BACKUP, "--database", str(db_path))
 
     assert result.returncode == 1
-    assert "warehouse_box_items" in result.stdout
+    assert "schema verification failed" in result.stdout
 
 
 @pytest.mark.parametrize(
@@ -285,21 +400,22 @@ def test_verify_backup_rejects_missing_warehouse_box_table(tmp_path: Path) -> No
 )
 def test_verify_backup_rejects_missing_io_or_shipping_table(tmp_path: Path, missing_table: str) -> None:
     db_path = tmp_path / f"missing-{missing_table}.db"
-    _create_ops_schema_db(db_path)
+    _create_head_schema_db(db_path)
     with sqlite3.connect(db_path) as con:
         con.execute(f'DROP TABLE "{missing_table}"')
 
-    result = _run_script(VERIFY_BACKUP, str(db_path))
+    result = _run_script(VERIFY_BACKUP, "--database", str(db_path))
 
     assert result.returncode == 1
-    assert missing_table in result.stdout
+    assert "DATABASE_STATUS=FAIL" in result.stdout
+    assert "failed" in result.stdout.lower()
 
 
 def test_verify_backup_rejects_arbitrary_corrupt_bytes(tmp_path: Path) -> None:
     db_path = tmp_path / "corrupt.db"
     db_path.write_bytes(b"\x00DEXCOWIN-not-a-sqlite-database\xff")
 
-    result = _run_script(VERIFY_BACKUP, str(db_path))
+    result = _run_script(VERIFY_BACKUP, "--database", str(db_path))
 
     assert result.returncode == 1
     assert "failed" in (result.stdout + result.stderr).lower()
@@ -311,29 +427,30 @@ def test_verify_latest_ignores_newer_pre_maintenance_snapshot(tmp_path: Path) ->
     backup_dir.mkdir(parents=True)
     regular = backup_dir / "mes_20990101_000000.db"
     pre_snapshot = backup_dir / "mes_PRE-maintenance_20990101_000001.db"
-    _create_ops_schema_db(regular)
+    _create_pass_backup(regular)
     pre_snapshot.write_bytes(b"not a database")
 
     result = _run_script(VERIFY_BACKUP, "--latest", env={"MES_RUNTIME_ROOT": str(runtime_root)})
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert f"latest backup : {regular}" in result.stdout
+    assert "BACKUP_STATUS=PASS" in result.stdout
 
 
 def test_verify_backup_rejects_foreign_key_violations(tmp_path: Path) -> None:
     db_path = tmp_path / "foreign-key-violation.db"
-    _create_ops_schema_db(db_path)
+    _create_head_schema_db(db_path)
     con = sqlite3.connect(db_path)
     try:
-        con.execute("INSERT INTO warehouse_box_items VALUES (1, 'missing-box', 'missing-item')")
+        con.execute("PRAGMA foreign_keys = OFF")
+        con.execute("UPDATE inventory SET item_id = 'missing-item'")
         con.commit()
     finally:
         con.close()
 
-    result = _run_script(VERIFY_BACKUP, str(db_path))
+    result = _run_script(VERIFY_BACKUP, "--database", str(db_path))
 
     assert result.returncode == 1
-    assert "foreign_key_check: failed" in result.stdout
+    assert "foreign key violations detected" in result.stdout
 
 
 def test_check_inventory_integrity_accepts_current_schema(tmp_path: Path) -> None:
@@ -463,7 +580,7 @@ def test_check_inventory_integrity_warns_for_zero_delta_inventory_effect(tmp_pat
 
 def test_backup_db_py_creates_verified_backup_under_runtime_root(tmp_path: Path) -> None:
     src = tmp_path / "source.db"
-    _create_ops_schema_db(src)
+    _create_head_schema_db(src)
 
     runtime_root = tmp_path / "runtime"
     backup_dir = runtime_root / "backups" / "sqlite"
@@ -489,14 +606,14 @@ def test_sqlite_backup_is_verified_under_a_private_non_regular_name(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = tmp_path / "source.db"
-    _create_ops_schema_db(source)
+    _create_head_schema_db(source)
     monkeypatch.setenv("MES_RUNTIME_ROOT", str(tmp_path / "runtime"))
     observed: list[Path] = []
     original_verify = backup_db_module._verify_sqlite_backup
 
-    def record_verification_path(path: Path) -> None:
+    def record_verification_path(path: Path) -> dict[str, object]:
         observed.append(path)
-        original_verify(path)
+        return original_verify(path)
 
     monkeypatch.setattr(backup_db_module, "_verify_sqlite_backup", record_verification_path)
 
@@ -514,7 +631,7 @@ def test_failed_sqlite_verification_cannot_expose_a_file_to_retention(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = tmp_path / "source.db"
-    _create_ops_schema_db(source)
+    _create_head_schema_db(source)
     runtime_root = tmp_path / "runtime"
     backup_dir = runtime_root / "backups" / "sqlite"
     backup_dir.mkdir(parents=True)
@@ -540,7 +657,11 @@ def test_failed_sqlite_verification_cannot_expose_a_file_to_retention(
 
     assert len(observed) == 1
     assert not REGULAR_BACKUP_NAME.fullmatch(observed[0].name)
-    assert {path.name: path.read_bytes() for path in backup_dir.iterdir()} == expected
+    assert {
+        path.name: path.read_bytes()
+        for path in backup_dir.iterdir()
+        if REGULAR_BACKUP_NAME.fullmatch(path.name)
+    } == expected
 
 
 def test_postgres_dump_is_written_privately_before_publication(
@@ -550,17 +671,19 @@ def test_postgres_dump_is_written_privately_before_publication(
     runtime_root = tmp_path / "runtime"
     monkeypatch.setenv("MES_RUNTIME_ROOT", str(runtime_root))
     written: list[Path] = []
-    original_write_text = Path.write_text
+    original_write_bytes = Path.write_bytes
 
-    def fake_pg_dump(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
-        return subprocess.CompletedProcess(command, 0, stdout="-- dump\n", stderr="")
+    def fake_pg_dump(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        return subprocess.CompletedProcess(command, 0, stdout=b"-- dump\n", stderr=b"")
 
-    def record_write(path: Path, data: str, **kwargs: object) -> int:
-        written.append(path)
-        return original_write_text(path, data, **kwargs)
+    def record_write(path: Path, data: bytes) -> int:
+        if data == b"-- dump\n":
+            written.append(path)
+        return original_write_bytes(path, data)
 
     monkeypatch.setattr(backup_db_module.subprocess, "run", fake_pg_dump)
-    monkeypatch.setattr(Path, "write_text", record_write)
+    monkeypatch.setattr(backup_db_module, "_validate_postgres_dump", lambda *_args, **_kwargs: _fake_postgres_evidence())
+    monkeypatch.setattr(Path, "write_bytes", record_write)
 
     published = backup_db_module.backup_postgres(None, "localhost", 5432, "mes_user", "mes_db")
 
@@ -586,15 +709,17 @@ def test_failed_postgres_temp_write_leaves_regular_backups_unchanged(
     expected = {path.name: path.read_bytes() for path in existing}
     monkeypatch.setenv("MES_RUNTIME_ROOT", str(runtime_root))
 
-    def fake_pg_dump(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
-        return subprocess.CompletedProcess(command, 0, stdout="-- partial dump\n", stderr="")
+    def fake_pg_dump(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        return subprocess.CompletedProcess(command, 0, stdout=b"-- partial dump\n", stderr=b"")
 
-    def fail_partial_write(path: Path, data: str, **kwargs: object) -> int:
-        path.write_bytes(data.encode())
+    original_write_bytes = Path.write_bytes
+
+    def fail_partial_write(path: Path, data: bytes) -> int:
+        original_write_bytes(path, data)
         raise OSError("injected dump write failure")
 
     monkeypatch.setattr(backup_db_module.subprocess, "run", fake_pg_dump)
-    monkeypatch.setattr(Path, "write_text", fail_partial_write)
+    monkeypatch.setattr(Path, "write_bytes", fail_partial_write)
 
     with pytest.raises((OSError, SystemExit)):
         backup_db_module.backup_postgres(None, "localhost", 5432, "mes_user", "mes_db")
@@ -604,7 +729,7 @@ def test_failed_postgres_temp_write_leaves_regular_backups_unchanged(
 
 def test_concurrent_sqlite_backup_processes_create_distinct_verified_files(tmp_path: Path) -> None:
     src = tmp_path / "source.db"
-    _create_ops_schema_db(src)
+    _create_head_schema_db(src)
     runtime_root = tmp_path / "runtime"
     backup_dir = runtime_root / "backups" / "sqlite"
     backup_dir.mkdir(parents=True)
@@ -647,7 +772,7 @@ def test_failed_sqlite_backup_cannot_delete_an_existing_normal_backup(
 ) -> None:
     valid = tmp_path / "valid.db"
     corrupt = tmp_path / "corrupt.db"
-    _create_ops_schema_db(valid)
+    _create_head_schema_db(valid)
     corrupt.write_bytes(b"not a sqlite database")
     monkeypatch.setenv("MES_RUNTIME_ROOT", str(tmp_path / "runtime"))
     monkeypatch.setattr(
@@ -668,7 +793,7 @@ def test_failed_sqlite_backup_cannot_delete_an_existing_normal_backup(
 
 def test_backup_db_py_rejects_legacy_backup_directory_override(tmp_path: Path) -> None:
     src = tmp_path / "source.db"
-    _create_ops_schema_db(src)
+    _create_head_schema_db(src)
     runtime_root = tmp_path / "runtime"
     legacy_dir = tmp_path / "legacy-backups"
 
@@ -689,14 +814,14 @@ def test_backup_db_py_rejects_legacy_backup_directory_override(tmp_path: Path) -
 
 def test_backup_db_keeps_latest_ten_regular_sqlite_backups_and_preserves_pre_snapshots(tmp_path: Path) -> None:
     src = tmp_path / "source.db"
-    _create_ops_schema_db(src)
+    _create_head_schema_db(src)
     runtime_root = tmp_path / "runtime"
     backup_dir = runtime_root / "backups" / "sqlite"
     backup_dir.mkdir(parents=True)
     old_backups = []
     for index in range(11):
         backup = backup_dir / f"mes_20000101_0000{index:02d}.db"
-        backup.touch()
+        _copy_as_pass_backup(src, backup)
         old_backups.append(backup)
         timestamp = time.time() - (100 - index)
         os.utime(backup, (timestamp, timestamp))
@@ -711,6 +836,9 @@ def test_backup_db_keeps_latest_ten_regular_sqlite_backups_and_preserves_pre_sna
     assert pre_snapshot.exists()
     assert not old_backups[0].exists()
     assert not old_backups[1].exists()
+    assert not backup_manifest.manifest_path_for(old_backups[0]).exists()
+    assert not backup_manifest.manifest_path_for(old_backups[1]).exists()
+    assert all(backup_manifest.manifest_path_for(path).exists() for path in regular)
 
 
 def test_backup_db_integrity_only_snapshots_a_migration_eligible_legacy_schema(tmp_path: Path) -> None:
@@ -762,8 +890,8 @@ def test_restore_db_source_integrity_only_prepares_legacy_candidate_for_migratio
 def test_restore_db_py_keeps_pre_restore_snapshot_under_runtime_root(tmp_path: Path) -> None:
     backup = tmp_path / "backup.db"
     target = tmp_path / "target.db"
-    _create_ops_schema_db(backup)
-    _create_ops_schema_db(target)
+    _create_pass_backup(backup)
+    _create_head_schema_db(target)
     runtime_root = tmp_path / "runtime"
 
     result = _run_script(
@@ -772,12 +900,16 @@ def test_restore_db_py_keeps_pre_restore_snapshot_under_runtime_root(tmp_path: P
         str(backup),
         "--target",
         str(target),
+        "--offline-target",
         env={"MES_RUNTIME_ROOT": str(runtime_root)},
     )
 
-    snapshots = list((runtime_root / "backups" / "sqlite").glob("mes_PRE-RESTORE_*.db"))
+    snapshots = list(
+        (runtime_root / "backups" / "sqlite").glob("mes-before-pre-restore-*.db")
+    )
     assert result.returncode == 0, result.stdout + result.stderr
     assert len(snapshots) == 1
+    assert backup_manifest.manifest_path_for(snapshots[0]).is_file()
     assert not list(tmp_path.glob("target.pre-restore.*.db"))
 
 
@@ -788,9 +920,9 @@ def test_restore_db_uses_preverified_rollback_without_duplicate_snapshot(tmp_pat
     rollback_dir = runtime_root / "backups" / "sqlite"
     rollback_dir.mkdir(parents=True)
     rollback = rollback_dir / "mes_20990101_000000.db"
-    _create_ops_schema_db(backup)
-    _create_ops_schema_db(target)
-    _create_ops_schema_db(rollback)
+    _create_pass_backup(backup, item_name="Restore source")
+    _create_head_schema_db(target)
+    _copy_as_pass_backup(target, rollback)
 
     result = _run_script(
         RESTORE_DB,
@@ -800,12 +932,13 @@ def test_restore_db_uses_preverified_rollback_without_duplicate_snapshot(tmp_pat
         str(target),
         "--preverified-rollback",
         str(rollback),
+        "--offline-target",
         env={"MES_RUNTIME_ROOT": str(runtime_root)},
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert f"ROLLBACK_PATH={rollback.resolve()}" in result.stdout
-    assert not list(rollback_dir.glob("mes_PRE-RESTORE_*.db"))
+    assert not list(rollback_dir.glob("mes-before-pre-restore-*.db"))
     assert not list(tmp_path.rglob("*.digest-*.tmp"))
 
 
@@ -816,15 +949,16 @@ def test_restore_db_rejects_preverified_rollback_that_does_not_match_target(tmp_
     rollback_dir = runtime_root / "backups" / "sqlite"
     rollback_dir.mkdir(parents=True)
     rollback = rollback_dir / "mes_20990101_000000.db"
-    _create_ops_schema_db(backup)
-    _create_ops_schema_db(target)
-    _create_ops_schema_db(rollback)
+    _create_pass_backup(backup, item_name="Restore source")
+    _create_head_schema_db(target)
+    _copy_as_pass_backup(target, rollback)
     connection = sqlite3.connect(rollback)
     try:
         connection.execute("UPDATE items SET item_name = 'wrong rollback'")
         connection.commit()
     finally:
         connection.close()
+    _write_pass_manifest(rollback)
 
     original_target = target.read_bytes()
     result = _run_script(
@@ -835,6 +969,7 @@ def test_restore_db_rejects_preverified_rollback_that_does_not_match_target(tmp_
         str(target),
         "--preverified-rollback",
         str(rollback),
+        "--offline-target",
         env={"MES_RUNTIME_ROOT": str(runtime_root)},
     )
 
@@ -853,11 +988,12 @@ def test_restore_db_detects_changed_target_before_rejecting_invalid_candidate(tm
     rollback_dir.mkdir(parents=True)
     rollback = rollback_dir / "mes_20990101_000000.db"
     candidate.write_bytes(b"not a sqlite database")
-    _create_ops_schema_db(target)
-    _create_ops_schema_db(rollback)
+    _create_head_schema_db(target)
+    _copy_as_pass_backup(target, rollback)
     with sqlite3.connect(rollback) as connection:
         connection.execute("UPDATE items SET item_name = 'stale rollback'")
         connection.commit()
+    _write_pass_manifest(rollback)
 
     original_target = target.read_bytes()
     result = _run_script(
@@ -868,6 +1004,7 @@ def test_restore_db_detects_changed_target_before_rejecting_invalid_candidate(tm
         str(target),
         "--preverified-rollback",
         str(rollback),
+        "--offline-target",
         env={"MES_RUNTIME_ROOT": str(runtime_root)},
     )
 
@@ -883,11 +1020,12 @@ def test_restore_db_detects_changed_target_before_rejecting_missing_candidate(tm
     rollback_dir = runtime_root / "backups" / "sqlite"
     rollback_dir.mkdir(parents=True)
     rollback = rollback_dir / "mes_20990101_000000.db"
-    _create_ops_schema_db(target)
-    _create_ops_schema_db(rollback)
+    _create_head_schema_db(target)
+    _copy_as_pass_backup(target, rollback)
     with sqlite3.connect(rollback) as connection:
         connection.execute("UPDATE items SET item_name = 'stale rollback'")
         connection.commit()
+    _write_pass_manifest(rollback)
 
     original_target = target.read_bytes()
     result = _run_script(
@@ -898,6 +1036,7 @@ def test_restore_db_detects_changed_target_before_rejecting_missing_candidate(tm
         str(target),
         "--preverified-rollback",
         str(rollback),
+        "--offline-target",
         env={"MES_RUNTIME_ROOT": str(runtime_root)},
     )
 
@@ -912,8 +1051,8 @@ def test_restore_db_can_install_the_preverified_rollback_without_duplicate_snaps
     rollback_dir = runtime_root / "backups" / "sqlite"
     rollback_dir.mkdir(parents=True)
     rollback = rollback_dir / "mes_20990101_000000.db"
-    _create_ops_schema_db(target)
-    _create_ops_schema_db(rollback)
+    _create_head_schema_db(target)
+    _copy_as_pass_backup(target, rollback)
     connection = sqlite3.connect(target)
     try:
         connection.execute("UPDATE items SET item_name = 'failed candidate'")
@@ -929,14 +1068,18 @@ def test_restore_db_can_install_the_preverified_rollback_without_duplicate_snaps
         str(target),
         "--preverified-rollback",
         str(rollback),
+        "--offline-target",
         env={"MES_RUNTIME_ROOT": str(runtime_root)},
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert not list(rollback_dir.glob("mes_PRE-RESTORE_*.db"))
+    assert not list(rollback_dir.glob("mes-before-pre-restore-*.db"))
     assert not list(tmp_path.rglob("*.digest-*.tmp"))
     with sqlite3.connect(target) as connection:
-        assert connection.execute("SELECT item_name FROM items WHERE item_id = 'item-1'").fetchone() == (
+        assert connection.execute(
+            "SELECT item_name FROM items WHERE item_id = ?",
+            (CURRENT_ITEM_ID,),
+        ).fetchone() == (
             "Part A",
         )
 
@@ -946,14 +1089,17 @@ def test_pre_restore_snapshot_includes_wal_commit_and_never_collides(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     target = tmp_path / "target.db"
-    _create_ops_schema_db(target)
+    _create_head_schema_db(target)
     monkeypatch.setenv("MES_RUNTIME_ROOT", str(tmp_path / "runtime"))
 
     connection = sqlite3.connect(target)
     try:
         assert connection.execute("PRAGMA journal_mode=WAL").fetchone()[0] == "wal"
         connection.execute("PRAGMA wal_autocheckpoint=0")
-        connection.execute("INSERT INTO items VALUES ('wal-item', 'AA-0002', 'WAL Part')")
+        connection.execute(
+            "UPDATE items SET item_name = 'WAL Part' WHERE item_id = ?",
+            (CURRENT_ITEM_ID,),
+        )
         connection.commit()
         assert Path(f"{target}-wal").exists()
 
@@ -966,7 +1112,8 @@ def test_pre_restore_snapshot_includes_wal_commit_and_never_collides(
             assert verify.returncode == 0, verify.stdout + verify.stderr
             with sqlite3.connect(snapshot) as snapshot_db:
                 assert snapshot_db.execute(
-                    "SELECT item_name FROM items WHERE item_id = 'wal-item'"
+                    "SELECT item_name FROM items WHERE item_id = ?",
+                    (CURRENT_ITEM_ID,),
                 ).fetchone() == ("WAL Part",)
     finally:
         connection.close()
@@ -1084,7 +1231,7 @@ def test_restore_cleanup_failure_leaves_new_target_active_without_stale_sidecars
     assert str(leftovers[0]) in capsys.readouterr().err
 
 
-@pytest.mark.parametrize("failure_stage", ["copy", "verify", "replace"])
+@pytest.mark.parametrize("failure_stage", ["copy", "verify", "install"])
 def test_restore_staging_failure_preserves_target_and_sidecars(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1096,17 +1243,24 @@ def test_restore_staging_failure_preserves_target_and_sidecars(
     target_dir.mkdir()
     source = source_dir / "backup.db"
     target = target_dir / "mes.db"
-    _create_ops_schema_db(source)
-    _create_ops_schema_db(target)
+    _create_pass_backup(source)
+    _create_head_schema_db(target)
     with sqlite3.connect(source) as source_db:
-        source_db.execute("UPDATE items SET item_name = 'Restored Part' WHERE item_id = 'item-1'")
+        source_db.execute(
+            "UPDATE items SET item_name = 'Restored Part' WHERE item_id = ?",
+            (CURRENT_ITEM_ID,),
+        )
+    _write_pass_manifest(source)
     monkeypatch.setenv("MES_RUNTIME_ROOT", str(tmp_path / "runtime"))
 
     target_db = sqlite3.connect(target)
     try:
         assert target_db.execute("PRAGMA journal_mode=WAL").fetchone()[0] == "wal"
         target_db.execute("PRAGMA wal_autocheckpoint=0")
-        target_db.execute("INSERT INTO items VALUES ('wal-item', 'AA-0002', 'WAL Part')")
+        target_db.execute(
+            "UPDATE items SET item_name = 'WAL Target' WHERE item_id = ?",
+            (CURRENT_ITEM_ID,),
+        )
         target_db.commit()
         staged_boundary: dict[str, bytes] = {}
         original_snapshot = restore_db_module._create_pre_restore_snapshot
@@ -1132,47 +1286,82 @@ def test_restore_staging_failure_preserves_target_and_sidecars(
 
             monkeypatch.setattr(restore_db_module.shutil, "copy2", fail_staging_copy)
         elif failure_stage == "verify":
-            original_verify = restore_db_module._verify_sqlite_backup
+            original_verify = restore_db_module.backup_manifest.verify_sqlite_candidate
 
-            def fail_staging_verify(path: Path) -> None:
+            def fail_staging_verify(
+                path: Path,
+                manifest: dict[str, object],
+            ) -> backup_manifest.BackupVerification:
                 if path.parent == target.parent and path not in {source, target}:
-                    raise SystemExit(91)
-                original_verify(path)
+                    return backup_manifest.BackupVerification(
+                        backup_manifest.BackupStatus.FAIL,
+                        ("injected staging verification failure",),
+                    )
+                return original_verify(path, manifest)
 
-            monkeypatch.setattr(restore_db_module, "_verify_sqlite_backup", fail_staging_verify)
+            monkeypatch.setattr(
+                restore_db_module.backup_manifest,
+                "verify_sqlite_candidate",
+                fail_staging_verify,
+            )
         else:
-            def fail_replace(src: str | Path, dst: str | Path) -> None:
-                raise OSError("injected atomic replace failure")
+            original_install = restore_db_module._copy_sqlite_into_connection
 
-            monkeypatch.setattr(restore_db_module.os, "replace", fail_replace)
+            def fail_install(
+                src: Path,
+                destination: sqlite3.Connection,
+            ) -> None:
+                if ".restore-" in src.name:
+                    raise OSError("injected writer-fenced install failure")
+                original_install(src, destination)
+
+            monkeypatch.setattr(
+                restore_db_module,
+                "_copy_sqlite_into_connection",
+                fail_install,
+            )
 
         with pytest.raises((OSError, SystemExit)):
-            restore_db_module.restore_sqlite(str(source), str(target), run_check=False)
+            restore_db_module.restore_sqlite(
+                str(source),
+                str(target),
+                run_check=False,
+                offline_target=True,
+            )
 
-        assert target.read_bytes() == staged_boundary[""]
+        if failure_stage != "install":
+            assert target.read_bytes() == staged_boundary[""]
         for suffix in ("-wal", "-shm"):
             sidecar = Path(f"{target}{suffix}")
             assert sidecar.exists()
-            assert sidecar.read_bytes() == staged_boundary[suffix]
+            if failure_stage != "install":
+                assert sidecar.read_bytes() == staged_boundary[suffix]
         assert not list(target.parent.glob(f".{target.name}.restore-*.tmp"))
     finally:
         target_db.close()
+    with sqlite3.connect(target) as restored_target:
+        assert restored_target.execute(
+            "SELECT item_name FROM items WHERE item_id = ?",
+            (CURRENT_ITEM_ID,),
+        ).fetchone() == ("WAL Target",)
 
 
 def test_successful_restore_removes_stale_sqlite_sidecars(tmp_path: Path) -> None:
     source = tmp_path / "backup.db"
     target = tmp_path / "target" / "mes.db"
-    _create_ops_schema_db(source)
+    _create_pass_backup(source)
     target.parent.mkdir()
     Path(f"{target}-wal").write_bytes(b"stale wal")
     Path(f"{target}-shm").write_bytes(b"stale shm")
+    Path(f"{target}-journal").write_bytes(b"stale journal")
 
     restore_db_module.restore_sqlite(str(source), str(target), run_check=False)
 
     assert target.exists()
     assert not Path(f"{target}-wal").exists()
     assert not Path(f"{target}-shm").exists()
-    verify = _run_script(VERIFY_BACKUP, str(target))
+    assert not Path(f"{target}-journal").exists()
+    verify = _run_script(VERIFY_BACKUP, "--database", str(target))
     assert verify.returncode == 0, verify.stdout + verify.stderr
 
 
@@ -1180,12 +1369,20 @@ def test_restore_db_py_rejects_invalid_sqlite_backup(tmp_path: Path) -> None:
     invalid_backup = tmp_path / "invalid.db"
     sqlite3.connect(invalid_backup).close()
     target = tmp_path / "target.db"
-    _create_ops_schema_db(target)
+    _create_head_schema_db(target)
 
-    result = _run_script(RESTORE_DB, "--sqlite", str(invalid_backup), "--target", str(target), "--check")
+    result = _run_script(
+        RESTORE_DB,
+        "--sqlite",
+        str(invalid_backup),
+        "--target",
+        str(target),
+        "--check",
+        "--offline-target",
+    )
 
     assert result.returncode == 1
-    verify_target = _run_script(VERIFY_BACKUP, str(target))
+    verify_target = _run_script(VERIFY_BACKUP, "--database", str(target))
     assert verify_target.returncode == 0, verify_target.stdout + verify_target.stderr
 
 
@@ -1193,10 +1390,12 @@ def test_cleanup_backups_keeps_latest_ten_regular_runtime_backups(tmp_path: Path
     runtime_root = tmp_path / "runtime"
     backup_dir = runtime_root / "backups" / "sqlite"
     backup_dir.mkdir(parents=True)
+    retention_source = tmp_path / "retention-source.db"
+    _create_head_schema_db(retention_source)
     regular = []
     for index in range(12):
         backup = backup_dir / f"mes_20000101_0000{index:02d}.db"
-        backup.touch()
+        _copy_as_pass_backup(retention_source, backup)
         timestamp = time.time() - (100 - index)
         os.utime(backup, (timestamp, timestamp))
         regular.append(backup)
@@ -1215,7 +1414,12 @@ def test_cleanup_backups_keeps_latest_ten_regular_runtime_backups(tmp_path: Path
     assert result.returncode == 0, result.stdout + result.stderr
     assert not regular[0].exists()
     assert not regular[1].exists()
+    assert not backup_manifest.manifest_path_for(regular[0]).exists()
+    assert not backup_manifest.manifest_path_for(regular[1]).exists()
     assert all(path.exists() for path in regular[2:])
+    assert all(
+        backup_manifest.manifest_path_for(path).exists() for path in regular[2:]
+    )
     assert pre_snapshot.exists()
     assert legacy.exists()
 

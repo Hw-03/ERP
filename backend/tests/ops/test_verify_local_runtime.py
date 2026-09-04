@@ -69,12 +69,16 @@ def _mock_full_gate_runtime(
     tmp_path: Path,
     *,
     npm_exit_code: int = 0,
+    openapi_baseline: bytes = b"{}\r\n",
+    openapi_capture: bytes = b"{}\r\n",
 ) -> tuple[Path, dict[str, str]]:
     """실제 PowerShell 병렬 orchestration만 남기고 느린 하위 명령을 대체한다."""
     repo = _verification_repo(tmp_path)
     baseline = repo / "_dev" / "baselines" / "openapi.json"
     baseline.parent.mkdir(parents=True)
-    baseline.write_bytes(b"{}\r\n")
+    baseline.write_bytes(openapi_baseline)
+    capture = tmp_path / "openapi-capture.json"
+    capture.write_bytes(openapi_capture)
     _git(repo, "add", ".")
     _git(repo, "commit", "-qm", "openapi baseline")
 
@@ -101,7 +105,7 @@ def _mock_full_gate_runtime(
                 'if "%~1"=="-" (',
                 '  >>"%DEXCOWIN_MOCK_GATE_ENV_LOG%" echo backend-openapi TEST_POSTGRES_URL=%TEST_POSTGRES_URL% DATABASE_URL=%DATABASE_URL% DEXCOWIN_POSTGRES_TEST_ACK=%DEXCOWIN_POSTGRES_TEST_ACK%',
                 "  more >nul",
-                '  >"%~2" echo {}',
+                '  copy /b "%DEXCOWIN_MOCK_OPENAPI_CAPTURE%" "%~2" >nul',
                 "  exit /b 0",
                 ")",
                 'if /I "%~2"=="pytest" (',
@@ -124,6 +128,7 @@ def _mock_full_gate_runtime(
         "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
         "DEXCOWIN_VERIFY_PARALLEL_CPU_THRESHOLD": "1",
         "DEXCOWIN_MOCK_GATE_ENV_LOG": str(gate_env_log),
+        "DEXCOWIN_MOCK_OPENAPI_CAPTURE": str(capture),
     }
 
 
@@ -252,6 +257,38 @@ def _mock_smart_targeted_runtime(
 
 def _gate_event_lines(gate_log: Path, gate_id: str) -> list[str]:
     return Path(f"{gate_log}.{gate_id}").read_text(encoding="utf-8").splitlines()
+
+
+def _run_backend_openapi_gate(
+    tmp_path: Path,
+    *,
+    baseline: bytes = b"{}\r\n",
+    capture: bytes,
+) -> subprocess.CompletedProcess[bytes]:
+    repo, extra_env = _mock_full_gate_runtime(
+        tmp_path,
+        openapi_baseline=baseline,
+        openapi_capture=capture,
+    )
+    gate_file = repo / "openapi-gate.json"
+    gate_file.write_text(
+        json.dumps(
+            {
+                "id": "backend-openapi",
+                "area": "backend",
+                "kind": "contract",
+                "reason": "OpenAPI newline comparison contract",
+                "files": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return _run_verify(
+        repo,
+        "-InternalGateFile",
+        str(gate_file),
+        extra_env=extra_env,
+    )
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="PowerShell runtime test is Windows-only")
@@ -464,6 +501,45 @@ def test_full_mode_scopes_postgres_environment_to_concurrency_gate(tmp_path: Pat
         "DEXCOWIN_POSTGRES_TEST_ACK=acknowledged",
     ]
     assert {name: extra_env[name] for name in postgres_env} == postgres_env
+
+
+def test_openapi_capture_uses_explicit_lf_newline_contract() -> None:
+    script = VERIFY_LOCAL.read_text(encoding="utf-8-sig")
+
+    assert 'with open(out, "w", encoding="utf-8", newline="\\n") as f:' in script
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="PowerShell runtime test is Windows-only")
+def test_openapi_gate_accepts_crlf_baseline_with_lf_capture(tmp_path: Path) -> None:
+    result = _run_backend_openapi_gate(tmp_path, capture=b"{}\n")
+
+    output = _output(result)
+    assert result.returncode == 0, output
+    assert "OpenAPI spec matches baseline." in output
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="PowerShell runtime test is Windows-only")
+def test_openapi_gate_rejects_meaningful_json_drift_after_eol_normalization(
+    tmp_path: Path,
+) -> None:
+    result = _run_backend_openapi_gate(tmp_path, capture=b'{"drift": true}\n')
+
+    output = _output(result)
+    assert result.returncode != 0
+    assert "OpenAPI drift" in output
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="PowerShell runtime test is Windows-only")
+def test_openapi_gate_rejects_case_only_json_drift(tmp_path: Path) -> None:
+    result = _run_backend_openapi_gate(
+        tmp_path,
+        baseline=b'{"value":"A"}\r\n',
+        capture=b'{"value":"a"}\n',
+    )
+
+    output = _output(result)
+    assert result.returncode != 0
+    assert "OpenAPI drift" in output
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="PowerShell runtime test is Windows-only")

@@ -27,7 +27,10 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from scripts.runtime_paths import runtime_path  # noqa: E402
+from scripts.ops import backup_manifest  # noqa: E402
 from scripts.ops.backup_retention import REGULAR_BACKUP_NAME  # noqa: E402
+
+SQLITE_DB_PATH = PROJECT_ROOT / "backend" / "mes.db"
 
 try:
     import httpx
@@ -73,29 +76,32 @@ async def check_server_reachable(client: httpx.AsyncClient, base_url: str) -> bo
         return False
 
 
-async def check_db_engine_from_server(client: httpx.AsyncClient, base_url: str) -> bool:
+async def check_db_engine_from_server(
+    client: httpx.AsyncClient,
+    base_url: str,
+) -> Literal["sqlite", "postgresql"] | None:
     """2. 서버 실제 DB 엔진 확인 (환경변수 아닌 서버 응답 기준)"""
     try:
         res = await client.get(f"{base_url}/api/health/db-info", timeout=5)
         if res.status_code != 200:
             record("DB 엔진 (서버)", "WARN", f"조회 실패 HTTP {res.status_code}")
-            return True
+            return None
         data = res.json()
         engine = data.get("db_engine", "unknown")
         if engine == "postgresql":
             record("DB 엔진 (서버)", "PASS",
                    "PostgreSQL 확인 — DB 엔진 조건 통과 (전체 준비 상태는 모든 사전 점검 결과로 판단)")
-            return True
+            return "postgresql"
         elif engine == "sqlite":
             record("DB 엔진 (서버)", "FAIL",
                    "❌ SQLite 감지 — 30명 운영 금지. DATABASE_URL을 PostgreSQL로 변경 후 서버 재시작 필요.")
-            return False
+            return "sqlite"
         else:
             record("DB 엔진 (서버)", "WARN", f"알 수 없는 엔진: {engine}")
-            return True
+            return None
     except Exception as e:
         record("DB 엔진 (서버)", "WARN", f"점검 실패 — {e}")
-        return True
+        return None
 
 
 async def check_db_write(client: httpx.AsyncClient, base_url: str) -> None:
@@ -260,27 +266,80 @@ async def check_concurrent_30(base_url: str) -> None:
         record("동시 30요청", "FAIL", f"{ok}/30 성공, {err}건 실패 — PostgreSQL 전환 필요")
 
 
-async def check_backup_exists() -> None:
+async def check_backup_exists(
+    expected_engine: Literal["sqlite", "postgresql"] | None,
+) -> None:
     """11. 최근 백업 파일 존재"""
-    backup_dirs = [runtime_path("backups", "sqlite"), runtime_path("backups", "postgres")]
-    if not any(path.exists() for path in backup_dirs):
+    if expected_engine is None:
+        record("백업 존재", "WARN", "서버 DB 엔진을 확인하지 못해 백업을 선택할 수 없음")
+        return
+    suffix = ".db" if expected_engine == "sqlite" else ".sql"
+    backup_subdirectory = "sqlite" if expected_engine == "sqlite" else "postgres"
+    backup_dir = runtime_path("backups", backup_subdirectory)
+    if not backup_dir.exists():
         record("백업 존재", "WARN", "런타임 백업 폴더 없음 — scripts\\ops\\backup_db.bat 실행 필요")
         return
     files = [
         path
-        for backup_dir in backup_dirs
         for path in backup_dir.glob("mes_*")
-        if path.is_file() and REGULAR_BACKUP_NAME.fullmatch(path.name)
+        if path.is_file()
+        and path.suffix == suffix
+        and REGULAR_BACKUP_NAME.fullmatch(path.name)
     ]
     if not files:
         record("백업 존재", "WARN", "백업 파일 없음 — scripts\\ops\\backup_db.bat 실행 필요")
         return
-    latest = max(f.stat().st_mtime for f in files)
+    latest_file = max(files, key=lambda path: (path.stat().st_mtime_ns, path.name))
+    verification = backup_manifest.verify_manifest_receipt(
+        latest_file,
+        expected_engine=expected_engine,
+    )
+    if verification.status is backup_manifest.BackupStatus.LEGACY_UNVERIFIED:
+        record(
+            "백업 존재",
+            "WARN",
+            f"최근 백업 검증: {verification.status.value} — backup-manifest/v1 필요",
+        )
+        return
+    if expected_engine == "sqlite":
+        verification = backup_manifest.verify_sqlite_backup(
+            latest_file,
+            source_path=SQLITE_DB_PATH,
+        )
+    if verification.status is not backup_manifest.BackupStatus.PASS:
+        detail = "; ".join(verification.errors) or "검증 증거 불충분"
+        record(
+            "백업 존재",
+            "FAIL",
+            f"최근 백업 검증: {verification.status.value} — {detail}",
+        )
+        return
+    if expected_engine == "postgresql":
+        record(
+            "백업 존재",
+            "WARN",
+            "최근 PostgreSQL backup-manifest/v1 영수증 PASS, "
+            "disposable restore 검증 NOT_VERIFIED\n"
+            f"PREFLIGHT_BACKUP_PATH={latest_file.resolve()}\n"
+            "PREFLIGHT_MANIFEST_PATH="
+            f"{backup_manifest.manifest_path_for(latest_file).resolve()}",
+        )
+        return
+
+    latest = latest_file.stat().st_mtime
     age_days = (datetime.now(timezone.utc).timestamp() - latest) / 86400
     if age_days <= 1:
-        record("백업 존재", "PASS", f"최근 백업: {age_days * 24:.1f}시간 전 ({len(files)}개)")
+        record(
+            "백업 존재",
+            "PASS",
+            f"backup-manifest/v1 PASS, 최근 백업: {age_days * 24:.1f}시간 전 ({len(files)}개)",
+        )
     elif age_days <= 7:
-        record("백업 존재", "PASS", f"최근 백업: {age_days:.1f}일 전 ({len(files)}개)")
+        record(
+            "백업 존재",
+            "PASS",
+            f"backup-manifest/v1 PASS, 최근 백업: {age_days:.1f}일 전 ({len(files)}개)",
+        )
     else:
         record("백업 존재", "WARN", f"마지막 백업 {age_days:.0f}일 전 — 매일 백업 권장")
 
@@ -425,7 +484,7 @@ async def main():
             print("\n❌ 서버 연결 실패 — 나머지 점검을 건너뜁니다.")
             sys.exit(1)
 
-        db_ok = await check_db_engine_from_server(client, base_url)
+        server_engine = await check_db_engine_from_server(client, base_url)
         await check_db_write(client, base_url)
         await check_health_detailed(client, base_url)
         await check_inventory_negative(client, base_url)
@@ -439,7 +498,7 @@ async def main():
 
     await check_concurrent_30(base_url)
     await check_write_latency_under_load(base_url)
-    await check_backup_exists()
+    await check_backup_exists(server_engine)
 
     # 집계
     passes = sum(1 for r in results if r.level == "PASS")

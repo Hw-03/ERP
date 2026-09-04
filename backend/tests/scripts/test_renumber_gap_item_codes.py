@@ -6,8 +6,15 @@ import importlib.util
 import sqlite3
 import sys
 from pathlib import Path
+from types import ModuleType
 
 import pytest
+import sqlalchemy as sa
+from sqlalchemy.orm import Session
+
+from app.models import Inventory, Item, ProcessType, WarehouseUnplacedItem
+from bootstrap.schema import ensure_schema
+from scripts.ops import backup_manifest
 
 SCRIPT_PATH = Path(__file__).resolve().parents[3] / "scripts" / "dev" / "renumber_gap_item_codes.py"
 
@@ -58,7 +65,7 @@ PR_CONTIGUOUS_RENAMES = [
 ]
 
 
-def _load_subject():
+def _load_subject() -> ModuleType:
     spec = importlib.util.spec_from_file_location("renumber_gap_item_codes", SCRIPT_PATH)
     if spec is None or spec.loader is None:
         raise RuntimeError("재번호 스크립트를 불러올 수 없습니다.")
@@ -69,6 +76,21 @@ def _load_subject():
     finally:
         sys.modules.pop(spec.name, None)
     return module
+
+
+def _load_algorithm_subject(
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[ModuleType, list[tuple[Path, str]]]:
+    """Load the algorithm with only its runtime backup boundary isolated."""
+    subject = _load_subject()
+    backup_calls: list[tuple[Path, str]] = []
+
+    def fake_backup(database_path: Path, plan_name: str) -> Path:
+        backup_calls.append((database_path, plan_name))
+        return database_path.parent / f"{database_path.stem}-{plan_name}-test-backup.db"
+
+    monkeypatch.setattr(subject, "_create_backup", fake_backup)
+    return subject, backup_calls
 
 
 @pytest.fixture(autouse=True)
@@ -209,16 +231,20 @@ def _create_pr_gap_database(path: Path) -> dict[str, str]:
     return item_ids
 
 
-def test_apply_renumber_updates_codes_and_snapshots_without_changing_bom_item_ids(tmp_path: Path) -> None:
+def test_apply_renumber_updates_codes_and_snapshots_without_changing_bom_item_ids(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     database_path = tmp_path / "mes.db"
     original_item_ids = _create_database(database_path)
 
-    subject = _load_subject()
+    subject, backup_calls = _load_algorithm_subject(monkeypatch)
     report = subject.renumber_database(database_path, apply=True)
 
     assert report.applied is True
     assert report.renamed_count == 19
-    assert Path(report.backup_path).parent == tmp_path / "runtime" / "backups" / "sqlite"
+    assert backup_calls == [(database_path, "ar-pr-gap")]
+    assert report.backup_path == str(tmp_path / "mes-ar-pr-gap-test-backup.db")
     conn = sqlite3.connect(database_path)
     try:
         for symbol, process_type, old_serial, new_serial in RENAMES:
@@ -289,7 +315,10 @@ def test_apply_refuses_missing_target_without_changing_database(tmp_path: Path) 
     assert not (tmp_path / "runtime").exists()
 
 
-def test_apply_normalizes_all_historical_snapshots_for_a_renumbered_item(tmp_path: Path) -> None:
+def test_apply_normalizes_all_historical_snapshots_for_a_renumbered_item(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     database_path = tmp_path / "mes.db"
     item_ids = _create_database(database_path)
     conn = sqlite3.connect(database_path)
@@ -300,8 +329,10 @@ def test_apply_normalizes_all_historical_snapshots_for_a_renumbered_item(tmp_pat
     conn.commit()
     conn.close()
 
-    subject = _load_subject()
+    subject, backup_calls = _load_algorithm_subject(monkeypatch)
     subject.renumber_database(database_path, apply=True)
+
+    assert backup_calls == [(database_path, "ar-pr-gap")]
 
     conn = sqlite3.connect(database_path)
     try:
@@ -312,10 +343,13 @@ def test_apply_normalizes_all_historical_snapshots_for_a_renumbered_item(tmp_pat
         conn.close()
 
 
-def test_apply_can_be_rerun_to_normalize_snapshot_after_item_codes_are_already_renumbered(tmp_path: Path) -> None:
+def test_apply_can_be_rerun_to_normalize_snapshot_after_item_codes_are_already_renumbered(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     database_path = tmp_path / "mes.db"
     item_ids = _create_database(database_path)
-    subject = _load_subject()
+    subject, backup_calls = _load_algorithm_subject(monkeypatch)
     subject.renumber_database(database_path, apply=True)
 
     conn = sqlite3.connect(database_path)
@@ -329,6 +363,7 @@ def test_apply_can_be_rerun_to_normalize_snapshot_after_item_codes_are_already_r
     report = subject.renumber_database(database_path, apply=True)
 
     assert report.applied is True
+    assert backup_calls == [(database_path, "ar-pr-gap"), (database_path, "ar-pr-gap")]
     conn = sqlite3.connect(database_path)
     try:
         assert conn.execute(
@@ -338,11 +373,14 @@ def test_apply_can_be_rerun_to_normalize_snapshot_after_item_codes_are_already_r
         conn.close()
 
 
-def test_apply_pr_contiguous_plan_compacts_205_items_and_preserves_bom_item_ids(tmp_path: Path) -> None:
+def test_apply_pr_contiguous_plan_compacts_205_items_and_preserves_bom_item_ids(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     database_path = tmp_path / "mes.db"
     item_ids = _create_pr_gap_database(database_path)
 
-    subject = _load_subject()
+    subject, backup_calls = _load_algorithm_subject(monkeypatch)
     report = subject.renumber_database(
         database_path,
         renames=tuple(subject.Rename(*rename) for rename in PR_CONTIGUOUS_RENAMES),
@@ -351,6 +389,7 @@ def test_apply_pr_contiguous_plan_compacts_205_items_and_preserves_bom_item_ids(
     )
 
     assert report.renamed_count == 21
+    assert backup_calls == [(database_path, "pr-contiguous")]
     conn = sqlite3.connect(database_path)
     try:
         assert [row[0] for row in conn.execute(
@@ -431,10 +470,13 @@ def _create_full_renumber_database(path: Path) -> dict[str, str]:
     return item_ids
 
 
-def test_full_rollback_plan_restores_original_codes_and_snapshots(tmp_path: Path) -> None:
+def test_full_rollback_plan_restores_original_codes_and_snapshots(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     database_path = tmp_path / "mes.db"
     original_item_ids = _create_full_renumber_database(database_path)
-    subject = _load_subject()
+    subject, backup_calls = _load_algorithm_subject(monkeypatch)
 
     subject.renumber_database(
         database_path,
@@ -458,6 +500,11 @@ def test_full_rollback_plan_restores_original_codes_and_snapshots(tmp_path: Path
 
     assert report.applied is True
     assert report.renamed_count == 31
+    assert backup_calls == [
+        (database_path, "ar-pr-gap"),
+        (database_path, "pr-contiguous"),
+        (database_path, "full-rollback"),
+    ]
     conn = sqlite3.connect(database_path)
     try:
         for rename in subject.FULL_ROLLBACK_RENAMES:
@@ -474,3 +521,65 @@ def test_full_rollback_plan_restores_original_codes_and_snapshots(tmp_path: Path
             )
     finally:
         conn.close()
+
+
+def test_apply_creates_verified_current_head_backup_before_mutation(tmp_path: Path) -> None:
+    database_path = tmp_path / "mes.db"
+    item_id = "00000000000000000000000000000001"
+    engine = sa.create_engine(f"sqlite:///{database_path.as_posix()}")
+    try:
+        ensure_schema(engine=engine)
+        with Session(engine) as session:
+            item = Item(
+                item_id=item_id,
+                item_name="Backup boundary item",
+                unit="EA",
+                model_symbol="6",
+                process_type_code="AR",
+                serial_no=719,
+            )
+            session.add_all(
+                [
+                    ProcessType(code="AR", prefix="A", suffix="R", stage_order=45),
+                    item,
+                    Inventory(
+                        inventory_id="00000000000000000000000000000002",
+                        item_id=item.item_id,
+                        quantity=5,
+                        warehouse_qty=5,
+                        pending_quantity=0,
+                    ),
+                    WarehouseUnplacedItem(
+                        id="00000000000000000000000000000003",
+                        item_id=item.item_id,
+                        quantity=5,
+                    ),
+                ]
+            )
+            session.commit()
+    finally:
+        engine.dispose()
+
+    subject = _load_subject()
+    report = subject.renumber_database(
+        database_path,
+        renames=(subject.Rename("6", "AR", 719, 365),),
+        plan_name="backup-boundary",
+        apply=True,
+    )
+
+    assert report.backup_path is not None
+    backup_path = Path(report.backup_path)
+    assert backup_path.is_file()
+    assert backup_manifest.manifest_path_for(backup_path).is_file()
+    verification = backup_manifest.verify_sqlite_backup(backup_path)
+    assert verification.status is backup_manifest.BackupStatus.PASS, verification.errors
+
+    with sqlite3.connect(backup_path) as connection:
+        assert connection.execute(
+            "SELECT serial_no, mes_code FROM items WHERE item_id = ?", (item_id,)
+        ).fetchone() == (719, "6-AR-0719")
+    with sqlite3.connect(database_path) as connection:
+        assert connection.execute(
+            "SELECT serial_no, mes_code FROM items WHERE item_id = ?", (item_id,)
+        ).fetchone() == (365, "6-AR-0365")

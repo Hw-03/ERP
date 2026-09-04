@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import shutil
 import subprocess
@@ -15,8 +16,64 @@ LOCAL_DEV_WORKTREE_PREFIX = r"c:\erp\.worktrees" + "\\"
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.ops import preflight_30_users
-from scripts.ops.backup_retention import REGULAR_BACKUP_NAME, retain_latest_backups
+from scripts.ops import backup_manifest, backup_retention, preflight_30_users  # noqa: E402
+from scripts.ops.backup_retention import (  # noqa: E402
+    REGULAR_BACKUP_NAME,
+    retain_latest_backups,
+)
+
+
+def _write_retention_receipt(path: Path) -> None:
+    if path.stat().st_size == 0:
+        path.write_bytes(b"retention fixture\n")
+    engine = "postgresql" if path.suffix == ".sql" else "sqlite"
+    manifest = backup_manifest.build_manifest(
+        path,
+        published_name=path.name,
+        evidence={
+            "engine": engine,
+            "alembic_revision": "head",
+            "schema_fingerprint": "0" * 64,
+            "data_revision": {
+                "revision": 1,
+                "updated_at": "2026-09-04T00:00:00Z",
+            },
+            "snapshot_hash": "1" * 64,
+            "oracle_hash": "2" * 64,
+            "snapshot_metadata": (
+                {"server_version": "16.15"} if engine == "postgresql" else {}
+            ),
+            "verification": {
+                "status": backup_manifest.BackupStatus.PASS.value,
+                "schema": "PASS",
+                "sqlite_integrity": (
+                    "NOT_APPLICABLE" if engine == "postgresql" else "PASS"
+                ),
+                "foreign_keys": "PASS",
+                "inventory": {
+                    "contract": backup_manifest.INVENTORY_CONTRACT,
+                    "status": "pass",
+                    "blocking_count": 0,
+                    "warning_count": 0,
+                    "checks": [],
+                },
+            },
+        },
+        source_snapshot=(
+            {"method": "pg_dump", "transaction_snapshot": True}
+            if engine == "postgresql"
+            else {
+                "method": "sqlite3.backup",
+                "wal_included": True,
+                "journal_mode": "wal",
+                "physical_generation": "3" * 64,
+            }
+        ),
+    )
+    backup_retention.manifest_path_for(path).write_text(
+        json.dumps(manifest),
+        encoding="utf-8",
+    )
 
 
 def _run_python(code: str, *, env: dict[str, str] | None = None, cwd: Path = ROOT) -> subprocess.CompletedProcess[str]:
@@ -97,6 +154,7 @@ def test_postgres_retention_keeps_latest_ten_regular_dumps_and_preserves_pre_sna
     for index in range(12):
         backup = backup_dir / f"mes_20000101_0000{index:02d}.sql"
         backup.touch()
+        _write_retention_receipt(backup)
         timestamp = time.time() - (100 - index)
         os.utime(backup, (timestamp, timestamp))
         regular.append(backup)
@@ -107,6 +165,14 @@ def test_postgres_retention_keeps_latest_ten_regular_dumps_and_preserves_pre_sna
 
     assert set(removed) == set(regular[:2])
     assert all(path.exists() for path in regular[2:])
+    assert all(
+        backup_retention.manifest_path_for(path).exists()
+        for path in regular[2:]
+    )
+    assert all(
+        not backup_retention.manifest_path_for(path).exists()
+        for path in regular[:2]
+    )
     assert pre_snapshot.exists()
 
 
@@ -120,30 +186,37 @@ def test_retention_tolerates_concurrent_windows_delete_race(
     for index in range(11):
         backup = backup_dir / f"mes_20000101_0000{index:02d}.db"
         backup.touch()
+        _write_retention_receipt(backup)
         os.utime(backup, (index + 1, index + 1))
         regular.append(backup)
     victim = regular[0]
-    original_unlink = Path.unlink
+    original_replace = backup_retention._durable_replace
     raced = False
 
-    def unlink_after_competing_process(
-        path: Path,
-        missing_ok: bool = False,
-    ) -> None:
+    def replace_after_competing_process(source: str | Path, target: str | Path) -> None:
         nonlocal raced
-        if path == victim and not raced:
+        if Path(source) == victim and not raced:
             raced = True
-            original_unlink(path, missing_ok=missing_ok)
-            raise PermissionError(5, "another backup process removed the file", str(path))
-        original_unlink(path, missing_ok=missing_ok)
+            victim.unlink()
+            raise PermissionError(
+                5,
+                "another backup process removed the file",
+                str(victim),
+            )
+        original_replace(source, target)
 
-    monkeypatch.setattr(Path, "unlink", unlink_after_competing_process)
+    monkeypatch.setattr(
+        backup_retention,
+        "_durable_replace",
+        replace_after_competing_process,
+    )
 
     removed = retain_latest_backups(backup_dir, suffix=".db")
 
     assert raced is True
     assert removed == [victim]
     assert not victim.exists()
+    assert not backup_retention.manifest_path_for(victim).exists()
 
 
 @pytest.mark.parametrize(
@@ -170,10 +243,97 @@ def test_preflight_backup_check_ignores_pre_only_snapshots(
     monkeypatch.setenv("MES_RUNTIME_ROOT", str(runtime_root))
     preflight_30_users.results.clear()
 
-    asyncio.run(preflight_30_users.check_backup_exists())
+    asyncio.run(preflight_30_users.check_backup_exists("sqlite"))
 
     assert preflight_30_users.results[-1].level == "WARN"
     assert "백업 파일 없음" in preflight_30_users.results[-1].message
+
+
+def test_preflight_backup_check_never_passes_a_manifestless_recent_backup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime_root = tmp_path / "runtime"
+    backup_dir = runtime_root / "backups" / "sqlite"
+    backup_dir.mkdir(parents=True)
+    artifact = backup_dir / "mes_20260904_120000.db"
+    artifact.write_bytes(b"legacy backup bytes")
+    monkeypatch.setenv("MES_RUNTIME_ROOT", str(runtime_root))
+    preflight_30_users.results.clear()
+
+    asyncio.run(preflight_30_users.check_backup_exists("sqlite"))
+
+    assert preflight_30_users.results[-1].level != "PASS"
+    assert "LEGACY_UNVERIFIED" in preflight_30_users.results[-1].message
+
+
+def test_preflight_backup_check_fails_an_invalid_manifest_receipt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime_root = tmp_path / "runtime"
+    backup_dir = runtime_root / "backups" / "sqlite"
+    backup_dir.mkdir(parents=True)
+    artifact = backup_dir / "mes_20260904_120001.db"
+    artifact.write_bytes(b"invalid receipt bytes")
+    backup_manifest.manifest_path_for(artifact).write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("MES_RUNTIME_ROOT", str(runtime_root))
+    preflight_30_users.results.clear()
+
+    asyncio.run(preflight_30_users.check_backup_exists("sqlite"))
+
+    assert preflight_30_users.results[-1].level == "FAIL"
+    assert "FAIL" in preflight_30_users.results[-1].message
+
+
+def test_preflight_backup_check_rejects_an_incomplete_v1_manifest_pair(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime_root = tmp_path / "runtime"
+    backup_dir = runtime_root / "backups" / "sqlite"
+    backup_dir.mkdir(parents=True)
+    artifact = backup_dir / "mes_20260904_120002.db"
+    artifact.write_bytes(b"verified receipt bytes")
+    manifest = {
+        "contract": backup_manifest.MANIFEST_CONTRACT,
+        "artifact": {
+            "name": artifact.name,
+            "sha256": backup_manifest.file_sha256(artifact),
+            "size": artifact.stat().st_size,
+        },
+        "database": {"engine": "sqlite"},
+        "source_snapshot": {"physical_generation": "a" * 64},
+        "verification": {"status": "PASS"},
+        "runtime_recovery": backup_manifest.RUNTIME_RECOVERY_CONTRACT,
+    }
+    backup_manifest.manifest_path_for(artifact).write_text(
+        json.dumps(manifest),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("MES_RUNTIME_ROOT", str(runtime_root))
+    preflight_30_users.results.clear()
+
+    asyncio.run(preflight_30_users.check_backup_exists("sqlite"))
+
+    assert preflight_30_users.results[-1].level == "FAIL"
+
+
+def test_preflight_backup_check_never_uses_a_different_engine_backup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime_root = tmp_path / "runtime"
+    backup_dir = runtime_root / "backups" / "sqlite"
+    backup_dir.mkdir(parents=True)
+    artifact = backup_dir / "mes_20260904_120003.db"
+    artifact.write_bytes(b"newer sqlite bytes")
+    monkeypatch.setenv("MES_RUNTIME_ROOT", str(runtime_root))
+    preflight_30_users.results.clear()
+
+    asyncio.run(preflight_30_users.check_backup_exists("postgresql"))
+
+    assert preflight_30_users.results[-1].level != "PASS"
 
 
 @pytest.mark.parametrize(
@@ -205,6 +365,15 @@ def test_operations_diagnostics_use_profile_aware_healthcheck_command() -> None:
 
     assert "scripts\\ops\\healthcheck.bat" in operations
     assert "curl http://127.0.0.1:8011/health/detailed" not in operations
+
+
+def test_operations_postgres_resume_requires_an_actual_postgres_backup_command() -> None:
+    operations = (ROOT / "_attic" / "docs" / "OPERATIONS.md").read_text(encoding="utf-8")
+
+    assert "backup_db.bat --postgres" in operations
+    assert "--validation-url" in operations
+    assert "PREFLIGHT_BACKUP_PATH" in operations
+    assert "PREFLIGHT_MANIFEST_PATH" in operations
 
 
 def test_start_documentation_describes_resolved_profiles_instead_of_a_fixed_dev_port() -> None:

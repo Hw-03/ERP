@@ -126,7 +126,7 @@ import sys
 sys.path.insert(0, ".")
 from app.main import app
 out = sys.argv[1]
-with open(out, "w", encoding="utf-8") as f:
+with open(out, "w", encoding="utf-8", newline="\n") as f:
     json.dump(app.openapi(), f, indent=2, sort_keys=True, ensure_ascii=False)
     f.write("\n")
 '@
@@ -135,9 +135,9 @@ with open(out, "w", encoding="utf-8") as f:
                 throw "OpenAPI capture failed"
             }
 
-            $current = Get-Content -LiteralPath $TmpFile -Raw
-            $baseline = Get-Content -LiteralPath $BaselineFile -Raw
-            if ($current -ne $baseline) {
+            $current = (Get-Content -LiteralPath $TmpFile -Raw).Replace("`r`n", "`n").Replace("`r", "`n")
+            $baseline = (Get-Content -LiteralPath $BaselineFile -Raw).Replace("`r`n", "`n").Replace("`r", "`n")
+            if ($current -cne $baseline) {
                 Write-Host ""
                 Write-Host "OpenAPI drift detected. Update _dev/baselines/openapi.json."
                 throw "OpenAPI drift"

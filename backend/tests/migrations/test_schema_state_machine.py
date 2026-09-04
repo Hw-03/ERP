@@ -734,6 +734,10 @@ def test_exact_unversioned_sqlite_uses_verified_runtime_backup(
     assert result.backup.verified is True
     assert result.backup.path.is_file()
     assert result.backup.path.parent == runtime_root / "backups" / "sqlite"
+    manifest = result.backup.path.with_name(
+        f"{result.backup.path.name}.manifest.json"
+    )
+    assert '"status":"STRUCTURAL_ONLY"' in manifest.read_text(encoding="utf-8")
     assert _version_rows(path) == [HEAD_REVISION]
 
 
