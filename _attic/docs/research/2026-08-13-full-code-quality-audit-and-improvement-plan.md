@@ -9,13 +9,13 @@
 - 두 번째 개선 체크포인트 기준 SHA: `90ce42d9fef0505ccbd7f5b7ea86b60760cb09dd`
 - 최신 `main` 동기화 대상 SHA: `78e8023f41ef59528d9d8c07498e7653f9bee247`
 - 현재 실행 위치: `C:\ERP\.worktrees\full-code-quality-checkpoint-2`
-- Git 상태: 장기 품질 브랜치 `codex/full-code-quality-improvement`. CP4 완료 HEAD `e64a9a12da16f8502ab1a1e82dbed2b1d2648a01`에서 고정 `main` `78e8023f41ef59528d9d8c07498e7653f9bee247`을 품질 worktree 방향에만 통합했고, merge commit `deafc335502b46f9ed068bbb11175361826615ea` 뒤 CP5 W4 제품 commit `ac8f26d570e728f193c1b2b40b8efdae7fe2363e`, CI 회귀 수정 commit `8a66907014cfa7c5cd5de90e7d3b42d599a56ccf`, W5 제품 commit `fb339b5dc29013fc97af5035905431177ec54aea`까지 기존 품질 브랜치에 push했다. W5 GitHub CI run `33606010198`은 6/6 success다. `main` 역병합·push·PR·force-push는 없음
-- 실행 진척: 체크포인트 1·3·4 완료. 체크포인트 2의 `IC-04`·`IC-20`은 저장소 구현·로컬 PostgreSQL 실증과 품질 브랜치 CI 실행까지 통과했지만 required-check 설정 증거는 별도 외부 경계로 남긴다. CP4는 workflow 거래 보정 차단, semantic idempotency, handover/correction/cancel 경합, 삭제 품목 참조 보호를 세 hard stop으로 완료했다. CP5는 S0 최신 main 통합, W1 read-only preflight, Gate A 승인, W2 `IC-06` 물리 위치 원장, W3 `IC-07+IC-08` 공통 예약·출하 상태기계, W4 `IC-03-B` 전용 workflow 취소와 Gate C, W5 `IC-17` 공통 무결성 계약까지 완료했다. 다음 순서는 W6 `IC-18`이며 아직 시작하지 않았다.
-- 잔여 작업: 엄격한 완료 판정상 `IC` 15개가 남는다. `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-09`, `IC-10`, `IC-11`, `IC-17`은 완료했다. `IC-04`·`IC-20`의 required-check 외부 증거가 확보되면 13개로 줄며, 최종 closeout `DOC-01`, `AT-01`, `AT-02`도 남아 있다.
-- 최종 판정: **CP5 W5 COMPLETE — W6 `IC-18` 진입 직전 정지**
+- Git 상태: 장기 품질 브랜치 `codex/full-code-quality-improvement`. CP4 완료 HEAD `e64a9a12da16f8502ab1a1e82dbed2b1d2648a01`에서 고정 `main` `78e8023f41ef59528d9d8c07498e7653f9bee247`을 품질 worktree 방향에만 통합했고, merge commit `deafc335502b46f9ed068bbb11175361826615ea` 뒤 CP5 W4 제품 commit `ac8f26d570e728f193c1b2b40b8efdae7fe2363e`, CI 회귀 수정 commit `8a66907014cfa7c5cd5de90e7d3b42d599a56ccf`, W5 제품 commit `fb339b5dc29013fc97af5035905431177ec54aea`, W6 제품 commit `d43ab268cb6fa9dcde94e9b93203978f3550c73d`, CI 이식성 보완 commit `dffb8e01e713d58e3d6df678ee98c0cfc20cd1e5`·`fd34189400f63225164c007bffcf7f561b813eb6`까지 기존 품질 브랜치에 push했다. W6 최종 GitHub CI run `33923104275`는 6/6 success다. `main` 역병합·push·PR·force-push는 없음
+- 실행 진척: 체크포인트 1·3·4 완료. 체크포인트 2의 `IC-04`·`IC-20`은 저장소 구현·로컬 PostgreSQL 실증과 품질 브랜치 CI 실행까지 통과했지만 required-check 설정 증거는 별도 외부 경계로 남긴다. CP4는 workflow 거래 보정 차단, semantic idempotency, handover/correction/cancel 경합, 삭제 품목 참조 보호를 세 hard stop으로 완료했다. CP5는 S0 최신 main 통합, W1 read-only preflight, Gate A 승인, W2 `IC-06` 물리 위치 원장, W3 `IC-07+IC-08` 공통 예약·출하 상태기계, W4 `IC-03-B` 전용 workflow 취소와 Gate C, W5 `IC-17` 공통 무결성 계약, W6 `IC-18` backup·restore 증명까지 완료했다. 다음 순서는 W7 `IC-19`이며 아직 시작하지 않았다.
+- 잔여 작업: 엄격한 완료 판정상 `IC` 14개가 남는다. `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-09`, `IC-10`, `IC-11`, `IC-17`, `IC-18`은 완료했다. `IC-04`·`IC-20`의 required-check 외부 증거가 확보되면 12개로 줄며, 최종 closeout `DOC-01`, `AT-01`, `AT-02`도 남아 있다.
+- 최종 판정: **CP5 W6 COMPLETE — W7 `IC-19` 진입 직전 정지**
 - 문서 성격: 현행 코드의 감사 결과이자 후속 구현 순서의 단일 정본
 
-> **증거 시점 안내:** 2~7절의 코드 줄번호와 실패 서술은 2026-08-13 원 감사 snapshot을 보존한다. 이후 `main`이 바꾼 계약과 충돌하는 문장은 `[STALE]` 역사 증거이며, 현재 판정·구현 경계는 8.9.6절과 12.23절이 우선한다.
+> **증거 시점 안내:** 2~7절의 코드 줄번호와 실패 서술은 2026-08-13 원 감사 snapshot을 보존한다. 이후 `main`이 바꾼 계약과 충돌하는 문장은 `[STALE]` 역사 증거이며, 현재 판정·구현 경계는 8.9.6절과 12.24절이 우선한다.
 
 ---
 
@@ -913,7 +913,9 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 - **실패·복구 정책:** DB missing/empty이면 후속 validator를 실행하지 않고 즉시 요약된 FAIL. SQLite validator는 read-only URI/query-only로만 열어 실패 경로가 빈 DB 파일을 만들지 않는다. stale/invalid backup은 traceback이 아니라 FAIL. PostgreSQL은 pg_dump exit만으로 valid 처리하지 않고 임시 restore 검증 경로를 둔다.
 - **테스트:** WAL-only write 뒤 backup freshness, table/column/index 누락, wrong head, corrupt FK, missing DB에서 파일 생성 0과 후속 subprocess 0, staged restore failure와 원 DB 보존.
 - **합격 조건:** backup valid가 감사 SHA의 schema head와 복구 가능한 snapshot을 의미하고 readiness가 항상 명시적 exit code를 반환한다.
-- **의존성/롤백:** `IC-17`의 check ID/schema를 소비하므로 그 contract 뒤에 적용한다. manifest 없는 legacy backup은 `legacy-unverified`로 읽기만 허용하고 새 verifier 결과를 위조해 PASS시키지 않는다.
+- **의존성/롤백:** `IC-17`의 check ID/schema를 소비하므로 그 contract 뒤에 적용한다. manifest 없는 legacy backup은 `LEGACY_UNVERIFIED`로 읽기만 허용하고 새 verifier 결과를 위조해 PASS시키지 않는다.
+- **체크포인트 상태:** `완료`(2026-09-05). `backup-manifest/v1` sidecar를 artifact 뒤에 원자 publish하고 hash·size·engine·Alembic revision·schema fingerprint·data revision·snapshot hash·검증 receipt를 고정했다. SQLite online backup/WAL freshness와 PostgreSQL dump의 폐기 가능한 임시 DB 복구 검증, staged restore, retention·NAS·cleanup pair, runtime recovery owner까지 같은 계약으로 묶었다.
+- **완료 증거:** SQLite manifest contract 146/146, retention 11/11, 실제 PostgreSQL 28/28, canonical PostgreSQL runner 129 scenarios 100%, 최종 GitHub CI run `33923104275` 6/6 success다. 제품 commit은 `d43ab268cb6fa9dcde94e9b93203978f3550c73d`, CI 이식성 보완은 `dffb8e01e713d58e3d6df678ee98c0cfc20cd1e5`·`fd34189400f63225164c007bffcf7f561b813eb6`이며 세부 closeout은 12.24절을 따른다.
 
 #### `IC-19` health endpoint 의미 분리
 
@@ -1086,11 +1088,11 @@ flowchart LR
 >
 > **추천 실행 형태: 부모 통합 + 경계가 겹치지 않는 카드별 하위 에이전트** - 구현 파일 소유권을 분리하고 최종 통합·검증·상태 갱신은 부모가 맡습니다.
 
-**남은 실행 GOAL:** 체크포인트 5 W5까지 확립한 작업자 신뢰 경계, 물리 위치 원장, 공통 예약, 출하 조건부 상태 전이, 전용 workflow 취소, semantic idempotency, command 경합, 삭제 품목 참조 보호, 공통 무결성 판정을 기반으로 남은 15개 IC 카드를 의존 순서대로 구현해 운영 false-green을 제거한다. `IC-04`·`IC-20`은 저장소·로컬 PostgreSQL 구현과 품질 브랜치 CI 실행이 끝났지만 required-check 외부 증거 대기 상태이므로 이 수에 포함한다.
+**남은 실행 GOAL:** 체크포인트 5 W6까지 확립한 작업자 신뢰 경계, 물리 위치 원장, 공통 예약, 출하 조건부 상태 전이, 전용 workflow 취소, semantic idempotency, command 경합, 삭제 품목 참조 보호, 공통 무결성 판정, backup·restore 증명을 기반으로 남은 14개 IC 카드를 의존 순서대로 구현해 운영 false-green을 제거한다. `IC-04`·`IC-20`은 저장소·로컬 PostgreSQL 구현과 품질 브랜치 CI 실행이 끝났지만 required-check 외부 증거 대기 상태이므로 이 수에 포함한다.
 
 #### 8.9.1 카드 수와 체크포인트 수
 
-`IC-01`~`IC-27` 중 체크포인트 1에서 `IC-02`, `IC-05`, `IC-27`, 체크포인트 3에서 `IC-01`, 체크포인트 4에서 `IC-09`, `IC-10`, `IC-11`, 체크포인트 5 W2에서 `IC-06`, W3에서 `IC-07`, `IC-08`, W4에서 `IC-03`, W5에서 `IC-17`을 완료했다. 체크포인트 2의 `IC-04`·`IC-20`은 저장소 구현·이중 리뷰·로컬 PostgreSQL 실증과 품질 브랜치 CI 성공까지 확보했지만 required-check 설정 증거가 없어 엄격한 완료 상태로 올리지 않는다. 따라서 **남은 IC는 15개**이며, 체크포인트 2 외부 증거가 확보되는 즉시 13개로 줄어든다. `DOC-01`, `AT-01`, `AT-02`는 IC 수에 포함하지 않고 마지막 closeout으로 수행한다.
+`IC-01`~`IC-27` 중 체크포인트 1에서 `IC-02`, `IC-05`, `IC-27`, 체크포인트 3에서 `IC-01`, 체크포인트 4에서 `IC-09`, `IC-10`, `IC-11`, 체크포인트 5 W2에서 `IC-06`, W3에서 `IC-07`, `IC-08`, W4에서 `IC-03`, W5에서 `IC-17`, W6에서 `IC-18`을 완료했다. 체크포인트 2의 `IC-04`·`IC-20`은 저장소 구현·이중 리뷰·로컬 PostgreSQL 실증과 품질 브랜치 CI 성공까지 확보했지만 required-check 설정 증거가 없어 엄격한 완료 상태로 올리지 않는다. 따라서 **남은 IC는 14개**이며, 체크포인트 2 외부 증거가 확보되는 즉시 12개로 줄어든다. `DOC-01`, `AT-01`, `AT-02`는 IC 수에 포함하지 않고 마지막 closeout으로 수행한다.
 
 | 구간 | 상태 | 이 구간에서 완전히 닫는 IC | 구간 종료 후 남은 IC |
 |---|---|---|---:|
@@ -1098,7 +1100,7 @@ flowchart LR
 | 체크포인트 2 | `로컬 구현·리뷰·커밋·PostgreSQL 실증 완료 / GitHub 증거 보류` | `IC-04`, `IC-20` | 외부 증거 전 24, 통과 후 22 |
 | 체크포인트 3 | `완료 / PostgreSQL 경합 NOT_VERIFIED` | `IC-01` | 외부 증거 전 23, 통과 후 21 |
 | 체크포인트 4 | `완료` | `IC-09`, `IC-10`, `IC-11`; `IC-03`은 correction 안전막까지 완료된 `PARTIAL` | 외부 증거 전 20, 통과 후 18 |
-| 체크포인트 5 | `진행 중 — W5 IC-17 완료, W6 IC-18 대기` | `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-17`, `IC-18`, `IC-19` | 외부 증거 전 13, 통과 후 11 |
+| 체크포인트 5 | `진행 중 — W6 IC-18 완료, W7 IC-19 대기` | `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-17`, `IC-18`, `IC-19` | 외부 증거 전 13, 통과 후 11 |
 | 체크포인트 6 | `대기` | `IC-12`, `IC-13`, `IC-14`, `IC-15`, `IC-16`, `IC-25`, `IC-26` | 외부 증거 전 6, 통과 후 4 |
 | 체크포인트 7 | `대기` | `IC-21`, `IC-22`, `IC-23`, `IC-24`; 이후 `DOC-01`, `AT-01`, `AT-02` closeout | 외부 증거 전 2, 통과 후 0 |
 
@@ -1196,7 +1198,7 @@ flowchart LR
 - [x] **`IC-07` + `IC-08` 같은 release 완료 (2026-09-02):** 모든 소비 primitive가 stock pending과 active shipping allocation을 함께 보는 공통 availability를 사용한다. shipping prepare/pickup/cancel은 request lock·deterministic inventory/location/allocation lock·expected status/version·command receipt를 같은 transaction에 적용한다. 실제 PostgreSQL 필수 runner 79/79, 최종 full gate 18/18, Playwright 17/17, GitHub CI 6/6, 독립 리뷰 Critical/Important/Minor 0으로 Gate B를 통과했다.
 - [x] **`IC-03-B` 완료 (2026-09-02):** shipping pickup, production receipt, 완료 IO batch, StockRequest 실행, defect disassembly의 전용 workflow cancel이 기록된 `before_state`, effects, allocation/pending, request/batch 상태, event를 한 transaction으로 되돌린다. 일반 우회와 불완전 legacy는 안정된 409로 차단하고, 실제 PostgreSQL 4개 경합·3자 delta·독립 리뷰·GitHub CI 6/6으로 Gate C를 통과했다.
 - [x] **`IC-17` 완료 (2026-09-02):** CLI·관리자 API·detailed health가 공통 순수 `inventory-integrity/v1` engine을 사용한다. 안정된 check ID/severity/count/samples, blocking exit 1, 사용/config exit 2, DB/schema/tool exit 3을 고정했고 location pending, StockRequest, ShippingAllocation, box/zone/unplaced, orphan, contract v2 effect false-green을 SQLite·실제 PostgreSQL에서 차단했다. 제품 commit `fb339b5d`, 최종 독립 리뷰 0/0/0, GitHub CI run `33606010198` 6/6으로 완료했다.
-- [ ] **`IC-18` 완료:** backup artifact가 snapshot metadata·Alembic head·전체 schema·WAL 시점을 증명하고 restore는 verify와 post-check를 기본값으로 한다.
+- [x] **`IC-18` 완료 (2026-09-05):** `backup-manifest/v1`이 artifact hash·size·engine·Alembic head·schema fingerprint·data revision·snapshot hash·검증 receipt를 증명한다. manifest를 artifact 뒤에 원자 publish하고, SQLite WAL online backup과 stale 판정, PostgreSQL dump의 폐기 가능한 임시 DB restore, staged restore, retention·NAS·cleanup pair를 fail-closed로 고정했다. 제품 commit `d43ab268`, CI 이식성 보완 `dffb8e01`·`fd341894`, 최종 CI run `33923104275` 6/6으로 완료했다.
 - [ ] **`IC-19` 완료:** live는 process, ready는 DB/schema/dependency, detailed/integrity는 업무 불변식이라는 단일 의미로 나누고 운영 consumer를 함께 전환한다.
 
 순서는 `IC-06 read-only preflight`→사용자 승인→`IC-06 runtime`→`IC-07+IC-08`→`IC-03-B`→`IC-17`→`IC-18`→`IC-19`다. `IC-07` availability만 먼저 배포하면 race에서 초과예약될 수 있으므로 `IC-08`의 request/allocation lock·receipt와 같은 release checkpoint에서 함께 닫는다. 각 카드는 별도 change/evidence를 가질 수 있지만 이 순서를 건너뛰지 않는다.
@@ -1999,5 +2001,20 @@ Gate 0은 CI 정본과 같은 Node 20에서 닫고 정본 로컬 검증 entrypoi
 - **불변·동결·종료:** 품질 `backend/mes.db` SHA-256은 전후 `D0419DC051B881DA145B466AF99490570D18C47BCAAE990C57FFD4476FE28147`로 불변이다. 일회용 `test_cp5_w5_staged` DB를 drop하고 격리 cluster를 정상 종료했으며 55432·8021·3100·3300 listener는 0이다. 주간보고, 모바일 하단 tab, desktop shipping step 5 카드 배치 추가 변경은 0이며 `C:\ERP-dev`에는 접근하지 않았다. `C:\ERP` main의 기존 사용자 변경은 읽기 전용으로 두고 수정·stage·commit하지 않았다.
 
 **W5 판정:** `IC-17`은 `완료`다. 엄격한 잔여 IC는 15개이며 다음 단일 구현 범위는 W6 `IC-18` backup·restore 증명이다. W6 작업·thread·제품 변경은 아직 시작하지 않았고 이 지점에서 정지한다.
+
+---
+
+### 12.24 CP5 W6 `IC-18` backup·restore 증명 완료와 W7 정지 경계
+
+- **구현·Git:** 품질 worktree의 기존 branch `codex/full-code-quality-improvement`에서만 구현했다. 제품 commit `d43ab268cb6fa9dcde94e9b93203978f3550c73d`와 GitHub CI에서 드러난 PostgreSQL 도구 탐색·보조 cluster socket 이식성 보완 commit `dffb8e01e713d58e3d6df678ee98c0cfc20cd1e5`, `fd34189400f63225164c007bffcf7f561b813eb6`을 같은 원격 branch에 push했다. 새 branch·force-push·PR·main push/merge는 없었다.
+- **manifest 계약:** `backup-manifest/v1`을 artifact 생성과 검증 뒤에 원자 publish한다. artifact SHA-256·size·engine·Alembic revision·schema fingerprint·data revision·snapshot hash·검증 receipt를 고정하고 manifest 없는 기존 backup은 `LEGACY_UNVERIFIED`로만 분류한다.
+- **복구·freshness 계약:** SQLite는 online backup으로 WAL을 포함하고 source의 후속 WAL commit을 stale로 판정한다. restore는 staged DB에서 head·schema·FK·W5 integrity를 검증한 뒤에만 교체한다. PostgreSQL dump는 폐기 가능한 임시 DB에 먼저 복구해 같은 검사를 통과하기 전 target을 drop하지 않는다. 실제 직원 DB restore·cutover·배포는 수행하지 않았다.
+- **운영 pair 계약:** retention·NAS 전송·cleanup은 artifact와 manifest를 한 쌍으로 처리하고, runtime recovery owner와 Task Scheduler 경계도 같은 fail-closed 증명 계약을 소비한다.
+- **집중 검증:** SQLite manifest contract 146/146, retention 11/11, 실제 PostgreSQL 28/28, canonical PostgreSQL runner 129 scenarios 100%가 통과했다. 전체 backend·frontend·OpenAPI exact·docs와 staged 검증도 통과했다. 증거 정본은 `_attic/runtime/code-quality-improvement/20260904-082523/cp5-w6-ic18/`이다.
+- **CI 이식성 회귀:** 첫 CI는 Ubuntu PATH 밖의 PostgreSQL server binary를, 두 번째 CI는 runner에서 쓸 수 없는 기본 Unix socket 경로를 검출했다. test-only harness가 `pg_config --bindir` fallback, data directory 안의 상대 socket, start log와 정확한 data-dir 정리를 사용하도록 TDD로 보완했다. 최종 GitHub CI run `33923104275`의 6개 job이 모두 success다.
+- **독립 리뷰:** W6 제품 범위의 명세·품질 리뷰는 Critical/Important/Minor 0이다. 최종 CI 이식성 보완 재리뷰는 Critical 0, Important 0이며 한 리뷰어가 실패 cleanup의 보조 진단과 ephemeral port TOCTOU에 비차단 Minor 2를 남겼다. 둘 다 제품·backup 계약을 약화하지 않으며 명시적인 CI 재현이 생길 때 test harness 후속으로 다룬다.
+- **불변·동결·종료:** 품질 `backend/mes.db` SHA-256은 전후 `D0419DC051B881DA145B466AF99490570D18C47BCAAE990C57FFD4476FE28147`로 불변이다. 일회용 PostgreSQL DB는 0이고 8021·3100·3300·55432 listener도 0이다. 주간보고, 모바일 하단 tab, desktop shipping step 5 카드 배치 추가 변경은 0이며 개발·직원 서버에는 연결하거나 영향을 주지 않았다.
+
+**W6 판정:** `IC-18`은 `완료`다. 엄격한 잔여 IC는 14개이며 다음 단일 구현 범위는 W7 `IC-19` health 의미 분리다. W7은 이 closeout을 품질 branch에 고정한 뒤 시작하고 CP6는 시작하지 않는다.
 
 ---
