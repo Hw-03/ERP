@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { WeeklyDetailTable } from "../WeeklyDetailTable";
 
 const group = {
@@ -57,7 +57,7 @@ describe("WeeklyDetailTable verified columns", () => {
   });
 
   it("keeps legacy stock labels outside verified reports", () => {
-    render(<WeeklyDetailTable group={group} stockBasis="legacy" />);
+    render(<WeeklyDetailTable group={group} stockBasis="legacy" onItemSelect={() => {}} />);
 
     expect(screen.getAllByRole("columnheader").map((header) => header.textContent)).toContain("전주 재고");
     expect(screen.getAllByRole("columnheader").map((header) => header.textContent)).toContain("현재 재고");
@@ -67,7 +67,7 @@ describe("WeeklyDetailTable verified columns", () => {
   });
 
   it("sticks the real table header and leaves horizontal scrolling to its parent", () => {
-    render(<WeeklyDetailTable group={group} stockBasis="normal" />);
+    render(<WeeklyDetailTable group={group} stockBasis="normal" onItemSelect={() => {}} />);
 
     const firstHeader = screen.getAllByRole("columnheader")[0];
     expect(firstHeader.closest("thead")).toHaveClass("sticky", "top-0", "z-10");
@@ -76,5 +76,25 @@ describe("WeeklyDetailTable verified columns", () => {
     });
     expect(screen.getByTestId("weekly-detail-summary")).toHaveClass("pt-2");
     expect(screen.getByTestId("weekly-detail-table")).not.toHaveClass("overflow-x-auto");
+  });
+
+  it("opens the selected item from desktop rows and mobile cards", () => {
+    const onItemSelect = vi.fn();
+    render(<WeeklyDetailTable group={group} stockBasis="normal" onItemSelect={onItemSelect} />);
+
+    const desktopRow = screen.getByTestId("weekly-detail-desktop-row-item-1");
+    fireEvent.click(desktopRow);
+    fireEvent.keyDown(desktopRow, { key: "Enter" });
+    fireEvent.keyDown(desktopRow, { key: " " });
+
+    const mobileCard = screen
+      .getAllByRole("button", { name: "CSGR + CSCB BOM 구성 보기" })
+      .find((candidate) => candidate.tagName === "BUTTON");
+    expect(mobileCard).toBeDefined();
+    fireEvent.click(mobileCard!);
+
+    expect(onItemSelect).toHaveBeenCalledTimes(4);
+    expect(onItemSelect).toHaveBeenNthCalledWith(1, group.items[0]);
+    expect(onItemSelect).toHaveBeenNthCalledWith(4, group.items[0]);
   });
 });

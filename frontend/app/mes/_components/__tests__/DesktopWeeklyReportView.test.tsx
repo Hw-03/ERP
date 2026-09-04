@@ -8,6 +8,18 @@ const state = vi.hoisted(() => ({
   useWeeklyReportQuery: vi.fn(),
 }));
 
+const selectedItem = {
+  item_id: "item-bom-1",
+  mes_code: "8-TF-0001",
+  item_name: "DXDR-70 튜브",
+  prev_qty: 0,
+  produce_qty: 0,
+  receive_qty: 0,
+  out_qty: 0,
+  current_qty: 0,
+  delta: 0,
+};
+
 vi.mock("@/lib/api/admin", () => ({
   adminApi: { downloadF705ProductionLog: state.downloadF705ProductionLog },
 }));
@@ -21,9 +33,20 @@ vi.mock("../_weekly_sections/WeeklyGroupCards", () => ({
 }));
 
 vi.mock("../_weekly_sections/WeeklyDetailTable", () => ({
-  WeeklyDetailTable: ({ stockBasis }: { stockBasis: string }) => (
-    <div data-testid="weekly-detail-table" data-stock-basis={stockBasis}>품목 상세</div>
+  WeeklyDetailTable: ({ stockBasis, onItemSelect }: { stockBasis: string; onItemSelect?: (item: typeof selectedItem) => void }) => (
+    <div data-testid="weekly-detail-table" data-stock-basis={stockBasis}>
+      품목 상세
+      <button type="button" onClick={() => onItemSelect?.(selectedItem)}>BOM 열기</button>
+    </div>
   ),
+}));
+
+vi.mock("../_inventory_sections/BomDetailModal", () => ({
+  BomDetailModal: ({ itemId, open, onClose }: { itemId: string; open: boolean; onClose: () => void }) => open ? (
+    <div role="dialog" aria-label="BOM 구성 보기" data-item-id={itemId}>
+      <button type="button" onClick={onClose}>닫기</button>
+    </div>
+  ) : null,
 }));
 
 vi.mock("../_weekly_sections/WeeklyProductionMatrix", () => ({
@@ -277,5 +300,17 @@ describe("DesktopWeeklyReportView F705-02 다운로드", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("8-VF-0006");
     expect(screen.queryByTestId("weekly-production-card")).not.toBeInTheDocument();
     expect(screen.queryByText("공정별 변화")).not.toBeInTheDocument();
+  });
+
+  it("주간보고 품목을 선택하면 해당 BOM 모달을 열고 닫는다", () => {
+    renderWeekly();
+
+    fireEvent.click(screen.getByRole("button", { name: "BOM 열기" }));
+
+    const dialog = screen.getByRole("dialog", { name: "BOM 구성 보기" });
+    expect(dialog).toHaveAttribute("data-item-id", selectedItem.item_id);
+
+    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
+    expect(screen.queryByRole("dialog", { name: "BOM 구성 보기" })).not.toBeInTheDocument();
   });
 });

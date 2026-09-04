@@ -372,6 +372,8 @@ interface Props {
   tapToExpandName?: boolean;
   /** 팝업 본문용 — 부모 식별, 현재 재고, 재시도를 표시한다. */
   modal?: boolean;
+  /** 주간보고 모바일 시트용 — 현재 재고·생산 가능 수량과 구성품 재고를 함께 표시한다. */
+  mobileDetail?: boolean;
 }
 
 export function useBomTree(itemId: string, open: boolean, departmentOrder?: "desc") {
@@ -589,7 +591,14 @@ export function ModalBomTree({ tree, expandedItemIds, onToggleItem }: ModalBomTr
   );
 }
 
-export function BomSubExpander({ itemId, open, compact = false, tapToExpandName = false, modal = false }: Props) {
+export function BomSubExpander({
+  itemId,
+  open,
+  compact = false,
+  tapToExpandName = false,
+  modal = false,
+  mobileDetail = false,
+}: Props) {
   const { tree, retry } = useBomTree(itemId, open);
 
   if (!open) return null;
@@ -624,6 +633,37 @@ export function BomSubExpander({ itemId, open, compact = false, tapToExpandName 
         </span>
       </div>}
 
+      {mobileDetail && tree && <div
+        data-testid="bom-mobile-detail-summary"
+        className="flex flex-wrap gap-2 border-b px-3 py-3"
+        style={{ borderColor: LEGACY_COLORS.border }}
+      >
+        <span
+          className="rounded-full px-2.5 py-1 text-xs font-bold tabular-nums"
+          style={{
+            color: tree.current_stock === 0 ? LEGACY_COLORS.red : LEGACY_COLORS.muted2,
+            background: LEGACY_COLORS.s1,
+          }}
+        >
+          현재 재고 {formatQty(tree.current_stock)} {tree.unit}
+        </span>
+        <span
+          className="rounded-full px-2.5 py-1 text-xs font-bold tabular-nums"
+          style={{
+            color: tree.additional_producible_quantity && tree.additional_producible_quantity > 0
+              ? LEGACY_COLORS.purple
+              : LEGACY_COLORS.muted2,
+            background: tree.additional_producible_quantity && tree.additional_producible_quantity > 0
+              ? tint(LEGACY_COLORS.purple, 12)
+              : LEGACY_COLORS.s1,
+          }}
+        >
+          {typeof tree.additional_producible_quantity === "number"
+            ? `추가 생산 가능 ${formatQty(tree.additional_producible_quantity)} ${tree.unit}`
+            : "추가 생산 가능 계산 불가"}
+        </span>
+      </div>}
+
       {tree === null && (
         <div
           className={modal ? "rounded-[18px] border px-4 py-8 text-center text-sm" : "px-3 py-3 text-xs"}
@@ -644,7 +684,7 @@ export function BomSubExpander({ itemId, open, compact = false, tapToExpandName 
           하위 구성을 불러오지 못했습니다.
         </div>
       )}
-      {modal && tree === false && <button
+      {(modal || mobileDetail) && tree === false && <button
         type="button"
         onClick={retry}
         className="mt-3 min-h-11 rounded-[10px] border px-4 py-2 text-sm font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
@@ -722,7 +762,7 @@ export function BomSubExpander({ itemId, open, compact = false, tapToExpandName 
               isLast={index === tree.children.length - 1}
               compact={compact}
               tapToExpandName={tapToExpandName}
-              stock={false}
+              stock={mobileDetail}
             />)}
           </ul>
         )}

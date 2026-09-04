@@ -3,7 +3,7 @@
 import { memo } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
-import type { WeeklyGroupReport } from "@/lib/api/types/weekly";
+import type { WeeklyGroupReport, WeeklyItemReport } from "@/lib/api/types/weekly";
 import { EmptyState } from "../common/EmptyState";
 
 // 0 값 de-emphasis — WCAG AA 충족(투명 30% 는 미달) → 솔리드 muted2(5.55:1).
@@ -12,9 +12,10 @@ const ZERO_FADE = LEGACY_COLORS.muted2;
 interface Props {
   group: WeeklyGroupReport | undefined;
   stockBasis: "legacy" | "normal";
+  onItemSelect: (item: WeeklyItemReport) => void;
 }
 
-function WeeklyDetailTableImpl({ group, stockBasis }: Props) {
+function WeeklyDetailTableImpl({ group, stockBasis, onItemSelect }: Props) {
   if (!group || group.items.length === 0) {
     return (
       <EmptyState
@@ -111,9 +112,12 @@ function WeeklyDetailTableImpl({ group, stockBasis }: Props) {
           const deltaColor =
             d > 0 ? LEGACY_COLORS.green : d < 0 ? LEGACY_COLORS.red : LEGACY_COLORS.muted2;
           return (
-            <div
+            <button
               key={row.item_id}
-              className="rounded-[14px] border p-3"
+              type="button"
+              onClick={() => onItemSelect(row)}
+              aria-label={`${row.item_name} BOM 구성 보기`}
+              className="w-full rounded-[14px] border p-3 text-left transition-colors hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
               style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
             >
               <div className="flex items-start justify-between gap-2">
@@ -160,7 +164,7 @@ function WeeklyDetailTableImpl({ group, stockBasis }: Props) {
                   </div>
                 ))}
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
@@ -224,7 +228,21 @@ function WeeklyDetailTableImpl({ group, stockBasis }: Props) {
                 : LEGACY_COLORS.border;
 
               return (
-                <tr key={row.item_id}>
+                <tr
+                  key={row.item_id}
+                  data-testid={`weekly-detail-desktop-row-${row.item_id}`}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${row.item_name} BOM 구성 보기`}
+                  onClick={() => onItemSelect(row)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      onItemSelect(row);
+                    }
+                  }}
+                  className="cursor-pointer transition-[filter] hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)] focus-visible:outline-offset-2"
+                >
                   {/* 품목 코드 */}
                   <td
                     className="rounded-l-[12px] border-y border-l py-1.5 pl-3 pr-3 text-[14px] font-bold"

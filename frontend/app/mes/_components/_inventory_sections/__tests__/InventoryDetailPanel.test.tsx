@@ -912,6 +912,21 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     fireEvent.click(rowContext.getByRole("button", { expanded: false }));
     expect(await screen.findByText("하위 구성품")).toBeInTheDocument();
   });
+
+  it("shows live stock details and retry controls for the mobile BOM detail view", async () => {
+    vi.spyOn(api, "getBOMTree")
+      .mockResolvedValueOnce({ ...bomTree, current_stock: 3, additional_producible_quantity: 8 })
+      .mockRejectedValueOnce(new Error("network failure"));
+    const { rerender } = render(<BomSubExpander itemId="item-1" open compact mobileDetail />);
+
+    const summary = await screen.findByTestId("bom-mobile-detail-summary");
+    expect(summary).toHaveTextContent("현재 재고 3 EA");
+    expect(summary).toHaveTextContent("추가 생산 가능 8 EA");
+    expect(screen.getByText("현재 재고 10 EA")).toBeInTheDocument();
+
+    rerender(<BomSubExpander itemId="item-2" open compact mobileDetail />);
+    expect(await screen.findByRole("button", { name: "다시 시도" })).toBeInTheDocument();
+  });
 });
 
 describe("InventoryDetailPanel mobile BOM viewer", () => {
