@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime, timezone
 import json
+import locale
 import os
 from pathlib import Path
 import shutil
@@ -192,6 +193,135 @@ def test_postgres_server_binary_resolver_fails_clearly_without_pg_config(
         _resolve_postgres_server_binary("initdb")
 
 
+def test_secondary_postgres_cluster_uses_writable_root_socket_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    commands: list[list[str]] = []
+
+    def fake_which(name: str) -> str | None:
+        return f"C:/postgres/bin/{name}.exe"
+
+    def fake_run(
+        args: list[str],
+        **_kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        commands.append(args)
+        if args[0].endswith("initdb.exe"):
+            Path(args[args.index("-D") + 1]).mkdir()
+        return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(shutil, "which", fake_which)
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    with _secondary_postgres_cluster(tmp_path, user="postgres") as (port, _url):
+        pass
+
+    socket_dir = tmp_path / "secondary-postgres" / "socket"
+    probe = socket_dir / "write-probe"
+    try:
+        probe.write_text("writable", encoding="utf-8")
+    except OSError:
+        socket_writable = False
+    else:
+        socket_writable = True
+        probe.unlink()
+    start_command = next(command for command in commands if command[-1] == "start")
+    server_options = start_command[start_command.index("-o") + 1]
+
+    assert {
+        "exists": socket_dir.is_dir(),
+        "writable": socket_writable,
+        "server_options": server_options,
+    } == {
+        "exists": True,
+        "writable": True,
+        "server_options": f'-h 127.0.0.1 -p {port} -k "socket"',
+    }
+
+
+def test_secondary_postgres_cluster_start_failure_reports_stderr_and_server_log(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    server_log = tmp_path / "secondary-postgres.log"
+    pg_ctl_stderr = tmp_path / "pg_ctl-start.stderr.log"
+
+    def fake_which(name: str) -> str | None:
+        return f"C:/postgres/bin/{name}.exe"
+
+    def fake_run(
+        args: list[str],
+        **_kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        if args[0].endswith("initdb.exe"):
+            Path(args[args.index("-D") + 1]).mkdir()
+        if args[-1] == "start":
+            server_log.write_text(
+                "FATAL: could not create Unix-domain socket lock file\n",
+                encoding="utf-8",
+            )
+            pg_ctl_stderr.write_text(
+                "pg_ctl: could not start server\n",
+                encoding="utf-8",
+            )
+            raise subprocess.CalledProcessError(
+                1,
+                args,
+            )
+        return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(shutil, "which", fake_which)
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    with pytest.raises(AssertionError) as error:
+        with _secondary_postgres_cluster(tmp_path, user="postgres"):
+            pass
+
+    message = str(error.value)
+    assert "secondary PostgreSQL cluster failed to start" in message
+    assert "pg_ctl: could not start server" in message
+    assert "FATAL: could not create Unix-domain socket lock file" in message
+
+
+def test_secondary_postgres_cluster_start_failure_stops_exact_data_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    commands: list[list[str]] = []
+
+    def fake_which(name: str) -> str | None:
+        return f"C:/postgres/bin/{name}.exe"
+
+    def fake_run(
+        args: list[str],
+        **_kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        commands.append(args)
+        if args[0].endswith("initdb.exe"):
+            Path(args[args.index("-D") + 1]).mkdir()
+        if args[-1] == "start":
+            raise subprocess.CalledProcessError(1, args)
+        return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(shutil, "which", fake_which)
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    with pytest.raises(AssertionError):
+        with _secondary_postgres_cluster(tmp_path, user="postgres"):
+            pass
+
+    assert commands[-1] == [
+        "C:/postgres/bin/pg_ctl.exe",
+        "-D",
+        str(tmp_path / "secondary-postgres"),
+        "-m",
+        "fast",
+        "-w",
+        "stop",
+    ]
+
+
 @contextmanager
 def _secondary_postgres_cluster(
     root: Path,
@@ -203,6 +333,7 @@ def _secondary_postgres_cluster(
     initdb = _resolve_postgres_server_binary("initdb")
     pg_ctl = _resolve_postgres_server_binary("pg_ctl")
     data_dir = root / "secondary-postgres"
+    stop_command = [pg_ctl, "-D", str(data_dir), "-m", "fast", "-w", "stop"]
     subprocess.run(
         [
             initdb,
@@ -221,25 +352,61 @@ def _secondary_postgres_cluster(
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
         listener.bind(("127.0.0.1", 0))
         port = int(listener.getsockname()[1])
-    subprocess.run(
-        [
-            pg_ctl,
-            "-D",
-            str(data_dir),
-            "-o",
-            f"-h 127.0.0.1 -p {port}",
-            "-w",
-            "start",
-        ],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        check=True,
-    )
+    socket_dir = data_dir / "socket"
+    socket_dir.mkdir()
+    server_log = root / "secondary-postgres.log"
+    pg_ctl_stdout = root / "pg_ctl-start.stdout.log"
+    pg_ctl_stderr = root / "pg_ctl-start.stderr.log"
+    try:
+        with pg_ctl_stdout.open("wb") as stdout, pg_ctl_stderr.open("wb") as stderr:
+            subprocess.run(
+                [
+                    pg_ctl,
+                    "-D",
+                    str(data_dir),
+                    "-l",
+                    str(server_log),
+                    "-o",
+                    f'-h 127.0.0.1 -p {port} -k "{socket_dir.name}"',
+                    "-w",
+                    "start",
+                ],
+                stdout=stdout,
+                stderr=stderr,
+                check=True,
+            )
+    except subprocess.CalledProcessError as exc:
+        subprocess.run(
+            stop_command,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        output_encoding = locale.getpreferredencoding(False)
+        stdout_output = pg_ctl_stdout.read_text(
+            encoding=output_encoding,
+            errors="replace",
+        )
+        stderr_output = pg_ctl_stderr.read_text(
+            encoding=output_encoding,
+            errors="replace",
+        )
+        server_output = (
+            server_log.read_text(encoding=output_encoding, errors="replace")
+            if server_log.is_file()
+            else "<server log was not created>"
+        )
+        raise AssertionError(
+            "secondary PostgreSQL cluster failed to start\n"
+            f"stdout:\n{stdout_output or '<empty>'}\n"
+            f"stderr:\n{stderr_output or '<empty>'}\n"
+            f"server log ({server_log}):\n{server_output}"
+        ) from exc
     try:
         yield port, f"postgresql://{user}@127.0.0.1:{port}/postgres"
     finally:
         subprocess.run(
-            [pg_ctl, "-D", str(data_dir), "-m", "fast", "-w", "stop"],
+            stop_command,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             check=True,
