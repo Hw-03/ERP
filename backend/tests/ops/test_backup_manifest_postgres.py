@@ -83,6 +83,115 @@ def _render_url(base_url: sa.engine.URL, database_name: str) -> str:
     return base_url.set(database=database_name).render_as_string(hide_password=False)
 
 
+def _resolve_postgres_server_binary(name: str) -> str:
+    """Resolve a server binary when distributions expose only pg_config on PATH."""
+
+    direct_path = shutil.which(name)
+    if direct_path is not None:
+        return direct_path
+
+    pg_config = shutil.which("pg_config")
+    if pg_config is None:
+        raise AssertionError(
+            f"PostgreSQL server binary {name!r} was not found on PATH and "
+            "pg_config is unavailable"
+        )
+
+    try:
+        result = subprocess.run(
+            [pg_config, "--bindir"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise AssertionError(
+            f"pg_config --bindir failed while resolving PostgreSQL server binary "
+            f"{name!r}"
+        ) from exc
+
+    bindir_text = result.stdout.strip()
+    bindir = Path(bindir_text)
+    if not bindir_text or not bindir.is_absolute():
+        raise AssertionError(
+            "pg_config --bindir did not return an absolute path: "
+            f"{bindir_text!r}"
+        )
+
+    for candidate in (bindir / name, bindir / f"{name}.exe"):
+        if candidate.is_file():
+            return str(candidate)
+
+    raise AssertionError(
+        f"PostgreSQL server binary {name!r} was not found on PATH or in "
+        f"pg_config bindir {bindir}"
+    )
+
+
+def test_postgres_server_binary_resolver_prefers_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    direct_path = "C:/postgres/bin/initdb.exe"
+
+    def fake_which(name: str) -> str | None:
+        return direct_path if name == "initdb" else None
+
+    def unexpected_run(*args: object, **kwargs: object) -> None:
+        pytest.fail("pg_config must not run when the server binary is on PATH")
+
+    monkeypatch.setattr(shutil, "which", fake_which)
+    monkeypatch.setattr(subprocess, "run", unexpected_run)
+
+    assert _resolve_postgres_server_binary("initdb") == direct_path
+
+
+@pytest.mark.parametrize(
+    ("binary_name", "candidate_name"),
+    [("initdb", "initdb"), ("pg_ctl", "pg_ctl.exe")],
+)
+def test_postgres_server_binary_resolver_uses_pg_config_bindir(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    binary_name: str,
+    candidate_name: str,
+) -> None:
+    bindir = tmp_path / "server-bin"
+    bindir.mkdir()
+    candidate = bindir / candidate_name
+    candidate.touch()
+    pg_config = str(tmp_path / "client-bin" / "pg_config.exe")
+
+    def fake_which(name: str) -> str | None:
+        return pg_config if name == "pg_config" else None
+
+    def fake_run(
+        args: list[str],
+        *,
+        capture_output: bool,
+        text: bool,
+        check: bool,
+    ) -> subprocess.CompletedProcess[str]:
+        assert args == [pg_config, "--bindir"]
+        assert capture_output is True
+        assert text is True
+        assert check is True
+        return subprocess.CompletedProcess(args, 0, stdout=f"{bindir}\n", stderr="")
+
+    monkeypatch.setattr(shutil, "which", fake_which)
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    assert _resolve_postgres_server_binary(binary_name) == str(candidate)
+
+
+def test_postgres_server_binary_resolver_fails_clearly_without_pg_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(shutil, "which", lambda _name: None)
+
+    with pytest.raises(AssertionError, match="pg_config is unavailable"):
+        _resolve_postgres_server_binary("initdb")
+
+
 @contextmanager
 def _secondary_postgres_cluster(
     root: Path,
@@ -91,9 +200,8 @@ def _secondary_postgres_cluster(
 ) -> Iterator[tuple[int, str]]:
     """Start one isolated trust-auth cluster and stop only that exact data dir."""
 
-    initdb = shutil.which("initdb")
-    pg_ctl = shutil.which("pg_ctl")
-    assert initdb is not None and pg_ctl is not None
+    initdb = _resolve_postgres_server_binary("initdb")
+    pg_ctl = _resolve_postgres_server_binary("pg_ctl")
     data_dir = root / "secondary-postgres"
     subprocess.run(
         [
