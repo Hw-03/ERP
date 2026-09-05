@@ -9,13 +9,13 @@
 - 두 번째 개선 체크포인트 기준 SHA: `90ce42d9fef0505ccbd7f5b7ea86b60760cb09dd`
 - 최신 `main` 동기화 대상 SHA: `78e8023f41ef59528d9d8c07498e7653f9bee247`
 - 현재 실행 위치: `C:\ERP\.worktrees\full-code-quality-checkpoint-2`
-- Git 상태: 장기 품질 브랜치 `codex/full-code-quality-improvement`. CP4 완료 HEAD `e64a9a12da16f8502ab1a1e82dbed2b1d2648a01`에서 고정 `main` `78e8023f41ef59528d9d8c07498e7653f9bee247`을 품질 worktree 방향에만 통합했고, merge commit `deafc335502b46f9ed068bbb11175361826615ea` 뒤 CP5 W4 제품 commit `ac8f26d570e728f193c1b2b40b8efdae7fe2363e`, CI 회귀 수정 commit `8a66907014cfa7c5cd5de90e7d3b42d599a56ccf`, W5 제품 commit `fb339b5dc29013fc97af5035905431177ec54aea`, W6 제품 commit `d43ab268cb6fa9dcde94e9b93203978f3550c73d`, CI 이식성 보완 commit `dffb8e01e713d58e3d6df678ee98c0cfc20cd1e5`·`fd34189400f63225164c007bffcf7f561b813eb6`까지 기존 품질 브랜치에 push했다. W6 최종 GitHub CI run `33923104275`는 6/6 success다. `main` 역병합·push·PR·force-push는 없음
-- 실행 진척: 체크포인트 1·3·4 완료. 체크포인트 2의 `IC-04`·`IC-20`은 저장소 구현·로컬 PostgreSQL 실증과 품질 브랜치 CI 실행까지 통과했지만 required-check 설정 증거는 별도 외부 경계로 남긴다. CP4는 workflow 거래 보정 차단, semantic idempotency, handover/correction/cancel 경합, 삭제 품목 참조 보호를 세 hard stop으로 완료했다. CP5는 S0 최신 main 통합, W1 read-only preflight, Gate A 승인, W2 `IC-06` 물리 위치 원장, W3 `IC-07+IC-08` 공통 예약·출하 상태기계, W4 `IC-03-B` 전용 workflow 취소와 Gate C, W5 `IC-17` 공통 무결성 계약, W6 `IC-18` backup·restore 증명까지 완료했다. 다음 순서는 W7 `IC-19`이며 아직 시작하지 않았다.
-- 잔여 작업: 엄격한 완료 판정상 `IC` 14개가 남는다. `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-09`, `IC-10`, `IC-11`, `IC-17`, `IC-18`은 완료했다. `IC-04`·`IC-20`의 required-check 외부 증거가 확보되면 12개로 줄며, 최종 closeout `DOC-01`, `AT-01`, `AT-02`도 남아 있다.
-- 최종 판정: **CP5 W6 COMPLETE — W7 `IC-19` 진입 직전 정지**
+- Git 상태: 장기 품질 브랜치 `codex/full-code-quality-improvement`. CP4 완료 HEAD `e64a9a12da16f8502ab1a1e82dbed2b1d2648a01`에서 고정 `main` `78e8023f41ef59528d9d8c07498e7653f9bee247`을 품질 worktree 방향에만 통합했고, merge commit `deafc335502b46f9ed068bbb11175361826615ea` 뒤 CP5 W4 제품 commit `ac8f26d570e728f193c1b2b40b8efdae7fe2363e`, CI 회귀 수정 commit `8a66907014cfa7c5cd5de90e7d3b42d599a56ccf`, W5 제품 commit `fb339b5dc29013fc97af5035905431177ec54aea`, W6 제품 commit `d43ab268cb6fa9dcde94e9b93203978f3550c73d`, CI 이식성 보완 commit `dffb8e01e713d58e3d6df678ee98c0cfc20cd1e5`·`fd34189400f63225164c007bffcf7f561b813eb6`, W7 제품 commit `b27ba39cd2cbad574fda30af9c118697086c30ad`까지 기존 품질 브랜치에 push했다. W7 최종 GitHub CI run `33934558904`는 6/6 success다. `main` 역병합·push·PR·force-push는 없음
+- 실행 진척: 체크포인트 1·3·4 완료. 체크포인트 2의 `IC-04`·`IC-20`은 저장소 구현·로컬 PostgreSQL 실증과 품질 브랜치 CI 실행까지 통과했지만 required-check 설정 증거는 별도 외부 경계로 남긴다. CP4는 workflow 거래 보정 차단, semantic idempotency, handover/correction/cancel 경합, 삭제 품목 참조 보호를 세 hard stop으로 완료했다. CP5는 S0 최신 main 통합부터 W7 `IC-19` health 의미 분리까지 전 단계를 완료했다. CP6는 시작하지 않았다.
+- 잔여 작업: 엄격한 완료 판정상 `IC` 13개가 남는다. `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-09`, `IC-10`, `IC-11`, `IC-17`, `IC-18`, `IC-19`는 완료했다. `IC-04`·`IC-20`의 required-check 외부 증거가 확보되면 11개로 줄며, 최종 closeout `DOC-01`, `AT-01`, `AT-02`도 남아 있다.
+- 최종 판정: **CP5 COMPLETE — CP6 미착수**
 - 문서 성격: 현행 코드의 감사 결과이자 후속 구현 순서의 단일 정본
 
-> **증거 시점 안내:** 2~7절의 코드 줄번호와 실패 서술은 2026-08-13 원 감사 snapshot을 보존한다. 이후 `main`이 바꾼 계약과 충돌하는 문장은 `[STALE]` 역사 증거이며, 현재 판정·구현 경계는 8.9.6절과 12.24절이 우선한다.
+> **증거 시점 안내:** 2~7절의 코드 줄번호와 실패 서술은 2026-08-13 원 감사 snapshot을 보존한다. 이후 `main`이 바꾼 계약과 충돌하는 문장은 `[STALE]` 역사 증거이며, 현재 판정·구현 경계는 8.9.6절과 12.25절이 우선한다.
 
 ---
 
@@ -635,7 +635,7 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 | `QP-018` shipping frontend module 심화 | **근거 부족** | 대형 조정 component는 남지만 구조 분해 자체보다 QP-006/011과 pagination이 선행이다. 선행 seam을 닫은 뒤 다시 측정한다. | `IC-13`, `IC-16`, `IC-24` 후 재평가 |
 | `QP-019` desktop/mobile IO 공통화 | **해결** | 두 shell이 실제로 `useIoSubmit` 등 공용 hook을 사용해 ADR-0003과 일치한다. 추가 통합을 위한 중복 결함 근거가 없다. | 변경 없음 |
 | `QP-020` OpenAPI↔frontend type | **미해결** | OpenAPI drift gate는 있으나 frontend는 수동 DTO이며 `package_out`/nullable drift가 확인됐다. | `IC-21` |
-| `QP-021` health·오류·shipping 조회 | **부분 해결** | live DB ping과 history pagination이 있고 `IC-27`로 schema report exit 의미는 분리됐다. true liveness/readiness 분리, active list pagination, mobile load-more는 부족하다. | `IC-16`, `IC-19`; `IC-27` 완료 |
+| `QP-021` health·오류·shipping 조회 | **부분 해결** | `IC-19`로 DB 독립 liveness, DB·schema·blocking integrity readiness와 sanitized detailed 진단을 분리했고 `IC-27`의 schema report exit 의미도 유지했다. active list pagination과 mobile load-more는 부족하다. | `IC-16`; `IC-19`, `IC-27` 완료 |
 | `QP-022` bundle·responsive shell·문서 | **부분 해결** | build/bundle gate는 통과. client width shell swap/static import와 문서 drift는 남는다. responsive shell은 `IC-24`에서 실제 bundle/render 측정 후 변경 여부를 결정하고 문서는 `DOC-01`로 고친다. | `IC-24`, `DOC-01` |
 | `QP-023` 측정형 위생 | **부분 해결** | BOM cache와 query-zero test는 개선됨. SWR/useResource 미사용, hook suppression, BOM bytes, dependency는 측정 후 처리한다. | `IC-22`, `IC-24`, `AT-01` |
 
@@ -920,13 +920,15 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 #### `IC-19` health endpoint 의미 분리
 
 - **작업자 영향:** 프로세스가 살아 있는지와 업무를 받아도 되는지를 운영자가 구분할 수 있다.
-- **근거/근본 원인:** `/health/live`가 DB SELECT에 의존하고 detailed는 total 식 일부만 반영한다. `backend/app/main.py:319-378`, `services/integrity.py:88-118`
+- **근거/수정 전 원인:** 수정 전 `/health/live`가 DB SELECT에 의존하고 detailed는 total 식 일부만 반영했다. 원 감사 근거는 `backend/app/main.py:319-378`, `services/integrity.py:88-118`이다.
 - **수정 경계:** live는 process event loop만, ready는 DB 연결·schema head·필수 dependency, detailed/integrity는 업무 불변식을 담당한다.
 - **API/type/schema:** health response field를 versioned 문서로 고정하고 deploy/readiness scripts consumer를 함께 수정한다.
 - **실패 정책:** DB down은 live 200/ready 503, invariant mismatch는 ready 정책 결정에 따라 503 또는 별도 operational block으로 명시한다.
 - **테스트:** process up/DB down/wrong schema/invariant fail, deployment script routing.
 - **합격 조건:** 각 endpoint가 한 의미만 가지며 운영 문서와 script가 같은 endpoint를 사용한다.
 - **의존성/롤백:** `IC-17` check severity와 `IC-18` operational consumer contract 뒤에 적용한다. 기존 `/health/live` alias를 한 release 유지하되 새 orchestration은 `/health/ready`로 먼저 전환한다.
+- **체크포인트 상태:** `완료`(2026-09-05). `/health/live`는 DB를 조회하지 않는 process/event-loop liveness로 고정했고(`backend/app/main.py:367`), `/health/ready`는 DB·Alembic head·dependency·blocking integrity를 판정한다(`backend/app/main.py:397-596`). `/health/detailed`는 같은 readiness 결과와 sanitized integrity ID/count를 additive로 제공한다(`backend/app/main.py:647-706`). startup·E2E는 ready, Docker·restart는 live를 소비하며 status/watch는 alive와 ready를 분리했다.
+- **완료 증거:** 제품 commit `b27ba39cd2cbad574fda30af9c118697086c30ad`, backend focused 64건, Node 20 E2E readiness 계약 7/7, PowerShell runtime 계약, 실제 PostgreSQL을 포함한 로컬 full gate 18/18, Playwright 17/17, 독립 명세·품질 리뷰 Critical/Important/Minor 0, GitHub CI run `33934558904` 6/6 success다. 세부 closeout은 12.25절을 따른다.
 
 ### 8.6 Wave 5 — 일반 구조·타입·테스트 seam
 
@@ -1088,11 +1090,11 @@ flowchart LR
 >
 > **추천 실행 형태: 부모 통합 + 경계가 겹치지 않는 카드별 하위 에이전트** - 구현 파일 소유권을 분리하고 최종 통합·검증·상태 갱신은 부모가 맡습니다.
 
-**남은 실행 GOAL:** 체크포인트 5 W6까지 확립한 작업자 신뢰 경계, 물리 위치 원장, 공통 예약, 출하 조건부 상태 전이, 전용 workflow 취소, semantic idempotency, command 경합, 삭제 품목 참조 보호, 공통 무결성 판정, backup·restore 증명을 기반으로 남은 14개 IC 카드를 의존 순서대로 구현해 운영 false-green을 제거한다. `IC-04`·`IC-20`은 저장소·로컬 PostgreSQL 구현과 품질 브랜치 CI 실행이 끝났지만 required-check 외부 증거 대기 상태이므로 이 수에 포함한다.
+**남은 실행 GOAL:** 체크포인트 5까지 확립한 작업자 신뢰 경계, 물리 위치 원장, 공통 예약, 출하 조건부 상태 전이, 전용 workflow 취소, semantic idempotency, command 경합, 삭제 품목 참조 보호, 공통 무결성 판정, backup·restore 증명, health 의미 분리를 기반으로 남은 13개 IC 카드를 의존 순서대로 구현해 운영 false-green을 제거한다. `IC-04`·`IC-20`은 저장소·로컬 PostgreSQL 구현과 품질 브랜치 CI 실행이 끝났지만 required-check 외부 증거 대기 상태이므로 이 수에 포함한다.
 
 #### 8.9.1 카드 수와 체크포인트 수
 
-`IC-01`~`IC-27` 중 체크포인트 1에서 `IC-02`, `IC-05`, `IC-27`, 체크포인트 3에서 `IC-01`, 체크포인트 4에서 `IC-09`, `IC-10`, `IC-11`, 체크포인트 5 W2에서 `IC-06`, W3에서 `IC-07`, `IC-08`, W4에서 `IC-03`, W5에서 `IC-17`, W6에서 `IC-18`을 완료했다. 체크포인트 2의 `IC-04`·`IC-20`은 저장소 구현·이중 리뷰·로컬 PostgreSQL 실증과 품질 브랜치 CI 성공까지 확보했지만 required-check 설정 증거가 없어 엄격한 완료 상태로 올리지 않는다. 따라서 **남은 IC는 14개**이며, 체크포인트 2 외부 증거가 확보되는 즉시 12개로 줄어든다. `DOC-01`, `AT-01`, `AT-02`는 IC 수에 포함하지 않고 마지막 closeout으로 수행한다.
+`IC-01`~`IC-27` 중 체크포인트 1에서 `IC-02`, `IC-05`, `IC-27`, 체크포인트 3에서 `IC-01`, 체크포인트 4에서 `IC-09`, `IC-10`, `IC-11`, 체크포인트 5에서 `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-17`, `IC-18`, `IC-19`를 완료했다. 체크포인트 2의 `IC-04`·`IC-20`은 저장소 구현·이중 리뷰·로컬 PostgreSQL 실증과 품질 브랜치 CI 성공까지 확보했지만 required-check 설정 증거가 없어 엄격한 완료 상태로 올리지 않는다. 따라서 **남은 IC는 13개**이며, 체크포인트 2 외부 증거가 확보되는 즉시 11개로 줄어든다. `DOC-01`, `AT-01`, `AT-02`는 IC 수에 포함하지 않고 마지막 closeout으로 수행한다.
 
 | 구간 | 상태 | 이 구간에서 완전히 닫는 IC | 구간 종료 후 남은 IC |
 |---|---|---|---:|
@@ -1100,7 +1102,7 @@ flowchart LR
 | 체크포인트 2 | `로컬 구현·리뷰·커밋·PostgreSQL 실증 완료 / GitHub 증거 보류` | `IC-04`, `IC-20` | 외부 증거 전 24, 통과 후 22 |
 | 체크포인트 3 | `완료 / PostgreSQL 경합 NOT_VERIFIED` | `IC-01` | 외부 증거 전 23, 통과 후 21 |
 | 체크포인트 4 | `완료` | `IC-09`, `IC-10`, `IC-11`; `IC-03`은 correction 안전막까지 완료된 `PARTIAL` | 외부 증거 전 20, 통과 후 18 |
-| 체크포인트 5 | `진행 중 — W6 IC-18 완료, W7 IC-19 대기` | `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-17`, `IC-18`, `IC-19` | 외부 증거 전 13, 통과 후 11 |
+| 체크포인트 5 | `완료` | `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-17`, `IC-18`, `IC-19` | 외부 증거 전 13, 통과 후 11 |
 | 체크포인트 6 | `대기` | `IC-12`, `IC-13`, `IC-14`, `IC-15`, `IC-16`, `IC-25`, `IC-26` | 외부 증거 전 6, 통과 후 4 |
 | 체크포인트 7 | `대기` | `IC-21`, `IC-22`, `IC-23`, `IC-24`; 이후 `DOC-01`, `AT-01`, `AT-02` closeout | 외부 증거 전 2, 통과 후 0 |
 
@@ -1164,7 +1166,7 @@ flowchart LR
 
 #### 8.9.5 체크포인트 4 — correction 안전막·semantic idempotency·조건부 command `[완료] [GPT-5.6 Sol] [부분 병렬]`
 
-**진입·완료 상태:** 2026-08-28 최신 `main` `759067e`, 승인된 0024 repair `0379648e`, 승인된 0029 repair `0142a569`를 품질 브랜치에 통합한 GREEN 기준선에서 시작했다. `main`의 inventory-operation 원장·원자 취소를 정본으로 유지한 채 아래 세 hard stop을 모두 완료했으며 CP5는 시작하지 않았다.
+**진입·완료 상태:** 2026-08-28 최신 `main` `759067e`, 승인된 0024 repair `0379648e`, 승인된 0029 repair `0142a569`를 품질 브랜치에 통합한 GREEN 기준선에서 시작했다. `main`의 inventory-operation 원장·원자 취소를 정본으로 유지한 채 아래 세 hard stop을 모두 완료했으며, 이 CP4 종료 시점에는 CP5를 시작하지 않았다.
 
 **GOAL:** workflow 귀속 거래의 잘못된 수량 보정을 fail-closed하고, IO·StockRequest 결과 불명 재시도와 handover·correction·cancel 경합에서 중복 재고 반영을 제거하며, active item command와 deleted history의 경계를 분리한다.
 
@@ -1199,7 +1201,7 @@ flowchart LR
 - [x] **`IC-03-B` 완료 (2026-09-02):** shipping pickup, production receipt, 완료 IO batch, StockRequest 실행, defect disassembly의 전용 workflow cancel이 기록된 `before_state`, effects, allocation/pending, request/batch 상태, event를 한 transaction으로 되돌린다. 일반 우회와 불완전 legacy는 안정된 409로 차단하고, 실제 PostgreSQL 4개 경합·3자 delta·독립 리뷰·GitHub CI 6/6으로 Gate C를 통과했다.
 - [x] **`IC-17` 완료 (2026-09-02):** CLI·관리자 API·detailed health가 공통 순수 `inventory-integrity/v1` engine을 사용한다. 안정된 check ID/severity/count/samples, blocking exit 1, 사용/config exit 2, DB/schema/tool exit 3을 고정했고 location pending, StockRequest, ShippingAllocation, box/zone/unplaced, orphan, contract v2 effect false-green을 SQLite·실제 PostgreSQL에서 차단했다. 제품 commit `fb339b5d`, 최종 독립 리뷰 0/0/0, GitHub CI run `33606010198` 6/6으로 완료했다.
 - [x] **`IC-18` 완료 (2026-09-05):** `backup-manifest/v1`이 artifact hash·size·engine·Alembic head·schema fingerprint·data revision·snapshot hash·검증 receipt를 증명한다. manifest를 artifact 뒤에 원자 publish하고, SQLite WAL online backup과 stale 판정, PostgreSQL dump의 폐기 가능한 임시 DB restore, staged restore, retention·NAS·cleanup pair를 fail-closed로 고정했다. 제품 commit `d43ab268`, CI 이식성 보완 `dffb8e01`·`fd341894`, 최종 CI run `33923104275` 6/6으로 완료했다.
-- [ ] **`IC-19` 완료:** live는 process, ready는 DB/schema/dependency, detailed/integrity는 업무 불변식이라는 단일 의미로 나누고 운영 consumer를 함께 전환한다.
+- [x] **`IC-19` 완료 (2026-09-05):** live는 DB 독립 process/event-loop liveness, ready는 DB·Alembic head·dependency·blocking integrity, detailed는 같은 readiness와 sanitized integrity ID/count로 분리했다. startup·frontend/E2E는 ready, Docker·restart는 live, status/watch는 alive와 ready를 각각 소비한다. 제품 commit `b27ba39c`, 로컬 full gate 18/18·Playwright 17/17·실제 PostgreSQL, 독립 리뷰 0/0/0, GitHub CI run `33934558904` 6/6으로 완료했다.
 
 순서는 `IC-06 read-only preflight`→사용자 승인→`IC-06 runtime`→`IC-07+IC-08`→`IC-03-B`→`IC-17`→`IC-18`→`IC-19`다. `IC-07` availability만 먼저 배포하면 race에서 초과예약될 수 있으므로 `IC-08`의 request/allocation lock·receipt와 같은 release checkpoint에서 함께 닫는다. 각 카드는 별도 change/evidence를 가질 수 있지만 이 순서를 건너뛰지 않는다.
 
@@ -1263,13 +1265,13 @@ flowchart LR
   C1["체크포인트 1 완료: IC-02·05·27"] --> C2["2: 필수 gate·cutover kill-switch"]
   C2 --> C3["3 완료: IC-01 VerifiedActor"]
   C3 --> C4["4 완료: correction 안전막·멱등·조건부 command"]
-  C4 --> C5["5: 위치·예약·integrity·운영 진실"]
+  C4 --> C5["5 완료: 위치·예약·integrity·운영 진실"]
   C5 --> C6["6: 화면 freshness"]
   C5 --> C7["7: type·dependency·closeout"]
   C6 --> C7
 ```
 
-다음 제품 작업은 체크포인트 5의 첫 hard stop인 `IC-06 read-only preflight`다. CP4는 완료했지만 CP5는 시작하지 않았으며, preflight가 mutation 0·snapshot/report hash를 증명한 뒤에도 runtime 적용은 사용자 승인 전까지 금지한다. 체크포인트 2의 품질 브랜치 CI 성공을 required-check 설정 완료로 오인하지 않는다. 후속 구현자는 새 operation identity를 설계하지 말고 `IC-03-B`를 `IC-07`·`IC-08` 뒤에 수행한다.
+체크포인트 5는 W7 `IC-19`까지 완료했다. 다음 제품 작업 후보는 체크포인트 6의 화면 freshness 카드지만 사용자 지시 전에는 시작하지 않는다. 재개 시 먼저 현재 `main`과 품질 branch의 delta를 산정하고 CP6 범위를 재판정한다. 체크포인트 2의 품질 브랜치 CI 성공을 required-check 설정 완료로 오인하지 않는다.
 
 ---
 ## 9. 테스트·운영 검증 보강안
@@ -2016,5 +2018,19 @@ Gate 0은 CI 정본과 같은 Node 20에서 닫고 정본 로컬 검증 entrypoi
 - **불변·동결·종료:** 품질 `backend/mes.db` SHA-256은 전후 `D0419DC051B881DA145B466AF99490570D18C47BCAAE990C57FFD4476FE28147`로 불변이다. 일회용 PostgreSQL DB는 0이고 8021·3100·3300·55432 listener도 0이다. 주간보고, 모바일 하단 tab, desktop shipping step 5 카드 배치 추가 변경은 0이며 개발·직원 서버에는 연결하거나 영향을 주지 않았다.
 
 **W6 판정:** `IC-18`은 `완료`다. 엄격한 잔여 IC는 14개이며 다음 단일 구현 범위는 W7 `IC-19` health 의미 분리다. W7은 이 closeout을 품질 branch에 고정한 뒤 시작하고 CP6는 시작하지 않는다.
+
+---
+
+### 12.25 CP5 W7 `IC-19` health 의미 분리 완료와 CP6 정지 경계
+
+- **구현·Git:** 품질 worktree의 기존 branch `codex/full-code-quality-improvement`에서만 구현했다. 제품 commit은 `b27ba39cd2cbad574fda30af9c118697086c30ad`이며 같은 원격 branch에 push했다. 새 branch·force-push·PR·main push/merge는 없었다.
+- **endpoint 계약:** `/health/live`는 DB·schema·inventory를 조회하지 않는 process/event-loop liveness다. `/health/ready`는 DB 연결, Alembic head, 필수 dependency와 W5 blocking integrity를 판정하고 실패 시 503을 반환하며 warning-only는 준비 상태를 막지 않는다. `/health/detailed`는 같은 readiness와 sanitized `inventory-integrity/v1` check ID/count를 제공하고 기존 필드를 additive로 유지한다.
+- **consumer 계약:** backend startup, frontend와 Playwright readiness wait는 `/health/ready`를 사용한다. Docker와 restart 판단은 `/health/live`만 사용해 데이터 불일치가 재시작 루프를 만들지 않는다. status/watch/runtime scheduler는 alive와 ready를 분리해 nonzero readiness를 정상처럼 표시하지 않는다. 직원 동기화·배포 스크립트는 정적 계약만 바꿨고 실제 실행하지 않았다.
+- **집중 검증·리뷰:** backend health/runtime focused 64건, Node 20 E2E readiness 계약 7/7, PowerShell runtime batch·crash-loop 계약, OpenAPI exact가 통과했다. 독립 명세 리뷰와 코드 품질 리뷰는 최종 Critical/Important/Minor 0이다.
+- **최종 로컬 검증:** 실제 PostgreSQL 16을 연결한 `verify_local.ps1 -Mode full -DbReadOnlyCheck -IncludeE2E`의 18개 gate가 1,622.738초에 모두 통과했다. Ruff·mypy·PostgreSQL concurrency·backend full pytest·OpenAPI, frontend lint·app/test/E2E type·coverage·build·bundle, docs, DB read-only와 Playwright 17/17이 모두 PASS했다. 증거 정본은 `_attic/runtime/code-quality-improvement/20260905-081356/cp5-w7-ic19/`이다.
+- **GitHub CI:** run `33934558904`에서 frontend, backend, Playwright E2E, verification policy, 실제 PostgreSQL concurrency, Windows ops profile의 6개 job이 모두 success다. Actions Node 20 deprecation annotation은 runner platform warning이며 제품 job 실패는 0이다.
+- **불변·동결·종료:** 품질 `backend/mes.db` SHA-256은 전후 `D0419DC051B881DA145B466AF99490570D18C47BCAAE990C57FFD4476FE28147`로 불변이다. 일회용 PostgreSQL DB와 E2E 임시 DB는 0이고 8021·3100·3300·55432 listener도 0이다. 주간보고, 모바일 하단 tab, desktop shipping step 5 카드 배치 추가 변경은 0이며 `C:\ERP` main은 읽기 전용, 개발·직원 서버는 미접근·무영향으로 유지했다.
+
+**CP5 판정:** `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-17`, `IC-18`, `IC-19`는 모두 `완료`다. 엄격한 잔여 IC는 13개이며 required-check 외부 증거가 확보되면 11개다. CP6는 시작하지 않고 별도 인계에서 대기한다.
 
 ---
