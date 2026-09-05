@@ -110,7 +110,7 @@ test.describe("입출고 내역 PC 정보 위계", () => {
     await approvePage.goto("/mes?tab=history");
 
     const table = approvePage.locator("table").filter({
-      has: approvePage.getByRole("columnheader", { name: "수량" }),
+      has: approvePage.getByRole("columnheader", { name: "품목코드 · 수량" }),
     });
     await expect(table).toBeVisible();
 
