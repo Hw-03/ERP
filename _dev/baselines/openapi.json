@@ -3415,6 +3415,349 @@
         "title": "HandoverSubmitRequest",
         "type": "object"
       },
+      "HealthDatabaseStatus": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "title": "HealthDatabaseStatus",
+        "type": "object"
+      },
+      "HealthDetailedResponse": {
+        "properties": {
+          "contract": {
+            "const": "health-detailed/v1",
+            "title": "Contract",
+            "type": "string"
+          },
+          "db": {
+            "$ref": "#/components/schemas/HealthDatabaseStatus"
+          },
+          "inventory_integrity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HealthIntegrityDetail"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "inventory_mismatch_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inventory Mismatch Count"
+          },
+          "last_transaction_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Transaction At"
+          },
+          "readiness": {
+            "$ref": "#/components/schemas/HealthReadinessResponse"
+          },
+          "rows": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Rows",
+            "type": "object"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "degraded"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "contract",
+          "status",
+          "db",
+          "rows",
+          "inventory_mismatch_count",
+          "inventory_integrity",
+          "last_transaction_at",
+          "readiness"
+        ],
+        "title": "HealthDetailedResponse",
+        "type": "object"
+      },
+      "HealthIntegrityCheckDetail": {
+        "properties": {
+          "check_id": {
+            "title": "Check Id",
+            "type": "string"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "samples": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Samples",
+            "type": "array"
+          },
+          "severity": {
+            "enum": [
+              "blocking",
+              "warning"
+            ],
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "check_id",
+          "severity",
+          "count",
+          "samples"
+        ],
+        "title": "HealthIntegrityCheckDetail",
+        "type": "object"
+      },
+      "HealthIntegrityCheckSummary": {
+        "properties": {
+          "check_id": {
+            "title": "Check Id",
+            "type": "string"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "severity": {
+            "enum": [
+              "blocking",
+              "warning"
+            ],
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "check_id",
+          "severity",
+          "count"
+        ],
+        "title": "HealthIntegrityCheckSummary",
+        "type": "object"
+      },
+      "HealthIntegrityDetail": {
+        "properties": {
+          "blocking_count": {
+            "title": "Blocking Count",
+            "type": "integer"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/HealthIntegrityCheckDetail"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "contract": {
+            "const": "inventory-integrity/v1",
+            "title": "Contract",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pass",
+              "warning",
+              "fail"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "warning_count": {
+            "title": "Warning Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "contract",
+          "status",
+          "blocking_count",
+          "warning_count",
+          "checks"
+        ],
+        "title": "HealthIntegrityDetail",
+        "type": "object"
+      },
+      "HealthIntegritySummary": {
+        "properties": {
+          "blocking_count": {
+            "title": "Blocking Count",
+            "type": "integer"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/HealthIntegrityCheckSummary"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "contract": {
+            "const": "inventory-integrity/v1",
+            "title": "Contract",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pass",
+              "warning",
+              "fail"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "warning_count": {
+            "title": "Warning Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "contract",
+          "status",
+          "blocking_count",
+          "warning_count",
+          "checks"
+        ],
+        "title": "HealthIntegritySummary",
+        "type": "object"
+      },
+      "HealthLiveResponse": {
+        "properties": {
+          "contract": {
+            "const": "health-liveness/v1",
+            "title": "Contract",
+            "type": "string"
+          },
+          "status": {
+            "const": "live",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "contract",
+          "status"
+        ],
+        "title": "HealthLiveResponse",
+        "type": "object"
+      },
+      "HealthReadinessCheck": {
+        "properties": {
+          "check_id": {
+            "title": "Check Id",
+            "type": "string"
+          },
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Count"
+          },
+          "status": {
+            "enum": [
+              "pass",
+              "fail",
+              "not_checked"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "check_id",
+          "status",
+          "count"
+        ],
+        "title": "HealthReadinessCheck",
+        "type": "object"
+      },
+      "HealthReadinessResponse": {
+        "properties": {
+          "alembic_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alembic Revision"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/HealthReadinessCheck"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "contract": {
+            "const": "health-readiness/v1",
+            "title": "Contract",
+            "type": "string"
+          },
+          "inventory_integrity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HealthIntegritySummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "ready",
+              "not_ready"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "contract",
+          "status",
+          "checks",
+          "alembic_revision",
+          "inventory_integrity"
+        ],
+        "title": "HealthReadinessResponse",
+        "type": "object"
+      },
       "InitialLocationInput": {
         "properties": {
           "department": {
@@ -23896,10 +24239,22 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/HealthDetailedResponse"
+                }
               }
             },
             "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthDetailedResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           }
         },
         "summary": "Health Detailed",
@@ -23910,19 +24265,53 @@
     },
     "/health/live": {
       "get": {
-        "description": "경량 liveness — 컨테이너/오케스트레이터 프로브 전용 (WS3).\n\n정적 `/health` 와 달리 DB-down 을 구분: DB 미연결이면 503.\n`/health/detailed` 와 달리 row count·무결성 스캔을 하지 않아 30s 주기\n프로브에 적합(가벼움).",
+        "description": "Report only process and event-loop liveness; never touch dependencies.",
         "operationId": "health_live_health_live_get",
         "responses": {
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/HealthLiveResponse"
+                }
               }
             },
             "description": "Successful Response"
           }
         },
         "summary": "Health Live",
+        "tags": [
+          "System"
+        ]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "description": "Report whether the current process may accept DEXCOWIN MES workload.",
+        "operationId": "health_ready_health_ready_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthReadinessResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthReadinessResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Health Ready",
         "tags": [
           "System"
         ]

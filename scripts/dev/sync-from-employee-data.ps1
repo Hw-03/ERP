@@ -272,7 +272,7 @@ function Test-HttpEndpoint {
 
 function Test-DevelopmentHealth {
     $backend = Test-HttpEndpoint `
-        -Uri "http://127.0.0.1:8011/health/live" `
+        -Uri "http://127.0.0.1:8011/health/ready" `
         -Attempts $BackendHealthAttempts
     $frontend = Test-HttpEndpoint `
         -Uri "http://127.0.0.1:3001" `

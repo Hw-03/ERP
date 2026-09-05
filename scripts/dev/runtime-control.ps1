@@ -506,9 +506,9 @@ function Invoke-ProfileFrontendStartup {
             throw "[frontend] Timed out waiting for another $($Profile.Name) startup request to finish."
         }
 
-    $backendHealthUrl = "http://127.0.0.1:$($Profile.BackendPort)/health/live"
+    $backendHealthUrl = "http://127.0.0.1:$($Profile.BackendPort)/health/ready"
     if (-not (Wait-RuntimeHttp200 -Url $backendHealthUrl)) {
-        throw "[start-frontend] Backend is not live at $backendHealthUrl. Start the profile backend first."
+        throw "[start-frontend] Backend is not ready at $backendHealthUrl. Start the profile backend first."
     }
 
     Assert-ProfileFrontendBuildReady -Profile $Profile -FrontendDir $FrontendDir

@@ -352,9 +352,9 @@ function New-FrontendStartupTestArguments {
     $failed = $false
     $startupArgs = New-FrontendStartupTestArguments -Profile $profile -Suffix 'backend-down'
     try { Invoke-ProfileFrontendStartup @startupArgs }
-    catch { $failed = $_.Exception.Message -match 'Backend is not live.*8010' }
-    if (-not $failed -or $calls.Starts -ne 0 -or $urls.Count -ne 1 -or $urls[0] -notmatch ':8010/health/live$') {
-        throw 'Frontend startup must fail before starting when the selected profile backend is unavailable.'
+    catch { $failed = $_.Exception.Message -match 'Backend is not ready.*8010' }
+    if (-not $failed -or $calls.Starts -ne 0 -or $urls.Count -ne 1 -or $urls[0] -notmatch ':8010/health/ready$') {
+        throw 'Frontend startup must fail before starting when the selected profile backend is not ready.'
     }
 }
 

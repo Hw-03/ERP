@@ -21,7 +21,8 @@ $ControlPath = Join-Path $LogDir "backend-runtime-control.json"
 $LaunchRequestPath = Join-Path $LogDir "backend-runtime-launch-request.json"
 $StdoutLog = Join-Path $LogDir "backend-dev.out.log"
 $StderrLog = Join-Path $LogDir "backend-dev.err.log"
-$HealthUrl = "http://127.0.0.1:$($Profile.BackendPort)/health/live"
+$LiveUrl = "http://127.0.0.1:$($Profile.BackendPort)/health/live"
+$ReadyUrl = "http://127.0.0.1:$($Profile.BackendPort)/health/ready"
 
 if (-not (Test-Path $BackendDir)) {
     throw "Backend directory not found: $BackendDir"
@@ -63,9 +64,14 @@ function Start-BackendSupervisor {
         -ChildCommand $childCommand `
         -Environment @{ MES_RUNTIME_ROOT = $RuntimeRoot }
 
-    if (-not (Wait-RuntimeHttp200 -Url $HealthUrl -Attempts 90)) {
+    if (-not (Wait-RuntimeHttp200 -Url $LiveUrl -Attempts 90)) {
         $state = Get-RuntimeState -Path $StatePath
-        throw "[start-backend] Backend did not respond on $HealthUrl. status=$($state.status). Check $EventPath"
+        throw "[start-backend] Backend did not respond on $LiveUrl. status=$($state.status). Check $EventPath"
+    }
+    if (-not (Wait-RuntimeHttp200 -Url $ReadyUrl -Attempts 1)) {
+        Add-RuntimeEvent -Path $EventPath -Profile $Profile.Name -Service "backend" `
+            -Event "service_not_ready" `
+            -Details @{ readyUrl = $ReadyUrl }
     }
     return $launch
 }
@@ -93,12 +99,12 @@ Add-RuntimeEvent -Path $EventPath -Profile $Profile.Name -Service "backend" `
     -Details @{ request = $request }
 Request-RuntimeTaskStart -RepoRoot $Profile.RepoRoot -Service "backend" | Out-Null
 
-if (-not (Wait-RuntimeHttp200 -Url $HealthUrl -Attempts 120)) {
+if (-not (Wait-RuntimeHttp200 -Url $ReadyUrl -Attempts 120)) {
     $state = Get-RuntimeState -Path $StatePath
     $task = Get-RuntimeTaskRegistration -RepoRoot $Profile.RepoRoot -Service "backend"
-    throw "[start-backend] Backend did not respond on $HealthUrl. task=$($task.Status) runtime=$($state.status). Check $EventPath"
+    throw "[start-backend] Backend did not become ready on $ReadyUrl. task=$($task.Status) runtime=$($state.status). Check $EventPath"
 }
 
-Write-Host "[start-backend] OK - $($Profile.Label) backend ready on $HealthUrl"
+Write-Host "[start-backend] OK - $($Profile.Label) backend ready on $ReadyUrl"
 Write-Host "[start-backend] runtime owner: $((Get-RuntimeTaskSpecification -RepoRoot $Profile.RepoRoot -Service 'backend').TaskName)"
 Write-Host "[start-backend] runtime events: $EventPath"

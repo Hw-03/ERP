@@ -159,6 +159,14 @@ taskkill /PID <PID> /F
 
 종료 후 `start.bat` 재실행.
 
+## 헬스 엔드포인트 의미
+
+- `/health/live`: 프로세스와 event loop가 응답하는지만 확인한다. DB·schema·재고 불변식 장애로 재시작 반복을 만들지 않도록 Docker와 supervisor 재시작 판단에 사용한다.
+- `/health/ready`: DB 연결, Alembic head, 무결성 진단 dependency와 blocking `inventory-integrity/v1` 판정을 확인한다. 하나라도 실패하면 `503`; warning-only는 `200`이다. backend/frontend 시작과 배포 후 준비 완료 대기에 사용한다.
+- `/health/detailed`: 운영 진단용이다. readiness와 식별자를 제거한 무결성 check ID·severity·count를 제공하며 orchestration 재시작 판단에는 사용하지 않는다.
+
+`status-servers.ps1`과 backend `watch-service.ps1`은 alive와 ready를 별도로 표시한다.
+
 ## 1차 장애 대응
 
 | 증상 | 원인 후보 | 1차 조치 |
@@ -183,10 +191,13 @@ scripts\ops\healthcheck.bat
 
 응답 필드:
 
+- `contract`: `"health-detailed/v1"`
 - `status`: `"ok"`는 정합성까지 정상, `"degraded"`는 DB 또는 재고 정합성 점검 필요
 - `db.ok`: `true`면 DB 연결 정상
 - `rows`: `items` / `employees` / `inventory` / `transaction_logs` 행 수
 - `inventory_mismatch_count`: Inventory 합계와 InventoryLocation 합계 불일치 건수 — `0` 이 정상
+- `inventory_integrity`: 외부 식별자를 제거한 `inventory-integrity/v1` check ID·severity·count
+- `readiness`: `/health/ready`와 같은 준비 상태 판정
 - `last_transaction_at`: 최근 거래 시각
 
 ### 자동 1차 진단 (Phase 4 추가)

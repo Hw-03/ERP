@@ -6,6 +6,7 @@ import importlib
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import text
@@ -1094,7 +1095,24 @@ def test_post_cutover_v1_operation_with_pre_cutover_invalid_log_is_blocking(
     assert _check(result, "OPERATION_V2_EFFECT_INVALID").count == 1
 
 
-def test_admin_api_and_detailed_health_publish_same_v1_checks(client, make_item, db_session) -> None:
+def test_admin_api_and_detailed_health_publish_same_v1_verdict_with_sanitized_samples(
+    client,
+    make_item,
+    db_session,
+    monkeypatch,
+) -> None:
+    from app import main
+
+    monkeypatch.setattr(
+        main,
+        "check_schema",
+        lambda *, connection: SimpleNamespace(
+            ready=True,
+            revision="20260831_0033",
+            differences=(),
+        ),
+        raising=False,
+    )
     item = make_item(name="세 소비자 공통 판정", warehouse_qty=Decimal("4"))
     unplaced = db_session.query(WarehouseUnplacedItem).filter_by(item_id=item.item_id).one()
     unplaced.quantity = Decimal("1")
@@ -1107,7 +1125,22 @@ def test_admin_api_and_detailed_health_publish_same_v1_checks(client, make_item,
     assert detailed.status_code == 200, detailed.text
     contract_keys = {"contract", "status", "blocking_count", "warning_count", "checks"}
     admin_contract = {key: admin.json()[key] for key in contract_keys}
-    assert detailed.json()["inventory_integrity"] == admin_contract
+    detailed_contract = detailed.json()["inventory_integrity"]
+    assert {
+        key: detailed_contract[key]
+        for key in {"contract", "status", "blocking_count", "warning_count"}
+    } == {
+        key: admin_contract[key]
+        for key in {"contract", "status", "blocking_count", "warning_count"}
+    }
+    assert [
+        (check["check_id"], check["severity"], check["count"])
+        for check in detailed_contract["checks"]
+    ] == [
+        (check["check_id"], check["severity"], check["count"])
+        for check in admin_contract["checks"]
+    ]
+    assert all(check["samples"] == [] for check in detailed_contract["checks"])
     assert admin_contract["status"] == "fail"
     assert detailed.json()["status"] == "degraded"
     assert next(

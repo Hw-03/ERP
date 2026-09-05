@@ -9,7 +9,7 @@
  * 흐름:
  *  1) 실 mes.db 해시 기록
  *  2) mes_e2e.db* 삭제 → bootstrap_db.py --all (DATABASE_URL=전용DB)
- *  3) uvicorn 전용 백엔드 기동(포트 8021) → /health/live 폴링
+ *  3) uvicorn 전용 백엔드 기동(포트 8021) → /health/ready 폴링
  *  4) API 시드(품목/BOM/직원 확보) → .e2e-seed.json 저장
  * 프론트(custom Next server, 3100)는 playwright.config webServer 가 BACKEND_INTERNAL_URL 로 8021 에 프록시.
  */
@@ -53,7 +53,7 @@ async function waitForHealth(url: string, timeoutMs: number) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
-      const r = await fetch(`${url}/health/live`);
+      const r = await fetch(`${url}/health/ready`);
       if (r.ok) return;
     } catch {
       /* 아직 안 뜸 */

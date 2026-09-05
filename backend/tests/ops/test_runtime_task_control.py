@@ -127,8 +127,10 @@ def test_runtime_entrypoints_delegate_without_direct_fallback() -> None:
     assert '"--workers", "1"' in backend
     assert '"--no-proxy-headers"' in backend
     assert "function Wait-BackendReady" not in backend
-    assert backend.count("Wait-RuntimeHttp200 -Url $HealthUrl -Attempts 90") == 1
-    assert backend.count("Wait-RuntimeHttp200 -Url $HealthUrl -Attempts 120") == 1
+    assert backend.count("Wait-RuntimeHttp200 -Url $LiveUrl -Attempts 90") == 1
+    assert backend.count("Wait-RuntimeHttp200 -Url $ReadyUrl -Attempts 1)") == 1
+    assert backend.count("Wait-RuntimeHttp200 -Url $ReadyUrl -Attempts 120)") == 1
+    assert "service_not_ready" in backend
     assert "Wait-RuntimeHttp200 -Url $HealthUrl -Attempts 120" in frontend
     assert runtime_control.count("Wait-RuntimeHttp200 -Url $healthUrl -Attempts 90") >= 2
     assert "function Wait-FrontendReady" not in frontend

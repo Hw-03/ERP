@@ -48,8 +48,8 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      # 경량 liveness: DB-down 시 /health/live 가 503 → unhealthy (정적 /health 아님).
-      # python:slim 에 curl 없음 → urllib. 503/연결실패 시 예외→비0 종료.
+      # 경량 liveness: DB·schema·업무 불변식과 무관하게 process 응답만 확인한다.
+      # python:slim 에 curl 없음 → urllib. 연결실패 시 예외→비0 종료.
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8010/health/live',timeout=3).status==200 else 1)"]
       interval: 30s
       timeout: 5s

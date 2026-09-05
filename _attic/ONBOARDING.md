@@ -36,7 +36,7 @@ Top MCP Servers:
 
 ## Team Tips
 
-- **시작 / 중지 스크립트**: 백엔드는 항상 `scripts/dev/start-backend.ps1` (좀비 워커 자동 정리 + /health/live 확인) 와 `scripts/dev/stop-backend.ps1` (포트 8011 PID 강제 종료 — dev) 를 사용한다. 백엔드 로그가 0줄이면 좀비 의심 — stop 후 start 로 재기동.
+- **시작 / 중지 스크립트**: 백엔드는 항상 `scripts/dev/start-backend.ps1` (`/health/live`로 프로세스 소유권 확인 + `/health/ready` 준비 완료 대기) 와 `scripts/dev/stop-backend.ps1` (포트 8011 PID 강제 종료 — dev) 를 사용한다. 백엔드 로그가 0줄이면 좀비 의심 — stop 후 start 로 재기동.
 - **커밋 / 푸시는 명시 요청 시에만**: AI 가 자동으로 커밋·푸시하지 않는다. 커밋 메시지는 `YYYY-MM-DD area: 요약` 형식 (예: `2026-05-29 backend: 시리얼 부여 수정`).
 - **검증 게이트**: 구현 중에는 관련 테스트만 반복하고, 커밋 전 저장소 루트에서 `powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1 -Mode smart -ChangeSet staged`를 실행한다. `staged`는 영향 계획의 범위이며 게이트는 현재 working tree에서 실행되므로, 정확한 staged 스냅샷 검증은 깨끗한 전용 worktree에서 한다. 문서 변경에는 Markdown 공백·유지 문서 링크 검사를 함께 실행한다. 검증 인프라 변경이나 명시적 전체 확인은 `-Mode full`, GitHub CI는 항상 전체 게이트를 사용한다.
 - **DB 변경**: 서버 기동만으로 DB 가 바뀌면 안 됨. 스키마 변경·시드는 `cd backend && python bootstrap_db.py --all`.

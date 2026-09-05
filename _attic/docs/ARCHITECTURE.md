@@ -121,7 +121,9 @@ available = (warehouse_qty - warehouse_pending)
 
 | 메서드 | 경로 | 의미 |
 |---|---|---|
-| GET | `/health`, `/health/detailed` | 헬스체크 (`detailed`는 DB 점검 + mismatch 카운트) |
+| GET | `/health/live` | DB와 무관한 process/event-loop liveness (`health-liveness/v1`) |
+| GET | `/health/ready` | DB 연결·Alembic head·필수 무결성 dependency·blocking verdict readiness (`health-readiness/v1`) |
+| GET | `/health/detailed` | readiness와 식별자를 제거한 무결성 check ID·count, 기존 상세 필드 (`health-detailed/v1`) |
 | GET | `/api/items` | 품목 목록 (bulk_compute로 N+1 제거) |
 | GET | `/api/inventory/summary` | 공정코드별 재고 요약 (`process_types` 18개 기준) |
 | POST | `/api/inventory/receive` | 창고 입고 |

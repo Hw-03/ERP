@@ -108,8 +108,8 @@ work type으로 취급하지 않는다.
 
 ## 운영
 
-- 백엔드: `scripts/dev/start-backend.ps1` (좀비 워커 정리 + /health/live 확인)
-- 정합성 검사: `services/integrity.py` 의 mismatch 카운트 (`/health/detailed` 노출)
+- 백엔드: `scripts/dev/start-backend.ps1` (`/health/live`로 프로세스 소유권 확인 + `/health/ready` 준비 완료 대기)
+- 정합성 검사: `services/inventory_integrity.py`의 versioned 판정 (`/health/ready`, `/health/detailed` 노출)
 - 백업: `scripts/ops/backup_db.bat`
 
 ## 폴더·파일 명칭 가이드

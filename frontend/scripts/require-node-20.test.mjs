@@ -20,6 +20,14 @@ test("Playwright config and global setup fail closed on direct npx entry", () =>
   assert.doesNotMatch(config, /npx playwright test --ui/);
 });
 
+test("Playwright global setup waits for backend readiness, not process liveness", () => {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const setup = fs.readFileSync(path.join(root, "tests/e2e/global-setup.ts"), "utf-8");
+
+  assert.match(setup, /fetch\(`\$\{url\}\/health\/ready`\)/);
+  assert.doesNotMatch(setup, /fetch\(`\$\{url\}\/health\/live`\)/);
+});
+
 test("verification scripts stay compatible with every declared Node 20 release", () => {
   assert.doesNotMatch(fs.readFileSync(new URL("./require-node-20.test.mjs", import.meta.url), "utf-8"), /import\.meta\.dirname/);
   assert.doesNotMatch(fs.readFileSync(new URL("./typecheck-baseline.test.mjs", import.meta.url), "utf-8"), /import\.meta\.dirname/);

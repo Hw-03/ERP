@@ -634,7 +634,7 @@ $backendOk = $false
 for ($i = 0; $i -lt 60; $i++) {
     Start-Sleep -Milliseconds 500
     try {
-        $resp = Invoke-WebRequest -Uri "http://127.0.0.1:8010/health/live" -TimeoutSec 1 -UseBasicParsing -ErrorAction Stop
+        $resp = Invoke-WebRequest -Uri "http://127.0.0.1:8010/health/ready" -TimeoutSec 1 -UseBasicParsing -ErrorAction Stop
         if ($resp.StatusCode -eq 200) { $backendOk = $true; break }
     }
     catch {}

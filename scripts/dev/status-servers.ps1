@@ -28,7 +28,8 @@ function Show-ServiceStatus {
         [int] $Port,
         [string] $StatePath,
         [string] $EventPath,
-        [string] $HealthUrl
+        [string] $LiveUrl,
+        [string] $ReadyUrl
     )
 
     $task = Get-RuntimeTaskRegistration -RepoRoot $Profile.RepoRoot -Service $Service
@@ -78,7 +79,13 @@ function Show-ServiceStatus {
             -ToleranceSeconds $childToleranceSeconds
     }
     $listeners = @(Get-ListeningPortPids -Port $Port)
-    $ready = Test-HttpReady -Url $HealthUrl
+    $alive = Test-HttpReady -Url $LiveUrl
+    $ready = if ($ReadyUrl) {
+        Test-HttpReady -Url $ReadyUrl
+    }
+    else {
+        $alive
+    }
     $displayStatus = if ($supervisorAlive) {
         [string] $state.status
     }
@@ -110,7 +117,8 @@ function Show-ServiceStatus {
     Write-Host "  supervisor  : $supervisorPid (alive=$supervisorAlive)"
     Write-Host "  child       : $childPid (alive=$childAlive)"
     Write-Host "  port        : $Port (listening=$($listeners.Count -gt 0))"
-    Write-Host "  health      : $HealthUrl (ready=$ready)"
+    Write-Host "  live        : $LiveUrl (alive=$alive)"
+    if ($ReadyUrl) { Write-Host "  ready       : $ReadyUrl (ready=$ready)" }
     Write-Host "  restarts    : $($state.restartFailures)"
     Write-Host "  last reason : $lastReason"
     Write-Host "  events      : $EventPath"
@@ -128,14 +136,15 @@ Show-ServiceStatus `
     -Port $Profile.BackendPort `
     -StatePath (Join-Path $BackendLogDir "backend-runtime.json") `
     -EventPath (Join-Path $BackendLogDir "backend-runtime-events.jsonl") `
-    -HealthUrl "http://127.0.0.1:$($Profile.BackendPort)/health/live"
+    -LiveUrl "http://127.0.0.1:$($Profile.BackendPort)/health/live" `
+    -ReadyUrl "http://127.0.0.1:$($Profile.BackendPort)/health/ready"
 
 Show-ServiceStatus `
     -Service "frontend" `
     -Port $Profile.FrontendPort `
     -StatePath (Join-Path $FrontendLogDir "frontend-runtime.json") `
     -EventPath (Join-Path $FrontendLogDir "frontend-runtime-events.jsonl") `
-    -HealthUrl "http://127.0.0.1:$($Profile.FrontendPort)/mes"
+    -LiveUrl "http://127.0.0.1:$($Profile.FrontendPort)/mes"
 
 Write-Host "[database]"
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $SchemaReadinessScript -Mode Report

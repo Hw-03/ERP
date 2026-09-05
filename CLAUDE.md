@@ -115,7 +115,7 @@ cd backend
 python bootstrap_db.py --all
 ```
 
-- Run backend (canonical — auto-cleans zombie workers + checks /health/live):
+- Run backend (canonical — auto-cleans zombie workers, uses `/health/live` for process ownership, and waits for `/health/ready`):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\dev\start-backend.ps1
