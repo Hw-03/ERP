@@ -1,35 +1,34 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { DeptDetailView } from "../_department_parts/DeptDetailView";
-
-vi.mock("@/lib/api", () => ({
-  api: { updateDepartment: vi.fn() },
-}));
-
-vi.mock("../../DepartmentsContext", () => ({
-  useRefreshDepartments: () => vi.fn(),
-}));
 
 vi.mock("@/lib/ui/ConfirmModal", () => ({
   ConfirmModal: () => null,
 }));
 
+const department = { id: 1, name: "조립", display_order: 1, is_active: true, color_hex: "#2f74e7" };
+
+function ControlledDetail() {
+  const [editForm, setEditForm] = useState({ name: department.name, color_hex: department.color_hex });
+  return (
+    <DeptDetailView
+      dept={department}
+      editForm={editForm}
+      setEditForm={setEditForm}
+      empCount={1}
+      itemCount={1}
+      deptEmployees={[]}
+      onToggleActive={vi.fn()}
+      onRequestDelete={vi.fn()}
+    />
+  );
+}
+
 describe("DeptDetailView", () => {
   it("starts the palette closed and exposes it through an accessible button", () => {
     render(
-      <DeptDetailView
-        dept={{ id: 1, name: "조립", display_order: 1, is_active: true, color_hex: "#2f74e7" }}
-        adminPin="0000"
-        empCount={1}
-        itemCount={1}
-        deptEmployees={[]}
-        onSetDepartments={vi.fn()}
-        setSelectedDept={vi.fn()}
-        onStatusChange={vi.fn()}
-        onError={vi.fn()}
-        onToggleActive={vi.fn()}
-        onRequestDelete={vi.fn()}
-      />,
+      <ControlledDetail />,
     );
 
     expect(screen.getByTitle("현재 저장된 색상")).toBeInTheDocument();
@@ -57,19 +56,7 @@ describe("DeptDetailView", () => {
 
   it("가용 높이를 카드에 배분하고 위험 작업 행을 상세 영역 최하단에 둔다", () => {
     render(
-      <DeptDetailView
-        dept={{ id: 1, name: "조립", display_order: 1, is_active: true, color_hex: "#2f74e7" }}
-        adminPin="0000"
-        empCount={1}
-        itemCount={1}
-        deptEmployees={[]}
-        onSetDepartments={vi.fn()}
-        setSelectedDept={vi.fn()}
-        onStatusChange={vi.fn()}
-        onError={vi.fn()}
-        onToggleActive={vi.fn()}
-        onRequestDelete={vi.fn()}
-      />,
+      <ControlledDetail />,
     );
 
     const colorCard = screen.getByText("색상").parentElement;

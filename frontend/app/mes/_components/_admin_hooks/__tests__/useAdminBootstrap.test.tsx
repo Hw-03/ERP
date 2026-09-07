@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   revision: null as number | null,
   models: [],
+  departments: [] as unknown[],
+  departmentsQuery: vi.fn(),
   getItems: vi.fn(),
   getEmployees: vi.fn(),
   getDepartments: vi.fn(),
@@ -23,6 +25,10 @@ vi.mock("@/lib/queries/useModelsQuery", () => ({
   useModelsQuery: () => ({ data: mocks.models }),
 }));
 
+vi.mock("@/lib/queries/useDepartmentsQuery", () => ({
+  useDepartmentsQuery: (...args: unknown[]) => mocks.departmentsQuery(...args),
+}));
+
 vi.mock("@/lib/queries/realtime", () => ({
   useRealtimeRevision: () => mocks.revision,
 }));
@@ -40,6 +46,11 @@ function deferred<T>() {
 describe("useAdminBootstrap realtime refresh", () => {
   beforeEach(() => {
     mocks.revision = null;
+    mocks.departments = [];
+    mocks.departmentsQuery.mockReset().mockImplementation(() => ({
+      data: mocks.departments,
+      error: null,
+    }));
     mocks.getItems.mockReset().mockResolvedValue([]);
     mocks.getEmployees.mockReset().mockResolvedValue([]);
     mocks.getDepartments.mockReset().mockResolvedValue([]);
@@ -56,7 +67,7 @@ describe("useAdminBootstrap realtime refresh", () => {
       expect(mocks.getItems).toHaveBeenCalledTimes(1);
       expect(mocks.getAllBOM).toHaveBeenCalledTimes(1);
       expect(mocks.getEmployees).toHaveBeenCalledTimes(1);
-      expect(mocks.getDepartments).toHaveBeenCalledTimes(1);
+      expect(mocks.departmentsQuery).toHaveBeenCalledWith(undefined, { enabled: true });
     });
 
     mocks.revision = 1;
@@ -67,7 +78,31 @@ describe("useAdminBootstrap realtime refresh", () => {
       expect(mocks.getAllBOM).toHaveBeenCalledTimes(2);
     });
     expect(mocks.getEmployees).toHaveBeenCalledTimes(1);
-    expect(mocks.getDepartments).toHaveBeenCalledTimes(1);
+    expect(mocks.getDepartments).not.toHaveBeenCalled();
+  });
+
+  it("uses the department query result without mirroring it into local bootstrap state", async () => {
+    mocks.departments = [
+      { id: 1, name: "조립", display_order: 1, is_active: true, color_hex: "#2f74e7" },
+    ];
+    const onError = vi.fn();
+    const { result, rerender } = renderHook(
+      () => useAdminBootstrap({ unlocked: true, globalSearch: "", onError }),
+    );
+
+    await waitFor(() => expect(result.current.departments[0]?.name).toBe("조립"));
+    await waitFor(() => {
+      expect(mocks.getItems).toHaveBeenCalledTimes(1);
+      expect(mocks.getEmployees).toHaveBeenCalledTimes(1);
+    });
+    expect(mocks.getDepartments).not.toHaveBeenCalled();
+
+    mocks.departments = [
+      { id: 1, name: "조립 2", display_order: 1, is_active: true, color_hex: "#2f74e7" },
+    ];
+    act(() => rerender());
+
+    expect(result.current.departments[0]?.name).toBe("조립 2");
   });
 
   it("ignores an older item response that finishes after a newer revision response", async () => {

@@ -42,18 +42,18 @@ function Test-SamePath {
     )
 }
 
-function Test-ChildPath {
+function Test-DirectChildPath {
     param(
         [string] $Path,
         [string] $Parent
     )
 
     $fullPath = [System.IO.Path]::GetFullPath($Path).TrimEnd('\')
-    $fullParent = [System.IO.Path]::GetFullPath($Parent).TrimEnd('\') + '\'
-    return $fullPath.StartsWith($fullParent, [System.StringComparison]::OrdinalIgnoreCase)
+    $pathParent = [System.IO.Path]::GetDirectoryName($fullPath)
+    return Test-SamePath $pathParent $Parent
 }
 
-if ((Test-SamePath $RepoRoot $DevRoot) -or (Test-ChildPath $RepoRoot $DevWorktreeRoot)) {
+if ((Test-SamePath $RepoRoot $DevRoot) -or (Test-DirectChildPath $RepoRoot $DevWorktreeRoot)) {
     $name = "development"
     $label = "development"
     $frontendPort = 3001

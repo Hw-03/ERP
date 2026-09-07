@@ -12,6 +12,7 @@ const routerPush = vi.hoisted(() => vi.fn());
 const routerReplace = vi.hoisted(() => vi.fn());
 const queryClientMock = vi.hoisted(() => ({
   prefetchQuery: vi.fn(),
+  prefetchInfiniteQuery: vi.fn(),
 }));
 const shippingViewProps = vi.hoisted(() => vi.fn());
 const adminViewMounts = vi.hoisted(() => vi.fn());
@@ -153,6 +154,7 @@ describe("DesktopMesShell tab transition", () => {
     routerPush.mockClear();
     routerReplace.mockClear();
     queryClientMock.prefetchQuery.mockClear();
+    queryClientMock.prefetchInfiniteQuery.mockClear();
     shippingViewProps.mockClear();
     adminViewMounts.mockClear();
     vi.mocked(sendClientEvent).mockClear();
@@ -212,6 +214,10 @@ describe("DesktopMesShell tab transition", () => {
         "summary",
         expect.objectContaining({ dateFrom: expect.any(String) }),
       ],
+    }));
+    expect(queryClientMock.prefetchInfiniteQuery).toHaveBeenCalledWith(expect.objectContaining({
+      queryKey: ["shipping", "requestPages", {}],
+      initialPageParam: null,
     }));
   });
 

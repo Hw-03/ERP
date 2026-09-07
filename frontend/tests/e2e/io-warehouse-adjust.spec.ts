@@ -4,14 +4,78 @@
  * 전용 mes_e2e.db에서 데스크톱 보정 입고와 모바일 보정 출고를 차례로 제출한다.
  * 실제 mes.db는 globalSetup과 캡처된 teardown의 해시 가드로 변경되지 않는다.
  */
+import { spawnSync } from "node:child_process";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import {
   advanceToQuantityStep,
   clickNextStep,
   gotoWarehouseCompose,
   loginAsOperator,
-  pickWorkType,
+  readSeed,
 } from "./_helpers";
+
+interface SqlInventorySnapshot {
+  item_id: string;
+  quantity: number;
+  warehouse_qty: number;
+  location_qty: number;
+  consistent: boolean;
+}
+
+function readSqlInventory(itemId: string): SqlInventorySnapshot {
+  const databasePath = resolve(process.cwd(), "..", "backend", "mes_e2e.db");
+  const script = [
+    "import json, sqlite3, sys",
+    "from pathlib import Path",
+    "db_path = Path(sys.argv[1]).resolve()",
+    "item_id = sys.argv[2].replace('-', '')",
+    "connection = sqlite3.connect(db_path.as_uri() + '?mode=ro', uri=True)",
+    "try:",
+    "    connection.execute('PRAGMA query_only = ON')",
+    "    row = connection.execute(\"\"\"",
+    "        SELECT inventory.quantity, inventory.warehouse_qty,",
+    "               COALESCE((",
+    "                   SELECT SUM(inventory_locations.quantity)",
+    "                   FROM inventory_locations",
+    "                   WHERE replace(inventory_locations.item_id, '-', '') = ?",
+    "                     AND inventory_locations.status IN ('PRODUCTION', 'DEFECTIVE')",
+    "               ), 0)",
+    "        FROM inventory",
+    "        WHERE replace(inventory.item_id, '-', '') = ?",
+    "    \"\"\", (item_id, item_id)).fetchone()",
+    "    if row is None:",
+    "        raise RuntimeError('inventory row not found')",
+    "    quantity, warehouse_qty, location_qty = map(int, row)",
+    "    print(json.dumps({",
+    "        'item_id': sys.argv[2],",
+    "        'quantity': quantity,",
+    "        'warehouse_qty': warehouse_qty,",
+    "        'location_qty': location_qty,",
+    "        'consistent': quantity == warehouse_qty + location_qty,",
+    "    }))",
+    "finally:",
+    "    connection.close()",
+  ].join("\n");
+  const result = spawnSync("python", ["-c", script, databasePath, itemId], {
+    encoding: "utf8",
+    windowsHide: true,
+  });
+  expect(result.status, result.stderr || result.stdout).toBe(0);
+  return JSON.parse(result.stdout) as SqlInventorySnapshot;
+}
+
+function numericText(raw: string): number {
+  return Number(raw.replace(/[^0-9-]/g, ""));
+}
+
+function writeFinalEvidence(filename: string, value: unknown): void {
+  const evidenceDir = process.env.CP6_FINAL_EVIDENCE_DIR;
+  if (!evidenceDir) return;
+  mkdirSync(evidenceDir, { recursive: true });
+  writeFileSync(resolve(evidenceDir, filename), JSON.stringify(value, null, 2), "utf8");
+}
 
 async function visible(locator: Locator): Promise<Locator> {
   return locator.filter({ visible: true }).first();
@@ -35,6 +99,7 @@ async function addItemAndWaitForPreview(page: Page, itemButton: Locator): Promis
 
 test.describe.serial("입출고 V2 — 창고 수량보정", () => {
   test("데스크톱 보정 입고 → 즉시 완료 → 창고 ADJUST 이력", async ({ page }) => {
+    const { rawItem } = readSeed();
     await page.setViewportSize({ width: 1440, height: 900 });
     await loginAsOperator(page, { role: "warehouse" });
     await gotoWarehouseCompose(page);
@@ -77,6 +142,9 @@ test.describe.serial("입출고 V2 — 창고 수량보정", () => {
     await expect(page.getByText("보정 입고", { exact: true }).filter({ visible: true })).toBeVisible();
     const before = await stockValue(page, "현재 창고");
     const after = await stockValue(page, "실행 후");
+    const sqlBefore = readSqlInventory(rawItem.item_id);
+    expect(sqlBefore.consistent).toBe(true);
+    expect(before).toBe(sqlBefore.warehouse_qty);
     expect(after - before).toBe(1);
 
     await page.getByRole("button", { name: /제출확인/ }).filter({ visible: true }).click();
@@ -86,6 +154,11 @@ test.describe.serial("입출고 V2 — 창고 수량보정", () => {
     await expect(page.getByRole("dialog", { name: /창고 보정 입고를 진행하시겠습니까/ })).toBeVisible();
     await page.getByRole("button", { name: "즉시 반영", exact: true }).click();
     await expect(page.getByRole("dialog", { name: /입출고 반영 완료/ })).toBeVisible();
+
+    const sqlAfter = readSqlInventory(rawItem.item_id);
+    expect(sqlAfter.consistent).toBe(true);
+    expect(sqlAfter.warehouse_qty - sqlBefore.warehouse_qty).toBe(1);
+    expect(sqlAfter.quantity - sqlBefore.quantity).toBe(1);
 
     const response = await page.request.get(
       "/api/inventory/transactions?search=E2E원자재튜브&transaction_types=ADJUST",
@@ -97,13 +170,62 @@ test.describe.serial("입출고 V2 — 창고 수량보정", () => {
         expect.objectContaining({
           transaction_type: "ADJUST",
           department: "창고",
-          warehouse_qty_before: expect.any(Number),
-          warehouse_qty_after: expect.any(Number),
+          warehouse_qty_before: sqlBefore.warehouse_qty,
+          warehouse_qty_after: sqlAfter.warehouse_qty,
         }),
       ]),
     );
 
     await page.getByRole("button", { name: "확인", exact: true }).click();
+    const itemsResponsePromise = page.waitForResponse((itemsResponse) => {
+      const url = new URL(itemsResponse.url());
+      return itemsResponse.request().method() === "GET"
+        && url.pathname === "/api/items"
+        && url.searchParams.get("limit") === "2000";
+    });
+    await page.goto("/mes?tab=dashboard");
+    const itemsResponse = await itemsResponsePromise;
+    expect(itemsResponse.ok()).toBe(true);
+    const items: Array<Record<string, unknown>> = await itemsResponse.json();
+    const apiItem = items.find((item) => item.item_id === rawItem.item_id);
+    expect(apiItem).toBeDefined();
+    expect(Number(apiItem?.warehouse_qty)).toBe(sqlAfter.warehouse_qty);
+    expect(Number(apiItem?.quantity)).toBe(sqlAfter.quantity);
+
+    const itemRow = page
+      .locator('tr[role="button"]')
+      .filter({ hasText: rawItem.item_name })
+      .filter({ visible: true })
+      .first();
+    await expect(itemRow).toBeVisible();
+    const warehouseChip = itemRow
+      .getByTestId("inventory-dept-stock-summary")
+      .locator("span")
+      .first();
+    await expect(warehouseChip).toBeVisible();
+    await expect(warehouseChip).toHaveText(/^창고\s/);
+    const uiWarehouseQty = numericText(await warehouseChip.innerText());
+    const uiAvailableQty = numericText(await itemRow.getByTestId("inventory-total-stock").innerText());
+    expect(uiWarehouseQty).toBe(Number(apiItem?.warehouse_qty));
+    expect(uiAvailableQty).toBe(Number(apiItem?.available_quantity));
+    expect(sqlAfter.quantity).toBe(sqlAfter.warehouse_qty + sqlAfter.location_qty);
+
+    writeFinalEvidence("inventory-sql-api-ui-oracle.json", {
+      database: "backend/mes_e2e.db",
+      item: { item_id: rawItem.item_id, item_name: rawItem.item_name },
+      before: sqlBefore,
+      after: sqlAfter,
+      apiPhysicalInventory: {
+        quantity: Number(apiItem?.quantity),
+        warehouse_qty: Number(apiItem?.warehouse_qty),
+      },
+      availableInventory: {
+        api_available_quantity: Number(apiItem?.available_quantity),
+        ui_available_quantity: uiAvailableQty,
+      },
+      uiWarehouseQty,
+    });
+
     await page.goto("/mes?tab=history");
     await expect(page.getByText("수량 조정", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("창고", { exact: true }).first()).toBeVisible();

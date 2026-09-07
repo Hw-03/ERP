@@ -272,10 +272,18 @@ export interface ShippingRequest {
   transaction_count: number;
 }
 
-export interface ShippingHistoryPage {
+export interface ShippingRequestPage {
   requests: ShippingRequest[];
   next_cursor: string | null;
   has_more: boolean;
+}
+
+export type ShippingHistoryPage = ShippingRequestPage;
+
+export interface ShippingRequestPageParams {
+  status?: ShippingRequestStatus;
+  cursor?: string;
+  limit?: number;
 }
 
 export interface ShippingHistoryMonth {

@@ -3,20 +3,16 @@ import { renderHook, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
-const createMutate = vi.fn();
-const updateMutate = vi.fn();
-const deleteMutate = vi.fn();
-const reorderMutate = vi.fn();
+const createMutateAsync = vi.fn();
+const updateMutateAsync = vi.fn();
+const deleteMutateAsync = vi.fn();
+const reorderMutateAsync = vi.fn();
 
 vi.mock("@/lib/queries/useDepartmentsQuery", () => ({
-  useCreateDepartmentMutation: () => ({ mutate: createMutate }),
-  useUpdateDepartmentMutation: () => ({ mutate: updateMutate }),
-  useDeleteDepartmentMutation: () => ({ mutate: deleteMutate }),
-  useReorderDepartmentsMutation: () => ({ mutate: reorderMutate }),
-}));
-
-vi.mock("../../DepartmentsContext", () => ({
-  useRefreshDepartments: () => async () => undefined,
+  useCreateDepartmentMutation: () => ({ mutateAsync: createMutateAsync }),
+  useUpdateDepartmentMutation: () => ({ mutateAsync: updateMutateAsync }),
+  useDeleteDepartmentMutation: () => ({ mutateAsync: deleteMutateAsync }),
+  useReorderDepartmentsMutation: () => ({ mutateAsync: reorderMutateAsync }),
 }));
 
 import { useAdminDepartmentsCommands } from "../useAdminDepartmentsCommands";
@@ -36,7 +32,6 @@ const D = (id: number, name = `D${id}`, is_active = true, color_hex = "#1d4ed8")
 
 const baseArgs = (over: Partial<Parameters<typeof useAdminDepartmentsCommands>[0]> = {}) => ({
   departments: [],
-  setDepartments: vi.fn(),
   selectedDept: null,
   setSelectedDept: vi.fn(),
   onStatusChange: vi.fn(),
@@ -49,49 +44,47 @@ const baseArgs = (over: Partial<Parameters<typeof useAdminDepartmentsCommands>[0
 
 describe("useAdminDepartmentsCommands", () => {
   beforeEach(() => {
-    createMutate.mockReset();
-    updateMutate.mockReset();
-    deleteMutate.mockReset();
-    reorderMutate.mockReset();
+    createMutateAsync.mockReset();
+    updateMutateAsync.mockReset();
+    deleteMutateAsync.mockReset();
+    reorderMutateAsync.mockReset();
+    createMutateAsync.mockResolvedValue(D(5, "신규"));
+    updateMutateAsync.mockResolvedValue(D(1));
+    deleteMutateAsync.mockResolvedValue(undefined);
+    reorderMutateAsync.mockResolvedValue({ ok: true });
   });
 
-  it("add — 빈 이름이면 createMutation 호출 안 함", () => {
+  it("add — 빈 이름이면 createMutation 호출 안 함", async () => {
     const args = baseArgs({ getAddName: () => "  " });
     const { result } = renderHook(() => useAdminDepartmentsCommands(args), { wrapper });
-    act(() => {
-      result.current.add();
+    await act(async () => {
+      await result.current.add();
     });
-    expect(createMutate).not.toHaveBeenCalled();
+    expect(createMutateAsync).not.toHaveBeenCalled();
   });
 
-  it("add — 이름 있으면 createMutation.mutate 호출 + onSuccess시 setDepartments", () => {
+  it("add — 서버 mutation 완료 후 후속 상태와 성공 메시지만 갱신", async () => {
     const args = baseArgs({ getAddName: () => "신규" });
     const { result } = renderHook(() => useAdminDepartmentsCommands(args), { wrapper });
-    act(() => {
-      result.current.add();
+    await act(async () => {
+      await result.current.add();
     });
-    expect(createMutate).toHaveBeenCalledTimes(1);
-    const [payload, opts] = createMutate.mock.calls[0]!;
+    expect(createMutateAsync).toHaveBeenCalledTimes(1);
+    const [payload] = createMutateAsync.mock.calls[0]!;
     expect(payload.name).toBe("신규");
     expect(payload.pin).toBe("1234");
-    // onSuccess 시뮬레이션
-    act(() => {
-      opts.onSuccess(D(5, "신규"));
-    });
-    expect(args.setDepartments).toHaveBeenCalled();
     expect(args.onAfterAdd).toHaveBeenCalled();
     expect(args.onStatusChange).toHaveBeenCalledWith("'신규' 부서를 추가했습니다.");
   });
 
-  it("reorder — items 페이로드 + setDepartments 즉시 호출", () => {
+  it("reorder — 로컬 미러 없이 서버 mutation에 순서 페이로드를 전달", async () => {
     const args = baseArgs({ departments: [D(1), D(2)] });
     const { result } = renderHook(() => useAdminDepartmentsCommands(args), { wrapper });
-    act(() => {
-      result.current.reorder([D(2), D(1)]);
+    await act(async () => {
+      await result.current.reorder([D(2), D(1)]);
     });
-    expect(args.setDepartments).toHaveBeenCalledTimes(1);
-    expect(reorderMutate).toHaveBeenCalledTimes(1);
-    expect(reorderMutate.mock.calls[0]![0]).toEqual({
+    expect(reorderMutateAsync).toHaveBeenCalledTimes(1);
+    expect(reorderMutateAsync.mock.calls[0]![0]).toEqual({
       items: [
         { id: 2, display_order: 0 },
         { id: 1, display_order: 1 },
@@ -100,16 +93,29 @@ describe("useAdminDepartmentsCommands", () => {
     });
   });
 
-  it("updateColor — updateMutation.mutate { id, payload }", () => {
+  it("updateColor — updateMutation.mutateAsync { id, payload }", async () => {
     const args = baseArgs({ departments: [D(1)] });
     const { result } = renderHook(() => useAdminDepartmentsCommands(args), { wrapper });
-    act(() => {
-      result.current.updateColor(1, "#dc2626");
+    await act(async () => {
+      await result.current.updateColor(1, "#dc2626");
     });
-    expect(updateMutate).toHaveBeenCalledTimes(1);
-    expect(updateMutate.mock.calls[0]![0]).toEqual({
+    expect(updateMutateAsync).toHaveBeenCalledTimes(1);
+    expect(updateMutateAsync.mock.calls[0]![0]).toEqual({
       id: 1,
       payload: { color_hex: "#dc2626", pin: "1234" },
     });
+  });
+
+  it("mutation 실패는 성공 상태를 만들지 않고 오류를 노출", async () => {
+    updateMutateAsync.mockRejectedValue(new Error("색상 저장 실패"));
+    const args = baseArgs({ departments: [D(1)] });
+    const { result } = renderHook(() => useAdminDepartmentsCommands(args), { wrapper });
+
+    await act(async () => {
+      await result.current.updateColor(1, "#dc2626");
+    });
+
+    expect(args.onError).toHaveBeenCalledWith("색상 저장 실패");
+    expect(args.onStatusChange).not.toHaveBeenCalled();
   });
 });

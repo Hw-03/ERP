@@ -9,7 +9,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { useShippingRequestsQuery } from "../useShippingQuery";
+import type { ShippingRequest } from "@/lib/api";
+import {
+  upsertShippingPageRequest,
+  useShippingRequestPagesQuery,
+  useShippingRequestsQuery,
+} from "../useShippingQuery";
+import { invalidateOperationalQueries } from "../realtime";
 
 function makeResponse(body: unknown, ok = true): Response {
   return {
@@ -84,5 +90,65 @@ describe("useShippingRequestsQuery", () => {
     expect(result2.current.isLoading).toBe(false);
     expect(result2.current.data).toEqual(sampleRequests);
     expect(fetchSpy.mock.calls.length).toBe(callCountAfterFirstMount);
+  });
+});
+
+describe("useShippingRequestPagesQuery", () => {
+  it("seeds a first page when a mutation completes before the initial list request", () => {
+    const next = sampleRequests[0] as ShippingRequest;
+
+    expect(upsertShippingPageRequest(undefined, next)).toEqual({
+      pages: [{ requests: [next], next_cursor: null, has_more: false }],
+      pageParams: [null],
+    });
+  });
+
+  it("loads the next cursor page and de-duplicates a boundary row", async () => {
+    const secondRequest = { request_id: "req-2", status: "PREPARED", base_pf_item_id: "pf-2" };
+    const fetchSpy = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      return Promise.resolve(makeResponse(url.includes("cursor=next")
+        ? { requests: [sampleRequests[0], secondRequest], next_cursor: null, has_more: false }
+        : { requests: sampleRequests, next_cursor: "next", has_more: true }));
+    });
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    const client = makeClient();
+    const { result } = renderHook(() => useShippingRequestPagesQuery(), {
+      wrapper: makeWrapper(client),
+    });
+
+    await waitFor(() => expect(result.current.requests).toEqual(sampleRequests));
+    expect(result.current.hasNextPage).toBe(true);
+    await result.current.fetchNextPage();
+
+    await waitFor(() => expect(result.current.requests).toEqual([sampleRequests[0], secondRequest]));
+    expect(result.current.hasNextPage).toBe(false);
+    expect(String(fetchSpy.mock.calls[1][0])).toContain("cursor=next");
+  });
+
+  it("realtime operational invalidation restarts an active list from the first page", async () => {
+    const secondRequest = { request_id: "req-2", status: "PREPARED", base_pf_item_id: "pf-2" };
+    const fetchSpy = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      return Promise.resolve(makeResponse(url.includes("cursor=next")
+        ? { requests: [secondRequest], next_cursor: null, has_more: false }
+        : { requests: sampleRequests, next_cursor: "next", has_more: true }));
+    });
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    const client = makeClient();
+    const { result } = renderHook(() => useShippingRequestPagesQuery(), {
+      wrapper: makeWrapper(client),
+    });
+    await waitFor(() => expect(result.current.requests).toEqual(sampleRequests));
+    await result.current.fetchNextPage();
+    await waitFor(() => expect(result.current.requests).toEqual([...sampleRequests, secondRequest]));
+
+    fetchSpy.mockClear();
+    await invalidateOperationalQueries(client);
+
+    expect(fetchSpy).toHaveBeenCalled();
+    expect(String(fetchSpy.mock.calls[0][0])).not.toContain("cursor=");
   });
 });

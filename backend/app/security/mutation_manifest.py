@@ -216,6 +216,7 @@ SERVICE_READ_ONLY_EXPORTS: frozenset[str] = frozenset(
         "app.services.shipping.component_change_preview_independent",
         "app.services.shipping.get_request",
         "app.services.shipping.match_bom",
+        "app.services.shipping.prepare_stock_shortages_many",
         "app.services.sr_draft.get_draft_request",
         "app.services.sr_draft.list_draft_requests",
         "app.services.sr_reservation.aggregate_reservations",
@@ -336,6 +337,7 @@ SHIPPING_READ_ONLY_SERVICE_EXPORTS: frozenset[str] = frozenset(
         "app.services.shipping.component_change_preview_independent",
         "app.services.shipping.get_request",
         "app.services.shipping.match_bom",
+        "app.services.shipping.prepare_stock_shortages_many",
     }
 )
 

@@ -7,7 +7,8 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, act } from "@testing-library/react";
-import type { ReactElement } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement, ReactNode } from "react";
 import { InventoryItemsTable } from "../InventoryItemsTable";
 import { DepartmentsProvider } from "../../DepartmentsContext";
 import type { Item } from "@/lib/api";
@@ -39,8 +40,20 @@ vi.mock("@/lib/api", () => ({
   },
 }));
 
+vi.mock("@/lib/queries/useDepartmentsQuery", () => ({
+  useDepartmentsQuery: () => ({ data: [] }),
+}));
+
 function renderWithProviders(ui: ReactElement) {
-  return render(<DepartmentsProvider>{ui}</DepartmentsProvider>);
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      <QueryClientProvider client={client}>
+        <DepartmentsProvider>{children}</DepartmentsProvider>
+      </QueryClientProvider>
+    );
+  }
+  return render(ui, { wrapper: Wrapper });
 }
 
 function makeItem(i: number): Item {
@@ -93,6 +106,44 @@ const baseProps = {
 };
 
 describe("InventoryItemsTable — chunked render", () => {
+  it("데스크톱·모바일의 로딩과 필터 결과에서도 KPI 모집단 설명을 항상 표시한다", () => {
+    const explanation = "KPI 숫자는 PA·PF 중간품목을 제외하며, 좁힌 목록에는 PA·PF가 표시될 수 있습니다.";
+    const item = makeItem(1);
+    const { getByText, rerender } = renderWithProviders(
+      <InventoryItemsTable
+        {...baseProps}
+        filteredItems={[item]}
+        displayLimit={100}
+        setDisplayLimit={() => {}}
+      />,
+    );
+
+    expect(getByText(explanation)).toBeVisible();
+
+    rerender(
+      <InventoryItemsTable
+        {...baseProps}
+        loading
+        filteredItems={[]}
+        displayLimit={100}
+        setDisplayLimit={() => {}}
+      />,
+    );
+    expect(getByText(explanation)).toBeVisible();
+
+    rerender(
+      <InventoryItemsTable
+        {...baseProps}
+        activeFilterCount={1}
+        filteredItems={[]}
+        displayLimit={100}
+        setDisplayLimit={() => {}}
+        compact
+      />,
+    );
+    expect(getByText(explanation)).toBeVisible();
+  });
+
   it("데스크톱에서는 바깥 작업영역 기준으로 검색창 아래 열 헤더를 고정한다", () => {
     const item = makeItem(1);
     const { container, rerender } = renderWithProviders(
@@ -121,15 +172,13 @@ describe("InventoryItemsTable — chunked render", () => {
     expect(desktopHeaders[0]).toHaveStyle({ background: "var(--c-inventory-table-header)" });
 
     rerender(
-      <DepartmentsProvider>
-        <InventoryItemsTable
-          {...baseProps}
-          filteredItems={[item]}
-          displayLimit={100}
-          setDisplayLimit={() => {}}
-          compact
-        />
-      </DepartmentsProvider>,
+      <InventoryItemsTable
+        {...baseProps}
+        filteredItems={[item]}
+        displayLimit={100}
+        setDisplayLimit={() => {}}
+        compact
+      />,
     );
 
     const compactTable = container.querySelector("table");
@@ -202,28 +251,24 @@ describe("InventoryItemsTable — chunked render", () => {
 
     act(() => fireIntersection());
     rerender(
-      <DepartmentsProvider>
-        <InventoryItemsTable
-          {...baseProps}
-          filteredItems={items}
-          displayLimit={100}
-          setDisplayLimit={() => {}}
-        />
-      </DepartmentsProvider>,
+      <InventoryItemsTable
+        {...baseProps}
+        filteredItems={items}
+        displayLimit={100}
+        setDisplayLimit={() => {}}
+      />,
     );
     expect(container.querySelectorAll("tbody tr").length).toBe(40);
 
     // selectedItem 변경 등 filteredItems/displayLimit 와 무관한 리렌더를 흉내.
     rerender(
-      <DepartmentsProvider>
-        <InventoryItemsTable
-          {...baseProps}
-          filteredItems={items}
-          displayLimit={100}
-          selectedItem={items[0]}
-          setDisplayLimit={() => {}}
-        />
-      </DepartmentsProvider>,
+      <InventoryItemsTable
+        {...baseProps}
+        filteredItems={items}
+        displayLimit={100}
+        selectedItem={items[0]}
+        setDisplayLimit={() => {}}
+      />,
     );
     expect(container.querySelectorAll("tbody tr").length).toBe(40);
   });
