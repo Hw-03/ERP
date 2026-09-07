@@ -259,9 +259,9 @@ test.describe("불량 격리 건별 원장", () => {
       .filter({ visible: true })
       .filter({ hasText: "첫 격리 메모" });
     await expect(completedRow.getByText("2개", { exact: true })).toBeVisible();
-    firstRecordState = await recordState(firstRecord.record_id);
-    expect(Number(firstRecordState.quantity)).toBe(2);
-    expect(Number(firstRecordState.pending_quantity)).toBe(0);
-    expect(Number(firstRecordState.available_quantity)).toBe(2);
+    const completedFirstRecordState = await recordState(firstRecord.record_id);
+    expect(Number(completedFirstRecordState.quantity)).toBe(2);
+    expect(Number(completedFirstRecordState.pending_quantity)).toBe(0);
+    expect(Number(completedFirstRecordState.available_quantity)).toBe(2);
   });
 });
