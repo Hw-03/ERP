@@ -40,6 +40,26 @@ describe("shippingApi", () => {
     expect(body.companion_lines).toEqual([{ item_id: "carton-1", quantity: 3, unit: "EA" }]);
   });
 
+  it("forwards caller cancellation to BOM matching", async () => {
+    let requestSignal: AbortSignal | undefined;
+    globalThis.fetch = vi.fn((_url, init) => {
+      requestSignal = init?.signal ?? undefined;
+      return new Promise<Response>((_resolve, reject) => {
+        requestSignal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+      });
+    }) as unknown as typeof fetch;
+    const controller = new AbortController();
+
+    const match = shippingApi.matchShippingBom({
+      base_pf_item_id: "pf-1",
+      bom_lines: [{ parent_stage: "PA", child_item_id: "af-1", quantity: 1 }],
+    }, { signal: controller.signal });
+    controller.abort();
+
+    expect(requestSignal?.aborted).toBe(true);
+    await expect(match).rejects.toBeInstanceOf(ResultUnknownError);
+  });
+
   it("updates checklist and sends serial numbers when completing preparation", async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
@@ -232,6 +252,24 @@ describe("shippingApi", () => {
     expect(historyUrl).toContain("q=INV-");
     expect(historyUrl).toContain("cursor=next");
     expect(historyUrl).toContain("limit=50");
+  });
+
+  it("reads an active request page with its stable cursor contract", async () => {
+    const page = { requests: [{ request_id: "req-1" }], next_cursor: "next", has_more: true };
+    const fetchSpy = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) => Promise.resolve(makeResponse(page)));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await expect(shippingApi.getShippingRequestPage({
+      status: "PREPARING",
+      cursor: "cursor-1",
+      limit: 25,
+    })).resolves.toEqual(page);
+
+    const url = String(fetchSpy.mock.calls[0][0]);
+    expect(url).toContain("/api/shipping/requests/page?");
+    expect(url).toContain("status=PREPARING");
+    expect(url).toContain("cursor=cursor-1");
+    expect(url).toContain("limit=25");
   });
 
   it("reads one shipping request by id with an abort signal", async () => {

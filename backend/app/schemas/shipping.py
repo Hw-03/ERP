@@ -350,10 +350,14 @@ class ShippingRequestResponse(BaseModel):
     transaction_count: int = 0
 
 
-class ShippingHistoryPageResponse(BaseModel):
+class ShippingRequestPageResponse(BaseModel):
     requests: list[ShippingRequestResponse]
     next_cursor: Optional[str] = None
     has_more: bool
+
+
+class ShippingHistoryPageResponse(ShippingRequestPageResponse):
+    """Backward-compatible history name for the shared shipping page contract."""
 
 
 class ShippingHistoryMonthResponse(BaseModel):

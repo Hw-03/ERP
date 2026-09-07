@@ -11,7 +11,7 @@ from typing import Any, Callable, Optional
 
 from fastapi import Depends, Query, Response, status
 from sqlalchemy import and_, func, or_
-from sqlalchemy.orm import Session, aliased
+from sqlalchemy.orm import Session, aliased, joinedload, selectinload
 
 from app.database import get_db
 from app.dependencies.verified_actor import (
@@ -25,7 +25,11 @@ from app.models import (
     DepartmentEnum,
     Employee,
     Item,
+    ShippingAllocation,
     ShippingRequest,
+    ShippingRequestBomLine,
+    ShippingRequestChecklistLine,
+    ShippingRequestCompanionLine,
     ShippingRequestRevision,
     ShippingRequestStatusEnum,
     TransactionLog,
@@ -50,6 +54,7 @@ from app.schemas.shipping import (
     ShippingInvoiceUpdate,
     ShippingHistoryMonthResponse,
     ShippingHistoryPageResponse,
+    ShippingRequestPageResponse,
     ShippingRequestRevisionResponse,
     ShippingRequestCreate,
     ShippingRequestResponse,
@@ -71,6 +76,8 @@ _COMPONENT_CHANGE_DEPARTMENTS = {
 }
 _KST = timezone(timedelta(hours=9))
 _LATEST_REVISION_UNSET = object()
+_TRANSACTIONS_UNSET = object()
+_STOCK_SHORTAGES_UNSET = object()
 
 
 def _line_payload(lines: list[ShippingBomLineInput] | None) -> list[dict] | None:
@@ -158,6 +165,8 @@ def _to_response(
     db: Session,
     req: ShippingRequest,
     latest_preparation_revision: ShippingRequestRevision | None | object = _LATEST_REVISION_UNSET,
+    transaction_rows: list[TransactionLog] | object = _TRANSACTIONS_UNSET,
+    stock_shortages: list[dict] | object = _STOCK_SHORTAGES_UNSET,
 ) -> ShippingRequestResponse:
     if latest_preparation_revision is _LATEST_REVISION_UNSET:
         latest_preparation_revision = (
@@ -169,12 +178,17 @@ def _to_response(
             .order_by(ShippingRequestRevision.created_at.desc(), ShippingRequestRevision.revision_id.desc())
             .first()
         )
-    tx_rows = (
-        db.query(TransactionLog)
-        .filter(TransactionLog.shipping_request_id == req.request_id)
-        .order_by(TransactionLog.created_at.asc(), TransactionLog.log_id.asc())
-        .all()
-    )
+    if transaction_rows is _TRANSACTIONS_UNSET:
+        transaction_rows = (
+            db.query(TransactionLog)
+            .filter(TransactionLog.shipping_request_id == req.request_id)
+            .order_by(TransactionLog.created_at.asc(), TransactionLog.log_id.asc())
+            .all()
+        )
+    tx_rows = transaction_rows if isinstance(transaction_rows, list) else []
+    if stock_shortages is _STOCK_SHORTAGES_UNSET:
+        stock_shortages = shipping_svc._prepare_stock_shortages(db, req)
+    shortage_rows = stock_shortages if isinstance(stock_shortages, list) else []
     return ShippingRequestResponse(
         request_id=req.request_id,
         status=req.status,
@@ -271,10 +285,57 @@ def _to_response(
         ],
         stock_shortages=[
             ShippingStockShortageResponse(**shortage)
-            for shortage in shipping_svc._prepare_stock_shortages(db, req)
+            for shortage in shortage_rows
         ],
         transaction_count=len(tx_rows),
     )
+
+
+def _request_response_options() -> tuple[Any, ...]:
+    return (
+        joinedload(ShippingRequest.base_pf_item),
+        joinedload(ShippingRequest.final_pa_item),
+        joinedload(ShippingRequest.final_pf_item),
+        selectinload(ShippingRequest.bom_lines).joinedload(ShippingRequestBomLine.child_item),
+        selectinload(ShippingRequest.companion_lines).joinedload(ShippingRequestCompanionLine.item),
+        selectinload(ShippingRequest.checklist_lines).joinedload(ShippingRequestChecklistLine.item),
+        selectinload(ShippingRequest.allocations).joinedload(ShippingAllocation.item),
+        selectinload(ShippingRequest.events),
+    )
+
+
+def _responses_for_rows(db: Session, rows: list[ShippingRequest]) -> list[ShippingRequestResponse]:
+    request_ids = [row.request_id for row in rows]
+    if not request_ids:
+        return []
+    latest_revisions = _latest_preparation_revisions(db, request_ids)
+    transaction_rows = (
+        db.query(TransactionLog)
+        .options(joinedload(TransactionLog.item))
+        .filter(TransactionLog.shipping_request_id.in_(request_ids))
+        .order_by(
+            TransactionLog.shipping_request_id.asc(),
+            TransactionLog.created_at.asc(),
+            TransactionLog.log_id.asc(),
+        )
+        .all()
+    )
+    transactions_by_request: dict[uuid.UUID, list[TransactionLog]] = {
+        request_id: [] for request_id in request_ids
+    }
+    for transaction in transaction_rows:
+        transactions_by_request[transaction.shipping_request_id].append(transaction)
+    shortages_by_request = shipping_svc.prepare_stock_shortages_many(db, rows)
+    return [
+        _to_response(
+            db,
+            row,
+            latest_revisions.get(row.request_id),
+            transactions_by_request[row.request_id],
+            shortages_by_request[row.request_id],
+        )
+        for row in rows
+    ]
 
 
 def _action_or_422(db: Session, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
@@ -398,28 +459,98 @@ def component_change_independent(
     except ValueError as exc:
         raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.STOCK_SHORTAGE, str(exc))
 
+def _active_requests_query(
+    db: Session,
+    status_filter: ShippingRequestStatusEnum | None,
+):
+    query = db.query(ShippingRequest).options(*_request_response_options())
+    if status_filter is not None:
+        return query.filter(ShippingRequest.status == status_filter)
+    return query.filter(ShippingRequest.status != ShippingRequestStatusEnum.CANCELLED)
+
+
+def _request_page_cursor(request: ShippingRequest) -> str:
+    payload = {
+        "sort_at": request.created_at.isoformat(),
+        "request_id": str(request.request_id),
+    }
+    return base64.urlsafe_b64encode(
+        json.dumps(payload, separators=(",", ":")).encode()
+    ).decode().rstrip("=")
+
+
+def _decode_request_page_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
+    try:
+        padded = cursor + "=" * (-len(cursor) % 4)
+        value = json.loads(base64.urlsafe_b64decode(padded.encode()).decode())
+        return datetime.fromisoformat(value["sort_at"]), uuid.UUID(value["request_id"])
+    except (ValueError, KeyError, TypeError, UnicodeDecodeError, json.JSONDecodeError, binascii.Error):
+        raise http_error(status.HTTP_400_BAD_REQUEST, ErrorCode.BAD_REQUEST, "유효하지 않은 출하 요청 커서입니다.")
+
+
 @router.get("/requests", response_model=list[ShippingRequestResponse])
 def list_requests(
     status_filter: Optional[ShippingRequestStatusEnum] = Query(None, alias="status"),
+    limit: int = Query(50, ge=1, le=50),
     db: Session = Depends(get_db),
 ):
-    query = db.query(ShippingRequest)
-    if status_filter is not None:
-        query = query.filter(ShippingRequest.status == status_filter)
-    else:
-        query = query.filter(ShippingRequest.status != ShippingRequestStatusEnum.CANCELLED)
-    rows = query.order_by(ShippingRequest.created_at.desc(), ShippingRequest.request_id.desc()).all()
-    latest_revisions = _latest_preparation_revisions(db, [row.request_id for row in rows])
-    return [_to_response(db, row, latest_revisions.get(row.request_id)) for row in rows]
+    """One-release list adapter; bounded while clients migrate to the page route."""
+
+    rows = (
+        _active_requests_query(db, status_filter)
+        .order_by(ShippingRequest.created_at.desc(), ShippingRequest.request_id.desc())
+        .limit(limit)
+        .all()
+    )
+    return _responses_for_rows(db, rows)
+
+
+@router.get("/requests/page", response_model=ShippingRequestPageResponse)
+def list_request_page(
+    status_filter: Optional[ShippingRequestStatusEnum] = Query(None, alias="status"),
+    cursor: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=50),
+    db: Session = Depends(get_db),
+):
+    query = _active_requests_query(db, status_filter)
+    if cursor:
+        cursor_at, cursor_id = _decode_request_page_cursor(cursor)
+        query = query.filter(or_(
+            ShippingRequest.created_at < cursor_at,
+            and_(
+                ShippingRequest.created_at == cursor_at,
+                ShippingRequest.request_id < cursor_id,
+            ),
+        ))
+    rows = (
+        query.order_by(ShippingRequest.created_at.desc(), ShippingRequest.request_id.desc())
+        .limit(limit + 1)
+        .all()
+    )
+    page = rows[:limit]
+    has_more = len(rows) > limit
+    return ShippingRequestPageResponse(
+        requests=_responses_for_rows(db, page),
+        next_cursor=_request_page_cursor(page[-1]) if has_more and page else None,
+        has_more=has_more,
+    )
 
 
 @router.get("/requests/{request_id}", response_model=ShippingRequestResponse)
 def get_request(request_id: uuid.UUID, db: Session = Depends(get_db)):
-    try:
-        req = shipping_svc.get_request(db, request_id)
-    except ShippingError as exc:
-        raise http_error(status.HTTP_404_NOT_FOUND, ErrorCode.NOT_FOUND, str(exc))
-    return _to_response(db, req)
+    req = (
+        db.query(ShippingRequest)
+        .options(*_request_response_options())
+        .filter(ShippingRequest.request_id == request_id)
+        .first()
+    )
+    if req is None:
+        raise http_error(
+            status.HTTP_404_NOT_FOUND,
+            ErrorCode.NOT_FOUND,
+            "출하 요청을 찾을 수 없습니다.",
+        )
+    return _responses_for_rows(db, [req])[0]
 
 
 @router.post("/requests", response_model=ShippingRequestResponse, status_code=status.HTTP_201_CREATED)
@@ -748,6 +879,7 @@ def history(
     )
     query = (
         db.query(ShippingRequest)
+        .options(*_request_response_options())
         .outerjoin(final_pf, ShippingRequest.final_pf_item_id == final_pf.item_id)
         .join(base_pf, ShippingRequest.base_pf_item_id == base_pf.item_id)
         .filter(ShippingRequest.status.in_(allowed))
@@ -768,9 +900,8 @@ def history(
     rows = query.order_by(sort_at.desc(), ShippingRequest.request_id.desc()).limit(limit + 1).all()
     page = rows[:limit]
     has_more = len(rows) > limit
-    latest_revisions = _latest_preparation_revisions(db, [row.request_id for row in page])
     return ShippingHistoryPageResponse(
-        requests=[_to_response(db, row, latest_revisions.get(row.request_id)) for row in page],
+        requests=_responses_for_rows(db, page),
         next_cursor=_history_cursor(page[-1], _history_sort_at(page[-1])) if has_more and page else None,
         has_more=has_more,
     )

@@ -8824,6 +8824,7 @@
         "type": "object"
       },
       "ShippingHistoryPageResponse": {
+        "description": "Backward-compatible history name for the shared shipping page contract.",
         "properties": {
           "has_more": {
             "title": "Has More",
@@ -9189,6 +9190,38 @@
           "base_pf_item_id"
         ],
         "title": "ShippingRequestCreate",
+        "type": "object"
+      },
+      "ShippingRequestPageResponse": {
+        "properties": {
+          "has_more": {
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "requests": {
+            "items": {
+              "$ref": "#/components/schemas/ShippingRequestResponse"
+            },
+            "title": "Requests",
+            "type": "array"
+          }
+        },
+        "required": [
+          "requests",
+          "has_more"
+        ],
+        "title": "ShippingRequestPageResponse",
         "type": "object"
       },
       "ShippingRequestResponse": {
@@ -21549,6 +21582,7 @@
     },
     "/api/shipping/requests": {
       "get": {
+        "description": "One-release list adapter; bounded while clients migrate to the page route.",
         "operationId": "list_requests_api_shipping_requests_get",
         "parameters": [
           {
@@ -21565,6 +21599,18 @@
                 }
               ],
               "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
             }
           }
         ],
@@ -21634,6 +21680,83 @@
           }
         },
         "summary": "Create Request",
+        "tags": [
+          "Shipping"
+        ]
+      }
+    },
+    "/api/shipping/requests/page": {
+      "get": {
+        "operationId": "list_request_page_api_shipping_requests_page_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ShippingRequestStatusEnum"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShippingRequestPageResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Request Page",
         "tags": [
           "Shipping"
         ]

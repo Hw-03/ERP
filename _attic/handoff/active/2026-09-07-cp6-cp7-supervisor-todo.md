@@ -18,14 +18,14 @@
 - 확정 `SYNC_BASE_SHA`: `731edc2df15c89753e60c12be95a65ef88e33bde`. 품질 본 branch는 CP6 통합까지 이 SHA에서 고정한다.
 - CP6 구현 작업: `01a07b0c-4563-7c41-a8c7-5df5ad2e91e2`, `C:\ERP\.worktrees\full-code-quality-cp6`, branch `codex/full-code-quality-cp6`.
 - 정본 감사 계획: [전수 감사·개선 계획](../../docs/research/2026-08-13-full-code-quality-audit-and-improvement-plan.md), 8.9.7·8.9.8 및 12.26절
-- 현 상태: **S0 제품 merge `cd195d9e`의 GitHub run34099290108은6/6 PASS, docs-only 기준 commit은731edc2d다. CP6 A1은 LOCAL_VERIFIED(관련14파일73PASS, 앱/테스트 타입·린트, 최종 명세·품질 C/I/M0)이며 staged smart 후 로컬 커밋한다. 이후 A2로 진행하며 CP6 전체 gate·push·CI는 최종 묶음에서 수행한다. CP7 읽기 전용 사전감사는 완료했고 제품 구현은 CP6 통합 뒤 시작한다.**
-- 구현·검증 완료 집계: 아래 실행 단위 3/16 완료. CP6 A1은 로컬 구현·focused 검증 완료이며 CP6 최종 통합/CI 완료와 구분한다.
+- 현 상태: **S0 제품 CI6/6과 SYNC731edc2d를 유지한다. CP6 A1은 local commit59c52bad, A2는 focused 검증·독립 최종 리뷰 C/I/M0를 인수했다. A2 staged smart·로컬 commit 뒤 같은 worktree에서 A3로 이어간다. 중간 push는 하지 않고 CP6 전체 gate·push·CI는 최종 묶음에서 수행한다. CP7 제품 구현은 CP6 통합 뒤 시작한다.**
+- 구현·검증 완료 집계: 아래 실행 단위 4/16 완료. A1·A2의 로컬 구현·focused 검증과 CP6 최종 통합/CI 완료를 구분한다.
 
 ## 실행 체크리스트
 
 - [x] S0 (2026-09-07): fixed main 병합, 전체 delta manifest, migration 두 계보 통합, 격리 보완, 영역별 검증 복구, 이중 리뷰, 제품 merge push 및 [실제 CI6/6 성공](https://github.com/Hw-03/ERP/actions/runs/34099290108). 제품 SHA `cd195d9e668cb4ece139f48562337f58d19839d8`; `SYNC_BASE_SHA`는 같은 제품 경로를 유지하는 본 docs-only commit이다. 문서-only CI 중복은 CP6 코드 push로 묶는다.
-- [x] CP6 A1 (2026-09-07, LOCAL_VERIFIED): IC12→14 actual dirty/Promise save/이동 guard/React Query 단일 정본. 초기 RED13건 및 후속 편집 유실 RED1건을 보완해 관련14파일73/73 PASS. 앱 타입·테스트 타입(56계약/279manifest/known419·new0)·변경 파일 lint·diff-check PASS, 최종 명세/품질 C/I/M0. `20260907-cp6-a1/a1-green-vitest.json` 및 감사 계획12.27.1. staged smart 후 local commit, 원격 검증은 CP6 종료 단계다.
-- [ ] CP6 A2: IC13→16 BOM 응답 generation/payload baseline/출하 pagination·bulk loading·desktop/mobile load-more.
+- [x] CP6 A1 (2026-09-07, LOCAL_VERIFIED): IC12→14 actual dirty/Promise save/이동 guard/React Query 단일 정본. 초기 RED와 후속 편집 유실을 보완해 관련14파일73PASS, 최종 명세/품질 C/I/M0. staged smart(frontend5/docs3) PASS, related41파일334PASS·direct10파일39PASS·타입/린트/docs PASS. 로컬 commit `59c52bad3f303603b01961b4e3ee3fb550bbd2e5`, post-commit clean을 총괄 확인. 원격 검증은 CP6 종료 단계다. 증거는 감사12.27.1과 `20260907-cp6-a1/`.
+- [x] CP6 A2 (2026-09-07, LOCAL_VERIFIED): IC13→16 BOM abort/generation/fingerprint·실제 dirty baseline·stable cursor·bulk loading·desktop/mobile load-more. 관련8파일239PASS 후 품질 Important2를 RED→GREEN 보완해 최종 delta frontend5/backend2PASS와 명세/품질 C/I/M0. 총괄이 실제 diff·원본 실행·두 최종 리뷰를 확인했다. 증거는 감사12.27.2 및 `20260907-cp6-a2/`. staged smart/로컬 commit은 다음 절차이며 full/CI는 CP6 종료 때 수행한다.
 - [ ] CP6 A3: IC15 map mutation 순서·소유권·오래된 rollback 방지·refetch.
 - [ ] CP6 A4: IC25 PA·PF KPI 모집단 상시 설명, 기존 계산 불변.
 - [ ] CP6 A5: IC26 첫/다른/같은 작성자 animation 0/1/0, 탭·날짜·상세 0.
@@ -62,6 +62,7 @@ CP6의 A1~A5는 focused GREEN·독립 새 diff 리뷰 C/I0 후 구간별 local c
 - S0는 기존 migration을 재작성하지 않고 `20260907_0034`, down_revision `("20260903_0032", "20260831_0033")`의 DDL 없는 merge revision만 추가한다. 이미 품질에 반영된 PostgreSQL repair도 보존한다.
 - IC12는 프런트 저장 반환형 `Promise<SaveResult>`를 명시하고 기존 department API를 유지한다.
 - IC16의 stable cursor/has_more는 additive이며 기존 list adapter를 한 release 유지한다. 재고 정책은 바꾸지 않는다.
+- IC16 호환의 정확한 범위: legacy 배열 응답 형태는 유지하지만 active 목록은 최대50건으로 제한한다. 예전 무제한 전체 반환 의미까지 보존한다는 뜻은 아니다. 실제 desktop/mobile/shell consumer는 page 경로로 전환했고 legacy API/hook은 정의만 남긴다.
 - IC21은 generated raw type과 업무 adapter를 분리하며 runtime wire format을 유지한다.
 - 나머지 카드에서 breaking API/non-additive schema 변경을 임의 추가하지 않는다.
 

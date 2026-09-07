@@ -18,14 +18,129 @@
  * 탭 재방문 시 재요청 없이 즉시 렌더.
  */
 
-import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { useMemo } from "react";
+import { useInfiniteQuery, useQuery, type InfiniteData } from "@tanstack/react-query";
+import {
+  api,
+  type ShippingHistoryParams,
+  type ShippingRequest,
+  type ShippingRequestPage,
+  type ShippingRequestPageParams,
+} from "@/lib/api";
 import { STALE_TIME } from "./client";
 import { queryKeys } from "./keys";
 
 type ShippingRequestsQueryOptions = {
   live?: boolean;
 };
+
+const SHIPPING_PAGE_SIZE = 50;
+
+export type ShippingPagesCache = InfiniteData<ShippingRequestPage, string | null>;
+
+export function flattenShippingPages(data: ShippingPagesCache | undefined): ShippingRequest[] {
+  const seen = new Set<string>();
+  return (data?.pages ?? []).flatMap((page) => page.requests.filter((request) => {
+    if (seen.has(request.request_id)) return false;
+    seen.add(request.request_id);
+    return true;
+  }));
+}
+
+export function upsertShippingPageRequest(
+  data: ShippingPagesCache | undefined,
+  next: ShippingRequest,
+): ShippingPagesCache | undefined {
+  if (!data || data.pages.length === 0) {
+    return {
+      pages: [{ requests: [next], next_cursor: null, has_more: false }],
+      pageParams: [null],
+    };
+  }
+  const pages = data.pages.map((page) => ({
+    ...page,
+    requests: page.requests.filter((request) => request.request_id !== next.request_id),
+  }));
+  pages[0] = { ...pages[0], requests: [next, ...pages[0].requests] };
+  return { ...data, pages };
+}
+
+export function removeShippingPageRequest(
+  data: ShippingPagesCache | undefined,
+  requestId: string,
+): ShippingPagesCache | undefined {
+  if (!data) return data;
+  return {
+    ...data,
+    pages: data.pages.map((page) => ({
+      ...page,
+      requests: page.requests.filter((request) => request.request_id !== requestId),
+    })),
+  };
+}
+
+export function useShippingRequestPagesQuery(
+  params: Omit<ShippingRequestPageParams, "cursor"> = {},
+  options: ShippingRequestsQueryOptions = {},
+) {
+  const live = options.live === true;
+  const queryKey = queryKeys.shipping.requestPages(params);
+  const query = useInfiniteQuery<
+    ShippingRequestPage,
+    Error,
+    ShippingPagesCache,
+    typeof queryKey,
+    string | null
+  >({
+    queryKey,
+    initialPageParam: null,
+    queryFn: ({ pageParam, signal }) => api.getShippingRequestPage({
+      ...params,
+      cursor: pageParam ?? undefined,
+      limit: params.limit ?? SHIPPING_PAGE_SIZE,
+    }, { signal }),
+    getNextPageParam: (lastPage) => lastPage.has_more ? lastPage.next_cursor : null,
+    placeholderData: { pages: [], pageParams: [] },
+    ...(live
+      ? {
+          refetchOnMount: "always" as const,
+          refetchOnWindowFocus: false,
+          refetchInterval: STALE_TIME.VOLATILE,
+          staleTime: STALE_TIME.VOLATILE,
+        }
+      : {}),
+    refetchIntervalInBackground: false,
+  });
+  const requests = useMemo(() => flattenShippingPages(query.data), [query.data]);
+  return { ...query, requests };
+}
+
+export function useShippingHistoryPagesQuery(
+  params: Omit<ShippingHistoryParams, "cursor"> = {},
+  enabled = true,
+) {
+  const queryKey = queryKeys.shipping.historyPages(params);
+  const query = useInfiniteQuery<
+    ShippingRequestPage,
+    Error,
+    ShippingPagesCache,
+    typeof queryKey,
+    string | null
+  >({
+    queryKey,
+    initialPageParam: null,
+    queryFn: ({ pageParam, signal }) => api.getShippingHistory({
+      ...params,
+      cursor: pageParam ?? undefined,
+      limit: params.limit ?? SHIPPING_PAGE_SIZE,
+    }, { signal }),
+    getNextPageParam: (lastPage) => lastPage.has_more ? lastPage.next_cursor : null,
+    enabled,
+    placeholderData: { pages: [], pageParams: [] },
+  });
+  const requests = useMemo(() => flattenShippingPages(query.data), [query.data]);
+  return { ...query, requests };
+}
 
 export function useShippingRequestsQuery(
   params?: Parameters<typeof api.getShippingRequests>[0],

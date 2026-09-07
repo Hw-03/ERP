@@ -6,16 +6,22 @@ from decimal import Decimal
 from typing import Any, Callable
 
 import pytest
+from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 from app.models import (
     DepartmentEnum,
     Employee,
     EmployeeLevelEnum,
+    ShippingAllocation,
     ShippingRequest,
+    ShippingRequestBomLine,
+    ShippingRequestCompanionLine,
     ShippingRequestStatusEnum,
     TransactionLog,
+    TransactionTypeEnum,
 )
+from app.services import shipping as shipping_svc
 from app.services.pin_auth import hash_pin
 
 
@@ -1146,6 +1152,211 @@ def test_shipping_mobile_list_is_read_only_shape(client, db_session, make_item, 
     assert rows.status_code == 200, rows.text
     assert rows.json()[0]["request_id"] == request_id
     assert any(line["item_name"] == "Pouch" for line in rows.json()[0]["checklist_lines"])
+
+
+def test_shipping_active_page_uses_a_stable_cursor_for_equal_timestamps(
+    client,
+    db_session,
+    make_item,
+):
+    pf = make_item(name="Paged PF", process_type_code="PF", model_symbol="4", serial_no=1)
+    created_at = datetime(2026, 9, 7, 9, 0)
+    requests = [
+        ShippingRequest(
+            base_pf_item_id=pf.item_id,
+            status=ShippingRequestStatusEnum.PREPARING,
+            created_at=created_at,
+        )
+        for _ in range(3)
+    ]
+    db_session.add_all(requests)
+    db_session.commit()
+    expected_ids = [str(row.request_id) for row in sorted(requests, key=lambda row: row.request_id, reverse=True)]
+
+    first = client.get("/api/shipping/requests/page", params={"limit": 2})
+    assert first.status_code == 200, first.text
+    assert first.json()["has_more"] is True
+    assert first.json()["next_cursor"]
+
+    second = client.get(
+        "/api/shipping/requests/page",
+        params={"limit": 2, "cursor": first.json()["next_cursor"]},
+    )
+    assert second.status_code == 200, second.text
+    combined_ids = [row["request_id"] for row in first.json()["requests"] + second.json()["requests"]]
+    assert combined_ids == expected_ids
+    assert len(combined_ids) == len(set(combined_ids))
+    assert second.json()["has_more"] is False
+
+
+def test_shipping_page_query_count_does_not_scale_with_response_rows(
+    client,
+    db_session,
+    make_item,
+    make_bom,
+    make_location,
+):
+    af = make_item(name="Query Count AF", process_type_code="AF", model_symbol="4", serial_no=1)
+    pa = make_item(name="Query Count PA", process_type_code="PA", model_symbol="4", serial_no=2)
+    pf = make_item(name="Query Count PF", process_type_code="PF", model_symbol="4", serial_no=3)
+    companion = make_item(name="Query Count Companion", process_type_code="PR", model_symbol="4", serial_no=4)
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    for item in (pa, af, companion):
+        make_location(
+            item.item_id,
+            department=shipping_svc.inventory_svc.department_for_item(item),
+            quantity=Decimal("1"),
+        )
+    db_session.commit()
+    request_ids: list[str] = []
+    for _index in range(4):
+        created = client.post(
+            "/api/shipping/requests",
+            json={
+                "base_pf_item_id": str(pf.item_id),
+                "request_quantity": 2,
+                "companion_lines": [
+                    {"item_id": str(companion.item_id), "quantity": 2, "unit": "EA"},
+                ],
+            },
+        )
+        assert created.status_code == 201, created.text
+        request_ids.append(created.json()["request_id"])
+    db_session.add(
+        ShippingAllocation(
+            request_id=request_ids[0],
+            item_id=companion.item_id,
+            quantity=1,
+            unit="EA",
+            department=shipping_svc.inventory_svc.department_for_item(companion).value,
+            status="RESERVED",
+        )
+    )
+    db_session.commit()
+
+    def select_count(limit: int) -> int:
+        statements: list[str] = []
+
+        def capture_select(_conn, _cursor, statement, _parameters, _context, _executemany):
+            if statement.lstrip().upper().startswith("SELECT"):
+                statements.append(statement)
+
+        event.listen(db_session.bind, "before_cursor_execute", capture_select)
+        try:
+            response = client.get("/api/shipping/requests/page", params={"limit": limit})
+        finally:
+            event.remove(db_session.bind, "before_cursor_execute", capture_select)
+        assert response.status_code == 200, response.text
+        assert len(response.json()["requests"]) == limit
+        assert all(row["stock_shortages"] for row in response.json()["requests"])
+        return len(statements)
+
+    assert select_count(1) == select_count(4)
+
+
+def test_shipping_request_detail_query_count_does_not_scale_with_child_rows(
+    client,
+    db_session,
+    make_item,
+):
+    pa = make_item(name="Detail Query PA", process_type_code="PA", model_symbol="4", serial_no=1)
+    pf = make_item(name="Detail Query PF", process_type_code="PF", model_symbol="4", serial_no=2)
+    bom_items = [
+        make_item(name=f"Detail BOM {index}", process_type_code="PR", model_symbol="4", serial_no=10 + index)
+        for index in range(3)
+    ]
+    companion_items = [
+        make_item(name=f"Detail Companion {index}", process_type_code="PR", model_symbol="4", serial_no=20 + index)
+        for index in range(3)
+    ]
+    transaction_items = [
+        make_item(name=f"Detail Transaction {index}", process_type_code="PR", model_symbol="4", serial_no=30 + index)
+        for index in range(3)
+    ]
+    sparse = ShippingRequest(
+        base_pf_item_id=pf.item_id,
+        final_pa_item_id=pa.item_id,
+        final_pf_item_id=pf.item_id,
+        status=ShippingRequestStatusEnum.PREPARING,
+    )
+    dense = ShippingRequest(
+        base_pf_item_id=pf.item_id,
+        final_pa_item_id=pa.item_id,
+        final_pf_item_id=pf.item_id,
+        status=ShippingRequestStatusEnum.PREPARING,
+    )
+    db_session.add_all([sparse, dense])
+    db_session.flush()
+
+    def add_children(request, count: int) -> None:
+        db_session.add_all([
+            ShippingRequestBomLine(
+                request_id=request.request_id,
+                parent_stage="PA",
+                child_item_id=item.item_id,
+                quantity=1,
+                unit="EA",
+                included=True,
+                origin="CUSTOM",
+                sort_order=index,
+            )
+            for index, item in enumerate(bom_items[:count])
+        ])
+        db_session.add_all([
+            ShippingRequestCompanionLine(
+                request_id=request.request_id,
+                item_id=item.item_id,
+                quantity=1,
+                unit="EA",
+                sort_order=index,
+            )
+            for index, item in enumerate(companion_items[:count])
+        ])
+        db_session.add_all([
+            TransactionLog(
+                item_id=item.item_id,
+                transaction_type=TransactionTypeEnum.SHIP,
+                quantity_change=-1,
+                quantity_before=1,
+                quantity_after=0,
+                shipping_request_id=request.request_id,
+                shipping_phase="PICKUP",
+                inventory_effect=[],
+            )
+            for item in transaction_items[:count]
+        ])
+
+    add_children(sparse, 1)
+    add_children(dense, 3)
+    db_session.commit()
+
+    def select_count(request_id: uuid.UUID) -> tuple[int, dict[str, Any]]:
+        statements: list[str] = []
+
+        def capture_select(_conn, _cursor, statement, _parameters, _context, _executemany):
+            if statement.lstrip().upper().startswith("SELECT"):
+                statements.append(statement)
+
+        db_session.expire_all()
+        event.listen(db_session.bind, "before_cursor_execute", capture_select)
+        try:
+            response = client.get(f"/api/shipping/requests/{request_id}")
+        finally:
+            event.remove(db_session.bind, "before_cursor_execute", capture_select)
+        assert response.status_code == 200, response.text
+        return len(statements), response.json()
+
+    sparse_count, sparse_body = select_count(sparse.request_id)
+    dense_count, dense_body = select_count(dense.request_id)
+
+    assert len(sparse_body["bom_lines"]) == 1
+    assert len(dense_body["bom_lines"]) == 3
+    assert len(sparse_body["companion_lines"]) == 1
+    assert len(dense_body["companion_lines"]) == 3
+    assert sparse_body["transaction_count"] == 1
+    assert dense_body["transaction_count"] == 3
+    assert sparse_count == dense_count
 
 
 def test_shipping_bom_included_origin_and_match_flags(client, db_session, make_item, make_bom):

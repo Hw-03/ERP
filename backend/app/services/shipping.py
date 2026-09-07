@@ -14,6 +14,7 @@ from app.models import (
     BOM,
     DepartmentEnum,
     Inventory,
+    InventoryLocation,
     InventoryOperation,
     InventoryOperationEffect,
     InventoryOperationEffectKindEnum,
@@ -1269,6 +1270,116 @@ def _prepare_stock_shortages(db: Session, req: ShippingRequest) -> list[dict]:
             }
         )
     return shortages
+
+
+def prepare_stock_shortages_many(
+    db: Session,
+    requests: Iterable[ShippingRequest],
+) -> dict[uuid.UUID, list[dict]]:
+    """Build list-page shortage summaries with a fixed number of stock queries."""
+
+    request_rows = list(requests)
+    result: dict[uuid.UUID, list[dict]] = {
+        request.request_id: [] for request in request_rows
+    }
+    checks_by_request: dict[
+        uuid.UUID,
+        dict[uuid.UUID, tuple[Item, int, str]],
+    ] = {}
+    item_by_id: dict[uuid.UUID, Item] = {}
+
+    for request in request_rows:
+        if request.status != ShippingRequestStatusEnum.PREPARING:
+            continue
+        try:
+            request_quantity = _request_quantity(request)
+        except ShippingError:
+            continue
+        final_pa = request.final_pa_item
+        if final_pa is None or request.final_pf_item_id is None:
+            continue
+
+        checks: dict[uuid.UUID, tuple[Item, int, str]] = {}
+
+        def add_check(item: Item, required: int, phase: str = PREPARE_PHASE) -> None:
+            if required <= 0:
+                return
+            existing = checks.get(item.item_id)
+            checks[item.item_id] = (
+                item,
+                required if existing is None else existing[1] + required,
+                phase,
+            )
+            item_by_id[item.item_id] = item
+
+        add_check(final_pa, request_quantity)
+        for line in request.bom_lines:
+            if not line.included or line.child_item_id == final_pa.item_id:
+                continue
+            if should_skip_bom_inventory(
+                line.child_item,
+                bom_generated=line.origin == "DEFAULT",
+            ):
+                continue
+            add_check(line.child_item, int(line.quantity or 0) * request_quantity)
+        for line in request.companion_lines:
+            add_check(line.item, int(line.quantity or 0))
+        if checks:
+            checks_by_request[request.request_id] = checks
+
+    if not item_by_id:
+        return result
+
+    departments = {
+        item_id: inventory_svc.department_for_item(item)
+        for item_id, item in item_by_id.items()
+    }
+    locations = (
+        db.query(InventoryLocation)
+        .filter(
+            InventoryLocation.item_id.in_(item_by_id),
+            InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+        )
+        .all()
+    )
+    location_by_cell = {
+        (location.item_id, str(getattr(location.department, "value", location.department))): location
+        for location in locations
+    }
+    reserved_by_cell = stock_availability.bulk_reserved_by_cell(db, item_by_id)
+
+    for request_id, checks in checks_by_request.items():
+        shortages: list[dict] = []
+        for item, required, phase in checks.values():
+            department = departments[item.item_id]
+            cell = stock_availability.AvailabilityCell.location(item.item_id, department)
+            location = location_by_cell.get((item.item_id, department.value))
+            current = Decimal(str(location.quantity if location is not None else 0))
+            pending = Decimal(str(location.pending_quantity if location is not None else 0))
+            available = stock_availability.calculate_available(
+                current,
+                pending,
+                reserved_by_cell.get(cell, Decimal("0")),
+            )
+            allocated = max(current - available, Decimal("0"))
+            shortage = max(Decimal(required) - available, Decimal("0"))
+            if shortage <= 0:
+                continue
+            shortages.append({
+                "item_id": item.item_id,
+                "item_name": item.item_name,
+                "mes_code": item.mes_code,
+                "process_type_code": item.process_type_code,
+                "department": department.value,
+                "required_quantity": required,
+                "current_quantity": int(current),
+                "allocated_quantity": int(allocated),
+                "available_quantity": int(available),
+                "shortage_quantity": int(shortage),
+                "phase": phase,
+            })
+        result[request_id] = shortages
+    return result
 
 
 def _log_inventory_change(

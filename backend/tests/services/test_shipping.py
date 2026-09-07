@@ -1359,6 +1359,61 @@ def test_prepare_stock_shortages_does_not_lazy_create_final_items(
     ) == before
 
 
+def test_prepare_stock_shortages_many_matches_single_with_bom_companion_and_reservation(
+    db_session,
+    make_item,
+    make_bom,
+    make_location,
+):
+    component = make_item(name="bulk-shortage-component", process_type_code="AF")
+    pa = make_item(name="bulk-shortage-pa", process_type_code="PA")
+    pf = make_item(name="bulk-shortage-pf", process_type_code="PF")
+    companion = make_item(name="bulk-shortage-companion", process_type_code="PR")
+    make_bom(pa.item_id, component.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    request = _create_request(
+        db_session,
+        {
+            "base_pf_item_id": pf.item_id,
+            "request_quantity": 2,
+            "companion_lines": [
+                {"item_id": companion.item_id, "quantity": 2, "unit": "EA"},
+            ],
+        },
+    )
+    stocked_items = [request.final_pa_item, component, companion]
+    for item in stocked_items:
+        make_location(
+            item.item_id,
+            department=shipping_svc.inventory_svc.department_for_item(item),
+            quantity=Decimal("1"),
+        )
+    db_session.add(
+        ShippingAllocation(
+            request_id=request.request_id,
+            item_id=companion.item_id,
+            quantity=1,
+            unit="EA",
+            department=shipping_svc.inventory_svc.department_for_item(companion).value,
+            status="RESERVED",
+        )
+    )
+    db_session.flush()
+
+    single = shipping_svc._prepare_stock_shortages(db_session, request)
+    bulk = shipping_svc.prepare_stock_shortages_many(db_session, [request])[request.request_id]
+
+    assert bulk == single
+    assert {row["item_name"] for row in bulk} == {
+        "bulk-shortage-pa",
+        "bulk-shortage-component",
+        "bulk-shortage-companion",
+    }
+    companion_shortage = next(row for row in bulk if row["item_id"] == companion.item_id)
+    assert companion_shortage["allocated_quantity"] == 1
+    assert companion_shortage["available_quantity"] == 0
+
+
 def test_shipping_bom_stock_exempt_child_is_skipped_in_prepare_and_component_change(
     db_session, make_item, make_bom, make_location
 ):

@@ -27,7 +27,7 @@ import {
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatKstDate } from "@/lib/mes/date";
 import { api } from "@/lib/api";
-import type { Item, ProductionCapacity } from "@/lib/api";
+import type { Item, ProductionCapacity, ShippingRequestPage } from "@/lib/api";
 import { productionApi } from "@/lib/api/production";
 import { warehouseMapApi } from "@/lib/api/warehouse-map";
 import { STALE_TIME } from "@/lib/queries/client";
@@ -332,9 +332,14 @@ function DesktopMesShellInner({
       queryKey: queryKeys.warehouseMap.map(),
       queryFn: () => warehouseMapApi.getMap(),
     });
-    void queryClient.prefetchQuery({
-      queryKey: queryKeys.shipping.requests(),
-      queryFn: ({ signal }) => api.getShippingRequests(undefined, { signal }),
+    void queryClient.prefetchInfiniteQuery({
+      queryKey: queryKeys.shipping.requestPages(),
+      initialPageParam: null as string | null,
+      queryFn: ({ signal, pageParam }) => api.getShippingRequestPage({
+        cursor: pageParam ?? undefined,
+        limit: 50,
+      }, { signal }),
+      getNextPageParam: (lastPage: ShippingRequestPage) => lastPage.has_more ? lastPage.next_cursor : null,
     });
   }, [queryClient, weekMon]);
 

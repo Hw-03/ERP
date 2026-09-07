@@ -14,6 +14,8 @@ import type {
   ShippingPickupCommandPayload,
   ShippingRequest,
   ShippingRequestCreatePayload,
+  ShippingRequestPage,
+  ShippingRequestPageParams,
   ShippingRequestStatus,
   ShippingRequestRevision,
   ShippingRequestUpdatePayload,
@@ -116,6 +118,14 @@ function historyQuery(params?: ShippingHistoryParams): string {
   return qs.toString() ? `?${qs}` : "";
 }
 
+function requestPageQuery(params?: ShippingRequestPageParams): string {
+  const qs = new URLSearchParams();
+  if (params?.status) qs.set("status", params.status);
+  if (params?.cursor) qs.set("cursor", params.cursor);
+  if (params?.limit !== undefined) qs.set("limit", String(params.limit));
+  return qs.toString() ? `?${qs}` : "";
+}
+
 function getShippingHistory(): Promise<ShippingRequest[]>;
 function getShippingHistory(
   params: ShippingHistoryParams,
@@ -148,6 +158,14 @@ export const shippingApi = {
     opts?: { signal?: AbortSignal },
   ): Promise<ShippingRequest> =>
     fetcher<ShippingRequest>(toApiUrl(`/api/shipping/requests/${requestId}`), opts?.signal),
+
+  getShippingRequestPage: (
+    params: ShippingRequestPageParams = {},
+    opts?: { signal?: AbortSignal },
+  ): Promise<ShippingRequestPage> => fetcher<ShippingRequestPage>(
+    toApiUrl(`/api/shipping/requests/page${requestPageQuery(params)}`),
+    opts?.signal,
+  ),
 
   createShippingRequest: (payload: ShippingRequestCreatePayload) =>
     postJson<ShippingRequest>(toApiUrl("/api/shipping/requests"), payload),
@@ -202,6 +220,12 @@ export const shippingApi = {
       opts?.signal,
     ),
 
-  matchShippingBom: (payload: { base_pf_item_id: string; bom_lines: ShippingBomLineInput[] }) =>
-    postJson<ShippingBomMatchResponse>(toApiUrl("/api/shipping/bom-match"), payload),
+  matchShippingBom: (
+    payload: { base_pf_item_id: string; bom_lines: ShippingBomLineInput[] },
+    opts?: { signal?: AbortSignal },
+  ) => postJson<ShippingBomMatchResponse>(
+    toApiUrl("/api/shipping/bom-match"),
+    payload,
+    opts?.signal,
+  ),
 };
