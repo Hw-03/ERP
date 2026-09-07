@@ -208,8 +208,8 @@ def create_request(
         allow_internal_use=allow_internal_use,
     )
 
-    # 불량 격리/처리 결재 룰: 격리 출처가 "창고" 면 창고 정/부 결재, 그 외 부서면 그 부서 정/부 결재.
-    # 정/부 권한자 직접 처리 시 _finalize_submission 이 즉시 완료로 흡수 — 별도 분기 불필요.
+    # 불량 등록·처리는 모두 요청자가 즉시 실행한다. 격리 처리도 한 부서의 기록만
+    # 포함하도록 제한해 건별 불량 원장 연결 범위는 유지한다.
     _IMMEDIATE_DEFECT_TYPES = {
         StockRequestTypeEnum.MARK_DEFECTIVE_WH,
         StockRequestTypeEnum.MARK_DEFECTIVE_PROD,
@@ -230,7 +230,7 @@ def create_request(
         requires_department_approval = False
     elif request_type in _QUARANTINE_PROCESS_TYPES:
         warehouse_override = False
-        requires_department_approval = True
+        requires_department_approval = False
         departments = {
             str(getattr(line.from_department, "value", line.from_department))
             for line in lines_input
@@ -238,7 +238,6 @@ def create_request(
         }
         if len(departments) != 1:
             raise ValueError("격리 처리 요청은 한 부서의 기록만 포함해야 합니다.")
-        approval_department = departments.pop()
 
     _validate_lines(request_type, lines_input)
     _preflight_inventory_check(db, request_type, lines_input)

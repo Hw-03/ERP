@@ -130,7 +130,7 @@ describe("DefectDepartmentList", () => {
       "lg:grid-cols-[minmax(0,1.15fr)_minmax(110px,0.38fr)_minmax(110px,0.38fr)_minmax(0,2fr)]",
     );
     expect(screen.queryByText("처리 가능 3개")).not.toBeInTheDocument();
-    expect(screen.getByText("승인 대기 1개")).toBeInTheDocument();
+    expect(screen.getByText("처리 대기 1개")).toBeInTheDocument();
   });
 
   it("flags only unresolved legacy aggregates, not reconstructed records", () => {

@@ -352,7 +352,7 @@ function DefectRecordRow({
                 color={LEGACY_COLORS.muted2}
               />
             )}
-            {pendingQty > 0 && <StatusBadge label={`승인 대기 ${formatQty(pendingQty)}개`} color={LEGACY_COLORS.yellow} />}
+            {pendingQty > 0 && <StatusBadge label={`처리 대기 ${formatQty(pendingQty)}개`} color={LEGACY_COLORS.yellow} />}
             {warn && <StatusBadge label="1년 초과" color={LEGACY_COLORS.red} icon={<AlertTriangle className="h-3 w-3" />} />}
           </div>
         </div>

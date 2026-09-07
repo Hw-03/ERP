@@ -68,8 +68,8 @@ export function PaPfDefectWizard({
 
   const submitLabel: Record<DisposalAction, string> = {
     unquarantine: "정상 복귀로 변경",
-    scrap: "폐기 요청 →",
-    disassemble: "재작업 요청 →",
+    scrap: "즉시 폐기 →",
+    disassemble: "즉시 재작업 →",
   };
 
   async function handleSubmit() {
@@ -316,8 +316,8 @@ export function PaPfDefectWizard({
         open={confirmOpen}
         title={action === "scrap" ? "폐기 확인" : "재작업 확인"}
         tone="danger"
-        cautionMessage="승인 완료 후 재고에 반영됩니다."
-        confirmLabel="처리 요청"
+        cautionMessage="확인하면 즉시 재고에 반영됩니다."
+        confirmLabel={action === "scrap" ? "즉시 폐기" : "즉시 재작업"}
         busy={busy}
         onClose={() => setConfirmOpen(false)}
         onConfirm={() => { setConfirmOpen(false); void handleSubmit(); }}
