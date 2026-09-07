@@ -152,16 +152,54 @@ describe("DailyWorkReportScreen", () => {
     expect(outer).not.toHaveClass("lg:overflow-y-auto");
   });
 
-  it("animates the result area only after selecting an all-report author", () => {
-    queryState.reports = [{ employee_id: "employee-2", employee_name: "Other", department: "Test" }];
+  it("첫 작성자는 정적으로 열고 다른 작성자로 바뀔 때만 결과 영역을 한 번 애니메이션한다", () => {
+    queryState.reports = [
+      { employee_id: "employee-2", employee_name: "첫 작성자", department: "조립" },
+      { employee_id: "employee-3", employee_name: "다른 작성자", department: "조립" },
+    ];
+    queryState.activity = {
+      data: {
+        work_date: "2026-08-03",
+        employee_id: "employee-2",
+        cancelled_count: 0,
+        summary: [{ operation_key: "warehouse", operation_label: "창고", work_count: 1, quantity_by_unit: { EA: 1 } }],
+        details: [{ type: "solo", key: "log-1", logs: [] }],
+      } as never,
+      isError: false,
+    };
 
-    render(<DailyWorkReportScreen employeeId="employee-1" operator={{ employee_id: "employee-1", name: "Mine", department: "Test" } as never} />);
-    fireEvent.click(screen.getAllByRole("tab")[1]);
+    render(<DailyWorkReportScreen employeeId="employee-1" operator={{ employee_id: "employee-1", name: "내 작성자", department: "조립" } as never} />);
+    fireEvent.click(screen.getByRole("tab", { name: "전체 일보" }));
 
     expect(screen.queryByTestId("daily-work-report-result")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Other Test" }));
+    fireEvent.click(screen.getByRole("button", { name: "첫 작성자 조립" }));
+    expect(screen.getByTestId("daily-work-report-result")).not.toHaveClass("animate-view-fade");
 
+    fireEvent.click(screen.getByRole("button", { name: "첫 작성자 조립" }));
+    expect(screen.getByTestId("daily-work-report-result")).not.toHaveClass("animate-view-fade");
+
+    fireEvent.click(screen.getByRole("button", { name: "다른 작성자 조립" }));
     expect(screen.getByTestId("daily-work-report-result")).toHaveClass("animate-view-fade");
+    fireEvent.animationEnd(screen.getByTestId("daily-work-report-result"));
+    expect(screen.getByTestId("daily-work-report-result")).not.toHaveClass("animate-view-fade");
+
+    fireEvent.click(screen.getByRole("button", { name: "다른 작성자 조립" }));
+    expect(screen.getByTestId("daily-work-report-result")).not.toHaveClass("animate-view-fade");
+
+    fireEvent.click(screen.getByRole("button", { name: "창고 거래 상세 펼치기" }));
+    expect(screen.getByTestId("daily-work-report-result")).not.toHaveClass("animate-view-fade");
+
+    fireEvent.click(screen.getByRole("tab", { name: "내 일보" }));
+    expect(screen.getByTestId("daily-work-report-result")).not.toHaveClass("animate-view-fade");
+
+    const todayParts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" })
+      .formatToParts(new Date())
+      .reduce<Record<string, string>>((parts, part) => ({ ...parts, [part.type]: part.value }), {});
+    const previousDay = new Date(Number(todayParts.year), Number(todayParts.month) - 1, Number(todayParts.day) - 1);
+    const previousDayLabel = `${previousDay.getFullYear()}년 ${previousDay.getMonth() + 1}월 ${previousDay.getDate()}일`;
+    fireEvent.click(screen.getByRole("button", { name: "일보 날짜 선택" }));
+    fireEvent.click(screen.getByRole("button", { name: previousDayLabel }));
+    expect(screen.getByTestId("daily-work-report-result")).not.toHaveClass("animate-view-fade");
   });
 
   it("전체 일보의 읽기 전용 MES 상세는 일보 본문 스크롤로 확인한다", () => {

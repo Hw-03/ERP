@@ -106,6 +106,44 @@ const baseProps = {
 };
 
 describe("InventoryItemsTable — chunked render", () => {
+  it("데스크톱·모바일의 로딩과 필터 결과에서도 KPI 모집단 설명을 항상 표시한다", () => {
+    const explanation = "KPI 숫자는 PA·PF 중간품목을 제외하며, 좁힌 목록에는 PA·PF가 표시될 수 있습니다.";
+    const item = makeItem(1);
+    const { getByText, rerender } = renderWithProviders(
+      <InventoryItemsTable
+        {...baseProps}
+        filteredItems={[item]}
+        displayLimit={100}
+        setDisplayLimit={() => {}}
+      />,
+    );
+
+    expect(getByText(explanation)).toBeVisible();
+
+    rerender(
+      <InventoryItemsTable
+        {...baseProps}
+        loading
+        filteredItems={[]}
+        displayLimit={100}
+        setDisplayLimit={() => {}}
+      />,
+    );
+    expect(getByText(explanation)).toBeVisible();
+
+    rerender(
+      <InventoryItemsTable
+        {...baseProps}
+        activeFilterCount={1}
+        filteredItems={[]}
+        displayLimit={100}
+        setDisplayLimit={() => {}}
+        compact
+      />,
+    );
+    expect(getByText(explanation)).toBeVisible();
+  });
+
   it("데스크톱에서는 바깥 작업영역 기준으로 검색창 아래 열 헤더를 고정한다", () => {
     const item = makeItem(1);
     const { container, rerender } = renderWithProviders(

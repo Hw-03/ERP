@@ -77,6 +77,7 @@ describe("useDesktopInventoryDerivations", () => {
       ["LOW", 1],
       ["ZERO", 1],
     ]);
+    expect(result.current.kpiCards.find((card) => card.key === "ALL")?.hint).toBe("PA·PF 제외 품목");
     await waitFor(() => expect(onSummaryChange).toHaveBeenLastCalledWith({ low: 2, zero: 1 }));
     expect(matchesKpi(paNormal, "NORMAL")).toBe(true);
     expect(matchesKpi(pfLow, "LOW")).toBe(true);
@@ -89,6 +90,9 @@ describe("useDesktopInventoryDerivations", () => {
       ["LOW", 0],
       ["ZERO", 0],
     ]);
+    expect(result.current.kpiCards.find((card) => card.key === "ALL")?.hint).toBe(
+      "PA·PF 제외 전체 3건 · 클릭하면 초기화",
+    );
     await waitFor(() => expect(onSummaryChange).toHaveBeenLastCalledWith({ low: 1, zero: 0 }));
   });
 

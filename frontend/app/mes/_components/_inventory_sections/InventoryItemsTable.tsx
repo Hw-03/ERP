@@ -67,51 +67,68 @@ export function InventoryItemsTable({
   // 영원히 20개에서 멈춘다.
   const displayedItems = useMemo(() => filteredItems.slice(0, displayLimit), [filteredItems, displayLimit]);
   const { visible: chunkedItems, sentinelRef, hasMore: hasMoreChunk } = useChunkedRender(displayedItems, 20);
+  const populationNotice = (
+    <p className="mb-2 px-1 text-xs leading-5" style={{ color: LEGACY_COLORS.muted2 }}>
+      KPI 숫자는 PA·PF 중간품목을 제외하며, 좁힌 목록에는 PA·PF가 표시될 수 있습니다.
+    </p>
+  );
 
   if (error) {
-    return <LoadFailureCard message={error} onRetry={onRetry} />;
+    return (
+      <>
+        {populationNotice}
+        <LoadFailureCard message={error} onRetry={onRetry} />
+      </>
+    );
   }
   if (loading) {
     return (
-      <div
-        className="rounded-[24px] border px-4 py-4 text-base"
-        style={{
-          borderColor: LEGACY_COLORS.border,
-          background: LEGACY_COLORS.s2,
-          color: LEGACY_COLORS.muted2,
-        }}
-      >
-        재고 데이터를 불러오는 중입니다...
-      </div>
+      <>
+        {populationNotice}
+        <div
+          className="rounded-[24px] border px-4 py-4 text-base"
+          style={{
+            borderColor: LEGACY_COLORS.border,
+            background: LEGACY_COLORS.s2,
+            color: LEGACY_COLORS.muted2,
+          }}
+        >
+          재고 데이터를 불러오는 중입니다...
+        </div>
+      </>
     );
   }
   if (filteredItems.length === 0) {
     return (
-      <div className="space-y-3">
-        {refreshError && (
-          <LoadFailureCard
-            message={refreshError}
-            prefix="최신 재고 목록 동기화 실패"
-            retryLabel="다시 동기화"
-            onRetry={onRetry}
+      <>
+        {populationNotice}
+        <div className="space-y-3">
+          {refreshError && (
+            <LoadFailureCard
+              message={refreshError}
+              prefix="최신 재고 목록 동기화 실패"
+              retryLabel="다시 동기화"
+              onRetry={onRetry}
+            />
+          )}
+          <EmptyState
+          variant={activeFilterCount > 0 || hasKpiFilter ? "filtered-out" : "no-search-result"}
+          icon={<PackageSearch className="h-8 w-8" />}
+          title="검색 결과가 없습니다."
+          description="검색어 또는 필터를 초기화해 전체 품목을 다시 확인하세요."
+          action={
+            activeFilterCount > 0 || hasKpiFilter
+              ? { label: "필터 초기화", onClick: onResetAllFilters }
+              : undefined
+          }
           />
-        )}
-        <EmptyState
-        variant={activeFilterCount > 0 || hasKpiFilter ? "filtered-out" : "no-search-result"}
-        icon={<PackageSearch className="h-8 w-8" />}
-        title="검색 결과가 없습니다."
-        description="검색어 또는 필터를 초기화해 전체 품목을 다시 확인하세요."
-        action={
-          activeFilterCount > 0 || hasKpiFilter
-            ? { label: "필터 초기화", onClick: onResetAllFilters }
-            : undefined
-        }
-        />
-      </div>
+        </div>
+      </>
     );
   }
   return (
     <>
+      {populationNotice}
       {refreshError && (
         <div className="mb-3">
           <LoadFailureCard

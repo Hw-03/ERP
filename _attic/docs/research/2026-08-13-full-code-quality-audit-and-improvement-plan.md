@@ -2135,7 +2135,7 @@ main 변경으로 완전히 해결된 CP6 카드는 없으며 다음의 남은 �
 - 실제 날짜 확인 후 `adaa5bed1846bf071629d5d8cc37371cf7beca79` / `2026-09-07 shipping: 출하 요청 동시성과 페이지 조회 안정화`로 로컬 커밋했다. 총괄이 부모59c52bad·정확24경로·subject·clean 및 기존/임시 DB family6개의 absent를 확인했다. 푸시는 하지 않았다. A3는 같은 worktree에서 진행하며 CP6 full·원격 CI·품질 통합 완료와 구분한다.
 - 미실행 docs3는 총괄이 `verify_local.ps1 -Mode docs`로 별도 완료했다. whitespace·문서 링크 단위·실제 링크3gate PASS, exit0, 단위13PASS/1 Windows symlink권한 skip이다. 원본 마지막 출력·명령·chunk ID는 `a2-docs-closeout.json`에 보존했다. smart 한 번 전체 PASS가 아니라 실패 영역과 미실행 영역을 각각 복구한 결과다. 문서 단위 테스트의 synthetic fixture는 기본 OS Temp를 사용한 실행 기록을 남겼으며, 실제 서버/DB 접근과 구분한다.
 
-#### 12.27.3 CP6 A3 — IC-15 focused·리뷰 완료 (2026-09-07)
+#### 12.27.3 CP6 A3 — IC-15 LOCAL_VERIFIED (2026-09-07)
 
 - `frontend/app/mes/_components/_warehouse_map_sections/useWarehouseMapMutations.ts:38,85,108,144`의 QueryClient별 coordinator가 operation ID와 box/source/target 자리 소유권을 관리한다. 겹치지 않는 작업은 병렬이며 동일 대상은 서버 수렴까지 차단한다. restack은 실제 `box_ids` 전체를 소유한다. 실패는 여전히 해당 작업이 소유한 박스만 복원하고, 마지막 network 작업 종료 뒤 invalidate 및 서버 지도 fetch로 수렴한다. backend revision이나 schema는 추가하지 않았다.
 - 실제 `DesktopWarehouseMapView.tsx:113,368,378`의 move/restack이 이 hook을 소비한다. `useWarehouseMapQuery.ts:7`은 진행 중 자동 조회를 비활성화하며 같은 QueryClient로 재마운트해도 진행 소유권과 낙관 cache를 유지한다. `JariColumn.tsx:160`과 `WarehouseStages.tsx:656`은 pending 표시·drag 차단을 연결한다. API·재고 계산·모바일 읽기 전용 지도·동결 UI 변경은 없다.
@@ -2147,3 +2147,19 @@ main 변경으로 완전히 해결된 CP6 카드는 없으며 다음의 남은 �
 - 사용자 속도 지시와 efficient-verification에 따라 검증된 소유권 로직을 번들 한도만을 위해 재설계하지 않는다. 총괄은 필요한 작은 정리1회 또는 정당한 기능 증가에 대한 기본 한도2.414→2.430MiB(약0.66%) 조정을 승인했다. 실제 byte 측정·초과 exit·명시적 --max 동작은 유지하고 script/test/live 설명을 함께 맞췄다. 아래 bundle·미실행 docs 복구와 해당 delta 리뷰를 확인해 로컬 commit을 준비한다. 통과한 coverage/build를 작은 gate 설정 복구 때문에 반복하지 않았다.
 - 보완 결과: 중복 `operations` Map만 제거하고 기존 `owners`를 수렴 완료까지 유지하는 작은 정리를 했다. 후속 focused6PASS·앱 tsc PASS·production rebuild exit0이며, 실제 번들은179bytes 줄어2,537,378bytes다. 새 기본 한도2,548,039.68bytes 안에서 bundle 계약2/2PASS와 실제 검사 exit0(`a3-bundle-budget-recovery.log`)를 총괄이 확인했다. `--max` 파싱/초과 exit는 그대로다. 동일 동작의 중복 상태 제거와 budget delta에 대한 품질 재리뷰는 C/I/M0, Ready이며 총괄도 실제 diff를 읽었다. 원래276파일2555PASS·lines94.97% coverage를 반복하지 않았다.
 - 미실행 docs3의 별도 closeout은 whitespace와 실제 링크가 통과하고 단위3건만 child Node24 PATH 오염으로 실패했다. 각 exec에 승인 Node20 PATH와 task-local TEMP/TMP를 다시 고정한 뒤 실패한 단위 묶음만 복구했다. `a3-docs-link-tests-recheck.log`는 **총14건 중13PASS/1 Windows symlink권한 skip, exit0**다. 단위 내부 가짜 backend gate 출력을 실제 PostgreSQL/백엔드 검증으로 계산하지 않는다. docs3는 각각 복구 완료이며 원래 smart exit1 및 중간 docs 실패 원본은 유지한다. 최종 로컬 commit을 준비하고 push는 하지 않는다.
+- 최종 local commit은 `8d7a0a77c28be3c35f80fdd75bace937ae897b18` / `2026-09-07 warehouse: 창고 지도 이동 순서 안정화`다. 총괄이 실제 HEAD·부모adaa5bed·정확11경로·subject와 commit 직후 clean을 확인했다. 푸시는 하지 않았으며 A4→A5 저위험 UI 묶음으로 진행한다. A3의 로컬 검증 완료와 CP6 전체 gate/CI/품질 branch 통합 완료는 구분한다.
+
+#### 12.27.4 CP6 A4·A5 — IC-25·IC-26 FOCUSED_VERIFIED (2026-09-07)
+
+- `frontend/app/mes/_components/_hooks/useDesktopInventoryDerivations.tsx:100`의 ALL hint는 PA·PF 제외 모집단을 명시한다. `frontend/app/mes/_components/_inventory_sections/InventoryItemsTable.tsx:70-131`의 공통 설명을 error/loading/empty/normal 반환 경로에 모두 표시한다. 기존 PA/PF 판별·KPI 숫자·필터·검색·목록 계산은 변경하지 않았다. 실제 desktop/mobile의 공용 consumer를 유지하며 숫자와 목록의 포함 기준이 같다는 오해만 줄인다.
+- A4 예상 RED는 hint와 설명 누락2건(`exec-41e3afa8-1b27-437b-8270-67dd258a2349`)이고, 구현 후2파일8/8PASS(`exec-040f5987-659c-4fa0-bf92-c6ae93f8b14d`)다. 잘린 실패 DOM 출력은 truncated 표식을 유지하며 독립 runtime 결함 개수로 세지 않는다.
+- `frontend/app/mes/_components/_daily_report/DailyWorkReportScreen.tsx:111,185-202,286-305`는 첫 작성자 선택과 실제 작성자 전환을 구분한다. 같은 작성자는 early return하며 tab/date 및 animationEnd가 상태를 해제하고 detail은 애니메이션 상태를 변경하지 않는다. `globals.css`의 기존 reduced-motion 규칙과 주간보고·모바일 nav·출하 step5는 수정하지 않았다.
+- A5 예상 RED는 첫 작성자가 기존 animate-view-fade를 가진1건(`exec-08ce7fd0-d73e-4de4-9782-07375cc5ce37`,25PASS/1FAIL)이고, 최소 구현 후 일보 화면26/26PASS(`exec-e83ccaa2-2fa7-4170-80b1-bcfbb4f175b6`)다. 이 단위 테스트는 class 적용·종료와 비재발화 계약이다. 실제 브라우저 animationstart 수와 reduced-motion 동작을 이미 증명했다고 표현하지 않는다.
+- 합친 focused3파일34/34PASS(`exec-fbe85ead-e240-4f93-ae51-4851e34be060`), 앱 tsc exit0(`exec-d6bf447e-327f-4089-a4c2-b5f119f71b6a`), 변경6파일 ESLint --max-warnings=0 exit0, diff-check exit0를 총괄이 원본으로 인수했다. 독립 명세 turn `01a07bb4-c8c9-74c1-80e1-deb4ae85413f` 및 품질 turn `01a07bb4-f6a6-70b0-b958-457adb722202`은 각각 Critical0/Important0/Minor0, Ready다. 총괄도 제품 diff를 읽었고 기존 여섯 frontend 경로와 문서2개만 변경됨을 확인했다.
+- 원본 command/review index는 ignored `20260907-cp6-a4-a5/a45-command-and-review-evidence.json`이다. 합친 exact8경로 staged smart1회와 로컬 commit을 준비한다. 최종 실제 KPI 표시·작성자 animation/reduced-motion·UI/API/독립 SQL·동결 캡처는 CP6 전체 E2E에 함께 넣는다. CP6 full/원격 CI/품질 branch 통합 완료 판정은 아직 아니다.
+
+#### 12.27.5 CP6 최종 DB·브라우저 검증 준비 경계
+
+- `scripts/dev/verify_local.ps1:155-213`의 read-only DB gate는 해당 worktree `backend/mes.db`를 고정 경로로 읽으며 부재하면 실패한다. 이를 위해 실제 개발 DB를 가져오거나 gate를 우회하지 않는다. 최초 부재했던 CP6 경로에만 ignored runtime에서 만든 nonzero 합성 schema-head snapshot을 배타 생성해 잠시 제공하는 방법을 승인했다. 기존 파일 발견 시 덮기·채택은 금지한다.
+- 합성 fixture는 닫힌 일관 snapshot으로 만든 뒤 소유권·nonce·size·hash를 기록한다. 검사 전후 같은 fixture hash를 증명하고, finally에서 소유권과 hash가 일치하는 단일 파일만 제거해 최초/최종 `mes.db/-wal/-shm` 부재를 복원한다. 예기치 않은 파일·sidecar·hash 변경은 삭제하지 않고 증거로 보존한다. 실제 main/직원 DB 접근은0이며, 임시 fixture 생성/삭제가 있었다면 파일 쓰기0으로 숨기지 않는다. 이 절은 준비 계약이며 실제 실행 성공 증거가 아니다.
+- supervisor runtime `cp6-final-oracle-prep.md`, `cp6-a45-final-browser-prep.md`, `cp6-final-db-gate-prep.md`를 최종 구현 작업에 인계했다. 기존 창고 보정 E2E에 UI/API/독립 SQL 대조를 결합하며, 일보는 key remount를 감안한 document capture listener로 실제 visible 결과의 animationstart만 센다. route mock을 쓰는 화면 검증은 실제 재고 원장 증거와 분리한다. 새 테스트 서버/DB 준비는 A4·A5 로컬 commit 후에만 시작한다.

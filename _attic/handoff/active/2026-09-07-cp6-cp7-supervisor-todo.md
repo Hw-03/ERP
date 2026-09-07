@@ -18,17 +18,17 @@
 - 확정 `SYNC_BASE_SHA`: `731edc2df15c89753e60c12be95a65ef88e33bde`. 품질 본 branch는 CP6 통합까지 이 SHA에서 고정한다.
 - CP6 구현 작업: `01a07b0c-4563-7c41-a8c7-5df5ad2e91e2`, `C:\ERP\.worktrees\full-code-quality-cp6`, branch `codex/full-code-quality-cp6`.
 - 정본 감사 계획: [전수 감사·개선 계획](../../docs/research/2026-08-13-full-code-quality-audit-and-improvement-plan.md), 8.9.7·8.9.8 및 12.26절
-- 현 상태: **S0 제품 CI6/6과 SYNC731edc2d를 유지한다. CP6 A1은59c52bad, A2는adaa5bed로 로컬 커밋했고 A3를 시작했다. A2 smart의 실제8PASS/1FAIL 뒤 타입·직접 테스트를 복구했고 미실행 docs3도 총괄의 별도 검증으로 통과했다. 중간 push 없이 CP6 전체 gate·push·CI는 최종 묶음에서 수행한다. CP7 제품 구현은 CP6 통합 뒤 시작한다.**
-- 구현·검증 완료 집계: 아래 실행 단위 4/16 완료. A1·A2의 로컬 구현·focused 검증과 CP6 최종 통합/CI 완료를 구분한다.
+- 현 상태: **S0 제품 CI6/6과 SYNC731edc2d를 유지한다. CP6 A1=59c52bad, A2=adaa5bed, A3=8d7a0a77은 로컬 커밋·검증 완료다. A4·A5 구현과 합친 focused34PASS·독립 리뷰 C/I/M0도 확인했다. 두 카드는 staged smart1회와 한 로컬 commit으로 묶는다. 중간 push 없이 CP6 전체 gate·실제 화면·push·CI는 최종 묶음에서 수행한다. CP7 제품 구현은 CP6 통합 뒤 시작한다.**
+- 구현·좁은 검증 완료 집계: 아래 실행 단위 7/16 완료. A4·A5의 staged gate/commit과 실제 browser 증거는 아직 남았으며 CP6 최종 통합/CI 완료로 계산하지 않는다.
 
 ## 실행 체크리스트
 
 - [x] S0 (2026-09-07): fixed main 병합, 전체 delta manifest, migration 두 계보 통합, 격리 보완, 영역별 검증 복구, 이중 리뷰, 제품 merge push 및 [실제 CI6/6 성공](https://github.com/Hw-03/ERP/actions/runs/34099290108). 제품 SHA `cd195d9e668cb4ece139f48562337f58d19839d8`; `SYNC_BASE_SHA`는 같은 제품 경로를 유지하는 본 docs-only commit이다. 문서-only CI 중복은 CP6 코드 push로 묶는다.
 - [x] CP6 A1 (2026-09-07, LOCAL_VERIFIED): IC12→14 actual dirty/Promise save/이동 guard/React Query 단일 정본. 초기 RED와 후속 편집 유실을 보완해 관련14파일73PASS, 최종 명세/품질 C/I/M0. staged smart(frontend5/docs3) PASS, related41파일334PASS·direct10파일39PASS·타입/린트/docs PASS. 로컬 commit `59c52bad3f303603b01961b4e3ee3fb550bbd2e5`, post-commit clean을 총괄 확인. 원격 검증은 CP6 종료 단계다. 증거는 감사12.27.1과 `20260907-cp6-a1/`.
 - [x] CP6 A2 (2026-09-07, LOCAL_VERIFIED): IC13→16 BOM/dirty/page/bulk·desktop/mobile load-more. 관련8파일239PASS, 품질 Important2 보완 후 delta frontend5/backend2PASS와 명세/품질 C/I/M0. smart exit1의 새 테스트 타입3종은 국소 수정해 typecheck exit0(417 known/new0), 직접182PASS로 복구했다. 실제 smart8PASS/1FAIL과 별도 docs3PASS(exit0)를 구분한다. 로컬 commit `adaa5bed1846bf071629d5d8cc37371cf7beca79`, 부모59c52bad·정확24경로·clean을 총괄 확인. full/CI는 CP6 종료 단계이며 감사12.27.2 및 `20260907-cp6-a2/`가 증거다.
-- [ ] CP6 A3 [검증 복구 완료, commit 대기]: IC15 focused4파일20PASS 및 Minor1 보완5PASS, 최종 명세/품질 C/I/M0. 최초 staged smart6PASS/1FAIL은 bundle만 실패했으며 coverage276파일2555PASS·build는 통과했다. 중복 상태 정리 후 focused6PASS/rebuild PASS, 승인 한도2.430MiB에서 실제2,537,378bytes·bundle2PASS/exit0, delta 품질C/I/M0. 미실행 docs3도 복구 완료(단위 총14건=13PASS/1권한skip). 최종11경로를 A2 commitadaa5bed 위에 로컬 커밋하고 A4+A5 묶음으로 이어간다. 감사12.27.3과 ignored `20260907-cp6-a3/`가 증거이며 CP6 full/CI는 아직 남았다.
-- [ ] CP6 A4: IC25 PA·PF KPI 모집단 상시 설명, 기존 계산 불변.
-- [ ] CP6 A5: IC26 첫/다른/같은 작성자 animation 0/1/0, 탭·날짜·상세 0.
+- [x] CP6 A3 (2026-09-07, LOCAL_VERIFIED): IC15 focused4파일20PASS 및 Minor1 보완5PASS, 최종 명세/품질 C/I/M0. 최초 staged smart6PASS/1FAIL은 bundle만 실패했으며 coverage276파일2555PASS·build는 통과했다. 중복 상태 정리 후 focused6PASS/rebuild PASS, 승인 한도2.430MiB에서 실제2,537,378bytes·bundle2PASS/exit0, delta 품질C/I/M0. 미실행 docs3도 복구 완료(단위 총14건=13PASS/1권한skip). commit `8d7a0a77c28be3c35f80fdd75bace937ae897b18`, 부모adaa5bed·정확11경로·subject·clean을 총괄 확인했다. push0. 감사12.27.3과 ignored `20260907-cp6-a3/`가 증거이며 CP6 full/CI는 아직 남았다.
+- [x] CP6 A4 (2026-09-07, FOCUSED_VERIFIED): IC25 PA·PF KPI 모집단 상시 설명, 기존 계산 불변. 예상 RED2 뒤2파일8PASS이며 A5와 합친3파일34PASS·앱 tsc·변경6파일 ESLint exit0다. 합친 독립 명세/품질 C/I/M0. 감사12.27.4와 ignored `20260907-cp6-a4-a5/a45-command-and-review-evidence.json`이 근거다. staged smart·로컬 commit과 실제 desktop/mobile browser는 별도 최종 단계다.
+- [x] CP6 A5 (2026-09-07, FOCUSED_VERIFIED): IC26 첫/다른/같은 작성자 class 계약0/1/0, 탭·날짜·상세0을 RED1→26PASS로 확인했다. 실제 animationstart/reduced-motion 증명과 구분하며 최종 E2E에서 검증한다. A4와 합친 두 독립 리뷰 C/I/M0이며 동일 evidence에 보존한다.
 - 속도 우선 배치 조정(2026-09-07): A3 로컬 commit 뒤 A4 RED/GREEN → A5 RED/GREEN을 같은 단일 편집자가 순차 수행한다. 두 카드의 검증 근거는 분리하되 합친 diff의 독립 명세/품질 리뷰와 staged smart·로컬 commit은 각각 한 묶음으로 수행한다. 실제 browser animation/reduced-motion·KPI 표시는 CP6 최종 화면/E2E 검증에 포함한다. backend/DB/frozen 변경이나 최종 gate 생략은 없다.
 - [ ] CP6 종료·통합: 화면/API/독립 SQL, frozen 증거, full gate, 이중 리뷰, CP6 push/CI, 품질 통합/CI. `POST_CP6_SHA` 고정.
 - [x] CP7 병렬 사전감사 (2026-09-07): 타입·advisory·a11y·정책 consumer·문서·이동/중복 자산 manifest 및 DTO 후보26행 정적 검토, tracked 변경0. `full-code-quality-cp7-preaudit`의 ignored `20260907-cp7-preaudit/cp7-preaudit/preaudit.md`와 `ic21-manual-dto-targets.csv/.json`을 인계한다. 정적 차이18행은 실제 runtime 결함18건을 뜻하지 않는다. 제품/generator/runtime 검증은 CP7 구현 책임이다.
@@ -73,6 +73,7 @@ CP6의 A1~A5는 focused GREEN·독립 새 diff 리뷰 C/I0 후 구간별 local c
 - `C:\ERP-dev` 파일·검색·해시·DB·프로세스·포트를 포함한 모든 접근을 금지한다.
 - 실제 개발·직원 서버 시작/중지/배포, main merge/push, PR, force-push를 금지한다.
 - DB mutation은 각 worktree ignored runtime의 격리 DB만 사용한다. 기존 `backend/mes.db`는 전후 불변이다.
+- CP6 최종 read-only gate의 한정 예외: 현재 부재한 CP6 `backend/mes.db` 경로만, ignored runtime에서 생성·닫은 합성 schema-head fixture를 배타 생성해 임시 제공할 수 있다. 기존 파일이 발견되면 덮거나 사용하지 않는다. 실행 중 fixture hash 불변과 원래/최종 DB family 부재를 각각 증명하고, 소유권·hash가 같은 단일 임시 파일만 정리한다. 이는 실제 DB 무변경이지 파일 생성/삭제0은 아니다. main/직원 DB 복사·연결은 금지한다. 상세는 supervisor ignored `cp6-final-db-gate-prep.md`다.
 - E2E base URL은 전용 loopback으로 고정하고 점유 포트에 mutation/종료를 보내지 않는다. 직접 생성한 PID와 시작시각을 검증한 프로세스만 종료한다.
 - S0 실제 Windows 실행에서 bind-only probe가 점유된 8021을 가용으로 오판하고 identity404로 중단됐다. 다른 서버는 조회·종료·재사용하지 않는다. 격리 워크트리 자율 진행 승인에 따라 총괄이 connect+bind 점유 검사 보강과 전용 backend `8021 → 8022` fallback을 test-only 범위에서 승인했다. 선택 포트는 proxy/setup/nonce/cleanup 전체에서 일치해야 하며 두 포트가 모두 점유됐으면 mutation 전에 거부한다. 실제 개발·직원 포트 및 임의 URL을 허용하지 않는다.
 - 주간보고·모바일 하단 nav/pill·출하 step5 카드 배치의 main 결과를 보존하며 추가 변경하지 않는다. 사용자 추가 승인 예외는 `frontend/app/mes/_components/_weekly_sections/__tests__/WeeklyDetailTable.test.tsx` 첫 render에 필수 `onItemSelect` 콜백 1줄을 보완하는 테스트 변경뿐이다.
