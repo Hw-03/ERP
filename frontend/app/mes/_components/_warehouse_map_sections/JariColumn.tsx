@@ -27,6 +27,7 @@ export function JariColumn({
   scale,
   matchQuery,
   draggable,
+  pendingBoxIds,
   onBoxDragStart,
   onBoxDrop,
 }: {
@@ -35,6 +36,8 @@ export function JariColumn({
   matchQuery?: string;
   /** 편집 모드: 박스를 드래그해 다른 자리로 이동(줄확대 화면). */
   draggable?: boolean;
+  /** 서버 수렴 전 중복 드래그를 막을 박스 식별자. */
+  pendingBoxIds?: ReadonlySet<string>;
   onBoxDragStart?: (boxId: string) => void;
   /** 편집 모드: 이 박스 기준 위/아래에 끌어온 박스를 끼워넣기(스택 중간 삽입). */
   onBoxDrop?: (targetBoxId: string, place: "above" | "below") => void;
@@ -59,6 +62,7 @@ export function JariColumn({
         />
       )}
       {[...boxes].reverse().map((box) => {
+        const pending = pendingBoxIds?.has(box.box_id) ?? false;
         const color = boxColor(box) ?? LEGACY_COLORS.muted2;
         const matched =
           hasMatchQuery &&
@@ -153,9 +157,12 @@ export function JariColumn({
         return (
           <div
             key={box.box_id}
-            draggable={draggable || undefined}
+            data-box-id={box.box_id}
+            data-pending={pending || undefined}
+            aria-busy={pending || undefined}
+            draggable={(draggable && !pending) || undefined}
             onDragStart={
-              draggable
+              draggable && !pending
                 ? (e) => {
                     e.stopPropagation();
                     onBoxDragStart?.(box.box_id);
@@ -163,7 +170,7 @@ export function JariColumn({
                 : undefined
             }
             onDragOver={
-              onBoxDrop
+              onBoxDrop && !pending
                 ? (e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -176,12 +183,12 @@ export function JariColumn({
                 : undefined
             }
             onDragLeave={
-              onBoxDrop
+              onBoxDrop && !pending
                 ? () => setDropHint((p) => (p?.boxId === box.box_id ? null : p))
                 : undefined
             }
             onDrop={
-              onBoxDrop
+              onBoxDrop && !pending
                 ? (e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -203,7 +210,8 @@ export function JariColumn({
               padding: isFront ? "0 5px" : "0 8px",
               borderRadius: 6,
               background: `color-mix(in srgb, ${color} 28%, ${LEGACY_COLORS.s1})`,
-              cursor: draggable ? "grab" : undefined,
+              cursor: pending ? "wait" : draggable ? "grab" : undefined,
+              opacity: pending ? 0.6 : 1,
               boxShadow:
                 dropHint?.boxId === box.box_id
                   ? dropHint.place === "above"
