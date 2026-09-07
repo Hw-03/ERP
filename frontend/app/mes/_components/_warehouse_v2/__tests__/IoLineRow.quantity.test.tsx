@@ -162,6 +162,29 @@ describe("IoLineRow quantity", () => {
     );
   });
 
+  it("does not show an execution-after quantity for an excluded line", () => {
+    render(
+      <IoLineRow
+        line={makeLine({
+          direction: "out",
+          from_bucket: "warehouse",
+          to_bucket: "none",
+          quantity: 0,
+          included: false,
+          exclusion_note: "이번 작업 제외",
+        })}
+        subType="warehouse_to_dept"
+        isChild
+        available={10}
+        onToggle={() => {}}
+        onQuantityChange={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("실행 후").parentElement).toHaveTextContent("—");
+  });
+
   it("aligns stock and remove controls to the BOM header desktop columns", () => {
     render(
       <IoLineRow

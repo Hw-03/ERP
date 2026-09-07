@@ -1639,7 +1639,7 @@ describe("[bomSync] applyToggleLine", () => {
     expect(mm.included).toBe(true); // manual 은 동기화 안 됨
   });
 
-  it("일반 자동 BOM 자식 단독 토글(다시 포함) → shortage 재계산", () => {
+  it("일반 자동 BOM 자식 단독 토글(다시 포함) → 현재 기준 수량으로 복원하고 shortage를 재계산", () => {
     const bundles = [
       makeBundle({
         bundle_id: "B",
@@ -1649,8 +1649,37 @@ describe("[bomSync] applyToggleLine", () => {
     const next = applyToggleLine(bundles, "B", "C", "warehouse_to_dept", availMap({ C: 7 }));
     const c = next[0].lines[0];
     expect(c.included).toBe(true);
-    expect(c.shortage).toBe(3); // max(0, 10 - 7)
+    expect(c.quantity).toBe(20); // 현재 기준 수량 10 × BOM 소요량 2
+    expect(c.shortage).toBe(13); // max(0, 20 - 7)
     expect(c.exclusion_note).toBeNull();
+  });
+
+  it("창고 BOM 하위를 제외하면 기준 수량 변경 뒤에도 제외를 유지하고 재체크하면 현재 기준으로 복원한다", () => {
+    const bundles = [
+      makeBundle({
+        bundle_id: "B",
+        quantity: 1,
+        lines: [
+          makeLine({
+            line_id: "C",
+            origin: "bom_auto",
+            bom_expected: 2,
+            included: true,
+            quantity: 2,
+            from_bucket: "warehouse",
+          }),
+        ],
+      }),
+    ];
+
+    const excluded = applyToggleLine(bundles, "B", "C", "warehouse_to_dept", availMap({ C: 100 }));
+    expect(excluded[0].lines[0]).toMatchObject({ quantity: 0, included: false, edited: true, shortage: 0 });
+
+    const resized = applyBundleQuantityChange(excluded, "B", 40, "warehouse_to_dept", availMap({ C: 100 }));
+    expect(resized[0].lines[0]).toMatchObject({ quantity: 0, included: false, edited: true, shortage: 0 });
+
+    const restored = applyToggleLine(resized, "B", "C", "warehouse_to_dept", availMap({ C: 100 }));
+    expect(restored[0].lines[0]).toMatchObject({ quantity: 80, included: true, edited: false, shortage: 0 });
   });
 
   it("부서 BOM 자동 하위를 체크 해제하면 수량 0으로 제외한다", () => {

@@ -136,7 +136,9 @@ export function IoLineRow({
   const displayedCurrent = isWarehouseAdjust && item
     ? Number(item.warehouse_qty) || 0
     : available;
-  const expected = bomStockExempt || noInventoryEffect
+  const expected = !line.included && !bomStockExempt
+    ? null
+    : bomStockExempt || noInventoryEffect
     ? displayedCurrent
     : expectedAfter(effectLine, displayedCurrent);
   const tag = noInventoryEffect
@@ -333,7 +335,7 @@ export function IoLineRow({
           className="text-base font-black tabular-nums"
           style={{ color: expectedColor }}
         >
-          {expected === null ? "-" : formatQty(expected)}
+          {expected === null ? "—" : formatQty(expected)}
         </div>
         {shortage && (
           <div

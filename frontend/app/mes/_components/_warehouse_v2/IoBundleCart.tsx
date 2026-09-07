@@ -26,6 +26,8 @@ interface Props {
   onAdvance: () => void;
   canAdvance: boolean;
   hasShortage?: boolean;
+  hasInvalidQuantity?: boolean;
+  invalidLineCodes?: string[];
   /** 항목 3-4 — 모바일 전용: Step4에도 임시저장 버튼 노출. 데스크톱은 미전달(버튼 없음 → 무변경). */
   onSaveDraft?: () => void;
   /** 항목 7 — 부족 품목 '창고에서 가져오기'(생산 4단계, 데스크톱 전용). */
@@ -53,6 +55,8 @@ export function IoBundleCart({
   onAdvance,
   canAdvance,
   hasShortage,
+  hasInvalidQuantity,
+  invalidLineCodes = [],
   onSaveDraft,
   pullEnabled,
   pullSelected,
@@ -62,6 +66,7 @@ export function IoBundleCart({
   pulling,
 }: Props) {
   const pullSelectedCount = pullSelected?.size ?? 0;
+  const includedCount = bundles.flatMap((bundle) => bundle.lines).filter((line) => line.included).length;
   const hasMissingInternalUseBomMode =
     subType === "internal_use_out" && hasUnselectedInternalUseBomMode(bundles);
   const pullButtonLabel =
@@ -129,6 +134,16 @@ export function IoBundleCart({
           {!canAdvance && hasShortage && (
             <p className="text-center text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>
               재고가 부족한 항목이 있습니다
+            </p>
+          )}
+          {!canAdvance && !hasShortage && includedCount === 0 && (
+            <p className="text-center text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>
+              반영할 품목을 하나 이상 선택하세요
+            </p>
+          )}
+          {!canAdvance && !hasShortage && hasInvalidQuantity && invalidLineCodes.length > 0 && (
+            <p className="text-center text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>
+              수량 0: {invalidLineCodes.join(", ")}
             </p>
           )}
           {!canAdvance && hasMissingInternalUseBomMode && (

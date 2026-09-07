@@ -545,8 +545,8 @@ describe("IoComposeView navigation chrome", () => {
         {
           line_id: "excluded-line", item_id: "bom-item", item_name: "제외 품목", mes_code: "BOM-1", unit: "EA",
           direction: "out", from_bucket: "warehouse", from_department: null, to_bucket: "production", to_department: "조립",
-          quantity: 2, bom_expected: 2, included: false, origin: "bom", edited: true, has_children: false,
-          shortage: 0, exclusion_note: "대체 품목 사용",
+          quantity: 0, bom_expected: 2, included: false, origin: "bom", edited: true, has_children: false,
+          shortage: 0, exclusion_note: "이번 작업 제외",
         },
       ],
     }] as never;

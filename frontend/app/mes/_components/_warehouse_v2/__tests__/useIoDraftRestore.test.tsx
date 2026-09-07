@@ -2,7 +2,11 @@ import { useRef, useState } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { IoBatch, IoSubType } from "@/lib/api";
-import { restoreInternalUseBundles, useIoDraftRestore } from "../useIoDraftRestore";
+import {
+  normalizeWarehouseIoDraftBundles,
+  restoreInternalUseBundles,
+  useIoDraftRestore,
+} from "../useIoDraftRestore";
 import { useIoWorkState } from "../useIoWorkState";
 
 function makeDraft(subType: IoSubType): IoBatch {
@@ -206,6 +210,65 @@ function CanonicalProcessRestoreHarness() {
 }
 
 describe("useIoDraftRestore", () => {
+  it("창고 입출고 초안의 체크됨·수량 0과 제외된 양수 수량을 제외 상태로 정규화한다", () => {
+    const bundles = [{
+      bundle_id: "warehouse-draft",
+      source_kind: "bom_parent" as const,
+      title: "창고 BOM",
+      source_item_id: "parent-1",
+      source_mes_code: null,
+      quantity: 40,
+      expanded_level: 1,
+      lines: [
+        {
+          line_id: "zero-included",
+          item_id: "item-1",
+          item_name: "체크된 영수량",
+          mes_code: "7-AA-0052",
+          unit: "EA",
+          direction: "out" as const,
+          from_bucket: "warehouse" as const,
+          from_department: null,
+          to_bucket: "production" as const,
+          to_department: "조립",
+          quantity: 0,
+          bom_expected: 1,
+          included: true,
+          origin: "bom_auto" as const,
+          edited: false,
+          has_children: false,
+          shortage: 0,
+          exclusion_note: null,
+        },
+        {
+          line_id: "positive-excluded",
+          item_id: "item-2",
+          item_name: "제외된 양수 수량",
+          mes_code: "7-AA-0053",
+          unit: "EA",
+          direction: "out" as const,
+          from_bucket: "warehouse" as const,
+          from_department: null,
+          to_bucket: "production" as const,
+          to_department: "조립",
+          quantity: 40,
+          bom_expected: 1,
+          included: false,
+          origin: "bom_auto" as const,
+          edited: true,
+          has_children: false,
+          shortage: 4,
+          exclusion_note: "이번 작업 제외",
+        },
+      ],
+    }];
+
+    expect(normalizeWarehouseIoDraftBundles(bundles)[0].lines).toMatchObject([
+      { quantity: 0, included: false, edited: true, shortage: 0, exclusion_note: "이번 작업 제외" },
+      { quantity: 0, included: false, edited: true, shortage: 0, exclusion_note: "이번 작업 제외" },
+    ]);
+  });
+
   it("생산으로 저장된 낱개-only draft를 방향 기준 수량보정 subtype으로 즉시 복원한다", () => {
     render(<CanonicalProcessRestoreHarness />);
 
