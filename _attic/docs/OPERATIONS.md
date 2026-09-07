@@ -2,6 +2,8 @@
 
 내부 MES를 365일 켜두는 PC에서 운영하는 사람을 위한 매뉴얼. 보안/권한·CI/CD·실 서비스 등록은 이 문서의 범위가 아니다.
 
+> **품질 감사/worktree 안전 범위:** 이 문서의 실행·중지·백업·직원 동기화·배포·작업 등록 절차는 운영자 또는 통합 checkout용이다. 격리된 코드 품질 작업에서는 해당 명령을 실행하거나 development/employee URL·port·DB를 조회하지 않는다. 정적 검증은 [`verify_local.ps1`](../../scripts/dev/verify_local.ps1)의 plan/gate 계약을 따르고, 브라우저 회귀 실행이 별도로 승인된 때만 [합성 DB E2E 격리 계약](../../frontend/tests/e2e/README.md)을 따른다. 과거 실환경 관찰은 현재 상태로 재확인하지 않는다.
+
 ## 표준 실행 경로
 
 - **표준은 `start.bat`**. 컨테이너 정의는 루트가 아닌 `docker/docker-compose.yml`에 있으며, 정규 운영 경로는 아니다.
@@ -179,7 +181,7 @@ taskkill /PID <PID> /F
 | `/health/detailed` 가 `inventory_mismatch_count > 0` | Inventory 합계와 위치별 합계 불일치 | DB 백업 후 운영 담당에게 보고 (수정은 별도 절차) |
 | `operational_readiness.bat` 가 `FAIL` | 백업 없음/오래됨/DB보다 오래됨, 백업 검증 실패, 재고 정합성 실패 | 입출고 시작 금지. `backup_db.bat`, `verify_backup.bat`, `check_inventory_integrity.py` 결과를 확인 |
 | WARN missing transaction effects 표시 | 과거 거래 로그에 자동 역취소용 재고 영향 기록 없음 | 신규 작업은 가능. 해당 과거 거래 자동 취소는 거부되며, 히스토리/현재 재고 대조 후 별도 보정 거래로 처리 |
-| 다른 PC에서 접속 안 됨 | LAN IP 변경 / 방화벽 | start.bat 콘솔에 표시된 새 IP 확인, Windows 방화벽에서 8011·3001 (dev) 또는 8010·3000 (prod) 인바운드 허용 |
+| 다른 PC에서 접속 안 됨 | LAN IP 변경 / 방화벽 | start.bat 콘솔에 표시된 새 IP 확인, Windows 방화벽에서 8011·3001 (development) 또는 8010·3000 (employee) 인바운드 허용 |
 
 ## 데이터 정합성 점검(수동)
 

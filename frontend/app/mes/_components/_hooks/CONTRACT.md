@@ -1,8 +1,8 @@
 # Hook Contract — frontend/app/mes/\_components/\_hooks
 
-이 폴더와 `_admin_hooks/`, `mobile/hooks/` 의 hook 들은 외부 라이브러리(SWR / React Query) 미도입 정책 하에서 일관된 모양을 갖도록 약속한다.
+이 폴더와 `_admin_hooks/`, `mobile/hooks/` 에는 기존 local hook과 React Query hook이 공존한다. 새 server-state read/mutation은 `frontend/lib/queries/`의 query key·hook 계약을 우선하고, local UI 상태 hook은 이 문서의 모양을 따른다.
 
-## 1. Read hook (단일 fetcher)
+## 1. Legacy local read hook (단일 fetcher)
 
 표준 모양: `useResource<T>(fetcher, deps)` → `{ data, loading, error, reload }`
 
@@ -11,9 +11,9 @@
 - `error: string | null` — 한국어 사용자 메시지
 - `reload: () => Promise<void>` — 강제 재조회 (예: 사용자가 "다시 시도" 클릭)
 
-신규 read hook 은 가급적 `useResource` 를 직접 쓰거나 위 4개 키를 그대로 노출한다.
+기존 legacy local read hook을 유지·확장할 때는 가급적 `useResource`를 직접 쓰거나 위 4개 키를 그대로 노출한다.
 
-## 2. List hook (페이지 / 검색 / 필터)
+## 2. Legacy local list hook (페이지 / 검색 / 필터)
 
 표준 모양: `useItems(filters)` → `{ items, loading, error, hasMore, loadMore, refetch }`
 
@@ -24,7 +24,7 @@
   - `useEffect` cleanup 에서 `ctrl.abort()`
 - 변경이 드문 read 는 deps 기반 reload 로 충분 (예: `useResource`).
 
-## 3. Mutation hook
+## 3. Legacy local mutation hook
 
 표준 모양: `{ run, busy, error }` 또는 `(payload) => Promise<T>` 형태의 함수 노출.
 
@@ -59,7 +59,7 @@
 | 검색창 빠른 타이핑 | AbortController (`useItems`, `useTransactions`) |
 | 단일 fetcher + deps 변경 | `useResource(fetcher, deps)` — fetcher 가 `signal` 받으면 자동 abort 처리 (5.5-F) |
 | 변하지 않는 reference 데이터 | `useResource(fn, [])` |
-| 외부 트리거(저장 후 갱신) | 부모가 `refetch()` 호출 / Context 의 `refresh*` 콜백 |
+| 외부 트리거(저장 후 갱신) | React Query server state는 해당 `queryKey` invalidate, legacy local state만 부모 `refetch()` / Context `refresh*` 콜백 |
 | 단일 mutation | `await api.x()` → `setState` (pessimistic) |
 | 즉시 UI 반응이 중요 | optimistic + 롤백 (현재는 거의 없음) |
 
@@ -69,10 +69,11 @@
 - 단순 form 은 `useState` 다중 호출로 충분.
 - 5개 이상 필드 + 단계 진행이 있는 wizard 는 Context dispatcher 패턴 사용 (예: `_warehouse_steps/`, `_dept_steps/`).
 
-## 7. 향후 hook 추가 시 체크리스트
+## 7. Hook 추가·변경 체크리스트
 
-- [ ] 위 1~3 형태 중 하나에 정렬되는가?
-- [ ] race 가능성이 있으면 AbortController 적용했는가?
-- [ ] mutation 은 pessimistic 인지 optimistic 인지 의도가 명확한가?
+- [ ] server state라면 `frontend/lib/queries/`의 query key·hook·invalidate 계약을 따르는가?
+- [ ] legacy local hook이라면 위 1~3 형태 중 하나에 정렬되는가?
+- [ ] legacy local fetch에 race 가능성이 있으면 AbortController를 적용했는가?
+- [ ] legacy local mutation은 pessimistic인지 optimistic인지 의도가 명확한가?
 - [ ] 에러 메시지는 한국어 사용자 메시지인가?
-- [ ] `data, loading, error` 키가 일관되는가?
+- [ ] legacy local hook의 `data, loading, error` 키가 일관되는가?

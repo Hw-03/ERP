@@ -2310,3 +2310,29 @@ main 변경으로 완전히 해결된 CP6 카드는 없으며 다음의 남은 �
 - 총괄 `f9f8a3`은 ignored `20260908-cp7-b4/review-evidence.md`의 최종 명세 `/root/b1_spec_review`와 품질 `/root/b1_quality_review` 원문을 읽었다. 두 final round2는 모두 C/I/M0·Ready Yes이며 과거 task 명칭의 B1은 이번 B4 리뷰 범위를 뜻하지 않는다. 품질 리뷰는 기존 승인/반려와 새 잠금 순서의 교착 역전 부재를 정적으로 대조했다. PG가 검증하지 않은 모든 교차 조합까지 동적 PASS라고 확대하지 않는다.
 - PG의 정상2회 및 환경/fixture 실패3회는 각 own nonce/PID/PGDATA/data_directory를 대조한 뒤 exact test DB와 cluster만 정리했고 status3·55437 AVAILABLE을 기록했다. PGDATA/evidence는 남겼다. root `f69237`도 마지막 기존 결과/cleanup 원본을 읽었으며 공유 환경을 새로 조회하지 않았다. 이 증거는 역사적 실행 경계 예외를 없애거나 전체 시스템 listener0을 주장하는 근거가 아니다.
 - 총괄은 정확27개 제품/테스트/생성 경로와 정본문서2개를 한 B4 로컬 rollback commit으로 인수한다. staged smart 영향 계획과 이미 통과한 직접 증거·문서 gate를 결합하며 PlanOnly를 실제 full PASS로 기록하지 않는다. B3/B4 일반 push 후 exact SHA의 실제 CI를 확인한다. 불변 원격 CI 대기 중 비중첩 B5 문서-only 작업·직접 검증만 병행하고, B6 진입과 IC23/24 원격 완료는 CI success 이후다. 최종 CP7 전체 gate·frozen 화면·최종 품질 통합/CI는 별도 필수다.
+
+#### 12.28.11 B3·B4 원격 검증과 국소 복구 경계
+
+- B4는 `113b4699df564a905f5c287155deebce6b84102c`(부모234d4f5b, tree7d40e9c9)로 커밋됐다. 총괄 `3d5ada`는 정확29경로(28M/1A)·제목·clean을, `b6cc1a`는 기존 CP7 branch 일반 push와 upstream0/0을 확인했다. staged smart `d1743501`은 계획·실행0이다. 별도 docs gate `9db52615`의3PASS·26,053.239ms와14PASS/권한skip1은 총괄 `f1f4d5`가 기존 원본을 읽어 인수했다.
+- [CI34166260511](https://github.com/Hw-03/ERP/actions/runs/34166260511)은 exact113을 검증한다. 총괄 `eeada9`/`cc5ffb`에서 Windows ops·검증 정책·실제 PostgreSQL 경합·frontend 전체(lint/type/coverage/build/bundle)4개 job은 성공했지만 **E2E는 실패, backend는 진행 중**이었다. 원격 전체 PASS가 아니다.
+- E2E job101877769545 원본 `28830c`는20PASS/2FAIL/2NOT_RUN이다. `cp6-final-evidence.spec.ts:89,321`의 로딩 표시와 `io-receive.spec.ts:46`의 부서 결재 완료 dialog가 재시도에서도 보이지 않았다. 원인 확정 전 테스트 결함·제품 결함·flaky로 단정하지 않는다. report upload 경로가 없어 screenshot/trace는 업로드되지 않았으며 runner는 `ownership-result=released phase=cleanup-complete`를 기록했다.
+- 같은 CP7 writer가 B5 문서 diff를 분리 보존하며 이 두 경로만 재현·진단·최소 보완한다. timeout 상향·assertion 삭제·skip으로 통과시키지 않고 관련 검사와 두 좁은 리뷰 후 recovery commit/CI를 진행한다. 이미 성공한 PostgreSQL·frontend 전체 검사를 로컬에서 반복하지 않는다. B6 진입과 IC23/24 원격 완료는 복구 SHA의 실제 CI 성공까지 유보한다.
+- **원격 최종 종료:** 이후 총괄 `bf40fb`는 같은 CI의completed/failure·4job success/2job failure를 확인했다. backend 원본 `d70476`/`34d2de`는 security mutation-manifest2건 실패이며, 새 공용 `approval_rules.approval_kind`와 `io_preview.has_declared_custom_process_bom`의 보안 분류가 빠졌다. writer가 실제 순수 계산/DB 읽기 책임을 대조해 정확한 분류를 등록하고 기존 exact-set/re-export 검사는 유지한다. 제품 함수를 숨기거나 검사 자체를 완화하지 않는다. 같은 recovery 단위의 직접 RED/GREEN·delta 리뷰로 처리하며 backend 전체를 다시 실행하지 않는다.
+
+#### 12.28.12 B5 / DOC01 문서 정합성 로컬 인수
+
+- 기준113b4699에서 README, ONBOARDING, ARCHITECTURE, OPERATIONS, hook CONTRACT, E2E README의6개 Markdown만 수정했다. 실제 Next16, React Query/legacy local hook 공존과 query/invalidate 책임, profile 명칭, canonical PlanOnly 경로, E2E token→ownership→합성 bootstrap→spawn→PID receipt→readiness→seed 순서를 현행 소스에 맞췄다.
+- 일반 운영 문서의 profile 설명은 삭제하거나 거짓 격리 주소로 바꾸지 않았다. 격리 품질 작업에서 일반 start/stop/bootstrap·직원 sync/deploy/register와 실환경 URL/port/DB 접근을 금지하는 적용 범위를 명시하고 승인된 합성 E2E 계약으로 연결했다. 과거 profile 무충돌 관찰에는 `[HISTORICAL — 재확인 금지]`를 표시했다. 기존 supervisor 실행 경계 예외는 보존하며 재조회하지 않는다.
+- 실제 정적 source/doc 대조 `017c5ae7`는27/27PASS, `e0e57ca1`은 maintained Markdown broken link0·변경 문서 PowerShell parser-only·diff-check PASS다. 최초 임시 검사기의 경로/문자열 해석 실패는 보존했고 실제 업무 명령·서버·DB·테스트 실행은 없었다. 문서 계약 증거이지 운영 동작 재검증이 아니다.
+- 총괄 `ba4814`/`e3b55d`는6개 전체 diff와 ignored `20260908-cp7-b5/review-evidence.md`를 읽었다. 독립 명세 최종 `01a07dff-81c6`와 품질 최종 `01a07dff-7068`도 직접 조회해 각각 **C/I/M0·Ready Yes**를 확인했다. 초기 hook 적용 범위·PlanOnly·token 순서·profile 명칭의 I/M 지적은 해당 문장만 수정하고 delta 리뷰로 닫았다.
+- DOC01은 **LOCAL_VERIFIED**이며 별도 docs rollback commit으로 보존한다. B3/B4 원격 실패, B6 이동, B7 자산 정리와 CP7 최종 gate/통합은 이 인수로 완료되지 않는다. 총괄 정본2개는 부모만 갱신한다.
+
+#### 12.28.13 B3·B4 CI 복구 로컬 인수
+
+- 복구 diff는 security mutation manifest1개와 E2E2개, 합계3파일10추가/4삭제다. 총괄 `8e91d6`/`473867`/`1fe00c`가 전체 diff·기준113을 직접 확인했다. B5 docs6개와 총괄docs2개는 별도 docs commit으로 분리한다. 원격 최초4PASS/2FAIL은 보존하며 아직 원격 복구 완료는 아니다.
+- 입고 테스트는 실제 DOM의 `입출고 반영 완료`와 `ioComposeOperations.ts:213-219`의즉시 반영 분기에 맞춰 제목만 교정했다. 성공 본문과 결재/재고 동작은 바꾸지 않았다. A4의 첫-request-only barrier는 재발급 GET도 같은 release까지 막도록 보완했고 로딩·응답·데이터 assertion과 timeout은 유지했다. 제품 `isLoading`을 바꿔 캐시를 깜빡이게 하지 않았다.
+- 수정 전 A4는 로컬 1회와 반복 3회 PASS였으므로 그것만으로 원격 실패를 flaky라고 판정하지 않았다. 보존한 수정 전 로컬 trace는 동일 endpoint 요청의 실패/재발급 200을 desktop/mobile에서 각각 기록한다. 총괄 `fcd27e`가 압축 network JSON의 두 status -1·두 200을 직접 읽었다. 원격에서 응답이 assertion보다 빨랐다는 설명은 원격 trace 부재로 **추론**이며 로컬 관찰과 구분한다. 원본은 ignored `20260908-cp7-b4-ci-recovery/pre-fix-a4-trace/`의 3,418,994bytes·SHA256 `F240BE04395FC2136AB653DEDB5AFACA15CFA88B8C3AE704C305B9EA1CD7FDF5`다.
+- 직접 E2E `bb467b56`은 3PASS/1SKIP·36.2초이며 skip은 최종 frozen 환경변수가 없는 선택 검사다. E2E 타입 `7d30d385`, 두 파일 lint `88601eb0`, 즉시 반영 분기 unit `973b9053` 11PASS를 인수했다. 소유 3300/8022·합성 DB를 사용했고 기존 worktree DB family 불변·정리·ownership release를 원본에서 확인했다. 같은 검사를 재실행해 숫자를 늘리지 않는다.
+- 실제 순수 `approval_kind`와 BOM SELECT 비교 `has_declared_custom_process_bom`만 `SERVICE_READ_ONLY_EXPORTS`에 등록했다. exact 1-class·canonical re-export·독립 AST write reachability 검사는 그대로다. security `d14379b3` 32PASS, 관련 approval/BOM `9cc5224c` 39PASS, 변경 manifest Ruff `d3124996` PASS다. 전체 backend/PG를 로컬에서 반복하지 않았다.
+- 총괄 `534242`는 최종 review-evidence를 읽고, 별도 명세 최종 `01a07e0e-4295`·품질 최종 `01a07e0e-3296` 원문도 직접 확인했다. 두 리뷰는 E2E 판정을 보존하며 manifest 증분을 대조했고 모두 C/I/M0·Ready다. staged smart 범위 계획·직접 증거·변경 docs gate 후 두 논리 commit을 한 번 push하고 새 exact SHA의 CI를 확인한다.
+- 잔여 관찰: 같은 E2E의 `DailyWorkActivity.tsx:145` 부모 state 갱신 React warning은 실패가 아니지만 B8에 남긴다. 총괄 `1fe00c`의 blame은 143~147행이 기존 `7d3fa7889`에서 온 코드임을 확인했다. 이번 recovery에서 제품 수정하지 않았으며 E2E PASS를 warning 0이라고 표현하지 않는다. CI의 github-only reporter/HTML artifact 경로 불일치도 원본 증거 보존 제약으로 남긴다.
