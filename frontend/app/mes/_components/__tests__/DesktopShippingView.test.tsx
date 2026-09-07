@@ -132,6 +132,7 @@ function request(overrides: Partial<ShippingRequest> = {}): ShippingRequest {
     final_pa_item_name: null,
     final_pf_item_id: null,
     final_pf_item_name: null,
+    finalization_mode: "KEEP_BASE",
     requested_by_name: "shipping",
     custom_pa_name: null,
     custom_pf_name: null,

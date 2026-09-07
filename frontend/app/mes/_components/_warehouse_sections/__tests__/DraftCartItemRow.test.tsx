@@ -20,6 +20,21 @@ function makeDraft(): StockRequest {
 }
 
 describe("DraftCartItemRow timestamp", () => {
+  it("알 수 없는 요청 유형은 안전 문구로 표시하고 draft command를 숨긴다", () => {
+    render(
+      <DraftCartItemRow
+        draft={{ ...makeDraft(), request_type: "future_transfer" as "raw_receive" }}
+        isBusy={false}
+        onContinue={vi.fn()}
+        onRequestDelete={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("알 수 없는 요청 (future_transfer)")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "이어서 작업" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "삭제" })).not.toBeInTheDocument();
+  });
+
   it("마지막 수정 일시를 KST 절대 시각으로 표시", () => {
     render(
       <DraftCartItemRow

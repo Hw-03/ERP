@@ -521,7 +521,7 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     const parentHeader = await screen.findByTestId("bom-modal-header");
     expect(within(parentHeader).getByText("BOM", { exact: true })).toBeInTheDocument();
     expect(within(parentHeader).getByText(bomTree.item_name)).toHaveClass("font-black");
-    expect(within(parentHeader).getByText(bomTree.mes_code)).toHaveClass("font-mono");
+    expect(within(parentHeader).getByText(bomTree.mes_code!)).toHaveClass("font-mono");
   });
 
   it("identifies the BOM parent item in the loaded modal header", async () => {
@@ -531,7 +531,7 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
 
     const dialog = await screen.findByRole("dialog");
     await waitFor(() => expect(dialog).toHaveTextContent(bomTree.item_name));
-    expect(dialog).toHaveTextContent(bomTree.mes_code);
+    expect(dialog).toHaveTextContent(bomTree.mes_code!);
   });
 
   it("shows current and additional production badges before the modal actions", async () => {

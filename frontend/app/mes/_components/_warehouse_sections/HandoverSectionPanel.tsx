@@ -242,7 +242,7 @@ export function HandoverSectionPanel({
   );
 }
 
-function HandoverCardList({
+export function HandoverCardList({
   docs,
   emptyText,
   onPrint,
@@ -270,7 +270,10 @@ function HandoverCardList({
   return (
     <div className="flex flex-col gap-2">
       {docs.map((doc) => {
-        const st = STATUS_LABEL[doc.status] ?? STATUS_LABEL.draft;
+        const st = STATUS_LABEL[doc.status] ?? {
+          text: `알 수 없는 상태 (${doc.status})`,
+          tone: LEGACY_COLORS.muted2,
+        };
         const totalQty = doc.lines.reduce((acc, l) => acc + l.quantity, 0);
         const first = doc.lines[0];
         const itemLabel = first

@@ -244,7 +244,7 @@ export interface ShippingRequest {
   final_pa_item_name: string | null;
   final_pf_item_id: string | null;
   final_pf_item_name: string | null;
-  finalization_mode?: ShippingFinalizationMode;
+  finalization_mode: ShippingFinalizationMode;
   reuse_pf_item_id?: string | null;
   requested_by_name: string | null;
   custom_pa_name: string | null;

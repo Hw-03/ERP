@@ -82,7 +82,7 @@ export function useAdminMasterItemsCommands({
         item_name: addForm.item_name.trim(),
         process_type_code: addForm.process_type_code || undefined,
         unit: addForm.unit || "EA",
-        model_slots: addForm.model_slots.length > 0 ? addForm.model_slots : undefined,
+        model_slots: addForm.model_slots,
         bom_stock_exempt: addForm.bom_stock_exempt,
         sales_review_required: addForm.sales_review_required,
         legacy_item_type: addForm.legacy_item_type || undefined,

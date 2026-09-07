@@ -2,6 +2,8 @@
 // @vitest-environment jsdom
 import { shippingApi } from "../api/shipping";
 import { ResultUnknownError } from "../api-core";
+import type { components } from "../api/generated/openapi";
+import type { ShippingRequest } from "../api/types/shipping";
 
 function makeResponse(body: unknown, ok = true): Response {
   return {
@@ -15,14 +17,98 @@ function makeResponse(body: unknown, ok = true): Response {
 
 const originalFetch = globalThis.fetch;
 const expectedUpdatedAt = "2026-09-01T00:00:00Z";
+
+function shippingRequestResponse(
+  overrides: Partial<components["schemas"]["ShippingRequestResponse"]> = {},
+): components["schemas"]["ShippingRequestResponse"] {
+  return {
+    base_pf_item_id: "pf-1",
+    base_pf_item_name: "PF",
+    created_at: "2026-09-08T00:00:00Z",
+    finalization_mode: "KEEP_BASE",
+    request_id: "req-1",
+    status: "PREPARING",
+    updated_at: "2026-09-08T00:00:00Z",
+    ...overrides,
+  };
+}
+
 afterEach(() => {
   globalThis.fetch = originalFetch;
   sessionStorage.clear();
 });
 
 describe("shippingApi", () => {
+  it("OpenAPI 응답의 finalization_mode를 required public 필드로 유지한다", () => {
+    const required: undefined extends ShippingRequest["finalization_mode"] ? never : true = true;
+    expect(required).toBe(true);
+  });
+
+  it("generated shipping raw 응답의 생략 nullable 필드를 public 기본값으로 정규화한다", async () => {
+    const raw = {
+      allocations: [{
+        allocation_id: "allocation-1",
+        created_at: "2026-09-08T00:00:00Z",
+        item_id: "item-allocation",
+        item_name: "포장재",
+        quantity: 1,
+        request_id: "req-1",
+        status: "reserved",
+      }],
+      base_pf_item_id: "pf-1",
+      base_pf_item_name: "Standard PF",
+      bom_lines: [{
+        child_item_id: "item-bom",
+        item_name: "BOM 품목",
+        line_id: "bom-line-1",
+        parent_stage: "PA",
+        quantity: 1,
+        unit: "EA",
+      }],
+      checklist_lines: [],
+      companion_lines: [],
+      created_at: "2026-09-08T00:00:00Z",
+      events: [],
+      finalization_mode: "KEEP_BASE",
+      request_id: "req-1",
+      status: "PREPARING",
+      stock_shortages: [],
+      transaction_count: 0,
+      transactions: [{
+        created_at: "2026-09-08T00:00:00Z",
+        item_id: "item-transaction",
+        item_name: "출하 품목",
+        log_id: "transaction-1",
+        quantity_change: -1,
+        transaction_type: "SHIP",
+      }],
+      updated_at: "2026-09-08T00:00:00Z",
+    } satisfies components["schemas"]["ShippingRequestResponse"];
+    globalThis.fetch = vi.fn(() => Promise.resolve(makeResponse(raw))) as unknown as typeof fetch;
+
+    await expect(shippingApi.getShippingRequest("req-1")).resolves.toEqual(expect.objectContaining({
+      finalization_mode: "KEEP_BASE",
+      request_quantity: 1,
+      base_pf_mes_code: null,
+      final_pa_item_id: null,
+      final_pa_item_name: null,
+      final_pf_item_id: null,
+      final_pf_item_name: null,
+      requested_by_name: null,
+      custom_pa_name: null,
+      custom_pf_name: null,
+      notes: null,
+      serial_numbers: null,
+      prepared_at: null,
+      picked_up_at: null,
+      bom_lines: [expect.objectContaining({ included: true, origin: "CUSTOM" })],
+      transactions: [expect.objectContaining({ cancelled: false })],
+      allocations: [expect.objectContaining({ unit: "EA" })],
+    }));
+  });
+
   it("creates a shipping request", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse(shippingRequestResponse())));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
 
     await shippingApi.createShippingRequest({
@@ -61,7 +147,7 @@ describe("shippingApi", () => {
   });
 
   it("updates checklist and sends serial numbers when completing preparation", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse(shippingRequestResponse())));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
 
     await shippingApi.updateShippingChecklist("req-1", {
@@ -86,7 +172,7 @@ describe("shippingApi", () => {
 
   it("sends a key and expected state for every shipping workflow command", async () => {
     const fetchSpy = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
-      Promise.resolve(makeResponse({})),
+      Promise.resolve(makeResponse(shippingRequestResponse())),
     );
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
 
@@ -132,7 +218,7 @@ describe("shippingApi", () => {
       call += 1;
       return call === 1
         ? Promise.reject(new TypeError("lost response"))
-        : Promise.resolve(makeResponse({ request_id: "req-1" }));
+        : Promise.resolve(makeResponse(shippingRequestResponse({ request_id: "req-1" })));
     }) as unknown as typeof fetch;
 
     await expect(
@@ -163,7 +249,7 @@ describe("shippingApi", () => {
       call += 1;
       return call === 1
         ? Promise.reject(new TypeError("lost prepare response"))
-        : Promise.resolve(makeResponse({ request_id: "req-1" }));
+        : Promise.resolve(makeResponse(shippingRequestResponse({ request_id: "req-1" })));
     }) as unknown as typeof fetch;
 
     await expect(
@@ -188,7 +274,7 @@ describe("shippingApi", () => {
       call += 1;
       return call === 1
         ? Promise.reject(new TypeError("lost pickup response"))
-        : Promise.resolve(makeResponse({ request_id: "req-1" }));
+        : Promise.resolve(makeResponse(shippingRequestResponse({ request_id: "req-1" })));
     }) as unknown as typeof fetch;
 
     await expect(
@@ -212,7 +298,7 @@ describe("shippingApi", () => {
       call += 1;
       return call === 1
         ? Promise.reject(new TypeError("lost actor A response"))
-        : Promise.resolve(makeResponse({ request_id: "req-1" }));
+        : Promise.resolve(makeResponse(shippingRequestResponse({ request_id: "req-1" })));
     }) as unknown as typeof fetch;
 
     await expect(
@@ -234,6 +320,165 @@ describe("shippingApi", () => {
       expected_status: "PREPARING",
     });
     expect(bodies[1].client_request_id).not.toBe(bodies[0].client_request_id);
+  });
+
+  it("필수 mutation 응답 누락도 결과 불명으로 보존해 같은 command를 재시도한다", async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    let call = 0;
+    globalThis.fetch = vi.fn((_url, init) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      call += 1;
+      return Promise.resolve(makeResponse(call === 1 ? {} : shippingRequestResponse()));
+    }) as unknown as typeof fetch;
+
+    await expect(shippingApi.prepareShippingComplete("req-required", {
+      serial_numbers: "SN-ORIGINAL",
+    })).rejects.toBeInstanceOf(ResultUnknownError);
+    await shippingApi.prepareShippingComplete("req-required", {
+      serial_numbers: "SN-CHANGED",
+    });
+
+    expect(bodies[1]).toEqual(bodies[0]);
+  });
+
+  it.each([
+    ["allocations", { allocations: [{}] }],
+    ["bom_lines", { bom_lines: [{}] }],
+    ["checklist_lines", { checklist_lines: [{}] }],
+    ["companion_lines", { companion_lines: [{}] }],
+    ["events", { events: [{}] }],
+    ["stock_shortages", { stock_shortages: [{}] }],
+    ["transactions", { transactions: [{}] }],
+    ["latest_preparation_revision", { latest_preparation_revision: { changes: [] } }],
+  ])("%s 중첩 필수 응답 누락도 같은 command로 재시도한다", async (name, invalidNested) => {
+    const bodies: Array<Record<string, unknown>> = [];
+    let call = 0;
+    globalThis.fetch = vi.fn((_url, init) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      call += 1;
+      return Promise.resolve(makeResponse(call === 1
+        ? { ...shippingRequestResponse(), ...invalidNested }
+        : shippingRequestResponse()));
+    }) as unknown as typeof fetch;
+
+    await expect(shippingApi.prepareShippingComplete(`req-nested-${name}`, {
+      serial_numbers: "SN-ORIGINAL",
+    })).rejects.toBeInstanceOf(ResultUnknownError);
+    await shippingApi.prepareShippingComplete(`req-nested-${name}`, {
+      serial_numbers: "SN-CHANGED",
+    });
+
+    expect(bodies[1]).toEqual(bodies[0]);
+  });
+
+  it.each([
+    {
+      name: "prepare complete",
+      first: () => shippingApi.prepareShippingComplete("req-decode-prepare", {
+        serial_numbers: "SN-ORIGINAL",
+      }),
+      second: () => shippingApi.prepareShippingComplete("req-decode-prepare", {
+        serial_numbers: "SN-CHANGED",
+      }),
+    },
+    {
+      name: "prepare cancel",
+      first: () => shippingApi.cancelShippingPrepare("req-decode-cancel", {
+        reason: "original",
+      }),
+      second: () => shippingApi.cancelShippingPrepare("req-decode-cancel", {
+        reason: "changed",
+      }),
+    },
+    {
+      name: "pickup complete",
+      first: () => shippingApi.completeShippingPickup("req-decode-pickup", {
+        expected_updated_at: "2026-09-08T00:00:00Z",
+      }),
+      second: () => shippingApi.completeShippingPickup("req-decode-pickup", {
+        expected_updated_at: "2026-09-08T00:01:00Z",
+      }),
+    },
+    {
+      name: "pickup cancel",
+      first: () => shippingApi.cancelShippingPickup("req-decode-pickup-cancel", {
+        expected_updated_at: "2026-09-08T00:00:00Z",
+      }),
+      second: () => shippingApi.cancelShippingPickup("req-decode-pickup-cancel", {
+        expected_updated_at: "2026-09-08T00:01:00Z",
+      }),
+    },
+  ])("$name decode 실패도 결과 불명으로 보존해 같은 command를 재시도한다", async ({ first, second }) => {
+    const bodies: Array<Record<string, unknown>> = [];
+    let call = 0;
+    globalThis.fetch = vi.fn((_url, init) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      call += 1;
+      return Promise.resolve(makeResponse(call === 1
+        ? { ...shippingRequestResponse(), bom_lines: [{ parent_stage: "FUTURE" }] }
+        : shippingRequestResponse()));
+    }) as unknown as typeof fetch;
+
+    await expect(first()).rejects.toBeInstanceOf(ResultUnknownError);
+    await second();
+
+    expect(bodies[1]).toEqual(bodies[0]);
+  });
+
+  it("prepare decode 실패는 기존 cancel inverse key를 지우지 않는다", async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    let call = 0;
+    globalThis.fetch = vi.fn((_url, init) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      call += 1;
+      if (call === 1) return Promise.reject(new TypeError("lost cancel response"));
+      if (call === 2) {
+        return Promise.resolve(makeResponse({
+          ...shippingRequestResponse(),
+          bom_lines: [{ parent_stage: "FUTURE" }],
+        }));
+      }
+      return Promise.resolve(makeResponse(shippingRequestResponse()));
+    }) as unknown as typeof fetch;
+
+    await expect(shippingApi.cancelShippingPrepare("req-inverse", {
+      reason: "original cancel",
+    })).rejects.toBeInstanceOf(ResultUnknownError);
+    await expect(shippingApi.prepareShippingComplete("req-inverse", {
+      serial_numbers: "SN-DECODE",
+    })).rejects.toBeInstanceOf(ResultUnknownError);
+    await shippingApi.cancelShippingPrepare("req-inverse", { reason: "changed cancel" });
+
+    expect(bodies[2]).toEqual(bodies[0]);
+  });
+
+  it("pickup decode 실패는 기존 pickup-cancel inverse key를 지우지 않는다", async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    let call = 0;
+    globalThis.fetch = vi.fn((_url, init) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      call += 1;
+      if (call === 1) return Promise.reject(new TypeError("lost pickup cancel response"));
+      if (call === 2) {
+        return Promise.resolve(makeResponse({
+          ...shippingRequestResponse(),
+          bom_lines: [{ parent_stage: "FUTURE" }],
+        }));
+      }
+      return Promise.resolve(makeResponse(shippingRequestResponse()));
+    }) as unknown as typeof fetch;
+
+    await expect(shippingApi.cancelShippingPickup("req-pickup-inverse", {
+      expected_updated_at: "2026-09-08T00:00:00Z",
+    })).rejects.toBeInstanceOf(ResultUnknownError);
+    await expect(shippingApi.completeShippingPickup("req-pickup-inverse", {
+      expected_updated_at: "2026-09-08T00:01:00Z",
+    })).rejects.toBeInstanceOf(ResultUnknownError);
+    await shippingApi.cancelShippingPickup("req-pickup-inverse", {
+      expected_updated_at: "2026-09-08T00:02:00Z",
+    });
+
+    expect(bodies[2]).toEqual(bodies[0]);
   });
 
   it("lists history and filters request status", async () => {
@@ -263,7 +508,11 @@ describe("shippingApi", () => {
       status: "PREPARING",
       cursor: "cursor-1",
       limit: 25,
-    })).resolves.toEqual(page);
+    })).resolves.toEqual(expect.objectContaining({
+      next_cursor: "next",
+      has_more: true,
+      requests: [expect.objectContaining({ request_id: "req-1" })],
+    }));
 
     const url = String(fetchSpy.mock.calls[0][0]);
     expect(url).toContain("/api/shipping/requests/page?");
@@ -288,11 +537,13 @@ describe("shippingApi", () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({ requests: rows, next_cursor: null, has_more: false })));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
 
-    await expect(shippingApi.getShippingHistory()).resolves.toEqual(rows);
+    await expect(shippingApi.getShippingHistory()).resolves.toEqual([
+      expect.objectContaining({ request_id: "hist-1" }),
+    ]);
   });
 
   it("updates invoice and reads revisions and history months", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse(shippingRequestResponse())));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
 
     await shippingApi.updateShippingInvoice("req-1", " inv-001 ");

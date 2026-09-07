@@ -17,9 +17,10 @@
 - S0 구현 작업: `01a079d0-9157-7503-9377-817f636c14c4`
 - 확정 `SYNC_BASE_SHA`: `731edc2df15c89753e60c12be95a65ef88e33bde`. 품질 본 branch는 CP6 통합까지 이 SHA에서 고정한다.
 - CP6 구현 작업: `01a07b0c-4563-7c41-a8c7-5df5ad2e91e2`, `C:\ERP\.worktrees\full-code-quality-cp6`, branch `codex/full-code-quality-cp6`.
+- CP7 구현 작업: `01a07c76-6395-7dc0-ba58-91c6fc4d3538`, `C:\ERP\.worktrees\full-code-quality-cp7`, branch `codex/full-code-quality-cp7`, 고정 `POST_CP6_SHA=7f232773b1eea204a251bc5ac001ef5b03319d3b`. 초기 HEAD·branch·linked worktree·clean을 확인했고 B1부터 착수했다. 품질 branch는 이 SHA에서 CP7 최종 통합까지 움직이지 않는다.
 - 정본 감사 계획: [전수 감사·개선 계획](../../docs/research/2026-08-13-full-code-quality-audit-and-improvement-plan.md), 8.9.7·8.9.8 및 12.26절
-- 현 상태(2026-09-08): **CP6 최종d60f84ed push와 실제 GitHub CI34135084227의6/6 성공을 확인했다. 품질 merge c9d70903은 검증된 CP6와 exact tree다. 문서 closeout·품질 push/CI를 진행하며 CP7은 통합된 고정 기반에서 B1 구현을 병행한다. 품질 CI 성공 전에는 CP7 첫 commit과 CP6 종료 체크를 금지한다. 근거는 감사12.27.8~9다.**
-- 실행 단위 집계: 아래 7/16 완료, 미완료9. 실제 browser는 검증됐으나 CP6 종료 항목은 원격 CI·통합까지 포함하므로 아직 체크하지 않는다.
+- 현 상태(2026-09-08): **CP6 종료·품질 통합 완료. CP6 d60f84ed의 CI34135084227과 품질7f232773의 CI34137728037이 모두 실제6/6 success다. 품질 branch는 POST_CP6_SHA에서 고정하고 CP7 B1을 진행한다. 남은 단계는 새 diff만 focused 검증하며 최종 통합에서 전체 gate·실제 CI를 확인한다. 근거는 감사12.27.8~12.28이다.**
+- 실행 단위 집계: 아래 8/16 완료, 미완료8. CP6 종료·통합까지 완료했으며 CP7 B1~B7 및 최종 통합은 아직 미완료다.
 
 ## 실행 체크리스트
 
@@ -30,10 +31,10 @@
 - [x] CP6 A4 (2026-09-07, LOCAL_VERIFIED): IC25 PA·PF KPI 모집단 상시 설명, 기존 계산 불변. 예상 RED2 뒤2파일8PASS, A5와 합친3파일34PASS·앱 tsc·변경6파일 ESLint exit0, 독립 명세/품질 C/I/M0다. 정확8경로 staged smart8/8PASS 후 commit `edc3a83611472ca6a99b134ac868e195d07ccd00`, 부모8d7a0a77·subject·clean을 총괄 확인했다. 감사12.27.4와 ignored `20260907-cp6-a4-a5/`가 근거이며 실제 desktop/mobile browser·push/CI는 최종 단계다.
 - [x] CP6 A5 (2026-09-07, LOCAL_VERIFIED): IC26 첫/다른/같은 작성자 class 계약0/1/0, 탭·날짜·상세0을 RED1→26PASS로 확인했다. A4와 합친 명세/품질 C/I/M0·staged smart8/8PASS·commit edc3a836을 공유한다. 실제 animationstart/reduced-motion 증명은 최종 E2E에서 검증한다.
 - 속도 우선 배치 조정(2026-09-07): A3 로컬 commit 뒤 A4 RED/GREEN → A5 RED/GREEN을 같은 단일 편집자가 순차 수행한다. 두 카드의 검증 근거는 분리하되 합친 diff의 독립 명세/품질 리뷰와 staged smart·로컬 commit은 각각 한 묶음으로 수행한다. 실제 browser animation/reduced-motion·KPI 표시는 CP6 최종 화면/E2E 검증에 포함한다. backend/DB/frozen 변경이나 최종 gate 생략은 없다.
-- [ ] CP6 종료·통합 [CP6 CI6/6·품질 merge 완료, 품질 CI 대기]: SQL/API/UI·A4/A5/frozen·최종 두 리뷰C/I/M0·최종d60f84ed push와 CI34135084227 success를 확인했다. merge c9d70903의 tree도 exact다. 문서 closeout 고정 SHA·품질 CI 성공 뒤 체크한다. CP7 첫 commit 전까지 품질 CI 성공이 필수이며 같은 통과 검사를 반복하지 않는다.
+- [x] CP6 종료·통합 (2026-09-08): SQL/API/UI·A4/A5/frozen·최종 두 리뷰C/I/M0·최종d60f84ed push와 CI34135084227 success를 확인했다. merge c9d70903의 tree는 exact이며 docs-only7f232773의 품질 CI34137728037도 실제6/6 success다. 총괄의 gh 원본 조회36d0dd와 ignored cp6-quality-ci-final.json이 근거다. 품질 branch는 고정하고 같은 통과 검사를 반복하지 않는다.
 - CP6 최초 full 결과(2026-09-07): 693,611.448ms·exit1, 실제9PASS/1FAIL이다. frontend7영역은 전체276파일2,556테스트·coverage94.97%·build/bundle을 포함해 통과했다. PG는 깊은 Windows 임시 경로로 실패했다. backend full pytest/OpenAPI·docs·DB·E2E 등 미실행 영역과 실패 PG만 짧은 own basetemp에서 복구하며 frontend/full 전체는 반복하지 않는다. 최초 합성 DB hash불변·원래 부재 복원·소유 test DB 삭제/cluster 종료도 확인했다. 감사12.27.6과 ignored 최종 run `resume-4/`가 원본이다. 후속 구성 검사 통과를 최초 full 명령 PASS로 바꾸지 않는다.
 - [x] CP7 병렬 사전감사 (2026-09-07): 타입·advisory·a11y·정책 consumer·문서·이동/중복 자산 manifest 및 DTO 후보26행 정적 검토, tracked 변경0. `full-code-quality-cp7-preaudit`의 ignored `20260907-cp7-preaudit/cp7-preaudit/preaudit.md`와 `ic21-manual-dto-targets.csv/.json`을 인계한다. 정적 차이18행은 실제 runtime 결함18건을 뜻하지 않는다. 제품/generator/runtime 검증은 CP7 구현 책임이다.
-- [ ] CP7 B1: IC21 generated raw OpenAPI types + business adapter·nullable/unknown enum/serialization CI.
+- [ ] CP7 B1 [로컬 구현·리뷰 완료, 원격 검증 전, 2026-09-08]: IC21 generated raw OpenAPI types + business adapter·nullable/unknown enum/serialization CI. 초기 명세·품질 지적을 보완해 최종 두 리뷰 C/I/M0·13파일162PASS·앱/테스트 타입·strict lint·build·bundle PASS를 총괄이 실제 근거로 인수했다. production preview/cancel 필수 구조 검증과 기존 stock/shipping pending key 보존은 서로 다른 계약이며 새 replay 프로토콜은 추가하지 않았다. 정확 staged/generated guard·미검증 구성 검사·commit/push·실제 CI 뒤에 완료 체크한다. 근거는 감사12.28.1~12.28.2다.
 - [ ] CP7 B2: IC22 Next → Vitest/coverage → ESLint/PostCSS 세 독립 변경과 단계별 검증·rollback.
 - [ ] CP7 B3: IC23 핵심 IO/shipping/defect/department 오류·focus·keyboard/axe blocking 계약.
 - [ ] CP7 B4: IC24 확인된 두 번째 consumer 정책만 공통화; approval matrix·public facade 유지.
@@ -58,6 +59,8 @@ S0 문서만 별도로 push하면 현재 workflow가 전체6job을 재실행하�
 CP6의 A1~A5는 focused GREEN·독립 새 diff 리뷰 C/I0 후 구간별 local commit을 남긴다. 매 구간의 같은 full6CI push 대기는 반복하지 않고 CP6 최종 full gate·리뷰 후 한 번 push한다. 실제 CI 성공 뒤 품질 branch 통합/CI를 수행한다. 새 infra 또는 고위험 변경이 생기면 그 실제 영향만 별도로 판단한다.
 
 사용자의 빠르고 신뢰도 높은 완료 지시에 따라, focused GREEN으로 고정한 같은 diff의 명세·품질 읽기 전용 리뷰는 병렬로 수행할 수 있다. 제품 편집자는 한 명이며 두 리뷰의 C/I0가 모두 필요하다. 수용은 명세 확인 후 품질 확인 순서로 하고, 리뷰 중 지적을 고치면 바뀐 관련 부분만 다시 검토한다. 필수 검토·완료 기준을 줄이는 것은 아니다.
+
+CP7 검증 배치 조정(2026-09-08): B1은 응답 검증·멱등 key 안전막 변경이므로 최종 관련 검사와 실제 CI를 통과한 뒤 B2로 간다. B2의 Next → Vitest/coverage → ESLint/PostCSS는 순서·독립 로컬 commit/rollback 단위를 유지하되, 세 commit의 원격 push/전체 CI 대기는 B2 종료 시 한 번으로 묶는다. Next는 로그인·shell·proxy·빌드, Vitest는 실제 unit/coverage, ESLint/PostCSS는 lint·CSS/build 등 각 변경 도구가 책임지는 검사를 그때 실행한다. 앞 단계와 무관한 같은 검사를 다시 실행하지 않는다. 최신 diff의 명세·품질 C/I0, 생성 타입 guard 및 CP7 최종 full/실제 CI는 그대로 필수다. 최종 CI 실패 시 해당 변경 단위로 원인을 좁히며 기존 실패 기록을 PASS로 덮지 않는다.
 
 ## API·schema 경계
 

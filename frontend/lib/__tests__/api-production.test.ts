@@ -41,6 +41,39 @@ function inventoryOperationWire(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function inventoryOperationLineWire() {
+  return {
+    log_id: "log-1",
+    item_id: "item-1",
+    item_name: "품목",
+    mes_code: null,
+    transaction_type: "ADJUST",
+    quantity_change: "7",
+    quantity_before: "1",
+    quantity_after: "8",
+    transfer_qty: null,
+    department: "고압",
+    operation_role: "PRIMARY",
+    reverses_log_id: null,
+    reference_no: null,
+    notes: null,
+    created_at: "2026-08-25T06:00:00Z",
+  };
+}
+
+function inventoryOperationEffectWire() {
+  return {
+    effect_id: "effect-1",
+    effect_kind: "inventory",
+    subject_type: "item",
+    subject_id: "item-1",
+    role: "PRIMARY",
+    before_state: { quantity: 1 },
+    after_state: { quantity: 8 },
+    reverses_effect_id: null,
+  };
+}
+
 describe("productionApi", () => {
   it("productionReceipt POST /api/production/receipt", async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
@@ -158,6 +191,67 @@ describe("productionApi", () => {
     ]);
   });
 
+  it("validates and maps nested free-form inventory operation fields", async () => {
+    const line = inventoryOperationLineWire();
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({
+      items: [inventoryOperationWire({
+        lines: [line],
+        matching_lines: [line],
+        effects: [inventoryOperationEffectWire()],
+      })],
+      next_cursor: null,
+    })));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    const page = await productionApi.getInventoryOperations();
+
+    expect(page.items[0]).toMatchObject({
+      lines: [{ quantityChange: 7, quantityBefore: 1, quantityAfter: 8 }],
+      matchingLines: [{ quantityChange: 7 }],
+      effects: [{ effectId: "effect-1", beforeState: { quantity: 1 } }],
+    });
+  });
+
+  it("rejects malformed free-form cancellation previews", async () => {
+    globalThis.fetch = vi.fn(() => Promise.resolve(makeResponse({
+      cells: [],
+      defect_records: [],
+      effects: [],
+    }))) as unknown as typeof fetch;
+
+    await expect(
+      productionApi.previewInventoryOperationCancellation("operation-1"),
+    ).rejects.toThrow();
+  });
+
+  it("rejects malformed free-form inventory operation pages", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({
+      items: {},
+      next_cursor: null,
+    })));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await expect(productionApi.getInventoryOperations()).rejects.toThrow(
+      "입출고 작업 목록 응답 형식이 올바르지 않습니다.",
+    );
+  });
+
+  it.each([
+    ["required scalar", { actor_name: null }],
+    ["nested line", { lines: [{}] }],
+    ["nested effect", { effects: [{}] }],
+  ])("rejects malformed free-form inventory operation %s fields", async (_label, overrides) => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({
+      items: [inventoryOperationWire(overrides)],
+      next_cursor: null,
+    })));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await expect(productionApi.getInventoryOperations()).rejects.toThrow(
+      "입출고 작업 응답 형식이 올바르지 않습니다.",
+    );
+  });
+
   it("cancels an inventory operation with the reviewed plan hash", async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse(inventoryOperationWire({
       operation_id: "cancellation-1",
@@ -185,6 +279,21 @@ describe("productionApi", () => {
       pin: "0305",
       plan_hash: "a".repeat(64),
     });
+  });
+
+  it("rejects malformed free-form cancellation results", async () => {
+    globalThis.fetch = vi.fn(() => Promise.resolve(makeResponse({
+      lines: [],
+      matching_lines: [],
+      effects: [],
+    }))) as unknown as typeof fetch;
+
+    await expect(productionApi.cancelInventoryOperation("operation-1", {
+      reason: "작업 전체 취소",
+      employee_code: "E06",
+      pin: "0305",
+      plan_hash: "a".repeat(64),
+    })).rejects.toThrow();
   });
 
   it("getTransactionsSummary forwards history operation keys", async () => {
