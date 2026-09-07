@@ -949,6 +949,21 @@ def test_code_sync_dry_run_reports_machine_readable_no_change(tmp_path: Path) ->
     assert "snapshot-register" not in _event_kinds(event_log)
 
 
+def test_code_sync_dry_run_ignores_excluded_destination_extras(tmp_path: Path) -> None:
+    sync_path, environment, _ = _prepare_sync_sandbox(
+        tmp_path,
+        {
+            "FAKE_BACKEND_DRYRUN_EXIT": "2",
+            "FAKE_FRONTEND_DRYRUN_EXIT": "2",
+        },
+    )
+
+    result = _run_sync(sync_path, environment, "-Force", "-DryRun")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "SYNC_CHANGES=0" in result.stdout
+
+
 @pytest.mark.parametrize(
     "overrides",
     [

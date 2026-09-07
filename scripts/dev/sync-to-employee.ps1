@@ -263,6 +263,8 @@ if ($backendDryRunExit -ge 8) {
     if ($DryRun) { Write-Host "SYNC_CHANGES=ERROR" }
     exit 4
 }
+$robocopyFileChangePattern = '^\s*(New File|newer|older|\*EXTRA(?:\s+File)?)'
+$backendFileChanges = @($backendDryRun | Where-Object { $_ -match $robocopyFileChangePattern })
 $schemaHits = $backendDryRun | Where-Object {
     $line = $_
     $schemaPatterns | Where-Object { $line -match $_ }
@@ -270,6 +272,8 @@ $schemaHits = $backendDryRun | Where-Object {
 
 $frontendDryRun = @()
 $opsDryRun = @()
+$frontendFileChanges = @()
+$opsFileChanges = @()
 $hasCodeChanges = $false
 if ($DryRun) {
     $frontendDryRun = robocopy "$DevRoot\frontend" $EmpFrontend /L /MIR `
@@ -285,6 +289,8 @@ if ($DryRun) {
         Write-Host "SYNC_CHANGES=ERROR"
         exit 4
     }
+    $frontendFileChanges = @($frontendDryRun | Where-Object { $_ -match $robocopyFileChangePattern })
+    $opsFileChanges = @($opsDryRun | Where-Object { $_ -match $robocopyFileChangePattern })
 
     $manualFileChanges = $false
     foreach ($scriptName in $runtimeScripts) {
@@ -312,9 +318,12 @@ if ($DryRun) {
         }
     }
     $hasCodeChanges = (
-        $backendDryRunExit -ne 0 -or
-        $frontendDryRunExit -ne 0 -or
-        $opsDryRunExit -ne 0 -or
+        ($backendDryRunExit -band 5) -ne 0 -or
+        ($frontendDryRunExit -band 5) -ne 0 -or
+        ($opsDryRunExit -band 5) -ne 0 -or
+        $backendFileChanges.Count -gt 0 -or
+        $frontendFileChanges.Count -gt 0 -or
+        $opsFileChanges.Count -gt 0 -or
         $manualFileChanges
     )
     Write-Host "SYNC_CHANGES=$(if ($hasCodeChanges) { 1 } else { 0 })"
@@ -339,6 +348,7 @@ if ($schemaHits -and $AutoSchema) {
             $preflightTool,
             "--employee-db", $EmpDb,
             "--backend-dir", $DevBackend,
+            "--target-backend-dir", $EmpBackend,
             "--runtime-root", $EmpRuntimeRoot,
             "--source-migrations", (Join-Path $DevBackend "alembic\versions"),
             "--target-migrations", (Join-Path $EmpBackend "alembic\versions"),
@@ -361,11 +371,11 @@ else {
 
 if ($DryRun) {
     Write-Host "[dry-run] 백엔드 변경 예정 파일:"
-    $backendDryRun | Where-Object { $_ -match '^\s*(New File|newer|older|\*EXTRA)' } | ForEach-Object { Write-Host "  $_" }
+    $backendFileChanges | ForEach-Object { Write-Host "  $_" }
     Write-Host "[dry-run] 프론트엔드 변경 예정 파일:"
-    $frontendDryRun | Where-Object { $_ -match '^\s*(New File|newer|older|\*EXTRA)' } | ForEach-Object { Write-Host "  $_" }
+    $frontendFileChanges | ForEach-Object { Write-Host "  $_" }
     Write-Host "[dry-run] 운영 스크립트 변경 예정 파일:"
-    $opsDryRun | Where-Object { $_ -match '^\s*(New File|newer|older|\*EXTRA)' } | ForEach-Object { Write-Host "  $_" }
+    $opsFileChanges | ForEach-Object { Write-Host "  $_" }
     Write-Host "[dry-run] 아무것도 변경하지 않았습니다."
     exit 0
 }
