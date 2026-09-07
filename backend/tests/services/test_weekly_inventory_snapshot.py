@@ -103,6 +103,45 @@ def test_dashboard_finished_stock_includes_only_vacuum_generator_va_items(
     }
 
 
+def test_weekly_snapshot_includes_ceramic_tube_housing_from_2026_09_07(
+    db_session,
+    make_item,
+):
+    """세라믹튜브 하우징은 9/6 경계부터 다음 주 고압 보고 대상에 저장한다."""
+    from app.models import WeeklyInventorySnapshotItem
+    from app.services.weekly_inventory_snapshot import capture_weekly_inventory_snapshot
+
+    housing = make_item(
+        name="세라믹튜브 70KV 하우징 [DXDR-070] [DX3000, ADX4000W, ADX6000, SOLO]",
+        process_type_code="HA",
+        model_symbol="3468",
+        serial_no=6,
+        warehouse_qty=Decimal("5"),
+    )
+    before = capture_weekly_inventory_snapshot(
+        db_session,
+        week_end=date(2026, 8, 30),
+        captured_at=datetime(2026, 8, 30, 15, 0),
+        source="scheduled",
+    )
+    after = capture_weekly_inventory_snapshot(
+        db_session,
+        week_end=date(2026, 9, 6),
+        captured_at=datetime(2026, 9, 6, 15, 0),
+        source="scheduled",
+    )
+    db_session.flush()
+
+    assert db_session.query(WeeklyInventorySnapshotItem).filter_by(
+        snapshot_id=before.snapshot_id,
+        item_id=housing.item_id,
+    ).count() == 0
+    assert db_session.query(WeeklyInventorySnapshotItem).filter_by(
+        snapshot_id=after.snapshot_id,
+        item_id=housing.item_id,
+    ).count() == 1
+
+
 def test_weekly_snapshot_is_idempotent_and_keeps_first_values(
     db_session,
     make_item,
