@@ -18,8 +18,8 @@
 - 확정 `SYNC_BASE_SHA`: `731edc2df15c89753e60c12be95a65ef88e33bde`. 품질 본 branch는 CP6 통합까지 이 SHA에서 고정한다.
 - CP6 구현 작업: `01a07b0c-4563-7c41-a8c7-5df5ad2e91e2`, `C:\ERP\.worktrees\full-code-quality-cp6`, branch `codex/full-code-quality-cp6`.
 - 정본 감사 계획: [전수 감사·개선 계획](../../docs/research/2026-08-13-full-code-quality-audit-and-improvement-plan.md), 8.9.7·8.9.8 및 12.26절
-- 현 상태: **S0 제품 CI6/6과 SYNC731edc2d를 유지한다. CP6 A1=59c52bad, A2=adaa5bed, A3=8d7a0a77은 로컬 커밋·검증 완료다. A4·A5 구현과 합친 focused34PASS·독립 리뷰 C/I/M0도 확인했다. 두 카드는 staged smart1회와 한 로컬 commit으로 묶는다. 중간 push 없이 CP6 전체 gate·실제 화면·push·CI는 최종 묶음에서 수행한다. CP7 제품 구현은 CP6 통합 뒤 시작한다.**
-- 구현·좁은 검증 완료 집계: 아래 실행 단위 7/16 완료. A4·A5의 staged gate/commit과 실제 browser 증거는 아직 남았으며 CP6 최종 통합/CI 완료로 계산하지 않는다.
+- 현 상태: **S0 제품 CI6/6과 SYNC731edc2d를 유지한다. CP6 A1~A5 로컬 커밋 이후 구성 검사 복구와 실제 화면 검증을 인수했다. Playwright 최초18PASS/1FAIL/1NOT_RUN 뒤 test-only selector 복구2/2PASS, 최종 명세·품질 C/I/M0다. 원본 full FAIL은 보존하며 CP6 최종 commit/push·실제 CI·품질 통합이 남았다. CP7 제품 구현은 통합 뒤 시작한다. 최신 근거는 감사12.27.8이다.**
+- 실행 단위 집계: 아래 7/16 완료, 미완료9. 실제 browser는 검증됐으나 CP6 종료 항목은 원격 CI·통합까지 포함하므로 아직 체크하지 않는다.
 
 ## 실행 체크리스트
 
@@ -27,10 +27,11 @@
 - [x] CP6 A1 (2026-09-07, LOCAL_VERIFIED): IC12→14 actual dirty/Promise save/이동 guard/React Query 단일 정본. 초기 RED와 후속 편집 유실을 보완해 관련14파일73PASS, 최종 명세/품질 C/I/M0. staged smart(frontend5/docs3) PASS, related41파일334PASS·direct10파일39PASS·타입/린트/docs PASS. 로컬 commit `59c52bad3f303603b01961b4e3ee3fb550bbd2e5`, post-commit clean을 총괄 확인. 원격 검증은 CP6 종료 단계다. 증거는 감사12.27.1과 `20260907-cp6-a1/`.
 - [x] CP6 A2 (2026-09-07, LOCAL_VERIFIED): IC13→16 BOM/dirty/page/bulk·desktop/mobile load-more. 관련8파일239PASS, 품질 Important2 보완 후 delta frontend5/backend2PASS와 명세/품질 C/I/M0. smart exit1의 새 테스트 타입3종은 국소 수정해 typecheck exit0(417 known/new0), 직접182PASS로 복구했다. 실제 smart8PASS/1FAIL과 별도 docs3PASS(exit0)를 구분한다. 로컬 commit `adaa5bed1846bf071629d5d8cc37371cf7beca79`, 부모59c52bad·정확24경로·clean을 총괄 확인. full/CI는 CP6 종료 단계이며 감사12.27.2 및 `20260907-cp6-a2/`가 증거다.
 - [x] CP6 A3 (2026-09-07, LOCAL_VERIFIED): IC15 focused4파일20PASS 및 Minor1 보완5PASS, 최종 명세/품질 C/I/M0. 최초 staged smart6PASS/1FAIL은 bundle만 실패했으며 coverage276파일2555PASS·build는 통과했다. 중복 상태 정리 후 focused6PASS/rebuild PASS, 승인 한도2.430MiB에서 실제2,537,378bytes·bundle2PASS/exit0, delta 품질C/I/M0. 미실행 docs3도 복구 완료(단위 총14건=13PASS/1권한skip). commit `8d7a0a77c28be3c35f80fdd75bace937ae897b18`, 부모adaa5bed·정확11경로·subject·clean을 총괄 확인했다. push0. 감사12.27.3과 ignored `20260907-cp6-a3/`가 증거이며 CP6 full/CI는 아직 남았다.
-- [x] CP6 A4 (2026-09-07, FOCUSED_VERIFIED): IC25 PA·PF KPI 모집단 상시 설명, 기존 계산 불변. 예상 RED2 뒤2파일8PASS이며 A5와 합친3파일34PASS·앱 tsc·변경6파일 ESLint exit0다. 합친 독립 명세/품질 C/I/M0. 감사12.27.4와 ignored `20260907-cp6-a4-a5/a45-command-and-review-evidence.json`이 근거다. staged smart·로컬 commit과 실제 desktop/mobile browser는 별도 최종 단계다.
-- [x] CP6 A5 (2026-09-07, FOCUSED_VERIFIED): IC26 첫/다른/같은 작성자 class 계약0/1/0, 탭·날짜·상세0을 RED1→26PASS로 확인했다. 실제 animationstart/reduced-motion 증명과 구분하며 최종 E2E에서 검증한다. A4와 합친 두 독립 리뷰 C/I/M0이며 동일 evidence에 보존한다.
+- [x] CP6 A4 (2026-09-07, LOCAL_VERIFIED): IC25 PA·PF KPI 모집단 상시 설명, 기존 계산 불변. 예상 RED2 뒤2파일8PASS, A5와 합친3파일34PASS·앱 tsc·변경6파일 ESLint exit0, 독립 명세/품질 C/I/M0다. 정확8경로 staged smart8/8PASS 후 commit `edc3a83611472ca6a99b134ac868e195d07ccd00`, 부모8d7a0a77·subject·clean을 총괄 확인했다. 감사12.27.4와 ignored `20260907-cp6-a4-a5/`가 근거이며 실제 desktop/mobile browser·push/CI는 최종 단계다.
+- [x] CP6 A5 (2026-09-07, LOCAL_VERIFIED): IC26 첫/다른/같은 작성자 class 계약0/1/0, 탭·날짜·상세0을 RED1→26PASS로 확인했다. A4와 합친 명세/품질 C/I/M0·staged smart8/8PASS·commit edc3a836을 공유한다. 실제 animationstart/reduced-motion 증명은 최종 E2E에서 검증한다.
 - 속도 우선 배치 조정(2026-09-07): A3 로컬 commit 뒤 A4 RED/GREEN → A5 RED/GREEN을 같은 단일 편집자가 순차 수행한다. 두 카드의 검증 근거는 분리하되 합친 diff의 독립 명세/품질 리뷰와 staged smart·로컬 commit은 각각 한 묶음으로 수행한다. 실제 browser animation/reduced-motion·KPI 표시는 CP6 최종 화면/E2E 검증에 포함한다. backend/DB/frozen 변경이나 최종 gate 생략은 없다.
-- [ ] CP6 종료·통합: 화면/API/독립 SQL, frozen 증거, full gate, 이중 리뷰, CP6 push/CI, 품질 통합/CI. `POST_CP6_SHA` 고정.
+- [ ] CP6 종료·통합 [로컬 증거 인수, 원격 대기]: SQL/API/UI501/451·합성 불변식, 실제 A4/A5/frozen, PG129 및 실패영역 복구·docs/DB·최종 두 리뷰C/I/M0를 확인했다. 최초 full/E2E FAIL과 scoped 복구를 분리한다. 남은 작업은 최종 commit/push·실제 CP6 CI·품질 통합/CI·`POST_CP6_SHA` 고정이다. 같은 통과 검사를 반복하지 않는다.
+- CP6 최초 full 결과(2026-09-07): 693,611.448ms·exit1, 실제9PASS/1FAIL이다. frontend7영역은 전체276파일2,556테스트·coverage94.97%·build/bundle을 포함해 통과했다. PG는 깊은 Windows 임시 경로로 실패했다. backend full pytest/OpenAPI·docs·DB·E2E 등 미실행 영역과 실패 PG만 짧은 own basetemp에서 복구하며 frontend/full 전체는 반복하지 않는다. 최초 합성 DB hash불변·원래 부재 복원·소유 test DB 삭제/cluster 종료도 확인했다. 감사12.27.6과 ignored 최종 run `resume-4/`가 원본이다. 후속 구성 검사 통과를 최초 full 명령 PASS로 바꾸지 않는다.
 - [x] CP7 병렬 사전감사 (2026-09-07): 타입·advisory·a11y·정책 consumer·문서·이동/중복 자산 manifest 및 DTO 후보26행 정적 검토, tracked 변경0. `full-code-quality-cp7-preaudit`의 ignored `20260907-cp7-preaudit/cp7-preaudit/preaudit.md`와 `ic21-manual-dto-targets.csv/.json`을 인계한다. 정적 차이18행은 실제 runtime 결함18건을 뜻하지 않는다. 제품/generator/runtime 검증은 CP7 구현 책임이다.
 - [ ] CP7 B1: IC21 generated raw OpenAPI types + business adapter·nullable/unknown enum/serialization CI.
 - [ ] CP7 B2: IC22 Next → Vitest/coverage → ESLint/PostCSS 세 독립 변경과 단계별 검증·rollback.
@@ -106,3 +107,13 @@ CP6의 A1~A5는 focused GREEN·독립 새 diff 리뷰 C/I0 후 구간별 local c
 - main required status checks API는 `404 Branch not protected`, effective rules 및 rulesets는 비어 있었다. 외부 강제 정책은 `NOT_VERIFIED`이며 설정을 변경하지 않는다. CP4/IC20 저장소 구현·CI 성공과 외부 정책 완료를 구분한다. 품질 브랜치 완료를 허용하되 main 통합은 별도 승인/재감사 대상이다.
 
 이전 CP5 TODO의 정지·다음 단계 미승인 설명은 그 시점의 역사적 상태다. 현 실행에는 본 문서의 사용자 승인과 fixed SHA를 적용한다.
+
+## CP6 최종 검증 준비 경계 기록
+
+- 최신 판정(2026-09-07, 감사12.27.8): 최종 화면 최초18PASS/1FAIL/1NOT_RUN과 창고 보정2/2 복구, SQL/API/UI·A4/A5/frozen·합성 hash불변/원래부재 복원·소유 자원 정리·최종 두 리뷰C/I/M0를 인수했다. 원격 전체 CI와 품질 통합은 아직 미완료다. 아래 준비/실패 당시의 미확인 설명은 역사적 기록이며 이 최신 판정을 따른다.
+
+- backend 구성 검사 복구에서 PostgreSQL129/129·exit0을 확인했으며 전체 backend pytest는6실패로 종료됐다. 원인별 국소 복구 중이며 CP6 종료 체크는 유지한다. 원본은 최종 run의 `component-recovery-backend-3/`, 상세는 감사12.27.7이다.
+- 실제 DB 자동 접근 경계 위반: 기존 migration 테스트가 local DB 부재 시 Git 공통 디렉터리로 main DB를 찾아 임시 복사한 뒤 revision20260903_0032로 skip했다. source의 `_primary_database_path()`123-135행과 테스트256-267행, 실제 로그를 총괄이 대조했다. 사용자에게 공개했고 원본 추가 접근·같은 테스트 재실행을 차단했다. synthetic0010 fixture로 데이터 보존/FK 검증을 유지하도록 교정하며, 자기 pytest 디렉터리의 정확 복사본만 내용을 열지 않고 정리한다. 이 실행은 main DB 접근0이 아니며 현재 정리/교정 완료는 아직 미확인이다. 개발·직원 서버 시작/중지/배포는 계속 금지한다.
+- 후속 복구 확인: 정확 임시 복사본1개 삭제·파일명 잔여0을 원본 명령/JSON으로 확인했다. synthetic0010-stamped drift fixture1PASS, runtime 직접 자식 guard9PASS, 출하 read-only manifest32PASS와 두 리뷰 C/I/M0·Ruff/parser/diff/OpenAPI PASS다. 감사12.27.7이 최신 판정이다. exact8 staged smart PlanOnly의 infra18게이트는 미실행이며, 사용자 속도 지시에 따라 기존 PASS·국소 복구를 보존하고 미실행 docs3/DB/E2E/git-status만 이어간다. 전체 원격 CI 성공은 필수로 유지하며 이 한정 배치를 smart18/18PASS로 기록하지 않는다.
+- 최종 full 실행 전 PostgreSQL 준비가 `pg_ctl start` 출력 파이프를 자식 서버가 상속해 대기했다. 소유 cluster를 정상 종료했으며 이 시도에는 full gate 실행과 임시 canonical DB 생성이 없었다. 이후 준비만 복구하며 기존 통과 검사를 재실행하지 않는다.
+- 복구 스크립트의 상대 `apply_patch`가 허용 worktree 밖 `C:\ERP\_attic\runtime\code-quality-improvement\20260907-cp6-final\run-20260907-213626-9c04d839892444e1b40d3a10489ff061\resume-final-full.ps1`을 잠시 생성했다. 해당 단일 자기 파일은 `exec-a7398c6b-ef23-483b-9eb0-ce59bae86975`에서 제거됐다. 이 기록은 main 보관 파일 생성·제거의 경계 예외이며 서버·DB 변경 증거와 구분한다. 추가 main 정리·검색은 하지 않는다. 이후 패치 헤더에는 격리 worktree의 절대 경로만 허용한다.

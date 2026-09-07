@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import io
 from collections import Counter
-import shutil
 import sqlite3
 import subprocess
 import sys
 from pathlib import Path
 
-import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import event
@@ -118,21 +116,6 @@ def _shipping_schema_signature(db: sqlite3.Connection) -> tuple[list[tuple], lis
         list(db.execute("PRAGMA foreign_key_list(shipping_requests)")),
         list(db.execute("PRAGMA index_list(shipping_requests)")),
     )
-
-
-def _primary_database_path() -> Path:
-    local_database = BACKEND_DIR / "mes.db"
-    if local_database.exists():
-        return local_database
-
-    result = subprocess.run(
-        ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
-        cwd=BACKEND_DIR,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return Path(result.stdout.strip()).resolve().parent / "backend" / "mes.db"
 
 
 def _database_revision(path: Path) -> str | None:
@@ -253,21 +236,16 @@ def test_database_revision_is_none_for_missing_empty_or_unstamped_sqlite(
     assert _database_revision(unstamped) is None
 
 
-def test_repair_upgrades_actual_0010_database_copy_without_data_loss(tmp_path: Path) -> None:
-    source = _primary_database_path()
-    if not source.exists():
-        pytest.skip("actual backend/mes.db is not available")
-
-    path = tmp_path / "actual-mes-0010.db"
-    shutil.copy2(source, path)
-    source_revision = _database_revision(path)
-    if source_revision is None:
-        pytest.skip("actual backend/mes.db has no readable Alembic revision stamp")
-    if source_revision != PREVIOUS_REVISION:
-        pytest.skip(f"actual backend/mes.db is at {source_revision}, not 0010")
+def test_repair_upgrades_isolated_0010_database_without_data_loss(tmp_path: Path) -> None:
+    path = tmp_path / "isolated-mes-0010.db"
+    config = _config(path)
+    command.upgrade(config, "20260727_0007")
+    _seed_shipping_dependencies(path)
+    command.stamp(config, PREVIOUS_REVISION)
+    assert _database_revision(path) == PREVIOUS_REVISION
     before = _shipping_dependent_rows(path)
 
-    _upgrade_with_sqlite_foreign_keys(_config(path), MIGRATION_REVISION)
+    _upgrade_with_sqlite_foreign_keys(config, MIGRATION_REVISION)
 
     with sqlite3.connect(path) as db:
         revision = db.execute("SELECT version_num FROM alembic_version").fetchone()[0]

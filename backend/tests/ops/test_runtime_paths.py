@@ -600,6 +600,20 @@ def test_profile_resolver_runtime_root_rejects_arbitrary_checkout(
 
 
 @pytest.mark.skipif(os.name != "nt", reason="server profile resolver is a Windows PowerShell script")
+def test_profile_resolver_runtime_root_rejects_nested_worktree_directory() -> None:
+    nested_root = r"C:\ERP\.worktrees\approved-worktree\_attic\runtime\arbitrary-root"
+    result = _run_profile_resolver(
+        "-RuntimeRepoRoot",
+        nested_root,
+        "-Property",
+        "BackendInternalUrl",
+    )
+
+    assert result.returncode != 0
+    assert "Unknown DEXCOWIN MES runtime root" in result.stderr
+
+
+@pytest.mark.skipif(os.name != "nt", reason="server profile resolver is a Windows PowerShell script")
 def test_profile_resolver_without_test_override_rejects_unknown_runtime_root(
     tmp_path: Path,
 ) -> None:
