@@ -22,7 +22,7 @@ ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
 POSTGRES_PREREQUISITE_REVISION = "20260807_0015"
 PREVIOUS_REVISION = "20260825_0028"
 MIGRATION_REVISION = "20260826_0029"
-HEAD_REVISION = "20260831_0033"
+HEAD_REVISION = "20260907_0034"
 ROLE_ENUM_NAME = "inventory_operation_role_enum"
 ROLE_ENUM_LABELS = tuple(member.value for member in InventoryOperationRoleEnum)
 
@@ -398,8 +398,13 @@ def test_postgresql_offline_sql_preserves_inventory_operation_contract() -> None
 def test_alembic_has_single_head() -> None:
     config = Config(str(ALEMBIC_INI))
     config.set_main_option("script_location", str(BACKEND_DIR / "alembic"))
+    scripts = ScriptDirectory.from_config(config)
 
-    assert len(ScriptDirectory.from_config(config).get_heads()) == 1
+    assert scripts.get_heads() == [HEAD_REVISION]
+    assert scripts.get_revision(HEAD_REVISION).down_revision == (
+        "20260903_0032",
+        "20260831_0033",
+    )
 
 
 def test_inventory_operation_migration_adds_append_only_ledger_contract(tmp_path: Path) -> None:

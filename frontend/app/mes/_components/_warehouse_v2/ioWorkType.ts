@@ -16,7 +16,6 @@ import {
 } from "@/lib/io/glossary";
 
 const MANUAL_ORIGINS = new Set(["manual", "adjust_in", "adjust_out"]);
-const MEMO_REQUIRED_SUB_TYPES = new Set(["adjust_in", "adjust_out"]);
 
 export const IO_WORK_TYPES: Array<{
   id: IoWorkType;
@@ -113,11 +112,14 @@ export function requiresApproval(subType: IoSubType) {
   return ["warehouse_to_dept", "dept_to_warehouse", "internal_use_out"].includes(subType);
 }
 
-export function requiresMemoForDepartmentSingleAdjustment(
+/** process 흐름에서 실제 부서 결재로 분기되는 작업만 결재 사유 메모를 요구한다. */
+export function requiresDepartmentApprovalMemo(
   workType: IoWorkType,
   subType: IoSubType,
+  bundles: IoBundle[] = [],
+  fromDepartment?: string | null,
 ): boolean {
-  return workType === "process" && MEMO_REQUIRED_SUB_TYPES.has(subType);
+  return workType === "process" && approvalKind(subType, bundles, fromDepartment) === "department";
 }
 
 /** 백엔드 MANUAL_LINE_ORIGINS 와 동기 — 1라인이라도 낱개면 부서 결재 필요. */
@@ -139,9 +141,12 @@ export function hasCustomBomQuantity(bundles: IoBundle[]): boolean {
     const baseQuantity = Number(bundle.quantity) || 0;
     if (!parent || baseQuantity <= 0) return false;
     const parentQuantity = Number(parent.quantity) || 0;
+    if (parentQuantity <= 0) return false;
     return bundle.lines.some((line) => {
       if (line.origin !== "bom_auto" || line.bom_stock_exempt) return false;
+      if (line.bom_expected == null) return true;
       const expected = parentQuantity * ((Number(line.bom_expected) || 0) / baseQuantity);
+      if (expected > 0 && !line.included) return true;
       return Math.abs((Number(line.quantity) || 0) - expected) > 0.0001;
     });
   });
@@ -155,7 +160,7 @@ export function isCustomProcessBomBundle(
   return isBomForced(subType) && hasCustomBomQuantity([bundle]);
 }
 
-/** 커스텀 출고 BOM의 원본 회수 라인을 실제 선택 출고 효과로 해석한다.
+/** 커스텀 부서 BOM의 원본 하위를 선택한 입출고 효과로 해석한다.
  * 원본은 BOM 토큰 검증과 제출을 위해 변경하지 않는다. */
 export function processBomEffectLine(
   subType: IoSubType,
@@ -170,9 +175,18 @@ export function processBomEffectLine(
   if (line.origin === "direct") {
     return null;
   }
-  if (subType !== "disassemble") return line;
-  if (Number(line.quantity) <= 0 || line.bom_stock_exempt) return null;
   if (line.origin !== "bom_auto") return line;
+  if (Number(line.quantity) <= 0 || line.bom_stock_exempt) return null;
+  if (subType === "produce") {
+    return {
+      ...line,
+      direction: "in",
+      from_bucket: "none",
+      from_department: null,
+      to_bucket: "production",
+      to_department: line.from_department,
+    };
+  }
   return {
     ...line,
     direction: "out",
@@ -216,6 +230,51 @@ export function isBomForced(subType: IoSubType) {
 }
 
 export type DeptIoDirection = "in" | "out";
+
+/** process 작업의 현재 묶음 구성에서 저장할 대표 subtype을 결정한다.
+ * backend와 같이 BOM 묶음 자체가 있으면 BOM 방향이 우선하고,
+ * BOM 없이 manual 묶음만 있으면 낱개 수량보정 방향을 사용한다. */
+export function canonicalProcessSubType(
+  workType: IoWorkType,
+  direction: DeptIoDirection | null,
+  bundles: IoBundle[],
+  currentSubType: IoSubType,
+): IoSubType {
+  if (workType !== "process" || direction == null) return currentSubType;
+
+  const hasBundle = (sourceKind: IoSourceKind) => bundles.some(
+    (bundle) => bundle.source_kind === sourceKind,
+  );
+  if (hasBundle("bom_parent")) return deptIoSubType(direction, "bom");
+  if (hasBundle("manual")) return deptIoSubType(direction, "single");
+  return currentSubType;
+}
+
+/** 같은 source item을 다시 미리보기할 때 기존 묶음을 교체하거나 추가한다.
+ * process는 BOM과 manual을 함께 보존하고, internal_use는 기존 단일 선택 정책을 유지한다. */
+export function mergePreviewBundles(
+  bundles: IoBundle[],
+  sourceItemId: string,
+  sourceKind: IoSourceKind,
+  subType: IoSubType,
+  previewBundles: IoBundle[],
+): IoBundle[] {
+  if (subType === "internal_use_out") {
+    return [
+      ...bundles.filter((bundle) => bundle.source_item_id !== sourceItemId),
+      ...previewBundles,
+    ];
+  }
+  const existingIndex = bundles.findIndex((bundle) =>
+    bundle.source_item_id === sourceItemId && (
+      sourceKind === "manual" ? bundle.source_kind === "manual" : bundle.source_kind !== "manual"
+    ),
+  );
+  if (existingIndex === -1) return [...bundles, ...previewBundles];
+  const next = [...bundles];
+  next.splice(existingIndex, 1, ...previewBundles);
+  return next;
+}
 
 // (방향, 액션) → sub_type 매핑. process workType 한정.
 export function deptIoSubType(direction: DeptIoDirection, mode: "bom" | "single"): IoSubType {
@@ -333,13 +392,24 @@ export function getItemActionMode(subType: IoSubType): ItemActionMode {
   return "single_only";
 }
 
-/** 단품 부서 입출고(낱개 입고/출고) — 모바일에서 5단계 위저드 대신 인라인 빠른 폼으로 분기.
- *  adjust 는 getItemActionMode === "single_only" 라 BOM 전개가 없어 한 화면 완결이 가능하다. */
+/** 낱개 수량보정 계열 subtype 판정.
+ * 모바일 인라인 폼 사용 여부는 workType까지 보는 usesMobileSingleAdjustForm에서 결정한다. */
 export function isSingleInlineSubType(subType: IoSubType): boolean {
   return subType === "adjust_in"
     || subType === "adjust_out"
     || subType === "warehouse_adjust_in"
     || subType === "warehouse_adjust_out";
+}
+
+/** 모바일 낱개 빠른 폼은 process 와 창고 수량보정에 사용한다.
+ * process 는 사용자가 BOM·품목 picker 로 전환한 뒤에는 해당 선택을 유지한다. */
+export function usesMobileSingleAdjustForm(
+  workType: IoWorkType,
+  subType: IoSubType,
+  processPickerMode = false,
+): boolean {
+  if (!isSingleInlineSubType(subType)) return false;
+  return workType === "warehouse_adjust" || (workType === "process" && !processPickerMode);
 }
 
 export function isWarehouseAdjustSubType(subType: IoSubType): boolean {
@@ -366,10 +436,13 @@ export function ioDepartmentPayload(
 }
 
 /** 한 묶음 카트 안에서 BOM 묶음과 낱개 묶음을 같이 가질 수 있는지.
- *  창고 입출고와 사용출고(internal_use_out)는 BOM·낱개 혼합 선택을 허용한다.
- *  produce/disassemble 은 BOM 강제(isBomForced) 흐름과 백엔드 분기가 달라 락 유지. */
+ * 창고 입출고·부서 입출고·사용출고는 BOM·낱개 혼합 선택을 허용한다. */
 export function allowsMixedBundles(subType: IoSubType): boolean {
-  return subType === "warehouse_to_dept" || subType === "dept_to_warehouse" || subType === "internal_use_out";
+  return subType === "warehouse_to_dept"
+    || subType === "dept_to_warehouse"
+    || subType === "produce"
+    || subType === "disassemble"
+    || subType === "internal_use_out";
 }
 
 export type LineTagTone = "green" | "red" | "blue" | "purple" | "muted";
@@ -401,7 +474,11 @@ export function lineTagLabel(line: IoLine, subType: IoSubType): { text: string; 
   if (line.origin === "manual") return { text: "이 품목만", tone: "muted" };
   if (subType === "produce") {
     if (line.origin === "direct") return { text: "생산 결과품", tone: "green" };
-    if (line.origin === "bom_auto") return { text: "투입 자재", tone: "red" };
+    if (line.origin === "bom_auto") {
+      return line.direction === "in"
+        ? { text: "선택 입고", tone: "green" }
+        : { text: "투입 자재", tone: "red" };
+    }
   }
   if (subType === "disassemble") {
     if (line.origin === "direct") return { text: "분해 대상", tone: "red" };

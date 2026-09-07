@@ -318,6 +318,7 @@ export function MobileWarehouseScreen({
         ) : (
           <div className={`h-full overflow-y-auto px-3 pb-6 ${panelStyles.touchScope}`}>
             <WarehouseDraftPanelTabs
+              layout="mobile"
               sectionTab={sectionTab}
               canSeeQueue={canSeeQueue}
               canSeeDeptQueue={canSeeDeptQueue}

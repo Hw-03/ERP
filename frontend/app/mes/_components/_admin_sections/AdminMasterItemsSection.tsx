@@ -25,7 +25,7 @@ type DetailTab = "info" | "stock" | "bom";
 
 const DETAIL_TABS: { id: DetailTab; label: string }[] = [
   { id: "info", label: "기본 정보" },
-  { id: "stock", label: "재고 정보" },
+  { id: "stock", label: "재고·구매" },
   { id: "bom", label: "BOM / 사용처" },
 ];
 
@@ -434,7 +434,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
                 >
                   복구
                 </button>
-              ) : tab === "info" ? (
+              ) : tab === "info" || tab === "stock" ? (
                 <button
                   type="button"
                   onClick={() => void saveItem()}
@@ -473,7 +473,7 @@ function ItemDetailTabs({
     return <EditItemForm key={item.item_id} selectedItem={item} />;
   }
   if (tab === "stock") {
-    return <ItemStockTab item={item} />;
+    return <EditItemForm key={item.item_id} selectedItem={item} stockPurchaseOnly />;
   }
   if (tab === "bom") {
     return <ItemBomTab item={item} allBomRows={allBomRows} />;
@@ -481,58 +481,6 @@ function ItemDetailTabs({
   return null;
 }
 
-function ItemStockTab({ item }: { item: Item }) {
-  const safety = Math.round(Number(item.min_stock ?? 0));
-  const current = Number(item.quantity);
-  const warehouse = Number(item.warehouse_qty ?? 0);
-  const status =
-    item.min_stock != null && current < item.min_stock
-      ? { label: "안전재고 부족", tone: LEGACY_COLORS.red }
-      : { label: "정상", tone: LEGACY_COLORS.green };
-  return (
-    <div className="grid h-full min-h-[9rem] grid-cols-2 grid-rows-2 gap-3">
-      <StockStat label="현재 재고" value={current} unit={item.unit ?? "EA"} tone={LEGACY_COLORS.blue} />
-      <StockStat label="창고 보관" value={warehouse} unit={item.unit ?? "EA"} tone={LEGACY_COLORS.cyan} />
-      <StockStat label="안전 재고" value={safety} unit={item.unit ?? "EA"} tone={LEGACY_COLORS.yellow} />
-      <StockStat label="재고 상태" value={status.label} unit="" tone={status.tone} />
-    </div>
-  );
-}
-function StockStat({
-  label,
-  value,
-  unit,
-  tone,
-}: {
-  label: string;
-  value: number | string;
-  unit: string;
-  tone: string;
-}) {
-  return (
-    <div
-      className="h-full rounded-[14px] border px-4 py-4"
-      style={{
-        background: `color-mix(in srgb, ${tone} 8%, transparent)`,
-        borderColor: `color-mix(in srgb, ${tone} 30%, transparent)`,
-      }}
-    >
-      <div className="text-[12px] font-bold" style={{ color: tone }}>
-        {label}
-      </div>
-      <div className="mt-2 flex items-baseline gap-1.5">
-        <div className="text-[26px] font-black leading-none" style={{ color: tone }}>
-          {typeof value === "number" ? formatQty(value) : value}
-        </div>
-        {unit && (
-          <div className="text-[12px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-            {unit}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 function ItemBomTab({
   item,
   allBomRows,

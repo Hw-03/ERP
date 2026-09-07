@@ -9,12 +9,23 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { Item } from "@/lib/api";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queries/keys";
+import {
+  normalizeStandardPurchasePrice,
+  validateStockPurchaseValues,
+} from "./itemStockPurchaseValidation";
 
 export type ItemEditForm = {
   item_name: string;
   legacy_item_type: string;
   supplier: string;
+  supplier_item_code: string;
+  standard_purchase_price: string;
+  purchase_price_effective_date: string;
   min_stock: string;
+  reorder_point: string;
+  procurement_lead_time_days: string;
+  minimum_order_quantity: string;
+  purchase_memo: string;
   process_type_code: string;
   unit: string;
   model_slots: number[];
@@ -27,7 +38,14 @@ export const EMPTY_ITEM_EDIT_FORM: ItemEditForm = {
   item_name: "",
   legacy_item_type: "",
   supplier: "",
+  supplier_item_code: "",
+  standard_purchase_price: "",
+  purchase_price_effective_date: "",
   min_stock: "",
+  reorder_point: "",
+  procurement_lead_time_days: "",
+  minimum_order_quantity: "",
+  purchase_memo: "",
   process_type_code: "TR",
   unit: "EA",
   model_slots: [],
@@ -54,7 +72,14 @@ export function itemToEditForm(item: Item): ItemEditForm {
     item_name: item.item_name,
     legacy_item_type: item.legacy_item_type ?? "",
     supplier: item.supplier ?? "",
+    supplier_item_code: item.supplier_item_code ?? "",
+    standard_purchase_price: item.standard_purchase_price ?? "",
+    purchase_price_effective_date: item.purchase_price_effective_date ?? "",
     min_stock: item.min_stock != null ? String(Math.round(Number(item.min_stock))) : "",
+    reorder_point: item.reorder_point != null ? String(Math.round(Number(item.reorder_point))) : "",
+    procurement_lead_time_days: item.procurement_lead_time_days != null ? String(Math.round(Number(item.procurement_lead_time_days))) : "",
+    minimum_order_quantity: item.minimum_order_quantity != null ? String(Math.round(Number(item.minimum_order_quantity))) : "",
+    purchase_memo: item.purchase_memo ?? "",
     process_type_code: item.process_type_code ?? "TR",
     unit: item.unit ?? "EA",
     model_slots: savedSlots.length > 0 ? savedSlots : inferModelSlots(mesCode),
@@ -68,8 +93,15 @@ type UpdateItemPayload = {
   item_name?: string;
   spec?: string;
   legacy_item_type?: string;
-  supplier?: string;
-  min_stock?: number;
+  supplier?: string | null;
+  supplier_item_code?: string | null;
+  standard_purchase_price?: string | null;
+  purchase_price_effective_date?: string | null;
+  min_stock?: number | null;
+  reorder_point?: number | null;
+  procurement_lead_time_days?: number | null;
+  minimum_order_quantity?: number | null;
+  purchase_memo?: string | null;
   process_type_code?: string;
   unit?: string;
   model_slots?: number[];
@@ -134,14 +166,27 @@ export function useAdminMasterItemsForm({
 
   async function save(): Promise<void> {
     if (!selectedItem) return;
+    const stockPurchaseError = validateStockPurchaseValues(form);
+    if (stockPurchaseError) {
+      onError(stockPurchaseError);
+      return;
+    }
+    const standardPurchasePrice = normalizeStandardPurchasePrice(form.standard_purchase_price);
     try {
       // mes_code 는 백엔드가 (model_symbol, process_type_code, serial_no) 에서 자동 부여.
       // 프론트에서 보내지 않음 — 사용자가 손으로 입력 못 함.
       const payload: UpdateItemPayload = {
         item_name: form.item_name || undefined,
         legacy_item_type: form.legacy_item_type || undefined,
-        supplier: form.supplier || undefined,
-        min_stock: form.min_stock ? Number(form.min_stock) : undefined,
+        supplier: form.supplier.trim() || null,
+        supplier_item_code: form.supplier_item_code.trim() || null,
+        standard_purchase_price: standardPurchasePrice || null,
+        purchase_price_effective_date: form.purchase_price_effective_date || null,
+        min_stock: form.min_stock === "" ? null : Number(form.min_stock),
+        reorder_point: form.reorder_point === "" ? null : Number(form.reorder_point),
+        procurement_lead_time_days: form.procurement_lead_time_days === "" ? null : Number(form.procurement_lead_time_days),
+        minimum_order_quantity: form.minimum_order_quantity === "" ? null : Number(form.minimum_order_quantity),
+        purchase_memo: form.purchase_memo.trim() || null,
         process_type_code: form.process_type_code || undefined,
         unit: form.unit || undefined,
         model_slots: form.model_slots,

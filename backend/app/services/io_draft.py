@@ -19,10 +19,12 @@ from app.services.io_preview import (
     APPROVAL_SUB_TYPES,
     _bucket_available,
     _d,
+    has_included_manual_line,
+    normalize_process_sub_type,
     validate_internal_use_bundles,
     validate_internal_use_operation,
     validate_internal_use_requester,
-    validate_operation_sources,
+    validate_saved_operation_sources,
     validate_warehouse_adjust_operation,
     validate_warehouse_adjust_requester,
 )
@@ -65,6 +67,11 @@ def save_draft(
     덮어쓰기(이전 동작) 제거 — 같은 (work_type, sub_type) 라도 batch_id 가 없으면
     새 draft 가 쌓여 '작업 중' 탭에서 여러 작업을 이어서 진행할 수 있다.
     """
+    payload.sub_type = normalize_process_sub_type(
+        work_type=payload.work_type,
+        sub_type=payload.sub_type,
+        bundles=payload.bundles,
+    )
     incoming_batch_id = getattr(payload, "batch_id", None)
     batch: IoBatch | None = None
     if incoming_batch_id is not None:
@@ -83,9 +90,11 @@ def save_draft(
         raise PermissionError("비활성 직원은 입출고 작업을 제출할 수 없습니다.")
     _lock_active_payload_items(db, payload)
     _normalize_payload_bom_stock_exempt(db, payload)
-    validate_operation_sources(
-        payload.sub_type,
-        (bundle.source_kind for bundle in payload.bundles),
+    validate_saved_operation_sources(
+        work_type=payload.work_type,
+        sub_type=payload.sub_type,
+        bundles=payload.bundles,
+        requested_department=payload.to_department,
     )
     validate_internal_use_requester(
         requester,
@@ -124,7 +133,10 @@ def save_draft(
         batch.sub_type = payload.sub_type
         batch.from_department = payload.from_department
         batch.to_department = payload.to_department
-        batch.requires_approval = payload.sub_type in APPROVAL_SUB_TYPES
+        batch.requires_approval = (
+            payload.sub_type in APPROVAL_SUB_TYPES
+            or has_included_manual_line(payload.bundles)
+        )
         batch.reference_no = payload.reference_no
         batch.notes = payload.notes
         batch.request_fingerprint = None

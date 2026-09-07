@@ -2,6 +2,7 @@
 
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { FilterChip } from "../common/FilterChip";
+import { Search, X } from "lucide-react";
 
 export type DefectScope = "my" | "production" | "all";
 export type DefectActorScope = "all" | "mine";
@@ -17,6 +18,8 @@ interface Props {
   onSortChange: (sort: DefectSort) => void;
   onFilterLockedChange: (locked: boolean) => void;
   currentDept: string;
+  search: string;
+  setSearch: (value: string) => void;
 }
 
 export function DefectFilterBar({
@@ -29,6 +32,8 @@ export function DefectFilterBar({
   onSortChange,
   onFilterLockedChange,
   currentDept,
+  search,
+  setSearch,
 }: Props) {
   return (
     <div
@@ -113,6 +118,33 @@ export function DefectFilterBar({
           />
           <span>필터 고정</span>
         </label>
+      </div>
+
+      <div
+        className="flex min-h-11 w-full min-w-[240px] flex-1 items-center gap-2 rounded-[10px] border px-3 lg:ml-auto lg:w-auto focus-within:ring-2 focus-within:ring-[var(--c-blue)] focus-within:ring-offset-2"
+        style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+      >
+        <Search className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
+        <input
+          type="search"
+          aria-label="불량 검색"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="품명 · 코드 · 부서 · 사유 · 처리자"
+          className="min-h-11 min-w-0 flex-1 bg-transparent text-sm outline-none"
+          style={{ color: LEGACY_COLORS.text }}
+        />
+        {search && (
+          <button
+            type="button"
+            aria-label="불량 검색 지우기"
+            onClick={() => setSearch("")}
+            className="flex min-h-11 min-w-11 items-center justify-center rounded-[8px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-blue)]"
+            style={{ color: LEGACY_COLORS.muted2 }}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
     </div>
   );

@@ -300,6 +300,7 @@ export function DesktopWarehouseView({
             className={isWorkAreaSection ? "flex min-h-0 flex-1 flex-col" : undefined}
           >
             <WarehouseDraftPanelTabs
+              layout="desktop"
               sectionTab={sectionTab}
               canSeeQueue={canSeeQueue}
               canSeeDeptQueue={canSeeDeptQueue}

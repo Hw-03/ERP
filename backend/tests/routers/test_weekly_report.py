@@ -80,13 +80,14 @@ def _make_prod_item(db_session, *, name: str, process_code: str,
 
 
 def _add_log(db_session, item_id, *, tx_type: TransactionTypeEnum,
-             qty: Decimal, at: datetime) -> TransactionLog:
+             qty: Decimal, at: datetime, shipping_phase: str | None = None) -> TransactionLog:
     log = TransactionLog(
         item_id=item_id,
         transaction_type=tx_type,
         quantity_change=qty,
         quantity_before=Decimal("0"),
         quantity_after=qty,
+        shipping_phase=shipping_phase,
     )
     log.created_at = at
     db_session.add(log)
@@ -157,6 +158,7 @@ def _add_operation_log(
     action: str,
     display_label: str,
     at: datetime = _WEEK_MID,
+    shipping_phase: str | None = None,
 ) -> TransactionLog:
     operation = InventoryOperation(
         kind=InventoryOperationKindEnum.BUSINESS,
@@ -180,6 +182,7 @@ def _add_operation_log(
         operation_role=role,
         inventory_effect=effects,
         created_at=at,
+        shipping_phase=shipping_phase,
     )
     db_session.add(log)
     db_session.flush()
@@ -207,6 +210,48 @@ def test_production_matrix_basic(client, db_session):
     assert _dec(matrix["DX3000"]["total_qty"]) == _dec(5)
     assert _dec(matrix["ADX6000"]["vf_qty"]) == _dec(3)
     assert _dec(matrix["ADX6000"]["total_qty"]) == _dec(3)
+
+
+def test_legacy_weekly_report_treats_component_change_as_out_and_receive(client, db_session):
+    source = _make_prod_item(db_session, name="iM3 AF SOLO", process_code="AF", model_symbol="8", qty=_dec(0))
+    target = _make_prod_item(db_session, name="20cm AF SOLO", process_code="AF", model_symbol="8", qty=_dec(1))
+    _add_log(db_session, source.item_id, tx_type=TransactionTypeEnum.PRODUCE, qty=_dec(21), at=_WEEK_MID)
+    _add_log(db_session, source.item_id, tx_type=TransactionTypeEnum.BACKFLUSH, qty=_dec(-20), at=_WEEK_MID)
+    _add_log(
+        db_session,
+        source.item_id,
+        tx_type=TransactionTypeEnum.BACKFLUSH,
+        qty=_dec(-1),
+        at=_WEEK_MID,
+        shipping_phase="COMPONENT_CHANGE",
+    )
+    _add_log(
+        db_session,
+        target.item_id,
+        tx_type=TransactionTypeEnum.PRODUCE,
+        qty=_dec(1),
+        at=_WEEK_MID,
+        shipping_phase="COMPONENT_CHANGE",
+    )
+    db_session.commit()
+
+    response = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    rows = {
+        item_row["item_id"]: item_row
+        for group in body["groups"]
+        for item_row in group["items"]
+    }
+    assert (rows[str(source.item_id)]["produce_qty"], rows[str(source.item_id)]["out_qty"]) == (21, 21)
+    assert (
+        rows[str(target.item_id)]["produce_qty"],
+        rows[str(target.item_id)]["receive_qty"],
+        rows[str(target.item_id)]["out_qty"],
+    ) == (0, 1, 0)
+    solo = {row["model_key"]: row for row in body["production_matrix"]}["SOLO"]
+    assert solo["af_qty"] == 21
 
 
 def test_production_matrix_includes_tf_pf(client, db_session):
@@ -1016,6 +1061,103 @@ def test_verified_week_matches_nf_production_cancelled_scrap_and_quarantine(clie
         - row["out_qty"]
         - row["defect_qty"]
     ) == row["delta"]
+
+
+def test_verified_weekly_report_treats_component_change_as_out_and_receive(client, db_session):
+    source = _make_prod_item(db_session, name="iM3 AF SOLO", process_code="AF", model_symbol="8", qty=_dec(0))
+    target = _make_prod_item(db_session, name="20cm AF SOLO", process_code="AF", model_symbol="8", qty=_dec(1))
+    _activate_verified_weekly_report(db_session)
+    for tx_type, role, quantity, item, phase in (
+        (TransactionTypeEnum.PRODUCE, InventoryOperationRoleEnum.PRODUCT_OUTPUT, 21, source, None),
+        (TransactionTypeEnum.BACKFLUSH, InventoryOperationRoleEnum.COMPONENT_INPUT, -20, source, None),
+        (TransactionTypeEnum.BACKFLUSH, InventoryOperationRoleEnum.COMPONENT_INPUT, -1, source, "COMPONENT_CHANGE"),
+        (TransactionTypeEnum.PRODUCE, InventoryOperationRoleEnum.PRODUCT_OUTPUT, 1, target, "COMPONENT_CHANGE"),
+    ):
+        _add_operation_log(
+            db_session,
+            item=item,
+            tx_type=tx_type,
+            role=role,
+            quantity_change=quantity,
+            effects=[{
+                "scope": "location",
+                "department": "에이징",
+                "status": "PRODUCTION",
+                "delta": quantity,
+            }],
+            action="component_change" if phase else "production_flow",
+            display_label="품목 전환" if phase else "생산 흐름",
+            shipping_phase=phase,
+        )
+    previous = [(source, _dec(0)), (target, _dec(0))]
+    current = [(source, _dec(0)), (target, _dec(1))]
+    _add_snapshot(db_session, week_end=date(2026, 5, 3), item_quantities=previous, verified=True)
+    _add_snapshot(db_session, week_end=date(2026, 5, 10), item_quantities=current, verified=True)
+    db_session.commit()
+
+    response = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["validation"]["status"] == "verified"
+    rows = {
+        item_row["item_id"]: item_row
+        for group in body["groups"]
+        for item_row in group["items"]
+    }
+    assert (rows[str(source.item_id)]["produce_qty"], rows[str(source.item_id)]["out_qty"]) == (21, 21)
+    assert (rows[str(target.item_id)]["produce_qty"], rows[str(target.item_id)]["receive_qty"]) == (0, 1)
+    solo = {row["model_key"]: row for row in body["production_matrix"]}["SOLO"]
+    assert solo["af_qty"] == 21
+    for row in rows.values():
+        assert row["delta"] == row["produce_qty"] + row["receive_qty"] - row["out_qty"] - row["defect_qty"]
+
+
+def test_verified_component_change_in_later_week_preserves_original_production(client, db_session):
+    source = _make_prod_item(db_session, name="iM3 AF SOLO", process_code="AF", model_symbol="8", qty=_dec(20))
+    target = _make_prod_item(db_session, name="20cm AF SOLO", process_code="AF", model_symbol="8", qty=_dec(1))
+    _activate_verified_weekly_report(db_session)
+    _add_operation_log(
+        db_session,
+        item=source,
+        tx_type=TransactionTypeEnum.PRODUCE,
+        role=InventoryOperationRoleEnum.PRODUCT_OUTPUT,
+        quantity_change=21,
+        effects=[{"scope": "location", "department": "에이징", "status": "PRODUCTION", "delta": 21}],
+        action="produce",
+        display_label="생산",
+    )
+    for item, tx_type, role, quantity in (
+        (source, TransactionTypeEnum.BACKFLUSH, InventoryOperationRoleEnum.COMPONENT_INPUT, -1),
+        (target, TransactionTypeEnum.PRODUCE, InventoryOperationRoleEnum.PRODUCT_OUTPUT, 1),
+    ):
+        _add_operation_log(
+            db_session,
+            item=item,
+            tx_type=tx_type,
+            role=role,
+            quantity_change=quantity,
+            effects=[{"scope": "location", "department": "에이징", "status": "PRODUCTION", "delta": quantity}],
+            action="component_change",
+            display_label="품목 전환",
+            at=datetime(2026, 5, 13, 12, 0),
+            shipping_phase="COMPONENT_CHANGE",
+        )
+    _add_snapshot(db_session, week_end=date(2026, 5, 3), item_quantities=[(source, _dec(0)), (target, _dec(0))], verified=True)
+    _add_snapshot(db_session, week_end=date(2026, 5, 10), item_quantities=[(source, _dec(21)), (target, _dec(0))], verified=True)
+    _add_snapshot(db_session, week_end=date(2026, 5, 17), item_quantities=[(source, _dec(20)), (target, _dec(1))], verified=True)
+    db_session.commit()
+
+    production_week = client.get("/api/inventory/weekly-report?week_start=2026-05-04&week_end=2026-05-10").json()
+    conversion_week = client.get("/api/inventory/weekly-report?week_start=2026-05-11&week_end=2026-05-17").json()
+
+    first_rows = {row["item_id"]: row for group in production_week["groups"] for row in group["items"]}
+    second_rows = {row["item_id"]: row for group in conversion_week["groups"] for row in group["items"]}
+    assert first_rows[str(source.item_id)]["produce_qty"] == 21
+    assert (second_rows[str(source.item_id)]["produce_qty"], second_rows[str(source.item_id)]["out_qty"]) == (0, 1)
+    assert (second_rows[str(target.item_id)]["produce_qty"], second_rows[str(target.item_id)]["receive_qty"]) == (0, 1)
+    solo = {row["model_key"]: row for row in conversion_week["production_matrix"]}["SOLO"]
+    assert solo["af_qty"] == 0
 
 
 def test_verified_week_matches_rework_quarantine_restore_examples(client, db_session):

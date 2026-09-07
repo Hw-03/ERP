@@ -3,22 +3,32 @@
  *
  * 가드레일: 실 backend/mes.db 는 절대 건드리지 않는다.
  *  - 전용 DB: backend/mes_e2e.db (teardown 에서 삭제)
- *  - 전용 백엔드 포트 8021 / 전용 프론트 포트 3100 (dev 8011·3001, prod 8010·3000 과 무충돌)
- *  - setup 시작 시 실 mes.db SHA256 기록 → teardown 에서 불변 검증
+ *  - 전용 백엔드 포트 8021 또는 8022 / 전용 프론트 포트 3100 또는 3300~3399
+ *  - setup 시작 시 실 mes.db/-wal/-shm 존재 여부와 SHA256 기록 → teardown 에서 불변 검증
  *
  * 흐름:
- *  1) 실 mes.db 해시 기록
+ *  1) 실 mes.db/-wal/-shm 상태 기록
  *  2) mes_e2e.db* 삭제 → bootstrap_db.py --all (DATABASE_URL=전용DB)
- *  3) uvicorn 전용 백엔드 기동(포트 8021) → /health/ready 폴링
+ *  3) 선택된 전용 포트에 uvicorn 백엔드 기동 → /health/ready 폴링
  *  4) API 시드(품목/BOM/직원 확보) → .e2e-seed.json 저장
- * 프론트(custom Next server, 3100)는 playwright.config webServer 가 BACKEND_INTERNAL_URL 로 8021 에 프록시.
+ * 프론트(custom Next server)는 playwright.config webServer 가 선택된 BACKEND_INTERNAL_URL로 프록시.
  */
 import { spawn, spawnSync } from "child_process";
-import { createHash } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 import { request, type APIRequestContext } from "@playwright/test";
 import { assertSupportedNodeVersion } from "../../scripts/require-node-20.cjs";
+import {
+  approvedE2eBackendPort,
+  assertE2eRunOwnership,
+  assertFileFamilyUnchanged,
+  markE2eRunPhase,
+  prepareOwnedBackendPreflight,
+  readProcessStartToken,
+  snapshotFileFamily,
+  waitForOwnedBackendReady,
+} from "./e2e-lifecycle.mjs";
+import { cleanupCapturedE2eRun } from "./global-teardown";
 
 assertSupportedNodeVersion(process.version);
 
@@ -29,17 +39,29 @@ const REAL_DB = path.join(BACKEND_DIR, "mes.db");
 const E2E_DB = path.join(BACKEND_DIR, "mes_e2e.db");
 const DATABASE_URL = `sqlite:///${E2E_DB.split(path.sep).join("/")}`;
 
-const BACKEND_PORT = 8021;
+const BACKEND_PORT = approvedE2eBackendPort(process.env.E2E_BACKEND_PORT);
 const BACKEND_URL = `http://127.0.0.1:${BACKEND_PORT}`;
 const OPERATOR_PIN = process.env.E2E_OPERATOR_PIN ?? "2468";
 const OPERATOR_SESSION_COOKIE = "dexcowin_operator_session";
 
-const PID_FILE = path.join(HERE, ".e2e-backend.pid");
-const HASH_FILE = path.join(HERE, ".e2e-realdb-hash");
+const PROCESS_RECEIPT_FILE = path.join(HERE, ".e2e-backend-process.json");
+const HASH_FILE = path.join(HERE, ".e2e-realdb-family.json");
 const SEED_FILE = path.join(HERE, ".e2e-seed.json");
+const LOCK_DIR = path.join(HERE, ".e2e-run-lock");
 
-function sha256(file: string): string {
-  return createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+function assertSetupArtifactsAbsent() {
+  const guardedArtifacts = [
+    PROCESS_RECEIPT_FILE,
+    HASH_FILE,
+    SEED_FILE,
+    E2E_DB,
+    `${E2E_DB}-wal`,
+    `${E2E_DB}-shm`,
+  ];
+  const existing = guardedArtifacts.filter((artifact) => fs.existsSync(artifact));
+  if (existing.length > 0) {
+    throw new Error(`기존 E2E ownership 산출물이 있어 setup을 거부합니다: ${existing.join(", ")}`);
+  }
 }
 
 function rmDbFamily(base: string) {
@@ -49,18 +71,20 @@ function rmDbFamily(base: string) {
   }
 }
 
-async function waitForHealth(url: string, timeoutMs: number) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    try {
-      const r = await fetch(`${url}/health/ready`);
-      if (r.ok) return;
-    } catch {
-      /* 아직 안 뜸 */
-    }
-    await new Promise((res) => setTimeout(res, 500));
+
+async function stopSpawnedChildHandle(backend: ReturnType<typeof spawn>): Promise<void> {
+  if (backend.exitCode !== null) return;
+  const exited = new Promise<void>((resolve) => backend.once("exit", () => resolve()));
+  if (!backend.kill("SIGKILL") && backend.exitCode === null) {
+    throw new Error("receipt 작성 전 E2E 백엔드 종료 요청에 실패했습니다.");
   }
-  throw new Error(`전용 백엔드(${url}) 가 ${timeoutMs}ms 안에 헬스 그린이 되지 않음`);
+  await Promise.race([
+    exited,
+    new Promise<never>((_, reject) => setTimeout(
+      () => reject(new Error("receipt 작성 전 E2E 백엔드가 종료되지 않았습니다.")),
+      2_000,
+    )),
+  ]);
 }
 
 async function getJson(context: APIRequestContext, url: string): Promise<any> {
@@ -293,50 +317,126 @@ async function seed(context: APIRequestContext) {
 }
 
 export default async function globalSetup() {
-  // 1) 실 mes.db 해시 기록(teardown 불변 검증용)
-  if (fs.existsSync(REAL_DB)) {
-    fs.writeFileSync(HASH_FILE, sha256(REAL_DB));
-    console.log("[e2e:setup] 실 mes.db 해시 기록");
-  } else {
-    fs.rmSync(HASH_FILE, { force: true });
-    console.log("[e2e:setup] 실 mes.db 없음(해시 가드 생략)");
+  const runToken = process.env.DEXCOWIN_E2E_RUN_TOKEN;
+  if (!runToken) {
+    throw new Error("E2E runner ownership is required");
   }
+  assertE2eRunOwnership({ lockDir: LOCK_DIR, runToken });
+  assertSetupArtifactsAbsent();
 
-  // 2) 전용 DB 초기화 + bootstrap
-  rmDbFamily(E2E_DB);
-  console.log(`[e2e:setup] bootstrap_db.py --all → ${DATABASE_URL}`);
-  const boot = spawnSync("python", ["bootstrap_db.py", "--all"], {
-    cwd: BACKEND_DIR,
-    env: { ...process.env, DATABASE_URL },
-    encoding: "utf-8",
+  // 인터프리터 해석 실패나 setup 직전 포트 점유는 산출물·DB 변경 전에 안전 종료한다.
+  const PYTHON_EXECUTABLE = await prepareOwnedBackendPreflight({
+    backendPort: BACKEND_PORT,
+    markSafeAbort: () => {
+      markE2eRunPhase({ lockDir: LOCK_DIR, runToken, phase: "safe-abort" });
+    },
   });
-  if (boot.status !== 0) {
-    throw new Error(`bootstrap 실패(code ${boot.status})\n${boot.stdout}\n${boot.stderr}`);
-  }
 
-  // 3) 전용 백엔드 기동(포트 8021, --reload 없음 → 단일 프로세스)
-  const backend = spawn(
-    "python",
-    ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", String(BACKEND_PORT), "--workers", "1", "--no-proxy-headers"],
-    {
+  const protectedDbFamily = snapshotFileFamily(REAL_DB);
+  const runNonce = runToken;
+  let backend: ReturnType<typeof spawn> | undefined;
+  let processReceipt: { pid: number; startToken: string; runNonce: string } | undefined;
+  let mutationStarted = false;
+  try {
+    markE2eRunPhase({ lockDir: LOCK_DIR, runToken, phase: "setup-mutating" });
+    mutationStarted = true;
+    fs.writeFileSync(HASH_FILE, JSON.stringify(protectedDbFamily, null, 2));
+    console.log("[e2e:setup] 실 mes.db/-wal/-shm 상태 기록");
+    console.log(`[e2e:setup] bootstrap_db.py --all → ${DATABASE_URL}`);
+    const boot = spawnSync(PYTHON_EXECUTABLE, ["bootstrap_db.py", "--all"], {
       cwd: BACKEND_DIR,
       env: { ...process.env, DATABASE_URL },
-      stdio: "ignore",
-      detached: true,
-      windowsHide: true,
-    },
-  );
-  backend.unref();
-  if (backend.pid) fs.writeFileSync(PID_FILE, String(backend.pid));
-  console.log(`[e2e:setup] 백엔드 기동(pid ${backend.pid}) — 헬스 대기`);
-  await waitForHealth(BACKEND_URL, 30_000);
+      encoding: "utf-8",
+    });
+    if (boot.status !== 0) {
+      throw new Error(`bootstrap 실패(code ${boot.status})\n${boot.stdout}\n${boot.stderr}`);
+    }
 
-  // 4) 시드
-  const apiContext = await request.newContext({ baseURL: BACKEND_URL });
-  try {
-    await seed(apiContext);
-  } finally {
-    await apiContext.dispose();
+    backend = spawn(
+      PYTHON_EXECUTABLE,
+      ["-m", "uvicorn", "scripts.e2e_app:app", "--host", "127.0.0.1", "--port", String(BACKEND_PORT), "--workers", "1", "--no-proxy-headers"],
+      {
+        cwd: BACKEND_DIR,
+        env: { ...process.env, DATABASE_URL, E2E_RUN_NONCE: runNonce },
+        stdio: "ignore",
+        detached: true,
+        windowsHide: true,
+      },
+    );
+    if (!backend.pid) throw new Error("E2E 전용 백엔드 PID를 받지 못했습니다.");
+
+    const startToken = readProcessStartToken(backend.pid);
+    if (startToken === null) {
+      throw new Error("E2E 전용 백엔드가 process receipt 기록 전에 종료되었습니다.");
+    }
+    processReceipt = { pid: backend.pid, startToken, runNonce };
+    fs.writeFileSync(
+      PROCESS_RECEIPT_FILE,
+      JSON.stringify({ version: 2, ...processReceipt, backendUrl: BACKEND_URL, databaseUrl: DATABASE_URL }, null, 2),
+    );
+    backend.unref();
+    console.log(`[e2e:setup] 백엔드 기동(pid ${backend.pid}) — 헬스 대기`);
+    await waitForOwnedBackendReady({
+      backendUrl: BACKEND_URL,
+      expectedNonce: runNonce,
+      expectedPid: backend.pid,
+      timeoutMs: 30_000,
+      getExitCode: () => backend?.exitCode ?? null,
+    });
+
+    const apiContext = await request.newContext({ baseURL: BACKEND_URL });
+    try {
+      await seed(apiContext);
+    } finally {
+      await apiContext.dispose();
+    }
+    markE2eRunPhase({ lockDir: LOCK_DIR, runToken, phase: "setup-ready" });
+  } catch (error) {
+    if (!mutationStarted) {
+      markE2eRunPhase({ lockDir: LOCK_DIR, runToken, phase: "safe-abort" });
+      throw error;
+    }
+    try {
+      if (processReceipt) {
+        await cleanupCapturedE2eRun({
+          runToken,
+          receipt: processReceipt,
+          protectedDbFamily,
+        });
+      } else if (backend) {
+        // identity receipt 전에는 직접 생성한 ChildProcess handle만 종료한다.
+        await stopSpawnedChildHandle(backend);
+        assertFileFamilyUnchanged(protectedDbFamily, snapshotFileFamily(REAL_DB));
+        rmDbFamily(E2E_DB);
+        fs.rmSync(PROCESS_RECEIPT_FILE, { force: true });
+        fs.rmSync(HASH_FILE, { force: true });
+        fs.rmSync(SEED_FILE, { force: true });
+        markE2eRunPhase({ lockDir: LOCK_DIR, runToken, phase: "cleanup-complete" });
+      } else {
+        assertFileFamilyUnchanged(protectedDbFamily, snapshotFileFamily(REAL_DB));
+        rmDbFamily(E2E_DB);
+        fs.rmSync(PROCESS_RECEIPT_FILE, { force: true });
+        fs.rmSync(HASH_FILE, { force: true });
+        fs.rmSync(SEED_FILE, { force: true });
+        markE2eRunPhase({ lockDir: LOCK_DIR, runToken, phase: "cleanup-complete" });
+      }
+    } catch (cleanupError) {
+      // 살아 있을 수 있는 프로세스의 DB와 ownership 증거를 보존한다.
+      throw new AggregateError(
+        [error, cleanupError],
+        "E2E setup 실패 후 소유 프로세스 종료를 증명하지 못했습니다.",
+      );
+    }
+    throw error;
   }
   console.log("[e2e:setup] 완료");
+  if (!processReceipt) {
+    throw new Error("E2E setup 완료 후 captured process receipt가 없습니다.");
+  }
+  const capturedReceipt = processReceipt;
+  return async () => cleanupCapturedE2eRun({
+    runToken,
+    receipt: capturedReceipt,
+    protectedDbFamily,
+  });
 }

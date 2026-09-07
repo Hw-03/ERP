@@ -52,18 +52,18 @@ export function applyToggleLine(
       target.bom_expected != null &&
       Number(target.bom_expected) > 0;
     if (isForcedBomChild) {
-      if (!target.included) return bundle;
+      const newIncluded = !target.included;
       return {
         ...bundle,
         lines: bundle.lines.map((line) =>
           line.line_id === lineId
             ? {
                 ...line,
-                quantity: 0,
-                included: false,
-                edited: true,
+                quantity: newIncluded ? 1 : 0,
+                included: newIncluded,
+                edited: !newIncluded,
                 shortage: 0,
-                exclusion_note: exclusionNoteFor(subType, line.origin, false),
+                exclusion_note: exclusionNoteFor(subType, line.origin, newIncluded),
               }
             : line,
         ),
@@ -224,7 +224,9 @@ export function applyBundleQuantityChange(
           Number(line.bom_expected) > 0 &&
           (isBomStockExempt(line) || newQty === 0 || !line.edited)
         ) {
-          const childQty = expectedBomChildQuantity(bundle, line, newQty);
+          // bundle.quantity 는 stepper 의 현재값이라 호출마다 바뀐다.
+          // preview(parent_qty=1)의 bom_expected 를 1개당 기준으로 직접 곱한다.
+          const childQty = newQty * Number(line.bom_expected);
           if (isBomStockExempt(line)) {
             return {
               ...line,

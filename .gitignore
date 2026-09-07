@@ -33,7 +33,10 @@ frontend/playwright-report/
 frontend/.last-run.json
 frontend/tests/e2e/.e2e-backend.pid
 frontend/tests/e2e/.e2e-realdb-hash
+frontend/tests/e2e/.e2e-backend-process.json
+frontend/tests/e2e/.e2e-realdb-family.json
 frontend/tests/e2e/.e2e-seed.json
+frontend/tests/e2e/.e2e-run-lock/
 
 # Node
 node_modules/

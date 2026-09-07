@@ -9,6 +9,7 @@ import { EmptyState, LoadFailureCard, LoadingSkeleton } from "../common";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { DraftCartItemRow } from "./DraftCartItemRow";
 import { IoDraftWorkCard } from "./IoDraftWorkCard";
+import { IoDraftWorkTable } from "./IoDraftWorkTable";
 import { WarehouseEmptyWorkArea } from "./WarehouseEmptyWorkArea";
 import {
   useDeleteIoDraftMutation,
@@ -17,6 +18,7 @@ import {
 } from "@/lib/queries/useDraftCartQuery";
 
 interface Props {
+  layout: "desktop" | "mobile";
   employeeId: string | null;
   refreshNonce: number;
   onContinue: (draft: StockRequest) => void;
@@ -33,6 +35,7 @@ type DeleteTarget =
   | null;
 
 export function DraftCartPanel({
+  layout,
   employeeId,
   refreshNonce,
   onContinue,
@@ -139,15 +142,24 @@ export function DraftCartPanel({
         />
       )}
 
-      {ioDrafts.map((draft) => (
-        <IoDraftWorkCard
-          key={draft.batch_id}
-          draft={draft}
-          isBusy={busyId === draft.batch_id}
-          onContinue={() => onContinueIo?.(draft)}
-          onRequestDelete={() => setDeleteTarget({ kind: "io", draft })}
+      {layout === "desktop" && ioDrafts.length > 0 ? (
+        <IoDraftWorkTable
+          drafts={ioDrafts}
+          busyId={busyId}
+          onContinue={(draft) => onContinueIo?.(draft)}
+          onRequestDelete={(draft) => setDeleteTarget({ kind: "io", draft })}
         />
-      ))}
+      ) : (
+        ioDrafts.map((draft) => (
+          <IoDraftWorkCard
+            key={draft.batch_id}
+            draft={draft}
+            isBusy={busyId === draft.batch_id}
+            onContinue={() => onContinueIo?.(draft)}
+            onRequestDelete={() => setDeleteTarget({ kind: "io", draft })}
+          />
+        ))
+      )}
 
       {drafts.map((draft) => (
         <DraftCartItemRow

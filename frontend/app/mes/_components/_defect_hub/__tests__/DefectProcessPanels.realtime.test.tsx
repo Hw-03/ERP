@@ -164,9 +164,9 @@ describe.each(panels)("%s defect process panel realtime location updates", (_nam
     expect(screen.getByRole("textbox")).toHaveValue("");
   });
 
-  it("limits processing to the unreserved quantity and links approval requests to the record", async () => {
+  it("limits processing to the unreserved quantity and immediately processes the linked record", async () => {
     const props = { currentEmployee: employee, onDone: vi.fn(), onCancel: vi.fn() };
-    const { container } = render(
+    render(
       <Panel
         {...props}
         location={{ ...location, quantity: 10, pending_quantity: 4, available_quantity: 6 }}
@@ -175,11 +175,11 @@ describe.each(panels)("%s defect process panel realtime location updates", (_nam
 
     expect(screen.getByRole("spinbutton")).toHaveValue(6);
     fireEvent.click(screen.getByRole("button", { name: /전체 폐기/ }));
-    fireEvent.click(Array.from(container.querySelectorAll("button")).at(-1)!);
+    fireEvent.click(screen.getByRole("button", { name: "즉시 폐기 →" }));
 
     const dialog = await screen.findByRole("dialog");
-    expect(dialog).toHaveTextContent("승인 완료 후 재고에 반영됩니다.");
-    fireEvent.click(Array.from(dialog.querySelectorAll("button")).at(-1)!);
+    expect(dialog).toHaveTextContent("확인하면 즉시 재고에 반영됩니다.");
+    fireEvent.click(screen.getByRole("button", { name: "즉시 폐기" }));
 
     await waitFor(() => {
       expect(apiMocks.createStockRequest).toHaveBeenCalledWith(

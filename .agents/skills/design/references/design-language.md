@@ -40,7 +40,8 @@
 ## Primitives — 실측 (문서 카탈로그보다 최신)
 
 - 모바일 `primitives/` 실제 **25개**. 문서의 "18 + 보조 6"은 낡음. 보조로 묶인 실제 7개: `SectionHeader` · `AsyncState` · `EmptyState` · `ItemRow` · `MoreMenuRow` · `WizardHeader` · `WizardProgress`.
-- 공용 `lib/ui/` 실제 **8개**: BottomSheet · ConfirmModal · Toast · TruncatedText · Tooltip · Button · ImageLightbox · dirty-guard. (문서엔 앞 4개만)
+- 공용 `lib/ui/` 실제 **7개**: BottomSheet · ConfirmModal · TruncatedText · Tooltip · Button · ImageLightbox · dirty-guard.
+- 짧은 성공·오류·정보 알림은 `common/StatusTargetNotice` 단일 소스를 데스크톱·모바일에서 공유한다.
 - ⚠️ **모바일↔데스크탑 중복**(이름/구현 다름 — 신규 작업 시 어느 화면인지 보고 맞는 쪽 사용):
   - `KpiCard`: 모바일(`primitives/`, color 기반) vs 데스크탑(`common/`, tone-tint 기반)
   - `FilterChip`: 모바일(직접 button) vs 데스크탑(`common/`, Button 래퍼)

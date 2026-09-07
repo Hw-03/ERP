@@ -1108,7 +1108,7 @@ def test_admin_api_and_detailed_health_publish_same_v1_verdict_with_sanitized_sa
         "check_schema",
         lambda *, connection: SimpleNamespace(
             ready=True,
-            revision="20260831_0033",
+            revision="20260907_0034",
             differences=(),
         ),
         raising=False,

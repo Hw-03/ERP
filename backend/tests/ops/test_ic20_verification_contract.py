@@ -20,14 +20,25 @@ def _text(relative_path: str) -> str:
 
 def test_node_20_is_declared_and_all_e2e_entrypoints_share_the_guard() -> None:
     package = json.loads(_text("frontend/package.json"))
+    e2e_runner = _text("frontend/scripts/run-playwright-e2e.mjs")
     verify_e2e = _text("scripts/dev/verify_e2e.ps1")
     verify_local = _text("scripts/dev/verify_local.ps1")
 
     assert (ROOT / ".nvmrc").read_text(encoding="ascii").strip() == "20"
     assert package["engines"]["node"] == ">=20 <21"
     assert _text(".github/workflows/ci.yml").count("node-version-file: .nvmrc") == 2
-    assert package["scripts"]["test:e2e"].startswith("node scripts/require-node-20.mjs && ")
-    assert package["scripts"]["test:e2e:headed"].startswith("node scripts/require-node-20.mjs && ")
+    assert package["scripts"]["test:e2e"] == "node scripts/run-playwright-e2e.mjs"
+    assert package["scripts"]["test:e2e:headed"] == (
+        "node scripts/run-playwright-e2e.mjs --headed"
+    )
+    assert package["scripts"]["test:e2e:ui"] == "node scripts/run-playwright-e2e.mjs --ui"
+    assert (
+        'import { assertSupportedNodeVersion } from "./require-node-20.mjs";'
+        in e2e_runner
+    )
+    node_guard = e2e_runner.index("assertSupportedNodeVersion(process.version);")
+    playwright_start = e2e_runner.index("const result = await runPlaywrightE2e();")
+    assert node_guard < playwright_start
     assert "npm run test:e2e" in verify_e2e
     assert "npx playwright test" not in verify_e2e
     assert "function Assert-Node20" in verify_local

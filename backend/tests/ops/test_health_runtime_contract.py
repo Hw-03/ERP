@@ -31,7 +31,7 @@ def test_backend_startup_separates_scheduler_liveness_from_caller_readiness() ->
 
 def test_frontend_and_e2e_startup_wait_for_backend_readiness() -> None:
     runtime_control = _read("scripts/dev/runtime-control.ps1")
-    e2e_setup = _read("frontend/tests/e2e/global-setup.ts")
+    e2e_lifecycle = _read("frontend/tests/e2e/e2e-lifecycle.mjs")
 
     frontend_startup = runtime_control[
         runtime_control.index("function Invoke-ProfileFrontendStartup") :
@@ -39,8 +39,8 @@ def test_frontend_and_e2e_startup_wait_for_backend_readiness() -> None:
     assert "/health/ready" in frontend_startup
     assert "/health/live" not in frontend_startup
     assert "Backend is not ready" in frontend_startup
-    assert "`${url}/health/ready`" in e2e_setup
-    assert "`${url}/health/live`" not in e2e_setup
+    assert "`${backendUrl}/health/ready`" in e2e_lifecycle
+    assert "`${backendUrl}/health/live`" not in e2e_lifecycle
 
 
 def test_status_and_watch_report_alive_and_ready_as_distinct_states() -> None:

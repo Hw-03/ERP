@@ -446,6 +446,17 @@ describe("historyPresentation", () => {
     ).label).toBe("구성품 차감");
   });
 
+  it("labels correction operation children as single-item inbound or outbound by direction", () => {
+    expect(getReferenceBatchLinePresentation(
+      makeLog({ transaction_type: "ADJUST", operation_role: "CORRECTION", quantity_change: 2 }),
+      "batch",
+    )).toEqual({ label: "단품 입고", tone: "muted" });
+    expect(getReferenceBatchLinePresentation(
+      makeLog({ transaction_type: "ADJUST", operation_role: "CORRECTION", quantity_change: -2 }),
+      "batch",
+    )).toEqual({ label: "단품 출고", tone: "muted" });
+  });
+
   it("uses the prepare completer as the shipping history actor", () => {
     const row = getHistoryRowPresentation(makeLog({
       transaction_type: "SHIP",

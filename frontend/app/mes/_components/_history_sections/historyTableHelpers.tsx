@@ -49,12 +49,12 @@ export const HISTORY_CHILD_ROW_CLASS = "h-[40px]";
 export const HISTORY_CHILD_CELL_CLASS = "h-[40px] overflow-hidden border-b py-0 align-middle";
 export const HISTORY_TABLE_OPERATION_PILL_CLASS = "w-32 max-w-full min-w-0 overflow-hidden";
 export const HISTORY_ITEM_CODE_WIDTH_PX = 144;
-export const HISTORY_QUANTITY_WIDTH_PX = 220;
-export const HISTORY_CODE_QUANTITY_CONTENT_WIDTH_PX = HISTORY_ITEM_CODE_WIDTH_PX + HISTORY_QUANTITY_WIDTH_PX;
-export const HISTORY_STOCK_SNAPSHOT_GUTTER_WIDTH_PX = 0;
-export const HISTORY_CODE_QUANTITY_WIDTH_PX = HISTORY_CODE_QUANTITY_CONTENT_WIDTH_PX + HISTORY_STOCK_SNAPSHOT_GUTTER_WIDTH_PX;
-const STOCK_SNAPSHOT_MIN_QUANTITY_WIDTH = formatQty(10_000).length;
-const STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH = formatQty(100).length;
+export const HISTORY_STOCK_SNAPSHOT_WIDTH_PX = 220;
+const STOCK_SNAPSHOT_MIN_QUANTITY_WIDTH_PX = 24;
+const STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH_PX = 24;
+const STOCK_SNAPSHOT_DELTA_WIDTH_PX = 40;
+const STOCK_SNAPSHOT_ARROW_WIDTH_PX = 24;
+const STOCK_SNAPSHOT_DIGIT_WIDTH_PX = 8;
 
 export function FlowBadge({
   type,
@@ -317,65 +317,36 @@ function AlignedItemCode({ code }: { code: string }) {
   );
 }
 
-export function ItemCodeQuantityCell({
+export function ItemCodeCell({
   code,
   sourceCode,
-  quantity,
   compact,
   dense = false,
 }: {
   code?: string | null;
   sourceCode?: string | null;
-  quantity: ReactNode;
   compact?: boolean;
   dense?: boolean;
 }) {
   const padX = compact ? "px-1" : "px-3";
   return (
     <td
-      colSpan={2}
       className={`${dense ? "h-[40px]" : "h-[64px]"} overflow-hidden border-b p-0 align-middle`}
-      style={{ borderColor: LEGACY_COLORS.border, width: `${HISTORY_CODE_QUANTITY_WIDTH_PX}px`, transition: HISTORY_CELL_TRANSITION }}
+      style={{ borderColor: LEGACY_COLORS.border, width: `${HISTORY_ITEM_CODE_WIDTH_PX}px`, transition: HISTORY_CELL_TRANSITION }}
     >
       <div
-        className={`grid ${dense ? "h-[40px]" : "h-[64px]"}`}
-        style={{ gridTemplateColumns: `${HISTORY_ITEM_CODE_WIDTH_PX}px ${HISTORY_QUANTITY_WIDTH_PX}px`, width: `${HISTORY_CODE_QUANTITY_CONTENT_WIDTH_PX}px` }}
+        className={`flex min-w-0 items-center justify-end overflow-hidden whitespace-nowrap ${dense ? "h-[40px]" : "h-[64px]"} ${padX} text-right text-xs font-semibold`}
+        style={{ color: code ? LEGACY_COLORS.muted2 : LEGACY_COLORS.muted }}
       >
-        <div
-          className={`flex min-w-0 items-center justify-end overflow-hidden whitespace-nowrap ${padX} text-right text-xs font-semibold`}
-          style={{ color: code ? LEGACY_COLORS.muted2 : LEGACY_COLORS.muted }}
-        >
-          {sourceCode ? (
-            <div className="flex w-full min-w-0 flex-col items-stretch leading-tight">
-              <AlignedItemCode code={sourceCode} />
-              <span aria-hidden className="self-end leading-none">↓</span>
-              <AlignedItemCode code={code ?? "-"} />
-            </div>
-          ) : <AlignedItemCode code={code || "-"} />}
-        </div>
-        <div className="flex min-w-0 items-center justify-start overflow-hidden whitespace-nowrap px-1 text-center">
-          {quantity}
-        </div>
+        {sourceCode ? (
+          <div className="flex w-full min-w-0 flex-col items-stretch leading-tight">
+            <AlignedItemCode code={sourceCode} />
+            <span aria-hidden className="self-end leading-none">↓</span>
+            <AlignedItemCode code={code ?? "-"} />
+          </div>
+        ) : <AlignedItemCode code={code || "-"} />}
       </div>
     </td>
-  );
-}
-
-export function QuantityStockCell({
-  presentation,
-  summary,
-  dense = false,
-  cancelled = false,
-}: {
-  presentation: HistoryRowPresentation;
-  summary?: MovementSummary;
-  dense?: boolean;
-  cancelled?: boolean;
-}) {
-  return (
-    <div className={`flex items-center justify-center overflow-hidden ${dense ? "h-10" : "h-11"}`}>
-      <MovementSummaryCell summary={summary ?? presentation.movement} cancelled={cancelled} />
-    </div>
   );
 }
 
@@ -414,14 +385,14 @@ export function StockSnapshotCell({
     { label: "창고", before: warehouseBefore, after: warehouseAfter, beforeText: warehouseBeforeText, afterText: warehouseAfterText },
     { label: "부서", before: departmentBefore, after: departmentAfter, beforeText: departmentBeforeText, afterText: departmentAfterText },
   ].filter((snapshot) => snapshot.before !== snapshot.after);
-  const chipQuantityWidth = Math.max(
-    STOCK_SNAPSHOT_MIN_QUANTITY_WIDTH,
-    quantityWidth ?? Math.max(...changedSnapshots.flatMap((snapshot) => [snapshot.beforeText.length, snapshot.afterText.length])),
+  const chipQuantityWidthPx = Math.max(
+    STOCK_SNAPSHOT_MIN_QUANTITY_WIDTH_PX,
+    quantityWidth ?? Math.max(...changedSnapshots.flatMap((snapshot) => [snapshot.beforeText.length, snapshot.afterText.length])) * STOCK_SNAPSHOT_DIGIT_WIDTH_PX,
   );
-  const beforeQuantityWidth = chipQuantityWidth;
+  const beforeQuantityWidthPx = chipQuantityWidthPx;
   const snapshotLabel = changedSnapshots.length === 0
     ? "재고 변동 없음"
-    : `재고 변동: ${changedSnapshots.map((snapshot) => `${snapshot.label} ${snapshot.beforeText} → ${snapshot.afterText}`).join(", ")}`;
+    : `재고 변동: ${changedSnapshots.map((snapshot) => `${snapshot.label} ${snapshot.beforeText} ${formatStockDelta(snapshot.after - snapshot.before)}→${snapshot.afterText}`).join(", ")}`;
 
   return (
     <td className={`${cellClass} px-1 text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
@@ -432,7 +403,7 @@ export function StockSnapshotCell({
         {changedSnapshots.length === 0 ? (
           <span aria-hidden="true" className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>—</span>
         ) : changedSnapshots.map((snapshot) => (
-          <StockSnapshotLine key={snapshot.label} label={snapshot.label} beforeText={snapshot.beforeText} afterText={snapshot.afterText} beforeQuantityWidth={beforeQuantityWidth} afterQuantityWidth={STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH} increased={snapshot.after > snapshot.before} decreased={snapshot.after < snapshot.before} cancelled={log.cancelled} />
+          <StockSnapshotLine key={snapshot.label} label={snapshot.label} beforeText={snapshot.beforeText} afterText={snapshot.afterText} delta={snapshot.after - snapshot.before} beforeQuantityWidthPx={beforeQuantityWidthPx} afterQuantityWidthPx={STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH_PX} increased={snapshot.after > snapshot.before} decreased={snapshot.after < snapshot.before} cancelled={log.cancelled} />
         ))}
       </div>
     </td>
@@ -454,7 +425,7 @@ export function getStockSnapshotQuantityWidth(logs: TransactionLog[]): number | 
     ];
   });
   return quantities.length > 0
-    ? Math.max(STOCK_SNAPSHOT_MIN_QUANTITY_WIDTH, ...quantities.map((quantity) => formatQty(quantity).length))
+    ? Math.max(STOCK_SNAPSHOT_MIN_QUANTITY_WIDTH_PX, ...quantities.map((quantity) => formatQty(quantity).length * STOCK_SNAPSHOT_DIGIT_WIDTH_PX))
     : undefined;
 }
 
@@ -462,8 +433,9 @@ function StockSnapshotLine({
   label,
   beforeText,
   afterText,
-  beforeQuantityWidth,
-  afterQuantityWidth,
+  delta,
+  beforeQuantityWidthPx,
+  afterQuantityWidthPx,
   increased,
   decreased,
   cancelled,
@@ -471,21 +443,29 @@ function StockSnapshotLine({
   label: string;
   beforeText: string;
   afterText: string;
-  beforeQuantityWidth: number;
-  afterQuantityWidth: number;
+  delta: number;
+  beforeQuantityWidthPx: number;
+  afterQuantityWidthPx: number;
   increased: boolean;
   decreased: boolean;
   cancelled: boolean;
 }) {
   const afterColor = increased ? LEGACY_COLORS.blue : decreased ? LEGACY_COLORS.red : LEGACY_COLORS.muted2;
+  const deltaText = formatStockDelta(delta);
   return (
-    <span aria-label={`${label} ${beforeText} → ${afterText}`} className="inline-flex items-center whitespace-nowrap text-xs font-semibold leading-4">
+    <span aria-label={`${label} ${beforeText} ${deltaText}→${afterText}`} className="inline-flex items-center whitespace-nowrap text-xs font-semibold leading-4">
       <span className="w-7 text-left" style={{ color: LEGACY_COLORS.muted }}>{label}</span>
-      <span className="text-right tabular-nums" style={{ color: LEGACY_COLORS.muted2, width: `${beforeQuantityWidth}ch` }}>{beforeText}</span>
-      <span style={{ color: LEGACY_COLORS.muted }}>→</span>
-      <span data-history-after-stock={cancelled || undefined} className="min-w-0 shrink-0 text-left font-bold tabular-nums" style={{ color: afterColor, width: `${afterQuantityWidth}ch` }}>{afterText}</span>
+      <span className="text-right tabular-nums" style={{ color: LEGACY_COLORS.muted2, width: `${beforeQuantityWidthPx}px` }}>{beforeText}</span>
+      <span data-history-after-stock={cancelled || undefined} className="shrink-0 text-left font-bold tabular-nums" style={{ color: afterColor, width: `${STOCK_SNAPSHOT_DELTA_WIDTH_PX}px` }}>{deltaText}</span>
+      <span aria-hidden="true" data-history-after-stock={cancelled || undefined} className="shrink-0 text-center font-bold" style={{ color: afterColor, width: `${STOCK_SNAPSHOT_ARROW_WIDTH_PX}px` }}>→</span>
+      <span data-history-after-stock={cancelled || undefined} className="min-w-0 shrink-0 text-left font-bold tabular-nums" style={{ color: afterColor, width: `${afterQuantityWidthPx}px` }}>{afterText}</span>
     </span>
   );
+}
+
+function formatStockDelta(delta: number): string {
+  const absolute = formatQty(Math.abs(delta));
+  return delta > 0 ? `+${absolute}` : `−${absolute}`;
 }
 
 export function PeopleStatusCell({
@@ -922,10 +902,9 @@ export function BatchHeader({
           />
         </div>
       </td>
-      <ItemCodeQuantityCell
+      <ItemCodeCell
         code={presentation.target.code}
         sourceCode={presentation.target.sourceCode}
-        quantity={<QuantityStockCell presentation={presentation} summary={summary} />}
       />
       <StockSnapshotCell log={representativeLog} />
       <td className={`${HISTORY_STATUS_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
@@ -1246,15 +1225,10 @@ function ReferenceBatchLineRow({
           </TruncatedText>
         </div>
       </td>
-      <ItemCodeQuantityCell
+      <ItemCodeCell
         code={presentation.target.code}
         compact={compact}
         dense
-        quantity={(
-          <div className="flex h-10 items-center justify-center overflow-hidden">
-            <MovementSummaryCell summary={getHistoryLogSignedQuantity(log)} compact={compact} />
-          </div>
-        )}
       />
       <StockSnapshotCell log={log} dense />
       <td className={`${HISTORY_CHILD_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }} />
@@ -1408,14 +1382,9 @@ export function OpBatchHeader({
           />
         </div>
       </td>
-      <ItemCodeQuantityCell
+      <ItemCodeCell
         code={presentation.target.code}
         compact={compact}
-        quantity={batch ? (
-          <QuantityStockCell presentation={presentation} summary={summary} />
-        ) : (
-          <HistoryBatchMetadataPlaceholder widthClass={compact ? "w-28" : "w-48"} />
-        )}
       />
       <StockSnapshotCell log={representativeLog} quantityWidth={snapshotQuantityWidth} />
       <td className={`${HISTORY_STATUS_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>

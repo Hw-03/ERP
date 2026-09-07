@@ -750,11 +750,14 @@ def test_item_conversion_api_supports_spec_and_bom_modes(client, db_session, mak
     target_aa = make_item(name="Export AA", process_type_code="AA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
     source_af = make_item(name="Domestic AF", process_type_code="AF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=4)
     target_af = make_item(name="Export AF", process_type_code="AF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=5)
+    same_bom_af = make_item(name="Domestic AF renamed", process_type_code="AF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=6)
     make_bom(source_aa.item_id, source_leaf.item_id, Decimal("2"))
     make_bom(target_aa.item_id, source_leaf.item_id, Decimal("2"))
     make_bom(source_af.item_id, source_aa.item_id, Decimal("1"))
     make_bom(target_af.item_id, target_aa.item_id, Decimal("1"))
+    make_bom(same_bom_af.item_id, source_aa.item_id, Decimal("1"))
     make_location(source_af.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("3"))
+    make_location(target_aa.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("1"))
     db_session.commit()
 
     spec_preview = client.get(
@@ -762,7 +765,7 @@ def test_item_conversion_api_supports_spec_and_bom_modes(client, db_session, mak
         params={
             "requester_employee_id": str(requester.employee_id),
             "source_item_id": str(source_af.item_id),
-            "target_item_id": str(target_af.item_id),
+            "target_item_id": str(same_bom_af.item_id),
             "quantity": 2,
             "requested_mode": "SPEC",
         },
@@ -779,7 +782,7 @@ def test_item_conversion_api_supports_spec_and_bom_modes(client, db_session, mak
         "/api/io/item-conversion",
         json={
             "source_item_id": str(source_af.item_id),
-            "target_item_id": str(target_af.item_id),
+            "target_item_id": str(same_bom_af.item_id),
             "quantity": 2,
             "requested_mode": "SPEC",
             "requester_employee_id": str(requester.employee_id),
@@ -792,22 +795,12 @@ def test_item_conversion_api_supports_spec_and_bom_modes(client, db_session, mak
     assert done["reference_no"].startswith("ITEM-CONV-")
     assert len(done["transactions"]) == 2
 
-    added_leaf = make_item(name="Export-only leaf", process_type_code="TR", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=6)
-    source_pa = make_item(name="Source PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=7)
-    target_pa = make_item(name="Target PA", process_type_code="PA", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=8)
-    make_bom(source_pa.item_id, source_af.item_id, Decimal("1"))
-    make_bom(target_pa.item_id, source_af.item_id, Decimal("1"))
-    make_bom(target_pa.item_id, added_leaf.item_id, Decimal("1"))
-    make_location(source_pa.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
-    make_location(added_leaf.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
-    db_session.commit()
-
     bom_preview = client.get(
         "/api/io/item-conversion-preview",
         params={
             "requester_employee_id": str(requester.employee_id),
-            "source_item_id": str(source_pa.item_id),
-            "target_item_id": str(target_pa.item_id),
+            "source_item_id": str(source_af.item_id),
+            "target_item_id": str(target_af.item_id),
             "quantity": 1,
             "requested_mode": "BOM",
         },
@@ -816,8 +809,13 @@ def test_item_conversion_api_supports_spec_and_bom_modes(client, db_session, mak
     assert bom_preview.status_code == 200, bom_preview.text
     bom_body = bom_preview.json()
     assert bom_body["resolved_mode"] == "BOM"
-    assert [line["item_name"] for line in bom_body["lines"]] == ["Export-only leaf"]
-    assert bom_body["lines"][0]["total_delta"] == 1
+    lines_by_item_id = {line["item_id"]: line for line in bom_body["lines"]}
+    assert set(lines_by_item_id) == {str(source_aa.item_id), str(target_aa.item_id)}
+    assert lines_by_item_id[str(source_aa.item_id)]["total_delta"] == -1
+    assert lines_by_item_id[str(source_aa.item_id)]["line_kind"] == "recover"
+    assert lines_by_item_id[str(target_aa.item_id)]["total_delta"] == 1
+    assert lines_by_item_id[str(target_aa.item_id)]["line_kind"] == "consume"
+    assert str(source_leaf.item_id) not in lines_by_item_id
 
 
 def test_item_conversion_api_auto_resolves_mode_when_request_omits_mode(
@@ -840,6 +838,7 @@ def test_item_conversion_api_auto_resolves_mode_when_request_omits_mode(
     make_bom(target_pa.item_id, source_af.item_id, Decimal("1"))
     make_bom(target_pa.item_id, extra_leaf.item_id, Decimal("1"))
     make_location(source_af.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("2"))
+    make_location(target_aa.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("1"))
     make_location(source_pa.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
     make_location(extra_leaf.item_id, department=DepartmentEnum.TUBE, quantity=Decimal("1"))
     db_session.commit()
@@ -854,8 +853,15 @@ def test_item_conversion_api_auto_resolves_mode_when_request_omits_mode(
         },
     )
     assert spec_preview.status_code == 200, spec_preview.text
-    assert spec_preview.json()["requested_mode"] == "SPEC"
-    assert spec_preview.json()["resolved_mode"] == "SPEC"
+    direct_preview = spec_preview.json()
+    assert direct_preview["requested_mode"] == "BOM"
+    assert direct_preview["resolved_mode"] == "BOM"
+    assert direct_preview["executable"] is True
+    assert {line["item_id"] for line in direct_preview["lines"]} == {
+        str(source_aa.item_id),
+        str(target_aa.item_id),
+    }
+    assert all(line["item_id"] != str(shared_leaf.item_id) for line in direct_preview["lines"])
 
     bom_preview = client.get(
         "/api/io/item-conversion-preview",

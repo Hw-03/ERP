@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type SetStateAction } from "react";
 import type { IoBundle, IoLine, IoSubType, IoWorkType } from "./types";
 import {
   DEFAULT_SUB_TYPE,
+  canonicalProcessSubType,
   processBomEffectLine,
   type DeptIoDirection,
 } from "./ioWorkType";
@@ -19,6 +20,11 @@ export const IO_STEP_LABELS: Record<IoStep, string> = {
 
 type GetAvailable = (line: IoLine) => number | null;
 
+function isWholeQuantity(value: number, minimum: number): boolean {
+  const quantity = Number(value);
+  return Number.isFinite(quantity) && Number.isInteger(quantity) && quantity >= minimum;
+}
+
 export function useIoWorkState(
   initialWorkType?: IoWorkType,
   initialDepartment?: string | null,
@@ -26,19 +32,30 @@ export function useIoWorkState(
 ) {
   const defaultDepartment = initialDepartment || "조립";
   const [workType, setWorkTypeBase] = useState<IoWorkType>(initialWorkType ?? "receive");
-  const [subType, setSubType] = useState<IoSubType>("receive_supplier");
+  const [selectedSubType, setSelectedSubType] = useState<IoSubType>("receive_supplier");
   const [fromDepartment, setFromDepartment] = useState<string>(defaultDepartment);
   const [toDepartment, setToDepartment] = useState<string>(defaultDepartment);
-  const [bundles, setBundles] = useState<IoBundle[]>([]);
+  const [bundles, setBundlesBase] = useState<IoBundle[]>([]);
   const [notes, setNotes] = useState("");
   const [referenceNo, setReferenceNo] = useState("");
   const [step, setStep] = useState<IoStep>(1);
   // process/warehouse_adjust 방향(입고/출고) 선택. null = 미선택 → Step 2 advance 차단.
   const [deptIoDirection, setDeptIoDirectionBase] = useState<DeptIoDirection | null>(null);
 
+  function setBundles(next: SetStateAction<IoBundle[]>) {
+    setBundlesBase(next);
+  }
+
+  const subType = canonicalProcessSubType(
+    workType,
+    deptIoDirection,
+    bundles,
+    selectedSubType,
+  );
+
   function setWorkType(next: IoWorkType) {
     setWorkTypeBase(next);
-    setSubType(DEFAULT_SUB_TYPE[next]);
+    setSelectedSubType(DEFAULT_SUB_TYPE[next]);
     setToDepartment(next === "internal_use" ? "" : defaultDepartment);
     setDeptIoDirectionBase(null);
     setBundles([]);
@@ -49,7 +66,7 @@ export function useIoWorkState(
   function setDeptIoDirection(dir: DeptIoDirection) {
     setDeptIoDirectionBase(dir);
     setBundles([]);
-    setSubType(
+    setSelectedSubType(
       workType === "warehouse_adjust"
         ? dir === "in"
           ? "warehouse_adjust_in"
@@ -90,7 +107,9 @@ export function useIoWorkState(
       ? line.shortage > 0
       : Number(line.quantity) > available;
   });
-  const hasInvalidQuantity = effectIncludedLines.some((line) => line.quantity <= 0);
+  const hasInvalidQuantity =
+    bundles.some((bundle) => !isWholeQuantity(bundle.quantity, 0)) ||
+    effectIncludedLines.some((line) => !isWholeQuantity(line.quantity, 1));
   const hasMissingInternalUseBomMode =
     workType === "internal_use" && hasUnselectedInternalUseBomMode(bundles);
 
@@ -168,7 +187,7 @@ export function useIoWorkState(
     hasMissingInternalUseBomMode,
     canAdvance,
     setWorkType,
-    setSubType,
+    setSubType: setSelectedSubType,
     setFromDepartment,
     setToDepartment,
     setBundles,

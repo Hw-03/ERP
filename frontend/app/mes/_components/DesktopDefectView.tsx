@@ -19,6 +19,7 @@ import { DefectProcessPanel } from "./_defect_hub/DefectProcessPanel";
 import { InlineErrorNote } from "./_defect_hub/InlineErrorNote";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { LoadFailureCard } from "./common/LoadFailureCard";
+import { matchesDefectSearch } from "./_defect_hub/defectSearch";
 
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
@@ -114,6 +115,7 @@ function DefectViewInner({
     defectDeptFilter,
   });
   const [kpiFilter, setKpiFilter] = useState<DefectKpiKind | null>(null);
+  const [search, setSearch] = useState("");
   const [view, setView] = useState<ViewMode>({ kind: "hub" });
   const [reloadNonce, setReloadNonce] = useState(0);
 
@@ -200,13 +202,14 @@ function DefectViewInner({
           Date.now() - new Date(loc.defective_at).getTime() > ONE_YEAR_MS,
       );
     }
+    result = result.filter((loc) => matchesDefectSearch(loc, search));
 
     return [...result].sort((a, b) => {
       const ta = a.defective_at ? new Date(a.defective_at).getTime() : 0;
       const tb = b.defective_at ? new Date(b.defective_at).getTime() : 0;
       return sort === "oldest" ? ta - tb : tb - ta;
     });
-  }, [scopedLocations, sort, kpiFilter]);
+  }, [scopedLocations, sort, kpiFilter, search]);
 
   // KPI 집계 범위 라벨 — 숫자가 어느 범위인지 카드 부제로 노출
   const departmentScopeLabel =
@@ -373,6 +376,8 @@ function DefectViewInner({
               onSortChange={setSort}
               onFilterLockedChange={setFilterLocked}
               currentDept={operator.department}
+              search={search}
+              setSearch={setSearch}
             />
 
             {refreshError && (
@@ -399,6 +404,7 @@ function DefectViewInner({
                 onMemoUpdated={handleMemoUpdated}
                 onProcess={handleProcessRow}
                 priorityDept={operator.department}
+                searchActive={search.trim().length > 0}
               />
             )}
           </div>

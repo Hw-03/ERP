@@ -6,6 +6,18 @@ const state = vi.hoisted(() => ({
   getWeeklyReport: vi.fn(() => new Promise(() => {})),
 }));
 
+const selectedItem = {
+  item_id: "item-bom-1",
+  mes_code: "8-TF-0001",
+  item_name: "DXDR-70 튜브",
+  prev_qty: 0,
+  produce_qty: 0,
+  receive_qty: 0,
+  out_qty: 0,
+  current_qty: 0,
+  delta: 0,
+};
+
 vi.mock("@/lib/api", () => ({
   api: {
     getWeeklyReport: state.getWeeklyReport,
@@ -13,8 +25,25 @@ vi.mock("@/lib/api", () => ({
 }));
 
 vi.mock("../../../_weekly_sections/WeeklyDetailTable", () => ({
-  WeeklyDetailTable: ({ stockBasis }: { stockBasis: string }) => (
-    <div data-testid="mobile-weekly-detail" data-stock-basis={stockBasis} />
+  WeeklyDetailTable: ({ stockBasis, onItemSelect }: { stockBasis: string; onItemSelect?: (item: typeof selectedItem) => void }) => (
+    <div data-testid="mobile-weekly-detail" data-stock-basis={stockBasis}>
+      <button type="button" onClick={() => onItemSelect?.(selectedItem)}>BOM 열기</button>
+    </div>
+  ),
+}));
+
+vi.mock("@/lib/ui/BottomSheet", () => ({
+  BottomSheet: ({ open, title, onClose, children }: { open: boolean; title?: string; onClose: () => void; children: React.ReactNode }) => open ? (
+    <div role="dialog" aria-label={title}>
+      <button type="button" onClick={onClose}>닫기</button>
+      {children}
+    </div>
+  ) : null,
+}));
+
+vi.mock("../../../_warehouse_v2/BomSubExpander", () => ({
+  BomSubExpander: ({ itemId, mobileDetail }: { itemId: string; mobileDetail?: boolean }) => (
+    <div data-testid="mobile-weekly-bom-tree" data-item-id={itemId} data-mobile-detail={String(mobileDetail)} />
   ),
 }));
 
@@ -69,5 +98,36 @@ describe("MobileWeeklyScreen", () => {
       "data-stock-basis",
       "normal",
     );
+  });
+
+  it("opens the selected item BOM in a mobile sheet", async () => {
+    state.getWeeklyReport.mockResolvedValue({
+      groups: [{
+        process_code: "TF",
+        dept_name: "튜브",
+        label: "튜브",
+        item_count: 1,
+        prev_qty: 0,
+        increase_qty: 0,
+        decrease_qty: 0,
+        produce_qty: 0,
+        receive_qty: 0,
+        out_qty: 0,
+        current_qty: 0,
+        delta: 0,
+        items: [selectedItem],
+      }],
+      production_matrix: [],
+    });
+
+    render(<MobileWeeklyScreen weekMon={new Date("2026-08-31T00:00:00")} />);
+    fireEvent.click(await screen.findByRole("button", { name: "BOM 열기" }));
+
+    expect(screen.getByRole("dialog", { name: "BOM 구성 보기" })).toBeInTheDocument();
+    expect(screen.getByTestId("mobile-weekly-bom-tree")).toHaveAttribute("data-item-id", selectedItem.item_id);
+    expect(screen.getByTestId("mobile-weekly-bom-tree")).toHaveAttribute("data-mobile-detail", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
+    expect(screen.queryByRole("dialog", { name: "BOM 구성 보기" })).not.toBeInTheDocument();
   });
 });

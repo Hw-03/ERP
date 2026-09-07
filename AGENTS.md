@@ -59,16 +59,19 @@ Keep both files aligned so Claude Code and Codex can work on DEXCOWIN MES with t
 
 ## Plan Mode - Codex Model Recommendation
 
-After completing a plan, always place the recommended Codex model and reasoning level at the very top of the plan shown to the user. The model must be one of the Codex UI model choices, and the reasoning level must be written in Korean exactly as shown in the UI:
+After completing a plan, always place the recommended Codex model, exactly one reasoning level, and execution shape at the very top of the plan shown to the user. The model and reasoning-level names must match the labels shown in the Codex UI:
 
 > **추천 모델: GPT-5.6 Terra** - [한 줄 이유]
 > **추천 추론 수준: Medium** - [한 줄 이유]
-> **울트라: 사용 안 함** - [필요할 때만 한 줄 이유]
+> **실행 방식: 단독 작업** - [한 줄 이유]
 
-Available model choices:
-- **GPT-5.6 Sol**: Use for the hardest plans: broad architecture, security/permission changes, state machines, risky data-flow changes, or complex cross-file judgment.
-- **GPT-5.6 Terra**: Default for most DEXCOWIN MES development plans: normal feature work, backend+frontend integration, bug fixes, moderate refactors, and test planning.
-- **GPT-5.6 Luna**: Use for narrow, quick, low-risk plans: document edits, file searches, simple renames, small UI text/style tweaks, and mechanical cleanup.
+추론 수준은 반드시 `Light`, `Medium`, `High`, `Extra High`, `최대`, `울트라` 중 정확히 하나만 추천한다. 별도의 `울트라: 사용함/사용 안 함` 줄은 절대 넣지 않는다. 울트라가 적합하면 `**추천 추론 수준: 울트라**`로 바로 표기하고, 실행 방식 줄에서 하위 에이전트의 역할을 설명한다.
+
+모델 선택 기준:
+- **GPT-6 Astra**: 가장 어려운 엔드투엔드 작업의 기본 후보다. 불명확한 요구를 해석하면서 장기 다단계 작업을 끝까지 수행해야 하거나, 넓은 아키텍처 판단, 고위험 보안·권한·데이터 정합성 변경, 복잡한 코드·브라우저·문서 작업의 통합이 필요한 플랜에 사용한다. 단순히 파일 수가 많거나 오래 걸린다는 이유만으로 선택하지 않는다.
+- **GPT-5.6 Sol**: 복잡한 전문 개발 작업에 사용한다. Astra까지는 필요 없지만, 여러 모듈의 비자명한 구현·디버깅·검토 판단이 필요한 경우가 대상이다.
+- **GPT-5.6 Terra**: 성능과 사용량의 균형이 필요한 일반 DEXCOWIN MES 개발의 기본값이다. 보통의 기능 개발, 프론트엔드·백엔드 연동, 국소 버그 수정, 중간 규모 리팩터링, 테스트 계획에 사용한다.
+- **GPT-5.6 Luna**: 좁고 빠르며 저위험인 작업에 사용한다. 파일 탐색, 문서 수정, 단순 이름 변경, 작은 UI 문구·스타일 수정, 기계적 정리에 적합하다.
 
 UI 추론 수준과 선택 기준:
 - **Light**: 답이나 변경 방법이 이미 명확하고, 탐색·도구 호출·검증에 깊은 판단이 거의 필요 없는 지연 시간 우선 작업. 파일 탐색, 기계적 이름 변경, 단순 문구·상수 변경, 좁은 문서 수정에 사용한다.
@@ -76,10 +79,9 @@ UI 추론 수준과 선택 기준:
 - **High**: Medium으로는 놓치기 쉬운 의존성·예외·회귀 경로가 있고, 추가 추론이 결과 품질을 높일 구체적 이유가 있을 때만 사용한다. 여러 모듈의 상태 변화, 비자명한 디버깅, 데이터 흐름 검증, 테스트 설계가 그 예다.
 - **Extra High**: 설계 대안 비교, 불명확한 결함 원인, 권한·동시성·상태 전이, 여러 독립 조사 결과의 통합처럼 탐색과 검증 자체가 핵심인 작업에 사용한다. 단순히 수정 파일 수가 많다는 이유만으로 올리지 않는다.
 - **최대**: 품질 우선의 가장 어려운 작업에만 사용한다. 보안·데이터 정합성·아키텍처 변경처럼 잘못된 판단의 비용이 높고, Extra High보다 더 많은 탐색과 검증이 성공률을 실질적으로 높일 때 선택한다. 같은 유형의 반복 작업에서는 Extra High와 최대를 대표 사례로 비교해 더 나은 품질·지연·사용량 균형을 확인한다.
+- **울트라**: 서로 독립적인 고가치 작업 흐름을 여러 하위 에이전트로 병렬 분담하고, 부모가 결과를 통합·검증하는 일이 실제 병목일 때 사용한다. 단일 문제의 깊은 분석, 순차 의존 작업, 단순히 규모가 크거나 오래 걸리는 작업에는 추천하지 않는다. 울트라는 사용량을 더 빨리 소모한다.
 
-**울트라**는 위 다섯 단계와 같은 단순 추론 수준이 아니라, Codex가 여러 하위 에이전트를 적극적으로 조율하는 특수 실행 방식으로 취급한다. 서로 독립적인 작업 흐름을 병렬로 나눌 수 있고 그 결과를 통합하는 일이 병목일 때만 추천한다. 단일 문제의 깊은 분석, 순차 의존 작업, 단순히 규모가 크거나 오래 걸리는 작업에는 추천하지 않는다. 울트라는 사용량을 더 빨리 소모한다.
-
-플랜에서는 먼저 `Light` 또는 `Medium`을 기준 후보로 잡고, 추가 추론이 품질을 높일 구체적 실패 위험을 한 줄 이유에 적을 수 있을 때만 `High` 이상을 추천한다. 추천 모델, 추론 수준, 울트라 사용 여부는 서로 독립적으로 판단한다.
+플랜에서는 먼저 `Light` 또는 `Medium`을 기준 후보로 잡고, 추가 추론이 품질을 높일 구체적 실패 위험을 한 줄 이유에 적을 수 있을 때만 `High` 이상을 추천한다. 모델, 추론 수준, 실행 방식은 각각 작업의 난도·위험·병렬성에 따라 판단하되, 울트라를 추천할 때는 실행 방식도 하위 에이전트 병렬 작업으로 구체화한다.
 
 For Codex plans, also include the recommended execution shape when useful: solo vs. subagents.
 ## Commit / Push

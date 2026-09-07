@@ -13,10 +13,8 @@ import { HistoryLogRow } from "./HistoryLogRow";
 import {
   BatchHeader,
   HISTORY_CELL_TRANSITION,
-  HISTORY_CODE_QUANTITY_CONTENT_WIDTH_PX,
-  HISTORY_CODE_QUANTITY_WIDTH_PX,
   HISTORY_ITEM_CODE_WIDTH_PX,
-  HISTORY_QUANTITY_WIDTH_PX,
+  HISTORY_STOCK_SNAPSHOT_WIDTH_PX,
   OpBatchHeader,
   ReferenceBatchDetail,
   buildGroups,
@@ -71,23 +69,15 @@ type ColSpec = {
   hidden?: boolean;
   px?: string;
   colSpan?: number;
-  groupLabels?: readonly [string, string];
 };
 
-// 평상시(우측 패널 닫힘) — 현장 판단 순서: 언제 → 작업 → 대상 → 품목코드 → 수량 → 위치 재고 → 담당자.
+// 평상시(우측 패널 닫힘) — 현장 판단 순서: 언제 → 작업 → 대상 → 품목코드 → 위치별 증감 → 담당자.
 const COLUMNS: ColSpec[] = [
   { label: "일시", width: "116px", align: "center", px: "px-2" },
   { label: "작업", width: "184px", align: "center" },
   { label: "대상" },
-  {
-    label: "품목코드 · 수량",
-    width: `${HISTORY_CODE_QUANTITY_WIDTH_PX}px`,
-    align: "center",
-    px: "px-0",
-    colSpan: 2,
-    groupLabels: ["품목코드", "수량"],
-  },
-  { label: "재고 변동", width: "172px", align: "center", px: "px-1" },
+  { label: "품목코드", width: `${HISTORY_ITEM_CODE_WIDTH_PX}px`, align: "center", px: "px-0" },
+  { label: "재고 변동", width: `${HISTORY_STOCK_SNAPSHOT_WIDTH_PX}px`, align: "center", px: "px-1" },
   { label: "담당자", width: "132px", align: "center", px: "px-2" },
 ];
 const HISTORY_TABLE_COLUMN_SPAN = COLUMNS.reduce((total, column) => total + (column.colSpan ?? 1), 0);
@@ -145,21 +135,13 @@ function HistoryTableSkeleton() {
             {COLUMNS.map((column, index) => (
               <th
                 key={column.label || `loading-spacer-${index}`}
-                scope={column.colSpan ? "colgroup" : column.label ? "col" : undefined}
+                scope={column.label ? "col" : undefined}
                 aria-hidden={column.label ? undefined : true}
-                aria-label={column.groupLabels ? column.label : undefined}
                 colSpan={column.colSpan}
                 className={historyTableHeaderClass(column, index)}
                 style={{ background: "var(--c-history-table-header)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: column.width, minWidth: column.minWidth, transition: HISTORY_CELL_TRANSITION }}
               >
-                {column.groupLabels ? (
-                  <div
-                    className="grid"
-                    style={{ gridTemplateColumns: `${HISTORY_ITEM_CODE_WIDTH_PX}px ${HISTORY_QUANTITY_WIDTH_PX}px`, width: `${HISTORY_CODE_QUANTITY_CONTENT_WIDTH_PX}px` }}
-                  >
-                    {column.groupLabels.map((label) => <span key={label}>{label}</span>)}
-                  </div>
-                ) : column.label}
+                {column.label}
               </th>
             ))}
           </tr>
@@ -171,31 +153,14 @@ function HistoryTableSkeleton() {
                 <td
                   key={`${column.label}-${columnIndex}`}
                   colSpan={column.colSpan}
-                  className={column.groupLabels ? "h-[64px] overflow-hidden border-b p-0 align-middle" : "border-b px-4 py-2 align-middle"}
-                  style={{ borderColor: LEGACY_COLORS.border, width: column.groupLabels ? column.width : undefined, transition: column.groupLabels ? HISTORY_CELL_TRANSITION : undefined }}
+                  className="border-b px-4 py-2 align-middle"
+                  style={{ borderColor: LEGACY_COLORS.border }}
                 >
-                  {column.groupLabels ? (
-                    <div
-                      className="grid h-[64px]"
-                      style={{ gridTemplateColumns: `${HISTORY_ITEM_CODE_WIDTH_PX}px ${HISTORY_QUANTITY_WIDTH_PX}px`, width: `${HISTORY_CODE_QUANTITY_CONTENT_WIDTH_PX}px` }}
-                    >
-                      {column.groupLabels.map((label, labelIndex) => (
-                        <div key={label} className="flex items-center justify-center px-2">
-                          <div
-                            aria-hidden="true"
-                            className="h-4 animate-pulse rounded-[6px]"
-                            style={{ background: LEGACY_COLORS.s3, width: labelIndex === 1 ? "76%" : "58%" }}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div
-                      aria-hidden="true"
-                      className="mx-auto h-4 animate-pulse rounded-[6px]"
-                      style={{ background: LEGACY_COLORS.s3, width: columnIndex === 2 ? "72%" : "58%" }}
-                    />
-                  )}
+                  <div
+                    aria-hidden="true"
+                    className="mx-auto h-4 animate-pulse rounded-[6px]"
+                    style={{ background: LEGACY_COLORS.s3, width: columnIndex === 2 ? "72%" : "58%" }}
+                  />
                 </td>
               ))}
             </tr>
@@ -483,21 +448,13 @@ export function HistoryTable({
                 {COLUMNS.map((column, index) => (
                   <th
                     key={column.label || `spacer-${index}`}
-                    scope={column.colSpan ? "colgroup" : column.label ? "col" : undefined}
+                    scope={column.label ? "col" : undefined}
                     aria-hidden={column.label ? undefined : true}
-                    aria-label={column.groupLabels ? column.label : undefined}
                     colSpan={column.colSpan}
                     className={historyTableHeaderClass(column, index)}
                     style={{ background: "var(--c-history-table-header)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: column.width, minWidth: column.minWidth, transition: HISTORY_CELL_TRANSITION }}
                   >
-                    {column.groupLabels ? (
-                      <div
-                        className="grid"
-                      style={{ gridTemplateColumns: `${HISTORY_ITEM_CODE_WIDTH_PX}px ${HISTORY_QUANTITY_WIDTH_PX}px`, width: `${HISTORY_CODE_QUANTITY_CONTENT_WIDTH_PX}px` }}
-                      >
-                        {column.groupLabels.map((label) => <span key={label}>{label}</span>)}
-                      </div>
-                    ) : column.label}
+                    {column.label}
                   </th>
                 ))}
               </tr>

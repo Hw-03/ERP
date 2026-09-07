@@ -4,10 +4,10 @@ import { useMemo, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { Button } from "@/lib/ui/Button";
-import { Toast, type ToastState } from "@/lib/ui/Toast";
 import { api, type Item } from "@/lib/api";
 import type { Handover } from "@/lib/api/types";
 import { QuantityInput } from "../common/QuantityInput";
+import { StatusTargetNotice, useStatusTargetNotice } from "../common/StatusTargetNotice";
 
 const RECEIVE_DEPARTMENTS = ["고압", "진공"];
 const DRAFT_TITLE_PLACEHOLDER = "(작성 중)";
@@ -55,7 +55,11 @@ export function HandoverComposeForm({
   const [draftId, setDraftId] = useState<string | null>(draft?.handover_id ?? null);
   const [selectedItemId, setSelectedItemId] = useState("");
   const [busy, setBusy] = useState(false);
-  const [toast, setToast] = useState<ToastState | null>(null);
+  const {
+    notice: feedbackNotice,
+    showNotice: showFeedbackNotice,
+    dismissNotice: dismissFeedbackNotice,
+  } = useStatusTargetNotice();
 
   // 인수인계 대상은 튜브 TF 품목. 코드에 "TF" 가 포함된 품목만 선택지로 노출하고,
   // 이미 추가한 품목은 제외.
@@ -117,13 +121,13 @@ export function HandoverComposeForm({
     try {
       const saved = await api.saveHandoverDraft(draftPayload());
       setDraftId(saved.handover_id);
-      setToast({ message: "임시저장했습니다. 나중에 이어서 작성할 수 있습니다.", type: "success" });
+      showFeedbackNotice("임시저장했습니다. 나중에 이어서 작성할 수 있습니다.", "success");
       onDraftSaved?.();
     } catch (err) {
-      setToast({
-        message: err instanceof Error ? err.message : "임시저장 중 오류가 발생했습니다.",
-        type: "error",
-      });
+      showFeedbackNotice(
+        err instanceof Error ? err.message : "임시저장 중 오류가 발생했습니다.",
+        "error",
+      );
     } finally {
       setBusy(false);
     }
@@ -149,17 +153,17 @@ export function HandoverComposeForm({
           lines: lines.map((l) => ({ item_id: l.item_id, quantity: l.quantity })),
         });
       }
-      setToast({ message: "인수인계서를 제출했습니다.", type: "success" });
+      showFeedbackNotice("인수인계서를 제출했습니다.", "success");
       setLines([]);
       setAnalysisText("");
       setNotes("");
       setDraftId(null);
       onCreated();
     } catch (err) {
-      setToast({
-        message: err instanceof Error ? err.message : "제출 중 오류가 발생했습니다.",
-        type: "error",
-      });
+      showFeedbackNotice(
+        err instanceof Error ? err.message : "제출 중 오류가 발생했습니다.",
+        "error",
+      );
     } finally {
       setBusy(false);
     }
@@ -321,7 +325,13 @@ export function HandoverComposeForm({
         </Button>
       </div>
 
-      <Toast toast={toast} onClose={() => setToast(null)} />
+      {feedbackNotice && (
+        <StatusTargetNotice
+          key={feedbackNotice.id}
+          notice={feedbackNotice}
+          onArrive={dismissFeedbackNotice}
+        />
+      )}
     </div>
   );
 }

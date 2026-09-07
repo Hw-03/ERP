@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
-import type { ReactNode } from "react";
 import { DesktopAdminView } from "../DesktopAdminView";
 
 const state = vi.hoisted(() => ({
@@ -21,10 +20,6 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/lib/ui/dirty-guard", () => ({
   useConfirmNavigation: () => (next: () => void) => next(),
-}));
-
-vi.mock("@/lib/ui/Toast", () => ({
-  Toast: ({ children }: { children?: ReactNode }) => <>{children}</>,
 }));
 
 vi.mock("../_admin_hooks/useAdminViewState", () => ({

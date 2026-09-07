@@ -302,6 +302,83 @@ describe("DefectHubPanel", () => {
     expect(screen.queryByText("7-TR-0003")).not.toBeInTheDocument();
     expect(screen.getByText("격리 중").parentElement).toHaveTextContent("1건");
   });
+
+  it("applies mobile search with scope, actor, KPI intersection and keeps it after realtime refresh", async () => {
+    const { rerender } = render(<DefectHubPanel currentEmployee={{ ...mockEmployee, department: "기타" }} />);
+    openList();
+    expect(await screen.findByText("전극(70kV)")).toBeInTheDocument();
+
+    const search = screen.getByRole("searchbox", { name: "불량 검색" });
+    fireEvent.change(search, { target: { value: " 기능 불량 " } });
+    expect(screen.getByText("게터")).toBeInTheDocument();
+    expect(screen.queryByText("전극(70kV)")).not.toBeInTheDocument();
+    expect(screen.getByText("격리 중").parentElement).toHaveTextContent("2건");
+    expect(screen.getByText("1년 이상 ⚠").parentElement).toHaveTextContent("1건");
+
+    fireEvent.click(screen.getByRole("button", { name: "내가 격리" }));
+    expect(screen.queryByText("게터")).not.toBeInTheDocument();
+    expect(screen.getByText("격리 중").parentElement).toHaveTextContent("1건");
+    expect(screen.getByText("1년 이상 ⚠").parentElement).toHaveTextContent("0건");
+
+    fireEvent.change(search, { target: { value: "없는 검색어" } });
+    expect(screen.getByText("검색 결과가 없습니다.")).toBeInTheDocument();
+
+    fireEvent.change(search, { target: { value: "TARGET" } });
+    vi.mocked(defectsApi.listDefects).mockResolvedValueOnce([
+      { ...mockLocations[0], mes_code: "TARGET-001", quarantined_by_employee_id: mockEmployee.employee_id },
+      { ...mockLocations[0], record_id: "other", mes_code: "OTHER-001", quarantined_by_employee_id: mockEmployee.employee_id },
+    ]);
+    realtime.revision = 1;
+    rerender(<DefectHubPanel currentEmployee={{ ...mockEmployee, department: "기타" }} />);
+    await waitFor(() => expect(vi.mocked(defectsApi.listDefects)).toHaveBeenCalledTimes(2));
+    expect(screen.getByText("TARGET-001")).toBeInTheDocument();
+    expect(screen.queryByText("OTHER-001")).not.toBeInTheDocument();
+  });
+
+  it("preserves the selected sort order in the mobile filtered list", async () => {
+    render(<DefectHubPanel currentEmployee={{ ...mockEmployee, department: "기타" }} />);
+    openList();
+    expect(await screen.findByText("전극(70kV)")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "newest" } });
+    const summaries = screen.getAllByTestId("defect-item-summary");
+    expect(summaries[0]).toHaveTextContent("전극(70kV)");
+    expect(summaries[1]).toHaveTextContent("게터");
+  });
+
+  it("intersects search and the over-year KPI while retaining scope KPI counts and sort order", async () => {
+    const day = 24 * 60 * 60 * 1000;
+    const matchingOld = { ...mockLocations[0], record_id: "target-old", item_id: "target-old", item_name: "검색 오래된", mes_code: "TARGET-OLD", defective_at: new Date(Date.now() - 400 * day).toISOString() };
+    const matchingNew = { ...mockLocations[0], record_id: "target-new", item_id: "target-new", item_name: "검색 최신", mes_code: "TARGET-NEW", defective_at: new Date(Date.now() - 200 * day).toISOString() };
+    const nonMatchingOld = { ...mockLocations[0], record_id: "other-old", item_id: "other-old", item_name: "다른 품목", mes_code: "OTHER-OLD", defective_at: new Date(Date.now() - 400 * day).toISOString() };
+    vi.mocked(defectsApi.listDefects).mockResolvedValueOnce([matchingOld, matchingNew, nonMatchingOld]);
+
+    render(<DefectHubPanel currentEmployee={{ ...mockEmployee, department: "기타" }} />);
+    openList();
+    expect(await screen.findByText("검색 오래된")).toBeInTheDocument();
+    const search = screen.getByRole("searchbox", { name: "불량 검색" });
+    fireEvent.change(search, { target: { value: " target " } });
+    expect(screen.getByText("격리 중").parentElement).toHaveTextContent("3건");
+    expect(screen.getByText("1년 이상 ⚠").parentElement).toHaveTextContent("2건");
+    expect(screen.queryByText("다른 품목")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "newest" } });
+    let summaries = screen.getAllByTestId("defect-item-summary");
+    expect(summaries[0]).toHaveTextContent("검색 최신");
+    expect(summaries[1]).toHaveTextContent("검색 오래된");
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "oldest" } });
+    await waitFor(() => expect(screen.getByRole("combobox")).toHaveValue("oldest"));
+    summaries = screen.getAllByTestId("defect-item-summary");
+    expect(summaries[0]).toHaveTextContent("검색 오래된");
+    expect(summaries[1]).toHaveTextContent("검색 최신");
+
+    fireEvent.click(screen.getByText("1년 이상 ⚠"));
+    expect(screen.getByText("검색 오래된")).toBeInTheDocument();
+    expect(screen.queryByText("검색 최신")).not.toBeInTheDocument();
+    expect(screen.queryByText("다른 품목")).not.toBeInTheDocument();
+    expect(screen.getByText("격리 중").parentElement).toHaveTextContent("3건");
+    expect(screen.getByText("1년 이상 ⚠").parentElement).toHaveTextContent("2건");
+  });
 });
 
 describe("DefectHubPanel realtime refresh", () => {

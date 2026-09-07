@@ -43,13 +43,16 @@ vi.mock("../IoConfirmStep", () => ({
   IoConfirmStep: ({
     onSaveDraft,
     onSubmit,
+    onValidationError,
   }: {
     onSaveDraft: () => void;
     onSubmit: () => void;
+    onValidationError?: (message: string) => void;
   }) => (
     <>
       <button type="button" data-testid="draft-save" onClick={onSaveDraft}>save</button>
       <button type="button" data-testid="confirm-submit" onClick={onSubmit}>submit</button>
+      <button type="button" data-testid="confirm-memo-error" onClick={() => onValidationError?.("메모가 없어 부서 결재 요청을 진행할 수 없습니다.")}>memo error</button>
     </>
   ),
 }));
@@ -78,7 +81,14 @@ function conversionItem(id: string, name: string, quantity: number): Item {
     legacy_part: null,
     legacy_item_type: null,
     supplier: null,
+    supplier_item_code: null,
+    standard_purchase_price: null,
+    purchase_price_effective_date: null,
     min_stock: null,
+    reorder_point: null,
+    procurement_lead_time_days: null,
+    minimum_order_quantity: null,
+    purchase_memo: null,
     mes_code: id,
     model_symbol: null,
     model_slots: [],
@@ -160,6 +170,39 @@ beforeEach(() => {
 });
 
 describe("IoComposeView navigation chrome", () => {
+  it("최종 확인의 메모 검증 오류를 상태 대상 알림으로 표시한다", async () => {
+    render(
+      <IoComposeView
+        globalSearch=""
+        operator={operator}
+        employees={[]}
+        items={[]}
+        productModels={[]}
+        setItems={() => {}}
+        onStatusChange={() => {}}
+        restoreStep={5}
+        restoreDraft={{
+          batch_id: "memo-validation-draft",
+          work_type: "process",
+          sub_type: "adjust_in",
+          from_department: null,
+          to_department: "조립",
+          reference_no: null,
+          notes: null,
+          bundles: [],
+        } as never}
+      />,
+    );
+
+    fireEvent.click(await screen.findByTestId("confirm-memo-error"));
+
+    const notice = await screen.findByRole("alert");
+    expect(notice).toHaveClass("status-target-notice");
+    expect(notice).toHaveTextContent(
+      "메모가 없어 부서 결재 요청을 진행할 수 없습니다.",
+    );
+  });
+
   it("작성 중으로 복귀한 작업의 반려 사유를 조합 화면 상단에 표시하지 않는다", () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },

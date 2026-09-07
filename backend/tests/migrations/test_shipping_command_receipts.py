@@ -17,6 +17,7 @@ from app.models import ShippingCommandReceipt
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 PREVIOUS_REVISION = "20260831_0032"
 MIGRATION_REVISION = "20260831_0033"
+CURRENT_HEAD = "20260907_0034"
 TABLE_NAME = "shipping_command_receipts"
 UNIQUE_NAME = "uq_shipping_command_receipt_actor_route_key"
 ACTOR_INDEX = "ix_shipping_command_receipts_actor_employee_id"
@@ -97,13 +98,17 @@ def _assert_receipt_schema(engine: sa.Engine) -> None:
     )
 
 
-def test_0033_is_the_single_head() -> None:
+def test_0033_is_a_parent_of_the_single_merge_head() -> None:
     config = Config(str(BACKEND_DIR / "alembic.ini"))
     config.set_main_option("script_location", str(BACKEND_DIR / "alembic"))
     script = ScriptDirectory.from_config(config)
 
-    assert script.get_heads() == [MIGRATION_REVISION]
+    assert script.get_heads() == [CURRENT_HEAD]
     assert script.get_revision(MIGRATION_REVISION).down_revision == PREVIOUS_REVISION
+    assert script.get_revision(CURRENT_HEAD).down_revision == (
+        "20260903_0032",
+        MIGRATION_REVISION,
+    )
 
 
 @pytest.mark.parametrize("start_revision", ["base", PREVIOUS_REVISION])

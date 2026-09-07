@@ -2,7 +2,7 @@
  * 창고 수량보정 입출고 — 창고 정·부 전용 즉시 반영 흐름.
  *
  * 전용 mes_e2e.db에서 데스크톱 보정 입고와 모바일 보정 출고를 차례로 제출한다.
- * 실제 mes.db는 globalSetup/globalTeardown의 해시 가드로 변경되지 않는다.
+ * 실제 mes.db는 globalSetup과 캡처된 teardown의 해시 가드로 변경되지 않는다.
  */
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import {

@@ -5,12 +5,13 @@
 
 ## 격리 실행 — 실 DB 미접촉 (2026-06-04~)
 
-`globalSetup`/`globalTeardown` 이 **전용 DB·전용 서버**를 자동으로 띄우고 내린다. 실
-`backend/mes.db` 는 절대 건드리지 않는다(teardown 에서 SHA256 불변 검증).
+공통 Node runner가 실행 전 원자적 run lock을 잡고, `globalSetup`이 **전용 DB·전용 서버**를
+자동으로 띄운 뒤 현재 run token을 캡처한 teardown을 반환한다. 실 `backend/mes.db`는 절대
+건드리지 않는다(teardown에서 SHA256 불변 검증).
 
 - 전용 DB: `backend/mes_e2e.db` (부트스트랩+시드, teardown 삭제)
-- 전용 백엔드: 포트 **8021** (globalSetup 이 `DATABASE_URL` 로 기동)
-- 전용 프론트: 포트 **3100** (`scripts/next-server.js dev`, `/api/*` → `BACKEND_INTERNAL_URL`=8021 프록시)
+- 전용 백엔드: 기본 **8021**, 승인 fallback **8022** (globalSetup이 `DATABASE_URL`로 기동)
+- 전용 프론트: 기본 **3100**, 승인 fallback 범위 **3300~3399**(wrapper 기본 선택은 3300, `/api/*` → 선택된 `BACKEND_INTERNAL_URL` 프록시)
 - dev(8011/3001)·prod(8010/3000) 스택과 무충돌.
 
 ```bash
@@ -18,6 +19,10 @@ cd frontend
 npm run test:e2e                        # Node 20 guard + 전체 E2E
 npm run test:e2e -- io-receive.spec.ts  # Node 20 guard + 단일 spec
 ```
+
+세 npm 진입점(`test:e2e`, `test:e2e:headed`, `test:e2e:ui`)만 사용한다. raw
+`npx playwright test`는 run lock과 현재 token이 없어 config 로딩 단계에서 거부된다. 기존 lock이나
+receipt가 남아 있으면 자동 회수·PID 종료를 시도하지 않고 증거를 보존한 채 실패한다.
 
 또는 리포지토리 루트에서:
 ```powershell
@@ -33,7 +38,7 @@ setup은 지정 작업자별 `/api/operator-session`을 한 번 호출해 실제
 보관하고, `_helpers.ts`의 `loginAsOperator(page, { role | code })`는 테스트별 새 browser context에
 해당 cookie를 복제한 뒤 `GET /api/operator-session` 정본으로 actor를 재검증한다. 따라서 브라우저
 상태는 격리하면서 production 세션 발급 예산을 테스트 수만큼 소모하지 않는다. 임시 시드와 cookie는
-global teardown에서 삭제한다. 결재 2-세션 테스트는 `code`(employee_code)로 제출자/승인자를 분리한다.
+캡처된 teardown에서 삭제한다. 결재 2-세션 테스트는 `code`(employee_code)로 제출자/승인자를 분리한다.
 
 ## 시나리오
 
@@ -62,4 +67,5 @@ global teardown에서 삭제한다. 결재 2-세션 테스트는 `code`(employee
 ## CI
 
 `.github/workflows/ci.yml` 의 필수 `e2e` job 이 `npm run test:e2e`로 동일 코드 전체를 돈다
-(전용 DB globalSetup). teardown 은 OS 분기(Windows taskkill / POSIX SIGKILL)로 크로스플랫폼.
+(공통 run lock + 전용 DB globalSetup). 캡처된 teardown은 OS 분기(Windows taskkill / POSIX
+SIGKILL)로 크로스플랫폼이다.

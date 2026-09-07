@@ -74,6 +74,22 @@ describe("QuantityStepper", () => {
     expect(onChange).toHaveBeenNthCalledWith(2, 1);
   });
 
+  it("기본 입력은 정수 단위이며 소수 값을 전달하지 않는다", () => {
+    const onChange = vi.fn();
+
+    render(<QuantityStepper value={3} onChange={onChange} label="정수 수량" />);
+
+    const input = screen.getByRole("spinbutton", { name: "정수 수량" });
+    expect(input).toHaveAttribute("step", "1");
+
+    fireEvent.change(input, { target: { value: "1.5" } });
+    expect(onChange).not.toHaveBeenCalled();
+
+    fireEvent.change(input, { target: { value: "4" } });
+    expect(onChange).toHaveBeenCalledOnce();
+    expect(onChange).toHaveBeenCalledWith(4);
+  });
+
   it("uses the shared quantity-input surface with the existing quick controls", () => {
     render(<QuantityStepper value={12} onChange={() => {}} label="공통 수량" />);
 

@@ -4,16 +4,10 @@ import { useState } from "react";
 import type { TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TruncatedText } from "@/lib/ui/TruncatedText";
-import { ChevronToggleBtn, HISTORY_CELL_TRANSITION, HISTORY_TABLE_OPERATION_PILL_CLASS, ItemCodeQuantityCell, StockSnapshotCell } from "./historyTableHelpers";
-import { buildReworkItemSummaries, type ReworkItemSummary, type ReworkResultTone } from "./reworkSummary";
+import { ChevronToggleBtn, HISTORY_CELL_TRANSITION, HISTORY_TABLE_OPERATION_PILL_CLASS, ItemCodeCell, StockSnapshotCell } from "./historyTableHelpers";
+import { buildReworkItemSummaries, type ReworkItemSummary } from "./reworkSummary";
 
 const REWORK_RESULT_LABEL = "처리결과";
-const REWORK_RESULT_TONE_COLORS: Record<ReworkResultTone, string> = {
-  danger: LEGACY_COLORS.red,
-  success: LEGACY_COLORS.green,
-  muted: LEGACY_COLORS.muted2,
-};
-
 type Props = {
   logs: TransactionLog[];
   parentItemId: string;
@@ -104,26 +98,10 @@ function ReworkSummaryRow({ summary, title, compact, rowId, cancelled, expanded,
           </TruncatedText>
         </div>
       </td>
-      <ItemCodeQuantityCell
+      <ItemCodeCell
         code={summary.mesCode}
         compact={compact}
         dense
-        quantity={(
-          <div className="text-xs font-bold">
-            {summary.resultParts.map((part, index) => (
-              <span key={`${part.tone}-${part.label}`}>
-                {index > 0 && (
-                  <span aria-hidden style={{ color: LEGACY_COLORS.muted2 }}>
-                    {" · "}
-                  </span>
-                )}
-                <span style={{ color: REWORK_RESULT_TONE_COLORS[part.tone] }}>
-                  {part.label}
-                </span>
-              </span>
-            ))}
-          </div>
-        )}
       />
       <StockSnapshotCell log={summary.representativeLog} dense />
       <td className="border-b px-4 py-2 text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>

@@ -14,6 +14,10 @@ import {
 import { queryKeys } from "@/lib/queries/keys";
 import { itemsApi } from "@/lib/api/items";
 import { EMPTY_ADD_FORM, type AddForm } from "../_admin_sections/adminShared";
+import {
+  normalizeStandardPurchasePrice,
+  validateStockPurchaseValues,
+} from "./itemStockPurchaseValidation";
 
 export type UseAdminMasterItemsCommandsArgs = {
   setItems: (updater: (prev: Item[]) => Item[]) => void;
@@ -63,6 +67,12 @@ export function useAdminMasterItemsCommands({
       onError("초기 재고 위치와 수량을 입력하세요.");
       return;
     }
+    const stockPurchaseError = validateStockPurchaseValues(addForm);
+    if (stockPurchaseError) {
+      onError(stockPurchaseError);
+      return;
+    }
+    const standardPurchasePrice = normalizeStandardPurchasePrice(addForm.standard_purchase_price);
     try {
       const builtLocs = allLocs
         .filter((r) => r.department && Number(r.quantity) > 0 && r.department !== "창고")
@@ -76,8 +86,15 @@ export function useAdminMasterItemsCommands({
         bom_stock_exempt: addForm.bom_stock_exempt,
         sales_review_required: addForm.sales_review_required,
         legacy_item_type: addForm.legacy_item_type || undefined,
-        supplier: addForm.supplier || undefined,
-        min_stock: addForm.min_stock === "" ? undefined : Number(addForm.min_stock),
+        ...(addForm.supplier.trim() ? { supplier: addForm.supplier.trim() } : {}),
+        ...(addForm.supplier_item_code.trim() ? { supplier_item_code: addForm.supplier_item_code.trim() } : {}),
+        ...(standardPurchasePrice ? { standard_purchase_price: standardPurchasePrice } : {}),
+        ...(addForm.purchase_price_effective_date ? { purchase_price_effective_date: addForm.purchase_price_effective_date } : {}),
+        ...(addForm.min_stock === "" ? {} : { min_stock: Number(addForm.min_stock) }),
+        ...(addForm.reorder_point === "" ? {} : { reorder_point: Number(addForm.reorder_point) }),
+        ...(addForm.procurement_lead_time_days === "" ? {} : { procurement_lead_time_days: Number(addForm.procurement_lead_time_days) }),
+        ...(addForm.minimum_order_quantity === "" ? {} : { minimum_order_quantity: Number(addForm.minimum_order_quantity) }),
+        ...(addForm.purchase_memo.trim() ? { purchase_memo: addForm.purchase_memo.trim() } : {}),
         initial_quantity: totalQty,
         initial_locations: builtLocs.length > 0 ? builtLocs : undefined,
       });

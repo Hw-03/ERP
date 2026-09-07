@@ -107,6 +107,60 @@ describe("DesktopDefectView realtime refresh", () => {
     expect(screen.getByTestId("defect-list")).toBeInTheDocument();
   });
 
+  it("intersects desktop search with the over-year KPI while retaining KPI counts and sort order", async () => {
+    const day = 24 * 60 * 60 * 1000;
+    const matchingOld = { ...location, record_id: "target-old", item_id: "target-old", item_name: "검색 오래된", mes_code: "TARGET-OLD", defective_at: new Date(Date.now() - 400 * day).toISOString() };
+    const matchingNew = { ...location, record_id: "target-new", item_id: "target-new", item_name: "검색 최신", mes_code: "TARGET-NEW", defective_at: new Date(Date.now() - 200 * day).toISOString() };
+    const nonMatchingOld = { ...location, record_id: "other-old", item_id: "other-old", item_name: "다른 품목", mes_code: "OTHER-OLD", defective_at: new Date(Date.now() - 400 * day).toISOString() };
+    mocks.listDefects.mockResolvedValueOnce([matchingOld, matchingNew, nonMatchingOld]);
+
+    render(<DesktopDefectView operator={{ ...operator, department: "기타" }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Open list" }));
+    expect(await screen.findByRole("button", { name: "Process TARGET-OLD" })).toBeInTheDocument();
+    const search = screen.getByRole("searchbox", { name: "불량 검색" });
+    fireEvent.change(search, { target: { value: " target " } });
+    expect(screen.queryByRole("button", { name: "Process OTHER-OLD" })).not.toBeInTheDocument();
+    expect(screen.getByText("격리 중").parentElement).toHaveTextContent("3건");
+    expect(screen.getByText("1년 이상 ⚠").parentElement).toHaveTextContent("2건");
+
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "newest" } });
+    expect(await screen.findByRole("button", { name: "Process TARGET-NEW" })).toBeInTheDocument();
+    let processButtons = screen.getAllByRole("button", { name: /Process TARGET-/ });
+    expect(processButtons[0]).toHaveTextContent("TARGET-NEW");
+    expect(processButtons[1]).toHaveTextContent("TARGET-OLD");
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "oldest" } });
+    await waitFor(() => expect(screen.getByRole("combobox")).toHaveValue("oldest"));
+    processButtons = screen.getAllByRole("button", { name: /Process TARGET-/ });
+    expect(processButtons[0]).toHaveTextContent("TARGET-OLD");
+    expect(processButtons[1]).toHaveTextContent("TARGET-NEW");
+    fireEvent.click(screen.getByText("1년 이상 ⚠"));
+    expect(screen.getByRole("button", { name: "Process TARGET-OLD" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Process TARGET-NEW" })).not.toBeInTheDocument();
+    expect(screen.getByText("격리 중").parentElement).toHaveTextContent("3건");
+    expect(screen.getByText("1년 이상 ⚠").parentElement).toHaveTextContent("2건");
+  });
+
+  it("keeps the current search applied after a realtime refresh", async () => {
+    mocks.listDefects.mockResolvedValueOnce([location]);
+    const { rerender } = render(<DesktopDefectView operator={operator} />);
+    fireEvent.click(screen.getByRole("button", { name: "Open list" }));
+    expect(await screen.findByRole("button", { name: "Process D-001" })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "불량 검색" }), { target: { value: "target" } });
+    expect(screen.queryByRole("button", { name: "Process D-001" })).not.toBeInTheDocument();
+
+    mocks.listDefects.mockResolvedValueOnce([
+      { ...location, mes_code: "TARGET-001" },
+      { ...location, record_id: "record-other", mes_code: "OTHER-001" },
+    ]);
+    mocks.revision = 1;
+    rerender(<DesktopDefectView operator={operator} />);
+
+    await waitFor(() => expect(mocks.listDefects).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("button", { name: "Process TARGET-001" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Process OTHER-001" })).not.toBeInTheDocument();
+  });
+
   it("reconnects a process view to the fresh location and returns to the list when it disappears", async () => {
     mocks.listDefects.mockResolvedValueOnce([location]);
     const { rerender } = render(<DesktopDefectView operator={operator} />);

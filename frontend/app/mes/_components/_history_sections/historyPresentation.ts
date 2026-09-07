@@ -198,6 +198,9 @@ export function getReferenceBatchLinePresentation(
     return { label: "출하 구성", tone: "muted" };
   }
   if (kind === "outbound") return { label: "출고품", tone: "danger" };
+  if (log.operation_role === "CORRECTION") {
+    return { label: log.quantity_change >= 0 ? "단품 입고" : "단품 출고", tone: "muted" };
+  }
   return { label: "구성품", tone: "muted" };
 }
 

@@ -106,7 +106,7 @@ test.describe("불량 격리 건별 원장", () => {
     );
   });
 
-  test("같은 품목의 독립 행·부분 처리·메모 이력·승인 예약 생명주기", async ({ page }) => {
+  test("같은 품목의 독립 행·부분 처리·메모 이력·즉시 처리 작업자 기록", async ({ page }) => {
     test.setTimeout(120_000);
     const seed = readSeed();
     const operator = await loginAsOperator(page, { role: "department" });
@@ -221,11 +221,11 @@ test.describe("불량 격리 건별 원장", () => {
     await expect(refreshedSecondRow).toContainText("변경 후: 수정된 긴 메모");
 
     const requester = await loginAsOperator(page);
-    const createReservedRequest = () => postJson(page.request, "/api/stock-requests", {
+    const createImmediateRequest = () => postJson(page.request, "/api/stock-requests", {
       requester_employee_id: requester.employee_id,
       request_type: "defect_scrap",
       reason_category: "외관 불량",
-      reason_memo: "승인 예약 검증",
+      reason_memo: "즉시 처리 검증",
       lines: [{
         record_id: firstRecord.record_id,
         item_id: item.item_id,
@@ -236,52 +236,31 @@ test.describe("불량 격리 건별 원장", () => {
       }],
     });
 
-    const cancelledRequest = await createReservedRequest();
-    expect(cancelledRequest.status).toBe("reserved");
-    await page.reload();
-    await openList(page);
-    await expandItemRecords(page, item.item_name);
-    let reservedRow = page
-      .getByRole("article", { name: `${item.item_name} 격리 기록` })
-      .filter({ visible: true })
-      .filter({ hasText: "첫 격리 메모" });
-    await expect(reservedRow).toContainText("승인 대기 1개");
-    let firstRecordState = await recordState(firstRecord.record_id);
-    expect(Number(firstRecordState.quantity)).toBe(3);
-    expect(Number(firstRecordState.pending_quantity)).toBe(1);
-    expect(Number(firstRecordState.available_quantity)).toBe(2);
+    const completedRequest = await createImmediateRequest();
+    expect(completedRequest.status).toBe("completed");
+    expect(completedRequest.requires_warehouse_approval).toBeFalsy();
+    expect(completedRequest.requires_department_approval).toBeFalsy();
+    expect(completedRequest.approval_department).toBeNull();
+    expect(completedRequest.approved_by_employee_id).toBeNull();
+    expect(completedRequest.department_approved_by_employee_id).toBeNull();
 
-    const cancelled = await postJson(
-      page.request,
-      `/api/stock-requests/${cancelledRequest.request_id}/cancel`,
-      { actor_employee_id: requester.employee_id, pin: seed.operatorPin },
-    );
-    expect(cancelled.status).toBe("cancelled");
-    await page.reload();
-    await openList(page);
-    await expandItemRecords(page, item.item_name);
-    reservedRow = page
-      .getByRole("article", { name: `${item.item_name} 격리 기록` })
-      .filter({ visible: true })
-      .filter({ hasText: "첫 격리 메모" });
-    await expect(reservedRow).not.toContainText("승인 대기");
-    firstRecordState = await recordState(firstRecord.record_id);
-    expect(Number(firstRecordState.quantity)).toBe(3);
-    expect(Number(firstRecordState.pending_quantity)).toBe(0);
-    expect(Number(firstRecordState.available_quantity)).toBe(3);
-
-    const approvedRequest = await createReservedRequest();
-    await loginAsOperator(page, { role: "department" });
-    const approved = await postJson(
-      page.request,
-      `/api/stock-requests/${approvedRequest.request_id}/department-approve`,
-      { actor_employee_id: operator.employee_id, pin: seed.operatorPin },
-    );
-    expect(approved.status).toBe("completed");
-    firstRecordState = await recordState(firstRecord.record_id);
+    const firstRecordState = await recordState(firstRecord.record_id);
     expect(Number(firstRecordState.quantity)).toBe(2);
     expect(Number(firstRecordState.pending_quantity)).toBe(0);
     expect(Number(firstRecordState.available_quantity)).toBe(2);
+
+    const transactionsResponse = await page.request.get(
+      `/api/inventory/transactions?item_id=${item.item_id}&transaction_type=DEFECT_SCRAP&reference_no=${completedRequest.request_code}`,
+    );
+    expect(transactionsResponse.ok()).toBeTruthy();
+    const transactions: any[] = await transactionsResponse.json();
+    expect(transactions).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        produced_by: requester.name,
+        producer_employee_id: requester.employee_id,
+      }),
+    ]));
+
     await page.reload();
     await openList(page);
     await expandItemRecords(page, item.item_name);
@@ -290,9 +269,9 @@ test.describe("불량 격리 건별 원장", () => {
       .filter({ visible: true })
       .filter({ hasText: "첫 격리 메모" });
     await expect(completedRow.getByText("2개", { exact: true })).toBeVisible();
-    firstRecordState = await recordState(firstRecord.record_id);
-    expect(Number(firstRecordState.quantity)).toBe(2);
-    expect(Number(firstRecordState.pending_quantity)).toBe(0);
-    expect(Number(firstRecordState.available_quantity)).toBe(2);
+    const finalRecordState = await recordState(firstRecord.record_id);
+    expect(Number(finalRecordState.quantity)).toBe(2);
+    expect(Number(finalRecordState.pending_quantity)).toBe(0);
+    expect(Number(finalRecordState.available_quantity)).toBe(2);
   });
 });

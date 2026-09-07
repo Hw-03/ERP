@@ -4,6 +4,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { useAdminMasterItemsContext } from "../AdminMasterItemsContext";
 import { ItemFormFields } from "./ItemFormFields";
 import type { ItemFormData } from "./ItemFormFields";
+import { ItemStockPurchaseFields } from "./ItemStockPurchaseFields";
 
 export function AddItemForm() {
   const {
@@ -21,6 +22,11 @@ export function AddItemForm() {
         showInitialLocations
         enableAfSalesReviewDefault
         productModels={productModels}
+      />
+      <ItemStockPurchaseFields
+        form={addForm}
+        setForm={setAddForm}
+        unit={addForm.unit}
       />
 
       <button

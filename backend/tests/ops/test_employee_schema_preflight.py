@@ -170,6 +170,10 @@ def test_inventory_location_ledger_declares_data_preserving_employee_policy() ->
         "20260828_0031_cp4_command_integrity.py",
         "20260831_0032_inventory_location_ledger.py",
         "20260831_0033_shipping_command_receipts.py",
+        "20260903_0030_defect_movement_baselines.py",
+        "20260903_0031_add_item_procurement_fields.py",
+        "20260903_0032_add_item_purchase_memo.py",
+        "20260907_0034_merge_procurement_and_shipping_heads.py",
     ],
 )
 def test_current_employee_schema_migrations_declare_auto_deploy_policy(filename: str) -> None:

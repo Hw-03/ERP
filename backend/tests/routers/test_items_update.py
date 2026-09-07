@@ -9,6 +9,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 ADMIN_HEADERS = {"X-Admin-Pin": "0000"}
 
 
@@ -104,6 +106,107 @@ json={"min_stock": 12},
     )
     assert res.status_code == 200, res.text
     assert res.json()["min_stock"] == 12
+
+
+def test_update_item_rejects_negative_min_stock(client, make_item):
+    item = make_item(name="음수 안전재고", process_type_code="VR")
+
+    response = client.put(
+        f"/api/items/{item.item_id}",
+        headers=ADMIN_HEADERS,
+        json={"min_stock": -1},
+    )
+
+    assert response.status_code == 422, response.text
+
+
+def test_update_item_preserves_omitted_procurement_fields_and_clears_explicit_nulls(client, make_item):
+    item = make_item(name="구매 마스터 수정", process_type_code="HR")
+    configured = client.put(
+        f"/api/items/{item.item_id}",
+        headers=ADMIN_HEADERS,
+        json={
+            "supplier": "기존 공급사",
+            "min_stock": 20,
+            "supplier_item_code": "SUP-OLD",
+            "standard_purchase_price": "100.25",
+            "purchase_price_effective_date": "2026-09-01",
+            "procurement_lead_time_days": 7,
+            "minimum_order_quantity": 3,
+            "reorder_point": 11,
+            "purchase_memo": "기존 구매 조건",
+        },
+    )
+    assert configured.status_code == 200, configured.text
+    assert configured.json()["standard_purchase_price"] == "100.25"
+
+    partial = client.put(
+        f"/api/items/{item.item_id}",
+        headers=ADMIN_HEADERS,
+        json={"item_name": "구매 마스터 이름만 수정"},
+    )
+    assert partial.status_code == 200, partial.text
+    body = partial.json()
+    assert body["supplier"] == "기존 공급사"
+    assert body["min_stock"] == 20
+    assert body["supplier_item_code"] == "SUP-OLD"
+    assert body["standard_purchase_price"] == "100.25"
+    assert body["purchase_price_effective_date"] == "2026-09-01"
+    assert body["procurement_lead_time_days"] == 7
+    assert body["minimum_order_quantity"] == 3
+    assert body["reorder_point"] == 11
+    assert body["purchase_memo"] == "기존 구매 조건"
+
+    cleared = client.put(
+        f"/api/items/{item.item_id}",
+        headers=ADMIN_HEADERS,
+        json={
+            "supplier": None,
+            "min_stock": None,
+            "supplier_item_code": None,
+            "standard_purchase_price": None,
+            "purchase_price_effective_date": None,
+            "procurement_lead_time_days": None,
+            "minimum_order_quantity": None,
+            "reorder_point": None,
+            "purchase_memo": None,
+        },
+    )
+    assert cleared.status_code == 200, cleared.text
+    body = cleared.json()
+    for field in (
+        "supplier",
+        "min_stock",
+        "supplier_item_code",
+        "standard_purchase_price",
+        "purchase_price_effective_date",
+        "procurement_lead_time_days",
+        "minimum_order_quantity",
+        "reorder_point",
+        "purchase_memo",
+    ):
+        assert body[field] is None
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("standard_purchase_price", "-0.01"),
+        ("procurement_lead_time_days", -1),
+        ("minimum_order_quantity", 0),
+        ("reorder_point", -1),
+    ],
+)
+def test_update_item_rejects_invalid_procurement_values(client, make_item, field, value):
+    item = make_item(name=f"구매 수정 검증 {field}", process_type_code="HR")
+
+    response = client.put(
+        f"/api/items/{item.item_id}",
+        headers=ADMIN_HEADERS,
+        json={field: value},
+    )
+
+    assert response.status_code == 422, response.text
 
 
 def test_update_item_empty_payload_no_change(client, make_item):

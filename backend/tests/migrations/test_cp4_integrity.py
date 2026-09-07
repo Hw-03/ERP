@@ -40,9 +40,13 @@ def test_cp4_revision_remains_in_the_single_head_chain() -> None:
 
     script = ScriptDirectory.from_config(config)
 
-    assert script.get_heads() == ["20260831_0033"]
+    assert script.get_heads() == ["20260907_0034"]
     assert script.get_revision("20260831_0032").down_revision == MIGRATION_REVISION
     assert script.get_revision("20260831_0033").down_revision == "20260831_0032"
+    assert script.get_revision("20260907_0034").down_revision == (
+        "20260903_0032",
+        "20260831_0033",
+    )
 
 
 def test_0030_to_0031_adds_and_rollback_removes_correction_unique_index(
@@ -470,7 +474,7 @@ def test_postgresql_head_0031_downgrade_and_reupgrade() -> None:
     from tests.migrations.test_inventory_location_ledger import _postgres_database
 
     with _postgres_database("test_cp4_integrity") as database_url:
-        command.upgrade(_postgres_config(database_url), "head")
+        command.upgrade(_postgres_config(database_url), "20260831_0033")
         engine = sa.create_engine(database_url, poolclass=sa.pool.NullPool)
         try:
             with engine.connect() as connection:
@@ -510,7 +514,7 @@ def test_postgresql_head_0031_downgrade_and_reupgrade() -> None:
                     assert connection.execute(
                         sa.text("SELECT version_num FROM alembic_version")
                     ).scalar_one() == MIGRATION_REVISION
-                    command.upgrade(config, "head")
+                    command.upgrade(config, "20260831_0033")
                     assert connection.execute(
                         sa.text("SELECT version_num FROM alembic_version")
                     ).scalar_one() == "20260831_0033"

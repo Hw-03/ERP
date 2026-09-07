@@ -12,6 +12,7 @@ import { WeeklyGroupCards } from "./_weekly_sections/WeeklyGroupCards";
 import { WeeklyDetailTable } from "./_weekly_sections/WeeklyDetailTable";
 import { WeeklyProductionMatrix } from "./_weekly_sections/WeeklyProductionMatrix";
 import { LoadingSkeleton } from "./common";
+import { BomDetailModal } from "./_inventory_sections/BomDetailModal";
 
 interface Props {
   weekMon: Date;
@@ -19,6 +20,7 @@ interface Props {
 
 export function DesktopWeeklyReportView({ weekMon }: Props) {
   const [selectedCode, setSelectedCode] = useState("TF");
+  const [selectedBomItemId, setSelectedBomItemId] = useState<string | null>(null);
   const [f705Downloading, setF705Downloading] = useState(false);
   const [f705DownloadError, setF705DownloadError] = useState<string | null>(null);
 
@@ -220,12 +222,20 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
                 <WeeklyDetailTable
                   group={selectedGroup}
                   stockBasis={stockBasis}
+                  onItemSelect={(item) => setSelectedBomItemId(item.item_id)}
                 />
               )}
             </div>
           </div>
         </div>
       </div>
+      {selectedBomItemId && (
+        <BomDetailModal
+          itemId={selectedBomItemId}
+          open
+          onClose={() => setSelectedBomItemId(null)}
+        />
+      )}
     </div>
   );
 }

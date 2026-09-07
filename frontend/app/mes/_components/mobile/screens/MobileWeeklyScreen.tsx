@@ -7,14 +7,17 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatKstDate } from "@/lib/mes/date";
 import { api } from "@/lib/api";
 import type {
+  WeeklyItemReport,
   WeeklyReportResponse,
   WeeklyProductionModelRow,
 } from "@/lib/api/types/weekly";
+import { BottomSheet } from "@/lib/ui/BottomSheet";
 import { WeeklyWeekPicker } from "../../_weekly_sections/WeeklyWeekPicker";
 import { WeeklyGroupCards } from "../../_weekly_sections/WeeklyGroupCards";
 import { WeeklyDetailTable } from "../../_weekly_sections/WeeklyDetailTable";
 // 항목 4-13 — 모바일 생산현황을 PC 와 동일한 매트릭스 표로(frozen 컴포넌트 import 만, 수정 금지).
 import { WeeklyProductionMatrix } from "../../_weekly_sections/WeeklyProductionMatrix";
+import { BomSubExpander } from "../../_warehouse_v2/BomSubExpander";
 import { AsyncState } from "../primitives";
 import { TYPO } from "../tokens";
 
@@ -58,6 +61,7 @@ export function MobileWeeklyScreen({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedCode, setSelectedCode] = useState("TF");
+  const [selectedBomItem, setSelectedBomItem] = useState<WeeklyItemReport | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
 
   const weekStart = formatKstDate(weekMon);
@@ -179,10 +183,39 @@ export function MobileWeeklyScreen({
             <WeeklyDetailTable
               group={selectedGroup}
               stockBasis={stockBasis}
+              onItemSelect={setSelectedBomItem}
             />
           </section>
         </AsyncState>
       </div>
+      <BottomSheet
+        open={selectedBomItem !== null}
+        onClose={() => setSelectedBomItem(null)}
+        title="BOM 구성 보기"
+      >
+        {selectedBomItem && (
+          <div className="px-5">
+            <div className="mb-3">
+              <p className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>
+                {selectedBomItem.item_name}
+              </p>
+              <p className="mt-1 font-mono text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+                {selectedBomItem.mes_code ?? "품목 코드 없음"}
+              </p>
+              <p className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+                읽기 전용 · 구성품별 현재 재고
+              </p>
+            </div>
+            <BomSubExpander
+              itemId={selectedBomItem.item_id}
+              open
+              compact
+              tapToExpandName
+              mobileDetail
+            />
+          </div>
+        )}
+      </BottomSheet>
     </div>
   );
 }

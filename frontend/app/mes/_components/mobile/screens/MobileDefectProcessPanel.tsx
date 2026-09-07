@@ -241,8 +241,8 @@ export function MobileDefectProcessPanel({
           open={confirmOpen}
           title="재작업 확인"
           tone="danger"
-          cautionMessage="승인 완료 후 재고에 반영됩니다."
-          confirmLabel="처리 요청"
+          cautionMessage="확인하면 즉시 재고에 반영됩니다."
+          confirmLabel="즉시 재작업"
           busy={busy}
           onClose={() => setConfirmOpen(false)}
           onConfirm={() => {
@@ -330,7 +330,7 @@ export function MobileDefectProcessPanel({
         {location.has_bom && (
           <ActionRow
             label="재작업"
-            desc="승인 후 BOM 재작업 처리"
+            desc="즉시 BOM 재작업 처리"
             color={LEGACY_COLORS.yellow}
             selected={action === "disassemble"}
             onClick={() => setAction("disassemble")}
@@ -338,7 +338,7 @@ export function MobileDefectProcessPanel({
         )}
         <ActionRow
           label="전체 폐기"
-          desc="승인 후 격리 재고 차감"
+          desc="즉시 격리 재고 차감"
           color={LEGACY_COLORS.red}
           selected={action === "scrap"}
           onClick={() => setAction("scrap")}
@@ -346,7 +346,7 @@ export function MobileDefectProcessPanel({
         {isWarehouse && (
           <ActionRow
             label="반품"
-            desc="승인 후 반품 처리"
+            desc="즉시 반품 처리"
             color={LEGACY_COLORS.muted2}
             selected={action === "return"}
             onClick={() => setAction("return")}
@@ -421,8 +421,8 @@ export function MobileDefectProcessPanel({
             : action === "unquarantine"
             ? "정상 복귀 →"
             : action === "scrap"
-            ? "폐기 요청 →"
-            : "반품 요청 →"}
+            ? "즉시 폐기 →"
+            : "즉시 반품 →"}
         </button>
       </StickyFooter>
 
@@ -430,8 +430,8 @@ export function MobileDefectProcessPanel({
         open={confirmOpen}
         title={action === "unquarantine" ? "정상 복귀 확인" : action === "scrap" ? "폐기 확인" : "반품 확인"}
         tone="danger"
-        cautionMessage={action === "unquarantine" ? "이 작업은 즉시 반영됩니다." : "승인 완료 후 재고에 반영됩니다."}
-        confirmLabel={action === "unquarantine" ? "즉시 복귀" : "처리 요청"}
+        cautionMessage={action === "unquarantine" ? "이 작업은 즉시 반영됩니다." : "확인하면 즉시 재고에 반영됩니다."}
+        confirmLabel={action === "unquarantine" ? "즉시 복귀" : action === "scrap" ? "즉시 폐기" : "즉시 반품"}
         busy={busy}
         onClose={() => setConfirmOpen(false)}
         onConfirm={() => {

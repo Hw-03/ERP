@@ -22,10 +22,12 @@ test("Playwright config and global setup fail closed on direct npx entry", () =>
 
 test("Playwright global setup waits for backend readiness, not process liveness", () => {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-  const setup = fs.readFileSync(path.join(root, "tests/e2e/global-setup.ts"), "utf-8");
+  const lifecycle = fs.readFileSync(path.join(root, "tests/e2e/e2e-lifecycle.mjs"), "utf-8");
 
-  assert.match(setup, /fetch\(`\$\{url\}\/health\/ready`\)/);
-  assert.doesNotMatch(setup, /fetch\(`\$\{url\}\/health\/live`\)/);
+  assert.match(lifecycle, /runWithinBackendReadinessDeadline/);
+  assert.match(lifecycle, /fetchImpl\(`\$\{backendUrl\}\/health\/ready`, \{ signal \}\)/);
+  assert.match(lifecycle, /new AbortController\(\)/);
+  assert.doesNotMatch(lifecycle, /fetchImpl\(`\$\{backendUrl\}\/health\/live`\)/);
 });
 
 test("verification scripts stay compatible with every declared Node 20 release", () => {

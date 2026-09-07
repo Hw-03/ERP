@@ -27,6 +27,10 @@ interface Props {
   onConfirm?: () => void | Promise<void>;
   /** 읽기 전용 팝업: backdrop 닫기를 켜고 확인 액션을 숨긴다. */
   viewer?: boolean;
+  /** 안내 확인 전용 팝업: 취소·Escape 닫기를 막고 확인 액션만 노출한다. */
+  acknowledgeOnly?: boolean;
+  /** 긴 안내 제목과 비교 콘텐츠를 한 줄 폭으로 보여준다. */
+  wide?: boolean;
   tone?: ConfirmTone;
   cautionMessage?: string;
   children?: ReactNode;
@@ -45,6 +49,8 @@ export function ConfirmModal({
   onClose,
   onConfirm,
   viewer = false,
+  acknowledgeOnly = false,
+  wide = false,
   tone = "normal",
   cautionMessage,
   children,
@@ -74,6 +80,7 @@ export function ConfirmModal({
     const handler = (e: KeyboardEvent) => {
       if (busy) return;
       if (e.key === "Escape") {
+        if (acknowledgeOnly) return;
         if (viewer) {
           e.preventDefault();
           e.stopImmediatePropagation();
@@ -94,7 +101,7 @@ export function ConfirmModal({
     };
     window.addEventListener("keydown", handler, viewer);
     return () => window.removeEventListener("keydown", handler, viewer);
-  }, [open, busy, onConfirm, viewer, closeWithAudit]);
+  }, [open, busy, onConfirm, viewer, acknowledgeOnly, closeWithAudit]);
 
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -123,7 +130,7 @@ export function ConfirmModal({
     >
       <div
         ref={panelRef}
-        className="w-full max-w-[520px] rounded-[24px] border p-6"
+        className={`w-full rounded-[24px] border p-6 ${wide ? "max-w-[640px]" : "max-w-[520px]"}`}
         style={{
           background: LEGACY_COLORS.s1,
           borderColor: isCautionLike
@@ -156,20 +163,22 @@ export function ConfirmModal({
         {children}
 
         <div className="mt-4 flex items-center justify-end gap-2">
-          <button
-            ref={closeRef}
-            type="button"
-            onClick={closeWithAudit}
-            disabled={busy}
-            className="standard-hover rounded-[14px] border px-5 py-2.5 text-sm font-bold transition-colors disabled:opacity-50"
-            style={{
-              borderColor: LEGACY_COLORS.border,
-              color: LEGACY_COLORS.muted2,
-              background: LEGACY_COLORS.s2,
-            }}
-          >
-            {cancelLabel}
-          </button>
+          {!acknowledgeOnly && (
+            <button
+              ref={closeRef}
+              type="button"
+              onClick={closeWithAudit}
+              disabled={busy}
+              className="standard-hover rounded-[14px] border px-5 py-2.5 text-sm font-bold transition-colors disabled:opacity-50"
+              style={{
+                borderColor: LEGACY_COLORS.border,
+                color: LEGACY_COLORS.muted2,
+                background: LEGACY_COLORS.s2,
+              }}
+            >
+              {cancelLabel}
+            </button>
+          )}
           {!viewer && onConfirm && (
             <button
               type="button"

@@ -12,9 +12,8 @@ import {
   HISTORY_MAIN_CELL_CLASS,
   HISTORY_MAIN_ROW_CLASS,
   HISTORY_STATUS_CELL_CLASS,
-  ItemCodeQuantityCell,
+  ItemCodeCell,
   PeopleStatusCell,
-  QuantityStockCell,
   StockSnapshotCell,
   TargetSummaryBlock,
   type LogGroup,
@@ -113,10 +112,9 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
           icon={<Wrench className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.red }} />}
         />
       </td>
-      <ItemCodeQuantityCell
+      <ItemCodeCell
         code={presentation.target.code}
         compact={compact}
-        quantity={<QuantityStockCell presentation={presentation} />}
       />
       <StockSnapshotCell log={parentLog} />
       <td className={`${HISTORY_STATUS_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>

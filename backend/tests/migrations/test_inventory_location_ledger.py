@@ -24,7 +24,8 @@ BOX_UNIQUE_INDEX = "uq_warehouse_box_items_box_item"
 ZONE_UNIQUE_INDEX = "uq_warehouse_zone_items_zone_item"
 UNPLACED_UNIQUE_INDEX = "uq_warehouse_unplaced_items_item_id"
 TEST_POSTGRES_URL = os.getenv("TEST_POSTGRES_URL")
-CURRENT_HEAD = "20260831_0033"
+QUALITY_BRANCH_HEAD = "20260831_0033"
+CURRENT_HEAD = "20260907_0034"
 
 
 def _config(database_url: str) -> Config:
@@ -377,12 +378,16 @@ def _apply_anomaly(
         raise AssertionError(anomaly)
 
 
-def test_0032_is_the_direct_predecessor_of_the_single_head() -> None:
+def test_0032_remains_on_the_quality_path_to_the_single_merge_head() -> None:
     config = Config(str(BACKEND_DIR / "alembic.ini"))
     config.set_main_option("script_location", str(BACKEND_DIR / "alembic"))
     script = ScriptDirectory.from_config(config)
     assert script.get_heads() == [CURRENT_HEAD]
-    assert script.get_revision(CURRENT_HEAD).down_revision == MIGRATION_REVISION
+    assert script.get_revision(QUALITY_BRANCH_HEAD).down_revision == MIGRATION_REVISION
+    assert script.get_revision(CURRENT_HEAD).down_revision == (
+        "20260903_0032",
+        QUALITY_BRANCH_HEAD,
+    )
 
 
 def test_fresh_base_to_0032_creates_empty_unplaced_ledger(tmp_path: Path) -> None:

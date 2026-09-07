@@ -25,7 +25,7 @@ interface PaPfDefectWizardPanelProps {
 /**
  * PA/PF(분해 가능) 격리 항목 처리 패널 — PaPfDefectWizard 의 마스터-디테일 패널 버전.
  * createPortal + fixed overlay 껍데기만 벗기고 폼/검증/제출 로직(분해 트리 포함)은 100% 보존.
- * 폐기/분해는 승인 요청 — ConfirmModal 만 모달로 유지.
+ * 폐기/분해는 즉시 처리 — ConfirmModal 만 모달로 유지.
  */
 export function PaPfDefectWizardPanel({
   location,
@@ -66,8 +66,8 @@ export function PaPfDefectWizardPanel({
 
   const submitLabel: Record<DisposalAction, string> = {
     unquarantine: "정상 복귀로 변경",
-    scrap: "폐기 요청 →",
-    disassemble: "재작업 요청 →",
+    scrap: "즉시 폐기 →",
+    disassemble: "즉시 재작업 →",
   };
 
   async function handleSubmit() {
@@ -284,8 +284,8 @@ export function PaPfDefectWizardPanel({
         open={confirmOpen}
         title={action === "scrap" ? "폐기 확인" : "재작업 확인"}
         tone="danger"
-        cautionMessage="승인 완료 후 재고에 반영됩니다."
-        confirmLabel="처리 요청"
+        cautionMessage="확인하면 즉시 재고에 반영됩니다."
+        confirmLabel={action === "scrap" ? "즉시 폐기" : "즉시 재작업"}
         busy={busy}
         onClose={() => setConfirmOpen(false)}
         onConfirm={() => { setConfirmOpen(false); void handleSubmit(); }}

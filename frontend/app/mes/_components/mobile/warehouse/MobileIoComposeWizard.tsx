@@ -24,17 +24,19 @@ import { IoTargetPicker } from "../../_warehouse_v2/IoTargetPicker";
 import { IoBundleCart } from "../../_warehouse_v2/IoBundleCart";
 import { IoConfirmStep } from "../../_warehouse_v2/IoConfirmStep";
 import { IoSubmitModals, type IoSubmitResultState } from "../../_warehouse_v2/IoSubmitModals";
-import { Toast, type ToastState } from "@/lib/ui/Toast";
+import { StatusTargetNotice, useStatusTargetNotice } from "../../common/StatusTargetNotice";
 import {
   IO_WORK_TYPES,
   approvalKind,
   ioDepartmentPayload,
   isExitWorkType,
   isSingleInlineSubType,
+  mergePreviewBundles,
   pickerDirectionLabel,
   singleItemSourceKind,
   subTypeLabel,
   targetDepartmentOf,
+  usesMobileSingleAdjustForm,
 } from "../../_warehouse_v2/ioWorkType";
 import {
   applyBundleQuantityChange,
@@ -123,7 +125,11 @@ export function MobileIoComposeWizard({
   );
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<IoSubmitResultState | null>(null);
-  const [toast, setToast] = useState<ToastState | null>(null);
+  const {
+    notice: feedbackNotice,
+    showNotice: showFeedbackNotice,
+    dismissNotice: dismissFeedbackNotice,
+  } = useStatusTargetNotice();
   const [bomParents, setBomParents] = useState<Set<string>>(() => new Set());
   const state = useIoWorkState(defaultWorkType, operator?.department, getAvailable);
   const [
@@ -154,6 +160,7 @@ export function MobileIoComposeWizard({
   // BOM 부모 품목으로 진입한 경우 자동 추가하지 않고 picker 에서 row 만 강조.
   const [highlightItemId, setHighlightItemId] = useState<string | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
+  const [processPickerMode, setProcessPickerMode] = useState(false);
   const previousAuditScreenRef = useRef<string | null>(null);
   const restoredDraftRef = useRef<string | null>(null);
   // 마지막으로 복원을 발동시킨 '이어서 하기' nonce — 같은 draft 재선택 재발동 판정용.
@@ -257,7 +264,7 @@ export function MobileIoComposeWizard({
         await saveCurrentDraft();
       } catch (err) {
         const message = err instanceof Error ? err.message : "저장 중 오류가 발생했습니다.";
-        setToast({ message, type: "error" });
+        showFeedbackNotice(message, "error");
         throw err;
       }
     };
@@ -283,8 +290,6 @@ export function MobileIoComposeWizard({
         state.fromDepartment,
         state.toDepartment,
       );
-      // 선택 단계에서는 수량을 늘리지 않고 같은 품목의 미리보기만 교체한다.
-      const existingIdx = state.bundles.findIndex((b) => b.source_item_id === item.item_id);
       const response = await previewTarget({
         employeeId,
         workType: state.workType,
@@ -299,15 +304,9 @@ export function MobileIoComposeWizard({
         },
       });
       const newBundles = response.bundles;
-      if (existingIdx !== -1) {
-        state.setBundles((prev) => {
-          const next = [...prev];
-          next.splice(existingIdx, 1, ...newBundles);
-          return next;
-        });
-      } else {
-        state.setBundles((prev) => [...prev, ...newBundles]);
-      }
+      state.setBundles((prev) =>
+        mergePreviewBundles(prev, item.item_id, sourceKind, effectiveSubType, newBundles),
+      );
       if (isSingleInlineSubType(effectiveSubType)) {
         setSearch("");
       }
@@ -387,6 +386,7 @@ export function MobileIoComposeWizard({
   // (안 하면 다음 저장이 이전 draft 를 덮어써 손실.)
   function beginNewCompositionSlot() {
     bumpOperationGeneration();
+    setProcessPickerMode(false);
     autosaveBatchIdRef.current = null;
     // 새 작업 슬롯 — 복원 추적 해제. 같은 '이어서 작업' 재선택 시 재복원 보장.
     restoredDraftRef.current = null;
@@ -465,10 +465,10 @@ export function MobileIoComposeWizard({
     try {
       const batchId = await saveCurrentDraft();
       if (!batchId) return;
-      setToast({ message: "저장되었습니다. 나중에 이어서 진행할 수 있습니다.", type: "success" });
+      showFeedbackNotice("저장되었습니다. 나중에 이어서 진행할 수 있습니다.", "success");
     } catch (err) {
       const message = err instanceof Error ? err.message : "저장 중 오류가 발생했습니다.";
-      setToast({ message, type: "error" });
+      showFeedbackNotice(message, "error");
     }
   }
 
@@ -675,7 +675,7 @@ export function MobileIoComposeWizard({
         )}
 
         {step === 3 &&
-          (isSingleInlineSubType(state.subType) ? (
+          (usesMobileSingleAdjustForm(state.workType, state.subType, processPickerMode) ? (
             <MobileSingleAdjustForm
               subType={state.subType}
               items={items}
@@ -698,6 +698,7 @@ export function MobileIoComposeWizard({
               }}
               saving={drafting}
               onReview={() => state.goTo(5)}
+              onOpenPicker={state.workType === "process" ? () => setProcessPickerMode(true) : undefined}
               busy={previewing}
               error={error}
             />
@@ -832,6 +833,7 @@ export function MobileIoComposeWizard({
             saving={drafting}
             approvalKind={approvalKind(state.subType, state.bundles, state.fromDepartment)}
             onNotesChange={state.setNotes}
+            onValidationError={(message) => showFeedbackNotice(message, "error")}
             onSubmit={handleSubmit}
             onSaveDraft={handleSaveDraft}
           />
@@ -858,7 +860,13 @@ export function MobileIoComposeWizard({
       )}
 
       <IoSubmitModals result={result} onClose={() => setResult(null)} />
-      <Toast toast={toast} onClose={() => setToast(null)} />
+      {feedbackNotice && (
+        <StatusTargetNotice
+          key={feedbackNotice.id}
+          notice={feedbackNotice}
+          onArrive={dismissFeedbackNotice}
+        />
+      )}
 
       {scanOpen && (
         <BarcodeScannerModal

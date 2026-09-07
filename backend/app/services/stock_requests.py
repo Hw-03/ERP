@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from decimal import Decimal
 from typing import Optional, Sequence
 
 from sqlalchemy.orm import Session
@@ -36,7 +35,6 @@ from app.models import (
     StockRequestStatusEnum,
     StockRequestTypeEnum,
 )
-from app.services import inventory as inventory_svc
 from app.services.dept_hierarchy import can_approve_department
 from app.repositories import item_repository
 
@@ -217,8 +215,8 @@ def create_request(
         allow_internal_use=allow_internal_use,
     )
 
-    # 불량 격리/처리 결재 룰: 격리 출처가 "창고" 면 창고 정/부 결재, 그 외 부서면 그 부서 정/부 결재.
-    # 정/부 권한자 직접 처리 시 _finalize_submission 이 즉시 완료로 흡수 — 별도 분기 불필요.
+    # 불량 등록·처리는 모두 요청자가 즉시 실행한다. 격리 처리도 한 부서의 기록만
+    # 포함하도록 제한해 건별 불량 원장 연결 범위는 유지한다.
     _IMMEDIATE_DEFECT_TYPES = {
         StockRequestTypeEnum.MARK_DEFECTIVE_WH,
         StockRequestTypeEnum.MARK_DEFECTIVE_PROD,
@@ -239,7 +237,7 @@ def create_request(
         requires_department_approval = False
     elif request_type in _QUARANTINE_PROCESS_TYPES:
         warehouse_override = False
-        requires_department_approval = True
+        requires_department_approval = False
         departments = {
             str(getattr(line.from_department, "value", line.from_department))
             for line in lines_input
@@ -247,7 +245,6 @@ def create_request(
         }
         if len(departments) != 1:
             raise ValueError("격리 처리 요청은 한 부서의 기록만 포함해야 합니다.")
-        approval_department = departments.pop()
 
     _validate_lines(request_type, lines_input)
     _preflight_inventory_check(db, request_type, lines_input)
@@ -290,7 +287,7 @@ def create_manual_adjustment_request(
     - request_type = MANUAL_ADJUSTMENT (bucket/dept 검증 생략)
     - requires_warehouse_approval=False, requires_department_approval=True
     - 비자가승인 출고 라인은 source별로 점유하고 RESERVED, 입고 전용은 SUBMITTED로 대기.
-    - 자가승인 가능: `can_approve_department`가 허용하는 부서 정/부 또는 창고 정/부면
+    - 자가승인 가능: 생산부·창고 정/부는 전 공정 요청을 점유 없이 승인 표시한다.
       점유 없이 dept_approved를 기록하고 호출자가 즉시 실재고를 반영한다.
     """
     if not lines_input:

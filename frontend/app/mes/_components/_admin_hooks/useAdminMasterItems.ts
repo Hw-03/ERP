@@ -18,7 +18,7 @@ export type UseAdminMasterItemsArgs = {
   globalSearch: string;
   onStatusChange: (msg: string) => void;
   onError: (msg: string) => void;
-  /** 짧은 토스트(상단 우측 비공식 메시지) — DesktopAdminView 의 showSave 와 호환 */
+  /** 짧은 상태 대상 알림 — DesktopAdminView 의 showSave 와 호환 */
   onShowSave?: (msg: string) => void;
   adminPin: string;
   productModels: ProductModel[];
@@ -28,8 +28,15 @@ type UpdateItemPayload = {
   item_name?: string;
   spec?: string;
   legacy_item_type?: string;
-  supplier?: string;
-  min_stock?: number;
+  supplier?: string | null;
+  supplier_item_code?: string | null;
+  standard_purchase_price?: string | null;
+  purchase_price_effective_date?: string | null;
+  min_stock?: number | null;
+  reorder_point?: number | null;
+  procurement_lead_time_days?: number | null;
+  minimum_order_quantity?: number | null;
+  purchase_memo?: string | null;
   process_type_code?: string;
   unit?: string;
   model_slots?: number[];

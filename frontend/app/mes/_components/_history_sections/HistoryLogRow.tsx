@@ -14,9 +14,8 @@ import {
   HISTORY_MAIN_CELL_CLASS,
   HISTORY_MAIN_ROW_CLASS,
   HISTORY_STATUS_CELL_CLASS,
-  ItemCodeQuantityCell,
+  ItemCodeCell,
   PeopleStatusCell,
-  QuantityStockCell,
   StockSnapshotCell,
   TargetSummaryBlock,
   ChevronToggleBtn,
@@ -100,9 +99,8 @@ function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, contro
           icon={<Package className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />}
         />
       </td>
-      <ItemCodeQuantityCell
+      <ItemCodeCell
         code={presentation.target.code}
-        quantity={<QuantityStockCell presentation={presentation} />}
       />
       <StockSnapshotCell log={log} />
       <td className={`${HISTORY_STATUS_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>

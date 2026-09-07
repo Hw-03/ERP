@@ -51,6 +51,13 @@ POST_LEGACY_ADDITIVE_SCHEMA_MARKERS = (
     "shipping_request_revisions",
     "sales_review_required",
     "bom_stock_exempt",
+    "supplier_item_code",
+    "standard_purchase_price",
+    "purchase_price_effective_date",
+    "procurement_lead_time_days",
+    "minimum_order_quantity",
+    "reorder_point",
+    "purchase_memo",
     "bom_auto_token",
     "invoice_number",
     "cancelled_at",
@@ -313,6 +320,13 @@ _POSTGRES_TEXT_CAST_RE = re.compile(
     r"::\s*(?:character varying|varchar|text)(?:\[\])?",
     flags=re.IGNORECASE,
 )
+_POSTGRES_SIMPLE_COMPARISON_NUMERIC_CAST_RE = re.compile(
+    r"(?P<operator>(?:<=|>=|<>|!=|=|<|>)\s*)"
+    r"(?P<literal>[+-]?(?:\d+(?:\.\d*)?|\.\d+))"
+    r"\s*::\s*(?:numeric|decimal)\b"
+    r"(?=\s*(?:\)|$|\band\b|\bor\b))",
+    flags=re.IGNORECASE,
+)
 _SQL_STRING_LITERAL_RE = re.compile(r"'(?:''|[^'])*'")
 _POSTGRES_GROUPING_SENSITIVE_OPERATOR_RE = re.compile(
     r"(?<!\|)\|(?!\|)|[+*/%\-]|\b(?:and|or|not)\b",
@@ -325,11 +339,33 @@ _POSTGRES_PARENTHESIZED_NAME_RE = re.compile(
 _POSTGRES_CASE_KEYWORDS = frozenset({"case", "when", "then", "else", "end"})
 
 
+def _normalize_postgres_simple_numeric_casts(value: str) -> str:
+    chunks: list[str] = []
+    cursor = 0
+    for literal in _SQL_STRING_LITERAL_RE.finditer(value):
+        chunks.append(
+            _POSTGRES_SIMPLE_COMPARISON_NUMERIC_CAST_RE.sub(
+                r"\g<operator>\g<literal>",
+                value[cursor : literal.start()],
+            )
+        )
+        chunks.append(literal.group(0))
+        cursor = literal.end()
+    chunks.append(
+        _POSTGRES_SIMPLE_COMPARISON_NUMERIC_CAST_RE.sub(
+            r"\g<operator>\g<literal>",
+            value[cursor:],
+        )
+    )
+    return "".join(chunks)
+
+
 def _normalize_check_sql(value: object | None, dialect: str) -> str | None:
-    """Normalize PostgreSQL's equivalent IN/ANY reflection without hiding values."""
+    """Normalize equivalent PostgreSQL reflection without hiding values."""
     if value is None or dialect != "postgresql":
         return _normalize_sql(value)
     normalized = _POSTGRES_TEXT_CAST_RE.sub("", str(value))
+    normalized = _normalize_postgres_simple_numeric_casts(normalized)
     normalized = re.sub(
         r"([a-z_][a-z0-9_]*)\s*=\s*any\s*\(\s*array\s*\[(.*?)\]\s*\)",
         r"\1 IN (\2)",
@@ -789,6 +825,20 @@ def validate_unversioned_data(connection: Connection) -> None:
 
 def _is_expected_post_legacy_addition(difference: str) -> bool:
     """기존 무버전 DB에 Alembic이 안전하게 추가할 차이만 허용한다."""
+    if difference.startswith("check constraint mismatch: items "):
+        return (
+            all(
+                check_name in difference
+                for check_name in (
+                    "ck_items_standard_purchase_price_nonneg",
+                    "ck_items_procurement_lead_time_days_nonneg",
+                    "ck_items_minimum_order_quantity_positive",
+                    "ck_items_reorder_point_nonneg",
+                )
+            )
+            and "actual=[('ck_items_min_stock_nonneg', "
+            "'min_stock>=0 or min_stock is null')]" in difference
+        )
     if not any(marker in difference for marker in POST_LEGACY_ADDITIVE_SCHEMA_MARKERS):
         return False
     return difference.startswith("Alembic metadata diff: ('add_") or (

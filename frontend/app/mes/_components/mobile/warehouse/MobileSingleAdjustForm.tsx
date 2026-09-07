@@ -33,6 +33,7 @@ export function MobileSingleAdjustForm({
   onSaveDraft,
   saving,
   onReview,
+  onOpenPicker,
   busy,
   error,
 }: {
@@ -49,6 +50,7 @@ export function MobileSingleAdjustForm({
   onSaveDraft: () => void;
   saving: boolean;
   onReview: () => void;
+  onOpenPicker?: () => void;
   busy: boolean;
   error: string | null;
 }) {
@@ -212,6 +214,17 @@ export function MobileSingleAdjustForm({
           ? "창고 재고에 즉시 반영됩니다."
           : `단품 ${isOut ? "출고" : "입고"}는 부서 결재로 처리됩니다.`}
       </div>
+
+      {onOpenPicker && (
+        <button
+          type="button"
+          onClick={onOpenPicker}
+          className="self-start text-sm font-black"
+          style={{ color: accent }}
+        >
+          BOM·품목 더 담기
+        </button>
+      )}
 
       <div className="grid grid-cols-2 gap-2">
         <PrimaryActionButton

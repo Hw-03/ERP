@@ -110,23 +110,21 @@ describe("ReworkBatchHeader", () => {
     expect(row).toHaveStyle({ background: tint(LEGACY_COLORS.red, 18) });
   });
 
-  it("keeps the operation badge width when the table is constrained", () => {
+  it("keeps the operation badge and item-code widths when the table is constrained", () => {
     renderHeader({ compact: true });
 
     const toggle = screen.getByRole("button", { name: "묶음 펼치기" });
     const row = toggle.closest("tr")!;
     const cells = within(row).getAllByRole("cell");
-    const quantityPill = screen.getByText("재작업 5 EA");
 
     expect(cells[1].firstElementChild).toHaveClass("px-3");
     expect(cells[2]).toHaveClass("px-2");
-    expect(cells[3]).toHaveAttribute("colspan", "2");
+    expect(cells[3]).not.toHaveAttribute("colspan");
     expect(cells[3]).not.toHaveAttribute("data-history-collapsible-group");
-    expect(cells[3].firstElementChild?.children[1]).toHaveClass("justify-start", "px-1");
+    expect(cells[3]).toHaveStyle({ width: "144px" });
     expect(cells[4]).toHaveClass("px-1");
     expect(cells[5]).toHaveClass("px-2");
-    expect(quantityPill).toHaveClass("min-w-[12.75rem]");
-    expect(quantityPill).not.toHaveClass("min-w-0", "flex-1");
+    expect(screen.queryByText("재작업 5 EA")).not.toBeInTheDocument();
   });
 
   it.each(["Enter", " "])("keeps row selection separate from chevron toggle with %s", (key) => {
@@ -282,7 +280,7 @@ describe("ReworkBatchDetail", () => {
     expect(screen.getByText("폐기 품목 B")).toBeInTheDocument();
   });
 
-  it("renders mixed rework results as separately toned parts", () => {
+  it("omits mixed rework quantities from the list", () => {
     render(
       <table>
         <tbody>
@@ -298,11 +296,8 @@ describe("ReworkBatchDetail", () => {
       </table>,
     );
 
-    const scrap = screen.getByText("폐기 5 EA");
-    const recovery = screen.getByText("회수 2 EA");
-    expect(scrap).toHaveStyle({ color: LEGACY_COLORS.red });
-    expect(recovery).toHaveStyle({ color: LEGACY_COLORS.green });
-    expect(scrap.closest("td")).toHaveTextContent("폐기 5 EA · 회수 2 EA");
+    expect(screen.queryByText("폐기 5 EA")).not.toBeInTheDocument();
+    expect(screen.queryByText("회수 2 EA")).not.toBeInTheDocument();
   });
 
   it.each([
@@ -310,21 +305,18 @@ describe("ReworkBatchDetail", () => {
       name: "scrap-only result",
       logs: [makeLog({ transaction_type: "DEFECT_SCRAP", quantity_change: -5, transfer_qty: 5 })],
       label: "폐기 5 EA",
-      color: LEGACY_COLORS.red,
     },
     {
       name: "recovery-only result",
       logs: [makeLog({ transaction_type: "RECEIVE", quantity_change: 2, transfer_qty: 2 })],
       label: "회수 2 EA",
-      color: LEGACY_COLORS.green,
     },
     {
       name: "excluded result",
       logs: [makeLog({ transaction_type: "DISASSEMBLE", quantity_change: 0, transfer_qty: 0 })],
       label: "처리 제외",
-      color: LEGACY_COLORS.muted2,
     },
-  ])("renders the $name with its result tone", ({ logs, label, color }) => {
+  ])("omits the $name quantity from the list", ({ logs, label }) => {
     render(
       <table>
         <tbody>
@@ -333,7 +325,7 @@ describe("ReworkBatchDetail", () => {
       </table>,
     );
 
-    expect(screen.getByText(label)).toHaveStyle({ color });
+    expect(screen.queryByText(label)).not.toBeInTheDocument();
   });
 
   it("marks every cancelled result row for selective strike styling", () => {
@@ -342,8 +334,8 @@ describe("ReworkBatchDetail", () => {
         <tbody>
           <ReworkBatchDetail
             logs={[
-              makeLog({ log_id: "scrap", transaction_type: "DEFECT_SCRAP", quantity_change: -5, transfer_qty: 5 }),
-              makeLog({ log_id: "recover", transaction_type: "RECEIVE", quantity_change: 2, transfer_qty: 2 }),
+              makeLog({ log_id: "scrap", item_id: "SCRAP", mes_code: "3-AA-0018", item_name: "폐기 행", transaction_type: "DEFECT_SCRAP", quantity_change: -5, transfer_qty: 5 }),
+              makeLog({ log_id: "recover", item_id: "RECOVER", mes_code: "3-AA-0019", item_name: "회수 행", transaction_type: "RECEIVE", quantity_change: 2, transfer_qty: 2 }),
             ]}
             parentItemId="PARENT"
             colSpan={8}
@@ -353,8 +345,9 @@ describe("ReworkBatchDetail", () => {
       </table>,
     );
 
-    expect(screen.getByText("폐기 5 EA").closest("tr")).toHaveAttribute("data-history-cancelled", "true");
-    expect(screen.getByText("회수 2 EA").closest("tr")).toHaveAttribute("data-history-cancelled", "true");
+    expect(screen.getByText("폐기 결과").closest("tr")).toHaveAttribute("data-history-cancelled", "true");
+    fireEvent.click(screen.getByRole("button", { name: "처리결과 구성 펼치기" }));
+    expect(screen.getByText("회수 행").closest("tr")).toHaveAttribute("data-history-cancelled", "true");
   });
 
   it("shows the full overflowing item name on hover and focus", async () => {

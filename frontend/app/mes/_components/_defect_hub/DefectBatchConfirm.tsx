@@ -16,8 +16,8 @@ export type BatchAction = "unquarantine" | "scrap" | "return";
 
 const META: Record<BatchAction, { title: string; submit: string }> = {
   unquarantine: { title: "선택 항목 정상 복귀", submit: "정상 복귀" },
-  scrap: { title: "선택 항목 폐기", submit: "폐기 요청" },
-  return: { title: "선택 항목 반품", submit: "반품 요청" },
+  scrap: { title: "선택 항목 폐기", submit: "즉시 폐기" },
+  return: { title: "선택 항목 반품", submit: "즉시 반품" },
 };
 
 interface ReasonRow {
@@ -166,7 +166,7 @@ export function DefectBatchConfirm({
             {meta.title}
           </h2>
           <p className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-            {locations.length}건 일괄 처리 — {action === "unquarantine" ? "즉시 반영" : "승인 완료 후 반영"}됩니다. 줄마다 사유를 입력하세요.
+            {locations.length}건 일괄 처리 — 즉시 반영됩니다. 줄마다 사유를 입력하세요.
           </p>
         </div>
       </div>

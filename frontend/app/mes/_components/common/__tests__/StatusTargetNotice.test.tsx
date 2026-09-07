@@ -1,6 +1,25 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { StatusTargetNotice } from "../StatusTargetNotice";
+import { StatusTargetNotice, useStatusTargetNotice } from "../StatusTargetNotice";
+
+function NoticeHarness() {
+  const { notice, showNotice, dismissNotice } = useStatusTargetNotice();
+
+  return (
+    <>
+      <button type="button" onClick={() => showNotice("메모를 입력하세요.", "error")}>
+        오류 표시
+      </button>
+      {notice && (
+        <StatusTargetNotice
+          key={notice.id}
+          notice={notice}
+          onArrive={dismissNotice}
+        />
+      )}
+    </>
+  );
+}
 
 describe("StatusTargetNotice", () => {
   it("positions itself from the production-safe status target attribute", () => {
@@ -57,5 +76,31 @@ describe("StatusTargetNotice", () => {
 
     fireEvent.animationEnd(notice);
     expect(onArrive).toHaveBeenCalledWith(7);
+  });
+
+  it("shows an error notice with alert semantics and dismisses it after animation", () => {
+    render(<NoticeHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "오류 표시" }));
+
+    const notice = screen.getByRole("alert");
+    expect(notice).toHaveClass("status-target-notice");
+    expect(notice).toHaveTextContent("메모를 입력하세요.");
+
+    fireEvent.animationEnd(notice);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("stays centered without target coordinates until it fades out", () => {
+    render(
+      <StatusTargetNotice
+        notice={{ id: 8, message: "saved", tone: "success" }}
+        onArrive={vi.fn()}
+      />,
+    );
+
+    const notice = screen.getByRole("status");
+    expect(notice.style.getPropertyValue("--status-target-notice-x")).toBe("");
+    expect(notice.style.getPropertyValue("--status-target-notice-y")).toBe("");
   });
 });

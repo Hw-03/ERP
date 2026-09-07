@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { IoBatch, IoSubType } from "@/lib/api";
 import { restoreInternalUseBundles, useIoDraftRestore } from "../useIoDraftRestore";
+import { useIoWorkState } from "../useIoWorkState";
 
 function makeDraft(subType: IoSubType): IoBatch {
   return {
@@ -149,7 +150,68 @@ function RestoreShortageHarness({
   return <span data-testid="restored-shortage">{bundles[0]?.lines[0]?.shortage ?? "-"}</span>;
 }
 
+function CanonicalProcessRestoreHarness() {
+  const restoredDraftRef = useRef<string | null>(null);
+  const restoredNonceRef = useRef<number | null>(null);
+  const autosaveBatchIdRef = useRef<string | null>(null);
+  const state = useIoWorkState();
+  const draft: IoBatch = {
+    ...makeDraft("produce"),
+    work_type: "process",
+    sub_type: "produce",
+    bundles: [
+      {
+        bundle_id: "manual-bundle",
+        source_kind: "manual",
+        title: "낱개",
+        source_item_id: "manual-item",
+        source_mes_code: null,
+        quantity: 1,
+        expanded_level: 0,
+        lines: [{
+          line_id: "manual-line",
+          item_id: "manual-item",
+          item_name: "낱개",
+          mes_code: null,
+          unit: "EA",
+          direction: "adjust",
+          from_bucket: "none",
+          from_department: null,
+          to_bucket: "production",
+          to_department: "조립",
+          quantity: 1,
+          bom_expected: null,
+          included: true,
+          origin: "manual",
+          edited: false,
+          has_children: false,
+          shortage: 0,
+          exclusion_note: null,
+        }],
+      },
+    ],
+  };
+
+  useIoDraftRestore({
+    draftToRestore: draft,
+    restoreNonce: 1,
+    restoredDraftRef,
+    restoredNonceRef,
+    autosaveBatchIdRef,
+    state,
+    onStatusChange: vi.fn(),
+  });
+
+  return <span data-testid="canonical-restored-subtype">{state.subType}</span>;
+}
+
 describe("useIoDraftRestore", () => {
+  it("생산으로 저장된 낱개-only draft를 방향 기준 수량보정 subtype으로 즉시 복원한다", () => {
+    render(<CanonicalProcessRestoreHarness />);
+
+    expect(screen.getByTestId("canonical-restored-subtype")).toHaveTextContent("adjust_in");
+  });
+
   it("legacy internal-use BOM draft를 기존 하위만 차감 방식으로 복원한다", () => {
     const draft = {
       ...makeDraft("internal_use_out"),

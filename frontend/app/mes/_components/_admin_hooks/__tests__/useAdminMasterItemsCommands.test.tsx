@@ -103,6 +103,161 @@ describe("useAdminMasterItemsCommands", () => {
     expect(result.current.addMode).toBe(false);
   });
 
+  it("생성 payload는 구매·재고 기준의 공백을 생략하고 값은 형식에 맞춰 변환한다", async () => {
+    createMutateAsync.mockResolvedValue({ item_id: "100", item_name: "신규", mes_code: "N-001" });
+    const { result } = renderHook(() => useAdminMasterItemsCommands(baseArgs()), {
+      wrapper: makeWrapper(makeClient()),
+    });
+    act(() => {
+      result.current.setAddForm((form) => ({
+        ...form,
+        item_name: "신규",
+        model_slots: [1],
+        initial_locations: [{ department: "창고", quantity: "1" }],
+        supplier: "  공급사  ",
+        supplier_item_code: "  SUP-1  ",
+        standard_purchase_price: "1234.50",
+        purchase_price_effective_date: "2026-09-01",
+        min_stock: "10",
+        reorder_point: "",
+        procurement_lead_time_days: "7",
+        minimum_order_quantity: "20",
+        purchase_memo: "  납기 전 연락  ",
+      }));
+    });
+
+    await act(async () => { result.current.add(); });
+
+    expect(createMutateAsync).toHaveBeenCalledWith(expect.objectContaining({
+      supplier: "공급사",
+      supplier_item_code: "SUP-1",
+      standard_purchase_price: "1234.50",
+      purchase_price_effective_date: "2026-09-01",
+      min_stock: 10,
+      procurement_lead_time_days: 7,
+      minimum_order_quantity: 20,
+      purchase_memo: "납기 전 연락",
+    }));
+    expect(createMutateAsync.mock.calls[0][0]).not.toHaveProperty("reorder_point");
+  });
+
+  it("MOQ가 1 미만이면 생성 API를 호출하지 않는다", async () => {
+    const args = baseArgs();
+    const { result } = renderHook(() => useAdminMasterItemsCommands(args), {
+      wrapper: makeWrapper(makeClient()),
+    });
+    act(() => {
+      result.current.setAddForm((form) => ({
+        ...form,
+        item_name: "신규",
+        model_slots: [1],
+        initial_locations: [{ department: "창고", quantity: "1" }],
+        minimum_order_quantity: "0",
+      }));
+    });
+
+    await act(async () => { result.current.add(); });
+
+    expect(args.onError).toHaveBeenCalledWith("최소 발주수량(MOQ)은 1 이상 입력하세요.");
+    expect(createMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["min_stock", "-1", "안전재고는 0 이상 입력하세요."],
+    ["reorder_point", "-1", "발주점은 0 이상 입력하세요."],
+    ["procurement_lead_time_days", "-1", "조달 리드타임은 0 이상 입력하세요."],
+  ] as const)("%s가 음수이면 생성 API를 호출하지 않는다", async (field, value, errorMessage) => {
+    const args = baseArgs();
+    const { result } = renderHook(() => useAdminMasterItemsCommands(args), {
+      wrapper: makeWrapper(makeClient()),
+    });
+    act(() => {
+      result.current.setAddForm((form) => ({
+        ...form,
+        item_name: "신규",
+        model_slots: [1],
+        initial_locations: [{ department: "창고", quantity: "1" }],
+        [field]: value,
+      }));
+    });
+
+    await act(async () => { result.current.add(); });
+
+    expect(args.onError).toHaveBeenCalledWith(errorMessage);
+    expect(createMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["min_stock", "1.5", "안전재고는 0 이상 입력하세요."],
+    ["reorder_point", "1.5", "발주점은 0 이상 입력하세요."],
+    ["procurement_lead_time_days", "1.5", "조달 리드타임은 0 이상 입력하세요."],
+    ["minimum_order_quantity", "1.5", "최소 발주수량(MOQ)은 1 이상 입력하세요."],
+    ["min_stock", "Infinity", "안전재고는 0 이상 입력하세요."],
+    ["reorder_point", "abc", "발주점은 0 이상 입력하세요."],
+    ["procurement_lead_time_days", "Infinity", "조달 리드타임은 0 이상 입력하세요."],
+    ["minimum_order_quantity", "abc", "최소 발주수량(MOQ)은 1 이상 입력하세요."],
+  ] as const)("%s의 잘못된 정수값 %s이면 생성 API를 호출하지 않는다", async (field, value, errorMessage) => {
+    const args = baseArgs();
+    const { result } = renderHook(() => useAdminMasterItemsCommands(args), {
+      wrapper: makeWrapper(makeClient()),
+    });
+    act(() => {
+      result.current.setAddForm((form) => ({
+        ...form,
+        item_name: "신규",
+        model_slots: [1],
+        initial_locations: [{ department: "창고", quantity: "1" }],
+        [field]: value,
+      }));
+    });
+
+    await act(async () => { result.current.add(); });
+
+    expect(args.onError).toHaveBeenCalledWith(errorMessage);
+    expect(createMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it.each(["abc", "-1", "1.234", "   "])("잘못된 기준 매입단가 %j이면 생성 API를 호출하지 않는다", async (standardPurchasePrice) => {
+    const args = baseArgs();
+    const { result } = renderHook(() => useAdminMasterItemsCommands(args), {
+      wrapper: makeWrapper(makeClient()),
+    });
+    act(() => {
+      result.current.setAddForm((form) => ({
+        ...form,
+        item_name: "신규",
+        model_slots: [1],
+        initial_locations: [{ department: "창고", quantity: "1" }],
+        standard_purchase_price: standardPurchasePrice,
+      }));
+    });
+
+    await act(async () => { result.current.add(); });
+
+    expect(args.onError).toHaveBeenCalledWith("기준 매입단가는 0 이상, 소수점 둘째 자리까지 입력하세요.");
+    expect(createMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("유효한 기준 매입단가는 공백을 제거한 문자열로 생성 payload에 보존한다", async () => {
+    createMutateAsync.mockResolvedValue({ item_id: "100", item_name: "신규", mes_code: "N-001" });
+    const { result } = renderHook(() => useAdminMasterItemsCommands(baseArgs()), {
+      wrapper: makeWrapper(makeClient()),
+    });
+    act(() => {
+      result.current.setAddForm((form) => ({
+        ...form,
+        item_name: "신규",
+        model_slots: [1],
+        initial_locations: [{ department: "창고", quantity: "1" }],
+        standard_purchase_price: " 123.45 ",
+      }));
+    });
+
+    await act(async () => { result.current.add(); });
+
+    expect(createMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ standard_purchase_price: "123.45" }));
+  });
+
   it("submits zero initial quantity when a warehouse location is selected", async () => {
     createMutateAsync.mockResolvedValue({
       item_id: "zero-stock",

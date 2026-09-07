@@ -47,6 +47,15 @@ describe("DefectDepartmentList", () => {
     apiMocks.getMemoHistory.mockReset();
   });
 
+  it("distinguishes an empty search result from an empty defect list", () => {
+    const { rerender } = render(<DefectDepartmentList locations={[]} onProcess={vi.fn()} searchActive />);
+    expect(screen.getByText("검색 결과가 없습니다.")).toBeInTheDocument();
+
+    rerender(<DefectDepartmentList locations={[]} onProcess={vi.fn()} />);
+    expect(screen.getByText("격리된 불량 재고가 없습니다.")).toBeInTheDocument();
+    expect(screen.queryByText("검색 결과가 없습니다.")).not.toBeInTheDocument();
+  });
+
   it("renders only the defect reason in the row summary", () => {
     render(
       <DefectDepartmentList
@@ -59,6 +68,14 @@ describe("DefectDepartmentList", () => {
     expect(reasonSummary).toHaveTextContent("격리 사유dimension");
     expect(reasonSummary).not.toHaveTextContent("left bracket scratched");
     expect(screen.getByText("left bracket scratched")).toBeInTheDocument();
+  });
+
+  it("uses a subtle surface color when a quarantine record is hovered", () => {
+    render(<DefectDepartmentList locations={[makeLocation()]} onProcess={vi.fn()} />);
+
+    const record = screen.getByLabelText("AX-100 격리 기록");
+    expect(record).toHaveClass("hover:bg-[var(--c-s3)]");
+    expect(record).not.toHaveClass("hover:bg-[var(--c-s4)]");
   });
 
   it("renders a muted missing value with a wrapping reason value area", () => {
@@ -113,7 +130,7 @@ describe("DefectDepartmentList", () => {
       "lg:grid-cols-[minmax(0,1.15fr)_minmax(110px,0.38fr)_minmax(110px,0.38fr)_minmax(0,2fr)]",
     );
     expect(screen.queryByText("처리 가능 3개")).not.toBeInTheDocument();
-    expect(screen.getByText("승인 대기 1개")).toBeInTheDocument();
+    expect(screen.getByText("처리 대기 1개")).toBeInTheDocument();
   });
 
   it("flags only unresolved legacy aggregates, not reconstructed records", () => {

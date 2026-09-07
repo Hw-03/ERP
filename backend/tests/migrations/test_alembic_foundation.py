@@ -112,7 +112,7 @@ def test_empty_sqlite_upgrade_creates_current_schema_and_is_rerunnable(tmp_path)
         with engine.connect() as connection:
             assert connection.scalar(
                 sa.text("SELECT version_num FROM alembic_version")
-            ) == "20260831_0033"
+            ) == "20260907_0034"
             location_columns = {
                 column["name"]: column
                 for column in inspector.get_columns("inventory_locations")
@@ -553,6 +553,52 @@ def test_postgresql_check_normalization_preserves_allowed_values():
 
     assert expected_normalized == _normalize_check_sql(reflected, "postgresql")
     assert expected_normalized != _normalize_check_sql(changed, "postgresql")
+
+
+def test_postgresql_check_normalization_ignores_numeric_literal_casts():
+    expected = (
+        "standard_purchase_price >= 0 OR standard_purchase_price IS NULL"
+    )
+    reflected = (
+        "standard_purchase_price >= 0::numeric "
+        "OR standard_purchase_price IS NULL"
+    )
+    changed = reflected.replace("0::numeric", "1::numeric")
+
+    expected_normalized = _normalize_check_sql(expected, "postgresql")
+
+    assert expected_normalized == _normalize_check_sql(reflected, "postgresql")
+    assert expected_normalized != _normalize_check_sql(changed, "postgresql")
+
+
+def test_postgresql_check_normalization_preserves_numeric_casts_in_expressions():
+    integer_division = "amount >= 1 / 2"
+    numeric_division = "amount >= 1::numeric / 2"
+
+    assert _normalize_check_sql(
+        integer_division,
+        "postgresql",
+    ) != _normalize_check_sql(numeric_division, "postgresql")
+
+
+def test_postgresql_check_normalization_preserves_cast_text_inside_strings():
+    plain_text = "label = 'amount >= 1)'"
+    cast_text = "label = 'amount >= 1::numeric)'"
+
+    assert _normalize_check_sql(plain_text, "postgresql") != _normalize_check_sql(
+        cast_text,
+        "postgresql",
+    )
+
+
+def test_postgresql_check_normalization_preserves_numeric_typmod_rounding():
+    bare_literal = "amount >= 1.239"
+    rounded_numeric = "amount >= 1.239::numeric(3, 2)"
+
+    assert _normalize_check_sql(
+        bare_literal,
+        "postgresql",
+    ) != _normalize_check_sql(rounded_numeric, "postgresql")
 
 
 @pytest.mark.skipif(
