@@ -63,6 +63,7 @@ from app.services.io_preview import (
     validate_warehouse_adjust_operation,
     validate_warehouse_adjust_requester,
 )
+from app.services.approval_rules import approval_kind
 from app.services.io_persist import (
     _batch_to_payload,
     ensure_batch_is_mutable,
@@ -572,6 +573,7 @@ def _submit_approval(
             from_department=line.from_department,
             to_bucket=_request_bucket(line.to_bucket),
             to_department=line.to_department,
+            operation_line_id=line.line_id,
         )
         for line in lines
     ]
@@ -1225,10 +1227,12 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
     custom_process_bom_bundle_ids = _custom_process_bom_bundle_ids(db, batch)
     custom_process_bom = bool(custom_process_bom_bundle_ids)
     included_lines = _included_lines(batch)
-    department_approval_required = (
-        batch.work_type == "process"
-        and (_has_manual_line(included_lines) or custom_process_bom)
-    )
+    department_approval_required = approval_kind(
+        work_type=batch.work_type,
+        sub_type=batch.sub_type,
+        has_manual_line=_has_manual_line(included_lines),
+        has_custom_process_bom=custom_process_bom,
+    ) == "department"
     if department_approval_required and not (batch.notes or "").strip():
         raise ValueError("부서 결재 요청에는 메모를 입력해야 합니다.")
 
@@ -1274,8 +1278,7 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
         elif not included_lines:
             _complete_without_inventory(batch)
         elif batch.sub_type in APPROVAL_SUB_TYPES:
-            # 창고 승인 sub_type — manual line 유무 무관, 창고 승인 1회로만.
-            # 새 정책: 모든 요청은 창고 또는 부서 중 하나로만 결재.
+            # StockRequest 기반 실행 sub_type. 실제 결재 필요 여부는 approval_kind가 정한다.
             _submit_approval(db, requester=requester, batch=batch)
         else:
             _submit_immediate(db, requester=requester, batch=batch)

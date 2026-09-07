@@ -1,0 +1,58 @@
+[
+  {
+    "name": "ordinary_staff",
+    "level": "staff",
+    "warehouse_role": "none",
+    "department_role": "none",
+    "can_see_department_queue": false,
+    "defect_default_source": "production"
+  },
+  {
+    "name": "admin_only",
+    "level": "admin",
+    "warehouse_role": "none",
+    "department_role": "none",
+    "can_see_department_queue": false,
+    "defect_default_source": "production"
+  },
+  {
+    "name": "department_primary",
+    "level": "staff",
+    "warehouse_role": "none",
+    "department_role": "primary",
+    "can_see_department_queue": true,
+    "defect_default_source": "production"
+  },
+  {
+    "name": "department_deputy",
+    "level": "staff",
+    "warehouse_role": "none",
+    "department_role": "deputy",
+    "can_see_department_queue": true,
+    "defect_default_source": "production"
+  },
+  {
+    "name": "warehouse_primary",
+    "level": "staff",
+    "warehouse_role": "primary",
+    "department_role": "none",
+    "can_see_department_queue": true,
+    "defect_default_source": "warehouse"
+  },
+  {
+    "name": "warehouse_deputy",
+    "level": "staff",
+    "warehouse_role": "deputy",
+    "department_role": "none",
+    "can_see_department_queue": true,
+    "defect_default_source": "warehouse"
+  },
+  {
+    "name": "dual_approver",
+    "level": "staff",
+    "warehouse_role": "primary",
+    "department_role": "primary",
+    "can_see_department_queue": true,
+    "defect_default_source": "production"
+  }
+]

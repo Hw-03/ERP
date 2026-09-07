@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { api, type IoBatch, type Item, type StockRequest } from "@/lib/api";
-import { isDepartmentApprover } from "../../_warehouse_steps";
+import { canApproveDepartmentRequests } from "../../_warehouse_steps";
 import { useWarehouseData } from "../../_warehouse_hooks/useWarehouseData";
 import { WarehouseHeader } from "../../_warehouse_sections/WarehouseHeader";
 import {
@@ -122,7 +122,7 @@ export function MobileWarehouseScreen({
   const canSeeQueue =
     (operator?.warehouse_role ?? "none") === "primary" ||
     (operator?.warehouse_role ?? "none") === "deputy";
-  const canSeeDeptQueue = isDepartmentApprover(operator);
+  const canSeeDeptQueue = canApproveDepartmentRequests(operator);
   // 인수인계: 작성(튜브) 또는 인수 확인(받는 부서 소속)이면 탭 노출 — 데스크톱 동일. 결재권자는 제외.
   const canReceiveHandover = HANDOVER_RECEIVE_DEPTS.includes(operator?.department ?? "");
   const showHandover = (operator?.department ?? "") === "튜브" || canReceiveHandover;

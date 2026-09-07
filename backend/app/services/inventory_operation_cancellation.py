@@ -1306,6 +1306,38 @@ def _lock_policy_owner_rows(
     subject_ids: dict[str, list[str]] = {}
     for effect in effects:
         subject_ids.setdefault(effect.subject_type, []).append(effect.subject_id)
+    linked_request_ids_by_batch: dict[str, set[str]] = {}
+    if policy.domain == "stock_request":
+        request_ids = sorted(set(subject_ids.get("StockRequest", [])))
+        linked_batch_ids = sorted(
+            {
+                str(batch_id)
+                for (batch_id,) in db.query(StockRequest.operation_batch_id)
+                .filter(
+                    StockRequest.request_id.in_(request_ids),
+                    StockRequest.operation_batch_id.isnot(None),
+                )
+                .all()
+            }
+        )
+        if linked_batch_ids:
+            linked_rows = (
+                db.query(StockRequest.request_id, StockRequest.operation_batch_id)
+                .filter(StockRequest.operation_batch_id.in_(linked_batch_ids))
+                .order_by(
+                    StockRequest.operation_batch_id.asc(),
+                    StockRequest.request_id.asc(),
+                )
+                .all()
+            )
+            for request_id, batch_id in linked_rows:
+                linked_request_ids_by_batch.setdefault(str(batch_id), set()).add(
+                    str(request_id)
+                )
+            subject_ids.setdefault("StockRequest", []).extend(
+                str(request_id) for request_id, _batch_id in linked_rows
+            )
+            subject_ids.setdefault("IoBatch", []).extend(linked_batch_ids)
     owner_specs = (
         ("StockRequest", StockRequest, StockRequest.request_id),
         ("IoBatch", IoBatch, IoBatch.batch_id),
@@ -1326,6 +1358,30 @@ def _lock_policy_owner_rows(
             raise WorkflowCancellationConflict(
                 WORKFLOW_STATE_CONFLICT,
                 "연결된 업무를 찾을 수 없습니다.",
+            )
+    if linked_request_ids_by_batch:
+        current_rows = (
+            db.query(StockRequest.request_id, StockRequest.operation_batch_id)
+            .filter(
+                StockRequest.operation_batch_id.in_(
+                    sorted(linked_request_ids_by_batch)
+                )
+            )
+            .order_by(
+                StockRequest.operation_batch_id.asc(),
+                StockRequest.request_id.asc(),
+            )
+            .all()
+        )
+        current_request_ids_by_batch: dict[str, set[str]] = {}
+        for request_id, batch_id in current_rows:
+            current_request_ids_by_batch.setdefault(str(batch_id), set()).add(
+                str(request_id)
+            )
+        if current_request_ids_by_batch != linked_request_ids_by_batch:
+            raise WorkflowCancellationConflict(
+                WORKFLOW_STATE_CONFLICT,
+                "취소 처리 중 연결된 입출고 요청이 변경되었습니다. 다시 확인해 주세요.",
             )
     request_ids = sorted(set(subject_ids.get("StockRequest", [])))
     if request_ids:
@@ -1644,6 +1700,32 @@ def _record_policy_cancel_event(
     db.flush()
 
 
+def _sync_restored_stock_request_batches(
+    db: Session,
+    *,
+    policy: CancelPolicy | None,
+    effects: list[InventoryOperationEffect],
+) -> None:
+    """요청 상태 복원과 같은 트랜잭션에서 연결 IO 배치 집계를 되돌린다."""
+    if policy is None or policy.domain != "stock_request":
+        return
+    from app.services.io_persist import _sync_batch_from_stock_request
+
+    request_ids = sorted(
+        {
+            effect.subject_id
+            for effect in effects
+            if effect.effect_kind == InventoryOperationEffectKindEnum.WORKFLOW
+            and effect.subject_type == "StockRequest"
+        }
+    )
+    for request_id in request_ids:
+        request = db.get(StockRequest, request_id)
+        if request is None:
+            raise CancellationNotAllowed("연결된 업무를 찾을 수 없습니다.")
+        _sync_batch_from_stock_request(db, request)
+
+
 def _assert_plan_applied(
     db: Session,
     *,
@@ -1932,6 +2014,11 @@ def cancel_operation(
                 reason=reason,
                 policy=policy,
             )
+        _sync_restored_stock_request_batches(
+            db,
+            policy=policy,
+            effects=operation_effects,
+        )
         _record_policy_cancel_event(
             db,
             policy=policy,

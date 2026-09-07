@@ -18,9 +18,22 @@ const currentWorkAreaProps = vi.hoisted(() => ({
   },
 }));
 
+const currentOperator = vi.hoisted(() => ({
+  value: {
+    employee_id: "emp-1",
+    warehouse_role: "none",
+    department_role: "none",
+    level: "staff",
+    department: "조립",
+  },
+}));
+
 const apiMocks = vi.hoisted(() => ({
   listStockRequestDrafts: vi.fn(),
   listDrafts: vi.fn(),
+  countWarehouseQueue: vi.fn(),
+  countDepartmentQueue: vi.fn(),
+  countHandoverInbox: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({ api: apiMocks }));
@@ -86,12 +99,7 @@ vi.mock("@/app/mes/_components/_warehouse_v2/IoComposeView", () => ({
 }));
 
 vi.mock("@/app/mes/_components/login/useCurrentOperator", () => ({
-  readCurrentOperator: () => ({
-    employee_id: "emp-1",
-    warehouse_role: "none",
-    department_role: "none",
-    department: "조립",
-  }),
+  readCurrentOperator: () => currentOperator.value,
 }));
 
 describe("DesktopWarehouseView", () => {
@@ -99,10 +107,51 @@ describe("DesktopWarehouseView", () => {
     window.history.replaceState(null, "", "/mes?tab=warehouse&section=mine");
     apiMocks.listStockRequestDrafts.mockReset();
     apiMocks.listDrafts.mockReset();
+    apiMocks.countWarehouseQueue.mockReset();
+    apiMocks.countDepartmentQueue.mockReset();
+    apiMocks.countHandoverInbox.mockReset();
     apiMocks.listStockRequestDrafts.mockReturnValue(new Promise(() => {}));
     apiMocks.listDrafts.mockReturnValue(new Promise(() => {}));
+    apiMocks.countWarehouseQueue.mockReturnValue(new Promise(() => {}));
+    apiMocks.countDepartmentQueue.mockReturnValue(new Promise(() => {}));
+    apiMocks.countHandoverInbox.mockReturnValue(new Promise(() => {}));
+    currentOperator.value = {
+      employee_id: "emp-1",
+      warehouse_role: "none",
+      department_role: "none",
+      level: "staff",
+      department: "조립",
+    };
     currentComposeProps.value = null;
     currentWorkAreaProps.value = null;
+  });
+
+  it.each([
+    ["admin-only", { level: "admin", warehouse_role: "none", department_role: "none" }, false],
+    ["department primary", { level: "staff", warehouse_role: "none", department_role: "primary" }, true],
+    ["warehouse deputy", { level: "staff", warehouse_role: "deputy", department_role: "none" }, true],
+  ] as const)("shows the department queue only for canonical approvers: %s", (_name, roles, expected) => {
+    currentOperator.value = { ...currentOperator.value, ...roles };
+
+    render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+
+    if (expected) {
+      expect(screen.getByRole("tab", { name: /부서 승인함/ })).toBeVisible();
+      expect(apiMocks.countDepartmentQueue).toHaveBeenCalledWith("emp-1");
+    } else {
+      expect(screen.queryByRole("tab", { name: /부서 승인함/ })).not.toBeInTheDocument();
+      expect(apiMocks.countDepartmentQueue).not.toHaveBeenCalled();
+    }
+  });
+
+  it("rejects an admin-only department queue deep link", () => {
+    currentOperator.value = { ...currentOperator.value, level: "admin" };
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=dept-queue");
+
+    render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+
+    expect(screen.getByTestId("io-compose-view")).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /부서 승인함/ })).not.toBeInTheDocument();
   });
 
   it("내 요청 URL로 직접 진입해도 상단 기본 탭 3개를 표시한다", () => {

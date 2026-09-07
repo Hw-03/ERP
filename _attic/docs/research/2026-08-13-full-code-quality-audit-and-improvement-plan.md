@@ -8,14 +8,14 @@
 - 첫 개선 체크포인트 기준 SHA: `8be64743c65ce6db3c8270d5cc6b73fcf64b216a`
 - 두 번째 개선 체크포인트 기준 SHA: `90ce42d9fef0505ccbd7f5b7ea86b60760cb09dd`
 - 최신 `main` 동기화 대상 SHA: `d2b0dd2969883b2c8876c4375c99a456dcb6f21e` (이후 main 추가 동기화 없음)
-- 현재 실행 위치: `C:\ERP\.worktrees\full-code-quality-checkpoint-2`
+- 현재 구현 위치: `C:\ERP\.worktrees\full-code-quality-cp7` (`codex/full-code-quality-cp7`). 최종 통합 대상은 `C:\ERP\.worktrees\full-code-quality-checkpoint-2`의 품질 브랜치이며 `POST_CP6_SHA=7f232773`에서 고정한다.
 - Git 상태: 장기 품질 브랜치 `codex/full-code-quality-improvement`. CP4 완료 HEAD `e64a9a12da16f8502ab1a1e82dbed2b1d2648a01`에서 고정 `main` `78e8023f41ef59528d9d8c07498e7653f9bee247`을 품질 worktree 방향에만 통합했고, merge commit `deafc335502b46f9ed068bbb11175361826615ea` 뒤 CP5 W4 제품 commit `ac8f26d570e728f193c1b2b40b8efdae7fe2363e`, CI 회귀 수정 commit `8a66907014cfa7c5cd5de90e7d3b42d599a56ccf`, W5 제품 commit `fb339b5dc29013fc97af5035905431177ec54aea`, W6 제품 commit `d43ab268cb6fa9dcde94e9b93203978f3550c73d`, CI 이식성 보완 commit `dffb8e01e713d58e3d6df678ee98c0cfc20cd1e5`·`fd34189400f63225164c007bffcf7f561b813eb6`, W7 제품 commit `b27ba39cd2cbad574fda30af9c118697086c30ad`까지 기존 품질 브랜치에 push했다. W7 최종 GitHub CI run `33934558904`는 6/6 success다. `main` 역병합·push·PR·force-push는 없음
-- 실행 진척: 체크포인트 1·3·4 완료. 체크포인트 2의 `IC-04`·`IC-20`은 저장소 구현·로컬 PostgreSQL 실증과 품질 브랜치 CI 실행까지 통과했지만 required-check 설정 증거는 별도 외부 경계로 남긴다. CP4는 workflow 거래 보정 차단, semantic idempotency, handover/correction/cancel 경합, 삭제 품목 참조 보호를 세 hard stop으로 완료했다. CP5는 S0 최신 main 통합부터 W7 `IC-19` health 의미 분리까지 전 단계를 완료했다. CP6는 시작하지 않았다.
-- 잔여 작업: 엄격한 완료 판정상 `IC` 13개가 남는다. `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-09`, `IC-10`, `IC-11`, `IC-17`, `IC-18`, `IC-19`는 완료했다. `IC-04`·`IC-20`의 required-check 외부 증거가 확보되면 11개로 줄며, 최종 closeout `DOC-01`, `AT-01`, `AT-02`도 남아 있다.
-- 최신 판정(2026-09-08): **CP6 품질 통합·CP7 B1 실제 CI 완료 — CP7 B2 진행**. CP6 `d60f84ed`의 CI34135084227, 품질 `7f232773`의 CI34137728037, CP7 `1ad03e37`의 CI34149717620은 모두 실제6/6 success다. 품질 merge `c9d70903`은 같은 CP6 제품 tree이며 CP7은 고정 `POST_CP6_SHA=7f232773` 위에서 구현한다. 이전 두 항목의 CP5 진척·잔여 수량은 당시 역사적 snapshot이다. 현재 남은 제품 IC는22~24이며, IC04/20의 외부 required-check 정책과 DOC01/AT01/AT02·최종 재감사는 별도로 남는다.
+- CP5 종료 당시 진척 `[HISTORICAL]`: 체크포인트 1·3·4 완료. 체크포인트 2의 `IC-04`·`IC-20`은 저장소 구현·로컬 PostgreSQL 실증과 품질 브랜치 CI 실행까지 통과했지만 required-check 설정 증거는 별도 외부 경계로 남겼다. CP4의 세 hard stop과 CP5의 S0~W7은 완료했으며, 당시에는 CP6 미착수였다. 이 문장은 현재 CP6 상태가 아니다.
+- CP5 종료 당시 잔여 집계 `[HISTORICAL]`: 엄격한 판정상 IC13개(required-check 외부 경계2개 포함) 및 `DOC-01`, `AT-01`, `AT-02`가 남았던 snapshot이다. 현재 완료 수량이나 새 실행 지시로 재사용하지 않는다.
+- 최신 판정(2026-09-08): **CP6 품질 통합·CP7 B1/B2 실제 CI 완료, B3/B4 로컬 검증 완료·원격 검증 대기**. CP6 `d60f84ed`/품질 `7f232773`/B1 `1ad03e37`/B2 `12901903`의 CI34135084227·34137728037·34149717620·34157355573은 실제6/6 success다. B3는 `234d4f5b`로 커밋됐고 B4/IC24 및 연결 IoBatch 취소 상태 복원(B4-R1)의 직접 검증·두 리뷰 C/I/M0를 인수했다. B4 별도 로컬 commit 뒤 두 단계를 묶어 원격 검증한다. `DOC-01`/`AT-01`/`AT-02`·B8 재감사·최종 통합은 미완료다. IC04/20의 외부 required-check 정책, 수용한 Next Minor1·ESLint9 EOL 예외·기존 테스트 타입 부채는 완료 카드와 분리해 보존한다. 근거는12.27.9·12.28.7~12.28.10이며 품질 브랜치는 최종 CP7 인수 전까지 이동하지 않는다.
 - 문서 성격: 현행 코드의 감사 결과이자 후속 구현 순서의 단일 정본
 
-> **증거 시점 안내:** 1~7절의 원 감사 코드 줄번호와 실패 서술은 당시 snapshot을 보존한다. 이후 구현과 충돌하는 문장은 `[STALE]` 역사 증거이며, 현재 판정·구현 경계는 8.9.7~8.9.8 및 12.26~12.27절이 우선한다. 최종 작업자 신뢰도 재판정은 CP7 B8에서 수행한다.
+> **증거 시점 안내:** 1~7절의 원 감사 코드 줄번호와 실패 서술은 당시 snapshot을 보존한다. 이후 구현과 충돌하는 문장은 `[STALE]` 역사 증거이며, 현재 판정·구현 경계는 8.9.7~8.9.8 및 12.26~12.28절이 우선한다. 최종 작업자 신뢰도 재판정은 CP7 B8에서 수행한다. B4-R1의 재현·보완 중 상태를 과거 CP5 완료 문구로 덮지 않는다.
 
 ---
 
@@ -980,6 +980,7 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 
 #### `IC-24` 일반 module locality 정리
 
+- **체크포인트 상태:** `로컬 검증·두 리뷰 완료, 원격 검증 대기 (2026-09-08)`. B4의 직접 backend261/frontend177, 실제 PostgreSQL 두 경합 node와 두 독립 리뷰 C/I/M0를 인수했다. 승인 정책 locality·BOM child 누락 표시·연결 IO 취소 상태 복원 근거는12.28.9~12.28.10이며 B3와 묶은 exact-head CI 이후 완료로 승격한다.
 - **작업자 영향:** 직접적인 화면 변화보다 이후 재고 수정이 한 정책만 고치도록 만들어 회귀 가능성을 낮춘다.
 - **근거/근본 원인:** approval role 판단, shipping orchestration, server state, health/ops policy가 여러 adapter에 분산돼 있다.
 - **수정 경계:** 앞 카드에서 두 번째 consumer가 확인된 policy만 깊은 module로 추출한다. 특히 approval_rules가 subtype뿐 아니라 warehouse/department/self/admin scope를 제공하고 submit/list/count/button adapter가 같은 결과를 사용하게 한다. responsive shell은 client-width swap/static import가 실제 duplicate bundle·상태 reset을 만드는지 bundle/render 측정부터 하고, 증거가 있을 때만 경계를 바꾼다. 한 번만 쓰이는 helper를 추상화하지 않는다.
@@ -1243,7 +1244,7 @@ flowchart LR
 - [x] **`IC-21` 완료 (2026-09-08):** OpenAPI generated raw type·업무 adapter·nullable/unknown enum/request serialization drift guard, 두 리뷰 C/I/M0 및 commit1ad03e37의 실제 CI34149717620 6/6 success. 상세12.28.2.
 - [x] **`IC-22` 완료(2026-09-08):** Next runtime, Vitest/coverage, ESLint/PostCSS와 관련 Vite 보안 후속을 네 독립 rollback commit으로 분리했다. 전체/production audit0·도구별 직접 검사·독립 C/I0와 exact129의 실제 CI34157355573 6/6 success를 인수했다(12.28.3~12.28.7). 사용자 속도 조정에 따라 반복 full 대신 증분 근거와 한 번의 B2 원격 전체 검증을 결합했다. 원본 local full2회FAIL·Next next-env Minor1·ESLint9 EOL 예외를 보존하며 `--force`는 사용하지 않았다.
 - [ ] **`IC-23` 원격 검증 대기:** 핵심 IO·shipping·defect·department의 error/focus/a11y blocking 계약은 로컬 검증·두 리뷰 C/I/M0로 인수했다(12.28.8). B4와 묶은 실제 CI가 통과한 뒤 완료로 전환한다.
-- [ ] **`IC-24` 완료:** approval role/self/admin/list/count/button와 앞 카드에서 두 번째 consumer가 확인된 policy만 공통 module로 모은다. 행동 변경과 광역 파일 이동은 섞지 않는다.
+- [ ] **`IC-24` 원격 검증 대기:** 승인 큐·approval kind를 실제 consumer와 공통 fixture matrix로 연결했고, 기존 정책을 보존하는 BOM/line identity·연결 IO 취소 상태 보완을 직접 검증했다. 두 독립 리뷰 C/I/M0이며 B3와 묶은 실제 CI 이후 완료로 전환한다(12.28.10). responsive shell·광역 이동·schema는 변경하지 않았다.
 - [ ] **`DOC-01` 완료:** live 운영·온보딩·handoff의 URL, DB, gate, 링크를 현행 코드와 맞추고 역사 관찰에는 재실행 금지 표지를 붙인다.
 - [ ] **`AT-01` 완료:** 각 source의 consumer 0을 다시 확인한 뒤 `git mv`, import/path/doc 갱신, old path 0, import/parser/dry-run을 같은 change에서 끝낸다.
 - [ ] **`AT-02` 완료:** 실제 consumer가 없는 byte-identical frontend 자산만 hash report와 함께 제거하고 item 이미지·원본 data·regression evidence는 보존한다.
@@ -2289,3 +2290,23 @@ main 변경으로 완전히 해결된 CP6 카드는 없으며 다음의 남은 �
 - 리뷰에서 초기 모달 mock·직접 focus·누락된 역방향 키보드/오류 재시도 증거를 보완했다. 모달이 약속하지 않은 ‘취소 버튼 자동 포커스’를 새 제품 요구로 추가하지 않았다. 최종 독립 명세 `/root/b1_spec_review`와 품질 `/root/b1_quality_review`는 각각 C/I/M0·Ready Yes이며, 총괄 `bb2385`가 ignored `20260908-cp7-b3-final/review-evidence.md`의 원문을 인수했다. 이전 RED·중간 실패는 보존하고 같은 전체 테스트를 반복하지 않았다.
 - design 스킬에 따라 실제 렌더 경로와 light/dark token 대비를 확인했다. 공용 Button의 전역 변경은 제외하고 `FilterChip/KpiCard/StatusPill`의 선택적 text tone·수량 조절기의 기본 false인 대비 옵션으로 대상 화면만 보완했다. 총괄 `d57925`에서 공용 Button/ConfirmModal·동결 weekly/mobile nav/globals 추가 diff0과 출하 step5 카드 geometry 추가 diff0을 확인했다. backend/API/schema/migration 변경은 없다.
 - 두 최종 E2E는 CP7 합성 DB와3300/8022만 사용했고, worktree `mes.db/-wal/-shm` 불변·정리 완료·소유권 해제를 원본에서 확인했다. 기존3100 점유자를 포함한 모든 서버가 없다는 뜻은 아니다. 이 단계는 **LOCAL_VERIFIED**이며 별도 로컬 rollback commit 뒤 B4를 진행한다. IC23 최종 완료는 B3+B4 push의 실제 CI 이후이며, Next next-env Minor1·ESLint9 EOL·기존 타입 부채·최종 frozen 검증 대기는 그대로 남는다.
+- B3는 실제 `234d4f5b9871201ca0dac204efafafd68ac7b157`(부모12901903, tree8468ff16)로 커밋됐다. 총괄 `34ea83`은 한국어 제목·정확34경로(32M/2A)·clean·upstream1ahead/0behind를 확인했다. staged smart `765ec9`는34경로 계획·실행0이며, docs의 최초 Node24 환경4FAIL(`d2b821`)은 승인 Node20 PATH를 고정한 docs3종·staged diff-check PASS(`6fd6af`)로 회복했다. 제품 전체 검증을 다시 실행하거나 아직 push했다고 표시하지 않는다.
+
+#### 12.28.9 B4 정책 locality — 착수 경계
+
+- B3 `234d4f5b`를 고정 기준으로 IC24에 착수한다. 서버 `dept_hierarchy.py:29-49`와 부서 승인·큐의 역할 계약을 기준으로 frontend의 실제 두 큐 consumer만 연결하며, 같은 기존 helper를 쓰는 불량 기본 출처는 그대로 둔다. admin 단독의 타인 승인/부서 큐 권한 없음과 `sr_execution.py:651-694`의 기존 창고 자기요청 예외는 서로 다른 계약이다. 새 권한 정책으로 한꺼번에 바꾸지 않는다.
+- RV007의 고정 main 결정은 불량 즉시·무승인이다. preview와 실제 dispatch의 manual/custom BOM 입력을 맞추되 `APPROVAL_SUB_TYPES`를 단순 삭제하거나 `_submit_immediate`로 우회하지 않는다. 총괄 `d82c21`/`b53bb4`에서 `_link_stock_request`가 batch를 후기 연결하고 `sr_execution._execute_line`이 생성 시점에 line 식별자를 소비하는 경로를 확인했다. 재현 대상은 **TransactionLog.operation_line_id 누락**이며 기존 operation/domain 전체가 없다는 주장으로 확대하지 않는다. 기존 내부 입력의 optional 식별자 전달과 직접 SQL/취소 회귀까지만 허용한다.
+- 완료 StockRequest 일반 cancel의 기존422와 history/operation의 workflow 우회 차단409를 구분한다. 첫 surface를409로 바꾸거나 새 취소 엔진·원장·migration·backfill을 만들지 않는다. API wire와 transaction/lock 경계도 유지한다. 이 절은 착수 시 범위·근거이며 RED/GREEN·최종 리뷰·원격 PASS를 미리 선언하지 않는다.
+- **재현 후 범위 보완(B4-R1):** 같은 불량 통합 사례의 operation 취소 뒤 request/line은 submitted·정상/불량 수량은5/0으로 복원됐지만 연결 IoBatch ORM과 실제 `GET /api/io/{batch_id}`는 completed·기존 completed_at을 유지하는 RED가 확인됐다. 이는 새 line 식별자 전달이 만든 회귀가 아니라 기존 취소 연결 누락이다. 총괄의 정적 근거 `557897`/`55c228`과 담당자의 단일 동적 재현을 구분한다. 최신 자율 진행 권한으로 기존 request 집계 동기화의 같은 transaction 내 재사용과 필요한 owner 보호·실제 PostgreSQL 경합 검증을 추가 승인했다. 새 상태 정책·schema·원장 재설계·legacy 추정/backfill은 금지하며 최종 GREEN 전 완료로 승격하지 않는다.
+
+#### 12.28.10 B4 정책·연결 취소 원자성 로컬 인수
+
+- 기준은 B3 `234d4f5b`다. 실제 두 warehouse 큐는 부서 정/부·창고 정/부 권한 정책을 사용하고 기존 admin 창고 자기요청 및 불량 기본 출처 계약은 분리 보존한다. backend/frontend의 공통 역할 fixture와 실제 pending 요청의 HTTP list/count/approve/reject를 대조했다. 서로 다른 언어의 helper를 하나의 함수라고 과장하지 않으며 서버 권한 검증이 최종 경계다.
+- `io_preview.py:595-642`는 현재 DB BOM의 자식 집합·수량을 payload/ORM과 비교한다. draft/persist에서도 같은 DB 정본을 사용해 전체/부분 자식 누락의 승인 표시를 실제 submit과 맞췄다. 이전 Important의 RED를 보존하며 BOM 없는 품목의 정책은 바꾸지 않았다. 불량은 request-backed 즉시 완료와 기존 operation/batch 소유권을 보존하고 내부 optional line ID만 생성 시점에 전달한다. 생성 baseline/type 변경은 API 권한 설명 두 건이며 schema/wire 변화는 없다.
+- B4-R1은 같은 batch의 연결 StockRequest를 먼저 잠그고 IoBatch/line을 잠근 뒤, 취소 transaction 안에서 기존 전체 요청 집계를 재사용한다(`inventory_operation_cancellation.py:1285-1397,1703-1726,2017-2021`). 실제 HTTP/SQL 회귀는 재고·불량·request/line·batch 복원과 후속 예외 rollback·중복 취소를 검증한다. 원래 line ID 누락 및 stale batch RED와 테스트 fixture/환경 오류는 서로 구별해 보존한다.
+- 최종 직접 backend `6f64868b`는261PASS/exit0, frontend `36c67b46`은4파일177PASS/exit0이다. 초기5파일188PASS와 겹치므로 둘을 합쳐 고유 수처럼 세지 않는다. `fcce98ac`은 앱 타입 exit0·검증 계약56PASS/skip0·test manifest285·기존392/신규0을 확인했다. strict product Ruff와 변경 frontend ESLint는 통과했고, 변경 test 파일에 남은 기존 F841/E741은 신규 오류0과 구별한다. 전체 lint 부채가 사라졌다는 뜻은 아니다.
+- 실제 PostgreSQL16은 별도 nonce의 두 직접 node만 실행했다. `cc6105d2`/`5410887b`(run49586b…)는 동일 operation 중복 취소1PASS/skip0·성공1/거부1·batch partially_completed를 증명했다. 총괄이 이 사례만으로 새 sibling 잠금의 효과를 증명할 수 없음을 지적한 뒤, `9c2281ff`/`4b25688e`(runf14bd099…)는 **서로 다른 두 operation**의 동시 취소1PASS/skip0·합법적 성공2·최종 batch submitted/completed_at None·reversal2를 증명했다. 서로 다른 backend PID를 단언했고 두 node는 canonical PostgreSQL runner에 필수 등록됐다(`792fc1eb`). 같은 전체 runner는 반복하지 않았으며 원격 전체 검증은 아직 남는다.
+- OpenAPI baseline `a1199e53` 및 고유 임시 생성 타입 `897696d6`은 정규화된 정확 일치다. 첫 npx 경로 해석 실패는 own cache에 보존하고 로컬 고정 generator로 복구했으며 재설치하지 않았다. `ec36fac1` diff-check도 통과했다. model/migration/lockfile·responsive shell·동결 weekly/mobile nav/globals/shipping step5의 추가 diff는 없다.
+- 총괄 `f9f8a3`은 ignored `20260908-cp7-b4/review-evidence.md`의 최종 명세 `/root/b1_spec_review`와 품질 `/root/b1_quality_review` 원문을 읽었다. 두 final round2는 모두 C/I/M0·Ready Yes이며 과거 task 명칭의 B1은 이번 B4 리뷰 범위를 뜻하지 않는다. 품질 리뷰는 기존 승인/반려와 새 잠금 순서의 교착 역전 부재를 정적으로 대조했다. PG가 검증하지 않은 모든 교차 조합까지 동적 PASS라고 확대하지 않는다.
+- PG의 정상2회 및 환경/fixture 실패3회는 각 own nonce/PID/PGDATA/data_directory를 대조한 뒤 exact test DB와 cluster만 정리했고 status3·55437 AVAILABLE을 기록했다. PGDATA/evidence는 남겼다. root `f69237`도 마지막 기존 결과/cleanup 원본을 읽었으며 공유 환경을 새로 조회하지 않았다. 이 증거는 역사적 실행 경계 예외를 없애거나 전체 시스템 listener0을 주장하는 근거가 아니다.
+- 총괄은 정확27개 제품/테스트/생성 경로와 정본문서2개를 한 B4 로컬 rollback commit으로 인수한다. staged smart 영향 계획과 이미 통과한 직접 증거·문서 gate를 결합하며 PlanOnly를 실제 full PASS로 기록하지 않는다. B3/B4 일반 push 후 exact SHA의 실제 CI를 확인한다. 불변 원격 CI 대기 중 비중첩 B5 문서-only 작업·직접 검증만 병행하고, B6 진입과 IC23/24 원격 완료는 CI success 이후다. 최종 CP7 전체 gate·frozen 화면·최종 품질 통합/CI는 별도 필수다.

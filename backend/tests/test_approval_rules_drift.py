@@ -11,6 +11,7 @@ from pathlib import Path
 
 from app.services import approval_rules
 from app.services.approval_rules import (
+    IMMEDIATE_DEFECT_SUB_TYPES,
     MANUAL_LINE_ORIGINS,
     WAREHOUSE_APPROVAL_SUB_TYPES,
 )
@@ -56,4 +57,13 @@ def test_warehouse_approval_sub_types_fe_be_parity():
     assert fe == set(WAREHOUSE_APPROVAL_SUB_TYPES), (
         f"창고 결재 sub_type drift — FE {sorted(fe)} != BE {sorted(WAREHOUSE_APPROVAL_SUB_TYPES)}. "
         "approval_rules.WAREHOUSE_APPROVAL_SUB_TYPES 와 ioWorkType.requiresApproval 을 함께 갱신할 것."
+    )
+
+
+def test_immediate_defect_sub_types_fe_be_parity():
+    """FE defect 즉시 처리 집합 == BE IMMEDIATE_DEFECT_SUB_TYPES."""
+    fe = _strings_in(_match(r"_DEFECT_SUB_TYPES[^=]*=\s*\[(.*?)\]"))
+    assert fe == set(IMMEDIATE_DEFECT_SUB_TYPES), (
+        f"불량 즉시 처리 sub_type drift — FE {sorted(fe)} != "
+        f"BE {sorted(IMMEDIATE_DEFECT_SUB_TYPES)}."
     )

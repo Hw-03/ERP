@@ -95,6 +95,34 @@ def test_preview_internal_use_requires_warehouse_approval(db_session, make_item)
     assert result["requires_approval"] is True
 
 
+def test_preview_defect_quarantine_is_immediate_without_approval(db_session, make_item):
+    item = make_item()
+
+    result = iop.preview(
+        db_session,
+        work_type="defect",
+        sub_type="defect_quarantine",
+        targets=[_target(item.item_id)],
+        from_department="조립",
+    )
+
+    assert result["requires_approval"] is False
+
+
+def test_preview_manual_process_adjustment_requires_department_approval(db_session, make_item):
+    item = make_item()
+
+    result = iop.preview(
+        db_session,
+        work_type="process",
+        sub_type="adjust_in",
+        targets=[_target(item.item_id, source_kind="manual")],
+        to_department="조립",
+    )
+
+    assert result["requires_approval"] is True
+
+
 def test_preview_internal_use_expands_bom_parent(db_session, make_item, make_bom):
     parent = make_item(name="사내 사용 BOM 부모", process_type_code="AF")
     child = make_item(name="사내 사용 BOM 구성품", process_type_code="AR")

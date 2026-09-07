@@ -13,13 +13,15 @@ FE↔BE 일치는 `tests/test_approval_rules_drift.py` 가 자동 검사한다(A
 
 from __future__ import annotations
 
+from typing import Literal
+
 # 창고 정/부 승인이 필요한 sub_type(프론트 requiresApproval 과 동일 집합).
 WAREHOUSE_APPROVAL_SUB_TYPES: frozenset[str] = frozenset(
     {"warehouse_to_dept", "dept_to_warehouse", "internal_use_out"}
 )
 
-# 결재가 필요한 전체 sub_type(창고 승인 + 불량 격리).
-# 불량 격리(defect_quarantine)는 io 배치 경로에서 결재 대상으로 표시된다.
+# StockRequest 기반 실행 경로를 타는 전체 sub_type.
+# defect_quarantine은 즉시·무승인이지만 요청/원장/취소 귀속을 보존하려고 이 집합에 남긴다.
 APPROVAL_SUB_TYPES: frozenset[str] = WAREHOUSE_APPROVAL_SUB_TYPES | frozenset(
     {"defect_quarantine"}
 )
@@ -27,3 +29,30 @@ APPROVAL_SUB_TYPES: frozenset[str] = WAREHOUSE_APPROVAL_SUB_TYPES | frozenset(
 # 낱개 라인 origin — 1라인이라도 포함되면 부서 결재 정/부 승인이 필요.
 # 프론트 IoLine.origin / ioWorkType.MANUAL_ORIGINS 와 동기화.
 MANUAL_LINE_ORIGINS: frozenset[str] = frozenset({"manual", "adjust_in", "adjust_out"})
+
+IMMEDIATE_DEFECT_SUB_TYPES: frozenset[str] = frozenset(
+    {"defect_quarantine", "defect_restore", "defect_process", "supplier_return"}
+)
+
+ApprovalKind = Literal["none", "warehouse", "department"]
+
+
+def approval_kind(
+    *,
+    work_type: str,
+    sub_type: str,
+    has_manual_line: bool = False,
+    has_custom_process_bom: bool = False,
+) -> ApprovalKind:
+    """표시와 실행 분기가 공유하는 결재 종류를 반환한다.
+
+    request-backed 실행 여부와 결재 필요 여부는 서로 다른 정책이다. 특히 불량 격리는
+    StockRequest 경로를 유지하면서도 즉시·무승인으로 표시한다.
+    """
+    if sub_type in WAREHOUSE_APPROVAL_SUB_TYPES:
+        return "warehouse"
+    if sub_type in IMMEDIATE_DEFECT_SUB_TYPES:
+        return "none"
+    if work_type == "process" and (has_manual_line or has_custom_process_bom):
+        return "department"
+    return "none"

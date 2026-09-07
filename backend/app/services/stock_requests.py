@@ -175,6 +175,7 @@ def _build_request_and_lines(
             to_department=li.to_department,
             status=status,
             defect_quarantine_record_id=li.record_id,
+            operation_line_id=li.operation_line_id,
         )
         db.add(line)
     db.flush()

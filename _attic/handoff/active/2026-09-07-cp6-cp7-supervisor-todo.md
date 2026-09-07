@@ -19,8 +19,8 @@
 - CP6 구현 작업: `01a07b0c-4563-7c41-a8c7-5df5ad2e91e2`, `C:\ERP\.worktrees\full-code-quality-cp6`, branch `codex/full-code-quality-cp6`.
 - CP7 구현 작업: `01a07c76-6395-7dc0-ba58-91c6fc4d3538`, `C:\ERP\.worktrees\full-code-quality-cp7`, branch `codex/full-code-quality-cp7`, 고정 `POST_CP6_SHA=7f232773b1eea204a251bc5ac001ef5b03319d3b`. 초기 HEAD·branch·linked worktree·clean을 확인했고 B1부터 착수했다. 품질 branch는 이 SHA에서 CP7 최종 통합까지 움직이지 않는다.
 - 정본 감사 계획: [전수 감사·개선 계획](../../docs/research/2026-08-13-full-code-quality-audit-and-improvement-plan.md), 8.9.7·8.9.8 및 12.26절
-- 현 상태(2026-09-08): **CP6 종료·품질 통합과 CP7 B1·B2 완료, B3 로컬 검증·독립 리뷰 인수 완료. B2 actual CI34157355573의 exact129·6/6 success는 확정이다. B3는 별도 로컬 커밋 후 B4로 이어가며 두 단계의 push·원격 전체 CI는 묶는다. 품질 branch는 POST_CP6_SHA에서 고정하며 근거는 감사12.27.8~12.28.8이다.**
-- 실행 단위 집계: 아래 11/16 로컬 실행 완료, 미완료5. B3 원격 검증과 CP7 B4~B7·최종 통합은 남아 있다. 실행 단위는 크기가 다르므로 이 비율을 전체 작업량 비율로 해석하지 않는다.
+- 현 상태(2026-09-08): **CP6 종료·품질 통합과 CP7 B1·B2 완료, B3 commit `234d4f5b` 및 B4 로컬 검증·두 리뷰를 인수했다. B2 actual CI34157355573의 exact129·6/6 success는 확정이다. B4 별도 로컬 commit 뒤 B3/B4의 push·원격 전체 CI를 묶는다. 품질 branch는 POST_CP6_SHA에서 고정하며 근거는 감사12.27.8~12.28.10이다.**
+- 실행 단위 집계: 아래 12/16 로컬 실행 완료, 미완료4. B3/B4 원격 검증과 CP7 B5~B7·최종 통합은 남아 있다. 실행 단위는 크기가 다르므로 이 비율을 전체 작업량 비율로 해석하지 않는다.
 
 ## 실행 체크리스트
 
@@ -39,7 +39,9 @@
 - B2 실행 경계 예외(2026-09-08): `exec79b5b323`에서 worktree 루트의 `npm run check:bundle-size`를 1회 잘못 실행해 npm이 상위 `C:\ERP\package.json`을 조회하고 ENOENT로 종료했으며 로그를 `C:\Users\user\AppData\Local\npm-cache`에 기록했다. 서버·DB 접근 증거는 없고 main/전역 로그를 다시 읽거나 지우지 않았다. 이후 모든 npm 계열 명령은 정확한 CP7 `frontend` cwd·절대 `--prefix`와 CP7 ignored 고유 cache/TEMP/TMP에 고정하며, 이미 통과한 Next build·bundle은 반복하지 않는다.
 - [x] CP7 B3 (2026-09-08, LOCAL_VERIFIED): IC23 핵심 IO/shipping/defect/department 오류·focus·keyboard/axe blocking 계약. 직접4파일43PASS와 최종 관리자2파일11PASS, light/dark 핵심 E2E4PASS·최종 관리자delta1PASS, 두 독립 리뷰 C/I/M0를 총괄이 인수했다. 테스트 타입285파일·392known/신규0, 앱/E2E 타입·strict lint·diff-check가 통과했다. 공용 기본 UI와 동결 영역·API/schema/backend 변경0, 소유 E2E DB family 불변·cleanup-complete 근거를 보존한다. 감사12.28.8 및 ignored `20260908-cp7-b3-final/review-evidence.md` 참조. 별도 로컬 커밋은 이 문서와 함께 수행하고 원격 완료는 B4와 합친 CI 이후다.
 - 속도 우선 배치 조정(2026-09-08, B3~B4): 카드별 RED→직접 GREEN·독립 명세/품질 리뷰·별도 로컬 rollback commit을 유지하고 두 단계가 모두 GREEN일 때 한 번 push/실제 전체 CI를 실행한다. 로컬 완료와 원격 검증 완료는 분리하고, 최종 CP7 full gate 및 재고·권한 필수 검사는 생략하지 않는다.
-- [ ] CP7 B4: IC24 확인된 두 번째 consumer 정책만 공통화; approval matrix·public facade 유지.
+- [x] CP7 B4 (2026-09-08, LOCAL_VERIFIED / 기준234d4f5b): IC24 승인 큐·preview의 실제 consumer/역할 fixture·HTTP 권한, BOM 전체/부분 자식 누락, defect 즉시 완료의 line identity와 전용 취소 귀속을 보완했다. backend261PASS/frontend177PASS·타입 기존392/신규0·OpenAPI exact·두 독립 리뷰 C/I/M0를 총괄이 인수했다. API wire/schema·동결 UI·responsive shell 변화는0이다. 상세 감사12.28.10 및 ignored `20260908-cp7-b4/review-evidence.md`. 별도 로컬 commit 뒤 B3/B4 actual CI까지 원격 완료는 유보한다.
+- B4-R1 로컬 인수: 기존 취소 뒤 연결 IoBatch stale RED를 같은 transaction의 기존 request 집계 동기화와 일관된 owner 보호로 해결했다. 실제 PG 두 node는 same-operation 성공1/거부1과 different-operation 성공2/최종 submitted·완료시각None을 각각1PASS/skip0로 증명했다. 원본 실패와 own cleanup을 보존하고 새 상태·원장·schema·backfill은 추가하지 않았다.
+- 속도 우선 후속 배치: B4 commit/push를 총괄이 인수한 후 불변 B3/B4 SHA의 원격 CI 동안 비중첩 B5 문서-only 로컬 변경·직접 검증을 병행한다. B6 전 actual CI success가 필요하다. B5/B6/B7은 개별 rollback commit·직접 증거·두 delta 리뷰를 유지하고 full/원격 CI는 최종 CP7 경계로 묶는다.
 - [ ] CP7 B5: DOC01 live 링크·명령·DB·URL 정합성, 역사 관찰 재실행 금지.
 - [ ] CP7 B6: AT01 source/target consumer 재검증, git mv와 모든 경로/문서 갱신, old path 0.
 - [ ] CP7 B7: AT02 consumer 0 byte-identical frontend copy만 제거, 원본·item 이미지·실제 consumer 보존.

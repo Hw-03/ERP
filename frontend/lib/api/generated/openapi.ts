@@ -2748,9 +2748,10 @@ export interface paths {
          * List Department Queue
          * @description 부서 결재 정/부 승인 대기 목록.
          *
-         *     노출 부서 범위 (그릴 합의 — docs/defect-handling-redesign.md):
-         *       - 부서 정/부: 생산 라인 6개(튜브/고압/진공/튜닝/조립/출하)
-         *       - 창고 정/부 / admin: 모든 부서
+         *     노출 부서 범위:
+         *       - 부서 정/부: 창고 외 모든 부서
+         *       - 창고 정/부: 모든 부서
+         *       - admin 단독: 결재 권한 없음
          */
         get: operations["list_department_queue_api_stock_requests_department_queue_get"];
         put?: never;
@@ -2964,7 +2965,7 @@ export interface paths {
         put?: never;
         /**
          * Department Approve Stock Request
-         * @description 부서 결재 승인 — department_role in (primary/deputy) 또는 admin.
+         * @description 부서 결재 승인 — 부서 정/부 또는 창고 정/부만 허용.
          */
         post: operations["department_approve_stock_request_api_stock_requests__request_id__department_approve_post"];
         delete?: never;

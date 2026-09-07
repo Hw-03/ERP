@@ -5,7 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { defectsApi } from "@/lib/api/defects";
 import type { DefectKpi, DefectLocation } from "@/lib/api/types/defects";
-import { isWarehouseStaff, isDepartmentApprover } from "./_warehouse_steps";
+import { defectDefaultSource, isWarehouseStaff } from "./_warehouse_steps";
 import { useWarehouseData } from "./_warehouse_hooks/useWarehouseData";
 import type { Operator } from "./login/useCurrentOperator";
 import { DefectKpiCards, type DefectKpiKind } from "./_defect_hub/DefectKpiCards";
@@ -23,11 +23,6 @@ import { matchesDefectSearch } from "./_defect_hub/defectSearch";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 const PRODUCTION_LINES = new Set(["튜브", "고압", "진공", "튜닝", "조립", "출하"]);
-
-/** 역할 기반 기본 출처 — 창고 전담자만 "warehouse", 나머지 "production". */
-function defaultSourceForOp(op: Operator): "warehouse" | "production" {
-  return isWarehouseStaff(op) && !isDepartmentApprover(op) ? "warehouse" : "production";
-}
 
 /** 화면 모드 — hub가 진입점. list 외에는 좌측 목록을 덮는 전폭 작업 화면. */
 type ViewMode =
@@ -312,7 +307,7 @@ function DefectViewInner({
                 items={items}
                 productModels={productModels}
                 currentEmployee={employee}
-                defaultSource={defaultSourceForOp(operator)}
+                defaultSource={defectDefaultSource(operator)}
                 onCancel={() => window.history.back()}
                 onDone={(directAction) =>
                   handleProcessed(

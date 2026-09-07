@@ -14,6 +14,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import (
+    BOM,
     DepartmentEnum,
     Employee,
     Item,
@@ -34,7 +35,11 @@ from app.services.bom_stock_policy import (
 
 # 결재 규칙 단일 원천(approval_rules). io.py / io_dispatch / io_persist 가 본 모듈에서
 # 이 이름들을 re-export·import 하므로 네임스페이스에 노출한다.
-from app.services.approval_rules import APPROVAL_SUB_TYPES, MANUAL_LINE_ORIGINS  # noqa: F401
+from app.services.approval_rules import (  # noqa: F401
+    APPROVAL_SUB_TYPES,
+    MANUAL_LINE_ORIGINS,
+    approval_kind,
+)
 
 
 WORK_TYPES = {
@@ -566,10 +571,14 @@ def validate_operation_sources(sub_type: str, source_kinds: Iterable[str]) -> No
 
 def _bundle_value(bundle: object, name: str, default: object = None) -> object:
     """Pydantic payload와 저장된 ORM bundle에서 공통 필드를 읽는다."""
+    if isinstance(bundle, dict):
+        return bundle.get(name, default)
     return getattr(bundle, name, default)
 
 
 def _line_value(line: object, name: str, default: object = None) -> object:
+    if isinstance(line, dict):
+        return line.get(name, default)
     return getattr(line, name, default)
 
 
@@ -581,6 +590,56 @@ def has_included_manual_line(bundles: Iterable[object]) -> bool:
         for bundle in bundles
         for line in _bundle_value(bundle, "lines", ())
     )
+
+
+def has_declared_custom_process_bom(
+    db: Session,
+    *,
+    work_type: str,
+    sub_type: str,
+    bundles: Iterable[object],
+) -> bool:
+    """현재 DB BOM과 저장/표시 payload의 하위 구성·수량 차이를 판정한다."""
+    if work_type != "process" or sub_type not in {"produce", "disassemble"}:
+        return False
+    for bundle in bundles:
+        if _bundle_value(bundle, "source_kind") != "bom_parent":
+            continue
+        lines = tuple(_bundle_value(bundle, "lines", ()))
+        source_item_id = _bundle_value(bundle, "source_item_id")
+        parent = next(
+            (
+                line
+                for line in lines
+                if _line_value(line, "origin") == "direct"
+                and _line_value(line, "item_id") == source_item_id
+            ),
+            None,
+        )
+        if parent is None:
+            continue
+        bom_rows = {
+            row.child_item_id: _d(row.quantity)
+            for row in db.query(BOM).filter(BOM.parent_item_id == source_item_id).all()
+        }
+        auto_lines = [
+            line for line in lines if _line_value(line, "origin") == BOM_AUTO_ORIGIN
+        ]
+        if set(bom_rows) != {_line_value(line, "item_id") for line in auto_lines}:
+            return True
+        parent_quantity = _d(_line_value(parent, "quantity", 0))
+        for line in auto_lines:
+            if _line_value(line, "bom_stock_exempt", False):
+                continue
+            unit_quantity = bom_rows.get(_line_value(line, "item_id"))
+            if unit_quantity is None:
+                return True
+            expected = parent_quantity * unit_quantity
+            if expected > 0 and not _line_value(line, "included", True):
+                return True
+            if _d(_line_value(line, "quantity", 0)) != expected:
+                return True
+    return False
 
 
 def normalize_process_sub_type(
@@ -1228,9 +1287,20 @@ def preview(
             sub_type=sub_type,
         )
         bundles.append(bundle)
+    requires_approval = approval_kind(
+        work_type=work_type,
+        sub_type=sub_type,
+        has_manual_line=has_included_manual_line(bundles),
+        has_custom_process_bom=has_declared_custom_process_bom(
+            db,
+            work_type=work_type,
+            sub_type=sub_type,
+            bundles=bundles,
+        ),
+    ) != "none"
     return {
         "work_type": work_type,
         "sub_type": sub_type,
-        "requires_approval": sub_type in APPROVAL_SUB_TYPES,
+        "requires_approval": requires_approval,
         "bundles": bundles,
     }

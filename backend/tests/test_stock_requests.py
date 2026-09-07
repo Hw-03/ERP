@@ -14,8 +14,10 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 
@@ -32,6 +34,7 @@ from app.models import (
     StockRequest,
     StockRequestLine,
     StockRequestStatusEnum,
+    StockRequestTypeEnum,
     TransactionLog,
     TransactionTypeEnum,
 )
@@ -1812,3 +1815,93 @@ def test_department_queue_count_matches_list(db_session, client, make_item):
     assert res_list.status_code == 200
     assert res_cnt.status_code == 200
     assert res_cnt.json()["count"] == len(res_list.json())
+
+
+@pytest.mark.parametrize(
+    "case",
+    json.loads(
+        (Path(__file__).parent / "fixtures/department_approval_role_matrix.json").read_text(
+            encoding="utf-8"
+        )
+    ),
+    ids=lambda case: case["name"],
+)
+def test_department_role_matrix_controls_http_queue_count_approve_and_reject(
+    db_session, client, case
+):
+    requester = _make_employee(
+        db_session,
+        code=f"MATRIX-REQ-{case['name']}",
+        name="역할 행렬 요청자",
+    )
+    actor = _make_employee(
+        db_session,
+        code=f"MATRIX-ACT-{case['name']}",
+        name="역할 행렬 결재자",
+        warehouse_role=case["warehouse_role"],
+        level=EmployeeLevelEnum(case["level"]),
+    )
+    actor.department_role = case["department_role"]
+
+    def _pending_request(*, requires_warehouse_approval: bool) -> StockRequest:
+        request = StockRequest(
+            requester_employee_id=requester.employee_id,
+            requester_name=requester.name,
+            requester_department=DepartmentEnum.ASSEMBLY.value,
+            approval_department=DepartmentEnum.ASSEMBLY.value,
+            request_type=StockRequestTypeEnum.DEPT_INTERNAL,
+            status=StockRequestStatusEnum.SUBMITTED,
+            requires_warehouse_approval=requires_warehouse_approval,
+            requires_department_approval=True,
+        )
+        db_session.add(request)
+        db_session.flush()
+        return request
+
+    queue_request = _pending_request(requires_warehouse_approval=False)
+    approve_request = _pending_request(requires_warehouse_approval=True)
+    reject_request = _pending_request(requires_warehouse_approval=False)
+    db_session.commit()
+
+    queue = client.get(
+        "/api/stock-requests/department-queue",
+        params={"actor_employee_id": str(actor.employee_id)},
+    )
+    count = client.get(
+        "/api/stock-requests/department-queue/count",
+        params={"actor_employee_id": str(actor.employee_id)},
+    )
+    assert queue.status_code == 200, queue.text
+    assert count.status_code == 200, count.text
+    visible_ids = {entry["request_id"] for entry in queue.json()}
+    expected_visible_ids = (
+        {str(queue_request.request_id), str(reject_request.request_id)}
+        if case["can_see_department_queue"]
+        else set()
+    )
+    assert visible_ids == expected_visible_ids
+    assert count.json()["count"] == len(expected_visible_ids)
+
+    approved = client.post(
+        f"/api/stock-requests/{approve_request.request_id}/department-approve",
+        json={"actor_employee_id": str(actor.employee_id), "pin": "0000"},
+    )
+    rejected = client.post(
+        f"/api/stock-requests/{reject_request.request_id}/department-reject",
+        json={
+            "actor_employee_id": str(actor.employee_id),
+            "pin": "0000",
+            "reason": "역할 행렬 반려 검증",
+        },
+    )
+    if case["can_see_department_queue"]:
+        assert approved.status_code == 200, approved.text
+        assert approved.json()["department_approved_by_employee_id"] == str(actor.employee_id)
+        assert rejected.status_code == 200, rejected.text
+        assert rejected.json()["status"] == StockRequestStatusEnum.REJECTED.value
+    else:
+        assert approved.status_code == 403, approved.text
+        assert rejected.status_code == 403, rejected.text
+        db_session.expire_all()
+        assert db_session.get(StockRequest, approve_request.request_id).status == StockRequestStatusEnum.SUBMITTED
+        assert db_session.get(StockRequest, reject_request.request_id).status == StockRequestStatusEnum.SUBMITTED

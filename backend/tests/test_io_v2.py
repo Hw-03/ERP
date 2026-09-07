@@ -8,17 +8,20 @@ import pytest
 from app.models import (
     ActivityAuditLog,
     BOM,
+    DefectQuarantineRecord,
     DepartmentEnum,
     Employee,
     EmployeeLevelEnum,
     Inventory,
     InventoryOperation,
+    InventoryOperationEffect,
     InventoryLocation,
     InventoryOperationRoleEnum,
     IoBatch,
     IoBundle,
     IoLine,
     LocationStatusEnum,
+    Notification,
     ShippingRequest,
     ShippingRequestStatusEnum,
     StockRequest,
@@ -31,6 +34,8 @@ from app.models import (
     WarehouseUnplacedItem,
 )
 from app.services import shipping_actions as shipping_actions_svc
+from app.services import inventory_operation_cancellation as cancellation_svc
+from app.services import inventory_operations as inventory_operation_svc
 from app.services.pin_auth import DEFAULT_PIN_HASH
 
 
@@ -188,6 +193,235 @@ def _reject_department_request(client, request_id, approver: Employee):
             "pin": "0000",
             "reason": "재입고 반려",
         },
+    )
+
+
+def test_defect_quarantine_preview_submit_preserves_request_operation_and_cancel_owner(
+    client, db_session, make_item, make_location, monkeypatch
+):
+    item = make_item(name="격리 승인 정책 품목", warehouse_qty=Decimal("0"))
+    make_location(
+        item.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        quantity=Decimal("5"),
+    )
+    requester = _make_employee(db_session, code="DEFECT-IO")
+    db_session.add(
+        SystemSetting(
+            setting_key=inventory_operation_svc.CUTOVER_SETTING_KEY,
+            setting_value="2000-01-01T00:00:00",
+        )
+    )
+    db_session.flush()
+    db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one().quantity = Decimal("5")
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "defect",
+            "sub_type": "defect_quarantine",
+            "from_department": DepartmentEnum.ASSEMBLY.value,
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "item_id": str(item.item_id),
+                    "quantity": 2,
+                }
+            ],
+        },
+    )
+
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["requires_approval"] is False
+    payload = {
+        "requester_employee_id": str(requester.employee_id),
+        "work_type": "defect",
+        "sub_type": "defect_quarantine",
+        "from_department": DepartmentEnum.ASSEMBLY.value,
+        "bundles": preview.json()["bundles"],
+    }
+    drafted = client.put("/api/io/draft", json=payload)
+    assert drafted.status_code == 200, drafted.text
+    assert drafted.json()["requires_approval"] is False
+    submitted = client.post(
+        f"/api/io/draft/{drafted.json()['batch_id']}/submit",
+        params={"requester_employee_id": str(requester.employee_id)},
+    )
+
+    assert submitted.status_code == 201, submitted.text
+    assert submitted.json()["status"] == "completed"
+    assert submitted.json()["requires_approval"] is False
+    db_session.expire_all()
+    batch = db_session.query(IoBatch).one()
+    request = db_session.query(StockRequest).one()
+    request_line = db_session.query(StockRequestLine).one()
+    operation = db_session.query(InventoryOperation).one()
+    log = db_session.query(TransactionLog).one()
+    io_line = batch.bundles[0].lines[0]
+
+    assert batch.stock_request_id == request.request_id
+    assert request.operation_batch_id == batch.batch_id
+    assert request.status == StockRequestStatusEnum.COMPLETED
+    assert request.requires_warehouse_approval is False
+    assert request.requires_department_approval is False
+    assert request_line.operation_line_id == io_line.line_id
+    assert log.operation_id == operation.operation_id
+    assert log.operation_batch_id == batch.batch_id
+    assert log.operation_line_id == io_line.line_id
+    assert log.quantity_change == Decimal("0")
+    assert log.quantity_before == Decimal("5")
+    assert log.quantity_after == Decimal("5")
+    assert {
+        (
+            effect["scope"],
+            effect.get("department"),
+            effect.get("status"),
+            effect["before_quantity"],
+            effect["after_quantity"],
+            effect["delta"],
+        )
+        for effect in log.inventory_effect
+    } == {
+        ("location", DepartmentEnum.ASSEMBLY.value, LocationStatusEnum.PRODUCTION.value, 5, 3, -2),
+        ("location", DepartmentEnum.ASSEMBLY.value, LocationStatusEnum.DEFECTIVE.value, 0, 2, 2),
+    }
+    assert operation.domain == "stock_request"
+    assert operation.action == StockRequestTypeEnum.MARK_DEFECTIVE_PROD.value
+    production_location = (
+        db_session.query(InventoryLocation)
+        .filter(
+            InventoryLocation.item_id == item.item_id,
+            InventoryLocation.department == DepartmentEnum.ASSEMBLY,
+            InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+        )
+        .one()
+    )
+    defective_location = (
+        db_session.query(InventoryLocation)
+        .filter(
+            InventoryLocation.item_id == item.item_id,
+            InventoryLocation.department == DepartmentEnum.ASSEMBLY,
+            InventoryLocation.status == LocationStatusEnum.DEFECTIVE,
+        )
+        .one()
+    )
+    assert production_location.quantity == Decimal("3")
+    assert defective_location.quantity == Decimal("2")
+    assert db_session.query(DefectQuarantineRecord).one().remaining_quantity == Decimal("2")
+    effects = db_session.query(InventoryOperationEffect).all()
+    assert [(effect.subject_type, effect.subject_id) for effect in effects] == [
+        ("StockRequest", str(request.request_id))
+    ]
+    assert db_session.query(Notification).count() == 0
+
+    regular_cancel = client.post(
+        f"/api/stock-requests/{request.request_id}/cancel",
+        json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
+    )
+    assert regular_cancel.status_code == 422, regular_cancel.text
+    operation_cancel = client.post(
+        f"/api/inventory/operations/{operation.operation_id}/cancel/preview"
+    )
+    assert operation_cancel.status_code == 200, operation_cancel.text
+    assert operation_cancel.json()["can_cancel"] is True
+    assert operation_cancel.json()["effects"] == [
+        {
+            "effect_id": str(effects[0].effect_id),
+            "effect_kind": "WORKFLOW",
+            "subject_type": "StockRequest",
+            "subject_id": str(request.request_id),
+            "role": "EXECUTION_STATUS",
+            "current_state": {"status": "completed"},
+            "target_state": {"status": "submitted"},
+        }
+    ]
+    original_assert_plan_applied = cancellation_svc._assert_plan_applied
+
+    def fail_after_reversal(*_args, **_kwargs):
+        raise cancellation_svc.CancellationNotAllowed("강제 취소 롤백 검증")
+
+    monkeypatch.setattr(cancellation_svc, "_assert_plan_applied", fail_after_reversal)
+    failed_cancel = client.post(
+        f"/api/inventory/operations/{operation.operation_id}/cancel",
+        json={
+            "reason": "격리 입력 취소 실패 검증",
+            "employee_code": requester.employee_code,
+            "pin": "0000",
+            "plan_hash": operation_cancel.json()["plan_hash"],
+        },
+    )
+    assert failed_cancel.status_code == 422, failed_cancel.text
+    monkeypatch.setattr(
+        cancellation_svc,
+        "_assert_plan_applied",
+        original_assert_plan_applied,
+    )
+    db_session.expire_all()
+    assert db_session.get(StockRequest, request.request_id).status == StockRequestStatusEnum.COMPLETED
+    assert db_session.get(StockRequestLine, request_line.line_id).status == StockRequestStatusEnum.COMPLETED
+    failed_batch = db_session.get(IoBatch, batch.batch_id)
+    assert failed_batch.status == "completed"
+    assert failed_batch.completed_at is not None
+    assert db_session.get(InventoryLocation, production_location.location_id).quantity == Decimal("3")
+    assert db_session.get(InventoryLocation, defective_location.location_id).quantity == Decimal("2")
+    assert db_session.query(DefectQuarantineRecord).one().remaining_quantity == Decimal("2")
+    assert (
+        db_session.query(InventoryOperation)
+        .filter(InventoryOperation.reverses_operation_id == operation.operation_id)
+        .count()
+        == 0
+    )
+
+    cancelled = client.post(
+        f"/api/inventory/operations/{operation.operation_id}/cancel",
+        json={
+            "reason": "격리 입력 취소",
+            "employee_code": requester.employee_code,
+            "pin": "0000",
+            "plan_hash": operation_cancel.json()["plan_hash"],
+        },
+    )
+    assert cancelled.status_code == 200, cancelled.text
+    db_session.expire_all()
+    assert db_session.get(StockRequest, request.request_id).status == StockRequestStatusEnum.SUBMITTED
+    assert db_session.get(StockRequestLine, request_line.line_id).status == StockRequestStatusEnum.SUBMITTED
+    assert db_session.get(InventoryLocation, production_location.location_id).quantity == Decimal("5")
+    assert db_session.get(InventoryLocation, defective_location.location_id).quantity == Decimal("0")
+    assert db_session.query(DefectQuarantineRecord).one().remaining_quantity == Decimal("0")
+    restored_batch = db_session.get(IoBatch, batch.batch_id)
+    restored_batch_response = client.get(f"/api/io/{batch.batch_id}")
+    assert restored_batch_response.status_code == 200, restored_batch_response.text
+    assert {
+        "orm_status": restored_batch.status,
+        "orm_completed_at": restored_batch.completed_at,
+        "dto_status": restored_batch_response.json()["status"],
+        "dto_completed_at": restored_batch_response.json()["completed_at"],
+    } == {
+        "orm_status": "submitted",
+        "orm_completed_at": None,
+        "dto_status": "submitted",
+        "dto_completed_at": None,
+    }
+    duplicate_cancel = client.post(
+        f"/api/inventory/operations/{operation.operation_id}/cancel",
+        json={
+            "reason": "격리 입력 중복 취소",
+            "employee_code": requester.employee_code,
+            "pin": "0000",
+            "plan_hash": operation_cancel.json()["plan_hash"],
+        },
+    )
+    assert duplicate_cancel.status_code == 409, duplicate_cancel.text
+    db_session.expire_all()
+    assert db_session.get(StockRequest, request.request_id).status == StockRequestStatusEnum.SUBMITTED
+    assert db_session.get(IoBatch, batch.batch_id).status == "submitted"
+    assert (
+        db_session.query(InventoryOperation)
+        .filter(InventoryOperation.reverses_operation_id == operation.operation_id)
+        .count()
+        == 1
     )
 
 
@@ -4490,6 +4724,7 @@ def test_io_draft_submission_requires_memo_without_changing_draft(
 
     drafted = client.put("/api/io/draft", json=payload)
     assert drafted.status_code == 200, drafted.text
+    assert drafted.json()["requires_approval"] is True
     batch_id = drafted.json()["batch_id"]
 
     rejected = client.post(
@@ -4655,6 +4890,7 @@ def test_io_draft_submit_custom_process_bom_requires_memo_without_changing_draft
 
     drafted = client.put("/api/io/draft", json=payload)
     assert drafted.status_code == 200, drafted.text
+    assert drafted.json()["requires_approval"] is True
     batch_id = drafted.json()["batch_id"]
 
     rejected = client.post(
@@ -4724,6 +4960,7 @@ def test_io_explicitly_excluded_positive_bom_child_requires_memo_and_department_
     if submit_existing_draft:
         drafted = client.put("/api/io/draft", json=payload)
         assert drafted.status_code == 200, drafted.text
+        assert drafted.json()["requires_approval"] is True
         batch_id = drafted.json()["batch_id"]
         rejected = client.post(
             f"/api/io/draft/{batch_id}/submit",
@@ -4942,6 +5179,7 @@ def test_io_no_effect_custom_bom_keeps_department_approval_for_fresh_and_draft(
     if submit_existing_draft:
         drafted = client.put("/api/io/draft", json=payload)
         assert drafted.status_code == 200, drafted.text
+        assert drafted.json()["requires_approval"] is True
         batch_id = drafted.json()["batch_id"]
         rejected = client.post(
             f"/api/io/draft/{batch_id}/submit",
@@ -4973,6 +5211,57 @@ def test_io_no_effect_custom_bom_keeps_department_approval_for_fresh_and_draft(
     assert request.requires_department_approval is True
     assert len(request.lines) == 1
     assert db_session.query(TransactionLog).count() == 0
+
+
+@pytest.mark.parametrize("sub_type", ["produce", "disassemble"])
+def test_io_partial_missing_bom_child_keeps_department_approval_in_draft(
+    client,
+    db_session,
+    make_item,
+    make_bom,
+    make_location,
+    sub_type,
+):
+    parent = make_item(name=f"API 일부 누락 상위 {sub_type}", process_type_code="AF")
+    first_child = make_item(name=f"API 일부 누락 하위 1 {sub_type}", process_type_code="AR")
+    second_child = make_item(name=f"API 일부 누락 하위 2 {sub_type}", process_type_code="AR")
+    make_bom(parent.item_id, first_child.item_id, Decimal("1"))
+    make_bom(parent.item_id, second_child.item_id, Decimal("2"))
+    make_location(
+        parent.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        quantity=Decimal("7" if sub_type == "disassemble" else "0"),
+    )
+    make_location(first_child.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("10"))
+    make_location(second_child.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("10"))
+    requester = _make_employee(db_session, code=f"PARTIAL-{sub_type}")
+    db_session.commit()
+    bundles = _preview_process_bom_bundles(client, requester, parent, sub_type=sub_type)
+    for bundle in bundles:
+        bundle["lines"] = [
+            line for line in bundle["lines"] if line["item_id"] != str(second_child.item_id)
+        ]
+
+    drafted = client.put(
+        "/api/io/draft",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": sub_type,
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "notes": " ",
+            "bundles": bundles,
+        },
+    )
+
+    assert drafted.status_code == 200, drafted.text
+    assert drafted.json()["requires_approval"] is True
+    rejected = client.post(
+        f"/api/io/draft/{drafted.json()['batch_id']}/submit",
+        params={"requester_employee_id": str(requester.employee_id)},
+    )
+    assert rejected.status_code == 422, rejected.text
+    assert db_session.query(StockRequest).count() == 0
 
 
 @pytest.mark.parametrize(
