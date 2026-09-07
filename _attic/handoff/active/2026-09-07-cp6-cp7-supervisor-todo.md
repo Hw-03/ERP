@@ -19,7 +19,7 @@
 - CP6 구현 작업: `01a07b0c-4563-7c41-a8c7-5df5ad2e91e2`, `C:\ERP\.worktrees\full-code-quality-cp6`, branch `codex/full-code-quality-cp6`.
 - CP7 구현 작업: `01a07c76-6395-7dc0-ba58-91c6fc4d3538`, `C:\ERP\.worktrees\full-code-quality-cp7`, branch `codex/full-code-quality-cp7`, 고정 `POST_CP6_SHA=7f232773b1eea204a251bc5ac001ef5b03319d3b`. 초기 HEAD·branch·linked worktree·clean을 확인했고 B1부터 착수했다. 품질 branch는 이 SHA에서 CP7 최종 통합까지 움직이지 않는다.
 - 정본 감사 계획: [전수 감사·개선 계획](../../docs/research/2026-08-13-full-code-quality-audit-and-improvement-plan.md), 8.9.7·8.9.8 및 12.26절
-- 현 상태(2026-09-08): **CP6 종료·품질 통합과 CP7 B1 완료. CP7 1ad03e37의 CI34149717620도 실제6/6 success이며 B2 Next 업그레이드를 시작했다. 품질 branch는 POST_CP6_SHA에서 고정한다. 새 diff만 focused 검증하며 최종 통합에서 전체 gate·실제 CI를 확인한다. 근거는 감사12.27.8~12.28이다.**
+- 현 상태(2026-09-08): **CP6 종료·품질 통합과 CP7 B1 완료. B2의 Next c9435efc·Vitest65c0ed8·ESLint/PostCSS8cf8ea43은 로컬 커밋 완료이며, Vite6.4.3 후속도 직접 검증·두 리뷰 C/I/M0·all/prod audit0으로 인수했다. 마지막 commit/push·전체 실제 CI는 아직 남아 있다. 품질 branch는 POST_CP6_SHA에서 고정하며 근거는 감사12.27.8~12.28.6이다.**
 - 실행 단위 집계: 아래 9/16 완료, 미완료7. CP7 B2~B7 및 최종 통합은 아직 미완료다. 실행 단위는 크기가 다르므로 이 비율을 전체 작업량 비율로 해석하지 않는다.
 
 ## 실행 체크리스트
@@ -35,7 +35,7 @@
 - CP6 최초 full 결과(2026-09-07): 693,611.448ms·exit1, 실제9PASS/1FAIL이다. frontend7영역은 전체276파일2,556테스트·coverage94.97%·build/bundle을 포함해 통과했다. PG는 깊은 Windows 임시 경로로 실패했다. backend full pytest/OpenAPI·docs·DB·E2E 등 미실행 영역과 실패 PG만 짧은 own basetemp에서 복구하며 frontend/full 전체는 반복하지 않는다. 최초 합성 DB hash불변·원래 부재 복원·소유 test DB 삭제/cluster 종료도 확인했다. 감사12.27.6과 ignored 최종 run `resume-4/`가 원본이다. 후속 구성 검사 통과를 최초 full 명령 PASS로 바꾸지 않는다.
 - [x] CP7 병렬 사전감사 (2026-09-07): 타입·advisory·a11y·정책 consumer·문서·이동/중복 자산 manifest 및 DTO 후보26행 정적 검토, tracked 변경0. `full-code-quality-cp7-preaudit`의 ignored `20260907-cp7-preaudit/cp7-preaudit/preaudit.md`와 `ic21-manual-dto-targets.csv/.json`을 인계한다. 정적 차이18행은 실제 runtime 결함18건을 뜻하지 않는다. 제품/generator/runtime 검증은 CP7 구현 책임이다.
 - [x] CP7 B1 (2026-09-08): IC21 generated raw OpenAPI types·업무 adapter·nullable/unknown enum/serialization CI 연결. 최종 두 리뷰 C/I/M0·13파일162PASS·앱/테스트 타입·strict lint·build·bundle 및 생성 tracked guard를 인수했다. 로컬 전체 coverage 최초 실패는 mock-only4경로와 직접14PASS로 복구하고 원본 실패를 보존했다. commit `1ad03e3748f0fbfe38a331704019ba4f1c280a1c`의 [실제 CI34149717620](https://github.com/Hw-03/ERP/actions/runs/34149717620)은 completed/success·6/6이다. 총괄 독립 gh 조회와 ignored `cp7-b1-ci-final.json`이 근거다. 기존 stock/shipping pending 보존 외에 새 production replay 프로토콜은 추가하지 않았다. 감사12.28.1~12.28.2 참조.
-- [ ] CP7 B2 [진행]: IC22 Next → Vitest/coverage → ESLint/PostCSS 세 독립 변경과 단계별 검증·rollback. Next16.3.4·React19.2.8의 focused110+10PASS·build/bundle·실제 로그인/모바일·production audit0·두 리뷰 C/I0를 인수했고, next-env 생성 경로 churn Minor1은 공개 수용한다. 정확 staged/docs 확인 후 첫 로컬 commit을 허용한다. 세 로컬 commit 뒤 한 번 push/전체 CI를 확인하며 목표·예외·증거는 감사12.28.3~12.28.4에 기록한다.
+- [ ] CP7 B2 [원격 검증 대기]: IC22 세 로컬 rollback commit(c9435efc/65c0ed8/8cf8ea43)과 Vite6.4.3 보안 후속의 직접 검증·두 리뷰 C/I0를 인수했다. 같은 React batch 후속 편집 유실과 제거된 Next lint verifier 경로도 RED→GREEN으로 보완했다. 실제 전체 audit18→0·production0이며 마지막4경로(package/lock+총괄docs2) commit/push 뒤 전체 CI를 확인한다. 원본 local full2회FAIL·coverage 미보고·Next next-env Minor1·ESLint9 EOL 예외는 유지한다. 감사12.28.3~12.28.6 참조.
 - B2 실행 경계 예외(2026-09-08): `exec79b5b323`에서 worktree 루트의 `npm run check:bundle-size`를 1회 잘못 실행해 npm이 상위 `C:\ERP\package.json`을 조회하고 ENOENT로 종료했으며 로그를 `C:\Users\user\AppData\Local\npm-cache`에 기록했다. 서버·DB 접근 증거는 없고 main/전역 로그를 다시 읽거나 지우지 않았다. 이후 모든 npm 계열 명령은 정확한 CP7 `frontend` cwd·절대 `--prefix`와 CP7 ignored 고유 cache/TEMP/TMP에 고정하며, 이미 통과한 Next build·bundle은 반복하지 않는다.
 - [ ] CP7 B3: IC23 핵심 IO/shipping/defect/department 오류·focus·keyboard/axe blocking 계약.
 - [ ] CP7 B4: IC24 확인된 두 번째 consumer 정책만 공통화; approval matrix·public facade 유지.
@@ -62,6 +62,8 @@ CP6의 A1~A5는 focused GREEN·독립 새 diff 리뷰 C/I0 후 구간별 local c
 사용자의 빠르고 신뢰도 높은 완료 지시에 따라, focused GREEN으로 고정한 같은 diff의 명세·품질 읽기 전용 리뷰는 병렬로 수행할 수 있다. 제품 편집자는 한 명이며 두 리뷰의 C/I0가 모두 필요하다. 수용은 명세 확인 후 품질 확인 순서로 하고, 리뷰 중 지적을 고치면 바뀐 관련 부분만 다시 검토한다. 필수 검토·완료 기준을 줄이는 것은 아니다.
 
 CP7 검증 배치 조정(2026-09-08): B1은 응답 검증·멱등 key 안전막 변경이므로 최종 관련 검사와 실제 CI를 통과한 뒤 B2로 간다. B2의 Next → Vitest/coverage → ESLint/PostCSS는 순서·독립 로컬 commit/rollback 단위를 유지하되, 세 commit의 원격 push/전체 CI 대기는 B2 종료 시 한 번으로 묶는다. Next는 로그인·shell·proxy·빌드, Vitest는 실제 unit/coverage, ESLint/PostCSS는 lint·CSS/build 등 각 변경 도구가 책임지는 검사를 그때 실행한다. 앞 단계와 무관한 같은 검사를 다시 실행하지 않는다. 최신 diff의 명세·품질 C/I0, 생성 타입 guard 및 CP7 최종 full/실제 CI는 그대로 필수다. 최종 CI 실패 시 해당 변경 단위로 원인을 좁히며 기존 실패 기록을 PASS로 덮지 않는다.
+
+추가 배치 조정(2026-09-08): 잔여 dev-only Vite/esbuild advisory2건은 지원 중인 Vite6.4.3의 관련4번째 보안 단위로 해소하고 B2 한 번의 원격 검증에 함께 넣는다. B5~B7은 승인된 문서·one-off 이동·중복복사 제거의 독립 로컬 commit과 직접 검증/리뷰를 유지하며, 같은 제품의 전체 gate/CI는 최종 CP7로 묶는다. 알려진 archive 문서 참조는 승인 source→target 표에 따라 내용 보존 경로 패치로 갱신하며 새 runtime consumer와 구분한다. 제품 편집자는 계속 하나, 정본 감사·본 TODO는 총괄만 수정한다.
 
 ## API·schema 경계
 
