@@ -19,8 +19,8 @@
 - CP6 구현 작업: `01a07b0c-4563-7c41-a8c7-5df5ad2e91e2`, `C:\ERP\.worktrees\full-code-quality-cp6`, branch `codex/full-code-quality-cp6`.
 - CP7 구현 작업: `01a07c76-6395-7dc0-ba58-91c6fc4d3538`, `C:\ERP\.worktrees\full-code-quality-cp7`, branch `codex/full-code-quality-cp7`, 고정 `POST_CP6_SHA=7f232773b1eea204a251bc5ac001ef5b03319d3b`. 초기 HEAD·branch·linked worktree·clean을 확인했고 B1부터 착수했다. 품질 branch는 이 SHA에서 CP7 최종 통합까지 움직이지 않는다.
 - 정본 감사 계획: [전수 감사·개선 계획](../../docs/research/2026-08-13-full-code-quality-audit-and-improvement-plan.md), 8.9.7·8.9.8 및 12.26절
-- 현 상태(2026-09-08): **CP6 종료·품질 통합 완료. CP6 d60f84ed의 CI34135084227과 품질7f232773의 CI34137728037이 모두 실제6/6 success다. 품질 branch는 POST_CP6_SHA에서 고정하고 CP7 B1을 진행한다. 남은 단계는 새 diff만 focused 검증하며 최종 통합에서 전체 gate·실제 CI를 확인한다. 근거는 감사12.27.8~12.28이다.**
-- 실행 단위 집계: 아래 8/16 완료, 미완료8. CP6 종료·통합까지 완료했으며 CP7 B1~B7 및 최종 통합은 아직 미완료다.
+- 현 상태(2026-09-08): **CP6 종료·품질 통합과 CP7 B1 완료. CP7 1ad03e37의 CI34149717620도 실제6/6 success이며 B2 Next 업그레이드를 시작했다. 품질 branch는 POST_CP6_SHA에서 고정한다. 새 diff만 focused 검증하며 최종 통합에서 전체 gate·실제 CI를 확인한다. 근거는 감사12.27.8~12.28이다.**
+- 실행 단위 집계: 아래 9/16 완료, 미완료7. CP7 B2~B7 및 최종 통합은 아직 미완료다. 실행 단위는 크기가 다르므로 이 비율을 전체 작업량 비율로 해석하지 않는다.
 
 ## 실행 체크리스트
 
@@ -34,8 +34,9 @@
 - [x] CP6 종료·통합 (2026-09-08): SQL/API/UI·A4/A5/frozen·최종 두 리뷰C/I/M0·최종d60f84ed push와 CI34135084227 success를 확인했다. merge c9d70903의 tree는 exact이며 docs-only7f232773의 품질 CI34137728037도 실제6/6 success다. 총괄의 gh 원본 조회36d0dd와 ignored cp6-quality-ci-final.json이 근거다. 품질 branch는 고정하고 같은 통과 검사를 반복하지 않는다.
 - CP6 최초 full 결과(2026-09-07): 693,611.448ms·exit1, 실제9PASS/1FAIL이다. frontend7영역은 전체276파일2,556테스트·coverage94.97%·build/bundle을 포함해 통과했다. PG는 깊은 Windows 임시 경로로 실패했다. backend full pytest/OpenAPI·docs·DB·E2E 등 미실행 영역과 실패 PG만 짧은 own basetemp에서 복구하며 frontend/full 전체는 반복하지 않는다. 최초 합성 DB hash불변·원래 부재 복원·소유 test DB 삭제/cluster 종료도 확인했다. 감사12.27.6과 ignored 최종 run `resume-4/`가 원본이다. 후속 구성 검사 통과를 최초 full 명령 PASS로 바꾸지 않는다.
 - [x] CP7 병렬 사전감사 (2026-09-07): 타입·advisory·a11y·정책 consumer·문서·이동/중복 자산 manifest 및 DTO 후보26행 정적 검토, tracked 변경0. `full-code-quality-cp7-preaudit`의 ignored `20260907-cp7-preaudit/cp7-preaudit/preaudit.md`와 `ic21-manual-dto-targets.csv/.json`을 인계한다. 정적 차이18행은 실제 runtime 결함18건을 뜻하지 않는다. 제품/generator/runtime 검증은 CP7 구현 책임이다.
-- [ ] CP7 B1 [로컬 구현·리뷰 완료, 원격 검증 전, 2026-09-08]: IC21 generated raw OpenAPI types + business adapter·nullable/unknown enum/serialization CI. 초기 명세·품질 지적을 보완해 최종 두 리뷰 C/I/M0·13파일162PASS·앱/테스트 타입·strict lint·build·bundle PASS를 총괄이 실제 근거로 인수했다. production preview/cancel 필수 구조 검증과 기존 stock/shipping pending key 보존은 서로 다른 계약이며 새 replay 프로토콜은 추가하지 않았다. 정확 staged/generated guard·미검증 구성 검사·commit/push·실제 CI 뒤에 완료 체크한다. 근거는 감사12.28.1~12.28.2다.
-- [ ] CP7 B2: IC22 Next → Vitest/coverage → ESLint/PostCSS 세 독립 변경과 단계별 검증·rollback.
+- [x] CP7 B1 (2026-09-08): IC21 generated raw OpenAPI types·업무 adapter·nullable/unknown enum/serialization CI 연결. 최종 두 리뷰 C/I/M0·13파일162PASS·앱/테스트 타입·strict lint·build·bundle 및 생성 tracked guard를 인수했다. 로컬 전체 coverage 최초 실패는 mock-only4경로와 직접14PASS로 복구하고 원본 실패를 보존했다. commit `1ad03e3748f0fbfe38a331704019ba4f1c280a1c`의 [실제 CI34149717620](https://github.com/Hw-03/ERP/actions/runs/34149717620)은 completed/success·6/6이다. 총괄 독립 gh 조회와 ignored `cp7-b1-ci-final.json`이 근거다. 기존 stock/shipping pending 보존 외에 새 production replay 프로토콜은 추가하지 않았다. 감사12.28.1~12.28.2 참조.
+- [ ] CP7 B2 [진행]: IC22 Next → Vitest/coverage → ESLint/PostCSS 세 독립 변경과 단계별 검증·rollback. Next16.3.4·React19.2.8의 focused110+10PASS·build/bundle·실제 로그인/모바일·production audit0·두 리뷰 C/I0를 인수했고, next-env 생성 경로 churn Minor1은 공개 수용한다. 정확 staged/docs 확인 후 첫 로컬 commit을 허용한다. 세 로컬 commit 뒤 한 번 push/전체 CI를 확인하며 목표·예외·증거는 감사12.28.3~12.28.4에 기록한다.
+- B2 실행 경계 예외(2026-09-08): `exec79b5b323`에서 worktree 루트의 `npm run check:bundle-size`를 1회 잘못 실행해 npm이 상위 `C:\ERP\package.json`을 조회하고 ENOENT로 종료했으며 로그를 `C:\Users\user\AppData\Local\npm-cache`에 기록했다. 서버·DB 접근 증거는 없고 main/전역 로그를 다시 읽거나 지우지 않았다. 이후 모든 npm 계열 명령은 정확한 CP7 `frontend` cwd·절대 `--prefix`와 CP7 ignored 고유 cache/TEMP/TMP에 고정하며, 이미 통과한 Next build·bundle은 반복하지 않는다.
 - [ ] CP7 B3: IC23 핵심 IO/shipping/defect/department 오류·focus·keyboard/axe blocking 계약.
 - [ ] CP7 B4: IC24 확인된 두 번째 consumer 정책만 공통화; approval matrix·public facade 유지.
 - [ ] CP7 B5: DOC01 live 링크·명령·DB·URL 정합성, 역사 관찰 재실행 금지.

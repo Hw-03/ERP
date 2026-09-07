@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import { AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { defectsApi } from "@/lib/api/defects";
@@ -40,7 +40,7 @@ export function RDefectActionPanel({
   currentEmployee,
   onSubmitted,
   onClose,
-}: RDefectActionPanelProps): JSX.Element {
+}: RDefectActionPanelProps): ReactElement {
   const [action, setAction] = useState<RAction>("unquarantine");
   const [category, setCategory] = useState("");
   const [memo, setMemo] = useState("");

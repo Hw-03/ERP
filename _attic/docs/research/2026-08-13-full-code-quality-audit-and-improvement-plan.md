@@ -12,7 +12,7 @@
 - Git 상태: 장기 품질 브랜치 `codex/full-code-quality-improvement`. CP4 완료 HEAD `e64a9a12da16f8502ab1a1e82dbed2b1d2648a01`에서 고정 `main` `78e8023f41ef59528d9d8c07498e7653f9bee247`을 품질 worktree 방향에만 통합했고, merge commit `deafc335502b46f9ed068bbb11175361826615ea` 뒤 CP5 W4 제품 commit `ac8f26d570e728f193c1b2b40b8efdae7fe2363e`, CI 회귀 수정 commit `8a66907014cfa7c5cd5de90e7d3b42d599a56ccf`, W5 제품 commit `fb339b5dc29013fc97af5035905431177ec54aea`, W6 제품 commit `d43ab268cb6fa9dcde94e9b93203978f3550c73d`, CI 이식성 보완 commit `dffb8e01e713d58e3d6df678ee98c0cfc20cd1e5`·`fd34189400f63225164c007bffcf7f561b813eb6`, W7 제품 commit `b27ba39cd2cbad574fda30af9c118697086c30ad`까지 기존 품질 브랜치에 push했다. W7 최종 GitHub CI run `33934558904`는 6/6 success다. `main` 역병합·push·PR·force-push는 없음
 - 실행 진척: 체크포인트 1·3·4 완료. 체크포인트 2의 `IC-04`·`IC-20`은 저장소 구현·로컬 PostgreSQL 실증과 품질 브랜치 CI 실행까지 통과했지만 required-check 설정 증거는 별도 외부 경계로 남긴다. CP4는 workflow 거래 보정 차단, semantic idempotency, handover/correction/cancel 경합, 삭제 품목 참조 보호를 세 hard stop으로 완료했다. CP5는 S0 최신 main 통합부터 W7 `IC-19` health 의미 분리까지 전 단계를 완료했다. CP6는 시작하지 않았다.
 - 잔여 작업: 엄격한 완료 판정상 `IC` 13개가 남는다. `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-09`, `IC-10`, `IC-11`, `IC-17`, `IC-18`, `IC-19`는 완료했다. `IC-04`·`IC-20`의 required-check 외부 증거가 확보되면 11개로 줄며, 최종 closeout `DOC-01`, `AT-01`, `AT-02`도 남아 있다.
-- 최신 판정(2026-09-08): **CP6 카드 구현·품질 통합·양쪽 실제 CI 완료 — CP7 B1 진행**. CP6 `d60f84ed`의 CI34135084227과 품질 `7f232773`의 CI34137728037은 모두 실제6/6 success다. 품질 merge `c9d70903`은 같은 제품 tree이며 CP7은 고정 `POST_CP6_SHA=7f232773` 위에서 구현한다. 이전 두 항목의 CP5 진척·잔여 수량은 당시 역사적 snapshot이다. 현재 남은 제품 IC는21~24이며, IC04/20의 외부 required-check 정책과 DOC01/AT01/AT02·최종 재감사는 별도로 남는다.
+- 최신 판정(2026-09-08): **CP6 품질 통합·CP7 B1 실제 CI 완료 — CP7 B2 진행**. CP6 `d60f84ed`의 CI34135084227, 품질 `7f232773`의 CI34137728037, CP7 `1ad03e37`의 CI34149717620은 모두 실제6/6 success다. 품질 merge `c9d70903`은 같은 CP6 제품 tree이며 CP7은 고정 `POST_CP6_SHA=7f232773` 위에서 구현한다. 이전 두 항목의 CP5 진척·잔여 수량은 당시 역사적 snapshot이다. 현재 남은 제품 IC는22~24이며, IC04/20의 외부 required-check 정책과 DOC01/AT01/AT02·최종 재감사는 별도로 남는다.
 - 문서 성격: 현행 코드의 감사 결과이자 후속 구현 순서의 단일 정본
 
 > **증거 시점 안내:** 1~7절의 원 감사 코드 줄번호와 실패 서술은 당시 snapshot을 보존한다. 이후 구현과 충돌하는 문장은 `[STALE]` 역사 증거이며, 현재 판정·구현 경계는 8.9.7~8.9.8 및 12.26~12.27절이 우선한다. 최종 작업자 신뢰도 재판정은 CP7 B8에서 수행한다.
@@ -946,6 +946,7 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 
 #### `IC-21` OpenAPI 기반 frontend DTO 연결
 
+- **체크포인트 상태:** `완료 (2026-09-08)`. 생성 raw type·업무 adapter·drift guard·unknown 명령 차단을 구현하고 두 리뷰 C/I/M0 및 exact commit `1ad03e37`의 실제 CI34149717620 6/6을 확인했다. 최초 실패와 증분 복구를 포함한 근거는12.28.1~12.28.2다.
 - **작업자 영향:** backend가 보내는 null/enum을 화면이 잘못 가정해 수량 작업이 중단되는 일을 줄인다.
 - **근거/근본 원인:** `CQ-018`, 수동 DTO drift.
 - **수정 경계:** OpenAPI에서 생성한 raw types와 업무 친화 adapter를 분리한다. 직접 hand-written enum은 adapter 테스트로만 유지한다.
@@ -959,7 +960,7 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 
 - **작업자 영향:** production runtime 취약점은 신속히 줄이고, dev-tool 대규모 upgrade가 제품 회귀와 섞이지 않게 한다.
 - **근거/근본 원인:** `CQ-023`, 현재 audit 20건.
-- **수정 경계:** 1차 Next `14.2.3→14.2.35` 호환 범위, 2차 Vitest/coverage, 3차 ESLint/PostCSS로 PR을 분리한다.
+- **수정 경계:** 초기14.2.35 목표는 지원 정책 재확인으로 대체했다. 1차 Next16.3.4·React19 호환, 2차 Vitest/coverage3.2.7, 3차 ESLint/PostCSS를 독립 로컬 commit/rollback으로 분리한다(12.28.3). B2 전체 push/CI는 한 번으로 묶으며 PR은 생성하지 않는다.
 - **API/type/schema:** 없음. lockfile과 build artifact만 변함.
 - **실패 정책:** 각 단계마다 advisory가 실제 runtime/dev 어느 bundle에 도달하는지 기록하고 `--force` 자동 적용 금지.
 - **테스트:** npm audit diff, lint/type/unit/coverage/build/bundle/E2E. Next 단계는 login·desktop/mobile shell·API proxy smoke 필수.
@@ -1090,11 +1091,11 @@ flowchart LR
 >
 > **추천 실행 형태: 부모 통합 + 경계가 겹치지 않는 카드별 하위 에이전트** - 구현 파일 소유권을 분리하고 최종 통합·검증·상태 갱신은 부모가 맡습니다.
 
-**남은 실행 GOAL:** 체크포인트 5까지 확립한 작업자 신뢰 경계, 물리 위치 원장, 공통 예약, 출하 조건부 상태 전이, 전용 workflow 취소, semantic idempotency, command 경합, 삭제 품목 참조 보호, 공통 무결성 판정, backup·restore 증명, health 의미 분리를 기반으로 남은 13개 IC 카드를 의존 순서대로 구현해 운영 false-green을 제거한다. `IC-04`·`IC-20`은 저장소·로컬 PostgreSQL 구현과 품질 브랜치 CI 실행이 끝났지만 required-check 외부 증거 대기 상태이므로 이 수에 포함한다.
+**남은 실행 GOAL(2026-09-08 갱신):** 체크포인트 5의 재고·운영 안전막과 체크포인트 6의 화면·캐시 계약 위에서 체크포인트 7의 type·dependency·접근성·정책 locality 및 문서·보존 경계를 마무리한다. `IC-04`·`IC-20`의 저장소·PostgreSQL·실제 CI 근거와 required-check 외부 설정 증거를 구분한다. 후자는 `NOT_VERIFIED`로 유지하며, 최신 승인 계약에 따라 품질 브랜치 구현 완료와 main 통합 허용을 분리한다.
 
 #### 8.9.1 카드 수와 체크포인트 수
 
-`IC-01`~`IC-27` 중 체크포인트 1에서 `IC-02`, `IC-05`, `IC-27`, 체크포인트 3에서 `IC-01`, 체크포인트 4에서 `IC-09`, `IC-10`, `IC-11`, 체크포인트 5에서 `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-17`, `IC-18`, `IC-19`를 완료했다. 체크포인트 2의 `IC-04`·`IC-20`은 저장소 구현·이중 리뷰·로컬 PostgreSQL 실증과 품질 브랜치 CI 성공까지 확보했지만 required-check 설정 증거가 없어 엄격한 완료 상태로 올리지 않는다. 따라서 **남은 IC는 13개**이며, 체크포인트 2 외부 증거가 확보되는 즉시 11개로 줄어든다. `DOC-01`, `AT-01`, `AT-02`는 IC 수에 포함하지 않고 마지막 closeout으로 수행한다.
+`IC-01`~`IC-27` 중 체크포인트 1에서 `IC-02`, `IC-05`, `IC-27`, 체크포인트 3에서 `IC-01`, 체크포인트 4에서 `IC-09`, `IC-10`, `IC-11`, 체크포인트 5에서 `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-17`, `IC-18`, `IC-19`, 체크포인트 6에서 `IC-12`, `IC-13`, `IC-14`, `IC-15`, `IC-16`, `IC-25`, `IC-26`, 체크포인트 7 B1에서 `IC-21`을 완료했다. 체크포인트 6·B1의 실제 CI 근거는12.27.9~12.28이다. 현재 **품질 구현·원격 검증 잔여 IC는3개(`IC-22`~`IC-24`)**다. 체크포인트 2의 required-check 외부 설정2건은 별도 `NOT_VERIFIED`이고 main 통합 조건으로 남는다. `DOC-01`, `AT-01`, `AT-02`는 IC 수에 포함하지 않는 마지막 closeout이다. 아래 마지막 열은 최초 로드맵의 구간별 잔여 수로 보존하며 현재 실행 집계와 혼동하지 않는다.
 
 | 구간 | 상태 | 이 구간에서 완전히 닫는 IC | 구간 종료 후 남은 IC |
 |---|---|---|---:|
@@ -1103,8 +1104,8 @@ flowchart LR
 | 체크포인트 3 | `완료 / PostgreSQL 경합 NOT_VERIFIED` | `IC-01` | 외부 증거 전 23, 통과 후 21 |
 | 체크포인트 4 | `완료` | `IC-09`, `IC-10`, `IC-11`; `IC-03`은 correction 안전막까지 완료된 `PARTIAL` | 외부 증거 전 20, 통과 후 18 |
 | 체크포인트 5 | `완료` | `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-17`, `IC-18`, `IC-19` | 외부 증거 전 13, 통과 후 11 |
-| 체크포인트 6 | `대기` | `IC-12`, `IC-13`, `IC-14`, `IC-15`, `IC-16`, `IC-25`, `IC-26` | 외부 증거 전 6, 통과 후 4 |
-| 체크포인트 7 | `대기` | `IC-21`, `IC-22`, `IC-23`, `IC-24`; 이후 `DOC-01`, `AT-01`, `AT-02` closeout | 외부 증거 전 2, 통과 후 0 |
+| 체크포인트 6 | `완료 / 품질 통합·실제 CI 완료` | `IC-12`, `IC-13`, `IC-14`, `IC-15`, `IC-16`, `IC-25`, `IC-26` | 외부 증거 전 6, 통과 후 4 |
+| 체크포인트 7 | `진행 / IC-21 완료·IC-22 착수` | `IC-22`, `IC-23`, `IC-24`; 이후 `DOC-01`, `AT-01`, `AT-02` closeout | 외부 증거 전 2, 통과 후 0 |
 
 체크포인트를 합치지 않는다. 특히 2는 후속 동시성 증거와 cutover kill-switch, 3은 actor trust root, 4는 일반 command의 안전 차단·멱등·경합, 5는 물리 원장부터 운영 readiness까지의 엄격한 직렬 chain이다. 6과 7도 화면 행동과 계약·정리 작업을 분리해 행동 변경과 물리 이동을 같은 diff에 섞지 않는다.
 
@@ -1239,7 +1240,7 @@ flowchart LR
 
 **GOAL:** 안정된 제품 행동 위에서 OpenAPI type, dependency, 접근성, 정책 locality를 각각 독립적으로 강화하고 live 문서와 `_attic` 물리 경계를 최종 정리한다.
 
-- [ ] **`IC-21` 완료:** OpenAPI generated raw type과 업무 adapter를 분리하고 nullable·unknown enum·request serialization drift가 같은 change에서 CI에 잡히게 한다.
+- [x] **`IC-21` 완료 (2026-09-08):** OpenAPI generated raw type·업무 adapter·nullable/unknown enum/request serialization drift guard, 두 리뷰 C/I/M0 및 commit1ad03e37의 실제 CI34149717620 6/6 success. 상세12.28.2.
 - [ ] **`IC-22` 완료:** Next runtime, Vitest/coverage, ESLint/PostCSS를 세 개의 독립 change로 올리고 각각 `npm audit` 도달 범위·rollback·full gate evidence를 남긴다. `--force` 자동 적용은 금지한다.
 - [ ] **`IC-23` 완료:** 핵심 IO·shipping·defect·department 경로의 공용 error/focus/a11y contract를 blocking test로 만든다.
 - [ ] **`IC-24` 완료:** approval role/self/admin/list/count/button와 앞 카드에서 두 번째 consumer가 확인된 policy만 공통 module로 모은다. 행동 변경과 광역 파일 이동은 섞지 않는다.
@@ -1252,7 +1253,7 @@ flowchart LR
 
 **비범위:** 새 업무 행동, item 이미지 자동 삭제, 근거 없는 responsive shell 변경, 대규모 refactor. responsive shell은 bundle·state reset 측정이 실제 문제를 증명할 때만 별도 승인 change로 수행한다.
 
-**실행 전 결정 gate:** `RV-007`의 IO defect quarantine이 즉시 완료인지 승인 대기인지 확정하지 못하면 approval locality 정리를 중단한다. 새 consumer가 생겼거나 historical 원본/rollback hash가 불명확한 파일·asset은 이동·삭제하지 않는다.
+**실행 전 결정 gate:** `RV-007`은 S0 재감사(12.26)의 고정 main 근거에서 즉시·무승인으로 이미 결정됐고 남은 것은 preview/submit 구현 drift다. IC24는 이 기존 정책을 보존하는 회귀·공통화만 수행하며 새 업무 선택을 만들지 않는다. 실제 최신 코드에서 별개의 미결정 정책이 확인되면 그 판단은 자동 추정하지 않는다. 새 consumer가 생겼거나 historical 원본/rollback hash가 불명확한 파일·asset은 이동·삭제하지 않는다.
 
 **필수 검증:** generated type diff 0, dependency 단계별 audit·lint·type·unit·coverage·build·bundle·E2E, keyboard/axe/focus return, approval 순수 matrix+router/UI integration, import cycle/query count, live docs 링크·명령 dry parse, old-path 양방향 검색 0, Git rename/hash, asset manifest·login screenshot, 전체 manifest 차집합 0.
 
@@ -2232,3 +2233,22 @@ main 변경으로 완전히 해결된 CP6 카드는 없으며 다음의 남은 �
 - 최종 production build `exec-97921cef-67c7-4767-95f8-7c220d9bd5e1`는 exit0, 실제 `bundle-final.log`는2단위PASS와 **2,552,981bytes / 승인2,553,282.56bytes**를 기록했다(총괄322153). CP6 기준보다15,603bytes(+0.615%) 증가한 필수 B1 응답 안전막 비용이며 기존 실패 로그도 보존한다. 같은 build를 문서 정리 때문에 재실행하지 않는다.
 - 사용자 속도 지시를 적용해 정확 staged 영향 분석과 미검증 구성만 실행한다. CI의 frontend generated guard4줄 때문에 변화 없는 backend/PG 전체를 로컬에서 다시 실행하지 않는다. 이전 단계와 최신 delta의 실제 PASS, 새 전체 frontend unit/coverage·docs·generated tracking guard를 구분해 보존하고 실제 전체 원격 CI는 반드시 확인한다. 이 한정 조합을 미실행 smart/full 전체 PASS로 표기하지 않는다.
 - 정확47경로 staged smart PlanOnly는 infra16게이트를 계획했지만 실제 검사는0건이다. docs는 Node20 환경의 별도 실행에서3/3PASS(27,323.981ms;14단위 중13PASS/권한skip1)와 유지 링크 유효를 확인했다. 최초 전체 frontend unit/coverage는 **278파일 중275PASS/3FAIL,2,594테스트 중2,586PASS/8FAIL**,231.59초로 종료됐다(총괄42fc16). shipping query4·draft cart1·stock mutation3의 sparse mock/정규화 기대값을 해당 public 계약과 맞추며, 제품 validator를 느슨하게 만들지 않는다. 원래 전체 FAIL과 coverage 미보고를 보존하고 해당 mock delta만 직접 재검증한 뒤 실제 GitHub 전체/coverage 결과를 확인한다.
+- mock-only4경로 보완 뒤 실패3파일14/14 및 마지막 draft4/4가 통과했고, test 타입은 기존416/신규0이다. 독립 증분 품질 turn `01a07d02-5594-7f53-8910-f6a7b621200b`는 C/I/M0·기대값 완화 없음으로 판정했다. 생성 파일의 실제 tracked guard도 exit0이다. 총괄은 최종51경로 commit `1ad03e3748f0fbfe38a331704019ba4f1c280a1c`·부모7f232773·`2026-09-08 frontend: OpenAPI DTO 경계 연결`·clean·upstream0/0을 확인했다. [CI34149717620](https://github.com/Hw-03/ERP/actions/runs/34149717620)은 이 exact SHA에서 실행 중이며, 최종 전체 success를 아직 추정하지 않는다.
+- **최종 원격 인수:** 이후 총괄이 같은 CI의 `headSha=1ad03e3748f0fbfe38a331704019ba4f1c280a1c`, completed/success, E2E·PostgreSQL·frontend·backend·Windows ops·verification policy **6/6 success**를 실제 gh로 확인했다. 원본은 총괄 ignored `cp7-b1-ci-final.json`이다. B1/IC21은 완료이며 B2로 진행한다. 원격 전체 coverage PASS는 앞의 로컬 최초 FAIL 기록을 대체하거나 삭제하지 않는다.
+
+#### 12.28.3 B2 의존성 목표와 검증 배치 — 설치 전 결정
+
+- Node20 peer만 보고 Next14.2.35를 중간 설치하는 안은 채택하지 않았다. [공식 지원 정책](https://nextjs.org/support-policy)의 supported major와 실제 registry의 중첩 PostCSS를 대조해 **Next16.3.4**를 목표로 정했다.15.5.25의 nested8.4.31 대신16.3.4의8.5.23을 확인했으며 실제 설치·앱 호환성 PASS는 별도다.
+- React18 package peer 허용만으로 App Router 호환을 단정한 초기 선택도 정정했다. [공식 설치 설명](https://nextjs.org/docs/app/getting-started/installation)과 [16 업그레이드 설명](https://nextjs.org/docs/app/guides/upgrading/version-16)을 적용해 React/DOM19.2.8·types19.2.18/19.2.7, 직접 peer 호환에 필요한 lucide0.469.0·SWR2.3.0만 Next rollback 단위의 동반 후보로 둔다. 불필요 최신 major 일괄 갱신은 하지 않고 설치 tree/audit/실제 화면으로 검증한다.
+- 후속 후보는 Vitest/coverage3.2.7, root PostCSS8.5.28이다. ESLint는 최신 resolve 가능한 plugin metadata까지 대조했다(`exec-9c494df1`): hooks/TypeScript 계열은10을 지원하지만 react/import/jsx-a11y는 여전히9까지만 허용한다. 따라서 config-next16.3.4 + ESLint9.39.5를 peer-valid 경계로 택하며, [ESLint9 EOL](https://eslint.org/version-support/)은 지원 완료로 숨기지 않는 **개발 도구 vendor 호환성 예외**다. EOL 자체와 실제 도달 가능한 취약점은 분리하고 `--force`·`--legacy-peer-deps`는 금지한다.
+- 세 논리 rollback 순서는 Next → Vitest/coverage → ESLint/PostCSS다. Next16의 lint CLI 변경은 필수인 부분만 먼저 처리하며 engine/config 갱신은 가능한 세 번째 단위에 유지한다. 기존 strict 규칙·범위를 유지하고 새 compiler 권고를 이유로 동결 UI/무관 코드를 광역 수정하지 않는다. 단계별 관련 검사·두 리뷰·local commit 후 B2 전체를 한 번 push/CI 검증한다. B1의 실제6/6 CI 성공 전에는 설치·제품 수정을 시작하지 않는다.
+- B2 Next 단위의 실행 경계 예외: `exec79b5b323`에서 worktree 루트의 `npm run check:bundle-size`를 1회 잘못 실행해 npm이 상위 `C:\ERP\package.json`을 조회하고 ENOENT로 종료했으며 로그를 `C:\Users\user\AppData\Local\npm-cache`에 기록했다. 서버·DB 접근 증거는 없고 main/전역 로그의 재열람·삭제는 하지 않았다. 이후 npm 계열 명령은 CP7 `frontend` cwd·절대 `--prefix`와 CP7 ignored 고유 cache/TEMP/TMP에 고정하며, 기존 Next build·bundle PASS는 그대로 재사용한다.
+
+#### 12.28.4 B2 Next runtime 단위 로컬 인수
+
+- 실제 설치는 Next16.3.4·React/DOM19.2.8·React types19.2.18/DOM types19.2.7·lucide0.469.0·SWR2.4.1(manifest의 허용2.x 범위)이다. `npm ls` exit0(`exec-7d62697e`), production-only audit `exec-f0993741`은 exit0·알려진 advisory0이다. 전체 audit18건 중 critical2는 아직 갱신 전 Vitest/coverage이며 B2 전체 보안 완료로 선언하지 않는다. production audit0 역시 모든 취약점 부재의 보증은 아니다.
+- `middleware.ts→proxy.ts`와 export/test를 함께 전환했으며 실제 old-name code/docs 검색0이다. React19 보정은 반환 타입·nullable ref·비레거시 fixture의 `legacy_origin:null`에 한정한다. backend와 동결 weekly/mobile nav/globals/shipping step5 추가 diff0을 총괄이 확인했다.
+- 관련10파일110PASS(`exec-cd8e5f89`), fixture10PASS(`exec-6f7d41b8`), strict lint·앱/E2E 타입 exit0이다. 테스트 타입은 새 TS2769 10건의 원인 fixture만 보완한 뒤 exit0(담당자 집계 기존393/신규0)이며 baseline 확대는 없다. `exec-b0bea39c`는 production 산출물만 잠시 격리한 tsc exit0이다. dev 산출물까지 모두 없는 조건의 증거로 확대하지 않는다.
+- 실제 production build는 `exec-f3e0f75e` exit0, 같은 산출물의 bundle은 `exec-f2f71337` 2단위PASS·2,363,811bytes/승인2,553,282.56bytes다. 실제 Next dev에서 작업자 세션1PASS(`exec-9b627f1f`)와 모바일 재고 보정1PASS(`exec-372d78ea`)를 확인했다. 동결 screenshot1SKIP는 남겨 CP7 최종 characterization에서 검증한다. 두 E2E의 전용3300/8022 소유권 해제·임시 DB/seed/receipt/lock 부재·워크트리 DB family 불변 근거를 보존하며 기존3100 점유는 건드리지 않았다.
+- 명세 turn `01a07d2a-0fc2-7b90-9132-f838419e8c2c`은 C/I/M0·Ready예, 품질 turn `01a07d2a-29ad-7b93-8fd8-f69c42dde341`은 C0/I0/M1·Ready예다. **수용한 Minor1:** 추적 중인 자동 `next-env.d.ts`는 dev/build phase에 따라 생성 import 경로가 바뀐다. 런타임 실패가 아니며 추적 제외와 clean-install 타입 생성 계약을 묶는 대안은 존재한다. 이를 해결하려면 반드시 distDir 구조를 바꿔야 한다고 단정하지 않는다. 이번 Next 단위는 그 추가 변경을 섞지 않고 한계를 공개한다.
+- 총괄은 사용자 속도 조정에 따라 동일 전체 gate 반복 대신 실제 staged 영향 계획과 위 최신 관련 증거·문서 gate의 합집합을 인수한다. PlanOnly는 실행 PASS가 아니며 backend 전체·GitHub CI를 이 로컬 Next 단위에서 새로 통과했다고 표시하지 않는다. 정확19개 논리 경로(제품17+정본문서2)의 staged 확인·docs PASS 후 로컬 commit을 허용하고, Vitest/coverage→ESLint/PostCSS 뒤 한 번 push/실제 CI를 확인한다. B2/IC22 완료 체크는 그 이후다.

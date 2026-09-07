@@ -19,11 +19,9 @@ module.exports = (phase) => {
 
   /** @type {import('next').NextConfig} */
   const config = {
-    devIndicators: { buildActivity: false },
+    devIndicators: false,
+    agentRules: false,
     compiler: { reactRemoveProperties: phase === PHASE_PRODUCTION_BUILD },
-    eslint: {
-      dirs: ["app", "lib", "features", "components"],
-    },
     async rewrites() {
       return [
         {

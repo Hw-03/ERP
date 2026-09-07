@@ -2,7 +2,7 @@ import { createHmac } from "node:crypto";
 import { createRequire } from "node:module";
 import { NextRequest } from "next/server";
 import { describe, expect, it } from "vitest";
-import { config, middleware } from "../../middleware";
+import { config, proxy } from "../../proxy";
 
 const require = createRequire(import.meta.url);
 
@@ -86,7 +86,7 @@ describe("Next /api proxy forwarding boundary", () => {
       },
     });
 
-    const response = middleware(request);
+    const response = proxy(request);
     const overriddenHeaders = new Set(
       response.headers.get("x-middleware-override-headers")?.split(",") ?? [],
     );
@@ -98,7 +98,7 @@ describe("Next /api proxy forwarding boundary", () => {
     expect(response.headers.get("x-middleware-request-x-mes-employee-code")).toBe("E1");
   });
 
-  it("applies the sanitizing middleware only to the API proxy surface", () => {
+  it("applies the sanitizing proxy only to the API proxy surface", () => {
     expect(config.matcher).toBe("/api/:path*");
   });
 });

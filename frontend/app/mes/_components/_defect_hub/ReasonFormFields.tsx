@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactElement } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { AppSelect } from "../common/AppSelect";
 import { REASON_CATEGORIES } from "./reasonCategories";
@@ -22,7 +23,7 @@ export function ReasonFormFields({
   onCategoryChange,
   onMemoChange,
   required = false,
-}: ReasonFormFieldsProps): JSX.Element {
+}: ReasonFormFieldsProps): ReactElement {
   const categoryMissing = required && !category;
 
   return (
