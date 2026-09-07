@@ -15,14 +15,16 @@
 - 공통 기준: `78e8023f41ef59528d9d8c07498e7653f9bee247`
 - 총괄 작업: `01a02250-1191-7883-aa55-5fc91f6ccd87`
 - S0 구현 작업: `01a079d0-9157-7503-9377-817f636c14c4`
+- 확정 `SYNC_BASE_SHA`: `731edc2df15c89753e60c12be95a65ef88e33bde`. 품질 본 branch는 CP6 통합까지 이 SHA에서 고정한다.
+- CP6 구현 작업: `01a07b0c-4563-7c41-a8c7-5df5ad2e91e2`, `C:\ERP\.worktrees\full-code-quality-cp6`, branch `codex/full-code-quality-cp6`.
 - 정본 감사 계획: [전수 감사·개선 계획](../../docs/research/2026-08-13-full-code-quality-audit-and-improvement-plan.md), 8.9.7·8.9.8 및 12.26절
-- 현 상태: **S0 제품 통합 merge `cd195d9e`의 GitHub run34099290108은6/6 PASS다. 전체 및 후속 변경분의 명세·품질 리뷰를 인수했고 총괄 문서만 로컬 docs commit으로 고정해 CP6 코드 push와 묶는다. 이 문서 commit이 `SYNC_BASE_SHA`이며 실제 SHA는 총괄 ignored state와 CP6 시작 프롬프트에 기록한다. CP7 읽기 전용 사전감사와 DTO 정적 후보26행 검토도 완료했다. CP6·CP7 제품 구현은 아직 미착수다. 역사적 broad FAIL과 개별 복구/최종 CI 결과를 구분한다.**
-- 완료 집계: 아래 실행 단위 2/16 완료. 완료 수치는 테스트·리뷰·CI 근거와 함께 갱신한다.
+- 현 상태: **S0 제품 merge `cd195d9e`의 GitHub run34099290108은6/6 PASS, docs-only 기준 commit은731edc2d다. CP6 A1은 LOCAL_VERIFIED(관련14파일73PASS, 앱/테스트 타입·린트, 최종 명세·품질 C/I/M0)이며 staged smart 후 로컬 커밋한다. 이후 A2로 진행하며 CP6 전체 gate·push·CI는 최종 묶음에서 수행한다. CP7 읽기 전용 사전감사는 완료했고 제품 구현은 CP6 통합 뒤 시작한다.**
+- 구현·검증 완료 집계: 아래 실행 단위 3/16 완료. CP6 A1은 로컬 구현·focused 검증 완료이며 CP6 최종 통합/CI 완료와 구분한다.
 
 ## 실행 체크리스트
 
 - [x] S0 (2026-09-07): fixed main 병합, 전체 delta manifest, migration 두 계보 통합, 격리 보완, 영역별 검증 복구, 이중 리뷰, 제품 merge push 및 [실제 CI6/6 성공](https://github.com/Hw-03/ERP/actions/runs/34099290108). 제품 SHA `cd195d9e668cb4ece139f48562337f58d19839d8`; `SYNC_BASE_SHA`는 같은 제품 경로를 유지하는 본 docs-only commit이다. 문서-only CI 중복은 CP6 코드 push로 묶는다.
-- [ ] CP6 A1: IC12→14 실제 dirty/Promise save/이동 guard/React Query 단일 정본.
+- [x] CP6 A1 (2026-09-07, LOCAL_VERIFIED): IC12→14 actual dirty/Promise save/이동 guard/React Query 단일 정본. 초기 RED13건 및 후속 편집 유실 RED1건을 보완해 관련14파일73/73 PASS. 앱 타입·테스트 타입(56계약/279manifest/known419·new0)·변경 파일 lint·diff-check PASS, 최종 명세/품질 C/I/M0. `20260907-cp6-a1/a1-green-vitest.json` 및 감사 계획12.27.1. staged smart 후 local commit, 원격 검증은 CP6 종료 단계다.
 - [ ] CP6 A2: IC13→16 BOM 응답 generation/payload baseline/출하 pagination·bulk loading·desktop/mobile load-more.
 - [ ] CP6 A3: IC15 map mutation 순서·소유권·오래된 rollback 방지·refetch.
 - [ ] CP6 A4: IC25 PA·PF KPI 모집단 상시 설명, 기존 계산 불변.
@@ -43,13 +45,17 @@
 S0가 GREEN이면 `SYNC_BASE_SHA`에서 CP6 제품 구현 작업을 만든다. CP7 사전감사는 사용자 속도 지시에 따라 이미 push한 잠정 제품 SHA `cd195d9e668cb4ece139f48562337f58d19839d8`에서 읽기 전용으로 먼저 시작한다. S0 최종 SHA와의 차이는 총괄이 확인하고 제품 변경이 있으면 그 영향 범위만 재조사한다. 이 선행 조사는 CI 성공이나 CP7 구현 완료를 뜻하지 않는다.
 
 - CP6 구현: `C:\ERP\.worktrees\full-code-quality-cp6`, branch `codex/full-code-quality-cp6`.
-- CP7 사전감사: `C:\ERP\.worktrees\full-code-quality-cp7-preaudit`, detached `cd195d9e`. 작업 `01a07af9-9e1b-7431-ac2e-68e6bf420894`. ignored 증거만 작성하고 제품·문서·lockfile 변경, 설치·테스트·서버 시작은 하지 않는다.
+- CP7 사전감사: `C:\ERP\.worktrees\full-code-quality-cp7-preaudit`, 조사 snapshot `cd195d9e`, 현재 detached `731edc2d`. 작업 `01a07af9-9e1b-7431-ac2e-68e6bf420894`. 조사 뒤 docs-only 차이2개를 확인해 기준만 맞췄으며 제품 재조사는 하지 않았다. ignored 증거만 작성했고 제품·문서·lockfile 변경, 설치·테스트·서버 시작은 없었다.
 
 CP6 통합 뒤에만 `POST_CP6_SHA`에서 `C:\ERP\.worktrees\full-code-quality-cp7`, branch `codex/full-code-quality-cp7` 구현 작업을 만든다. CP7은 IC21→IC22 세 단계→IC23→IC24→DOC01→AT01→AT02→최종 재감사 순서다.
 
 S0 문서만 별도로 push하면 현재 workflow가 전체6job을 재실행하므로, 제품 merge CI 성공 뒤 문서2개는 로컬 docs commit으로 고정하고 CP6 코드 push와 묶는다. 이 docs tip을 `SYNC_BASE_SHA`로 쓰며 제품 경로는 CI 검증 merge와 exact여야 한다. 그 사이 품질 branch의 의도적 docs-only1commit ahead를 허용하고 CP6 통합까지 tip을 움직이지 않는다. 문서 전용 gate는 생략하지 않으며 최종 품질 branch의 upstream 일치 조건은 유지한다.
 
 각 묶음은 RED→최소 구현→focused GREEN→새 변경분 명세·품질 리뷰→총괄 증거 확인으로 진행한다. 사용자 추가 지시에 따라 작은 저위험 묶음은 통합 검증·push·CI 확인을 함께 처리하며, 같은 코드의 통과한 전체 검증을 작은 수정마다 반복하지 않는다. 논리적 commit/rollback 단위는 유지한다. 전체 검증과 실제 CI 성공 확인은 S0·CP6·CP7 통합 경계에 유지하고 IC22의 호환성 검증은 세 단계별로 수행한다. 재고·권한·migration·서버 격리 문제는 즉시 검증한다. 총괄만 본 TODO와 정본 감사 문서를 갱신하며 사용자 재승인 없이 다음 GREEN 단계로 이동한다.
+
+CP6의 A1~A5는 focused GREEN·독립 새 diff 리뷰 C/I0 후 구간별 local commit을 남긴다. 매 구간의 같은 full6CI push 대기는 반복하지 않고 CP6 최종 full gate·리뷰 후 한 번 push한다. 실제 CI 성공 뒤 품질 branch 통합/CI를 수행한다. 새 infra 또는 고위험 변경이 생기면 그 실제 영향만 별도로 판단한다.
+
+사용자의 빠르고 신뢰도 높은 완료 지시에 따라, focused GREEN으로 고정한 같은 diff의 명세·품질 읽기 전용 리뷰는 병렬로 수행할 수 있다. 제품 편집자는 한 명이며 두 리뷰의 C/I0가 모두 필요하다. 수용은 명세 확인 후 품질 확인 순서로 하고, 리뷰 중 지적을 고치면 바뀐 관련 부분만 다시 검토한다. 필수 검토·완료 기준을 줄이는 것은 아니다.
 
 ## API·schema 경계
 
@@ -71,7 +77,9 @@ S0 문서만 별도로 push하면 현재 workflow가 전체6job을 재실행하�
 - 고정 main 이후의 새 커밋은 이번 실행 도중 다시 동기화하지 않는다.
 - 기존 pushed migration 수정, 추정 backfill, 동결 변경, 실제 PG/CI 증거 불가, 새 업무 정책, 범위 내 해결 불가 Critical/Important, 보존 불명 데이터 삭제는 자동 중단한다.
 
-## 현재 증거와 미확인 항목
+## 최종 S0 증거와 역사적 검증 기록
+
+현재 S0의 정본 판정은 아래 최종 원격 검증과 `SYNC_BASE_SHA`다. 과거 실패·중단 당시의 `재실행해야 한다`, `pending`, `NOT_RUN`은 역사적 기록이며 새로운 CP6 할 일이나 S0 재검증 지시가 아니다. CP6는 변경된 부분의 focused 검사부터 진행한다.
 
 - 최종 원격 검증: 총괄이 `gh run view 34099290108 --json status,conclusion,headSha,jobs`로 completed/success, SHA `cd195d9e`, Verification policy·실제PostgreSQL·Windows ops·Playwright·Backend·Frontend의6개 success를 확인했다. merge tree는 `aa12135fcb1051a51032d007e7b1e4a661aaaf43`, 부모는 품질74085263과 fixed main d2b0dd29다. docs-only commit 전 제품 dirty0, upstream divergence0/0이었다. 문서-only local commit1개 ahead는 위 속도 조정 계약으로 허용한다.
 

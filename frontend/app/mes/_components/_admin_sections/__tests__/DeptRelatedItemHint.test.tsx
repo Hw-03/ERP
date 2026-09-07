@@ -2,14 +2,6 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { DeptDetailView } from "../_department_parts/DeptDetailView";
 
-vi.mock("@/lib/api", () => ({
-  api: { updateDepartment: vi.fn() },
-}));
-
-vi.mock("../../DepartmentsContext", () => ({
-  useRefreshDepartments: () => vi.fn(),
-}));
-
 vi.mock("@/lib/ui/ConfirmModal", () => ({
   ConfirmModal: () => null,
 }));
@@ -19,14 +11,11 @@ describe("DeptDetailView", () => {
     render(
       <DeptDetailView
         dept={{ id: 2, name: "기타", display_order: 2, is_active: true, color_hex: "#2f74e7" }}
-        adminPin="0000"
+        editForm={{ name: "기타", color_hex: "#2f74e7" }}
+        setEditForm={vi.fn()}
         empCount={0}
         itemCount={0}
         deptEmployees={[]}
-        onSetDepartments={vi.fn()}
-        setSelectedDept={vi.fn()}
-        onStatusChange={vi.fn()}
-        onError={vi.fn()}
         onToggleActive={vi.fn()}
         onRequestDelete={vi.fn()}
       />,
@@ -39,14 +28,11 @@ describe("DeptDetailView", () => {
     render(
       <DeptDetailView
         dept={{ id: 3, name: "DepartmentEnum.SHIPPING", display_order: 3, is_active: true, color_hex: "#2f74e7" }}
-        adminPin="0000"
+        editForm={{ name: "DepartmentEnum.SHIPPING", color_hex: "#2f74e7" }}
+        setEditForm={vi.fn()}
         empCount={0}
         itemCount={1}
         deptEmployees={[]}
-        onSetDepartments={vi.fn()}
-        setSelectedDept={vi.fn()}
-        onStatusChange={vi.fn()}
-        onError={vi.fn()}
         onToggleActive={vi.fn()}
         onRequestDelete={vi.fn()}
       />,

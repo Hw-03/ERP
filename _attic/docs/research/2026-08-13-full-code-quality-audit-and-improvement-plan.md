@@ -2095,3 +2095,23 @@ main 변경으로 완전히 해결된 CP6 카드는 없으며 다음의 남은 �
 | AT-02 | OPEN | runtime consumer0인 byte-identical 복제 asset만 후속 hash/화면 확인 후 제거 |
 
 `RV-007`은 `PARTIAL / DECIDED_BUT_IMPLEMENTATION_DRIFT`다. fixed main이 불량 처리의 즉시·무승인 정책을 이미 결정했으므로 새 업무 선택을 추정하지 않는다. 기존 IO preview의 승인 표시와 실제 즉시 submit 사이 drift는 IC-24에서 회귀로 닫는다. 실제 사용 중인 로그인 asset과 동결 UI는 정리 대상이 아니다.
+
+### 12.27 CP6 구현 진입과 검증 배치
+
+- CP6 작업은 `C:\ERP\.worktrees\full-code-quality-cp6`, branch `codex/full-code-quality-cp6`에서 시작했다. 기준은 S0 CI6/6이 통과한 제품 merge와 같은 제품 경로를 가진 docs-only tip `731edc2df15c89753e60c12be95a65ef88e33bde`다.
+- 품질 본 branch는 CP6 통합까지731edc2d에서 고정한다. 이 절과 active TODO의 이후 변경은 CP6 worktree 사본에만 반영하며 main을 수정하거나 추가 main commit을 따라가지 않는다.
+- A1 `IC-12→IC-14`는 실제 부서 render 경로와 dirty/Promise 저장·query 정본 계약부터 TDD로 구현한다. 시작 시 CP6의 `backend/mes.db*`는 모두 부재였다. 기존 main/품질 DB를 복사하지 않으며 필요한 격리 UI/DB 검증만 해당 worktree의 synthetic 기준으로 준비한다.
+- 수정 전 A1 RED는 직접4파일13건 중 예상 실패11건·통과2건으로 기록됐다. 이는 독립 runtime 결함11건이라는 집계가 아니다. 동결 기준 캡처는 전용8022/3300의 synthetic E2E1건이57.1초에 통과했고 실제 DB 불변·cleanup-complete 로그를 총괄이 읽었다. `20260907-cp6-a1/frozen-baseline/`의 두 PNG와 layout JSON도 직접 확인했다. 모바일390×844의 nav390×90, desktop1440×900의 변경 구성품 inner list58px를 이후 비교 기준으로 보존한다. 최종 변경 후 동결 검증 완료와는 구분한다.
+- 사용자 속도 지시에 따라 A1~A5는 focused 검증·독립 변경분 리뷰 후 논리적 local commit을 남기고, CP6 최종 full gate·리뷰 뒤 한 번 push해 실제CI를 확인한다. 단위 수정마다 같은 전체 테스트와CI를 반복하지 않는다. 최종 품질 통합/CI와 재고·권한·서버 보호 검증은 유지한다.
+- CP7 사전감사는 별도 detached worktree에서 완료했다. DTO 후보26행은 모두 역할에 맞게 읽었으며18행의 정적 차이를 실제 runtime 결함18건으로 승격하지 않는다. CP7 제품 구현은 CP6 완료 SHA로 다시 대조한 뒤 시작한다.
+
+#### 12.27.1 CP6 A1 — IC-12·IC-14 LOCAL_VERIFIED (2026-09-07)
+
+- 부서 editable name/color·persisted baseline·dirty·`save(): Promise<SaveResult>`는 `frontend/app/mes/_components/_admin_hooks/useAdminDepartmentsForm.ts:68-139`가 소유한다. 동시 save는 같은 Promise를 반환하고 실패는 reject한다. 저장 중 새 편집은 덮지 않으며 새 baseline 대비 dirty로 유지한다.
+- 실제 로컬·전역 이동 guard는 `frontend/app/mes/_components/_admin_sections/AdminDepartmentsSection.tsx:56-62`의 persistence adapter를 사용한다. 명세 리뷰에서 첫 저장 완료 뒤 후속 편집이 유실될 수 있는 Important1을 발견해 RED로 재현했고, 최신 편집의 순차 저장까지 완료해야 이동하게 보완했다. 일반 중복 저장의 요청1회 계약과 unmount registry 정리는 유지한다. 공백 정규화 응답도1회 요청 후 종료하는 회귀가 통과했다.
+- `DepartmentsContext.tsx:27-31`은 활성 부서 query의 조회/색상 adapter이고 admin bootstrap은 `useAdminBootstrap.ts:63-67`의 enabled query를 소비한다. create/update/delete/reorder의 `useDepartmentsQuery.ts:34,48,57,66`은 같은 departments.all key를 invalidate한다. 실제 desktop/mobile/admin 경로에 별도 부서 배열 정본을 남기지 않는다. consumer0인 선행 legacy `DeptManagementPanel`은 이번 카드에서 삭제·개조하지 않았다.
+- 사용자 전환의 query cache 폐기는 기존 `frontend/lib/queries/client.tsx:56-61` 경계를 유지한다. `MesLoginGate.test.tsx:386,430,480-481`의 이전 cache0·새 client 계약을 포함한 관련 묶음이 통과했다. 부서 공유 key와 actor-dependent 상태를 같은 의미로 혼동하지 않는다.
+- 최종 focused 증거: 관련14파일73/73 PASS(`20260907-cp6-a1/a1-green-vitest.json`, SHA256 `0F6A38F142BCB3854F771F9776525BDA028A40D0E0A6559583CB2E73EEB4A57A`), 앱 타입 exit0, 테스트 타입56계약 PASS·manifest279·known419/new0, 변경20개 frontend 파일 ESLint `--max-warnings=0` exit0, diff-check exit0. 초기 expected RED11/13과 중간 fixture 비결정성 실패는 최종 결과와 구분한다.
+- 최종 delta 명세·품질 리뷰는 각각 Critical0/Important0/Minor0, Ready다. Important 보완 후 두 reviewer가 다시 확인했고, 공백/빈 이름 fallback 종료와 stable onError test 보완도 좁게 재확인했다. 총괄은 최신 실제 diff, 핵심 form/guard source, RED/GREEN JSON 및 원본 실행 결과를 인수했다.
+- A1 시점 API/schema/backend 변경0, 동결 경로 추가 diff0, 원래 부재한 `mes.db/-wal/-shm` 및 임시 `mes_e2e.db/-wal/-shm` 모두 최종 absent다. E2E lock/receipt/hash/seed도 absent다. 이는 CP6 최종 visual 비교나 전체 listener0 주장과는 다르다.
+- 이 판정은 **로컬 구현·focused 검증 완료**다. 필수 staged smart 뒤 local commit하고 A2로 진행한다. CP6 전체 gate·독립 최종 리뷰·원격 CI·품질 branch 통합은 아직 남아 있으며 S0 검증으로 이를 대체하지 않는다.

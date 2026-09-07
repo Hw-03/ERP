@@ -4,15 +4,15 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
-  useRef,
-  useState,
   type ReactNode,
 } from "react";
-import { api, type DepartmentMaster } from "@/lib/api";
+import { useQueryClient } from "@tanstack/react-query";
+import type { DepartmentMaster } from "@/lib/api";
 import { departmentDisplayColor, employeeColor } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
+import { queryKeys } from "@/lib/queries/keys";
+import { useDepartmentsQuery } from "@/lib/queries/useDepartmentsQuery";
 
 type Ctx = {
   departments: DepartmentMaster[];
@@ -23,27 +23,13 @@ type Ctx = {
 const DepartmentsCtx = createContext<Ctx | null>(null);
 
 export function DepartmentsProvider({ children }: { children: ReactNode }) {
-  const [departments, setDepartments] = useState<DepartmentMaster[]>([]);
-  const inflightRef = useRef<Promise<void> | null>(null);
+  const queryClient = useQueryClient();
+  const { data: departments = [] } = useDepartmentsQuery({ isActive: true });
 
-  const refresh = useCallback(async () => {
-    if (inflightRef.current) return inflightRef.current;
-    const p = api
-      .getDepartments({ isActive: true })
-      .then((rows) => {
-        setDepartments(rows);
-      })
-      .catch(() => {})
-      .finally(() => {
-        inflightRef.current = null;
-      });
-    inflightRef.current = p;
-    return p;
-  }, []);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
+  const refresh = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: queryKeys.departments.all }),
+    [queryClient],
+  );
 
   // departments 가 바뀔 때만 lookup 함수가 새로 만들어지도록.
   const getColor = useMemo(() => {

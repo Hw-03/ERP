@@ -10,16 +10,17 @@ import {
   type ProductModel,
 } from "@/lib/api";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
+import { useDepartmentsQuery } from "@/lib/queries/useDepartmentsQuery";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 
 /**
- * 관리자 화면의 5개 도메인 부트스트랩 + BOM 새로고침 훅.
+ * 관리자 화면의 로컬 편집 도메인 부트스트랩 + BOM 새로고침 훅.
  *
  * Round-8 (R8-1) 추출. DesktopAdminView 의 6 useState + 2 useEffect (exhaustive-deps
  * disable Cat-C 2건) 를 1 hook 으로 묶고 useCallback 으로 deps 정상화.
  *
- * fetch 타이밍 / API 호출 횟수 변화 0:
- *   - unlocked + globalSearch 변화 시 items/employees/departments fetch (Promise.all)
+ *   - unlocked + globalSearch 변화 시 items/employees fetch (Promise.all)
+ *   - departments 는 React Query를 정본으로 사용하고 로컬 배열로 미러링하지 않는다.
  *   - models 는 useModelsQuery(enabled: unlocked) 로 분리 — unlocked 게이트 동일,
  *     React Query 캐시를 로컬 productModels state 로 미러링해 기존 setProductModels
  *     낙관적 갱신 API 를 그대로 유지한다.
@@ -39,7 +40,6 @@ export interface UseAdminBootstrapResult {
   productModels: ProductModel[];
   setProductModels: React.Dispatch<React.SetStateAction<ProductModel[]>>;
   departments: DepartmentMaster[];
-  setDepartments: React.Dispatch<React.SetStateAction<DepartmentMaster[]>>;
   allBomRows: BOMDetailEntry[];
   setAllBomRows: React.Dispatch<React.SetStateAction<BOMDetailEntry[]>>;
   loadData: () => Promise<void>;
@@ -55,26 +55,27 @@ export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBoots
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [productModels, setProductModels] = useState<ProductModel[]>([]);
   const [allBomRows, setAllBomRows] = useState<BOMDetailEntry[]>([]);
-  const [departments, setDepartments] = useState<DepartmentMaster[]>([]);
   const itemsRequestId = useRef(0);
   const allBomRequestId = useRef(0);
 
   // models 만 React Query 로 분리 — enabled(unlocked) 로 게이트 보존.
   const { data: modelsData } = useModelsQuery({ enabled: unlocked });
+  const { data: departments = [], error: departmentsError } = useDepartmentsQuery(
+    undefined,
+    { enabled: unlocked },
+  );
   useEffect(() => {
     if (modelsData) setProductModels(modelsData);
   }, [modelsData]);
 
   const loadData = useCallback(async () => {
     const requestId = ++itemsRequestId.current;
-    const [nextItems, nextEmployees, nextDepts] = await Promise.all([
+    const [nextItems, nextEmployees] = await Promise.all([
       api.getItems({ limit: 2000, search: globalSearch.trim() || undefined }),
       api.getEmployees({ activeOnly: false }),
-      api.getDepartments(),
     ]);
     if (requestId === itemsRequestId.current) setItems(nextItems);
     setEmployees(nextEmployees);
-    setDepartments(nextDepts);
   }, [globalSearch]);
 
   const refreshAllBom = useCallback(() => {
@@ -96,13 +97,22 @@ export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBoots
     if (requestId === itemsRequestId.current) setItems(next);
   }, [globalSearch]);
 
-  // items/employees/departments 부트스트랩 — unlocked + globalSearch 변화 시
+  // items/employees 부트스트랩 — unlocked + globalSearch 변화 시
   useEffect(() => {
     if (!unlocked) return;
     void loadData().catch((nextError) =>
       onError(nextError instanceof Error ? nextError.message : "관리자 데이터를 불러오지 못했습니다."),
     );
   }, [unlocked, loadData, onError]);
+
+  useEffect(() => {
+    if (!unlocked || !departmentsError) return;
+    onError(
+      departmentsError instanceof Error
+        ? departmentsError.message
+        : "부서 목록을 불러오지 못했습니다.",
+    );
+  }, [unlocked, departmentsError, onError]);
 
   // BOM — unlocked 변화 시 별도 fetch
   useEffect(() => {
@@ -122,7 +132,7 @@ export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBoots
     items, setItems,
     employees, setEmployees,
     productModels, setProductModels,
-    departments, setDepartments,
+    departments,
     allBomRows, setAllBomRows,
     loadData,
     refreshAllBom,

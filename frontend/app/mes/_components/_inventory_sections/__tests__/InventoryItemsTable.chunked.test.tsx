@@ -7,7 +7,8 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, act } from "@testing-library/react";
-import type { ReactElement } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement, ReactNode } from "react";
 import { InventoryItemsTable } from "../InventoryItemsTable";
 import { DepartmentsProvider } from "../../DepartmentsContext";
 import type { Item } from "@/lib/api";
@@ -39,8 +40,20 @@ vi.mock("@/lib/api", () => ({
   },
 }));
 
+vi.mock("@/lib/queries/useDepartmentsQuery", () => ({
+  useDepartmentsQuery: () => ({ data: [] }),
+}));
+
 function renderWithProviders(ui: ReactElement) {
-  return render(<DepartmentsProvider>{ui}</DepartmentsProvider>);
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      <QueryClientProvider client={client}>
+        <DepartmentsProvider>{children}</DepartmentsProvider>
+      </QueryClientProvider>
+    );
+  }
+  return render(ui, { wrapper: Wrapper });
 }
 
 function makeItem(i: number): Item {
@@ -121,15 +134,13 @@ describe("InventoryItemsTable — chunked render", () => {
     expect(desktopHeaders[0]).toHaveStyle({ background: "var(--c-inventory-table-header)" });
 
     rerender(
-      <DepartmentsProvider>
-        <InventoryItemsTable
-          {...baseProps}
-          filteredItems={[item]}
-          displayLimit={100}
-          setDisplayLimit={() => {}}
-          compact
-        />
-      </DepartmentsProvider>,
+      <InventoryItemsTable
+        {...baseProps}
+        filteredItems={[item]}
+        displayLimit={100}
+        setDisplayLimit={() => {}}
+        compact
+      />,
     );
 
     const compactTable = container.querySelector("table");
@@ -202,28 +213,24 @@ describe("InventoryItemsTable — chunked render", () => {
 
     act(() => fireIntersection());
     rerender(
-      <DepartmentsProvider>
-        <InventoryItemsTable
-          {...baseProps}
-          filteredItems={items}
-          displayLimit={100}
-          setDisplayLimit={() => {}}
-        />
-      </DepartmentsProvider>,
+      <InventoryItemsTable
+        {...baseProps}
+        filteredItems={items}
+        displayLimit={100}
+        setDisplayLimit={() => {}}
+      />,
     );
     expect(container.querySelectorAll("tbody tr").length).toBe(40);
 
     // selectedItem 변경 등 filteredItems/displayLimit 와 무관한 리렌더를 흉내.
     rerender(
-      <DepartmentsProvider>
-        <InventoryItemsTable
-          {...baseProps}
-          filteredItems={items}
-          displayLimit={100}
-          selectedItem={items[0]}
-          setDisplayLimit={() => {}}
-        />
-      </DepartmentsProvider>,
+      <InventoryItemsTable
+        {...baseProps}
+        filteredItems={items}
+        displayLimit={100}
+        selectedItem={items[0]}
+        setDisplayLimit={() => {}}
+      />,
     );
     expect(container.querySelectorAll("tbody tr").length).toBe(40);
   });

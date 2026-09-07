@@ -59,7 +59,7 @@ export function DesktopAdminView({
     items, setItems,
     employees, setEmployees,
     productModels, setProductModels,
-    departments, setDepartments,
+    departments,
     allBomRows,
     refreshAllBom,
     refreshItems,
@@ -124,7 +124,6 @@ export function DesktopAdminView({
               productModels={productModels}
               setProductModels={setProductModels}
               departments={departments}
-              setDepartments={setDepartments}
               selectedDept={selectedDept}
               setSelectedDept={setSelectedDept}
               allBomRows={allBomRows}
