@@ -1,0 +1,97 @@
+# CP6·CP7 총괄 실행 TODO
+
+> **추천 모델: GPT-5.6 Sol** — 최신 AGENTS.md의 모델 범위 안에서 재고 안전막과 통합 경계를 판단한다.
+> **추천 추론 수준: 최대** — 인증·재고·migration 충돌의 잘못된 통합 비용이 높다.
+> **울트라: 사용** — CP6 구현과 CP7 사전감사·독립 리뷰의 독립 구간을 병렬 배분한다.
+> **실행 방식: 별도 작업 + 읽기 전용 하위 에이전트** — 제품 코드 편집자는 워크트리별 한 명으로 제한한다.
+
+**GOAL:** 최신 main `d2b0dd29`을 품질 브랜치에 통합하고, 격리 워크트리에서 CP6과 CP7의 승인된 카드를 모두 구현·검증하여 품질 브랜치를 main 통합 직전의 검증된 완료 상태로 만든다.
+
+## 현재 실행 기준
+
+- 사용자 승인: CP6·CP7 전체 실행과 명시한 품질 브랜치 commit/push. 최초 계획 후 main 변경을 확인했고, 추가 승인으로 `d2b0dd2969883b2c8876c4375c99a456dcb6f21e`까지만 가져오며 main 미커밋 파일은 제외한다.
+- 품질 worktree: `C:\ERP\.worktrees\full-code-quality-checkpoint-2`
+- 품질 branch/base: `codex/full-code-quality-improvement`, `74085263c85096044d365cad339526ac452a2a26`
+- 공통 기준: `78e8023f41ef59528d9d8c07498e7653f9bee247`
+- 총괄 작업: `01a02250-1191-7883-aa55-5fc91f6ccd87`
+- S0 구현 작업: `01a079d0-9157-7503-9377-817f636c14c4`
+- 정본 감사 계획: [전수 감사·개선 계획](../../docs/research/2026-08-13-full-code-quality-audit-and-improvement-plan.md), 8.9.7·8.9.8 및 12.26절
+- 현 상태: **S0 제품 통합 merge `cd195d9e`의 GitHub run34099290108은6/6 PASS다. 전체 및 후속 변경분의 명세·품질 리뷰를 인수했고 총괄 문서만 로컬 docs commit으로 고정해 CP6 코드 push와 묶는다. 이 문서 commit이 `SYNC_BASE_SHA`이며 실제 SHA는 총괄 ignored state와 CP6 시작 프롬프트에 기록한다. CP7 읽기 전용 사전감사와 DTO 정적 후보26행 검토도 완료했다. CP6·CP7 제품 구현은 아직 미착수다. 역사적 broad FAIL과 개별 복구/최종 CI 결과를 구분한다.**
+- 완료 집계: 아래 실행 단위 2/16 완료. 완료 수치는 테스트·리뷰·CI 근거와 함께 갱신한다.
+
+## 실행 체크리스트
+
+- [x] S0 (2026-09-07): fixed main 병합, 전체 delta manifest, migration 두 계보 통합, 격리 보완, 영역별 검증 복구, 이중 리뷰, 제품 merge push 및 [실제 CI6/6 성공](https://github.com/Hw-03/ERP/actions/runs/34099290108). 제품 SHA `cd195d9e668cb4ece139f48562337f58d19839d8`; `SYNC_BASE_SHA`는 같은 제품 경로를 유지하는 본 docs-only commit이다. 문서-only CI 중복은 CP6 코드 push로 묶는다.
+- [ ] CP6 A1: IC12→14 실제 dirty/Promise save/이동 guard/React Query 단일 정본.
+- [ ] CP6 A2: IC13→16 BOM 응답 generation/payload baseline/출하 pagination·bulk loading·desktop/mobile load-more.
+- [ ] CP6 A3: IC15 map mutation 순서·소유권·오래된 rollback 방지·refetch.
+- [ ] CP6 A4: IC25 PA·PF KPI 모집단 상시 설명, 기존 계산 불변.
+- [ ] CP6 A5: IC26 첫/다른/같은 작성자 animation 0/1/0, 탭·날짜·상세 0.
+- [ ] CP6 종료·통합: 화면/API/독립 SQL, frozen 증거, full gate, 이중 리뷰, CP6 push/CI, 품질 통합/CI. `POST_CP6_SHA` 고정.
+- [x] CP7 병렬 사전감사 (2026-09-07): 타입·advisory·a11y·정책 consumer·문서·이동/중복 자산 manifest 및 DTO 후보26행 정적 검토, tracked 변경0. `full-code-quality-cp7-preaudit`의 ignored `20260907-cp7-preaudit/cp7-preaudit/preaudit.md`와 `ic21-manual-dto-targets.csv/.json`을 인계한다. 정적 차이18행은 실제 runtime 결함18건을 뜻하지 않는다. 제품/generator/runtime 검증은 CP7 구현 책임이다.
+- [ ] CP7 B1: IC21 generated raw OpenAPI types + business adapter·nullable/unknown enum/serialization CI.
+- [ ] CP7 B2: IC22 Next → Vitest/coverage → ESLint/PostCSS 세 독립 변경과 단계별 검증·rollback.
+- [ ] CP7 B3: IC23 핵심 IO/shipping/defect/department 오류·focus·keyboard/axe blocking 계약.
+- [ ] CP7 B4: IC24 확인된 두 번째 consumer 정책만 공통화; approval matrix·public facade 유지.
+- [ ] CP7 B5: DOC01 live 링크·명령·DB·URL 정합성, 역사 관찰 재실행 금지.
+- [ ] CP7 B6: AT01 source/target consumer 재검증, git mv와 모든 경로/문서 갱신, old path 0.
+- [ ] CP7 B7: AT02 consumer 0 byte-identical frontend copy만 제거, 원본·item 이미지·실제 consumer 보존.
+- [ ] CP7 종료·최종 통합: 상태/재고 matrix/manifest 재감사, full gate, 이중 리뷰, 품질 통합/push/CI, 임시 자원 정리, Goal 완료.
+
+## 작업 분리와 진행 계약
+
+S0가 GREEN이면 `SYNC_BASE_SHA`에서 CP6 제품 구현 작업을 만든다. CP7 사전감사는 사용자 속도 지시에 따라 이미 push한 잠정 제품 SHA `cd195d9e668cb4ece139f48562337f58d19839d8`에서 읽기 전용으로 먼저 시작한다. S0 최종 SHA와의 차이는 총괄이 확인하고 제품 변경이 있으면 그 영향 범위만 재조사한다. 이 선행 조사는 CI 성공이나 CP7 구현 완료를 뜻하지 않는다.
+
+- CP6 구현: `C:\ERP\.worktrees\full-code-quality-cp6`, branch `codex/full-code-quality-cp6`.
+- CP7 사전감사: `C:\ERP\.worktrees\full-code-quality-cp7-preaudit`, detached `cd195d9e`. 작업 `01a07af9-9e1b-7431-ac2e-68e6bf420894`. ignored 증거만 작성하고 제품·문서·lockfile 변경, 설치·테스트·서버 시작은 하지 않는다.
+
+CP6 통합 뒤에만 `POST_CP6_SHA`에서 `C:\ERP\.worktrees\full-code-quality-cp7`, branch `codex/full-code-quality-cp7` 구현 작업을 만든다. CP7은 IC21→IC22 세 단계→IC23→IC24→DOC01→AT01→AT02→최종 재감사 순서다.
+
+S0 문서만 별도로 push하면 현재 workflow가 전체6job을 재실행하므로, 제품 merge CI 성공 뒤 문서2개는 로컬 docs commit으로 고정하고 CP6 코드 push와 묶는다. 이 docs tip을 `SYNC_BASE_SHA`로 쓰며 제품 경로는 CI 검증 merge와 exact여야 한다. 그 사이 품질 branch의 의도적 docs-only1commit ahead를 허용하고 CP6 통합까지 tip을 움직이지 않는다. 문서 전용 gate는 생략하지 않으며 최종 품질 branch의 upstream 일치 조건은 유지한다.
+
+각 묶음은 RED→최소 구현→focused GREEN→새 변경분 명세·품질 리뷰→총괄 증거 확인으로 진행한다. 사용자 추가 지시에 따라 작은 저위험 묶음은 통합 검증·push·CI 확인을 함께 처리하며, 같은 코드의 통과한 전체 검증을 작은 수정마다 반복하지 않는다. 논리적 commit/rollback 단위는 유지한다. 전체 검증과 실제 CI 성공 확인은 S0·CP6·CP7 통합 경계에 유지하고 IC22의 호환성 검증은 세 단계별로 수행한다. 재고·권한·migration·서버 격리 문제는 즉시 검증한다. 총괄만 본 TODO와 정본 감사 문서를 갱신하며 사용자 재승인 없이 다음 GREEN 단계로 이동한다.
+
+## API·schema 경계
+
+- S0는 기존 migration을 재작성하지 않고 `20260907_0034`, down_revision `("20260903_0032", "20260831_0033")`의 DDL 없는 merge revision만 추가한다. 이미 품질에 반영된 PostgreSQL repair도 보존한다.
+- IC12는 프런트 저장 반환형 `Promise<SaveResult>`를 명시하고 기존 department API를 유지한다.
+- IC16의 stable cursor/has_more는 additive이며 기존 list adapter를 한 release 유지한다. 재고 정책은 바꾸지 않는다.
+- IC21은 generated raw type과 업무 adapter를 분리하며 runtime wire format을 유지한다.
+- 나머지 카드에서 breaking API/non-additive schema 변경을 임의 추가하지 않는다.
+
+## 절대 보호 경계
+
+- `C:\ERP` main tracked 파일/index/DB/서버는 변경하지 않는다. main 미커밋 파일을 읽거나 복사해 포함하지 않는다.
+- `C:\ERP-dev` 파일·검색·해시·DB·프로세스·포트를 포함한 모든 접근을 금지한다.
+- 실제 개발·직원 서버 시작/중지/배포, main merge/push, PR, force-push를 금지한다.
+- DB mutation은 각 worktree ignored runtime의 격리 DB만 사용한다. 기존 `backend/mes.db`는 전후 불변이다.
+- E2E base URL은 전용 loopback으로 고정하고 점유 포트에 mutation/종료를 보내지 않는다. 직접 생성한 PID와 시작시각을 검증한 프로세스만 종료한다.
+- S0 실제 Windows 실행에서 bind-only probe가 점유된 8021을 가용으로 오판하고 identity404로 중단됐다. 다른 서버는 조회·종료·재사용하지 않는다. 격리 워크트리 자율 진행 승인에 따라 총괄이 connect+bind 점유 검사 보강과 전용 backend `8021 → 8022` fallback을 test-only 범위에서 승인했다. 선택 포트는 proxy/setup/nonce/cleanup 전체에서 일치해야 하며 두 포트가 모두 점유됐으면 mutation 전에 거부한다. 실제 개발·직원 포트 및 임의 URL을 허용하지 않는다.
+- 주간보고·모바일 하단 nav/pill·출하 step5 카드 배치의 main 결과를 보존하며 추가 변경하지 않는다. 사용자 추가 승인 예외는 `frontend/app/mes/_components/_weekly_sections/__tests__/WeeklyDetailTable.test.tsx` 첫 render에 필수 `onItemSelect` 콜백 1줄을 보완하는 테스트 변경뿐이다.
+- 고정 main 이후의 새 커밋은 이번 실행 도중 다시 동기화하지 않는다.
+- 기존 pushed migration 수정, 추정 backfill, 동결 변경, 실제 PG/CI 증거 불가, 새 업무 정책, 범위 내 해결 불가 Critical/Important, 보존 불명 데이터 삭제는 자동 중단한다.
+
+## 현재 증거와 미확인 항목
+
+- 최종 원격 검증: 총괄이 `gh run view 34099290108 --json status,conclusion,headSha,jobs`로 completed/success, SHA `cd195d9e`, Verification policy·실제PostgreSQL·Windows ops·Playwright·Backend·Frontend의6개 success를 확인했다. merge tree는 `aa12135fcb1051a51032d007e7b1e4a661aaaf43`, 부모는 품질74085263과 fixed main d2b0dd29다. docs-only commit 전 제품 dirty0, upstream divergence0/0이었다. 문서-only local commit1개 ahead는 위 속도 조정 계약으로 허용한다.
+
+- 최신 E2E 복구: `20260907-cp6-cp7-supervisor/playwright-e2e-fallback-green.log`에서 17/17 PASS(2.4분), real mes.db 불변, cleanup-complete와 ownership released를 총괄이 읽었다. 후속 native exclusive port probe·HTTP readiness timeout 두 지적은 최소 수정으로 해결됐고 명세 재리뷰 C/I/M0이다. `e2e-infra-verification-contract-final2.log`는56/56, native lifecycle25/25, Windows wrapper6/6, `e2e-direct-npm-startup-smoke.log`는1/1 PASS다. 두 실제 실행 PID46472·44700은 사후 start token null이고 DB family SHA는 불변, 임시 DB/seed/lock/receipt는 absent다. 기존 점유8021/3100의 소유자를 조사하거나 종료하지 않았다. 제품 전체·PostgreSQL·coverage·build·17 E2E는 이 최소 수정 때문에 반복하지 않았다. 품질 리뷰 및 Git/CI 완료와 구분한다.
+
+- 재개 후 복구 증거: test-only 명세·품질 리뷰 모두 Critical/Important/Minor 0, frontend 직접15파일272건과 backend 정확1건 PASS, npm 타입 계약 Node41/manifest277/known419·new0을 부모가 인수했다. 전체 frontend coverage271파일2522건 PASS(94.97%), production build 및 bundle2.408MB/한도2.414MB도 통과했다. OpenAPI exact, DB readonly mismatch0, docs 링크 및 docs 단위13 PASS/1 Windows symlink권한 skip이 확인됐다. full/staged 역사적 FAIL과 구분한다. 실제 E2E는 준비 단계 identity404이며 포트 점유 오판의 좁은 인프라 보완 후 다시 실행해야 한다.
+- 최근 실패와 재개 승인: `staged-smart-final-timings.json`은 1,854.578초, exit1, 5 PASS·2 FAIL이다. backend 공통 E2E runner 정적 계약 1건과 frontend 신규 타입 진단 17그룹·24건이 실패 원인이며 뒤의 gate는 NOT_RUN이다. frontend 진단은 독립 읽기 전용 조사에서 테스트 fixture/mock drift로 분류됐다. fixed main의 `_weekly_sections/__tests__/WeeklyDetailTable.test.tsx:38-42` 첫 render에 필수 `onItemSelect` 콜백이 누락되어 예외 승인을 요청했고, 사용자가 격리 작업 범위 내 자율 진행을 명시 승인했다. 타입 baseline 상향·ts-ignore·제품 Props 완화로 우회하지 않는다. 동일 S0 작업에 최소 보완, 직접 실패 검사와 미실행 영역, 독립 리뷰를 지시했다. 기존 PASS인 PostgreSQL·전체 backend는 이 테스트-only 보완 때문에 반복하지 않으며 복구 결과를 full 명령 PASS로 표현하지 않는다.
+- 일시정지 종료 증거: `PAUSED-FROZEN-WEEKLY-TYPECHECK-HANDOFF.md` 및 소유 PostgreSQL의 기존 종료 명령 원본을 부모가 확인했다. 소유 PID28076 cluster는 정상 종료됐고 `pg_ctl status`는 3(no server)이다. 중지한 cluster 파일은 ignored 경로에 남겨 두었으며 DB 데이터 삭제 완료로 주장하지 않는다. 기존 `mes.db` hash는 불변, 임시 E2E 산출물은 absent이고 소유 포트는 해제됐다. 재개 전에 commit/push는 수행하지 않았다.
+- S0 premerge: `_attic/runtime/code-quality-improvement/20260907-120744-s0-main-sync/`. 27커밋·159경로, 품질 변경 교집합 48경로, 실제 merge conflict 22경로.
+- S0 전 품질 DB SHA-256: `D0419DC051B881DA145B466AF99490570D18C47BCAAE990C57FFD4476FE28147`.
+- 총괄 승인 계약/작업 ID/진행 JSON: `_attic/runtime/code-quality-improvement/20260907-cp6-cp7-supervisor/`.
+- 중간 검증: backend focused 363건, merge migration 총 10건(SQLite 5 + 실제 PostgreSQL 5)의 GREEN 원본을 총괄이 확인했다. PostgreSQL 필수 runner의 원본 exit0과 skip0도 확인했다. 87은 등록 selector 수이며 매개변수화된 실제 실행 건수와 같다고 표현하지 않는다. 이것만으로 S0 완료를 선언하지 않는다.
+- 최초 full 결과: `full-gate.log`와 `full-gate-timings.json` 원본을 총괄이 확인했다. 2,143.254초 후 exit 1이며 실행된 gate는 5 PASS·2 FAIL이다. backend Ruff/mypy/PostgreSQL concurrency와 frontend lint/app type은 PASS, backend full pytest는 4개 테스트 실패, frontend test-typecheck는 readiness 문자열 계약 1건 실패다. 뒤의 OpenAPI·frontend E2E type/coverage/build/bundle·docs·DB·Playwright는 아직 미실행이다. “frontend 7개 영역 완료”라는 초기 보고는 잘못됐으며 이 원본 집계를 정본으로 삼는다.
+- 후속 focused GREEN: `backend-focused-after-full-gate.log` 61/61, `e2e-verification-contract-after-signal.log` Node 계약 40/40(fail/skip 0), E2E typecheck PASS의 원본을 총괄이 확인했다. Node 40건에는 기존 검증 계약이 포함되며 신규 E2E 40건을 뜻하지 않는다.
+- E2E 소유권 후속 리뷰: stale receipt teardown, 동시 setup의 공유 자원 삭제 경합, child signal 전에 lock을 해제하는 3건을 test-only runner/config guard/captured teardown 및 RED/GREEN으로 보완했다. 독립 최종 재리뷰 Critical/Important 0이며 실제 E2E 실행을 재개했다. 이 좁은 리뷰는 S0 전체 명세·품질 리뷰를 대체하지 않는다.
+- 실제 E2E 1차: `e2e-actual-after-ownership.log`에서 16/17 PASS, `io-history-labels` PC 컬럼 검사 1건 FAIL을 확인했다. 현행 `HistoryTable.tsx:74-82,442-459`와 실패 DOM 모두 6열 `품목코드`를 표시하지만 테스트만 `품목코드 · 수량`을 기대했다. 제품 UI는 바꾸지 않고 selector/헤더 기대 두 곳을 현행 계약에 맞췄다. 원본 screenshot/video/DOM은 `e2e-first-run-failure-artifacts/`에 보존하고 targeted 재검증 뒤 필수 staged 검증과 전체 E2E를 통합한다.
+- E2E 종료 상태: 기존 `e2e-preflight-state.json`과 `e2e-postfailure-state.json`을 총괄이 대조했다. `mes.db/-wal/-shm` 존재와 SHA가 모두 동일하고 임시 E2E DB·receipt·hash·seed·lock은 absent, 전용 8021/3300 bind 가능이다. 기존 3100 점유는 조사/종료하지 않고 3300 fallback을 사용했으므로 전체 listener 0으로 표현하지 않는다. 최초 full FAIL은 별도로 보존하며 후속 focused PASS로 full PASS를 주장하지 않는다.
+- 실행 경계 예외: S0 담당자가 진행 진단 중 전역 `Win32_Process` 조회 후 worktree/검증 명령 문자열 필터를 1회 수행했다고 보고했다. 뒤이어 소유 backend gate PID `56084`의 자식 관계를 1회 조회했다. 총괄은 전역 조회를 즉시 중단시키고 이후 소유 PID·원본 로그만 확인하도록 제한했다. 서버·DB·파일 변경 여부와 메타데이터 조회 범위를 별도로 기록하며, 이 사실을 무조건적인 “직원 환경 접근 0” 주장으로 덮지 않는다. 상세는 기존 증거만 사용하고 직원 환경을 다시 조회하지 않는다.
+- 추가 실행 경계 기록: Node 위치를 찾는 동안 담당자가 `C:\Users\user`에서 파일명 metadata 재귀 검색을1회 수행했다. 총괄은 이를 중단하고 이미 검증한 quality runtime의 Node20 절대 경로를 후속 작업에 고정했다. 이 탐색을 worktree-only read0으로 숨기지 않으며 서버/DB 변경과 구분한다. 같은 검색이나 직원 환경 재조회는 하지 않는다.
+- 기존 CP5 HEAD74085263 CI [33936388212](https://github.com/Hw-03/ERP/actions/runs/33936388212)는 6개 job 모두 success임을 2026-09-07 읽기 전용 재확인했다. 이는 신규 S0 검증을 대체하지 않는다.
+- main required status checks API는 `404 Branch not protected`, effective rules 및 rulesets는 비어 있었다. 외부 강제 정책은 `NOT_VERIFIED`이며 설정을 변경하지 않는다. CP4/IC20 저장소 구현·CI 성공과 외부 정책 완료를 구분한다. 품질 브랜치 완료를 허용하되 main 통합은 별도 승인/재감사 대상이다.
+
+이전 CP5 TODO의 정지·다음 단계 미승인 설명은 그 시점의 역사적 상태다. 현 실행에는 본 문서의 사용자 승인과 fixed SHA를 적용한다.
