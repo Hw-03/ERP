@@ -12,7 +12,7 @@
 - Git 상태: 장기 품질 브랜치 `codex/full-code-quality-improvement`. CP4 완료 HEAD `e64a9a12da16f8502ab1a1e82dbed2b1d2648a01`에서 고정 `main` `78e8023f41ef59528d9d8c07498e7653f9bee247`을 품질 worktree 방향에만 통합했고, merge commit `deafc335502b46f9ed068bbb11175361826615ea` 뒤 CP5 W4 제품 commit `ac8f26d570e728f193c1b2b40b8efdae7fe2363e`, CI 회귀 수정 commit `8a66907014cfa7c5cd5de90e7d3b42d599a56ccf`, W5 제품 commit `fb339b5dc29013fc97af5035905431177ec54aea`, W6 제품 commit `d43ab268cb6fa9dcde94e9b93203978f3550c73d`, CI 이식성 보완 commit `dffb8e01e713d58e3d6df678ee98c0cfc20cd1e5`·`fd34189400f63225164c007bffcf7f561b813eb6`, W7 제품 commit `b27ba39cd2cbad574fda30af9c118697086c30ad`까지 기존 품질 브랜치에 push했다. W7 최종 GitHub CI run `33934558904`는 6/6 success다. `main` 역병합·push·PR·force-push는 없음
 - CP5 종료 당시 진척 `[HISTORICAL]`: 체크포인트 1·3·4 완료. 체크포인트 2의 `IC-04`·`IC-20`은 저장소 구현·로컬 PostgreSQL 실증과 품질 브랜치 CI 실행까지 통과했지만 required-check 설정 증거는 별도 외부 경계로 남겼다. CP4의 세 hard stop과 CP5의 S0~W7은 완료했으며, 당시에는 CP6 미착수였다. 이 문장은 현재 CP6 상태가 아니다.
 - CP5 종료 당시 잔여 집계 `[HISTORICAL]`: 엄격한 판정상 IC13개(required-check 외부 경계2개 포함) 및 `DOC-01`, `AT-01`, `AT-02`가 남았던 snapshot이다. 현재 완료 수량이나 새 실행 지시로 재사용하지 않는다.
-- 최신 판정(2026-09-08): **CP6 품질 통합·CP7 B1/B2 실제 CI 완료, B3/B4 로컬 검증 완료·원격 검증 대기**. CP6 `d60f84ed`/품질 `7f232773`/B1 `1ad03e37`/B2 `12901903`의 CI34135084227·34137728037·34149717620·34157355573은 실제6/6 success다. B3는 `234d4f5b`로 커밋됐고 B4/IC24 및 연결 IoBatch 취소 상태 복원(B4-R1)의 직접 검증·두 리뷰 C/I/M0를 인수했다. B4 별도 로컬 commit 뒤 두 단계를 묶어 원격 검증한다. `DOC-01`/`AT-01`/`AT-02`·B8 재감사·최종 통합은 미완료다. IC04/20의 외부 required-check 정책, 수용한 Next Minor1·ESLint9 EOL 예외·기존 테스트 타입 부채는 완료 카드와 분리해 보존한다. 근거는12.27.9·12.28.7~12.28.10이며 품질 브랜치는 최종 CP7 인수 전까지 이동하지 않는다.
+- 최신 판정(2026-09-08): **CP6 품질 통합 및 CP7 B1~B5 원격 검증 완료, B6 `_attic` 이전·직접 검증·두 리뷰 로컬 인수**. B3/B4 복구 `a5e1dad6`와 B5 문서 `bff9dd73`을 포함한 CI34168183559의 exact bff9·6/6 success는 B6 이후의 검증과 구분한다(12.28.15~16). `AT-02`·B8 재감사·최종 full gate/frozen 증명·품질 통합은 미완료이며 B6/B7 원격 검증은 최종 CP7에 묶는다. IC04/20 외부 required-check, 수용한 Next Minor1·ESLint9 EOL 예외·기존 테스트 타입 부채는 별도다. 품질 브랜치는 최종 CP7 인수 전까지 POST_CP6_SHA에서 고정한다.
 - 문서 성격: 현행 코드의 감사 결과이자 후속 구현 순서의 단일 정본
 
 > **증거 시점 안내:** 1~7절의 원 감사 코드 줄번호와 실패 서술은 당시 snapshot을 보존한다. 이후 구현과 충돌하는 문장은 `[STALE]` 역사 증거이며, 현재 판정·구현 경계는 8.9.7~8.9.8 및 12.26~12.28절이 우선한다. 최종 작업자 신뢰도 재판정은 CP7 B8에서 수행한다. B4-R1의 재현·보완 중 상태를 과거 CP5 완료 문구로 덮지 않는다.
@@ -1014,17 +1014,17 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 
 #### `AT-01` consumer 0 파일의 실제 `_attic` 이전
 
-이 카드는 사용자 지시로 **실제 후속 구현 목표**에 포함한다. 다만 본 감사의 산출물 계약은 tracked 문서 하나이므로 이번 감사 실행에서는 파일을 옮기지 않는다. 앞의 재고 P0/P1을 닫은 뒤 독립 change로 다음 source→target을 다시 preflight하고 이동한다.
+최초 감사의 문서-only 계약은 역사적 범위다. 사용자 승인된 CP7 B6의 정확15개 이동과 경로·구문·문서·두 독립 리뷰를 2026-09-08 로컬 인수했다(12.28.15~16). 별도 rollback commit으로 보존하고 원격 검증은 최종 CP7에 묶는다. 아래 `source`는 복구를 위한 **의도된 historical literal**이며 현재 실행 경로가 아니다. 보존 판정 행은 이동하지 않았다.
 
 - **작업자 영향:** active 실행 경로와 one-off/historical 도구를 분리해 실수로 오래된 script를 운영 경로처럼 실행하는 위험을 줄인다.
 - **근거/수정 경계:** consumer audit의 `NO_RUNTIME_CONSUMER_CONFIRMED`, `CQ-021`, ATTIC_POLICY. 아래 source·target과 같은 change의 모든 import/path/doc만 수정한다.
 - **API/schema·실패 정책:** 제품 API/schema 없음. preflight에서 새 consumer가 하나라도 나오면 해당 파일 이동은 중단한다.
-- **테스트/합격 조건:** 아래 1~5 절차의 old-path 0, import/parser/dry-run, docs/backend gate, Git rename/hash가 모두 통과해야 한다.
+- **테스트/합격 조건:** 아래 1~5 절차의 비역사 old-path 0, AST/parser·안전한 경로 fixture, docs 직접 gate, Git rename/hash가 통과해야 한다. 실제 업무·DB 접근이 가능한 one-off import/실행은 하지 않으며 전체 검증은 최종 CP7 gate에 포함한다.
 - **의존성/롤백:** Wave 1~5 뒤 마지막 독립 change. 표의 각 파일을 원위치하고 참조 patch를 역적용하는 exact rollback manifest를 남긴다.
 
 | 분류 | source | target | 함께 갱신할 것 |
 |---|---|---|---|
-| app runtime consumer 0 | `backend/app/services/seed_cleanup.py` | `_attic/backend-scripts/seed_cleanup.py` | `_attic/scripts/dev/import_inventory_cleanup.py` import/sys.path, 이동 파일 `REPO_ROOT`, `_attic/backend-scripts/seed.py`, 관련 docs |
+| 보존 / 실제 consumer 확인 | `backend/app/services/seed_cleanup.py` | 이동하지 않음 | `backend/tests/test_inventory_location_ledger.py`, security mutation manifest, `_attic/scripts/dev/import_inventory_cleanup.py`가 사용하므로 원위치 유지 |
 | one-off data/Excel | `scripts/dev/_kwon_match_v3.py` | `_attic/scripts/dev/_kwon_match_v3.py` | 참조 0 재확인 |
 | one-off data/Excel | `scripts/dev/a_file_mes_code_apply.py` | `_attic/scripts/dev/a_file_mes_code_apply.py` | 참조 0 재확인 |
 | one-off data/Excel | `scripts/dev/auto_link_pa_af_demo.py` | `_attic/scripts/dev/auto_link_pa_af_demo.py` | 참조 0 재확인 |
@@ -1036,7 +1036,7 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 | one-off data/Excel | `scripts/dev/rename_db_dump_sheets.py` | `_attic/scripts/dev/rename_db_dump_sheets.py` | 참조 0 재확인 |
 | one-off data/Excel | `scripts/dev/rewrite_output_with_a_as_truth.py` | `_attic/scripts/dev/rewrite_output_with_a_as_truth.py` | 참조 0 재확인 |
 | one-off data/Excel | `scripts/dev/seed_history_cases.py` | `_attic/scripts/dev/seed_history_cases.py` | 참조 0 재확인 |
-| unsafe orphan deploy | `scripts/prod/deploy.ps1` | `_attic/scripts/prod/deploy.ps1` | consumer 0, 안전한 현 sync 경로 문서화 |
+| unsafe orphan deploy | `scripts/prod/deploy.ps1` | `_attic/scripts/prod/deploy.ps1` | consumer 0, 역사용·실행 금지 표지와 격리 검증 계약. 실제 배포/직원 명령 실행 금지 |
 | 완료 handoff | `_attic/handoff/archive/2026-08-28-todo-baseline/2026-07-28-dashboard-admin-ui-todo.md` | `_attic/handoff/archive/2026-07-28-dashboard-admin-ui-todo.md` | active handoff와 `docs/superpowers/plans/`의 실제 참조 갱신 |
 | 완료 handoff | `_attic/handoff/archive/2026-08-28-todo-baseline/2026-07-28-history-admin-bom-todo.md` | `_attic/handoff/archive/2026-07-28-history-admin-bom-todo.md` | active handoff와 `docs/superpowers/plans/`의 실제 참조 갱신 |
 | 완료 handoff | `_attic/handoff/archive/2026-08-28-todo-baseline/2026-08-03-admin-export-followup-todo.md` | `_attic/handoff/archive/2026-08-03-admin-export-followup-todo.md` | active handoff와 `docs/superpowers/plans/`의 실제 참조 갱신 |
@@ -1046,7 +1046,7 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 1. `rg`로 basename·import·문서·CI·운영 consumer를 다시 검색한다. consumer가 하나라도 생겼으면 이동을 보류한다.
 2. `git mv`로 source→target을 같은 change에서 완료하고 모든 import/path/doc를 함께 바꾼다.
 3. old path/name을 코드와 `_attic/docs`, README에서 검색해 의도된 historical literal 외 0건으로 만든다.
-4. Python import smoke, parser/dry-run fixture, 관련 backend/docs gate를 실행한다.
+4. Python AST 파싱·안전한 root-path fixture·PowerShell parser-only와 관련 docs gate를 실행한다. one-off의 실제 import·DB·업무 실행은 금지한다.
 5. rollback은 파일을 원위치하고 import·`REPO_ROOT`·문서 patch를 함께 역적용한다.
 
 #### `AT-02` 중복 asset·historical 보존 정리
@@ -1096,7 +1096,7 @@ flowchart LR
 
 #### 8.9.1 카드 수와 체크포인트 수
 
-`IC-01`~`IC-27` 중 체크포인트 1에서 `IC-02`, `IC-05`, `IC-27`, 체크포인트 3에서 `IC-01`, 체크포인트 4에서 `IC-09`, `IC-10`, `IC-11`, 체크포인트 5에서 `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-17`, `IC-18`, `IC-19`, 체크포인트 6에서 `IC-12`, `IC-13`, `IC-14`, `IC-15`, `IC-16`, `IC-25`, `IC-26`, 체크포인트 7 B1·B2에서 `IC-21`, `IC-22`를 완료했다. 체크포인트 6·B1·B2의 실제 CI 근거는12.27.9~12.28.7이다. 현재 **품질 구현·원격 검증 잔여 IC는2개(`IC-23`, `IC-24`)**다. 체크포인트 2의 required-check 외부 설정2건은 별도 `NOT_VERIFIED`이고 main 통합 조건으로 남는다. `DOC-01`, `AT-01`, `AT-02`는 IC 수에 포함하지 않는 마지막 closeout이다. 아래 마지막 열은 최초 로드맵의 구간별 잔여 수로 보존하며 현재 실행 집계와 혼동하지 않는다.
+`IC-01`~`IC-27` 중 체크포인트 1에서 `IC-02`, `IC-05`, `IC-27`, 체크포인트 3에서 `IC-01`, 체크포인트 4에서 `IC-09`, `IC-10`, `IC-11`, 체크포인트 5에서 `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-17`, `IC-18`, `IC-19`, 체크포인트 6에서 `IC-12`, `IC-13`, `IC-14`, `IC-15`, `IC-16`, `IC-25`, `IC-26`, 체크포인트 7 B1~B4에서 `IC-21`, `IC-22`, `IC-23`, `IC-24`를 완료했다. 실제 CI 근거는12.27.9~12.28.15다. 현재 **카드별 품질 구현·원격 검증 잔여 IC는0개**지만, CP7 최종 재감사·전체 gate·품질 통합은 아직 남아 있다. 체크포인트 2의 required-check 외부 설정2건은 별도 `NOT_VERIFIED`이고 main 통합 조건으로 남는다. `DOC-01`은 완료했고 `AT-01`, `AT-02`는 IC 수에 포함하지 않는 마지막 closeout이다. 아래 마지막 열은 최초 로드맵의 구간별 잔여 수로 보존하며 현재 실행 집계와 혼동하지 않는다.
 
 | 구간 | 상태 | 이 구간에서 완전히 닫는 IC | 구간 종료 후 남은 IC |
 |---|---|---|---:|
@@ -1106,7 +1106,7 @@ flowchart LR
 | 체크포인트 4 | `완료` | `IC-09`, `IC-10`, `IC-11`; `IC-03`은 correction 안전막까지 완료된 `PARTIAL` | 외부 증거 전 20, 통과 후 18 |
 | 체크포인트 5 | `완료` | `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-17`, `IC-18`, `IC-19` | 외부 증거 전 13, 통과 후 11 |
 | 체크포인트 6 | `완료 / 품질 통합·실제 CI 완료` | `IC-12`, `IC-13`, `IC-14`, `IC-15`, `IC-16`, `IC-25`, `IC-26` | 외부 증거 전 6, 통과 후 4 |
-| 체크포인트 7 | `진행 / IC-21·IC-22 완료·IC-23 로컬 검증 완료` | `IC-23` 원격 검증, `IC-24`; 이후 `DOC-01`, `AT-01`, `AT-02` closeout | 외부 증거 전 2, 통과 후 0 |
+| 체크포인트 7 | `진행 / IC-21~24·DOC-01 완료` | `AT-01`, `AT-02`, 최종 재감사·gate·품질 통합 | 외부 증거 전 2, 통과 후 0 |
 
 체크포인트를 합치지 않는다. 특히 2는 후속 동시성 증거와 cutover kill-switch, 3은 actor trust root, 4는 일반 command의 안전 차단·멱등·경합, 5는 물리 원장부터 운영 readiness까지의 엄격한 직렬 chain이다. 6과 7도 화면 행동과 계약·정리 작업을 분리해 행동 변경과 물리 이동을 같은 diff에 섞지 않는다.
 
@@ -1243,10 +1243,10 @@ flowchart LR
 
 - [x] **`IC-21` 완료 (2026-09-08):** OpenAPI generated raw type·업무 adapter·nullable/unknown enum/request serialization drift guard, 두 리뷰 C/I/M0 및 commit1ad03e37의 실제 CI34149717620 6/6 success. 상세12.28.2.
 - [x] **`IC-22` 완료(2026-09-08):** Next runtime, Vitest/coverage, ESLint/PostCSS와 관련 Vite 보안 후속을 네 독립 rollback commit으로 분리했다. 전체/production audit0·도구별 직접 검사·독립 C/I0와 exact129의 실제 CI34157355573 6/6 success를 인수했다(12.28.3~12.28.7). 사용자 속도 조정에 따라 반복 full 대신 증분 근거와 한 번의 B2 원격 전체 검증을 결합했다. 원본 local full2회FAIL·Next next-env Minor1·ESLint9 EOL 예외를 보존하며 `--force`는 사용하지 않았다.
-- [ ] **`IC-23` 원격 검증 대기:** 핵심 IO·shipping·defect·department의 error/focus/a11y blocking 계약은 로컬 검증·두 리뷰 C/I/M0로 인수했다(12.28.8). B4와 묶은 실제 CI가 통과한 뒤 완료로 전환한다.
-- [ ] **`IC-24` 원격 검증 대기:** 승인 큐·approval kind를 실제 consumer와 공통 fixture matrix로 연결했고, 기존 정책을 보존하는 BOM/line identity·연결 IO 취소 상태 보완을 직접 검증했다. 두 독립 리뷰 C/I/M0이며 B3와 묶은 실제 CI 이후 완료로 전환한다(12.28.10). responsive shell·광역 이동·schema는 변경하지 않았다.
-- [ ] **`DOC-01` 완료:** live 운영·온보딩·handoff의 URL, DB, gate, 링크를 현행 코드와 맞추고 역사 관찰에는 재실행 금지 표지를 붙인다.
-- [ ] **`AT-01` 완료:** 각 source의 consumer 0을 다시 확인한 뒤 `git mv`, import/path/doc 갱신, old path 0, import/parser/dry-run을 같은 change에서 끝낸다.
+- [x] **`IC-23` 완료 (2026-09-08):** 핵심 IO·shipping·defect·department의 error/focus/a11y blocking 계약을 직접 검증·두 리뷰 C/I/M0로 인수하고, 복구 포함 exact bff9의 CI34168183559 6/6 success를 확인했다(12.28.8·12.28.13~15). 선택 업무의 접근성 증거를 앱 전체 WCAG 인증으로 확대하지 않는다.
+- [x] **`IC-24` 완료 (2026-09-08):** 승인 큐·approval kind의 실제 consumer/공통 fixture와 기존 정책을 보존하는 BOM·line identity·연결 IO 취소 상태 보완을 직접 검증했다. 두 리뷰 C/I/M0·실제 PostgreSQL 두 node·exact bff9의 CI34168183559 6/6 success가 근거다(12.28.10~15). responsive shell·schema·광역 refactor는 변경하지 않았다.
+- [x] **`DOC-01` 완료 (2026-09-08):** live 문서6개의 현행 코드·격리 실행 경계·역사 표지·링크/구문을 검증했고 두 리뷰 C/I/M0 및 별도 docs commit bff9dd73의 실제 CI6/6을 인수했다(12.28.12~15). B6의 경로 이동으로 생기는 참조 변경은 같은 B6 change에서 추가 검증한다.
+- [x] **`AT-01` 로컬 완료 (2026-09-08):** consumer/hash를 재확인한15개를 `git mv`하고 정확한 root/self-usage/문서 경로만 보정했다. AST·안전 경로 fixture·PowerShell parser-only, 역치환 byte-exact, 비역사 old path0, 두 독립 리뷰 C/I/M0를 인수했다(12.28.16). 실제 consumer가 있는 seed_cleanup은 보존했고 운영 script/import는 실행하지 않았다. 원격 최종 검증은 별도다.
 - [ ] **`AT-02` 완료:** 실제 consumer가 없는 byte-identical frontend 자산만 hash report와 함께 제거하고 item 이미지·원본 data·regression evidence는 보존한다.
 - [ ] **최종 재감사:** `QP-001`~`QP-023`, `CQ`, `RV`, `IC` 상태를 재집계하고 재고 작업 70행 matrix와 작업자 결론을 현재 SHA에서 다시 판정한다.
 
@@ -2336,3 +2336,23 @@ main 변경으로 완전히 해결된 CP6 카드는 없으며 다음의 남은 �
 - 실제 순수 `approval_kind`와 BOM SELECT 비교 `has_declared_custom_process_bom`만 `SERVICE_READ_ONLY_EXPORTS`에 등록했다. exact 1-class·canonical re-export·독립 AST write reachability 검사는 그대로다. security `d14379b3` 32PASS, 관련 approval/BOM `9cc5224c` 39PASS, 변경 manifest Ruff `d3124996` PASS다. 전체 backend/PG를 로컬에서 반복하지 않았다.
 - 총괄 `534242`는 최종 review-evidence를 읽고, 별도 명세 최종 `01a07e0e-4295`·품질 최종 `01a07e0e-3296` 원문도 직접 확인했다. 두 리뷰는 E2E 판정을 보존하며 manifest 증분을 대조했고 모두 C/I/M0·Ready다. staged smart 범위 계획·직접 증거·변경 docs gate 후 두 논리 commit을 한 번 push하고 새 exact SHA의 CI를 확인한다.
 - 잔여 관찰: 같은 E2E의 `DailyWorkActivity.tsx:145` 부모 state 갱신 React warning은 실패가 아니지만 B8에 남긴다. 총괄 `1fe00c`의 blame은 143~147행이 기존 `7d3fa7889`에서 온 코드임을 확인했다. 이번 recovery에서 제품 수정하지 않았으며 E2E PASS를 warning 0이라고 표현하지 않는다. CI의 github-only reporter/HTML artifact 경로 불일치도 원본 증거 보존 제약으로 남긴다.
+
+#### 12.28.14 복구·B5 커밋 인수와 최종 증거 경계
+
+- 복구는 `a5e1dad66304743be69d3ffd16d93520397370cc`의 정확3개 변경 파일, B5는 그 자식 `bff9dd73827f8511780f296d5ab26322f9a1ac81`의 정확8개 문서(담당6개·총괄2개)로 나눠 기존 CP7 branch에 일반 push했다. 총괄 `62c583`/`be92ff`는 제목·부모·tree·경로와 clean/upstream0·0을 확인했고, `331f61`/`5ce81c`는 이를 현재 Git과 다시 대조했다. 새 branch·main 변경·PR·배포는 없다.
+- B8 증분 원장의 복구3행·B5문서8행은 고정 커밋 객체의 before/after blob22개와 모두 일치한다(`5ce81c`). 이는 파일 내용과 근거의 연결 검증이며 전체 의미 검토나 새 동적 PASS를 뜻하지 않는다. ignored `20260908-cp7-b8-recovery-b5-delta/`의 두 enrichment와 총괄 `cp7-recovery-b5-commit-intake.json`을 연결한다.
+- [CI34168183559](https://github.com/Hw-03/ERP/actions/runs/34168183559)은 exact `bff9dd73`을 검증한다. 총괄 `71d6b2`/`40ce86`/`598528`에서 Windows ops·검증 정책·실제 PostgreSQL·E2E·frontend5개 job 성공, backend pytest/OpenAPI 진행 중임을 확인했다. E2E는23PASS/선택 frozen SKIP1이다. 이 중간 결과를6/6 또는 최종 frozen PASS로 기록하지 않는다. B6 이동 전 실제 원격 GREEN을 확인한다.
+- B5 문서 gate `9b639dc8`는 승인 Node20에서 통과했지만, 새 PowerShell에 TEMP/TMP가 고정되지 않아 symlink 테스트가 OS_TEMP fixture를 사용했다. 엄격한 worktree-only 임시 파일 증거가 아니며 기존 실행 경계 예외에 추가한다. 실제 main/직원 DB·서버 사용 증거와 구분하고 그 외부 임시 경로를 재조회·삭제하지 않는다. 후속 명령은 ignored `20260908-cp7-verification-environment.ps1`로 process-local Node20·TEMP/TMP·npm cache를 먼저 고정한다. 환경 설정만을 이유로 통과한 전체 검사를 반복하지 않는다.
+
+#### 12.28.15 B3·B4 복구·B5 원격 완료 및 B6 진입
+
+- 총괄의 기존 watch `ac07ad`는 exit0으로 종료했고, 후속 독립 조회 `75e58e`는 [CI34168183559](https://github.com/Hw-03/ERP/actions/runs/34168183559)의 exact `bff9dd73827f8511780f296d5ab26322f9a1ac81`·completed/success·6개 job 모두 success를 확인했다. backend pytest/OpenAPI까지 통과했으며 앞의5/6 대기 기록과 최초 CI34166260511 실패는 역사 증거로 보존한다. 원본 JSON은 총괄 ignored `cp7-b3-b4-recovery-b5-ci-final.json`이다.
+- 이에 따라 IC23·IC24 및 DOC01의 구현·직접 검증·독립 리뷰·해당 원격 검증 조건을 인수했다. 최종 CP7 full gate, 두 환경변수를 설정한 frozen characterization, B6/B7 이후 manifest·재고 matrix 재판정, 품질 브랜치 통합과 최종 CI는 아직 별도 미완료다. E2E23PASS/선택 SKIP1과 report artifact 부재, 외부 required-check NOT_VERIFIED를 과장하거나 삭제하지 않는다.
+- B6 담당자의 읽기 전용 `20260908-cp7-b6/preflight-evidence.md` 전체를 총괄 `8812e7`이 읽고, `79392a`에서 정확 source15개 SHA256과 target15개 부재를 독립 확인했다. Python11개는 root 계산6개·self-usage4개의 최소 경로 보정만 필요하다. unsafe deploy1개와 승인된 역사 handoff3개도 원래 이동 표와 일치하며 `seed_cleanup.py`는 test/security/wrapper consumer 때문에 보존한다. 실제 이동·parser/path·old-reference·두 리뷰는 이제 진행하므로 AT01 완료로 선취하지 않는다.
+
+#### 12.28.16 B6 / AT01 물리 이전 로컬 인수
+
+- 실제 변경은 Python11개·역사 deploy1개·완료 handoff3개, 정확15개 rename과 참조 문서3개다. 총괄 `b0c80c`가 전체 raw diff를 읽고 root 계산6파일·self-usage4파일 및 역사 경로 literal만 바뀌었음을 확인했다. seed_cleanup과 실제 consumer, 제품 runtime·migration·동결 UI는 보존했다. 총괄 정본2개를 포함한 change는20경로다.
+- 담당자 `a126ac68`의 의도한 치환 역적용 byte-exact, `592df3e1`의 Python AST11·root fixture6·PowerShell parser PASS와 `5fc8c9c4`의 비역사 old path0을 총괄이 실제 출력에서 읽었다. historical/source 표17건과 새 target의 old suffix7건은 명시 예외다. 원래 CRLF checkout과 Git blob의 차이를 구별했고 초기 mixed-EOL 실패는 원본으로 보존했다. 실제 import·one-off 스크립트·배포 명령·DB·서버 실행은 없다.
+- 총괄이 독립 명세 최종 `01a07e39-2ff4`와 품질 최종 `01a07e3d-9929` 원문을 확인했다. 둘 다 Critical/Important/Minor0·Ready Yes이며 품질 리뷰는18개 파일의 UTF-8 no-BOM·CRLF, 내용 보존 및 staged rename/unstaged content의 최종 staging 경계를 대조했다.
+- AT01의 로컬 구현 조건을 인수하고 정확 범위의 별도 rollback commit을 허용한다. 변경 문서 gate·staged 범위 검산 후 B7의 승인된 중복 이미지9개로 진행한다. B6/B7의 build·화면·전체 gate·원격 CI는 최종 CP7에서 한 번 검증하며 아직 통과로 기록하지 않는다. 원장·재고 matrix의 현재 증거 연결과 품질 브랜치 최종 통합도 남아 있다.

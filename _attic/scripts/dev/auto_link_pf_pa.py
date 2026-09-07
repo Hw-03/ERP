@@ -6,8 +6,8 @@ PA 품목명에서 정확히 ``_가방 포장 완료`` 접미사를 제거한 ba
 매칭 못 한 PA(예: "ASS'Y" 형식)는 자연스럽게 큐에서 빠진다.
 
 실행:
-    python scripts/dev/auto_link_pf_pa.py            # dry-run (기본). DB 무변경.
-    python scripts/dev/auto_link_pf_pa.py --apply    # POST /api/bom 호출로 실제 INSERT.
+    python _attic/scripts/dev/auto_link_pf_pa.py            # dry-run (기본). DB 무변경.
+    python _attic/scripts/dev/auto_link_pf_pa.py --apply    # POST /api/bom 호출로 실제 INSERT.
 
 apply 모드는 로컬 백엔드(http://localhost:8010)가 떠있어야 한다.
 중복(409)은 정상 skip 으로 집계.
@@ -29,7 +29,7 @@ except Exception:
 
 SUFFIX = "_가방 포장 완료"
 BACKEND_URL = "http://localhost:8010"
-DB_PATH = Path(__file__).resolve().parents[2] / "backend" / "mes.db"
+DB_PATH = Path(__file__).resolve().parents[3] / "backend" / "mes.db"
 NOTES_TAG = "auto-linked PF-PA 2026-05-22"
 
 

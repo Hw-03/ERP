@@ -38,14 +38,14 @@
 
 - 이번 실행에서 완료: 3, 5, 6, 8, 10, 14, 16, 24번.
 - 이전 live code에서 완료 확인: 1, 2, 4, 7, 9, 15, 17~23번.
-- 11~13번 관리자 내보내기는 `_attic/handoff/archive/2026-08-28-todo-baseline/2026-08-03-admin-export-followup-todo.md`의 독립 카드 4개 정책으로 대체되어 구현 완료됐다.
+- 11~13번 관리자 내보내기는 `_attic/handoff/archive/2026-08-03-admin-export-followup-todo.md`의 독립 카드 4개 정책으로 대체되어 구현 완료됐다.
 - 10번 BOM 데이터 행은 사용자가 선택한 조밀한 안으로 확정해 일반 행을 37px로 통일했다.
 - 7번의 42px 헤더 작업은 본 문서 기준으로 완료된 뒤, 2026-08-03 동시 사용자 작업에서 중복 `BOM 내보내기` 제거와 보기 전환 확대 정책으로 갱신됐다. 현재 live code를 최신 기준으로 본다.
 - 관련 관리자·BOM·보안·이력 Vitest 10개 파일 85개 테스트와 TypeScript 검사가 통과했다.
 
 ## 참고한 기준과 근거
 
-- 기존 완료 문서: `_attic/handoff/archive/2026-08-28-todo-baseline/2026-07-28-history-admin-bom-todo.md`
+- 기존 완료 문서: `_attic/handoff/archive/2026-07-28-history-admin-bom-todo.md`
 - 최근 BOM 필터 기준: `_attic/handoff/2026-07-28-bom-filter-density-plan.md`
 - 브라우저 확인:
   - 대시보드 `/mes?tab=dashboard`의 생산 가능 모델 요약 `· SOLO 400 / 40 / 626`

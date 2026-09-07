@@ -27,7 +27,7 @@
 
 ## 참고한 기준과 근거
 
-- 기존 완료 문서: `_attic/handoff/archive/2026-08-28-todo-baseline/2026-07-28-dashboard-admin-ui-todo.md`의 관리자 내보내기 3개 항목.
+- 기존 완료 문서: `_attic/handoff/archive/2026-07-28-dashboard-admin-ui-todo.md`의 관리자 내보내기 3개 항목.
 - 구현 기준 커밋: `ab67bc6a` (`2026-07-28 mes: 관리자·출하 UI와 스키마 보정`).
 - 브라우저 확인:
   - 관리자 `/mes?tab=admin` > 시스템 > 내보내기의 `F705-02 연간 생산일지`, `F704-02 연간 자재 입출고관리대장`, `시스템 원본 로그 관리`, `시스템 원본 로그 (월별)`, `선택 데이터 내보내기 (CSV)`, `품목·입출고 Excel` 기본 상태.

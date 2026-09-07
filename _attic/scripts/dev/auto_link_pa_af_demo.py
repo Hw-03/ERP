@@ -9,8 +9,8 @@ Jaccard 토큰 유사도 1순위 AF 를 자식으로 1:1 자동 연결한다.
 - Chest & Bed For ADX6000 ASS'Y / Podiatry For ADX6000 ASS'Y
 
 실행:
-    python scripts/dev/auto_link_pa_af_demo.py            # dry-run
-    python scripts/dev/auto_link_pa_af_demo.py --apply    # POST /api/bom
+    python _attic/scripts/dev/auto_link_pa_af_demo.py            # dry-run
+    python _attic/scripts/dev/auto_link_pa_af_demo.py --apply    # POST /api/bom
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ except Exception:
     pass
 
 BACKEND_URL = "http://localhost:8010"
-DB_PATH = Path(__file__).resolve().parents[2] / "backend" / "mes.db"
+DB_PATH = Path(__file__).resolve().parents[3] / "backend" / "mes.db"
 NOTES_TAG = "auto-linked PA-AF demo 2026-05-22"
 
 ACCESSORY_PA_NAMES = {
