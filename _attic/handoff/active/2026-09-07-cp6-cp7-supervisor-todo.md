@@ -18,7 +18,7 @@
 - 확정 `SYNC_BASE_SHA`: `731edc2df15c89753e60c12be95a65ef88e33bde`. 품질 본 branch는 CP6 통합까지 이 SHA에서 고정한다.
 - CP6 구현 작업: `01a07b0c-4563-7c41-a8c7-5df5ad2e91e2`, `C:\ERP\.worktrees\full-code-quality-cp6`, branch `codex/full-code-quality-cp6`.
 - 정본 감사 계획: [전수 감사·개선 계획](../../docs/research/2026-08-13-full-code-quality-audit-and-improvement-plan.md), 8.9.7·8.9.8 및 12.26절
-- 현 상태: **S0 제품 CI6/6과 SYNC731edc2d를 유지한다. CP6 A1~A5 로컬 커밋 이후 구성 검사 복구와 실제 화면 검증을 인수했다. Playwright 최초18PASS/1FAIL/1NOT_RUN 뒤 test-only selector 복구2/2PASS, 최종 명세·품질 C/I/M0다. 원본 full FAIL은 보존하며 CP6 최종 commit/push·실제 CI·품질 통합이 남았다. CP7 제품 구현은 통합 뒤 시작한다. 최신 근거는 감사12.27.8이다.**
+- 현 상태(2026-09-08): **CP6 최종d60f84ed push와 실제 GitHub CI34135084227의6/6 성공을 확인했다. 품질 merge c9d70903은 검증된 CP6와 exact tree다. 문서 closeout·품질 push/CI를 진행하며 CP7은 통합된 고정 기반에서 B1 구현을 병행한다. 품질 CI 성공 전에는 CP7 첫 commit과 CP6 종료 체크를 금지한다. 근거는 감사12.27.8~9다.**
 - 실행 단위 집계: 아래 7/16 완료, 미완료9. 실제 browser는 검증됐으나 CP6 종료 항목은 원격 CI·통합까지 포함하므로 아직 체크하지 않는다.
 
 ## 실행 체크리스트
@@ -30,7 +30,7 @@
 - [x] CP6 A4 (2026-09-07, LOCAL_VERIFIED): IC25 PA·PF KPI 모집단 상시 설명, 기존 계산 불변. 예상 RED2 뒤2파일8PASS, A5와 합친3파일34PASS·앱 tsc·변경6파일 ESLint exit0, 독립 명세/품질 C/I/M0다. 정확8경로 staged smart8/8PASS 후 commit `edc3a83611472ca6a99b134ac868e195d07ccd00`, 부모8d7a0a77·subject·clean을 총괄 확인했다. 감사12.27.4와 ignored `20260907-cp6-a4-a5/`가 근거이며 실제 desktop/mobile browser·push/CI는 최종 단계다.
 - [x] CP6 A5 (2026-09-07, LOCAL_VERIFIED): IC26 첫/다른/같은 작성자 class 계약0/1/0, 탭·날짜·상세0을 RED1→26PASS로 확인했다. A4와 합친 명세/품질 C/I/M0·staged smart8/8PASS·commit edc3a836을 공유한다. 실제 animationstart/reduced-motion 증명은 최종 E2E에서 검증한다.
 - 속도 우선 배치 조정(2026-09-07): A3 로컬 commit 뒤 A4 RED/GREEN → A5 RED/GREEN을 같은 단일 편집자가 순차 수행한다. 두 카드의 검증 근거는 분리하되 합친 diff의 독립 명세/품질 리뷰와 staged smart·로컬 commit은 각각 한 묶음으로 수행한다. 실제 browser animation/reduced-motion·KPI 표시는 CP6 최종 화면/E2E 검증에 포함한다. backend/DB/frozen 변경이나 최종 gate 생략은 없다.
-- [ ] CP6 종료·통합 [로컬 증거 인수, 원격 대기]: SQL/API/UI501/451·합성 불변식, 실제 A4/A5/frozen, PG129 및 실패영역 복구·docs/DB·최종 두 리뷰C/I/M0를 확인했다. 최초 full/E2E FAIL과 scoped 복구를 분리한다. 남은 작업은 최종 commit/push·실제 CP6 CI·품질 통합/CI·`POST_CP6_SHA` 고정이다. 같은 통과 검사를 반복하지 않는다.
+- [ ] CP6 종료·통합 [CP6 CI6/6·품질 merge 완료, 품질 CI 대기]: SQL/API/UI·A4/A5/frozen·최종 두 리뷰C/I/M0·최종d60f84ed push와 CI34135084227 success를 확인했다. merge c9d70903의 tree도 exact다. 문서 closeout 고정 SHA·품질 CI 성공 뒤 체크한다. CP7 첫 commit 전까지 품질 CI 성공이 필수이며 같은 통과 검사를 반복하지 않는다.
 - CP6 최초 full 결과(2026-09-07): 693,611.448ms·exit1, 실제9PASS/1FAIL이다. frontend7영역은 전체276파일2,556테스트·coverage94.97%·build/bundle을 포함해 통과했다. PG는 깊은 Windows 임시 경로로 실패했다. backend full pytest/OpenAPI·docs·DB·E2E 등 미실행 영역과 실패 PG만 짧은 own basetemp에서 복구하며 frontend/full 전체는 반복하지 않는다. 최초 합성 DB hash불변·원래 부재 복원·소유 test DB 삭제/cluster 종료도 확인했다. 감사12.27.6과 ignored 최종 run `resume-4/`가 원본이다. 후속 구성 검사 통과를 최초 full 명령 PASS로 바꾸지 않는다.
 - [x] CP7 병렬 사전감사 (2026-09-07): 타입·advisory·a11y·정책 consumer·문서·이동/중복 자산 manifest 및 DTO 후보26행 정적 검토, tracked 변경0. `full-code-quality-cp7-preaudit`의 ignored `20260907-cp7-preaudit/cp7-preaudit/preaudit.md`와 `ic21-manual-dto-targets.csv/.json`을 인계한다. 정적 차이18행은 실제 runtime 결함18건을 뜻하지 않는다. 제품/generator/runtime 검증은 CP7 구현 책임이다.
 - [ ] CP7 B1: IC21 generated raw OpenAPI types + business adapter·nullable/unknown enum/serialization CI.
@@ -49,7 +49,7 @@ S0가 GREEN이면 `SYNC_BASE_SHA`에서 CP6 제품 구현 작업을 만든다. C
 - CP6 구현: `C:\ERP\.worktrees\full-code-quality-cp6`, branch `codex/full-code-quality-cp6`.
 - CP7 사전감사: `C:\ERP\.worktrees\full-code-quality-cp7-preaudit`, 조사 snapshot `cd195d9e`, 현재 detached `731edc2d`. 작업 `01a07af9-9e1b-7431-ac2e-68e6bf420894`. 조사 뒤 docs-only 차이2개를 확인해 기준만 맞췄으며 제품 재조사는 하지 않았다. ignored 증거만 작성했고 제품·문서·lockfile 변경, 설치·테스트·서버 시작은 없었다.
 
-CP6 통합 뒤에만 `POST_CP6_SHA`에서 `C:\ERP\.worktrees\full-code-quality-cp7`, branch `codex/full-code-quality-cp7` 구현 작업을 만든다. CP7은 IC21→IC22 세 단계→IC23→IC24→DOC01→AT01→AT02→최종 재감사 순서다.
+CP6 통합 뒤에만 `POST_CP6_SHA`에서 `C:\ERP\.worktrees\full-code-quality-cp7`, branch `codex/full-code-quality-cp7` 구현 작업을 만든다. CP7은 IC21→IC22 세 단계→IC23→IC24→DOC01→AT01→AT02→최종 재감사 순서다. 2026-09-08 속도 조정으로 검증된 CP6와 동일 제품 tree인 품질 통합의 CI 대기는 CP7 B1 로컬 구현·리뷰와 병행한다. 품질 CI는 실제 성공까지 추적하며 CP7 첫 commit/push는 그 뒤에만 허용한다. 사용자 재승인을 요청하거나 main에 반영하지 않는다.
 
 S0 문서만 별도로 push하면 현재 workflow가 전체6job을 재실행하므로, 제품 merge CI 성공 뒤 문서2개는 로컬 docs commit으로 고정하고 CP6 코드 push와 묶는다. 이 docs tip을 `SYNC_BASE_SHA`로 쓰며 제품 경로는 CI 검증 merge와 exact여야 한다. 그 사이 품질 branch의 의도적 docs-only1commit ahead를 허용하고 CP6 통합까지 tip을 움직이지 않는다. 문서 전용 gate는 생략하지 않으며 최종 품질 branch의 upstream 일치 조건은 유지한다.
 

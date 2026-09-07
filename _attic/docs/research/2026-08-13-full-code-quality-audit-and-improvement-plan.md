@@ -7,15 +7,15 @@
 - 원 감사 기준일·SHA: 2026-08-13 KST, `71d6a34faf27ef736fe7dc64a5084ff2a7f46893`
 - 첫 개선 체크포인트 기준 SHA: `8be64743c65ce6db3c8270d5cc6b73fcf64b216a`
 - 두 번째 개선 체크포인트 기준 SHA: `90ce42d9fef0505ccbd7f5b7ea86b60760cb09dd`
-- 최신 `main` 동기화 대상 SHA: `78e8023f41ef59528d9d8c07498e7653f9bee247`
+- 최신 `main` 동기화 대상 SHA: `d2b0dd2969883b2c8876c4375c99a456dcb6f21e` (이후 main 추가 동기화 없음)
 - 현재 실행 위치: `C:\ERP\.worktrees\full-code-quality-checkpoint-2`
 - Git 상태: 장기 품질 브랜치 `codex/full-code-quality-improvement`. CP4 완료 HEAD `e64a9a12da16f8502ab1a1e82dbed2b1d2648a01`에서 고정 `main` `78e8023f41ef59528d9d8c07498e7653f9bee247`을 품질 worktree 방향에만 통합했고, merge commit `deafc335502b46f9ed068bbb11175361826615ea` 뒤 CP5 W4 제품 commit `ac8f26d570e728f193c1b2b40b8efdae7fe2363e`, CI 회귀 수정 commit `8a66907014cfa7c5cd5de90e7d3b42d599a56ccf`, W5 제품 commit `fb339b5dc29013fc97af5035905431177ec54aea`, W6 제품 commit `d43ab268cb6fa9dcde94e9b93203978f3550c73d`, CI 이식성 보완 commit `dffb8e01e713d58e3d6df678ee98c0cfc20cd1e5`·`fd34189400f63225164c007bffcf7f561b813eb6`, W7 제품 commit `b27ba39cd2cbad574fda30af9c118697086c30ad`까지 기존 품질 브랜치에 push했다. W7 최종 GitHub CI run `33934558904`는 6/6 success다. `main` 역병합·push·PR·force-push는 없음
 - 실행 진척: 체크포인트 1·3·4 완료. 체크포인트 2의 `IC-04`·`IC-20`은 저장소 구현·로컬 PostgreSQL 실증과 품질 브랜치 CI 실행까지 통과했지만 required-check 설정 증거는 별도 외부 경계로 남긴다. CP4는 workflow 거래 보정 차단, semantic idempotency, handover/correction/cancel 경합, 삭제 품목 참조 보호를 세 hard stop으로 완료했다. CP5는 S0 최신 main 통합부터 W7 `IC-19` health 의미 분리까지 전 단계를 완료했다. CP6는 시작하지 않았다.
 - 잔여 작업: 엄격한 완료 판정상 `IC` 13개가 남는다. `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-09`, `IC-10`, `IC-11`, `IC-17`, `IC-18`, `IC-19`는 완료했다. `IC-04`·`IC-20`의 required-check 외부 증거가 확보되면 11개로 줄며, 최종 closeout `DOC-01`, `AT-01`, `AT-02`도 남아 있다.
-- 최종 판정: **CP5 COMPLETE — CP6 미착수**
+- 최신 판정(2026-09-08): **CP6 카드 구현·분리 브랜치 CI 완료 — 품질 브랜치 통합 CI 진행**. CP6 `d60f84ed`의 실제 CI6/6을 확인했고 품질 merge `c9d70903`은 같은 제품 tree다. CP7 제품 구현은 이 통합 위에서 시작하며, 이전 두 항목의 CP5 진척·잔여 수량은 당시 역사적 snapshot이다. 현재 남은 제품 IC는21~24이며, IC04/20의 외부 required-check 정책과 DOC01/AT01/AT02·최종 재감사는 별도로 남는다.
 - 문서 성격: 현행 코드의 감사 결과이자 후속 구현 순서의 단일 정본
 
-> **증거 시점 안내:** 2~7절의 코드 줄번호와 실패 서술은 2026-08-13 원 감사 snapshot을 보존한다. 이후 `main`이 바꾼 계약과 충돌하는 문장은 `[STALE]` 역사 증거이며, 현재 판정·구현 경계는 8.9.6절과 12.25절이 우선한다.
+> **증거 시점 안내:** 1~7절의 원 감사 코드 줄번호와 실패 서술은 당시 snapshot을 보존한다. 이후 구현과 충돌하는 문장은 `[STALE]` 역사 증거이며, 현재 판정·구현 경계는 8.9.7~8.9.8 및 12.26~12.27절이 우선한다. 최종 작업자 신뢰도 재판정은 CP7 B8에서 수행한다.
 
 ---
 
@@ -1219,11 +1219,11 @@ flowchart LR
 
 **GOAL:** frontend의 저장·dirty·비동기 응답·cache·pagination·KPI 의미를 backend 정본과 맞춰 작업자가 보는 상태가 실제 서버 상태와 어긋나지 않게 한다.
 
-- [ ] **`IC-12`→`IC-14` 완료:** 실제 department form의 dirty와 Promise save를 먼저 고친 뒤 React Query를 부서 server state의 단일 정본으로 만들고 Context는 lookup adapter로 축소한다.
-- [ ] **`IC-13`→`IC-16` 완료:** shipping BOM match generation과 실제 payload dirty를 먼저 고친 뒤 active/history pagination·bulk loading·desktop/mobile load-more를 적용한다.
-- [ ] **`IC-15` 완료:** warehouse map mutation을 operation ID/generation과 query invalidation으로 직렬화해 오래된 rollback이 최신 성공을 덮지 못하게 한다. 이는 체크포인트 5의 위치 원장 계약을 소비한다.
-- [ ] **`IC-25` 완료:** KPI 숫자의 PA·PF 제외 모집단과 목록 포함 가능성을 desktop/mobile에 항상 명시한다.
-- [ ] **`IC-26` 완료:** 첫 일보 작성자 선택은 animation 0, 서로 다른 작성자 전환만 1회가 되도록 handoff와 live 구현을 맞춘다.
+- [x] **`IC-12`→`IC-14` 완료 (2026-09-08):** 실제 department form의 dirty/Promise save와 React Query 단일 정본·Context lookup adapter를 구현했다. A1 `59c52bad`, 최종 CI `34135084227`, 근거12.27.1·12.27.9.
+- [x] **`IC-13`→`IC-16` 완료 (2026-09-08):** BOM generation·payload dirty와 active/history pagination·bulk·desktop/mobile load-more를 구현했다. A2 `adaa5bed`, 근거12.27.2·12.27.9. legacy 배열 형태는 유지하되 무제한 목록 의미는 보존하지 않는다.
+- [x] **`IC-15` 완료 (2026-09-08):** map의 대상별 operation/generation·오래된 rollback 차단·최종 query 수렴을 구현했다. A3 `8d7a0a77`, 근거12.27.3·12.27.9.
+- [x] **`IC-25` 완료 (2026-09-08):** desktop/mobile 공용 모집단 설명과 loading/filter 지속 표시를 구현·실제 화면 검증했다. `edc3a836`, 근거12.27.4·12.27.8~9.
+- [x] **`IC-26` 완료 (2026-09-08):** 첫 작성자0·다른 작성자1·같은 작성자/탭/날짜/상세0 및 reduced-motion0을 실제 브라우저에서 확인했다. `edc3a836`, 근거12.27.4·12.27.8~9.
 
 `IC-12`, `IC-13`, `IC-15`, `IC-25`, `IC-26`은 실제 파일 소유권이 다를 때 병렬 가능하다. `IC-14`는 `IC-12` 뒤, `IC-16`은 `IC-13`과 체크포인트 5의 shipping API/state contract 뒤에 둔다. 출하 frontend의 `IC-13`과 `IC-16`은 한 owner가 순차 수행한다.
 
@@ -1271,7 +1271,7 @@ flowchart LR
   C6 --> C7
 ```
 
-체크포인트 5는 W7 `IC-19`까지 완료했다. 다음 제품 작업 후보는 체크포인트 6의 화면 freshness 카드지만 사용자 지시 전에는 시작하지 않는다. 재개 시 먼저 현재 `main`과 품질 branch의 delta를 산정하고 CP6 범위를 재판정한다. 체크포인트 2의 품질 브랜치 CI 성공을 required-check 설정 완료로 오인하지 않는다.
+체크포인트 5와 CP6 제품 카드는 완료했고, fixed main `d2b0dd29`와 CP6를 품질 브랜치에 통합했다. 승인된 다음 제품 작업은 CP7이다. 품질 통합의 실제 CI는 병행 확인하되 성공 전 CP7 첫 commit을 금지한다(12.27.9). main을 다시 동기화하지 않으며 체크포인트 2의 품질 브랜치 CI 성공을 required-check 설정 완료로 오인하지 않는다.
 
 ---
 ## 9. 테스트·운영 검증 보강안
@@ -2198,3 +2198,10 @@ main 변경으로 완전히 해결된 CP6 카드는 없으며 다음의 남은 �
 - docs 링크 단위는13PASS/Windows symlink권한skip1, maintained 링크 검사PASS, DB read-only mismatch0, git-status 내부 gatePASS다. docs-whitespace 내부 단독 실행은 Plan 컨텍스트 누락으로 검사 전에 실패했으므로 동일 검사를 직접 `git diff --cached --check`로 수행한 exit0와 구분해 기록한다. 모든 문서 경로를 검사했다는 뜻은 아니다.
 - 두 E2E 실행 모두 합성 canonical snapshot의 전후 SHA-256 `B3446800F7FAB0E41CBD61F9FD5531E67B3F76712D91D28E1B1FE21060D1C7A7`가 같았고 자기 임시 파일만 제거해 원래 DB family 부재를 복원했다. E2E DB/seed/ownership 산출물 잔여0·cleanup failure0이다. 소유8021/8022/3300 가용을 확인했지만 기존3100 점유는 그대로 두었으므로 전체 listener0으로 표현하지 않는다. 12.27.7의 실제 DB 복사 경계 위반도 이 합성 snapshot 결과로 지우지 않는다.
 - 최종 명세 turn `01a07c52-abc4-71d1-a571-6233c3ef017f`와 품질 turn `01a07c52-c940-7971-bb98-66345bae58bc`는 각각 **Critical0/Important0/Minor0, Ready YES**다. 총괄이 실제 staged diff·raw log·oracle·cleanup과 두 리뷰를 인수했다. 제품 코드 추가 수정 없이 CP6 최종 논리 commit/push와 실제 GitHub CI로 진행하고, 그 뒤 품질 branch 통합/CI 및 `POST_CP6_SHA`를 고정한다. CP7 제품 구현은 아직 시작하지 않았다.
+
+#### 12.27.9 CP6 원격 검증과 품질 통합 (2026-09-08)
+
+- CP6 최종 commit은 `d60f84ede604c61c334472d0770299b2a37be014`, 부모 `edc3a836`, tree `31b3f59a48701a9f9eecb48fda2d5c327a5798d4`다. 실제 commit 직전 docs3/3·cached diff-check를 통과했고 subject는 실제 작성 날짜의 `2026-09-07 quality: CP6 최종 검증과 격리 경계 보완`이다. 일반 push 뒤 같은 원격 ref와 clean을 확인했다.
+- [CP6 GitHub Actions 34135084227](https://github.com/Hw-03/ERP/actions/runs/34135084227)은 정확한 위 SHA에서 **completed/success, 6/6 success**다. Backend pytest/compile/OpenAPI, Frontend lint/type/coverage/build, 실제 PostgreSQL, 전용 DB E2E, Windows 검증 정책, 운영 profile job을 총괄이 GitHub의 실제 결과로 확인했다. 로컬 원본 full FAIL을 지우지 않으며 원격 성공은 별도 증거다.
+- 품질 branch가 `731edc2d`에서 움직이지 않았고 clean임을 확인한 뒤 `--no-ff` merge `c9d709034d26bd774f682bb186bbad1f048f7300`을 만들었다. 부모는731edc2d/d60f84ed이며 merge tree는 검증된 CP6 tree와 정확히 같다. 충돌·제품 추가 편집은 없다. main branch/워크트리 병합·push, PR·배포는 수행하지 않는다.
+- 속도 조정: 같은 코드의 원격 검사 대기를 직렬로 반복하지 않는다. 품질 branch의 이번 문서-only closeout을 검증·push한 뒤 그 고정 SHA를 CP7 기반으로 사용하고, 품질 CI를 별도 추적하면서 CP7 B1의 로컬 구현·검토를 병행한다. **품질 CI가 success가 되기 전에는 CP7 첫 commit/push 및 CP6 최종 종료 체크를 허용하지 않는다.** 품질 CI를 생략하거나 동일 tree만으로 성공을 추정하지 않는다. 실패하면 실제 원인을 좁혀 해결하고 잘못된 기반을 완료로 선언하지 않는다.
