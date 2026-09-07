@@ -207,7 +207,7 @@ def _mock_smart_targeted_runtime(
     local_bin = repo / "frontend" / "node_modules" / ".bin"
     local_bin.mkdir(parents=True)
     commands = {
-        "next.cmd": ("frontend-lint-files", lint_exit_code),
+        "eslint.cmd": ("frontend-lint-files", lint_exit_code),
         "tsc.cmd": ("frontend-tsc-incremental", 0),
     }
     for filename, (label, exit_code) in commands.items():
@@ -647,6 +647,10 @@ def test_smart_targeted_gates_run_in_parallel_and_merge_each_timing(tmp_path: Pa
         events = _gate_event_lines(gate_log, gate_id)
         assert events[0].startswith(f"{gate_id} start")
         assert events[-1].startswith(f"{gate_id} end")
+    lint_args = _gate_event_lines(gate_log, "frontend-lint-files")[0]
+    assert "--max-warnings=0" in lint_args
+    assert "app/sample.ts" in lint_args
+    assert "app/sample.test.ts" in lint_args
     assert report["total_ms"] < sum(gate["duration_ms"] for gate in report["gates"])
     related_args = Path(f"{gate_log}.related").read_text(encoding="utf-8")
     direct_args = Path(f"{gate_log}.run").read_text(encoding="utf-8")

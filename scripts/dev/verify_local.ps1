@@ -24,7 +24,7 @@ if ($LASTEXITCODE -ne 0 -or -not $RepoRoot) {
 $RepoRoot = $RepoRoot.Trim()
 $FrontendRoot = Join-Path $RepoRoot "frontend"
 $BackendRoot = Join-Path $RepoRoot "backend"
-$FrontendNextBin = Join-Path $FrontendRoot "node_modules\.bin\next.cmd"
+$FrontendEslintBin = Join-Path $FrontendRoot "node_modules\.bin\eslint.cmd"
 $FrontendTscBin = Join-Path $FrontendRoot "node_modules\.bin\tsc.cmd"
 $FrontendVitestBin = Join-Path $FrontendRoot "node_modules\.bin\vitest.cmd"
 $VerifyE2EScript = Join-Path $RepoRoot "scripts\dev\verify_e2e.ps1"
@@ -592,9 +592,7 @@ function Invoke-Gate {
                     Write-Host "No lintable changed frontend files."
                     return
                 }
-                $FileArgs = @()
-                foreach ($file in $SourceFiles) { $FileArgs += @("--file", $file) }
-                & $FrontendNextBin lint --max-warnings=0 @FileArgs
+                & $FrontendEslintBin --max-warnings=0 @SourceFiles
             }
         }
         "frontend-tsc-incremental" {
