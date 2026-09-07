@@ -104,5 +104,14 @@ describe("QuantityStepper", () => {
     expect(screen.getByRole("button", { name: "-1" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "+1" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "+10" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "+1" })).toHaveStyle({ color: "var(--c-green)" });
+  });
+
+  it("keeps high-contrast control text opt-in", () => {
+    render(<QuantityStepper value={12} onChange={() => {}} highContrastControls />);
+
+    expect(screen.getByRole("button", { name: "+1" })).toHaveStyle({
+      color: "color-mix(in srgb, var(--c-green) 70%, var(--c-text))",
+    });
   });
 });

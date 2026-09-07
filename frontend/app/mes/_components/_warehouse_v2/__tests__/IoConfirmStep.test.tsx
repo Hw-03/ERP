@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { createRef, useState, type RefObject } from "react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { IoBundle, IoSubType, IoWorkType } from "@/lib/api";
 import { IoConfirmStep } from "../IoConfirmStep";
@@ -46,7 +46,7 @@ const bundle = {
   lines: [parentLine, childLine],
 } satisfies IoBundle;
 
-function renderConfirmStep() {
+function renderConfirmStep(submitButtonRef?: RefObject<HTMLButtonElement | null>) {
   return render(
     <IoConfirmStep
       workType="warehouse_io"
@@ -61,6 +61,7 @@ function renderConfirmStep() {
       onNotesChange={() => {}}
       onSubmit={() => {}}
       onSaveDraft={vi.fn()}
+      submitButtonRef={submitButtonRef}
     />,
   );
 }
@@ -360,6 +361,25 @@ describe("IoConfirmStep", () => {
     fireEvent.change(memoInput, { target: { value: "  " } });
     fireEvent.click(submitButton);
     expect(screen.getByText("메모를 입력해야 부서 결재 요청을 할 수 있습니다.")).toBeInTheDocument();
+  });
+
+  it.each(["취소", "Escape"] as const)("확인 모달을 %s로 닫으면 제출 버튼으로 포커스를 돌려준다", async (closeMethod) => {
+    const submitButtonRef = createRef<HTMLButtonElement>();
+    renderConfirmStep(submitButtonRef);
+    const submitButton = screen.getByRole("button", { name: "창고 결재 요청 2건" });
+    expect(submitButtonRef.current).toBe(submitButton);
+
+    submitButton.focus();
+    fireEvent.click(submitButton);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    if (closeMethod === "취소") {
+      fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    } else {
+      fireEvent.keyDown(window, { key: "Escape" });
+    }
+
+    await waitFor(() => expect(submitButton).toHaveFocus());
   });
 
   it.each(["produce", "disassemble"] as const)("혼합 %s 작업은 낱개가 있으면 메모 없이 제출할 수 없다", (subType) => {

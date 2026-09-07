@@ -1095,7 +1095,7 @@ flowchart LR
 
 #### 8.9.1 카드 수와 체크포인트 수
 
-`IC-01`~`IC-27` 중 체크포인트 1에서 `IC-02`, `IC-05`, `IC-27`, 체크포인트 3에서 `IC-01`, 체크포인트 4에서 `IC-09`, `IC-10`, `IC-11`, 체크포인트 5에서 `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-17`, `IC-18`, `IC-19`, 체크포인트 6에서 `IC-12`, `IC-13`, `IC-14`, `IC-15`, `IC-16`, `IC-25`, `IC-26`, 체크포인트 7 B1에서 `IC-21`을 완료했다. 체크포인트 6·B1의 실제 CI 근거는12.27.9~12.28이다. 현재 **품질 구현·원격 검증 잔여 IC는3개(`IC-22`~`IC-24`)**다. 체크포인트 2의 required-check 외부 설정2건은 별도 `NOT_VERIFIED`이고 main 통합 조건으로 남는다. `DOC-01`, `AT-01`, `AT-02`는 IC 수에 포함하지 않는 마지막 closeout이다. 아래 마지막 열은 최초 로드맵의 구간별 잔여 수로 보존하며 현재 실행 집계와 혼동하지 않는다.
+`IC-01`~`IC-27` 중 체크포인트 1에서 `IC-02`, `IC-05`, `IC-27`, 체크포인트 3에서 `IC-01`, 체크포인트 4에서 `IC-09`, `IC-10`, `IC-11`, 체크포인트 5에서 `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-17`, `IC-18`, `IC-19`, 체크포인트 6에서 `IC-12`, `IC-13`, `IC-14`, `IC-15`, `IC-16`, `IC-25`, `IC-26`, 체크포인트 7 B1·B2에서 `IC-21`, `IC-22`를 완료했다. 체크포인트 6·B1·B2의 실제 CI 근거는12.27.9~12.28.7이다. 현재 **품질 구현·원격 검증 잔여 IC는2개(`IC-23`, `IC-24`)**다. 체크포인트 2의 required-check 외부 설정2건은 별도 `NOT_VERIFIED`이고 main 통합 조건으로 남는다. `DOC-01`, `AT-01`, `AT-02`는 IC 수에 포함하지 않는 마지막 closeout이다. 아래 마지막 열은 최초 로드맵의 구간별 잔여 수로 보존하며 현재 실행 집계와 혼동하지 않는다.
 
 | 구간 | 상태 | 이 구간에서 완전히 닫는 IC | 구간 종료 후 남은 IC |
 |---|---|---|---:|
@@ -1105,7 +1105,7 @@ flowchart LR
 | 체크포인트 4 | `완료` | `IC-09`, `IC-10`, `IC-11`; `IC-03`은 correction 안전막까지 완료된 `PARTIAL` | 외부 증거 전 20, 통과 후 18 |
 | 체크포인트 5 | `완료` | `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-17`, `IC-18`, `IC-19` | 외부 증거 전 13, 통과 후 11 |
 | 체크포인트 6 | `완료 / 품질 통합·실제 CI 완료` | `IC-12`, `IC-13`, `IC-14`, `IC-15`, `IC-16`, `IC-25`, `IC-26` | 외부 증거 전 6, 통과 후 4 |
-| 체크포인트 7 | `진행 / IC-21 완료·IC-22 착수` | `IC-22`, `IC-23`, `IC-24`; 이후 `DOC-01`, `AT-01`, `AT-02` closeout | 외부 증거 전 2, 통과 후 0 |
+| 체크포인트 7 | `진행 / IC-21·IC-22 완료·IC-23 로컬 검증 완료` | `IC-23` 원격 검증, `IC-24`; 이후 `DOC-01`, `AT-01`, `AT-02` closeout | 외부 증거 전 2, 통과 후 0 |
 
 체크포인트를 합치지 않는다. 특히 2는 후속 동시성 증거와 cutover kill-switch, 3은 actor trust root, 4는 일반 command의 안전 차단·멱등·경합, 5는 물리 원장부터 운영 readiness까지의 엄격한 직렬 chain이다. 6과 7도 화면 행동과 계약·정리 작업을 분리해 행동 변경과 물리 이동을 같은 diff에 섞지 않는다.
 
@@ -1241,8 +1241,8 @@ flowchart LR
 **GOAL:** 안정된 제품 행동 위에서 OpenAPI type, dependency, 접근성, 정책 locality를 각각 독립적으로 강화하고 live 문서와 `_attic` 물리 경계를 최종 정리한다.
 
 - [x] **`IC-21` 완료 (2026-09-08):** OpenAPI generated raw type·업무 adapter·nullable/unknown enum/request serialization drift guard, 두 리뷰 C/I/M0 및 commit1ad03e37의 실제 CI34149717620 6/6 success. 상세12.28.2.
-- [ ] **`IC-22` 완료:** Next runtime, Vitest/coverage, ESLint/PostCSS를 세 개의 독립 change로 올리고 각각 `npm audit` 도달 범위·rollback·full gate evidence를 남긴다. `--force` 자동 적용은 금지한다.
-- [ ] **`IC-23` 완료:** 핵심 IO·shipping·defect·department 경로의 공용 error/focus/a11y contract를 blocking test로 만든다.
+- [x] **`IC-22` 완료(2026-09-08):** Next runtime, Vitest/coverage, ESLint/PostCSS와 관련 Vite 보안 후속을 네 독립 rollback commit으로 분리했다. 전체/production audit0·도구별 직접 검사·독립 C/I0와 exact129의 실제 CI34157355573 6/6 success를 인수했다(12.28.3~12.28.7). 사용자 속도 조정에 따라 반복 full 대신 증분 근거와 한 번의 B2 원격 전체 검증을 결합했다. 원본 local full2회FAIL·Next next-env Minor1·ESLint9 EOL 예외를 보존하며 `--force`는 사용하지 않았다.
+- [ ] **`IC-23` 원격 검증 대기:** 핵심 IO·shipping·defect·department의 error/focus/a11y blocking 계약은 로컬 검증·두 리뷰 C/I/M0로 인수했다(12.28.8). B4와 묶은 실제 CI가 통과한 뒤 완료로 전환한다.
 - [ ] **`IC-24` 완료:** approval role/self/admin/list/count/button와 앞 카드에서 두 번째 consumer가 확인된 policy만 공통 module로 모은다. 행동 변경과 광역 파일 이동은 섞지 않는다.
 - [ ] **`DOC-01` 완료:** live 운영·온보딩·handoff의 URL, DB, gate, 링크를 현행 코드와 맞추고 역사 관찰에는 재실행 금지 표지를 붙인다.
 - [ ] **`AT-01` 완료:** 각 source의 consumer 0을 다시 확인한 뒤 `git mv`, import/path/doc 갱신, old path 0, import/parser/dry-run을 같은 change에서 끝낸다.
@@ -2271,3 +2271,21 @@ main 변경으로 완전히 해결된 CP6 카드는 없으며 다음의 남은 �
 - 후속 명세 `01a07d6b-1f5f`와 품질 `01a07d6b-0a0f`는 각각 C/I/M0·로컬 rollback 단위 Ready다. 전체 unit/coverage의 로컬3번째 반복 대신 이전 단위와 이 직접 증거를 합쳐 인수하고 B2 전체를 한 번 push해 실제 CI를 확인한다. **Vite 로컬 검증은 완료했지만 IC22/B2 전체 완료는 아직 원격 CI 대기**다. 원래 local full2회FAIL, Next next-env Minor1과 ESLint9 EOL 예외는 그대로 보존한다.
 - 후속 DOC01/AT01/AT02도 논리 로컬 commit·직접 검증·새 diff 명세/품질 C/I0는 유지하되 같은 제품의 full/원격 CI는 최종 CP7 경계로 묶는다. 실제 login screenshot·asset 소비 경로·이동 parser/link 검증은 생략하지 않는다.
 - AT01의 기존 문서 참조가 있는 archive handoff3개는 승인 표에 명시된 **역사 내용 보존 이동+경로 참조 동시 갱신** 대상이다. 새 TODO나 역사적 업무 재작성은 금지한다. consumer가 새로 생긴 `seed_cleanup.py`는 보존하며, unsafe deploy는 실행 금지 표지와 parser-only 검증으로 attic에 격리한다. 실제 직원 명령 실행이나 데이터 삭제 권한을 부여하지 않는다. 자세한 현재 source/target·hash·참조 대조는 ignored `20260908-cp7-b5-b7-ready/parent-scope-decision.md`에 기록했다.
+
+#### 12.28.7 B2 원격 인수와 B3·B4 검증 배치
+
+- 네 번째 Vite 단위는 `129019038319c766b60b59295ae65a10fedae46a`(부모8cf8ea43, tree909d3908)로 커밋했다. 실제 날짜·한국어 제목·정확4경로(package/lock와 총괄docs2)·clean을 확인했고, 기존 CP7 branch에만 `1ad03e37..12901903` 일반 push를 했다. 총괄 actual `cbd29a`에서 upstream0/0도 확인했다. staged smart `798ea794`는10gate 계획·실행0이며 별도 docs3/3PASS·15단위 중14PASS/권한skip1을 미실행 full PASS로 바꾸지 않는다.
+- 총괄 actual `05297a`는 [CI34157355573](https://github.com/Hw-03/ERP/actions/runs/34157355573)의 exact129에서 frontend 전체(lint/type/coverage/build/bundle), E2E, PostgreSQL, Windows ops, 검증 정책5개 job 성공을 확인했다. **backend pytest는 진행 중이며 IC22/B2 최종 완료는 아직 유보한다.** 원격 coverage 성공과 원본 local full2회FAIL·local coverage 미보고는 서로 다른 증거다.
+- 최신 사용자 속도·자율 진행 지시에 따라 불변129 원격 snapshot의 backend 검사와 비중첩인 B3 frontend 로컬 구현·직접 검사·리뷰를 병행한다. 전체 B2 CI 성공 전 B3 commit/push·B4 진입은 금지한다. B3의 실제 네 핵심 업무 keyboard/axe를 기존 소유 nonce E2E의 blocking 검사로 연결하며 기본 localhost3000 standalone scanner는 실행하지 않는다.
+- B3와 B4는 카드별 RED→직접 GREEN·독립 명세/품질 C/I0·별도 로컬 rollback commit을 유지하고 두 단계 완료 후 한 번 push·실제 전체 CI를 실행한다. 카드의 로컬 인수와 최종 원격 완료를 구분한다. 마지막 CP7 full gate, 실제 PostgreSQL과 업무·권한 필수 검증은 생략하지 않는다.
+- B8 증분 원장도 기존 근거를 재사용했다. `1ad03e37..12901903`의 NUL Git diff는31레코드(28M/1A/1D/1R086), 양끝 추적 집합2,569개이며 총괄 `a778d1`이 각 status/rename/prior/new blob 불일치0을 확인했다. 이는 고정 B2 bridge이지 최종 CP7 전수 의미 검토나 B8 완료가 아니다.
+- **최종 B2 원격 인수:** 이후 총괄 actual `9ca4cc`는 같은 CI34157355573의 exact129·completed/success와 **6/6 job success**를 확인했다. 원본 `cp7-b2-ci-final.json`을 총괄 ignored 증거에 보존했다. IC22/B2는 완료이며, 앞의5/6 대기 상태는 역사적 중간 기록이다. 원격 전체 unit/coverage·build/bundle·backend·PG·E2E 성공을 원본 local FAIL의 삭제나 대체 근거로 사용하지 않는다. B3 완료·최종 CP7 완료는 아직 별도다.
+
+#### 12.28.8 B3 오류·focus·접근성 로컬 인수
+
+- 기준은 B2 `12901903`이다. 실제 desktop/mobile IO의 일반 오류·확인창 닫힘, 출하·불량의 초기 로드 실패와 키보드 재시도, 부서 색상 필드 연결·행 Enter/Space·확인창 trigger 복귀를 보완했다. 공용 `LoadFailureCard`의 이름/focus는 opt-in이며, 기존 정보 Notice·공용 ConfirmModal의 기본 계약은 바꾸지 않았다. 출하 초기 오류와 데이터가 남은 재조회 실패를 구분하고 기존 페이지·캐시 정책을 보존한다.
+- 직접 GREEN은 `exec-817ebd11`의4파일43PASS와 마지막 관리자 delta `exec-c275a362`의2파일11PASS다. 서로 겹치는 검사 수를 합쳐 고유 테스트 수처럼 표시하지 않는다. 앱 타입·변경 파일 strict lint·E2E 타입 exit0, `exec-83a9bbed`의 test manifest285·기존392/신규0을 확인했다. 같은 명령 뒤의 rg 문법 오류는 별도 검색 실패이며 타입 PASS로 숨기지 않았고, 후속 고정 문자열 조회에서 E2E `.focus()`0을 확인했다.
+- 소유 nonce E2E `exec-a2223062`는 핵심4/4PASS(38.9초), 관리자 테스트의 마지막 delta `exec-4136d0e3`는1/1PASS(32.4초)다. 네 실제 영역에서 light/dark·WCAG2A/AA·2.1A/AA axe를 모든 impact의 blocking assertion으로 실행했다. Tab/Shift+Tab/Enter/Space/Escape를 실제 사용하며 click은 인증 준비에만 쓴다. 이는 선택한 업무 영역의 증거이며 앱 전체 WCAG 인증을 뜻하지 않는다.
+- 리뷰에서 초기 모달 mock·직접 focus·누락된 역방향 키보드/오류 재시도 증거를 보완했다. 모달이 약속하지 않은 ‘취소 버튼 자동 포커스’를 새 제품 요구로 추가하지 않았다. 최종 독립 명세 `/root/b1_spec_review`와 품질 `/root/b1_quality_review`는 각각 C/I/M0·Ready Yes이며, 총괄 `bb2385`가 ignored `20260908-cp7-b3-final/review-evidence.md`의 원문을 인수했다. 이전 RED·중간 실패는 보존하고 같은 전체 테스트를 반복하지 않았다.
+- design 스킬에 따라 실제 렌더 경로와 light/dark token 대비를 확인했다. 공용 Button의 전역 변경은 제외하고 `FilterChip/KpiCard/StatusPill`의 선택적 text tone·수량 조절기의 기본 false인 대비 옵션으로 대상 화면만 보완했다. 총괄 `d57925`에서 공용 Button/ConfirmModal·동결 weekly/mobile nav/globals 추가 diff0과 출하 step5 카드 geometry 추가 diff0을 확인했다. backend/API/schema/migration 변경은 없다.
+- 두 최종 E2E는 CP7 합성 DB와3300/8022만 사용했고, worktree `mes.db/-wal/-shm` 불변·정리 완료·소유권 해제를 원본에서 확인했다. 기존3100 점유자를 포함한 모든 서버가 없다는 뜻은 아니다. 이 단계는 **LOCAL_VERIFIED**이며 별도 로컬 rollback commit 뒤 B4를 진행한다. IC23 최종 완료는 B3+B4 push의 실제 CI 이후이며, Next next-env Minor1·ESLint9 EOL·기존 타입 부채·최종 frozen 검증 대기는 그대로 남는다.

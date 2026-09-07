@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Building2, Plus, Save, X } from "lucide-react";
 import type { DepartmentMaster, Employee, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -53,6 +53,11 @@ export function AdminDepartmentsSection({
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [addMode, setAddMode] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DepartmentMaster | null>(null);
+  const deleteButtonRef = useRef<HTMLButtonElement>(null);
+  const readableBlue = `color-mix(in srgb, ${LEGACY_COLORS.blue} 30%, ${LEGACY_COLORS.text})`;
+  const readableGreen = `color-mix(in srgb, ${LEGACY_COLORS.green} 30%, ${LEGACY_COLORS.text})`;
+  const readableMuted = `color-mix(in srgb, ${LEGACY_COLORS.muted2} 30%, ${LEGACY_COLORS.text})`;
+  const accessiblePrimaryBackground = `color-mix(in srgb, ${LEGACY_COLORS.blueSolid} 98%, ${LEGACY_COLORS.text})`;
   const persistDepartment = async () => {
     while ((await saveDepartment()).status === "saved") {
       // A save can finish with newer edits still dirty; persist them before navigation.
@@ -144,9 +149,16 @@ export function AdminDepartmentsSection({
     if (deleted) setDeleteTarget(null);
   }
 
+  function closeDeleteConfirm() {
+    setDeleteTarget(null);
+    requestAnimationFrame(() => {
+      if (deleteButtonRef.current?.isConnected) deleteButtonRef.current.focus();
+    });
+  }
+
   return (
     <>
-      <div className="flex min-h-0 flex-1 flex-col">
+      <div data-testid="admin-departments-section" className="flex min-h-0 flex-1 flex-col">
         <AdminPageHeader
           icon={Building2}
           title="부서 관리"
@@ -154,14 +166,14 @@ export function AdminDepartmentsSection({
             <AdminKpiBar
               placement="header"
               items={[
-                { key: "all", label: "전체 부서", value: departments.length, hint: "등록된 부서 수", tone: LEGACY_COLORS.blue },
-                { key: "active", label: "사용 중", value: stats.active, hint: "활성 부서", tone: LEGACY_COLORS.green },
-                { key: "inactive", label: "비활성", value: stats.inactive, hint: "사용 중지", tone: LEGACY_COLORS.muted2 },
+                { key: "all", label: "전체 부서", value: departments.length, hint: "등록된 부서 수", tone: LEGACY_COLORS.blue, textTone: readableBlue },
+                { key: "active", label: "사용 중", value: stats.active, hint: "활성 부서", tone: LEGACY_COLORS.green, textTone: readableGreen },
+                { key: "inactive", label: "비활성", value: stats.inactive, hint: "사용 중지", tone: LEGACY_COLORS.muted2, textTone: readableMuted },
               ]}
             />
           }
           actions={
-            <Button variant="primary" size="md" iconLeft={<Plus className="h-4 w-4" />} onClick={handleStartAdd}>
+            <Button variant="primary" size="md" iconLeft={<Plus className="h-4 w-4" />} onClick={handleStartAdd} style={{ background: accessiblePrimaryBackground }}>
               부서 추가
             </Button>
           }
@@ -177,9 +189,9 @@ export function AdminDepartmentsSection({
             onSearchChange={setSearch}
             filters={
               <>
-                <FilterChip active={statusFilter === "all"} label="전체" onClick={() => setStatusFilter("all")} size="sm" />
-                <FilterChip active={statusFilter === "active"} label="사용 중" onClick={() => setStatusFilter("active")} size="sm" tone={LEGACY_COLORS.green} />
-                <FilterChip active={statusFilter === "inactive"} label="비활성" onClick={() => setStatusFilter("inactive")} size="sm" />
+                <FilterChip active={statusFilter === "all"} label="전체" onClick={() => setStatusFilter("all")} size="sm" textTone={readableBlue} />
+                <FilterChip active={statusFilter === "active"} label="사용 중" onClick={() => setStatusFilter("active")} size="sm" tone={LEGACY_COLORS.green} textTone={readableGreen} />
+                <FilterChip active={statusFilter === "inactive"} label="비활성" onClick={() => setStatusFilter("inactive")} size="sm" textTone={readableBlue} />
               </>
             }
             listRole="grid"
@@ -244,7 +256,13 @@ export function AdminDepartmentsSection({
                     DPT-{String(dept.id).padStart(2, "0")} · {empCount}명
                   </div>
                   <div role="gridcell" className="flex justify-center">
-                    <StatusPill label={dept.is_active ? "사용 중" : "비활성"} tone={dept.is_active ? "success" : "neutral"} showDot maxWidth={84} />
+                    <StatusPill
+                      label={dept.is_active ? "사용 중" : "비활성"}
+                      tone={dept.is_active ? "success" : "neutral"}
+                      textTone={dept.is_active ? readableGreen : readableMuted}
+                      showDot
+                      maxWidth={84}
+                    />
                   </div>
                 </div>
               );
@@ -267,6 +285,7 @@ export function AdminDepartmentsSection({
                 <StatusPill
                   label={selectedDept.is_active ? "사용 중" : "비활성"}
                   tone={selectedDept.is_active ? "success" : "neutral"}
+                  textTone={selectedDept.is_active ? readableGreen : readableMuted}
                 />
               ) : null
             }
@@ -276,7 +295,7 @@ export function AdminDepartmentsSection({
                   취소
                 </Button>
               ) : selectedDept ? (
-                <Button variant="primary" size="md" className="h-11 min-w-[88px]" iconLeft={<Save className="h-4 w-4" />} onClick={() => void saveDepartment().catch(() => undefined)}>
+                <Button variant="primary" size="md" className="h-11 min-w-[88px]" iconLeft={<Save className="h-4 w-4" />} onClick={() => void saveDepartment().catch(() => undefined)} style={{ background: accessiblePrimaryBackground }}>
                   저장
                 </Button>
               ) : null
@@ -297,6 +316,7 @@ export function AdminDepartmentsSection({
                 )}
                 onToggleActive={() => handleToggleActive(selectedDept)}
                 onRequestDelete={() => setDeleteTarget(selectedDept)}
+                deleteButtonRef={deleteButtonRef}
               />
             ) : (
               <EmptyState
@@ -315,7 +335,7 @@ export function AdminDepartmentsSection({
         tone="danger"
         cautionMessage="이 작업은 되돌릴 수 없습니다. 부서에 속한 직원과 품목 매핑은 유지되지만, 부서명 참조가 사라집니다."
         confirmLabel="삭제"
-        onClose={() => setDeleteTarget(null)}
+        onClose={closeDeleteConfirm}
         onConfirm={handleConfirmDelete}
       />
     </>

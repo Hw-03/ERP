@@ -124,10 +124,10 @@ export function MobileShippingScreen() {
   }
 
   const activeQuery = tab === "history" ? historyQuery : requestsQuery;
-  const loading = activeQuery.isLoading;
   const queryError = tab === "history" ? historyQuery.error : requestsQuery.error;
   const error = queryError instanceof Error ? queryError.message : queryError ? "출하 데이터를 불러오지 못했습니다." : null;
-  const hasActiveData = activeQuery.data !== undefined;
+  const hasActiveData = activeQuery.dataUpdatedAt > 0;
+  const loading = !hasActiveData && activeQuery.isFetching && !error;
   const initialError = hasActiveData ? null : error;
   const refreshError = hasActiveData ? error : null;
   const retryRefresh = () => {
@@ -156,8 +156,21 @@ export function MobileShippingScreen() {
         <TabButton active={tab === "history"} icon={History} label="이력" onClick={() => setTab("history")} />
       </div>
 
-      {loading && <InlineState title="로딩 중" body="출하 데이터를 불러오고 있습니다." />}
-      {initialError && <InlineState title="오류" body={initialError} tone={LEGACY_COLORS.red} />}
+      {loading && (
+        <div role="status" aria-live="polite">
+          <InlineState title="로딩 중" body="출하 데이터를 불러오고 있습니다." />
+        </div>
+      )}
+      {initialError && (
+        <LoadFailureCard
+          message={initialError}
+          prefix="출하 데이터를 불러오지 못했습니다"
+          retryLabel="다시 시도"
+          onRetry={retryRefresh}
+          ariaLabel="출하 데이터 로드 오류"
+          focusOnMount
+        />
+      )}
       {refreshError && (
         <LoadFailureCard
           message={refreshError}

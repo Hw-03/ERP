@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type LegacyRef } from "react";
+import { useRef, useState, type LegacyRef, type RefObject } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -51,6 +51,7 @@ interface Props {
   onValidationError?: (message: string) => void;
   onSubmit: () => void;
   onSaveDraft: () => void;
+  submitButtonRef?: RefObject<HTMLButtonElement | null>;
 }
 
 const APPROVAL_META: Record<
@@ -187,6 +188,7 @@ export function IoConfirmStep({
   onValidationError,
   onSubmit,
   onSaveDraft,
+  submitButtonRef,
 }: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [memoValidationAttempted, setMemoValidationAttempted] = useState(false);
@@ -366,6 +368,7 @@ export function IoConfirmStep({
             {saving ? "저장 중..." : "저장"}
           </button>
           <button
+            ref={submitButtonRef}
             type="button"
             onClick={() => {
               if (memoMissing) {

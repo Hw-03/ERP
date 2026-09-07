@@ -16,7 +16,6 @@ import { useDefectFilterPreferences } from "./_defect_hub/useDefectFilterPrefere
 import { DefectDepartmentList } from "./_defect_hub/DefectDepartmentList";
 import { DefectCartFlow, type DefectCartMode } from "./_defect_hub/DefectCartFlow";
 import { DefectProcessPanel } from "./_defect_hub/DefectProcessPanel";
-import { InlineErrorNote } from "./_defect_hub/InlineErrorNote";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { LoadFailureCard } from "./common/LoadFailureCard";
 import { matchesDefectSearch } from "./_defect_hub/defectSearch";
@@ -291,9 +290,10 @@ function DefectViewInner({
   }
 
   const isFullWidthWork = view.kind !== "list" && view.kind !== "hub";
+  const readableMuted = `color-mix(in srgb, ${LEGACY_COLORS.muted2} 30%, ${LEGACY_COLORS.text})`;
 
   return (
-    <div className="flex min-h-0 flex-1 min-w-0 pl-0 lg:pr-4">
+    <div data-testid="defect-desktop-view" className="flex min-h-0 flex-1 min-w-0 pl-0 lg:pr-4">
       <div
         className="scrollbar-hide flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto rounded-[28px] border"
         style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}
@@ -343,7 +343,7 @@ function DefectViewInner({
                 type="button"
                 onClick={() => window.history.back()}
                 className="standard-hover flex items-center gap-1 rounded-[10px] border px-3 py-1.5 text-sm font-bold transition-colors"
-                style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
+                style={{ borderColor: LEGACY_COLORS.border, color: readableMuted, background: LEGACY_COLORS.s2 }}
               >
                 <ArrowLeft className="h-4 w-4" />
                 작업 선택
@@ -390,13 +390,23 @@ function DefectViewInner({
             )}
 
             {loading ? (
-              <div className="py-10 text-center text-sm font-bold" style={{ color: LEGACY_COLORS.muted }}>
+              <div
+                className="py-10 text-center text-sm font-bold"
+                style={{ color: `color-mix(in srgb, ${LEGACY_COLORS.muted} 60%, ${LEGACY_COLORS.text})` }}
+                role="status"
+                aria-live="polite"
+              >
                 불량 데이터 로딩 중...
               </div>
             ) : error ? (
-              <InlineErrorNote variant="block" className="!text-sm">
-                {error}
-              </InlineErrorNote>
+              <LoadFailureCard
+                prefix="불량 데이터를 불러오지 못했습니다"
+                message={error}
+                retryLabel="다시 시도"
+                onRetry={() => setReloadNonce((value) => value + 1)}
+                ariaLabel="불량 데이터 로드 오류"
+                focusOnMount
+              />
             ) : (
               <DefectDepartmentList
                 locations={filteredLocations}
