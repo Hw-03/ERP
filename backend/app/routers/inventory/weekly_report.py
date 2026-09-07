@@ -50,6 +50,13 @@ from app.services.weekly_inventory_snapshot import (
     sunday_cutoff_utc,
 )
 from app.services import weekly_report_contract
+from app.services.weekly_report_scope import (
+    FINISHED_PROCESS_CODES,
+    includes_vacuum_generator_for_week,
+    weekly_report_group_code,
+    weekly_report_item_clause,
+    weekly_report_item_sort_key,
+)
 
 from ._shared import PROCESS_TYPE_LABELS
 
@@ -57,9 +64,9 @@ router = APIRouter()
 
 _KST = ZoneInfo("Asia/Seoul")
 
-_F_CODES = ["TF", "HF", "VF", "NF", "AF", "PF"]
+_F_CODES = list(FINISHED_PROCESS_CODES)
 
-_PROD_CODES = ["TF", "HF", "VF", "NF", "AF", "PF"]
+_PROD_CODES = list(FINISHED_PROCESS_CODES)
 
 _DEPT_NAMES: dict[str, str] = {
     "TF": "튜브",
@@ -320,6 +327,7 @@ def get_weekly_report(
 ):
     if week_start is None or week_end is None:
         week_start, week_end = _current_week_bounds()
+    include_vacuum_generator = includes_vacuum_generator_for_week(week_start)
 
     contract_state = weekly_report_contract.weekly_contract_state(
         db,
@@ -346,7 +354,12 @@ def get_weekly_report(
         rows: list[object] = (
             db.query(Item, Inventory)
             .outerjoin(Inventory, Item.item_id == Inventory.item_id)
-            .filter(Item.process_type_code.in_(_F_CODES))
+            .filter(
+                weekly_report_item_clause(
+                    Item,
+                    include_vacuum_generator=include_vacuum_generator,
+                )
+            )
             .order_by(Item.mes_code)
             .all()
         )
@@ -470,6 +483,7 @@ def get_weekly_report(
             out_map[iid] = out_map.get(iid, Decimal("0")) + abs(val)
 
     group_items: dict[str, list[WeeklyItemReport]] = {code: [] for code in _F_CODES}
+    source_process_codes: dict[str, str] = {}
 
     for row in rows:
         if snapshot_context is None:
@@ -477,19 +491,30 @@ def get_weekly_report(
             item_id = item.item_id
             mes_code = item.mes_code
             item_name = item.item_name
-            code = item.process_type_code or "??"
+            source_process_code = item.process_type_code
+            code = weekly_report_group_code(
+                item.process_type_code,
+                item.item_name,
+                include_vacuum_generator=include_vacuum_generator,
+            ) or "??"
             current_qty = Decimal(str(inv.quantity if inv else 0))
             snapshot_prev_qty: Decimal | None = None
         else:
             item_id = row.item_id
             mes_code = row.mes_code
             item_name = row.item_name
-            code = row.process_type_code or "??"
+            source_process_code = row.process_type_code
+            code = weekly_report_group_code(
+                row.process_type_code,
+                row.item_name,
+                include_vacuum_generator=include_vacuum_generator,
+            ) or "??"
             current_qty = row.current_qty
             snapshot_prev_qty = row.prev_qty
         if code not in group_items:
             continue
         iid = str(item_id)
+        source_process_codes[iid] = source_process_code
         produce_qty = produce_map.get(iid, Decimal("0"))
         receive_qty = receive_map.get(iid, Decimal("0"))
         out_qty = out_map.get(iid, Decimal("0"))
@@ -514,6 +539,14 @@ def get_weekly_report(
     groups: list[WeeklyGroupReport] = []
     for code in _F_CODES:
         items = group_items.get(code, [])
+        if code == "VF":
+            items.sort(
+                key=lambda item: weekly_report_item_sort_key(
+                    source_process_codes.get(item.item_id),
+                    item.mes_code,
+                    item.item_name,
+                )
+            )
         label = PROCESS_TYPE_LABELS.get(code, code)
         dept = _DEPT_NAMES.get(code, code)
         g_prev = sum((i.prev_qty for i in items), Decimal("0"))
@@ -544,7 +577,6 @@ def get_weekly_report(
 
     # ── 생산 매트릭스 집계 ────────────────────────────────────────
     production_filters = [
-        Item.process_type_code.in_(_PROD_CODES),
         TransactionLog.transaction_type.in_(PRODUCTION_TX_TYPES),
         or_(
             TransactionLog.shipping_phase.is_(None),
@@ -553,6 +585,12 @@ def get_weekly_report(
         TransactionLog.created_at >= dt_start,
     ]
     if snapshot_context is None:
+        production_filters.append(
+            weekly_report_item_clause(
+                Item,
+                include_vacuum_generator=include_vacuum_generator,
+            )
+        )
         production_filters.append(TransactionLog.created_at <= dt_end)
     else:
         production_filters.extend([
@@ -576,11 +614,31 @@ def get_weekly_report(
     symbol_map, ordered_models = _load_model_symbols(db)
 
     matrix: dict[str, dict[str, Decimal]] = {}
+    snapshot_group_codes = (
+        {
+            str(row.item_id): weekly_report_group_code(
+                row.process_type_code,
+                row.item_name,
+                include_vacuum_generator=include_vacuum_generator,
+            )
+            for row in snapshot_context.items
+        }
+        if snapshot_context is not None
+        else {}
+    )
     for item, qty_sum in prod_items:
         model_key = _resolve_model(item.model_symbol, symbol_map)
         if model_key is None:
             continue
-        proc = item.process_type_code or ""
+        proc = (
+            snapshot_group_codes.get(str(item.item_id))
+            if snapshot_context is not None
+            else weekly_report_group_code(
+                item.process_type_code,
+                item.item_name,
+                include_vacuum_generator=include_vacuum_generator,
+            )
+        ) or ""
         if proc not in _PROD_CODES:
             continue
         val = abs(Decimal(str(qty_sum)))

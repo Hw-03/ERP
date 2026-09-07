@@ -1,4 +1,4 @@
-"""활성 완료품의 주말 재고를 대시보드 계산 기준으로 확정한다."""
+"""활성 주간보고 대상 품목의 주말 재고를 대시보드 계산 기준으로 확정한다."""
 
 from __future__ import annotations
 
@@ -19,10 +19,10 @@ from app.models import (
     WeeklyInventorySnapshotItem,
 )
 from app.services import stock_math
+from app.services.weekly_report_scope import weekly_report_item_clause
 
 
 KST = ZoneInfo("Asia/Seoul")
-FINISHED_PROCESS_CODES: tuple[str, ...] = ("TF", "HF", "VF", "NF", "AF", "PF")
 DISUSED_ITEM_TYPE = "불용"
 
 
@@ -41,13 +41,13 @@ class DashboardFinishedStock:
 
 
 def load_dashboard_finished_stock(db: Session) -> list[DashboardFinishedStock]:
-    """삭제·불용을 제외한 완료품을 조회하고 위치별 재고 합계를 계산한다."""
+    """삭제·불용을 제외한 주간보고 대상 품목의 위치별 재고 합계를 계산한다."""
 
     items = (
         db.query(Item)
         .filter(
             Item.deleted_at.is_(None),
-            Item.process_type_code.in_(FINISHED_PROCESS_CODES),
+            weekly_report_item_clause(Item),
             or_(Item.legacy_item_type.is_(None), Item.legacy_item_type != DISUSED_ITEM_TYPE),
         )
         .order_by(Item.mes_code)

@@ -46,12 +46,17 @@ vi.mock("../_inventory_sections/InventoryFilterToggleButton", () => ({
   InventoryFilterToggleButton: ({
     logic,
     onLogicChange,
+    onToggle,
   }: {
     logic: "AND" | "OR";
     onLogicChange: (logic: "AND" | "OR") => void;
+    onToggle: () => void;
   }) => (
     <>
       <output data-testid="filter-logic">{logic}</output>
+      <button type="button" onClick={onToggle}>
+        기준 필터 열기
+      </button>
       <button type="button" onClick={() => onLogicChange("OR")}>
         OR로 전환
       </button>
@@ -60,7 +65,25 @@ vi.mock("../_inventory_sections/InventoryFilterToggleButton", () => ({
 }));
 
 vi.mock("../_inventory_sections/InventoryFilterBar", () => ({
-  InventoryFilters: () => <div data-testid="inventory-filters" />,
+  InventoryFilters: ({
+    departmentFilterBasis,
+    onDepartmentFilterBasisChange,
+    onResetAll,
+  }: {
+    departmentFilterBasis: "location" | "code";
+    onDepartmentFilterBasisChange: (basis: "location" | "code") => void;
+    onResetAll: () => void;
+  }) => (
+    <div data-testid="inventory-filters">
+      <output data-testid="department-filter-basis">{departmentFilterBasis}</output>
+      <button type="button" onClick={() => onDepartmentFilterBasisChange("location")}>
+        재고 위치 기준
+      </button>
+      <button type="button" onClick={onResetAll}>
+        기준 필터 초기화
+      </button>
+    </div>
+  ),
   InventoryTableStickyHeader: () => <div data-testid="inventory-table-header" />,
 }));
 
@@ -146,5 +169,24 @@ describe("DesktopInventoryView scrollbar", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "전체 초기화 KPI" }));
     expect(screen.getByTestId("filter-logic")).toHaveTextContent("AND");
+  });
+
+  it("기본 기준은 품목 코드이고 위치 기준 전환 후 전체 초기화하면 품목 코드로 돌아간다", () => {
+    render(
+      <DesktopInventoryView
+        globalSearch=""
+        onStatusChange={vi.fn()}
+        onGoToWarehouse={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "기준 필터 열기" }));
+    expect(screen.getByTestId("department-filter-basis")).toHaveTextContent("code");
+
+    fireEvent.click(screen.getByRole("button", { name: "재고 위치 기준" }));
+    expect(screen.getByTestId("department-filter-basis")).toHaveTextContent("location");
+
+    fireEvent.click(screen.getByRole("button", { name: "기준 필터 초기화" }));
+    expect(screen.getByTestId("department-filter-basis")).toHaveTextContent("code");
   });
 });

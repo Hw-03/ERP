@@ -47,10 +47,24 @@ vi.mock("../../../_inventory_sections/InventoryCapacityPanel", () => ({
 }));
 
 vi.mock("../../../_inventory_sections/InventoryFilterBar", () => ({
-  InventoryFilters: ({ onResetAll }: { onResetAll: () => void }) => (
-    <button type="button" onClick={onResetAll}>
-      전체 초기화
-    </button>
+  InventoryFilters: ({
+    departmentFilterBasis,
+    onDepartmentFilterBasisChange,
+    onResetAll,
+  }: {
+    departmentFilterBasis: "location" | "code";
+    onDepartmentFilterBasisChange: (basis: "location" | "code") => void;
+    onResetAll: () => void;
+  }) => (
+    <>
+      <output data-testid="mobile-department-filter-basis">{departmentFilterBasis}</output>
+      <button type="button" onClick={() => onDepartmentFilterBasisChange("location")}>
+        재고 위치 기준
+      </button>
+      <button type="button" onClick={onResetAll}>
+        전체 초기화
+      </button>
+    </>
   ),
 }));
 
@@ -93,5 +107,24 @@ describe("MobileDashboardScreen", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "전체 초기화" }));
     expect(screen.getByRole("button", { name: "AND" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("기본 기준은 품목 코드이고 위치 기준 전환 후 전체 초기화하면 품목 코드로 돌아간다", () => {
+    render(
+      <MobileDashboardScreen
+        globalSearch=""
+        onStatusChange={() => {}}
+        onGoToWarehouse={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "필터 열기" }));
+    expect(screen.getByTestId("mobile-department-filter-basis")).toHaveTextContent("code");
+
+    fireEvent.click(screen.getByRole("button", { name: "재고 위치 기준" }));
+    expect(screen.getByTestId("mobile-department-filter-basis")).toHaveTextContent("location");
+
+    fireEvent.click(screen.getByRole("button", { name: "전체 초기화" }));
+    expect(screen.getByTestId("mobile-department-filter-basis")).toHaveTextContent("code");
   });
 });

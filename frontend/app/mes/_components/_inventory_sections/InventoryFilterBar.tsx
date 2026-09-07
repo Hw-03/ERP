@@ -65,8 +65,8 @@ export function InventoryFilters({
           </div>
           <div className="inline-flex shrink-0 items-stretch rounded-[12px] border p-1" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
             {([
-              ["location", "재고 위치 기준"],
               ["code", "품목 코드 기준"],
+              ["location", "재고 위치 기준"],
             ] as const).map(([basis, label]) => {
               const active = departmentFilterBasis === basis;
               return (

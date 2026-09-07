@@ -74,6 +74,35 @@ def test_dashboard_finished_stock_uses_location_sum_and_active_scope(
     assert rows[0].defective_quantity == Decimal("2")
 
 
+def test_dashboard_finished_stock_includes_only_vacuum_generator_va_items(
+    db_session,
+    make_item,
+):
+    """스냅샷 범위는 발생부·진공 VA 계열만 완료품 예외로 포함한다."""
+    from app.services.weekly_inventory_snapshot import load_dashboard_finished_stock
+
+    target = make_item(
+        name="발생부 (진공) [DX3000]",
+        process_type_code="VA",
+        warehouse_qty=Decimal("5"),
+    )
+    target_10p = make_item(
+        name="발생부 (10P) (진공) [ADX6000]",
+        process_type_code="VA",
+        warehouse_qty=Decimal("3"),
+    )
+    make_item(name="신주 케이스 작업완료 [DX3000]", process_type_code="VA", warehouse_qty=Decimal("13"))
+    make_item(name="발생부 (진공) [DX3000] 원자재", process_type_code="VR", warehouse_qty=Decimal("11"))
+    db_session.flush()
+
+    rows = load_dashboard_finished_stock(db_session)
+
+    assert _quantity_by_item(rows) == {
+        str(target.item_id): Decimal("5"),
+        str(target_10p.item_id): Decimal("3"),
+    }
+
+
 def test_weekly_snapshot_is_idempotent_and_keeps_first_values(
     db_session,
     make_item,

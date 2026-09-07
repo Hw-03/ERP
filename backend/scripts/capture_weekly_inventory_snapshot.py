@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""매주 월요일 실행해 직전 일요일 완료품 재고를 확정한다."""
+"""매주 월요일 실행해 직전 일요일 주간보고 대상 품목의 재고를 확정한다."""
 
 from __future__ import annotations
 

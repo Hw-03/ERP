@@ -31,6 +31,10 @@ describe("matchesInventoryCategoryFilters", () => {
     selectedProcessSteps: [],
   };
 
+  it("기본 부서 구분은 품목 코드 기준이다", () => {
+    expect(inventoryFilter.DEFAULT_DEPARTMENT_FILTER_BASIS).toBe("code");
+  });
+
   it("기본 논리는 AND다", () => {
     expect(
       (inventoryFilter as { DEFAULT_INVENTORY_FILTER_LOGIC?: string })
