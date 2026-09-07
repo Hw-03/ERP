@@ -66,7 +66,7 @@ export function useAdminDepartmentsForm({
   onSaved,
 }: UseAdminDepartmentsFormArgs): UseAdminDepartmentsFormState {
   const [addName, setAddName] = useState("");
-  const [detailForm, setDetailForm] = useState<DepartmentDetailForm>(() => toDetailForm(department));
+  const [detailForm, setDetailFormState] = useState<DepartmentDetailForm>(() => toDetailForm(department));
   const [baseline, setBaseline] = useState<DepartmentDetailForm>(() => toDetailForm(department));
   const { mutateAsync } = useUpdateDepartmentMutation();
   const inFlightRef = useRef<Promise<SaveResult> | null>(null);
@@ -76,6 +76,13 @@ export function useAdminDepartmentsForm({
   const sourceDepartmentIdRef = useRef<number | null>(department?.id ?? null);
   const dirty = !formsEqual(detailForm, baseline);
   const dirtyRef = useRef(dirty);
+  const setDetailForm = useCallback<Dispatch<SetStateAction<DepartmentDetailForm>>>((value) => {
+    const next = typeof value === "function"
+      ? value(detailFormRef.current)
+      : value;
+    detailFormRef.current = next;
+    setDetailFormState(next);
+  }, []);
 
   departmentRef.current = department;
   detailFormRef.current = detailForm;
@@ -93,7 +100,7 @@ export function useAdminDepartmentsForm({
     detailFormRef.current = next;
     setBaseline(next);
     setDetailForm(next);
-  }, [department]);
+  }, [department, setDetailForm]);
 
   const save = useCallback((): Promise<SaveResult> => {
     if (inFlightRef.current) return inFlightRef.current;
@@ -116,12 +123,12 @@ export function useAdminDepartmentsForm({
       .then((updated) => {
         const savedBaseline = toDetailForm(updated);
         baselineRef.current = savedBaseline;
+        const nextDetailForm = formsEqual(detailFormRef.current, submitted)
+          ? savedBaseline
+          : detailFormRef.current;
+        detailFormRef.current = nextDetailForm;
         setBaseline(savedBaseline);
-        setDetailForm((current) => {
-          const next = formsEqual(current, submitted) ? savedBaseline : current;
-          detailFormRef.current = next;
-          return next;
-        });
+        setDetailForm(nextDetailForm);
         onSaved?.(updated);
         onStatusChange(`'${updated.name}' 부서 정보를 저장했습니다.`);
         return { status: "saved" as const, department: updated };
@@ -136,7 +143,7 @@ export function useAdminDepartmentsForm({
 
     inFlightRef.current = request;
     return request;
-  }, [adminPin, mutateAsync, onError, onSaved, onStatusChange]);
+  }, [adminPin, mutateAsync, onError, onSaved, onStatusChange, setDetailForm]);
 
   const reset = useCallback(() => {
     const next = toDetailForm(departmentRef.current);
@@ -145,7 +152,7 @@ export function useAdminDepartmentsForm({
     detailFormRef.current = next;
     setBaseline(next);
     setDetailForm(next);
-  }, []);
+  }, [setDetailForm]);
 
   return {
     form: { addName },

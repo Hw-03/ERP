@@ -169,13 +169,13 @@ describe("useAdminDepartmentsForm", () => {
     let save!: Promise<unknown>;
     act(() => {
       save = result.current.save();
+    });
+
+    await act(async () => {
       result.current.setDetailForm((current: { name: string; color_hex: string }) => ({
         ...current,
         name: "후속 편집",
       }));
-    });
-
-    await act(async () => {
       pending.resolve({ ...department, name: "저장 중 값" });
       await save;
     });
