@@ -18713,7 +18713,7 @@
     },
     "/api/inventory/transactions/{log_id}/cancel": {
       "post": {
-        "description": "거래 취소 — 내역 유지 + 재고 자동 롤백 + '취소됨' 표시.\n\n권한: 요청자 본인(producer_employee_id) 또는 결재 권한자(warehouse_role / department_role != none).\nBOM 배치(PRODUCE+BACKFLUSH)는 operation_batch_id 단위로 일괄 취소.",
+        "description": "거래 취소 — 내역 유지 + 재고 자동 롤백 + '취소됨' 표시.\n\n권한: 배치 요청자 본인(배치가 없으면 producer_employee_id) 또는 결재 권한자.\nBOM 배치(PRODUCE+BACKFLUSH)는 operation_batch_id 단위로 일괄 취소.",
         "operationId": "cancel_transaction_api_inventory_transactions__log_id__cancel_post",
         "parameters": [
           {

@@ -1106,7 +1106,7 @@ def cancel_transaction(
 ):
     """거래 취소 — 내역 유지 + 재고 자동 롤백 + '취소됨' 표시.
 
-    권한: 요청자 본인(producer_employee_id) 또는 결재 권한자(warehouse_role / department_role != none).
+    권한: 배치 요청자 본인(배치가 없으면 producer_employee_id) 또는 결재 권한자.
     BOM 배치(PRODUCE+BACKFLUSH)는 operation_batch_id 단위로 일괄 취소.
     """
     log = db.query(TransactionLog).filter(TransactionLog.log_id == log_id).first()
@@ -1130,13 +1130,12 @@ def cancel_transaction(
 
     # 권한 체크: 본인(요청자) 또는 결재 권한자
     # 요청자 식별 — 히스토리 화면의 '요청자' 표기와 동일한 우선순위로 판정한다:
-    #   1) producer_employee_id
-    #   2) operation_batch_id -> IoBatch.requester_employee_id
+    #   1) operation_batch_id -> IoBatch.requester_employee_id
+    #   2) producer_employee_id (배치 요청자 정보가 없는 거래)
+    # 승인 거래의 producer_employee_id는 요청자가 아닌 승인 처리자일 수 있다.
     # produced_by is only a display snapshot and is not trusted for authorization.
     requester_eid: Optional[str] = None
-    if log.producer_employee_id is not None:
-        requester_eid = str(log.producer_employee_id)
-    elif log.operation_batch_id is not None:
+    if log.operation_batch_id is not None:
         batch = (
             db.query(IoBatch)
             .filter(IoBatch.batch_id == log.operation_batch_id)
@@ -1144,6 +1143,8 @@ def cancel_transaction(
         )
         if batch is not None and batch.requester_employee_id is not None:
             requester_eid = str(batch.requester_employee_id)
+    if requester_eid is None and log.producer_employee_id is not None:
+        requester_eid = str(log.producer_employee_id)
     is_self = requester_eid == str(canceller.employee_id) if requester_eid is not None else False
     is_approver = (
         (getattr(canceller, "warehouse_role", None) or "none").lower() != "none"
