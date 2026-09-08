@@ -19,8 +19,8 @@
 - CP6 구현 작업: `01a07b0c-4563-7c41-a8c7-5df5ad2e91e2`, `C:\ERP\.worktrees\full-code-quality-cp6`, branch `codex/full-code-quality-cp6`.
 - CP7 구현 작업: `01a07c76-6395-7dc0-ba58-91c6fc4d3538`, `C:\ERP\.worktrees\full-code-quality-cp7`, branch `codex/full-code-quality-cp7`, 고정 `POST_CP6_SHA=7f232773b1eea204a251bc5ac001ef5b03319d3b`. 초기 HEAD·branch·linked worktree·clean을 확인했고 B1부터 착수했다. 품질 branch는 이 SHA에서 CP7 최종 통합까지 움직이지 않는다.
 - 정본 감사 계획: [전수 감사·개선 계획](../../docs/research/2026-08-13-full-code-quality-audit-and-improvement-plan.md), 8.9.7·8.9.8 및 12.26절
-- 현 상태(2026-09-08): **CP6 종료·품질 통합 및 CP7 B1~B5 완료. 복구 a5e1dad6와 문서 bff9dd73을 포함한 CI34168183559는 exact bff9·completed/success·6/6이다. 총괄 ac07ad/75e58e로 확인했고 B6 이전을 승인했다. 최초 CI34166260511의4성공/2실패는 역사 증거로 보존한다. 품질 branch는 POST_CP6_SHA에서 고정한다(감사12.28.15).**
-- 실행 단위 집계: 아래 14/16 실행 완료(B6은 로컬 인수), 미완료2(B7, 최종 재감사·검증·통합). B6/B7 원격 검증은 최종 CP7에 묶는다. 실행 단위 크기가 다르므로 이 비율을 전체 작업량 비율로 해석하지 않는다.
+- 현 상태(2026-09-08): **CP6 종료·품질 통합 및 CP7 B1~B5 원격 완료. B6 커밋173cb894 및 B7 삭제·두 리뷰 로컬 인수.** 복구/B5의 CI34168183559 exact bff9·6/6과 B6/B7 이후 최종 검증은 구분한다. 최초 CI34166260511 실패는 역사 증거로 보존하고 품질 branch는 POST_CP6_SHA에서 고정한다(감사12.28.15~17).
+- 실행 단위 집계: 아래 15/16 실행 완료(B6/B7은 로컬 인수), 미완료1(최종 재감사·검증·통합). B6/B7 원격 검증은 최종 CP7에 묶는다. 실행 단위 크기가 다르므로 이 비율을 전체 작업량 비율로 해석하지 않는다.
 - 국소 복구·B6 진입(감사12.28.13~15): recovery3파일/B5docs8파일의 before/after blob11쌍 불일치0, 실제 CI6/6을 확인했다. 이동 전 source15개 SHA256 일치·target15개 부재를 총괄79392a로 확인했고 seed_cleanup은 실제 consumer 때문에 보존한다. E2E23PASS/선택 frozen SKIP1은 최종 frozen 증명을 대신하지 않는다.
 
 ## 실행 체크리스트
@@ -45,7 +45,7 @@
 - 속도 우선 후속 배치: B4 commit/push를 총괄이 인수한 후 불변 B3/B4 SHA의 원격 CI 동안 비중첩 B5 문서-only 로컬 변경·직접 검증을 병행한다. B6 전 actual CI success가 필요하다. B5/B6/B7은 개별 rollback commit·직접 증거·두 delta 리뷰를 유지하고 full/원격 CI는 최종 CP7 경계로 묶는다.
 - [x] CP7 B5 (2026-09-08, VERIFIED): DOC01 실제 Next16·React Query/legacy 공존·profile·PlanOnly·E2E 소유권 순서와 격리 실행 경계를6문서에서 교정했다. 정적27/27·링크0broken·PowerShell parser-only·diff-check와 최종 두 리뷰 C/I/M0를 총괄 인수했다. 감사12.28.12 및 ignored `20260908-cp7-b5/review-evidence.md` 참조. 별도 docs commit bff9dd73과 실제 CI34168183559 6/6을 인수했다. B6 이전은 진행 중이며 최종 검증은 별도다.
 - [x] CP7 B6 (2026-09-08, LOCAL_VERIFIED): AT01 정확15개 rename·참조 문서3개·정본2개. root/self-usage 보정, AST11·root fixture6·PowerShell parser-only·역치환 byte-exact·비역사 old path0을 총괄이 읽고 raw diff b0c80c와 대조했다. 독립 명세01a07e39-2ff4·품질01a07e3d-9929 모두 C/I/M0·Ready다. 실제 consumer가 있는 seed_cleanup 및 역사 내용은 보존했다. 감사12.28.16과 ignored 20260908-cp7-b6/preflight-evidence.md가 근거며 별도 rollback commit/최종 원격 검증은 분리한다.
-- [ ] CP7 B7: AT02 consumer 0 byte-identical frontend copy만 제거, 원본·item 이미지·실제 consumer 보존.
+- [x] CP7 B7 (2026-09-08, LOCAL_VERIFIED): AT02 정확 로그인 PNG 복사본9개만 삭제. consumer0·원본9개/hash보존·Git 복구blob9개를 대조했다. 실제 로그인 webp/item이미지/data는 보존했고, 독립 명세01a07e4a-7fba·품질01a07e4c-5c38의C/I/M0를 총괄이 원문으로 확인했다. 감사12.28.17 및 ignored 20260908-cp7-b7/preflight-evidence.md가 근거다. 최종 build/로그인 screenshot/full/CI는 별도로 남는다.
 - [ ] CP7 종료·최종 통합: 상태/재고 matrix/manifest 재감사, full gate, 이중 리뷰, 품질 통합/push/CI, 임시 자원 정리, Goal 완료.
 
 ## 작업 분리와 진행 계약
