@@ -600,7 +600,7 @@ def _run_data_sync(
 
 
 def _prepare_auto_sync_sandbox(
-    tmp_path: Path, *, dry_run_exit: int, changes: int
+    tmp_path: Path, *, dry_run_exit: int, changes: int, require_force: bool = False
 ) -> tuple[Path, dict[str, str], Path]:
     event_log = tmp_path / "auto-sync-events.log"
     fake_shell = tmp_path / "fake-powershell.cmd"
@@ -610,8 +610,14 @@ def _prepare_auto_sync_sandbox(
             f"""
             @echo off
             >>"%SYNC_EVENT_LOG%" echo %*
+            if "%REQUIRE_FORCE%"=="1" (
+              echo %* | findstr /C:"-Force" >nul
+              if errorlevel 1 exit /b 2
+            )
             echo %* | findstr /C:"-DryRun" >nul
             if not errorlevel 1 (
+              echo %* | findstr /C:"-ReportActivity" >nul
+              if not errorlevel 1 echo ACTIVITY_GUARD_OVERRIDE=timestamp=2026-09-08T04:01:12;employee=E27;source=desktop
               echo SYNC_CHANGES={changes}
               exit /b {dry_run_exit}
             )
@@ -626,7 +632,13 @@ def _prepare_auto_sync_sandbox(
     sync_path = tmp_path / "auto-sync-under-test.ps1"
     sync_path.write_text(script_copy, encoding="utf-8-sig")
     environment = os.environ.copy()
-    environment.update({"SYNC_EVENT_LOG": str(event_log), "FAKE_POWERSHELL": str(fake_shell)})
+    environment.update(
+        {
+            "SYNC_EVENT_LOG": str(event_log),
+            "FAKE_POWERSHELL": str(fake_shell),
+            "REQUIRE_FORCE": "1" if require_force else "0",
+        }
+    )
     return sync_path, environment, event_log
 
 
@@ -949,6 +961,14 @@ def test_code_sync_dry_run_reports_machine_readable_no_change(tmp_path: Path) ->
     assert "snapshot-register" not in _event_kinds(event_log)
 
 
+def test_code_sync_can_emit_minimal_activity_evidence_for_approved_schedule() -> None:
+    script = SYNC_SCRIPT.read_text(encoding="utf-8-sig")
+
+    assert "[switch] $ReportActivity" in script
+    assert "ACTIVITY_GUARD_OVERRIDE=" in script
+    assert '$activityEmployee = "anonymous"' in script
+
+
 def test_code_sync_dry_run_ignores_excluded_destination_extras(tmp_path: Path) -> None:
     sync_path, environment, _ = _prepare_sync_sandbox(
         tmp_path,
@@ -1020,21 +1040,26 @@ def test_automatic_sync_applies_only_when_dry_run_reports_changes(tmp_path: Path
     assert "APPLY_CALLED=1" in result.stdout
 
 
-def test_automatic_sync_preserves_activity_guard_exit_two_without_apply(tmp_path: Path) -> None:
+def test_automatic_sync_uses_approved_force_and_reports_activity_evidence(
+    tmp_path: Path,
+) -> None:
     sync_path, environment, event_log = _prepare_auto_sync_sandbox(
-        tmp_path, dry_run_exit=2, changes=1
+        tmp_path, dry_run_exit=0, changes=1, require_force=True
     )
 
     result = _run_auto_sync(sync_path, environment)
+    events = event_log.read_text(encoding="utf-8-sig").splitlines()
 
-    assert result.returncode == 2, result.stdout + result.stderr
-    assert len(event_log.read_text(encoding="utf-8-sig").splitlines()) == 1
-    assert "APPLY_CALLED=1" not in result.stdout
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "ACTIVITY_GUARD_OVERRIDE=timestamp=2026-09-08T04:01:12;employee=E27;source=desktop" in result.stdout
+    assert all("-Force" in event for event in events)
+    assert "-ReportActivity" in events[0]
+    assert "APPLY_CALLED=1" in result.stdout
 
 
 def test_automatic_sync_preserves_schema_ready_exit_three_with_auto_schema(tmp_path: Path) -> None:
     sync_path, environment, event_log = _prepare_auto_sync_sandbox(
-        tmp_path, dry_run_exit=3, changes=1
+        tmp_path, dry_run_exit=3, changes=1, require_force=True
     )
 
     result = _run_auto_sync(sync_path, environment)
@@ -1043,7 +1068,7 @@ def test_automatic_sync_preserves_schema_ready_exit_three_with_auto_schema(tmp_p
     assert result.returncode == 0, result.stdout + result.stderr
     assert len(events) == 2
     assert "-AutoSchema" in events[-1]
-    assert "-Force" not in events[-1]
+    assert "-Force" in events[-1]
 
 
 def test_automatic_sync_propagates_dry_run_error_without_apply(tmp_path: Path) -> None:
@@ -1434,7 +1459,7 @@ def test_employee_sync_auto_schema_preflight_runs_before_stopping_services() -> 
     assert "exit 9" in script[preflight:stop]
 
 
-def test_automatic_sync_uses_dry_run_and_never_blocks_on_source_git_state() -> None:
+def test_automatic_sync_uses_approved_force_only_inside_the_schedule_wrapper() -> None:
     script = AUTO_SYNC_SCRIPT.read_text(encoding="utf-8-sig")
 
     assert "-DryRun" in script
@@ -1442,7 +1467,9 @@ def test_automatic_sync_uses_dry_run_and_never_blocks_on_source_git_state() -> N
     assert "git status --porcelain" not in script
     assert "git rev-list" not in script
     assert "@{u}" not in script
-    assert "-Force" not in script
+    assert 'Invoke-EmployeeSync -Arguments @("-DryRun", "-Force", "-ReportActivity")' in script
+    assert 'Invoke-EmployeeSync -Arguments @("-Force")' in script
+    assert 'Invoke-EmployeeSync -Arguments @("-AutoSchema", "-Force")' in script
     assert "return [int] $LASTEXITCODE" not in script
     assert "$script:EmployeeSyncExit" in script
     assert "| Out-Host" in script
