@@ -17,7 +17,8 @@ param(
     [switch] $DryRun,
     [switch] $Force,
     [switch] $AllowSchemaChange,
-    [switch] $AutoSchema
+    [switch] $AutoSchema,
+    [switch] $ReportActivity
 )
 
 $ErrorActionPreference = "Stop"
@@ -225,9 +226,30 @@ $activityLog = @($EmpLog, $EmpLegacyLog) |
     Where-Object { Test-Path -LiteralPath $_ } |
     Sort-Object { (Get-Item -LiteralPath $_).LastWriteTime } -Descending |
     Select-Object -First 1
+$lastActivityLine = if ($activityLog) {
+    Get-Content -LiteralPath $activityLog -Tail 1 -ErrorAction SilentlyContinue
+}
+if ($ReportActivity) {
+    $activityTimestamp = "unknown"
+    $activityEmployee = "anonymous"
+    $activitySource = "unknown"
+    $activityEvent = "unknown"
+    if ($lastActivityLine -match '^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})') {
+        $activityTimestamp = $Matches[1]
+    }
+    if ($lastActivityLine -match 'emp=([^\s]+)' -and $Matches[1] -ne "-") {
+        $activityEmployee = $Matches[1]
+    }
+    if ($lastActivityLine -match 'source=([^\s]+)') {
+        $activitySource = $Matches[1]
+    }
+    if ($lastActivityLine -match 'evt=([^\s]+)') {
+        $activityEvent = $Matches[1]
+    }
+    Write-Host "ACTIVITY_GUARD_OVERRIDE=timestamp=$activityTimestamp;employee=$activityEmployee;source=$activitySource;event=$activityEvent"
+}
 if (-not $Force -and $activityLog) {
-    $lastLine = Get-Content -LiteralPath $activityLog -Tail 1 -ErrorAction SilentlyContinue
-    if ($lastLine -match '^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})') {
+    if ($lastActivityLine -match '^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})') {
         $lastTs = [datetime]::ParseExact($Matches[1], "yyyy-MM-dd HH:mm:ss", $null)
         $elapsed = (Get-Date) - $lastTs
         if ($elapsed.TotalMinutes -lt 10) {
