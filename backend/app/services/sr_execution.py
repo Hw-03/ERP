@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.database import _is_sqlite
 from app.models import (
     Employee,
+    Item,
     InventoryOperation,
     InventoryOperationEffectKindEnum,
     InventoryOperationRoleEnum,
@@ -26,6 +27,7 @@ from app.services import inventory as inventory_svc
 from app.services import inv_effect
 from app.services import inventory_operations as operation_svc
 from app.services.dept_hierarchy import can_approve_department
+from app.services.inv_transfer import department_for_item
 from app.services.sr_validation import (
     _TX_TYPE_BY_REQUEST,
 )
@@ -48,6 +50,34 @@ def release_reservation(db: Session, request: StockRequest) -> None:
             db,
             _request_inventory_item_ids(db, request, lines),
         )
+    sr_reservation.release_lines(db, lines, request_id=request.request_id)
+
+
+def reroute_and_preflight_dept_to_warehouse(
+    db: Session,
+    request: StockRequest,
+) -> None:
+    """Live 코드 출발 부서로 재예약해 승인 직전 가용 재고를 원자적으로 확인한다.
+
+    호출자는 기존 RESERVED 점유를 먼저 해제해야 한다. 이 함수의 임시 예약은
+    다른 대기 요청의 pending을 포함해 가용량을 검사한 뒤 즉시 자기 몫만 해제한다.
+    이후 실행은 같은 트랜잭션과 잠금 범위 안에서 이어진다.
+    """
+    if request.request_type != StockRequestTypeEnum.DEPT_TO_WAREHOUSE:
+        return
+
+    lines = list(request.lines)
+    for line in lines:
+        item = db.query(Item).filter(Item.item_id == line.item_id).first()
+        if item is None:
+            raise ValueError(f"품목을 찾을 수 없습니다: {line.item_id}")
+        line.from_department = department_for_item(item).value
+
+    from app.services import sr_reservation
+
+    if not sr_reservation.aggregate_reservations(lines):
+        return
+    sr_reservation.reserve_lines(db, lines)
     sr_reservation.release_lines(db, lines, request_id=request.request_id)
 
 
@@ -92,15 +122,21 @@ def _handle_raw_ship(db, request, line, approver, qty, item_id) -> Decimal:
 
 
 def _handle_warehouse_to_dept(db, request, line, approver, qty, item_id) -> Decimal:
-    if line.to_department is None:
-        raise ValueError("창고→부서 이동은 도착 부서가 필요합니다.")
+    item = db.query(Item).filter(Item.item_id == item_id).first()
+    if item is None:
+        raise ValueError(f"품목을 찾을 수 없습니다: {item_id}")
+    # 승인 시점에도 live Item 공정코드를 기준으로 확정한다.
+    line.to_department = department_for_item(item).value
     inventory_svc.transfer_to_production(db, item_id, qty, line.to_department)
     return _NO_QTY_CHANGE
 
 
 def _handle_dept_to_warehouse(db, request, line, approver, qty, item_id) -> Decimal:
-    if line.from_department is None:
-        raise ValueError("부서→창고 복귀는 출발 부서가 필요합니다.")
+    item = db.query(Item).filter(Item.item_id == item_id).first()
+    if item is None:
+        raise ValueError(f"품목을 찾을 수 없습니다: {item_id}")
+    # 승인 시점에도 live Item 공정코드를 기준으로 확정한다.
+    line.from_department = department_for_item(item).value
     inventory_svc.transfer_to_warehouse(db, item_id, qty, line.from_department)
     return _NO_QTY_CHANGE
 
@@ -644,6 +680,8 @@ def _finalize_submission(
         or can_self_approve_department
     )
     if warehouse_ok and dept_ok:
+        # 자가승인도 대기 요청과 같은 live source 가용성 규칙을 적용한다.
+        reroute_and_preflight_dept_to_warehouse(db, request)
         _execute_all_lines(
             db, request, lines, operator_name=requester.name, approver=requester
         )

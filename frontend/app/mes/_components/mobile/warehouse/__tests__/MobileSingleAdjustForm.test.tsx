@@ -77,12 +77,14 @@ function Harness({
   onAddItem = vi.fn(),
   onSaveDraft = vi.fn(),
   onReview = vi.fn(),
+  addBlocked = false,
 }: {
   bundles?: IoBundle[];
   subType?: IoSubType;
   onAddItem?: (item: Item) => void;
   onSaveDraft?: () => void;
   onReview?: () => void;
+  addBlocked?: boolean;
 }) {
   const [search, setSearch] = useState("CTR");
 
@@ -102,6 +104,7 @@ function Harness({
       saving={false}
       onReview={onReview}
       busy={false}
+      addBlocked={addBlocked}
       error={null}
     />
   );
@@ -135,6 +138,17 @@ describe("MobileSingleAdjustForm", () => {
     await waitFor(() => expect(input).toHaveValue(""));
     expect(screen.queryByRole("button", { name: /CTR Board/ })).not.toBeInTheDocument();
     await waitFor(() => expect(document.activeElement).toBe(input));
+  });
+
+  it("BOM 확인 중에는 검색 결과로 새 품목을 담지 못한다", () => {
+    const onAddItem = vi.fn();
+    render(<Harness addBlocked onAddItem={onAddItem} />);
+
+    const result = screen.getByRole("button", { name: /CTR Board/ });
+    expect(result).toBeDisabled();
+    fireEvent.click(result);
+
+    expect(onAddItem).not.toHaveBeenCalled();
   });
 
   it("shows a visible draft save action beside the single submit action", () => {

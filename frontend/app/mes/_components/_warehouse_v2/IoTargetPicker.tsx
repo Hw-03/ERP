@@ -48,6 +48,7 @@ import {
   allowsMixedBundles,
   deptIoSubType,
   getItemActionMode,
+  isAutoDepartmentRoute,
   singleItemSourceKind,
   type DeptIoDirection,
   type ItemActionMode,
@@ -74,6 +75,8 @@ interface BaseProps {
   onRemoveBundles: (bundleIds: string[]) => void;
   onAdvance: () => void;
   busy?: boolean;
+  /** BOM 목록이 미확인/실패인 동안 신규 묶음 추가만 막는다. 기존 선택 해제는 허용한다. */
+  addBlocked?: boolean;
   fullscreen?: boolean;
   onFullscreenChange?: (fullscreen: boolean) => void;
   /**
@@ -145,6 +148,7 @@ function ChoiceButtons({
   bomLocked = false,
   singleLocked = false,
   busy,
+  addBlocked = false,
   size = "compact",
   ariaPrefix,
   onChoose,
@@ -155,6 +159,7 @@ function ChoiceButtons({
   bomLocked?: boolean;
   singleLocked?: boolean;
   busy?: boolean;
+  addBlocked?: boolean;
   size?: ChoiceSize;
   ariaPrefix?: string;
   onChoose: (mode: ChoiceMode) => void;
@@ -174,7 +179,7 @@ function ChoiceButtons({
         const isBom = mode === "bom";
         const selected = isBom ? bomSelected : singleSelected;
         const locked = isBom ? bomLocked : singleLocked;
-        const disabled = Boolean(busy) || locked || (isBom && !hasBom);
+        const disabled = Boolean(busy) || locked || (isBom && !hasBom) || (!selected && addBlocked);
         const label = isBom ? "BOM" : "낱개";
         const title = isBom && !hasBom
           ? "등록된 BOM이 없습니다"
@@ -248,6 +253,7 @@ export function IoTargetPicker({
   onRemoveBundles,
   onAdvance,
   busy,
+  addBlocked = false,
   fullscreen = false,
   onFullscreenChange,
   highlightItemId,
@@ -551,6 +557,7 @@ export function IoTargetPicker({
                 onAdd={onAddItem}
                 onRemove={onRemoveBundles}
                 busy={busy}
+                addBlocked={addBlocked}
                 hasActiveFilter={hasActiveFilter}
                 clearFilters={clearFilters}
                 mode={actionMode}
@@ -668,6 +675,7 @@ function InternalUseSourceControl({
   selectedMode,
   hasBom,
   busy,
+  addBlocked,
   onOpen,
   onChoose,
 }: {
@@ -681,6 +689,7 @@ function InternalUseSourceControl({
   selectedMode: "bom" | "single" | null;
   hasBom: boolean;
   busy?: boolean;
+  addBlocked?: boolean;
   onOpen: () => void;
   onChoose: (sourceKind: "direct_item" | "manual") => void;
 }) {
@@ -733,6 +742,7 @@ function InternalUseSourceControl({
       singleSelected={selectedMode === "single"}
       hasBom={hasBom}
       busy={busy}
+      addBlocked={addBlocked}
       size={variant === "mobile" ? "mobile-source" : "desktop-source"}
       ariaPrefix={`${ariaPrefix}${controlLabel}`}
       onChoose={(mode) => onChoose(mode === "bom" ? "direct_item" : "manual")}
@@ -747,6 +757,7 @@ function ItemTable({
   onAdd,
   onRemove,
   busy,
+  addBlocked = false,
   hasActiveFilter,
   clearFilters,
   mode,
@@ -775,6 +786,7 @@ function ItemTable({
   ) => void;
   onRemove: (bundleIds: string[]) => void;
   busy?: boolean;
+  addBlocked?: boolean;
   hasActiveFilter: boolean;
   clearFilters: () => void;
   mode: ItemActionMode;
@@ -887,13 +899,16 @@ function ItemTable({
               subType === "warehouse_adjust_out" ||
               (subType === "defect_quarantine" && targetDepartment === "창고");
             const showsWarehouseAvailability = pendingQty > 0 && isWarehouseOutbound;
-            const sourceStatus = outboundLocationStatus(subType, targetDepartment);
+            const sourceDepartment = isAutoDepartmentRoute(subType)
+              ? impliedDeptName
+              : targetDepartment;
+            const sourceStatus = outboundLocationStatus(subType, sourceDepartment);
             const sourceLocation = sourceStatus
-              ? findInventoryLocation(item, targetDepartment, sourceStatus)
+              ? findInventoryLocation(item, sourceDepartment, sourceStatus)
               : undefined;
             const sourcePendingQty = locationPending(sourceLocation);
             const sourceAvailableQty = locationAvailable(sourceLocation);
-            const showsDepartmentAvailability = sourceStatus != null && targetDepartment != null;
+            const showsDepartmentAvailability = sourceStatus != null && sourceDepartment != null;
             const isHighlight = highlightItemId === item.item_id;
             const selectedBundles = bundles.filter((bundle) => bundle.source_item_id === item.item_id);
             const isSelected = selectedBundles.length > 0;
@@ -948,12 +963,13 @@ function ItemTable({
                   selectedMode={selectedSourceLocation === source ? selectedMode : null}
                   hasBom={bomParents.has(item.item_id)}
                   busy={busy}
+                  addBlocked={addBlocked}
                   onOpen={() => setOpenInternalUseSource({ itemId: item.item_id, source })}
                   onChoose={(sourceKind) => chooseInternalUseMode(source, sourceKind)}
                 />
               );
             };
-            const rowClickEnabled = mode === "single_only" && !busy;
+            const rowClickEnabled = mode === "single_only" && !busy && !addBlocked;
             const bomBundleIds = selectedBundles
               .filter((bundle) => bundle.source_kind === "bom_parent")
               .map((bundle) => bundle.bundle_id);
@@ -962,7 +978,7 @@ function ItemTable({
               .map((bundle) => bundle.bundle_id);
             const toggleSingleItem = () => {
               if (isSingleSelected) onRemove(singleBundleIds);
-              else onAdd(item, singleItemSourceKind(subType));
+              else if (!addBlocked) onAdd(item, singleItemSourceKind(subType));
             };
             return (
               <HighlightableRow
@@ -1090,6 +1106,7 @@ function ItemTable({
                         bomLocked={!isProcess && !allowMix && hasSingleBundle}
                         singleLocked={!isProcess && !allowMix && hasBomBundle}
                         busy={busy}
+                        addBlocked={addBlocked}
                         onChoose={(choiceMode) => {
                           const isBom = choiceMode === "bom";
                           const selected = isBom ? isBomSelected : isSingleSelected;
@@ -1112,7 +1129,7 @@ function ItemTable({
                       <button
                         type="button"
                         aria-pressed={isSingleSelected}
-                        disabled={busy}
+                        disabled={busy || (!isSingleSelected && addBlocked)}
                         onClick={(event) => {
                           event.stopPropagation();
                           toggleSingleItem();

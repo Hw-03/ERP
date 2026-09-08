@@ -442,6 +442,36 @@ describe("useIoDraftRestore", () => {
     await waitFor(() => expect(goTo).toHaveBeenCalledWith(4));
   });
 
+  it("자동 부서 경로가 갱신된 draft는 전용 안내 문구를 표시한다", async () => {
+    const status = vi.fn();
+    const restoredDraftRef = { current: null as string | null };
+    const restoredNonceRef = { current: null as number | null };
+    const autosaveBatchIdRef = { current: null as string | null };
+    const state = {
+      fromDepartment: "조립", toDepartment: "조립",
+      setWorkType: vi.fn(), setSubType: vi.fn(), setDeptIoDirectionRaw: vi.fn(),
+      setFromDepartment: vi.fn(), setToDepartment: vi.fn(), setReferenceNo: vi.fn(),
+      setNotes: vi.fn(), setBundles: vi.fn(), goTo: vi.fn(),
+    };
+    function NormalizedHarness() {
+      useIoDraftRestore({
+        draftToRestore: { ...makeDraft("warehouse_to_dept"), department_routes_normalized: true },
+        restoreNonce: 1,
+        restoredDraftRef,
+        restoredNonceRef,
+        autosaveBatchIdRef,
+        state: state as never,
+        onStatusChange: status,
+      });
+      return null;
+    }
+
+    render(<NormalizedHarness />);
+
+    await waitFor(() => expect(status).toHaveBeenCalledWith("품목코드 기준으로 부서 경로를 자동 갱신했습니다."));
+    expect(state.setBundles).toHaveBeenCalled();
+  });
+
   it("respects an explicit URL restore step for a single adjust draft", async () => {
     const goTo = vi.fn();
     render(<Harness subType="adjust_out" goTo={goTo} restoreStep={3} />);

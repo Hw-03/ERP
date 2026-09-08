@@ -140,7 +140,7 @@ describe("IoTargetPicker row click", () => {
     expect(warehouseCell).toHaveTextContent("창고 10 · 예약 3");
   });
 
-  it("subtracts only the selected department production reservation and exposes it in the mobile row", () => {
+  it("자동 부서 출고는 선택된 헤더 부서 대신 품목 코드 부서의 예약 재고를 표시한다", () => {
     render(
       <IoTargetPicker
         {...baseProps}
@@ -150,8 +150,8 @@ describe("IoTargetPicker row click", () => {
         targetDepartment="조립"
         items={[makeItem({
           locations: [
-            { department: "조립", status: "PRODUCTION", quantity: 10, pending_quantity: 3, available_quantity: 7 },
-            { department: "고압", status: "PRODUCTION", quantity: 20, pending_quantity: 19, available_quantity: 1 },
+            { department: "튜브", status: "PRODUCTION", quantity: 10, pending_quantity: 3, available_quantity: 7 },
+            { department: "조립", status: "PRODUCTION", quantity: 20, pending_quantity: 19, available_quantity: 1 },
           ],
         })]}
       />,
@@ -161,6 +161,28 @@ describe("IoTargetPicker row click", () => {
     const row = screen.getByText("Clickable Item").closest("tr")!;
     expect(within(row).getAllByRole("cell")[3]).toHaveTextContent("출고 가능 7");
     expect(within(row).getAllByRole("cell")[3]).toHaveTextContent("실재고 10 · 예약 3");
+  });
+
+  it("자동 부서 출고에서 코드 부서를 찾지 못하면 과거 헤더 부서 재고로 대체하지 않는다", () => {
+    render(
+      <IoTargetPicker
+        {...baseProps}
+        workType="process"
+        subType="adjust_out"
+        deptIoDirection="out"
+        targetDepartment="조립"
+        items={[makeItem({
+          processTypeCode: "UNKNOWN",
+          locations: [
+            { department: "조립", status: "PRODUCTION", quantity: 10, pending_quantity: 3, available_quantity: 7 },
+          ],
+        })]}
+      />,
+    );
+
+    expect(screen.queryByTestId("picker-mobile-source-available-item-1")).not.toBeInTheDocument();
+    const row = screen.getByText("Clickable Item").closest("tr")!;
+    expect(within(row).getAllByRole("cell")[3]).not.toHaveTextContent("출고 가능 7");
   });
 
   it("uses warehouse availability when defect quarantine starts from the warehouse", () => {
@@ -486,6 +508,36 @@ describe("IoTargetPicker row click", () => {
     fireEvent.click(screen.getByText("Clickable Item").closest("tr")!);
 
     expect(onAddItem).toHaveBeenCalledWith(expect.objectContaining({ item_id: "item-1" }), "manual");
+  });
+
+  it("BOM 확인 중에는 행 클릭과 추가 버튼으로 새 품목을 담지 못한다", () => {
+    const onAddItem = vi.fn();
+    render(<IoTargetPicker {...baseProps} addBlocked onAddItem={onAddItem} />);
+
+    const row = screen.getByText("Clickable Item").closest("tr")!;
+    fireEvent.click(row);
+
+    expect(onAddItem).not.toHaveBeenCalled();
+    expect(within(row).getByRole("button", { name: "선택" })).toBeDisabled();
+  });
+
+  it("BOM 확인 중에도 이미 담긴 낱개 품목은 선택 해제할 수 있다", () => {
+    const onRemoveBundles = vi.fn();
+    render(
+      <IoTargetPicker
+        {...baseProps}
+        addBlocked
+        bundles={[makeBundle("manual")]}
+        onRemoveBundles={onRemoveBundles}
+      />,
+    );
+
+    const row = screen.getByText("Clickable Item").closest("tr")!;
+    const selected = within(row).getByRole("button", { name: "선택" });
+    expect(selected).not.toBeDisabled();
+    fireEvent.click(selected);
+
+    expect(onRemoveBundles).toHaveBeenCalledWith(["bundle-manual"]);
   });
 
   it("adds a process single item as quantity adjustment instead of production", () => {

@@ -216,8 +216,70 @@ def test_internal_use_direct_request_rejects_non_as_research_destination(
 # ---------------------------------------------------------------------------
 
 
+def test_direct_warehouse_to_dept_rejects_item_code_department_mismatch(
+    db_session, client, make_item
+):
+    item = make_item(
+        name="직접 요청 경로 검증",
+        process_type_code="AR",
+        warehouse_qty=Decimal("10"),
+    )
+    requester = _make_employee(db_session, code="AUTO-DIRECT", name="요청자")
+    db_session.commit()
+
+    out = _create_request_via_api(
+        client,
+        requester_id=str(requester.employee_id),
+        request_type="warehouse_to_dept",
+        lines=[
+            {
+                "item_id": str(item.item_id),
+                "quantity": "1",
+                "from_bucket": "warehouse",
+                "to_bucket": "production",
+                "to_department": DepartmentEnum.TUBE.value,
+            }
+        ],
+    )
+
+    assert out["status_code"] == 422, out["body"]
+    assert db_session.query(StockRequest).count() == 0
+
+
+def test_direct_warehouse_to_dept_draft_rejects_item_code_department_mismatch(
+    db_session, client, make_item
+):
+    item = make_item(
+        name="직접 초안 경로 검증",
+        process_type_code="AR",
+        warehouse_qty=Decimal("10"),
+    )
+    requester = _make_employee(db_session, code="AUTO-DIRECT-DRAFT", name="요청자")
+    db_session.commit()
+
+    response = client.put(
+        "/api/stock-requests/draft",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "request_type": "warehouse_to_dept",
+            "lines": [
+                {
+                    "item_id": str(item.item_id),
+                    "quantity": "1",
+                    "from_bucket": "warehouse",
+                    "to_bucket": "production",
+                    "to_department": DepartmentEnum.TUBE.value,
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 422, response.json()
+    assert db_session.query(StockRequest).count() == 0
+
+
 def test_warehouse_to_dept_request_reserves_pending(db_session, client, make_item):
-    item = make_item(name="P001", warehouse_qty=Decimal("10"))
+    item = make_item(name="P001", process_type_code="AR", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="W01", name="요청자A")
     db_session.commit()
 
@@ -323,7 +385,7 @@ def test_multiline_request_rolls_back_when_one_line_short(db_session, client, ma
 
 
 def test_approve_consumes_pending_and_moves_stock(db_session, client, make_item):
-    item = make_item(name="P004", warehouse_qty=Decimal("10"))
+    item = make_item(name="P004", process_type_code="AR", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="W04", name="요청자D")
     approver = _make_employee(
         db_session, code="WH1", name="창고정", warehouse_role="primary"
@@ -393,7 +455,7 @@ def test_approve_consumes_pending_and_moves_stock(db_session, client, make_item)
 
 def test_warehouse_primary_self_approves_on_submit(db_session, client, make_item):
     """warehouse_role=primary 직원이 본인 명의로 wh-to-dept 제출 시 즉시 처리."""
-    item = make_item(name="P004S1", warehouse_qty=Decimal("10"))
+    item = make_item(name="P004S1", process_type_code="AR", warehouse_qty=Decimal("10"))
     requester = _make_employee(
         db_session, code="WHSELF1", name="창고정자가", warehouse_role="primary"
     )
@@ -438,7 +500,7 @@ def test_warehouse_primary_self_approves_on_submit(db_session, client, make_item
 
 def test_warehouse_deputy_self_approves_on_submit(db_session, client, make_item):
     """warehouse_role=deputy 도 동일하게 자가승인."""
-    item = make_item(name="P004S2", warehouse_qty=Decimal("5"))
+    item = make_item(name="P004S2", process_type_code="AR", warehouse_qty=Decimal("5"))
     requester = _make_employee(
         db_session, code="WHSELF2", name="창고부자가", warehouse_role="deputy"
     )
@@ -469,7 +531,7 @@ def test_warehouse_deputy_self_approves_on_submit(db_session, client, make_item)
 
 def test_non_warehouse_requester_still_reserves(db_session, client, make_item):
     """warehouse_role=none 일반 직원의 요청은 종전대로 RESERVED."""
-    item = make_item(name="P004S3", warehouse_qty=Decimal("5"))
+    item = make_item(name="P004S3", process_type_code="AR", warehouse_qty=Decimal("5"))
     requester = _make_employee(
         db_session, code="WHSELF3", name="일반직원", warehouse_role="none"
     )
@@ -504,7 +566,7 @@ def test_non_warehouse_requester_still_reserves(db_session, client, make_item):
 
 
 def test_reject_releases_pending(db_session, client, make_item):
-    item = make_item(name="P005", warehouse_qty=Decimal("10"))
+    item = make_item(name="P005", process_type_code="AR", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="W05", name="요청자E")
     approver = _make_employee(
         db_session, code="WH2", name="창고정2", warehouse_role="primary"
@@ -552,7 +614,7 @@ def test_reject_releases_pending(db_session, client, make_item):
 
 
 def test_requester_cancel_releases_pending(db_session, client, make_item):
-    item = make_item(name="P006", warehouse_qty=Decimal("10"))
+    item = make_item(name="P006", process_type_code="AR", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="W06", name="요청자F")
     db_session.commit()
 
@@ -662,7 +724,7 @@ def test_dept_internal_request_completes_immediately(
 
 
 def test_non_warehouse_employee_cannot_approve(db_session, client, make_item):
-    item = make_item(name="P008", warehouse_qty=Decimal("10"))
+    item = make_item(name="P008", process_type_code="AR", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="W08", name="요청자H")
     not_warehouse = _make_employee(
         db_session, code="X01", name="일반직원", warehouse_role="none"
@@ -698,7 +760,7 @@ def test_non_warehouse_employee_cannot_approve(db_session, client, make_item):
 
 
 def test_approve_rejects_wrong_pin(db_session, client, make_item):
-    item = make_item(name="P009", warehouse_qty=Decimal("5"))
+    item = make_item(name="P009", process_type_code="AR", warehouse_qty=Decimal("5"))
     requester = _make_employee(db_session, code="W09", name="요청자I")
     approver = _make_employee(
         db_session, code="WH3", name="창고부", warehouse_role="deputy", pin="1234"
@@ -734,7 +796,7 @@ def test_approve_rejects_wrong_pin(db_session, client, make_item):
 
 
 def test_completed_request_cannot_be_processed_again(db_session, client, make_item):
-    item = make_item(name="P010", warehouse_qty=Decimal("5"))
+    item = make_item(name="P010", process_type_code="AR", warehouse_qty=Decimal("5"))
     requester = _make_employee(db_session, code="W10", name="요청자J")
     approver = _make_employee(
         db_session, code="WH4", name="창고정3", warehouse_role="primary"
@@ -784,7 +846,7 @@ def test_completed_request_cannot_be_processed_again(db_session, client, make_it
 
 
 def test_reservations_endpoint_lists_active_pending_lines(db_session, client, make_item):
-    item = make_item(name="P011", warehouse_qty=Decimal("10"))
+    item = make_item(name="P011", process_type_code="AR", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="W11", name="요청자K")
     db_session.commit()
 
@@ -815,7 +877,7 @@ def test_reservations_endpoint_lists_active_pending_lines(db_session, client, ma
 def test_reservations_endpoint_lists_department_source_and_from_department(
     db_session, client, make_item, make_location
 ):
-    item = make_item(name="department reservation")
+    item = make_item(name="department reservation", process_type_code="AR")
     make_location(
         item.item_id,
         department=DepartmentEnum.ASSEMBLY,
@@ -989,7 +1051,7 @@ def _upsert_draft(
 
 
 def test_upsert_draft_creates_draft_without_pending_or_log(db_session, client, make_item):
-    item = make_item(name="DRAFT001", warehouse_qty=Decimal("10"))
+    item = make_item(name="DRAFT001", process_type_code="AR", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="D01", name="장바구니A")
     db_session.commit()
 
@@ -1021,8 +1083,8 @@ def test_upsert_draft_creates_draft_without_pending_or_log(db_session, client, m
 
 
 def test_upsert_draft_updates_existing_no_new_row(db_session, client, make_item):
-    item_a = make_item(name="DRAFT002A", warehouse_qty=Decimal("10"))
-    item_b = make_item(name="DRAFT002B", warehouse_qty=Decimal("10"))
+    item_a = make_item(name="DRAFT002A", process_type_code="AR", warehouse_qty=Decimal("10"))
+    item_b = make_item(name="DRAFT002B", process_type_code="AR", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="D02", name="장바구니B")
     db_session.commit()
 
@@ -1064,7 +1126,7 @@ def test_upsert_draft_updates_existing_no_new_row(db_session, client, make_item)
 
 
 def test_drafts_isolated_per_employee(db_session, client, make_item):
-    item = make_item(name="DRAFT003", warehouse_qty=Decimal("10"))
+    item = make_item(name="DRAFT003", process_type_code="AR", warehouse_qty=Decimal("10"))
     emp_a = _make_employee(db_session, code="DA", name="직원A")
     emp_b = _make_employee(db_session, code="DB", name="직원B")
     db_session.commit()
@@ -1105,7 +1167,7 @@ def test_drafts_isolated_per_employee(db_session, client, make_item):
 def test_delete_draft_removes_row_and_lines_no_pending_change(
     db_session, client, make_item
 ):
-    item = make_item(name="DRAFT004", warehouse_qty=Decimal("10"))
+    item = make_item(name="DRAFT004", process_type_code="AR", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="D04", name="장바구니D")
     db_session.commit()
 
@@ -1147,7 +1209,7 @@ def test_delete_draft_removes_row_and_lines_no_pending_change(
 
 
 def test_submit_draft_warehouse_to_dept_reserves(db_session, client, make_item):
-    item = make_item(name="DRAFT005", warehouse_qty=Decimal("10"))
+    item = make_item(name="DRAFT005", process_type_code="AR", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="D05", name="장바구니E")
     db_session.commit()
 
@@ -1245,7 +1307,7 @@ def test_submit_draft_dept_internal_completes_immediately(
 
 
 def test_submit_non_draft_request_rejected(db_session, client, make_item):
-    item = make_item(name="DRAFT007", warehouse_qty=Decimal("10"))
+    item = make_item(name="DRAFT007", process_type_code="AR", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="D07", name="장바구니G")
     db_session.commit()
 
@@ -1346,7 +1408,7 @@ def test_invalid_bucket_combo_draft_rejected(db_session, client, make_item):
 
 
 def test_other_employee_cannot_delete_or_submit_draft(db_session, client, make_item):
-    item = make_item(name="DRAFT010", warehouse_qty=Decimal("10"))
+    item = make_item(name="DRAFT010", process_type_code="AR", warehouse_qty=Decimal("10"))
     owner = _make_employee(db_session, code="OWN", name="주인")
     intruder = _make_employee(db_session, code="INT", name="침입자")
     db_session.commit()
@@ -1443,7 +1505,7 @@ def test_submit_nonexistent_request_id_returns_404(db_session, client):
 def test_submit_dept_to_warehouse_fails_when_production_stock_insufficient(
     db_session, client, make_item, make_location
 ):
-    item = make_item(name="FIX3001", warehouse_qty=Decimal("0"))
+    item = make_item(name="FIX3001", process_type_code="AR", warehouse_qty=Decimal("0"))
     # 부서 생산 재고 0 (make_location 없음 — InventoryLocation row 없음)
     requester = _make_employee(db_session, code="FIX3A", name="테스터Fix3")
     db_session.commit()
@@ -1487,7 +1549,7 @@ def test_department_queue_excludes_warehouse_approval_pending(
     새 정책: 창고 승인이 필요한 요청은 창고 승인이 끝날 때까지 부서 큐에서 가려진다.
     Filter: requires_warehouse_approval=False 조건이 추가되어 동시 결재 row 차단.
     """
-    item = make_item(name="QSEP1", warehouse_qty=Decimal("10"))
+    item = make_item(name="QSEP1", process_type_code="AR", warehouse_qty=Decimal("10"))
     requester = _make_employee(
         db_session, code="QSEPR", name="요청자QS"
     )
@@ -1529,7 +1591,7 @@ def test_department_queue_excludes_warehouse_approval_pending(
 
 
 def test_warehouse_queue_count_matches_list(db_session, client, make_item):
-    item = make_item(name="QCNT1", warehouse_qty=Decimal("5"))
+    item = make_item(name="QCNT1", process_type_code="AR", warehouse_qty=Decimal("5"))
     requester = _make_employee(db_session, code="QCN1", name="요청자QC1")
     db_session.commit()
 

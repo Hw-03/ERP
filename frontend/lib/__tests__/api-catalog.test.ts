@@ -22,6 +22,7 @@ import {
   useDeleteModelMutation,
   useReorderModelsMutation,
 } from "@/lib/queries/useModelsQuery";
+import { catalogApi } from "@/lib/api/catalog";
 
 /** 각 테스트마다 새로운 QueryClient로 격리 */
 function makeWrapper() {
@@ -57,6 +58,22 @@ describe("useModelsQuery (MSW)", () => {
     const { Wrapper } = makeWrapper();
     const { result } = renderHook(() => useModelsQuery(), { wrapper: Wrapper });
     await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+});
+
+describe("catalogApi BOM GET", () => {
+  it("선택적 AbortSignal을 BOM 목록 요청에 전달한다", async () => {
+    const originalFetch = globalThis.fetch;
+    const fetchSpy = vi.fn(() => Promise.resolve(new Response("[]", { status: 200 })));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const controller = new AbortController();
+
+    try {
+      await catalogApi.getAllBOM(controller.signal);
+      expect(fetchSpy.mock.calls[0]?.[1]).toMatchObject({ signal: controller.signal });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });
 

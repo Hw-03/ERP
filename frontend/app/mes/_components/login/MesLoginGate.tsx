@@ -9,8 +9,9 @@ import { formatKstDate } from "@/lib/mes/date";
 import { queryKeys } from "@/lib/queries/keys";
 import { OperatorLoginCard } from "./OperatorLoginCard";
 import { clearCurrentOperator, getStoredBootId, readCurrentOperator } from "./useCurrentOperator";
+import { runLoginReadWithRetry, validateActiveEmployees, validateAppSession } from "./loginReadRetry";
 
-type GatePhase = "loading" | "intro" | "form" | "authed";
+type GatePhase = "loading" | "intro" | "form" | "recovery" | "authed";
 type LogoState = "center" | "above-card";
 
 /*
@@ -47,6 +48,7 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
   const [logoState, setLogoState] = useState<LogoState>("center");
   // 항목 5-2 — 모바일(<1024px)만 인트로 시작 스케일을 작게(작게→크게 반전). 데스크톱은 현행 유지.
   const [isNarrow, setIsNarrow] = useState(false);
+  const [recoveryAttempt, setRecoveryAttempt] = useState(0);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const clearTimers = () => {
@@ -92,10 +94,14 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
       queryFn: () => warehouseMapApi.getMap(),
     });
 
+    const controller = new AbortController();
     void (async () => {
       // boot_id 불일치 시 서버 재시작 감지 → 재로그인 강제
       try {
-        const session = await api.getAppSession();
+        const session = await runLoginReadWithRetry(
+          (readSignal) => api.getAppSession(readSignal),
+          { stage: "app_session", signal: controller.signal, validate: validateAppSession },
+        );
         if (cancelled) return;
         const storedBootId = getStoredBootId();
         if (storedBootId !== session.boot_id) {
@@ -105,14 +111,16 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
         }
       } catch {
         if (cancelled) return;
-        clearCurrentOperator();
-        goToLogin();
+        setPhase("recovery");
         return;
       }
 
       // 작업자 식별용 — 비활성 직원이면 자동 진입을 차단한다 (보안 인증 아님).
       try {
-        const list = await api.getEmployees({ activeOnly: true });
+        const list = await runLoginReadWithRetry(
+          (readSignal) => api.getEmployees({ activeOnly: true }, readSignal),
+          { stage: "active_employees", signal: controller.signal, validate: validateActiveEmployees },
+        );
         if (cancelled) return;
         const stillActive = list.some((e) => e.employee_id === stored.employee_id);
         if (stillActive) {
@@ -123,13 +131,15 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
         }
       } catch {
         if (cancelled) return;
-        clearCurrentOperator();
-        goToLogin();
+        setPhase("recovery");
       }
     })();
 
-    return () => { cancelled = true; };
-  }, [queryClient]);
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [queryClient, recoveryAttempt]);
 
   // 인트로 단계 진입 → 로고 축소 → 카드 등장 (≤ 1.5s 절제된 시퀀스)
   useEffect(() => {
@@ -150,6 +160,11 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
       }
     }
     setPhase("authed");
+  };
+
+  const retryStoredLogin = () => {
+    setPhase("loading");
+    setRecoveryAttempt((attempt) => attempt + 1);
   };
 
   // SSR/hydration 깜빡임 방지
@@ -192,7 +207,7 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
       </div>
 
       {/* 배경 패턴 — form 단계에만 표시 */}
-      {phase === "form" && (
+      {(phase === "form" || phase === "recovery") && (
         <div
           className="pointer-events-none absolute inset-0"
           style={{
@@ -204,7 +219,7 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
       )}
 
       {/* 데스크톱 로그인 여백에서 카드 방향을 안내하는 DEXRAY 마스코트 */}
-      {phase === "form" && (
+      {(phase === "form" || phase === "recovery") && (
         <div
           aria-hidden="true"
           className="pointer-events-none absolute hidden lg:block"
@@ -241,6 +256,30 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
           }}
         >
           <OperatorLoginCard onLogin={handleLogin} />
+        </div>
+      )}
+      {phase === "recovery" && (
+        <div
+          className="mes-card-anim mx-auto w-full"
+          style={{ maxWidth: 440, padding: "0 16px", animation: "mes-card-rise 0.35s ease both" }}
+        >
+          <div
+            className="rounded-[24px] border p-8 text-center"
+            style={{ background: "var(--c-s1)", borderColor: "var(--c-border)", boxShadow: "var(--c-card-shadow)" }}
+          >
+            <p className="text-base font-semibold" style={{ color: "var(--c-text)" }}>로그인 정보를 확인하지 못했습니다.</p>
+            <p className="mt-2 text-sm" role="alert" style={{ color: "var(--c-muted)" }}>
+              서버 연결을 확인한 뒤 다시 시도해 주세요.
+            </p>
+            <button
+              type="button"
+              onClick={retryStoredLogin}
+              className="mt-6 w-full rounded-[14px] py-3 text-base font-semibold text-white"
+              style={{ background: "var(--c-blue)" }}
+            >
+              다시 시도
+            </button>
+          </div>
         </div>
       )}
     </div>

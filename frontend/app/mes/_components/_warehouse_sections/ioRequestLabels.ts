@@ -1,8 +1,9 @@
 /** 입출고 요청 유형 표시 라벨 — DraftCartItemRow / WarehouseQueueRow / MyRequestRow 공용.
  *  단일 사전은 `frontend/lib/io/glossary.ts` (P0-1). 본 파일은 backward-compat re-export. */
-import type { StockRequestLine } from "@/lib/api";
+import type { StockRequestLine, StockRequestType } from "@/lib/api";
 import { REQUEST_TYPE_LABEL as _GLOSSARY_REQUEST_TYPE_LABEL } from "@/lib/io/glossary";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { normalizeDepartment } from "@/lib/mes/department";
 import { formatQty } from "@/lib/mes/format";
 
 export const REQUEST_TYPE_LABEL: Record<string, string> = _GLOSSARY_REQUEST_TYPE_LABEL;
@@ -46,6 +47,64 @@ export function getRequestQuantityPresentation(
   if (hasSource && !hasDestination) return { text: `-${quantity}개`, tone: "negative" };
   if (hasSource && hasDestination) return { text: `이동 ${quantity}개`, tone: "movement" };
   return { text: `${quantity}개`, tone: "neutral" };
+}
+
+const AUTOMATIC_DEPARTMENT_REQUEST_TYPES = new Set<StockRequestType>([
+  "warehouse_to_dept",
+  "dept_to_warehouse",
+  "manual_adjustment",
+]);
+
+export function isAutomaticDepartmentRequest(requestType: StockRequestType): boolean {
+  return AUTOMATIC_DEPARTMENT_REQUEST_TYPES.has(requestType);
+}
+
+/** 자동 부서 승인 요청의 라인별 실제 재고 경로. */
+export function getRequestLineRouteLabel(
+  requestType: StockRequestType | undefined,
+  line: StockRequestLine,
+): string | null {
+  if (!requestType || !isAutomaticDepartmentRequest(requestType)) return null;
+  if (requestType === "warehouse_to_dept" && line.to_department) {
+    return `창고 → ${normalizeDepartment(line.to_department)}`;
+  }
+  if (requestType === "dept_to_warehouse" && line.from_department) {
+    return `${normalizeDepartment(line.from_department)} → 창고`;
+  }
+  if (line.from_bucket === "none" && line.to_bucket === "production" && line.to_department) {
+    return `${normalizeDepartment(line.to_department)} 입고`;
+  }
+  if (line.from_bucket === "production" && line.to_bucket === "none" && line.from_department) {
+    return `${normalizeDepartment(line.from_department)} 출고`;
+  }
+  return null;
+}
+
+/** 요청 헤더의 실제 라인 경로. 여러 생산 부서가 섞이면 첫 라인을 대표로 쓰지 않는다. */
+export function getRequestFlowLabel(
+  requestType: StockRequestType,
+  lines: StockRequestLine[],
+): string | null {
+  const productionDepartments = new Set<string>();
+  for (const line of lines) {
+    if (line.from_bucket === "production" && line.from_department) {
+      productionDepartments.add(line.from_department);
+    }
+    if (line.to_bucket === "production" && line.to_department) {
+      productionDepartments.add(line.to_department);
+    }
+  }
+  if (isAutomaticDepartmentRequest(requestType) && productionDepartments.size > 1) {
+    return "여러 부서";
+  }
+
+  const firstLine = lines[0];
+  if (!firstLine) return null;
+  const endpointLabel = (bucket: StockRequestLine["from_bucket"], department: string | null) =>
+    bucket === "warehouse" ? "창고" : department ? normalizeDepartment(department) : null;
+  const from = endpointLabel(firstLine.from_bucket, firstLine.from_department);
+  const to = endpointLabel(firstLine.to_bucket, firstLine.to_department);
+  return from && to ? `${from} → ${to}` : from ?? to;
 }
 
 /**

@@ -127,7 +127,7 @@ def _open_linked_request(client, db_session, *, requester: Employee, batch: IoBa
 def test_revert_to_draft_rejects_unlinked_request_without_mutation(
     client, db_session, make_item
 ) -> None:
-    item = make_item(name="Unlinked revert", warehouse_qty=Decimal("5"))
+    item = make_item(name="Unlinked revert", process_type_code="AR", warehouse_qty=Decimal("5"))
     requester = _employee(db_session, code="SR-REV-UNLINKED", name="요청자")
     db_session.commit()
     request = _open_linked_request(
@@ -154,8 +154,8 @@ def test_revert_to_draft_rejects_unlinked_request_without_mutation(
 def test_revert_to_draft_cancels_all_open_linked_requests_and_releases_reservations(
     client, db_session, make_item
 ) -> None:
-    first = make_item(name="Multi revert first", warehouse_qty=Decimal("5"))
-    second = make_item(name="Multi revert second", warehouse_qty=Decimal("5"))
+    first = make_item(name="Multi revert first", process_type_code="AR", warehouse_qty=Decimal("5"))
+    second = make_item(name="Multi revert second", process_type_code="AR", warehouse_qty=Decimal("5"))
     requester = _employee(db_session, code="SR-REV-MULTI", name="요청자")
     batch = _linked_batch(db_session, requester)
     db_session.commit()
@@ -191,8 +191,8 @@ def test_revert_to_draft_cancels_all_open_linked_requests_and_releases_reservati
 def test_revert_to_draft_rejects_completed_sibling_without_mutation(
     client, db_session, make_item
 ) -> None:
-    first = make_item(name="Completed sibling first", warehouse_qty=Decimal("5"))
-    second = make_item(name="Completed sibling second", warehouse_qty=Decimal("5"))
+    first = make_item(name="Completed sibling first", process_type_code="AR", warehouse_qty=Decimal("5"))
+    second = make_item(name="Completed sibling second", process_type_code="AR", warehouse_qty=Decimal("5"))
     requester = _employee(db_session, code="SR-REV-COMPLETE", name="요청자")
     batch = _linked_batch(db_session, requester)
     db_session.commit()
@@ -228,8 +228,8 @@ def test_revert_to_draft_rejects_completed_sibling_without_mutation(
 def test_revert_to_draft_rolls_back_all_cancellations_when_later_cancel_fails(
     client, db_session, make_item, monkeypatch
 ) -> None:
-    first = make_item(name="Rollback revert first", warehouse_qty=Decimal("5"))
-    second = make_item(name="Rollback revert second", warehouse_qty=Decimal("5"))
+    first = make_item(name="Rollback revert first", process_type_code="AR", warehouse_qty=Decimal("5"))
+    second = make_item(name="Rollback revert second", process_type_code="AR", warehouse_qty=Decimal("5"))
     requester = _employee(db_session, code="SR-REV-ROLLBACK", name="요청자")
     batch = _linked_batch(db_session, requester)
     db_session.commit()
@@ -273,7 +273,7 @@ def test_revert_to_draft_rolls_back_all_cancellations_when_later_cancel_fails(
 def test_revert_to_draft_cancels_single_open_linked_request(
     client, db_session, make_item
 ) -> None:
-    item = make_item(name="Single revert", warehouse_qty=Decimal("5"))
+    item = make_item(name="Single revert", process_type_code="AR", warehouse_qty=Decimal("5"))
     requester = _employee(db_session, code="SR-REV-SINGLE", name="요청자")
     batch = _linked_batch(db_session, requester)
     db_session.commit()
@@ -302,7 +302,7 @@ def test_revert_to_draft_cancels_single_open_linked_request(
 def test_revert_to_draft_rejects_completed_batch_without_mutation(
     client, db_session, make_item, batch_status
 ) -> None:
-    item = make_item(name=f"Completed batch {batch_status}", warehouse_qty=Decimal("5"))
+    item = make_item(name=f"Completed batch {batch_status}", process_type_code="AR", warehouse_qty=Decimal("5"))
     requester = _employee(db_session, code=f"SR-REV-{batch_status}", name="요청자")
     batch = _linked_batch(db_session, requester, status=batch_status)
     db_session.commit()
@@ -330,9 +330,9 @@ def test_revert_to_draft_rejects_completed_batch_without_mutation(
 def test_revert_to_draft_cancels_submitted_and_preserves_terminal_siblings(
     client, db_session, make_item
 ) -> None:
-    submitted_item = make_item(name="Submitted revert", warehouse_qty=Decimal("5"))
-    rejected_item = make_item(name="Rejected sibling", warehouse_qty=Decimal("5"))
-    failed_item = make_item(name="Failed sibling", warehouse_qty=Decimal("5"))
+    submitted_item = make_item(name="Submitted revert", process_type_code="AR", warehouse_qty=Decimal("5"))
+    rejected_item = make_item(name="Rejected sibling", process_type_code="AR", warehouse_qty=Decimal("5"))
+    failed_item = make_item(name="Failed sibling", process_type_code="AR", warehouse_qty=Decimal("5"))
     requester = _employee(db_session, code="SR-REV-PRESERVE", name="요청자")
     batch = _linked_batch(db_session, requester)
     db_session.commit()
@@ -372,7 +372,7 @@ def test_revert_to_draft_cancels_submitted_and_preserves_terminal_siblings(
 def test_revert_to_draft_requires_matching_batch_requester(
     client, db_session, make_item
 ) -> None:
-    item = make_item(name="Batch owner mismatch", warehouse_qty=Decimal("5"))
+    item = make_item(name="Batch owner mismatch", process_type_code="AR", warehouse_qty=Decimal("5"))
     requester = _employee(db_session, code="SR-REV-BATCH-REQUESTER", name="요청자")
     batch_owner = _employee(db_session, code="SR-REV-BATCH-OWNER", name="다른작성자")
     batch = _linked_batch(db_session, batch_owner)
@@ -399,7 +399,7 @@ def test_revert_to_draft_requires_matching_batch_requester(
 def test_revert_to_draft_does_not_take_clicked_request_lock_before_batch_lock(
     client, db_session, make_item, monkeypatch
 ) -> None:
-    item = make_item(name="Revert lock order", warehouse_qty=Decimal("5"))
+    item = make_item(name="Revert lock order", process_type_code="AR", warehouse_qty=Decimal("5"))
     requester = _employee(db_session, code="SR-REV-LOCK-ORDER", name="요청자")
     batch = _linked_batch(db_session, requester)
     db_session.commit()
@@ -426,7 +426,7 @@ def test_create_rolls_back_request_lines_and_pending_when_notification_fails(
     make_item,
     monkeypatch,
 ) -> None:
-    item = make_item(name="StockRequest create rollback", warehouse_qty=Decimal("5"))
+    item = make_item(name="StockRequest create rollback", process_type_code="AR", warehouse_qty=Decimal("5"))
     requester = _employee(db_session, code="SR-ACT-CREATE", name="요청자")
     db_session.commit()
 
@@ -471,7 +471,7 @@ def test_warehouse_approve_rolls_back_inventory_box_log_and_status_when_notifica
     monkeypatch,
 ) -> None:
     warehouse_map_svc.set_box_tracking_enabled(db_session, True)
-    item = make_item(name="StockRequest approve rollback", warehouse_qty=Decimal("10"))
+    item = make_item(name="StockRequest approve rollback", process_type_code="AR", warehouse_qty=Decimal("10"))
     box = _warehouse_box(db_session, item_id=item.item_id, quantity=10)
     requester = _employee(db_session, code="SR-ACT-APP-RQ", name="요청자")
     approver = _employee(
@@ -536,7 +536,7 @@ def test_department_approve_rolls_back_execution_when_notification_fails(
     monkeypatch,
 ) -> None:
     warehouse_map_svc.set_box_tracking_enabled(db_session, True)
-    item = make_item(name="Department approve rollback", warehouse_qty=Decimal("10"))
+    item = make_item(name="Department approve rollback", process_type_code="AR", warehouse_qty=Decimal("10"))
     box = _warehouse_box(db_session, item_id=item.item_id, quantity=10)
     requester = _employee(db_session, code="SR-ACT-DEPT-RQ", name="요청자")
     warehouse_approver = _employee(
@@ -616,7 +616,7 @@ def test_cancel_rolls_back_pending_and_status_when_batch_sync_fails(
     make_item,
     monkeypatch,
 ) -> None:
-    item = make_item(name="StockRequest cancel rollback", warehouse_qty=Decimal("5"))
+    item = make_item(name="StockRequest cancel rollback", process_type_code="AR", warehouse_qty=Decimal("5"))
     requester = _employee(db_session, code="SR-ACT-CANCEL", name="요청자")
     db_session.commit()
 
@@ -684,7 +684,7 @@ def test_failed_approval_rolls_back_execution_then_commits_only_failure_state(
     make_item,
     monkeypatch,
 ) -> None:
-    item = make_item(name="Failed approval two UoW", warehouse_qty=Decimal("10"))
+    item = make_item(name="Failed approval two UoW", process_type_code="AR", warehouse_qty=Decimal("10"))
     requester = _employee(db_session, code="SR-ACT-FAIL-RQ", name="요청자")
     approver = _employee(
         db_session,
@@ -765,10 +765,12 @@ def test_multiline_approval_rolls_back_first_line_after_second_line_late_failure
     warehouse_map_svc.set_box_tracking_enabled(db_session, True)
     first_item = make_item(
         name="StockRequest multiline first",
+        process_type_code="AR",
         warehouse_qty=Decimal("10"),
     )
     second_item = make_item(
         name="StockRequest multiline second",
+        process_type_code="AR",
         warehouse_qty=Decimal("10"),
     )
     first_box = _warehouse_box(db_session, item_id=first_item.item_id, quantity=10)

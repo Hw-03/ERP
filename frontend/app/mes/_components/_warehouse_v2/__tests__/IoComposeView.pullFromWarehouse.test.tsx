@@ -4,6 +4,13 @@ import { api } from "@/lib/api";
 import { IoComposeView } from "../IoComposeView";
 
 const dirtyRegistration = vi.hoisted(() => ({ dirty: false }));
+const bomQuery = vi.hoisted(() => ({
+  data: [] as { parent_item_id: string }[],
+  isSuccess: true,
+  isPending: false,
+  isError: false,
+  refetch: vi.fn(),
+}));
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/mes",
@@ -25,6 +32,9 @@ vi.mock("@/lib/api", () => ({
 }));
 
 vi.mock("@/lib/queries/realtime", () => ({ useRealtimeRevision: () => 0 }));
+vi.mock("@/lib/queries/useBomQuery", () => ({
+  useBomListQuery: () => bomQuery,
+}));
 vi.mock("@/lib/activity-audit-context", () => ({ setAuditScreen: vi.fn() }));
 vi.mock("@/lib/client-events", () => ({ sendClientEvent: vi.fn() }));
 vi.mock("@/lib/ui/dirty-guard", () => ({
@@ -97,7 +107,7 @@ vi.mock("../IoWorkTypeStep", () => ({
   ),
 }));
 vi.mock("../IoBundleCart", () => ({
-  IoBundleCart: ({ bundles, subType, onPullFromWarehouse, onTogglePull, onQuantityChange, onSaveDraft, pulling }: {
+  IoBundleCart: ({ bundles, subType, onPullFromWarehouse, onTogglePull, onQuantityChange, onSaveDraft, pulling, pullBlocked }: {
     bundles: { bundle_id: string; lines: { line_id: string; quantity: number }[] }[];
     subType: string;
     onPullFromWarehouse: () => void;
@@ -105,6 +115,7 @@ vi.mock("../IoBundleCart", () => ({
     onQuantityChange: (bundleId: string, lineId: string, quantity: number, shortage: number) => void;
     onSaveDraft: () => void;
     pulling: boolean;
+    pullBlocked?: boolean;
   }) => (
     <>
       <output data-testid="pull-cart-state">{`${subType}:${bundles.map((bundle) => bundle.bundle_id).join(",")}`}</output>
@@ -121,7 +132,8 @@ vi.mock("../IoBundleCart", () => ({
       >
         첫 품목 수량 변경
       </button>
-      <button type="button" onClick={onPullFromWarehouse}>부족 품목 가져오기</button>
+      <button type="button" onClick={onPullFromWarehouse} disabled={pullBlocked}>부족 품목 가져오기</button>
+      <button type="button" onClick={onPullFromWarehouse}>차단 우회 부족 품목 가져오기</button>
       <button type="button" onClick={onSaveDraft}>임시저장</button>
     </>
   ),
@@ -252,6 +264,12 @@ function renderCompose(onDraftSaved = vi.fn(), restoreStep = 4, onStatusChange =
 
 beforeEach(() => {
   vi.clearAllMocks();
+  Object.assign(bomQuery, {
+    data: [],
+    isSuccess: true,
+    isPending: false,
+    isError: false,
+  });
   dirtyRegistration.dirty = false;
   vi.mocked(api.getAllBOM).mockResolvedValue([]);
   vi.mocked(api.getItems).mockResolvedValue([]);
@@ -262,6 +280,23 @@ beforeEach(() => {
 });
 
 describe("IoComposeView 부족 품목 가져오기", () => {
+  it("캐시된 BOM 목록이 있어도 조회 오류가 확정되면 부족 품목 가져오기를 막는다", async () => {
+    Object.assign(bomQuery, {
+      data: [{ parent_item_id: "cached-bom-parent" }],
+      isSuccess: false,
+      isPending: false,
+      isError: true,
+    });
+    renderCompose();
+
+    await screen.findByTestId("pull-cart-state");
+    expect(screen.getByRole("button", { name: "부족 품목 가져오기" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "차단 우회 부족 품목 가져오기" }));
+    expect(api.saveDraft).not.toHaveBeenCalled();
+    expect(api.preview).not.toHaveBeenCalled();
+    expect(screen.getByText("BOM 정보를 불러오지 못했습니다. 다시 시도해 주세요")).toBeInTheDocument();
+  });
+
   it("첫 클릭에서 원 초안 URL 복원을 끄고 새 창고 반출 카트를 표시한다", async () => {
     const onDraftSaved = vi.fn();
     renderCompose(onDraftSaved);

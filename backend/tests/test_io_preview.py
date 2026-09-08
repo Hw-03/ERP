@@ -42,19 +42,58 @@ def test_route_receive_supplier(make_item):
     assert route == ("in", "none", None, "warehouse", None)
 
 
-def test_route_warehouse_to_dept(make_item):
-    route = iop._route_for_sub_type("warehouse_to_dept", item=make_item(),
-                                    from_department=None, to_department="조립")
-    assert route == ("move", "warehouse", None, "production", "조립")
+def test_route_warehouse_to_dept_uses_item_code_department_not_client_value(make_item):
+    item = make_item(process_type_code="TR")
+
+    route = iop._route_for_sub_type(
+        "warehouse_to_dept",
+        item=item,
+        from_department=None,
+        to_department="조립",
+    )
+
+    assert route == ("move", "warehouse", None, "production", DepartmentEnum.TUBE.value)
 
 
-def test_route_dept_to_warehouse(make_item):
-    route = iop._route_for_sub_type("dept_to_warehouse", item=make_item(),
-                                    from_department="조립", to_department=None)
-    assert route == ("move", "production", "조립", "warehouse", None)
+def test_route_dept_to_warehouse_uses_item_code_department_not_client_value(make_item):
+    item = make_item(process_type_code="TR")
+
+    route = iop._route_for_sub_type(
+        "dept_to_warehouse",
+        item=item,
+        from_department="조립",
+        to_department=None,
+    )
+
+    assert route == ("move", "production", DepartmentEnum.TUBE.value, "warehouse", None)
 
 
-def test_route_disassemble_result_prefers_selected_to_department(make_item):
+def test_automatic_headers_clear_both_fields_for_mixed_production_endpoints():
+    bundles = [
+        SimpleNamespace(
+            lines=[
+                SimpleNamespace(
+                    included=True,
+                    from_bucket="production",
+                    from_department=DepartmentEnum.TUBE.value,
+                    to_bucket="none",
+                    to_department=None,
+                ),
+                SimpleNamespace(
+                    included=True,
+                    from_bucket="none",
+                    from_department=None,
+                    to_bucket="production",
+                    to_department=DepartmentEnum.ASSEMBLY.value,
+                ),
+            ]
+        )
+    ]
+
+    assert iop.automatic_department_headers(bundles) == (None, None)
+
+
+def test_route_disassemble_result_uses_item_code_department(make_item):
     route = iop._route_for_sub_type(
         "disassemble",
         item=make_item(),
@@ -63,7 +102,7 @@ def test_route_disassemble_result_prefers_selected_to_department(make_item):
         role="result",
     )
 
-    assert route == ("out", "production", "조립", "none", None)
+    assert route == ("out", "production", DepartmentEnum.TUBE.value, "none", None)
 
 
 def test_route_internal_use_out_from_warehouse(make_item):
@@ -513,7 +552,7 @@ def test_bucket_available_excludes_location_pending(
 def test_preview_department_source_shortage_excludes_pending(
     db_session, make_item, make_location
 ):
-    item = make_item(name="production-preview-pending")
+    item = make_item(name="production-preview-pending", process_type_code="AR")
     location = make_location(
         item.item_id,
         department=DepartmentEnum.ASSEMBLY,

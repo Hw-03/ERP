@@ -177,7 +177,11 @@ export function useIoDraftRestore(params: {
     state.setNotes(draftToRestore.notes || "");
     state.setBundles(restoreInternalUseBundles(draftToRestore, getAvailable));
     state.goTo(restoreStep ?? 4);
-    onStatusChange("임시저장 작업을 불러왔습니다.");
+    onStatusChange(
+      draftToRestore.department_routes_normalized
+        ? "품목코드 기준으로 부서 경로를 자동 갱신했습니다."
+        : "임시저장 작업을 불러왔습니다.",
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftToRestore?.batch_id, restoreNonce]);
 

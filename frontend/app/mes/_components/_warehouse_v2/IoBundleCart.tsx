@@ -36,6 +36,8 @@ interface Props {
   /** 가져오기 버튼 라벨용 — 선택 0이면 부족 라인 전체 개수. */
   pullCount?: number;
   pulling?: boolean;
+  /** BOM 목록 미확인/실패 시 새 창고 반출 작업 전환을 막는다. */
+  pullBlocked?: boolean;
 }
 
 export function IoBundleCart({
@@ -60,6 +62,7 @@ export function IoBundleCart({
   onPullFromWarehouse,
   pullCount,
   pulling,
+  pullBlocked,
 }: Props) {
   const pullSelectedCount = pullSelected?.size ?? 0;
   const hasMissingInternalUseBomMode =
@@ -140,7 +143,7 @@ export function IoBundleCart({
             <button
               type="button"
               onClick={onPullFromWarehouse}
-              disabled={internalUseBomBusy || pulling}
+              disabled={internalUseBomBusy || pulling || pullBlocked}
               className="standard-hover w-full rounded-[14px] border px-5 py-3 text-sm font-black transition-colors"
               style={{
                 background: tint(LEGACY_COLORS.red, 10),

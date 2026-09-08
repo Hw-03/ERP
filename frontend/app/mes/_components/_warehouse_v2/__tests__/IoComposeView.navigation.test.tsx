@@ -11,6 +11,9 @@ const sendClientEvent = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/activity-audit-context", () => ({ setAuditScreen }));
 vi.mock("@/lib/client-events", () => ({ sendClientEvent }));
+vi.mock("@/lib/queries/useBomQuery", () => ({
+  useBomListQuery: () => ({ data: [], isSuccess: true, isPending: false, isError: false, refetch: vi.fn() }),
+}));
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/mes",
@@ -138,6 +141,73 @@ function renderCompose(items: Item[] = [], currentOperator = operator) {
   );
 }
 
+function autoRouteDraft(
+  subType: "warehouse_to_dept" | "dept_to_warehouse" | "produce" | "disassemble",
+  departments: string[],
+) {
+  const toDepartment = subType === "warehouse_to_dept" || subType === "produce";
+  return {
+    batch_id: `auto-route-${subType}-${departments.join("-") || "empty"}`,
+    work_type: subType === "warehouse_to_dept" || subType === "dept_to_warehouse" ? "warehouse_io" : "process",
+    sub_type: subType,
+    from_department: null,
+    to_department: null,
+    bundles: departments.map((department, index) => ({
+      bundle_id: `bundle-${index}`,
+      source_kind: "manual",
+      title: `${department} 품목`,
+      source_item_id: `item-${index}`,
+      source_mes_code: `AUTO-${index}`,
+      quantity: 1,
+      expanded_level: 0,
+      lines: [{
+        line_id: `line-${index}`,
+        item_id: `item-${index}`,
+        item_name: `${department} 품목`,
+        mes_code: `AUTO-${index}`,
+        unit: "EA",
+        direction: "move",
+        from_bucket: toDepartment ? "warehouse" : "production",
+        from_department: toDepartment ? null : department,
+        to_bucket: toDepartment ? "production" : "warehouse",
+        to_department: toDepartment ? department : null,
+        quantity: 1,
+        bom_expected: null,
+        included: true,
+        origin: "direct",
+        edited: false,
+        has_children: false,
+        shortage: 0,
+        exclusion_note: null,
+      }],
+    })),
+  } as never;
+}
+
+function renderAutoRouteSummary(
+  subType: "warehouse_to_dept" | "dept_to_warehouse" | "produce" | "disassemble",
+  departments: string[],
+) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <IoComposeView
+        globalSearch=""
+        operator={operator}
+        employees={[]}
+        items={[]}
+        productModels={[]}
+        setItems={() => {}}
+        onStatusChange={() => {}}
+        restoreStep={3}
+        restoreDraft={autoRouteDraft(subType, departments)}
+      />
+    </QueryClientProvider>,
+  );
+}
+
 function workTypeCards(): HTMLButtonElement[] {
   return screen.getAllByRole("button").filter((button): button is HTMLButtonElement => button.hasAttribute("aria-pressed"));
 }
@@ -163,6 +233,31 @@ beforeEach(() => {
 });
 
 describe("IoComposeView navigation chrome", () => {
+  it("자동 창고 이동 2단계 요약은 아직 선택 전에는 일반 방향을 표시한다", async () => {
+    renderAutoRouteSummary("dept_to_warehouse", []);
+
+    const nav = await screen.findByTestId("io-step-nav");
+    expect(within(nav).getByText("부서 → 창고")).toBeInTheDocument();
+  });
+
+  it("자동 창고 이동 2단계 요약은 하나의 실제 출발 부서를 표시한다", async () => {
+    renderAutoRouteSummary("dept_to_warehouse", ["튜브"]);
+
+    const nav = await screen.findByTestId("io-step-nav");
+    expect(within(nav).getByText("튜브 → 창고")).toBeInTheDocument();
+  });
+
+  it("자동 경로 2단계 요약은 혼합 부서와 process 방향을 정확히 표시한다", async () => {
+    renderAutoRouteSummary("warehouse_to_dept", ["튜브", "고압"]);
+
+    let nav = await screen.findByTestId("io-step-nav");
+    expect(within(nav).getByText("창고 → 여러 부서")).toBeInTheDocument();
+
+    renderAutoRouteSummary("produce", ["튜브"]);
+    nav = (await screen.findAllByTestId("io-step-nav"))[1];
+    expect(within(nav).getByText("입고 · 튜브")).toBeInTheDocument();
+  });
+
   it("최종 확인의 메모 검증 오류를 상태 대상 알림으로 표시한다", async () => {
     render(
       <IoComposeView
@@ -580,8 +675,8 @@ describe("IoComposeView navigation chrome", () => {
       requester_employee_id: operator.employee_id,
       work_type: "warehouse_io",
       sub_type: "warehouse_to_dept",
-      from_department: "원자재",
-      to_department: "조립",
+      from_department: null,
+      to_department: null,
       reference_no: "EDIT-REF-7",
       notes: "최종 메모",
       batch_id: "edited-desktop-draft",

@@ -3872,6 +3872,11 @@
             "title": "Created At",
             "type": "string"
           },
+          "department_routes_normalized": {
+            "default": false,
+            "title": "Department Routes Normalized",
+            "type": "boolean"
+          },
           "from_department": {
             "anyOf": [
               {

@@ -51,6 +51,48 @@ describe("IoSubTypeStep", () => {
     expect(screen.queryByRole("button", { name: "조립" })).not.toBeInTheDocument();
   });
 
+  it("부서 입출고는 대상 부서 선택 없이 입고·출고 방향만 표시한다", () => {
+    render(
+      <IoSubTypeStep
+        workType="process"
+        subType="produce"
+        fromDepartment="고압"
+        toDepartment="조립"
+        deptIoDirection="in"
+        onSubTypeChange={vi.fn()}
+        onFromDepartmentChange={vi.fn()}
+        onToDepartmentChange={vi.fn()}
+        onDeptIoDirectionChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "생산 입고" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "분해 출고" })).toBeInTheDocument();
+    expect(screen.queryByText("대상 부서")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "조립" })).not.toBeInTheDocument();
+  });
+
+  it("창고 입출고는 부서 선택 없이 두 작업 카드만 표시한다", () => {
+    render(
+      <IoSubTypeStep
+        workType="warehouse_io"
+        subType="warehouse_to_dept"
+        fromDepartment="고압"
+        toDepartment="조립"
+        deptIoDirection={null}
+        onSubTypeChange={vi.fn()}
+        onFromDepartmentChange={vi.fn()}
+        onToDepartmentChange={vi.fn()}
+        onDeptIoDirectionChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "창고 → 부서" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "부서 → 창고" })).toBeInTheDocument();
+    expect(screen.queryByText("도착 부서")).not.toBeInTheDocument();
+    expect(screen.queryByText("출발 부서")).not.toBeInTheDocument();
+  });
+
   it("internal use의 AS·연구 선택지를 사용 부서 영역 전체에 2열로 채운다", () => {
     render(
       <IoSubTypeStep

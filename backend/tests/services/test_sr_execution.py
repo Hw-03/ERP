@@ -42,10 +42,12 @@ from app.models import (
 )
 from app.services.pin_auth import DEFAULT_PIN_HASH
 from app.services import sr_execution as svc
+from app.services import sr_approval
 
 D = Decimal
 ASSEMBLY = DepartmentEnum.ASSEMBLY
 HV = DepartmentEnum.HIGH_VOLTAGE
+TUBE = DepartmentEnum.TUBE
 
 
 # ──────────────────────────── helpers ────────────────────────────
@@ -282,7 +284,7 @@ def test_execute_line_internal_use_from_department_only_consumes_that_location(
 
 def test_execute_line_warehouse_to_dept(db_session, make_item):
     """WAREHOUSE_TO_DEPT: 창고 -qty / 부서 생산 +qty, 총량 불변, change=0."""
-    item = make_item(name="W2D", warehouse_qty=D("10"))
+    item = make_item(name="W2D", process_type_code="AR", warehouse_qty=D("10"))
     emp = _make_employee(db_session)
     req = _make_request(db_session, emp, request_type=StockRequestTypeEnum.WAREHOUSE_TO_DEPT)
     line = _add_line(
@@ -303,9 +305,9 @@ def test_execute_line_warehouse_to_dept(db_session, make_item):
     assert logs[0].quantity_change == D("0")
 
 
-def test_execute_line_warehouse_to_dept_missing_dept_raises(db_session, make_item):
-    """WAREHOUSE_TO_DEPT 인데 to_department 누락 → ValueError."""
-    item = make_item(name="W2DX", warehouse_qty=D("10"))
+def test_execute_line_warehouse_to_dept_missing_dept_uses_item_code(db_session, make_item):
+    """WAREHOUSE_TO_DEPT는 요청 부서가 없어도 품목 코드 부서로 실행한다."""
+    item = make_item(name="W2DX", process_type_code="AR", warehouse_qty=D("10"))
     emp = _make_employee(db_session)
     req = _make_request(db_session, emp, request_type=StockRequestTypeEnum.WAREHOUSE_TO_DEPT)
     line = _add_line(
@@ -314,13 +316,13 @@ def test_execute_line_warehouse_to_dept_missing_dept_raises(db_session, make_ite
         to_department=None,
     )
 
-    with pytest.raises(ValueError):
-        svc._execute_line(db_session, req, line, approver=emp, is_approval=False)
+    svc._execute_line(db_session, req, line, approver=emp, is_approval=False)
+    assert _prod_qty(db_session, item.item_id, ASSEMBLY) == D("3")
 
 
 def test_execute_line_dept_to_warehouse(db_session, make_item, make_location):
     """DEPT_TO_WAREHOUSE: 부서 생산 -qty / 창고 +qty, 총량 불변, change=0."""
-    item = make_item(name="D2W", warehouse_qty=D("0"))
+    item = make_item(name="D2W", process_type_code="AR", warehouse_qty=D("0"))
     make_location(item.item_id, department=ASSEMBLY,
                   status=LocationStatusEnum.PRODUCTION, quantity=D("5"))
     inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
@@ -709,7 +711,7 @@ def test_execute_line_raw_ship_insufficient_raises(db_session, make_item):
 
 def test_release_then_execute_line_approval_consumes_stock(db_session, make_item):
     """Final approval releases the request once before line execution."""
-    item = make_item(name="APR", warehouse_qty=D("10"), pending=D("3"))
+    item = make_item(name="APR", process_type_code="AR", warehouse_qty=D("10"), pending=D("3"))
     emp = _make_employee(db_session)
     req = _make_request(db_session, emp, request_type=StockRequestTypeEnum.WAREHOUSE_TO_DEPT)
     line = _add_line(
@@ -816,7 +818,7 @@ def test_execute_all_lines_records_one_operation_for_request(db_session, make_it
 
 def test_finalize_warehouse_primary_self_approves(db_session, make_item):
     """창고 primary 본인 wh_to_dept 제출 → 즉시 COMPLETED + 실재고 이동 + approved_by 기록."""
-    item = make_item(name="FIN1", warehouse_qty=D("10"))
+    item = make_item(name="FIN1", process_type_code="AR", warehouse_qty=D("10"))
     emp = _make_employee(db_session, warehouse_role="primary")
     req = _make_request(
         db_session, emp, request_type=StockRequestTypeEnum.WAREHOUSE_TO_DEPT,
@@ -1003,6 +1005,114 @@ def test_finalize_dept_to_warehouse_reserves_production_source(
 
     assert request.status == StockRequestStatusEnum.RESERVED
     assert _loc_pending(db_session, item.item_id) == D("4")
+
+
+def test_approve_dept_to_warehouse_rereserves_live_code_source(
+    db_session, make_item, make_location, monkeypatch
+):
+    """승인 전 코드가 바뀌면 기존 예약을 푼 뒤 새 부서를 다시 예약해 실행한다."""
+    item = make_item(name="live D2W reservation", process_type_code="AR", warehouse_qty=D("0"))
+    make_location(item.item_id, department=ASSEMBLY, quantity=D("1"))
+    make_location(item.item_id, department=TUBE, quantity=D("1"))
+    requester = _make_employee(db_session, warehouse_role="none")
+    approver = _make_employee(db_session, code="WH-APP", warehouse_role="primary")
+    request = _make_request(
+        db_session,
+        requester,
+        request_type=StockRequestTypeEnum.DEPT_TO_WAREHOUSE,
+        requires_warehouse_approval=True,
+    )
+    _add_line(
+        db_session,
+        request,
+        item,
+        quantity=D("1"),
+        from_bucket=RequestBucketEnum.PRODUCTION,
+        to_bucket=RequestBucketEnum.WAREHOUSE,
+        from_department=ASSEMBLY.value,
+    )
+    svc._finalize_submission(db_session, request=request, requester=requester, now=datetime.utcnow())
+    assert request.status == StockRequestStatusEnum.RESERVED
+
+    item.process_type_code = "TR"
+    db_session.flush()
+    from app.services import sr_reservation
+
+    original_reserve = sr_reservation.reserve_lines
+    reroute_reservations: list[str | None] = []
+
+    def capture_live_reservation(db, lines, *, employee=None):
+        lines = list(lines)
+        reroute_reservations.extend(line.from_department for line in lines)
+        return original_reserve(db, lines, employee=employee)
+
+    monkeypatch.setattr(sr_reservation, "reserve_lines", capture_live_reservation)
+    sr_approval.approve_request(db_session, request, approver=approver, pin="0000")
+
+    assert reroute_reservations == [TUBE.value]
+    assert request.lines[0].from_department == TUBE.value
+    assert _prod_qty(db_session, item.item_id, ASSEMBLY) == D("1")
+    assert _prod_qty(db_session, item.item_id, TUBE) == D("0")
+    assert _loc_pending(db_session, item.item_id, TUBE) == D("0")
+    assert _wh_qty(db_session, item.item_id) == D("1")
+
+
+def test_live_reroute_preflight_does_not_consume_competing_pending_stock(
+    db_session, make_item, make_location
+):
+    """코드 변경 뒤 새 부서의 다른 대기 예약을 넘겨 출고할 수 없다."""
+    item = make_item(name="competing live D2W", process_type_code="AR", warehouse_qty=D("0"))
+    make_location(item.item_id, department=ASSEMBLY, quantity=D("1"))
+    make_location(item.item_id, department=TUBE, quantity=D("1"))
+    requester = _make_employee(db_session, warehouse_role="none")
+    old_request = _make_request(
+        db_session,
+        requester,
+        request_type=StockRequestTypeEnum.DEPT_TO_WAREHOUSE,
+        requires_warehouse_approval=True,
+    )
+    _add_line(
+        db_session,
+        old_request,
+        item,
+        quantity=D("1"),
+        from_bucket=RequestBucketEnum.PRODUCTION,
+        to_bucket=RequestBucketEnum.WAREHOUSE,
+        from_department=ASSEMBLY.value,
+    )
+    svc._finalize_submission(
+        db_session, request=old_request, requester=requester, now=datetime.utcnow()
+    )
+    item.process_type_code = "TR"
+    db_session.flush()
+
+    competing_request = _make_request(
+        db_session,
+        requester,
+        request_type=StockRequestTypeEnum.DEPT_TO_WAREHOUSE,
+        requires_warehouse_approval=True,
+    )
+    _add_line(
+        db_session,
+        competing_request,
+        item,
+        quantity=D("1"),
+        from_bucket=RequestBucketEnum.PRODUCTION,
+        to_bucket=RequestBucketEnum.WAREHOUSE,
+        from_department=TUBE.value,
+    )
+    svc._finalize_submission(
+        db_session, request=competing_request, requester=requester, now=datetime.utcnow()
+    )
+    assert _loc_pending(db_session, item.item_id, TUBE) == D("1")
+
+    svc.release_reservation(db_session, old_request)
+    with pytest.raises(ValueError, match="부서 가용 재고 부족"):
+        svc.reroute_and_preflight_dept_to_warehouse(db_session, old_request)
+
+    assert _prod_qty(db_session, item.item_id, TUBE) == D("1")
+    assert _loc_pending(db_session, item.item_id, TUBE) == D("1")
+    assert _wh_qty(db_session, item.item_id) == D("0")
 
 
 def test_finalize_inbound_only_approval_stays_submitted(db_session, make_item):

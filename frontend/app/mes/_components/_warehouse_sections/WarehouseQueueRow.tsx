@@ -8,6 +8,7 @@ import { formatKstDateTime } from "@/lib/mes/format";
 import {
   REQUEST_TYPE_LABEL,
   formatRequestNotes,
+  getRequestFlowLabel,
   getRequestStatusPresentation,
 } from "./ioRequestLabels";
 import { StockRequestLineTable } from "./StockRequestLineTable";
@@ -59,11 +60,7 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
   const noteText = formatRequestNotes(req.notes);
   const typeLabel = REQUEST_TYPE_LABEL[req.request_type] ?? req.request_type;
   const status = getRequestStatusPresentation(req.status);
-  const firstLine = req.lines[0];
-  const fromDept = firstLine?.from_department ? normalizeDepartment(firstLine.from_department) : null;
-  const toDept = firstLine?.to_department ? normalizeDepartment(firstLine.to_department) : null;
-  const flowLabel =
-    fromDept && toDept ? `${fromDept} → ${toDept}` : fromDept ?? toDept ?? null;
+  const flowLabel = getRequestFlowLabel(req.request_type, req.lines);
 
   return (
     <div
@@ -116,7 +113,7 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
         </div>
       </div>
 
-      <StockRequestLineTable lines={req.lines} />
+      <StockRequestLineTable lines={req.lines} requestType={req.request_type} />
 
       {noteText &&
         (approvePinFor === req.request_id || showRejectFor === req.request_id) && (

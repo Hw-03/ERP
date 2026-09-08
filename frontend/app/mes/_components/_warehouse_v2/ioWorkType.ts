@@ -17,6 +17,20 @@ import {
 
 const MANUAL_ORIGINS = new Set(["manual", "adjust_in", "adjust_out"]);
 
+const AUTO_DEPARTMENT_ROUTE_SUB_TYPES = new Set<IoSubType>([
+  "warehouse_to_dept",
+  "dept_to_warehouse",
+  "produce",
+  "disassemble",
+  "adjust_in",
+  "adjust_out",
+]);
+
+/** 품목의 공정코드로 생산 부서를 서버가 결정하는 작업이다. */
+export function isAutoDepartmentRoute(subType: IoSubType): boolean {
+  return AUTO_DEPARTMENT_ROUTE_SUB_TYPES.has(subType);
+}
+
 export const IO_WORK_TYPES: Array<{
   id: IoWorkType;
   label: string;
@@ -93,13 +107,7 @@ export function subTypeLabel(subType: IoSubType) {
 
 export function requiresDepartments(subType: IoSubType) {
   return [
-    "warehouse_to_dept",
-    "dept_to_warehouse",
-    "produce",
-    "disassemble",
     "dept_transfer",
-    "adjust_in",
-    "adjust_out",
     "defect_quarantine",
     "supplier_return",
     "defect_restore",
@@ -327,6 +335,7 @@ export function targetDepartmentOf(
   fromDepartment: string,
   toDepartment: string,
 ): string | null {
+  if (isAutoDepartmentRoute(subType)) return null;
   // 출발 부서가 대상인 작업
   if (subType === "dept_to_warehouse" || subType === "defect_quarantine" || subType === "supplier_return" || subType === "defect_restore" || subType === "defect_process") {
     return fromDepartment;
@@ -349,6 +358,7 @@ export function directionWord(dir: DeptIoDirection | null): "입고" | "출고" 
 
 // sub_type → Step 2 에서 노출할 부서 grid (출발/도착). IoSubTypeStep 단일 소스.
 export function deptVisibility(subType: IoSubType): { from: boolean; to: boolean } {
+  if (isAutoDepartmentRoute(subType)) return { from: false, to: false };
   if (subType === "internal_use_out") return { from: false, to: true };
   if (subType === "warehouse_to_dept") return { from: false, to: true };
   if (subType === "dept_to_warehouse") return { from: true, to: false };
@@ -429,10 +439,31 @@ export function ioDepartmentPayload(
   fromDepartment: string,
   toDepartment: string,
 ): { fromDepartment: string | null; toDepartment: string | null } {
-  if (isWarehouseAdjustSubType(subType)) {
+  if (isAutoDepartmentRoute(subType) || isWarehouseAdjustSubType(subType)) {
     return { fromDepartment: null, toDepartment: null };
   }
   return { fromDepartment, toDepartment };
+}
+
+/** 자동 부서 입출고의 실제 재고 반영 경로를 라인별로 표시한다. */
+export function automaticLineRouteLabel(
+  subType: IoSubType,
+  line: Pick<IoLine, "from_bucket" | "from_department" | "to_bucket" | "to_department">,
+): string | null {
+  if (!isAutoDepartmentRoute(subType)) return null;
+  if (line.from_bucket === "warehouse" && line.to_bucket === "production" && line.to_department) {
+    return `창고 → ${line.to_department}`;
+  }
+  if (line.from_bucket === "production" && line.to_bucket === "warehouse" && line.from_department) {
+    return `${line.from_department} → 창고`;
+  }
+  if (line.to_bucket === "production" && line.to_department) {
+    return `${line.to_department} 입고`;
+  }
+  if (line.from_bucket === "production" && line.from_department) {
+    return `${line.from_department} 출고`;
+  }
+  return null;
 }
 
 /** 한 묶음 카트 안에서 BOM 묶음과 낱개 묶음을 같이 가질 수 있는지.

@@ -24,7 +24,7 @@ describe("MobileSubTypeStep", () => {
     expect(screen.queryByRole("button", { name: "조립" })).not.toBeInTheDocument();
   });
 
-  it("weights detail selection and destination department at a 4:6 mobile ratio", () => {
+  it("창고 입출고는 부서 선택 없이 두 세부 작업 카드만 표시한다", () => {
     render(
       <MobileSubTypeStep
         workType="warehouse_io"
@@ -39,9 +39,31 @@ describe("MobileSubTypeStep", () => {
       />,
     );
 
-    expect(screen.getByText("세부 작업").parentElement).toHaveClass("basis-[40%]");
-    expect(screen.getByText("도착 부서").parentElement).toHaveClass("basis-[60%]");
-    expect(screen.getByRole("button", { name: "튜브" })).toHaveClass("min-h-[56px]");
+    expect(screen.getByText("세부 작업").parentElement).toHaveClass("flex-1");
+    expect(screen.getByRole("button", { name: /창고 → 부서/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /부서 → 창고/ })).toBeInTheDocument();
+    expect(screen.queryByText("도착 부서")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "튜브" })).not.toBeInTheDocument();
+  });
+
+  it("부서 입출고는 모바일에서도 대상 부서 선택 없이 방향만 표시한다", () => {
+    render(
+      <MobileSubTypeStep
+        workType="process"
+        subType="produce"
+        fromDepartment="고압"
+        toDepartment="조립"
+        deptIoDirection="in"
+        onSubTypeChange={vi.fn()}
+        onFromDepartmentChange={vi.fn()}
+        onToDepartmentChange={vi.fn()}
+        onDeptIoDirectionChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "입고" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "출고" })).toBeInTheDocument();
+    expect(screen.queryByText("대상 부서")).not.toBeInTheDocument();
   });
 
   it("393px 흐름에서 internal_use는 AS·연구 전용 선택지만 렌더한다", () => {

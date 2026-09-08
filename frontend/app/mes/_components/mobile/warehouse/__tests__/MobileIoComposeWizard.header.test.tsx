@@ -36,6 +36,9 @@ vi.mock("@/lib/api", () => ({
     submitDraft: vi.fn(),
   },
 }));
+vi.mock("@/lib/queries/useBomQuery", () => ({
+  useBomListQuery: () => ({ data: [], isSuccess: true, isPending: false, isError: false, refetch: vi.fn() }),
+}));
 
 vi.mock("../../../_warehouse_v2/useIoWorkState", () => ({
   useIoWorkState: () => wizardState,
@@ -90,6 +93,35 @@ beforeEach(() => {
 });
 
 describe("MobileIoComposeWizard Step 5 헤더", () => {
+  it.each([
+    ["창고 입출고", "warehouse_io", "warehouse_to_dept"],
+    ["부서 입출고", "process", "produce"],
+  ])("%s는 부서 선택기 없는 2단계 헤더를 세부 작업 선택으로 표시한다", (_label, workType, subType) => {
+    const originalStep = wizardState.step;
+    const originalWorkType = wizardState.workType;
+    const originalSubType = wizardState.subType;
+    wizardState.step = 2;
+    wizardState.workType = workType;
+    wizardState.subType = subType;
+    try {
+      render(
+        <MobileIoComposeWizard
+          globalSearch=""
+          operator={null}
+          items={[]}
+          setItems={vi.fn()}
+          onStatusChange={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("세부 작업 선택")).toBeInTheDocument();
+    } finally {
+      wizardState.step = originalStep;
+      wizardState.workType = originalWorkType;
+      wizardState.subType = originalSubType;
+    }
+  });
+
   it("최종 확인의 메모 검증 오류를 상태 대상 알림으로 표시한다", async () => {
     render(
       <MobileIoComposeWizard
@@ -325,8 +357,8 @@ describe("MobileIoComposeWizard Step 5 헤더", () => {
           employeeId: currentOperator.employee_id,
           workType: "warehouse_io",
           subType: "warehouse_to_dept",
-          fromDepartment: "원자재",
-          toDepartment: "조립",
+          fromDepartment: null,
+          toDepartment: null,
           referenceNo: "MOBILE-REF-3",
           notes: "모바일 최종 메모",
           batchId: "edited-mobile-draft",

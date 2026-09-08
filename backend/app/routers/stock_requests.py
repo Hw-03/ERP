@@ -17,6 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from app.database import get_db, _is_sqlite
 from app.models import (
     Employee,
+    Item,
     StockRequest,
     StockRequestLine,
     StockRequestStatusEnum,
@@ -33,6 +34,7 @@ from app.schemas import (
     StockRequestSubmitPayload,
 )
 from app.services import stock_requests as svc
+from app.services.inv_transfer import department_for_item
 from app.services import stock_request_actions as action_svc
 from app.services._tx import commit_and_refresh, commit_only
 from app.services import notifications as notif_svc
@@ -40,6 +42,31 @@ from app._evt import emit as _evt_emit
 
 
 router = APIRouter()
+
+
+def _validate_direct_automatic_department_routes(
+    db: Session,
+    payload: StockRequestCreate | StockRequestDraftUpsert,
+) -> None:
+    """직접 창고↔부서 요청도 품목 코드와 다른 생산부서를 우회하지 못하게 한다."""
+    expected_department_field = {
+        StockRequestTypeEnum.WAREHOUSE_TO_DEPT: "to_department",
+        StockRequestTypeEnum.DEPT_TO_WAREHOUSE: "from_department",
+    }.get(payload.request_type)
+    if expected_department_field is None:
+        return
+    for line in payload.lines:
+        item = db.query(Item).filter(Item.item_id == line.item_id).first()
+        if item is None:
+            # 기존 서비스가 동일한 422 메시지로 처리한다.
+            continue
+        expected = department_for_item(item).value
+        actual = getattr(line, expected_department_field)
+        if actual != expected:
+            raise ValueError(
+                f"품목코드 기준 부서와 요청 부서가 다릅니다: "
+                f"{item.mes_code or item.item_id} / 기대 {expected} / 요청 {actual}"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -58,6 +85,11 @@ def create_stock_request(payload: StockRequestCreate, db: Session = Depends(get_
         raise http_error(404, ErrorCode.NOT_FOUND, "요청자(직원)를 찾을 수 없습니다.")
     if not bool(requester.is_active):
         raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원은 요청할 수 없습니다.")
+
+    try:
+        _validate_direct_automatic_department_routes(db, payload)
+    except ValueError as exc:
+        raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
 
     lines_input = [
         svc.LineInput(
@@ -308,6 +340,11 @@ def upsert_stock_request_draft(
         raise http_error(404, ErrorCode.NOT_FOUND, "요청자(직원)를 찾을 수 없습니다.")
     if not bool(requester.is_active):
         raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원은 요청할 수 없습니다.")
+
+    try:
+        _validate_direct_automatic_department_routes(db, payload)
+    except ValueError as exc:
+        raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
 
     lines_input = [
         svc.LineInput(

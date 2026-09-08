@@ -75,6 +75,39 @@ describe("MyRequestRow request timestamp", () => {
     );
   });
 
+  it("자동 부서 혼합 요청은 첫 라인 대신 여러 부서로 요약한다", () => {
+    render(
+      <MyRequestRow
+        req={makeRequest({
+          lines: [
+            { ...makeLine(1, "warehouse", "production"), to_department: "조립" },
+            { ...makeLine(2, "warehouse", "production"), to_department: "고압" },
+          ],
+        })}
+        onCancelRequest={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("my-request-summary")).toHaveTextContent("여러 부서 · 2건");
+  });
+
+  it("부서간 이동은 여러 부서로 축약하지 않고 실제 출발·도착 부서를 표시한다", () => {
+    render(
+      <MyRequestRow
+        req={makeRequest({
+          request_type: "dept_internal",
+          lines: [
+            { ...makeLine(1, "production", "production"), from_department: "튜브", to_department: "고압" },
+            { ...makeLine(2, "production", "production"), from_department: "튜브", to_department: "고압" },
+          ],
+        })}
+        onCancelRequest={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("my-request-summary")).toHaveTextContent("튜브 → 고압 · 2건");
+  });
+
   it("상대시간 대신 실제 제출 일시를 표시", () => {
     render(
       <MyRequestRow

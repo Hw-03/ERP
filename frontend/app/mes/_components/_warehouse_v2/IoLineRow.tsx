@@ -9,6 +9,7 @@ import { mesCodeDeptBadge } from "@/lib/mes/process";
 import { useDeptColorLookup } from "../DepartmentsContext";
 import type { IoLine, IoSubType, Item } from "./types";
 import {
+  automaticLineRouteLabel,
   isBomForced,
   isWarehouseAdjustSubType,
   lineTagLabel,
@@ -142,6 +143,7 @@ export function IoLineRow({
   const tag = noInventoryEffect
     ? { text: "변동 없음", tone: "muted" as const }
     : lineTagLabel(effectLine, subType);
+  const routeLabel = noInventoryEffect ? null : automaticLineRouteLabel(subType, effectLine);
   const tagColor = toneToColor(tag.tone);
   const expectedColor =
     expected === null
@@ -224,6 +226,7 @@ export function IoLineRow({
         </div>
         <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
           <span className="truncate">{line.mes_code ?? "-"}</span>
+          {routeLabel && <span data-testid="io-line-route">{routeLabel}</span>}
           <span
             className="rounded-full px-2 py-0.5 text-[10px] font-bold"
             style={{ background: tint(tagColor, 14), color: tagColor }}

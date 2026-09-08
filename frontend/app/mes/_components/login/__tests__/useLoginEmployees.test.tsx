@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
@@ -19,18 +19,23 @@ describe("useLoginEmployees", () => {
     state.getEmployees.mockReset();
   });
 
-  it("logs the original error when loading login employees fails", async () => {
+  it("shows failure state and retries active employee loading", async () => {
     const failure = new Error("CORS request blocked");
     state.getEmployees.mockRejectedValue(failure);
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    renderHook(() => useLoginEmployees());
+    const { result } = renderHook(() => useLoginEmployees());
 
     await waitFor(() => {
-      expect(consoleError).toHaveBeenCalledWith(
-        "[MES login] Failed to load active employees.",
-        failure,
-      );
+      expect(result.current.status).toBe("error");
     });
+    expect(consoleWarn).toHaveBeenCalledWith("[MES login] read failed", expect.objectContaining({
+      stage: "active_employees",
+      attempts: 2,
+    }));
+
+    state.getEmployees.mockResolvedValue([]);
+    act(() => result.current.retry());
+    await waitFor(() => expect(result.current.status).toBe("ready"));
   });
 });

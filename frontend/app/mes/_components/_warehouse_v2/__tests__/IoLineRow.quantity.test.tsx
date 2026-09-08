@@ -143,6 +143,27 @@ describe("IoLineRow quantity", () => {
     expect(screen.getByRole("button", { name: "-1" })).toHaveClass("min-h-[44px]");
   });
 
+  it("자동 부서 이동 라인에는 품목별 실제 창고→부서 경로를 표시한다", () => {
+    render(
+      <IoLineRow
+        line={makeLine({
+          direction: "move",
+          from_bucket: "warehouse",
+          to_bucket: "production",
+          to_department: "고압",
+        })}
+        subType="warehouse_to_dept"
+        isChild={false}
+        available={10}
+        onToggle={() => {}}
+        onQuantityChange={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("창고 → 고압")).toBeInTheDocument();
+  });
+
   it("uses included for non-internal-use checkbox state even when the server sends selected", () => {
     render(
       <IoLineRow

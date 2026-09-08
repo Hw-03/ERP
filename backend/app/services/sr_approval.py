@@ -24,6 +24,7 @@ from app.services.sr_execution import (
     _execute_all_lines,
     _request_inventory_item_ids,
     release_reservation,
+    reroute_and_preflight_dept_to_warehouse,
 )
 
 # 주의: io_dispatch.execute_batch_after_dept_approval 만 함수 내부 지연 import 한다.
@@ -82,6 +83,7 @@ def approve_request(
 
     try:
         release_reservation(db, request)
+        reroute_and_preflight_dept_to_warehouse(db, request)
         _execute_all_lines(
             db,
             request,
@@ -165,6 +167,7 @@ def approve_request_department(
 
     try:
         release_reservation(db, request)
+        reroute_and_preflight_dept_to_warehouse(db, request)
         if request.request_type == StockRequestTypeEnum.MANUAL_ADJUSTMENT:
             # io_dispatch 가 원본 IoBatch 라인을 _apply_line 식으로 실행.
             execute_batch_after_dept_approval(db, request=request, approver=approver)

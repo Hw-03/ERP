@@ -185,7 +185,7 @@ def test_approve_transitions_reserved_to_completed_and_moves_stock(
     db_session, make_item
 ):
     """승인: RESERVED→COMPLETED + pending 해제 + 창고 차감 + 부서 생산 입고."""
-    item = make_item(name="A001", warehouse_qty=D("10"))
+    item = make_item(name="A001", process_type_code="AR", warehouse_qty=D("10"))
     requester = _make_employee(db_session, code="RQ1", name="요청자")
     approver = _make_employee(db_session, code="WH1", name="창고정", warehouse_role="primary")
     req = _make_reserved_request(db_session, requester, item, qty=D("3"))
@@ -214,7 +214,7 @@ def test_legacy_submitted_department_request_can_be_approved_without_reservation
 ):
     from app.services import sr_reservation
 
-    item = make_item(name="legacy-department-source")
+    item = make_item(name="legacy-department-source", process_type_code="AR")
     location = make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
     requester = _make_employee(db_session, code="LEGACY-REQ")
     approver = _make_employee(
@@ -392,7 +392,7 @@ def test_warehouse_approve_holds_when_department_pending(db_session, make_item):
 
 def test_department_approve_completes_after_warehouse(db_session, make_item):
     """듀얼 결재: 창고→부서 순서로 모두 충족되면 COMPLETED + 실재고 이동."""
-    item = make_item(name="DUAL2", warehouse_qty=D("10"))
+    item = make_item(name="DUAL2", process_type_code="AR", warehouse_qty=D("10"))
     requester = _make_employee(db_session, code="DRQ2")
     wh = _make_employee(db_session, code="DWH2", warehouse_role="primary")
     dept = _make_employee(db_session, code="DDP2", department_role="primary")
@@ -420,7 +420,7 @@ def test_department_approve_releases_location_reservation_before_execution(
 ):
     from app.models import RequestBucketEnum
 
-    item = make_item(name="department-approved-source")
+    item = make_item(name="department-approved-source", process_type_code="AR")
     location = make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
     requester = _make_employee(db_session, code="DREQ-SOURCE")
     approver = _make_employee(
@@ -555,8 +555,8 @@ def test_department_reject_returns_process_single_adjustment_to_same_draft(
     db_session, make_item, make_location
 ):
     """부서 낱개 조정 반려는 요청 이력은 남기고 기존 다품목 batch만 draft로 되돌린다."""
-    first = make_item(name="반려 복귀 A")
-    second = make_item(name="반려 복귀 B")
+    first = make_item(name="반려 복귀 A", process_type_code="AR")
+    second = make_item(name="반려 복귀 B", process_type_code="AR")
     first_location = make_location(first.item_id, department=ASSEMBLY, quantity=D("5"))
     second_location = make_location(second.item_id, department=ASSEMBLY, quantity=D("5"))
     requester = _make_employee(db_session, code="ADJ-REQ")

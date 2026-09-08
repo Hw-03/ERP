@@ -37,7 +37,7 @@ export const catalogApi = {
   }) => patchJson<{ ok: boolean }>(toApiUrl("/api/models/reorder"), payload),
 
   // BOM --------------------------------------------------------------------
-  getAllBOM: () => fetcher<BOMDetailEntry[]>(toApiUrl("/api/bom")),
+  getAllBOM: (signal?: AbortSignal) => fetcher<BOMDetailEntry[]>(toApiUrl("/api/bom"), signal),
   getBOM: (parentItemId: string) => fetcher<BOMEntry[]>(toApiUrl(`/api/bom/${parentItemId}`)),
   getBOMTree: (parentItemId: string, options?: { departmentOrder?: "desc" }) => {
     const query = options?.departmentOrder ? `?department_order=${options.departmentOrder}` : "";

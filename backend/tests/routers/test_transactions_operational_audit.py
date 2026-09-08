@@ -44,7 +44,7 @@ def test_history_exposes_request_actor_and_inventory_effect_for_approved_transfe
     db_session,
     make_item,
 ):
-    item = make_item(name="Audit Item", warehouse_qty=Decimal("10"))
+    item = make_item(name="Audit Item", process_type_code="AR", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="REQ1", name="Requester")
     approver = _make_employee(
         db_session,

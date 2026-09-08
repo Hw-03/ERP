@@ -8,8 +8,8 @@ import { deleteJson, fetcher, patchJson, postJson, putJson, toApiUrl } from "../
 import type { DepartmentMaster } from "./types";
 
 export const departmentsApi = {
-  getAppSession: (): Promise<{ boot_id: string; started_at: string }> =>
-    fetcher(toApiUrl("/api/app-session")),
+  getAppSession: (signal?: AbortSignal): Promise<{ boot_id: string; started_at: string }> =>
+    fetcher(toApiUrl("/api/app-session"), signal),
 
   getDepartments: (params?: { isActive?: boolean }) => {
     const query = new URLSearchParams();

@@ -3,7 +3,7 @@
  */
 
 import React from "react";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
@@ -17,6 +17,20 @@ import {
   useUpdateBomMutation,
   useDeleteBomMutation,
 } from "@/lib/queries/useBomQuery";
+import { catalogApi } from "@/lib/api/catalog";
+import { ApiError } from "@/lib/api-core";
+
+const validBomList = [{
+  bom_id: "bom-1",
+  parent_item_id: "parent-1",
+  parent_item_name: "완제품A",
+  parent_mes_code: "FA-001",
+  child_item_id: "child-1",
+  child_item_name: "부품X",
+  child_mes_code: "PX-001",
+  quantity: 1,
+  unit: "EA",
+}];
 
 function makeWrapper() {
   const client = new QueryClient({
@@ -34,22 +48,80 @@ function makeWrapper() {
 
 describe("useBomListQuery (MSW)", () => {
   it("전체 BOM 목록 반환 (2개)", async () => {
+    const getAllBOM = vi.spyOn(catalogApi, "getAllBOM").mockResolvedValue([...validBomList, {
+      ...validBomList[0], bom_id: "bom-2", child_item_id: "child-2",
+    }]);
     const { Wrapper } = makeWrapper();
     const { result } = renderHook(() => useBomListQuery(), { wrapper: Wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toHaveLength(2);
     expect(result.current.data?.[0].bom_id).toBe("bom-1");
+    expect(getAllBOM.mock.calls[0]?.[0]).toBeInstanceOf(AbortSignal);
+    getAllBOM.mockRestore();
   });
 
   it("404 응답 시 isError === true", async () => {
-    server.use(
-      http.get("*/api/bom", () =>
-        HttpResponse.json({ detail: "Not found" }, { status: 404 }),
-      ),
-    );
+    const getAllBOM = vi.spyOn(catalogApi, "getAllBOM").mockRejectedValue(new ApiError("Not found", 404));
     const { Wrapper } = makeWrapper();
     const { result } = renderHook(() => useBomListQuery(), { wrapper: Wrapper });
     await waitFor(() => expect(result.current.isError).toBe(true));
+    getAllBOM.mockRestore();
+  });
+
+  it("일시적인 503은 500ms 뒤 한 번만 재시도해 성공한다", async () => {
+    const getAllBOM = vi.spyOn(catalogApi, "getAllBOM")
+      .mockRejectedValueOnce(new ApiError("temporarily unavailable", 503))
+      .mockResolvedValueOnce([]);
+    const { Wrapper } = makeWrapper();
+    const { result } = renderHook(() => useBomListQuery(), { wrapper: Wrapper });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true), { timeout: 2_000 });
+    expect(getAllBOM).toHaveBeenCalledTimes(2);
+    getAllBOM.mockRestore();
+  });
+
+  it("4xx는 재시도하지 않는다", async () => {
+    const getAllBOM = vi.spyOn(catalogApi, "getAllBOM").mockRejectedValue(new ApiError("Not found", 404));
+    const { Wrapper } = makeWrapper();
+    const { result } = renderHook(() => useBomListQuery(), { wrapper: Wrapper });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(getAllBOM).toHaveBeenCalledTimes(1);
+    getAllBOM.mockRestore();
+  });
+
+  it("BOM 부모 식별자가 없는 응답은 오류로 처리하고 재시도하지 않는다", async () => {
+    const getAllBOM = vi.spyOn(catalogApi, "getAllBOM")
+      .mockResolvedValue([{ bom_id: "bom-1", child_item_id: "child-1" }] as never);
+    const { Wrapper } = makeWrapper();
+    const { result } = renderHook(() => useBomListQuery(), { wrapper: Wrapper });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(getAllBOM).toHaveBeenCalledTimes(1);
+    getAllBOM.mockRestore();
+  });
+
+  it("JSON 형식이 깨진 응답은 재시도하지 않는다", async () => {
+    const getAllBOM = vi.spyOn(catalogApi, "getAllBOM")
+      .mockRejectedValue(new SyntaxError("Unexpected token"));
+    const { Wrapper } = makeWrapper();
+    const { result } = renderHook(() => useBomListQuery(), { wrapper: Wrapper });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(getAllBOM).toHaveBeenCalledTimes(1);
+    getAllBOM.mockRestore();
+  });
+
+  it("사용자 취소 AbortError는 재시도하지 않는다", async () => {
+    const abort = new Error("request cancelled");
+    abort.name = "AbortError";
+    const getAllBOM = vi.spyOn(catalogApi, "getAllBOM").mockRejectedValue(abort);
+    const { Wrapper } = makeWrapper();
+    const { result } = renderHook(() => useBomListQuery(), { wrapper: Wrapper });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(getAllBOM).toHaveBeenCalledTimes(1);
+    getAllBOM.mockRestore();
   });
 });
 

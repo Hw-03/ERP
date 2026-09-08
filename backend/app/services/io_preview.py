@@ -23,6 +23,7 @@ from app.models import (
 )
 from app.services import bom as bom_svc
 from app.services import inventory as inventory_svc
+from app.services.inv_transfer import department_for_item
 from app.services import stock_math
 from app.services.bom_stock_policy import (
     BOM_AUTO_ORIGIN,
@@ -60,6 +61,16 @@ WAREHOUSE_ADJUST_SUB_TYPES = frozenset(
     {"warehouse_adjust_in", "warehouse_adjust_out"}
 )
 WAREHOUSE_MANAGER_ROLES = frozenset({"primary", "deputy"})
+AUTOMATIC_DEPARTMENT_SUB_TYPES = frozenset(
+    {
+        "warehouse_to_dept",
+        "dept_to_warehouse",
+        "produce",
+        "disassemble",
+        "adjust_in",
+        "adjust_out",
+    }
+)
 
 
 def validate_internal_use_operation(
@@ -516,9 +527,21 @@ def _route_for_sub_type(
     if sub_type == "receive_supplier":
         return ("in", "none", None, "warehouse", None)
     if sub_type == "warehouse_to_dept":
-        return ("move", "warehouse", None, "production", to_department)
+        return (
+            "move",
+            "warehouse",
+            None,
+            "production",
+            _enum_value(department_for_item(item)),
+        )
     if sub_type == "dept_to_warehouse":
-        return ("move", "production", from_department, "warehouse", None)
+        return (
+            "move",
+            "production",
+            _enum_value(department_for_item(item)),
+            "warehouse",
+            None,
+        )
     if sub_type == INTERNAL_USE_SUB_TYPE:
         if source_location == "department":
             source_department = _component_source_dept(item, None)
@@ -526,25 +549,25 @@ def _route_for_sub_type(
         return ("out", "warehouse", None, "none", to_department)
     if sub_type == "produce":
         if role == "result":
-            dept = _default_production_dept(item, to_department or from_department)
+            dept = _enum_value(department_for_item(item))
             return ("in", "none", None, "production", dept)
         # 부품: 작업 부서가 아니라 부품의 소속 공정에서 차감 (튜닝 보드는 튜닝에서).
-        dept = _component_source_dept(item, to_department or from_department)
+        dept = _enum_value(department_for_item(item))
         return ("out", "production", dept, "none", None)
     if sub_type == "disassemble":
         if role == "result":
-            dept = _default_production_dept(item, to_department or from_department)
+            dept = _enum_value(department_for_item(item))
             return ("out", "production", dept, "none", None)
         # 회수 부품: 소속 공정으로 복귀.
-        dept = _component_source_dept(item, from_department or to_department)
+        dept = _enum_value(department_for_item(item))
         return ("in", "none", None, "production", dept)
     if sub_type == "dept_transfer":
         return ("move", "production", from_department, "production", to_department)
     if sub_type == "adjust_in":
-        dept = _default_production_dept(item, to_department or from_department)
+        dept = _enum_value(department_for_item(item))
         return ("adjust", "none", None, "production", dept)
     if sub_type == "adjust_out":
-        dept = _default_production_dept(item, to_department or from_department)
+        dept = _enum_value(department_for_item(item))
         return ("adjust", "production", dept, "none", None)
     if sub_type == "warehouse_adjust_in":
         return ("adjust", "none", None, "warehouse", None)
@@ -562,6 +585,101 @@ def _route_for_sub_type(
         source = from_department or to_department or DepartmentEnum.ASSEMBLY.value
         return ("out", "defective", source, "none", None)
     raise ValueError(f"지원하지 않는 세부 작업입니다: {sub_type}")
+
+
+def normalize_automatic_department_routes(
+    db: Session,
+    *,
+    work_type: str,
+    sub_type: str,
+    bundles: Iterable[object],
+) -> bool:
+    """자동 부서 작업의 저장·제출 라인을 현재 품목 코드 기준으로 재경로화한다.
+
+    호출자가 보낸 부서값은 자동 작업에서 의도가 아니라 표시용 과거 데이터로 취급한다.
+    ORM 라인과 Pydantic payload 모두 속성 인터페이스로 처리한다.
+    """
+    if sub_type not in AUTOMATIC_DEPARTMENT_SUB_TYPES:
+        return False
+
+    changed = False
+    for bundle in bundles:
+        source_kind = getattr(bundle, "source_kind", None)
+        for line in getattr(bundle, "lines", ()):
+            item = _get_item(db, getattr(line, "item_id"))
+            route_sub_type = sub_type
+            # 생산 BOM과 함께 저장된 manual 보정은 대표 subtype(produce/disassemble)으로
+            # 바뀌어도 독립 보정이라는 실제 효과를 유지한다.
+            if (
+                sub_type in {"produce", "disassemble"}
+                and source_kind == MANUAL_SOURCE_KIND
+                and getattr(line, "origin", None) in MANUAL_LINE_ORIGINS
+            ):
+                route_sub_type = (
+                    "adjust_in"
+                    if getattr(line, "to_bucket", None) == "production"
+                    else "adjust_out"
+                )
+            # A direct line is the process result whether it came from a BOM
+            # parent or a BOM-less direct-item target.  Only generated BOM
+            # lines are component consumption/recovery lines.
+            role = "result" if getattr(line, "origin", None) == "direct" else "component"
+            route = _route_for_sub_type(
+                route_sub_type,
+                item=item,
+                from_department=None,
+                to_department=None,
+                role=role,
+            )
+            fields = (
+                "direction",
+                "from_bucket",
+                "from_department",
+                "to_bucket",
+                "to_department",
+            )
+            if any(getattr(line, field) != value for field, value in zip(fields, route)):
+                changed = True
+            for field, value in zip(fields, route):
+                setattr(line, field, value)
+            if getattr(line, "included", True) and route[1] != "none":
+                available = _bucket_available(
+                    db,
+                    item_id=item.item_id,
+                    bucket=route[1],
+                    department=route[2],
+                )
+                shortage = max(Decimal("0"), _d(getattr(line, "quantity")) - available)
+            else:
+                shortage = Decimal("0")
+            if _d(getattr(line, "shortage", 0)) != shortage:
+                changed = True
+            setattr(line, "shortage", shortage)
+    return changed
+
+
+def automatic_department_headers(bundles: Iterable[object]) -> tuple[Optional[str], Optional[str]]:
+    """라인의 production endpoint가 단일 부서일 때만 batch 헤더에 남긴다."""
+    departments: set[str] = set()
+    has_from_endpoint = False
+    has_to_endpoint = False
+    for bundle in bundles:
+        for line in getattr(bundle, "lines", ()):
+            if not getattr(line, "included", True):
+                continue
+            if getattr(line, "from_bucket", None) == "production" and getattr(line, "from_department", None):
+                departments.add(getattr(line, "from_department"))
+                has_from_endpoint = True
+            if getattr(line, "to_bucket", None) == "production" and getattr(line, "to_department", None):
+                departments.add(getattr(line, "to_department"))
+                has_to_endpoint = True
+    if len(departments) != 1:
+        return (None, None)
+    department = next(iter(departments))
+    return (
+        department if has_from_endpoint else None,
+        department if has_to_endpoint else None,
+    )
 
 
 # source_kind == "manual" 은 BOM 전개를 건너뛰고 낱개 라인으로 처리한다.
@@ -696,11 +814,6 @@ def validate_saved_operation_sources(
         kind != MANUAL_SOURCE_KIND for kind in kinds
     ):
         raise ValueError("process 수량보정은 낱개 manual 묶음만 저장할 수 있습니다.")
-    if any(kind == MANUAL_SOURCE_KIND for kind in kinds) and not (
-        requested_department and requested_department.strip()
-    ):
-        raise ValueError("process 낱개 작업은 요청 대상 부서를 선택해야 합니다.")
-
     for bundle in bundle_list:
         lines = list(_bundle_value(bundle, "lines", ()))
         source_kind = str(_bundle_value(bundle, "source_kind"))
@@ -734,12 +847,12 @@ def validate_saved_operation_sources(
                 _line_value(line, "from_bucket") == "none"
                 and _line_value(line, "from_department") is None
                 and _line_value(line, "to_bucket") == "production"
-                and _line_value(line, "to_department") == requested_department
+                and _line_value(line, "to_department") is not None
             )
         elif sub_type in {"disassemble", "adjust_out"}:
             valid_route = (
                 _line_value(line, "from_bucket") == "production"
-                and _line_value(line, "from_department") == requested_department
+                and _line_value(line, "from_department") is not None
                 and _line_value(line, "to_bucket") == "none"
                 and _line_value(line, "to_department") is None
             )

@@ -1,9 +1,12 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Employee } from "@/lib/api";
+import { ApiError } from "@/lib/api-core";
 
 const state = vi.hoisted(() => ({
   employees: [] as Employee[],
+  employeesState: "ready" as "loading" | "ready" | "error",
+  retryEmployees: vi.fn(),
   verifyEmployeePin: vi.fn(),
   getAppSession: vi.fn(),
   markLoginNotificationPopupPending: vi.fn(),
@@ -18,11 +21,19 @@ vi.mock("@/lib/api", () => ({
 }));
 
 vi.mock("../useLoginEmployees", () => ({
-  useLoginEmployees: () => state.employees,
+  useLoginEmployees: () => ({
+    employees: state.employees,
+    status: state.employeesState,
+    retry: state.retryEmployees,
+  }),
 }));
 
 vi.mock("./useLoginEmployees", () => ({
-  useLoginEmployees: () => state.employees,
+  useLoginEmployees: () => ({
+    employees: state.employees,
+    status: state.employeesState,
+    retry: state.retryEmployees,
+  }),
 }));
 
 vi.mock("../EmployeeCombobox", () => ({
@@ -84,7 +95,10 @@ async function submitLogin() {
 
 describe("OperatorLoginCard", () => {
   beforeEach(() => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     state.employees = [makeEmployee()];
+    state.employeesState = "ready";
+    state.retryEmployees.mockReset();
     state.verifyEmployeePin.mockReset();
     state.getAppSession.mockReset();
     state.markLoginNotificationPopupPending.mockReset();
@@ -100,7 +114,7 @@ describe("OperatorLoginCard", () => {
   });
 
   it("clears the PIN and restores focus after login fails", async () => {
-    state.verifyEmployeePin.mockRejectedValue(new Error("invalid PIN"));
+    state.verifyEmployeePin.mockRejectedValue(new ApiError("invalid PIN", 403));
 
     render(<OperatorLoginCard onLogin={() => {}} />);
     fireEvent.click(screen.getByRole("button", { name: "직원 선택" }));
@@ -173,5 +187,68 @@ describe("OperatorLoginCard", () => {
         "boot-1",
       );
     });
+  });
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it("keeps the PIN and does not log in when session confirmation fails", async () => {
+    state.verifyEmployeePin.mockResolvedValue(makeEmployee());
+    state.getAppSession.mockRejectedValue(new Error("offline"));
+    const onLogin = vi.fn();
+
+    render(<OperatorLoginCard onLogin={onLogin} />);
+    await act(async () => { await submitLogin(); });
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("연결 상태를 확인하지 못했습니다");
+    });
+    expect(screen.getByLabelText(/PIN/)).toHaveValue("1234");
+    expect(state.setCurrentOperator).not.toHaveBeenCalled();
+    expect(onLogin).not.toHaveBeenCalled();
+  });
+
+  it("retries only the session confirmation after a temporary failure", async () => {
+    state.verifyEmployeePin.mockResolvedValue(makeEmployee());
+    state.getAppSession
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce({ boot_id: "boot-1", started_at: "2026-07-02T00:00:00Z" });
+    const onLogin = vi.fn();
+
+    render(<OperatorLoginCard onLogin={onLogin} />);
+    await submitLogin();
+
+    await waitFor(() => expect(onLogin).toHaveBeenCalledTimes(1));
+    expect(state.verifyEmployeePin).toHaveBeenCalledTimes(1);
+    expect(state.getAppSession).toHaveBeenCalledTimes(2);
+    expect(state.setCurrentOperator).toHaveBeenCalledWith(expect.any(Object), "boot-1");
+  });
+
+  it("does not turn a rate-limited PIN response into an invalid PIN message", async () => {
+    state.verifyEmployeePin.mockRejectedValue(new ApiError("too many", 429));
+
+    render(<OperatorLoginCard onLogin={() => {}} />);
+    await act(async () => { await submitLogin(); });
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("로그인 시도가 너무 많습니다");
+      expect(screen.getByLabelText(/PIN/)).toHaveValue("1234");
+      expect(screen.getByLabelText(/PIN/)).not.toBeDisabled();
+    });
+    expect(state.getAppSession).not.toHaveBeenCalled();
+  });
+
+  it("does not store or log in when the session response has an empty boot id", async () => {
+    state.verifyEmployeePin.mockResolvedValue(makeEmployee());
+    state.getAppSession.mockResolvedValue({ boot_id: "", started_at: "2026-09-08T00:00:00Z" });
+    const onLogin = vi.fn();
+
+    render(<OperatorLoginCard onLogin={onLogin} />);
+    await submitLogin();
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("연결 상태를 확인하지 못했습니다"));
+    expect(screen.getByLabelText(/PIN/)).toHaveValue("1234");
+    expect(state.getAppSession).toHaveBeenCalledTimes(1);
+    expect(state.setCurrentOperator).not.toHaveBeenCalled();
+    expect(onLogin).not.toHaveBeenCalled();
   });
 });
