@@ -8,6 +8,7 @@ import pytest
 
 from app.models import (
     DefectQuarantineRecord,
+    DefectQuarantineReconstruction,
     InventoryOperation,
     InventoryOperationKindEnum,
     InventoryOperationRoleEnum,
@@ -121,6 +122,169 @@ def _add_log(
     db_session.add(log)
     db_session.flush()
     return log
+
+
+def _add_reconstructed_legacy_record(
+    db_session,
+    item,
+    *,
+    quantity: int,
+    at: datetime,
+    remaining_quantity: int | None = None,
+    department: str = "조립",
+    cancelled: bool = False,
+    source_record_id=None,
+    source_at: datetime | None = None,
+    source_department: str | None = None,
+    source_quantity: int | None = None,
+    source_item=None,
+) -> tuple[DefectQuarantineRecord, DefectQuarantineRecord, TransactionLog]:
+    parent = _add_record(
+        db_session,
+        item,
+        quantity=99,
+        at=_kst_naive(2026, 8, 1),
+        department=department,
+        is_legacy=True,
+    )
+    child = _add_record(
+        db_session,
+        item,
+        quantity=quantity,
+        at=at,
+        department=department,
+        is_legacy=True,
+    )
+    child.remaining_quantity = Decimal(
+        quantity if remaining_quantity is None else remaining_quantity
+    )
+    operation = _add_operation(
+        db_session,
+        action="legacy_mark_defective",
+        at=source_at or at,
+        domain="defect",
+    )
+    source = _add_log(
+        db_session,
+        source_item or item,
+        operation,
+        tx_type=TransactionTypeEnum.MARK_DEFECTIVE,
+        role=InventoryOperationRoleEnum.PRIMARY,
+        quantity=-quantity,
+        department=source_department or department,
+        record_id=source_record_id if source_record_id is not None else child.record_id,
+    )
+    source.cancelled = cancelled
+    source.inventory_effect = [
+        {
+            "scope": "location",
+            "department": source_department or department,
+            "status": "DEFECTIVE",
+            "delta": source_quantity if source_quantity is not None else quantity,
+        }
+    ]
+    db_session.add(
+        DefectQuarantineReconstruction(
+            child_record_id=child.record_id,
+            parent_record_id=parent.record_id,
+            source_transaction_log_id=source.log_id,
+        )
+    )
+    db_session.flush()
+    return parent, child, source
+
+
+def test_statistics_includes_verified_reconstructed_legacy_children_only(
+    db_session,
+    make_item,
+) -> None:
+    item = make_item(name="복원 품목", process_type_code="TR")
+    _add_reconstructed_legacy_record(
+        db_session,
+        item,
+        quantity=4,
+        remaining_quantity=0,
+        at=_kst_naive(2026, 9, 2),
+    )
+    _, _, cancelled_source = _add_reconstructed_legacy_record(
+        db_session,
+        item,
+        quantity=3,
+        at=_kst_naive(2026, 9, 3),
+        cancelled=True,
+    )
+    _, _, mismatched_source = _add_reconstructed_legacy_record(
+        db_session,
+        item,
+        quantity=2,
+        at=_kst_naive(2026, 9, 4),
+        source_quantity=1,
+    )
+
+    result = get_defect_statistics(
+        db_session,
+        period="week",
+        anchor=date(2026, 9, 4),
+    )
+
+    assert cancelled_source.cancelled is True
+    assert mismatched_source.inventory_effect[0]["delta"] == 1
+    assert result.summary.record_count == 1
+    assert result.summary.quantity == 4
+    assert result.timeline[2].quantity == 4
+    assert result.excluded_legacy_count == 2
+
+
+def test_statistics_excludes_reconstructed_legacy_children_with_mismatched_source_fields(
+    db_session,
+    make_item,
+) -> None:
+    item = make_item(name="검증 대상", process_type_code="TR")
+    other_item = make_item(name="다른 품목", process_type_code="TR")
+    _add_reconstructed_legacy_record(
+        db_session,
+        item,
+        quantity=2,
+        at=_kst_naive(2026, 9, 2),
+        source_at=_kst_naive(2026, 9, 3),
+    )
+    _add_reconstructed_legacy_record(
+        db_session,
+        item,
+        quantity=2,
+        at=_kst_naive(2026, 9, 3),
+        source_department="창고",
+    )
+    unrelated_record = _add_record(
+        db_session,
+        item,
+        quantity=1,
+        at=_kst_naive(2026, 8, 1),
+    )
+    _add_reconstructed_legacy_record(
+        db_session,
+        item,
+        quantity=2,
+        at=_kst_naive(2026, 9, 4),
+        source_record_id=unrelated_record.record_id,
+    )
+    _add_reconstructed_legacy_record(
+        db_session,
+        item,
+        quantity=2,
+        at=_kst_naive(2026, 9, 5),
+        source_item=other_item,
+    )
+
+    result = get_defect_statistics(
+        db_session,
+        period="week",
+        anchor=date(2026, 9, 4),
+    )
+
+    assert result.summary.record_count == 0
+    assert result.summary.quantity == 0
+    assert result.excluded_legacy_count == 4
 
 
 @pytest.mark.parametrize(

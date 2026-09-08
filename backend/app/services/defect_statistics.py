@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     DefectQuarantineRecord,
+    DefectQuarantineReconstruction,
     InventoryOperation,
     InventoryOperationKindEnum,
     InventoryOperationRoleEnum,
@@ -221,6 +222,54 @@ def _occurrence_from_record(
     )
 
 
+def _defective_quantity_from_inventory_effect(
+    inventory_effect: object,
+    department: str,
+) -> int | None:
+    """원본 거래가 특정 부서 불량 위치에 기록한 수량을 검증한다."""
+
+    if not isinstance(inventory_effect, list):
+        return None
+
+    total = 0
+    for effect in inventory_effect:
+        if not isinstance(effect, dict):
+            continue
+        if (
+            effect.get("scope") != "location"
+            or effect.get("department") != department
+            or effect.get("status") != "DEFECTIVE"
+        ):
+            continue
+        try:
+            total += int(effect.get("delta", 0))
+        except (TypeError, ValueError):
+            return None
+    return total
+
+
+def _is_verified_reconstructed_legacy_record(
+    record: DefectQuarantineRecord,
+    source_log: TransactionLog | None,
+) -> bool:
+    """복원 자식이 원본 불량 거래와 일치할 때만 통계 발생으로 인정한다."""
+
+    if source_log is None or source_log.cancelled:
+        return False
+    if source_log.transaction_type != TransactionTypeEnum.MARK_DEFECTIVE:
+        return False
+    if source_log.defect_quarantine_record_id != record.record_id:
+        return False
+    if source_log.item_id != record.item_id or source_log.department != record.department:
+        return False
+    if source_log.created_at != record.quarantined_at:
+        return False
+    return _defective_quantity_from_inventory_effect(
+        source_log.inventory_effect,
+        record.department,
+    ) == abs(int(record.original_quantity))
+
+
 def _load_quarantine_occurrences(
     db: Session,
     *,
@@ -228,11 +277,32 @@ def _load_quarantine_occurrences(
     end_utc: datetime,
     filters: _ResolvedFilters,
 ) -> tuple[list[_Occurrence], int]:
-    """기간 내 격리 원장을 읽고 legacy 건은 결과 대신 제외 건수로 반환한다."""
+    """기간 내 격리 원장을 읽고 검증 가능한 legacy 발생만 복원한다."""
 
+    reconstructed_parent_ids = {
+        parent_id
+        for (parent_id,) in db.query(
+            DefectQuarantineReconstruction.parent_record_id
+        ).all()
+    }
     rows = (
-        db.query(DefectQuarantineRecord, Item)
+        db.query(
+            DefectQuarantineRecord,
+            Item,
+            DefectQuarantineReconstruction,
+            TransactionLog,
+        )
         .join(Item, Item.item_id == DefectQuarantineRecord.item_id)
+        .outerjoin(
+            DefectQuarantineReconstruction,
+            DefectQuarantineReconstruction.child_record_id
+            == DefectQuarantineRecord.record_id,
+        )
+        .outerjoin(
+            TransactionLog,
+            TransactionLog.log_id
+            == DefectQuarantineReconstruction.source_transaction_log_id,
+        )
         .filter(
             DefectQuarantineRecord.quarantined_at >= start_utc,
             DefectQuarantineRecord.quarantined_at < end_utc,
@@ -245,11 +315,16 @@ def _load_quarantine_occurrences(
     )
     occurrences: list[_Occurrence] = []
     excluded_legacy_count = 0
-    for record, item in rows:
+    for record, item, reconstruction, source_log in rows:
+        if record.record_id in reconstructed_parent_ids:
+            continue
         occurrence = _occurrence_from_record(record, item)
         if not _matches_filters(occurrence, filters):
             continue
-        if record.is_legacy:
+        if record.is_legacy and not (
+            reconstruction is not None
+            and _is_verified_reconstructed_legacy_record(record, source_log)
+        ):
             excluded_legacy_count += 1
             continue
         occurrences.append(occurrence)
