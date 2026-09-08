@@ -147,6 +147,8 @@ export function IoComposeView({
   );
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<IoSubmitResultState | null>(null);
+  const errorSummaryRef = useRef<HTMLDivElement>(null);
+  const submitButtonRef = useRef<HTMLButtonElement>(null);
   const {
     notice: feedbackNotice,
     showNotice: showFeedbackNotice,
@@ -220,6 +222,17 @@ export function IoComposeView({
     notes: state.notes,
   };
   const internalUsePreviewLock = useInternalUseBomPreviewLock();
+
+  useEffect(() => {
+    if (error) errorSummaryRef.current?.focus();
+  }, [error]);
+
+  function closeSubmitResult() {
+    setResult(null);
+    window.requestAnimationFrame(() => {
+      if (submitButtonRef.current?.isConnected) submitButtonRef.current.focus();
+    });
+  }
   const intentAppliedRef = useRef(false);
 
   const { previewing, previewTarget } = useIoPreview();
@@ -1072,9 +1085,14 @@ export function IoComposeView({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
+    <div data-testid="io-compose-view" className="flex h-full min-h-0 flex-col gap-3">
       {error && (
         <div
+          ref={errorSummaryRef}
+          role="alert"
+          aria-label="입출고 작업 오류"
+          aria-atomic="true"
+          tabIndex={-1}
           className="rounded-[12px] border px-4 py-3 text-sm font-bold"
           style={{
             background: tint(LEGACY_COLORS.red, 10),
@@ -1334,6 +1352,7 @@ export function IoComposeView({
               onValidationError={(message) => showFeedbackNotice(message, "error")}
               onSubmit={handleSubmit}
               onSaveDraft={handleSaveDraft}
+              submitButtonRef={submitButtonRef}
             />
           </WizardStepCard>
         </div>
@@ -1341,7 +1360,7 @@ export function IoComposeView({
 
       <IoSubmitModals
         result={result}
-        onClose={() => setResult(null)}
+        onClose={closeSubmitResult}
         onGoToMap={() => router.push("?tab=warehouseMap", { scroll: false })}
       />
       {draftSaveNotice && (

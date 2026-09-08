@@ -4,10 +4,9 @@
  * DOM 전역 `Notification` 과 충돌을 피하려 `AppNotification` 으로 명명.
  */
 
-export type NotificationType =
-  | "approval_request"
-  | "approval_approved"
-  | "approval_rejected";
+import type { components } from "../generated/openapi";
+
+export type NotificationType = components["schemas"]["NotificationResponse"]["type"];
 
 export interface AppNotification {
   notification_id: string;

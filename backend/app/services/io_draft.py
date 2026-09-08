@@ -15,10 +15,11 @@ from datetime import datetime
 
 from app.models import Employee, IoBatch
 from app.schemas import IoDraftUpsert
+from app.services.approval_rules import approval_kind
 from app.services.io_preview import (
-    APPROVAL_SUB_TYPES,
     _bucket_available,
     _d,
+    has_declared_custom_process_bom,
     has_included_manual_line,
     normalize_process_sub_type,
     validate_internal_use_bundles,
@@ -133,10 +134,17 @@ def save_draft(
         batch.sub_type = payload.sub_type
         batch.from_department = payload.from_department
         batch.to_department = payload.to_department
-        batch.requires_approval = (
-            payload.sub_type in APPROVAL_SUB_TYPES
-            or has_included_manual_line(payload.bundles)
-        )
+        batch.requires_approval = approval_kind(
+            work_type=payload.work_type,
+            sub_type=payload.sub_type,
+            has_manual_line=has_included_manual_line(payload.bundles),
+            has_custom_process_bom=has_declared_custom_process_bom(
+                db,
+                work_type=payload.work_type,
+                sub_type=payload.sub_type,
+                bundles=payload.bundles,
+            ),
+        ) != "none"
         batch.reference_no = payload.reference_no
         batch.notes = payload.notes
         batch.request_fingerprint = None

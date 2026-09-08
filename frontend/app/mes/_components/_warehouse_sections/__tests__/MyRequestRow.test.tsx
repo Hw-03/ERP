@@ -103,6 +103,24 @@ describe("MyRequestRow request timestamp", () => {
 });
 
 describe("MyRequestRow presentation", () => {
+  it("알 수 없는 요청 유형은 안전 문구로 표시하고 command를 숨긴다", () => {
+    render(
+      <MyRequestRow
+        req={makeRequest({
+          request_type: "future_transfer" as "raw_receive",
+          status: "submitted",
+          operation_batch_id: "batch-unknown",
+        })}
+        onCancelRequest={vi.fn()}
+        onRevertToDraft={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("알 수 없는 요청 (future_transfer)")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "수정" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "요청 취소" })).not.toBeInTheDocument();
+  });
+
   it.each(["submitted", "reserved"] as const)(
     "%s 상태를 승인 대기로 표시",
     (status) => {

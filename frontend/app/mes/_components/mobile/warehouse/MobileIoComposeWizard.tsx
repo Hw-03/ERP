@@ -125,6 +125,9 @@ export function MobileIoComposeWizard({
   );
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<IoSubmitResultState | null>(null);
+  const errorSummaryRef = useRef<HTMLDivElement>(null);
+  const submitButtonRef = useRef<HTMLButtonElement>(null);
+  const scannerTriggerRef = useRef<HTMLElement | null>(null);
   const {
     notice: feedbackNotice,
     showNotice: showFeedbackNotice,
@@ -189,6 +192,30 @@ export function MobileIoComposeWizard({
   };
   const internalUsePreviewLock = useInternalUseBomPreviewLock();
   const intentAppliedRef = useRef(false);
+
+  useEffect(() => {
+    if (error) errorSummaryRef.current?.focus();
+  }, [error]);
+
+  function openScanner() {
+    const activeElement = document.activeElement;
+    scannerTriggerRef.current = activeElement instanceof HTMLElement ? activeElement : null;
+    setScanOpen(true);
+  }
+
+  function closeScanner() {
+    setScanOpen(false);
+    window.requestAnimationFrame(() => {
+      if (scannerTriggerRef.current?.isConnected) scannerTriggerRef.current.focus();
+    });
+  }
+
+  function closeSubmitResult() {
+    setResult(null);
+    window.requestAnimationFrame(() => {
+      if (submitButtonRef.current?.isConnected) submitButtonRef.current.focus();
+    });
+  }
   useEffect(() => {
     if (!entryIntent || intentAppliedRef.current) return;
     intentAppliedRef.current = true;
@@ -636,6 +663,11 @@ export function MobileIoComposeWizard({
       <div className="sg min-h-0 flex-1 overflow-y-auto px-3 pb-6">
         {error && (
           <div
+            ref={errorSummaryRef}
+            role="alert"
+            aria-label="입출고 작업 오류"
+            aria-atomic="true"
+            tabIndex={-1}
             className="mb-3 rounded-[12px] border px-4 py-3 text-sm font-bold"
             style={{
               background: tint(LEGACY_COLORS.red, 10),
@@ -692,7 +724,7 @@ export function MobileIoComposeWizard({
                 state.setBundles((prev) => prev.filter((b) => b.bundle_id !== bundleId))
               }
               getAvailable={getAvailable}
-              onScan={() => setScanOpen(true)}
+              onScan={openScanner}
               onSaveDraft={() => {
                 void handleSaveDraft();
               }}
@@ -709,7 +741,7 @@ export function MobileIoComposeWizard({
                 <PrimaryActionButton
                   label="스캔으로 시작"
                   icon={ScanLine}
-                  onClick={() => setScanOpen(true)}
+                  onClick={openScanner}
                 />
               </div>
               <IoTargetPicker
@@ -836,6 +868,7 @@ export function MobileIoComposeWizard({
             onValidationError={(message) => showFeedbackNotice(message, "error")}
             onSubmit={handleSubmit}
             onSaveDraft={handleSaveDraft}
+            submitButtonRef={submitButtonRef}
           />
         )}
       </div>
@@ -859,7 +892,7 @@ export function MobileIoComposeWizard({
         </StickyFooter>
       )}
 
-      <IoSubmitModals result={result} onClose={() => setResult(null)} />
+      <IoSubmitModals result={result} onClose={closeSubmitResult} />
       {feedbackNotice && (
         <StatusTargetNotice
           key={feedbackNotice.id}
@@ -871,7 +904,7 @@ export function MobileIoComposeWizard({
       {scanOpen && (
         <BarcodeScannerModal
           onDetected={handleScanDetected}
-          onClose={() => setScanOpen(false)}
+          onClose={closeScanner}
         />
       )}
     </div>

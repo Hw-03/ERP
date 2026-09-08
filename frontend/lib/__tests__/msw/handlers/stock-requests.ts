@@ -1,16 +1,20 @@
 import { http, HttpResponse } from "msw";
+import type { components } from "../../../api/generated/openapi";
 
 const sampleRequest = {
   request_id: "req-1",
   requester_employee_id: "e1",
+  requester_name: "작업자",
+  requester_department: "조립",
   request_type: "raw_receive",
-  status: "pending_warehouse",
+  status: "submitted",
+  requires_warehouse_approval: true,
   reference_no: null,
   notes: null,
   lines: [],
   created_at: "2026-05-23T00:00:00",
   updated_at: "2026-05-23T00:00:00",
-};
+} satisfies components["schemas"]["StockRequestResponse"];
 
 const warehouseQueue = [
   { ...sampleRequest, request_id: "req-1" },
@@ -49,7 +53,7 @@ export const stockRequestsHandlers = [
     return HttpResponse.json({
       ...sampleRequest,
       request_id: String(params.id),
-      status: "approved",
+      status: "completed",
     });
   }),
 
@@ -76,7 +80,7 @@ export const stockRequestsHandlers = [
     HttpResponse.json({
       ...sampleRequest,
       request_id: String(params.id),
-      status: "pending_warehouse",
+      status: "submitted",
     }),
   ),
 

@@ -7,7 +7,7 @@ const FOCUSABLE_SELECTORS =
 
 export function useFocusTrap<T extends HTMLElement>(
   active: boolean,
-  options?: { initialFocusRef?: React.RefObject<HTMLElement> },
+  options?: { initialFocusRef?: React.RefObject<HTMLElement | null> },
 ) {
   const ref = useRef<T>(null);
   const initialFocusRef = options?.initialFocusRef;

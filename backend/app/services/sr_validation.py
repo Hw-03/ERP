@@ -136,6 +136,7 @@ class LineInput:
         "to_bucket",
         "to_department",
         "record_id",
+        "operation_line_id",
     )
 
     def __init__(
@@ -148,6 +149,7 @@ class LineInput:
         to_bucket: RequestBucketEnum,
         to_department: Optional[DepartmentEnum],
         record_id: Optional[uuid.UUID] = None,
+        operation_line_id: Optional[uuid.UUID] = None,
     ) -> None:
         self.item_id = item_id
         self.quantity = Decimal(str(quantity))
@@ -156,6 +158,7 @@ class LineInput:
         self.to_bucket = to_bucket
         self.to_department = to_department
         self.record_id = record_id
+        self.operation_line_id = operation_line_id
 
 
 # ---------------------------------------------------------------------------

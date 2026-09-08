@@ -73,9 +73,13 @@ async function gotoDashboardThroughItemsBarrier(page: Page): Promise<void> {
   let held = false;
 
   const handler = async (route: Route): Promise<void> => {
-    if (isItemsListRequest(route) && !held) {
-      held = true;
-      markIntercepted();
+    if (isItemsListRequest(route)) {
+      // React Strict Mode can abort and reissue the initial query. Keep every
+      // matching request behind the same barrier until the loading UI is checked.
+      if (!held) {
+        held = true;
+        markIntercepted();
+      }
       await release;
     }
     await route.continue();

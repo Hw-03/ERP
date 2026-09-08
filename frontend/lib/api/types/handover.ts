@@ -2,7 +2,9 @@
  * 인수인계서 도메인 타입 — `@/lib/api/types/handover`.
  */
 
-export type HandoverStatus = "draft" | "submitted" | "received";
+import type { components } from "../generated/openapi";
+
+export type HandoverStatus = components["schemas"]["HandoverResponse"]["status"];
 
 export interface HandoverLine {
   line_id: string;

@@ -5,6 +5,7 @@
  */
 
 import type { Department } from "./shared";
+import type { components } from "../generated/openapi";
 
 export type StockRequestStatus =
   | "draft"
@@ -15,25 +16,33 @@ export type StockRequestStatus =
   | "completed"
   | "failed_approval";
 
-export type StockRequestType =
-  | "raw_receive"
-  | "raw_ship"
-  | "warehouse_to_dept"
-  | "dept_to_warehouse"
-  | "dept_internal"
-  | "mark_defective_wh"
-  | "mark_defective_prod"
-  | "supplier_return"
-  | "internal_use"
-  | "manual_adjustment"
-  | "defect_scrap"
-  | "defect_return"
-  | "defect_disassemble"
-  // R 정상 재고 바로 폐기/반품 — 격리를 거치지 않고 정상(창고/부서) 재고에서 즉시 처리.
-  // 백엔드 StockRequestTypeEnum 의 SCRAP_NORMAL/RETURN_NORMAL 값과 정확히 일치.
-  | "scrap_normal"
-  | "return_normal"
-  | "rework_normal";
+export type StockRequestCommandType = components["schemas"]["StockRequestTypeEnum"];
+export type StockRequestType = StockRequestCommandType | (string & {});
+
+const STOCK_REQUEST_COMMAND_TYPES = {
+  raw_receive: true,
+  raw_ship: true,
+  warehouse_to_dept: true,
+  dept_to_warehouse: true,
+  dept_internal: true,
+  mark_defective_wh: true,
+  mark_defective_prod: true,
+  supplier_return: true,
+  package_out: true,
+  internal_use: true,
+  manual_adjustment: true,
+  defect_scrap: true,
+  defect_return: true,
+  defect_disassemble: true,
+  scrap_normal: true,
+  return_normal: true,
+  rework_normal: true,
+} satisfies Record<StockRequestCommandType, true>;
+
+/** OpenAPI에 체크인된 요청 유형만 mutation 입력으로 허용한다. */
+export function isStockRequestCommandType(value: string): value is StockRequestCommandType {
+  return Object.prototype.hasOwnProperty.call(STOCK_REQUEST_COMMAND_TYPES, value);
+}
 
 export type RequestBucket = "warehouse" | "production" | "defective" | "none";
 
@@ -91,7 +100,7 @@ export interface StockRequest {
 
 export interface StockRequestCreatePayload {
   requester_employee_id: string;
-  request_type: StockRequestType;
+  request_type: StockRequestCommandType;
   reference_no?: string | null;
   notes?: string | null;
   reason_category?: string | null;
@@ -110,7 +119,7 @@ export interface StockRequestCreatePayload {
 
 export interface StockRequestDraftUpsertPayload {
   requester_employee_id: string;
-  request_type: StockRequestType;
+  request_type: StockRequestCommandType;
   reference_no?: string | null;
   notes?: string | null;
   reason_category?: string | null;

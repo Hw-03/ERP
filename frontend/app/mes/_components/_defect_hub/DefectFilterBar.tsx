@@ -35,6 +35,8 @@ export function DefectFilterBar({
   search,
   setSearch,
 }: Props) {
+  const readableBlue = `color-mix(in srgb, ${LEGACY_COLORS.blue} 30%, ${LEGACY_COLORS.text})`;
+  const readableMuted = `color-mix(in srgb, ${LEGACY_COLORS.muted2} 30%, ${LEGACY_COLORS.text})`;
   return (
     <div
       className="flex flex-wrap items-center gap-4 rounded-[14px] border px-4 py-3"
@@ -45,7 +47,7 @@ export function DefectFilterBar({
     >
       {/* 부서 범위 칩 (단일선택 토글) */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="mr-1 text-xs font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
+        <span className="mr-1 text-xs font-black uppercase tracking-[1.5px]" style={{ color: readableMuted }}>
           부서
         </span>
         <FilterChip
@@ -53,12 +55,14 @@ export function DefectFilterBar({
           active={scope === "my"}
           onClick={() => onScopeChange("my")}
           size="sm"
+          textTone={readableBlue}
         />
         <FilterChip
           label="전체"
           active={scope === "all"}
           onClick={() => onScopeChange("all")}
           size="sm"
+          textTone={readableBlue}
         />
       </div>
 
@@ -67,7 +71,7 @@ export function DefectFilterBar({
 
       {/* 격리 처리자 범위 칩 */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="mr-1 text-xs font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
+        <span className="mr-1 text-xs font-black uppercase tracking-[1.5px]" style={{ color: readableMuted }}>
           격리자
         </span>
         <FilterChip
@@ -75,12 +79,14 @@ export function DefectFilterBar({
           active={actorScope === "all"}
           onClick={() => onActorScopeChange("all")}
           size="sm"
+          textTone={readableBlue}
         />
         <FilterChip
           label="내가 격리"
           active={actorScope === "mine"}
           onClick={() => onActorScopeChange("mine")}
           size="sm"
+          textTone={readableBlue}
         />
       </div>
 
@@ -89,10 +95,11 @@ export function DefectFilterBar({
 
       {/* 정렬 */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
+        <span className="text-xs font-black uppercase tracking-[1.5px]" style={{ color: readableMuted }}>
           정렬
         </span>
         <select
+          aria-label="정렬"
           value={sort}
           onChange={(e) => onSortChange(e.target.value as DefectSort)}
           className="rounded-[8px] border px-2 py-1 text-xs font-bold"
@@ -107,7 +114,7 @@ export function DefectFilterBar({
         </select>
         <label
           className="-my-2 flex min-h-11 cursor-pointer select-none items-center gap-2 rounded-[8px] px-2 text-xs font-bold"
-          style={{ color: LEGACY_COLORS.muted2 }}
+          style={{ color: readableMuted }}
         >
           <input
             type="checkbox"

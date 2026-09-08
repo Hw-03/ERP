@@ -42,7 +42,7 @@ test.describe("입출고 V2 — 원자재 입고", () => {
     await page.getByRole("button", { name: "결재 요청", exact: true }).click();
 
     // 종착: 자가승인 즉시 반영 (상태 대상 알림과 중복되므로 다이얼로그로 스코프)
-    const doneDialog = page.getByRole("dialog", { name: /부서 결재 요청 완료/ });
+    const doneDialog = page.getByRole("dialog", { name: /입출고 반영 완료/ });
     await expect(doneDialog).toBeVisible();
     await expect(doneDialog.getByText("입출고가 반영되었습니다.")).toBeVisible();
   });

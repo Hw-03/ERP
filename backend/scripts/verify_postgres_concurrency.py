@@ -53,6 +53,8 @@ REQUIRED_TESTS = [
     "tests/concurrency/test_transaction_correction_postgres.py::test_postgres_corrected_operation_rejects_fresh_cancellation_preview",
     "tests/concurrency/test_transaction_correction_postgres.py::test_postgres_v2_cancel_and_outbound_have_one_physical_winner",
     "tests/concurrency/test_transaction_correction_postgres.py::test_postgres_effect_snapshot_serializes_placement_and_cancels_only_own_delta",
+    "tests/concurrency/test_workflow_cancel_postgres.py::test_linked_io_batch_multi_request_cancel_twice_has_one_aggregate_winner",
+    "tests/concurrency/test_workflow_cancel_postgres.py::test_linked_io_batch_different_request_cancels_share_owner_lock_order",
     "tests/concurrency/test_cp4_command_postgres.py::test_postgres_cp4_fingerprint_columns_are_nullable_varchar_64",
     "tests/concurrency/test_cp4_command_postgres.py::test_postgres_io_same_key_collision_applies_once_and_replays",
     "tests/concurrency/test_cp4_command_postgres.py::test_postgres_existing_draft_submit_race_and_lost_response_apply_once",

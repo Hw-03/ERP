@@ -25,7 +25,7 @@ declare global {
 export type ScannerMode = "native" | "zxing" | "insecure" | "unsupported";
 
 export interface UseBarcodeScannerResult {
-  videoRef: React.RefObject<HTMLVideoElement>;
+  videoRef: React.RefObject<HTMLVideoElement | null>;
   mode: ScannerMode;
   error: string | null;
   detected: string | null;

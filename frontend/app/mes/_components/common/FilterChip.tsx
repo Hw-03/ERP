@@ -9,11 +9,12 @@ interface Props {
   label: string;
   onClick: () => void;
   tone?: string;
+  textTone?: string;
   size?: "sm" | "md";
   className?: string;
 }
 
-function FilterChipImpl({ active, label, onClick, tone = LEGACY_COLORS.blue, size = "md", className = "" }: Props) {
+function FilterChipImpl({ active, label, onClick, tone = LEGACY_COLORS.blue, textTone, size = "md", className = "" }: Props) {
   const px = size === "sm" ? "px-3 py-1" : "px-4 py-2";
   return (
     <Button
@@ -24,7 +25,7 @@ function FilterChipImpl({ active, label, onClick, tone = LEGACY_COLORS.blue, siz
       style={{
         background: active ? `color-mix(in srgb, ${tone} 14%, transparent)` : LEGACY_COLORS.s2,
         borderColor: active ? tone : LEGACY_COLORS.border,
-        color: active ? tone : LEGACY_COLORS.muted2,
+        color: textTone ?? (active ? tone : LEGACY_COLORS.muted2),
       }}
     >
       {label}

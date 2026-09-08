@@ -7,7 +7,7 @@ backend/mes.db 에서 PA(process_type_code='PA') 30개와 AF(process_type_code='
 자동 INSERT 는 하지 않는다.
 
 실행:
-    python scripts/dev/pa_af_match_candidates.py
+    python _attic/scripts/dev/pa_af_match_candidates.py
 산출:
     pa_af_candidates_20260522.xlsx (repo root)
 """
@@ -31,8 +31,8 @@ except Exception as exc:
     print(f"openpyxl 가 필요합니다: {exc}", file=sys.stderr)
     sys.exit(1)
 
-DB_PATH = Path(__file__).resolve().parents[2] / "backend" / "mes.db"
-OUTPUT_PATH = Path(__file__).resolve().parents[2] / "pa_af_candidates_20260522.xlsx"
+DB_PATH = Path(__file__).resolve().parents[3] / "backend" / "mes.db"
+OUTPUT_PATH = Path(__file__).resolve().parents[3] / "pa_af_candidates_20260522.xlsx"
 TOP_N = 5
 
 # 매칭 시 의미 없는 단어 — 빠지면 점수가 깎이지 않도록 사전 제거.

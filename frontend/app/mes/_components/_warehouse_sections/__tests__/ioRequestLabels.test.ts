@@ -4,6 +4,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import {
   getRequestQuantityPresentation,
   getRequestStatusPresentation,
+  getRequestTypePresentation,
 } from "../ioRequestLabels";
 
 function quantityLine(
@@ -37,6 +38,22 @@ describe("getRequestStatusPresentation", () => {
     expect(getRequestStatusPresentation("unknown")).toEqual({
       label: "unknown",
       color: LEGACY_COLORS.muted2,
+    });
+  });
+});
+
+describe("getRequestTypePresentation", () => {
+  it("package_out은 알려진 출하 유형으로 표시한다", () => {
+    expect(getRequestTypePresentation("package_out")).toEqual({
+      label: "출하",
+      commandSafe: true,
+    });
+  });
+
+  it("알 수 없는 유형은 안전 문구와 command 차단 상태를 반환한다", () => {
+    expect(getRequestTypePresentation("future_transfer")).toEqual({
+      label: "알 수 없는 요청 (future_transfer)",
+      commandSafe: false,
     });
   });
 });

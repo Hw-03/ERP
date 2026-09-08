@@ -5,14 +5,16 @@
 
 ## 격리 실행 — 실 DB 미접촉 (2026-06-04~)
 
-공통 Node runner가 실행 전 원자적 run lock을 잡고, `globalSetup`이 **전용 DB·전용 서버**를
-자동으로 띄운 뒤 현재 run token을 캡처한 teardown을 반환한다. 실 `backend/mes.db`는 절대
-건드리지 않는다(teardown에서 SHA256 불변 검증).
+공통 Node runner가 run token/nonce를 발급한 뒤, mutation 전에 원자적 ownership lock을 획득한다. `globalSetup`은
+해당 worktree `backend/mes.db` 가족 상태를 기록하고 **합성 전용 DB**를 bootstrap한 뒤, nonce를 전달한 전용
+loopback 백엔드를 기동한다. 기동 뒤에만 PID start token을 읽어 receipt로 저장하고 nonce·PID가 일치하는
+readiness를 확인한 다음 합성 업무 seed를 준비한다. teardown은 캡처·저장된 receipt와 소유권을 대조해 정리하며, 불일치 또는 incomplete
+cleanup이면 lock과 증거를 보존하고 실패한다.
 
-- 전용 DB: `backend/mes_e2e.db` (부트스트랩+시드, teardown 삭제)
-- 전용 백엔드: 기본 **8021**, 승인 fallback **8022** (globalSetup이 `DATABASE_URL`로 기동)
-- 전용 프론트: 기본 **3100**, 승인 fallback 범위 **3300~3399**(wrapper 기본 선택은 3300, `/api/*` → 선택된 `BACKEND_INTERNAL_URL` 프록시)
-- dev(8011/3001)·prod(8010/3000) 스택과 무충돌.
+- 합성 전용 DB: `backend/mes_e2e.db` (`DATABASE_URL`로 bootstrap+seed, 소유 teardown만 삭제)
+- 전용 loopback 백엔드: 기본 **8021**, 승인 fallback **8022**
+- 전용 프론트: 기본 **3100**, 승인 fallback 범위 **3300~3399**(`/api/*`는 선택된 `BACKEND_INTERNAL_URL` 프록시)
+- `[HISTORICAL — 재확인 금지]` development(8011/3001)·employee(8010/3000) profile과의 무충돌 관찰은 과거 기록이다. 현재 안전 계약은 위 전용 port의 availability 확인과 ownership receipt뿐이며, 직원 경로·포트·DB를 조회하거나 실행하지 않는다.
 
 ```bash
 cd frontend

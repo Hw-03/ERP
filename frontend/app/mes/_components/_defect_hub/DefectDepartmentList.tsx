@@ -100,7 +100,13 @@ export function DefectDepartmentList({
 
   if (depts.length === 0) {
     return (
-      <div className="rounded-[14px] border px-6 py-8 text-center" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}>
+      <div
+        className="rounded-[14px] border px-6 py-8 text-center"
+        style={{
+          borderColor: LEGACY_COLORS.border,
+          color: `color-mix(in srgb, ${LEGACY_COLORS.muted} 30%, ${LEGACY_COLORS.text})`,
+        }}
+      >
         <p className="text-base font-bold">{searchActive ? "검색 결과가 없습니다." : "격리된 불량 재고가 없습니다."}</p>
       </div>
     );

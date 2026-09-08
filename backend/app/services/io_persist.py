@@ -1,6 +1,6 @@
 """배치 영속화 + 응답 페이로드 직렬화 + 외부 결재 상태 동기화.
 
-io_preview 의 헬퍼(_enum_value, _new_id, APPROVAL_SUB_TYPES)를 재사용한다.
+io_preview 의 영속화·결재 표시 헬퍼를 재사용한다.
 io_draft / io_dispatch 가 이 모듈의 _persist_batch / _batch_to_payload / _load_requester 를 호출한다.
 """
 
@@ -24,6 +24,7 @@ from app.models import (
 )
 from app.repositories import item_repository
 from app.schemas.io import IoBundlePayload
+from app.services.approval_rules import approval_kind
 from app.services.bom_stock_policy import (
     BOM_STOCK_EXEMPT_NOTE,
     BOM_AUTO_ORIGIN,
@@ -31,9 +32,9 @@ from app.services.bom_stock_policy import (
     should_skip_bom_inventory,
 )
 from app.services.io_preview import (
-    APPROVAL_SUB_TYPES,
     _enum_value,
     _new_id,
+    has_declared_custom_process_bom,
     has_included_manual_line,
     normalize_process_sub_type,
     validate_internal_use_bundles,
@@ -481,10 +482,17 @@ def _persist_batch(
         requester_department=_enum_value(requester.department) or "",
         from_department=payload.from_department,
         to_department=payload.to_department,
-        requires_approval=(
-            payload.sub_type in APPROVAL_SUB_TYPES
-            or has_included_manual_line(payload.bundles)
-        ),
+        requires_approval=approval_kind(
+            work_type=payload.work_type,
+            sub_type=payload.sub_type,
+            has_manual_line=has_included_manual_line(payload.bundles),
+            has_custom_process_bom=has_declared_custom_process_bom(
+                db,
+                work_type=payload.work_type,
+                sub_type=payload.sub_type,
+                bundles=payload.bundles,
+            ),
+        ) != "none",
         reference_no=payload.reference_no,
         notes=payload.notes,
         client_request_id=getattr(payload, "client_request_id", None),

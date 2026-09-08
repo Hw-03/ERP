@@ -17,9 +17,13 @@
 - S0 구현 작업: `01a079d0-9157-7503-9377-817f636c14c4`
 - 확정 `SYNC_BASE_SHA`: `731edc2df15c89753e60c12be95a65ef88e33bde`. 품질 본 branch는 CP6 통합까지 이 SHA에서 고정한다.
 - CP6 구현 작업: `01a07b0c-4563-7c41-a8c7-5df5ad2e91e2`, `C:\ERP\.worktrees\full-code-quality-cp6`, branch `codex/full-code-quality-cp6`.
+- CP7 구현 작업: `01a07c76-6395-7dc0-ba58-91c6fc4d3538`, `C:\ERP\.worktrees\full-code-quality-cp7`, branch `codex/full-code-quality-cp7`, 고정 `POST_CP6_SHA=7f232773b1eea204a251bc5ac001ef5b03319d3b`. 초기 HEAD·branch·linked worktree·clean을 확인했고 B1부터 착수했다. 품질 branch는 이 SHA에서 CP7 최종 통합까지 움직이지 않는다.
 - 정본 감사 계획: [전수 감사·개선 계획](../../docs/research/2026-08-13-full-code-quality-audit-and-improvement-plan.md), 8.9.7·8.9.8 및 12.26절
-- 현 상태(2026-09-08): **CP6 최종d60f84ed push와 실제 GitHub CI34135084227의6/6 성공을 확인했다. 품질 merge c9d70903은 검증된 CP6와 exact tree다. 문서 closeout·품질 push/CI를 진행하며 CP7은 통합된 고정 기반에서 B1 구현을 병행한다. 품질 CI 성공 전에는 CP7 첫 commit과 CP6 종료 체크를 금지한다. 근거는 감사12.27.8~9다.**
-- 실행 단위 집계: 아래 7/16 완료, 미완료9. 실제 browser는 검증됐으나 CP6 종료 항목은 원격 CI·통합까지 포함하므로 아직 체크하지 않는다.
+- 현 상태(2026-09-08): **CP6 종료·품질 통합 및 CP7 B1~B5 원격 완료. B6 커밋173cb894 및 B7 삭제·두 리뷰 로컬 인수.** 복구/B5의 CI34168183559 exact bff9·6/6과 B6/B7 이후 최종 검증은 구분한다. 최초 CI34166260511 실패는 역사 증거로 보존하고 품질 branch는 POST_CP6_SHA에서 고정한다(감사12.28.15~17).
+- 실행 단위 집계: 아래 15/16 실행 완료(B6/B7은 로컬 인수), 미완료1(최종 재감사·검증·통합). B6/B7 원격 검증은 최종 CP7에 묶는다. 실행 단위 크기가 다르므로 이 비율을 전체 작업량 비율로 해석하지 않는다.
+- 최신 종료 상태(2026-09-08): B7은 `f3d63991c2e1235bea8637bcb62553eb0ead4116`으로 커밋됐으며 B6/B7 두 로컬 commit은 아직 push 전이다. 감사12.29에72행 재고 matrix·CQ/RV/IC64행·QP24행·전체파일2,563행 정본과 source hash/깊이/한계를 추가했다. 문서 독립 리뷰 C0/I0·Minor2는 원장 표기만 보완했다. 최초 최종 full(run9615)은6PASS/2FAIL이며 PostgreSQL 복구 시험3개/출하 이름 기대1개 및 미실행 gate를 국소 복구한다. 최초 FAIL을 후속 PASS로 덮지 않으며 완료 체크는15/16을 유지한다.
+- 후속 인수(감사12.29.7): PostgreSQL3개·backend62개 실패는 짧은 own basetemp에서 모두 복구됐다. 출하 이름 테스트의 직접 RED→GREEN·독립 명세/품질 C0/I0/M0, startup2개 단독 PASS, OpenAPI exact·production build·bundle PASS 및 frozen 두 flag의 공식 E2E24/24PASS·SQL/API/UI·로그인 화면 증거를 인수했다. 합성 DB gate PASS·본체 hash불변과 own WAL/SHM 회수·원래 부재 복원도 확인했다. 로컬 full/coverage 원본 실패는 보존하며 최종 exact commit의 CI coverage를 필수 정본으로 확인한다. 최종 문서/리뷰·CI/품질 통합은 아직 미완료이고, 성공한 gate는 반복하지 않는다.
+- 국소 복구·B6 진입(감사12.28.13~15): recovery3파일/B5docs8파일의 before/after blob11쌍 불일치0, 실제 CI6/6을 확인했다. 이동 전 source15개 SHA256 일치·target15개 부재를 총괄79392a로 확인했고 seed_cleanup은 실제 consumer 때문에 보존한다. E2E23PASS/선택 frozen SKIP1은 최종 frozen 증명을 대신하지 않는다.
 
 ## 실행 체크리스트
 
@@ -30,16 +34,20 @@
 - [x] CP6 A4 (2026-09-07, LOCAL_VERIFIED): IC25 PA·PF KPI 모집단 상시 설명, 기존 계산 불변. 예상 RED2 뒤2파일8PASS, A5와 합친3파일34PASS·앱 tsc·변경6파일 ESLint exit0, 독립 명세/품질 C/I/M0다. 정확8경로 staged smart8/8PASS 후 commit `edc3a83611472ca6a99b134ac868e195d07ccd00`, 부모8d7a0a77·subject·clean을 총괄 확인했다. 감사12.27.4와 ignored `20260907-cp6-a4-a5/`가 근거이며 실제 desktop/mobile browser·push/CI는 최종 단계다.
 - [x] CP6 A5 (2026-09-07, LOCAL_VERIFIED): IC26 첫/다른/같은 작성자 class 계약0/1/0, 탭·날짜·상세0을 RED1→26PASS로 확인했다. A4와 합친 명세/품질 C/I/M0·staged smart8/8PASS·commit edc3a836을 공유한다. 실제 animationstart/reduced-motion 증명은 최종 E2E에서 검증한다.
 - 속도 우선 배치 조정(2026-09-07): A3 로컬 commit 뒤 A4 RED/GREEN → A5 RED/GREEN을 같은 단일 편집자가 순차 수행한다. 두 카드의 검증 근거는 분리하되 합친 diff의 독립 명세/품질 리뷰와 staged smart·로컬 commit은 각각 한 묶음으로 수행한다. 실제 browser animation/reduced-motion·KPI 표시는 CP6 최종 화면/E2E 검증에 포함한다. backend/DB/frozen 변경이나 최종 gate 생략은 없다.
-- [ ] CP6 종료·통합 [CP6 CI6/6·품질 merge 완료, 품질 CI 대기]: SQL/API/UI·A4/A5/frozen·최종 두 리뷰C/I/M0·최종d60f84ed push와 CI34135084227 success를 확인했다. merge c9d70903의 tree도 exact다. 문서 closeout 고정 SHA·품질 CI 성공 뒤 체크한다. CP7 첫 commit 전까지 품질 CI 성공이 필수이며 같은 통과 검사를 반복하지 않는다.
+- [x] CP6 종료·통합 (2026-09-08): SQL/API/UI·A4/A5/frozen·최종 두 리뷰C/I/M0·최종d60f84ed push와 CI34135084227 success를 확인했다. merge c9d70903의 tree는 exact이며 docs-only7f232773의 품질 CI34137728037도 실제6/6 success다. 총괄의 gh 원본 조회36d0dd와 ignored cp6-quality-ci-final.json이 근거다. 품질 branch는 고정하고 같은 통과 검사를 반복하지 않는다.
 - CP6 최초 full 결과(2026-09-07): 693,611.448ms·exit1, 실제9PASS/1FAIL이다. frontend7영역은 전체276파일2,556테스트·coverage94.97%·build/bundle을 포함해 통과했다. PG는 깊은 Windows 임시 경로로 실패했다. backend full pytest/OpenAPI·docs·DB·E2E 등 미실행 영역과 실패 PG만 짧은 own basetemp에서 복구하며 frontend/full 전체는 반복하지 않는다. 최초 합성 DB hash불변·원래 부재 복원·소유 test DB 삭제/cluster 종료도 확인했다. 감사12.27.6과 ignored 최종 run `resume-4/`가 원본이다. 후속 구성 검사 통과를 최초 full 명령 PASS로 바꾸지 않는다.
 - [x] CP7 병렬 사전감사 (2026-09-07): 타입·advisory·a11y·정책 consumer·문서·이동/중복 자산 manifest 및 DTO 후보26행 정적 검토, tracked 변경0. `full-code-quality-cp7-preaudit`의 ignored `20260907-cp7-preaudit/cp7-preaudit/preaudit.md`와 `ic21-manual-dto-targets.csv/.json`을 인계한다. 정적 차이18행은 실제 runtime 결함18건을 뜻하지 않는다. 제품/generator/runtime 검증은 CP7 구현 책임이다.
-- [ ] CP7 B1: IC21 generated raw OpenAPI types + business adapter·nullable/unknown enum/serialization CI.
-- [ ] CP7 B2: IC22 Next → Vitest/coverage → ESLint/PostCSS 세 독립 변경과 단계별 검증·rollback.
-- [ ] CP7 B3: IC23 핵심 IO/shipping/defect/department 오류·focus·keyboard/axe blocking 계약.
-- [ ] CP7 B4: IC24 확인된 두 번째 consumer 정책만 공통화; approval matrix·public facade 유지.
-- [ ] CP7 B5: DOC01 live 링크·명령·DB·URL 정합성, 역사 관찰 재실행 금지.
-- [ ] CP7 B6: AT01 source/target consumer 재검증, git mv와 모든 경로/문서 갱신, old path 0.
-- [ ] CP7 B7: AT02 consumer 0 byte-identical frontend copy만 제거, 원본·item 이미지·실제 consumer 보존.
+- [x] CP7 B1 (2026-09-08): IC21 generated raw OpenAPI types·업무 adapter·nullable/unknown enum/serialization CI 연결. 최종 두 리뷰 C/I/M0·13파일162PASS·앱/테스트 타입·strict lint·build·bundle 및 생성 tracked guard를 인수했다. 로컬 전체 coverage 최초 실패는 mock-only4경로와 직접14PASS로 복구하고 원본 실패를 보존했다. commit `1ad03e3748f0fbfe38a331704019ba4f1c280a1c`의 [실제 CI34149717620](https://github.com/Hw-03/ERP/actions/runs/34149717620)은 completed/success·6/6이다. 총괄 독립 gh 조회와 ignored `cp7-b1-ci-final.json`이 근거다. 기존 stock/shipping pending 보존 외에 새 production replay 프로토콜은 추가하지 않았다. 감사12.28.1~12.28.2 참조.
+- [x] CP7 B2 (2026-09-08): IC22 네 rollback commit(c9435efc/65c0ed8/8cf8ea43/12901903)을 기존 CP7 branch에 일반 push했고 [CI34157355573](https://github.com/Hw-03/ERP/actions/runs/34157355573)의 exact129 completed/success·6/6을 총괄 actual9ca4cc로 확인했다. 전체 audit18→0·production0과 실제 전체 coverage/build/bundle·backend·PG·E2E를 인수했다. 원본 local full2회FAIL·local coverage 미보고·Next next-env Minor1·ESLint9 EOL 예외는 유지한다. 감사12.28.3~12.28.7과 총괄 ignored cp7-b2-ci-final.json 참조.
+- B2 실행 경계 예외(2026-09-08): `exec79b5b323`에서 worktree 루트의 `npm run check:bundle-size`를 1회 잘못 실행해 npm이 상위 `C:\ERP\package.json`을 조회하고 ENOENT로 종료했으며 로그를 `C:\Users\user\AppData\Local\npm-cache`에 기록했다. 서버·DB 접근 증거는 없고 main/전역 로그를 다시 읽거나 지우지 않았다. 이후 모든 npm 계열 명령은 정확한 CP7 `frontend` cwd·절대 `--prefix`와 CP7 ignored 고유 cache/TEMP/TMP에 고정하며, 이미 통과한 Next build·bundle은 반복하지 않는다.
+- [x] CP7 B3 (2026-09-08, VERIFIED): IC23 핵심 IO/shipping/defect/department 오류·focus·keyboard/axe blocking 계약. 직접4파일43PASS와 최종 관리자2파일11PASS, light/dark 핵심 E2E4PASS·최종 관리자delta1PASS, 두 독립 리뷰 C/I/M0를 총괄이 인수했다. 테스트 타입285파일·392known/신규0, 앱/E2E 타입·strict lint·diff-check가 통과했다. 공용 기본 UI와 동결 영역·API/schema/backend 변경0, 소유 E2E DB family 불변·cleanup-complete 근거를 보존한다. 감사12.28.8 및 ignored `20260908-cp7-b3-final/review-evidence.md` 참조. B3 commit234d4f5b와 후속 복구를 포함한 exact bff9의 실제 CI34168183559 6/6을 인수했다(12.28.15).
+- 속도 우선 배치 조정(2026-09-08, B3~B4): 카드별 RED→직접 GREEN·독립 명세/품질 리뷰·별도 로컬 rollback commit을 유지하고 두 단계가 모두 GREEN일 때 한 번 push/실제 전체 CI를 실행한다. 로컬 완료와 원격 검증 완료는 분리하고, 최종 CP7 full gate 및 재고·권한 필수 검사는 생략하지 않는다.
+- [x] CP7 B4 (2026-09-08, VERIFIED / 기준234d4f5b): IC24 승인 큐·preview의 실제 consumer/역할 fixture·HTTP 권한, BOM 전체/부분 자식 누락, defect 즉시 완료의 line identity와 전용 취소 귀속을 보완했다. backend261PASS/frontend177PASS·타입 기존392/신규0·OpenAPI exact·두 독립 리뷰 C/I/M0를 총괄이 인수했다. API wire/schema·동결 UI·responsive shell 변화는0이다. 상세 감사12.28.10 및 ignored `20260908-cp7-b4/review-evidence.md`. B4 commit113b4699 및 recovery a5e1dad6를 포함한 exact bff9의 실제 CI34168183559 6/6을 인수했다(12.28.15).
+- B4-R1 로컬 인수: 기존 취소 뒤 연결 IoBatch stale RED를 같은 transaction의 기존 request 집계 동기화와 일관된 owner 보호로 해결했다. 실제 PG 두 node는 same-operation 성공1/거부1과 different-operation 성공2/최종 submitted·완료시각None을 각각1PASS/skip0로 증명했다. 원본 실패와 own cleanup을 보존하고 새 상태·원장·schema·backfill은 추가하지 않았다.
+- 속도 우선 후속 배치: B4 commit/push를 총괄이 인수한 후 불변 B3/B4 SHA의 원격 CI 동안 비중첩 B5 문서-only 로컬 변경·직접 검증을 병행한다. B6 전 actual CI success가 필요하다. B5/B6/B7은 개별 rollback commit·직접 증거·두 delta 리뷰를 유지하고 full/원격 CI는 최종 CP7 경계로 묶는다.
+- [x] CP7 B5 (2026-09-08, VERIFIED): DOC01 실제 Next16·React Query/legacy 공존·profile·PlanOnly·E2E 소유권 순서와 격리 실행 경계를6문서에서 교정했다. 정적27/27·링크0broken·PowerShell parser-only·diff-check와 최종 두 리뷰 C/I/M0를 총괄 인수했다. 감사12.28.12 및 ignored `20260908-cp7-b5/review-evidence.md` 참조. 별도 docs commit bff9dd73과 실제 CI34168183559 6/6을 인수했다. B6 이전은 진행 중이며 최종 검증은 별도다.
+- [x] CP7 B6 (2026-09-08, LOCAL_VERIFIED): AT01 정확15개 rename·참조 문서3개·정본2개. root/self-usage 보정, AST11·root fixture6·PowerShell parser-only·역치환 byte-exact·비역사 old path0을 총괄이 읽고 raw diff b0c80c와 대조했다. 독립 명세01a07e39-2ff4·품질01a07e3d-9929 모두 C/I/M0·Ready다. 실제 consumer가 있는 seed_cleanup 및 역사 내용은 보존했다. 감사12.28.16과 ignored 20260908-cp7-b6/preflight-evidence.md가 근거며 별도 rollback commit/최종 원격 검증은 분리한다.
+- [x] CP7 B7 (2026-09-08, LOCAL_VERIFIED): AT02 정확 로그인 PNG 복사본9개만 삭제. consumer0·원본9개/hash보존·Git 복구blob9개를 대조했다. 실제 로그인 webp/item이미지/data는 보존했고, 독립 명세01a07e4a-7fba·품질01a07e4c-5c38의C/I/M0를 총괄이 원문으로 확인했다. 감사12.28.17 및 ignored 20260908-cp7-b7/preflight-evidence.md가 근거다. 최종 build/로그인 screenshot/full/CI는 별도로 남는다.
 - [ ] CP7 종료·최종 통합: 상태/재고 matrix/manifest 재감사, full gate, 이중 리뷰, 품질 통합/push/CI, 임시 자원 정리, Goal 완료.
 
 ## 작업 분리와 진행 계약
@@ -59,6 +67,10 @@ CP6의 A1~A5는 focused GREEN·독립 새 diff 리뷰 C/I0 후 구간별 local c
 
 사용자의 빠르고 신뢰도 높은 완료 지시에 따라, focused GREEN으로 고정한 같은 diff의 명세·품질 읽기 전용 리뷰는 병렬로 수행할 수 있다. 제품 편집자는 한 명이며 두 리뷰의 C/I0가 모두 필요하다. 수용은 명세 확인 후 품질 확인 순서로 하고, 리뷰 중 지적을 고치면 바뀐 관련 부분만 다시 검토한다. 필수 검토·완료 기준을 줄이는 것은 아니다.
 
+CP7 검증 배치 조정(2026-09-08): B1은 응답 검증·멱등 key 안전막 변경이므로 최종 관련 검사와 실제 CI를 통과한 뒤 B2로 간다. B2의 Next → Vitest/coverage → ESLint/PostCSS는 순서·독립 로컬 commit/rollback 단위를 유지하되, 세 commit의 원격 push/전체 CI 대기는 B2 종료 시 한 번으로 묶는다. Next는 로그인·shell·proxy·빌드, Vitest는 실제 unit/coverage, ESLint/PostCSS는 lint·CSS/build 등 각 변경 도구가 책임지는 검사를 그때 실행한다. 앞 단계와 무관한 같은 검사를 다시 실행하지 않는다. 최신 diff의 명세·품질 C/I0, 생성 타입 guard 및 CP7 최종 full/실제 CI는 그대로 필수다. 최종 CI 실패 시 해당 변경 단위로 원인을 좁히며 기존 실패 기록을 PASS로 덮지 않는다.
+
+추가 배치 조정(2026-09-08): 잔여 dev-only Vite/esbuild advisory2건은 지원 중인 Vite6.4.3의 관련4번째 보안 단위로 해소하고 B2 한 번의 원격 검증에 함께 넣는다. B5~B7은 승인된 문서·one-off 이동·중복복사 제거의 독립 로컬 commit과 직접 검증/리뷰를 유지하며, 같은 제품의 전체 gate/CI는 최종 CP7로 묶는다. 알려진 archive 문서 참조는 승인 source→target 표에 따라 내용 보존 경로 패치로 갱신하며 새 runtime consumer와 구분한다. 제품 편집자는 계속 하나, 정본 감사·본 TODO는 총괄만 수정한다.
+
 ## API·schema 경계
 
 - S0는 기존 migration을 재작성하지 않고 `20260907_0034`, down_revision `("20260903_0032", "20260831_0033")`의 DDL 없는 merge revision만 추가한다. 이미 품질에 반영된 PostgreSQL repair도 보존한다.
@@ -75,6 +87,7 @@ CP6의 A1~A5는 focused GREEN·독립 새 diff 리뷰 C/I0 후 구간별 local c
 - 실제 개발·직원 서버 시작/중지/배포, main merge/push, PR, force-push를 금지한다.
 - DB mutation은 각 worktree ignored runtime의 격리 DB만 사용한다. 기존 `backend/mes.db`는 전후 불변이다.
 - CP6 최종 read-only gate의 한정 예외: 현재 부재한 CP6 `backend/mes.db` 경로만, ignored runtime에서 생성·닫은 합성 schema-head fixture를 배타 생성해 임시 제공할 수 있다. 기존 파일이 발견되면 덮거나 사용하지 않는다. 실행 중 fixture hash 불변과 원래/최종 DB family 부재를 각각 증명하고, 소유권·hash가 같은 단일 임시 파일만 정리한다. 이는 실제 DB 무변경이지 파일 생성/삭제0은 아니다. main/직원 DB 복사·연결은 금지한다. 상세는 supervisor ignored `cp6-final-db-gate-prep.md`다.
+- CP7 최종 read-only gate도 동일한 한정 예외를 적용한다. 검사 함수가 `DATABASE_URL`이 아니라 CP7 `backend/mes.db`를 직접 참조하므로, 원래 부재를 확인한 그 정확 경로에만 ignored runtime에서 만든 합성 head fixture를 배타 생성한다. main/직원 데이터를 복사하지 않으며 read-only 실행 전후 hash·소유권 일치 및 원래 DB family 부재로의 복귀를 각각 기록한다. 예상 밖 파일이 발견되면 덮거나 삭제하지 않는다.
 - E2E base URL은 전용 loopback으로 고정하고 점유 포트에 mutation/종료를 보내지 않는다. 직접 생성한 PID와 시작시각을 검증한 프로세스만 종료한다.
 - S0 실제 Windows 실행에서 bind-only probe가 점유된 8021을 가용으로 오판하고 identity404로 중단됐다. 다른 서버는 조회·종료·재사용하지 않는다. 격리 워크트리 자율 진행 승인에 따라 총괄이 connect+bind 점유 검사 보강과 전용 backend `8021 → 8022` fallback을 test-only 범위에서 승인했다. 선택 포트는 proxy/setup/nonce/cleanup 전체에서 일치해야 하며 두 포트가 모두 점유됐으면 mutation 전에 거부한다. 실제 개발·직원 포트 및 임의 URL을 허용하지 않는다.
 - 주간보고·모바일 하단 nav/pill·출하 step5 카드 배치의 main 결과를 보존하며 추가 변경하지 않는다. 사용자 추가 승인 예외는 `frontend/app/mes/_components/_weekly_sections/__tests__/WeeklyDetailTable.test.tsx` 첫 render에 필수 `onItemSelect` 콜백 1줄을 보완하는 테스트 변경뿐이다.

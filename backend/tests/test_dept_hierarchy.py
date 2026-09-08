@@ -7,6 +7,9 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
 from app.models import Employee, EmployeeLevelEnum
@@ -56,6 +59,26 @@ def _make_employee(
 
 
 class TestCanApproveDepartment:
+    @pytest.mark.parametrize(
+        "case",
+        json.loads(
+            (Path(__file__).parent / "fixtures/department_approval_role_matrix.json").read_text(
+                encoding="utf-8"
+            )
+        ),
+        ids=lambda case: case["name"],
+    )
+    def test_frontend_queue_role_matrix_matches_backend_policy(self, case):
+        actor = _make_employee(
+            level=EmployeeLevelEnum(case["level"]),
+            warehouse_role=case["warehouse_role"],
+            department_role=case["department_role"],
+        )
+        assert can_approve_department(actor, "조립") is case["can_see_department_queue"]
+        visible = approvable_departments(actor)
+        queue_visible = visible is None or "조립" in visible
+        assert queue_visible is case["can_see_department_queue"]
+
     def test_부서_정은_생산_6공정_OK(self):
         actor = _make_employee(department_role="primary")
         for line in PRODUCTION_LINES:

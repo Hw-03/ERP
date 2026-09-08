@@ -5,6 +5,8 @@
  * Round-10A (#2) 에서 types.ts 본문 이전 — 도메인 파일들이 본 파일에서 import.
  */
 
+import type { components } from "../generated/openapi";
+
 export type ProcessTypeCode =
   | "TR" | "TA" | "TF"
   | "HR" | "HA" | "HF"
@@ -50,7 +52,7 @@ export type WarehouseRole = "none" | "primary" | "deputy";
 export type DepartmentRole = "none" | "primary" | "deputy";
 
 export interface InventoryLocationRow {
-  department: Department;
+  department: components["schemas"]["InventoryLocationResponse"]["department"];
   status: LocationStatus;
   quantity: number;
   pending_quantity?: number;

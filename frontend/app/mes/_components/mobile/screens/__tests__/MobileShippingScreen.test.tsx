@@ -99,6 +99,12 @@ async function flushQueries() {
   });
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
 beforeEach(() => {
   vi.mocked(api.getShippingRequests).mockReset().mockResolvedValue([request()]);
   vi.mocked(api.getShippingRequestPage).mockReset().mockImplementation(async () => ({
@@ -124,6 +130,30 @@ afterEach(() => {
 });
 
 describe("MobileShippingScreen", () => {
+  it("최초 출하 조회를 polite status로 알린다", () => {
+    vi.mocked(api.getShippingRequests).mockReturnValue(new Promise(() => {}));
+
+    renderScreen();
+
+    expect(screen.getByRole("status")).toHaveTextContent("출하 데이터를 불러오고 있습니다.");
+  });
+
+  it("최초 조회 실패를 포커스된 alert로 표시하고 버튼으로 재시도한다", async () => {
+    vi.mocked(api.getShippingRequests).mockRejectedValueOnce(new Error("initial mobile failure"));
+
+    renderScreen();
+
+    const alert = await screen.findByRole("alert", { name: "출하 데이터 로드 오류" });
+    expect(alert).toHaveTextContent("initial mobile failure");
+    await waitFor(() => expect(alert).toHaveFocus());
+
+    vi.mocked(api.getShippingRequests).mockResolvedValueOnce([request()]);
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+
+    expect(await screen.findByText("Standard PF")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("alert", { name: "출하 데이터 로드 오류" })).not.toBeInTheDocument());
+  });
+
   it("빈 준비 목록에서 새 요청이 즉시 표시되는 흐름을 안내한다", async () => {
     vi.mocked(api.getShippingRequests).mockResolvedValue([]);
 
@@ -131,6 +161,7 @@ describe("MobileShippingScreen", () => {
 
     expect(await screen.findByText("PC에서 새 출하 요청을 만들면 바로 표시됩니다.")).toBeInTheDocument();
     expect(screen.queryByText("PC에서 요청을 준비 중으로 넘기면 표시됩니다.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
   it("공용 requests query로 최초 조회하고 마운트 중 30초마다만 폴링한다", async () => {
@@ -210,6 +241,7 @@ describe("MobileShippingScreen", () => {
 
     expect(await screen.findByText("Standard PF")).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "다시 동기화" })).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
 
     vi.mocked(api.getShippingRequests).mockResolvedValueOnce([
       request({ base_pf_item_name: "Fresh PF" }),
@@ -498,6 +530,33 @@ describe("MobileShippingScreen", () => {
       expect.objectContaining({ cursor: "next-request", limit: 50 }),
       expect.any(Object),
     );
+  });
+
+  it("다음 페이지가 대기 중이어도 기존 목록을 초기 로딩으로 숨기지 않는다", async () => {
+    const nextPage = deferred<{ requests: ShippingRequest[]; next_cursor: null; has_more: false }>();
+    vi.mocked(api.getShippingRequestPage).mockImplementation(async (params) => (
+      params?.cursor === "next-request"
+        ? nextPage.promise
+        : { requests: [request()], next_cursor: "next-request", has_more: true }
+    ));
+
+    renderScreen();
+    expect(await screen.findByText("Standard PF")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "준비 요청 더 보기" }));
+
+    expect(screen.getByText("Standard PF")).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+
+    await act(async () => {
+      nextPage.resolve({
+        requests: [request({ request_id: "req-2", base_pf_item_name: "Second PF" })],
+        next_cursor: null,
+        has_more: false,
+      });
+      await nextPage.promise;
+    });
+    expect(await screen.findByText("Second PF")).toBeInTheDocument();
   });
 
   it("이력의 다음 페이지를 이어 붙이고 커서 경계 중복을 제거한다", async () => {

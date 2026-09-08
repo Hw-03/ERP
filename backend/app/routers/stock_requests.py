@@ -264,9 +264,10 @@ def list_department_queue(
 ):
     """부서 결재 정/부 승인 대기 목록.
 
-    노출 부서 범위 (그릴 합의 — docs/defect-handling-redesign.md):
-      - 부서 정/부: 생산 라인 6개(튜브/고압/진공/튜닝/조립/출하)
-      - 창고 정/부 / admin: 모든 부서
+    노출 부서 범위:
+      - 부서 정/부: 창고 외 모든 부서
+      - 창고 정/부: 모든 부서
+      - admin 단독: 결재 권한 없음
     """
     actor = (
         db.query(Employee).filter(Employee.employee_id == actor_employee_id).first()
@@ -581,7 +582,7 @@ def department_approve_stock_request(
     actor: VerifiedActor,
     db: Session = Depends(get_db),
 ) -> StockRequest:
-    """부서 결재 승인 — department_role in (primary/deputy) 또는 admin."""
+    """부서 결재 승인 — 부서 정/부 또는 창고 정/부만 허용."""
     ensure_actor_employee_id(actor, payload.actor_employee_id)
     request = _load_request_for_action(db, request_id)
 

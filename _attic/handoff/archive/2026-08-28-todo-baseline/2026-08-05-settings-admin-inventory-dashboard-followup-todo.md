@@ -29,7 +29,7 @@
 
 ## 참고 기준과 근거
 
-- 기존 후속 TODO: `_attic/handoff/archive/2026-08-28-todo-baseline/2026-08-03-admin-export-followup-todo.md`, `_attic/handoff/archive/2026-08-28-todo-baseline/2026-07-28-dashboard-admin-ui-todo.md`, `_attic/handoff/archive/2026-08-28-todo-baseline/2026-07-28-history-admin-bom-todo.md`
+- 기존 후속 TODO: `_attic/handoff/archive/2026-08-03-admin-export-followup-todo.md`, `_attic/handoff/archive/2026-07-28-dashboard-admin-ui-todo.md`, `_attic/handoff/archive/2026-07-28-history-admin-bom-todo.md`
 - 코드 확인:
   - 상단바의 PIN 변경 모달과 알림 벨은 각각 `frontend/app/mes/_components/DesktopTopbar.tsx:57-63, 186-220, 248-303`, `frontend/app/mes/_components/notifications/NotificationBell.tsx:183-316`에 있다.
   - 모델 목록은 코드 열을 표시하고 `M-${slot}` 형식으로 노출한다: `frontend/app/mes/_components/_admin_sections/AdminModelsSection.tsx:213-250`.

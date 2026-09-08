@@ -61,7 +61,7 @@ describe("DefectFilterBar", () => {
       />,
     );
 
-    const sortSelect = screen.getByRole("combobox");
+    const sortSelect = screen.getByRole("combobox", { name: "정렬" });
     const checkbox = screen.getByRole("checkbox", { name: "필터 고정" });
     expect(sortSelect.compareDocumentPosition(checkbox) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(checkbox).not.toBeChecked();

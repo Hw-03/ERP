@@ -132,6 +132,7 @@ function request(overrides: Partial<ShippingRequest> = {}): ShippingRequest {
     final_pa_item_name: null,
     final_pf_item_id: null,
     final_pf_item_name: null,
+    finalization_mode: "KEEP_BASE",
     requested_by_name: "shipping",
     custom_pa_name: null,
     custom_pf_name: null,
@@ -248,7 +249,7 @@ function render(ui: ReactElement) {
   function Wrapper({ children }: { children: ReactNode }) {
     return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
   }
-  return rtlRender(ui, { wrapper: Wrapper });
+  return { queryClient: client, ...rtlRender(ui, { wrapper: Wrapper }) };
 }
 
 beforeEach(() => {
@@ -654,13 +655,55 @@ describe("DesktopShippingView", () => {
     expect(api.getShippingHistory).not.toHaveBeenCalled();
   });
 
-  it("keeps the shipping hub mounted while the first request fetch is pending", () => {
+  it("treats a successful empty request page as loaded instead of returning to initial loading", async () => {
+    vi.mocked(api.getShippingRequests).mockResolvedValueOnce([]);
+
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(api.getShippingRequests).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
+    expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy();
+    expect(screen.getByTestId("shipping-hub-count-request")).toHaveTextContent("0");
+  });
+
+  it("keeps the shipping hub mounted and politely announces the first request fetch", () => {
     vi.mocked(api.getShippingRequests).mockReturnValue(new Promise(() => {}));
 
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
-    expect(screen.queryByText("출하 데이터를 불러오는 중입니다.")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("출하 데이터를 불러오는 중입니다.");
     expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy();
+  });
+
+  it("shows a focused initial-load alert and retries from its native button", async () => {
+    vi.mocked(api.getShippingRequests).mockRejectedValueOnce(new Error("initial shipping failure"));
+
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    const alert = await screen.findByRole("alert", { name: "출하 데이터 로드 오류" });
+    expect(alert).toHaveTextContent("initial shipping failure");
+    await waitFor(() => expect(alert).toHaveFocus());
+
+    vi.mocked(api.getShippingRequests).mockResolvedValueOnce([request()]);
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+
+    await waitFor(() => expect(screen.queryByRole("alert", { name: "출하 데이터 로드 오류" })).not.toBeInTheDocument());
+  });
+
+  it("keeps successful request data visible when a later refresh fails", async () => {
+    const { container, queryClient } = render(<DesktopShippingView onStatusChange={() => {}} />);
+    await waitFor(() => expect(screen.getByTestId("shipping-hub-count-request")).not.toHaveTextContent("0"));
+    const countBeforeRefresh = screen.getByTestId("shipping-hub-count-request").textContent;
+
+    vi.mocked(api.getShippingRequests).mockRejectedValueOnce(new Error("desktop refresh failure"));
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.shipping.requestPages() });
+    });
+
+    expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy();
+    expect(screen.getByTestId("shipping-hub-count-request")).toHaveTextContent(countBeforeRefresh ?? "");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(await screen.findByRole("alert", { name: "출하 데이터 동기화 오류" })).toHaveTextContent("desktop refresh failure");
   });
 
   it("loads PF candidates separately and delays the full item list until PF selection", async () => {
@@ -3167,12 +3210,14 @@ describe("DesktopShippingView", () => {
 
     const paSummary = await screen.findByTestId("shipping-final-pa-summary");
     const pfSummary = await screen.findByTestId("shipping-final-pf-summary");
-    await waitFor(() => expect(paSummary).toHaveTextContent("새 PA 생성 예정"));
-    expect(paSummary).toHaveTextContent("Standard PA");
+    await waitFor(() => {
+      expect(paSummary).toHaveTextContent("새 PA 생성 예정");
+      expect(paSummary).toHaveTextContent("Standard PA");
+      expect(pfSummary).toHaveTextContent("새 PF 생성 예정");
+      expect(pfSummary).toHaveTextContent("Standard PF");
+    });
     expect(paSummary).toHaveTextContent("4-PA-0004");
     expect(paSummary).not.toHaveTextContent("예상 코드 · 저장 시 변경 가능");
-    expect(pfSummary).toHaveTextContent("새 PF 생성 예정");
-    expect(pfSummary).toHaveTextContent("Standard PF");
     expect(pfSummary).toHaveTextContent("4-PF-0005");
     expect(pfSummary).not.toHaveTextContent("예상 코드 · 저장 시 변경 가능");
     expect(screen.getByTestId("shipping-final-pa-summary-label")).toHaveStyle({ color: "var(--c-process-pa)" });

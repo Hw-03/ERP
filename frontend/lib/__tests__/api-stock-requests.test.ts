@@ -3,6 +3,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { stockRequestsApi } from "../api/stock-requests";
 import { ResultUnknownError } from "../api-core";
+import type { components } from "../api/generated/openapi";
 
 function makeResponse(body: unknown, ok = true): Response {
   return {
@@ -21,6 +22,24 @@ function hasPendingStorage(namespace: string): boolean {
 }
 
 const originalFetch = globalThis.fetch;
+
+function stockRequestResponse(
+  overrides: Partial<components["schemas"]["StockRequestResponse"]> = {},
+): components["schemas"]["StockRequestResponse"] {
+  return {
+    created_at: "2026-09-08T00:00:00Z",
+    request_id: "request-1",
+    request_type: "raw_receive",
+    requester_department: "조립",
+    requester_employee_id: "employee-1",
+    requester_name: "요청자",
+    requires_warehouse_approval: true,
+    status: "submitted",
+    updated_at: "2026-09-08T00:00:00Z",
+    ...overrides,
+  };
+}
+
 afterEach(() => {
   globalThis.fetch = originalFetch;
   sessionStorage.clear();
@@ -28,7 +47,7 @@ afterEach(() => {
 
 describe("stockRequestsApi", () => {
   it("createStockRequest POST /api/stock-requests", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse(stockRequestResponse())));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
     await stockRequestsApi.createStockRequest({
       requester_employee_id: "e1",
@@ -40,6 +59,63 @@ describe("stockRequestsApi", () => {
     expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/stock-requests");
   });
 
+  it("알 수 없는 요청 유형은 전송 전에 차단한다", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await expect(stockRequestsApi.createStockRequest({
+      requester_employee_id: "e1",
+      request_type: "future_request" as "raw_receive",
+      lines: [],
+    })).rejects.toThrow("지원하지 않는 재고 요청 유형");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("명시적 null은 전송하고 undefined 필드는 생략한다", async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    globalThis.fetch = vi.fn((_url, init) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return Promise.resolve(makeResponse(stockRequestResponse()));
+    }) as unknown as typeof fetch;
+
+    await stockRequestsApi.createStockRequest({
+      requester_employee_id: "e1",
+      request_type: "raw_receive",
+      reference_no: null,
+      notes: undefined,
+      lines: [],
+    });
+
+    expect(bodies[0]).toHaveProperty("reference_no", null);
+    expect(bodies[0]).not.toHaveProperty("notes");
+  });
+
+  it("package_out 응답과 생략된 optional 필드를 public shape로 정규화한다", async () => {
+    globalThis.fetch = vi.fn(() => Promise.resolve(makeResponse([{
+      request_id: "request-package-out",
+      requester_employee_id: "employee-1",
+      requester_name: "출하 담당",
+      requester_department: "출하",
+      request_type: "package_out",
+      status: "submitted",
+      requires_warehouse_approval: true,
+      created_at: "2026-09-08T00:00:00Z",
+      updated_at: "2026-09-08T00:00:00Z",
+    }]))) as unknown as typeof fetch;
+
+    const [request] = await stockRequestsApi.listMyStockRequests("employee-1");
+
+    expect(request).toMatchObject({
+      request_type: "package_out",
+      request_code: null,
+      approval_department: null,
+      requires_department_approval: false,
+      notes: null,
+      operation_batch_id: null,
+      lines: [],
+    });
+  });
+
   it("transport uncertainty 뒤 동일 payload의 key와 본문을 보존한다", async () => {
     const bodies: Array<Record<string, unknown>> = [];
     let call = 0;
@@ -48,7 +124,7 @@ describe("stockRequestsApi", () => {
       call += 1;
       return call === 1
         ? Promise.reject(new TypeError("lost response"))
-        : Promise.resolve(makeResponse({ request_id: "r-1" }));
+        : Promise.resolve(makeResponse(stockRequestResponse({ request_id: "r-1" })));
     }) as unknown as typeof fetch;
     const payload = {
       requester_employee_id: "employee-uncertain",
@@ -83,7 +159,7 @@ describe("stockRequestsApi", () => {
       call += 1;
       return call === 1
         ? Promise.reject(new TypeError("lost response before reload"))
-        : Promise.resolve(makeResponse({ request_id: "r-reloaded" }));
+        : Promise.resolve(makeResponse(stockRequestResponse({ request_id: "r-reloaded" })));
     }) as unknown as typeof fetch;
     const payload = {
       requester_employee_id: "employee-reload",
@@ -113,11 +189,59 @@ describe("stockRequestsApi", () => {
     expect(hasPendingStorage("s")).toBe(false);
   });
 
+  it("mutation 응답 decode 실패도 결과 불명으로 보존해 같은 요청으로 재시도한다", async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    let call = 0;
+    globalThis.fetch = vi.fn((_url, init) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      call += 1;
+      return Promise.resolve(makeResponse(call === 1
+        ? { lines: [] }
+        : stockRequestResponse({ request_id: "r-retried", lines: [] })));
+    }) as unknown as typeof fetch;
+    const payload = {
+      requester_employee_id: "employee-decode",
+      request_type: "raw_receive" as const,
+      reference_no: "decode-boundary",
+      notes: "original",
+      lines: [],
+    };
+
+    await expect(stockRequestsApi.createStockRequest(payload)).rejects.toBeInstanceOf(
+      ResultUnknownError,
+    );
+    await stockRequestsApi.createStockRequest({ ...payload, notes: "changed" });
+
+    expect(bodies[1]).toEqual(bodies[0]);
+  });
+
+  it("필수 mutation 응답 누락도 결과 불명으로 보존해 같은 요청으로 재시도한다", async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    let call = 0;
+    globalThis.fetch = vi.fn((_url, init) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      call += 1;
+      return Promise.resolve(makeResponse(call === 1 ? {} : stockRequestResponse()));
+    }) as unknown as typeof fetch;
+    const payload = {
+      requester_employee_id: "employee-required",
+      request_type: "raw_receive" as const,
+      lines: [],
+    };
+
+    await expect(stockRequestsApi.createStockRequest(payload)).rejects.toBeInstanceOf(
+      ResultUnknownError,
+    );
+    await stockRequestsApi.createStockRequest(payload);
+
+    expect(bodies[1]).toEqual(bodies[0]);
+  });
+
   it("성공 뒤 같은 payload는 새 key로 새 명령이 된다", async () => {
     const keys: unknown[] = [];
     globalThis.fetch = vi.fn((_url, init) => {
       keys.push((JSON.parse(String(init?.body)) as Record<string, unknown>).client_request_id);
-      return Promise.resolve(makeResponse({ request_id: "r-success" }));
+      return Promise.resolve(makeResponse(stockRequestResponse({ request_id: "r-success" })));
     }) as unknown as typeof fetch;
     const payload = {
       requester_employee_id: "employee-success",
@@ -151,7 +275,7 @@ describe("stockRequestsApi", () => {
           text: () => Promise.resolve(JSON.stringify({ detail: "invalid" })),
         } as Response);
       }
-      return Promise.resolve(makeResponse({ request_id: "r-after-422" }));
+      return Promise.resolve(makeResponse(stockRequestResponse({ request_id: "r-after-422" })));
     }) as unknown as typeof fetch;
     const payload = {
       requester_employee_id: "employee-definitive",
@@ -187,7 +311,7 @@ describe("stockRequestsApi", () => {
           text: () => Promise.resolve(JSON.stringify({ detail: "busy" })),
         } as Response);
       }
-      return Promise.resolve(makeResponse({ request_id: "r-after-503" }));
+      return Promise.resolve(makeResponse(stockRequestResponse({ request_id: "r-after-503" })));
     }) as unknown as typeof fetch;
     const payload = {
       requester_employee_id: "employee-retryable",
@@ -217,7 +341,7 @@ describe("stockRequestsApi", () => {
       call += 1;
       return call === 1
         ? Promise.reject(new TypeError("lost first form response"))
-        : Promise.resolve(makeResponse({ request_id: `request-${call}` }));
+        : Promise.resolve(makeResponse(stockRequestResponse({ request_id: `request-${call}` })));
     }) as unknown as typeof fetch;
     const firstForm = {
       requester_employee_id: "employee-two-forms",
@@ -277,7 +401,9 @@ describe("stockRequestsApi", () => {
       notes: "changed",
       lines: [{ ...payload.lines[0], quantity: 9 }],
     });
-    resolvers.forEach((resolve) => resolve(makeResponse({ request_id: "r-shared" })));
+    resolvers.forEach((resolve) => resolve(makeResponse(
+      stockRequestResponse({ request_id: "r-shared" }),
+    )));
     await Promise.all([first, second]);
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
@@ -298,14 +424,14 @@ describe("stockRequestsApi", () => {
   });
 
   it("approveStockRequest POST /{id}/approve", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse(stockRequestResponse())));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
     await stockRequestsApi.approveStockRequest("r-1", { actor_employee_id: "e1", pin: "0000" });
     expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/stock-requests/r-1/approve");
   });
 
   it("submitStockRequestDraft POST /{id}/submit", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse(stockRequestResponse())));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
     await stockRequestsApi.submitStockRequestDraft("r-1", "e-1");
     expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/stock-requests/r-1/submit");
@@ -323,14 +449,14 @@ describe("stockRequestsApi", () => {
   });
 
   it("rejectStockRequest POST /{id}/reject", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse(stockRequestResponse())));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
     await stockRequestsApi.rejectStockRequest("r-1", { actor_employee_id: "e1", pin: "0000" });
     expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/stock-requests/r-1/reject");
   });
 
   it("cancelStockRequest POST /{id}/cancel", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse(stockRequestResponse())));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
     await stockRequestsApi.cancelStockRequest("r-1", { actor_employee_id: "e1", pin: "0000" });
     expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/stock-requests/r-1/cancel");
@@ -345,7 +471,7 @@ describe("stockRequestsApi", () => {
   });
 
   it("upsertStockRequestDraft PUT /api/stock-requests/draft", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse(stockRequestResponse())));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
     await stockRequestsApi.upsertStockRequestDraft({
       requester_employee_id: "e1",

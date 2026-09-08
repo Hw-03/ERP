@@ -101,6 +101,16 @@ export function isDepartmentApprover(op: OperatorLike): boolean {
   return op.department_role === "primary" || op.department_role === "deputy";
 }
 
+export function canApproveDepartmentRequests(op: OperatorLike): boolean {
+  return isWarehouseStaff(op)
+    || op?.department_role === "primary"
+    || op?.department_role === "deputy";
+}
+
+export function defectDefaultSource(op: OperatorLike): DefectiveSource {
+  return isWarehouseStaff(op) && !isDepartmentApprover(op) ? "warehouse" : "production";
+}
+
 
 export function workTypesForOperator(op: OperatorLike): WorkType[] {
   if (!op) return [];

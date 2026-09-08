@@ -13,7 +13,7 @@ from pathlib import Path
 import openpyxl
 from openpyxl.styles import PatternFill
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 A_SRC = ROOT / '_attic' / 'data' / '0520 권동환 사원님 재고' / 'F704-03__R00__자재_재고_현황_매칭품명추가.xlsx'
 A_BAK = A_SRC.with_name(A_SRC.stem + '_원본백업_20260520.xlsx')
 MATCH = ROOT / '_attic' / 'data' / '생산부_재고_매칭작업_최종.bak_memo13_20260518_101641.xlsx'

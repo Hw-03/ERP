@@ -384,12 +384,17 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   const requests = shippingRequestsQuery.requests;
   const [mutationError, setMutationError] = useState<string | null>(null);
   const setError = setMutationError;
-  const error = mutationError ?? (shippingRequestsQuery.error
+  const requestQueryError = shippingRequestsQuery.error
     ? shippingRequestsQuery.error instanceof Error
       ? shippingRequestsQuery.error.message
       : "출하 데이터를 불러오지 못했습니다."
-    : null);
+    : null;
+  const error = mutationError ?? requestQueryError;
   const loading = shippingRequestsQuery.isLoading;
+  const hasLoadedRequestData = shippingRequestsQuery.dataUpdatedAt > 0;
+  const initialRequestLoading = !hasLoadedRequestData
+    && shippingRequestsQuery.isFetching
+    && !requestQueryError;
   const [itemsLoading, setItemsLoading] = useState(false);
   const [pfItemsLoading, setPfItemsLoading] = useState(false);
   const [pfItemsLoaded, setPfItemsLoaded] = useState(false);
@@ -1954,7 +1959,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
 
   if (loading) {
     return (
-      <div className="flex h-full min-h-0 flex-1 items-center justify-center px-6">
+      <div className="flex h-full min-h-0 flex-1 items-center justify-center px-6" role="status" aria-live="polite">
         <div className="text-sm font-black" style={{ color: LEGACY_COLORS.muted2 }}>출하 데이터를 불러오는 중입니다.</div>
       </div>
     );
@@ -1963,7 +1968,22 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   const usesExternalRootRail = view === "requestDetail" || view === "historyList" || view === "historyWork";
   const rootContent = (
     <>
-      {error && <Notice tone={LEGACY_COLORS.red} title="오류" body={error} />}
+      {initialRequestLoading && (
+        <div className="sr-only" role="status" aria-live="polite">
+          출하 데이터를 불러오는 중입니다.
+        </div>
+      )}
+      {requestQueryError && (
+        <LoadFailureCard
+          message={requestQueryError}
+          prefix={hasLoadedRequestData ? "최신 출하 내역을 동기화하지 못했습니다" : "출하 데이터를 불러오지 못했습니다"}
+          retryLabel={hasLoadedRequestData ? "다시 동기화" : "다시 시도"}
+          onRetry={() => { void shippingRequestsQuery.refetch(); }}
+          ariaLabel={hasLoadedRequestData ? "출하 데이터 동기화 오류" : "출하 데이터 로드 오류"}
+          focusOnMount={!hasLoadedRequestData}
+        />
+      )}
+      {mutationError && <Notice tone={LEGACY_COLORS.red} title="오류" body={mutationError} />}
       {renderActiveView()}
     </>
   );
@@ -3065,6 +3085,9 @@ function RequestSection(props: {
               const active = props.wizardStep === step;
               const complete = props.wizardStep > step;
               const tone = active ? LEGACY_COLORS.blue : complete ? LEGACY_COLORS.green : LEGACY_COLORS.muted2;
+              const textTone = active || complete
+                ? `color-mix(in srgb, ${tone} 70%, ${LEGACY_COLORS.text})`
+                : tone;
               return (
                 <button
                   key={title}
@@ -3074,7 +3097,7 @@ function RequestSection(props: {
                   }}
                   disabled={!canOpenStep(step)}
                   className="min-h-12 rounded-[14px] border px-3 py-2 text-left text-xs font-black transition-all disabled:cursor-not-allowed disabled:opacity-40"
-                  style={{ background: active ? tint(tone, 16) : LEGACY_COLORS.s2, borderColor: active ? tone : LEGACY_COLORS.border, color: tone }}
+                  style={{ background: active ? tint(tone, 16) : LEGACY_COLORS.s2, borderColor: active ? tone : LEGACY_COLORS.border, color: textTone }}
                 >
                   <span className="block truncate whitespace-nowrap">{step + ". " + title}</span>
                 </button>
@@ -3299,6 +3322,7 @@ function RequestSection(props: {
                   step={1}
                   inputRef={requestQuantityRef}
                   disabled={locked || props.pending !== null}
+                  highContrastControls
                 />
               </div>
             ) : props.wizardStep === 3 && (requiresPaName || requiresPfName) ? (

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DirtyGuardProvider } from "@/lib/ui/dirty-guard";
 import { AdminDepartmentsSection } from "../AdminDepartmentsSection";
@@ -93,8 +93,28 @@ describe("AdminDepartmentsSection", () => {
 
     expect(context.setSelectedDept).toHaveBeenCalledWith(assembly);
     context.setSelectedDept.mockClear();
+    fireEvent.keyDown(row!, { key: "Enter" });
+    expect(context.setSelectedDept).toHaveBeenCalledWith(assembly);
+    context.setSelectedDept.mockClear();
     fireEvent.click(row!);
     expect(context.setSelectedDept).toHaveBeenCalledWith(assembly);
+  });
+
+  it("삭제 확인창을 닫으면 영구 삭제 버튼으로 포커스를 돌려준다", async () => {
+    render(
+      <DirtyGuardProvider>
+        <AdminDepartmentsSection employees={[]} items={[]} />
+      </DirtyGuardProvider>,
+    );
+
+    const trigger = screen.getByRole("button", { name: "영구 삭제" });
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    const cancel = screen.getByRole("button", { name: "취소" });
+    fireEvent.click(cancel);
+
+    await waitFor(() => expect(trigger).toHaveFocus());
   });
 
   it("passes the available detail height into the department workspace", () => {

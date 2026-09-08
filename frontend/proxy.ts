@@ -6,7 +6,7 @@ const UNTRUSTED_CLIENT_IP_HEADERS = [
   "x-real-ip",
 ] as const;
 
-export function middleware(request: NextRequest): NextResponse {
+export function proxy(request: NextRequest): NextResponse {
   const headers = new Headers(request.headers);
   for (const header of UNTRUSTED_CLIENT_IP_HEADERS) {
     headers.delete(header);

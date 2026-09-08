@@ -2,26 +2,47 @@ import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
+const jsdomTypeScriptTests = [
+  "lib/queries/**/*.test.ts",
+  "lib/__tests__/query-*.test.ts",
+  "lib/__tests__/api-catalog.test.ts",
+  "lib/__tests__/activity-audit-context.test.ts",
+  "lib/__tests__/api-core.test.ts",
+  "lib/__tests__/api-notifications.test.ts",
+  "lib/__tests__/client-events.test.ts",
+  "app/mes/_components/login/__tests__/useCurrentOperator.test.ts",
+  "app/mes/_components/_warehouse_v2/__tests__/warehouseFlow.golden.test.ts",
+];
+
 export default defineConfig({
   plugins: [react()],
   test: {
-    environment: "node",
-    environmentMatchGlobs: [
-      ["**/*.test.tsx", "jsdom"],
-      ["lib/queries/**/*.test.ts", "jsdom"],
-      ["lib/__tests__/query-*.test.ts", "jsdom"],
-      ["lib/__tests__/api-catalog.test.ts", "jsdom"],
-      ["lib/__tests__/activity-audit-context.test.ts", "jsdom"],
-      ["lib/__tests__/api-core.test.ts", "jsdom"],
-      ["lib/__tests__/api-notifications.test.ts", "jsdom"],
-      ["lib/__tests__/client-events.test.ts", "jsdom"],
-      ["app/mes/_components/login/__tests__/useCurrentOperator.test.ts", "jsdom"],
-      ["app/mes/_components/_warehouse_v2/__tests__/warehouseFlow.golden.test.ts", "jsdom"],
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "node",
+          environment: "node",
+          include: ["app/**/*.test.ts", "lib/**/*.test.ts"],
+          exclude: jsdomTypeScriptTests,
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "jsdom",
+          environment: "jsdom",
+          include: [
+            "app/**/*.test.tsx",
+            "lib/**/*.test.tsx",
+            ...jsdomTypeScriptTests,
+          ],
+        },
+      },
     ],
     isolate: true,
     setupFiles: ["./vitest.setup.ts"],
     globals: true,
-    include: ["app/**/*.test.{ts,tsx}", "lib/**/*.test.{ts,tsx}"],
     coverage: {
       provider: "v8",
       // 측정 대상 — 단위 테스트가 작성된 정본 모듈만 측정.

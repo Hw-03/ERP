@@ -9,6 +9,12 @@
  */
 
 import { deleteJson, fetcher, patchJson, postJson, putJson, toApiUrl } from "../api-core";
+import type { components } from "./generated/openapi";
+
+export type WarehouseAngleCreatePayload = components["schemas"]["WarehouseAngleCreate"];
+export type WarehouseAngleUpdatePayload = components["schemas"]["WarehouseAngleUpdate"];
+export type WarehouseBoxCreatePayload = components["schemas"]["WarehouseBoxCreate"];
+export type WarehouseBoxUpdatePayload = components["schemas"]["WarehouseBoxUpdate"];
 
 export type BoxSize = "LARGE" | "MEDIUM" | "SMALL";
 export type WarehouseSpecialZoneType = "aisle" | "pallet";
@@ -143,9 +149,9 @@ export const warehouseMapApi = {
     ),
 
   // 구조 편집 (admin)
-  createAngle: (payload: Partial<WarehouseAngle> & { label: string }) =>
+  createAngle: (payload: WarehouseAngleCreatePayload) =>
     postJson<WarehouseAngle>(toApiUrl("/api/warehouse-map/angles"), payload),
-  updateAngle: (id: number, payload: Partial<WarehouseAngle>) =>
+  updateAngle: (id: number, payload: WarehouseAngleUpdatePayload) =>
     putJson<WarehouseAngle>(toApiUrl(`/api/warehouse-map/angles/${id}`), payload),
   deleteAngle: (id: number) =>
     deleteJson<void>(toApiUrl(`/api/warehouse-map/angles/${id}`)),
@@ -153,15 +159,9 @@ export const warehouseMapApi = {
     patchJson<{ ok: boolean }>(toApiUrl("/api/warehouse-map/angles/reorder"), { items }),
 
   // 위치 배정 (admin)
-  createBox: (payload: {
-    angle_id: number;
-    row_no: number;
-    layer_no: number;
-    jari_index: number;
-    size: BoxSize;
-    items: BoxItemPayload[];
-  }) => postJson<WarehouseBox>(toApiUrl("/api/warehouse-map/boxes"), payload),
-  updateBox: (boxId: string, payload: { size?: BoxSize; items?: BoxItemPayload[] }) =>
+  createBox: (payload: WarehouseBoxCreatePayload) =>
+    postJson<WarehouseBox>(toApiUrl("/api/warehouse-map/boxes"), payload),
+  updateBox: (boxId: string, payload: WarehouseBoxUpdatePayload) =>
     putJson<WarehouseBox>(toApiUrl(`/api/warehouse-map/boxes/${boxId}`), payload),
   moveBox: (
     boxId: string,

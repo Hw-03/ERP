@@ -9,7 +9,7 @@ phase4 우측 카드 재정비 직후, MCP 수동 클릭 대신 한 번 실행�
 묶음 6건: PRODUCE BOM / DISASSEMBLE BOM / BACKFLUSH 단일 /
          PRODUCE BOM(제외 자식 포함) / ADJUST+ + 수정 이력 / legacy(batch null)
 
-실행: python scripts/dev/seed_history_cases.py
+실행: python _attic/scripts/dev/seed_history_cases.py
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ import uuid
 from decimal import Decimal
 from pathlib import Path
 
-BACKEND_DIR = Path(__file__).resolve().parents[2] / "backend"
+BACKEND_DIR = Path(__file__).resolve().parents[3] / "backend"
 sys.path.insert(0, str(BACKEND_DIR))
 
 from dotenv import load_dotenv  # noqa: E402

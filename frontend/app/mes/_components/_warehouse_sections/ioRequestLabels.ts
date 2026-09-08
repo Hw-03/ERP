@@ -5,7 +5,21 @@ import { REQUEST_TYPE_LABEL as _GLOSSARY_REQUEST_TYPE_LABEL } from "@/lib/io/glo
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 
-export const REQUEST_TYPE_LABEL: Record<string, string> = _GLOSSARY_REQUEST_TYPE_LABEL;
+export const REQUEST_TYPE_LABEL = _GLOSSARY_REQUEST_TYPE_LABEL;
+
+/** 알 수 없는 backend enum은 표시하되 요청 command에는 사용하지 않는다. */
+export function getRequestTypePresentation(requestType: string): {
+  label: string;
+  commandSafe: boolean;
+} {
+  const commandSafe = Object.prototype.hasOwnProperty.call(REQUEST_TYPE_LABEL, requestType);
+  return {
+    label: commandSafe
+      ? REQUEST_TYPE_LABEL[requestType]
+      : `알 수 없는 요청 (${requestType})`,
+    commandSafe,
+  };
+}
 
 export type RequestQuantityTone = "positive" | "negative" | "movement" | "neutral";
 

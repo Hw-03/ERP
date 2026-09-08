@@ -20,7 +20,7 @@ export function useWarehouseScroll({ step1Done, step2Done, forcedStep, lastResul
   const prevForcedStepRef = useRef<1 | 2 | null>(null);
   const prevLastResultRef = useRef<{ count: number; label: string } | null>(null);
 
-  function scrollToRef(ref: React.RefObject<HTMLDivElement>, delay = 150) {
+  function scrollToRef(ref: React.RefObject<HTMLDivElement | null>, delay = 150) {
     window.setTimeout(() => {
       requestAnimationFrame(() => {
         ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });

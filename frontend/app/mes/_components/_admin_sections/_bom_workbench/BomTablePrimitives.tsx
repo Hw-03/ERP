@@ -61,7 +61,7 @@ function useBomNameOverflow(itemName: string) {
 interface BomRowTooltipProps {
   itemName: string;
   children: (props: {
-    nameRef: RefObject<HTMLSpanElement>;
+    nameRef: RefObject<HTMLSpanElement | null>;
     actionTooltipProps: Pick<DOMAttributes<HTMLElement>,
       "onMouseEnter" | "onMouseLeave" | "onMouseOverCapture" | "onMouseOutCapture" | "onFocusCapture" | "onBlurCapture">;
   }) => ReactNode;

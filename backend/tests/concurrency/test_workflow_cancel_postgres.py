@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal
 import os
@@ -12,7 +12,7 @@ import uuid
 
 from fastapi import HTTPException, Request
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import NullPool
@@ -25,12 +25,18 @@ from app.models import (
     InventoryOperationEffect,
     InventoryOperationEffectKindEnum,
     InventoryOperationRoleEnum,
+    IoBatch,
     Item,
+    RequestBucketEnum,
     ShippingAllocation,
     ShippingRequest,
     ShippingRequestEvent,
     ShippingRequestStatusEnum,
     SystemSetting,
+    StockRequest,
+    StockRequestLine,
+    StockRequestStatusEnum,
+    StockRequestTypeEnum,
     TransactionLog,
     TransactionTypeEnum,
     WarehouseUnplacedItem,
@@ -59,10 +65,13 @@ class _WorkflowCase:
     actor_id: uuid.UUID
     item_id: uuid.UUID
     operation_id: uuid.UUID
-    original_log_id: uuid.UUID
+    original_log_id: uuid.UUID | None
     effective_at: datetime
     shipping_request_id: uuid.UUID | None = None
     shipping_allocation_id: uuid.UUID | None = None
+    io_batch_id: uuid.UUID | None = None
+    stock_request_ids: tuple[uuid.UUID, ...] = ()
+    related_operation_ids: tuple[uuid.UUID, ...] = ()
 
 
 def _session_factory() -> tuple[Engine, sessionmaker[Session]]:
@@ -318,6 +327,127 @@ def _seed_shipping_pickup(
         )
 
 
+def _seed_linked_stock_request_operation(
+    make_session: sessionmaker[Session],
+) -> _WorkflowCase:
+    suffix = uuid.uuid4().hex[:12]
+    effective_at = datetime.utcnow()
+    department = "조립"
+    with make_session() as db:
+        setting = db.get(SystemSetting, operation_svc.CUTOVER_SETTING_KEY)
+        if setting is None:
+            db.add(
+                SystemSetting(
+                    setting_key=operation_svc.CUTOVER_SETTING_KEY,
+                    setting_value="2026-01-01T00:00:00",
+                )
+            )
+        else:
+            setting.setting_value = "2026-01-01T00:00:00"
+        actor = Employee(
+            employee_code=f"WF-PG-IO-{suffix}",
+            name=f"workflow IO PG {suffix}",
+            role=f"{department}/staff",
+            department=department,
+            level=EmployeeLevelEnum.STAFF,
+            warehouse_role="none",
+            department_role="none",
+            display_order=0,
+            is_active=True,
+            pin_hash=DEFAULT_PIN_HASH,
+        )
+        item = Item(
+            item_name=f"workflow IO cancel PG {suffix}",
+            process_type_code="TF",
+            unit="EA",
+            model_symbol=suffix,
+            serial_no=1,
+        )
+        db.add_all([actor, item])
+        db.flush()
+        batch = IoBatch(
+            work_type="defect",
+            sub_type="defect_quarantine",
+            status="completed",
+            requester_employee_id=actor.employee_id,
+            requester_name=actor.name,
+            requester_department=department,
+            from_department=department,
+            requires_approval=False,
+            submitted_at=effective_at,
+            completed_at=effective_at,
+        )
+        db.add(batch)
+        db.flush()
+        requests = [
+            StockRequest(
+                requester_employee_id=actor.employee_id,
+                requester_name=actor.name,
+                requester_department=department,
+                request_type=StockRequestTypeEnum.MARK_DEFECTIVE_PROD,
+                status=StockRequestStatusEnum.COMPLETED,
+                requires_warehouse_approval=False,
+                requires_department_approval=False,
+                submitted_at=effective_at,
+                completed_at=effective_at,
+                operation_batch_id=batch.batch_id,
+            )
+            for _index in range(2)
+        ]
+        db.add_all(requests)
+        db.flush()
+        db.add_all(
+            StockRequestLine(
+                request_id=request.request_id,
+                item_id=item.item_id,
+                item_name_snapshot=item.item_name,
+                quantity=1,
+                from_bucket=RequestBucketEnum.PRODUCTION,
+                from_department=department,
+                to_bucket=RequestBucketEnum.DEFECTIVE,
+                to_department=department,
+                status=StockRequestStatusEnum.COMPLETED,
+            )
+            for request in requests
+        )
+        operations: list[InventoryOperation] = []
+        for request in requests:
+            operation = operation_svc._create_business_operation(
+                db,
+                domain="stock_request",
+                action=StockRequestTypeEnum.MARK_DEFECTIVE_PROD.value,
+                display_label="불량 격리",
+                actor_name=actor.name,
+                actor_employee_id=actor.employee_id,
+                effective_at=effective_at,
+            )
+            assert operation is not None
+            operation_svc._record_effect(
+                db,
+                operation=operation,
+                effect_kind=InventoryOperationEffectKindEnum.WORKFLOW,
+                subject_type="StockRequest",
+                subject_id=request.request_id,
+                role="EXECUTION_STATUS",
+                before_state={"status": StockRequestStatusEnum.SUBMITTED.value},
+                after_state={"status": StockRequestStatusEnum.COMPLETED.value},
+            )
+            operations.append(operation)
+        db.commit()
+        return _WorkflowCase(
+            actor_id=actor.employee_id,
+            item_id=item.item_id,
+            operation_id=operations[0].operation_id,
+            original_log_id=None,
+            effective_at=effective_at,
+            io_batch_id=batch.batch_id,
+            stock_request_ids=tuple(request.request_id for request in requests),
+            related_operation_ids=tuple(
+                operation.operation_id for operation in operations
+            ),
+        )
+
+
 def _preview(
     make_session: sessionmaker[Session],
     case: _WorkflowCase,
@@ -354,7 +484,33 @@ def _cancel(
             return exc.reason_code
 
 
+def _cancel_with_backend_pid(
+    make_session: sessionmaker[Session],
+    case: _WorkflowCase,
+    *,
+    plan_hash: str,
+) -> tuple[str, int]:
+    with make_session() as db:
+        backend_pid = int(db.execute(text("SELECT pg_backend_pid()")).scalar_one())
+        actor = db.get(Employee, case.actor_id)
+        assert actor is not None
+        try:
+            cancellation_svc.cancel_operation(
+                db,
+                operation_id=case.operation_id,
+                canceller=actor,
+                reason="PostgreSQL linked IO 취소",
+                plan_hash=plan_hash,
+                now=case.effective_at,
+            )
+            return "cancelled", backend_pid
+        except cancellation_svc.WorkflowCancellationConflict as exc:
+            db.rollback()
+            return exc.reason_code, backend_pid
+
+
 def _assert_three_way_reversal(db: Session, case: _WorkflowCase) -> None:
+    assert case.original_log_id is not None
     original = db.get(TransactionLog, case.original_log_id)
     assert original is not None
     reversal = (
@@ -440,6 +596,150 @@ def test_workflow_cancel_twice_has_one_winner_and_no_loser_orphans() -> None:
                 ShippingRequestEvent.event_type == "PICKUP_CANCELLED",
             ).count() == 1
             _assert_three_way_reversal(db, case)
+    finally:
+        engine.dispose()
+
+
+def test_linked_io_batch_multi_request_cancel_twice_has_one_aggregate_winner() -> None:
+    engine, make_session = _session_factory()
+    try:
+        case = _seed_linked_stock_request_operation(make_session)
+        assert case.io_batch_id is not None
+        assert len(case.stock_request_ids) == 2
+        preview = _preview(make_session, case)
+        assert preview.can_cancel is True
+        barrier = Barrier(2)
+
+        def worker() -> tuple[str, int]:
+            barrier.wait(timeout=10)
+            return _cancel_with_backend_pid(
+                make_session,
+                case,
+                plan_hash=preview.plan_hash,
+            )
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(executor.map(lambda _index: worker(), range(2)))
+
+        assert len({backend_pid for _outcome, backend_pid in results}) == 2
+        assert sorted(outcome for outcome, _backend_pid in results) == [
+            cancellation_svc.WORKFLOW_ALREADY_CANCELLED,
+            "cancelled",
+        ]
+        with make_session() as db:
+            restored = db.get(StockRequest, case.stock_request_ids[0])
+            sibling = db.get(StockRequest, case.stock_request_ids[1])
+            batch = db.get(IoBatch, case.io_batch_id)
+            assert restored is not None
+            assert sibling is not None
+            assert batch is not None
+            assert restored.status == StockRequestStatusEnum.SUBMITTED
+            assert sibling.status == StockRequestStatusEnum.COMPLETED
+            assert {
+                request_id: status
+                for request_id, status in db.query(
+                    StockRequestLine.request_id,
+                    StockRequestLine.status,
+                )
+                .filter(StockRequestLine.request_id.in_(case.stock_request_ids))
+                .all()
+            } == {
+                case.stock_request_ids[0]: StockRequestStatusEnum.SUBMITTED,
+                case.stock_request_ids[1]: StockRequestStatusEnum.COMPLETED,
+            }
+            assert batch.status == "partially_completed"
+            assert batch.completed_at == sibling.completed_at
+            assert batch.stock_request_id is None
+            cancellation = (
+                db.query(InventoryOperation)
+                .filter(InventoryOperation.reverses_operation_id == case.operation_id)
+                .one()
+            )
+            assert (
+                db.query(InventoryOperationEffect)
+                .filter(
+                    InventoryOperationEffect.operation_id == cancellation.operation_id,
+                    InventoryOperationEffect.reverses_effect_id.isnot(None),
+                )
+                .count()
+                == 1
+            )
+    finally:
+        engine.dispose()
+
+
+def test_linked_io_batch_different_request_cancels_share_owner_lock_order() -> None:
+    engine, make_session = _session_factory()
+    try:
+        case = _seed_linked_stock_request_operation(make_session)
+        assert case.io_batch_id is not None
+        assert len(case.related_operation_ids) == 2
+        cases = tuple(
+            replace(case, operation_id=operation_id)
+            for operation_id in case.related_operation_ids
+        )
+        previews = tuple(_preview(make_session, worker_case) for worker_case in cases)
+        assert all(preview.can_cancel for preview in previews)
+        barrier = Barrier(2)
+
+        def worker(index: int) -> tuple[str, int]:
+            barrier.wait(timeout=10)
+            return _cancel_with_backend_pid(
+                make_session,
+                cases[index],
+                plan_hash=previews[index].plan_hash,
+            )
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(executor.map(worker, range(2)))
+
+        assert len({backend_pid for _outcome, backend_pid in results}) == 2
+        assert [outcome for outcome, _backend_pid in results] == [
+            "cancelled",
+            "cancelled",
+        ]
+        with make_session() as db:
+            requests = (
+                db.query(StockRequest)
+                .filter(StockRequest.request_id.in_(case.stock_request_ids))
+                .order_by(StockRequest.request_id.asc())
+                .all()
+            )
+            batch = db.get(IoBatch, case.io_batch_id)
+            assert len(requests) == 2
+            assert batch is not None
+            assert {request.status for request in requests} == {
+                StockRequestStatusEnum.SUBMITTED
+            }
+            assert {
+                status
+                for (status,) in db.query(StockRequestLine.status)
+                .filter(StockRequestLine.request_id.in_(case.stock_request_ids))
+                .all()
+            } == {StockRequestStatusEnum.SUBMITTED}
+            assert batch.status == "submitted"
+            assert batch.completed_at is None
+            cancellations = (
+                db.query(InventoryOperation)
+                .filter(
+                    InventoryOperation.reverses_operation_id.in_(
+                        case.related_operation_ids
+                    )
+                )
+                .all()
+            )
+            assert len(cancellations) == 2
+            assert (
+                db.query(InventoryOperationEffect)
+                .filter(
+                    InventoryOperationEffect.operation_id.in_(
+                        [cancellation.operation_id for cancellation in cancellations]
+                    ),
+                    InventoryOperationEffect.reverses_effect_id.isnot(None),
+                )
+                .count()
+                == 2
+            )
     finally:
         engine.dispose()
 
