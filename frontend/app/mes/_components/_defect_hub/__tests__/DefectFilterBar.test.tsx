@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { DefectFilterBar } from "../DefectFilterBar";
 
@@ -15,32 +15,65 @@ describe("DefectFilterBar", () => {
     currentDept: "조립",
   };
 
-  it("renders an accessible 44px search field with a clear button and wrapping layout", () => {
-    const setSearch = vi.fn();
-    const { rerender } = render(<DefectFilterBar {...baseProps} search=" memo " setSearch={setSearch} />);
+  it("renders category cards and exposes same-group OR selection callbacks", () => {
+    const onDepartmentsChange = vi.fn();
+    const onModelsChange = vi.fn();
+    const onProcessStepsChange = vi.fn();
+    render(
+      <DefectFilterBar
+        {...baseProps}
+        departments={["튜브", "조립"]}
+        selectedDepartments={["튜브"]}
+        onDepartmentsChange={onDepartmentsChange}
+        models={["DX-1"]}
+        selectedModels={[]}
+        onModelsChange={onModelsChange}
+        selectedProcessSteps={["R"]}
+        onProcessStepsChange={onProcessStepsChange}
+      />,
+    );
 
-    const input = screen.getByRole("searchbox", { name: "불량 검색" });
-    expect(input).toHaveClass("min-h-11");
-    expect(input.parentElement).toHaveClass("focus-within:ring-2");
-    expect(input).toHaveAttribute("placeholder", "품명 · 코드 · 부서 · 사유 · 처리자");
-    expect(input.parentElement).toHaveClass("flex-1");
-    expect(input.parentElement).toHaveClass("min-h-11", "min-w-[240px]", "w-full", "lg:w-auto");
-    expect(screen.getByRole("button", { name: "불량 검색 지우기" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "불량 검색 지우기" }));
-    expect(setSearch).toHaveBeenCalledWith("");
+    const departmentCard = screen.getByRole("group", { name: "부서 구분" });
+    const modelCard = screen.getByRole("group", { name: "모델 구분" });
+    const processCard = screen.getByRole("group", { name: "공정 구분" });
+    expect(within(departmentCard).getByRole("button", { name: "내 부서" })).toBeInTheDocument();
+    expect(within(modelCard).queryByRole("button", { name: "미분류" })).not.toBeInTheDocument();
+    expect(within(processCard).getByRole("button", { name: "공정완료" })).toBeInTheDocument();
 
-    rerender(<DefectFilterBar {...baseProps} search="" setSearch={setSearch} />);
-    expect(screen.queryByRole("button", { name: "불량 검색 지우기" })).not.toBeInTheDocument();
+    fireEvent.click(within(departmentCard).getByRole("button", { name: "조립" }));
+    fireEvent.click(within(modelCard).getByRole("button", { name: "DX-1" }));
+    fireEvent.click(within(processCard).getByRole("button", { name: "중간공정" }));
+
+    expect(onDepartmentsChange).toHaveBeenCalledWith(["튜브", "조립"]);
+    expect(onModelsChange).toHaveBeenCalledWith(["DX-1"]);
+    expect(onProcessStepsChange).toHaveBeenCalledWith(["R", "A"]);
   });
 
-  it("places the search field after all existing filter controls in DOM focus order", () => {
-    const { container } = render(<DefectFilterBar {...baseProps} search="" setSearch={vi.fn()} />);
-    const focusables = Array.from(container.querySelectorAll<HTMLElement>("button, select, input"))
-      .filter((element) => !element.hasAttribute("disabled") && element.tabIndex >= 0);
-    const search = screen.getByRole("searchbox", { name: "불량 검색" });
+  it("resets only the three category selections and keeps search out of the filter bar", () => {
+    const onDepartmentsChange = vi.fn();
+    const onModelsChange = vi.fn();
+    const onProcessStepsChange = vi.fn();
+    const { container } = render(
+      <DefectFilterBar
+        {...baseProps}
+        departments={["조립"]}
+        selectedDepartments={["조립"]}
+        onDepartmentsChange={onDepartmentsChange}
+        models={["DX-1"]}
+        selectedModels={["DX-1", "미분류"]}
+        onModelsChange={onModelsChange}
+        selectedProcessSteps={["F"]}
+        onProcessStepsChange={onProcessStepsChange}
+      />,
+    );
 
-    expect(focusables.at(-1)).toBe(search);
-    expect(focusables.slice(0, -1)).not.toContain(search);
+    expect(container.querySelector('input[type="search"]')).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "전체 초기화" }));
+    expect(onDepartmentsChange).toHaveBeenCalledWith([]);
+    expect(onModelsChange).toHaveBeenCalledWith([]);
+    expect(onProcessStepsChange).toHaveBeenCalledWith([]);
+    expect(baseProps.onActorScopeChange).not.toHaveBeenCalled();
+    expect(baseProps.onSortChange).not.toHaveBeenCalled();
   });
 
   it("renders the filter lock checkbox after the sort select and reports changes", () => {
@@ -56,8 +89,6 @@ describe("DefectFilterBar", () => {
         onSortChange={vi.fn()}
         onFilterLockedChange={onFilterLockedChange}
         currentDept="조립"
-        search=""
-        setSearch={vi.fn()}
       />,
     );
 
@@ -80,8 +111,6 @@ describe("DefectFilterBar", () => {
         onSortChange={vi.fn()}
         onFilterLockedChange={onFilterLockedChange}
         currentDept="조립"
-        search=""
-        setSearch={vi.fn()}
       />,
     );
     expect(screen.getByRole("checkbox", { name: "필터 고정" })).toBeChecked();

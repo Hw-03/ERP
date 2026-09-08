@@ -37,6 +37,7 @@ from app.schemas import (
 from app.services.weekly_inventory_snapshot import load_dashboard_finished_stock
 from app.services.weekly_report_scope import (
     FINISHED_PROCESS_CODES,
+    includes_ceramic_tube_housing_for_week,
     includes_vacuum_generator_for_week,
     weekly_report_group_code,
     weekly_report_item_sort_key,
@@ -279,7 +280,11 @@ def _snapshot_normal_items(snapshot: WeeklyInventorySnapshot) -> dict[str, tuple
     return rows
 
 
-def _live_normal_items(db: Session) -> dict[str, tuple]:
+def _live_normal_items(
+    db: Session,
+    *,
+    include_ceramic_tube_housing: bool,
+) -> dict[str, tuple]:
     return {
         str(row.item.item_id): (
             row.item.item_id,
@@ -288,7 +293,10 @@ def _live_normal_items(db: Session) -> dict[str, tuple]:
             row.item.process_type_code,
             Decimal(str(row.normal_quantity)),
         )
-        for row in load_dashboard_finished_stock(db)
+        for row in load_dashboard_finished_stock(
+            db,
+            include_ceramic_tube_housing=include_ceramic_tube_housing,
+        )
     }
 
 
@@ -309,7 +317,10 @@ def _load_boundaries(
     previous = _snapshot_normal_items(previous_snapshot)
 
     if week_start <= today <= week_end:
-        current = _live_normal_items(db)
+        current = _live_normal_items(
+            db,
+            include_ceramic_tube_housing=includes_ceramic_tube_housing_for_week(week_start),
+        )
     elif week_end < today:
         current_snapshot = (
             db.query(WeeklyInventorySnapshot)
@@ -332,7 +343,9 @@ def _load_boundaries(
         group_code = weekly_report_group_code(
             metadata[3],
             metadata[2],
+            metadata[1],
             include_vacuum_generator=includes_vacuum_generator_for_week(week_start),
+            include_ceramic_tube_housing=includes_ceramic_tube_housing_for_week(week_start),
         )
         if group_code not in FINISHED_CODES:
             continue
@@ -677,7 +690,7 @@ def build_verified_weekly_report(
     groups: list[WeeklyGroupReport] = []
     for code in FINISHED_CODES:
         rows = grouped[code]
-        if code == "VF":
+        if code in {"HF", "VF"}:
             source_process_codes = {
                 str(item.item_id): item.source_process_type_code for item in items
             }

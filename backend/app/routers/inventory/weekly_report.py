@@ -52,6 +52,7 @@ from app.services.weekly_inventory_snapshot import (
 from app.services import weekly_report_contract
 from app.services.weekly_report_scope import (
     FINISHED_PROCESS_CODES,
+    includes_ceramic_tube_housing_for_week,
     includes_vacuum_generator_for_week,
     weekly_report_group_code,
     weekly_report_item_clause,
@@ -161,7 +162,11 @@ def _snapshot_items_by_id(
     }
 
 
-def _live_items_by_id(db: Session) -> dict[object, _InventoryPointItem]:
+def _live_items_by_id(
+    db: Session,
+    *,
+    include_ceramic_tube_housing: bool,
+) -> dict[object, _InventoryPointItem]:
     return {
         row.item.item_id: _InventoryPointItem(
             item_id=row.item.item_id,
@@ -170,7 +175,10 @@ def _live_items_by_id(db: Session) -> dict[object, _InventoryPointItem]:
             process_type_code=row.item.process_type_code,
             quantity=row.quantity,
         )
-        for row in load_dashboard_finished_stock(db)
+        for row in load_dashboard_finished_stock(
+            db,
+            include_ceramic_tube_housing=include_ceramic_tube_housing,
+        )
     }
 
 
@@ -240,7 +248,10 @@ def _load_snapshot_report_context(
 
         items = _merge_inventory_points(
             _snapshot_items_by_id(previous_snapshot),
-            _live_items_by_id(db),
+            _live_items_by_id(
+                db,
+                include_ceramic_tube_housing=includes_ceramic_tube_housing_for_week(week_start),
+            ),
         )
         now_utc = datetime.now(UTC).replace(tzinfo=None)
         return _SnapshotReportContext(
@@ -328,6 +339,7 @@ def get_weekly_report(
     if week_start is None or week_end is None:
         week_start, week_end = _current_week_bounds()
     include_vacuum_generator = includes_vacuum_generator_for_week(week_start)
+    include_ceramic_tube_housing = includes_ceramic_tube_housing_for_week(week_start)
 
     contract_state = weekly_report_contract.weekly_contract_state(
         db,
@@ -358,6 +370,7 @@ def get_weekly_report(
                 weekly_report_item_clause(
                     Item,
                     include_vacuum_generator=include_vacuum_generator,
+                    include_ceramic_tube_housing=include_ceramic_tube_housing,
                 )
             )
             .order_by(Item.mes_code)
@@ -495,7 +508,9 @@ def get_weekly_report(
             code = weekly_report_group_code(
                 item.process_type_code,
                 item.item_name,
+                item.mes_code,
                 include_vacuum_generator=include_vacuum_generator,
+                include_ceramic_tube_housing=include_ceramic_tube_housing,
             ) or "??"
             current_qty = Decimal(str(inv.quantity if inv else 0))
             snapshot_prev_qty: Decimal | None = None
@@ -507,7 +522,9 @@ def get_weekly_report(
             code = weekly_report_group_code(
                 row.process_type_code,
                 row.item_name,
+                row.mes_code,
                 include_vacuum_generator=include_vacuum_generator,
+                include_ceramic_tube_housing=include_ceramic_tube_housing,
             ) or "??"
             current_qty = row.current_qty
             snapshot_prev_qty = row.prev_qty
@@ -539,7 +556,7 @@ def get_weekly_report(
     groups: list[WeeklyGroupReport] = []
     for code in _F_CODES:
         items = group_items.get(code, [])
-        if code == "VF":
+        if code in {"HF", "VF"}:
             items.sort(
                 key=lambda item: weekly_report_item_sort_key(
                     source_process_codes.get(item.item_id),
@@ -589,6 +606,7 @@ def get_weekly_report(
             weekly_report_item_clause(
                 Item,
                 include_vacuum_generator=include_vacuum_generator,
+                include_ceramic_tube_housing=include_ceramic_tube_housing,
             )
         )
         production_filters.append(TransactionLog.created_at <= dt_end)
@@ -619,7 +637,9 @@ def get_weekly_report(
             str(row.item_id): weekly_report_group_code(
                 row.process_type_code,
                 row.item_name,
+                row.mes_code,
                 include_vacuum_generator=include_vacuum_generator,
+                include_ceramic_tube_housing=include_ceramic_tube_housing,
             )
             for row in snapshot_context.items
         }
@@ -636,7 +656,9 @@ def get_weekly_report(
             else weekly_report_group_code(
                 item.process_type_code,
                 item.item_name,
+                item.mes_code,
                 include_vacuum_generator=include_vacuum_generator,
+                include_ceramic_tube_housing=include_ceramic_tube_housing,
             )
         ) or ""
         if proc not in _PROD_CODES:

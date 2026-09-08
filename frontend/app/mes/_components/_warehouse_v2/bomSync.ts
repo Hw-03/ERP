@@ -8,7 +8,7 @@
  * getAvailable 은 IoComposeView 클로저(현재 items 의존)이므로 인자로 주입한다.
  */
 import type { IoBundle, IoLine, IoSubType } from "./types";
-import { exclusionNoteFor, isBomForced } from "./ioWorkType";
+import { exclusionNoteFor } from "./ioWorkType";
 
 type GetAvailable = (line: IoLine) => number | null;
 const BOM_STOCK_EXEMPT_NOTE = "BOM 재고 미반영";
@@ -22,6 +22,15 @@ function expectedBomChildQuantity(bundle: IoBundle, line: IoLine, parentQuantity
   const initialExpected = Number(line.bom_expected) || 0;
   if (bundleQuantity <= 0) return 0;
   return parentQuantity * (initialExpected / bundleQuantity);
+}
+
+/** 현재 묶음 기준으로 자동 BOM 하위를 다시 포함할 때의 수량. */
+function expectedAutoChildQuantity(bundle: IoBundle, line: IoLine): number {
+  const directParent = bundle.lines.find((candidate) => candidate.origin === "direct");
+  if (directParent) {
+    return expectedBomChildQuantity(bundle, line, Number(directParent.quantity) || 0);
+  }
+  return Math.max(0, Number(bundle.quantity) || 0) * (Number(line.bom_expected) || 0);
 }
 
 /** 출발 재고를 차감하는 라인만 부족 여부를 계산한다. */
@@ -46,24 +55,26 @@ export function applyToggleLine(
     const target = bundle.lines.find((l) => l.line_id === lineId);
     if (!target) return bundle;
     if (isBomStockExempt(target)) return bundle;
-    const isForcedBomChild =
-      isBomForced(subType) &&
+    const isAutoBomChild =
       target.origin === "bom_auto" &&
       target.bom_expected != null &&
       Number(target.bom_expected) > 0;
-    if (isForcedBomChild) {
+    if (isAutoBomChild) {
       const newIncluded = !target.included;
+      const quantity = newIncluded ? expectedAutoChildQuantity(bundle, target) : 0;
+      const included = newIncluded && quantity > 0;
+      const available = getAvailable(target);
       return {
         ...bundle,
         lines: bundle.lines.map((line) =>
           line.line_id === lineId
             ? {
                 ...line,
-                quantity: newIncluded ? 1 : 0,
-                included: newIncluded,
-                edited: !newIncluded,
-                shortage: 0,
-                exclusion_note: exclusionNoteFor(subType, line.origin, newIncluded),
+                quantity,
+                included,
+                edited: !included,
+                shortage: included ? shortageForQuantity(line, quantity, available) : 0,
+                exclusion_note: exclusionNoteFor(subType, line.origin, included),
               }
             : line,
         ),
@@ -145,7 +156,9 @@ export function applyLineQuantityChange(
                 quantity: childQty,
                 shortage: 0,
                 included: false,
-                edited: false,
+                // 사용자가 체크 해제한 하위는 제외 상태를 보존하되, 상위가 0이어서
+                // 자동 제외된 하위는 다음 기준 수량에서 다시 계산한다.
+                edited: line.included ? false : line.edited,
                 exclusion_note: BOM_STOCK_EXEMPT_NOTE,
               };
             }
@@ -160,7 +173,8 @@ export function applyLineQuantityChange(
               quantity: childQty,
               shortage: childShortage,
               included: childIncluded,
-              edited: false,
+              // 사용자가 체크 해제한 하위는 기준 수량 0을 거쳐도 제외 상태를 유지한다.
+              edited: line.included ? false : line.edited,
               exclusion_note: childIncluded ? line.exclusion_note : exclusionNoteFor(subType, line.origin, false),
             };
           }

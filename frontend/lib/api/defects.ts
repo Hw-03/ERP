@@ -10,6 +10,10 @@ import type {
   DefectMemoRevision,
   DefectMemoUpdatePayload,
   DefectMemoUpdateResult,
+  DefectStatisticsQuery,
+  DefectStatisticsResponse,
+  BulkUnquarantinePayload,
+  BulkUnquarantineResult,
   QuarantinePayload,
   UnquarantinePayload,
 } from "./types/defects";
@@ -44,6 +48,9 @@ export const defectsApi = {
   unquarantine: (payload: UnquarantinePayload): Promise<void> =>
     postJson<void>(toApiUrl("/api/defects/unquarantine"), payload),
 
+  unquarantineBulk: (payload: BulkUnquarantinePayload): Promise<BulkUnquarantineResult> =>
+    postJson<BulkUnquarantineResult>(toApiUrl("/api/defects/unquarantine/bulk"), payload),
+
   updateMemo: (recordId: string, payload: DefectMemoUpdatePayload) =>
     putJson<DefectMemoUpdateResult>(
       toApiUrl(`/api/defects/records/${recordId}/memo`),
@@ -54,4 +61,14 @@ export const defectsApi = {
     fetcher<DefectMemoRevision[]>(
       toApiUrl(`/api/defects/records/${recordId}/memo-history`),
     ),
+
+  getStatistics: (query: DefectStatisticsQuery): Promise<DefectStatisticsResponse> => {
+    const params = new URLSearchParams({ period: query.period, anchor: query.anchor });
+    query.departments.forEach((value) => params.append("department", value));
+    query.models.forEach((value) => params.append("model", value));
+    query.process_steps.forEach((value) => params.append("process_step", value));
+    return fetcher<DefectStatisticsResponse>(
+      toApiUrl(`/api/defects/statistics?${params.toString()}`),
+    );
+  },
 };

@@ -108,7 +108,12 @@ def _effect_deltas(effect: object) -> tuple[Decimal, Decimal]:
     return normal_delta, defective_delta
 
 
-def _build_rows(db: Session, snapshot: WeeklyInventorySnapshot) -> tuple[BackfillRow, ...]:
+def _build_rows(
+    db: Session,
+    snapshot: WeeklyInventorySnapshot,
+    *,
+    target_predicate: Callable[[Item], bool],
+) -> tuple[BackfillRow, ...]:
     """현재 셀 재고에서 경계 이후 원장 효과를 빼 누락 행을 복원한다."""
 
     existing_ids = {
@@ -139,7 +144,7 @@ def _build_rows(db: Session, snapshot: WeeklyInventorySnapshot) -> tuple[Backfil
         for item in missing_items
         if item.deleted_at is None
         and item.legacy_item_type != DISUSED_ITEM_TYPE
-        and is_vacuum_generator_weekly_item(item.process_type_code, item.item_name)
+        and target_predicate(item)
     ]
     figures = stock_math.bulk_compute(db, [item.item_id for item in candidates])
     rows: list[BackfillRow] = []
@@ -232,10 +237,15 @@ def backfill_snapshot(
     week_end: date,
     apply: bool,
     backup_fn: Callable[..., Path] = backup_sqlite,
+    target_predicate: Callable[[Item], bool] | None = None,
+    backup_label: str = BACKUP_LABEL,
 ) -> BackfillReport:
     """대상 일요일 스냅샷을 미리보거나 백업 후 원자적으로 보충한다."""
 
     source = db_path.resolve()
+    resolved_target_predicate = target_predicate or (
+        lambda item: is_vacuum_generator_weekly_item(item.process_type_code, item.item_name)
+    )
     if not source.is_file():
         raise BackfillSafetyError(f"database file not found: {source}")
     database_url = (
@@ -256,7 +266,11 @@ def backfill_snapshot(
             if snapshot is None:
                 raise BackfillSafetyError(f"weekly snapshot not found: {week_end.isoformat()}")
             _validate_verified_snapshot(db, snapshot)
-            rows = _build_rows(db, snapshot)
+            rows = _build_rows(
+                db,
+                snapshot,
+                target_predicate=resolved_target_predicate,
+            )
             if not apply or not rows:
                 db.rollback()
                 return BackfillReport(
@@ -266,7 +280,7 @@ def backfill_snapshot(
                     backup_path=None,
                 )
 
-            backup_path = backup_fn(str(source), label=BACKUP_LABEL)
+            backup_path = backup_fn(str(source), label=backup_label)
             db.add_all(
                 [
                     WeeklyInventorySnapshotItem(

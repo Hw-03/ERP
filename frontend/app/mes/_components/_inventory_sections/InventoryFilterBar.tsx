@@ -125,13 +125,6 @@ export function InventoryFilters({
               className="w-full"
             />
           ))}
-          <FilterChip
-            active={selectedModels.includes("미분류")}
-            label="미분류"
-            onClick={() => toggleModel("미분류")}
-            tone={LEGACY_COLORS.muted2}
-            className="w-full"
-          />
         </div>
       </div>
       <div className="rounded-[16px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>

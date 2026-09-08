@@ -1161,6 +1161,113 @@
         "title": "BoxTrackingUpdate",
         "type": "object"
       },
+      "BulkUnquarantineLine": {
+        "properties": {
+          "department": {
+            "title": "Department",
+            "type": "string"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "record_id": {
+            "format": "uuid",
+            "title": "Record Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "record_id",
+          "item_id",
+          "department",
+          "quantity"
+        ],
+        "title": "BulkUnquarantineLine",
+        "type": "object"
+      },
+      "BulkUnquarantineRequest": {
+        "properties": {
+          "actor_employee_id": {
+            "format": "uuid",
+            "title": "Actor Employee Id",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/BulkUnquarantineLine"
+            },
+            "minItems": 1,
+            "title": "Lines",
+            "type": "array"
+          },
+          "reason_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category"
+          },
+          "reason_memo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Memo"
+          }
+        },
+        "required": [
+          "actor_employee_id",
+          "lines"
+        ],
+        "title": "BulkUnquarantineRequest",
+        "type": "object"
+      },
+      "BulkUnquarantineResult": {
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "processed_records": {
+            "title": "Processed Records",
+            "type": "integer"
+          },
+          "total_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Quantity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "processed_records",
+          "total_quantity",
+          "message"
+        ],
+        "title": "BulkUnquarantineResult",
+        "type": "object"
+      },
       "CapacityAfBlock": {
         "description": "AF(조립 완제품) 기준 생산 가능 수량.\n\n재고 기준은 available(=warehouse+production-pending)이며 **계획/대응 수량 지표**다.\n생산 등록 가능성 검증(backflush, warehouse_available)이 아니다.\n\n주의: summary.ship_ready / fast_production / total_production 은 'AF별 독립 계산의 합계'다.\n여러 AF 가 같은 하위 자재를 공유하면 모든 AF 수량을 동시에 보장하지는 않는다.",
         "properties": {
@@ -2048,6 +2155,240 @@
           "changed"
         ],
         "title": "DefectMemoUpdateResult",
+        "type": "object"
+      },
+      "DefectStatisticsBreakdownEntry": {
+        "description": "하나의 분류값에 모인 발생 건수와 수량.",
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "record_count": {
+            "title": "Record Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "record_count",
+          "quantity"
+        ],
+        "title": "DefectStatisticsBreakdownEntry",
+        "type": "object"
+      },
+      "DefectStatisticsItemBreakdownEntry": {
+        "description": "품목별 분류값과 화면 표시에 필요한 품목 식별자.",
+        "properties": {
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "record_count": {
+            "title": "Record Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "record_count",
+          "quantity",
+          "item_id"
+        ],
+        "title": "DefectStatisticsItemBreakdownEntry",
+        "type": "object"
+      },
+      "DefectStatisticsPeriod": {
+        "description": "KST 달력 기준으로 확정된 포함 시작일과 종료일.",
+        "properties": {
+          "anchor": {
+            "format": "date",
+            "title": "Anchor",
+            "type": "string"
+          },
+          "end_date": {
+            "format": "date",
+            "title": "End Date",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "week",
+              "month",
+              "year"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "start_date": {
+            "format": "date",
+            "title": "Start Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "anchor",
+          "start_date",
+          "end_date"
+        ],
+        "title": "DefectStatisticsPeriod",
+        "type": "object"
+      },
+      "DefectStatisticsResponse": {
+        "description": "불량 통계 API가 그대로 반환할 수 있는 서비스 응답.",
+        "properties": {
+          "departments": {
+            "items": {
+              "$ref": "#/components/schemas/DefectStatisticsBreakdownEntry"
+            },
+            "title": "Departments",
+            "type": "array"
+          },
+          "excluded_legacy_count": {
+            "title": "Excluded Legacy Count",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DefectStatisticsItemBreakdownEntry"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "period": {
+            "$ref": "#/components/schemas/DefectStatisticsPeriod"
+          },
+          "reasons": {
+            "items": {
+              "$ref": "#/components/schemas/DefectStatisticsBreakdownEntry"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/DefectStatisticsSummary"
+          },
+          "timeline": {
+            "items": {
+              "$ref": "#/components/schemas/DefectStatisticsTimelineEntry"
+            },
+            "title": "Timeline",
+            "type": "array"
+          }
+        },
+        "required": [
+          "period",
+          "summary",
+          "timeline",
+          "items",
+          "reasons",
+          "departments",
+          "excluded_legacy_count"
+        ],
+        "title": "DefectStatisticsResponse",
+        "type": "object"
+      },
+      "DefectStatisticsSummary": {
+        "description": "선택 기간·필터 전체의 핵심 발생 지표.",
+        "properties": {
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "record_count": {
+            "title": "Record Count",
+            "type": "integer"
+          },
+          "top_item": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DefectStatisticsItemBreakdownEntry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "top_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DefectStatisticsBreakdownEntry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "record_count",
+          "quantity"
+        ],
+        "title": "DefectStatisticsSummary",
+        "type": "object"
+      },
+      "DefectStatisticsTimelineEntry": {
+        "description": "빈 구간도 포함하는 일별 또는 월별 발생 버킷.",
+        "properties": {
+          "bucket": {
+            "title": "Bucket",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "record_count": {
+            "title": "Record Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "bucket",
+          "label",
+          "record_count",
+          "quantity"
+        ],
+        "title": "DefectStatisticsTimelineEntry",
         "type": "object"
       },
       "DepartmentCreate": {
@@ -14835,6 +15176,122 @@
         ]
       }
     },
+    "/api/defects/statistics": {
+      "get": {
+        "description": "KST 달력 기준 불량 발생 통계를 주간·월간·연간으로 반환한다.",
+        "operationId": "get_statistics_api_defects_statistics_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "period",
+            "required": false,
+            "schema": {
+              "default": "week",
+              "enum": [
+                "week",
+                "month",
+                "year"
+              ],
+              "title": "Period",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "anchor",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "Anchor",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "department",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Department"
+            }
+          },
+          {
+            "in": "query",
+            "name": "model",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model"
+            }
+          },
+          {
+            "in": "query",
+            "name": "process_step",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Process Step"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefectStatisticsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Statistics",
+        "tags": [
+          "Defects"
+        ]
+      }
+    },
     "/api/defects/unquarantine": {
       "post": {
         "description": "정상 복귀 (즉시, 결재 없음). unmark_defective 래퍼.",
@@ -14872,6 +15329,48 @@
           }
         },
         "summary": "Unquarantine",
+        "tags": [
+          "Defects"
+        ]
+      }
+    },
+    "/api/defects/unquarantine/bulk": {
+      "post": {
+        "description": "선택한 동일 품목·부서 격리 기록을 전부 정상 복귀한다.",
+        "operationId": "unquarantine_bulk_api_defects_unquarantine_bulk_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkUnquarantineRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkUnquarantineResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unquarantine Bulk",
         "tags": [
           "Defects"
         ]

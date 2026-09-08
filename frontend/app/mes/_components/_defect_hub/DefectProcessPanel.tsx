@@ -14,22 +14,49 @@ import { InlineErrorNote } from "./InlineErrorNote";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { REASON_CATEGORIES } from "./reasonCategories";
 import { QuantityInput } from "../common/QuantityInput";
+import { makeClientRequestId } from "@/lib/uuid";
+import { ApiError } from "@/lib/api-core";
 
 type ProcessAction = "unquarantine" | "scrap" | "return" | "disassemble";
 
 interface Props {
-  location: DefectLocation;
+  location?: DefectLocation;
+  locations?: DefectLocation[];
+  batchMode?: boolean;
   currentEmployee: { employee_id: string; name: string; department: string };
   onDone: () => void;
   onCancel: () => void;
+  onInvalidated?: (message: string) => void;
 }
 
-export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel }: Props) {
+export function DefectProcessPanel({
+  location: singleLocation,
+  locations: selectedLocations,
+  batchMode = false,
+  currentEmployee,
+  onDone,
+  onCancel,
+  onInvalidated,
+}: Props) {
+  const processingLocations = selectedLocations?.length
+    ? selectedLocations
+    : singleLocation
+      ? [singleLocation]
+      : [];
+  const location = processingLocations[0];
+  if (!location) throw new Error("처리할 불량 격리 기록이 필요합니다.");
+  const isBatch = batchMode || processingLocations.length > 1;
   const isWarehouse = location.department === "창고";
 
   const [step, setStep] = useState<1 | 2>(1);
   const [action, setAction] = useState<ProcessAction>("unquarantine");
-  const availableQty = Math.max(1, Number(location.available_quantity) || 1);
+  const availableQty = Math.max(
+    1,
+    processingLocations.reduce(
+      (total, current) => total + (Number(current.available_quantity) || 0),
+      0,
+    ),
+  );
   const [processQty, setProcessQty] = useState<number>(availableQty);
   const [category, setCategory] = useState("");
   const [memo, setMemo] = useState("");
@@ -38,16 +65,30 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const locationIdentityRef = useRef(location.record_id);
+  const locationIdentity = processingLocations.map((current) => current.record_id).join(":");
+  const locationIdentityRef = useRef(locationIdentity);
+  const batchRequestIdsRef = useRef<Partial<Record<ProcessAction, string>>>({});
+  const batchSnapshot = processingLocations.map((current) =>
+    `${current.record_id}:${current.available_quantity}:${current.pending_quantity}`,
+  ).join("|");
+  const batchSnapshotRef = useRef(batchSnapshot);
+  const batchInvalidatedRef = useRef(false);
   const maxQty = availableQty;
   const boundedProcessQty = Math.max(1, Math.min(maxQty, processQty));
 
   useEffect(() => {
-    if (locationIdentityRef.current === location.record_id) return;
-    locationIdentityRef.current = location.record_id;
+    if (!isBatch || busy || batchInvalidatedRef.current || batchSnapshotRef.current === batchSnapshot) return;
+    batchInvalidatedRef.current = true;
+    setConfirmOpen(false);
+    onInvalidated?.("선택한 기록의 수량 또는 처리 대기 상태가 변경되었습니다.");
+  }, [batchSnapshot, busy, isBatch, onInvalidated]);
+
+  useEffect(() => {
+    if (locationIdentityRef.current === locationIdentity) return;
+    locationIdentityRef.current = locationIdentity;
     setStep(1);
     setAction("unquarantine");
-    setProcessQty(Math.max(1, Number(location.available_quantity) || 1));
+    setProcessQty(availableQty);
     setCategory("");
     setMemo("");
     setDecisions([]);
@@ -55,12 +96,13 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
     setBusy(false);
     setErrorMsg(null);
     setConfirmOpen(false);
-  }, [location.record_id, location.available_quantity]);
+    batchRequestIdsRef.current = {};
+  }, [locationIdentity, availableQty]);
 
   useEffect(() => {
-    const freshMax = Math.max(1, Number(location.available_quantity) || 1);
-    setProcessQty((currentQty) => Math.max(1, Math.min(freshMax, currentQty)));
-  }, [location.available_quantity]);
+    const freshMax = availableQty;
+    setProcessQty((currentQty) => isBatch ? freshMax : Math.max(1, Math.min(freshMax, currentQty)));
+  }, [availableQty, isBatch]);
 
   useEffect(() => {
     if (action !== "disassemble") {
@@ -91,68 +133,94 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
     setBusy(true);
     setErrorMsg(null);
     try {
+      const batchClientRequestId = isBatch
+        ? batchRequestIdsRef.current[action]
+          ?? (batchRequestIdsRef.current[action] = `defect-batch:${makeClientRequestId()}`)
+        : undefined;
       if (action === "unquarantine") {
-        await defectsApi.unquarantine({
-          record_id: location.record_id,
-          item_id: location.item_id,
-          qty: boundedProcessQty,
-          dept: location.department,
-          reason_category: category || null,
-          reason_memo: memo || null,
-          actor_employee_id: currentEmployee.employee_id,
-        });
+        if (isBatch) {
+          await defectsApi.unquarantineBulk({
+            actor_employee_id: currentEmployee.employee_id,
+            reason_category: category || null,
+            reason_memo: memo || null,
+            lines: processingLocations.map((current) => ({
+              record_id: current.record_id,
+              item_id: current.item_id,
+              department: current.department,
+              quantity: Number(current.available_quantity),
+            })),
+          });
+        } else {
+          await defectsApi.unquarantine({
+            record_id: location.record_id,
+            item_id: location.item_id,
+            qty: boundedProcessQty,
+            dept: location.department,
+            reason_category: category || null,
+            reason_memo: memo || null,
+            actor_employee_id: currentEmployee.employee_id,
+          });
+        }
       } else if (action === "scrap") {
         await stockRequestsApi.createStockRequest({
           requester_employee_id: currentEmployee.employee_id,
+          client_request_id: batchClientRequestId,
           request_type: "defect_scrap",
           reason_category: category || null,
           reason_memo: memo || null,
           notes: memo || null,
-          lines: [{
-            record_id: location.record_id,
-            item_id: location.item_id,
-            quantity: boundedProcessQty,
-            from_bucket: "defective",
-            from_department: location.department as Department,
-            to_bucket: "none",
-          }],
+          lines: processingLocations.map((current) => ({
+            record_id: current.record_id,
+            item_id: current.item_id,
+            quantity: isBatch ? Number(current.available_quantity) : boundedProcessQty,
+            from_bucket: "defective" as const,
+            from_department: current.department as Department,
+            to_bucket: "none" as const,
+          })),
         });
       } else if (action === "return") {
         await stockRequestsApi.createStockRequest({
           requester_employee_id: currentEmployee.employee_id,
+          client_request_id: batchClientRequestId,
           request_type: "defect_return",
           reason_category: category || null,
           reason_memo: memo || null,
           notes: memo || null,
-          lines: [{
-            record_id: location.record_id,
-            item_id: location.item_id,
-            quantity: boundedProcessQty,
-            from_bucket: "defective",
-            from_department: location.department as Department,
-            to_bucket: "none",
-          }],
+          lines: processingLocations.map((current) => ({
+            record_id: current.record_id,
+            item_id: current.item_id,
+            quantity: isBatch ? Number(current.available_quantity) : boundedProcessQty,
+            from_bucket: "defective" as const,
+            from_department: current.department as Department,
+            to_bucket: "none" as const,
+          })),
         });
       } else {
         const childDecisions = decisions.map(toServerDecision);
         await stockRequestsApi.createStockRequest({
           requester_employee_id: currentEmployee.employee_id,
+          client_request_id: batchClientRequestId,
           request_type: "defect_disassemble",
           reason_category: category || null,
           reason_memo: memo || null,
           notes: JSON.stringify({ child_decisions: childDecisions }),
-          lines: [{
-            record_id: location.record_id,
-            item_id: location.item_id,
-            quantity: boundedProcessQty,
-            from_bucket: "defective",
-            from_department: location.department as Department,
-            to_bucket: "none",
-          }],
+          lines: processingLocations.map((current) => ({
+            record_id: current.record_id,
+            item_id: current.item_id,
+            quantity: isBatch ? Number(current.available_quantity) : boundedProcessQty,
+            from_bucket: "defective" as const,
+            from_department: current.department as Department,
+            to_bucket: "none" as const,
+          })),
         });
       }
       onDone();
     } catch (err: unknown) {
+      if (isBatch && err instanceof ApiError && (err.status === 422 || err.status === 409) && onInvalidated) {
+        setConfirmOpen(false);
+        onInvalidated(err.message);
+        return;
+      }
       setErrorMsg(err instanceof Error ? err.message : "처리 중 오류가 발생했습니다.");
     } finally {
       setBusy(false);
@@ -178,7 +246,7 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
             이전
           </button>
           <div>
-            <h2 className="text-2xl font-black" style={{ color: LEGACY_COLORS.text }}>불량 처리</h2>
+            <h2 className="text-2xl font-black" style={{ color: LEGACY_COLORS.text }}>{isBatch ? "불량 여러 건 처리" : "불량 처리"}</h2>
             <div className="flex items-center gap-2 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
               <span>① 처리 선택</span>
               <span>→</span>
@@ -202,18 +270,22 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
             <div className="flex flex-col gap-1">
               <span className="text-xs font-black uppercase tracking-[0.8px]" style={{ color: LEGACY_COLORS.muted2 }}>처리 수량</span>
               <div className="flex items-center gap-2">
-                <QuantityInput
-                  min={1}
-                  max={maxQty}
-                  value={boundedProcessQty}
-                  onChange={(e) => {
-                    const v = Math.max(1, Math.min(maxQty, Number(e.target.value) || 1));
-                    setProcessQty(v);
-                    setDecisions([]);
-                  }}
-                  className="w-24 rounded-[10px] border px-3 py-2 text-base font-black"
-                  style={{ borderColor: tint(LEGACY_COLORS.blue, 35), background: LEGACY_COLORS.s1, color: LEGACY_COLORS.blue }}
-                />
+                {isBatch ? (
+                  <span className="text-xl font-black" style={{ color: LEGACY_COLORS.blue }}>{formatQty(boundedProcessQty)}개</span>
+                ) : (
+                  <QuantityInput
+                    min={1}
+                    max={maxQty}
+                    value={boundedProcessQty}
+                    onChange={(e) => {
+                      const v = Math.max(1, Math.min(maxQty, Number(e.target.value) || 1));
+                      setProcessQty(v);
+                      setDecisions([]);
+                    }}
+                    className="w-24 rounded-[10px] border px-3 py-2 text-base font-black"
+                    style={{ borderColor: tint(LEGACY_COLORS.blue, 35), background: LEGACY_COLORS.s1, color: LEGACY_COLORS.blue }}
+                  />
+                )}
                 <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>/ 처리 가능 {formatQty(maxQty)}개</span>
               </div>
             </div>
@@ -276,7 +348,7 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
           onClose={() => setConfirmOpen(false)}
           onConfirm={() => { setConfirmOpen(false); void handleSubmit(); }}
         >
-          <span style={{ color: LEGACY_COLORS.text }}>{location.item_name} × {boundedProcessQty}개를 재작업합니다.</span>
+          <span style={{ color: LEGACY_COLORS.text }}>{location.item_name} × {boundedProcessQty}개{isBatch ? ` (${processingLocations.length}건)` : ""}를 재작업합니다.</span>
         </ConfirmModal>
       </div>
     );
@@ -305,7 +377,7 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
           목록
         </button>
         <div>
-          <h2 className="text-2xl font-black" style={{ color: LEGACY_COLORS.text }}>불량 처리</h2>
+          <h2 className="text-2xl font-black" style={{ color: LEGACY_COLORS.text }}>{isBatch ? "불량 여러 건 처리" : "불량 처리"}</h2>
           {location.has_bom && (
             <div className="flex items-center gap-2 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
               <span style={{ color: LEGACY_COLORS.yellow }}>① 처리 선택</span>
@@ -328,35 +400,40 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
             <span className="text-lg font-black" style={{ color: LEGACY_COLORS.text }}>{location.item_name}</span>
           </div>
           <div className="flex gap-6 text-sm font-bold" style={{ color: LEGACY_COLORS.muted }}>
-            <span>남은 수량 <span style={{ color: LEGACY_COLORS.text }}>{formatQty(location.quantity)}개</span></span>
-            <span>처리 가능 <span style={{ color: LEGACY_COLORS.green }}>{formatQty(location.available_quantity)}개</span></span>
+            {isBatch && <span style={{ color: LEGACY_COLORS.blue }}>선택한 격리 기록 {processingLocations.length}건</span>}
+            <span>남은 수량 <span style={{ color: LEGACY_COLORS.text }}>{formatQty(isBatch ? boundedProcessQty : location.quantity)}개</span></span>
+            <span>처리 가능 <span style={{ color: LEGACY_COLORS.green }}>{formatQty(maxQty)}개</span></span>
             <span>부서 <span style={{ color: LEGACY_COLORS.text }}>{location.department}</span></span>
             <span>격리일 <span style={{ color: LEGACY_COLORS.text }}>{formatDate(location.defective_at)}</span></span>
           </div>
         </div>
 
         {/* 처리 수량 */}
-        <div className="flex items-center gap-3">
+        <div className="flex min-h-11 items-center gap-3">
           <span className="text-sm font-black" style={{ color: LEGACY_COLORS.muted2 }}>처리 수량</span>
-          <QuantityInput
-            min={1}
-            max={maxQty}
-            value={boundedProcessQty}
-            onChange={(e) => {
-              const v = Math.max(1, Math.min(maxQty, Number(e.target.value) || 1));
-              setProcessQty(v);
-                    setDecisions([]);
-            }}
-            className="w-28 rounded-[10px] border px-3 py-2.5 text-base font-black"
-            style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
-          />
+          {isBatch ? (
+            <span className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>{formatQty(boundedProcessQty)}개</span>
+          ) : (
+            <QuantityInput
+              min={1}
+              max={maxQty}
+              value={boundedProcessQty}
+              onChange={(e) => {
+                const v = Math.max(1, Math.min(maxQty, Number(e.target.value) || 1));
+                setProcessQty(v);
+                setDecisions([]);
+              }}
+              className="w-28 rounded-[10px] border px-3 py-2.5 text-base font-black"
+              style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
+            />
+          )}
           <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>/ 처리 가능 {formatQty(maxQty)}개</span>
         </div>
 
         {/* 작업 선택 */}
         <div className="flex flex-col gap-3">
           <span className="text-sm font-black" style={{ color: LEGACY_COLORS.muted2 }}>작업 선택</span>
-          <div className="flex gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <ActionCard
               label="정상 복귀"
               desc="불량 해제 후 정상 재고로"
@@ -473,10 +550,10 @@ export function DefectProcessPanel({ location, currentEmployee, onDone, onCancel
       >
         <span style={{ color: LEGACY_COLORS.text }}>
           {action === "unquarantine"
-            ? `${location.item_name} × ${processQty}개를 정상 재고로 복귀합니다.`
+            ? `${location.item_name} × ${boundedProcessQty}개${isBatch ? ` (${processingLocations.length}건)` : ""}를 정상 재고로 복귀합니다.`
             : action === "scrap"
-            ? `${location.item_name} × ${boundedProcessQty}개를 폐기합니다.`
-            : `${location.item_name} × ${boundedProcessQty}개를 반품합니다.`}
+            ? `${location.item_name} × ${boundedProcessQty}개${isBatch ? ` (${processingLocations.length}건)` : ""}를 폐기합니다.`
+            : `${location.item_name} × ${boundedProcessQty}개${isBatch ? ` (${processingLocations.length}건)` : ""}를 반품합니다.`}
         </span>
       </ConfirmModal>
     </div>

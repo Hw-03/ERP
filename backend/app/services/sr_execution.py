@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.database import _is_sqlite
 from app.models import (
+    DefectQuarantineRecord,
     Employee,
     Item,
     InventoryOperation,
@@ -30,6 +31,7 @@ from app.services.dept_hierarchy import can_approve_department
 from app.services.inv_transfer import department_for_item
 from app.services.sr_validation import (
     _TX_TYPE_BY_REQUEST,
+    requires_exact_defect_selection,
 )
 
 
@@ -605,6 +607,53 @@ def _execute_all_lines(
     is_approval: bool = False,
 ) -> None:
     lines = list(lines)
+    if requires_exact_defect_selection(
+        request.request_type,
+        len(lines),
+        request.client_request_id,
+    ):
+        from app.services import defect_records as defect_records_svc
+
+        record_ids = [line.defect_quarantine_record_id for line in lines]
+        if any(record_id is None for record_id in record_ids):
+            raise ValueError("선택 격리 처리는 모든 라인에 격리 기록이 필요합니다.")
+        if len(record_ids) != len(set(record_ids)):
+            raise ValueError("선택 격리 처리 요청에 중복된 기록이 있습니다.")
+        if len(lines) > 1 and len({line.item_id for line in lines}) != 1:
+            raise ValueError("다건 격리 처리는 같은 품목의 기록만 포함해야 합니다.")
+        if len(lines) > 1 and len({line.from_department for line in lines}) != 1:
+            raise ValueError("격리 처리 요청은 한 부서의 기록만 포함해야 합니다.")
+        for line in sorted(lines, key=lambda current: str(current.defect_quarantine_record_id)):
+            record = defect_records_svc.get_record_for_action(
+                db,
+                record_id=line.defect_quarantine_record_id,
+                item_id=line.item_id,
+                department=line.from_department,
+            )
+            if record is None:
+                raise ValueError("선택한 격리 기록을 찾을 수 없습니다.")
+            defect_records_svc.ensure_available(
+                db,
+                record,
+                Decimal(str(line.quantity or 0)),
+                exclude_line_id=line.line_id,
+                require_exact=True,
+            )
+    uses_multi_defect_sources = (
+        request.request_type == StockRequestTypeEnum.DEFECT_DISASSEMBLE
+        and len(lines) > 1
+    )
+    # 승인 경로의 release_reservation과 동일하게 inventory → defect record 순서로 잠근다.
+    if uses_multi_defect_sources and not _is_sqlite:
+        inventory_svc.ensure_and_lock_inventories(
+            db,
+            _request_inventory_item_ids(db, request, lines),
+        )
+    defect_disassemble_sources = (
+        _prepare_defect_disassemble_sources(db, lines)
+        if uses_multi_defect_sources
+        else None
+    )
     operation = operation_svc.create_business_operation(
         db,
         domain="stock_request",
@@ -617,18 +666,27 @@ def _execute_all_lines(
         idempotency_key=f"stock_request:{request.request_id}:execute",
     )
     # 정렬된 순서로 모든 아이템 선락 → 교착 방지 (PostgreSQL only; SQLite는 WAL 직렬화)
-    if not _is_sqlite:
+    if not _is_sqlite and not uses_multi_defect_sources:
         all_item_ids = _request_inventory_item_ids(db, request, lines)
         inventory_svc.ensure_and_lock_inventories(db, all_item_ids)
-    for line in lines:
-        _execute_line(
+    if defect_disassemble_sources is not None:
+        _execute_defect_disassemble_sources(
             db,
             request,
-            line,
+            defect_disassemble_sources,
             approver=approver,
-            is_approval=is_approval,
             operation=operation,
         )
+    else:
+        for line in lines:
+            _execute_line(
+                db,
+                request,
+                line,
+                approver=approver,
+                is_approval=is_approval,
+                operation=operation,
+            )
     operation_svc.record_effect(
         db,
         operation=operation,
@@ -639,6 +697,95 @@ def _execute_all_lines(
         before_state={"status": request.status.value},
         after_state={"status": StockRequestStatusEnum.COMPLETED.value},
     )
+
+
+def _prepare_defect_disassemble_sources(
+    db: Session,
+    lines: list[StockRequestLine],
+) -> list[tuple[StockRequestLine, DefectQuarantineRecord]]:
+    """다중 재작업 source를 잠그고 단일 품목·부서·건별 수량을 선검증한다."""
+    record_ids = [line.defect_quarantine_record_id for line in lines]
+    if any(record_id is None for record_id in record_ids):
+        raise ValueError("다중 재작업은 모든 라인에 격리 기록이 필요합니다.")
+    if len(record_ids) != len(set(record_ids)):
+        raise ValueError("재작업 요청에 중복된 격리 기록이 있습니다.")
+    if len({line.item_id for line in lines}) != 1:
+        raise ValueError("다중 재작업은 같은 품목의 격리 기록만 처리할 수 있습니다.")
+    if len({str(line.from_department) for line in lines}) != 1:
+        raise ValueError("다중 재작업은 같은 부서의 격리 기록만 처리할 수 있습니다.")
+    if any(line.from_bucket != RequestBucketEnum.DEFECTIVE for line in lines):
+        raise ValueError("다중 재작업은 격리 재고 라인만 처리할 수 있습니다.")
+
+    from app.services import defect_records as defect_records_svc
+
+    prepared_by_id: dict[
+        uuid.UUID,
+        tuple[StockRequestLine, DefectQuarantineRecord],
+    ] = {}
+    for line in sorted(lines, key=lambda current: str(current.defect_quarantine_record_id)):
+        record = defect_records_svc.get_record_for_action(
+            db,
+            record_id=line.defect_quarantine_record_id,
+            item_id=line.item_id,
+            department=line.from_department,
+        )
+        if record is None:
+            raise ValueError("선택한 격리 기록을 찾을 수 없습니다.")
+        defect_records_svc.ensure_available(
+            db,
+            record,
+            Decimal(str(line.quantity or 0)),
+            exclude_line_id=line.line_id,
+        )
+        prepared_by_id[record.record_id] = (line, record)
+    return [prepared_by_id[line.defect_quarantine_record_id] for line in lines]
+
+
+def _execute_defect_disassemble_sources(
+    db: Session,
+    request: StockRequest,
+    sources: list[tuple[StockRequestLine, DefectQuarantineRecord]],
+    *,
+    approver: Employee,
+    operation: InventoryOperation | None,
+) -> None:
+    """다중 source 합계를 한 번 분해하고 건별 원장 잔량과 이동을 각각 남긴다."""
+    from app.services import defect_records as defect_records_svc
+
+    first_line = sources[0][0]
+    total_quantity = sum(
+        (Decimal(str(line.quantity or 0)) for line, _record in sources),
+        Decimal("0"),
+    )
+    _handle_defect_disassemble(
+        db,
+        request,
+        first_line,
+        approver,
+        total_quantity,
+        first_line.item_id,
+        operation=operation,
+    )
+    for line, record in sources:
+        quantity = Decimal(str(line.quantity or 0))
+        defect_records_svc.decrement_record(
+            db,
+            record,
+            quantity,
+            exclude_line_id=line.line_id,
+        )
+        operation_svc.record_defect_movement(
+            db,
+            operation=operation,
+            record_id=record.record_id,
+            item_id=line.item_id,
+            department=str(line.from_department),
+            movement_type=StockRequestTypeEnum.DEFECT_DISASSEMBLE.value,
+            quantity_delta=-quantity,
+            role="DEFECTIVE_SOURCE",
+            actor_name=approver.name,
+            actor_employee_id=approver.employee_id,
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -78,6 +78,26 @@ describe("WeeklyDetailTable verified columns", () => {
     expect(screen.getByTestId("weekly-detail-table")).not.toHaveClass("overflow-x-auto");
   });
 
+  it("displays the included HA housing as a two-line HF code in the desktop table", () => {
+    const highVoltageGroup = {
+      ...group,
+      process_code: "HF",
+      items: [{
+        ...group.items[0],
+        item_id: "housing-item",
+        mes_code: "3468-HA-0006",
+        item_name: "세라믹튜브 70KV 하우징",
+      }],
+    };
+
+    render(<WeeklyDetailTable group={highVoltageGroup} stockBasis="normal" onItemSelect={() => {}} />);
+
+    const desktopRow = screen.getByTestId("weekly-detail-desktop-row-housing-item");
+    expect(desktopRow).toHaveTextContent("3468-HF");
+    expect(desktopRow).toHaveTextContent("-0006");
+    expect(desktopRow).not.toHaveTextContent("3468-HA-0006");
+  });
+
   it("opens the selected item from desktop rows and mobile cards", () => {
     const onItemSelect = vi.fn();
     render(<WeeklyDetailTable group={group} stockBasis="normal" onItemSelect={onItemSelect} />);

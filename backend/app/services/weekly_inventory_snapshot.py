@@ -19,7 +19,10 @@ from app.models import (
     WeeklyInventorySnapshotItem,
 )
 from app.services import stock_math
-from app.services.weekly_report_scope import weekly_report_item_clause
+from app.services.weekly_report_scope import (
+    includes_ceramic_tube_housing_for_week,
+    weekly_report_item_clause,
+)
 
 
 KST = ZoneInfo("Asia/Seoul")
@@ -40,14 +43,21 @@ class DashboardFinishedStock:
     defective_quantity: Decimal
 
 
-def load_dashboard_finished_stock(db: Session) -> list[DashboardFinishedStock]:
+def load_dashboard_finished_stock(
+    db: Session,
+    *,
+    include_ceramic_tube_housing: bool = True,
+) -> list[DashboardFinishedStock]:
     """삭제·불용을 제외한 주간보고 대상 품목의 위치별 재고 합계를 계산한다."""
 
     items = (
         db.query(Item)
         .filter(
             Item.deleted_at.is_(None),
-            weekly_report_item_clause(Item),
+            weekly_report_item_clause(
+                Item,
+                include_ceramic_tube_housing=include_ceramic_tube_housing,
+            ),
             or_(Item.legacy_item_type.is_(None), Item.legacy_item_type != DISUSED_ITEM_TYPE),
         )
         .order_by(Item.mes_code)
@@ -139,7 +149,12 @@ def capture_weekly_inventory_snapshot(
     if existing is not None:
         return existing
 
-    rows = load_dashboard_finished_stock(db)
+    rows = load_dashboard_finished_stock(
+        db,
+        include_ceramic_tube_housing=includes_ceramic_tube_housing_for_week(
+            week_end + timedelta(days=1)
+        ),
+    )
     snapshot = WeeklyInventorySnapshot(
         week_end=week_end,
         as_of_utc=sunday_cutoff_utc(week_end),

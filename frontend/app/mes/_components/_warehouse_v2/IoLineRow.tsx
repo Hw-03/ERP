@@ -125,7 +125,12 @@ export function IoLineRow({
       : isOutgoing(effectLine) && Number(effectLine.quantity) > available
   );
   const titleColor = disabled ? LEGACY_COLORS.muted2 : LEGACY_COLORS.text;
-  const rowBackground = shortage ? tint(LEGACY_COLORS.red, 8) : "transparent";
+  const isExcluded = !line.included && !bomStockExempt;
+  const rowBackground = shortage
+    ? tint(LEGACY_COLORS.red, 8)
+    : isExcluded
+      ? tint(LEGACY_COLORS.muted2, 8)
+      : "transparent";
   const stock = item ? getStockState(Number(item.quantity), item.min_stock == null ? null : Number(item.min_stock)) : null;
   const deptBadge = item ? mesCodeDeptBadge(item.mes_code, getDeptColor) : null;
   const deductionSource =
@@ -137,7 +142,9 @@ export function IoLineRow({
   const displayedCurrent = isWarehouseAdjust && item
     ? Number(item.warehouse_qty) || 0
     : available;
-  const expected = bomStockExempt || noInventoryEffect
+  const expected = !line.included && !bomStockExempt
+    ? displayedCurrent
+    : bomStockExempt || noInventoryEffect
     ? displayedCurrent
     : expectedAfter(effectLine, displayedCurrent);
   const tag = noInventoryEffect
@@ -192,6 +199,7 @@ export function IoLineRow({
           background: selected ? LEGACY_COLORS.blue : "transparent",
           borderColor: selected ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
           color: selected ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
+          opacity: isExcluded ? 0.6 : 1,
         }}
         aria-pressed={selected}
       >
@@ -199,7 +207,10 @@ export function IoLineRow({
       </button>
 
       {/* 2. 품목명 + 코드 + 메타 (모바일에선 flex-1 로 한 줄 폭 확보) */}
-      <div className="min-w-0 flex-1 basis-[60%] lg:flex-none lg:basis-auto">
+      <div
+        className="min-w-0 flex-1 basis-[60%] lg:flex-none lg:basis-auto"
+        style={{ opacity: isExcluded ? 0.6 : 1 }}
+      >
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           {/* 항목 4-7A — 모바일에서 긴 품목명 탭하면 전체 펼침(PC 는 1줄+title 유지). */}
           <ExpandableItemName
@@ -259,12 +270,12 @@ export function IoLineRow({
       ) : deptBadge ? (
         <span
           className="justify-self-start rounded-full px-2 py-0.5 text-[10px] font-bold"
-          style={{ color: deptBadge.color, background: deptBadge.bg }}
+          style={{ color: deptBadge.color, background: deptBadge.bg, opacity: isExcluded ? 0.6 : 1 }}
         >
           {deptBadge.label}
         </span>
       ) : (
-        <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>-</span>
+        <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2, opacity: isExcluded ? 0.6 : 1 }}>-</span>
       )}
 
       {/* 4. 연구 BOM은 고정 수량, 나머지는 수량 stepper (모바일에선 한 줄 차지) */}
@@ -336,7 +347,7 @@ export function IoLineRow({
           className="text-base font-black tabular-nums"
           style={{ color: expectedColor }}
         >
-          {expected === null ? "-" : formatQty(expected)}
+          {expected === null ? "—" : formatQty(expected)}
         </div>
         {shortage && (
           <div
