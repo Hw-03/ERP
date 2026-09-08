@@ -21,6 +21,8 @@
 - 정본 감사 계획: [전수 감사·개선 계획](../../docs/research/2026-08-13-full-code-quality-audit-and-improvement-plan.md), 8.9.7·8.9.8 및 12.26절
 - 현 상태(2026-09-08): **CP6 종료·품질 통합 및 CP7 B1~B5 원격 완료. B6 커밋173cb894 및 B7 삭제·두 리뷰 로컬 인수.** 복구/B5의 CI34168183559 exact bff9·6/6과 B6/B7 이후 최종 검증은 구분한다. 최초 CI34166260511 실패는 역사 증거로 보존하고 품질 branch는 POST_CP6_SHA에서 고정한다(감사12.28.15~17).
 - 실행 단위 집계: 아래 15/16 실행 완료(B6/B7은 로컬 인수), 미완료1(최종 재감사·검증·통합). B6/B7 원격 검증은 최종 CP7에 묶는다. 실행 단위 크기가 다르므로 이 비율을 전체 작업량 비율로 해석하지 않는다.
+- 최신 종료 상태(2026-09-08): B7은 `f3d63991c2e1235bea8637bcb62553eb0ead4116`으로 커밋됐으며 B6/B7 두 로컬 commit은 아직 push 전이다. 감사12.29에72행 재고 matrix·CQ/RV/IC64행·QP24행·전체파일2,563행 정본과 source hash/깊이/한계를 추가했다. 문서 독립 리뷰 C0/I0·Minor2는 원장 표기만 보완했다. 최초 최종 full(run9615)은6PASS/2FAIL이며 PostgreSQL 복구 시험3개/출하 이름 기대1개 및 미실행 gate를 국소 복구한다. 최초 FAIL을 후속 PASS로 덮지 않으며 완료 체크는15/16을 유지한다.
+- 후속 인수(감사12.29.7): PostgreSQL3개·backend62개 실패는 짧은 own basetemp에서 모두 복구됐다. 출하 이름 테스트의 직접 RED→GREEN·독립 명세/품질 C0/I0/M0, startup2개 단독 PASS, OpenAPI exact·production build·bundle PASS 및 frozen 두 flag의 공식 E2E24/24PASS·SQL/API/UI·로그인 화면 증거를 인수했다. 합성 DB gate PASS·본체 hash불변과 own WAL/SHM 회수·원래 부재 복원도 확인했다. 로컬 full/coverage 원본 실패는 보존하며 최종 exact commit의 CI coverage를 필수 정본으로 확인한다. 최종 문서/리뷰·CI/품질 통합은 아직 미완료이고, 성공한 gate는 반복하지 않는다.
 - 국소 복구·B6 진입(감사12.28.13~15): recovery3파일/B5docs8파일의 before/after blob11쌍 불일치0, 실제 CI6/6을 확인했다. 이동 전 source15개 SHA256 일치·target15개 부재를 총괄79392a로 확인했고 seed_cleanup은 실제 consumer 때문에 보존한다. E2E23PASS/선택 frozen SKIP1은 최종 frozen 증명을 대신하지 않는다.
 
 ## 실행 체크리스트
@@ -85,6 +87,7 @@ CP7 검증 배치 조정(2026-09-08): B1은 응답 검증·멱등 key 안전막 
 - 실제 개발·직원 서버 시작/중지/배포, main merge/push, PR, force-push를 금지한다.
 - DB mutation은 각 worktree ignored runtime의 격리 DB만 사용한다. 기존 `backend/mes.db`는 전후 불변이다.
 - CP6 최종 read-only gate의 한정 예외: 현재 부재한 CP6 `backend/mes.db` 경로만, ignored runtime에서 생성·닫은 합성 schema-head fixture를 배타 생성해 임시 제공할 수 있다. 기존 파일이 발견되면 덮거나 사용하지 않는다. 실행 중 fixture hash 불변과 원래/최종 DB family 부재를 각각 증명하고, 소유권·hash가 같은 단일 임시 파일만 정리한다. 이는 실제 DB 무변경이지 파일 생성/삭제0은 아니다. main/직원 DB 복사·연결은 금지한다. 상세는 supervisor ignored `cp6-final-db-gate-prep.md`다.
+- CP7 최종 read-only gate도 동일한 한정 예외를 적용한다. 검사 함수가 `DATABASE_URL`이 아니라 CP7 `backend/mes.db`를 직접 참조하므로, 원래 부재를 확인한 그 정확 경로에만 ignored runtime에서 만든 합성 head fixture를 배타 생성한다. main/직원 데이터를 복사하지 않으며 read-only 실행 전후 hash·소유권 일치 및 원래 DB family 부재로의 복귀를 각각 기록한다. 예상 밖 파일이 발견되면 덮거나 삭제하지 않는다.
 - E2E base URL은 전용 loopback으로 고정하고 점유 포트에 mutation/종료를 보내지 않는다. 직접 생성한 PID와 시작시각을 검증한 프로세스만 종료한다.
 - S0 실제 Windows 실행에서 bind-only probe가 점유된 8021을 가용으로 오판하고 identity404로 중단됐다. 다른 서버는 조회·종료·재사용하지 않는다. 격리 워크트리 자율 진행 승인에 따라 총괄이 connect+bind 점유 검사 보강과 전용 backend `8021 → 8022` fallback을 test-only 범위에서 승인했다. 선택 포트는 proxy/setup/nonce/cleanup 전체에서 일치해야 하며 두 포트가 모두 점유됐으면 mutation 전에 거부한다. 실제 개발·직원 포트 및 임의 URL을 허용하지 않는다.
 - 주간보고·모바일 하단 nav/pill·출하 step5 카드 배치의 main 결과를 보존하며 추가 변경하지 않는다. 사용자 추가 승인 예외는 `frontend/app/mes/_components/_weekly_sections/__tests__/WeeklyDetailTable.test.tsx` 첫 render에 필수 `onItemSelect` 콜백 1줄을 보완하는 테스트 변경뿐이다.

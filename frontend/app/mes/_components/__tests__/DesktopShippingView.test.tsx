@@ -3210,12 +3210,14 @@ describe("DesktopShippingView", () => {
 
     const paSummary = await screen.findByTestId("shipping-final-pa-summary");
     const pfSummary = await screen.findByTestId("shipping-final-pf-summary");
-    await waitFor(() => expect(paSummary).toHaveTextContent("새 PA 생성 예정"));
-    expect(paSummary).toHaveTextContent("Standard PA");
+    await waitFor(() => {
+      expect(paSummary).toHaveTextContent("새 PA 생성 예정");
+      expect(paSummary).toHaveTextContent("Standard PA");
+      expect(pfSummary).toHaveTextContent("새 PF 생성 예정");
+      expect(pfSummary).toHaveTextContent("Standard PF");
+    });
     expect(paSummary).toHaveTextContent("4-PA-0004");
     expect(paSummary).not.toHaveTextContent("예상 코드 · 저장 시 변경 가능");
-    expect(pfSummary).toHaveTextContent("새 PF 생성 예정");
-    expect(pfSummary).toHaveTextContent("Standard PF");
     expect(pfSummary).toHaveTextContent("4-PF-0005");
     expect(pfSummary).not.toHaveTextContent("예상 코드 · 저장 시 변경 가능");
     expect(screen.getByTestId("shipping-final-pa-summary-label")).toHaveStyle({ color: "var(--c-process-pa)" });
