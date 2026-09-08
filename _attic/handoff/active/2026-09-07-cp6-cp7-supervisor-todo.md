@@ -7,7 +7,20 @@
 
 **GOAL:** 최신 main `d2b0dd29`을 품질 브랜치에 통합하고, 격리 워크트리에서 CP6과 CP7의 승인된 카드를 모두 구현·검증하여 품질 브랜치를 main 통합 직전의 검증된 완료 상태로 만든다.
 
-## 현재 실행 기준
+## 최종 인계 기준 (2026-09-08)
+
+- **실행 체크리스트16/16 완료:** S0, CP6 A1~A5·통합, CP7 사전감사·B1~B8·품질 통합. 이는 승인된 구현/검증 묶음의 완료이며 모든 기존 기술 부채나 모든 재고 업무의 동적 조합이 VERIFIED라는 뜻은 아니다.
+- 인계 worktree: `C:\ERP\.worktrees\full-code-quality-checkpoint-2`; branch: `codex/full-code-quality-improvement`. 고정 main은 `d2b0dd2969883b2c8876c4375c99a456dcb6f21e`이며 이후 main 동기화는 없다.
+- CP7 `a9a3c344845cc18b1c4aefd94ec6659cf482142b`의 [CI34179512339](https://github.com/Hw-03/ERP/actions/runs/34179512339)와 품질 no-ff merge `793d8f79f93cc6b6df25332d34c0e04173c1e6c5`의 [CI34181061472](https://github.com/Hw-03/ERP/actions/runs/34181061472)를 각각 actual6/6 success로 인수했다. merge tree `13b19dd343711667d3cafea8353e269f19f481ba`는 검증 CP7과 동일하다.
+- 최종 증거: 프런트279파일/2,632테스트·설정 대상 coverage93.01% lines(전체 저장소 coverage 아님), backend/OpenAPI·실제 PG·E2E job success, 로컬 전용 E2E24/24·SQL/API/UI·로그인·frozen 비교, 두 독립 리뷰 C/I/M0. 상세 정본은 감사12.30절이다.
+- 작업자 판정은 **조건부 사용 가능**. CQ/RV/IC64행은61 COMPLETE/3 NOT_VERIFIED, QP24행은해결16/부분7/근거부족1, 재고 matrix는70 PARTIAL/2 VERIFIED다. external required-check 정책(CQ016/CQ017/IC20), 실물/직원 DB 대조, HTTPS·main 반영·배포는 완료로 꾸미지 않는다.
+- 최종 문서 commit 자체의 SHA·CI·clean/upstream·문서2개 증분 원장은 품질 ignored `20260907-cp6-cp7-supervisor/quality-closeout-final-receipt.json`에 기록하고 실제 성공을 확인한 뒤 Goal을 완료한다. 이 문서에는 자신의 미래 CI를 PASS로 쓰지 않는다.
+- 소유 E2E/합성 DB family·seed·listener 정리와 품질 DB 본체 시작 hash불변을 인수했다. 기존 품질 WAL/SHM 및 ignored stopped cluster/회수 증거는 보존한다. 전 기간의 경계 예외는 아래 역사 기록과 감사12.30.3을 따른다.
+- CP6·CP7 작업과 worktree는 보존한다. 다음 작업은 사용자 승인 후 **그 시점의 main 추가 delta를 별도 감사하는 것**이다. main merge/push·PR·force-push·배포를 자동으로 시작하지 않는다.
+
+## 착수·중간 실행 기준 [HISTORICAL]
+
+아래 SHA 고정·15/16·미완료·대기 표현은 해당 시점의 기록이다. 현재 판정은 위 최종 인계 기준과 감사12.30절을 따르며 완료된 검사의 재실행 지시가 아니다.
 
 - 사용자 승인: CP6·CP7 전체 실행과 명시한 품질 브랜치 commit/push. 최초 계획 후 main 변경을 확인했고, 추가 승인으로 `d2b0dd2969883b2c8876c4375c99a456dcb6f21e`까지만 가져오며 main 미커밋 파일은 제외한다.
 - 품질 worktree: `C:\ERP\.worktrees\full-code-quality-checkpoint-2`
@@ -25,7 +38,7 @@
 - 후속 인수(감사12.29.7): PostgreSQL3개·backend62개 실패는 짧은 own basetemp에서 모두 복구됐다. 출하 이름 테스트의 직접 RED→GREEN·독립 명세/품질 C0/I0/M0, startup2개 단독 PASS, OpenAPI exact·production build·bundle PASS 및 frozen 두 flag의 공식 E2E24/24PASS·SQL/API/UI·로그인 화면 증거를 인수했다. 합성 DB gate PASS·본체 hash불변과 own WAL/SHM 회수·원래 부재 복원도 확인했다. 로컬 full/coverage 원본 실패는 보존하며 최종 exact commit의 CI coverage를 필수 정본으로 확인한다. 최종 문서/리뷰·CI/품질 통합은 아직 미완료이고, 성공한 gate는 반복하지 않는다.
 - 국소 복구·B6 진입(감사12.28.13~15): recovery3파일/B5docs8파일의 before/after blob11쌍 불일치0, 실제 CI6/6을 확인했다. 이동 전 source15개 SHA256 일치·target15개 부재를 총괄79392a로 확인했고 seed_cleanup은 실제 consumer 때문에 보존한다. E2E23PASS/선택 frozen SKIP1은 최종 frozen 증명을 대신하지 않는다.
 
-## 실행 체크리스트
+## 실행 체크리스트 — 16/16 완료
 
 - [x] S0 (2026-09-07): fixed main 병합, 전체 delta manifest, migration 두 계보 통합, 격리 보완, 영역별 검증 복구, 이중 리뷰, 제품 merge push 및 [실제 CI6/6 성공](https://github.com/Hw-03/ERP/actions/runs/34099290108). 제품 SHA `cd195d9e668cb4ece139f48562337f58d19839d8`; `SYNC_BASE_SHA`는 같은 제품 경로를 유지하는 본 docs-only commit이다. 문서-only CI 중복은 CP6 코드 push로 묶는다.
 - [x] CP6 A1 (2026-09-07, LOCAL_VERIFIED): IC12→14 actual dirty/Promise save/이동 guard/React Query 단일 정본. 초기 RED와 후속 편집 유실을 보완해 관련14파일73PASS, 최종 명세/품질 C/I/M0. staged smart(frontend5/docs3) PASS, related41파일334PASS·direct10파일39PASS·타입/린트/docs PASS. 로컬 commit `59c52bad3f303603b01961b4e3ee3fb550bbd2e5`, post-commit clean을 총괄 확인. 원격 검증은 CP6 종료 단계다. 증거는 감사12.27.1과 `20260907-cp6-a1/`.
@@ -48,7 +61,7 @@
 - [x] CP7 B5 (2026-09-08, VERIFIED): DOC01 실제 Next16·React Query/legacy 공존·profile·PlanOnly·E2E 소유권 순서와 격리 실행 경계를6문서에서 교정했다. 정적27/27·링크0broken·PowerShell parser-only·diff-check와 최종 두 리뷰 C/I/M0를 총괄 인수했다. 감사12.28.12 및 ignored `20260908-cp7-b5/review-evidence.md` 참조. 별도 docs commit bff9dd73과 실제 CI34168183559 6/6을 인수했다. B6 이전은 진행 중이며 최종 검증은 별도다.
 - [x] CP7 B6 (2026-09-08, LOCAL_VERIFIED): AT01 정확15개 rename·참조 문서3개·정본2개. root/self-usage 보정, AST11·root fixture6·PowerShell parser-only·역치환 byte-exact·비역사 old path0을 총괄이 읽고 raw diff b0c80c와 대조했다. 독립 명세01a07e39-2ff4·품질01a07e3d-9929 모두 C/I/M0·Ready다. 실제 consumer가 있는 seed_cleanup 및 역사 내용은 보존했다. 감사12.28.16과 ignored 20260908-cp7-b6/preflight-evidence.md가 근거며 별도 rollback commit/최종 원격 검증은 분리한다.
 - [x] CP7 B7 (2026-09-08, LOCAL_VERIFIED): AT02 정확 로그인 PNG 복사본9개만 삭제. consumer0·원본9개/hash보존·Git 복구blob9개를 대조했다. 실제 로그인 webp/item이미지/data는 보존했고, 독립 명세01a07e4a-7fba·품질01a07e4c-5c38의C/I/M0를 총괄이 원문으로 확인했다. 감사12.28.17 및 ignored 20260908-cp7-b7/preflight-evidence.md가 근거다. 최종 build/로그인 screenshot/full/CI는 별도로 남는다.
-- [ ] CP7 종료·최종 통합: 상태/재고 matrix/manifest 재감사, full gate, 이중 리뷰, 품질 통합/push/CI, 임시 자원 정리, Goal 완료.
+- [x] CP7 종료·최종 통합 (2026-09-08): 상태/재고 matrix/2,563파일 원장 재감사, 최초 full 원본과 구성 복구, 최종 이중 리뷰·E2E24/24·DB/소유 자원 정리를 인수했다. exact CP7 a9a3c344·품질 merge793d8f79의 실제 CI가 각각6/6 success이며 품질 브랜치 일반 push까지 완료했다. 최종 문서 자체의 CI/Goal 도구 종료는 위 receipt 계약으로 확인한다.
 
 ## 작업 분리와 진행 계약
 
