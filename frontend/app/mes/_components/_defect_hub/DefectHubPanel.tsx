@@ -96,6 +96,7 @@ export function DefectHubPanel({
   const [search, setSearch] = useState("");
   const [processingLocations, setProcessingLocations] = useState<DefectLocation[]>([]);
   const [processingBatch, setProcessingBatch] = useState(false);
+  const [processingError, setProcessingError] = useState<string | null>(null);
   const [cartMode, setCartMode] = useState<DefectCartMode>("add");
   const [reloadNonce, setReloadNonce] = useState(0);
 
@@ -239,6 +240,7 @@ export function DefectHubPanel({
 
   function handleBatchProcess(selectedLocations: DefectLocation[]) {
     if (selectedLocations.length === 0) return;
+    setProcessingError(null);
     setProcessingLocations(selectedLocations);
     setProcessingBatch(true);
     setView("process");
@@ -340,6 +342,10 @@ export function DefectHubPanel({
         currentEmployee={currentEmployee}
         onDone={handleProcessDone}
         onCancel={handleProcessCancel}
+        onInvalidated={(message) => {
+          setProcessingError(`${message} 선택을 해제하고 목록을 갱신합니다.`);
+          handleProcessDone();
+        }}
       />
     );
   }
@@ -444,6 +450,7 @@ export function DefectHubPanel({
       )}
 
       {/* 목록 */}
+      {processingError && <InlineErrorNote variant="block">{processingError}</InlineErrorNote>}
       {refreshError && (
         <LoadFailureCard
           prefix="최신 불량 격리 목록을 동기화하지 못했습니다"

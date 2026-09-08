@@ -21,8 +21,8 @@ const ACTION_LABELS: Record<RAction, string> = {
 
 const ACTION_DESC: Record<RAction, string> = {
   unquarantine: "잘못 격리된 경우. 즉시 정상 재고로 복귀.",
-  scrap: "승인 완료 후 격리 재고에서 제거합니다.",
-  return: "승인 완료 후 공급처 반품으로 처리합니다.",
+  scrap: "확인하면 즉시 격리 재고에서 제거합니다.",
+  return: "확인하면 즉시 공급처 반품으로 처리합니다.",
 };
 
 export interface RDefectActionModalProps {
@@ -36,7 +36,7 @@ export interface RDefectActionModalProps {
 /**
  * R(원자재) 격리 항목 처리 모달.
  * 정상복귀 → defectsApi.unquarantine (즉시).
- * 폐기/반품 → stockRequestsApi.createStockRequest (결재 흐름).
+ * 폐기/반품 → stockRequestsApi.createStockRequest (즉시 처리).
  */
 export function RDefectActionModal({
   open,
@@ -101,7 +101,7 @@ export function RDefectActionModal({
           actor_employee_id: currentEmployee.employee_id,
         });
       } else {
-        // 폐기 or 반품 — stock_requests 결재 흐름
+        // 폐기 or 반품 — stock_requests 즉시 처리
         const requestType = action === "scrap" ? "defect_scrap" : "defect_return";
         await stockRequestsApi.createStockRequest({
           requester_employee_id: currentEmployee.employee_id,
@@ -205,7 +205,7 @@ export function RDefectActionModal({
                       className="ml-2 rounded-full px-2 py-0.5 text-xs font-black"
                       style={{ background: LEGACY_COLORS.redSolid, color: LEGACY_COLORS.white }}
                     >
-                      승인 필요
+                      즉시 처리
                     </span>
                   )}
                 </div>

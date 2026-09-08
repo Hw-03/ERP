@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { DefectLocation } from "@/lib/api/types/defects";
+import { ApiError } from "@/lib/api-core";
 
 const apiMocks = vi.hoisted(() => ({
   unquarantine: vi.fn(),
@@ -100,6 +101,32 @@ describe("DefectProcessPanel batch processing", () => {
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 
+  it("invalidates the batch after server validation changes without reporting success", async () => {
+    const onInvalidated = vi.fn();
+    const onDone = vi.fn();
+    apiMocks.unquarantineBulk.mockRejectedValue(new ApiError("수량이 변경되었습니다", 422));
+    render(<DefectProcessPanel locations={locations} currentEmployee={employee}
+      onDone={onDone} onCancel={vi.fn()} onInvalidated={onInvalidated} />);
+    fireEvent.click(screen.getByRole("button", { name: "정상 복귀 →" }));
+    fireEvent.click(await screen.findByRole("button", { name: "즉시 복귀" }));
+    await waitFor(() => expect(onInvalidated).toHaveBeenCalledWith("수량이 변경되었습니다"));
+    expect(onDone).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    { available_quantity: 1 },
+    { pending_quantity: 1 },
+  ])("invalidates a selected snapshot on a realtime quantity or pending change: %j", async (change) => {
+    const onInvalidated = vi.fn();
+    const props = { locations, currentEmployee: employee, onDone: vi.fn(), onCancel: vi.fn(), onInvalidated };
+    const { rerender } = render(<DefectProcessPanel {...props} />);
+    rerender(<DefectProcessPanel {...props} locations={[{ ...locations[0], ...change }, locations[1]]} />);
+    await waitFor(() => expect(onInvalidated).toHaveBeenCalledTimes(1));
+    expect(apiMocks.createStockRequest).not.toHaveBeenCalled();
+    expect(apiMocks.unquarantineBulk).not.toHaveBeenCalled();
+  });
+
   it("creates one scrap request containing only the selected record lines", async () => {
     render(
       <DefectProcessPanel
@@ -111,9 +138,10 @@ describe("DefectProcessPanel batch processing", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: /전체 폐기/ }));
-    fireEvent.click(screen.getByRole("button", { name: "폐기 요청 →" }));
+    fireEvent.click(screen.getByRole("button", { name: "즉시 폐기 →" }));
     await screen.findByRole("dialog");
-    fireEvent.click(screen.getByRole("button", { name: "처리 요청" }));
+    expect(screen.getByText("확인하면 즉시 재고에 반영됩니다.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "즉시 폐기" }));
 
     await waitFor(() => expect(apiMocks.createStockRequest).toHaveBeenCalledTimes(1));
     expect(apiMocks.createStockRequest).toHaveBeenCalledWith(expect.objectContaining({
@@ -139,9 +167,9 @@ describe("DefectProcessPanel batch processing", () => {
 
     expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /전체 폐기/ }));
-    fireEvent.click(screen.getByRole("button", { name: "폐기 요청 →" }));
+    fireEvent.click(screen.getByRole("button", { name: "즉시 폐기 →" }));
     await screen.findByRole("dialog");
-    fireEvent.click(screen.getByRole("button", { name: "처리 요청" }));
+    fireEvent.click(screen.getByRole("button", { name: "즉시 폐기" }));
 
     await waitFor(() => expect(apiMocks.createStockRequest).toHaveBeenCalledTimes(1));
     expect(apiMocks.createStockRequest).toHaveBeenCalledWith(expect.objectContaining({
@@ -167,7 +195,7 @@ describe("DefectProcessPanel batch processing", () => {
     fireEvent.click(screen.getByRole("button", { name: "결정 추가" }));
     fireEvent.click(screen.getByRole("button", { name: "최종 처리 →" }));
     await screen.findByRole("dialog");
-    fireEvent.click(screen.getByRole("button", { name: "처리 요청" }));
+    fireEvent.click(screen.getByRole("button", { name: "즉시 재작업" }));
 
     await waitFor(() => expect(apiMocks.createStockRequest).toHaveBeenCalledTimes(1));
     expect(apiMocks.createStockRequest).toHaveBeenCalledWith(expect.objectContaining({

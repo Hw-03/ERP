@@ -422,6 +422,12 @@ function DefectViewInner({
                 currentEmployee={employee}
                 onCancel={() => window.history.back()}
                 onDone={() => handleProcessed("불량 처리 완료")}
+                onInvalidated={(message) => {
+                  window.history.replaceState({ defect: "list" }, "");
+                  setView({ kind: "list" });
+                  setReloadNonce((value) => value + 1);
+                  onStatusChange?.(`${message} 선택을 해제하고 목록을 갱신합니다.`);
+                }}
               />
             )}
           </div>

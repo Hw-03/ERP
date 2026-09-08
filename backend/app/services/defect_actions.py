@@ -258,7 +258,7 @@ def unquarantine_inventory_bulk(
                 raise ValueError("선택한 격리 기록을 찾을 수 없습니다.")
             pending = defect_records_svc.pending_quantity(db, record.record_id)
             if pending > 0:
-                raise ValueError("승인 대기 또는 예약 중인 격리 기록은 정상 복귀할 수 없습니다.")
+                raise ValueError("처리 대기 또는 예약 중인 격리 기록은 정상 복귀할 수 없습니다.")
             remaining = Decimal(str(record.remaining_quantity or 0))
             quantity = Decimal(str(line.quantity))
             if quantity <= 0 or remaining != quantity:

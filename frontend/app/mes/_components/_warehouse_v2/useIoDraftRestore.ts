@@ -9,7 +9,7 @@
  */
 import { useEffect, type MutableRefObject } from "react";
 import type { IoBatch, IoBundle, IoLine } from "@/lib/api";
-import { deptIoDirectionOf } from "./ioWorkType";
+import { deptIoDirectionOf, exclusionNoteFor } from "./ioWorkType";
 import type { useIoWorkState } from "./useIoWorkState";
 import type { IoStep } from "./useIoWorkState";
 
@@ -122,6 +122,24 @@ export function restoreInternalUseBundles(
   });
 }
 
+/** 오래된 창고 입출고 초안의 제외 상태를 현재 수량 규칙으로 맞춘다. */
+export function normalizeWarehouseIoDraftBundles(bundles: IoBundle[]): IoBundle[] {
+  return bundles.map((bundle) => ({
+    ...bundle,
+    lines: bundle.lines.map((line) => {
+      if (line.included && Number(line.quantity) > 0) return line;
+      return {
+        ...line,
+        quantity: 0,
+        included: false,
+        edited: line.origin === "bom_auto" ? true : line.edited,
+        shortage: 0,
+        exclusion_note: exclusionNoteFor("warehouse_to_dept", line.origin, false),
+      };
+    }),
+  }));
+}
+
 export function useIoDraftRestore(params: {
   draftToRestore: IoBatch | null | undefined;
   /** '이어서 하기' 클릭마다 증가하는 토큰. 같은 draft(batch_id 불변)를 다시 골라도
@@ -175,7 +193,12 @@ export function useIoDraftRestore(params: {
     state.setToDepartment(draftToRestore.to_department || state.toDepartment);
     state.setReferenceNo(draftToRestore.reference_no || "");
     state.setNotes(draftToRestore.notes || "");
-    state.setBundles(restoreInternalUseBundles(draftToRestore, getAvailable));
+    const restoredBundles = restoreInternalUseBundles(draftToRestore, getAvailable);
+    state.setBundles(
+      draftToRestore.work_type === "warehouse_io"
+        ? normalizeWarehouseIoDraftBundles(restoredBundles)
+        : restoredBundles,
+    );
     state.goTo(restoreStep ?? 4);
     onStatusChange("임시저장 작업을 불러왔습니다.");
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -6,7 +6,7 @@ import type { KpiFilter } from "./InventoryKpiPanel";
 export type InventoryFilterLogic = "OR" | "AND";
 export const DEFAULT_INVENTORY_FILTER_LOGIC: InventoryFilterLogic = "AND";
 export type DepartmentFilterBasis = "location" | "code";
-export const DEFAULT_DEPARTMENT_FILTER_BASIS: DepartmentFilterBasis = "location";
+export const DEFAULT_DEPARTMENT_FILTER_BASIS: DepartmentFilterBasis = "code";
 const DISUSED_MATERIAL_TYPE = "불용";
 
 type InventoryCategoryFilters = {

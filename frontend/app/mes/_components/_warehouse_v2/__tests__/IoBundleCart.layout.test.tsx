@@ -141,4 +141,42 @@ describe("IoBundleCart layout", () => {
     expect(screen.getByRole("button", { name: "저장" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "제출확인 →" })).toBeDisabled();
   });
+
+  it("반영 품목이 없거나 수량 0인 반영 품목이 있으면 제출확인 차단 이유를 표시한다", () => {
+    const { rerender } = render(
+      <IoBundleCart
+        bundles={[{ ...bundle, lines: [{ ...line, quantity: 0, included: false }] }]}
+        subType="warehouse_to_dept"
+        itemMap={new Map([[item.item_id, item]])}
+        getAvailable={() => 10}
+        onToggleLine={vi.fn()}
+        onQuantityChange={vi.fn()}
+        onRemoveLine={vi.fn()}
+        onRemoveBundle={vi.fn()}
+        onAdvance={vi.fn()}
+        canAdvance={false}
+      />,
+    );
+
+    expect(screen.getByText("반영할 품목을 하나 이상 선택하세요")).toBeInTheDocument();
+
+    rerender(
+      <IoBundleCart
+        bundles={[bundle]}
+        subType="warehouse_to_dept"
+        itemMap={new Map([[item.item_id, item]])}
+        getAvailable={() => 10}
+        onToggleLine={vi.fn()}
+        onQuantityChange={vi.fn()}
+        onRemoveLine={vi.fn()}
+        onRemoveBundle={vi.fn()}
+        onAdvance={vi.fn()}
+        canAdvance={false}
+        hasInvalidQuantity
+        invalidLineCodes={["7-AA-0052"]}
+      />,
+    );
+
+    expect(screen.getByText("수량 0: 7-AA-0052")).toBeInTheDocument();
+  });
 });

@@ -40,6 +40,61 @@ def test_changed_migrations_require_declared_auto_deploy_policy(tmp_path: Path) 
         module.load_changed_migration_policies(source, target)
 
 
+def test_preflight_allows_docstring_only_model_changes_without_a_migration(
+    tmp_path: Path,
+) -> None:
+    module = _load_preflight_module()
+    source_backend = tmp_path / "source"
+    target_backend = tmp_path / "target"
+    for backend in (source_backend, target_backend):
+        (backend / "alembic" / "versions").mkdir(parents=True)
+        (backend / "app" / "models").mkdir(parents=True)
+
+    source_model = source_backend / "app" / "models" / "snapshot.py"
+    target_model = target_backend / "app" / "models" / "snapshot.py"
+    source_model.write_text(
+        '"""새 설명."""\n\nclass Snapshot:\n    """새 클래스 설명."""\n\n    table = "snapshots"\n',
+        encoding="utf-8",
+    )
+    target_model.write_text(
+        '"""기존 설명."""\n\nclass Snapshot:\n    """기존 클래스 설명."""\n\n    table = "snapshots"\n',
+        encoding="utf-8",
+    )
+
+    policies = module.load_preflight_policies(
+        source_backend,
+        target_backend,
+        source_backend / "alembic" / "versions",
+        target_backend / "alembic" / "versions",
+    )
+
+    assert policies == ()
+
+
+def test_preflight_rejects_model_code_changes_without_a_migration(tmp_path: Path) -> None:
+    module = _load_preflight_module()
+    source_backend = tmp_path / "source"
+    target_backend = tmp_path / "target"
+    for backend in (source_backend, target_backend):
+        (backend / "alembic" / "versions").mkdir(parents=True)
+        (backend / "app" / "models").mkdir(parents=True)
+
+    (source_backend / "app" / "models" / "snapshot.py").write_text(
+        'class Snapshot:\n    table = "weekly_snapshots"\n', encoding="utf-8"
+    )
+    (target_backend / "app" / "models" / "snapshot.py").write_text(
+        'class Snapshot:\n    table = "snapshots"\n', encoding="utf-8"
+    )
+
+    with pytest.raises(module.PreflightPolicyError, match="no changed Alembic"):
+        module.load_preflight_policies(
+            source_backend,
+            target_backend,
+            source_backend / "alembic" / "versions",
+            target_backend / "alembic" / "versions",
+        )
+
+
 def test_data_change_policy_requires_a_query_validator(tmp_path: Path) -> None:
     module = _load_preflight_module()
     source = tmp_path / "source"

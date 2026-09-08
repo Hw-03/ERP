@@ -15,6 +15,7 @@ import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { REASON_CATEGORIES } from "./reasonCategories";
 import { QuantityInput } from "../common/QuantityInput";
 import { makeClientRequestId } from "@/lib/uuid";
+import { ApiError } from "@/lib/api-core";
 
 type ProcessAction = "unquarantine" | "scrap" | "return" | "disassemble";
 
@@ -25,6 +26,7 @@ interface Props {
   currentEmployee: { employee_id: string; name: string; department: string };
   onDone: () => void;
   onCancel: () => void;
+  onInvalidated?: (message: string) => void;
 }
 
 export function DefectProcessPanel({
@@ -34,6 +36,7 @@ export function DefectProcessPanel({
   currentEmployee,
   onDone,
   onCancel,
+  onInvalidated,
 }: Props) {
   const processingLocations = selectedLocations?.length
     ? selectedLocations
@@ -65,8 +68,20 @@ export function DefectProcessPanel({
   const locationIdentity = processingLocations.map((current) => current.record_id).join(":");
   const locationIdentityRef = useRef(locationIdentity);
   const batchRequestIdsRef = useRef<Partial<Record<ProcessAction, string>>>({});
+  const batchSnapshot = processingLocations.map((current) =>
+    `${current.record_id}:${current.available_quantity}:${current.pending_quantity}`,
+  ).join("|");
+  const batchSnapshotRef = useRef(batchSnapshot);
+  const batchInvalidatedRef = useRef(false);
   const maxQty = availableQty;
   const boundedProcessQty = Math.max(1, Math.min(maxQty, processQty));
+
+  useEffect(() => {
+    if (!isBatch || busy || batchInvalidatedRef.current || batchSnapshotRef.current === batchSnapshot) return;
+    batchInvalidatedRef.current = true;
+    setConfirmOpen(false);
+    onInvalidated?.("선택한 기록의 수량 또는 처리 대기 상태가 변경되었습니다.");
+  }, [batchSnapshot, busy, isBatch, onInvalidated]);
 
   useEffect(() => {
     if (locationIdentityRef.current === locationIdentity) return;
@@ -201,6 +216,11 @@ export function DefectProcessPanel({
       }
       onDone();
     } catch (err: unknown) {
+      if (isBatch && err instanceof ApiError && (err.status === 422 || err.status === 409) && onInvalidated) {
+        setConfirmOpen(false);
+        onInvalidated(err.message);
+        return;
+      }
       setErrorMsg(err instanceof Error ? err.message : "처리 중 오류가 발생했습니다.");
     } finally {
       setBusy(false);
@@ -322,8 +342,8 @@ export function DefectProcessPanel({
           open={confirmOpen}
           title="재작업 확인"
           tone="danger"
-          cautionMessage="승인 완료 후 재고에 반영됩니다."
-          confirmLabel="처리 요청"
+          cautionMessage="확인하면 즉시 재고에 반영됩니다."
+          confirmLabel="즉시 재작업"
           busy={busy}
           onClose={() => setConfirmOpen(false)}
           onConfirm={() => { setConfirmOpen(false); void handleSubmit(); }}
@@ -424,7 +444,7 @@ export function DefectProcessPanel({
             {location.has_bom && (
               <ActionCard
                 label="재작업"
-                desc="승인 후 BOM 재작업 처리"
+                desc="즉시 BOM 재작업 처리"
                 color={LEGACY_COLORS.yellow}
                 selected={action === "disassemble"}
                 onClick={() => setAction("disassemble")}
@@ -432,7 +452,7 @@ export function DefectProcessPanel({
             )}
             <ActionCard
               label="전체 폐기"
-              desc="승인 후 격리 재고 차감"
+              desc="즉시 격리 재고 차감"
               color={LEGACY_COLORS.red}
               selected={action === "scrap"}
               onClick={() => setAction("scrap")}
@@ -440,7 +460,7 @@ export function DefectProcessPanel({
             {isWarehouse && (
               <ActionCard
                 label="반품"
-                desc="승인 후 반품 처리"
+                desc="즉시 반품 처리"
                 color={LEGACY_COLORS.muted2}
                 selected={action === "return"}
                 onClick={() => setAction("return")}
@@ -513,7 +533,7 @@ export function DefectProcessPanel({
             className="rounded-[16px] px-8 py-3 text-base font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
             style={{ background: actionColor[action] }}
           >
-            {busy ? "처리 중..." : action === "unquarantine" ? "정상 복귀 →" : action === "scrap" ? "폐기 요청 →" : "반품 요청 →"}
+            {busy ? "처리 중..." : action === "unquarantine" ? "정상 복귀 →" : action === "scrap" ? "즉시 폐기 →" : "즉시 반품 →"}
           </button>
         )}
       </div>
@@ -522,8 +542,8 @@ export function DefectProcessPanel({
         open={confirmOpen}
         title={action === "unquarantine" ? "정상 복귀 확인" : action === "scrap" ? "폐기 확인" : "반품 확인"}
         tone="danger"
-        cautionMessage={action === "unquarantine" ? "이 작업은 즉시 반영됩니다." : "승인 완료 후 재고에 반영됩니다."}
-        confirmLabel={action === "unquarantine" ? "즉시 복귀" : "처리 요청"}
+        cautionMessage={action === "unquarantine" ? "이 작업은 즉시 반영됩니다." : "확인하면 즉시 재고에 반영됩니다."}
+        confirmLabel={action === "unquarantine" ? "즉시 복귀" : action === "scrap" ? "즉시 폐기" : "즉시 반품"}
         busy={busy}
         onClose={() => setConfirmOpen(false)}
         onConfirm={() => { setConfirmOpen(false); void handleSubmit(); }}

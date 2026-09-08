@@ -817,6 +817,11 @@ export function MobileIoComposeWizard({
               if (state.canAdvance[4]) state.goTo(5);
             }}
             canAdvance={state.canAdvance[4]}
+            hasShortage={state.hasShortage}
+            hasInvalidQuantity={state.hasInvalidQuantity}
+            invalidLineCodes={(state.includedLines ?? [])
+              .filter((line) => Number(line.quantity) <= 0)
+              .map((line) => line.mes_code ?? line.item_name)}
             onSaveDraft={handleSaveDraft}
           />
         )}

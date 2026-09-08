@@ -191,7 +191,7 @@ describe("PaPfDefectWizard", () => {
     expect(screen.getByText("정상 복귀로 변경")).toBeInTheDocument();
   });
 
-  it("'전부 폐기' 선택 → DisassembleTree 미표시, 폐기 요청 → 확인팝업 → createStockRequest(DEFECT_SCRAP)", async () => {
+  it("'전부 폐기' 선택 → DisassembleTree 미표시, 즉시 폐기 → 확인팝업 → createStockRequest(DEFECT_SCRAP)", async () => {
     render(<PaPfDefectWizard {...defaultProps} />);
 
     fireEvent.click(screen.getByLabelText(/전부 폐기/));
@@ -203,10 +203,10 @@ describe("PaPfDefectWizard", () => {
       target: { value: "외관 불량" },
     });
 
-    // 승인 요청 → 확인 팝업 → 요청 버튼
-    fireEvent.click(screen.getByText("폐기 요청 →"));
+    // 즉시 처리 확인 팝업 → 확정 버튼
+    fireEvent.click(screen.getByText("즉시 폐기 →"));
     await waitFor(() => expect(screen.getByText("폐기 확인")).toBeInTheDocument());
-    fireEvent.click(screen.getByText("처리 요청"));
+    fireEvent.click(screen.getByText("즉시 폐기"));
 
     await waitFor(() => {
       expect(stockRequestsApi.createStockRequest).toHaveBeenCalledWith(
@@ -243,7 +243,7 @@ describe("PaPfDefectWizard", () => {
     );
   });
 
-  it("재작업 + 정상/격리/폐기 수량 분할 → 결재 요청 → createStockRequest(DEFECT_DISASSEMBLE, notes JSON 검증)", async () => {
+  it("재작업 + 정상/격리/폐기 수량 분할 → 즉시 처리 → createStockRequest(DEFECT_DISASSEMBLE, notes JSON 검증)", async () => {
     render(<PaPfDefectWizard {...defaultProps} />);
 
     // BOM 로드 대기
@@ -260,10 +260,10 @@ describe("PaPfDefectWizard", () => {
     fireEvent.change(screen.getByLabelText("게터 폐기 수량"), { target: { value: "5" } });
     expect(screen.getByLabelText("게터 정상 수량")).toHaveValue(0);
 
-    // 승인 요청 → 확인 팝업 → 요청 버튼
-    fireEvent.click(screen.getByText("재작업 요청 →"));
+    // 즉시 처리 확인 팝업 → 확정 버튼
+    fireEvent.click(screen.getByText("즉시 재작업 →"));
     await waitFor(() => expect(screen.getByText("재작업 확인")).toBeInTheDocument());
-    fireEvent.click(screen.getByText("처리 요청"));
+    fireEvent.click(screen.getByText("즉시 재작업"));
 
     await waitFor(() => {
       expect(stockRequestsApi.createStockRequest).toHaveBeenCalledWith(
@@ -295,11 +295,11 @@ describe("PaPfDefectWizard", () => {
     });
   });
 
-  it("카테고리 미선택 시 재작업 요청 버튼 비활성", async () => {
+  it("카테고리 미선택 시 즉시 재작업 버튼 비활성", async () => {
     render(<PaPfDefectWizard {...defaultProps} />);
 
     await waitFor(() => expect(screen.getByText("필라멘트")).toBeInTheDocument());
-    const submitBtn = screen.getByText("재작업 요청 →");
+    const submitBtn = screen.getByText("즉시 재작업 →");
     expect(submitBtn).toBeDisabled();
   });
 

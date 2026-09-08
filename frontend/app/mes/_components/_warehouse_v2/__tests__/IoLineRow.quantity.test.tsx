@@ -162,6 +162,56 @@ describe("IoLineRow quantity", () => {
     );
   });
 
+  it("shows unchanged available stock as the execution-after quantity for an excluded line", () => {
+    render(
+      <IoLineRow
+        line={makeLine({
+          direction: "out",
+          from_bucket: "warehouse",
+          to_bucket: "none",
+          quantity: 0,
+          included: false,
+          exclusion_note: "이번 작업 제외",
+        })}
+        subType="warehouse_to_dept"
+        isChild
+        available={10}
+        onToggle={() => {}}
+        onQuantityChange={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("실행 후").parentElement).toHaveTextContent("10");
+  });
+
+  it("dims only the item identity area when a warehouse line is excluded", () => {
+    render(
+      <IoLineRow
+        line={makeLine({
+          direction: "out",
+          from_bucket: "warehouse",
+          to_bucket: "none",
+          quantity: 0,
+          included: false,
+          exclusion_note: "이번 작업 제외",
+        })}
+        subType="warehouse_to_dept"
+        isChild
+        available={10}
+        onToggle={() => {}}
+        onQuantityChange={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+
+    const row = screen.getByRole("spinbutton", { name: "수량" }).closest("[style*='grid-template-columns']");
+    if (!row) throw new Error("제외된 수량 행을 찾을 수 없습니다.");
+    expect(row).not.toHaveStyle({ opacity: "0.6" });
+    expect(screen.getByRole("button", { name: "재고 반영 변경" })).toHaveStyle({ opacity: "0.6" });
+    expect(screen.getByText("가능 재고").parentElement).not.toHaveStyle({ opacity: "0.6" });
+  });
+
   it("aligns stock and remove controls to the BOM header desktop columns", () => {
     render(
       <IoLineRow

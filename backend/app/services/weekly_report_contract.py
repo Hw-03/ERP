@@ -35,6 +35,13 @@ from app.schemas import (
     WeeklyWarning,
 )
 from app.services.weekly_inventory_snapshot import load_dashboard_finished_stock
+from app.services.weekly_report_scope import (
+    FINISHED_PROCESS_CODES,
+    includes_ceramic_tube_housing_for_week,
+    includes_vacuum_generator_for_week,
+    weekly_report_group_code,
+    weekly_report_item_sort_key,
+)
 
 
 KST = ZoneInfo("Asia/Seoul")
@@ -43,7 +50,7 @@ TRANSITION_NOTICE = (
     "주간보고 계산 기준을 개선 중입니다. 이번 주 수치는 실제 재고와 다를 수 있으며, "
     "다음 주부터 새 기준으로 정확한 정보가 표시됩니다."
 )
-FINISHED_CODES = ("TF", "HF", "VF", "NF", "AF", "PF")
+FINISHED_CODES = FINISHED_PROCESS_CODES
 DEPARTMENT_NAMES = {
     "TF": "튜브",
     "HF": "고압",
@@ -200,6 +207,7 @@ class _BoundaryItem:
     mes_code: Optional[str]
     item_name: str
     process_type_code: str
+    source_process_type_code: str
     previous: Decimal
     current: Decimal
 
@@ -272,7 +280,11 @@ def _snapshot_normal_items(snapshot: WeeklyInventorySnapshot) -> dict[str, tuple
     return rows
 
 
-def _live_normal_items(db: Session) -> dict[str, tuple]:
+def _live_normal_items(
+    db: Session,
+    *,
+    include_ceramic_tube_housing: bool,
+) -> dict[str, tuple]:
     return {
         str(row.item.item_id): (
             row.item.item_id,
@@ -281,7 +293,10 @@ def _live_normal_items(db: Session) -> dict[str, tuple]:
             row.item.process_type_code,
             Decimal(str(row.normal_quantity)),
         )
-        for row in load_dashboard_finished_stock(db)
+        for row in load_dashboard_finished_stock(
+            db,
+            include_ceramic_tube_housing=include_ceramic_tube_housing,
+        )
     }
 
 
@@ -302,7 +317,10 @@ def _load_boundaries(
     previous = _snapshot_normal_items(previous_snapshot)
 
     if week_start <= today <= week_end:
-        current = _live_normal_items(db)
+        current = _live_normal_items(
+            db,
+            include_ceramic_tube_housing=includes_ceramic_tube_housing_for_week(week_start),
+        )
     elif week_end < today:
         current_snapshot = (
             db.query(WeeklyInventorySnapshot)
@@ -320,14 +338,24 @@ def _load_boundaries(
         previous_row = previous.get(item_id)
         current_row = current.get(item_id)
         metadata = current_row or previous_row
-        if metadata is None or metadata[3] not in FINISHED_CODES:
+        if metadata is None:
+            continue
+        group_code = weekly_report_group_code(
+            metadata[3],
+            metadata[2],
+            metadata[1],
+            include_vacuum_generator=includes_vacuum_generator_for_week(week_start),
+            include_ceramic_tube_housing=includes_ceramic_tube_housing_for_week(week_start),
+        )
+        if group_code not in FINISHED_CODES:
             continue
         items.append(
             _BoundaryItem(
                 item_id=metadata[0],
                 mes_code=metadata[1],
                 item_name=metadata[2],
-                process_type_code=metadata[3],
+                process_type_code=group_code,
+                source_process_type_code=metadata[3],
                 previous=previous_row[4] if previous_row else Decimal("0"),
                 current=current_row[4] if current_row else Decimal("0"),
             )
@@ -541,6 +569,7 @@ def _production_matrix(
     db: Session,
     *,
     activities: dict[str, _ActivityTotal],
+    boundary_items: list[_BoundaryItem],
 ) -> list[WeeklyProductionModelRow]:
     items = {
         str(item.item_id): item
@@ -553,16 +582,18 @@ def _production_matrix(
         .all()
     )
     symbol_names = {row.symbol: row.model_name for row in symbols if len(row.symbol or "") == 1}
+    boundary_groups = {str(item.item_id): item.process_type_code for item in boundary_items}
     matrix: dict[str, dict[str, Decimal]] = {}
     for item_id, total in activities.items():
         item = items.get(item_id)
         if item is None or total.produce <= 0:
             continue
         model_name = symbol_names.get(item.model_symbol)
-        if model_name is None or item.process_type_code not in FINISHED_CODES:
+        group_code = boundary_groups.get(item_id)
+        if model_name is None or group_code not in FINISHED_CODES:
             continue
-        matrix.setdefault(model_name, {})[item.process_type_code] = (
-            matrix.setdefault(model_name, {}).get(item.process_type_code, Decimal("0"))
+        matrix.setdefault(model_name, {})[group_code] = (
+            matrix.setdefault(model_name, {}).get(group_code, Decimal("0"))
             + total.produce
         )
     rows: list[WeeklyProductionModelRow] = []
@@ -659,6 +690,17 @@ def build_verified_weekly_report(
     groups: list[WeeklyGroupReport] = []
     for code in FINISHED_CODES:
         rows = grouped[code]
+        if code in {"HF", "VF"}:
+            source_process_codes = {
+                str(item.item_id): item.source_process_type_code for item in items
+            }
+            rows.sort(
+                key=lambda row: weekly_report_item_sort_key(
+                    source_process_codes.get(row.item_id),
+                    row.mes_code,
+                    row.item_name,
+                )
+            )
         produce = sum((row.produce_qty for row in rows), Decimal("0"))
         receive = sum((row.receive_qty for row in rows), Decimal("0"))
         out = sum((row.out_qty for row in rows), Decimal("0"))
@@ -698,7 +740,7 @@ def build_verified_weekly_report(
         groups=groups,
         summary=summary,
         warnings=[],
-        production_matrix=_production_matrix(db, activities=activities),
+        production_matrix=_production_matrix(db, activities=activities, boundary_items=items),
         basis_version=2,
         report_status="verified",
         validation=WeeklyReportValidation(

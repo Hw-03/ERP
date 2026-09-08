@@ -134,6 +134,8 @@ def ensure_available(
         exclude_line_id=exclude_line_id,
     )
     available = Decimal(str(record.remaining_quantity or 0)) - pending
+    if require_exact and pending > 0:
+        raise ValueError("처리 대기 중인 격리 기록은 선택 처리할 수 없습니다.")
     if quantity <= 0:
         raise ValueError("처리 수량은 0보다 커야 합니다.")
     if require_exact and available != quantity:

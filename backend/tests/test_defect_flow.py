@@ -3,9 +3,9 @@
 시나리오:
 1. 격리 (POST /api/defects/quarantine) → InventoryLocation DEFECTIVE, defective_at 채움, MARK_DEFECTIVE 로그
 2. 정상복귀 (POST /api/defects/unquarantine) → defective_at NULL, UNMARK_DEFECTIVE 로그
-3. 격리 → stock_request(DEFECT_SCRAP) 발의 → 부서 결재자 승인 → DEFECT_SCRAP 로그, 재고 차감
-4. 격리 → submit_defective_disassemble(keep, scrap, keep) → DISASSEMBLE + RECEIVE×2 + DEFECT_SCRAP
-5. R 정상 → stock_request(DEFECT_RETURN) 발의 → 부서 결재 승인 → SUPPLIER_RETURN 로그
+3. 격리 → stock_request(DEFECT_SCRAP) 즉시 처리 → 요청자 로그, 재고 차감
+4. 격리 → stock_request(DEFECT_DISASSEMBLE) 즉시 처리 → DISASSEMBLE + RECEIVE×2 + DEFECT_SCRAP
+5. R 정상 → stock_request(DEFECT_RETURN) 즉시 처리 → SUPPLIER_RETURN 로그
 """
 
 from __future__ import annotations
@@ -28,7 +28,9 @@ from app.models import (
     Inventory,
     InventoryLocation,
     LocationStatusEnum,
+    RequestBucketEnum,
     StockRequest,
+    StockRequestLine,
     StockRequestStatusEnum,
     StockRequestTypeEnum,
     SystemSetting,
@@ -37,11 +39,89 @@ from app.models import (
 )
 from app.services.pin_auth import DEFAULT_PIN_HASH, hash_pin
 from app.services import inventory as inventory_svc
+from app.services import defect_records as defect_records_svc
 
 
 # ---------------------------------------------------------------------------
 # 픽스처 헬퍼
 # ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("request_type", ["defect_scrap", "defect_return", "defect_disassemble"])
+@pytest.mark.parametrize("fail_second", [False, True])
+def test_bulk_immediate_processing_is_atomic_for_plain_employee(
+    db_session, client, make_item, make_bom, monkeypatch, request_type, fail_second,
+):
+    """일반 직원 다건 처리는 선택 건만 즉시 실행하며 중간 실패도 모두 복구한다."""
+    item = make_item(name="BULK-IMMEDIATE", process_type_code="PF", warehouse_qty=Decimal("6"))
+    child = make_item(name="BULK-CHILD", process_type_code="AR", warehouse_qty=Decimal("0"))
+    make_bom(item.item_id, child.item_id, Decimal("2"))
+    actor = _make_employee(db_session, code="BULK-STAFF", name="일반 직원")
+    db_session.add(SystemSetting(setting_key="inventory_operation_cutover_at", setting_value="2026-01-01T00:00:00"))
+    db_session.commit()
+    for qty in (1, 2, 3):
+        response = client.post("/api/defects/quarantine", json={
+            "item_id": str(item.item_id), "qty": qty, "source": "warehouse",
+            "target_dept": DepartmentEnum.ASSEMBLY.value,
+            "actor_employee_id": str(actor.employee_id),
+            "reason_memo": "통합 검증",
+        })
+        assert response.status_code == 200, response.json()
+    records = db_session.query(DefectQuarantineRecord).filter(
+        DefectQuarantineRecord.item_id == item.item_id,
+    ).order_by(DefectQuarantineRecord.original_quantity).all()
+    selected = records[:2]
+    before_logs = db_session.query(TransactionLog).count()
+    before_movements = db_session.query(DefectInventoryMovement).count()
+    original_decrement = defect_records_svc.decrement_record
+    calls = 0
+
+    def decrement_with_failure(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise ValueError("injected second record failure")
+        return original_decrement(*args, **kwargs)
+
+    if fail_second:
+        monkeypatch.setattr(defect_records_svc, "decrement_record", decrement_with_failure)
+    payload = {
+        "requester_employee_id": str(actor.employee_id), "request_type": request_type,
+        "client_request_id": f"defect-batch:{request_type}:{fail_second}",
+        "reason_category": "기타", "reason_memo": "공통 통합 검증",
+        "notes": json.dumps({"child_decisions": [{
+            "item_id": str(child.item_id), "qty": "6", "normal_qty": "6",
+            "defective_qty": "0", "scrap_qty": "0",
+        }]}),
+        "lines": [{
+            "item_id": str(item.item_id), "record_id": str(record.record_id),
+            "quantity": int(record.remaining_quantity), "from_bucket": "defective",
+            "from_department": DepartmentEnum.ASSEMBLY.value, "to_bucket": "none",
+        } for record in selected],
+    }
+    response = client.post("/api/stock-requests", json=payload)
+    db_session.expire_all()
+    if fail_second:
+        assert response.status_code == 422, response.json()
+        assert "injected" in response.text
+        assert db_session.query(StockRequest).count() == 0
+        assert db_session.query(TransactionLog).count() == before_logs
+        assert db_session.query(DefectInventoryMovement).count() == before_movements
+        assert [record.remaining_quantity for record in records] == [Decimal("1"), Decimal("2"), Decimal("3")]
+        assert db_session.query(Inventory).filter(Inventory.item_id == child.item_id).one().quantity == 0
+    else:
+        assert response.status_code == 201, response.json()
+        assert response.json()["status"] == "completed"
+        assert response.json()["requires_department_approval"] is False
+        assert response.json()["requires_warehouse_approval"] is False
+        assert response.json()["approved_by_employee_id"] is None
+        assert [record.remaining_quantity for record in records] == [Decimal("0"), Decimal("0"), Decimal("3")]
+        movements = db_session.query(DefectInventoryMovement).filter(
+            DefectInventoryMovement.movement_type == request_type,
+        ).all()
+        assert {movement.record_id for movement in movements} == {record.record_id for record in selected}
+        assert len({movement.operation_id for movement in movements}) == 1
+        if request_type == "defect_disassemble":
+            assert db_session.query(Inventory).filter(Inventory.item_id == child.item_id).one().quantity == 6
 
 
 def _make_employee(
@@ -715,7 +795,8 @@ def test_bulk_unquarantine_rejects_empty_lines(db_session, client):
     assert response.status_code == 422
 
 
-def test_bulk_unquarantine_rejects_reserved_record(db_session, client, make_item):
+@pytest.mark.parametrize("action", ["restore", "defect_scrap", "defect_return"])
+def test_bulk_unquarantine_rejects_reserved_record(db_session, client, make_item, action):
     item = make_item(name="R002-BULK-RESERVED", warehouse_qty=Decimal("5"))
     actor = _make_employee(db_session, code="E02-BULK-RESERVED", name="예약 복귀 작업자")
     db_session.commit()
@@ -734,27 +815,29 @@ def test_bulk_unquarantine_rejects_reserved_record(db_session, client, make_item
     record = db_session.query(DefectQuarantineRecord).filter(
         DefectQuarantineRecord.item_id == item.item_id
     ).one()
-    reserved = client.post(
-        "/api/stock-requests",
-        json={
-            "requester_employee_id": str(actor.employee_id),
-            "request_type": "defect_scrap",
-            "lines": [{
-                "record_id": str(record.record_id),
-                "item_id": str(item.item_id),
-                "quantity": 1,
-                "from_bucket": "defective",
-                "from_department": DepartmentEnum.ASSEMBLY.value,
-                "to_bucket": "none",
-            }],
-        },
+    # 새 요청은 즉시 실행하므로 과거 정책에서 남은 예약 행을 직접 구성한다.
+    reserved = StockRequest(
+        request_code="LEGACY-BULK-RESERVED",
+        requester_employee_id=actor.employee_id,
+        requester_name=actor.name,
+        requester_department=actor.department,
+        request_type=StockRequestTypeEnum.DEFECT_SCRAP,
+        status=StockRequestStatusEnum.RESERVED,
+        requires_department_approval=True,
     )
-    assert reserved.status_code == 201, reserved.json()
-    assert reserved.json()["status"] == "reserved"
+    db_session.add(reserved)
+    db_session.flush()
+    db_session.add(StockRequestLine(
+        request_id=reserved.request_id, item_id=item.item_id, quantity=Decimal("1"),
+        item_name_snapshot=item.item_name, mes_code_snapshot=item.mes_code,
+        defect_quarantine_record_id=record.record_id,
+        from_bucket=RequestBucketEnum.DEFECTIVE, from_department=DepartmentEnum.ASSEMBLY.value,
+        to_bucket=RequestBucketEnum.NONE, status=StockRequestStatusEnum.RESERVED,
+    ))
+    db_session.commit()
 
-    response = client.post(
-        "/api/defects/unquarantine/bulk",
-        json={
+    if action == "restore":
+        response = client.post("/api/defects/unquarantine/bulk", json={
             "actor_employee_id": str(actor.employee_id),
             "lines": [{
                 "record_id": str(record.record_id),
@@ -762,8 +845,19 @@ def test_bulk_unquarantine_rejects_reserved_record(db_session, client, make_item
                 "department": DepartmentEnum.ASSEMBLY.value,
                 "quantity": "2",
             }],
-        },
-    )
+        })
+    else:
+        # 잔량에서 예약량을 뺀 수량과 일치해도 예약 중인 기록은 선택 처리 불가.
+        response = client.post("/api/stock-requests", json={
+            "requester_employee_id": str(actor.employee_id),
+            "request_type": action,
+            "client_request_id": f"defect-batch:reserved-{action}",
+            "lines": [{
+                "record_id": str(record.record_id), "item_id": str(item.item_id),
+                "quantity": 1, "from_bucket": "defective",
+                "from_department": DepartmentEnum.ASSEMBLY.value, "to_bucket": "none",
+            }],
+        })
 
     assert response.status_code == 422
     db_session.expire_all()
@@ -994,7 +1088,7 @@ def test_single_record_batch_request_requires_exact_quantity_and_record_id(
     assert db_session.query(StockRequest).count() == 0
 
 
-def test_defect_disassemble_approval_executes_multiple_source_records_once(
+def test_defect_disassemble_immediately_executes_multiple_source_records_once(
     db_session, client, make_item, make_bom
 ):
     parent = make_item(
@@ -1012,14 +1106,6 @@ def test_defect_disassemble_approval_executes_multiple_source_records_once(
         db_session,
         code="E02-REWORK-MULTI",
         name="다건 재작업 발의자",
-    )
-    approver = _make_employee(
-        db_session,
-        code="E02-REWORK-MULTI-APPROVER",
-        name="다건 재작업 승인자",
-        department=DepartmentEnum.ASSEMBLY,
-        department_role="primary",
-        pin="1234",
     )
     db_session.add(
         SystemSetting(
@@ -1075,36 +1161,9 @@ def test_defect_disassemble_approval_executes_multiple_source_records_once(
     }
     created = client.post("/api/stock-requests", json=request_payload)
     assert created.status_code == 201, created.json()
-    assert created.json()["status"] == "reserved"
-    cancelled = client.post(
-        f"/api/stock-requests/{created.json()['request_id']}/cancel",
-        json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
-    )
-    assert cancelled.status_code == 200, cancelled.json()
-    assert cancelled.json()["status"] == "cancelled"
-    db_session.expire_all()
-    assert [record.remaining_quantity for record in records] == [
-        Decimal("1"),
-        Decimal("2"),
-    ]
-    parent_location = db_session.query(InventoryLocation).filter(
-        InventoryLocation.item_id == parent.item_id,
-        InventoryLocation.department == DepartmentEnum.ASSEMBLY.value,
-        InventoryLocation.status == LocationStatusEnum.DEFECTIVE,
-    ).one()
-    assert parent_location.pending_quantity == Decimal("0")
-
-    created = client.post("/api/stock-requests", json=request_payload)
-    assert created.status_code == 201, created.json()
-    assert created.json()["status"] == "reserved"
-
-    approved = client.post(
-        f"/api/stock-requests/{created.json()['request_id']}/department-approve",
-        json={"actor_employee_id": str(approver.employee_id), "pin": "1234"},
-    )
-
-    assert approved.status_code == 200, approved.json()
-    assert approved.json()["status"] == "completed"
+    assert created.json()["status"] == "completed"
+    assert created.json()["requires_department_approval"] is False
+    assert created.json()["approved_by_employee_id"] is None
     db_session.expire_all()
     assert [record.remaining_quantity for record in records] == [
         Decimal("0"),
@@ -1271,12 +1330,6 @@ def test_quarantine_then_scrap_preserves_two_audit_logs(
 def test_defect_scrap_via_stock_request(db_session, client, make_item):
     item = make_item(name="R003", process_type_code="TR", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="E03", name="발의자C")
-    approver = _make_employee(
-        db_session, code="E04", name="결재자D",
-        department=DepartmentEnum.ASSEMBLY,
-        department_role="primary",
-        pin="1234",
-    )
     db_session.commit()
 
     # 격리
@@ -1294,7 +1347,7 @@ def test_defect_scrap_via_stock_request(db_session, client, make_item):
     inv_before = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
     qty_before = inv_before.quantity
 
-    # DEFECT_SCRAP 제출 — 발의 수량을 예약하고 부서 승인 후 완료
+    # DEFECT_SCRAP 제출 — 승인 없이 즉시 완료
     res = client.post("/api/stock-requests", json={
         "requester_employee_id": str(requester.employee_id),
         "request_type": "defect_scrap",
@@ -1308,14 +1361,12 @@ def test_defect_scrap_via_stock_request(db_session, client, make_item):
         "notes": "폐기 처리",
     })
     assert res.status_code == 201, res.json()
-    assert res.json()["status"] == "reserved"
-
-    approved = client.post(
-        f"/api/stock-requests/{res.json()['request_id']}/department-approve",
-        json={"actor_employee_id": str(approver.employee_id), "pin": "1234"},
-    )
-    assert approved.status_code == 200, approved.json()
-    assert approved.json()["status"] == "completed"
+    assert res.json()["status"] == "completed"
+    assert res.json()["requires_warehouse_approval"] is False
+    assert res.json()["requires_department_approval"] is False
+    assert res.json()["approval_department"] is None
+    assert res.json()["approved_by_employee_id"] is None
+    assert res.json()["department_approved_by_employee_id"] is None
 
     db_session.expire_all()
     inv_after = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
@@ -1327,21 +1378,15 @@ def test_defect_scrap_via_stock_request(db_session, client, make_item):
         TransactionLog.transaction_type == TransactionTypeEnum.DEFECT_SCRAP,
     ).first()
     assert scrap_log is not None
+    assert scrap_log.produced_by == requester.name
+    assert scrap_log.producer_employee_id == requester.employee_id
 
 
-def test_defect_request_reserves_selected_record_then_releases_or_completes(
+def test_defect_request_executes_selected_record_immediately(
     db_session, client, make_item
 ):
     item = make_item(name="R003-RECORD", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="E03-RECORD", name="건별 처리 발의자")
-    approver = _make_employee(
-        db_session,
-        code="E04-RECORD",
-        name="건별 처리 결재자",
-        department=DepartmentEnum.ASSEMBLY,
-        department_role="primary",
-        pin="1234",
-    )
     db_session.commit()
 
     for qty, memo in (("2", "처리 대상"), ("3", "별도 유지")):
@@ -1387,54 +1432,25 @@ def test_defect_request_reserves_selected_record_then_releases_or_completes(
             },
         )
 
-    reserved = create_scrap("1")
-    assert reserved.status_code == 201, reserved.json()
-    assert reserved.json()["status"] == "reserved"
-    assert reserved.json()["requires_department_approval"] is True
-    assert reserved.json()["approval_department"] == DepartmentEnum.ASSEMBLY.value
-    assert reserved.json()["lines"][0]["record_id"] == selected["record_id"]
+    completed = create_scrap("1")
+    assert completed.status_code == 201, completed.json()
+    assert completed.json()["status"] == "completed"
+    assert completed.json()["requires_department_approval"] is False
+    assert completed.json()["approval_department"] is None
+    assert completed.json()["lines"][0]["record_id"] == selected["record_id"]
 
     listed = {
         row["record_id"]: row
         for row in client.get("/api/defects/locations").json()
         if row["item_id"] == str(item.item_id)
     }
-    assert listed[selected["record_id"]]["pending_quantity"] == "1"
+    assert listed[selected["record_id"]]["pending_quantity"] == "0"
     assert listed[selected["record_id"]]["available_quantity"] == "1"
     assert listed[untouched["record_id"]]["pending_quantity"] == "0"
     assert listed[untouched["record_id"]]["available_quantity"] == "3"
 
     conflict = create_scrap("2")
     assert conflict.status_code == 422
-
-    cancelled = client.post(
-        f"/api/stock-requests/{reserved.json()['request_id']}/cancel",
-        json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
-    )
-    assert cancelled.status_code == 200, cancelled.json()
-    assert cancelled.json()["status"] == "cancelled"
-
-    approved_request = create_scrap("1")
-    assert approved_request.status_code == 201, approved_request.json()
-    approved = client.post(
-        f"/api/stock-requests/{approved_request.json()['request_id']}/department-approve",
-        json={"actor_employee_id": str(approver.employee_id), "pin": "1234"},
-    )
-    assert approved.status_code == 200, approved.json()
-    assert approved.json()["status"] == "completed"
-
-    rejected_request = create_scrap("1")
-    assert rejected_request.status_code == 201, rejected_request.json()
-    rejected = client.post(
-        f"/api/stock-requests/{rejected_request.json()['request_id']}/department-reject",
-        json={
-            "actor_employee_id": str(approver.employee_id),
-            "pin": "1234",
-            "reason": "폐기 취소",
-        },
-    )
-    assert rejected.status_code == 200, rejected.json()
-    assert rejected.json()["status"] == "rejected"
 
     final_rows = {
         row["record_id"]: row
@@ -1457,6 +1473,7 @@ def test_defect_request_reserves_selected_record_then_releases_or_completes(
         .one()
     )
     assert linked_log.quantity_change == Decimal("-1")
+    assert linked_log.producer_employee_id == requester.employee_id
 
 
 # ---------------------------------------------------------------------------
@@ -1565,6 +1582,48 @@ def test_defective_disassemble_keep_scrap(db_session, make_item, make_bom):
     assert scrap_log is None
 
 
+def test_defect_disassemble_via_stock_request_executes_immediately_as_requester(
+    db_session, client, make_item, make_bom
+):
+    parent = make_item(name="IMMEDIATE-PA", process_type_code="PA", warehouse_qty=Decimal("0"))
+    child = make_item(name="IMMEDIATE-CHILD", process_type_code="TR", warehouse_qty=Decimal("0"))
+    make_bom(parent.item_id, child.item_id, Decimal("1"))
+    _make_defective_location(db_session, parent.item_id, DepartmentEnum.ASSEMBLY, Decimal("2"))
+    requester = _make_employee(db_session, code="IMMEDIATE-DASM", name="재작업 요청자")
+    db_session.commit()
+
+    response = client.post("/api/stock-requests", json={
+        "requester_employee_id": str(requester.employee_id),
+        "request_type": "defect_disassemble",
+        "reason_category": "기능불량",
+        "notes": json.dumps({"child_decisions": [{
+            "item_id": str(child.item_id),
+            "action": "keep",
+            "qty": "2",
+        }]}),
+        "lines": [{
+            "item_id": str(parent.item_id),
+            "quantity": "2",
+            "from_bucket": "defective",
+            "from_department": DepartmentEnum.ASSEMBLY.value,
+            "to_bucket": "none",
+        }],
+    })
+
+    assert response.status_code == 201, response.json()
+    assert response.json()["status"] == "completed"
+    assert response.json()["requires_department_approval"] is False
+    assert response.json()["approval_department"] is None
+
+    db_session.expire_all()
+    disassemble_log = db_session.query(TransactionLog).filter(
+        TransactionLog.item_id == parent.item_id,
+        TransactionLog.transaction_type == TransactionTypeEnum.DISASSEMBLE,
+    ).one()
+    assert disassemble_log.produced_by == requester.name
+    assert disassemble_log.producer_employee_id == requester.employee_id
+
+
 @pytest.mark.parametrize("stale_field", ["quantity", "item"])
 def test_defect_disassemble_stale_bom_payload_returns_422_and_rolls_back(
     db_session, client, make_item, make_bom, stale_field
@@ -1628,15 +1687,9 @@ def test_defect_disassemble_stale_bom_payload_returns_422_and_rolls_back(
 
 
 def test_defect_return_via_stock_request(db_session, client, make_item):
-    """격리 재고에서 공급처 반품 요청 → 부서 결재 → 재고 차감."""
+    """격리 재고에서 공급처 반품을 즉시 처리하고 요청자를 작업자로 남긴다."""
     item = make_item(name="R004", process_type_code="TR", warehouse_qty=Decimal("8"))
     requester = _make_employee(db_session, code="E05", name="발의자E")
-    approver = _make_employee(
-        db_session, code="E06", name="결재자F",
-        department=DepartmentEnum.ASSEMBLY,
-        department_role="primary",
-        pin="5678",
-    )
     db_session.commit()
 
     # 격리 먼저 (warehouse 4개 → DEFECTIVE)
@@ -1655,7 +1708,7 @@ def test_defect_return_via_stock_request(db_session, client, make_item):
     from app.models import Inventory as Inv
     qty_before = db_session.query(Inv).filter(Inv.item_id == item.item_id).first().quantity
 
-    # DEFECT_RETURN 결재 요청 (격리 재고에서 공급처 반품)
+    # DEFECT_RETURN 즉시 처리 (격리 재고에서 공급처 반품)
     res = client.post("/api/stock-requests", json={
         "requester_employee_id": str(requester.employee_id),
         "request_type": "defect_return",
@@ -1670,26 +1723,13 @@ def test_defect_return_via_stock_request(db_session, client, make_item):
         "notes": "공급처 반품",
     })
     assert res.status_code == 201, res.json()
-    req_id = res.json()["request_id"]
-    # 승인 불필요(warehouse bucket 없음) + department_role 있어도 requires_department=True
-    # 이미 생성됐으면 status 확인
     body = res.json()
-    if body["status"] == "completed":
-        # 자가 결재 즉시 완료 — 재고 차감 확인
-        db_session.expire_all()
-        inv_after = db_session.query(Inv).filter(Inv.item_id == item.item_id).first()
-        assert inv_after.quantity == qty_before - Decimal("3")
-    else:
-        # 결재 대기 → 부서 결재 승인
-        approve_res = client.post(f"/api/stock-requests/{req_id}/department-approve", json={
-            "actor_employee_id": str(approver.employee_id),
-            "pin": "5678",
-        })
-        assert approve_res.status_code == 200, approve_res.json()
-        assert approve_res.json()["status"] == "completed"
-        db_session.expire_all()
-        inv_after = db_session.query(Inv).filter(Inv.item_id == item.item_id).first()
-        assert inv_after.quantity == qty_before - Decimal("3")
+    assert body["status"] == "completed"
+    assert body["requires_department_approval"] is False
+    assert body["approval_department"] is None
+    db_session.expire_all()
+    inv_after = db_session.query(Inv).filter(Inv.item_id == item.item_id).first()
+    assert inv_after.quantity == qty_before - Decimal("3")
 
     # SUPPLIER_RETURN 로그 확인
     sr_log = db_session.query(TransactionLog).filter(
@@ -1697,6 +1737,8 @@ def test_defect_return_via_stock_request(db_session, client, make_item):
         TransactionLog.transaction_type == TransactionTypeEnum.SUPPLIER_RETURN,
     ).first()
     assert sr_log is not None
+    assert sr_log.produced_by == requester.name
+    assert sr_log.producer_employee_id == requester.employee_id
 
 
 # ---------------------------------------------------------------------------
