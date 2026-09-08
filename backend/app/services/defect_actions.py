@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, Sequence
 import uuid
 
 from sqlalchemy import update as sa_update
@@ -25,6 +26,16 @@ from app.services import inventory as inventory_svc
 from app.services import defect_records as defect_records_svc
 from app.services import inventory_operations as operation_svc
 from app.services._tx import transactional
+
+
+@dataclass(frozen=True)
+class BulkUnquarantineLine:
+    """정상 복귀 다건 요청의 제출 시점 기록 스냅샷."""
+
+    record_id: uuid.UUID
+    item_id: uuid.UUID
+    department: DepartmentEnum
+    quantity: Decimal
 
 
 def quarantine_inventory(
@@ -211,3 +222,58 @@ def unquarantine_inventory(
                 actor_employee_id=actor.employee_id,
             )
     return inv
+
+
+def unquarantine_inventory_bulk(
+    db: Session,
+    *,
+    lines: Sequence[BulkUnquarantineLine],
+    actor: Employee,
+    reason_category: Optional[str],
+    reason_memo: Optional[str],
+) -> None:
+    """선택 기록을 모두 검증한 뒤 기존 단건 복귀 계약을 원자적으로 반복한다."""
+    if not lines:
+        raise ValueError("정상 복귀할 격리 기록이 비어 있습니다.")
+
+    record_ids = [line.record_id for line in lines]
+    if len(record_ids) != len(set(record_ids)):
+        raise ValueError("중복된 격리 기록은 함께 처리할 수 없습니다.")
+    if len({line.item_id for line in lines}) != 1:
+        raise ValueError("정상 복귀는 같은 품목의 격리 기록만 함께 처리할 수 있습니다.")
+    if len({line.department for line in lines}) != 1:
+        raise ValueError("정상 복귀는 같은 부서의 격리 기록만 함께 처리할 수 있습니다.")
+
+    with transactional(db):
+        by_record_id = {line.record_id: line for line in lines}
+        for record_id in sorted(record_ids, key=str):
+            line = by_record_id[record_id]
+            record = defect_records_svc.get_record_for_action(
+                db,
+                record_id=record_id,
+                item_id=line.item_id,
+                department=line.department,
+            )
+            if record is None:
+                raise ValueError("선택한 격리 기록을 찾을 수 없습니다.")
+            pending = defect_records_svc.pending_quantity(db, record.record_id)
+            if pending > 0:
+                raise ValueError("승인 대기 또는 예약 중인 격리 기록은 정상 복귀할 수 없습니다.")
+            remaining = Decimal(str(record.remaining_quantity or 0))
+            quantity = Decimal(str(line.quantity))
+            if quantity <= 0 or remaining != quantity:
+                raise ValueError(
+                    "선택 후 격리 기록 수량이 변경되었습니다. 목록을 새로고침해 주세요."
+                )
+
+        for line in lines:
+            unquarantine_inventory(
+                db,
+                record_id=line.record_id,
+                item_id=line.item_id,
+                qty=line.quantity,
+                dept=line.department,
+                actor=actor,
+                reason_category=reason_category,
+                reason_memo=reason_memo,
+            )

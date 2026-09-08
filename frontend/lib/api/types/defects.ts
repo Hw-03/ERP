@@ -51,6 +51,24 @@ export interface UnquarantinePayload {
   actor_employee_id: string;
 }
 
+export interface BulkUnquarantinePayload {
+  actor_employee_id: string;
+  reason_category?: string | null;
+  reason_memo?: string | null;
+  lines: Array<{
+    record_id: string;
+    item_id: string;
+    department: string;
+    quantity: number;
+  }>;
+}
+
+export interface BulkUnquarantineResult {
+  processed_records: number;
+  total_quantity: number;
+  message: string;
+}
+
 export interface DefectMemoUpdatePayload {
   memo: string;
   actor_employee_id: string;
@@ -70,4 +88,53 @@ export interface DefectMemoRevision {
   edited_by_name: string;
   edited_at: string;
   is_initial: boolean;
+}
+
+export type DefectStatisticsPeriodKind = "week" | "month" | "year";
+
+export interface DefectStatisticsBreakdown {
+  key: string;
+  label: string;
+  record_count: number;
+  quantity: number;
+}
+
+export interface DefectStatisticsItemBreakdown extends DefectStatisticsBreakdown {
+  item_id: string;
+  mes_code: string | null;
+}
+
+export interface DefectStatisticsTimelineEntry {
+  bucket: string;
+  label: string;
+  record_count: number;
+  quantity: number;
+}
+
+export interface DefectStatisticsResponse {
+  period: {
+    kind: DefectStatisticsPeriodKind;
+    anchor: string;
+    start_date: string;
+    end_date: string;
+  };
+  summary: {
+    record_count: number;
+    quantity: number;
+    top_item: DefectStatisticsItemBreakdown | null;
+    top_reason: DefectStatisticsBreakdown | null;
+  };
+  timeline: DefectStatisticsTimelineEntry[];
+  items: DefectStatisticsItemBreakdown[];
+  reasons: DefectStatisticsBreakdown[];
+  departments: DefectStatisticsBreakdown[];
+  excluded_legacy_count: number;
+}
+
+export interface DefectStatisticsQuery {
+  period: DefectStatisticsPeriodKind;
+  anchor: string;
+  departments: string[];
+  models: string[];
+  process_steps: string[];
 }

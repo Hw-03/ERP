@@ -23,6 +23,10 @@ const baseProps = {
 };
 
 describe("InventoryFilters", () => {
+  it("omits the unclassified model filter", () => {
+    render(<InventoryFilters {...baseProps} />);
+    expect(screen.queryByRole("button", { name: "미분류" })).not.toBeInTheDocument();
+  });
   it("부서 칩 해석을 재고 위치와 품목 코드 기준으로 전환한다", () => {
     const onDepartmentFilterBasisChange = vi.fn();
     const props = {

@@ -1,141 +1,290 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import type { DefectActorScope, DefectScope, DefectSort } from "./DefectFilterBar";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { DefectActorScope, DefectProcessStep, DefectScope, DefectSort } from "./DefectFilterBar";
 
 const STORAGE_PREFIX = "dexcowin_mes_defect_filters:";
-const STORAGE_VERSION = 1;
+const STORAGE_VERSION = 2;
+const PRODUCTION_DEPARTMENTS = ["튜브", "고압", "진공", "튜닝", "조립", "출하"] as const;
+const VALID_SCOPES: DefectScope[] = ["my", "production", "all"];
+const VALID_ACTOR_SCOPES: DefectActorScope[] = ["all", "mine"];
+const VALID_SORTS: DefectSort[] = ["oldest", "newest"];
+const VALID_PROCESS_STEPS: DefectProcessStep[] = ["R", "A", "F", "UNCLASSIFIED", "DISUSED"];
 
 interface DefectFilterSnapshot {
-  version: typeof STORAGE_VERSION;
+  version: 2;
+  scope: DefectScope;
+  actorScope: DefectActorScope;
+  sort: DefectSort;
+  selectedDepartments: string[];
+  selectedModels: string[];
+  selectedProcessSteps: DefectProcessStep[];
+}
+
+interface DefectFilterSnapshotV1 {
+  version: 1;
   scope: DefectScope;
   actorScope: DefectActorScope;
   sort: DefectSort;
 }
+
+type StoredFilterValues = Omit<DefectFilterSnapshot, "version">;
 
 interface UseDefectFilterPreferencesOptions {
   employeeId: string;
   defaultScope: DefectScope;
   defaultSort: DefectSort;
+  currentDept?: string;
   defectDeptFilter?: string | null;
 }
 
-interface DefectFilterPreferences {
-  scope: DefectScope;
-  actorScope: DefectActorScope;
-  sort: DefectSort;
-  filterLocked: boolean;
-  setScope: (scope: DefectScope) => void;
-  setActorScope: (scope: DefectActorScope) => void;
-  setSort: (sort: DefectSort) => void;
-  setFilterLocked: (locked: boolean) => void;
+function unique<T>(values: readonly T[]): T[] {
+  return Array.from(new Set(values));
+}
+
+function isLegacyBaseSnapshot(
+  value: unknown,
+): value is Pick<DefectFilterSnapshotV1, "scope" | "actorScope" | "sort"> {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as DefectFilterSnapshotV1;
+  return VALID_SCOPES.includes(candidate.scope)
+    && VALID_ACTOR_SCOPES.includes(candidate.actorScope)
+    && VALID_SORTS.includes(candidate.sort);
+}
+
+function departmentsForScope(scope: DefectScope, currentDept?: string): string[] {
+  if (scope === "my" && currentDept) return [currentDept];
+  if (scope === "production") return [...PRODUCTION_DEPARTMENTS];
+  return [];
+}
+
+/** v1의 부서 범위를 새 다중 선택 값으로 보존하면서 v2 저장 형식으로 승격한다. */
+export function migrateDefectFilterSnapshot(
+  value: unknown,
+  currentDept?: string,
+): DefectFilterSnapshot | null {
+  if (!isLegacyBaseSnapshot(value)) return null;
+  const candidate = value as DefectFilterSnapshotV1 | DefectFilterSnapshot;
+
+  if (candidate.version === 1) {
+    return {
+      version: 2,
+      scope: candidate.scope,
+      actorScope: candidate.actorScope,
+      sort: candidate.sort,
+      selectedDepartments: departmentsForScope(candidate.scope, currentDept),
+      selectedModels: [],
+      selectedProcessSteps: [],
+    };
+  }
+
+  if (
+    candidate.version !== 2
+    || !Array.isArray(candidate.selectedDepartments)
+    || !candidate.selectedDepartments.every((entry) => typeof entry === "string")
+    || !Array.isArray(candidate.selectedModels)
+    || !candidate.selectedModels.every((entry) => typeof entry === "string")
+    || !Array.isArray(candidate.selectedProcessSteps)
+    || !candidate.selectedProcessSteps.every((entry) => VALID_PROCESS_STEPS.includes(entry))
+  ) {
+    return null;
+  }
+
+  return {
+    version: 2,
+    scope: candidate.scope,
+    actorScope: candidate.actorScope,
+    sort: candidate.sort,
+    selectedDepartments: unique(candidate.selectedDepartments),
+    selectedModels: unique(candidate.selectedModels.filter((model) => model !== "미분류")),
+    selectedProcessSteps: unique(candidate.selectedProcessSteps.filter((step) => step !== "UNCLASSIFIED")),
+  };
 }
 
 function storageKey(employeeId: string): string {
   return `${STORAGE_PREFIX}${employeeId}`;
 }
 
-function isDefectFilterSnapshot(value: unknown): value is DefectFilterSnapshot {
-  if (!value || typeof value !== "object") return false;
-  const candidate = value as Partial<DefectFilterSnapshot>;
-  return (
-    candidate.version === STORAGE_VERSION &&
-    (candidate.scope === "my" || candidate.scope === "production" || candidate.scope === "all") &&
-    (candidate.actorScope === "all" || candidate.actorScope === "mine") &&
-    (candidate.sort === "oldest" || candidate.sort === "newest")
-  );
-}
-
-function removeSnapshot(employeeId: string): void {
+function readSnapshot(employeeId: string, currentDept?: string): DefectFilterSnapshot | null {
   try {
-    window.localStorage.removeItem(storageKey(employeeId));
-  } catch {
-    // Storage can be unavailable in restricted browser contexts; filters remain usable in memory.
-  }
-}
-
-function readSnapshot(employeeId: string): DefectFilterSnapshot | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(storageKey(employeeId));
+    const raw = localStorage.getItem(storageKey(employeeId));
     if (!raw) return null;
-    const parsed: unknown = JSON.parse(raw);
-    if (isDefectFilterSnapshot(parsed)) return parsed;
+
+    const parsed = JSON.parse(raw) as unknown;
+    const snapshot = migrateDefectFilterSnapshot(parsed, currentDept);
+    if (!snapshot) {
+      localStorage.removeItem(storageKey(employeeId));
+      return null;
+    }
+    if ((parsed as { version?: unknown }).version === 1) {
+      localStorage.setItem(storageKey(employeeId), JSON.stringify(snapshot));
+    }
+    return snapshot;
   } catch {
-    // Invalid or unavailable storage falls back to the screen defaults below.
+    try {
+      localStorage.removeItem(storageKey(employeeId));
+    } catch {
+      // localStorage가 차단된 환경에서는 화면 기본값으로 계속 동작한다.
+    }
+    return null;
   }
-  removeSnapshot(employeeId);
-  return null;
 }
 
 function writeSnapshot(employeeId: string, snapshot: DefectFilterSnapshot): boolean {
   try {
-    window.localStorage.setItem(storageKey(employeeId), JSON.stringify(snapshot));
+    localStorage.setItem(storageKey(employeeId), JSON.stringify(snapshot));
     return true;
   } catch {
     return false;
   }
 }
 
-/** Keeps defect list filters in memory and optionally persists them for one employee/browser. */
 export function useDefectFilterPreferences({
   employeeId,
   defaultScope,
   defaultSort,
+  currentDept,
   defectDeptFilter,
-}: UseDefectFilterPreferencesOptions): DefectFilterPreferences {
+}: UseDefectFilterPreferencesOptions) {
   const [scope, setScopeState] = useState<DefectScope>(defaultScope);
   const [actorScope, setActorScopeState] = useState<DefectActorScope>("all");
   const [sort, setSortState] = useState<DefectSort>(defaultSort);
   const [filterLocked, setFilterLockedState] = useState(false);
+  const [selectedDepartments, setDepartmentState] = useState<string[]>(
+    departmentsForScope(defaultScope, currentDept),
+  );
+  const [selectedModels, setModelState] = useState<string[]>([]);
+  const [selectedProcessSteps, setProcessStepState] = useState<DefectProcessStep[]>([]);
+  const valuesRef = useRef<StoredFilterValues>({
+    scope: defaultScope,
+    actorScope: "all",
+    sort: defaultSort,
+    selectedDepartments: departmentsForScope(defaultScope, currentDept),
+    selectedModels: [],
+    selectedProcessSteps: [],
+  });
+  const filterLockedRef = useRef(false);
 
   useEffect(() => {
-    const saved = readSnapshot(employeeId);
-    setScopeState(defectDeptFilter ? "my" : saved?.scope ?? defaultScope);
-    setActorScopeState(saved?.actorScope ?? "all");
-    setSortState(saved?.sort ?? defaultSort);
-    setFilterLockedState(saved !== null);
-  }, [employeeId, defaultScope, defaultSort, defectDeptFilter]);
+    const saved = readSnapshot(employeeId, currentDept);
+    const effectiveScope = defectDeptFilter ? "my" : saved?.scope ?? defaultScope;
+    const restoredValues: StoredFilterValues = {
+      scope: effectiveScope,
+      actorScope: saved?.actorScope ?? "all",
+      sort: saved?.sort ?? defaultSort,
+      selectedDepartments: defectDeptFilter
+        ? [defectDeptFilter]
+        : saved?.selectedDepartments ?? departmentsForScope(defaultScope, currentDept),
+      selectedModels: saved?.selectedModels ?? [],
+      selectedProcessSteps: saved?.selectedProcessSteps ?? [],
+    };
+    valuesRef.current = restoredValues;
+    filterLockedRef.current = saved !== null;
+    setScopeState(effectiveScope);
+    setActorScopeState(restoredValues.actorScope);
+    setSortState(restoredValues.sort);
+    setDepartmentState(restoredValues.selectedDepartments);
+    setModelState(restoredValues.selectedModels);
+    setProcessStepState(restoredValues.selectedProcessSteps);
+    setFilterLockedState(filterLockedRef.current);
+  }, [employeeId, defaultScope, defaultSort, currentDept, defectDeptFilter]);
 
-  const persist = useCallback((next: Omit<DefectFilterSnapshot, "version">): void => {
-    if (writeSnapshot(employeeId, { version: STORAGE_VERSION, ...next })) return;
-    setFilterLockedState(false);
+  const persist = useCallback((next: StoredFilterValues): void => {
+    if (!writeSnapshot(employeeId, { version: STORAGE_VERSION, ...next })) {
+      filterLockedRef.current = false;
+      setFilterLockedState(false);
+    }
   }, [employeeId]);
 
-  const setScope = useCallback((nextScope: DefectScope): void => {
-    setScopeState(nextScope);
-    if (filterLocked) persist({ scope: nextScope, actorScope, sort });
-  }, [actorScope, filterLocked, persist, sort]);
+  const updateValues = useCallback((next: Partial<StoredFilterValues>): StoredFilterValues => {
+    const updated = { ...valuesRef.current, ...next };
+    valuesRef.current = updated;
+    return updated;
+  }, []);
 
-  const setActorScope = useCallback((nextActorScope: DefectActorScope): void => {
-    setActorScopeState(nextActorScope);
-    if (filterLocked) persist({ scope, actorScope: nextActorScope, sort });
-  }, [filterLocked, persist, scope, sort]);
+  const setScope = useCallback((next: DefectScope): void => {
+    const updated = updateValues({ scope: next });
+    setScopeState(next);
+    if (filterLockedRef.current) persist(updated);
+  }, [persist, updateValues]);
 
-  const setSort = useCallback((nextSort: DefectSort): void => {
-    setSortState(nextSort);
-    if (filterLocked) persist({ scope, actorScope, sort: nextSort });
-  }, [actorScope, filterLocked, persist, scope]);
+  const setActorScope = useCallback((next: DefectActorScope): void => {
+    const updated = updateValues({ actorScope: next });
+    setActorScopeState(next);
+    if (filterLockedRef.current) persist(updated);
+  }, [persist, updateValues]);
+
+  const setSort = useCallback((next: DefectSort): void => {
+    const updated = updateValues({ sort: next });
+    setSortState(next);
+    if (filterLockedRef.current) persist(updated);
+  }, [persist, updateValues]);
+
+  const setSelectedDepartments = useCallback((values: string[]): void => {
+    const next = unique(values);
+    const updated = updateValues({ selectedDepartments: next });
+    setDepartmentState(next);
+    if (filterLockedRef.current) persist(updated);
+  }, [persist, updateValues]);
+
+  const setSelectedModels = useCallback((values: string[]): void => {
+    const next = unique(values);
+    const updated = updateValues({ selectedModels: next });
+    setModelState(next);
+    if (filterLockedRef.current) persist(updated);
+  }, [persist, updateValues]);
+
+  const setSelectedProcessSteps = useCallback((values: DefectProcessStep[]): void => {
+    const next = unique(values);
+    const updated = updateValues({ selectedProcessSteps: next });
+    setProcessStepState(next);
+    if (filterLockedRef.current) persist(updated);
+  }, [persist, updateValues]);
+
+  const resetCategoryFilters = useCallback((): void => {
+    const updated = updateValues({
+      selectedDepartments: [],
+      selectedModels: [],
+      selectedProcessSteps: [],
+    });
+    setDepartmentState([]);
+    setModelState([]);
+    setProcessStepState([]);
+    if (filterLockedRef.current) persist(updated);
+  }, [persist, updateValues]);
 
   const setFilterLocked = useCallback((locked: boolean): void => {
     if (!locked) {
-      removeSnapshot(employeeId);
+      try {
+        localStorage.removeItem(storageKey(employeeId));
+      } catch {
+        // localStorage가 차단된 환경에서도 현재 화면 필터는 유지한다.
+      }
+      filterLockedRef.current = false;
       setFilterLockedState(false);
       return;
     }
-    if (writeSnapshot(employeeId, { version: STORAGE_VERSION, scope, actorScope, sort })) {
+    if (writeSnapshot(employeeId, { version: STORAGE_VERSION, ...valuesRef.current })) {
+      filterLockedRef.current = true;
       setFilterLockedState(true);
     }
-  }, [actorScope, employeeId, scope, sort]);
+  }, [employeeId]);
 
   return {
     scope,
     actorScope,
     sort,
     filterLocked,
+    selectedDepartments,
+    selectedModels,
+    selectedProcessSteps,
     setScope,
     setActorScope,
     setSort,
     setFilterLocked,
+    setSelectedDepartments,
+    setSelectedModels,
+    setSelectedProcessSteps,
+    resetCategoryFilters,
   };
 }

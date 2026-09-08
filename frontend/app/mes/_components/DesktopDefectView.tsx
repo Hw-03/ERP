@@ -12,7 +12,10 @@ import { DefectKpiCards, type DefectKpiKind } from "./_defect_hub/DefectKpiCards
 import { DefectHubEntry } from "./_defect_hub/DefectHubEntry";
 import type { DefectHubCardId } from "./_defect_hub/defectHubCards";
 import { DefectFilterBar, type DefectScope } from "./_defect_hub/DefectFilterBar";
+import { DefectSearchInput } from "./_defect_hub/DefectSearchInput";
+import { DefectStatisticsView } from "./_defect_hub/DefectStatisticsView";
 import { useDefectFilterPreferences } from "./_defect_hub/useDefectFilterPreferences";
+import { filterDefectLocations } from "./_defect_hub/defectCategoryFilter";
 import { DefectDepartmentList } from "./_defect_hub/DefectDepartmentList";
 import { DefectCartFlow, type DefectCartMode } from "./_defect_hub/DefectCartFlow";
 import { DefectProcessPanel } from "./_defect_hub/DefectProcessPanel";
@@ -34,8 +37,9 @@ function defaultSourceForOp(op: Operator): "warehouse" | "production" {
 type ViewMode =
   | { kind: "hub" }
   | { kind: "list" }
+  | { kind: "statistics" }
   | { kind: "cart"; mode: DefectCartMode }
-  | { kind: "process"; location: DefectLocation };
+  | { kind: "process"; locations: DefectLocation[]; batch: boolean };
 
 interface Props {
   operator: Operator | null;
@@ -108,10 +112,18 @@ function DefectViewInner({
     setActorScope,
     setSort,
     setFilterLocked,
+    selectedDepartments,
+    selectedModels,
+    selectedProcessSteps,
+    setSelectedDepartments,
+    setSelectedModels,
+    setSelectedProcessSteps,
+    resetCategoryFilters,
   } = useDefectFilterPreferences({
     employeeId: operator.employee_id,
     defaultScope,
     defaultSort: "newest",
+    currentDept: operator.department,
     defectDeptFilter,
   });
   const [kpiFilter, setKpiFilter] = useState<DefectKpiKind | null>(null);
@@ -137,12 +149,16 @@ function DefectViewInner({
           setRefreshError(null);
           setView((currentView) => {
             if (currentView.kind !== "process") return currentView;
-            const freshLocation = locData.find(
-              (location) =>
-                location.record_id === currentView.location.record_id &&
-                Number(location.available_quantity) > 0,
-            );
-            return freshLocation ? { kind: "process", location: freshLocation } : { kind: "list" };
+            const freshLocations = currentView.locations
+              .map((selected) => locData.find(
+                (location) =>
+                  location.record_id === selected.record_id &&
+                  Number(location.available_quantity) > 0,
+              ))
+              .filter((location): location is DefectLocation => location !== undefined);
+            return freshLocations.length === currentView.locations.length
+              ? { kind: "process", locations: freshLocations, batch: currentView.batch }
+              : { kind: "list" };
           });
         }
       } catch (err) {
@@ -161,7 +177,16 @@ function DefectViewInner({
     };
   }, [reloadNonce, realtimeRevision]);
 
-  // 부서 범위와 격리 처리자 범위를 먼저 합성 — KPI 집계와 목록이 공유하는 모집단
+  const departmentOptions = useMemo(
+    () => Array.from(new Set(locations.map((location) => location.department).filter(Boolean))).sort(),
+    [locations],
+  );
+  const modelOptions = useMemo(
+    () => Array.from(new Set(productModels.map((model) => model.model_name).filter((name): name is string => Boolean(name)))),
+    [productModels],
+  );
+
+  // 부서·모델·공정과 격리 처리자 범위를 합성 — KPI 집계와 목록이 공유하는 모집단
   const scopedLocations = useMemo(() => {
     let result = locations;
     if (scope === "my") {
@@ -175,8 +200,12 @@ function DefectViewInner({
         (loc) => loc.quarantined_by_employee_id === operator.employee_id,
       );
     }
-    return result;
-  }, [locations, scope, actorScope, defectDeptFilter, operator.department, operator.employee_id]);
+    return filterDefectLocations(result, items, productModels, {
+      departments: selectedDepartments,
+      models: selectedModels,
+      processSteps: selectedProcessSteps,
+    });
+  }, [locations, scope, actorScope, defectDeptFilter, operator.department, operator.employee_id, items, productModels, selectedDepartments, selectedModels, selectedProcessSteps]);
 
   // KPI — 현재 부서 범위 기준으로 집계해 목록과 항상 일치 (서버 /kpi 대신 클라 계산)
   const kpi = useMemo<DefectKpi>(
@@ -212,8 +241,9 @@ function DefectViewInner({
   }, [scopedLocations, sort, kpiFilter, search]);
 
   // KPI 집계 범위 라벨 — 숫자가 어느 범위인지 카드 부제로 노출
-  const departmentScopeLabel =
-    scope === "my"
+  const departmentScopeLabel = selectedDepartments.length > 0
+    ? selectedDepartments.join(" · ")
+    : scope === "my"
       ? `${defectDeptFilter ?? operator.department} 부서`
       : scope === "production"
       ? "생산 전체"
@@ -235,6 +265,8 @@ function DefectViewInner({
       setView({ kind: "cart", mode: cur.mode });
     } else if (cur?.defect === "list") {
       setView({ kind: "list" });
+    } else if (cur?.defect === "statistics") {
+      setView({ kind: "statistics" });
     } else if (cur?.defect === "process") {
       // location 데이터 없이 복원 불가 — 목록으로
       setView({ kind: "list" });
@@ -249,6 +281,8 @@ function DefectViewInner({
         setView({ kind: "hub" });
       } else if (s.defect === "list") {
         setView({ kind: "list" });
+      } else if (s.defect === "statistics") {
+        setView({ kind: "statistics" });
       } else if (s.defect === "cart" && (s.mode === "add" || s.mode === "scrap")) {
         setView({ kind: "cart", mode: s.mode });
       } else {
@@ -267,9 +301,12 @@ function DefectViewInner({
     } else if (id === "scrap") {
       window.history.pushState({ defect: "cart", mode: "scrap" }, "");
       setView({ kind: "cart", mode: "scrap" });
-    } else {
+    } else if (id === "list") {
       window.history.pushState({ defect: "list" }, "");
       setView({ kind: "list" });
+    } else {
+      window.history.pushState({ defect: "statistics" }, "");
+      setView({ kind: "statistics" });
     }
   }
 
@@ -281,7 +318,13 @@ function DefectViewInner({
 
   function handleProcessRow(loc: DefectLocation) {
     window.history.pushState({ defect: "process" }, "");
-    setView({ kind: "process", location: loc });
+    setView({ kind: "process", locations: [loc], batch: false });
+  }
+
+  function handleBatchProcess(selectedLocations: DefectLocation[]) {
+    if (selectedLocations.length === 0) return;
+    window.history.pushState({ defect: "process" }, "");
+    setView({ kind: "process", locations: selectedLocations, batch: true });
   }
 
   function handleMemoUpdated(recordId: string, memo: string) {
@@ -291,6 +334,49 @@ function DefectViewInner({
   }
 
   const isFullWidthWork = view.kind !== "list" && view.kind !== "hub";
+
+  if (view.kind === "statistics") {
+    return (
+      <div className="flex min-h-0 min-w-0 flex-1 pl-0 lg:pr-4">
+        <div className="relative min-h-0 min-w-0 flex-1">
+          <div
+            role="region"
+            aria-label="불량 통계 전체 스크롤 영역"
+            tabIndex={0}
+            data-keep-scroll
+            className="absolute inset-y-0 left-0 right-0 overflow-y-auto lg:-right-2.5 lg:[scrollbar-gutter:stable]"
+          >
+            <div
+              className="animate-view-fade min-h-full min-w-full p-[17px]"
+              style={{ background: LEGACY_COLORS.s1 }}
+            >
+              <DefectStatisticsView
+                departmentOptions={departmentOptions}
+                modelOptions={modelOptions}
+                currentDepartment={operator.department}
+                onBack={() => window.history.back()}
+              />
+            </div>
+          </div>
+          <div aria-hidden className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between">
+            <div className="flex justify-between">
+              <span className="h-7 w-7" style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 27px, var(--c-bg) 28px)" }} />
+              <span className="h-7 w-7" style={{ background: "radial-gradient(circle at 0 100%, transparent 0 27px, var(--c-bg) 28px)" }} />
+            </div>
+            <div className="flex justify-between">
+              <span className="h-7 w-7" style={{ background: "radial-gradient(circle at 100% 0, transparent 0 27px, var(--c-bg) 28px)" }} />
+              <span className="h-7 w-7" style={{ background: "radial-gradient(circle at 0 0, transparent 0 27px, var(--c-bg) 28px)" }} />
+            </div>
+          </div>
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 z-20 rounded-[28px] border"
+            style={{ borderColor: LEGACY_COLORS.border }}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-0 flex-1 min-w-0 pl-0 lg:pr-4">
@@ -305,7 +391,10 @@ function DefectViewInner({
         )}
 
         {isFullWidthWork && (
-          <div key={view.kind} className="animate-view-fade flex min-h-0 flex-1 flex-col px-4 py-4">
+          <div
+            key={view.kind}
+            className="animate-view-fade flex min-h-0 min-w-0 flex-1 flex-col px-4 py-4"
+          >
             {view.kind === "cart" && (
               <DefectCartFlow
                 mode={view.mode}
@@ -327,7 +416,9 @@ function DefectViewInner({
             )}
             {view.kind === "process" && (
               <DefectProcessPanel
-                location={view.location}
+                location={view.locations[0]}
+                locations={view.locations}
+                batchMode={view.batch}
                 currentEmployee={employee}
                 onCancel={() => window.history.back()}
                 onDone={() => handleProcessed("불량 처리 완료")}
@@ -376,9 +467,32 @@ function DefectViewInner({
               onSortChange={setSort}
               onFilterLockedChange={setFilterLocked}
               currentDept={operator.department}
-              search={search}
-              setSearch={setSearch}
+              departments={departmentOptions}
+              selectedDepartments={selectedDepartments}
+              onDepartmentsChange={(values) => {
+                setScope("all");
+                setSelectedDepartments(values);
+                setKpiFilter(null);
+              }}
+              models={modelOptions}
+              selectedModels={selectedModels}
+              onModelsChange={(values) => {
+                setSelectedModels(values);
+                setKpiFilter(null);
+              }}
+              selectedProcessSteps={selectedProcessSteps}
+              onProcessStepsChange={(values) => {
+                setSelectedProcessSteps(values);
+                setKpiFilter(null);
+              }}
+              onResetCategoryFilters={() => {
+                setScope("all");
+                resetCategoryFilters();
+                setKpiFilter(null);
+              }}
             />
+
+            <DefectSearchInput value={search} onChange={setSearch} />
 
             {refreshError && (
               <LoadFailureCard
@@ -403,6 +517,7 @@ function DefectViewInner({
                 currentEmployee={employee}
                 onMemoUpdated={handleMemoUpdated}
                 onProcess={handleProcessRow}
+                onBatchProcess={handleBatchProcess}
                 priorityDept={operator.department}
                 searchActive={search.trim().length > 0}
               />

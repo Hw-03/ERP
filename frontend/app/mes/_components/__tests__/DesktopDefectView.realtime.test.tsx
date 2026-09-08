@@ -1,10 +1,12 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Operator } from "../login/useCurrentOperator";
+import type { ProductModel } from "@/lib/api";
 
 const mocks = vi.hoisted(() => ({
   revision: null as number | null,
   listDefects: vi.fn(),
+  productModels: [] as ProductModel[],
 }));
 
 vi.mock("@/lib/queries/realtime", () => ({
@@ -16,7 +18,7 @@ vi.mock("@/lib/api/defects", () => ({
 }));
 
 vi.mock("../_warehouse_hooks/useWarehouseData", () => ({
-  useWarehouseData: () => ({ items: [], productModels: [] }),
+  useWarehouseData: () => ({ items: [], productModels: mocks.productModels }),
 }));
 
 vi.mock("../_defect_hub/DefectHubEntry", () => ({
@@ -47,6 +49,10 @@ vi.mock("../_defect_hub/DefectProcessPanel", () => ({
   DefectProcessPanel: ({ location }: { location: { quantity: number } }) => (
     <div data-testid="process-location">{location.quantity}</div>
   ),
+}));
+
+vi.mock("../_defect_hub/DefectStatisticsView", () => ({
+  DefectStatisticsView: () => <div data-testid="statistics-content">Statistics</div>,
 }));
 
 import { DesktopDefectView } from "../DesktopDefectView";
@@ -89,9 +95,30 @@ function deferred<T>() {
 describe("DesktopDefectView realtime refresh", () => {
   beforeEach(() => {
     mocks.revision = null;
+    mocks.productModels = [];
     mocks.listDefects.mockReset().mockResolvedValue([]);
     window.history.replaceState(null, "");
     window.localStorage.clear();
+  });
+
+  it("provides a visible, keyboard-accessible outer statistics scroll rail", async () => {
+    window.history.replaceState({ defect: "statistics" }, "");
+    render(<DesktopDefectView operator={operator} />);
+
+    const viewport = await screen.findByRole("region", { name: "불량 통계 전체 스크롤 영역" });
+    expect(viewport).toContainElement(screen.getByTestId("statistics-content"));
+    expect(viewport).toHaveAttribute("tabindex", "0");
+    expect(viewport).toHaveAttribute("data-keep-scroll");
+    expect(viewport).toHaveClass("overflow-y-auto", "lg:-right-2.5", "lg:[scrollbar-gutter:stable]");
+    expect(viewport).not.toHaveClass("scrollbar-hide");
+  });
+
+  it("preserves the dashboard model catalog order", async () => {
+    mocks.productModels = [{ slot: 3, model_name: "DX3000" }, { slot: 7, model_name: "COCOON" }, { slot: 4, model_name: "ADX4000W" }].map((model) => ({ ...model, symbol: null, is_reserved: false }));
+    render(<DesktopDefectView operator={operator} />);
+    fireEvent.click(screen.getByRole("button", { name: "Open list" }));
+    const group = await screen.findByRole("group", { name: "모델 구분" });
+    expect(within(group).getAllByRole("button").map((button) => button.textContent)).toEqual(["전체", "DX3000", "COCOON", "ADX4000W"]);
   });
 
   it("reloads locations on revision while preserving the current list view", async () => {
@@ -276,7 +303,7 @@ describe("DesktopDefectView realtime refresh", () => {
     expect(screen.getByText("격리 중").parentElement).toHaveTextContent("2건");
     expect(screen.getByText("1년 이상 ⚠").parentElement).toHaveTextContent("1건");
 
-    const departmentFilters = screen.getByText("부서").parentElement!;
+    const departmentFilters = screen.getByRole("group", { name: "부서 구분" });
     fireEvent.click(within(departmentFilters).getByRole("button", { name: "내 부서" }));
 
     expect(screen.getByRole("button", { name: "Process MINE-ASSEMBLY" })).toBeInTheDocument();

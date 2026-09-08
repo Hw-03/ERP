@@ -191,7 +191,7 @@ describe("DefectDepartmentList", () => {
     expect(screen.queryByText("첫 기록")).not.toBeInTheDocument();
     expect(screen.queryByText("최근 기록")).not.toBeInTheDocument();
 
-    fireEvent.click(summary);
+    fireEvent.click(screen.getByRole("button", { name: "Assembly AX-100 격리 2건" }));
     expect(summary).toHaveAttribute("style", expect.stringContaining("8%, transparent"));
   });
 
@@ -209,7 +209,7 @@ describe("DefectDepartmentList", () => {
     );
 
     const summary = screen.getByTestId("defect-item-group-summary");
-    fireEvent.click(summary);
+    fireEvent.click(screen.getByRole("button", { name: "Assembly AX-100 격리 2건" }));
 
     expect(summary).toHaveAttribute("aria-expanded", "true");
     expect(screen.getAllByTestId("defect-record-grid")).toHaveLength(3);
@@ -218,6 +218,99 @@ describe("DefectDepartmentList", () => {
     expect(screen.getAllByTestId("defect-child-item-placeholder")[0]).toHaveClass("items-center", "justify-center", "text-3xl");
     fireEvent.click(screen.getAllByRole("button", { name: "처리" })[1]);
     expect(onProcess).toHaveBeenCalledWith(expect.objectContaining({ record_id: "record-second" }));
+  });
+
+  it("selects only available records from one repeated-item group for batch processing", () => {
+    const onBatchProcess = vi.fn();
+    render(
+      <DefectDepartmentList
+        locations={[
+          makeLocation({ record_id: "record-first", reason_memo: "첫 기록" }),
+          makeLocation({ record_id: "record-second", reason_memo: "둘째 기록" }),
+          makeLocation({
+            record_id: "record-pending",
+            reason_memo: "승인 중",
+            pending_quantity: 1,
+            available_quantity: 1,
+          }),
+        ]}
+        onProcess={vi.fn()}
+        onBatchProcess={onBatchProcess}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "여러 건 선택" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "선택 처리" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "여러 건 선택" }));
+
+    expect(screen.getByTestId("defect-item-group-summary")).toHaveAttribute("aria-expanded", "true");
+    expect(screen.queryAllByTestId("defect-child-item-placeholder")).toHaveLength(0);
+    const checkboxes = screen.getAllByRole("checkbox");
+    expect(checkboxes).toHaveLength(3);
+    expect(checkboxes[2]).toBeDisabled();
+    expect(screen.getByText("승인 대기")).toBeInTheDocument();
+
+    fireEvent.click(checkboxes[0]);
+    fireEvent.click(checkboxes[1]);
+    fireEvent.click(screen.getByRole("button", { name: "선택 처리 2건" }));
+
+    expect(onBatchProcess).toHaveBeenCalledWith([
+      expect.objectContaining({ record_id: "record-first" }),
+      expect.objectContaining({ record_id: "record-second" }),
+    ]);
+  });
+
+  it("keeps batch selection active for only one item group", () => {
+    render(
+      <DefectDepartmentList
+        locations={[
+          makeLocation({ record_id: "item-1-a" }),
+          makeLocation({ record_id: "item-1-b" }),
+          makeLocation({ record_id: "item-2-a", item_id: "item-2", item_name: "BX-200" }),
+          makeLocation({ record_id: "item-2-b", item_id: "item-2", item_name: "BX-200" }),
+        ]}
+        onProcess={vi.fn()}
+        onBatchProcess={vi.fn()}
+      />,
+    );
+
+    const activateButtons = screen.getAllByRole("button", { name: "여러 건 선택" });
+    fireEvent.click(activateButtons[0]);
+    expect(screen.getAllByRole("checkbox")).toHaveLength(2);
+
+    fireEvent.click(screen.getAllByRole("button", { name: "여러 건 선택" })[0]);
+    expect(screen.getAllByRole("checkbox")).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "선택 취소" })).toHaveLength(1);
+  });
+
+  it("clears repeated-item selection when the filtered location set changes", () => {
+    const locations = [
+      makeLocation({ record_id: "record-first" }),
+      makeLocation({ record_id: "record-second" }),
+    ];
+    const { rerender } = render(
+      <DefectDepartmentList
+        locations={locations}
+        onProcess={vi.fn()}
+        onBatchProcess={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "여러 건 선택" }));
+    fireEvent.click(screen.getAllByRole("checkbox")[0]);
+    expect(screen.getByRole("button", { name: "선택 처리 1건" })).toBeEnabled();
+
+    rerender(
+      <DefectDepartmentList
+        locations={[...locations]}
+        onProcess={vi.fn()}
+        onBatchProcess={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "여러 건 선택" })).toBeInTheDocument();
   });
 
   it("does not merge matching item ids from different departments", () => {
@@ -233,9 +326,10 @@ describe("DefectDepartmentList", () => {
       />,
     );
 
-    expect(screen.getAllByTestId("defect-item-group-summary")).toHaveLength(2);
-    expect(screen.getByRole("button", { name: /Assembly.*격리 2건/ })).toHaveTextContent("5개");
-    expect(screen.getByRole("button", { name: /Warehouse.*격리 2건/ })).toHaveTextContent("18개");
+    const summaries = screen.getAllByTestId("defect-item-group-summary");
+    expect(summaries).toHaveLength(2);
+    expect(summaries[0]).toHaveTextContent("5개");
+    expect(summaries[1]).toHaveTextContent("18개");
   });
 
   it.each([null, "", "   "])("renders an unknown actor for %j", (quarantinedBy) => {
@@ -261,7 +355,7 @@ describe("DefectDepartmentList", () => {
       />,
     );
 
-    fireEvent.click(screen.getByTestId("defect-item-group-summary"));
+    fireEvent.click(screen.getByRole("button", { name: "Assembly AX-100 격리 2건" }));
     fireEvent.click(screen.getAllByRole("button", { name: "처리" })[1]);
 
     expect(onProcess).toHaveBeenCalledWith(

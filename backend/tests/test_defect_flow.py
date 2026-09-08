@@ -19,6 +19,7 @@ import pytest
 
 from app.models import (
     DepartmentEnum,
+    DefectInventoryMovement,
     DefectQuarantineMemoRevision,
     DefectQuarantineRecord,
     DefectQuarantineReconstruction,
@@ -30,6 +31,7 @@ from app.models import (
     StockRequest,
     StockRequestStatusEnum,
     StockRequestTypeEnum,
+    SystemSetting,
     TransactionLog,
     TransactionTypeEnum,
 )
@@ -621,6 +623,508 @@ def test_unquarantine_partially_updates_only_the_selected_record(
         .one()
     )
     assert str(log.defect_quarantine_record_id) == selected["record_id"]
+
+
+def test_bulk_unquarantine_restores_selected_records_with_shared_reason(
+    db_session, client, make_item
+):
+    item = make_item(name="R002-BULK", warehouse_qty=Decimal("10"))
+    actor = _make_employee(db_session, code="E02-BULK", name="다건 복귀 작업자")
+    db_session.add(
+        SystemSetting(
+            setting_key="inventory_operation_cutover_at",
+            setting_value="2026-01-01T00:00:00",
+        )
+    )
+    db_session.commit()
+
+    for qty, memo in (("1", "복귀 A"), ("2", "복귀 B")):
+        response = client.post(
+            "/api/defects/quarantine",
+            json={
+                "item_id": str(item.item_id),
+                "qty": qty,
+                "source": "warehouse",
+                "target_dept": DepartmentEnum.VACUUM.value,
+                "reason_memo": memo,
+                "actor_employee_id": str(actor.employee_id),
+            },
+        )
+        assert response.status_code == 200, response.json()
+
+    records = (
+        db_session.query(DefectQuarantineRecord)
+        .filter(DefectQuarantineRecord.item_id == item.item_id)
+        .order_by(DefectQuarantineRecord.quarantined_at, DefectQuarantineRecord.record_id)
+        .all()
+    )
+    response = client.post(
+        "/api/defects/unquarantine/bulk",
+        json={
+            "actor_employee_id": str(actor.employee_id),
+            "reason_category": "재검사 통과",
+            "reason_memo": "선택 건 일괄 복귀",
+            "lines": [
+                {
+                    "record_id": str(record.record_id),
+                    "item_id": str(item.item_id),
+                    "department": DepartmentEnum.VACUUM.value,
+                    "quantity": str(record.remaining_quantity),
+                }
+                for record in records
+            ],
+        },
+    )
+
+    assert response.status_code == 200, response.json()
+    assert response.json() == {
+        "processed_records": 2,
+        "total_quantity": "3",
+        "message": "정상 복귀 완료",
+    }
+    db_session.expire_all()
+    assert {record.remaining_quantity for record in records} == {Decimal("0")}
+    logs = (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.transaction_type == TransactionTypeEnum.UNMARK_DEFECTIVE)
+        .all()
+    )
+    assert len(logs) == 2
+    assert {log.reason_category for log in logs} == {"재검사 통과"}
+    assert {log.reason_memo for log in logs} == {"선택 건 일괄 복귀"}
+    movements = (
+        db_session.query(DefectInventoryMovement)
+        .filter(DefectInventoryMovement.movement_type == "RESTORE")
+        .all()
+    )
+    assert {movement.record_id for movement in movements} == {
+        record.record_id for record in records
+    }
+    assert sum(-movement.quantity_delta for movement in movements) == Decimal("3")
+
+
+def test_bulk_unquarantine_rejects_empty_lines(db_session, client):
+    actor = _make_employee(db_session, code="E02-BULK-EMPTY", name="다건 복귀 작업자")
+    db_session.commit()
+
+    response = client.post(
+        "/api/defects/unquarantine/bulk",
+        json={"actor_employee_id": str(actor.employee_id), "lines": []},
+    )
+
+    assert response.status_code == 422
+
+
+def test_bulk_unquarantine_rejects_reserved_record(db_session, client, make_item):
+    item = make_item(name="R002-BULK-RESERVED", warehouse_qty=Decimal("5"))
+    actor = _make_employee(db_session, code="E02-BULK-RESERVED", name="예약 복귀 작업자")
+    db_session.commit()
+    quarantined = client.post(
+        "/api/defects/quarantine",
+        json={
+            "item_id": str(item.item_id),
+            "qty": "2",
+            "source": "warehouse",
+            "target_dept": DepartmentEnum.ASSEMBLY.value,
+            "reason_memo": "예약 대상",
+            "actor_employee_id": str(actor.employee_id),
+        },
+    )
+    assert quarantined.status_code == 200, quarantined.json()
+    record = db_session.query(DefectQuarantineRecord).filter(
+        DefectQuarantineRecord.item_id == item.item_id
+    ).one()
+    reserved = client.post(
+        "/api/stock-requests",
+        json={
+            "requester_employee_id": str(actor.employee_id),
+            "request_type": "defect_scrap",
+            "lines": [{
+                "record_id": str(record.record_id),
+                "item_id": str(item.item_id),
+                "quantity": 1,
+                "from_bucket": "defective",
+                "from_department": DepartmentEnum.ASSEMBLY.value,
+                "to_bucket": "none",
+            }],
+        },
+    )
+    assert reserved.status_code == 201, reserved.json()
+    assert reserved.json()["status"] == "reserved"
+
+    response = client.post(
+        "/api/defects/unquarantine/bulk",
+        json={
+            "actor_employee_id": str(actor.employee_id),
+            "lines": [{
+                "record_id": str(record.record_id),
+                "item_id": str(item.item_id),
+                "department": DepartmentEnum.ASSEMBLY.value,
+                "quantity": "2",
+            }],
+        },
+    )
+
+    assert response.status_code == 422
+    db_session.expire_all()
+    assert record.remaining_quantity == Decimal("2")
+
+
+def test_defect_disassemble_request_rejects_duplicate_source_record(
+    db_session, client, make_item
+):
+    item = make_item(name="R002-REWORK-DUP", process_type_code="PF", warehouse_qty=Decimal("5"))
+    actor = _make_employee(db_session, code="E02-REWORK-DUP", name="재작업 발의자")
+    db_session.commit()
+    quarantined = client.post(
+        "/api/defects/quarantine",
+        json={
+            "item_id": str(item.item_id),
+            "qty": "2",
+            "source": "warehouse",
+            "target_dept": DepartmentEnum.ASSEMBLY.value,
+            "reason_memo": "중복 방지",
+            "actor_employee_id": str(actor.employee_id),
+        },
+    )
+    assert quarantined.status_code == 200, quarantined.json()
+    record = db_session.query(DefectQuarantineRecord).filter(
+        DefectQuarantineRecord.item_id == item.item_id
+    ).one()
+    line = {
+        "record_id": str(record.record_id),
+        "item_id": str(item.item_id),
+        "quantity": 1,
+        "from_bucket": "defective",
+        "from_department": DepartmentEnum.ASSEMBLY.value,
+        "to_bucket": "none",
+    }
+
+    response = client.post(
+        "/api/stock-requests",
+        json={
+            "requester_employee_id": str(actor.employee_id),
+            "request_type": "defect_disassemble",
+            "notes": "{}",
+            "lines": [line, line],
+        },
+    )
+
+    assert response.status_code == 422
+    assert db_session.query(StockRequest).count() == 0
+
+
+def test_defect_disassemble_request_rejects_mixed_source_items(
+    db_session, client, make_item
+):
+    items = [
+        make_item(name=f"R002-REWORK-MIX-{index}", process_type_code="PF", warehouse_qty=Decimal("2"))
+        for index in range(2)
+    ]
+    actor = _make_employee(db_session, code="E02-REWORK-MIX", name="재작업 발의자")
+    db_session.commit()
+    records = []
+    for item in items:
+        quarantined = client.post(
+            "/api/defects/quarantine",
+            json={
+                "item_id": str(item.item_id),
+                "qty": "1",
+                "source": "warehouse",
+                "target_dept": DepartmentEnum.ASSEMBLY.value,
+                "reason_memo": "혼합 방지",
+                "actor_employee_id": str(actor.employee_id),
+            },
+        )
+        assert quarantined.status_code == 200, quarantined.json()
+        records.append(
+            db_session.query(DefectQuarantineRecord)
+            .filter(DefectQuarantineRecord.item_id == item.item_id)
+            .one()
+        )
+
+    response = client.post(
+        "/api/stock-requests",
+        json={
+            "requester_employee_id": str(actor.employee_id),
+            "request_type": "defect_disassemble",
+            "notes": "{}",
+            "lines": [
+                {
+                    "record_id": str(record.record_id),
+                    "item_id": str(item.item_id),
+                    "quantity": 1,
+                    "from_bucket": "defective",
+                    "from_department": DepartmentEnum.ASSEMBLY.value,
+                    "to_bucket": "none",
+                }
+                for item, record in zip(items, records)
+            ],
+        },
+    )
+
+    assert response.status_code == 422
+    assert db_session.query(StockRequest).count() == 0
+
+
+@pytest.mark.parametrize("request_type", ["defect_scrap", "defect_return"])
+def test_multi_defect_request_rejects_duplicate_and_mixed_source_records(
+    db_session, client, make_item, request_type
+):
+    items = [
+        make_item(name=f"MULTI-VALIDATION-{index}", warehouse_qty=Decimal("3"))
+        for index in range(2)
+    ]
+    actor = _make_employee(
+        db_session,
+        code=f"MULTI-{request_type}",
+        name="다건 처리 발의자",
+    )
+    db_session.commit()
+    records = []
+    for item in items:
+        response = client.post(
+            "/api/defects/quarantine",
+            json={
+                "item_id": str(item.item_id),
+                "qty": "2",
+                "source": "warehouse",
+                "target_dept": DepartmentEnum.ASSEMBLY.value,
+                "reason_memo": "다건 검증",
+                "actor_employee_id": str(actor.employee_id),
+            },
+        )
+        assert response.status_code == 200, response.json()
+        records.append(
+            db_session.query(DefectQuarantineRecord)
+            .filter(DefectQuarantineRecord.item_id == item.item_id)
+            .one()
+        )
+
+    def line(item, record):
+        return {
+            "record_id": str(record.record_id),
+            "item_id": str(item.item_id),
+            "quantity": 1,
+            "from_bucket": "defective",
+            "from_department": DepartmentEnum.ASSEMBLY.value,
+            "to_bucket": "none",
+        }
+
+    duplicate = line(items[0], records[0])
+    duplicate_response = client.post(
+        "/api/stock-requests",
+        json={
+            "requester_employee_id": str(actor.employee_id),
+            "request_type": request_type,
+            "lines": [duplicate, duplicate],
+        },
+    )
+    assert duplicate_response.status_code == 422
+
+    mixed_response = client.post(
+        "/api/stock-requests",
+        json={
+            "requester_employee_id": str(actor.employee_id),
+            "request_type": request_type,
+            "lines": [line(item, record) for item, record in zip(items, records)],
+        },
+    )
+    assert mixed_response.status_code == 422
+    assert db_session.query(StockRequest).count() == 0
+
+
+def test_single_record_batch_request_requires_exact_quantity_and_record_id(
+    db_session, client, make_item
+):
+    item = make_item(name="SINGLE-BATCH-EXACT", warehouse_qty=Decimal("3"))
+    actor = _make_employee(
+        db_session,
+        code="SINGLE-BATCH-EXACT",
+        name="단건 선택 처리 발의자",
+    )
+    db_session.commit()
+    quarantined = client.post(
+        "/api/defects/quarantine",
+        json={
+            "item_id": str(item.item_id),
+            "qty": "2",
+            "source": "warehouse",
+            "target_dept": DepartmentEnum.ASSEMBLY.value,
+            "reason_memo": "단건 선택 검증",
+            "actor_employee_id": str(actor.employee_id),
+        },
+    )
+    assert quarantined.status_code == 200, quarantined.json()
+    record = db_session.query(DefectQuarantineRecord).filter(
+        DefectQuarantineRecord.item_id == item.item_id
+    ).one()
+    base_line = {
+        "record_id": str(record.record_id),
+        "item_id": str(item.item_id),
+        "quantity": 1,
+        "from_bucket": "defective",
+        "from_department": DepartmentEnum.ASSEMBLY.value,
+        "to_bucket": "none",
+    }
+
+    stale_response = client.post(
+        "/api/stock-requests",
+        json={
+            "requester_employee_id": str(actor.employee_id),
+            "request_type": "defect_scrap",
+            "client_request_id": "defect-batch:single-stale",
+            "lines": [base_line],
+        },
+    )
+    assert stale_response.status_code == 422
+
+    missing_record_line = {**base_line, "quantity": 2}
+    missing_record_line.pop("record_id")
+    missing_record_response = client.post(
+        "/api/stock-requests",
+        json={
+            "requester_employee_id": str(actor.employee_id),
+            "request_type": "defect_scrap",
+            "client_request_id": "defect-batch:single-no-record",
+            "lines": [missing_record_line],
+        },
+    )
+    assert missing_record_response.status_code == 422
+    assert db_session.query(StockRequest).count() == 0
+
+
+def test_defect_disassemble_approval_executes_multiple_source_records_once(
+    db_session, client, make_item, make_bom
+):
+    parent = make_item(
+        name="R002-REWORK-MULTI",
+        process_type_code="PF",
+        warehouse_qty=Decimal("3"),
+    )
+    child = make_item(
+        name="R002-REWORK-MULTI-CHILD",
+        process_type_code="VR",
+        warehouse_qty=Decimal("0"),
+    )
+    make_bom(parent.item_id, child.item_id, Decimal("1"))
+    requester = _make_employee(
+        db_session,
+        code="E02-REWORK-MULTI",
+        name="다건 재작업 발의자",
+    )
+    approver = _make_employee(
+        db_session,
+        code="E02-REWORK-MULTI-APPROVER",
+        name="다건 재작업 승인자",
+        department=DepartmentEnum.ASSEMBLY,
+        department_role="primary",
+        pin="1234",
+    )
+    db_session.add(
+        SystemSetting(
+            setting_key="inventory_operation_cutover_at",
+            setting_value="2026-01-01T00:00:00",
+        )
+    )
+    db_session.commit()
+    for quantity in ("1", "2"):
+        quarantined = client.post(
+            "/api/defects/quarantine",
+            json={
+                "item_id": str(parent.item_id),
+                "qty": quantity,
+                "source": "warehouse",
+                "target_dept": DepartmentEnum.ASSEMBLY.value,
+                "reason_memo": f"재작업 {quantity}",
+                "actor_employee_id": str(requester.employee_id),
+            },
+        )
+        assert quarantined.status_code == 200, quarantined.json()
+    records = (
+        db_session.query(DefectQuarantineRecord)
+        .filter(DefectQuarantineRecord.item_id == parent.item_id)
+        .order_by(DefectQuarantineRecord.remaining_quantity)
+        .all()
+    )
+    request_payload = {
+        "requester_employee_id": str(requester.employee_id),
+        "request_type": "defect_disassemble",
+        "reason_category": "재작업",
+        "reason_memo": "선택 기록 재작업",
+        "notes": json.dumps({
+            "child_decisions": [{
+                "item_id": str(child.item_id),
+                "qty": "3",
+                "normal_qty": "3",
+                "defective_qty": "0",
+                "scrap_qty": "0",
+            }]
+        }),
+        "lines": [
+            {
+                "record_id": str(record.record_id),
+                "item_id": str(parent.item_id),
+                "quantity": int(record.remaining_quantity),
+                "from_bucket": "defective",
+                "from_department": DepartmentEnum.ASSEMBLY.value,
+                "to_bucket": "none",
+            }
+            for record in records
+        ],
+    }
+    created = client.post("/api/stock-requests", json=request_payload)
+    assert created.status_code == 201, created.json()
+    assert created.json()["status"] == "reserved"
+    cancelled = client.post(
+        f"/api/stock-requests/{created.json()['request_id']}/cancel",
+        json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
+    )
+    assert cancelled.status_code == 200, cancelled.json()
+    assert cancelled.json()["status"] == "cancelled"
+    db_session.expire_all()
+    assert [record.remaining_quantity for record in records] == [
+        Decimal("1"),
+        Decimal("2"),
+    ]
+    parent_location = db_session.query(InventoryLocation).filter(
+        InventoryLocation.item_id == parent.item_id,
+        InventoryLocation.department == DepartmentEnum.ASSEMBLY.value,
+        InventoryLocation.status == LocationStatusEnum.DEFECTIVE,
+    ).one()
+    assert parent_location.pending_quantity == Decimal("0")
+
+    created = client.post("/api/stock-requests", json=request_payload)
+    assert created.status_code == 201, created.json()
+    assert created.json()["status"] == "reserved"
+
+    approved = client.post(
+        f"/api/stock-requests/{created.json()['request_id']}/department-approve",
+        json={"actor_employee_id": str(approver.employee_id), "pin": "1234"},
+    )
+
+    assert approved.status_code == 200, approved.json()
+    assert approved.json()["status"] == "completed"
+    db_session.expire_all()
+    assert [record.remaining_quantity for record in records] == [
+        Decimal("0"),
+        Decimal("0"),
+    ]
+    parent_logs = db_session.query(TransactionLog).filter(
+        TransactionLog.item_id == parent.item_id,
+        TransactionLog.transaction_type == TransactionTypeEnum.DISASSEMBLE,
+    ).all()
+    assert len(parent_logs) == 1
+    assert parent_logs[0].quantity_change == Decimal("-3")
+    source_movements = db_session.query(DefectInventoryMovement).filter(
+        DefectInventoryMovement.movement_type == "defect_disassemble",
+        DefectInventoryMovement.record_id.in_([record.record_id for record in records]),
+    ).all()
+    assert {movement.record_id for movement in source_movements} == {
+        record.record_id for record in records
+    }
+    assert len({movement.operation_id for movement in source_movements}) == 1
+    assert source_movements[0].operation_id == parent_logs[0].operation_id
 
 
 # ---------------------------------------------------------------------------

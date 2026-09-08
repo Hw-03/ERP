@@ -124,8 +124,9 @@ def ensure_available(
     quantity: Decimal,
     *,
     exclude_line_id: Optional[uuid.UUID] = None,
+    require_exact: bool = False,
 ) -> None:
-    """남은 수량에서 다른 승인 대기 수량을 뺀 범위인지 검증한다."""
+    """남은 수량에서 다른 승인 대기 수량을 뺀 처리 가능 수량을 검증한다."""
     quantity = Decimal(str(quantity))
     pending = pending_quantity(
         db,
@@ -135,6 +136,11 @@ def ensure_available(
     available = Decimal(str(record.remaining_quantity or 0)) - pending
     if quantity <= 0:
         raise ValueError("처리 수량은 0보다 커야 합니다.")
+    if require_exact and available != quantity:
+        raise ValueError(
+            f"선택한 격리 기록의 처리 가능 수량이 변경되었습니다: "
+            f"현재 {available}개, 선택 당시 {quantity}개."
+        )
     if available < quantity:
         raise ValueError(
             f"선택한 격리 기록의 처리 가능 수량이 부족합니다: "
