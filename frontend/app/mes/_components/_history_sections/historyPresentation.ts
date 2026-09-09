@@ -131,6 +131,13 @@ const SHIPPING_PHASE_MOVEMENT_VERB: Record<string, string> = {
   PICKUP: "출하",
 };
 
+const DEPARTMENT_CORRECTION_REFERENCE_PREFIX = "DEPT-CORRECTION-";
+
+export function isDepartmentCorrectionLog(log: Pick<TransactionLog, "reference_no" | "transaction_type">): boolean {
+  return log.transaction_type === "TRANSFER_DEPT"
+    && Boolean(log.reference_no?.startsWith(DEPARTMENT_CORRECTION_REFERENCE_PREFIX));
+}
+
 function isComponentChangePhase(phase: string | null | undefined): boolean {
   return phase === "COMPONENT_CHANGE";
 }
@@ -171,6 +178,7 @@ export function getReferenceBatchLinePresentation(
   log: TransactionLog,
   kind: ReferenceBatchKind,
 ): ReferenceBatchLinePresentation {
+  if (isDepartmentCorrectionLog(log)) return { label: "이동", tone: "info" };
   if (kind === "shipment") {
     if (log.shipping_phase === "COMPONENT_CHANGE") {
       const componentLabel = getComponentChangeLineLabel(log);
@@ -570,6 +578,9 @@ export function getHistoryListOperationLabel(
   log: TransactionLog,
   batch?: IoBatch | null,
 ): string {
+  if (isDepartmentCorrectionLog(log)) {
+    return log.operation_kind === "CANCELLATION" ? "부서 위치 조정 취소" : "부서 위치 조정";
+  }
   if (log.operation_kind === "CANCELLATION") {
     return `${getHistoryListOperationLabel({ ...log, operation_kind: null }, batch)} 취소`;
   }
