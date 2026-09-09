@@ -1,12 +1,13 @@
 "use client";
 
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, CircleHelp } from "lucide-react";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TransactionLog } from "@/lib/api";
 import type { TransactionReferenceSummary } from "@/lib/api/production";
 import { ioApi } from "@/lib/api/io";
 import type { IoBatch } from "@/lib/api/types/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { Tooltip } from "@/lib/ui/Tooltip";
 import { EmptyState, LoadFailureCard } from "../common";
 import type { HistorySelection } from "./historyConstants";
 import { HistoryLogRow } from "./HistoryLogRow";
@@ -18,6 +19,7 @@ import {
   OpBatchHeader,
   ReferenceBatchDetail,
   buildGroups,
+  getAdditionalDistinctItemCount,
   getHistorySeparationHint,
   getStockSnapshotQuantityWidth,
   type LogGroup,
@@ -63,6 +65,7 @@ type Props = {
 
 type ColSpec = {
   label: string;
+  help?: string;
   width?: string;
   minWidth?: string;
   align?: "left" | "center" | "right";
@@ -77,7 +80,13 @@ const COLUMNS: ColSpec[] = [
   { label: "작업", width: "184px", align: "center" },
   { label: "대상" },
   { label: "품목코드", width: `${HISTORY_ITEM_CODE_WIDTH_PX}px`, align: "center", px: "px-0" },
-  { label: "재고 변동", width: `${HISTORY_STOCK_SNAPSHOT_WIDTH_PX}px`, align: "center", px: "px-1" },
+  {
+    label: "재고 변동",
+    help: "재고는 요청 시각 순서로 계산합니다.\n요청이 승인되면 과거 표시도 변경될 수 있습니다.",
+    width: `${HISTORY_STOCK_SNAPSHOT_WIDTH_PX}px`,
+    align: "center",
+    px: "px-1",
+  },
   { label: "담당자", width: "132px", align: "center", px: "px-2" },
 ];
 const HISTORY_TABLE_COLUMN_SPAN = COLUMNS.reduce((total, column) => total + (column.colSpan ?? 1), 0);
@@ -215,6 +224,7 @@ export function HistoryTable({
   collapseRequestNonce = 0,
 }: Props) {
   const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null);
+  const [collapsedSearchGroupKeys, setCollapsedSearchGroupKeys] = useState<Set<string>>(new Set());
   const [fetchGeneration, setFetchGeneration] = useState(0);
   const previousCollapseRequestRef = useRef(collapseRequestNonce);
 
@@ -252,6 +262,15 @@ export function HistoryTable({
 
   const localGroups = useMemo(() => buildGroups(filteredLogs), [filteredLogs]);
   const groups = displayGroups ?? localGroups;
+  const searchMetadataActive = groups.some((group) => group.matchedLogIds != null);
+  const previousSearchMetadataActiveRef = useRef(searchMetadataActive);
+
+  useEffect(() => {
+    if (previousSearchMetadataActiveRef.current === searchMetadataActive) return;
+    previousSearchMetadataActiveRef.current = searchMetadataActive;
+    setExpandedGroupKey(null);
+    setCollapsedSearchGroupKeys(new Set());
+  }, [searchMetadataActive]);
 
   // ── visible op_batch lazy fetch ──
   // observer 는 마운트 시 한 번만. batchCache 변경마다 재생성하지 않게 ref 만 본다.
@@ -389,15 +408,43 @@ export function HistoryTable({
     }
   }, [batchCache, enqueueBatchFetch, fetchGeneration, groups]);
 
-  function toggleGroup(key: string) {
+  function isGroupExpanded(key: string, matchedLogIds?: string[] | null): boolean {
+    return matchedLogIds != null
+      ? !collapsedSearchGroupKeys.has(key)
+      : expandedGroupKey === key;
+  }
+
+  function toggleGroup(key: string, matchedLogIds?: string[] | null) {
+    if (matchedLogIds != null) {
+      setCollapsedSearchGroupKeys((previous) => {
+        const next = new Set(previous);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        return next;
+      });
+      return;
+    }
     setExpandedGroupKey((prev) => (prev === key ? null : key));
   }
 
-  function expandGroup(key: string) {
+  function expandGroup(key: string, matchedLogIds?: string[] | null) {
+    if (matchedLogIds != null) {
+      setCollapsedSearchGroupKeys((previous) => {
+        if (!previous.has(key)) return previous;
+        const next = new Set(previous);
+        next.delete(key);
+        return next;
+      });
+      return;
+    }
     setExpandedGroupKey(key);
   }
 
-  function collapseGroup(key: string) {
+  function collapseGroup(key: string, matchedLogIds?: string[] | null) {
+    if (matchedLogIds != null) {
+      setCollapsedSearchGroupKeys((previous) => new Set(previous).add(key));
+      return;
+    }
     setExpandedGroupKey((prev) => (prev === key ? null : prev));
   }
 
@@ -449,12 +496,24 @@ export function HistoryTable({
                   <th
                     key={column.label || `spacer-${index}`}
                     scope={column.label ? "col" : undefined}
+                    aria-label={column.help ? column.label : undefined}
                     aria-hidden={column.label ? undefined : true}
                     colSpan={column.colSpan}
                     className={historyTableHeaderClass(column, index)}
                     style={{ background: "var(--c-history-table-header)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: column.width, minWidth: column.minWidth, transition: HISTORY_CELL_TRANSITION }}
                   >
-                    {column.label}
+                    {column.help ? (
+                      <Tooltip
+                        content={<span className="block whitespace-pre text-left">{column.help}</span>}
+                        triggerTabIndex={0}
+                        triggerAriaLabel="재고 변동 계산 기준"
+                      >
+                        <span className="inline-flex items-center gap-1">
+                          {column.label}
+                          <CircleHelp aria-hidden="true" className="h-3.5 w-3.5" />
+                        </span>
+                      </Tooltip>
+                    ) : column.label}
                   </th>
                 ))}
               </tr>
@@ -483,7 +542,7 @@ export function HistoryTable({
                 if (group.type === "operation") {
                   const primaryLog = getOperationPrimaryLog(group.logs);
                   const childLogs = group.logs.filter((log) => log.log_id !== primaryLog.log_id);
-                  const expanded = expandedGroupKey === group.operationId;
+                  const expanded = isGroupExpanded(group.operationId, group.matchedLogIds);
                   const controlsId = historyGroupPanelId(group.operationId);
                   const primarySelected = selectedLogId === primaryLog.log_id;
                   const selected = selectedLogId === primaryLog.log_id
@@ -495,19 +554,21 @@ export function HistoryTable({
                         selected={selected}
                         onSelect={() => {
                           onSelectLog(primaryLog);
-                          if (primarySelected) collapseGroup(group.operationId);
-                          else expandGroup(group.operationId);
+                          if (primarySelected) collapseGroup(group.operationId, group.matchedLogIds);
+                          else expandGroup(group.operationId, group.matchedLogIds);
                         }}
                         expanded={expanded}
-                        onToggle={childLogs.length > 0 ? () => toggleGroup(group.operationId) : undefined}
+                        onToggle={childLogs.length > 0 ? () => toggleGroup(group.operationId, group.matchedLogIds) : undefined}
                         controlsId={childLogs.length > 0 ? controlsId : undefined}
                         toggleLabel="작업 구성"
                         separationHint={separationHint}
+                        additionalItemCount={getAdditionalDistinctItemCount(group.logs, primaryLog)}
                       />
                       {expanded && childLogs.length > 0 && (
                         <ReferenceBatchDetail
                           logs={childLogs}
                           highlightLogId={selectedLogId}
+                          matchedLogIds={group.matchedLogIds}
                           onSelectLog={onSelectChildLog ?? onSelectLog}
                           controlsId={controlsId}
                           flat
@@ -518,7 +579,7 @@ export function HistoryTable({
                 }
 
                 if (group.type === "defect_lifecycle") {
-                  const expanded = expandedGroupKey === group.key;
+                  const expanded = isGroupExpanded(group.key, group.matchedLogIds);
                   const controlsId = historyGroupPanelId(group.key);
                   const selected = selectedLogId === group.parent.log_id || selectedLogId === group.child.log_id;
                   return (
@@ -528,14 +589,16 @@ export function HistoryTable({
                         selected={selected}
                         onSelect={onSelectLog}
                         expanded={expanded}
-                        onToggle={() => toggleGroup(group.key)}
+                        onToggle={() => toggleGroup(group.key, group.matchedLogIds)}
                         controlsId={controlsId}
                         separationHint={separationHint}
+                        additionalItemCount={getAdditionalDistinctItemCount([group.parent, group.child], group.parent)}
                       />
                       {expanded && (
                         <ReferenceBatchDetail
                           logs={[group.child]}
                           highlightLogId={selectedLogId}
+                          matchedLogIds={group.matchedLogIds}
                           onSelectLog={onSelectChildLog ?? onSelectLog}
                           controlsId={controlsId}
                         />
@@ -545,7 +608,7 @@ export function HistoryTable({
                 }
 
                 if (group.type === "op_batch") {
-                  const expanded = expandedGroupKey === group.batchId;
+                  const expanded = isGroupExpanded(group.batchId, group.matchedLogIds);
                   const controlsId = historyGroupPanelId(group.batchId);
                   const batch = batchCache.get(group.batchId) ?? null;
                   const snapshotQuantityWidth = getStockSnapshotQuantityWidth(group.logs);
@@ -556,13 +619,13 @@ export function HistoryTable({
                       <OpBatchHeader
                         group={group}
                         expanded={expanded}
-                        onToggle={() => toggleGroup(group.batchId)}
+                        onToggle={() => toggleGroup(group.batchId, group.matchedLogIds)}
                         selected={isSelected}
                         onSelect={() => {
                           // 같은 묶음 재클릭 → 부모 selection 토글로 닫힘 + 펼침도 동시 접음.
                           onSelectBatch(group.batchId, group.logs);
-                          if (isSelected) collapseGroup(group.batchId);
-                          else expandGroup(group.batchId);
+                          if (isSelected) collapseGroup(group.batchId, group.matchedLogIds);
+                          else expandGroup(group.batchId, group.matchedLogIds);
                         }}
                         batch={batch}
                         rowRef={opBatchRowRef}
@@ -577,6 +640,7 @@ export function HistoryTable({
                           cache={batchCache}
                           onCached={handleCacheBatch}
                           logs={group.logs}
+                          matchedLogIds={group.matchedLogIds}
                           snapshotQuantityWidth={snapshotQuantityWidth}
                           highlightItemId={focusItemId}
                           controlsId={controlsId}
@@ -590,7 +654,7 @@ export function HistoryTable({
                 // 재작업(defect-disassemble) 배치 → 트리 뷰
                 const groupKey = group.refKey;
                 if (group.refNo.startsWith("defect-disassemble:")) {
-                  const expanded = expandedGroupKey === groupKey;
+                  const expanded = isGroupExpanded(groupKey, group.matchedLogIds);
                   const controlsId = historyGroupPanelId(groupKey);
                   const parentLog = group.logs.find((l) => l.transaction_type === "DISASSEMBLE") ?? group.logs[0];
                   const childLogs = group.logs.filter((l) => l.transaction_type !== "DISASSEMBLE");
@@ -600,12 +664,12 @@ export function HistoryTable({
                       <ReworkBatchHeader
                         group={group}
                         expanded={expanded}
-                        onToggle={() => toggleGroup(groupKey)}
+                        onToggle={() => toggleGroup(groupKey, group.matchedLogIds)}
                         selected={isSelected}
                         onSelect={() => {
                           onSelectLog(parentLog);
-                          if (isSelected && expanded) collapseGroup(groupKey);
-                          else expandGroup(groupKey);
+                          if (isSelected && expanded) collapseGroup(groupKey, group.matchedLogIds);
+                          else expandGroup(groupKey, group.matchedLogIds);
                         }}
                         controlsId={controlsId}
                       />
@@ -615,6 +679,7 @@ export function HistoryTable({
                           parentItemId={parentLog.item_id}
                           colSpan={HISTORY_TABLE_COLUMN_SPAN}
                           controlsId={controlsId}
+                          matchedLogIds={group.matchedLogIds}
                           cancelled={group.logs.some((log) => log.cancelled)}
                         />
                       )}
@@ -623,7 +688,7 @@ export function HistoryTable({
                 }
 
                 // op_batch 가 아니라 IoBatch 가 없으므로 클릭 시 첫 로그 상세를 연다.
-                const expanded = expandedGroupKey === groupKey;
+                const expanded = isGroupExpanded(groupKey, group.matchedLogIds);
                 const controlsId = historyGroupPanelId(groupKey);
                 const isSelected = selectedLogId === group.logs[0]?.log_id;
                 const focusLogId = focusTarget?.groupKey === groupKey ? focusTarget.logId ?? null : null;
@@ -632,12 +697,12 @@ export function HistoryTable({
                     <BatchHeader
                       group={group}
                       expanded={expanded}
-                      onToggle={() => toggleGroup(groupKey)}
+                      onToggle={() => toggleGroup(groupKey, group.matchedLogIds)}
                       selected={isSelected}
                       onSelect={() => {
                         onSelectLog(group.logs[0]);
-                        if (isSelected && expanded) collapseGroup(groupKey);
-                        else expandGroup(groupKey);
+                        if (isSelected && expanded) collapseGroup(groupKey, group.matchedLogIds);
+                        else expandGroup(groupKey, group.matchedLogIds);
                       }}
                       controlsId={controlsId}
                       separationHint={separationHint}
@@ -648,6 +713,7 @@ export function HistoryTable({
                       <ReferenceBatchDetail
                         logs={group.logs}
                         highlightLogId={focusLogId}
+                        matchedLogIds={group.matchedLogIds}
                         onSelectLog={onSelectChildLog ?? onSelectLog}
                         controlsId={controlsId}
                       />

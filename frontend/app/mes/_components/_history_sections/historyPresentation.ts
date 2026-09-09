@@ -573,7 +573,8 @@ export function getHistoryListOperationLabel(
   if (log.operation_kind === "CANCELLATION") {
     return `${getHistoryListOperationLabel({ ...log, operation_kind: null }, batch)} 취소`;
   }
-  if (log.reference_no?.startsWith("defect-disassemble:")) return "불량";
+  if (log.transaction_type === "UNMARK_DEFECTIVE") return "불량 정상 복귀";
+  if (log.reference_no?.startsWith("defect-disassemble:")) return "재작업";
 
   const phaseLabel = getShippingPhaseOperationLabel(log.shipping_phase);
   if (phaseLabel) return phaseLabel;
@@ -595,7 +596,6 @@ export function getHistoryListOperationLabel(
     case "ADJUST":
       return log.department === "창고" ? "수량 조정" : "부서 입출고";
     case "MARK_DEFECTIVE":
-    case "UNMARK_DEFECTIVE":
     case "DEFECT_SCRAP":
     case "SUPPLIER_RETURN":
       return "불량";

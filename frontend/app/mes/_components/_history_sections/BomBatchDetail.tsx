@@ -41,11 +41,12 @@ type Props = {
   controlsId?: string;
   /** 같은 operation_batch의 실제 거래 로그. BOM 줄별 스냅샷 표시용. */
   logs?: TransactionLog[];
+  matchedLogIds?: string[] | null;
   /** 작업 묶음 전체에 맞춘 재고 수량 표기 폭. */
   snapshotQuantityWidth?: number;
 };
 
-export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact, highlightItemId, controlsId, logs = [], snapshotQuantityWidth }: Props) {
+export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact, highlightItemId, controlsId, logs = [], matchedLogIds, snapshotQuantityWidth }: Props) {
   const realtimeRevision = useRealtimeRevision();
   const [batch, setBatch] = useState<IoBatch | null>(cache.get(batchId) ?? null);
   const [loading, setLoading] = useState(!cache.has(batchId));
@@ -101,6 +102,18 @@ export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact, hig
     });
   }, [batch, highlightItemId]);
 
+  useEffect(() => {
+    if (!batch || matchedLogIds == null) return;
+    const matchedItemIds = new Set(
+      logs.filter((log) => matchedLogIds.includes(log.log_id)).map((log) => log.item_id),
+    );
+    const matchedBundleIds = batch.bundles
+      .filter((bundle) => bundle.lines.some((line) => matchedItemIds.has(line.item_id)))
+      .map((bundle) => bundle.bundle_id);
+    if (matchedBundleIds.length === 0) return;
+    setExpandedBundles((previous) => new Set([...Array.from(previous), ...matchedBundleIds]));
+  }, [batch, logs, matchedLogIds]);
+
   function toggleBundle(bundleId: string) {
     setExpandedBundles((prev) => {
       const next = new Set(prev);
@@ -142,6 +155,7 @@ export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact, hig
           highlightItemId={highlightItemId}
           rowId={index === 0 ? controlsId : undefined}
           logs={logs}
+          matchedLogIds={matchedLogIds}
           snapshotQuantityWidth={snapshotQuantityWidth}
         />
       ))}
@@ -205,6 +219,7 @@ function BundleRows({
   highlightItemId,
   rowId,
   logs,
+  matchedLogIds,
   snapshotQuantityWidth,
 }: {
   bundle: IoBundle;
@@ -215,6 +230,7 @@ function BundleRows({
   highlightItemId?: string | null;
   rowId?: string;
   logs: TransactionLog[];
+  matchedLogIds?: string[] | null;
   snapshotQuantityWidth?: number;
 }) {
   const padX = compact ? "px-2" : "px-4";
@@ -236,6 +252,7 @@ function BundleRows({
   const isSingleLineDirect = !isBomParent && childLines.length === 1;
   const singleLineCode = isSingleLineDirect ? childLines[0].mes_code : null;
   const canExpand = isBomParent || (!isSingleLineDirect && childLines.length > 0);
+  const parentSearchMatched = parentLog != null && matchedLogIds?.includes(parentLog.log_id) === true;
 
   const shortageCount = childLines.filter((line) => line.included && line.shortage > 0).length;
   const detailId = `history-bom-${encodeURIComponent(bundle.bundle_id).replaceAll("%", "_")}`;
@@ -253,6 +270,7 @@ function BundleRows({
       <tr
         id={rowId}
         data-history-cancelled={cancelled || undefined}
+        data-history-search-match={parentSearchMatched ? "true" : undefined}
         tabIndex={canExpand ? 0 : undefined}
         aria-label={canExpand ? `${isBomParent ? "BOM 구성" : "라인 구성"} ${displayTitle}` : undefined}
         aria-expanded={canExpand ? expanded : undefined}
@@ -265,7 +283,12 @@ function BundleRows({
           onToggle();
         } : undefined}
         className={`${HISTORY_CHILD_ROW_CLASS}${canExpand ? " cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]" : ""}`}
-        style={{ background: "color-mix(in srgb, var(--c-blue) 5%, transparent)" }}
+        style={{
+          background: parentSearchMatched
+            ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
+            : "color-mix(in srgb, var(--c-blue) 5%, transparent)",
+          boxShadow: parentSearchMatched ? `inset 3px 0 0 ${LEGACY_COLORS.blue}` : undefined,
+        }}
       >
         <td className={`${HISTORY_CHILD_CELL_CLASS} ${padX}`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }} />
         <td className={`whitespace-nowrap ${HISTORY_CHILD_CELL_CLASS} ${padX} text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
@@ -359,6 +382,7 @@ function BundleRows({
           highlightItemId={highlightItemId}
           rowId={index === 0 ? detailId : undefined}
           log={getBomLineSnapshotLog(line, logs, batch)}
+          matchedLogIds={matchedLogIds}
           snapshotQuantityWidth={snapshotQuantityWidth}
         />
       ))}
@@ -374,6 +398,7 @@ function BomLineRow({
   highlightItemId,
   rowId,
   log,
+  matchedLogIds,
   snapshotQuantityWidth,
 }: {
   line: IoLine;
@@ -383,13 +408,15 @@ function BomLineRow({
   highlightItemId?: string | null;
   rowId?: string;
   log: TransactionLog | null;
+  matchedLogIds?: string[] | null;
   snapshotQuantityWidth?: number;
 }) {
   const padX = compact ? "px-2" : "px-4";
   const targetPadX = compact ? "px-2" : "px-4";
   const statusPadX = "px-2";
   const cancelled = batch.status === "cancelled";
-  const highlighted = highlightItemId === line.item_id;
+  const searchMatched = log != null && matchedLogIds?.includes(log.log_id) === true;
+  const highlighted = highlightItemId === line.item_id || searchMatched;
   const internalUseEffect = batch.sub_type === "internal_use_out" && bundle.source_kind === "bom_parent"
     ? getInternalUseHistoryLineEffectLabel(line, batch)
     : null;
@@ -399,6 +426,7 @@ function BomLineRow({
       data-history-cancelled={cancelled || undefined}
       className={HISTORY_CHILD_ROW_CLASS}
       data-history-focus-line={highlighted ? "true" : undefined}
+      data-history-search-match={searchMatched ? "true" : undefined}
       style={{
         background: highlighted
           ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`

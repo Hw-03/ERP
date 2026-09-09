@@ -64,17 +64,19 @@ function renderHeader({
   selected = false,
   onSelect = vi.fn(),
   onToggle = vi.fn(),
+  group = makeGroup(),
 }: {
   compact?: boolean;
   selected?: boolean;
   onSelect?: ReturnType<typeof vi.fn>;
   onToggle?: ReturnType<typeof vi.fn>;
+  group?: Extract<LogGroup, { type: "batch" }>;
 } = {}) {
   render(
     <table>
       <tbody>
         <ReworkBatchHeader
-          group={makeGroup()}
+          group={group}
           expanded={false}
           onToggle={onToggle}
           selected={selected}
@@ -98,6 +100,21 @@ function setBoxMetrics(
 }
 
 describe("ReworkBatchHeader", () => {
+  it("uses the rework label and gives its cancellation a separate label", () => {
+    renderHeader();
+    expect(screen.getByText("재작업")).toBeInTheDocument();
+    expect(screen.getByText("외 1품목")).toBeInTheDocument();
+    expect(screen.queryByText("1종 처리")).not.toBeInTheDocument();
+
+    const cancelledGroup = makeGroup();
+    cancelledGroup.logs[0] = {
+      ...cancelledGroup.logs[0],
+      operation_kind: "CANCELLATION",
+    };
+    renderHeader({ group: cancelledGroup });
+    expect(screen.getByText("재작업 취소")).toBeInTheDocument();
+  });
+
   it("keeps the rework color when selected", () => {
     renderHeader({ selected: true });
 

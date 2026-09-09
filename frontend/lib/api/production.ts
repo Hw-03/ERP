@@ -46,6 +46,7 @@ export interface TransactionDisplayGroup {
   type: TransactionDisplayGroupType;
   key: string;
   logs: TransactionLog[];
+  matchedLogIds?: string[] | null;
 }
 
 export interface TransactionDisplayGroupPage {
@@ -53,6 +54,10 @@ export interface TransactionDisplayGroupPage {
   nextCursor: string | null;
   hasMore: boolean;
 }
+
+type TransactionDisplayGroupWire = Omit<TransactionDisplayGroup, "matchedLogIds"> & {
+  matched_log_ids?: string[] | null;
+};
 
 type InventoryOperationLineWire = {
   log_id: string;
@@ -281,13 +286,16 @@ export const productionApi = {
     opts?: { signal?: AbortSignal },
   ): Promise<TransactionDisplayGroupPage> => {
     return fetcher<{
-      groups: TransactionDisplayGroup[];
+      groups: TransactionDisplayGroupWire[];
       next_cursor: string | null;
       has_more: boolean;
     }>(
       apiQuery("/api/inventory/transactions/display-groups", params),
       opts?.signal,
-    ).then((page) => mapWire<TransactionDisplayGroupPage>(page));
+    ).then((page) => ({
+      ...mapWire<TransactionDisplayGroupPage>(page),
+      groups: page.groups.map((group) => mapWire<TransactionDisplayGroup>(group)),
+    }));
   },
 
   /** 페이지네이션과 무관한 참조번호 묶음별 전체 요약. */

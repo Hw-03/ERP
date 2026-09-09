@@ -15,11 +15,16 @@ type Props = {
   compact?: boolean;
   controlsId?: string;
   cancelled?: boolean;
+  matchedLogIds?: string[] | null;
 };
 
-export function ReworkBatchDetail({ logs, colSpan, compact, controlsId, cancelled = false }: Props) {
+export function ReworkBatchDetail({ logs, colSpan, compact, controlsId, cancelled = false, matchedLogIds }: Props) {
   const summaries = buildReworkItemSummaries(logs);
   const [expanded, setExpanded] = useState(false);
+  const [searchCollapsed, setSearchCollapsed] = useState(false);
+  const matchedItemIds = new Set(
+    logs.filter((log) => matchedLogIds?.includes(log.log_id)).map((log) => log.item_id),
+  );
 
   if (summaries.length === 0) {
     return (
@@ -32,15 +37,19 @@ export function ReworkBatchDetail({ logs, colSpan, compact, controlsId, cancelle
   }
 
   if (summaries.length === 1) {
-    return <ReworkSummaryRow summary={summaries[0]} title={getResultTitle(summaries[0])} compact={compact} rowId={controlsId} cancelled={cancelled} />;
+    return <ReworkSummaryRow summary={summaries[0]} title={getResultTitle(summaries[0])} compact={compact} rowId={controlsId} cancelled={cancelled} searchMatched={matchedItemIds.has(summaries[0].itemId)} />;
   }
 
   const [first] = summaries;
   const detailId = `${controlsId ?? "history-rework"}-items`;
+  const detailExpanded = matchedLogIds != null ? !searchCollapsed : expanded;
   return (
     <>
-      <ReworkSummaryRow summary={first} title={getResultTitle(first)} compact={compact} rowId={controlsId} cancelled={cancelled} expanded={expanded} onToggle={() => setExpanded((value) => !value)} controlsId={detailId} />
-      {expanded && summaries.map((summary, index) => (
+      <ReworkSummaryRow summary={first} title={getResultTitle(first)} compact={compact} rowId={controlsId} cancelled={cancelled} expanded={detailExpanded} onToggle={() => {
+        if (matchedLogIds != null) setSearchCollapsed((value) => !value);
+        else setExpanded((value) => !value);
+      }} controlsId={detailId} searchMatched={matchedItemIds.has(first.itemId)} />
+      {detailExpanded && summaries.map((summary, index) => (
         <ReworkSummaryRow
           key={`${summary.itemId}-${summary.mesCode ?? ""}`}
           summary={summary}
@@ -48,6 +57,7 @@ export function ReworkBatchDetail({ logs, colSpan, compact, controlsId, cancelle
           compact={compact}
           rowId={index === 0 ? detailId : undefined}
           cancelled={cancelled}
+          searchMatched={matchedItemIds.has(summary.itemId)}
         />
       ))}
     </>
@@ -60,7 +70,7 @@ function getResultTitle(summary: ReworkItemSummary): string {
     : summary.itemName;
 }
 
-function ReworkSummaryRow({ summary, title, compact, rowId, cancelled, expanded, onToggle, controlsId }: { summary: ReworkItemSummary; title?: string; compact?: boolean; rowId?: string; cancelled: boolean; expanded?: boolean; onToggle?: () => void; controlsId?: string }) {
+function ReworkSummaryRow({ summary, title, compact, rowId, cancelled, expanded, onToggle, controlsId, searchMatched = false }: { summary: ReworkItemSummary; title?: string; compact?: boolean; rowId?: string; cancelled: boolean; expanded?: boolean; onToggle?: () => void; controlsId?: string; searchMatched?: boolean }) {
   const padX = compact ? "px-2" : "px-4";
   const displayTitle = title ?? summary.itemName;
 
@@ -68,6 +78,7 @@ function ReworkSummaryRow({ summary, title, compact, rowId, cancelled, expanded,
     <tr
       id={rowId}
       data-history-cancelled={cancelled || undefined}
+      data-history-search-match={searchMatched ? "true" : undefined}
       tabIndex={onToggle ? 0 : undefined}
       aria-label={onToggle ? `처리결과 구성 ${displayTitle}` : undefined}
       aria-expanded={onToggle ? expanded ?? false : undefined}
@@ -80,7 +91,12 @@ function ReworkSummaryRow({ summary, title, compact, rowId, cancelled, expanded,
         onToggle();
       } : undefined}
       className={onToggle ? "cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]" : undefined}
-      style={{ background: "color-mix(in srgb, var(--c-blue) 2%, transparent)" }}
+      style={{
+        background: searchMatched
+          ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
+          : "color-mix(in srgb, var(--c-blue) 2%, transparent)",
+        boxShadow: searchMatched ? `inset 3px 0 0 ${LEGACY_COLORS.blue}` : undefined,
+      }}
     >
       <td className={`border-b ${padX} py-2`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }} />
       <td className={`whitespace-nowrap border-b ${padX} py-2 text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>

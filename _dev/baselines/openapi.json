@@ -7376,6 +7376,85 @@
         "title": "RequestBucketEnum",
         "type": "string"
       },
+      "RequestOrderStockResponse": {
+        "description": "요청순으로 재구성한 조회 전용 잔고. 실제 처리 당시 원본과 분리한다.",
+        "properties": {
+          "department_qty_after": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Qty After"
+          },
+          "department_qty_before": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Qty Before"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "missing_history",
+                  "inconsistent_history",
+                  "ambiguous_order",
+                  "negative_balance"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "status": {
+            "enum": [
+              "available",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "warehouse_qty_after": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warehouse Qty After"
+          },
+          "warehouse_qty_before": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warehouse Qty Before"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "RequestOrderStockResponse",
+        "type": "object"
+      },
       "ReservationLineResponse": {
         "description": "품목별 점유중 라인 — InventoryDetailPanel 표시용.",
         "properties": {
@@ -10387,6 +10466,21 @@
             "title": "Logs",
             "type": "array"
           },
+          "matched_log_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched Log Ids"
+          },
           "type": {
             "enum": [
               "solo",
@@ -10806,6 +10900,16 @@
               }
             ],
             "title": "Reference No"
+          },
+          "request_order_stock": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RequestOrderStockResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "requested_at": {
             "anyOf": [
@@ -17812,7 +17916,7 @@
     },
     "/api/inventory/transactions/display-groups": {
       "get": {
-        "description": "필터된 로그를 화면 대표 행으로 묶어, 완결된 그룹 단위로 페이지를 반환한다.",
+        "description": "검색 일치 로그가 속한 작업을 보존하고 완결된 그룹 단위로 반환한다.",
         "operationId": "list_transaction_display_groups_api_inventory_transactions_display_groups_get",
         "parameters": [
           {

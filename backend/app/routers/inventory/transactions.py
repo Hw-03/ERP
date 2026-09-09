@@ -42,6 +42,7 @@ from app.services import transaction_actions as transaction_actions_svc
 from app.services import inventory_operation_cancellation as operation_cancellation_svc
 from app.services import legacy_inventory_operation_adoption as legacy_adoption_svc
 from app.services.transaction_display_groups import build_display_groups as _build_display_groups
+from app.services.request_order_stock import load_request_order_stock
 from app.services.export_helpers import csv_streaming_response
 from app.services.pin_auth import verify_pin
 from app.utils.search import build_normalized_search_filter
@@ -55,6 +56,7 @@ from app.routers.inventory._tx_filters import (
     _apply_common_filters,
     _history_visibility_filter,
     _history_request_date_expr,
+    _history_search_filter,
     _kst_date_to_utc_naive_bounds,
     _batch_name_map,
     _operation_info_map,
@@ -422,7 +424,7 @@ def list_transaction_display_groups(
     limit: int = Query(DISPLAY_GROUP_PAGE_SIZE, ge=1, le=DISPLAY_GROUP_PAGE_SIZE),
     db: Session = Depends(get_db),
 ) -> TransactionDisplayGroupPageResponse:
-    """필터된 로그를 화면 대표 행으로 묶어, 완결된 그룹 단위로 페이지를 반환한다."""
+    """검색 일치 로그가 속한 작업을 보존하고 완결된 그룹 단위로 반환한다."""
     edit_count_sq = (
         select(func.count(TransactionEditLog.edit_id))
         .where(TransactionEditLog.original_log_id == TransactionLog.log_id)
@@ -442,12 +444,13 @@ def list_transaction_display_groups(
         query = query.filter(TransactionLog.transaction_type == transaction_type)
     if reference_no:
         query = query.filter(TransactionLog.reference_no == reference_no)
+    # 검색 이외의 기존 필터 범위에서 먼저 작업 묶음을 완성한다.
     query = _apply_common_filters(
         query,
         db,
         transaction_types=transaction_types,
         operation_keys=operation_keys,
-        search=search,
+        search=None,
         department=department,
         model=model,
         process_step=process_step,
@@ -455,22 +458,27 @@ def list_transaction_display_groups(
         date_to=date_to,
         include_archived=include_archived,
     )
+    search_filter = _history_search_filter(search)
+    matched_log_ids = (
+        {log_id for (log_id,) in query.with_entities(TransactionLog.log_id).filter(search_filter).all()}
+        if search_filter is not None else None
+    )
     requested_at_order = _history_request_date_expr()
-    rows = query.order_by(
+    rows = query.add_columns(requested_at_order.label("request_order_at")).order_by(
         requested_at_order.desc(),
         TransactionLog.created_at.desc(),
         TransactionLog.log_id.desc(),
     ).all()
-    batch_ids = {log.operation_batch_id for log, _, _ in rows if log.operation_batch_id}
+    batch_ids = {log.operation_batch_id for log, _, _, _ in rows if log.operation_batch_id}
     batch_map = _batch_name_map(db, batch_ids)
-    reference_nos = {log.reference_no for log, _, _ in rows if log.reference_no}
+    reference_nos = {log.reference_no for log, _, _, _ in rows if log.reference_no}
     stock_request_map = _stock_request_info_map(db, reference_nos)
     operation_map = _operation_info_map(
         db,
-        {log.operation_id for log, _, _ in rows if log.operation_id},
+        {log.operation_id for log, _, _, _ in rows if log.operation_id},
     )
     logs = []
-    for log, item, edit_count in rows:
+    for log, item, edit_count, request_order_at in rows:
         info = stock_request_map.get(log.reference_no) if log.reference_no else None
         if info is None:
             info = batch_map.get(log.operation_batch_id)
@@ -482,17 +490,29 @@ def list_transaction_display_groups(
                 int(edit_count or 0),
                 requester_name=info.requester_name if info else None,
                 approver_name=info.approver_name if info else None,
-                requested_at=info.requested_at if info else None,
+                requested_at=request_order_at,
                 approved_at=info.approved_at if info else None,
                 operation=operation_info.operation if operation_info else None,
                 reversal=operation_info.reversal if operation_info else None,
             )
         )
     groups = _build_display_groups(logs)
+    if matched_log_ids is not None:
+        groups = [group for group in groups if any(log.log_id in matched_log_ids for log in group.logs)]
+        for group in groups:
+            group.matched_log_ids = [log.log_id for log in group.logs if log.log_id in matched_log_ids]
     if cursor:
         cursor_value = _decode_display_group_cursor(cursor)
         groups = [group for group in groups if _is_after_display_group_cursor(group, cursor_value)]
     page_groups = groups[:limit]
+    request_order_stock = load_request_order_stock(
+        db,
+        {log.item_id for group in page_groups for log in group.logs},
+        request_date_expr=requested_at_order,
+    )
+    for group in page_groups:
+        for log in group.logs:
+            log.request_order_stock = request_order_stock[log.log_id]
     has_more = len(page_groups) < len(groups)
     return TransactionDisplayGroupPageResponse(
         groups=page_groups,

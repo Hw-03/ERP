@@ -132,6 +132,127 @@ function makeMixedProductionOperationGroup() {
 }
 
 describe("HistoryTable hierarchy", () => {
+  it("expands every search-matched operation group and highlights only matched children", () => {
+    const first = makeOperationGroup();
+    const secondPrimary = makeLog({
+      log_id: "operation-2-primary",
+      item_name: "두 번째 작업 대표",
+      operation_id: "operation-2",
+      operation_role: "PRIMARY",
+    });
+    const secondMatched = makeLog({
+      log_id: "operation-2-matched",
+      item_id: "CHILD-2-MATCH",
+      item_name: "COCOON HANDLE CONNECTOR BD 7AR0241",
+      operation_id: "operation-2",
+      operation_role: "COMPONENT_INPUT",
+    });
+    const secondSibling = makeLog({
+      log_id: "operation-2-sibling",
+      item_id: "CHILD-2-SIBLING",
+      item_name: "두 번째 작업의 다른 구성품",
+      operation_id: "operation-2",
+      operation_role: "COMPONENT_INPUT",
+    });
+    const groups: LogGroup[] = [
+      { ...first.groups[0], matchedLogIds: [first.child.log_id] },
+      {
+        type: "operation",
+        operationId: "operation-2",
+        logs: [secondPrimary, secondMatched, secondSibling],
+        matchedLogIds: [secondMatched.log_id],
+      },
+    ];
+
+    render(
+      <HistoryTable
+        loading={false}
+        displayGroups={groups}
+        selection={{ kind: "log", log: secondSibling }}
+        onSelectLog={vi.fn()}
+        onSelectBatch={vi.fn()}
+        batchCache={new Map()}
+        setBatchCache={vi.fn()}
+        canLoadMore={false}
+        loadingMore={false}
+        onLoadMore={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(first.primary.item_name)).toBeInTheDocument();
+    expect(screen.getByText(first.child.item_name)).toBeInTheDocument();
+    expect(screen.getByText(secondPrimary.item_name)).toBeInTheDocument();
+    expect(screen.getByText(secondMatched.item_name)).toBeInTheDocument();
+    expect(screen.getByText(secondSibling.item_name)).toBeInTheDocument();
+    expect(screen.getByText(first.child.item_name).closest("tr")).toHaveAttribute("data-history-search-match", "true");
+    expect(screen.getByText(secondMatched.item_name).closest("tr")).toHaveAttribute("data-history-search-match", "true");
+    expect(screen.getByText(secondSibling.item_name).closest("tr")).not.toHaveAttribute("data-history-search-match");
+    expect(screen.getByText(secondSibling.item_name).closest("tr")).toHaveAttribute("data-history-focus-line", "true");
+  });
+
+  it("lets a search-expanded group stay manually collapsed and restores normal collapsed state after search clears", () => {
+    const { child, groups: baseGroups } = makeOperationGroup();
+    const searchGroups: LogGroup[] = [{ ...baseGroups[0], matchedLogIds: [child.log_id] }];
+    const view = renderTable(searchGroups);
+    const toggle = screen.getByRole("button", { name: "작업 구성 접기" });
+
+    fireEvent.click(toggle);
+    expect(screen.queryByText(child.item_name)).not.toBeInTheDocument();
+
+    view.rerender(
+      <HistoryTable loading={false} displayGroups={searchGroups} selection={null} onSelectLog={vi.fn()} onSelectBatch={vi.fn()} batchCache={new Map()} setBatchCache={vi.fn()} canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} />,
+    );
+    expect(screen.queryByText(child.item_name)).not.toBeInTheDocument();
+
+    const normalGroups: LogGroup[] = [{ ...baseGroups[0], matchedLogIds: null }];
+    view.rerender(
+      <HistoryTable loading={false} displayGroups={normalGroups} selection={null} onSelectLog={vi.fn()} onSelectBatch={vi.fn()} batchCache={new Map()} setBatchCache={vi.fn()} canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} />,
+    );
+    expect(screen.queryByText(child.item_name)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "작업 구성 펼치기" })).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("opens the matched BOM line inside a search-matched operation batch", () => {
+    const childLog = makeLog({
+      log_id: "batch-child-match",
+      item_id: "COMP-1",
+      item_name: "BOM 구성품",
+      operation_batch_id: "batch-1",
+      operation_line_id: "child",
+      transaction_type: "BACKFLUSH",
+    });
+    const groups: LogGroup[] = [{
+      type: "op_batch",
+      batchId: "batch-1",
+      refNo: null,
+      logs: [childLog],
+      matchedLogIds: [childLog.log_id],
+    }];
+
+    renderTable(groups, new Map([["batch-1", makeBatch()]]));
+
+    expect(screen.getByText("BOM 구성품")).toBeInTheDocument();
+    expect(screen.getByText("BOM 구성품").closest("tr")).toHaveAttribute("data-history-search-match", "true");
+  });
+
+  it("opens and highlights a matched result inside a multi-item rework group", () => {
+    const parent = makeLog({ log_id: "rework-parent", transaction_type: "DISASSEMBLE", reference_no: "defect-disassemble:search" });
+    const first = makeLog({ log_id: "rework-first", item_id: "SCRAP-A", item_name: "첫 처리 품목", transaction_type: "DEFECT_SCRAP", reference_no: parent.reference_no });
+    const matched = makeLog({ log_id: "rework-match", item_id: "SCRAP-B", item_name: "검색 일치 처리 품목", transaction_type: "DEFECT_SCRAP", reference_no: parent.reference_no });
+    const groups: LogGroup[] = [{
+      type: "batch",
+      refKey: "rework-search",
+      refNo: parent.reference_no!,
+      logs: [parent, first, matched],
+      matchedLogIds: [matched.log_id],
+    }];
+
+    renderTable(groups);
+
+    expect(screen.getByText(matched.item_name)).toBeInTheDocument();
+    expect(screen.getByText(matched.item_name).closest("tr")).toHaveAttribute("data-history-search-match", "true");
+  });
+
   it("opens the selected operation detail and child rows on the first primary-row click", () => {
     const { primary, groups } = makeOperationGroup();
     render(<OperationSelectionHarness groups={groups} />);
@@ -289,7 +410,7 @@ describe("HistoryTable hierarchy", () => {
 
     const row = screen.getByText("대표 품목").closest("tr")!;
     const inventory = within(row).getByLabelText("재고 변동 없음");
-    expect(within(inventory).getByText("—")).toBeInTheDocument();
+    expect(within(inventory).getByText("변동 없음")).toBeInTheDocument();
     expect(within(inventory).queryByLabelText(/^창고 /)).not.toBeInTheDocument();
     expect(within(inventory).queryByLabelText(/^부서 /)).not.toBeInTheDocument();
   });
@@ -389,7 +510,7 @@ describe("HistoryTable hierarchy", () => {
     expect(departmentLabel).toHaveClass("w-7", "text-left");
     expect(departmentBefore).toHaveClass("text-right", "tabular-nums");
     expect(departmentBefore).toHaveStyle({ width: "24px" });
-    expect(noChangeMarker).toHaveTextContent("—");
+    expect(noChangeMarker).toHaveTextContent("변동 없음");
     expect(departmentDelta).toHaveTextContent("−21");
     expect(departmentDelta).toHaveClass("shrink-0", "text-left", "font-bold", "tabular-nums");
     expect(departmentDelta).toHaveStyle({ width: "40px" });
@@ -695,7 +816,7 @@ describe("HistoryTable hierarchy", () => {
 
     expect(screen.queryByText("보정 품목 B")).not.toBeInTheDocument();
     expect(document.querySelectorAll("[data-history-main-row='true']")).toHaveLength(1);
-    const summaryRow = screen.getByText("보정 품목 A 외 1건").closest("tr")!;
+    const summaryRow = screen.getByText("외 1품목").closest("tr")!;
     expect(within(summaryRow).queryByLabelText(/^재고 변동:/)).not.toBeInTheDocument();
     expect(within(summaryRow).getAllByText("—")).toHaveLength(1);
     const toggle = screen.getByRole("button", { name: "묶음 펼치기" });

@@ -8,8 +8,10 @@ import {
 } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
 import type { TransactionDisplayGroup, TransactionReferenceSummary } from "@/lib/api/production";
+import type { RequestOrderStockUnavailableReason } from "@/lib/api/types/production";
 import type { IoBatch } from "@/lib/api/types/io";
 import { TruncatedText } from "@/lib/ui/TruncatedText";
+import { Tooltip } from "@/lib/ui/Tooltip";
 import type { HistoryPresentationTone, HistoryRowPresentation } from "./historyPresentation";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
@@ -55,6 +57,64 @@ const STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH_PX = 24;
 const STOCK_SNAPSHOT_DELTA_WIDTH_PX = 40;
 const STOCK_SNAPSHOT_ARROW_WIDTH_PX = 24;
 const STOCK_SNAPSHOT_DIGIT_WIDTH_PX = 8;
+
+/** 대표 품목을 제외하고 한 묶음에서 실제로 함께 처리한 품목 수를 센다. */
+export function getAdditionalDistinctItemCount(logs: TransactionLog[], representativeLog: TransactionLog | null): number {
+  const itemIds = new Set<string>();
+  for (const log of logs) {
+    if (!representativeLog || log.item_id !== representativeLog.item_id) itemIds.add(log.item_id);
+  }
+  return itemIds.size;
+}
+
+type ResolvedStockSnapshot = {
+  status: "available";
+  warehouseBefore: number;
+  warehouseAfter: number;
+  departmentBefore: number;
+  departmentAfter: number;
+} | {
+  status: "unavailable";
+  reason: string;
+} | {
+  status: "missing";
+};
+
+const REQUEST_ORDER_STOCK_REASON: Record<RequestOrderStockUnavailableReason, string> = {
+  missing_history: "재고 이력 일부가 없습니다.",
+  inconsistent_history: "재고 이력이 서로 맞지 않습니다.",
+  ambiguous_order: "같은 처리 시각의 거래 순서를 확정할 수 없습니다.",
+  negative_balance: "요청 순 계산 결과 재고가 음수가 됩니다.",
+};
+
+/** 목록 셀과 열 너비가 같은 기준의 재고 스냅샷을 사용하도록 단일 경계에서 선택한다. */
+export function resolveStockSnapshot(log: TransactionLog): ResolvedStockSnapshot {
+  const projected = log.request_order_stock;
+  if (projected?.status === "unavailable") {
+    return {
+      status: "unavailable",
+      reason: projected.reason
+        ? REQUEST_ORDER_STOCK_REASON[projected.reason]
+        : "요청 순 재고를 계산할 수 없습니다.",
+    };
+  }
+
+  const source = projected?.status === "available" ? projected : log;
+  const warehouseBefore = source.warehouse_qty_before;
+  const warehouseAfter = source.warehouse_qty_after;
+  const departmentBefore = source.department_qty_before;
+  const departmentAfter = source.department_qty_after;
+  if (warehouseBefore == null || warehouseAfter == null || departmentBefore == null || departmentAfter == null) {
+    return { status: "missing" };
+  }
+  return {
+    status: "available",
+    warehouseBefore,
+    warehouseAfter,
+    departmentBefore,
+    departmentAfter,
+  };
+}
 
 export function FlowBadge({
   type,
@@ -253,18 +313,20 @@ export function TargetSummaryBlock({
   icon,
   titleOverride,
   metaOverride,
+  additionalItemCount,
   cancelled = false,
 }: {
   presentation: HistoryRowPresentation;
   icon: React.ReactNode;
   titleOverride?: string;
   metaOverride?: string[];
+  additionalItemCount?: number;
   cancelled?: boolean;
 }) {
   const meta = metaOverride ?? presentation.target.meta;
-  const processingMetaIndex = meta.findIndex((part) => /^\d+종 처리$/.test(part));
-  const processingMeta = processingMetaIndex >= 0 ? meta[processingMetaIndex] : null;
-  const remainingMeta = processingMetaIndex >= 0 ? meta.filter((_, index) => index !== processingMetaIndex) : meta;
+  const additionalItemLabel = additionalItemCount && additionalItemCount > 0
+    ? `외 ${additionalItemCount}품목`
+    : null;
   const title = titleOverride ?? presentation.target.title;
   const displayTitle = presentation.target.sourceTitle
     ? `${presentation.target.sourceTitle} → ${title}`
@@ -276,17 +338,17 @@ export function TargetSummaryBlock({
         <div className="flex min-w-0 items-center gap-2">
           <TruncatedText
             accessibilityLabel={displayTitle}
-            className={`min-w-0 ${processingMeta ? "truncate" : "line-clamp-2"} text-sm font-bold leading-snug${cancelled ? " line-through" : ""}`}
+            className={`min-w-0 ${additionalItemLabel ? "truncate" : "line-clamp-2"} text-sm font-bold leading-snug${cancelled ? " line-through" : ""}`}
             style={{ color: LEGACY_COLORS.text }}
           >
             {displayTitle}
           </TruncatedText>
-          {processingMeta && <span className="shrink-0 text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>{processingMeta}</span>}
+          {additionalItemLabel && <span className="shrink-0 text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>{additionalItemLabel}</span>}
         </div>
       </div>
-      {remainingMeta.length > 0 && (
+      {meta.length > 0 && (
         <div className="mt-1 flex min-w-0 flex-nowrap items-center gap-1.5 overflow-hidden text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-          {remainingMeta.map((part) => (
+          {meta.map((part) => (
             <span key={part} className="min-w-0 shrink truncate font-semibold">
               {part}
             </span>
@@ -369,14 +431,25 @@ export function StockSnapshotCell({
     );
   }
 
-  const { warehouse_qty_before: warehouseBefore, warehouse_qty_after: warehouseAfter, department_qty_before: departmentBefore, department_qty_after: departmentAfter } = log;
-  if (warehouseBefore == null || warehouseAfter == null || departmentBefore == null || departmentAfter == null) {
+  const snapshot = resolveStockSnapshot(log);
+  if (snapshot.status === "unavailable") {
+    const accessibleLabel = `요청 순 재고 계산 불가: ${snapshot.reason}`;
+    return (
+      <td className={`${cellClass} px-1 text-center text-xs font-semibold`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.yellow }}>
+        <Tooltip content={snapshot.reason} multiline triggerTabIndex={0} triggerAriaLabel={accessibleLabel}>
+          <span>계산 불가</span>
+        </Tooltip>
+      </td>
+    );
+  }
+  if (snapshot.status === "missing") {
     return (
       <td className={`${cellClass} px-1 text-center text-xs font-semibold`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
         기록 없음
       </td>
     );
   }
+  const { warehouseBefore, warehouseAfter, departmentBefore, departmentAfter } = snapshot;
   const warehouseBeforeText = formatQty(warehouseBefore);
   const warehouseAfterText = formatQty(warehouseAfter);
   const departmentBeforeText = formatQty(departmentBefore);
@@ -401,7 +474,7 @@ export function StockSnapshotCell({
         className={`mx-auto flex w-fit min-w-0 flex-col items-start ${dense ? "gap-0" : "gap-0.5"}`}
       >
         {changedSnapshots.length === 0 ? (
-          <span aria-hidden="true" className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>—</span>
+          <span aria-hidden="true" className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>변동 없음</span>
         ) : changedSnapshots.map((snapshot) => (
           <StockSnapshotLine key={snapshot.label} label={snapshot.label} beforeText={snapshot.beforeText} afterText={snapshot.afterText} delta={snapshot.after - snapshot.before} beforeQuantityWidthPx={beforeQuantityWidthPx} afterQuantityWidthPx={STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH_PX} increased={snapshot.after > snapshot.before} decreased={snapshot.after < snapshot.before} cancelled={log.cancelled} />
         ))}
@@ -413,15 +486,13 @@ export function StockSnapshotCell({
 /** 묶음 안의 전·후 창고/부서 수량 중 가장 긴 화면 표기 폭을 구한다. */
 export function getStockSnapshotQuantityWidth(logs: TransactionLog[]): number | undefined {
   const quantities = logs.flatMap((log) => {
-    const warehouseChanged = log.warehouse_qty_before != null
-      && log.warehouse_qty_after != null
-      && log.warehouse_qty_before !== log.warehouse_qty_after;
-    const departmentChanged = log.department_qty_before != null
-      && log.department_qty_after != null
-      && log.department_qty_before !== log.department_qty_after;
+    const snapshot = resolveStockSnapshot(log);
+    if (snapshot.status !== "available") return [];
+    const warehouseChanged = snapshot.warehouseBefore !== snapshot.warehouseAfter;
+    const departmentChanged = snapshot.departmentBefore !== snapshot.departmentAfter;
     return [
-      ...(warehouseChanged ? [log.warehouse_qty_before, log.warehouse_qty_after] : []),
-      ...(departmentChanged ? [log.department_qty_before, log.department_qty_after] : []),
+      ...(warehouseChanged ? [snapshot.warehouseBefore, snapshot.warehouseAfter] : []),
+      ...(departmentChanged ? [snapshot.departmentBefore, snapshot.departmentAfter] : []),
     ];
   });
   return quantities.length > 0
@@ -497,12 +568,13 @@ export function PeopleStatusCell({
     </div>
   );
 }
-export type LogGroup =
+export type LogGroup = (
   | { type: "solo"; log: TransactionLog }
   | { type: "operation"; operationId: string; logs: TransactionLog[] }
   | { type: "batch"; refKey: string; refNo: string; logs: TransactionLog[] }
   | { type: "op_batch"; batchId: string; refNo: string | null; logs: TransactionLog[] }
-  | { type: "defect_lifecycle"; key: string; parent: TransactionLog; child: TransactionLog };
+  | { type: "defect_lifecycle"; key: string; parent: TransactionLog; child: TransactionLog }
+) & { matchedLogIds?: string[] | null };
 
 /** 서버가 확정한 대표 묶음을 표 렌더링 모델로만 변환한다. 새 묶음을 만들거나 합치지 않는다. */
 export function toHistoryLogGroups(groups: TransactionDisplayGroup[]): LogGroup[] {
@@ -510,11 +582,11 @@ export function toHistoryLogGroups(groups: TransactionDisplayGroup[]): LogGroup[
     const first = group.logs[0];
     if (!first) return result;
     if (group.type === "solo") {
-      result.push({ type: "solo", log: first });
+      result.push({ type: "solo", log: first, matchedLogIds: group.matchedLogIds });
       return result;
     }
     if (group.type === "operation") {
-      result.push({ type: "operation", operationId: group.key, logs: group.logs });
+      result.push({ type: "operation", operationId: group.key, logs: group.logs, matchedLogIds: group.matchedLogIds });
       return result;
     }
     if (group.type === "op_batch") {
@@ -523,6 +595,7 @@ export function toHistoryLogGroups(groups: TransactionDisplayGroup[]): LogGroup[
         batchId: first.operation_batch_id ?? group.key,
         refNo: first.reference_no ?? null,
         logs: group.logs,
+        matchedLogIds: group.matchedLogIds,
       });
       return result;
     }
@@ -532,11 +605,12 @@ export function toHistoryLogGroups(groups: TransactionDisplayGroup[]): LogGroup[
         refKey: group.key,
         refNo: first.reference_no ?? "",
         logs: group.logs,
+        matchedLogIds: group.matchedLogIds,
       });
       return result;
     }
     const child = group.logs[1];
-    if (child) result.push({ type: "defect_lifecycle", key: group.key, parent: first, child });
+    if (child) result.push({ type: "defect_lifecycle", key: group.key, parent: first, child, matchedLogIds: group.matchedLogIds });
     return result;
   }, []);
 }
@@ -827,6 +901,7 @@ export function BatchHeader({
   const first = group.logs[0];
   const referencePresentation = getReferenceBatchPresentation(group.logs, referenceSummary);
   const representativeLog = group.logs.find((log) => log.log_id === referencePresentation.representativeLogId) ?? first;
+  const additionalItemCount = getAdditionalDistinctItemCount(group.logs, representativeLog);
   const primaryType = (group.logs.find((l) => l.transaction_type !== "BACKFLUSH") ?? first).transaction_type;
   const flowColor = isReworkOperation(first) ? LEGACY_COLORS.red : transactionColor(primaryType);
   const summary = referenceSummary === null
@@ -899,6 +974,7 @@ export function BatchHeader({
           <TargetSummaryBlock
             presentation={presentation}
             icon={<Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
+            additionalItemCount={additionalItemCount}
           />
         </div>
       </td>
@@ -918,6 +994,7 @@ export function ReferenceBatchDetail({
   logs,
   compact,
   highlightLogId,
+  matchedLogIds,
   onSelectLog,
   controlsId,
   flat = false,
@@ -925,6 +1002,7 @@ export function ReferenceBatchDetail({
   logs: TransactionLog[];
   compact?: boolean;
   highlightLogId?: string | null;
+  matchedLogIds?: string[] | null;
   onSelectLog?: (log: TransactionLog) => void;
   controlsId?: string;
   flat?: boolean;
@@ -943,6 +1021,7 @@ export function ReferenceBatchDetail({
             kind={presentation.kind}
             compact={compact}
             highlightLogId={highlightLogId}
+            matchedLogIds={matchedLogIds}
             onSelectLog={onSelectLog}
             rowId={index === 0 ? controlsId : undefined}
           />
@@ -957,6 +1036,7 @@ export function ReferenceBatchDetail({
         logs={sortedLogs}
         compact={compact}
         highlightLogId={highlightLogId}
+        matchedLogIds={matchedLogIds}
         controlsId={controlsId}
       />
     );
@@ -969,6 +1049,7 @@ export function ReferenceBatchDetail({
         presentation={presentation}
         compact={compact}
         highlightLogId={highlightLogId}
+        matchedLogIds={matchedLogIds}
         onSelectLog={onSelectLog}
         controlsId={controlsId}
       />
@@ -984,6 +1065,7 @@ export function ReferenceBatchDetail({
           kind={presentation.kind}
           compact={compact}
           highlightLogId={highlightLogId}
+          matchedLogIds={matchedLogIds}
           onSelectLog={onSelectLog}
           rowId={index === 0 ? controlsId : undefined}
         />
@@ -997,6 +1079,7 @@ function ReferenceBatchSectionRow({
   presentation,
   compact,
   highlightLogId,
+  matchedLogIds,
   onSelectLog,
   controlsId,
 }: {
@@ -1004,13 +1087,16 @@ function ReferenceBatchSectionRow({
   presentation: ReturnType<typeof getReferenceBatchPresentation>;
   compact?: boolean;
   highlightLogId?: string | null;
+  matchedLogIds?: string[] | null;
   onSelectLog?: (log: TransactionLog) => void;
   controlsId?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [searchCollapsed, setSearchCollapsed] = useState(false);
   const sectionId = `${controlsId ?? "history-reference"}-items`;
   const [first, ...children] = logs;
   if (!first) return null;
+  const sectionExpanded = matchedLogIds != null ? !searchCollapsed : expanded;
 
   return (
     <>
@@ -1019,21 +1105,26 @@ function ReferenceBatchSectionRow({
         kind={presentation.kind}
         compact={compact}
         highlightLogId={highlightLogId}
+        matchedLogIds={matchedLogIds}
         onSelectLog={onSelectLog}
         rowId={controlsId}
         sectionLabel={presentation.operationLabel}
         toggleLabel={`${presentation.operationLabel} 구성`}
-        expanded={expanded}
-        onToggle={() => setExpanded((value) => !value)}
+        expanded={sectionExpanded}
+        onToggle={() => {
+          if (matchedLogIds != null) setSearchCollapsed((value) => !value);
+          else setExpanded((value) => !value);
+        }}
         controlsId={sectionId}
       />
-      {expanded && children.map((log, index) => (
+      {sectionExpanded && children.map((log, index) => (
         <ReferenceBatchLineRow
           key={log.log_id}
           log={log}
           kind={presentation.kind}
           compact={compact}
           highlightLogId={highlightLogId}
+          matchedLogIds={matchedLogIds}
           onSelectLog={onSelectLog}
           rowId={index === 0 ? sectionId : undefined}
         />
@@ -1046,14 +1137,17 @@ function ComponentChangeDetail({
   logs,
   compact,
   highlightLogId,
+  matchedLogIds,
   controlsId,
 }: {
   logs: TransactionLog[];
   compact?: boolean;
   highlightLogId?: string | null;
+  matchedLogIds?: string[] | null;
   controlsId?: string;
 }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ source: false, target: false });
+  const [searchCollapsed, setSearchCollapsed] = useState<Record<string, boolean>>({ source: false, target: false });
   const sections = [
     {
       key: "source" as const,
@@ -1082,6 +1176,7 @@ function ComponentChangeDetail({
               kind="shipment"
               compact={compact}
               highlightLogId={highlightLogId}
+              matchedLogIds={matchedLogIds}
               rowId={index === 0 ? sectionId : undefined}
             />
           ));
@@ -1095,11 +1190,14 @@ function ComponentChangeDetail({
               kind="shipment"
               compact={compact}
               highlightLogId={highlightLogId}
+              matchedLogIds={matchedLogIds}
               rowId={sectionId}
             />
           );
         }
-        const sectionExpanded = expanded[section.key] === true;
+        const sectionExpanded = matchedLogIds != null
+          ? searchCollapsed[section.key] !== true
+          : expanded[section.key] === true;
         return (
           <Fragment key={section.key}>
             <ReferenceBatchLineRow
@@ -1107,9 +1205,16 @@ function ComponentChangeDetail({
               kind="shipment"
               compact={compact}
               highlightLogId={highlightLogId}
+              matchedLogIds={matchedLogIds}
               sectionLabel={section.label}
               expanded={sectionExpanded}
-              onToggle={() => setExpanded((previous) => ({ ...previous, [section.key]: !previous[section.key] }))}
+              onToggle={() => {
+                if (matchedLogIds != null) {
+                  setSearchCollapsed((previous) => ({ ...previous, [section.key]: !previous[section.key] }));
+                } else {
+                  setExpanded((previous) => ({ ...previous, [section.key]: !previous[section.key] }));
+                }
+              }}
               controlsId={sectionId}
             />
             {sectionExpanded && children.map((log, index) => (
@@ -1119,6 +1224,7 @@ function ComponentChangeDetail({
                 kind="shipment"
                 compact={compact}
                 highlightLogId={highlightLogId}
+                matchedLogIds={matchedLogIds}
                 rowId={index === 0 ? sectionId : undefined}
               />
             ))}
@@ -1142,6 +1248,7 @@ function ReferenceBatchLineRow({
   kind,
   compact,
   highlightLogId,
+  matchedLogIds,
   onSelectLog,
   rowId,
   sectionLabel,
@@ -1154,6 +1261,7 @@ function ReferenceBatchLineRow({
   kind: ReturnType<typeof getReferenceBatchPresentation>["kind"];
   compact?: boolean;
   highlightLogId?: string | null;
+  matchedLogIds?: string[] | null;
   onSelectLog?: (log: TransactionLog) => void;
   rowId?: string;
   sectionLabel?: string;
@@ -1170,7 +1278,9 @@ function ReferenceBatchLineRow({
   const fullLineLabel = linePresentation.label;
   const lineLabel = compact && fullLineLabel === "추가 구성품 차감" ? "추가 차감" : fullLineLabel;
   const lineColor = PRESENTATION_TONE_COLOR[linePresentation.tone];
-  const highlighted = highlightLogId === log.log_id;
+  const searchMatched = matchedLogIds?.includes(log.log_id) === true;
+  const focused = highlightLogId === log.log_id;
+  const highlighted = focused || searchMatched;
   const canToggle = Boolean(onToggle);
   const onRowAction = onToggle ?? (onSelectLog ? () => onSelectLog(log) : undefined);
 
@@ -1181,7 +1291,8 @@ function ReferenceBatchLineRow({
       tabIndex={onRowAction ? 0 : undefined}
       aria-expanded={canToggle ? expanded ?? false : undefined}
       aria-controls={canToggle ? controlsId : undefined}
-      data-history-focus-line={highlighted ? "true" : undefined}
+      data-history-focus-line={focused ? "true" : undefined}
+      data-history-search-match={searchMatched ? "true" : undefined}
       onClick={onRowAction}
       onKeyDown={(e) => {
         if (!onRowAction || e.target !== e.currentTarget) return;
@@ -1299,6 +1410,12 @@ export function OpBatchHeader({
   const statusPadX = "px-2";
   const first = group.logs[0];
   const representativeLog = getOpBatchRepresentativeLog(group.logs, batch);
+  const displayBundles = batch ? getDisplayBundles(batch) : [];
+  const titleText = displayBundles[0]?.title ?? first.item_name;
+  const additionalItemCount = getAdditionalDistinctItemCount(
+    group.logs,
+    displayBundles.length > 0 ? representativeLog : first,
+  );
   const rawPrimaryType = (group.logs.find((l) => l.transaction_type !== "BACKFLUSH") ?? first).transaction_type;
   const primaryType = getHistoryDisplayTransactionType({ transaction_type: rawPrimaryType }, batch);
   const basePresentation = getHistoryRowPresentation(first, batch ?? undefined);
@@ -1306,15 +1423,6 @@ export function OpBatchHeader({
     ? (isReworkOperation(first, batch) ? LEGACY_COLORS.red : transactionColor(primaryType))
     : LEGACY_COLORS.muted2;
   const cancelled = group.logs.some((log) => log.cancelled);
-
-  let titleText: string;
-  if (batch && batch.bundles.length > 0) {
-    const displayBundles = getDisplayBundles(batch);
-    const head = displayBundles[0].title;
-    titleText = displayBundles.length > 1 ? `${head} 외 ${displayBundles.length - 1}건` : head;
-  } else {
-    titleText = `${first.item_name} 외 ${group.logs.length - 1}건`;
-  }
 
   const summary = getHistoryMovementSummary(first, batch, group.logs.length, group.logs);
   const presentation: HistoryRowPresentation = {
@@ -1379,6 +1487,7 @@ export function OpBatchHeader({
           <TargetSummaryBlock
             presentation={presentation}
             icon={<Layers className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
+            additionalItemCount={additionalItemCount}
           />
         </div>
       </td>

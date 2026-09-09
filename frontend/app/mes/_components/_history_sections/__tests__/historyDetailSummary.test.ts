@@ -109,6 +109,38 @@ describe("buildHistoryDetailSummary", () => {
     });
   });
 
+  it("keeps the raw processing snapshots separate from request-order stock", () => {
+    const log = Object.assign(makeLog({
+      warehouse_qty_before: 94,
+      warehouse_qty_after: 50,
+      department_qty_before: 30,
+      department_qty_after: 30,
+      requested_at: "2026-07-10T01:00:00Z",
+      approved_at: "2026-07-10T02:00:00Z",
+      created_at: "2026-07-10T02:00:01Z",
+    }), {
+      request_order_stock: {
+        status: "available",
+        reason: null,
+        warehouse_qty_before: 44,
+        warehouse_qty_after: 0,
+        department_qty_before: 30,
+        department_qty_after: 30,
+      },
+    });
+
+    expect(buildHistoryDetailSummary([log], null)).toMatchObject({
+      actualStock: {
+        warehouseBefore: 94,
+        warehouseAfter: 50,
+        departmentBefore: 30,
+        departmentAfter: 30,
+        requestedAt: "2026-07-10T01:00:00Z",
+        processedAt: "2026-07-10T02:00:01Z",
+      },
+    });
+  });
+
   it("uses the cancellation actor and time instead of the original batch requester", () => {
     const summary = buildHistoryDetailSummary(
       [makeLog({

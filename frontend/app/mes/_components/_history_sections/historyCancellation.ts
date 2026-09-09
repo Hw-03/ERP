@@ -51,11 +51,16 @@ export type HistoryLoadReconcileState = {
   loadingLogs: TransactionLog[] | null;
 };
 
-function withCancellation(
+/** 직접 변경 응답에 재계산 필드가 없으면 목록에서 받은 projection을 보존한다. */
+export function mergeHistoryLogUpdate(
   log: TransactionLog,
   updated: TransactionLog,
 ): TransactionLog {
-  if (log.log_id === updated.log_id) return updated;
+  if (log.log_id === updated.log_id) {
+    return updated.request_order_stock == null
+      ? { ...updated, request_order_stock: log.request_order_stock }
+      : updated;
+  }
   return {
     ...log,
     cancelled: true,
@@ -108,7 +113,7 @@ export function applyHistoryCancellation(
   const target = getCancellationTarget(updated, fallbackOperationBatchId);
   const patchLog = (log: TransactionLog) =>
     matchesCancellation(log, target)
-      ? withCancellation(log, updated)
+      ? mergeHistoryLogUpdate(log, updated)
       : log;
 
   let selection = state.selection;

@@ -23,6 +23,7 @@ import { resolveHistoryDateRange, type SelectedHistoryMonth } from "./_history_s
 import {
   advanceHistoryLoadReconcileState,
   applyHistoryCancellation,
+  mergeHistoryLogUpdate,
   reconcileHistorySelection,
   type HistoryLoadReconcileState,
 } from "./_history_sections/historyCancellation";
@@ -178,6 +179,7 @@ export function DesktopHistoryView() {
     loadMoreError,
     canLoadMore,
     loadMore,
+    refreshLoaded,
   } = historyData;
   const logs = useMemo(() => serverGroups.flatMap((group) => group.logs), [serverGroups]);
   const displayGroups = useMemo(() => toHistoryLogGroups(serverGroups), [serverGroups]);
@@ -343,6 +345,7 @@ export function DesktopHistoryView() {
       }),
     );
     void queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
+    refreshLoaded();
   }
 
   function handleLogUpdated(updated: TransactionLog) {
@@ -352,14 +355,17 @@ export function DesktopHistoryView() {
     }
     setGroups((currentGroups) => currentGroups.map((group) => ({
       ...group,
-      logs: group.logs.map((log) => (log.log_id === updated.log_id ? updated : log)),
+      logs: group.logs.map((log) => (
+        log.log_id === updated.log_id ? mergeHistoryLogUpdate(log, updated) : log
+      )),
     })));
     setSelection((current) =>
       current?.kind === "log" && current.log.log_id === updated.log_id
-        ? { ...current, log: updated }
+        ? { ...current, log: mergeHistoryLogUpdate(current.log, updated) }
         : { kind: "log", log: updated },
     );
     void queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
+    refreshLoaded();
   }
 
   function handleBatchCancelled(batchId: string, updated: TransactionLog) {

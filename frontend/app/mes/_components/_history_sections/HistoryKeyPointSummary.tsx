@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Activity, ArrowRight, ChevronDown, Clock3, MapPin, UserRound } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { formatQty } from "@/lib/mes/format";
 import { Tooltip } from "@/lib/ui/Tooltip";
 import { useDesktopRightPanelBody } from "../DesktopRightPanel";
 import { formatHistoryDateTimeLong } from "./historyFormat";
@@ -106,6 +107,37 @@ export function HistoryKeyPointSummary({
           <span className="whitespace-nowrap font-medium leading-snug">{formatHistoryDateTimeLong(summary.requester.at)}</span>
         </div>
       </div>
+
+      {summary.actualStock && (
+        <div className="border-t px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+          <div className="mb-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+            실제 처리 당시 재고
+          </div>
+          <p className="mb-2 text-xs leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>
+            목록은 요청 순서로 계산하므로, 실제 처리 당시 수량과 다를 수 있습니다.
+          </p>
+          <div className="grid gap-2 text-xs sm:grid-cols-2">
+            <ActualStockLine
+              label="창고"
+              before={summary.actualStock.warehouseBefore}
+              after={summary.actualStock.warehouseAfter}
+            />
+            <ActualStockLine
+              label="정상 부서"
+              before={summary.actualStock.departmentBefore}
+              after={summary.actualStock.departmentAfter}
+            />
+          </div>
+          <div className="mt-2 grid gap-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+            <span>
+              요청 시각 <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>{formatHistoryDateTimeLong(summary.actualStock.requestedAt)}</span>
+            </span>
+            <span>
+              처리 시각 <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>{formatHistoryDateTimeLong(summary.actualStock.processedAt)}</span>
+            </span>
+          </div>
+        </div>
+      )}
 
       {summary.flow && (
         <div className="border-t px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
@@ -267,6 +299,22 @@ export function HistoryKeyPointSummary({
         </div>
       )}
     </section>
+  );
+}
+
+function ActualStockLine({ label, before, after }: { label: string; before: number; after: number }) {
+  return (
+    <div
+      className="flex items-center justify-between gap-2 rounded-[12px] border px-3 py-2"
+      style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}
+    >
+      <span className="font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{label}</span>
+      <span className="inline-flex items-center gap-1 font-black tabular-nums" style={{ color: LEGACY_COLORS.text }}>
+        {formatQty(before)}
+        <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.muted2 }} />
+        {formatQty(after)}
+      </span>
+    </div>
   );
 }
 

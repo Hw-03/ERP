@@ -13,6 +13,21 @@ export interface InventoryEffectCell {
   box_id?: string | null;
 }
 
+export type RequestOrderStockUnavailableReason =
+  | "missing_history"
+  | "inconsistent_history"
+  | "ambiguous_order"
+  | "negative_balance";
+
+export interface RequestOrderStock {
+  status: "available" | "unavailable";
+  reason: RequestOrderStockUnavailableReason | null;
+  warehouse_qty_before: number | null;
+  warehouse_qty_after: number | null;
+  department_qty_before: number | null;
+  department_qty_after: number | null;
+}
+
 export interface TransactionLog {
   log_id: string;
   item_id: string;
@@ -59,6 +74,8 @@ export interface TransactionLog {
   cancelled_by: string | null;
   cancelled_at: string | null;
   inventory_effect?: InventoryEffectCell[] | null;
+  /** 요청 시각 순으로 재계산한 창고/정상 부서 재고. absent/null은 구 API 원본 스냅샷을 사용한다. */
+  request_order_stock?: RequestOrderStock | null;
 }
 
 export interface InventoryOperationLine {

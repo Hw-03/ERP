@@ -61,6 +61,7 @@ export function Tooltip({
   triggerAriaLabel,
 }: Props) {
   const triggerRef = useRef<HTMLSpanElement>(null);
+  const pointerFocusRef = useRef(false);
   const focusedTargetRef = useRef<HTMLElement | null>(null);
   const tooltipId = useId();
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
@@ -86,7 +87,7 @@ export function Tooltip({
     setPos({ left, top });
   };
   const handleMouseLeave = () => {
-    if (triggerRef.current?.contains(document.activeElement)) return;
+    if (!pointerFocusRef.current && triggerRef.current?.contains(document.activeElement)) return;
     clearFocusedDescription();
     setPos(null);
   };
@@ -108,6 +109,7 @@ export function Tooltip({
   };
   const handleBlur = (event: FocusEvent<HTMLSpanElement>) => {
     if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+    pointerFocusRef.current = false;
     clearFocusedDescription();
     setPos(null);
   };
@@ -129,6 +131,7 @@ export function Tooltip({
         aria-describedby={show && !describesFocusedChild ? tooltipId : undefined}
         className={triggerClassName}
         onMouseEnter={handleShow}
+        onPointerDown={() => { pointerFocusRef.current = true; }}
         onMouseLeave={handleMouseLeave}
         onFocus={handleFocus}
         onBlur={handleBlur}

@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from decimal import Decimal
+import pytest
 
-from app.models import Employee, IoBatch, TransactionLog, TransactionTypeEnum
+from app.models import Employee, InventoryOperation, IoBatch, TransactionLog, TransactionTypeEnum
 
 
 def _add_log(
@@ -103,6 +104,60 @@ def test_display_groups_pages_complete_groups_by_representative_row(client, db_s
     assert second_body["groups"][0]["logs"][0]["log_id"] == str(solo_logs[-1].log_id)
     assert second_body["has_more"] is False
     assert second_body["next_cursor"] is None
+
+
+@pytest.mark.parametrize("group_type", ["op_batch", "operation", "batch"])
+def test_component_search_preserves_complete_groups_and_cursor(client, db_session, make_item, group_type):
+    component = make_item(name="Search connector")
+    parent = make_item(name="Parent assembly")
+    sibling = make_item(name="Sibling cable")
+    base = datetime(2026, 9, 9, 5, 0)
+    expected = []
+    for index in range(2):
+        batch = _add_batch(db_session, f"search-{index}")
+        batch.submitted_at = base - timedelta(days=index)
+        logs = [
+            _add_log(db_session, item, created_at=batch.submitted_at,
+                     operation_batch_id=batch.batch_id)
+            for item in (parent, component, sibling)
+        ]
+        if group_type == "operation":
+            operation = InventoryOperation(kind="BUSINESS", domain="process", action="produce",
+                                           display_label="Assembly", actor_name="Tester",
+                                           effective_at=batch.submitted_at)
+            db_session.add(operation)
+            db_session.flush()
+            for log in logs:
+                log.operation_id = operation.operation_id
+        elif group_type == "batch":
+            for log in logs:
+                log.operation_batch_id = None
+                log.reference_no = f"SEARCH-REFERENCE-{index}"
+        expected.append(logs)
+    _add_log(db_session, sibling, created_at=base + timedelta(hours=1))
+    db_session.commit()
+    params = {"search": "searchconnector", "limit": 1}
+    first = client.get("/api/inventory/transactions/display-groups", params=params)
+    assert first.status_code == 200, first.text
+    body = first.json()
+    assert body["has_more"] is True
+    for index in range(2):
+        group = body["groups"][0]
+        assert group["type"] == group_type
+        assert {log["log_id"] for log in group["logs"]} == {str(log.log_id) for log in expected[index]}
+        assert group["matched_log_ids"] == [str(expected[index][1].log_id)]
+        if index == 0:
+            second = client.get("/api/inventory/transactions/display-groups",
+                                params={**params, "cursor": body["next_cursor"]})
+            assert second.status_code == 200, second.text
+            body = second.json()
+    assert body["has_more"] is False
+    filtered = client.get("/api/inventory/transactions/display-groups", params={
+        "search": "searchconnector", "date_from": "2026-09-09", "date_to": "2026-09-09",
+    }).json()
+    assert len(filtered["groups"]) == 1
+    assert len(filtered["groups"][0]["logs"]) == 3
+    assert client.get("/api/inventory/transactions/display-groups", params={"search": "no-match"}).json()["groups"] == []
 
 
 def test_display_groups_applies_existing_search_filter_and_sort(client, db_session, make_item):

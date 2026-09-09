@@ -102,6 +102,27 @@ describe("productionApi", () => {
     expect(String(fetchSpy.mock.calls[0][0])).toContain("operation_id=operation-1");
   });
 
+  it("maps display-group matched log ids from the wire response", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({
+      groups: [{
+        type: "operation",
+        key: "operation-1",
+        logs: [],
+        matched_log_ids: ["child-1", "child-2"],
+      }],
+      next_cursor: null,
+      has_more: false,
+    })));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    const page = await productionApi.getTransactionDisplayGroups({ search: "connector" });
+
+    expect(page.groups[0]).toMatchObject({
+      key: "operation-1",
+      matchedLogIds: ["child-1", "child-2"],
+    });
+  });
+
   it("previews an inventory operation cancellation and maps numeric cells", async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({
       operation_id: "operation-1",

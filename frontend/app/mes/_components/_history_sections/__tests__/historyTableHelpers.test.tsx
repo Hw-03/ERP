@@ -17,8 +17,10 @@ import {
   MovementSummaryCell,
   PeopleStatusCell,
   ReferenceBatchDetail,
+  StockSnapshotCell,
   TargetSummaryBlock,
   buildGroups,
+  getAdditionalDistinctItemCount,
   getStockSnapshotQuantityWidth,
   toHistoryLogGroups,
 } from "../historyTableHelpers";
@@ -69,6 +71,27 @@ function makeLog(overrides: Partial<TransactionLog> = {}): TransactionLog {
   };
 }
 
+describe("getAdditionalDistinctItemCount", () => {
+  it("대표 품목을 제외한 고유 품목만 세고 미변동 구성품도 포함한다", () => {
+    const representative = makeLog({ item_id: "PARENT", quantity_change: 5 });
+    const duplicateParent = makeLog({ log_id: "parent-copy", item_id: "PARENT", quantity_change: -5 });
+    const firstComponent = makeLog({ log_id: "component-a", item_id: "COMPONENT-A", quantity_change: 0 });
+    const duplicatedComponent = makeLog({ log_id: "component-a-copy", item_id: "COMPONENT-A", quantity_change: -1 });
+    const secondComponent = makeLog({ log_id: "component-b", item_id: "COMPONENT-B", quantity_change: 3 });
+
+    expect(getAdditionalDistinctItemCount(
+      [representative, duplicateParent, firstComponent, duplicatedComponent, secondComponent],
+      representative,
+    )).toBe(2);
+  });
+
+  it("추가 품목이 없으면 0을 반환한다", () => {
+    const representative = makeLog({ item_id: "PARENT" });
+
+    expect(getAdditionalDistinctItemCount([representative, makeLog({ log_id: "copy", item_id: "PARENT" })], representative)).toBe(0);
+  });
+});
+
 describe("getStockSnapshotQuantityWidth", () => {
   it("숨긴 미변동 재고의 큰 수량은 묶음 수량 폭에 포함하지 않는다", () => {
     expect(getStockSnapshotQuantityWidth([
@@ -79,6 +102,79 @@ describe("getStockSnapshotQuantityWidth", () => {
         department_qty_after: 75,
       }),
     ])).toBe(24);
+  });
+
+  it("요청 순 재고를 기준으로 묶음 수량 폭을 계산한다", () => {
+    const log = Object.assign(makeLog({
+      warehouse_qty_before: 9_999_999,
+      warehouse_qty_after: 9_999_955,
+      department_qty_before: 1_000_000,
+      department_qty_after: 999_956,
+    }), {
+      request_order_stock: {
+        status: "available",
+        reason: null,
+        warehouse_qty_before: 44,
+        warehouse_qty_after: 0,
+        department_qty_before: 12,
+        department_qty_after: 12,
+      },
+    });
+
+    expect(getStockSnapshotQuantityWidth([log])).toBe(24);
+  });
+});
+
+describe("StockSnapshotCell request-order stock", () => {
+  it("승인 시점 원본 대신 요청 순 재계산 재고를 표시한다", () => {
+    const log = Object.assign(makeLog({
+      quantity_change: -44,
+      warehouse_qty_before: 94,
+      warehouse_qty_after: 50,
+      department_qty_before: 30,
+      department_qty_after: 30,
+    }), {
+      request_order_stock: {
+        status: "available",
+        reason: null,
+        warehouse_qty_before: 44,
+        warehouse_qty_after: 0,
+        department_qty_before: 30,
+        department_qty_after: 30,
+      },
+    });
+
+    render(<table><tbody><tr><StockSnapshotCell log={log} /></tr></tbody></table>);
+
+    expect(screen.getByLabelText(/재고 변동: 창고 44.*0/)).toBeInTheDocument();
+    expect(screen.queryByText("94")).not.toBeInTheDocument();
+    expect(screen.queryByText("50")).not.toBeInTheDocument();
+  });
+
+  it("재계산 불가 응답은 원본 재고로 대체하지 않고 사유를 설명한다", async () => {
+    const log = Object.assign(makeLog({
+      warehouse_qty_before: 94,
+      warehouse_qty_after: 50,
+      department_qty_before: 30,
+      department_qty_after: 30,
+    }), {
+      request_order_stock: {
+        status: "unavailable",
+        reason: "ambiguous_order",
+        warehouse_qty_before: null,
+        warehouse_qty_after: null,
+        department_qty_before: null,
+        department_qty_after: null,
+      },
+    });
+
+    render(<table><tbody><tr><StockSnapshotCell log={log} /></tr></tbody></table>);
+
+    const unavailable = screen.getByLabelText("요청 순 재고 계산 불가: 같은 처리 시각의 거래 순서를 확정할 수 없습니다.");
+    expect(unavailable).toHaveTextContent("계산 불가");
+    expect(screen.queryByText("94")).not.toBeInTheDocument();
+    fireEvent.mouseEnter(unavailable);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("같은 처리 시각의 거래 순서를 확정할 수 없습니다.");
   });
 });
 
@@ -107,14 +203,14 @@ describe("toHistoryLogGroups", () => {
     const parent = makeLog({ log_id: "defect-parent", transaction_type: "MARK_DEFECTIVE" });
     const child = makeLog({ log_id: "defect-child", transaction_type: "DISASSEMBLE" });
     const groups = toHistoryLogGroups([
-      { type: "operation", key: "operation-1", logs: [makeLog({ operation_id: "operation-1" })] },
+      { type: "operation", key: "operation-1", logs: [makeLog({ operation_id: "operation-1" })], matchedLogIds: ["log-1"] },
       { type: "op_batch", key: "batch-1", logs: [makeLog({ operation_batch_id: "batch-1" })] },
       { type: "batch", key: "REF-1::PICKUP", logs: [makeLog({ reference_no: "REF-1", shipping_phase: "PICKUP" })] },
       { type: "defect_lifecycle", key: "defect-lifecycle:defect-parent:defect-child", logs: [parent, child] },
     ]);
 
     expect(groups).toEqual([
-      expect.objectContaining({ type: "operation", operationId: "operation-1" }),
+      expect.objectContaining({ type: "operation", operationId: "operation-1", matchedLogIds: ["log-1"] }),
       expect.objectContaining({ type: "op_batch", batchId: "batch-1" }),
       expect.objectContaining({ type: "batch", refKey: "REF-1::PICKUP", refNo: "REF-1" }),
       expect.objectContaining({ type: "defect_lifecycle", parent, child }),
@@ -123,6 +219,28 @@ describe("toHistoryLogGroups", () => {
 });
 
 describe("HistoryTable server groups", () => {
+  it("재고 변동 열에서 요청 순 계산과 승인 후 변경 가능성을 설명한다", async () => {
+    render(
+      <HistoryTable
+        loading={false}
+        filteredLogs={[makeLog()]}
+        selection={null}
+        onSelectLog={() => {}}
+        onSelectBatch={() => {}}
+        batchCache={new Map()}
+        setBatchCache={() => {}}
+        canLoadMore={false}
+        loadingMore={false}
+        onLoadMore={() => {}}
+      />,
+    );
+
+    const help = screen.getByLabelText("재고 변동 계산 기준");
+    fireEvent.focus(help);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("요청 시각 순서로 계산");
+    expect(screen.getByRole("tooltip")).toHaveTextContent("승인되면 과거 표시도 변경");
+  });
+
   it("invalidates the prior request during a revision render before passive cache reset", async () => {
     const batchId = "batch-revision-race";
     const staleBatch = {
@@ -462,7 +580,7 @@ describe("HistoryTable server groups", () => {
       />,
     );
 
-    fireEvent.click(screen.getByLabelText("재작업 대상 재작업").closest("tr")!);
+    fireEvent.click(screen.getByLabelText("재작업 대상").closest("tr")!);
     expect(onSelectLog).toHaveBeenCalledWith(expect.objectContaining({ log_id: "rework-parent" }));
   });
 });
@@ -608,12 +726,14 @@ describe("history table helper rendering policies", () => {
     const { rerender } = render(<HistoryTable {...props} filteredLogs={[first, second]} />);
 
     expect(screen.getByText("출고 구성 62건")).toBeInTheDocument();
+    expect(screen.getByText("외 1품목")).toBeInTheDocument();
     expect(screen.queryByText("출고 20품목 · 108 EA")).not.toBeInTheDocument();
 
     rerender(<HistoryTable {...props} filteredLogs={[first, second, makeLog({
       log_id: "ref-3", reference_no: "REF-ALL", item_id: "ITEM-3", transfer_qty: 50,
     })]} />);
     expect(screen.getByText("출고 구성 62건")).toBeInTheDocument();
+    expect(screen.getByText("외 2품목")).toBeInTheDocument();
     expect(screen.queryByText("출고 20품목 · 108 EA")).not.toBeInTheDocument();
   });
 
@@ -1018,21 +1138,21 @@ describe("history table helper rendering policies", () => {
     expect(screen.getByText("긴 보조 설명")).toHaveClass("truncate");
   });
 
-  it("places processing counts beside the target title", () => {
+  it("places additional item counts beside the target title", () => {
     const presentation = {
       target: {
         title: "COCOON OP BD ASS'Y",
         code: "7-AA-0047",
-        meta: ["4종 처리", "긴 보조 설명"],
+        meta: ["긴 보조 설명"],
       },
     } as HistoryRowPresentation;
 
-    render(<TargetSummaryBlock presentation={presentation} icon={<span aria-hidden />} />);
+    render(<TargetSummaryBlock presentation={presentation} icon={<span aria-hidden />} additionalItemCount={4} />);
 
-    const processingCount = screen.getByText("4종 처리");
-    expect(processingCount.parentElement).toHaveTextContent(presentation.target.title);
-    expect(processingCount).toHaveClass("shrink-0");
-    expect(screen.getByText("긴 보조 설명").parentElement).not.toHaveTextContent("4종 처리");
+    const itemCount = screen.getByText("외 4품목");
+    expect(itemCount.parentElement).toHaveTextContent(presentation.target.title);
+    expect(itemCount).toHaveClass("shrink-0");
+    expect(screen.getByText("긴 보조 설명").parentElement).not.toHaveTextContent("외 4품목");
   });
 
   it("strikes through cancelled target titles and quantity pills only", () => {

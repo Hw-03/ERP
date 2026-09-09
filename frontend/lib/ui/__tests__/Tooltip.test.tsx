@@ -1,9 +1,29 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { SlidePanel } from "@/app/mes/_components/common/SlidePanel";
 import { Tooltip } from "../Tooltip";
 
 describe("Tooltip", () => {
+  it("closes on mouse leave after pointer focus but preserves keyboard focus", () => {
+    render(<Tooltip content="Description" triggerTabIndex={0}><span>Target</span></Tooltip>);
+    const trigger = screen.getByText("Target").parentElement!;
+    fireEvent.mouseEnter(trigger);
+    fireEvent.pointerDown(trigger);
+    act(() => trigger.focus());
+    fireEvent.mouseLeave(trigger);
+    expect(trigger).toHaveFocus();
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    expect(trigger).not.toHaveAttribute("aria-describedby");
+
+    act(() => trigger.blur());
+    act(() => trigger.focus());
+    fireEvent.mouseEnter(trigger);
+    fireEvent.mouseLeave(trigger);
+    expect(screen.getByRole("tooltip")).toBeInTheDocument();
+    fireEvent.keyDown(trigger, { key: "Escape" });
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
   it("opens for keyboard focus, links the description, and closes on blur", () => {
     render(
       <Tooltip content="전체 설명">

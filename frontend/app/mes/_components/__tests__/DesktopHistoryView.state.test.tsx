@@ -179,6 +179,7 @@ vi.mock("../_history_sections/DesktopHistoryRightPanel", () => ({
             취소 콜백 보관
           </button>
           <button type="button" onClick={() => onLogUpdated(testState.updated)}>단건 취소 성공</button>
+          <button type="button" onClick={() => onLogUpdated(testState.updated)}>수정 성공</button>
         </>
       )}
       {canGoBack && <button type="button" onClick={onBack}>뒤로</button>}
@@ -255,6 +256,7 @@ function setHistoryResult(logs: TransactionLog[], loading: boolean, error: strin
     loadMoreError: null,
     canLoadMore: false,
     loadMore: vi.fn(),
+    refreshLoaded: vi.fn(),
     setGroups: (update: React.SetStateAction<any[]>) => {
       const next = typeof update === "function" ? update(testState.historyResult.groups) : update;
       testState.historyResult = { ...testState.historyResult, groups: next };
@@ -502,7 +504,64 @@ describe("DesktopHistoryView history state", () => {
       expect(screen.getByTestId("history-right-panel-state")).toHaveAttribute("data-selection-cancelled", "yes");
       expect(screen.getByTestId("history-right-panel-state")).toHaveAttribute("data-cache-status", "cancelled");
       expect(testState.queryClient?.getQueryState(transactionListKey)?.isInvalidated).toBe(true);
+      expect(testState.historyResult.refreshLoaded).toHaveBeenCalledOnce();
     });
+  });
+
+  it.each([undefined, null])("preserves request-order stock while a mutation response with %s is being reloaded", (requestOrderStock) => {
+    const original = Object.assign(makeLog({ operation_batch_id: null }), {
+      request_order_stock: {
+        status: "available",
+        reason: null,
+        warehouse_qty_before: 44,
+        warehouse_qty_after: 0,
+        department_qty_before: 10,
+        department_qty_after: 10,
+      },
+    });
+    testState.updated = makeLog({
+      operation_batch_id: null,
+      cancelled: true,
+      cancel_reason: "취소",
+      cancelled_by: "employee-1",
+      cancelled_at: "2026-07-10T02:00:00Z",
+      request_order_stock: requestOrderStock,
+    });
+    setHistoryResult([original], false);
+    const { rerender } = render(<DesktopHistoryView />);
+    fireEvent.click(screen.getByRole("button", { name: "단건 선택" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "단건 취소 성공" }));
+    rerender(<DesktopHistoryView />);
+
+    const patched = testState.historyResult.groups[0].logs[0] as TransactionLog & { request_order_stock?: unknown };
+    expect(patched.request_order_stock).toEqual(original.request_order_stock);
+    expect(testState.historyResult.refreshLoaded).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the projection and explicitly reloads after a non-cancellation edit", () => {
+    const original = Object.assign(makeLog({ operation_batch_id: null }), {
+      request_order_stock: {
+        status: "available",
+        reason: null,
+        warehouse_qty_before: 44,
+        warehouse_qty_after: 0,
+        department_qty_before: 10,
+        department_qty_after: 10,
+      },
+    });
+    testState.updated = makeLog({ operation_batch_id: null, item_name: "수정된 객체" });
+    setHistoryResult([original], false);
+    const { rerender } = render(<DesktopHistoryView />);
+    fireEvent.click(screen.getByRole("button", { name: "단건 선택" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "수정 성공" }));
+    rerender(<DesktopHistoryView />);
+
+    const patched = testState.historyResult.groups[0].logs[0] as TransactionLog & { request_order_stock?: unknown };
+    expect(patched.item_name).toBe("수정된 객체");
+    expect(patched.request_order_stock).toEqual(original.request_order_stock);
+    expect(testState.historyResult.refreshLoaded).toHaveBeenCalledOnce();
   });
 
   it("patches same-reference logs and a stacked selection without replacing the current target", async () => {

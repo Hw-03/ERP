@@ -31,6 +31,7 @@ function summary(overrides: Partial<HistoryDetailSummary> = {}): HistoryDetailSu
     impactGroups: [{ key: "actual", label: null, effects: [effect()] }],
     conversion: null,
     requester: { label: "요청자", name: "요청자 A", at: "2026-07-10T01:00:00Z" },
+    actualStock: null,
     flow: null,
     composition: null,
     impactIdentity: "log-1",
@@ -60,6 +61,28 @@ describe("HistoryKeyPointSummary", () => {
     expect(screen.getByText("+1 EA")).toBeInTheDocument();
     expect(screen.getByText("완제품 A")).toBeInTheDocument();
     expect(screen.queryByText(/처리 전|처리 후|창고 401/)).not.toBeInTheDocument();
+  });
+
+  it("shows the original processing stock and request/processing timestamps separately", () => {
+    const detailedSummary = Object.assign(summary(), {
+      actualStock: {
+        warehouseBefore: 94,
+        warehouseAfter: 50,
+        departmentBefore: 30,
+        departmentAfter: 30,
+        requestedAt: "2026-07-10T01:00:00Z",
+        processedAt: "2026-07-10T02:00:00Z",
+      },
+    });
+
+    render(<HistoryKeyPointSummary summary={detailedSummary} />);
+
+    const block = screen.getByText("실제 처리 당시 재고").parentElement!;
+    expect(within(block).getByText(/창고/).parentElement).toHaveTextContent("94");
+    expect(within(block).getByText(/창고/).parentElement).toHaveTextContent("50");
+    expect(within(block).getByText(/정상 부서/).parentElement).toHaveTextContent("30");
+    expect(within(block).getByText(/요청 시각/).parentElement).toHaveTextContent(/2026년 7월 10일/);
+    expect(within(block).getByText(/처리 시각/).parentElement).toHaveTextContent(/2026년 7월 10일/);
   });
 
   it("renders the requester name without a redundant requester label", () => {

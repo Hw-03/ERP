@@ -54,6 +54,14 @@ export type HistoryDetailSummary = {
     name: string;
     at: string;
   };
+  actualStock: {
+    warehouseBefore: number;
+    warehouseAfter: number;
+    departmentBefore: number;
+    departmentAfter: number;
+    requestedAt: string;
+    processedAt: string;
+  } | null;
   flow: {
     label: string;
     from: string | null;
@@ -268,6 +276,24 @@ function getStatus(logs: TransactionLog[], batch: IoBatch | null): HistoryDetail
   }
 }
 
+function getActualProcessingStock(log: TransactionLog): HistoryDetailSummary["actualStock"] {
+  if (log.request_order_stock == null) return null;
+  if (
+    log.warehouse_qty_before == null
+    || log.warehouse_qty_after == null
+    || log.department_qty_before == null
+    || log.department_qty_after == null
+  ) return null;
+  return {
+    warehouseBefore: log.warehouse_qty_before,
+    warehouseAfter: log.warehouse_qty_after,
+    departmentBefore: log.department_qty_before,
+    departmentAfter: log.department_qty_after,
+    requestedAt: log.requested_at ?? log.created_at,
+    processedAt: log.created_at,
+  };
+}
+
 export function buildHistoryDetailSummary(
   logs: TransactionLog[],
   batch: IoBatch | null,
@@ -301,6 +327,7 @@ export function buildHistoryDetailSummary(
         ? primary.requested_at ?? primary.created_at
         : batch?.submitted_at ?? primary.requested_at ?? primary.created_at,
     },
+    actualStock: getActualProcessingStock(primary),
     flow: reworkFlow ?? (presentation.flow.label
       ? {
         label: presentation.flow.label,

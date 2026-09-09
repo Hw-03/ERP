@@ -83,6 +83,12 @@ def _history_request_date_expr() -> ColumnElement:
         .correlate(TransactionLog)
         .scalar_subquery()
     )
+    stock_request_at = (
+        select(func.coalesce(StockRequest.submitted_at, StockRequest.created_at))
+        .where(StockRequest.request_code == TransactionLog.reference_no)
+        .correlate(TransactionLog)
+        .scalar_subquery()
+    )
     return case(
         (
             operation_kind == InventoryOperationKindEnum.CANCELLATION,
@@ -91,6 +97,7 @@ def _history_request_date_expr() -> ColumnElement:
         else_=func.coalesce(
             IoBatch.submitted_at,
             IoBatch.created_at,
+            stock_request_at,
             TransactionLog.created_at,
         ),
     )
@@ -450,7 +457,15 @@ def _apply_common_filters(
         query = query.filter(request_date_expr < date_to_end)
     if not include_archived:
         query = query.filter(TransactionLog.archived_at.is_(None))
-    search_filter = build_normalized_search_filter(
+    search_filter = _history_search_filter(search)
+    if search_filter is not None:
+        query = query.filter(search_filter)
+    return query
+
+
+def _history_search_filter(search: Optional[str]) -> Optional[ColumnElement[bool]]:
+    """목록과 묶음 내 검색 일치 여부에 동일한 정규화 조건을 사용한다."""
+    return build_normalized_search_filter(
         search,
         Item.item_name,
         Item.mes_code,
@@ -459,9 +474,6 @@ def _apply_common_filters(
         TransactionLog.produced_by,
         IoBatch.requester_name,
     )
-    if search_filter is not None:
-        query = query.filter(search_filter)
-    return query
 
 
 class _BatchInfo(NamedTuple):

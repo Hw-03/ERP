@@ -49,6 +49,22 @@ class TransactionEditLogResponse(BaseModel):
     created_at: UtcDatetime
 
 
+RequestOrderStockReason = Literal[
+    "missing_history", "inconsistent_history", "ambiguous_order", "negative_balance",
+]
+
+
+class RequestOrderStockResponse(BaseModel):
+    """요청순으로 재구성한 조회 전용 잔고. 실제 처리 당시 원본과 분리한다."""
+
+    status: Literal["available", "unavailable"]
+    reason: Optional[RequestOrderStockReason] = None
+    warehouse_qty_before: Optional[int] = None
+    warehouse_qty_after: Optional[int] = None
+    department_qty_before: Optional[int] = None
+    department_qty_after: Optional[int] = None
+
+
 class TransactionLogResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -95,6 +111,7 @@ class TransactionLogResponse(BaseModel):
     cancelled_by: Optional[uuid.UUID] = None
     cancelled_at: Optional[UtcDatetime] = None
     inventory_effect: Optional[list[dict[str, Any]]] = None
+    request_order_stock: Optional[RequestOrderStockResponse] = None
 
 
 class TransactionDisplayGroupResponse(BaseModel):
@@ -103,6 +120,7 @@ class TransactionDisplayGroupResponse(BaseModel):
     type: Literal["solo", "batch", "op_batch", "operation", "defect_lifecycle"]
     key: str
     logs: list[TransactionLogResponse]
+    matched_log_ids: Optional[list[uuid.UUID]] = None
 
 
 class TransactionDisplayGroupPageResponse(BaseModel):

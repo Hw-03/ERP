@@ -231,6 +231,37 @@ describe("useDesktopHistoryGroups", () => {
     });
   });
 
+  it("명시 새로고침도 기존 두 페이지를 모두 받은 뒤 한 번에 교체한다", async () => {
+    const refreshedSecondRequest = deferred<Response>();
+    const firstPage = { groups: [makeGroup(0)], next_cursor: "cursor-1", has_more: true };
+    const secondPage = { groups: [makeGroup(1)], next_cursor: null, has_more: false };
+    const refreshedFirstPage = { groups: [makeGroup(10)], next_cursor: "fresh-cursor-1", has_more: true };
+    const refreshedSecondPage = { groups: [makeGroup(11)], next_cursor: null, has_more: false };
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(makeResponse(firstPage))
+      .mockResolvedValueOnce(makeResponse(secondPage))
+      .mockResolvedValueOnce(makeResponse(refreshedFirstPage))
+      .mockReturnValueOnce(refreshedSecondRequest.promise);
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    const { result } = renderHook(() => useDesktopHistoryGroups(baseArgs), { wrapper: makeWrapper(client) });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => result.current.loadMore());
+    expect(result.current.groups).toEqual([makeGroup(0), makeGroup(1)]);
+
+    const refreshLoaded = (result.current as typeof result.current & { refreshLoaded?: () => void }).refreshLoaded;
+    expect(refreshLoaded).toEqual(expect.any(Function));
+    if (!refreshLoaded) return;
+    act(() => refreshLoaded());
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(4));
+    expect(String(fetchSpy.mock.calls[3][0])).toContain("cursor=fresh-cursor-1");
+    expect(result.current.groups).toEqual([makeGroup(0), makeGroup(1)]);
+
+    await act(async () => refreshedSecondRequest.resolve(makeResponse(refreshedSecondPage)));
+    await waitFor(() => expect(result.current.groups).toEqual([makeGroup(10), makeGroup(11)]));
+  });
+
   it("대표 행 100개를 받고 다음 요청에는 서버 커서를 전달해 완결된 묶음을 덧붙인다", async () => {
     const firstPage = { groups: Array.from({ length: 100 }, (_, index) => makeGroup(index)), next_cursor: "cursor-100", has_more: true };
     const secondPage = { groups: [makeGroup(100)], next_cursor: null, has_more: false };

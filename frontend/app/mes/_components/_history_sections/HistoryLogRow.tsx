@@ -31,9 +31,10 @@ type Props = {
   controlsId?: string;
   separationHint?: string | null;
   toggleLabel?: string;
+  additionalItemCount?: number;
 };
 
-function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, controlsId, separationHint, toggleLabel }: Props) {
+function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, controlsId, separationHint, toggleLabel, additionalItemCount }: Props) {
   const [hovered, setHovered] = useState(false);
   const padX = "px-4";
   const targetPadX = "px-4";
@@ -97,6 +98,7 @@ function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, contro
         <TargetSummaryBlock
           presentation={presentation}
           icon={<Package className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />}
+          additionalItemCount={additionalItemCount}
         />
       </td>
       <ItemCodeCell

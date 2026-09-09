@@ -128,11 +128,11 @@ describe("historyPresentation", () => {
     )).toBe("수량 조정");
     expect(getHistoryListOperationLabel(
       makeLog({ transaction_type: "DISASSEMBLE", reference_no: "defect-disassemble:1" }),
-    )).toBe("불량");
+    )).toBe("재작업");
     expect(getHistoryListOperationLabel(
       makeLog({ transaction_type: "SHIP", shipping_phase: "PICKUP" }),
     )).toBe("출하");
-    expect(getHistoryListOperationLabel(makeLog({ transaction_type: "UNMARK_DEFECTIVE" }))).toBe("불량");
+    expect(getHistoryListOperationLabel(makeLog({ transaction_type: "UNMARK_DEFECTIVE" }))).toBe("불량 정상 복귀");
   });
 
   it("internal use의 stock 표시는 창고 수량을 우선 사용한다", () => {
@@ -177,19 +177,25 @@ describe("historyPresentation", () => {
   ] as const)("keeps %s in the defect list while showing %s in detail", (transactionType, detailLabel) => {
     const log = makeLog({ transaction_type: transactionType });
 
-    expect(getHistoryListOperationLabel(log)).toBe("불량");
+    expect(getHistoryListOperationLabel(log)).toBe(transactionType === "UNMARK_DEFECTIVE" ? "불량 정상 복귀" : "불량");
     expect(getHistoryRowPresentation(log).operation.label).toBe(detailLabel);
   });
 
-  it("keeps defect disassembly list rows under 불량 and prioritizes 재작업 for every batch result", () => {
+  it("labels rework rows and their cancellation from the rework reference", () => {
     const batch = makeBatch({ sub_type: "disassemble" });
     const disassembly = makeLog({ transaction_type: "DISASSEMBLE", reference_no: "defect-disassemble:1" });
     const scrap = makeLog({ transaction_type: "DEFECT_SCRAP", reference_no: "defect-disassemble:1" });
     const recovered = makeLog({ transaction_type: "RECEIVE", reference_no: "defect-disassemble:1" });
+    const cancelledRework = makeLog({
+      transaction_type: "DISASSEMBLE",
+      reference_no: "defect-disassemble:1",
+      operation_kind: "CANCELLATION",
+    });
 
-    expect(getHistoryListOperationLabel(disassembly)).toBe("불량");
-    expect(getHistoryListOperationLabel(scrap)).toBe("불량");
-    expect(getHistoryListOperationLabel(recovered)).toBe("불량");
+    expect(getHistoryListOperationLabel(disassembly)).toBe("재작업");
+    expect(getHistoryListOperationLabel(scrap)).toBe("재작업");
+    expect(getHistoryListOperationLabel(recovered)).toBe("재작업");
+    expect(getHistoryListOperationLabel(cancelledRework)).toBe("재작업 취소");
     expect(getHistoryRowPresentation(disassembly, batch).operation.label).toBe("재작업");
     expect(getHistoryRowPresentation(scrap, batch).operation.label).toBe("재작업");
     expect(getHistoryRowPresentation(recovered, batch).operation.label).toBe("재작업");
