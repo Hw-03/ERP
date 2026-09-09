@@ -85,6 +85,23 @@ describe("DesktopWeeklyReportView F705-02 다운로드", () => {
     vi.restoreAllMocks();
   });
 
+  it("생산 부서 수는 상세의 A 품목 생산을 제외한 매트릭스로 계산한다", () => {
+    state.useWeeklyReportQuery.mockReturnValue({
+      data: {
+        groups: [
+          { process_code: "TF", produce_qty: 11, items: [] },
+          { process_code: "VF", produce_qty: 22, items: [] },
+        ],
+        production_matrix: [{ model_key: "SOLO", model_label: "SOLO", tf_qty: 11, vf_qty: 0, total_qty: 11 }],
+      },
+      isLoading: false,
+      error: null,
+    });
+    renderWeekly();
+    expect(screen.getByText("생산 부서 1/2")).toBeInTheDocument();
+    expect(screen.getByText("총 11개")).toBeInTheDocument();
+  });
+
   it("KST 월요일부터 일요일까지를 주간보고 조회 기간으로 사용한다", () => {
     renderWeekly(new Date("2026-08-31T00:00:00+09:00"));
 

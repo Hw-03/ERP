@@ -8,7 +8,6 @@ import { EmptyState } from "../common/EmptyState";
 
 // 0 값 de-emphasis — WCAG AA 충족(투명 30% 는 미달) → 솔리드 muted2(5.55:1).
 const ZERO_FADE = LEGACY_COLORS.muted2;
-const CERAMIC_TUBE_HOUSING_MES_CODE = "3468-HA-0006";
 
 interface Props {
   group: WeeklyGroupReport | undefined;
@@ -16,10 +15,6 @@ interface Props {
   onItemSelect: (item: WeeklyItemReport) => void;
 }
 
-function renderDesktopMesCode(mesCode: string | null): React.ReactNode {
-  if (mesCode !== CERAMIC_TUBE_HOUSING_MES_CODE) return mesCode ?? "—";
-  return <><span className="block">3468-HF</span><span className="block">-0006</span></>;
-}
 
 function WeeklyDetailTableImpl({ group, stockBasis, onItemSelect }: Props) {
   if (!group || group.items.length === 0) {
@@ -256,10 +251,11 @@ function WeeklyDetailTableImpl({ group, stockBasis, onItemSelect }: Props) {
                       background: rowBg,
                       borderColor: rowBorder,
                       color: LEGACY_COLORS.muted,
-                      whiteSpace: "nowrap",
+                      whiteSpace: "normal",
+                      overflowWrap: "anywhere",
                     }}
                   >
-                    {renderDesktopMesCode(row.mes_code)}
+                    {row.mes_code ?? "—"}
                   </td>
                   {/* 품명 */}
                   <td

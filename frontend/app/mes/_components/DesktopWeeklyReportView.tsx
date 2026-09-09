@@ -54,7 +54,10 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
     (best, r) => (r.total_qty > (best?.total_qty ?? 0) ? r : best),
     null as WeeklyProductionModelRow | null
   );
-  const activeDepts = data?.groups.filter((g) => g.produce_qty > 0).length ?? 0;
+  const activeDepts = data?.groups.filter((g) => {
+    const key = `${g.process_code.toLowerCase()}_qty` as keyof WeeklyProductionModelRow;
+    return matrixRows.some((row) => Number(row[key]) > 0);
+  }).length ?? 0;
   const totalDepts = data?.groups.length ?? 0;
 
   async function handleF705Download(): Promise<void> {

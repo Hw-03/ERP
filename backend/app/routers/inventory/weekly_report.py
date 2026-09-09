@@ -634,13 +634,7 @@ def get_weekly_report(
     matrix: dict[str, dict[str, Decimal]] = {}
     snapshot_group_codes = (
         {
-            str(row.item_id): weekly_report_group_code(
-                row.process_type_code,
-                row.item_name,
-                row.mes_code,
-                include_vacuum_generator=include_vacuum_generator,
-                include_ceramic_tube_housing=include_ceramic_tube_housing,
-            )
+            str(row.item_id): row.process_type_code
             for row in snapshot_context.items
         }
         if snapshot_context is not None
@@ -653,13 +647,7 @@ def get_weekly_report(
         proc = (
             snapshot_group_codes.get(str(item.item_id))
             if snapshot_context is not None
-            else weekly_report_group_code(
-                item.process_type_code,
-                item.item_name,
-                item.mes_code,
-                include_vacuum_generator=include_vacuum_generator,
-                include_ceramic_tube_housing=include_ceramic_tube_housing,
-            )
+            else item.process_type_code
         ) or ""
         if proc not in _PROD_CODES:
             continue
