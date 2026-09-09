@@ -186,7 +186,7 @@ export function HistoryBatchDetailPanel({
   const cancellationSummary = buildHistoryDetailSummary(cancellationLogs, canCancelAsBatch ? batch : null);
   const visibleSummary = buildHistoryDetailSummary(logs, batch);
   const summary = cancellationScope.status === "ready"
-    ? buildHistoryDetailSummary(cancellationScope.logs, batch)
+    ? { ...buildHistoryDetailSummary(cancellationScope.logs, batch), actualStock: visibleSummary.actualStock }
     : { ...visibleSummary, impactGroups: [] };
   const excludedLineCount = batch && batch.sub_type !== "internal_use_out"
     ? batch.bundles.reduce((count, bundle) => {

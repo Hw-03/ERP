@@ -1359,6 +1359,51 @@ def test_cancel_idempotent_double(client, db_session, make_item):
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.parametrize("cancel_as", ["requester", "approver", "other"])
+def test_cancel_approved_adjustment_uses_batch_requester(
+    client, db_session: Session, make_item, cancel_as: str,
+) -> None:
+    """승인 처리자의 ID가 기록되어도 배치 요청자는 본인 거래를 취소한다."""
+    item = make_item(name="Approved adjustment", process_type_code="AF")
+    requester = _make_employee(db_session, code="ADJ-REQ")
+    approver = _make_employee(db_session, code="ADJ-APR", department_role="primary")
+    other = _make_employee(db_session, code="ADJ-OTHER", name=requester.name)
+    db_session.commit()
+    payload = {
+        "requester_employee_id": str(requester.employee_id),
+        "work_type": "process",
+        "sub_type": "adjust_in",
+        "to_department": DepartmentEnum.ASSEMBLY.value,
+    }
+    preview = client.post("/api/io/preview", json={
+        **payload,
+        "targets": [{"source_kind": "manual", "item_id": str(item.item_id), "quantity": 7}],
+    })
+    assert preview.status_code == 200, preview.text
+    submitted = client.post("/api/io/submit", json={
+        **payload, "notes": "Adjustment cancellation regression", "bundles": preview.json()["bundles"],
+    })
+    assert submitted.status_code == 201, submitted.text
+    approved = client.post(
+        f"/api/stock-requests/{submitted.json()['stock_request_id']}/department-approve",
+        json={"actor_employee_id": str(approver.employee_id), "pin": "0000"},
+    )
+    assert approved.status_code == 200, approved.text
+    log = db_session.query(TransactionLog).filter(
+        TransactionLog.item_id == item.item_id,
+        TransactionLog.transaction_type == TransactionTypeEnum.ADJUST,
+    ).one()
+    assert log.producer_employee_id == approver.employee_id
+    assert log.operation_batch_id is not None
+    assert _cells(db_session, item.item_id)[1] == 7
+
+    actor = {"requester": requester, "approver": approver, "other": other}[cancel_as]
+    response = _cancel(client, log.log_id, code=actor.employee_code)
+
+    assert response.status_code == (403 if cancel_as == "other" else 200), response.text
+    assert _cells(db_session, item.item_id)[1] == (7 if cancel_as == "other" else 0)
+
+
 def test_cancel_non_self_non_approver_forbidden(client, db_session, make_item):
     item = make_item(name="권한품", warehouse_qty=Decimal("100"))
     requester = _make_employee(db_session, code="OWN1", name="요청자")

@@ -131,6 +131,64 @@ function makeMixedProductionOperationGroup() {
   };
 }
 
+function makeDepartmentCorrectionOperationGroup() {
+  const notes = "여러 작업자의 부서 위치 지정 실수 정정";
+  const logs = Array.from({ length: 12 }, (_, index) => {
+    const sourceEffect = {
+      scope: "location",
+      department: "조립",
+      status: "PRODUCTION",
+      delta: -20,
+      quantity_before: 20,
+      quantity_after: 0,
+    };
+    const targetEffect = {
+      scope: "location",
+      department: "출하",
+      status: "PRODUCTION",
+      delta: 20,
+      quantity_before: 2,
+      quantity_after: 22,
+    };
+    return makeLog({
+      log_id: `department-correction-${index}`,
+      item_id: `CORRECTION-${index}`,
+      item_name: index === 0 ? "34-AR-0738" : `위치 조정 품목 ${index}`,
+      mes_code: index === 0 ? "34-AR-0738" : `34-AR-${String(738 + index).padStart(4, "0")}`,
+      transaction_type: "TRANSFER_DEPT",
+      quantity_change: 0,
+      quantity_before: 10 + index,
+      quantity_after: 10 + index,
+      warehouse_qty_before: 100 + index,
+      warehouse_qty_after: 100 + index,
+      department_qty_before: 10 + index,
+      department_qty_after: 10 + index,
+      transfer_qty: 20,
+      reference_no: "DEPT-CORRECTION-20260910-01",
+      produced_by: "김현우",
+      requester_name: "김현우",
+      department: index % 2 === 0 ? "출하" : "조립",
+      notes,
+      operation_id: "department-correction-operation",
+      operation_role: index === 0 ? "PRIMARY" : "TRANSFER",
+      operation_kind: "BUSINESS",
+      operation_display_label: "부서 위치 조정",
+      inventory_effect: index % 2 === 0
+        ? [targetEffect, sourceEffect]
+        : [sourceEffect, targetEffect],
+    });
+  });
+  return {
+    logs,
+    notes,
+    groups: [{
+      type: "operation" as const,
+      operationId: "department-correction-operation",
+      logs,
+    }],
+  };
+}
+
 describe("HistoryTable hierarchy", () => {
   it("expands every search-matched operation group and highlights only matched children", () => {
     const first = makeOperationGroup();
@@ -253,6 +311,34 @@ describe("HistoryTable hierarchy", () => {
     expect(screen.getByText(matched.item_name).closest("tr")).toHaveAttribute("data-history-search-match", "true");
   });
 
+  it.each(["튜브", "고압", "진공", "튜닝", "조립", "출하"])("labels the changed production stock with its actual department: %s", (department) => {
+    const log = makeLog({
+      department: "창고",
+      warehouse_qty_before: 10, warehouse_qty_after: 9,
+      department_qty_before: 4, department_qty_after: 5,
+      inventory_effect: [
+        { scope: "warehouse", delta: -1 },
+        { scope: "location", department, status: "PRODUCTION", delta: 1 },
+        { scope: "location", department: "다른 부서", status: "DEFECTIVE", delta: -1 },
+      ],
+    });
+    renderTable([{ type: "solo", log }]);
+    expect(screen.getByLabelText(`재고 변동: 창고 10 −1→9, ${department} 4 +1→5`)).toBeInTheDocument();
+  });
+
+  it("keeps the aggregate label when multiple production departments changed", () => {
+    const log = makeLog({
+      warehouse_qty_before: 0, warehouse_qty_after: 0,
+      department_qty_before: 4, department_qty_after: 6,
+      inventory_effect: [
+        { scope: "location", department: "조립", status: "PRODUCTION", delta: 1 },
+        { scope: "location", department: "출하", status: "PRODUCTION", delta: 1 },
+      ],
+    });
+    renderTable([{ type: "solo", log }]);
+    expect(screen.getByLabelText("재고 변동: 부서 4 +2→6")).toBeInTheDocument();
+  });
+
   it("opens the selected operation detail and child rows on the first primary-row click", () => {
     const { primary, groups } = makeOperationGroup();
     render(<OperationSelectionHarness groups={groups} />);
@@ -328,6 +414,116 @@ describe("HistoryTable hierarchy", () => {
     expect(within(correctionRow).getByText("단품 입고")).toBeInTheDocument();
   });
 
+  it("shows the department correction as one parent operation with its real actor and memo", () => {
+    const { logs, notes, groups } = makeDepartmentCorrectionOperationGroup();
+    renderTable(groups);
+
+    const parentRow = screen.getByText(logs[0].item_name).closest("tr")!;
+    expect(within(parentRow).getByText("부서 위치 조정")).toBeInTheDocument();
+    expect(within(parentRow).getByText("김현우")).toBeInTheDocument();
+    expect(within(parentRow).getByText("메모")).toHaveAttribute("title", notes);
+    expect(within(parentRow).getByLabelText("부서 위치 이동: 조립 20 −20 → 출하 22")).toHaveTextContent("조립 20 −20 → 출하 22");
+  });
+
+  it("shows all department correction children as moves with historical source and destination quantities", () => {
+    const { logs, groups } = makeDepartmentCorrectionOperationGroup();
+    renderTable(groups);
+
+    fireEvent.click(screen.getByRole("button", { name: "작업 구성 펼치기" }));
+
+    const childRows = logs.slice(1).map((log) => screen.getByText(log.item_name).closest("tr")!);
+    expect(childRows).toHaveLength(11);
+    for (const row of childRows) {
+      expect(within(row).getByText("이동")).toBeInTheDocument();
+      expect(within(row).getByLabelText("부서 위치 이동: 조립 20 −20 → 출하 22")).toHaveTextContent("조립 20 −20 → 출하 22");
+    }
+  });
+
+  it("uses signed location effects when a department correction has no effect snapshots", () => {
+    const log = makeLog({
+      transaction_type: "TRANSFER_DEPT",
+      reference_no: "DEPT-CORRECTION-20260910-01",
+      warehouse_qty_before: 100,
+      warehouse_qty_after: 100,
+      department_qty_before: 22,
+      department_qty_after: 22,
+      inventory_effect: [
+        { scope: "location", department: "출하", status: "PRODUCTION", delta: 20 },
+        { scope: "location", department: "조립", status: "PRODUCTION", delta: -20 },
+      ],
+    });
+    renderTable([{ type: "solo", log }]);
+
+    expect(screen.getByLabelText("부서 위치 이동: 조립 −20 → 출하 +20")).toHaveTextContent("조립 −20 → 출하 +20");
+    expect(screen.queryByText("조립 22 −20 → 출하 22")).not.toBeInTheDocument();
+  });
+
+  it("keeps the standard aggregate snapshot for a non-correction department transfer", () => {
+    const log = makeLog({
+      transaction_type: "TRANSFER_DEPT",
+      reference_no: "TRANSFER-20260910-01",
+      warehouse_qty_before: 100,
+      warehouse_qty_after: 100,
+      department_qty_before: 20,
+      department_qty_after: 20,
+      inventory_effect: [
+        { scope: "location", department: "조립", status: "PRODUCTION", delta: -20, quantity_before: 20, quantity_after: 0 },
+        { scope: "location", department: "출하", status: "PRODUCTION", delta: 20, quantity_before: 2, quantity_after: 22 },
+      ],
+    });
+    renderTable([{ type: "solo", log }]);
+
+    expect(screen.getByLabelText("재고 변동 없음")).toHaveTextContent("변동 없음");
+    expect(screen.queryByLabelText(/^부서 위치 이동:/)).not.toBeInTheDocument();
+  });
+
+  it.each(["available", "unavailable"] as const)("preserves department correction paths and item counts with %s aggregate projection", (status) => {
+    const { groups, logs } = makeDepartmentCorrectionOperationGroup();
+    for (const log of logs) {
+      log.request_order_stock = status === "available"
+        ? { status, reason: null, warehouse_qty_before: 100, warehouse_qty_after: 100, department_qty_before: 22, department_qty_after: 22 }
+        : { status, reason: "missing_history", warehouse_qty_before: null, warehouse_qty_after: null, department_qty_before: null, department_qty_after: null };
+    }
+    renderTable(groups);
+    expect(screen.getByText("외 11품목")).toBeInTheDocument();
+    expect(screen.getByLabelText("부서 위치 이동: 조립 20 −20 → 출하 22")).toBeInTheDocument();
+    expect(screen.queryByText("변동 없음")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "작업 구성 펼치기" }));
+    expect(screen.getAllByLabelText("부서 위치 이동: 조립 20 −20 → 출하 22")).toHaveLength(logs.length);
+  });
+
+  it("combines the main department label with the request-order balance instead of the actual snapshot", () => {
+    const log = makeLog({
+      department: "조립",
+      warehouse_qty_before: 0, warehouse_qty_after: 0,
+      department_qty_before: 94, department_qty_after: 50,
+      request_order_stock: { status: "available", reason: null, warehouse_qty_before: 0, warehouse_qty_after: 0, department_qty_before: 44, department_qty_after: 0 },
+      inventory_effect: [{ scope: "location", department: "조립", status: "PRODUCTION", delta: -44 }],
+    });
+    renderTable([{ type: "solo", log }]);
+    expect(screen.getByLabelText("재고 변동: 조립 44 −44→0")).toBeInTheDocument();
+    expect(screen.queryByText("94")).not.toBeInTheDocument();
+  });
+
+  it("does not duplicate the cancellation suffix for a department correction reversal", () => {
+    const { logs } = makeDepartmentCorrectionOperationGroup();
+    const cancellationLogs = logs.map((log) => ({
+      ...log,
+      log_id: `${log.log_id}-cancelled`,
+      operation_id: "department-correction-cancellation",
+      operation_kind: "CANCELLATION" as const,
+      operation_display_label: "부서 위치 조정 취소",
+    }));
+    renderTable([{
+      type: "operation",
+      operationId: "department-correction-cancellation",
+      logs: cancellationLogs,
+    }]);
+
+    expect(screen.getByText("부서 위치 조정 취소")).toBeInTheDocument();
+    expect(screen.queryByText("부서 위치 조정 취소 취소")).not.toBeInTheDocument();
+  });
+
   it("keeps before-stock and status visible while marking only after-stock for cancelled source rows", () => {
     const css = readFileSync(resolve(process.cwd(), "app", "globals.css"), "utf8");
     expect(css).toMatch(
@@ -382,12 +578,12 @@ describe("HistoryTable hierarchy", () => {
     expect(itemCodeHeader).not.toHaveAttribute("colspan");
     expect(screen.queryByRole("columnheader", { name: "품목코드 · 수량" })).not.toBeInTheDocument();
     const row = screen.getByText("대표 품목").closest("tr")!;
-    const inventory = within(row).getByLabelText("재고 변동: 창고 0 +4→4, 부서 0 +7→7");
+    const inventory = within(row).getByLabelText("재고 변동: 창고 0 +4→4, 조립 0 +7→7");
     const warehouseLine = within(inventory).getByLabelText("창고 0 +4→4");
     expect(warehouseLine).toBeInTheDocument();
     expect(within(warehouseLine).getByText("+4")).toHaveStyle({ width: "40px" });
     expect(within(warehouseLine).getByText("→")).toHaveAttribute("aria-hidden", "true");
-    expect(within(inventory).getByLabelText("부서 0 +7→7")).toBeInTheDocument();
+    expect(within(inventory).getByLabelText("조립 0 +7→7")).toBeInTheDocument();
     expect(row).not.toHaveClass("opacity-60");
     expect(row).toHaveAttribute("data-history-cancelled", "true");
     expect(inventory.closest("td")).toBe(row.children[4]);
@@ -496,9 +692,9 @@ describe("HistoryTable hierarchy", () => {
 
     renderTable([{ type: "solo", log }, { type: "solo", log: shortLog }, { type: "solo", log: longAfterLog }]);
 
-    const departmentLine = screen.getByLabelText("부서 41 −21→20");
+    const departmentLine = screen.getByLabelText("조립 41 −21→20");
     const noChangeMarker = screen.getByLabelText("재고 변동 없음");
-    const longDepartmentLine = screen.getByLabelText("부서 471 −16→455");
+    const longDepartmentLine = screen.getByLabelText("조립 471 −16→455");
     const departmentLabel = departmentLine.children.item(0) as HTMLElement;
     const departmentBefore = departmentLine.children.item(1) as HTMLElement;
     const departmentDelta = departmentLine.children.item(2) as HTMLElement;
@@ -628,8 +824,8 @@ describe("HistoryTable hierarchy", () => {
     );
 
     const row = screen.getByText("대표 품목").closest("tr")!;
-    const inventory = within(row).getByLabelText("재고 변동: 부서 4 +1→5");
-    expect(within(inventory).getByLabelText("부서 4 +1→5")).toBeInTheDocument();
+    const inventory = within(row).getByLabelText("재고 변동: 조립 4 +1→5");
+    expect(within(inventory).getByLabelText("조립 4 +1→5")).toBeInTheDocument();
     expect(within(inventory).queryByLabelText(/^창고 /)).not.toBeInTheDocument();
   });
 
@@ -686,7 +882,7 @@ describe("HistoryTable hierarchy", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "묶음 펼치기" }));
     const bomRow = screen.getByText("BOM").closest("tr")!;
-    expect(within(bomRow).getByLabelText("재고 변동: 부서 0 +1→1")).toBeInTheDocument();
+    expect(within(bomRow).getByLabelText("재고 변동: 조립 0 +1→1")).toBeInTheDocument();
   });
 
   it("keeps the final table geometry while the first page is loading", () => {

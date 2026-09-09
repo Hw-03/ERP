@@ -269,7 +269,7 @@ describe("BomBatchDetail", () => {
     );
 
     expect(screen.queryByText("-1 EA")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("재고 변동: 부서 4 −1→3")).toBeInTheDocument();
+    expect(screen.getByLabelText("재고 변동: 조립 4 −1→3")).toBeInTheDocument();
   });
 
   it("shows unique batch logs on the BOM parent and component rows", () => {
@@ -299,11 +299,11 @@ describe("BomBatchDetail", () => {
       <table><tbody><BomBatchDetail batchId={batch.batch_id} colSpan={8} cache={new Map([[batch.batch_id, batch]])} onCached={vi.fn()} logs={logs} /></tbody></table>,
     );
 
-    expect(screen.getByLabelText("재고 변동: 부서 15 +1→16")).toBeInTheDocument();
+    expect(screen.getByLabelText("재고 변동: 조립 15 +1→16")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "BOM 구성 펼치기" }));
 
-    expect(screen.getByLabelText("재고 변동: 부서 3 −1→2")).toBeInTheDocument();
+    expect(screen.getByLabelText("재고 변동: 조립 3 −1→2")).toBeInTheDocument();
   });
 
   it("prefers the exact operation line log when a BOM component is duplicated", () => {
@@ -335,7 +335,7 @@ describe("BomBatchDetail", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "BOM 구성 펼치기" }));
 
-    expect(screen.getByLabelText("재고 변동: 부서 3 −1→2")).toBeInTheDocument();
+    expect(screen.getByLabelText("재고 변동: 조립 3 −1→2")).toBeInTheDocument();
     expect(screen.queryByLabelText("재고 변동: 창고 90 → 90, 부서 9 → 9")).not.toBeInTheDocument();
   });
 
@@ -723,8 +723,8 @@ describe("BomBatchDetail", () => {
       <table><tbody><BomBatchDetail batchId={batch.batch_id} colSpan={8} cache={new Map([[batch.batch_id, batch]])} onCached={vi.fn()} logs={logs} /></tbody></table>,
     );
 
-    expect(screen.getByLabelText("재고 변동: 창고 7 +1→8, 부서 2 +1→3")).toBeInTheDocument();
-    expect(screen.getByLabelText("재고 변동: 창고 40 +1→41, 부서 4 +1→5")).toBeInTheDocument();
+    expect(screen.getByLabelText("재고 변동: 창고 7 +1→8, 조립 2 +1→3")).toBeInTheDocument();
+    expect(screen.getByLabelText("재고 변동: 창고 40 +1→41, 조립 4 +1→5")).toBeInTheDocument();
   });
 
   it("keeps both stock snapshot cells unavailable for configuration-only rows", () => {

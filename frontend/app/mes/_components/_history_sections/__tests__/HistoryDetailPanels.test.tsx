@@ -192,6 +192,26 @@ beforeEach(() => {
 });
 
 describe("desktop history detail panels", () => {
+  it.each(["single", "batch"])("keeps actual processing stock after the %s detail scope loads without projection fields", async (kind) => {
+    const batch = makeBatch();
+    const selected = makeLog({
+      operation_batch_id: batch.batch_id,
+      department_qty_before: 94,
+      department_qty_after: 50,
+      request_order_stock: { status: "available", reason: null, warehouse_qty_before: 401, warehouse_qty_after: 401, department_qty_before: 44, department_qty_after: 0 },
+    });
+    const pending = deferred<TransactionLog[]>();
+    vi.mocked(productionApi.getTransactions).mockReturnValue(pending.promise);
+    vi.mocked(ioApi.getBatch).mockResolvedValue(batch);
+    render(kind === "single"
+      ? <HistoryDetailPanel panelOpen selected={selected} onSelectLog={() => {}} onLogUpdated={() => {}} variant="desktop" />
+      : <HistoryBatchDetailPanel panelOpen batchId={batch.batch_id} logs={[selected]} batchCache={new Map([[batch.batch_id, batch]])} setBatchCache={() => {}} onBatchCancelled={() => {}} variant="desktop" />);
+    expect(screen.getByText("실제 처리 당시 재고")).toBeInTheDocument();
+    await act(async () => { pending.resolve([{ ...selected, request_order_stock: undefined }]); });
+    expect(screen.getByText("실제 처리 당시 재고")).toBeInTheDocument();
+    expect(screen.getByText("실제 처리 당시 재고").parentElement).toHaveTextContent(/정상 부서\s*94\s*50/);
+  });
+
   it("모바일 상세는 묶음의 실행 로그를 사용해 단품 출고를 감소로 표시한다", async () => {
     const batch = makeBatch({
       sub_type: "disassemble",

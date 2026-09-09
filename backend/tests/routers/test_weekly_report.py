@@ -216,7 +216,7 @@ def test_production_matrix_basic(client, db_session):
 
 
 def test_legacy_weekly_report_groups_vacuum_generator_va_items_under_vf(client, db_session, monkeypatch):
-    """발생부 진공 VA 계열만 진공(VF) 상세·생산 매트릭스에 합산한다."""
+    """발생부 진공 VA 계열은 VF 상세에 포함하되 생산 매트릭스에서는 제외한다."""
     monkeypatch.setattr(weekly_report_scope, "VACUUM_GENERATOR_WEEKLY_START", date(2026, 5, 4))
     target = _make_prod_item(
         db_session,
@@ -267,8 +267,8 @@ def test_legacy_weekly_report_groups_vacuum_generator_va_items_under_vf(client, 
     }
     assert vf_group["produce_qty"] == 8
     dx3000 = {row["model_key"]: row for row in body["production_matrix"]}["DX3000"]
-    assert dx3000["vf_qty"] == 8
-    assert dx3000["total_qty"] == 8
+    assert dx3000["vf_qty"] == 0
+    assert dx3000["total_qty"] == 0
 
 
 def test_legacy_weekly_report_groups_ceramic_tube_housing_under_hf(client, db_session, monkeypatch):
@@ -764,7 +764,7 @@ def test_closed_snapshot_week_uses_boundaries_and_excludes_cancelled_flow(client
 
 
 def test_closed_snapshot_week_matrix_uses_snapshot_scope_after_item_rename(client, db_session, monkeypatch):
-    """과거 주차 매트릭스는 현재 품명이 아니라 스냅샷 시점의 VA→VF 귀속을 유지한다."""
+    """과거 주차에서도 품명 변경과 무관하게 VA 생산은 매트릭스에서 제외한다."""
     monkeypatch.setattr(weekly_report_scope, "VACUUM_GENERATOR_WEEKLY_START", date(2026, 5, 4))
     item = _make_prod_item(
         db_session,
@@ -789,8 +789,8 @@ def test_closed_snapshot_week_matrix_uses_snapshot_scope_after_item_rename(clien
 
     assert response.status_code == 200, response.text
     dx3000 = {row["model_key"]: row for row in response.json()["production_matrix"]}["DX3000"]
-    assert dx3000["vf_qty"] == 5
-    assert dx3000["total_qty"] == 5
+    assert dx3000["vf_qty"] == 0
+    assert dx3000["total_qty"] == 0
 
 
 def test_current_snapshot_week_uses_live_dashboard_stock_math(
@@ -1197,7 +1197,7 @@ def test_verified_week_matches_nf_production_cancelled_scrap_and_quarantine(clie
 
 
 def test_verified_weekly_report_groups_vacuum_generator_va_items_under_vf(client, db_session, monkeypatch):
-    """검증 v2도 스냅샷·활동·매트릭스에서 같은 VA 예외만 VF로 귀속한다."""
+    """검증 v2도 VA 상세는 유지하고 생산 매트릭스에서는 제외한다."""
     monkeypatch.setattr(weekly_report_scope, "VACUUM_GENERATOR_WEEKLY_START", date(2026, 5, 4))
     target = _make_prod_item(
         db_session,
@@ -1248,8 +1248,8 @@ def test_verified_weekly_report_groups_vacuum_generator_va_items_under_vf(client
     assert [row["item_id"] for row in vf_group["items"]] == [str(target.item_id)]
     assert vf_group["produce_qty"] == 5
     dx3000 = {row["model_key"]: row for row in body["production_matrix"]}["DX3000"]
-    assert dx3000["vf_qty"] == 5
-    assert dx3000["total_qty"] == 5
+    assert dx3000["vf_qty"] == 0
+    assert dx3000["total_qty"] == 0
 
 
 def test_verified_weekly_report_groups_ceramic_tube_housing_under_hf(client, db_session, monkeypatch):

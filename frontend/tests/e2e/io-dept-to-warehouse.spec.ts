@@ -19,12 +19,11 @@ test.describe("입출고 V2 — 부서 → 창고 회수", () => {
     // 1. 작업 유형: 창고 입출고
     await pickWorkType(page, /창고 입출고/);
 
-    // 2. 세부 작업: 부서 → 창고 + 출발 부서(튜브) → 다음 단계로
+    // 2. 세부 작업: 부서 → 창고 → 다음 단계로 (출발 부서는 품목코드로 자동 판정)
     await page.getByRole("button", { name: /부서 → 창고/ }).first().click();
-    await page.getByRole("button", { name: "튜브", exact: true }).click();
     await clickNextStep(page);
 
-    // 3. 품목 선택 — 조립 부서에 재고 있는 원자재 낱개
+    // 3. 품목 선택 — 튜브 부서에 재고 있는 원자재 낱개
     await page
       .getByRole("row", { name: /E2E원자재튜브/ })
       .getByRole("button", { name: "낱개", exact: true })

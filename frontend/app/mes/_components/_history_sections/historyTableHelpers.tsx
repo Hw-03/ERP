@@ -30,7 +30,7 @@ import {
   type MovementTone,
 } from "./historyBatchInterpreter";
 import { isReworkOperation } from "./transactionTaxonomy";
-import { getHistoryListOperationLabel, getHistoryRowPresentation, getReferenceBatchLinePresentation, getReferenceBatchPresentation, getShippingPhaseFlowLabel } from "./historyPresentation";
+import { getHistoryListOperationLabel, getHistoryRowPresentation, getReferenceBatchLinePresentation, getReferenceBatchPresentation, getShippingPhaseFlowLabel, isDepartmentCorrectionLog } from "./historyPresentation";
 import { formatHistoryDate } from "./historyFormat";
 
 const TX_ICON = {
@@ -431,6 +431,15 @@ export function StockSnapshotCell({
     );
   }
 
+  const departmentCorrectionFlow = getDepartmentCorrectionStockFlow(log);
+  if (departmentCorrectionFlow) {
+    return (
+      <td className={`${cellClass} px-1 text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
+        <DepartmentCorrectionStockFlow flow={departmentCorrectionFlow} />
+      </td>
+    );
+  }
+
   const snapshot = resolveStockSnapshot(log);
   if (snapshot.status === "unavailable") {
     const accessibleLabel = `요청 순 재고 계산 불가: ${snapshot.reason}`;
@@ -454,9 +463,21 @@ export function StockSnapshotCell({
   const warehouseAfterText = formatQty(warehouseAfter);
   const departmentBeforeText = formatQty(departmentBefore);
   const departmentAfterText = formatQty(departmentAfter);
+  const changedDepartments = new Set(
+    (log.inventory_effect ?? [])
+      .filter((effect) => effect.scope === "location" && effect.status === "PRODUCTION" && Number(effect.delta) !== 0)
+      .map((effect) => effect.department?.trim())
+      .filter((department): department is string => Boolean(department)),
+  );
+  // 정상 부서 재고의 합계이므로 여러 부서가 변한 로그를 한 부서로 단정하지 않는다.
+  const departmentLabel = changedDepartments.size === 1
+    ? Array.from(changedDepartments)[0]
+    : changedDepartments.size === 0 && log.department?.trim() && log.department.trim() !== "창고"
+      ? log.department.trim()
+      : "부서";
   const changedSnapshots = [
     { label: "창고", before: warehouseBefore, after: warehouseAfter, beforeText: warehouseBeforeText, afterText: warehouseAfterText },
-    { label: "부서", before: departmentBefore, after: departmentAfter, beforeText: departmentBeforeText, afterText: departmentAfterText },
+    { label: departmentLabel, before: departmentBefore, after: departmentAfter, beforeText: departmentBeforeText, afterText: departmentAfterText },
   ].filter((snapshot) => snapshot.before !== snapshot.after);
   const chipQuantityWidthPx = Math.max(
     STOCK_SNAPSHOT_MIN_QUANTITY_WIDTH_PX,
@@ -480,6 +501,71 @@ export function StockSnapshotCell({
         ))}
       </div>
     </td>
+  );
+}
+
+type DepartmentCorrectionStockFlow = {
+  sourceDepartment: string;
+  sourceBefore: number | null;
+  sourceDelta: number;
+  targetDepartment: string;
+  targetAfter: number | null;
+  targetDelta: number;
+};
+
+function getDepartmentCorrectionStockFlow(log: TransactionLog): DepartmentCorrectionStockFlow | null {
+  if (!isDepartmentCorrectionLog(log)) return null;
+  const locationEffects = (log.inventory_effect ?? []).flatMap((effect) => {
+    const department = effect.department?.trim();
+    const delta = Number(effect.delta);
+    if (effect.scope !== "location" || effect.status !== "PRODUCTION" || !department || !Number.isFinite(delta) || delta === 0) {
+      return [];
+    }
+    return [{ effect, department, delta }];
+  });
+  const sourceEffects = locationEffects.filter(({ delta }) => delta < 0);
+  const targetEffects = locationEffects.filter(({ delta }) => delta > 0);
+  if (locationEffects.length !== 2 || sourceEffects.length !== 1 || targetEffects.length !== 1) return null;
+
+  const source = sourceEffects[0];
+  const target = targetEffects[0];
+  return {
+    sourceDepartment: source.department,
+    sourceBefore: Number.isFinite(source.effect.quantity_before) ? source.effect.quantity_before ?? null : null,
+    sourceDelta: source.delta,
+    targetDepartment: target.department,
+    targetAfter: Number.isFinite(target.effect.quantity_after) ? target.effect.quantity_after ?? null : null,
+    targetDelta: target.delta,
+  };
+}
+
+function DepartmentCorrectionStockFlow({ flow }: { flow: DepartmentCorrectionStockFlow }) {
+  const hasSnapshots = flow.sourceBefore != null && flow.targetAfter != null;
+  const sourceBefore = hasSnapshots ? formatQty(flow.sourceBefore!) : null;
+  const sourceDelta = formatStockDelta(flow.sourceDelta);
+  const targetAfter = hasSnapshots ? formatQty(flow.targetAfter!) : formatStockDelta(flow.targetDelta);
+  const label = hasSnapshots
+    ? `${flow.sourceDepartment} ${sourceBefore} ${sourceDelta} → ${flow.targetDepartment} ${targetAfter}`
+    : `${flow.sourceDepartment} ${sourceDelta} → ${flow.targetDepartment} ${targetAfter}`;
+
+  return (
+    <span
+      aria-label={`부서 위치 이동: ${label}`}
+      className="mx-auto grid items-center whitespace-nowrap text-xs font-semibold tabular-nums"
+      style={{
+        color: LEGACY_COLORS.muted2,
+        // 일반 재고 행과 출발 수량·차감량·화살표의 기준선을 공유한다.
+        width: 28 + STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH_PX * 2 + STOCK_SNAPSHOT_DELTA_WIDTH_PX + STOCK_SNAPSHOT_ARROW_WIDTH_PX,
+        gridTemplateColumns: `28px ${STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH_PX}px ${STOCK_SNAPSHOT_DELTA_WIDTH_PX}px ${STOCK_SNAPSHOT_ARROW_WIDTH_PX}px 28px ${STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH_PX}px`,
+      }}
+    >
+      <span className="text-left" style={{ color: LEGACY_COLORS.muted }}>{flow.sourceDepartment}{" "}</span>
+      <span className="text-right">{sourceBefore}{" "}</span>
+      <span className="text-left font-bold" style={{ color: LEGACY_COLORS.red }}>{sourceDelta}{" "}</span>
+      <span className="text-center" style={{ color: LEGACY_COLORS.blue }}>→{" "}</span>
+      <span className="text-left" style={{ color: LEGACY_COLORS.muted }}>{flow.targetDepartment}{" "}</span>
+      <span className="text-left font-bold" style={{ color: LEGACY_COLORS.blue }}>{targetAfter}</span>
+    </span>
   );
 }
 

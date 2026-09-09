@@ -11,6 +11,8 @@ export interface InventoryEffectCell {
   department?: string | null;
   status?: string | null;
   box_id?: string | null;
+  quantity_before?: number;
+  quantity_after?: number;
 }
 
 export type RequestOrderStockUnavailableReason =

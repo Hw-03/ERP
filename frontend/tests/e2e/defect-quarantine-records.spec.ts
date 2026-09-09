@@ -35,7 +35,7 @@ async function expandItemRecords(page: Page, itemName: string) {
     .filter({ hasText: itemName });
   await expect(summary).toHaveCount(1);
   if (await summary.getAttribute("aria-expanded") !== "true") {
-    await summary.click();
+    await summary.getByRole("button", { name: new RegExp(`${itemName} 격리`) }).click();
   }
 }
 

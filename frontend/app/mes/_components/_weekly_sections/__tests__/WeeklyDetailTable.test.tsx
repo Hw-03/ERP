@@ -78,7 +78,7 @@ describe("WeeklyDetailTable verified columns", () => {
     expect(screen.getByTestId("weekly-detail-table")).not.toHaveClass("overflow-x-auto");
   });
 
-  it("displays the included HA housing as a two-line HF code in the desktop table", () => {
+  it("preserves the actual HA item code inside the HF group", () => {
     const highVoltageGroup = {
       ...group,
       process_code: "HF",
@@ -93,9 +93,8 @@ describe("WeeklyDetailTable verified columns", () => {
     render(<WeeklyDetailTable group={highVoltageGroup} stockBasis="normal" onItemSelect={() => {}} />);
 
     const desktopRow = screen.getByTestId("weekly-detail-desktop-row-housing-item");
-    expect(desktopRow).toHaveTextContent("3468-HF");
-    expect(desktopRow).toHaveTextContent("-0006");
-    expect(desktopRow).not.toHaveTextContent("3468-HA-0006");
+    expect(desktopRow).toHaveTextContent("3468-HA-0006");
+    expect(desktopRow).not.toHaveTextContent("3468-HF");
   });
 
   it("opens the selected item from desktop rows and mobile cards", () => {

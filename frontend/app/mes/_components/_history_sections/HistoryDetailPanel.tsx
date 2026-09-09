@@ -181,7 +181,7 @@ export function HistoryDetailPanel({
   const cancellationSummary = buildHistoryDetailSummary(cancellationLogs, batch);
   const visibleSummary = buildHistoryDetailSummary([selected], batch);
   const summary = cancellationScope.status === "ready"
-    ? buildHistoryDetailSummary(cancellationScope.logs, batch)
+    ? { ...buildHistoryDetailSummary(cancellationScope.logs, batch), actualStock: visibleSummary.actualStock }
     : { ...visibleSummary, impactGroups: [] };
   const isCancelled = selected.operation_kind === "CANCELLATION"
     || selected.operation_effective_status === "cancelled"

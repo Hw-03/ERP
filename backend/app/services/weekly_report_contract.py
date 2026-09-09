@@ -582,7 +582,7 @@ def _production_matrix(
         .all()
     )
     symbol_names = {row.symbol: row.model_name for row in symbols if len(row.symbol or "") == 1}
-    boundary_groups = {str(item.item_id): item.process_type_code for item in boundary_items}
+    boundary_groups = {str(item.item_id): item.source_process_type_code for item in boundary_items}
     matrix: dict[str, dict[str, Decimal]] = {}
     for item_id, total in activities.items():
         item = items.get(item_id)

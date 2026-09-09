@@ -19,9 +19,8 @@ test.describe("입출고 V2 — 창고 → 부서 결재 요청", () => {
     // 1. 작업 유형: 창고 입출고
     await pickWorkType(page, /창고 입출고/);
 
-    // 2. 세부 작업: 창고 → 부서 + 도착 부서(조립) → 다음 단계로
+    // 2. 세부 작업: 창고 → 부서 → 다음 단계로 (도착 부서는 품목코드로 자동 판정)
     await page.getByRole("button", { name: /창고 → 부서/ }).first().click();
-    await page.getByRole("button", { name: "조립", exact: true }).click();
     await clickNextStep(page);
 
     // 3. 품목 선택 — 원자재 낱개
