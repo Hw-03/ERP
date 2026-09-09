@@ -19,7 +19,6 @@ test.describe("결재 풀사이클 — 창고 승인", () => {
     await gotoWarehouseCompose(a);
     await pickWorkType(a, /창고 입출고/);
     await a.getByRole("button", { name: /창고 → 부서/ }).first().click();
-    await a.getByRole("button", { name: "조립", exact: true }).click();
     await clickNextStep(a);
     await a
       .getByRole("row", { name: /E2E원자재튜브/ })
