@@ -20,6 +20,7 @@ from app.models import (
     InventoryOperationEffect,
     InventoryOperationEffectKindEnum,
     InventoryOperationKindEnum,
+    InventoryOperationStatusEnum,
     IoBatch,
     Item,
     LocationStatusEnum,
@@ -306,8 +307,60 @@ def _subject_status(db: Session, subject_type: str, subject_id: str) -> Optional
     return str(getattr(subject.status, "value", subject.status))
 
 
+def _shipping_workflow_issues(db: Session) -> list[InventoryIntegrityIssue]:
+    """과거 취소가 현재 회차를 덮지 않도록 마지막 커밋 상태만 비교한다."""
+    histories = defaultdict(list)
+    for effect, operation in (
+        db.query(InventoryOperationEffect, InventoryOperation)
+        .join(InventoryOperation, InventoryOperation.operation_id == InventoryOperationEffect.operation_id)
+        .filter(
+            InventoryOperation.status == InventoryOperationStatusEnum.COMMITTED,
+            InventoryOperation.kind.in_([
+                InventoryOperationKindEnum.BUSINESS, InventoryOperationKindEnum.CANCELLATION,
+            ]),
+            InventoryOperationEffect.effect_kind == InventoryOperationEffectKindEnum.WORKFLOW,
+            InventoryOperationEffect.subject_type == "ShippingRequest",
+        ).all()
+    ):
+        histories[effect.subject_id].append((effect, operation))
+
+    issues = []
+    for subject_id, history in histories.items():
+        if not any(op.kind == InventoryOperationKindEnum.CANCELLATION for _, op in history):
+            continue
+        latest_time = max(op.created_at for _, op in history)
+        candidates = [(effect, op) for effect, op in history if op.created_at == latest_time]
+        # 동시각은 UUID 순서가 아닌 명시적인 역전 연결로만 전후를 확정한다.
+        candidates = [
+            (effect, op) for effect, op in candidates
+            if not any(
+                later.reverses_operation_id == op.operation_id
+                and reversal.reverses_effect_id == effect.effect_id
+                for reversal, later in candidates
+            )
+        ]
+        states = {str((effect.after_state or {}).get("status") or "") for effect, _ in candidates}
+        ambiguous = len(states) != 1 or "" in states
+        effect, operation = min(candidates or history, key=lambda row: str(row[0].effect_id))
+        expected = " / ".join(sorted(states)) if ambiguous else next(iter(states))
+        current = _subject_status(db, "ShippingRequest", subject_id)
+        if not ambiguous and current == expected:
+            continue
+        issues.append(_issue(
+            category="WORKFLOW_STATE_RESIDUE",
+            identity=("ShippingRequest", subject_id, operation.operation_id),
+            title="출하 최신 업무 상태 불일치",
+            description="같은 시각의 원장 순서를 확정할 수 없습니다." if ambiguous else "현재 출하 상태가 최신 커밋된 업무 효과와 다릅니다.",
+            cause_ids=(operation.operation_id, effect.effect_id, subject_id),
+            current_value=f"현재 상태 {current or '대상 없음'}",
+            expected_value=f"최신 상태 {expected or '확정 불가'}",
+            repairable=not ambiguous and operation.kind == InventoryOperationKindEnum.CANCELLATION,
+        ))
+    return issues
+
+
 def _workflow_and_allocation_issues(db: Session) -> list[InventoryIntegrityIssue]:
-    issues: list[InventoryIntegrityIssue] = []
+    issues = _shipping_workflow_issues(db)
     rows = (
         db.query(InventoryOperationEffect)
         .join(
@@ -320,6 +373,8 @@ def _workflow_and_allocation_issues(db: Session) -> list[InventoryIntegrityIssue
     for effect in rows:
         expected = str((effect.after_state or {}).get("status") or "cancelled")
         if effect.effect_kind == InventoryOperationEffectKindEnum.WORKFLOW:
+            if effect.subject_type == "ShippingRequest":
+                continue
             current = _subject_status(db, effect.subject_type, effect.subject_id)
             if current == expected:
                 continue

@@ -219,6 +219,10 @@ def _prepare_sync_sandbox(tmp_path: Path, overrides: dict[str, str]) -> tuple[Pa
     print(f"BACKUP_PATH={backup_path}")
     """
     _write(
+        dev_root / "scripts" / "ops" / "employee_schema_preflight.py",
+        _fake_python_tool("deployment-preflight", "FAKE_DEPLOYMENT_PREFLIGHT_EXIT"),
+    )
+    _write(
         dev_root / "scripts" / "ops" / "backup_db.py",
         _fake_python_tool("backup", "FAKE_BACKUP_EXIT", backup_body),
     )
@@ -622,6 +626,8 @@ def _prepare_auto_sync_sandbox(
               exit /b {dry_run_exit}
             )
             echo APPLY_CALLED=1
+            if "%FAKE_APPLY_STDERR%"=="1" echo operation integrity failed 1>&2
+            if defined FAKE_APPLY_EXIT exit /b %FAKE_APPLY_EXIT%
             exit /b 0
             """
         ).lstrip(),
@@ -1083,6 +1089,29 @@ def test_automatic_sync_propagates_dry_run_error_without_apply(tmp_path: Path) -
     assert "APPLY_CALLED=1" not in result.stdout
 
 
+def test_automatic_sync_preserves_apply_exit_with_stderr(tmp_path: Path) -> None:
+    sync_path, environment, event_log = _prepare_auto_sync_sandbox(tmp_path, dry_run_exit=0, changes=1)
+    environment.update(FAKE_APPLY_STDERR="1", FAKE_APPLY_EXIT="8")
+    result = _run_auto_sync(sync_path, environment)
+    assert result.returncode == 8, result.stdout + result.stderr
+    assert "operation integrity failed" in result.stdout + result.stderr
+    assert len(event_log.read_text(encoding="utf-8-sig").splitlines()) == 2
+
+
+def test_employee_sync_deployment_preflight_failure_leaves_employee_untouched(tmp_path: Path) -> None:
+    sync_path, environment, event_log = _prepare_sync_sandbox(
+        tmp_path, {"FAKE_DEPLOYMENT_PREFLIGHT_EXIT": "19"}
+    )
+    database = tmp_path / "employee" / "backend" / "mes.db"
+    before = database.read_bytes()
+    result = _run_sync(sync_path, environment)
+    assert result.returncode == 9, result.stdout + result.stderr
+    assert _event_kinds(event_log) == ["snapshot-preflight", "robocopy-dryrun", "deployment-preflight"]
+    assert database.read_bytes() == before
+    assert "SYNC_FAILURE_PHASE=PRE_STOP" in result.stdout
+    assert "exit 19" in result.stdout
+
+
 def test_employee_sync_stop_failure_restarts_services_without_backup_or_sync(tmp_path: Path) -> None:
     sync_path, environment, event_log = _prepare_sync_sandbox(
         tmp_path, {"FAKE_STOP_BACKEND_EXIT": "11"}
@@ -1095,6 +1124,7 @@ def test_employee_sync_stop_failure_restarts_services_without_backup_or_sync(tmp
     assert events == [
         "snapshot-preflight",
         "robocopy-dryrun",
+        "deployment-preflight",
         "runtime-task-validate",
         "stop-backend",
         "stop-frontend",
@@ -1118,6 +1148,7 @@ def test_employee_sync_backup_failure_restarts_services_without_sync_or_migratio
     assert events == [
         "snapshot-preflight",
         "robocopy-dryrun",
+        "deployment-preflight",
         "runtime-task-validate",
         "stop-backend",
         "stop-frontend",
@@ -1141,6 +1172,7 @@ def test_employee_sync_frontend_build_failure_restores_services_before_backend_s
     assert events == [
         "snapshot-preflight",
         "robocopy-dryrun",
+        "deployment-preflight",
         "runtime-task-validate",
         "stop-backend",
         "stop-frontend",
@@ -1166,6 +1198,7 @@ def test_employee_sync_post_verify_failure_keeps_services_stopped_and_prints_rec
     assert events == [
         "snapshot-preflight",
         "robocopy-dryrun",
+        "deployment-preflight",
         "runtime-task-validate",
         "stop-backend",
         "stop-frontend",
@@ -1195,6 +1228,7 @@ def test_employee_sync_success_uses_migrate_then_read_only_head_check(tmp_path: 
     assert events == [
         "snapshot-preflight",
         "robocopy-dryrun",
+        "deployment-preflight",
         "runtime-task-validate",
         "stop-backend",
         "stop-frontend",
@@ -1242,7 +1276,7 @@ def test_employee_sync_runtime_task_validation_failure_stops_before_server_shutd
     events = _event_kinds(event_log)
 
     assert result.returncode == 11, result.stdout + result.stderr
-    assert events == ["snapshot-preflight", "robocopy-dryrun", "runtime-task-validate"]
+    assert events == ["snapshot-preflight", "robocopy-dryrun", "deployment-preflight", "runtime-task-validate"]
     assert "stop-backend" not in events
     assert "stop-frontend" not in events
     assert "backup" not in events

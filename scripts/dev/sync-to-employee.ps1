@@ -159,6 +159,8 @@ function Write-RecoveryInstructions {
         [string] $ValidatedBackupPath
     )
 
+    Write-Host "SYNC_FAILURE_PHASE=POST_STOP"
+    Write-Host "SYNC_FAILURE_STAGE=$FailedStage"
     Write-Host "[$FailedStage] 서버를 재기동하지 않습니다. DB를 자동 복원하지 않았습니다."
     Write-Host "[$FailedStage] 검증된 백업: $ValidatedBackupPath"
     Write-Host "[$FailedStage] 검토 후 다음 명령으로 수동 복원하세요:"
@@ -362,30 +364,8 @@ if ($schemaHits -and -not $AllowSchemaChange) {
     exit 3
     }
 }
-if ($schemaHits -and $AutoSchema) {
-    $preflightTool = Join-Path $DevRoot "scripts\ops\employee_schema_preflight.py"
-    $preflightResult = Invoke-CheckedExternalCommand `
-        -FilePath "py.exe" `
-        -ArgumentList @(
-            $preflightTool,
-            "--employee-db", $EmpDb,
-            "--backend-dir", $DevBackend,
-            "--target-backend-dir", $EmpBackend,
-            "--runtime-root", $EmpRuntimeRoot,
-            "--source-migrations", (Join-Path $DevBackend "alembic\versions"),
-            "--target-migrations", (Join-Path $EmpBackend "alembic\versions"),
-            "--verify-tool", (Join-Path $DevRoot "scripts\ops\_verify_backup.py"),
-            "--inventory-tool", (Join-Path $DevRoot "scripts\ops\check_inventory_integrity.py")
-        )
-    Write-CheckedCommandResult -Label "schema-preflight" -Result $preflightResult
-    if (-not $preflightResult.Success) {
-        Write-Host "[schema] 자동 사전 검증 실패 - 직원 DB와 서버를 변경하지 않았습니다."
-        exit 9
-    }
-    Write-Host "[schema] 자동 사전 검증 통과"
-}
-elseif ($schemaHits) {
-    Write-Host "[schema] 스키마 관련 변경 감지됨 (-AllowSchemaChange 로 진행)"
+if ($schemaHits) {
+    Write-Host "[schema] 스키마 변경은 격리 사전 검증 후 반영합니다."
 }
 else {
     Write-Host "[schema] 스키마 관련 변경 없음"
@@ -400,6 +380,32 @@ if ($DryRun) {
     $opsFileChanges | ForEach-Object { Write-Host "  $_" }
     Write-Host "[dry-run] 아무것도 변경하지 않았습니다."
     exit 0
+}
+
+# 스키마 변경이 없어도 배포할 코드로 업무 원장까지 정지 전에 검증한다.
+if (-not $DryRun) {
+    $preflightTool = Join-Path $DevRoot "scripts\ops\employee_schema_preflight.py"
+    $preflightResult = Invoke-CheckedExternalCommand `
+        -FilePath "py.exe" `
+        -ArgumentList @(
+            $preflightTool,
+            "--employee-db", $EmpDb,
+            "--backend-dir", $DevBackend,
+            "--target-backend-dir", $EmpBackend,
+            "--runtime-root", $EmpRuntimeRoot,
+            "--source-migrations", (Join-Path $DevBackend "alembic\versions"),
+            "--target-migrations", (Join-Path $EmpBackend "alembic\versions"),
+            "--verify-tool", (Join-Path $DevRoot "scripts\ops\_verify_backup.py"),
+            "--inventory-tool", (Join-Path $DevRoot "scripts\ops\check_inventory_integrity.py"),
+            "--operation-tool", (Join-Path $DevRoot "scripts\ops\inventory_operation_admin.py")
+        )
+    Write-CheckedCommandResult -Label "deployment-preflight" -Result $preflightResult
+    if (-not $preflightResult.Success) {
+        Write-Host "SYNC_FAILURE_PHASE=PRE_STOP"
+        Write-Host "[preflight] 사전 검증 실패 - 직원 DB와 서버를 변경하지 않았습니다."
+        exit 9
+    }
+    Write-Host "[schema] 자동 사전 검증 통과"
 }
 
 Write-Host "[runtime-task] 직원 런타임 예약 작업 구성 확인 중..."
