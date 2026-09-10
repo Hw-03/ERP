@@ -117,7 +117,7 @@ export function BomRow({ row, childItem, onSaveQty, onRequestDelete, isLocked = 
           <QuantityInput
             ref={inputRef}
             min="0"
-            step="0.01"
+            step="1"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             {...actionTooltipProps}
