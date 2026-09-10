@@ -1503,7 +1503,7 @@ export interface paths {
         };
         /**
          * List Transaction Display Groups
-         * @description 필터된 로그를 화면 대표 행으로 묶어, 완결된 그룹 단위로 페이지를 반환한다.
+         * @description 검색 일치 로그가 속한 작업을 보존하고 완결된 그룹 단위로 반환한다.
          */
         get: operations["list_transaction_display_groups_api_inventory_transactions_display_groups_get"];
         put?: never;
@@ -1626,7 +1626,7 @@ export interface paths {
          * Cancel Transaction
          * @description 거래 취소 — 내역 유지 + 재고 자동 롤백 + '취소됨' 표시.
          *
-         *     권한: 요청자 본인(producer_employee_id) 또는 결재 권한자(warehouse_role / department_role != none).
+         *     권한: 배치 요청자 본인(배치가 없으면 producer_employee_id) 또는 결재 권한자.
          *     BOM 배치(PRODUCE+BACKFLUSH)는 operation_batch_id 단위로 일괄 취소.
          */
         post: operations["cancel_transaction_api_inventory_transactions__log_id__cancel_post"];
@@ -6507,6 +6507,27 @@ export interface components {
          */
         RequestBucketEnum: "warehouse" | "production" | "defective" | "none";
         /**
+         * RequestOrderStockResponse
+         * @description 요청순으로 재구성한 조회 전용 잔고. 실제 처리 당시 원본과 분리한다.
+         */
+        RequestOrderStockResponse: {
+            /** Department Qty After */
+            department_qty_after?: number | null;
+            /** Department Qty Before */
+            department_qty_before?: number | null;
+            /** Reason */
+            reason?: ("missing_history" | "inconsistent_history" | "ambiguous_order" | "negative_balance") | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "available" | "unavailable";
+            /** Warehouse Qty After */
+            warehouse_qty_after?: number | null;
+            /** Warehouse Qty Before */
+            warehouse_qty_before?: number | null;
+        };
+        /**
          * ReservationLineResponse
          * @description 품목별 점유중 라인 — InventoryDetailPanel 표시용.
          */
@@ -7657,6 +7678,8 @@ export interface components {
             key: string;
             /** Logs */
             logs: components["schemas"]["TransactionLogResponse"][];
+            /** Matched Log Ids */
+            matched_log_ids?: string[] | null;
             /**
              * Type
              * @enum {string}
@@ -7783,6 +7806,7 @@ export interface components {
             reason_memo?: string | null;
             /** Reference No */
             reference_no: string | null;
+            request_order_stock?: components["schemas"]["RequestOrderStockResponse"] | null;
             /** Requested At */
             requested_at?: string | null;
             /** Requester Name */
