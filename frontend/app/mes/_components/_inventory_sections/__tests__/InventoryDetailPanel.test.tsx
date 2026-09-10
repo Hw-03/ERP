@@ -519,7 +519,7 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     fireEvent.click(screen.getByRole("button", { name: "하위 구성 보기" }));
 
     const parentHeader = await screen.findByTestId("bom-modal-header");
-    expect(within(parentHeader).getByText("BOM", { exact: true })).toBeInTheDocument();
+    expect(await within(parentHeader).findByText("BOM", { exact: true })).toBeInTheDocument();
     expect(within(parentHeader).getByText(bomTree.item_name)).toHaveClass("font-black");
     expect(within(parentHeader).getByText(bomTree.mes_code!)).toHaveClass("font-mono");
   });
