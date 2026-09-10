@@ -247,7 +247,7 @@ def _seed_command(
         )
         item = Item(
             item_name=f"PostgreSQL {prefix} {suffix}",
-            process_type_code="TR",
+            process_type_code="AR" if department == DepartmentEnum.ASSEMBLY else "TR",
             unit="EA",
             model_symbol=f"{prefix[:2]}{suffix}",
             serial_no=1,

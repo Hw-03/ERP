@@ -16,6 +16,12 @@ const PROCESS_STEPS: ReadonlyArray<{ value: DefectProcessStep; label: string }> 
   { value: "DISUSED", label: "불용" },
 ];
 
+const READABLE_BLUE = `color-mix(in srgb, ${LEGACY_COLORS.blue} 30%, ${LEGACY_COLORS.text})`;
+const READABLE_GREEN = `color-mix(in srgb, ${LEGACY_COLORS.green} 30%, ${LEGACY_COLORS.text})`;
+const READABLE_RED = `color-mix(in srgb, ${LEGACY_COLORS.red} 30%, ${LEGACY_COLORS.text})`;
+const READABLE_YELLOW = `color-mix(in srgb, ${LEGACY_COLORS.yellow} 30%, ${LEGACY_COLORS.text})`;
+const READABLE_CYAN = `color-mix(in srgb, ${LEGACY_COLORS.cyan} 30%, ${LEGACY_COLORS.text})`;
+
 interface Props {
   departments: readonly string[];
   models: readonly string[];
@@ -70,28 +76,28 @@ export function DefectCategoryFilters({
   return (
     <div className="grid min-w-0 gap-3 lg:grid-cols-3">
       <FilterCard title="부서 구분" icon={<Sparkles className="h-4 w-4" style={{ color: LEGACY_COLORS.green }} />}>
-        <FilterChip active={selectedDepartments.length === 0} label="전체" onClick={() => onDepartmentsChange([])} tone={LEGACY_COLORS.green} className="min-h-11 w-full" />
+        <FilterChip active={selectedDepartments.length === 0} label="전체" onClick={() => onDepartmentsChange([])} tone={LEGACY_COLORS.green} textTone={selectedDepartments.length === 0 ? READABLE_GREEN : undefined} className="min-h-11 w-full" />
         {orderedDepartments.map((department) => (
-          <FilterChip key={department} active={selectedDepartments.includes(department)} label={department} onClick={() => onDepartmentsChange(toggleValue(selectedDepartments, department))} tone={LEGACY_COLORS.green} className="min-h-11 w-full" />
+          <FilterChip key={department} active={selectedDepartments.includes(department)} label={department} onClick={() => onDepartmentsChange(toggleValue(selectedDepartments, department))} tone={LEGACY_COLORS.green} textTone={selectedDepartments.includes(department) ? READABLE_GREEN : undefined} className="min-h-11 w-full" />
         ))}
-        {showMyDepartment && <FilterChip active={selectedDepartments.length === 1 && selectedDepartments[0] === currentDept} label="내 부서" onClick={() => onDepartmentsChange(currentDept ? [currentDept] : [])} tone={LEGACY_COLORS.green} className="min-h-11 w-full" />}
+        {showMyDepartment && <FilterChip active={selectedDepartments.length === 1 && selectedDepartments[0] === currentDept} label="내 부서" onClick={() => onDepartmentsChange(currentDept ? [currentDept] : [])} tone={LEGACY_COLORS.green} textTone={selectedDepartments.length === 1 && selectedDepartments[0] === currentDept ? READABLE_GREEN : undefined} className="min-h-11 w-full" />}
       </FilterCard>
 
       <FilterCard title="모델 구분" icon={<TrendingUp className="h-4 w-4" style={{ color: LEGACY_COLORS.cyan }} />}>
-        <FilterChip active={selectedModels.length === 0} label="전체" onClick={() => onModelsChange([])} tone={LEGACY_COLORS.cyan} className="min-h-11 w-full" />
+        <FilterChip active={selectedModels.length === 0} label="전체" onClick={() => onModelsChange([])} tone={LEGACY_COLORS.cyan} textTone={selectedModels.length === 0 ? READABLE_CYAN : undefined} className="min-h-11 w-full" />
         {models.map((model) => (
-          <FilterChip key={model} active={selectedModels.includes(model)} label={model} onClick={() => onModelsChange(toggleValue(selectedModels, model))} tone={LEGACY_COLORS.cyan} className="min-h-11 w-full" />
+          <FilterChip key={model} active={selectedModels.includes(model)} label={model} onClick={() => onModelsChange(toggleValue(selectedModels, model))} tone={LEGACY_COLORS.cyan} textTone={selectedModels.includes(model) ? READABLE_CYAN : undefined} className="min-h-11 w-full" />
         ))}
       </FilterCard>
 
       <FilterCard title="공정 구분" columns={2} icon={<Layers className="h-4 w-4" style={{ color: LEGACY_COLORS.yellow }} />}>
-        <FilterChip active={selectedProcessSteps.length === 0} label="전체" onClick={() => onProcessStepsChange([])} tone={LEGACY_COLORS.yellow} className="min-h-11 w-full" />
+        <FilterChip active={selectedProcessSteps.length === 0} label="전체" onClick={() => onProcessStepsChange([])} tone={LEGACY_COLORS.yellow} textTone={selectedProcessSteps.length === 0 ? READABLE_YELLOW : undefined} className="min-h-11 w-full" />
         {PROCESS_STEPS.map((step) => (
-          <FilterChip key={step.value} active={selectedProcessSteps.includes(step.value)} label={step.label} onClick={() => onProcessStepsChange(toggleValue(selectedProcessSteps, step.value))} tone={step.value === "DISUSED" ? LEGACY_COLORS.red : LEGACY_COLORS.yellow} className="min-h-11 w-full" />
+          <FilterChip key={step.value} active={selectedProcessSteps.includes(step.value)} label={step.label} onClick={() => onProcessStepsChange(toggleValue(selectedProcessSteps, step.value))} tone={step.value === "DISUSED" ? LEGACY_COLORS.red : LEGACY_COLORS.yellow} textTone={selectedProcessSteps.includes(step.value) ? (step.value === "DISUSED" ? READABLE_RED : READABLE_YELLOW) : undefined} className="min-h-11 w-full" />
         ))}
       </FilterCard>
 
-      {(selectedDepartments.length > 0 || selectedModels.length > 0 || selectedProcessSteps.length > 0) && <button type="button" onClick={onResetCategoryFilters} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-[16px] border px-4 text-sm font-bold transition-colors hover:brightness-110 lg:col-span-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}>
+      {(selectedDepartments.length > 0 || selectedModels.length > 0 || selectedProcessSteps.length > 0) && <button type="button" onClick={onResetCategoryFilters} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-[16px] border px-4 text-sm font-bold transition-colors hover:brightness-110 lg:col-span-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: READABLE_BLUE }}>
         <RotateCcw className="h-4 w-4" />
         전체 초기화
       </button>}

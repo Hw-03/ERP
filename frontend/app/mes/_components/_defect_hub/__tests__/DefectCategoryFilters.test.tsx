@@ -39,4 +39,13 @@ describe("DefectCategoryFilters", () => {
     expect(onResetCategoryFilters).not.toHaveBeenCalled();
     expect(screen.queryByText("격리자")).not.toBeInTheDocument();
   });
+
+  it("활성 필터와 초기화 버튼에 본문 대비를 확보한 텍스트 색을 적용한다", () => {
+    render(<DefectCategoryFilters departments={["조립"]} models={["DX-1"]} currentDept="조립" selectedDepartments={["조립"]} selectedModels={["DX-1"]} selectedProcessSteps={["R"]} onDepartmentsChange={vi.fn()} onModelsChange={vi.fn()} onProcessStepsChange={vi.fn()} onResetCategoryFilters={vi.fn()} />);
+
+    expect(within(screen.getByRole("group", { name: "부서 구분" })).getByRole("button", { name: "조립" })).toHaveStyle({ color: "color-mix(in srgb, var(--c-green) 30%, var(--c-text))" });
+    expect(within(screen.getByRole("group", { name: "모델 구분" })).getByRole("button", { name: "DX-1" })).toHaveStyle({ color: "color-mix(in srgb, var(--c-cyan) 30%, var(--c-text))" });
+    expect(within(screen.getByRole("group", { name: "공정 구분" })).getByRole("button", { name: "원자재" })).toHaveStyle({ color: "color-mix(in srgb, var(--c-yellow) 30%, var(--c-text))" });
+    expect(screen.getByRole("button", { name: "전체 초기화" })).toHaveStyle({ color: "color-mix(in srgb, var(--c-blue) 30%, var(--c-text))" });
+  });
 });

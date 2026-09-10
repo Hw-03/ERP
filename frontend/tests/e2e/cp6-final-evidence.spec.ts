@@ -11,7 +11,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 
 import { loginAsOperator, readSeed } from "./_helpers";
 
-const POPULATION_NOTICE = "KPI 숫자는 PA·PF 중간품목을 제외하며, 좁힌 목록에는 PA·PF가 표시될 수 있습니다.";
+const REMOVED_POPULATION_NOTICE = "KPI 숫자는 PA·PF 중간품목을 제외하며, 좁힌 목록에는 PA·PF가 표시될 수 있습니다.";
 
 interface AnimationProbeEvent {
   action: string;
@@ -89,7 +89,7 @@ async function gotoDashboardThroughItemsBarrier(page: Page): Promise<void> {
   await page.goto("/mes?tab=dashboard");
   await intercepted;
 
-  await expect(page.getByText(POPULATION_NOTICE, { exact: true }).filter({ visible: true })).toBeVisible();
+  await expect(page.getByText(REMOVED_POPULATION_NOTICE, { exact: true }).filter({ visible: true })).toHaveCount(0);
   await expect(page.getByText("재고 데이터를 불러오는 중입니다...", { exact: true }).filter({ visible: true })).toBeVisible();
 
   const responsePromise = page.waitForResponse((response) => (
@@ -108,7 +108,7 @@ async function exerciseInventoryNotice(page: Page, viewport: "desktop" | "mobile
   await page.setViewportSize(desktop ? { width: 1440, height: 900 } : { width: 390, height: 844 });
   await gotoDashboardThroughItemsBarrier(page);
 
-  const notice = page.getByText(POPULATION_NOTICE, { exact: true }).filter({ visible: true });
+  const notice = page.getByText(REMOVED_POPULATION_NOTICE, { exact: true }).filter({ visible: true });
   const allCard = page.getByRole("button", { name: /^전체/ }).filter({ visible: true }).first();
   const search = desktop
     ? page.getByRole("textbox", { name: "자재 검색" }).filter({ visible: true }).first()
@@ -141,7 +141,7 @@ async function exerciseInventoryNotice(page: Page, viewport: "desktop" | "mobile
     viewport,
     initialHint: "출하 중간 공정·공정 완료 품목 제외",
     narrowedHint,
-    notice: POPULATION_NOTICE,
+    removedNotice: REMOVED_POPULATION_NOTICE,
   };
 }
 
@@ -322,7 +322,7 @@ function expectLayoutClose(actual: FrozenMetrics, baseline: FrozenMetrics): void
 }
 
 test.describe.serial("CP6 최종 브라우저 증거", () => {
-  test("A4 재고 모집단 안내가 로딩·목록·빈 결과·KPI 필터에서 유지된다", async ({ page }) => {
+  test("A4 KPI 모집단 안내가 카드에 유지되고 기존 별도 문구는 노출되지 않는다", async ({ page }) => {
     await loginAsOperator(page);
     const desktop = await exerciseInventoryNotice(page, "desktop");
     const mobile = await exerciseInventoryNotice(page, "mobile");

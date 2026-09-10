@@ -495,6 +495,7 @@ def test_postgres_activity_waits_for_employee_lock_and_rechecks_expiry() -> None
                 purpose="operator",
                 boot_id=boot_id,
             )
+            db.flush()
             session_id = issued.row.session_id
             db.commit()
 
@@ -579,6 +580,7 @@ def test_postgres_logout_wins_over_late_activity_without_session_revival() -> No
                 purpose="operator",
                 boot_id=boot_id,
             )
+            db.flush()
             session_id = issued.row.session_id
             original_expiry = issued.row.expires_at
             db.commit()

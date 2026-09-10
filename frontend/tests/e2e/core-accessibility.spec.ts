@@ -77,7 +77,7 @@ test.describe("핵심 업무 접근성", () => {
 
     const workType = page.getByRole("button", { name: /창고 입출고/ }).filter({ visible: true }).first();
     await activateWithKeyboard(page, workType);
-    await expect(page.getByText("세부 작업과 부서 선택", { exact: true }).filter({ visible: true })).toBeVisible();
+    await expect(page.getByText("세부 작업 선택", { exact: true }).filter({ visible: true })).toBeVisible();
   });
 
   test("출하 요청 작성을 키보드로 열고 axe 계약을 통과한다", async ({ page }) => {
