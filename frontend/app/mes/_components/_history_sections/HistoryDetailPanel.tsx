@@ -241,6 +241,7 @@ export function HistoryDetailPanel({
     panelOpen,
     identity: selected.operation_id ? `operation:${selected.operation_id}` : `log:${selected.log_id}`,
     scope: cancelScope,
+    workflowMessage: cancellationScope.workflowMessage,
     effects,
     cancelled: isCancelled,
     scopeStatus: cancellationScopeStatus,
@@ -347,6 +348,7 @@ export function HistoryDetailPanel({
                 </Collapsible>
               )}
               <HistoryMobileCancelConfirmation
+                workflowMessage={cancellationScope.workflowMessage}
                 controller={controller}
                 scope={cancelScope}
                 variant="single"

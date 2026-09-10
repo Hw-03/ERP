@@ -859,7 +859,7 @@ def test_component_change_then_prepare_and_pickup_reserves_companions(
         plan_hash=preview.plan_hash,
     )
     db_session.refresh(req)
-    assert req.status == ShippingRequestStatusEnum.CANCELLED
+    assert req.status == ShippingRequestStatusEnum.PREPARED
     assert _location_qty(db_session, final_pf, DepartmentEnum.SHIPPING) == 1
     assert _location_qty(db_session, carton, DepartmentEnum.SHIPPING) == 5
     assert {
@@ -867,7 +867,7 @@ def test_component_change_then_prepare_and_pickup_reserves_companions(
         for allocation in db_session.query(ShippingAllocation)
         .filter(ShippingAllocation.request_id == req.request_id)
         .all()
-    } == {"RELEASED"}
+    } == {"RESERVED"}
 
 
 def test_shipping_bom_stock_exempt_child_is_skipped_in_prepare_and_component_change(

@@ -1518,10 +1518,10 @@ def test_legacy_shipping_reference_bundle_is_adopted_as_one_operation(
     assert response.status_code == 200, response.text
     assert db_session.query(InventoryOperation).count() == 2
     db_session.refresh(request)
-    assert request.status == ShippingRequestStatusEnum.CANCELLED
+    assert request.status == ShippingRequestStatusEnum.PREPARED
     for allocation in allocations:
         db_session.refresh(allocation)
-        assert allocation.status == "RELEASED"
+        assert allocation.status == "RESERVED"
     for source in logs:
         db_session.refresh(source)
         assert source.cancelled is False

@@ -17,8 +17,7 @@ import { useHistoryData } from "../../_hooks/useHistoryData";
 import { useToggleSet } from "../../_hooks/useToggleSet";
 import { useMonthlyCountsQuery } from "@/lib/queries/useTransactionsQuery";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
-import { queryKeys } from "@/lib/queries/keys";
-import { useRealtimeRevision } from "@/lib/queries/realtime";
+import { invalidateOperationalQueries, useRealtimeRevision } from "@/lib/queries/realtime";
 import { toDateKey, formatHistoryDate } from "../../_history_sections/historyFormat";
 import {
   getHistoryActor,
@@ -347,7 +346,7 @@ export function MobileHistoryScreen() {
         return patched ? [patched] : [];
       }),
     );
-    void queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
+    void invalidateOperationalQueries(queryClient);
   }
 
   function handleLogUpdated(updated: TransactionLog) {

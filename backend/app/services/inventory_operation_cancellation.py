@@ -29,6 +29,7 @@ from app.models import (
     IoBatch,
     ShippingAllocation,
     ShippingRequest,
+    ShippingRequestEvent,
     ShippingRequestStatusEnum,
     StockRequest,
     StockRequestStatusEnum,
@@ -41,6 +42,7 @@ from app.services import inv_effect
 from app.services import inventory as inventory_svc
 from app.services import inventory_operations as operation_svc
 from app.services import defect_records as defect_records_svc
+from app.services import shipping_workflow_operations as workflow_ops
 from app.services._tx import transactional
 from app.services.inv_calc import _sync_total
 
@@ -258,6 +260,7 @@ def _workflow_subject_state(
     db: Session,
     subject_type: str,
     subject_id: str,
+    shipping_action: str | None = None,
 ) -> tuple[dict, dict]:
     """연결 업무의 현재 상태와 취소 후 최종 상태를 반환한다."""
     if subject_type == "HandoverDoc":
@@ -274,7 +277,7 @@ def _workflow_subject_state(
             raise CancellationNotAllowed("연결된 출하 업무를 찾을 수 없습니다.")
         return (
             {"status": subject.status.value},
-            {"status": ShippingRequestStatusEnum.CANCELLED.value},
+            {"status": _shipping_target_status(shipping_action).value},
         )
     if subject_type == "StockRequest":
         subject = db.get(StockRequest, subject_id)
@@ -292,6 +295,19 @@ def _workflow_subject_state(
     raise CancellationNotAllowed("지원하지 않는 연결 업무 효과가 포함되어 있습니다.")
 
 
+def _shipping_target_status(action: str | None) -> ShippingRequestStatusEnum:
+    if action == "prepare":
+        return ShippingRequestStatusEnum.PREPARING
+    if action == "pickup":
+        return ShippingRequestStatusEnum.PREPARED
+    raise CancellationNotAllowed("지원하지 않는 출하 단계입니다.")
+
+
+def _shipping_action(db: Session, effect: InventoryOperationEffect) -> str | None:
+    operation = db.get(InventoryOperation, effect.operation_id)
+    return operation.action if operation and operation.domain == "shipping" else None
+
+
 def _effect_subject_plan(
     db: Session,
     effect: InventoryOperationEffect,
@@ -301,13 +317,14 @@ def _effect_subject_plan(
             db,
             effect.subject_type,
             effect.subject_id,
+            _shipping_action(db, effect),
         )
     elif effect.effect_kind == InventoryOperationEffectKindEnum.ALLOCATION:
         allocation = db.get(ShippingAllocation, effect.subject_id)
         if allocation is None:
             raise CancellationNotAllowed("연결된 출하 배정을 찾을 수 없습니다.")
         current = {"status": allocation.status}
-        target = {"status": "RELEASED"}
+        target = {"status": "RESERVED" if _shipping_action(db, effect) == "pickup" else "RELEASED"}
     else:
         raise CancellationNotAllowed("아직 취소를 지원하지 않는 작업 효과가 포함되어 있습니다.")
     return CancellationEffectSubject(
@@ -319,6 +336,54 @@ def _effect_subject_plan(
         current_state=current,
         target_state=target,
     )
+
+
+def _shipping_reservations(
+    db: Session, operation: InventoryOperation, effects: list[InventoryOperationEffect],
+    changes: dict[tuple[str, str, str, str, str], int], blockers: list[str],
+) -> list[dict]:
+    """이전 회차와 다른 요청의 예약을 침범하지 않는지 미리보기에서도 검사한다."""
+    if operation.domain != "shipping" or operation.action not in {"prepare", "pickup"}:
+        return []
+    workflows = [e for e in effects if e.subject_type == "ShippingRequest"]
+    if len(workflows) != 1:
+        blockers.append("출하 작업 연결이 올바르지 않습니다.")
+        return []
+    request_id = uuid.UUID(workflows[0].subject_id)
+    latest = workflow_ops.latest_operation(db, request_id, operation.action, active_only=True)
+    if latest is None or latest.operation_id != operation.operation_id:
+        blockers.append("현재 출하 단계의 최신 작업만 취소할 수 있습니다.")
+    if operation.action == "prepare" and workflow_ops.latest_operation(db, request_id, "pickup", active_only=True):
+        blockers.append("픽업 완료를 먼저 취소해 주세요.")
+    allocation_effects = [e for e in effects if e.subject_type == "ShippingAllocation"]
+    allocations = [db.get(ShippingAllocation, e.subject_id) for e in allocation_effects]
+    grouped: dict[tuple[uuid.UUID, str], int] = {}
+    for allocation in allocations:
+        if allocation is None or allocation.request_id != request_id:
+            blockers.append("출하 예약 연결이 올바르지 않습니다.")
+            continue
+        key = (allocation.item_id, allocation.department)
+        grouped[key] = grouped.get(key, 0) + int(allocation.quantity)
+    snapshot = []
+    for (item_id, department), quantity in sorted(grouped.items()):
+        cell = (str(item_id), "location", department, "PRODUCTION", "")
+        warehouse_cell = (str(item_id), "warehouse", "", "", "")
+        # Adopted legacy pickups retain their original warehouse movement.
+        if cell not in changes and warehouse_cell in changes:
+            cell = warehouse_cell
+        stock, pending = _current_cell(db, cell)
+        reserved = sum(int(row.quantity) for row in db.query(ShippingAllocation).filter(
+            ShippingAllocation.item_id == item_id,
+            ShippingAllocation.department == department,
+            ShippingAllocation.status == "RESERVED",
+        ).all())
+        delta = changes.get(cell, 0)
+        restored = quantity if operation.action == "pickup" else -quantity
+        if stock + delta < pending + reserved + restored:
+            blockers.append("출하 예약을 복원할 재고가 부족합니다.")
+        snapshot.append({"item_id": str(item_id), "department": department, "quantity": quantity,
+                         "stock": stock, "pending": pending, "reserved": reserved})
+    return snapshot
 
 
 def preview_cancellation(
@@ -456,6 +521,7 @@ def preview_cancellation(
             blockers.append("불량 원장과 실제 불량 재고가 일치하지 않아 취소할 수 없습니다.")
 
     effect_plans: list[CancellationEffectSubject] = []
+    reservation_snapshot = _shipping_reservations(db, operation, operation_effects, changes, blockers)
     for effect in operation_effects:
         try:
             effect_plan = _effect_subject_plan(db, effect)
@@ -480,6 +546,8 @@ def preview_cancellation(
         effects,
         unique_blockers,
     )
+    if reservation_snapshot:
+        payload["shipping_reservations"] = reservation_snapshot
     plan_hash = hashlib.sha256(
         json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(
             "utf-8"
@@ -605,8 +673,10 @@ def _close_workflow_subject(
     subject_id: str,
     cancellation: InventoryOperation,
     canceller: Employee,
+    shipping_action: str | None = None,
+    reason: str = "",
 ) -> tuple[dict, dict]:
-    before, target = _workflow_subject_state(db, subject_type, subject_id)
+    before, target = _workflow_subject_state(db, subject_type, subject_id, shipping_action)
     if subject_type == "HandoverDoc":
         subject = db.get(HandoverDoc, subject_id)
         subject.status = HandoverStatusEnum.CANCELLED
@@ -615,10 +685,17 @@ def _close_workflow_subject(
         subject.cancelled_at = cancellation.effective_at
     elif subject_type == "ShippingRequest":
         subject = db.get(ShippingRequest, subject_id)
-        subject.status = ShippingRequestStatusEnum.CANCELLED
-        subject.cancelled_by_employee_id = canceller.employee_id
-        subject.cancelled_by_name = canceller.name
-        subject.cancelled_at = cancellation.effective_at
+        subject.status = ShippingRequestStatusEnum(target["status"])
+        subject.cancelled_by_employee_id = None
+        subject.cancelled_by_name = None
+        subject.cancelled_at = None
+        subject.picked_up_at = None
+        if shipping_action == "prepare":
+            subject.prepared_at = None
+            subject.prepared_by_employee_id = None
+            subject.prepared_by_name = None
+        subject.updated_at = cancellation.effective_at
+        _record_shipping_cancellation_event(db, subject, shipping_action, reason, cancellation.effective_at)
     elif subject_type == "StockRequest":
         subject = db.get(StockRequest, subject_id)
         subject.status = StockRequestStatusEnum.CANCELLED
@@ -636,6 +713,15 @@ def _close_workflow_subject(
     return before, target
 
 
+def _record_shipping_cancellation_event(
+    db: Session, request: ShippingRequest, action: str, reason: str, occurred_at: datetime,
+) -> None:
+    """출하 탭과 공통 취소가 동일한 이벤트를 한 번만 기록한다."""
+    db.add(ShippingRequestEvent(request_id=request.request_id,
+        event_type="PREPARE_CANCELLED" if action == "prepare" else "PICKUP_CANCELLED",
+        message=reason, created_at=occurred_at))
+
+
 def _reverse_operation_effect(
     db: Session,
     *,
@@ -644,7 +730,7 @@ def _reverse_operation_effect(
     canceller: Employee,
     reason: str,
 ) -> InventoryOperationEffect:
-    """연결 업무는 최종 취소로 닫고 배정은 해제한 뒤 역전 효과를 추가한다."""
+    """미리보기와 같은 업무·예약 목표 상태를 적용하고 역전 효과를 추가한다."""
     if original.effect_kind == InventoryOperationEffectKindEnum.WORKFLOW:
         before, after = _close_workflow_subject(
             db,
@@ -652,15 +738,22 @@ def _reverse_operation_effect(
             subject_id=original.subject_id,
             cancellation=cancellation,
             canceller=canceller,
+            shipping_action=_shipping_action(db, original),
+            reason=reason,
         )
     elif original.effect_kind == InventoryOperationEffectKindEnum.ALLOCATION:
         allocation = db.get(ShippingAllocation, original.subject_id)
         if allocation is None:
             raise CancellationNotAllowed("연결된 출하 배정을 찾을 수 없습니다.")
         before = {"status": allocation.status}
-        allocation.status = "RELEASED"
-        allocation.released_at = cancellation.effective_at
-        allocation.released_reason = reason
+        allocation.status = _effect_subject_plan(db, original).target_state["status"]
+        if allocation.status == "RESERVED":
+            allocation.consumed_at = None
+            allocation.released_at = None
+            allocation.released_reason = None
+        else:
+            allocation.released_at = cancellation.effective_at
+            allocation.released_reason = reason
         after = {"status": allocation.status}
     else:
         raise CancellationNotAllowed("아직 취소를 지원하지 않는 작업 효과가 포함되어 있습니다.")
@@ -780,6 +873,13 @@ def cancel_operation(
 ) -> InventoryOperation:
     """잠금 후 계획을 재검산하고 전체 역전 작업을 한 트랜잭션으로 확정한다."""
     with transactional(db):
+        # 단계 명령과 같은 순서: 요청 → 원 작업 → 품목 재고.
+        request_effects = db.query(InventoryOperationEffect).filter(
+            InventoryOperationEffect.operation_id == operation_id,
+            InventoryOperationEffect.subject_type == "ShippingRequest",
+        ).all()
+        for request_id in sorted({uuid.UUID(effect.subject_id) for effect in request_effects}):
+            workflow_ops.lock_request(db, request_id)
         original = _lock_original_operation(db, operation_id)
         logs = (
             db.query(TransactionLog)
@@ -805,7 +905,14 @@ def cancel_operation(
             )
             .all()
         )
-        inventory_svc.lock_inventories(db, sorted({log.item_id for log in logs}))
+        allocation_ids = [uuid.UUID(effect.subject_id) for effect in operation_effects
+                          if effect.subject_type == "ShippingAllocation"]
+        allocation_items = {row.item_id for row in db.query(ShippingAllocation).filter(
+            ShippingAllocation.allocation_id.in_(allocation_ids),
+        ).all()} if allocation_ids else set()
+        inventory_svc.lock_inventories(db, sorted({log.item_id for log in logs} | allocation_items))
+        # 대기 중 바뀐 예약·재고를 identity map에서 재사용하지 않는다.
+        db.expire_all()
         current_plan = preview_cancellation(db, operation_id, now=now)
         if current_plan.plan_hash != plan_hash:
             raise CancellationPlanChanged(

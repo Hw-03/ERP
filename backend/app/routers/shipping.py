@@ -18,6 +18,7 @@ from app.database import get_db
 from app.models import (
     DepartmentEnum,
     Employee,
+    InventoryOperation,
     Item,
     ShippingRequest,
     ShippingRequestRevision,
@@ -77,7 +78,7 @@ def _companion_payload(lines) -> list[dict] | None:
     return [line.model_dump() for line in lines]
 
 
-def _tx_log_response(log: TransactionLog) -> ShippingTransactionLogResponse:
+def _tx_log_response(log: TransactionLog, reversal: InventoryOperation | None = None) -> ShippingTransactionLogResponse:
     return ShippingTransactionLogResponse(
         log_id=log.log_id,
         item_id=log.item_id,
@@ -95,9 +96,9 @@ def _tx_log_response(log: TransactionLog) -> ShippingTransactionLogResponse:
         notes=log.notes,
         shipping_phase=log.shipping_phase,
         created_at=log.created_at,
-        cancelled=bool(log.cancelled),
-        cancel_reason=log.cancel_reason,
-        cancelled_at=log.cancelled_at,
+        cancelled=bool(log.cancelled) or reversal is not None,
+        cancel_reason=reversal.reason if reversal else log.cancel_reason,
+        cancelled_at=reversal.effective_at if reversal else log.cancelled_at,
         inventory_effect=log.inventory_effect,
     )
 
@@ -167,6 +168,13 @@ def _to_response(
         .order_by(TransactionLog.created_at.asc(), TransactionLog.log_id.asc())
         .all()
     )
+    operation_ids = {log.operation_id for log in tx_rows if log.operation_id}
+    reversals = {
+        operation.reverses_operation_id: operation
+        for operation in db.query(InventoryOperation).filter(
+            InventoryOperation.reverses_operation_id.in_(operation_ids),
+        ).all()
+    } if operation_ids else {}
     return ShippingRequestResponse(
         request_id=req.request_id,
         status=req.status,
@@ -240,7 +248,7 @@ def _to_response(
             if isinstance(latest_preparation_revision, ShippingRequestRevision)
             else None
         ),
-        transactions=[_tx_log_response(log) for log in tx_rows],
+        transactions=[_tx_log_response(log, reversals.get(log.operation_id)) for log in tx_rows],
         allocations=[
             ShippingAllocationResponse(
                 allocation_id=allocation.allocation_id,

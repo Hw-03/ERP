@@ -43,19 +43,27 @@ type HistoryCancellationScopeState = {
   logs: TransactionLog[];
   planHash: string | null;
   blocker: string | null;
+  workflowMessage: string | null;
 };
 
 function scopeState(
   scopeKey: string,
   status: HistoryCancelScopeStatus,
   logs: TransactionLog[] = [],
-  preview?: { planHash: string; canCancel: boolean; blockers: string[] } | null,
+  preview?: { planHash: string; canCancel: boolean; blockers: string[]; effects?: Array<Record<string, unknown>> } | null,
 ): HistoryCancellationScopeState {
+  const workflow = preview?.effects?.find((effect) => effect.subject_type === "ShippingRequest");
+  const target = workflow?.target_state as { status?: string } | undefined;
   return {
     scopeKey,
     status,
     logs,
     planHash: preview?.planHash ?? null,
+    workflowMessage: target?.status === "PREPARING"
+      ? "준비 중으로 돌아가며 출하 예약을 해제합니다."
+      : target?.status === "PREPARED"
+        ? "출고 재고를 복원하고 준비 완료 및 출하 예약 상태로 돌아갑니다."
+        : null,
     blocker: preview && !preview.canCancel
       ? preview.blockers[0] ?? "현재 상태에서는 이 작업을 취소할 수 없습니다."
       : null,
@@ -218,6 +226,7 @@ export function HistoryCancelAction({
   onRetryScope,
   onSubmit,
   triggerLabel,
+  workflowMessage,
   scopeCount,
   children,
   pinToDesktopFooter = false,
@@ -234,6 +243,7 @@ export function HistoryCancelAction({
   onRetryScope?: () => void;
   onSubmit: (credentials: HistoryCancelCredentials) => Promise<void>;
   triggerLabel?: string;
+  workflowMessage?: string | null;
   scopeCount?: number;
   children?: (controller: HistoryCancelController) => ReactNode;
   pinToDesktopFooter?: boolean;
@@ -304,6 +314,7 @@ export function HistoryCancelAction({
       inFlightCancellationIdentities.delete(requestIdentity);
       if (lifecycleTokenRef.current !== token) return;
       setStep("error");
+      onRetryScope?.();
       setError(
         err instanceof ApiConnectionError
           ? "서버와 연결할 수 없습니다. 취소 처리 여부를 확인한 뒤 다시 시도해 주세요."
@@ -359,7 +370,7 @@ export function HistoryCancelAction({
     >
       <div className={desktopCancellationOpen ? "hc-confirm-summary--desktop" : undefined}>
         <strong>취소 내용 확인</strong>
-        <p>{copy.description}</p>
+        <p>{workflowMessage ?? copy.description}</p>
         <HistoryCancelImpactPreview effects={effects} scopeCount={scopeCount} />
       </div>
 
@@ -443,12 +454,14 @@ function HistoryCancelImpactPreview({
 
 export function HistoryMobileCancelConfirmation({
   controller,
+  workflowMessage,
   scope,
   variant,
   effects,
   scopeCount,
 }: {
   controller: HistoryCancelController;
+  workflowMessage?: string | null;
   scope: HistoryCancelScope;
   variant: "single" | "batch";
   effects: InventoryEffectRow[];
@@ -463,7 +476,7 @@ export function HistoryMobileCancelConfirmation({
   return (
     <div className="hc-mobile">
       <strong>취소 범위 확인</strong>
-      <p className="hc-scope">{scopeDescription}</p>
+      <p className="hc-scope">{workflowMessage ?? scopeDescription}</p>
       <HistoryCancelImpactPreview effects={effects} scopeCount={scopeCount} />
       <textarea
         aria-label="취소 사유"

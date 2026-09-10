@@ -33,6 +33,7 @@ vi.mock("next/navigation", () => ({
   },
 }));
 vi.mock("@/lib/queries/realtime", () => ({
+  invalidateOperationalQueries: vi.fn().mockResolvedValue(undefined),
   useRealtimeRevision: () => realtimeMock.revision,
 }));
 vi.mock("@/lib/api", () => ({
@@ -2269,6 +2270,18 @@ describe("DesktopShippingView", () => {
     expect(detailUrls.some((url) => url.includes("shippingHistoryStatus=CANCELLED"))).toBe(false);
   });
 
+  it("does not overwrite pickup navigation with the previous request-detail URL", async () => {
+    navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=prepared-1";
+    vi.mocked(api.completeShippingPickup).mockResolvedValue(request({ request_id: "prepared-1", status: "PICKED_UP" }));
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+    fireEvent.click(await screen.findByTestId("shipping-pickup-from-detail"));
+    fireEvent.click(await screen.findByRole("button", { name: "확인 후 실행" }));
+    await waitFor(() => expect(navigationMock.push).toHaveBeenCalledWith(
+      expect.stringContaining("shippingView=historyWork"), { scroll: false },
+    ));
+    expect(navigationMock.replace.mock.calls.some(([url]) => String(url).includes("shippingView=requestDetail"))).toBe(false);
+  });
+
   it("normalizes a mismatched history detail URL to the request status once", async () => {
     navigationMock.search = "tab=shipping&shippingView=historyWork&shippingRequestId=hist-picked&shippingHistoryStatus=CANCELLED";
     const picked = request({
@@ -2340,6 +2353,18 @@ describe("DesktopShippingView", () => {
       prepared_at: "2026-07-24T00:00:00Z",
       picked_up_at: "2026-07-24T01:00:00Z",
     });
+    const transaction = {
+      log_id: "current", item_id: "pf-1", item_name: "Current pickup", mes_code: "PF-001",
+      transaction_type: "SHIP" as const, quantity_change: -1, quantity_before: 1, quantity_after: 0,
+      warehouse_qty_before: 0, warehouse_qty_after: 0, reference_no: "SHIP-req", produced_by: "shipping",
+      notes: null, shipping_phase: "PICKUP", created_at: "2026-07-24T01:00:00Z", cancelled: false,
+      cancel_reason: null, cancelled_at: null, inventory_effect: [],
+    };
+    picked.transactions = [
+      { ...transaction, log_id: "previous", item_name: "Previous pickup", cancelled: true },
+      { ...transaction, log_id: "reversal", item_name: "Reversal", quantity_change: 1 },
+      transaction,
+    ];
     vi.mocked(api.getShippingRequests).mockResolvedValue([picked]);
     vi.mocked(api.getShippingHistory).mockResolvedValue({ requests: [picked], next_cursor: null, has_more: false });
     vi.mocked(api.getShippingRequest).mockResolvedValue(picked);
@@ -2348,6 +2373,10 @@ describe("DesktopShippingView", () => {
     render(<DesktopShippingView onStatusChange={() => {}} />);
 
     fireEvent.click(await screen.findByTestId("shipping-pickup-cancel-from-history"));
+    expect(screen.getByText("출하 차감 · Current pickup -1")).toBeInTheDocument();
+    expect(screen.queryByText("출하 차감 · Previous pickup -1")).not.toBeInTheDocument();
+    expect(screen.queryByText("출하 차감 · Reversal 1")).not.toBeInTheDocument();
+    expect(screen.getByText("출하 취소 · 재고 복원")).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: "확인 후 실행" }));
 
     await waitFor(() => expect(api.cancelShippingPickup).toHaveBeenCalledWith("hist-picked"));

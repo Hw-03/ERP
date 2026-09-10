@@ -16,7 +16,7 @@ import { useToggleSet } from "./_hooks/useToggleSet";
 import { useMonthlyCountsQuery, useTransactionReferenceSummariesQuery, useTransactionsSummaryQuery } from "@/lib/queries/useTransactionsQuery";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 import { queryKeys } from "@/lib/queries/keys";
-import { useRealtimeRevision } from "@/lib/queries/realtime";
+import { invalidateOperationalQueries, useRealtimeRevision } from "@/lib/queries/realtime";
 import { toDateKey } from "./_history_sections/historyFormat";
 import { type HistorySelection } from "./_history_sections/historyConstants";
 import { resolveHistoryDateRange, type SelectedHistoryMonth } from "./_history_sections/historyQuery";
@@ -344,7 +344,7 @@ export function DesktopHistoryView() {
         return patched ? [patched] : [];
       }),
     );
-    void queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
+    void invalidateOperationalQueries(queryClient);
     refreshLoaded();
   }
 

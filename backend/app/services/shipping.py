@@ -15,9 +15,7 @@ from app.models import (
     DepartmentEnum,
     Inventory,
     InventoryOperation,
-    InventoryOperationEffect,
     InventoryOperationEffectKindEnum,
-    InventoryOperationKindEnum,
     InventoryOperationRoleEnum,
     Item,
     ShippingAllocation,
@@ -38,6 +36,7 @@ from app.services import inv_effect
 from app.services import inventory_operations as operation_svc
 from app.services import inventory_operation_cancellation as cancellation_svc
 from app.services import inventory as inventory_svc
+from app.services import shipping_workflow_operations as workflow_ops
 from app.services.bom import bom_child_item_ordering
 from app.services.bom_stock_policy import should_skip_bom_inventory
 from app.services.inv_calc import _sync_total
@@ -90,24 +89,15 @@ def _shipping_workflow_operation(
     *,
     action: str,
 ) -> InventoryOperation | None:
-    """전환 이후 출하 상태 변경을 만든 원 작업을 찾는다."""
-    return (
-        db.query(InventoryOperation)
-        .join(
-            InventoryOperationEffect,
-            InventoryOperationEffect.operation_id == InventoryOperation.operation_id,
-        )
-        .filter(
-            InventoryOperation.kind == InventoryOperationKindEnum.BUSINESS,
-            InventoryOperation.domain == "shipping",
-            InventoryOperation.action == action,
-            InventoryOperationEffect.effect_kind == InventoryOperationEffectKindEnum.WORKFLOW,
-            InventoryOperationEffect.subject_type == "ShippingRequest",
-            InventoryOperationEffect.subject_id == str(req.request_id),
-        )
-        .order_by(InventoryOperation.effective_at.desc())
-        .first()
-    )
+    """취소되지 않은 최신 출하 회차만 대상으로 선택한다."""
+    return workflow_ops.latest_operation(db, req.request_id, action, active_only=True)
+
+
+def _lock_request(db: Session, request_id: uuid.UUID) -> ShippingRequest:
+    req = workflow_ops.lock_request(db, request_id)
+    if req is None:
+        raise ShippingError("출하 요청을 찾을 수 없습니다.")
+    return req
 
 
 def _resolve_cancellation_actor(
@@ -568,7 +558,7 @@ def update_request(
     actor: Employee,
 ) -> ShippingRequest:
     actor = _require_actor(actor)
-    req = _get_request(db, request_id)
+    req = _lock_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PREPARING:
         raise ShippingError("준비 중 상태에서만 출하 요청을 수정할 수 있습니다.")
     before = _revision_snapshot(req)
@@ -619,7 +609,7 @@ def delete_request(
     actor: Employee,
 ) -> None:
     actor = _require_actor(actor)
-    req = _get_request(db, request_id)
+    req = _lock_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PREPARING:
         raise ShippingError("준비 중 상태에서만 출하 요청을 취소할 수 있습니다.")
     req.status = ShippingRequestStatusEnum.CANCELLED
@@ -1583,6 +1573,7 @@ def _reserve_pickup_items(
             continue
         item_by_id[item.item_id] = item
         required_by_item[item.item_id] = required_by_item.get(item.item_id, 0) + quantity
+    inventory_svc.ensure_and_lock_inventories(db, sorted(required_by_item))
     departments = {
         item_id: _require_item_location_available(db, item_by_id[item_id], quantity)
         for item_id, quantity in required_by_item.items()
@@ -1740,7 +1731,7 @@ def prepare_complete(
     normalized_serial_numbers = serial_numbers.strip()
     if not normalized_serial_numbers:
         raise ShippingError("출하 SN을 입력해야 합니다.")
-    req = _get_request(db, request_id)
+    req = _lock_request(db, request_id)
     if req.invoice_number is None:
         raise ShippingError("준비 완료 전에 인보이스 번호를 입력해야 합니다.")
     if req.status != ShippingRequestStatusEnum.PREPARING:
@@ -1756,7 +1747,7 @@ def prepare_complete(
         actor_name=prepared_by_name or req.requested_by_name,
         actor_employee_id=prepared_by_employee_id,
         reason=req.notes,
-        idempotency_key=f"shipping:{req.request_id}:prepare",
+        idempotency_key=workflow_ops.next_operation_key(db, req.request_id, "prepare"),
     )
 
     _reserve_pickup_items(
@@ -1795,7 +1786,7 @@ def prepare_cancel(
     *,
     actor: Employee | None = None,
 ) -> ShippingRequest:
-    req = _get_request(db, request_id)
+    req = _lock_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PREPARED:
         raise ShippingError("준비 완료 요청에서만 취소할 수 있습니다.")
     operation = _shipping_workflow_operation(db, req, action="prepare")
@@ -1807,7 +1798,6 @@ def prepare_cancel(
             actor=actor,
             reason=cancellation_reason,
         )
-        _record_event(db, req, "PREPARE_CANCELLED", cancellation_reason)
         db.flush()
         return req
     logs = (
@@ -1876,7 +1866,7 @@ def _ship_from_item_location(
 
 
 def pickup_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
-    req = _get_request(db, request_id)
+    req = _lock_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PREPARED:
         raise ShippingError("준비 완료 요청에서만 픽업 완료할 수 있습니다.")
     if req.final_pf_item is None:
@@ -1890,7 +1880,7 @@ def pickup_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
         actor_name=req.prepared_by_name or req.requested_by_name,
         actor_employee_id=req.prepared_by_employee_id,
         reason=req.notes,
-        idempotency_key=f"shipping:{req.request_id}:pickup",
+        idempotency_key=workflow_ops.next_operation_key(db, req.request_id, "pickup"),
     )
     _consume_pickup_allocations(
         db,
@@ -1924,7 +1914,7 @@ def pickup_cancel(
     actor: Employee | None = None,
 ) -> ShippingRequest:
     """신규 픽업은 별도 역전 작업으로 취소하고 레거시만 기존 방식으로 처리한다."""
-    req = _get_request(db, request_id)
+    req = _lock_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PICKED_UP:
         raise ShippingError("픽업 완료 요청에서만 픽업 완료를 취소할 수 있습니다.")
     if req.final_pf_item is None:
@@ -1938,7 +1928,6 @@ def pickup_cancel(
             actor=actor,
             reason="픽업 완료 취소",
         )
-        _record_event(db, req, "PICKUP_CANCELLED", "픽업 완료 취소")
         db.flush()
         return req
 

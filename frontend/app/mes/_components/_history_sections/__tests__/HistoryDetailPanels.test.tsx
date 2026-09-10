@@ -1171,6 +1171,10 @@ describe("desktop history detail panels", () => {
   });
 
   it("previews and cancels every line of a new-ledger operation with the reviewed plan hash", async () => {
+    vi.mocked(productionApi.previewInventoryOperationCancellation).mockResolvedValue({
+      operationId: "operation-1", planHash: "a".repeat(64), canCancel: true, blockers: [], cells: [], defectRecords: [],
+      effects: [{ subject_type: "ShippingRequest", target_state: { status: "PREPARED" } }],
+    });
     const selected = makeLog({
       operation_id: "operation-1",
       operation_kind: "BUSINESS",
@@ -1208,6 +1212,7 @@ describe("desktop history detail panels", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "이 내역 취소" }));
     expect(await screen.findByText("취소할 내역 2건")).toBeInTheDocument();
+    expect(screen.getByText("출고 재고를 복원하고 준비 완료 및 출하 예약 상태로 돌아갑니다.")).toBeInTheDocument();
     expect(
       within(screen.getByTestId("history-cancel-confirmation")).getByText("하위 자재 B"),
     ).toBeInTheDocument();

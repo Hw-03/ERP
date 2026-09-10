@@ -4,6 +4,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { GitBranch, Package, XCircle } from "lucide-react";
 import { api, type TransactionLog } from "@/lib/api";
 import { ioApi } from "@/lib/api/io";
+import { productionApi } from "@/lib/api/production";
 import type { IoBatch, IoBundle, IoLine } from "@/lib/api/types/io";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { useCurrentOperator } from "../login/useCurrentOperator";
@@ -152,6 +153,7 @@ export function HistoryBatchDetailPanel({
     panelOpen: panelOpen && (Boolean(first.operation_batch_id) || canCancelAsBatch),
     identity: `batch:${batchId}`,
     visibleLogs: logs,
+    operationId: first.operation_id,
     operationBatchId: first.operation_batch_id,
     referenceNo: canCancelAsBatch && !first.operation_batch_id ? first.reference_no : null,
   });
@@ -164,6 +166,20 @@ export function HistoryBatchDetailPanel({
       throw new Error("취소 범위를 확인한 뒤 다시 시도해 주세요.");
     }
     const targetLogs = canCancelAsBatch ? cancellationScope.logs : [first];
+    if (first.operation_id) {
+      if (cancellationScope.blocker || !cancellationScope.planHash) {
+        throw new Error(cancellationScope.blocker ?? "취소 계획을 확인한 뒤 다시 시도해 주세요.");
+      }
+      const cancellation = await productionApi.cancelInventoryOperation(first.operation_id, {
+        reason, employee_code: operator.employee_code, pin, plan_hash: cancellationScope.planHash,
+      });
+      onBatchCancelled(batchId, {
+        ...first, cancelled: true, cancel_reason: reason,
+        cancelled_by: cancellation.actorEmployeeId, cancelled_at: cancellation.effectiveAt,
+        operation_effective_status: "cancelled", reversal_operation_id: cancellation.operationId,
+      });
+      return;
+    }
     const target = targetLogs.find((log) => !log.cancelled);
     if (!target) {
       throw new Error("이미 취소된 작업입니다.");
@@ -244,6 +260,8 @@ export function HistoryBatchDetailPanel({
         )}
 
         <HistoryCancelAction
+          workflowMessage={cancellationScope.workflowMessage}
+          blocker={cancellationScope.blocker}
           panelOpen={panelOpen}
           identity={cancellationIdentity}
           scope={cancellationActionScope}
@@ -264,6 +282,8 @@ export function HistoryBatchDetailPanel({
 
   return (
     <HistoryCancelAction
+      workflowMessage={cancellationScope.workflowMessage}
+      blocker={cancellationScope.blocker}
       panelOpen={panelOpen}
       identity={cancellationIdentity}
       scope={cancellationActionScope}
@@ -303,6 +323,7 @@ export function HistoryBatchDetailPanel({
 
           <HistoryDetailMemo notes={first.notes} transactionType={first.transaction_type} />
           <HistoryMobileCancelConfirmation
+            workflowMessage={cancellationScope.workflowMessage}
             controller={controller}
             scope={cancellationActionScope}
             variant="batch"

@@ -43,6 +43,18 @@ function makeLog(overrides: Partial<TransactionLog> = {}): TransactionLog {
   };
 }
 
+it("cancels only the matching operation, preserving previous and retry rounds", () => {
+  const original = makeLog({ operation_id: "pickup-2" });
+  const companion = makeLog({ log_id: "companion", operation_id: "pickup-2" });
+  const previous = makeLog({ log_id: "previous", operation_id: "pickup-1" });
+  const retry = makeLog({ log_id: "retry", operation_id: "pickup-3" });
+  const next = applyHistoryCancellation({ logs: [original, companion, previous, retry], selection: null, batchCache: new Map() }, {
+    ...original, cancelled: true, operation_effective_status: "cancelled", reversal_operation_id: "reversal-2",
+  });
+  expect(next.logs.map((log) => log.cancelled)).toEqual([true, true, false, false]);
+  expect(next.logs[1].reversal_operation_id).toBe("reversal-2");
+});
+
 function makeBatch(overrides: Partial<IoBatch> = {}): IoBatch {
   return {
     batch_id: "batch-1",
