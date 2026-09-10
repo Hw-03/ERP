@@ -234,6 +234,7 @@ def test_partial_batch_projects_only_the_approved_source(
     submitted = io_actions.submit(
         db_session,
         _internal_use_payload(requester, warehouse_item, department_item),
+        requester=requester,
     )
     batch = db_session.get(IoBatch, submitted["batch"]["batch_id"])
     requests = (

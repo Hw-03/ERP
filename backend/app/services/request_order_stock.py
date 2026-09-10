@@ -52,6 +52,16 @@ def _effect_delta(effect: object) -> StockTotals | None:
         elif cell.get("scope") == "warehouse_box":
             if not isinstance(cell.get("box_id"), str) or not cell["box_id"].strip():
                 return None
+        elif cell.get("scope") == "warehouse_zone":
+            if (
+                not isinstance(cell.get("row_id"), str)
+                or not cell["row_id"].strip()
+                or type(cell.get("zone_id")) is not int
+            ):
+                return None
+        elif cell.get("scope") == "warehouse_unplaced":
+            if not isinstance(cell.get("row_id"), str) or not cell["row_id"].strip():
+                return None
         else:
             return None
     return StockTotals(warehouse, department)

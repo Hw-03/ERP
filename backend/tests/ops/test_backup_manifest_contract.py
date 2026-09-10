@@ -897,6 +897,77 @@ def test_manifest_publication_cleanup_failure_leaves_retryable_receipt(
     assert not list(runtime_dir.glob(".backup-publication-quarantine-*"))
 
 
+def test_publication_recovery_ignores_receipt_completed_after_directory_scan(
+    runtime_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """동시 백업이 스캔 직후 자체 영수증을 지워도 다른 백업은 계속한다."""
+    receipt = runtime_dir / (
+        f"{backup_manifest.PUBLICATION_RECOVERY_PREFIX}{'6' * 32}.json"
+    )
+    receipt.write_text("{}", encoding="utf-8")
+    original_load = backup_manifest._load_publication_recovery_receipt
+
+    def complete_before_load(
+        path: Path,
+    ) -> tuple[str, int, int, Path, Path, Path, Path, Path, Path]:
+        path.unlink()
+        return original_load(path)
+
+    monkeypatch.setattr(
+        backup_manifest,
+        "_load_publication_recovery_receipt",
+        complete_before_load,
+    )
+
+    backup_manifest.recover_publication_receipts(runtime_dir)
+
+    assert not receipt.exists()
+
+
+def test_publication_recovery_propagates_missing_file_after_receipt_load(
+    runtime_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """영수증 로드 뒤의 파일 소실은 완료 경합으로 숨기지 않는다."""
+    token = "7" * 32
+    published = runtime_dir / "mes_20260904_120000.db"
+    published_manifest = backup_manifest.manifest_path_for(published)
+    staged = runtime_dir / f".{published.name}.pending-{'8' * 32}.tmp"
+    staged_manifest = runtime_dir / (
+        f".{published_manifest.name}.pending-{'9' * 32}.tmp"
+    )
+    quarantined = runtime_dir / (
+        f"{backup_manifest.PUBLICATION_QUARANTINE_PREFIX}{token}-{published.name}"
+    )
+    quarantined_manifest = runtime_dir / (
+        f"{backup_manifest.PUBLICATION_QUARANTINE_PREFIX}"
+        f"{token}-{published_manifest.name}"
+    )
+    receipt = runtime_dir / f"{backup_manifest.PUBLICATION_RECOVERY_PREFIX}{token}.json"
+    published.write_bytes(b"half-published-artifact")
+    backup_manifest._write_publication_recovery_receipt(
+        receipt,
+        state="recovery_required",
+        staged_artifact=staged,
+        published_artifact=published,
+        published_manifest=published_manifest,
+        staged_manifest=staged_manifest,
+        quarantined_artifact=quarantined,
+        quarantined_manifest=quarantined_manifest,
+    )
+
+    def fail_after_load(_source: Path, _destination: Path) -> None:
+        raise FileNotFoundError("injected recovery move failure")
+
+    monkeypatch.setattr(backup_manifest, "_durable_replace", fail_after_load)
+
+    with pytest.raises(FileNotFoundError, match="recovery move failure"):
+        backup_manifest.recover_publication_receipts(runtime_dir)
+
+    assert receipt.is_file()
+
+
 def test_artifact_publication_failure_recovers_private_staged_artifact(
     runtime_dir: Path,
     monkeypatch: pytest.MonkeyPatch,

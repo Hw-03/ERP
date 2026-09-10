@@ -42,7 +42,9 @@ def test_latest_warehouse_and_department_balances_are_independent():
 def test_box_and_defective_movements_do_not_duplicate_normal_stock():
     log = entry(1, (50, 50), (40, 45))
     log = replace(log, inventory_effect=log.inventory_effect + [
-        {"scope": "warehouse_box", "box_id": "box", "delta": -10},
+        {"scope": "warehouse_box", "box_id": "box", "delta": -2},
+        {"scope": "warehouse_zone", "row_id": "zone-row", "zone_id": 1, "delta": -3},
+        {"scope": "warehouse_unplaced", "row_id": "unplaced-row", "delta": -5},
         {"scope": "location", "department": "조립", "status": "DEFECTIVE", "delta": 5},
     ])
     stock = recalculate_request_order_stock([log], StockTotals(40, 45))[log.log_id]

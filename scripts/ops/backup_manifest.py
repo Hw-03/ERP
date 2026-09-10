@@ -801,6 +801,8 @@ def _load_publication_recovery_receipt(
 
     try:
         payload = json.loads(receipt.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        raise
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise OSError(f"invalid backup publication recovery receipt: {receipt}") from exc
     path_keys = (
@@ -896,6 +898,12 @@ def _process_is_running(process_id: int, expected_started_at_ns: int) -> bool:
 def _recover_publication_receipt(receipt: Path, *, force: bool = False) -> None:
     """Remove an incomplete public pair and delete its retry receipt last."""
 
+    try:
+        recovery = _load_publication_recovery_receipt(receipt)
+    except FileNotFoundError:
+        # A concurrent publisher can finish and remove its own receipt
+        # after this process has enumerated the directory.
+        return
     (
         state,
         publisher_pid,
@@ -906,7 +914,7 @@ def _recover_publication_receipt(receipt: Path, *, force: bool = False) -> None:
         staged_manifest,
         quarantined_artifact,
         quarantined_manifest,
-    ) = _load_publication_recovery_receipt(receipt)
+    ) = recovery
     if (
         not force
         and state == "publishing"
@@ -926,7 +934,7 @@ def _recover_publication_receipt(receipt: Path, *, force: bool = False) -> None:
     _durable_unlink(staged_manifest, missing_ok=True)
     _durable_unlink(quarantined_artifact, missing_ok=True)
     _durable_unlink(quarantined_manifest, missing_ok=True)
-    _durable_unlink(receipt)
+    _durable_unlink(receipt, missing_ok=True)
 
 
 def recover_publication_receipts(directory: Path) -> None:

@@ -103,9 +103,10 @@ test.describe("핵심 업무 접근성", () => {
     const loadAlert = page.getByRole("alert", { name: "출하 데이터 로드 오류" });
     await expect(loadAlert).toBeFocused();
 
-    failInitialShippingLoad = false;
     const retry = loadAlert.getByRole("button", { name: "다시 시도" });
-    await activateWithKeyboard(page, retry);
+    await tabTo(page, retry);
+    failInitialShippingLoad = false;
+    await page.keyboard.press("Enter");
     await expect(loadAlert).toHaveCount(0);
 
     await activateWithKeyboard(page, requestHub);
@@ -141,8 +142,10 @@ test.describe("핵심 업무 접근성", () => {
 
     const loadAlert = page.getByRole("alert", { name: "불량 데이터 로드 오류" });
     await expect(loadAlert).toBeFocused();
+    const retry = loadAlert.getByRole("button", { name: "다시 시도" });
+    await tabTo(page, retry);
     failInitialDefectLoad = false;
-    await activateWithKeyboard(page, loadAlert.getByRole("button", { name: "다시 시도" }));
+    await page.keyboard.press("Enter");
     await expect(loadAlert).toHaveCount(0);
 
     const search = page.getByRole("searchbox", { name: "불량 검색" }).filter({ visible: true });

@@ -222,6 +222,8 @@ SERVICE_READ_ONLY_EXPORTS: frozenset[str] = frozenset(
         "app.services.rate_limit.operator_login_kdf_ip_key",
         "app.services.rate_limit.operator_login_ip_key",
         "app.services.rate_limit.operator_session_issuance_key",
+        "app.services.request_order_stock.load_request_order_stock",
+        "app.services.request_order_stock.recalculate_request_order_stock",
         "app.services.shipping.component_change_preview_independent",
         "app.services.shipping.get_request",
         "app.services.shipping.match_bom",
