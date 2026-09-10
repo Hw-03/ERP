@@ -143,6 +143,7 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
           <input
             type="password"
             inputMode="numeric"
+            aria-label="승인 PIN"
             value={approvePin}
             onChange={(e) => setApprovePin(normalizePin(e.target.value))}
             onKeyDown={(e) => {
@@ -198,6 +199,7 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
             <input
               type="password"
               inputMode="numeric"
+              aria-label="반려 PIN"
               value={rejectPin}
               onChange={(e) => setRejectPin(normalizePin(e.target.value))}
               onKeyDown={(e) => {

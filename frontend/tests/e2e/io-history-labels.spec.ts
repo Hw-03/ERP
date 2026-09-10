@@ -102,7 +102,7 @@ test.describe("입출고 내역 PC 정보 위계", () => {
     await approvePage.goto("/mes?tab=warehouse");
     await approvePage.getByRole("tab", { name: /창고 승인함/ }).click();
     await approvePage.getByRole("button", { name: "승인", exact: true }).click();
-    await approvePage.getByRole("textbox", { name: "0000" }).fill(readSeed().operatorPin);
+    await approvePage.getByRole("textbox", { name: "승인 PIN" }).fill(readSeed().operatorPin);
     await approvePage.getByRole("button", { name: "승인 확정" }).click();
     await expect(approvePage.getByText("승인 대기 중인 요청이 없습니다.")).toBeVisible();
 

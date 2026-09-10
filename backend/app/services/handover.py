@@ -53,6 +53,12 @@ def can_receive(actor: Employee, to_department: str) -> bool:
     return (actor.department or "").strip() == (to_department or "").strip()
 
 
+def _ensure_can_compose(author: Employee) -> None:
+    """인수인계 작성 화면과 동일하게 튜브 부서 직원만 작성 명령을 허용한다."""
+    if (author.department or "").strip() != _FROM_DEPARTMENT:
+        raise PermissionError("인수인계 작성은 튜브 부서 직원만 할 수 있습니다.")
+
+
 def _gen_code() -> str:
     now = datetime.utcnow()
     return f"HO-{now:%Y%m%d-%H%M%S}-{uuid.uuid4().hex[:6]}"
@@ -72,6 +78,7 @@ def _lock_active_items(
 
 def create_handover(db: Session, *, author: Employee, payload) -> HandoverDoc:
     """인수인계서 작성 + 제출(status=submitted)."""
+    _ensure_can_compose(author)
     if not payload.lines:
         raise ValueError("인수인계 품목을 1개 이상 추가하세요.")
     if payload.to_department == _FROM_DEPARTMENT:
@@ -152,6 +159,7 @@ def _replace_lines(db: Session, doc: HandoverDoc, payload_lines) -> None:
 
 def save_handover_draft(db: Session, *, author: Employee, payload) -> HandoverDoc:
     """인수인계 임시저장 — 신규 draft 생성 또는 본인 기존 draft 갱신(status=DRAFT 유지)."""
+    _ensure_can_compose(author)
     if not payload.to_department:
         raise ValueError("인수 부서를 먼저 선택하세요.")
     if payload.to_department == _FROM_DEPARTMENT:
@@ -191,6 +199,7 @@ def save_handover_draft(db: Session, *, author: Employee, payload) -> HandoverDo
 
 def submit_handover(db: Session, doc: HandoverDoc, *, author: Employee) -> HandoverDoc:
     """임시저장(DRAFT) → 제출(SUBMITTED). 제출 필수값 검증."""
+    _ensure_can_compose(author)
     if doc.author_employee_id != author.employee_id:
         raise PermissionError("본인이 작성한 문서만 제출할 수 있습니다.")
     if doc.status == HandoverStatusEnum.SUBMITTED:

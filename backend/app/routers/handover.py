@@ -67,6 +67,8 @@ def create_handover(
     ensure_actor_employee_id(actor, payload.author_employee_id)
     try:
         doc = handover_actions_svc.create_handover(db, author=actor, payload=payload)
+    except PermissionError as exc:
+        raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
     except ValueError as exc:
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
     return doc

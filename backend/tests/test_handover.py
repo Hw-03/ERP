@@ -106,6 +106,50 @@ def _create_handover(client, author, to_dept, item, qty=3, title="튜브 인수�
     )
 
 
+def test_handover_compose_requires_tube_department(client, db_session, make_item):
+    item = make_item(name="인수인계 작성 권한")
+    non_tube_author = _make_employee(
+        db_session,
+        code="HANDOVER-NON-TUBE",
+        department=DepartmentEnum.ASSEMBLY,
+    )
+    db_session.commit()
+
+    created = _create_handover(client, non_tube_author, "고압", item, qty=1)
+    assert created.status_code == 403
+
+    draft_payload = {
+        "author_employee_id": str(non_tube_author.employee_id),
+        "to_department": "고압",
+        "title": "권한 없는 임시저장",
+        "lines": [{"item_id": str(item.item_id), "quantity": 1}],
+    }
+    saved = client.put("/api/handovers/draft", json=draft_payload)
+    assert saved.status_code == 403
+    assert db_session.query(HandoverDoc).count() == 0
+
+    tube_author = _make_employee(
+        db_session,
+        code="HANDOVER-TUBE-THEN-MOVED",
+        department=DepartmentEnum.TUBE,
+    )
+    db_session.commit()
+    draft_payload["author_employee_id"] = str(tube_author.employee_id)
+    allowed_draft = client.put("/api/handovers/draft", json=draft_payload)
+    assert allowed_draft.status_code == 200
+    handover_id = allowed_draft.json()["handover_id"]
+
+    tube_author.department = DepartmentEnum.ASSEMBLY.value
+    db_session.commit()
+    submitted = client.post(
+        f"/api/handovers/{handover_id}/submit",
+        json={"author_employee_id": str(tube_author.employee_id)},
+    )
+    assert submitted.status_code == 403
+    db_session.expire_all()
+    assert db_session.get(HandoverDoc, uuid.UUID(handover_id)).status == HandoverStatusEnum.DRAFT
+
+
 def test_handover_create_and_receive_moves_stock(client, db_session, make_item):
     item = make_item(name="8TF Tube", warehouse_qty=Decimal("0"))
     _seed_production(db_session, item.item_id, "튜브", Decimal("5"))

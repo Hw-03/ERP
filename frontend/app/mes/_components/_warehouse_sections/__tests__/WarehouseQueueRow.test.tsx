@@ -66,7 +66,7 @@ describe("WarehouseQueueRow approval PIN", () => {
     const setApprovePin = vi.fn();
     render(<WarehouseQueueRow {...baseProps} setApprovePin={setApprovePin} />);
 
-    fireEvent.change(screen.getByPlaceholderText("0000"), { target: { value: "12a345" } });
+    fireEvent.change(screen.getByLabelText("승인 PIN"), { target: { value: "12a345" } });
 
     expect(setApprovePin).toHaveBeenCalledWith("1234");
   });
@@ -77,11 +77,11 @@ describe("WarehouseQueueRow approval PIN", () => {
       <WarehouseQueueRow {...baseProps} approvePin="123" submitApprove={submitApprove} />,
     );
 
-    fireEvent.keyDown(screen.getByPlaceholderText("0000"), { key: " " });
+    fireEvent.keyDown(screen.getByLabelText("승인 PIN"), { key: " " });
     expect(submitApprove).not.toHaveBeenCalled();
 
     rerender(<WarehouseQueueRow {...baseProps} approvePin="1234" submitApprove={submitApprove} />);
-    fireEvent.keyDown(screen.getByPlaceholderText("0000"), { key: " " });
+    fireEvent.keyDown(screen.getByLabelText("승인 PIN"), { key: " " });
 
     expect(submitApprove).toHaveBeenCalledWith("req-1");
   });

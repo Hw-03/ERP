@@ -44,7 +44,7 @@ test.describe("결재 풀사이클 — 창고 승인", () => {
 
     // 승인 → 격리 E2E PIN → 승인 확정
     await b.getByRole("button", { name: "승인", exact: true }).click();
-    await b.getByRole("textbox", { name: "0000" }).fill(readSeed().operatorPin);
+    await b.getByRole("textbox", { name: "승인 PIN" }).fill(readSeed().operatorPin);
     await b.getByRole("button", { name: "승인 확정" }).click();
 
     // 승인 반영 → 창고 승인함 비워짐
