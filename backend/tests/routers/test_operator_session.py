@@ -8,7 +8,7 @@ import logging
 import pytest
 import time
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from fastapi import Request, Response
 from fastapi.testclient import TestClient
@@ -176,7 +176,14 @@ def test_custom_legacy_pin_login_upgrades_hash_and_restores_from_cookie(
     assert all(PIN_CHANGE_COOKIE not in value for value in response.headers.get_list("set-cookie"))
     assert response.json()["employee"]["employee_id"] == str(employee.employee_id)
     assert response.json()["expires_at"]
+    assert response.json()["server_time"]
     assert response.json()["boot_id"]
+    operator_cookie = next(
+        value
+        for value in response.headers.get_list("set-cookie")
+        if value.startswith(f"{OPERATOR_COOKIE}=")
+    )
+    assert "Max-Age" not in operator_cookie
     assert "token" not in response.text.lower()
 
     db_session.expire_all()
@@ -189,6 +196,110 @@ def test_custom_legacy_pin_login_upgrades_hash_and_restores_from_cookie(
     restored = client.get("/api/operator-session")
     assert restored.status_code == 200, restored.text
     assert restored.json()["employee"]["employee_code"] == "LOGIN-01"
+
+
+def test_get_is_read_only_and_activity_renews_the_valid_session(
+    db_session,
+    auth_client,
+) -> None:
+    employee = _employee(
+        db_session,
+        code="LOGIN-IDLE-ACTIVITY",
+        pin_hash=hash_pin("2468"),
+        pin_requires_change=False,
+    )
+    login = auth_client.post(
+        "/api/operator-session",
+        json={"employee_id": str(employee.employee_id), "pin": "2468"},
+    )
+    assert login.status_code == 200, login.text
+    row = db_session.query(OperatorSession).filter_by(purpose="operator").one()
+    row.expires_at = utc_now() + timedelta(minutes=5)
+    db_session.commit()
+    shortened_expiry = row.expires_at
+
+    restored = auth_client.get("/api/operator-session")
+    assert restored.status_code == 200, restored.text
+    db_session.expire_all()
+    assert db_session.get(OperatorSession, row.session_id).expires_at == shortened_expiry
+
+    renewed = auth_client.post("/api/operator-session/activity")
+    assert renewed.status_code == 200, renewed.text
+    assert renewed.json()["server_time"]
+    renewed_expiry = db_session.get(OperatorSession, row.session_id).expires_at
+    assert renewed_expiry > shortened_expiry + timedelta(minutes=20)
+    assert all(
+        not value.startswith(f"{OPERATOR_COOKIE}=")
+        for value in renewed.headers.get_list("set-cookie")
+    )
+
+
+def test_explicit_login_renews_an_existing_same_employee_session(
+    db_session,
+    auth_client,
+) -> None:
+    employee = _employee(
+        db_session,
+        code="LOGIN-IDLE-REAUTH",
+        pin_hash=hash_pin("2468"),
+        pin_requires_change=False,
+    )
+    first = auth_client.post(
+        "/api/operator-session",
+        json={"employee_id": str(employee.employee_id), "pin": "2468"},
+    )
+    assert first.status_code == 200, first.text
+    row = db_session.query(OperatorSession).filter_by(purpose="operator").one()
+    row.expires_at = utc_now() + timedelta(minutes=5)
+    db_session.commit()
+    shortened_expiry = row.expires_at
+
+    second = auth_client.post(
+        "/api/operator-session",
+        json={"employee_id": str(employee.employee_id), "pin": "2468"},
+    )
+
+    assert second.status_code == 200, second.text
+    db_session.expire_all()
+    renewed_expiry = db_session.get(OperatorSession, row.session_id).expires_at
+    assert renewed_expiry > shortened_expiry + timedelta(minutes=20)
+    response_expiry = datetime.fromisoformat(
+        second.json()["expires_at"].replace("Z", "+00:00")
+    ).replace(tzinfo=None)
+    assert response_expiry == renewed_expiry
+    assert all(
+        not value.startswith(f"{OPERATOR_COOKIE}=")
+        for value in second.headers.get_list("set-cookie")
+    )
+
+
+def test_activity_cannot_revive_an_expired_session(db_session, auth_client) -> None:
+    employee = _employee(
+        db_session,
+        code="LOGIN-IDLE-EXPIRED",
+        pin_hash=hash_pin("2468"),
+        pin_requires_change=False,
+    )
+    login = auth_client.post(
+        "/api/operator-session",
+        json={"employee_id": str(employee.employee_id), "pin": "2468"},
+    )
+    assert login.status_code == 200, login.text
+    row = db_session.query(OperatorSession).filter_by(purpose="operator").one()
+    expired_at = utc_now() - timedelta(seconds=1)
+    row.expires_at = expired_at
+    db_session.commit()
+
+    renewed = auth_client.post("/api/operator-session/activity")
+
+    assert renewed.status_code == 401, renewed.text
+    assert renewed.json()["detail"]["code"] == "SESSION_EXPIRED"
+    db_session.expire_all()
+    assert db_session.get(OperatorSession, row.session_id).expires_at == expired_at
+    assert all(
+        not value.startswith(f"{OPERATOR_COOKIE}=")
+        for value in renewed.headers.get_list("set-cookie")
+    )
 
 
 def test_login_does_not_read_expired_orm_state_after_session_commit(

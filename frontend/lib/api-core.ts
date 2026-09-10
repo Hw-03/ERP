@@ -130,6 +130,7 @@ async function parseApiError(res: Response): Promise<ParsedApiError> {
 }
 
 export const AUTH_REQUIRED_EVENT = "dexcowin_auth_required";
+export type AuthRequiredReason = "server" | "idle";
 
 let authGeneration = 0;
 
@@ -145,22 +146,32 @@ export function advanceAuthGeneration(): void {
 }
 
 /** 명시적 logout/PIN revoke 경계를 열고 actor-scoped UI 상태를 폐기한다. */
-export function establishAuthRequiredBoundary(): void {
+export function establishAuthRequiredBoundary(
+  reason: AuthRequiredReason = "server",
+): void {
   if (typeof window === "undefined") return;
   advanceAuthGeneration();
-  window.dispatchEvent(new CustomEvent(AUTH_REQUIRED_EVENT));
+  window.dispatchEvent(new CustomEvent(AUTH_REQUIRED_EVENT, { detail: { reason } }));
 }
 
 export async function apiErrorFromResponse(
   res: Response,
   requestAuthGeneration: number,
+  authRequiredReason: AuthRequiredReason | null = "server",
 ): Promise<ApiError> {
   const parsed = await parseApiError(res);
   if (
-    (res.status === 401 || (res.status === 403 && parsed.code === "ACTOR_MISMATCH")) &&
+    (
+      res.status === 401
+      || (
+        res.status === 403
+        && (parsed.code === "ACTOR_MISMATCH" || parsed.code === "EMPLOYEE_INACTIVE")
+      )
+    ) &&
     requestAuthGeneration === authGeneration
+    && authRequiredReason !== null
   ) {
-    establishAuthRequiredBoundary();
+    establishAuthRequiredBoundary(authRequiredReason);
   }
   return new ApiError(parsed.message, res.status, parsed.code, parsed.extra);
 }
@@ -249,6 +260,33 @@ function rethrowGetRequestError(error: unknown, url: string): never {
   );
 }
 
+function isAbortSignalRealmMismatch(error: unknown): boolean {
+  return (
+    error instanceof TypeError
+    && /Expected signal .* instance of AbortSignal/.test(error.message)
+  );
+}
+
+function fetchWithoutSignalUntilAbort(
+  url: string,
+  init: RequestInit,
+  signal: AbortSignal,
+): Promise<Response> {
+  const fallbackInit = { ...init };
+  delete fallbackInit.signal;
+  return new Promise<Response>((resolve, reject) => {
+    const rejectOnAbort = () => reject(signal.reason ?? new Error("Request aborted"));
+    if (signal.aborted) {
+      rejectOnAbort();
+      return;
+    }
+    signal.addEventListener("abort", rejectOnAbort, { once: true });
+    void fetch(url, fallbackInit).then(resolve, reject).finally(() => {
+      signal.removeEventListener("abort", rejectOnAbort);
+    });
+  });
+}
+
 /**
  * 일반 GET 페치 — JSON 응답 반환. AbortSignal 지원.
  */
@@ -256,6 +294,7 @@ async function readResponse<T>(
   url: string,
   signal: AbortSignal | undefined,
   reader: "json" | "blob",
+  authRequiredReason: AuthRequiredReason | null = "server",
 ): Promise<T> {
   const requestAuthGeneration = captureAuthGeneration();
   let res: Response;
@@ -268,13 +307,29 @@ async function readResponse<T>(
     rethrowGetRequestError(error, url);
   }
   if (!res.ok) {
-    throw await apiErrorFromResponse(res, requestAuthGeneration);
+    throw await apiErrorFromResponse(res, requestAuthGeneration, authRequiredReason);
   }
   return res[reader]() as Promise<T>;
 }
 
 export function fetcher<T>(url: string, signal?: AbortSignal): Promise<T> {
   return readResponse<T>(url, signal, "json");
+}
+
+export function fetcherWithAuthBoundaryReason<T>(
+  url: string,
+  signal: AbortSignal | undefined,
+  reason: AuthRequiredReason,
+): Promise<T> {
+  return readResponse<T>(url, signal, "json", reason);
+}
+
+/** 응답을 받은 호출자가 현재 인증 세대인지 확인한 뒤 401 경계를 결정하는 GET. */
+export function fetcherWithoutAuthBoundary<T>(
+  url: string,
+  signal?: AbortSignal,
+): Promise<T> {
+  return readResponse<T>(url, signal, "json", null);
 }
 
 /** 인증 헤더를 포함해 파일 응답을 Blob 으로 내려받는다. */
@@ -297,6 +352,7 @@ async function writeJson<T>(
   body?: unknown,
   callerSignal?: AbortSignal,
   extraHeaders?: Record<string, string>,
+  authRequiredReason: AuthRequiredReason | null = "server",
 ): Promise<T> {
   const requestAuthGeneration = captureAuthGeneration();
   const controller = new AbortController();
@@ -328,7 +384,14 @@ async function writeJson<T>(
   }
   let res: Response;
   try {
-    res = await fetch(url, init);
+    try {
+      res = await fetch(url, init);
+    } catch (error) {
+      if (!isAbortSignalRealmMismatch(error)) throw error;
+      // MSW/jsdom처럼 fetch와 AbortSignal의 realm이 다르면 Request 생성 전에
+      // TypeError가 나므로 전송 중복 없이 재시도하고 timeout 판정은 직접 유지한다.
+      res = await fetchWithoutSignalUntilAbort(url, init, controller.signal);
+    }
   } catch {
     throw new ResultUnknownError();
   } finally {
@@ -336,7 +399,13 @@ async function writeJson<T>(
     callerSignal?.removeEventListener("abort", abortFromCaller);
   }
   if (controller.signal.aborted) throw new ResultUnknownError();
-  if (!res.ok) throw await apiErrorFromResponse(res, requestAuthGeneration);
+  if (!res.ok) {
+    throw await apiErrorFromResponse(
+      res,
+      requestAuthGeneration,
+      authRequiredReason,
+    );
+  }
   if (res.status === 204) return undefined as T;
   try {
     const text = await res.text();
@@ -352,6 +421,18 @@ export const postJson = <T>(
   body?: unknown,
   signal?: AbortSignal,
 ): Promise<T> => writeJson<T>(url, "POST", body, signal);
+export const postJsonWithAuthBoundaryReason = <T>(
+  url: string,
+  body: unknown,
+  reason: AuthRequiredReason,
+  signal?: AbortSignal,
+): Promise<T> => writeJson<T>(url, "POST", body, signal, undefined, reason);
+/** 지연 응답의 유효성을 호출자가 확인한 뒤 401 경계를 결정하는 POST. */
+export const postJsonWithoutAuthBoundary = <T>(
+  url: string,
+  body?: unknown,
+  signal?: AbortSignal,
+): Promise<T> => writeJson<T>(url, "POST", body, signal, undefined, null);
 export const putJson = <T>(
   url: string,
   body?: unknown,
@@ -368,3 +449,9 @@ export const deleteJson = <T = void>(
   signal?: AbortSignal,
   extraHeaders?: Record<string, string>,
 ): Promise<T> => writeJson<T>(url, "DELETE", body, signal, extraHeaders);
+export const deleteJsonWithoutAuthBoundary = <T = void>(
+  url: string,
+  body?: unknown,
+  signal?: AbortSignal,
+  extraHeaders?: Record<string, string>,
+): Promise<T> => writeJson<T>(url, "DELETE", body, signal, extraHeaders, null);

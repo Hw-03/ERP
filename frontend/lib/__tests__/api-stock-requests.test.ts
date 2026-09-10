@@ -46,6 +46,27 @@ afterEach(() => {
 });
 
 describe("stockRequestsApi", () => {
+  it("includes a notification target in my, warehouse, and department queue requests", async () => {
+    const urls: string[] = [];
+    globalThis.fetch = vi.fn((url) => {
+      urls.push(String(url));
+      return Promise.resolve(makeResponse([]));
+    }) as unknown as typeof fetch;
+
+    await stockRequestsApi.listMyStockRequests("requester", "mine-target");
+    await stockRequestsApi.listWarehouseQueue("warehouse-target");
+    await stockRequestsApi.listDepartmentQueue("department-actor", "department-target");
+
+    const mine = new URL(urls[0], "http://localhost");
+    const warehouse = new URL(urls[1], "http://localhost");
+    const department = new URL(urls[2], "http://localhost");
+    expect(mine.searchParams.get("requester_employee_id")).toBe("requester");
+    expect(mine.searchParams.get("target_request_id")).toBe("mine-target");
+    expect(warehouse.searchParams.get("target_request_id")).toBe("warehouse-target");
+    expect(department.searchParams.get("actor_employee_id")).toBe("department-actor");
+    expect(department.searchParams.get("target_request_id")).toBe("department-target");
+  });
+
   it("createStockRequest POST /api/stock-requests", async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse(stockRequestResponse())));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;

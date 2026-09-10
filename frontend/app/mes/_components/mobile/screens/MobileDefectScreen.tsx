@@ -57,6 +57,7 @@ function MobileDefectInner({
           employee_id: operator.employee_id,
           name: operator.name,
           department: operator.department,
+          warehouse_role: operator.warehouse_role,
         }}
         items={items}
         productModels={productModels}

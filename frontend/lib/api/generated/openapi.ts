@@ -813,6 +813,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/defects/statistics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Statistics
+         * @description KST 달력 기준 불량 발생 통계를 주간·월간·연간으로 반환한다.
+         */
+        get: operations["get_statistics_api_defects_statistics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/defects/unquarantine": {
         parameters: {
             query?: never;
@@ -827,6 +847,26 @@ export interface paths {
          * @description 정상 복귀 (즉시, 결재 없음). unmark_defective 래퍼.
          */
         post: operations["unquarantine_api_defects_unquarantine_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/defects/unquarantine/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unquarantine Bulk
+         * @description 선택한 동일 품목·부서 격리 기록을 전부 정상 복귀한다.
+         */
+        post: operations["unquarantine_bulk_api_defects_unquarantine_bulk_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2196,6 +2236,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/operator-session/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Renew Current Operator Session
+         * @description 명시적인 사용자 활동으로 유효한 작업자 세션만 30분 연장한다.
+         */
+        post: operations["renew_current_operator_session_api_operator_session_activity_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/operator-session/complete-pin-change": {
         parameters: {
             query?: never;
@@ -2748,10 +2808,7 @@ export interface paths {
          * List Department Queue
          * @description 부서 결재 정/부 승인 대기 목록.
          *
-         *     노출 부서 범위:
-         *       - 부서 정/부: 창고 외 모든 부서
-         *       - 창고 정/부: 모든 부서
-         *       - admin 단독: 결재 권한 없음
+         *     부서 정/부만 창고 외 부서 결재를 조회할 수 있다.
          */
         get: operations["list_department_queue_api_stock_requests_department_queue_get"];
         put?: never;
@@ -2965,7 +3022,7 @@ export interface paths {
         put?: never;
         /**
          * Department Approve Stock Request
-         * @description 부서 결재 승인 — 부서 정/부 또는 창고 정/부만 허용.
+         * @description 부서 결재 승인 — 부서 정/부만 허용.
          */
         post: operations["department_approve_stock_request_api_stock_requests__request_id__department_approve_post"];
         delete?: never;
@@ -3281,6 +3338,26 @@ export interface paths {
         get: operations["get_structure_api_warehouse_map_structure_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/warehouse-map/verify-editor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify Editor Access
+         * @description 편집 진입 전에 실제 변경 요청과 같은 창고 관리자 자격을 확인한다.
+         */
+        post: operations["verify_editor_access_api_warehouse_map_verify_editor_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3875,6 +3952,46 @@ export interface components {
              */
             enabled: boolean;
         };
+        /** BulkUnquarantineLine */
+        BulkUnquarantineLine: {
+            /** Department */
+            department: string;
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
+            /** Quantity */
+            quantity: number | string;
+            /**
+             * Record Id
+             * Format: uuid
+             */
+            record_id: string;
+        };
+        /** BulkUnquarantineRequest */
+        BulkUnquarantineRequest: {
+            /**
+             * Actor Employee Id
+             * Format: uuid
+             */
+            actor_employee_id: string;
+            /** Lines */
+            lines: components["schemas"]["BulkUnquarantineLine"][];
+            /** Reason Category */
+            reason_category?: string | null;
+            /** Reason Memo */
+            reason_memo?: string | null;
+        };
+        /** BulkUnquarantineResult */
+        BulkUnquarantineResult: {
+            /** Message */
+            message: string;
+            /** Processed Records */
+            processed_records: number;
+            /** Total Quantity */
+            total_quantity: string;
+        };
         /**
          * CapacityAfBlock
          * @description AF(조립 완제품) 기준 생산 가능 수량.
@@ -4284,6 +4401,111 @@ export interface components {
             changed: boolean;
             /** Memo */
             memo: string;
+        };
+        /**
+         * DefectStatisticsBreakdownEntry
+         * @description 하나의 분류값에 모인 발생 건수와 수량.
+         */
+        DefectStatisticsBreakdownEntry: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Quantity */
+            quantity: number;
+            /** Record Count */
+            record_count: number;
+        };
+        /**
+         * DefectStatisticsItemBreakdownEntry
+         * @description 품목별 분류값과 화면 표시에 필요한 품목 식별자.
+         */
+        DefectStatisticsItemBreakdownEntry: {
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Mes Code */
+            mes_code?: string | null;
+            /** Quantity */
+            quantity: number;
+            /** Record Count */
+            record_count: number;
+        };
+        /**
+         * DefectStatisticsPeriod
+         * @description KST 달력 기준으로 확정된 포함 시작일과 종료일.
+         */
+        DefectStatisticsPeriod: {
+            /**
+             * Anchor
+             * Format: date
+             */
+            anchor: string;
+            /**
+             * End Date
+             * Format: date
+             */
+            end_date: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "week" | "month" | "year";
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+        };
+        /**
+         * DefectStatisticsResponse
+         * @description 불량 통계 API가 그대로 반환할 수 있는 서비스 응답.
+         */
+        DefectStatisticsResponse: {
+            /** Departments */
+            departments: components["schemas"]["DefectStatisticsBreakdownEntry"][];
+            /** Excluded Legacy Count */
+            excluded_legacy_count: number;
+            /** Items */
+            items: components["schemas"]["DefectStatisticsItemBreakdownEntry"][];
+            period: components["schemas"]["DefectStatisticsPeriod"];
+            /** Reasons */
+            reasons: components["schemas"]["DefectStatisticsBreakdownEntry"][];
+            summary: components["schemas"]["DefectStatisticsSummary"];
+            /** Timeline */
+            timeline: components["schemas"]["DefectStatisticsTimelineEntry"][];
+        };
+        /**
+         * DefectStatisticsSummary
+         * @description 선택 기간·필터 전체의 핵심 발생 지표.
+         */
+        DefectStatisticsSummary: {
+            /** Quantity */
+            quantity: number;
+            /** Record Count */
+            record_count: number;
+            top_item?: components["schemas"]["DefectStatisticsItemBreakdownEntry"] | null;
+            top_reason?: components["schemas"]["DefectStatisticsBreakdownEntry"] | null;
+        };
+        /**
+         * DefectStatisticsTimelineEntry
+         * @description 빈 구간도 포함하는 일별 또는 월별 발생 버킷.
+         */
+        DefectStatisticsTimelineEntry: {
+            /** Bucket */
+            bucket: string;
+            /** Label */
+            label: string;
+            /** Quantity */
+            quantity: number;
+            /** Record Count */
+            record_count: number;
         };
         /** DepartmentCreate */
         DepartmentCreate: {
@@ -5171,6 +5393,11 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Department Routes Normalized
+             * @default false
+             */
+            department_routes_normalized?: boolean;
             /** From Department */
             from_department?: string | null;
             /** Notes */
@@ -5989,6 +6216,11 @@ export interface components {
              * Format: date-time
              */
             expires_at: string;
+            /**
+             * Server Time
+             * Format: date-time
+             */
+            server_time: string;
         };
         /** PinVerifyRequest */
         PinVerifyRequest: {
@@ -9697,6 +9929,41 @@ export interface operations {
             };
         };
     };
+    get_statistics_api_defects_statistics_get: {
+        parameters: {
+            query: {
+                period?: "week" | "month" | "year";
+                anchor: string;
+                department?: string[] | null;
+                model?: string[] | null;
+                process_step?: string[] | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DefectStatisticsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     unquarantine_api_defects_unquarantine_post: {
         parameters: {
             query?: never;
@@ -9717,6 +9984,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DefectActionResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unquarantine_bulk_api_defects_unquarantine_bulk_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkUnquarantineRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkUnquarantineResult"];
                 };
             };
             /** @description Validation Error */
@@ -12560,6 +12860,26 @@ export interface operations {
             };
         };
     };
+    renew_current_operator_session_api_operator_session_activity_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperatorSessionResponse"];
+                };
+            };
+        };
+    };
     complete_pin_change_api_operator_session_complete_pin_change_post: {
         parameters: {
             query?: never;
@@ -13615,6 +13935,7 @@ export interface operations {
                 requester_employee_id?: string | null;
                 status?: components["schemas"]["StockRequestStatusEnum"] | null;
                 limit?: number;
+                target_request_id?: string | null;
             };
             header?: never;
             path?: never;
@@ -13677,10 +13998,11 @@ export interface operations {
     };
     list_department_queue_api_stock_requests_department_queue_get: {
         parameters: {
-            query: {
-                /** @description 현재 직원 ID — 결재 가능 부서만 노출 */
-                actor_employee_id: string;
+            query?: {
+                /** @description 현재 직원 ID — 세션 작업자 일치 확인용 */
+                actor_employee_id?: string | null;
                 limit?: number;
+                target_request_id?: string | null;
             };
             header?: never;
             path?: never;
@@ -13710,9 +14032,9 @@ export interface operations {
     };
     count_department_queue_api_stock_requests_department_queue_count_get: {
         parameters: {
-            query: {
-                /** @description 현재 직원 ID — 결재 가능 부서만 카운트 */
-                actor_employee_id: string;
+            query?: {
+                /** @description 현재 직원 ID — 세션 작업자 일치 확인용 */
+                actor_employee_id?: string | null;
             };
             header?: never;
             path?: never;
@@ -13904,6 +14226,7 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
+                target_request_id?: string | null;
             };
             header?: never;
             path?: never;
@@ -14706,6 +15029,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WarehouseAngleResponse"][];
+                };
+            };
+        };
+    };
+    verify_editor_access_api_warehouse_map_verify_editor_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Employee-Code"?: string | null;
+                "X-Operator-Pin"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -14,6 +14,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import type { IoBundle, IoLine, IoSubType, IoWorkType } from "./types";
 import {
+  automaticLineRouteLabel,
   deptIoDisplayLabel,
   hasCustomBomQuantity,
   isBomForced,
@@ -442,6 +443,7 @@ function ConfirmBundleCard({
     const onlyLine = bundle.lines[0];
     if (!onlyLine.included || bomParentLineIds.has(onlyLine.line_id)) return null;
     const dir = signFor(onlyLine);
+    const routeLabel = automaticLineRouteLabel(subType, onlyLine);
     return (
       <div
         className="flex min-h-[60px] items-center justify-between gap-4 rounded-[18px] px-5 py-3"
@@ -456,12 +458,13 @@ function ConfirmBundleCard({
             style={{ color: LEGACY_COLORS.muted2 }}
           >
             <span>{onlyLine.mes_code ?? "-"}</span>
-            {onlyLine.direction === "move" && (onlyLine.from_department || onlyLine.to_department) && (
+            {routeLabel && <span>{routeLabel}</span>}
+            {!routeLabel && onlyLine.direction === "move" && (onlyLine.from_department || onlyLine.to_department) && (
               <span>
                 · {onlyLine.from_department ?? "창고"} → {onlyLine.to_department ?? "창고"}
               </span>
             )}
-            {!showDeductionSource && onlyLine.direction !== "move" && (onlyLine.from_department || onlyLine.to_department) && (
+            {!routeLabel && !showDeductionSource && onlyLine.direction !== "move" && (onlyLine.from_department || onlyLine.to_department) && (
               <span>· {onlyLine.from_department || onlyLine.to_department}</span>
             )}
           </div>
@@ -521,6 +524,7 @@ function ConfirmBundleCard({
         ? deductionSourceName(headerLine)
         : null
     : null;
+  const headerRouteLabel = headerLine ? automaticLineRouteLabel(subType, headerLine) : null;
 
   return (
     <article
@@ -584,7 +588,8 @@ function ConfirmBundleCard({
           style={{ color: LEGACY_COLORS.muted2 }}
         >
           <span>{headerLine.mes_code ?? "-"}</span>
-          {!showDeductionSource && (headerLine.from_department || headerLine.to_department) && (
+          {headerRouteLabel && <span>{headerRouteLabel}</span>}
+          {!headerRouteLabel && !showDeductionSource && (headerLine.from_department || headerLine.to_department) && (
             <span>
               · {headerLine.from_department ?? "-"}
               {headerLine.direction === "move" ? ` → ${headerLine.to_department ?? "-"}` : ""}
@@ -670,6 +675,7 @@ function ConfirmLineRow({
   const customBomEffectLabel = customProcessBom
     ? subType === "produce" ? "선택 입고" : "선택 출고"
     : null;
+  const routeLabel = automaticLineRouteLabel(subType, line);
   const dir = showInternalUseEffect && !line.included
     ? { sign: null as null, color: LEGACY_COLORS.muted2 }
     : signFor(line);
@@ -725,7 +731,8 @@ function ConfirmLineRow({
               {customBomEffectLabel}
             </span>
           )}
-          {!showDeductionSource && (line.from_department || line.to_department) && (
+          {routeLabel && <span>{routeLabel}</span>}
+          {!routeLabel && !showDeductionSource && (line.from_department || line.to_department) && (
             <span>
               {line.direction === "move"
                 ? `· ${line.from_department ?? "창고"} → ${line.to_department ?? "창고"}`

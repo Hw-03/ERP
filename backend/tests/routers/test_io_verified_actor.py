@@ -42,6 +42,11 @@ def _login(client, employee: Employee) -> None:
     assert response.status_code == 200, response.text
 
 
+def _logout(client) -> None:
+    response = client.delete("/api/operator-session")
+    assert response.status_code == 204, response.text
+
+
 def _draft_payload(employee: Employee) -> dict:
     return {
         "requester_employee_id": str(employee.employee_id),
@@ -133,6 +138,48 @@ def test_io_draft_persists_verified_session_actor(db_session, client) -> None:
     batch = db_session.query(IoBatch).one()
     assert batch.requester_employee_id == actor.employee_id
     assert batch.requester_name == actor.name
+
+
+def test_io_draft_reads_require_authenticated_owner(db_session, client) -> None:
+    owner = _employee(db_session, code="IO-DRAFT-READ-OWNER")
+    intruder = _employee(db_session, code="IO-DRAFT-READ-INTRUDER")
+    _login(client, owner)
+    saved = client.put("/api/io/draft", json=_draft_payload(owner))
+    assert saved.status_code == 200, saved.text
+    batch_id = saved.json()["batch_id"]
+    _logout(client)
+
+    owner_params = {
+        "requester_employee_id": str(owner.employee_id),
+        "work_type": "process",
+        "sub_type": "produce",
+    }
+    assert client.get("/api/io/draft", params=owner_params).status_code == 401
+    assert client.get(
+        "/api/io/drafts",
+        params={"requester_employee_id": str(owner.employee_id)},
+    ).status_code == 401
+    assert client.get(f"/api/io/{batch_id}").status_code == 401
+
+    _login(client, intruder)
+    for path, params in (
+        ("/api/io/draft", owner_params),
+        ("/api/io/drafts", {"requester_employee_id": str(owner.employee_id)}),
+    ):
+        response = client.get(path, params=params)
+        assert response.status_code == 403, response.text
+        assert response.json()["detail"]["code"] == "ACTOR_MISMATCH"
+    detail = client.get(f"/api/io/{batch_id}")
+    assert detail.status_code == 403, detail.text
+
+    _logout(client)
+    _login(client, owner)
+    assert client.get("/api/io/draft", params=owner_params).status_code == 200
+    assert client.get(
+        "/api/io/drafts",
+        params={"requester_employee_id": str(owner.employee_id)},
+    ).status_code == 200
+    assert client.get(f"/api/io/{batch_id}").status_code == 200
 
 
 def test_io_action_service_requires_explicit_server_actor() -> None:

@@ -21,6 +21,7 @@ interface CurrentEmployee {
 interface Props {
   locations: DefectLocation[];
   onProcess: (location: DefectLocation) => void;
+  onBatchProcess?: (locations: DefectLocation[]) => void;
   currentEmployee?: CurrentEmployee;
   onMemoUpdated?: (recordId: string, memo: string) => void;
   /** 전체 보기 시 이 부서를 가장 위에 표시. */
@@ -63,6 +64,7 @@ const historyMemoText = (value: string | null) => value && value.length > 0 ? va
 export function DefectDepartmentList({
   locations,
   onProcess,
+  onBatchProcess,
   currentEmployee,
   onMemoUpdated,
   priorityDept,
@@ -78,12 +80,25 @@ export function DefectDepartmentList({
   });
   const [collapsedDepts, setCollapsedDepts] = useState<Set<string>>(new Set());
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [batchSelection, setBatchSelection] = useState<{
+    groupKey: string;
+    recordIds: Set<string>;
+  } | null>(null);
+
+  useEffect(() => {
+    setBatchSelection(null);
+  }, [locations]);
 
   function toggleCollapse(dept: string) {
     setCollapsedDepts((previous) => {
       const next = new Set(previous);
       if (next.has(dept)) next.delete(dept);
-      else next.add(dept);
+      else {
+        next.add(dept);
+        setBatchSelection((current) =>
+          current?.groupKey.startsWith(`${dept}:`) ? null : current,
+        );
+      }
       return next;
     });
   }
@@ -92,9 +107,27 @@ export function DefectDepartmentList({
     const key = `${dept}:${itemId}`;
     setExpandedItems((previous) => {
       const next = new Set(previous);
-      if (next.has(key)) next.delete(key);
+      if (next.has(key)) {
+        next.delete(key);
+        setBatchSelection((current) => current?.groupKey === key ? null : current);
+      }
       else next.add(key);
       return next;
+    });
+  }
+
+  function startBatchSelection(groupKey: string) {
+    setExpandedItems((previous) => new Set(previous).add(groupKey));
+    setBatchSelection({ groupKey, recordIds: new Set() });
+  }
+
+  function toggleBatchRecord(groupKey: string, recordId: string) {
+    setBatchSelection((current) => {
+      if (!current || current.groupKey !== groupKey) return current;
+      const recordIds = new Set(current.recordIds);
+      if (recordIds.has(recordId)) recordIds.delete(recordId);
+      else recordIds.add(recordId);
+      return { groupKey, recordIds };
     });
   }
 
@@ -148,6 +181,15 @@ export function DefectDepartmentList({
                       currentEmployee={currentEmployee}
                       onMemoUpdated={onMemoUpdated}
                       onProcess={onProcess}
+                      batchEnabled={onBatchProcess !== undefined}
+                      batchSelection={batchSelection?.groupKey === itemKey ? batchSelection.recordIds : null}
+                      onStartBatchSelection={() => startBatchSelection(itemKey)}
+                      onCancelBatchSelection={() => setBatchSelection(null)}
+                      onToggleBatchRecord={(recordId) => toggleBatchRecord(itemKey, recordId)}
+                      onBatchProcess={() => {
+                        if (!batchSelection || batchSelection.groupKey !== itemKey) return;
+                        onBatchProcess?.(records.filter((record) => batchSelection.recordIds.has(record.record_id)));
+                      }}
                     />
                   );
                 })}
@@ -168,6 +210,12 @@ function DefectItemGroup({
   currentEmployee,
   onMemoUpdated,
   onProcess,
+  batchEnabled,
+  batchSelection,
+  onStartBatchSelection,
+  onCancelBatchSelection,
+  onToggleBatchRecord,
+  onBatchProcess,
 }: {
   department: string;
   records: DefectLocation[];
@@ -176,6 +224,12 @@ function DefectItemGroup({
   currentEmployee?: CurrentEmployee;
   onMemoUpdated?: (recordId: string, memo: string) => void;
   onProcess: (location: DefectLocation) => void;
+  batchEnabled: boolean;
+  batchSelection: Set<string> | null;
+  onStartBatchSelection: () => void;
+  onCancelBatchSelection: () => void;
+  onToggleBatchRecord: (recordId: string) => void;
+  onBatchProcess: () => void;
 }) {
   if (records.length === 1) {
     return (
@@ -190,15 +244,13 @@ function DefectItemGroup({
 
   const latestRecord = findLatestRecord(records);
   const totalQuantity = records.reduce((total, record) => total + Number(record.quantity), 0);
+  const selectedCount = batchSelection?.size ?? 0;
 
   return (
     <>
-      <button
-        type="button"
+      <div
         data-testid="defect-item-group-summary"
-        aria-label={`${department} ${latestRecord.item_name} 격리 ${records.length}건`}
         aria-expanded={expanded}
-        onClick={onToggle}
         className="min-h-11 w-full px-4 py-4 text-left transition-colors hover:brightness-95 sm:px-5 lg:min-h-[156px]"
         style={{ background: tint(getDepartmentFallbackColor(department), expanded ? 8 : 4) }}
       >
@@ -213,15 +265,48 @@ function DefectItemGroup({
             <p className="mt-1 break-words text-sm font-bold leading-5" style={{ color: LEGACY_COLORS.muted2 }}>{formatDateTime(latestRecord.defective_at)}</p>
             <p className="mt-1 break-words text-base font-black leading-6" style={{ color: LEGACY_COLORS.text }}>{quarantinedByName(latestRecord)}</p>
           </div>
-          <div className="flex min-w-0 items-center justify-between gap-3 border-t pt-3 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0" style={{ borderColor: LEGACY_COLORS.border }}>
-            <div className="min-w-0">
-              <p className="text-sm font-black" style={{ color: LEGACY_COLORS.text }}>격리 기록 {records.length}건</p>
-              <p className="mt-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>펼쳐서 개별 기록 확인</p>
-            </div>
-            {expanded ? <ChevronUp className="h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} /> : <ChevronDown className="h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />}
+          <div className="flex min-w-0 flex-col justify-center gap-2 border-t pt-3 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0" style={{ borderColor: LEGACY_COLORS.border }}>
+            <button
+              type="button"
+              aria-label={`${department} ${latestRecord.item_name} 격리 ${records.length}건`}
+              aria-expanded={expanded}
+              onClick={onToggle}
+              className="flex min-h-11 w-full items-center justify-between gap-3 rounded-[10px] px-2 text-left transition-colors hover:bg-[var(--c-s3)]"
+            >
+              <span className="min-w-0">
+                <span className="block text-sm font-black" style={{ color: LEGACY_COLORS.text }}>격리 기록 {records.length}건</span>
+                <span className="mt-1 block text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>펼쳐서 개별 기록 확인</span>
+              </span>
+              {expanded ? <ChevronUp className="h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} /> : <ChevronDown className="h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />}
+            </button>
+            {batchEnabled && (
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={batchSelection ? onCancelBatchSelection : onStartBatchSelection}
+                  className="standard-hover min-h-11 rounded-[10px] border px-3 text-sm font-black transition-colors"
+                  style={{
+                    background: batchSelection ? tint(LEGACY_COLORS.muted2, 8) : tint(LEGACY_COLORS.blue, 8),
+                    borderColor: batchSelection ? LEGACY_COLORS.border : tint(LEGACY_COLORS.blue, 40),
+                    color: batchSelection ? LEGACY_COLORS.muted2 : LEGACY_COLORS.blue,
+                  }}
+                >
+                  {batchSelection ? "선택 취소" : "여러 건 선택"}
+                </button>
+                <button
+                  type="button"
+                  onClick={onBatchProcess}
+                  disabled={selectedCount === 0}
+                  className="standard-hover min-h-11 rounded-[10px] border px-3 text-sm font-black transition-colors disabled:cursor-not-allowed disabled:opacity-45"
+                  style={{ background: tint(LEGACY_COLORS.red, 8), borderColor: tint(LEGACY_COLORS.red, 40), color: LEGACY_COLORS.red }}
+                >
+                  {selectedCount > 0 ? `선택 처리 ${selectedCount}건` : "선택 처리"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
-      </button>
+      </div>
 
       {expanded && records.map((record) => (
         <DefectRecordRow
@@ -231,6 +316,9 @@ function DefectItemGroup({
           currentEmployee={currentEmployee}
           onMemoUpdated={onMemoUpdated}
           onProcess={onProcess}
+          selectionMode={batchSelection !== null}
+          selected={batchSelection?.has(record.record_id) ?? false}
+          onToggleSelected={() => onToggleBatchRecord(record.record_id)}
         />
       ))}
     </>
@@ -243,12 +331,18 @@ function DefectRecordRow({
   currentEmployee,
   onMemoUpdated,
   onProcess,
+  selectionMode = false,
+  selected = false,
+  onToggleSelected,
 }: {
   location: DefectLocation;
   hideItemIdentity?: boolean;
   currentEmployee?: CurrentEmployee;
   onMemoUpdated?: (recordId: string, memo: string) => void;
   onProcess: (location: DefectLocation) => void;
+  selectionMode?: boolean;
+  selected?: boolean;
+  onToggleSelected?: () => void;
 }) {
   const [memo, setMemo] = useState(() => memoText(location.reason_memo));
   const [draftMemo, setDraftMemo] = useState(() => memoText(location.reason_memo));
@@ -278,6 +372,11 @@ function DefectRecordRow({
   const canEditMemo = currentEmployee !== undefined;
   const pendingQty = Number(location.pending_quantity);
   const availableQty = Number(location.available_quantity);
+  const selectionDisabledReason = pendingQty > 0
+    ? "처리 대기"
+    : location.is_legacy && location.legacy_origin !== "reconstructed"
+      ? "기존 합산"
+      : null;
   const warn = isOverOneYear(location.defective_at);
   const quarantinedBy = quarantinedByName(location);
   const reasonCategory = location.reason_category?.trim();
@@ -340,7 +439,15 @@ function DefectRecordRow({
         data-testid="defect-record-grid"
         className={RECORD_GRID_CLASS}
       >
-        <DefectItemIdentity location={location} hidden={hideItemIdentity} />
+        <DefectItemIdentity
+          location={location}
+          hidden={hideItemIdentity}
+          selectionMode={selectionMode}
+          selected={selected}
+          selectionDisabled={selectionDisabledReason !== null}
+          selectionDisabledLabel={selectionDisabledReason ?? undefined}
+          onToggleSelected={onToggleSelected}
+        />
 
         <QuantitySummary quantity={location.quantity} recordCount={1} testId="defect-remaining-quantity" />
 
@@ -460,11 +567,40 @@ function StatusBadge({ label, color, icon }: { label: string; color: string; ico
 function DefectItemIdentity({
   location,
   hidden = false,
+  selectionMode = false,
+  selected = false,
+  selectionDisabled = false,
+  selectionDisabledLabel = "선택 불가",
+  onToggleSelected,
 }: {
   location: DefectLocation;
   hidden?: boolean;
+  selectionMode?: boolean;
+  selected?: boolean;
+  selectionDisabled?: boolean;
+  selectionDisabledLabel?: string;
+  onToggleSelected?: () => void;
 }) {
   if (hidden) {
+    if (selectionMode) {
+      return (
+        <label
+          data-testid="defect-child-selection"
+          className="flex min-h-11 min-w-0 cursor-pointer flex-col items-center justify-center gap-1 text-sm font-bold has-[:disabled]:cursor-not-allowed"
+          style={{ color: selectionDisabled ? LEGACY_COLORS.yellow : LEGACY_COLORS.blue }}
+        >
+          <input
+            type="checkbox"
+            aria-label={`${location.item_name} ${formatDateTime(location.defective_at)} 선택`}
+            checked={selected}
+            disabled={selectionDisabled}
+            onChange={onToggleSelected}
+            className="h-5 w-5 accent-[var(--c-blue)]"
+          />
+          <span className="text-xs font-bold">{selectionDisabled ? selectionDisabledLabel : "선택"}</span>
+        </label>
+      );
+    }
     return (
       <div data-testid="defect-child-item-placeholder" aria-hidden="true" className="flex min-w-0 items-center justify-center text-3xl font-black" style={{ color: LEGACY_COLORS.muted }}>-</div>
     );

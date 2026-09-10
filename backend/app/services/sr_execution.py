@@ -11,7 +11,9 @@ from sqlalchemy.orm import Session
 
 from app.repositories import item_repository
 from app.models import (
+    DefectQuarantineRecord,
     Employee,
+    Item,
     InventoryOperation,
     InventoryOperationEffectKindEnum,
     InventoryOperationRoleEnum,
@@ -27,8 +29,10 @@ from app.services import inv_effect
 from app.services import inventory_operations as operation_svc
 from app.services import warehouse_map as warehouse_map_svc
 from app.services.dept_hierarchy import can_approve_department as _can_approve_department
+from app.services.inv_transfer import department_for_item as _department_for_item
 from app.services.sr_validation import (
     _TX_TYPE_BY_REQUEST,
+    requires_exact_defect_selection as _requires_exact_defect_selection,
 )
 
 
@@ -61,6 +65,38 @@ def release_reservation(
             db,
             _request_inventory_item_ids(db, request, lines),
         )
+    sr_reservation._release_lines(db, lines, request_id=request.request_id)
+
+
+def reroute_and_preflight_dept_to_warehouse(
+    db: Session,
+    request: StockRequest,
+    *,
+    actor: Employee,
+) -> None:
+    """Live 코드 출발 부서로 재예약해 승인 직전 가용 재고를 원자적으로 확인한다.
+
+    호출자는 기존 RESERVED 점유를 먼저 해제해야 한다. 이 함수의 임시 예약은
+    다른 대기 요청의 pending을 포함해 가용량을 검사한 뒤 즉시 자기 몫만 해제한다.
+    이후 실행은 같은 트랜잭션과 잠금 범위 안에서 이어진다.
+    """
+    if request.request_type != StockRequestTypeEnum.DEPT_TO_WAREHOUSE:
+        return
+    if not isinstance(actor, Employee):
+        raise TypeError("actor must be an Employee")
+
+    lines = list(request.lines)
+    for line in lines:
+        item = db.query(Item).filter(Item.item_id == line.item_id).first()
+        if item is None:
+            raise ValueError(f"품목을 찾을 수 없습니다: {line.item_id}")
+        line.from_department = _department_for_item(item).value
+
+    from app.services import sr_reservation
+
+    if not sr_reservation.aggregate_reservations(lines):
+        return
+    sr_reservation.reserve_lines(db, lines, employee=actor)
     sr_reservation._release_lines(db, lines, request_id=request.request_id)
 
 
@@ -105,15 +141,21 @@ def _handle_raw_ship(db, request, line, approver, qty, item_id) -> Decimal:
 
 
 def _handle_warehouse_to_dept(db, request, line, approver, qty, item_id) -> Decimal:
-    if line.to_department is None:
-        raise ValueError("창고→부서 이동은 도착 부서가 필요합니다.")
+    item = db.query(Item).filter(Item.item_id == item_id).first()
+    if item is None:
+        raise ValueError(f"품목을 찾을 수 없습니다: {item_id}")
+    # 승인 시점에도 live Item 공정코드를 기준으로 확정한다.
+    line.to_department = _department_for_item(item).value
     inventory_svc._transfer_to_production(db, item_id, qty, line.to_department)
     return _NO_QTY_CHANGE
 
 
 def _handle_dept_to_warehouse(db, request, line, approver, qty, item_id) -> Decimal:
-    if line.from_department is None:
-        raise ValueError("부서→창고 복귀는 출발 부서가 필요합니다.")
+    item = db.query(Item).filter(Item.item_id == item_id).first()
+    if item is None:
+        raise ValueError(f"품목을 찾을 수 없습니다: {item_id}")
+    # 승인 시점에도 live Item 공정코드를 기준으로 확정한다.
+    line.from_department = _department_for_item(item).value
     inventory_svc._transfer_to_warehouse(db, item_id, qty, line.from_department)
     return _NO_QTY_CHANGE
 
@@ -588,7 +630,6 @@ def _execute_all_lines(
         reason=request.reason_memo or request.notes,
         idempotency_key=f"stock_request:{request.request_id}:execute",
     )
-    # 정렬된 순서로 모든 아이템 선락 → 교착 방지 (PostgreSQL only; SQLite는 WAL 직렬화)
     if _uses_row_locks(db):
         all_item_ids = _request_inventory_item_ids(db, request, lines)
         active_items = item_repository.lock_active_many(db, all_item_ids)
@@ -602,15 +643,66 @@ def _execute_all_lines(
             include_boxes_for_item_ids=True,
             include_zones_for_item_ids=True,
         )
-    for line in lines:
-        _execute_line(
+
+    if _requires_exact_defect_selection(
+        request.request_type,
+        len(lines),
+        request.client_request_id,
+    ):
+        from app.services import defect_records as defect_records_svc
+
+        record_ids = [line.defect_quarantine_record_id for line in lines]
+        if any(record_id is None for record_id in record_ids):
+            raise ValueError("선택 격리 처리는 모든 라인에 격리 기록이 필요합니다.")
+        if len(record_ids) != len(set(record_ids)):
+            raise ValueError("선택 격리 처리 요청에 중복된 기록이 있습니다.")
+        if len(lines) > 1 and len({line.item_id for line in lines}) != 1:
+            raise ValueError("다건 격리 처리는 같은 품목의 기록만 포함해야 합니다.")
+        if len(lines) > 1 and len({line.from_department for line in lines}) != 1:
+            raise ValueError("격리 처리 요청은 한 부서의 기록만 포함해야 합니다.")
+        for line in sorted(lines, key=lambda current: str(current.defect_quarantine_record_id)):
+            record = defect_records_svc._get_record_for_action(
+                db,
+                record_id=line.defect_quarantine_record_id,
+                item_id=line.item_id,
+                department=line.from_department,
+            )
+            if record is None:
+                raise ValueError("선택한 격리 기록을 찾을 수 없습니다.")
+            defect_records_svc._ensure_available(
+                db,
+                record,
+                Decimal(str(line.quantity or 0)),
+                exclude_line_id=line.line_id,
+                require_exact=True,
+            )
+    uses_multi_defect_sources = (
+        request.request_type == StockRequestTypeEnum.DEFECT_DISASSEMBLE
+        and len(lines) > 1
+    )
+    defect_disassemble_sources = (
+        _prepare_defect_disassemble_sources(db, lines)
+        if uses_multi_defect_sources
+        else None
+    )
+    if defect_disassemble_sources is not None:
+        _execute_defect_disassemble_sources(
             db,
             request,
-            line,
+            defect_disassemble_sources,
             approver=approver,
-            is_approval=is_approval,
             operation=operation,
         )
+    else:
+        for line in lines:
+            _execute_line(
+                db,
+                request,
+                line,
+                approver=approver,
+                is_approval=is_approval,
+                operation=operation,
+            )
     operation_svc._record_effect(
         db,
         operation=operation,
@@ -621,6 +713,95 @@ def _execute_all_lines(
         before_state={"status": request.status.value},
         after_state={"status": StockRequestStatusEnum.COMPLETED.value},
     )
+
+
+def _prepare_defect_disassemble_sources(
+    db: Session,
+    lines: list[StockRequestLine],
+) -> list[tuple[StockRequestLine, DefectQuarantineRecord]]:
+    """다중 재작업 source를 잠그고 단일 품목·부서·건별 수량을 선검증한다."""
+    record_ids = [line.defect_quarantine_record_id for line in lines]
+    if any(record_id is None for record_id in record_ids):
+        raise ValueError("다중 재작업은 모든 라인에 격리 기록이 필요합니다.")
+    if len(record_ids) != len(set(record_ids)):
+        raise ValueError("재작업 요청에 중복된 격리 기록이 있습니다.")
+    if len({line.item_id for line in lines}) != 1:
+        raise ValueError("다중 재작업은 같은 품목의 격리 기록만 처리할 수 있습니다.")
+    if len({str(line.from_department) for line in lines}) != 1:
+        raise ValueError("다중 재작업은 같은 부서의 격리 기록만 처리할 수 있습니다.")
+    if any(line.from_bucket != RequestBucketEnum.DEFECTIVE for line in lines):
+        raise ValueError("다중 재작업은 격리 재고 라인만 처리할 수 있습니다.")
+
+    from app.services import defect_records as defect_records_svc
+
+    prepared_by_id: dict[
+        uuid.UUID,
+        tuple[StockRequestLine, DefectQuarantineRecord],
+    ] = {}
+    for line in sorted(lines, key=lambda current: str(current.defect_quarantine_record_id)):
+        record = defect_records_svc._get_record_for_action(
+            db,
+            record_id=line.defect_quarantine_record_id,
+            item_id=line.item_id,
+            department=line.from_department,
+        )
+        if record is None:
+            raise ValueError("선택한 격리 기록을 찾을 수 없습니다.")
+        defect_records_svc._ensure_available(
+            db,
+            record,
+            Decimal(str(line.quantity or 0)),
+            exclude_line_id=line.line_id,
+        )
+        prepared_by_id[record.record_id] = (line, record)
+    return [prepared_by_id[line.defect_quarantine_record_id] for line in lines]
+
+
+def _execute_defect_disassemble_sources(
+    db: Session,
+    request: StockRequest,
+    sources: list[tuple[StockRequestLine, DefectQuarantineRecord]],
+    *,
+    approver: Employee,
+    operation: InventoryOperation | None,
+) -> None:
+    """다중 source 합계를 한 번 분해하고 건별 원장 잔량과 이동을 각각 남긴다."""
+    from app.services import defect_records as defect_records_svc
+
+    first_line = sources[0][0]
+    total_quantity = sum(
+        (Decimal(str(line.quantity or 0)) for line, _record in sources),
+        Decimal("0"),
+    )
+    _handle_defect_disassemble(
+        db,
+        request,
+        first_line,
+        approver,
+        total_quantity,
+        first_line.item_id,
+        operation=operation,
+    )
+    for line, record in sources:
+        quantity = Decimal(str(line.quantity or 0))
+        defect_records_svc._decrement_record(
+            db,
+            record,
+            quantity,
+            exclude_line_id=line.line_id,
+        )
+        operation_svc._record_defect_movement(
+            db,
+            operation=operation,
+            record_id=record.record_id,
+            item_id=line.item_id,
+            department=str(line.from_department),
+            movement_type=StockRequestTypeEnum.DEFECT_DISASSEMBLE.value,
+            quantity_delta=-quantity,
+            role="DEFECTIVE_SOURCE",
+            actor_name=approver.name,
+            actor_employee_id=approver.employee_id,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -645,23 +826,26 @@ def _finalize_submission(
     """
     lines = list(request.lines)
     requester_role = (requester.warehouse_role or "none").lower()
-    requester_level = getattr(getattr(requester, "level", None), "value", requester.level)
-    is_admin = requester_level == "admin"
+    can_self_approve_warehouse = (
+        bool(request.requires_warehouse_approval)
+        and requester_role in ("primary", "deputy")
+    )
     can_self_approve_department = _can_approve_department(
         requester,
-        request.requester_department,
+        request.approval_department or request.requester_department,
     )
 
     warehouse_ok = (
         (not request.requires_warehouse_approval)
-        or is_admin
-        or requester_role in ("primary", "deputy")
+        or can_self_approve_warehouse
     )
     dept_ok = (
         (not request.requires_department_approval)
         or can_self_approve_department
     )
     if warehouse_ok and dept_ok:
+        # 자가승인도 대기 요청과 같은 live source 가용성 규칙을 적용한다.
+        reroute_and_preflight_dept_to_warehouse(db, request, actor=requester)
         _execute_all_lines(
             db, request, lines, operator_name=requester.name, approver=requester
         )
@@ -670,8 +854,7 @@ def _finalize_submission(
         # 결재 자체가 불필요한 타입(불량 전체 등 requires_*=False)은 approved_by = null 유지 —
         # 같은 사람이 요청자·승인자로 동시에 표시되는 혼란 방지.
         requester_self_approved = (
-            request.requires_warehouse_approval
-            and (requester_role in ("primary", "deputy") or is_admin)
+            can_self_approve_warehouse
         ) or (
             request.requires_department_approval
             and can_self_approve_department
@@ -688,6 +871,19 @@ def _finalize_submission(
         for line in lines:
             line.status = StockRequestStatusEnum.COMPLETED
         return request
+
+    if can_self_approve_warehouse:
+        request.approved_by_employee_id = requester.employee_id
+        request.approved_by_name = requester.name
+        request.approved_at = now
+    if (
+        request.requires_department_approval
+        and can_self_approve_department
+        and warehouse_ok
+    ):
+        request.department_approved_by_employee_id = requester.employee_id
+        request.department_approved_by_name = requester.name
+        request.department_approved_at = now
 
     from app.services import sr_reservation
 

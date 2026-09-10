@@ -4243,12 +4243,9 @@ function RequestRow({ request, active, layout = "default", onClick }: { request:
     { key: "quantity", label: "출하 수량", value: `${request.request_quantity}대`, tabular: true },
     { key: "invoice", label: "인보이스", value: request.invoice_number ?? "미입력", tabular: false },
   ] as const;
-  const requestBoardMetadata = [metadata[1], metadata[0], metadata[3]];
-  const rowClassName = layout === "requestBoard"
-    ? "standard-hover flex h-[136px] flex-col overflow-hidden rounded-[16px] border px-4 py-2 text-left outline-none transition-all active:scale-[0.995] focus-visible:ring-2"
-    : layout === "historyList"
-      ? "standard-hover h-[112px] overflow-hidden rounded-[16px] border px-4 py-3 text-left outline-none transition-all active:scale-[0.995] focus-visible:ring-2"
-      : "min-h-[136px] rounded-[14px] border px-4 py-3 text-left transition-colors";
+  const rowClassName = structuredLayout
+    ? "standard-hover h-[112px] overflow-hidden rounded-[16px] border px-4 py-3 text-left outline-none transition-all active:scale-[0.995] focus-visible:ring-2"
+    : "min-h-[136px] rounded-[14px] border px-4 py-3 text-left transition-colors";
   return (
     <button
       type="button"
@@ -4262,26 +4259,6 @@ function RequestRow({ request, active, layout = "default", onClick }: { request:
         color: LEGACY_COLORS.text,
       }}
     >
-      {layout === "requestBoard" ? (
-        <div data-testid={`shipping-request-board-primary-${request.request_id}`} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3">
-          <div className="min-w-0">
-            <div className="truncate text-sm font-black leading-4" title={finalPfName}>{finalPfName}</div>
-            <div className="flex min-w-0 items-center gap-2 truncate text-xs font-bold leading-3" style={{ color: LEGACY_COLORS.muted2 }}>
-              <SummaryCode code={request.base_pf_mes_code ?? "-"} testId={`shipping-request-code-${request.request_id}`} className="shrink-0" />
-              {hasDifferentBasePf && (
-                <span className="min-w-0 truncate" title={`기준 PF · ${request.base_pf_item_name}`}>기준 PF · {request.base_pf_item_name}</span>
-              )}
-            </div>
-          </div>
-          <div className="flex shrink-0 items-start gap-3">
-            <div data-testid={`shipping-request-board-quantity-${request.request_id}`} className="text-right">
-              <span className="block text-xs font-bold leading-3" style={{ color: LEGACY_COLORS.muted2 }}>출하 수량</span>
-              <span className="block text-sm font-black leading-4 tabular-nums">{request.request_quantity}대</span>
-            </div>
-            <span className="shrink-0"><StatusBadge status={request.status} compact /></span>
-          </div>
-        </div>
-      ) : (
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div
@@ -4307,16 +4284,15 @@ function RequestRow({ request, active, layout = "default", onClick }: { request:
           <StatusBadge status={request.status} compact />
         )}
       </div>
-      )}
       {structuredLayout ? (
         <div
           data-testid={`shipping-request-metadata-${request.request_id}`}
-          className={`grid ${layout === "requestBoard" ? "mt-2 flex-1 content-center grid-cols-2 grid-rows-2 gap-x-4 border-t pt-2" : "mt-2 grid-cols-[1.5fr_1fr_1fr_2fr] gap-x-2 border-t pt-1.5"}`}
+          className="mt-2 grid grid-cols-[1.5fr_1fr_1fr_2fr] gap-x-2 border-t pt-1.5"
           style={{ borderColor: LEGACY_COLORS.border }}
         >
-          {(layout === "requestBoard" ? requestBoardMetadata : metadata).map((item) => (
-            <div key={item.key} data-testid={`shipping-request-meta-${item.key}-${request.request_id}`} className={`min-w-0 ${layout === "requestBoard" && item.key === "invoice" ? "col-span-2 self-end" : ""}`}>
-              <span className={`block text-xs font-bold ${layout === "requestBoard" ? "leading-3" : "leading-4"}`} style={{ color: LEGACY_COLORS.muted2 }}>{item.label}</span>
+          {metadata.map((item) => (
+            <div key={item.key} data-testid={`shipping-request-meta-${item.key}-${request.request_id}`} className="min-w-0">
+              <span className="block text-xs font-bold leading-4" style={{ color: LEGACY_COLORS.muted2 }}>{item.label}</span>
               <span
                 className={`block truncate text-sm font-black leading-4 ${item.tabular ? "tabular-nums" : ""}`}
                 title={item.value}

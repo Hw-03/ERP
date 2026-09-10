@@ -12,11 +12,11 @@ import { deleteJson, fetcher, postJson, putJson, toApiUrl } from "../api-core";
 import type { Department, DepartmentRole, Employee, EmployeeLevel, SidebarMode, WarehouseRole } from "./types";
 
 export const employeesApi = {
-  getEmployees: (params?: { department?: Department; activeOnly?: boolean }) => {
+  getEmployees: (params?: { department?: Department; activeOnly?: boolean }, signal?: AbortSignal) => {
     const query = new URLSearchParams();
     if (params?.department) query.set("department", params.department);
     if (params?.activeOnly !== undefined) query.set("active_only", String(params.activeOnly));
-    return fetcher<Employee[]>(toApiUrl(`/api/employees?${query}`));
+    return fetcher<Employee[]>(toApiUrl(`/api/employees?${query}`), signal);
   },
 
   createEmployee: (payload: {

@@ -22,5 +22,6 @@ class OperatorPinChangeCompleteRequest(BaseModel):
 
 class OperatorSessionResponse(BaseModel):
     employee: EmployeeResponse
+    server_time: UtcDatetime
     expires_at: UtcDatetime
     boot_id: str

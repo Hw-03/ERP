@@ -38,6 +38,7 @@ describe("warehouse step permission helpers", () => {
     });
 
     expect(canApproveDepartmentRequests(actual)).toBe(row.can_see_department_queue);
+    expect(isWarehouseStaff(actual)).toBe(row.can_see_warehouse_queue);
     expect(defectDefaultSource(actual)).toBe(row.defect_default_source);
   });
 

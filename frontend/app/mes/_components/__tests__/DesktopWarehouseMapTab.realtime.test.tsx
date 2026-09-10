@@ -6,7 +6,7 @@ const testState = vi.hoisted(() => ({
   revision: 1 as number | null,
   getItems: vi.fn(),
   reconcile: vi.fn(),
-  verifyPin: vi.fn(),
+  verifyEditor: vi.fn(),
   registerOperatorCredsProvider: vi.fn(),
 }));
 
@@ -14,16 +14,15 @@ vi.mock("@/lib/queries/realtime", () => ({
   useRealtimeRevision: () => testState.revision,
 }));
 
-vi.mock("@/lib/api/employees", () => ({
-  employeesApi: { verifyEmployeePin: testState.verifyPin },
-}));
-
 vi.mock("@/lib/api/items", () => ({
   itemsApi: { getItems: testState.getItems },
 }));
 
 vi.mock("@/lib/api/warehouse-map", () => ({
-  warehouseMapApi: { reconcile: testState.reconcile },
+  warehouseMapApi: {
+    reconcile: testState.reconcile,
+    verifyEditor: testState.verifyEditor,
+  },
 }));
 
 vi.mock("@/lib/api-core", () => ({
@@ -61,7 +60,7 @@ vi.mock("../_admin_sections/AdminWarehouseStructureSection", () => ({
 beforeEach(() => {
   vi.clearAllMocks();
   testState.revision = null;
-  testState.verifyPin.mockResolvedValue({});
+  testState.verifyEditor.mockResolvedValue(undefined);
   testState.getItems.mockResolvedValue([]);
   testState.reconcile.mockResolvedValue({ rows: [], mismatch_count: 0 });
 });
@@ -116,16 +115,35 @@ describe("DesktopWarehouseMapTab realtime refresh", () => {
     expect(screen.queryByText(/박스 관리에서 정리하기/)).not.toBeInTheDocument();
   });
 
-  it("uses the current session actor for mutation step-up without a second login request", async () => {
+  it("verifies the current session actor before registering mutation step-up credentials", async () => {
     render(<DesktopWarehouseMapTab />);
 
     await enterEditMode();
 
-    expect(testState.verifyPin).not.toHaveBeenCalled();
+    expect(testState.verifyEditor).toHaveBeenCalledTimes(1);
     const provider = testState.registerOperatorCredsProvider.mock.calls[0]?.[0] as
       | (() => { code: string; pin: string } | null)
       | undefined;
     expect(provider?.()).toEqual({ code: "E001", pin: "1234" });
+  });
+
+  it("keeps the editor closed when PIN verification fails", async () => {
+    testState.verifyEditor.mockRejectedValueOnce(new Error("PIN 확인 실패"));
+    render(<DesktopWarehouseMapTab />);
+
+    fireEvent.click(screen.getByRole("button", { name: "편집 모드" }));
+    fireEvent.change(screen.getByPlaceholderText("본인 PIN"), { target: { value: "1234" } });
+    fireEvent.click(screen.getByRole("button", { name: "편집 시작" }));
+
+    expect(await screen.findByText("PIN 확인 실패")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "편집 시작" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "보기 모드로" })).not.toBeInTheDocument();
+    expect(testState.getItems).not.toHaveBeenCalled();
+    expect(testState.reconcile).not.toHaveBeenCalled();
+    const provider = testState.registerOperatorCredsProvider.mock.calls[0]?.[0] as
+      | (() => { code: string; pin: string } | null)
+      | undefined;
+    expect(provider?.()).toBeNull();
   });
 
   it("applies reconcile results when the concurrent item refresh fails", async () => {

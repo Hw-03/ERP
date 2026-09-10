@@ -343,6 +343,7 @@ export type IoBatchRawOptionalKeys = Assert<Equal<
   | "approver_name"
   | "bundles"
   | "completed_at"
+  | "department_routes_normalized"
   | "from_department"
   | "notes"
   | "reference_no"
@@ -354,7 +355,7 @@ export type IoBatchRawOptionalKeys = Assert<Equal<
 >>;
 export type IoBatchPublicOptionalKeys = Assert<Equal<
   OptionalKeys<IoBatch>,
-  "shipping_request_id" | "stock_requests"
+  "department_routes_normalized" | "shipping_request_id" | "stock_requests"
 >>;
 export type IoBundleRawOptionalKeys = Assert<Equal<
   OptionalKeys<Raw["IoBundlePayload"]>,

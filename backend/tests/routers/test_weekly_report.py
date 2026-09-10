@@ -11,6 +11,7 @@ from decimal import Decimal
 from itertools import count
 
 import pytest
+from app.services import weekly_report_scope
 from app.models import (
     DepartmentEnum,
     Inventory,
@@ -203,13 +204,115 @@ def test_production_matrix_basic(client, db_session):
 
     resp = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
     assert resp.status_code == 200
-    matrix = {r["model_key"]: r for r in resp.json()["production_matrix"]}
+    body = resp.json()
+    matrix = {r["model_key"]: r for r in body["production_matrix"]}
 
+    assert [group["process_code"] for group in body["groups"]] == ["TF", "HF", "VF", "NF", "AF", "PF"]
     assert _dec(matrix["DX3000"]["hf_qty"]) == _dec(5)
     assert _dec(matrix["DX3000"]["tf_qty"]) == _dec(0)
     assert _dec(matrix["DX3000"]["total_qty"]) == _dec(5)
     assert _dec(matrix["ADX6000"]["vf_qty"]) == _dec(3)
     assert _dec(matrix["ADX6000"]["total_qty"]) == _dec(3)
+
+
+def test_legacy_weekly_report_groups_vacuum_generator_va_items_under_vf(client, db_session, monkeypatch):
+    """발생부 진공 VA 계열만 진공(VF) 상세·생산 매트릭스에 합산한다."""
+    monkeypatch.setattr(weekly_report_scope, "VACUUM_GENERATOR_WEEKLY_START", date(2026, 5, 4))
+    target = _make_prod_item(
+        db_session,
+        name="발생부 (진공) [DX3000]",
+        process_code="VA",
+        model_symbol="3",
+        qty=_dec(5),
+    )
+    target_10p = _make_prod_item(
+        db_session,
+        name="발생부 (10P) (진공) [DX3000]",
+        process_code="VA",
+        model_symbol="3",
+        qty=_dec(3),
+    )
+    other_va = _make_prod_item(
+        db_session,
+        name="신주 케이스 작업완료 [DX3000]",
+        process_code="VA",
+        model_symbol="3",
+        qty=_dec(13),
+    )
+    other_process = _make_prod_item(
+        db_session,
+        name="발생부 (진공) [DX3000] 원자재",
+        process_code="VR",
+        model_symbol="3",
+        qty=_dec(11),
+    )
+    for item, qty in ((target, 5), (target_10p, 3), (other_va, 13), (other_process, 11)):
+        _add_log(
+            db_session,
+            item.item_id,
+            tx_type=TransactionTypeEnum.PRODUCE,
+            qty=_dec(qty),
+            at=_WEEK_MID,
+        )
+    db_session.commit()
+
+    response = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    vf_group = {group["process_code"]: group for group in body["groups"]}["VF"]
+    assert {row["item_id"] for row in vf_group["items"]} == {
+        str(target.item_id),
+        str(target_10p.item_id),
+    }
+    assert vf_group["produce_qty"] == 8
+    dx3000 = {row["model_key"]: row for row in body["production_matrix"]}["DX3000"]
+    assert dx3000["vf_qty"] == 8
+    assert dx3000["total_qty"] == 8
+
+
+def test_legacy_weekly_report_groups_ceramic_tube_housing_under_hf(client, db_session, monkeypatch):
+    """승인된 HA 한 품목만 고압(HF) 상세에 합산하고 다중 모델 매트릭스에서는 제외한다."""
+    monkeypatch.setattr(weekly_report_scope, "CERAMIC_TUBE_HOUSING_WEEKLY_START", date(2026, 5, 4))
+    target = _make_prod_item(
+        db_session,
+        name="세라믹튜브 70KV 하우징 [DXDR-070] [DX3000, ADX4000W, ADX6000, SOLO]",
+        process_code="HA",
+        model_symbol="3468",
+        serial_no=6,
+        qty=_dec(5),
+    )
+    excluded = _make_prod_item(
+        db_session,
+        name="다른 고압 중간품",
+        process_code="HA",
+        model_symbol="3468",
+        serial_no=7,
+        qty=_dec(13),
+    )
+    finished = _make_prod_item(
+        db_session,
+        name="발생부 고압 최종 작업완료",
+        process_code="HF",
+        model_symbol="8",
+        serial_no=14,
+        qty=_dec(2),
+    )
+    _add_log(db_session, target.item_id, tx_type=TransactionTypeEnum.PRODUCE, qty=_dec(5), at=_WEEK_MID)
+    _add_log(db_session, excluded.item_id, tx_type=TransactionTypeEnum.PRODUCE, qty=_dec(13), at=_WEEK_MID)
+    _add_log(db_session, finished.item_id, tx_type=TransactionTypeEnum.PRODUCE, qty=_dec(2), at=_WEEK_MID)
+    db_session.commit()
+
+    response = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    hf_group = {group["process_code"]: group for group in body["groups"]}["HF"]
+    assert [row["item_id"] for row in hf_group["items"]] == [str(target.item_id), str(finished.item_id)]
+    assert hf_group["produce_qty"] == 7
+    assert hf_group["current_qty"] == 7
+    matrix = {row["model_key"]: row for row in body["production_matrix"]}
+    assert matrix["SOLO"]["hf_qty"] == 2
 
 
 def test_legacy_weekly_report_treats_component_change_as_out_and_receive(client, db_session):
@@ -660,6 +763,36 @@ def test_closed_snapshot_week_uses_boundaries_and_excludes_cancelled_flow(client
     assert _dec(body["summary"]["total_current_qty"]) == _dec(8)
 
 
+def test_closed_snapshot_week_matrix_uses_snapshot_scope_after_item_rename(client, db_session, monkeypatch):
+    """과거 주차 매트릭스는 현재 품명이 아니라 스냅샷 시점의 VA→VF 귀속을 유지한다."""
+    monkeypatch.setattr(weekly_report_scope, "VACUUM_GENERATOR_WEEKLY_START", date(2026, 5, 4))
+    item = _make_prod_item(
+        db_session,
+        name="발생부 (진공) [DX3000]",
+        process_code="VA",
+        model_symbol="3",
+        qty=_dec(5),
+    )
+    _add_log(
+        db_session,
+        item.item_id,
+        tx_type=TransactionTypeEnum.PRODUCE,
+        qty=_dec(5),
+        at=_WEEK_MID,
+    )
+    _add_snapshot(db_session, week_end=date(2026, 5, 3), item_quantities=[(item, _dec(0))])
+    _add_snapshot(db_session, week_end=date(2026, 5, 10), item_quantities=[(item, _dec(5))])
+    item.item_name = "신주 케이스 작업완료 [DX3000]"
+    db_session.commit()
+
+    response = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
+
+    assert response.status_code == 200, response.text
+    dx3000 = {row["model_key"]: row for row in response.json()["production_matrix"]}["DX3000"]
+    assert dx3000["vf_qty"] == 5
+    assert dx3000["total_qty"] == 5
+
+
 def test_current_snapshot_week_uses_live_dashboard_stock_math(
     client,
     db_session,
@@ -1061,6 +1194,223 @@ def test_verified_week_matches_nf_production_cancelled_scrap_and_quarantine(clie
         - row["out_qty"]
         - row["defect_qty"]
     ) == row["delta"]
+
+
+def test_verified_weekly_report_groups_vacuum_generator_va_items_under_vf(client, db_session, monkeypatch):
+    """검증 v2도 스냅샷·활동·매트릭스에서 같은 VA 예외만 VF로 귀속한다."""
+    monkeypatch.setattr(weekly_report_scope, "VACUUM_GENERATOR_WEEKLY_START", date(2026, 5, 4))
+    target = _make_prod_item(
+        db_session,
+        name="발생부 (진공) [DX3000]",
+        process_code="VA",
+        model_symbol="3",
+        qty=_dec(5),
+    )
+    excluded = _make_prod_item(
+        db_session,
+        name="신주 케이스 작업완료 [DX3000]",
+        process_code="VA",
+        model_symbol="3",
+        qty=_dec(9),
+    )
+    _activate_verified_weekly_report(db_session)
+    _add_operation_log(
+        db_session,
+        item=target,
+        tx_type=TransactionTypeEnum.PRODUCE,
+        role=InventoryOperationRoleEnum.PRODUCT_OUTPUT,
+        quantity_change=5,
+        effects=[{"scope": "warehouse", "delta": 5}],
+        action="produce",
+        display_label="발생부 진공 생산",
+    )
+    _add_snapshot(
+        db_session,
+        week_end=date(2026, 5, 3),
+        item_quantities=[(target, _dec(0)), (excluded, _dec(0))],
+        verified=True,
+    )
+    _add_snapshot(
+        db_session,
+        week_end=date(2026, 5, 10),
+        item_quantities=[(target, _dec(5)), (excluded, _dec(9))],
+        verified=True,
+    )
+    target.item_name = "신주 케이스 작업완료 [DX3000]"
+    db_session.commit()
+
+    response = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["report_status"] == "verified"
+    vf_group = {group["process_code"]: group for group in body["groups"]}["VF"]
+    assert [row["item_id"] for row in vf_group["items"]] == [str(target.item_id)]
+    assert vf_group["produce_qty"] == 5
+    dx3000 = {row["model_key"]: row for row in body["production_matrix"]}["DX3000"]
+    assert dx3000["vf_qty"] == 5
+    assert dx3000["total_qty"] == 5
+
+
+def test_verified_weekly_report_groups_ceramic_tube_housing_under_hf(client, db_session, monkeypatch):
+    """검증 v2도 HA 스냅샷 행을 HF로 귀속하고 다중 모델 수량은 매트릭스에 배분하지 않는다."""
+    monkeypatch.setattr(weekly_report_scope, "CERAMIC_TUBE_HOUSING_WEEKLY_START", date(2026, 5, 4))
+    target = _make_prod_item(
+        db_session,
+        name="세라믹튜브 70KV 하우징 [DXDR-070] [DX3000, ADX4000W, ADX6000, SOLO]",
+        process_code="HA",
+        model_symbol="3468",
+        serial_no=6,
+        qty=_dec(5),
+    )
+    excluded = _make_prod_item(
+        db_session,
+        name="다른 고압 중간품",
+        process_code="HA",
+        model_symbol="3468",
+        serial_no=7,
+        qty=_dec(9),
+    )
+    finished = _make_prod_item(
+        db_session,
+        name="발생부 고압 최종 작업완료",
+        process_code="HF",
+        model_symbol="8",
+        serial_no=14,
+        qty=_dec(2),
+    )
+    _activate_verified_weekly_report(db_session)
+    _add_operation_log(
+        db_session,
+        item=target,
+        tx_type=TransactionTypeEnum.PRODUCE,
+        role=InventoryOperationRoleEnum.PRODUCT_OUTPUT,
+        quantity_change=5,
+        effects=[{"scope": "warehouse", "delta": 5}],
+        action="produce",
+        display_label="세라믹튜브 하우징 생산",
+    )
+    _add_operation_log(
+        db_session,
+        item=finished,
+        tx_type=TransactionTypeEnum.PRODUCE,
+        role=InventoryOperationRoleEnum.PRODUCT_OUTPUT,
+        quantity_change=2,
+        effects=[{"scope": "warehouse", "delta": 2}],
+        action="produce",
+        display_label="고압 완료품 생산",
+    )
+    _add_snapshot(
+        db_session,
+        week_end=date(2026, 5, 3),
+        item_quantities=[(target, _dec(0)), (excluded, _dec(0)), (finished, _dec(0))],
+        verified=True,
+    )
+    _add_snapshot(
+        db_session,
+        week_end=date(2026, 5, 10),
+        item_quantities=[(target, _dec(5)), (excluded, _dec(9)), (finished, _dec(2))],
+        verified=True,
+    )
+    db_session.commit()
+
+    response = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["report_status"] == "verified"
+    hf_group = {group["process_code"]: group for group in body["groups"]}["HF"]
+    assert [row["item_id"] for row in hf_group["items"]] == [str(target.item_id), str(finished.item_id)]
+    assert hf_group["produce_qty"] == 7
+    matrix = {row["model_key"]: row for row in body["production_matrix"]}
+    assert matrix["SOLO"]["hf_qty"] == 2
+
+
+def test_vacuum_generator_scope_starts_with_week_of_2026_09_07(client, db_session):
+    """9/6 경계 백필은 다음 주 기준선이며 8월 5주차 표의 신규 범위를 소급하지 않는다."""
+    target = _make_prod_item(
+        db_session,
+        name="발생부 (진공) [DX3000]",
+        process_code="VA",
+        model_symbol="3",
+        qty=_dec(5),
+    )
+    _activate_verified_weekly_report(db_session, starts_at="2026-08-31T00:00:00+09:00")
+    _add_snapshot(
+        db_session,
+        week_end=date(2026, 8, 30),
+        item_quantities=[],
+        verified=True,
+    )
+    _add_snapshot(
+        db_session,
+        week_end=date(2026, 9, 6),
+        item_quantities=[(target, _dec(5))],
+        verified=True,
+    )
+    db_session.commit()
+
+    previous_response = client.get(
+        "/api/inventory/weekly-report?week_start=2026-08-31&week_end=2026-09-06"
+    )
+    current_response = client.get(
+        "/api/inventory/weekly-report?week_start=2026-09-07&week_end=2026-09-13"
+    )
+
+    assert previous_response.status_code == 200, previous_response.text
+    assert previous_response.json()["report_status"] == "verified"
+    assert all(
+        row["item_id"] != str(target.item_id)
+        for group in previous_response.json()["groups"]
+        for row in group["items"]
+    )
+    assert current_response.status_code == 200, current_response.text
+    assert current_response.json()["report_status"] == "verified"
+    vf_group = {group["process_code"]: group for group in current_response.json()["groups"]}["VF"]
+    assert [row["item_id"] for row in vf_group["items"]] == [str(target.item_id)]
+
+
+def test_ceramic_tube_housing_scope_starts_with_week_of_2026_09_07(client, db_session):
+    """9/6 경계의 HA 추가는 다음 주 고압 보고에서만 보인다."""
+    target = _make_prod_item(
+        db_session,
+        name="세라믹튜브 70KV 하우징 [DXDR-070] [DX3000, ADX4000W, ADX6000, SOLO]",
+        process_code="HA",
+        model_symbol="3468",
+        serial_no=6,
+        qty=_dec(5),
+    )
+    _activate_verified_weekly_report(db_session, starts_at="2026-08-31T00:00:00+09:00")
+    _add_snapshot(
+        db_session,
+        week_end=date(2026, 8, 30),
+        item_quantities=[],
+        verified=True,
+    )
+    _add_snapshot(
+        db_session,
+        week_end=date(2026, 9, 6),
+        item_quantities=[(target, _dec(5))],
+        verified=True,
+    )
+    db_session.commit()
+
+    previous_response = client.get(
+        "/api/inventory/weekly-report?week_start=2026-08-31&week_end=2026-09-06"
+    )
+    current_response = client.get(
+        "/api/inventory/weekly-report?week_start=2026-09-07&week_end=2026-09-13"
+    )
+
+    assert previous_response.status_code == 200, previous_response.text
+    assert all(
+        row["item_id"] != str(target.item_id)
+        for group in previous_response.json()["groups"]
+        for row in group["items"]
+    )
+    assert current_response.status_code == 200, current_response.text
+    hf_group = {group["process_code"]: group for group in current_response.json()["groups"]}["HF"]
+    assert [row["item_id"] for row in hf_group["items"]] == [str(target.item_id)]
 
 
 def test_verified_weekly_report_treats_component_change_as_out_and_receive(client, db_session):

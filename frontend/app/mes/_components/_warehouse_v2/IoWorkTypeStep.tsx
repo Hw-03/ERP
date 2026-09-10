@@ -124,25 +124,22 @@ export function IoSubTypeStep({
     );
   }
 
-  // process workType은 (입고/출고) 카드 + 대상 부서 그리드만 노출. 4 chip 숨김.
+  // process workType은 품목코드로 부서를 자동 판정하므로 입고/출고 방향만 노출한다.
   if (workType === "process") {
     return (
-      <div className="grid h-full min-h-0 gap-6" style={{ gridTemplateRows: "4fr 6fr" }}>
-        <DeptGrid label="대상 부서" value={toDepartment} onChange={onToDepartmentChange} fill />
-        <div className="flex min-h-0 flex-col">
-          <Step2Label label="방향" />
-          <div className="grid min-h-0 flex-1 grid-cols-2 gap-4">
-            <DirectionCard
-              dir="in"
-              active={deptIoDirection === "in"}
-              onClick={() => onDeptIoDirectionChange("in")}
-            />
-            <DirectionCard
-              dir="out"
-              active={deptIoDirection === "out"}
-              onClick={() => onDeptIoDirectionChange("out")}
-            />
-          </div>
+      <div className="flex h-full min-h-0 flex-col">
+        <Step2Label label="방향" />
+        <div className="grid min-h-0 flex-1 grid-cols-2 gap-4">
+          <DirectionCard
+            dir="in"
+            active={deptIoDirection === "in"}
+            onClick={() => onDeptIoDirectionChange("in")}
+          />
+          <DirectionCard
+            dir="out"
+            active={deptIoDirection === "out"}
+            onClick={() => onDeptIoDirectionChange("out")}
+          />
         </div>
       </div>
     );

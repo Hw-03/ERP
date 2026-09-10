@@ -23,6 +23,13 @@ from app.schemas import (
 router = VerifiedActorRouter()
 
 
+@router.post("/verify-editor", status_code=status.HTTP_204_NO_CONTENT)
+def verify_editor_access(
+    _mgr: Annotated[Employee, Depends(require_warehouse_manager)],
+) -> None:
+    """편집 진입 전에 실제 변경 요청과 같은 창고 관리자 자격을 확인한다."""
+
+
 @router.post("/angles", response_model=WarehouseAngleResponse, status_code=status.HTTP_201_CREATED)
 def create_angle(
     payload: WarehouseAngleCreate,

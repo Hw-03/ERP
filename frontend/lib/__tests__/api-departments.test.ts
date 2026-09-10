@@ -26,6 +26,16 @@ describe("departmentsApi", () => {
     expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/app-session");
   });
 
+  it("forwards an optional abort signal when reading the app session", async () => {
+    const fetchSpy = vi.fn<typeof fetch>(() => Promise.resolve(makeResponse({ boot_id: "b", started_at: "" })));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const controller = new AbortController();
+
+    await departmentsApi.getAppSession(controller.signal);
+
+    expect((fetchSpy.mock.calls[0][1] as RequestInit).signal).toBe(controller.signal);
+  });
+
   it("getDepartments without params", async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse([])));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;

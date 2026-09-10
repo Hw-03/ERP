@@ -12,8 +12,8 @@ export type DepartmentCreatePayload = components["schemas"]["DepartmentCreate"];
 export type DepartmentUpdatePayload = components["schemas"]["DepartmentUpdate"];
 
 export const departmentsApi = {
-  getAppSession: (): Promise<{ boot_id: string; started_at: string }> =>
-    fetcher(toApiUrl("/api/app-session")),
+  getAppSession: (signal?: AbortSignal): Promise<{ boot_id: string; started_at: string }> =>
+    fetcher(toApiUrl("/api/app-session"), signal),
 
   getDepartments: (params?: { isActive?: boolean }) => {
     const query = new URLSearchParams();

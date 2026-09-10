@@ -11,6 +11,13 @@ const currentWizardProps = vi.hoisted(() => ({
   },
 }));
 
+const currentPanelProps = vi.hoisted(() => ({
+  value: null as null | {
+    sectionTab?: string;
+    targetRequestId?: string | null;
+  },
+}));
+
 const currentOperator = vi.hoisted(() => ({
   value: {
     employee_id: "emp-1",
@@ -78,16 +85,27 @@ vi.mock("../../../_warehouse_sections/WarehouseSectionTabs", () => ({
 }));
 
 vi.mock("../../../_warehouse_sections/WarehouseDraftPanelTabs", () => ({
-  WarehouseDraftPanelTabs: ({ onContinueIoDraft }: { onContinueIoDraft?: (draft: never) => void }) => (
-    <div data-testid="draft-panels">
-      <button
-        type="button"
-        onClick={() => onContinueIoDraft?.({ batch_id: "adjust-draft", sub_type: "adjust_out" } as never)}
-      >
-        continue adjust draft
-      </button>
-    </div>
-  ),
+  WarehouseDraftPanelTabs: ({
+    sectionTab,
+    targetRequestId,
+    onContinueIoDraft,
+  }: {
+    sectionTab?: string;
+    targetRequestId?: string | null;
+    onContinueIoDraft?: (draft: never) => void;
+  }) => {
+    currentPanelProps.value = { sectionTab, targetRequestId };
+    return (
+      <div data-testid="draft-panels">
+        <button
+          type="button"
+          onClick={() => onContinueIoDraft?.({ batch_id: "adjust-draft", sub_type: "adjust_out" } as never)}
+        >
+          continue adjust draft
+        </button>
+      </div>
+    );
+  },
 }));
 
 vi.mock("../../warehouse/MobileDirtyLeaveSheet", () => ({
@@ -128,6 +146,7 @@ describe("MobileWarehouseScreen compact step header", () => {
       level: "staff",
     };
     currentWizardProps.value = null;
+    currentPanelProps.value = null;
   });
 
   afterEach(() => {
@@ -137,7 +156,7 @@ describe("MobileWarehouseScreen compact step header", () => {
   it.each([
     ["admin-only", { level: "admin", warehouse_role: "none", department_role: "none" }, false],
     ["department deputy", { level: "staff", warehouse_role: "none", department_role: "deputy" }, true],
-    ["warehouse primary", { level: "staff", warehouse_role: "primary", department_role: "none" }, true],
+    ["warehouse primary", { level: "staff", warehouse_role: "primary", department_role: "none" }, false],
   ] as const)("shows the department queue only for canonical approvers: %s", (_name, roles, expected) => {
     currentOperator.value = { ...currentOperator.value, ...roles };
 
@@ -163,6 +182,23 @@ describe("MobileWarehouseScreen compact step header", () => {
 
     expect(new URLSearchParams(window.location.search).get("draftId")).toBeNull();
     expect(currentWizardProps.value?.restoreDraft).toBeNull();
+  });
+
+  it("opens an authorized approval notification at its exact request", () => {
+    currentOperator.value = {
+      ...currentOperator.value,
+      warehouse_role: "primary",
+    };
+    window.history.replaceState(
+      {},
+      "",
+      "/mes?tab=warehouse&section=queue&stockRequestId=request-1",
+    );
+
+    render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />);
+
+    expect(currentPanelProps.value?.sectionTab).toBe("queue");
+    expect(currentPanelProps.value?.targetRequestId).toBe("request-1");
   });
 
   it("수동 입출고 초안 이어서 작업은 수량 조정 단계로 이동한다", () => {

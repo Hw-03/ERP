@@ -5,7 +5,7 @@ import { InventoryFilters, InventoryTableStickyHeader } from "../InventoryFilter
 const baseProps = {
   open: true,
   selectedDepts: [],
-  departmentFilterBasis: "location" as const,
+  departmentFilterBasis: "code" as const,
   selectedModels: [],
   selectedProcessSteps: [],
   showDisused: false,
@@ -23,6 +23,10 @@ const baseProps = {
 };
 
 describe("InventoryFilters", () => {
+  it("omits the unclassified model filter", () => {
+    render(<InventoryFilters {...baseProps} />);
+    expect(screen.queryByRole("button", { name: "미분류" })).not.toBeInTheDocument();
+  });
   it("부서 칩 해석을 재고 위치와 품목 코드 기준으로 전환한다", () => {
     const onDepartmentFilterBasisChange = vi.fn();
     const props = {
@@ -39,10 +43,21 @@ describe("InventoryFilters", () => {
     expect(screen.getByRole("button", { name: "조립" })).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("품목 코드 기준을 먼저 표시하고 기본 활성 기준으로 표시한다", () => {
+    render(<InventoryFilters {...baseProps} />);
+
+    const codeButton = screen.getByRole("button", { name: "품목 코드 기준" });
+    const locationButton = screen.getByRole("button", { name: "재고 위치 기준" });
+
+    expect(codeButton.compareDocumentPosition(locationButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(codeButton).toHaveAttribute("aria-pressed", "true");
+    expect(locationButton).toHaveAttribute("aria-pressed", "false");
+  });
+
   it("선택된 기준은 부서 칩보다 조금 진한 민트 틴트로 표시한다", () => {
     render(<InventoryFilters {...baseProps} />);
 
-    expect(screen.getByRole("button", { name: "재고 위치 기준" })).toHaveStyle({
+    expect(screen.getByRole("button", { name: "품목 코드 기준" })).toHaveStyle({
       background: "color-mix(in srgb, var(--c-green) 20%, transparent)",
       color: "var(--c-green)",
     });

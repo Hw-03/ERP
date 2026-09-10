@@ -3,10 +3,10 @@
 import { useState } from "react";
 import type { StockRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { normalizeDepartment } from "@/lib/mes/department";
 import { formatKstDateTime } from "@/lib/mes/format";
 import {
   formatRequestNotes,
+  getRequestFlowLabel,
   getRequestStatusPresentation,
   getRequestTypePresentation,
 } from "./ioRequestLabels";
@@ -36,11 +36,7 @@ export function MyRequestRow({
   const displayNotes = formatRequestNotes(req.notes);
   const notesLong = (displayNotes ?? "").length > 60;
 
-  const firstLine = req.lines[0];
-  const fromDept = firstLine?.from_department ? normalizeDepartment(firstLine.from_department) : null;
-  const toDept = firstLine?.to_department ? normalizeDepartment(firstLine.to_department) : null;
-  const flowLabel =
-    fromDept && toDept ? `${fromDept} → ${toDept}` : fromDept ?? toDept ?? null;
+  const flowLabel = getRequestFlowLabel(req.request_type, req.lines);
 
   return (
     <div
@@ -105,7 +101,7 @@ export function MyRequestRow({
         </span>
       </div>
 
-      <StockRequestLineTable lines={req.lines} collapseAfter={5} />
+      <StockRequestLineTable lines={req.lines} requestType={req.request_type} collapseAfter={5} />
 
       {(displayNotes || cancelable) && (
         <div data-testid="my-request-footer" className="mt-3 flex flex-wrap items-center gap-3">

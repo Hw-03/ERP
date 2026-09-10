@@ -27,6 +27,7 @@ from app.services.sr_execution import (
     _execute_all_lines,
     _request_inventory_item_ids,
     release_reservation as _release_reservation,
+    reroute_and_preflight_dept_to_warehouse as _reroute_and_preflight_dept_to_warehouse,
 )
 
 # 주의: io_dispatch.execute_batch_after_dept_approval 만 함수 내부 지연 import 한다.
@@ -85,6 +86,7 @@ def approve_request(
 
     try:
         _release_reservation(db, request, actor=approver)
+        _reroute_and_preflight_dept_to_warehouse(db, request, actor=approver)
         _execute_all_lines(
             db,
             request,
@@ -120,23 +122,27 @@ def approve_request_department(
 ) -> StockRequest:
     """부서 결재 승인.
 
-    - actor: `can_approve_department`가 허용하는 부서 정/부 또는 창고 정/부
+    - actor: `can_approve_department`가 허용하는 부서 정/부
     - MANUAL_ADJUSTMENT 단독: 승인 즉시 io_dispatch.execute_batch_after_dept_approval 호출
-    - 듀얼(창고+부서): 양쪽 모두 충족 시 _execute_all_lines, 아니면 status 유지
+    - 듀얼(창고+부서): 창고 승인 후 부서 승인 시 _execute_all_lines
     """
     if not request.requires_department_approval:
         raise ValueError("부서 결재가 필요하지 않은 요청입니다.")
 
     # 결재 권한 (그릴 합의 — docs/defect-handling-redesign.md):
     #   - 부서 정/부: 창고 외 부서 결재
-    #   - 창고 정/부: 모든 부서 결재
     #   - admin level 단독: 결재 권한 없음
     # 사람 이름 박지 않음. 자세한 룰은 `dept_hierarchy.can_approve_department`.
     approval_department = request.approval_department or request.requester_department
     if not _can_approve_department(approver, approval_department):
         raise PermissionError(
-            "결재 권한이 없습니다 (부서 정/부 또는 창고 정/부 필요)."
+            "결재 권한이 없습니다 (부서 정/부 필요)."
         )
+    if (
+        request.requires_warehouse_approval
+        and request.approved_by_employee_id is None
+    ):
+        raise ValueError("창고 결재가 먼저 필요합니다.")
     if not rate_limit.verify_operator_pin(approver, pin, http_request):
         raise PermissionError("PIN이 일치하지 않습니다.")
     _set_actor(http_request, approver)
@@ -168,6 +174,7 @@ def approve_request_department(
 
     try:
         _release_reservation(db, request, actor=approver)
+        _reroute_and_preflight_dept_to_warehouse(db, request, actor=approver)
         if request.request_type == StockRequestTypeEnum.MANUAL_ADJUSTMENT:
             # io_dispatch 가 원본 IoBatch 라인을 _apply_line 식으로 실행.
             execute_batch_after_dept_approval(db, request=request, approver=approver)
@@ -244,6 +251,8 @@ def reject_request(
     reason: str,
     http_request: Optional[Request] = None,
 ) -> StockRequest:
+    if not request.requires_warehouse_approval:
+        raise ValueError("창고 결재가 필요하지 않은 요청입니다.")
     role = (approver.warehouse_role or "none").lower()
     if role not in ("primary", "deputy"):
         raise PermissionError("창고 담당자만 반려할 수 있습니다.")
@@ -292,8 +301,13 @@ def reject_request_department(
     approval_department = request.approval_department or request.requester_department
     if not _can_approve_department(approver, approval_department):
         raise PermissionError(
-            "결재 권한이 없습니다 (부서 정/부 또는 창고 정/부 필요)."
+            "결재 권한이 없습니다 (부서 정/부 필요)."
         )
+    if (
+        request.requires_warehouse_approval
+        and request.approved_by_employee_id is None
+    ):
+        raise ValueError("창고 결재가 먼저 필요합니다.")
     if not rate_limit.verify_operator_pin(approver, pin, http_request):
         raise PermissionError("PIN이 일치하지 않습니다.")
     _set_actor(http_request, approver)

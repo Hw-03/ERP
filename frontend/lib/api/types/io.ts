@@ -131,6 +131,8 @@ export interface IoBatch {
   from_department: Department | string | null;
   to_department: Department | string | null;
   requires_approval: boolean;
+  /** 기존 임시저장 경로를 품목코드 기준으로 서버가 갱신했는지 여부. */
+  department_routes_normalized?: boolean;
   stock_request_id: string | null;
   /** 구 버전 응답과의 호환을 위해 optional로 읽는다. */
   shipping_request_id?: string | null;

@@ -1,7 +1,20 @@
-import { deleteJson, fetcher, postJson, toApiUrl } from "../api-core";
+import {
+  deleteJson,
+  deleteJsonWithoutAuthBoundary,
+  fetcher,
+  fetcherWithAuthBoundaryReason,
+  fetcherWithoutAuthBoundary,
+  postJsonWithoutAuthBoundary,
+  toApiUrl,
+  type AuthRequiredReason,
+} from "../api-core";
 import type { OperatorSessionResponse } from "./types/operator-session";
 
 let logoutInFlight: Promise<void> | null = null;
+
+function stampSessionReceipt(session: OperatorSessionResponse): OperatorSessionResponse {
+  return { ...session, client_received_at_ms: Date.now() };
+}
 
 async function waitForLogoutBoundary(): Promise<void> {
   if (!logoutInFlight) return;
@@ -17,10 +30,10 @@ async function createOperatorSession(
   pin: string,
 ): Promise<OperatorSessionResponse> {
   await waitForLogoutBoundary();
-  return postJson<OperatorSessionResponse>(toApiUrl("/api/operator-session"), {
-    employee_id: employeeId,
-    pin,
-  });
+  return postJsonWithoutAuthBoundary<OperatorSessionResponse>(
+    toApiUrl("/api/operator-session"),
+    { employee_id: employeeId, pin },
+  ).then(stampSessionReceipt);
 }
 
 function deleteOperatorSession(employeeCode?: string): Promise<void> {
@@ -42,19 +55,41 @@ function deleteOperatorSession(employeeCode?: string): Promise<void> {
 
 async function cancelPinChangeChallenge(employeeId: string): Promise<void> {
   await waitForLogoutBoundary();
-  return deleteJson<void>(
-    `${toApiUrl("/api/operator-session")}?pin_change_employee_id=${encodeURIComponent(employeeId)}`,
-  );
+    return deleteJsonWithoutAuthBoundary<void>(
+      `${toApiUrl("/api/operator-session")}?pin_change_employee_id=${encodeURIComponent(employeeId)}`,
+    );
 }
 
 export const operatorSessionApi = {
   createOperatorSession,
 
-  getOperatorSession: () =>
-    fetcher<OperatorSessionResponse>(toApiUrl("/api/operator-session")),
+  getOperatorSession: (
+    signal?: AbortSignal,
+    authRequiredReason: AuthRequiredReason = "server",
+  ) => authRequiredReason === "server"
+    ? fetcher<OperatorSessionResponse>(toApiUrl("/api/operator-session"), signal)
+        .then(stampSessionReceipt)
+    : fetcherWithAuthBoundaryReason<OperatorSessionResponse>(
+        toApiUrl("/api/operator-session"),
+        signal,
+        authRequiredReason,
+      ).then(stampSessionReceipt),
+
+  getOperatorSessionForIdleCheck: (signal?: AbortSignal) =>
+    fetcherWithoutAuthBoundary<OperatorSessionResponse>(
+      toApiUrl("/api/operator-session"),
+      signal,
+    ).then(stampSessionReceipt),
+
+  renewOperatorSession: (signal?: AbortSignal) =>
+    postJsonWithoutAuthBoundary<OperatorSessionResponse>(
+      toApiUrl("/api/operator-session/activity"),
+      undefined,
+      signal,
+    ).then(stampSessionReceipt),
 
   completeOperatorPinChange: (employeeId: string, newPin: string) =>
-    postJson<void>(toApiUrl("/api/operator-session/complete-pin-change"), {
+    postJsonWithoutAuthBoundary<void>(toApiUrl("/api/operator-session/complete-pin-change"), {
       employee_id: employeeId,
       new_pin: newPin,
     }),

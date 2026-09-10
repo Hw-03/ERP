@@ -35,6 +35,7 @@ from app.models import (
     IoLine,
     Item,
     LocationStatusEnum,
+    RequestBucketEnum,
     StockRequest,
     StockRequestLine,
     StockRequestStatusEnum,
@@ -46,7 +47,12 @@ from app.models import (
 from app.routers import io as io_router
 from app.routers import items as items_router
 from app.routers import stock_requests as stock_request_router
-from app.schemas import IoDraftUpsert, IoSubmitRequest, StockRequestCreate
+from app.schemas import (
+    IoDraftUpsert,
+    IoSubmitRequest,
+    StockRequestActionRequest,
+    StockRequestCreate,
+)
 from app.services import handover as handover_svc
 from app.services import inv_effect
 from app.services import inventory_operation_cancellation as cancellation_svc
@@ -55,6 +61,7 @@ from app.services import io_dispatch as io_dispatch_svc
 from app.services import io_draft as io_draft_svc
 from app.services import stock_requests as stock_request_svc
 from app.services.pin_auth import DEFAULT_PIN_HASH
+from app.services.sr_validation import LineInput
 
 
 POSTGRES_URL = os.environ.get("TEST_POSTGRES_URL", "").strip()
@@ -1055,6 +1062,222 @@ def test_postgres_stock_request_code_retry_reacquires_idempotency_lock(
             assert inventory.pending_quantity == Decimal("1")
     finally:
         engine.dispose()
+
+
+@pytest.mark.parametrize("leader", ["approve", "cancel"])
+def test_postgres_dept_to_warehouse_approve_cancel_has_one_inventory_winner(
+    monkeypatch: pytest.MonkeyPatch,
+    leader: str,
+) -> None:
+    engine, make_session = _session_factory()
+    suffix = uuid.uuid4().hex[:10]
+    with make_session() as setup:
+        _ensure_cutover(setup)
+        requester = _employee(
+            f"ACR-{suffix}",
+            department=DepartmentEnum.ASSEMBLY,
+        )
+        approver = _employee(
+            f"ACA-{suffix}",
+            department=DepartmentEnum.WAREHOUSE,
+            warehouse_role="primary",
+        )
+        item = Item(
+            item_name=f"PostgreSQL approve cancel {suffix}",
+            process_type_code="AR",
+            unit="EA",
+            model_symbol=f"AC{suffix}",
+            serial_no=1,
+        )
+        setup.add_all((requester, approver, item))
+        setup.flush()
+        setup.add_all(
+            (
+                Inventory(
+                    item_id=item.item_id,
+                    quantity=Decimal("5"),
+                    warehouse_qty=Decimal("0"),
+                    pending_quantity=Decimal("0"),
+                ),
+                WarehouseUnplacedItem(item_id=item.item_id, quantity=0),
+                InventoryLocation(
+                    item_id=item.item_id,
+                    department=DepartmentEnum.ASSEMBLY,
+                    status=LocationStatusEnum.PRODUCTION,
+                    quantity=Decimal("5"),
+                    pending_quantity=Decimal("0"),
+                ),
+            )
+        )
+        request = stock_request_svc.create_request(
+            setup,
+            requester=requester,
+            request_type=StockRequestTypeEnum.DEPT_TO_WAREHOUSE,
+            lines_input=[
+                LineInput(
+                    item_id=item.item_id,
+                    quantity=Decimal("3"),
+                    from_bucket=RequestBucketEnum.PRODUCTION,
+                    from_department=DepartmentEnum.ASSEMBLY,
+                    to_bucket=RequestBucketEnum.WAREHOUSE,
+                    to_department=None,
+                )
+            ],
+            reference_no=None,
+            notes=None,
+        )
+        setup.commit()
+        setup.refresh(request)
+        request_id = request.request_id
+        requester_id = requester.employee_id
+        approver_id = approver.employee_id
+        item_id = item.item_id
+        assert request.status == StockRequestStatusEnum.RESERVED
+        assert _inventory(setup, item_id).pending_quantity == Decimal("0")
+        source_location = setup.query(InventoryLocation).filter(
+            InventoryLocation.item_id == item_id,
+            InventoryLocation.department == DepartmentEnum.ASSEMBLY,
+            InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+        ).one()
+        assert source_location.pending_quantity == Decimal("3")
+
+    worker_state = local()
+    leader_locked = Event()
+    release_leader = Event()
+    pids: dict[str, Queue[int]] = {"approve": Queue(), "cancel": Queue()}
+    real_loader = stock_request_router._load_request_for_action
+
+    def coordinated_loader(db: Session, target_request_id: uuid.UUID) -> StockRequest:
+        loaded = real_loader(db, target_request_id)
+        if getattr(worker_state, "is_leader", False):
+            leader_locked.set()
+            if not release_leader.wait(timeout=10):
+                raise AssertionError("leader request lock release timed out")
+        return loaded
+
+    monkeypatch.setattr(
+        stock_request_router,
+        "_load_request_for_action",
+        coordinated_loader,
+    )
+
+    def run(action: str, *, is_leader: bool) -> tuple[str, int, int]:
+        with make_session() as db:
+            worker_state.is_leader = is_leader
+            actor_id = approver_id if action == "approve" else requester_id
+            actor = db.get(Employee, actor_id)
+            assert actor is not None
+            pid = db.execute(text("SELECT pg_backend_pid()")).scalar_one()
+            pids[action].put(pid)
+            payload = StockRequestActionRequest(
+                actor_employee_id=actor_id,
+                pin="0000",
+            )
+            try:
+                if action == "approve":
+                    stock_request_router.approve_stock_request(
+                        request_id=request_id,
+                        payload=payload,
+                        http_request=_request(f"/api/stock-requests/{request_id}/approve"),
+                        actor=actor,
+                        db=db,
+                    )
+                else:
+                    stock_request_router.cancel_stock_request(
+                        request_id=request_id,
+                        payload=payload,
+                        http_request=_request(f"/api/stock-requests/{request_id}/cancel"),
+                        actor=actor,
+                        db=db,
+                    )
+                return action, 200, pid
+            except HTTPException as exc:
+                return action, exc.status_code, pid
+
+    follower = "cancel" if leader == "approve" else "approve"
+    executor = ThreadPoolExecutor(max_workers=2)
+    lock_error: BaseException | None = None
+    try:
+        leader_future = executor.submit(run, leader, is_leader=True)
+        assert leader_locked.wait(timeout=10)
+        leader_pid = pids[leader].get(timeout=10)
+        follower_future = executor.submit(run, follower, is_leader=False)
+        follower_pid = pids[follower].get(timeout=10)
+        assert leader_pid != follower_pid
+        try:
+            _assert_worker_waits_for_holder(
+                engine,
+                worker_pid=follower_pid,
+                holder_pid=leader_pid,
+            )
+        except BaseException as exc:
+            lock_error = exc
+        finally:
+            release_leader.set()
+        outcomes = {
+            leader_future.result(timeout=20)[:2],
+            follower_future.result(timeout=20)[:2],
+        }
+    finally:
+        release_leader.set()
+        executor.shutdown(wait=True)
+
+    if lock_error is not None:
+        raise lock_error
+    assert outcomes == {(leader, 200), (follower, 422)}
+
+    expected_status = (
+        StockRequestStatusEnum.COMPLETED
+        if leader == "approve"
+        else StockRequestStatusEnum.CANCELLED
+    )
+    with make_session() as verify:
+        final_request = verify.get(StockRequest, request_id)
+        assert final_request is not None
+        final_line = verify.query(StockRequestLine).filter(
+            StockRequestLine.request_id == request_id
+        ).one()
+        inventory = _inventory(verify, item_id)
+        location = verify.query(InventoryLocation).filter(
+            InventoryLocation.item_id == item_id,
+            InventoryLocation.department == DepartmentEnum.ASSEMBLY,
+            InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+        ).one()
+        unplaced = verify.query(WarehouseUnplacedItem).filter(
+            WarehouseUnplacedItem.item_id == item_id
+        ).one()
+        transaction_count = verify.query(TransactionLog).filter(
+            TransactionLog.item_id == item_id
+        ).count()
+        operation_count = verify.query(InventoryOperation).filter(
+            InventoryOperation.idempotency_key
+            == f"stock_request:{request_id}:execute"
+        ).count()
+
+        assert final_request.status == expected_status
+        assert final_line.status == expected_status
+        assert location.pending_quantity == Decimal("0")
+        assert inventory.pending_quantity == Decimal("0")
+        assert inventory.quantity == Decimal("5")
+        assert inventory.warehouse_qty == unplaced.quantity
+        assert inventory.quantity == inventory.warehouse_qty + location.quantity
+        if leader == "approve":
+            assert location.quantity == Decimal("2")
+            assert inventory.warehouse_qty == Decimal("3")
+            assert transaction_count == 1
+            assert operation_count == 1
+            assert final_request.approved_by_employee_id == approver_id
+            assert final_request.completed_at is not None
+            assert final_request.cancelled_at is None
+        else:
+            assert location.quantity == Decimal("5")
+            assert inventory.warehouse_qty == Decimal("0")
+            assert transaction_count == 0
+            assert operation_count == 0
+            assert final_request.approved_by_employee_id is None
+            assert final_request.completed_at is None
+            assert final_request.cancelled_at is not None
+    engine.dispose()
 
 
 def test_postgres_cross_route_same_key_race_has_one_owner() -> None:

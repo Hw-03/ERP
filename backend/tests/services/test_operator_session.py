@@ -37,7 +37,7 @@ def _employee(db_session, *, code: str = "SESSION-01") -> Employee:
     return employee
 
 
-def test_operator_session_stores_only_digest_and_expires_after_twelve_hours(
+def test_operator_session_stores_only_digest_and_expires_after_thirty_idle_minutes(
     db_session,
 ) -> None:
     session_service = _service()
@@ -59,7 +59,7 @@ def test_operator_session_stores_only_digest_and_expires_after_twelve_hours(
     assert issued.token not in row.token_hash
     assert row.token_hash == session_service.hash_session_token(issued.token)
     assert row.issued_at == now
-    assert row.expires_at == now + timedelta(hours=12)
+    assert row.expires_at == now + timedelta(minutes=30)
     assert row.boot_id == "boot-a"
 
 
@@ -83,7 +83,7 @@ def test_resolve_session_rejects_expiry_revoke_consumption_and_boot_change(
         issued.token,
         purpose="operator",
         boot_id="boot-a",
-        now=now + timedelta(hours=11, minutes=59),
+        now=now + timedelta(minutes=29, seconds=59),
     ).status == session_service.SessionStatus.VALID
     assert session_service.resolve_session(
         db_session,
@@ -97,7 +97,7 @@ def test_resolve_session_rejects_expiry_revoke_consumption_and_boot_change(
         issued.token,
         purpose="operator",
         boot_id="boot-a",
-        now=now + timedelta(hours=12),
+        now=now + timedelta(minutes=30),
     ).status == session_service.SessionStatus.EXPIRED
 
     issued.row.revoked_at = now + timedelta(minutes=1)
@@ -118,6 +118,71 @@ def test_resolve_session_rejects_expiry_revoke_consumption_and_boot_change(
         now=now + timedelta(minutes=2),
     ).status == session_service.SessionStatus.CONSUMED
 
+
+def test_renew_operator_session_extends_only_a_valid_operator_session(db_session) -> None:
+    employee = _employee(db_session, code="SESSION-IDLE-RENEW")
+    session_service = _service()
+    issued_at = datetime(2026, 8, 19, 7, 0, 0)
+    issued = session_service.create_session(
+        db_session,
+        employee_id=employee.employee_id,
+        purpose="operator",
+        boot_id="boot-a",
+        now=issued_at,
+    )
+    db_session.flush()
+
+    renewed_at = issued_at + timedelta(minutes=29)
+    resolution = session_service.renew_operator_session(
+        db_session,
+        issued.token,
+        boot_id="boot-a",
+        now=renewed_at,
+    )
+
+    assert resolution.status == session_service.SessionStatus.VALID
+    assert resolution.row is issued.row
+    assert issued.row.expires_at == renewed_at + timedelta(minutes=30)
+
+    original_expiry = issued.row.expires_at
+    expired = session_service.renew_operator_session(
+        db_session,
+        issued.token,
+        boot_id="boot-a",
+        now=original_expiry,
+    )
+    assert expired.status == session_service.SessionStatus.EXPIRED
+    assert issued.row.expires_at == original_expiry
+
+
+def test_renew_rechecks_real_time_after_waiting_for_locks(db_session, monkeypatch) -> None:
+    employee = _employee(db_session, code="SESSION-IDLE-LOCK-WAIT")
+    session_service = _service()
+    issued_at = datetime(2026, 8, 19, 7, 0, 0)
+    issued = session_service.create_session(
+        db_session,
+        employee_id=employee.employee_id,
+        purpose="operator",
+        boot_id="boot-a",
+        now=issued_at,
+    )
+    db_session.flush()
+    clock = iter(
+        (
+            issued_at + timedelta(minutes=29, seconds=59),
+            issued_at + timedelta(minutes=30),
+        )
+    )
+    monkeypatch.setattr(session_service, "utc_now", lambda: next(clock))
+
+    resolution = session_service.renew_operator_session(
+        db_session,
+        issued.token,
+        boot_id="boot-a",
+    )
+
+    assert resolution.status == session_service.SessionStatus.EXPIRED
+    assert issued.row.expires_at == issued_at + timedelta(minutes=30)
 
 def test_employee_session_revocation_covers_operator_and_pin_change(db_session) -> None:
     employee = _employee(db_session, code="SESSION-03")

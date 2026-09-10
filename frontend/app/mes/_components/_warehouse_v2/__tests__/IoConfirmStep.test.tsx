@@ -230,7 +230,7 @@ describe("IoConfirmStep", () => {
     expect(within(card).queryByText("-1")).not.toBeInTheDocument();
     fireEvent.click(card);
     expect(within(card).getByText("선택 입고")).toBeInTheDocument();
-    expect(within(card).getByText("· 조립")).toBeInTheDocument();
+    expect(within(card).getByText("조립 입고")).toBeInTheDocument();
   });
 
   it("커스텀 분해 BOM은 최종 확인에서도 참고 출고와 상위 미반영을 안내한다", () => {
@@ -283,7 +283,7 @@ describe("IoConfirmStep", () => {
 
     const card = screen.getByRole("button", { name: /히팅 싱크 \+ 방열팬/ });
     fireEvent.click(card);
-    expect(within(card).getByText("· 창고 → 조립")).toBeInTheDocument();
+    expect(within(card).getByText("창고 → 조립")).toBeInTheDocument();
   });
 
   it("빈 부서 결재 메모를 클릭으로 차단하고 인라인 오류와 부모 toast를 전달한다", () => {

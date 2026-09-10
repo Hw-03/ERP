@@ -1,4 +1,4 @@
-"""주간보고용 완료품 재고 확정 스냅샷."""
+"""주간보고 대상 품목의 재고 확정 스냅샷."""
 
 import uuid
 from datetime import date, datetime
@@ -23,7 +23,7 @@ __all__ = ["WeeklyInventorySnapshot", "WeeklyInventorySnapshotItem"]
 
 
 class WeeklyInventorySnapshot(Base):
-    """한 일요일 종료 시점에 확정된 활성 완료품 재고 묶음."""
+    """한 일요일 종료 시점에 확정된 활성 주간보고 품목 재고 묶음."""
 
     __tablename__ = "weekly_inventory_snapshots"
 
@@ -67,7 +67,7 @@ class WeeklyInventorySnapshot(Base):
 
 
 class WeeklyInventorySnapshotItem(Base):
-    """품목 삭제·이름 변경과 무관하게 보존되는 스냅샷 시점의 완료품 행."""
+    """품목 삭제·이름 변경과 무관하게 보존되는 스냅샷 시점의 주간보고 품목 행."""
 
     __tablename__ = "weekly_inventory_snapshot_items"
 

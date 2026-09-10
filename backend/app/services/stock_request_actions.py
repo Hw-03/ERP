@@ -92,6 +92,7 @@ def approve_warehouse_request(
     try:
         with transactional(db):
             previous_status = request.status
+            previous_warehouse_approver_id = request.approved_by_employee_id
             stock_request_svc.approve_request(
                 db,
                 request,
@@ -108,6 +109,11 @@ def approve_warehouse_request(
                     request,
                     decision="approved",
                 )
+            elif (
+                previous_warehouse_approver_id is None
+                and request.approved_by_employee_id is not None
+            ):
+                notification_svc._notify_request_arrived(db, request)
     except stock_request_svc.FailedApprovalError as exc:
         _record_failed_approval(
             db,

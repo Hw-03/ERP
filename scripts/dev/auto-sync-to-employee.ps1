@@ -18,7 +18,7 @@ function Invoke-EmployeeSync {
     $script:EmployeeSyncOutput | Out-Host
 }
 
-Invoke-EmployeeSync -Arguments @("-DryRun")
+Invoke-EmployeeSync -Arguments @("-DryRun", "-Force", "-ReportActivity")
 $dryRunExit = $script:EmployeeSyncExit
 if ($dryRunExit -eq 0) {
     $changeLine = $script:EmployeeSyncOutput |
@@ -34,15 +34,11 @@ if ($dryRunExit -eq 0) {
         Write-Host "AUTO_SYNC_RESULT=NO_CHANGES"
         exit 0
     }
-    Invoke-EmployeeSync
+    Invoke-EmployeeSync -Arguments @("-Force")
     exit $script:EmployeeSyncExit
 }
-if ($dryRunExit -eq 2) {
-    Write-Host "[auto] 최근 직원 활동으로 다음 예약까지 동기화를 미룹니다."
-    exit 2
-}
 if ($dryRunExit -eq 3) {
-    Invoke-EmployeeSync -Arguments @("-AutoSchema")
+    Invoke-EmployeeSync -Arguments @("-AutoSchema", "-Force")
     exit $script:EmployeeSyncExit
 }
 

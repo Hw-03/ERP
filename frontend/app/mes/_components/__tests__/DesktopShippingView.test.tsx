@@ -2979,10 +2979,9 @@ describe("DesktopShippingView", () => {
 
     const named = container.querySelector('[data-shipping-request-id="requested-meta"]') as HTMLElement;
     const namedMetadata = within(named).getByTestId("shipping-request-metadata-requested-meta");
-    const namedPrimary = within(named).getByTestId("shipping-request-board-primary-requested-meta");
     expect(within(namedMetadata).getByText("요청 일시")).toBeInTheDocument();
     expect(within(namedMetadata).getByText("김건호")).toBeInTheDocument();
-    expect(within(namedPrimary).getByText("1대")).toBeInTheDocument();
+    expect(within(namedMetadata).getByText("1대")).toBeInTheDocument();
     expect(named).not.toHaveTextContent("· 김건호");
 
     const preparing = container.querySelector('[data-shipping-request-id="preparing-meta"]') as HTMLElement;
@@ -2995,8 +2994,9 @@ describe("DesktopShippingView", () => {
     expect(within(missing).getByText("요청자 없음")).toBeInTheDocument();
   });
 
-  it("lays out request-board cards as two-column information blocks", async () => {
+  it("lays out request-board cards with one-line history-style metadata", async () => {
     const finalPfName = "DX-7020s_70kV, 2mA_호주_iM3 긴 품명 카드";
+    const longInvoice = "DEXCO-20260907-LONG-INVOICE-NUMBER";
     vi.mocked(api.getShippingRequests).mockResolvedValue([
       request({
         request_id: "request-board-layout",
@@ -3004,6 +3004,13 @@ describe("DesktopShippingView", () => {
         request_quantity: 20,
         final_pf_item_name: finalPfName,
         requested_by_name: null,
+        invoice_number: longInvoice,
+      }),
+      request({
+        request_id: "request-board-prepared-layout",
+        status: "PREPARED",
+        request_quantity: 3,
+        requested_by_name: "김건호",
         invoice_number: null,
       }),
     ]);
@@ -3013,34 +3020,33 @@ describe("DesktopShippingView", () => {
 
     const row = container.querySelector('[data-shipping-request-id="request-board-layout"]') as HTMLElement;
     const metadata = within(row).getByTestId("shipping-request-metadata-request-board-layout");
-    const primary = within(row).getByTestId("shipping-request-board-primary-request-board-layout");
     const date = within(metadata).getByTestId("shipping-request-meta-date-request-board-layout");
-    const invoiceBlock = within(metadata).getByTestId("shipping-request-meta-invoice-request-board-layout");
     const title = within(row).getByText(finalPfName);
-    const invoice = within(metadata).getByText("미입력");
-    const emptyCard = within(screen.getByTestId("shipping-request-list-panel")).getByText("준비 완료 없음").parentElement;
+    const preparedRow = container.querySelector('[data-shipping-request-id="request-board-prepared-layout"]') as HTMLElement;
+    const preparedMetadata = within(preparedRow).getByTestId("shipping-request-metadata-request-board-prepared-layout");
 
     expect(row).toHaveAttribute("data-shipping-card-layout", "requestBoard");
-    expect(emptyCard).toHaveClass("min-h-[136px]");
-    expect(row).toHaveClass("h-[136px]", "rounded-[16px]", "py-2", "standard-hover", "active:scale-[0.995]", "focus-visible:ring-2");
+    expect(row).toHaveClass("h-[112px]", "rounded-[16px]", "py-3", "standard-hover", "active:scale-[0.995]", "focus-visible:ring-2");
     expect(row).not.toHaveClass("hover:brightness-105");
-    expect(row).not.toHaveClass("h-[168px]");
+    expect(row).not.toHaveClass("h-[136px]", "h-[168px]");
     expect(title).toHaveClass("truncate");
     expect(title).not.toHaveClass("line-clamp-2", "min-h-10");
-    expect(primary).toHaveClass("grid", "grid-cols-[minmax(0,1fr)_auto]");
-    const quantity = within(primary).getByTestId("shipping-request-board-quantity-request-board-layout");
-    expect(quantity).toHaveTextContent("출하 수량");
-    expect(quantity).toHaveTextContent("20대");
-    expect(metadata).toHaveClass("grid", "grid-cols-2", "grid-rows-2", "flex-1", "content-center", "border-t", "pt-2");
-    expect(invoiceBlock).toHaveClass("col-span-2", "self-end");
+    expect(within(row).queryByTestId("shipping-request-board-quantity-request-board-layout")).not.toBeInTheDocument();
+    expect(metadata).toHaveClass("grid", "grid-cols-[1.5fr_1fr_1fr_2fr]", "border-t", "pt-1.5");
     expect(within(row).getByText("기준 PF · Standard PF")).toBeInTheDocument();
     expect(date).toHaveTextContent("요청 일시");
     expect(date).not.toHaveTextContent("Standard PF");
     expect(metadata).toHaveTextContent("요청자");
     expect(metadata).toHaveTextContent("요청자 없음");
-    expect(metadata).not.toHaveTextContent("출하 수량");
+    expect(metadata).toHaveTextContent("출하 수량");
+    expect(metadata).toHaveTextContent("20대");
     expect(metadata).toHaveTextContent("인보이스");
-    expect(invoice).toHaveStyle({ color: LEGACY_COLORS.yellow });
+    expect(metadata).toHaveTextContent(longInvoice);
+    expect(preparedRow).toHaveClass("h-[112px]");
+    expect(preparedMetadata).toHaveTextContent("김건호");
+    expect(preparedMetadata).toHaveTextContent("3대");
+    const missingInvoice = within(preparedMetadata).getByText("미입력");
+    expect(missingInvoice).toHaveStyle({ color: LEGACY_COLORS.yellow });
   });
 
   it("keeps default request rows unchanged outside request and history lists", async () => {

@@ -73,7 +73,25 @@ export function MobileWarehouseScreen({
   const urlRestoreStep = typeof window === "undefined"
     ? undefined
     : parseWarehouseStep(new URLSearchParams(window.location.search).get("step"));
-  const [sectionTab, setSectionTab] = useState<WarehouseSectionTab>("compose");
+  const targetRequestId = typeof window === "undefined"
+    ? null
+    : new URLSearchParams(window.location.search).get("stockRequestId");
+  const [sectionTab, setSectionTab] = useState<WarehouseSectionTab>(() => {
+    if (typeof window === "undefined") return "compose";
+    const section = new URLSearchParams(window.location.search).get("section");
+    const valid: WarehouseSectionTab[] = ["compose", "cart", "mine", "queue", "dept-queue", "handover"];
+    if (!section || !valid.includes(section as WarehouseSectionTab)) return "compose";
+    const warehouseRole = operator?.warehouse_role ?? "none";
+    if (section === "queue" && warehouseRole !== "primary" && warehouseRole !== "deputy") {
+      return "compose";
+    }
+    if (section === "dept-queue" && !canApproveDepartmentRequests(operator)) return "compose";
+    if (section === "handover") {
+      const department = operator?.department ?? "";
+      if (department !== "튜브" && !HANDOVER_RECEIVE_DEPTS.includes(department)) return "compose";
+    }
+    return section as WarehouseSectionTab;
+  });
   const [panelRefreshNonce, setPanelRefreshNonce] = useState(0);
   const [cartCount, setCartCount] = useState(() => {
     const eid = operator?.employee_id ?? "";
@@ -343,6 +361,7 @@ export function MobileWarehouseScreen({
                 setCartCount(n);
                 if (operatorEmployeeId) cartCountCache.set(operatorEmployeeId, n);
               }}
+              targetRequestId={targetRequestId}
             />
           </div>
         )}

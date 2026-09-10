@@ -63,6 +63,8 @@ export function DesktopWarehouseMapTab({
   const [editMode, setEditMode] = useState(false);
   const [pinOpen, setPinOpen] = useState(false);
   const [pin, setPin] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [pinError, setPinError] = useState<string | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [editorTab, setEditorTab] = useState<"map" | "structure">("map");
   const [editorError, setEditorError] = useState<string | null>(null);
@@ -144,21 +146,31 @@ export function DesktopWarehouseMapTab({
     };
   }, []);
 
-  function confirmPin() {
+  async function confirmPin() {
     if (!operator || !pin) return;
-    credsRef.current = { code: operator.employee_code, pin };
-    editModeRef.current = true;
-    const requestRevision = currentRevisionRef.current;
-    appliedItemsRevisionRef.current = requestRevision;
-    appliedReconcileRevisionRef.current = requestRevision;
-    setEditMode(true);
-    setPinOpen(false);
-    setPin("");
-    void refreshItems(requestRevision).catch((error: unknown) => {
-      setEditorError(error instanceof Error ? error.message : "품목 조회에 실패했습니다.");
-    });
-    void refreshMismatches(requestRevision);
-    onStatusChange?.("창고 지도 편집 모드");
+    setVerifying(true);
+    setPinError(null);
+    try {
+      credsRef.current = { code: operator.employee_code, pin };
+      await warehouseMapApi.verifyEditor();
+      editModeRef.current = true;
+      const requestRevision = currentRevisionRef.current;
+      appliedItemsRevisionRef.current = requestRevision;
+      appliedReconcileRevisionRef.current = requestRevision;
+      setEditMode(true);
+      setPinOpen(false);
+      setPin("");
+      void refreshItems(requestRevision).catch((error: unknown) => {
+        setEditorError(error instanceof Error ? error.message : "품목 조회에 실패했습니다.");
+      });
+      void refreshMismatches(requestRevision);
+      onStatusChange?.("창고 지도 편집 모드");
+    } catch (error) {
+      credsRef.current = null;
+      setPinError(error instanceof Error ? error.message : "PIN 확인에 실패했습니다.");
+    } finally {
+      setVerifying(false);
+    }
   }
 
   function exitEditMode() {
@@ -224,6 +236,7 @@ export function DesktopWarehouseMapTab({
                   if (e.key === "Escape") {
                     setPinOpen(false);
                     setPin("");
+                    setPinError(null);
                   }
                 }}
                 placeholder="본인 PIN"
@@ -233,18 +246,24 @@ export function DesktopWarehouseMapTab({
               <button
                 type="button"
                 onClick={() => void confirmPin()}
-                disabled={!pin}
+                disabled={verifying || !pin}
                 className="rounded-[12px] px-3 py-2 text-[13px] font-bold text-white transition-colors disabled:opacity-50"
                 style={{ background: LEGACY_COLORS.blueSolid }}
               >
-                편집 시작
+                {verifying ? "확인 중…" : "편집 시작"}
               </button>
+              {pinError && (
+                <span className="text-[12px] font-bold" style={{ color: LEGACY_COLORS.red }}>
+                  {pinError}
+                </span>
+              )}
             </div>
           ) : (
             <button
               type="button"
               onClick={() => {
                 setPinOpen(true);
+                setPinError(null);
               }}
               className="flex items-center gap-1.5 rounded-[12px] px-3 py-2 text-[13px] font-bold text-white transition-colors hover:brightness-[1.04]"
               style={{ background: LEGACY_COLORS.blueSolid }}

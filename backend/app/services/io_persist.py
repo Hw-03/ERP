@@ -9,7 +9,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Iterable, Optional
 
 from sqlalchemy.orm import Session
 
@@ -25,17 +25,23 @@ from app.models import (
 from app.repositories import item_repository
 from app.schemas.io import IoBundlePayload
 from app.services.approval_rules import approval_kind
+from app.services.command_idempotency import fingerprint_io_draft_submit
 from app.services.bom_stock_policy import (
     BOM_STOCK_EXEMPT_NOTE,
     BOM_AUTO_ORIGIN,
+    has_valid_bom_auto_token,
+    io_bom_auto_claims,
+    _issue_bom_auto_token,
     is_bom_generated_line,
     should_skip_bom_inventory,
 )
 from app.services.io_preview import (
+    automatic_department_headers,
     _enum_value,
     _new_id,
     has_declared_custom_process_bom,
     has_included_manual_line,
+    normalize_automatic_department_routes,
     normalize_process_sub_type,
     validate_internal_use_bundles,
     validate_internal_use_operation,
@@ -153,6 +159,91 @@ def _normalize_batch_bom_stock_exempt(db: Session, batch: IoBatch) -> None:
         work_type=batch.work_type,
         sub_type=batch.sub_type,
     )
+
+
+def normalize_automatic_routes_with_bom_token_refresh(
+    db: Session,
+    *,
+    work_type: str,
+    sub_type: str,
+    bundles: Iterable[object],
+) -> bool:
+    """유효한 자동 BOM 근거를 보존하며 live 품목 코드 경로로 토큰을 회전한다.
+
+    토큰은 미리보기 당시 endpoint까지 서명한다. 저장 중 endpoint만 서버가 바꾸면
+    다음 draft 제출에서 원본 BOM 의도까지 무효로 보이므로, 변경 전 유효성을 먼저
+    확인하고 변경 후 서버가 새 endpoint용 토큰을 발급한다.
+    """
+    verified_lines: list[tuple[object, object]] = []
+    for bundle in bundles:
+        for line in getattr(bundle, "lines", ()):
+            if getattr(line, "origin", None) != BOM_AUTO_ORIGIN:
+                continue
+            claims = io_bom_auto_claims(
+                bundle_id=getattr(bundle, "bundle_id", None),
+                line_id=getattr(line, "line_id", None),
+                source_kind=getattr(bundle, "source_kind", None),
+                source_item_id=getattr(bundle, "source_item_id", None),
+                item_id=getattr(line, "item_id", None),
+                work_type=work_type,
+                sub_type=sub_type,
+                direction=getattr(line, "direction", None),
+                from_bucket=getattr(line, "from_bucket", None),
+                from_department=getattr(line, "from_department", None),
+                to_bucket=getattr(line, "to_bucket", None),
+                to_department=getattr(line, "to_department", None),
+            )
+            if is_bom_generated_line(
+                db,
+                bundle_id=getattr(bundle, "bundle_id", None),
+                line_id=getattr(line, "line_id", None),
+                source_kind=getattr(bundle, "source_kind", None),
+                source_item_id=getattr(bundle, "source_item_id", None),
+                item_id=getattr(line, "item_id", None),
+                work_type=work_type,
+                sub_type=sub_type,
+                direction=getattr(line, "direction", None),
+                from_bucket=getattr(line, "from_bucket", None),
+                from_department=getattr(line, "from_department", None),
+                to_bucket=getattr(line, "to_bucket", None),
+                to_department=getattr(line, "to_department", None),
+                bom_auto_token=getattr(line, "bom_auto_token", None),
+            ) or has_valid_bom_auto_token(
+                db,
+                flow="io",
+                claims=claims,
+                token=getattr(line, "bom_auto_token", None),
+            ):
+                verified_lines.append((bundle, line))
+
+    changed = normalize_automatic_department_routes(
+        db,
+        work_type=work_type,
+        sub_type=sub_type,
+        bundles=bundles,
+    )
+    if not changed:
+        return False
+    for bundle, line in verified_lines:
+        line.bom_auto_token = _issue_bom_auto_token(
+            db,
+            flow="io",
+            claims=io_bom_auto_claims(
+                bundle_id=getattr(bundle, "bundle_id", None),
+                line_id=getattr(line, "line_id", None),
+                source_kind=getattr(bundle, "source_kind", None),
+                source_item_id=getattr(bundle, "source_item_id", None),
+                item_id=getattr(line, "item_id", None),
+                work_type=work_type,
+                sub_type=sub_type,
+                direction=getattr(line, "direction", None),
+                from_bucket=getattr(line, "from_bucket", None),
+                from_department=getattr(line, "from_department", None),
+                to_bucket=getattr(line, "to_bucket", None),
+                to_department=getattr(line, "to_department", None),
+            ),
+        )
+    return True
 
 
 def _normalize_bom_stock_exempt_lines(
@@ -415,6 +506,7 @@ def _batch_to_payload(batch: IoBatch, db: Optional[Session] = None) -> dict:
         "stock_requests": [
             _stock_request_summary(request) for request in linked_requests
         ],
+        "department_routes_normalized": False,
     }
 
 
@@ -438,7 +530,17 @@ def _persist_batch(
         work_type=payload.work_type,
         sub_type=payload.sub_type,
     )
+    normalize_automatic_routes_with_bom_token_refresh(
+        db,
+        work_type=payload.work_type,
+        sub_type=payload.sub_type,
+        bundles=payload.bundles,
+    )
     _normalize_payload_bom_stock_exempt(db, payload)
+    if payload.sub_type in {"warehouse_to_dept", "dept_to_warehouse", "produce", "disassemble", "adjust_in", "adjust_out"}:
+        payload.from_department, payload.to_department = automatic_department_headers(
+            payload.bundles
+        )
     validate_internal_use_bundles(
         work_type=payload.work_type,
         sub_type=payload.sub_type,
@@ -638,6 +740,42 @@ def get_batch(db: Session, *, batch_id: uuid.UUID) -> Optional[dict]:
     return _batch_to_payload(batch, db=db) if batch else None
 
 
+def _normalize_automatic_batch_routes_with_draft_fingerprint_refresh(
+    db: Session,
+    batch: IoBatch,
+) -> None:
+    """서버 파생 자동 경로만 바뀐 draft 제출 지문을 현재 경로로 회전한다."""
+    current_draft_fingerprint = fingerprint_io_draft_submit(
+        batch.requester_employee_id,
+        batch.batch_id,
+        _batch_to_payload(batch),
+    )
+    refresh_fingerprint = batch.request_fingerprint == current_draft_fingerprint
+    normalize_automatic_department_routes(
+        db,
+        work_type=batch.work_type,
+        sub_type=batch.sub_type,
+        bundles=batch.bundles,
+    )
+    if batch.sub_type in {
+        "warehouse_to_dept",
+        "dept_to_warehouse",
+        "produce",
+        "disassemble",
+        "adjust_in",
+        "adjust_out",
+    }:
+        batch.from_department, batch.to_department = automatic_department_headers(
+            batch.bundles
+        )
+    if refresh_fingerprint:
+        batch.request_fingerprint = fingerprint_io_draft_submit(
+            batch.requester_employee_id,
+            batch.batch_id,
+            _batch_to_payload(batch),
+        )
+
+
 def _sync_batch_from_stock_requests(
     db: Session,
     batch: IoBatch,
@@ -713,6 +851,8 @@ def _sync_batch_from_stock_requests(
             batch.reference_no = request.request_code
     else:
         batch.stock_request_id = None
+    if batch.status in {"completed", "partially_completed"}:
+        _normalize_automatic_batch_routes_with_draft_fingerprint_refresh(db, batch)
     batch.updated_at = datetime.utcnow()
     db.flush()
 

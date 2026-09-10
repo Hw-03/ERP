@@ -84,12 +84,11 @@ test.describe("입출고 내역 PC 정보 위계", () => {
     await gotoWarehouseCompose(submitPage);
     await pickWorkType(submitPage, /창고 입출고/);
     await submitPage.getByRole("button", { name: /창고 → 부서/ }).first().click();
-    await submitPage.getByRole("button", { name: "조립", exact: true }).click();
+    await expect(submitPage.getByText("도착 부서", { exact: true }).filter({ visible: true })).toHaveCount(0);
     await clickNextStep(submitPage);
-    await submitPage
-      .getByRole("row", { name: /E2E원자재튜브/ })
-      .getByRole("button", { name: "낱개", exact: true })
-      .click();
+    const itemRow = submitPage.getByRole("row", { name: /E2E원자재튜브/ });
+    await itemRow.getByRole("button", { name: "낱개", exact: true }).click();
+    await expect(submitPage.getByText("창고 → 튜브", { exact: true }).filter({ visible: true })).toBeVisible();
     await advanceToQuantityStep(submitPage);
     await submitPage.getByRole("button", { name: /제출확인/ }).click();
     await submitPage.getByRole("button", { name: /창고 결재 요청/ }).click();

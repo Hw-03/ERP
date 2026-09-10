@@ -1,15 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import type { StockRequestLine } from "@/lib/api";
+import type { StockRequestLine, StockRequestType } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import {
   getRequestQuantityPresentation,
+  getRequestLineRouteLabel,
   type RequestQuantityTone,
 } from "./ioRequestLabels";
 
 export interface StockRequestLineTableProps {
   lines: StockRequestLine[];
+  requestType?: StockRequestType;
   collapseAfter?: number;
 }
 
@@ -38,7 +40,7 @@ function AlignedItemCode({ code }: { code: string }) {
 }
 
 /** 요청 품목을 데스크톱 3열 표와 모바일 적층 행으로 일관되게 표시한다. */
-export function StockRequestLineTable({ lines, collapseAfter }: StockRequestLineTableProps) {
+export function StockRequestLineTable({ lines, requestType, collapseAfter }: StockRequestLineTableProps) {
   const [expanded, setExpanded] = useState(false);
   const canToggle = collapseAfter !== undefined && lines.length > collapseAfter;
   const visibleLines = canToggle && !expanded ? lines.slice(0, collapseAfter) : lines;
@@ -67,6 +69,7 @@ export function StockRequestLineTable({ lines, collapseAfter }: StockRequestLine
 
       {visibleLines.map((line, index) => {
         const quantity = getRequestQuantityPresentation(line);
+        const routeLabel = getRequestLineRouteLabel(requestType, line);
         const itemCode = line.mes_code_snapshot ?? "-";
         const isLastRow = index === visibleLines.length - 1;
         return (
@@ -80,7 +83,12 @@ export function StockRequestLineTable({ lines, collapseAfter }: StockRequestLine
             }
           >
             <span className="order-2 min-w-0 flex-1 font-medium lg:order-none lg:block">
-              {line.item_name_snapshot}
+              <span className="block truncate">{line.item_name_snapshot}</span>
+              {routeLabel && (
+                <span className="block text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+                  {routeLabel}
+                </span>
+              )}
             </span>
             <span
               className="order-1 shrink-0 text-xs lg:hidden"

@@ -144,6 +144,7 @@ class IoBatchResponse(BaseModel):
     updated_at: UtcDatetime
     submitted_at: Optional[UtcDatetime] = None
     completed_at: Optional[UtcDatetime] = None
+    department_routes_normalized: bool = False
     bundles: List[IoBundlePayload] = Field(default_factory=list)
     stock_requests: List[IoStockRequestSummary] = Field(default_factory=list)
 

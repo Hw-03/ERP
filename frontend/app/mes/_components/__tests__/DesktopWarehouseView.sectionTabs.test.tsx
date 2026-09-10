@@ -15,6 +15,7 @@ const currentComposeProps = vi.hoisted(() => ({
 const currentWorkAreaProps = vi.hoisted(() => ({
   value: null as null | {
     onEmptyStateChange?: (empty: boolean) => void;
+    targetRequestId?: string | null;
   },
 }));
 
@@ -57,12 +58,14 @@ vi.mock("@/app/mes/_components/_warehouse_sections/WarehouseDraftPanelTabs", () 
     sectionTab,
     onContinueIoDraft,
     onEmptyStateChange,
+    targetRequestId,
   }: {
     sectionTab: string;
     onContinueIoDraft?: (draft: never) => void;
     onEmptyStateChange?: (empty: boolean) => void;
+    targetRequestId?: string | null;
   }) => {
-    currentWorkAreaProps.value = { onEmptyStateChange };
+    currentWorkAreaProps.value = { onEmptyStateChange, targetRequestId };
     if (sectionTab === "compose") return null;
 
     return (
@@ -129,7 +132,7 @@ describe("DesktopWarehouseView", () => {
   it.each([
     ["admin-only", { level: "admin", warehouse_role: "none", department_role: "none" }, false],
     ["department primary", { level: "staff", warehouse_role: "none", department_role: "primary" }, true],
-    ["warehouse deputy", { level: "staff", warehouse_role: "deputy", department_role: "none" }, true],
+    ["warehouse deputy", { level: "staff", warehouse_role: "deputy", department_role: "none" }, false],
   ] as const)("shows the department queue only for canonical approvers: %s", (_name, roles, expected) => {
     currentOperator.value = { ...currentOperator.value, ...roles };
 
@@ -152,6 +155,26 @@ describe("DesktopWarehouseView", () => {
 
     expect(screen.getByTestId("io-compose-view")).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: /부서 승인함/ })).not.toBeInTheDocument();
+  });
+
+  it("forwards an approval notification request id to the authorized queue", () => {
+    currentOperator.value = {
+      ...currentOperator.value,
+      warehouse_role: "primary",
+    };
+    window.history.replaceState(
+      null,
+      "",
+      "/mes?tab=warehouse&section=queue&stockRequestId=request-1",
+    );
+
+    render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+
+    expect(screen.getByRole("tab", { name: /창고 승인함/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(currentWorkAreaProps.value?.targetRequestId).toBe("request-1");
   });
 
   it("내 요청 URL로 직접 진입해도 상단 기본 탭 3개를 표시한다", () => {

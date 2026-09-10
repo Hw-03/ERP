@@ -28,6 +28,19 @@ vi.mock("../../mobile/screens/MobileDefectCartFlow", () => ({
     <div data-testid="cart-flow">{mode}</div>
   ),
 }));
+vi.mock("../DefectProcessPanel", () => ({
+  DefectProcessPanel: ({ locations }: { locations: DefectLocation[] }) => (
+    <div data-testid="batch-process-panel">{locations.map((location) => location.record_id).join(",")}</div>
+  ),
+}));
+vi.mock("../DefectStatisticsView", () => ({
+  DefectStatisticsView: ({ onBack }: { onBack: () => void }) => (
+    <div data-testid="statistics-view">
+      불량 통계 화면
+      <button type="button" onClick={onBack}>통계 뒤로</button>
+    </div>
+  ),
+}));
 
 import { defectsApi } from "@/lib/api/defects";
 
@@ -92,10 +105,19 @@ beforeEach(() => {
   vi.mocked(defectsApi.listDefects).mockClear();
   vi.mocked(defectsApi.listDefects).mockResolvedValue(mockLocations);
   window.localStorage.clear();
+  window.history.replaceState({ defect: "hub" }, "");
 });
 
 describe("DefectHubPanel", () => {
-  // 항목 2-5 — 첫 화면(hub)은 카드 3장만. KPI/필터/격리 목록은 '격리 목록' 카드 선택 후 list 화면에서만.
+  it("preserves the dashboard model catalog order on mobile", async () => {
+    const productModels = [{ slot: 3, model_name: "DX3000" }, { slot: 7, model_name: "COCOON" }, { slot: 4, model_name: "ADX4000W" }].map((model) => ({ ...model, symbol: null, is_reserved: false }));
+    render(<DefectHubPanel currentEmployee={mockEmployee} productModels={productModels} />);
+    fireEvent.click(screen.getByText("격리 목록"));
+    const group = await screen.findByRole("group", { name: "모델 구분" });
+    expect(within(group).getAllByRole("button").map((button) => button.textContent)).toEqual(["전체", "DX3000", "COCOON", "ADX4000W"]);
+  });
+
+  // 항목 2-5 — 첫 화면(hub)은 카드 4장만. KPI/필터/격리 목록은 '격리 목록' 카드 선택 후 list 화면에서만.
   // 카드 라벨 '격리 목록' 을 눌러 list 화면으로 진입한다.
   function openList() {
     fireEvent.click(screen.getByText("격리 목록"));
@@ -151,9 +173,60 @@ describe("DefectHubPanel", () => {
 
     // scope="all"이 초기값 (기타는 생산라인 아님)
     await waitFor(() => {
-      expect(screen.getByText("조립")).toBeInTheDocument();
-      expect(screen.getByText("진공")).toBeInTheDocument();
+      expect(screen.getByText("7-TR-0001")).toBeInTheDocument();
+      expect(screen.getByText("7-TR-0003")).toBeInTheDocument();
     });
+  });
+
+  it("생산 부서 소속 창고 담당자는 데스크톱과 같이 전체 부서를 기본 조회한다", async () => {
+    render(
+      <DefectHubPanel
+        currentEmployee={{ ...mockEmployee, warehouse_role: "primary" }}
+      />,
+    );
+    openList();
+
+    await waitFor(() => {
+      expect(screen.getByText("7-TR-0001")).toBeInTheDocument();
+      expect(screen.getByText("7-TR-0003")).toBeInTheDocument();
+    });
+  });
+
+  it("history 대상 state에 따라 통계와 목록 화면을 복원한다", async () => {
+    window.history.replaceState({ defect: "statistics" }, "");
+    render(<DefectHubPanel currentEmployee={mockEmployee} />);
+    expect(await screen.findByTestId("statistics-view")).toBeInTheDocument();
+
+    act(() => {
+      window.dispatchEvent(new PopStateEvent("popstate", { state: { defect: "list" } }));
+    });
+    expect(await screen.findByText("격리 중")).toBeInTheDocument();
+  });
+
+  it("목록에서 작업 선택으로 돌아간 뒤 통계 뒤로가기도 허브로 복귀한다", async () => {
+    const backSpy = vi.spyOn(window.history, "back").mockImplementation(() => {
+      window.history.replaceState({ defect: "hub" }, "");
+      window.dispatchEvent(new PopStateEvent("popstate", { state: { defect: "hub" } }));
+    });
+    try {
+      render(<DefectHubPanel currentEmployee={mockEmployee} />);
+      openList();
+      expect(window.history.state).toEqual({ defect: "list" });
+
+      fireEvent.click(screen.getByRole("button", { name: /작업 선택/ }));
+      expect(backSpy).toHaveBeenCalledTimes(1);
+      expect(window.history.state).toEqual({ defect: "hub" });
+      expect(screen.getByRole("button", { name: /불량 통계/ })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: /불량 통계/ }));
+      fireEvent.click(await screen.findByRole("button", { name: "통계 뒤로" }));
+
+      expect(backSpy).toHaveBeenCalledTimes(2);
+      expect(window.history.state).toEqual({ defect: "hub" });
+      expect(screen.getByRole("button", { name: /격리 목록/ })).toBeInTheDocument();
+    } finally {
+      backSpy.mockRestore();
+    }
   });
 
   it("400일 전 격리 항목에 ⚠1년 배지가 표시된다", async () => {
@@ -209,8 +282,8 @@ describe("DefectHubPanel", () => {
 
     await waitFor(() => {
       // scope="my"이지만 defectDeptFilter="진공"이므로 진공 부서만 표시
-      expect(screen.queryByText("조립")).not.toBeInTheDocument();
-      expect(screen.getByText("진공")).toBeInTheDocument();
+      expect(screen.queryByText("7-TR-0001")).not.toBeInTheDocument();
+      expect(screen.getByText("7-TR-0003")).toBeInTheDocument();
     });
   });
 
@@ -228,6 +301,12 @@ describe("DefectHubPanel", () => {
     expect(cart).toHaveTextContent("scrap");
   });
 
+  it("'불량 통계' 카드 클릭 시 주·월·연 통계 화면으로 전환된다", async () => {
+    render(<DefectHubPanel currentEmployee={mockEmployee} />);
+    fireEvent.click(screen.getByRole("button", { name: /불량 통계/ }));
+    expect(await screen.findByTestId("statistics-view")).toBeInTheDocument();
+  });
+
   it("[처리] 버튼 클릭 시 통합 처리 패널이 열린다", async () => {
     render(<DefectHubPanel currentEmployee={{ ...mockEmployee, department: "기타" }} />);
     openList();
@@ -243,6 +322,25 @@ describe("DefectHubPanel", () => {
     const panel = await screen.findByTestId("process-panel");
     expect(panel).toBeInTheDocument();
     expect(panel).toHaveTextContent("7-TR-0001");
+  });
+
+  it("동일 품목의 선택 기록만 모바일 다건 처리 패널로 전달한다", async () => {
+    vi.mocked(defectsApi.listDefects).mockResolvedValueOnce([
+      mockLocations[0],
+      { ...mockLocations[0], record_id: "record-003", quantity: 2, original_quantity: 2, available_quantity: 2 },
+    ]);
+    render(<DefectHubPanel currentEmployee={{ ...mockEmployee, department: "기타" }} />);
+    openList();
+
+    fireEvent.click(await screen.findByRole("button", { name: "여러 건 선택" }));
+    const checkboxes = screen
+      .getAllByTestId("defect-child-selection")
+      .map((container) => within(container).getByRole("checkbox"));
+    fireEvent.click(checkboxes[0]);
+    fireEvent.click(checkboxes[1]);
+    fireEvent.click(screen.getByRole("button", { name: "선택 처리 2건" }));
+
+    expect(await screen.findByTestId("batch-process-panel")).toHaveTextContent("record-001,record-003");
   });
 
   it("combines department and quarantine actor for the list and KPI population", async () => {
@@ -301,7 +399,7 @@ describe("DefectHubPanel", () => {
     expect(screen.getByText("격리 중").parentElement).toHaveTextContent("1건");
     expect(screen.getByText("1년 이상 ⚠").parentElement).toHaveTextContent("0건");
 
-    const departmentFilters = screen.getByText("부서").parentElement!;
+    const departmentFilters = screen.getByRole("group", { name: "부서 구분" });
     fireEvent.click(within(departmentFilters).getByRole("button", { name: "전체" }));
 
     expect(screen.getByText("MINE-ASSEMBLY")).toBeInTheDocument();

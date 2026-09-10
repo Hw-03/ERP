@@ -17,6 +17,7 @@ from app.models import (
     Notification,
     StockRequest,
     StockRequestLine,
+    StockRequestStatusEnum,
     StockRequestTypeEnum,
 )
 from app.services import notifications as notif_svc
@@ -140,14 +141,100 @@ def test_department_recipients_follow_can_approve_rule(db_session):
     line_codes = {
         e.employee_code for e in notif_svc.recipients_for_department_approval(db_session, "조립")
     }
-    assert line_codes == {"DP", "WP"}  # admin level 단독(AD)·일반 직원(PL) 제외
+    assert line_codes == {"DP"}  # 창고 역할·admin level 단독·일반 직원 제외
 
-    # 창고 부서 대상이면 부서 정/부는 제외(can_approve_department 룰), 창고 정/부는 포함
+    # 창고는 부서 결재 대상이 아니므로 어느 역할에도 부서 알림을 보내지 않음.
     wh_codes = {
         e.employee_code for e in notif_svc.recipients_for_department_approval(db_session, "창고")
     }
-    assert "DP" not in wh_codes
-    assert "WP" in wh_codes
+    assert wh_codes == set()
+
+
+def test_department_notification_uses_approval_department(db_session):
+    requester = _make_employee(
+        db_session,
+        code="DEPT-NOTIFY-REQUESTER",
+        department=DepartmentEnum.WAREHOUSE,
+    )
+    department_approver = _make_employee(
+        db_session,
+        code="DEPT-NOTIFY-APPROVER",
+        department_role="primary",
+    )
+    warehouse_approver = _make_employee(
+        db_session,
+        code="DEPT-NOTIFY-WAREHOUSE",
+        warehouse_role="primary",
+    )
+    request = StockRequest(
+        requester_employee_id=requester.employee_id,
+        requester_name=requester.name,
+        requester_department=DepartmentEnum.WAREHOUSE.value,
+        approval_department=DepartmentEnum.ASSEMBLY.value,
+        request_type=StockRequestTypeEnum.DEPT_INTERNAL,
+        status=StockRequestStatusEnum.SUBMITTED,
+        requires_warehouse_approval=False,
+        requires_department_approval=True,
+    )
+    db_session.add(request)
+    db_session.flush()
+
+    notif_svc._notify_request_arrived(db_session, request)
+    db_session.flush()
+
+    recipients = {
+        row.recipient_employee_id
+        for row in db_session.query(Notification).filter(
+            Notification.related_request_id == request.request_id
+        )
+    }
+    assert recipients == {department_approver.employee_id}
+    assert warehouse_approver.employee_id not in recipients
+
+
+def test_stale_approval_notification_is_hidden_after_role_policy_change(
+    client,
+    db_session,
+):
+    requester = _make_employee(db_session, code="STALE-NOTIFY-REQUESTER")
+    warehouse_only = _make_employee(
+        db_session,
+        code="STALE-NOTIFY-WH",
+        warehouse_role="primary",
+    )
+    request = StockRequest(
+        requester_employee_id=requester.employee_id,
+        requester_name=requester.name,
+        requester_department=DepartmentEnum.ASSEMBLY.value,
+        approval_department=DepartmentEnum.ASSEMBLY.value,
+        request_type=StockRequestTypeEnum.DEPT_INTERNAL,
+        status=StockRequestStatusEnum.SUBMITTED,
+        requires_warehouse_approval=False,
+        requires_department_approval=True,
+    )
+    db_session.add(request)
+    db_session.flush()
+    db_session.add(
+        Notification(
+            recipient_employee_id=warehouse_only.employee_id,
+            type="approval_request",
+            title="구정책 결재 알림",
+            body="더 이상 조회하면 안 되는 알림",
+            target_tab="warehouse",
+            target_section="dept-queue",
+            related_request_id=request.request_id,
+        )
+    )
+    db_session.commit()
+
+    response = client.get(
+        "/api/notifications",
+        params={"recipient_employee_id": str(warehouse_only.employee_id)},
+        headers=_actor_headers(warehouse_only),
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {"items": [], "unread_count": 0}
 
 
 # ---------------------------------------------------------------------------
@@ -253,7 +340,7 @@ def test_notification_query_requires_matching_session_actor(auth_client, db_sess
     db_session.add(
         Notification(
             recipient_employee_id=wh_deputy.employee_id,
-            type="approval_request",
+            type="approval_approved",
             title="테스트 알림",
             body="세션 소유자 검증",
         )

@@ -115,31 +115,31 @@ async function exerciseInventoryNotice(page: Page, viewport: "desktop" | "mobile
     : page.getByPlaceholder("품명 · 코드 · 위치 · 공급처").filter({ visible: true }).first();
 
   await expect(search).toBeVisible();
-  await expect(notice).toBeVisible();
-  await expect(allCard).toContainText("PA·PF 제외 품목");
+  await expect(notice).toHaveCount(0);
+  await expect(allCard).toContainText("출하 중간 공정·공정 완료 품목 제외");
 
   await search.fill("E2E출하PF");
   await expect(page.getByText("E2E출하PF", { exact: true }).filter({ visible: true }).first()).toBeVisible();
-  await expect(notice).toBeVisible();
-  await expect(allCard).toContainText(/PA·PF 제외 전체 \d+건 · 클릭하면 초기화/);
+  await expect(notice).toHaveCount(0);
+  await expect(allCard).toContainText(/출하 중간 공정·공정 완료 품목 제외 · 전체 \d+건 · 클릭하면 초기화/);
   const narrowedHint = (await allCard.innerText()).replace(/\s+/g, " ").trim();
 
   await search.fill("CP6-존재하지-않는-품목");
   await expect(page.getByText("검색 결과가 없습니다.", { exact: true }).filter({ visible: true })).toBeVisible();
-  await expect(notice).toBeVisible();
+  await expect(notice).toHaveCount(0);
 
   await search.fill("");
   const lowCard = page.getByRole("button", { name: /^부족/ }).filter({ visible: true }).first();
   await lowCard.click();
   await expect(lowCard).toHaveAttribute("aria-pressed", "true");
-  await expect(notice).toBeVisible();
+  await expect(notice).toHaveCount(0);
   await allCard.click();
   await expect(allCard).toHaveAttribute("aria-pressed", "true");
-  await expect(allCard).toContainText("PA·PF 제외 품목");
+  await expect(allCard).toContainText("출하 중간 공정·공정 완료 품목 제외");
 
   return {
     viewport,
-    initialHint: "PA·PF 제외 품목",
+    initialHint: "출하 중간 공정·공정 완료 품목 제외",
     narrowedHint,
     notice: POPULATION_NOTICE,
   };

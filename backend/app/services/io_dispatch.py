@@ -70,11 +70,18 @@ from app.services.io_persist import (
     _persist_batch,
     _lock_active_batch_items,
     _normalize_batch_bom_stock_exempt,
+    _normalize_automatic_batch_routes_with_draft_fingerprint_refresh,
     _sync_batch_from_stock_requests,
+    normalize_automatic_routes_with_bom_token_refresh,
 )
 
 
 CUSTOM_BOM_REFERENCE_EXCLUSION_NOTE = "커스텀 BOM 상위 미반영"
+
+
+def _normalize_automatic_batch_routes(db: Session, batch: IoBatch) -> None:
+    """실제 반영 직전에도 live 품목 코드로 자동 부서 경로를 확정한다."""
+    _normalize_automatic_batch_routes_with_draft_fingerprint_refresh(db, batch)
 
 
 def _included_lines(batch: IoBatch) -> list[IoLine]:
@@ -760,6 +767,8 @@ def execute_batch_after_dept_approval(
     if request.request_code and not batch.reference_no:
         batch.reference_no = request.request_code
 
+    _normalize_automatic_batch_routes(db, batch)
+
     if _is_no_effect_custom_bom_reference_request(batch, request):
         _complete_no_effect_department_approval(batch=batch, request=request)
         db.flush()
@@ -1184,6 +1193,14 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
         sub_type=batch.sub_type,
         bundles=batch.bundles,
     )
+    # An old draft token proves the original BOM/inclusion intent.  Validate it
+    # and rotate it for the live route before stock-exempt handling reads it.
+    normalize_automatic_routes_with_bom_token_refresh(
+        db,
+        work_type=batch.work_type,
+        sub_type=batch.sub_type,
+        bundles=batch.bundles,
+    )
     _normalize_batch_bom_stock_exempt(db, batch)
     _validate_process_bom_parent_lines(batch)
     _normalize_process_bom_auto_inclusion(batch)
@@ -1251,6 +1268,9 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
                 batch,
                 custom_process_bom_bundle_ids,
             )
+        # BOM 자동행 토큰은 미리보기 당시 경로로 먼저 검증한다. 이후 실제 제출 경로는
+        # live 품목 코드 기준으로 다시 확정해 선택 부서나 오래된 초안을 실행하지 않는다.
+        _normalize_automatic_batch_routes(db, batch)
         included_lines = _included_lines(batch)
         if department_approval_required:
             # process 부서 승인만 필요 — 낱개 또는 기준과 다른 BOM 자동 하위.
@@ -1402,7 +1422,6 @@ def submit_existing_draft(
     db.flush()
     db.refresh(batch)
     _lock_active_batch_items(db, batch)
-    _normalize_batch_bom_stock_exempt(db, batch)
     _execute_submission(db, requester=requester, batch=batch)
     batch.request_fingerprint = fingerprint_io_draft_submit(
         requester.employee_id,

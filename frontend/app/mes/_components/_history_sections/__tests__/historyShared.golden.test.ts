@@ -86,6 +86,8 @@ function makeBatch(overrides: Partial<IoBatch> & { bundles?: IoBundle[] } = {}):
     requester_employee_id: "emp-1",
     requester_name: "홍길동",
     requester_department: "조립",
+    approver_employee_id: null,
+    approver_name: null,
     from_department: null,
     to_department: null,
     requires_approval: false,

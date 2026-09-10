@@ -115,6 +115,16 @@ def test_operator_session_delete_advertises_scoped_pin_change_cancellation():
     }
 
 
+def test_operator_session_activity_is_an_authenticated_session_response():
+    schema = app.openapi()
+    operation = schema["paths"]["/api/operator-session/activity"]["post"]
+    response_schema = operation["responses"]["200"]["content"]["application/json"]["schema"]
+    session_schema = schema["components"]["schemas"]["OperatorSessionResponse"]
+
+    assert response_schema == {"$ref": "#/components/schemas/OperatorSessionResponse"}
+    assert "server_time" in session_schema["required"]
+
+
 def test_shipping_commands_advertise_optional_idempotency_and_state_fields():
     schema = app.openapi()
     request_schemas = {

@@ -97,7 +97,11 @@ def _create_request_via_api(
 def test_stock_request_semantic_idempotency_replays_exact_and_rejects_change(
     db_session, client, make_item
 ):
-    item = make_item(name="Stock semantic idem", warehouse_qty=Decimal("10"))
+    item = make_item(
+        name="Stock semantic idem",
+        process_type_code="AR",
+        warehouse_qty=Decimal("10"),
+    )
     requester = _make_employee(
         db_session, code="SR-IDEM-01", name="요청자-IDEM"
     )
@@ -151,7 +155,11 @@ def test_stock_request_semantic_idempotency_replays_exact_and_rejects_change(
 def test_stock_request_same_key_other_actor_and_legacy_null_are_fail_closed(
     db_session, client, make_item
 ):
-    item = make_item(name="Stock scoped idem", warehouse_qty=Decimal("10"))
+    item = make_item(
+        name="Stock scoped idem",
+        process_type_code="AR",
+        warehouse_qty=Decimal("10"),
+    )
     requester = _make_employee(
         db_session, code="SR-IDEM-SCOPE-1", name="요청자-IDEM-1"
     )
@@ -340,8 +348,70 @@ def test_internal_use_direct_request_rejects_non_as_research_destination(
 # ---------------------------------------------------------------------------
 
 
+def test_direct_warehouse_to_dept_rejects_item_code_department_mismatch(
+    db_session, client, make_item
+):
+    item = make_item(
+        name="직접 요청 경로 검증",
+        process_type_code="AR",
+        warehouse_qty=Decimal("10"),
+    )
+    requester = _make_employee(db_session, code="AUTO-DIRECT", name="요청자")
+    db_session.commit()
+
+    out = _create_request_via_api(
+        client,
+        requester_id=str(requester.employee_id),
+        request_type="warehouse_to_dept",
+        lines=[
+            {
+                "item_id": str(item.item_id),
+                "quantity": "1",
+                "from_bucket": "warehouse",
+                "to_bucket": "production",
+                "to_department": DepartmentEnum.TUBE.value,
+            }
+        ],
+    )
+
+    assert out["status_code"] == 422, out["body"]
+    assert db_session.query(StockRequest).count() == 0
+
+
+def test_direct_warehouse_to_dept_draft_rejects_item_code_department_mismatch(
+    db_session, client, make_item
+):
+    item = make_item(
+        name="직접 초안 경로 검증",
+        process_type_code="AR",
+        warehouse_qty=Decimal("10"),
+    )
+    requester = _make_employee(db_session, code="AUTO-DIRECT-DRAFT", name="요청자")
+    db_session.commit()
+
+    response = client.put(
+        "/api/stock-requests/draft",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "request_type": "warehouse_to_dept",
+            "lines": [
+                {
+                    "item_id": str(item.item_id),
+                    "quantity": "1",
+                    "from_bucket": "warehouse",
+                    "to_bucket": "production",
+                    "to_department": DepartmentEnum.TUBE.value,
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 422, response.json()
+    assert db_session.query(StockRequest).count() == 0
+
+
 def test_warehouse_to_dept_request_reserves_pending(db_session, client, make_item):
-    item = make_item(name="P001", warehouse_qty=Decimal("10"))
+    item = make_item(name="P001", process_type_code="AR", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="W01", name="요청자A")
     db_session.commit()
 
@@ -447,7 +517,7 @@ def test_multiline_request_rolls_back_when_one_line_short(db_session, client, ma
 
 
 def test_approve_consumes_pending_and_moves_stock(db_session, client, make_item):
-    item = make_item(name="P004", warehouse_qty=Decimal("10"))
+    item = make_item(name="P004", process_type_code="AR", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="W04", name="요청자D")
     approver = _make_employee(
         db_session, code="WH1", name="창고정", warehouse_role="primary"
@@ -517,7 +587,7 @@ def test_approve_consumes_pending_and_moves_stock(db_session, client, make_item)
 
 def test_warehouse_primary_self_approves_on_submit(db_session, client, make_item):
     """warehouse_role=primary 직원이 본인 명의로 wh-to-dept 제출 시 즉시 처리."""
-    item = make_item(name="P004S1", warehouse_qty=Decimal("10"))
+    item = make_item(name="P004S1", process_type_code="AR", warehouse_qty=Decimal("10"))
     requester = _make_employee(
         db_session, code="WHSELF1", name="창고정자가", warehouse_role="primary"
     )
@@ -562,7 +632,7 @@ def test_warehouse_primary_self_approves_on_submit(db_session, client, make_item
 
 def test_warehouse_deputy_self_approves_on_submit(db_session, client, make_item):
     """warehouse_role=deputy 도 동일하게 자가승인."""
-    item = make_item(name="P004S2", warehouse_qty=Decimal("5"))
+    item = make_item(name="P004S2", process_type_code="AR", warehouse_qty=Decimal("5"))
     requester = _make_employee(
         db_session, code="WHSELF2", name="창고부자가", warehouse_role="deputy"
     )
@@ -593,7 +663,7 @@ def test_warehouse_deputy_self_approves_on_submit(db_session, client, make_item)
 
 def test_non_warehouse_requester_still_reserves(db_session, client, make_item):
     """warehouse_role=none 일반 직원의 요청은 종전대로 RESERVED."""
-    item = make_item(name="P004S3", warehouse_qty=Decimal("5"))
+    item = make_item(name="P004S3", process_type_code="AR", warehouse_qty=Decimal("5"))
     requester = _make_employee(
         db_session, code="WHSELF3", name="일반직원", warehouse_role="none"
     )
@@ -628,7 +698,7 @@ def test_non_warehouse_requester_still_reserves(db_session, client, make_item):
 
 
 def test_reject_releases_pending(db_session, client, make_item):
-    item = make_item(name="P005", warehouse_qty=Decimal("10"))
+    item = make_item(name="P005", process_type_code="AR", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="W05", name="요청자E")
     approver = _make_employee(
         db_session, code="WH2", name="창고정2", warehouse_role="primary"
@@ -676,7 +746,7 @@ def test_reject_releases_pending(db_session, client, make_item):
 
 
 def test_requester_cancel_releases_pending(db_session, client, make_item):
-    item = make_item(name="P006", warehouse_qty=Decimal("10"))
+    item = make_item(name="P006", process_type_code="AR", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="W06", name="요청자F")
     db_session.commit()
 
@@ -786,7 +856,7 @@ def test_dept_internal_request_completes_immediately(
 
 
 def test_non_warehouse_employee_cannot_approve(db_session, client, make_item):
-    item = make_item(name="P008", warehouse_qty=Decimal("10"))
+    item = make_item(name="P008", process_type_code="AR", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="W08", name="요청자H")
     not_warehouse = _make_employee(
         db_session, code="X01", name="일반직원", warehouse_role="none"
@@ -822,7 +892,7 @@ def test_non_warehouse_employee_cannot_approve(db_session, client, make_item):
 
 
 def test_approve_rejects_wrong_pin(db_session, client, make_item):
-    item = make_item(name="P009", warehouse_qty=Decimal("5"))
+    item = make_item(name="P009", process_type_code="AR", warehouse_qty=Decimal("5"))
     requester = _make_employee(db_session, code="W09", name="요청자I")
     approver = _make_employee(
         db_session, code="WH3", name="창고부", warehouse_role="deputy", pin="1234"
@@ -858,7 +928,7 @@ def test_approve_rejects_wrong_pin(db_session, client, make_item):
 
 
 def test_completed_request_cannot_be_processed_again(db_session, client, make_item):
-    item = make_item(name="P010", warehouse_qty=Decimal("5"))
+    item = make_item(name="P010", process_type_code="AR", warehouse_qty=Decimal("5"))
     requester = _make_employee(db_session, code="W10", name="요청자J")
     approver = _make_employee(
         db_session, code="WH4", name="창고정3", warehouse_role="primary"
@@ -908,7 +978,7 @@ def test_completed_request_cannot_be_processed_again(db_session, client, make_it
 
 
 def test_reservations_endpoint_lists_active_pending_lines(db_session, client, make_item):
-    item = make_item(name="P011", warehouse_qty=Decimal("10"))
+    item = make_item(name="P011", process_type_code="AR", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="W11", name="요청자K")
     db_session.commit()
 
@@ -939,7 +1009,7 @@ def test_reservations_endpoint_lists_active_pending_lines(db_session, client, ma
 def test_reservations_endpoint_lists_department_source_and_from_department(
     db_session, client, make_item, make_location
 ):
-    item = make_item(name="department reservation")
+    item = make_item(name="department reservation", process_type_code="AR")
     make_location(
         item.item_id,
         department=DepartmentEnum.ASSEMBLY,
@@ -1113,7 +1183,7 @@ def _upsert_draft(
 
 
 def test_upsert_draft_creates_draft_without_pending_or_log(db_session, client, make_item):
-    item = make_item(name="DRAFT001", warehouse_qty=Decimal("10"))
+    item = make_item(name="DRAFT001", process_type_code="AR", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="D01", name="장바구니A")
     db_session.commit()
 
@@ -1145,8 +1215,8 @@ def test_upsert_draft_creates_draft_without_pending_or_log(db_session, client, m
 
 
 def test_upsert_draft_updates_existing_no_new_row(db_session, client, make_item):
-    item_a = make_item(name="DRAFT002A", warehouse_qty=Decimal("10"))
-    item_b = make_item(name="DRAFT002B", warehouse_qty=Decimal("10"))
+    item_a = make_item(name="DRAFT002A", process_type_code="AR", warehouse_qty=Decimal("10"))
+    item_b = make_item(name="DRAFT002B", process_type_code="AR", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="D02", name="장바구니B")
     db_session.commit()
 
@@ -1188,7 +1258,7 @@ def test_upsert_draft_updates_existing_no_new_row(db_session, client, make_item)
 
 
 def test_drafts_isolated_per_employee(db_session, client, make_item):
-    item = make_item(name="DRAFT003", warehouse_qty=Decimal("10"))
+    item = make_item(name="DRAFT003", process_type_code="AR", warehouse_qty=Decimal("10"))
     emp_a = _make_employee(db_session, code="DA", name="직원A")
     emp_b = _make_employee(db_session, code="DB", name="직원B")
     db_session.commit()
@@ -1229,7 +1299,7 @@ def test_drafts_isolated_per_employee(db_session, client, make_item):
 def test_delete_draft_removes_row_and_lines_no_pending_change(
     db_session, client, make_item
 ):
-    item = make_item(name="DRAFT004", warehouse_qty=Decimal("10"))
+    item = make_item(name="DRAFT004", process_type_code="AR", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="D04", name="장바구니D")
     db_session.commit()
 
@@ -1271,7 +1341,7 @@ def test_delete_draft_removes_row_and_lines_no_pending_change(
 
 
 def test_submit_draft_warehouse_to_dept_reserves(db_session, client, make_item):
-    item = make_item(name="DRAFT005", warehouse_qty=Decimal("10"))
+    item = make_item(name="DRAFT005", process_type_code="AR", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="D05", name="장바구니E")
     db_session.commit()
 
@@ -1369,7 +1439,7 @@ def test_submit_draft_dept_internal_completes_immediately(
 
 
 def test_submit_non_draft_request_rejected(db_session, client, make_item):
-    item = make_item(name="DRAFT007", warehouse_qty=Decimal("10"))
+    item = make_item(name="DRAFT007", process_type_code="AR", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="D07", name="장바구니G")
     db_session.commit()
 
@@ -1470,7 +1540,7 @@ def test_invalid_bucket_combo_draft_rejected(db_session, client, make_item):
 
 
 def test_other_employee_cannot_delete_or_submit_draft(db_session, client, make_item):
-    item = make_item(name="DRAFT010", warehouse_qty=Decimal("10"))
+    item = make_item(name="DRAFT010", process_type_code="AR", warehouse_qty=Decimal("10"))
     owner = _make_employee(db_session, code="OWN", name="주인")
     intruder = _make_employee(db_session, code="INT", name="침입자")
     db_session.commit()
@@ -1519,6 +1589,12 @@ def test_draft_does_not_appear_in_my_requests_or_warehouse_queue(
 ):
     item = make_item(name="DRAFT011", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="D11", name="장바구니K")
+    warehouse_actor = _make_employee(
+        db_session,
+        code="D11-WH",
+        name="창고 결재자",
+        warehouse_role="primary",
+    )
     db_session.commit()
 
     _upsert_draft(
@@ -1536,7 +1612,10 @@ def test_draft_does_not_appear_in_my_requests_or_warehouse_queue(
     assert len(res_my.json()) == 0  # DRAFT 가 유일하므로 결과 비어야 함.
 
     # GET /warehouse-queue — DRAFT 미노출.
-    res_q = client.get("/api/stock-requests/warehouse-queue")
+    res_q = client.get(
+        "/api/stock-requests/warehouse-queue",
+        headers={"X-Actor-Employee-Id": str(warehouse_actor.employee_id)},
+    )
     assert res_q.status_code == 200
     assert all(r["status"] != "draft" for r in res_q.json())
     assert len(res_q.json()) == 0
@@ -1567,7 +1646,7 @@ def test_submit_nonexistent_request_id_returns_404(db_session, client):
 def test_submit_dept_to_warehouse_fails_when_production_stock_insufficient(
     db_session, client, make_item, make_location
 ):
-    item = make_item(name="FIX3001", warehouse_qty=Decimal("0"))
+    item = make_item(name="FIX3001", process_type_code="AR", warehouse_qty=Decimal("0"))
     # 부서 생산 재고 0 (make_location 없음 — InventoryLocation row 없음)
     requester = _make_employee(db_session, code="FIX3A", name="테스터Fix3")
     db_session.commit()
@@ -1659,7 +1738,11 @@ def test_create_dept_to_warehouse_preflight_counts_shipping_reservation(
 def test_submit_draft_preflight_counts_shipping_reservation(
     db_session, client, make_item, make_location, monkeypatch
 ):
-    item = make_item(name="canonical draft preflight", warehouse_qty=Decimal("0"))
+    item = make_item(
+        name="canonical draft preflight",
+        process_type_code="AR",
+        warehouse_qty=Decimal("0"),
+    )
     make_location(
         item.item_id,
         department=DepartmentEnum.ASSEMBLY,
@@ -1714,10 +1797,22 @@ def test_department_queue_excludes_warehouse_approval_pending(
     새 정책: 창고 승인이 필요한 요청은 창고 승인이 끝날 때까지 부서 큐에서 가려진다.
     Filter: requires_warehouse_approval=False 조건이 추가되어 동시 결재 row 차단.
     """
-    item = make_item(name="QSEP1", warehouse_qty=Decimal("10"))
+    item = make_item(name="QSEP1", process_type_code="AR", warehouse_qty=Decimal("10"))
     requester = _make_employee(
         db_session, code="QSEPR", name="요청자QS"
     )
+    warehouse_actor = _make_employee(
+        db_session,
+        code="QSEP-WH",
+        name="창고 결재자",
+        warehouse_role="primary",
+    )
+    department_actor = _make_employee(
+        db_session,
+        code="QSEP-DEPT",
+        name="부서 결재자",
+    )
+    department_actor.department_role = "primary"
     db_session.commit()
 
     out = _create_request_via_api(
@@ -1743,21 +1838,31 @@ def test_department_queue_excludes_warehouse_approval_pending(
     db_session.commit()
 
     # 창고 큐는 노출.
-    res_wh = client.get("/api/stock-requests/warehouse-queue")
+    res_wh = client.get(
+        "/api/stock-requests/warehouse-queue",
+        headers={"X-Actor-Employee-Id": str(warehouse_actor.employee_id)},
+    )
     assert res_wh.status_code == 200
     assert any(r["request_id"] == request_id for r in res_wh.json())
 
     # 부서 큐는 동일 부서 actor 로 조회해도 노출 안 됨.
     res_dept = client.get(
-        f"/api/stock-requests/department-queue?actor_employee_id={requester.employee_id}",
+        f"/api/stock-requests/department-queue?actor_employee_id={department_actor.employee_id}",
+        headers={"X-Actor-Employee-Id": str(department_actor.employee_id)},
     )
     assert res_dept.status_code == 200
     assert not any(r["request_id"] == request_id for r in res_dept.json())
 
 
 def test_warehouse_queue_count_matches_list(db_session, client, make_item):
-    item = make_item(name="QCNT1", warehouse_qty=Decimal("5"))
+    item = make_item(name="QCNT1", process_type_code="AR", warehouse_qty=Decimal("5"))
     requester = _make_employee(db_session, code="QCN1", name="요청자QC1")
+    warehouse_actor = _make_employee(
+        db_session,
+        code="QCN1-WH",
+        name="창고 결재자",
+        warehouse_role="primary",
+    )
     db_session.commit()
 
     _create_request_via_api(
@@ -1775,8 +1880,12 @@ def test_warehouse_queue_count_matches_list(db_session, client, make_item):
         ],
     )
 
-    res_list = client.get("/api/stock-requests/warehouse-queue")
-    res_cnt = client.get("/api/stock-requests/warehouse-queue/count")
+    actor_headers = {"X-Actor-Employee-Id": str(warehouse_actor.employee_id)}
+    res_list = client.get("/api/stock-requests/warehouse-queue", headers=actor_headers)
+    res_cnt = client.get(
+        "/api/stock-requests/warehouse-queue/count",
+        headers=actor_headers,
+    )
     assert res_list.status_code == 200
     assert res_cnt.status_code == 200
     assert res_cnt.json()["count"] == len(res_list.json())
@@ -1788,6 +1897,12 @@ def test_department_queue_count_matches_list(db_session, client, make_item):
     requester = _make_employee(
         db_session, code="QCN2", name="요청자QC2"
     )
+    department_actor = _make_employee(
+        db_session,
+        code="QCN2-DEPT",
+        name="부서 결재자",
+    )
+    department_actor.department_role = "primary"
     db_session.commit()
 
     # manual_adjustment 만 부서 결재 단독 경로. wh approval=False, dept approval=True.
@@ -1807,10 +1922,12 @@ def test_department_queue_count_matches_list(db_session, client, make_item):
     # manual_adjustment 는 별도 경로일 수 있어 422 도 허용 (생성 자체가 동일 라우터 아닐 가능성).
     # 이 테스트의 목적은 count API 가 list 와 길이 일치하는지만 검증.
     res_list = client.get(
-        f"/api/stock-requests/department-queue?actor_employee_id={requester.employee_id}",
+        f"/api/stock-requests/department-queue?actor_employee_id={department_actor.employee_id}",
+        headers={"X-Actor-Employee-Id": str(department_actor.employee_id)},
     )
     res_cnt = client.get(
-        f"/api/stock-requests/department-queue/count?actor_employee_id={requester.employee_id}",
+        f"/api/stock-requests/department-queue/count?actor_employee_id={department_actor.employee_id}",
+        headers={"X-Actor-Employee-Id": str(department_actor.employee_id)},
     )
     assert res_list.status_code == 200
     assert res_cnt.status_code == 200
@@ -1826,7 +1943,7 @@ def test_department_queue_count_matches_list(db_session, client, make_item):
     ),
     ids=lambda case: case["name"],
 )
-def test_department_role_matrix_controls_http_queue_count_approve_and_reject(
+def test_approval_role_matrix_controls_http_queues_and_actions(
     db_session, client, case
 ):
     requester = _make_employee(
@@ -1843,7 +1960,11 @@ def test_department_role_matrix_controls_http_queue_count_approve_and_reject(
     )
     actor.department_role = case["department_role"]
 
-    def _pending_request(*, requires_warehouse_approval: bool) -> StockRequest:
+    def _pending_request(
+        *,
+        requires_warehouse_approval: bool,
+        requires_department_approval: bool,
+    ) -> StockRequest:
         request = StockRequest(
             requester_employee_id=requester.employee_id,
             requester_name=requester.name,
@@ -1852,47 +1973,120 @@ def test_department_role_matrix_controls_http_queue_count_approve_and_reject(
             request_type=StockRequestTypeEnum.DEPT_INTERNAL,
             status=StockRequestStatusEnum.SUBMITTED,
             requires_warehouse_approval=requires_warehouse_approval,
-            requires_department_approval=True,
+            requires_department_approval=requires_department_approval,
         )
         db_session.add(request)
         db_session.flush()
         return request
 
-    queue_request = _pending_request(requires_warehouse_approval=False)
-    approve_request = _pending_request(requires_warehouse_approval=True)
-    reject_request = _pending_request(requires_warehouse_approval=False)
+    warehouse_queue_request = _pending_request(
+        requires_warehouse_approval=True,
+        requires_department_approval=False,
+    )
+    warehouse_approve_request = _pending_request(
+        requires_warehouse_approval=True,
+        requires_department_approval=False,
+    )
+    warehouse_reject_request = _pending_request(
+        requires_warehouse_approval=True,
+        requires_department_approval=False,
+    )
+    department_queue_request = _pending_request(
+        requires_warehouse_approval=False,
+        requires_department_approval=True,
+    )
+    department_approve_request = _pending_request(
+        requires_warehouse_approval=False,
+        requires_department_approval=True,
+    )
+    department_reject_request = _pending_request(
+        requires_warehouse_approval=False,
+        requires_department_approval=True,
+    )
     db_session.commit()
+    headers = {"X-Actor-Employee-Id": str(actor.employee_id)}
+
+    warehouse_queue = client.get(
+        "/api/stock-requests/warehouse-queue",
+        headers=headers,
+    )
+    warehouse_count = client.get(
+        "/api/stock-requests/warehouse-queue/count",
+        headers=headers,
+    )
+    if case["can_see_warehouse_queue"]:
+        assert warehouse_queue.status_code == 200, warehouse_queue.text
+        assert warehouse_count.status_code == 200, warehouse_count.text
+        warehouse_ids = {entry["request_id"] for entry in warehouse_queue.json()}
+        assert warehouse_ids == {
+            str(warehouse_queue_request.request_id),
+            str(warehouse_approve_request.request_id),
+            str(warehouse_reject_request.request_id),
+        }
+        assert warehouse_count.json()["count"] == len(warehouse_ids)
+    else:
+        assert warehouse_queue.status_code == 403, warehouse_queue.text
+        assert warehouse_count.status_code == 403, warehouse_count.text
 
     queue = client.get(
         "/api/stock-requests/department-queue",
         params={"actor_employee_id": str(actor.employee_id)},
+        headers=headers,
     )
     count = client.get(
         "/api/stock-requests/department-queue/count",
         params={"actor_employee_id": str(actor.employee_id)},
+        headers=headers,
     )
-    assert queue.status_code == 200, queue.text
-    assert count.status_code == 200, count.text
-    visible_ids = {entry["request_id"] for entry in queue.json()}
-    expected_visible_ids = (
-        {str(queue_request.request_id), str(reject_request.request_id)}
-        if case["can_see_department_queue"]
-        else set()
+    if case["can_see_department_queue"]:
+        assert queue.status_code == 200, queue.text
+        assert count.status_code == 200, count.text
+        visible_ids = {entry["request_id"] for entry in queue.json()}
+        expected_visible_ids = {
+            str(department_queue_request.request_id),
+            str(department_approve_request.request_id),
+            str(department_reject_request.request_id),
+        }
+        assert visible_ids == expected_visible_ids
+        assert count.json()["count"] == len(expected_visible_ids)
+    else:
+        assert queue.status_code == 403, queue.text
+        assert count.status_code == 403, count.text
+
+    warehouse_approved = client.post(
+        f"/api/stock-requests/{warehouse_approve_request.request_id}/approve",
+        json={"actor_employee_id": str(actor.employee_id), "pin": "0000"},
+        headers=headers,
     )
-    assert visible_ids == expected_visible_ids
-    assert count.json()["count"] == len(expected_visible_ids)
+    warehouse_rejected = client.post(
+        f"/api/stock-requests/{warehouse_reject_request.request_id}/reject",
+        json={
+            "actor_employee_id": str(actor.employee_id),
+            "pin": "0000",
+            "reason": "창고 역할 행렬 반려 검증",
+        },
+        headers=headers,
+    )
+    if case["can_see_warehouse_queue"]:
+        assert warehouse_approved.status_code == 200, warehouse_approved.text
+        assert warehouse_rejected.status_code == 200, warehouse_rejected.text
+    else:
+        assert warehouse_approved.status_code == 403, warehouse_approved.text
+        assert warehouse_rejected.status_code == 403, warehouse_rejected.text
 
     approved = client.post(
-        f"/api/stock-requests/{approve_request.request_id}/department-approve",
+        f"/api/stock-requests/{department_approve_request.request_id}/department-approve",
         json={"actor_employee_id": str(actor.employee_id), "pin": "0000"},
+        headers=headers,
     )
     rejected = client.post(
-        f"/api/stock-requests/{reject_request.request_id}/department-reject",
+        f"/api/stock-requests/{department_reject_request.request_id}/department-reject",
         json={
             "actor_employee_id": str(actor.employee_id),
             "pin": "0000",
             "reason": "역할 행렬 반려 검증",
         },
+        headers=headers,
     )
     if case["can_see_department_queue"]:
         assert approved.status_code == 200, approved.text
@@ -1903,5 +2097,68 @@ def test_department_role_matrix_controls_http_queue_count_approve_and_reject(
         assert approved.status_code == 403, approved.text
         assert rejected.status_code == 403, rejected.text
         db_session.expire_all()
-        assert db_session.get(StockRequest, approve_request.request_id).status == StockRequestStatusEnum.SUBMITTED
-        assert db_session.get(StockRequest, reject_request.request_id).status == StockRequestStatusEnum.SUBMITTED
+        assert db_session.get(StockRequest, department_approve_request.request_id).status == StockRequestStatusEnum.SUBMITTED
+        assert db_session.get(StockRequest, department_reject_request.request_id).status == StockRequestStatusEnum.SUBMITTED
+
+
+def test_dual_approval_http_actions_reject_department_stage_before_warehouse(
+    db_session, client
+):
+    """숨겨진 부서 큐를 직접 호출해도 창고 결재 전 승인·반려할 수 없다."""
+    requester = _make_employee(
+        db_session,
+        code="DUAL-HTTP-REQ",
+        name="듀얼 요청자",
+    )
+    approver = _make_employee(
+        db_session,
+        code="DUAL-HTTP-DEPT",
+        name="듀얼 부서 결재자",
+    )
+    approver.department_role = "primary"
+
+    def _dual_request() -> StockRequest:
+        request = StockRequest(
+            requester_employee_id=requester.employee_id,
+            requester_name=requester.name,
+            requester_department=DepartmentEnum.ASSEMBLY.value,
+            approval_department=DepartmentEnum.ASSEMBLY.value,
+            request_type=StockRequestTypeEnum.DEPT_INTERNAL,
+            status=StockRequestStatusEnum.SUBMITTED,
+            requires_warehouse_approval=True,
+            requires_department_approval=True,
+        )
+        db_session.add(request)
+        db_session.flush()
+        return request
+
+    approve_request = _dual_request()
+    reject_request = _dual_request()
+    db_session.commit()
+    headers = {"X-Actor-Employee-Id": str(approver.employee_id)}
+
+    approved = client.post(
+        f"/api/stock-requests/{approve_request.request_id}/department-approve",
+        json={"actor_employee_id": str(approver.employee_id), "pin": "0000"},
+        headers=headers,
+    )
+    rejected = client.post(
+        f"/api/stock-requests/{reject_request.request_id}/department-reject",
+        json={
+            "actor_employee_id": str(approver.employee_id),
+            "pin": "0000",
+            "reason": "단계 우회 시도",
+        },
+        headers=headers,
+    )
+
+    assert approved.status_code == 422, approved.text
+    assert rejected.status_code == 422, rejected.text
+    assert approved.json()["detail"]["message"] == "창고 결재가 먼저 필요합니다."
+    assert rejected.json()["detail"]["message"] == "창고 결재가 먼저 필요합니다."
+    db_session.expire_all()
+    for request_id in (approve_request.request_id, reject_request.request_id):
+        request = db_session.get(StockRequest, request_id)
+        assert request.status == StockRequestStatusEnum.SUBMITTED
+        assert request.department_approved_by_employee_id is None
+        assert request.rejected_by_employee_id is None

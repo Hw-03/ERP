@@ -9,12 +9,17 @@ export interface DefectHubEmployee {
   employee_id: string;
   name: string;
   department: string;
+  warehouse_role?: "primary" | "deputy" | "none";
 }
 import { DEFECT_HUB_CARDS, type DefectHubCardId } from "./defectHubCards";
 import { DefectKpiCards, type DefectKpiKind } from "./DefectKpiCards";
 import { DefectFilterBar, type DefectScope } from "./DefectFilterBar";
+import { DefectSearchInput } from "./DefectSearchInput";
+import { DefectStatisticsView } from "./DefectStatisticsView";
 import { useDefectFilterPreferences } from "./useDefectFilterPreferences";
+import { filterDefectLocations } from "./defectCategoryFilter";
 import { DefectDepartmentList } from "./DefectDepartmentList";
+import { DefectProcessPanel } from "./DefectProcessPanel";
 import { MobileDefectProcessPanel } from "../mobile/screens/MobileDefectProcessPanel";
 import { MobileDefectCartFlow } from "../mobile/screens/MobileDefectCartFlow";
 import type { DefectCartMode } from "./DefectCartFlow";
@@ -23,9 +28,12 @@ import { tint } from "@/lib/mes/colorUtils";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { LoadFailureCard } from "../common/LoadFailureCard";
 import { matchesDefectSearch } from "./defectSearch";
+import { InlineErrorNote } from "./InlineErrorNote";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 const PRODUCTION_LINES = new Set(["튜브", "고압", "진공", "튜닝", "조립", "출하"]);
+const EMPTY_ITEMS: Item[] = [];
+const EMPTY_MODELS: ProductModel[] = [];
 
 interface Props {
   defectDeptFilter?: string | null;
@@ -39,8 +47,8 @@ interface Props {
 export function DefectHubPanel({
   defectDeptFilter,
   currentEmployee,
-  items = [],
-  productModels = [],
+  items = EMPTY_ITEMS,
+  productModels = EMPTY_MODELS,
   defaultSource,
 }: Props) {
   const realtimeRevision = useRealtimeRevision();
@@ -51,10 +59,14 @@ export function DefectHubPanel({
   const hasLoadedRef = useRef(false);
   const requestGenerationRef = useRef(0);
 
-  const [view, setView] = useState<"hub" | "list" | "process" | "cart">("hub");
+  const [view, setView] = useState<"hub" | "list" | "process" | "cart" | "statistics">("hub");
+  const isWarehouseEmployee = currentEmployee.warehouse_role === "primary"
+    || currentEmployee.warehouse_role === "deputy";
   const defaultScope: DefectScope = defectDeptFilter
     ? "my"
-    : PRODUCTION_LINES.has(currentEmployee.department)
+    : isWarehouseEmployee
+      ? "all"
+      : PRODUCTION_LINES.has(currentEmployee.department)
       ? "my"
       : "all";
   const {
@@ -66,32 +78,43 @@ export function DefectHubPanel({
     setActorScope,
     setSort,
     setFilterLocked,
+    selectedDepartments,
+    selectedModels,
+    selectedProcessSteps,
+    setSelectedDepartments,
+    setSelectedModels,
+    setSelectedProcessSteps,
+    resetCategoryFilters,
   } = useDefectFilterPreferences({
     employeeId: currentEmployee.employee_id,
     defaultScope,
     defaultSort: "oldest",
+    currentDept: currentEmployee.department,
     defectDeptFilter,
   });
   const [kpiFilter, setKpiFilter] = useState<DefectKpiKind | null>(null);
   const [search, setSearch] = useState("");
-  const [processingLocation, setProcessingLocation] = useState<DefectLocation | null>(null);
+  const [processingLocations, setProcessingLocations] = useState<DefectLocation[]>([]);
+  const [processingBatch, setProcessingBatch] = useState(false);
+  const [processingError, setProcessingError] = useState<string | null>(null);
   const [cartMode, setCartMode] = useState<DefectCartMode>("add");
   const [reloadNonce, setReloadNonce] = useState(0);
 
-  const activeProcessingLocation = useMemo(() => {
-    if (!processingLocation) return null;
-    return locations.find(
-      (location) =>
-        location.record_id === processingLocation.record_id &&
-        Number(location.available_quantity) > 0,
-    ) ?? null;
-  }, [locations, processingLocation]);
+  const activeProcessingLocations = useMemo(
+    () => processingLocations
+      .map((selected) => locations.find(
+        (location) => location.record_id === selected.record_id && Number(location.available_quantity) > 0,
+      ))
+      .filter((location): location is DefectLocation => location !== undefined),
+    [locations, processingLocations],
+  );
 
   useEffect(() => {
-    if (view !== "process" || !processingLocation || loading || activeProcessingLocation) return;
-    setProcessingLocation(null);
+    if (view !== "process" || processingLocations.length === 0 || loading || activeProcessingLocations.length === processingLocations.length) return;
+    setProcessingLocations([]);
+    setProcessingBatch(false);
     setView("list");
-  }, [view, processingLocation, loading, activeProcessingLocation]);
+  }, [view, processingLocations, loading, activeProcessingLocations]);
 
   // 마운트 시 목록 로드 (처리 완료 후 reloadNonce 증가 시 재로드)
   useEffect(() => {
@@ -129,7 +152,16 @@ export function DefectHubPanel({
     };
   }, [reloadNonce, realtimeRevision]);
 
-  // 부서 범위와 격리 처리자 범위를 먼저 합성 — KPI 집계와 목록이 공유하는 모집단
+  const departmentOptions = useMemo(
+    () => Array.from(new Set(locations.map((location) => location.department).filter(Boolean))).sort(),
+    [locations],
+  );
+  const modelOptions = useMemo(
+    () => Array.from(new Set(productModels.map((model) => model.model_name).filter((name): name is string => Boolean(name)))),
+    [productModels],
+  );
+
+  // 부서·모델·공정과 격리 처리자 범위를 합성 — KPI 집계와 목록이 공유하는 모집단
   const scopedLocations = useMemo(() => {
     let result = locations;
 
@@ -148,8 +180,12 @@ export function DefectHubPanel({
       );
     }
 
-    return result;
-  }, [locations, scope, actorScope, defectDeptFilter, currentEmployee.department, currentEmployee.employee_id]);
+    return filterDefectLocations(result, items, productModels, {
+      departments: selectedDepartments,
+      models: selectedModels,
+      processSteps: selectedProcessSteps,
+    });
+  }, [locations, scope, actorScope, defectDeptFilter, currentEmployee.department, currentEmployee.employee_id, items, productModels, selectedDepartments, selectedModels, selectedProcessSteps]);
 
   const kpi = useMemo<DefectKpi>(
     () => ({
@@ -186,8 +222,9 @@ export function DefectHubPanel({
     return result;
   }, [scopedLocations, sort, kpiFilter, search]);
 
-  const departmentScopeLabel =
-    scope === "my"
+  const departmentScopeLabel = selectedDepartments.length > 0
+    ? selectedDepartments.join(" · ")
+    : scope === "my"
       ? `${defectDeptFilter ?? currentEmployee.department} 부서`
       : scope === "production"
       ? "생산 전체"
@@ -196,18 +233,29 @@ export function DefectHubPanel({
 
   // [처리] 버튼 클릭 → 데스크톱과 동일한 통합 처리 패널(전폭 view)로 전환.
   function handleProcess(location: DefectLocation) {
-    setProcessingLocation(location);
+    setProcessingLocations([location]);
+    setProcessingBatch(false);
+    setView("process");
+  }
+
+  function handleBatchProcess(selectedLocations: DefectLocation[]) {
+    if (selectedLocations.length === 0) return;
+    setProcessingError(null);
+    setProcessingLocations(selectedLocations);
+    setProcessingBatch(true);
     setView("process");
   }
 
   function handleProcessDone() {
-    setProcessingLocation(null);
+    setProcessingLocations([]);
+    setProcessingBatch(false);
     setReloadNonce((n) => n + 1);
     setView("list"); // 처리 후 갱신된 목록을 바로 보여줌
   }
 
   function handleProcessCancel() {
-    setProcessingLocation(null);
+    setProcessingLocations([]);
+    setProcessingBatch(false);
     setView("list");
   }
 
@@ -220,13 +268,30 @@ export function DefectHubPanel({
     setView("hub");
   }
 
-  // 브라우저 뒤로가기 → cart/process는 한 단계 위로, list면 hub로 (hub에서는 무시).
+  // 브라우저 history의 대상 state를 기준으로 허브·목록·통계 화면을 복원한다.
   useEffect(() => {
-    const onPop = () => {
-      setView((cur) =>
-        cur === "cart" ? "hub" : cur === "process" ? "list" : cur === "list" ? "hub" : cur,
-      );
-    };
+    function applyHistoryState(state: unknown): void {
+      const target = state as { defect?: string; mode?: DefectCartMode } | null;
+      if (target?.defect === "list") {
+        setView("list");
+      } else if (target?.defect === "statistics") {
+        setView("statistics");
+      } else if (target?.defect === "cart" && (target.mode === "add" || target.mode === "scrap")) {
+        setCartMode(target.mode);
+        setView("cart");
+      } else if (target?.defect === "process") {
+        setView("list");
+        window.history.replaceState({ defect: "list" }, "");
+      } else {
+        setView("hub");
+      }
+    }
+
+    const initialState = window.history.state as { defect?: string } | null;
+    if (initialState?.defect) applyHistoryState(initialState);
+    else window.history.replaceState({ defect: "hub" }, "");
+
+    const onPop = (event: PopStateEvent) => applyHistoryState(event.state);
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
@@ -238,9 +303,12 @@ export function DefectHubPanel({
     } else if (id === "scrap") {
       setCartMode("scrap");
       setView("cart");
-    } else {
+    } else if (id === "list") {
       window.history.pushState({ defect: "list" }, "");
       setView("list");
+    } else {
+      window.history.pushState({ defect: "statistics" }, "");
+      setView("statistics");
     }
   }
 
@@ -255,13 +323,29 @@ export function DefectHubPanel({
   }
 
   // 처리 화면 — 데스크톱 DefectProcessPanel 과 동일 동작의 모바일 통합 패널(전폭).
-  if (view === "process" && activeProcessingLocation) {
+  if (view === "process" && activeProcessingLocations.length === 1 && !processingBatch) {
     return (
       <MobileDefectProcessPanel
-        location={activeProcessingLocation}
+        location={activeProcessingLocations[0]}
         currentEmployee={currentEmployee}
         onDone={handleProcessDone}
         onCancel={handleProcessCancel}
+      />
+    );
+  }
+
+  if (view === "process" && activeProcessingLocations.length > 0 && processingBatch) {
+    return (
+      <DefectProcessPanel
+        locations={activeProcessingLocations}
+        batchMode
+        currentEmployee={currentEmployee}
+        onDone={handleProcessDone}
+        onCancel={handleProcessCancel}
+        onInvalidated={(message) => {
+          setProcessingError(`${message} 선택을 해제하고 목록을 갱신합니다.`);
+          handleProcessDone();
+        }}
       />
     );
   }
@@ -277,6 +361,17 @@ export function DefectHubPanel({
         defaultSource={defaultSource}
         onDone={handleCartDone}
         onCancel={handleCartCancel}
+      />
+    );
+  }
+
+  if (view === "statistics") {
+    return (
+      <DefectStatisticsView
+        departmentOptions={departmentOptions}
+        modelOptions={modelOptions}
+        currentDepartment={currentEmployee.department}
+        onBack={() => window.history.back()}
       />
     );
   }
@@ -307,9 +402,32 @@ export function DefectHubPanel({
         onSortChange={setSort}
         onFilterLockedChange={setFilterLocked}
         currentDept={currentEmployee.department}
-        search={search}
-        setSearch={setSearch}
+        departments={departmentOptions}
+        selectedDepartments={selectedDepartments}
+        onDepartmentsChange={(values) => {
+          setScope("all");
+          setSelectedDepartments(values);
+          setKpiFilter(null);
+        }}
+        models={modelOptions}
+        selectedModels={selectedModels}
+        onModelsChange={(values) => {
+          setSelectedModels(values);
+          setKpiFilter(null);
+        }}
+        selectedProcessSteps={selectedProcessSteps}
+        onProcessStepsChange={(values) => {
+          setSelectedProcessSteps(values);
+          setKpiFilter(null);
+        }}
+        onResetCategoryFilters={() => {
+          setScope("all");
+          resetCategoryFilters();
+          setKpiFilter(null);
+        }}
       />
+
+      <DefectSearchInput value={search} onChange={setSearch} />
 
       {/* KPI 필터 활성 표시 */}
       {kpiFilter && (
@@ -332,6 +450,7 @@ export function DefectHubPanel({
       )}
 
       {/* 목록 */}
+      {processingError && <InlineErrorNote variant="block">{processingError}</InlineErrorNote>}
       {refreshError && (
         <LoadFailureCard
           prefix="최신 불량 격리 목록을 동기화하지 못했습니다"
@@ -364,6 +483,7 @@ export function DefectHubPanel({
           currentEmployee={currentEmployee}
           onMemoUpdated={handleMemoUpdated}
           onProcess={handleProcess}
+          onBatchProcess={handleBatchProcess}
           searchActive={search.trim().length > 0}
         />
       )}
@@ -374,7 +494,7 @@ export function DefectHubPanel({
     <div className="flex min-h-full flex-col gap-4">
       {/* 항목 7-3 — 헤더("불량 처리 허브" 제목 + 우상단 이름·부서) 제거(불필요). */}
       {view === "hub" ? (
-        /* 항목 2-5 — 첫 화면은 키오스크식 카드 3장(격리·폐기·목록)만. PC(DesktopDefectView)
+        /* 항목 2-5 — 첫 화면은 키오스크식 카드 4장(격리·폐기·목록·통계)만. PC(DesktopDefectView)
            처럼 "무엇을 할지 선택만" 하게 한다. KPI/필터/격리 목록은 카드 선택 후 list 화면에서만.
            (이전엔 카드 2장 + listSection 을 첫 화면에 함께 띄워 모바일이 혼잡했음.) */
         <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -416,7 +536,7 @@ export function DefectHubPanel({
         <>
           <button
             type="button"
-            onClick={() => setView("hub")}
+            onClick={() => window.history.back()}
             className="standard-hover flex items-center gap-1 self-start rounded-[10px] border px-3 py-1.5 text-xs font-bold transition-colors"
             style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
           >

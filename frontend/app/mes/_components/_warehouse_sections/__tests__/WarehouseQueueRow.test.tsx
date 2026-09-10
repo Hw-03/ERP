@@ -97,6 +97,22 @@ describe("WarehouseQueueRow request timestamp", () => {
     );
   });
 
+  it("자동 부서 혼합 요청은 승인 대기열에서 여러 부서로 요약한다", () => {
+    render(
+      <WarehouseQueueRow
+        {...baseProps}
+        req={makeRequest({
+          lines: [
+            { ...makeLine(1), to_department: "조립" },
+            { ...makeLine(2), to_department: "고압" },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId("warehouse-request-summary")).toHaveTextContent("여러 부서 · 2건");
+  });
+
   it("제출 일시가 없는 레거시 요청은 생성 일시를 표시", () => {
     const req = {
       ...makeRequest(),
@@ -135,7 +151,7 @@ describe("WarehouseQueueRow presentation", () => {
     expect(screen.getByTestId("warehouse-request-summary")).toHaveTextContent("조립 · 1건");
     expect(screen.queryByText("제출됨")).not.toBeInTheDocument();
     const heading = container.querySelector("[data-stock-request-id] > div");
-    expect(heading?.textContent?.replace(/\s/g, "")).toMatch(/^창고→부서조립·1건승인대기/);
+    expect(heading?.textContent?.replace(/\s/g, "")).toMatch(/^창고→부서창고→조립·1건승인대기/);
   });
 
   it("승인 대상 품목을 3열로 전부 표시하고 접지 않음", () => {

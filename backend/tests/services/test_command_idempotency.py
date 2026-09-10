@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
+from decimal import Decimal
 import uuid
 
 from app.services.command_idempotency import (
@@ -118,6 +120,21 @@ def test_io_draft_submit_fingerprint_scopes_actor_route_batch_and_contents() -> 
 
     changed = {**payload, "notes": "changed after the original command"}
     assert fingerprint_io_draft_submit(actor, batch_id, changed) != baseline
+
+
+def test_io_draft_submit_fingerprint_accepts_persisted_decimal_quantities() -> None:
+    actor = uuid.uuid4()
+    batch_id = uuid.uuid4()
+    payload = _io_payload()
+    payload["bundles"][0]["quantity"] = Decimal("1.0000")
+    payload["bundles"][0]["lines"][0]["quantity"] = Decimal("1.0000")
+    same_quantities = deepcopy(payload)
+    same_quantities["bundles"][0]["quantity"] = Decimal("1")
+    same_quantities["bundles"][0]["lines"][0]["quantity"] = Decimal("1")
+
+    assert fingerprint_io_draft_submit(actor, batch_id, payload) == (
+        fingerprint_io_draft_submit(actor, batch_id, same_quantities)
+    )
 
 
 def test_stock_request_fingerprint_preserves_order_and_excludes_transport_key() -> None:

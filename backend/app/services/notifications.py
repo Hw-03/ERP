@@ -128,10 +128,16 @@ def _notify_request_arrived(db: Session, request: StockRequest) -> None:
         target_section = "queue"
     elif (
         request.requires_department_approval
-        and not request.requires_warehouse_approval
+        and (
+            not request.requires_warehouse_approval
+            or request.approved_by_employee_id is not None
+        )
         and request.department_approved_by_employee_id is None
     ):
-        recipients = recipients_for_department_approval(db, request.requester_department)
+        recipients = recipients_for_department_approval(
+            db,
+            request.approval_department or request.requester_department,
+        )
         target_section = "dept-queue"
     else:
         return

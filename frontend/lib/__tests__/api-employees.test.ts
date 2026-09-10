@@ -42,6 +42,16 @@ describe("employeesApi.getEmployees", () => {
     expect(url).toContain("active_only=true");
     expect(url).toMatch(/department=/);
   });
+
+  it("forwards an optional abort signal", async () => {
+    const fetchSpy = vi.fn<typeof fetch>(() => Promise.resolve(makeResponse([])));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const controller = new AbortController();
+
+    await employeesApi.getEmployees({ activeOnly: true }, controller.signal);
+
+    expect((fetchSpy.mock.calls[0][1] as RequestInit).signal).toBe(controller.signal);
+  });
 });
 
 describe("employeesApi.verifyEmployeePin", () => {

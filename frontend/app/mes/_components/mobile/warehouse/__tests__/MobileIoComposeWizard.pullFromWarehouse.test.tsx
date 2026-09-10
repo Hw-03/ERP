@@ -48,8 +48,18 @@ const state = vi.hoisted(() => ({
 const saveDraft = vi.hoisted(() => vi.fn());
 const previewTarget = vi.hoisted(() => vi.fn());
 const submit = vi.hoisted(() => vi.fn());
+const bomQuery = vi.hoisted(() => ({
+  data: [] as { parent_item_id: string }[],
+  isSuccess: true,
+  isPending: false,
+  isError: false,
+  refetch: vi.fn(),
+}));
 
 vi.mock("@/lib/api", () => ({ api: { getAllBOM: vi.fn(() => new Promise(() => {})), getItems: vi.fn(() => Promise.resolve([])) } }));
+vi.mock("@/lib/queries/useBomQuery", () => ({
+  useBomListQuery: () => bomQuery,
+}));
 vi.mock("../../../_warehouse_v2/useIoWorkState", () => ({ useIoWorkState: () => state }));
 vi.mock("../../../_warehouse_v2/useIoDraftRestore", () => ({ useIoDraftRestore: () => {} }));
 vi.mock("../../../_warehouse_v2/useIoDraft", () => ({ useIoDraft: () => ({ drafting: false, saveDraft }) }));
@@ -69,12 +79,13 @@ vi.mock("../../../_warehouse_v2/IoConfirmStep", () => ({
   ),
 }));
 vi.mock("../../../_warehouse_v2/IoBundleCart", () => ({
-  IoBundleCart: ({ bundles, onPullFromWarehouse, onQuantityChange, onSaveDraft, pulling }: {
+  IoBundleCart: ({ bundles, onPullFromWarehouse, onQuantityChange, onSaveDraft, pulling, pullBlocked }: {
     bundles: { bundle_id: string; lines: { line_id: string; quantity?: number }[] }[];
     onPullFromWarehouse: () => void;
     onQuantityChange: (bundleId: string, lineId: string, quantity: number, shortage: number) => void;
     onSaveDraft: () => void;
     pulling: boolean;
+    pullBlocked?: boolean;
   }) => (
     <>
       <output data-testid="mobile-pull-cart-state">
@@ -91,7 +102,8 @@ vi.mock("../../../_warehouse_v2/IoBundleCart", () => ({
       >
         모바일 첫 품목 수량 변경
       </button>
-      <button type="button" onClick={onPullFromWarehouse}>부족 품목 가져오기</button>
+      <button type="button" onClick={onPullFromWarehouse} disabled={pullBlocked}>부족 품목 가져오기</button>
+      <button type="button" onClick={onPullFromWarehouse}>차단 우회 부족 품목 가져오기</button>
       <button type="button" onClick={onSaveDraft}>모바일 임시저장</button>
     </>
   ),
@@ -141,6 +153,12 @@ function applyBundleUpdates() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  Object.assign(bomQuery, {
+    data: [],
+    isSuccess: true,
+    isPending: false,
+    isError: false,
+  });
   state.setBundles.mockReset();
   state.step = 4;
   state.workType = "process";
@@ -160,6 +178,23 @@ beforeEach(() => {
 });
 
 describe("MobileIoComposeWizard 부족 품목 가져오기", () => {
+  it("캐시된 BOM 목록이 있어도 조회 오류가 확정되면 부족 품목 가져오기를 막는다", async () => {
+    Object.assign(bomQuery, {
+      data: [{ parent_item_id: "cached-bom-parent" }],
+      isSuccess: false,
+      isPending: false,
+      isError: true,
+    });
+    renderWizard();
+
+    await screen.findByTestId("mobile-pull-cart-state");
+    expect(screen.getByRole("button", { name: "부족 품목 가져오기" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "차단 우회 부족 품목 가져오기" }));
+    expect(saveDraft).not.toHaveBeenCalled();
+    expect(previewTarget).not.toHaveBeenCalled();
+    expect(screen.getByText("BOM 정보를 불러오지 못했습니다. 다시 시도해 주세요")).toBeInTheDocument();
+  });
+
   it("process 단품 폼에서 picker로 전환해 기존 낱개를 보존한 채 BOM을 추가한다", async () => {
     state.step = 3;
     state.workType = "process";

@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Employee, OperatorSessionResponse } from "@/lib/api";
 import { ApiError, postJson } from "@/lib/api-core";
@@ -10,9 +10,11 @@ import { QueryProvider } from "@/lib/queries/client";
 
 const state = vi.hoisted(() => ({
   getOperatorSession: vi.fn(),
+  renewOperatorSession: vi.fn(),
   deleteOperatorSession: vi.fn(),
   clearCurrentOperator: vi.fn(),
   restoreCurrentOperator: vi.fn(),
+  loginSession: null as OperatorSessionResponse | null,
   getWeeklyReport: vi.fn().mockResolvedValue({}),
   getWarehouseMap: vi.fn().mockResolvedValue({}),
 }));
@@ -28,6 +30,7 @@ vi.mock("@/lib/queries/realtime", () => ({
 vi.mock("@/lib/api/operator-session", () => ({
   operatorSessionApi: {
     getOperatorSession: state.getOperatorSession,
+    renewOperatorSession: state.renewOperatorSession,
     deleteOperatorSession: state.deleteOperatorSession,
   },
 }));
@@ -42,14 +45,19 @@ vi.mock("@/lib/api/warehouse-map", () => ({
 
 vi.mock("../OperatorLoginCard", () => ({
   OperatorLoginCard: ({
+    onLogin,
     logoutPending,
     onRetryLogout,
   }: {
+    onLogin?: (session: OperatorSessionResponse) => void;
     logoutPending?: boolean;
     onRetryLogout?: () => void;
   }) => (
     <div>
       Operator login form
+      {onLogin && (
+        <button type="button" onClick={() => onLogin(state.loginSession ?? makeSession())}>모의 로그인 완료</button>
+      )}
       {logoutPending && (
         <button type="button" onClick={onRetryLogout}>로그아웃 재시도</button>
       )}
@@ -91,9 +99,11 @@ function makeEmployee(): Employee {
 }
 
 function makeSession(): OperatorSessionResponse {
+  const serverTime = Date.now();
   return {
     employee: makeEmployee(),
-    expires_at: "2026-08-19T12:00:00Z",
+    server_time: new Date(serverTime).toISOString(),
+    expires_at: new Date(serverTime + 30 * 60_000).toISOString(),
     boot_id: "boot-1",
   };
 }
@@ -173,6 +183,26 @@ function CrossTabSecurityProbe({
   return <output>{pin ?? "no-admin-pin"}</output>;
 }
 
+function DraftProbe() {
+  return <input aria-label="미저장 작업" defaultValue="" />;
+}
+
+function OperatorSensitiveDraftProbe() {
+  const [value, setValue] = useState("");
+  useEffect(() => {
+    const clear = () => setValue("");
+    window.addEventListener("test-operator-clear", clear);
+    return () => window.removeEventListener("test-operator-clear", clear);
+  }, []);
+  return (
+    <input
+      aria-label="작업자 연동 미저장 작업"
+      value={value}
+      onChange={(event) => setValue(event.target.value)}
+    />
+  );
+}
+
 const LOGOUT_PENDING_KEY = "dexcowin_mes_logout_pending";
 const LOGOUT_PENDING_VALUE = JSON.stringify({ state: "failed", employee_code: "A001" });
 
@@ -222,9 +252,12 @@ describe("MesLoginGate server session", () => {
   beforeEach(() => {
     installMatchMedia({ reducedMotion: true });
     state.getOperatorSession.mockReset();
+    state.renewOperatorSession.mockReset();
+    state.renewOperatorSession.mockImplementation(async () => makeSession());
     state.deleteOperatorSession.mockReset();
     state.clearCurrentOperator.mockReset();
     state.restoreCurrentOperator.mockReset();
+    state.loginSession = null;
   });
 
   afterEach(() => {
@@ -275,6 +308,87 @@ describe("MesLoginGate server session", () => {
     expect(order).toEqual(["DELETE", "GET"]);
     expect(state.deleteOperatorSession).toHaveBeenCalledWith("E1");
     expect(window.localStorage.getItem("dexcowin_mes_logout_pending")).toBeNull();
+  });
+
+  it("unblocks login when logout reconciliation emits the real 401 auth event", async () => {
+    window.localStorage.setItem(
+      "dexcowin_mes_logout_pending",
+      JSON.stringify({ state: "failed", employee_code: "E1" }),
+    );
+    state.deleteOperatorSession.mockResolvedValueOnce(undefined);
+    state.getOperatorSession.mockImplementationOnce(async () => {
+      window.dispatchEvent(new CustomEvent("dexcowin_auth_required"));
+      throw new ApiError("Authentication required", 401, "AUTH_REQUIRED");
+    });
+
+    renderLoginGate();
+
+    expect(await screen.findByText("Operator login form")).toBeInTheDocument();
+    await waitFor(() => expect(state.getOperatorSession).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole("button", { name: "로그아웃 재시도" })).not.toBeInTheDocument();
+    expect(window.localStorage.getItem("dexcowin_mes_logout_pending")).toBeNull();
+  });
+
+  it("hides and restores an in-memory draft only after the same employee reauthenticates", async () => {
+    state.getOperatorSession.mockResolvedValue(makeSession());
+    state.clearCurrentOperator.mockImplementation(() => {
+      window.dispatchEvent(new CustomEvent("test-operator-clear"));
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MesLoginGate>
+          <OperatorSensitiveDraftProbe />
+        </MesLoginGate>
+      </QueryClientProvider>,
+    );
+    const draft = await screen.findByLabelText("작업자 연동 미저장 작업");
+    fireEvent.change(draft, { target: { value: "작성 중인 내용" } });
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent("dexcowin_auth_required", { detail: { reason: "idle" } }));
+    });
+
+    expect(screen.getByText("Operator login form")).toBeInTheDocument();
+    expect(draft).not.toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "모의 로그인 완료" }));
+
+    await waitFor(() => expect(draft).toBeVisible());
+    expect(draft).toHaveValue("작성 중인 내용");
+  });
+
+  it("discards an in-memory draft when a different employee logs in", async () => {
+    window.history.replaceState({}, "", "/mes?tab=dashboard");
+    state.getOperatorSession.mockResolvedValue(makeSession());
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MesLoginGate>
+          <DraftProbe />
+        </MesLoginGate>
+      </QueryClientProvider>,
+    );
+    const draft = await screen.findByLabelText("미저장 작업");
+    fireEvent.change(draft, { target: { value: "다른 직원에게 보이면 안 됨" } });
+    act(() => {
+      window.dispatchEvent(new CustomEvent("dexcowin_auth_required", { detail: { reason: "idle" } }));
+    });
+    state.loginSession = {
+      ...makeSession(),
+      employee: {
+        ...makeEmployee(),
+        employee_id: "emp-2",
+        employee_code: "E2",
+        name: "다른 작업자",
+      },
+    };
+
+    fireEvent.click(screen.getByRole("button", { name: "모의 로그인 완료" }));
+
+    const replacement = await screen.findByLabelText("미저장 작업");
+    expect(replacement).toBeVisible();
+    expect(replacement).toHaveValue("");
+    expect(replacement).not.toBe(draft);
   });
 
   it("blocks restore and login while persisted logout retry still fails", async () => {

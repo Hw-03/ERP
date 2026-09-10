@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import datetime, timedelta
 import hashlib
 import os
 from threading import Barrier, Event, get_ident
@@ -49,6 +49,7 @@ from app.services.operator_session import (
     resolve_session,
     resolve_session_and_lock_employee,
     resolve_session_and_lock_employees,
+    renew_operator_session,
     revoke_session,
 )
 from app.services.pin_auth import hash_pin, verify_pin_and_upgrade
@@ -470,6 +471,176 @@ def test_postgres_same_cookie_logout_then_login_fails_after_revalidation(
     finally:
         if listener_attached:
             event.remove(engine, "before_cursor_execute", _observe_login_employee_lock)
+        with make_session() as cleanup:
+            cleanup.query(Employee).filter(Employee.employee_id == employee_id).delete()
+            cleanup.commit()
+        engine.dispose()
+
+
+def test_postgres_activity_waits_for_employee_lock_and_rechecks_expiry() -> None:
+    engine = create_engine(POSTGRES_URL, poolclass=NullPool)
+    make_session = sessionmaker(bind=engine, expire_on_commit=False)
+    employee = _employee()
+    employee_id = employee.employee_id
+    boot_id = current_boot_id()
+    listener_attached = False
+
+    try:
+        with make_session() as db:
+            db.add(employee)
+            db.flush()
+            issued = create_session(
+                db,
+                employee_id=employee_id,
+                purpose="operator",
+                boot_id=boot_id,
+            )
+            session_id = issued.row.session_id
+            db.commit()
+
+        state_change_holds_employee = Event()
+        activity_attempted_employee_lock = Event()
+        activity_thread_id: list[int] = []
+
+        def _observe_activity_employee_lock(
+            _conn,
+            _cursor,
+            statement,
+            _parameters,
+            _context,
+            _executemany,
+        ) -> None:
+            if (
+                activity_thread_id
+                and get_ident() == activity_thread_id[0]
+                and "FROM employees" in statement
+                and "FOR UPDATE" in statement
+            ):
+                activity_attempted_employee_lock.set()
+
+        event.listen(engine, "before_cursor_execute", _observe_activity_employee_lock)
+        listener_attached = True
+
+        def expire_while_holding_employee() -> None:
+            with make_session() as db:
+                db.query(Employee).filter_by(employee_id=employee_id).with_for_update().one()
+                row = db.get(OperatorSession, session_id)
+                assert row is not None
+                row.expires_at = datetime.utcnow() - timedelta(seconds=1)
+                db.flush()
+                state_change_holds_employee.set()
+                assert activity_attempted_employee_lock.wait(5)
+                db.commit()
+
+        def renew_after_preflight() -> SessionStatus:
+            assert state_change_holds_employee.wait(5)
+            activity_thread_id.append(get_ident())
+            with make_session() as db:
+                return renew_operator_session(
+                    db,
+                    issued.token,
+                    boot_id=boot_id,
+                ).status
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            expire_future = pool.submit(expire_while_holding_employee)
+            renew_future = pool.submit(renew_after_preflight)
+            expire_future.result(timeout=10)
+            assert renew_future.result(timeout=10) == SessionStatus.EXPIRED
+
+        with make_session() as db:
+            row = db.get(OperatorSession, session_id)
+            assert row is not None
+            assert row.expires_at < datetime.utcnow()
+    finally:
+        if listener_attached:
+            event.remove(engine, "before_cursor_execute", _observe_activity_employee_lock)
+        with make_session() as cleanup:
+            cleanup.query(Employee).filter(Employee.employee_id == employee_id).delete()
+            cleanup.commit()
+        engine.dispose()
+
+
+def test_postgres_logout_wins_over_late_activity_without_session_revival() -> None:
+    engine = create_engine(POSTGRES_URL, poolclass=NullPool)
+    make_session = sessionmaker(bind=engine, expire_on_commit=False)
+    employee = _employee()
+    employee_id = employee.employee_id
+    boot_id = current_boot_id()
+    listener_attached = False
+
+    try:
+        with make_session() as db:
+            db.add(employee)
+            db.flush()
+            issued = create_session(
+                db,
+                employee_id=employee_id,
+                purpose="operator",
+                boot_id=boot_id,
+            )
+            session_id = issued.row.session_id
+            original_expiry = issued.row.expires_at
+            db.commit()
+
+        logout_holds_employee = Event()
+        activity_attempted_employee_lock = Event()
+        activity_thread_id: list[int] = []
+
+        def _observe_activity_employee_lock(
+            _conn,
+            _cursor,
+            statement,
+            _parameters,
+            _context,
+            _executemany,
+        ) -> None:
+            if (
+                activity_thread_id
+                and get_ident() == activity_thread_id[0]
+                and "FROM employees" in statement
+                and "FOR UPDATE" in statement
+            ):
+                activity_attempted_employee_lock.set()
+
+        event.listen(engine, "before_cursor_execute", _observe_activity_employee_lock)
+        listener_attached = True
+
+        def logout_while_holding_employee() -> None:
+            with make_session() as db:
+                db.query(Employee).filter_by(employee_id=employee_id).with_for_update().one()
+                row = db.get(OperatorSession, session_id)
+                assert row is not None
+                row.revoked_at = datetime.utcnow()
+                db.flush()
+                logout_holds_employee.set()
+                assert activity_attempted_employee_lock.wait(5)
+                db.commit()
+
+        def late_activity() -> SessionStatus:
+            assert logout_holds_employee.wait(5)
+            activity_thread_id.append(get_ident())
+            with make_session() as db:
+                return renew_operator_session(
+                    db,
+                    issued.token,
+                    boot_id=boot_id,
+                ).status
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            logout_future = pool.submit(logout_while_holding_employee)
+            activity_future = pool.submit(late_activity)
+            logout_future.result(timeout=10)
+            assert activity_future.result(timeout=10) == SessionStatus.REVOKED
+
+        with make_session() as db:
+            row = db.get(OperatorSession, session_id)
+            assert row is not None
+            assert row.revoked_at is not None
+            assert row.expires_at == original_expiry
+    finally:
+        if listener_attached:
+            event.remove(engine, "before_cursor_execute", _observe_activity_employee_lock)
         with make_session() as cleanup:
             cleanup.query(Employee).filter(Employee.employee_id == employee_id).delete()
             cleanup.commit()

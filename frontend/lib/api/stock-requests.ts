@@ -267,24 +267,38 @@ export const stockRequestsApi = {
   // Stock requests (창고 결재 흐름) -----------------------------------------
   createStockRequest,
 
-  listMyStockRequests: (employeeId: string) =>
+  listMyStockRequests: (employeeId: string, targetRequestId?: string | null) =>
     fetcher<RawStockRequestResponse[]>(
       toApiUrl(
-        `/api/stock-requests?requester_employee_id=${encodeURIComponent(employeeId)}`,
+        `/api/stock-requests?requester_employee_id=${encodeURIComponent(employeeId)}${
+          targetRequestId
+            ? `&target_request_id=${encodeURIComponent(targetRequestId)}`
+            : ""
+        }`,
       ),
     ).then(fromOpenApiStockRequestList),
 
-  listWarehouseQueue: () =>
+  listWarehouseQueue: (targetRequestId?: string | null) =>
     fetcher<RawStockRequestResponse[]>(
-      toApiUrl("/api/stock-requests/warehouse-queue"),
+      toApiUrl(
+        `/api/stock-requests/warehouse-queue${
+          targetRequestId
+            ? `?target_request_id=${encodeURIComponent(targetRequestId)}`
+            : ""
+        }`,
+      ),
     ).then(fromOpenApiStockRequestList),
 
-  listDepartmentQueue: (actorEmployeeId: string) =>
+  listDepartmentQueue: (actorEmployeeId: string, targetRequestId?: string | null) =>
     fetcher<RawStockRequestResponse[]>(
       toApiUrl(
         `/api/stock-requests/department-queue?actor_employee_id=${encodeURIComponent(
           actorEmployeeId,
-        )}`,
+        )}${
+          targetRequestId
+            ? `&target_request_id=${encodeURIComponent(targetRequestId)}`
+            : ""
+        }`,
       ),
     ).then(fromOpenApiStockRequestList),
 

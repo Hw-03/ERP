@@ -14,32 +14,93 @@ from app.dependencies.verified_actor import (
     VerifiedActorRouter,
     ensure_actor_employee_id,
 )
-from app.models import Notification
+from app.models import (
+    Notification,
+    NotificationTypeEnum,
+    StockRequest,
+    StockRequestStatusEnum,
+)
 from app.schemas import NotificationListResponse, NotificationMarkReadRequest
 from app.services._tx import commit_only
+from app.services.dept_hierarchy import can_approve_department
 
 router = VerifiedActorRouter()
 
 _LIST_LIMIT = 50
 
 
-def _list_payload(db: Session, recipient_employee_id: uuid.UUID) -> dict:
+_PENDING_APPROVAL_STATUSES = {
+    StockRequestStatusEnum.SUBMITTED,
+    StockRequestStatusEnum.RESERVED,
+}
+
+
+def _visible_rows(db: Session, actor) -> list[Notification]:
     rows = (
         db.query(Notification)
-        .filter(Notification.recipient_employee_id == recipient_employee_id)
+        .filter(Notification.recipient_employee_id == actor.employee_id)
         .order_by(Notification.created_at.desc())
-        .limit(_LIST_LIMIT)
         .all()
     )
-    unread = (
-        db.query(Notification)
-        .filter(
-            Notification.recipient_employee_id == recipient_employee_id,
-            Notification.is_read.is_(False),
+    approval_request_ids = {
+        row.related_request_id
+        for row in rows
+        if row.type == NotificationTypeEnum.APPROVAL_REQUEST.value
+        and row.related_request_id is not None
+    }
+    requests = {
+        request.request_id: request
+        for request in (
+            db.query(StockRequest)
+            .filter(StockRequest.request_id.in_(approval_request_ids))
+            .all()
+            if approval_request_ids
+            else []
         )
-        .count()
-    )
-    return {"items": rows, "unread_count": int(unread)}
+    }
+    warehouse_role = (actor.warehouse_role or "none").lower()
+    can_approve_warehouse = warehouse_role in ("primary", "deputy")
+
+    visible: list[Notification] = []
+    for row in rows:
+        if row.type != NotificationTypeEnum.APPROVAL_REQUEST.value:
+            visible.append(row)
+            continue
+        request = requests.get(row.related_request_id)
+        if request is None or request.status not in _PENDING_APPROVAL_STATUSES:
+            continue
+        if row.target_section == "queue":
+            allowed = (
+                can_approve_warehouse
+                and bool(request.requires_warehouse_approval)
+                and request.approved_by_employee_id is None
+            )
+        elif row.target_section == "dept-queue":
+            approval_department = (
+                request.approval_department or request.requester_department
+            )
+            allowed = (
+                bool(request.requires_department_approval)
+                and (
+                    not bool(request.requires_warehouse_approval)
+                    or request.approved_by_employee_id is not None
+                )
+                and request.department_approved_by_employee_id is None
+                and can_approve_department(actor, approval_department)
+            )
+        else:
+            allowed = False
+        if allowed:
+            visible.append(row)
+    return visible
+
+
+def _list_payload(db: Session, actor) -> dict:
+    rows = _visible_rows(db, actor)
+    return {
+        "items": rows[:_LIST_LIMIT],
+        "unread_count": sum(not bool(row.is_read) for row in rows),
+    }
 
 
 @router.get("", response_model=NotificationListResponse)
@@ -49,7 +110,7 @@ def list_notifications(
     db: Session = Depends(get_db),
 ):
     ensure_actor_employee_id(actor, recipient_employee_id)
-    return _list_payload(db, recipient_employee_id)
+    return _list_payload(db, actor)
 
 
 @router.get("/unread-count")
@@ -59,15 +120,7 @@ def unread_count(
     db: Session = Depends(get_db),
 ) -> dict:
     ensure_actor_employee_id(actor, recipient_employee_id)
-    n = (
-        db.query(Notification)
-        .filter(
-            Notification.recipient_employee_id == recipient_employee_id,
-            Notification.is_read.is_(False),
-        )
-        .count()
-    )
-    return {"count": int(n)}
+    return {"count": sum(not bool(row.is_read) for row in _visible_rows(db, actor))}
 
 
 @router.delete("/read")
@@ -127,4 +180,4 @@ def mark_read(
     for row in query.all():
         row.is_read = True
     commit_only(db)
-    return _list_payload(db, payload.recipient_employee_id)
+    return _list_payload(db, actor)

@@ -256,13 +256,13 @@ describe("requiresDepartments", () => {
     const map = Object.fromEntries(ALL_SUB_TYPES.map((s) => [s, requiresDepartments(s)]));
     expect(map).toEqual({
       receive_supplier: false,
-      warehouse_to_dept: true,
-      dept_to_warehouse: true,
-      produce: true,
-      disassemble: true,
+      warehouse_to_dept: false,
+      dept_to_warehouse: false,
+      produce: false,
+      disassemble: false,
       dept_transfer: true,
-      adjust_in: true,
-      adjust_out: true,
+      adjust_in: false,
+      adjust_out: false,
       warehouse_adjust_in: false,
       warehouse_adjust_out: false,
       defect_quarantine: true,
@@ -647,6 +647,22 @@ describe("getItemActionMode", () => {
       fromDepartment: null,
       toDepartment: null,
     });
+  });
+
+  it("자동 부서 작업은 상태에 남은 헤더 부서를 payload에 싣지 않는다", () => {
+    for (const subType of [
+      "warehouse_to_dept",
+      "dept_to_warehouse",
+      "produce",
+      "disassemble",
+      "adjust_in",
+      "adjust_out",
+    ] as IoSubType[]) {
+      expect(ioDepartmentPayload(subType, "고압", "조립")).toEqual({
+        fromDepartment: null,
+        toDepartment: null,
+      });
+    }
   });
 
   it("subType별 모드 고정", () => {
@@ -1363,13 +1379,13 @@ describe("[추출 골든] targetDepartmentOf — Step3 대상 부서", () => {
     );
     expect(map).toEqual({
       receive_supplier: null,
-      warehouse_to_dept: "도착",
-      dept_to_warehouse: "출발",
-      produce: "도착",
-      disassemble: "도착",
+      warehouse_to_dept: null,
+      dept_to_warehouse: null,
+      produce: null,
+      disassemble: null,
       dept_transfer: "도착",
-      adjust_in: "도착",
-      adjust_out: "도착",
+      adjust_in: null,
+      adjust_out: null,
       warehouse_adjust_in: null,
       warehouse_adjust_out: null,
       defect_quarantine: "출발",
@@ -1394,13 +1410,13 @@ describe("[추출 골든] deptVisibility", () => {
     const map = Object.fromEntries(ALL_SUB_TYPES.map((s) => [s, deptVisibility(s)]));
     expect(map).toEqual({
       receive_supplier: { from: false, to: false },
-      warehouse_to_dept: { from: false, to: true },
-      dept_to_warehouse: { from: true, to: false },
-      produce: { from: false, to: true },
-      disassemble: { from: false, to: true },
+      warehouse_to_dept: { from: false, to: false },
+      dept_to_warehouse: { from: false, to: false },
+      produce: { from: false, to: false },
+      disassemble: { from: false, to: false },
       dept_transfer: { from: true, to: true },
-      adjust_in: { from: false, to: true },
-      adjust_out: { from: false, to: true },
+      adjust_in: { from: false, to: false },
+      adjust_out: { from: false, to: false },
       warehouse_adjust_in: { from: false, to: false },
       warehouse_adjust_out: { from: false, to: false },
       defect_quarantine: { from: true, to: false },
@@ -1640,7 +1656,7 @@ describe("[bomSync] applyToggleLine", () => {
     expect(mm.included).toBe(true); // manual 은 동기화 안 됨
   });
 
-  it("일반 자동 BOM 자식 단독 토글(다시 포함) → shortage 재계산", () => {
+  it("일반 자동 BOM 자식 단독 토글(다시 포함) → 현재 기준 수량으로 복원하고 shortage를 재계산", () => {
     const bundles = [
       makeBundle({
         bundle_id: "B",
@@ -1650,8 +1666,37 @@ describe("[bomSync] applyToggleLine", () => {
     const next = applyToggleLine(bundles, "B", "C", "warehouse_to_dept", availMap({ C: 7 }));
     const c = next[0].lines[0];
     expect(c.included).toBe(true);
-    expect(c.shortage).toBe(3); // max(0, 10 - 7)
+    expect(c.quantity).toBe(20); // 현재 기준 수량 10 × BOM 소요량 2
+    expect(c.shortage).toBe(13); // max(0, 20 - 7)
     expect(c.exclusion_note).toBeNull();
+  });
+
+  it("창고 BOM 하위를 제외하면 기준 수량 변경 뒤에도 제외를 유지하고 재체크하면 현재 기준으로 복원한다", () => {
+    const bundles = [
+      makeBundle({
+        bundle_id: "B",
+        quantity: 1,
+        lines: [
+          makeLine({
+            line_id: "C",
+            origin: "bom_auto",
+            bom_expected: 2,
+            included: true,
+            quantity: 2,
+            from_bucket: "warehouse",
+          }),
+        ],
+      }),
+    ];
+
+    const excluded = applyToggleLine(bundles, "B", "C", "warehouse_to_dept", availMap({ C: 100 }));
+    expect(excluded[0].lines[0]).toMatchObject({ quantity: 0, included: false, edited: true, shortage: 0 });
+
+    const resized = applyBundleQuantityChange(excluded, "B", 40, "warehouse_to_dept", availMap({ C: 100 }));
+    expect(resized[0].lines[0]).toMatchObject({ quantity: 0, included: false, edited: true, shortage: 0 });
+
+    const restored = applyToggleLine(resized, "B", "C", "warehouse_to_dept", availMap({ C: 100 }));
+    expect(restored[0].lines[0]).toMatchObject({ quantity: 80, included: true, edited: false, shortage: 0 });
   });
 
   it("부서 BOM 자동 하위를 체크 해제하면 수량 0으로 제외한다", () => {

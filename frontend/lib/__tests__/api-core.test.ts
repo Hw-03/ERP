@@ -4,6 +4,7 @@ import {
   extractErrorMessage,
   parseError,
   fetcher,
+  fetcherWithoutAuthBoundary,
   fetchBlob,
   postJson,
   putJson,
@@ -193,6 +194,23 @@ describe("fetcher / write helpers", () => {
     expect(error).toMatchObject({
       message: "연결 실패",
     });
+  });
+
+  it("postJson retries without signal when the fetch realm rejects the signal before sending", async () => {
+    const fetchSpy = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new TypeError(
+          'RequestInit: Expected signal ("AbortSignal {}") to be an instance of AbortSignal.',
+        ),
+      )
+      .mockResolvedValueOnce(makeResponse({ ok: true, body: { id: "1" } }));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await expect(postJson("/api/items", { name: "X" })).resolves.toEqual({ id: "1" });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect((fetchSpy.mock.calls[0]?.[1] as RequestInit).signal).toBeDefined();
+    expect((fetchSpy.mock.calls[1]?.[1] as RequestInit).signal).toBeUndefined();
   });
 
   it("postJson converts a timeout into ResultUnknownError", async () => {
@@ -408,6 +426,29 @@ describe("fetcher / write helpers", () => {
     window.removeEventListener("dexcowin_auth_required", listener);
   });
 
+  it("lets an idle-session caller validate a late 401 before opening a boundary", async () => {
+    const listener = vi.fn();
+    window.addEventListener("dexcowin_auth_required", listener);
+    globalThis.fetch = vi.fn(() =>
+      Promise.resolve(
+        makeResponse({
+          ok: false,
+          status: 401,
+          body: { detail: { code: "SESSION_EXPIRED", message: "세션이 만료되었습니다." } },
+        }),
+      ),
+    ) as unknown as typeof fetch;
+
+    const failure = await fetcherWithoutAuthBoundary("/api/operator-session").catch(
+      (error: unknown) => error,
+    );
+
+    expect(failure).toBeInstanceOf(ApiError);
+    expect(failure).toMatchObject({ status: 401, code: "SESSION_EXPIRED" });
+    expect(listener).not.toHaveBeenCalled();
+    window.removeEventListener("dexcowin_auth_required", listener);
+  });
+
   it("rejects a cross-tab mutation with the tab operator claim and opens an auth boundary", async () => {
     window.sessionStorage.setItem(
       "dexcowin_mes_operator",
@@ -439,6 +480,27 @@ describe("fetcher / write helpers", () => {
     expect(headers.get("X-MES-Employee-Code")).toBe("A001");
     expect(failure).toMatchObject({ status: 403, code: "ACTOR_MISMATCH" });
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(listener).toHaveBeenCalledTimes(1);
+    window.removeEventListener("dexcowin_auth_required", listener);
+  });
+
+  it("opens an auth boundary when a normal API reports an inactive employee", async () => {
+    const listener = vi.fn();
+    window.addEventListener("dexcowin_auth_required", listener);
+    globalThis.fetch = vi.fn(() => Promise.resolve(makeResponse({
+      ok: false,
+      status: 403,
+      body: {
+        detail: {
+          code: "EMPLOYEE_INACTIVE",
+          message: "비활성화된 직원입니다.",
+        },
+      },
+    }))) as unknown as typeof fetch;
+
+    const failure = await fetcher("/api/items").catch((error: unknown) => error);
+
+    expect(failure).toMatchObject({ status: 403, code: "EMPLOYEE_INACTIVE" });
     expect(listener).toHaveBeenCalledTimes(1);
     window.removeEventListener("dexcowin_auth_required", listener);
   });

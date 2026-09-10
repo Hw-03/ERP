@@ -53,6 +53,7 @@ from app.services.sr_validation import (  # noqa: F401
     line_requires_approval,
     line_requires_pending,
     request_requires_approval,
+    requires_exact_defect_selection,
     validate_line_shape_for_request_type,
     validate_request_entrypoint,
 )
@@ -231,6 +232,11 @@ def create_request(
         StockRequestTypeEnum.DEFECT_RETURN,
         StockRequestTypeEnum.DEFECT_DISASSEMBLE,
     }
+    exact_defect_selection = requires_exact_defect_selection(
+        request_type,
+        len(lines_input),
+        client_request_id,
+    )
     warehouse_override: Optional[bool] = None
     approval_department: Optional[str] = None
     if request_type in _IMMEDIATE_DEFECT_TYPES:
@@ -246,10 +252,23 @@ def create_request(
         }
         if len(departments) != 1:
             raise ValueError("격리 처리 요청은 한 부서의 기록만 포함해야 합니다.")
+        if len(lines_input) > 1:
+            if len({line.item_id for line in lines_input}) != 1:
+                raise ValueError("다건 격리 처리는 같은 품목의 기록만 포함해야 합니다.")
+        record_ids = [line.record_id for line in lines_input]
+        if exact_defect_selection:
+            if any(record_id is None for record_id in record_ids):
+                raise ValueError("선택 격리 처리는 모든 라인에 격리 기록이 필요합니다.")
+            if len(record_ids) != len(set(record_ids)):
+                raise ValueError("선택 격리 처리 요청에 중복된 기록이 있습니다.")
 
     _validate_lines(request_type, lines_input)
     _preflight_inventory_check(db, request_type, lines_input)
-    _preflight_defective_check(db, lines_input)
+    _preflight_defective_check(
+        db,
+        lines_input,
+        require_exact_records=exact_defect_selection,
+    )
     now = datetime.utcnow()
     code = _generate_request_code(now)
     request = _build_request_and_lines(
@@ -288,7 +307,7 @@ def create_manual_adjustment_request(
     - request_type = MANUAL_ADJUSTMENT (bucket/dept 검증 생략)
     - requires_warehouse_approval=False, requires_department_approval=True
     - 비자가승인 출고 라인은 source별로 점유하고 RESERVED, 입고 전용은 SUBMITTED로 대기.
-    - 자가승인 가능: 생산부·창고 정/부는 전 공정 요청을 점유 없이 승인 표시한다.
+    - 자가승인 가능: 부서 정/부는 부서 결재 요청을 점유 없이 승인 표시한다.
       점유 없이 dept_approved를 기록하고 호출자가 즉시 실재고를 반영한다.
     """
     if not lines_input:

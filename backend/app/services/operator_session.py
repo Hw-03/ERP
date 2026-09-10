@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.models import Employee, OperatorSession
 
 
-OPERATOR_SESSION_TTL = timedelta(hours=12)
+OPERATOR_SESSION_TTL = timedelta(minutes=30)
 PIN_CHANGE_SESSION_TTL = timedelta(minutes=10)
 SESSION_TOKEN_BYTES = 32
 OPERATOR_SESSION_COOKIE = "dexcowin_operator_session"
@@ -165,6 +165,30 @@ def resolve_session_and_lock_employee(
     if resolution.row is not None:
         employee = employees.get(resolution.row.employee_id)
     return resolution, employee
+
+
+def renew_operator_session(
+    db: Session,
+    token: str | None,
+    *,
+    boot_id: str,
+    now: datetime | None = None,
+) -> SessionResolution:
+    """유효한 작업자 세션만 마지막 활동 시각 기준으로 30분 연장한다."""
+    resolution, _employee = resolve_session_and_lock_employee(
+        db,
+        token,
+        purpose="operator",
+        boot_id=boot_id,
+        now=now,
+    )
+    if resolution.status != SessionStatus.VALID or resolution.row is None:
+        return resolution
+    renewed_at = now if now is not None else utc_now()
+    if renewed_at >= resolution.row.expires_at:
+        return SessionResolution(SessionStatus.EXPIRED, resolution.row)
+    resolution.row.expires_at = renewed_at + OPERATOR_SESSION_TTL
+    return resolution
 
 
 def resolve_session_and_lock_employees(

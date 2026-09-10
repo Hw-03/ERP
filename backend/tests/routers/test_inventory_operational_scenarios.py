@@ -128,7 +128,7 @@ def _assert_auditable(
 
 
 def test_inventory_day_flow_preserves_quantities_and_audit_trail(db_session, client, make_item):
-    item = make_item(name="ops-day-flow", process_type_code="TR", warehouse_qty=D("0"))
+    item = make_item(name="ops-day-flow", process_type_code="AR", warehouse_qty=D("0"))
     warehouse_user = _make_employee(
         db_session,
         code="OPWH1",

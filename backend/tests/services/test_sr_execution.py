@@ -1,12 +1,12 @@
 """services/sr_execution.py 회귀 그물 테스트.
 
 대상: _execute_line / _execute_all_lines / _finalize_submission.
-현재 동작 고정용 — 코드는 절대 수정하지 않는다.
+현재 동작의 회귀 방지용.
 
 검증 초점:
 - 요청 타입별(RAW_RECEIVE/RAW_SHIP/WAREHOUSE_TO_DEPT/DEPT_TO_WAREHOUSE/
   DEPT_INTERNAL/MARK_DEFECTIVE_WH/MARK_DEFECTIVE_PROD) 재고 이동 + TransactionLog 생성
-- _finalize_submission 자가승인 분기 (창고 primary/deputy / admin / 일반직원 RESERVED)
+- _finalize_submission 역할별 자가승인과 일반직원 RESERVED 분기
 - 정상 경로 + ValueError (필수 부서 누락, 재고 부족, 미지원 타입)
 - 재고 불변식 (총량 보존 이동은 quantity_change=0)
 """
@@ -22,6 +22,7 @@ import pytest
 
 from app.models import (
     DepartmentEnum,
+    DefectInventoryMovement,
     DefectQuarantineRecord,
     Employee,
     EmployeeLevelEnum,
@@ -41,11 +42,14 @@ from app.models import (
     TransactionTypeEnum,
 )
 from app.services.pin_auth import DEFAULT_PIN_HASH
+from app.services import sr_approval
+from app.services import inventory_operation_cancellation as cancellation_svc
 from app.services import sr_execution as svc
 
 D = Decimal
 ASSEMBLY = DepartmentEnum.ASSEMBLY
 HV = DepartmentEnum.HIGH_VOLTAGE
+TUBE = DepartmentEnum.TUBE
 
 
 # ──────────────────────────── helpers ────────────────────────────
@@ -87,6 +91,7 @@ def _make_request(
     notes: str | None = None,
     reason_category: str | None = None,
     reason_memo: str | None = None,
+    client_request_id: str | None = None,
 ) -> StockRequest:
     req = StockRequest(
         request_code=f"SR-TEST-{uuid.uuid4().hex[:8].upper()}",
@@ -100,10 +105,117 @@ def _make_request(
         notes=notes,
         reason_category=reason_category,
         reason_memo=reason_memo,
+        client_request_id=client_request_id,
     )
     db_session.add(req)
     db_session.flush()
     return req
+
+
+def test_batch_defect_request_rejects_quantity_that_no_longer_matches_record(
+    db_session, make_item, make_location
+):
+    item = make_item(name="BATCH-STALE-UP", process_type_code="AR", warehouse_qty=D("0"))
+    make_location(
+        item.item_id,
+        department=ASSEMBLY,
+        status=LocationStatusEnum.DEFECTIVE,
+        quantity=D("2"),
+    )
+    employee = _make_employee(db_session, code="BATCH-STALE-UP")
+    record = DefectQuarantineRecord(
+        item_id=item.item_id,
+        department=ASSEMBLY.value,
+        original_quantity=D("2"),
+        remaining_quantity=D("2"),
+    )
+    db_session.add(record)
+    db_session.flush()
+    request = _make_request(
+        db_session,
+        employee,
+        request_type=StockRequestTypeEnum.DEFECT_SCRAP,
+        client_request_id="defect-batch:test-stale-up",
+    )
+    line = _add_line(
+        db_session,
+        request,
+        item,
+        quantity=D("1"),
+        from_bucket=RequestBucketEnum.DEFECTIVE,
+        to_bucket=RequestBucketEnum.NONE,
+        from_department=ASSEMBLY.value,
+        record_id=record.record_id,
+    )
+
+    with pytest.raises(ValueError, match="처리 가능 수량이 변경"):
+        svc._execute_all_lines(
+            db_session,
+            request,
+            [line],
+            operator_name=employee.name,
+            approver=employee,
+        )
+
+    assert record.remaining_quantity == D("2")
+    assert _defective_qty(db_session, item.item_id, ASSEMBLY) == D("2")
+    assert _logs(db_session, item.item_id) == []
+
+
+def test_batch_defect_request_checks_every_record_before_any_inventory_change(
+    db_session, make_item, make_location
+):
+    item = make_item(name="BATCH-STALE-ATOMIC", process_type_code="AR", warehouse_qty=D("0"))
+    make_location(
+        item.item_id,
+        department=ASSEMBLY,
+        status=LocationStatusEnum.DEFECTIVE,
+        quantity=D("5"),
+    )
+    employee = _make_employee(db_session, code="BATCH-STALE-ATOMIC")
+    records = [
+        DefectQuarantineRecord(
+            item_id=item.item_id,
+            department=ASSEMBLY.value,
+            original_quantity=quantity,
+            remaining_quantity=quantity,
+        )
+        for quantity in (D("2"), D("3"))
+    ]
+    db_session.add_all(records)
+    db_session.flush()
+    request = _make_request(
+        db_session,
+        employee,
+        request_type=StockRequestTypeEnum.DEFECT_SCRAP,
+        client_request_id="defect-batch:test-atomic-stale",
+    )
+    lines = [
+        _add_line(
+            db_session,
+            request,
+            item,
+            quantity=D("2"),
+            from_bucket=RequestBucketEnum.DEFECTIVE,
+            to_bucket=RequestBucketEnum.NONE,
+            from_department=ASSEMBLY.value,
+            record_id=record.record_id,
+        )
+        for record in records
+    ]
+
+    with pytest.raises(ValueError, match="처리 가능 수량이 변경"):
+        svc._execute_all_lines(
+            db_session,
+            request,
+            lines,
+            operator_name=employee.name,
+            approver=employee,
+        )
+
+    assert [record.remaining_quantity for record in records] == [D("2"), D("3")]
+    assert _defective_qty(db_session, item.item_id, ASSEMBLY) == D("5")
+    assert _logs(db_session, item.item_id) == []
 
 
 def _add_line(
@@ -116,6 +228,7 @@ def _add_line(
     to_bucket: RequestBucketEnum,
     from_department: str | None = None,
     to_department: str | None = None,
+    record_id: uuid.UUID | None = None,
 ) -> StockRequestLine:
     line = StockRequestLine(
         request_id=request.request_id,
@@ -127,6 +240,7 @@ def _add_line(
         from_department=from_department,
         to_department=to_department,
         status=StockRequestStatusEnum.SUBMITTED,
+        defect_quarantine_record_id=record_id,
     )
     db_session.add(line)
     db_session.flush()
@@ -282,7 +396,7 @@ def test_execute_line_internal_use_from_department_only_consumes_that_location(
 
 def test_execute_line_warehouse_to_dept(db_session, make_item):
     """WAREHOUSE_TO_DEPT: 창고 -qty / 부서 생산 +qty, 총량 불변, change=0."""
-    item = make_item(name="W2D", warehouse_qty=D("10"))
+    item = make_item(name="W2D", process_type_code="AR", warehouse_qty=D("10"))
     emp = _make_employee(db_session)
     req = _make_request(db_session, emp, request_type=StockRequestTypeEnum.WAREHOUSE_TO_DEPT)
     line = _add_line(
@@ -303,9 +417,9 @@ def test_execute_line_warehouse_to_dept(db_session, make_item):
     assert logs[0].quantity_change == D("0")
 
 
-def test_execute_line_warehouse_to_dept_missing_dept_raises(db_session, make_item):
-    """WAREHOUSE_TO_DEPT 인데 to_department 누락 → ValueError."""
-    item = make_item(name="W2DX", warehouse_qty=D("10"))
+def test_execute_line_warehouse_to_dept_missing_dept_uses_item_code(db_session, make_item):
+    """WAREHOUSE_TO_DEPT는 요청 부서가 없어도 품목 코드 부서로 실행한다."""
+    item = make_item(name="W2DX", process_type_code="AR", warehouse_qty=D("10"))
     emp = _make_employee(db_session)
     req = _make_request(db_session, emp, request_type=StockRequestTypeEnum.WAREHOUSE_TO_DEPT)
     line = _add_line(
@@ -314,13 +428,13 @@ def test_execute_line_warehouse_to_dept_missing_dept_raises(db_session, make_ite
         to_department=None,
     )
 
-    with pytest.raises(ValueError):
-        svc._execute_line(db_session, req, line, approver=emp, is_approval=False)
+    svc._execute_line(db_session, req, line, approver=emp, is_approval=False)
+    assert _prod_qty(db_session, item.item_id, ASSEMBLY) == D("3")
 
 
 def test_execute_line_dept_to_warehouse(db_session, make_item, make_location):
     """DEPT_TO_WAREHOUSE: 부서 생산 -qty / 창고 +qty, 총량 불변, change=0."""
-    item = make_item(name="D2W", warehouse_qty=D("0"))
+    item = make_item(name="D2W", process_type_code="AR", warehouse_qty=D("0"))
     make_location(item.item_id, department=ASSEMBLY,
                   status=LocationStatusEnum.PRODUCTION, quantity=D("5"))
     inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
@@ -694,6 +808,256 @@ def test_execute_line_defect_disassemble_rejects_stale_bom_quantity_before_inven
     assert _logs(db_session, parent.item_id) == []
     assert _logs(db_session, child.item_id) == []
 
+
+def test_execute_all_lines_defect_disassemble_aggregates_source_records_once(
+    db_session, make_item, make_location, make_bom
+):
+    parent = make_item(name="MULTI-PARENT", process_type_code="PF", warehouse_qty=D("0"))
+    child = make_item(name="MULTI-CHILD", process_type_code="VR", warehouse_qty=D("0"))
+    make_bom(parent.item_id, child.item_id, D("1"))
+    make_location(
+        parent.item_id,
+        department=ASSEMBLY,
+        status=LocationStatusEnum.DEFECTIVE,
+        quantity=D("3"),
+    )
+    parent_inventory = db_session.query(Inventory).filter(
+        Inventory.item_id == parent.item_id
+    ).one()
+    parent_inventory.quantity = D("3")
+    employee = _make_employee(db_session, code="MULTI-REWORK")
+    records = [
+        DefectQuarantineRecord(
+            item_id=parent.item_id,
+            department=ASSEMBLY.value,
+            original_quantity=quantity,
+            remaining_quantity=quantity,
+            quarantined_by_employee_id=employee.employee_id,
+            quarantined_by_name=employee.name,
+        )
+        for quantity in (D("1"), D("2"))
+    ]
+    db_session.add_all(records)
+    db_session.add(
+        SystemSetting(
+            setting_key="inventory_operation_cutover_at",
+            setting_value="2026-01-01T00:00:00",
+        )
+    )
+    db_session.flush()
+    request = _make_request(
+        db_session,
+        employee,
+        request_type=StockRequestTypeEnum.DEFECT_DISASSEMBLE,
+        requires_warehouse_approval=False,
+        notes=json.dumps({
+            "child_decisions": [{
+                "item_id": str(child.item_id),
+                "qty": "3",
+                "normal_qty": "3",
+                "defective_qty": "0",
+                "scrap_qty": "0",
+            }]
+        }),
+    )
+    lines = [
+        _add_line(
+            db_session,
+            request,
+            parent,
+            quantity=record.remaining_quantity,
+            from_bucket=RequestBucketEnum.DEFECTIVE,
+            to_bucket=RequestBucketEnum.NONE,
+            from_department=ASSEMBLY.value,
+            record_id=record.record_id,
+        )
+        for record in records
+    ]
+
+    svc._execute_all_lines(
+        db_session,
+        request,
+        lines,
+        operator_name=employee.name,
+        approver=employee,
+    )
+    db_session.flush()
+
+    assert _defective_qty(db_session, parent.item_id, ASSEMBLY) == D("0")
+    assert _prod_qty(db_session, child.item_id, DepartmentEnum.VACUUM) == D("3")
+    assert [record.remaining_quantity for record in records] == [D("0"), D("0")]
+    parent_logs = _logs(db_session, parent.item_id)
+    assert [log.transaction_type for log in parent_logs] == [
+        TransactionTypeEnum.DISASSEMBLE
+    ]
+    assert parent_logs[0].quantity_change == D("-3")
+    movements = (
+        db_session.query(DefectInventoryMovement)
+        .filter(DefectInventoryMovement.record_id.in_([record.record_id for record in records]))
+        .order_by(DefectInventoryMovement.record_id)
+        .all()
+    )
+    assert {
+        movement.record_id: movement.quantity_delta for movement in movements
+    } == {
+        records[0].record_id: D("-1"),
+        records[1].record_id: D("-2"),
+    }
+    assert len({movement.operation_id for movement in movements}) == 1
+    assert movements[0].operation_id == parent_logs[0].operation_id
+
+    request.status = StockRequestStatusEnum.COMPLETED
+    request.completed_at = datetime.utcnow()
+    for line in lines:
+        line.status = StockRequestStatusEnum.COMPLETED
+    db_session.commit()
+    operation = db_session.get(InventoryOperation, parent_logs[0].operation_id)
+    preview = cancellation_svc.preview_cancellation(
+        db_session,
+        operation.operation_id,
+        now=operation.effective_at,
+    )
+    assert preview.can_cancel is True, preview.blockers
+
+    cancellation_svc.cancel_operation(
+        db_session,
+        operation_id=operation.operation_id,
+        canceller=employee,
+        reason="다건 재작업 취소",
+        plan_hash=preview.plan_hash,
+        now=operation.effective_at,
+    )
+
+    db_session.expire_all()
+    assert _defective_qty(db_session, parent.item_id, ASSEMBLY) == D("3")
+    assert _prod_qty(db_session, child.item_id, DepartmentEnum.VACUUM) == D("0")
+    assert [
+        db_session.get(DefectQuarantineRecord, record.record_id).remaining_quantity
+        for record in records
+    ] == [D("1"), D("2")]
+    reversed_movements = db_session.query(DefectInventoryMovement).filter(
+        DefectInventoryMovement.reverses_movement_id.isnot(None)
+    ).all()
+    assert {movement.record_id for movement in reversed_movements} == {
+        record.record_id for record in records
+    }
+
+
+def test_execute_all_lines_defect_disassemble_rejects_duplicate_record_before_mutation(
+    db_session, make_item, make_location, make_bom
+):
+    parent = make_item(name="DUP-PARENT", process_type_code="PF", warehouse_qty=D("0"))
+    child = make_item(name="DUP-CHILD", process_type_code="VR", warehouse_qty=D("0"))
+    make_bom(parent.item_id, child.item_id, D("1"))
+    make_location(
+        parent.item_id,
+        department=ASSEMBLY,
+        status=LocationStatusEnum.DEFECTIVE,
+        quantity=D("2"),
+    )
+    db_session.query(Inventory).filter(Inventory.item_id == parent.item_id).one().quantity = D("2")
+    employee = _make_employee(db_session, code="DUP-REWORK")
+    record = DefectQuarantineRecord(
+        item_id=parent.item_id,
+        department=ASSEMBLY.value,
+        original_quantity=D("2"),
+        remaining_quantity=D("2"),
+    )
+    db_session.add(record)
+    db_session.flush()
+    request = _make_request(
+        db_session,
+        employee,
+        request_type=StockRequestTypeEnum.DEFECT_DISASSEMBLE,
+        requires_warehouse_approval=False,
+        notes=json.dumps({
+            "child_decisions": [{
+                "item_id": str(child.item_id),
+                "qty": "2",
+                "normal_qty": "2",
+                "defective_qty": "0",
+                "scrap_qty": "0",
+            }]
+        }),
+    )
+    lines = [
+        _add_line(
+            db_session,
+            request,
+            parent,
+            quantity=D("1"),
+            from_bucket=RequestBucketEnum.DEFECTIVE,
+            to_bucket=RequestBucketEnum.NONE,
+            from_department=ASSEMBLY.value,
+            record_id=record.record_id,
+        )
+        for _ in range(2)
+    ]
+
+    with pytest.raises(ValueError, match="중복"):
+        svc._execute_all_lines(
+            db_session,
+            request,
+            lines,
+            operator_name=employee.name,
+            approver=employee,
+        )
+
+    assert _defective_qty(db_session, parent.item_id, ASSEMBLY) == D("2")
+    assert record.remaining_quantity == D("2")
+    assert _prod_qty(db_session, child.item_id, DepartmentEnum.VACUUM) == D("0")
+    assert _logs(db_session, parent.item_id) == []
+
+
+def test_prepare_defect_disassemble_sources_rejects_stale_record_quantity(
+    db_session, make_item, make_location
+):
+    parent = make_item(name="STALE-MULTI-PARENT", process_type_code="PF", warehouse_qty=D("0"))
+    make_location(
+        parent.item_id,
+        department=ASSEMBLY,
+        status=LocationStatusEnum.DEFECTIVE,
+        quantity=D("2"),
+    )
+    db_session.query(Inventory).filter(Inventory.item_id == parent.item_id).one().quantity = D("2")
+    employee = _make_employee(db_session, code="STALE-MULTI-REWORK")
+    records = [
+        DefectQuarantineRecord(
+            item_id=parent.item_id,
+            department=ASSEMBLY.value,
+            original_quantity=D("1"),
+            remaining_quantity=D("1"),
+        )
+        for _ in range(2)
+    ]
+    db_session.add_all(records)
+    db_session.flush()
+    request = _make_request(
+        db_session,
+        employee,
+        request_type=StockRequestTypeEnum.DEFECT_DISASSEMBLE,
+    )
+    lines = [
+        _add_line(
+            db_session,
+            request,
+            parent,
+            quantity=quantity,
+            from_bucket=RequestBucketEnum.DEFECTIVE,
+            to_bucket=RequestBucketEnum.NONE,
+            from_department=ASSEMBLY.value,
+            record_id=record.record_id,
+        )
+        for record, quantity in zip(records, (D("1"), D("2")))
+    ]
+
+    with pytest.raises(ValueError, match="처리 가능 수량"):
+        svc._prepare_defect_disassemble_sources(db_session, lines)
+
+    assert _defective_qty(db_session, parent.item_id, ASSEMBLY) == D("2")
+    assert [record.remaining_quantity for record in records] == [D("1"), D("1")]
+    assert _logs(db_session, parent.item_id) == []
+
 def test_execute_line_raw_ship_insufficient_raises(db_session, make_item):
     """RAW_SHIP 창고 재고 부족 → ValueError."""
     item = make_item(name="RSX", warehouse_qty=D("2"))
@@ -709,7 +1073,7 @@ def test_execute_line_raw_ship_insufficient_raises(db_session, make_item):
 
 def test_release_then_execute_line_approval_consumes_stock(db_session, make_item):
     """Final approval releases the request once before line execution."""
-    item = make_item(name="APR", warehouse_qty=D("10"), pending=D("3"))
+    item = make_item(name="APR", process_type_code="AR", warehouse_qty=D("10"), pending=D("3"))
     emp = _make_employee(db_session)
     req = _make_request(db_session, emp, request_type=StockRequestTypeEnum.WAREHOUSE_TO_DEPT)
     line = _add_line(
@@ -882,7 +1246,7 @@ def test_execute_all_lines_prelocks_physical_ledger_before_line_execution(
 
 def test_finalize_warehouse_primary_self_approves(db_session, make_item):
     """창고 primary 본인 wh_to_dept 제출 → 즉시 COMPLETED + 실재고 이동 + approved_by 기록."""
-    item = make_item(name="FIN1", warehouse_qty=D("10"))
+    item = make_item(name="FIN1", process_type_code="AR", warehouse_qty=D("10"))
     emp = _make_employee(db_session, warehouse_role="primary")
     req = _make_request(
         db_session, emp, request_type=StockRequestTypeEnum.WAREHOUSE_TO_DEPT,
@@ -968,10 +1332,56 @@ def test_finalize_warehouse_primary_self_approves_dual_request(db_session, make_
     )
     db_session.flush()
 
-    assert request.status == StockRequestStatusEnum.COMPLETED
+    assert request.status == StockRequestStatusEnum.RESERVED
     assert request.approved_by_employee_id == requester.employee_id
-    assert request.department_approved_by_employee_id == requester.employee_id
-    assert _wh_qty(db_session, item.item_id) == D("3")
+    assert request.department_approved_by_employee_id is None
+    assert _wh_qty(db_session, item.item_id) == D("5")
+    inventory = db_session.query(Inventory).filter(
+        Inventory.item_id == item.item_id
+    ).one()
+    assert inventory.pending_quantity == D("2")
+
+
+def test_finalize_department_primary_waits_for_warehouse_before_self_approval(
+    db_session,
+    make_item,
+):
+    item = make_item(name="dual-department-self-approval", warehouse_qty=D("5"))
+    requester = _make_employee(
+        db_session,
+        code="DUAL-DEPT-SELF",
+        warehouse_role="none",
+    )
+    requester.department_role = "primary"
+    request = _make_request(
+        db_session,
+        requester,
+        request_type=StockRequestTypeEnum.WAREHOUSE_TO_DEPT,
+        requires_warehouse_approval=True,
+        requires_department_approval=True,
+    )
+    _add_line(
+        db_session,
+        request,
+        item,
+        quantity=D("2"),
+        from_bucket=RequestBucketEnum.WAREHOUSE,
+        to_bucket=RequestBucketEnum.PRODUCTION,
+        to_department=ASSEMBLY.value,
+    )
+
+    svc._finalize_submission(
+        db_session,
+        request=request,
+        requester=requester,
+        now=datetime.utcnow(),
+    )
+    db_session.flush()
+
+    assert request.status == StockRequestStatusEnum.RESERVED
+    assert request.approved_by_employee_id is None
+    assert request.department_approved_by_employee_id is None
+    assert _wh_qty(db_session, item.item_id) == D("5")
 
 
 def test_finalize_admin_does_not_self_approve_department_part(db_session, make_item):
@@ -1071,6 +1481,118 @@ def test_finalize_dept_to_warehouse_reserves_production_source(
     assert _loc_pending(db_session, item.item_id) == D("4")
 
 
+def test_approve_dept_to_warehouse_rereserves_live_code_source(
+    db_session, make_item, make_location, monkeypatch
+):
+    """승인 전 코드가 바뀌면 기존 예약을 푼 뒤 새 부서를 다시 예약해 실행한다."""
+    item = make_item(name="live D2W reservation", process_type_code="AR", warehouse_qty=D("0"))
+    make_location(item.item_id, department=ASSEMBLY, quantity=D("1"))
+    make_location(item.item_id, department=TUBE, quantity=D("1"))
+    requester = _make_employee(db_session, warehouse_role="none")
+    approver = _make_employee(db_session, code="WH-APP", warehouse_role="primary")
+    request = _make_request(
+        db_session,
+        requester,
+        request_type=StockRequestTypeEnum.DEPT_TO_WAREHOUSE,
+        requires_warehouse_approval=True,
+    )
+    _add_line(
+        db_session,
+        request,
+        item,
+        quantity=D("1"),
+        from_bucket=RequestBucketEnum.PRODUCTION,
+        to_bucket=RequestBucketEnum.WAREHOUSE,
+        from_department=ASSEMBLY.value,
+    )
+    svc._finalize_submission(db_session, request=request, requester=requester, now=datetime.utcnow())
+    assert request.status == StockRequestStatusEnum.RESERVED
+
+    item.process_type_code = "TR"
+    db_session.flush()
+    from app.services import sr_reservation
+
+    original_reserve = sr_reservation.reserve_lines
+    reroute_reservations: list[str | None] = []
+
+    def capture_live_reservation(db, lines, *, employee=None):
+        lines = list(lines)
+        reroute_reservations.extend(line.from_department for line in lines)
+        return original_reserve(db, lines, employee=employee)
+
+    monkeypatch.setattr(sr_reservation, "reserve_lines", capture_live_reservation)
+    sr_approval.approve_request(db_session, request, approver=approver, pin="0000")
+
+    assert reroute_reservations == [TUBE.value]
+    assert request.lines[0].from_department == TUBE.value
+    assert _prod_qty(db_session, item.item_id, ASSEMBLY) == D("1")
+    assert _prod_qty(db_session, item.item_id, TUBE) == D("0")
+    assert _loc_pending(db_session, item.item_id, TUBE) == D("0")
+    assert _wh_qty(db_session, item.item_id) == D("1")
+
+
+def test_live_reroute_preflight_does_not_consume_competing_pending_stock(
+    db_session, make_item, make_location
+):
+    """코드 변경 뒤 새 부서의 다른 대기 예약을 넘겨 출고할 수 없다."""
+    item = make_item(name="competing live D2W", process_type_code="AR", warehouse_qty=D("0"))
+    make_location(item.item_id, department=ASSEMBLY, quantity=D("1"))
+    make_location(item.item_id, department=TUBE, quantity=D("1"))
+    requester = _make_employee(db_session, warehouse_role="none")
+    old_request = _make_request(
+        db_session,
+        requester,
+        request_type=StockRequestTypeEnum.DEPT_TO_WAREHOUSE,
+        requires_warehouse_approval=True,
+    )
+    _add_line(
+        db_session,
+        old_request,
+        item,
+        quantity=D("1"),
+        from_bucket=RequestBucketEnum.PRODUCTION,
+        to_bucket=RequestBucketEnum.WAREHOUSE,
+        from_department=ASSEMBLY.value,
+    )
+    svc._finalize_submission(
+        db_session, request=old_request, requester=requester, now=datetime.utcnow()
+    )
+    item.process_type_code = "TR"
+    db_session.flush()
+
+    competing_request = _make_request(
+        db_session,
+        requester,
+        request_type=StockRequestTypeEnum.DEPT_TO_WAREHOUSE,
+        requires_warehouse_approval=True,
+    )
+    _add_line(
+        db_session,
+        competing_request,
+        item,
+        quantity=D("1"),
+        from_bucket=RequestBucketEnum.PRODUCTION,
+        to_bucket=RequestBucketEnum.WAREHOUSE,
+        from_department=TUBE.value,
+    )
+    svc._finalize_submission(
+        db_session, request=competing_request, requester=requester, now=datetime.utcnow()
+    )
+    assert _loc_pending(db_session, item.item_id, TUBE) == D("1")
+
+    svc.release_reservation(db_session, old_request, actor=requester)
+    with pytest.raises(ValueError, match="부서 가용 재고 부족"):
+        svc.reroute_and_preflight_dept_to_warehouse(
+            db_session,
+            old_request,
+            actor=requester,
+        )
+
+    assert _prod_qty(db_session, item.item_id, TUBE) == D("1")
+    assert _loc_pending(db_session, item.item_id, TUBE) == D("1")
+    assert _wh_qty(db_session, item.item_id) == D("0")
+
+
 def test_finalize_inbound_only_approval_stays_submitted(db_session, make_item):
     item = make_item(name="inbound-only")
     requester = _make_employee(db_session, warehouse_role="none")
@@ -1129,8 +1651,8 @@ def test_finalize_no_approval_required_completes(db_session, make_item, make_loc
     assert len(_logs(db_session, item.item_id)) == 1
 
 
-def test_finalize_admin_self_approves(db_session, make_item):
-    """admin 요청자 → 창고 승인 없이도 자가승인 COMPLETED + approved_by 기록."""
+def test_finalize_admin_without_warehouse_role_waits_for_approval(db_session, make_item):
+    """admin level만으로는 창고 결재 권한이 생기지 않는다."""
     item = make_item(name="FIN5", warehouse_qty=D("9"))
     emp = _make_employee(db_session, warehouse_role="none", level=EmployeeLevelEnum.ADMIN)
     req = _make_request(
@@ -1146,9 +1668,13 @@ def test_finalize_admin_self_approves(db_session, make_item):
     svc._finalize_submission(db_session, request=req, requester=emp, now=datetime.utcnow())
     db_session.flush()
 
-    assert req.status == StockRequestStatusEnum.COMPLETED
-    assert req.approved_by_employee_id == emp.employee_id  # admin self-approved
-    assert _wh_qty(db_session, item.item_id) == D("6")
+    assert req.status == StockRequestStatusEnum.RESERVED
+    assert req.approved_by_employee_id is None
+    assert _wh_qty(db_session, item.item_id) == D("9")
+    inventory = db_session.query(Inventory).filter(
+        Inventory.item_id == item.item_id
+    ).one()
+    assert inventory.pending_quantity == D("3")
 
 
 # ══════════════════════════ release_reservation ══════════════════════════

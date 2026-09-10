@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { RequestBucket, StockRequestLine } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { StockRequestLineTable } from "../StockRequestLineTable";
+import { getRequestFlowLabel } from "../ioRequestLabels";
 
 function makeLine(
   index: number,
@@ -27,6 +28,16 @@ function makeLine(
 }
 
 describe("StockRequestLineTable", () => {
+  it("혼합 부서 수동 조정은 첫 부서 대신 여러 부서와 라인별 입출고를 표시", () => {
+    const lines: StockRequestLine[] = [
+      { ...makeLine(1, "none", "production"), to_department: "튜브" },
+      { ...makeLine(2, "production", "none"), from_department: "고압" },
+    ];
+    render(<StockRequestLineTable requestType="manual_adjustment" lines={lines} />);
+    expect(screen.getByText("튜브 입고")).toBeInTheDocument();
+    expect(screen.getByText("고압 출고")).toBeInTheDocument();
+    expect(getRequestFlowLabel("manual_adjustment", lines)).toBe("여러 부서");
+  });
   it("데스크톱 열 제목과 입고·출고·이동 요청 수량을 표시", () => {
     render(
       <StockRequestLineTable
@@ -73,6 +84,17 @@ describe("StockRequestLineTable", () => {
       "grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]",
     );
     expect(screen.getByText("3-TR-0001")).toHaveClass("lg:hidden");
+  });
+
+  it("자동 부서 승인 요청 라인에는 실제 창고→부서 경로를 표시", () => {
+    render(
+      <StockRequestLineTable
+        requestType="warehouse_to_dept"
+        lines={[{ ...makeLine(1, "warehouse", "production"), to_department: "고압" }]}
+      />,
+    );
+
+    expect(screen.getByText("창고 → 고압")).toBeInTheDocument();
   });
 
   it("collapseAfter 이후 품목을 더보기와 접기로 전환", () => {

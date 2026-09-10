@@ -134,6 +134,8 @@ export interface BoxItemPayload {
 
 export const warehouseMapApi = {
   getMap: () => fetcher<WarehouseMap>(toApiUrl("/api/warehouse-map/map")),
+  verifyEditor: () =>
+    postJson<void>(toApiUrl("/api/warehouse-map/verify-editor")),
   getBoxTracking: () =>
     fetcher<BoxTrackingUiPreference>(toApiUrl("/api/warehouse-map/box-tracking")),
   setBoxTracking: (payload: BoxTrackingUiPreference) =>

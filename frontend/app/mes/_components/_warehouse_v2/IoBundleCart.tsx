@@ -26,6 +26,8 @@ interface Props {
   onAdvance: () => void;
   canAdvance: boolean;
   hasShortage?: boolean;
+  hasInvalidQuantity?: boolean;
+  invalidLineCodes?: string[];
   /** 항목 3-4 — 모바일 전용: Step4에도 임시저장 버튼 노출. 데스크톱은 미전달(버튼 없음 → 무변경). */
   onSaveDraft?: () => void;
   /** 항목 7 — 부족 품목 '창고에서 가져오기'(생산 4단계, 데스크톱 전용). */
@@ -36,6 +38,8 @@ interface Props {
   /** 가져오기 버튼 라벨용 — 선택 0이면 부족 라인 전체 개수. */
   pullCount?: number;
   pulling?: boolean;
+  /** BOM 목록 미확인/실패 시 새 창고 반출 작업 전환을 막는다. */
+  pullBlocked?: boolean;
 }
 
 export function IoBundleCart({
@@ -53,6 +57,8 @@ export function IoBundleCart({
   onAdvance,
   canAdvance,
   hasShortage,
+  hasInvalidQuantity,
+  invalidLineCodes = [],
   onSaveDraft,
   pullEnabled,
   pullSelected,
@@ -60,8 +66,10 @@ export function IoBundleCart({
   onPullFromWarehouse,
   pullCount,
   pulling,
+  pullBlocked,
 }: Props) {
   const pullSelectedCount = pullSelected?.size ?? 0;
+  const includedCount = bundles.flatMap((bundle) => bundle.lines).filter((line) => line.included).length;
   const hasMissingInternalUseBomMode =
     subType === "internal_use_out" && hasUnselectedInternalUseBomMode(bundles);
   const pullButtonLabel =
@@ -131,6 +139,16 @@ export function IoBundleCart({
               재고가 부족한 항목이 있습니다
             </p>
           )}
+          {!canAdvance && !hasShortage && includedCount === 0 && (
+            <p className="text-center text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>
+              반영할 품목을 하나 이상 선택하세요
+            </p>
+          )}
+          {!canAdvance && !hasShortage && hasInvalidQuantity && invalidLineCodes.length > 0 && (
+            <p className="text-center text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>
+              수량 0: {invalidLineCodes.join(", ")}
+            </p>
+          )}
           {!canAdvance && hasMissingInternalUseBomMode && (
             <p className="text-center text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>
               각 BOM 묶음의 차감 방식을 선택하세요
@@ -140,7 +158,7 @@ export function IoBundleCart({
             <button
               type="button"
               onClick={onPullFromWarehouse}
-              disabled={internalUseBomBusy || pulling}
+              disabled={internalUseBomBusy || pulling || pullBlocked}
               className="standard-hover w-full rounded-[14px] border px-5 py-3 text-sm font-black transition-colors"
               style={{
                 background: tint(LEGACY_COLORS.red, 10),

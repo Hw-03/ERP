@@ -13,6 +13,7 @@ from app._actor import clear_actor, set_actor
 from app.database import get_db
 from app.dependencies.verified_actor import (
     OptionalCurrentActor,
+    VerifiedActor,
     ensure_actor_employee_code,
     resolve_verified_actor,
 )
@@ -28,11 +29,13 @@ from app.schemas import (
 from app.services import audit, rate_limit
 from app.services.operator_session import (
     IssuedSession,
+    OPERATOR_SESSION_TTL,
     OPERATOR_SESSION_COOKIE,
     PIN_CHANGE_CHALLENGE_COOKIE,
     SessionStatus,
     _reissue_pin_change_session,
     create_session,
+    renew_operator_session,
     resolve_session,
     resolve_session_and_lock_employee,
     resolve_session_and_lock_employees,
@@ -53,7 +56,13 @@ _DUMMY_PIN_HASH = hash_pin("9999")
 MAX_ACTIVE_OPERATOR_SESSIONS_PER_EMPLOYEE = 32
 
 
-def _set_cookie(response: Response, *, name: str, token: str, max_age: int) -> None:
+def _set_cookie(
+    response: Response,
+    *,
+    name: str,
+    token: str,
+    max_age: int | None,
+) -> None:
     response.set_cookie(
         name,
         token,
@@ -66,11 +75,12 @@ def _set_cookie(response: Response, *, name: str, token: str, max_age: int) -> N
 
 
 def set_operator_session_cookie(response: Response, issued: IssuedSession) -> None:
+    """작업자 token은 서버 만료만 권위 있게 적용하는 브라우저 session cookie다."""
     _set_cookie(
         response,
         name=OPERATOR_SESSION_COOKIE,
         token=issued.token,
-        max_age=12 * 60 * 60,
+        max_age=None,
     )
 
 
@@ -360,9 +370,11 @@ def create_operator_session(
             expires_at = issued.row.expires_at
         else:
             assert existing_operator is not None
+            existing_operator.expires_at = now + OPERATOR_SESSION_TTL
             expires_at = existing_operator.expires_at
         session_response = OperatorSessionResponse(
             employee=employee_profile(db, employee),
+            server_time=now,
             expires_at=expires_at,
             boot_id=current_boot_id(),
         )
@@ -397,9 +409,39 @@ def get_operator_session(
     employee, session_row = resolve_verified_actor(db, request, for_update=False)
     return OperatorSessionResponse(
         employee=employee_profile(db, employee),
+        server_time=utc_now(),
         expires_at=session_row.expires_at,
         boot_id=current_boot_id(),
     )
+
+
+@router.post("/activity", response_model=OperatorSessionResponse)
+def renew_current_operator_session(
+    request: Request,
+    _response: Response,
+    actor: VerifiedActor,
+    db: Session = Depends(get_db),
+) -> OperatorSessionResponse:
+    """명시적인 사용자 활동으로 유효한 작업자 세션만 30분 연장한다."""
+    resolution = renew_operator_session(
+        db,
+        request.cookies.get(OPERATOR_SESSION_COOKIE),
+        boot_id=current_boot_id(),
+    )
+    if resolution.status != SessionStatus.VALID or resolution.row is None:
+        raise _session_error(resolution.status)
+    session_response = OperatorSessionResponse(
+        employee=employee_profile(db, actor),
+        server_time=utc_now(),
+        expires_at=resolution.row.expires_at,
+        boot_id=current_boot_id(),
+    )
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return session_response
 
 
 @router.delete("", status_code=status.HTTP_204_NO_CONTENT)

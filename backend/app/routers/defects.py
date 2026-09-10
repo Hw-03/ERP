@@ -3,19 +3,21 @@
 엔드포인트:
   GET  /api/defects/locations    활성 건별 격리 기록 목록
   GET  /api/defects/kpi          KPI 카드 (격리중/1년이상)
+  GET  /api/defects/statistics   KST 주간·월간·연간 불량 발생 통계
   POST /api/defects/quarantine   격리 (mark_defective 래퍼)
   POST /api/defects/unquarantine 정상 복귀 (unmark_defective 래퍼)
+  POST /api/defects/unquarantine/bulk 선택 기록 다건 정상 복귀
 """
 
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import List, Literal, Optional
 
 from fastapi import Depends, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -46,6 +48,12 @@ from app.services import defect_actions as defect_actions_svc
 from app.services.pin_auth import validate_pin
 from app._evt import emit as _evt_emit
 from app.repositories import item_repository
+from app.schemas.defect_statistics import (
+    DefectStatisticsFilters,
+    DefectStatisticsPeriodKind,
+    DefectStatisticsResponse,
+)
+from app.services.defect_statistics import get_defect_statistics
 
 router = VerifiedActorRouter()
 
@@ -106,6 +114,26 @@ class UnquarantineRequest(BaseModel):
 class DefectActionResult(BaseModel):
     item_id: uuid.UUID
     quantity: Decimal
+    message: str
+
+
+class BulkUnquarantineLine(BaseModel):
+    record_id: uuid.UUID
+    item_id: uuid.UUID
+    department: str
+    quantity: Decimal
+
+
+class BulkUnquarantineRequest(BaseModel):
+    actor_employee_id: uuid.UUID
+    reason_category: Optional[str] = None
+    reason_memo: Optional[str] = None
+    lines: List[BulkUnquarantineLine] = Field(..., min_length=1)
+
+
+class BulkUnquarantineResult(BaseModel):
+    processed_records: int
+    total_quantity: Decimal
     message: str
 
 
@@ -414,6 +442,28 @@ def get_defect_kpi(db: Session = Depends(get_db)):
     )
 
 
+@router.get("/statistics", response_model=DefectStatisticsResponse)
+def get_statistics(
+    period: DefectStatisticsPeriodKind = Query("week"),
+    anchor: date = Query(...),
+    department: Optional[List[str]] = Query(None),
+    model: Optional[List[str]] = Query(None),
+    process_step: Optional[List[str]] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """KST 달력 기준 불량 발생 통계를 주간·월간·연간으로 반환한다."""
+    return get_defect_statistics(
+        db,
+        period=period,
+        anchor=anchor,
+        filters=DefectStatisticsFilters(
+            departments=tuple(department or ()),
+            models=tuple(model or ()),
+            process_steps=tuple(process_step or ()),
+        ),
+    )
+
+
 # ---------------------------------------------------------------------------
 # GET/PUT /api/defects/records/{record_id}/memo
 # ---------------------------------------------------------------------------
@@ -624,5 +674,55 @@ def unquarantine(
     return DefectActionResult(
         item_id=payload.item_id,
         quantity=payload.qty,
+        message="정상 복귀 완료",
+    )
+
+
+@router.post("/unquarantine/bulk", response_model=BulkUnquarantineResult)
+def unquarantine_bulk(
+    payload: BulkUnquarantineRequest,
+    http_request: Request,
+    actor: VerifiedActor,
+    db: Session = Depends(get_db),
+):
+    """선택한 동일 품목·부서 격리 기록을 전부 정상 복귀한다."""
+    ensure_actor_employee_id(actor, payload.actor_employee_id)
+
+    try:
+        lines = [
+            defect_actions_svc.BulkUnquarantineLine(
+                record_id=line.record_id,
+                item_id=line.item_id,
+                department=_dept_enum(line.department),
+                quantity=line.quantity,
+            )
+            for line in payload.lines
+        ]
+        defect_actions_svc.unquarantine_inventory_bulk(
+            db,
+            lines=lines,
+            actor=actor,
+            reason_category=payload.reason_category,
+            reason_memo=payload.reason_memo,
+        )
+    except ValueError as exc:
+        raise http_error(422, ErrorCode.VALIDATION_ERROR, str(exc))
+
+    total_quantity = sum(
+        (Decimal(str(line.quantity)) for line in lines),
+        Decimal("0"),
+    )
+    _evt_emit(
+        "defect_unmark_bulk",
+        request=http_request,
+        item=str(lines[0].item_id),
+        qty=str(total_quantity),
+        dept=lines[0].department.value,
+        records=str(len(lines)),
+        reason=payload.reason_category,
+    )
+    return BulkUnquarantineResult(
+        processed_records=len(lines),
+        total_quantity=total_quantity,
         message="정상 복귀 완료",
     )

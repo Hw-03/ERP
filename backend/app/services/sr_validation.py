@@ -28,6 +28,27 @@ from app.services import stock_availability
 # 정책 상수
 # ---------------------------------------------------------------------------
 
+DEFECT_BATCH_CLIENT_REQUEST_PREFIX = "defect-batch:"
+DEFECT_QUARANTINE_PROCESS_TYPES = frozenset(
+    {
+        StockRequestTypeEnum.DEFECT_SCRAP,
+        StockRequestTypeEnum.DEFECT_RETURN,
+        StockRequestTypeEnum.DEFECT_DISASSEMBLE,
+    }
+)
+
+
+def requires_exact_defect_selection(
+    request_type: StockRequestTypeEnum,
+    line_count: int,
+    client_request_id: Optional[str],
+) -> bool:
+    """목록 선택 흐름은 각 기록의 선택 당시 전체 처리 가능 수량만 허용한다."""
+    return request_type in DEFECT_QUARANTINE_PROCESS_TYPES and (
+        line_count > 1
+        or bool(client_request_id and client_request_id.startswith(DEFECT_BATCH_CLIENT_REQUEST_PREFIX))
+    )
+
 # request_type → 승인 시 호출할 거래 유형 (TransactionLog.transaction_type)
 _TX_TYPE_BY_REQUEST: dict[StockRequestTypeEnum, TransactionTypeEnum] = {
     StockRequestTypeEnum.RAW_RECEIVE: TransactionTypeEnum.RECEIVE,
@@ -389,6 +410,8 @@ def _preflight_inventory_check(
 def _preflight_defective_check(
     db: Session,
     lines_input: Sequence[LineInput],
+    *,
+    require_exact_records: bool = False,
 ) -> None:
     """from_bucket==DEFECTIVE 라인의 격리 재고 사전 검증.
 
@@ -400,17 +423,32 @@ def _preflight_defective_check(
     """
     from app.services import defect_records as defect_records_svc
 
+    if require_exact_records:
+        item_repository.lock_active_many(
+            db,
+            (
+                line.item_id
+                for line in lines_input
+                if line.from_bucket == RequestBucketEnum.DEFECTIVE
+            ),
+        )
+
     needed: dict[tuple, Decimal] = {}
     record_needed: dict[uuid.UUID, Decimal] = {}
     records = {}
-    for li in lines_input:
+    ordered_lines = (
+        sorted(lines_input, key=lambda line: str(line.record_id))
+        if require_exact_records
+        else lines_input
+    )
+    for li in ordered_lines:
         if li.from_bucket == RequestBucketEnum.DEFECTIVE and li.from_department is not None:
             record = defect_records_svc._get_record_for_action(
                 db,
                 record_id=li.record_id,
                 item_id=li.item_id,
                 department=li.from_department,
-                lock=False,
+                lock=require_exact_records,
             )
             if record is not None:
                 li.record_id = record.record_id
@@ -423,7 +461,12 @@ def _preflight_defective_check(
                 needed[key] = needed.get(key, Decimal("0")) + li.quantity
 
     for record_id, qty in record_needed.items():
-        defect_records_svc._ensure_available(db, records[record_id], qty)
+        defect_records_svc._ensure_available(
+            db,
+            records[record_id],
+            qty,
+            require_exact=require_exact_records,
+        )
 
     if not needed:
         return
@@ -439,6 +482,11 @@ def _preflight_defective_check(
             .first()
         )
         avail = loc.quantity if loc else Decimal("0")
+        if require_exact_records and avail != qty:
+            raise ValueError(
+                f"선택한 격리 재고의 처리 가능 수량이 변경되었습니다: "
+                f"현재 {avail}개, 선택 당시 {qty}개."
+            )
         if avail < qty:
             item = item_repository.get_active(db, item_id)
             item_name = item.item_name if item else str(item_id)

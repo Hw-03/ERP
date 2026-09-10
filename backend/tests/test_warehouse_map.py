@@ -109,6 +109,15 @@ def _set_unplaced(db_session, item_id, quantity: int) -> WarehouseUnplacedItem:
 
 # ──────────────────────────── 앵글 CRUD ────────────────────────────
 
+def test_verify_editor_access_requires_valid_manager_pin(client):
+    assert client.post(f"{BASE}/verify-editor").status_code == 403
+    assert client.post(
+        f"{BASE}/verify-editor",
+        headers={"X-Employee-Code": "WM001", "X-Operator-Pin": "9999"},
+    ).status_code == 403
+    assert client.post(f"{BASE}/verify-editor", headers=MGR).status_code == 204
+
+
 def test_create_angle(client):
     angle = _make_angle(client)
     assert angle["label"] == "A열"

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies.verified_actor import (
+    CurrentActor,
     VerifiedActor,
     VerifiedActorRouter,
     ensure_actor_employee_id,
@@ -262,8 +263,10 @@ def get_io_draft(
     requester_employee_id: uuid.UUID = Query(...),
     work_type: str = Query(...),
     sub_type: Optional[str] = Query(None),
+    actor: CurrentActor = None,
     db: Session = Depends(get_db),
 ):
+    ensure_actor_employee_id(actor, requester_employee_id)
     return io_svc.get_draft(
         db,
         requester_employee_id=requester_employee_id,
@@ -275,8 +278,10 @@ def get_io_draft(
 @router.get("/drafts", response_model=list[IoBatchResponse])
 def list_io_drafts(
     requester_employee_id: uuid.UUID = Query(...),
+    actor: CurrentActor = None,
     db: Session = Depends(get_db),
 ):
+    ensure_actor_employee_id(actor, requester_employee_id)
     return io_svc.list_drafts(db, requester_employee_id=requester_employee_id)
 
 
@@ -444,8 +449,14 @@ def submit_io_draft(
 
 
 @router.get("/{batch_id}", response_model=IoBatchResponse)
-def get_io_batch(batch_id: uuid.UUID, db: Session = Depends(get_db)):
+def get_io_batch(
+    batch_id: uuid.UUID,
+    actor: CurrentActor = None,
+    db: Session = Depends(get_db),
+):
     batch = io_svc.get_batch(db, batch_id=batch_id)
     if batch is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "입출고 작업 묶음을 찾을 수 없습니다.")
+    if batch["status"] == "draft":
+        ensure_actor_employee_id(actor, batch["requester_employee_id"])
     return batch

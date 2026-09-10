@@ -9,13 +9,14 @@ import uuid
 from typing import List, Optional
 
 from fastapi import Depends, Query, Request, Response, status
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from sqlalchemy.exc import IntegrityError
 
-from app.database import get_db, _is_sqlite
+from app.database import get_db
 from app.dependencies.verified_actor import (
+    CurrentActor,
     VerifiedActor,
     VerifiedActorRouter,
     ensure_actor_employee_id,
@@ -23,12 +24,13 @@ from app.dependencies.verified_actor import (
 from app.models import (
     Employee,
     IoBatch,
+    Item,
     StockRequest,
     StockRequestStatusEnum,
     StockRequestTypeEnum,
 )
 from app.routers._errors import ErrorCode, http_error
-from app.services.dept_hierarchy import approvable_departments
+from app.services.dept_hierarchy import approvable_departments, can_approve_department
 from app.schemas import (
     ReservationLineResponse,
     StockRequestActionRequest,
@@ -38,6 +40,7 @@ from app.schemas import (
     StockRequestSubmitPayload,
 )
 from app.services import stock_requests as svc
+from app.services.inv_transfer import department_for_item
 from app.services import stock_request_actions as action_svc
 from app.services._tx import commit_and_refresh, commit_only
 from app.services import notifications as notif_svc
@@ -97,6 +100,31 @@ def _resolve_stock_request_idempotency(
     return existing
 
 
+def _validate_direct_automatic_department_routes(
+    db: Session,
+    payload: StockRequestCreate | StockRequestDraftUpsert,
+) -> None:
+    """직접 창고↔부서 요청도 품목 코드와 다른 생산부서를 우회하지 못하게 한다."""
+    expected_department_field = {
+        StockRequestTypeEnum.WAREHOUSE_TO_DEPT: "to_department",
+        StockRequestTypeEnum.DEPT_TO_WAREHOUSE: "from_department",
+    }.get(payload.request_type)
+    if expected_department_field is None:
+        return
+    for line in payload.lines:
+        item = db.query(Item).filter(Item.item_id == line.item_id).first()
+        if item is None:
+            # 기존 서비스가 동일한 422 메시지로 처리한다.
+            continue
+        expected = department_for_item(item).value
+        actual = getattr(line, expected_department_field)
+        if actual != expected:
+            raise ValueError(
+                f"품목코드 기준 부서와 요청 부서가 다릅니다: "
+                f"{item.mes_code or item.item_id} / 기대 {expected} / 요청 {actual}"
+            )
+
+
 # ---------------------------------------------------------------------------
 # 요청 생성
 # ---------------------------------------------------------------------------
@@ -132,6 +160,11 @@ def create_stock_request(
         )
         if replay is not None:
             return replay
+
+    try:
+        _validate_direct_automatic_department_routes(db, payload)
+    except ValueError as exc:
+        raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
 
     lines_input = [
         svc.LineInput(
@@ -191,54 +224,84 @@ def create_stock_request(
 # ---------------------------------------------------------------------------
 
 
+def _has_warehouse_approval_role(actor: Employee) -> bool:
+    return (actor.warehouse_role or "none").lower() in ("primary", "deputy")
+
+
+def _require_warehouse_approval_role(actor: Employee) -> None:
+    if not _has_warehouse_approval_role(actor):
+        raise http_error(403, ErrorCode.FORBIDDEN, "창고 결재 권한이 없습니다.")
+
+
+def _require_department_approval_role(actor: Employee) -> None:
+    if not (actor.department_role or "none").lower() in ("primary", "deputy"):
+        raise http_error(403, ErrorCode.FORBIDDEN, "부서 결재 권한이 없습니다.")
+
+
 @router.get("", response_model=List[StockRequestResponse])
 def list_stock_requests(
     requester_employee_id: Optional[uuid.UUID] = Query(None),
     status_filter: Optional[StockRequestStatusEnum] = Query(None, alias="status"),
     limit: int = Query(50, ge=1, le=200),
+    target_request_id: uuid.UUID | None = Query(None),
+    actor: CurrentActor = None,
     db: Session = Depends(get_db),
 ):
-    query = db.query(StockRequest)
-    if requester_employee_id is not None:
-        query = query.filter(StockRequest.requester_employee_id == requester_employee_id)
+    ensure_actor_employee_id(actor, requester_employee_id)
+    base_query = db.query(StockRequest).filter(
+        StockRequest.requester_employee_id == actor.employee_id
+    )
     if status_filter is not None:
-        query = query.filter(StockRequest.status == status_filter)
+        base_query = base_query.filter(StockRequest.status == status_filter)
     else:
         # status 미지정 시 DRAFT 제외 — '내 요청' 목록에 장바구니가 섞이면 안 됨.
-        query = query.filter(StockRequest.status != StockRequestStatusEnum.DRAFT)
-    rows = query.order_by(StockRequest.created_at.desc()).limit(limit).all()
+        base_query = base_query.filter(StockRequest.status != StockRequestStatusEnum.DRAFT)
+    rows = base_query.order_by(StockRequest.created_at.desc()).limit(limit).all()
+    if target_request_id is not None:
+        target = base_query.filter(StockRequest.request_id == target_request_id).first()
+        if target is not None:
+            rows = [target, *(row for row in rows if row.request_id != target.request_id)][:limit]
     return rows
 
 
 @router.get("/warehouse-queue", response_model=List[StockRequestResponse])
-def list_warehouse_queue(db: Session = Depends(get_db), limit: int = Query(100, ge=1, le=500)):
+def list_warehouse_queue(
+    limit: int = Query(100, ge=1, le=500),
+    target_request_id: uuid.UUID | None = Query(None),
+    actor: CurrentActor = None,
+    db: Session = Depends(get_db),
+):
     """창고 담당자 승인 대기 목록 (RESERVED 또는 SUBMITTED, 승인 필요).
 
     창고 결재가 아직 완료되지 않은 요청만 반환 (듀얼 승인 케이스에서 창고는 완료, 부서만 대기인
     요청은 부서 큐로 노출).
     """
-    rows = (
-        db.query(StockRequest)
-        .filter(
-            StockRequest.requires_warehouse_approval.is_(True),
-            StockRequest.approved_by_employee_id.is_(None),
-            StockRequest.status.in_(
-                (
-                    StockRequestStatusEnum.RESERVED,
-                    StockRequestStatusEnum.SUBMITTED,
-                )
-            ),
-        )
-        .order_by(StockRequest.created_at.desc())
-        .limit(limit)
-        .all()
+    _require_warehouse_approval_role(actor)
+    base_query = db.query(StockRequest).filter(
+        StockRequest.requires_warehouse_approval.is_(True),
+        StockRequest.approved_by_employee_id.is_(None),
+        StockRequest.status.in_(
+            (
+                StockRequestStatusEnum.RESERVED,
+                StockRequestStatusEnum.SUBMITTED,
+            )
+        ),
     )
+    rows = base_query.order_by(StockRequest.created_at.desc()).limit(limit).all()
+    if target_request_id is not None:
+        target = base_query.filter(StockRequest.request_id == target_request_id).first()
+        if target is not None:
+            rows = [target, *(row for row in rows if row.request_id != target.request_id)][:limit]
     return rows
 
 
 @router.get("/warehouse-queue/count")
-def count_warehouse_queue(db: Session = Depends(get_db)) -> dict:
+def count_warehouse_queue(
+    actor: CurrentActor = None,
+    db: Session = Depends(get_db),
+) -> dict:
     """창고 승인함 대기 건수 — `list_warehouse_queue` 와 동일 필터."""
+    _require_warehouse_approval_role(actor)
     n = (
         db.query(StockRequest)
         .filter(
@@ -258,31 +321,30 @@ def count_warehouse_queue(db: Session = Depends(get_db)) -> dict:
 
 @router.get("/department-queue", response_model=List[StockRequestResponse])
 def list_department_queue(
-    actor_employee_id: uuid.UUID = Query(..., description="현재 직원 ID — 결재 가능 부서만 노출"),
-    db: Session = Depends(get_db),
+    actor_employee_id: uuid.UUID | None = Query(
+        None,
+        description="현재 직원 ID — 세션 작업자 일치 확인용",
+    ),
     limit: int = Query(100, ge=1, le=500),
+    target_request_id: uuid.UUID | None = Query(None),
+    actor: CurrentActor = None,
+    db: Session = Depends(get_db),
 ):
     """부서 결재 정/부 승인 대기 목록.
 
-    노출 부서 범위:
-      - 부서 정/부: 창고 외 모든 부서
-      - 창고 정/부: 모든 부서
-      - admin 단독: 결재 권한 없음
+    부서 정/부만 창고 외 부서 결재를 조회할 수 있다.
     """
-    actor = (
-        db.query(Employee).filter(Employee.employee_id == actor_employee_id).first()
-    )
-    if actor is None:
-        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    ensure_actor_employee_id(actor, actor_employee_id)
+    _require_department_approval_role(actor)
 
     visible = approvable_departments(actor)
-    if visible is not None and len(visible) == 0:
-        return []
 
     base_query = db.query(StockRequest).filter(
         StockRequest.requires_department_approval.is_(True),
-        # 새 정책 방어선: 창고 승인 필요한 요청은 부서 큐에 노출하지 않음.
-        StockRequest.requires_warehouse_approval.is_(False),
+        or_(
+            StockRequest.requires_warehouse_approval.is_(False),
+            StockRequest.approved_by_employee_id.is_not(None),
+        ),
         StockRequest.department_approved_by_employee_id.is_(None),
         StockRequest.status.in_(
             (
@@ -299,30 +361,35 @@ def list_department_queue(
             ).in_(list(visible))
         )
 
-    return (
-        base_query.order_by(StockRequest.created_at.desc()).limit(limit).all()
-    )
+    rows = base_query.order_by(StockRequest.created_at.desc()).limit(limit).all()
+    if target_request_id is not None:
+        target = base_query.filter(StockRequest.request_id == target_request_id).first()
+        if target is not None:
+            rows = [target, *(row for row in rows if row.request_id != target.request_id)][:limit]
+    return rows
 
 
 @router.get("/department-queue/count")
 def count_department_queue(
-    actor_employee_id: uuid.UUID = Query(..., description="현재 직원 ID — 결재 가능 부서만 카운트"),
+    actor_employee_id: uuid.UUID | None = Query(
+        None,
+        description="현재 직원 ID — 세션 작업자 일치 확인용",
+    ),
+    actor: CurrentActor = None,
     db: Session = Depends(get_db),
 ) -> dict:
     """부서 승인함 대기 건수 — `list_department_queue` 와 동일 부서 범위 적용."""
-    actor = (
-        db.query(Employee).filter(Employee.employee_id == actor_employee_id).first()
-    )
-    if actor is None:
-        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    ensure_actor_employee_id(actor, actor_employee_id)
+    _require_department_approval_role(actor)
 
     visible = approvable_departments(actor)
-    if visible is not None and len(visible) == 0:
-        return {"count": 0}
 
     base_query = db.query(StockRequest).filter(
         StockRequest.requires_department_approval.is_(True),
-        StockRequest.requires_warehouse_approval.is_(False),
+        or_(
+            StockRequest.requires_warehouse_approval.is_(False),
+            StockRequest.approved_by_employee_id.is_not(None),
+        ),
         StockRequest.department_approved_by_employee_id.is_(None),
         StockRequest.status.in_(
             (
@@ -384,6 +451,11 @@ def upsert_stock_request_draft(
 ) -> StockRequest:
     ensure_actor_employee_id(actor, payload.requester_employee_id)
 
+    try:
+        _validate_direct_automatic_department_routes(db, payload)
+    except ValueError as exc:
+        raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
+
     lines_input = [
         svc.LineInput(
             record_id=li.record_id,
@@ -423,9 +495,11 @@ def upsert_stock_request_draft(
 def get_stock_request_draft(
     requester_employee_id: uuid.UUID = Query(...),
     request_type: StockRequestTypeEnum = Query(...),
+    actor: CurrentActor = None,
     db: Session = Depends(get_db),
 ):
     """단일 DRAFT 조회. 없으면 200 + null."""
+    ensure_actor_employee_id(actor, requester_employee_id)
     return svc.get_draft_request(
         db,
         requester_employee_id=requester_employee_id,
@@ -436,9 +510,11 @@ def get_stock_request_draft(
 @router.get("/drafts", response_model=List[StockRequestResponse])
 def list_stock_request_drafts(
     requester_employee_id: uuid.UUID = Query(...),
+    actor: CurrentActor = None,
     db: Session = Depends(get_db),
 ):
     """본인 DRAFT 목록만. 다른 직원 draft 노출 금지."""
+    ensure_actor_employee_id(actor, requester_employee_id)
     return svc.list_draft_requests(db, requester_employee_id=requester_employee_id)
 
 
@@ -471,10 +547,32 @@ def delete_stock_request_draft(
 
 
 @router.get("/{request_id}", response_model=StockRequestResponse)
-def get_stock_request(request_id: uuid.UUID, db: Session = Depends(get_db)):
+def get_stock_request(
+    request_id: uuid.UUID,
+    actor: CurrentActor = None,
+    db: Session = Depends(get_db),
+):
     request = db.query(StockRequest).filter(StockRequest.request_id == request_id).first()
     if request is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "요청을 찾을 수 없습니다.")
+    approval_department = request.approval_department or request.requester_department
+    can_read = (
+        request.requester_employee_id == actor.employee_id
+        or (
+            bool(request.requires_warehouse_approval)
+            and _has_warehouse_approval_role(actor)
+        )
+        or (
+            bool(request.requires_department_approval)
+            and (
+                not request.requires_warehouse_approval
+                or request.approved_by_employee_id is not None
+            )
+            and can_approve_department(actor, approval_department)
+        )
+    )
+    if not can_read:
+        raise http_error(403, ErrorCode.FORBIDDEN, "요청을 조회할 권한이 없습니다.")
     return request
 
 
@@ -486,7 +584,7 @@ def get_stock_request(request_id: uuid.UUID, db: Session = Depends(get_db)):
 def _load_request_for_action(db: Session, request_id: uuid.UUID) -> StockRequest:
     """승인/반려/취소 전용 조회 — PostgreSQL: FOR UPDATE 행 잠금으로 중복 처리 방지."""
     q = db.query(StockRequest).filter(StockRequest.request_id == request_id)
-    if not _is_sqlite:
+    if db.bind is not None and db.bind.dialect.name != "sqlite":
         q = q.with_for_update()
     request = q.first()
     if request is None:
@@ -582,7 +680,7 @@ def department_approve_stock_request(
     actor: VerifiedActor,
     db: Session = Depends(get_db),
 ) -> StockRequest:
-    """부서 결재 승인 — 부서 정/부 또는 창고 정/부만 허용."""
+    """부서 결재 승인 — 부서 정/부만 허용."""
     ensure_actor_employee_id(actor, payload.actor_employee_id)
     request = _load_request_for_action(db, request_id)
 

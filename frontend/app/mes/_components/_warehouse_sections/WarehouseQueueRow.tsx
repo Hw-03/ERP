@@ -7,6 +7,7 @@ import { normalizeDepartment } from "@/lib/mes/department";
 import { formatKstDateTime } from "@/lib/mes/format";
 import {
   formatRequestNotes,
+  getRequestFlowLabel,
   getRequestStatusPresentation,
   getRequestTypePresentation,
 } from "./ioRequestLabels";
@@ -60,11 +61,7 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
   const requestType = getRequestTypePresentation(req.request_type);
   const typeLabel = requestType.label;
   const status = getRequestStatusPresentation(req.status);
-  const firstLine = req.lines[0];
-  const fromDept = firstLine?.from_department ? normalizeDepartment(firstLine.from_department) : null;
-  const toDept = firstLine?.to_department ? normalizeDepartment(firstLine.to_department) : null;
-  const flowLabel =
-    fromDept && toDept ? `${fromDept} → ${toDept}` : fromDept ?? toDept ?? null;
+  const flowLabel = getRequestFlowLabel(req.request_type, req.lines);
 
   return (
     <div
@@ -117,7 +114,7 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
         </div>
       </div>
 
-      <StockRequestLineTable lines={req.lines} />
+      <StockRequestLineTable lines={req.lines} requestType={req.request_type} />
 
       {noteText &&
         (approvePinFor === req.request_id || showRejectFor === req.request_id) && (

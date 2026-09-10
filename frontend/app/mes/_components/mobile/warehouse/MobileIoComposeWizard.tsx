@@ -6,7 +6,6 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import {
   api,
-  type BOMDetailEntry,
   type IoBundle,
   type IoInternalUseBomMode,
   type IoLine,
@@ -65,6 +64,9 @@ import {
   shortageLines,
 } from "../../_warehouse_v2/pullFromWarehouse";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
+import { useBomListQuery } from "@/lib/queries/useBomQuery";
+import { LoadFailureCard } from "../../common/LoadFailureCard";
+import { useIoPreselect } from "../../_warehouse_v2/useIoPreselect";
 import { ioLineAvailable } from "@/lib/mes/inventory";
 import { setAuditScreen } from "@/lib/activity-audit-context";
 import { sendClientEvent } from "@/lib/client-events";
@@ -133,7 +135,14 @@ export function MobileIoComposeWizard({
     showNotice: showFeedbackNotice,
     dismissNotice: dismissFeedbackNotice,
   } = useStatusTargetNotice();
-  const [bomParents, setBomParents] = useState<Set<string>>(() => new Set());
+  const bomListQuery = useBomListQuery();
+  const bomParents = useMemo(
+    () => new Set((bomListQuery.data ?? []).map((row) => row.parent_item_id)),
+    [bomListQuery.data],
+  );
+  const bomParentsLoaded = bomListQuery.isSuccess;
+  const itemAddBlocked = bomListQuery.isPending || bomListQuery.isError;
+  const bomRevisionRef = useRef(revision);
   const state = useIoWorkState(defaultWorkType, operator?.department, getAvailable);
   const [
     pullSelected,
@@ -157,9 +166,6 @@ export function MobileIoComposeWizard({
     state.toDepartment,
     state.workType,
   ], draftToRestore?.batch_id, restoreNonce);
-  // 가드 key 는 `${item_id}__${workType}` — workType 변경 시 bundles reset 되므로
-  // 같은 preselectedItem 이라도 재적용되어야 한다.
-  const preselectedHandledRef = useRef<string | null>(null);
   // BOM 부모 품목으로 진입한 경우 자동 추가하지 않고 picker 에서 row 만 강조.
   const [highlightItemId, setHighlightItemId] = useState<string | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
@@ -238,18 +244,10 @@ export function MobileIoComposeWizard({
   }, [globalSearch]);
 
   useEffect(() => {
-    let cancelled = false;
-    api
-      .getAllBOM()
-      .then((rows: BOMDetailEntry[]) => {
-        if (cancelled) return;
-        setBomParents(new Set(rows.map((row) => row.parent_item_id)));
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [revision]);
+    if (bomRevisionRef.current === revision) return;
+    bomRevisionRef.current = revision;
+    void bomListQuery.refetch();
+  }, [bomListQuery, revision]);
 
   useIoDraftRestore({
     draftToRestore,
@@ -306,6 +304,10 @@ export function MobileIoComposeWizard({
     subTypeOverride?: IoSubType,
     sourceLocation?: IoSourceLocation,
   ) {
+    if (itemAddBlocked) {
+      setError("BOM 정보를 불러오지 못했습니다. 다시 시도해 주세요");
+      return;
+    }
     setError(null);
     const effectiveSubType = subTypeOverride ?? state.subType;
     if (subTypeOverride && subTypeOverride !== state.subType) {
@@ -345,6 +347,10 @@ export function MobileIoComposeWizard({
 
   // 스캔값(mes_code) → 품목 매칭. 충돌 B: 인라인 폼과 공유하는 단일 핸들러.
   function handleScanDetected(raw: string) {
+    if (itemAddBlocked) {
+      setError("BOM 정보를 불러오지 못했습니다. 다시 시도해 주세요");
+      return;
+    }
     const norm = raw.trim().toLowerCase();
     if (!norm) return;
     const matched = items.find((it) => (it.mes_code ?? "").trim().toLowerCase() === norm);
@@ -363,22 +369,19 @@ export function MobileIoComposeWizard({
     }
   }
 
-  useEffect(() => {
-    if (!preselectedItem) return;
-    // workType 변경 시 bundles 가 reset 되므로 key 에 workType 포함.
-    const handledKey = `${preselectedItem.item_id}__${state.workType}`;
-    if (preselectedHandledRef.current === handledKey) return;
-    if (state.workType === "process" && state.deptIoDirection == null) return;
-    preselectedHandledRef.current = handledKey;
-    if (bomParents.has(preselectedItem.item_id)) {
-      // BOM 부모: 자동 카트 추가하지 않고 picker 에서 row 만 강조.
-      setHighlightItemId(preselectedItem.item_id);
-    } else {
-      setHighlightItemId(null);
-      void addItem(preselectedItem);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preselectedItem?.item_id, state.workType, state.deptIoDirection, bomParents]);
+  useIoPreselect({
+    preselectedItem,
+    bomParents,
+    bomParentsLoaded,
+    workType: state.workType,
+    subType: state.subType,
+    fromDepartment: state.fromDepartment,
+    toDepartment: state.toDepartment,
+    deptIoDirection: state.deptIoDirection,
+    forceManual: entryIntent?.forceManualItem,
+    addItem,
+    setHighlightItemId,
+  });
 
   function getAvailable(line: IoLine): number | null {
     const item = items.find((row) => row.item_id === line.item_id);
@@ -501,6 +504,10 @@ export function MobileIoComposeWizard({
 
   async function pullFromWarehouse() {
     if (pullingRef.current) return;
+    if (itemAddBlocked) {
+      setError("BOM 정보를 불러오지 못했습니다. 다시 시도해 주세요");
+      return;
+    }
     if (!employeeId || !operator?.department) return;
     const itemIds = collectShortageItemIds(state.bundles, pullSelected);
     if (itemIds.length === 0) return;
@@ -515,14 +522,12 @@ export function MobileIoComposeWizard({
           employeeId,
           workType: "warehouse_io",
           subType: "warehouse_to_dept",
-          toDepartment: operator.department,
           target: { source_kind: "manual", item_id: itemId, quantity: 1 },
         })).bundles,
         (savedDraftId, newBundles) => {
           onDraftSaved?.(savedDraftId, state.step, false);
           state.setWorkType("warehouse_io");
           state.setSubType("warehouse_to_dept");
-          state.setToDepartment(operator.department);
           beginNewCompositionSlot();
           state.setBundles(newBundles);
           setPullSelected(new Set());
@@ -622,7 +627,9 @@ export function MobileIoComposeWizard({
       : step === 2
       ? state.workType === "warehouse_adjust"
         ? "입고·출고 방향 선택"
-        : "세부 작업과 부서"
+        : state.workType === "process" || state.workType === "warehouse_io"
+          ? "세부 작업 선택"
+          : "세부 작업과 부서"
       : step === 3
       ? `${pickerDirectionLabel(state.subType)} 품목 선택`
       : step === 4
@@ -708,7 +715,23 @@ export function MobileIoComposeWizard({
 
         {step === 3 &&
           (usesMobileSingleAdjustForm(state.workType, state.subType, processPickerMode) ? (
-            <MobileSingleAdjustForm
+            <>
+              {bomListQuery.isPending && (
+                <p className="mb-3 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                  BOM 확인 중입니다.
+                </p>
+              )}
+              {bomListQuery.isError && (
+                <div className="mb-3">
+                  <LoadFailureCard
+                    prefix=""
+                    message="BOM 정보를 불러오지 못했습니다. 다시 시도해 주세요"
+                    retryLabel="다시 시도"
+                    onRetry={() => { void bomListQuery.refetch(); }}
+                  />
+                </div>
+              )}
+              <MobileSingleAdjustForm
               subType={state.subType}
               items={items}
               bundles={state.bundles}
@@ -732,10 +755,25 @@ export function MobileIoComposeWizard({
               onReview={() => state.goTo(5)}
               onOpenPicker={state.workType === "process" ? () => setProcessPickerMode(true) : undefined}
               busy={previewing}
+              addBlocked={itemAddBlocked}
               error={error}
             />
+            </>
           ) : (
             <>
+              {bomListQuery.isPending && (
+                <p className="mb-3 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                  BOM 확인 중입니다.
+                </p>
+              )}
+              {bomListQuery.isError && (
+                <LoadFailureCard
+                  prefix=""
+                  message="BOM 정보를 불러오지 못했습니다. 다시 시도해 주세요"
+                  retryLabel="다시 시도"
+                  onRetry={() => { void bomListQuery.refetch(); }}
+                />
+              )}
               {/* 항목 8 — 스캔 시작 버튼은 당분간 UI에서 숨김(코드·핸들러 유지, hidden). */}
               <div className="mb-3 hidden">
                 <PrimaryActionButton
@@ -773,6 +811,7 @@ export function MobileIoComposeWizard({
                   if (state.bundles.length > 0) state.goTo(4);
                 }}
                 busy={previewing}
+                addBlocked={itemAddBlocked}
               />
             </>
           ))}
@@ -837,6 +876,7 @@ export function MobileIoComposeWizard({
               void refreshInternalUseBom(bundleId, { mode })
             }
             pulling={pulling}
+            pullBlocked={itemAddBlocked}
             internalUseBomBusy={internalUsePreviewLock.busy}
             onRemoveLine={state.removeLine}
             onRemoveBundle={(bundleId) =>
@@ -849,6 +889,11 @@ export function MobileIoComposeWizard({
               if (state.canAdvance[4]) state.goTo(5);
             }}
             canAdvance={state.canAdvance[4]}
+            hasShortage={state.hasShortage}
+            hasInvalidQuantity={state.hasInvalidQuantity}
+            invalidLineCodes={(state.includedLines ?? [])
+              .filter((line) => Number(line.quantity) <= 0)
+              .map((line) => line.mes_code ?? line.item_name)}
             onSaveDraft={handleSaveDraft}
           />
         )}
@@ -882,7 +927,7 @@ export function MobileIoComposeWizard({
               ? "다음 단계로 →"
               : state.workType === "warehouse_adjust"
                 ? "입고 또는 출고를 선택하세요"
-                : "세부 작업과 부서를 선택하세요"}
+                : "세부 작업을 선택하세요"}
             intent={isExitWorkType(state.workType) ? "danger" : "primary"}
             disabled={!state.canAdvance[2]}
             onClick={() => {

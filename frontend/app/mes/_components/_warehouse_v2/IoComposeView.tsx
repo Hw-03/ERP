@@ -6,14 +6,14 @@ import { CheckCircle2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { Button } from "@/lib/ui/Button";
 import { tint } from "@/lib/mes/colorUtils";
-import { api, type BOMDetailEntry, type IoBundle, type IoInternalUseBomMode, type IoLine, type IoSourceKind, type IoSourceLocation, type IoSubType, type IoWorkType, type Item } from "@/lib/api";
+import { api, type IoBundle, type IoInternalUseBomMode, type IoLine, type IoSourceKind, type IoSourceLocation, type IoSubType, type IoWorkType, type Item } from "@/lib/api";
 import { WizardStepCard } from "./_atoms";
 import { IoWorkTypeStep, IoSubTypeStep } from "./IoWorkTypeStep";
 import { IoTargetPicker } from "./IoTargetPicker";
 import { IoBundleCart } from "./IoBundleCart";
 import { IoConfirmStep } from "./IoConfirmStep";
 import { IoSubmitModals, type IoSubmitResultState } from "./IoSubmitModals";
-import { IO_WORK_TYPES, approvalKind, deptVisibility, directionWord, ioDepartmentPayload, isExitWorkType, mergePreviewBundles, pickerDirectionLabel, requiresDepartments, subTypeLabel, targetDepartmentOf } from "./ioWorkType";
+import { IO_WORK_TYPES, approvalKind, deptVisibility, directionWord, ioDepartmentPayload, isAutoDepartmentRoute, isExitWorkType, mergePreviewBundles, pickerDirectionLabel, requiresDepartments, subTypeLabel, targetDepartmentOf } from "./ioWorkType";
 import { applyBundleQuantityChange, applyLineQuantityChange, applyToggleLine } from "./bomSync";
 import { collectShortageItemIds, shortageLines } from "./pullFromWarehouse";
 import { useIoDraftRestore } from "./useIoDraftRestore";
@@ -38,6 +38,8 @@ import {
   type StatusTargetNotice as StatusTargetNoticeState,
 } from "../common/StatusTargetNotice";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
+import { useBomListQuery } from "@/lib/queries/useBomQuery";
+import { LoadFailureCard } from "../common/LoadFailureCard";
 import {
   runWarehousePull,
   runCompositionSubmit,
@@ -156,10 +158,15 @@ export function IoComposeView({
   } = useStatusTargetNotice();
   const [draftSaveNotice, setDraftSaveNotice] = useState<DraftSaveNotice | null>(null);
   const draftSaveNoticeIdRef = useRef(0);
-  // BOM 부모 item_id 집합 — process workType에서 "BOM 적용" 버튼 활성 판단용. 마운트 시 1회 fetch.
-  const [bomParents, setBomParents] = useState<Set<string>>(() => new Set());
-  // BOM 적재 완료 플래그 — useIoPreselect 의 race 가드 (S1: 빈 set 상태에서 BOM 부모를 일반 품목으로 오인하던 결함).
-  const [bomParentsLoaded, setBomParentsLoaded] = useState(false);
+  const bomListQuery = useBomListQuery();
+  // 빈 배열도 성공한 BOM 목록이다. 실패·로딩은 품목을 BOM 없음으로 오인하지 않는다.
+  const bomParents = useMemo(
+    () => new Set((bomListQuery.data ?? []).map((row) => row.parent_item_id)),
+    [bomListQuery.data],
+  );
+  const bomParentsLoaded = bomListQuery.isSuccess;
+  const itemAddBlocked = bomListQuery.isPending || bomListQuery.isError;
+  const bomRevisionRef = useRef(revision);
   // BOM 부모 품목으로 진입한 경우 자동 추가하지 않고 Step 3 picker 에서 row 만 강조한다.
   const [highlightItemId, setHighlightItemId] = useState<string | null>(null);
   const restoredDraftRef = useRef<string | null>(null);
@@ -324,24 +331,10 @@ export function IoComposeView({
   }, [state.step, globalSearch]);
 
   useEffect(() => {
-    let cancelled = false;
-    api.getAllBOM()
-      .then((rows: BOMDetailEntry[]) => {
-        if (cancelled) return;
-        setBomParents(new Set(rows.map((row) => row.parent_item_id)));
-        // 빈 set 도 "로딩 끝" 으로 표시해야 preselect 가 일반 품목으로 진행. 실패는 catch 에서 동일 처리.
-        setBomParentsLoaded(true);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        // BOM 조회 실패 시 빈 set 유지 → "BOM 적용" 버튼은 모든 품목에서 disabled.
-        // 그래도 preselect 가 보류 상태로 잠기지 않도록 loaded=true 로 풀어준다.
-        setBomParentsLoaded(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [revision]);
+    if (bomRevisionRef.current === revision) return;
+    bomRevisionRef.current = revision;
+    void bomListQuery.refetch();
+  }, [bomListQuery, revision]);
 
   useIoDraftRestore({
     draftToRestore,
@@ -396,6 +389,10 @@ export function IoComposeView({
     subTypeOverride?: IoSubType,
     sourceLocation?: IoSourceLocation,
   ) {
+    if (itemAddBlocked) {
+      setError("BOM 정보를 불러오지 못했습니다. 다시 시도해 주세요");
+      return;
+    }
     setError(null);
     // setSubType은 다음 렌더로 미뤄지므로, previewTarget에는 effective 값을 즉시 전달.
     const effectiveSubType = subTypeOverride ?? state.subType;
@@ -680,6 +677,10 @@ export function IoComposeView({
   //   setBundles 는 반드시 그 뒤. 새 슬롯은 beginNewCompositionSlot.
   async function pullFromWarehouse() {
     if (pullingRef.current) return;
+    if (itemAddBlocked) {
+      setError("BOM 정보를 불러오지 못했습니다. 다시 시도해 주세요");
+      return;
+    }
     if (!employeeId) {
       setError("작업자를 선택하세요.");
       return;
@@ -702,14 +703,12 @@ export function IoComposeView({
           employeeId,
           workType: "warehouse_io",
           subType: "warehouse_to_dept",
-          toDepartment: targetDept,
           target: { source_kind: "manual", item_id: itemId, quantity: 1 },
         })).bundles,
         (savedDraftId, newBundles) => {
           onDraftSaved?.(savedDraftId, state.step, false);
           state.setWorkType("warehouse_io");
           state.setSubType("warehouse_to_dept");
-          state.setToDepartment(targetDept);
           beginNewCompositionSlot();
           state.setBundles(newBundles);
           setPullSelected(new Set());
@@ -774,19 +773,32 @@ export function IoComposeView({
 
   const step = state.step;
   const subTypeText = subTypeLabel(state.subType);
-  const dept = requiresDepartments(state.subType)
-    ? `${state.fromDepartment} → ${state.toDepartment}`
-    : "부서 무관";
+  const autoDepartmentSummary = (() => {
+    if (!isAutoDepartmentRoute(state.subType)) return null;
+    const departmentNames = new Set(
+      state.includedLines.flatMap((line) => {
+        const department =
+          state.subType === "dept_to_warehouse" ||
+          state.subType === "disassemble" ||
+          state.subType === "adjust_out"
+            ? line.from_department
+            : line.to_department;
+        return department ? [department] : [];
+      }),
+    );
+    if (departmentNames.size === 1) return Array.from(departmentNames)[0];
+    return departmentNames.size > 1 ? "여러 부서" : "부서";
+  })();
   const stepTwoSummary = (() => {
     if (state.workType === "process") {
-      return `${directionWord(state.deptIoDirection)} · ${state.toDepartment}`;
+      return `${directionWord(state.deptIoDirection)} · ${autoDepartmentSummary}`;
     }
     if (state.workType === "warehouse_adjust") {
       return `수량보정 · ${directionWord(state.deptIoDirection)}`;
     }
     // 라벨에 이미 방향이 박힌 subType — 라벨의 "부서" 자리를 실제 부서명으로 치환
-    if (state.subType === "warehouse_to_dept") return `창고 → ${state.toDepartment}`;
-    if (state.subType === "dept_to_warehouse") return `${state.fromDepartment} → 창고`;
+    if (state.subType === "warehouse_to_dept") return `창고 → ${autoDepartmentSummary}`;
+    if (state.subType === "dept_to_warehouse") return `${autoDepartmentSummary} → 창고`;
     if (!requiresDepartments(state.subType)) return `${subTypeText} · 부서 무관`;
     // 그 외 — deptVisibility 가 의미있는 부서만 한 번 표기
     const vis = deptVisibility(state.subType);
@@ -850,7 +862,9 @@ export function IoComposeView({
       : stepId === 2
         ? state.workType === "warehouse_adjust"
           ? "입고·출고 방향 선택"
-          : "세부 작업과 부서 선택"
+          : state.workType === "process" || state.workType === "warehouse_io"
+            ? "세부 작업 선택"
+            : "세부 작업과 부서 선택"
         : stepId === 4
           ? "수량 조정"
           : "최종 확인";
@@ -1179,7 +1193,7 @@ export function IoComposeView({
                       ? "다음 단계로 →"
                       : state.workType === "warehouse_adjust"
                         ? "입고 또는 출고를 선택하세요"
-                        : "세부 작업과 부서를 선택하세요"}
+                        : "세부 작업을 선택하세요"}
                   </Button>
                 </div>
               </div>
@@ -1203,6 +1217,21 @@ export function IoComposeView({
             chromeOnly
             fill
           >
+            {bomListQuery.isPending && (
+              <p className="mb-3 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                BOM 확인 중입니다.
+              </p>
+            )}
+            {bomListQuery.isError && (
+              <div className="mb-3">
+                <LoadFailureCard
+                  prefix=""
+                  message="BOM 정보를 불러오지 못했습니다. 다시 시도해 주세요"
+                  retryLabel="다시 시도"
+                  onRetry={() => { void bomListQuery.refetch(); }}
+                />
+              </div>
+            )}
             <IoTargetPicker
               workType={state.workType}
               subType={state.subType}
@@ -1226,6 +1255,7 @@ export function IoComposeView({
                 if (state.bundles.length > 0) state.goTo(4);
               }}
               busy={previewing}
+              addBlocked={itemAddBlocked}
               fullscreen={itemPickerFullscreen}
               onFullscreenChange={onItemPickerFullscreenChange}
             />
@@ -1311,12 +1341,17 @@ export function IoComposeView({
               }}
               canAdvance={state.canAdvance[4]}
               hasShortage={state.hasShortage}
+              hasInvalidQuantity={state.hasInvalidQuantity}
+              invalidLineCodes={state.includedLines
+                .filter((line) => Number(line.quantity) <= 0)
+                .map((line) => line.mes_code ?? line.item_name)}
               pullEnabled={pullEnabled}
               pullSelected={pullSelected}
               onTogglePull={togglePull}
               onPullFromWarehouse={pullFromWarehouse}
               pullCount={pullCount}
               pulling={pulling}
+              pullBlocked={itemAddBlocked}
               onSaveDraft={handleSaveDraft}
             />
           </WizardStepCard>

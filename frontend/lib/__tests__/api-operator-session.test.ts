@@ -1,5 +1,8 @@
+// @vitest-environment jsdom
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { operatorSessionApi } from "../api/operator-session";
+import { AUTH_REQUIRED_EVENT } from "../api-core";
 
 function makeResponse(body: unknown, status = 200): Response {
   return {
@@ -38,6 +41,36 @@ describe("operatorSessionApi", () => {
     expect(JSON.parse(init?.body as string)).toEqual({ employee_id: "emp-1", pin: "1234" });
   });
 
+  it("does not discard a preserved session when a login bootstrap fails", async () => {
+    const boundary = vi.fn();
+    window.addEventListener(AUTH_REQUIRED_EVENT, boundary);
+    globalThis.fetch = vi.fn(() => Promise.resolve(makeResponse({
+      detail: { code: "INVALID_CREDENTIALS", message: "PIN 번호가 올바르지 않습니다." },
+    }, 401))) as unknown as typeof fetch;
+
+    await expect(
+      operatorSessionApi.createOperatorSession("emp-1", "9999"),
+    ).rejects.toMatchObject({ status: 401, code: "INVALID_CREDENTIALS" });
+
+    expect(boundary).not.toHaveBeenCalled();
+    window.removeEventListener(AUTH_REQUIRED_EVENT, boundary);
+  });
+
+  it("records when each session response reached the browser", async () => {
+    const receivedAt = new Date("2026-09-09T00:00:05Z").getTime();
+    vi.setSystemTime(receivedAt);
+    globalThis.fetch = vi.fn(() => Promise.resolve(makeResponse({
+      employee: {},
+      server_time: "2026-09-09T00:00:00Z",
+      expires_at: "2026-09-09T00:30:00Z",
+      boot_id: "boot-1",
+    }))) as unknown as typeof fetch;
+
+    const session = await operatorSessionApi.getOperatorSessionForIdleCheck();
+
+    expect(session.client_received_at_ms).toBe(receivedAt);
+  });
+
   it("restores the current operator session", async () => {
     const fetchSpy = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
       Promise.resolve(makeResponse({ employee: {}, boot_id: "boot-1" })),
@@ -49,6 +82,21 @@ describe("operatorSessionApi", () => {
     const [url, init] = fetchSpy.mock.calls[0]!;
     expect(url).toBe("/api/operator-session");
     expect(init?.method).toBeUndefined();
+    expect(init?.credentials).toBe("include");
+  });
+
+  it("renews the current session from explicit user activity without a body", async () => {
+    const fetchSpy = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
+      Promise.resolve(makeResponse({ employee: {}, boot_id: "boot-1" })),
+    );
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await operatorSessionApi.renewOperatorSession();
+
+    const [url, init] = fetchSpy.mock.calls[0]!;
+    expect(url).toBe("/api/operator-session/activity");
+    expect(init?.method).toBe("POST");
+    expect(init?.body).toBeUndefined();
     expect(init?.credentials).toBe("include");
   });
 

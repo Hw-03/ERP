@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from enum import Enum
 import hashlib
 import json
@@ -56,6 +57,8 @@ def _plain(value: Any) -> Any:
         return value.value
     if isinstance(value, uuid.UUID):
         return str(value)
+    if isinstance(value, Decimal):
+        return "0" if value == 0 else format(value.normalize(), "f")
     return value
 
 

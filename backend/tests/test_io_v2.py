@@ -2035,6 +2035,129 @@ def test_io_submit_warehouse_to_dept_links_all_logs_to_batch(
     )
 
 
+def test_warehouse_approval_reroutes_linked_batch_lines_from_live_item_code(
+    client, db_session, make_item
+):
+    """창고 결재 후 batch 이력도 request 실행 경로와 같은 live 부서를 보존한다."""
+    item = make_item(name="창고 결재 코드 변경", process_type_code="AR", warehouse_qty=Decimal("3"))
+    requester = _make_employee(db_session, code="BATCH-LIVE-REQ")
+    approver = _make_employee(
+        db_session, code="BATCH-LIVE-WH", warehouse_role="primary"
+    )
+    db_session.commit()
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io",
+            "sub_type": "warehouse_to_dept",
+            "targets": [{"item_id": str(item.item_id), "quantity": 1}],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    submitted = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io",
+            "sub_type": "warehouse_to_dept",
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert submitted.status_code == 201, submitted.text
+    request_id = submitted.json()["stock_request_id"]
+
+    item.process_type_code = "TR"
+    db_session.commit()
+    approved = client.post(
+        f"/api/stock-requests/{request_id}/approve",
+        json={"actor_employee_id": str(approver.employee_id), "pin": "0000"},
+    )
+
+    assert approved.status_code == 200, approved.text
+    db_session.expire_all()
+    request = db_session.query(StockRequest).one()
+    batch = db_session.query(IoBatch).one()
+    assert request.status == StockRequestStatusEnum.COMPLETED
+    assert request.lines[0].to_department == DepartmentEnum.TUBE
+    assert batch.from_department is None
+    assert batch.to_department == DepartmentEnum.TUBE.value
+    assert batch.bundles[0].lines[0].to_department == DepartmentEnum.TUBE.value
+
+
+def test_draft_submit_replay_survives_server_live_department_reroute(
+    client, db_session, make_item
+):
+    """승인 시 서버가 자동 경로를 바꿔도 같은 draft 제출 명령은 재실행하지 않는다."""
+    item = make_item(
+        name="draft 승인 코드 변경",
+        process_type_code="AR",
+        warehouse_qty=Decimal("3"),
+    )
+    requester = _make_employee(db_session, code="DRAFT-LIVE-REQ")
+    approver = _make_employee(
+        db_session,
+        code="DRAFT-LIVE-WH",
+        warehouse_role="primary",
+    )
+    db_session.commit()
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io",
+            "sub_type": "warehouse_to_dept",
+            "targets": [{"item_id": str(item.item_id), "quantity": 1}],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    draft = client.put(
+        "/api/io/draft",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io",
+            "sub_type": "warehouse_to_dept",
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert draft.status_code == 200, draft.text
+    batch_id = draft.json()["batch_id"]
+    submit_route = (
+        f"/api/io/draft/{batch_id}/submit"
+        f"?requester_employee_id={requester.employee_id}"
+    )
+    submitted = client.post(submit_route)
+    assert submitted.status_code == 201, submitted.text
+    request_id = submitted.json()["stock_request_id"]
+
+    item.process_type_code = "TR"
+    db_session.commit()
+    approved = client.post(
+        f"/api/stock-requests/{request_id}/approve",
+        json={"actor_employee_id": str(approver.employee_id), "pin": "0000"},
+    )
+    assert approved.status_code == 200, approved.text
+    physical_counts = (
+        db_session.query(TransactionLog).count(),
+        db_session.query(InventoryOperation).count(),
+        db_session.query(StockRequest).count(),
+    )
+
+    replay = client.post(submit_route)
+
+    assert replay.status_code == 201, replay.text
+    assert replay.json()["status"] == "completed"
+    assert (
+        db_session.query(TransactionLog).count(),
+        db_session.query(InventoryOperation).count(),
+        db_session.query(StockRequest).count(),
+    ) == physical_counts
+    db_session.expire_all()
+    batch = db_session.query(IoBatch).one()
+    assert batch.to_department == DepartmentEnum.TUBE.value
+    assert batch.bundles[0].lines[0].to_department == DepartmentEnum.TUBE.value
+
+
 def test_io_submit_draft_endpoint_replays_without_duplicate_effects(
     client, db_session, make_item, monkeypatch
 ):
@@ -2217,7 +2340,7 @@ def test_io_submit_draft_replay_fails_closed_for_actor_content_and_legacy_state(
 def test_io_draft_recomputes_department_shortage_with_pending(
     client, db_session, make_item, make_location
 ):
-    item = make_item(name="Draft production pending")
+    item = make_item(name="Draft production pending", process_type_code="AR")
     location = make_location(
         item.item_id,
         department=DepartmentEnum.ASSEMBLY,
@@ -2270,6 +2393,208 @@ def test_io_draft_recomputes_department_shortage_with_pending(
 
     assert fetched.status_code == 200, fetched.json()
     assert fetched.json()["bundles"][0]["lines"][0]["shortage"] == 1
+
+
+@pytest.mark.parametrize(
+    ("sub_type", "department_field", "expected_from_bucket", "expected_to_bucket"),
+    [
+        ("dept_to_warehouse", "from_department", "production", "warehouse"),
+        ("warehouse_to_dept", "to_department", "warehouse", "production"),
+    ],
+)
+def test_io_draft_keeps_manual_warehouse_transfer_route(
+    client,
+    db_session,
+    make_item,
+    sub_type,
+    department_field,
+    expected_from_bucket,
+    expected_to_bucket,
+):
+    """창고↔부서 단품은 manual 편집 상태여도 이동 경로로 저장한다."""
+    item = make_item(name="수동 창고 반입", process_type_code="TR")
+    requester = _make_employee(db_session, code="IO-MANUAL-DEPT-TO-WH")
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io",
+            "sub_type": sub_type,
+            department_field: DepartmentEnum.ASSEMBLY.value,
+            "targets": [{"item_id": str(item.item_id), "quantity": "2"}],
+        },
+    )
+    assert preview.status_code == 200, preview.json()
+    bundle = preview.json()["bundles"][0]
+    bundle["source_kind"] = "manual"
+    bundle["lines"][0]["origin"] = "manual"
+    bundle["lines"][0]["edited"] = True
+
+    saved = client.put(
+        "/api/io/draft",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io",
+            "sub_type": sub_type,
+            department_field: DepartmentEnum.ASSEMBLY.value,
+            "bundles": [bundle],
+        },
+    )
+
+    assert saved.status_code == 200, saved.json()
+    line = saved.json()["bundles"][0]["lines"][0]
+    assert line["direction"] == "move"
+    assert line["from_bucket"] == expected_from_bucket
+    assert line["to_bucket"] == expected_to_bucket
+
+
+def test_io_draft_replaces_spoofed_automatic_department_route(
+    client, db_session, make_item
+):
+    item = make_item(
+        name="자동 라우팅 품목",
+        process_type_code="AR",
+        warehouse_qty=Decimal("10"),
+    )
+    requester = _make_employee(db_session, code="IO-AUTO-ROUTE")
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io",
+            "sub_type": "warehouse_to_dept",
+            "to_department": DepartmentEnum.TUBE.value,
+            "targets": [{"item_id": str(item.item_id), "quantity": "1"}],
+        },
+    )
+    assert preview.status_code == 200, preview.json()
+    bundles = preview.json()["bundles"]
+    bundles[0]["lines"][0]["to_department"] = DepartmentEnum.TUBE.value
+
+    saved = client.put(
+        "/api/io/draft",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io",
+            "sub_type": "warehouse_to_dept",
+            "to_department": DepartmentEnum.TUBE.value,
+            "bundles": bundles,
+        },
+    )
+
+    assert saved.status_code == 200, saved.json()
+    assert saved.json()["to_department"] == DepartmentEnum.ASSEMBLY.value
+    assert saved.json()["bundles"][0]["lines"][0]["to_department"] == DepartmentEnum.ASSEMBLY.value
+
+
+def test_io_draft_read_marks_legacy_department_route_as_normalized(
+    client, db_session, make_item
+):
+    item = make_item(
+        name="기존 초안 자동 라우팅 품목",
+        process_type_code="AR",
+        warehouse_qty=Decimal("10"),
+    )
+    requester = _make_employee(db_session, code="IO-LEGACY-AUTO")
+    db_session.commit()
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io",
+            "sub_type": "warehouse_to_dept",
+            "targets": [{"item_id": str(item.item_id), "quantity": "2"}],
+        },
+    )
+    assert preview.status_code == 200, preview.json()
+    saved = client.put(
+        "/api/io/draft",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io",
+            "sub_type": "warehouse_to_dept",
+            "reference_no": "LEGACY-ROUTE",
+            "notes": "기존 메모 보존",
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert saved.status_code == 200, saved.json()
+    stored = db_session.query(IoLine).one()
+    stored.to_department = DepartmentEnum.TUBE.value
+    db_session.commit()
+
+    fetched = client.get(
+        "/api/io/draft",
+        params={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io",
+            "sub_type": "warehouse_to_dept",
+        },
+    )
+
+    assert fetched.status_code == 200, fetched.json()
+    assert fetched.json()["department_routes_normalized"] is True
+    assert fetched.json()["reference_no"] == "LEGACY-ROUTE"
+    assert fetched.json()["notes"] == "기존 메모 보존"
+    assert fetched.json()["bundles"][0]["lines"][0]["to_department"] == DepartmentEnum.ASSEMBLY.value
+
+
+def test_io_submit_mixed_code_departments_keeps_one_batch_and_request(
+    client, db_session, make_item, make_bom
+):
+    parent = make_item(name="혼합 부서 BOM", process_type_code="AF")
+    assembly_child = make_item(
+        name="조립 하위품",
+        process_type_code="AR",
+        warehouse_qty=Decimal("10"),
+    )
+    tube_child = make_item(
+        name="튜브 하위품",
+        process_type_code="TR",
+        warehouse_qty=Decimal("10"),
+    )
+    make_bom(parent.item_id, assembly_child.item_id, Decimal("1"))
+    make_bom(parent.item_id, tube_child.item_id, Decimal("1"))
+    requester = _make_employee(db_session, code="IO-MIXED-CODE")
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io",
+            "sub_type": "warehouse_to_dept",
+            "targets": [{"item_id": str(parent.item_id), "quantity": "1"}],
+        },
+    )
+    assert preview.status_code == 200, preview.json()
+    routes = {
+        line["item_id"]: line["to_department"]
+        for line in preview.json()["bundles"][0]["lines"]
+    }
+    assert routes == {
+        str(assembly_child.item_id): DepartmentEnum.ASSEMBLY.value,
+        str(tube_child.item_id): DepartmentEnum.TUBE.value,
+    }
+
+    submitted = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io",
+            "sub_type": "warehouse_to_dept",
+            "bundles": preview.json()["bundles"],
+        },
+    )
+
+    assert submitted.status_code == 201, submitted.json()
+    assert submitted.json()["batch"]["to_department"] is None
+    assert db_session.query(IoBatch).count() == 1
+    assert db_session.query(StockRequest).count() == 1
 
 
 def test_io_submit_idempotent_with_client_request_id(client, db_session, make_item):
@@ -2528,7 +2853,7 @@ def test_io_submit_same_key_other_actor_and_route_conflict_without_mutation(
 def test_io_immediate_adjust_in_increases_production_quantity(
     client, db_session, make_item, make_location
 ):
-    item = make_item(name="Adj In", warehouse_qty=Decimal("0"))
+    item = make_item(name="Adj In", process_type_code="AR", warehouse_qty=Decimal("0"))
     make_location(item.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("0"))
     # adjust_in 은 Phase B 부터 부서 결재 정/부 권한자만 즉시 완료된다.
     requester = _make_employee(db_session, department_role="primary")
@@ -2586,6 +2911,64 @@ def test_io_immediate_adjust_in_increases_production_quantity(
     tx = db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id).all()
     assert len(tx) == 1
     assert tx[0].transaction_type == TransactionTypeEnum.ADJUST
+
+
+@pytest.mark.parametrize(
+    ("sub_type", "initial_quantity", "expected_quantity"),
+    [("produce", Decimal("0"), Decimal("1")), ("disassemble", Decimal("1"), Decimal("0"))],
+)
+def test_bomless_process_direct_item_uses_result_route(
+    client, db_session, make_item, make_location, sub_type, initial_quantity, expected_quantity
+):
+    """BOM 없는 단품 생산·분해 direct 행도 결과품의 코드 부서에서 반영한다."""
+    item = make_item(name=f"BOM 없는 {sub_type}", process_type_code="AF")
+    make_location(item.item_id, department=DepartmentEnum.ASSEMBLY, quantity=initial_quantity)
+    requester = _make_employee(
+        db_session, code=f"BOMLESS-{sub_type}", department_role="primary"
+    )
+    db_session.commit()
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": sub_type,
+            "targets": [{"source_kind": "direct_item", "item_id": str(item.item_id), "quantity": 1}],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    line = preview.json()["bundles"][0]["lines"][0]
+    assert line["direction"] == ("in" if sub_type == "produce" else "out")
+    endpoint = line["to_department"] if sub_type == "produce" else line["from_department"]
+    assert endpoint == DepartmentEnum.ASSEMBLY.value
+
+    drafted = client.put(
+        "/api/io/draft",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": sub_type,
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert drafted.status_code == 200, drafted.text
+    submitted = client.post(
+        f"/api/io/draft/{drafted.json()['batch_id']}/submit",
+        params={"requester_employee_id": str(requester.employee_id)},
+    )
+
+    assert submitted.status_code == 201, submitted.text
+    db_session.expire_all()
+    location = (
+        db_session.query(InventoryLocation)
+        .filter(
+            InventoryLocation.item_id == item.item_id,
+            InventoryLocation.department == DepartmentEnum.ASSEMBLY,
+            InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+        )
+        .one()
+    )
+    assert location.quantity == expected_quantity
 
 
 def test_io_submit_merges_duplicate_manual_single_item_bundles(
@@ -3067,8 +3450,8 @@ def test_io_submit_mixed_disassembly_outbound_waits_for_approval_and_logs_correc
     assert logs[manual_item.item_id].operation_role == InventoryOperationRoleEnum.CORRECTION
 
 
-def test_io_draft_rejects_tampered_mixed_manual_bundle(client, db_session, make_item, make_bom):
-    """BOM에 섞인 낱개는 외부→요청 부서 adjust 단일 라인만 허용한다."""
+def test_io_draft_normalizes_tampered_mixed_manual_bundle(client, db_session, make_item, make_bom):
+    """BOM에 섞인 낱개 위조 경로도 서버가 코드 기준 경로로 덮어쓴다."""
     parent = make_item(name="Mixed Tamper Parent", process_type_code="AF")
     component = make_item(name="Mixed Tamper Component", process_type_code="AR")
     manual_item = make_item(name="Mixed Tamper Manual", process_type_code="AF")
@@ -3094,7 +3477,7 @@ def test_io_draft_rejects_tampered_mixed_manual_bundle(client, db_session, make_
     manual_bundle = manual_preview.json()["bundles"][0]
     manual_bundle["lines"][0]["direction"] = "in"
 
-    rejected = client.put(
+    normalized = client.put(
         "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id),
@@ -3106,9 +3489,10 @@ def test_io_draft_rejects_tampered_mixed_manual_bundle(client, db_session, make_
         },
     )
 
-    assert rejected.status_code == 422, rejected.json()
-    assert "adjust" in str(rejected.json())
-    assert db_session.query(IoBatch).count() == 0
+    assert normalized.status_code == 200, normalized.json()
+    manual_line = normalized.json()["bundles"][1]["lines"][0]
+    assert manual_line["direction"] == "adjust"
+    assert manual_line["to_department"] == DepartmentEnum.ASSEMBLY.value
 
 
 @pytest.mark.parametrize(
@@ -3253,7 +3637,7 @@ def test_io_process_submit_rejects_direct_item_adjustment_bundle(client, db_sess
 
 
 @pytest.mark.parametrize("tamper", ["non_singleton", "wrong_bucket"])
-def test_io_draft_rejects_tampered_manual_adjustment_bundle(
+def test_io_draft_normalizes_tampered_manual_adjustment_bundle(
     client, db_session, make_item, tamper
 ):
     """process 낱개는 singleton과 외부→요청 부서 adjust 경로를 모두 지켜야 한다."""
@@ -3286,8 +3670,14 @@ def test_io_draft_rejects_tampered_manual_adjustment_bundle(
         },
     )
 
-    assert response.status_code == 422, response.json()
-    assert db_session.query(IoBatch).count() == 0
+    if tamper == "wrong_bucket":
+        assert response.status_code == 200, response.json()
+        line = response.json()["bundles"][0]["lines"][0]
+        assert line["from_bucket"] == "none"
+        assert line["to_department"] == DepartmentEnum.TUBE.value
+    else:
+        assert response.status_code == 422, response.json()
+        assert db_session.query(IoBatch).count() == 0
 
 
 def test_io_draft_mixed_production_uses_requested_target_department(
@@ -3406,7 +3796,8 @@ def test_io_mixed_production_department_approval_uses_target_department(
     )
     assert submitted.status_code == 201, submitted.text
     request = db_session.query(StockRequest).one()
-    assert request.approval_department == DepartmentEnum.TUNING
+    # 자동 라우팅의 혼합 라인은 하나의 생산부 정/부 승인 규칙을 그대로 사용한다.
+    assert request.approval_department == DepartmentEnum.ASSEMBLY
     assert db_session.query(TransactionLog).count() == 0
 
     queue = client.get(
@@ -3424,7 +3815,7 @@ def test_io_mixed_production_department_approval_uses_target_department(
             db_session.query(InventoryLocation)
             .filter(
                 InventoryLocation.item_id == item.item_id,
-                InventoryLocation.department == DepartmentEnum.TUNING,
+                InventoryLocation.department == DepartmentEnum.ASSEMBLY,
                 InventoryLocation.status == LocationStatusEnum.PRODUCTION,
             )
             .one()
@@ -3496,7 +3887,7 @@ def test_io_mixed_target_department_primary_requester_can_self_approve(
             db_session.query(InventoryLocation)
             .filter(
                 InventoryLocation.item_id == item.item_id,
-                InventoryLocation.department == DepartmentEnum.TUNING,
+                InventoryLocation.department == DepartmentEnum.ASSEMBLY,
                 InventoryLocation.status == LocationStatusEnum.PRODUCTION,
             )
             .one()
@@ -3669,7 +4060,7 @@ def test_io_process_draft_rejects_unknown_origin_in_bom_payload(
 
 
 @pytest.mark.parametrize("sub_type", ["adjust_in", "adjust_out"])
-def test_io_process_manual_adjustment_requires_target_department(
+def test_io_process_manual_adjustment_uses_item_code_without_target_department(
     client, db_session, make_item, sub_type
 ):
     """입고·출고 모두 process manual 대상 부서를 생략할 수 없다."""
@@ -3697,8 +4088,10 @@ def test_io_process_manual_adjustment_requires_target_department(
             }],
         },
     )
-    assert response.status_code == 422, response.json()
-    assert db_session.query(IoBatch).count() == 0
+    assert response.status_code == 200, response.json()
+    line = response.json()["bundles"][0]["lines"][0]
+    expected_field = "to_department" if sub_type == "adjust_in" else "from_department"
+    assert line[expected_field] == DepartmentEnum.TUBE.value
 
 
 def test_io_draft_rejects_manual_origin_forged_in_bom_bundle(
@@ -3761,7 +4154,7 @@ def test_io_non_process_payload_keeps_produce_manual_source_rejection(
     assert db_session.query(IoBatch).count() == 0
 
 
-def test_io_draft_rejects_mixed_manual_department_different_from_requested_target(
+def test_io_draft_normalizes_mixed_manual_department_different_from_requested_target(
     client, db_session, make_item, make_bom
 ):
     """대상이 튜닝인 생산입고에 조립 낱개 라인을 변조해 섞을 수 없다."""
@@ -3799,7 +4192,7 @@ def test_io_draft_rejects_mixed_manual_department_different_from_requested_targe
     manual_bundle = manual_preview.json()["bundles"][0]
     manual_bundle["lines"][0]["to_department"] = DepartmentEnum.ASSEMBLY.value
 
-    rejected = client.put(
+    normalized = client.put(
         "/api/io/draft",
         json={
             "requester_employee_id": str(requester.employee_id),
@@ -3811,14 +4204,15 @@ def test_io_draft_rejects_mixed_manual_department_different_from_requested_targe
         },
     )
 
-    assert rejected.status_code == 422, rejected.json()
-    assert db_session.query(IoBatch).count() == 0
+    assert normalized.status_code == 200, normalized.json()
+    manual_line = normalized.json()["bundles"][1]["lines"][0]
+    assert manual_line["to_department"] == DepartmentEnum.ASSEMBLY.value
 
 
 def test_io_immediate_adjust_out_decreases_production_quantity(
     client, db_session, make_item, make_location
 ):
-    item = make_item(name="Adj Out", warehouse_qty=Decimal("0"))
+    item = make_item(name="Adj Out", process_type_code="AR", warehouse_qty=Decimal("0"))
     make_location(item.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("10"))
     db_session.flush()
     # 위치 합과 총량 동기화
@@ -4917,6 +5311,225 @@ def test_io_draft_submit_custom_process_bom_requires_memo_without_changing_draft
     )
     assert submitted.status_code == 201, submitted.text
     assert submitted.json()["requires_approval"] is True
+
+
+def test_process_draft_keeps_exempt_bom_child_when_live_code_changes_before_save(
+    client, db_session, make_item, make_bom
+):
+    """저장 정규화가 자동 BOM 토큰과 미반영 의도를 끊지 않는다."""
+    parent = make_item(name="코드 변경 초안 결과품", process_type_code="AF")
+    child = make_item(name="코드 변경 초안 미반영 자재", process_type_code="AR")
+    child.bom_stock_exempt = True
+    make_bom(parent.item_id, child.item_id, Decimal("1"))
+    requester = _make_employee(db_session)
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "produce",
+            "targets": [{"item_id": str(parent.item_id), "quantity": 1}],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    preview_child = next(
+        line
+        for bundle in preview.json()["bundles"]
+        for line in bundle["lines"]
+        if line["item_id"] == str(child.item_id)
+    )
+    assert preview_child["bom_auto_token"]
+    assert preview_child["bom_stock_exempt"] is True
+
+    child.process_type_code = "TR"
+    db_session.commit()
+    drafted = client.put(
+        "/api/io/draft",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "produce",
+            "bundles": preview.json()["bundles"],
+        },
+    )
+
+    assert drafted.status_code == 200, drafted.text
+    saved_child = next(
+        line
+        for bundle in drafted.json()["bundles"]
+        for line in bundle["lines"]
+        if line["item_id"] == str(child.item_id)
+    )
+    assert saved_child["from_department"] == DepartmentEnum.TUBE.value
+    assert saved_child["bom_stock_exempt"] is True
+    assert saved_child["included"] is False
+
+    submitted = client.post(
+        f"/api/io/draft/{drafted.json()['batch_id']}/submit",
+        params={"requester_employee_id": str(requester.employee_id)},
+    )
+
+    assert submitted.status_code == 201, submitted.text
+    assert submitted.json()["status"] == "completed"
+    persisted_child = next(
+        line
+        for bundle in submitted.json()["batch"]["bundles"]
+        for line in bundle["lines"]
+        if line["item_id"] == str(child.item_id)
+    )
+    assert persisted_child["bom_stock_exempt"] is True
+    assert persisted_child["included"] is False
+
+
+def test_process_draft_submit_keeps_exempt_bom_child_after_live_code_change(
+    client, db_session, make_item, make_bom
+):
+    """재열지 않은 기존 초안 제출도 옛 토큰 의도와 새 실행 경로를 함께 보존한다."""
+    parent = make_item(name="직접 제출 코드 변경 결과품", process_type_code="AF")
+    child = make_item(name="직접 제출 코드 변경 미반영 자재", process_type_code="AR")
+    child.bom_stock_exempt = True
+    make_bom(parent.item_id, child.item_id, Decimal("1"))
+    requester = _make_employee(db_session)
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "produce",
+            "targets": [{"item_id": str(parent.item_id), "quantity": 1}],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    drafted = client.put(
+        "/api/io/draft",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "produce",
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert drafted.status_code == 200, drafted.text
+    stored_child = next(
+        line
+        for bundle in drafted.json()["bundles"]
+        for line in bundle["lines"]
+        if line["item_id"] == str(child.item_id)
+    )
+    stored_token = stored_child["bom_auto_token"]
+
+    child.process_type_code = "TR"
+    db_session.commit()
+    submitted = client.post(
+        f"/api/io/draft/{drafted.json()['batch_id']}/submit",
+        params={"requester_employee_id": str(requester.employee_id)},
+    )
+
+    assert submitted.status_code == 201, submitted.text
+    persisted_child = next(
+        line
+        for bundle in submitted.json()["batch"]["bundles"]
+        for line in bundle["lines"]
+        if line["item_id"] == str(child.item_id)
+    )
+    assert persisted_child["from_department"] == DepartmentEnum.TUBE.value
+    assert persisted_child["bom_auto_token"] != stored_token
+    assert persisted_child["bom_stock_exempt"] is True
+    assert persisted_child["included"] is False
+
+
+def test_legacy_process_draft_reopen_autosave_keeps_exempt_bom_child(
+    client, db_session, make_item, make_bom
+):
+    """재열기 응답의 live 경로와 토큰은 자동저장에도 함께 유효해야 한다."""
+    parent = make_item(name="기존 초안 결과품", process_type_code="AF")
+    child = make_item(name="기존 초안 미반영 자재", process_type_code="AR")
+    child.bom_stock_exempt = True
+    make_bom(parent.item_id, child.item_id, Decimal("1"))
+    requester = _make_employee(db_session)
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "produce",
+            "targets": [{"item_id": str(parent.item_id), "quantity": 1}],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    drafted = client.put(
+        "/api/io/draft",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "produce",
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert drafted.status_code == 200, drafted.text
+    stored_token = next(
+        line["bom_auto_token"]
+        for bundle in drafted.json()["bundles"]
+        for line in bundle["lines"]
+        if line["item_id"] == str(child.item_id)
+    )
+
+    child.process_type_code = "TR"
+    db_session.commit()
+    reopened = client.get(
+        "/api/io/draft",
+        params={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": "produce",
+        },
+    )
+
+    assert reopened.status_code == 200, reopened.text
+    payload = reopened.json()
+    reopened_child = next(
+        line
+        for bundle in payload["bundles"]
+        for line in bundle["lines"]
+        if line["item_id"] == str(child.item_id)
+    )
+    assert payload["department_routes_normalized"] is True
+    assert reopened_child["from_department"] == DepartmentEnum.TUBE.value
+    assert reopened_child["bom_auto_token"] != stored_token
+    assert reopened_child["bom_stock_exempt"] is True
+    assert reopened_child["included"] is False
+
+    autosaved = client.put(
+        "/api/io/draft",
+        json={
+            "batch_id": payload["batch_id"],
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": payload["work_type"],
+            "sub_type": payload["sub_type"],
+            "from_department": payload["from_department"],
+            "to_department": payload["to_department"],
+            "reference_no": payload["reference_no"],
+            "notes": payload["notes"],
+            "bundles": payload["bundles"],
+        },
+    )
+
+    assert autosaved.status_code == 200, autosaved.text
+    autosaved_child = next(
+        line
+        for bundle in autosaved.json()["bundles"]
+        for line in bundle["lines"]
+        if line["item_id"] == str(child.item_id)
+    )
+    assert autosaved_child["from_department"] == DepartmentEnum.TUBE.value
+    assert autosaved_child["bom_stock_exempt"] is True
+    assert autosaved_child["included"] is False
 
 
 @pytest.mark.parametrize("sub_type", ["produce", "disassemble"])

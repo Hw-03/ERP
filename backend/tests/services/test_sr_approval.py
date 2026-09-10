@@ -9,7 +9,6 @@
   - 이미 처리된 요청 재처리 방지 (멱등 / ValueError)
   - 재고 불변식 (warehouse_qty / pending / production location)
 
-서비스 코드는 수정하지 않는다. 현재 동작을 고정하는 회귀 테스트만 작성한다.
 StockRequest 구성은 실제 생성 경로(create_request)를 그대로 사용해 현실성을 보장한다.
 """
 
@@ -185,7 +184,7 @@ def test_approve_transitions_reserved_to_completed_and_moves_stock(
     db_session, make_item
 ):
     """승인: RESERVED→COMPLETED + pending 해제 + 창고 차감 + 부서 생산 입고."""
-    item = make_item(name="A001", warehouse_qty=D("10"))
+    item = make_item(name="A001", process_type_code="AR", warehouse_qty=D("10"))
     requester = _make_employee(db_session, code="RQ1", name="요청자")
     approver = _make_employee(db_session, code="WH1", name="창고정", warehouse_role="primary")
     req = _make_reserved_request(db_session, requester, item, qty=D("3"))
@@ -214,7 +213,7 @@ def test_legacy_submitted_department_request_can_be_approved_without_reservation
 ):
     from app.services import sr_reservation
 
-    item = make_item(name="legacy-department-source")
+    item = make_item(name="legacy-department-source", process_type_code="AR")
     location = make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
     requester = _make_employee(db_session, code="LEGACY-REQ")
     approver = _make_employee(
@@ -341,6 +340,33 @@ def test_reject_rejects_non_warehouse_role(db_session, make_item):
     assert _inv(db_session, item.item_id).pending_quantity == D("2")
 
 
+def test_warehouse_reject_refuses_department_only_request(db_session, make_item):
+    """창고 담당자도 부서 전용 결재 요청을 창고 반려할 수 없다."""
+    item = make_item(name="R-DEPT-ONLY", warehouse_qty=D("10"))
+    requester = _make_employee(db_session, code="RQ-DEPT-ONLY")
+    approver = _make_employee(
+        db_session,
+        code="WH-DEPT-ONLY",
+        warehouse_role="primary",
+    )
+    request = _make_reserved_request(db_session, requester, item, qty=D("2"))
+    request.requires_warehouse_approval = False
+    request.requires_department_approval = True
+    db_session.flush()
+
+    with pytest.raises(ValueError, match="창고 결재가 필요하지 않은 요청"):
+        svc.reject_request(
+            db_session,
+            request,
+            approver=approver,
+            pin="0000",
+            reason="잘못된 창고 반려",
+        )
+
+    assert request.status == StockRequestStatusEnum.RESERVED
+    assert _inv(db_session, item.item_id).pending_quantity == D("2")
+
+
 def test_completed_request_cannot_be_rejected(db_session, make_item):
     """완료된 요청 반려 시도 → ValueError (재처리 방지)."""
     item = make_item(name="R004", warehouse_qty=D("10"))
@@ -392,7 +418,7 @@ def test_warehouse_approve_holds_when_department_pending(db_session, make_item):
 
 def test_department_approve_completes_after_warehouse(db_session, make_item):
     """듀얼 결재: 창고→부서 순서로 모두 충족되면 COMPLETED + 실재고 이동."""
-    item = make_item(name="DUAL2", warehouse_qty=D("10"))
+    item = make_item(name="DUAL2", process_type_code="AR", warehouse_qty=D("10"))
     requester = _make_employee(db_session, code="DRQ2")
     wh = _make_employee(db_session, code="DWH2", warehouse_role="primary")
     dept = _make_employee(db_session, code="DDP2", department_role="primary")
@@ -415,12 +441,38 @@ def test_department_approve_completes_after_warehouse(db_session, make_item):
     assert _prod_qty(db_session, item.item_id) == D("3")
 
 
+def test_department_approve_cannot_bypass_pending_warehouse_stage(
+    db_session, make_item
+):
+    """듀얼 결재는 직접 서비스 호출이어도 창고 결재 전 부서 승인을 차단한다."""
+    item = make_item(name="DUAL-STAGE-APPROVE", warehouse_qty=D("10"))
+    requester = _make_employee(db_session, code="DRQ-STAGE-A")
+    dept = _make_employee(
+        db_session,
+        code="DDP-STAGE-A",
+        department_role="primary",
+    )
+    request = _make_dual_reserved_request(db_session, requester, item, qty=D("2"))
+
+    with pytest.raises(ValueError, match="창고 결재가 먼저 필요합니다"):
+        svc.approve_request_department(
+            db_session,
+            request,
+            approver=dept,
+            pin="0000",
+        )
+
+    assert request.status == StockRequestStatusEnum.RESERVED
+    assert request.department_approved_by_employee_id is None
+    assert _inv(db_session, item.item_id).pending_quantity == D("2")
+
+
 def test_department_approve_releases_location_reservation_before_execution(
     db_session, make_item, make_location
 ):
     from app.models import RequestBucketEnum
 
-    item = make_item(name="department-approved-source")
+    item = make_item(name="department-approved-source", process_type_code="AR")
     location = make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
     requester = _make_employee(db_session, code="DREQ-SOURCE")
     approver = _make_employee(
@@ -483,21 +535,27 @@ def test_department_approve_rejects_unauthorized(db_session, make_item):
     assert req.department_approved_by_employee_id is None
 
 
-def test_department_approve_twice_rejected(db_session, make_item):
-    """이미 부서 결재된 요청 재승인 → ValueError (재처리 방지)."""
+def test_department_approve_completed_request_is_idempotent(db_session, make_item):
+    """창고→부서 승인 완료 뒤 재승인해도 재고를 다시 반영하지 않는다."""
     item = make_item(name="DUAL4", warehouse_qty=D("10"))
     requester = _make_employee(db_session, code="DRQ4")
+    warehouse = _make_employee(
+        db_session,
+        code="DWH4",
+        warehouse_role="primary",
+    )
     dept = _make_employee(db_session, code="DDP4", department_role="primary")
     req = _make_dual_reserved_request(db_session, requester, item, qty=D("2"))
 
-    # 창고 결재는 아직 — 부서 결재만 먼저 마킹 (status 유지).
+    svc.approve_request(db_session, req, approver=warehouse, pin="0000")
     svc.approve_request_department(db_session, req, approver=dept, pin="0000")
     db_session.flush()
-    assert req.department_approved_by_employee_id is not None
-    assert req.status == StockRequestStatusEnum.RESERVED  # 창고 결재 대기
+    warehouse_after_first = _inv(db_session, item.item_id).warehouse_qty
 
-    with pytest.raises(ValueError):
-        svc.approve_request_department(db_session, req, approver=dept, pin="0000")
+    out = svc.approve_request_department(db_session, req, approver=dept, pin="0000")
+
+    assert out.status == StockRequestStatusEnum.COMPLETED
+    assert _inv(db_session, item.item_id).warehouse_qty == warehouse_after_first
 
 
 # ════════════ 부서 결재 반려 — reject_request_department ════════════
@@ -507,8 +565,14 @@ def test_department_reject_releases_pending(db_session, make_item):
     """부서 결재 반려: pending 원복 + REJECTED + 사유 저장."""
     item = make_item(name="DREJ1", warehouse_qty=D("10"))
     requester = _make_employee(db_session, code="DJ1")
+    warehouse = _make_employee(
+        db_session,
+        code="DWJ1",
+        warehouse_role="primary",
+    )
     dept = _make_employee(db_session, code="DDJ1", department_role="primary")
     req = _make_dual_reserved_request(db_session, requester, item, qty=D("4"))
+    svc.approve_request(db_session, req, approver=warehouse, pin="0000")
 
     out = svc.reject_request_department(
         db_session, req, approver=dept, pin="0000", reason="부서 반려"
@@ -523,18 +587,51 @@ def test_department_reject_releases_pending(db_session, make_item):
     assert inv.warehouse_qty == D("10")
 
 
+def test_department_reject_cannot_bypass_pending_warehouse_stage(
+    db_session, make_item
+):
+    """듀얼 결재는 직접 서비스 호출이어도 창고 결재 전 부서 반려를 차단한다."""
+    item = make_item(name="DUAL-STAGE-REJECT", warehouse_qty=D("10"))
+    requester = _make_employee(db_session, code="DRQ-STAGE-R")
+    dept = _make_employee(
+        db_session,
+        code="DDP-STAGE-R",
+        department_role="deputy",
+    )
+    request = _make_dual_reserved_request(db_session, requester, item, qty=D("2"))
+
+    with pytest.raises(ValueError, match="창고 결재가 먼저 필요합니다"):
+        svc.reject_request_department(
+            db_session,
+            request,
+            approver=dept,
+            pin="0000",
+            reason="단계 우회 시도",
+        )
+
+    assert request.status == StockRequestStatusEnum.RESERVED
+    assert request.rejected_by_employee_id is None
+    assert _inv(db_session, item.item_id).pending_quantity == D("2")
+
+
 def test_department_reject_releases_location_pending(
     db_session, make_item, make_location
 ):
     item = make_item(name="department-reject")
     location = make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
     requester = _make_employee(db_session, code="DLOC-REQ")
+    warehouse = _make_employee(
+        db_session,
+        code="DLOC-WH",
+        warehouse_role="primary",
+    )
     approver = _make_employee(
         db_session, code="DLOC-APP", department_role="primary"
     )
     request = _make_location_reserved_request(db_session, requester, item)
     request.requires_department_approval = True
     db_session.flush()
+    svc.approve_request(db_session, request, approver=warehouse, pin="0000")
 
     svc.reject_request_department(
         db_session,
@@ -555,8 +652,8 @@ def test_department_reject_returns_process_single_adjustment_to_same_draft(
     db_session, make_item, make_location
 ):
     """부서 낱개 조정 반려는 요청 이력은 남기고 기존 다품목 batch만 draft로 되돌린다."""
-    first = make_item(name="반려 복귀 A")
-    second = make_item(name="반려 복귀 B")
+    first = make_item(name="반려 복귀 A", process_type_code="AR")
+    second = make_item(name="반려 복귀 B", process_type_code="AR")
     first_location = make_location(first.item_id, department=ASSEMBLY, quantity=D("5"))
     second_location = make_location(second.item_id, department=ASSEMBLY, quantity=D("5"))
     requester = _make_employee(db_session, code="ADJ-REQ")
@@ -678,6 +775,11 @@ def test_department_reject_keeps_non_adjust_process_batch_rejected(db_session, m
     """BOM 등 다른 부서 결재 반려에는 draft 복귀 규칙을 적용하지 않는다."""
     item = make_item(name="BOM 반려 유지", warehouse_qty=D("10"))
     requester = _make_employee(db_session, code="BOM-REQ")
+    warehouse = _make_employee(
+        db_session,
+        code="BOM-WH",
+        warehouse_role="primary",
+    )
     approver = _make_employee(db_session, code="BOM-APP", department_role="primary")
     batch = _make_process_adjust_batch(
         db_session, requester=requester, items=[item], sub_type="produce"
@@ -685,6 +787,7 @@ def test_department_reject_keeps_non_adjust_process_batch_rejected(db_session, m
     request = _make_dual_reserved_request(db_session, requester, item, qty=D("1"))
     request.operation_batch_id = batch.batch_id
     db_session.flush()
+    svc.approve_request(db_session, request, approver=warehouse, pin="0000")
 
     svc.reject_request_department(
         db_session, request, approver=approver, pin="0000", reason="BOM 반려"

@@ -67,16 +67,10 @@ export function InventoryItemsTable({
   // 영원히 20개에서 멈춘다.
   const displayedItems = useMemo(() => filteredItems.slice(0, displayLimit), [filteredItems, displayLimit]);
   const { visible: chunkedItems, sentinelRef, hasMore: hasMoreChunk } = useChunkedRender(displayedItems, 20);
-  const populationNotice = (
-    <p className="mb-2 px-1 text-xs leading-5" style={{ color: LEGACY_COLORS.muted2 }}>
-      KPI 숫자는 PA·PF 중간품목을 제외하며, 좁힌 목록에는 PA·PF가 표시될 수 있습니다.
-    </p>
-  );
 
   if (error) {
     return (
       <>
-        {populationNotice}
         <LoadFailureCard message={error} onRetry={onRetry} />
       </>
     );
@@ -84,7 +78,6 @@ export function InventoryItemsTable({
   if (loading) {
     return (
       <>
-        {populationNotice}
         <div
           className="rounded-[24px] border px-4 py-4 text-base"
           style={{
@@ -101,7 +94,6 @@ export function InventoryItemsTable({
   if (filteredItems.length === 0) {
     return (
       <>
-        {populationNotice}
         <div className="space-y-3">
           {refreshError && (
             <LoadFailureCard
@@ -128,7 +120,6 @@ export function InventoryItemsTable({
   }
   return (
     <>
-      {populationNotice}
       {refreshError && (
         <div className="mb-3">
           <LoadFailureCard

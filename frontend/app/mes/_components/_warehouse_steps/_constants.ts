@@ -102,8 +102,7 @@ export function isDepartmentApprover(op: OperatorLike): boolean {
 }
 
 export function canApproveDepartmentRequests(op: OperatorLike): boolean {
-  return isWarehouseStaff(op)
-    || op?.department_role === "primary"
+  return op?.department_role === "primary"
     || op?.department_role === "deputy";
 }
 

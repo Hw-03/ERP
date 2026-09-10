@@ -58,6 +58,9 @@ export function DesktopWarehouseView({
   const urlRestoreStep = typeof window === "undefined"
     ? undefined
     : parseWarehouseStep(new URLSearchParams(window.location.search).get("step"));
+  const targetRequestId = typeof window === "undefined"
+    ? null
+    : new URLSearchParams(window.location.search).get("stockRequestId");
   const [employeeId, setEmployeeId] = useState<string>(operator?.employee_id ?? "");
   // 알림 클릭 딥링크 — URL ?section= 으로 초기 섹션 결정 (권한 없으면 compose 폴백).
   const [sectionTab, setSectionTab] = useState<WarehouseSectionTab>(() => {
@@ -330,6 +333,7 @@ export function DesktopWarehouseView({
               }}
               onEmptyStateChange={setWorkAreaEmpty}
               onStartCompose={() => handleSectionTabChange("compose")}
+              targetRequestId={targetRequestId}
             />
           </div>
         )}

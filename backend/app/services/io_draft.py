@@ -8,6 +8,7 @@ from __future__ import annotations
 import uuid
 from decimal import Decimal
 from typing import Optional
+from types import SimpleNamespace
 
 from sqlalchemy.orm import Session
 
@@ -17,6 +18,7 @@ from app.models import Employee, IoBatch
 from app.schemas import IoDraftUpsert
 from app.services.approval_rules import approval_kind
 from app.services.io_preview import (
+    automatic_department_headers,
     _bucket_available,
     _d,
     has_declared_custom_process_bom,
@@ -36,12 +38,38 @@ from app.services.io_persist import (
     _persist_batch,
     _lock_active_payload_items,
     _normalize_payload_bom_stock_exempt,
+    normalize_automatic_routes_with_bom_token_refresh,
 )
 
 
 def _draft_to_current_stock_payload(db: Session, batch: IoBatch) -> dict:
-    """저장 내용은 보존하고 부족 수량만 현재 출발 위치 재고로 계산한다."""
+    """저장 내용은 보존하고 자동 부서 경로·부족 수량만 현재 기준으로 계산한다."""
     payload = _batch_to_payload(batch, db=db)
+    bundle_views = []
+    for bundle in payload["bundles"]:
+        lines = [SimpleNamespace(**line) for line in bundle["lines"]]
+        bundle_views.append(
+            SimpleNamespace(
+                bundle_id=bundle["bundle_id"],
+                source_kind=bundle["source_kind"],
+                source_item_id=bundle["source_item_id"],
+                lines=lines,
+            )
+        )
+    normalized = normalize_automatic_routes_with_bom_token_refresh(
+        db,
+        work_type=batch.work_type,
+        sub_type=batch.sub_type,
+        bundles=bundle_views,
+    )
+    if batch.sub_type in {"warehouse_to_dept", "dept_to_warehouse", "produce", "disassemble", "adjust_in", "adjust_out"}:
+        payload["from_department"], payload["to_department"] = automatic_department_headers(
+            bundle_views
+        )
+    for bundle, view in zip(payload["bundles"], bundle_views):
+        for line, line_view in zip(bundle["lines"], view.lines):
+            line.update(vars(line_view))
+    payload["department_routes_normalized"] = normalized
     for bundle in payload["bundles"]:
         for line in bundle["lines"]:
             if not line["included"] or line["from_bucket"] == "none":
@@ -90,7 +118,17 @@ def save_draft(
     if not bool(requester.is_active):
         raise PermissionError("비활성 직원은 입출고 작업을 제출할 수 없습니다.")
     _lock_active_payload_items(db, payload)
+    normalize_automatic_routes_with_bom_token_refresh(
+        db,
+        work_type=payload.work_type,
+        sub_type=payload.sub_type,
+        bundles=payload.bundles,
+    )
     _normalize_payload_bom_stock_exempt(db, payload)
+    if payload.sub_type in {"warehouse_to_dept", "dept_to_warehouse", "produce", "disassemble", "adjust_in", "adjust_out"}:
+        payload.from_department, payload.to_department = automatic_department_headers(
+            payload.bundles
+        )
     validate_saved_operation_sources(
         work_type=payload.work_type,
         sub_type=payload.sub_type,

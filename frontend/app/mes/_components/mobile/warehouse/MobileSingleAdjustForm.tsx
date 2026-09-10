@@ -35,6 +35,7 @@ export function MobileSingleAdjustForm({
   onReview,
   onOpenPicker,
   busy,
+  addBlocked = false,
   error,
 }: {
   subType: IoSubType;
@@ -52,6 +53,7 @@ export function MobileSingleAdjustForm({
   onReview: () => void;
   onOpenPicker?: () => void;
   busy: boolean;
+  addBlocked?: boolean;
   error: string | null;
 }) {
   const isOut = subType === "adjust_out" || subType === "warehouse_adjust_out";
@@ -77,6 +79,7 @@ export function MobileSingleAdjustForm({
   );
 
   function handleAddItem(item: Item) {
+    if (addBlocked) return;
     onAddItem(item);
     onSearchChange("");
     searchInputRef.current?.focus();
@@ -121,7 +124,7 @@ export function MobileSingleAdjustForm({
             <button
               key={it.item_id}
               type="button"
-              disabled={busy}
+              disabled={busy || addBlocked}
               onClick={() => {
                 handleAddItem(it);
               }}
