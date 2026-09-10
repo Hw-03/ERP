@@ -13,6 +13,7 @@ from app.models import (
     DefectInventoryMovement,
     DefectQuarantineRecord,
     DepartmentEnum,
+    Inventory,
     InventoryLocation,
     InventoryOperation,
     InventoryOperationEffect,
@@ -227,6 +228,7 @@ def test_activation_seeds_existing_defect_opening_balance_once(
             ),
         ]
     )
+    db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one().quantity = Decimal("2")
     db_session.commit()
 
     preview = activate_inventory_operation_contract(

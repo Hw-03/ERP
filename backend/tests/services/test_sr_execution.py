@@ -1,12 +1,12 @@
 """services/sr_execution.py 회귀 그물 테스트.
 
 대상: _execute_line / _execute_all_lines / _finalize_submission.
-현재 동작 고정용 — 코드는 절대 수정하지 않는다.
+현재 동작의 회귀 방지용.
 
 검증 초점:
 - 요청 타입별(RAW_RECEIVE/RAW_SHIP/WAREHOUSE_TO_DEPT/DEPT_TO_WAREHOUSE/
   DEPT_INTERNAL/MARK_DEFECTIVE_WH/MARK_DEFECTIVE_PROD) 재고 이동 + TransactionLog 생성
-- _finalize_submission 자가승인 분기 (창고 primary/deputy / admin / 일반직원 RESERVED)
+- _finalize_submission 역할별 자가승인과 일반직원 RESERVED 분기
 - 정상 경로 + ValueError (필수 부서 누락, 재고 부족, 미지원 타입)
 - 재고 불변식 (총량 보존 이동은 quantity_change=0)
 """
@@ -1083,7 +1083,7 @@ def test_release_then_execute_line_approval_consumes_stock(db_session, make_item
     )
     req.status = StockRequestStatusEnum.RESERVED
 
-    svc.release_reservation(db_session, req)
+    svc.release_reservation(db_session, req, actor=emp)
     svc._execute_line(db_session, req, line, approver=emp, is_approval=True)
     db_session.flush()
 
@@ -1173,6 +1173,72 @@ def test_execute_all_lines_records_one_operation_for_request(db_session, make_it
     assert effect.subject_type == "StockRequest"
     assert effect.before_state == {"status": "submitted"}
     assert effect.after_state == {"status": "completed"}
+
+
+def test_execute_all_lines_prelocks_physical_ledger_before_line_execution(
+    db_session,
+    make_item,
+    monkeypatch,
+):
+    """승인 라인이 격리 레코드에 접근하기 전에 B/Z/U 잠금까지 끝내야 한다."""
+    from app.services import warehouse_map as warehouse_map_svc
+
+    item = make_item(name="physical-prelock-before-record", warehouse_qty=D("1"))
+    employee = _make_employee(db_session, code="SR-PHYSICAL-PRELOCK")
+    request = _make_request(
+        db_session,
+        employee,
+        request_type=StockRequestTypeEnum.DEFECT_SCRAP,
+    )
+    line = _add_line(
+        db_session,
+        request,
+        item,
+        quantity=D("1"),
+        from_bucket=RequestBucketEnum.DEFECTIVE,
+        to_bucket=RequestBucketEnum.NONE,
+        from_department=ASSEMBLY.value,
+    )
+    events: list[tuple[str, object]] = []
+
+    monkeypatch.setattr(svc, "_uses_row_locks", lambda _db: True)
+    monkeypatch.setattr(
+        svc.inventory_svc,
+        "_ensure_and_lock_inventories",
+        lambda _db, item_ids: events.append(("inventory", item_ids)) or {},
+    )
+
+    def lock_physical(_db, **kwargs):
+        events.append(("physical", kwargs))
+
+    monkeypatch.setattr(warehouse_map_svc, "lock_warehouse_map_rows", lock_physical)
+    monkeypatch.setattr(
+        svc,
+        "_execute_line",
+        lambda *_args, **_kwargs: events.append(("record", line.item_id)),
+    )
+
+    svc._execute_all_lines(
+        db_session,
+        request,
+        [line],
+        operator_name=employee.name,
+        approver=employee,
+        is_approval=True,
+    )
+
+    assert events == [
+        ("inventory", [item.item_id]),
+        (
+            "physical",
+            {
+                "item_ids": [item.item_id],
+                "include_boxes_for_item_ids": True,
+                "include_zones_for_item_ids": True,
+            },
+        ),
+        ("record", item.item_id),
+    ]
 
 
 # ══════════════════════════ _finalize_submission ══════════════════════════
@@ -1266,10 +1332,56 @@ def test_finalize_warehouse_primary_self_approves_dual_request(db_session, make_
     )
     db_session.flush()
 
-    assert request.status == StockRequestStatusEnum.COMPLETED
+    assert request.status == StockRequestStatusEnum.RESERVED
     assert request.approved_by_employee_id == requester.employee_id
-    assert request.department_approved_by_employee_id == requester.employee_id
-    assert _wh_qty(db_session, item.item_id) == D("3")
+    assert request.department_approved_by_employee_id is None
+    assert _wh_qty(db_session, item.item_id) == D("5")
+    inventory = db_session.query(Inventory).filter(
+        Inventory.item_id == item.item_id
+    ).one()
+    assert inventory.pending_quantity == D("2")
+
+
+def test_finalize_department_primary_waits_for_warehouse_before_self_approval(
+    db_session,
+    make_item,
+):
+    item = make_item(name="dual-department-self-approval", warehouse_qty=D("5"))
+    requester = _make_employee(
+        db_session,
+        code="DUAL-DEPT-SELF",
+        warehouse_role="none",
+    )
+    requester.department_role = "primary"
+    request = _make_request(
+        db_session,
+        requester,
+        request_type=StockRequestTypeEnum.WAREHOUSE_TO_DEPT,
+        requires_warehouse_approval=True,
+        requires_department_approval=True,
+    )
+    _add_line(
+        db_session,
+        request,
+        item,
+        quantity=D("2"),
+        from_bucket=RequestBucketEnum.WAREHOUSE,
+        to_bucket=RequestBucketEnum.PRODUCTION,
+        to_department=ASSEMBLY.value,
+    )
+
+    svc._finalize_submission(
+        db_session,
+        request=request,
+        requester=requester,
+        now=datetime.utcnow(),
+    )
+    db_session.flush()
+
+    assert request.status == StockRequestStatusEnum.RESERVED
+    assert request.approved_by_employee_id is None
+    assert request.department_approved_by_employee_id is None
+    assert _wh_qty(db_session, item.item_id) == D("5")
 
 
 def test_finalize_admin_does_not_self_approve_department_part(db_session, make_item):
@@ -1468,9 +1580,13 @@ def test_live_reroute_preflight_does_not_consume_competing_pending_stock(
     )
     assert _loc_pending(db_session, item.item_id, TUBE) == D("1")
 
-    svc.release_reservation(db_session, old_request)
+    svc.release_reservation(db_session, old_request, actor=requester)
     with pytest.raises(ValueError, match="부서 가용 재고 부족"):
-        svc.reroute_and_preflight_dept_to_warehouse(db_session, old_request)
+        svc.reroute_and_preflight_dept_to_warehouse(
+            db_session,
+            old_request,
+            actor=requester,
+        )
 
     assert _prod_qty(db_session, item.item_id, TUBE) == D("1")
     assert _loc_pending(db_session, item.item_id, TUBE) == D("1")
@@ -1535,8 +1651,8 @@ def test_finalize_no_approval_required_completes(db_session, make_item, make_loc
     assert len(_logs(db_session, item.item_id)) == 1
 
 
-def test_finalize_admin_self_approves(db_session, make_item):
-    """admin 요청자 → 창고 승인 없이도 자가승인 COMPLETED + approved_by 기록."""
+def test_finalize_admin_without_warehouse_role_waits_for_approval(db_session, make_item):
+    """admin level만으로는 창고 결재 권한이 생기지 않는다."""
     item = make_item(name="FIN5", warehouse_qty=D("9"))
     emp = _make_employee(db_session, warehouse_role="none", level=EmployeeLevelEnum.ADMIN)
     req = _make_request(
@@ -1552,9 +1668,13 @@ def test_finalize_admin_self_approves(db_session, make_item):
     svc._finalize_submission(db_session, request=req, requester=emp, now=datetime.utcnow())
     db_session.flush()
 
-    assert req.status == StockRequestStatusEnum.COMPLETED
-    assert req.approved_by_employee_id == emp.employee_id  # admin self-approved
-    assert _wh_qty(db_session, item.item_id) == D("6")
+    assert req.status == StockRequestStatusEnum.RESERVED
+    assert req.approved_by_employee_id is None
+    assert _wh_qty(db_session, item.item_id) == D("9")
+    inventory = db_session.query(Inventory).filter(
+        Inventory.item_id == item.item_id
+    ).one()
+    assert inventory.pending_quantity == D("3")
 
 
 # ══════════════════════════ release_reservation ══════════════════════════
@@ -1573,7 +1693,7 @@ def test_release_reservation_restores_pending(db_session, make_item):
     )
     db_session.flush()
 
-    svc.release_reservation(db_session, req)
+    svc.release_reservation(db_session, req, actor=emp)
     db_session.flush()
 
     inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
@@ -1593,7 +1713,7 @@ def test_release_reservation_noop_when_not_reserved(db_session, make_item):
     )
     db_session.flush()
 
-    svc.release_reservation(db_session, req)
+    svc.release_reservation(db_session, req, actor=emp)
     db_session.flush()
 
     inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
@@ -1631,14 +1751,14 @@ def test_release_reservation_locks_sorted_unique_inventories_before_source_relea
         events.append(("lock", item_ids))
         return {item_id: object() for item_id in item_ids}
 
-    def release_lines(_db, _lines, **_kwargs):
+    def _release_lines_stub(_db, _lines, **_kwargs):
         events.append(("release", None))
 
-    monkeypatch.setattr(svc, "_is_sqlite", False)
+    monkeypatch.setattr(svc, "_uses_row_locks", lambda _db: True)
     monkeypatch.setattr(svc.inventory_svc, "lock_inventories", lock_inventories)
-    monkeypatch.setattr(sr_reservation, "release_lines", release_lines)
+    monkeypatch.setattr(sr_reservation, "_release_lines", _release_lines_stub)
 
-    svc.release_reservation(db_session, req)
+    svc.release_reservation(db_session, req, actor=emp)
 
     assert events == [
         ("lock", sorted({first.item_id, second.item_id})),
@@ -1712,19 +1832,19 @@ def test_rework_first_prelock_includes_recursive_child_tree(
     )
     events = []
 
-    monkeypatch.setattr(svc, "_is_sqlite", False)
+    monkeypatch.setattr(svc, "_uses_row_locks", lambda _db: True)
     monkeypatch.setattr(
         svc.inventory_svc,
-        "ensure_and_lock_inventories",
+        "_ensure_and_lock_inventories",
         lambda _db, item_ids: events.append(("lock", item_ids)) or {},
     )
     if operation == "release":
         monkeypatch.setattr(
             sr_reservation,
-            "release_lines",
+            "_release_lines",
             lambda *_args, **_kwargs: events.append(("release", None)),
         )
-        svc.release_reservation(db_session, request)
+        svc.release_reservation(db_session, request, actor=employee)
     else:
         monkeypatch.setattr(
             svc,

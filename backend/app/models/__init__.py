@@ -41,6 +41,7 @@ from app.models.notification import (
     Notification,
     NotificationTypeEnum,
 )
+from app.models.operator_session import OperatorSession
 from app.models.item import (
     BOM,
     Item,
@@ -53,6 +54,7 @@ from app.models.shipping import (
     ShippingRequestCompanionLine,
     ShippingRequestEvent,
     ShippingRequestRevision,
+    ShippingCommandReceipt,
     ShippingFinalizationModeEnum,
     ShippingRequestStatusEnum,
 )
@@ -86,6 +88,7 @@ from app.models.warehouse import (
     WarehouseSpecialZone,
     WarehouseSpecialZoneItem,
     WarehouseSpecialZoneAudit,
+    WarehouseUnplacedItem,
 )
 from app.models.employee_item_order import EmployeeItemOrder
 from app.models.assembly_checklist import (
@@ -145,6 +148,7 @@ __all__ = [
     "ShippingRequestCompanionLine",
     "ShippingRequestEvent",
     "ShippingRequestRevision",
+    "ShippingCommandReceipt",
     "ShippingFinalizationModeEnum",
     "ShippingRequestStatusEnum",
     # stock requests
@@ -164,6 +168,7 @@ __all__ = [
     # notifications
     "Notification",
     "NotificationTypeEnum",
+    "OperatorSession",
     # system / audit
     "SystemSetting",
     "DataRevision",
@@ -177,6 +182,7 @@ __all__ = [
     "WarehouseSpecialZone",
     "WarehouseSpecialZoneItem",
     "WarehouseSpecialZoneAudit",
+    "WarehouseUnplacedItem",
     "BoxSizeEnum",
     # employee item order
     "EmployeeItemOrder",

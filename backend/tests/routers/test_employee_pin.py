@@ -1,11 +1,7 @@
-"""직원 PIN 검증 테스트.
-
-작업자 식별용 PIN 로그인 — 실제 보안 인증이 아님.
-"""
+"""직원 PIN 인증·변경·초기화 계약."""
 
 from __future__ import annotations
 
-import pytest
 from app.models import AdminAuditLog, DepartmentEnum, Employee, EmployeeLevelEnum
 from app.services.pin_auth import DEFAULT_PIN_HASH, hash_pin, verify_pin
 
@@ -20,6 +16,7 @@ def _make_employee(db, *, name="홍길동", code="E99", pin_hash=None, is_active
         display_order=99,
         is_active=is_active,
         pin_hash=pin_hash,
+        pin_requires_change=pin_hash in (None, DEFAULT_PIN_HASH),
     )
     db.add(emp)
     db.flush()
@@ -27,22 +24,23 @@ def _make_employee(db, *, name="홍길동", code="E99", pin_hash=None, is_active
 
 
 def test_default_pin_is_0000(db_session, client):
-    """pin_hash가 설정된 직원은 0000으로 검증된다."""
+    """기본 PIN은 작업 세션 대신 최초 변경 challenge만 발급한다."""
     emp = _make_employee(db_session, pin_hash=DEFAULT_PIN_HASH)
     db_session.commit()
 
     resp = client.post(f"/api/employees/{emp.employee_id}/verify-pin", json={"pin": "0000"})
-    assert resp.status_code == 200
-    assert resp.json()["employee_id"] == str(emp.employee_id)
+    assert resp.status_code == 409
+    assert resp.json()["detail"]["code"] == "PIN_CHANGE_REQUIRED"
 
 
 def test_null_pin_hash_uses_default(db_session, client):
-    """pin_hash가 None이면 기본 PIN 0000으로 검증된다."""
+    """미설정 PIN도 작업 세션 없이 최초 변경 challenge로 제한한다."""
     emp = _make_employee(db_session, pin_hash=None)
     db_session.commit()
 
     resp = client.post(f"/api/employees/{emp.employee_id}/verify-pin", json={"pin": "0000"})
-    assert resp.status_code == 200
+    assert resp.status_code == 409
+    assert resp.json()["detail"]["code"] == "PIN_CHANGE_REQUIRED"
 
 
 def test_verify_pin_success(db_session, client):
@@ -58,13 +56,13 @@ def test_verify_pin_success(db_session, client):
 
 
 def test_verify_pin_wrong_fails(db_session, client):
-    """잘못된 PIN은 403을 반환한다."""
+    """잘못된 PIN은 직원 존재 여부를 숨긴 동일한 401을 반환한다."""
     emp = _make_employee(db_session, pin_hash=DEFAULT_PIN_HASH)
     db_session.commit()
 
     resp = client.post(f"/api/employees/{emp.employee_id}/verify-pin", json={"pin": "9999"})
-    assert resp.status_code == 403
-    assert resp.json()["detail"]["code"] == "FORBIDDEN"
+    assert resp.status_code == 401
+    assert resp.json()["detail"]["code"] == "INVALID_CREDENTIALS"
 
 
 def test_inactive_employee_blocked(db_session, client):
@@ -79,10 +77,11 @@ def test_inactive_employee_blocked(db_session, client):
 
 
 def test_employee_not_found(db_session, client):
-    """존재하지 않는 직원은 404를 반환한다."""
+    """존재하지 않는 직원도 잘못된 PIN과 동일한 401을 반환한다."""
     import uuid
     resp = client.post(f"/api/employees/{uuid.uuid4()}/verify-pin", json={"pin": "0000"})
-    assert resp.status_code == 404
+    assert resp.status_code == 401
+    assert resp.json()["detail"]["code"] == "INVALID_CREDENTIALS"
 
 
 # ───────────────────────── reset-pin (W9-C) ─────────────────────────
@@ -100,12 +99,13 @@ def test_reset_employee_pin_success(db_session, client):
     )
     assert resp.status_code == 204, resp.text
 
-    # 초기화 후 기본 PIN 0000 으로 검증 통과
+    # 초기화 후 기본 PIN은 작업 세션 없이 최초 변경 challenge만 허용
     verify = client.post(
         f"/api/employees/{emp.employee_id}/verify-pin",
         json={"pin": "0000"},
     )
-    assert verify.status_code == 200
+    assert verify.status_code == 409
+    assert verify.json()["detail"]["code"] == "PIN_CHANGE_REQUIRED"
 
 
 def test_reset_employee_pin_wrong_admin_pin_403(db_session, client):

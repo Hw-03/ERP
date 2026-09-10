@@ -4,8 +4,8 @@ $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path
 $RuntimeControlScript = Join-Path $RepoRoot "scripts\dev\runtime-control.ps1"
 . $RuntimeControlScript
 
-$actualFrontendListener = '"C:\Program Files\nodejs\node.exe" C:\ERP\frontend\node_modules\.pnpm\next@14.2.3_x\node_modules\next\dist\server\lib\start-server.js'
-$smuggledFrontendPath = '"C:\Program Files\nodejs\node.exe" -e "setInterval(()=>{},1000)" C:\ERP\frontend\node_modules\next\dist\server\lib\start-server.js'
+$actualFrontendListener = '"C:\Program Files\nodejs\node.exe" C:\ERP\frontend\scripts\next-server.js dev --hostname 0.0.0.0 --port 3001'
+$smuggledFrontendPath = '"C:\Program Files\nodejs\node.exe" -e "setInterval(()=>{},1000)" C:\ERP\frontend\scripts\next-server.js dev --hostname 0.0.0.0 --port 3001'
 $smuggledWrapperPath = '"C:\Program Files\nodejs\node.exe" -e "setInterval(()=>{},1000)" C:\ERP\frontend\scripts\dev.js'
 if (-not (Test-ServiceProcessOwned -Service frontend -Port 3001 -RepoRoot 'C:\ERP' -CommandLine $actualFrontendListener)) {
     throw 'The anchored current-profile Next start-server listener shape must be owned.'
@@ -76,7 +76,7 @@ function Start-FakeNodeListener {
     $calls = [pscustomobject]@{ CommandReads = 0 }
     $kills = [System.Collections.Generic.List[int]]::new()
     $events = [System.Collections.Generic.List[object]]::new()
-    $ownedCommand = '"C:\Program Files\nodejs\node.exe" C:\ERP\frontend\node_modules\next\dist\server\lib\start-server.js'
+    $ownedCommand = '"C:\Program Files\nodejs\node.exe" C:\ERP\frontend\scripts\next-server.js dev --hostname 0.0.0.0 --port 3001'
     $changedCommand = 'node C:\outside-repo\listener.js'
 
     function Get-ListeningPortPids { return @(41001) }
@@ -114,7 +114,7 @@ function Start-FakeNodeListener {
     $kills = [System.Collections.Generic.List[int]]::new()
     $events = [System.Collections.Generic.List[object]]::new()
     function Get-ListeningPortPids { return @(41002) }
-    function Get-ProcessCommandLine { return '"C:\Program Files\nodejs\node.exe" C:\ERP\frontend\node_modules\next\dist\server\lib\start-server.js' }
+    function Get-ProcessCommandLine { return '"C:\Program Files\nodejs\node.exe" C:\ERP\frontend\scripts\next-server.js dev --hostname 0.0.0.0 --port 3001' }
     function Get-ProcessStartedAt { return '2026-08-10T00:00:00+09:00' }
     function Test-ProcessStartMatches {
         $calls.StartChecks++
@@ -144,7 +144,7 @@ function Start-FakeNodeListener {
     $reads = @{ '41101' = 0; '41102' = 0 }
     $kills = [System.Collections.Generic.List[int]]::new()
     $events = [System.Collections.Generic.List[object]]::new()
-    $ownedCommand = '"C:\Program Files\nodejs\node.exe" C:\ERP\frontend\node_modules\next\dist\server\lib\start-server.js'
+    $ownedCommand = '"C:\Program Files\nodejs\node.exe" C:\ERP\frontend\scripts\next-server.js dev --hostname 0.0.0.0 --port 3001'
     function Get-ListeningPortPids { return @(41101, 41102) }
     function Get-ProcessCommandLine {
         param([int] $ProcessId)
@@ -207,7 +207,7 @@ function Start-FakeNodeListener {
     function Get-ListeningPortPids { return @(43001, 43002) }
     function Get-ProcessCommandLine {
         param([int] $ProcessId)
-        if ($ProcessId -eq 43001) { return '"C:\Program Files\nodejs\node.exe" C:\ERP\frontend\node_modules\next\dist\server\lib\start-server.js' }
+        if ($ProcessId -eq 43001) { return '"C:\Program Files\nodejs\node.exe" C:\ERP\frontend\scripts\next-server.js dev --hostname 0.0.0.0 --port 3001' }
         return 'node C:\outside-repo\listener.js'
     }
     function Get-ProcessStartedAt { return '2026-08-10T00:00:00+09:00' }
@@ -352,9 +352,9 @@ function New-FrontendStartupTestArguments {
     $failed = $false
     $startupArgs = New-FrontendStartupTestArguments -Profile $profile -Suffix 'backend-down'
     try { Invoke-ProfileFrontendStartup @startupArgs }
-    catch { $failed = $_.Exception.Message -match 'Backend is not live.*8010' }
-    if (-not $failed -or $calls.Starts -ne 0 -or $urls.Count -ne 1 -or $urls[0] -notmatch ':8010/health/live$') {
-        throw 'Frontend startup must fail before starting when the selected profile backend is unavailable.'
+    catch { $failed = $_.Exception.Message -match 'Backend is not ready.*8010' }
+    if (-not $failed -or $calls.Starts -ne 0 -or $urls.Count -ne 1 -or $urls[0] -notmatch ':8010/health/ready$') {
+        throw 'Frontend startup must fail before starting when the selected profile backend is not ready.'
     }
 }
 

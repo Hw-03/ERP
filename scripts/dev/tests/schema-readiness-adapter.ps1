@@ -43,7 +43,13 @@ function Stop-TestProcessTree {
     if ($env:OS -eq "Windows_NT") {
         $taskkill = Join-Path $env:SystemRoot "System32\taskkill.exe"
         if (Test-Path -LiteralPath $taskkill -PathType Leaf) {
-            & $taskkill /PID ([string] $Process.Id) /T /F 2>$null | Out-Null
+            try {
+                & $taskkill /PID ([string] $Process.Id) /T /F 2>$null | Out-Null
+            }
+            catch {
+                # The process can exit after HasExited and before taskkill. If it
+                # is still alive, the .NET tree/single-process fallback below runs.
+            }
         }
     }
 

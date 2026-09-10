@@ -64,7 +64,7 @@ describe("useModelsQuery (MSW)", () => {
 describe("catalogApi BOM GET", () => {
   it("선택적 AbortSignal을 BOM 목록 요청에 전달한다", async () => {
     const originalFetch = globalThis.fetch;
-    const fetchSpy = vi.fn(() => Promise.resolve(new Response("[]", { status: 200 })));
+    const fetchSpy = vi.fn<typeof fetch>(() => Promise.resolve(new Response("[]", { status: 200 })));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
     const controller = new AbortController();
 

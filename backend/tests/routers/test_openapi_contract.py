@@ -7,11 +7,10 @@ import json
 from app.main import app
 
 
-def _query_parameter(operation: dict, name: str) -> dict:
-    return next(
-        parameter
-        for parameter in operation["parameters"]
-        if parameter["in"] == "query" and parameter["name"] == name
+def _has_query_parameter(operation: dict, name: str) -> bool:
+    return any(
+        parameter["in"] == "query" and parameter["name"] == name
+        for parameter in operation.get("parameters", [])
     )
 
 
@@ -41,16 +40,16 @@ def test_openapi_tag_metadata_matches_router_tags():
     assert "Variance" not in declared_tags
 
 
-def test_legacy_integrity_operation_and_pin_query_parameters_are_deprecated():
+def test_admin_pin_is_never_advertised_in_query_and_delete_bodies_remain():
     schema = app.openapi()
     integrity_get = schema["paths"]["/api/settings/integrity/inventory"]["get"]
     department_delete = schema["paths"]["/api/departments/{dept_id}"]["delete"]
     model_delete = schema["paths"]["/api/models/{slot}"]["delete"]
 
     assert integrity_get["deprecated"] is True
-    assert _query_parameter(integrity_get, "pin")["deprecated"] is True
-    assert _query_parameter(department_delete, "pin")["deprecated"] is True
-    assert _query_parameter(model_delete, "pin")["deprecated"] is True
+    for operation in (integrity_get, department_delete, model_delete):
+        assert _has_query_parameter(operation, "pin") is False
+        assert "requestBody" in operation
 
 
 def test_capacity_is_canonical_and_possible_is_deprecated_compatibility_alias(client):
@@ -98,3 +97,90 @@ def test_process_type_descriptions_use_dynamic_code_source_without_fixed_count()
     assert "GET /api/codes/process-types" in item_update["description"]
     assert "GET /api/codes/process-types" in item_filter["description"]
     assert "GET /api/codes/process-types" in inventory_summary["description"]
+
+
+def test_operator_session_delete_advertises_scoped_pin_change_cancellation():
+    operation = app.openapi()["paths"]["/api/operator-session"]["delete"]
+    parameter = next(
+        item
+        for item in operation["parameters"]
+        if item["name"] == "pin_change_employee_id"
+    )
+
+    assert parameter["in"] == "query"
+    assert parameter["required"] is False
+    assert {item.get("format") for item in parameter["schema"]["anyOf"]} == {
+        "uuid",
+        None,
+    }
+
+
+def test_operator_session_activity_is_an_authenticated_session_response():
+    schema = app.openapi()
+    operation = schema["paths"]["/api/operator-session/activity"]["post"]
+    response_schema = operation["responses"]["200"]["content"]["application/json"]["schema"]
+    session_schema = schema["components"]["schemas"]["OperatorSessionResponse"]
+
+    assert response_schema == {"$ref": "#/components/schemas/OperatorSessionResponse"}
+    assert "server_time" in session_schema["required"]
+
+
+def test_shipping_commands_advertise_optional_idempotency_and_state_fields():
+    schema = app.openapi()
+    request_schemas = {
+        "prepare-complete": "ShippingPrepareCompleteRequest",
+        "prepare-cancel": "ShippingPrepareCancelRequest",
+        "pickup-complete": "ShippingPickupCompleteRequest",
+        "pickup-cancel": "ShippingPickupCancelRequest",
+    }
+
+    for suffix, schema_name in request_schemas.items():
+        component = schema["components"]["schemas"][schema_name]
+        properties = component["properties"]
+        assert properties["client_request_id"]["anyOf"] == [
+            {"type": "string", "format": "uuid"},
+            {"type": "null"},
+        ]
+        assert properties["expected_status"]["anyOf"] == [
+            {"$ref": "#/components/schemas/ShippingRequestStatusEnum"},
+            {"type": "null"},
+        ]
+        assert properties["expected_updated_at"]["anyOf"] == [
+            {"type": "string", "format": "date-time"},
+            {"type": "null"},
+        ]
+        assert "client_request_id" not in component.get("required", [])
+        assert "expected_status" not in component.get("required", [])
+        assert "expected_updated_at" not in component.get("required", [])
+
+        operation = schema["paths"][
+            f"/api/shipping/requests/{{request_id}}/{suffix}"
+        ]["post"]
+        assert "requestBody" in operation
+
+    prepare_properties = schema["components"]["schemas"][
+        "ShippingPrepareCompleteRequest"
+    ]["properties"]
+    assert prepare_properties["companion_lines"]["deprecated"] is True
+
+    assert schema["paths"][
+        "/api/shipping/requests/{request_id}/prepare-complete"
+    ]["post"]["requestBody"]["required"] is True
+    for suffix in ("prepare-cancel", "pickup-complete", "pickup-cancel"):
+        request_body = schema["paths"][
+            f"/api/shipping/requests/{{request_id}}/{suffix}"
+        ]["post"]["requestBody"]
+        assert request_body.get("required") is not True
+
+
+def test_inventory_responses_advertise_canonical_warehouse_availability():
+    schema = app.openapi()
+
+    for schema_name in ("InventoryResponse", "ItemWithInventory"):
+        assert schema["components"]["schemas"][schema_name]["properties"][
+            "warehouse_available_quantity"
+        ] == {
+            "type": "integer",
+            "title": "Warehouse Available Quantity",
+            "default": 0,
+        }

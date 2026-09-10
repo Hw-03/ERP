@@ -535,7 +535,7 @@ describe("IoComposeView 부족 품목 가져오기", () => {
     fireEvent.click(screen.getByRole("button", { name: "새 작업 품목 추가" }));
     await waitFor(() => expect(api.preview).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getByRole("button", { name: "수량 조정으로 이동" }));
-    await screen.findByTestId("pull-cart-state");
+    await screen.findByTestId("pull-cart-state", {}, { timeout: 3_000 });
     onStatusChange.mockClear();
     onDraftSaved.mockClear();
 
@@ -581,7 +581,7 @@ describe("IoComposeView 부족 품목 가져오기", () => {
     onStatusChange.mockClear();
     fireEvent.click(screen.getByRole("button", { name: "두 번째 부족 품목 선택" }));
     fireEvent.click(screen.getByRole("button", { name: "부족 품목 가져오기" }));
-    await waitFor(() => expect(api.preview).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(api.preview).toHaveBeenCalledTimes(1), { timeout: 3_000 });
 
     fireEvent.click(screen.getByRole("button", { name: "첫 품목 수량 변경" }));
     await waitFor(() => {
@@ -642,7 +642,7 @@ describe("IoComposeView 부족 품목 가져오기", () => {
     });
     await waitFor(() => {
       expect(screen.getByTestId("pull-busy-state")).toHaveTextContent("idle");
-    });
+    }, { timeout: 3_000 });
 
     expect(screen.getByTestId("pull-cart-state")).toHaveTextContent("produce:replacement-bundle");
     expect(screen.queryByText("오래된 미리보기 실패")).not.toBeInTheDocument();

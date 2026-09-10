@@ -433,10 +433,27 @@ def _validate_scope(
             raise LegacyCancellationAdoptionError(
                 INCOMPLETE_LEGACY_EFFECT_MESSAGE
             ) from exc
-        deltas = [int(effect["delta"]) for effect in effects]
+        deltas = [
+            int(effect["delta"])
+            for effect in effects
+            if effect.get("scope") in {"warehouse", "location"}
+        ]
+        warehouse_delta = sum(
+            int(effect["delta"])
+            for effect in effects
+            if effect.get("scope") == "warehouse"
+        )
+        physical_delta = sum(
+            int(effect["delta"])
+            for effect in effects
+            if effect.get("scope")
+            in {"warehouse_box", "warehouse_zone", "warehouse_unplaced"}
+        )
         if _is_rework_scrap_child(log):
             continue
         if not deltas or any(delta == 0 for delta in deltas):
+            raise LegacyCancellationAdoptionError(INCOMPLETE_LEGACY_EFFECT_MESSAGE)
+        if physical_delta and physical_delta != warehouse_delta:
             raise LegacyCancellationAdoptionError(INCOMPLETE_LEGACY_EFFECT_MESSAGE)
         if log.transaction_type in _TRANSFER_TYPES:
             if len(deltas) < 2 or min(deltas) >= 0 or max(deltas) <= 0 or sum(deltas) != 0:
@@ -548,7 +565,7 @@ def _record_batch_workflows(
     operation: InventoryOperation,
     batch: IoBatch,
 ) -> None:
-    operation_svc.record_effect(
+    operation_svc._record_effect(
         db,
         operation=operation,
         effect_kind=InventoryOperationEffectKindEnum.WORKFLOW,
@@ -572,7 +589,7 @@ def _record_batch_workflows(
     for request in requests:
         if request.status != StockRequestStatusEnum.COMPLETED:
             raise LegacyCancellationAdoptionError(INCOMPLETE_LEGACY_EFFECT_MESSAGE)
-        operation_svc.record_effect(
+        operation_svc._record_effect(
             db,
             operation=operation,
             effect_kind=InventoryOperationEffectKindEnum.WORKFLOW,
@@ -593,7 +610,7 @@ def _record_shipping_workflows(
 ) -> None:
     if request.status != ShippingRequestStatusEnum.PICKED_UP:
         raise LegacyCancellationAdoptionError(INCOMPLETE_LEGACY_EFFECT_MESSAGE)
-    operation_svc.record_effect(
+    operation_svc._record_effect(
         db,
         operation=operation,
         effect_kind=InventoryOperationEffectKindEnum.WORKFLOW,
@@ -623,7 +640,7 @@ def _record_shipping_workflows(
         if logged_by_item != allocated_by_item:
             raise LegacyCancellationAdoptionError(INCOMPLETE_LEGACY_EFFECT_MESSAGE)
     for allocation in allocations:
-        operation_svc.record_effect(
+        operation_svc._record_effect(
             db,
             operation=operation,
             effect_kind=InventoryOperationEffectKindEnum.ALLOCATION,
@@ -658,7 +675,7 @@ def adopt_and_cancel(
         batch=batch,
         shipping_request=shipping_request,
     )
-    operation = operation_svc.adopt_legacy_business_operation(
+    operation = operation_svc._adopt_legacy_business_operation(
         db,
         domain=metadata[0],
         action=metadata[1],
@@ -672,9 +689,9 @@ def adopt_and_cancel(
         adopted_at=now,
     )
     for source_log in logs:
-        operation_svc.attach_transaction(source_log, operation, _role_for(source_log))
+        operation_svc._attach_transaction(source_log, operation, _role_for(source_log))
         for movement in defect_movements[source_log.log_id]:
-            operation_svc.record_defect_movement(
+            operation_svc._record_defect_movement(
                 db,
                 operation=operation,
                 record_id=movement.record_id,
@@ -703,6 +720,11 @@ def adopt_and_cancel(
         now=now,
     )
     if not preview.can_cancel:
+        if preview.reason_code is not None:
+            raise cancellation_svc.WorkflowCancellationConflict(
+                preview.reason_code,
+                preview.blockers[0],
+            )
         raise cancellation_svc.CancellationNotAllowed(preview.blockers[0])
     cancellation = cancellation_svc.cancel_operation(
         db,

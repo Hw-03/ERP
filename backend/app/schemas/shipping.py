@@ -64,7 +64,17 @@ class ShippingChecklistUpdate(BaseModel):
 
 class ShippingPrepareCompleteRequest(BaseModel):
     serial_numbers: str = Field(..., min_length=1)
-    companion_lines: list[ShippingCompanionLineInput] = []
+    companion_lines: list[ShippingCompanionLineInput] = Field(
+        default_factory=list,
+        deprecated=True,
+        description=(
+            "하위 호환용 입력입니다. 준비 완료에는 출하 요청에 저장된 동반 출하품을 "
+            "사용하며 이 값은 무시됩니다."
+        ),
+    )
+    client_request_id: Optional[uuid.UUID] = None
+    expected_status: Optional[ShippingRequestStatusEnum] = None
+    expected_updated_at: Optional[UtcDatetime] = None
 
 
 class ShippingInvoiceUpdate(BaseModel):
@@ -73,6 +83,21 @@ class ShippingInvoiceUpdate(BaseModel):
 
 class ShippingPrepareCancelRequest(BaseModel):
     reason: Optional[str] = Field(None, max_length=300)
+    client_request_id: Optional[uuid.UUID] = None
+    expected_status: Optional[ShippingRequestStatusEnum] = None
+    expected_updated_at: Optional[UtcDatetime] = None
+
+
+class ShippingPickupCompleteRequest(BaseModel):
+    client_request_id: Optional[uuid.UUID] = None
+    expected_status: Optional[ShippingRequestStatusEnum] = None
+    expected_updated_at: Optional[UtcDatetime] = None
+
+
+class ShippingPickupCancelRequest(BaseModel):
+    client_request_id: Optional[uuid.UUID] = None
+    expected_status: Optional[ShippingRequestStatusEnum] = None
+    expected_updated_at: Optional[UtcDatetime] = None
 
 
 class ShippingComponentChangePreviewRequest(BaseModel):
@@ -203,6 +228,9 @@ class ShippingEventResponse(BaseModel):
     event_id: uuid.UUID
     event_type: str
     message: Optional[str] = None
+    actor_employee_id: Optional[uuid.UUID] = None
+    actor_employee_code: Optional[str] = None
+    actor_name: Optional[str] = None
     created_at: UtcDatetime
 
 
@@ -322,10 +350,14 @@ class ShippingRequestResponse(BaseModel):
     transaction_count: int = 0
 
 
-class ShippingHistoryPageResponse(BaseModel):
+class ShippingRequestPageResponse(BaseModel):
     requests: list[ShippingRequestResponse]
     next_cursor: Optional[str] = None
     has_more: bool
+
+
+class ShippingHistoryPageResponse(ShippingRequestPageResponse):
+    """Backward-compatible history name for the shared shipping page contract."""
 
 
 class ShippingHistoryMonthResponse(BaseModel):

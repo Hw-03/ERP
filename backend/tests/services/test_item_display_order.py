@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from app.models import Item
 from app.services.item_display_order import (
-    apply_default_item_display_order,
-    insert_item_at_process_end,
+    _apply_default_item_display_order,
+    _insert_item_at_process_end,
 )
 
 
@@ -25,7 +25,7 @@ def test_apply_default_item_display_order_uses_process_then_serial(db_session, m
     ha = make_item(name="high-voltage-assembly", process_type_code="HA", serial_no=1)
     tr_early = make_item(name="tube-raw-early", process_type_code="TR", serial_no=1)
 
-    apply_default_item_display_order(db_session)
+    _apply_default_item_display_order(db_session)
     db_session.flush()
 
     assert [item.item_id for item in _ordered_items(db_session)] == [
@@ -49,7 +49,7 @@ def test_insert_item_at_process_end_ignores_new_item_serial_and_preserves_custom
     hf.sort_order, hr_first.sort_order, hr_last.sort_order, tr.sort_order = 0, 1, 2, 3
     db_session.flush()
 
-    insert_item_at_process_end(db_session, new_hr)
+    _insert_item_at_process_end(db_session, new_hr)
     db_session.flush()
 
     assert [item.item_id for item in _ordered_items(db_session)] == [
@@ -72,7 +72,7 @@ def test_insert_item_at_process_end_places_empty_known_code_between_neighboring_
     tr.sort_order, tf.sort_order, hr.sort_order = 0, 1, 2
     db_session.flush()
 
-    insert_item_at_process_end(db_session, new_ta)
+    _insert_item_at_process_end(db_session, new_ta)
     db_session.flush()
 
     assert [(item.item_name, item.sort_order) for item in _ordered_items(db_session)] == [

@@ -15,7 +15,8 @@
   완성할 수 있는 수. AF 자체는 추가 조립하지 않는다.
 - **total_production**(총생산) : PF 루트로 BOM 전체 재귀 이론 최대.
 
-모든 수량은 `StockFigures.available`(warehouse＋production−pending)을 기준으로 한다.
+모든 수량은 `StockFigures.available`
+(warehouse＋production−재고 요청 예약−활성 출하 예약)을 기준으로 한다.
 이는 **계획/대응 수량 지표**이며, 생산 등록 가능성 검증(backflush, `warehouse_available`)이
 아니다.
 """

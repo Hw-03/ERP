@@ -13,7 +13,14 @@ BACKEND_DIR = Path(__file__).resolve().parents[2]
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from app.models import DepartmentEnum, Inventory, InventoryLocation, Item, LocationStatusEnum
+from app.models import (
+    DepartmentEnum,
+    Inventory,
+    InventoryLocation,
+    Item,
+    LocationStatusEnum,
+    WarehouseUnplacedItem,
+)
 
 
 def _setup_warehouse_only(make_session, warehouse_qty: Decimal):
@@ -30,7 +37,15 @@ def _setup_warehouse_only(make_session, warehouse_qty: Decimal):
         warehouse_qty=warehouse_qty,
         pending_quantity=Decimal("0"),
     )
-    session.add(inv)
+    session.add_all(
+        [
+            inv,
+            WarehouseUnplacedItem(
+                item_id=item.item_id,
+                quantity=int(warehouse_qty),
+            ),
+        ]
+    )
     session.commit()
     item_id = item.item_id
     session.close()
@@ -52,7 +67,15 @@ def _setup_with_location(make_session, warehouse_qty: Decimal, loc_qty: Decimal,
         warehouse_qty=warehouse_qty,
         pending_quantity=Decimal("0"),
     )
-    session.add(inv)
+    session.add_all(
+        [
+            inv,
+            WarehouseUnplacedItem(
+                item_id=item.item_id,
+                quantity=int(warehouse_qty),
+            ),
+        ]
+    )
     session.flush()
     loc = InventoryLocation(
         item_id=item.item_id,
@@ -82,7 +105,7 @@ def test_concurrent_transfer_to_production_no_negative(concurrent_engine, make_s
     def try_transfer():
         session = make_session()
         try:
-            inventory_svc.transfer_to_production(session, item_id, Decimal("1"), dept)
+            inventory_svc._transfer_to_production(session, item_id, Decimal("1"), dept)
             session.commit()
             successes.append("ok")
         except ValueError as e:
@@ -133,7 +156,7 @@ def test_concurrent_transfer_to_warehouse_no_negative(concurrent_engine, make_se
     def try_transfer():
         session = make_session()
         try:
-            inventory_svc.transfer_to_warehouse(session, item_id, Decimal("1"), dept)
+            inventory_svc._transfer_to_warehouse(session, item_id, Decimal("1"), dept)
             session.commit()
             successes.append("ok")
         except ValueError as e:

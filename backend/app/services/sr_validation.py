@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+import secrets
 import uuid
 from decimal import Decimal
 from typing import Optional, Sequence
@@ -13,13 +15,13 @@ from app.models import (
     DepartmentEnum,
     Employee,
     InventoryLocation,
-    Item,
     LocationStatusEnum,
     RequestBucketEnum,
     StockRequestLine,
     StockRequestTypeEnum,
     TransactionTypeEnum,
 )
+from app.services import stock_availability
 
 
 # ---------------------------------------------------------------------------
@@ -129,10 +131,6 @@ def validate_request_entrypoint(
 # ---------------------------------------------------------------------------
 
 
-import secrets
-from datetime import datetime
-
-
 def _generate_request_code(ts: datetime) -> str:
     """SR-YYYYMMDD-HHMMSS-XXXXXXXX 형식 (8자리 랜덤 hex, 32비트 엔트로피).
 
@@ -159,6 +157,7 @@ class LineInput:
         "to_bucket",
         "to_department",
         "record_id",
+        "operation_line_id",
     )
 
     def __init__(
@@ -171,6 +170,7 @@ class LineInput:
         to_bucket: RequestBucketEnum,
         to_department: Optional[DepartmentEnum],
         record_id: Optional[uuid.UUID] = None,
+        operation_line_id: Optional[uuid.UUID] = None,
     ) -> None:
         self.item_id = item_id
         self.quantity = Decimal(str(quantity))
@@ -179,6 +179,7 @@ class LineInput:
         self.to_bucket = to_bucket
         self.to_department = to_department
         self.record_id = record_id
+        self.operation_line_id = operation_line_id
 
 
 # ---------------------------------------------------------------------------
@@ -387,19 +388,19 @@ def _preflight_inventory_check(
     if not needed:
         return
 
-    for (item_id, dept), qty in needed.items():
-        loc = (
-            db.query(InventoryLocation)
-            .filter(
-                InventoryLocation.item_id == item_id,
-                InventoryLocation.department == dept,
-                InventoryLocation.status == LocationStatusEnum.PRODUCTION,
-            )
-            .first()
+    cells = {
+        key: stock_availability.AvailabilityCell.location(
+            key[0],
+            key[1],
+            LocationStatusEnum.PRODUCTION,
         )
-        avail = loc.quantity if loc else Decimal("0")
+        for key in needed
+    }
+    figures = stock_availability.figures_for_cells(db, cells.values())
+    for (item_id, dept), qty in needed.items():
+        avail = figures[cells[(item_id, dept)]].available
         if avail < qty:
-            item = item_repository.get(db, item_id)
+            item = item_repository.get_active(db, item_id)
             item_name = item.item_name if item else str(item_id)
             raise ValueError(
                 f"부서 생산 재고 부족: {item_name} / {dept} 생산 {avail}개, 요청 {qty}개."
@@ -422,6 +423,16 @@ def _preflight_defective_check(
     """
     from app.services import defect_records as defect_records_svc
 
+    if require_exact_records:
+        item_repository.lock_active_many(
+            db,
+            (
+                line.item_id
+                for line in lines_input
+                if line.from_bucket == RequestBucketEnum.DEFECTIVE
+            ),
+        )
+
     needed: dict[tuple, Decimal] = {}
     record_needed: dict[uuid.UUID, Decimal] = {}
     records = {}
@@ -432,7 +443,7 @@ def _preflight_defective_check(
     )
     for li in ordered_lines:
         if li.from_bucket == RequestBucketEnum.DEFECTIVE and li.from_department is not None:
-            record = defect_records_svc.get_record_for_action(
+            record = defect_records_svc._get_record_for_action(
                 db,
                 record_id=li.record_id,
                 item_id=li.item_id,
@@ -450,7 +461,7 @@ def _preflight_defective_check(
                 needed[key] = needed.get(key, Decimal("0")) + li.quantity
 
     for record_id, qty in record_needed.items():
-        defect_records_svc.ensure_available(
+        defect_records_svc._ensure_available(
             db,
             records[record_id],
             qty,
@@ -477,7 +488,7 @@ def _preflight_defective_check(
                 f"현재 {avail}개, 선택 당시 {qty}개."
             )
         if avail < qty:
-            item = item_repository.get(db, item_id)
+            item = item_repository.get_active(db, item_id)
             item_name = item.item_name if item else str(item_id)
             dept_label = getattr(dept, "value", str(dept))
             raise ValueError(

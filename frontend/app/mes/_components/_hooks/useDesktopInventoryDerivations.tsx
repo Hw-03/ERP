@@ -97,7 +97,7 @@ export function useDesktopInventoryDerivations({
     {
       label: "전체",
       value: isFiltered ? kpiScopedItems.length : activeTotal,
-      hint: isFiltered ? `전체 ${activeTotal}건 · 클릭하면 초기화` : "전체 품목",
+      hint: isFiltered ? `출하 중간 공정·공정 완료 품목 제외 · 전체 ${activeTotal}건 · 클릭하면 초기화` : "출하 중간 공정·공정 완료 품목 제외",
       tone: LEGACY_COLORS.blue,
       key: "ALL",
     },

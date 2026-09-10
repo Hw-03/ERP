@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, Search } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -37,7 +37,7 @@ export function AddRDirectModal({
   onClose,
   currentEmployee,
   onSubmitted,
-}: AddRDirectModalProps): JSX.Element | null {
+}: AddRDirectModalProps): ReactElement | null {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Item[]>([]);
   const [searching, setSearching] = useState(false);

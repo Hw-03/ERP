@@ -15,6 +15,7 @@ interface Props {
 }
 
 export function DefectKpiCards({ kpi, scopeLabel, activeFilter, onCardClick }: Props) {
+  const readableRed = `color-mix(in srgb, ${LEGACY_COLORS.red} 30%, ${LEGACY_COLORS.text})`;
   return (
     <div className="grid grid-cols-2 gap-2">
       <KpiCard
@@ -23,6 +24,7 @@ export function DefectKpiCards({ kpi, scopeLabel, activeFilter, onCardClick }: P
         unit="건"
         hint={scopeLabel ? `${scopeLabel} 기준` : "현재 DEFECTIVE 상태"}
         tone={LEGACY_COLORS.red}
+        textTone={readableRed}
       />
       <KpiCard
         label="1년 이상 ⚠"
@@ -30,6 +32,7 @@ export function DefectKpiCards({ kpi, scopeLabel, activeFilter, onCardClick }: P
         unit="건"
         hint="격리 후 365일 초과"
         tone={LEGACY_COLORS.red}
+        textTone={readableRed}
         active={activeFilter === "over_one_year"}
         onClick={() => onCardClick("over_one_year")}
       />

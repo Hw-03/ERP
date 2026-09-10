@@ -199,6 +199,15 @@ async function submitComposition(
     const response = draftId
       ? await submitExistingDraft(draftId)
       : await submit(bundles);
+    if (
+      draftId
+      && response.batch?.batch_id
+      && response.batch.batch_id !== draftId
+    ) {
+      throw new Error(
+        "이전 결과 불명 작업이 먼저 완료되었습니다. 현재 작업은 보존했으니 다시 제출하세요.",
+      );
+    }
     const requests = response.stock_requests ?? [];
     const responseKind = requests[0]?.approval_kind ?? fallbackKind;
     const title = response.requires_approval

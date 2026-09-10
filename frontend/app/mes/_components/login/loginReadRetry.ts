@@ -3,7 +3,7 @@ import { ApiError } from "@/lib/api-core";
 export const LOGIN_READ_TIMEOUT_MS = 8_000;
 export const LOGIN_READ_RETRY_DELAY_MS = 500;
 
-type LoginReadStage = "app_session" | "active_employees";
+type LoginReadStage = "operator_session" | "app_session" | "active_employees";
 
 interface LoginReadOptions<T> {
   stage: LoginReadStage;

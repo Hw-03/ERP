@@ -24,6 +24,7 @@ from app.models import (
     WarehouseAngle,
     WarehouseBox,
     WarehouseBoxItem,
+    WarehouseUnplacedItem,
 )
 from app.schemas import IoSubmitRequest
 from app.services import io_actions as actions
@@ -80,6 +81,8 @@ def _add_tracked_box(db_session, item_id: uuid.UUID, quantity: int) -> None:
     db_session.add(
         WarehouseBoxItem(box_id=box.box_id, item_id=item_id, quantity=quantity)
     )
+    unplaced = db_session.query(WarehouseUnplacedItem).filter_by(item_id=item_id).one()
+    unplaced.quantity -= quantity
     db_session.flush()
 
 
@@ -158,7 +161,7 @@ def test_save_internal_use_draft_accepts_server_derived_department_source(
     payload = _internal_use_payload(requester, [item])
     _use_department_source(payload, DepartmentEnum.HIGH_VOLTAGE.value)
 
-    draft = io_draft.save_draft(db_session, payload)
+    draft = io_draft.save_draft(db_session, payload, requester=requester)
 
     assert draft["status"] == "draft"
     assert draft["bundles"][0]["lines"][0]["from_bucket"] == "production"
@@ -178,7 +181,7 @@ def test_save_internal_use_draft_rejects_tampered_department_source(
     _use_department_source(payload, DepartmentEnum.TUBE.value)
 
     with pytest.raises(ValueError, match="라인 구성이 올바르지"):
-        io_draft.save_draft(db_session, payload)
+        io_draft.save_draft(db_session, payload, requester=requester)
 
 
 def test_submit_existing_internal_use_draft_revalidates_department_source(
@@ -192,7 +195,7 @@ def test_submit_existing_internal_use_draft_revalidates_department_source(
     )
     payload = _internal_use_payload(requester, [item])
     _use_department_source(payload, DepartmentEnum.HIGH_VOLTAGE.value)
-    draft = io_draft.save_draft(db_session, payload)
+    draft = io_draft.save_draft(db_session, payload, requester=requester)
     db_session.commit()
 
     line = db_session.query(IoLine).one()
@@ -203,7 +206,7 @@ def test_submit_existing_internal_use_draft_revalidates_department_source(
         actions.submit_existing_draft(
             db_session,
             batch_id=draft["batch_id"],
-            requester_employee_id=requester.employee_id,
+            requester=requester,
         )
 
 
@@ -222,7 +225,7 @@ def test_save_internal_use_draft_rejects_duplicate_parent_sources(
     duplicate_line.from_department = DepartmentEnum.HIGH_VOLTAGE.value
 
     with pytest.raises(ValueError, match="한 원본과 한 방식"):
-        io_draft.save_draft(db_session, payload)
+        io_draft.save_draft(db_session, payload, requester=requester)
 
 
 def test_submit_internal_use_splits_warehouse_and_each_source_department(
@@ -263,7 +266,7 @@ def test_submit_internal_use_splits_warehouse_and_each_source_department(
     tube_line.from_bucket = "production"
     tube_line.from_department = DepartmentEnum.TUBE.value
 
-    result = actions.submit(db_session, payload)
+    result = actions.submit(db_session, payload, requester=requester)
 
     requests = (
         db_session.query(StockRequest)
@@ -356,7 +359,7 @@ def test_internal_use_source_requests_approve_and_reject_independently(
     department_line = payload.bundles[1].lines[0]
     department_line.from_bucket = "production"
     department_line.from_department = DepartmentEnum.HIGH_VOLTAGE.value
-    submitted = actions.submit(db_session, payload)
+    submitted = actions.submit(db_session, payload, requester=requester)
     batch_id = submitted["batch"]["batch_id"]
     requests = (
         db_session.query(StockRequest)
@@ -455,7 +458,7 @@ def test_submit_rolls_back_first_line_box_batch_request_and_log_when_second_line
     requester = _make_requester(db_session)
     for item in (first, second):
         _add_tracked_box(db_session, item.item_id, 3)
-    warehouse_map_svc.set_box_tracking_enabled(db_session, True)
+    warehouse_map_svc._set_box_tracking_enabled(db_session, True)
     first_id, second_id = first.item_id, second.item_id
     db_session.commit()
 
@@ -474,7 +477,11 @@ def test_submit_rolls_back_first_line_box_batch_request_and_log_when_second_line
     monkeypatch.setattr(sr_execution, "_execute_line", fail_on_second_line)
 
     with pytest.raises(RuntimeError) as raised:
-        actions.submit(db_session, _internal_use_payload(requester, [first, second]))
+        actions.submit(
+            db_session,
+            _internal_use_payload(requester, [first, second]),
+            requester=requester,
+        )
 
     assert raised.value is boom
     assert line_calls == 2
@@ -501,12 +508,16 @@ def test_submit_commits_once_with_inventory_box_batch_request_and_log(
     item = make_item(name="IO commit", warehouse_qty=Decimal("3"))
     requester = _make_requester(db_session)
     _add_tracked_box(db_session, item.item_id, 3)
-    warehouse_map_svc.set_box_tracking_enabled(db_session, True)
+    warehouse_map_svc._set_box_tracking_enabled(db_session, True)
     item_id = item.item_id
     db_session.commit()
 
     boundaries = _count_session_boundaries(db_session, monkeypatch)
-    result = actions.submit(db_session, _internal_use_payload(requester, [item]))
+    result = actions.submit(
+        db_session,
+        _internal_use_payload(requester, [item]),
+        requester=requester,
+    )
 
     assert result["status"] == "completed"
     assert boundaries == {"commit": 1, "rollback": 0}
@@ -536,12 +547,12 @@ def test_submit_rolls_back_batch_request_pending_and_notification_when_notify_fa
     )
     _make_requester(db_session)
     _add_tracked_box(db_session, item.item_id, 3)
-    warehouse_map_svc.set_box_tracking_enabled(db_session, True)
+    warehouse_map_svc._set_box_tracking_enabled(db_session, True)
     item_id = item.item_id
     db_session.commit()
 
     boundaries = _count_session_boundaries(db_session, monkeypatch)
-    original_notify = io_dispatch.notif_svc.notify_request_arrived
+    original_notify = io_dispatch.notif_svc._notify_request_arrived
     boom = RuntimeError("IO 알림 저장 후 실패")
 
     def notify_then_fail(db, request):
@@ -552,12 +563,16 @@ def test_submit_rolls_back_batch_request_pending_and_notification_when_notify_fa
 
     monkeypatch.setattr(
         io_dispatch.notif_svc,
-        "notify_request_arrived",
+        "_notify_request_arrived",
         notify_then_fail,
     )
 
     with pytest.raises(RuntimeError) as raised:
-        actions.submit(db_session, _internal_use_payload(requester, [item]))
+        actions.submit(
+            db_session,
+            _internal_use_payload(requester, [item]),
+            requester=requester,
+        )
 
     assert raised.value is boom
     assert boundaries == {"commit": 0, "rollback": 1}
@@ -586,9 +601,9 @@ def test_submit_existing_draft_rolls_back_all_lines_and_restores_draft_on_failur
     requester = _make_requester(db_session)
     for item in (first, second):
         _add_tracked_box(db_session, item.item_id, 3)
-    warehouse_map_svc.set_box_tracking_enabled(db_session, True)
+    warehouse_map_svc._set_box_tracking_enabled(db_session, True)
     payload = _internal_use_payload(requester, [first, second])
-    draft = io_draft.save_draft(db_session, payload)
+    draft = io_draft.save_draft(db_session, payload, requester=requester)
     draft_id = draft["batch_id"]
     first_id, second_id = first.item_id, second.item_id
     db_session.commit()
@@ -615,7 +630,7 @@ def test_submit_existing_draft_rolls_back_all_lines_and_restores_draft_on_failur
         actions.submit_existing_draft(
             db_session,
             batch_id=draft_id,
-            requester_employee_id=requester.employee_id,
+            requester=requester,
         )
 
     assert raised.value is boom
@@ -645,10 +660,11 @@ def test_submit_existing_draft_commits_once(
     item = make_item(name="IO draft commit", warehouse_qty=Decimal("3"))
     requester = _make_requester(db_session)
     _add_tracked_box(db_session, item.item_id, 3)
-    warehouse_map_svc.set_box_tracking_enabled(db_session, True)
+    warehouse_map_svc._set_box_tracking_enabled(db_session, True)
     draft = io_draft.save_draft(
         db_session,
         _internal_use_payload(requester, [item]),
+        requester=requester,
     )
     draft_id = draft["batch_id"]
     db_session.commit()
@@ -657,11 +673,69 @@ def test_submit_existing_draft_commits_once(
     result = actions.submit_existing_draft(
         db_session,
         batch_id=draft_id,
-        requester_employee_id=requester.employee_id,
+        requester=requester,
     )
 
     assert result["status"] == "completed"
     assert boundaries == {"commit": 1, "rollback": 0}
+
+
+def test_submit_existing_draft_keeps_batch_transition_before_item_locks(
+    db_session, make_item, monkeypatch
+):
+    item = make_item(name="IO draft lock order", warehouse_qty=Decimal("0"))
+    requester = _make_requester(db_session)
+    draft = io_draft.save_draft(
+        db_session,
+        IoSubmitRequest(
+            requester_employee_id=requester.employee_id,
+            work_type="receive",
+            sub_type="receive_supplier",
+            bundles=[{
+                "bundle_id": str(uuid.uuid4()),
+                "source_kind": "direct_item",
+                "title": item.item_name,
+                "source_item_id": str(item.item_id),
+                "quantity": 1,
+                "lines": [{
+                    "line_id": str(uuid.uuid4()),
+                    "item_id": str(item.item_id),
+                    "item_name": item.item_name,
+                    "mes_code": item.mes_code,
+                    "direction": "in",
+                    "from_bucket": "none",
+                    "to_bucket": "warehouse",
+                    "quantity": 1,
+                    "origin": "direct",
+                }],
+            }],
+        ),
+        requester=requester,
+    )
+    db_session.commit()
+    order: list[str] = []
+    real_execute = db_session.execute
+    real_lock_items = io_dispatch._lock_active_batch_items
+
+    def track_batch_transition(statement, *args, **kwargs):
+        if str(statement).startswith("UPDATE io_batches SET status"):
+            order.append("batch-transition")
+        return real_execute(statement, *args, **kwargs)
+
+    def track_item_locks(db, batch):
+        order.append("item-locks")
+        return real_lock_items(db, batch)
+
+    monkeypatch.setattr(db_session, "execute", track_batch_transition)
+    monkeypatch.setattr(io_dispatch, "_lock_active_batch_items", track_item_locks)
+
+    actions.submit_existing_draft(
+        db_session,
+        batch_id=draft["batch_id"],
+        requester=requester,
+    )
+
+    assert order[:2] == ["batch-transition", "item-locks"]
 
 
 def test_submit_existing_draft_rejects_when_conditional_draft_transition_loses_race(
@@ -694,6 +768,7 @@ def test_submit_existing_draft_rejects_when_conditional_draft_transition_loses_r
                 }],
             }],
         ),
+        requester=requester,
     )
     db_session.commit()
     real_execute = db_session.execute
@@ -709,7 +784,7 @@ def test_submit_existing_draft_rejects_when_conditional_draft_transition_loses_r
         actions.submit_existing_draft(
             db_session,
             batch_id=draft["batch_id"],
-            requester_employee_id=requester.employee_id,
+            requester=requester,
         )
 
     db_session.expire_all()

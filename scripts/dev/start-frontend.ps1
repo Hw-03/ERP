@@ -25,20 +25,6 @@ if (-not (Test-Path $FrontendDir)) {
 }
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 
-function Wait-FrontendReady {
-    for ($attempt = 0; $attempt -lt 30; $attempt++) {
-        Start-Sleep -Milliseconds 500
-        try {
-            $response = Invoke-WebRequest -Uri $HealthUrl -TimeoutSec 1 -UseBasicParsing -ErrorAction Stop
-            if ($response.StatusCode -eq 200) { return $true }
-        }
-        catch {
-            # The supervisor may still be starting or backing off after a failure.
-        }
-    }
-    return $false
-}
-
 function Start-FrontendSupervisor {
     param([object] $Request)
 
@@ -74,7 +60,7 @@ Add-RuntimeEvent -Path $EventPath -Profile $Profile.Name -Service "frontend" `
     -Details @{ request = $request }
 Request-RuntimeTaskStart -RepoRoot $Profile.RepoRoot -Service "frontend" | Out-Null
 
-if (-not (Wait-FrontendReady)) {
+if (-not (Wait-RuntimeHttp200 -Url $HealthUrl -Attempts 120)) {
     $state = Get-RuntimeState -Path $StatePath
     $task = Get-RuntimeTaskRegistration -RepoRoot $Profile.RepoRoot -Service "frontend"
     throw "[start-frontend] Frontend did not respond on $HealthUrl. task=$($task.Status) runtime=$($state.status). Check $EventPath"

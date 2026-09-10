@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Inventory, InventoryLocation
 from app.schemas import InventoryLocationResponse, InventoryResponse
-from app.services import stock_math
+from app.services import stock_availability, stock_math
 
 
 # 18개 공정코드 단일 기준 라벨 (README/docs/ITEM_CODE_RULES.md 기준).
@@ -58,14 +58,17 @@ def list_locations(db: Session, item_id: uuid.UUID) -> List[InventoryLocationRes
         .filter(InventoryLocation.item_id == item_id, InventoryLocation.quantity > 0)
         .all()
     )
+    reserved_by_cell = stock_availability.bulk_reserved_by_cell(db, [item_id])
     return [
         InventoryLocationResponse(
             department=row.department,
             status=row.status,
             quantity=row.quantity or Decimal("0"),
             pending_quantity=row.pending_quantity or Decimal("0"),
-            available_quantity=(row.quantity or Decimal("0"))
-            - (row.pending_quantity or Decimal("0")),
+            available_quantity=stock_availability.location_available_quantity(
+                row,
+                reserved_by_cell,
+            ),
         )
         for row in rows
     ]
@@ -85,6 +88,7 @@ def _build_response(
         defective_total=fig.defective_total,
         pending_quantity=fig.pending,
         department_pending_quantity=fig.department_pending,
+        warehouse_available_quantity=fig.warehouse_available,
         available_quantity=fig.available,
         last_reserver_name=inv.last_reserver_name,
         location=inv.location,
@@ -108,6 +112,7 @@ def to_response_bulk(
         return []
     item_ids = [inv.item_id for inv in invs]
     figures_map = stock_math.bulk_compute(db, item_ids)
+    reserved_by_cell = stock_availability.bulk_reserved_by_cell(db, item_ids)
 
     loc_rows = (
         db.query(InventoryLocation)
@@ -122,8 +127,10 @@ def to_response_bulk(
                 status=row.status,
                 quantity=row.quantity or Decimal("0"),
                 pending_quantity=row.pending_quantity or Decimal("0"),
-                available_quantity=(row.quantity or Decimal("0"))
-                - (row.pending_quantity or Decimal("0")),
+                available_quantity=stock_availability.location_available_quantity(
+                    row,
+                    reserved_by_cell,
+                ),
             )
         )
 

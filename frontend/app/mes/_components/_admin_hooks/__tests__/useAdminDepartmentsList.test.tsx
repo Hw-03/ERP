@@ -4,14 +4,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
 vi.mock("@/lib/queries/useDepartmentsQuery", () => ({
-  useCreateDepartmentMutation: () => ({ mutate: vi.fn() }),
-  useUpdateDepartmentMutation: () => ({ mutate: vi.fn() }),
-  useDeleteDepartmentMutation: () => ({ mutate: vi.fn() }),
-  useReorderDepartmentsMutation: () => ({ mutate: vi.fn() }),
-}));
-
-vi.mock("../../DepartmentsContext", () => ({
-  useRefreshDepartments: () => async () => undefined,
+  useCreateDepartmentMutation: () => ({ mutateAsync: vi.fn() }),
+  useUpdateDepartmentMutation: () => ({ mutateAsync: vi.fn() }),
+  useDeleteDepartmentMutation: () => ({ mutateAsync: vi.fn() }),
+  useReorderDepartmentsMutation: () => ({ mutateAsync: vi.fn() }),
 }));
 
 import { useAdminDepartments } from "../useAdminDepartments";
@@ -30,7 +26,6 @@ const D = (id: number, name = `D${id}`, is_active = true): any => ({
 
 const baseArgs = (over: Partial<Parameters<typeof useAdminDepartments>[0]> = {}) => ({
   departments: [] as any[],
-  setDepartments: vi.fn(),
   selectedDept: null,
   setSelectedDept: vi.fn(),
   onStatusChange: vi.fn(),

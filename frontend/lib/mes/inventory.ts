@@ -19,6 +19,7 @@ type InventoryItemLike = {
   warehouse_qty: number;
   pending_quantity?: number;
   department_pending_quantity?: number;
+  warehouse_available_quantity?: number;
   locations?: InventoryLocationLike[];
 };
 
@@ -39,8 +40,13 @@ export function warehousePending(item: Pick<InventoryItemLike, "pending_quantity
   return Math.max(0, quantityOrZero(item.pending_quantity));
 }
 
-/** 창고 출고 한도는 창고 실재고에서 창고 예약만 뺀 값이다. */
-export function warehouseAvailable(item: Pick<InventoryItemLike, "warehouse_qty" | "pending_quantity">): number {
+/** 창고 출고 한도는 API 정본 가용량을 우선하고, 구버전 응답만 요청 예약으로 계산한다. */
+export function warehouseAvailable(item: Pick<
+  InventoryItemLike,
+  "warehouse_qty" | "pending_quantity" | "warehouse_available_quantity"
+>): number {
+  const available = Number(item.warehouse_available_quantity);
+  if (Number.isFinite(available)) return Math.max(0, available);
   return Math.max(0, quantityOrZero(item.warehouse_qty) - warehousePending(item));
 }
 

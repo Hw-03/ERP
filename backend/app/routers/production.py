@@ -5,11 +5,17 @@ import uuid
 from decimal import Decimal
 from typing import List, Tuple
 
-from fastapi import APIRouter, Depends, status
+from fastapi import Depends, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Item
+from app.dependencies.verified_actor import (
+    VerifiedActor,
+    VerifiedActorRouter,
+    ensure_actor_employee_code,
+    ensure_actor_employee_name,
+)
+from app.models import Item, LocationStatusEnum
 from app.schemas import (
     BomCheckResponse,
     CapacityResponse,
@@ -18,6 +24,7 @@ from app.schemas import (
 )
 from app.services import production_receipt as production_receipt_svc
 from app.services import inventory as inventory_svc
+from app.services import stock_availability
 from app.services.production_receipt import (
     ProductionBadRequest,
     ProductionItemNotFound,
@@ -28,11 +35,10 @@ from app.services.bom import explode_bom as _explode_bom_svc
 from app.services.bom import merge_requirements
 from app.services.production_capacity import compute_capacity
 from app.routers._errors import ErrorCode, http_error
-from app.routers.inventory._tx_helper import resolve_producer
 from app.repositories import item_repository
 
 
-router = APIRouter()
+router = VerifiedActorRouter()
 
 logger = logging.getLogger("mes")
 
@@ -45,17 +51,28 @@ logger = logging.getLogger("mes")
 )
 def production_receipt(
     payload: ProductionReceiptRequest,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
 ):
-    produced_item = item_repository.get(db, payload.item_id)
+    ensure_actor_employee_code(actor, payload.producer_employee_code)
+    ensure_actor_employee_name(actor, payload.produced_by)
+    payload = payload.model_copy(
+        update={
+            "producer_employee_code": actor.employee_code,
+            "produced_by": actor.name,
+        }
+    )
+
+    produced_item = item_repository.get_active(db, payload.item_id)
     if not produced_item:
         raise http_error(404, ErrorCode.NOT_FOUND, "생산 대상 품목을 찾을 수 없습니다.")
 
-    producer_name, producer_id = resolve_producer(db, payload.producer_employee_code)
-
     try:
         result = production_receipt_svc.execute_production_receipt(
-            db, payload, produced_item, producer_name, producer_id,
+            db,
+            payload,
+            produced_item,
+            actor=actor,
         )
     except ProductionItemNotFound as exc:
         raise http_error(status.HTTP_404_NOT_FOUND, ErrorCode.NOT_FOUND, str(exc))
@@ -115,7 +132,7 @@ def check_production_feasibility(
     quantity: Decimal = 1,
     db: Session = Depends(get_db),
 ):
-    item = item_repository.get(db, item_id)
+    item = item_repository.get_active(db, item_id)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
@@ -128,23 +145,38 @@ def check_production_feasibility(
     comp_ids = list(merged.keys())
     comps_map = {
         c.item_id: c
-        for c in db.query(Item).filter(Item.item_id.in_(comp_ids)).all()
+        for c in db.query(Item)
+        .filter(Item.item_id.in_(comp_ids), Item.deleted_at.is_(None))
+        .all()
     }
+    if set(comp_ids) != set(comps_map):
+        raise http_error(404, ErrorCode.NOT_FOUND, "BOM 구성품을 찾을 수 없습니다.")
 
     for comp_item_id, required_qty in merged.items():
         comp_item = comps_map.get(comp_item_id)
         if comp_item is None:
             continue
         try:
-            dept, current_avail = inventory_svc.item_department_stock(db, comp_item)
+            dept = inventory_svc.department_for_item(comp_item)
+            figure = stock_availability.figure_for_cell(
+                db,
+                stock_availability.AvailabilityCell.location(
+                    comp_item.item_id,
+                    dept,
+                    LocationStatusEnum.PRODUCTION,
+                ),
+            )
+            current_total = figure.physical
+            current_pending = figure.stock_request_pending
+            current_avail = figure.available
         except ValueError:
             dept = None
+            current_total = Decimal("0")
+            current_pending = Decimal("0")
             current_avail = Decimal("0")
         ok = current_avail >= required_qty
         if not ok:
             all_ok = False
-        current_total = current_avail
-        current_pending = Decimal("0")
         result.append(
             {
                 "mes_code": comp_item.mes_code,

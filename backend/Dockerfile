@@ -13,4 +13,4 @@ EXPOSE 8010
 
 # 운영용: --reload 사용 금지. inotify watcher 누수 + 안정성 위험.
 # 코드 변경은 이미지 재빌드로 반영한다.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8010"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8010", "--workers", "1", "--no-proxy-headers"]

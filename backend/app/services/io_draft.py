@@ -1,6 +1,6 @@
 """임시저장(draft) CRUD + 멱등 재제출 응답.
 
-io_persist 의 _load_requester / _persist_batch / _batch_to_payload 를 재사용한다.
+io_persist 의 영속화·응답 헬퍼를 재사용한다.
 """
 
 from __future__ import annotations
@@ -14,12 +14,14 @@ from sqlalchemy.orm import Session
 
 from datetime import datetime
 
-from app.models import IoBatch
+from app.models import Employee, IoBatch
+from app.schemas import IoDraftUpsert
+from app.services.approval_rules import approval_kind
 from app.services.io_preview import (
-    APPROVAL_SUB_TYPES,
     automatic_department_headers,
     _bucket_available,
     _d,
+    has_declared_custom_process_bom,
     has_included_manual_line,
     normalize_process_sub_type,
     validate_internal_use_bundles,
@@ -33,9 +35,9 @@ from app.services.io_persist import (
     _add_bundles_and_lines,
     _batch_to_payload,
     ensure_batch_is_mutable,
-    _load_requester,
     _persist_batch,
-    normalize_payload_bom_stock_exempt,
+    _lock_active_payload_items,
+    _normalize_payload_bom_stock_exempt,
     normalize_automatic_routes_with_bom_token_refresh,
 )
 
@@ -83,7 +85,12 @@ def _draft_to_current_stock_payload(db: Session, batch: IoBatch) -> dict:
     return payload
 
 
-def save_draft(db: Session, payload) -> dict:
+def save_draft(
+    db: Session,
+    payload: IoDraftUpsert,
+    *,
+    requester: Employee,
+) -> dict:
     """임시저장. batch_id 가 오면 해당 draft 를 제자리 갱신, 없으면 새 슬롯 누적.
 
     덮어쓰기(이전 동작) 제거 — 같은 (work_type, sub_type) 라도 batch_id 가 없으면
@@ -94,18 +101,34 @@ def save_draft(db: Session, payload) -> dict:
         sub_type=payload.sub_type,
         bundles=payload.bundles,
     )
-    normalize_payload_bom_stock_exempt(db, payload)
+    incoming_batch_id = getattr(payload, "batch_id", None)
+    batch: IoBatch | None = None
+    if incoming_batch_id is not None:
+        batch = (
+            db.query(IoBatch)
+            .filter(IoBatch.batch_id == incoming_batch_id)
+            .with_for_update()
+            .first()
+        )
+        if batch is None or batch.status != "draft":
+            raise ValueError("임시저장 작업을 찾을 수 없습니다.")
+        if batch.requester_employee_id != requester.employee_id:
+            raise PermissionError("본인 임시저장 작업만 수정할 수 있습니다.")
+        ensure_batch_is_mutable(batch)
+    if not bool(requester.is_active):
+        raise PermissionError("비활성 직원은 입출고 작업을 제출할 수 없습니다.")
+    _lock_active_payload_items(db, payload)
     normalize_automatic_routes_with_bom_token_refresh(
         db,
         work_type=payload.work_type,
         sub_type=payload.sub_type,
         bundles=payload.bundles,
     )
+    _normalize_payload_bom_stock_exempt(db, payload)
     if payload.sub_type in {"warehouse_to_dept", "dept_to_warehouse", "produce", "disassemble", "adjust_in", "adjust_out"}:
         payload.from_department, payload.to_department = automatic_department_headers(
             payload.bundles
         )
-    requester = _load_requester(db, payload.requester_employee_id)
     validate_saved_operation_sources(
         work_type=payload.work_type,
         sub_type=payload.sub_type,
@@ -142,30 +165,27 @@ def save_draft(db: Session, payload) -> dict:
         to_department=payload.to_department,
         lines=(line for bundle in payload.bundles for line in bundle.lines),
     )
-    incoming_batch_id = getattr(payload, "batch_id", None)
 
-    if incoming_batch_id is not None:
-        batch = (
-            db.query(IoBatch)
-            .filter(IoBatch.batch_id == incoming_batch_id)
-            .first()
-        )
-        if batch is None or batch.status != "draft":
-            raise ValueError("임시저장 작업을 찾을 수 없습니다.")
-        if batch.requester_employee_id != requester.employee_id:
-            raise PermissionError("본인 임시저장 작업만 수정할 수 있습니다.")
-        ensure_batch_is_mutable(batch)
-        # 메타 갱신 + 자식 교체. client_request_id 는 보존(submit 멱등성).
+    if batch is not None:
+        # 메타 갱신 + 자식 교체. transport key는 보존하되 새 제출 지문은 다시 만든다.
         batch.work_type = payload.work_type
         batch.sub_type = payload.sub_type
         batch.from_department = payload.from_department
         batch.to_department = payload.to_department
-        batch.requires_approval = (
-            payload.sub_type in APPROVAL_SUB_TYPES
-            or has_included_manual_line(payload.bundles)
-        )
+        batch.requires_approval = approval_kind(
+            work_type=payload.work_type,
+            sub_type=payload.sub_type,
+            has_manual_line=has_included_manual_line(payload.bundles),
+            has_custom_process_bom=has_declared_custom_process_bom(
+                db,
+                work_type=payload.work_type,
+                sub_type=payload.sub_type,
+                bundles=payload.bundles,
+            ),
+        ) != "none"
         batch.reference_no = payload.reference_no
         batch.notes = payload.notes
+        batch.request_fingerprint = None
         batch.updated_at = datetime.utcnow()
         # cascade='all, delete-orphan' — 비우고 flush 해서 기존 자식을 INSERT 전에 DELETE.
         batch.bundles.clear()
@@ -209,11 +229,11 @@ def list_drafts(db: Session, *, requester_employee_id: uuid.UUID) -> list[dict]:
     return [_draft_to_current_stock_payload(db, row) for row in rows]
 
 
-def delete_draft(db: Session, *, batch_id: uuid.UUID, requester_employee_id: uuid.UUID) -> None:
+def delete_draft(db: Session, *, batch_id: uuid.UUID, requester: Employee) -> None:
     batch = db.query(IoBatch).filter(IoBatch.batch_id == batch_id).first()
     if batch is None:
         raise ValueError("임시저장 작업을 찾을 수 없습니다.")
-    if batch.requester_employee_id != requester_employee_id:
+    if batch.requester_employee_id != requester.employee_id:
         raise PermissionError("본인 임시저장 작업만 삭제할 수 있습니다.")
     if batch.status != "draft":
         raise ValueError("임시저장 상태가 아닙니다.")
@@ -222,8 +242,11 @@ def delete_draft(db: Session, *, batch_id: uuid.UUID, requester_employee_id: uui
     db.flush()
 
 
-def find_by_client_request_id(db: Session, client_request_id: str) -> Optional[IoBatch]:
-    """멱등 retry 시 기존 batch 조회. submit IntegrityError 후 라우터가 사용."""
+def find_by_client_request_id(
+    db: Session,
+    client_request_id: str,
+) -> Optional[IoBatch]:
+    """멱등 retry 시 key의 전역 소유 batch를 조회한다."""
     return (
         db.query(IoBatch)
         .filter(IoBatch.client_request_id == client_request_id)
@@ -231,16 +254,20 @@ def find_by_client_request_id(db: Session, client_request_id: str) -> Optional[I
     )
 
 
-def build_idempotent_response(batch: IoBatch) -> dict:
+def build_idempotent_response(batch: IoBatch, *, db: Session) -> dict:
     """이미 처리 완료된 batch에 대해 IoSubmitResponse 모양 dict 생성 (재제출 멱등 응답)."""
-    if batch.requires_approval:
+    if batch.status in {"submitted", "reserved"}:
         message = "승인 요청이 생성되었습니다."
+    elif not any(line.included for bundle in batch.bundles for line in bundle.lines):
+        message = "BOM 재고 미반영 품목만 포함되어 재고 변동 없이 처리되었습니다."
     else:
         message = "입출고가 반영되었습니다."
+    batch_payload = _batch_to_payload(batch, db=db)
     return {
-        "batch": _batch_to_payload(batch),
+        "batch": batch_payload,
         "status": batch.status,
         "requires_approval": batch.requires_approval,
         "stock_request_id": batch.stock_request_id,
+        "stock_requests": batch_payload["stock_requests"],
         "message": message,
     }

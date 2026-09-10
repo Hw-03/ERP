@@ -28,6 +28,7 @@ from fastapi import Request
 from sqlalchemy.orm import Session
 
 from app.models import AdminAuditLog
+from app._actor import get_actor_emp
 
 
 def record(
@@ -40,13 +41,15 @@ def record(
     request: Optional[Request] = None,
     actor_pin_role: str = "admin",
     actor_employee_code: Optional[str] = None,
+    bootstrap_employee_id: Optional[str] = None,
 ) -> AdminAuditLog:
     rid = None
     actor_emp = actor_employee_code
     if request is not None:
         rid = getattr(request.state, "request_id", None)
         if actor_emp is None:
-            actor_emp = getattr(request.state, "actor_emp", None)
+            request_actor = get_actor_emp(request)
+            actor_emp = request_actor if request_actor != "-" else None
     log = AdminAuditLog(
         action=action,
         target_type=target_type,
@@ -55,6 +58,7 @@ def record(
         request_id=rid,
         actor_pin_role=actor_pin_role,
         actor_employee_code=actor_emp,
+        bootstrap_employee_id=bootstrap_employee_id,
     )
     db.add(log)
     return log

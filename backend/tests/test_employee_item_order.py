@@ -7,8 +7,6 @@ from __future__ import annotations
 
 import uuid
 
-import pytest
-
 from app.models import Employee, EmployeeLevelEnum
 from app.services.pin_auth import DEFAULT_PIN_HASH
 
@@ -177,26 +175,29 @@ def test_delete_clears_all(client, db_session, make_item):
 
 
 # ---------------------------------------------------------------------------
-# 존재하지 않는 employee_id → GET/PUT/DELETE 404
+# 세션과 다른 employee_id claim → GET/PUT/DELETE 403
 # ---------------------------------------------------------------------------
 
 
-def test_nonexistent_employee_get_404(client):
+def test_nonexistent_employee_get_rejects_actor_mismatch(client):
     fake_id = str(uuid.uuid4())
     resp = client.get(f"/api/items/my-order?employee_id={fake_id}")
-    assert resp.status_code == 404
+    assert resp.status_code == 403
+    assert resp.json()["detail"]["code"] == "ACTOR_MISMATCH"
 
 
-def test_nonexistent_employee_put_404(client):
+def test_nonexistent_employee_put_rejects_actor_mismatch(client):
     fake_id = str(uuid.uuid4())
     resp = client.put(
         "/api/items/my-order",
         json={"employee_id": fake_id, "items": []},
     )
-    assert resp.status_code == 404
+    assert resp.status_code == 403
+    assert resp.json()["detail"]["code"] == "ACTOR_MISMATCH"
 
 
-def test_nonexistent_employee_delete_404(client):
+def test_nonexistent_employee_delete_rejects_actor_mismatch(client):
     fake_id = str(uuid.uuid4())
     resp = client.delete(f"/api/items/my-order?employee_id={fake_id}")
-    assert resp.status_code == 404
+    assert resp.status_code == 403
+    assert resp.json()["detail"]["code"] == "ACTOR_MISMATCH"

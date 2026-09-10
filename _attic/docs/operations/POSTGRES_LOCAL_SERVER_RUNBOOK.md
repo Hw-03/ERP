@@ -75,12 +75,11 @@ Bootstrap 완료.
 ## 5. 서버 시작
 
 ```bash
-cd backend
-# 30명 기준: workers 2 권장 (CPU 코어 수에 따라 조정)
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8010 --workers 2
+cd <DEXCOWIN-MES 저장소 루트>
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\start-backend.ps1
 ```
 
-> **주의**: `--reload` 플래그는 `--workers`와 함께 사용 불가. 운영 서버에서는 제거.
+> **주의**: operator session의 `boot_id`와 PIN 시도 제한은 process-local 상태를 사용한다. shared identity 설계 전에는 canonical launcher가 강제하는 단일 worker를 유지하고 worker 수를 늘리지 않는다.
 
 서버 시작 확인:
 ```bash
@@ -137,7 +136,7 @@ docker compose -f docker/docker-compose.yml ps postgres
 1. Docker Desktop 실행 (시스템 트레이 아이콘 확인)
 2. PostgreSQL 기동: `docker compose -f docker/docker-compose.yml up -d postgres`
 3. 약 30초 대기
-4. 서버 시작: `python -m uvicorn app.main:app --host 0.0.0.0 --port 8010 --workers 2`
+4. 저장소 루트에서 서버 시작: `powershell -ExecutionPolicy Bypass -File .\scripts\dev\start-backend.ps1`
 5. preflight 실행: `python scripts/ops/preflight_30_users.py --url http://localhost:8010`
 
 ### 백업 복구
@@ -172,7 +171,7 @@ New-NetFirewallRule -DisplayName "MES Server" -Direction Inbound -Protocol TCP -
 - [ ] `docker compose ps postgres` → healthy
 - [ ] `backend/.env`에 `DATABASE_URL=postgresql://...` 설정됨
 - [ ] `python bootstrap_db.py` 완료
-- [ ] 서버 시작 (--workers 2)
+- [ ] canonical launcher로 서버 시작 (단일 worker)
 - [ ] `preflight_30_users.py` 전체 PASS
 - [ ] 직원들에게 서버 IP 공유: `http://<서버IP>:8010`
 

@@ -128,7 +128,7 @@
 
 ## 3. 모바일 컴포넌트 체크리스트
 
-> 이 중 3가지 — ① `<button>` 시맨틱(div/span+onClick 금지) ② 인라인 hex 색 금지 ③ 정보성 `title=` 금지 — 는 신규 영역 [`features/mes/`](frontend/features/mes/)에서 **ESLint로 자동 강제**된다([.eslintrc.json](frontend/.eslintrc.json) `no-restricted-syntax`). 레거시(`_components/`)는 기존 위반이 많아 게이트로 막지 않고, 해당 파일을 만질 때 점진 정리한다.
+> [STALE] 과거 `features/mes/`에 적용했던 3가지 전용 `no-restricted-syntax` 규칙은 해당 영역 제거와 함께 삭제되었다. 현재 [`eslint.config.mjs`](../../frontend/eslint.config.mjs)는 `next/core-web-vitals`를 적용하며, 아래 3가지는 자동 강제가 아닌 변경 시 셀프 점검 항목이다.
 
 신규 컴포넌트 추가 시 5분 셀프 점검:
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 import shutil
@@ -73,6 +74,73 @@ class VerifyLocalDocsScopeTests(unittest.TestCase):
                 path for path in process_temp_directory.rglob("*") if path.is_file()
             )
             self.assertEqual(temporary_artifacts, [])
+
+        self.assertFalse(temporary_root.exists())
+        return commands
+
+    def run_frontend_lint_gate(self) -> list[str]:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            temporary_root = Path(temporary_directory)
+            repo = temporary_root / "repo"
+            process_temp_directory = temporary_root / "process-temp"
+            command_log = temporary_root / "commands.log"
+            repo.mkdir()
+            process_temp_directory.mkdir()
+
+            self.prepare_repository(repo, ["frontend/app/page.tsx"])
+            eslint_bin = repo / "frontend" / "node_modules" / ".bin" / "eslint.cmd"
+            eslint_bin.parent.mkdir(parents=True)
+            eslint_bin.write_text(
+                '@echo off\necho eslint:%*>> "%FAKE_COMMAND_LOG%"\nexit /b 0\n',
+                encoding="ascii",
+            )
+            gate_path = temporary_root / "frontend-lint-files.json"
+            gate_path.write_text(
+                json.dumps(
+                    {
+                        "id": "frontend-lint-files",
+                        "area": "frontend",
+                        "kind": "targeted",
+                        "reason": "test changed-file lint",
+                        "files": ["frontend/app/page.tsx", "frontend/README.md"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            environment = os.environ.copy()
+            environment.update(
+                {
+                    "FAKE_COMMAND_LOG": str(command_log),
+                    "TEMP": str(process_temp_directory),
+                    "TMP": str(process_temp_directory),
+                }
+            )
+
+            result = subprocess.run(
+                [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(repo / "scripts" / "dev" / "verify_local.ps1"),
+                    "-InternalGateFile",
+                    str(gate_path),
+                ],
+                cwd=repo,
+                env=environment,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+            )
+            self.assertEqual(
+                result.returncode,
+                0,
+                f"verify_local failed:\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}",
+            )
+            commands = command_log.read_text(encoding="utf-8").splitlines()
 
         self.assertFalse(temporary_root.exists())
         return commands
@@ -200,6 +268,11 @@ exit /b 0
             any(command.startswith("python:-m pytest -q") for command in commands),
             commands,
         )
+
+    def test_changed_frontend_file_lint_uses_direct_eslint_cli_strictly(self) -> None:
+        commands = self.run_frontend_lint_gate()
+
+        self.assertEqual(commands, ["eslint:--max-warnings=0 app/page.tsx"])
 
 
 if __name__ == "__main__":

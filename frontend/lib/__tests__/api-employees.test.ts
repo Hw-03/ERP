@@ -44,7 +44,7 @@ describe("employeesApi.getEmployees", () => {
   });
 
   it("forwards an optional abort signal", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse([])));
+    const fetchSpy = vi.fn<typeof fetch>(() => Promise.resolve(makeResponse([])));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
     const controller = new AbortController();
 

@@ -42,8 +42,11 @@ export const queryKeys = {
     all: ["shipping"] as const,
     requests: (params?: { status?: string }) =>
       ["shipping", "requests", params ?? {}] as const,
+    requestPages: (params?: { status?: string; limit?: number }) =>
+      ["shipping", "requestPages", params ?? {}] as const,
     revisions: (requestId: string) => ["shipping", "revisions", requestId] as const,
     history: (params?: object) => ["shipping", "history", params ?? {}] as const,
+    historyPages: (params?: object) => ["shipping", "historyPages", params ?? {}] as const,
     historyMonths: (params?: object) => ["shipping", "historyMonths", params ?? {}] as const,
   },
   assemblyChecklists: {
@@ -97,11 +100,12 @@ export const queryKeys = {
   },
   stockRequests: {
     all: ["stockRequests"] as const,
-    warehouseQueue: () => ["stockRequests", "warehouseQueue"] as const,
-    departmentQueue: (actorId: string) =>
-      ["stockRequests", "departmentQueue", actorId] as const,
-    myList: (employeeId: string) =>
-      ["stockRequests", "myList", employeeId] as const,
+    warehouseQueue: (targetRequestId?: string | null) =>
+      ["stockRequests", "warehouseQueue", targetRequestId ?? null] as const,
+    departmentQueue: (actorId: string, targetRequestId?: string | null) =>
+      ["stockRequests", "departmentQueue", actorId, targetRequestId ?? null] as const,
+    myList: (employeeId: string, targetRequestId?: string | null) =>
+      ["stockRequests", "myList", employeeId, targetRequestId ?? null] as const,
     drafts: (employeeId: string) =>
       ["stockRequests", "drafts", employeeId] as const,
     reservations: (itemId: string) =>

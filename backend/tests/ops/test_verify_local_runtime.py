@@ -69,29 +69,47 @@ def _mock_full_gate_runtime(
     tmp_path: Path,
     *,
     npm_exit_code: int = 0,
+    openapi_baseline: bytes = b"{}\r\n",
+    openapi_capture: bytes = b"{}\r\n",
 ) -> tuple[Path, dict[str, str]]:
     """실제 PowerShell 병렬 orchestration만 남기고 느린 하위 명령을 대체한다."""
     repo = _verification_repo(tmp_path)
     baseline = repo / "_dev" / "baselines" / "openapi.json"
     baseline.parent.mkdir(parents=True)
-    baseline.write_bytes(b"{}\r\n")
+    baseline.write_bytes(openapi_baseline)
+    capture = tmp_path / "openapi-capture.json"
+    capture.write_bytes(openapi_capture)
     _git(repo, "add", ".")
     _git(repo, "commit", "-qm", "openapi baseline")
 
     fake_bin = tmp_path / "fake-bin"
     fake_bin.mkdir()
+    gate_env_log = tmp_path / "full-gate-env.log"
     real_python = Path(sys.executable)
     (fake_bin / "python.cmd").write_text(
         "\r\n".join(
             [
                 "@echo off",
                 'if /I "%~nx1"=="verification_policy.py" (',
+                "  if defined DEXCOWIN_MOCK_POLICY_FILE (",
+                '    type "%DEXCOWIN_MOCK_POLICY_FILE%"',
+                "    exit /b 0",
+                "  )",
                 f'  "{real_python}" %*',
                 "  exit /b %ERRORLEVEL%",
                 ")",
+                'if /I "%~nx1"=="verify_postgres_concurrency.py" (',
+                '  >>"%DEXCOWIN_MOCK_GATE_ENV_LOG%" echo backend-postgres-concurrency TEST_POSTGRES_URL=%TEST_POSTGRES_URL% DATABASE_URL=%DATABASE_URL% DEXCOWIN_POSTGRES_TEST_ACK=%DEXCOWIN_POSTGRES_TEST_ACK%',
+                "  exit /b 0",
+                ")",
                 'if "%~1"=="-" (',
+                '  >>"%DEXCOWIN_MOCK_GATE_ENV_LOG%" echo backend-openapi TEST_POSTGRES_URL=%TEST_POSTGRES_URL% DATABASE_URL=%DATABASE_URL% DEXCOWIN_POSTGRES_TEST_ACK=%DEXCOWIN_POSTGRES_TEST_ACK%',
                 "  more >nul",
-                '  >"%~2" echo {}',
+                '  copy /b "%DEXCOWIN_MOCK_OPENAPI_CAPTURE%" "%~2" >nul',
+                "  exit /b 0",
+                ")",
+                'if /I "%~2"=="pytest" (',
+                '  >>"%DEXCOWIN_MOCK_GATE_ENV_LOG%" echo backend-pytest-full TEST_POSTGRES_URL=%TEST_POSTGRES_URL% DATABASE_URL=%DATABASE_URL% DEXCOWIN_POSTGRES_TEST_ACK=%DEXCOWIN_POSTGRES_TEST_ACK%',
                 "  exit /b 0",
                 ")",
                 "exit /b 0",
@@ -104,10 +122,13 @@ def _mock_full_gate_runtime(
         f"@echo off\r\nexit /b {npm_exit_code}\r\n",
         encoding="ascii",
     )
+    (fake_bin / "node.cmd").write_text("@echo off\r\necho v20.20.2\r\nexit /b 0\r\n", encoding="ascii")
     (fake_bin / "npx.cmd").write_text("@echo off\r\nexit /b 0\r\n", encoding="ascii")
     return repo, {
         "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
         "DEXCOWIN_VERIFY_PARALLEL_CPU_THRESHOLD": "1",
+        "DEXCOWIN_MOCK_GATE_ENV_LOG": str(gate_env_log),
+        "DEXCOWIN_MOCK_OPENAPI_CAPTURE": str(capture),
     }
 
 
@@ -160,6 +181,18 @@ def _mock_smart_targeted_runtime(
                 '  >>"%DEXCOWIN_MOCK_GATE_LOG%.backend-openapi" echo backend-openapi end',
                 "  exit /b 0",
                 ")",
+                'if /I "%~2"=="ruff" (',
+                '  >>"%DEXCOWIN_MOCK_GATE_LOG%.backend-ruff" echo backend-ruff start',
+                "  ping -n 4 127.0.0.1 >nul",
+                '  >>"%DEXCOWIN_MOCK_GATE_LOG%.backend-ruff" echo backend-ruff end',
+                "  exit /b 0",
+                ")",
+                'if /I "%~2"=="mypy" (',
+                '  >>"%DEXCOWIN_MOCK_GATE_LOG%.backend-mypy" echo backend-mypy start',
+                "  ping -n 4 127.0.0.1 >nul",
+                '  >>"%DEXCOWIN_MOCK_GATE_LOG%.backend-mypy" echo backend-mypy end',
+                "  exit /b 0",
+                ")",
                 '>>"%DEXCOWIN_MOCK_GATE_LOG%.backend-testmon" echo backend-testmon start',
                 "ping -n 4 127.0.0.1 >nul",
                 '>>"%DEXCOWIN_MOCK_GATE_LOG%.backend-testmon" echo backend-testmon end',
@@ -169,10 +202,12 @@ def _mock_smart_targeted_runtime(
         ),
         encoding="ascii",
     )
+    (fake_bin / "node.cmd").write_text("@echo off\r\necho v20.20.2\r\nexit /b 0\r\n", encoding="ascii")
+    (fake_bin / "npm.cmd").write_text("@echo off\r\nexit /b 0\r\n", encoding="ascii")
     local_bin = repo / "frontend" / "node_modules" / ".bin"
     local_bin.mkdir(parents=True)
     commands = {
-        "next.cmd": ("frontend-lint-files", lint_exit_code),
+        "eslint.cmd": ("frontend-lint-files", lint_exit_code),
         "tsc.cmd": ("frontend-tsc-incremental", 0),
     }
     for filename, (label, exit_code) in commands.items():
@@ -222,6 +257,38 @@ def _mock_smart_targeted_runtime(
 
 def _gate_event_lines(gate_log: Path, gate_id: str) -> list[str]:
     return Path(f"{gate_log}.{gate_id}").read_text(encoding="utf-8").splitlines()
+
+
+def _run_backend_openapi_gate(
+    tmp_path: Path,
+    *,
+    baseline: bytes = b"{}\r\n",
+    capture: bytes,
+) -> subprocess.CompletedProcess[bytes]:
+    repo, extra_env = _mock_full_gate_runtime(
+        tmp_path,
+        openapi_baseline=baseline,
+        openapi_capture=capture,
+    )
+    gate_file = repo / "openapi-gate.json"
+    gate_file.write_text(
+        json.dumps(
+            {
+                "id": "backend-openapi",
+                "area": "backend",
+                "kind": "contract",
+                "reason": "OpenAPI newline comparison contract",
+                "files": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return _run_verify(
+        repo,
+        "-InternalGateFile",
+        str(gate_file),
+        extra_env=extra_env,
+    )
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="PowerShell runtime test is Windows-only")
@@ -359,15 +426,120 @@ def test_full_mode_runs_both_areas_in_parallel_and_merges_timings(tmp_path: Path
     report = json.loads(timing.read_text(encoding="utf-8-sig"))
     gate_ids = {gate["id"] for gate in report["gates"]}
     assert gate_ids == {
+        "backend-ruff",
+        "backend-mypy",
+        "backend-postgres-concurrency",
         "backend-pytest-full",
         "backend-openapi",
         "frontend-lint",
         "frontend-typecheck",
+        "frontend-test-typecheck",
+        "frontend-e2e-typecheck",
         "frontend-coverage",
         "frontend-build",
         "frontend-bundle-size",
         "git-status",
     }
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="PowerShell runtime test is Windows-only")
+def test_full_mode_scopes_postgres_environment_to_concurrency_gate(tmp_path: Path) -> None:
+    repo, extra_env = _mock_full_gate_runtime(tmp_path)
+    policy_file = tmp_path / "postgres-env-policy.json"
+    gate_ids = [
+        "backend-postgres-concurrency",
+        "backend-pytest-full",
+        "backend-openapi",
+        "backend-postgres-concurrency",
+    ]
+    policy_file.write_text(
+        json.dumps(
+            {
+                "mode": "full",
+                "change_set": "all",
+                "selected_files": [],
+                "ignored_files": [],
+                "conflicts": [],
+                "escalations": [],
+                "gates": [
+                    {
+                        "id": gate_id,
+                        "area": "backend",
+                        "kind": "contract",
+                        "reason": "PostgreSQL environment scope contract",
+                        "files": [],
+                    }
+                    for gate_id in gate_ids
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    postgres_env = {
+        "TEST_POSTGRES_URL": "postgres-test-url",
+        "DATABASE_URL": "postgres-database-url",
+        "DEXCOWIN_POSTGRES_TEST_ACK": "acknowledged",
+    }
+    extra_env.update({**postgres_env, "DEXCOWIN_MOCK_POLICY_FILE": str(policy_file)})
+
+    result = _run_verify(repo, "-Mode", "full", extra_env=extra_env)
+
+    output = _output(result)
+    assert result.returncode == 0, output
+    gate_env_log = Path(extra_env["DEXCOWIN_MOCK_GATE_ENV_LOG"])
+    lines = gate_env_log.read_text(encoding="utf-8").splitlines()
+    assert lines == [
+        "backend-postgres-concurrency "
+        "TEST_POSTGRES_URL=postgres-test-url "
+        "DATABASE_URL=postgres-database-url "
+        "DEXCOWIN_POSTGRES_TEST_ACK=acknowledged",
+        "backend-pytest-full TEST_POSTGRES_URL= DATABASE_URL= DEXCOWIN_POSTGRES_TEST_ACK=",
+        "backend-openapi TEST_POSTGRES_URL= DATABASE_URL= DEXCOWIN_POSTGRES_TEST_ACK=",
+        "backend-postgres-concurrency "
+        "TEST_POSTGRES_URL=postgres-test-url "
+        "DATABASE_URL=postgres-database-url "
+        "DEXCOWIN_POSTGRES_TEST_ACK=acknowledged",
+    ]
+    assert {name: extra_env[name] for name in postgres_env} == postgres_env
+
+
+def test_openapi_capture_uses_explicit_lf_newline_contract() -> None:
+    script = VERIFY_LOCAL.read_text(encoding="utf-8-sig")
+
+    assert 'with open(out, "w", encoding="utf-8", newline="\\n") as f:' in script
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="PowerShell runtime test is Windows-only")
+def test_openapi_gate_accepts_crlf_baseline_with_lf_capture(tmp_path: Path) -> None:
+    result = _run_backend_openapi_gate(tmp_path, capture=b"{}\n")
+
+    output = _output(result)
+    assert result.returncode == 0, output
+    assert "OpenAPI spec matches baseline." in output
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="PowerShell runtime test is Windows-only")
+def test_openapi_gate_rejects_meaningful_json_drift_after_eol_normalization(
+    tmp_path: Path,
+) -> None:
+    result = _run_backend_openapi_gate(tmp_path, capture=b'{"drift": true}\n')
+
+    output = _output(result)
+    assert result.returncode != 0
+    assert "OpenAPI drift" in output
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="PowerShell runtime test is Windows-only")
+def test_openapi_gate_rejects_case_only_json_drift(tmp_path: Path) -> None:
+    result = _run_backend_openapi_gate(
+        tmp_path,
+        baseline=b'{"value":"A"}\r\n',
+        capture=b'{"value":"a"}\n',
+    )
+
+    output = _output(result)
+    assert result.returncode != 0
+    assert "OpenAPI drift" in output
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="PowerShell runtime test is Windows-only")
@@ -422,6 +594,9 @@ def test_parallel_failure_waits_for_other_area_and_stops_followup_gates(tmp_path
     report = json.loads(timing.read_text(encoding="utf-8-sig"))
     gate_statuses = {gate["id"]: gate["status"] for gate in report["gates"]}
     assert gate_statuses == {
+        "backend-ruff": "passed",
+        "backend-mypy": "passed",
+        "backend-postgres-concurrency": "passed",
         "backend-pytest-full": "passed",
         "backend-openapi": "passed",
         "frontend-lint": "failed",
@@ -446,17 +621,22 @@ def test_smart_targeted_gates_run_in_parallel_and_merge_each_timing(tmp_path: Pa
 
     output = _output(result)
     assert result.returncode == 0, output
-    assert "Running 6 smart targeted gates in parallel" in output
+    assert "Running 8 smart targeted gates in parallel" in output
     report = json.loads(timing.read_text(encoding="utf-8-sig"))
     assert {gate["id"] for gate in report["gates"]} == {
+        "backend-ruff",
+        "backend-mypy",
         "backend-testmon",
         "backend-openapi",
         "frontend-lint-files",
         "frontend-tsc-incremental",
         "frontend-vitest-related",
+        "frontend-test-typecheck",
         "frontend-direct-tests",
     }
     for gate_id in {
+        "backend-ruff",
+        "backend-mypy",
         "backend-testmon",
         "backend-openapi",
         "frontend-lint-files",
@@ -467,6 +647,10 @@ def test_smart_targeted_gates_run_in_parallel_and_merge_each_timing(tmp_path: Pa
         events = _gate_event_lines(gate_log, gate_id)
         assert events[0].startswith(f"{gate_id} start")
         assert events[-1].startswith(f"{gate_id} end")
+    lint_args = _gate_event_lines(gate_log, "frontend-lint-files")[0]
+    assert "--max-warnings=0" in lint_args
+    assert "app/sample.ts" in lint_args
+    assert "app/sample.test.ts" in lint_args
     assert report["total_ms"] < sum(gate["duration_ms"] for gate in report["gates"])
     related_args = Path(f"{gate_log}.related").read_text(encoding="utf-8")
     direct_args = Path(f"{gate_log}.run").read_text(encoding="utf-8")
@@ -503,7 +687,7 @@ def test_smart_parallel_failure_waits_for_all_children_and_merges_timings(tmp_pa
     report = json.loads(timing.read_text(encoding="utf-8-sig"))
     statuses = {gate["id"]: gate["status"] for gate in report["gates"]}
     assert statuses["frontend-lint-files"] == "failed"
-    assert len(statuses) == 6
+    assert len(statuses) == 8
 
 
 def test_verify_local_keeps_existing_switches_and_adds_smart_policy_parameters() -> None:

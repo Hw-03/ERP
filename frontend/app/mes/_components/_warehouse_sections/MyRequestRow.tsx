@@ -5,10 +5,10 @@ import type { StockRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatKstDateTime } from "@/lib/mes/format";
 import {
-  REQUEST_TYPE_LABEL,
   formatRequestNotes,
   getRequestFlowLabel,
   getRequestStatusPresentation,
+  getRequestTypePresentation,
 } from "./ioRequestLabels";
 import { StockRequestLineTable } from "./StockRequestLineTable";
 
@@ -26,8 +26,11 @@ export function MyRequestRow({
   onRevertToDraft?: () => void;
   highlighted?: boolean;
 }) {
-  const cancelable = req.status === "submitted" || req.status === "reserved";
-  const typeLabel = REQUEST_TYPE_LABEL[req.request_type] ?? req.request_type;
+  const requestType = getRequestTypePresentation(req.request_type);
+  const cancelable = requestType.commandSafe && (
+    req.status === "submitted" || req.status === "reserved"
+  );
+  const typeLabel = requestType.label;
   const status = getRequestStatusPresentation(req.status);
   const [notesExpanded, setNotesExpanded] = useState(false);
   const displayNotes = formatRequestNotes(req.notes);

@@ -9,12 +9,38 @@
  */
 
 import { deleteJson, fetcher, patchJson, postJson, putJson, toApiUrl } from "../api-core";
+import type { components } from "./generated/openapi";
 import type {
   BOMDetailEntry,
   BOMEntry,
   BOMTreeNode,
   ProductModel,
 } from "./types";
+
+type OpenApiBOMTreeNode = components["schemas"]["BOMTreeNode"];
+
+function requireFiniteNumber(value: number | null | undefined, field: string): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error(`BOM tree 응답의 ${field} 값이 없습니다.`);
+  }
+  return value;
+}
+
+/** OpenAPI의 nullable/기본값 표현을 기존 BOM 업무 타입으로 정규화한다. */
+function fromOpenApiBOMTreeNode(raw: OpenApiBOMTreeNode): BOMTreeNode {
+  return {
+    item_id: raw.item_id,
+    mes_code: raw.mes_code ?? null,
+    item_name: raw.item_name,
+    process_type_code: raw.process_type_code ?? null,
+    unit: raw.unit,
+    required_quantity: raw.required_quantity,
+    current_stock: requireFiniteNumber(raw.current_stock, "current_stock"),
+    additional_producible_quantity: raw.additional_producible_quantity ?? null,
+    production_capacity_ignored: raw.production_capacity_ignored ?? false,
+    children: (raw.children ?? []).map(fromOpenApiBOMTreeNode),
+  };
+}
 
 export const catalogApi = {
   // Models -----------------------------------------------------------------
@@ -41,7 +67,9 @@ export const catalogApi = {
   getBOM: (parentItemId: string) => fetcher<BOMEntry[]>(toApiUrl(`/api/bom/${parentItemId}`)),
   getBOMTree: (parentItemId: string, options?: { departmentOrder?: "desc" }) => {
     const query = options?.departmentOrder ? `?department_order=${options.departmentOrder}` : "";
-    return fetcher<BOMTreeNode>(toApiUrl(`/api/bom/${parentItemId}/tree${query}`));
+    return fetcher<OpenApiBOMTreeNode>(
+      toApiUrl(`/api/bom/${parentItemId}/tree${query}`),
+    ).then(fromOpenApiBOMTreeNode);
   },
   /** 주어진 품목을 자식으로 사용하는 parent BOM 행. 직접 사용처(1단계). */
   getBOMWhereUsed: (itemId: string) =>

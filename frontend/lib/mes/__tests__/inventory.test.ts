@@ -88,4 +88,18 @@ describe("inventory reservation helpers", () => {
       to_bucket: "none",
     })).toBe(4);
   });
+
+  it("prefers the backend canonical warehouse availability", () => {
+    const canonicalItem = {
+      ...item,
+      warehouse_available_quantity: 3,
+    };
+
+    expect(helpers.warehouseAvailable?.(canonicalItem)).toBe(3);
+    expect(helpers.ioLineAvailable?.(canonicalItem, {
+      from_bucket: "warehouse",
+      to_bucket: "production",
+      to_department: "조립",
+    })).toBe(3);
+  });
 });

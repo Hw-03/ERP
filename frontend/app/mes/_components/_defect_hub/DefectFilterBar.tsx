@@ -66,6 +66,8 @@ export function DefectFilterBar({
   onProcessStepsChange,
   onResetCategoryFilters,
 }: Props) {
+  const readableBlue = `color-mix(in srgb, ${LEGACY_COLORS.blue} 30%, ${LEGACY_COLORS.text})`;
+  const readableMuted = `color-mix(in srgb, ${LEGACY_COLORS.muted2} 30%, ${LEGACY_COLORS.text})`;
   const activeDepartments = [...(selectedDepartments ?? legacyDepartments(scope, currentDept))];
 
   function setDepartments(next: string[]): void {
@@ -103,15 +105,15 @@ export function DefectFilterBar({
       />
 
       <div className="flex flex-wrap items-center gap-2 rounded-[16px] border px-3 py-2" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-        <span className="mr-1 text-xs font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>격리자</span>
-        <FilterChip label="전체" active={actorScope === "all"} onClick={() => onActorScopeChange("all")} size="sm" className="min-h-11" />
-        <FilterChip label="내가 격리" active={actorScope === "mine"} onClick={() => onActorScopeChange("mine")} size="sm" className="min-h-11" />
-        <span className="ml-1 text-xs font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>정렬</span>
+        <span className="mr-1 text-xs font-black uppercase tracking-[1.5px]" style={{ color: readableMuted }}>격리자</span>
+        <FilterChip label="전체" active={actorScope === "all"} onClick={() => onActorScopeChange("all")} size="sm" className="min-h-11" textTone={readableBlue} />
+        <FilterChip label="내가 격리" active={actorScope === "mine"} onClick={() => onActorScopeChange("mine")} size="sm" className="min-h-11" textTone={readableBlue} />
+        <span className="ml-1 text-xs font-black uppercase tracking-[1.5px]" style={{ color: readableMuted }}>정렬</span>
         <select aria-label="정렬" value={sort} onChange={(event) => onSortChange(event.target.value as DefectSort)} className="min-h-11 rounded-[12px] border px-3 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-blue)] focus-visible:ring-offset-2" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
           <option value="oldest">오래된 순</option>
           <option value="newest">최신 순</option>
         </select>
-        <label className="flex min-h-11 cursor-pointer select-none items-center gap-2 rounded-[12px] px-2 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+        <label className="flex min-h-11 cursor-pointer select-none items-center gap-2 rounded-[12px] px-2 text-sm font-bold" style={{ color: readableMuted }}>
           <input type="checkbox" checked={filterLocked} onChange={(event) => onFilterLockedChange(event.target.checked)} className="h-4 w-4 cursor-pointer rounded border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-blue)] focus-visible:ring-offset-2" style={{ accentColor: LEGACY_COLORS.blue }} />
           <span>필터 고정</span>
         </label>

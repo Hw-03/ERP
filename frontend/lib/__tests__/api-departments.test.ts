@@ -27,7 +27,7 @@ describe("departmentsApi", () => {
   });
 
   it("forwards an optional abort signal when reading the app session", async () => {
-    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({ boot_id: "b", started_at: "" })));
+    const fetchSpy = vi.fn<typeof fetch>(() => Promise.resolve(makeResponse({ boot_id: "b", started_at: "" })));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
     const controller = new AbortController();
 

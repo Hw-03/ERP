@@ -54,10 +54,24 @@ export interface ShippingChecklistUpdatePayload {
 
 export interface ShippingPrepareCompletePayload {
   serial_numbers: string;
+  /** @deprecated 준비 완료는 출하 요청에 저장된 동반 출하품을 사용하며 이 값은 무시됩니다. */
+  companion_lines?: ShippingCompanionLineInput[];
+  client_request_id?: string;
+  expected_status?: ShippingRequestStatus;
+  expected_updated_at?: string;
 }
 
 export interface ShippingPrepareCancelPayload {
   reason?: string | null;
+  client_request_id?: string;
+  expected_status?: ShippingRequestStatus;
+  expected_updated_at?: string;
+}
+
+export interface ShippingPickupCommandPayload {
+  client_request_id?: string;
+  expected_status?: ShippingRequestStatus;
+  expected_updated_at?: string;
 }
 
 export interface ShippingComponentChangeExecutePayload {
@@ -142,6 +156,9 @@ export interface ShippingEvent {
   event_id: string;
   event_type: string;
   message: string | null;
+  actor_employee_id: string | null;
+  actor_employee_code: string | null;
+  actor_name: string | null;
   created_at: string;
 }
 
@@ -227,7 +244,7 @@ export interface ShippingRequest {
   final_pa_item_name: string | null;
   final_pf_item_id: string | null;
   final_pf_item_name: string | null;
-  finalization_mode?: ShippingFinalizationMode;
+  finalization_mode: ShippingFinalizationMode;
   reuse_pf_item_id?: string | null;
   requested_by_name: string | null;
   custom_pa_name: string | null;
@@ -255,10 +272,18 @@ export interface ShippingRequest {
   transaction_count: number;
 }
 
-export interface ShippingHistoryPage {
+export interface ShippingRequestPage {
   requests: ShippingRequest[];
   next_cursor: string | null;
   has_more: boolean;
+}
+
+export type ShippingHistoryPage = ShippingRequestPage;
+
+export interface ShippingRequestPageParams {
+  status?: ShippingRequestStatus;
+  cursor?: string;
+  limit?: number;
 }
 
 export interface ShippingHistoryMonth {

@@ -15,7 +15,14 @@ const state = vi.hoisted(() => ({
       { line_id: "short-1", item_id: "short-item-1", included: true, shortage: 1, quantity: 1 },
       { line_id: "short-2", item_id: "short-item-2", included: true, shortage: 1, quantity: 1 },
     ],
-  }] as { bundle_id: string; lines: { line_id: string; item_id: string; included: boolean; shortage: number; quantity?: number }[] }[],
+  }] as {
+    bundle_id: string;
+    source_kind?: string;
+    source_item_id?: string;
+    title?: string;
+    quantity?: number;
+    lines: { line_id: string; item_id: string; included: boolean; shortage: number; quantity?: number }[];
+  }[],
   notes: "",
   referenceNo: "",
   includedLines: [],
@@ -199,7 +206,7 @@ describe("MobileIoComposeWizard 부족 품목 가져오기", () => {
       source_item_id: "same-item",
       title: "낱개 품목",
       quantity: 1,
-      lines: [{ line_id: "manual-line", item_id: "same-item", included: true, quantity: 1 }],
+      lines: [{ line_id: "manual-line", item_id: "same-item", included: true, shortage: 0, quantity: 1 }],
     }];
     applyBundleUpdates();
     previewTarget.mockResolvedValueOnce({
@@ -209,7 +216,7 @@ describe("MobileIoComposeWizard 부족 품목 가져오기", () => {
         source_item_id: "same-item",
         title: "BOM 품목",
         quantity: 1,
-        lines: [{ line_id: "bom-line", item_id: "same-item", included: true, quantity: 1 }],
+        lines: [{ line_id: "bom-line", item_id: "same-item", included: true, shortage: 0, quantity: 1 }],
       }],
     });
     const view = renderWizard();
@@ -223,7 +230,7 @@ describe("MobileIoComposeWizard 부족 품목 가져오기", () => {
     expect(screen.getByTestId("mobile-picker-bundle-kinds")).toHaveTextContent("manual");
     fireEvent.click(screen.getByRole("button", { name: "BOM 품목 추가" }));
     await waitFor(() => expect(previewTarget).toHaveBeenCalledWith(expect.objectContaining({ subType: "produce" })));
-    view.rerender(<MobileIoComposeWizard globalSearch="" operator={operator} items={[]} setItems={vi.fn()} onStatusChange={vi.fn()} />);
+    view.rerender(<MobileIoComposeWizard globalSearch="" operator={operator} employees={[]} items={[]} setItems={vi.fn()} onStatusChange={vi.fn()} />);
 
     expect(screen.getByTestId("mobile-picker-bundle-kinds")).toHaveTextContent("manual,bom_parent");
   });
@@ -252,7 +259,7 @@ describe("MobileIoComposeWizard 부족 품목 가져오기", () => {
       source_item_id: "same-item",
       title: "낱개 품목",
       quantity: 1,
-      lines: [{ line_id: "manual-line", item_id: "same-item", included: true, quantity: 1 }],
+      lines: [{ line_id: "manual-line", item_id: "same-item", included: true, shortage: 0, quantity: 1 }],
     }];
     const view = renderWizard();
 
@@ -260,11 +267,11 @@ describe("MobileIoComposeWizard 부족 품목 가져오기", () => {
     expect(screen.getByRole("button", { name: "BOM 품목 추가" })).toBeInTheDocument();
 
     state.step = 2;
-    view.rerender(<MobileIoComposeWizard globalSearch="" operator={operator} items={[]} setItems={vi.fn()} onStatusChange={vi.fn()} />);
+    view.rerender(<MobileIoComposeWizard globalSearch="" operator={operator} employees={[]} items={[]} setItems={vi.fn()} onStatusChange={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "모바일 세부 유형 변경" }));
 
     state.step = 3;
-    view.rerender(<MobileIoComposeWizard globalSearch="" operator={operator} items={[]} setItems={vi.fn()} onStatusChange={vi.fn()} />);
+    view.rerender(<MobileIoComposeWizard globalSearch="" operator={operator} employees={[]} items={[]} setItems={vi.fn()} onStatusChange={vi.fn()} />);
     expect(screen.getByRole("button", { name: /작성 중 저장/ })).toBeInTheDocument();
   });
 

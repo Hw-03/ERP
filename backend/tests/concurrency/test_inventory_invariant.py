@@ -20,7 +20,14 @@ BACKEND_DIR = Path(__file__).resolve().parents[2]
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from app.models import DepartmentEnum, Inventory, InventoryLocation, Item, LocationStatusEnum
+from app.models import (
+    DepartmentEnum,
+    Inventory,
+    InventoryLocation,
+    Item,
+    LocationStatusEnum,
+    WarehouseUnplacedItem,
+)
 
 
 def _setup(make_session, warehouse_qty: Decimal, prod_qty: Decimal, dept: DepartmentEnum):
@@ -37,7 +44,15 @@ def _setup(make_session, warehouse_qty: Decimal, prod_qty: Decimal, dept: Depart
         warehouse_qty=warehouse_qty,
         pending_quantity=Decimal("0"),
     )
-    session.add(inv)
+    session.add_all(
+        [
+            inv,
+            WarehouseUnplacedItem(
+                item_id=item.item_id,
+                quantity=int(warehouse_qty),
+            ),
+        ]
+    )
     if prod_qty > 0:
         loc = InventoryLocation(
             item_id=item.item_id,
@@ -72,9 +87,9 @@ def test_inventory_invariant_after_concurrent_ops(concurrent_engine, make_sessio
         session = make_session()
         try:
             if op == "tp":
-                inventory_svc.transfer_to_production(session, item_id, Decimal("1"), dept)
+                inventory_svc._transfer_to_production(session, item_id, Decimal("1"), dept)
             else:
-                inventory_svc.transfer_to_warehouse(session, item_id, Decimal("1"), dept)
+                inventory_svc._transfer_to_warehouse(session, item_id, Decimal("1"), dept)
             session.commit()
         except ValueError:
             try:

@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Iterable, Sequence
+from typing import Iterable, Sequence, cast
 import uuid
 
 from sqlalchemy.orm import Session
 
+from app.repositories import item_repository
 from app.models import (
+    Employee,
     Inventory,
     InventoryLocation,
     LocationStatusEnum,
@@ -90,9 +92,13 @@ def _prelock_inventories(
     db: Session,
     groups: Sequence[ReservationGroup],
 ) -> None:
-    """Ensure then lock every source item's Inventory before any source mutation."""
+    """Lock source Items, then ensure and lock Inventory rows in UUID order."""
     item_ids = sorted({group.item_id for group in groups})
-    inventory_svc.ensure_and_lock_inventories(db, item_ids)
+    active_items = item_repository.lock_active_many(db, item_ids)
+    missing = sorted(set(item_ids) - set(active_items), key=str)
+    if missing:
+        raise ValueError(f"품목을 찾을 수 없습니다: {missing[0]}")
+    inventory_svc._ensure_and_lock_inventories(db, item_ids)
 
 
 def _group_key(
@@ -151,14 +157,14 @@ def _release_group(
     quantity: Decimal,
 ) -> None:
     if group.bucket == RequestBucketEnum.WAREHOUSE:
-        inventory_svc.release(db, group.item_id, quantity)
+        inventory_svc._release(db, group.item_id, quantity)
     else:
-        inventory_svc.release_location(
+        inventory_svc._release_location(
             db,
             group.item_id,
             quantity,
-            department=group.department,
-            status=group.status,
+            department=cast(str, group.department),
+            status=cast(LocationStatusEnum, group.status),
         )
 
 
@@ -176,10 +182,19 @@ def _reconciled_release_quantity(
     return min(group.quantity, max(Decimal("0"), current - protected))
 
 
-def reserve_lines(db: Session, lines: Iterable, *, employee=None) -> None:
+def reserve_lines(
+    db: Session,
+    lines: Iterable,
+    *,
+    employee: Employee,
+) -> None:
+    if not isinstance(employee, Employee):
+        raise TypeError("employee must be an Employee")
     lines = list(lines)
     from app.services import defect_records as defect_records_svc
 
+    groups = aggregate_reservations(lines)
+    _prelock_inventories(db, groups)
     record_groups: dict[uuid.UUID, tuple[object, Decimal]] = {}
     for line in lines:
         record_id = getattr(
@@ -203,7 +218,7 @@ def reserve_lines(db: Session, lines: Iterable, *, employee=None) -> None:
 
     for record_id in sorted(record_groups, key=str):
         line, quantity = record_groups[record_id]
-        record = defect_records_svc.get_record_for_action(
+        record = defect_records_svc._get_record_for_action(
             db,
             record_id=record_id,
             item_id=line.item_id,
@@ -211,10 +226,7 @@ def reserve_lines(db: Session, lines: Iterable, *, employee=None) -> None:
         )
         if record is None:
             raise ValueError("선택한 격리 기록을 찾을 수 없습니다.")
-        defect_records_svc.ensure_available(db, record, quantity)
-
-    groups = aggregate_reservations(lines)
-    _prelock_inventories(db, groups)
+        defect_records_svc._ensure_available(db, record, quantity)
     for group in groups:
         if group.bucket == RequestBucketEnum.WAREHOUSE:
             inventory_svc.reserve(
@@ -224,16 +236,16 @@ def reserve_lines(db: Session, lines: Iterable, *, employee=None) -> None:
                 employee=employee,
             )
         else:
-            inventory_svc.reserve_location(
+            inventory_svc._reserve_location(
                 db,
                 group.item_id,
                 group.quantity,
-                department=group.department,
-                status=group.status,
+                department=cast(str, group.department),
+                status=cast(LocationStatusEnum, group.status),
             )
 
 
-def release_lines(
+def _release_lines(
     db: Session,
     lines: Iterable,
     *,
@@ -256,7 +268,7 @@ def release_lines(
             _release_group(db, group, quantity)
 
 
-def release_lines_best_effort(
+def _release_lines_best_effort(
     db: Session,
     lines: Iterable,
     *,

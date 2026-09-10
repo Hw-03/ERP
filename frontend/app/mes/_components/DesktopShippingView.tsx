@@ -36,7 +36,13 @@ import {
   type ShippingRequestRevisionChange,
   type ShippingRequestStatus,
 } from "@/lib/api";
-import { useShippingRequestsQuery, useShippingRevisionsQuery } from "@/lib/queries/useShippingQuery";
+import {
+  removeShippingPageRequest,
+  type ShippingPagesCache,
+  upsertShippingPageRequest,
+  useShippingRequestPagesQuery,
+  useShippingRevisionsQuery,
+} from "@/lib/queries/useShippingQuery";
 import { queryKeys } from "@/lib/queries/keys";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -51,6 +57,11 @@ import type { Operator } from "./login/useCurrentOperator";
 import { QuantityStepper } from "./_warehouse_v2/QuantityStepper";
 import type { IoEntryIntent } from "./_warehouse_v2/types";
 import { matchesSearchText } from "@/lib/searchText";
+import {
+  shippingBomMatchFingerprint,
+  shippingRequestDraftFingerprint,
+  useShippingBomMatch,
+} from "./_shipping/useShippingBomMatch";
 
 type SectionTab = "request" | "history";
 type ViewMode = "hub" | "requestList" | "requestDetail" | "requestWork" | "prepList" | "prepWork" | "historyList" | "historyWork";
@@ -301,6 +312,45 @@ function companionPayload(lines: CompanionDraftLine[], itemById: Map<string, Ite
     }));
 }
 
+function savedRequestDraftFingerprint(req: ShippingRequest): string {
+  return shippingRequestDraftFingerprint({
+    base_pf_item_id: req.base_pf_item_id,
+    request_quantity: req.request_quantity,
+    invoice_number: req.invoice_number ?? null,
+    requested_by_name: req.requested_by_name,
+    custom_pa_name: req.custom_pa_name,
+    custom_pf_name: req.custom_pf_name,
+    notes: req.notes,
+    finalization_mode: req.finalization_mode ?? "KEEP_BASE",
+    reuse_pf_item_id: req.reuse_pf_item_id ?? null,
+    companion_lines: req.companion_lines.map((line) => ({
+      item_id: line.item_id,
+      quantity: line.quantity,
+      unit: line.unit,
+    })),
+    bom_lines: req.bom_lines.map((line) => ({
+      parent_stage: line.parent_stage,
+      child_item_id: line.child_item_id,
+      quantity: line.quantity,
+      unit: line.unit,
+      included: line.included,
+      origin: line.origin,
+    })),
+  });
+}
+
+function emptyRequestDraftFingerprint(requestedBy: string): string {
+  return shippingRequestDraftFingerprint({
+    base_pf_item_id: "",
+    request_quantity: 1,
+    requested_by_name: requestedBy,
+    finalization_mode: "KEEP_BASE",
+    reuse_pf_item_id: null,
+    companion_lines: [],
+    bom_lines: [],
+  });
+}
+
 export function DesktopShippingView({ onStatusChange, operator = null, onGoToWarehouse }: {
   onStatusChange: (status: string) => void;
   operator?: Operator | null;
@@ -329,24 +379,22 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   const [pfItems, setPfItems] = useState<Item[]>([]);
   const queryClient = useQueryClient();
   const realtimeRevision = useRealtimeRevision();
-  const shippingRequestsQuery = useShippingRequestsQuery();
-  const requests = useMemo(() => shippingRequestsQuery.data ?? [], [shippingRequestsQuery.data]);
-  const setRequests = useCallback(
-    (next: ShippingRequest[] | ((prev: ShippingRequest[]) => ShippingRequest[])) => {
-      queryClient.setQueryData<ShippingRequest[]>(queryKeys.shipping.requests(), (prev) =>
-        typeof next === "function" ? (next as (prev: ShippingRequest[]) => ShippingRequest[])(prev ?? []) : next,
-      );
-    },
-    [queryClient],
-  );
+  const { cancel: cancelBomMatch, run: runBomMatch } = useShippingBomMatch();
+  const shippingRequestsQuery = useShippingRequestPagesQuery();
+  const requests = shippingRequestsQuery.requests;
   const [mutationError, setMutationError] = useState<string | null>(null);
   const setError = setMutationError;
-  const error = mutationError ?? (shippingRequestsQuery.error
+  const requestQueryError = shippingRequestsQuery.error
     ? shippingRequestsQuery.error instanceof Error
       ? shippingRequestsQuery.error.message
       : "출하 데이터를 불러오지 못했습니다."
-    : null);
+    : null;
+  const error = mutationError ?? requestQueryError;
   const loading = shippingRequestsQuery.isLoading;
+  const hasLoadedRequestData = shippingRequestsQuery.dataUpdatedAt > 0;
+  const initialRequestLoading = !hasLoadedRequestData
+    && shippingRequestsQuery.isFetching
+    && !requestQueryError;
   const [itemsLoading, setItemsLoading] = useState(false);
   const [pfItemsLoading, setPfItemsLoading] = useState(false);
   const [pfItemsLoaded, setPfItemsLoaded] = useState(false);
@@ -371,6 +419,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const [companionDraft, setCompanionDraft] = useState<CompanionDraftLine[]>([]);
   const [nameValidationNotice, setNameValidationNotice] = useState<NameValidationNotice | null>(null);
+  const [draftBaselineFingerprint, setDraftBaselineFingerprint] = useState<string | null>(null);
   const [historyStatus, setHistoryStatus] = useState<ShippingHistoryStatus>("PICKED_UP");
   const [historyMonths, setHistoryMonths] = useState<ShippingHistoryMonth[]>([]);
   const [historyYear, setHistoryYear] = useState<number | null>(null);
@@ -401,6 +450,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
 
   function advanceRequestDraftGeneration(): number {
     requestDraftGenerationRef.current += 1;
+    cancelBomMatch();
     postSaveRequestListSearchRef.current = null;
     if (mountedRef.current) {
       setPending(null);
@@ -455,7 +505,9 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     [editingId, requests],
   );
   const selectedPrep = useMemo(
-    () => prepRequests.find((req) => req.request_id === selectedPrepId) ?? prepRequests[0] ?? null,
+    () => selectedPrepId
+      ? prepRequests.find((req) => req.request_id === selectedPrepId) ?? null
+      : prepRequests[0] ?? null,
     [prepRequests, selectedPrepId],
   );
   const selectedHistory = useMemo(() => {
@@ -465,7 +517,31 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     return view === "historyWork" && selectedHistoryId ? null : historyRows[0] ?? null;
   }, [historyRows, requests, selectedHistoryId, view]);
   const canEditDraft = !selectedRequest || selectedRequest.status === "PREPARING";
-  const shippingWorkDirty = view === "requestWork" || view === "prepWork" || view === "historyWork";
+  const currentDraftPayload = { base_pf_item_id: basePfId, ...draftPayload() };
+  const currentDraftFingerprint = shippingRequestDraftFingerprint(currentDraftPayload);
+  const currentBomMatchPayload = {
+    base_pf_item_id: basePfId,
+    bom_lines: currentDraftPayload.bom_lines ?? [],
+  };
+  const currentBomMatchFingerprint = shippingBomMatchFingerprint(currentBomMatchPayload);
+  const currentBomMatchPayloadRef = useRef(currentBomMatchPayload);
+  const currentBomMatchFingerprintRef = useRef(currentBomMatchFingerprint);
+  const currentDraftFingerprintRef = useRef(currentDraftFingerprint);
+  currentBomMatchPayloadRef.current = currentBomMatchPayload;
+  currentBomMatchFingerprintRef.current = currentBomMatchFingerprint;
+  currentDraftFingerprintRef.current = currentDraftFingerprint;
+  const applyBomMatchResult = useCallback((result: ShippingBomMatchResponse) => {
+    setMatchResult(result);
+    if (result.base_pf_matches !== undefined) {
+      setFinalizationMode((current) => (
+        result.base_pf_matches ? "KEEP_BASE" : current === "KEEP_BASE" ? "CREATE_NEW" : current
+      ));
+      if (result.base_pf_matches) setReusePfItemId(null);
+    }
+  }, []);
+  const shippingWorkDirty = view === "requestWork"
+    && draftBaselineFingerprint !== null
+    && currentDraftFingerprint !== draftBaselineFingerprint;
   const saveShippingWork = useCallback(() => {}, []);
   useRegisterDirty("shipping-work", shippingWorkDirty, saveShippingWork, undefined, { mode: "confirm-only" });
   function buildShippingUrl(
@@ -552,11 +628,11 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   }
 
   const upsertRequest = useCallback((next: ShippingRequest) => {
-    setRequests((prev) => {
-      const rest = prev.filter((row) => row.request_id !== next.request_id);
-      return [next, ...rest];
-    });
-  }, [setRequests]);
+    queryClient.setQueryData<ShippingPagesCache>(
+      queryKeys.shipping.requestPages(),
+      (current) => upsertShippingPageRequest(current, next),
+    );
+  }, [queryClient]);
 
   const handleInvoiceSaved = useCallback((next: ShippingRequest) => {
     upsertRequest(next);
@@ -824,11 +900,11 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     void loadHistoryPage(params, true, historyRequestGenerationRef.current);
   }
 
-  // 초기 요청 로드 중 목록 flicker 방지: 실제 목록은 useShippingRequestsQuery가 관리한다.
+  // 초기 요청 로드 중 목록 flicker 방지: 실제 목록은 page query가 관리한다.
   // 이 effect는 첫 데이터가 들어온 뒤 선택 id 기본값만 맞춘다.
   useEffect(() => {
     if (shippingRequestsQuery.isLoading) return;
-    const data = shippingRequestsQuery.data ?? [];
+    const data = requests;
     setSelectedPrepId((current) => current ?? data.find((req) => req.status === "PREPARING" || req.status === "PREPARED")?.request_id ?? null);
     setSelectedHistoryId((current) => current ?? data.find((req) => req.status === "PICKED_UP" || req.status === "CANCELLED")?.request_id ?? null);
     if (shippingRequestsQuery.error) {
@@ -836,7 +912,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
       onStatusChange(msg);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shippingRequestsQuery.data, shippingRequestsQuery.isLoading, shippingRequestsQuery.error]);
+  }, [requests, shippingRequestsQuery.isLoading, shippingRequestsQuery.error]);
   useEffect(() => {
     if (view !== "historyWork" || !selectedHistoryId || shippingRequestsQuery.isLoading) return;
     const existing = historyRows.find((request) => request.request_id === selectedHistoryId)
@@ -939,6 +1015,35 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     // Revision is the sole trigger; current history filters and selection stay intact.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [realtimeRevision]);
+  useEffect(() => {
+    if (searchParams.get("tab") !== "shipping") return;
+    const requestedView = searchParams.get("shippingView");
+    if (requestedView !== "requestDetail" && requestedView !== "requestWork" && requestedView !== "prepWork") return;
+    const requestId = searchParams.get("shippingRequestId");
+    if (!requestId || requests.some((request) => request.request_id === requestId)) return;
+    if (shippingRequestsQuery.isFetching && (shippingRequestsQuery.data?.pages.length ?? 0) === 0) return;
+
+    const controller = new AbortController();
+    let active = true;
+    void api.getShippingRequest(requestId, { signal: controller.signal })
+      .then((request) => {
+        if (!active) return;
+        setError(null);
+        upsertRequest(request);
+      })
+      .catch((err) => {
+        if (!active || controller.signal.aborted) return;
+        const message = err instanceof Error ? err.message : "출하 요청을 불러오지 못했습니다.";
+        setError(message);
+        onStatusChange(message);
+        setView(requestedView === "requestWork" ? "requestList" : requestedView);
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [onStatusChange, requests, searchParams, setError, shippingRequestsQuery.data, shippingRequestsQuery.isFetching, upsertRequest]);
   useEffect(() => {
     if (searchParams.get("tab") !== "shipping") {
       if (view === "requestWork") advanceRequestDraftGeneration();
@@ -1068,7 +1173,6 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     const requestedStep = requestWizardStepFromParam(searchParams.get("shippingStep"));
     const found = effectiveRequestId ? requests.find((req) => req.request_id === effectiveRequestId) : null;
     if (effectiveRequestId && !found) {
-      if (!loading) setView("requestList");
       return;
     }
     const draftMatchesUrl = requestDraftIdentityRef.current !== UNINITIALIZED_REQUEST_DRAFT
@@ -1119,6 +1223,9 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         setCompanionDraft(requestCompanionDraft(found));
         setDraftLines(requestBomLines(found));
         setMatchResult(null);
+        setFinalizationMode(found.finalization_mode ?? "KEEP_BASE");
+        setReusePfItemId(found.reuse_pf_item_id ?? null);
+        setDraftBaselineFingerprint(savedRequestDraftFingerprint(found));
         setRequestWizardStep(nextRequestStep);
         setView("requestWork");
         void ensureItemsLoaded(requestDraftGenerationRef.current);
@@ -1142,6 +1249,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     setMatchResult(null);
     setFinalizationMode("KEEP_BASE");
     setReusePfItemId(null);
+    setDraftBaselineFingerprint(emptyRequestDraftFingerprint(operator?.name ?? ""));
     setView("requestWork");
     void ensurePfItemsLoaded();
   // URL query drives browser back/forward for the shipping subview.
@@ -1169,6 +1277,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     setMatchResult(null);
     setFinalizationMode("KEEP_BASE");
     setReusePfItemId(null);
+    setDraftBaselineFingerprint(emptyRequestDraftFingerprint(operator?.name ?? ""));
     void ensurePfItemsLoaded();
   }
 
@@ -1192,6 +1301,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     setMatchResult(null);
     setFinalizationMode(req.finalization_mode ?? "KEEP_BASE");
     setReusePfItemId(req.reuse_pf_item_id ?? null);
+    setDraftBaselineFingerprint(savedRequestDraftFingerprint(req));
     setRequestWizardStep(nextView === "requestWork" ? 2 : 1);
     if (syncUrl) navigateView(nextView, req.request_id, undefined, nextView === "requestWork" ? 2 : undefined);
     else setView(nextView);
@@ -1305,16 +1415,21 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
       const editingRequestId = editingId;
       const wasNewDraft = editingRequestId === null;
       const payload = draftPayload();
+      const submittedFingerprint = shippingRequestDraftFingerprint({
+        base_pf_item_id: basePfId,
+        ...payload,
+      });
       const saved = editingRequestId
         ? await api.updateShippingRequest(editingRequestId, payload)
         : await api.createShippingRequest({ base_pf_item_id: basePfId, ...payload });
-      await queryClient.cancelQueries({ queryKey: queryKeys.shipping.requests(), exact: true });
+      await queryClient.cancelQueries({ queryKey: queryKeys.shipping.requestPages(), exact: true });
       upsertRequest(saved);
       if (editingRequestId) {
         await queryClient.invalidateQueries({ queryKey: queryKeys.shipping.revisions(saved.request_id) });
       }
       if (!isCurrentRequestDraftGeneration(generation)) return saved;
       requestDraftIdentityRef.current = saved.request_id;
+      setDraftBaselineFingerprint(submittedFingerprint);
       setEditingId(saved.request_id);
       if (wasNewDraft) {
         const currentSearch = searchParams.toString();
@@ -1363,19 +1478,26 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     }
     setPending("match");
     setError(null);
+    const payload = currentBomMatchPayloadRef.current;
+    const draftFingerprint = currentDraftFingerprintRef.current;
     try {
-      const result = await api.matchShippingBom({
-        base_pf_item_id: basePfId,
-        bom_lines: draftPayload().bom_lines,
-      });
-      if (!isCurrentRequestDraftGeneration(generation)) return false;
-      setMatchResult(result);
+      const outcome = await runBomMatch(payload);
+      if (
+        !isCurrentRequestDraftGeneration(generation)
+        || outcome.status === "aborted"
+        || outcome.fingerprint !== currentBomMatchFingerprintRef.current
+        || draftFingerprint !== currentDraftFingerprintRef.current
+      ) return false;
+      if (outcome.status === "error" || !outcome.result) {
+        const msg = outcome.error instanceof Error ? outcome.error.message : "동일 BOM 확인에 실패했습니다.";
+        setError(msg);
+        onStatusChange(msg);
+        return false;
+      }
+      const result = outcome.result;
+      applyBomMatchResult(result);
       const usesCandidateSelection = result.base_pf_matches !== undefined;
       const resolvedMode = result.base_pf_matches ? "KEEP_BASE" : finalizationMode;
-      if (result.base_pf_matches !== undefined) {
-        setFinalizationMode((current) => result.base_pf_matches ? "KEEP_BASE" : current === "KEEP_BASE" ? "CREATE_NEW" : current);
-        if (result.base_pf_matches) setReusePfItemId(null);
-      }
       const selectedCandidate = result.pf_candidates?.find((candidate) => candidate.pf_item_id === reusePfItemId);
       if (usesCandidateSelection && !result.base_pf_matches && resolvedMode === "REUSE_CANDIDATE" && !selectedCandidate) {
         const msg = "재사용할 기존 PF 후보를 다시 선택하세요.";
@@ -1397,12 +1519,6 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         return false;
       }
       return true;
-    } catch (err) {
-      if (!isCurrentRequestDraftGeneration(generation)) return false;
-      const msg = err instanceof Error ? err.message : "동일 BOM 확인에 실패했습니다.";
-      setError(msg);
-      onStatusChange(msg);
-      return false;
     } finally {
       if (isCurrentRequestDraftGeneration(generation)) setPending(null);
     }
@@ -1430,25 +1546,27 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
       onStatusChange("기준 PF를 먼저 선택하세요.");
       return;
     }
+    const generation = requestDraftGenerationRef.current;
     setPending("match");
     setError(null);
     try {
-      const result = await api.matchShippingBom({
-        base_pf_item_id: basePfId,
-        bom_lines: draftPayload().bom_lines,
-      });
-      setMatchResult(result);
-      if (result.base_pf_matches) {
-        setFinalizationMode("KEEP_BASE");
-        setReusePfItemId(null);
+      const outcome = await runBomMatch(currentBomMatchPayloadRef.current);
+      if (
+        !isCurrentRequestDraftGeneration(generation)
+        || outcome.status === "aborted"
+        || outcome.fingerprint !== currentBomMatchFingerprintRef.current
+      ) return;
+      if (outcome.status === "error" || !outcome.result) {
+        const msg = outcome.error instanceof Error ? outcome.error.message : "동일 BOM 확인에 실패했습니다.";
+        setError(msg);
+        onStatusChange(msg);
+        return;
       }
+      const result = outcome.result;
+      applyBomMatchResult(result);
       onStatusChange(result.base_pf_matches ? "기준 PF의 BOM과 같습니다." : (result.pf_candidates?.length ?? 0) > 0 ? "동일 BOM 후보를 찾았습니다." : "동일한 PA/PF BOM 후보가 없습니다.");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "동일 BOM 확인에 실패했습니다.";
-      setError(msg);
-      onStatusChange(msg);
     } finally {
-      setPending(null);
+      if (isCurrentRequestDraftGeneration(generation)) setPending(null);
     }
   }
 
@@ -1477,18 +1595,29 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     setError(null);
     try {
       if (action.kind === "prepare") {
-        const next = await api.prepareShippingComplete(action.request.request_id, { serial_numbers: serialNumbers });
+        const next = await api.prepareShippingComplete(action.request.request_id, {
+          serial_numbers: serialNumbers,
+          expected_status: action.request.status,
+          expected_updated_at: action.request.updated_at,
+        }, operator?.employee_id);
         upsertRequest(next);
         setSelectedPrepId(next.request_id);
         onStatusChange("출하 준비 완료 처리했습니다.");
       } else if (action.kind === "cancel") {
-        const next = await api.cancelShippingPrepare(action.request.request_id, { reason: "출하 준비 변경" });
+        const next = await api.cancelShippingPrepare(action.request.request_id, {
+          reason: "출하 준비 변경",
+          expected_status: action.request.status,
+          expected_updated_at: action.request.updated_at,
+        }, operator?.employee_id);
         upsertRequest(next);
         setSelectedPrepId(next.request_id);
         onStatusChange("준비 완료를 취소했습니다. 요청과 BOM을 다시 수정할 수 있습니다.");
       } else if (action.kind === "delete") {
         await api.deleteShippingRequest(action.request.request_id);
-        setRequests((prev) => prev.filter((row) => row.request_id !== action.request.request_id));
+        queryClient.setQueryData<ShippingPagesCache>(
+          queryKeys.shipping.requestPages(),
+          (current) => removeShippingPageRequest(current, action.request.request_id),
+        );
         clearRequestWizardHistory();
         if (requestDraftIdentityRef.current === action.request.request_id) {
           requestDraftIdentityRef.current = UNINITIALIZED_REQUEST_DRAFT;
@@ -1500,7 +1629,10 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         navigateView("requestList");
         onStatusChange("출하 요청을 취소했습니다.");
       } else if (action.kind === "pickupCancel") {
-        const next = await api.cancelShippingPickup(action.request.request_id);
+        const next = await api.cancelShippingPickup(action.request.request_id, {
+          expected_status: action.request.status,
+          expected_updated_at: action.request.updated_at,
+        }, operator?.employee_id);
         upsertRequest(next);
         setHistoryRows((current) => current.filter((row) => row.request_id !== next.request_id));
         setSelectedHistoryId(null);
@@ -1508,7 +1640,10 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         navigateView("prepWork", next.request_id);
         onStatusChange("픽업 완료를 취소했습니다. 출하 준비에서 다시 확인하세요.");
       } else {
-        const next = await api.completeShippingPickup(action.request.request_id);
+        const next = await api.completeShippingPickup(action.request.request_id, {
+          expected_status: action.request.status,
+          expected_updated_at: action.request.updated_at,
+        }, operator?.employee_id);
         upsertRequest(next);
         setHistoryStatus("PICKED_UP");
         setHistoryRows((current) => [next, ...current.filter((row) => row.request_id !== next.request_id)]);
@@ -1557,33 +1692,26 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   }
 
   useEffect(() => {
-    if (view !== "requestWork" || !basePfId || draftLines.length === 0) return;
-    const bomLines = draftLines
-      .filter((line) => line.child_item_id && Number(line.quantity) > 0)
-      .map((line) => ({
-        parent_stage: line.parent_stage,
-        child_item_id: line.child_item_id,
-        quantity: Number(line.quantity),
-        unit: line.unit || itemById.get(line.child_item_id)?.unit || "EA",
-        included: line.included,
-        origin: line.origin,
-      }));
-    if (bomLines.length === 0) return;
+    if (view !== "requestWork" || !basePfId || currentBomMatchPayloadRef.current.bom_lines.length === 0) return;
+    const payload = currentBomMatchPayloadRef.current;
+    let started = false;
 
     const timer = window.setTimeout(() => {
-      api.matchShippingBom({ base_pf_item_id: basePfId, bom_lines: bomLines })
-        .then((result) => {
-          setMatchResult(result);
-          if (result.base_pf_matches !== undefined) {
-            setFinalizationMode((current) => result.base_pf_matches ? "KEEP_BASE" : current === "KEEP_BASE" ? "CREATE_NEW" : current);
-            if (result.base_pf_matches) setReusePfItemId(null);
-          }
-        })
-        .catch(() => undefined);
+      started = true;
+      void runBomMatch(payload).then((outcome) => {
+        if (
+          outcome.status === "success"
+          && outcome.result
+          && outcome.fingerprint === currentBomMatchFingerprintRef.current
+        ) applyBomMatchResult(outcome.result);
+      });
     }, 350);
 
-    return () => window.clearTimeout(timer);
-  }, [basePfId, draftLines, itemById, view]);
+    return () => {
+      window.clearTimeout(timer);
+      if (started) cancelBomMatch();
+    };
+  }, [applyBomMatchResult, basePfId, cancelBomMatch, currentBomMatchFingerprint, runBomMatch, view]);
 
   useEffect(() => {
     if (!matchResult) return;
@@ -1621,8 +1749,11 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
       const entry = (
         <RequestListEntry
           requests={activeRequests}
+          hasMore={Boolean(shippingRequestsQuery.hasNextPage)}
+          loadingMore={shippingRequestsQuery.isFetchingNextPage}
           onBack={() => navigateView("hub")}
           onNew={clearDraft}
+          onLoadMore={() => void shippingRequestsQuery.fetchNextPage()}
           onOpen={(req) => loadRequestIntoDraft(req, "requestDetail")}
         />
       );
@@ -1717,7 +1848,10 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
       return (
         <PrepListEntry
           requests={prepRequests}
+          hasMore={Boolean(shippingRequestsQuery.hasNextPage)}
+          loadingMore={shippingRequestsQuery.isFetchingNextPage}
           onBack={() => navigateView("hub")}
+          onLoadMore={() => void shippingRequestsQuery.fetchNextPage()}
           onOpen={(req) => {
             setSelectedPrepId(req.request_id);
             navigateView("prepWork", req.request_id);
@@ -1825,7 +1959,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
 
   if (loading) {
     return (
-      <div className="flex h-full min-h-0 flex-1 items-center justify-center px-6">
+      <div className="flex h-full min-h-0 flex-1 items-center justify-center px-6" role="status" aria-live="polite">
         <div className="text-sm font-black" style={{ color: LEGACY_COLORS.muted2 }}>출하 데이터를 불러오는 중입니다.</div>
       </div>
     );
@@ -1834,7 +1968,22 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   const usesExternalRootRail = view === "requestDetail" || view === "historyList" || view === "historyWork";
   const rootContent = (
     <>
-      {error && <Notice tone={LEGACY_COLORS.red} title="오류" body={error} />}
+      {initialRequestLoading && (
+        <div className="sr-only" role="status" aria-live="polite">
+          출하 데이터를 불러오는 중입니다.
+        </div>
+      )}
+      {requestQueryError && (
+        <LoadFailureCard
+          message={requestQueryError}
+          prefix={hasLoadedRequestData ? "최신 출하 내역을 동기화하지 못했습니다" : "출하 데이터를 불러오지 못했습니다"}
+          retryLabel={hasLoadedRequestData ? "다시 동기화" : "다시 시도"}
+          onRetry={() => { void shippingRequestsQuery.refetch(); }}
+          ariaLabel={hasLoadedRequestData ? "출하 데이터 동기화 오류" : "출하 데이터 로드 오류"}
+          focusOnMount={!hasLoadedRequestData}
+        />
+      )}
+      {mutationError && <Notice tone={LEGACY_COLORS.red} title="오류" body={mutationError} />}
       {renderActiveView()}
     </>
   );
@@ -1947,7 +2096,15 @@ function ShippingHubEntry({ counts, onOpen }: { counts: Record<SectionTab, numbe
   );
 }
 
-function RequestListEntry({ requests, onBack, onNew, onOpen }: { requests: ShippingRequest[]; onBack: () => void; onNew: () => void; onOpen: (request: ShippingRequest) => void }) {
+function RequestListEntry({ requests, hasMore, loadingMore, onBack, onNew, onLoadMore, onOpen }: {
+  requests: ShippingRequest[];
+  hasMore: boolean;
+  loadingMore: boolean;
+  onBack: () => void;
+  onNew: () => void;
+  onLoadMore: () => void;
+  onOpen: (request: ShippingRequest) => void;
+}) {
   const groups: Array<{ status: ShippingRequestStatus; label: string }> = [
     { status: "PREPARING", label: "준비 중" },
     { status: "PREPARED", label: "준비 완료" },
@@ -1993,6 +2150,18 @@ function RequestListEntry({ requests, onBack, onNew, onOpen }: { requests: Shipp
           );
         })}
       </div>
+      {hasMore && (
+        <button
+          type="button"
+          data-testid="shipping-request-load-more"
+          onClick={onLoadMore}
+          disabled={loadingMore}
+          className="min-h-11 rounded-[12px] border px-5 text-sm font-black disabled:opacity-45"
+          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}
+        >
+          {loadingMore ? "요청을 불러오는 중" : "요청 더 보기"}
+        </button>
+      )}
     </div>
   );
 }
@@ -2411,7 +2580,14 @@ function RevisionHistory({ request }: { request: ShippingRequest }) {
 }
 
 
-function PrepListEntry({ requests, onBack, onOpen }: { requests: ShippingRequest[]; onBack: () => void; onOpen: (request: ShippingRequest) => void }) {
+function PrepListEntry({ requests, hasMore, loadingMore, onBack, onLoadMore, onOpen }: {
+  requests: ShippingRequest[];
+  hasMore: boolean;
+  loadingMore: boolean;
+  onBack: () => void;
+  onLoadMore: () => void;
+  onOpen: (request: ShippingRequest) => void;
+}) {
   return (
     <div className={SHIPPING_FLEX_COL_CLASS}>
       <Panel dataTestId="shipping-prep-list" className={SHIPPING_FLEX_COL_CLASS}>
@@ -2432,6 +2608,18 @@ function PrepListEntry({ requests, onBack, onOpen }: { requests: ShippingRequest
             </div>
           )}
         </div>
+        {hasMore && (
+          <button
+            type="button"
+            data-testid="shipping-prep-load-more"
+            onClick={onLoadMore}
+            disabled={loadingMore}
+            className="mt-3 min-h-11 rounded-[12px] border px-5 text-sm font-black disabled:opacity-45"
+            style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}
+          >
+            {loadingMore ? "준비 요청을 불러오는 중" : "준비 요청 더 보기"}
+          </button>
+        )}
       </Panel>
     </div>
   );
@@ -2897,6 +3085,9 @@ function RequestSection(props: {
               const active = props.wizardStep === step;
               const complete = props.wizardStep > step;
               const tone = active ? LEGACY_COLORS.blue : complete ? LEGACY_COLORS.green : LEGACY_COLORS.muted2;
+              const textTone = active || complete
+                ? `color-mix(in srgb, ${tone} 70%, ${LEGACY_COLORS.text})`
+                : tone;
               return (
                 <button
                   key={title}
@@ -2906,7 +3097,7 @@ function RequestSection(props: {
                   }}
                   disabled={!canOpenStep(step)}
                   className="min-h-12 rounded-[14px] border px-3 py-2 text-left text-xs font-black transition-all disabled:cursor-not-allowed disabled:opacity-40"
-                  style={{ background: active ? tint(tone, 16) : LEGACY_COLORS.s2, borderColor: active ? tone : LEGACY_COLORS.border, color: tone }}
+                  style={{ background: active ? tint(tone, 16) : LEGACY_COLORS.s2, borderColor: active ? tone : LEGACY_COLORS.border, color: textTone }}
                 >
                   <span className="block truncate whitespace-nowrap">{step + ". " + title}</span>
                 </button>
@@ -3131,6 +3322,7 @@ function RequestSection(props: {
                   step={1}
                   inputRef={requestQuantityRef}
                   disabled={locked || props.pending !== null}
+                  highContrastControls
                 />
               </div>
             ) : props.wizardStep === 3 && (requiresPaName || requiresPfName) ? (

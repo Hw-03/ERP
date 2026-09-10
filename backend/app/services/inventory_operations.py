@@ -50,7 +50,7 @@ def is_ledger_active(db: Session, *, at: Optional[datetime] = None) -> bool:
     return configured is not None and (at or datetime.utcnow()) >= configured
 
 
-def create_business_operation(
+def _create_business_operation(
     db: Session,
     *,
     domain: str,
@@ -79,14 +79,14 @@ def create_business_operation(
         reason=reason,
         idempotency_key=idempotency_key,
         effective_at=occurred_at,
-        contract_version=1,
+        contract_version=2,
     )
     db.add(operation)
     db.flush()
     return operation
 
 
-def adopt_legacy_business_operation(
+def _adopt_legacy_business_operation(
     db: Session,
     *,
     domain: str,
@@ -129,7 +129,7 @@ def adopt_legacy_business_operation(
     return operation
 
 
-def create_cancellation_operation(
+def _create_cancellation_operation(
     db: Session,
     *,
     original: InventoryOperation,
@@ -158,7 +158,7 @@ def create_cancellation_operation(
     return operation
 
 
-def attach_transaction(
+def _attach_transaction(
     log: TransactionLog,
     operation: Optional[InventoryOperation],
     role: InventoryOperationRoleEnum,
@@ -170,7 +170,7 @@ def attach_transaction(
     return log
 
 
-def record_effect(
+def _record_effect(
     db: Session,
     *,
     operation: Optional[InventoryOperation],
@@ -197,7 +197,7 @@ def record_effect(
     return effect
 
 
-def record_defect_movement(
+def _record_defect_movement(
     db: Session,
     *,
     operation: Optional[InventoryOperation],

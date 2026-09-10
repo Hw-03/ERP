@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { notificationsApi } from "../api/notifications";
+import {
+  advanceAuthGeneration,
+  establishAuthRequiredBoundary,
+} from "../api-core";
 
 function makeResponse(body: unknown, ok = true, status?: number): Response {
   const st = status ?? (ok ? 200 : 500);
@@ -36,6 +40,54 @@ describe("notificationsApi.listNotifications", () => {
     expect(url).toContain("/api/notifications");
     expect(url).toContain("recipient_employee_id=e-1");
     expect(headersOf(init).get("X-Actor-Employee-Id")).toBe("e-1");
+  });
+
+  it("preserves session errors and emits the global 401 event", async () => {
+    const listener = vi.fn();
+    window.addEventListener("dexcowin_auth_required", listener);
+    globalThis.fetch = vi.fn(() =>
+      Promise.resolve(
+        makeResponse(
+          { detail: { code: "SESSION_EXPIRED", message: "세션이 만료되었습니다." } },
+          false,
+          401,
+        ),
+      ),
+    ) as unknown as typeof fetch;
+
+    const failure = await notificationsApi.listNotifications("e-1").catch((error) => error);
+
+    expect(failure).toMatchObject({ status: 401, code: "SESSION_EXPIRED" });
+    expect(listener).toHaveBeenCalledTimes(1);
+    window.removeEventListener("dexcowin_auth_required", listener);
+  });
+
+  it("ignores an old operator notification request that returns 401 after a new login", async () => {
+    let resolveOldResponse!: (response: Response) => void;
+    const oldResponse = new Promise<Response>((resolve) => {
+      resolveOldResponse = resolve;
+    });
+    globalThis.fetch = vi.fn(() => oldResponse) as unknown as typeof fetch;
+    const listener = vi.fn();
+    window.addEventListener("dexcowin_auth_required", listener);
+
+    const oldRequest = notificationsApi.listNotifications("operator-a").catch(
+      (error: unknown) => error,
+    );
+    establishAuthRequiredBoundary();
+    advanceAuthGeneration();
+    resolveOldResponse(
+      makeResponse(
+        { detail: { code: "SESSION_EXPIRED", message: "세션이 만료되었습니다." } },
+        false,
+        401,
+      ),
+    );
+    const failure = await oldRequest;
+
+    expect(failure).toMatchObject({ status: 401, code: "SESSION_EXPIRED" });
+    expect(listener).toHaveBeenCalledTimes(1);
+    window.removeEventListener("dexcowin_auth_required", listener);
   });
 });
 

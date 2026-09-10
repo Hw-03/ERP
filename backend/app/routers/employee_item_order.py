@@ -8,15 +8,21 @@ DELETE /api/items/my-order?employee_id=<str> → {"ok": true}
 import uuid
 from typing import List
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.verified_actor import (
+    CurrentActor,
+    VerifiedActor,
+    VerifiedActorRouter,
+    ensure_actor_employee_id,
+)
 from app.models import Employee, EmployeeItemOrder, Item
 from app.routers._errors import ErrorCode, http_error
 from app.schemas.item import MyItemOrderEntry, MyItemOrderPut
 
-router = APIRouter()
+router = VerifiedActorRouter()
 
 
 def _get_employee_or_404(db: Session, employee_id: uuid.UUID) -> Employee:
@@ -29,10 +35,11 @@ def _get_employee_or_404(db: Session, employee_id: uuid.UUID) -> Employee:
 @router.get("/my-order", response_model=List[MyItemOrderEntry])
 def get_my_order(
     employee_id: uuid.UUID = Query(..., description="직원 ID"),
+    actor: CurrentActor = None,
     db: Session = Depends(get_db),
 ):
     """직원의 품목 표시 순서 조회. 행 없으면 빈 배열."""
-    _get_employee_or_404(db, employee_id)
+    ensure_actor_employee_id(actor, employee_id)
     rows = (
         db.query(EmployeeItemOrder)
         .filter(EmployeeItemOrder.employee_id == employee_id)
@@ -43,14 +50,14 @@ def get_my_order(
 
 
 @router.put("/my-order")
-def put_my_order(payload: MyItemOrderPut, db: Session = Depends(get_db)):
+def put_my_order(payload: MyItemOrderPut, actor: VerifiedActor, db: Session = Depends(get_db)):
     """직원의 품목 표시 순서 전체 교체.
 
     기존 행 전부 삭제 후 bulk insert (upsert 효과).
     존재하지 않는 item_id는 조용히 skip.
     """
     employee_id = payload.employee_id
-    _get_employee_or_404(db, employee_id)
+    ensure_actor_employee_id(actor, employee_id)
 
     # 존재하는 item_id만 허용 (FK 위반 방지 + silent skip)
     requested_ids = [str(e.item_id).replace("-", "") for e in payload.items]
@@ -87,10 +94,11 @@ def put_my_order(payload: MyItemOrderPut, db: Session = Depends(get_db)):
 @router.delete("/my-order")
 def delete_my_order(
     employee_id: uuid.UUID = Query(..., description="직원 ID"),
+    actor: VerifiedActor = None,
     db: Session = Depends(get_db),
 ):
     """직원의 품목 표시 순서 전체 삭제."""
-    _get_employee_or_404(db, employee_id)
+    ensure_actor_employee_id(actor, employee_id)
     db.query(EmployeeItemOrder).filter(
         EmployeeItemOrder.employee_id == employee_id
     ).delete(synchronize_session=False)

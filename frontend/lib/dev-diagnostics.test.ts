@@ -21,7 +21,7 @@ describe("dev diagnostics", () => {
       },
       childProcess: {
         pid: 1234,
-        commandLine: "node next dev --port 3001",
+        commandLine: "node scripts/next-server.js dev --port 3001",
       },
       pipeErrors: [{ stream: "stdout", message: "EPIPE: broken pipe, write" }],
       portOwners: [{ pid: 1234, localPort: 3001 }],

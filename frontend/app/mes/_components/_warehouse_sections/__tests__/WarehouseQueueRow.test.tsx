@@ -127,6 +127,20 @@ describe("WarehouseQueueRow request timestamp", () => {
 });
 
 describe("WarehouseQueueRow presentation", () => {
+  it("알 수 없는 요청 유형은 안전 문구로 표시하고 승인 command를 숨긴다", () => {
+    render(
+      <WarehouseQueueRow
+        {...baseProps}
+        approvePinFor={null}
+        req={makeRequest({ request_type: "future_transfer" as "raw_receive" })}
+      />,
+    );
+
+    expect(screen.getByText("알 수 없는 요청 (future_transfer)")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "승인" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "반려" })).not.toBeInTheDocument();
+  });
+
   it("submitted도 승인 대기로 표시하고 유형·부서·건수·상태 순으로 배치", () => {
     const { container } = render(
       <WarehouseQueueRow {...baseProps} req={makeRequest({ status: "submitted" })} />,

@@ -14,29 +14,33 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import (
+    BOM,
     DepartmentEnum,
     Employee,
-    Inventory,
-    InventoryLocation,
     Item,
     LocationStatusEnum,
 )
+from app.repositories import item_repository
 from app.services import bom as bom_svc
 from app.services import inventory as inventory_svc
+from app.services import stock_availability
 from app.services.inv_transfer import department_for_item
-from app.services import stock_math
 from app.services.bom_stock_policy import (
     BOM_AUTO_ORIGIN,
     BOM_STOCK_EXEMPT_NOTE,
     is_bom_generated_line,
     io_bom_auto_claims,
-    issue_bom_auto_token,
+    _issue_bom_auto_token,
     should_skip_bom_inventory,
 )
 
 # 결재 규칙 단일 원천(approval_rules). io.py / io_dispatch / io_persist 가 본 모듈에서
 # 이 이름들을 re-export·import 하므로 네임스페이스에 노출한다.
-from app.services.approval_rules import APPROVAL_SUB_TYPES, MANUAL_LINE_ORIGINS  # noqa: F401
+from app.services.approval_rules import (  # noqa: F401
+    APPROVAL_SUB_TYPES,
+    MANUAL_LINE_ORIGINS,
+    approval_kind,
+)
 
 
 WORK_TYPES = {
@@ -377,7 +381,7 @@ def _enum_value(value) -> Optional[str]:
 
 
 def _get_item(db: Session, item_id: uuid.UUID) -> Item:
-    item = db.query(Item).filter(Item.item_id == item_id).first()
+    item = item_repository.get_active(db, item_id)
     if item is None:
         raise ValueError(f"품목을 찾을 수 없습니다: {item_id}")
     return item
@@ -402,40 +406,22 @@ def _bucket_available(
     department: Optional[str],
 ) -> Decimal:
     if bucket == "warehouse":
-        inv = db.query(Inventory).filter(Inventory.item_id == item_id).first()
-        # 가용 정의(warehouse - pending)는 stock_math 단일 소스를 따른다.
-        return stock_math.figures_from_inventory(inv).warehouse_available
+        cell = stock_availability.AvailabilityCell.warehouse(item_id)
     if bucket == "production" and department:
-        loc = (
-            db.query(InventoryLocation)
-            .filter(
-                InventoryLocation.item_id == item_id,
-                InventoryLocation.department == department,
-                InventoryLocation.status == LocationStatusEnum.PRODUCTION,
-            )
-            .first()
+        cell = stock_availability.AvailabilityCell.location(
+            item_id,
+            department,
+            LocationStatusEnum.PRODUCTION,
         )
-        return (
-            _d(loc.quantity) - _d(loc.pending_quantity)
-            if loc
-            else Decimal("0")
+    elif bucket == "defective" and department:
+        cell = stock_availability.AvailabilityCell.location(
+            item_id,
+            department,
+            LocationStatusEnum.DEFECTIVE,
         )
-    if bucket == "defective" and department:
-        loc = (
-            db.query(InventoryLocation)
-            .filter(
-                InventoryLocation.item_id == item_id,
-                InventoryLocation.department == department,
-                InventoryLocation.status == LocationStatusEnum.DEFECTIVE,
-            )
-            .first()
-        )
-        return (
-            _d(loc.quantity) - _d(loc.pending_quantity)
-            if loc
-            else Decimal("0")
-        )
-    return Decimal("0")
+    elif bucket != "warehouse":
+        return Decimal("0")
+    return stock_availability.figure_for_cell(db, cell).available
 
 
 def _default_production_dept(item: Item, fallback: Optional[str]) -> str:
@@ -703,10 +689,14 @@ def validate_operation_sources(sub_type: str, source_kinds: Iterable[str]) -> No
 
 def _bundle_value(bundle: object, name: str, default: object = None) -> object:
     """Pydantic payload와 저장된 ORM bundle에서 공통 필드를 읽는다."""
+    if isinstance(bundle, dict):
+        return bundle.get(name, default)
     return getattr(bundle, name, default)
 
 
 def _line_value(line: object, name: str, default: object = None) -> object:
+    if isinstance(line, dict):
+        return line.get(name, default)
     return getattr(line, name, default)
 
 
@@ -718,6 +708,56 @@ def has_included_manual_line(bundles: Iterable[object]) -> bool:
         for bundle in bundles
         for line in _bundle_value(bundle, "lines", ())
     )
+
+
+def has_declared_custom_process_bom(
+    db: Session,
+    *,
+    work_type: str,
+    sub_type: str,
+    bundles: Iterable[object],
+) -> bool:
+    """현재 DB BOM과 저장/표시 payload의 하위 구성·수량 차이를 판정한다."""
+    if work_type != "process" or sub_type not in {"produce", "disassemble"}:
+        return False
+    for bundle in bundles:
+        if _bundle_value(bundle, "source_kind") != "bom_parent":
+            continue
+        lines = tuple(_bundle_value(bundle, "lines", ()))
+        source_item_id = _bundle_value(bundle, "source_item_id")
+        parent = next(
+            (
+                line
+                for line in lines
+                if _line_value(line, "origin") == "direct"
+                and _line_value(line, "item_id") == source_item_id
+            ),
+            None,
+        )
+        if parent is None:
+            continue
+        bom_rows = {
+            row.child_item_id: _d(row.quantity)
+            for row in db.query(BOM).filter(BOM.parent_item_id == source_item_id).all()
+        }
+        auto_lines = [
+            line for line in lines if _line_value(line, "origin") == BOM_AUTO_ORIGIN
+        ]
+        if set(bom_rows) != {_line_value(line, "item_id") for line in auto_lines}:
+            return True
+        parent_quantity = _d(_line_value(parent, "quantity", 0))
+        for line in auto_lines:
+            if _line_value(line, "bom_stock_exempt", False):
+                continue
+            unit_quantity = bom_rows.get(_line_value(line, "item_id"))
+            if unit_quantity is None:
+                return True
+            expected = parent_quantity * unit_quantity
+            if expected > 0 and not _line_value(line, "included", True):
+                return True
+            if _d(_line_value(line, "quantity", 0)) != expected:
+                return True
+    return False
 
 
 def normalize_process_sub_type(
@@ -1283,7 +1323,7 @@ def _issue_bundle_bom_auto_tokens(
     for line in bundle["lines"]:
         if line["origin"] != BOM_AUTO_ORIGIN:
             continue
-        line["bom_auto_token"] = issue_bom_auto_token(
+        line["bom_auto_token"] = _issue_bom_auto_token(
             db,
             flow="io",
             claims=io_bom_auto_claims(
@@ -1360,9 +1400,20 @@ def preview(
             sub_type=sub_type,
         )
         bundles.append(bundle)
+    requires_approval = approval_kind(
+        work_type=work_type,
+        sub_type=sub_type,
+        has_manual_line=has_included_manual_line(bundles),
+        has_custom_process_bom=has_declared_custom_process_bom(
+            db,
+            work_type=work_type,
+            sub_type=sub_type,
+            bundles=bundles,
+        ),
+    ) != "none"
     return {
         "work_type": work_type,
         "sub_type": sub_type,
-        "requires_approval": sub_type in APPROVAL_SUB_TYPES,
+        "requires_approval": requires_approval,
         "bundles": bundles,
     }

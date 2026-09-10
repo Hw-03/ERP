@@ -8,6 +8,14 @@
  */
 
 import { fetcher, postJson, toApiUrl } from "../api-core";
+import type { operations } from "./generated/openapi";
+import {
+  fieldsMatch,
+  isNullableString,
+  isRecord,
+  isString,
+  isStringArray,
+} from "./openapi-runtime";
 import type {
   ProductionCapacity,
   ProductionCheckResponse,
@@ -93,6 +101,7 @@ type InventoryOperationWire = {
   reversal_operation_id: string | null;
   can_cancel: boolean;
   cancel_blockers: string[];
+  cancel_warnings: string[];
   lines: InventoryOperationLineWire[];
   matching_lines: InventoryOperationLineWire[];
   effects: Array<{
@@ -112,12 +121,15 @@ type InventoryOperationCancellationPreviewWire = {
   plan_hash: string;
   can_cancel: boolean;
   blockers: string[];
+  warnings: string[];
   cells: Array<{
     item_id: string;
     scope: string;
     department: string | null;
     status: string | null;
+    row_id: string | null;
     box_id: string | null;
+    zone_id: string | number | null;
     quantity_change: string | number;
     current_quantity: string | number;
     reserved_quantity: string | number;
@@ -126,6 +138,199 @@ type InventoryOperationCancellationPreviewWire = {
   defect_records: Array<Record<string, unknown>>;
   effects: Array<Record<string, unknown>>;
 };
+
+type OpenApiInventoryOperationPage =
+  operations["list_operations_api_inventory_operations_get"]["responses"][200]["content"]["application/json"];
+type OpenApiInventoryOperationCancellationPreview =
+  operations["preview_operation_cancel_api_inventory_operations__operation_id__cancel_preview_post"]["responses"][200]["content"]["application/json"];
+type OpenApiInventoryOperationCancellationResult =
+  operations["cancel_operation_api_inventory_operations__operation_id__cancel_post"]["responses"][200]["content"]["application/json"];
+
+const TRANSACTION_TYPES = new Set<string>([
+  "RECEIVE",
+  "PRODUCE",
+  "SHIP",
+  "ADJUST",
+  "BACKFLUSH",
+  "DISASSEMBLE",
+  "TRANSFER_TO_PROD",
+  "TRANSFER_TO_WH",
+  "TRANSFER_DEPT",
+  "MARK_DEFECTIVE",
+  "UNMARK_DEFECTIVE",
+  "DEFECT_SCRAP",
+  "SUPPLIER_RETURN",
+  "INTERNAL_USE",
+]);
+
+function isWireNumber(value: unknown): value is string | number {
+  return (
+    (typeof value === "number" && Number.isFinite(value))
+    || (typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value)))
+  );
+}
+
+function isNullableWireNumber(value: unknown): value is string | number | null {
+  return value === null || isWireNumber(value);
+}
+
+function isInventoryOperationLineWire(value: unknown): value is InventoryOperationLineWire {
+  return (
+    isRecord(value)
+    && fieldsMatch(value, ["log_id", "item_id", "created_at"], isString)
+    && fieldsMatch(
+      value,
+      [
+        "item_name",
+        "mes_code",
+        "department",
+        "operation_role",
+        "reverses_log_id",
+        "reference_no",
+        "notes",
+      ],
+      isNullableString,
+    )
+    && typeof value.transaction_type === "string"
+    && TRANSACTION_TYPES.has(value.transaction_type)
+    && fieldsMatch(value, ["quantity_change"], isWireNumber)
+    && fieldsMatch(
+      value,
+      ["quantity_before", "quantity_after", "transfer_qty"],
+      isNullableWireNumber,
+    )
+  );
+}
+
+function isInventoryOperationEffectWire(
+  value: unknown,
+): value is InventoryOperationWire["effects"][number] {
+  return (
+    isRecord(value)
+    && fieldsMatch(
+      value,
+      ["effect_id", "effect_kind", "subject_type", "subject_id", "role"],
+      isString,
+    )
+    && isRecord(value.before_state)
+    && isRecord(value.after_state)
+    && isNullableString(value.reverses_effect_id)
+  );
+}
+
+function isInventoryOperationWire(value: unknown): value is InventoryOperationWire {
+  return (
+    isRecord(value)
+    && fieldsMatch(
+      value,
+      ["operation_id", "domain", "action", "display_label", "actor_name", "effective_at"],
+      isString,
+    )
+    && (value.kind === "BUSINESS" || value.kind === "CANCELLATION")
+    && (
+      value.effective_status === "active"
+      || value.effective_status === "cancelled"
+      || value.effective_status === "cancellation"
+    )
+    && fieldsMatch(
+      value,
+      [
+        "actor_employee_id",
+        "department",
+        "reason",
+        "reverses_operation_id",
+        "reversal_operation_id",
+      ],
+      isNullableString,
+    )
+    && typeof value.can_cancel === "boolean"
+    && isStringArray(value.cancel_blockers)
+    && isStringArray(value.cancel_warnings)
+    && Array.isArray(value.lines)
+    && value.lines.every(isInventoryOperationLineWire)
+    && Array.isArray(value.matching_lines)
+    && value.matching_lines.every(isInventoryOperationLineWire)
+    && Array.isArray(value.effects)
+    && value.effects.every(isInventoryOperationEffectWire)
+  );
+}
+
+function parseInventoryOperation(raw: unknown): InventoryOperationWire {
+  if (!isInventoryOperationWire(raw)) {
+    throw new Error("입출고 작업 응답 형식이 올바르지 않습니다.");
+  }
+  return raw;
+}
+
+function isCancellationPreviewCellWire(
+  value: unknown,
+): value is InventoryOperationCancellationPreviewWire["cells"][number] {
+  return (
+    isRecord(value)
+    && fieldsMatch(value, ["item_id", "scope"], isString)
+    && fieldsMatch(
+      value,
+      ["department", "status", "row_id", "box_id"],
+      isNullableString,
+    )
+    && (
+      value.zone_id === null
+      || typeof value.zone_id === "string"
+      || (typeof value.zone_id === "number" && Number.isFinite(value.zone_id))
+    )
+    && fieldsMatch(
+      value,
+      ["quantity_change", "current_quantity", "reserved_quantity", "quantity_after"],
+      isWireNumber,
+    )
+  );
+}
+
+function isInventoryOperationCancellationPreviewWire(
+  value: unknown,
+): value is InventoryOperationCancellationPreviewWire {
+  return (
+    isRecord(value)
+    && fieldsMatch(value, ["operation_id", "plan_hash"], isString)
+    && typeof value.can_cancel === "boolean"
+    && isStringArray(value.blockers)
+    && isStringArray(value.warnings)
+    && Array.isArray(value.cells)
+    && value.cells.every(isCancellationPreviewCellWire)
+    && Array.isArray(value.defect_records)
+    && value.defect_records.every(isRecord)
+    && Array.isArray(value.effects)
+    && value.effects.every(isRecord)
+  );
+}
+
+function parseInventoryOperationCancellationPreview(
+  raw: OpenApiInventoryOperationCancellationPreview,
+): InventoryOperationCancellationPreviewWire {
+  if (!isInventoryOperationCancellationPreviewWire(raw)) {
+    throw new Error("입출고 작업 취소 미리보기 응답 형식이 올바르지 않습니다.");
+  }
+  return raw;
+}
+
+function parseInventoryOperationPage(raw: OpenApiInventoryOperationPage): {
+  items: InventoryOperationWire[];
+  next_cursor: string | null;
+} {
+  if (
+    !isRecord(raw)
+    || !Array.isArray(raw.items)
+    || (raw.next_cursor !== null && typeof raw.next_cursor !== "string")
+  ) {
+    throw new Error("입출고 작업 목록 응답 형식이 올바르지 않습니다.");
+  }
+
+  const items = raw.items.map((operation) => {
+    return parseInventoryOperation(operation);
+  });
+
+  return { items, next_cursor: raw.next_cursor };
+}
 
 function mapWire<T>(wire: object): T {
   return Object.fromEntries(Object.entries(wire).map(([key, value]) => [
@@ -167,22 +372,26 @@ export const productionApi = {
     params?: { itemId?: string; limit?: number; cursor?: string | null },
     opts?: { signal?: AbortSignal },
   ): Promise<InventoryOperationPage> => {
-    return fetcher<{ items: InventoryOperationWire[]; next_cursor: string | null }>(
+    return fetcher<OpenApiInventoryOperationPage>(
       apiQuery("/api/inventory/operations", params),
       opts?.signal,
-    ).then((page) => ({
-      items: page.items.map(mapInventoryOperation),
-      nextCursor: page.next_cursor,
-    }));
+    )
+      .then(parseInventoryOperationPage)
+      .then((page) => ({
+        items: page.items.map(mapInventoryOperation),
+        nextCursor: page.next_cursor,
+      }));
   },
 
   previewInventoryOperationCancellation: (
     operationId: string,
   ): Promise<InventoryOperationCancellationPreview> =>
-    postJson<InventoryOperationCancellationPreviewWire>(
+    postJson<OpenApiInventoryOperationCancellationPreview>(
       toApiUrl(`/api/inventory/operations/${encodeURIComponent(operationId)}/cancel/preview`),
       {},
-    ).then(mapInventoryOperationCancellationPreview),
+    )
+      .then(parseInventoryOperationCancellationPreview)
+      .then(mapInventoryOperationCancellationPreview),
 
   cancelInventoryOperation: (
     operationId: string,
@@ -193,10 +402,10 @@ export const productionApi = {
       plan_hash: string;
     },
   ): Promise<InventoryOperation> =>
-    postJson<InventoryOperationWire>(
+    postJson<OpenApiInventoryOperationCancellationResult>(
       toApiUrl(`/api/inventory/operations/${encodeURIComponent(operationId)}/cancel`),
       payload,
-    ).then(mapInventoryOperation),
+    ).then(parseInventoryOperation).then(mapInventoryOperation),
 
   productionReceipt: (payload: {
     item_id: string;

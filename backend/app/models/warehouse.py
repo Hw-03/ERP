@@ -35,6 +35,7 @@ __all__ = [
     "WarehouseAngle",
     "WarehouseBox",
     "WarehouseBoxItem",
+    "WarehouseUnplacedItem",
 ]
 
 
@@ -153,6 +154,12 @@ class WarehouseBoxItem(Base):
     __table_args__ = (
         CheckConstraint("quantity >= 0", name="ck_wh_boxitem_qty_nonneg"),
         Index("ix_wh_boxitem_item", "item_id"),  # 검색·재고대조 핵심
+        Index(
+            "uq_warehouse_box_items_box_item",
+            "box_id",
+            "item_id",
+            unique=True,
+        ),
     )
 
 class WarehouseSpecialZone(Base):
@@ -215,6 +222,40 @@ class WarehouseSpecialZoneItem(Base):
     __table_args__ = (
         CheckConstraint("quantity >= 0", name="ck_wh_zoneitem_qty_nonneg"),
         Index("ix_wh_zoneitem_item", "item_id"),
+        Index(
+            "uq_warehouse_zone_items_zone_item",
+            "zone_id",
+            "item_id",
+            unique=True,
+        ),
+    )
+
+
+class WarehouseUnplacedItem(Base):
+    """A stable per-item row for warehouse quantity not placed in B or active Z."""
+
+    __tablename__ = "warehouse_unplaced_items"
+
+    id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
+    item_id = Column(
+        UUIDString,
+        ForeignKey("items.item_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    quantity = Column(IntQuantity, nullable=False, default=0)
+
+    item = relationship("Item")
+
+    __table_args__ = (
+        CheckConstraint(
+            "quantity >= 0",
+            name="ck_warehouse_unplaced_items_quantity_nonnegative",
+        ),
+        Index(
+            "uq_warehouse_unplaced_items_item_id",
+            "item_id",
+            unique=True,
+        ),
     )
 
 

@@ -1,6 +1,6 @@
 """배치 영속화 + 응답 페이로드 직렬화 + 외부 결재 상태 동기화.
 
-io_preview 의 헬퍼(_enum_value, _new_id, APPROVAL_SUB_TYPES)를 재사용한다.
+io_preview 의 영속화·결재 표시 헬퍼를 재사용한다.
 io_draft / io_dispatch 가 이 모듈의 _persist_batch / _batch_to_payload / _load_requester 를 호출한다.
 """
 
@@ -22,21 +22,24 @@ from app.models import (
     StockRequest,
     StockRequestStatusEnum,
 )
+from app.repositories import item_repository
 from app.schemas.io import IoBundlePayload
+from app.services.approval_rules import approval_kind
+from app.services.command_idempotency import fingerprint_io_draft_submit
 from app.services.bom_stock_policy import (
     BOM_STOCK_EXEMPT_NOTE,
     BOM_AUTO_ORIGIN,
     has_valid_bom_auto_token,
     io_bom_auto_claims,
-    issue_bom_auto_token,
+    _issue_bom_auto_token,
     is_bom_generated_line,
     should_skip_bom_inventory,
 )
 from app.services.io_preview import (
-    APPROVAL_SUB_TYPES,
     automatic_department_headers,
     _enum_value,
     _new_id,
+    has_declared_custom_process_bom,
     has_included_manual_line,
     normalize_automatic_department_routes,
     normalize_process_sub_type,
@@ -50,6 +53,40 @@ from app.services.io_preview import (
 
 
 LEGACY_SHIPPING_LINK_READ_ONLY_MESSAGE = "폐기된 출하 준비 연결 작업은 조회만 가능합니다."
+
+
+def _lock_active_item_ids(db: Session, item_ids: set[uuid.UUID]) -> None:
+    """새 IO 참조가 가리킬 모든 품목을 INSERT 전에 잠근다."""
+    active = item_repository.lock_active_many(db, item_ids)
+    missing = sorted(item_ids - set(active), key=str)
+    if missing:
+        raise ValueError(f"품목을 찾을 수 없습니다: {missing[0]}")
+
+
+def _lock_active_payload_items(db: Session, payload: object) -> None:
+    item_ids = {
+        item_id
+        for bundle in getattr(payload, "bundles", ())
+        for item_id in (
+            getattr(bundle, "source_item_id", None),
+            *(getattr(line, "item_id", None) for line in bundle.lines),
+        )
+        if item_id is not None
+    }
+    _lock_active_item_ids(db, item_ids)
+
+
+def _lock_active_batch_items(db: Session, batch: IoBatch) -> None:
+    item_ids = {
+        item_id
+        for bundle in batch.bundles
+        for item_id in (
+            bundle.source_item_id,
+            *(line.item_id for line in bundle.lines),
+        )
+        if item_id is not None
+    }
+    _lock_active_item_ids(db, item_ids)
 
 
 def _normalize_bom_stock_exempt_line(
@@ -98,7 +135,7 @@ def _normalize_bom_stock_exempt_line(
         line.exclusion_note = None
 
 
-def normalize_payload_bom_stock_exempt(db: Session, payload: object) -> None:
+def _normalize_payload_bom_stock_exempt(db: Session, payload: object) -> None:
     """새 제출·임시저장 payload의 자동 BOM 자재 정책을 서버 기준으로 강제한다."""
     bundle_lines = [
         (bundle, line)
@@ -113,7 +150,7 @@ def normalize_payload_bom_stock_exempt(db: Session, payload: object) -> None:
     )
 
 
-def normalize_batch_bom_stock_exempt(db: Session, batch: IoBatch) -> None:
+def _normalize_batch_bom_stock_exempt(db: Session, batch: IoBatch) -> None:
     """미제출 draft를 제출할 때 현재 품목 설정으로 스냅샷을 다시 계산한다."""
     bundle_lines = [(bundle, line) for bundle in batch.bundles for line in bundle.lines]
     _normalize_bom_stock_exempt_lines(
@@ -188,7 +225,7 @@ def normalize_automatic_routes_with_bom_token_refresh(
     if not changed:
         return False
     for bundle, line in verified_lines:
-        line.bom_auto_token = issue_bom_auto_token(
+        line.bom_auto_token = _issue_bom_auto_token(
             db,
             flow="io",
             claims=io_bom_auto_claims(
@@ -229,7 +266,11 @@ def _normalize_bom_stock_exempt_lines(
         for _, line in bundle_lines:
             line.bom_stock_exempt = False
         return
-    items = db.query(Item).filter(Item.item_id.in_(item_ids)).all()
+    items = (
+        db.query(Item)
+        .filter(Item.item_id.in_(item_ids), Item.deleted_at.is_(None))
+        .all()
+    )
     items_by_id = {item.item_id: item for item in items}
     for bundle, line in bundle_lines:
         item = items_by_id.get(line.item_id)
@@ -476,24 +517,26 @@ def _persist_batch(
     payload,
     status: str,
     submitted_at: Optional[datetime] = None,
+    request_fingerprint: Optional[str] = None,
 ) -> IoBatch:
     payload.sub_type = normalize_process_sub_type(
         work_type=payload.work_type,
         sub_type=payload.sub_type,
         bundles=payload.bundles,
     )
+    _lock_active_payload_items(db, payload)
     validate_internal_use_requester(
         requester,
         work_type=payload.work_type,
         sub_type=payload.sub_type,
     )
-    normalize_payload_bom_stock_exempt(db, payload)
     normalize_automatic_routes_with_bom_token_refresh(
         db,
         work_type=payload.work_type,
         sub_type=payload.sub_type,
         bundles=payload.bundles,
     )
+    _normalize_payload_bom_stock_exempt(db, payload)
     if payload.sub_type in {"warehouse_to_dept", "dept_to_warehouse", "produce", "disassemble", "adjust_in", "adjust_out"}:
         payload.from_department, payload.to_department = automatic_department_headers(
             payload.bundles
@@ -541,13 +584,21 @@ def _persist_batch(
         requester_department=_enum_value(requester.department) or "",
         from_department=payload.from_department,
         to_department=payload.to_department,
-        requires_approval=(
-            payload.sub_type in APPROVAL_SUB_TYPES
-            or has_included_manual_line(payload.bundles)
-        ),
+        requires_approval=approval_kind(
+            work_type=payload.work_type,
+            sub_type=payload.sub_type,
+            has_manual_line=has_included_manual_line(payload.bundles),
+            has_custom_process_bom=has_declared_custom_process_bom(
+                db,
+                work_type=payload.work_type,
+                sub_type=payload.sub_type,
+                bundles=payload.bundles,
+            ),
+        ) != "none",
         reference_no=payload.reference_no,
         notes=payload.notes,
         client_request_id=getattr(payload, "client_request_id", None),
+        request_fingerprint=request_fingerprint,
         submitted_at=submitted_at,
         created_at=now,
         updated_at=now,
@@ -689,7 +740,43 @@ def get_batch(db: Session, *, batch_id: uuid.UUID) -> Optional[dict]:
     return _batch_to_payload(batch, db=db) if batch else None
 
 
-def sync_batch_from_stock_requests(
+def _normalize_automatic_batch_routes_with_draft_fingerprint_refresh(
+    db: Session,
+    batch: IoBatch,
+) -> None:
+    """서버 파생 자동 경로만 바뀐 draft 제출 지문을 현재 경로로 회전한다."""
+    current_draft_fingerprint = fingerprint_io_draft_submit(
+        batch.requester_employee_id,
+        batch.batch_id,
+        _batch_to_payload(batch),
+    )
+    refresh_fingerprint = batch.request_fingerprint == current_draft_fingerprint
+    normalize_automatic_department_routes(
+        db,
+        work_type=batch.work_type,
+        sub_type=batch.sub_type,
+        bundles=batch.bundles,
+    )
+    if batch.sub_type in {
+        "warehouse_to_dept",
+        "dept_to_warehouse",
+        "produce",
+        "disassemble",
+        "adjust_in",
+        "adjust_out",
+    }:
+        batch.from_department, batch.to_department = automatic_department_headers(
+            batch.bundles
+        )
+    if refresh_fingerprint:
+        batch.request_fingerprint = fingerprint_io_draft_submit(
+            batch.requester_employee_id,
+            batch.batch_id,
+            _batch_to_payload(batch),
+        )
+
+
+def _sync_batch_from_stock_requests(
     db: Session,
     batch: IoBatch,
     requests: Optional[list[StockRequest]] = None,
@@ -765,27 +852,16 @@ def sync_batch_from_stock_requests(
     else:
         batch.stock_request_id = None
     if batch.status in {"completed", "partially_completed"}:
-        normalize_automatic_department_routes(
-            db,
-            work_type=batch.work_type,
-            sub_type=batch.sub_type,
-            bundles=batch.bundles,
-        )
-        if batch.sub_type in {
-            "warehouse_to_dept", "dept_to_warehouse", "produce", "disassemble", "adjust_in", "adjust_out",
-        }:
-            batch.from_department, batch.to_department = automatic_department_headers(
-                batch.bundles
-            )
+        _normalize_automatic_batch_routes_with_draft_fingerprint_refresh(db, batch)
     batch.updated_at = datetime.utcnow()
     db.flush()
 
 
-def sync_batch_from_stock_request(db: Session, request: StockRequest) -> None:
+def _sync_batch_from_stock_request(db: Session, request: StockRequest) -> None:
     batch_id = getattr(request, "operation_batch_id", None)
     if not batch_id:
         return
     batch = db.query(IoBatch).filter(IoBatch.batch_id == batch_id).first()
     if batch is None:
         return
-    sync_batch_from_stock_requests(db, batch)
+    _sync_batch_from_stock_requests(db, batch)

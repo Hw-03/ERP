@@ -36,7 +36,9 @@ Top MCP Servers:
 
 ## Team Tips
 
-- **시작 / 중지 스크립트**: 백엔드는 항상 `scripts/dev/start-backend.ps1` (좀비 워커 자동 정리 + /health/live 확인) 와 `scripts/dev/stop-backend.ps1` (포트 8011 PID 강제 종료 — dev) 를 사용한다. 백엔드 로그가 0줄이면 좀비 의심 — stop 후 start 로 재기동.
+> **품질 감사/worktree 안전 범위:** 아래 시작·중지·DB·직원 환경 명령은 운영자 또는 통합 checkout용이다. 격리된 코드 품질 작업에서는 `start.bat`, `stop.bat`, `bootstrap_db.py`, 직원 동기화·배포·작업 등록 명령을 실행하거나 development/employee URL·port·DB를 조회하지 않는다. 정적 검증은 [`verify_local.ps1`](../scripts/dev/verify_local.ps1)의 plan/gate 계약을 따르고, 브라우저 회귀 실행이 별도로 승인된 때만 [합성 DB E2E 격리 계약](../frontend/tests/e2e/README.md)을 따른다. 과거 실환경 관찰은 현재 상태로 재확인하지 않는다.
+
+- **시작 / 중지 스크립트**: 백엔드는 항상 `scripts/dev/start-backend.ps1` (`/health/live`로 프로세스 소유권 확인 + `/health/ready` 준비 완료 대기) 와 `scripts/dev/stop-backend.ps1` (포트 8011 PID 강제 종료 — dev) 를 사용한다. 백엔드 로그가 0줄이면 좀비 의심 — stop 후 start 로 재기동.
 - **커밋 / 푸시는 명시 요청 시에만**: AI 가 자동으로 커밋·푸시하지 않는다. 커밋 메시지는 `YYYY-MM-DD area: 요약` 형식 (예: `2026-05-29 backend: 시리얼 부여 수정`).
 - **검증 게이트**: 구현 중에는 관련 테스트만 반복하고, 커밋 전 저장소 루트에서 `powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1 -Mode smart -ChangeSet staged`를 실행한다. `staged`는 영향 계획의 범위이며 게이트는 현재 working tree에서 실행되므로, 정확한 staged 스냅샷 검증은 깨끗한 전용 worktree에서 한다. 문서 변경에는 Markdown 공백·유지 문서 링크 검사를 함께 실행한다. 검증 인프라 변경이나 명시적 전체 확인은 `-Mode full`, GitHub CI는 항상 전체 게이트를 사용한다.
 - **DB 변경**: 서버 기동만으로 DB 가 바뀌면 안 됨. 스키마 변경·시드는 `cd backend && python bootstrap_db.py --all`.
@@ -50,7 +52,7 @@ Top MCP Servers:
 1. **저장소 클론 + 의존성 설치** — `start.bat` 1회 실행으로 backend `pip install` + frontend `npm install` 자동 수행
 2. **활성 화면 확인** — 브라우저에서 `http://localhost:3001/mes` 접속. 데스크톱은 사이드바 탭(대시보드·입출고·입출고 내역·출하·불량·창고 지도·보고서)과 하단 설정에서 흐름을 확인한다.
 3. **문서 허브 1회 훑기** — [루트 README](../README.md) 문서 허브 섹션의 [ARCHITECTURE.md](docs/ARCHITECTURE.md), [GLOSSARY.md](docs/GLOSSARY.md), [ITEM_CODE_RULES.md](docs/ITEM_CODE_RULES.md), [REPO_LAYOUT.md](docs/REPO_LAYOUT.md)
-4. **첫 작업 전 검증** — `verify_local.ps1 -Mode smart -PlanOnly`로 환경과 검증 계획 확인
+4. **첫 작업 전 검증** — 저장소 루트에서 `powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1 -Mode smart -PlanOnly`로 환경과 검증 계획 확인
 5. **Claude Code 세션 시작** — CLAUDE.md 규칙대로 작업 시작
 
 <!-- INSTRUCTION FOR CLAUDE: A new teammate just pasted this guide for how the

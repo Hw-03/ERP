@@ -21,6 +21,7 @@ from app.models import (
     LocationStatusEnum,
     TransactionLog,
     TransactionTypeEnum,
+    WarehouseUnplacedItem,
 )
 from app.services import transaction_actions
 
@@ -50,12 +51,15 @@ def _item(session, suffix: str, *, warehouse: int, total: int) -> Item:
     )
     session.add(item)
     session.flush()
-    session.add(
-        Inventory(
-            item_id=item.item_id,
-            quantity=Decimal(total),
-            warehouse_qty=Decimal(warehouse),
-        )
+    session.add_all(
+        [
+            Inventory(
+                item_id=item.item_id,
+                quantity=Decimal(total),
+                warehouse_qty=Decimal(warehouse),
+            ),
+            WarehouseUnplacedItem(item_id=item.item_id, quantity=warehouse),
+        ]
     )
     session.flush()
     return item
@@ -123,12 +127,13 @@ def test_same_transaction_is_reversed_only_once(concurrent_engine, make_session)
     try:
         inventory = check.query(Inventory).one()
         refreshed = check.get(TransactionLog, ids[0])
-        assert sorted(result.split(":", 1)[0] for result in results) == [
-            "cancelled",
+        assert [result.split(":", 1)[0] for result in results] == [
+            "rejected",
             "rejected",
         ]
-        assert inventory is not None and inventory.warehouse_qty == Decimal("10")
-        assert refreshed is not None and refreshed.cancelled is True
+        assert all("legacy" in result.lower() or "레거시" in result for result in results)
+        assert inventory is not None and inventory.warehouse_qty == Decimal("0")
+        assert refreshed is not None and refreshed.cancelled is False
     finally:
         check.close()
 
@@ -184,15 +189,16 @@ def test_batch_transactions_are_reversed_only_once(concurrent_engine, make_sessi
             .filter(TransactionLog.log_id.in_(ids[3]))
             .all()
         )
-        assert sorted(result.split(":", 1)[0] for result in results) == [
-            "cancelled",
+        assert [result.split(":", 1)[0] for result in results] == [
+            "rejected",
             "rejected",
         ]
+        assert all("legacy" in result.lower() or "레거시" in result for result in results)
         assert [inventory.warehouse_qty for inventory in inventories] == [
-            Decimal("10"),
-            Decimal("10"),
+            Decimal("0"),
+            Decimal("0"),
         ]
-        assert all(log.cancelled for log in batch_logs)
+        assert all(not log.cancelled for log in batch_logs)
     finally:
         check.close()
 
@@ -286,13 +292,14 @@ def test_fifo_allocations_are_restored_only_once(concurrent_engine, make_session
             .all()
         )
         refreshed_first, refreshed_second = refreshed_records
-        assert sorted(result.split(":", 1)[0] for result in results) == [
-            "cancelled",
+        assert [result.split(":", 1)[0] for result in results] == [
+            "rejected",
             "rejected",
         ]
-        assert inventory is not None and inventory.warehouse_qty == Decimal("0")
-        assert refreshed_location is not None and refreshed_location.quantity == Decimal("4")
-        assert refreshed_first is not None and refreshed_first.remaining_quantity == Decimal("1")
-        assert refreshed_second is not None and refreshed_second.remaining_quantity == Decimal("3")
+        assert all("legacy" in result.lower() or "레거시" in result for result in results)
+        assert inventory is not None and inventory.warehouse_qty == Decimal("2")
+        assert refreshed_location is not None and refreshed_location.quantity == Decimal("2")
+        assert refreshed_first is not None and refreshed_first.remaining_quantity == Decimal("0")
+        assert refreshed_second is not None and refreshed_second.remaining_quantity == Decimal("2")
     finally:
         check.close()

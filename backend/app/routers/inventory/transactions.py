@@ -8,16 +8,21 @@ import csv
 import json
 import uuid
 from datetime import date, datetime
-from decimal import Decimal
 from io import StringIO
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import String, and_, case, cast, func, literal, or_, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.verified_actor import (
+    VerifiedActor,
+    VerifiedActorRouter,
+    ensure_actor_employee_code,
+    ensure_actor_employee_id,
+)
 from app.models import (
     Employee,
     InventoryOperation,
@@ -39,14 +44,13 @@ from app.schemas import (
     TransactionQuantityCorrectionResponse,
 )
 from app.services import transaction_actions as transaction_actions_svc
+from app.services import rate_limit
 from app.services import inventory_operation_cancellation as operation_cancellation_svc
 from app.services import legacy_inventory_operation_adoption as legacy_adoption_svc
 from app.services.transaction_display_groups import build_display_groups as _build_display_groups
 from app.services.request_order_stock import load_request_order_stock
 from app.services.export_helpers import csv_streaming_response
-from app.services.pin_auth import verify_pin
 from app.utils.search import build_normalized_search_filter
-from app._actor import set_actor
 from app.routers.inventory._tx_filters import (
     _SUMMARY_WAREHOUSE_TYPES,
     _SUMMARY_DEPT_TYPES,
@@ -63,10 +67,10 @@ from app.routers.inventory._tx_filters import (
     _stock_request_info_map,
     _to_log_response,
 )
-from app.repositories import item_repository, inventory_repository
+from app.repositories import item_repository
 
 
-router = APIRouter()
+router = VerifiedActorRouter()
 
 
 # 단일 export 요청에서 허용하는 최대 행 수. 운영 PC 메모리 보호용 안전 상한.
@@ -76,14 +80,6 @@ OPERATION_KEYS_DESCRIPTION = (
     "화면 작업 종류 키. 예: warehouse,process,defect,item_conversion,shipping"
 )
 
-
-# 수량 보정이 허용되는 거래 타입.
-# ADJUST 제외: 절대값 지정 방식이라 delta 보정 정책 애매 (별도 정책 확정 필요).
-# TRANSFER_*: 부서 버킷 정보가 TransactionLog에 없어 1차 미지원.
-QUANTITY_CORRECTABLE = {
-    TransactionTypeEnum.RECEIVE,
-    TransactionTypeEnum.SHIP,
-}
 
 class TransactionSummaryResponse(BaseModel):
     """입출고 내역 화면 KPI — 조건 전체 카운트(페이지네이션과 무관)."""
@@ -205,33 +201,30 @@ _TX_ROW_COLOR = {
 }
 
 
-def _log_snapshot(log: TransactionLog) -> dict:
-    """TransactionLog의 가변 필드 스냅샷 (JSON 직렬화 가능 형태)."""
-    return {
-        "transaction_type": log.transaction_type.value if log.transaction_type else None,
-        "quantity_change": str(log.quantity_change) if log.quantity_change is not None else None,
-        "reference_no": log.reference_no,
-        "produced_by": log.produced_by,
-        "notes": log.notes,
-    }
-
-
 def _verify_editor(
-    db: Session,
-    employee_id: uuid.UUID,
+    request: Request,
+    actor: Employee,
+    claimed_employee_id: uuid.UUID,
     pin: str,
-    request: Optional[Request] = None,
 ) -> Employee:
-    """수정자 직원 + PIN 검증. 작업자 식별용 — 실제 보안 인증이 아님."""
-    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
-    if not employee:
-        raise http_error(404, ErrorCode.NOT_FOUND, "수정자 직원을 찾을 수 없습니다.")
-    if not bool(employee.is_active):
-        raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원은 거래를 수정할 수 없습니다.")
-    if not verify_pin(employee.pin_hash, pin):
+    """body 직원 ID는 검증하고 session actor 본인의 PIN만 step-up 검증한다."""
+    ensure_actor_employee_id(actor, claimed_employee_id)
+    return _verify_actor_pin(request, actor, pin)
+
+
+def _verify_actor_pin(request: Request, actor: Employee, pin: str) -> Employee:
+    """거래·창고·로그인이 공유하는 actor+IP 키로 본인 PIN을 검증한다."""
+    try:
+        pin_is_valid = rate_limit.verify_operator_pin(actor, pin, request)
+    except rate_limit.OperatorPinRateLimitExceeded as exc:
+        raise http_error(
+            429,
+            ErrorCode.TOO_MANY_REQUESTS,
+            str(exc),
+        )
+    if not pin_is_valid:
         raise http_error(403, ErrorCode.FORBIDDEN, "PIN이 올바르지 않습니다.")
-    set_actor(request, employee)
-    return employee
+    return actor
 
 
 @router.get("/transactions/monthly-counts", summary="연도별 월별 거래 카운트")
@@ -936,6 +929,7 @@ def meta_edit_transaction(
     log_id: uuid.UUID,
     payload: TransactionMetaEditRequest,
     request: Request,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
 ):
     """거래 메타데이터(notes/reference_no/produced_by) 수정. 재고에 영향 없음.
@@ -943,7 +937,7 @@ def meta_edit_transaction(
     원본 TransactionLog의 메타 필드는 직접 업데이트하지만, 변경 전/후 스냅샷을
     TransactionEditLog에 기록하여 감사 이력을 남긴다.
     """
-    editor = _verify_editor(db, payload.edited_by_employee_id, payload.edited_by_pin, request)
+    editor = _verify_editor(request, actor, payload.edited_by_employee_id, payload.edited_by_pin)
     try:
         log, item = transaction_actions_svc.edit_transaction_metadata(
             db,
@@ -1000,97 +994,48 @@ def quantity_correct_transaction(
     log_id: uuid.UUID,
     payload: TransactionQuantityCorrectionRequest,
     request: Request,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
 ):
     """RECEIVE/SHIP 수량 보정. 원본은 보존하고 차액만 ADJUST 거래로 보정한다.
 
     - delta = new_quantity_change - original.quantity_change
     - new_warehouse = inventory.warehouse_qty + delta (음수 방지 검증)
-    - adjust_warehouse() 서비스 호출로 재고 동기화
+    - _adjust_warehouse() private core 호출로 재고 동기화
     - ADJUST TransactionLog 생성 + TransactionEditLog 기록
     """
-    log = db.query(TransactionLog).filter(TransactionLog.log_id == log_id).first()
-    if not log:
-        raise http_error(404, ErrorCode.NOT_FOUND, "거래를 찾을 수 없습니다.")
-    item = item_repository.get(db, log.item_id)
-    if not item:
-        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
+    editor = _verify_editor(request, actor, payload.edited_by_employee_id, payload.edited_by_pin)
 
-    if log.transaction_type not in QUANTITY_CORRECTABLE:
+    try:
+        result = transaction_actions_svc.correct_transaction_quantity(
+            db,
+            log_id=log_id,
+            editor=editor,
+            new_quantity=payload.quantity_change,
+            reason=payload.reason,
+            request=request,
+        )
+    except (
+        transaction_actions_svc.TransactionLogNotFound,
+        transaction_actions_svc.TransactionItemNotFound,
+        transaction_actions_svc.TransactionInventoryNotFound,
+    ) as exc:
+        raise http_error(404, ErrorCode.NOT_FOUND, str(exc))
+    except transaction_actions_svc.CorrectionConflict as exc:
         raise http_error(
-            422,
-            ErrorCode.BUSINESS_RULE,
-            f"수량 보정은 RECEIVE / SHIP 유형만 지원합니다 (현재: {log.transaction_type.value}).",
+            409,
+            ErrorCode.CORRECTION_CONFLICT,
+            str(exc),
+            reason=exc.reason,
         )
+    except transaction_actions_svc.TransactionQuantityCorrectionShortage as exc:
+        raise http_error(422, ErrorCode.STOCK_SHORTAGE, str(exc))
+    except transaction_actions_svc.UnsupportedTransactionQuantityCorrection as exc:
+        raise http_error(422, ErrorCode.BUSINESS_RULE, str(exc))
 
-    new_qty = payload.quantity_change
-
-    # SHIP 부호 검증: SHIP은 음수여야 함
-    if log.transaction_type == TransactionTypeEnum.SHIP and new_qty >= 0:
-        raise http_error(
-            422,
-            ErrorCode.BUSINESS_RULE,
-            "SHIP의 수량 변화량은 음수여야 합니다 (UI에서 양수 입력 시 자동 음수 변환 필요).",
-        )
-    if log.transaction_type == TransactionTypeEnum.RECEIVE and new_qty <= 0:
-        raise http_error(
-            422,
-            ErrorCode.BUSINESS_RULE,
-            "RECEIVE의 수량 변화량은 양수여야 합니다.",
-        )
-
-    # 동일 거래에 이미 수량 보정 이력이 있으면 추가 보정 차단 (정책 미확정)
-    existing_correction = (
-        db.query(TransactionEditLog.edit_id)
-        .filter(
-            TransactionEditLog.original_log_id == log.log_id,
-            TransactionEditLog.correction_log_id.isnot(None),
-        )
-        .first()
-    )
-    if existing_correction is not None:
-        raise http_error(
-            422,
-            ErrorCode.BUSINESS_RULE,
-            "이미 수량 보정된 거래입니다. 추가 보정은 별도 정책 확정 후 가능합니다.",
-        )
-
-    editor = _verify_editor(db, payload.edited_by_employee_id, payload.edited_by_pin, request)
-
-    delta = new_qty - log.quantity_change
-
-    # 재고 검증: 보정 후 warehouse_qty >= max(0, pending_quantity)
-    inv = inventory_repository.get(db, log.item_id)
-    if not inv:
-        raise http_error(404, ErrorCode.NOT_FOUND, "재고 레코드를 찾을 수 없습니다.")
-
-    new_warehouse = inv.warehouse_qty + delta
-    if new_warehouse < 0:
-        raise http_error(
-            422,
-            ErrorCode.STOCK_SHORTAGE,
-            f"재고 부족: 보정 후 창고 재고가 {float(new_warehouse)}로 음수가 됩니다.",
-        )
-    # pending_quantity가 None인 레거시 레코드 방어
-    pending = inv.pending_quantity or Decimal("0")
-    if new_warehouse < pending:
-        raise http_error(
-            422,
-            ErrorCode.STOCK_SHORTAGE,
-            "예약 수량보다 창고 재고가 낮아질 수 없습니다.",
-        )
-
-    before = _log_snapshot(log)
-    correction_log = transaction_actions_svc.correct_transaction_quantity(
-        db,
-        log=log,
-        editor=editor,
-        new_warehouse=new_warehouse,
-        delta=delta,
-        reason=payload.reason,
-        before=before,
-        request=request,
-    )
+    log = result.original
+    correction_log = result.correction
+    item = result.item
     db.refresh(log)
     db.refresh(correction_log)
 
@@ -1122,31 +1067,48 @@ def cancel_transaction(
     log_id: uuid.UUID,
     payload: TransactionCancelRequest,
     request: Request,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
-):
+) -> TransactionLogResponse:
     """거래 취소 — 내역 유지 + 재고 자동 롤백 + '취소됨' 표시.
 
     권한: 배치 요청자 본인(배치가 없으면 producer_employee_id) 또는 결재 권한자.
     BOM 배치(PRODUCE+BACKFLUSH)는 operation_batch_id 단위로 일괄 취소.
     """
-    log = db.query(TransactionLog).filter(TransactionLog.log_id == log_id).first()
-    if not log:
+    ensure_actor_employee_code(actor, payload.employee_code)
+    canceller = _verify_actor_pin(request, actor, payload.pin)
+
+    log = db.get(TransactionLog, log_id)
+    if log is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "거래를 찾을 수 없습니다.")
+    operation_id = log.operation_id
+    if operation_id is None:
+        try:
+            _operation, log = transaction_actions_svc.lock_transaction_operation_and_log(
+                db,
+                log_id,
+                legacy_only=True,
+            )
+        except transaction_actions_svc.TransactionLogNotFound:
+            raise http_error(404, ErrorCode.NOT_FOUND, "거래를 찾을 수 없습니다.")
+        except transaction_actions_svc.CorrectionConflict as exc:
+            raise http_error(
+                409,
+                ErrorCode.COMMAND_CONFLICT,
+                "거래 상태가 변경되어 취소할 수 없습니다.",
+                reason=exc.reason,
+            )
 
     if bool(getattr(log, "cancelled", False)):
         raise http_error(422, ErrorCode.BUSINESS_RULE, "이미 취소된 거래입니다.")
 
-    item = item_repository.get(db, log.item_id)
+    item = item_repository.get_active(
+        db,
+        log.item_id,
+        for_update=operation_id is None,
+    )
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
-
-    canceller = db.query(Employee).filter(Employee.employee_code == payload.employee_code).first()
-    if not canceller:
-        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
-    if not bool(canceller.is_active):
-        raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원은 거래를 취소할 수 없습니다.")
-    if not verify_pin(canceller.pin_hash, payload.pin):
-        raise http_error(403, ErrorCode.FORBIDDEN, "PIN이 올바르지 않습니다.")
 
     # 권한 체크: 본인(요청자) 또는 결재 권한자
     # 요청자 식별 — 히스토리 화면의 '요청자' 표기와 동일한 우선순위로 판정한다:
@@ -1173,21 +1135,21 @@ def cancel_transaction(
     if not (is_self or is_approver):
         raise http_error(403, ErrorCode.FORBIDDEN, "본인 거래 또는 결재 권한자만 취소할 수 있습니다.")
 
-    set_actor(request, canceller)
-
-    if log.operation_id is not None:
+    if operation_id is not None:
         try:
             preview = operation_cancellation_svc.preview_cancellation(
                 db,
-                log.operation_id,
+                operation_id,
             )
             operation_cancellation_svc.cancel_operation(
                 db,
-                operation_id=log.operation_id,
+                operation_id=operation_id,
                 canceller=canceller,
                 reason=payload.reason,
                 plan_hash=preview.plan_hash,
             )
+        except operation_cancellation_svc.WorkflowCancellationConflict as exc:
+            raise http_error(409, exc.reason_code, str(exc)) from exc
         except operation_cancellation_svc.CancellationPlanChanged as exc:
             raise http_error(409, ErrorCode.CONFLICT, str(exc)) from exc
         except operation_cancellation_svc.CancellationNotAllowed as exc:
@@ -1209,6 +1171,8 @@ def cancel_transaction(
         )
     except transaction_actions_svc.TransactionInventoryNotFound as exc:
         raise http_error(404, ErrorCode.NOT_FOUND, str(exc))
+    except operation_cancellation_svc.WorkflowCancellationConflict as exc:
+        raise http_error(409, exc.reason_code, str(exc)) from exc
     except operation_cancellation_svc.CancellationPlanChanged as exc:
         raise http_error(409, ErrorCode.CONFLICT, str(exc)) from exc
     except legacy_adoption_svc.LegacyCancellationAdoptionError as exc:

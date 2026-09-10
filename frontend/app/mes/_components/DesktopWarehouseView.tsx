@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { api, type IoBatch, type Item, type StockRequest } from "@/lib/api";
-import { isDepartmentApprover } from "./_warehouse_steps";
+import { canApproveDepartmentRequests } from "./_warehouse_steps";
 import { useWarehouseData } from "./_warehouse_hooks/useWarehouseData";
 import { WarehouseHeader } from "./_warehouse_sections/WarehouseHeader";
 import { WarehouseSectionTabs, type WarehouseSectionTab } from "./_warehouse_sections/WarehouseSectionTabs";
@@ -58,6 +58,9 @@ export function DesktopWarehouseView({
   const urlRestoreStep = typeof window === "undefined"
     ? undefined
     : parseWarehouseStep(new URLSearchParams(window.location.search).get("step"));
+  const targetRequestId = typeof window === "undefined"
+    ? null
+    : new URLSearchParams(window.location.search).get("stockRequestId");
   const [employeeId, setEmployeeId] = useState<string>(operator?.employee_id ?? "");
   // 알림 클릭 딥링크 — URL ?section= 으로 초기 섹션 결정 (권한 없으면 compose 폴백).
   const [sectionTab, setSectionTab] = useState<WarehouseSectionTab>(() => {
@@ -67,7 +70,7 @@ export function DesktopWarehouseView({
     if (!s || !valid.includes(s as WarehouseSectionTab)) return "compose";
     const whRole = operator?.warehouse_role ?? "none";
     if (s === "queue" && whRole !== "primary" && whRole !== "deputy") return "compose";
-    if (s === "dept-queue" && !isDepartmentApprover(operator)) return "compose";
+    if (s === "dept-queue" && !canApproveDepartmentRequests(operator)) return "compose";
     if (s === "handover") {
       const dept = operator?.department ?? "";
       const ok = dept === "튜브" || HANDOVER_RECEIVE_DEPTS.includes(dept);
@@ -102,7 +105,7 @@ export function DesktopWarehouseView({
   const canSeeQueue =
     (operator?.warehouse_role ?? "none") === "primary" ||
     (operator?.warehouse_role ?? "none") === "deputy";
-  const canSeeDeptQueue = isDepartmentApprover(operator);
+  const canSeeDeptQueue = canApproveDepartmentRequests(operator);
   // 인수인계: 작성(튜브 부서원) 또는 인수 확인(받는 부서 소속)이면 탭 노출. 결재권자는 제외.
   const canReceiveHandover = HANDOVER_RECEIVE_DEPTS.includes(operator?.department ?? "");
   const showHandover = (operator?.department ?? "") === "튜브" || canReceiveHandover;
@@ -330,6 +333,7 @@ export function DesktopWarehouseView({
               }}
               onEmptyStateChange={setWorkAreaEmpty}
               onStartCompose={() => handleSectionTabChange("compose")}
+              targetRequestId={targetRequestId}
             />
           </div>
         )}

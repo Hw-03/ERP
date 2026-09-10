@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, createEvent, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Employee } from "@/lib/api";
 import { EmployeeCombobox } from "../EmployeeCombobox";
@@ -28,7 +28,7 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
 
 function renderCombobox(employees = [makeEmployee()], onChange = vi.fn()) {
   render(<EmployeeCombobox employees={employees} value={null} onChange={onChange} />);
-  const input = screen.getByRole("combobox", { name: "직원 선택" });
+  const input = screen.getByRole("combobox", { name: "직원 선택" }) as HTMLInputElement;
   fireEvent.click(input);
   return { input, onChange };
 }
@@ -48,6 +48,24 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("EmployeeCombobox 한글 조립", () => {
+  it("닫힌 선택 상자의 Enter가 부모 form을 제출하지 않게 차단", () => {
+    const employee = makeEmployee();
+    render(
+      <form>
+        <EmployeeCombobox employees={[employee]} value={employee} onChange={vi.fn()} />
+      </form>,
+    );
+
+    const enter = createEvent.keyDown(screen.getByRole("combobox"), {
+      key: "Enter",
+      code: "Enter",
+      cancelable: true,
+    });
+    fireEvent(screen.getByRole("combobox"), enter);
+
+    expect(enter.defaultPrevented).toBe(true);
+  });
+
   it.each([
     ["P", "ㅖ", "ㅔ"],
     ["O", "ㅒ", "ㅐ"],

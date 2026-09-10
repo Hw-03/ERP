@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import argparse
 import csv
+import enum
+import json
 import os
 import subprocess
 import sys
@@ -28,7 +30,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Iterable, Any
 
-from sqlalchemy import create_engine
+from sqlalchemy import String, cast, create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
 
@@ -48,10 +50,13 @@ from app.models import (  # noqa: E402
     IoLine,
     Item,
     LocationStatusEnum,
+    ShippingAllocation,
+    ShippingRequest,
     StockRequest,
     StockRequestLine,
     TransactionEditLog,
     TransactionLog,
+    TransactionTypeEnum,
     WarehouseBoxItem,
 )
 
@@ -71,6 +76,122 @@ BUCKET_ALIASES = {
 
 class CutoverInputError(ValueError):
     """Raised when the cutover input is unsafe to apply."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        shipping_report: tuple[ShippingCutoverReportEntry, ...] = (),
+    ) -> None:
+        super().__init__(message)
+        self.shipping_report = shipping_report
+
+
+class ShippingCutoverDisposition(str, enum.Enum):
+    """Whether a historical shipping request can still change stock."""
+
+    TERMINAL_SAFE = "TERMINAL_SAFE"
+    FUTURE_DELTA = "FUTURE_DELTA"
+    INCONSISTENT = "INCONSISTENT"
+
+
+def classify_shipping_cutover_state(
+    *,
+    status: str,
+    allocation_statuses: Iterable[str],
+    active_log_phases: Iterable[str],
+    active_pickup_log_count: int,
+    active_pickup_effect_log_count: int,
+    malformed_active_log_count: int = 0,
+    malformed_allocation_count: int = 0,
+) -> ShippingCutoverDisposition:
+    """Classify one shipping request from persisted state only."""
+    normalized_status = str(status).upper()
+    allocations = frozenset(str(value).upper() for value in allocation_statuses)
+    phases = frozenset(str(value).upper() for value in active_log_phases)
+    known_allocations = {"RESERVED", "CONSUMED", "RELEASED"}
+
+    if malformed_active_log_count or malformed_allocation_count:
+        return ShippingCutoverDisposition.INCONSISTENT
+    if not allocations <= known_allocations:
+        return ShippingCutoverDisposition.INCONSISTENT
+    if active_pickup_log_count != active_pickup_effect_log_count:
+        return ShippingCutoverDisposition.INCONSISTENT
+    if ("PICKUP" in phases or active_pickup_log_count) and normalized_status != "PICKED_UP":
+        return ShippingCutoverDisposition.INCONSISTENT
+
+    if normalized_status == "REQUESTED":
+        return (
+            ShippingCutoverDisposition.FUTURE_DELTA
+            if not allocations
+            else ShippingCutoverDisposition.INCONSISTENT
+        )
+    if normalized_status == "PREPARING":
+        return (
+            ShippingCutoverDisposition.FUTURE_DELTA
+            if allocations in {frozenset(), frozenset({"RELEASED"})}
+            else ShippingCutoverDisposition.INCONSISTENT
+        )
+    if normalized_status == "PREPARED":
+        allowed = {
+            frozenset(),
+            frozenset({"RESERVED"}),
+            frozenset({"RESERVED", "RELEASED"}),
+        }
+        return (
+            ShippingCutoverDisposition.FUTURE_DELTA
+            if allocations in allowed
+            else ShippingCutoverDisposition.INCONSISTENT
+        )
+    if normalized_status == "PICKED_UP":
+        allowed = {
+            frozenset(),
+            frozenset({"CONSUMED"}),
+            frozenset({"CONSUMED", "RELEASED"}),
+        }
+        if allocations not in allowed or active_pickup_effect_log_count < 1:
+            return ShippingCutoverDisposition.INCONSISTENT
+        return ShippingCutoverDisposition.FUTURE_DELTA
+    if normalized_status == "CANCELLED":
+        return (
+            ShippingCutoverDisposition.TERMINAL_SAFE
+            if allocations in {frozenset(), frozenset({"RELEASED"})}
+            else ShippingCutoverDisposition.INCONSISTENT
+        )
+    return ShippingCutoverDisposition.INCONSISTENT
+
+
+def _has_effective_inventory_delta(value: Any) -> bool:
+    """Return whether an effect can prove a real, reversible inventory delta."""
+    if not isinstance(value, list) or not value:
+        return False
+    for cell in value:
+        if not isinstance(cell, dict):
+            return False
+        scope = cell.get("scope")
+        delta = cell.get("delta")
+        if type(delta) is not int or delta == 0 or abs(delta) > 2_147_483_647:
+            return False
+        if scope == "location":
+            if set(cell) != {"scope", "department", "status", "delta"}:
+                return False
+            if not isinstance(cell.get("department"), str) or not cell["department"].strip():
+                return False
+            try:
+                LocationStatusEnum(cell.get("status"))
+            except (TypeError, ValueError):
+                return False
+        elif scope == "warehouse_box":
+            if set(cell) != {"scope", "box_id", "delta"}:
+                return False
+            if not isinstance(cell.get("box_id"), str) or not cell["box_id"].strip():
+                return False
+        elif scope == "warehouse":
+            if set(cell) != {"scope", "delta"}:
+                return False
+        else:
+            return False
+    return True
 
 
 @dataclass(frozen=True)
@@ -106,6 +227,30 @@ class CutoverSummary:
     io_lines_deleted: int
     warehouse_box_items_deleted: int
     missing_items: tuple[str, ...]
+    shipping_report: tuple[ShippingCutoverReportEntry, ...] = ()
+
+
+@dataclass(frozen=True)
+class ShippingAllocationQuantity:
+    status: str
+    quantity: int
+
+
+@dataclass(frozen=True)
+class ShippingCutoverReportEntry:
+    request_id: str
+    status: str
+    allocation_quantities: tuple[ShippingAllocationQuantity, ...]
+    active_log_phases: tuple[str, ...]
+    active_pickup_log_count: int
+    active_pickup_effect_log_count: int
+    malformed_active_log_count: int
+    malformed_allocation_count: int
+    disposition: ShippingCutoverDisposition
+
+    @property
+    def allocation_statuses(self) -> tuple[str, ...]:
+        return tuple(row.status for row in self.allocation_quantities)
 
 
 def _clean(value: Any) -> str:
@@ -364,10 +509,177 @@ def _apply_targets(db: Session, targets: dict[str, dict[str, Any]]) -> int:
     return inserted_locations
 
 
-def run_cutover(db: Session, rows: list[CutoverRow], options: CutoverOptions) -> CutoverSummary:
-    targets, missing = _validate_rows(db, rows, options)
+def _acquire_cutover_write_lock(db: Session) -> None:
+    """Start the apply transaction while excluding shipping writers."""
+    bind = db.get_bind()
+    bind_in_transaction = getattr(bind, "in_transaction", None)
+    if db.in_transaction() or (callable(bind_in_transaction) and bind_in_transaction()):
+        raise CutoverInputError("cutover apply requires a fresh Session without an open transaction")
+    dialect = bind.dialect.name
+    try:
+        if dialect == "sqlite":
+            db.execute(text("BEGIN IMMEDIATE"))
+            return
+        if dialect == "postgresql":
+            db.execute(
+                text(
+                    "LOCK TABLE shipping_requests, shipping_allocations, transaction_logs "
+                    "IN ACCESS EXCLUSIVE MODE"
+                )
+            )
+            return
+    except Exception:
+        db.rollback()
+        raise
+    raise CutoverInputError(f"cutover apply does not support database dialect {dialect!r}")
 
+
+def _decode_inventory_effect(raw_value: str | None) -> tuple[Any, bool]:
+    if raw_value is None:
+        return None, False
+    try:
+        return json.loads(raw_value), False
+    except (TypeError, json.JSONDecodeError):
+        return None, True
+
+
+def _active_log_flag(raw_value: str | None) -> tuple[bool, bool]:
+    normalized = str(raw_value).strip().lower()
+    if normalized in {"0", "false"}:
+        return True, False
+    if normalized in {"1", "true"}:
+        return False, False
+    return True, True
+
+
+def inspect_shipping_cutover(db: Session) -> tuple[ShippingCutoverReportEntry, ...]:
+    """Return request, allocation, and raw log evidence without enum ORM decoding."""
+    request_statuses = {
+        str(request_id): str(raw_status).upper()
+        for request_id, raw_status in (
+            db.query(
+                ShippingRequest.request_id,
+                cast(ShippingRequest.status, String).label("status"),
+            )
+            .all()
+        )
+    }
+    allocation_totals: dict[str, dict[str, int]] = {}
+    malformed_allocations: dict[str, int] = {}
+    for request_id, raw_status, raw_quantity in db.query(
+        ShippingAllocation.request_id,
+        cast(ShippingAllocation.status, String).label("status"),
+        ShippingAllocation.quantity,
+    ).all():
+        key = str(request_id)
+        status = str(raw_status).upper()
+        totals = allocation_totals.setdefault(key, {})
+        if type(raw_quantity) is not int or raw_quantity <= 0 or raw_quantity > 2_147_483_647:
+            malformed_allocations[key] = malformed_allocations.get(key, 0) + 1
+            continue
+        totals[status] = totals.get(status, 0) + raw_quantity
+
+    log_evidence: dict[str, dict[str, Any]] = {}
+    known_phases = {"PICKUP", "PREPARE", "COMPONENT_CHANGE"}
+    known_transaction_types = {member.value for member in TransactionTypeEnum}
+    log_rows = db.query(
+        TransactionLog.shipping_request_id,
+        cast(TransactionLog.shipping_phase, String).label("shipping_phase"),
+        cast(TransactionLog.transaction_type, String).label("transaction_type"),
+        cast(TransactionLog.inventory_effect, String).label("inventory_effect"),
+        cast(TransactionLog.cancelled, String).label("cancelled"),
+    ).filter(TransactionLog.shipping_request_id.is_not(None)).all()
+    for request_id, raw_phase, raw_transaction_type, raw_effect, raw_cancelled in log_rows:
+        active, malformed_cancelled = _active_log_flag(raw_cancelled)
+        if not active:
+            continue
+        key = str(request_id)
+        evidence = log_evidence.setdefault(
+            key,
+            {"phases": set(), "pickup_logs": 0, "pickup_effects": 0, "malformed_logs": 0},
+        )
+        phase = str(raw_phase).upper()
+        transaction_type = str(raw_transaction_type).upper()
+        evidence["phases"].add(phase)
+        effect, malformed_json = _decode_inventory_effect(raw_effect)
+        malformed_log = (
+            malformed_cancelled
+            or phase not in known_phases
+            or transaction_type not in known_transaction_types
+            or malformed_json
+        )
+        if phase == "PICKUP":
+            evidence["pickup_logs"] += 1
+            if _has_effective_inventory_delta(effect):
+                evidence["pickup_effects"] += 1
+        if malformed_log:
+            evidence["malformed_logs"] += 1
+
+    report: list[ShippingCutoverReportEntry] = []
+    request_ids = set(request_statuses) | set(allocation_totals) | set(log_evidence)
+    for request_id in sorted(request_ids):
+        totals = allocation_totals.get(request_id, {})
+        log = log_evidence.get(
+            request_id,
+            {"phases": set(), "pickup_logs": 0, "pickup_effects": 0, "malformed_logs": 0},
+        )
+        status = request_statuses.get(request_id, "MISSING_REQUEST")
+        malformed_allocation_count = malformed_allocations.get(request_id, 0)
+        disposition = classify_shipping_cutover_state(
+            status=status,
+            allocation_statuses=totals,
+            active_log_phases=log["phases"],
+            active_pickup_log_count=log["pickup_logs"],
+            active_pickup_effect_log_count=log["pickup_effects"],
+            malformed_active_log_count=log["malformed_logs"],
+            malformed_allocation_count=malformed_allocation_count,
+        )
+        report.append(
+            ShippingCutoverReportEntry(
+                request_id=request_id,
+                status=status,
+                allocation_quantities=tuple(
+                    ShippingAllocationQuantity(status=allocation_status, quantity=quantity)
+                    for allocation_status, quantity in sorted(totals.items())
+                ),
+                active_log_phases=tuple(sorted(log["phases"])),
+                active_pickup_log_count=log["pickup_logs"],
+                active_pickup_effect_log_count=log["pickup_effects"],
+                malformed_active_log_count=log["malformed_logs"],
+                malformed_allocation_count=malformed_allocation_count,
+                disposition=disposition,
+            )
+        )
+    return tuple(report)
+
+
+def _ensure_shipping_cutover_safe(db: Session) -> tuple[ShippingCutoverReportEntry, ...]:
+    report = inspect_shipping_cutover(db)
+    unsafe = [entry for entry in report if entry.disposition is not ShippingCutoverDisposition.TERMINAL_SAFE]
+    if unsafe:
+        details = "; ".join(
+            f"{entry.request_id}={entry.disposition.value}"
+            f"(status={entry.status}, "
+            f"allocations={[(row.status, row.quantity) for row in entry.allocation_quantities]}, "
+            f"active_phases={list(entry.active_log_phases)}, pickup_logs={entry.active_pickup_log_count}, "
+            f"effective_pickup_effects={entry.active_pickup_effect_log_count}, "
+            f"malformed_logs={entry.malformed_active_log_count}, "
+            f"malformed_allocations={entry.malformed_allocation_count})"
+            for entry in unsafe
+        )
+        raise CutoverInputError(
+            f"shipping cutover preflight rejected: {details}",
+            shipping_report=report,
+        )
+    return report
+
+
+def run_cutover(db: Session, rows: list[CutoverRow], options: CutoverOptions) -> CutoverSummary:
+    if not options.clear_history:
+        raise CutoverInputError("clear_history=False is unsafe; cutover must clear operational history")
     if not options.apply:
+        targets, missing = _validate_rows(db, rows, options)
+        shipping_report = _ensure_shipping_cutover_safe(db)
         counts = _preview_counts(db, options.clear_history, options.clear_warehouse_map)
         return CutoverSummary(
             applied=False,
@@ -379,19 +691,28 @@ def run_cutover(db: Session, rows: list[CutoverRow], options: CutoverOptions) ->
                 if int(quantity) > 0
             ),
             missing_items=missing,
+            shipping_report=shipping_report,
             **counts,
         )
 
-    counts = _clear_operational_state(db, options)
-    inserted_locations = _apply_targets(db, targets)
-    db.commit()
-    return CutoverSummary(
-        applied=True,
-        items_updated=len(targets),
-        inventory_locations_inserted=inserted_locations,
-        missing_items=missing,
-        **counts,
-    )
+    _acquire_cutover_write_lock(db)
+    try:
+        targets, missing = _validate_rows(db, rows, options)
+        shipping_report = _ensure_shipping_cutover_safe(db)
+        counts = _clear_operational_state(db, options)
+        inserted_locations = _apply_targets(db, targets)
+        db.commit()
+        return CutoverSummary(
+            applied=True,
+            items_updated=len(targets),
+            inventory_locations_inserted=inserted_locations,
+            missing_items=missing,
+            shipping_report=shipping_report,
+            **counts,
+        )
+    except Exception:
+        db.rollback()
+        raise
 
 
 def _database_url(args: argparse.Namespace) -> str:
@@ -423,6 +744,33 @@ def _make_session(url: str):
     return sessionmaker(bind=engine)
 
 
+def _print_shipping_report(
+    report: tuple[ShippingCutoverReportEntry, ...],
+    *,
+    stream: Any = None,
+) -> None:
+    target = stream or sys.stdout
+    print("  shipping preflight:", file=target)
+    if not report:
+        print("    no shipping request/allocation/log evidence", file=target)
+        return
+    for entry in report:
+        allocation_text = ",".join(
+            f"{row.status}={row.quantity}"
+            for row in entry.allocation_quantities
+        ) or "none"
+        phases = ",".join(entry.active_log_phases) or "none"
+        print(
+            f"    request={entry.request_id} status={entry.status} "
+            f"disposition={entry.disposition.value} allocations={allocation_text} "
+            f"active_phases={phases} pickup_logs={entry.active_pickup_log_count} "
+            f"effective_pickup_effects={entry.active_pickup_effect_log_count} "
+            f"malformed_logs={entry.malformed_active_log_count} "
+            f"malformed_allocations={entry.malformed_allocation_count}",
+            file=target,
+        )
+
+
 def _print_summary(summary: CutoverSummary) -> None:
     mode = "APPLY" if summary.applied else "DRY-RUN"
     print(f"[{mode}] inventory cutover summary")
@@ -435,6 +783,7 @@ def _print_summary(summary: CutoverSummary) -> None:
     print(f"  warehouse box items deleted: {summary.warehouse_box_items_deleted}")
     if summary.missing_items:
         print(f"  missing items zeroed       : {len(summary.missing_items)}")
+    _print_shipping_report(summary.shipping_report)
 
 
 def parse_args() -> argparse.Namespace:
@@ -449,7 +798,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Set active items missing from the input file to zero instead of failing.",
     )
-    parser.add_argument("--keep-history", action="store_true", help="Do not clear transaction/request/io history")
+    parser.add_argument(
+        "--keep-history",
+        action="store_true",
+        help="Legacy unsafe option; always rejected because cutover must clear operational history.",
+    )
     parser.add_argument("--keep-warehouse-map", action="store_true", help="Do not clear warehouse map item quantities")
     return parser.parse_args()
 
@@ -459,6 +812,9 @@ def main() -> int:
     if args.apply and args.confirm != "START-OVER":
         print("[CUTOVER] --apply requires --confirm START-OVER", file=sys.stderr)
         return 2
+    if args.keep_history:
+        print("[CUTOVER] input rejected: --keep-history is unsafe and no longer supported", file=sys.stderr)
+        return 1
 
     try:
         rows = parse_cutover_file(args.source)
@@ -487,6 +843,7 @@ def main() -> int:
         return 0
     except CutoverInputError as exc:
         print(f"[CUTOVER] input rejected: {exc}", file=sys.stderr)
+        _print_shipping_report(exc.shipping_report, stream=sys.stderr)
         return 1
 
 

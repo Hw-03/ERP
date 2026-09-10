@@ -8,6 +8,7 @@ export interface AdminKpiItem {
   value: string | number;
   hint?: string;
   tone: string;
+  textTone?: string;
   active?: boolean;
   onClick?: () => void;
 }
@@ -31,6 +32,7 @@ export function AdminKpiBar({ items, placement = "block" }: AdminKpiBarProps) {
           value={kpi.value}
           hint={placement === "header" ? undefined : kpi.hint}
           tone={kpi.tone}
+          textTone={kpi.textTone}
           active={kpi.active}
           onClick={kpi.onClick}
           compact

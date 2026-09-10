@@ -108,6 +108,7 @@ export function DailyWorkReportScreen({
   const [workDate, setWorkDate] = useState(() => toKstDateKey());
   const [tab, setTab] = useState<ReportTab>("mine");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+  const [animateResult, setAnimateResult] = useState(false);
   const [isActivityDetailOpen, setIsActivityDetailOpen] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
@@ -181,6 +182,7 @@ export function DailyWorkReportScreen({
       setSaveError(null);
       setTab(next);
       setSelectedEmployeeId(null);
+      setAnimateResult(false);
       setIsActivityDetailOpen(false);
     }, "저장하지 않은 내용이 있습니다. 이동하면 작성 중인 일보가 사라집니다.");
   }, [requestChange, tab]);
@@ -193,6 +195,7 @@ export function DailyWorkReportScreen({
       setSaveError(null);
       setWorkDate(next);
       setSelectedEmployeeId(null);
+      setAnimateResult(false);
       setIsActivityDetailOpen(false);
     }, "저장하지 않은 내용이 있습니다. 날짜를 바꾸면 작성 중인 일보가 사라집니다.");
   }, [requestChange, today]);
@@ -278,13 +281,17 @@ export function DailyWorkReportScreen({
                   const selected = selectedEmployeeId === entry.employee_id;
                   const departmentColor = getDepartmentFallbackColor(entry.department);
                   return (
-                    <button key={entry.employee_id} type="button" onClick={() => requestChange(() => {
-                      targetVersionRef.current += 1;
-                      setDirty(false);
-                      setSaveError(null);
-                      setSelectedEmployeeId(entry.employee_id);
-                      setIsActivityDetailOpen(false);
-                    }, "저장하지 않은 내용이 있습니다. 직원을 바꾸면 작성 중인 일보가 사라집니다.")} className="min-h-11 rounded-[12px] border px-3 text-left text-sm font-bold transition active:scale-[0.98]" style={{ color: selected ? LEGACY_COLORS.white : LEGACY_COLORS.text, borderColor: `color-mix(in srgb, ${departmentColor} ${selected ? 60 : 35}%, transparent)`, background: selected ? departmentColor : `color-mix(in srgb, ${departmentColor} 12%, transparent)` }}>
+                    <button key={entry.employee_id} type="button" onClick={() => {
+                      if (selected) return;
+                      requestChange(() => {
+                        targetVersionRef.current += 1;
+                        setDirty(false);
+                        setSaveError(null);
+                        setAnimateResult(selectedEmployeeId !== null);
+                        setSelectedEmployeeId(entry.employee_id);
+                        setIsActivityDetailOpen(false);
+                      }, "저장하지 않은 내용이 있습니다. 직원을 바꾸면 작성 중인 일보가 사라집니다.");
+                    }} className="min-h-11 rounded-[12px] border px-3 text-left text-sm font-bold transition active:scale-[0.98]" style={{ color: selected ? LEGACY_COLORS.white : LEGACY_COLORS.text, borderColor: `color-mix(in srgb, ${departmentColor} ${selected ? 60 : 35}%, transparent)`, background: selected ? departmentColor : `color-mix(in srgb, ${departmentColor} 12%, transparent)` }}>
                       <span>{entry.employee_name}</span><span className="ml-1.5 text-xs font-medium" style={{ color: selected ? LEGACY_COLORS.white : departmentColor }}>{entry.department}</span>
                     </button>
                   );
@@ -295,7 +302,7 @@ export function DailyWorkReportScreen({
         )}
 
         {targetEmployeeId ? (
-          <div key={tab === "all" ? targetEmployeeId : "mine"} data-testid="daily-work-report-result" className={`min-w-0 space-y-3 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:gap-3 lg:space-y-0 ${tab === "all" && selectedEmployeeId ? "animate-view-fade" : ""}`}>
+          <div key={tab === "all" ? targetEmployeeId : "mine"} data-testid="daily-work-report-result" onAnimationEnd={() => setAnimateResult(false)} className={`min-w-0 space-y-3 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:gap-3 lg:space-y-0 ${tab === "all" && animateResult ? "animate-view-fade" : ""}`}>
             {reportLoadFailed && <Failure message="일보를 불러오지 못했습니다." />}
             {activityQuery.isError ? <Failure message="MES 거래를 불러오지 못했습니다." /> : activityQuery.data ? <DailyWorkActivity activity={activityQuery.data} onDetailOpenChange={setIsActivityDetailOpen} /> : <PanelPlaceholder>MES 거래를 불러오는 중입니다.</PanelPlaceholder>}
             <DailyWorkReportEditor

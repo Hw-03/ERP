@@ -27,13 +27,13 @@ export interface BOMDetailEntry {
 
 export interface BOMTreeNode {
   item_id: string;
-  mes_code: string;
+  mes_code: string | null;
   item_name: string;
   process_type_code: string | null;
   unit: string;
   required_quantity: number;
   current_stock: number;
-  additional_producible_quantity?: number;
+  additional_producible_quantity?: number | null;
   production_capacity_ignored?: boolean;
   children: BOMTreeNode[];
 }

@@ -10,7 +10,11 @@
  */
 
 import { deleteJson, fetcher, patchJson, postJson, putJson, toApiUrl } from "../api-core";
+import type { components } from "./generated/openapi";
 import type { Item } from "./types";
+
+export type ItemCreatePayload = components["schemas"]["ItemCreate"];
+export type ItemUpdatePayload = components["schemas"]["ItemUpdate"];
 
 export interface ItemOrderEntry {
   item_id: string;
@@ -43,49 +47,12 @@ export const itemsApi = {
 
   getItem: (itemId: string) => fetcher<Item>(toApiUrl(`/api/items/${itemId}`)),
 
-  createItem: async (payload: {
-    item_name: string;
-    process_type_code?: string;
-    unit?: string;
-    legacy_item_type?: string;
-    supplier?: string | null;
-    supplier_item_code?: string | null;
-    standard_purchase_price?: string | null;
-    purchase_price_effective_date?: string | null;
-    min_stock?: number | null;
-    reorder_point?: number | null;
-    procurement_lead_time_days?: number | null;
-    minimum_order_quantity?: number | null;
-    purchase_memo?: string | null;
-    initial_quantity?: number;
-    model_slots?: number[];
-    bom_stock_exempt?: boolean;
-    sales_review_required?: boolean;
-    initial_locations?: { department: string; quantity: number }[];
-  }) => postJson<Item>(toApiUrl("/api/items"), payload),
+  createItem: async (payload: ItemCreatePayload) =>
+    postJson<Item>(toApiUrl("/api/items"), payload),
 
   updateItem: async (
     itemId: string,
-    payload: {
-      item_name?: string;
-      process_type_code?: string;
-      unit?: string;
-      legacy_part?: string;
-      legacy_item_type?: string;
-      supplier?: string | null;
-      supplier_item_code?: string | null;
-      standard_purchase_price?: string | null;
-      purchase_price_effective_date?: string | null;
-      min_stock?: number | null;
-      reorder_point?: number | null;
-      procurement_lead_time_days?: number | null;
-      minimum_order_quantity?: number | null;
-      purchase_memo?: string | null;
-      mes_code?: string;
-      model_slots?: number[];
-      bom_stock_exempt?: boolean;
-      sales_review_required?: boolean;
-    },
+    payload: ItemUpdatePayload,
   ) => putJson<Item>(toApiUrl(`/api/items/${itemId}`), payload),
 
   /** BOM 완료 상태 토글 — 사용자가 명시적으로 "완료로 표시"/"완료 해제"를 누를 때만 호출. */

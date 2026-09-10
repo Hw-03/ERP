@@ -72,7 +72,7 @@ def test_bulk_immediate_processing_is_atomic_for_plain_employee(
     selected = records[:2]
     before_logs = db_session.query(TransactionLog).count()
     before_movements = db_session.query(DefectInventoryMovement).count()
-    original_decrement = defect_records_svc.decrement_record
+    original_decrement = defect_records_svc._decrement_record
     calls = 0
 
     def decrement_with_failure(*args, **kwargs):
@@ -83,7 +83,11 @@ def test_bulk_immediate_processing_is_atomic_for_plain_employee(
         return original_decrement(*args, **kwargs)
 
     if fail_second:
-        monkeypatch.setattr(defect_records_svc, "decrement_record", decrement_with_failure)
+        monkeypatch.setattr(
+            defect_records_svc,
+            "_decrement_record",
+            decrement_with_failure,
+        )
     payload = {
         "requester_employee_id": str(actor.employee_id), "request_type": request_type,
         "client_request_id": f"defect-batch:{request_type}:{fail_second}",
@@ -379,7 +383,7 @@ def test_quarantine_unrelated_integrity_error_is_not_reported_as_success(
     monkeypatch.setattr(db_session, "rollback", count_rollback)
     monkeypatch.setattr(
         defects_router.defect_actions_svc.inv_effect,
-        "capture_effect",
+        "_capture_effect",
         fail_with_unrelated_integrity_error,
     )
     response = client.post(
@@ -1496,7 +1500,7 @@ def test_defective_disassemble_keep_scrap(db_session, make_item, make_bom):
     make_bom(parent.item_id, child3.item_id, Decimal("1"))
 
     # 부모 DEFECTIVE 재고 설정
-    parent_loc = _make_defective_location(db_session, parent.item_id, DepartmentEnum.ASSEMBLY, Decimal("2"))
+    _make_defective_location(db_session, parent.item_id, DepartmentEnum.ASSEMBLY, Decimal("2"))
     db_session.commit()
 
     from app.services.dept_adjustment import submit_defective_disassemble
@@ -1514,8 +1518,7 @@ def test_defective_disassemble_keep_scrap(db_session, make_item, make_bom):
         ],
         reason_category="기능불량",
         reason_memo="분해 처리",
-        actor_employee_id=actor.employee_id,
-        actor="테스터",
+        actor=actor,
     )
     db_session.commit()
 
@@ -1539,6 +1542,7 @@ def test_defective_disassemble_keep_scrap(db_session, make_item, make_bom):
     ).first()
     assert disassemble_log is not None
     assert disassemble_log.producer_employee_id == actor.employee_id
+    assert disassemble_log.produced_by == actor.name
 
 
     # keep 자식 → 품목코드 기준 부서(PRODUCTION) 입고 확인
@@ -1764,7 +1768,7 @@ def test_return_to_supplier_from_normal_production(db_session, make_item):
     db_session.flush()
     qty_before = inv.quantity
 
-    inv_after = inventory_svc.return_to_supplier_from_normal(
+    inv_after = inventory_svc._return_to_supplier_from_normal(
         db_session,
         item.item_id,
         Decimal("3"),
@@ -1789,8 +1793,8 @@ def test_return_to_supplier_from_normal_production(db_session, make_item):
 
 
 def test_kpi_returns_counts(db_session, client, make_item):
-    item = make_item(name="KPITEST", process_type_code="TR", warehouse_qty=Decimal("10"))
-    actor = _make_employee(db_session, code="EKPI", name="KPI작업자")
+    make_item(name="KPITEST", process_type_code="TR", warehouse_qty=Decimal("10"))
+    _make_employee(db_session, code="EKPI", name="KPI작업자")
     db_session.commit()
 
     res = client.get("/api/defects/kpi")

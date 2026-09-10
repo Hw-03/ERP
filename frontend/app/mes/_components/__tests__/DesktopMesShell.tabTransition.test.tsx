@@ -12,6 +12,7 @@ const routerPush = vi.hoisted(() => vi.fn());
 const routerReplace = vi.hoisted(() => vi.fn());
 const queryClientMock = vi.hoisted(() => ({
   prefetchQuery: vi.fn(),
+  prefetchInfiniteQuery: vi.fn(),
 }));
 const shippingViewProps = vi.hoisted(() => vi.fn());
 const adminViewMounts = vi.hoisted(() => vi.fn());
@@ -90,10 +91,32 @@ vi.mock("../DesktopSidebar", () => ({
 }));
 
 vi.mock("../DesktopTopbar", () => ({
-  DesktopTopbar: ({ title, titleAddon }: { title: string; titleAddon?: ReactNode }) => (
+  DesktopTopbar: ({
+    title,
+    titleAddon,
+    onNavigate,
+  }: {
+    title: string;
+    titleAddon?: ReactNode;
+    onNavigate?: (target: {
+      tab: string;
+      section: string;
+      relatedRequestId: string;
+    }) => void;
+  }) => (
     <header>
       {title}
       <div data-testid="desktop-topbar-title-addon">{titleAddon}</div>
+      <button
+        type="button"
+        onClick={() => onNavigate?.({
+          tab: "warehouse",
+          section: "queue",
+          relatedRequestId: "request-1",
+        })}
+      >
+        approval notification
+      </button>
     </header>
   ),
 }));
@@ -103,6 +126,7 @@ vi.mock("../DesktopWarehouseView", () => ({
   DesktopWarehouseView: ({ onSubmitSuccess }: { onSubmitSuccess?: () => void }) => (
     <main>
       <button type="button" onClick={() => onSubmitSuccess?.()}>warehouse submit</button>
+      <output data-testid="warehouse-mount-url">{window.location.search}</output>
     </main>
   ),
 }));
@@ -153,6 +177,7 @@ describe("DesktopMesShell tab transition", () => {
     routerPush.mockClear();
     routerReplace.mockClear();
     queryClientMock.prefetchQuery.mockClear();
+    queryClientMock.prefetchInfiniteQuery.mockClear();
     shippingViewProps.mockClear();
     adminViewMounts.mockClear();
     vi.mocked(sendClientEvent).mockClear();
@@ -213,6 +238,10 @@ describe("DesktopMesShell tab transition", () => {
         expect.objectContaining({ dateFrom: expect.any(String) }),
       ],
     }));
+    expect(queryClientMock.prefetchInfiniteQuery).toHaveBeenCalledWith(expect.objectContaining({
+      queryKey: ["shipping", "requestPages", {}],
+      initialPageParam: null,
+    }));
   });
 
   it("prefetches the current KST Monday through Sunday", () => {
@@ -248,6 +277,18 @@ describe("DesktopMesShell tab transition", () => {
     fireEvent.click(screen.getByRole("button", { name: "history" }));
 
     expect(screen.getByTestId("desktop-tab-transition")).toBe(transition);
+  });
+
+  it("applies an approval notification URL before remounting the active warehouse tab", () => {
+    window.history.replaceState({}, "", "/mes?tab=warehouse&section=mine");
+    render(<DesktopMesShell />);
+
+    fireEvent.click(screen.getByRole("button", { name: "approval notification" }));
+
+    const params = new URLSearchParams(screen.getByTestId("warehouse-mount-url").textContent ?? "");
+    expect(params.get("tab")).toBe("warehouse");
+    expect(params.get("section")).toBe("queue");
+    expect(params.get("stockRequestId")).toBe("request-1");
   });
 
   it("shows daily report controls in the top bar only while the daily tab is active", () => {

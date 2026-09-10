@@ -24,7 +24,7 @@ if ($LASTEXITCODE -ne 0 -or -not $RepoRoot) {
 $RepoRoot = $RepoRoot.Trim()
 $FrontendRoot = Join-Path $RepoRoot "frontend"
 $BackendRoot = Join-Path $RepoRoot "backend"
-$FrontendNextBin = Join-Path $FrontendRoot "node_modules\.bin\next.cmd"
+$FrontendEslintBin = Join-Path $FrontendRoot "node_modules\.bin\eslint.cmd"
 $FrontendTscBin = Join-Path $FrontendRoot "node_modules\.bin\tsc.cmd"
 $FrontendVitestBin = Join-Path $FrontendRoot "node_modules\.bin\vitest.cmd"
 $VerifyE2EScript = Join-Path $RepoRoot "scripts\dev\verify_e2e.ps1"
@@ -41,6 +41,11 @@ $TotalWatch = [System.Diagnostics.Stopwatch]::StartNew()
 $GateTimings = New-Object System.Collections.Generic.List[object]
 $Plan = $null
 $FailureMessage = $null
+$PostgresTestEnvironmentNames = @(
+    "TEST_POSTGRES_URL",
+    "DATABASE_URL",
+    "DEXCOWIN_POSTGRES_TEST_ACK"
+)
 
 function Invoke-Check {
     param(
@@ -62,7 +67,19 @@ function Invoke-Check {
     $watch = [System.Diagnostics.Stopwatch]::StartNew()
     $status = "passed"
     $pushed = $false
+    $ScopePostgresTestEnvironment = (
+        $GateId.StartsWith("backend-") -and
+        $GateId -ne "backend-postgres-concurrency"
+    )
+    $PreviousPostgresTestEnvironment = @{}
     try {
+        if ($ScopePostgresTestEnvironment) {
+            foreach ($EnvironmentName in $PostgresTestEnvironmentNames) {
+                $PreviousPostgresTestEnvironment[$EnvironmentName] =
+                    [Environment]::GetEnvironmentVariable($EnvironmentName, "Process")
+                [Environment]::SetEnvironmentVariable($EnvironmentName, $null, "Process")
+            }
+        }
         Push-Location $WorkingDirectory
         $pushed = $true
         $global:LASTEXITCODE = 0
@@ -76,6 +93,15 @@ function Invoke-Check {
         throw
     }
     finally {
+        if ($ScopePostgresTestEnvironment) {
+            foreach ($EnvironmentName in $PostgresTestEnvironmentNames) {
+                [Environment]::SetEnvironmentVariable(
+                    $EnvironmentName,
+                    $PreviousPostgresTestEnvironment[$EnvironmentName],
+                    "Process"
+                )
+            }
+        }
         if ($pushed) {
             Pop-Location
         }
@@ -100,7 +126,7 @@ import sys
 sys.path.insert(0, ".")
 from app.main import app
 out = sys.argv[1]
-with open(out, "w", encoding="utf-8") as f:
+with open(out, "w", encoding="utf-8", newline="\n") as f:
     json.dump(app.openapi(), f, indent=2, sort_keys=True, ensure_ascii=False)
     f.write("\n")
 '@
@@ -109,9 +135,9 @@ with open(out, "w", encoding="utf-8") as f:
                 throw "OpenAPI capture failed"
             }
 
-            $current = Get-Content -LiteralPath $TmpFile -Raw
-            $baseline = Get-Content -LiteralPath $BaselineFile -Raw
-            if ($current -ne $baseline) {
+            $current = (Get-Content -LiteralPath $TmpFile -Raw).Replace("`r`n", "`n").Replace("`r", "`n")
+            $baseline = (Get-Content -LiteralPath $BaselineFile -Raw).Replace("`r`n", "`n").Replace("`r", "`n")
+            if ($current -cne $baseline) {
                 Write-Host ""
                 Write-Host "OpenAPI drift detected. Update _dev/baselines/openapi.json."
                 throw "OpenAPI drift"
@@ -200,16 +226,34 @@ function Get-GateName {
         "frontend-direct-tests"    { return "Frontend directly changed tests" }
         "frontend-lint"            { return "Frontend strict lint" }
         "frontend-typecheck"       { return "Frontend type check" }
+        "frontend-test-typecheck"  { return "Frontend unit test type check" }
+        "frontend-e2e-typecheck"   { return "Frontend E2E type check" }
         "frontend-coverage"        { return "Frontend tests + coverage" }
         "frontend-build"           { return "Frontend production build" }
         "frontend-bundle-size"     { return "Frontend bundle size" }
         "backend-testmon"          { return "Backend pytest-testmon" }
+        "backend-ruff"             { return "Backend Ruff baseline" }
+        "backend-mypy"             { return "Backend mypy baseline" }
+        "backend-postgres-concurrency" { return "Backend PostgreSQL concurrency" }
         "backend-pytest-full"      { return "Backend full pytest" }
         "backend-openapi"          { return "OpenAPI drift" }
         "git-status"               { return "Git working tree status" }
         "db-read-only"             { return "DB read-only consistency" }
         "playwright-e2e"           { return "Playwright E2E (dedicated DB)" }
         default { return $GateId }
+    }
+}
+
+function Assert-Node20 {
+    $nodeVersion = $null
+    try {
+        $nodeVersion = (& node --version 2>$null | Select-Object -First 1)
+    }
+    catch {
+        $nodeVersion = $null
+    }
+    if (-not $nodeVersion -or $nodeVersion -notmatch '^v20\.') {
+        throw "Frontend verification requires Node.js 20 (current: $nodeVersion)."
     }
 }
 
@@ -507,6 +551,9 @@ function Invoke-Gate {
 
     $GateId = [string] $Gate.id
     $GateFiles = @($Gate.files)
+    if ([string] $Gate.area -eq "frontend") {
+        Assert-Node20
+    }
     switch ($GateId) {
         "docs-whitespace" {
             Invoke-Check $GateId (Get-GateName $GateId) $RepoRoot {
@@ -545,9 +592,7 @@ function Invoke-Gate {
                     Write-Host "No lintable changed frontend files."
                     return
                 }
-                $FileArgs = @()
-                foreach ($file in $SourceFiles) { $FileArgs += @("--file", $file) }
-                & $FrontendNextBin lint --max-warnings=0 @FileArgs
+                & $FrontendEslintBin --max-warnings=0 @SourceFiles
             }
         }
         "frontend-tsc-incremental" {
@@ -571,7 +616,13 @@ function Invoke-Gate {
             Invoke-Check $GateId (Get-GateName $GateId) $FrontendRoot { npm run lint:strict }
         }
         "frontend-typecheck" {
-            Invoke-Check $GateId (Get-GateName $GateId) $FrontendRoot { npx tsc --noEmit }
+            Invoke-Check $GateId (Get-GateName $GateId) $FrontendRoot { npm run typecheck:app }
+        }
+        "frontend-test-typecheck" {
+            Invoke-Check $GateId (Get-GateName $GateId) $FrontendRoot { npm run typecheck:tests }
+        }
+        "frontend-e2e-typecheck" {
+            Invoke-Check $GateId (Get-GateName $GateId) $FrontendRoot { npm run typecheck:e2e }
         }
         "frontend-coverage" {
             if ($env:DEXCOWIN_FRONTEND_MAX_WORKERS) {
@@ -592,6 +643,15 @@ function Invoke-Gate {
         }
         "backend-testmon" {
             Invoke-Check $GateId (Get-GateName $GateId) $BackendRoot { python -m pytest -q --testmon }
+        }
+        "backend-ruff" {
+            Invoke-Check $GateId (Get-GateName $GateId) $BackendRoot { python -m ruff check . }
+        }
+        "backend-mypy" {
+            Invoke-Check $GateId (Get-GateName $GateId) $BackendRoot { python -m mypy }
+        }
+        "backend-postgres-concurrency" {
+            Invoke-Check $GateId (Get-GateName $GateId) $BackendRoot { python scripts/verify_postgres_concurrency.py }
         }
         "backend-pytest-full" {
             $WorkerCount = Get-BackendWorkerCount
@@ -737,10 +797,12 @@ try {
 
         Write-VerificationPlan $Plan $PlannedGates
         if (-not $PlanOnly) {
-            $BackendFullIds = @("backend-pytest-full", "backend-openapi")
+            $BackendFullIds = @("backend-ruff", "backend-mypy", "backend-postgres-concurrency", "backend-pytest-full", "backend-openapi")
             $FrontendFullIds = @(
                 "frontend-lint",
                 "frontend-typecheck",
+                "frontend-test-typecheck",
+                "frontend-e2e-typecheck",
                 "frontend-coverage",
                 "frontend-build",
                 "frontend-bundle-size"
@@ -762,6 +824,8 @@ try {
 
             $SmartParallelGateIds = @(
                 "backend-testmon",
+                "backend-ruff",
+                "backend-mypy",
                 "backend-openapi",
                 "frontend-lint-files",
                 "frontend-tsc-incremental",
@@ -773,7 +837,7 @@ try {
                 $PlannedGates | Where-Object {
                     [string] $_.id -in $SmartParallelGateIds -and
                     (
-                        [string] $_.kind -eq "targeted" -or
+                        [string] $_.kind -in @("targeted", "static") -or
                         (
                             [string] $_.id -eq "backend-openapi" -and
                             "backend" -notin $EscalatedAreas

@@ -3,8 +3,9 @@
 /**
  * React Query Provider — W4-A.
  *
- * 전역에서 단일 QueryClient를 사용. `frontend/app/mes/page.tsx`의
- * `<AdminSessionProvider>` 안쪽에서 mount.
+ * 작업자 인증 epoch마다 QueryClient를 하나씩 사용한다. provider는 로그인 복원에
+ * 필요해 `MesLoginGate` 바깥에 있고, 401/logout 경계에서 기존 cache를 지운 뒤
+ * 새 client로 교체한다.
  *
  * 기본 옵션:
  *  - staleTime 5분: 같은 쿼리를 5분간 fresh로 간주 (네트워크 호출 절감)
@@ -15,7 +16,8 @@
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { AUTH_REQUIRED_EVENT } from "@/lib/api-core";
 import { RealtimeSyncProvider } from "./realtime";
 
 /**
@@ -43,8 +45,22 @@ const defaultOptions = {
   mutations: { retry: 0 },
 };
 
+function createQueryClient(): QueryClient {
+  return new QueryClient({ defaultOptions });
+}
+
 export function QueryProvider({ children }: { children: ReactNode }) {
-  const [client] = useState(() => new QueryClient({ defaultOptions }));
+  const [client, setClient] = useState(createQueryClient);
+
+  useEffect(() => {
+    const rotateActorScopedCache = () => {
+      client.clear();
+      setClient(createQueryClient());
+    };
+    window.addEventListener(AUTH_REQUIRED_EVENT, rotateActorScopedCache);
+    return () => window.removeEventListener(AUTH_REQUIRED_EVENT, rotateActorScopedCache);
+  }, [client]);
+
   return (
     <QueryClientProvider client={client}>
       <RealtimeSyncProvider>{children}</RealtimeSyncProvider>

@@ -9,6 +9,7 @@ import { MobileShippingScreen } from "../MobileShippingScreen";
 vi.mock("@/lib/api", () => ({
   api: {
     getShippingRequests: vi.fn(),
+    getShippingRequestPage: vi.fn(),
     getShippingHistory: vi.fn(),
     updateShippingChecklist: vi.fn(),
     clearShippingChecklist: vi.fn(),
@@ -98,9 +99,24 @@ async function flushQueries() {
   });
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
 beforeEach(() => {
   vi.mocked(api.getShippingRequests).mockReset().mockResolvedValue([request()]);
-  vi.mocked(api.getShippingHistory).mockReset().mockResolvedValue([]);
+  vi.mocked(api.getShippingRequestPage).mockReset().mockImplementation(async () => ({
+    requests: await api.getShippingRequests(),
+    next_cursor: null,
+    has_more: false,
+  }));
+  vi.mocked(api.getShippingHistory).mockReset().mockResolvedValue({
+    requests: [],
+    next_cursor: null,
+    has_more: false,
+  });
   vi.mocked(api.updateShippingChecklist).mockReset().mockResolvedValue({
     ...request(),
     checklist_lines: [{ ...request().checklist_lines[0], checked: true }],
@@ -114,6 +130,30 @@ afterEach(() => {
 });
 
 describe("MobileShippingScreen", () => {
+  it("최초 출하 조회를 polite status로 알린다", () => {
+    vi.mocked(api.getShippingRequests).mockReturnValue(new Promise(() => {}));
+
+    renderScreen();
+
+    expect(screen.getByRole("status")).toHaveTextContent("출하 데이터를 불러오고 있습니다.");
+  });
+
+  it("최초 조회 실패를 포커스된 alert로 표시하고 버튼으로 재시도한다", async () => {
+    vi.mocked(api.getShippingRequests).mockRejectedValueOnce(new Error("initial mobile failure"));
+
+    renderScreen();
+
+    const alert = await screen.findByRole("alert", { name: "출하 데이터 로드 오류" });
+    expect(alert).toHaveTextContent("initial mobile failure");
+    await waitFor(() => expect(alert).toHaveFocus());
+
+    vi.mocked(api.getShippingRequests).mockResolvedValueOnce([request()]);
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+
+    expect(await screen.findByText("Standard PF")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("alert", { name: "출하 데이터 로드 오류" })).not.toBeInTheDocument());
+  });
+
   it("빈 준비 목록에서 새 요청이 즉시 표시되는 흐름을 안내한다", async () => {
     vi.mocked(api.getShippingRequests).mockResolvedValue([]);
 
@@ -121,6 +161,7 @@ describe("MobileShippingScreen", () => {
 
     expect(await screen.findByText("PC에서 새 출하 요청을 만들면 바로 표시됩니다.")).toBeInTheDocument();
     expect(screen.queryByText("PC에서 요청을 준비 중으로 넘기면 표시됩니다.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
   it("공용 requests query로 최초 조회하고 마운트 중 30초마다만 폴링한다", async () => {
@@ -130,7 +171,10 @@ describe("MobileShippingScreen", () => {
     await flushQueries();
     expect(api.getShippingRequests).toHaveBeenCalledTimes(1);
     expect(api.getShippingHistory).not.toHaveBeenCalled();
-    expect(queryClient.getQueryData(queryKeys.shipping.requests())).toEqual([request()]);
+    expect(queryClient.getQueryData(queryKeys.shipping.requestPages())).toEqual({
+      pages: [{ requests: [request()], next_cursor: null, has_more: false }],
+      pageParams: [null],
+    });
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(30_000);
@@ -197,6 +241,7 @@ describe("MobileShippingScreen", () => {
 
     expect(await screen.findByText("Standard PF")).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "다시 동기화" })).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
 
     vi.mocked(api.getShippingRequests).mockResolvedValueOnce([
       request({ base_pf_item_name: "Fresh PF" }),
@@ -384,13 +429,17 @@ describe("MobileShippingScreen", () => {
     fireEvent.click(checkbox);
 
     await waitFor(() => expect(checkbox).toBeChecked());
-    expect(queryClient.getQueryData<ShippingRequest[]>(queryKeys.shipping.requests())?.[0].checklist_lines[0].checked).toBe(true);
+    expect((queryClient.getQueryData(queryKeys.shipping.requestPages()) as {
+      pages: Array<{ requests: ShippingRequest[] }>;
+    }).pages[0].requests[0].checklist_lines[0].checked).toBe(true);
 
     fireEvent.click(screen.getByRole("button", { name: /전체 해제/ }));
 
     await waitFor(() => expect(checkbox).not.toBeChecked());
     expect(api.clearShippingChecklist).toHaveBeenCalledWith("req-1");
-    expect(queryClient.getQueryData<ShippingRequest[]>(queryKeys.shipping.requests())?.[0].checklist_lines[0].checked).toBe(false);
+    expect((queryClient.getQueryData(queryKeys.shipping.requestPages()) as {
+      pages: Array<{ requests: ShippingRequest[] }>;
+    }).pages[0].requests[0].checklist_lines[0].checked).toBe(false);
   });
 
   it("PREPARED 요청의 체크리스트와 전체 해제는 읽기 전용이며 API를 호출하지 않는다", async () => {
@@ -436,7 +485,7 @@ describe("MobileShippingScreen", () => {
   it("CANCELLED는 요청과 준비 목록에서 제외하고 history page 호환 목록에는 표시한다", async () => {
     const cancelled = request({ request_id: "cancelled-1", status: "CANCELLED", base_pf_item_name: "취소된 PF" });
     vi.mocked(api.getShippingRequests).mockResolvedValue([cancelled, request()]);
-    vi.mocked(api.getShippingHistory).mockResolvedValue([cancelled]);
+    vi.mocked(api.getShippingHistory).mockResolvedValue({ requests: [cancelled], next_cursor: null, has_more: false });
 
     renderScreen();
 
@@ -459,6 +508,78 @@ describe("MobileShippingScreen", () => {
     expect(screen.getByText(/생성·수정·완료 처리는 PC/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /준비 완료/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /픽업 완료/ })).not.toBeInTheDocument();
+  });
+
+  it("준비 요청의 다음 페이지를 이어 붙이고 커서 경계 중복을 제거한다", async () => {
+    const first = request();
+    const second = request({ request_id: "req-2", base_pf_item_name: "Second PF" });
+    vi.mocked(api.getShippingRequestPage).mockImplementation(async (params) => (
+      params?.cursor === "next-request"
+        ? { requests: [first, second], next_cursor: null, has_more: false }
+        : { requests: [first], next_cursor: "next-request", has_more: true }
+    ));
+
+    renderScreen();
+
+    expect(await screen.findByText("Standard PF")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "준비 요청 더 보기" }));
+
+    expect(await screen.findByText("Second PF")).toBeInTheDocument();
+    expect(screen.getAllByText("Standard PF")).toHaveLength(1);
+    expect(api.getShippingRequestPage).toHaveBeenLastCalledWith(
+      expect.objectContaining({ cursor: "next-request", limit: 50 }),
+      expect.any(Object),
+    );
+  });
+
+  it("다음 페이지가 대기 중이어도 기존 목록을 초기 로딩으로 숨기지 않는다", async () => {
+    const nextPage = deferred<{ requests: ShippingRequest[]; next_cursor: null; has_more: false }>();
+    vi.mocked(api.getShippingRequestPage).mockImplementation(async (params) => (
+      params?.cursor === "next-request"
+        ? nextPage.promise
+        : { requests: [request()], next_cursor: "next-request", has_more: true }
+    ));
+
+    renderScreen();
+    expect(await screen.findByText("Standard PF")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "준비 요청 더 보기" }));
+
+    expect(screen.getByText("Standard PF")).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+
+    await act(async () => {
+      nextPage.resolve({
+        requests: [request({ request_id: "req-2", base_pf_item_name: "Second PF" })],
+        next_cursor: null,
+        has_more: false,
+      });
+      await nextPage.promise;
+    });
+    expect(await screen.findByText("Second PF")).toBeInTheDocument();
+  });
+
+  it("이력의 다음 페이지를 이어 붙이고 커서 경계 중복을 제거한다", async () => {
+    const first = request({ request_id: "hist-1", status: "PICKED_UP", base_pf_item_name: "First History PF" });
+    const second = request({ request_id: "hist-2", status: "CANCELLED", base_pf_item_name: "Second History PF" });
+    vi.mocked(api.getShippingHistory).mockImplementation(async (params) => (
+      params?.cursor === "next-history"
+        ? { requests: [first, second], next_cursor: null, has_more: false }
+        : { requests: [first], next_cursor: "next-history", has_more: true }
+    ));
+
+    renderScreen();
+    fireEvent.click(screen.getByRole("button", { name: "이력" }));
+
+    expect(await screen.findByText("First History PF")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "이력 더 보기" }));
+
+    expect(await screen.findByText("Second History PF")).toBeInTheDocument();
+    expect(screen.getAllByText("First History PF")).toHaveLength(1);
+    expect(api.getShippingHistory).toHaveBeenLastCalledWith(
+      expect.objectContaining({ cursor: "next-history", limit: 50 }),
+      expect.any(Object),
+    );
   });
 
   it("uses the expandable two-line item name pattern for long shipping names", async () => {

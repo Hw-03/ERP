@@ -88,7 +88,7 @@ from app.services.sr_approval import (  # noqa: F401
     FailedApprovalError,
     approve_request,
     approve_request_department,
-    cancel_open_stock_requests,
+    _cancel_open_stock_requests,
     cancel_request,
     mark_failed_approval,
     reject_request,
@@ -113,6 +113,7 @@ def _build_request_and_lines(
     request_code: Optional[str],
     submitted_at: Optional[datetime],
     client_request_id: Optional[str] = None,
+    request_fingerprint: Optional[str] = None,
     requires_warehouse_approval_override: Optional[bool] = None,
     requires_department_approval: bool = False,
     approval_department: Optional[str] = None,
@@ -123,6 +124,12 @@ def _build_request_and_lines(
 
     inventory_svc 호출 / TransactionLog 생성은 절대 하지 않는다 (DRAFT 안전성 보장).
     """
+    item_ids = {line.item_id for line in lines_input}
+    active_items = item_repository.lock_active_many(db, item_ids)
+    missing = sorted(item_ids - set(active_items), key=str)
+    if missing:
+        raise ValueError(f"품목을 찾을 수 없습니다: {missing[0]}")
+
     if requires_warehouse_approval_override is None:
         requires_approval = any(
             line_requires_approval(li.from_bucket, li.to_bucket) for li in lines_input
@@ -133,6 +140,7 @@ def _build_request_and_lines(
     request = StockRequest(
         request_code=request_code,
         client_request_id=client_request_id,
+        request_fingerprint=request_fingerprint,
         requester_employee_id=requester.employee_id,
         requester_name=requester.name,
         requester_department=requester.department,
@@ -155,9 +163,7 @@ def _build_request_and_lines(
     db.flush()
 
     for li in lines_input:
-        item = item_repository.get(db, li.item_id)
-        if item is None:
-            raise ValueError(f"품목을 찾을 수 없습니다: {li.item_id}")
+        item = active_items[li.item_id]
         line = StockRequestLine(
             request_id=request.request_id,
             item_id=li.item_id,
@@ -170,6 +176,7 @@ def _build_request_and_lines(
             to_department=li.to_department,
             status=status,
             defect_quarantine_record_id=li.record_id,
+            operation_line_id=li.operation_line_id,
         )
         db.add(line)
     db.flush()
@@ -190,6 +197,7 @@ def create_request(
     reference_no: Optional[str],
     notes: Optional[str],
     client_request_id: Optional[str] = None,
+    request_fingerprint: Optional[str] = None,
     requires_department_approval: bool = False,
     reason_category: Optional[str] = None,
     reason_memo: Optional[str] = None,
@@ -274,6 +282,7 @@ def create_request(
         request_code=code,
         submitted_at=now,
         client_request_id=client_request_id,
+        request_fingerprint=request_fingerprint,
         requires_warehouse_approval_override=warehouse_override,
         requires_department_approval=requires_department_approval,
         approval_department=approval_department,
@@ -298,7 +307,7 @@ def create_manual_adjustment_request(
     - request_type = MANUAL_ADJUSTMENT (bucket/dept 검증 생략)
     - requires_warehouse_approval=False, requires_department_approval=True
     - 비자가승인 출고 라인은 source별로 점유하고 RESERVED, 입고 전용은 SUBMITTED로 대기.
-    - 자가승인 가능: 생산부·창고 정/부는 전 공정 요청을 점유 없이 승인 표시한다.
+    - 자가승인 가능: 부서 정/부는 부서 결재 요청을 점유 없이 승인 표시한다.
       점유 없이 dept_approved를 기록하고 호출자가 즉시 실재고를 반영한다.
     """
     if not lines_input:

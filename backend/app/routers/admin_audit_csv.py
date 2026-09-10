@@ -3,21 +3,22 @@
 `app.services.audit_csv` 가 자동으로 떨군 월별 CSV 를 내부 확인용으로 제공한다.
 외부 심사용 F704-02 양식은 ``admin_audit_ledger``에서 별도로 생성한다.
 - 목록 조회 / CSV 원본 / XLSX 변환 / 수동 백필 4종.
-- 권한: 화면단에서 관리자 PIN 잠금이 보호 (admin_audit 라우터와 동일 패턴).
+- 권한: 서버의 관리자 PIN dependency가 보호한다 (admin_audit 라우터와 동일 패턴).
 """
 
 from __future__ import annotations
 
 import re
-from typing import List, Optional
+from typing import List
 
-from fastapi import APIRouter, Depends
+from fastapi import Depends
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.verified_actor import VerifiedActorRouter
 from app.dependencies.admin import require_admin_pin
 from app.routers._errors import ErrorCode, http_error
 from app.services import audit_csv as svc
@@ -25,7 +26,7 @@ from app.services.export_helpers import csv_streaming_response
 from app.utils.excel import apply_header, auto_width, make_xlsx_response
 
 
-router = APIRouter()
+router = VerifiedActorRouter()
 
 
 _MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")

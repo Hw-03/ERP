@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from contextlib import contextmanager
 from decimal import Decimal
 
@@ -13,18 +14,137 @@ from app.models import (
     DefectInventoryMovement,
     DefectQuarantineRecord,
     DeptAdjSubTypeEnum,
+    Employee,
+    EmployeeLevelEnum,
     InventoryOperation,
     InventoryOperationRoleEnum,
     LocationStatusEnum,
     SystemSetting,
     TransactionLog,
-    TransactionTypeEnum,
 )
 from app.services import dept_adjustment as svc
 from app.services import inventory as inv_svc
+from app.services.pin_auth import hash_pin
 
 D = Decimal
 ASSEMBLY = DepartmentEnum.ASSEMBLY
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        svc.submit_adjustment,
+        svc.submit_defective_disassemble,
+        svc.submit_normal_disassemble,
+    ],
+)
+def test_public_mutation_service_requires_employee_actor(mutation) -> None:
+    parameters = inspect.signature(mutation).parameters
+
+    assert "actor" in parameters
+    assert parameters["actor"].default is inspect.Parameter.empty
+    assert "operator_name" not in parameters
+    assert "producer_employee_id" not in parameters
+    assert "actor_employee_id" not in parameters
+
+
+def _service_actor(db_session) -> Employee:
+    actor = (
+        db_session.query(Employee)
+        .filter(Employee.employee_code == "DEPT-SVC")
+        .first()
+    )
+    if actor is not None:
+        return actor
+    actor = Employee(
+        employee_code="DEPT-SVC",
+        name="서버 조정자",
+        role=f"{ASSEMBLY.value}/staff",
+        department=ASSEMBLY,
+        level=EmployeeLevelEnum.STAFF,
+        display_order=0,
+        is_active=True,
+        pin_hash=hash_pin("2468"),
+        pin_requires_change=False,
+    )
+    db_session.add(actor)
+    db_session.flush()
+    return actor
+
+
+def test_public_mutation_services_reject_missing_or_non_employee_actor(
+    db_session, make_item
+) -> None:
+    item = make_item(name="actor-required-adjustment")
+    line = svc.AdjLine(
+        item_id=item.item_id,
+        direction="in",
+        quantity=D("1"),
+        department=ASSEMBLY,
+    )
+
+    with pytest.raises(TypeError):
+        svc.submit_adjustment(db_session, DeptAdjSubTypeEnum.CORRECTION, [line])
+    with pytest.raises(TypeError, match="Employee"):
+        svc.submit_adjustment(
+            db_session,
+            DeptAdjSubTypeEnum.CORRECTION,
+            [line],
+            actor="spoof",
+        )
+    with pytest.raises(TypeError):
+        svc.submit_adjustment(
+            db_session,
+            DeptAdjSubTypeEnum.CORRECTION,
+            [line],
+            actor=_service_actor(db_session),
+            operator_name="spoof",
+        )
+
+    rework_kwargs = {
+        "reason_category": "actor contract",
+        "reason_memo": "no mutation",
+    }
+    with pytest.raises(TypeError):
+        svc.submit_defective_disassemble(
+            db_session,
+            item.item_id,
+            D("1"),
+            ASSEMBLY,
+            [],
+            **rework_kwargs,
+        )
+    with pytest.raises(TypeError, match="Employee"):
+        svc.submit_defective_disassemble(
+            db_session,
+            item.item_id,
+            D("1"),
+            ASSEMBLY,
+            [],
+            actor="spoof",
+            **rework_kwargs,
+        )
+    with pytest.raises(TypeError):
+        svc.submit_normal_disassemble(
+            db_session,
+            item.item_id,
+            D("1"),
+            "production",
+            ASSEMBLY,
+            [],
+            **rework_kwargs,
+        )
+    with pytest.raises(TypeError, match="Employee"):
+        svc.submit_normal_disassemble(
+            db_session,
+            item.item_id,
+            D("1"),
+            "production",
+            ASSEMBLY,
+            [],
+            actor="spoof",
+            **rework_kwargs,
+        )
 
 
 # ──────────────────────────── helpers ────────────────────────────
@@ -81,7 +201,7 @@ def test_rework_disassemble_prelocks_parent_and_recursive_children_before_mutati
     defective = make_item(name="rework-lock-defective", process_type_code="HR")
     scrap = make_item(name="rework-lock-scrap", process_type_code="VR")
     make_location(parent.item_id, department=ASSEMBLY, quantity=D("1"))
-    parent_inventory = inv_svc.get_or_create_inventory(db_session, parent.item_id)
+    parent_inventory = inv_svc._get_or_create_inventory(db_session, parent.item_id)
     parent_inventory.quantity = D("1")
     decisions = [
         {
@@ -98,8 +218,8 @@ def test_rework_disassemble_prelocks_parent_and_recursive_children_before_mutati
         {parent.item_id, branch.item_id, normal.item_id, defective.item_id, scrap.item_id}
     )
     events = []
-    real_lock = svc.inventory_svc.ensure_and_lock_inventories
-    real_scrap = svc.inventory_svc.scrap_normal
+    real_lock = svc.inventory_svc._ensure_and_lock_inventories
+    real_scrap = svc.inventory_svc._scrap_normal
 
     def ensure_and_lock(db, item_ids):
         events.append(("lock", item_ids))
@@ -111,10 +231,10 @@ def test_rework_disassemble_prelocks_parent_and_recursive_children_before_mutati
 
     monkeypatch.setattr(
         svc.inventory_svc,
-        "ensure_and_lock_inventories",
+        "_ensure_and_lock_inventories",
         ensure_and_lock,
     )
-    monkeypatch.setattr(svc.inventory_svc, "scrap_normal", scrap_normal)
+    monkeypatch.setattr(svc.inventory_svc, "_scrap_normal", scrap_normal)
 
     svc.submit_normal_disassemble(
         db_session,
@@ -125,7 +245,7 @@ def test_rework_disassemble_prelocks_parent_and_recursive_children_before_mutati
         decisions,
         reason_category="test",
         reason_memo="lock order",
-        actor="tester",
+        actor=_service_actor(db_session),
     )
 
     assert events[0] == ("lock", expected_ids)
@@ -139,7 +259,7 @@ def test_normal_rework_records_one_operation_with_explicit_line_roles(
     defective = make_item(name="불량 회수 자식", process_type_code="HR")
     scrap = make_item(name="폐기 자식", process_type_code="VR")
     make_location(parent.item_id, department=ASSEMBLY, quantity=D("1"))
-    inv_svc.get_or_create_inventory(db_session, parent.item_id).quantity = D("1")
+    inv_svc._get_or_create_inventory(db_session, parent.item_id).quantity = D("1")
     _enable_operation_ledger(db_session)
 
     result = svc.submit_normal_disassemble(
@@ -159,7 +279,7 @@ def test_normal_rework_records_one_operation_with_explicit_line_roles(
         ],
         reason_category="재작업",
         reason_memo="역할 검증",
-        actor="작업자",
+        actor=_service_actor(db_session),
     )
 
     operation = db_session.query(InventoryOperation).one()
@@ -190,7 +310,7 @@ def test_normal_rework_skips_flagged_bom_leaf_inventory(
     child.bom_stock_exempt = True
     make_bom(parent.item_id, child.item_id, D("1"))
     make_location(parent.item_id, department=ASSEMBLY, quantity=D("1"))
-    inv_svc.get_or_create_inventory(db_session, parent.item_id).quantity = D("1")
+    inv_svc._get_or_create_inventory(db_session, parent.item_id).quantity = D("1")
     db_session.flush()
     template_child = next(
         line
@@ -214,7 +334,7 @@ def test_normal_rework_skips_flagged_bom_leaf_inventory(
         ],
         reason_category="재작업",
         reason_memo="BOM 재고 미반영",
-        actor="tester",
+        actor=_service_actor(db_session),
     )
 
     assert result["child_log_ids"] == []
@@ -232,7 +352,7 @@ def test_normal_rework_keeps_flagged_bom_leaf_without_server_template_token(
     child.bom_stock_exempt = True
     make_bom(parent.item_id, child.item_id, D("1"))
     make_location(parent.item_id, department=ASSEMBLY, quantity=D("1"))
-    inv_svc.get_or_create_inventory(db_session, parent.item_id).quantity = D("1")
+    inv_svc._get_or_create_inventory(db_session, parent.item_id).quantity = D("1")
     db_session.flush()
 
     result = svc.submit_normal_disassemble(
@@ -250,7 +370,7 @@ def test_normal_rework_keeps_flagged_bom_leaf_without_server_template_token(
         ],
         reason_category="재작업",
         reason_memo="수동 결정",
-        actor="tester",
+        actor=_service_actor(db_session),
     )
 
     assert len(result["child_log_ids"]) == 1
@@ -266,7 +386,7 @@ def test_normal_rework_keeps_flagged_non_bom_decision_inventory(
     child = make_item(name="수동 재작업 품목", process_type_code="AR")
     child.bom_stock_exempt = True
     make_location(parent.item_id, department=ASSEMBLY, quantity=D("1"))
-    inv_svc.get_or_create_inventory(db_session, parent.item_id).quantity = D("1")
+    inv_svc._get_or_create_inventory(db_session, parent.item_id).quantity = D("1")
     db_session.flush()
 
     result = svc.submit_normal_disassemble(
@@ -284,7 +404,7 @@ def test_normal_rework_keeps_flagged_non_bom_decision_inventory(
         ],
         reason_category="재작업",
         reason_memo="수동 품목",
-        actor="tester",
+        actor=_service_actor(db_session),
     )
 
     assert len(result["child_log_ids"]) == 1
@@ -304,14 +424,14 @@ def test_production_template_basic(make_item, make_bom, db_session):
     lines = svc.build_production_template(db_session, parent.item_id, D("3"))
 
     # 구성품 out, 결과품 in
-    out_lines = [l for l in lines if l.direction == "out"]
-    in_lines = [l for l in lines if l.direction == "in"]
+    out_lines = [line for line in lines if line.direction == "out"]
+    in_lines = [line for line in lines if line.direction == "in"]
     assert len(out_lines) == 2
     assert len(in_lines) == 1
     assert in_lines[0].item_id == parent.item_id
     assert in_lines[0].quantity == D("3")
 
-    qty_map = {l.item_id: l.quantity for l in out_lines}
+    qty_map = {line.item_id: line.quantity for line in out_lines}
     assert qty_map[child_b.item_id] == D("6")
     assert qty_map[child_c.item_id] == D("3")
 
@@ -332,8 +452,8 @@ def test_disassembly_template_basic(make_item, make_bom, db_session):
 
     lines = svc.build_disassembly_template(db_session, parent.item_id, D("2"))
 
-    out_lines = [l for l in lines if l.direction == "out"]
-    in_lines = [l for l in lines if l.direction == "in"]
+    out_lines = [line for line in lines if line.direction == "out"]
+    in_lines = [line for line in lines if line.direction == "in"]
     assert len(out_lines) == 1
     assert out_lines[0].item_id == parent.item_id
     assert out_lines[0].quantity == D("2")
@@ -380,8 +500,12 @@ def test_submit_production(make_item, make_location, db_session):
         svc.AdjLine(item_id=result.item_id, direction="in",  quantity=D("1"), department=ASSEMBLY),
     ]
 
+    actor = _service_actor(db_session)
     log_ids = svc.submit_adjustment(
-        db_session, DeptAdjSubTypeEnum.PRODUCTION, lines, operator_name="홍길동"
+        db_session,
+        DeptAdjSubTypeEnum.PRODUCTION,
+        lines,
+        actor=actor,
     )
     db_session.commit()
 
@@ -396,6 +520,10 @@ def test_submit_production(make_item, make_location, db_session):
     assert {
         log.department for log in db_session.query(TransactionLog).all()
     } == {ASSEMBLY.value}
+    assert {
+        (log.produced_by, log.producer_employee_id)
+        for log in db_session.query(TransactionLog).all()
+    } == {(actor.name, actor.employee_id)}
     assert {log.log_id for log in db_session.query(TransactionLog).all()} == set(log_ids)
 
 
@@ -424,7 +552,7 @@ def test_submit_production_records_one_operation_and_bom_roles(
                 department=ASSEMBLY,
             ),
         ],
-        operator_name="생산 작업자",
+        actor=_service_actor(db_session),
     )
 
     operation = db_session.query(InventoryOperation).one()
@@ -466,6 +594,7 @@ def test_submit_validates_all_lines_before_transaction(
                     department=ASSEMBLY,
                 )
             ],
+            actor=_service_actor(db_session),
         )
 
     assert entered_transaction is False
@@ -505,6 +634,7 @@ def test_submit_mixed_valid_and_invalid_lines_has_no_sql_side_effects(
                     department=ASSEMBLY,
                 ),
             ],
+            actor=_service_actor(db_session),
         )
     except ValueError as exc:
         error = exc
@@ -561,6 +691,7 @@ def test_submit_rolls_back_when_created_log_count_mismatches_lines(
                     department=ASSEMBLY,
                 ),
             ],
+            actor=_service_actor(db_session),
         )
     except RuntimeError as exc:
         error = exc
@@ -588,7 +719,7 @@ def test_submit_rolls_back_inventory_when_ledger_capture_fails(
     def fail_capture(*_args, **_kwargs):
         raise RuntimeError("ledger failure")
 
-    monkeypatch.setattr(svc.inv_effect, "capture_effect", fail_capture)
+    monkeypatch.setattr(svc.inv_effect, "_capture_effect", fail_capture)
 
     with pytest.raises(RuntimeError, match="ledger failure"):
         svc.submit_adjustment(
@@ -602,6 +733,7 @@ def test_submit_rolls_back_inventory_when_ledger_capture_fails(
                     department=ASSEMBLY,
                 )
             ],
+            actor=_service_actor(db_session),
         )
 
     db_session.expire_all()
@@ -622,7 +754,12 @@ def test_submit_production_manual_edit(make_item, make_location, db_session):
         ),
         svc.AdjLine(item_id=result.item_id, direction="in", quantity=D("1"), department=ASSEMBLY),
     ]
-    svc.submit_adjustment(db_session, DeptAdjSubTypeEnum.PRODUCTION, lines)
+    svc.submit_adjustment(
+        db_session,
+        DeptAdjSubTypeEnum.PRODUCTION,
+        lines,
+        actor=_service_actor(db_session),
+    )
     db_session.commit()
 
     assert _prod_qty(db_session, comp.item_id) == D("3")  # 10 - 7
@@ -641,6 +778,7 @@ def test_submit_adjustment_skips_flagged_bom_line_but_keeps_result(
         db_session,
         DeptAdjSubTypeEnum.PRODUCTION,
         svc.build_production_template(db_session, result.item_id, D("1")),
+        actor=_service_actor(db_session),
     )
 
     assert len(log_ids) == 1
@@ -676,6 +814,7 @@ def test_submit_adjustment_keeps_flagged_line_without_matching_bom_parent(
                 department=ASSEMBLY,
             ),
         ],
+        actor=_service_actor(db_session),
     )
 
     assert len(log_ids) == 2
@@ -712,6 +851,7 @@ def test_submit_adjustment_keeps_flagged_bom_shape_without_server_token(
                 department=ASSEMBLY,
             ),
         ],
+        actor=_service_actor(db_session),
     )
 
     assert len(log_ids) == 2
@@ -737,7 +877,10 @@ def test_submit_disassembly_mixed(make_item, make_location, db_session):
     ]
 
     log_ids = svc.submit_adjustment(
-        db_session, DeptAdjSubTypeEnum.DISASSEMBLY, lines, operator_name="작업자"
+        db_session,
+        DeptAdjSubTypeEnum.DISASSEMBLY,
+        lines,
+        actor=_service_actor(db_session),
     )
     db_session.commit()
 
@@ -775,7 +918,12 @@ def test_submit_correction_in_out(make_item, make_location, db_session):
         svc.AdjLine(item_id=item_a.item_id, direction="in",  quantity=D("3"), department=ASSEMBLY, reason="발견"),
         svc.AdjLine(item_id=item_b.item_id, direction="out", quantity=D("2"), department=ASSEMBLY, reason="누락 확인"),
     ]
-    svc.submit_adjustment(db_session, DeptAdjSubTypeEnum.CORRECTION, lines)
+    svc.submit_adjustment(
+        db_session,
+        DeptAdjSubTypeEnum.CORRECTION,
+        lines,
+        actor=_service_actor(db_session),
+    )
     db_session.commit()
 
     assert _prod_qty(db_session, item_a.item_id) == D("3")
@@ -795,7 +943,12 @@ def test_submit_insufficient_stock_raises(make_item, make_location, db_session):
         svc.AdjLine(item_id=item.item_id, direction="out", quantity=D("5"), department=ASSEMBLY),
     ]
     with pytest.raises(ValueError, match="재고 부족"):
-        svc.submit_adjustment(db_session, DeptAdjSubTypeEnum.CORRECTION, lines)
+        svc.submit_adjustment(
+            db_session,
+            DeptAdjSubTypeEnum.CORRECTION,
+            lines,
+            actor=_service_actor(db_session),
+        )
 
 
 def test_submit_atomicity(make_item, make_location, db_session):
@@ -812,7 +965,12 @@ def test_submit_atomicity(make_item, make_location, db_session):
     ]
 
     with pytest.raises(ValueError):
-        svc.submit_adjustment(db_session, DeptAdjSubTypeEnum.CORRECTION, lines)
+        svc.submit_adjustment(
+            db_session,
+            DeptAdjSubTypeEnum.CORRECTION,
+            lines,
+            actor=_service_actor(db_session),
+        )
 
     db_session.rollback()
 
@@ -822,4 +980,9 @@ def test_submit_atomicity(make_item, make_location, db_session):
 
 def test_submit_empty_lines_raises(db_session):
     with pytest.raises(ValueError, match="라인"):
-        svc.submit_adjustment(db_session, DeptAdjSubTypeEnum.CORRECTION, [])
+        svc.submit_adjustment(
+            db_session,
+            DeptAdjSubTypeEnum.CORRECTION,
+            [],
+            actor=_service_actor(db_session),
+        )

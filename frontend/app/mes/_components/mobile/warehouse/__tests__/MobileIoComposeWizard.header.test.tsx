@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { RefObject } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
 import { MobileIoComposeWizard } from "../MobileIoComposeWizard";
@@ -7,10 +8,10 @@ const wizardState = vi.hoisted(() => ({
   step: 5,
   workType: "warehouse_io",
   subType: "warehouse_to_dept",
-  fromDepartment: null,
+  fromDepartment: null as string | null,
   toDepartment: "조립",
   bundles: [],
-  referenceNo: null,
+  referenceNo: null as string | null,
   notes: "",
   hasShortage: false,
   hasInvalidQuantity: false,
@@ -22,6 +23,7 @@ const wizardState = vi.hoisted(() => ({
   reset: vi.fn(),
 }));
 const saveDraft = vi.hoisted(() => vi.fn());
+const submitIo = vi.hoisted(() => vi.fn());
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -65,27 +67,44 @@ vi.mock("../../../_warehouse_v2/useIoPreview", () => ({
 }));
 
 vi.mock("../../../_warehouse_v2/useIoSubmit", () => ({
-  useIoSubmit: () => ({ submitting: false, run: (work: () => Promise<unknown>) => work(), submit: vi.fn() }),
+  useIoSubmit: () => ({ submitting: false, run: (work: () => Promise<unknown>) => work(), submit: submitIo }),
 }));
 
 vi.mock("../../../_warehouse_v2/IoConfirmStep", () => ({
   IoConfirmStep: ({
     onSubmit,
     onValidationError,
+    submitButtonRef,
   }: {
     onSubmit: () => void;
     onValidationError?: (message: string) => void;
+    submitButtonRef?: RefObject<HTMLButtonElement | null>;
   }) => (
     <>
-      <button type="button" onClick={onSubmit}>모바일 제출</button>
+      <button ref={submitButtonRef} type="button" onClick={onSubmit}>모바일 제출</button>
       <button type="button" onClick={() => onValidationError?.("메모가 없어 부서 결재 요청을 진행할 수 없습니다.")}>메모 오류</button>
     </>
+  ),
+}));
+
+vi.mock("../MobileSingleAdjustForm", () => ({
+  MobileSingleAdjustForm: ({ onScan }: { onScan: () => void }) => (
+    <button type="button" onClick={onScan}>코드 스캔</button>
+  ),
+}));
+
+vi.mock("../../../BarcodeScannerModal", () => ({
+  BarcodeScannerModal: ({ onClose }: { onClose: () => void }) => (
+    <div role="dialog" aria-label="코드 스캐너">
+      <button type="button" onClick={onClose}>스캐너 닫기</button>
+    </div>
   ),
 }));
 
 beforeEach(() => {
   vi.clearAllMocks();
   saveDraft.mockImplementation(async ({ batchId }: { batchId: string | null }) => ({ batch_id: batchId }));
+  submitIo.mockResolvedValue({ requires_approval: false, message: "처리되었습니다." });
   vi.mocked(api.submitDraft).mockResolvedValue({
     requires_approval: true,
     message: "부서 결재 요청이 생성되었습니다.",
@@ -93,6 +112,82 @@ beforeEach(() => {
 });
 
 describe("MobileIoComposeWizard Step 5 헤더", () => {
+  it("제출 오류를 이름 있는 alert로 알리고 오류 요약에 포커스를 둔다", async () => {
+    render(
+      <MobileIoComposeWizard
+        globalSearch=""
+        operator={null}
+        employees={[]}
+        items={[]}
+        setItems={vi.fn()}
+        onStatusChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "모바일 제출" }));
+
+    const alert = await screen.findByRole("alert", { name: "입출고 작업 오류" });
+    expect(alert).toHaveTextContent("작업자를 선택하세요.");
+    await waitFor(() => expect(alert).toHaveFocus());
+  });
+
+  it("실패 결과 모달을 닫으면 제출 버튼으로 포커스를 돌려준다", async () => {
+    submitIo.mockRejectedValueOnce(new Error("네트워크 오류"));
+    render(
+      <MobileIoComposeWizard
+        globalSearch=""
+        operator={{ employee_id: "op-1", name: "작업자", department: "조립", warehouse_role: "none" }}
+        employees={[]}
+        items={[]}
+        setItems={vi.fn()}
+        onStatusChange={vi.fn()}
+      />,
+    );
+
+    const submitButton = screen.getByRole("button", { name: "모바일 제출" });
+    fireEvent.click(submitButton);
+    expect(await screen.findByRole("dialog", { name: "제출 실패" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "확인" }));
+
+    await waitFor(() => expect(submitButton).toHaveFocus());
+  });
+
+  it("스캐너를 닫으면 스캔을 연 버튼으로 포커스를 돌려준다", async () => {
+    const original = {
+      step: wizardState.step,
+      workType: wizardState.workType,
+      subType: wizardState.subType,
+    };
+    wizardState.step = 3;
+    wizardState.workType = "warehouse_adjust";
+    wizardState.subType = "warehouse_adjust_in";
+    try {
+      render(
+        <MobileIoComposeWizard
+          globalSearch=""
+          operator={null}
+          employees={[]}
+          items={[]}
+          setItems={vi.fn()}
+          onStatusChange={vi.fn()}
+        />,
+      );
+
+      const scanButton = screen.getByRole("button", { name: "코드 스캔" });
+      scanButton.focus();
+      fireEvent.click(scanButton);
+      const closeButton = await screen.findByRole("button", { name: "스캐너 닫기" });
+      closeButton.focus();
+      fireEvent.click(closeButton);
+
+      await waitFor(() => expect(scanButton).toHaveFocus());
+    } finally {
+      wizardState.step = original.step;
+      wizardState.workType = original.workType;
+      wizardState.subType = original.subType;
+    }
+  });
+
   it.each([
     ["창고 입출고", "warehouse_io", "warehouse_to_dept"],
     ["부서 입출고", "process", "produce"],
@@ -108,6 +203,7 @@ describe("MobileIoComposeWizard Step 5 헤더", () => {
         <MobileIoComposeWizard
           globalSearch=""
           operator={null}
+          employees={[]}
           items={[]}
           setItems={vi.fn()}
           onStatusChange={vi.fn()}
@@ -127,6 +223,7 @@ describe("MobileIoComposeWizard Step 5 헤더", () => {
       <MobileIoComposeWizard
         globalSearch=""
         operator={null}
+        employees={[]}
         items={[]}
         setItems={vi.fn()}
         onStatusChange={vi.fn()}
@@ -150,6 +247,7 @@ describe("MobileIoComposeWizard Step 5 헤더", () => {
         <MobileIoComposeWizard
           globalSearch=""
           operator={null}
+          employees={[]}
           items={[]}
           setItems={vi.fn()}
           onStatusChange={vi.fn()}
@@ -171,6 +269,7 @@ describe("MobileIoComposeWizard Step 5 헤더", () => {
         <MobileIoComposeWizard
           globalSearch=""
           operator={null}
+          employees={[]}
           items={[]}
           setItems={vi.fn()}
           onStatusChange={vi.fn()}
@@ -189,6 +288,7 @@ describe("MobileIoComposeWizard Step 5 헤더", () => {
       <MobileIoComposeWizard
         globalSearch=""
         operator={null}
+        employees={[]}
         items={[]}
         setItems={vi.fn()}
         onStatusChange={vi.fn()}
@@ -206,6 +306,7 @@ describe("MobileIoComposeWizard Step 5 헤더", () => {
       <MobileIoComposeWizard
         globalSearch=""
         operator={null}
+        employees={[]}
         items={[]}
         setItems={vi.fn()}
         onStatusChange={vi.fn()}
@@ -264,6 +365,7 @@ describe("MobileIoComposeWizard Step 5 헤더", () => {
       <MobileIoComposeWizard
         globalSearch=""
         operator={previousOperator}
+        employees={[]}
         items={[]}
         setItems={vi.fn()}
         onStatusChange={vi.fn()}
@@ -275,6 +377,7 @@ describe("MobileIoComposeWizard Step 5 헤더", () => {
       <MobileIoComposeWizard
         globalSearch=""
         operator={currentOperator}
+        employees={[]}
         items={[]}
         setItems={vi.fn()}
         onStatusChange={vi.fn()}
@@ -343,6 +446,7 @@ describe("MobileIoComposeWizard Step 5 헤더", () => {
         <MobileIoComposeWizard
           globalSearch=""
           operator={currentOperator}
+          employees={[]}
           items={[]}
           setItems={vi.fn()}
           onStatusChange={vi.fn()}

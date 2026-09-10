@@ -21,7 +21,14 @@ function item(overrides: Partial<Item>): Item {
     legacy_part: null,
     legacy_item_type: null,
     supplier: null,
+    supplier_item_code: null,
+    standard_purchase_price: null,
+    purchase_price_effective_date: null,
     min_stock: 10,
+    reorder_point: null,
+    procurement_lead_time_days: null,
+    minimum_order_quantity: null,
+    purchase_memo: null,
     mes_code: null,
     model_symbol: null,
     model_slots: [],
@@ -70,6 +77,7 @@ describe("useDesktopInventoryDerivations", () => {
       ["LOW", 1],
       ["ZERO", 1],
     ]);
+    expect(result.current.kpiCards.find((card) => card.key === "ALL")?.hint).toBe("출하 중간 공정·공정 완료 품목 제외");
     await waitFor(() => expect(onSummaryChange).toHaveBeenLastCalledWith({ low: 2, zero: 1 }));
     expect(matchesKpi(paNormal, "NORMAL")).toBe(true);
     expect(matchesKpi(pfLow, "LOW")).toBe(true);
@@ -82,6 +90,9 @@ describe("useDesktopInventoryDerivations", () => {
       ["LOW", 0],
       ["ZERO", 0],
     ]);
+    expect(result.current.kpiCards.find((card) => card.key === "ALL")?.hint).toBe(
+      "출하 중간 공정·공정 완료 품목 제외 · 전체 3건 · 클릭하면 초기화",
+    );
     await waitFor(() => expect(onSummaryChange).toHaveBeenLastCalledWith({ low: 1, zero: 0 }));
   });
 

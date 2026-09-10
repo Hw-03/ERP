@@ -6,13 +6,26 @@ from io import StringIO
 import uuid
 from typing import Annotated, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from fastapi.responses import StreamingResponse
+from fastapi import Depends, Query, Request, status
 from sqlalchemy.orm import Query as SAQuery, Session
 
 from app.database import get_db
+from app.dependencies.verified_actor import VerifiedActor, VerifiedActorRouter
 from app.dependencies.admin import require_admin_pin
-from app.models import BOM, DepartmentEnum, Inventory, InventoryLocation, Item, LocationStatusEnum
+from app.models import (
+    BOM,
+    DepartmentEnum,
+    Inventory,
+    InventoryLocation,
+    InventoryOperationRoleEnum,
+    Item,
+    LocationStatusEnum,
+    TransactionLog,
+    TransactionTypeEnum,
+    WarehouseBoxItem,
+    WarehouseSpecialZoneItem,
+    WarehouseUnplacedItem,
+)
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     BomCompletionUpdate,
@@ -30,18 +43,17 @@ from app.utils.mes_code import (
     slots_to_model_symbol,
 )
 from app.utils.search import build_normalized_search_filter
-from app.models import ProductSymbol
-from app.services import audit
-from app.services import inventory as inventory_svc
-from app.services import stock_math
-from app.services.item_display_order import insert_item_at_process_end
-from app.services._tx import commit_and_refresh
+from app.services import audit, inv_effect, item_lifecycle
+from app.services import inventory_operations as operation_svc
+from app.services import stock_availability, stock_math
+from app.services.item_display_order import _insert_item_at_process_end
+from app.services._tx import commit_and_refresh, transactional
 from app._evt import emit as _evt_emit
 from app.services.export_helpers import csv_streaming_response
-from app.services.reorder import reorder_by_display_order
+from app.services.reorder import _reorder_by_display_order
 from app.repositories import item_repository, inventory_repository
 
-router = APIRouter()
+router = VerifiedActorRouter()
 
 
 def _build_item_query(db: Session) -> SAQuery:
@@ -74,14 +86,20 @@ def _to_item_with_inventory(
             .filter(InventoryLocation.item_id == item.item_id, InventoryLocation.quantity > 0)
             .all()
         )
+        reserved_by_cell = stock_availability.bulk_reserved_by_cell(
+            db,
+            [item.item_id],
+        )
         locations = [
             InventoryLocationResponse(
                 department=row.department,
                 status=row.status,
                 quantity=row.quantity or _D("0"),
                 pending_quantity=row.pending_quantity or _D("0"),
-                available_quantity=(row.quantity or _D("0"))
-                - (row.pending_quantity or _D("0")),
+                available_quantity=stock_availability.location_available_quantity(
+                    row,
+                    reserved_by_cell,
+                ),
             )
             for row in loc_rows
         ]
@@ -128,6 +146,7 @@ def _to_item_with_inventory(
         defective_total=fig.defective_total,
         pending_quantity=fig.pending,
         department_pending_quantity=fig.department_pending,
+        warehouse_available_quantity=fig.warehouse_available,
         available_quantity=fig.available,
         last_reserver_name=inventory.last_reserver_name if inventory else None,
         location=inventory.location if inventory else None,
@@ -139,6 +158,7 @@ def _to_item_with_inventory(
 def create_item(
     payload: ItemCreate,
     request: Request,
+    actor: VerifiedActor,
     _admin: Annotated[None, Depends(require_admin_pin)],
     db: Session = Depends(get_db),
 ):
@@ -202,7 +222,7 @@ def create_item(
     )
     db.add(item)
     db.flush()
-    insert_item_at_process_end(db, item)
+    _insert_item_at_process_end(db, item)
 
     init_qty = payload.initial_quantity if payload.initial_quantity is not None else 0
     locs = payload.initial_locations or []
@@ -225,8 +245,20 @@ def create_item(
         raise http_error(422, ErrorCode.UNPROCESSABLE, f"배분 합계({alloc_sum})가 초기 수량({init_qty})을 초과합니다.")
 
     warehouse = init_qty - alloc_sum
+    operation = None
+    if init_qty > 0:
+        operation = operation_svc._create_business_operation(
+            db,
+            domain="items",
+            action="initial_stock",
+            display_label="품목 초기 재고",
+            actor_name=actor.name,
+            actor_employee_id=actor.employee_id,
+            department=DepartmentEnum.WAREHOUSE.value,
+        )
     inventory = Inventory(item_id=item.item_id, quantity=init_qty, warehouse_qty=warehouse)
     db.add(inventory)
+    db.add(WarehouseUnplacedItem(item_id=item.item_id, quantity=warehouse))
 
     for ln in locs:
         db.add(InventoryLocation(
@@ -235,6 +267,27 @@ def create_item(
             status=LocationStatusEnum.PRODUCTION,
             quantity=ln.quantity,
         ))
+
+    if operation is not None:
+        db.flush()
+        db.add(
+            operation_svc._attach_transaction(
+                TransactionLog(
+                    item_id=item.item_id,
+                    transaction_type=TransactionTypeEnum.RECEIVE,
+                    quantity_change=init_qty,
+                    quantity_before=0,
+                    quantity_after=init_qty,
+                    produced_by=actor.name,
+                    producer_employee_id=actor.employee_id,
+                    department=DepartmentEnum.WAREHOUSE.value,
+                    notes="품목 등록 초기 재고",
+                    **inv_effect._capture_log_stock_snapshot(db, item.item_id, {}),
+                ),
+                operation,
+                InventoryOperationRoleEnum.PRIMARY,
+            )
+        )
 
     audit.record(
         db,
@@ -316,6 +369,7 @@ def list_items(
     # bulk prefetch — N+1 제거. 기존에는 item 1건당 4 쿼리씩 나갔음.
     item_ids = [it.item_id for it, _ in rows]
     figures_map = stock_math.bulk_compute(db, item_ids)
+    reserved_by_cell = stock_availability.bulk_reserved_by_cell(db, item_ids)
 
     from decimal import Decimal as _D
 
@@ -334,8 +388,10 @@ def list_items(
                 status=row.status,
                 quantity=row.quantity or _D("0"),
                 pending_quantity=row.pending_quantity or _D("0"),
-                available_quantity=(row.quantity or _D("0"))
-                - (row.pending_quantity or _D("0")),
+                available_quantity=stock_availability.location_available_quantity(
+                    row,
+                    reserved_by_cell,
+                ),
             )
         )
 
@@ -375,7 +431,7 @@ def reorder_items(
             "활성 품목 전체 목록에서만 표시 순서를 변경할 수 있습니다.",
         )
 
-    reorder_by_display_order(
+    _reorder_by_display_order(
         db, Item, "item_id",
         [(item.item_id, item.display_order) for item in payload.items],
         order_field="sort_order",
@@ -433,7 +489,6 @@ def export_items_xlsx(
     db: Session = Depends(get_db),
 ):
     from datetime import date as _date
-    from decimal import Decimal as _D
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
     from app.utils.excel import apply_header, auto_width, make_xlsx_response
@@ -525,7 +580,7 @@ def update_item(
     _admin: Annotated[None, Depends(require_admin_pin)],
     db: Session = Depends(get_db),
 ):
-    item = item_repository.get(db, item_id)
+    item = item_repository.get_active(db, item_id, for_update=True)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
@@ -644,7 +699,7 @@ def update_bom_completion(
     db: Session = Depends(get_db),
 ):
     """BOM 완료 상태 토글 — 사용자가 명시적으로 누를 때만 set/clear."""
-    item = item_repository.get(db, item_id)
+    item = item_repository.get_active(db, item_id, for_update=True)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
@@ -671,30 +726,42 @@ def soft_delete_item(
     _admin: Annotated[None, Depends(require_admin_pin)],
     db: Session = Depends(get_db),
 ):
-    """품목 소프트 삭제 — deleted_at 세팅 + BOM 연결 제거. 입출고 내역은 보존."""
-    item = item_repository.get(db, item_id)
-    if not item:
-        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
-    if item.deleted_at is not None:
-        raise http_error(409, ErrorCode.CONFLICT, "이미 삭제된 품목입니다.")
+    """활성 업무와 BOM 참조가 없는 품목만 소프트 삭제한다."""
+    with transactional(db):
+        item = item_repository.get_including_deleted(
+            db,
+            item_id,
+            for_update=True,
+        )
+        if not item:
+            raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
+        if item.deleted_at is not None:
+            raise http_error(409, ErrorCode.CONFLICT, "이미 삭제된 품목입니다.")
 
-    db.query(BOM).filter(
-        (BOM.parent_item_id == item_id) | (BOM.child_item_id == item_id)
-    ).delete(synchronize_session=False)
+        total, refs = item_lifecycle.active_item_references(db, item_id)
+        if total:
+            raise http_error(
+                409,
+                ErrorCode.ITEM_IN_USE,
+                "진행 중인 업무 또는 BOM에서 사용 중인 품목입니다.",
+                total=total,
+                refs=refs,
+            )
 
-    item.deleted_at = datetime.now(UTC).replace(tzinfo=None)
-    item.updated_at = datetime.now(UTC).replace(tzinfo=None)
+        now = datetime.now(UTC).replace(tzinfo=None)
+        item.deleted_at = now
+        item.updated_at = now
 
-    audit.record(
-        db,
-        request=request,
-        action="item.delete",
-        target_type="item",
-        target_id=str(item.item_id),
-        payload_summary=f"{item.item_name} ({item.mes_code or 'no-code'})",
-    )
+        audit.record(
+            db,
+            request=request,
+            action="item.delete",
+            target_type="item",
+            target_id=str(item.item_id),
+            payload_summary=f"{item.item_name} ({item.mes_code or 'no-code'})",
+        )
 
-    commit_and_refresh(db, item)
+    db.refresh(item)
     _evt_emit(
         "item_delete",
         request=request,
@@ -712,11 +779,63 @@ def restore_item(
     db: Session = Depends(get_db),
 ):
     """삭제된 품목 복구 — deleted_at 초기화."""
-    item = item_repository.get(db, item_id)
+    item = item_repository.get_including_deleted(db, item_id, for_update=True)
     if not item:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
     if item.deleted_at is None:
         raise http_error(409, ErrorCode.CONFLICT, "삭제되지 않은 품목입니다.")
+
+    inventory = db.query(Inventory).filter(Inventory.item_id == item.item_id).one_or_none()
+    unplaced = (
+        db.query(WarehouseUnplacedItem)
+        .filter(WarehouseUnplacedItem.item_id == item.item_id)
+        .one_or_none()
+    )
+    if inventory is None and unplaced is None:
+        has_physical_rows = (
+            db.query(WarehouseBoxItem.id)
+            .filter(WarehouseBoxItem.item_id == item.item_id)
+            .first()
+            is not None
+            or db.query(WarehouseSpecialZoneItem.id)
+            .filter(WarehouseSpecialZoneItem.item_id == item.item_id)
+            .first()
+            is not None
+        )
+        if has_physical_rows:
+            raise http_error(
+                409,
+                ErrorCode.CONFLICT,
+                "삭제 품목의 물리 위치 원장이 불완전하여 복구할 수 없습니다.",
+            )
+        location_total = sum(
+            int(quantity or 0)
+            for (quantity,) in db.query(InventoryLocation.quantity)
+            .filter(InventoryLocation.item_id == item.item_id)
+            .all()
+        )
+        db.add(
+            Inventory(
+                item_id=item.item_id,
+                quantity=location_total,
+                warehouse_qty=0,
+            )
+        )
+        db.add(WarehouseUnplacedItem(item_id=item.item_id, quantity=0))
+        db.flush()
+    elif inventory is None or unplaced is None:
+        raise http_error(
+            409,
+            ErrorCode.CONFLICT,
+            "삭제 품목의 창고 원장이 불완전하여 복구할 수 없습니다.",
+        )
+    else:
+        try:
+            from app.services import warehouse_map
+
+            warehouse_map._lock_warehouse_ledger(db, item.item_id)
+        except ValueError as exc:
+            raise http_error(409, ErrorCode.CONFLICT, str(exc)) from exc
 
     item.deleted_at = None
     item.updated_at = datetime.now(UTC).replace(tzinfo=None)

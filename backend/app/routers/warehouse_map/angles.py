@@ -2,15 +2,17 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import Depends, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.verified_actor import VerifiedActorRouter
 from app.dependencies.warehouse_manager import require_warehouse_manager
 from app.models import Employee, WarehouseAngle, WarehouseBox
 from app.routers._errors import ErrorCode, http_error
-from app.services.reorder import reorder_by_display_order
+from app.services import warehouse_map as wm_service
+from app.services.reorder import _reorder_by_display_order
 from app.schemas import (
     WarehouseAngleCreate,
     WarehouseAngleReorderPayload,
@@ -18,7 +20,14 @@ from app.schemas import (
     WarehouseAngleUpdate,
 )
 
-router = APIRouter()
+router = VerifiedActorRouter()
+
+
+@router.post("/verify-editor", status_code=status.HTTP_204_NO_CONTENT)
+def verify_editor_access(
+    _mgr: Annotated[Employee, Depends(require_warehouse_manager)],
+) -> None:
+    """편집 진입 전에 실제 변경 요청과 같은 창고 관리자 자격을 확인한다."""
 
 
 @router.post("/angles", response_model=WarehouseAngleResponse, status_code=status.HTTP_201_CREATED)
@@ -56,7 +65,7 @@ def reorder_angles(
     _mgr: Annotated[Employee, Depends(require_warehouse_manager)],
     db: Session = Depends(get_db),
 ):
-    reorder_by_display_order(
+    _reorder_by_display_order(
         db, WarehouseAngle, "id",
         [(item.id, item.display_order) for item in payload.items],
     )
@@ -88,7 +97,13 @@ def delete_angle(
     _mgr: Annotated[Employee, Depends(require_warehouse_manager)],
     db: Session = Depends(get_db),
 ):
-    angle = db.query(WarehouseAngle).filter(WarehouseAngle.id == angle_id).first()
+    wm_service.lock_warehouse_map_rows(db, angle_ids=[angle_id])
+    angle = (
+        db.query(WarehouseAngle)
+        .execution_options(populate_existing=True)
+        .filter(WarehouseAngle.id == angle_id)
+        .one_or_none()
+    )
     if not angle:
         raise http_error(404, ErrorCode.NOT_FOUND, "앵글을 찾을 수 없습니다.")
     # 박스가 남아 있으면 실수 삭제 방지 (배치 전소 방지)

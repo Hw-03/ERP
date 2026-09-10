@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactElement } from "react";
 import { useMyItemOrderQuery } from "@/lib/queries/useMyItemOrderQuery";
 import { buildEmployeeOrderRank } from "../_warehouse_v2/itemPickerShared";
 import { createPortal } from "react-dom";
@@ -42,7 +42,7 @@ export function AddQuarantineModal({
   onClose,
   currentEmployee,
   onSubmitted,
-}: AddQuarantineModalProps): JSX.Element | null {
+}: AddQuarantineModalProps): ReactElement | null {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Item[]>([]);
   const [searching, setSearching] = useState(false);

@@ -262,10 +262,24 @@ export function MobileShell({
     commitMobileTab(target);
   }, [activeTab, canOpenMobileTab, commitMobileTab, dailyReportDirty, fallbackTab, warehouseDirty]);
 
-  const handleNotificationNavigate = useCallback(({ tab, section }: NotificationNavigationTarget) => {
+  const handleNotificationNavigate = useCallback(({ tab, section, relatedRequestId }: NotificationNavigationTarget) => {
     if (!(VALID_TAB_IDS as string[]).includes(tab)) return;
     const target = tab as MobileTabId;
     if (!canOpenMobileTab(target)) return;
+    const params = new URLSearchParams(window.location.search);
+    params.set("tab", target);
+    if (section) params.set("section", section);
+    else params.delete("section");
+    if (target === "warehouse" && relatedRequestId) {
+      params.set("stockRequestId", relatedRequestId);
+    } else {
+      params.delete("stockRequestId");
+    }
+    window.history.pushState(
+      { ...(window.history.state || {}), notificationTarget: relatedRequestId },
+      "",
+      `${window.location.pathname}?${params.toString()}`,
+    );
     handleTabChange(target);
     if (target === "defect" && section) setDefectDeptFilter(section);
   }, [canOpenMobileTab, handleTabChange]);

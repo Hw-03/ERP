@@ -2,6 +2,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
+import type { IoBundle } from "@/lib/api";
 import {
   runWarehousePull,
   saveCompositionDraft,
@@ -130,6 +131,34 @@ describe("ioComposeOperations", () => {
     expect(setResult).toHaveBeenCalledWith(expect.objectContaining({ kind: "error" }));
   });
 
+  it("이전 pending draft가 먼저 복구되면 현재 다른 draft 연결을 지우지 않는다", async () => {
+    const batchRef = { current: "draft-new" as string | null };
+    const setResult = vi.fn();
+    const onDraftSubmitted = vi.fn();
+
+    await runCompositionSubmit(
+      "employee-1", "adjust_in", "조립", async () => {},
+      () => [{ bundle_id: "bundle-new", lines: [] } as never], batchRef,
+      vi.fn(), vi.fn(), vi.fn(), setResult, vi.fn(), vi.fn(), vi.fn(), async () => [], vi.fn(),
+      undefined,
+      vi.fn(async () => ({
+        batch: { batch_id: "draft-pending" },
+        requires_approval: false,
+        message: "이전 작업 완료",
+      } as never)),
+      onDraftSubmitted,
+      operationRefs(),
+      async () => ({ batch_id: "draft-new" }),
+    );
+
+    expect(batchRef.current).toBe("draft-new");
+    expect(onDraftSubmitted).not.toHaveBeenCalled();
+    expect(setResult).toHaveBeenCalledWith(expect.objectContaining({
+      kind: "error",
+      message: expect.stringContaining("이전 결과 불명 작업"),
+    }));
+  });
+
   it("기존 초안은 현재 snapshot을 먼저 저장한 뒤 같은 batch를 제출한다", async () => {
     const batchRef = { current: "draft-1" as string | null };
     const refs = operationRefs();
@@ -137,8 +166,8 @@ describe("ioComposeOperations", () => {
     const bundles = [
       { bundle_id: "bundle-1", lines: [] },
       { bundle_id: "bundle-2", lines: [] },
-    ] as never[];
-    const saveExisting = vi.fn(async (snapshot: never[]) => {
+    ] as unknown as IoBundle[];
+    const saveExisting = vi.fn(async (snapshot: IoBundle[]) => {
       events.push("save");
       expect(snapshot).toBe(bundles);
       return { batch_id: "draft-1" };

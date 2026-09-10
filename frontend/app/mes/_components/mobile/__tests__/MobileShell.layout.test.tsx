@@ -87,16 +87,32 @@ vi.mock("../screens", () => ({
   MobileMoreScreen: ({
     onChecklist,
     onWeekly,
+    onNotificationNavigate,
     visibleEntries,
   }: {
     onChecklist?: () => void;
     onWeekly?: () => void;
+    onNotificationNavigate?: (target: {
+      tab: string;
+      section: string;
+      relatedRequestId: string;
+    }) => void;
     visibleEntries?: string[];
   }) => (
     <>
       <div data-testid="more-entry-order">{visibleEntries?.join(",")}</div>
       <button type="button" onClick={onChecklist}>open checklist</button>
       <button type="button" onClick={onWeekly}>open weekly</button>
+      <button
+        type="button"
+        onClick={() => onNotificationNavigate?.({
+          tab: "warehouse",
+          section: "queue",
+          relatedRequestId: "request-1",
+        })}
+      >
+        open approval notification
+      </button>
     </>
   ),
 }));
@@ -166,6 +182,19 @@ describe("MobileShell layout", () => {
 
     expect(screen.getByText("assembly checklist screen")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "체크리스트" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("keeps an approval notification section and request id while opening warehouse", () => {
+    render(<MobileShell />);
+
+    fireEvent.click(screen.getByRole("button", { name: "더보기" }));
+    fireEvent.click(screen.getByRole("button", { name: "open approval notification" }));
+
+    expect(screen.getByText("warehouse screen")).toBeInTheDocument();
+    const params = new URLSearchParams(window.location.search);
+    expect(params.get("tab")).toBe("warehouse");
+    expect(params.get("section")).toBe("queue");
+    expect(params.get("stockRequestId")).toBe("request-1");
   });
 
   it("orders More entries and returns checklist and weekly screens to More", () => {

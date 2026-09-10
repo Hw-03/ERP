@@ -6,13 +6,17 @@ import uuid
 from dataclasses import asdict
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app._actor import set_actor
 from app.database import get_db
+from app.dependencies.verified_actor import (
+    VerifiedActor,
+    VerifiedActorRouter,
+    ensure_actor_employee_code,
+)
 from app.models import (
     Employee,
     InventoryOperation,
@@ -23,10 +27,10 @@ from app.models import (
 )
 from app.routers._errors import ErrorCode, http_error
 from app.services import inventory_operation_cancellation as cancellation_svc
-from app.services.pin_auth import verify_pin
+from app.services import rate_limit
 
 
-router = APIRouter()
+router = VerifiedActorRouter()
 
 
 class OperationCancelRequest(BaseModel):
@@ -109,9 +113,11 @@ def _operation_payload(
         )
         can_cancel = cancel_plan.can_cancel
         cancel_blockers = list(cancel_plan.blockers)
+        cancel_warnings = list(cancel_plan.warnings)
     except cancellation_svc.CancellationError as exc:
         can_cancel = False
         cancel_blockers = [str(exc)]
+        cancel_warnings = []
     return {
         "operation_id": str(operation.operation_id),
         "kind": operation.kind.value,
@@ -134,6 +140,7 @@ def _operation_payload(
         "reversal_operation_id": str(reversal.operation_id) if reversal else None,
         "can_cancel": can_cancel,
         "cancel_blockers": cancel_blockers,
+        "cancel_warnings": cancel_warnings,
         "lines": [_line_payload(log, items.get(log.item_id)) for log in logs],
         "matching_lines": matching_lines,
         "effects": [
@@ -256,46 +263,48 @@ def preview_operation_cancel(
 
 
 def _verified_canceller(
-    db: Session,
     *,
     operation: InventoryOperation,
-    employee_code: str,
+    actor: Employee,
     pin: str,
+    http_request: Request,
 ) -> Employee:
-    employee = db.query(Employee).filter(Employee.employee_code == employee_code).one_or_none()
-    if employee is None:
-        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
-    if not bool(employee.is_active):
+    if not bool(actor.is_active):
         raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원은 작업을 취소할 수 없습니다.")
-    if not verify_pin(employee.pin_hash, pin):
+    try:
+        pin_is_valid = rate_limit.verify_operator_pin(actor, pin, http_request)
+    except rate_limit.OperatorPinRateLimitExceeded as exc:
+        raise http_error(429, ErrorCode.TOO_MANY_REQUESTS, str(exc)) from exc
+    if not pin_is_valid:
         raise http_error(403, ErrorCode.FORBIDDEN, "PIN이 올바르지 않습니다.")
-    is_self = operation.actor_employee_id == employee.employee_id
+    is_self = operation.actor_employee_id == actor.employee_id
     is_approver = (
-        (employee.warehouse_role or "none").lower() != "none"
-        or (employee.department_role or "none").lower() != "none"
+        (actor.warehouse_role or "none").lower() != "none"
+        or (actor.department_role or "none").lower() != "none"
     )
     if not (is_self or is_approver):
         raise http_error(403, ErrorCode.FORBIDDEN, "본인 작업 또는 결재 권한자만 취소할 수 있습니다.")
-    return employee
+    return actor
 
 
 @router.post("/operations/{operation_id}/cancel")
 def cancel_operation(
     operation_id: uuid.UUID,
     payload: OperationCancelRequest,
-    request: Request,
+    http_request: Request,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
 ) -> dict:
     operation = db.get(InventoryOperation, operation_id)
     if operation is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "작업을 찾을 수 없습니다.")
+    ensure_actor_employee_code(actor, payload.employee_code)
     canceller = _verified_canceller(
-        db,
         operation=operation,
-        employee_code=payload.employee_code,
+        actor=actor,
         pin=payload.pin,
+        http_request=http_request,
     )
-    set_actor(request, canceller)
     try:
         cancellation = cancellation_svc.cancel_operation(
             db,
@@ -304,6 +313,8 @@ def cancel_operation(
             reason=payload.reason,
             plan_hash=payload.plan_hash,
         )
+    except cancellation_svc.WorkflowCancellationConflict as exc:
+        raise http_error(409, exc.reason_code, str(exc)) from exc
     except cancellation_svc.CancellationPlanChanged as exc:
         raise http_error(409, ErrorCode.CONFLICT, str(exc)) from exc
     except cancellation_svc.CancellationNotAllowed as exc:

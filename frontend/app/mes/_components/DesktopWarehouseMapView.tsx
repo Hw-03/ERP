@@ -24,6 +24,7 @@ import { buildCellIndex, cellColor, cellKey, rowLabel } from "./_warehouse_map_s
 import { FloorStage, FrontStage, RowStage } from "./_warehouse_map_sections/WarehouseStages";
 import { WarehouseJariPanel } from "./_warehouse_map_sections/WarehouseJariPanel";
 import { AddBoxScreen } from "./_warehouse_map_sections/AddBoxScreen";
+import { useWarehouseMapMutations } from "./_warehouse_map_sections/useWarehouseMapMutations";
 import { queryKeys } from "@/lib/queries/keys";
 import { useWarehouseMapQuery } from "@/lib/queries/useWarehouseMapQuery";
 import styles from "./_warehouse_map_sections/warehouseMap.module.css";
@@ -109,8 +110,10 @@ export function DesktopWarehouseMapView({
   onFullscreenChange?: (fullscreen: boolean) => void;
 }) {
   const queryClient = useQueryClient();
-  const mapQuery = useWarehouseMapQuery();
+  const mapMutations = useWarehouseMapMutations({ onStatusChange });
+  const mapQuery = useWarehouseMapQuery({ enabled: !mapMutations.hasPending });
   const [map, setMap] = useState<WarehouseMap | null>(() => mapQuery.data ?? null);
+  const [boxTrackingEnabled, setBoxTrackingEnabled] = useState(true);
   const loading = mapQuery.isLoading && !map;
   const error = mapQuery.error
     ? mapQuery.error instanceof Error
@@ -151,6 +154,26 @@ export function DesktopWarehouseMapView({
   const searchInputRef = useRef<HTMLInputElement>(null);
   // history drill depth — 드릴다운을 browser history에 쌓아 브라우저 뒤로가기 지원 (DesktopHistoryView 선례)
   const wmDepthRef = useRef(0);
+
+  const visibleBoxes = useMemo(
+    () => (editable || boxTrackingEnabled ? map?.boxes ?? [] : []),
+    [boxTrackingEnabled, editable, map],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    warehouseMapApi
+      .getBoxTracking()
+      .then((preference) => {
+        if (!cancelled) setBoxTrackingEnabled(preference.enabled);
+      })
+      .catch(() => {
+        // 하위 호환 설정을 읽지 못하면 기존처럼 박스를 표시한다.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const nextMap = mapQuery.data;
@@ -206,7 +229,13 @@ export function DesktopWarehouseMapView({
     const selectedItemId = selectedItemRef.current?.item_id;
     if (!selectedItemId) return;
 
-    const nextSelectedItem = findItemMatch(nextMap, selectedItemId);
+    const nextSelectedItem = findItemMatch(
+      {
+        ...nextMap,
+        boxes: editable || boxTrackingEnabled ? nextMap.boxes : [],
+      },
+      selectedItemId,
+    );
     setSelectedItem(nextSelectedItem);
     if (!nextSelectedItem) {
       setLocGuide(null);
@@ -217,13 +246,13 @@ export function DesktopWarehouseMapView({
     setMatchQuery(nextSelectedItem.mes_code ?? nextSelectedItem.item_name);
     setLocGuide(buildLocGuide(nextSelectedItem, nextMap.angles));
     setHitAngles(buildHitAngles(nextSelectedItem.hits));
-  }, [mapQuery.data]);
+  }, [boxTrackingEnabled, editable, mapQuery.data]);
 
   useEffect(() => {
     if (error) onStatusChange?.(error);
   }, [error, onStatusChange]);
 
-  const cellIndex = useMemo(() => buildCellIndex(map?.boxes ?? []), [map]);
+  const cellIndex = useMemo(() => buildCellIndex(visibleBoxes), [visibleBoxes]);
   const angles = map?.angles ?? [];
 
   function setAnimatedStage(next: Stage) {
@@ -336,120 +365,22 @@ export function DesktopWarehouseMapView({
     }
   }
 
-  // 편집 모드: 박스 드래그 이동. 낙관적 업데이트(즉시 반영) → 서버 확정 → 실패 시 되돌림.
+  // 편집 모드: 박스 드래그 이동. 겹치지 않는 자리만 병렬 처리하고 완료 뒤 서버 지도에 수렴한다.
   const handleMoveBox = (
     boxId: string,
     target: { row: number; layer: number; jari: number },
   ) => {
-    if (!curAngle || !map) return;
-    const angleId = curAngle.id;
-    const prevBoxes = map.boxes;
-    const targetMax = prevBoxes
-      .filter(
-        (b) =>
-          b.angle_id === angleId &&
-          b.row_no === target.row &&
-          b.layer_no === target.layer &&
-          b.jari_index === target.jari,
-      )
-      .reduce((mx, b) => Math.max(mx, b.stack_order), 0);
-
-    // 즉시 화면 반영 — 대상 자리 맨 위로.
-    setMap((m) =>
-      m
-        ? {
-            ...m,
-            boxes: m.boxes.map((b) =>
-              b.box_id === boxId
-                ? {
-                    ...b,
-                    angle_id: angleId,
-                    row_no: target.row,
-                    layer_no: target.layer,
-                    jari_index: target.jari,
-                    stack_order: targetMax + 1,
-                  }
-                : b,
-            ),
-          }
-        : m,
-    );
-
-    void warehouseMapApi
-      .moveBox(boxId, {
-        angle_id: angleId,
-        row_no: target.row,
-        layer_no: target.layer,
-        jari_index: target.jari,
-      })
-      .catch((e) => {
-        // 실패 → 원복 + 안내(예: 용량 초과).
-        setMap((m) => (m ? { ...m, boxes: prevBoxes } : m));
-        onStatusChange?.(e instanceof Error ? e.message : "박스 이동에 실패했습니다.");
-      });
+    if (!curAngle) return;
+    void mapMutations.moveBox(boxId, { angleId: curAngle.id, ...target });
   };
 
-  // 편집 모드: 박스 위/아래에 끼워넣기(스택 중간 삽입). 자리 전체 순서 재배치.
+  // 편집 모드: 박스 위/아래에 끼워넣기. 대상 자리 전체를 한 작업이 소유한다.
   const handleInsertBox = (
     boxId: string,
     target: { row: number; layer: number; jari: number; targetBoxId: string; place: "above" | "below" },
   ) => {
-    if (!curAngle || !map) return;
-    const angleId = curAngle.id;
-    const prevBoxes = map.boxes;
-    const dragged = prevBoxes.find((b) => b.box_id === boxId);
-    if (!dragged) return;
-
-    const jariBoxes = prevBoxes
-      .filter(
-        (b) =>
-          b.box_id !== boxId &&
-          b.angle_id === angleId &&
-          b.row_no === target.row &&
-          b.layer_no === target.layer &&
-          b.jari_index === target.jari,
-      )
-      .sort((a, b) => a.stack_order - b.stack_order);
-    const tIdx = jariBoxes.findIndex((b) => b.box_id === target.targetBoxId);
-    if (tIdx < 0) return;
-    const insertIdx = target.place === "above" ? tIdx + 1 : tIdx;
-    const ordered = [...jariBoxes.slice(0, insertIdx), dragged, ...jariBoxes.slice(insertIdx)];
-    const boxIds = ordered.map((b) => b.box_id);
-    const orderMap = new Map(boxIds.map((id, i) => [id, i] as const));
-
-    // 즉시 화면 반영 — 새 순서대로 stack_order 재배치.
-    setMap((m) =>
-      m
-        ? {
-            ...m,
-            boxes: m.boxes.map((b) =>
-              orderMap.has(b.box_id)
-                ? {
-                    ...b,
-                    angle_id: angleId,
-                    row_no: target.row,
-                    layer_no: target.layer,
-                    jari_index: target.jari,
-                    stack_order: orderMap.get(b.box_id) ?? b.stack_order,
-                  }
-                : b,
-            ),
-          }
-        : m,
-    );
-
-    void warehouseMapApi
-      .restackJari({
-        angle_id: angleId,
-        row_no: target.row,
-        layer_no: target.layer,
-        jari_index: target.jari,
-        box_ids: boxIds,
-      })
-      .catch((e) => {
-        setMap((m) => (m ? { ...m, boxes: prevBoxes } : m));
-        onStatusChange?.(e instanceof Error ? e.message : "스택 순서 변경에 실패했습니다.");
-      });
+    if (!curAngle) return;
+    void mapMutations.insertBox(boxId, { angleId: curAngle.id, ...target });
   };
 
   // ── Keyboard: "/" focus, Esc close ──
@@ -573,7 +504,7 @@ export function DesktopWarehouseMapView({
     }
     // item_id 로 1차 그룹핑(품목 단위), 그 안에서 칸(cellKey)으로 2차 그룹핑.
     const byItem = new Map<string, { name: string; code: string | null; cells: Map<string, SearchHit> }>();
-    for (const b of map.boxes) {
+    for (const b of visibleBoxes) {
       for (const it of b.items) {
         if (
           matchesSearchText(it.item_name, q) ||
@@ -1057,6 +988,7 @@ export function DesktopWarehouseMapView({
                   pulseLayer={pulse?.layer}
                   matchQuery={matchQuery}
                   editable={editable}
+                  pendingBoxIds={mapMutations.pendingBoxIds}
                   onMoveBox={handleMoveBox}
                   onInsertBox={handleInsertBox}
                   onRowChange={handleRowChange}

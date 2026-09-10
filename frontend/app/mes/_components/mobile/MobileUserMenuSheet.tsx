@@ -6,7 +6,11 @@ import { BottomSheet } from "@/lib/ui/BottomSheet";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TYPO } from "./tokens";
 import { api } from "@/lib/api";
-import { clearCurrentOperator, useCurrentOperator } from "../login/useCurrentOperator";
+import {
+  logoutCurrentOperator,
+  returnToOperatorLogin,
+  useCurrentOperator,
+} from "../login/useCurrentOperator";
 import { normalizeDepartment } from "@/lib/mes/department";
 import { PinInput } from "./primitives";
 
@@ -40,7 +44,6 @@ export function MobileUserMenuSheet({
   const [pinConfirm, setPinConfirm] = useState("");
   const [pinError, setPinError] = useState<string | null>(null);
   const [pinBusy, setPinBusy] = useState(false);
-  const [pinDone, setPinDone] = useState(false);
 
   // 로그아웃 확인
   const [confirmLogout, setConfirmLogout] = useState(false);
@@ -52,7 +55,6 @@ export function MobileUserMenuSheet({
     setPinConfirm("");
     setPinError(null);
     setPinBusy(false);
-    setPinDone(false);
   }
 
   function handleClose() {
@@ -81,8 +83,7 @@ export function MobileUserMenuSheet({
       setPinError(null);
       try {
         await api.changeMyPin(operator.employee_id, pinCurrent, pinNew);
-        setPinDone(true);
-        setPinStep("idle");
+        returnToOperatorLogin();
       } catch (e) {
         setPinError(e instanceof Error ? e.message : "PIN 변경에 실패했습니다.");
       } finally {
@@ -142,14 +143,9 @@ export function MobileUserMenuSheet({
       <div className="px-5 py-3">
         {pinStep === "idle" ? (
           <div>
-            {pinDone && (
-              <div className={`${TYPO.caption} mb-2 font-semibold`} style={{ color: LEGACY_COLORS.green }}>
-                PIN이 변경되었습니다.
-              </div>
-            )}
             <button
               type="button"
-              onClick={() => { setPinDone(false); setPinError(null); setPinStep("current"); }}
+              onClick={() => { setPinError(null); setPinStep("current"); }}
               className="flex w-full items-center gap-3 rounded-[16px] px-4 py-3 text-left transition-opacity active:opacity-70"
               style={{
                 background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)`,
@@ -238,7 +234,7 @@ export function MobileUserMenuSheet({
               </button>
               <button
                 type="button"
-                onClick={() => { clearCurrentOperator(); window.location.reload(); }}
+                onClick={() => { void logoutCurrentOperator(); }}
                 className="flex-1 rounded-[14px] py-2.5 text-sm font-semibold transition-opacity active:opacity-70"
                 style={{
                   background: `color-mix(in srgb, ${LEGACY_COLORS.red} 18%, transparent)`,

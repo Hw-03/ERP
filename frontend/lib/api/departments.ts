@@ -5,7 +5,11 @@
  */
 
 import { deleteJson, fetcher, patchJson, postJson, putJson, toApiUrl } from "../api-core";
+import type { components } from "./generated/openapi";
 import type { DepartmentMaster } from "./types";
+
+export type DepartmentCreatePayload = components["schemas"]["DepartmentCreate"];
+export type DepartmentUpdatePayload = components["schemas"]["DepartmentUpdate"];
 
 export const departmentsApi = {
   getAppSession: (signal?: AbortSignal): Promise<{ boot_id: string; started_at: string }> =>
@@ -17,24 +21,12 @@ export const departmentsApi = {
     return fetcher<DepartmentMaster[]>(toApiUrl(`/api/departments?${query}`));
   },
 
-  createDepartment: (payload: {
-    name: string;
-    display_order?: number;
-    pin: string;
-    color_hex?: string;
-    io_enabled?: boolean;
-  }) => postJson<DepartmentMaster>(toApiUrl("/api/departments"), payload),
+  createDepartment: (payload: DepartmentCreatePayload) =>
+    postJson<DepartmentMaster>(toApiUrl("/api/departments"), payload),
 
   updateDepartment: (
     id: number,
-    payload: {
-      name?: string;
-      display_order?: number;
-      is_active?: boolean;
-      color_hex?: string | null;
-      io_enabled?: boolean;
-      pin: string;
-    },
+    payload: DepartmentUpdatePayload,
   ) => putJson<DepartmentMaster>(toApiUrl(`/api/departments/${id}`), payload),
 
   deleteDepartment: (id: number, pin: string) =>

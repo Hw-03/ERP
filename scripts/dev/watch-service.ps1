@@ -44,6 +44,18 @@ function Test-LineMatchesAny {
     return $false
 }
 
+function Test-WatchHttp200 {
+    param([string] $Url)
+
+    try {
+        $response = Invoke-WebRequest -Uri $Url -TimeoutSec 1 -UseBasicParsing -ErrorAction Stop
+        return $response.StatusCode -eq 200
+    }
+    catch {
+        return $false
+    }
+}
+
 function Write-WatchLine {
     param(
         [string] $Line,
@@ -158,6 +170,21 @@ $FrontendErrorPatterns = @(
 )
 
 if ($Service -eq "backend") {
+    $liveUrl = "http://127.0.0.1:$($Profile.BackendPort)/health/live"
+    $readyUrl = "http://127.0.0.1:$($Profile.BackendPort)/health/ready"
+    if (Test-WatchHttp200 -Url $liveUrl) {
+        Write-Host "[watch-backend] ALIVE"
+    }
+    else {
+        Write-Host "[watch-backend] NOT_ALIVE"
+    }
+    if (Test-WatchHttp200 -Url $readyUrl) {
+        Write-Host "[watch-backend] READY"
+    }
+    else {
+        Write-Host "[watch-backend] NOT_READY"
+    }
+    Write-Host ""
     Write-Host "===== Database readiness ====="
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $SchemaReadinessScript -Mode Report
     $schemaExit = $LASTEXITCODE

@@ -176,7 +176,7 @@ describe("DesktopWeeklyReportView F705-02 다운로드", () => {
 
     await waitFor(() => expect(createObjectURL).toHaveBeenCalledOnce());
     expect(click).toHaveBeenCalledOnce();
-    const anchor = click.mock.instances[0] as HTMLAnchorElement;
+    const anchor = click.mock.contexts[0] as HTMLAnchorElement;
     expect(anchor.download).toBe("F705-02 (R01) 2025 생산일지.xlsx");
     expect(anchor.parentNode).toBeNull();
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:f705-success");

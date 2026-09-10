@@ -79,9 +79,10 @@ def test_smart_targeted_gates_use_independent_hidden_children() -> None:
 def test_smart_frontend_gates_use_local_windows_bins_and_thread_pool() -> None:
     script = _script()
 
-    assert 'Join-Path $FrontendRoot "node_modules\\.bin\\next.cmd"' in script
+    assert 'Join-Path $FrontendRoot "node_modules\\.bin\\eslint.cmd"' in script
     assert 'Join-Path $FrontendRoot "node_modules\\.bin\\tsc.cmd"' in script
     assert 'Join-Path $FrontendRoot "node_modules\\.bin\\vitest.cmd"' in script
+    assert "& $FrontendEslintBin --max-warnings=0 @SourceFiles" in script
     assert "npx vitest related" not in script
     assert "npx vitest run @TestFiles" not in script
     assert "--pool=threads" in script

@@ -43,6 +43,7 @@ from app.models import (
     Item,
     LocationStatusEnum,
     TransactionLog,
+    WarehouseUnplacedItem,
 )
 from app.services.inventory import PROCESS_TYPE_TO_DEPT
 
@@ -183,7 +184,6 @@ def reset_core_tables(db) -> None:
     db.query(Inventory).delete()
     db.query(Item).delete()
     db.query(Employee).delete()
-    db.commit()
 
 
 DEFAULT_EMPLOYEES = [
@@ -233,7 +233,6 @@ def seed_employees(db, now) -> None:
             created_at=now,
             updated_at=now,
         ))
-    db.commit()
     print(f"Default employees inserted: {len(DEFAULT_EMPLOYEES)}")
 
 
@@ -312,6 +311,12 @@ def seed_from_legacy_html() -> None:
                     updated_at=now,
                 )
             )
+            db.add(
+                WarehouseUnplacedItem(
+                    item_id=item.item_id,
+                    quantity=legacy_qty if legacy_is_warehouse else Decimal("0"),
+                )
+            )
             if not legacy_is_warehouse and legacy_dept is not None and legacy_qty > 0:
                 db.add(InventoryLocation(
                     item_id=item.item_id,
@@ -350,7 +355,6 @@ def seed() -> None:
 
     db = SessionLocal()
     now = datetime.now(UTC).replace(tzinfo=None)
-    seed_employees(db, now)
 
     inserted = 0
     skipped = 0
@@ -359,9 +363,9 @@ def seed() -> None:
     errors: list[str] = []
 
     try:
+        seed_employees(db, now)
         db.query(Inventory).delete()
         db.query(Item).delete()
-        db.commit()
 
         for csv_row_number, row in enumerate(rows, start=2):
             item_code = (row.get("item_id") or "").strip()
@@ -433,6 +437,12 @@ def seed() -> None:
                 updated_at=now,
             )
             db.add(inventory)
+            db.add(
+                WarehouseUnplacedItem(
+                    item_id=item.item_id,
+                    quantity=quantity if is_warehouse else Decimal("0"),
+                )
+            )
             db.flush()
             if not is_warehouse and dept is not None and quantity > 0:
                 db.add(InventoryLocation(
@@ -447,9 +457,6 @@ def seed() -> None:
                 process_type_counts[inferred_pt] += 1
             else:
                 process_type_counts["(unmapped)"] += 1
-
-            if inserted % 200 == 0:
-                db.commit()
 
         db.commit()
 

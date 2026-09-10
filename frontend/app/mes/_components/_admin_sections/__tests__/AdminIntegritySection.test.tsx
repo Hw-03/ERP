@@ -17,6 +17,18 @@ describe("AdminIntegritySection", () => {
   beforeEach(() => {
     state.getInventoryIntegrity.mockReset();
     state.getInventoryIntegrity.mockResolvedValue({
+      contract: "inventory-integrity/v1",
+      status: "fail",
+      blocking_count: 1,
+      warning_count: 0,
+      checks: [
+        {
+          check_id: "WORKFLOW_STATE_RESIDUE",
+          severity: "blocking",
+          count: 1,
+          samples: [{ problem_id: "INT-ABC123" }],
+        },
+      ],
       generated_at: "2026-08-25T09:00:00",
       is_consistent: false,
       issue_count: 1,
@@ -61,5 +73,46 @@ describe("AdminIntegritySection", () => {
     fireEvent.click(screen.getByRole("button", { name: "다시 검사" }));
 
     await waitFor(() => expect(state.getInventoryIntegrity).toHaveBeenCalledTimes(2));
+  });
+
+  it("새 blocking check를 문제 수와 결과 목록에 표시한다", async () => {
+    state.getInventoryIntegrity.mockResolvedValueOnce({
+      contract: "inventory-integrity/v1",
+      status: "fail",
+      blocking_count: 1,
+      warning_count: 0,
+      checks: [
+        {
+          check_id: "WAREHOUSE_PHYSICAL_MISMATCH",
+          severity: "blocking",
+          count: 1,
+          samples: [
+            {
+              item_id: "item-1",
+              warehouse_quantity: 4,
+              unplaced_quantity: 1,
+            },
+          ],
+        },
+      ],
+      generated_at: "2026-09-02T09:00:00",
+      is_consistent: false,
+      issue_count: 0,
+      category_counts: {
+        DEFECT_STOCK_MISMATCH: 0,
+        PARTIAL_CANCELLATION: 0,
+        WORKFLOW_STATE_RESIDUE: 0,
+        SHIPPING_ALLOCATION_MISMATCH: 0,
+        DUPLICATE_REVERSAL: 0,
+        WEEKLY_UNCLASSIFIED_EFFECT: 0,
+      },
+      issues: [],
+    });
+
+    render(<AdminIntegritySection />);
+
+    expect(await screen.findByText("WAREHOUSE_PHYSICAL_MISMATCH")).toBeInTheDocument();
+    expect(screen.getByText(/발견 문제 1건/)).toBeInTheDocument();
+    expect(screen.queryByText("발견된 정합성 문제가 없습니다.")).not.toBeInTheDocument();
   });
 });

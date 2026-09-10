@@ -185,3 +185,13 @@ class TransactionEditLog(Base):
         nullable=True,
     )  # 4차 수량 보정 시 생성된 ADJUST 거래 참조
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
+
+    __table_args__ = (
+        Index(
+            "uq_transaction_edit_log_quantity_correction",
+            "original_log_id",
+            unique=True,
+            postgresql_where=correction_log_id.isnot(None),
+            sqlite_where=correction_log_id.isnot(None),
+        ),
+    )

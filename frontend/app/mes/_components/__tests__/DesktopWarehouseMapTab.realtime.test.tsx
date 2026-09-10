@@ -6,15 +6,12 @@ const testState = vi.hoisted(() => ({
   revision: 1 as number | null,
   getItems: vi.fn(),
   reconcile: vi.fn(),
-  verifyPin: vi.fn(),
+  verifyEditor: vi.fn(),
+  registerOperatorCredsProvider: vi.fn(),
 }));
 
 vi.mock("@/lib/queries/realtime", () => ({
   useRealtimeRevision: () => testState.revision,
-}));
-
-vi.mock("@/lib/api/employees", () => ({
-  employeesApi: { verifyEmployeePin: testState.verifyPin },
 }));
 
 vi.mock("@/lib/api/items", () => ({
@@ -22,11 +19,14 @@ vi.mock("@/lib/api/items", () => ({
 }));
 
 vi.mock("@/lib/api/warehouse-map", () => ({
-  warehouseMapApi: { reconcile: testState.reconcile },
+  warehouseMapApi: {
+    reconcile: testState.reconcile,
+    verifyEditor: testState.verifyEditor,
+  },
 }));
 
 vi.mock("@/lib/api-core", () => ({
-  registerOperatorCredsProvider: vi.fn(),
+  registerOperatorCredsProvider: testState.registerOperatorCredsProvider,
 }));
 
 vi.mock("../login/useCurrentOperator", () => ({
@@ -60,7 +60,7 @@ vi.mock("../_admin_sections/AdminWarehouseStructureSection", () => ({
 beforeEach(() => {
   vi.clearAllMocks();
   testState.revision = null;
-  testState.verifyPin.mockResolvedValue({});
+  testState.verifyEditor.mockResolvedValue(undefined);
   testState.getItems.mockResolvedValue([]);
   testState.reconcile.mockResolvedValue({ rows: [], mismatch_count: 0 });
 });
@@ -82,6 +82,70 @@ function deferred<T>() {
 }
 
 describe("DesktopWarehouseMapTab realtime refresh", () => {
+  it("shows structurally invalid ledgers even when the legacy placement subtotal matches", async () => {
+    testState.reconcile.mockResolvedValueOnce({
+      rows: [{
+        item_id: "invalid-ledger-1",
+        mes_code: "M-INVALID",
+        item_name: "invalid-ledger-item",
+        placed_total: 0,
+        warehouse_qty: 0,
+        diff: 0,
+        status: "ok",
+        box_total: 0,
+        zone_total: 0,
+        inactive_zone_total: 0,
+        unplaced_total: 0,
+        ledger_total: 0,
+        ledger_diff: 0,
+        ledger_status: "invalid",
+        inventory_present: false,
+        unplaced_present: false,
+        ledger_issues: ["missing_inventory", "missing_unplaced"],
+      }],
+      mismatch_count: 0,
+      ledger_mismatch_count: 1,
+    });
+    render(<DesktopWarehouseMapTab />);
+
+    await enterEditMode();
+
+    expect(await screen.findByText(/재고 위치 원장 구조 또는 수량이 올바르지 않습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/M-INVALID\(B 0 · Z 0 · U 0 \/ W 0 · 재고 행 없음 · 미배치\(U\) 행 없음\)/)).toBeInTheDocument();
+    expect(screen.queryByText(/박스 관리에서 정리하기/)).not.toBeInTheDocument();
+  });
+
+  it("verifies the current session actor before registering mutation step-up credentials", async () => {
+    render(<DesktopWarehouseMapTab />);
+
+    await enterEditMode();
+
+    expect(testState.verifyEditor).toHaveBeenCalledTimes(1);
+    const provider = testState.registerOperatorCredsProvider.mock.calls[0]?.[0] as
+      | (() => { code: string; pin: string } | null)
+      | undefined;
+    expect(provider?.()).toEqual({ code: "E001", pin: "1234" });
+  });
+
+  it("keeps the editor closed when PIN verification fails", async () => {
+    testState.verifyEditor.mockRejectedValueOnce(new Error("PIN 확인 실패"));
+    render(<DesktopWarehouseMapTab />);
+
+    fireEvent.click(screen.getByRole("button", { name: "편집 모드" }));
+    fireEvent.change(screen.getByPlaceholderText("본인 PIN"), { target: { value: "1234" } });
+    fireEvent.click(screen.getByRole("button", { name: "편집 시작" }));
+
+    expect(await screen.findByText("PIN 확인 실패")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "편집 시작" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "보기 모드로" })).not.toBeInTheDocument();
+    expect(testState.getItems).not.toHaveBeenCalled();
+    expect(testState.reconcile).not.toHaveBeenCalled();
+    const provider = testState.registerOperatorCredsProvider.mock.calls[0]?.[0] as
+      | (() => { code: string; pin: string } | null)
+      | undefined;
+    expect(provider?.()).toBeNull();
+  });
+
   it("applies reconcile results when the concurrent item refresh fails", async () => {
     const { rerender } = render(<DesktopWarehouseMapTab />);
     await enterEditMode();
@@ -102,7 +166,7 @@ describe("DesktopWarehouseMapTab realtime refresh", () => {
     testState.revision = 2;
     rerender(<DesktopWarehouseMapTab />);
 
-    expect(await screen.findByText(/M-1\(0\/4\)/)).toBeInTheDocument();
+    expect(await screen.findByText(/M-1\(B 0 · Z 0 · U 0 \/ W 4\)/)).toBeInTheDocument();
   });
 
   it("applies item results when the concurrent reconcile refresh fails", async () => {
@@ -200,7 +264,7 @@ describe("DesktopWarehouseMapTab realtime refresh", () => {
       });
       await newerReconcile.promise;
     });
-    expect(await screen.findByText(/F-1\(0\/4\)/)).toBeInTheDocument();
+    expect(await screen.findByText(/F-1\(B 0 · Z 0 · U 0 \/ W 4\)/)).toBeInTheDocument();
 
     await act(async () => {
       olderReconcile.resolve({
@@ -218,7 +282,7 @@ describe("DesktopWarehouseMapTab realtime refresh", () => {
       await olderReconcile.promise;
     });
     await waitFor(() => {
-      expect(screen.getByText(/F-1\(0\/4\)/)).toBeInTheDocument();
+      expect(screen.getByText(/F-1\(B 0 · Z 0 · U 0 \/ W 4\)/)).toBeInTheDocument();
       expect(screen.queryByText(/S-1\(0\/7\)/)).not.toBeInTheDocument();
     });
   });

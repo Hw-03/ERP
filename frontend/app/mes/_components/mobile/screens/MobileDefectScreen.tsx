@@ -1,7 +1,7 @@
 "use client";
 
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { isWarehouseStaff, isDepartmentApprover } from "../../_warehouse_steps";
+import { defectDefaultSource } from "../../_warehouse_steps";
 import { readCurrentOperator, type Operator } from "../../login/useCurrentOperator";
 import { useWarehouseData } from "../../_warehouse_hooks/useWarehouseData";
 import { DefectHubPanel } from "../../_defect_hub/DefectHubPanel";
@@ -49,9 +49,6 @@ function MobileDefectInner({
   const { items, productModels } = useWarehouseData({ globalSearch: "", onStatusChange: NOOP });
 
   // 역할 기반 기본 출처 — 창고 전담자만 "warehouse", 나머지 "production"(데스크톱 동일).
-  const defaultSource: "warehouse" | "production" =
-    isWarehouseStaff(operator) && !isDepartmentApprover(operator) ? "warehouse" : "production";
-
   return (
     <div className="h-full w-full overflow-y-auto px-3 pb-6 pt-3">
       <DefectHubPanel
@@ -64,7 +61,7 @@ function MobileDefectInner({
         }}
         items={items}
         productModels={productModels}
-        defaultSource={defaultSource}
+        defaultSource={defectDefaultSource(operator)}
       />
     </div>
   );

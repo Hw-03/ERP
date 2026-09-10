@@ -2,12 +2,12 @@
 /**
  * Round-16 #4 — Bundle size gate.
  *
- * .next-prod/static/chunks 의 *.js 합산 크기가 임계 (default 2.84 MB) 이내인지 검사.
+ * .next-prod/static/chunks 의 *.js 합산 크기가 임계 (default 2.84 MiB) 이내인지 검사.
  * Next.js production build 후 실행. 임계 초과 시 exit 1.
  *
  * 사용:
  *   node scripts/check-bundle-size.mjs              # default 임계
- *   node scripts/check-bundle-size.mjs --max 1.5    # 1.5 MB 강제
+ *   node scripts/check-bundle-size.mjs --max 1.5    # 1.5 MiB 강제
  *
  * 빌드 결과 디렉터리는 package.json 의 build 스크립트에서 --distDir .next-prod 로
  * 분리되어 있다 (dev 서버의 .next 와 충돌 방지).
@@ -23,9 +23,9 @@ const FRONTEND_ROOT = path.resolve(__dirname, "..");
 
 const args = process.argv.slice(2);
 const maxIdx = args.indexOf("--max");
-// 2026-09-10: 요청순 재고·묶음 표시 통합 실측 2.835 MB에 맞춰 예산을 0.01 MB 조정.
-const MAX_MB = maxIdx >= 0 ? parseFloat(args[maxIdx + 1]) : 2.84;
-const MAX_BYTES = MAX_MB * 1024 * 1024;
+// 2026-09-10: 요청순 재고·묶음 표시 통합 실측 2.835 MiB에 맞춰 예산을 0.02 MiB 조정.
+const MAX_MIB = maxIdx >= 0 ? parseFloat(args[maxIdx + 1]) : 2.84;
+const MAX_BYTES = MAX_MIB * 1024 * 1024;
 
 async function walk(dir) {
   const out = [];
@@ -57,17 +57,17 @@ async function main() {
     total += stat.size;
   }
 
-  const totalMB = total / 1024 / 1024;
-  const limitMB = MAX_BYTES / 1024 / 1024;
+  const totalMiB = total / 1024 / 1024;
+  const limitMiB = MAX_BYTES / 1024 / 1024;
   console.log(
-    `Bundle size (${distDir}/static/chunks): ${totalMB.toFixed(3)} MB (${total.toLocaleString()} bytes) ` +
-      `(limit ${limitMB.toFixed(3)} MB, ${MAX_BYTES.toLocaleString()} bytes)`,
+    `Bundle size (${distDir}/static/chunks): ${totalMiB.toFixed(3)} MiB (${total.toLocaleString()} bytes) ` +
+      `(limit ${limitMiB.toFixed(3)} MiB, ${MAX_BYTES.toLocaleString()} bytes)`,
   );
 
   if (total > MAX_BYTES) {
     console.error(
-      `✗ Bundle size ${totalMB.toFixed(3)} MB (${total.toLocaleString()} bytes) exceeds ` +
-        `limit ${limitMB.toFixed(3)} MB (${MAX_BYTES.toLocaleString()} bytes).`,
+      `✗ Bundle size ${totalMiB.toFixed(3)} MiB (${total.toLocaleString()} bytes) exceeds ` +
+        `limit ${limitMiB.toFixed(3)} MiB (${MAX_BYTES.toLocaleString()} bytes).`,
     );
     process.exit(1);
   }

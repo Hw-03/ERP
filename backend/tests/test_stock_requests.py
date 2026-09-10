@@ -14,8 +14,10 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 
@@ -26,9 +28,13 @@ from app.models import (
     Inventory,
     InventoryLocation,
     LocationStatusEnum,
+    ShippingAllocation,
+    ShippingRequest,
+    ShippingRequestStatusEnum,
     StockRequest,
     StockRequestLine,
     StockRequestStatusEnum,
+    StockRequestTypeEnum,
     TransactionLog,
     TransactionTypeEnum,
 )
@@ -73,6 +79,7 @@ def _create_request_via_api(
     request_type: str,
     lines: list[dict],
     notes: str | None = None,
+    client_request_id: str | None = None,
 ) -> dict:
     payload = {
         "requester_employee_id": requester_id,
@@ -81,8 +88,133 @@ def _create_request_via_api(
     }
     if notes is not None:
         payload["notes"] = notes
+    if client_request_id is not None:
+        payload["client_request_id"] = client_request_id
     res = client.post("/api/stock-requests", json=payload)
     return {"status_code": res.status_code, "body": res.json()}
+
+
+def test_stock_request_semantic_idempotency_replays_exact_and_rejects_change(
+    db_session, client, make_item
+):
+    item = make_item(
+        name="Stock semantic idem",
+        process_type_code="AR",
+        warehouse_qty=Decimal("10"),
+    )
+    requester = _make_employee(
+        db_session, code="SR-IDEM-01", name="요청자-IDEM"
+    )
+    db_session.commit()
+    line = {
+        "item_id": str(item.item_id),
+        "quantity": "1",
+        "from_bucket": "warehouse",
+        "to_bucket": "production",
+        "to_department": DepartmentEnum.ASSEMBLY.value,
+    }
+    key = "stock-semantic-idem-001"
+
+    first = _create_request_via_api(
+        client,
+        requester_id=str(requester.employee_id),
+        request_type="warehouse_to_dept",
+        lines=[line],
+        notes="same",
+        client_request_id=key,
+    )
+    exact = _create_request_via_api(
+        client,
+        requester_id=str(requester.employee_id),
+        request_type="warehouse_to_dept",
+        lines=[line],
+        notes="same",
+        client_request_id=key,
+    )
+    changed = _create_request_via_api(
+        client,
+        requester_id=str(requester.employee_id),
+        request_type="warehouse_to_dept",
+        lines=[{**line, "quantity": "2"}],
+        notes="changed",
+        client_request_id=key,
+    )
+
+    assert first["status_code"] == 201, first["body"]
+    assert exact["status_code"] == 201, exact["body"]
+    assert exact["body"]["request_id"] == first["body"]["request_id"]
+    assert changed["status_code"] == 409, changed["body"]
+    assert changed["body"]["detail"]["code"] == "IDEMPOTENCY_CONFLICT"
+    assert changed["body"]["detail"]["extra"]["reason"] == "fingerprint_mismatch"
+    assert db_session.query(StockRequest).count() == 1
+    db_session.expire_all()
+    inventory = db_session.query(Inventory).filter_by(item_id=item.item_id).one()
+    assert inventory.pending_quantity == Decimal("1")
+
+
+def test_stock_request_same_key_other_actor_and_legacy_null_are_fail_closed(
+    db_session, client, make_item
+):
+    item = make_item(
+        name="Stock scoped idem",
+        process_type_code="AR",
+        warehouse_qty=Decimal("10"),
+    )
+    requester = _make_employee(
+        db_session, code="SR-IDEM-SCOPE-1", name="요청자-IDEM-1"
+    )
+    other = _make_employee(
+        db_session, code="SR-IDEM-SCOPE-2", name="요청자-IDEM-2"
+    )
+    db_session.commit()
+    line = {
+        "item_id": str(item.item_id),
+        "quantity": "1",
+        "from_bucket": "warehouse",
+        "to_bucket": "production",
+        "to_department": DepartmentEnum.ASSEMBLY.value,
+    }
+    key = "stock-semantic-idem-scope"
+    first = _create_request_via_api(
+        client,
+        requester_id=str(requester.employee_id),
+        request_type="warehouse_to_dept",
+        lines=[line],
+        client_request_id=key,
+    )
+    assert first["status_code"] == 201, first["body"]
+
+    actor_conflict = _create_request_via_api(
+        client,
+        requester_id=str(other.employee_id),
+        request_type="warehouse_to_dept",
+        lines=[line],
+        client_request_id=key,
+    )
+    assert actor_conflict["status_code"] == 409, actor_conflict["body"]
+    assert actor_conflict["body"]["detail"]["code"] == "IDEMPOTENCY_CONFLICT"
+    assert actor_conflict["body"]["detail"]["extra"]["reason"] == "actor_mismatch"
+
+    request = db_session.query(StockRequest).one()
+    request.request_fingerprint = None
+    db_session.commit()
+    legacy_conflict = _create_request_via_api(
+        client,
+        requester_id=str(requester.employee_id),
+        request_type="warehouse_to_dept",
+        lines=[line],
+        client_request_id=key,
+    )
+    assert legacy_conflict["status_code"] == 409, legacy_conflict["body"]
+    assert legacy_conflict["body"]["detail"]["code"] == "IDEMPOTENCY_CONFLICT"
+    assert (
+        legacy_conflict["body"]["detail"]["extra"]["reason"]
+        == "legacy_fingerprint_missing"
+    )
+    assert db_session.query(StockRequest).count() == 1
+    db_session.expire_all()
+    inventory = db_session.query(Inventory).filter_by(item_id=item.item_id).one()
+    assert inventory.pending_quantity == Decimal("1")
 
 
 def test_internal_use_direct_request_rejects_unauthorized_requester(
@@ -1457,6 +1589,12 @@ def test_draft_does_not_appear_in_my_requests_or_warehouse_queue(
 ):
     item = make_item(name="DRAFT011", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="D11", name="장바구니K")
+    warehouse_actor = _make_employee(
+        db_session,
+        code="D11-WH",
+        name="창고 결재자",
+        warehouse_role="primary",
+    )
     db_session.commit()
 
     _upsert_draft(
@@ -1474,7 +1612,10 @@ def test_draft_does_not_appear_in_my_requests_or_warehouse_queue(
     assert len(res_my.json()) == 0  # DRAFT 가 유일하므로 결과 비어야 함.
 
     # GET /warehouse-queue — DRAFT 미노출.
-    res_q = client.get("/api/stock-requests/warehouse-queue")
+    res_q = client.get(
+        "/api/stock-requests/warehouse-queue",
+        headers={"X-Actor-Employee-Id": str(warehouse_actor.employee_id)},
+    )
     assert res_q.status_code == 200
     assert all(r["status"] != "draft" for r in res_q.json())
     assert len(res_q.json()) == 0
@@ -1535,6 +1676,113 @@ def test_submit_dept_to_warehouse_fails_when_production_stock_insufficient(
     assert "재고 부족" in res.json().get("detail", {}).get("message", "")
 
 
+def _add_active_shipping_reservation(db_session, item_id, quantity: Decimal) -> None:
+    request = ShippingRequest(
+        status=ShippingRequestStatusEnum.PREPARED,
+        base_pf_item_id=item_id,
+        request_quantity=1,
+    )
+    db_session.add(request)
+    db_session.flush()
+    db_session.add(
+        ShippingAllocation(
+            request_id=request.request_id,
+            item_id=item_id,
+            quantity=quantity,
+            department=DepartmentEnum.ASSEMBLY.value,
+            status="RESERVED",
+        )
+    )
+
+
+def test_create_dept_to_warehouse_preflight_counts_shipping_reservation(
+    db_session, client, make_item, make_location, monkeypatch
+):
+    item = make_item(name="canonical create preflight", warehouse_qty=Decimal("0"))
+    make_location(
+        item.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        status=LocationStatusEnum.PRODUCTION,
+        quantity=Decimal("5"),
+    )
+    requester = _make_employee(db_session, code="SR-CAN-C", name="canonical create")
+    _add_active_shipping_reservation(db_session, item.item_id, Decimal("4"))
+    db_session.commit()
+
+    from app.services import sr_reservation
+
+    monkeypatch.setattr(
+        sr_reservation,
+        "reserve_lines",
+        lambda *_args, **_kwargs: pytest.fail("canonical preflight was bypassed"),
+    )
+    result = _create_request_via_api(
+        client,
+        requester_id=str(requester.employee_id),
+        request_type="dept_to_warehouse",
+        lines=[
+            {
+                "item_id": str(item.item_id),
+                "quantity": "2",
+                "from_bucket": "production",
+                "from_department": DepartmentEnum.ASSEMBLY.value,
+                "to_bucket": "warehouse",
+            }
+        ],
+    )
+
+    assert result["status_code"] == 422, result["body"]
+    assert db_session.query(StockRequest).count() == 0
+
+
+def test_submit_draft_preflight_counts_shipping_reservation(
+    db_session, client, make_item, make_location, monkeypatch
+):
+    item = make_item(
+        name="canonical draft preflight",
+        process_type_code="AR",
+        warehouse_qty=Decimal("0"),
+    )
+    make_location(
+        item.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        status=LocationStatusEnum.PRODUCTION,
+        quantity=Decimal("5"),
+    )
+    requester = _make_employee(db_session, code="SR-CAN-D", name="canonical draft")
+    _add_active_shipping_reservation(db_session, item.item_id, Decimal("4"))
+    db_session.commit()
+    draft = _upsert_draft(
+        client,
+        requester_id=str(requester.employee_id),
+        request_type="dept_to_warehouse",
+        lines=[
+            {
+                "item_id": str(item.item_id),
+                "quantity": "2",
+                "from_bucket": "production",
+                "from_department": DepartmentEnum.ASSEMBLY.value,
+                "to_bucket": "warehouse",
+            }
+        ],
+    )
+    assert draft["status_code"] == 200, draft["body"]
+
+    from app.services import sr_reservation
+
+    monkeypatch.setattr(
+        sr_reservation,
+        "reserve_lines",
+        lambda *_args, **_kwargs: pytest.fail("canonical preflight was bypassed"),
+    )
+    response = client.post(
+        f"/api/stock-requests/{draft['body']['request_id']}/submit",
+        json={"requester_employee_id": str(requester.employee_id)},
+    )
+
+    assert response.status_code == 422, response.text
+
+
 # ---------------------------------------------------------------------------
 # Approval separation (new policy): 부서 큐에는 창고 승인 필요한 요청이 노출되지 않음.
 # count API 는 list API 와 동일 필터로 길이가 일치.
@@ -1553,6 +1801,18 @@ def test_department_queue_excludes_warehouse_approval_pending(
     requester = _make_employee(
         db_session, code="QSEPR", name="요청자QS"
     )
+    warehouse_actor = _make_employee(
+        db_session,
+        code="QSEP-WH",
+        name="창고 결재자",
+        warehouse_role="primary",
+    )
+    department_actor = _make_employee(
+        db_session,
+        code="QSEP-DEPT",
+        name="부서 결재자",
+    )
+    department_actor.department_role = "primary"
     db_session.commit()
 
     out = _create_request_via_api(
@@ -1578,13 +1838,17 @@ def test_department_queue_excludes_warehouse_approval_pending(
     db_session.commit()
 
     # 창고 큐는 노출.
-    res_wh = client.get("/api/stock-requests/warehouse-queue")
+    res_wh = client.get(
+        "/api/stock-requests/warehouse-queue",
+        headers={"X-Actor-Employee-Id": str(warehouse_actor.employee_id)},
+    )
     assert res_wh.status_code == 200
     assert any(r["request_id"] == request_id for r in res_wh.json())
 
     # 부서 큐는 동일 부서 actor 로 조회해도 노출 안 됨.
     res_dept = client.get(
-        f"/api/stock-requests/department-queue?actor_employee_id={requester.employee_id}",
+        f"/api/stock-requests/department-queue?actor_employee_id={department_actor.employee_id}",
+        headers={"X-Actor-Employee-Id": str(department_actor.employee_id)},
     )
     assert res_dept.status_code == 200
     assert not any(r["request_id"] == request_id for r in res_dept.json())
@@ -1593,6 +1857,12 @@ def test_department_queue_excludes_warehouse_approval_pending(
 def test_warehouse_queue_count_matches_list(db_session, client, make_item):
     item = make_item(name="QCNT1", process_type_code="AR", warehouse_qty=Decimal("5"))
     requester = _make_employee(db_session, code="QCN1", name="요청자QC1")
+    warehouse_actor = _make_employee(
+        db_session,
+        code="QCN1-WH",
+        name="창고 결재자",
+        warehouse_role="primary",
+    )
     db_session.commit()
 
     _create_request_via_api(
@@ -1610,8 +1880,12 @@ def test_warehouse_queue_count_matches_list(db_session, client, make_item):
         ],
     )
 
-    res_list = client.get("/api/stock-requests/warehouse-queue")
-    res_cnt = client.get("/api/stock-requests/warehouse-queue/count")
+    actor_headers = {"X-Actor-Employee-Id": str(warehouse_actor.employee_id)}
+    res_list = client.get("/api/stock-requests/warehouse-queue", headers=actor_headers)
+    res_cnt = client.get(
+        "/api/stock-requests/warehouse-queue/count",
+        headers=actor_headers,
+    )
     assert res_list.status_code == 200
     assert res_cnt.status_code == 200
     assert res_cnt.json()["count"] == len(res_list.json())
@@ -1623,6 +1897,12 @@ def test_department_queue_count_matches_list(db_session, client, make_item):
     requester = _make_employee(
         db_session, code="QCN2", name="요청자QC2"
     )
+    department_actor = _make_employee(
+        db_session,
+        code="QCN2-DEPT",
+        name="부서 결재자",
+    )
+    department_actor.department_role = "primary"
     db_session.commit()
 
     # manual_adjustment 만 부서 결재 단독 경로. wh approval=False, dept approval=True.
@@ -1642,11 +1922,243 @@ def test_department_queue_count_matches_list(db_session, client, make_item):
     # manual_adjustment 는 별도 경로일 수 있어 422 도 허용 (생성 자체가 동일 라우터 아닐 가능성).
     # 이 테스트의 목적은 count API 가 list 와 길이 일치하는지만 검증.
     res_list = client.get(
-        f"/api/stock-requests/department-queue?actor_employee_id={requester.employee_id}",
+        f"/api/stock-requests/department-queue?actor_employee_id={department_actor.employee_id}",
+        headers={"X-Actor-Employee-Id": str(department_actor.employee_id)},
     )
     res_cnt = client.get(
-        f"/api/stock-requests/department-queue/count?actor_employee_id={requester.employee_id}",
+        f"/api/stock-requests/department-queue/count?actor_employee_id={department_actor.employee_id}",
+        headers={"X-Actor-Employee-Id": str(department_actor.employee_id)},
     )
     assert res_list.status_code == 200
     assert res_cnt.status_code == 200
     assert res_cnt.json()["count"] == len(res_list.json())
+
+
+@pytest.mark.parametrize(
+    "case",
+    json.loads(
+        (Path(__file__).parent / "fixtures/department_approval_role_matrix.json").read_text(
+            encoding="utf-8"
+        )
+    ),
+    ids=lambda case: case["name"],
+)
+def test_approval_role_matrix_controls_http_queues_and_actions(
+    db_session, client, case
+):
+    requester = _make_employee(
+        db_session,
+        code=f"MATRIX-REQ-{case['name']}",
+        name="역할 행렬 요청자",
+    )
+    actor = _make_employee(
+        db_session,
+        code=f"MATRIX-ACT-{case['name']}",
+        name="역할 행렬 결재자",
+        warehouse_role=case["warehouse_role"],
+        level=EmployeeLevelEnum(case["level"]),
+    )
+    actor.department_role = case["department_role"]
+
+    def _pending_request(
+        *,
+        requires_warehouse_approval: bool,
+        requires_department_approval: bool,
+    ) -> StockRequest:
+        request = StockRequest(
+            requester_employee_id=requester.employee_id,
+            requester_name=requester.name,
+            requester_department=DepartmentEnum.ASSEMBLY.value,
+            approval_department=DepartmentEnum.ASSEMBLY.value,
+            request_type=StockRequestTypeEnum.DEPT_INTERNAL,
+            status=StockRequestStatusEnum.SUBMITTED,
+            requires_warehouse_approval=requires_warehouse_approval,
+            requires_department_approval=requires_department_approval,
+        )
+        db_session.add(request)
+        db_session.flush()
+        return request
+
+    warehouse_queue_request = _pending_request(
+        requires_warehouse_approval=True,
+        requires_department_approval=False,
+    )
+    warehouse_approve_request = _pending_request(
+        requires_warehouse_approval=True,
+        requires_department_approval=False,
+    )
+    warehouse_reject_request = _pending_request(
+        requires_warehouse_approval=True,
+        requires_department_approval=False,
+    )
+    department_queue_request = _pending_request(
+        requires_warehouse_approval=False,
+        requires_department_approval=True,
+    )
+    department_approve_request = _pending_request(
+        requires_warehouse_approval=False,
+        requires_department_approval=True,
+    )
+    department_reject_request = _pending_request(
+        requires_warehouse_approval=False,
+        requires_department_approval=True,
+    )
+    db_session.commit()
+    headers = {"X-Actor-Employee-Id": str(actor.employee_id)}
+
+    warehouse_queue = client.get(
+        "/api/stock-requests/warehouse-queue",
+        headers=headers,
+    )
+    warehouse_count = client.get(
+        "/api/stock-requests/warehouse-queue/count",
+        headers=headers,
+    )
+    if case["can_see_warehouse_queue"]:
+        assert warehouse_queue.status_code == 200, warehouse_queue.text
+        assert warehouse_count.status_code == 200, warehouse_count.text
+        warehouse_ids = {entry["request_id"] for entry in warehouse_queue.json()}
+        assert warehouse_ids == {
+            str(warehouse_queue_request.request_id),
+            str(warehouse_approve_request.request_id),
+            str(warehouse_reject_request.request_id),
+        }
+        assert warehouse_count.json()["count"] == len(warehouse_ids)
+    else:
+        assert warehouse_queue.status_code == 403, warehouse_queue.text
+        assert warehouse_count.status_code == 403, warehouse_count.text
+
+    queue = client.get(
+        "/api/stock-requests/department-queue",
+        params={"actor_employee_id": str(actor.employee_id)},
+        headers=headers,
+    )
+    count = client.get(
+        "/api/stock-requests/department-queue/count",
+        params={"actor_employee_id": str(actor.employee_id)},
+        headers=headers,
+    )
+    if case["can_see_department_queue"]:
+        assert queue.status_code == 200, queue.text
+        assert count.status_code == 200, count.text
+        visible_ids = {entry["request_id"] for entry in queue.json()}
+        expected_visible_ids = {
+            str(department_queue_request.request_id),
+            str(department_approve_request.request_id),
+            str(department_reject_request.request_id),
+        }
+        assert visible_ids == expected_visible_ids
+        assert count.json()["count"] == len(expected_visible_ids)
+    else:
+        assert queue.status_code == 403, queue.text
+        assert count.status_code == 403, count.text
+
+    warehouse_approved = client.post(
+        f"/api/stock-requests/{warehouse_approve_request.request_id}/approve",
+        json={"actor_employee_id": str(actor.employee_id), "pin": "0000"},
+        headers=headers,
+    )
+    warehouse_rejected = client.post(
+        f"/api/stock-requests/{warehouse_reject_request.request_id}/reject",
+        json={
+            "actor_employee_id": str(actor.employee_id),
+            "pin": "0000",
+            "reason": "창고 역할 행렬 반려 검증",
+        },
+        headers=headers,
+    )
+    if case["can_see_warehouse_queue"]:
+        assert warehouse_approved.status_code == 200, warehouse_approved.text
+        assert warehouse_rejected.status_code == 200, warehouse_rejected.text
+    else:
+        assert warehouse_approved.status_code == 403, warehouse_approved.text
+        assert warehouse_rejected.status_code == 403, warehouse_rejected.text
+
+    approved = client.post(
+        f"/api/stock-requests/{department_approve_request.request_id}/department-approve",
+        json={"actor_employee_id": str(actor.employee_id), "pin": "0000"},
+        headers=headers,
+    )
+    rejected = client.post(
+        f"/api/stock-requests/{department_reject_request.request_id}/department-reject",
+        json={
+            "actor_employee_id": str(actor.employee_id),
+            "pin": "0000",
+            "reason": "역할 행렬 반려 검증",
+        },
+        headers=headers,
+    )
+    if case["can_see_department_queue"]:
+        assert approved.status_code == 200, approved.text
+        assert approved.json()["department_approved_by_employee_id"] == str(actor.employee_id)
+        assert rejected.status_code == 200, rejected.text
+        assert rejected.json()["status"] == StockRequestStatusEnum.REJECTED.value
+    else:
+        assert approved.status_code == 403, approved.text
+        assert rejected.status_code == 403, rejected.text
+        db_session.expire_all()
+        assert db_session.get(StockRequest, department_approve_request.request_id).status == StockRequestStatusEnum.SUBMITTED
+        assert db_session.get(StockRequest, department_reject_request.request_id).status == StockRequestStatusEnum.SUBMITTED
+
+
+def test_dual_approval_http_actions_reject_department_stage_before_warehouse(
+    db_session, client
+):
+    """숨겨진 부서 큐를 직접 호출해도 창고 결재 전 승인·반려할 수 없다."""
+    requester = _make_employee(
+        db_session,
+        code="DUAL-HTTP-REQ",
+        name="듀얼 요청자",
+    )
+    approver = _make_employee(
+        db_session,
+        code="DUAL-HTTP-DEPT",
+        name="듀얼 부서 결재자",
+    )
+    approver.department_role = "primary"
+
+    def _dual_request() -> StockRequest:
+        request = StockRequest(
+            requester_employee_id=requester.employee_id,
+            requester_name=requester.name,
+            requester_department=DepartmentEnum.ASSEMBLY.value,
+            approval_department=DepartmentEnum.ASSEMBLY.value,
+            request_type=StockRequestTypeEnum.DEPT_INTERNAL,
+            status=StockRequestStatusEnum.SUBMITTED,
+            requires_warehouse_approval=True,
+            requires_department_approval=True,
+        )
+        db_session.add(request)
+        db_session.flush()
+        return request
+
+    approve_request = _dual_request()
+    reject_request = _dual_request()
+    db_session.commit()
+    headers = {"X-Actor-Employee-Id": str(approver.employee_id)}
+
+    approved = client.post(
+        f"/api/stock-requests/{approve_request.request_id}/department-approve",
+        json={"actor_employee_id": str(approver.employee_id), "pin": "0000"},
+        headers=headers,
+    )
+    rejected = client.post(
+        f"/api/stock-requests/{reject_request.request_id}/department-reject",
+        json={
+            "actor_employee_id": str(approver.employee_id),
+            "pin": "0000",
+            "reason": "단계 우회 시도",
+        },
+        headers=headers,
+    )
+
+    assert approved.status_code == 422, approved.text
+    assert rejected.status_code == 422, rejected.text
+    assert approved.json()["detail"]["message"] == "창고 결재가 먼저 필요합니다."
+    assert rejected.json()["detail"]["message"] == "창고 결재가 먼저 필요합니다."
+    db_session.expire_all()
+    for request_id in (approve_request.request_id, reject_request.request_id):
+        request = db_session.get(StockRequest, request_id)
+        assert request.status == StockRequestStatusEnum.SUBMITTED
+        assert request.department_approved_by_employee_id is None
+        assert request.rejected_by_employee_id is None

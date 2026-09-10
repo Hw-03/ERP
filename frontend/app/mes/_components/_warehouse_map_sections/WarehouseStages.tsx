@@ -398,6 +398,7 @@ export function RowStage({
   pulseLayer,
   matchQuery,
   editable,
+  pendingBoxIds,
   onMoveBox,
   onInsertBox,
   onRowChange,
@@ -412,6 +413,8 @@ export function RowStage({
   matchQuery?: string;
   /** 편집 모드: 박스를 다른 자리로 드래그 이동(빈 영역 드롭 = 맨 위). */
   editable?: boolean;
+  /** 서버 확정과 지도 재조회가 끝날 때까지 다시 이동할 수 없는 박스. */
+  pendingBoxIds?: ReadonlySet<string>;
   onMoveBox?: (boxId: string, target: { row: number; layer: number; jari: number }) => void;
   /** 편집 모드: 박스 위/아래에 끌어온 박스를 끼워넣기(스택 중간 삽입). */
   onInsertBox?: (
@@ -650,6 +653,7 @@ export function RowStage({
                         scale="row"
                         matchQuery={matchQuery}
                         draggable={editable}
+                        pendingBoxIds={pendingBoxIds}
                         onBoxDragStart={(id) => { draggedBoxRef.current = id; }}
                         onBoxDrop={
                           editable

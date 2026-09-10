@@ -5,12 +5,13 @@ from __future__ import annotations
 import re
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import Depends, Request
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.verified_actor import VerifiedActorRouter
 from app.dependencies.admin import require_admin_pin
 from app.models import AuditTerminal
 from app.routers._errors import ErrorCode, http_error
@@ -25,7 +26,7 @@ from app.services.realtime import suppress_realtime_revision
 from app.utils.excel import apply_header, auto_width, make_xlsx_response
 
 
-router = APIRouter()
+router = VerifiedActorRouter()
 MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 
 

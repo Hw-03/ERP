@@ -29,7 +29,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from app.models import Item  # noqa: E402
 from app.services.item_display_order import (  # noqa: E402
-    apply_default_item_display_order,
+    _apply_default_item_display_order,
     default_item_display_order,
 )
 
@@ -317,7 +317,7 @@ def run_sort_order_normalization(
         return summary
 
     try:
-        apply_default_item_display_order(db)
+        _apply_default_item_display_order(db)
         db.commit()
     except Exception:
         db.rollback()

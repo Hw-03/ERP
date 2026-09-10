@@ -25,7 +25,9 @@ describe("toInventoryEffectRows", () => {
         itemName: "완제품 A",
         unit: "EA",
         locationId: null,
+        rowId: null,
         boxId: null,
+        zoneId: null,
         department: null,
         status: null,
         label: "창고 재고",
@@ -39,7 +41,9 @@ describe("toInventoryEffectRows", () => {
         itemName: "완제품 A",
         unit: "EA",
         locationId: "location-assembly-production",
+        rowId: null,
         boxId: null,
+        zoneId: null,
         department: "조립",
         status: "PRODUCTION",
         label: "조립 재고",
@@ -68,6 +72,42 @@ describe("toInventoryEffectRows", () => {
         key: "item-a:EA:warehouse_box::::box-2",
         boxId: "box-2",
         label: "박스 재고",
+      },
+    ]);
+  });
+
+  it("keeps exact special-zone and unplaced rows visible", () => {
+    const rows = toInventoryEffectRows(
+      [
+        {
+          scope: "warehouse_zone",
+          row_id: "zone-row-1",
+          zone_id: 7,
+          delta: -2,
+        },
+        {
+          scope: "warehouse_unplaced",
+          row_id: "unplaced-row-1",
+          delta: -1,
+        },
+      ],
+      { itemId: "item-a", itemName: "부품 A", unit: "EA" },
+    );
+
+    expect(rows).toMatchObject([
+      {
+        scope: "warehouse_zone",
+        rowId: "zone-row-1",
+        zoneId: "7",
+        label: "특수구역 재고",
+        deltaLabel: "-2",
+      },
+      {
+        scope: "warehouse_unplaced",
+        rowId: "unplaced-row-1",
+        zoneId: null,
+        label: "미배치 재고",
+        deltaLabel: "-1",
       },
     ]);
   });

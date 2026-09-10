@@ -2,7 +2,11 @@
  * 결재 알림 도메인 API - `@/lib/api/notifications`.
  */
 
-import { ApiError, parseError, toApiUrl } from "../api-core";
+import {
+  apiErrorFromResponse,
+  captureAuthGeneration,
+  toApiUrl,
+} from "../api-core";
 import { getAuditRequestHeaders } from "../activity-audit-context";
 import { readCurrentEmployeeCodeForLog } from "../operator-log-context";
 import type { NotificationListResponse, NotificationMarkReadPayload } from "./types";
@@ -13,10 +17,14 @@ async function requestWithActor<T>(
   employeeId: string,
   init: RequestInit = {},
 ): Promise<T> {
+  const requestAuthGeneration = captureAuthGeneration();
   const headers = new Headers(init.headers);
   headers.set("X-Actor-Employee-Id", employeeId);
   const employeeCode = readCurrentEmployeeCodeForLog();
-  if (employeeCode) headers.set("X-MES-Employee-Code", employeeCode);
+  const method = (init.method ?? "GET").toUpperCase();
+  if (employeeCode && ["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
+    headers.set("X-MES-Employee-Code", employeeCode);
+  }
   for (const [name, value] of Object.entries(getAuditRequestHeaders())) {
     headers.set(name, value);
   }
@@ -24,7 +32,7 @@ async function requestWithActor<T>(
     headers.set("Content-Type", "application/json");
   }
   const res = await fetch(url, { ...init, headers, credentials: "include" });
-  if (!res.ok) throw new ApiError(await parseError(res), res.status);
+  if (!res.ok) throw await apiErrorFromResponse(res, requestAuthGeneration);
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }

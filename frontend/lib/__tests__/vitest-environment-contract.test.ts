@@ -15,28 +15,37 @@ async function readPackageScripts(): Promise<Record<string, string>> {
 }
 
 describe("Vitest environment contract", () => {
-  it("uses node by default and assigns jsdom only to browser-dependent tests", async () => {
+  it("assigns disjoint node and jsdom projects to their dependent tests", async () => {
     const config = await readVitestConfig();
 
     expect(typeof document).toBe("undefined");
-    expect(config).toMatch(/environment:\s*"node"/);
     expect(config).toMatch(/isolate:\s*true/);
-    expect(config).toMatch(/"\*\*\/\*\.test\.tsx"\s*,\s*"jsdom"/);
-    expect(config).toMatch(/"lib\/queries\/\*\*\/\*\.test\.ts"\s*,\s*"jsdom"/);
-    expect(config).toMatch(/"lib\/__tests__\/query-\*\.test\.ts"\s*,\s*"jsdom"/);
-    expect(config).toMatch(/"lib\/__tests__\/api-catalog\.test\.ts"\s*,\s*"jsdom"/);
-    expect(config).toMatch(/"lib\/__tests__\/activity-audit-context\.test\.ts"\s*,\s*"jsdom"/);
-    expect(config).toMatch(/"lib\/__tests__\/api-core\.test\.ts"\s*,\s*"jsdom"/);
-    expect(config).toMatch(/"lib\/__tests__\/api-notifications\.test\.ts"\s*,\s*"jsdom"/);
-    expect(config).toMatch(/"lib\/__tests__\/client-events\.test\.ts"\s*,\s*"jsdom"/);
-    expect(config).toMatch(/"app\/mes\/_components\/login\/__tests__\/useCurrentOperator\.test\.ts"\s*,\s*"jsdom"/);
-    expect(config).toMatch(/"app\/mes\/_components\/_warehouse_v2\/__tests__\/warehouseFlow\.golden\.test\.ts"\s*,\s*"jsdom"/);
+    expect(config).not.toContain("environmentMatchGlobs");
+    expect(config).toMatch(/name:\s*"node",\s*environment:\s*"node"/);
+    expect(config).toMatch(/name:\s*"jsdom",\s*environment:\s*"jsdom"/);
+    expect(config).toContain("exclude: jsdomTypeScriptTests");
+    for (const jsdomTest of [
+      "lib/queries/**/*.test.ts",
+      "lib/__tests__/query-*.test.ts",
+      "lib/__tests__/api-catalog.test.ts",
+      "lib/__tests__/activity-audit-context.test.ts",
+      "lib/__tests__/api-core.test.ts",
+      "lib/__tests__/api-notifications.test.ts",
+      "lib/__tests__/client-events.test.ts",
+      "app/mes/_components/login/__tests__/useCurrentOperator.test.ts",
+      "app/mes/_components/_warehouse_v2/__tests__/warehouseFlow.golden.test.ts",
+    ]) {
+      expect(config).toContain(`"${jsdomTest}"`);
+    }
   });
 
   it("keeps test discovery and coverage threshold scope stable", async () => {
     const config = await readVitestConfig();
 
-    expect(config).toMatch(/include:\s*\["app\/\*\*\/\*\.test\.\{ts,tsx\}",\s*"lib\/\*\*\/\*\.test\.\{ts,tsx\}"\]/);
+    expect(config).toContain('include: ["app/**/*.test.ts", "lib/**/*.test.ts"]');
+    expect(config).toMatch(
+      /include:\s*\[\s*"app\/\*\*\/\*\.test\.tsx",\s*"lib\/\*\*\/\*\.test\.tsx",\s*\.\.\.jsdomTypeScriptTests,/,
+    );
     for (const metric of ["lines", "functions", "branches", "statements"]) {
       expect(config).toMatch(new RegExp(`${metric}:\\s*75`));
     }

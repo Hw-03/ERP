@@ -32,7 +32,7 @@ from bootstrap.schema import (
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
-HEAD_REVISION = "20260903_0032"
+HEAD_REVISION = "20260907_0034"
 
 
 def test_schema_state_exposes_explicit_legacy_onboarding_state():
@@ -179,6 +179,9 @@ def _create_independent_legacy_items_database(path: Path) -> None:
 
     with sqlite3.connect(path) as db:
         db.execute("PRAGMA foreign_keys=OFF")
+        db.execute("DROP TABLE warehouse_unplaced_items")
+        db.execute("DROP INDEX uq_warehouse_box_items_box_item")
+        db.execute("DROP INDEX uq_warehouse_zone_items_zone_item")
         db.execute("DROP TABLE items")
         db.execute(
             """
@@ -731,6 +734,10 @@ def test_exact_unversioned_sqlite_uses_verified_runtime_backup(
     assert result.backup.verified is True
     assert result.backup.path.is_file()
     assert result.backup.path.parent == runtime_root / "backups" / "sqlite"
+    manifest = result.backup.path.with_name(
+        f"{result.backup.path.name}.manifest.json"
+    )
+    assert '"status":"STRUCTURAL_ONLY"' in manifest.read_text(encoding="utf-8")
     assert _version_rows(path) == [HEAD_REVISION]
 
 

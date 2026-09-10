@@ -10,7 +10,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.models import DepartmentEnum, LocationStatusEnum
+from app.models import (
+    DepartmentEnum,
+    LocationStatusEnum,
+    ShippingAllocation,
+    ShippingRequest,
+)
 from app.services import io_preview as iop
 
 D = Decimal
@@ -124,6 +129,34 @@ def test_preview_internal_use_requires_warehouse_approval(db_session, make_item)
         sub_type="internal_use_out",
         targets=[_target(item.item_id)],
         to_department="AS",
+    )
+
+    assert result["requires_approval"] is True
+
+
+def test_preview_defect_quarantine_is_immediate_without_approval(db_session, make_item):
+    item = make_item()
+
+    result = iop.preview(
+        db_session,
+        work_type="defect",
+        sub_type="defect_quarantine",
+        targets=[_target(item.item_id)],
+        from_department="조립",
+    )
+
+    assert result["requires_approval"] is False
+
+
+def test_preview_manual_process_adjustment_requires_department_approval(db_session, make_item):
+    item = make_item()
+
+    result = iop.preview(
+        db_session,
+        work_type="process",
+        sub_type="adjust_in",
+        targets=[_target(item.item_id, source_kind="manual")],
+        to_department="조립",
     )
 
     assert result["requires_approval"] is True
@@ -544,6 +577,50 @@ def test_bucket_available_excludes_location_pending(
         item_id=item.item_id,
         bucket=bucket,
         department=DepartmentEnum.ASSEMBLY.value,
+    )
+
+    assert available == D("7")
+
+
+@pytest.mark.parametrize("bucket", ["warehouse", "production"])
+def test_bucket_available_excludes_active_shipping_reservation(
+    db_session,
+    make_item,
+    make_location,
+    bucket,
+):
+    item = make_item(name=f"{bucket}-shipping-reserved", warehouse_qty=D("10"))
+    department = None
+    if bucket == "production":
+        make_location(
+            item.item_id,
+            department=DepartmentEnum.ASSEMBLY,
+            quantity=D("10"),
+        )
+        department = DepartmentEnum.ASSEMBLY.value
+    request = ShippingRequest(
+        base_pf_item_id=item.item_id,
+        request_quantity=1,
+        requested_by_name="shipping-preview",
+    )
+    db_session.add(request)
+    db_session.flush()
+    db_session.add(
+        ShippingAllocation(
+            request_id=request.request_id,
+            item_id=item.item_id,
+            quantity=3,
+            department=department,
+            status="RESERVED",
+        )
+    )
+    db_session.flush()
+
+    available = iop._bucket_available(
+        db_session,
+        item_id=item.item_id,
+        bucket=bucket,
+        department=department,
     )
 
     assert available == D("7")

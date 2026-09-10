@@ -4,9 +4,9 @@
  * 창고 지도 탭 — 보기(전 직원) + 편집(창고 정/부 관리자 전용).
  *
  * 일반 직원: 읽기 전용 지도(DesktopWarehouseMapView)만.
- * 창고 정/부 관리자(warehouse_role primary/deputy): "편집 모드" 토글 → 본인 PIN 확인 →
+ * 창고 정/부 관리자(warehouse_role primary/deputy): "편집 모드" 토글 → 본인 PIN 입력 →
  *   박스 관리(이동·넣기·빼기·편집) / 구조 편집 노출. 편집 쓰기는 X-Employee-Code + X-Operator-Pin 으로
- *   백엔드 require_warehouse_manager 가 검증(api-core operator 자격증명 주입).
+ *   현재 세션 actor를 백엔드 require_warehouse_manager 가 step-up 검증(api-core mutation 전용 주입).
  *
  * "박스 관리"는 DesktopWarehouseMapView(editable)에서 드래그 이동 + 칸 패널 박스 넣기/빼기를
  *   한 화면에 통합한다. "구조 편집"(AdminWarehouseStructureSection)은 앵글·통로·PL 구조물 단위라 분리 유지.
@@ -15,7 +15,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Eye, Pencil, ShieldCheck } from "lucide-react";
 import type { Item } from "@/lib/api";
-import { employeesApi } from "@/lib/api/employees";
 import { itemsApi } from "@/lib/api/items";
 import { warehouseMapApi, type ReconcileRow } from "@/lib/api/warehouse-map";
 import { registerOperatorCredsProvider } from "@/lib/api-core";
@@ -29,6 +28,23 @@ const EDITOR_TABS = [
   { id: "map" as const, label: "박스 관리" },
   { id: "structure" as const, label: "구조 편집" },
 ];
+
+function ledgerIssueLabels(row: ReconcileRow): string[] {
+  return (row.ledger_issues ?? []).map((issue) => {
+    if (issue === "missing_inventory") return "재고 행 없음";
+    if (issue === "missing_unplaced") return "미배치(U) 행 없음";
+    if (issue === "inactive_zone_stock") {
+      return `비활성 구역 재고 ${row.inactive_zone_total ?? 0}`;
+    }
+    return "원장 구조 이상";
+  });
+}
+
+function reconcileRowLabel(row: ReconcileRow): string {
+  const issues = ledgerIssueLabels(row);
+  const issueSuffix = issues.length > 0 ? ` · ${issues.join(" · ")}` : "";
+  return `${row.mes_code ?? row.item_name}(B ${row.box_total ?? row.placed_total} · Z ${row.zone_total ?? 0} · U ${row.unplaced_total ?? 0} / W ${row.warehouse_qty}${issueSuffix})`;
+}
 
 export function DesktopWarehouseMapTab({
   onStatusChange,
@@ -89,7 +105,9 @@ export function DesktopWarehouseMapTab({
       ) {
         return false;
       }
-      setMismatches(res.rows.filter((r) => r.status !== "ok"));
+      setMismatches(
+        res.rows.filter((row) => row.status !== "ok" || row.ledger_status !== "ok"),
+      );
       if (editModeRef.current) {
         appliedReconcileRevisionRef.current = requestRevision;
       }
@@ -133,16 +151,23 @@ export function DesktopWarehouseMapTab({
     setVerifying(true);
     setPinError(null);
     try {
-      await employeesApi.verifyEmployeePin(operator.employee_id, pin);
       credsRef.current = { code: operator.employee_code, pin };
-      await refreshItems();
-      void refreshMismatches();
+      await warehouseMapApi.verifyEditor();
+      editModeRef.current = true;
+      const requestRevision = currentRevisionRef.current;
+      appliedItemsRevisionRef.current = requestRevision;
+      appliedReconcileRevisionRef.current = requestRevision;
       setEditMode(true);
       setPinOpen(false);
       setPin("");
+      void refreshItems(requestRevision).catch((error: unknown) => {
+        setEditorError(error instanceof Error ? error.message : "품목 조회에 실패했습니다.");
+      });
+      void refreshMismatches(requestRevision);
       onStatusChange?.("창고 지도 편집 모드");
-    } catch (e) {
-      setPinError(e instanceof Error ? e.message : "PIN 확인에 실패했습니다.");
+    } catch (error) {
+      credsRef.current = null;
+      setPinError(error instanceof Error ? error.message : "PIN 확인에 실패했습니다.");
     } finally {
       setVerifying(false);
     }
@@ -157,6 +182,10 @@ export function DesktopWarehouseMapTab({
     setEditorError(null);
     onStatusChange?.("창고 지도");
   }
+
+  const hasStructuralMismatch = mismatches.some(
+    (row) => (row.ledger_issues ?? []).length > 0,
+  );
 
   if (fullscreen) {
     return (
@@ -295,11 +324,14 @@ export function DesktopWarehouseMapTab({
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.yellow }} />
                 <div className="min-w-0">
                   <div className="text-[13px] font-bold" style={{ color: LEGACY_COLORS.text }}>
-                    배치 확인 필요 {mismatches.length}건 — 박스 합과 창고 재고가 다릅니다
+                    {hasStructuralMismatch
+                      ? `원장 확인 필요 ${mismatches.length}건 — 재고 위치 원장 구조 또는 수량이 올바르지 않습니다`
+                      : `배치 확인 필요 ${mismatches.length}건 — B·Z·U 합과 W 재고가 다릅니다`}
                   </div>
                   <div className="mt-0.5 truncate text-[12px] font-medium" style={{ color: LEGACY_COLORS.muted2 }}>
-                    {mismatches.slice(0, 4).map((r) => `${r.mes_code ?? r.item_name}(${r.placed_total}/${r.warehouse_qty})`).join("  ·  ")}
-                    {mismatches.length > 4 ? "  …" : ""} — 박스 관리에서 정리하기 →
+                    {mismatches.slice(0, 4).map(reconcileRowLabel).join("  ·  ")}
+                    {mismatches.length > 4 ? "  …" : ""}
+                    {hasStructuralMismatch ? " — 관리자 점검 필요" : " — 박스 관리에서 정리하기 →"}
                   </div>
                 </div>
               </button>

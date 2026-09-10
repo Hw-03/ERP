@@ -8,15 +8,16 @@ Startup 부작용 (create_all / run_migrations / seed / MES 백필) 은 모두
     python bootstrap_db.py --all
 """
 
-import datetime as _dt
 import os
 import uuid
+from dataclasses import dataclass
+from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, text
-from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app._access_log import access_log_middleware
@@ -30,7 +31,13 @@ from app.models import (
     TransactionLog,
 )
 from app.routers._errors import ErrorCode
-from app.services import integrity as integrity_svc
+from app.schemas.health import (
+    HealthDetailedResponse,
+    HealthLiveResponse,
+    HealthReadinessResponse,
+)
+from app.schemas.inventory_integrity import InventoryIntegrityResponse
+from app.services import inventory_integrity as inventory_integrity_svc
 
 from app.routers import (
     admin_audit,
@@ -55,6 +62,7 @@ from app.routers import (
     items,
     models as models_router,
     notifications,
+    operator_sessions,
     production,
     realtime,
     settings,
@@ -64,13 +72,11 @@ from app.routers import (
 )
 from app.services import audit_csv as audit_csv_svc
 from app.services import realtime as realtime_svc
+from app.runtime_identity import BOOT_ID, BOOT_STARTED_AT
+from bootstrap.schema import check_schema
 
 audit_csv_svc.register_session_listeners()
 realtime_svc.register_session_listeners()
-
-
-_BOOT_ID: str = uuid.uuid4().hex
-_BOOT_STARTED_AT: str = _dt.datetime.utcnow().isoformat()
 
 
 app = FastAPI(
@@ -161,7 +167,7 @@ setup_logging()
 _log = get_logger()
 _log.info(
     "evt=system_startup boot_id=%s started_at=%s version=%s",
-    _BOOT_ID, _BOOT_STARTED_AT, app.version,
+    BOOT_ID, BOOT_STARTED_AT, app.version,
 )
 
 
@@ -188,7 +194,7 @@ def _warm_symbol_cache() -> None:
 
 @app.on_event("shutdown")
 def _log_shutdown() -> None:
-    _log.info("evt=system_shutdown boot_id=%s", _BOOT_ID)
+    _log.info("evt=system_shutdown boot_id=%s", BOOT_ID)
 
 
 @app.on_event("shutdown")
@@ -210,6 +216,30 @@ def _rid(request: Request) -> str:
         or request.headers.get("X-Request-Id")
         or uuid.uuid4().hex[:12]
     )
+
+
+def _log_sqlalchemy_error(request: Request, exc: SQLAlchemyError, *, event: str) -> str:
+    """Record only bounded SQLAlchemy metadata; statements and parameters are secrets."""
+    rid = _rid(request)
+    code = getattr(exc, "code", None)
+    safe_code = (
+        code
+        if isinstance(code, str)
+        and code.isascii()
+        and 1 <= len(code) <= 16
+        and code.replace("-", "").replace("_", "").isalnum()
+        else "-"
+    )
+    _log.error(
+        "evt=%s rid=%s emp=%s path=%s err_type=%s sa_code=%s",
+        event,
+        rid,
+        get_actor_emp(request),
+        request.url.path,
+        type(exc).__name__,
+        safe_code,
+    )
+    return rid
 
 
 @app.exception_handler(ValueError)
@@ -244,9 +274,7 @@ def _value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
 
 @app.exception_handler(IntegrityError)
 def _integrity_error_handler(request: Request, exc: IntegrityError) -> JSONResponse:
-    rid = _rid(request)
-    emp = get_actor_emp(request)
-    _log.error("IntegrityError rid=%s emp=%s path=%s msg=%s", rid, emp, request.url.path, exc)
+    rid = _log_sqlalchemy_error(request, exc, event="db_integrity_error")
     return JSONResponse(
         status_code=409,
         content=_error_payload(
@@ -259,18 +287,25 @@ def _integrity_error_handler(request: Request, exc: IntegrityError) -> JSONRespo
 
 @app.exception_handler(OperationalError)
 def _operational_error_handler(request: Request, exc: OperationalError) -> JSONResponse:
-    rid = _rid(request)
-    emp = get_actor_emp(request)
-    # 정상 운영 로그는 short msg 만(SQL/parameters 통째 박지 않음 — 노이즈 방지).
-    # 전체 SQL 은 DEBUG 레벨에서만 노출.
-    short = str(getattr(exc, "orig", None) or exc).splitlines()[0][:200]
-    _log.error("OperationalError rid=%s emp=%s path=%s msg=%s", rid, emp, request.url.path, short)
-    _log.debug("OperationalError detail rid=%s sql=%s params=%s", rid, getattr(exc, "statement", "-"), getattr(exc, "params", "-"))
+    rid = _log_sqlalchemy_error(request, exc, event="db_operational_error")
     return JSONResponse(
         status_code=503,
         content=_error_payload(
             ErrorCode.DB_UNAVAILABLE,
             "DB 연결 일시 오류",
+            extra={"request_id": rid},
+        ),
+    )
+
+
+@app.exception_handler(SQLAlchemyError)
+def _sqlalchemy_error_handler(request: Request, exc: SQLAlchemyError) -> JSONResponse:
+    rid = _log_sqlalchemy_error(request, exc, event="db_error")
+    return JSONResponse(
+        status_code=500,
+        content=_error_payload(
+            ErrorCode.INTERNAL,
+            "처리 중 오류가 발생했습니다.",
             extra={"request_id": rid},
         ),
     )
@@ -295,6 +330,8 @@ def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONRespon
 app.include_router(employee_item_order.router, prefix="/api/items", tags=["Items"])
 app.include_router(items.router, prefix="/api/items", tags=["Items"])
 app.include_router(employees.router, prefix="/api/employees", tags=["Employees"])
+app.include_router(employees.bootstrap_router, prefix="/api/employees", tags=["Employees"])
+app.include_router(operator_sessions.router, prefix="/api/operator-session", tags=["Employees"])
 app.include_router(daily_work_reports.router, prefix="/api/daily-work-reports", tags=["Daily Work Reports"])
 app.include_router(departments.router, prefix="/api/departments", tags=["Departments"])
 app.include_router(client_events.router, prefix="/api", tags=["Client Events"])
@@ -327,44 +364,102 @@ def health_check():
     return {"status": "ok", "service": "DEXCOWIN MES API"}
 
 
-@app.get("/health/live", tags=["System"])
-def health_live(request: Request, db: Session = Depends(get_db)):
-    """경량 liveness — 컨테이너/오케스트레이터 프로브 전용 (WS3).
-
-    정적 `/health` 와 달리 DB-down 을 구분: DB 미연결이면 503.
-    `/health/detailed` 와 달리 row count·무결성 스캔을 하지 않아 30s 주기
-    프로브에 적합(가벼움).
-    """
-    try:
-        db.execute(text("SELECT 1"))
-    except Exception as exc:  # noqa: BLE001 — 프로브는 사유 무관 비가용이면 503
-        _log.warning(
-            "evt=health_live_db_unavailable rid=%s err_type=%s",
-            _rid(request),
-            type(exc).__name__,
-        )
-        raise HTTPException(status_code=503, detail="DB 연결 확인 실패")
-    return {"status": "live"}
+@app.get("/health/live", tags=["System"], response_model=HealthLiveResponse)
+async def health_live() -> dict[str, str]:
+    """Report only process and event-loop liveness; never touch dependencies."""
+    return {
+        "contract": "health-liveness/v1",
+        "status": "live",
+    }
 
 
 @app.get("/api/app-session", tags=["System"])
 def app_session():
-    return {"boot_id": _BOOT_ID, "started_at": _BOOT_STARTED_AT}
+    return {"boot_id": BOOT_ID, "started_at": BOOT_STARTED_AT}
 
 
-def _detailed_health_degraded_response(
+_READINESS_CHECK_IDS = (
+    "DATABASE_CONNECTION",
+    "ALEMBIC_HEAD",
+    "INVENTORY_INTEGRITY_DEPENDENCY",
+    "INVENTORY_INTEGRITY_BLOCKING",
+)
+
+
+@dataclass(frozen=True)
+class _ReadinessEvaluation:
+    payload: dict[str, Any]
+    status_code: int
+    database_ok: bool
+    integrity: InventoryIntegrityResponse | None
+
+
+def _readiness_checks() -> list[dict[str, Any]]:
+    """Build the fixed readiness check sequence before any dependency runs."""
+    return [
+        {"check_id": check_id, "status": "not_checked", "count": None}
+        for check_id in _READINESS_CHECK_IDS
+    ]
+
+
+def _sanitized_integrity_payload(
+    integrity: InventoryIntegrityResponse,
+    *,
+    include_empty_samples: bool,
+) -> dict[str, Any]:
+    """Expose stable verdict fields without row, item, or operation identifiers."""
+    checks: list[dict[str, Any]] = []
+    for check in integrity.checks:
+        payload: dict[str, Any] = {
+            "check_id": check.check_id,
+            "severity": check.severity,
+            "count": check.count,
+        }
+        if include_empty_samples:
+            payload["samples"] = []
+        checks.append(payload)
+    return {
+        "contract": integrity.contract,
+        "status": integrity.status,
+        "blocking_count": integrity.blocking_count,
+        "warning_count": integrity.warning_count,
+        "checks": checks,
+    }
+
+
+def _readiness_payload(
+    *,
+    checks: list[dict[str, Any]],
+    alembic_revision: str | None,
+    integrity: InventoryIntegrityResponse | None,
+) -> dict[str, Any]:
+    ready = all(check["status"] == "pass" for check in checks)
+    return {
+        "contract": "health-readiness/v1",
+        "status": "ready" if ready else "not_ready",
+        "checks": checks,
+        "alembic_revision": alembic_revision,
+        "inventory_integrity": (
+            _sanitized_integrity_payload(integrity, include_empty_samples=False)
+            if integrity is not None
+            else None
+        ),
+    }
+
+
+def _record_health_dependency_failure(
     request: Request,
     db: Session,
     exc: Exception,
     *,
     event: str,
-) -> JSONResponse:
-    """진단 쿼리 실패 세션을 정리하고 민감정보 없는 503을 반환한다."""
+) -> None:
+    """Rollback a failed probe without logging exception text or connection data."""
     try:
         db.rollback()
     except Exception as rollback_exc:  # noqa: BLE001 — rollback 실패 원문도 기록하지 않음
         _log.warning(
-            "evt=health_detailed_rollback_failed rid=%s err_type=%s",
+            "evt=health_probe_rollback_failed rid=%s err_type=%s",
             _rid(request),
             type(rollback_exc).__name__,
         )
@@ -374,41 +469,206 @@ def _detailed_health_degraded_response(
         _rid(request),
         type(exc).__name__,
     )
+
+
+def _evaluate_readiness(
+    request: Request,
+    db: Session,
+    *,
+    event_prefix: str,
+) -> _ReadinessEvaluation:
+    """Evaluate DB, schema, and blocking integrity dependencies in fail-fast order."""
+    checks = _readiness_checks()
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception as exc:  # noqa: BLE001 — dependency failures share a safe contract
+        checks[0]["status"] = "fail"
+        _record_health_dependency_failure(
+            request,
+            db,
+            exc,
+            event=f"{event_prefix}_db_unavailable",
+        )
+        return _ReadinessEvaluation(
+            payload=_readiness_payload(
+                checks=checks,
+                alembic_revision=None,
+                integrity=None,
+            ),
+            status_code=503,
+            database_ok=False,
+            integrity=None,
+        )
+    checks[0]["status"] = "pass"
+
+    try:
+        schema = check_schema(connection=db.connection())
+    except Exception as exc:  # noqa: BLE001 — schema tooling is a readiness dependency
+        checks[1]["status"] = "fail"
+        _record_health_dependency_failure(
+            request,
+            db,
+            exc,
+            event=f"{event_prefix}_schema_unavailable",
+        )
+        return _ReadinessEvaluation(
+            payload=_readiness_payload(
+                checks=checks,
+                alembic_revision=None,
+                integrity=None,
+            ),
+            status_code=503,
+            database_ok=True,
+            integrity=None,
+        )
+
+    revision = str(schema.revision) if schema.revision is not None else None
+    if not schema.ready:
+        checks[1]["status"] = "fail"
+        _log.warning(
+            "evt=%s_schema_not_ready rid=%s",
+            event_prefix,
+            _rid(request),
+        )
+        return _ReadinessEvaluation(
+            payload=_readiness_payload(
+                checks=checks,
+                alembic_revision=revision,
+                integrity=None,
+            ),
+            status_code=503,
+            database_ok=True,
+            integrity=None,
+        )
+    checks[1]["status"] = "pass"
+
+    try:
+        integrity = inventory_integrity_svc.diagnose_inventory_integrity(db)
+    except Exception as exc:  # noqa: BLE001 — diagnostics are a required dependency
+        checks[2]["status"] = "fail"
+        _record_health_dependency_failure(
+            request,
+            db,
+            exc,
+            event=f"{event_prefix}_integrity_unavailable",
+        )
+        return _ReadinessEvaluation(
+            payload=_readiness_payload(
+                checks=checks,
+                alembic_revision=revision,
+                integrity=None,
+            ),
+            status_code=503,
+            database_ok=True,
+            integrity=None,
+        )
+    checks[2]["status"] = "pass"
+    checks[3]["status"] = "fail" if integrity.blocking_count else "pass"
+    checks[3]["count"] = integrity.blocking_count
+    payload = _readiness_payload(
+        checks=checks,
+        alembic_revision=revision,
+        integrity=integrity,
+    )
+    return _ReadinessEvaluation(
+        payload=payload,
+        status_code=503 if integrity.blocking_count else 200,
+        database_ok=True,
+        integrity=integrity,
+    )
+
+
+@app.get(
+    "/health/ready",
+    tags=["System"],
+    response_model=HealthReadinessResponse,
+    responses={503: {"model": HealthReadinessResponse}},
+)
+def health_ready(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> dict[str, Any] | JSONResponse:
+    """Report whether the current process may accept DEXCOWIN MES workload."""
+    evaluation = _evaluate_readiness(request, db, event_prefix="health_ready")
+    if evaluation.status_code != 200:
+        return JSONResponse(status_code=evaluation.status_code, content=evaluation.payload)
+    return evaluation.payload
+
+
+def _detailed_health_unavailable_response(
+    *,
+    readiness: _ReadinessEvaluation,
+) -> JSONResponse:
+    """Return the additive detailed contract when a required dependency is unavailable."""
     return JSONResponse(
         status_code=503,
         content={
+            "contract": "health-detailed/v1",
             "status": "degraded",
-            "db": {"ok": False},
+            "db": {"ok": readiness.database_ok},
             "rows": {},
             "inventory_mismatch_count": None,
+            "inventory_integrity": None,
             "last_transaction_at": None,
+            "readiness": readiness.payload,
         },
     )
 
 
-@app.get("/health/detailed", tags=["System"])
-def health_detailed(request: Request, db: Session = Depends(get_db)):
+def _detailed_health_diagnostics_failed_response(
+    request: Request,
+    db: Session,
+    exc: Exception,
+    *,
+    readiness: _ReadinessEvaluation,
+) -> JSONResponse:
+    """Preserve readiness while sanitizing a later diagnostic query failure."""
+    _record_health_dependency_failure(
+        request,
+        db,
+        exc,
+        event="health_detailed_diagnostics_unavailable",
+    )
+    return JSONResponse(
+        status_code=503,
+        content={
+            "contract": "health-detailed/v1",
+            "status": "degraded",
+            "db": {"ok": False},
+            "rows": {},
+            "inventory_mismatch_count": None,
+            "inventory_integrity": None,
+            "last_transaction_at": None,
+            "readiness": readiness.payload,
+        },
+    )
+
+
+@app.get(
+    "/health/detailed",
+    tags=["System"],
+    response_model=HealthDetailedResponse,
+    responses={503: {"model": HealthDetailedResponse}},
+)
+def health_detailed(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> dict[str, Any] | JSONResponse:
     """운영 점검용 상세 헬스. 프론트엔드는 /health 만 사용.
 
     - DB ping
     - 주요 테이블 row count
-    - inventory mismatch count (불변식 위반)
+    - inventory-integrity/v1 공통 업무 불변식과 기존 total mismatch count
     - open queue batch count
     - 최근 transaction_log created_at
     """
-    # 1) DB ping
-    try:
-        db.execute(text("SELECT 1"))
-    except Exception as exc:  # noqa: BLE001 — 상세 점검도 DB 장애면 즉시 중단
-        return _detailed_health_degraded_response(
-            request,
-            db,
-            exc,
-            event="health_detailed_db_unavailable",
-        )
+    readiness = _evaluate_readiness(request, db, event_prefix="health_detailed")
+    integrity = readiness.integrity
+    if integrity is None:
+        return _detailed_health_unavailable_response(readiness=readiness)
 
     try:
-        # 2) Row counts
+        # 기존 detailed 필드는 한 release 동안 additive 호환한다.
         rows = {
             "items": db.query(Item).count(),
             "employees": db.query(Employee).count(),
@@ -416,26 +676,33 @@ def health_detailed(request: Request, db: Session = Depends(get_db)):
             "transaction_logs": db.query(TransactionLog).count(),
         }
 
-        # 3) inventory mismatch — 가벼운 검사
-        mismatches = integrity_svc.check_inventory_consistency(db)
-        mismatch_count = len(mismatches)
+        mismatch_count = next(
+            check.count
+            for check in integrity.checks
+            if check.check_id == "INVENTORY_TOTAL_MISMATCH"
+        )
 
-        # 4) 최근 transaction log 시간
         last_tx = db.query(func.max(TransactionLog.created_at)).scalar()
     except Exception as exc:  # noqa: BLE001 — 모든 후속 진단 실패를 동일한 503으로 처리
-        return _detailed_health_degraded_response(
+        return _detailed_health_diagnostics_failed_response(
             request,
             db,
             exc,
-            event="health_detailed_diagnostics_unavailable",
+            readiness=readiness,
         )
 
     return {
-        "status": "ok" if mismatch_count == 0 else "degraded",
+        "contract": "health-detailed/v1",
+        "status": "degraded" if integrity.status == "fail" else "ok",
         "db": {"ok": True},
         "rows": rows,
         "inventory_mismatch_count": mismatch_count,
+        "inventory_integrity": _sanitized_integrity_payload(
+            integrity,
+            include_empty_samples=True,
+        ),
         "last_transaction_at": last_tx.isoformat() if last_tx else None,
+        "readiness": readiness.payload,
     }
 
 

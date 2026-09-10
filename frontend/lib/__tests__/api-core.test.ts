@@ -4,6 +4,7 @@ import {
   extractErrorMessage,
   parseError,
   fetcher,
+  fetcherWithoutAuthBoundary,
   fetchBlob,
   postJson,
   putJson,
@@ -11,7 +12,9 @@ import {
   deleteJson,
   FALLBACK_SERVER_API_BASE,
   registerAdminPinProvider,
+  registerOperatorCredsProvider,
   ApiConnectionError,
+  ResultUnknownError,
   ApiError,
 } from "../api-core";
 import { adminApi } from "../api/admin";
@@ -135,6 +138,7 @@ describe("fetcher / write helpers", () => {
     window.sessionStorage.clear();
     setAuditScreen(null);
     registerAdminPinProvider(() => null);
+    registerOperatorCredsProvider(() => null);
     vi.useRealTimers();
   });
 
@@ -178,33 +182,162 @@ describe("fetcher / write helpers", () => {
     expect(JSON.parse(init.body as string)).toEqual({ name: "X" });
   });
 
-  it("postJson converts a network rejection into ApiConnectionError", async () => {
+  it("postJson converts a network rejection into ResultUnknownError", async () => {
     globalThis.fetch = vi.fn(() =>
       Promise.reject(new TypeError("Failed to fetch")),
     ) as unknown as typeof fetch;
 
     const error = await postJson("/api/items", { name: "X" }).catch((failure: unknown) => failure);
 
+    expect(error).toBeInstanceOf(ResultUnknownError);
     expect(error).toBeInstanceOf(ApiConnectionError);
     expect(error).toMatchObject({
       message: "연결 실패",
     });
   });
 
-  it("postJson converts a timeout into ApiConnectionError", async () => {
-    globalThis.fetch = vi.fn(
-      () => new Promise<Response>(() => {}),
-    ) as unknown as typeof fetch;
+  it("postJson retries without signal when the fetch realm rejects the signal before sending", async () => {
+    const fetchSpy = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new TypeError(
+          'RequestInit: Expected signal ("AbortSignal {}") to be an instance of AbortSignal.',
+        ),
+      )
+      .mockResolvedValueOnce(makeResponse({ ok: true, body: { id: "1" } }));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await expect(postJson("/api/items", { name: "X" })).resolves.toEqual({ id: "1" });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect((fetchSpy.mock.calls[0]?.[1] as RequestInit).signal).toBeDefined();
+    expect((fetchSpy.mock.calls[1]?.[1] as RequestInit).signal).toBeUndefined();
+  });
+
+  it("postJson converts a timeout into ResultUnknownError", async () => {
+    let requestSignal: AbortSignal | undefined;
+    globalThis.fetch = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      requestSignal = init?.signal ?? undefined;
+      return new Promise<Response>((_resolve, reject) => {
+        requestSignal?.addEventListener(
+          "abort",
+          () => reject(requestSignal?.reason),
+          { once: true },
+        );
+      });
+    }) as unknown as typeof fetch;
 
     const request = postJson("/api/items", { name: "X" });
     const failure = request.catch((error: unknown) => error);
     await vi.advanceTimersByTimeAsync(15_000);
     const error = await failure;
 
+    expect(error).toBeInstanceOf(ResultUnknownError);
     expect(error).toBeInstanceOf(ApiConnectionError);
     expect(error).toMatchObject({
       message: "연결 실패",
     });
+    expect(requestSignal?.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("postJson combines a caller signal with its timeout signal", async () => {
+    const caller = new AbortController();
+    let requestSignal: AbortSignal | undefined;
+    globalThis.fetch = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      requestSignal = init?.signal ?? undefined;
+      return new Promise<Response>((_resolve, reject) => {
+        requestSignal?.addEventListener(
+          "abort",
+          () => reject(requestSignal?.reason),
+          { once: true },
+        );
+      });
+    }) as unknown as typeof fetch;
+
+    const result = postJson("/api/items", { name: "X" }, caller.signal).catch(
+      (error: unknown) => error,
+    );
+    caller.abort();
+    await vi.advanceTimersByTimeAsync(15_000);
+
+    expect(await result).toBeInstanceOf(ResultUnknownError);
+    expect(requestSignal).toBeDefined();
+    expect(requestSignal).not.toBe(caller.signal);
+    expect(requestSignal?.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("postJson rejects a late success after its timeout as ResultUnknownError", async () => {
+    globalThis.fetch = vi.fn(() =>
+      new Promise<Response>((resolve) => {
+        setTimeout(
+          () => resolve(makeResponse({ ok: true, body: { id: "late" } })),
+          20_000,
+        );
+      }),
+    ) as unknown as typeof fetch;
+
+    const result = postJson("/api/items", { name: "X" }).catch(
+      (error: unknown) => error,
+    );
+    await vi.advanceTimersByTimeAsync(20_000);
+
+    expect(await result).toBeInstanceOf(ResultUnknownError);
+  });
+
+  it("postJson treats a lost success body as ResultUnknownError", async () => {
+    globalThis.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        text: () => Promise.reject(new TypeError("body connection lost")),
+      } as Response),
+    ) as unknown as typeof fetch;
+
+    await expect(postJson("/api/items", { name: "X" })).rejects.toBeInstanceOf(
+      ResultUnknownError,
+    );
+  });
+
+  it("postJson preserves a known 422 even when its error body is lost", async () => {
+    globalThis.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: false,
+        status: 422,
+        statusText: "Unprocessable Entity",
+        text: () => Promise.reject(new TypeError("body connection lost")),
+      } as Response),
+    ) as unknown as typeof fetch;
+
+    const error = await postJson("/api/items", { name: "X" }).catch(
+      (failure: unknown) => failure,
+    );
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ status: 422 });
+  });
+
+  it("postJson clears its timeout after a successful response", async () => {
+    globalThis.fetch = vi.fn(() =>
+      Promise.resolve(makeResponse({ ok: true, body: { id: "1" } })),
+    ) as unknown as typeof fetch;
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+    const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
+
+    try {
+      await postJson("/api/items", { name: "X" });
+
+      const timeoutCallIndex = setTimeoutSpy.mock.calls.findIndex(
+        ([, delay]) => delay === 15_000,
+      );
+      expect(timeoutCallIndex).toBeGreaterThanOrEqual(0);
+      expect(clearTimeoutSpy).toHaveBeenCalledWith(
+        setTimeoutSpy.mock.results[timeoutCallIndex]?.value,
+      );
+    } finally {
+      setTimeoutSpy.mockRestore();
+      clearTimeoutSpy.mockRestore();
+    }
   });
 
   it("attaches the audit session, terminal, screen, and source to write requests", async () => {
@@ -246,13 +379,177 @@ describe("fetcher / write helpers", () => {
     expect(init.method).toBe("PATCH");
   });
 
-  it("write helpers throw with parsed message on !ok", async () => {
+  it("write helpers preserve structured error code and extra on !ok", async () => {
     globalThis.fetch = vi.fn(() =>
       Promise.resolve(
-        makeResponse({ ok: false, body: { detail: { message: "유효성 실패" } } }),
+        makeResponse({
+          ok: false,
+          status: 409,
+          body: {
+            detail: {
+              code: "PIN_CHANGE_REQUIRED",
+              message: "새 PIN을 먼저 설정해야 합니다.",
+              extra: { expires_in: 600 },
+            },
+          },
+        }),
       ),
     ) as unknown as typeof fetch;
-    await expect(postJson("/api/items", {})).rejects.toThrow("유효성 실패");
+
+    const failure = await postJson("/api/operator-session", {}).catch((error) => error);
+
+    expect(failure).toBeInstanceOf(ApiError);
+    expect(failure).toMatchObject({
+      message: "새 PIN을 먼저 설정해야 합니다.",
+      status: 409,
+      code: "PIN_CHANGE_REQUIRED",
+      extra: { expires_in: 600 },
+    });
+  });
+
+  it("dispatches an authentication-required event for HTTP 401", async () => {
+    const listener = vi.fn();
+    window.addEventListener("dexcowin_auth_required", listener);
+    globalThis.fetch = vi.fn(() =>
+      Promise.resolve(
+        makeResponse({
+          ok: false,
+          status: 401,
+          body: { detail: { code: "SESSION_EXPIRED", message: "세션이 만료되었습니다." } },
+        }),
+      ),
+    ) as unknown as typeof fetch;
+
+    await fetcher("/api/items").catch(() => undefined);
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    window.removeEventListener("dexcowin_auth_required", listener);
+  });
+
+  it("lets an idle-session caller validate a late 401 before opening a boundary", async () => {
+    const listener = vi.fn();
+    window.addEventListener("dexcowin_auth_required", listener);
+    globalThis.fetch = vi.fn(() =>
+      Promise.resolve(
+        makeResponse({
+          ok: false,
+          status: 401,
+          body: { detail: { code: "SESSION_EXPIRED", message: "세션이 만료되었습니다." } },
+        }),
+      ),
+    ) as unknown as typeof fetch;
+
+    const failure = await fetcherWithoutAuthBoundary("/api/operator-session").catch(
+      (error: unknown) => error,
+    );
+
+    expect(failure).toBeInstanceOf(ApiError);
+    expect(failure).toMatchObject({ status: 401, code: "SESSION_EXPIRED" });
+    expect(listener).not.toHaveBeenCalled();
+    window.removeEventListener("dexcowin_auth_required", listener);
+  });
+
+  it("rejects a cross-tab mutation with the tab operator claim and opens an auth boundary", async () => {
+    window.sessionStorage.setItem(
+      "dexcowin_mes_operator",
+      JSON.stringify({ employee_id: "operator-a", employee_code: "A001", name: "작업자 A" }),
+    );
+    const listener = vi.fn();
+    window.addEventListener("dexcowin_auth_required", listener);
+    const fetchSpy = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
+      Promise.resolve(
+        makeResponse({
+          ok: false,
+          status: 403,
+          body: {
+            detail: {
+              code: "ACTOR_MISMATCH",
+              message: "세션 작업자와 요청 작업자가 다릅니다.",
+            },
+          },
+        }),
+      ),
+    );
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    const failure = await postJson("/api/io/submit", { work_type: "receive" }).catch(
+      (error: unknown) => error,
+    );
+
+    const headers = new Headers((fetchSpy.mock.calls[0]?.[1] as RequestInit).headers);
+    expect(headers.get("X-MES-Employee-Code")).toBe("A001");
+    expect(failure).toMatchObject({ status: 403, code: "ACTOR_MISMATCH" });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(listener).toHaveBeenCalledTimes(1);
+    window.removeEventListener("dexcowin_auth_required", listener);
+  });
+
+  it("opens an auth boundary when a normal API reports an inactive employee", async () => {
+    const listener = vi.fn();
+    window.addEventListener("dexcowin_auth_required", listener);
+    globalThis.fetch = vi.fn(() => Promise.resolve(makeResponse({
+      ok: false,
+      status: 403,
+      body: {
+        detail: {
+          code: "EMPLOYEE_INACTIVE",
+          message: "비활성화된 직원입니다.",
+        },
+      },
+    }))) as unknown as typeof fetch;
+
+    const failure = await fetcher("/api/items").catch((error: unknown) => error);
+
+    expect(failure).toMatchObject({ status: 403, code: "EMPLOYEE_INACTIVE" });
+    expect(listener).toHaveBeenCalledTimes(1);
+    window.removeEventListener("dexcowin_auth_required", listener);
+  });
+
+  it("keeps a same-actor mutation on the normal success path", async () => {
+    window.sessionStorage.setItem(
+      "dexcowin_mes_operator",
+      JSON.stringify({ employee_id: "operator-a", employee_code: "A001", name: "작업자 A" }),
+    );
+    const listener = vi.fn();
+    window.addEventListener("dexcowin_auth_required", listener);
+    const fetchSpy = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
+      Promise.resolve(makeResponse({ ok: true, body: { accepted: true } })),
+    );
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await expect(postJson("/api/io/submit", { work_type: "receive" })).resolves.toEqual({
+      accepted: true,
+    });
+
+    const headers = new Headers((fetchSpy.mock.calls[0]?.[1] as RequestInit).headers);
+    expect(headers.get("X-MES-Employee-Code")).toBe("A001");
+    expect(listener).not.toHaveBeenCalled();
+    window.removeEventListener("dexcowin_auth_required", listener);
+  });
+
+  it("keeps login and PIN bootstrap claimless but binds logout to the tab operator", async () => {
+    window.sessionStorage.setItem(
+      "dexcowin_mes_operator",
+      JSON.stringify({ employee_id: "operator-a", employee_code: "A001", name: "작업자 A" }),
+    );
+    const fetchSpy = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
+      Promise.resolve(makeResponse({ ok: true, body: { employee: {}, boot_id: "boot-b" } })),
+    );
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await postJson("/api/operator-session", { employee_id: "operator-b", pin: "2222" });
+    await postJson("/api/operator-session/complete-pin-change", {
+      employee_id: "operator-b",
+      new_pin: "3333",
+    });
+    await deleteJson("/api/operator-session");
+
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+    expect(new Headers(fetchSpy.mock.calls[0]?.[1]?.headers).get("X-MES-Employee-Code")).toBeNull();
+    expect(new Headers(fetchSpy.mock.calls[1]?.[1]?.headers).get("X-MES-Employee-Code")).toBeNull();
+    expect(new Headers(fetchSpy.mock.calls[2]?.[1]?.headers).get("X-MES-Employee-Code")).toBe(
+      "A001",
+    );
   });
 
   it("postJson without body skips Content-Type while keeping audit headers", async () => {
@@ -269,7 +566,7 @@ describe("fetcher / write helpers", () => {
     expect(headers["X-MES-Audit-Session"]).toMatch(/^[a-f0-9-]+$/);
   });
 
-  it("fetcher attaches the current operator code as a log-only header", async () => {
+  it("does not turn the current operator cache into an actor header", async () => {
     window.sessionStorage.setItem(
       "dexcowin_mes_operator",
       JSON.stringify({ employee_id: "emp-1", name: "Kim", employee_code: "E22" }),
@@ -282,9 +579,9 @@ describe("fetcher / write helpers", () => {
     await fetcher("/api/items");
 
     const init = fetchSpy.mock.calls[0][1] as RequestInit;
-    const headers = init.headers as Record<string, string>;
-    expect(headers["X-MES-Employee-Code"]).toBe("E22");
-    expect(headers["X-Employee-Code"]).toBeUndefined();
+    const headers = new Headers(init.headers);
+    expect(headers.get("X-MES-Employee-Code")).toBeNull();
+    expect(headers.get("X-Employee-Code")).toBeNull();
   });
 
   it("fetcher skips the log-only employee header before login", async () => {
@@ -297,6 +594,51 @@ describe("fetcher / write helpers", () => {
 
     const init = fetchSpy.mock.calls[0][1] as RequestInit;
     expect(init.headers).toBeUndefined();
+  });
+
+  it("does not attach warehouse step-up credentials to GET requests", async () => {
+    const fetchSpy = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
+      Promise.resolve(makeResponse({ ok: true, body: { ok: true } })),
+    );
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    registerOperatorCredsProvider(() => ({ code: "E001", pin: "2468" }));
+
+    await fetcher("/api/warehouse-map/reconcile");
+
+    const init = fetchSpy.mock.calls[0]?.[1];
+    const headers = new Headers(init?.headers);
+    expect(headers.get("X-Employee-Code")).toBeNull();
+    expect(headers.get("X-Operator-Pin")).toBeNull();
+  });
+
+  it("attaches warehouse step-up credentials to mutation requests", async () => {
+    const fetchSpy = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
+      Promise.resolve(makeResponse({ ok: true, body: { ok: true } })),
+    );
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    registerOperatorCredsProvider(() => ({ code: "E001", pin: "2468" }));
+
+    await postJson("/api/warehouse-map/locations", { code: "A-01" });
+
+    const init = fetchSpy.mock.calls[0]?.[1];
+    const headers = new Headers(init?.headers);
+    expect(headers.get("X-Employee-Code")).toBe("E001");
+    expect(headers.get("X-Operator-Pin")).toBe("2468");
+  });
+
+  it("does not disclose warehouse step-up credentials to other mutations", async () => {
+    const fetchSpy = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
+      Promise.resolve(makeResponse({ ok: true, body: { ok: true } })),
+    );
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    registerOperatorCredsProvider(() => ({ code: "E001", pin: "2468" }));
+
+    await postJson("/api/io/submit", { work_type: "receive" });
+
+    const init = fetchSpy.mock.calls[0]?.[1];
+    const headers = new Headers(init?.headers);
+    expect(headers.get("X-Employee-Code")).toBeNull();
+    expect(headers.get("X-Operator-Pin")).toBeNull();
   });
 
   it("fetchBlob sends the registered admin PIN header and returns the response Blob", async () => {

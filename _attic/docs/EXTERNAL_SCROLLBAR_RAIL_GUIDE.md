@@ -250,4 +250,3 @@
 
 - `frontend/app/mes/_components/_warehouse_v2/IoTargetPicker.tsx`
 - 입출고 요청 작성 3단계의 품목 선택 표
-

@@ -244,7 +244,8 @@ class CapacityPfVariant(BaseModel):
 class CapacityAfBlock(BaseModel):
     """AF(조립 완제품) 기준 생산 가능 수량.
 
-    재고 기준은 available(=warehouse+production-pending)이며 **계획/대응 수량 지표**다.
+    재고 기준은 available(=warehouse+production-재고 요청 예약-활성 출하 예약)이며
+    **계획/대응 수량 지표**다.
     생산 등록 가능성 검증(backflush, warehouse_available)이 아니다.
 
     주의: summary.ship_ready / fast_production / total_production 은 'AF별 독립 계산의 합계'다.
@@ -276,7 +277,8 @@ class CapacityResponse(BaseModel):
     """전체 생산 가능 수량 응답.
 
     - **immediate**: BOM 직계 자식 1단계(AA/TF/HF/VF 등 중간재·반제품)의 가용 재고만으로
-      빠르게 만들 수 있는 수량. 각 직계 자식의 available(=warehouse+PRODUCTION-pending)
+      빠르게 만들 수 있는 수량. 각 직계 자식의
+      available(=warehouse+PRODUCTION-재고 요청 예약-활성 출하 예약)
       을 per-unit 수량으로 나눈 값의 최솟값.
     - **maximum**: leaf 까지 전개한 전체 하위 자재의 available 합계 기준 이론적 최대.
       불량(DEFECTIVE) 재고는 제외.

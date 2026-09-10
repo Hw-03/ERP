@@ -27,7 +27,7 @@ import {
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatKstDate } from "@/lib/mes/date";
 import { api } from "@/lib/api";
-import type { Item, ProductionCapacity } from "@/lib/api";
+import type { Item, ProductionCapacity, ShippingRequestPage } from "@/lib/api";
 import { productionApi } from "@/lib/api/production";
 import { warehouseMapApi } from "@/lib/api/warehouse-map";
 import { STALE_TIME } from "@/lib/queries/client";
@@ -234,9 +234,9 @@ function DesktopMesShellInner({
       if (target === "warehouse" && relatedRequestId) params.set("stockRequestId", relatedRequestId);
       const url = `?${params.toString()}`;
       if (target === activeTab) {
-        // 같은 탭이면 리마운트를 강제해 섹션 초기화 로직(?section=)이 다시 실행되게 한다.
+        // 자식이 새 쿼리를 읽은 뒤 리마운트되도록 주소를 먼저 동기화한다.
         pendingUrlTabRef.current = target;
-        router.push(url, { scroll: false });
+        window.history.pushState(null, "", url);
         setRefreshNonce((n) => n + 1);
       } else {
         commitDesktopTab(target, { url });
@@ -332,9 +332,14 @@ function DesktopMesShellInner({
       queryKey: queryKeys.warehouseMap.map(),
       queryFn: () => warehouseMapApi.getMap(),
     });
-    void queryClient.prefetchQuery({
-      queryKey: queryKeys.shipping.requests(),
-      queryFn: ({ signal }) => api.getShippingRequests(undefined, { signal }),
+    void queryClient.prefetchInfiniteQuery({
+      queryKey: queryKeys.shipping.requestPages(),
+      initialPageParam: null as string | null,
+      queryFn: ({ signal, pageParam }) => api.getShippingRequestPage({
+        cursor: pageParam ?? undefined,
+        limit: 50,
+      }, { signal }),
+      getNextPageParam: (lastPage: ShippingRequestPage) => lastPage.has_more ? lastPage.next_cursor : null,
     });
   }, [queryClient, weekMon]);
 

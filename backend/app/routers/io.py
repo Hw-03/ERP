@@ -5,11 +5,17 @@ from __future__ import annotations
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import Depends, Query, Request, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies.verified_actor import (
+    CurrentActor,
+    VerifiedActor,
+    VerifiedActorRouter,
+    ensure_actor_employee_id,
+)
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     IoBatchResponse,
@@ -32,10 +38,60 @@ from app.services import shipping as shipping_svc
 from app.services import shipping_actions as shipping_actions_svc
 from app.services.shipping import ShippingError
 from app.services._tx import commit_only
-from app.models import Employee, TransactionLog
+from app.models import Employee, StockRequest, TransactionLog
+from app.services.command_idempotency import (
+    IdempotencyConflict,
+    fingerprint_io_submit,
+    lock_idempotency_key,
+    require_matching_fingerprint,
+)
 
 
-router = APIRouter()
+router = VerifiedActorRouter()
+
+
+def _idempotency_conflict(reason: str) -> Exception:
+    return http_error(
+        409,
+        ErrorCode.IDEMPOTENCY_CONFLICT,
+        "같은 요청 키를 다른 명령에 사용할 수 없습니다.",
+        reason=reason,
+    )
+
+
+def _mark_idempotent_replay(request: Request) -> None:
+    """동일 업무 명령 재생은 새 사용자 감사 행을 만들지 않는다."""
+    request.state.activity_audit_skip = True
+
+
+def _resolve_io_idempotency(
+    db: Session,
+    *,
+    client_request_id: str,
+    request_fingerprint: str,
+    actor: Employee,
+) -> dict | None:
+    """key의 전역 소유자를 확인하고 exact IO retry만 응답으로 재생한다."""
+    cross_route = (
+        db.query(StockRequest.request_id)
+        .filter(StockRequest.client_request_id == client_request_id)
+        .first()
+    )
+    if cross_route is not None:
+        raise _idempotency_conflict("route_mismatch")
+    existing = io_svc.find_by_client_request_id(db, client_request_id)
+    if existing is None:
+        return None
+    if existing.requester_employee_id != actor.employee_id:
+        raise _idempotency_conflict("actor_mismatch")
+    try:
+        require_matching_fingerprint(
+            existing.request_fingerprint,
+            request_fingerprint,
+        )
+    except IdempotencyConflict as exc:
+        raise _idempotency_conflict(exc.reason)
+    return io_svc.build_idempotent_response(existing, db=db)
 
 
 def _load_item_conversion_requester(db: Session, employee_id: uuid.UUID) -> Employee:
@@ -104,8 +160,13 @@ def item_conversion_preview(
 
 
 @router.post("/item-conversion", response_model=ShippingComponentChangeResultResponse)
-def execute_item_conversion(payload: ItemConversionExecuteRequest, db: Session = Depends(get_db)):
-    requester = _load_item_conversion_requester(db, payload.requester_employee_id)
+def execute_item_conversion(
+    payload: ItemConversionExecuteRequest,
+    actor: VerifiedActor,
+    db: Session = Depends(get_db),
+) -> ShippingComponentChangeResultResponse:
+    ensure_actor_employee_id(actor, payload.requester_employee_id)
+    _load_item_conversion_requester(db, actor.employee_id)
 
     try:
         result = shipping_actions_svc.execute_component_change_independent(
@@ -115,8 +176,7 @@ def execute_item_conversion(payload: ItemConversionExecuteRequest, db: Session =
             payload.quantity,
             payload.memo,
             payload.requested_mode,
-            requester_name=requester.name,
-            requester_employee_id=requester.employee_id,
+            actor=actor,
         )
         return ShippingComponentChangeResultResponse(
             **{key: value for key, value in result.items() if key != "transactions"},
@@ -129,14 +189,18 @@ def execute_item_conversion(payload: ItemConversionExecuteRequest, db: Session =
 
 
 @router.post("/preview", response_model=IoPreviewResponse)
-def preview_io(payload: IoPreviewRequest, db: Session = Depends(get_db)):
+def preview_io(
+    payload: IoPreviewRequest,
+    actor: VerifiedActor,
+    db: Session = Depends(get_db),
+) -> dict:
+    ensure_actor_employee_id(actor, payload.requester_employee_id)
     try:
         if payload.work_type == "internal_use" or payload.sub_type == "internal_use_out":
             if payload.requester_employee_id is None:
                 raise ValueError("사내 사용 미리보기에는 requester_employee_id가 필요합니다.")
-            requester = io_svc._load_requester(db, payload.requester_employee_id)
             io_svc.validate_internal_use_requester(
-                requester,
+                actor,
                 work_type=payload.work_type,
                 sub_type=payload.sub_type,
             )
@@ -146,9 +210,8 @@ def preview_io(payload: IoPreviewRequest, db: Session = Depends(get_db)):
         }:
             if payload.requester_employee_id is None:
                 raise ValueError("창고 수량보정 미리보기에는 requester_employee_id가 필요합니다.")
-            requester = io_svc._load_requester(db, payload.requester_employee_id)
             io_svc.validate_warehouse_adjust_requester(
-                requester,
+                actor,
                 work_type=payload.work_type,
                 sub_type=payload.sub_type,
             )
@@ -167,9 +230,15 @@ def preview_io(payload: IoPreviewRequest, db: Session = Depends(get_db)):
 
 
 @router.put("/draft", response_model=IoBatchResponse)
-def save_io_draft(payload: IoDraftUpsert, http_request: Request, db: Session = Depends(get_db)):
+def save_io_draft(
+    payload: IoDraftUpsert,
+    http_request: Request,
+    actor: VerifiedActor,
+    db: Session = Depends(get_db),
+) -> dict:
+    ensure_actor_employee_id(actor, payload.requester_employee_id)
     try:
-        draft = io_svc.save_draft(db, payload)
+        draft = io_svc.save_draft(db, payload, requester=actor)
     except PermissionError as exc:
         db.rollback()
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
@@ -194,8 +263,10 @@ def get_io_draft(
     requester_employee_id: uuid.UUID = Query(...),
     work_type: str = Query(...),
     sub_type: Optional[str] = Query(None),
+    actor: CurrentActor = None,
     db: Session = Depends(get_db),
 ):
+    ensure_actor_employee_id(actor, requester_employee_id)
     return io_svc.get_draft(
         db,
         requester_employee_id=requester_employee_id,
@@ -207,22 +278,30 @@ def get_io_draft(
 @router.get("/drafts", response_model=list[IoBatchResponse])
 def list_io_drafts(
     requester_employee_id: uuid.UUID = Query(...),
+    actor: CurrentActor = None,
     db: Session = Depends(get_db),
 ):
+    ensure_actor_employee_id(actor, requester_employee_id)
     return io_svc.list_drafts(db, requester_employee_id=requester_employee_id)
 
 
-@router.delete("/draft/{batch_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/draft/{batch_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+)
 def delete_io_draft(
     batch_id: uuid.UUID,
+    actor: VerifiedActor,
     requester_employee_id: uuid.UUID = Query(...),
     db: Session = Depends(get_db),
-):
+) -> None:
+    ensure_actor_employee_id(actor, requester_employee_id)
     try:
         io_svc.delete_draft(
             db,
             batch_id=batch_id,
-            requester_employee_id=requester_employee_id,
+            requester=actor,
         )
     except PermissionError as exc:
         db.rollback()
@@ -235,9 +314,43 @@ def delete_io_draft(
 
 
 @router.post("/submit", response_model=IoSubmitResponse, status_code=status.HTTP_201_CREATED)
-def submit_io(payload: IoSubmitRequest, http_request: Request, db: Session = Depends(get_db)):
+def submit_io(
+    payload: IoSubmitRequest,
+    http_request: Request,
+    actor: VerifiedActor,
+    db: Session = Depends(get_db),
+) -> dict:
+    ensure_actor_employee_id(actor, payload.requester_employee_id)
+    request_fingerprint: str | None = None
+    client_request_id = getattr(payload, "client_request_id", None)
+    if client_request_id:
+        request_fingerprint = fingerprint_io_submit(actor.employee_id, payload)
+        replay = _resolve_io_idempotency(
+            db,
+            client_request_id=client_request_id,
+            request_fingerprint=request_fingerprint,
+            actor=actor,
+        )
+        if replay is not None:
+            _mark_idempotent_replay(http_request)
+            return replay
+        lock_idempotency_key(db, client_request_id)
+        replay = _resolve_io_idempotency(
+            db,
+            client_request_id=client_request_id,
+            request_fingerprint=request_fingerprint,
+            actor=actor,
+        )
+        if replay is not None:
+            _mark_idempotent_replay(http_request)
+            return replay
     try:
-        result = io_actions_svc.submit(db, payload)
+        submit_kwargs = (
+            {"request_fingerprint": request_fingerprint}
+            if request_fingerprint is not None
+            else {}
+        )
+        result = io_actions_svc.submit(db, payload, requester=actor, **submit_kwargs)
         _batch = result.get("batch") or {}
         http_request.state.activity_audit_related_id = str(_batch.get("batch_id") or "")[:120] or None
         http_request.state.activity_audit_target_summary = (
@@ -260,11 +373,19 @@ def submit_io(payload: IoSubmitRequest, http_request: Request, db: Session = Dep
     except ValueError as exc:
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
     except IntegrityError as exc:
-        # client_request_id 중복 → 기존 batch 멱등 반환 (더블클릭/네트워크 retry 보호)
-        if payload.client_request_id and "client_request_id" in str(exc).lower():
-            existing = io_svc.find_by_client_request_id(db, payload.client_request_id)
-            if existing is not None:
-                return io_svc.build_idempotent_response(existing)
+        # failed transaction 정리 뒤 winner를 재조회해야 PostgreSQL 세션을 다시 쓸 수 있다.
+        db.rollback()
+        db.expire_all()
+        if client_request_id and request_fingerprint is not None:
+            replay = _resolve_io_idempotency(
+                db,
+                client_request_id=client_request_id,
+                request_fingerprint=request_fingerprint,
+                actor=actor,
+            )
+            if replay is not None:
+                _mark_idempotent_replay(http_request)
+                return replay
             raise http_error(
                 409,
                 ErrorCode.CONFLICT,
@@ -286,19 +407,27 @@ def submit_io(payload: IoSubmitRequest, http_request: Request, db: Session = Dep
 def submit_io_draft(
     batch_id: uuid.UUID,
     http_request: Request,
+    actor: VerifiedActor,
     requester_employee_id: uuid.UUID = Query(...),
     db: Session = Depends(get_db),
-):
+) -> dict:
+    ensure_actor_employee_id(actor, requester_employee_id)
     try:
         result = io_actions_svc.submit_existing_draft(
             db,
             batch_id=batch_id,
-            requester_employee_id=requester_employee_id,
+            requester=actor,
         )
+    except IdempotencyConflict as exc:
+        raise _idempotency_conflict(exc.reason)
     except PermissionError as exc:
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
     except ValueError as exc:
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
+    is_replay = bool(result.pop("_idempotent_replay", False))
+    if is_replay:
+        _mark_idempotent_replay(http_request)
+        return result
     _batch = result.get("batch") or {}
     http_request.state.activity_audit_related_id = str(_batch.get("batch_id") or "")[:120] or None
     http_request.state.activity_audit_target_summary = (
@@ -320,8 +449,14 @@ def submit_io_draft(
 
 
 @router.get("/{batch_id}", response_model=IoBatchResponse)
-def get_io_batch(batch_id: uuid.UUID, db: Session = Depends(get_db)):
+def get_io_batch(
+    batch_id: uuid.UUID,
+    actor: CurrentActor = None,
+    db: Session = Depends(get_db),
+):
     batch = io_svc.get_batch(db, batch_id=batch_id)
     if batch is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "입출고 작업 묶음을 찾을 수 없습니다.")
+    if batch["status"] == "draft":
+        ensure_actor_employee_id(actor, batch["requester_employee_id"])
     return batch

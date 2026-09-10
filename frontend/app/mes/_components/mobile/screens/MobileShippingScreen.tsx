@@ -8,7 +8,12 @@ import { formatBomQuantity } from "@/lib/mes/bomFormat";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { queryKeys } from "@/lib/queries/keys";
-import { useShippingHistoryQuery, useShippingRequestsQuery } from "@/lib/queries/useShippingQuery";
+import {
+  type ShippingPagesCache,
+  upsertShippingPageRequest,
+  useShippingHistoryPagesQuery,
+  useShippingRequestPagesQuery,
+} from "@/lib/queries/useShippingQuery";
 import { ExpandableItemName } from "../../_warehouse_v2/ExpandableItemName";
 import { LoadFailureCard } from "../../common/LoadFailureCard";
 
@@ -35,10 +40,10 @@ export function MobileShippingScreen() {
   const [mutationErrors, setMutationErrors] = useState<Record<string, string>>({});
   const [pendingId, setPendingId] = useState<string | null>(null);
   const queryClient = useQueryClient();
-  const requestsQuery = useShippingRequestsQuery(undefined, { live: true });
-  const historyQuery = useShippingHistoryQuery(tab === "history");
-  const requests = useMemo(() => requestsQuery.data ?? [], [requestsQuery.data]);
-  const history = historyQuery.data ?? [];
+  const requestsQuery = useShippingRequestPagesQuery({}, { live: true });
+  const historyQuery = useShippingHistoryPagesQuery({}, tab === "history");
+  const requests = requestsQuery.requests;
+  const history = historyQuery.requests;
   const refetchRequests = requestsQuery.refetch;
   const lastResumeRefetchAtRef = useRef<number | null>(null);
 
@@ -74,10 +79,10 @@ export function MobileShippingScreen() {
   }, [refetchAfterResume]);
 
   function upsert(next: ShippingRequest) {
-    queryClient.setQueryData<ShippingRequest[]>(queryKeys.shipping.requests(), (prev = []) => [
-      next,
-      ...prev.filter((row) => row.request_id !== next.request_id),
-    ]);
+    queryClient.setQueryData<ShippingPagesCache>(
+      queryKeys.shipping.requestPages(),
+      (current) => upsertShippingPageRequest(current, next),
+    );
   }
 
   async function updateChecklist(req: ShippingRequest, itemId: string, checked: boolean) {
@@ -119,10 +124,10 @@ export function MobileShippingScreen() {
   }
 
   const activeQuery = tab === "history" ? historyQuery : requestsQuery;
-  const loading = activeQuery.isLoading;
   const queryError = tab === "history" ? historyQuery.error : requestsQuery.error;
   const error = queryError instanceof Error ? queryError.message : queryError ? "출하 데이터를 불러오지 못했습니다." : null;
-  const hasActiveData = activeQuery.data !== undefined;
+  const hasActiveData = activeQuery.dataUpdatedAt > 0;
+  const loading = !hasActiveData && activeQuery.isFetching && !error;
   const initialError = hasActiveData ? null : error;
   const refreshError = hasActiveData ? error : null;
   const retryRefresh = () => {
@@ -151,8 +156,21 @@ export function MobileShippingScreen() {
         <TabButton active={tab === "history"} icon={History} label="이력" onClick={() => setTab("history")} />
       </div>
 
-      {loading && <InlineState title="로딩 중" body="출하 데이터를 불러오고 있습니다." />}
-      {initialError && <InlineState title="오류" body={initialError} tone={LEGACY_COLORS.red} />}
+      {loading && (
+        <div role="status" aria-live="polite">
+          <InlineState title="로딩 중" body="출하 데이터를 불러오고 있습니다." />
+        </div>
+      )}
+      {initialError && (
+        <LoadFailureCard
+          message={initialError}
+          prefix="출하 데이터를 불러오지 못했습니다"
+          retryLabel="다시 시도"
+          onRetry={retryRefresh}
+          ariaLabel="출하 데이터 로드 오류"
+          focusOnMount
+        />
+      )}
       {refreshError && (
         <LoadFailureCard
           message={refreshError}
@@ -168,6 +186,13 @@ export function MobileShippingScreen() {
             <InlineState title="요청 없음" body="PC에서 새 출하 요청을 만들 수 있습니다." />
           ) : (
             activeRequests.map((req) => <MobileRequestCard key={req.request_id} request={req} />)
+          )}
+          {requestsQuery.hasNextPage && (
+            <MobileLoadMoreButton
+              label="요청 더 보기"
+              loading={requestsQuery.isFetchingNextPage}
+              onClick={() => void requestsQuery.fetchNextPage()}
+            />
           )}
         </div>
       )}
@@ -188,6 +213,13 @@ export function MobileShippingScreen() {
               />
             ))
           )}
+          {requestsQuery.hasNextPage && (
+            <MobileLoadMoreButton
+              label="준비 요청 더 보기"
+              loading={requestsQuery.isFetchingNextPage}
+              onClick={() => void requestsQuery.fetchNextPage()}
+            />
+          )}
         </div>
       )}
 
@@ -198,9 +230,34 @@ export function MobileShippingScreen() {
           ) : (
             history.map((req) => <MobileRequestCard key={req.request_id} request={req} />)
           )}
+          {historyQuery.hasNextPage && (
+            <MobileLoadMoreButton
+              label="이력 더 보기"
+              loading={historyQuery.isFetchingNextPage}
+              onClick={() => void historyQuery.fetchNextPage()}
+            />
+          )}
         </div>
       )}
     </div>
+  );
+}
+
+function MobileLoadMoreButton({ label, loading, onClick }: {
+  label: string;
+  loading: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={loading}
+      className="min-h-11 rounded-[12px] border px-4 text-sm font-black disabled:opacity-45"
+      style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}
+    >
+      {loading ? "불러오는 중" : label}
+    </button>
   );
 }
 

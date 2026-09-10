@@ -7,7 +7,11 @@ import { employeesApi } from "@/lib/api/employees";
 import { PIN_LENGTH } from "@/lib/auth/constants";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import type { SidebarMode } from "@/lib/sidebar-mode";
-import { updateCurrentOperatorPreferences, useCurrentOperator } from "./login/useCurrentOperator";
+import {
+  returnToOperatorLogin,
+  updateCurrentOperatorPreferences,
+  useCurrentOperator,
+} from "./login/useCurrentOperator";
 import type { AppearancePreferences } from "./useAppearancePreferences";
 
 export type { AppearancePreferences } from "./useAppearancePreferences";
@@ -146,6 +150,7 @@ export function DesktopSettingsView({
       setPinConfirm("");
       setPinExpanded(false);
       setPinFeedback({ tone: "success", text: "PIN이 변경되었습니다." });
+      returnToOperatorLogin();
     } catch (pinError) {
       setPinFeedback({
         tone: "error",

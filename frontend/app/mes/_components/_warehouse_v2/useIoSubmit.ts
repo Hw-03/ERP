@@ -1,12 +1,17 @@
 import { useRef, useState } from "react";
-import { api, type IoBundle, type IoSubType, type IoWorkType } from "@/lib/api";
-import { ApiError } from "@/lib/api-core";
+import {
+  api,
+  type IoBundle,
+  type IoDraftPayload,
+  type IoSubType,
+  type IoWorkType,
+} from "@/lib/api";
+import { runPendingCommand } from "@/lib/pending-command-storage";
 import { makeClientRequestId } from "@/lib/uuid";
 
 export function useIoSubmit() {
   const [submitting, setSubmitting] = useState(false);
   const inFlightRef = useRef(false);
-  const clientRequestIdRef = useRef<string | null>(null);
 
   async function run<T>(work: () => Promise<T>): Promise<T | undefined> {
     if (inFlightRef.current) return undefined;
@@ -30,12 +35,9 @@ export function useIoSubmit() {
     notes?: string | null;
     bundles: IoBundle[];
   }) {
-    // 폼 세션 멱등 키: 동일 시도 재전송 시 서버가 기존 batch 멱등 반환 → 재고 이중 차감 방지
-    if (!clientRequestIdRef.current) {
-      clientRequestIdRef.current = makeClientRequestId();
-    }
-    try {
-      const result = await api.submit({
+    return runPendingCommand(
+      `i:${payload.employeeId}`,
+      {
         requester_employee_id: payload.employeeId,
         work_type: payload.workType,
         sub_type: payload.subType,
@@ -43,19 +45,11 @@ export function useIoSubmit() {
         to_department: payload.toDepartment || null,
         reference_no: payload.referenceNo || null,
         notes: payload.notes || null,
-        client_request_id: clientRequestIdRef.current,
+        client_request_id: makeClientRequestId(),
         bundles: payload.bundles,
-      });
-      // 성공 시 키 폐기 — 다음 폼 세션은 새 UUID
-      clientRequestIdRef.current = null;
-      return result;
-    } catch (err) {
-      // 503(과부하)는 같은 키로 재시도 가능하도록 유지. 그 외 실패도 사용자가 수정 후 재제출하므로 키 폐기.
-      if (!(err instanceof ApiError) || !err.isUnavailable) {
-        clientRequestIdRef.current = null;
-      }
-      throw err;
-    }
+      } as IoDraftPayload,
+      (request) => api.submit(request),
+    );
   }
 
   return { submitting, run, submit };

@@ -1,12 +1,17 @@
 /**
- * 현재 로그인된 작업자 정보를 sessionStorage에서 관리하는 훅.
- *
- * 작업자 식별용 — 실제 보안 인증이 아님.
- * 로그인된 작업자 정보는 입출고/수정 작업의 produced_by 기본값으로 사용된다.
+ * 서버가 검증한 현재 작업자 프로필의 화면 표시용 sessionStorage cache.
+ * 권한 정본은 HttpOnly cookie와 GET /api/operator-session이며 이 cache를 mutation
+ * 행위자 인증에 사용하지 않는다.
  */
 
 import { useEffect, useState } from "react";
-import type { Department, DepartmentRole, EmployeeLevel, WarehouseRole } from "@/lib/api";
+import type { Department, DepartmentRole, Employee, EmployeeLevel, WarehouseRole } from "@/lib/api";
+import { operatorSessionApi } from "@/lib/api/operator-session";
+import {
+  ApiError,
+  advanceAuthGeneration,
+  establishAuthRequiredBoundary,
+} from "@/lib/api-core";
 import { sendClientEvent } from "@/lib/client-events";
 import { clearAuditSession, startAuditSession } from "@/lib/activity-audit-context";
 import { getClientEventSource } from "@/lib/operator-log-context";
@@ -36,9 +41,50 @@ export interface Operator {
   loginPopupEnabled: boolean;
 }
 
+type OperatorSource = Partial<Operator> & Partial<Employee>;
+
+function normalizeOperator(source: OperatorSource): Operator {
+  const warehouseRole = (source.warehouse_role ?? "none").toLowerCase();
+  const departmentRole = (source.department_role ?? "none").toLowerCase();
+  const slots = source.assigned_model_slots;
+  const hiddenTabs = source.hidden_sidebar_tabs;
+  return {
+    employee_id: source.employee_id as string,
+    name: source.name as string,
+    role: typeof source.role === "string" ? source.role : "",
+    department: source.department as Department,
+    level: source.level as EmployeeLevel,
+    employee_code: source.employee_code as string,
+    warehouse_role: (
+      warehouseRole === "primary" || warehouseRole === "deputy" ? warehouseRole : "none"
+    ) as WarehouseRole,
+    department_role: (
+      departmentRole === "primary" || departmentRole === "deputy" ? departmentRole : "none"
+    ) as DepartmentRole,
+    theme: source.theme ?? null,
+    sidebar_mode: normalizeSidebarMode(source.sidebar_mode) ?? "hover",
+    assigned_model_slots: Array.isArray(slots)
+      ? slots.filter((slot): slot is number => typeof slot === "number" && Number.isInteger(slot))
+      : [],
+    io_enabled: source.io_enabled ?? true,
+    hidden_sidebar_tabs: Array.isArray(hiddenTabs)
+      ? hiddenTabs.filter((tab): tab is string => typeof tab === "string")
+      : [],
+    loginPopupEnabled:
+      source.loginPopupEnabled !== false && source.login_notification_popup_enabled !== false,
+  };
+}
+
+/** 서버 응답의 검증된 직원 프로필을 화면 전용 cache 모양으로 변환한다. */
+export function operatorFromEmployee(employee: Employee): Operator {
+  return normalizeOperator(employee);
+}
+
 const OPERATOR_KEY = "dexcowin_mes_operator";
 const BOOT_KEY = "dexcowin_mes_boot_id";
 const LOGIN_NOTIFICATION_POPUP_PENDING_KEY = "dexcowin_mes_login_popup_pending";
+export const OPERATOR_LOGOUT_PENDING_KEY = "dexcowin_mes_logout_pending";
+export const OPERATOR_LOGOUT_PENDING_EVENT = "dexcowin_operator_logout_pending";
 // 같은 탭에서 setCurrentOperator 가 호출되면 useCurrentOperator 구독자들을 깨우기 위한 이벤트.
 // storage 이벤트는 변경을 일으킨 탭에 발화하지 않으므로 별도 CustomEvent가 필요하다.
 const OPERATOR_CHANGE_EVENT = "dexcowin_operator_change";
@@ -54,40 +100,9 @@ function readOperator(): Operator | null {
     clearLegacyPersistentOperator();
     const raw = window.sessionStorage.getItem(OPERATOR_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<Operator> & {
-      warehouse_role?: string | null;
-      department_role?: string | null;
-      assigned_model_slots?: unknown;
-      hidden_sidebar_tabs?: unknown;
-      loginPopupEnabled?: unknown;
-    };
+    const parsed = JSON.parse(raw) as OperatorSource;
     if (!parsed.employee_id || !parsed.name) return null;
-    const wh = (parsed.warehouse_role ?? "none").toLowerCase();
-    const dept = (parsed.department_role ?? "none").toLowerCase();
-    const slotsRaw = parsed.assigned_model_slots;
-    const slots = Array.isArray(slotsRaw)
-      ? slotsRaw.filter((s): s is number => typeof s === "number" && Number.isInteger(s))
-      : [];
-    const hiddenRaw = parsed.hidden_sidebar_tabs;
-    const hiddenTabs = Array.isArray(hiddenRaw)
-      ? hiddenRaw.filter((tab): tab is string => typeof tab === "string")
-      : [];
-    return {
-      employee_id: parsed.employee_id,
-      name: parsed.name,
-      role: typeof parsed.role === "string" ? parsed.role : "",
-      department: parsed.department as Department,
-      level: parsed.level as EmployeeLevel,
-      employee_code: parsed.employee_code as string,
-      warehouse_role: (wh === "primary" || wh === "deputy" ? wh : "none") as WarehouseRole,
-      department_role: (dept === "primary" || dept === "deputy" ? dept : "none") as DepartmentRole,
-      theme: parsed.theme ?? null,
-      sidebar_mode: normalizeSidebarMode(parsed.sidebar_mode) ?? "hover",
-      assigned_model_slots: slots,
-      io_enabled: parsed.io_enabled ?? true,
-      hidden_sidebar_tabs: hiddenTabs,
-      loginPopupEnabled: parsed.loginPopupEnabled !== false,
-    };
+    return normalizeOperator(parsed);
   } catch {
     return null;
   }
@@ -106,16 +121,24 @@ export function getStoredBootId(): string | null {
 
 export function setCurrentOperator(op: Operator, bootId?: string): void {
   if (typeof window === "undefined") return;
+  restoreCurrentOperator(op, bootId);
+  sendClientEvent({ event: "ui_login", source: getClientEventSource() });
+}
+
+/** 서버가 검증해 돌려준 프로필을 화면 cache에 복원한다. 로그인 감사 이벤트는 만들지 않는다. */
+export function restoreCurrentOperator(op: Operator, bootId?: string): void {
+  if (typeof window === "undefined") return;
   clearLegacyPersistentOperator();
   window.sessionStorage.setItem(OPERATOR_KEY, JSON.stringify(op));
   if (bootId) window.sessionStorage.setItem(BOOT_KEY, bootId);
+  if (bootId) advanceAuthGeneration();
   startAuditSession();
-  sendClientEvent({ event: "ui_login", source: getClientEventSource() });
   window.dispatchEvent(new CustomEvent(OPERATOR_CHANGE_EVENT));
 }
 
 /** Updates UI preferences without creating another login audit event. */
 export function updateCurrentOperatorPreferences(patch: {
+  theme?: Operator["theme"];
   sidebar_mode?: SidebarMode;
   loginPopupEnabled?: boolean;
 }): void {
@@ -128,13 +151,109 @@ export function updateCurrentOperatorPreferences(patch: {
 
 export function clearCurrentOperator(): void {
   if (typeof window === "undefined") return;
-  sendClientEvent({ event: "ui_logout", source: getClientEventSource() });
   clearAuditSession();
   window.sessionStorage.removeItem(OPERATOR_KEY);
   window.sessionStorage.removeItem(BOOT_KEY);
   window.sessionStorage.removeItem(LOGIN_NOTIFICATION_POPUP_PENDING_KEY);
   clearLegacyPersistentOperator();
   window.dispatchEvent(new CustomEvent(OPERATOR_CHANGE_EVENT));
+}
+
+/** 서버가 세션을 이미 폐기한 경우 로컬 cache를 지우고 로그인 게이트로 복귀한다. */
+export function returnToOperatorLogin(): void {
+  if (typeof window === "undefined") return;
+  clearCurrentOperator();
+  establishAuthRequiredBoundary();
+}
+
+interface PendingOperatorLogout {
+  state: "pending" | "failed";
+  employee_code: string;
+}
+
+function readPendingOperatorLogout(): PendingOperatorLogout | null {
+  if (typeof window === "undefined") return null;
+  const raw = window.localStorage.getItem(OPERATOR_LOGOUT_PENDING_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<PendingOperatorLogout>;
+    if (
+      (parsed.state === "pending" || parsed.state === "failed")
+      && typeof parsed.employee_code === "string"
+      && parsed.employee_code.length > 0
+    ) {
+      return { state: parsed.state, employee_code: parsed.employee_code };
+    }
+  } catch {
+    // malformed marker는 claimless DELETE로 완화하지 않고 로그인 차단 상태로 남긴다.
+  }
+  return null;
+}
+
+function setPendingOperatorLogout(
+  state: "pending" | "failed" | null,
+  employeeCode?: string,
+): void {
+  if (typeof window === "undefined") return;
+  if (state === null) {
+    window.localStorage.removeItem(OPERATOR_LOGOUT_PENDING_KEY);
+  } else {
+    window.localStorage.setItem(
+      OPERATOR_LOGOUT_PENDING_KEY,
+      JSON.stringify({ state, employee_code: employeeCode ?? "" }),
+    );
+  }
+  window.dispatchEvent(new CustomEvent(OPERATOR_LOGOUT_PENDING_EVENT));
+}
+
+export function hasPendingOperatorLogout(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(OPERATOR_LOGOUT_PENDING_KEY) !== null;
+}
+
+function isActorMismatch(error: unknown): boolean {
+  return error instanceof ApiError
+    && error.status === 403
+    && error.code === "ACTOR_MISMATCH";
+}
+
+async function revokePendingOperatorSession(employeeCode: string): Promise<void> {
+  try {
+    await operatorSessionApi.deleteOperatorSession(employeeCode);
+  } catch (error) {
+    if (!isActorMismatch(error)) {
+      setPendingOperatorLogout("failed", employeeCode);
+      throw error;
+    }
+  }
+  setPendingOperatorLogout(null);
+}
+
+/** restore/login 전에 남은 서버 capability 폐기를 먼저 확정한다. */
+export async function retryPendingOperatorLogout(): Promise<void> {
+  if (!hasPendingOperatorLogout()) return;
+  const pending = readPendingOperatorLogout();
+  if (!pending) {
+    throw new Error("로그아웃 재시도 대상 작업자를 확인할 수 없습니다.");
+  }
+  setPendingOperatorLogout("pending", pending.employee_code);
+  await revokePendingOperatorSession(pending.employee_code);
+}
+
+/** 민감 UI는 즉시 잠그되 서버 폐기 성공 전에는 로그아웃 완료로 간주하지 않는다. */
+export async function logoutCurrentOperator(): Promise<void> {
+  if (typeof window === "undefined") return;
+  const employeeCode = readCurrentOperator()?.employee_code;
+  sendClientEvent({ event: "ui_logout", source: getClientEventSource() });
+  setPendingOperatorLogout("pending", employeeCode);
+  if (!employeeCode) {
+    setPendingOperatorLogout("failed");
+    returnToOperatorLogin();
+    return;
+  }
+  const revokeSession = revokePendingOperatorSession(employeeCode);
+  returnToOperatorLogin();
+  await revokeSession.catch(() => undefined);
 }
 
 export function markLoginNotificationPopupPending(employeeId: string): void {

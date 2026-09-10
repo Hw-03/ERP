@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "incremental": false,
+    "types": ["node", "vitest/globals", "@testing-library/jest-dom"]
+  },
+  "include": [
+    "app/**/*.test.ts",
+    "app/**/*.test.tsx",
+    "lib/**/*.test.ts",
+    "lib/**/*.test.tsx",
+    "app/**/*.test.*",
+    "app/**/*.spec.*",
+    "lib/**/*.test.*",
+    "lib/**/*.spec.*",
+    "scripts/**/*.test.*",
+    "scripts/**/*.spec.*",
+    "vitest.config.mts",
+    "vitest.setup.ts"
+  ],
+  "exclude": ["node_modules", "_archive", "**/_archive/**", "tests/e2e/**"]
+}

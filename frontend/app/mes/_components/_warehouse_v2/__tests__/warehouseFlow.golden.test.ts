@@ -88,6 +88,7 @@ function makeBundle(overrides: Partial<IoBundle> & { lines?: IoLine[] } = {}): I
     source_kind: "direct_item",
     title: "테스트 번들",
     source_item_id: null,
+    source_mes_code: null,
     quantity: 10,
     expanded_level: 0,
     lines: [],

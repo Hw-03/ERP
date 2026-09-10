@@ -113,7 +113,7 @@ def test_create_rolls_back_doc_and_lines_when_post_create_step_fails(
         db.flush()
         raise boom
 
-    monkeypatch.setattr(notifications_svc, "notify_handover_arrived", fail_after_create)
+    monkeypatch.setattr(notifications_svc, "_notify_handover_arrived", fail_after_create)
 
     with pytest.raises(RuntimeError) as raised:
         actions.create_handover(
@@ -223,7 +223,7 @@ def test_submit_restores_draft_status_when_notification_step_fails(
         db.flush()
         raise boom
 
-    monkeypatch.setattr(notifications_svc, "notify_handover_arrived", fail_after_submit)
+    monkeypatch.setattr(notifications_svc, "_notify_handover_arrived", fail_after_submit)
 
     with pytest.raises(RuntimeError) as raised:
         actions.submit_handover(db_session, doc, author=author)
@@ -273,7 +273,7 @@ def test_delete_draft_restores_doc_and_lines_when_flush_fails(
         actions.delete_handover_draft(
             db_session,
             handover_id=doc_id,
-            author_employee_id=author.employee_id,
+            author=author,
         )
 
     assert raised.value is boom
@@ -292,7 +292,7 @@ def test_delete_draft_commits_once(db_session, make_item, monkeypatch):
     deleted = actions.delete_handover_draft(
         db_session,
         handover_id=doc_id,
-        author_employee_id=author.employee_id,
+        author=author,
     )
 
     assert deleted is True

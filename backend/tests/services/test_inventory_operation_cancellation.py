@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+import uuid
 
 import pytest
 
@@ -22,10 +23,19 @@ from app.models import (
     InventoryOperationKindEnum,
     InventoryOperationRoleEnum,
     InventoryOperationEffect,
+    ShippingAllocation,
+    ShippingRequest,
+    ShippingRequestStatusEnum,
     SystemSetting,
+    TransactionEditLog,
     TransactionLog,
     TransactionTypeEnum,
     LocationStatusEnum,
+    BoxSizeEnum,
+    WarehouseAngle,
+    WarehouseBox,
+    WarehouseBoxItem,
+    WarehouseUnplacedItem,
 )
 from app.services import inv_effect
 from app.services import inventory as inventory_svc
@@ -33,6 +43,7 @@ from app.services import defect_actions as defect_actions_svc
 from app.services import inventory_operation_cancellation as cancellation_svc
 from app.services import inventory_operations as operation_svc
 from app.services import handover as handover_svc
+from app.services import transaction_actions
 from app.services.pin_auth import DEFAULT_PIN_HASH
 
 
@@ -55,7 +66,7 @@ def _actor(db_session) -> Employee:
 
 
 def _receive_operation(db_session, item, actor: Employee, quantity: int) -> InventoryOperation:
-    operation = operation_svc.create_business_operation(
+    operation = operation_svc._create_business_operation(
         db_session,
         domain="inventory_io",
         action="receive",
@@ -66,15 +77,15 @@ def _receive_operation(db_session, item, actor: Employee, quantity: int) -> Inve
         effective_at=datetime(2026, 8, 25, 3, 0),
     )
     assert operation is not None
-    before = inv_effect.snapshot_cells(db_session, item.item_id)
-    inventory_svc.receive_confirmed(
+    before = inv_effect._snapshot_cells(db_session, item.item_id)
+    inventory_svc._receive_confirmed(
         db_session,
         item.item_id,
         Decimal(quantity),
         bucket="warehouse",
     )
-    inventory = inventory_svc.get_or_create_inventory(db_session, item.item_id)
-    log = operation_svc.attach_transaction(
+    inventory = inventory_svc._get_or_create_inventory(db_session, item.item_id)
+    log = operation_svc._attach_transaction(
         TransactionLog(
             item_id=item.item_id,
             transaction_type=TransactionTypeEnum.RECEIVE,
@@ -84,7 +95,7 @@ def _receive_operation(db_session, item, actor: Employee, quantity: int) -> Inve
             produced_by=actor.name,
             producer_employee_id=actor.employee_id,
             department="창고",
-            **inv_effect.capture_log_stock_snapshot(db_session, item.item_id, before),
+            **inv_effect._capture_log_stock_snapshot(db_session, item.item_id, before),
         ),
         operation,
         InventoryOperationRoleEnum.PRIMARY,
@@ -92,6 +103,26 @@ def _receive_operation(db_session, item, actor: Employee, quantity: int) -> Inve
     db_session.add(log)
     db_session.commit()
     return operation
+
+
+def _reserve_shipping(db_session, item, quantity: int) -> None:
+    request = ShippingRequest(
+        status=ShippingRequestStatusEnum.PREPARED,
+        base_pf_item_id=item.item_id,
+        request_quantity=1,
+    )
+    db_session.add(request)
+    db_session.flush()
+    db_session.add(
+        ShippingAllocation(
+            request_id=request.request_id,
+            item_id=item.item_id,
+            quantity=quantity,
+            department=None,
+            status="RESERVED",
+        )
+    )
+    db_session.commit()
 
 
 def test_cancel_creates_separate_reversal_operation_and_opposite_log(
@@ -138,8 +169,362 @@ def test_cancel_creates_separate_reversal_operation_and_opposite_log(
     assert logs[0].cancelled is False
     assert logs[1].reverses_log_id == logs[0].log_id
     assert logs[1].quantity_change == Decimal("-7")
-    inventory = inventory_svc.get_or_create_inventory(db_session, item.item_id)
+    inventory = inventory_svc._get_or_create_inventory(db_session, item.item_id)
     assert inventory.warehouse_qty == Decimal("0")
+
+
+def test_quantity_correction_cannot_reduce_below_active_shipping_reservation(
+    db_session,
+    make_item,
+) -> None:
+    item = make_item(name="출하 예약 보정 차단", warehouse_qty=Decimal("0"))
+    actor = _actor(db_session)
+    db_session.add(
+        SystemSetting(
+            setting_key=operation_svc.CUTOVER_SETTING_KEY,
+            setting_value="2026-01-01T00:00:00",
+        )
+    )
+    db_session.commit()
+    operation = _receive_operation(db_session, item, actor, 10)
+    source_log = db_session.query(TransactionLog).filter_by(
+        operation_id=operation.operation_id
+    ).one()
+    _reserve_shipping(db_session, item, 10)
+
+    with pytest.raises(transaction_actions.TransactionQuantityCorrectionShortage):
+        transaction_actions.correct_transaction_quantity(
+            db_session,
+            log_id=source_log.log_id,
+            editor=actor,
+            new_quantity=Decimal("1"),
+            reason="출하 예약 침범 보정",
+            request=None,
+        )
+
+    db_session.expire_all()
+    inventory = db_session.query(Inventory).filter_by(item_id=item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("10")
+    assert db_session.query(InventoryOperation).count() == 1
+    assert db_session.query(TransactionEditLog).count() == 0
+
+
+def test_cancellation_preview_counts_active_shipping_reservation(
+    db_session,
+    make_item,
+) -> None:
+    item = make_item(name="출하 예약 취소 차단", warehouse_qty=Decimal("0"))
+    actor = _actor(db_session)
+    db_session.add(
+        SystemSetting(
+            setting_key=operation_svc.CUTOVER_SETTING_KEY,
+            setting_value="2026-01-01T00:00:00",
+        )
+    )
+    db_session.commit()
+    operation = _receive_operation(db_session, item, actor, 10)
+    _reserve_shipping(db_session, item, 10)
+
+    preview = cancellation_svc.preview_cancellation(
+        db_session,
+        operation.operation_id,
+        now=datetime(2026, 8, 25, 3, 0),
+    )
+
+    assert preview.can_cancel is False
+    assert cancellation_svc.INSUFFICIENT_STOCK_MESSAGE in preview.blockers
+    warehouse_cell = next(cell for cell in preview.cells if cell.scope == "warehouse")
+    assert warehouse_cell.reserved_quantity == 10
+
+
+def test_v2_preview_rejects_stock_used_after_the_recorded_physical_effect(
+    db_session,
+    make_item,
+) -> None:
+    item = make_item(name="후속 사용 차단", warehouse_qty=Decimal("0"))
+    actor = _actor(db_session)
+    db_session.add(
+        SystemSetting(
+            setting_key=operation_svc.CUTOVER_SETTING_KEY,
+            setting_value="2026-01-01T00:00:00",
+        )
+    )
+    db_session.commit()
+    original = _receive_operation(db_session, item, actor, 7)
+
+    initial = cancellation_svc.preview_cancellation(
+        db_session,
+        original.operation_id,
+        now=datetime(2026, 8, 25, 3, 0),
+    )
+    assert initial.can_cancel is True
+    assert initial.warnings == ()
+    unplaced_cells = [
+        cell for cell in initial.cells if cell.scope == "warehouse_unplaced"
+    ]
+    assert len(unplaced_cells) == 1
+    assert unplaced_cells[0].row_id is not None
+
+    inventory_svc._receive_confirmed(
+        db_session,
+        item.item_id,
+        Decimal("1"),
+        bucket="warehouse",
+    )
+    db_session.commit()
+
+    changed = cancellation_svc.preview_cancellation(
+        db_session,
+        original.operation_id,
+        now=datetime(2026, 8, 25, 3, 0),
+    )
+    assert changed.can_cancel is False
+    assert cancellation_svc.PHYSICAL_ROW_CHANGED_MESSAGE in changed.blockers
+
+
+def test_v2_preview_rejects_box_row_with_mismatched_container_id(
+    db_session,
+    make_item,
+) -> None:
+    item = make_item(name="잘못된 박스 식별자", warehouse_qty=Decimal("2"))
+    inventory = db_session.query(Inventory).filter_by(item_id=item.item_id).one()
+    angle = WarehouseAngle(label="v2-box-id", rows=1, layers=1, jaris_per_cell=1)
+    db_session.add(angle)
+    db_session.flush()
+    box = WarehouseBox(
+        angle_id=angle.id,
+        row_no=1,
+        layer_no=1,
+        jari_index=0,
+        size=BoxSizeEnum.SMALL,
+    )
+    db_session.add(box)
+    db_session.flush()
+    box_row = WarehouseBoxItem(
+        box_id=box.box_id,
+        item_id=item.item_id,
+        quantity=2,
+    )
+    db_session.add(box_row)
+    db_session.query(WarehouseUnplacedItem).filter_by(
+        item_id=item.item_id
+    ).one().quantity = 0
+    operation = InventoryOperation(
+        kind=InventoryOperationKindEnum.BUSINESS,
+        domain="inventory_io",
+        action="receive",
+        display_label="잘못된 박스 식별자",
+        actor_name="tester",
+        effective_at=datetime(2026, 8, 25, 3, 0),
+        contract_version=2,
+    )
+    db_session.add(operation)
+    db_session.flush()
+    db_session.add(
+        TransactionLog(
+            item_id=item.item_id,
+            transaction_type=TransactionTypeEnum.RECEIVE,
+            quantity_change=2,
+            quantity_before=0,
+            quantity_after=2,
+            produced_by="tester",
+            operation_id=operation.operation_id,
+            operation_role=InventoryOperationRoleEnum.PRIMARY,
+            inventory_effect=[
+                {
+                    "scope": "warehouse",
+                    "row_id": str(inventory.inventory_id),
+                    "before_quantity": 0,
+                    "after_quantity": 2,
+                    "delta": 2,
+                },
+                {
+                    "scope": "warehouse_box",
+                    "row_id": str(box_row.id),
+                    "box_id": str(uuid.uuid4()),
+                    "before_quantity": 0,
+                    "after_quantity": 2,
+                    "delta": 2,
+                },
+            ],
+        )
+    )
+    db_session.commit()
+
+    preview = cancellation_svc.preview_cancellation(
+        db_session,
+        operation.operation_id,
+        now=datetime(2026, 8, 25, 3, 0),
+    )
+
+    assert preview.can_cancel is False
+    assert cancellation_svc.PHYSICAL_ROW_CHANGED_MESSAGE in preview.blockers
+
+
+def test_v1_warehouse_only_effect_warns_and_never_inferrs_a_physical_location(
+    db_session,
+    make_item,
+) -> None:
+    item = make_item(name="레거시 위치 미추정", warehouse_qty=Decimal("2"))
+    operation = InventoryOperation(
+        kind=InventoryOperationKindEnum.BUSINESS,
+        domain="legacy",
+        action="receive",
+        display_label="레거시 입고",
+        actor_name="legacy",
+        effective_at=datetime(2026, 8, 25, 3, 0),
+        contract_version=1,
+    )
+    db_session.add(operation)
+    db_session.flush()
+    db_session.add(
+        TransactionLog(
+            item_id=item.item_id,
+            transaction_type=TransactionTypeEnum.RECEIVE,
+            quantity_change=2,
+            quantity_before=0,
+            quantity_after=2,
+            produced_by="legacy",
+            operation_id=operation.operation_id,
+            operation_role=InventoryOperationRoleEnum.PRIMARY,
+            inventory_effect=[{"scope": "warehouse", "delta": 2}],
+        )
+    )
+    db_session.commit()
+
+    preview = cancellation_svc.preview_cancellation(
+        db_session,
+        operation.operation_id,
+        now=datetime(2026, 8, 25, 3, 0),
+    )
+
+    assert preview.can_cancel is False
+    assert preview.warnings == (cancellation_svc.LEGACY_EFFECT_WARNING,)
+    assert cancellation_svc.LEGACY_EFFECT_BLOCKER in preview.blockers
+
+
+def test_v1_box_effect_without_stable_row_id_is_quarantined(
+    db_session,
+    make_item,
+) -> None:
+    item = make_item(name="레거시 박스 행 미추정", warehouse_qty=Decimal("2"))
+    angle = WarehouseAngle(label="legacy", rows=1, layers=1, jaris_per_cell=1)
+    db_session.add(angle)
+    db_session.flush()
+    box = WarehouseBox(
+        angle_id=angle.id,
+        row_no=1,
+        layer_no=1,
+        jari_index=0,
+        size=BoxSizeEnum.SMALL,
+    )
+    db_session.add(box)
+    db_session.flush()
+    db_session.add(
+        WarehouseBoxItem(box_id=box.box_id, item_id=item.item_id, quantity=2)
+    )
+    unplaced = (
+        db_session.query(WarehouseUnplacedItem)
+        .filter(WarehouseUnplacedItem.item_id == item.item_id)
+        .one()
+    )
+    unplaced.quantity = 0
+    operation = InventoryOperation(
+        kind=InventoryOperationKindEnum.BUSINESS,
+        domain="legacy",
+        action="receive",
+        display_label="레거시 박스 입고",
+        actor_name="legacy",
+        effective_at=datetime(2026, 8, 25, 3, 0),
+        contract_version=1,
+    )
+    db_session.add(operation)
+    db_session.flush()
+    db_session.add(
+        TransactionLog(
+            item_id=item.item_id,
+            transaction_type=TransactionTypeEnum.RECEIVE,
+            quantity_change=2,
+            quantity_before=0,
+            quantity_after=2,
+            produced_by="legacy",
+            operation_id=operation.operation_id,
+            operation_role=InventoryOperationRoleEnum.PRIMARY,
+            inventory_effect=[
+                {"scope": "warehouse", "delta": 2},
+                {
+                    "scope": "warehouse_box",
+                    "box_id": str(box.box_id),
+                    "delta": 2,
+                },
+            ],
+        )
+    )
+    db_session.commit()
+
+    preview = cancellation_svc.preview_cancellation(
+        db_session,
+        operation.operation_id,
+        now=datetime(2026, 8, 25, 3, 0),
+    )
+
+    assert preview.can_cancel is False
+    assert preview.warnings == (cancellation_svc.LEGACY_EFFECT_WARNING,)
+    assert cancellation_svc.LEGACY_EFFECT_BLOCKER in preview.blockers
+
+
+def test_cancel_blocks_original_operation_after_quantity_correction(
+    db_session,
+    make_item,
+) -> None:
+    item = make_item(name="보정 뒤 원작업 취소", warehouse_qty=Decimal("0"))
+    actor = _actor(db_session)
+    db_session.add(
+        SystemSetting(
+            setting_key="inventory_operation_cutover_at",
+            setting_value="2026-01-01T00:00:00",
+        )
+    )
+    db_session.commit()
+    original = _receive_operation(db_session, item, actor, 10)
+    source_log = (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.operation_id == original.operation_id)
+        .one()
+    )
+
+    transaction_actions.correct_transaction_quantity(
+        db_session,
+        log_id=source_log.log_id,
+        editor=actor,
+        new_quantity=Decimal("12"),
+        reason="입고 수량 보정",
+        request=None,
+    )
+
+    preview = cancellation_svc.preview_cancellation(
+        db_session,
+        original.operation_id,
+        now=datetime(2026, 8, 25, 3, 0),
+    )
+    assert preview.can_cancel is False
+    assert cancellation_svc.CORRECTED_OPERATION_MESSAGE in preview.blockers
+    with pytest.raises(cancellation_svc.CancellationNotAllowed):
+        cancellation_svc.cancel_operation(
+            db_session,
+            operation_id=original.operation_id,
+            canceller=actor,
+            reason="보정된 원작업 취소 시도",
+            plan_hash=preview.plan_hash,
+            now=datetime(2026, 8, 25, 3, 0),
+        )
+
+    db_session.expire_all()
+    inventory = inventory_svc._get_or_create_inventory(db_session, item.item_id)
+    assert inventory.warehouse_qty == Decimal("12")
+    assert db_session.query(InventoryOperation).count() == 2
+    assert db_session.query(TransactionLog).count() == 2
+    assert db_session.query(TransactionEditLog).count() == 1
 
 
 def test_cancel_rejects_stale_plan_without_partial_change(db_session, make_item) -> None:
@@ -158,7 +543,7 @@ def test_cancel_rejects_stale_plan_without_partial_change(db_session, make_item)
         original.operation_id,
         now=datetime(2026, 8, 25, 3, 0),
     )
-    inventory_svc.consume_warehouse(db_session, item.item_id, Decimal("1"))
+    inventory_svc._consume_warehouse(db_session, item.item_id, Decimal("1"))
     db_session.commit()
 
     with pytest.raises(cancellation_svc.CancellationPlanChanged):
@@ -173,7 +558,7 @@ def test_cancel_rejects_stale_plan_without_partial_change(db_session, make_item)
 
     assert db_session.query(InventoryOperation).count() == 1
     assert db_session.query(TransactionLog).count() == 1
-    inventory = inventory_svc.get_or_create_inventory(db_session, item.item_id)
+    inventory = inventory_svc._get_or_create_inventory(db_session, item.item_id)
     assert inventory.warehouse_qty == Decimal("6")
 
 
@@ -190,7 +575,7 @@ def test_cancel_blocks_insufficient_stock_without_writing_any_reversal(
     )
     db_session.commit()
     original = _receive_operation(db_session, item, actor, 7)
-    inventory_svc.consume_warehouse(db_session, item.item_id, Decimal("7"))
+    inventory_svc._consume_warehouse(db_session, item.item_id, Decimal("7"))
     db_session.commit()
 
     preview = cancellation_svc.preview_cancellation(
@@ -280,7 +665,7 @@ def test_cancel_rolls_back_every_change_when_reversal_fails_midway(
 
     assert db_session.query(InventoryOperation).count() == 1
     assert db_session.query(TransactionLog).count() == 1
-    inventory = inventory_svc.get_or_create_inventory(db_session, item.item_id)
+    inventory = inventory_svc._get_or_create_inventory(db_session, item.item_id)
     assert inventory.warehouse_qty == Decimal("7")
 
 
@@ -306,7 +691,7 @@ def test_cancel_rolls_back_when_post_apply_inventory_invariant_does_not_match_pl
 
     def corrupt_after_reverse(*args, **kwargs):
         result = reverse_log(*args, **kwargs)
-        inventory = inventory_svc.get_or_create_inventory(db_session, item.item_id)
+        inventory = inventory_svc._get_or_create_inventory(db_session, item.item_id)
         inventory.warehouse_qty += Decimal("1")
         inventory.quantity += Decimal("1")
         db_session.flush()
@@ -329,7 +714,7 @@ def test_cancel_rolls_back_when_post_apply_inventory_invariant_does_not_match_pl
 
     assert db_session.query(InventoryOperation).count() == 1
     assert db_session.query(TransactionLog).count() == 1
-    inventory = inventory_svc.get_or_create_inventory(db_session, item.item_id)
+    inventory = inventory_svc._get_or_create_inventory(db_session, item.item_id)
     assert inventory.warehouse_qty == Decimal("7")
 
 
@@ -346,8 +731,8 @@ def test_cancel_uses_equivalent_replenished_stock_instead_of_provenance(
     )
     db_session.commit()
     original = _receive_operation(db_session, item, actor, 7)
-    inventory_svc.consume_warehouse(db_session, item.item_id, Decimal("7"))
-    inventory_svc.receive_confirmed(
+    inventory_svc._consume_warehouse(db_session, item.item_id, Decimal("7"))
+    inventory_svc._receive_confirmed(
         db_session,
         item.item_id,
         Decimal("7"),
@@ -369,7 +754,7 @@ def test_cancel_uses_equivalent_replenished_stock_instead_of_provenance(
         plan_hash=preview.plan_hash,
         now=datetime(2026, 8, 25, 3, 0),
     )
-    inventory = inventory_svc.get_or_create_inventory(db_session, item.item_id)
+    inventory = inventory_svc._get_or_create_inventory(db_session, item.item_id)
     assert inventory.warehouse_qty == Decimal("0")
 
 
@@ -485,11 +870,11 @@ def test_cancel_quarantine_reverses_physical_stock_and_defect_ledger(
     )
     assert [movement.quantity_delta for movement in movements] == [2, -2]
     assert movements[1].reverses_movement_id == movements[0].movement_id
-    inventory = inventory_svc.get_or_create_inventory(db_session, item.item_id)
+    inventory = inventory_svc._get_or_create_inventory(db_session, item.item_id)
     assert inventory.warehouse_qty == Decimal("5")
 
 
-def test_cancel_handover_closes_workflow_instead_of_restoring_waiting_state(
+def test_handover_cancel_requires_exact_legacy_contract_and_closes_workflow(
     db_session, make_item, make_location
 ) -> None:
     item = make_item(name="인수인계 취소", warehouse_qty=Decimal("0"))
@@ -544,7 +929,7 @@ def test_cancel_handover_closes_workflow_instead_of_restoring_waiting_state(
 
     handover_svc.receive_handover(
         db_session,
-        document,
+        document.handover_id,
         actor=receiver,
         pin="0000",
     )
@@ -555,11 +940,87 @@ def test_cancel_handover_closes_workflow_instead_of_restoring_waiting_state(
     )
     original.effective_at = datetime(2026, 8, 25, 3, 0)
     db_session.commit()
+
+    effect = (
+        db_session.query(InventoryOperationEffect)
+        .filter(InventoryOperationEffect.operation_id == original.operation_id)
+        .one()
+    )
+    effect.after_state = {"status": HandoverStatusEnum.SUBMITTED.value}
+    db_session.commit()
+    malformed_preview = cancellation_svc.preview_cancellation(
+        db_session,
+        original.operation_id,
+        now=datetime(2026, 8, 25, 3, 0),
+    )
+    assert malformed_preview.can_cancel is False
+    assert malformed_preview.reason_code == cancellation_svc.WORKFLOW_CANCEL_UNSUPPORTED
+    with pytest.raises(cancellation_svc.WorkflowCancellationConflict) as malformed:
+        cancellation_svc.cancel_operation(
+            db_session,
+            operation_id=original.operation_id,
+            canceller=receiver,
+            reason="변형된 인수인계 효과 취소 차단",
+            plan_hash=malformed_preview.plan_hash,
+            now=datetime(2026, 8, 25, 3, 0),
+        )
+    assert malformed.value.reason_code == cancellation_svc.WORKFLOW_CANCEL_UNSUPPORTED
+
+    effect.after_state = {"status": HandoverStatusEnum.RECEIVED.value}
+    linked_request = ShippingRequest(
+        status=ShippingRequestStatusEnum.PREPARING,
+        base_pf_item_id=item.item_id,
+        request_quantity=1,
+    )
+    db_session.add(linked_request)
+    db_session.flush()
+    original_log = (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.operation_id == original.operation_id)
+        .one()
+    )
+    original_log.shipping_request_id = linked_request.request_id
+    db_session.commit()
+    linked_preview = cancellation_svc.preview_cancellation(
+        db_session,
+        original.operation_id,
+        now=datetime(2026, 8, 25, 3, 0),
+    )
+    assert linked_preview.can_cancel is False
+    assert linked_preview.reason_code == cancellation_svc.WORKFLOW_CANCEL_UNSUPPORTED
+    with pytest.raises(cancellation_svc.WorkflowCancellationConflict) as linked:
+        cancellation_svc.cancel_operation(
+            db_session,
+            operation_id=original.operation_id,
+            canceller=receiver,
+            reason="연결된 인수인계 로그 취소 차단",
+            plan_hash=linked_preview.plan_hash,
+            now=datetime(2026, 8, 25, 3, 0),
+        )
+    assert linked.value.reason_code == cancellation_svc.WORKFLOW_CANCEL_UNSUPPORTED
+    assert db_session.query(InventoryOperation).count() == 1
+    assert db_session.query(InventoryOperationEffect).count() == 1
+    db_session.refresh(document)
+    assert document.status == HandoverStatusEnum.RECEIVED
+    location_quantities = dict(
+        db_session.query(InventoryLocation.department, InventoryLocation.quantity)
+        .filter(
+            InventoryLocation.item_id == item.item_id,
+            InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+        )
+        .all()
+    )
+    assert location_quantities[DepartmentEnum.TUBE] == Decimal("0")
+    assert location_quantities[DepartmentEnum.HIGH_VOLTAGE] == Decimal("2")
+
+    original_log.shipping_request_id = None
+    db_session.commit()
     preview = cancellation_svc.preview_cancellation(
         db_session,
         original.operation_id,
         now=datetime(2026, 8, 25, 3, 0),
     )
+    assert preview.can_cancel is True
     cancellation_svc.cancel_operation(
         db_session,
         operation_id=original.operation_id,

@@ -6,17 +6,22 @@ from decimal import Decimal
 import pytest
 
 from app.models import (
+    ActivityAuditLog,
     BOM,
+    DefectQuarantineRecord,
     DepartmentEnum,
     Employee,
     EmployeeLevelEnum,
     Inventory,
+    InventoryOperation,
+    InventoryOperationEffect,
     InventoryLocation,
     InventoryOperationRoleEnum,
     IoBatch,
     IoBundle,
     IoLine,
     LocationStatusEnum,
+    Notification,
     ShippingRequest,
     ShippingRequestStatusEnum,
     StockRequest,
@@ -26,8 +31,11 @@ from app.models import (
     SystemSetting,
     TransactionLog,
     TransactionTypeEnum,
+    WarehouseUnplacedItem,
 )
-from app.services import shipping as shipping_svc
+from app.services import shipping_actions as shipping_actions_svc
+from app.services import inventory_operation_cancellation as cancellation_svc
+from app.services import inventory_operations as inventory_operation_svc
 from app.services.pin_auth import DEFAULT_PIN_HASH
 
 
@@ -188,6 +196,235 @@ def _reject_department_request(client, request_id, approver: Employee):
     )
 
 
+def test_defect_quarantine_preview_submit_preserves_request_operation_and_cancel_owner(
+    client, db_session, make_item, make_location, monkeypatch
+):
+    item = make_item(name="격리 승인 정책 품목", warehouse_qty=Decimal("0"))
+    make_location(
+        item.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        quantity=Decimal("5"),
+    )
+    requester = _make_employee(db_session, code="DEFECT-IO")
+    db_session.add(
+        SystemSetting(
+            setting_key=inventory_operation_svc.CUTOVER_SETTING_KEY,
+            setting_value="2000-01-01T00:00:00",
+        )
+    )
+    db_session.flush()
+    db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one().quantity = Decimal("5")
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "defect",
+            "sub_type": "defect_quarantine",
+            "from_department": DepartmentEnum.ASSEMBLY.value,
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "item_id": str(item.item_id),
+                    "quantity": 2,
+                }
+            ],
+        },
+    )
+
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["requires_approval"] is False
+    payload = {
+        "requester_employee_id": str(requester.employee_id),
+        "work_type": "defect",
+        "sub_type": "defect_quarantine",
+        "from_department": DepartmentEnum.ASSEMBLY.value,
+        "bundles": preview.json()["bundles"],
+    }
+    drafted = client.put("/api/io/draft", json=payload)
+    assert drafted.status_code == 200, drafted.text
+    assert drafted.json()["requires_approval"] is False
+    submitted = client.post(
+        f"/api/io/draft/{drafted.json()['batch_id']}/submit",
+        params={"requester_employee_id": str(requester.employee_id)},
+    )
+
+    assert submitted.status_code == 201, submitted.text
+    assert submitted.json()["status"] == "completed"
+    assert submitted.json()["requires_approval"] is False
+    db_session.expire_all()
+    batch = db_session.query(IoBatch).one()
+    request = db_session.query(StockRequest).one()
+    request_line = db_session.query(StockRequestLine).one()
+    operation = db_session.query(InventoryOperation).one()
+    log = db_session.query(TransactionLog).one()
+    io_line = batch.bundles[0].lines[0]
+
+    assert batch.stock_request_id == request.request_id
+    assert request.operation_batch_id == batch.batch_id
+    assert request.status == StockRequestStatusEnum.COMPLETED
+    assert request.requires_warehouse_approval is False
+    assert request.requires_department_approval is False
+    assert request_line.operation_line_id == io_line.line_id
+    assert log.operation_id == operation.operation_id
+    assert log.operation_batch_id == batch.batch_id
+    assert log.operation_line_id == io_line.line_id
+    assert log.quantity_change == Decimal("0")
+    assert log.quantity_before == Decimal("5")
+    assert log.quantity_after == Decimal("5")
+    assert {
+        (
+            effect["scope"],
+            effect.get("department"),
+            effect.get("status"),
+            effect["before_quantity"],
+            effect["after_quantity"],
+            effect["delta"],
+        )
+        for effect in log.inventory_effect
+    } == {
+        ("location", DepartmentEnum.ASSEMBLY.value, LocationStatusEnum.PRODUCTION.value, 5, 3, -2),
+        ("location", DepartmentEnum.ASSEMBLY.value, LocationStatusEnum.DEFECTIVE.value, 0, 2, 2),
+    }
+    assert operation.domain == "stock_request"
+    assert operation.action == StockRequestTypeEnum.MARK_DEFECTIVE_PROD.value
+    production_location = (
+        db_session.query(InventoryLocation)
+        .filter(
+            InventoryLocation.item_id == item.item_id,
+            InventoryLocation.department == DepartmentEnum.ASSEMBLY,
+            InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+        )
+        .one()
+    )
+    defective_location = (
+        db_session.query(InventoryLocation)
+        .filter(
+            InventoryLocation.item_id == item.item_id,
+            InventoryLocation.department == DepartmentEnum.ASSEMBLY,
+            InventoryLocation.status == LocationStatusEnum.DEFECTIVE,
+        )
+        .one()
+    )
+    assert production_location.quantity == Decimal("3")
+    assert defective_location.quantity == Decimal("2")
+    assert db_session.query(DefectQuarantineRecord).one().remaining_quantity == Decimal("2")
+    effects = db_session.query(InventoryOperationEffect).all()
+    assert [(effect.subject_type, effect.subject_id) for effect in effects] == [
+        ("StockRequest", str(request.request_id))
+    ]
+    assert db_session.query(Notification).count() == 0
+
+    regular_cancel = client.post(
+        f"/api/stock-requests/{request.request_id}/cancel",
+        json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
+    )
+    assert regular_cancel.status_code == 422, regular_cancel.text
+    operation_cancel = client.post(
+        f"/api/inventory/operations/{operation.operation_id}/cancel/preview"
+    )
+    assert operation_cancel.status_code == 200, operation_cancel.text
+    assert operation_cancel.json()["can_cancel"] is True
+    assert operation_cancel.json()["effects"] == [
+        {
+            "effect_id": str(effects[0].effect_id),
+            "effect_kind": "WORKFLOW",
+            "subject_type": "StockRequest",
+            "subject_id": str(request.request_id),
+            "role": "EXECUTION_STATUS",
+            "current_state": {"status": "completed"},
+            "target_state": {"status": "submitted"},
+        }
+    ]
+    original_assert_plan_applied = cancellation_svc._assert_plan_applied
+
+    def fail_after_reversal(*_args, **_kwargs):
+        raise cancellation_svc.CancellationNotAllowed("강제 취소 롤백 검증")
+
+    monkeypatch.setattr(cancellation_svc, "_assert_plan_applied", fail_after_reversal)
+    failed_cancel = client.post(
+        f"/api/inventory/operations/{operation.operation_id}/cancel",
+        json={
+            "reason": "격리 입력 취소 실패 검증",
+            "employee_code": requester.employee_code,
+            "pin": "0000",
+            "plan_hash": operation_cancel.json()["plan_hash"],
+        },
+    )
+    assert failed_cancel.status_code == 422, failed_cancel.text
+    monkeypatch.setattr(
+        cancellation_svc,
+        "_assert_plan_applied",
+        original_assert_plan_applied,
+    )
+    db_session.expire_all()
+    assert db_session.get(StockRequest, request.request_id).status == StockRequestStatusEnum.COMPLETED
+    assert db_session.get(StockRequestLine, request_line.line_id).status == StockRequestStatusEnum.COMPLETED
+    failed_batch = db_session.get(IoBatch, batch.batch_id)
+    assert failed_batch.status == "completed"
+    assert failed_batch.completed_at is not None
+    assert db_session.get(InventoryLocation, production_location.location_id).quantity == Decimal("3")
+    assert db_session.get(InventoryLocation, defective_location.location_id).quantity == Decimal("2")
+    assert db_session.query(DefectQuarantineRecord).one().remaining_quantity == Decimal("2")
+    assert (
+        db_session.query(InventoryOperation)
+        .filter(InventoryOperation.reverses_operation_id == operation.operation_id)
+        .count()
+        == 0
+    )
+
+    cancelled = client.post(
+        f"/api/inventory/operations/{operation.operation_id}/cancel",
+        json={
+            "reason": "격리 입력 취소",
+            "employee_code": requester.employee_code,
+            "pin": "0000",
+            "plan_hash": operation_cancel.json()["plan_hash"],
+        },
+    )
+    assert cancelled.status_code == 200, cancelled.text
+    db_session.expire_all()
+    assert db_session.get(StockRequest, request.request_id).status == StockRequestStatusEnum.SUBMITTED
+    assert db_session.get(StockRequestLine, request_line.line_id).status == StockRequestStatusEnum.SUBMITTED
+    assert db_session.get(InventoryLocation, production_location.location_id).quantity == Decimal("5")
+    assert db_session.get(InventoryLocation, defective_location.location_id).quantity == Decimal("0")
+    assert db_session.query(DefectQuarantineRecord).one().remaining_quantity == Decimal("0")
+    restored_batch = db_session.get(IoBatch, batch.batch_id)
+    restored_batch_response = client.get(f"/api/io/{batch.batch_id}")
+    assert restored_batch_response.status_code == 200, restored_batch_response.text
+    assert {
+        "orm_status": restored_batch.status,
+        "orm_completed_at": restored_batch.completed_at,
+        "dto_status": restored_batch_response.json()["status"],
+        "dto_completed_at": restored_batch_response.json()["completed_at"],
+    } == {
+        "orm_status": "submitted",
+        "orm_completed_at": None,
+        "dto_status": "submitted",
+        "dto_completed_at": None,
+    }
+    duplicate_cancel = client.post(
+        f"/api/inventory/operations/{operation.operation_id}/cancel",
+        json={
+            "reason": "격리 입력 중복 취소",
+            "employee_code": requester.employee_code,
+            "pin": "0000",
+            "plan_hash": operation_cancel.json()["plan_hash"],
+        },
+    )
+    assert duplicate_cancel.status_code == 409, duplicate_cancel.text
+    db_session.expire_all()
+    assert db_session.get(StockRequest, request.request_id).status == StockRequestStatusEnum.SUBMITTED
+    assert db_session.get(IoBatch, batch.batch_id).status == "submitted"
+    assert (
+        db_session.query(InventoryOperation)
+        .filter(InventoryOperation.reverses_operation_id == operation.operation_id)
+        .count()
+        == 1
+    )
+
+
 def test_shipping_request_id_is_rejected_for_new_io_submission_and_draft(
     client, db_session, make_bom, make_item, make_location
 ):
@@ -198,12 +435,13 @@ def test_shipping_request_id_is_rejected_for_new_io_submission_and_draft(
     make_bom(pf.item_id, pa.item_id, Decimal("1"))
     make_location(pa.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
     requester = _make_employee(db_session, code="SHIP-LINKED-IO")
-    request = shipping_svc.create_request(
+    request = shipping_actions_svc.create_request(
         db_session,
         {
             "base_pf_item_id": pf.item_id,
             "invoice_number": "SHIP-LINKED-IO-001",
         },
+        requester,
     )
     db_session.commit()
 
@@ -254,12 +492,13 @@ def test_shipping_request_id_is_rejected_regardless_of_request_status(
     make_bom(pf.item_id, pa.item_id, Decimal("1"))
     make_location(pa.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
     requester = _make_employee(db_session, code="SHIP-CONTEXT-STATE")
-    request = shipping_svc.create_request(
+    request = shipping_actions_svc.create_request(
         db_session,
         {
             "base_pf_item_id": pf.item_id,
             "invoice_number": "SHIP-CONTEXT-STATE-001",
         },
+        requester,
     )
     db_session.commit()
 
@@ -582,7 +821,28 @@ def test_internal_use_submit_reserves_then_approval_consumes_only_warehouse(
     assert log.producer_employee_id == requester.employee_id
     assert log.warehouse_qty_before == Decimal("10")
     assert log.warehouse_qty_after == Decimal("7")
-    assert log.inventory_effect == [{"scope": "warehouse", "delta": -3}]
+    unplaced = (
+        db_session.query(WarehouseUnplacedItem)
+        .filter(WarehouseUnplacedItem.item_id == item.item_id)
+        .one()
+    )
+    assert unplaced.quantity == 7
+    assert log.inventory_effect == [
+        {
+            "scope": "warehouse",
+            "before_quantity": 10,
+            "after_quantity": 7,
+            "delta": -3,
+            "row_id": str(inv.inventory_id),
+        },
+        {
+            "scope": "warehouse_unplaced",
+            "before_quantity": 10,
+            "after_quantity": 7,
+            "delta": -3,
+            "row_id": str(unplaced.id),
+        },
+    ]
 
 
 def test_internal_use_bom_preview_round_trips_mode_source_and_component_selection(
@@ -1825,7 +2085,84 @@ def test_warehouse_approval_reroutes_linked_batch_lines_from_live_item_code(
     assert batch.bundles[0].lines[0].to_department == DepartmentEnum.TUBE.value
 
 
-def test_io_submit_draft_endpoint_completes_batch(client, db_session, make_item):
+def test_draft_submit_replay_survives_server_live_department_reroute(
+    client, db_session, make_item
+):
+    """승인 시 서버가 자동 경로를 바꿔도 같은 draft 제출 명령은 재실행하지 않는다."""
+    item = make_item(
+        name="draft 승인 코드 변경",
+        process_type_code="AR",
+        warehouse_qty=Decimal("3"),
+    )
+    requester = _make_employee(db_session, code="DRAFT-LIVE-REQ")
+    approver = _make_employee(
+        db_session,
+        code="DRAFT-LIVE-WH",
+        warehouse_role="primary",
+    )
+    db_session.commit()
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io",
+            "sub_type": "warehouse_to_dept",
+            "targets": [{"item_id": str(item.item_id), "quantity": 1}],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    draft = client.put(
+        "/api/io/draft",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "warehouse_io",
+            "sub_type": "warehouse_to_dept",
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert draft.status_code == 200, draft.text
+    batch_id = draft.json()["batch_id"]
+    submit_route = (
+        f"/api/io/draft/{batch_id}/submit"
+        f"?requester_employee_id={requester.employee_id}"
+    )
+    submitted = client.post(submit_route)
+    assert submitted.status_code == 201, submitted.text
+    request_id = submitted.json()["stock_request_id"]
+
+    item.process_type_code = "TR"
+    db_session.commit()
+    approved = client.post(
+        f"/api/stock-requests/{request_id}/approve",
+        json={"actor_employee_id": str(approver.employee_id), "pin": "0000"},
+    )
+    assert approved.status_code == 200, approved.text
+    physical_counts = (
+        db_session.query(TransactionLog).count(),
+        db_session.query(InventoryOperation).count(),
+        db_session.query(StockRequest).count(),
+    )
+
+    replay = client.post(submit_route)
+
+    assert replay.status_code == 201, replay.text
+    assert replay.json()["status"] == "completed"
+    assert (
+        db_session.query(TransactionLog).count(),
+        db_session.query(InventoryOperation).count(),
+        db_session.query(StockRequest).count(),
+    ) == physical_counts
+    db_session.expire_all()
+    batch = db_session.query(IoBatch).one()
+    assert batch.to_department == DepartmentEnum.TUBE.value
+    assert batch.bundles[0].lines[0].to_department == DepartmentEnum.TUBE.value
+
+
+def test_io_submit_draft_endpoint_replays_without_duplicate_effects(
+    client, db_session, make_item, monkeypatch
+):
+    from app.routers import io as io_router
+
     item = make_item(name="Raw Draft", warehouse_qty=Decimal("0"))
     requester = _make_employee(db_session)
     db_session.commit()
@@ -1864,12 +2201,30 @@ def test_io_submit_draft_endpoint_completes_batch(client, db_session, make_item)
     )
     assert any(d["batch_id"] == batch_id for d in drafts_before.json())
 
+    emitted_events: list[str] = []
+    monkeypatch.setattr(
+        io_router,
+        "_evt_emit",
+        lambda event, **_kwargs: emitted_events.append(event),
+    )
+
     submit_res = client.post(
         f"/api/io/draft/{batch_id}/submit"
         f"?requester_employee_id={requester.employee_id}",
     )
+    physical_counts_after_first = (
+        db_session.query(TransactionLog).count(),
+        db_session.query(InventoryOperation).count(),
+        db_session.query(StockRequest).count(),
+    )
+    replay_res = client.post(
+        f"/api/io/draft/{batch_id}/submit"
+        f"?requester_employee_id={requester.employee_id}",
+    )
     assert submit_res.status_code == 201, submit_res.json()
+    assert replay_res.status_code == 201, replay_res.json()
     assert submit_res.json()["status"] == "completed"
+    assert replay_res.json() == submit_res.json()
 
     detail = client.get(f"/api/io/{batch_id}")
     assert detail.status_code == 200
@@ -1883,6 +2238,103 @@ def test_io_submit_draft_endpoint_completes_batch(client, db_session, make_item)
     inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
     assert inv.warehouse_qty == Decimal("7")
     assert db_session.query(IoBatch).count() == 1
+    assert physical_counts_after_first[0] == 1
+    assert physical_counts_after_first[1] <= 1
+    assert physical_counts_after_first[2] == 0
+    assert (
+        db_session.query(TransactionLog).count(),
+        db_session.query(InventoryOperation).count(),
+        db_session.query(StockRequest).count(),
+    ) == physical_counts_after_first
+    assert emitted_events == ["io_submit"]
+    assert (
+        db_session.query(ActivityAuditLog)
+        .filter(ActivityAuditLog.action_key == "http.post.io.draft.id.submit")
+        .count()
+        == 1
+    )
+
+
+def test_io_submit_draft_replay_fails_closed_for_actor_content_and_legacy_state(
+    client, db_session, make_item
+):
+    item = make_item(name="Scoped Draft", warehouse_qty=Decimal("0"))
+    requester = _make_employee(db_session, code="IO-DRAFT-SCOPE-1")
+    other = _make_employee(db_session, code="IO-DRAFT-SCOPE-2")
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "receive",
+            "sub_type": "receive_supplier",
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "item_id": str(item.item_id),
+                    "quantity": "2",
+                }
+            ],
+        },
+    )
+    draft = client.put(
+        "/api/io/draft",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "receive",
+            "sub_type": "receive_supplier",
+            "notes": "original",
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    batch_id = draft.json()["batch_id"]
+    route = f"/api/io/draft/{batch_id}/submit"
+    first = client.post(
+        route,
+        params={"requester_employee_id": str(requester.employee_id)},
+    )
+    assert first.status_code == 201, first.json()
+    physical_counts = (
+        db_session.query(TransactionLog).count(),
+        db_session.query(InventoryOperation).count(),
+    )
+
+    other_actor = client.post(
+        route,
+        params={"requester_employee_id": str(other.employee_id)},
+        headers={"X-Actor-Employee-Id": str(other.employee_id)},
+    )
+    assert other_actor.status_code == 403, other_actor.json()
+
+    batch = db_session.query(IoBatch).filter(IoBatch.batch_id == batch_id).one()
+    batch.notes = "changed after submit"
+    db_session.commit()
+    changed = client.post(
+        route,
+        params={"requester_employee_id": str(requester.employee_id)},
+    )
+    assert changed.status_code == 409, changed.json()
+    assert changed.json()["detail"]["code"] == "IDEMPOTENCY_CONFLICT"
+    assert changed.json()["detail"]["extra"]["reason"] == "fingerprint_mismatch"
+
+    batch.notes = "original"
+    batch.request_fingerprint = None
+    db_session.commit()
+    legacy = client.post(
+        route,
+        params={"requester_employee_id": str(requester.employee_id)},
+    )
+    assert legacy.status_code == 409, legacy.json()
+    assert legacy.json()["detail"]["code"] == "IDEMPOTENCY_CONFLICT"
+    assert legacy.json()["detail"]["extra"]["reason"] == "legacy_fingerprint_missing"
+    assert (
+        db_session.query(TransactionLog).count(),
+        db_session.query(InventoryOperation).count(),
+    ) == physical_counts
+    db_session.expire_all()
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("2")
 
 
 def test_io_draft_recomputes_department_shortage_with_pending(
@@ -2184,11 +2636,218 @@ def test_io_submit_idempotent_with_client_request_id(client, db_session, make_it
     second = client.post("/api/io/submit", json=payload)
     assert second.status_code == 201, second.json()
     assert second.json()["batch"]["batch_id"] == first_batch_id
+    assert second.json() == first.json()
 
     # batch가 1건만 존재하고 재고도 4 한 번만 증가
     assert db_session.query(IoBatch).count() == 1
     inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
     assert inv.warehouse_qty == Decimal("4")
+    assert (
+        db_session.query(ActivityAuditLog)
+        .filter(ActivityAuditLog.action_key == "http.post.io.submit")
+        .count()
+        == 1
+    )
+
+
+def test_io_submit_idempotent_replay_preserves_approval_response(
+    client, db_session, make_item
+):
+    item = make_item(name="Idem approval raw", warehouse_qty=Decimal("10"))
+    requester = _make_employee(
+        db_session,
+        code="IO-IDEM-APPROVAL",
+        department=DepartmentEnum.AS,
+    )
+    db_session.commit()
+    preview = _preview_internal_use(client, requester, item)
+    assert preview.status_code == 200, preview.json()
+    payload = {
+        "requester_employee_id": str(requester.employee_id),
+        "work_type": "internal_use",
+        "sub_type": "internal_use_out",
+        "to_department": "AS",
+        "client_request_id": "test-idem-key-approval",
+        "bundles": preview.json()["bundles"],
+    }
+
+    first = client.post("/api/io/submit", json=payload)
+    second = client.post("/api/io/submit", json=payload)
+
+    assert first.status_code == 201, first.json()
+    assert second.status_code == 201, second.json()
+    assert second.json() == first.json()
+    assert first.json()["status"] == "reserved"
+    assert len(first.json()["stock_requests"]) == 1
+    assert first.json()["batch"]["stock_requests"] == first.json()["stock_requests"]
+    assert db_session.query(IoBatch).count() == 1
+    assert db_session.query(StockRequest).count() == 1
+    db_session.expire_all()
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("10")
+    assert inventory.pending_quantity == Decimal("3")
+
+
+def test_io_submit_same_key_changed_payload_conflicts_without_mutation(
+    client, db_session, make_item
+):
+    item = make_item(name="Semantic Idem Raw", warehouse_qty=Decimal("0"))
+    requester = _make_employee(db_session, code="IO-IDEM-CHANGED")
+    db_session.commit()
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "receive",
+            "sub_type": "receive_supplier",
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "item_id": str(item.item_id),
+                    "quantity": "4",
+                }
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.json()
+    payload = {
+        "requester_employee_id": str(requester.employee_id),
+        "work_type": "receive",
+        "sub_type": "receive_supplier",
+        "client_request_id": "test-idem-key-changed",
+        "bundles": preview.json()["bundles"],
+    }
+    first = client.post("/api/io/submit", json=payload)
+    assert first.status_code == 201, first.json()
+    logs_before = db_session.query(TransactionLog).count()
+
+    changed = {**payload, "notes": "different inventory command"}
+    changed["bundles"] = [dict(bundle) for bundle in payload["bundles"]]
+    changed["bundles"][0]["quantity"] = 5
+    changed["bundles"][0]["lines"] = [
+        {**line, "quantity": 5} for line in payload["bundles"][0]["lines"]
+    ]
+    conflict = client.post("/api/io/submit", json=changed)
+
+    assert conflict.status_code == 409, conflict.json()
+    assert conflict.json()["detail"]["code"] == "IDEMPOTENCY_CONFLICT"
+    assert conflict.json()["detail"]["extra"]["reason"] == "fingerprint_mismatch"
+    assert db_session.query(IoBatch).count() == 1
+    assert db_session.query(TransactionLog).count() == logs_before
+    db_session.expire_all()
+    inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inv.warehouse_qty == Decimal("4")
+
+
+def test_io_submit_legacy_null_fingerprint_conflicts_without_mutation(
+    client, db_session, make_item
+):
+    item = make_item(name="Legacy Idem Raw", warehouse_qty=Decimal("0"))
+    requester = _make_employee(db_session, code="IO-IDEM-LEGACY")
+    db_session.commit()
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "receive",
+            "sub_type": "receive_supplier",
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "item_id": str(item.item_id),
+                    "quantity": "2",
+                }
+            ],
+        },
+    )
+    payload = {
+        "requester_employee_id": str(requester.employee_id),
+        "work_type": "receive",
+        "sub_type": "receive_supplier",
+        "client_request_id": "test-idem-key-legacy-null",
+        "bundles": preview.json()["bundles"],
+    }
+    first = client.post("/api/io/submit", json=payload)
+    assert first.status_code == 201, first.json()
+    batch = db_session.query(IoBatch).one()
+    batch.request_fingerprint = None
+    db_session.commit()
+    logs_before = db_session.query(TransactionLog).count()
+
+    conflict = client.post("/api/io/submit", json=payload)
+
+    assert conflict.status_code == 409, conflict.json()
+    assert conflict.json()["detail"]["code"] == "IDEMPOTENCY_CONFLICT"
+    assert conflict.json()["detail"]["extra"]["reason"] == "legacy_fingerprint_missing"
+    assert db_session.query(IoBatch).count() == 1
+    assert db_session.query(TransactionLog).count() == logs_before
+
+
+def test_io_submit_same_key_other_actor_and_route_conflict_without_mutation(
+    client, db_session, make_item
+):
+    item = make_item(name="Scoped Idem Raw", warehouse_qty=Decimal("0"))
+    requester = _make_employee(db_session, code="IO-IDEM-SCOPE-1")
+    other = _make_employee(db_session, code="IO-IDEM-SCOPE-2")
+    db_session.commit()
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "receive",
+            "sub_type": "receive_supplier",
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "item_id": str(item.item_id),
+                    "quantity": "3",
+                }
+            ],
+        },
+    )
+    key = "test-idem-key-actor-route"
+    payload = {
+        "requester_employee_id": str(requester.employee_id),
+        "work_type": "receive",
+        "sub_type": "receive_supplier",
+        "client_request_id": key,
+        "bundles": preview.json()["bundles"],
+    }
+    first = client.post("/api/io/submit", json=payload)
+    assert first.status_code == 201, first.json()
+    logs_before = db_session.query(TransactionLog).count()
+
+    actor_conflict = client.post(
+        "/api/io/submit",
+        json={**payload, "requester_employee_id": str(other.employee_id)},
+    )
+    route_conflict = client.post(
+        "/api/stock-requests",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "request_type": "warehouse_to_dept",
+            "client_request_id": key,
+            "lines": [
+                {
+                    "item_id": str(item.item_id),
+                    "quantity": 1,
+                    "from_bucket": "warehouse",
+                    "to_bucket": "production",
+                    "to_department": DepartmentEnum.ASSEMBLY.value,
+                }
+            ],
+        },
+    )
+
+    assert actor_conflict.status_code == 409, actor_conflict.json()
+    assert actor_conflict.json()["detail"]["code"] == "IDEMPOTENCY_CONFLICT"
+    assert actor_conflict.json()["detail"]["extra"]["reason"] == "actor_mismatch"
+    assert route_conflict.status_code == 409, route_conflict.json()
+    assert route_conflict.json()["detail"]["code"] == "IDEMPOTENCY_CONFLICT"
+    assert route_conflict.json()["detail"]["extra"]["reason"] == "route_mismatch"
+    assert db_session.query(IoBatch).count() == 1
+    assert db_session.query(StockRequest).count() == 0
+    assert db_session.query(TransactionLog).count() == logs_before
 
 
 def test_io_immediate_adjust_in_increases_production_quantity(
@@ -4459,6 +5118,7 @@ def test_io_draft_submission_requires_memo_without_changing_draft(
 
     drafted = client.put("/api/io/draft", json=payload)
     assert drafted.status_code == 200, drafted.text
+    assert drafted.json()["requires_approval"] is True
     batch_id = drafted.json()["batch_id"]
 
     rejected = client.post(
@@ -4624,6 +5284,7 @@ def test_io_draft_submit_custom_process_bom_requires_memo_without_changing_draft
 
     drafted = client.put("/api/io/draft", json=payload)
     assert drafted.status_code == 200, drafted.text
+    assert drafted.json()["requires_approval"] is True
     batch_id = drafted.json()["batch_id"]
 
     rejected = client.post(
@@ -4912,6 +5573,7 @@ def test_io_explicitly_excluded_positive_bom_child_requires_memo_and_department_
     if submit_existing_draft:
         drafted = client.put("/api/io/draft", json=payload)
         assert drafted.status_code == 200, drafted.text
+        assert drafted.json()["requires_approval"] is True
         batch_id = drafted.json()["batch_id"]
         rejected = client.post(
             f"/api/io/draft/{batch_id}/submit",
@@ -5130,6 +5792,7 @@ def test_io_no_effect_custom_bom_keeps_department_approval_for_fresh_and_draft(
     if submit_existing_draft:
         drafted = client.put("/api/io/draft", json=payload)
         assert drafted.status_code == 200, drafted.text
+        assert drafted.json()["requires_approval"] is True
         batch_id = drafted.json()["batch_id"]
         rejected = client.post(
             f"/api/io/draft/{batch_id}/submit",
@@ -5161,6 +5824,57 @@ def test_io_no_effect_custom_bom_keeps_department_approval_for_fresh_and_draft(
     assert request.requires_department_approval is True
     assert len(request.lines) == 1
     assert db_session.query(TransactionLog).count() == 0
+
+
+@pytest.mark.parametrize("sub_type", ["produce", "disassemble"])
+def test_io_partial_missing_bom_child_keeps_department_approval_in_draft(
+    client,
+    db_session,
+    make_item,
+    make_bom,
+    make_location,
+    sub_type,
+):
+    parent = make_item(name=f"API 일부 누락 상위 {sub_type}", process_type_code="AF")
+    first_child = make_item(name=f"API 일부 누락 하위 1 {sub_type}", process_type_code="AR")
+    second_child = make_item(name=f"API 일부 누락 하위 2 {sub_type}", process_type_code="AR")
+    make_bom(parent.item_id, first_child.item_id, Decimal("1"))
+    make_bom(parent.item_id, second_child.item_id, Decimal("2"))
+    make_location(
+        parent.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        quantity=Decimal("7" if sub_type == "disassemble" else "0"),
+    )
+    make_location(first_child.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("10"))
+    make_location(second_child.item_id, department=DepartmentEnum.ASSEMBLY, quantity=Decimal("10"))
+    requester = _make_employee(db_session, code=f"PARTIAL-{sub_type}")
+    db_session.commit()
+    bundles = _preview_process_bom_bundles(client, requester, parent, sub_type=sub_type)
+    for bundle in bundles:
+        bundle["lines"] = [
+            line for line in bundle["lines"] if line["item_id"] != str(second_child.item_id)
+        ]
+
+    drafted = client.put(
+        "/api/io/draft",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": sub_type,
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "notes": " ",
+            "bundles": bundles,
+        },
+    )
+
+    assert drafted.status_code == 200, drafted.text
+    assert drafted.json()["requires_approval"] is True
+    rejected = client.post(
+        f"/api/io/draft/{drafted.json()['batch_id']}/submit",
+        params={"requester_employee_id": str(requester.employee_id)},
+    )
+    assert rejected.status_code == 422, rejected.text
+    assert db_session.query(StockRequest).count() == 0
 
 
 @pytest.mark.parametrize(

@@ -18,6 +18,7 @@ function baseForm(overrides: Partial<ItemFormData> = {}): ItemFormData {
     reorder_point: "",
     procurement_lead_time_days: "",
     minimum_order_quantity: "",
+    purchase_memo: "",
     process_type_code: "TR",
     unit: "EA",
     model_slots: [],

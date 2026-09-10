@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { normalizeSidebarMode, type SidebarMode } from "@/lib/sidebar-mode";
-import { readCurrentOperator, setCurrentOperator, useCurrentOperator } from "./login/useCurrentOperator";
+import {
+  readCurrentOperator,
+  updateCurrentOperatorPreferences,
+  useCurrentOperator,
+} from "./login/useCurrentOperator";
 
 const SIDEBAR_MODE_STORAGE_KEY = "dexcowin_mes_sidebar_mode";
 
@@ -57,7 +61,10 @@ export function useAppearancePreferences(): {
     window.localStorage.setItem(SIDEBAR_MODE_STORAGE_KEY, next.sidebarMode);
 
     if (currentOperator) {
-      setCurrentOperator({ ...currentOperator, theme: next.theme, sidebar_mode: next.sidebarMode });
+      updateCurrentOperatorPreferences({
+        theme: next.theme,
+        sidebar_mode: next.sidebarMode,
+      });
     }
     setPreferences(next);
   }, [operator]);

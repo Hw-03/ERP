@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -44,7 +44,7 @@ export function RDefectActionModal({
   location,
   currentEmployee,
   onSubmitted,
-}: RDefectActionModalProps): JSX.Element | null {
+}: RDefectActionModalProps): ReactElement | null {
   const [action, setAction] = useState<RAction>("unquarantine");
   const [category, setCategory] = useState("");
   const [memo, setMemo] = useState("");

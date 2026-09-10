@@ -6,11 +6,13 @@ DEXCOWIN의 품목, 재고, BOM, 입출고를 관리하는 경량 MES 프로토�
 
 - 품목 수 등 기준정보 수치: `python _attic/backend-scripts/facts.py` 로 확인 (문서에 박지 않음)
 - 백엔드: FastAPI + SQLAlchemy + SQLite (`backend/mes.db`)
-- 프론트엔드: Next.js 14 + Tailwind CSS
+- 프론트엔드: Next.js 16 + Tailwind CSS
 - 주 사용 화면: `/mes` (데스크톱 셸의 현재 탭 구성은 `frontend/app/mes/README.md` 참조)
 - 품목코드 기준 문서: `_attic/docs/ITEM_CODE_RULES.md`
 
 ## 빠른 시작 (Windows · 권장)
+
+> **품질 감사/worktree 안전 범위:** 아래 일반 실행·중지·profile 명령은 운영자 또는 통합 checkout용이다. 격리된 코드 품질 작업에서는 `start.bat`, `stop.bat`, `bootstrap_db.py`, 직원 동기화·배포·작업 등록 명령을 실행하거나 development/employee URL·port·DB를 조회하지 않는다. 정적 검증은 [`verify_local.ps1`](scripts/dev/verify_local.ps1)의 plan/gate 계약을 따르고, 브라우저 회귀 실행이 별도로 승인된 때만 [합성 DB E2E 격리 계약](frontend/tests/e2e/README.md)을 따른다. 과거 실환경 관찰은 현재 상태로 재확인하지 않는다.
 
 루트의 `start.bat` 한 번 실행으로 백엔드·프론트가 background 프로세스로 함께 뜬다. 시작 후 표시된 URL을 브라우저에서 직접 연다.
 
@@ -49,7 +51,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev\start-backend.ps1
 
 ```bash
 cd backend
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8011 --reload
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8011 --reload --workers 1 --no-proxy-headers
 ```
 
 프론트엔드 (dev — `npm run dev` 가 PORT=3001 기본 사용):
@@ -58,6 +60,8 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8011 --reload
 cd frontend
 npm run dev
 ```
+
+프론트는 `scripts/next-server.js`의 raw socket 경계를 거쳐 기존 Next `/api` rewrite를 사용한다. 이 경계를 우회하는 직접 `next dev`/`next start` 실행은 client-IP 기반 PIN 시도 제한을 무력화하므로 사용하지 않는다.
 
 대표 접속 (dev):
 
@@ -115,7 +119,7 @@ ERP/
 │   ├── app/              routers / services / models
 │   ├── mes.db            활성 DB (품목 수 등은 `python _attic/backend-scripts/facts.py` 로 확인)
 │   └── requirements.txt
-├── frontend/             Next.js 14 · Tailwind
+├── frontend/             Next.js 16 · Tailwind
 │   ├── app/mes/          현재 활성 MES 셸
 │   └── lib/
 │       ├── api/          도메인 API 모듈

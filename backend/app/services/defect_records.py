@@ -22,7 +22,7 @@ def _department_value(department: object) -> str:
     return str(getattr(department, "value", department))
 
 
-def create_record(
+def _create_record(
     db: Session,
     *,
     item_id: uuid.UUID,
@@ -67,7 +67,7 @@ def create_record(
     return record
 
 
-def get_record_for_action(
+def _get_record_for_action(
     db: Session,
     *,
     record_id: Optional[uuid.UUID],
@@ -102,7 +102,7 @@ def get_record_for_action(
     return record
 
 
-def pending_quantity(
+def _pending_quantity(
     db: Session,
     record_id: uuid.UUID,
     *,
@@ -118,7 +118,7 @@ def pending_quantity(
     return Decimal(str(query.scalar() or 0))
 
 
-def ensure_available(
+def _ensure_available(
     db: Session,
     record: DefectQuarantineRecord,
     quantity: Decimal,
@@ -128,7 +128,7 @@ def ensure_available(
 ) -> None:
     """남은 수량에서 다른 승인 대기 수량을 뺀 처리 가능 수량을 검증한다."""
     quantity = Decimal(str(quantity))
-    pending = pending_quantity(
+    pending = _pending_quantity(
         db,
         record.record_id,
         exclude_line_id=exclude_line_id,
@@ -150,7 +150,7 @@ def ensure_available(
         )
 
 
-def decrement_record(
+def _decrement_record(
     db: Session,
     record: DefectQuarantineRecord,
     quantity: Decimal,
@@ -159,7 +159,7 @@ def decrement_record(
 ) -> None:
     """검증된 수량만 선택 기록에서 차감한다."""
     quantity = Decimal(str(quantity))
-    ensure_available(
+    _ensure_available(
         db,
         record,
         quantity,

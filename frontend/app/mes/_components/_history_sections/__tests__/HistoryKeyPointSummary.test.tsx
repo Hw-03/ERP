@@ -13,7 +13,9 @@ function effect(overrides: Partial<InventoryEffectRow> = {}): InventoryEffectRow
     itemName: "완제품 A",
     unit: "EA",
     locationId: null,
+    rowId: null,
     boxId: null,
+    zoneId: null,
     department: "조립",
     status: "PRODUCTION",
     label: "조립 재고",
@@ -446,7 +448,7 @@ describe("HistoryKeyPointSummary", () => {
     const itemName = screen.getByText(longName);
     setBoxMetrics(itemName, { clientWidth: 100, scrollWidth: 420, clientHeight: 20, scrollHeight: 20 });
 
-    const row = itemName.closest("[class*='min-h-11']")!;
+    const row = itemName.closest<HTMLElement>("[class*='min-h-11']")!;
     const trigger = row.parentElement!;
     await waitFor(() => expect(trigger).toHaveAttribute("tabindex", "0"));
     expect(trigger).toContainElement(row);

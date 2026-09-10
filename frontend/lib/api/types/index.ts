@@ -23,3 +23,4 @@ export type * from "./handover";
 export type * from "./shipping";
 export type * from "./assembly-checklists";
 export type * from "./daily-work-reports";
+export type * from "./operator-session";

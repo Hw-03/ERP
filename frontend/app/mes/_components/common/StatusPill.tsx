@@ -23,6 +23,7 @@ interface Props {
   maxWidth?: number | string;
   className?: string;
   title?: string;
+  textTone?: string;
 }
 
 function StatusPillImpl({
@@ -32,13 +33,14 @@ function StatusPillImpl({
   maxWidth = 260,
   className = "",
   title,
+  textTone,
 }: Props) {
   const color = TONE_COLOR[tone];
   return (
     <span
       className={`inline-flex items-center gap-1.5 truncate rounded-full border px-3 py-2 text-xs font-bold ${className}`}
       style={{
-        color,
+        color: textTone ?? color,
         background: `color-mix(in srgb, ${color} 14%, transparent)`,
         borderColor: `color-mix(in srgb, ${color} 30%, transparent)`,
         maxWidth,

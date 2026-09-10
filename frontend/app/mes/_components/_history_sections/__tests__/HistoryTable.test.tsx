@@ -1003,7 +1003,7 @@ describe("HistoryTable hierarchy", () => {
       department_qty_before: 4,
       department_qty_after: 5,
     });
-    const batch = { ...makeBatch(), batch_id: "batch-adjust", sub_type: "adjust_in", bundles: [] };
+    const batch: IoBatch = { ...makeBatch(), batch_id: "batch-adjust", sub_type: "adjust_in", bundles: [] };
 
     renderTable(
       [{ type: "op_batch", batchId: "batch-adjust", refNo: null, logs: [first, second] }],

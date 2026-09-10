@@ -12,6 +12,17 @@ export type StatusTargetNotice = {
   tone?: StatusTargetNoticeTone;
 };
 
+function statusTargetOffset(): { offsetX: number; offsetY: number } | null {
+  if (typeof document === "undefined") return null;
+  const target = document.querySelector<HTMLElement>('[data-status-target="desktop"]');
+  const rect = target?.getBoundingClientRect();
+  if (!rect) return null;
+  return {
+    offsetX: rect.left + rect.width / 2 - window.innerWidth / 2,
+    offsetY: rect.top + rect.height / 2 - window.innerHeight / 2,
+  };
+}
+
 interface StatusTargetNoticeController {
   notice: StatusTargetNotice | null;
   showNotice: (message: string, tone?: StatusTargetNoticeTone) => void;
@@ -48,6 +59,7 @@ export function StatusTargetNotice({
   dataTestId?: string;
   style?: CSSProperties;
 }) {
+  const [offset] = useState(statusTargetOffset);
   const tone = notice.tone ?? "info";
   const toneColor = tone === "success"
     ? LEGACY_COLORS.green
@@ -61,6 +73,10 @@ export function StatusTargetNotice({
     color: toneColor,
     boxShadow: "var(--c-popup-shadow)",
     ...style,
+    ...(offset && {
+      "--status-target-notice-x": `${offset.offsetX}px`,
+      "--status-target-notice-y": `${offset.offsetY}px`,
+    }),
   } as CSSProperties;
 
   return (

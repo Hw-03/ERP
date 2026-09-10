@@ -261,6 +261,17 @@
             "title": "Audit Id",
             "type": "string"
           },
+          "bootstrap_employee_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bootstrap Employee Id"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -1134,9 +1145,10 @@
         "type": "object"
       },
       "BoxTrackingResponse": {
-        "description": "창고 박스 자동 차감 활성 여부.",
+        "description": "하위 호환용 박스 배치 UI 표시 선호도.",
         "properties": {
           "enabled": {
+            "description": "박스 배치 UI 표시 선호도입니다. 물리 원장 차감에는 영향을 주지 않습니다.",
             "title": "Enabled",
             "type": "boolean"
           }
@@ -1148,9 +1160,10 @@
         "type": "object"
       },
       "BoxTrackingUpdate": {
-        "description": "박스 추적 토글 (admin PIN 은 X-Admin-Pin 헤더로).",
+        "description": "박스 배치 UI 표시 선호도 변경(admin PIN은 X-Admin-Pin 헤더).",
         "properties": {
           "enabled": {
+            "description": "박스 배치 UI 표시 선호도입니다. 물리 원장 차감에는 영향을 주지 않습니다.",
             "title": "Enabled",
             "type": "boolean"
           }
@@ -1269,7 +1282,7 @@
         "type": "object"
       },
       "CapacityAfBlock": {
-        "description": "AF(조립 완제품) 기준 생산 가능 수량.\n\n재고 기준은 available(=warehouse+production-pending)이며 **계획/대응 수량 지표**다.\n생산 등록 가능성 검증(backflush, warehouse_available)이 아니다.\n\n주의: summary.ship_ready / fast_production / total_production 은 'AF별 독립 계산의 합계'다.\n여러 AF 가 같은 하위 자재를 공유하면 모든 AF 수량을 동시에 보장하지는 않는다.",
+        "description": "AF(조립 완제품) 기준 생산 가능 수량.\n\n재고 기준은 available(=warehouse+production-재고 요청 예약-활성 출하 예약)이며\n**계획/대응 수량 지표**다.\n생산 등록 가능성 검증(backflush, warehouse_available)이 아니다.\n\n주의: summary.ship_ready / fast_production / total_production 은 'AF별 독립 계산의 합계'다.\n여러 AF 가 같은 하위 자재를 공유하면 모든 AF 수량을 동시에 보장하지는 않는다.",
         "properties": {
           "auto_representatives": {
             "description": "모델별 PF 후보 중 출하 대기+빠른 생산+총생산 합계가 가장 큰 자동 기준 PF. 동점은 총생산, 빠른 생산, 출하 대기, PF 코드, 품목 ID 순으로 결정.",
@@ -1567,7 +1580,7 @@
         "type": "object"
       },
       "CapacityResponse": {
-        "description": "전체 생산 가능 수량 응답.\n\n- **immediate**: BOM 직계 자식 1단계(AA/TF/HF/VF 등 중간재·반제품)의 가용 재고만으로\n  빠르게 만들 수 있는 수량. 각 직계 자식의 available(=warehouse+PRODUCTION-pending)\n  을 per-unit 수량으로 나눈 값의 최솟값.\n- **maximum**: leaf 까지 전개한 전체 하위 자재의 available 합계 기준 이론적 최대.\n  불량(DEFECTIVE) 재고는 제외.\n- **af**: AF(조립 완제품) 기준 신규 블록. immediate/maximum 은 전환 기간 호환용으로 유지.",
+        "description": "전체 생산 가능 수량 응답.\n\n- **immediate**: BOM 직계 자식 1단계(AA/TF/HF/VF 등 중간재·반제품)의 가용 재고만으로\n  빠르게 만들 수 있는 수량. 각 직계 자식의\n  available(=warehouse+PRODUCTION-재고 요청 예약-활성 출하 예약)\n  을 per-unit 수량으로 나눈 값의 최솟값.\n- **maximum**: leaf 까지 전개한 전체 하위 자재의 available 합계 기준 이론적 최대.\n  불량(DEFECTIVE) 재고는 제외.\n- **af**: AF(조립 완제품) 기준 신규 블록. immediate/maximum 은 전환 기간 호환용으로 유지.",
         "properties": {
           "af": {
             "anyOf": [
@@ -2852,13 +2865,15 @@
         "properties": {
           "current_pin": {
             "maxLength": 4,
-            "minLength": 1,
+            "minLength": 4,
+            "pattern": "^[0-9]{4}$",
             "title": "Current Pin",
             "type": "string"
           },
           "new_pin": {
             "maxLength": 4,
             "minLength": 4,
+            "pattern": "^[0-9]{4}$",
             "title": "New Pin",
             "type": "string"
           }
@@ -3741,6 +3756,349 @@
         "title": "HandoverSubmitRequest",
         "type": "object"
       },
+      "HealthDatabaseStatus": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "title": "HealthDatabaseStatus",
+        "type": "object"
+      },
+      "HealthDetailedResponse": {
+        "properties": {
+          "contract": {
+            "const": "health-detailed/v1",
+            "title": "Contract",
+            "type": "string"
+          },
+          "db": {
+            "$ref": "#/components/schemas/HealthDatabaseStatus"
+          },
+          "inventory_integrity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HealthIntegrityDetail"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "inventory_mismatch_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inventory Mismatch Count"
+          },
+          "last_transaction_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Transaction At"
+          },
+          "readiness": {
+            "$ref": "#/components/schemas/HealthReadinessResponse"
+          },
+          "rows": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Rows",
+            "type": "object"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "degraded"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "contract",
+          "status",
+          "db",
+          "rows",
+          "inventory_mismatch_count",
+          "inventory_integrity",
+          "last_transaction_at",
+          "readiness"
+        ],
+        "title": "HealthDetailedResponse",
+        "type": "object"
+      },
+      "HealthIntegrityCheckDetail": {
+        "properties": {
+          "check_id": {
+            "title": "Check Id",
+            "type": "string"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "samples": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Samples",
+            "type": "array"
+          },
+          "severity": {
+            "enum": [
+              "blocking",
+              "warning"
+            ],
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "check_id",
+          "severity",
+          "count",
+          "samples"
+        ],
+        "title": "HealthIntegrityCheckDetail",
+        "type": "object"
+      },
+      "HealthIntegrityCheckSummary": {
+        "properties": {
+          "check_id": {
+            "title": "Check Id",
+            "type": "string"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "severity": {
+            "enum": [
+              "blocking",
+              "warning"
+            ],
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "check_id",
+          "severity",
+          "count"
+        ],
+        "title": "HealthIntegrityCheckSummary",
+        "type": "object"
+      },
+      "HealthIntegrityDetail": {
+        "properties": {
+          "blocking_count": {
+            "title": "Blocking Count",
+            "type": "integer"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/HealthIntegrityCheckDetail"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "contract": {
+            "const": "inventory-integrity/v1",
+            "title": "Contract",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pass",
+              "warning",
+              "fail"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "warning_count": {
+            "title": "Warning Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "contract",
+          "status",
+          "blocking_count",
+          "warning_count",
+          "checks"
+        ],
+        "title": "HealthIntegrityDetail",
+        "type": "object"
+      },
+      "HealthIntegritySummary": {
+        "properties": {
+          "blocking_count": {
+            "title": "Blocking Count",
+            "type": "integer"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/HealthIntegrityCheckSummary"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "contract": {
+            "const": "inventory-integrity/v1",
+            "title": "Contract",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pass",
+              "warning",
+              "fail"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "warning_count": {
+            "title": "Warning Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "contract",
+          "status",
+          "blocking_count",
+          "warning_count",
+          "checks"
+        ],
+        "title": "HealthIntegritySummary",
+        "type": "object"
+      },
+      "HealthLiveResponse": {
+        "properties": {
+          "contract": {
+            "const": "health-liveness/v1",
+            "title": "Contract",
+            "type": "string"
+          },
+          "status": {
+            "const": "live",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "contract",
+          "status"
+        ],
+        "title": "HealthLiveResponse",
+        "type": "object"
+      },
+      "HealthReadinessCheck": {
+        "properties": {
+          "check_id": {
+            "title": "Check Id",
+            "type": "string"
+          },
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Count"
+          },
+          "status": {
+            "enum": [
+              "pass",
+              "fail",
+              "not_checked"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "check_id",
+          "status",
+          "count"
+        ],
+        "title": "HealthReadinessCheck",
+        "type": "object"
+      },
+      "HealthReadinessResponse": {
+        "properties": {
+          "alembic_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alembic Revision"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/HealthReadinessCheck"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "contract": {
+            "const": "health-readiness/v1",
+            "title": "Contract",
+            "type": "string"
+          },
+          "inventory_integrity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HealthIntegritySummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "ready",
+              "not_ready"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "contract",
+          "status",
+          "checks",
+          "alembic_revision",
+          "inventory_integrity"
+        ],
+        "title": "HealthReadinessResponse",
+        "type": "object"
+      },
       "InitialLocationInput": {
         "properties": {
           "department": {
@@ -3891,6 +4249,42 @@
         "title": "IntegrityRepairResponse",
         "type": "object"
       },
+      "InventoryIntegrityCheck": {
+        "properties": {
+          "check_id": {
+            "title": "Check Id",
+            "type": "string"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "samples": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Samples",
+            "type": "array"
+          },
+          "severity": {
+            "enum": [
+              "blocking",
+              "warning"
+            ],
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "check_id",
+          "severity",
+          "count",
+          "samples"
+        ],
+        "title": "InventoryIntegrityCheck",
+        "type": "object"
+      },
       "InventoryIntegrityIssue": {
         "properties": {
           "category": {
@@ -3952,6 +4346,10 @@
       },
       "InventoryIntegrityResponse": {
         "properties": {
+          "blocking_count": {
+            "title": "Blocking Count",
+            "type": "integer"
+          },
           "category_counts": {
             "additionalProperties": {
               "type": "integer"
@@ -3968,6 +4366,18 @@
             },
             "title": "Category Counts",
             "type": "object"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/InventoryIntegrityCheck"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "contract": {
+            "const": "inventory-integrity/v1",
+            "title": "Contract",
+            "type": "string"
           },
           "generated_at": {
             "format": "date-time",
@@ -3988,9 +4398,27 @@
             },
             "title": "Issues",
             "type": "array"
+          },
+          "status": {
+            "enum": [
+              "pass",
+              "warning",
+              "fail"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "warning_count": {
+            "title": "Warning Count",
+            "type": "integer"
           }
         },
         "required": [
+          "contract",
+          "status",
+          "blocking_count",
+          "warning_count",
+          "checks",
           "generated_at",
           "is_consistent",
           "issue_count",
@@ -4116,6 +4544,11 @@
             "format": "date-time",
             "title": "Updated At",
             "type": "string"
+          },
+          "warehouse_available_quantity": {
+            "default": 0,
+            "title": "Warehouse Available Quantity",
+            "type": "integer"
           },
           "warehouse_qty": {
             "default": 0,
@@ -6271,6 +6704,11 @@
             "title": "Updated At",
             "type": "string"
           },
+          "warehouse_available_quantity": {
+            "default": 0,
+            "title": "Warehouse Available Quantity",
+            "type": "integer"
+          },
           "warehouse_qty": {
             "default": 0,
             "title": "Warehouse Qty",
@@ -6639,11 +7077,85 @@
         "title": "OperationCancelRequest",
         "type": "object"
       },
+      "OperatorPinChangeCompleteRequest": {
+        "properties": {
+          "employee_id": {
+            "format": "uuid",
+            "title": "Employee Id",
+            "type": "string"
+          },
+          "new_pin": {
+            "maxLength": 4,
+            "minLength": 4,
+            "pattern": "^[0-9]{4}$",
+            "title": "New Pin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "employee_id",
+          "new_pin"
+        ],
+        "title": "OperatorPinChangeCompleteRequest",
+        "type": "object"
+      },
+      "OperatorSessionLoginRequest": {
+        "properties": {
+          "employee_id": {
+            "format": "uuid",
+            "title": "Employee Id",
+            "type": "string"
+          },
+          "pin": {
+            "maxLength": 4,
+            "minLength": 4,
+            "pattern": "^[0-9]{4}$",
+            "title": "Pin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "employee_id",
+          "pin"
+        ],
+        "title": "OperatorSessionLoginRequest",
+        "type": "object"
+      },
+      "OperatorSessionResponse": {
+        "properties": {
+          "boot_id": {
+            "title": "Boot Id",
+            "type": "string"
+          },
+          "employee": {
+            "$ref": "#/components/schemas/EmployeeResponse"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "server_time": {
+            "format": "date-time",
+            "title": "Server Time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "employee",
+          "server_time",
+          "expires_at",
+          "boot_id"
+        ],
+        "title": "OperatorSessionResponse",
+        "type": "object"
+      },
       "PinVerifyRequest": {
         "properties": {
           "pin": {
-            "maxLength": 20,
-            "minLength": 1,
+            "maxLength": 4,
+            "minLength": 4,
+            "pattern": "^[0-9]{4}$",
             "title": "Pin",
             "type": "string"
           }
@@ -7241,6 +7753,10 @@
       },
       "ReconcileResponse": {
         "properties": {
+          "ledger_mismatch_count": {
+            "title": "Ledger Mismatch Count",
+            "type": "integer"
+          },
           "mismatch_count": {
             "title": "Mismatch Count",
             "type": "integer"
@@ -7255,16 +7771,29 @@
         },
         "required": [
           "rows",
-          "mismatch_count"
+          "mismatch_count",
+          "ledger_mismatch_count"
         ],
         "title": "ReconcileResponse",
         "type": "object"
       },
       "ReconcileRow": {
         "properties": {
+          "box_total": {
+            "title": "Box Total",
+            "type": "integer"
+          },
           "diff": {
             "title": "Diff",
             "type": "integer"
+          },
+          "inactive_zone_total": {
+            "title": "Inactive Zone Total",
+            "type": "integer"
+          },
+          "inventory_present": {
+            "title": "Inventory Present",
+            "type": "boolean"
           },
           "item_id": {
             "format": "uuid",
@@ -7274,6 +7803,31 @@
           "item_name": {
             "title": "Item Name",
             "type": "string"
+          },
+          "ledger_diff": {
+            "title": "Ledger Diff",
+            "type": "integer"
+          },
+          "ledger_issues": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ledger Issues",
+            "type": "array"
+          },
+          "ledger_status": {
+            "enum": [
+              "ok",
+              "over",
+              "under",
+              "invalid"
+            ],
+            "title": "Ledger Status",
+            "type": "string"
+          },
+          "ledger_total": {
+            "title": "Ledger Total",
+            "type": "integer"
           },
           "mes_code": {
             "anyOf": [
@@ -7299,8 +7853,20 @@
             "title": "Status",
             "type": "string"
           },
+          "unplaced_present": {
+            "title": "Unplaced Present",
+            "type": "boolean"
+          },
+          "unplaced_total": {
+            "title": "Unplaced Total",
+            "type": "integer"
+          },
           "warehouse_qty": {
             "title": "Warehouse Qty",
+            "type": "integer"
+          },
+          "zone_total": {
+            "title": "Zone Total",
             "type": "integer"
           }
         },
@@ -7310,7 +7876,17 @@
           "placed_total",
           "warehouse_qty",
           "diff",
-          "status"
+          "status",
+          "box_total",
+          "zone_total",
+          "unplaced_total",
+          "inactive_zone_total",
+          "ledger_total",
+          "ledger_diff",
+          "ledger_status",
+          "inventory_present",
+          "unplaced_present",
+          "ledger_issues"
         ],
         "title": "ReconcileRow",
         "type": "object"
@@ -8578,6 +9154,40 @@
       },
       "ShippingEventResponse": {
         "properties": {
+          "actor_employee_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Employee Code"
+          },
+          "actor_employee_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Employee Id"
+          },
+          "actor_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Name"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -8645,6 +9255,7 @@
         "type": "object"
       },
       "ShippingHistoryPageResponse": {
+        "description": "Backward-compatible history name for the shared shipping page contract.",
         "properties": {
           "has_more": {
             "title": "Has More",
@@ -8694,8 +9305,122 @@
         "title": "ShippingInvoiceUpdate",
         "type": "object"
       },
+      "ShippingPickupCancelRequest": {
+        "properties": {
+          "client_request_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Request Id"
+          },
+          "expected_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShippingRequestStatusEnum"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expected_updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Updated At"
+          }
+        },
+        "title": "ShippingPickupCancelRequest",
+        "type": "object"
+      },
+      "ShippingPickupCompleteRequest": {
+        "properties": {
+          "client_request_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Request Id"
+          },
+          "expected_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShippingRequestStatusEnum"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expected_updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Updated At"
+          }
+        },
+        "title": "ShippingPickupCompleteRequest",
+        "type": "object"
+      },
       "ShippingPrepareCancelRequest": {
         "properties": {
+          "client_request_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Request Id"
+          },
+          "expected_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShippingRequestStatusEnum"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expected_updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Updated At"
+          },
           "reason": {
             "anyOf": [
               {
@@ -8714,13 +9439,48 @@
       },
       "ShippingPrepareCompleteRequest": {
         "properties": {
+          "client_request_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Request Id"
+          },
           "companion_lines": {
-            "default": [],
+            "deprecated": true,
+            "description": "하위 호환용 입력입니다. 준비 완료에는 출하 요청에 저장된 동반 출하품을 사용하며 이 값은 무시됩니다.",
             "items": {
               "$ref": "#/components/schemas/ShippingCompanionLineInput"
             },
             "title": "Companion Lines",
             "type": "array"
+          },
+          "expected_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShippingRequestStatusEnum"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expected_updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Updated At"
           },
           "serial_numbers": {
             "minLength": 1,
@@ -8861,6 +9621,38 @@
           "base_pf_item_id"
         ],
         "title": "ShippingRequestCreate",
+        "type": "object"
+      },
+      "ShippingRequestPageResponse": {
+        "properties": {
+          "has_more": {
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "requests": {
+            "items": {
+              "$ref": "#/components/schemas/ShippingRequestResponse"
+            },
+            "title": "Requests",
+            "type": "array"
+          }
+        },
+        "required": [
+          "requests",
+          "has_more"
+        ],
+        "title": "ShippingRequestPageResponse",
         "type": "object"
       },
       "ShippingRequestResponse": {
@@ -11890,12 +12682,20 @@
             },
             "title": "Special Zones",
             "type": "array"
+          },
+          "unplaced_items": {
+            "items": {
+              "$ref": "#/components/schemas/WarehouseUnplacedItemResponse"
+            },
+            "title": "Unplaced Items",
+            "type": "array"
           }
         },
         "required": [
           "angles",
           "boxes",
-          "special_zones"
+          "special_zones",
+          "unplaced_items"
         ],
         "title": "WarehouseMapResponse",
         "type": "object"
@@ -12154,6 +12954,47 @@
           }
         },
         "title": "WarehouseSpecialZoneUpdate",
+        "type": "object"
+      },
+      "WarehouseUnplacedItemResponse": {
+        "properties": {
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Code"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "row_id": {
+            "format": "uuid",
+            "title": "Row Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "row_id",
+          "item_id",
+          "item_name",
+          "quantity"
+        ],
+        "title": "WarehouseUnplacedItemResponse",
         "type": "object"
       },
       "WeeklyActivityEvidence": {
@@ -12677,26 +13518,6 @@
         "operationId": "list_activity_audit_files_api_admin_activity_audit_files_get",
         "parameters": [
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -12750,26 +13571,6 @@
         "description": "현재 클라이언트 UUID에 관리용 표시 이름을 등록한다.",
         "operationId": "upsert_current_terminal_api_admin_activity_audit_terminals_current_put",
         "parameters": [
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
           {
             "in": "header",
             "name": "X-Admin-Pin",
@@ -12839,26 +13640,6 @@
             }
           },
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -12912,26 +13693,6 @@
             "schema": {
               "title": "Month",
               "type": "string"
-            }
-          },
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
             }
           },
           {
@@ -12993,26 +13754,6 @@
             }
           },
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -13061,26 +13802,6 @@
       "get": {
         "operationId": "list_files_api_admin_audit_csv_files_get",
         "parameters": [
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
           {
             "in": "header",
             "name": "X-Admin-Pin",
@@ -13144,26 +13865,6 @@
             }
           },
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -13217,26 +13918,6 @@
             "schema": {
               "title": "Month",
               "type": "string"
-            }
-          },
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
             }
           },
           {
@@ -13299,26 +13980,6 @@
             }
           },
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -13361,7 +14022,7 @@
     },
     "/api/admin/audit-logs": {
       "get": {
-        "description": "최근 감사로그 조회. 관리자 PIN 잠금 화면에서만 호출 (현재 별도 인증 미적용).",
+        "description": "서버의 관리자 PIN 인증을 거쳐 최근 감사로그를 조회한다.",
         "operationId": "list_audit_logs_api_admin_audit_logs_get",
         "parameters": [
           {
@@ -13430,26 +14091,6 @@
             }
           },
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -13503,26 +14144,6 @@
         "description": "재고·불량·취소·주간 분류 불변식을 변경 없이 검사한다.",
         "operationId": "get_inventory_integrity_api_admin_inventory_integrity_get",
         "parameters": [
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
           {
             "in": "header",
             "name": "X-Admin-Pin",
@@ -14184,26 +14805,6 @@
         "operationId": "create_bom_api_bom_post",
         "parameters": [
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -14322,26 +14923,6 @@
             }
           },
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -14390,26 +14971,6 @@
               "format": "uuid",
               "title": "Bom Id",
               "type": "string"
-            }
-          },
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
             }
           },
           {
@@ -14755,26 +15316,6 @@
             "schema": {
               "title": "Slot",
               "type": "integer"
-            }
-          },
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
             }
           },
           {
@@ -15536,26 +16077,6 @@
         "operationId": "create_department_api_departments_post",
         "parameters": [
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -15615,26 +16136,6 @@
         "operationId": "reorder_departments_api_departments_reorder_patch",
         "parameters": [
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -15689,7 +16190,7 @@
     },
     "/api/departments/{dept_id}": {
       "delete": {
-        "description": "관리자 PIN 으로 부서 삭제.\n\nPIN 은 request body(`{\"pin\": \"...\"}`) 로 전달하면 access log 에 남지 않는다.\n하위호환을 위해 body 가 없으면 query string `pin` 으로 폴백한다.",
+        "description": "관리자 PIN 으로 부서 삭제.\n\nPIN은 `X-Admin-Pin` 헤더 또는 request body로만 전달한다.",
         "operationId": "delete_department_api_departments__dept_id__delete",
         "parameters": [
           {
@@ -15699,26 +16200,6 @@
             "schema": {
               "title": "Dept Id",
               "type": "integer"
-            }
-          },
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
             }
           },
           {
@@ -15750,7 +16231,7 @@
                     "type": "null"
                   }
                 ],
-                "title": "Body"
+                "title": " Body"
               }
             }
           }
@@ -15785,26 +16266,6 @@
             "schema": {
               "title": "Dept Id",
               "type": "integer"
-            }
-          },
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
             }
           },
           {
@@ -16088,26 +16549,6 @@
         "operationId": "create_employee_api_employees_post",
         "parameters": [
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -16177,26 +16618,6 @@
             }
           },
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -16249,26 +16670,6 @@
               "format": "uuid",
               "title": "Employee Id",
               "type": "string"
-            }
-          },
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
             }
           },
           {
@@ -16443,26 +16844,6 @@
             }
           },
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -16620,7 +17001,7 @@
     },
     "/api/employees/{employee_id}/verify-pin": {
       "post": {
-        "description": "작업자 식별용 PIN 검증 — 실제 보안 인증이 아님.\n\n무차별 대입 완화를 위해 (직원ID + 클라이언트 IP) 키로 실패 시도를 제한한다.\n실패만 카운트하며 성공 시 키를 리셋한다.",
+        "description": "새 DB 세션 계약을 그대로 사용하는 한 release 호환 alias.",
         "operationId": "verify_employee_pin_api_employees__employee_id__verify_pin_post",
         "parameters": [
           {
@@ -18973,7 +19354,7 @@
     },
     "/api/inventory/transactions/{log_id}/quantity-correction": {
       "post": {
-        "description": "RECEIVE/SHIP 수량 보정. 원본은 보존하고 차액만 ADJUST 거래로 보정한다.\n\n- delta = new_quantity_change - original.quantity_change\n- new_warehouse = inventory.warehouse_qty + delta (음수 방지 검증)\n- adjust_warehouse() 서비스 호출로 재고 동기화\n- ADJUST TransactionLog 생성 + TransactionEditLog 기록",
+        "description": "RECEIVE/SHIP 수량 보정. 원본은 보존하고 차액만 ADJUST 거래로 보정한다.\n\n- delta = new_quantity_change - original.quantity_change\n- new_warehouse = inventory.warehouse_qty + delta (음수 방지 검증)\n- _adjust_warehouse() private core 호출로 재고 동기화\n- ADJUST TransactionLog 생성 + TransactionEditLog 기록",
         "operationId": "quantity_correct_transaction_api_inventory_transactions__log_id__quantity_correction_post",
         "parameters": [
           {
@@ -19762,26 +20143,6 @@
         "operationId": "create_item_api_items_post",
         "parameters": [
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -20056,26 +20417,6 @@
         "operationId": "reorder_items_api_items_reorder_patch",
         "parameters": [
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -20184,26 +20525,6 @@
             }
           },
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -20271,26 +20592,6 @@
               "format": "uuid",
               "title": "Item Id",
               "type": "string"
-            }
-          },
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
             }
           },
           {
@@ -20364,26 +20665,6 @@
             }
           },
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -20430,7 +20711,7 @@
     },
     "/api/items/{item_id}/soft-delete": {
       "patch": {
-        "description": "품목 소프트 삭제 — deleted_at 세팅 + BOM 연결 제거. 입출고 내역은 보존.",
+        "description": "활성 업무와 BOM 참조가 없는 품목만 소프트 삭제한다.",
         "operationId": "soft_delete_item_api_items__item_id__soft_delete_patch",
         "parameters": [
           {
@@ -20441,26 +20722,6 @@
               "format": "uuid",
               "title": "Item Id",
               "type": "string"
-            }
-          },
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
             }
           },
           {
@@ -20538,26 +20799,6 @@
         "operationId": "create_model_api_models_post",
         "parameters": [
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -20617,26 +20858,6 @@
         "description": "드래그 reorder 결과를 영구 저장. 부서 reorder 와 동일 패턴.\n\n- PIN 검증 후 payload.items 의 (slot, display_order) 쌍을 일괄 갱신.\n- 존재하지 않는 slot 은 조용히 스킵 (부분 갱신 허용).",
         "operationId": "reorder_models_api_models_reorder_patch",
         "parameters": [
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
           {
             "in": "header",
             "name": "X-Admin-Pin",
@@ -20705,26 +20926,6 @@
             }
           },
           {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
-          {
             "in": "header",
             "name": "X-Admin-Pin",
             "required": false,
@@ -20753,7 +20954,7 @@
                     "type": "null"
                   }
                 ],
-                "title": "Body"
+                "title": " Body"
               }
             }
           }
@@ -20789,26 +20990,6 @@
             "schema": {
               "title": "Slot",
               "type": "integer"
-            }
-          },
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
             }
           },
           {
@@ -20879,23 +21060,6 @@
               "title": "Recipient Employee Id",
               "type": "string"
             }
-          },
-          {
-            "in": "header",
-            "name": "X-Actor-Employee-Id",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Actor-Employee-Id"
-            }
           }
         ],
         "responses": {
@@ -20929,25 +21093,6 @@
     "/api/notifications/mark-read": {
       "post": {
         "operationId": "mark_read_api_notifications_mark_read_post",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "X-Actor-Employee-Id",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Actor-Employee-Id"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -20999,23 +21144,6 @@
               "title": "Recipient Employee Id",
               "type": "string"
             }
-          },
-          {
-            "in": "header",
-            "name": "X-Actor-Employee-Id",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Actor-Employee-Id"
-            }
           }
         ],
         "responses": {
@@ -21056,23 +21184,6 @@
               "format": "uuid",
               "title": "Recipient Employee Id",
               "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "X-Actor-Employee-Id",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Actor-Employee-Id"
             }
           }
         ],
@@ -21129,23 +21240,6 @@
               "title": "Recipient Employee Id",
               "type": "string"
             }
-          },
-          {
-            "in": "header",
-            "name": "X-Actor-Employee-Id",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Actor-Employee-Id"
-            }
           }
         ],
         "responses": {
@@ -21171,6 +21265,163 @@
         "summary": "Delete Notification",
         "tags": [
           "Notifications"
+        ]
+      }
+    },
+    "/api/operator-session": {
+      "delete": {
+        "operationId": "delete_operator_session_api_operator_session_delete",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "pin_change_employee_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pin Change Employee Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Operator Session",
+        "tags": [
+          "Employees"
+        ]
+      },
+      "get": {
+        "operationId": "get_operator_session_api_operator_session_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorSessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Operator Session",
+        "tags": [
+          "Employees"
+        ]
+      },
+      "post": {
+        "operationId": "create_operator_session_api_operator_session_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorSessionLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorSessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Operator Session",
+        "tags": [
+          "Employees"
+        ]
+      }
+    },
+    "/api/operator-session/activity": {
+      "post": {
+        "description": "명시적인 사용자 활동으로 유효한 작업자 세션만 30분 연장한다.",
+        "operationId": "renew_current_operator_session_api_operator_session_activity_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorSessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Renew Current Operator Session",
+        "tags": [
+          "Employees"
+        ]
+      }
+    },
+    "/api/operator-session/complete-pin-change": {
+      "post": {
+        "operationId": "complete_pin_change_api_operator_session_complete_pin_change_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorPinChangeCompleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Complete Pin Change",
+        "tags": [
+          "Employees"
         ]
       }
     },
@@ -21398,31 +21649,9 @@
     "/api/settings/integrity/inventory": {
       "get": {
         "deprecated": true,
-        "description": "Deprecated compatibility endpoint.\n\nPIN 은 request body(`{\"pin\": \"...\"}`) 로 전달하면 access log 에 남지 않는다.\n하위호환을 위해 body 가 없으면 query string `pin` 으로 폴백한다.",
+        "description": "Deprecated compatibility endpoint.\n\nPIN은 access log에 남지 않는 `X-Admin-Pin` 헤더 또는 request body로만 받는다.",
         "operationId": "check_inventory_integrity_api_settings_integrity_inventory_get",
         "parameters": [
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — body 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "maxLength": 32,
-                  "minLength": 4,
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — body 사용 권장)",
-              "title": "Pin"
-            }
-          },
           {
             "in": "query",
             "name": "limit",
@@ -21433,6 +21662,22 @@
               "minimum": 1,
               "title": "Limit",
               "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
             }
           }
         ],
@@ -21973,6 +22218,7 @@
     },
     "/api/shipping/requests": {
       "get": {
+        "description": "One-release list adapter; bounded while clients migrate to the page route.",
         "operationId": "list_requests_api_shipping_requests_get",
         "parameters": [
           {
@@ -21989,6 +22235,18 @@
                 }
               ],
               "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
             }
           }
         ],
@@ -22058,6 +22316,83 @@
           }
         },
         "summary": "Create Request",
+        "tags": [
+          "Shipping"
+        ]
+      }
+    },
+    "/api/shipping/requests/page": {
+      "get": {
+        "operationId": "list_request_page_api_shipping_requests_page_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ShippingRequestStatusEnum"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShippingRequestPageResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Request Page",
         "tags": [
           "Shipping"
         ]
@@ -22356,16 +22691,6 @@
           },
           {
             "in": "query",
-            "name": "requester_employee_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Requester Employee Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
             "name": "source_pa_item_id",
             "required": true,
             "schema": {
@@ -22382,6 +22707,23 @@
               "exclusiveMinimum": 0,
               "title": "Quantity",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "requester_employee_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Requester Employee Id"
             }
           },
           {
@@ -22492,6 +22834,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ShippingPickupCancelRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -22535,6 +22894,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ShippingPickupCompleteRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -22582,11 +22958,18 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ShippingPrepareCancelRequest"
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ShippingPrepareCancelRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -22764,6 +23147,23 @@
               "title": "Limit",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "target_request_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Target Request Id"
+            }
           }
         ],
         "responses": {
@@ -22839,19 +23239,26 @@
     },
     "/api/stock-requests/department-queue": {
       "get": {
-        "description": "부서 결재 정/부 승인 대기 목록.\n\n노출 부서 범위 (그릴 합의 — docs/defect-handling-redesign.md):\n  - 부서 정/부: 생산 라인 6개(튜브/고압/진공/튜닝/조립/출하)\n  - 창고 정/부 / admin: 모든 부서",
+        "description": "부서 결재 정/부 승인 대기 목록.\n\n부서 정/부만 창고 외 부서 결재를 조회할 수 있다.",
         "operationId": "list_department_queue_api_stock_requests_department_queue_get",
         "parameters": [
           {
-            "description": "현재 직원 ID — 결재 가능 부서만 노출",
+            "description": "현재 직원 ID — 세션 작업자 일치 확인용",
             "in": "query",
             "name": "actor_employee_id",
-            "required": true,
+            "required": false,
             "schema": {
-              "description": "현재 직원 ID — 결재 가능 부서만 노출",
-              "format": "uuid",
-              "title": "Actor Employee Id",
-              "type": "string"
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "현재 직원 ID — 세션 작업자 일치 확인용",
+              "title": "Actor Employee Id"
             }
           },
           {
@@ -22864,6 +23271,23 @@
               "minimum": 1,
               "title": "Limit",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "target_request_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Target Request Id"
             }
           }
         ],
@@ -22905,15 +23329,22 @@
         "operationId": "count_department_queue_api_stock_requests_department_queue_count_get",
         "parameters": [
           {
-            "description": "현재 직원 ID — 결재 가능 부서만 카운트",
+            "description": "현재 직원 ID — 세션 작업자 일치 확인용",
             "in": "query",
             "name": "actor_employee_id",
-            "required": true,
+            "required": false,
             "schema": {
-              "description": "현재 직원 ID — 결재 가능 부서만 카운트",
-              "format": "uuid",
-              "title": "Actor Employee Id",
-              "type": "string"
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "현재 직원 ID — 세션 작업자 일치 확인용",
+              "title": "Actor Employee Id"
             }
           }
         ],
@@ -23204,6 +23635,23 @@
               "title": "Limit",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "target_request_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Target Request Id"
+            }
           }
         ],
         "responses": {
@@ -23413,7 +23861,7 @@
     },
     "/api/stock-requests/{request_id}/department-approve": {
       "post": {
-        "description": "부서 결재 승인 — department_role in (primary/deputy) 또는 admin.",
+        "description": "부서 결재 승인 — 부서 정/부만 허용.",
         "operationId": "department_approve_stock_request_api_stock_requests__request_id__department_approve_post",
         "parameters": [
           {
@@ -23574,7 +24022,7 @@
     },
     "/api/stock-requests/{request_id}/revert-to-draft": {
       "post": {
-        "description": "연결된 미결 요청을 취소하고 IoBatch 전체를 draft로 복원한다.",
+        "description": "연결된 미결 요청을 모두 취소하고 IoBatch 전체를 draft로 복원한다.",
         "operationId": "revert_stock_request_to_draft_api_stock_requests__request_id__revert_to_draft_post",
         "parameters": [
           {
@@ -23972,7 +24420,7 @@
     },
     "/api/warehouse-map/box-tracking": {
       "get": {
-        "description": "창고 박스 자동 차감 활성 여부 — 프론트가 편집/경고 UI 노출 결정에 사용.",
+        "description": "박스 배치 UI 표시 선호도. 물리 원장 차감에는 영향을 주지 않는다.",
         "operationId": "get_box_tracking_api_warehouse_map_box_tracking_get",
         "responses": {
           "200": {
@@ -23992,29 +24440,9 @@
         ]
       },
       "put": {
-        "description": "창고 박스 자동 차감 기능 켜기/끄기 (전환 운영 스위치, admin PIN).\n\n켜기 전 전 품목 박스 배치가 끝나 있어야 한다 — 안 그러면 R5가 창고 출고를 막는다.",
+        "description": "박스 배치 UI 표시 선호도 변경. 물리 원장 차감에는 영향을 주지 않는다.",
         "operationId": "set_box_tracking_api_warehouse_map_box_tracking_put",
         "parameters": [
-          {
-            "deprecated": true,
-            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-            "in": "query",
-            "name": "pin",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "deprecated": true,
-              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
-              "title": "Pin"
-            }
-          },
           {
             "in": "header",
             "name": "X-Admin-Pin",
@@ -24636,6 +25064,65 @@
         ]
       }
     },
+    "/api/warehouse-map/verify-editor": {
+      "post": {
+        "description": "편집 진입 전에 실제 변경 요청과 같은 창고 관리자 자격을 확인한다.",
+        "operationId": "verify_editor_access_api_warehouse_map_verify_editor_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Employee-Code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Employee-Code"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Operator-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Operator-Pin"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Verify Editor Access",
+        "tags": [
+          "Warehouse Map"
+        ]
+      }
+    },
     "/api/warehouse-map/zones": {
       "post": {
         "operationId": "create_zone_api_warehouse_map_zones_post",
@@ -24965,16 +25452,28 @@
     },
     "/health/detailed": {
       "get": {
-        "description": "운영 점검용 상세 헬스. 프론트엔드는 /health 만 사용.\n\n- DB ping\n- 주요 테이블 row count\n- inventory mismatch count (불변식 위반)\n- open queue batch count\n- 최근 transaction_log created_at",
+        "description": "운영 점검용 상세 헬스. 프론트엔드는 /health 만 사용.\n\n- DB ping\n- 주요 테이블 row count\n- inventory-integrity/v1 공통 업무 불변식과 기존 total mismatch count\n- open queue batch count\n- 최근 transaction_log created_at",
         "operationId": "health_detailed_health_detailed_get",
         "responses": {
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/HealthDetailedResponse"
+                }
               }
             },
             "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthDetailedResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           }
         },
         "summary": "Health Detailed",
@@ -24985,19 +25484,53 @@
     },
     "/health/live": {
       "get": {
-        "description": "경량 liveness — 컨테이너/오케스트레이터 프로브 전용 (WS3).\n\n정적 `/health` 와 달리 DB-down 을 구분: DB 미연결이면 503.\n`/health/detailed` 와 달리 row count·무결성 스캔을 하지 않아 30s 주기\n프로브에 적합(가벼움).",
+        "description": "Report only process and event-loop liveness; never touch dependencies.",
         "operationId": "health_live_health_live_get",
         "responses": {
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/HealthLiveResponse"
+                }
               }
             },
             "description": "Successful Response"
           }
         },
         "summary": "Health Live",
+        "tags": [
+          "System"
+        ]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "description": "Report whether the current process may accept DEXCOWIN MES workload.",
+        "operationId": "health_ready_health_ready_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthReadinessResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthReadinessResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Health Ready",
         "tags": [
           "System"
         ]

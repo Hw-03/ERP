@@ -4,17 +4,25 @@ from __future__ import annotations
 
 import json
 import uuid
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, Optional
 
 from fastapi import Request
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import (
+    DefectInventoryMovement,
     DefectQuarantineRecord,
     DefectQuarantineReconstructionAllocation,
     Employee,
+    Inventory,
+    InventoryOperation,
+    InventoryOperationEffect,
+    InventoryOperationEffectKindEnum,
+    InventoryOperationKindEnum,
     InventoryOperationRoleEnum,
     Item,
     LocationStatusEnum,
@@ -23,11 +31,16 @@ from app.models import (
     TransactionEditLog,
     TransactionLog,
     TransactionTypeEnum,
+    WarehouseBoxItem,
+    WarehouseSpecialZoneItem,
+    WarehouseUnplacedItem,
 )
 from app.repositories import inventory_repository, item_repository
 from app.services import audit, inv_effect, inventory as inventory_svc
 from app.services import inventory_operations as operation_svc
 from app.services import legacy_inventory_operation_adoption as legacy_adoption_svc
+from app.services import stock_availability
+from app.services import warehouse_map as warehouse_map_svc
 from app.services._tx import transactional
 from app.services.inv_calc import _sync_total
 
@@ -50,6 +63,54 @@ class TransactionItemNotFound(LookupError):
 
 class UnsupportedTransactionMetadata(ValueError):
     """메타데이터 수정을 허용하지 않는 거래 유형일 때 발생한다."""
+
+
+class UnsupportedTransactionQuantityCorrection(ValueError):
+    """수량 보정을 지원하지 않는 거래 유형 또는 부호일 때 발생한다."""
+
+
+class TransactionQuantityCorrectionShortage(ValueError):
+    """수량 보정 결과가 창고 재고 또는 예약을 침범할 때 발생한다."""
+
+
+_CORRECTION_CONFLICT_MESSAGES = {
+    "already_corrected": "이미 수량 보정된 거래입니다.",
+    "transaction_cancelled": "취소된 거래는 수량 보정할 수 없습니다.",
+    "workflow_linked": "연결된 업무 거래는 수량 보정할 수 없습니다.",
+    "multiple_inventory_effects": "여러 재고 효과가 연결된 거래는 수량 보정할 수 없습니다.",
+    "non_warehouse_effect": "창고 외 재고 효과가 연결된 거래는 수량 보정할 수 없습니다.",
+    "unproven_inventory_effect": "단일 창고 재고 효과를 증명할 수 없는 거래입니다.",
+    "inventory_effect_mismatch": "거래 수량과 창고 재고 효과가 일치하지 않습니다.",
+    "non_inventory_side_effect": "재고 외 효과가 연결된 거래는 수량 보정할 수 없습니다.",
+    "ledger_unavailable": "재고 작업 원장이 활성화되지 않아 수량 보정할 수 없습니다.",
+}
+
+
+class CorrectionConflict(ValueError):
+    """동시 상태 또는 원장 증거 때문에 수량 보정을 안전하게 확정할 수 없음."""
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+        super().__init__(_CORRECTION_CONFLICT_MESSAGES[reason])
+
+
+@dataclass(frozen=True)
+class QuantityCorrectionResult:
+    """잠금 안에서 확정한 원본·보정 로그와 응답용 품목."""
+
+    original: TransactionLog
+    correction: TransactionLog
+    item: Item
+
+
+@dataclass(frozen=True)
+class _CorrectionSourceEffect:
+    """정정이 다시 확인하고 같은 실제 행에 적용할 원본 v2 효과."""
+
+    warehouse_row_id: str | None
+    warehouse_after: int | None
+    physical_cells: tuple[dict[str, Any], ...]
+    contract_version: int
 
 
 _META_CORRECTABLE = {
@@ -92,7 +153,7 @@ def edit_transaction_metadata(
         if log is None:
             raise TransactionLogNotFound("거래를 찾을 수 없습니다.")
 
-        item = item_repository.get(db, log.item_id)
+        item = item_repository.get_active(db, log.item_id, for_update=True)
         if item is None:
             raise TransactionItemNotFound("품목을 찾을 수 없습니다.")
 
@@ -133,75 +194,519 @@ def edit_transaction_metadata(
     return log, item
 
 
-def correct_transaction_quantity(
+def _lock_correction_operation(
+    db: Session,
+    operation_id: uuid.UUID,
+) -> InventoryOperation:
+    """취소와 동일한 owning operation 행을 먼저 잠근다."""
+    query = db.query(InventoryOperation).filter(
+        InventoryOperation.operation_id == operation_id
+    )
+    if db.get_bind().dialect.name != "sqlite":
+        query = query.with_for_update()
+    operation = query.one_or_none()
+    if operation is None:
+        raise CorrectionConflict("unproven_inventory_effect")
+    return operation
+
+
+def _lock_correction_log(
+    db: Session,
+    log_id: uuid.UUID,
+) -> TransactionLog:
+    """수량 보정 대상 로그를 현재 transaction 안에서 신선하게 잠근다."""
+    query = (
+        db.query(TransactionLog)
+        .populate_existing()
+        .filter(TransactionLog.log_id == log_id)
+    )
+    if db.get_bind().dialect.name != "sqlite":
+        query = query.with_for_update()
+    log = query.one_or_none()
+    if log is None:
+        raise TransactionLogNotFound("거래를 찾을 수 없습니다.")
+    return log
+
+
+def lock_transaction_operation_and_log(
+    db: Session,
+    log_id: uuid.UUID,
+    *,
+    legacy_only: bool = False,
+) -> tuple[InventoryOperation | None, TransactionLog]:
+    """거래 command가 operation → log 순서로 소유권을 잠그게 한다.
+
+    Legacy 취소는 log만 잠근 뒤 workflow operation으로 바뀌지 않았음을 재확인한다.
+    """
+    if legacy_only:
+        log = _lock_correction_log(db, log_id)
+        if log.operation_id is not None:
+            raise CorrectionConflict("workflow_linked")
+        return None, log
+
+    operation_id = db.query(TransactionLog.operation_id).filter(
+        TransactionLog.log_id == log_id
+    ).scalar()
+    operation = (
+        _lock_correction_operation(db, operation_id)
+        if operation_id is not None
+        else None
+    )
+    log = _lock_correction_log(db, log_id)
+    if log.operation_id is not None and operation is None:
+        operation = _lock_correction_operation(db, log.operation_id)
+    if operation is not None and log.operation_id != operation.operation_id:
+        raise CorrectionConflict("workflow_linked")
+    return operation, log
+
+
+def _assert_single_warehouse_effect(
+    log: TransactionLog,
+    operation: InventoryOperation | None,
+) -> _CorrectionSourceEffect:
+    effect = log.inventory_effect
+    if not isinstance(effect, list) or not effect:
+        raise CorrectionConflict("unproven_inventory_effect")
+    warehouse_cells = [
+        cell
+        for cell in effect
+        if isinstance(cell, dict) and cell.get("scope") == "warehouse"
+    ]
+    if not warehouse_cells and len(effect) == 1 and isinstance(effect[0], dict):
+        raise CorrectionConflict("non_warehouse_effect")
+    if len(warehouse_cells) != 1:
+        raise CorrectionConflict("multiple_inventory_effects")
+    cell = warehouse_cells[0]
+    if not isinstance(cell, dict) or "delta" not in cell:
+        raise CorrectionConflict("unproven_inventory_effect")
+    try:
+        effect_delta = Decimal(str(cell["delta"]))
+    except (TypeError, ValueError):
+        raise CorrectionConflict("unproven_inventory_effect") from None
+    if effect_delta == 0:
+        raise CorrectionConflict("unproven_inventory_effect")
+    if effect_delta != Decimal(str(log.quantity_change)):
+        raise CorrectionConflict("inventory_effect_mismatch")
+    v2_effect = operation is not None and int(operation.contract_version or 1) >= 2
+    warehouse_row_id: str | None = None
+    if v2_effect:
+        if not cell.get("row_id") or any(
+            field not in cell for field in ("before_quantity", "after_quantity")
+        ):
+            raise CorrectionConflict("unproven_inventory_effect")
+        warehouse_row_id = str(cell["row_id"])
+        try:
+            warehouse_before = Decimal(str(cell["before_quantity"]))
+            warehouse_after = Decimal(str(cell["after_quantity"]))
+        except (TypeError, ValueError):
+            raise CorrectionConflict("unproven_inventory_effect") from None
+        if warehouse_after - warehouse_before != effect_delta:
+            raise CorrectionConflict("inventory_effect_mismatch")
+
+    physical_cells = [entry for entry in effect if entry is not cell]
+    if v2_effect and not physical_cells:
+        raise CorrectionConflict("unproven_inventory_effect")
+    if physical_cells:
+        if operation is None or int(operation.contract_version or 1) < 2:
+            raise CorrectionConflict("multiple_inventory_effects")
+        if len(physical_cells) != 1:
+            raise CorrectionConflict("multiple_inventory_effects")
+        physical_delta = Decimal("0")
+        for physical in physical_cells:
+            if not isinstance(physical, dict):
+                raise CorrectionConflict("unproven_inventory_effect")
+            scope = physical.get("scope")
+            if scope not in {
+                "warehouse_box",
+                "warehouse_zone",
+                "warehouse_unplaced",
+            }:
+                raise CorrectionConflict("non_warehouse_effect")
+            if not physical.get("row_id") or any(
+                field not in physical
+                for field in ("before_quantity", "after_quantity", "delta")
+            ):
+                raise CorrectionConflict("unproven_inventory_effect")
+            if scope == "warehouse_box" and not physical.get("box_id"):
+                raise CorrectionConflict("unproven_inventory_effect")
+            if scope == "warehouse_zone":
+                try:
+                    zone_id = int(physical["zone_id"])
+                except (KeyError, TypeError, ValueError):
+                    raise CorrectionConflict("unproven_inventory_effect") from None
+                if zone_id <= 0:
+                    raise CorrectionConflict("unproven_inventory_effect")
+            try:
+                cell_delta = Decimal(str(physical["delta"]))
+                cell_before = Decimal(str(physical["before_quantity"]))
+                cell_after = Decimal(str(physical["after_quantity"]))
+            except (TypeError, ValueError):
+                raise CorrectionConflict("unproven_inventory_effect") from None
+            if cell_after - cell_before != cell_delta:
+                raise CorrectionConflict("inventory_effect_mismatch")
+            physical_delta += cell_delta
+        if physical_delta != effect_delta:
+            raise CorrectionConflict("inventory_effect_mismatch")
+    warehouse_snapshots = (log.warehouse_qty_before, log.warehouse_qty_after)
+    if any(value is not None for value in warehouse_snapshots):
+        if any(value is None for value in warehouse_snapshots):
+            raise CorrectionConflict("inventory_effect_mismatch")
+        warehouse_delta = Decimal(str(log.warehouse_qty_after)) - Decimal(
+            str(log.warehouse_qty_before)
+        )
+        if warehouse_delta != effect_delta:
+            raise CorrectionConflict("inventory_effect_mismatch")
+    department_snapshots = (log.department_qty_before, log.department_qty_after)
+    if any(value is not None for value in department_snapshots):
+        if any(value is None for value in department_snapshots):
+            raise CorrectionConflict("inventory_effect_mismatch")
+        if Decimal(str(log.department_qty_before)) != Decimal(
+            str(log.department_qty_after)
+        ):
+            raise CorrectionConflict("inventory_effect_mismatch")
+    return _CorrectionSourceEffect(
+        warehouse_row_id=warehouse_row_id,
+        warehouse_after=(int(cell["after_quantity"]) if v2_effect else None),
+        physical_cells=tuple(physical_cells),
+        contract_version=int(operation.contract_version or 1) if operation else 1,
+    )
+
+
+def _assert_correction_source(
     db: Session,
     *,
     log: TransactionLog,
-    editor: Employee,
-    new_warehouse: Decimal,
-    delta: Decimal,
-    reason: str,
-    before: dict[str, Any],
-    request: Optional[Request],
-) -> TransactionLog:
-    """재고 보정과 보정 원장·수정 이력·감사를 원자적으로 확정한다."""
-    with transactional(db):
-        operation = operation_svc.create_business_operation(
-            db,
-            domain="transaction",
-            action="quantity_correction",
-            display_label="수량 보정",
-            actor_name=editor.name,
-            actor_employee_id=editor.employee_id,
-            department="창고",
-            reason=reason,
-            idempotency_key=f"transaction_correction:{log.log_id}",
+    operation: InventoryOperation | None,
+) -> _CorrectionSourceEffect:
+    if log.cancelled or log.reverses_log_id is not None or (
+        db.query(TransactionLog.log_id)
+        .filter(TransactionLog.reverses_log_id == log.log_id)
+        .first()
+        is not None
+    ):
+        raise CorrectionConflict("transaction_cancelled")
+    if (
+        db.query(TransactionEditLog.edit_id)
+        .filter(
+            TransactionEditLog.original_log_id == log.log_id,
+            TransactionEditLog.correction_log_id.isnot(None),
         )
-        cells_before = inv_effect.snapshot_cells(db, log.item_id)
-        adjusted_inv, qty_before, _applied_delta = inventory_svc.adjust_warehouse(
-            db, log.item_id, new_warehouse
+        .first()
+        is not None
+    ):
+        raise CorrectionConflict("already_corrected")
+    if any(
+        value is not None
+        for value in (
+            log.operation_batch_id,
+            log.operation_line_id,
+            log.shipping_request_id,
+            log.shipping_phase,
+            log.defect_quarantine_record_id,
+            log.client_request_id,
         )
-        correction_log = operation_svc.attach_transaction(TransactionLog(
-            item_id=log.item_id,
-            transaction_type=TransactionTypeEnum.ADJUST,
-            quantity_change=delta,
-            quantity_before=qty_before,
-            quantity_after=adjusted_inv.quantity,
-            notes=f"보정: {reason}",
-            reference_no=str(log.log_id),
-            produced_by=editor.name,
-            producer_employee_id=editor.employee_id,
-            department="창고",
-            **inv_effect.capture_log_stock_snapshot(db, log.item_id, cells_before),
-        ), operation, InventoryOperationRoleEnum.CORRECTION)
-        db.add(correction_log)
-        db.flush()
+    ) or bool((log.reference_no or "").strip()):
+        raise CorrectionConflict("workflow_linked")
+    if operation is None and log.operation_role is not None:
+        raise CorrectionConflict("workflow_linked")
 
-        after = {
-            **before,
-            "_correction_log_id": str(correction_log.log_id),
-            "_applied_delta": str(delta),
-        }
-        db.add(
-            TransactionEditLog(
-                original_log_id=log.log_id,
-                edited_by_employee_id=editor.employee_id,
-                edited_by_name=editor.name,
-                reason=reason,
-                before_payload=json.dumps(before, ensure_ascii=False),
-                after_payload=json.dumps(after, ensure_ascii=False),
-                correction_log_id=correction_log.log_id,
+    source_effect = _assert_single_warehouse_effect(log, operation)
+    if operation is None:
+        return source_effect
+    if operation.kind != InventoryOperationKindEnum.BUSINESS:
+        raise CorrectionConflict("transaction_cancelled")
+    if log.operation_role != InventoryOperationRoleEnum.PRIMARY:
+        raise CorrectionConflict("workflow_linked")
+    expected_action = {
+        TransactionTypeEnum.RECEIVE: "receive",
+        TransactionTypeEnum.SHIP: "ship",
+    }[log.transaction_type]
+    if (
+        operation.domain != "inventory_io"
+        or operation.action != expected_action
+        or operation.idempotency_key is not None
+    ):
+        raise CorrectionConflict("workflow_linked")
+    if (
+        db.query(InventoryOperation.operation_id)
+        .filter(InventoryOperation.reverses_operation_id == operation.operation_id)
+        .first()
+        is not None
+    ):
+        raise CorrectionConflict("transaction_cancelled")
+    operation_logs = (
+        db.query(TransactionLog.log_id)
+        .filter(TransactionLog.operation_id == operation.operation_id)
+        .all()
+    )
+    if len(operation_logs) != 1 or operation_logs[0][0] != log.log_id:
+        raise CorrectionConflict("multiple_inventory_effects")
+    operation_effects = db.query(InventoryOperationEffect).filter(
+        InventoryOperationEffect.operation_id == operation.operation_id
+    ).all()
+    if any(
+        effect.effect_kind == InventoryOperationEffectKindEnum.WORKFLOW
+        for effect in operation_effects
+    ):
+        raise CorrectionConflict("workflow_linked")
+    if operation_effects or (
+        db.query(DefectInventoryMovement.movement_id)
+        .filter(DefectInventoryMovement.operation_id == operation.operation_id)
+        .first()
+        is not None
+    ):
+        raise CorrectionConflict("non_inventory_side_effect")
+    return source_effect
+
+
+def _physical_effect_key(cell: dict[str, Any]) -> tuple:
+    """v2 물리 효과를 ``inv_effect`` 스냅샷의 정확한 행 키로 바꾼다."""
+    scope = str(cell["scope"])
+    row_id = str(cell["row_id"])
+    if scope == "warehouse_box":
+        return (scope, row_id, str(cell.get("box_id")))
+    if scope == "warehouse_zone":
+        return (scope, row_id, int(cell["zone_id"]))
+    return (scope, row_id, None)
+
+
+def _assert_v2_correction_rows_unchanged(
+    source: _CorrectionSourceEffect,
+    cells: dict[tuple, int],
+) -> None:
+    """원 작업 직후의 W/B/Z/U UUID와 수량이 그대로인지 확인한다."""
+    if source.contract_version < 2:
+        return
+    warehouse_key = ("warehouse", source.warehouse_row_id, None)
+    if cells.get(warehouse_key) != source.warehouse_after:
+        raise CorrectionConflict("inventory_effect_mismatch")
+    for cell in source.physical_cells:
+        key = _physical_effect_key(cell)
+        if cells.get(key) != int(cell["after_quantity"]):
+            raise CorrectionConflict("inventory_effect_mismatch")
+
+
+def _physical_row_for_effect(
+    db: Session,
+    cell: dict[str, Any],
+) -> WarehouseBoxItem | WarehouseSpecialZoneItem | WarehouseUnplacedItem:
+    """원본 v2 효과가 가리킨 실제 물리 행을 PK로 반환한다."""
+    model = {
+        "warehouse_box": WarehouseBoxItem,
+        "warehouse_zone": WarehouseSpecialZoneItem,
+        "warehouse_unplaced": WarehouseUnplacedItem,
+    }[cell["scope"]]
+    row = db.get(model, cell["row_id"])
+    if row is None:
+        raise CorrectionConflict("inventory_effect_mismatch")
+    return row
+
+
+def _apply_exact_v2_correction(
+    db: Session,
+    *,
+    inventory: Inventory,
+    source: _CorrectionSourceEffect,
+    source_quantity_change: Decimal,
+    delta: Decimal,
+) -> tuple[Inventory, Decimal, Decimal]:
+    """v2 정정 delta를 원 작업이 실제 변경한 B/Z/U 행에만 적용한다."""
+    integral_delta = int(delta)
+    if Decimal(integral_delta) != delta:
+        raise CorrectionConflict("inventory_effect_mismatch")
+    physical = list(source.physical_cells)
+    source_delta = int(source_quantity_change)
+    if len(physical) != 1:
+        raise CorrectionConflict("multiple_inventory_effects")
+    cell = physical[0]
+    if source_delta > 0:
+        if cell["scope"] != "warehouse_unplaced":
+            raise CorrectionConflict("multiple_inventory_effects")
+    row = _physical_row_for_effect(db, cell)
+    new_quantity = int(row.quantity) + integral_delta
+    if new_quantity < 0:
+        source_label = "입고" if source_delta > 0 else "출고"
+        raise TransactionQuantityCorrectionShortage(
+            f"재고 부족: 원 {source_label} 위치의 수량이 부족합니다."
+        )
+    row.quantity = new_quantity
+
+    qty_before = Decimal(str(inventory.quantity or 0))
+    inventory.warehouse_qty = Decimal(str(inventory.warehouse_qty or 0)) + delta
+    _sync_total(db, inventory)
+    db.flush()
+    from app.services import warehouse_map as warehouse_map_svc
+
+    warehouse_map_svc._lock_warehouse_ledger(db, inventory.item_id)
+    return inventory, qty_before, delta
+
+
+def _is_correction_unique_violation(exc: IntegrityError) -> bool:
+    constraint = getattr(getattr(exc, "orig", None), "diag", None)
+    constraint_name = getattr(constraint, "constraint_name", None)
+    if constraint_name == "uq_transaction_edit_log_quantity_correction":
+        return True
+    message = str(getattr(exc, "orig", exc)).lower()
+    return (
+        "transaction_edit_logs.original_log_id" in message
+        and "unique" in message
+    )
+
+
+def correct_transaction_quantity(
+    db: Session,
+    *,
+    log_id: uuid.UUID,
+    editor: Employee,
+    new_quantity: Decimal,
+    reason: str,
+    request: Optional[Request],
+) -> QuantityCorrectionResult:
+    """재고 보정과 보정 원장·수정 이력·감사를 원자적으로 확정한다."""
+    try:
+        with transactional(db):
+            owning_operation, log = lock_transaction_operation_and_log(db, log_id)
+            item = item_repository.get_active(db, log.item_id, for_update=True)
+            if item is None:
+                raise TransactionItemNotFound("품목을 찾을 수 없습니다.")
+            if log.transaction_type not in {
+                TransactionTypeEnum.RECEIVE,
+                TransactionTypeEnum.SHIP,
+            }:
+                tx_type = getattr(log.transaction_type, "value", log.transaction_type)
+                raise UnsupportedTransactionQuantityCorrection(
+                    f"수량 보정은 RECEIVE / SHIP 유형만 지원합니다 (현재: {tx_type})."
+                )
+            if log.transaction_type == TransactionTypeEnum.SHIP and new_quantity >= 0:
+                raise UnsupportedTransactionQuantityCorrection(
+                    "SHIP의 수량 변화량은 음수여야 합니다."
+                )
+            if log.transaction_type == TransactionTypeEnum.RECEIVE and new_quantity <= 0:
+                raise UnsupportedTransactionQuantityCorrection(
+                    "RECEIVE의 수량 변화량은 양수여야 합니다."
+                )
+
+            source_effect = _assert_correction_source(
+                db,
+                log=log,
+                operation=owning_operation,
             )
-        )
-        audit.record(
-            db,
-            request=request,
-            action="transaction.quantity_correction",
-            target_type="transaction_log",
-            target_id=str(log.log_id),
-            payload_summary=f"{editor.name}: delta={float(delta)}, {reason}",
-        )
-    return correction_log
+            locked_inventory = inventory_svc.lock_inventories(db, [log.item_id]).get(
+                log.item_id
+            )
+            if locked_inventory is None:
+                raise TransactionInventoryNotFound(log.item_id)
+            if source_effect.warehouse_row_id is not None and str(
+                locked_inventory.inventory_id
+            ) != source_effect.warehouse_row_id:
+                raise CorrectionConflict("inventory_effect_mismatch")
+            cells_before = inv_effect._snapshot_cells(db, log.item_id)
+            _assert_v2_correction_rows_unchanged(source_effect, cells_before)
+            delta = new_quantity - Decimal(str(log.quantity_change))
+            new_warehouse = Decimal(str(locked_inventory.warehouse_qty or 0)) + delta
+            if new_warehouse < 0:
+                raise TransactionQuantityCorrectionShortage(
+                    f"재고 부족: 보정 후 창고 재고가 {float(new_warehouse)}로 음수가 됩니다."
+                )
+            warehouse_figure = stock_availability.figure_for_cell(
+                db,
+                stock_availability.AvailabilityCell.warehouse(log.item_id),
+                lock_allocations=True,
+            )
+            reserved_floor = (
+                warehouse_figure.stock_request_pending
+                + warehouse_figure.active_shipping_reserved
+            )
+            if new_warehouse < reserved_floor:
+                raise TransactionQuantityCorrectionShortage(
+                    "재고 요청·출하 예약 수량보다 창고 재고가 낮아질 수 없습니다."
+                )
+
+            before = _metadata_snapshot(log)
+            operation = operation_svc._create_business_operation(
+                db,
+                domain="transaction",
+                action="quantity_correction",
+                display_label="수량 보정",
+                actor_name=editor.name,
+                actor_employee_id=editor.employee_id,
+                department="창고",
+                reason=reason,
+                idempotency_key=f"transaction_correction:{log.log_id}",
+            )
+            if operation is None:
+                raise CorrectionConflict("ledger_unavailable")
+            if source_effect.contract_version >= 2:
+                adjusted_inv, qty_before, applied_delta = _apply_exact_v2_correction(
+                    db,
+                    inventory=locked_inventory,
+                    source=source_effect,
+                    source_quantity_change=Decimal(str(log.quantity_change)),
+                    delta=delta,
+                )
+            else:
+                adjusted_inv, qty_before, applied_delta = inventory_svc._adjust_warehouse(
+                    db, log.item_id, new_warehouse
+                )
+            if Decimal(str(applied_delta)) != delta:
+                raise CorrectionConflict("inventory_effect_mismatch")
+            correction_log = operation_svc._attach_transaction(
+                TransactionLog(
+                    item_id=log.item_id,
+                    transaction_type=TransactionTypeEnum.ADJUST,
+                    quantity_change=delta,
+                    quantity_before=qty_before,
+                    quantity_after=adjusted_inv.quantity,
+                    notes=f"보정: {reason}",
+                    reference_no=str(log.log_id),
+                    produced_by=editor.name,
+                    producer_employee_id=editor.employee_id,
+                    department="창고",
+                    **inv_effect._capture_log_stock_snapshot(
+                        db, log.item_id, cells_before
+                    ),
+                ),
+                operation,
+                InventoryOperationRoleEnum.CORRECTION,
+            )
+            db.add(correction_log)
+            db.flush()
+
+            after = {
+                **before,
+                "_correction_log_id": str(correction_log.log_id),
+                "_applied_delta": str(delta),
+            }
+            db.add(
+                TransactionEditLog(
+                    original_log_id=log.log_id,
+                    edited_by_employee_id=editor.employee_id,
+                    edited_by_name=editor.name,
+                    reason=reason,
+                    before_payload=json.dumps(before, ensure_ascii=False),
+                    after_payload=json.dumps(after, ensure_ascii=False),
+                    correction_log_id=correction_log.log_id,
+                )
+            )
+            db.flush()
+            audit.record(
+                db,
+                request=request,
+                action="transaction.quantity_correction",
+                target_type="transaction_log",
+                target_id=str(log.log_id),
+                payload_summary=f"{editor.name}: delta={float(delta)}, {reason}",
+            )
+            result = QuantityCorrectionResult(
+                original=log,
+                correction=correction_log,
+                item=item,
+            )
+    except IntegrityError as exc:
+        if _is_correction_unique_violation(exc):
+            raise CorrectionConflict("already_corrected") from exc
+        raise
+    return result
 
 
 def _normalize_effect_for_cancel(effect: object) -> object:
@@ -402,7 +907,7 @@ def _cancel_one_log(db: Session, log: TransactionLog) -> None:
     if not has_nonzero_delta:
         raise ValueError("재고 효과 기록이 비어 있어 자동 취소할 수 없습니다.")
     _reverse_linked_defect_record(db, log)
-    inv_effect.apply_effect_reverse(db, log.item_id, effect)
+    inv_effect._apply_effect_reverse(db, log.item_id, effect)
 
 
 def _claim_cancel_logs(db: Session, log_id: uuid.UUID) -> list[TransactionLog]:
@@ -492,9 +997,11 @@ def cancel_transaction(
             return log
         batch_logs = _claim_cancel_logs(db, log.log_id)
 
-        inventory_svc.lock_inventories(
+        warehouse_map_svc.lock_warehouse_map_rows(
             db,
-            sorted({batch_log.item_id for batch_log in batch_logs}),
+            item_ids=sorted({batch_log.item_id for batch_log in batch_logs}),
+            include_boxes_for_item_ids=True,
+            include_zones_for_item_ids=True,
         )
         for batch_log in batch_logs:
             inventory = inventory_repository.get(db, batch_log.item_id)

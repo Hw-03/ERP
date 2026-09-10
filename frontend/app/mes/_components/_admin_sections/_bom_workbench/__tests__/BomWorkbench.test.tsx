@@ -95,13 +95,15 @@ describe("BomWorkbench", () => {
       const masks = shell?.querySelector("[data-scrollbar-rail-masks]");
       expect(masks).toBeInTheDocument();
       expect(masks?.querySelectorAll("span")).toHaveLength(4);
-      for (const mask of masks?.querySelectorAll("span") ?? []) {
+      for (const mask of Array.from(masks?.querySelectorAll("span") ?? [])) {
         expect((mask as HTMLElement).style.background).toContain("var(--c-bg)");
       }
       expect(viewport.firstElementChild).toHaveClass("min-h-full", "min-w-full");
     }
 
-    const headers = container.querySelectorAll("[data-scrollbar-rail-viewport] .sticky.top-0");
+    const headers = Array.from(
+      container.querySelectorAll("[data-scrollbar-rail-viewport] .sticky.top-0"),
+    );
     expect(headers).toHaveLength(3);
     for (const header of headers) expect((header as HTMLElement).style.gridTemplateColumns).not.toBe("");
   });
@@ -120,7 +122,7 @@ describe("BomWorkbench", () => {
 
     const departmentFilters = screen.getByTestId("bom-department-filters");
     expect(departmentFilters).toHaveClass("min-h-[58px]", "flex-wrap");
-    for (const filter of departmentFilters.querySelectorAll("button")) {
+    for (const filter of Array.from(departmentFilters.querySelectorAll("button"))) {
       expect(filter).toHaveClass("h-11");
     }
 

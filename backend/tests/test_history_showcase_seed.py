@@ -2,14 +2,19 @@ from __future__ import annotations
 
 import importlib.util
 import sys
-from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 from unittest.mock import Mock
 
 from sqlalchemy import event
 
-from app.models import DepartmentEnum, Employee, EmployeeLevelEnum, InventoryLocation, LocationStatusEnum
+from app.models import (
+    DepartmentEnum,
+    Employee,
+    EmployeeLevelEnum,
+    InventoryLocation,
+    TransactionTypeEnum,
+)
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "dev" / "seed_history_showcase.py"
@@ -22,6 +27,12 @@ def _load_showcase_module():
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def test_shipping_seed_uses_actor_required_facade_result_without_private_mutator() -> None:
+    source = SCRIPT_PATH.read_text(encoding="utf-8")
+
+    assert "shipping_svc._require_final_items" not in source
 
 
 def test_showcase_dry_run_selects_real_workflow_candidates(db_session, make_item, make_location, make_bom):
@@ -37,7 +48,7 @@ def test_showcase_dry_run_selects_real_workflow_candidates(db_session, make_item
     )
     db_session.add(actor)
 
-    raw = make_item(name="검증 일반 자재", process_type_code="AR", warehouse_qty=Decimal("20"))
+    make_item(name="검증 일반 자재", process_type_code="AR", warehouse_qty=Decimal("20"))
     component_a = make_item(name="검증 구성품 A", process_type_code="AR", warehouse_qty=Decimal("20"))
     component_b = make_item(name="검증 구성품 B", process_type_code="AR", warehouse_qty=Decimal("20"))
     source_pa = make_item(name="검증 기존 PA", process_type_code="PA", warehouse_qty=Decimal("0"))
@@ -127,7 +138,7 @@ def test_showcase_apply_creates_searchable_real_inventory_history(db_session, ma
         is_active=True,
     )
     db_session.add(actor)
-    raw = make_item(name="실행 일반 자재", process_type_code="AR", warehouse_qty=Decimal("30"))
+    make_item(name="실행 일반 자재", process_type_code="AR", warehouse_qty=Decimal("30"))
     component_a = make_item(name="실행 구성품 A", process_type_code="AR", warehouse_qty=Decimal("30"))
     component_b = make_item(name="실행 구성품 B", process_type_code="AR", warehouse_qty=Decimal("30"))
     source_pa = make_item(name="실행 기존 PA", process_type_code="PA", warehouse_qty=Decimal("0"))
@@ -185,8 +196,8 @@ def test_showcase_apply_creates_searchable_real_inventory_history(db_session, ma
         log.defect_quarantine_record_id
         for log in logs
         if log.transaction_type in {
-            module.TransactionTypeEnum.MARK_DEFECTIVE,
-            module.TransactionTypeEnum.UNMARK_DEFECTIVE,
+            TransactionTypeEnum.MARK_DEFECTIVE,
+            TransactionTypeEnum.UNMARK_DEFECTIVE,
         }
     } == {record.record_id for record in quarantine_records}
     shipping_request = db_session.query(module.ShippingRequest).filter(
@@ -208,7 +219,7 @@ def test_showcase_remove_restores_inventory_and_deletes_marked_records(db_sessio
         is_active=True,
     )
     db_session.add(actor)
-    raw = make_item(name="정리 일반 자재", process_type_code="AR", warehouse_qty=Decimal("30"))
+    make_item(name="정리 일반 자재", process_type_code="AR", warehouse_qty=Decimal("30"))
     component_a = make_item(name="정리 구성품 A", process_type_code="AR", warehouse_qty=Decimal("30"))
     component_b = make_item(name="정리 구성품 B", process_type_code="AR", warehouse_qty=Decimal("30"))
     source_pa = make_item(name="정리 기존 PA", process_type_code="PA", warehouse_qty=Decimal("0"))
@@ -224,7 +235,7 @@ def test_showcase_remove_restores_inventory_and_deletes_marked_records(db_sessio
     db_session.commit()
 
     before_cells = {
-        item.item_id: module.inv_effect.snapshot_cells(db_session, item.item_id)
+        item.item_id: module.inv_effect._snapshot_cells(db_session, item.item_id)
         for item in db_session.query(module.Item).all()
     }
     marker = "[HISTORY-DEMO][REMOVE-TEST]"
@@ -261,6 +272,6 @@ def test_showcase_remove_restores_inventory_and_deletes_marked_records(db_sessio
         module.DefectQuarantineRecord.current_memo.contains(marker)
     ).count() == 0
     assert {
-        item_id: module.inv_effect.snapshot_cells(db_session, item_id)
+        item_id: module.inv_effect._snapshot_cells(db_session, item_id)
         for item_id in before_cells
     } == before_cells

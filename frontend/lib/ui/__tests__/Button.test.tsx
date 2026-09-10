@@ -9,5 +9,6 @@ describe("Button", () => {
     const button = screen.getByRole("button", { name: "저장" });
     expect(button).toHaveClass("standard-hover");
     expect(button).not.toHaveClass("hover:brightness-110");
+    expect(button).toHaveStyle({ background: "var(--c-blue-solid)" });
   });
 });

@@ -184,6 +184,17 @@ def test_manual_pf_pin_removal_declares_its_data_change_contract(tmp_path: Path)
     module.assert_policy_validators(database, (policy,))
 
 
+def test_inventory_location_ledger_declares_data_preserving_employee_policy() -> None:
+    module = _load_preflight_module()
+
+    policy = module._policy_from_migration(
+        MIGRATIONS / "20260831_0032_inventory_location_ledger.py"
+    )
+
+    assert policy.kind == "data-preserving"
+    assert policy.allowed_tables == frozenset()
+
+
 @pytest.mark.parametrize(
     "filename",
     [
@@ -210,8 +221,14 @@ def test_manual_pf_pin_removal_declares_its_data_change_contract(tmp_path: Path)
         "20260824_0027_defect_quarantine_records.py",
         "20260825_0028_reconstruct_legacy_defect_records.py",
         "20260826_0029_inventory_operations.py",
+        "20260827_0030_add_operator_sessions.py",
+        "20260828_0031_cp4_command_integrity.py",
+        "20260831_0032_inventory_location_ledger.py",
+        "20260831_0033_shipping_command_receipts.py",
+        "20260903_0030_defect_movement_baselines.py",
         "20260903_0031_add_item_procurement_fields.py",
         "20260903_0032_add_item_purchase_memo.py",
+        "20260907_0034_merge_procurement_and_shipping_heads.py",
     ],
 )
 def test_current_employee_schema_migrations_declare_auto_deploy_policy(filename: str) -> None:

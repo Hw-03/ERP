@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useEffect, useRef } from "react";
 import { AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 
@@ -9,6 +9,8 @@ interface Props {
   onRetry?: () => void;
   retryLabel?: string;
   prefix?: string;
+  ariaLabel?: string;
+  focusOnMount?: boolean;
 }
 
 function LoadFailureCardImpl({
@@ -16,10 +18,19 @@ function LoadFailureCardImpl({
   onRetry,
   retryLabel = "동기화",
   prefix = "데이터를 불러오지 못했습니다",
+  ariaLabel,
+  focusOnMount = false,
 }: Props) {
   const handleRetry = onRetry ?? (() => window.location.reload());
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (focusOnMount) cardRef.current?.focus();
+  }, [focusOnMount]);
+
   return (
     <div
+      ref={cardRef}
       className="flex items-center justify-between gap-3 rounded-[14px] border px-4 py-3 text-sm"
       style={{
         background: `color-mix(in srgb, ${LEGACY_COLORS.red} 10%, transparent)`,
@@ -27,6 +38,8 @@ function LoadFailureCardImpl({
         color: LEGACY_COLORS.red,
       }}
       role="alert"
+      aria-label={ariaLabel}
+      tabIndex={focusOnMount ? -1 : undefined}
     >
       <div className="flex min-w-0 items-center gap-2">
         <AlertTriangle className="h-4 w-4 shrink-0" />

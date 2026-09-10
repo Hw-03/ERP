@@ -20,6 +20,7 @@ const desktopTabIconColors = vi.hoisted(() => ({
 
 const queryClientMock = vi.hoisted(() => ({
   prefetchQuery: vi.fn(),
+  prefetchInfiniteQuery: vi.fn(),
 }));
 
 vi.mock("@tanstack/react-query", () => ({

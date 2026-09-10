@@ -74,6 +74,20 @@ _WEEKLY_V2_SNAPSHOT_COLUMNS = {
 }
 _WEEKLY_V2_ITEM_COLUMNS = {"normal_quantity", "defective_quantity"}
 
+INVENTORY_OPERATION_ROLE_ENUM = sa.Enum(
+    "PRIMARY",
+    "COMPONENT_INPUT",
+    "PRODUCT_OUTPUT",
+    "TRANSFER",
+    "CORRECTION",
+    "REWORK_PARENT_NORMAL",
+    "REWORK_PARENT_DEFECTIVE",
+    "REWORK_CHILD_NORMAL",
+    "REWORK_CHILD_DEFECTIVE",
+    "REWORK_CHILD_SCRAP",
+    name="inventory_operation_role_enum",
+)
+
 _SQLiteDependentSnapshot = tuple[
     str,
     list[str],
@@ -274,6 +288,52 @@ def _restore_sqlite_dependents_and_verify(
         )
 
 
+def _ensure_postgresql_operation_role_enum(bind: sa.Connection) -> None:
+    """Create the role enum only when every pre-existing namesake is exact."""
+    expected_schema = bind.execute(sa.text("SELECT current_schema()")).scalar_one()
+    expected_labels = list(INVENTORY_OPERATION_ROLE_ENUM.enums)
+    matching_enums = [
+        enum
+        for enum in sa.inspect(bind).get_enums(schema="*")
+        if enum["name"] == INVENTORY_OPERATION_ROLE_ENUM.name
+    ]
+    if matching_enums and not (
+        len(matching_enums) == 1
+        and matching_enums[0]["schema"] == expected_schema
+        and matching_enums[0]["labels"] == expected_labels
+    ):
+        found = [
+            {
+                "schema": enum["schema"],
+                "labels": enum["labels"],
+            }
+            for enum in matching_enums
+        ]
+        raise RuntimeError(
+            f"{INVENTORY_OPERATION_ROLE_ENUM.name} does not match expected schema "
+            f"and labels: expected {expected_schema}.{INVENTORY_OPERATION_ROLE_ENUM.name} "
+            f"{expected_labels}; found {found}"
+        )
+    INVENTORY_OPERATION_ROLE_ENUM.create(bind, checkfirst=True)
+    role_column_type = bind.execute(
+        sa.text(
+            "SELECT udt_schema, udt_name FROM information_schema.columns "
+            "WHERE table_schema = :schema_name "
+            "AND table_name = 'transaction_logs' "
+            "AND column_name = 'operation_role'"
+        ),
+        {"schema_name": expected_schema},
+    ).one_or_none()
+    if role_column_type is not None and tuple(role_column_type) != (
+        expected_schema,
+        INVENTORY_OPERATION_ROLE_ENUM.name,
+    ):
+        raise RuntimeError(
+            "transaction_logs.operation_role does not use the expected PostgreSQL "
+            f"enum type: found {tuple(role_column_type)}"
+        )
+
+
 def _create_operation_tables() -> None:
     op.create_table(
         "inventory_operations",
@@ -457,23 +517,12 @@ def _create_operation_tables() -> None:
 
 
 def _alter_transaction_logs() -> None:
-    role_enum = sa.Enum(
-        "PRIMARY",
-        "COMPONENT_INPUT",
-        "PRODUCT_OUTPUT",
-        "TRANSFER",
-        "CORRECTION",
-        "REWORK_PARENT_NORMAL",
-        "REWORK_PARENT_DEFECTIVE",
-        "REWORK_CHILD_NORMAL",
-        "REWORK_CHILD_DEFECTIVE",
-        "REWORK_CHILD_SCRAP",
-        name="inventory_operation_role_enum",
-    )
     if context.is_offline_mode():
         with op.batch_alter_table("transaction_logs") as batch_op:
             batch_op.add_column(sa.Column("operation_id", sa.String(length=32), nullable=True))
-            batch_op.add_column(sa.Column("operation_role", role_enum, nullable=True))
+            batch_op.add_column(
+                sa.Column("operation_role", INVENTORY_OPERATION_ROLE_ENUM, nullable=True)
+            )
             batch_op.add_column(sa.Column("reverses_log_id", sa.String(length=32), nullable=True))
             batch_op.create_foreign_key(
                 "fk_transaction_logs_operation_id_inventory_operations",
@@ -499,7 +548,9 @@ def _alter_transaction_logs() -> None:
         )
         with op.batch_alter_table("transaction_logs") as batch_op:
             batch_op.add_column(sa.Column("operation_id", sa.String(length=32), nullable=True))
-            batch_op.add_column(sa.Column("operation_role", role_enum, nullable=True))
+            batch_op.add_column(
+                sa.Column("operation_role", INVENTORY_OPERATION_ROLE_ENUM, nullable=True)
+            )
             batch_op.add_column(sa.Column("reverses_log_id", sa.String(length=32), nullable=True))
             batch_op.create_foreign_key(
                 "fk_transaction_logs_operation_id_inventory_operations",
@@ -604,13 +655,16 @@ def _alter_weekly_snapshots() -> None:
 
 def upgrade() -> None:
     if not context.is_offline_mode():
-        state = _existing_schema_state(op.get_bind())
-        if state == "complete":
-            return
+        bind = op.get_bind()
+        state = _existing_schema_state(bind)
         if state == "partial":
             raise RuntimeError(
                 "existing inventory operation ledger does not match the expected schema"
             )
+        if bind.dialect.name == "postgresql":
+            _ensure_postgresql_operation_role_enum(bind)
+        if state == "complete":
+            return
     _create_operation_tables()
     _alter_transaction_logs()
     _alter_handovers()

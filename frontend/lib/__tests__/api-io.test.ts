@@ -1,5 +1,8 @@
+// @vitest-environment jsdom
+
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { ioApi } from "../api/io";
+import { ResultUnknownError } from "../api-core";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -17,6 +20,7 @@ function makeResponse(body: unknown, ok = true, status?: number): Response {
 const originalFetch = globalThis.fetch;
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  sessionStorage.clear();
 });
 
 // ── preview ──────────────────────────────────────────────────────────────────
@@ -235,6 +239,50 @@ describe("ioApi.submitDraft", () => {
     const [url] = fetchSpy.mock.calls[0] as [string, RequestInit];
     expect(url).toContain("/api/io/draft/b-1/submit");
     expect(url).toContain("requester_employee_id=e-1");
+  });
+
+  it("결과 불명 뒤 모듈 reload를 거쳐도 같은 batch ID를 재전송한다", async () => {
+    const fetchSpy = vi.fn()
+      .mockRejectedValueOnce(new TypeError("response lost"))
+      .mockResolvedValueOnce(makeResponse({ batch: { batch_id: "b-1" }, status: "completed" }));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await expect(ioApi.submitDraft("b-1", "e-1")).rejects.toBeInstanceOf(
+      ResultUnknownError,
+    );
+    vi.resetModules();
+    const { ioApi: reloadedIoApi } = await import("../api/io");
+    await reloadedIoApi.submitDraft("b-new", "e-1");
+
+    expect(String(fetchSpy.mock.calls[1][0])).toContain("/api/io/draft/b-1/submit");
+    expect(String(fetchSpy.mock.calls[1][0])).not.toContain("b-new");
+    expect(sessionStorage.getItem("io:draft-submit:e-1")).toBeNull();
+  });
+
+  it("확정 422 뒤에는 pending batch를 지우고 다음 batch를 제출한다", async () => {
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(makeResponse({ detail: { message: "invalid" } }, false, 422))
+      .mockResolvedValueOnce(makeResponse({ batch: { batch_id: "b-2" }, status: "completed" }));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await expect(ioApi.submitDraft("b-1", "e-1")).rejects.toMatchObject({ status: 422 });
+    await ioApi.submitDraft("b-2", "e-1");
+
+    expect(String(fetchSpy.mock.calls[1][0])).toContain("/api/io/draft/b-2/submit");
+    expect(sessionStorage.getItem("io:draft-submit:e-1")).toBeNull();
+  });
+
+  it("503 뒤에는 pending batch를 보존해 현재 UI의 다른 batch보다 먼저 복구한다", async () => {
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(makeResponse({ detail: { message: "busy" } }, false, 503))
+      .mockResolvedValueOnce(makeResponse({ batch: { batch_id: "b-1" }, status: "completed" }));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await expect(ioApi.submitDraft("b-1", "e-1")).rejects.toMatchObject({ status: 503 });
+    await ioApi.submitDraft("b-new", "e-1");
+
+    expect(String(fetchSpy.mock.calls[1][0])).toContain("/api/io/draft/b-1/submit");
+    expect(String(fetchSpy.mock.calls[1][0])).not.toContain("b-new");
   });
 });
 

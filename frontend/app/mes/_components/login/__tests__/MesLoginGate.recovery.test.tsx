@@ -1,7 +1,8 @@
 /* eslint-disable @next/next/no-img-element */
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiError, AUTH_REQUIRED_EVENT } from "@/lib/api-core";
 import type { Operator } from "../useCurrentOperator";
 
 const state = vi.hoisted(() => ({
@@ -9,9 +10,13 @@ const state = vi.hoisted(() => ({
   getEmployees: vi.fn(),
   getWeeklyReport: vi.fn(),
   getMap: vi.fn(),
+  getOperatorSession: vi.fn(),
   readCurrentOperator: vi.fn(),
   getStoredBootId: vi.fn(),
   clearCurrentOperator: vi.fn(),
+  restoreCurrentOperator: vi.fn(),
+  hasPendingOperatorLogout: vi.fn(),
+  retryPendingOperatorLogout: vi.fn(),
 }));
 
 vi.mock("next/image", () => ({
@@ -23,11 +28,21 @@ vi.mock("@/lib/api", () => ({ api: {
   getWeeklyReport: state.getWeeklyReport,
 } }));
 vi.mock("@/lib/api/warehouse-map", () => ({ warehouseMapApi: { getMap: state.getMap } }));
-vi.mock("../useCurrentOperator", () => ({
-  clearCurrentOperator: state.clearCurrentOperator,
-  getStoredBootId: state.getStoredBootId,
-  readCurrentOperator: state.readCurrentOperator,
-}));
+vi.mock("@/lib/api/operator-session", () => ({ operatorSessionApi: {
+  getOperatorSession: state.getOperatorSession,
+} }));
+vi.mock("../useCurrentOperator", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../useCurrentOperator")>();
+  return {
+    ...actual,
+    clearCurrentOperator: state.clearCurrentOperator,
+    getStoredBootId: state.getStoredBootId,
+    readCurrentOperator: state.readCurrentOperator,
+    restoreCurrentOperator: state.restoreCurrentOperator,
+    hasPendingOperatorLogout: state.hasPendingOperatorLogout,
+    retryPendingOperatorLogout: state.retryPendingOperatorLogout,
+  };
+});
 vi.mock("../OperatorLoginCard", () => ({ OperatorLoginCard: () => <div>Login form</div> }));
 
 import { MesLoginGate } from "../MesLoginGate";
@@ -51,11 +66,29 @@ describe("MesLoginGate stored session recovery", () => {
     state.getEmployees.mockReset();
     state.getWeeklyReport.mockResolvedValue({});
     state.getMap.mockResolvedValue({});
+    state.getOperatorSession.mockReset();
+    state.getOperatorSession.mockResolvedValue({
+      boot_id: "boot-1",
+      server_time: "2026-09-08T11:30:00Z",
+      expires_at: "2026-09-08T12:00:00Z",
+      employee: {
+        employee_id: "emp-1", employee_code: "E1", name: "김현우", role: "staff",
+        department: "조립", level: "staff", warehouse_role: "none", department_role: "none",
+        io_enabled: true, assigned_model_slots: [], hidden_sidebar_tabs: [],
+        login_notification_popup_enabled: false,
+      },
+    });
     state.readCurrentOperator.mockReturnValue(stored);
     state.getStoredBootId.mockReturnValue("boot-1");
     state.clearCurrentOperator.mockReset();
+    state.restoreCurrentOperator.mockReset();
+    state.hasPendingOperatorLogout.mockReturnValue(false);
+    state.retryPendingOperatorLogout.mockReset();
   });
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
 
   it("keeps stored operator and withholds application content when session recovery fails", async () => {
     state.getAppSession.mockRejectedValue(new Error("offline"));
@@ -65,6 +98,38 @@ describe("MesLoginGate stored session recovery", () => {
     await waitFor(() => expect(screen.getByText("로그인 정보를 확인하지 못했습니다.")).toBeInTheDocument());
     expect(state.clearCurrentOperator).not.toHaveBeenCalled();
     expect(screen.queryByText("Authenticated content")).not.toBeInTheDocument();
+  });
+
+  it("times out and retries a hanging initial operator-session read before showing recovery", async () => {
+    vi.useFakeTimers();
+    state.getOperatorSession.mockImplementation(() => new Promise(() => {}));
+
+    renderGate();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(16_500);
+    });
+
+    expect(state.getOperatorSession).toHaveBeenCalledTimes(2);
+    expect(state.getOperatorSession.mock.calls.every(([signal]) => signal instanceof AbortSignal)).toBe(true);
+    expect(screen.getByText("로그인 정보를 확인하지 못했습니다.")).toBeInTheDocument();
+  });
+
+  it("keeps the login form when an auth-required event invalidates an in-flight restore", async () => {
+    let rejectAppSession!: (reason: unknown) => void;
+    state.getAppSession.mockImplementation(() => new Promise((_, reject) => {
+      rejectAppSession = reject;
+    }));
+
+    renderGate();
+    await waitFor(() => expect(state.getAppSession).toHaveBeenCalledTimes(1));
+    act(() => {
+      window.dispatchEvent(new Event(AUTH_REQUIRED_EVENT));
+      rejectAppSession(new ApiError("session expired", 401));
+    });
+
+    expect(await screen.findByText("Login form")).toBeInTheDocument();
+    await act(async () => Promise.resolve());
+    expect(screen.queryByText("로그인 정보를 확인하지 못했습니다.")).not.toBeInTheDocument();
   });
 
   it("clears stored operator when the server boot id changed", async () => {

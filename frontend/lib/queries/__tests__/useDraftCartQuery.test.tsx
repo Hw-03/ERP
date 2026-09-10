@@ -10,6 +10,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
+import type { StockRequest } from "@/lib/api";
+import type { components } from "@/lib/api/generated/openapi";
 import {
   useDeleteIoDraftMutation,
   useDeleteStockRequestDraftMutation,
@@ -50,13 +52,51 @@ afterEach(() => {
 
 describe("useDraftCartQuery", () => {
   it("stock draft + io draft 를 합쳐 반환", async () => {
-    const stockDrafts = [{ request_id: "sr1" }];
+    const stockDraftResponse = {
+      created_at: "2026-09-08T00:00:00Z",
+      lines: [],
+      request_id: "sr1",
+      request_type: "raw_receive",
+      requester_department: "조립",
+      requester_employee_id: "e1",
+      requester_name: "작업자",
+      requires_warehouse_approval: true,
+      status: "draft",
+      updated_at: "2026-09-08T00:00:00Z",
+    } satisfies components["schemas"]["StockRequestResponse"];
+    const stockDraft: StockRequest = {
+      ...stockDraftResponse,
+      approval_department: null,
+      approved_at: null,
+      approved_by_employee_id: null,
+      approved_by_name: null,
+      cancelled_at: null,
+      completed_at: null,
+      department_approved_at: null,
+      department_approved_by_employee_id: null,
+      department_approved_by_name: null,
+      notes: null,
+      operation_batch_id: null,
+      reason_category: null,
+      reason_memo: null,
+      reference_no: null,
+      rejected_at: null,
+      rejected_by_employee_id: null,
+      rejected_by_name: null,
+      rejected_reason: null,
+      request_code: null,
+      requester_department: "조립",
+      requires_department_approval: false,
+      reserved_at: null,
+      submitted_at: null,
+    };
+    const stockDrafts = [stockDraft];
     const ioDrafts = [{ batch_id: "io1" }];
     const fetchSpy = vi.fn((url: string) =>
       Promise.resolve(
         String(url).includes("/api/io/drafts")
           ? makeResponse(ioDrafts)
-          : makeResponse(stockDrafts),
+          : makeResponse([stockDraftResponse]),
       ),
     );
     globalThis.fetch = fetchSpy as unknown as typeof fetch;

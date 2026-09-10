@@ -20,7 +20,6 @@ from app.services import notifications as notification_svc
 from app.services import stock_requests as stock_request_svc
 from app.services._tx import transactional
 from app.services.io_persist import ensure_batch_is_mutable
-from app.services.pin_auth import verify_pin
 from app.services.sr_validation import LineInput
 
 
@@ -33,6 +32,7 @@ def create_request(
     reference_no: Optional[str],
     notes: Optional[str],
     client_request_id: Optional[str] = None,
+    request_fingerprint: Optional[str] = None,
     reason_category: Optional[str] = None,
     reason_memo: Optional[str] = None,
 ) -> StockRequest:
@@ -46,10 +46,11 @@ def create_request(
             reference_no=reference_no,
             notes=notes,
             client_request_id=client_request_id,
+            request_fingerprint=request_fingerprint,
             reason_category=reason_category,
             reason_memo=reason_memo,
         )
-        notification_svc.notify_request_arrived(db, request)
+        notification_svc._notify_request_arrived(db, request)
     return request
 
 
@@ -91,6 +92,7 @@ def approve_warehouse_request(
     try:
         with transactional(db):
             previous_status = request.status
+            previous_warehouse_approver_id = request.approved_by_employee_id
             stock_request_svc.approve_request(
                 db,
                 request,
@@ -102,11 +104,16 @@ def approve_warehouse_request(
                 request.status == StockRequestStatusEnum.COMPLETED
                 and previous_status != StockRequestStatusEnum.COMPLETED
             ):
-                notification_svc.notify_request_decided(
+                notification_svc._notify_request_decided(
                     db,
                     request,
                     decision="approved",
                 )
+            elif (
+                previous_warehouse_approver_id is None
+                and request.approved_by_employee_id is not None
+            ):
+                notification_svc._notify_request_arrived(db, request)
     except stock_request_svc.FailedApprovalError as exc:
         _record_failed_approval(
             db,
@@ -143,7 +150,7 @@ def approve_department_request(
                 request.status == StockRequestStatusEnum.COMPLETED
                 and previous_status != StockRequestStatusEnum.COMPLETED
             ):
-                notification_svc.notify_request_decided(
+                notification_svc._notify_request_decided(
                     db,
                     request,
                     decision="approved",
@@ -218,8 +225,6 @@ def revert_to_draft(
             raise PermissionError("본인 요청만 수정할 수 있습니다.")
         if batch.requester_employee_id != requester.employee_id:
             raise PermissionError("본인 작업 묶음만 수정할 수 있습니다.")
-        if not verify_pin(requester.pin_hash, pin):
-            raise PermissionError("PIN이 일치하지 않습니다.")
         ensure_batch_is_mutable(batch)
         if batch.status in {"completed", "partially_completed"}:
             raise ValueError("완료된 작업 묶음은 수정할 수 없습니다.")
@@ -256,6 +261,7 @@ def revert_to_draft(
                 )
 
         batch.status = "draft"
+        batch.request_fingerprint = None
         batch.completed_at = None
         batch.updated_at = datetime.utcnow()
         db.flush()

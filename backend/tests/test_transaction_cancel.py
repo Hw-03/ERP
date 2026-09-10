@@ -22,6 +22,7 @@ from app.models import (
     LocationStatusEnum,
     TransactionLog,
     TransactionTypeEnum,
+    WarehouseUnplacedItem,
 )
 from app.routers.inventory import transactions as transactions_router
 from app.services import transaction_actions
@@ -58,8 +59,10 @@ def _cells(db_session, item_id):
     """(warehouse_qty, {(dept,status): qty}) 스냅샷."""
     inv = db_session.query(Inventory).filter(Inventory.item_id == item_id).first()
     locs = {
-        (l.department, l.status.value): int(l.quantity or 0)
-        for l in db_session.query(InventoryLocation).filter(InventoryLocation.item_id == item_id).all()
+        (location.department, location.status.value): int(location.quantity or 0)
+        for location in db_session.query(InventoryLocation)
+        .filter(InventoryLocation.item_id == item_id)
+        .all()
     }
     return int(inv.warehouse_qty or 0), int(inv.quantity or 0), locs
 
@@ -198,6 +201,36 @@ def test_cancel_direct_defect_outgoing_restores_selected_record(
     db_session.add(outgoing)
     db_session.commit()
 
+    unplaced = (
+        db_session.query(WarehouseUnplacedItem)
+        .filter(WarehouseUnplacedItem.item_id == item.item_id)
+        .one()
+    )
+    outgoing.inventory_effect = [
+        {
+            "scope": "warehouse",
+            "before_quantity": 0,
+            "after_quantity": 2,
+            "delta": 2,
+        },
+        {
+            "scope": "location",
+            "department": DepartmentEnum.ASSEMBLY.value,
+            "status": LocationStatusEnum.DEFECTIVE.value,
+            "before_quantity": 5,
+            "after_quantity": 3,
+            "delta": -2,
+        },
+        {
+            "scope": "warehouse_unplaced",
+            "row_id": str(unplaced.id),
+            "before_quantity": 0,
+            "after_quantity": 2,
+            "delta": 2,
+        },
+    ]
+    db_session.commit()
+
     transaction_actions.cancel_transaction(
         db_session,
         log=outgoing,
@@ -282,6 +315,36 @@ def test_cancel_reconstructed_fifo_outgoing_restores_each_allocated_child(
             ),
         ]
     )
+    db_session.commit()
+
+    unplaced = (
+        db_session.query(WarehouseUnplacedItem)
+        .filter(WarehouseUnplacedItem.item_id == item.item_id)
+        .one()
+    )
+    outgoing.inventory_effect = [
+        {
+            "scope": "warehouse",
+            "before_quantity": 0,
+            "after_quantity": 2,
+            "delta": 2,
+        },
+        {
+            "scope": "location",
+            "department": DepartmentEnum.ASSEMBLY.value,
+            "status": LocationStatusEnum.DEFECTIVE.value,
+            "before_quantity": 4,
+            "after_quantity": 2,
+            "delta": -2,
+        },
+        {
+            "scope": "warehouse_unplaced",
+            "row_id": str(unplaced.id),
+            "before_quantity": 0,
+            "after_quantity": 2,
+            "delta": 2,
+        },
+    ]
     db_session.commit()
 
     transaction_actions.cancel_transaction(
@@ -407,6 +470,11 @@ def test_cancel_rolls_back_inventory_and_status_when_audit_fails(
 ):
     item = make_item(name="취소 롤백품", warehouse_qty=Decimal("50"))
     actor = _make_employee(db_session, code="CANCEL-ROLLBACK")
+    unplaced = (
+        db_session.query(WarehouseUnplacedItem)
+        .filter(WarehouseUnplacedItem.item_id == item.item_id)
+        .one()
+    )
     log = TransactionLog(
         item_id=item.item_id,
         transaction_type=TransactionTypeEnum.RECEIVE,
@@ -415,7 +483,21 @@ def test_cancel_rolls_back_inventory_and_status_when_audit_fails(
         quantity_after=Decimal("50"),
         produced_by=actor.name,
         producer_employee_id=actor.employee_id,
-        inventory_effect=[{"scope": "warehouse", "delta": 50}],
+        inventory_effect=[
+            {
+                "scope": "warehouse",
+                "before_quantity": 0,
+                "after_quantity": 50,
+                "delta": 50,
+            },
+            {
+                "scope": "warehouse_unplaced",
+                "row_id": str(unplaced.id),
+                "before_quantity": 0,
+                "after_quantity": 50,
+                "delta": 50,
+            },
+        ],
     )
     db_session.add(log)
     db_session.commit()
@@ -600,8 +682,7 @@ def test_cancel_defective_disassemble_with_scrap_child_restores_batch(
         ],
         reason_category="rework cancel regression",
         reason_memo="split child",
-        actor=actor.name,
-        actor_employee_id=actor.employee_id,
+        actor=actor,
     )
     db_session.commit()
 
@@ -752,8 +833,7 @@ def test_cancel_defective_disassemble_normalizes_single_effect_object(
         ],
         reason_category="rework object regression",
         reason_memo="single effect object",
-        actor=actor.name,
-        actor_employee_id=actor.employee_id,
+        actor=actor,
     )
     db_session.commit()
 
@@ -842,7 +922,7 @@ def test_cancel_rejects_empty_effect_when_rework_scrap_signature_is_not_exact(
     assert refreshed_log.cancelled is False
 
 
-def test_cancel_batch_prelocks_sorted_unique_inventories_before_reversal(
+def test_cancel_batch_prelocks_sorted_unique_physical_ledgers_before_reversal(
     db_session, make_item, monkeypatch
 ):
     first = make_item(name="cancel-lock-first", warehouse_qty=Decimal("1"))
@@ -867,9 +947,9 @@ def test_cancel_batch_prelocks_sorted_unique_inventories_before_reversal(
     events = []
 
     monkeypatch.setattr(
-        transaction_actions.inventory_svc,
-        "lock_inventories",
-        lambda _db, item_ids: events.append(("lock", item_ids)) or {},
+        transaction_actions.warehouse_map_svc,
+        "lock_warehouse_map_rows",
+        lambda _db, **kwargs: events.append(("lock", kwargs)),
     )
     monkeypatch.setattr(
         transaction_actions,
@@ -885,7 +965,14 @@ def test_cancel_batch_prelocks_sorted_unique_inventories_before_reversal(
         request=None,
     )
 
-    assert events[0] == ("lock", sorted({first.item_id, second.item_id}))
+    assert events[0] == (
+        "lock",
+        {
+            "item_ids": sorted({first.item_id, second.item_id}),
+            "include_boxes_for_item_ids": True,
+            "include_zones_for_item_ids": True,
+        },
+    )
 
 
 def test_cancel_batch_rolls_back_first_reversal_when_second_reversal_fails(
@@ -970,16 +1057,22 @@ def test_cancel_batch_rolls_back_first_reversal_when_second_reversal_fails(
 
 
 def test_effect_helper_roundtrip(db_session, make_item):
-    """효과 캡처(snapshot/diff) → 역재생(apply_effect_reverse) 라운드트립 — 창고↔부서 이동 형태."""
+    """효과 캡처(snapshot/diff) → 역재생(_apply_effect_reverse) 라운드트립 — 창고↔부서 이동 형태."""
     from app.services import inv_effect
 
     item = make_item(name="이동품", warehouse_qty=Decimal("40"))
     db_session.commit()
 
-    before = inv_effect.snapshot_cells(db_session, item.item_id)
+    before = inv_effect._snapshot_cells(db_session, item.item_id)
     # 창고→조립 PRODUCTION 이동을 모사
     inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
     inv.warehouse_qty = Decimal("25")
+    unplaced = (
+        db_session.query(WarehouseUnplacedItem)
+        .filter(WarehouseUnplacedItem.item_id == item.item_id)
+        .one()
+    )
+    unplaced.quantity = 25
     loc = InventoryLocation(
         item_id=item.item_id, department=DepartmentEnum.ASSEMBLY.value,
         status=LocationStatusEnum.PRODUCTION, quantity=Decimal("15"),
@@ -987,13 +1080,13 @@ def test_effect_helper_roundtrip(db_session, make_item):
     db_session.add(loc)
     db_session.flush()
 
-    effect = inv_effect.capture_effect(db_session, item.item_id, before)
+    effect = inv_effect._capture_effect(db_session, item.item_id, before)
     deltas = {(c["scope"], c.get("department"), c.get("status")): c["delta"] for c in effect}
     assert deltas[("warehouse", None, None)] == -15
     assert deltas[("location", DepartmentEnum.ASSEMBLY.value, "PRODUCTION")] == 15
 
     # 역재생 → 원상복구
-    inv_effect.apply_effect_reverse(db_session, item.item_id, effect)
+    inv_effect._apply_effect_reverse(db_session, item.item_id, effect)
     db_session.flush()
     inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
     loc = db_session.query(InventoryLocation).filter(
@@ -1019,7 +1112,7 @@ def test_effect_reverse_blocks_location_pending_invasion(
     db_session.flush()
 
     with pytest.raises(ValueError, match="예약"):
-        inv_effect.apply_effect_reverse(
+        inv_effect._apply_effect_reverse(
             db_session,
             item.item_id,
             [
@@ -1037,12 +1130,13 @@ def test_effect_reverse_blocks_location_pending_invasion(
     assert location.pending_quantity == Decimal("4")
 
 
-def test_effect_reverse_locks_inventory_before_location_for_location_only_effect(
+def test_effect_reverse_locks_physical_ledger_before_location_for_location_only_effect(
     db_session, make_item, make_location, monkeypatch
 ):
     from sqlalchemy.orm import Query
 
     from app.services import inv_effect
+    from app.services import warehouse_map
 
     item = make_item(name="effect-lock-order")
     make_location(
@@ -1052,6 +1146,7 @@ def test_effect_reverse_locks_inventory_before_location_for_location_only_effect
     )
     events = []
     real_with_for_update = Query.with_for_update
+    real_lock_ledger = warehouse_map._lock_warehouse_ledger
 
     def track_with_for_update(query, *args, **kwargs):
         entity = query.column_descriptions[0].get("entity")
@@ -1059,10 +1154,15 @@ def test_effect_reverse_locks_inventory_before_location_for_location_only_effect
             events.append(entity)
         return real_with_for_update(query, *args, **kwargs)
 
-    monkeypatch.setattr(inv_effect, "_is_sqlite", False)
+    def track_ledger_lock(db, item_id):
+        events.append("ledger")
+        return real_lock_ledger(db, item_id)
+
+    monkeypatch.setattr(inv_effect, "_uses_row_locks", lambda _db: True)
+    monkeypatch.setattr(warehouse_map, "_lock_warehouse_ledger", track_ledger_lock)
     monkeypatch.setattr(Query, "with_for_update", track_with_for_update)
 
-    inv_effect.apply_effect_reverse(
+    inv_effect._apply_effect_reverse(
         db_session,
         item.item_id,
         [
@@ -1075,7 +1175,7 @@ def test_effect_reverse_locks_inventory_before_location_for_location_only_effect
         ],
     )
 
-    assert events == [Inventory, InventoryLocation]
+    assert events == ["ledger", InventoryLocation, "ledger"]
 
 
 def test_effect_reverse_location_only_keeps_missing_inventory_error(
@@ -1091,7 +1191,7 @@ def test_effect_reverse_location_only_keeps_missing_inventory_error(
     db_session.flush()
 
     with pytest.raises(ValueError, match="재고 레코드를 찾을 수 없습니다"):
-        inv_effect.apply_effect_reverse(
+        inv_effect._apply_effect_reverse(
             db_session,
             item.item_id,
             [
@@ -1119,7 +1219,7 @@ def test_effect_reverse_allows_location_pending_boundary(
     location.pending_quantity = Decimal("4")
     db_session.flush()
 
-    inv_effect.apply_effect_reverse(
+    inv_effect._apply_effect_reverse(
         db_session,
         item.item_id,
         [
@@ -1150,7 +1250,7 @@ def test_effect_reverse_blocks_warehouse_pending_invasion(db_session, make_item)
     ).one()
 
     with pytest.raises(ValueError, match="예약"):
-        inv_effect.apply_effect_reverse(
+        inv_effect._apply_effect_reverse(
             db_session,
             item.item_id,
             [{"scope": "warehouse", "delta": 2}],
@@ -1271,11 +1371,17 @@ def test_cancel_blocked_when_would_go_negative(client, db_session, make_item):
     inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
     inv.warehouse_qty = Decimal("0")
     inv.quantity = Decimal("0")
+    unplaced = (
+        db_session.query(WarehouseUnplacedItem)
+        .filter(WarehouseUnplacedItem.item_id == item.item_id)
+        .one()
+    )
+    unplaced.quantity = 0
     db_session.commit()
 
     res = _cancel(client, log.log_id, code="NG01")
     assert res.status_code == 422, res.text
-    assert "음수" in res.json()["detail"]["message"]
+    assert "변경" in res.json()["detail"]["message"]
 
     # 재고 불변
     wh, _, _ = _cells(db_session, item.item_id)
@@ -1407,7 +1513,7 @@ def test_cancel_approved_adjustment_uses_batch_requester(
 def test_cancel_non_self_non_approver_forbidden(client, db_session, make_item):
     item = make_item(name="권한품", warehouse_qty=Decimal("100"))
     requester = _make_employee(db_session, code="OWN1", name="요청자")
-    other = _make_employee(db_session, code="OTH1", name="무권한타인")  # 역할 없음
+    _make_employee(db_session, code="OTH1", name="무권한타인")  # 역할 없음
     db_session.commit()
 
     client.post(
@@ -1456,7 +1562,7 @@ def test_cancel_without_employee_id_does_not_trust_same_name(client, db_session,
 def test_cancel_approver_can_cancel_others(client, db_session, make_item):
     item = make_item(name="결재취소품", warehouse_qty=Decimal("100"))
     requester = _make_employee(db_session, code="OWN2", name="요청자2")
-    approver = _make_employee(db_session, code="WH1", name="창고장", warehouse_role="primary")
+    _make_employee(db_session, code="WH1", name="창고장", warehouse_role="primary")
     db_session.commit()
 
     client.post(
@@ -1496,7 +1602,7 @@ def test_cancel_wrong_pin_forbidden(client, db_session, make_item):
 
 def test_cancel_legacy_defect_without_effect_returns_message(client, db_session, make_item):
     item = make_item(name="레거시불량", warehouse_qty=Decimal("100"))
-    approver = _make_employee(db_session, code="WH2", name="창고장2", warehouse_role="primary")
+    _make_employee(db_session, code="WH2", name="창고장2", warehouse_role="primary")
     # 효과 기록 이전 형식의 MARK_DEFECTIVE 로그 직접 삽입 (inventory_effect=None)
     log = TransactionLog(
         item_id=item.item_id,
@@ -1523,7 +1629,7 @@ def test_cancel_legacy_defect_without_effect_returns_message(client, db_session,
 def test_cancel_legacy_mark_defective_with_inferred_quantity_is_blocked(client, db_session, make_item):
     """수량 추론이 가능해 보여도 inventory_effect=None이면 자동 취소하지 않는다."""
     item = make_item(name="레거시불량복구", warehouse_qty=Decimal("70"))
-    approver = _make_employee(db_session, code="WH3", name="창고장3", warehouse_role="primary")
+    _make_employee(db_session, code="WH3", name="창고장3", warehouse_role="primary")
     # 격리된 상태 재현: 부서 DEFECTIVE 위치에 30개
     loc = InventoryLocation(
         item_id=item.item_id,

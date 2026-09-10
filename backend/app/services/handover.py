@@ -11,6 +11,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
+from fastapi import Request
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -25,13 +26,26 @@ from app.models import (
     TransactionLog,
     TransactionTypeEnum,
 )
+from app.repositories import item_repository
 from app.services import inventory as inventory_svc
 from app.services import inv_effect
+from app.services import rate_limit
 from app.services import inventory_operations as operation_svc
-from app.services.pin_auth import verify_pin
 from app.services._tx import transactional
 
 _FROM_DEPARTMENT = "튜브"
+
+
+class HandoverNotFound(Exception):
+    """잠금 시점에 대상 인수인계서가 존재하지 않는다."""
+
+
+class HandoverCommandConflict(Exception):
+    """최신 상태에서 receive 명령을 더 이상 실행할 수 없다."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
 
 
 def can_receive(actor: Employee, to_department: str) -> bool:
@@ -44,6 +58,18 @@ def _gen_code() -> str:
     return f"HO-{now:%Y%m%d-%H%M%S}-{uuid.uuid4().hex[:6]}"
 
 
+def _lock_active_items(
+    db: Session,
+    item_ids: list[uuid.UUID],
+) -> dict[uuid.UUID, Item]:
+    unique_ids = set(item_ids)
+    items = item_repository.lock_active_many(db, unique_ids)
+    missing = sorted(unique_ids - set(items), key=str)
+    if missing:
+        raise ValueError(f"품목을 찾을 수 없습니다: {missing[0]}")
+    return items
+
+
 def create_handover(db: Session, *, author: Employee, payload) -> HandoverDoc:
     """인수인계서 작성 + 제출(status=submitted)."""
     if not payload.lines:
@@ -52,7 +78,7 @@ def create_handover(db: Session, *, author: Employee, payload) -> HandoverDoc:
         raise ValueError("인수 부서는 튜브가 아니어야 합니다.")
 
     item_ids = [ln.item_id for ln in payload.lines]
-    items = {i.item_id: i for i in db.query(Item).filter(Item.item_id.in_(item_ids)).all()}
+    items = _lock_active_items(db, item_ids)
 
     doc = HandoverDoc(
         handover_code=_gen_code(),
@@ -102,13 +128,13 @@ def _apply_doc_fields(doc: HandoverDoc, payload) -> None:
 
 def _replace_lines(db: Session, doc: HandoverDoc, payload_lines) -> None:
     """기존 라인 전부 제거 후 payload 라인으로 재생성 (draft 갱신용)."""
+    item_ids = [ln.item_id for ln in payload_lines]
+    items = _lock_active_items(db, item_ids)
     for ln in list(doc.lines):
         db.delete(ln)
     db.flush()
     if not payload_lines:
         return
-    item_ids = [ln.item_id for ln in payload_lines]
-    items = {i.item_id: i for i in db.query(Item).filter(Item.item_id.in_(item_ids)).all()}
     for ln in payload_lines:
         item = items.get(ln.item_id)
         if item is None:
@@ -181,20 +207,27 @@ def submit_handover(db: Session, doc: HandoverDoc, *, author: Employee) -> Hando
     return doc
 
 
-def _receive_handover(db: Session, doc: HandoverDoc, *, actor: Employee, pin: str) -> HandoverDoc:
+def _receive_handover(
+    db: Session,
+    doc: HandoverDoc,
+    *,
+    actor: Employee,
+    pin: str,
+    http_request: Request | None,
+) -> HandoverDoc:
     """인수 확인 변경을 현재 트랜잭션에 적용한다."""
-    if doc.status == HandoverStatusEnum.RECEIVED:
-        return doc  # 멱등 — 이중 이동 방지
-    if doc.status != HandoverStatusEnum.SUBMITTED:
-        raise ValueError("제출된 인수인계서만 인수할 수 있습니다.")
-    if not verify_pin(actor.pin_hash, pin):
+    if not rate_limit.verify_operator_pin(actor, pin, http_request):
         raise PermissionError("PIN이 올바르지 않습니다.")
     if not can_receive(actor, doc.to_department):
         raise PermissionError("해당 부서의 인수 확인 권한이 없습니다.")
+    if doc.status == HandoverStatusEnum.RECEIVED:
+        raise HandoverCommandConflict("already_received")
+    if doc.status != HandoverStatusEnum.SUBMITTED:
+        raise HandoverCommandConflict("invalid_status")
 
     from_dept = DepartmentEnum(doc.from_department)
     to_dept = DepartmentEnum(doc.to_department)
-    operation = operation_svc.create_business_operation(
+    operation = operation_svc._create_business_operation(
         db,
         domain="handover",
         action="receive",
@@ -207,16 +240,17 @@ def _receive_handover(db: Session, doc: HandoverDoc, *, actor: Employee, pin: st
     )
 
     item_ids = sorted({line.item_id for line in doc.lines})
-    inventory_svc.ensure_and_lock_inventories(db, item_ids)
+    _lock_active_items(db, item_ids)
+    inventory_svc._ensure_and_lock_inventories(db, item_ids)
     for line in doc.lines:
         qty = Decimal(line.quantity)
-        inv = inventory_svc.get_or_create_inventory(db, line.item_id)
+        inv = inventory_svc._get_or_create_inventory(db, line.item_id)
         qty_before = inv.quantity or Decimal("0")
-        cells_before = inv_effect.snapshot_cells(db, line.item_id)
+        cells_before = inv_effect._snapshot_cells(db, line.item_id)
         # 튜브 PRODUCTION 부족 시 ValueError → 라우터가 422 변환(상태 불변).
-        inventory_svc.transfer_between_departments(db, line.item_id, qty, from_dept, to_dept)
+        inventory_svc._transfer_between_departments(db, line.item_id, qty, from_dept, to_dept)
         db.add(
-            operation_svc.attach_transaction(TransactionLog(
+            operation_svc._attach_transaction(TransactionLog(
                 item_id=line.item_id,
                 transaction_type=TransactionTypeEnum.TRANSFER_DEPT,
                 quantity_change=Decimal("0"),
@@ -228,7 +262,7 @@ def _receive_handover(db: Session, doc: HandoverDoc, *, actor: Employee, pin: st
                 department=doc.to_department,
                 reference_no=doc.handover_code,
                 notes=f"인수인계 {doc.from_department}→{doc.to_department}",
-                **inv_effect.capture_log_stock_snapshot(db, line.item_id, cells_before),
+                **inv_effect._capture_log_stock_snapshot(db, line.item_id, cells_before),
             ), operation, InventoryOperationRoleEnum.TRANSFER)
         )
 
@@ -236,7 +270,7 @@ def _receive_handover(db: Session, doc: HandoverDoc, *, actor: Employee, pin: st
     doc.received_by_employee_id = actor.employee_id
     doc.received_by_name = actor.name
     doc.received_at = datetime.utcnow()
-    operation_svc.record_effect(
+    operation_svc._record_effect(
         db,
         operation=operation,
         effect_kind=InventoryOperationEffectKindEnum.WORKFLOW,
@@ -250,7 +284,28 @@ def _receive_handover(db: Session, doc: HandoverDoc, *, actor: Employee, pin: st
     return doc
 
 
-def receive_handover(db: Session, doc: HandoverDoc, *, actor: Employee, pin: str) -> HandoverDoc:
-    """PIN 검증, 재고 이동, 원장과 인수 상태를 원자적으로 확정한다."""
+def receive_handover(
+    db: Session,
+    handover_id: uuid.UUID,
+    *,
+    actor: Employee,
+    pin: str,
+    http_request: Request | None = None,
+) -> HandoverDoc:
+    """문서 선점 뒤 PIN·상태·재고 이동·원장을 원자적으로 확정한다."""
     with transactional(db):
-        return _receive_handover(db, doc, actor=actor, pin=pin)
+        query = db.query(HandoverDoc).filter(
+            HandoverDoc.handover_id == handover_id
+        )
+        if db.get_bind().dialect.name != "sqlite":
+            query = query.with_for_update()
+        doc = query.one_or_none()
+        if doc is None:
+            raise HandoverNotFound
+        return _receive_handover(
+            db,
+            doc,
+            actor=actor,
+            pin=pin,
+            http_request=http_request,
+        )

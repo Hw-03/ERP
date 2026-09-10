@@ -1,0 +1,39 @@
+.root {
+  @apply fixed inset-0 z-50 flex items-center justify-center;
+  background: var(--c-bg);
+}
+
+.logo {
+  @apply pointer-events-none absolute;
+  transition: transform 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center center;
+}
+
+.logoImage {
+  width: 840px;
+  max-width: none;
+  height: auto;
+  user-select: none;
+}
+
+.pattern {
+  @apply pointer-events-none absolute inset-0;
+  background-image: radial-gradient(circle, var(--c-border) 1px, transparent 1px);
+  background-size: 28px 28px;
+  opacity: 0.5;
+}
+
+.mascot {
+  left: calc(50% + clamp(200px, 13vw, 260px));
+  bottom: clamp(120px, 25vh, 228px);
+  width: clamp(260px, min(18vw, 40vh), 380px);
+  animation: mes-card-rise 0.7s 0.08s ease both;
+  filter: drop-shadow(0 20px 28px color-mix(in srgb, var(--c-text) 12%, transparent));
+}
+
+.card {
+  @apply w-full;
+  align-self: flex-start;
+  margin-top: calc(50vh - 280px);
+  animation: mes-card-rise 0.6s ease both;
+}

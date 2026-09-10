@@ -29,7 +29,7 @@ function makeLine(
 
 describe("StockRequestLineTable", () => {
   it("혼합 부서 수동 조정은 첫 부서 대신 여러 부서와 라인별 입출고를 표시", () => {
-    const lines = [
+    const lines: StockRequestLine[] = [
       { ...makeLine(1, "none", "production"), to_department: "튜브" },
       { ...makeLine(2, "production", "none"), from_department: "고압" },
     ];

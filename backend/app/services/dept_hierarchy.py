@@ -29,9 +29,9 @@ def is_production_line(dept_name: str | None) -> bool:
 def can_approve_department(actor, target_dept: str | None) -> bool:
     """결재자가 `target_dept` 부서 요청을 결재할 수 있는지.
 
-    룰 (2026-05-27 그릴 합의):
+    룰:
       1. 부서 정/부 (`department_role`): "창고" 외 모든 부서 결재 가능
-      2. 창고 정/부 (`warehouse_role`): 모든 부서 결재 (창고 포함)
+      2. 창고 정/부 역할은 부서 결재 권한을 부여하지 않음
       3. `level=admin`만으로는 결재 권한이 생기지 않음
 
     한 명이 위 권한 중 하나라도 있으면 True.
@@ -40,11 +40,7 @@ def can_approve_department(actor, target_dept: str | None) -> bool:
         return False
 
     dept_role = (getattr(actor, "department_role", None) or "none").lower()
-    wh_role = (getattr(actor, "warehouse_role", None) or "none").lower()
-
     if dept_role in ("primary", "deputy") and target_dept != _WAREHOUSE_DEPT_NAME:
-        return True
-    if wh_role in ("primary", "deputy"):
         return True
     return False
 
@@ -59,9 +55,8 @@ def approvable_departments(actor) -> Iterable[str] | None:
     부서 정/부도 새 룰에선 모든 비-창고 부서를 결재하므로 None 반환.
     `requester_department`에 "창고"가 들어올 일은 없어(직원 소속 부서 기반) 별도 제외 불필요.
     """
-    wh_role = (getattr(actor, "warehouse_role", None) or "none").lower()
     dept_role = (getattr(actor, "department_role", None) or "none").lower()
 
-    if wh_role in ("primary", "deputy") or dept_role in ("primary", "deputy"):
+    if dept_role in ("primary", "deputy"):
         return None
     return frozenset()

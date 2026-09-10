@@ -6,7 +6,6 @@ inv_base.py 에만 의존. 역방향 import 없음.
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Optional
 
 import uuid
 
@@ -18,6 +17,7 @@ from app.models import (
     InventoryLocation,
     LocationStatusEnum,
 )
+from app.services import stock_math
 
 
 def production_total(db: Session, item_id: uuid.UUID) -> Decimal:
@@ -46,26 +46,10 @@ def defective_total(db: Session, item_id: uuid.UUID) -> Decimal:
     return Decimal(str(val or 0))
 
 
-def available(inv: Inventory, *, db: Optional[Session] = None) -> Decimal:
-    """Available = (warehouse_qty - warehouse pending) + (production - location pending). 불량 제외.
+def available(inv: Inventory, *, db: Session) -> Decimal:
+    """공식 StockFigures 수식으로 정상 재고 가용량을 반환한다."""
 
-    db가 주어지면 production_total을 실시간 계산. 없으면 warehouse만 (예약 검사용 안전 기준).
-    """
-    pending = inv.pending_quantity or Decimal("0")
-    wh = inv.warehouse_qty or Decimal("0")
-    prod = production_total(db, inv.item_id) if db is not None else Decimal("0")
-    prod_pending = Decimal("0")
-    if db is not None:
-        value = (
-            db.query(func.coalesce(func.sum(InventoryLocation.pending_quantity), 0))
-            .filter(
-                InventoryLocation.item_id == inv.item_id,
-                InventoryLocation.status == LocationStatusEnum.PRODUCTION,
-            )
-            .scalar()
-        )
-        prod_pending = Decimal(str(value or 0))
-    return wh - pending + prod - prod_pending
+    return stock_math.compute_for(db, inv.item_id).available
 
 
 def _sync_total(db: Session, inv: Inventory) -> None:

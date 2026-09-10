@@ -7,9 +7,10 @@
 
 Inventory.quantity = warehouse_qty + Σ InventoryLocation.quantity (불변식).
 가용 재고 available = (warehouse_qty − Inventory.pending_quantity)
-                   + Σ(PRODUCTION.quantity − PRODUCTION.pending_quantity). 불량 제외.
+                   + Σ(PRODUCTION.quantity − PRODUCTION.pending_quantity)
+                   − 활성 출하 배정. 불량 제외.
 Inventory.pending_quantity는 창고 예약만, InventoryLocation.pending_quantity는
-생산/불량 부서 위치 예약만 나타낸다.
+생산/불량 부서 위치 요청 예약만 나타낸다. 출하 예약은 ShippingAllocation이 나타낸다.
 
 내부 구현은 하위 모듈로 분리됨:
   inv_base.py      — 기반 헬퍼 + 부서 매핑
@@ -26,7 +27,7 @@ from decimal import Decimal
 from typing import Iterable, Optional
 import uuid
 
-from sqlalchemy import update as sa_update
+from sqlalchemy import select, update as sa_update
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
@@ -37,7 +38,9 @@ from app.models import (
     Employee,
     Inventory,
     InventoryLocation,
+    Item,
     LocationStatusEnum,
+    WarehouseUnplacedItem,
 )
 
 # ---------------------------------------------------------------------------
@@ -46,7 +49,7 @@ from app.models import (
 from app.services.inv_base import (  # noqa: F401
     PROCESS_TYPE_TO_DEPT,
     dept_for_process_type,
-    get_or_create_inventory,
+    _get_or_create_inventory,
     _lock_inventory,
     _lock_location,
     _get_or_create_location,
@@ -59,33 +62,51 @@ from app.services.inv_calc import (  # noqa: F401
     _sync_total,
 )
 from app.services.inv_transfer import (  # noqa: F401
-    receive_confirmed,
-    transfer_to_production,
-    transfer_to_warehouse,
-    transfer_between_departments,
-    consume_warehouse,
-    consume_from_department,
+    _receive_confirmed,
+    _transfer_to_production,
+    _transfer_to_warehouse,
+    _transfer_between_departments,
+    _consume_warehouse,
+    _consume_from_department,
     department_for_item,
     item_department_stock,
     format_item_location_shortage,
-    consume_from_item_department,
-    receive_to_item_department,
+    _consume_from_item_department,
+    _receive_to_item_department,
 )
 from app.services.inv_defective import (  # noqa: F401
     DefectSource,
     NormalSource,
     ReasonContext,
-    mark_defective,
-    unmark_defective,
-    receive_defective,
-    scrap_defective,
-    scrap_normal,
-    return_to_supplier,
-    return_to_supplier_from_normal,
+    _mark_defective,
+    _unmark_defective,
+    _receive_defective,
+    _scrap_defective,
+    _scrap_normal,
+    _return_to_supplier,
+    _return_to_supplier_from_normal,
 )
+from app.services import stock_availability
 
 
-def ensure_and_lock_inventories(
+def _lock_required_unplaced(
+    db: Session,
+    item_ids: list[uuid.UUID],
+) -> None:
+    """Lock every required U row and reject a structurally incomplete ledger."""
+    query = (
+        db.query(WarehouseUnplacedItem)
+        .filter(WarehouseUnplacedItem.item_id.in_(item_ids))
+        .order_by(WarehouseUnplacedItem.item_id.asc())
+    )
+    if db.get_bind().dialect.name == "postgresql":
+        query = query.with_for_update()
+    unplaced_ids = {row.item_id for row in query.all()}
+    if unplaced_ids != set(item_ids):
+        raise ValueError("물리 위치 원장 불일치 — 미배치(U) 행이 없습니다.")
+
+
+def _ensure_and_lock_inventories(
     db: Session,
     item_ids: Iterable[uuid.UUID],
 ) -> dict[uuid.UUID, Inventory]:
@@ -95,9 +116,20 @@ def ensure_and_lock_inventories(
     same deterministic order and repeat the bulk lock once.
     """
     ordered_item_ids = sorted(set(item_ids))
+    if not ordered_item_ids:
+        return {}
+    dialect_name = db.get_bind().dialect.name
+    if dialect_name == "postgresql":
+        db.execute(
+            select(Item)
+            .where(Item.item_id.in_(ordered_item_ids))
+            .order_by(Item.item_id.asc())
+            .with_for_update(of=Item.__table__)
+        ).scalars().all()
     locked = lock_inventories(db, ordered_item_ids)
     missing_item_ids = [item_id for item_id in ordered_item_ids if item_id not in locked]
     if not missing_item_ids:
+        _lock_required_unplaced(db, ordered_item_ids)
         return locked
 
     values = [
@@ -109,7 +141,6 @@ def ensure_and_lock_inventories(
         }
         for item_id in missing_item_ids
     ]
-    dialect_name = db.get_bind().dialect.name
     if dialect_name == "postgresql":
         statement = postgresql_insert(Inventory).values(values)
     elif dialect_name == "sqlite":
@@ -119,8 +150,31 @@ def ensure_and_lock_inventories(
     db.execute(
         statement.on_conflict_do_nothing(index_elements=[Inventory.item_id])
     )
+    unplaced_values = [
+        {
+            "id": uuid.uuid4(),
+            "item_id": item_id,
+            "quantity": 0,
+        }
+        for item_id in missing_item_ids
+    ]
+    if dialect_name == "postgresql":
+        unplaced_statement = postgresql_insert(WarehouseUnplacedItem).values(
+            unplaced_values
+        )
+    else:
+        unplaced_statement = sqlite_insert(WarehouseUnplacedItem).values(
+            unplaced_values
+        )
+    db.execute(
+        unplaced_statement.on_conflict_do_nothing(
+            index_elements=[WarehouseUnplacedItem.item_id]
+        )
+    )
     db.flush()
-    return lock_inventories(db, ordered_item_ids)
+    locked = lock_inventories(db, ordered_item_ids)
+    _lock_required_unplaced(db, ordered_item_ids)
+    return locked
 
 
 # ---------------------------------------------------------------------------
@@ -133,18 +187,33 @@ def reserve(
     item_id: uuid.UUID,
     qty: Decimal,
     *,
-    employee: Optional[Employee] = None,
-    employee_name: Optional[str] = None,
+    employee: Employee,
 ) -> Inventory:
     """warehouse_qty 가용분에서 예약(Pending). 부족 시 ValueError.
 
     원자적 조건부 UPDATE를 사용 — SQLite/PostgreSQL 모두 check-then-act 경쟁 없음.
     """
+    if not isinstance(employee, Employee):
+        raise TypeError("employee must be an Employee")
     if qty <= 0:
         raise ValueError("예약 수량은 0보다 커야 합니다.")
 
-    get_or_create_inventory(db, item_id)
-    db.flush()
+    _ensure_and_lock_inventories(db, [item_id])
+    from app.services import warehouse_map as warehouse_map_svc
+
+    warehouse_map_svc._load_warehouse_ledger_rows(db, item_id)
+    figure = stock_availability.figure_for_cell(
+        db,
+        stock_availability.AvailabilityCell.warehouse(item_id),
+        lock_allocations=True,
+    )
+    if figure.available < qty:
+        raise ValueError(
+            "창고 가용 재고 부족 "
+            f"(물리 {figure.physical}, 요청예약 {figure.stock_request_pending}, "
+            f"출하예약 {figure.active_shipping_reserved}, "
+            f"가용 {figure.available}, 요청 {qty})."
+        )
 
     result = db.execute(
         sa_update(Inventory)
@@ -169,16 +238,12 @@ def reserve(
     db.expire_all()
     inv = inventory_repository.get(db, item_id)
 
-    if employee is not None:
-        inv.last_reserver_employee_id = employee.employee_id
-        inv.last_reserver_name = employee.name
-    elif employee_name:
-        inv.last_reserver_employee_id = None
-        inv.last_reserver_name = employee_name
+    inv.last_reserver_employee_id = employee.employee_id
+    inv.last_reserver_name = employee.name
     return inv
 
 
-def release(db: Session, item_id: uuid.UUID, qty: Decimal) -> Inventory:
+def _release(db: Session, item_id: uuid.UUID, qty: Decimal) -> Inventory:
     """예약 해제 (Pending 차감)."""
     if qty <= 0:
         raise ValueError("해제 수량은 0보다 커야 합니다.")
@@ -192,7 +257,7 @@ def release(db: Session, item_id: uuid.UUID, qty: Decimal) -> Inventory:
     return inv
 
 
-def reserve_location(
+def _reserve_location(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,
@@ -204,7 +269,20 @@ def reserve_location(
     if qty <= 0:
         raise ValueError("예약 수량은 0보다 커야 합니다.")
 
-    _lock_inventory(db, item_id)
+    _ensure_and_lock_inventories(db, [item_id])
+    _lock_location(db, item_id, department, status)
+    figure = stock_availability.figure_for_cell(
+        db,
+        stock_availability.AvailabilityCell.location(item_id, department, status),
+        lock_allocations=True,
+    )
+    if figure.available < qty:
+        raise ValueError(
+            "부서 가용 재고 부족 "
+            f"(물리 {figure.physical}, 요청예약 {figure.stock_request_pending}, "
+            f"출하예약 {figure.active_shipping_reserved}, "
+            f"가용 {figure.available}, 요청 {qty})."
+        )
     result = db.execute(
         sa_update(InventoryLocation)
         .where(
@@ -247,7 +325,7 @@ def reserve_location(
     )
 
 
-def release_location(
+def _release_location(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,
@@ -299,20 +377,20 @@ def release_location(
     )
 
 
-def consume_pending(db: Session, item_id: uuid.UUID, qty: Decimal) -> Inventory:
+def _consume_pending(db: Session, item_id: uuid.UUID, qty: Decimal) -> Inventory:
     """배치 confirm (OUT): warehouse_qty와 pending_quantity 동시 차감."""
     if qty <= 0:
         raise ValueError("차감 수량은 0보다 커야 합니다.")
 
-    inv = _lock_inventory(db, item_id)
-    pending = inv.pending_quantity or Decimal("0")
-    wh = inv.warehouse_qty or Decimal("0")
-    if pending < qty:
-        raise ValueError(f"예약 수량이 부족합니다 (Pending {pending}, 차감 요청 {qty}).")
-    if wh < qty:
-        raise ValueError(f"창고 재고가 부족합니다 (Warehouse {wh}, 차감 요청 {qty}).")
-    inv.pending_quantity = pending - qty
-    inv.warehouse_qty = wh - qty
+    from app.services.warehouse_map import _apply_warehouse_ledger_delta
+
+    _lock_inventory(db, item_id)
+    inv = _apply_warehouse_ledger_delta(
+        db,
+        item_id,
+        -qty,
+        consume_mode="reserved",
+    )
     _sync_total(db, inv)
     return inv
 
@@ -320,7 +398,7 @@ def consume_pending(db: Session, item_id: uuid.UUID, qty: Decimal) -> Inventory:
 # ---------------------------------------------------------------------------
 # 창고 전용 헬퍼 (라우터가 warehouse_qty 를 직접 건드리지 않도록)
 # ---------------------------------------------------------------------------
-def adjust_warehouse(
+def _adjust_warehouse(
     db: Session,
     item_id: uuid.UUID,
     new_warehouse_qty: Decimal,
@@ -341,11 +419,18 @@ def adjust_warehouse(
             attempted=str(new_warehouse_qty),
         )
         raise ValueError("창고 수량은 음수일 수 없습니다.")
+    from app.services.warehouse_map import _apply_warehouse_ledger_delta
+
     inv = _lock_inventory(db, item_id)
     qty_before = inv.quantity or Decimal("0")
     wh_before = inv.warehouse_qty or Decimal("0")
     delta = new_warehouse_qty - wh_before
-    inv.warehouse_qty = new_warehouse_qty
+    inv = _apply_warehouse_ledger_delta(
+        db,
+        item_id,
+        delta,
+        consume_mode="absolute",
+    )
     if location is not None:
         inv.location = location
     _sync_total(db, inv)

@@ -63,7 +63,7 @@ def test_quarantine_rolls_back_inventory_when_ledger_capture_fails(
     def fail_capture(*_args, **_kwargs):
         raise RuntimeError("ledger failure")
 
-    monkeypatch.setattr(svc.inv_effect, "capture_effect", fail_capture)
+    monkeypatch.setattr(svc.inv_effect, "_capture_effect", fail_capture)
 
     with pytest.raises(RuntimeError, match="ledger failure"):
         svc.quarantine_inventory(
@@ -91,7 +91,7 @@ def test_unquarantine_rolls_back_inventory_when_ledger_capture_fails(
 ) -> None:
     item = make_item(warehouse_qty=Decimal("5"))
     actor = _actor(db_session)
-    inventory_svc.mark_defective(
+    inventory_svc._mark_defective(
         db_session,
         item.item_id,
         Decimal("2"),
@@ -105,7 +105,7 @@ def test_unquarantine_rolls_back_inventory_when_ledger_capture_fails(
     def fail_capture(*_args, **_kwargs):
         raise RuntimeError("ledger failure")
 
-    monkeypatch.setattr(svc.inv_effect, "capture_effect", fail_capture)
+    monkeypatch.setattr(svc.inv_effect, "_capture_effect", fail_capture)
 
     with pytest.raises(RuntimeError, match="ledger failure"):
         svc.unquarantine_inventory(
@@ -209,7 +209,7 @@ def test_bulk_unquarantine_rolls_back_every_record_when_second_restore_fails(
         .order_by(DefectQuarantineRecord.quarantined_at, DefectQuarantineRecord.record_id)
         .all()
     )
-    original_capture = svc.inv_effect.capture_effect
+    original_capture = svc.inv_effect._capture_effect
     capture_calls = 0
 
     def fail_second_restore(*args, **kwargs):
@@ -219,7 +219,7 @@ def test_bulk_unquarantine_rolls_back_every_record_when_second_restore_fails(
             raise RuntimeError("second restore ledger failure")
         return original_capture(*args, **kwargs)
 
-    monkeypatch.setattr(svc.inv_effect, "capture_effect", fail_second_restore)
+    monkeypatch.setattr(svc.inv_effect, "_capture_effect", fail_second_restore)
 
     with pytest.raises(RuntimeError, match="second restore ledger failure"):
         svc.unquarantine_inventory_bulk(

@@ -22,7 +22,7 @@ interface Props {
 
 export function MyRequestsPanel({ employeeId, refreshNonce, onChanged, targetRequestId }: Props) {
   const { data: items = [], isLoading: loading, error: qError, refetch } =
-    useMyStockRequestsQuery(employeeId ?? "");
+    useMyStockRequestsQuery(employeeId ?? "", targetRequestId);
   const cancelMutation = useCancelStockRequestMutation();
   const revertMutation = useRevertToDraftMutation();
   const loadError = qError

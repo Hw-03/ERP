@@ -14,12 +14,20 @@ from app.models import (
     EmployeeLevelEnum,
     Inventory,
     InventoryOperation,
+    InventoryOperationEffect,
+    InventoryOperationEffectKindEnum,
+    InventoryOperationKindEnum,
     InventoryOperationRoleEnum,
-    Item,
     SystemSetting,
     TransactionEditLog,
     TransactionLog,
     TransactionTypeEnum,
+    WarehouseAngle,
+    WarehouseBox,
+    WarehouseBoxItem,
+    WarehouseSpecialZone,
+    WarehouseSpecialZoneItem,
+    WarehouseUnplacedItem,
 )
 from app.routers.inventory import transactions as transactions_router
 from app.services import inventory_operation_cancellation as cancellation_svc
@@ -39,7 +47,15 @@ def editor(db_session):
         is_active="true",
         pin_hash=DEFAULT_PIN_HASH,
     )
-    db_session.add(emp)
+    db_session.add_all(
+        (
+            emp,
+            SystemSetting(
+                setting_key="inventory_operation_cutover_at",
+                setting_value="2026-01-01T00:00:00",
+            ),
+        )
+    )
     db_session.commit()
     return emp
 
@@ -54,9 +70,10 @@ def receive_log(db_session, make_item):
         quantity_change=Decimal("100"),
         quantity_before=Decimal("0"),
         quantity_after=Decimal("100"),
-        reference_no="REF-001",
+        reference_no=None,
         produced_by="원작성자(조립)",
         notes="원본 메모",
+        inventory_effect=[{"scope": "warehouse", "delta": 100}],
     )
     db_session.add(log)
     db_session.commit()
@@ -73,9 +90,10 @@ def ship_log(db_session, make_item):
         quantity_change=Decimal("-30"),
         quantity_before=Decimal("100"),
         quantity_after=Decimal("70"),
-        reference_no="SHP-001",
+        reference_no=None,
         produced_by="출고자(영업)",
         notes=None,
+        inventory_effect=[{"scope": "warehouse", "delta": -30}],
     )
     db_session.add(log)
     db_session.commit()
@@ -252,6 +270,7 @@ def test_quantity_correct_rolls_back_inventory_when_audit_fails(
         == 0
     )
     assert db_session.query(TransactionEditLog).count() == 0
+    assert db_session.query(InventoryOperation).count() == 0
 
 
 def test_quantity_correct_adjust_log_records_effect_and_editor_id(client, db_session, receive_log, editor):
@@ -296,6 +315,573 @@ def test_quantity_correct_adjust_log_records_effect_and_editor_id(client, db_ses
     assert inv.warehouse_qty == Decimal("100")
 
 
+def test_v2_quantity_correction_rejects_recreated_inventory_row(
+    client,
+    db_session,
+    make_item,
+    editor,
+) -> None:
+    item = make_item(name="v2 correction identity", warehouse_qty=Decimal("100"))
+    original_inventory = item.inventory
+    unplaced = db_session.query(WarehouseUnplacedItem).filter_by(
+        item_id=item.item_id
+    ).one()
+    operation = InventoryOperation(
+        kind=InventoryOperationKindEnum.BUSINESS,
+        domain="inventory_io",
+        action="receive",
+        display_label="v2 identity receive",
+        actor_name=editor.name,
+        actor_employee_id=editor.employee_id,
+        contract_version=2,
+    )
+    db_session.add(operation)
+    db_session.flush()
+    log = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.RECEIVE,
+        quantity_change=Decimal("100"),
+        quantity_before=Decimal("0"),
+        quantity_after=Decimal("100"),
+        warehouse_qty_before=Decimal("0"),
+        warehouse_qty_after=Decimal("100"),
+        department_qty_before=Decimal("0"),
+        department_qty_after=Decimal("0"),
+        produced_by=editor.name,
+        producer_employee_id=editor.employee_id,
+        inventory_effect=[
+            {
+                "scope": "warehouse",
+                "row_id": str(original_inventory.inventory_id),
+                "before_quantity": 0,
+                "after_quantity": 100,
+                "delta": 100,
+            },
+            {
+                "scope": "warehouse_unplaced",
+                "row_id": str(unplaced.id),
+                "before_quantity": 0,
+                "after_quantity": 100,
+                "delta": 100,
+            },
+        ],
+        operation_id=operation.operation_id,
+        operation_role=InventoryOperationRoleEnum.PRIMARY,
+    )
+    db_session.add(log)
+    db_session.commit()
+
+    db_session.delete(original_inventory)
+    db_session.flush()
+    replacement = Inventory(
+        item_id=item.item_id,
+        quantity=Decimal("100"),
+        warehouse_qty=Decimal("100"),
+        pending_quantity=Decimal("0"),
+    )
+    db_session.add(replacement)
+    db_session.commit()
+
+    response = client.post(
+        f"/api/inventory/transactions/{log.log_id}/quantity-correction",
+        json={
+            "quantity_change": 80,
+            "reason": "replacement row correction attempt",
+            "edited_by_employee_id": str(editor.employee_id),
+            "edited_by_pin": "0000",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["extra"] == {
+        "reason": "inventory_effect_mismatch"
+    }
+    db_session.refresh(replacement)
+    assert replacement.warehouse_qty == Decimal("100")
+    assert db_session.query(TransactionEditLog).count() == 0
+
+
+def _create_box_row(db_session, item_id, quantity: int) -> WarehouseBoxItem:
+    angle = WarehouseAngle(label=f"correction-{uuid.uuid4().hex[:8]}")
+    db_session.add(angle)
+    db_session.flush()
+    box = WarehouseBox(
+        angle_id=angle.id,
+        row_no=1,
+        layer_no=1,
+        jari_index=0,
+        size="SMALL",
+        stack_order=0,
+    )
+    db_session.add(box)
+    db_session.flush()
+    row = WarehouseBoxItem(
+        box_id=box.box_id,
+        item_id=item_id,
+        quantity=quantity,
+    )
+    db_session.add(row)
+    db_session.flush()
+    return row
+
+
+def test_v2_quantity_correction_rejects_placement_after_source_effect(
+    client,
+    db_session,
+    make_item,
+    editor,
+) -> None:
+    item = make_item(name="v2 correction placement drift", warehouse_qty=Decimal("100"))
+    inventory = item.inventory
+    unplaced = db_session.query(WarehouseUnplacedItem).filter_by(
+        item_id=item.item_id
+    ).one()
+    operation = InventoryOperation(
+        kind=InventoryOperationKindEnum.BUSINESS,
+        domain="inventory_io",
+        action="receive",
+        display_label="v2 placement drift receive",
+        actor_name=editor.name,
+        actor_employee_id=editor.employee_id,
+        contract_version=2,
+    )
+    db_session.add(operation)
+    db_session.flush()
+    log = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.RECEIVE,
+        quantity_change=Decimal("100"),
+        quantity_before=Decimal("0"),
+        quantity_after=Decimal("100"),
+        warehouse_qty_before=Decimal("0"),
+        warehouse_qty_after=Decimal("100"),
+        department_qty_before=Decimal("0"),
+        department_qty_after=Decimal("0"),
+        produced_by=editor.name,
+        producer_employee_id=editor.employee_id,
+        inventory_effect=[
+            {
+                "scope": "warehouse",
+                "row_id": str(inventory.inventory_id),
+                "before_quantity": 0,
+                "after_quantity": 100,
+                "delta": 100,
+            },
+            {
+                "scope": "warehouse_unplaced",
+                "row_id": str(unplaced.id),
+                "before_quantity": 0,
+                "after_quantity": 100,
+                "delta": 100,
+            },
+        ],
+        operation_id=operation.operation_id,
+        operation_role=InventoryOperationRoleEnum.PRIMARY,
+    )
+    db_session.add(log)
+    box_row = _create_box_row(db_session, item.item_id, 20)
+    unplaced.quantity = 80
+    db_session.commit()
+
+    response = client.post(
+        f"/api/inventory/transactions/{log.log_id}/quantity-correction",
+        json={
+            "quantity_change": 80,
+            "reason": "placement 뒤 정정 차단",
+            "edited_by_employee_id": str(editor.employee_id),
+            "edited_by_pin": "0000",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["extra"] == {
+        "reason": "inventory_effect_mismatch"
+    }
+    db_session.expire_all()
+    assert item.inventory.warehouse_qty == Decimal("100")
+    assert db_session.get(WarehouseBoxItem, box_row.id).quantity == 20
+    assert db_session.get(WarehouseUnplacedItem, unplaced.id).quantity == 80
+    assert db_session.query(TransactionEditLog).count() == 0
+
+
+def test_v2_ship_quantity_correction_restores_exact_box_row(
+    client,
+    db_session,
+    make_item,
+    editor,
+) -> None:
+    item = make_item(name="v2 exact box correction", warehouse_qty=Decimal("70"))
+    inventory = item.inventory
+    unplaced = db_session.query(WarehouseUnplacedItem).filter_by(
+        item_id=item.item_id
+    ).one()
+    box_row = _create_box_row(db_session, item.item_id, 10)
+    unplaced.quantity = 60
+    operation = InventoryOperation(
+        kind=InventoryOperationKindEnum.BUSINESS,
+        domain="inventory_io",
+        action="ship",
+        display_label="v2 exact box ship",
+        actor_name=editor.name,
+        actor_employee_id=editor.employee_id,
+        contract_version=2,
+    )
+    db_session.add(operation)
+    db_session.flush()
+    log = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.SHIP,
+        quantity_change=Decimal("-30"),
+        quantity_before=Decimal("100"),
+        quantity_after=Decimal("70"),
+        warehouse_qty_before=Decimal("100"),
+        warehouse_qty_after=Decimal("70"),
+        department_qty_before=Decimal("0"),
+        department_qty_after=Decimal("0"),
+        produced_by=editor.name,
+        producer_employee_id=editor.employee_id,
+        inventory_effect=[
+            {
+                "scope": "warehouse",
+                "row_id": str(inventory.inventory_id),
+                "before_quantity": 100,
+                "after_quantity": 70,
+                "delta": -30,
+            },
+            {
+                "scope": "warehouse_box",
+                "row_id": str(box_row.id),
+                "box_id": str(box_row.box_id),
+                "before_quantity": 40,
+                "after_quantity": 10,
+                "delta": -30,
+            },
+        ],
+        operation_id=operation.operation_id,
+        operation_role=InventoryOperationRoleEnum.PRIMARY,
+    )
+    db_session.add(log)
+    db_session.commit()
+
+    response = client.post(
+        f"/api/inventory/transactions/{log.log_id}/quantity-correction",
+        json={
+            "quantity_change": -20,
+            "reason": "원래 박스 행만 복원",
+            "edited_by_employee_id": str(editor.employee_id),
+            "edited_by_pin": "0000",
+        },
+    )
+
+    assert response.status_code == 200, response.json()
+    db_session.expire_all()
+    assert item.inventory.warehouse_qty == Decimal("80")
+    assert db_session.get(WarehouseBoxItem, box_row.id).quantity == 20
+    assert db_session.get(WarehouseUnplacedItem, unplaced.id).quantity == 60
+    correction = db_session.get(
+        TransactionLog,
+        uuid.UUID(response.json()["correction"]["log_id"]),
+    )
+    physical = [
+        cell
+        for cell in correction.inventory_effect
+        if cell["scope"] != "warehouse"
+    ]
+    assert physical == [
+        {
+            "scope": "warehouse_box",
+            "row_id": str(box_row.id),
+            "box_id": str(box_row.box_id),
+            "before_quantity": 10,
+            "after_quantity": 20,
+            "delta": 10,
+        }
+    ]
+
+
+def test_v2_ship_quantity_correction_rejects_multi_row_source_effect(
+    client,
+    db_session,
+    make_item,
+    editor,
+) -> None:
+    item = make_item(name="v2 multi-row correction", warehouse_qty=Decimal("70"))
+    inventory = item.inventory
+    unplaced = db_session.query(WarehouseUnplacedItem).filter_by(
+        item_id=item.item_id
+    ).one()
+    box_row = _create_box_row(db_session, item.item_id, 0)
+    zone = WarehouseSpecialZone(label="correction zone", zone_type="pallet")
+    db_session.add(zone)
+    db_session.flush()
+    zone_row = WarehouseSpecialZoneItem(
+        zone_id=zone.id,
+        item_id=item.item_id,
+        quantity=0,
+    )
+    db_session.add(zone_row)
+    db_session.flush()
+    operation = InventoryOperation(
+        kind=InventoryOperationKindEnum.BUSINESS,
+        domain="inventory_io",
+        action="ship",
+        display_label="v2 multi-row ship",
+        actor_name=editor.name,
+        actor_employee_id=editor.employee_id,
+        contract_version=2,
+    )
+    db_session.add(operation)
+    db_session.flush()
+    log = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.SHIP,
+        quantity_change=Decimal("-30"),
+        quantity_before=Decimal("100"),
+        quantity_after=Decimal("70"),
+        warehouse_qty_before=Decimal("100"),
+        warehouse_qty_after=Decimal("70"),
+        department_qty_before=Decimal("0"),
+        department_qty_after=Decimal("0"),
+        produced_by=editor.name,
+        producer_employee_id=editor.employee_id,
+        inventory_effect=[
+            {
+                "scope": "warehouse",
+                "row_id": str(inventory.inventory_id),
+                "before_quantity": 100,
+                "after_quantity": 70,
+                "delta": -30,
+            },
+            {
+                "scope": "warehouse_unplaced",
+                "row_id": str(unplaced.id),
+                "before_quantity": 80,
+                "after_quantity": 70,
+                "delta": -10,
+            },
+            {
+                "scope": "warehouse_zone",
+                "row_id": str(zone_row.id),
+                "zone_id": zone.id,
+                "before_quantity": 10,
+                "after_quantity": 0,
+                "delta": -10,
+            },
+            {
+                "scope": "warehouse_box",
+                "row_id": str(box_row.id),
+                "box_id": str(box_row.box_id),
+                "before_quantity": 10,
+                "after_quantity": 0,
+                "delta": -10,
+            },
+        ],
+        operation_id=operation.operation_id,
+        operation_role=InventoryOperationRoleEnum.PRIMARY,
+    )
+    db_session.add(log)
+    db_session.commit()
+
+    response = client.post(
+        f"/api/inventory/transactions/{log.log_id}/quantity-correction",
+        json={
+            "quantity_change": -20,
+            "reason": "다중 행 정정 차단",
+            "edited_by_employee_id": str(editor.employee_id),
+            "edited_by_pin": "0000",
+        },
+    )
+
+    assert response.status_code == 409, response.json()
+    assert response.json()["detail"]["extra"] == {
+        "reason": "multiple_inventory_effects"
+    }
+    db_session.expire_all()
+    assert item.inventory.warehouse_qty == Decimal("70")
+    assert db_session.get(WarehouseBoxItem, box_row.id).quantity == 0
+    assert db_session.get(WarehouseSpecialZoneItem, zone_row.id).quantity == 0
+    assert db_session.get(WarehouseUnplacedItem, unplaced.id).quantity == 70
+    assert db_session.query(TransactionEditLog).count() == 0
+
+
+def test_v2_quantity_correction_rejects_zone_effect_without_zone_id(
+    client,
+    db_session,
+    make_item,
+    editor,
+) -> None:
+    item = make_item(name="v2 missing zone id", warehouse_qty=Decimal("70"))
+    inventory = item.inventory
+    unplaced = db_session.query(WarehouseUnplacedItem).filter_by(
+        item_id=item.item_id
+    ).one()
+    unplaced.quantity = 40
+    zone = WarehouseSpecialZone(label="missing zone id", zone_type="pallet")
+    db_session.add(zone)
+    db_session.flush()
+    zone_row = WarehouseSpecialZoneItem(
+        zone_id=zone.id,
+        item_id=item.item_id,
+        quantity=30,
+    )
+    db_session.add(zone_row)
+    operation = InventoryOperation(
+        kind=InventoryOperationKindEnum.BUSINESS,
+        domain="inventory_io",
+        action="ship",
+        display_label="v2 missing zone id",
+        actor_name=editor.name,
+        actor_employee_id=editor.employee_id,
+        contract_version=2,
+    )
+    db_session.add(operation)
+    db_session.flush()
+    log = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.SHIP,
+        quantity_change=Decimal("-30"),
+        quantity_before=Decimal("100"),
+        quantity_after=Decimal("70"),
+        warehouse_qty_before=Decimal("100"),
+        warehouse_qty_after=Decimal("70"),
+        department_qty_before=Decimal("0"),
+        department_qty_after=Decimal("0"),
+        produced_by=editor.name,
+        producer_employee_id=editor.employee_id,
+        inventory_effect=[
+            {
+                "scope": "warehouse",
+                "row_id": str(inventory.inventory_id),
+                "before_quantity": 100,
+                "after_quantity": 70,
+                "delta": -30,
+            },
+            {
+                "scope": "warehouse_zone",
+                "row_id": str(zone_row.id),
+                "before_quantity": 60,
+                "after_quantity": 30,
+                "delta": -30,
+            },
+        ],
+        operation_id=operation.operation_id,
+        operation_role=InventoryOperationRoleEnum.PRIMARY,
+    )
+    db_session.add(log)
+    db_session.commit()
+
+    response = client.post(
+        f"/api/inventory/transactions/{log.log_id}/quantity-correction",
+        json={
+            "quantity_change": -20,
+            "reason": "zone_id 없는 손상 효과 차단",
+            "edited_by_employee_id": str(editor.employee_id),
+            "edited_by_pin": "0000",
+        },
+    )
+
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"]["extra"] == {
+        "reason": "unproven_inventory_effect"
+    }
+    db_session.expire_all()
+    assert item.inventory.warehouse_qty == Decimal("70")
+    assert db_session.get(WarehouseSpecialZoneItem, zone_row.id).quantity == 30
+    assert db_session.get(WarehouseUnplacedItem, unplaced.id).quantity == 40
+    assert db_session.query(TransactionEditLog).count() == 0
+
+
+def test_v2_ship_quantity_correction_rejects_recreated_box_row(
+    client,
+    db_session,
+    make_item,
+    editor,
+) -> None:
+    item = make_item(name="v2 recreated box correction", warehouse_qty=Decimal("70"))
+    inventory = item.inventory
+    unplaced = db_session.query(WarehouseUnplacedItem).filter_by(
+        item_id=item.item_id
+    ).one()
+    original_row = _create_box_row(db_session, item.item_id, 10)
+    original_row_id = original_row.id
+    box_id = original_row.box_id
+    unplaced.quantity = 60
+    operation = InventoryOperation(
+        kind=InventoryOperationKindEnum.BUSINESS,
+        domain="inventory_io",
+        action="ship",
+        display_label="v2 recreated box ship",
+        actor_name=editor.name,
+        actor_employee_id=editor.employee_id,
+        contract_version=2,
+    )
+    db_session.add(operation)
+    db_session.flush()
+    log = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.SHIP,
+        quantity_change=Decimal("-30"),
+        quantity_before=Decimal("100"),
+        quantity_after=Decimal("70"),
+        warehouse_qty_before=Decimal("100"),
+        warehouse_qty_after=Decimal("70"),
+        department_qty_before=Decimal("0"),
+        department_qty_after=Decimal("0"),
+        produced_by=editor.name,
+        producer_employee_id=editor.employee_id,
+        inventory_effect=[
+            {
+                "scope": "warehouse",
+                "row_id": str(inventory.inventory_id),
+                "before_quantity": 100,
+                "after_quantity": 70,
+                "delta": -30,
+            },
+            {
+                "scope": "warehouse_box",
+                "row_id": str(original_row_id),
+                "box_id": str(box_id),
+                "before_quantity": 40,
+                "after_quantity": 10,
+                "delta": -30,
+            },
+        ],
+        operation_id=operation.operation_id,
+        operation_role=InventoryOperationRoleEnum.PRIMARY,
+    )
+    db_session.add(log)
+    db_session.commit()
+    db_session.delete(original_row)
+    db_session.flush()
+    replacement = WarehouseBoxItem(
+        box_id=box_id,
+        item_id=item.item_id,
+        quantity=10,
+    )
+    db_session.add(replacement)
+    db_session.commit()
+
+    response = client.post(
+        f"/api/inventory/transactions/{log.log_id}/quantity-correction",
+        json={
+            "quantity_change": -20,
+            "reason": "재생성 박스 행 정정 차단",
+            "edited_by_employee_id": str(editor.employee_id),
+            "edited_by_pin": "0000",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["extra"] == {
+        "reason": "inventory_effect_mismatch"
+    }
+    db_session.expire_all()
+    assert item.inventory.warehouse_qty == Decimal("70")
+    assert db_session.get(WarehouseBoxItem, replacement.id).quantity == 10
+    assert db_session.get(WarehouseUnplacedItem, unplaced.id).quantity == 60
+    assert db_session.query(TransactionEditLog).count() == 0
+
+
 def test_legacy_previous_week_cancel_is_blocked_after_ledger_cutover(
     client, db_session, receive_log, editor
 ) -> None:
@@ -303,12 +889,8 @@ def test_legacy_previous_week_cancel_is_blocked_after_ledger_cutover(
     log.producer_employee_id = editor.employee_id
     log.inventory_effect = [{"scope": "warehouse", "delta": 100}]
     log.created_at = datetime.utcnow() - timedelta(days=8)
-    db_session.add(
-        SystemSetting(
-            setting_key="inventory_operation_cutover_at",
-            setting_value=(datetime.utcnow() - timedelta(days=1)).isoformat(),
-        )
-    )
+    cutover = db_session.get(SystemSetting, "inventory_operation_cutover_at")
+    cutover.setting_value = (datetime.utcnow() - timedelta(days=1)).isoformat()
     db_session.commit()
 
     response = client.post(
@@ -330,13 +912,6 @@ def test_legacy_previous_week_cancel_is_blocked_after_ledger_cutover(
 
 def test_quantity_correction_records_operation(client, db_session, receive_log, editor):
     log, _item = receive_log
-    db_session.add(
-        SystemSetting(
-            setting_key="inventory_operation_cutover_at",
-            setting_value="2026-01-01T00:00:00",
-        )
-    )
-    db_session.commit()
 
     response = client.post(
         f"/api/inventory/transactions/{log.log_id}/quantity-correction",
@@ -356,6 +931,571 @@ def test_quantity_correction_records_operation(client, db_session, receive_log, 
     )
     assert correction.operation_id == operation.operation_id
     assert correction.operation_role == InventoryOperationRoleEnum.CORRECTION
+
+
+def test_quantity_correct_allows_proven_simple_operation(
+    client,
+    db_session,
+    receive_log,
+    editor,
+):
+    log, _item = receive_log
+    operation = InventoryOperation(
+        kind=InventoryOperationKindEnum.BUSINESS,
+        domain="inventory_io",
+        action="receive",
+        display_label="단순 입고",
+        actor_name=editor.name,
+        actor_employee_id=editor.employee_id,
+        department="창고",
+    )
+    db_session.add(operation)
+    db_session.flush()
+    log.operation_id = operation.operation_id
+    log.operation_role = InventoryOperationRoleEnum.PRIMARY
+    db_session.commit()
+
+    response = client.post(
+        f"/api/inventory/transactions/{log.log_id}/quantity-correction",
+        json={
+            "quantity_change": 80,
+            "reason": "단순 입고 정정",
+            "edited_by_employee_id": str(editor.employee_id),
+            "edited_by_pin": "0000",
+        },
+    )
+
+    assert response.status_code == 200, response.json()
+    assert db_session.query(InventoryOperation).count() == 2
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("reference_no", "SR-2026-0001"),
+        ("client_request_id", "11111111-1111-4111-8111-111111111111"),
+    ],
+)
+def test_quantity_correct_blocks_business_reference_without_mutation(
+    client,
+    db_session,
+    receive_log,
+    editor,
+    field,
+    value,
+):
+    log, item = receive_log
+    setattr(log, field, value)
+    db_session.commit()
+
+    response = client.post(
+        f"/api/inventory/transactions/{log.log_id}/quantity-correction",
+        json={
+            "quantity_change": 80,
+            "reason": "업무 참조 거래 정정 시도",
+            "edited_by_employee_id": str(editor.employee_id),
+            "edited_by_pin": "0000",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["extra"] == {"reason": "workflow_linked"}
+    db_session.expire_all()
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("100")
+    assert db_session.query(TransactionLog).count() == 1
+    assert db_session.query(TransactionEditLog).count() == 0
+    assert db_session.query(InventoryOperation).count() == 0
+
+
+def test_quantity_correct_blocks_mismatched_operation_identity(
+    client,
+    db_session,
+    receive_log,
+    editor,
+):
+    log, item = receive_log
+    operation = InventoryOperation(
+        kind=InventoryOperationKindEnum.BUSINESS,
+        domain="shipping",
+        action="pickup",
+        display_label="불완전한 출하 참조",
+        actor_name=editor.name,
+        actor_employee_id=editor.employee_id,
+        department="창고",
+        idempotency_key=f"shipping:{uuid.uuid4().hex}:pickup",
+    )
+    db_session.add(operation)
+    db_session.flush()
+    log.operation_id = operation.operation_id
+    log.operation_role = InventoryOperationRoleEnum.PRIMARY
+    db_session.commit()
+
+    response = client.post(
+        f"/api/inventory/transactions/{log.log_id}/quantity-correction",
+        json={
+            "quantity_change": 80,
+            "reason": "손상된 업무 원장 정정 시도",
+            "edited_by_employee_id": str(editor.employee_id),
+            "edited_by_pin": "0000",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["extra"] == {"reason": "workflow_linked"}
+    db_session.expire_all()
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("100")
+    assert db_session.query(TransactionLog).count() == 1
+    assert db_session.query(TransactionEditLog).count() == 0
+    assert db_session.query(InventoryOperation).count() == 1
+
+
+def test_quantity_correct_requires_canonical_operation_ledger(
+    client,
+    db_session,
+    receive_log,
+    editor,
+):
+    log, item = receive_log
+    db_session.query(SystemSetting).filter(
+        SystemSetting.setting_key == "inventory_operation_cutover_at"
+    ).delete(synchronize_session=False)
+    db_session.commit()
+
+    response = client.post(
+        f"/api/inventory/transactions/{log.log_id}/quantity-correction",
+        json={
+            "quantity_change": 80,
+            "reason": "원장 비활성 보정 시도",
+            "edited_by_employee_id": str(editor.employee_id),
+            "edited_by_pin": "0000",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["extra"] == {"reason": "ledger_unavailable"}
+    db_session.expire_all()
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("100")
+    assert db_session.query(TransactionLog).count() == 1
+    assert db_session.query(TransactionEditLog).count() == 0
+    assert db_session.query(InventoryOperation).count() == 0
+
+
+def test_quantity_correct_blocks_workflow_linked_operation_without_mutation(
+    client,
+    db_session,
+    receive_log,
+    editor,
+):
+    log, item = receive_log
+    operation = InventoryOperation(
+        kind=InventoryOperationKindEnum.BUSINESS,
+        domain="inventory_io",
+        action="receive",
+        display_label="워크플로 입고",
+        actor_name=editor.name,
+        actor_employee_id=editor.employee_id,
+        department="창고",
+    )
+    db_session.add(operation)
+    db_session.flush()
+    log.operation_id = operation.operation_id
+    log.operation_role = InventoryOperationRoleEnum.PRIMARY
+    db_session.add(
+        InventoryOperationEffect(
+            operation_id=operation.operation_id,
+            effect_kind=InventoryOperationEffectKindEnum.WORKFLOW,
+            subject_type="IoBatch",
+            subject_id=uuid.uuid4().hex,
+            role="EXECUTION_STATUS",
+            before_state={"status": "submitted"},
+            after_state={"status": "completed"},
+        )
+    )
+    db_session.commit()
+
+    response = client.post(
+        f"/api/inventory/transactions/{log.log_id}/quantity-correction",
+        json={
+            "quantity_change": 80,
+            "reason": "워크플로 거래 정정 시도",
+            "edited_by_employee_id": str(editor.employee_id),
+            "edited_by_pin": "0000",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == {
+        "code": "CORRECTION_CONFLICT",
+        "message": "연결된 업무 거래는 수량 보정할 수 없습니다.",
+        "extra": {"reason": "workflow_linked"},
+    }
+    db_session.expire_all()
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("100")
+    assert db_session.query(TransactionLog).count() == 1
+    assert db_session.query(TransactionEditLog).count() == 0
+    assert db_session.query(InventoryOperation).count() == 1
+    assert db_session.query(InventoryOperationEffect).count() == 1
+
+
+@pytest.mark.parametrize(
+    ("effect", "reason"),
+    [
+        (
+            [
+                {"scope": "warehouse", "delta": 60},
+                {"scope": "warehouse", "delta": 40},
+            ],
+            "multiple_inventory_effects",
+        ),
+        (
+            [
+                {
+                    "scope": "location",
+                    "department": "조립",
+                    "status": "PRODUCTION",
+                    "delta": 100,
+                }
+            ],
+            "non_warehouse_effect",
+        ),
+        (None, "unproven_inventory_effect"),
+    ],
+)
+def test_quantity_correct_blocks_unproven_legacy_effect_without_mutation(
+    client,
+    db_session,
+    receive_log,
+    editor,
+    effect,
+    reason,
+):
+    log, item = receive_log
+    log.inventory_effect = effect
+    db_session.commit()
+
+    response = client.post(
+        f"/api/inventory/transactions/{log.log_id}/quantity-correction",
+        json={
+            "quantity_change": 80,
+            "reason": "증명되지 않은 거래 정정 시도",
+            "edited_by_employee_id": str(editor.employee_id),
+            "edited_by_pin": "0000",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "CORRECTION_CONFLICT"
+    assert response.json()["detail"]["extra"] == {"reason": reason}
+    db_session.expire_all()
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("100")
+    assert db_session.query(TransactionLog).count() == 1
+    assert db_session.query(TransactionEditLog).count() == 0
+    assert db_session.query(InventoryOperation).count() == 0
+
+
+def test_quantity_correct_blocks_cancelled_transaction_without_mutation(
+    client,
+    db_session,
+    receive_log,
+    editor,
+):
+    log, item = receive_log
+    log.cancelled = True
+    db_session.commit()
+
+    response = client.post(
+        f"/api/inventory/transactions/{log.log_id}/quantity-correction",
+        json={
+            "quantity_change": 80,
+            "reason": "취소 거래 정정 시도",
+            "edited_by_employee_id": str(editor.employee_id),
+            "edited_by_pin": "0000",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "CORRECTION_CONFLICT"
+    assert response.json()["detail"]["extra"] == {"reason": "transaction_cancelled"}
+    db_session.expire_all()
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("100")
+    assert db_session.query(TransactionLog).count() == 1
+    assert db_session.query(TransactionEditLog).count() == 0
+    assert db_session.query(InventoryOperation).count() == 0
+
+
+def test_quantity_correct_blocks_reversal_log_as_cancelled(
+    client,
+    db_session,
+    receive_log,
+    editor,
+):
+    log, item = receive_log
+    reversed_source = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.ADJUST,
+        quantity_change=Decimal("-100"),
+        inventory_effect=[{"scope": "warehouse", "delta": -100}],
+    )
+    db_session.add(reversed_source)
+    db_session.flush()
+    log.reverses_log_id = reversed_source.log_id
+    db_session.commit()
+
+    response = client.post(
+        f"/api/inventory/transactions/{log.log_id}/quantity-correction",
+        json={
+            "quantity_change": 80,
+            "reason": "역전 로그 정정 시도",
+            "edited_by_employee_id": str(editor.employee_id),
+            "edited_by_pin": "0000",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["extra"] == {"reason": "transaction_cancelled"}
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("100")
+    assert db_session.query(TransactionEditLog).count() == 0
+
+
+def test_quantity_correct_blocks_shipping_phase_reference(
+    client,
+    db_session,
+    receive_log,
+    editor,
+):
+    log, item = receive_log
+    log.shipping_phase = "pickup"
+    db_session.commit()
+
+    response = client.post(
+        f"/api/inventory/transactions/{log.log_id}/quantity-correction",
+        json={
+            "quantity_change": 80,
+            "reason": "출하 연결 거래 정정 시도",
+            "edited_by_employee_id": str(editor.employee_id),
+            "edited_by_pin": "0000",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["extra"] == {"reason": "workflow_linked"}
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("100")
+    assert db_session.query(TransactionEditLog).count() == 0
+
+
+def test_quantity_correct_blocks_non_primary_operation_role(
+    client,
+    db_session,
+    receive_log,
+    editor,
+):
+    log, item = receive_log
+    operation = InventoryOperation(
+        kind=InventoryOperationKindEnum.BUSINESS,
+        domain="inventory_io",
+        action="receive",
+        display_label="구성품 입고",
+        actor_name=editor.name,
+        actor_employee_id=editor.employee_id,
+        department="창고",
+    )
+    db_session.add(operation)
+    db_session.flush()
+    log.operation_id = operation.operation_id
+    log.operation_role = InventoryOperationRoleEnum.COMPONENT_INPUT
+    db_session.commit()
+
+    response = client.post(
+        f"/api/inventory/transactions/{log.log_id}/quantity-correction",
+        json={
+            "quantity_change": 80,
+            "reason": "구성품 역할 거래 정정 시도",
+            "edited_by_employee_id": str(editor.employee_id),
+            "edited_by_pin": "0000",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["extra"] == {"reason": "workflow_linked"}
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("100")
+    assert db_session.query(TransactionEditLog).count() == 0
+
+
+def test_quantity_correct_blocks_second_log_owned_by_operation(
+    client,
+    db_session,
+    receive_log,
+    editor,
+):
+    log, item = receive_log
+    operation = InventoryOperation(
+        kind=InventoryOperationKindEnum.BUSINESS,
+        domain="inventory_io",
+        action="receive",
+        display_label="묶음 입고",
+        actor_name=editor.name,
+        actor_employee_id=editor.employee_id,
+        department="창고",
+    )
+    db_session.add(operation)
+    db_session.flush()
+    log.operation_id = operation.operation_id
+    log.operation_role = InventoryOperationRoleEnum.PRIMARY
+    db_session.add(
+        TransactionLog(
+            item_id=item.item_id,
+            transaction_type=TransactionTypeEnum.RECEIVE,
+            quantity_change=Decimal("1"),
+            inventory_effect=[{"scope": "warehouse", "delta": 1}],
+            operation_id=operation.operation_id,
+            operation_role=InventoryOperationRoleEnum.PRIMARY,
+        )
+    )
+    db_session.commit()
+
+    response = client.post(
+        f"/api/inventory/transactions/{log.log_id}/quantity-correction",
+        json={
+            "quantity_change": 80,
+            "reason": "묶음 거래 정정 시도",
+            "edited_by_employee_id": str(editor.employee_id),
+            "edited_by_pin": "0000",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["extra"] == {
+        "reason": "multiple_inventory_effects"
+    }
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("100")
+    assert db_session.query(TransactionEditLog).count() == 0
+
+
+def test_quantity_correct_blocks_already_cancelled_operation(
+    client,
+    db_session,
+    receive_log,
+    editor,
+):
+    log, item = receive_log
+    operation = InventoryOperation(
+        kind=InventoryOperationKindEnum.BUSINESS,
+        domain="inventory_io",
+        action="receive",
+        display_label="취소된 입고",
+        actor_name=editor.name,
+        actor_employee_id=editor.employee_id,
+        department="창고",
+    )
+    db_session.add(operation)
+    db_session.flush()
+    log.operation_id = operation.operation_id
+    log.operation_role = InventoryOperationRoleEnum.PRIMARY
+    db_session.add(
+        InventoryOperation(
+            kind=InventoryOperationKindEnum.CANCELLATION,
+            domain=operation.domain,
+            action=operation.action,
+            display_label="취소된 입고 취소",
+            actor_name=editor.name,
+            actor_employee_id=editor.employee_id,
+            department="창고",
+            reverses_operation_id=operation.operation_id,
+        )
+    )
+    db_session.commit()
+
+    response = client.post(
+        f"/api/inventory/transactions/{log.log_id}/quantity-correction",
+        json={
+            "quantity_change": 80,
+            "reason": "취소 원장 정정 시도",
+            "edited_by_employee_id": str(editor.employee_id),
+            "edited_by_pin": "0000",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["extra"] == {"reason": "transaction_cancelled"}
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("100")
+    assert db_session.query(TransactionEditLog).count() == 0
+
+
+@pytest.mark.parametrize(
+    ("quantity_change", "effect_delta"),
+    [(Decimal("100"), 99), (Decimal("0"), 0)],
+)
+def test_quantity_correct_blocks_mismatched_or_zero_warehouse_effect(
+    client,
+    db_session,
+    receive_log,
+    editor,
+    quantity_change,
+    effect_delta,
+):
+    log, item = receive_log
+    log.quantity_change = quantity_change
+    log.inventory_effect = [{"scope": "warehouse", "delta": effect_delta}]
+    db_session.commit()
+
+    response = client.post(
+        f"/api/inventory/transactions/{log.log_id}/quantity-correction",
+        json={
+            "quantity_change": 80,
+            "reason": "효과 불일치 거래 정정 시도",
+            "edited_by_employee_id": str(editor.employee_id),
+            "edited_by_pin": "0000",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "CORRECTION_CONFLICT"
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("100")
+    assert db_session.query(TransactionEditLog).count() == 0
+
+
+def test_quantity_correct_blocks_warehouse_effect_contradicted_by_snapshots(
+    client,
+    db_session,
+    receive_log,
+    editor,
+):
+    log, item = receive_log
+    log.warehouse_qty_before = Decimal("100")
+    log.warehouse_qty_after = Decimal("100")
+    log.department_qty_before = Decimal("0")
+    log.department_qty_after = Decimal("100")
+    db_session.commit()
+
+    response = client.post(
+        f"/api/inventory/transactions/{log.log_id}/quantity-correction",
+        json={
+            "quantity_change": 80,
+            "reason": "wrong bucket 정정 시도",
+            "edited_by_employee_id": str(editor.employee_id),
+            "edited_by_pin": "0000",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["extra"] == {
+        "reason": "inventory_effect_mismatch"
+    }
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("100")
+    assert db_session.query(TransactionEditLog).count() == 0
 
 def test_quantity_correct_ship_must_be_negative(client, receive_log, editor):
     """SHIP 부호 검증은 수량 보정에서도 적용."""
@@ -477,9 +1617,10 @@ def test_quantity_correct_blocks_double_correction(client, db_session, receive_l
             "edited_by_pin": "0000",
         },
     )
-    assert r2.status_code == 422
+    assert r2.status_code == 409
     detail = r2.json()["detail"]
-    assert "이미 수량 보정된 거래" in detail["message"]
+    assert detail["code"] == "CORRECTION_CONFLICT"
+    assert detail["extra"] == {"reason": "already_corrected"}
 
 
 def test_quantity_correct_blocks_below_pending(client, db_session, make_item, editor):
@@ -492,6 +1633,7 @@ def test_quantity_correct_blocks_below_pending(client, db_session, make_item, ed
         quantity_change=D("100"),
         quantity_before=D("0"),
         quantity_after=D("100"),
+        inventory_effect=[{"scope": "warehouse", "delta": 100}],
     )
     db_session.add(log)
     db_session.commit()
@@ -524,6 +1666,7 @@ def test_quantity_correct_handles_null_pending_quantity(client, db_session, make
         quantity_change=D("100"),
         quantity_before=D("0"),
         quantity_after=D("100"),
+        inventory_effect=[{"scope": "warehouse", "delta": 100}],
     )
     db_session.add(log)
     db_session.commit()
@@ -565,6 +1708,7 @@ def test_reset_pin_requires_admin_pin(client, db_session):
         display_order=1,
         is_active="true",
         pin_hash=hash_pin("9999"),
+        pin_requires_change=False,
     )
     db_session.add(emp)
     db_session.commit()
@@ -586,7 +1730,7 @@ def test_reset_pin_requires_admin_pin(client, db_session):
 
 
 def test_reset_pin_with_correct_admin_pin(client, db_session):
-    """올바른 관리자 PIN으로 호출 시 직원 PIN이 0000으로 초기화."""
+    """관리자 초기화 후 기존 PIN은 폐기되고 0000은 최초 변경 challenge만 연다."""
     emp = Employee(
         employee_code="PR02",
         name="초기화대상",
@@ -596,6 +1740,7 @@ def test_reset_pin_with_correct_admin_pin(client, db_session):
         display_order=2,
         is_active="true",
         pin_hash=hash_pin("9999"),
+        pin_requires_change=False,
     )
     db_session.add(emp)
     db_session.commit()
@@ -607,6 +1752,7 @@ def test_reset_pin_with_correct_admin_pin(client, db_session):
     assert reset.status_code == 204
 
     r1 = client.post(f"/api/employees/{emp.employee_id}/verify-pin", json={"pin": "9999"})
-    assert r1.status_code == 403
+    assert r1.status_code == 401
     r2 = client.post(f"/api/employees/{emp.employee_id}/verify-pin", json={"pin": "0000"})
-    assert r2.status_code == 200
+    assert r2.status_code == 409
+    assert r2.json()["detail"]["code"] == "PIN_CHANGE_REQUIRED"

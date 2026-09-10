@@ -6,12 +6,17 @@
 
 - 원 감사 기준일·SHA: 2026-08-13 KST, `71d6a34faf27ef736fe7dc64a5084ff2a7f46893`
 - 첫 개선 체크포인트 기준 SHA: `8be64743c65ce6db3c8270d5cc6b73fcf64b216a`
-- 현재 실행 위치: `C:\ERP\.worktrees\full-code-quality-improvement`
-- Git 상태: detached HEAD의 미커밋 working diff, 브랜치·커밋·푸시 없음
-- 실행 진척: 체크포인트 1 완료, 후속 체크포인트 2~7의 6개 구간 대기
-- 잔여 작업: 미완료 `IC` 24개(미착수 23개 + 부분 완료 `IC-20`)와 최종 closeout `DOC-01`, `AT-01`, `AT-02`
-- 최종 판정: **조건부 사용 가능**
+- 두 번째 개선 체크포인트 기준 SHA: `90ce42d9fef0505ccbd7f5b7ea86b60760cb09dd`
+- 최신 `main` 동기화 대상 SHA: `d2b0dd2969883b2c8876c4375c99a456dcb6f21e` (이후 main 추가 동기화 없음)
+- 현재 인계 위치: `C:\ERP\.worktrees\full-code-quality-checkpoint-2` (`codex/full-code-quality-improvement`). CP7 `a9a3c344`를 품질 브랜치에 통합한 `793d8f79`의 tree가 검증된 CP7과 동일하며, 양쪽 실제 CI가 모두6/6 success다. CP6·CP7 구현 워크트리는 보존한다.
+- Git 상태: 장기 품질 브랜치 `codex/full-code-quality-improvement`. CP4 완료 HEAD `e64a9a12da16f8502ab1a1e82dbed2b1d2648a01`에서 고정 `main` `78e8023f41ef59528d9d8c07498e7653f9bee247`을 품질 worktree 방향에만 통합했고, merge commit `deafc335502b46f9ed068bbb11175361826615ea` 뒤 CP5 W4 제품 commit `ac8f26d570e728f193c1b2b40b8efdae7fe2363e`, CI 회귀 수정 commit `8a66907014cfa7c5cd5de90e7d3b42d599a56ccf`, W5 제품 commit `fb339b5dc29013fc97af5035905431177ec54aea`, W6 제품 commit `d43ab268cb6fa9dcde94e9b93203978f3550c73d`, CI 이식성 보완 commit `dffb8e01e713d58e3d6df678ee98c0cfc20cd1e5`·`fd34189400f63225164c007bffcf7f561b813eb6`, W7 제품 commit `b27ba39cd2cbad574fda30af9c118697086c30ad`까지 기존 품질 브랜치에 push했다. W7 최종 GitHub CI run `33934558904`는 6/6 success다. `main` 역병합·push·PR·force-push는 없음
+- CP5 종료 당시 진척 `[HISTORICAL]`: 체크포인트 1·3·4 완료. 체크포인트 2의 `IC-04`·`IC-20`은 저장소 구현·로컬 PostgreSQL 실증과 품질 브랜치 CI 실행까지 통과했지만 required-check 설정 증거는 별도 외부 경계로 남겼다. CP4의 세 hard stop과 CP5의 S0~W7은 완료했으며, 당시에는 CP6 미착수였다. 이 문장은 현재 CP6 상태가 아니다.
+- CP5 종료 당시 잔여 집계 `[HISTORICAL]`: 엄격한 판정상 IC13개(required-check 외부 경계2개 포함) 및 `DOC-01`, `AT-01`, `AT-02`가 남았던 snapshot이다. 현재 완료 수량이나 새 실행 지시로 재사용하지 않는다.
+- 최신 판정(2026-09-08): **CP6·CP7 승인 구현·독립 리뷰·품질 브랜치 통합 완료, 작업자 판정은 조건부 사용 가능**이다(12.30절). CP7 CI34179512339와 품질 통합 CI34181061472는 각각 exact SHA에서6/6 success다. 외부 required-check, Next Minor1·ESLint9 EOL 예외·기존 테스트 타입 부채·업무별 PARTIAL은 별도로 보존한다. main 역병합·PR·배포·새 main 동기화는 하지 않았다.
 - 문서 성격: 현행 코드의 감사 결과이자 후속 구현 순서의 단일 정본
+- 현재 종료 검증(2026-09-08, 12.29~12.30절):72행 재고 matrix·64개 finding·24개 QP·2,563개 파일의 역할/근거 원장을 재대조했다. 최초 local full의6PASS/2FAIL과 로컬 coverage `NOT_REPORTED`는 보존하며 PG3/pytest62/startup2 국소 복구·OpenAPI·build/bundle·E2E24/24 및 실제 최종 CI를 구분한다. 마지막 문서 commit 자체의 CI·최종 SHA/clean 증거는 종료 receipt에 연결하며, 미래 CI를 미리 PASS로 쓰지 않는다.
+
+> **증거 시점 안내:** 1~7절의 원 감사 코드 줄번호와 실패 서술은 당시 snapshot을 보존한다. 이후 구현과 충돌하는 문장은 `[STALE]` 역사 증거이며, 현재 판정·구현 경계는 8.9.7~8.9.8 및 12.26~12.30절이 우선한다. 최종 작업자 신뢰도 결론은12.30절이다. 앞선 절의 pending·NOT_RUN·미완료는 해당 실행 시점의 기록이지 완료된 검사의 재실행 지시가 아니다.
 
 ---
 
@@ -25,10 +30,10 @@
 
 1. 프런트의 입출고 쓰기 요청은 15초 후 화면에서 실패로 끝나도 서버 요청을 중단하지 않는다. 작업자가 다시 누르면 새 멱등 키가 발급되어 첫 요청의 지연 성공과 재시도가 모두 반영될 수 있다. `frontend/lib/api-core.ts:210-234`, `frontend/app/mes/_components/_warehouse_v2/useIoSubmit.ts:20-47`
 2. 출하 예약은 일반 재고 예약 필드와 별도인 `ShippingAllocation`에만 기록된다. 출하 외 소비 경로가 이 예약을 공통으로 차감하지 않으며, 출하 상태 전이에 request/allocation 행 잠금과 명령 멱등 키가 없다. `backend/app/services/shipping.py:858-899,1485-1536,1670-1769`, `backend/app/models/shipping.py:184-206`
-3. 일반 거래취소는 재고 효과만 역재생하고 출하 요청·allocation·IO batch·StockRequest 같은 업무 상태를 함께 되돌리지 않는다. 픽업 로그를 일반 취소하면 재고는 복원되지만 출하는 `PICKED_UP`, allocation은 `CONSUMED`로 남을 수 있다. `backend/app/services/transaction_actions.py:182-257`, `backend/app/services/inv_effect.py:35-104`
+3. 고정 `main`은 append-only `InventoryOperation`과 별도 cancellation operation으로 관련 재고·allocation·업무 상태를 함께 역전한다. 이로써 기존 effect-only 일반 취소 결함은 대체됐지만, workflow 귀속 RECEIVE/SHIP 수량 보정은 여전히 항상 창고 bucket을 바꾸므로 CP4의 첫 안전막으로 남는다. `backend/app/models/inventory_operation.py:54-112`, `backend/app/services/inventory_operation_cancellation.py:772-854`, `backend/app/routers/inventory/transactions.py:1000-1088`
 4. 원 감사에서 부서조정 `direction="scrap"`의 무음 성공을 재현했으나, 첫 체크포인트 `IC-02`에서 request enum·service·frontend submit type을 함께 좁혀 모든 subtype을 422로 차단했다. 폐기는 전용 재작업 `scrap_qty` 흐름만 사용한다.
 5. 운영 무결성 검사는 부서 예약, 출하 allocation, 창고 박스·특수구역 수량을 검사하지 않고, 누락·0 효과 거래를 경고만 한 뒤 성공 종료할 수 있다. 즉 “검사 통과”가 모든 재고 표현의 일치를 보증하지 않는다. `scripts/ops/check_inventory_integrity.py:62-332,349-409`
-6. 재고 초기화 도구는 출하 요청·allocation을 지우지 않는다. 기존 `PREPARED` 출하가 새 기준 재고에서 나중에 픽업되면 초기화 후 재고가 다시 차감될 수 있다. `scripts/ops/inventory_cutover.py:290-326`, `backend/app/services/shipping.py:1692-1704`
+6. 기준 SHA의 재고 초기화 도구는 출하 요청·allocation을 지우지 않아 기존 출하가 새 기준 재고를 다시 바꿀 수 있었다. 체크포인트 2 로컬 커밋 `3c75558c`의 `IC-04`는 미래 delta 가능 또는 불일치 출하를 dry-run/apply mutation 전에 차단하고, `CANCELLED` terminal-safe 조합만 허용한다. 이 보호막이 `main`에 통합되기 전과 체크포인트 5 운영 readiness 완료 전에는 실제 cutover를 계속 금지한다.
 
 따라서 현 상태의 운영 조건은 다음과 같다.
 
@@ -63,18 +68,18 @@
 | 부서→창고 | `PARTIAL` | 부서 예약 후 승인, 부서 감소·창고 증가 | HTTP 전체 경로·승인 전 재고 변동 경합 보강 필요 |
 | 부서→부서·인수인계 | `PARTIAL` | 정상 이동·rollback·received 멱등 | handover 문서 행 잠금과 PostgreSQL 이중 수령 미검증 |
 | AS·연구 사용출고 | `PARTIAL` | 예약·승인·창고/총재고 감소 | actor 신뢰와 결과 불명 재시도 |
-| 생산·BOM backflush | `PARTIAL` | 구성품 감소·완제품 증가·로그 효과·SQLite 1승자 | 복합 로그 일반 취소, PostgreSQL 잠금 증거 부족 |
+| 생산·BOM backflush | `PARTIAL` | 구성품 감소·완제품 증가·operation 원장·원자 취소·SQLite 1승자 | PostgreSQL 업무별 잠금 증거와 correction 안전막 부족 |
 | 분해·재작업 | `PARTIAL` | 부모 감소와 자식 정상/불량/폐기 분기 | 빈 효과 폐기 로그와 복합 취소 계약 |
 | 불량 격리·해제 | `PARTIAL` | 정상/불량 버킷 이동과 총량 보존, 중복 격리 방지 | actor 검증, 승인 표시와 실제 즉시 완료 drift |
 | 불량 폐기·반품 | `PARTIAL` | 독립 defect/StockRequest 정상 경로 수량 감소와 전용 재작업 폐기 | actor·경합·복합 취소 계약은 계속 보강 필요 |
 | 일반 부서조정 `scrap` | `VERIFIED` | `IC-02`에서 모든 subtype 422, service 직접 호출 fail-closed, 실패 전후 raw SQL 재고·로그 불변 | 폐기 기능은 이 표면이 아니라 전용 재작업 흐름만 사용 |
 | 순차 출하 준비·픽업·취소 | `PARTIAL` | 단일 호출에서 allocation·재고·로그의 정상 전이 | 행 잠금·멱등·공통 예약 부족 |
-| 출하와 일반 거래취소 결합 | `FAILED` | 없음 | 재고만 복원되고 출하 상태/allocation은 남을 수 있음 |
-| 거래 수량보정·일반 취소 | `FAILED` | 창고 RECEIVE 정정의 순차 primitive와 단일 effect 취소만 제한적으로 동작 | 부서 출하 SHIP도 창고 bucket을 정정하는 wrong-bucket 결함, 복합 업무 상태 분리 |
+| 출하와 operation 취소 결합 | `PARTIAL` | 원 operation의 재고·allocation·workflow 상태를 별도 reversal operation으로 함께 역전 | 실제 PostgreSQL 교차 경합과 후속 공통 예약 계약 부족 |
+| 거래 수량보정·취소 | `PARTIAL` | operation 취소 1승자와 레거시 증거 기반 편입, 원본 거래당 순차 correction 1회 | workflow-linked correction·SHIP wrong-bucket·correction 경합 |
 | 창고 박스·특수구역 | `PARTIAL` | 위치 표현과 reconcile 조회 | 출고 source 정책·중복 품목·운영 gate 사각지대 |
 | 대시보드·입출고·이력 표시 | `PARTIAL` | 정상 입고의 화면/SQL 일치 | mixed cache, 지도 optimistic 경합, 일부 오류 화면 |
-| cutover·readiness·복구 | `PARTIAL` | 제한된 local SQLite 검사와 backup primitive는 동작 | cutover는 정책 결정 전 운영 차단, WAL freshness·schema·allocation·box 사각지대 |
-| PostgreSQL 동시성 | `NOT_VERIFIED` | 없음 | `TEST_POSTGRES_URL`/ephemeral PostgreSQL 부재 |
+| cutover·readiness·복구 | `PARTIAL` | 체크포인트 2 로컬 커밋에서 현행 상태 4종×allocation 9종의 36조합, orphan·손상 원장, rollback, SQLite writer exclusion과 실제 PostgreSQL 두 연결 차단을 검증해 unsafe cutover를 차단 | 체크포인트 5의 WAL·schema·allocation·box readiness와 실제 운영 cutover 승인·실행은 남음 |
+| PostgreSQL 동시성 | `PARTIAL` | 폐기 가능한 PostgreSQL 16에서 clean Alembic head와 cutover 1행·창고 지도 3행의 독립 연결 잠금을 skip 없이 검증 | 출하·handover·correction 등 후속 카드의 업무별 경합과 GitHub 필수 job 실행은 남음 |
 
 ### 1.4 가장 먼저 할 일
 
@@ -83,8 +88,8 @@
 1. 첫 체크포인트에서 서버 시작 DB 보호 경계를 read-only로 되돌렸다(`IC-27` 완료).
 2. 부서조정 `scrap` 무음 성공을 막고 무결성 복구·감사 로그를 한 transaction으로 묶었다(`IC-02`, `IC-05` 완료).
 3. 체크포인트 2에서 필수 PostgreSQL·E2E·type gate를 먼저 완성하고, 재고를 다시 바꿀 수 있는 기존 출하가 있으면 cutover를 fail-closed한다(`IC-20`, `IC-04`).
-4. 체크포인트 3에서 session 발급 자격을 먼저 결정한 뒤 서버 검증 직원 session과 공통 actor 경계를 단독 구현한다(`IC-01`). 이후 mutation API 카드는 이 경계 뒤에 배포한다.
-5. 일반 correction/cancel 안전 차단과 멱등성·조건부 전이를 거쳐 `박스+특수구역+미배치=창고`, 예약·출하 상태기계, blocking integrity 순으로 진행한다(`IC-03`, `IC-06`~`IC-10`, `IC-17`~`IC-19`).
+4. 체크포인트 3에서 session 발급 자격을 결정하고 서버 검증 직원 session과 공통 actor 경계를 구현했다(`IC-01` 완료). 이후 mutation API 카드는 이 경계 뒤에서만 배포한다.
+5. main 원장을 중복 구현하지 않고 workflow-linked correction 안전막, semantic idempotency, handover/correction 조건부 전이, active/deleted item command 분리를 거쳐 `박스+특수구역+미배치=창고`, 예약·출하 상태기계, blocking integrity 순으로 진행한다(`IC-03`, `IC-06`~`IC-11`, `IC-17`~`IC-19`).
 
 후속 실행의 단일 순서와 각 정지 조건은 8.9절의 체크포인트 2~7을 따른다. 한 체크포인트가 통합·검증·리뷰를 모두 통과하기 전에는 다음 체크포인트를 시작하지 않는다.
 
@@ -568,8 +573,8 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 | `CQ-013` | `CONFIRMED` | backup verifier가 고정 20개 테이블만 검사하고 Alembic head/전체 schema를 증명하지 않는다. restore 기본은 inventory check도 선택 사항이다. | `scripts/ops/_verify_backup.py:28-93`, `scripts/ops/restore_db.py:221-248` |
 | `CQ-014` | `CONFIRMED` | readiness가 SQLite main DB mtime으로 backup freshness를 판단해 WAL에만 있는 후속 쓰기를 놓칠 수 있다. DB가 없을 때 eager check가 traceback하거나 일반 SQLite URL의 integrity subprocess가 빈 DB 파일을 만들 가능성도 있다. | `operational_readiness.py:49-92,114-128`, `backend/app/database.py:48-55` |
 | `CQ-015` | `RESOLVED_CHECKPOINT_1` | baseline E2E 실패의 stale selector와 자가승인 기대 drift를 Gate 0에서 고쳤고, 사용자가 닫을 수 있던 visible 전용 backend 콘솔도 숨김 실행으로 보강했다. CI E2E non-blocking은 `IC-20`, 보조 E2E 진입점의 Node 20 계약은 `CQ-030`으로 남는다. | RED 단일 0/1, focused 1/1·3/3, 무계측 Node 20 정본 전체 14/14, 숨김 backend 적용 후 전체 14/14. 12.9절 evidence |
-| `CQ-016` | `CONFIRMED` | backend CI는 Python 3.11 단일 버전과 pytest/compile/OpenAPI 중심이며 Ruff/mypy/필수 PostgreSQL job이 없다. | `.github/workflows/ci.yml:14-53` |
-| `CQ-017` | `CONFIRMED` | frontend `tsc`는 tests/e2e를 제외하고 coverage는 선택된 module whitelist만 측정한다. 전체 75%처럼 읽으면 안 된다. | `frontend/tsconfig.json:30-46`, `frontend/vitest.config.mts:11-54` |
+| `CQ-016` | `MITIGATED_CHECKPOINT_2_REPO` | 체크포인트 2 로컬 커밋에 Alembic-head PostgreSQL 2-connection 필수 job과 단계적 Ruff/mypy 0-error 범위를 추가했다. 전체 backend Ruff 사전 부채 184건은 숨기지 않고 `NOT_FULL_COVERAGE`로 남겼으며, 실제 CI 실행은 최종 push 전까지 보류한다. | `.github/workflows/ci.yml`, `backend/pyproject.toml`, `backend/scripts/verify_postgres_concurrency.py` |
+| `CQ-017` | `MITIGATED_CHECKPOINT_2_REPO` | app typecheck와 별도로 unit test manifest/type baseline 및 E2E zero-error typecheck를 blocking gate로 추가했다. unit test 기존 진단 409건은 정규화 baseline으로 고정해 신규 종류·증가만 막으며, 실제 CI 실행은 최종 push 전까지 보류한다. | `frontend/tsconfig.tests.json`, `frontend/tsconfig.e2e.json`, `frontend/scripts/typecheck-baseline.mjs`, `frontend/scripts/verify-test-typecheck-manifest.mjs` |
 | `CQ-018` | `CONFIRMED` | 수동 DTO에 `package_out`이 빠지고 defect `mes_code` nullability가 backend와 다르다. | `frontend/lib/api/types/stock-requests.ts:18-36`, `frontend/lib/api/types/defects.ts:6-16`, `backend/app/routers/defects.py:48-58` |
 | `CQ-019` | `CONFIRMED` | 부서 server state를 React Query, Context fetch, admin bootstrap/panel mutation이 따로 소유해 freshness/error/loading 계약이 다르다. | `DepartmentsContext.tsx:25-69`, `useDepartmentsQuery.ts:16-63`, `useAdminBootstrap.ts:68-78`, `DeptManagementPanel.tsx:51-93` |
 | `CQ-020` | `CONFIRMED` | active shipping list는 무제한/N+1이고 mobile은 추가 page를 소비하지 않아 데이터 증가 시 최신 화면/응답성이 나빠질 수 있다. | `routers/shipping.py:149-169,392-404,659-711`, `useShippingQuery.ts:51-57`, `MobileShippingScreen.tsx:39-42,182-188` |
@@ -578,7 +583,7 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 | `CQ-023` | `CONFIRMED` | 현재 dependency audit에 20건이 보고됐고 production Next와 dev tooling 취약점을 분리해 올려야 한다. | `frontend/package.json:19-40`, 감사 `npm audit --json` evidence |
 | `CQ-026` | `CONFIRMED` | handoff는 이미 열린 결과에서 다른 작성자로 바꿀 때만 animation을 요구하지만 구현·테스트는 첫 작성자 선택에도 적용한다. | `_attic/handoff/archive/2026-08-28-todo-baseline/2026-07-24-shipping-sales-followup-todo.md:262-275`, `_daily_report/DailyWorkReportScreen.tsx:278-298`, 관련 test `:155-166` |
 | `CQ-029` | `RESOLVED_CHECKPOINT_1` | schema readiness는 `0=READY`, `2=NOT_READY`, `3=CHECK_ERROR`로 분리되고 status/watch가 이를 다른 label로 표시한다. | Start/Report × ready/not-ready/check-error/malformed/missing·wrong path/launch-error behavior matrix와 상시 Windows pytest wrapper |
-| `CQ-030` | `MITIGATED_CHECKPOINT_1` | 로컬 E2E가 Node 20을 강제하지 않아 Node 24 PATH에서 Next worker 조기 종료와 연결 거부 연쇄 실패가 발생할 수 있었음 | Gate 0에서 Node 24 실패와 무계측 Node 20 14/14를 비교한 뒤 정본 `verify_e2e.ps1`과 `verify_local -IncludeE2E`가 Node major 20을 Playwright 전에 강제하도록 보강했다. Windows behavior test가 Node 20에서는 npx 호출, Node 24에서는 호출 0과 fail-closed, full gate의 wrapper 위임을 검증한다. `npm run test:e2e` 같은 보조 진입점과 `.nvmrc`·`engines.node` 설치 안내는 `IC-20` 후속 범위다. |
+| `CQ-030` | `RESOLVED_CHECKPOINT_2_REPO` | 로컬 E2E가 Node 20을 강제하지 않아 Node 24 PATH에서 Next worker 조기 종료와 연결 거부 연쇄 실패가 발생할 수 있었음 | 체크포인트 1의 wrapper guard에 더해 `.nvmrc`, `engines.node`, 모든 npm E2E script, Playwright config/global setup에 Node 20 fail-closed 계약을 연결했다. 지원하지 않는 Node에서는 npx·Playwright·제품 서버 호출이 0이며, 실제 CI 성공은 외부 대기다. |
 
 ### 6.5 보존해야 할 현재 강점
 
@@ -610,28 +615,28 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 
 | QP | 현 상태 | 현재 근거와 판단 | 이번 successor |
 |---|---|---|---|
-| `QP-001` 결과 불명·semantic idempotency | **미해결** | frontend timeout은 abort/key 보존이 없고 IO/StockRequest는 fingerprint가 없다. defect의 semantic 409 패턴만 참고 자산이다. `api-core.ts:210-235`, `useIoSubmit.ts:20-44`, `io.py:257-267` | `IC-09` |
-| `QP-002` 행위자 위조 차단 | **미해결** | 공통 VerifiedActor 없이 body/header ID, 일부 익명/비활성 actor mutation이 남는다. | `IC-01` |
-| `QP-003` 운영 DB·dialect 정합 | **부분 해결** | production mode SQLite guard와 SQLite WAL lock이 있고 `IC-27`로 startup check의 DB identity 분리는 해소됐다. 다만 운영 DB 결정과 필수 PostgreSQL concurrency gate는 닫히지 않았다. `database.py:22-63`, `tests/concurrency/conftest.py:36-68` | `IC-08`, `IC-18`, `IC-20`; `IC-27` 완료 |
+| `QP-001` 결과 불명·semantic idempotency | **해결** | CP4에서 IO·StockRequest에 actor+route+payload SHA-256 fingerprint를 저장하고 same-key/different-semantics와 legacy null fingerprint를 `IDEMPOTENCY_CONFLICT`로 거부했다. frontend는 `ResultUnknownError` 동안 같은 key+payload를 보존하며 PostgreSQL 응답 유실 재시도도 물리 반영 최대 1회를 증명했다. | `IC-09` 완료 |
+| `QP-002` 행위자 위조 차단 | **해결** | `VerifiedActorRouter`가 등록된 모든 mutation을 기본 보호하고, 양방향 route/service manifest가 예외와 actor consumer의 차집합 0을 검사한다. body/header 식별값 불일치는 쓰기 전에 `ACTOR_MISMATCH`로 거부한다. | `IC-01` 완료 |
+| `QP-003` 운영 DB·dialect 정합 | **부분 해결** | production mode SQLite guard와 SQLite WAL lock이 있고 `IC-27`로 startup check의 DB identity 분리는 해소됐다. 체크포인트 2 로컬 커밋에 Alembic-head PostgreSQL 2-connection 공통 runner와 필수 CI job을 추가했고, 폐기 가능한 로컬 PostgreSQL 16에서 clean migration과 4개 잠금 행을 실제 실행했다. GitHub 필수 job과 후속 업무별 경합은 남는다. | `IC-08`, `IC-18`; `IC-20` GitHub 증거 대기, `IC-27` 완료 |
 | `QP-004` 승인 정책 단일 진실 | **부분 해결** | 입출고 subtype 상수와 drift test는 생겼지만 role/self/admin/list/count/button 판정은 같은 policy를 쓰지 않는다. `approval_rules.py:1-29`, `sr_execution.py:453-483` | `IC-24`; IO defect 표시/실행은 별도 `RV-007` 결정 |
-| `QP-005` 불량 idempotency·actor | **부분 해결** | same-key/different-payload semantic matcher와 중복 race는 해결. actor 검증은 공통 경계가 없어 미해결. `defects.py:135-167,293-342`, `test_defect_flow.py:323-472` | `IC-01` |
-| `QP-006` 출하 원자 상태 전이 | **미해결** | action transaction은 생겼지만 request/allocation 상태 직렬화, command receipt, 공통 예약은 없다. | `IC-07`, `IC-08` |
-| `QP-007` 거래 정정·취소 수명주기 | **미해결** | 서비스 위임은 개선됐지만 복합 생산/출하의 업무 상태를 일반 effect 취소가 함께 되돌리지 않고 SHIP correction wrong-bucket도 있다. | `IC-03`, `IC-10` |
+| `QP-005` 불량 idempotency·actor | **해결** | 기존 same-key/different-payload semantic matcher·중복 race 보호에 더해, 불량 격리·해제·재작업이 세션 `Employee` actor만 서비스와 원장에 전달하고 위조 요청은 delta 0으로 거부한다. | `IC-01` 완료 |
+| `QP-006` 출하 원자 상태 전이 | **해결** | CP5 W3에서 request/allocation·재고 위치를 결정적 순서로 잠그고, 공통 availability와 shipping command receipt·expected status/version·동일 결과 replay를 한 transaction에 연결했다. 준비·픽업·각 취소와 예약-vs-타 업무 PostgreSQL 경합은 winner 1·loser mutation 0으로 증명했다. | `IC-07`, `IC-08` 완료 |
+| `QP-007` 거래 정정·취소 수명주기 | **해결** | main operation 원장·원자 취소·레거시 증거 편입과 CP4 correction 안전막에 더해 CP5 W4가 shipping pickup, production receipt, 완료 IO batch, StockRequest 실행, defect disassembly의 전용 취소 정책을 추가했다. 기록된 `before_state`, allocation/pending, 업무 상태, event, effect를 한 transaction으로 복원하고 중복·상태 drift·후속 소비·불완전 legacy는 안정된 409와 mutation 0으로 차단했다. | `IC-03`, `IC-10` 완료 |
 | `QP-008` integrity repair 단일 commit | **해결** | `IC-05`에서 service 내부 commit을 제거하고 router가 repair→audit flush→한 commit을 소유한다. audit summary는 `report.repaired`를 사용하며 audit/flush/commit 실패가 재고·audit를 함께 rollback함을 독립 SQL로 증명했다. | `IC-05` 완료 |
-| `QP-009` soft-deleted 품목 계약 | **미해결** | repository/IO lookup이 deleted item을 반환하고 delete가 open command를 확인하지 않는다. | `IC-11` |
+| `QP-009` soft-deleted 품목 계약 | **해결** | repository의 active/deleted-inclusive 조회를 분리하고 command·preview는 active만 사용한다. soft-delete는 item 선잠금 뒤 활성 IO·StockRequest·ShippingRequest·양방향 BOM 참조를 `ITEM_IN_USE`로 거부하며 history/audit/restore는 삭제 품목을 보존한다. | `IC-11` 완료 |
 | `QP-010` 부서 dirty/save Promise | **미해결** | parent dirty false 고정과 void save가 남는다. | `IC-12` |
 | `QP-011` 출하 BOM race·dirty 의미 | **미해결** | dirty는 view 기반으로 확정 drift, BOM match는 generation/abort 없이 경쟁 가능하다. step 5 frozen layout을 건드리지 않고 hook/baseline만 고친다. | `IC-13` |
-| `QP-012` 필수 E2E gate | **미해결** | Gate 0에서 stale selector와 자가승인 기대 drift를 고치고 visible 전용 backend 콘솔을 숨김 실행으로 보강해 로컬 Node 20 정본 14/14를 복구했다. 그러나 CI E2E가 여전히 `continue-on-error: true`라 회귀를 차단하지 못한다. `.github/workflows/ci.yml:109-144` | `IC-20` |
-| `QP-013A` 공통 식별 경계 | **미해결** | VerifiedActor, mutation rate/identity boundary가 없다. PIN rate limiter는 일부 employee 경로뿐이다. | `IC-01` |
-| `QP-013B` PIN 보안 이행 | **대체** | 현재 SHA256/default PIN은 식별용이라는 정책이 유지된다. 인증 수단으로 격상할지는 별도 제품·운영 결정이며 이번 재고 카드에 몰아넣지 않는다. `pin_auth.py:1-29` | 결정 시 독립 security plan |
-| `QP-014` backend 품질 gate | **부분 해결** | pytest/compile/OpenAPI는 있으나 Ruff/mypy/Python matrix/필수 PG job은 없다. | `IC-20` |
-| `QP-015` frontend test type·coverage | **부분 해결** | product `tsc --noEmit`과 whitelist coverage는 실행되지만 tests/e2e typecheck와 위험 module coverage는 빠진다. | `IC-20` |
+| `QP-012` 필수 E2E gate | **부분 해결** | Gate 0의 selector/lifecycle 복구에 이어 체크포인트 2 로컬 커밋에서 E2E `continue-on-error`를 제거하고 Node 20 blocking job을 추가했다. 고정 main이 `REQUESTED→PREPARING` command를 제거한 뒤에는 출하 생성 결과 `PREPARING`과 목록·상세 진입을 검증하는 현행 smoke로 교체했다. 로컬 E2E와 계약은 통과했으며 새 CI 실행·required-check 적용은 최종 push 전까지 보류한다. | `IC-20` 외부 증거 대기 |
+| `QP-013A` 공통 식별 경계 | **해결** | DB-backed opaque session, 공통 `VerifiedActor`, bootstrap/system 예외 manifest, 로그인·최초 변경·일반 변경 공통 rate-limit 계약을 적용했다. | `IC-01` 완료 |
+| `QP-013B` PIN 보안 이행 | **해결** | 승인 설계로 PIN을 mutation credential로 격상했다. 신규 hash는 PBKDF2-HMAC-SHA256 600,000회·무작위 salt를 사용하고 legacy SHA-256은 성공 검증 transaction에서만 승격한다. 기본/미설정 PIN은 10분 active challenge 행의 opaque token을 원자 회전해 호출자에게 다시 전달하고, credential 예산 안에서만 새 PIN 설정을 허용하며 그 전에는 작업 세션을 발급하지 않는다. | `IC-01` 완료; HTTPS는 후속 `SEC-01` |
+| `QP-014` backend 품질 gate | **부분 해결** | 체크포인트 2 working diff에 필수 PostgreSQL job과 Ruff 3파일·mypy 2파일의 0-error blocking 범위를 추가했다. 로컬 PostgreSQL runner는 실제 엔진에서 통과했지만 전체 backend Ruff 사전 부채 184건, Python matrix 확대와 GitHub job 실행은 남는다. | `IC-20` GitHub 증거 대기, 이후 범위 확대 |
+| `QP-015` frontend test type·coverage | **부분 해결** | product typecheck에 더해 unit test manifest/baseline과 E2E zero-error typecheck를 blocking gate로 추가했다. 고정 main 통합 뒤 현행 manifest는 266파일, 받아들인 기존 진단 ceiling은 429건이며 이후 신규 종류·증가는 차단한다. 위험 module coverage 확대와 baseline 감축은 남는다. | `IC-20` 외부 증거 대기, 이후 baseline 감축 |
 | `QP-016` 접근성 공통 계약 | **미해결** | 일부 화면 테스트는 있으나 공통 focus/error/live-region 계약과 필수 a11y gate는 없다. frozen nav styling은 제외한다. | `IC-23` |
 | `QP-017` server-state seam | **부분 해결** | QueryProvider와 departments query는 생겼지만 Context/direct fetch/admin bootstrap/panel mutation이 병존한다. production SWR consumer는 확인되지 않았다. | `IC-14` |
 | `QP-018` shipping frontend module 심화 | **근거 부족** | 대형 조정 component는 남지만 구조 분해 자체보다 QP-006/011과 pagination이 선행이다. 선행 seam을 닫은 뒤 다시 측정한다. | `IC-13`, `IC-16`, `IC-24` 후 재평가 |
 | `QP-019` desktop/mobile IO 공통화 | **해결** | 두 shell이 실제로 `useIoSubmit` 등 공용 hook을 사용해 ADR-0003과 일치한다. 추가 통합을 위한 중복 결함 근거가 없다. | 변경 없음 |
 | `QP-020` OpenAPI↔frontend type | **미해결** | OpenAPI drift gate는 있으나 frontend는 수동 DTO이며 `package_out`/nullable drift가 확인됐다. | `IC-21` |
-| `QP-021` health·오류·shipping 조회 | **부분 해결** | live DB ping과 history pagination이 있고 `IC-27`로 schema report exit 의미는 분리됐다. true liveness/readiness 분리, active list pagination, mobile load-more는 부족하다. | `IC-16`, `IC-19`; `IC-27` 완료 |
+| `QP-021` health·오류·shipping 조회 | **부분 해결** | `IC-19`로 DB 독립 liveness, DB·schema·blocking integrity readiness와 sanitized detailed 진단을 분리했고 `IC-27`의 schema report exit 의미도 유지했다. active list pagination과 mobile load-more는 부족하다. | `IC-16`; `IC-19`, `IC-27` 완료 |
 | `QP-022` bundle·responsive shell·문서 | **부분 해결** | build/bundle gate는 통과. client width shell swap/static import와 문서 drift는 남는다. responsive shell은 `IC-24`에서 실제 bundle/render 측정 후 변경 여부를 결정하고 문서는 `DOC-01`로 고친다. | `IC-24`, `DOC-01` |
 | `QP-023` 측정형 위생 | **부분 해결** | BOM cache와 query-zero test는 개선됨. SWR/useResource 미사용, hook suppression, BOM bytes, dependency는 측정 후 처리한다. | `IC-22`, `IC-24`, `AT-01` |
 
@@ -639,10 +644,10 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 
 | 상태 | 수 |
 |---|---:|
-| 해결 | 2 |
-| 부분 해결 | 9 |
-| 미해결 | 11 |
-| 대체 | 1 |
+| 해결 | 7 |
+| 부분 해결 | 7 |
+| 미해결 | 9 |
+| 대체 | 0 |
 | 근거 부족 | 1 |
 
 `QP-013`을 A/B 두 결정으로 나눠 세었기 때문에 표의 판정 행은 24개지만 원래 QP 번호는 23개 모두 정확히 한 번 이상 판정했다.
@@ -679,13 +684,15 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 
 #### `IC-01` 서버 검증 직원 세션과 VerifiedActor mutation 경계
 
+- **체크포인트 상태:** `완료`. 승인 설계, TDD 구현, 카드별 focused 검증, SQLite 전체 gate, Node 20 frontend 정본 gate와 Playwright 16/16을 통과했다. 체크포인트 3 전용 PostgreSQL 폐기 경합은 URL 부재로 `NOT_VERIFIED`이며 통과로 계산하지 않는다.
 - **작업자 영향:** 누가 수량을 바꿨는지 믿을 수 없으면 수량이 맞아도 원장과 책임 추적을 믿을 수 없다.
 - **근거/근본 원인:** `CQ-001`. router마다 body UUID, 사번 header, 이름 문자열, 무입력을 다르게 신뢰한다.
-- **수정 경계:** 로그인 성공 시 backend가 무작위 opaque token의 SHA-256만 DB session table에 저장하고, 브라우저에는 HttpOnly·SameSite=Lax session cookie를 발급한다. 절대 만료는 12시간이며 로그아웃, PIN 변경·초기화, 직원 비활성화·삭제, backend `boot_id` 변경에서 즉시 폐기한다. `backend/app/dependencies/verified_actor.py`는 이 서버 검증 identity에서 actor를 만들며 StockRequest, IO, defect, production, shipping, dept-adjustment mutation router가 동일 actor object만 service에 전달한다. `_actor.py`는 request context adapter로 축소하고 frontend `sessionStorage` 값은 표시 편의일 뿐 권한 source로 쓰지 않는다.
-- **API/type/schema:** `POST /api/operator-session/login`, `GET /api/operator-session`, `DELETE /api/operator-session`을 추가하고 기존 PIN 확인 endpoint는 한 release 동안 같은 cookie를 발급하는 호환 alias로 둔다. 기존 header/body 직원 값은 표시/요청 대상 값으로만 받고 verified session actor와 다르면 403이다. active 직원, endpoint별 부서/role을 서버에서 검증한다. 기존 audit UUID/code는 유지한다.
-- **실패·취소·경합 정책:** actor 검증 실패는 mutation 전에 401/403으로 끝나며 재고·요청·로그·event가 0이어야 한다. actor는 transaction 중간에 다시 body 값으로 교체할 수 없다.
-- **테스트:** 정상 session, 무서명/변조/만료/revoked session, sessionStorage/header/body만 피해자 값으로 맞춘 위장, 비활성 actor, 다른 body/header, 타 부서 actor matrix. 픽업·생산·불량의 실제 delta와 audit actor까지 확인한다.
-- **합격 조건:** 공통 dependency를 우회하는 활성 재고 mutation router가 0이고, 피해자 ID/header만 아는 client가 피해자로 mutation할 수 없으며 모든 mismatch가 mutation 0을 증명한다.
+- **수정 경계:** 로그인 성공 시 backend가 CSPRNG opaque token의 SHA-256 digest만 `operator_sessions`에 저장하고 브라우저에는 HttpOnly·SameSite=Lax cookie를 발급한다. 절대 만료는 12시간이며 로그아웃, PIN 변경·초기화, 직원 비활성화·삭제, backend `boot_id` 변경에서 즉시 폐기한다. `VerifiedActorRouter`는 등록된 모든 POST/PUT/PATCH/DELETE를 기본 보호하고, IO·StockRequest·불량·생산·출하·부서조정·거래 정정/취소·인수인계·창고지도·설정/관리자 복구까지 동일한 서버 `Employee` actor만 service에 전달한다. `_actor.py`와 감사 계층은 request state adapter로 축소했으며 frontend cache와 식별 header는 권한 source가 아니다.
+- **API/type/schema:** additive migration `20260819_0023`이 `employees.pin_requires_change`, `operator_sessions`, `admin_audit_logs.bootstrap_employee_id`와 인덱스를 추가하고 legacy null/default/custom PIN을 backfill한다. `POST /api/operator-session`, `GET /api/operator-session`, `DELETE /api/operator-session`, `POST /api/operator-session/complete-pin-change`를 추가했다. 기존 `POST /api/employees/{employee_id}/verify-pin`은 한 release 동안 canonical service를 호출하는 alias다. body/header 직원 claim이 session actor와 다르면 403이며, default/미설정 PIN은 409 challenge만 만들고 작업 세션을 발급하지 않는다.
+- **PIN·감사 정책:** 신규 PIN은 PBKDF2-HMAC-SHA256 600,000회·무작위 salt의 버전형 문자열로 저장하고, legacy 비기본 SHA-256은 로그인 성공 transaction에서만 승격한다. 기본 PIN challenge는 `verified_actor`가 아니며 `bootstrap_employee_id`와 request ID로 별도 감사한다. 관리자 PIN의 기존 결정론적 hash 계약은 직원 PBKDF2 helper와 분리해 유지한다.
+- **실패·취소·경합 정책:** actor 검증 실패는 mutation 전에 401/403으로 끝나며 재고·요청·로그·event가 0이다. mutation dependency는 session·employee 행을 잠그고, 폐기와 경합할 때 SQLite `BEGIN IMMEDIATE` 또는 PostgreSQL `FOR UPDATE`의 한 순서만 성공할 수 있게 한다. actor는 transaction 중간에 body 값으로 교체할 수 없다.
+- **테스트:** migration upgrade/forward-compatible 재실행, null/default/custom PIN, 정상·변조·만료·revoke·restart·비활성·삭제 cascade, 기본 PIN mutation 0, spoof·rollback, route/service manifest 양방향 차집합 0, 실제 IO·StockRequest·불량·생산·출하·부서조정·거래·인수인계·창고지도·설정 경계를 검증했다. frontend는 로그인·최초 변경·reload 복원·logout·401 복귀와 실제 쿠키 E2E를 검증했다.
+- **합격 조건:** 등록된 공통 dependency 우회 mutation router 0, manifest 미분류/중복 0, 피해자 ID/header만 아는 client의 피해자 mutation 0, default/미설정 PIN의 새 PIN 설정 전 mutation 0을 충족했다. SQLite 경합은 통과했고 PostgreSQL 경합은 `TEST_POSTGRES_URL` 부재로 `NOT_VERIFIED`다.
 - **의존성/롤백:** `IC-02`·`IC-05`의 국소 데이터 수정과 병렬 설계할 수 있으나, 나머지 mutation API 카드는 이 경계 이후 배포한다. rollback은 서버 session 발급/검증을 한 release 호환 mode로 유지하되 무검증 header 신뢰로 되돌아가지 않고 mutation을 fail-closed한다.
 
 #### `IC-02` 부서조정 `scrap` 무음 성공 제거
@@ -702,24 +709,27 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 
 #### `IC-03` 업무 수명주기와 일반 거래취소 분리
 
-- **작업자 영향:** 취소 후 수량은 돌아왔는데 출하/생산/요청 상태는 완료로 남는 상태를 막는다.
-- **근거/근본 원인:** `CQ-002`. `InventoryEffect`가 업무 상태를 포함하지 않는데 일반 cancel이 보편적 취소처럼 노출된다.
-- **수정 경계:** `transaction_actions.py`에 `CancelPolicy` 판정을 두고, shipping·production receipt·IO batch·StockRequest·defect disassemble의 전용 cancel module로 위임한다. history router는 policy 결과만 표시/실행한다.
-- **API/type/schema:** linked workflow log의 일반 correction/cancel은 즉시 409와 machine-readable reason을 반환한다. 새 생산 receipt부터 하나의 불변 `operation_batch_id`를 모든 관련 log에 저장하는 additive migration을 한다. 선택적·비고유 reference로 legacy 생산 log를 자동 묶거나 backfill하지 않는다. 과거 log는 단일 업무 귀속이 증명되지 않으면 일반 correction/cancel 불가로 유지한다.
-- **실패·취소·경합 정책:** 하나의 업무는 관련 effects, allocations/pending, request/batch status, events가 한 transaction에서 모두 되돌아가거나 전부 그대로 남는다. 이미 다음 업무가 소비한 재고라면 음수 방지와 409가 우선이다.
-- **테스트:** shipping pickup SHIP→수량정정/일반 cancel, production receipt의 BACKFLUSH 하나 correction/cancel, mixed defect disassembly, IO batch, cancel×2, cancel-vs-dedicated-cancel. 전후 SQL과 effect 합, 업무 상태를 검증한다.
-- **합격 조건:** location/workflow-linked SHIP을 warehouse에서 정정하는 경로 0, 업무 metadata가 있는 log를 단일 effect로만 취소할 수 있는 경로 0, 각 업무 cancel matrix 부분 상태 0.
-- **의존성/롤백:** `IC-08`의 조건부 전이와 함께 가면 강해지지만 우선 409 차단은 독립 배포 가능하다. migration은 additive로 두고 classifier를 이전 버전으로 되돌릴 수 있다.
+- **체크포인트 상태:** `완료`(2026-09-02). 고정 `main`의 operation identity·원자 취소·증거 기반 legacy 편입, CP4 correction 안전막, CP5 W4 전용 workflow cancel을 모두 닫았다. W4 제품 commit은 `ac8f26d570e728f193c1b2b40b8efdae7fe2363e`, 기존 handover 취소 회귀 수정은 `8a66907014cfa7c5cd5de90e7d3b42d599a56ccf`다.
+- **해결·대체 경계:** 별도 `operation_batch_id`나 중복 원장은 만들지 않았다. 기존 `InventoryOperation` 역전 엔진 위에 `(domain, action)` `CancelPolicy`를 두고 shipping pickup, production receipt, 완료 IO batch, StockRequest 실행, defect disassembly만 기록된 증거로 복원한다. 정확한 v2 `handover/receive`는 CP4의 기존 종료 계약을 유지하되 변형 effect나 shipping/IO 연결 로그가 섞이면 fail-closed한다.
+- **작업자 영향:** 취소 후 수량만 돌아오고 출하·생산·요청·불량 상태가 완료로 남거나, 반대로 상태만 돌아오고 원장·예약이 남는 부분 취소를 차단한다.
+- **근거/근본 원인:** 원 감사 `CQ-002`, 최신 successor `IC-03-B`. 일반 원장 역전만으로는 업무 owner 상태, allocation/pending, event를 정확히 복원할 수 없고 여러 취소 진입점의 잠금 순서도 달랐다.
+- **수정 경계:** history router는 정책 결과와 공통 오류 매핑만 소비한다. 정책 계층이 owner-first 잠금, 기록된 `before_state`, allocation/pending, event, effect 역전을 소유하며 문자열 추정이나 자동 legacy backfill은 하지 않는다.
+- **API/type/schema:** 기존 URL·성공 response shape와 DB schema를 유지한다. correction 충돌은 `CORRECTION_CONFLICT`, workflow 취소는 `WORKFLOW_CANCEL_UNSUPPORTED`, `WORKFLOW_STATE_CONFLICT`, `WORKFLOW_ALREADY_CANCELLED`, `WORKFLOW_DEPENDENCY_CONFLICT`를 HTTP 409로 반환한다.
+- **실패·취소·경합 정책:** 하나의 업무는 effects, allocation/pending, request/batch 상태, event가 한 transaction에서 모두 복원되거나 전부 그대로 남는다. 중복 취소, owner 상태 drift, 후속 소비, 불완전 legacy, 다중 IO execution은 mutation 0으로 거부한다. history 취소와 출하 전용 취소는 같은 owner-first 잠금 순서를 사용한다.
+- **테스트:** 5개 업무의 정상·중복·부분 실패·후속 소비·상태 drift matrix, API reason code, 실제 PostgreSQL 16의 cancel×2, history-vs-shipping, cancel-vs-next-consume, 기존 handover cancel×2를 검증했다. 최종 W4 회귀 묶음은 SQLite 147/147, PostgreSQL 4/4, 신규 deadlock 0이며 독립 명세·품질 리뷰는 Critical/Important/Minor 0이다.
+- **합격 조건:** expected delta, 독립 SQL before/after delta, operation/effect delta가 일치하고 loser의 allocation/pending/log/effect/event 잔존은 0이다. GitHub CI run `33589486541`의 6개 job이 모두 성공해 카드 전체를 완료했다.
+- **의존성/롤백:** schema 변화가 없어 두 W4 commit을 독립 revert할 수 있다. `IC-07`·`IC-08` 뒤에 완료했으며 다음 순서는 `IC-17`이다.
 
 #### `IC-04` inventory cutover의 미결 출하 차단
 
+- **체크포인트 상태:** `저장소 구현·이중 리뷰·로컬 PostgreSQL 증명 완료, GitHub 필수 job 대기`. 현행 4개 status×9개 allocation 조합의 persisted 36행, legacy `PICKED_UP`, orphan allocation/log, 손상 effect, CLI evidence, SQLite writer exclusion과 rollback을 검증했다. 공식 EDB PostgreSQL 16의 폐기 가능한 로컬 DB에서 공통 runner의 cutover 두 연결 차단도 skip 없이 통과했다.
 - **작업자 영향:** 새 기준 재고를 올린 직후 과거 출하가 다시 차감하는 위험을 제거한다.
 - **근거/근본 원인:** `RV-002`. cutover의 삭제 집합과 shipping lifecycle의 소유권이 분리되어 있다.
 - **수정 경계:** `scripts/ops/inventory_cutover.py`, cutover runbook, 관련 ops tests. 제품 runtime shipping service는 cutover용 우회 로직을 넣지 않는다.
 - **업무 결정:** shipping history를 유지하는 `--keep-history`는 허용하지 않는다. 상태×allocation 조합상 향후 pickup·cancel 등으로 재고를 다시 증감할 수 있는 `ShippingRequest` 또는 `ShippingAllocation`이 하나라도 존재하면 cutover를 0 mutation으로 fail-closed한다. 단순히 terminal row가 존재한다는 이유만으로 영구 차단하지 않고, 각 조합의 미래 허용 command와 inventory delta 가능성을 선언적 표로 판정한다. 승계가 필요하면 nonterminal뿐 아니라 `PICKED_UP/CONSUMED`의 역취소 가능성까지 포함한 모든 lifecycle을 내보내 별도 migration plan으로 승인한다. 자동 삭제·자동 승계는 기본값으로 두지 않는다.
 - **API/type/schema:** CLI preflight와 evidence report만 변경, schema 없음. 결과에 request/status/allocation 합과 차단 이유를 남긴다.
 - **실패·취소 정책:** preflight 실패는 어떠한 테이블도 변경하지 않는다. apply 중 실패는 기존 single transaction rollback과 backup 복구 경로를 유지한다.
-- **테스트:** REQUESTED/PREPARING/PREPARED/PICKED_UP/CANCELLED별 cutover, active/released/consumed allocation, `--keep-history` 거부, cutover→pickup과 cutover→pickup-cancel 차단, dry-run/apply, 후반 failure rollback.
+- **테스트:** PREPARING/PREPARED/PICKED_UP/CANCELLED별 cutover, active/released/consumed allocation, `--keep-history` 거부, cutover→pickup과 cutover→pickup-cancel 차단, dry-run/apply, 후반 failure rollback. 삭제된 `REQUESTED`는 현행 persisted matrix에 포함하지 않는다.
 - **합격 조건:** 미결 출하가 있는 기본 apply는 0 mutation으로 실패하고, 성공 cutover 뒤 old request가 새 baseline을 소비할 경로가 없다.
 - **의존성/롤백:** open shipping 처리 정책 승인이 선행이다. CLI guard는 제거 가능하지만 운영 runbook에는 구버전 실행 금지와 백업 복구 절차를 유지한다.
 
@@ -737,20 +747,22 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 
 #### `IC-06` 창고 물리 위치(box·special zone) 정책 preflight와 정합화
 
+- **체크포인트 상태:** `완료`. W1 read-only preflight와 Gate A 승인 뒤 additive `20260831_0032`로 `warehouse_unplaced_items`를 도입했고, 전체 활성 품목에 `B+활성 Z+U=W`를 적용했다. 구현 commit은 `e1a55b835137aa0092c41c1340263e77b0829a3c`다.
 - **작업자 영향:** 지도상 재고와 창고 총재고가 출고·취소 뒤 달라지는 위험을 줄인다.
 - **근거/근본 원인:** `CQ-007`. reconcile source와 outbound/effect source가 다르고 중복 row identity가 불명확하다.
-- **수정 경계:** 1차 change는 read-only duplicate/placement report와 정책 ADR만 작성한다. 정책 승인 뒤에만 `warehouse_map` service, `inv_effect`, box/zone schemas/routers, integrity checks를 수정한다.
+- **수정 경계:** `warehouse_map` service, inventory effect·취소, box/zone/unplaced model·schema·router, 품목 lifecycle, seed·운영 스크립트와 화면 표시 계약을 함께 맞췄다. 주간보고·모바일 하단 탭·출하 5단계 동결 파일은 변경하지 않았다.
 - **업무 결정:** `W`는 회계 총량이고, tracking 활성 품목의 물리 배치 원장은 `B + Z + U = W`를 항상 만족해야 한다. `B`는 box, `Z`는 special zone, `U`는 명시적인 미배치 bucket이다. 위치가 정해지지 않은 입고를 숨은 차이로 남기지 않고 `U`에 기록하며, 출고 command는 작업자가 실제 source를 고르거나 사전에 확정된 결정적 priority를 사용해야 한다.
-- **API/type/schema:** 동일 container 내 `(container_id,item_id)` unique 또는 명시적 line identity가 필요하면 migration과 duplicate merge report를 먼저 만든다. 임의 merge 금지.
-- **실패·취소 정책:** consume/cancel effect는 실제 변경한 box/zone row 모두를 stable row ID로 기록한다. 부분 복원 금지.
-- **테스트:** preflight가 mutation 0인지 먼저 검증한 뒤, 승인된 정책에 대해 box+zone 혼합, zone-only, 동일 item 중복 row, consume/cancel, 부족, 동시 restack/outbound, legacy duplicate를 검증한다.
-- **합격 조건:** tracking 활성 행에서 `W`, `B+Z+U`, effect delta가 항상 일치하고 integrity가 불일치를 blocking fail로 잡는다.
-- **의존성/롤백:** 위 `W/B/Z/U` 정책은 승인 완료 상태다. 구현 전 duplicate report를 보존하고 new identity column은 additive로 시작한다. 정책 배포 실패 시 outbound를 fail-closed로 전환한다.
+- **API/type/schema:** `(box_id,item_id)`, `(zone_id,item_id)`, unplaced `item_id`를 unique로 만들고 기존 B/Z UUID는 보존한다. duplicate·orphan·음수·비활성 zone 수량·`B+Z>W`는 migration에서 자동 merge/backfill하지 않고 fail-closed한다. map/reconcile 응답에는 B/Z/U와 invariant를 additive로 노출한다.
+- **실패·취소 정책:** 출고는 `R1 box → 활성 zone(display_order·zone_id·row_id) → U` 순서로 차감한다. contract v2는 실제 B/Z/U row UUID effect를 남기고 취소·정정은 그 행만 정확히 역전한다. 행 소실·후속 소비·비활성 zone 충돌은 409와 mutation 0이며 legacy v1 위치는 추정하지 않는다.
+- **테스트:** migration fresh/upgrade/downgrade·late DDL rollback, box+zone+unplaced 혼합, 부족, consume/cancel/correction, item delete/restore, seed·ops script, PostgreSQL restack/outbound·삭제·취소·부서/불량 교차 경합을 검증했다. fresh DB 순서 의존 fixture 결함도 격리·원상복구 방식으로 수정했다.
+- **합격 조건:** 전체 활성 품목에서 `W=B+활성 Z+U`, 실제 SQL delta와 v2 effect row UUID가 일치하고 PostgreSQL 필수 runner가 fresh 최초 실행부터 52/52·skip 0이다.
+- **의존성/롤백:** `0032`는 additive이며 legacy 위치를 추정해 backfill하지 않는다. 배포 전 W1 preflight report를 보존하고 anomaly가 있으면 migration과 outbound가 fail-closed한다.
 
 ### 8.3 Wave 2 — 예약·멱등성·잠금·원자 상태 전이
 
 #### `IC-07` 출하 예약을 모든 소비 경로가 존중하는 공통 availability
 
+- **체크포인트 상태:** `완료`. CP5 W3 commit `530a29ec3a8c315b07004e69b7ab1d6dc17ed4a3`에서 공통 availability와 동일 transaction 재검산을 적용했다.
 - **작업자 영향:** 준비 완료한 출하가 다른 작업 때문에 픽업 직전에 부족해지는 일을 막는다.
 - **근거/근본 원인:** `CQ-006`. StockRequest pending과 ShippingAllocation이 분리되고 primitive마다 보는 예약이 다르다.
 - **수정 경계:** 순수 `stock_availability` policy module을 만들고 warehouse/department consume, production backflush, IO, defect, shipping prepare가 같은 계산과 lock order를 사용한다. `ShippingAllocation`은 상세 예약 ledger로 유지하되 공통 blocked quantity에 포함한다.
@@ -762,6 +774,7 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 
 #### `IC-08` 출하 command receipt와 조건부 상태 전이
 
+- **체크포인트 상태:** `완료`. additive `20260831_0033`과 CP5 W3 commit `530a29ec3a8c315b07004e69b7ab1d6dc17ed4a3`에서 command receipt, semantic replay, expected status/version, 원자 취소를 적용했다.
 - **작업자 영향:** 중복 클릭·네트워크 재시도·동시 작업자가 준비/픽업을 두 번 실행하지 못한다.
 - **근거/근본 원인:** `RV-003`. transaction wrapper는 있지만 request/allocation 직렬화와 command identity가 없다.
 - **수정 경계:** `shipping_workflow` module 뒤에 request lock, deterministic inventory lock, expected-state transition, command receipt/fingerprint를 모은다. router는 입력과 오류 mapping만 한다.
@@ -773,10 +786,11 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 
 #### `IC-09` IO·StockRequest 결과 불명과 semantic idempotency
 
+- **체크포인트 상태:** `완료`. `io_batches`·`stock_requests.request_fingerprint VARCHAR(64)`와 actor+route+command+재고 의미 payload의 canonical SHA-256을 `20260828_0031`에 추가했다. 동일 actor+route+key+fingerprint만 replay하고 다른 의미 또는 legacy null fingerprint는 HTTP 409 `IDEMPOTENCY_CONFLICT`와 0 mutation이다. frontend `ResultUnknownError`는 transport uncertainty 동안 same key+payload를 유지한다. 구현 commit은 `1618a88c325564548f187e7fb62f76a0096d4ab5`다.
 - **작업자 영향:** timeout 뒤 재시도가 중복되거나, 수정한 재시도가 조용히 이전 결과로 바뀌는 일을 막는다.
 - **근거/근본 원인:** `RV-001`, `CQ-005`.
 - **수정 경계:** frontend transport는 `AbortController`와 명시적 `ResultUnknownError`를 제공한다. `useIoSubmit`은 결과 불명 동안 같은 key+payload fingerprint를 보존하고 이력 확인 UI를 제공한다. backend IO/StockRequest는 canonical payload fingerprint를 저장·비교한다.
-- **API/type/schema:** IoBatch/StockRequest에 fingerprint additive column과 backfill 정책이 필요하다. canonical JSON은 line 정렬, decimal normalization, actor/operation을 포함하되 UI-only field는 제외한다.
+- **API/type/schema:** IoBatch/StockRequest에 fingerprint additive column과 backfill 정책이 필요하다. canonical JSON은 object key와 의미상 unordered collection만 안정 정렬하고, bundles·lines처럼 API가 list로 받는 ordered collection의 순서는 보존한다. decimal normalization, actor/route/command를 포함하되 UI-only field는 제외한다. 따라서 같은 line의 순서만 바꾼 요청도 다른 fingerprint다.
 - **실패·취소·경합 정책:** same key+same fingerprint만 기존 결과; same key+different fingerprint 409; timeout/connection loss는 key 유지; 명시적 성공/검증된 실패 뒤에만 새 key.
 - **테스트:** fake timer/deferred fetch late success, response loss 후 retry, same key same/different payload, 두 connection insert race, legacy null fingerprint, multi-line ordering.
 - **합격 조건:** 결과 불명 scenario에서 가능한 물리 반영은 최대 1회이고 payload 변경은 절대 이전 성공으로 응답하지 않는다.
@@ -784,6 +798,7 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 
 #### `IC-10` handover·correction·cancel 조건부 전이
 
+- **체크포인트 상태:** `완료`. handover는 owning row를 잠그고 `SUBMITTED`를 재검증한 뒤 inventory를 결정적 순서로 잠근다. correction은 log·operation·inventory를 잠근 뒤 최신 상태를 재계산하며 기존 cancel 원장과 같은 잠금 순서를 사용한다. 실제 PostgreSQL의 handover×2, correction×2, cancel×2, correction-vs-cancel, rollback 후 retry와 응답 유실 retry에서 물리 반영 최대 1·성공자 1·loser orphan/부분 log 0을 증명했다.
 - **작업자 영향:** 같은 인수인계 수령·수량정정·취소를 두 사람이 동시에 실행해 이중 반영하는 가능성을 제거한다.
 - **근거/근본 원인:** `RV-004`.
 - **수정 경계:** 각 command가 owning document/log를 `FOR UPDATE` 또는 `WHERE status=expected` update로 선점한 뒤 inventory lock을 결정적 순서로 잡는다. stale absolute correction 계산은 lock 안에서 다시 한다.
@@ -795,11 +810,12 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 
 #### `IC-11` soft-deleted 품목 command 계약
 
+- **체크포인트 상태:** `완료`. item repository를 `get_active`와 `get_including_deleted`로 분리하고, command/preview는 active만, history/audit/restore는 deleted-inclusive만 사용한다. 구현·보완 commit은 `a62546a5e689a2a6311471ed0965eb879939841a`, `19d030b1d060ae1b74424843d9388438779f9951`다.
 - **작업자 영향:** 목록에서 삭제한 품목이 새 작업에 다시 나타나거나 이동하는 혼란을 막는다.
 - **근거/근본 원인:** `CQ-009`.
 - **수정 경계:** repository에 `get_active`와 `get_including_deleted`를 명시하고 command/preview는 active만, history/audit는 including-deleted만 사용한다. soft-delete preflight가 open IO/StockRequest/shipping/BOM 참조를 검사한다.
-- **API/type/schema:** open reference가 있으면 409와 참조 목록을 반환한다. schema 변경 없음.
-- **실패·취소 정책:** delete 자체와 BOM 정리는 한 transaction. history는 품목 snapshot으로 계속 보인다.
+- **API/type/schema:** open reference가 있으면 HTTP 409 `ITEM_IN_USE`, `extra.total`, 최대 50개의 `refs(kind/id/status)`를 반환한다. schema 변경 없음.
+- **실패·취소 정책:** BOM 자동 삭제는 금지한다. item row를 먼저 잠근 뒤 활성 IO·StockRequest·ShippingRequest의 base/BOM/companion/allocation 및 양방향 BOM 참조를 재검증하고, 참조 0일 때만 `deleted_at`과 audit을 한 transaction에서 확정한다. history는 품목 snapshot으로 계속 보인다.
 - **테스트:** deleted item preview/submit/restore, open draft/reserved/prepared reference, history 조회, concurrent delete-vs-submit.
 - **합격 조건:** 새 command가 deleted item을 수용하는 활성 경로 0, 과거 거래 조회는 유지.
 - **의존성/롤백:** `IC-01` actor와 무관한 독립 command lookup 변경이다. repository call-site 변경은 국소 revert 가능하며 DB 데이터 변형이 없다.
@@ -886,6 +902,8 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 - **테스트:** 각 invariant를 하나씩 깨뜨린 DB, 여러 mismatch, warning cutoff, SQLite/PostgreSQL query, health/readiness propagation.
 - **합격 조건:** 필수 불변식 표의 각 항목에 최소 1개의 fail test가 있고 false-green 0.
 - **의존성/롤백:** `IC-06`의 W/B/Z 정책과 `IC-07` reservation contract가 선행한다. 새 check를 ID별로 일시 warning 전환할 수 있지만 데이터 손상 P0 check는 flag로 우회하지 않는다.
+- **체크포인트 상태:** `완료`(2026-09-02). 공통 순수 `inventory-integrity/v1` engine을 CLI·관리자 API·detailed health가 함께 소비하며, 데이터 위반·사용/config·DB/schema/tool 오류의 종료 코드를 `1`·`2`·`3`으로 분리했다. 제품 commit은 `fb339b5dc29013fc97af5035905431177ec54aea`, GitHub CI run `33606010198`은 6/6 success다.
+- **완료 증거:** SQLite contract 37/37, W5 전용 실제 PostgreSQL 22/22, 관련 backend 204/204, 관리자 UI 3/3, 최종 독립 명세·품질 리뷰 Critical/Important/Minor 0이다. location pending, StockRequest, ShippingAllocation, B/Z/U, orphan, contract v2 effect 위반은 blocking이며 v1 missing effect만 cutoff 이전 warning으로 유지한다. 세부 closeout은 12.23절을 따른다.
 
 #### `IC-18` backup·restore·readiness의 schema와 WAL 증명
 
@@ -896,35 +914,40 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 - **실패·복구 정책:** DB missing/empty이면 후속 validator를 실행하지 않고 즉시 요약된 FAIL. SQLite validator는 read-only URI/query-only로만 열어 실패 경로가 빈 DB 파일을 만들지 않는다. stale/invalid backup은 traceback이 아니라 FAIL. PostgreSQL은 pg_dump exit만으로 valid 처리하지 않고 임시 restore 검증 경로를 둔다.
 - **테스트:** WAL-only write 뒤 backup freshness, table/column/index 누락, wrong head, corrupt FK, missing DB에서 파일 생성 0과 후속 subprocess 0, staged restore failure와 원 DB 보존.
 - **합격 조건:** backup valid가 감사 SHA의 schema head와 복구 가능한 snapshot을 의미하고 readiness가 항상 명시적 exit code를 반환한다.
-- **의존성/롤백:** `IC-17`의 check ID/schema를 소비하므로 그 contract 뒤에 적용한다. manifest 없는 legacy backup은 `legacy-unverified`로 읽기만 허용하고 새 verifier 결과를 위조해 PASS시키지 않는다.
+- **의존성/롤백:** `IC-17`의 check ID/schema를 소비하므로 그 contract 뒤에 적용한다. manifest 없는 legacy backup은 `LEGACY_UNVERIFIED`로 읽기만 허용하고 새 verifier 결과를 위조해 PASS시키지 않는다.
+- **체크포인트 상태:** `완료`(2026-09-05). `backup-manifest/v1` sidecar를 artifact 뒤에 원자 publish하고 hash·size·engine·Alembic revision·schema fingerprint·data revision·snapshot hash·검증 receipt를 고정했다. SQLite online backup/WAL freshness와 PostgreSQL dump의 폐기 가능한 임시 DB 복구 검증, staged restore, retention·NAS·cleanup pair, runtime recovery owner까지 같은 계약으로 묶었다.
+- **완료 증거:** SQLite manifest contract 146/146, retention 11/11, 실제 PostgreSQL 28/28, canonical PostgreSQL runner 129 scenarios 100%, 최종 GitHub CI run `33923104275` 6/6 success다. 제품 commit은 `d43ab268cb6fa9dcde94e9b93203978f3550c73d`, CI 이식성 보완은 `dffb8e01e713d58e3d6df678ee98c0cfc20cd1e5`·`fd34189400f63225164c007bffcf7f561b813eb6`이며 세부 closeout은 12.24절을 따른다.
 
 #### `IC-19` health endpoint 의미 분리
 
 - **작업자 영향:** 프로세스가 살아 있는지와 업무를 받아도 되는지를 운영자가 구분할 수 있다.
-- **근거/근본 원인:** `/health/live`가 DB SELECT에 의존하고 detailed는 total 식 일부만 반영한다. `backend/app/main.py:319-378`, `services/integrity.py:88-118`
+- **근거/수정 전 원인:** 수정 전 `/health/live`가 DB SELECT에 의존하고 detailed는 total 식 일부만 반영했다. 원 감사 근거는 `backend/app/main.py:319-378`, `services/integrity.py:88-118`이다.
 - **수정 경계:** live는 process event loop만, ready는 DB 연결·schema head·필수 dependency, detailed/integrity는 업무 불변식을 담당한다.
 - **API/type/schema:** health response field를 versioned 문서로 고정하고 deploy/readiness scripts consumer를 함께 수정한다.
 - **실패 정책:** DB down은 live 200/ready 503, invariant mismatch는 ready 정책 결정에 따라 503 또는 별도 operational block으로 명시한다.
 - **테스트:** process up/DB down/wrong schema/invariant fail, deployment script routing.
 - **합격 조건:** 각 endpoint가 한 의미만 가지며 운영 문서와 script가 같은 endpoint를 사용한다.
 - **의존성/롤백:** `IC-17` check severity와 `IC-18` operational consumer contract 뒤에 적용한다. 기존 `/health/live` alias를 한 release 유지하되 새 orchestration은 `/health/ready`로 먼저 전환한다.
+- **체크포인트 상태:** `완료`(2026-09-05). `/health/live`는 DB를 조회하지 않는 process/event-loop liveness로 고정했고(`backend/app/main.py:367`), `/health/ready`는 DB·Alembic head·dependency·blocking integrity를 판정한다(`backend/app/main.py:397-596`). `/health/detailed`는 같은 readiness 결과와 sanitized integrity ID/count를 additive로 제공한다(`backend/app/main.py:647-706`). startup·E2E는 ready, Docker·restart는 live를 소비하며 status/watch는 alive와 ready를 분리했다.
+- **완료 증거:** 제품 commit `b27ba39cd2cbad574fda30af9c118697086c30ad`, backend focused 64건, Node 20 E2E readiness 계약 7/7, PowerShell runtime 계약, 실제 PostgreSQL을 포함한 로컬 full gate 18/18, Playwright 17/17, 독립 명세·품질 리뷰 Critical/Important/Minor 0, GitHub CI run `33934558904` 6/6 success다. 세부 closeout은 12.25절을 따른다.
 
 ### 8.6 Wave 5 — 일반 구조·타입·테스트 seam
 
 #### `IC-20` 필수 E2E·test type·PostgreSQL gate 복구
 
-- **체크포인트 상태:** `부분 완료`. stale selector·자가승인 기대를 바로잡고 전용 backend를 숨김 실행해 Node 20에서 14/14를 복구했으며, `verify_e2e.ps1`은 다른 Node major에서 Playwright 전에 fail-closed한다. CI blocking, version file/`engines.node`, test typecheck와 PostgreSQL job은 후속 범위다.
+- **체크포인트 상태:** `저장소 구현·이중 리뷰·로컬 PostgreSQL 증명 완료, 실제 CI·required-check 증거 대기`. 체크포인트 1의 selector·숨김 backend를 유지하면서 `.nvmrc`/`engines.node`/모든 E2E entry의 Node 20 fail-closed, unit 247파일 manifest와 409진단 baseline, E2E zero-error typecheck, blocking 출하 smoke, 단계적 Ruff/mypy, Alembic-head PostgreSQL 2-connection 공통 runner/job을 구현했다. URL 부재 시 runner는 거짓 성공 대신 exit 3 `NOT_VERIFIED`이며, 폐기 가능한 로컬 PostgreSQL 16에서는 clean base→head와 필수 4행을 skip 없이 통과했다.
 - **작업자 영향:** 실제로 깨진 재고/승인/화면 흐름이 CI에서 초록으로 통과하지 못하게 한다.
 - **근거/근본 원인:** 체크포인트에서 해결한 `CQ-015`, `CQ-030`과 남은 `CQ-016`, `CQ-017`.
 - **수정 경계:** 완료된 selector/runtime guard를 유지하고 핵심 smoke E2E는 blocking job으로 분리한다. Node 20 버전 파일과 `engines.node`로 설치 단계도 맞춘다. 별도 test tsconfig로 unit/e2e typecheck, backend Ruff/mypy 단계적 baseline, PostgreSQL concurrency job을 추가한다.
 - **API/type/schema:** 없음. CI artifact naming과 required check 설정 변경.
 - **실패 정책:** flaky 격리는 quarantine 목록·owner·만료일이 있는 경우만 허용하고 핵심 재고 smoke는 `continue-on-error` 금지.
-- **테스트:** Node 20에서 현 14 E2E, 지원하지 않는 Node major의 명시적 fail-fast, inventory/approval/shipping smoke, test source typecheck, PG race matrix.
+- **테스트:** Node 20에서 기존 14 E2E와 신규 shipping smoke를 포함한 15 E2E, 지원하지 않는 Node major의 npx 호출 0 fail-fast, test source typecheck, PG race matrix.
 - **합격 조건:** baseline E2E 14/14, 전용 backend 콘솔 노출 0, 로컬·CI Node major drift 0, 지원하지 않는 runtime에서 Next worker cascade 전 명시적 오류, 필수 job non-optional, tests/e2e type error가 CI를 실패시킴.
 - **의존성/롤백:** `IC-08`·`IC-10` 완료 선언에 필요한 선행 infrastructure다. 신규 broad lint는 기존 debt를 baseline file로 단계 적용하되 핵심 E2E/PG safety job은 optional로 되돌리지 않는다.
 
 #### `IC-21` OpenAPI 기반 frontend DTO 연결
 
+- **체크포인트 상태:** `완료 (2026-09-08)`. 생성 raw type·업무 adapter·drift guard·unknown 명령 차단을 구현하고 두 리뷰 C/I/M0 및 exact commit `1ad03e37`의 실제 CI34149717620 6/6을 확인했다. 최초 실패와 증분 복구를 포함한 근거는12.28.1~12.28.2다.
 - **작업자 영향:** backend가 보내는 null/enum을 화면이 잘못 가정해 수량 작업이 중단되는 일을 줄인다.
 - **근거/근본 원인:** `CQ-018`, 수동 DTO drift.
 - **수정 경계:** OpenAPI에서 생성한 raw types와 업무 친화 adapter를 분리한다. 직접 hand-written enum은 adapter 테스트로만 유지한다.
@@ -938,7 +961,7 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 
 - **작업자 영향:** production runtime 취약점은 신속히 줄이고, dev-tool 대규모 upgrade가 제품 회귀와 섞이지 않게 한다.
 - **근거/근본 원인:** `CQ-023`, 현재 audit 20건.
-- **수정 경계:** 1차 Next `14.2.3→14.2.35` 호환 범위, 2차 Vitest/coverage, 3차 ESLint/PostCSS로 PR을 분리한다.
+- **수정 경계:** 초기14.2.35 목표는 지원 정책 재확인으로 대체했다. 1차 Next16.3.4·React19 호환, 2차 Vitest/coverage3.2.7, 3차 ESLint/PostCSS를 독립 로컬 commit/rollback으로 분리한다(12.28.3). B2 전체 push/CI는 한 번으로 묶으며 PR은 생성하지 않는다.
 - **API/type/schema:** 없음. lockfile과 build artifact만 변함.
 - **실패 정책:** 각 단계마다 advisory가 실제 runtime/dev 어느 bundle에 도달하는지 기록하고 `--force` 자동 적용 금지.
 - **테스트:** npm audit diff, lint/type/unit/coverage/build/bundle/E2E. Next 단계는 login·desktop/mobile shell·API proxy smoke 필수.
@@ -958,6 +981,7 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 
 #### `IC-24` 일반 module locality 정리
 
+- **체크포인트 상태:** `로컬 검증·두 리뷰 완료, 원격 검증 대기 (2026-09-08)`. B4의 직접 backend261/frontend177, 실제 PostgreSQL 두 경합 node와 두 독립 리뷰 C/I/M0를 인수했다. 승인 정책 locality·BOM child 누락 표시·연결 IO 취소 상태 복원 근거는12.28.9~12.28.10이며 B3와 묶은 exact-head CI 이후 완료로 승격한다.
 - **작업자 영향:** 직접적인 화면 변화보다 이후 재고 수정이 한 정책만 고치도록 만들어 회귀 가능성을 낮춘다.
 - **근거/근본 원인:** approval role 판단, shipping orchestration, server state, health/ops policy가 여러 adapter에 분산돼 있다.
 - **수정 경계:** 앞 카드에서 두 번째 consumer가 확인된 policy만 깊은 module로 추출한다. 특히 approval_rules가 subtype뿐 아니라 warehouse/department/self/admin scope를 제공하고 submit/list/count/button adapter가 같은 결과를 사용하게 한다. responsive shell은 client-width swap/static import가 실제 duplicate bundle·상태 reset을 만드는지 bundle/render 측정부터 하고, 증거가 있을 때만 경계를 바꾼다. 한 번만 쓰이는 helper를 추상화하지 않는다.
@@ -991,17 +1015,17 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 
 #### `AT-01` consumer 0 파일의 실제 `_attic` 이전
 
-이 카드는 사용자 지시로 **실제 후속 구현 목표**에 포함한다. 다만 본 감사의 산출물 계약은 tracked 문서 하나이므로 이번 감사 실행에서는 파일을 옮기지 않는다. 앞의 재고 P0/P1을 닫은 뒤 독립 change로 다음 source→target을 다시 preflight하고 이동한다.
+최초 감사의 문서-only 계약은 역사적 범위다. 사용자 승인된 CP7 B6의 정확15개 이동과 경로·구문·문서·두 독립 리뷰를 2026-09-08 로컬 인수했다(12.28.15~16). 별도 rollback commit으로 보존하고 원격 검증은 최종 CP7에 묶는다. 아래 `source`는 복구를 위한 **의도된 historical literal**이며 현재 실행 경로가 아니다. 보존 판정 행은 이동하지 않았다.
 
 - **작업자 영향:** active 실행 경로와 one-off/historical 도구를 분리해 실수로 오래된 script를 운영 경로처럼 실행하는 위험을 줄인다.
 - **근거/수정 경계:** consumer audit의 `NO_RUNTIME_CONSUMER_CONFIRMED`, `CQ-021`, ATTIC_POLICY. 아래 source·target과 같은 change의 모든 import/path/doc만 수정한다.
 - **API/schema·실패 정책:** 제품 API/schema 없음. preflight에서 새 consumer가 하나라도 나오면 해당 파일 이동은 중단한다.
-- **테스트/합격 조건:** 아래 1~5 절차의 old-path 0, import/parser/dry-run, docs/backend gate, Git rename/hash가 모두 통과해야 한다.
+- **테스트/합격 조건:** 아래 1~5 절차의 비역사 old-path 0, AST/parser·안전한 경로 fixture, docs 직접 gate, Git rename/hash가 통과해야 한다. 실제 업무·DB 접근이 가능한 one-off import/실행은 하지 않으며 전체 검증은 최종 CP7 gate에 포함한다.
 - **의존성/롤백:** Wave 1~5 뒤 마지막 독립 change. 표의 각 파일을 원위치하고 참조 patch를 역적용하는 exact rollback manifest를 남긴다.
 
 | 분류 | source | target | 함께 갱신할 것 |
 |---|---|---|---|
-| app runtime consumer 0 | `backend/app/services/seed_cleanup.py` | `_attic/backend-scripts/seed_cleanup.py` | `_attic/scripts/dev/import_inventory_cleanup.py` import/sys.path, 이동 파일 `REPO_ROOT`, `_attic/backend-scripts/seed.py`, 관련 docs |
+| 보존 / 실제 consumer 확인 | `backend/app/services/seed_cleanup.py` | 이동하지 않음 | `backend/tests/test_inventory_location_ledger.py`, security mutation manifest, `_attic/scripts/dev/import_inventory_cleanup.py`가 사용하므로 원위치 유지 |
 | one-off data/Excel | `scripts/dev/_kwon_match_v3.py` | `_attic/scripts/dev/_kwon_match_v3.py` | 참조 0 재확인 |
 | one-off data/Excel | `scripts/dev/a_file_mes_code_apply.py` | `_attic/scripts/dev/a_file_mes_code_apply.py` | 참조 0 재확인 |
 | one-off data/Excel | `scripts/dev/auto_link_pa_af_demo.py` | `_attic/scripts/dev/auto_link_pa_af_demo.py` | 참조 0 재확인 |
@@ -1013,7 +1037,7 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 | one-off data/Excel | `scripts/dev/rename_db_dump_sheets.py` | `_attic/scripts/dev/rename_db_dump_sheets.py` | 참조 0 재확인 |
 | one-off data/Excel | `scripts/dev/rewrite_output_with_a_as_truth.py` | `_attic/scripts/dev/rewrite_output_with_a_as_truth.py` | 참조 0 재확인 |
 | one-off data/Excel | `scripts/dev/seed_history_cases.py` | `_attic/scripts/dev/seed_history_cases.py` | 참조 0 재확인 |
-| unsafe orphan deploy | `scripts/prod/deploy.ps1` | `_attic/scripts/prod/deploy.ps1` | consumer 0, 안전한 현 sync 경로 문서화 |
+| unsafe orphan deploy | `scripts/prod/deploy.ps1` | `_attic/scripts/prod/deploy.ps1` | consumer 0, 역사용·실행 금지 표지와 격리 검증 계약. 실제 배포/직원 명령 실행 금지 |
 | 완료 handoff | `_attic/handoff/archive/2026-08-28-todo-baseline/2026-07-28-dashboard-admin-ui-todo.md` | `_attic/handoff/archive/2026-07-28-dashboard-admin-ui-todo.md` | active handoff와 `docs/superpowers/plans/`의 실제 참조 갱신 |
 | 완료 handoff | `_attic/handoff/archive/2026-08-28-todo-baseline/2026-07-28-history-admin-bom-todo.md` | `_attic/handoff/archive/2026-07-28-history-admin-bom-todo.md` | active handoff와 `docs/superpowers/plans/`의 실제 참조 갱신 |
 | 완료 handoff | `_attic/handoff/archive/2026-08-28-todo-baseline/2026-08-03-admin-export-followup-todo.md` | `_attic/handoff/archive/2026-08-03-admin-export-followup-todo.md` | active handoff와 `docs/superpowers/plans/`의 실제 참조 갱신 |
@@ -1023,7 +1047,7 @@ PostgreSQL일 때 router는 action 전에 StockRequest를 `FOR UPDATE`로 조회
 1. `rg`로 basename·import·문서·CI·운영 consumer를 다시 검색한다. consumer가 하나라도 생겼으면 이동을 보류한다.
 2. `git mv`로 source→target을 같은 change에서 완료하고 모든 import/path/doc를 함께 바꾼다.
 3. old path/name을 코드와 `_attic/docs`, README에서 검색해 의도된 historical literal 외 0건으로 만든다.
-4. Python import smoke, parser/dry-run fixture, 관련 backend/docs gate를 실행한다.
+4. Python AST 파싱·안전한 root-path fixture·PowerShell parser-only와 관련 docs gate를 실행한다. one-off의 실제 import·DB·업무 실행은 금지한다.
 5. rollback은 파일을 원위치하고 import·`REPO_ROOT`·문서 patch를 함께 역적용한다.
 
 #### `AT-02` 중복 asset·historical 보존 정리
@@ -1069,21 +1093,21 @@ flowchart LR
 >
 > **추천 실행 형태: 부모 통합 + 경계가 겹치지 않는 카드별 하위 에이전트** - 구현 파일 소유권을 분리하고 최종 통합·검증·상태 갱신은 부모가 맡습니다.
 
-**남은 실행 GOAL:** DB-backed 12시간 작업자 세션과 추적 재고 불변식을 기반으로 남은 24개 IC 카드를 의존 순서대로 구현해 권한 위장, 잘못된 취소, 중복 반영, 예약 선점, 운영 false-green을 제거한다.
+**남은 실행 GOAL(2026-09-08 갱신):** 체크포인트 5의 재고·운영 안전막과 체크포인트 6의 화면·캐시 계약 위에서 체크포인트 7의 type·dependency·접근성·정책 locality 및 문서·보존 경계를 마무리한다. `IC-04`·`IC-20`의 저장소·PostgreSQL·실제 CI 근거와 required-check 외부 설정 증거를 구분한다. 후자는 `NOT_VERIFIED`로 유지하며, 최신 승인 계약에 따라 품질 브랜치 구현 완료와 main 통합 허용을 분리한다.
 
 #### 8.9.1 카드 수와 체크포인트 수
 
-`IC-01`~`IC-27` 중 체크포인트 1에서 `IC-02`, `IC-05`, `IC-27`을 완료했다. `IC-20`은 Node 20 정본·E2E selector·숨김 backend lifecycle까지만 완료되어 부분 완료다. 따라서 **남은 IC는 24개**이며, 다음 **6개 체크포인트**로 닫는다. `DOC-01`, `AT-01`, `AT-02`는 IC 24개에 포함하지 않고 마지막 closeout으로 수행한다.
+`IC-01`~`IC-27` 중 체크포인트 1에서 `IC-02`, `IC-05`, `IC-27`, 체크포인트 3에서 `IC-01`, 체크포인트 4에서 `IC-09`, `IC-10`, `IC-11`, 체크포인트 5에서 `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-17`, `IC-18`, `IC-19`, 체크포인트 6에서 `IC-12`, `IC-13`, `IC-14`, `IC-15`, `IC-16`, `IC-25`, `IC-26`, 체크포인트 7 B1~B4에서 `IC-21`, `IC-22`, `IC-23`, `IC-24`를 완료했다. 실제 CI 근거는12.27.9~12.28.15다. 현재 **카드별 품질 구현·원격 검증 잔여 IC는0개**지만, CP7 최종 재감사·전체 gate·품질 통합은 아직 남아 있다. 체크포인트 2의 required-check 외부 설정2건은 별도 `NOT_VERIFIED`이고 main 통합 조건으로 남는다. `DOC-01`은 완료했고 `AT-01`, `AT-02`는 IC 수에 포함하지 않는 마지막 closeout이다. 아래 마지막 열은 최초 로드맵의 구간별 잔여 수로 보존하며 현재 실행 집계와 혼동하지 않는다.
 
 | 구간 | 상태 | 이 구간에서 완전히 닫는 IC | 구간 종료 후 남은 IC |
 |---|---|---|---:|
 | 체크포인트 1 | `완료` | `IC-02`, `IC-05`, `IC-27`; `IC-20` 일부 | 24 |
-| 체크포인트 2 | `대기` | `IC-04`, `IC-20` | 22 |
-| 체크포인트 3 | `대기` | `IC-01` | 21 |
-| 체크포인트 4 | `대기` | `IC-09`, `IC-10`, `IC-11`; `IC-03`은 안전 차단까지만 | 18 |
-| 체크포인트 5 | `대기` | `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-17`, `IC-18`, `IC-19` | 11 |
-| 체크포인트 6 | `대기` | `IC-12`, `IC-13`, `IC-14`, `IC-15`, `IC-16`, `IC-25`, `IC-26` | 4 |
-| 체크포인트 7 | `대기` | `IC-21`, `IC-22`, `IC-23`, `IC-24`; 이후 `DOC-01`, `AT-01`, `AT-02` closeout | 0 |
+| 체크포인트 2 | `로컬 구현·리뷰·커밋·PostgreSQL 실증 완료 / GitHub 증거 보류` | `IC-04`, `IC-20` | 외부 증거 전 24, 통과 후 22 |
+| 체크포인트 3 | `완료 / PostgreSQL 경합 NOT_VERIFIED` | `IC-01` | 외부 증거 전 23, 통과 후 21 |
+| 체크포인트 4 | `완료` | `IC-09`, `IC-10`, `IC-11`; `IC-03`은 correction 안전막까지 완료된 `PARTIAL` | 외부 증거 전 20, 통과 후 18 |
+| 체크포인트 5 | `완료` | `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-17`, `IC-18`, `IC-19` | 외부 증거 전 13, 통과 후 11 |
+| 체크포인트 6 | `완료 / 품질 통합·실제 CI 완료` | `IC-12`, `IC-13`, `IC-14`, `IC-15`, `IC-16`, `IC-25`, `IC-26` | 외부 증거 전 6, 통과 후 4 |
+| 체크포인트 7 | `진행 / IC-21~24·DOC-01 완료` | `AT-01`, `AT-02`, 최종 재감사·gate·품질 통합 | 외부 증거 전 2, 통과 후 0 |
 
 체크포인트를 합치지 않는다. 특히 2는 후속 동시성 증거와 cutover kill-switch, 3은 actor trust root, 4는 일반 command의 안전 차단·멱등·경합, 5는 물리 원장부터 운영 readiness까지의 엄격한 직렬 chain이다. 6과 7도 화면 행동과 계약·정리 작업을 분리해 행동 변경과 물리 이동을 같은 diff에 섞지 않는다.
 
@@ -1108,10 +1132,10 @@ flowchart LR
 
 **GOAL:** 후속 동시성 카드를 증명할 Node·E2E·type·PostgreSQL 필수 gate를 완성하고, 향후 재고를 바꿀 수 있는 기존 출하가 있는 cutover를 mutation 전에 차단한다.
 
-- [ ] **`IC-20` 완료:** 체크포인트 1의 selector·Node 20·숨김 backend 보강을 유지하고, Node version file·`engines.node`, test/e2e typecheck, blocking 핵심 E2E, 필수 PostgreSQL two-connection job, 단계적 Ruff/mypy baseline을 닫는다.
-- [ ] **필수 job 증명:** CI required-check 설정과 local wrapper가 같은 Node·test·PostgreSQL 계약을 사용하고, `continue-on-error`로 핵심 재고 smoke를 우회할 수 없게 한다.
-- [ ] **`IC-04` 상태표:** 각 shipping request status×allocation status에서 앞으로 허용되는 pickup/cancel과 가능한 inventory delta를 선언적 표로 고정한다. 단순 terminal row 존재와 실제 미래 delta 가능성을 구분한다.
-- [ ] **`IC-04` kill-switch:** 미래 delta 가능 lifecycle이 하나라도 있으면 cutover dry-run/apply 모두 0 mutation으로 실패하고 상태별 evidence를 남긴다. 자동 삭제·자동 승계·실제 cutover 실행은 하지 않는다.
+- [x] **`IC-20` 저장소 구현:** 체크포인트 1의 selector·Node 20·숨김 backend 보강을 유지하고, Node version file·`engines.node`, test/e2e typecheck, blocking 핵심 E2E, 필수 PostgreSQL two-connection job, 단계적 Ruff/mypy baseline을 구현하고 이중 리뷰를 통과했다.
+- [ ] **필수 job 증명:** local wrapper의 Node·test·PostgreSQL 계약과 폐기 가능한 PostgreSQL 16의 4개 필수 행은 증명했다. 같은 계약의 GitHub CI 성공과 required-check 적용을 확인하고, `continue-on-error`로 핵심 재고 smoke를 우회할 수 없게 한다.
+- [x] **`IC-04` 상태표:** 현행 4개 shipping request status×9개 allocation 조합에서 앞으로 허용되는 pickup/cancel과 가능한 inventory delta를 36개 persisted 조합으로 고정했다. 단순 terminal row 존재와 실제 미래 delta 가능성을 구분한다.
+- [x] **`IC-04` kill-switch:** 미래 delta 가능 lifecycle, orphan, 손상 evidence가 하나라도 있으면 cutover dry-run/apply 모두 0 mutation으로 실패하고 상태별 evidence를 남긴다. 자동 삭제·자동 승계·실제 cutover 실행은 하지 않는다.
 
 `IC-20`을 먼저 완료하고 그 gate 위에서 `IC-04`를 구현한다. 이 순서를 바꾸면 후속 PostgreSQL 경합 카드의 합격 증거를 만들 수 없고 cutover 안전 회귀도 CI가 차단하지 못한다.
 
@@ -1119,64 +1143,72 @@ flowchart LR
 
 **실행 전 정지 gate:** CI required-check를 바꿀 권한이 없거나 운영 DB dialect와 PostgreSQL 검증 계약이 다르거나 상태×allocation별 미래 delta 판정이 합의되지 않으면 구현·완료 선언을 중단한다.
 
-**필수 검증:** Node 20 blocking E2E 14/14, unsupported Node의 npx 호출 0, test/e2e type error failure, 실제 PostgreSQL 두 connection smoke, REQUESTED/PREPARING/PREPARED/PICKED_UP/CANCELLED와 RESERVED/CONSUMED/RELEASED 조합의 cutover matrix, 후반 failure rollback. Matrix의 기대 결과는 세 부류로 고정한다. `FUTURE_DELTA` 또는 `INCONSISTENT` 조합은 apply 실패·0 mutation, `TERMINAL_SAFE` 조합은 apply 허용·기준재고 반영 후 과거 request의 미래 delta 0, dry-run은 모든 조합에서 mutation 0이다.
+**필수 검증:** Node 20 blocking E2E 14/14, unsupported Node의 npx 호출 0, test/e2e type error failure, 실제 PostgreSQL 두 connection smoke, PREPARING/PREPARED/PICKED_UP/CANCELLED와 allocation 9종의 cutover matrix, 후반 failure rollback. Matrix의 기대 결과는 세 부류로 고정한다. `FUTURE_DELTA` 또는 `INCONSISTENT` 조합은 apply 실패·0 mutation, `TERMINAL_SAFE` 조합은 apply 허용·기준재고 반영 후 과거 request의 미래 delta 0, dry-run은 모든 조합에서 mutation 0이다.
 
-**완료·정지 조건:** 핵심 safety job optional 0, PostgreSQL 경합 harness가 CI에서 실제 실행, 미래 재고 delta 가능 출하가 있는 cutover mutation 0. `IC-20`과 `IC-04`를 완료하고 멈춘다.
+**완료·정지 조건:** 핵심 safety job optional 0, 미래 재고 delta 가능 출하의 cutover mutation 0, 폐기 가능한 PostgreSQL 16의 clean Alembic head와 두 연결 필수 4행은 저장소 diff와 로컬 검증으로 충족했다. 같은 PostgreSQL·E2E 계약의 실제 GitHub CI 실행과 required-check 적용이 남았으므로 체크포인트와 Goal은 아직 완료로 표시하지 않는다. 그 증거가 확보되면 `IC-20`과 `IC-04`를 완료 처리하고 즉시 멈춘다.
 
 #### 8.9.4 체크포인트 3 — 신뢰 가능한 작업자 actor `[GPT-5.6 Sol] [순차]`
 
 **GOAL:** 세션 발급 자격을 명시적으로 결정하고 DB-backed 12시간 서버 세션을 모든 재고 mutation의 단일 VerifiedActor 경계로 만든다.
 
-- [ ] **인증 bootstrap 결정:** 서버 session을 누구에게 발급할지, 기존 직원 PIN이 단순 식별에서 인증 credential로 격상되는지, 격상한다면 hash·rate limit·lockout·초기 PIN 이행을 어떻게 할지 별도 ADR과 사용자 승인으로 고정한다.
-- [ ] **`IC-01` session core:** 무작위 opaque token의 hash만 DB에 저장하고 HttpOnly·SameSite=Lax cookie, 12시간 절대 만료, logout·credential 변경·직원 비활성화/삭제·`boot_id` 변경 revoke를 적용한다.
-- [ ] **mutation surface manifest:** FastAPI의 모든 POST/PUT/PATCH/DELETE와 실제 service consumer를 manifest로 만들고 `inventory`, IO, StockRequest, defect, production, shipping, dept-adjustment, transaction correction/cancel, handover receive, warehouse-map, settings/admin repair 등 재고·업무 상태 변경 표면을 분류한다. actor가 필요 없는 표면은 서버 검증 근거와 의도적 예외 이유를 명시한다.
-- [ ] **`VerifiedActor` 전환:** 위 manifest의 활성 재고·업무 mutation은 공통 dependency가 만든 actor만 service에 전달한다. header/body/sessionStorage 값은 권한 source가 아니다.
-- [ ] **호환 경계:** 기존 PIN 확인 alias가 무검증 actor나 무자격 session을 발급하지 않게 하고, session actor와 body/header 대상 직원이 다르면 mutation 전에 401/403으로 끝낸다.
+- [x] **인증 bootstrap 결정:** 승인 설계 `docs/superpowers/specs/2026-08-19-verified-operator-session-design.md`에서 PIN의 mutation credential 격상, PBKDF2 600,000회, rate-limit, default/미설정 PIN의 대면 최초 변경 절차와 1회 challenge를 고정했다.
+- [x] **`IC-01` session core:** 무작위 opaque token의 hash만 DB에 저장하고 HttpOnly·SameSite=Lax cookie, 12시간 절대 만료, logout·credential 변경·직원 비활성화/삭제·`boot_id` 변경 revoke를 적용했다.
+- [x] **mutation surface manifest:** FastAPI의 모든 POST/PUT/PATCH/DELETE와 실제 service actor consumer를 양방향 manifest로 고정했다. bootstrap/system 예외는 이유 map과 정확히 일치하며 신규 미분류 route는 test에서 실패한다.
+- [x] **`VerifiedActor` 전환:** IO, StockRequest, defect, production, shipping, dept-adjustment, transaction correction/cancel, handover, warehouse-map, settings/admin repair를 포함한 활성 mutation은 공통 dependency의 `Employee`만 service에 전달한다.
+- [x] **호환 경계:** 기존 PIN 확인 alias는 canonical session service를 사용하고, 무자격/default actor는 작업 세션을 받지 못한다. session actor와 body/header claim이 다르면 mutation 전에 401/403으로 끝난다.
 
 이 체크포인트는 단독 실행한다. 인증과 mutation router를 여러 구현 에이전트가 동시에 고치면 호환 alias·cookie·actor audit 경계가 갈라질 수 있으므로 characterization 조사만 병렬화하고 production diff는 한 owner가 순차 소유한다.
 
-**확정된 것과 미결정인 것:** DB-backed opaque server session과 12시간 절대 만료는 확정됐다. 하지만 현재 문서의 “PIN은 식별 수단” 정책과 session 발급 credential은 아직 양립 방법이 정해지지 않았다. 이 모순을 해결하기 전에는 코드를 쓰지 않는다.
+**결정 결과:** PIN을 mutation credential로 격상하되 4자리 PIN의 한계를 인정하고, PBKDF2·rate-limit·기본 PIN 최초 변경·세션 revoke를 함께 적용했다. 기본 PIN challenge는 강한 본인 확인이 아니므로 관리자 대면 설정을 운영 절차로 고정하고, HTTP 전송 구간 위험과 `Secure` cookie 강제는 후속 `SEC-01`로 남긴다.
 
-**비범위:** 부서별 권한 matrix 재설계, responsive login UI 개편, 직원 환경 배포. credential 정책이 PIN 보안 격상을 요구하면 `QP-013B`를 대체 상태에서 다시 열고 이 체크포인트 범위·테스트를 사용자에게 재승인받는다.
+**비범위:** 부서별 권한 matrix 재설계, responsive login UI 개편, 직원 환경 배포, 회사 도메인·DNS·HTTPS·인증서·Caddy. 후속 `SEC-01` 전에는 신뢰할 수 없는 네트워크나 인터넷 공개에 안전하다고 판정하지 않는다.
 
 **필수 검증:** session migration upgrade/forward recovery, 정상 발급, 변조·만료·revoke·restart, 비활성 actor, 다른 body/header, 피해자 식별값 위장, mutation surface manifest 양방향 차집합 0, transaction/handover/warehouse-map/settings를 포함한 우회 scan, 실제 pickup·production·defect·correction·handover의 SQL delta와 audit actor, frontend login/logout/reload E2E.
 
-**완료·정지 조건:** session 발급 credential 모순 0, 공통 dependency 우회 mutation router 0, actor 불일치·무자격 session의 inventory/request/log/event 0. `IC-01`만 완료하고 멈춘다.
+**완료·정지 조건:** session 발급 credential 모순 0, 공통 dependency 우회 mutation router 0, actor 불일치·무자격 session의 inventory/request/log/event 0을 SQLite·HTTP·브라우저에서 충족했다. PostgreSQL 전용 폐기 경합은 `NOT_VERIFIED`로 남기되 사용자의 환경 부재 예외에 따라 `IC-01`과 체크포인트 3을 완료 처리하고, 체크포인트 4를 시작하지 않고 멈춘다.
 
-#### 8.9.5 체크포인트 4 — 일반 취소 차단·멱등·조건부 command `[GPT-5.6 Sol] [부분 병렬]`
+#### 8.9.5 체크포인트 4 — correction 안전막·semantic idempotency·조건부 command `[완료] [GPT-5.6 Sol] [부분 병렬]`
 
-**GOAL:** workflow 귀속 거래의 잘못된 일반 취소를 먼저 fail-closed하고, IO·StockRequest 재시도와 handover·correction·cancel 경합에서 중복 재고 반영을 제거한다.
+**진입·완료 상태:** 2026-08-28 최신 `main` `759067e`, 승인된 0024 repair `0379648e`, 승인된 0029 repair `0142a569`를 품질 브랜치에 통합한 GREEN 기준선에서 시작했다. `main`의 inventory-operation 원장·원자 취소를 정본으로 유지한 채 아래 세 hard stop을 모두 완료했으며, 이 CP4 종료 시점에는 CP5를 시작하지 않았다.
 
-- [ ] **`IC-03-A` 안전 차단·신규 batch identity:** shipping, production receipt, IO batch, StockRequest, defect disassembly 귀속 log의 일반 correction/cancel과 SHIP의 wrong-bucket correction을 machine-readable reason·409로 막는다. 새 production receipt의 BACKFLUSH/PRODUCE 관련 log에는 하나의 불변 `operation_batch_id`를 저장하는 additive migration을 적용한다. legacy 귀속은 reference 문자열로 추측하거나 자동 backfill하지 않고 증명되지 않으면 409를 유지한다.
-- [ ] **`IC-09` 완료:** frontend 결과 불명 상태는 같은 key+fingerprint를 보존하고 backend IO/StockRequest는 same key/same payload만 기존 결과를 반환하며 different payload는 409로 거부한다. fingerprint actor는 `IC-01`의 `VerifiedActor`만 사용한다.
-- [ ] **`IC-10` 완료:** handover, correction, cancel은 owning row를 조건부로 선점하고 stale absolute correction을 lock 안에서 다시 계산한다. PostgreSQL 두 connection에서 winner 하나를 증명한다.
-- [ ] **`IC-11` 완료:** command/preview는 active item만, history/audit는 deleted item도 조회하며 open IO/StockRequest/shipping/BOM 참조가 있으면 delete 409를 반환한다.
+**GOAL:** workflow 귀속 거래의 잘못된 수량 보정을 fail-closed하고, IO·StockRequest 결과 불명 재시도와 handover·correction·cancel 경합에서 중복 재고 반영을 제거하며, active item command와 deleted history의 경계를 분리한다.
 
-`IC-03-A`를 먼저 배포 가능한 안전막으로 만든다. 이후 `IC-09`와 `IC-10`은 파일 소유권이 분리될 때 병렬 가능하고 `IC-11`은 IO lookup 충돌을 피하도록 마지막에 통합한다. 전용 shipping allocation 예약과 box/zone 물리 원장은 이 체크포인트에서 바꾸지 않는다.
+| 카드 | 최종 판정 | `main`이 해결·대체한 범위 | CP4 완료 결과와 남은 범위 |
+|---|---|---|---|
+| `IC-03-A` | `PARTIAL` | operation identity·역전 operation·workflow effect 전체 취소와 증거 기반 legacy 편입은 `RESOLVED_BY_MAIN`; 별도 `operation_batch_id` migration과 linked cancel 409 설계는 `SUPERSEDED` | correction 안전막은 완료. `IC-03-B` 전용 workflow cancel만 CP5에 남음 |
+| `IC-09` | `완료` | unique `client_request_id`와 기존 결과 반환을 확장 | actor+route+ordered-payload fingerprint, semantic conflict 409, 결과 불명 key 보존 완료 |
+| `IC-10` | `완료` | cancel owning operation lock·plan 재검산·SQLite 동시 취소 1승자는 `RESOLVED_BY_MAIN` | handover/correction owning-row lock과 PostgreSQL 전체 경합 증거 완료 |
+| `IC-11` | `완료` | deleted item을 포함하는 operation history는 `RESOLVED_BY_MAIN` | active command lookup, open-reference delete 409, delete-vs-submit 경합 완료 |
 
-두 번의 **내부 hard stop**을 둔다. 먼저 `IC-03-A`의 migration·409 공개 계약·legacy 무추정 matrix가 focused GREEN과 명세·품질 리뷰를 통과하면 멈추고 rollback evidence를 승인받는다. 그 승인 후 `IC-09+IC-10`의 PostgreSQL 멱등·경합 증거를 만들고 다시 멈춘다. 두 번째 승인 뒤에만 `IC-11`을 통합하고 체크포인트 전체 gate를 한 번 실행한다.
+제품 카드끼리의 `CONFLICT`는 없다. 품질 operator-session revision 충돌은 main 공개 chain 뒤에 품질 전용 `20260827_0030`을 두어 구조상 해소했다. 0024 repair는 두 `pg_attribute` query를 table/partitioned-table로 제한해 index 오인을 없앴고, 0029 repair는 `transaction_logs.operation_role` 추가 전에 PostgreSQL named enum을 명시적으로 생성하되 기존 type drift를 fail-closed한다. 두 repair의 실제 PostgreSQL fresh/upgrade/rollback/retry 증거와 단일 Alembic head가 확보되어 기준선 migration `CONFLICT`는 **RESOLVED**다.
 
-**실행 전 결정 gate:** correction을 원본 거래당 한 번만 허용할지 명시적 revision/version으로 여러 번 허용할지 migration 전에 승인받는다. legacy log를 자동 귀속·backfill해야만 기능이 성립한다면 안전한 증거가 없으므로 정지한다.
+**구현 순서와 고정 결정:** 아래 세 구간을 순서대로 수행한다. 각 구간은 RED→GREEN, focused gate, 명세·품질 리뷰의 Critical/Important 0을 만든 뒤 다음으로 간다. 추가 제품 결정 승인은 필요 없다.
 
-**필수 검증:** linked log correction/cancel 409와 재고·업무 상태 불변, `operation_batch_id` migration upgrade·forward recovery와 새 production receipt의 동일 batch identity, legacy reference backfill 0, response loss·late success·same/different fingerprint, two-connection handover×2/correction×2/cancel×2/correction-vs-cancel, rollback 후 재시도, concurrent delete-vs-submit과 history 보존.
+1. **`IC-03-A` + correction 쪽 `IC-10`:** 원본 거래당 correction은 한 번만 허용한다. `quantity_correct_transaction`이 stale ORM 객체를 받지 않고 대상 log를 transaction 안에서 잠근 뒤 최신 correction/cancellation 상태와 inventory를 다시 읽어 delta를 계산한다. `operation_id`만으로 차단하지 않고 operation을 함께 잠가 비재고 effect·업무 참조가 없으며 대상 log의 단일 `warehouse` cell effect만 소유하는 비-workflow RECEIVE/SHIP인지 증명한다. 같은 단일 effect를 증명하는 operationless legacy log까지 simple warehouse correction으로 허용하고, 나머지 workflow·다중/non-warehouse effect는 machine-readable 409로 차단한다. 허용 경로만 기존 ADJUST 이력을 유지한다. main 취소 서비스·operation schema·`operation_batch_id`에는 변경 0이다.
+2. **`IC-09` + handover/cancel 쪽 `IC-10`:** IO와 StockRequest의 canonical fingerprint는 `VerifiedActor.employee_id`, route/command, 재고 의미를 가진 payload 전체를 포함한다. object key와 의미상 unordered collection만 안정 정렬하고 bundles·lines의 입력 순서는 보존하므로 line 순서 변경도 different payload다. same actor+route+key+fingerprint만 기존 결과를 반환하며 어느 한 항목이라도 다르거나 legacy fingerprint가 null이면 409다. frontend는 timeout·abort·connection loss·late response의 `ResultUnknown`에서 같은 key+fingerprint를 유지하고 명시적 성공 또는 확정 4xx 뒤에만 폐기한다. handover receive는 ID를 받아 transaction 안에서 문서 행을 잠그고 `SUBMITTED`를 재검증한 뒤 inventory를 결정적 순서로 잠근다. 기존 cancel 코드는 바꾸지 않고 PostgreSQL 증거만 보강한다.
+3. **`IC-11`:** repository를 `get_active`와 `get_including_deleted`로 분리한다. command/preview는 전자, history/audit/restore는 후자를 사용한다. soft-delete는 item 행을 먼저 잠그고 IO batch `draft/submitted/reserved/partially_completed`, StockRequest `draft/submitted/reserved`, ShippingRequest `PREPARING/PREPARED/PICKED_UP`, 어느 BOM 방향이든 활성 참조가 하나라도 있으면 참조 종류·식별자를 담은 409를 반환한다. BOM 자동 삭제는 금지하고 참조 0일 때만 `deleted_at`과 audit을 같은 transaction에서 확정한다.
 
-**완료·정지 조건:** 업무 귀속 log의 effect-only 일반 취소 0, 결과 불명 재시도의 물리 반영 최대 1회, handover/correction/cancel winner 1·loser orphan 0, deleted item 신규 command 0. `IC-09`, `IC-10`, `IC-11`은 완료하고 `IC-03`은 안전 차단이 완료된 `부분 완료`로 기록한 뒤 멈춘다.
+**내부 hard stop:** 1번의 correction 안전막·PostgreSQL correction 경합을 통과한 뒤 첫 정지, 2번의 semantic idempotency·handover/cancel PostgreSQL 경합을 통과한 뒤 두 번째 정지, 3번을 통합한 뒤 체크포인트 전체 gate를 한 번 실행하고 종료한다. 전용 shipping allocation 예약과 box/zone 물리 원장은 이 체크포인트에서 바꾸지 않는다.
+
+**필수 검증:** workflow-linked·non-warehouse correction 409와 재고·업무 상태 불변, simple warehouse correction 1회와 두 번째 409, response loss·late success·same/different actor/route/fingerprint·legacy null fingerprint, 실제 PostgreSQL 두 connection의 handover×2/correction×2/cancel×2/correction-vs-cancel과 rollback 재시도, deleted command/preview, open reference별 delete 409, concurrent delete-vs-submit, deleted history 보존. 각 mutation은 기대 delta·독립 SQL delta·operation/effect delta를 대조한다.
+
+**완료·정지 결과:** workflow-linked correction의 warehouse wrong-bucket 0, 결과 불명 재시도의 물리 반영 최대 1회, handover/correction/cancel winner 1·loser orphan 0, deleted item 신규 command 0을 충족했다. actual PostgreSQL runner 29/29, 구간별 GitHub CI 6/6, 독립 명세·품질 리뷰 Critical/Important 0으로 `IC-09`, `IC-10`, `IC-11`을 완료하고 `IC-03`은 correction 안전막까지 완료된 `PARTIAL`로 기록했다. 체크포인트 5는 시작하지 않는다.
 
 #### 8.9.6 체크포인트 5 — 물리 위치·출하 예약·운영 진실 `[GPT-5.6 Sol] [엄격 순차]`
 
 **GOAL:** 창고 물리 원장, 공통 availability, shipping 상태기계, 전용 workflow 취소, blocking integrity, backup, health를 하나의 검증 사슬로 완성한다.
 
-- [ ] **`IC-06` read-only preflight:** tracking 품목의 `W`, box `B`, special zone `Z`, unplaced `U`, duplicate·orphan을 mutation 없이 보고하고 input snapshot과 report hash를 고정한다. runtime·schema·재고 mutation은 이 change에서 0이다.
-- [ ] **`IC-06` 승인 후 완료:** preflight 결과와 outbound source·duplicate 처리 ADR을 사용자가 승인한 뒤에만 `B+Z+U=W`와 stable row effect identity를 적용한다.
-- [ ] **`IC-07` + `IC-08` 같은 release:** 모든 소비 primitive가 stock pending과 active shipping allocation을 함께 보는 공통 availability를 사용하고, shipping prepare/pickup/cancel은 request lock·deterministic inventory lock·expected-state·command receipt를 같은 release에서 적용한다.
-- [ ] **`IC-03-B` 완료:** shipping pickup, production receipt, IO batch, StockRequest, defect disassembly의 전용 workflow cancel이 effects, allocation/pending, request/batch status, event를 한 transaction으로 되돌리고 history router는 `CancelPolicy` 결과만 소비한다.
-- [ ] **`IC-17` 완료:** location pending, StockRequest, ShippingAllocation, box/zone/unplaced, orphan, effect cutoff를 안정된 check ID/severity로 검사하고 blocking mismatch는 exit 1로 만든다.
-- [ ] **`IC-18` 완료:** backup artifact가 snapshot metadata·Alembic head·전체 schema·WAL 시점을 증명하고 restore는 verify와 post-check를 기본값으로 한다.
-- [ ] **`IC-19` 완료:** live는 process, ready는 DB/schema/dependency, detailed/integrity는 업무 불변식이라는 단일 의미로 나누고 운영 consumer를 함께 전환한다.
+- [x] **`IC-06` read-only preflight (2026-08-31):** 모든 활성 품목의 `W`, box `B`, 활성 special zone `Z`, unplaced 후보 `U=W-B-Z`, duplicate·orphan·음수·초과배치를 mutation 없이 보고하고 input snapshot과 report hash를 고정했다. SQLite와 PostgreSQL의 repeatable read-only snapshot, 교차 dialect canonical hash, schema drift fail-closed를 검증했으며 runtime·schema·재고 mutation은 0이다.
+- [x] **`IC-06` runtime 완료 (2026-09-01):** Gate A 승인 뒤 additive `0032`, 전체 활성 품목 `B+활성 Z+U=W`, 결정적 출고 순서, stable row UUID effect, 정확 취소·정정, anomaly fail-closed를 구현했다. fresh PostgreSQL 최초 runner 52/52·skip 0, 전체 gate와 GitHub CI 6/6, 독립 리뷰 Critical/Important/Minor 0으로 완료했다.
+- [x] **`IC-07` + `IC-08` 같은 release 완료 (2026-09-02):** 모든 소비 primitive가 stock pending과 active shipping allocation을 함께 보는 공통 availability를 사용한다. shipping prepare/pickup/cancel은 request lock·deterministic inventory/location/allocation lock·expected status/version·command receipt를 같은 transaction에 적용한다. 실제 PostgreSQL 필수 runner 79/79, 최종 full gate 18/18, Playwright 17/17, GitHub CI 6/6, 독립 리뷰 Critical/Important/Minor 0으로 Gate B를 통과했다.
+- [x] **`IC-03-B` 완료 (2026-09-02):** shipping pickup, production receipt, 완료 IO batch, StockRequest 실행, defect disassembly의 전용 workflow cancel이 기록된 `before_state`, effects, allocation/pending, request/batch 상태, event를 한 transaction으로 되돌린다. 일반 우회와 불완전 legacy는 안정된 409로 차단하고, 실제 PostgreSQL 4개 경합·3자 delta·독립 리뷰·GitHub CI 6/6으로 Gate C를 통과했다.
+- [x] **`IC-17` 완료 (2026-09-02):** CLI·관리자 API·detailed health가 공통 순수 `inventory-integrity/v1` engine을 사용한다. 안정된 check ID/severity/count/samples, blocking exit 1, 사용/config exit 2, DB/schema/tool exit 3을 고정했고 location pending, StockRequest, ShippingAllocation, box/zone/unplaced, orphan, contract v2 effect false-green을 SQLite·실제 PostgreSQL에서 차단했다. 제품 commit `fb339b5d`, 최종 독립 리뷰 0/0/0, GitHub CI run `33606010198` 6/6으로 완료했다.
+- [x] **`IC-18` 완료 (2026-09-05):** `backup-manifest/v1`이 artifact hash·size·engine·Alembic head·schema fingerprint·data revision·snapshot hash·검증 receipt를 증명한다. manifest를 artifact 뒤에 원자 publish하고, SQLite WAL online backup과 stale 판정, PostgreSQL dump의 폐기 가능한 임시 DB restore, staged restore, retention·NAS·cleanup pair를 fail-closed로 고정했다. 제품 commit `d43ab268`, CI 이식성 보완 `dffb8e01`·`fd341894`, 최종 CI run `33923104275` 6/6으로 완료했다.
+- [x] **`IC-19` 완료 (2026-09-05):** live는 DB 독립 process/event-loop liveness, ready는 DB·Alembic head·dependency·blocking integrity, detailed는 같은 readiness와 sanitized integrity ID/count로 분리했다. startup·frontend/E2E는 ready, Docker·restart는 live, status/watch는 alive와 ready를 각각 소비한다. 제품 commit `b27ba39c`, 로컬 full gate 18/18·Playwright 17/17·실제 PostgreSQL, 독립 리뷰 0/0/0, GitHub CI run `33934558904` 6/6으로 완료했다.
 
 순서는 `IC-06 read-only preflight`→사용자 승인→`IC-06 runtime`→`IC-07+IC-08`→`IC-03-B`→`IC-17`→`IC-18`→`IC-19`다. `IC-07` availability만 먼저 배포하면 race에서 초과예약될 수 있으므로 `IC-08`의 request/allocation lock·receipt와 같은 release checkpoint에서 함께 닫는다. 각 카드는 별도 change/evidence를 가질 수 있지만 이 순서를 건너뛰지 않는다.
 
-이 큰 사슬에는 세 번의 **내부 hard stop**을 둔다. 첫째, `IC-06` read-only preflight의 mutation 0·snapshot/report hash를 검증한 즉시 멈추고 사용자에게 ADR과 runtime 적용을 승인받는다. 둘째, 승인된 `IC-06` runtime과 `IC-07+IC-08`의 PostgreSQL reservation/shipping race가 통과하면 명세·품질 리뷰를 받고 멈춘다. 셋째, 승인 후 `IC-03-B`의 모든 workflow cancel matrix와 재고 3자 대조를 통과하면 다시 리뷰·정지한다. 그 승인 후에만 `IC-17→IC-18→IC-19` 운영 사슬을 진행한다. 각 구간은 독립 rollback evidence를 가진다.
+이 큰 사슬에는 세 번의 **내부 hard stop**을 둔다. 첫째, `IC-06` read-only preflight의 mutation 0·snapshot/report hash를 검증하고 Gate A 승인을 받은 뒤 runtime을 적용한다. 둘째, `IC-06` runtime과 `IC-07+IC-08`의 PostgreSQL reservation/shipping race가 통과하면 명세·품질 리뷰를 받아 Critical/Important 0을 확인한다. 셋째, `IC-03-B`의 모든 workflow cancel matrix와 재고 3자 대조 뒤 다시 리뷰한다. 사용자는 2026-09-01에 남은 CP5를 별도 승인 대기 없이 끝내도록 승인했으므로, 총괄은 각 hard stop의 증거·리뷰가 GREEN이면 다음 작업으로 자동 진행한다. 각 구간은 독립 rollback evidence를 가진다.
 
 **비범위:** 화면 미관, 실제 cutover 실행, 자동 duplicate merge, 직원 환경 readiness. 체크포인트 2의 `IC-04`는 kill-switch일 뿐이며 이 체크포인트 전체가 끝나기 전에는 cutover 실행 가능 판정을 내리지 않는다.
 
@@ -1190,11 +1222,11 @@ flowchart LR
 
 **GOAL:** frontend의 저장·dirty·비동기 응답·cache·pagination·KPI 의미를 backend 정본과 맞춰 작업자가 보는 상태가 실제 서버 상태와 어긋나지 않게 한다.
 
-- [ ] **`IC-12`→`IC-14` 완료:** 실제 department form의 dirty와 Promise save를 먼저 고친 뒤 React Query를 부서 server state의 단일 정본으로 만들고 Context는 lookup adapter로 축소한다.
-- [ ] **`IC-13`→`IC-16` 완료:** shipping BOM match generation과 실제 payload dirty를 먼저 고친 뒤 active/history pagination·bulk loading·desktop/mobile load-more를 적용한다.
-- [ ] **`IC-15` 완료:** warehouse map mutation을 operation ID/generation과 query invalidation으로 직렬화해 오래된 rollback이 최신 성공을 덮지 못하게 한다. 이는 체크포인트 5의 위치 원장 계약을 소비한다.
-- [ ] **`IC-25` 완료:** KPI 숫자의 PA·PF 제외 모집단과 목록 포함 가능성을 desktop/mobile에 항상 명시한다.
-- [ ] **`IC-26` 완료:** 첫 일보 작성자 선택은 animation 0, 서로 다른 작성자 전환만 1회가 되도록 handoff와 live 구현을 맞춘다.
+- [x] **`IC-12`→`IC-14` 완료 (2026-09-08):** 실제 department form의 dirty/Promise save와 React Query 단일 정본·Context lookup adapter를 구현했다. A1 `59c52bad`, 최종 CI `34135084227`, 근거12.27.1·12.27.9.
+- [x] **`IC-13`→`IC-16` 완료 (2026-09-08):** BOM generation·payload dirty와 active/history pagination·bulk·desktop/mobile load-more를 구현했다. A2 `adaa5bed`, 근거12.27.2·12.27.9. legacy 배열 형태는 유지하되 무제한 목록 의미는 보존하지 않는다.
+- [x] **`IC-15` 완료 (2026-09-08):** map의 대상별 operation/generation·오래된 rollback 차단·최종 query 수렴을 구현했다. A3 `8d7a0a77`, 근거12.27.3·12.27.9.
+- [x] **`IC-25` 완료 (2026-09-08):** desktop/mobile 공용 모집단 설명과 loading/filter 지속 표시를 구현·실제 화면 검증했다. `edc3a836`, 근거12.27.4·12.27.8~9.
+- [x] **`IC-26` 완료 (2026-09-08):** 첫 작성자0·다른 작성자1·같은 작성자/탭/날짜/상세0 및 reduced-motion0을 실제 브라우저에서 확인했다. `edc3a836`, 근거12.27.4·12.27.8~9.
 
 `IC-12`, `IC-13`, `IC-15`, `IC-25`, `IC-26`은 실제 파일 소유권이 다를 때 병렬 가능하다. `IC-14`는 `IC-12` 뒤, `IC-16`은 `IC-13`과 체크포인트 5의 shipping API/state contract 뒤에 둔다. 출하 frontend의 `IC-13`과 `IC-16`은 한 owner가 순차 수행한다.
 
@@ -1210,20 +1242,20 @@ flowchart LR
 
 **GOAL:** 안정된 제품 행동 위에서 OpenAPI type, dependency, 접근성, 정책 locality를 각각 독립적으로 강화하고 live 문서와 `_attic` 물리 경계를 최종 정리한다.
 
-- [ ] **`IC-21` 완료:** OpenAPI generated raw type과 업무 adapter를 분리하고 nullable·unknown enum·request serialization drift가 같은 change에서 CI에 잡히게 한다.
-- [ ] **`IC-22` 완료:** Next runtime, Vitest/coverage, ESLint/PostCSS를 세 개의 독립 change로 올리고 각각 `npm audit` 도달 범위·rollback·full gate evidence를 남긴다. `--force` 자동 적용은 금지한다.
-- [ ] **`IC-23` 완료:** 핵심 IO·shipping·defect·department 경로의 공용 error/focus/a11y contract를 blocking test로 만든다.
-- [ ] **`IC-24` 완료:** approval role/self/admin/list/count/button와 앞 카드에서 두 번째 consumer가 확인된 policy만 공통 module로 모은다. 행동 변경과 광역 파일 이동은 섞지 않는다.
-- [ ] **`DOC-01` 완료:** live 운영·온보딩·handoff의 URL, DB, gate, 링크를 현행 코드와 맞추고 역사 관찰에는 재실행 금지 표지를 붙인다.
-- [ ] **`AT-01` 완료:** 각 source의 consumer 0을 다시 확인한 뒤 `git mv`, import/path/doc 갱신, old path 0, import/parser/dry-run을 같은 change에서 끝낸다.
-- [ ] **`AT-02` 완료:** 실제 consumer가 없는 byte-identical frontend 자산만 hash report와 함께 제거하고 item 이미지·원본 data·regression evidence는 보존한다.
-- [ ] **최종 재감사:** `QP-001`~`QP-023`, `CQ`, `RV`, `IC` 상태를 재집계하고 재고 작업 70행 matrix와 작업자 결론을 현재 SHA에서 다시 판정한다.
+- [x] **`IC-21` 완료 (2026-09-08):** OpenAPI generated raw type·업무 adapter·nullable/unknown enum/request serialization drift guard, 두 리뷰 C/I/M0 및 commit1ad03e37의 실제 CI34149717620 6/6 success. 상세12.28.2.
+- [x] **`IC-22` 완료(2026-09-08):** Next runtime, Vitest/coverage, ESLint/PostCSS와 관련 Vite 보안 후속을 네 독립 rollback commit으로 분리했다. 전체/production audit0·도구별 직접 검사·독립 C/I0와 exact129의 실제 CI34157355573 6/6 success를 인수했다(12.28.3~12.28.7). 사용자 속도 조정에 따라 반복 full 대신 증분 근거와 한 번의 B2 원격 전체 검증을 결합했다. 원본 local full2회FAIL·Next next-env Minor1·ESLint9 EOL 예외를 보존하며 `--force`는 사용하지 않았다.
+- [x] **`IC-23` 완료 (2026-09-08):** 핵심 IO·shipping·defect·department의 error/focus/a11y blocking 계약을 직접 검증·두 리뷰 C/I/M0로 인수하고, 복구 포함 exact bff9의 CI34168183559 6/6 success를 확인했다(12.28.8·12.28.13~15). 선택 업무의 접근성 증거를 앱 전체 WCAG 인증으로 확대하지 않는다.
+- [x] **`IC-24` 완료 (2026-09-08):** 승인 큐·approval kind의 실제 consumer/공통 fixture와 기존 정책을 보존하는 BOM·line identity·연결 IO 취소 상태 보완을 직접 검증했다. 두 리뷰 C/I/M0·실제 PostgreSQL 두 node·exact bff9의 CI34168183559 6/6 success가 근거다(12.28.10~15). responsive shell·schema·광역 refactor는 변경하지 않았다.
+- [x] **`DOC-01` 완료 (2026-09-08):** live 문서6개의 현행 코드·격리 실행 경계·역사 표지·링크/구문을 검증했고 두 리뷰 C/I/M0 및 별도 docs commit bff9dd73의 실제 CI6/6을 인수했다(12.28.12~15). B6의 경로 이동으로 생기는 참조 변경은 같은 B6 change에서 추가 검증한다.
+- [x] **`AT-01` 완료 (2026-09-08):** consumer/hash를 재확인한15개를 이전하고 root/self-usage/문서 참조를 함께 보정했다. AST·경로 fixture·parser·역치환 byte-exact·비역사 old path0·독립 리뷰 C/I/M0와 최종 CP7/품질 CI를 인수했다(12.28.16·12.30). 실제 consumer가 있는 seed_cleanup은 보존했으며 운영 script는 실행하지 않았다.
+- [x] **`AT-02` 완료 (2026-09-08):** consumer0인 로그인 PNG 복사본9개만 삭제했다. 원본/hash·Git 복구 경로·독립 리뷰 C/I/M0, production build와 실제 로그인 screenshot/삭제 PNG 요청0, 최종 CP7/품질 CI를 인수했다(12.28.17·12.29.7·12.30). item 이미지·실제 로그인 WebP·historical 원본은 보존했다.
+- [x] **최종 재감사 완료 (2026-09-08):** QP24행·CQ/RV/IC64행과 보완된 재고 작업72행, 파일2,563개 원장을 고정 코드에 재연결했다. 누락·중복·역할 미분류0이며 검토 깊이와 PARTIAL/NOT_VERIFIED를 보존했다. 작업자 결론과 실제 통합 증거는12.30절이다.
 
 순서는 `IC-21`→`IC-22`의 세 단계→`IC-23`→`IC-24`→`DOC-01`→`AT-01`→`AT-02`→최종 재감사다. 각 화살표는 **내부 hard stop**이다. 앞 change의 focused/full gate, 명세·품질 리뷰, rollback evidence를 승인한 뒤 다음 change로 넘어간다. `_attic`은 삭제 장소가 아니라 역사·one-off 보존 위치이며 외부 보관 확인 없는 `_attic/data` 삭제는 금지한다.
 
 **비범위:** 새 업무 행동, item 이미지 자동 삭제, 근거 없는 responsive shell 변경, 대규모 refactor. responsive shell은 bundle·state reset 측정이 실제 문제를 증명할 때만 별도 승인 change로 수행한다.
 
-**실행 전 결정 gate:** `RV-007`의 IO defect quarantine이 즉시 완료인지 승인 대기인지 확정하지 못하면 approval locality 정리를 중단한다. 새 consumer가 생겼거나 historical 원본/rollback hash가 불명확한 파일·asset은 이동·삭제하지 않는다.
+**실행 전 결정 gate:** `RV-007`은 S0 재감사(12.26)의 고정 main 근거에서 즉시·무승인으로 이미 결정됐고 남은 것은 preview/submit 구현 drift다. IC24는 이 기존 정책을 보존하는 회귀·공통화만 수행하며 새 업무 선택을 만들지 않는다. 실제 최신 코드에서 별개의 미결정 정책이 확인되면 그 판단은 자동 추정하지 않는다. 새 consumer가 생겼거나 historical 원본/rollback hash가 불명확한 파일·asset은 이동·삭제하지 않는다.
 
 **필수 검증:** generated type diff 0, dependency 단계별 audit·lint·type·unit·coverage·build·bundle·E2E, keyboard/axe/focus return, approval 순수 matrix+router/UI integration, import cycle/query count, live docs 링크·명령 dry parse, old-path 양방향 검색 0, Git rename/hash, asset manifest·login screenshot, 전체 manifest 차집합 0.
 
@@ -1234,15 +1266,15 @@ flowchart LR
 ```mermaid
 flowchart LR
   C1["체크포인트 1 완료: IC-02·05·27"] --> C2["2: 필수 gate·cutover kill-switch"]
-  C2 --> C3["3: VerifiedActor"]
-  C3 --> C4["4: 취소 차단·멱등·조건부 command"]
-  C4 --> C5["5: 위치·예약·integrity·운영 진실"]
+  C2 --> C3["3 완료: IC-01 VerifiedActor"]
+  C3 --> C4["4 완료: correction 안전막·멱등·조건부 command"]
+  C4 --> C5["5 완료: 위치·예약·integrity·운영 진실"]
   C5 --> C6["6: 화면 freshness"]
   C5 --> C7["7: type·dependency·closeout"]
   C6 --> C7
 ```
 
-다음 실행 시작점은 체크포인트 2다. 단, 현재 체크포인트 1 detached diff를 먼저 사용자가 검토·통합하고, 그 결과의 최신 `main` SHA에서 새 detached 워크트리를 준비한 뒤에만 시작한다.
+체크포인트 5와 CP6 제품 카드는 완료했고, fixed main `d2b0dd29`와 CP6를 품질 브랜치에 통합했다. 승인된 다음 제품 작업은 CP7이다. 품질 통합의 실제 CI는 병행 확인하되 성공 전 CP7 첫 commit을 금지한다(12.27.9). main을 다시 동기화하지 않으며 체크포인트 2의 품질 브랜치 CI 성공을 required-check 설정 완료로 오인하지 않는다.
 
 ---
 ## 9. 테스트·운영 검증 보강안
@@ -1613,7 +1645,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1 -Mode fu
 | transaction log | 0→0 |
 | 판정 | 감사 시점에는 무음 no-op을 재현해 `CQ-003` `REPRODUCED`; 첫 체크포인트 `IC-02`에서 `RESOLVED_CHECKPOINT_1` |
 
-### 12.4 명시적 `NOT_VERIFIED`
+### 12.4 원 감사(`71d6a34`)의 명시적 `NOT_VERIFIED`
 
 | gap | 이유 | 후속 카드 |
 |---|---|---|
@@ -1621,7 +1653,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1 -Mode fu
 | browser 실제 response-loss injection | server duplicate retry만 선택 실행 | `IC-09` |
 | shipping prepare/pickup/cancel 두 connection race | 전용 PG/동시 harness 미실행 | `IC-08` |
 | ShippingAllocation vs production/dept-adjust/defect cross-race | 이번 run 미실행 | `IC-07` |
-| PostgreSQL 전체 | 연결 환경 없음, 연결 시도 안 함 | `IC-08`, `IC-10`, `IC-20` |
+| PostgreSQL 전체 | 원 감사 당시 연결 환경 없음, 연결 시도 안 함. 체크포인트 2에서 cutover·창고 지도 선택 4행은 로컬 PostgreSQL로 해소했으나 후속 업무별 경합과 GitHub job은 남음 | `IC-08`, `IC-10`; `IC-20` GitHub 증거 대기 |
 
 이 gap은 PASS 수에 포함하지 않았다. 기존 정상 테스트가 있다고 해서 해당 경합을 `VERIFIED`로 올리지 않는다.
 
@@ -1740,4 +1772,895 @@ Gate 0은 CI 정본과 같은 Node 20에서 닫고 정본 로컬 검증 entrypoi
 
 최종 통합 검증은 `verify_local.ps1 -Mode full -DbReadOnlyCheck -IncludeE2E`로 수행했다. backend pytest, OpenAPI drift, frontend strict lint·typecheck, Vitest 232파일/1,861테스트와 coverage threshold(전체 statement 92.5%), production build, bundle 2,381,157 bytes/한도 2,381,316.096 bytes, DB read-only consistency는 통과했다. E2E는 사용자가 visible 전용 backend 콘솔을 닫은 외부 중단으로 2/14 뒤 실패했으며, 원인 제거 1줄만 반영한 뒤 영향받는 정본 E2E를 재실행해 14/14를 통과했다. 변경 범위가 전용 E2E 프로세스 표시 방식뿐이므로 이미 통과한 비영향 gate는 반복하지 않았다. 종료 시 `mes.db`·lockfile 해시 불변, E2E 임시 DB/PID/seed 0, 8021·3100 listener 0을 확인했다.
 
+### 12.10 체크포인트 2 저장소 구현과 외부 증거 경계 (`90ce42d9`)
+
+> **역사 증거:** 이 절의 `REQUESTED` 상태·45행·15개 E2E 수치는 당시 SHA의 결과다. 고정 main `38551726`이 해당 상태와 command를 제거했으므로 현행 계약·수치는 8.9.3·8.9.5와 12.15절을 우선한다.
+
+- **기준:** 최신 `main`의 고정 SHA `90ce42d9fef0505ccbd7f5b7ea86b60760cb09dd`에서 `C:\ERP\.worktrees\full-code-quality-checkpoint-2` detached worktree를 만들었다. branch·commit·push는 수행하지 않았다.
+- **delta:** 직전 체크포인트 통합 뒤 `ab8b2a1e..90ce42d9`의 28개 commit, 281개 변경 경로를 manifest로 다시 읽어 `IC-04`·`IC-20`의 전제와 동결 범위를 재판정했다.
+- **기준선:** Python dependency, 전용 Alembic `20260818_0022`, backend, frontend lint/type/Vitest/coverage/build/bundle, docs, DB read-only와 Node 20 E2E 14/14가 구현 전 통과했다. 최초 frontend 시도는 `npm ci`가 끝나기 전 시작한 환경 경쟁이었고 설치 완료 뒤 같은 gate가 통과했다.
+- **당시 환경:** 최초 저장소 구현·리뷰 시점에는 `TEST_POSTGRES_URL`, Docker/Podman, `psql`이 없어 실제 PostgreSQL 연결을 시도하지 않았다. 이후 12.12절에서 공식 배포 archive의 폐기 가능한 로컬 PostgreSQL cluster를 별도로 구성해 이 공백을 닫았다. GitHub repository admin 권한은 확인했지만 기존 `main` branch protection/ruleset은 없었고, uncommitted workflow를 먼저 required check로 설정하지 않았다.
+
+#### `IC-20` 필수 gate
+
+| 경계 | 저장소 구현·로컬 증거 | 남은 증거 |
+|---|---|---|
+| Node | `.nvmrc`, `engines.node >=20 <21`, npm·Playwright config/global setup·PowerShell entrypoint의 Node 20 fail-closed. 지원하지 않는 Node에서는 npx·Playwright·서버 호출 0 | 새 commit의 GitHub Node 20 E2E 성공 |
+| frontend type | product typecheck, unit 247파일 manifest 양방향 차집합 0, 기존 409진단 normalized baseline의 신규 종류·증가 차단, E2E zero-error typecheck | 기존 409진단 감축은 후속 debt이며 이번 카드의 거짓 0으로 세지 않음 |
+| backend quality | Ruff 3파일·mypy 2파일 0-error blocking 범위와 확대 절차. 전체 Ruff 사전 부채 184건은 `NOT_FULL_COVERAGE`로 명시 | 범위 확대는 후속 change |
+| 핵심 E2E | `[STALE]` 당시 기존 14개와 실제 UI 출하 `REQUESTED→PREPARING` smoke를 blocking `npm run test:e2e`로 연결하고 `continue-on-error` 제거 | 당시 새 workflow의 실제 15/15 CI |
+| PostgreSQL | Alembic head 확인 뒤 public table의 독립 Session/PID 2개로 warehouse-map 3행과 cutover lock 1행을 실행하는 공통 runner. ACK·test DB 이름·URL 동일성·`current_database()`를 mutation 전에 검사하며 URL 없음은 exit 3. 폐기 가능한 로컬 PostgreSQL 16에서 skip 0·4행 PASS | 같은 4행의 GitHub job 성공 뒤 check context를 required로 설정 |
+
+`IC-20` 명세 리뷰와 코드 품질 리뷰는 저장소 diff에 Critical/Important 0을 판정했다. 로컬 실제 PostgreSQL 증거까지 확보했지만 CI와 required-check가 없으므로 결과 상태는 `APPROVED_LOCAL_PG_WITH_GITHUB_PENDING`이다.
+
+#### `IC-04` cutover kill-switch
+
+| 검증 경계 | 결과 |
+|---|---|
+| 선언적 상태표 | `[STALE]` 당시 `REQUESTED`, `PREPARING`, `PREPARED`, `PICKED_UP`, `CANCELLED` × allocation 9조합의 persisted 45행을 `FUTURE_DELTA`·`INCONSISTENT`·`TERMINAL_SAFE`로 판정. 현행은 4상태×9조합=36행 |
+| legacy·손상 상태 | allocation 없는 legacy `PICKED_UP`도 유효 PICKUP effect가 있으면 취소 가능하므로 `FUTURE_DELTA`; orphan allocation/log, unknown transaction type/status, 빈·0·bool·float·string·범위 밖 effect는 `INCONSISTENT` |
+| mutation 0 | unsafe dry-run/apply, `--keep-history`, 열린 transaction, 미지원 dialect를 fail-closed. 후반 target failure와 lock failure는 history·inventory 전체 rollback |
+| terminal-safe | `CANCELLED`이며 allocation 없음/`RELEASED`만 허용. 적용 후 기존 request의 prepare/pickup/cancel command가 재고를 바꾸지 못함 |
+| 증거 출력 | safe summary와 unsafe exception/CLI 모두 request/status/disposition, allocation 상태별 수량 합, active phase, pickup/effective effect/malformed count를 보존 |
+| 경합 | SQLite `BEGIN IMMEDIATE` 실제 두 writer exclusion 통과. PostgreSQL은 3개 public table의 `ACCESS EXCLUSIVE` lock 뒤 두 번째 connection `ROW EXCLUSIVE` 차단·rollback 후 재진입 test를 공통 runner에 연결 |
+
+최초 저장소 focused 검증은 관련 188개 중 **184 PASS, PostgreSQL 전용 4 SKIP**였고 URL 부재 runner는 의도한 `NOT_VERIFIED`, exit 3을 반환했다. 이후 12.12절의 실제 PostgreSQL 재검증에서 공통 runner 4행과 관련 집중 회귀 211개를 skip 없이 통과했다. `IC-04`의 최초 명세·품질 리뷰 Important 6개 고유 항목을 TDD로 보강한 뒤 두 재리뷰 모두 Critical/Important 0을 확인했다. 현재 상태는 `APPROVED_LOCAL_PG_WITH_GITHUB_PENDING`이다. 실제 cutover, 자동 삭제·승계, 직원 환경 접근은 수행하지 않았고, Checkpoint 5와 별도 사용자 승인 전 실제 운영 cutover 금지는 유지한다.
+
+#### 최종 로컬 검증
+
+정본 명령 `verify_local.ps1 -Mode full -DbReadOnlyCheck -IncludeE2E`를 Node 20.20.2에서 한 번 실행했다. frontend lint·app/unit/E2E type·coverage·build·bundle은 모두 통과했고 backend Ruff/mypy도 통과했다. backend PostgreSQL gate가 전용 URL 부재를 exit 3으로 정확히 차단했기 때문에 전체 명령의 최종 exit는 1이며, 같은 backend 묶음의 후속 pytest/OpenAPI와 docs·DB·E2E는 fail-fast로 실행되지 않았다. 이는 성공으로 기록하지 않고 다음 직접 증거로 누락 gate를 보완했다.
+
+- backend full pytest: 1,642개 중 **1,636 PASS, PostgreSQL/환경 전용 6 SKIP**, exit 0
+- OpenAPI drift: baseline 일치, exit 0
+- Node 20 Playwright: 기존 14개 + 신규 출하 smoke, **15/15 PASS**, exit 0
+- docs: 14개 중 13 PASS·Windows symlink 권한 1 SKIP, maintained link·whitespace PASS
+- DB read-only: inventory mismatch 0, exit 0
+- `git diff --check`: PASS, 실질 변경 경로 35개(기존 18 + 신규 17)
+- worktree `backend/mes.db` SHA-256: 전후 `F427E7E53BFABEA900D6D6A6A18385BE09734966DC89F182FFA33C2DC53061B5`
+- 종료 상태: 8021·3100 listener 0, `mes_e2e.db`·E2E PID file 0
+
+#### 현재 정지 조건
+
+저장소 diff 기준으로 `IC-04`·`IC-20` 구현과 리뷰를 완료했고, 12.12절에서 **실제 PostgreSQL 4행 skip 0**도 충족했다. 그러나 새 GitHub E2E·PostgreSQL job 성공과 두 safety context의 required-check 적용은 push 보류 결정 때문에 남아 있다. 사용자는 장기 품질 브랜치의 로컬 커밋과 주기적 `main` 동기화를 승인하고 push는 최종 완료 시점까지 보류했다. 따라서 로컬 구현은 다음 체크포인트 준비에 사용할 수 있지만 `IC-04`·`IC-20`과 Goal은 GitHub 증거 전까지 엄격한 완료로 올리지 않는다.
+
+### 12.11 로컬 장기 품질 브랜치와 최신 `main` 동기화 (`38162da8`)
+
+- **브랜치 경계:** detached 작업을 `codex/full-code-quality-improvement` 로컬 브랜치로 전환하고 체크포인트 2의 35개 경로를 `3c75558c`에 커밋했다. upstream·원격 branch·push·PR·`main` 역병합은 모두 0이다.
+- **동기화 방향:** `origin/main`의 최신 `dcf5835e`를 품질 브랜치로만 병합해 merge commit `38162da8`을 만들었다. 메인 워크트리 파일은 수정하지 않는다. 이후에도 `체크포인트 로컬 커밋 → origin/main fetch/merge → delta 감사 → 통합 검증` 순서를 반복하고, 품질 브랜치를 `main`으로 보내는 작업은 전체 closeout 뒤 별도 사용자 승인으로만 수행한다.
+- **충돌 감사:** 품질 커밋의 35개 변경 경로와 `90ce42d9..dcf5835e`의 20개 변경 경로 사이 교집합은 0이었고 ort merge conflict도 0이었다.
+- **대시보드 delta:** `a370f4ba`는 불용 품목을 기본 목록/KPI에서 제외하고 명시적 불용 filter를 추가했으며 선택 chip을 엄격한 AND로 평가한다. 이는 화면 filter 변화이고 재고 mutation은 없다. PA·PF를 KPI 숫자에서 제외하면서 카드 목록에는 포함할 수 있는 `CQ-025`의 이중 모집단은 `useDesktopInventoryDerivations.tsx:21-24,58-76,99-100`과 `inventoryFilter.ts:37-43`에서 그대로이므로 `IC-25`를 해결 처리하지 않는다.
+- **BOM delta:** `dcf5835e`는 BOM tree의 modal 전용 부서 역순 query와 `production_capacity_ignored` 표시 필드를 추가하고 데스크톱 BOM 읽기 화면을 개선했다. 재고 수량·BOM mutation·출하 동결 영역은 바꾸지 않는다. backend schema는 필드를 기본값이 있는 boolean으로 내보내고 frontend 수동 DTO는 optional로 복제하므로 즉시 동작 결함은 재현되지 않았지만, 수동 API type drift를 없애는 `CQ-018/IC-21`의 근거를 보강한다. `backend/app/schemas/item.py:165-169`, `frontend/lib/api/types/catalog.ts:29-37`.
+- **병합 후 검증:** backend BOM·production capacity 24개 PASS, frontend inventory derivation/filter/detail 42개 PASS, OpenAPI baseline 일치, frontend strict lint와 app typecheck PASS. 병합 전 staged full gate는 frontend lint·app/unit/E2E type·coverage·build·bundle과 backend Ruff/mypy가 통과했고, 전용 PostgreSQL URL 부재만 exit 3 `NOT_VERIFIED`였다.
+- **진입 조건:** 최신 `main` delta에서 새 P0/P1 재고 mutation 결함이나 frozen UI 변경은 확인되지 않았다. 체크포인트 2의 로컬 PostgreSQL 증거는 12.12절에서 확보했지만 GitHub CI·required-check는 push 보류 결정 때문에 남아 있으므로, 후속 카드가 원격 필수 gate까지 완료됐다고 전제하지 않는다.
+
+### 12.12 체크포인트 2 로컬 PostgreSQL 실증과 통합 gate (`e6db237b`)
+
+- **격리 경계:** [EDB 공식 PostgreSQL binary archive](https://www.enterprisedb.com/download-postgresql-binaries?lang=en)의 Windows x64 PostgreSQL 16.15를 ignored runtime에만 풀었다. archive는 332,441,502 bytes, SHA-256 `25E6FCDFB8CAEC38691BF461125E7564508760666F7B8E5DC6A5F0818F58F81E`였고 실행 파일은 Authenticode `NotSigned`이므로 운영 배포 신뢰 근거로 사용하지 않는다. `127.0.0.1:55432`의 폐기 가능한 cluster와 `test_dexcowin_ci`만 사용했으며 Windows service·registry·전역 `PATH` 변경은 0이다.
+- **migration RED→GREEN:** 빈 PostgreSQL DB의 base→head가 `20260807_0016`에서 enum column의 기존 default를 cast하지 못해 중단됐다. offline/online 양쪽 migration에 `DROP DEFAULT → TYPE 변환 → typed DEFAULT 복원` 순서를 고정하고 순서 회귀 테스트를 추가했다.
+- **schema verifier RED→GREEN:** 실제 head DB가 boolean·sequence·enum default, PostgreSQL `ANY(ARRAY)` check constraint와 `items.mes_code` 생성열 reflection 차이 때문에 28건 drift로 오탐됐다. PostgreSQL default는 Alembic dialect 비교에 맡기고, check의 IN/ANY 및 유일한 기존 생성열의 reflection artifact만 좁게 정규화했다. 일반 계산식의 의미 있는 괄호와 허용값·literal 변경은 계속 mismatch가 되며, 실제 default 변경도 `modify_default`로 탐지함을 테스트했다.
+- **runtime RED→GREEN:** 공통 두 연결 runner의 실제 창고 이동이 commit 뒤 expired ORM object에서 `box_id`를 다시 읽어 `ObjectDeletedError`를 냈다. commit 전에 immutable response ID를 캡처하는 국소 수정으로 두 경합 테스트를 복구했다.
+- **실제 PostgreSQL 증거:** clean `bootstrap_db.py --all`과 read-only `--check`가 Alembic head `20260818_0022`에서 통과했다. 공통 runner는 cutover 1행과 창고 지도 3행을 독립 connection으로 실행해 **4/4 PASS, skip 0**이었다. migration·cutover·창고 지도 관련 집중 회귀 **211/211**도 같은 엔진에서 통과했다.
+- **전체 정본 gate:** Node 20과 위 전용 PostgreSQL URL을 명시한 `verify_local.ps1 -Mode full -DbReadOnlyCheck -IncludeE2E`가 exit 0이었다. backend Ruff/mypy/PostgreSQL/full pytest/OpenAPI, frontend lint/app·unit·E2E type/coverage/build/bundle, docs, worktree DB read-only, Playwright **15/15**가 모두 통과했다. 그 뒤 계산식 의미 괄호를 보존하는 좁은 fail-closed guard를 추가한 최종 코드에는 staged smart backend gate를 다시 실행해 Ruff/mypy/PostgreSQL 4행/full pytest/OpenAPI가 모두 exit 0임을 확인했다. worktree `backend/mes.db` SHA-256은 전후 `F427E7E53BFABEA900D6D6A6A18385BE09734966DC89F182FFA33C2DC53061B5`로 같았다.
+- **잔존·정리:** runner 종료 뒤 임시 schema와 public의 item/inventory/box/shipping/log 테스트 row가 모두 0임을 SQL로 확인했다. `test_dexcowin_ci`를 삭제하고 전용 cluster를 정상 종료했으며 `pg_ctl status=3`, `pg_isready=2`로 비실행을 확인했다. 원본 로그는 `_attic/runtime/code-quality-improvement/20260819-cp2-postgres-evidence/`에 보존한다.
+- **남은 외부 경계:** GitHub에 push하지 않았으므로 새 E2E·PostgreSQL workflow의 원격 성공과 required-check 적용은 아직 증명되지 않았다. 회사 도메인·DNS·홈페이지·인증서와 직원 환경은 이번 실증 범위 밖이며 변경하지 않는다.
+
+### 12.13 체크포인트 3 `IC-01` 검증된 작업자 세션 결과 (working diff)
+
+- **기준·격리:** `27da6e25718453378160fb9b930d8ed9cff8b622` 위 로컬 품질 브랜치 working diff에서만 구현했다. `C:\ERP` 메인 워크트리는 `AGENTS.md` 읽기 외 수정·복사·stash·reset·commit을 하지 않았고, `C:\ERP-dev`의 파일·해시·검색·DB·process·port에는 접근하지 않았다. branch 전환·commit·push·PR과 체크포인트 4 이후 카드는 0이다.
+- **migration·PIN:** additive `20260819_0023`은 정상 `0022→0023` upgrade에서 legacy/null/default/custom PIN의 `pin_requires_change`를 backfill하고 `operator_sessions`와 bootstrap audit actor 필드를 추가한다. 부분 배포 재실행은 기존 column/table/index의 정확한 형상을 검증·복구하되, 이미 존재하는 `pin_requires_change=true`는 custom legacy hash라도 보수적으로 유지해 새 PIN 변경을 요구한다. 신규 직원 PIN은 PBKDF2-HMAC-SHA256 600,000회·무작위 salt이며, legacy 비기본 SHA-256은 성공 로그인 transaction에서만 승격한다. 기본/미설정 PIN은 10분 active challenge 행의 opaque token을 원자 회전해 호출자에게 usable cookie를 다시 발급하고, credential 예산 10회 안에서만 허용한다. 새 PIN 설정·재로그인 전 operator session과 mutation은 0이며 challenge 이력은 삭제하지 않는다.
+- **session·폐기:** DB에는 CSPRNG token의 SHA-256 digest만 저장하고 브라우저에는 HttpOnly·SameSite=Lax cookie를 둔다. 절대 12시간·sliding 0이며 logout, 일반 PIN 변경, 관리자 초기화, 비활성화, hard delete cascade, `boot_id` 변경에서 기존 세션이 무효화된다. 로그인 KDF는 검증된 client IP별 60회/5분, 새 세션 발급은 직원+IP별 10회/5분이며 성공에도 resource 예산을 reset하지 않는다. 같은 유효 cookie는 기존 행을 재사용하고 직원별 현재 boot active operator session은 32행으로 제한한다. HTTP LAN에서는 `Secure`를 강제하지 못하는 전송 위험을 운영 문서에 남겼고 HTTPS·인증서는 후속 `SEC-01`로 분리했다.
+- **actor manifest:** 실제 등록된 모든 HTTP mutation은 `VERIFIED_ACTOR`, `AUTH_BOOTSTRAP`, `SYSTEM_EXCEPTION` 중 정확히 하나이며 bootstrap/system 예외는 이유 map과 일치한다. Employee-annotated service actor consumer도 독립 discovery와 선언 manifest의 양방향 차집합이 0이다. IO, StockRequest, 불량, 생산, 출하, 부서조정, 거래 정정·취소, 인수인계, 창고지도, 설정·관리자 복구와 히스토리 showcase service caller까지 서버 `Employee` actor로 전환했다.
+- **spoof·rollback·SQLite:** header/body 피해자 claim, 기본 PIN, 비활성·만료·revoke·restart·삭제·malformed cookie는 mutation 전에 401/403/409로 끝나며 inventory/request/log/event delta 0을 검증했다. SQLite session-vs-revoke 양 순서와 mutation 동시성, migration forward recovery, hard-delete cascade를 포함한 backend 전체 수집 1,898건 중 **1,882 PASS, 환경 전용 16 SKIP, 실패 0**이었다.
+- **PostgreSQL:** `tests/concurrency/test_operator_session_postgres.py`를 공통 PostgreSQL runner와 필수 계약 test에 연결해 mutation-first/revoke-first 두 잠금 순서를 정의했다. 그러나 이번 실행 환경의 `TEST_POSTGRES_URL`은 미설정이므로 이 실제 두 연결 행은 **`NOT_VERIFIED`**이며 skip을 PASS로 계산하지 않는다. 사용자 지시의 환경 부재 예외에 따라 이 항목을 잔존 증거로 명시하고 CP3 완료를 막는 거짓 blocker로 만들지 않는다.
+- **frontend·브라우저:** Node 20.20.2 정본 frontend gate에서 strict lint, app/unit/E2E type, 테스트 계약 16/16, 254개 test manifest, 기존 test 진단 386개 대비 신규 종류·증가 0, Vitest **250파일/2,075테스트 PASS**, statement coverage 93.65%·branch 88.22%·function 90%, production build, bundle **2,431,128 bytes / 2,432,696.32 bytes 한도**를 통과했다. 전용 `mes_e2e.db`, 8021/3100만 사용한 Playwright는 **16/16 PASS**였고, E01/E22/E04의 실제 HttpOnly session을 setup에서 1회씩 발급한 뒤 각 새 context가 cookie와 `GET /api/operator-session`으로 actor를 재검증해 운영 발급 상한을 우회하지 않았다. teardown은 실제 `backend/mes.db` SHA-256 `F427E7E53BFABEA900D6D6A6A18385BE09734966DC89F182FFA33C2DC53061B5` 불변, listener 0, 임시 DB·seed·결과물 0을 확인했다.
+- **OpenAPI·운영:** `_dev/baselines/openapi.json`은 현재 `app.openapi()`와 구조 일치하고, 운영 문서는 대면 최초 PIN 설정, 12시간·폐기·단일 worker `boot_id`, 실패 코드·rate-limit, 90일 이상 보존·batch cleanup, token/PIN 비로그, HTTP 위험을 설명한다. frozen 주간보고, 모바일 하단 tab 디자인, desktop shipping step 5 크기는 변경하지 않았다.
+- **정적·통합 gate:** backend Ruff 전체, mypy blocking baseline, OpenAPI exact 비교, frontend strict lint·app/test/E2E type·coverage·build·bundle, maintained Markdown link checker와 `git diff --check`가 통과했다. 별도 명세 리뷰와 코드 품질 리뷰는 최종 트리에서 **Critical 0 / Important 0 / Minor 0**으로 판정했다. PostgreSQL runner는 `TEST_POSTGRES_URL` 부재를 `NOT_VERIFIED`로 종료했으며 PASS로 기록하지 않았다.
+- **기존 변경 보존:** 시작 시 이미 미커밋이던 frontend 6파일(`CapacityDetailModal`, `DesktopHistoryView.state`, `useHistoryData`, `MobileHistoryScreen.history-data`, bundle-size script/test)과 operator handoff 문서는 되돌리거나 CP3 단독 변경으로 오인하지 않았다.
+
+### 12.14 최신 `main` 동기화와 체크포인트 4 진입 전 delta 감사
+
+- **동기화 경계:** 원격 품질 브랜치와 일치하던 `88cdd25b` 위에서 `origin/main`을 품질 워크트리 방향으로만 병합했다. 첫 검증 기준 `ea6da670` 뒤 원격이 다시 이동해 추가 UI 커밋 `bf8d5412`와 이를 포함한 최신 merge `957ec65805c3efe820416e49ba6eb839d6364665`까지 이어서 병합했다. 이전 동기화 기준 `c01034a3..957ec658`은 20개 커밋(비병합 19개)·127개 변경 경로다. `C:\ERP` 메인 워크트리와 `C:\ERP-dev`는 수정·복사·stash·reset·commit·push하지 않았다.
+- **delta 판정:** 부서 입출고의 차감 부서 선택, AS·연구 사용출고 BOM 모드, BOM 고정 자식수량, 생산능력·입출고·이력 UI와 개발 진단 도구 변경을 router→service→schema/test 및 실제 render 경로까지 재대조했다. 새 P0/P1 재고 mutation 결함은 확정되지 않았고, 기존 `IC-03` 이후 카드의 완료 상태도 올리지 않았다.
+- **마지막 UI delta:** `bf8d5412`의 9개 경로는 `/mes` → `DesktopMesShell` → `DesktopWarehouseView` → `IoComposeView` → `IoTargetPicker` 실제 렌더 경로에서 품목 선택만 전체 화면으로 전환한다. 재고 API·수량 계산·DB mutation은 없고, 관련 4파일·43개 테스트와 strict lint·app typecheck가 PASS했다. 모바일 하단 탭과 desktop shipping step 5 동결 경로는 포함하지 않는다.
+- **migration 직렬화:** 체크포인트 3의 작업자 세션 migration `20260819_0023` 뒤에 최신 `main`의 사용출고 BOM migration을 `20260820_0024`로 직렬화했다. Alembic ScriptDirectory와 CLI는 단일 head `20260820_0024`이며, 품질 워크트리 전용 `backend/mes.db`만 `0022→0023→0024`로 올렸다. 메인·직원 DB는 접근하거나 변경하지 않았다.
+- **병합 정합성:** CP3의 서버 검증 `VerifiedActor`·작업자 세션 계약과 최신 `main`의 AS·연구 BOM 분기, 출고 승인 부서, 고정 자식수량을 함께 유지했다. OpenAPI baseline은 현재 `app.openapi()`와 exact 일치하고 schema read-only check와 독립 inventory integrity 검사는 모두 PASS다.
+- **backend 통합:** 전체 1,922개를 4개 격리 worker로 수집해 **1,906 PASS, 환경 전용 16 SKIP, 실패 0**으로 종료했다. 백업 안전성 test의 “두 subprocess가 같은 1초 안에 끝나야 함”이라는 Windows 시간 의존 조건은 동일 publish 이름을 고정 주입하는 결정적 충돌 test로 바꿨고, 무작위 기본 PIN hash가 pytest parameter ID에 들어가 worker별 수집명이 달라지던 CP3 test는 고정 ID로 바꿨다. 두 보강의 focused RED/GREEN도 별도로 확인했다.
+- **frontend 통합:** Node 20.20.2에서 app/unit/E2E type, 255파일·2,142 Vitest, coverage(statement 93.74%, branch 88.30%, function 90%), production build를 통과했다. unit-test TypeScript baseline은 기존 386개에서 383개로 줄었고 신규 종류·증가는 0이다. 첫 검증 시 최신 `main`의 빌드 산출물도 2,458,398 bytes로 2.325MB 한도를 이미 넘었고 초기 통합 결과는 2,461,169 bytes였다. 마지막 전체 화면 UI까지 포함해 다시 build한 최종 결과는 **2,463,257 bytes**이며, 두 승인 기능 집합을 수용하는 최소 2.350MB 한도(2,464,153.6 bytes)에서 gate·계약 test가 PASS했다.
+- **브라우저·종료:** 전용 `mes_e2e.db`, 8021/3100만 사용한 Playwright는 16/16 PASS였고 teardown에서 실제 `backend/mes.db` SHA-256 전후 `598BD3606C91543C19B05CD17B2CB6F49609F45297A4764C7332C17EC990D448` 불변, listener·임시 DB·seed·결과물 0을 확인했다.
+- **잔존 경계:** 체크포인트 3 전용 PostgreSQL 두 연결 경합은 `TEST_POSTGRES_URL` 부재로 계속 `NOT_VERIFIED`이며 PASS로 세지 않는다. 최신 `main`에서 이미 커밋된 주간보고 화면 변경은 사용자 기능 변경으로 그대로 보존했지만 품질 동기화 과정에서 동결 파일을 추가 수정하지 않았고, 모바일 하단 탭과 desktop shipping step 5 동결 계약도 변경하지 않았다. 체크포인트 4 제품 구현은 0이다.
+- **Git closeout:** 이 동기화는 merge commit으로 `codex/full-code-quality-improvement`에만 push한다. `main` push·PR·품질 브랜치의 `main` 병합은 수행하지 않으며, 다음 작업은 clean 품질 브랜치에서 체크포인트 4 승인 범위만 시작한다.
+
+### 12.15 체크포인트 4 실행 전 고정 `main` 동기화·재감사 (`38551726`)
+
+- **동기화 경계:** 원격 품질 브랜치 `e0706c6`에서 시작해 사용자 지정 고정 `main` SHA `38551726bba7d8253ad19fb39b146e7c60c2bc2d`만 `--no-ff`로 병합했다. 로컬 merge commit은 `a7bae88f804fd865eeaafd47dcb30dd558857717`이며 부모는 `e0706c6`과 고정 `main`이다. `C:\ERP` 메인 워크트리는 읽기 전용 상태 확인만 했고 `C:\ERP-dev`는 파일·해시·검색·DB·process·port를 포함해 접근하지 않았다.
+- **전수 manifest:** 직전 merge-base `957ec65805c3efe820416e49ba6eb839d6364665..38551726`의 74개 commit을 누락 없이 manifest로 고정하고 전체 변경 300경로와 CP4 관련 113경로를 재감사했다. 원본 목록·차집합·정적 감사 결과는 ignored 증거 디렉터리 `_attic/runtime/code-quality-improvement/20260827-170256-cp4-sync-audit/`에 보존한다.
+- **migration 직렬화:** 고정 `main`의 배포 가능 공개 migration `20260820_0023`~`20260826_0029`는 blob을 수정하지 않고 그대로 보존했다. 품질 전용 작업자 세션 migration만 `20260827_0030_add_operator_sessions.py`로 재배치해 `0029→0030` 단일 head를 만들었다. SQLite의 fresh·`0029→0030`·실패 rollback은 통과했고 품질 워크트리 `backend/mes.db`는 head `0030`이다.
+- **병합 계약:** 고정 `main`이 도입한 inventory-operation 원장·취소·adoption을 중복 구현하지 않는다. merge 경계에서 작업자 세션 actor 검증과 공개 inventory-operation 계약을 함께 유지하고, 제거된 출하 `REQUESTED`/`send-to-prep` 계약을 현행 `PREPARING` 4상태×9조합=36행 및 UI list/detail E2E로 정리했다. CP4 제품 코드는 구현하지 않았다.
+- **CP4 카드 재분류:** `IC-03-A=PARTIAL`(원장 identity·취소·adoption은 `RESOLVED_BY_MAIN`; 새 operation batch/취소 409 설계는 `SUPERSEDED`; 잘못된 bucket·workflow/non-inventory side effect가 있는 correction 안전성은 `OPEN`), `IC-09=OPEN`(key 재사용에 actor·route·ordered payload fingerprint 없음), `IC-10=PARTIAL`(cancel lock/code와 SQLite winner는 `RESOLVED_BY_MAIN`; handover·correction 잠금 및 PostgreSQL 증거는 `OPEN`), `IC-11=PARTIAL`(삭제 history 보존은 `RESOLVED_BY_MAIN`; active command/delete reference 거부는 `OPEN`). baseline migration 문제는 제품 카드와 섞지 않고 별도 `CONFLICT`로 둔다.
+- **제품 구현자가 따를 단일 범위:** baseline이 다시 통과하기 전 CP4 제품 구현을 시작하지 않는다. 권한 해소 뒤에는 8.9.5의 세 구간을 그대로 따른다. 1번은 `IC-03-A` correction proof와 correction 쪽 `IC-10` owning-row lock, 2번은 `IC-09` fingerprint/replay와 handover/cancel 쪽 `IC-10` PostgreSQL 경합, 3번은 `IC-11` active reference 보호다. fingerprint는 object key와 의미상 unordered collection만 정규화하고 ordered bundle/line 순서는 보존한다.
+- **현재 검증:** focused backend 최종 회귀 126/126, backend full 2,130개 중 2,113 PASS·환경 전용 17 SKIP·FAIL 0, SQLite migration 3경로, Ruff·mypy·OpenAPI, frontend lint·app/unit/E2E type, Vitest 262파일·2,329테스트와 coverage, production build, bundle 2,500,688/2,500,853.76 bytes, 전용 DB Playwright 17/17을 통과했다. unit-test type 정본은 266파일·기존 429진단이며 신규 종류·증가는 0이다. 독립 명세·품질 리뷰에서 안전하게 해소할 수 있는 제품 범위·actor spoof·E2E fallback/cleanup 지적은 모두 반영했고 최종 재리뷰는 명세 Critical/Important 0, 코드 품질 Critical/Important/Minor 0으로 승인됐다. 공식 full은 frontend 7개 gate와 docs·Ruff·mypy까지 통과했지만 PostgreSQL `state=empty`에서 fail-closed됐고, 빈 DB `bootstrap_db.py --all`이 아래 공개 `0024` 오류를 직접 재현했다. 이를 성공으로 기록하지 않으며 전체 명령의 최종 exit는 1이다. 전체 수치와 종료 자원 상태는 `_attic/handoff/2026-08-27-2012-cp4-sync-audit-final-handoff.md`에 고정한다.
+- **차단 충돌:** 빈 PostgreSQL 16의 base→head가 고정 `main` 공개 migration `20260821_0024_remove_shipping_requested_status.py`에서 중단된다. 해당 검사 SQL이 `pg_class.relkind`를 제한하지 않아 `ix_shipping_requests_status` index의 `status` attribute를 enum column으로 오인한다. 이 blob은 고정 `main`과 정확히 같고 0024 이전 실패이므로 후속 0030으로 복구할 수 없다. 공개 migration 불변 조건 아래에는 합법적인 저장소 수정이 없으므로 전체 PostgreSQL/full gate, 최종 commit·push, CP4 진입을 차단한다. 고정 `main`의 교정 SHA를 새로 지정하거나 0024 수정 예외를 명시 승인받아야 한다.
+- **원격 관찰:** 기존 원격 품질 SHA `e0706c6`의 GitHub CI run `32437802361`은 성공했다. 고정 `main` SHA의 run `33050070103`은 bundle-size에서 실패했고 당시 workflow에는 품질 PostgreSQL job이 없었다. `main` branch protection 조회는 404로 설정된 required check가 없음을 확인했으며 설정은 변경하지 않았다. gate가 붉은 현재 로컬 75개 ahead commit은 push하지 않는다.
+
+### 12.16 PostgreSQL 0024 repair 통합과 0029 후속 blocker (`759067e`) `[SUPERSEDED_BY_12.17]`
+
+- **격리·기준:** `C:\ERP`의 `main == origin/main == 759067e031aaf8245347952be3e86474981cab29`와 사용자 dirty 9개는 읽기 전용으로 확인했다. `C:\ERP-dev`에는 접근하지 않았다. 별도 `C:\ERP\.worktrees\fix-postgres-shipping-status-0024`와 branch `codex/fix-postgres-shipping-status-0024`를 `759067e`에서 만들었고 CP4 제품 코드는 변경하지 않았다.
+- **main 추가 delta:** `38551726..759067e`는 commit 1개·변경 경로 8개다. 체크리스트·이력 상세 panel UI와 handoff만 바뀌었고 migration, 인증, inventory-operation, 주간보고, 모바일 하단 tab, desktop shipping step 5 동결 경로와 교집합은 0이다.
+- **0024 TDD repair:** 먼저 두 query 모두 table/partitioned-table만 읽는 테스트와 실제 PostgreSQL index/table/partitioned-table 테스트를 RED로 확인했다. production 변경은 `20260821_0024_remove_shipping_requested_status.py:147-175`의 두 query에 `relation.relkind IN ('r', 'p')`를 한 줄씩 추가한 것이 전부다. repair commit은 `0379648ef024c665f19fa1d037a5bccb21729bd8`이며 branch는 push하지 않았다.
+- **0024 실제 PostgreSQL 증거:** 폐기 가능한 PostgreSQL 16 DB에서 일반 `ix_shipping_requests_status.status`는 무시하면서 `0023→0024`가 성공했고, 별도 table과 partitioned-table의 enum column은 정확한 relation 이름으로 실패했다. 실패 transaction은 revision `0023`, 기존 5개 enum label, 임시 replacement type 0을 유지했으며 원인 table 제거 뒤 같은 DB의 retry가 revision `0024`, 4개 현행 label로 성공했다. repair staged smart gate의 backend full pytest와 OpenAPI도 exit 0이었다.
+- **품질 통합:** 시작 dirty manifest 20 tracked+3 untracked가 정확히 일치할 때만 stash `2ecf798c683e058d5224fbfd9588f9ab19acb687`를 만들었다. 최신 main merge `ed47a46830bd94ee06183746e454a83eb30e4346`과 repair merge `cd7a81c9edc136b3be9bcce71a15ef709ae0aed0`을 품질 브랜치 방향으로만 적용했다. stash는 23/23 충돌 없이 복원한 뒤 삭제했다. Alembic은 `20260826_0029→20260827_0030` 단일 head이고 기존 main migration diff는 품질 선행 `0016` 교정, 이번 승인 `0024` 교정, 품질 전용 `0030`뿐이다.
+- **새 실제 PostgreSQL blocker:** 품질 worktree의 빈 PostgreSQL DB에 공식 `bootstrap_db.py --all`을 실행하면 0024는 통과하지만 `20260826_0029_inventory_operations.py:459-500`에서 `inventory_operation_role_enum`이 존재하지 않아 `transaction_logs.operation_role` 추가가 `UndefinedObject`로 실패한다. 해당 0029 blob `7fd8fa7ee53a1707148fd99bb75b163b6b202b37`은 `759067e`와 품질 HEAD가 같아 merge 결함이 아니다. 실패 후 public table 0, `alembic_version` 없음, 해당 enum 0으로 transactional rollback됐다.
+- **중단 판정:** 기존 main migration revision을 추가로 고쳐야 하면 중단한다는 사용자 hard stop을 적용했다. 품질 branch의 전체 full gate, 새 GitHub E2E/PostgreSQL run, required-check 재판정, 독립 최종 리뷰, dirty 변경 commit·push는 실행하지 않았다. 기존 원격 `e0706c6`의 과거 성공은 현재 `cd7a81c9` 증거로 승격하지 않는다.
+- **CP4 재판정:** 제품 delta가 없으므로 `IC-03-A=PARTIAL`, `IC-09=OPEN`, `IC-10=PARTIAL`, `IC-11=PARTIAL`로 유지한다. 제품 카드 사이 conflict는 없고 baseline migration만 `CONFLICT`다. 다음 작업은 새 main 기반 별도 repair branch에서 0029 PostgreSQL enum 생성/재실행/rollback을 TDD로 교정한 뒤 이 품질 브랜치에 통합하는 것이며, 그 전에는 8.9.5의 제품 파일을 건드리지 않는다.
+
+### 12.17 PostgreSQL 0029 repair 통합과 CP4 GREEN 기준선 (`cd2c86b9`)
+
+- **승인·격리:** 사용자가 0029 별도 repair를 명시 승인했다. 수정은 `C:\ERP\.worktrees\fix-postgres-shipping-status-0024`의 `codex/fix-postgres-shipping-status-0024`에서 수행했고 `C:\ERP` main과 `C:\ERP-dev`는 수정하지 않았다.
+- **TDD repair:** `20260826_0029_inventory_operations.py`가 PostgreSQL named enum을 만들지 않고 column을 추가하던 RED를 고정한 뒤, column 추가 전에 enum을 생성하고 동일 type 재사용·label drift fail-closed·실패 rollback/retry 계약을 최소 변경으로 구현했다. repair commit은 `0142a5696cc3d6c10343d6f6537d0c99d75659de`, 품질 merge commit은 `cd2c86b9410610d237a899dd22ef25f6d9a62ace`다.
+- **실제 PostgreSQL:** PostgreSQL 16.15에서 fresh→0030, 0028→0029, 기존 enum 재사용, label/schema drift 거부, 의도적 후반 실패의 전체 rollback과 동일 DB retry를 포함한 migration 행렬 15/15가 통과했다. 통합 뒤 별도 동시성 gate 14/14도 통과했다.
+- **전체 기준선:** Node 20.20.2에서 `verify_local.ps1 -Mode full -DbReadOnlyCheck -IncludeE2E` exit 0. backend Ruff·mypy·full pytest·OpenAPI, frontend lint·app/test/E2E type·coverage·build·bundle, docs whitespace/link, DB read-only와 Playwright 17/17이 모두 통과했다.
+- **검증 환경 격리:** 실제 PostgreSQL용 `TEST_POSTGRES_URL`, `DATABASE_URL`, `DEXCOWIN_POSTGRES_TEST_ACK`는 concurrency gate에만 노출되고 backend full pytest·OpenAPI에는 전달되지 않도록 `verify_local.ps1`의 process 환경을 격리했다. runtime 계약 테스트는 두 번의 concurrency gate 사이에서도 원래 값을 복원함을 증명한다.
+- **종료 상태:** 품질 worktree `backend/mes.db` SHA-256은 검증 전후 `90FA7ABE83D2A8BF545531C15CDB75FDA2A3B9F519AA86F6EC396B8DE616C71E`로 불변이다. 일회용 PostgreSQL DB와 E2E DB는 삭제했고 8021·3100·3300·55432 listener는 0이다. 동결 UI 추가 변경은 0이다.
+- **CP4 판정:** 기준선 `CONFLICT`는 `RESOLVED`. 제품 카드는 구현 전 상태인 `IC-03-A=PARTIAL`, `IC-09=OPEN`, `IC-10=PARTIAL`, `IC-11=PARTIAL`을 유지하며 8.9.5의 세 hard stop을 그대로 실행한다.
+
+### 12.18 체크포인트 4 구현 완료와 CP5 정지 경계
+
+- **고정 경계:** 품질 worktree `C:\ERP\.worktrees\full-code-quality-checkpoint-2`, branch `codex/full-code-quality-improvement`, 고정 main `759067e031aaf8245347952be3e86474981cab29`에서만 실행했다. CP4 도중 main 추가 merge·push, 새 branch, PR, force-push, `C:\ERP` main worktree 변경, `C:\ERP-dev` 접근은 없었다.
+- **Hard stop A — correction 안전막:** `78c01d6a14fdf16e52ce0bdf8d3df03f7a768f95`가 단순 단일 warehouse RECEIVE/SHIP만 원본당 한 번 정정하고 workflow-linked·다중/non-warehouse effect, 취소됨, 이미 정정됨을 `CORRECTION_CONFLICT`로 차단한다. 대상 log·owning operation·inventory lock과 `20260828_0031` partial unique index를 함께 적용했다. GitHub CI run `33099973906`은 6/6 success다.
+- **Hard stop B — semantic idempotency·조건부 전이:** `1618a88c325564548f187e7fb62f76a0096d4ab5`가 IO·StockRequest fingerprint와 frontend `ResultUnknownError`, handover owning-row lock을 구현했다. same actor+route+key+fingerprint만 replay하고 의미가 다르거나 legacy null fingerprint면 `IDEMPOTENCY_CONFLICT`로 0 mutation 거부한다. GitHub CI run `33110611616`은 6/6 success다.
+- **Hard stop C — 삭제 품목 참조 보호:** `a62546a5e689a2a6311471ed0965eb879939841a`와 security manifest 보완 `19d030b1d060ae1b74424843d9388438779f9951`이 active/deleted repository 경계, item-first lock, 활성 IO·StockRequest·ShippingRequest·BOM 참조의 `ITEM_IN_USE`, delete-vs-submit 직렬화를 완성했다. BOM은 자동 삭제하지 않고 참조 0일 때만 `deleted_at`+audit을 확정한다. 최종 GitHub CI run `33117217612`은 6/6 success다.
+- **실제 PostgreSQL 증거:** PostgreSQL 16 두 connection barrier와 migration fresh/0030→0031/rollback을 포함한 runner 29/29가 통과했고 Alembic은 `20260828_0031 (head)` 단일 head다. correction×2, correction-vs-cancel, handover×2, cancel×2, rollback 후 retry, 응답 유실 retry, delete-vs-submit은 각각 winner 1·loser mutation/orphan/부분 log 0을 증명했다.
+- **통합 gate:** Node 20.20.2와 일회용 PostgreSQL 16에서 `verify_local.ps1 -Mode full -DbReadOnlyCheck -IncludeE2E` 최종 exit 0, 18/18 gate가 통과했다. backend Ruff·mypy·PostgreSQL 29/29·full pytest·OpenAPI, frontend lint·app/test/E2E type·coverage·production build·bundle, docs whitespace/link, DB read-only, Playwright 17/17이 모두 PASS했다. 초기 통합 시도는 Windows timeout test process가 `HasExited` 확인 직후 자연 종료하는 cleanup race 한 건을 드러냈고, `scripts/dev/tests/schema-readiness-adapter.ps1:36`에서 이미 종료한 `taskkill` 오류를 무해하게 처리하도록 보완한 뒤 집중 회귀 3/3과 최종 full gate를 통과했다.
+- **리뷰·동결:** 각 hard stop의 독립 명세·품질 리뷰는 Critical/Important 0이다. 주간보고, 모바일 하단 tab 디자인, desktop shipping step 5 카드 크기/grid/overflow 변경은 0이다.
+- **종료 상태:** 품질 worktree `backend/mes.db` SHA-256은 검증 전후 `90FA7ABE83D2A8BF545531C15CDB75FDA2A3B9F519AA86F6EC396B8DE616C71E`로 불변이다. 일회용 PostgreSQL DB는 drop 후 remaining 0이고 cluster를 정상 종료했다. E2E 임시 DB 0, 8021·3100·3300·55432 listener 0이다.
+- **최종 카드 상태:** `IC-09=완료`, `IC-10=완료`, `IC-11=완료`, `IC-03=PARTIAL(correction 안전막 완료, IC-03-B 남음)`. 다음 시작점은 CP5 `IC-06 read-only preflight`지만 이 실행에서는 CP5를 시작하지 않는다.
+
+### 12.19 고정 main `78e8023f` S0 동기화·재감사와 CP5 진입 기준선
+
+- **격리·Git 경계:** 품질 worktree `C:\ERP\.worktrees\full-code-quality-checkpoint-2`, branch `codex/full-code-quality-improvement`의 clean HEAD/upstream `e64a9a12da16f8502ab1a1e82dbed2b1d2648a01`에서 시작했다. `C:\ERP`의 `main == origin/main == 78e8023f41ef59528d9d8c07498e7653f9bee247`과 clean 상태는 읽기 전용으로만 확인했고, `C:\ERP-dev`는 파일·검색·해시·DB·process·port를 포함해 접근하지 않았다. merge-base는 `759067e031aaf8245347952be3e86474981cab29`이며, 고정 main을 `git merge --no-ff --no-commit`으로 품질 worktree 방향에만 통합했다. commit·push·branch 변경·PR은 수행하지 않았다.
+- **delta manifest:** merge-base 이후 품질 전용 28개 commit, main 전용 15개 commit, main 변경 175경로, 양쪽 교집합 24경로를 고정했다. 충돌은 아래 11경로였고 conflict marker와 unmerged entry를 모두 제거했다.
+  - backend: `backend/app/routers/stock_requests.py`, `backend/app/services/io_dispatch.py`
+  - frontend 계약·테스트: `frontend/app/mes/_components/_history_sections/__tests__/historyShared.golden.test.ts`, `frontend/app/mes/_components/_warehouse_v2/useIoSubmit.ts`, 그 테스트, `frontend/app/mes/_components/login/MesLoginGate.tsx`, `OperatorLoginCard.tsx`, 그 테스트
+  - 검증·운영: `frontend/scripts/check-bundle-size.mjs`, 그 테스트, `scripts/dev/start-backend.ps1`
+- **충돌 통합 계약:** StockRequest draft 복귀는 CP4 `VerifiedActor`와 main의 연결 request 전체 잠금·취소·rollback·draft 복원을 함께 유지한다. IO draft submit은 main의 `draft→submitted` 조건부 UPDATE를 batch-first 잠금 순서로 유지하고, actor+route+batch ID+정규화된 저장 내용 SHA-256을 성공 transaction에 기록한다. 같은 actor·route·batch의 exact retry만 현재 결과를 재생하며 다른 actor, 바뀐 저장 내용·route, legacy null fingerprint는 실패 폐쇄한다. replay는 재고·로그·operation·StockRequest를 다시 만들지 않고 domain event와 ActivityAudit도 중복 기록하지 않는다. frontend는 기존 draft 제출에도 공통 `ResultUnknown` pending command를 적용해 unmount·module reload 뒤 원래 batch ID를 보존하고 성공 또는 확정 4xx에서만 지운다. 신규 일반 제출의 동일 key/snapshot 보존도 그대로 유지한다. 로그인은 서버 operator session·최초 PIN challenge를 정본으로 두고 일반 로그인 실패 시 PIN focus 복구를 더했다. 이력 날짜 golden은 KST 경계와 CP4 취소/identity 표면을 함께 검증한다. backend 시작은 main의 triggerless Windows Task Scheduler supervisor를 유지하면서 단일 worker와 proxy header 비활성화를 child command에 고정했다.
+- **main positive delta와 잔여 범위 확대:** BOM tree API가 `backend/app/routers/bom.py:268-275`에서 `build_af_capacity_bom_cache`와 `compute_additional_producible_quantity`를 호출하고, `frontend/app/mes/_components/_inventory_sections/BomDetailModal.tsx:119-129`가 이를 표시한다. 이는 읽기 전용 표시 개선이지만 물리 재고를 소비하는 production capacity 계산이 availability의 추가 소비자가 되었으므로 `IC-07`의 공통 pending+shipping reservation 적용 표면이 넓어졌다. `scripts/dev/runtime-task-control.ps1`과 `register-runtime-tasks.ps1`은 runtime owner·등록 schema·재시도 상태를 새 운영 계약으로 만들고, `start-backend.ps1:24`, `status-servers.ps1:80-82,131`은 여전히 `/health/live`를 준비 상태처럼 소비한다. 따라서 integrity 결과 전파, backup/restore 후 runtime owner 복구 검증, live/ready consumer 전환의 `IC-17`·`IC-18`·`IC-19` 범위도 새 Task Scheduler 소비자를 포함하도록 넓어졌다.
+- **생성물·schema:** 최종 코드에서 OpenAPI baseline을 재생성해 SHA-256 `0B1B0A027169625DA05203BBD8720D7CC5F3BB625576A9D4A6507070A32A70D4`로 고정했고 두 번째 독립 생성과 byte exact 일치했다. Alembic은 `20260828_0031 (head)` 단일 head다. 공식 Node 20.20.2 production build가 통과했고 산출물 2,508,001 bytes를 수용하는 최소 bundle 한도는 2.392MB(2,508,193.792 bytes)다.
+- **동결 경계:** 주간보고 backend/frontend, 모바일 하단 tab 디자인, desktop shipping step 5의 대상 blob은 모두 고정 main `78e8023f`와 exact 일치한다. S0가 해당 동결 계약을 별도로 수정한 경로는 0이다.
+- **리뷰 보완:** 초기 독립 리뷰의 frontend 외부 30회/내부 90회 Important를 외부 90회로 보완했지만, 후속 supervisor 검토에서 backend 내부·외부 30회와 frontend 내부·외부 90회도 외부 호출이 먼저 시작하면 같은 시간 창 때문에 먼저 timeout될 수 있음이 확인됐다. backend의 별도 helper를 제거하고 공통 `Wait-RuntimeHttp200`으로 backend·frontend 모두 내부 90회, 외부 120회를 명시했으며 91번째 시도에서 외부 readiness가 성공하는 계약을 고정했다. Windows CI arbitrary checkout은 `resolve-server-profile.ps1 -TestRepoRoot`로 test profile을 만든 뒤 순수 `New-RuntimeTaskSpecification` builder에 주입하고, 실제 등록·start/status consumer는 strict `Get-RuntimeTaskSpecification` wrapper만 사용하도록 분리했다. production allowlist 밖 `-RuntimeRepoRoot`는 task action 전에 실패 폐쇄하며 production script에는 `TestRepoRoot`가 도달하지 않는다. 이 경계의 arbitrary checkout RED→GREEN과 register `-PreflightOnly`/`-WhatIf` fail-closed 계약을 포함한 runtime path·task 집중 회귀 40/40이 통과했다. 또 기존 IO draft 저장의 item-first와 제출의 batch-first 순서가 교차해 두 connection의 save→submit·submit→save 모두 실제 PostgreSQL `DeadlockDetected` RED를 재현했다. 저장도 기존 batch row `FOR UPDATE` 뒤 item lock을 잡는 batch-first로 통일했고, 두 방향 barrier 회귀와 기존 응답 유실 회귀를 포함한 필수 PostgreSQL runner 32/32(skip 0, exit 0), SQLite/API 직접 영향 회귀 31/31이 통과했다. 최종 independent rereview는 supervisor가 수행하므로 내부 승인 판정은 하지 않는다. 기존 Minor 1건은 `MesLoginGate`가 주 시작일을 브라우저 local timezone에서 계산한 뒤 KST 문자열로 바꾸어 비-KST 브라우저의 KST 월요일 경계에서 이전 주를 prefetch할 수 있다는 잔여 위험이다. 동결 주간보고 경로와 주 계산을 함께 통일하는 별도 승인 전에는 추가 제품 변경을 하지 않는다.
+
+| 잔여 카드 | S0 재판정 | 최신 main 반영 뒤 남은 정확한 경계 |
+|---|---|---|
+| `IC-06` | `PREFLIGHT_COMPLETE / RUNTIME_OPEN` | read-only preflight가 W/B/active-Z/U 후보, duplicate stable row identity, inactive zone, placement orphan, 음수·초과배치를 보고한다. SQLite·PostgreSQL의 repeatable read-only snapshot과 교차 dialect hash를 실증했고 runtime·schema·재고 mutation은 0이다. Gate A 승인 뒤에만 `0032` 물리 원장을 시작한다. |
+| `IC-07` | `OPEN` | 공통 availability와 pending+active shipping allocation 적용은 미구현이다. BOM tree의 추가 생산 가능 수량이 production capacity 소비자를 하나 더 드러내 적용·검증 표면이 넓어졌다. |
+| `IC-08` | `OPEN` | IO draft 조건부 전이와 StockRequest 연결 복귀는 국소 hardening이다. shipping request/allocation lock·expected state·command receipt와 prepare/pickup/cancel 경합 계약은 미구현이다. |
+| `IC-03-B` | `PARTIAL` | CP4 correction 안전막은 유지된다. shipping pickup, production receipt, IO batch, StockRequest, defect disassembly 전용 cancel의 effect·allocation/pending·상태·event 단일 transaction 복원은 미구현이다. |
+| `IC-17` | `OPEN` (범위 확대) | 안정된 inventory check ID/severity와 blocking exit는 미구현이다. Task Scheduler owner/status/retry가 새 운영 소비자가 되어 integrity 결과 전파 matrix에 포함해야 한다. |
+| `IC-18` | `OPEN` (범위 확대) | snapshot metadata·Alembic head·전체 schema·WAL 복구 증명은 미구현이다. DB restore 뒤 Task Scheduler 등록 schema·owner·재시도 상태까지 검증하는 운영 복구 경계가 추가됐다. |
+| `IC-19` | `OPEN` (범위 확대) | live/process, ready/DB·schema·dependency, detailed/integrity 분리는 미구현이다. start/status/supervisor recovery의 `/health/live` 소비를 새 ready 계약으로 함께 전환해야 한다. |
+
+- **역사적 최종 검증과 정지 판정 기록:** 최초 staged merge snapshot의 정본 `verify_local.ps1 -Mode full -DbReadOnlyCheck -IncludeE2E`는 18개 gate를 선택했으나 963.047초 뒤 backend full pytest의 새 service 보안 manifest 2건·중복 raw PIN surface 1건과 frontend unit-test type baseline의 신규 진단 4건에서 exit 1로 중단됐다. 이 역사적 실패는 그대로 보존하며, `revert_to_draft`의 중복 raw PIN 검사만 제거하되 기존 rate-limited cancel PIN 검증을 유지하고 actor/read-only manifest와 main test fixture 타입을 최소 보완했다. 실패 직접 회귀는 backend 63/63, frontend known 진단 423개·신규 0, 관련 Vitest 16/16으로 통과했다. 후속 supervisor 지적에 따라 Windows CI test-only root, 기존 IO draft의 exact semantic replay, backend·frontend 내부 90회/외부 120회 readiness를 보완했고, runtime 경로·task 계약 35/35, frontend focused 4파일 36/36, app/test type gate, 실제 PostgreSQL draft 경합·응답 유실 회귀가 통과했다. 이 변경을 포함한 첫 final rerun은 922.216초에 새 순수 helper `fingerprint_io_draft_submit`의 read-only 보안 분류 누락 1건이 두 manifest test에서 검출되어 exit 1이었고, 기존 fingerprint helper와 같은 exact read-only 분류 한 줄을 추가한 뒤 보안 manifest 28/28을 통과했다. 재검토 전 staged rerun은 Node 20.20.2와 폐기 가능한 PostgreSQL 16에서 974.851초, exit 0, 18/18이다. backend Ruff·mypy·PostgreSQL concurrency 30/30(skip 0, 새 draft race·응답 유실 포함)·full pytest·OpenAPI, frontend lint·app/test/E2E type·94.22% line coverage·production build·bundle, docs whitespace/link, DB read-only, Playwright 17/17이 모두 PASS했다. OpenAPI SHA-256은 `0B1B0A027169625DA05203BBD8720D7CC5F3BB625576A9D4A6507070A32A70D4`, `backend/mes.db` SHA-256은 전후 `90FA7ABE83D2A8BF545531C15CDB75FDA2A3B9F519AA86F6EC396B8DE616C71E`로 불변이고 동결 12 blob은 고정 main과 exact 일치한다. PostgreSQL test DB remaining 0, E2E 임시 DB 0, 8021·3100·3300·55432 listener 0이며 중지한 일회용 cluster 디렉터리는 휴지통으로 이동해 원래 경로에서 제거했다. 재검토 Important 보완 뒤 동일 staged snapshot을 Node 20.20.2와 폐기 가능한 PostgreSQL 16.15에서 다시 실행한 최종 full gate도 898.108초, exit 0, 18/18이다. backend Ruff·mypy·PostgreSQL concurrency 32/32(skip 0, save↔submit 두 lock 방향 포함)·full pytest·OpenAPI, frontend lint·app/test/E2E type·94.22% line coverage·production build·bundle 2/2, docs 3/3, DB read-only, Playwright 17/17이 모두 PASS했다. `mes.db`와 OpenAPI SHA-256은 위 값으로 불변이고 동결 12/12 blob은 고정 main과 exact 일치한다. 이번 test DB remaining 0, E2E 임시 DB 0, 8021·3100·3300·55432 listener 0이며 정상 종료한 일회용 cluster는 휴지통으로 이동해 원래 경로에서 제거했다. full gate는 GREEN이지만 최종 independent rereview는 supervisor 몫이므로 내부 완료 승인·commit·push는 하지 않는다.
+
+- **현재 코드 보완 후 최종 gate:** runtime task builder 분리와 arbitrary Windows checkout 계약을 포함한 현재 staged snapshot에서 Node 20.20.2·폐기 가능한 PostgreSQL 16.15로 `verify_local.ps1 -Mode full -DbReadOnlyCheck -IncludeE2E`를 다시 실행해 904.466초, exit 0, 18/18 PASS를 확인했다. backend Ruff·mypy·PostgreSQL concurrency 32/32(skip 0)·full pytest·OpenAPI, frontend lint·app/test/E2E type·94.22% line coverage·production build·bundle, docs 3/3, DB read-only, Playwright 17/17이 모두 통과했다. 증거 로그는 `_attic/runtime/code-quality-improvement/20260831-120815/s0-main-sync/42-final-full-gate-supervisor-r3.log`다. 임시 PostgreSQL DB remaining 0, cluster는 정상 종료 후 휴지통으로 이동했고, E2E 임시 DB와 8021·3100·3300·55432 listener는 0이다.
+- **DB baseline 차단 해소:** 위 현재 gate는 실행 중 품질 worktree 전용 `backend/mes.db`가 `0FC2AE454B6724413C9E27AFB2CB156C8B35D3817DB0BA4DB17313EC39E2BAA6`(1,347,584 bytes)로 전후 불변임을 확인했지만, 사고 전 기준선 `90FA7ABE83D2A8BF545531C15CDB75FDA2A3B9F519AA86F6EC396B8DE616C71E`의 정확한 바이트는 backup·snapshot·임시·휴지통에서 찾지 못했다. 사용자는 2026-08-31에 `C:\ERP` 개발 환경과 `C:\ERP-dev` 직원 환경에 영향이 없다는 조건으로 격리 품질 DB의 재생성을 승인했다. `0FC2...` 사고 파일은 `_attic/runtime/code-quality-improvement/20260831-120815/s0-main-sync/mes-db-after-accidental-bootstrap.db`와 `mes-db-before-user-approved-reset-20260831-162216.db`에 보존했다. 명시적 품질 DB URL로 fresh→`20260828_0031`을 부트스트랩한 새 기준선은 `D0419DC051B881DA145B466AF99490570D18C47BCAAE990C57FFD4476FE28147`이며 read-only check 전후 동일하다. `items=0`, `inventory_operations=0`, `transaction_logs=0`, `stock_requests=0`, `shipping_requests=0`이고, `C:\ERP\backend\mes.db`는 전후 `E468424B11DCCCF26B14C1850AB498072FEB94E1D9CFE71A9F0A5BD8442AFC23`으로 불변이다. `C:\ERP-dev`는 접근하지 않았다.
+
+**S0 종료 판정:** 코드·PostgreSQL·전체 gate·동결 UI·격리 DB 기준선은 GREEN이다. merge commit `deafc335502b46f9ed068bbb11175361826615ea`를 기존 품질 브랜치에 push했고 GitHub CI run `33368657382`의 Verification policy, PostgreSQL concurrency, Windows ops profile, frontend, Playwright E2E, backend 6개 job이 모두 success다. 다음 단일 작업은 8.9.6의 `IC-06 read-only preflight`다. preflight의 snapshot/report hash와 mutation 0 증거를 만든 직후 Gate A에서 정지하고, 사용자 승인 전에는 `IC-06` runtime·schema·재고 mutation 및 후속 `IC-07+IC-08`을 시작하지 않는다.
+
+### 12.20 CP5 W1 `IC-06` read-only preflight와 Gate A
+
+- **변경 경계:** `backend/scripts/inventory_location_preflight.py`, 전용 테스트, PostgreSQL 필수 runner 등록만 변경했다. API·model·migration·제품 runtime·화면 변경은 0이다.
+- **read-only 계약:** SQLite는 파일 `mode=ro`, `query_only`, 명시적 transaction을 사용한다. PostgreSQL은 `REPEATABLE READ READ ONLY` transaction을 사용한다. 양쪽 모두 예외 경로까지 rollback·close/dispose하며 여러 SELECT가 하나의 snapshot만 본다.
+- **보고 계약:** 모든 활성 품목에 대해 `W=Inventory.warehouse_qty`, `B=box row 합`, `Z=활성 special-zone row 합`, `U 후보=W-B-Z`를 계산한다. W-only, inactive-zone 수량, container/item duplicate와 stable row ID, item·container·box-angle orphan, 음수, `B+Z>W`를 canonical 순서로 보고한다.
+- **fail-closed 계약:** 필수 table·column과 PostgreSQL `BASE TABLE`을 강제한다. 동명 view, schema drift, 비정수·비정상 활성값, driver·연결·query 오류는 성공 보고서를 만들지 않으며 DB 접근 예외는 연결 정보와 SQL을 노출하지 않는다.
+- **격리 DB 결과:** 승인된 품질 worktree DB의 snapshot SHA-256은 `545b3864293b0d920ed8f48b5c37b590af34118b027b4249b5dbfd2958140abe`, report SHA-256은 `02ffdf0518d28bfa62186194c9e24910c4b1a8444862b3b6181fd919a1f83fe5`다. 이 fresh 품질 DB에는 inventory row와 anomaly가 모두 0이며, 이는 직원 환경의 실제 재고 판정이 아니다.
+- **검증:** SQLite focused 9/9, 실제 PostgreSQL 16.15 focused 15/15, 필수 PostgreSQL runner 38/38(skip 0), 검증 runner 계약 12/12, Ruff·mypy·`git diff --check`가 통과했다. 품질 `backend/mes.db` SHA-256은 전후 `D0419DC051B881DA145B466AF99490570D18C47BCAAE990C57FFD4476FE28147`로 불변이다.
+- **구현·원격 증거:** W1 구현 commit은 `1c7bb1538ca18c88d3dbdeb8d1621eb72b396051`이며 기존 품질 branch에만 push했다. GitHub CI run `33396543900`의 PostgreSQL concurrency, Windows ops profile, frontend, verification policy, Playwright E2E 17/17, backend 전체 6개 job이 모두 success다.
+- **독립 리뷰:** 최종 명세 리뷰와 운영·품질 리뷰 모두 Critical 0, Important 0, Minor 0이다.
+- **격리·종료:** 55432 listener와 postmaster PID는 0이다. 폐기 가능한 중지 cluster는 ignored evidence 경로에만 보존했으며 개발·직원 서버는 시작·연결·변경하지 않았다. `C:\ERP-dev`는 접근하지 않았다.
+- **증거:** `_attic/runtime/code-quality-improvement/20260831-170648/cp5-ic06-preflight/`.
+
+**Gate A 판정:** W1은 `APPROVAL-READY`다. 사용자 승인 전에는 `20260831_0032` migration, `warehouse_unplaced_items`, B/Z/U runtime mutation, `IC-07+IC-08`을 시작하지 않는다. 승인 시 이미 결정된 정책인 `박스 → 활성 특수구역 → 미배치` 출고 우선순위, duplicate·orphan·`B+Z>W` fail-closed, 전체 활성 품목 적용, legacy 위치 자동 backfill 금지를 그대로 구현한다.
+
 ---
+
+### 12.21 CP5 W3 `IC-07+IC-08` 공통 예약·출하 상태기계와 Gate B
+
+- **구현·Git:** 품질 worktree의 기존 branch `codex/full-code-quality-improvement`에서만 구현했고 제품 commit `530a29ec3a8c315b07004e69b7ab1d6dc17ed4a3`을 같은 원격 branch에 push했다. 새 branch·force-push·PR·main push/merge는 없었다.
+- **공통 availability:** 물리 수량에서 StockRequest pending과 active ShippingAllocation을 함께 차감하고, shipping pickup만 자기 request의 `RESERVED` allocation을 owner exemption으로 소비한다. 생산 backflush, IO, StockRequest, 부서조정, 불량, 출하 준비, BOM 추가 생산가능수량이 같은 계산과 transaction 내 재검산을 사용한다.
+- **조건부 명령:** additive `20260831_0033`의 `shipping_command_receipts`가 actor·route·client request ID·semantic fingerprint·expected/result status·operation·response snapshot을 보존한다. 동일 key·동일 의미는 원 결과를 replay하고, 다른 payload는 `IDEMPOTENCY_CONFLICT`, 상태·version drift는 `SHIPPING_STATE_CONFLICT`로 mutation 0 거부한다.
+- **상태·취소:** 준비·픽업·각 취소는 request→item/inventory→B/Z/U/location→allocation/receipt 순서로 잠그고 재고·allocation·effect·event·receipt를 한 transaction으로 commit 또는 rollback한다. 준비 취소는 allocation을 해제하고 `PREPARING`, 픽업 취소는 재고와 allocation을 복원해 `PREPARED`로 돌아간다.
+- **Gate RED와 보완:** 첫 full gate가 신규 public service 11개의 보안 분류 누락, StockRequest 재작업 예약 해제의 재귀 item 선잠금 회귀, legacy shipping 취소 테스트 기대값 drift로 backend 6건을 검출했다. 보안 manifest를 exact 분류하고 재귀 부모·자식을 pending 해제 전에 정렬 선잠금했으며 generic 취소의 출하 전용 blocker 우선순위를 테스트에 반영했다. 실패 6건과 backend 전체 gate를 다시 통과했고 최종 patch 독립 리뷰는 Critical/Important/Minor 0이다.
+- **PostgreSQL·집중 검증:** 실제 PostgreSQL 16.15 필수 runner 79/79, 실패·오류·skip 0이다. prepare×2, pickup×2, prepare-vs-cancel, pickup-vs-cancel, 저장-vs-제출 양방향, 예약-vs-생산/IO/부서조정/불량에서 winner 1, replay 물리 반영 최대 1회, loser mutation·orphan·부분 effect/event 0을 확인했다. W3 backend 집중 회귀는 247 PASS·PG 전용 5 SKIP이며 그 5건은 실제 PostgreSQL runner에서 별도 통과했다. Node 20 focused frontend는 179/179이고 신규 type 진단은 0이다.
+- **최종 로컬 gate:** `verify_local.ps1 -Mode full -DbReadOnlyCheck -IncludeE2E`는 972.998초, 18/18 PASS다. backend Ruff·mypy·PostgreSQL concurrency·full pytest·OpenAPI, frontend lint·app/test/E2E type·coverage·production build·bundle, docs 3/3, DB read-only, Playwright 17/17이 모두 통과했다. 정본 로그는 `_attic/runtime/code-quality-improvement/20260902-cp5-w3-gateb/verify-full-gate-final.log`다.
+- **GitHub CI:** run `33578029469`에서 Verification policy, PostgreSQL concurrency, Windows ops profile, frontend, Playwright E2E, backend 6개 job이 모두 success다.
+- **불변·동결·종료:** 품질 `backend/mes.db` SHA-256은 전후 `D0419DC051B881DA145B466AF99490570D18C47BCAAE990C57FFD4476FE28147`로 불변이다. 일회용 PostgreSQL DB는 drop했고 cluster는 정상 종료했으며 55432·8021·3100·3300 listener는 0이다. 중지한 cluster 파일은 ignored evidence 경로에만 남고 실행 영향은 없다. 주간보고, 모바일 하단 tab, desktop shipping step 5 카드 크기·grid·overflow 추가 변경은 0이며 `C:\ERP-dev`에는 접근하지 않았다.
+
+**Gate B 판정:** `IC-07`, `IC-08`은 `완료`다. 다음 단일 구현 범위는 W4 `IC-03-B` 전용 workflow 취소이며, W5 `IC-17` 이후 카드는 W4 증거·리뷰가 GREEN이 된 뒤에만 시작한다.
+
+---
+
+### 12.22 CP5 W4 `IC-03-B` 전용 workflow 취소와 Gate C
+
+- **구현·Git:** 품질 worktree의 기존 branch `codex/full-code-quality-improvement`에서만 구현했다. 제품 commit `ac8f26d570e728f193c1b2b40b8efdae7fe2363e`와 CI에서 검출한 handover 회귀 수정 commit `8a66907014cfa7c5cd5de90e7d3b42d599a56ccf`를 같은 원격 branch에 push했다. 새 branch·force-push·PR·main push/merge는 없었다.
+- **전용 정책:** 기존 `InventoryOperation` 역전 엔진을 유지하고 `(domain, action)` `CancelPolicy`가 shipping pickup, production receipt, 완료 IO batch, StockRequest 실행, defect disassembly의 owner row·허용 상태·기록된 `before_state`·allocation/pending·event 복원을 소유한다. history router는 정책 결과와 공통 409 매핑만 소비한다.
+- **fail-closed 계약:** 중복은 `WORKFLOW_ALREADY_CANCELLED`, owner 상태 drift는 `WORKFLOW_STATE_CONFLICT`, 후속 소비·다중 IO execution은 `WORKFLOW_DEPENDENCY_CONFLICT`, 미지원·불완전 legacy·workflow 우회는 `WORKFLOW_CANCEL_UNSUPPORTED`로 mutation 0 거부한다. history와 출하 전용 취소는 owner-first 잠금 순서를 공유한다.
+- **CP4 호환 회귀:** 첫 제품 CI run `33587257445`가 기존 PostgreSQL handover cancel×2를 conflict+conflict로 검출했다. 정확한 v2 `handover/receive`의 단일 `HandoverDoc`·`RECEIVE_STATUS`·`submitted→received` effect만 기존 generic 종료 경로로 허용했고, 변형 effect나 shipping/IO 연결 로그는 계속 차단했다. 수정 뒤 handover 경합은 success 1 + `WORKFLOW_ALREADY_CANCELLED` 1, loser orphan 0으로 복구됐다.
+- **동적 검증:** 5개 업무 정상·중복·부분 실패·후속 소비·상태 drift matrix와 API reason code를 검증했다. 최종 회귀 묶음은 SQLite 147/147, 실제 PostgreSQL 16의 workflow cancel×2, history-vs-shipping cancel, cancel-vs-next-consume, handover cancel×2 4/4, 신규 deadlock 0이다. expected delta, 독립 SQL delta, operation/effect delta 3자와 loser allocation/pending/log/effect/event 0을 대조했다.
+- **리뷰·gate·CI:** 최초 구현과 회귀 수정마다 명세·코드 품질 독립 리뷰를 반복해 최종 Critical/Important/Minor 0을 확인했다. Ruff, mypy, `git diff --check`, staged smart gate를 통과했고 최종 GitHub CI run `33589486541`의 Verification policy, frontend, Playwright E2E, backend, Windows ops, PostgreSQL concurrency 6개 job이 모두 success다.
+- **증거:** `_attic/runtime/code-quality-improvement/20260902-cp5-w4-ic03b/`와 `_attic/runtime/code-quality-improvement/20260902-cp5-w4-ic03b-ci-fix/`에 RED/GREEN, PostgreSQL JUnit, 3자 delta, focused gate 결과를 보존했다.
+- **불변·동결·종료:** 품질 `backend/mes.db` SHA-256은 전후 `D0419DC051B881DA145B466AF99490570D18C47BCAAE990C57FFD4476FE28147`로 불변이다. 일회용 PostgreSQL DB를 drop하고 cluster를 정상 종료했으며 55432·8021·3100·3300 listener는 0이다. 주간보고, 모바일 하단 tab, desktop shipping step 5 카드 배치 추가 변경은 0이며 `C:\ERP-dev`에는 접근하지 않았다.
+
+**Gate C 판정:** `IC-03`은 `완료`다. 엄격한 잔여 IC는 16개이며 다음 단일 구현 범위는 W5 `IC-17` 무결성 계약이다. W6 `IC-18`은 W5 증거·리뷰·CI가 GREEN이 된 뒤에만 시작한다.
+
+---
+
+### 12.23 CP5 W5 `IC-17` 공통 무결성 계약 완료와 W6 정지 경계
+
+- **구현·Git:** 품질 worktree의 기존 branch `codex/full-code-quality-improvement`에서만 구현했다. 제품 commit `fb339b5dc29013fc97af5035905431177ec54aea`를 같은 원격 branch에 push했으며 새 branch·force-push·PR·main push/merge는 없었다.
+- **단일 판정 계약:** 새 순수 `inventory_integrity_engine`이 canonical `inventory-integrity/v1` check ID, severity, count, samples, blocking verdict를 계산한다. CLI, 관리자 API, `/health/detailed`는 이 결과를 변형 없이 소비하며 exit는 `0=pass/warning-only`, `1=blocking data violation`, `2=사용/config`, `3=DB/schema/tool`로 고정했다. 누락 SQLite 경로는 read-only open 전에 실패해 빈 DB 파일을 만들지 않는다.
+- **검사 범위:** 총량·음수, location pending, StockRequest 상태·예약, ShippingAllocation 상태·위치 초과, box/활성 zone/unplaced 합계·중복·고아, contract v2 effect 누락·손상·owner·중복·semantic 위반을 blocking으로 검사한다. contract v1 missing effect는 cutover 이전에만 warning이며 cutoff 이후 기록을 v1로 낮춰 false-green을 만들 수 없도록 activation 시점을 함께 판정한다.
+- **집중 검증:** SQLite contract 37/37, W5 전용 실제 PostgreSQL 16 matrix 22/22, 관련 backend 회귀 204/204, 관리자 UI 3/3, frontend typecheck·ESLint, Ruff·대상 mypy가 통과했다. 실제 PostgreSQL에서는 dialect별 쿼리와 CLI/API/detailed 결과 일치, warning-only, 각 blocking invariant, connection/schema 오류를 독립적으로 확인했다.
+- **리뷰:** 별도 명세 리뷰와 코드 품질 리뷰의 최종 결과는 각각 Critical/Important/Minor 0이다. 수정 범위 밖의 기존 ORM 전체 mypy baseline은 W5 결함으로 승격하지 않았고, 변경 파일 대상 mypy는 통과했다.
+- **커밋 전 검증:** staged smart gate가 infra 변경으로 full 영역에 승격됐다. Node 24와 미설정 PostgreSQL URL, 이후 안전 승인 누락과 빈 test schema는 모두 mutation 전에 fail-closed했고 제품 코드는 바꾸지 않았다. ignored 증거 경로의 Node 20.20.2와 폐기 가능한 PostgreSQL 16.15를 사용해 schema를 `20260831_0033` head로 준비한 뒤 실패한 PostgreSQL 필수 runner를 100%·skip 0으로 재실행했다. 같은 staged snapshot의 backend Ruff·대상 mypy, frontend lint·app/test/E2E type·전체 coverage·production build·bundle이 통과했고, 앞선 W5 full backend pytest와 재생성 OpenAPI exact check도 통과했다.
+- **GitHub CI:** run `33606010198`의 backend pytest·compile·OpenAPI, PostgreSQL concurrency, frontend lint·type·coverage·build·bundle, Windows ops, Playwright E2E, verification policy 등 6개 job이 모두 success다. GitHub Actions의 Node 20 deprecation 표시는 runner platform warning이며 제품 job 실패는 0이다.
+- **증거:** `_attic/runtime/code-quality-improvement/20260902-135134/cp5-w5-ic17/`에 RED/GREEN, SQLite·PostgreSQL JUnit, 관련 회귀, OpenAPI, staged gate와 격리 DB 준비·재검증 로그를 보존했다.
+- **불변·동결·종료:** 품질 `backend/mes.db` SHA-256은 전후 `D0419DC051B881DA145B466AF99490570D18C47BCAAE990C57FFD4476FE28147`로 불변이다. 일회용 `test_cp5_w5_staged` DB를 drop하고 격리 cluster를 정상 종료했으며 55432·8021·3100·3300 listener는 0이다. 주간보고, 모바일 하단 tab, desktop shipping step 5 카드 배치 추가 변경은 0이며 `C:\ERP-dev`에는 접근하지 않았다. `C:\ERP` main의 기존 사용자 변경은 읽기 전용으로 두고 수정·stage·commit하지 않았다.
+
+**W5 판정:** `IC-17`은 `완료`다. 엄격한 잔여 IC는 15개이며 다음 단일 구현 범위는 W6 `IC-18` backup·restore 증명이다. W6 작업·thread·제품 변경은 아직 시작하지 않았고 이 지점에서 정지한다.
+
+---
+
+### 12.24 CP5 W6 `IC-18` backup·restore 증명 완료와 W7 정지 경계
+
+- **구현·Git:** 품질 worktree의 기존 branch `codex/full-code-quality-improvement`에서만 구현했다. 제품 commit `d43ab268cb6fa9dcde94e9b93203978f3550c73d`와 GitHub CI에서 드러난 PostgreSQL 도구 탐색·보조 cluster socket 이식성 보완 commit `dffb8e01e713d58e3d6df678ee98c0cfc20cd1e5`, `fd34189400f63225164c007bffcf7f561b813eb6`을 같은 원격 branch에 push했다. 새 branch·force-push·PR·main push/merge는 없었다.
+- **manifest 계약:** `backup-manifest/v1`을 artifact 생성과 검증 뒤에 원자 publish한다. artifact SHA-256·size·engine·Alembic revision·schema fingerprint·data revision·snapshot hash·검증 receipt를 고정하고 manifest 없는 기존 backup은 `LEGACY_UNVERIFIED`로만 분류한다.
+- **복구·freshness 계약:** SQLite는 online backup으로 WAL을 포함하고 source의 후속 WAL commit을 stale로 판정한다. restore는 staged DB에서 head·schema·FK·W5 integrity를 검증한 뒤에만 교체한다. PostgreSQL dump는 폐기 가능한 임시 DB에 먼저 복구해 같은 검사를 통과하기 전 target을 drop하지 않는다. 실제 직원 DB restore·cutover·배포는 수행하지 않았다.
+- **운영 pair 계약:** retention·NAS 전송·cleanup은 artifact와 manifest를 한 쌍으로 처리하고, runtime recovery owner와 Task Scheduler 경계도 같은 fail-closed 증명 계약을 소비한다.
+- **집중 검증:** SQLite manifest contract 146/146, retention 11/11, 실제 PostgreSQL 28/28, canonical PostgreSQL runner 129 scenarios 100%가 통과했다. 전체 backend·frontend·OpenAPI exact·docs와 staged 검증도 통과했다. 증거 정본은 `_attic/runtime/code-quality-improvement/20260904-082523/cp5-w6-ic18/`이다.
+- **CI 이식성 회귀:** 첫 CI는 Ubuntu PATH 밖의 PostgreSQL server binary를, 두 번째 CI는 runner에서 쓸 수 없는 기본 Unix socket 경로를 검출했다. test-only harness가 `pg_config --bindir` fallback, data directory 안의 상대 socket, start log와 정확한 data-dir 정리를 사용하도록 TDD로 보완했다. 최종 GitHub CI run `33923104275`의 6개 job이 모두 success다.
+- **독립 리뷰:** W6 제품 범위의 명세·품질 리뷰는 Critical/Important/Minor 0이다. 최종 CI 이식성 보완 재리뷰는 Critical 0, Important 0이며 한 리뷰어가 실패 cleanup의 보조 진단과 ephemeral port TOCTOU에 비차단 Minor 2를 남겼다. 둘 다 제품·backup 계약을 약화하지 않으며 명시적인 CI 재현이 생길 때 test harness 후속으로 다룬다.
+- **불변·동결·종료:** 품질 `backend/mes.db` SHA-256은 전후 `D0419DC051B881DA145B466AF99490570D18C47BCAAE990C57FFD4476FE28147`로 불변이다. 일회용 PostgreSQL DB는 0이고 8021·3100·3300·55432 listener도 0이다. 주간보고, 모바일 하단 tab, desktop shipping step 5 카드 배치 추가 변경은 0이며 개발·직원 서버에는 연결하거나 영향을 주지 않았다.
+
+**W6 판정:** `IC-18`은 `완료`다. 엄격한 잔여 IC는 14개이며 다음 단일 구현 범위는 W7 `IC-19` health 의미 분리다. W7은 이 closeout을 품질 branch에 고정한 뒤 시작하고 CP6는 시작하지 않는다.
+
+---
+
+### 12.25 CP5 W7 `IC-19` health 의미 분리 완료와 CP6 정지 경계
+
+- **구현·Git:** 품질 worktree의 기존 branch `codex/full-code-quality-improvement`에서만 구현했다. 제품 commit은 `b27ba39cd2cbad574fda30af9c118697086c30ad`이며 같은 원격 branch에 push했다. 새 branch·force-push·PR·main push/merge는 없었다.
+- **endpoint 계약:** `/health/live`는 DB·schema·inventory를 조회하지 않는 process/event-loop liveness다. `/health/ready`는 DB 연결, Alembic head, 필수 dependency와 W5 blocking integrity를 판정하고 실패 시 503을 반환하며 warning-only는 준비 상태를 막지 않는다. `/health/detailed`는 같은 readiness와 sanitized `inventory-integrity/v1` check ID/count를 제공하고 기존 필드를 additive로 유지한다.
+- **consumer 계약:** backend startup, frontend와 Playwright readiness wait는 `/health/ready`를 사용한다. Docker와 restart 판단은 `/health/live`만 사용해 데이터 불일치가 재시작 루프를 만들지 않는다. status/watch/runtime scheduler는 alive와 ready를 분리해 nonzero readiness를 정상처럼 표시하지 않는다. 직원 동기화·배포 스크립트는 정적 계약만 바꿨고 실제 실행하지 않았다.
+- **집중 검증·리뷰:** backend health/runtime focused 64건, Node 20 E2E readiness 계약 7/7, PowerShell runtime batch·crash-loop 계약, OpenAPI exact가 통과했다. 독립 명세 리뷰와 코드 품질 리뷰는 최종 Critical/Important/Minor 0이다.
+- **최종 로컬 검증:** 실제 PostgreSQL 16을 연결한 `verify_local.ps1 -Mode full -DbReadOnlyCheck -IncludeE2E`의 18개 gate가 1,622.738초에 모두 통과했다. Ruff·mypy·PostgreSQL concurrency·backend full pytest·OpenAPI, frontend lint·app/test/E2E type·coverage·build·bundle, docs, DB read-only와 Playwright 17/17이 모두 PASS했다. 증거 정본은 `_attic/runtime/code-quality-improvement/20260905-081356/cp5-w7-ic19/`이다.
+- **GitHub CI:** run `33934558904`에서 frontend, backend, Playwright E2E, verification policy, 실제 PostgreSQL concurrency, Windows ops profile의 6개 job이 모두 success다. Actions Node 20 deprecation annotation은 runner platform warning이며 제품 job 실패는 0이다.
+- **불변·동결·종료:** 품질 `backend/mes.db` SHA-256은 전후 `D0419DC051B881DA145B466AF99490570D18C47BCAAE990C57FFD4476FE28147`로 불변이다. 일회용 PostgreSQL DB와 E2E 임시 DB는 0이고 8021·3100·3300·55432 listener도 0이다. 주간보고, 모바일 하단 tab, desktop shipping step 5 카드 배치 추가 변경은 0이며 `C:\ERP` main은 읽기 전용, 개발·직원 서버는 미접근·무영향으로 유지했다.
+
+**CP5 판정:** `IC-03`, `IC-06`, `IC-07`, `IC-08`, `IC-17`, `IC-18`, `IC-19`는 모두 `완료`다. 엄격한 잔여 IC는 13개이며 required-check 외부 증거가 확보되면 11개다. CP6는 시작하지 않고 별도 인계에서 대기한다.
+
+---
+
+### 12.26 CP6·CP7 실행 승인과 S0 최신 main 통합 진행
+
+- **승인 기준 갱신:** 2026-09-07 사용자가 CP6·CP7 전체 실행을 승인했다. 최초 고정 main `e5c82323` 이후 2커밋·15경로와 main 미커밋 변경을 감지해 중단한 뒤, 사용자가 `d2b0dd2969883b2c8876c4375c99a456dcb6f21e`까지만 가져오고 미커밋 파일은 제외하도록 추가 승인했다. 이후 움직이는 main 이름을 자동 추종하지 않는다.
+- **실행 기준:** 품질 branch `codex/full-code-quality-improvement`, 시작 HEAD/upstream `74085263c85096044d365cad339526ac452a2a26`, 공통 기준 `78e8023f41ef59528d9d8c07498e7653f9bee247`. S0는 이 branch에서 fixed target의 `--no-ff --no-commit` 병합에 진입했다.
+- **범위 원장:** main delta는 27커밋·159경로, 품질 변경과의 교집합은 48경로이며 실제 merge conflict는 22경로다. premerge 원본 manifest와 metadata는 `_attic/runtime/code-quality-improvement/20260907-120744-s0-main-sync/`에 저장했다. 품질 DB 시작 hash는 `D0419DC051B881DA145B466AF99490570D18C47BCAAE990C57FFD4476FE28147`이다.
+- **병렬·순차 계약:** S0 검증·품질 push·CI 성공 후 exact `SYNC_BASE_SHA`에서 CP6 구현 worktree와 CP7 read-only preaudit worktree를 만든다. CP7 제품 구현은 CP6 통합 후 exact `POST_CP6_SHA`에서만 시작한다. 8.9.7·8.9.8의 각 카드 계약은 유지하며 main에서 이미 해결한 부분은 실제 코드·검증 근거로 재판정한다.
+- **기존 CI/외부 정책:** HEAD74085263의 GitHub CI run `33936388212`는 6개 job 실제 success다. required status checks API는 `404 Branch not protected`, main effective rules와 repository rulesets는 비어 있었다. 외부 강제 정책은 `NOT_VERIFIED`로 유지하며 설정 변경과 main 통합을 수행하지 않는다. 이 정책 제한은 신규 S0 제품 결함이나 새 중단 사유로 취급하지 않는다.
+- **검증 격리 보강:** E2E의 inherited base URL, 비소유 포트/PID 종료, backend 조기 종료, mes.db WAL/SHM 누락 위험을 읽기 전용 리뷰에서 확인했다. 사용자 서버 무영향 계약을 위해 S0에서 최소 test-only 보완 후 E2E를 수행하도록 지시했다. 완료 판정은 아직 하지 않았다.
+- **진행 정본:** [CP6·CP7 총괄 실행 TODO](../../handoff/active/2026-09-07-cp6-cp7-supervisor-todo.md). 총괄만 감사 문서와 active TODO를 편집하며 구간별 제품 작성자는 worktree별 한 명이다.
+
+**S0 중간 검증 이력(최종 판정은 아래 인수 절):** S0 텍스트 충돌은 해결했고 backend focused 363건 및 merge migration 10건(SQLite 5 + 실제 PostgreSQL 5)의 GREEN 원본을 총괄이 확인했다. 당시 실제 PostgreSQL 필수 runner는 담당자가 87/87·skip 0을 보고했으며 최종 원본 인수 전이었다. 최초 full gate는 2,143.254초 뒤 exit 1, 실행된 gate 5 PASS·2 FAIL이었다. backend 테스트 4건과 frontend test-typecheck 1건의 통합 계약 불일치를 최소 수정하고 후속 backend 61/61, Node 검증 계약 40/40 및 E2E typecheck PASS를 확인했다. 최초 full FAIL을 후속 focused PASS로 덮지 않는다.
+
+- **E2E 실제 관찰:** test-only 실행 소유권 지적 3건을 보완하고 독립 재리뷰 Critical/Important 0을 확인했다. 실제 E2E 1차는 16/17 PASS, PC 이력 헤더 selector 1건 FAIL이다. 현행 표/실패 DOM의 `품목코드`와 다른 테스트 기대만 최소 수정해 재검증한다. 실패 artifact를 별도 보존했으며 신규 통합 gate·전체 이중 리뷰·CI가 끝나기 전 S0는 미완료다.
+- **종료·경계 기록:** 실제 E2E 전후 `mes.db/-wal/-shm` 존재/hash가 모두 같고 임시 E2E DB·receipt·seed·hash·lock은 없었다. 직접 사용한 8021/3300은 bind 가능이며 기존 점유 3100은 조사/종료하지 않았다. 실행 중 담당자가 전역 `Win32_Process` 조회 후 문자열 필터 1회, 직접 소유 gate PID의 자식 관계 조회 1회를 수행했다고 보고했다. 즉시 전역 조회를 금지하고 소유 PID·원본 로그만 사용하도록 제한했다. 서버·DB·파일 변경과 메타데이터 조회 범위를 구분하고 이 예외를 숨겨 “직원 환경 접근 0”이라고 쓰지 않는다. 재확인을 위해 직원 환경에 접근하지 않는다.
+
+- **후속 staged 검증과 최소 복구:** `staged-smart-final-timings.json`의 18개 gate 계획은 1,854.578초 후 exit1, 실제 5 PASS·2 FAIL에서 종료됐다. backend 공통 E2E runner의 옛 command prefix 정적 기대 1건과 frontend 테스트 fixture/mock의 신규 타입 진단 17그룹·24건이 실패 원인이다. 나머지 gate는 NOT_RUN이다. 사용자에게 동결 테스트의 필수 콜백 1줄 예외를 요청한 뒤 격리 워크트리 자율 진행 승인을 받았다. 예외는 `_weekly_sections/__tests__/WeeklyDetailTable.test.tsx` 첫 render의 `onItemSelect`만이며 주간보고 제품 코드는 변경하지 않는다. baseline 상향·Props 완화 없이 테스트 계약만 맞추고 실패·미실행 검증을 마무리한다. 기존 PASS인 PostgreSQL 및 전체 backend의 반복은 이 테스트-only 복구의 필수 조건으로 삼지 않지만 역사적 full/staged FAIL을 PASS로 고쳐 쓰지 않는다.
+- **일시정지 정리 확인:** 직접 소유한 PostgreSQL cluster는 `pg_ctl stop`으로 정상 종료됐고 사후 `status`는 3(no server)였다. 중지 cluster 파일은 ignored 경로에 보존했으며 삭제 완료로 표현하지 않는다. 기존 품질 DB hash와 임시 E2E 산출물 정리 증거를 보존한 뒤 동일 S0 작업을 재개했다. 커밋·푸시·CP6 시작 승인은 총괄의 최종 증거 검토 뒤에만 전달한다.
+
+- **사용자 속도 조정 지시:** 정확성·신뢰도를 유지하면서 반복 검증을 줄인다. 구현 중에는 직접 영향 테스트와 새 diff 리뷰만 수행하고, 작은 저위험 묶음은 통합 검증·push·CI 확인을 함께 처리한다. 같은 코드에서 통과한 전체 backend/PostgreSQL/coverage/build/E2E를 작은 수정마다 반복하지 않는다. 재고·권한·migration·서버 격리 검증은 즉시 유지하며 전체 gate와 실제 CI는 S0·CP6·CP7 통합 경계, 의존성 호환성 검증은 IC22 단계별로 수행한다. 사용자 부재 중에도 승인 범위의 다음 GREEN 단계로 진행한다.
+- **E2E 복구 이력:** `20260907-cp6-cp7-supervisor/playwright-e2e-fallback-green.log`에서 전용 8022/3300의 17/17 PASS(2.4분), mes.db 불변, cleanup-complete/ownership released를 확인했다. 후속 test-only native port probe·readiness timeout 두 지적은 최소 수정 후 명세 C/I/M0, Node56/56, native lifecycle25/25, Windows wrapper6/6, direct npm startup smoke1/1로 닫았다. 실제 PID46472·44700의 사후 start-token null과 DB family hash 불변·임시 산출물 absent를 확인했으며 기존 점유8021/3100은 조사/종료하지 않았다. 전체 제품 검증을 재시작하지 않았고 당시 대기하던 최종 품질 리뷰와 품질 push/CI는 아래 인수 절에서 완료했다.
+
+CP6·CP7 제품 구현은 미착수다. 사용자 속도 지시에 따라 CP7 읽기 전용 사전감사만 이미 push한 잠정 merge `cd195d9e`에서 CI 대기와 병렬로 앞당겼다. 최종 `SYNC_BASE_SHA`와 제품 차이가 생기면 해당 조사만 다시 확인하며, 제품 구현의 S0 GREEN 조건은 유지한다. 본 절은 CP5 역사적 완료 증거를 덮어쓰거나 신규 단계의 완료로 사용하지 않는다.
+
+#### S0 후속 검증 인수와 CP6·CP7 재판정
+
+총괄은 기존 전체 S0 명세·품질 최종 메시지와 test-only fixture 보충 리뷰, 최신 fallback 명세·품질 리뷰를 별도로 인수했다. 전체 S0는 Critical/Important0, 두 test-only 보충 구간은 각각 Critical/Important/Minor0이다. 재검증이 아니라 보존된 원본의 적용 범위를 확인했다. 제품 merge `cd195d9e668cb4ece139f48562337f58d19839d8`를 품질 branch에 push했고 [GitHub run34099290108](https://github.com/Hw-03/ERP/actions/runs/34099290108)의6개 job 모두 success임을 총괄이 원본 API로 확인했다. S0 제품 통합은 완료다.
+
+문서만 push해도 전체CI가 재실행되는 현재 workflow(`.github/workflows/ci.yml:3-13,36,147,209`)를 고려해, 사용자 속도 지시에 따라 본 감사/active TODO는 docs-only local commit으로 고정하고 CP6 코드 push와 묶는다. 이 docs tip을 `SYNC_BASE_SHA`로 사용하며 CI 검증 SHA와 제품 경로가 같고 문서 전용 gate가 통과해야 한다. 품질 branch는 CP6 통합까지 이 tip에서 유지한다. 그동안 origin보다 docs-only1commit ahead인 것은 의도된 상태이며 최종 품질 branch upstream 일치 조건은 유지한다.
+
+추가 경계 기록: 담당자가 Node 경로를 찾으면서 사용자 홈의 파일명 metadata 재귀 검색을1회 했다. 기존 전역 process metadata 조회와 함께 원본으로 기록하고 이후 금지했다. 서버·DB 변경0과 외부 metadata 조회0을 혼동하지 않으며 재확인을 위해 직원 환경을 다시 조사하지 않는다.
+
+| 영역 | 인수 결과 및 경계 |
+| --- | --- |
+| 제품 통합·migration | backend focused363 PASS; merge migration SQLite5+실제PG5 PASS; 기존 revision blob 보존 및 DDL 없는0034 단일 head |
+| PostgreSQL 필수 runner | 등록 selector87, 매개변수화 실행129, skip0·exit0. PostgreSQL 도구 PATH 복구 뒤 성공한 원본을 인수했으며 SQLite로 대체하지 않음 |
+| frontend | 직접15파일272 PASS; test manifest277/known419/new0; coverage271파일2522 PASS, statements/lines94.97% |
+| build·API·문서·DB | production build 및 bundle PASS; OpenAPI exact; docs13 PASS/Windows symlink권한1skip; links valid; 품질 DB read-only mismatch0 |
+| E2E·Windows | 전체17 PASS 후 최신 test-only 수정은 Node56/56, lifecycle25/25, wrapper6/6, direct startup1/1로 증명. 전체17 반복 없음 |
+| 종료 | 직접PID46472·44700 부재, E2E 임시 산출물 absent, 품질 DB family SHA 불변. 중지한 PostgreSQL cluster 파일은 ignored 경로에 보존 |
+
+main 변경으로 완전히 해결된 CP6 카드는 없으며 다음의 남은 조건만 구현한다. 아래 source 좌표와 호출 경로의 상세 근거는 ignored `20260907-120744-s0-main-sync/s0-integration-re-audit.md` 및 파일별 원장에 보존했다.
+
+| 카드 | S0 판정 | 다음 작업에 넘기는 남은 조건 |
+| --- | --- | --- |
+| IC-12 | OPEN | 실제 child dirty와 parent no-op save를 Promise 저장·실패 이동 차단 계약으로 연결 |
+| IC-13 | OPEN | 출하 BOM 늦은 응답/abort/generation과 실제 editable payload baseline |
+| IC-14 | PARTIAL | 기존 department query/mutation을 정본으로 사용하고 Context/admin의 별도 서버 state 제거 |
+| IC-15 | OPEN | map의 전체 과거 snapshot rollback 대신 대상별 mutation 순서와 서버 수렴 |
+| IC-16 | PARTIAL | 기존 history cursor는 보존, 무제한 active 조회·response N+1·mobile load-more 보완 |
+| IC-25 | OPEN | PA/PF KPI 계산은 유지하고 모집단 설명을 상시 표시 |
+| IC-26 | OPEN | 첫/다른/같은 작성자 animation0/1/0과 날짜·탭·상세0 회귀 |
+| IC-21 | PARTIAL | 수동 DTO 위 generated raw type/adapter 및 package_out·nullable·unknown enum 계약 |
+| IC-22 | OPEN | 현재 의존성 advisory/호환성을 분리해 세 단계로 갱신; 자동 force/불필요 major 금지 |
+| IC-23 | PARTIAL | 기존 notice/focus trap 보존, 공통 error summary와 핵심 업무 keyboard/axe gate |
+| IC-24 | CONFLICT | frontend/backend 승인 권한 drift를 이미 결정된 서버 업무 정책에 맞춰 통일 |
+| DOC-01 | PARTIAL | live 문서의 잔여 stale 설명·명령·역사 관찰 표식 보완 |
+| AT-01 | CONFLICT | seed_cleanup.py에 실제 test/manifest/wrapper consumer가 있어 이동 제외; 다른 후보도 재확인 |
+| AT-02 | OPEN | runtime consumer0인 byte-identical 복제 asset만 후속 hash/화면 확인 후 제거 |
+
+`RV-007`은 `PARTIAL / DECIDED_BUT_IMPLEMENTATION_DRIFT`다. fixed main이 불량 처리의 즉시·무승인 정책을 이미 결정했으므로 새 업무 선택을 추정하지 않는다. 기존 IO preview의 승인 표시와 실제 즉시 submit 사이 drift는 IC-24에서 회귀로 닫는다. 실제 사용 중인 로그인 asset과 동결 UI는 정리 대상이 아니다.
+
+### 12.27 CP6 구현 진입과 검증 배치
+
+- CP6 작업은 `C:\ERP\.worktrees\full-code-quality-cp6`, branch `codex/full-code-quality-cp6`에서 시작했다. 기준은 S0 CI6/6이 통과한 제품 merge와 같은 제품 경로를 가진 docs-only tip `731edc2df15c89753e60c12be95a65ef88e33bde`다.
+- 품질 본 branch는 CP6 통합까지731edc2d에서 고정한다. 이 절과 active TODO의 이후 변경은 CP6 worktree 사본에만 반영하며 main을 수정하거나 추가 main commit을 따라가지 않는다.
+- A1 `IC-12→IC-14`는 실제 부서 render 경로와 dirty/Promise 저장·query 정본 계약부터 TDD로 구현한다. 시작 시 CP6의 `backend/mes.db*`는 모두 부재였다. 기존 main/품질 DB를 복사하지 않으며 필요한 격리 UI/DB 검증만 해당 worktree의 synthetic 기준으로 준비한다.
+- 수정 전 A1 RED는 직접4파일13건 중 예상 실패11건·통과2건으로 기록됐다. 이는 독립 runtime 결함11건이라는 집계가 아니다. 동결 기준 캡처는 전용8022/3300의 synthetic E2E1건이57.1초에 통과했고 실제 DB 불변·cleanup-complete 로그를 총괄이 읽었다. `20260907-cp6-a1/frozen-baseline/`의 두 PNG와 layout JSON도 직접 확인했다. 모바일390×844의 nav390×90, desktop1440×900의 변경 구성품 inner list58px를 이후 비교 기준으로 보존한다. 최종 변경 후 동결 검증 완료와는 구분한다.
+- 사용자 속도 지시에 따라 A1~A5는 focused 검증·독립 변경분 리뷰 후 논리적 local commit을 남기고, CP6 최종 full gate·리뷰 뒤 한 번 push해 실제CI를 확인한다. 단위 수정마다 같은 전체 테스트와CI를 반복하지 않는다. 최종 품질 통합/CI와 재고·권한·서버 보호 검증은 유지한다.
+- CP7 사전감사는 별도 detached worktree에서 완료했다. DTO 후보26행은 모두 역할에 맞게 읽었으며18행의 정적 차이를 실제 runtime 결함18건으로 승격하지 않는다. CP7 제품 구현은 CP6 완료 SHA로 다시 대조한 뒤 시작한다.
+
+#### 12.27.1 CP6 A1 — IC-12·IC-14 LOCAL_VERIFIED (2026-09-07)
+
+- 부서 editable name/color·persisted baseline·dirty·`save(): Promise<SaveResult>`는 `frontend/app/mes/_components/_admin_hooks/useAdminDepartmentsForm.ts:68-139`가 소유한다. 동시 save는 같은 Promise를 반환하고 실패는 reject한다. 저장 중 새 편집은 덮지 않으며 새 baseline 대비 dirty로 유지한다.
+- 실제 로컬·전역 이동 guard는 `frontend/app/mes/_components/_admin_sections/AdminDepartmentsSection.tsx:56-62`의 persistence adapter를 사용한다. 명세 리뷰에서 첫 저장 완료 뒤 후속 편집이 유실될 수 있는 Important1을 발견해 RED로 재현했고, 최신 편집의 순차 저장까지 완료해야 이동하게 보완했다. 일반 중복 저장의 요청1회 계약과 unmount registry 정리는 유지한다. 공백 정규화 응답도1회 요청 후 종료하는 회귀가 통과했다.
+- `DepartmentsContext.tsx:27-31`은 활성 부서 query의 조회/색상 adapter이고 admin bootstrap은 `useAdminBootstrap.ts:63-67`의 enabled query를 소비한다. create/update/delete/reorder의 `useDepartmentsQuery.ts:34,48,57,66`은 같은 departments.all key를 invalidate한다. 실제 desktop/mobile/admin 경로에 별도 부서 배열 정본을 남기지 않는다. consumer0인 선행 legacy `DeptManagementPanel`은 이번 카드에서 삭제·개조하지 않았다.
+- 사용자 전환의 query cache 폐기는 기존 `frontend/lib/queries/client.tsx:56-61` 경계를 유지한다. `MesLoginGate.test.tsx:386,430,480-481`의 이전 cache0·새 client 계약을 포함한 관련 묶음이 통과했다. 부서 공유 key와 actor-dependent 상태를 같은 의미로 혼동하지 않는다.
+- 최종 focused 증거: 관련14파일73/73 PASS(`20260907-cp6-a1/a1-green-vitest.json`, SHA256 `0F6A38F142BCB3854F771F9776525BDA028A40D0E0A6559583CB2E73EEB4A57A`), 앱 타입 exit0, 테스트 타입56계약 PASS·manifest279·known419/new0, 변경20개 frontend 파일 ESLint `--max-warnings=0` exit0, diff-check exit0. 초기 expected RED11/13과 중간 fixture 비결정성 실패는 최종 결과와 구분한다.
+- 최종 delta 명세·품질 리뷰는 각각 Critical0/Important0/Minor0, Ready다. Important 보완 후 두 reviewer가 다시 확인했고, 공백/빈 이름 fallback 종료와 stable onError test 보완도 좁게 재확인했다. 총괄은 최신 실제 diff, 핵심 form/guard source, RED/GREEN JSON 및 원본 실행 결과를 인수했다.
+- A1 시점 API/schema/backend 변경0, 동결 경로 추가 diff0, 원래 부재한 `mes.db/-wal/-shm` 및 임시 `mes_e2e.db/-wal/-shm` 모두 최종 absent다. E2E lock/receipt/hash/seed도 absent다. 이는 CP6 최종 visual 비교나 전체 listener0 주장과는 다르다.
+- 필수 staged smart는 frontend5/docs3의 예상8gate로 통과했다. related41파일334PASS, direct10파일39PASS, 타입/린트/docs PASS다. 처음 default Node24로 실행한 시도는 gate0개 사전조건 FAIL로 남기고 승인 Node20 PATH로 정상 실행한 exit0(`exec-508184f8-f6f4-456a-b3a2-60d311b51a08`)과 구분한다. 정책·제품을 바꿔 우회하지 않았다.
+- 실제 날짜를 확인해 `59c52bad3f303603b01961b4e3ee3fb550bbd2e5` / `2026-09-07 frontend: 부서 저장과 화면 캐시 일관성 개선`으로 로컬 커밋했다. 총괄이 부모731edc2d·정확22경로(frontend20+문서2)·subject·clean을 확인했다. push는 하지 않았다.
+- 이 판정은 **로컬 구현·검증·커밋 완료**다. 같은 CP6 worktree에서 A2로 진행한다. CP6 전체 gate·독립 최종 리뷰·원격 CI·품질 branch 통합은 아직 남아 있으며 S0 검증으로 이를 대체하지 않는다.
+
+#### 12.27.2 CP6 A2 — IC-13·IC-16 LOCAL_VERIFIED (2026-09-07)
+
+- `frontend/app/mes/_components/_shipping/useShippingBomMatch.ts:62,90`에서 실제 저장 payload fingerprint와 BOM 단일 요청 소유권을 정의한다. AbortController·generation·payload 일치·unmount를 확인하고 auto/manual/submit 경로가 같은 hook을 소비한다. `DesktopShippingView.tsx:521,537,1483,1552,1700`의 최신 fingerprint 확인과 requestWork baseline 비교로 보기 전용 이동 dirty, 원래 값 복귀, 저장 실패 및 오래된 응답 덮어쓰기를 구분한다.
+- `backend/app/routers/shipping.py:509`의 새 active page는 created_at DESC/request_id DESC 커서와 limit+1/has_more를 사용한다. 기존 history cursor를 보존하고 page와 detail 모두 관계 eager loading 및 revision/transaction/shortage bulk 직렬화를 사용한다. schema/페이지 endpoint와 OpenAPI baseline은 additive이며 DDL/migration 변경0이다.
+- legacy `/api/shipping/requests`는 한 release 동안 **배열 형태만 호환하고 최대50건으로 제한**한다. 예전 무제한 전체 반환 의미까지 유지하는 것은 아니다. 실제 desktop/mobile/shell은 page API로 전환됐으며 old API/hook은 호환 정의만 남는다. 양쪽 load-more·중복 ID 제거, 실시간 첫 페이지 재시작, 첫 페이지 밖 direct URL singleton 복원과 cache upsert를 연결했다.
+- 처음 query-count fixture가 실제 shortage 계산을 지나지 않는 공백을 총괄이 발견했다. `backend/tests/services/test_shipping.py:1362`의 실제 PA/PF·BOM·동반품·예약 입력에서 단건/배치 요약 동등성을 검증하고, `backend/tests/routers/test_shipping.py:1192`의 실제 page query-count 범위를 보강했다. CP5 재고·예약 정책을 바꾼 것이 아니다.
+- 독립 품질 리뷰 Important2는 각각 RED→GREEN으로 해결했다. 없는 prepWork URL에서 무관한 첫 요청을 대신 표시하던 fallback을 `DesktopShippingView.tsx:502-506`에서 제거했다. 단건 GET의 N+1은 `backend/app/routers/shipping.py:540-552`에서 같은 eager/bulk 경로로 바꾸고, `backend/tests/routers/test_shipping.py:1258`의 BOM/동반품/거래1행 대3행 SQL 수 회귀로 검증했다. 이 테스트의 RED는19 대33 SELECT였으며 GREEN은 동등했다.
+- focused 원본: 보완 전 frontend8파일239/239 PASS(`exec-847faa8e-2cc7-4e41-97d1-2082f97e8b1f`), shipping router/service/OpenAPI pytest exit0(`exec-edd7cb4b-6800-42b4-a34a-567e6817ee09`). 마지막 품질 보완은 frontend 직접 URL/상세5PASS(`exec-a020f4ba-b956-4287-b460-b0f8f2c32900`), backend detail/query-count/404 계약2PASS(`exec-d188a1bd-cc9b-4433-944c-3066346355ea`)와 tsc/변경 ESLint/Ruff exit0로 확인했다. 후속 좁은 수정 뒤239건 전체를 다시 돌렸다고 표현하지 않는다.
+- OpenAPI exact exit0 이후 마지막 보완은 handler/선택 로직뿐으로 schema를 변경하지 않았다. 초기 RED·placeholder/mock 계약 실패와 최종 GREEN은 따로 보존했다. `20260907-cp6-a2/a2-command-evidence.json`은 원본 도구 실행을 재실행 없이 수집한 index이며 잘린 출력은 truncated 표식을 유지한다. SHA256은 `F795E166C3D3331E64E84C0DD29615BCBEF631C433A2840900E5503139D9CD0E`다.
+- 독립 A2 명세/품질 전체 리뷰와 두 보완의 재리뷰를 총괄이 직접 읽었다. 최종 각각 Critical0/Important0/Minor0, Ready이며 `a2-spec-review.json`, `a2-quality-review.json`에 보존했다. 이전 C0/I2 판정도 삭제하지 않았다.
+- 실제 diff와 기존 step5 characterization을 확인했다. 주간보고·모바일 nav 파일 변경0, 출하 step5 height/grid/columns/overflow 추가 hunk0이다. CP6의 `mes.db/-wal/-shm` 및 임시 `mes_e2e.db/-wal/-shm`은 모두 absent를 총괄이 확인했다. 이 절은 최종 E2E 캡처·전체 listener0·전체 CP6 완료를 주장하지 않는다.
+- staged smart의 불필요한 cache-부재 승격을 피하려고 실제 S0의 ignored testmon 이력만 byte-exact 재사용했다. schema14/Python3.12.0/package manifest·상대경로 계약이 일치했고 과거 failed1을 그대로 남겼다. 제품 DB나 검증 정책을 수정하지 않았으며 표준 testmon이 변경/신규/실패 테스트를 재선택한다. 상세는 supervisor runtime `cp6-testmon-cache-reuse.md`; 최종 CP6 full/실제 PostgreSQL/CI는 유지한다.
+- 필수 staged smart를 정확24경로에서1회 실행했다. `a2-smart-staged.log`의 실제 결과는 **8PASS/1FAIL, exit1**이며 뒤의 docs3는 NOT_RUN이다. 초기의11PASS 보고는 계획12개에서 실패1개를 뺀 잘못된 집계였고, 총괄이 원본 Timing summary로 바로잡았다. 통과 영역은 backend Ruff/mypy/testmon/OpenAPI, frontend 변경 lint/앱 tsc/related/direct다.
+- 실패한 테스트 타입3종만 고쳤다. desktop/mobile mock의 optional params 접근과 api test fetch mock의 인수 tuple 선언을 바로잡았으며 baseline·제품 타입을 완화하지 않았다. `a2-test-typecheck-recheck.log`는 Node56 PASS/manifest280/known417·new0/exit0, `a2-direct-tests-recheck.log`는3파일182PASS/exit0다. 기존 통과 검사는 반복하지 않았고 처음 smart exit1을 PASS로 덮지 않았다. 미실행 docs3는 총괄이 문서 후속 상태 갱신과 함께 별도 검증한다.
+- 실제 날짜 확인 후 `adaa5bed1846bf071629d5d8cc37371cf7beca79` / `2026-09-07 shipping: 출하 요청 동시성과 페이지 조회 안정화`로 로컬 커밋했다. 총괄이 부모59c52bad·정확24경로·subject·clean 및 기존/임시 DB family6개의 absent를 확인했다. 푸시는 하지 않았다. A3는 같은 worktree에서 진행하며 CP6 full·원격 CI·품질 통합 완료와 구분한다.
+- 미실행 docs3는 총괄이 `verify_local.ps1 -Mode docs`로 별도 완료했다. whitespace·문서 링크 단위·실제 링크3gate PASS, exit0, 단위13PASS/1 Windows symlink권한 skip이다. 원본 마지막 출력·명령·chunk ID는 `a2-docs-closeout.json`에 보존했다. smart 한 번 전체 PASS가 아니라 실패 영역과 미실행 영역을 각각 복구한 결과다. 문서 단위 테스트의 synthetic fixture는 기본 OS Temp를 사용한 실행 기록을 남겼으며, 실제 서버/DB 접근과 구분한다.
+
+#### 12.27.3 CP6 A3 — IC-15 LOCAL_VERIFIED (2026-09-07)
+
+- `frontend/app/mes/_components/_warehouse_map_sections/useWarehouseMapMutations.ts:38,85,108,144`의 QueryClient별 coordinator가 operation ID와 box/source/target 자리 소유권을 관리한다. 겹치지 않는 작업은 병렬이며 동일 대상은 서버 수렴까지 차단한다. restack은 실제 `box_ids` 전체를 소유한다. 실패는 여전히 해당 작업이 소유한 박스만 복원하고, 마지막 network 작업 종료 뒤 invalidate 및 서버 지도 fetch로 수렴한다. backend revision이나 schema는 추가하지 않았다.
+- 실제 `DesktopWarehouseMapView.tsx:113,368,378`의 move/restack이 이 hook을 소비한다. `useWarehouseMapQuery.ts:7`은 진행 중 자동 조회를 비활성화하며 같은 QueryClient로 재마운트해도 진행 소유권과 낙관 cache를 유지한다. `JariColumn.tsx:160`과 `WarehouseStages.tsx:656`은 pending 표시·drag 차단을 연결한다. API·재고 계산·모바일 읽기 전용 지도·동결 UI 변경은 없다.
+- 초기 RED(`exec-4b657be4-3a55-4e06-8d48-74392f48b48b`)는 새 hook 미존재에 따른 계약 실패다. 이것만으로 기존 제품의 동시성 결함이 동적으로 재현됐다고 주장하지 않는다. 실제 원래 전체 snapshot rollback 경로를 읽은 정적 근거와, 구현 후 deferred Promise의 A실패/B성공·A성공/B실패·역순 완료·restack 소유권·unmount/remount 결과를 구분해 남긴다.
+- 최종 관련4파일20PASS(`exec-062deeba-8e02-4d91-b0ed-3a7a81cc8776`)와 앱 tsc exit0를 총괄이 원본으로 확인했다. 최초 테스트 타입 검사는 nested Node24 PATH 오염으로 환경 실패했으며, 승인 Node20 PATH 고정 후 새 테스트 ReadonlySet 전개1건을 Array.from으로 고쳐 exit0(`exec-f5637e89-f943-47f0-96d9-c1dde6fe2c0a`)로 복구했다. baseline 완화는 하지 않았다. 과거 실패와 중간 fixture 수정은 최종 PASS와 따로 보존한다.
+- 독립 명세 리뷰는 Critical0/Important0/Minor0, Ready다. 품질 최초 Minor1은 잠긴 자리 드롭이 무응답인 점이었고, `useWarehouseMapMutations.ts:218-221,294-297`에서 추가 API/캐시 변화 없이 상태 안내하도록 보완했다. 후속 hook5PASS(`exec-95e0132c-ecbc-45f9-9a1b-9afcd3ba5123`), 품질 재리뷰 Critical0/Important0/Minor0다. 총괄은 수정 분기와 충돌 안내3회·추가 API0 테스트를 직접 읽었다.
+- 기존 원본은 ignored `20260907-cp6-a3/a3-command-and-review-evidence.json`에 재실행 없이 수집했다. 잘린 출력은 truncated 표식을 유지한다. 처음에는 제품7경로와 총괄 문서2경로를 stage했고, 아래 bundle 보완 script/test2경로를 더해 최종11경로로 고정한다. CP6 전체 gate·원격 CI·최종 UI/API/SQL 대조를 이 focused 결과로 대체하지 않는다.
+- 필수 staged smart는 frontend7/docs3 계획에서 실행됐으며, 원본 `a3-smart-staged.log`의 실제 결과는 **6PASS/1FAIL, exit1, docs3 NOT_RUN**이다. lint·앱/테스트/E2E 타입·전체 frontend coverage·production build는 통과하고 bundle만 실패했다. 실제2,537,557bytes 대 한도2,531,262.464bytes로6,294.536bytes(약0.249%) 초과했다. 이 build는 A1~A3 누적 결과이며 새 hook 단독 증가로 단정하지 않는다.
+- 사용자 속도 지시와 efficient-verification에 따라 검증된 소유권 로직을 번들 한도만을 위해 재설계하지 않는다. 총괄은 필요한 작은 정리1회 또는 정당한 기능 증가에 대한 기본 한도2.414→2.430MiB(약0.66%) 조정을 승인했다. 실제 byte 측정·초과 exit·명시적 --max 동작은 유지하고 script/test/live 설명을 함께 맞췄다. 아래 bundle·미실행 docs 복구와 해당 delta 리뷰를 확인해 로컬 commit을 준비한다. 통과한 coverage/build를 작은 gate 설정 복구 때문에 반복하지 않았다.
+- 보완 결과: 중복 `operations` Map만 제거하고 기존 `owners`를 수렴 완료까지 유지하는 작은 정리를 했다. 후속 focused6PASS·앱 tsc PASS·production rebuild exit0이며, 실제 번들은179bytes 줄어2,537,378bytes다. 새 기본 한도2,548,039.68bytes 안에서 bundle 계약2/2PASS와 실제 검사 exit0(`a3-bundle-budget-recovery.log`)를 총괄이 확인했다. `--max` 파싱/초과 exit는 그대로다. 동일 동작의 중복 상태 제거와 budget delta에 대한 품질 재리뷰는 C/I/M0, Ready이며 총괄도 실제 diff를 읽었다. 원래276파일2555PASS·lines94.97% coverage를 반복하지 않았다.
+- 미실행 docs3의 별도 closeout은 whitespace와 실제 링크가 통과하고 단위3건만 child Node24 PATH 오염으로 실패했다. 각 exec에 승인 Node20 PATH와 task-local TEMP/TMP를 다시 고정한 뒤 실패한 단위 묶음만 복구했다. `a3-docs-link-tests-recheck.log`는 **총14건 중13PASS/1 Windows symlink권한 skip, exit0**다. 단위 내부 가짜 backend gate 출력을 실제 PostgreSQL/백엔드 검증으로 계산하지 않는다. docs3는 각각 복구 완료이며 원래 smart exit1 및 중간 docs 실패 원본은 유지한다. 최종 로컬 commit을 준비하고 push는 하지 않는다.
+- 최종 local commit은 `8d7a0a77c28be3c35f80fdd75bace937ae897b18` / `2026-09-07 warehouse: 창고 지도 이동 순서 안정화`다. 총괄이 실제 HEAD·부모adaa5bed·정확11경로·subject와 commit 직후 clean을 확인했다. 푸시는 하지 않았으며 A4→A5 저위험 UI 묶음으로 진행한다. A3의 로컬 검증 완료와 CP6 전체 gate/CI/품질 branch 통합 완료는 구분한다.
+
+#### 12.27.4 CP6 A4·A5 — IC-25·IC-26 LOCAL_VERIFIED (2026-09-07)
+
+- `frontend/app/mes/_components/_hooks/useDesktopInventoryDerivations.tsx:100`의 ALL hint는 PA·PF 제외 모집단을 명시한다. `frontend/app/mes/_components/_inventory_sections/InventoryItemsTable.tsx:70-131`의 공통 설명을 error/loading/empty/normal 반환 경로에 모두 표시한다. 기존 PA/PF 판별·KPI 숫자·필터·검색·목록 계산은 변경하지 않았다. 실제 desktop/mobile의 공용 consumer를 유지하며 숫자와 목록의 포함 기준이 같다는 오해만 줄인다.
+- A4 예상 RED는 hint와 설명 누락2건(`exec-41e3afa8-1b27-437b-8270-67dd258a2349`)이고, 구현 후2파일8/8PASS(`exec-040f5987-659c-4fa0-bf92-c6ae93f8b14d`)다. 잘린 실패 DOM 출력은 truncated 표식을 유지하며 독립 runtime 결함 개수로 세지 않는다.
+- `frontend/app/mes/_components/_daily_report/DailyWorkReportScreen.tsx:111,185-202,286-305`는 첫 작성자 선택과 실제 작성자 전환을 구분한다. 같은 작성자는 early return하며 tab/date 및 animationEnd가 상태를 해제하고 detail은 애니메이션 상태를 변경하지 않는다. `globals.css`의 기존 reduced-motion 규칙과 주간보고·모바일 nav·출하 step5는 수정하지 않았다.
+- A5 예상 RED는 첫 작성자가 기존 animate-view-fade를 가진1건(`exec-08ce7fd0-d73e-4de4-9782-07375cc5ce37`,25PASS/1FAIL)이고, 최소 구현 후 일보 화면26/26PASS(`exec-e83ccaa2-2fa7-4170-80b1-bcfbb4f175b6`)다. 이 단위 테스트는 class 적용·종료와 비재발화 계약이다. 실제 브라우저 animationstart 수와 reduced-motion 동작을 이미 증명했다고 표현하지 않는다.
+- 합친 focused3파일34/34PASS(`exec-fbe85ead-e240-4f93-ae51-4851e34be060`), 앱 tsc exit0(`exec-d6bf447e-327f-4089-a4c2-b5f119f71b6a`), 변경6파일 ESLint --max-warnings=0 exit0, diff-check exit0를 총괄이 원본으로 인수했다. 독립 명세 turn `01a07bb4-c8c9-74c1-80e1-deb4ae85413f` 및 품질 turn `01a07bb4-f6a6-70b0-b958-457adb722202`은 각각 Critical0/Important0/Minor0, Ready다. 총괄도 제품 diff를 읽었고 기존 여섯 frontend 경로와 문서2개만 변경됨을 확인했다.
+- 원본 command/review index는 ignored `20260907-cp6-a4-a5/a45-command-and-review-evidence.json`이다. 합친 exact8경로 staged smart1회와 로컬 commit을 준비한다. 최종 실제 KPI 표시·작성자 animation/reduced-motion·UI/API/독립 SQL·동결 캡처는 CP6 전체 E2E에 함께 넣는다. CP6 full/원격 CI/품질 branch 통합 완료 판정은 아직 아니다.
+- 최종 staged smart는 frontend5/docs3 **8/8PASS, exit0**,100,779.703ms다. `a45-smart-staged.log`에서 related10파일99PASS·direct3파일34PASS·테스트 타입계약56PASS/manifest282/known417·new0·lint/앱 tsc와 docs3 통과를 총괄이 확인했다. 문서 단위 총14건 중13PASS/Windows symlink권한skip1이다. 재고·PostgreSQL·실제 E2E가 이 smart에 포함됐다고 표현하지 않는다.
+- 최종 local commit은 `edc3a83611472ca6a99b134ac868e195d07ccd00` / `2026-09-07 frontend: 재고 기준 안내와 일보 전환 동작 개선`이다. 총괄이 실제 부모8d7a0a77·정확8경로·subject·post-commit clean을 확인했다(`0b02a1`). push는0이며 이후 CP6 최종 browser/DB/PG 준비를 시작한다. 본 후속 문서2개의 dirty는 총괄이 commit 결과를 기록한 의도된 변경이다.
+
+#### 12.27.5 CP6 최종 DB·브라우저 검증 준비 경계
+
+- `scripts/dev/verify_local.ps1:155-213`의 read-only DB gate는 해당 worktree `backend/mes.db`를 고정 경로로 읽으며 부재하면 실패한다. 이를 위해 실제 개발 DB를 가져오거나 gate를 우회하지 않는다. 최초 부재했던 CP6 경로에만 ignored runtime에서 만든 nonzero 합성 schema-head snapshot을 배타 생성해 잠시 제공하는 방법을 승인했다. 기존 파일 발견 시 덮기·채택은 금지한다.
+- 합성 fixture는 닫힌 일관 snapshot으로 만든 뒤 소유권·nonce·size·hash를 기록한다. 검사 전후 같은 fixture hash를 증명하고, finally에서 소유권과 hash가 일치하는 단일 파일만 제거해 최초/최종 `mes.db/-wal/-shm` 부재를 복원한다. 예기치 않은 파일·sidecar·hash 변경은 삭제하지 않고 증거로 보존한다. 실제 main/직원 DB 접근은0이며, 임시 fixture 생성/삭제가 있었다면 파일 쓰기0으로 숨기지 않는다. 이 절은 준비 계약이며 실제 실행 성공 증거가 아니다.
+- supervisor runtime `cp6-final-oracle-prep.md`, `cp6-a45-final-browser-prep.md`, `cp6-final-db-gate-prep.md`를 최종 구현 작업에 인계했다. 기존 창고 보정 E2E에 UI/API/독립 SQL 대조를 결합하며, 일보는 key remount를 감안한 document capture listener로 실제 visible 결과의 animationstart만 센다. route mock을 쓰는 화면 검증은 실제 재고 원장 증거와 분리한다. 새 테스트 서버/DB 준비는 A4·A5 로컬 commit 후에만 시작한다.
+- 최초 준비는 `pg_ctl start` 출력 파이프의 자식 상속으로 대기했고, 소유 PostgreSQL을 정상 종료해 회수했다. 이때 full gate는 NOT_RUN이고 임시 canonical DB도 생성되지 않았다. U=7을 명시한 유효 B/Z/U fixture, 배타 파일 생성 직후 소유권 기록, 소유 DB 삭제·서버 종료를 보완해 준비만 재개한다.
+- 경계 예외: 복구 중 상대 patch로 main의 ignored `resume-final-full.ps1` 한 파일이 잠시 생성됐다가 자기 파일만 제거됐다(`exec-a7398c6b-ef23-483b-9eb0-ce59bae86975`). 이는 파일 생성·제거 사실이며 서버·DB 변경 증거로 확대하거나 worktree 밖 쓰기0으로 숨기지 않는다. 정확 경로는 active TODO의 CP6 최종 준비 기록에 남겼다. 이후 patch 헤더는 격리 worktree 절대 경로로 고정하고 추가 main 검색·정리를 금지했다.
+
+#### 12.27.6 CP6 최종 전체 검사 — 실패 영역·미실행 영역 복구 중
+
+- 최초 실제 full은 2026-09-07 22:03:46 KST에 시작해 693,611.448ms 뒤 exit1로 종료됐다. 앞선 준비 시도는 full 실행 횟수에 포함하지 않는다. 원본은 ignored `20260907-cp6-final/run-20260907-213626-9c04d839892444e1b40d3a10489ff061/resume-4/`의 `full-gate.log`, `full-gate-start.json`, `full-gate-exit.json`이다.
+- 실제 결과는 **9PASS/1FAIL**이다. backend Ruff/mypy와 frontend lint·앱/테스트/E2E 타입·coverage·build·bundle의7영역은 통과했다. frontend coverage는276파일2,556PASS, line94.97%다. PostgreSQL 검사는 깊은 Windows TEMP 아래 백업 복구 영수증 생성의 FileNotFoundError로 실패했다. backend 전체 pytest/OpenAPI, docs3, git-status, DB read-only, Playwright는 아직 NOT_RUN이다. full 명령 전체를 PASS로 기록하지 않는다.
+- 격리 PostgreSQL16.15와 schema20260907_0034를 확인했고, 합성 SQLite는 B0/Z0/U7/W7·실재고7·부서0, FK0·integrity ok·총량/위치 불일치0을 독립 SQL로 검증했다. 임시 canonical snapshot의 전후 SHA-256은 `B3446800F7FAB0E41CBD61F9FD5531E67B3F76712D91D28E1B1FE21060D1C7A7`로 같았으며1392640bytes다. 소유 단일 파일을 제거해 원래 DB family 부재를 복원했고, test_cp6_final 삭제 뒤 잔여 test DB0·소유 cluster 정상 종료·cleanup failure0을 원본으로 확인했다. 중지된 cluster 파일은 보존한다.
+- 후속 실행은 짧은 worktree 내부 TEMP로 환경 실패를 복구하고 PostgreSQL 및 NOT_RUN 영역만 수행한다. 이미 통과한 frontend7영역은 제품 변경 없이 반복하지 않는다. 후속 구성 검사 결과·실제 CI와 이번 full exit1은 구분해 기록한다.
+
+#### 12.27.7 CP6 구성 검사 복구와 테스트 격리 경계 발견
+
+- `component-recovery-backend-3/`에서 forward-slash 절대 `--basetemp`로 원래 실패한 PostgreSQL backup selector가 exit0을 기록했고, 필수 PostgreSQL runner도 실제129건·skip0·exit0(415,161.564ms)으로 통과했다. 앞선 Windows 경로 표기/pytest shlex 준비 실패는 원본으로 보존한다. 제품 코드는 이 환경 교정으로 변경하지 않았다.
+- 같은 복구의 backend 전체 pytest는1,257,537.892ms 뒤 exit1로 종료됐다. 실패6건은 runtime root 판정2건·Task Scheduler 사전 판정2건·출하 공개 서비스의 security manifest 분류2건이다. 아직 원인별 수정/재검증 전이며 OpenAPI·최종 smart/DB/E2E·원격 CI 완료로 확대하지 않는다. 이미 통과한 frontend·PostgreSQL 검사는 반복하지 않는다.
+- 별도 격리 경계 위반이 확인됐다. 당시 `backend/tests/migrations/test_shipping_prepared_actor_repair.py:123-135`의 `_primary_database_path()`는 local `backend/mes.db`가 없으면 Git 공통 디렉터리의 부모에서 main DB 경로를 반환했다. 같은 파일256-267행의 테스트는 그 원본을 임시 경로에 `shutil.copy2`한 뒤 revision을 검사한다. 실제 full 로그의 `actual backend/mes.db is at 20260903_0032, not 0010` skip은 이 fallback 복사 경로 실행을 뒷받침한다. 이 실행을 main DB 접근0으로 기록하지 않는다.
+- 확인한 해당 경로는 원본 읽기·임시 복사이며 원본에 migration을 수행하는 코드 경로는 아니다. 그렇다고 추가 main hash/DB/서버 조회로 전체 무영향을 새로 보증하지 않는다. 총괄은 사용자에게 경계 위반을 공개하고 해당 테스트 재실행과 원본 추가 접근을 즉시 금지했다. 격리된 synthetic0010 fixture로 기존 데이터 보존/FK 검증을 유지하는 국소 test-only 교정을 지시했다. 기존 pushed migration은 변경하지 않는다.
+- 임시 실데이터 복사본은 이번 소유 pytest 경로 안에서 파일명·절대 경계·실행 종료만 확인해 정확 파일만 정리하도록 지시했다. 원본 비교나 복사본 내용 열람, 상위 재귀 삭제는 금지한다. 정리 완료 및 fixture 교정 GREEN은 아직 미확인이다. 다른 테스트의 같은 자동 DB 접근 경로는 별도 읽기 전용 소스 조사로 점검한다.
+- 후속 정리 확인: `actual-db-copy-cleanup.json` 및 원본 명령 결과에서 자기 `p6t9/popen-gw1/test_repair_upgrades_actual_000/actual-mes-0010.db` 복사본1개를 삭제하고 파일명 잔여0을 확인했다(23:19 KST). 원본은 추가 조회하지 않았고 복사본 내용도 열지 않았다. 임시 복사본은 영구 삭제됐으며 이를 복구하기 위해 원본에 재접근하지 않는다. PostgreSQL 소유 DB 잔여0·cluster 종료·cleanup failure0도 `summary.json`과 종료 원본으로 확인했다.
+- `resolve-server-profile.ps1`은 `.worktrees` 아래 모든 후손이 아니라 직접 자식 루트만 허용하도록 좁혔다. 새 중첩 루트 RED는 `exec-5a306912-5417-465f-815b-f4ad82645b6a`, 기존 정상/공백/employee 문자열 계약과 실패4건을 포함한 GREEN9건은 `exec-5d6a1448-f3f0-498b-9ff7-7ff892a6d854`다. 실제 서비스나 Task Scheduler를 조작하지 않는다. 출하 bulk 조회 함수는 실제 SELECT/계산 경로를 확인하고 두 read-only manifest 집합에 정확히 등록했으며 보안32건이 통과했다(`exec-775c8e47-70a0-48a1-8ab4-88845eb9f4d2`).
+- 실제 DB 테스트는 tmp SQLite의0007 스키마에 종속 데이터를 구성하고0010 stamp로 schema drift를 재현하는 synthetic fixture로 바꿨다. 기존0011 repair 후 행 보존·revision·FK 주장은 유지하며 해당1건은 exit0이다(`exec-bf29437f-00ba-4b8e-9bbe-ee69d2389de0`). 정상0010 schema 전체를 새로 입증했거나 실제 개발 데이터 호환성을 검증했다고 확대하지 않는다. 별도 읽기 전용 감사는 backend/tests의 DB 경로/연결/복사/환경/하위프로세스 패턴과 직접 helper 호출을 추적했고 다른 자동 실제 DB 접근 경로를 발견하지 못했다. 이는 저장소 전체 무접근의 포괄 보증이 아니다.
+- 해당 국소 diff의 독립 명세 turn `01a07c3f-2380-7530-bba6-c4758d41c756`와 품질 turn `01a07c3f-42c0-7973-862c-65534147b55e`는 각각 C/I/M0·Ready YES다. 변경 Python Ruff·PowerShell parser·diff-check exit0, 미실행 OpenAPI도 baseline exact·exit0(4,503.639ms)을 확인했다. 원래 full/전체 backend의 FAIL은 덮지 않는다.
+- 최종 정확8개 staged 경로의 smart PlanOnly는 resolver를 infra로 분류해18게이트로 승격했지만 검사는 실행하지 않았다(`exec-0e0f9b80-9fab-4497-9ab3-3d81f70d3062`). 사용자의 중복 검증 축소 지시에 따라 총괄은 기존 PASS와 새 delta GREEN·두 리뷰를 인수하고, 이번 국소 교정 때문에 같은 PG/전체 pytest/frontend를 다시 실행하지 않도록 한정 조정했다. 남은 docs3·DB read-only·실제 Playwright·git-status를 기존 개별 gate로 수행하며 원격의 전체 GitHub CI 성공은 여전히 필수다. 이 조합을 staged smart18/18 또는 원래 full 명령 PASS로 표시하지 않는다.
+
+#### 12.27.8 CP6 최종 화면·구성 검사 인수 — 로컬 완료, 원격 CI·통합 대기
+
+- 최종 증거는 같은 run의 `component-recovery-final-1/` 및 `component-recovery-final-2/`다. 최초 전체 Playwright는 **18PASS/1FAIL/1NOT_RUN, exit1**이었다. 실패한 창고 보정 desktop과 serial로 미실행된 mobile만 test-only 수정 후 다시 실행해 **2/2PASS, exit0(46.2초)**를 확인했다. 이를 단일 신규20/20 실행이나 원래 full PASS로 바꾸지 않는다. 최종 원격 CI의 전체 실행은 여전히 필수다.
+- 실패 원인은 physical 창고와 `창고`라는 부서 chip 모두에 매칭한 strict locator였다. 실제 `InventoryItemRow.tsx:80-88`에서 양수 physical warehouse가 먼저 삽입되는 구조를 확인해 첫 chip을 선택하고, `io-warehouse-adjust.spec.ts:201-210`에서 창고 의미와 API/SQL 수량을 별도로 검증한다. 예상 수량으로 locator를 선택하지 않고 제품 표시·계산은 수정하지 않았다.
+- `inventory-sql-api-ui-oracle.json`의 합성 품목은 독립 SQL 기준 전체/창고/부서가 **500/450/50 → 501/451/50**이며 총량 불변식을 만족했다. API physical quantity/warehouse는501/451, UI warehouse451, API/UI available은501로 일치했다. available 표시는 physical total과 분리해 검증한다. 이는 이 대표 보정 시나리오의 증거이지 모든 실제 품목·실물 재고 보증이 아니다.
+- 최초 실행에서 IC25 desktop/mobile 모집단 안내와 IC26 실제 animation/reduced-motion, frozen characterization의3개 시나리오는 모두 통과했다. 실제 `/api/items?limit=2000` 응답 barrier 뒤 화면을 읽었다. 일보는 mock GET을 이용한 화면 계약으로, 첫 작성자0·다른 작성자 start/end1/1·같은 작성자/상세/탭/날짜0·reduced-motion0이다. 이를 재고 데이터 통합 증거로 확대하지 않는다.
+- frozen viewport/geometry/style은 A1 기준과 일치했다. 모바일 nav는390×844 viewport에서0/754/390/90이고 PNG SHA도 기준과 같다. 출하 step5는1440×900에서 기존 card geometry·2열·58px 행·내부 overflow를 유지했다. 총괄은 두 시점의 실제 PNG를 열어 확인했으며 desktop의 데이터 문구 차이까지 pixel-identical이라고 주장하지 않는다.
+- docs 링크 단위는13PASS/Windows symlink권한skip1, maintained 링크 검사PASS, DB read-only mismatch0, git-status 내부 gatePASS다. docs-whitespace 내부 단독 실행은 Plan 컨텍스트 누락으로 검사 전에 실패했으므로 동일 검사를 직접 `git diff --cached --check`로 수행한 exit0와 구분해 기록한다. 모든 문서 경로를 검사했다는 뜻은 아니다.
+- 두 E2E 실행 모두 합성 canonical snapshot의 전후 SHA-256 `B3446800F7FAB0E41CBD61F9FD5531E67B3F76712D91D28E1B1FE21060D1C7A7`가 같았고 자기 임시 파일만 제거해 원래 DB family 부재를 복원했다. E2E DB/seed/ownership 산출물 잔여0·cleanup failure0이다. 소유8021/8022/3300 가용을 확인했지만 기존3100 점유는 그대로 두었으므로 전체 listener0으로 표현하지 않는다. 12.27.7의 실제 DB 복사 경계 위반도 이 합성 snapshot 결과로 지우지 않는다.
+- 최종 명세 turn `01a07c52-abc4-71d1-a571-6233c3ef017f`와 품질 turn `01a07c52-c940-7971-bb98-66345bae58bc`는 각각 **Critical0/Important0/Minor0, Ready YES**다. 총괄이 실제 staged diff·raw log·oracle·cleanup과 두 리뷰를 인수했다. 제품 코드 추가 수정 없이 CP6 최종 논리 commit/push와 실제 GitHub CI로 진행하고, 그 뒤 품질 branch 통합/CI 및 `POST_CP6_SHA`를 고정한다. CP7 제품 구현은 아직 시작하지 않았다.
+
+#### 12.27.9 CP6 원격 검증과 품질 통합 (2026-09-08)
+
+- CP6 최종 commit은 `d60f84ede604c61c334472d0770299b2a37be014`, 부모 `edc3a836`, tree `31b3f59a48701a9f9eecb48fda2d5c327a5798d4`다. 실제 commit 직전 docs3/3·cached diff-check를 통과했고 subject는 실제 작성 날짜의 `2026-09-07 quality: CP6 최종 검증과 격리 경계 보완`이다. 일반 push 뒤 같은 원격 ref와 clean을 확인했다.
+- [CP6 GitHub Actions 34135084227](https://github.com/Hw-03/ERP/actions/runs/34135084227)은 정확한 위 SHA에서 **completed/success, 6/6 success**다. Backend pytest/compile/OpenAPI, Frontend lint/type/coverage/build, 실제 PostgreSQL, 전용 DB E2E, Windows 검증 정책, 운영 profile job을 총괄이 GitHub의 실제 결과로 확인했다. 로컬 원본 full FAIL을 지우지 않으며 원격 성공은 별도 증거다.
+- 품질 branch가 `731edc2d`에서 움직이지 않았고 clean임을 확인한 뒤 `--no-ff` merge `c9d709034d26bd774f682bb186bbad1f048f7300`을 만들었다. 부모는731edc2d/d60f84ed이며 merge tree는 검증된 CP6 tree와 정확히 같다. 충돌·제품 추가 편집은 없다. main branch/워크트리 병합·push, PR·배포는 수행하지 않는다.
+- 속도 조정: 같은 코드의 원격 검사 대기를 직렬로 반복하지 않는다. 품질 branch의 이번 문서-only closeout을 검증·push한 뒤 그 고정 SHA를 CP7 기반으로 사용하고, 품질 CI를 별도 추적하면서 CP7 B1의 로컬 구현·검토를 병행한다. **품질 CI가 success가 되기 전에는 CP7 첫 commit/push 및 CP6 최종 종료 체크를 허용하지 않는다.** 품질 CI를 생략하거나 동일 tree만으로 성공을 추정하지 않는다. 실패하면 실제 원인을 좁혀 해결하고 잘못된 기반을 완료로 선언하지 않는다.
+
+### 12.28 CP7 구현 착수 (2026-09-08)
+
+- 품질 문서 closeout `7f232773b1eea204a251bc5ac001ef5b03319d3b`는 docs-only2경로 staged smart3/3PASS(17,488.563ms) 후 일반 push됐으며 upstream0/0·clean을 확인했다. 검증된 CP6 대비 제품 경로 diff0이다. [품질 CI34137728037](https://github.com/Hw-03/ERP/actions/runs/34137728037)은 정확한7f232773에서 **completed/success·6/6 success**로 종료됐다. 총괄 실제 gh 조회36d0dd와 ignored `cp6-quality-ci-final.json`에 원본을 보존했다. CP6 종료·통합을 완료했으며 B1 commit 전 기반 hard gate도 충족됐다.
+- 이 SHA를 `POST_CP6_SHA`로 고정하고 `C:\ERP\.worktrees\full-code-quality-cp7` / `codex/full-code-quality-cp7`을 생성했다. 별도 구현 작업 `01a07c76-6395-7dc0-ba58-91c6fc4d3538`이 B1부터 순차 수행한다. 총괄은 코드 편집을 맡지 않고 정본 문서·단계 통과·Git/CI·최종 통합을 소유한다. 품질 branch의 추가 이동과 main 재동기화는 하지 않는다.
+- 사전감사의 DTO/CP6 delta·B1 generator seam·의존성 호환 표면을 재사용하며, B8 파일 목록은 NUL/UTF8 Git 정본 seed에서 CP7 변경 집합을 반영한다. seed의 전체 PENDING/consumer UNKNOWN은 실제 내용 검토 완료가 아니고, unchanged 파일도 추적 가능한 실제 근거와 blob 동일성 또는 역할별 검토가 필요하다. 이전 quoted-octal73경로 문제는 정정 후 JSON/CSV/Git 양방향 차집합0을 총괄이 확인했다.
+- B8 병렬 준비에서 모델·스키마42개와 Alembic40개를 실제 전문 정적 검토하고 부모가 경로·blob82개 일치를 확인했다. 자산560개는 byte size/blob·형식 선언·실제 consumer를 대조했으며 참조550/UNKNOWN10을 구분했다. 이는 전체 파일 감사나 동적 PASS가 아니며 최종 tree와 consumer delta 재대조가 필요하다. ignored `cp7-b8-parent-preparation-intake.md`에 범위·세 정적 rollback 가설·자산 JSON 복구 및 잘못된 중복 집계 정정을 보존한다.
+
+#### 12.28.1 B1 중간 리뷰와 완료 범위 확인
+
+- 초기 raw 생성·stock-request/catalog 연결 및 shipping type 보완 뒤 명세 리뷰에서 Important2가 남았다. 첫 adapter 후보만 연결한 상태는 IC21 완료가 아니며, shipping public type의 requiredness만 바꾸고 실제 raw 응답 경계를 유지한 부분도 미완료다. B1·IC21 완료 체크 및 commit/push는 아직 하지 않는다.
+- 사전 DTO26행의 `first_adapter_candidate`는 착수 순서이지 완료 범위 축소가 아니다. 확인된 production drift18행은 같은 근본 원인/모듈을 묶어 generated raw→업무adapter 또는 generated에 종속된 명시 컴파일 계약으로 연결한다. drift 미확인4행·barrel·serialization·consumer 행은 기존 facade를 불필요하게 다시 쓰지 않고 유지 근거와 계약 fixture를 남긴다. 없는 실제 수량을 무조건0으로 정규화해 오류를 숨기지 않으며 기존 wire·업무 정책·동결 UI는 보존한다.
+- 생성 파일이 미추적인데도 `git diff`가 성공할 수 있는 gate 경계를 보완했다. 미추적 exit1·추적 모사 exit0의 초기 검증은 ignored `20260908-cp7-b1-openapi-dto/verification-evidence.md`에 남겼다. 첫 모사의 `%TEMP%/cp7-b1-positive-index`는 worktree 밖 임시 index 예외였고 후속 정확 경로 부재·실제 staged0 확인을 기록했다. 이후 임시 index/TEMP/log는 CP7 ignored run 경로로 제한한다. 이 기록을 실제 서버/DB 접근으로 확대하거나 완전한 경계 준수0 주장으로 지우지 않는다.
+- 1차 보완은 Node20 직접10파일98PASS, 앱 타입·strict lint exit0 및 테스트 타입 계약56PASS/기존416·신규0을 확인했다. missing catalog 수량과 mutation 응답 decode 전에 멱등 key가 사라지는 경계는 각각 실패 테스트 후 보완했다. 이는 당시 코드의 국소 증거이며 이후 변경의 최종 PASS로 재사용하지 않는다.
+- 2차 명세 리뷰는 C0/I3/M0다. generator의 default 필드 선택성 해석, 대표 필드에 그친 drift 계약, handover unknown 표시를 보완 중이다. `--default-non-nullable false` 이후 드러난 shipping 수량 누락은0으로 숨기지 않고 명시적 실패로 처리한다. B1·IC21은 여전히 미완료이며 변경된 부분의 테스트·재리뷰 이후에만 commit/push를 승인한다.
+- 2차 보완 뒤 명세 재리뷰 `01a07cd2-ed8a-7b42-a938-482911808489`는 C/I/M0·IC21 완료 가능으로 종료했다. 당시 Node20 집중13파일150PASS, 앱 타입 exit0, test manifest284·기존416/신규0, strict lint 및 생성 hash `69C436A094C77F6E6DED4CCE8D6984FB4E5F0D0E241285DA8FE21810242E8441` 재현을 총괄이 실제 명령·로그와 대조했다. 독립 품질 리뷰와 최종 Git/CI는 아직 남아 있다.
+- B1 빌드는 성공했지만 bundle은2,548,693bytes, 국소 보완 후2,548,531bytes로 기존2.430MiB 한도를 약492bytes 초과했다. 검증된 CP6의2,537,378bytes 대비 필수 응답 검증·unknown 표시 증가 약11KB(약0.44%)를 근거로 총괄은2.435MiB 최소 예산 조정을 승인했다. 실제 chunk 귀속·단위 테스트·같은 build 산출물 gate를 확인하며, 한도 맞추기를 위한 의미 없는 코드 축약·광역 재빌드는 하지 않는다. 원래 실패 증거를 삭제하거나 처음부터 PASS로 기록하지 않는다.
+- 후속 독립 품질 리뷰는 C0/I2/M1이다. production preview/cancel 자유형 응답과 stock/shipping mutation 응답에서 필수 필드 누락을 통과시키는 경계를 확인했고, writer는 불완전 응답 거부·pending key 보존 RED부터 보완한다. 앞선 명세0·150PASS·build 성공은 그 이전 snapshot의 증거이며 이 새 delta의 최종 통과를 뜻하지 않는다. 새 전체 검사를 반복하지 않고 영향받은 validator·멱등 경계 및 최종 bundle을 검증한 뒤 재리뷰한다. B1 완료·commit/push는 아직 승인하지 않았다.
+- 해당 보완 뒤 실제 `exec-d9818a92-c9e6-4ec5-bf5d-823df43be9ea`는13파일162PASS다. 앱 타입 `exec-0a51dc9a`·strict lint `exec-b077f19c`·test 타입 `exec-453dbe68`도 exit0이며 기존416/신규0을 보존한다. 최종 품질 turn `01a07cf2-9101-7300-bcf6-ff0fe3092221`는 C/I/M0·Ready예다. 생성 스키마와8개 중첩 경로 검증·동일 payload 재시도 보존을 대조했다. 마지막 build/bundle·증분 명세 검토·Git/실제 CI는 아직 완료 전이므로 B1 체크는 유지한다.
+
+#### 12.28.2 B1 최종 로컬 인수 — Git·원격 검증 전
+
+- 최종 증분 명세 turn `01a07cf5-2e3a-70b2-81c5-6fb5d18212a1`와 품질 turn `01a07cf2-9101-7300-bcf6-ff0fe3092221`는 각각 C/I/M0·Ready예다. 총괄이 실제 두 응답과13파일162PASS·앱 타입/테스트 baseline/strict lint의 exit0을 직접 인수했다. backend·migration diff0이며 runtime wire 형식과 동결 제품 범위는 유지한다.
+- production preview/cancel은 생성 타입의 free-form 응답을 필수 구조 validator로 검사한다. 이 API는 원래 `plan_hash` 기반 취소이고 별도 client-request replay 프로토콜이 없다. 일반 malformed-response 거부와, **기존 pending command가 있는 stock/shipping**의 `ResultUnknownError`·동일 payload 보존을 구분한다. 총괄의 혼합된 설명을 정정했으며 이를 위해 새 receipt/schema/업무 정책은 추가하지 않았다.
+- 최종 production build `exec-97921cef-67c7-4767-95f8-7c220d9bd5e1`는 exit0, 실제 `bundle-final.log`는2단위PASS와 **2,552,981bytes / 승인2,553,282.56bytes**를 기록했다(총괄322153). CP6 기준보다15,603bytes(+0.615%) 증가한 필수 B1 응답 안전막 비용이며 기존 실패 로그도 보존한다. 같은 build를 문서 정리 때문에 재실행하지 않는다.
+- 사용자 속도 지시를 적용해 정확 staged 영향 분석과 미검증 구성만 실행한다. CI의 frontend generated guard4줄 때문에 변화 없는 backend/PG 전체를 로컬에서 다시 실행하지 않는다. 이전 단계와 최신 delta의 실제 PASS, 새 전체 frontend unit/coverage·docs·generated tracking guard를 구분해 보존하고 실제 전체 원격 CI는 반드시 확인한다. 이 한정 조합을 미실행 smart/full 전체 PASS로 표기하지 않는다.
+- 정확47경로 staged smart PlanOnly는 infra16게이트를 계획했지만 실제 검사는0건이다. docs는 Node20 환경의 별도 실행에서3/3PASS(27,323.981ms;14단위 중13PASS/권한skip1)와 유지 링크 유효를 확인했다. 최초 전체 frontend unit/coverage는 **278파일 중275PASS/3FAIL,2,594테스트 중2,586PASS/8FAIL**,231.59초로 종료됐다(총괄42fc16). shipping query4·draft cart1·stock mutation3의 sparse mock/정규화 기대값을 해당 public 계약과 맞추며, 제품 validator를 느슨하게 만들지 않는다. 원래 전체 FAIL과 coverage 미보고를 보존하고 해당 mock delta만 직접 재검증한 뒤 실제 GitHub 전체/coverage 결과를 확인한다.
+- mock-only4경로 보완 뒤 실패3파일14/14 및 마지막 draft4/4가 통과했고, test 타입은 기존416/신규0이다. 독립 증분 품질 turn `01a07d02-5594-7f53-8910-f6a7b621200b`는 C/I/M0·기대값 완화 없음으로 판정했다. 생성 파일의 실제 tracked guard도 exit0이다. 총괄은 최종51경로 commit `1ad03e3748f0fbfe38a331704019ba4f1c280a1c`·부모7f232773·`2026-09-08 frontend: OpenAPI DTO 경계 연결`·clean·upstream0/0을 확인했다. [CI34149717620](https://github.com/Hw-03/ERP/actions/runs/34149717620)은 이 exact SHA에서 실행 중이며, 최종 전체 success를 아직 추정하지 않는다.
+- **최종 원격 인수:** 이후 총괄이 같은 CI의 `headSha=1ad03e3748f0fbfe38a331704019ba4f1c280a1c`, completed/success, E2E·PostgreSQL·frontend·backend·Windows ops·verification policy **6/6 success**를 실제 gh로 확인했다. 원본은 총괄 ignored `cp7-b1-ci-final.json`이다. B1/IC21은 완료이며 B2로 진행한다. 원격 전체 coverage PASS는 앞의 로컬 최초 FAIL 기록을 대체하거나 삭제하지 않는다.
+
+#### 12.28.3 B2 의존성 목표와 검증 배치 — 설치 전 결정
+
+- Node20 peer만 보고 Next14.2.35를 중간 설치하는 안은 채택하지 않았다. [공식 지원 정책](https://nextjs.org/support-policy)의 supported major와 실제 registry의 중첩 PostCSS를 대조해 **Next16.3.4**를 목표로 정했다.15.5.25의 nested8.4.31 대신16.3.4의8.5.23을 확인했으며 실제 설치·앱 호환성 PASS는 별도다.
+- React18 package peer 허용만으로 App Router 호환을 단정한 초기 선택도 정정했다. [공식 설치 설명](https://nextjs.org/docs/app/getting-started/installation)과 [16 업그레이드 설명](https://nextjs.org/docs/app/guides/upgrading/version-16)을 적용해 React/DOM19.2.8·types19.2.18/19.2.7, 직접 peer 호환에 필요한 lucide0.469.0·SWR2.3.0만 Next rollback 단위의 동반 후보로 둔다. 불필요 최신 major 일괄 갱신은 하지 않고 설치 tree/audit/실제 화면으로 검증한다.
+- 후속 후보는 Vitest/coverage3.2.7, root PostCSS8.5.28이다. ESLint는 최신 resolve 가능한 plugin metadata까지 대조했다(`exec-9c494df1`): hooks/TypeScript 계열은10을 지원하지만 react/import/jsx-a11y는 여전히9까지만 허용한다. 따라서 config-next16.3.4 + ESLint9.39.5를 peer-valid 경계로 택하며, [ESLint9 EOL](https://eslint.org/version-support/)은 지원 완료로 숨기지 않는 **개발 도구 vendor 호환성 예외**다. EOL 자체와 실제 도달 가능한 취약점은 분리하고 `--force`·`--legacy-peer-deps`는 금지한다.
+- 세 논리 rollback 순서는 Next → Vitest/coverage → ESLint/PostCSS다. Next16의 lint CLI 변경은 필수인 부분만 먼저 처리하며 engine/config 갱신은 가능한 세 번째 단위에 유지한다. 기존 strict 규칙·범위를 유지하고 새 compiler 권고를 이유로 동결 UI/무관 코드를 광역 수정하지 않는다. 단계별 관련 검사·두 리뷰·local commit 후 B2 전체를 한 번 push/CI 검증한다. B1의 실제6/6 CI 성공 전에는 설치·제품 수정을 시작하지 않는다.
+- B2 Next 단위의 실행 경계 예외: `exec79b5b323`에서 worktree 루트의 `npm run check:bundle-size`를 1회 잘못 실행해 npm이 상위 `C:\ERP\package.json`을 조회하고 ENOENT로 종료했으며 로그를 `C:\Users\user\AppData\Local\npm-cache`에 기록했다. 서버·DB 접근 증거는 없고 main/전역 로그의 재열람·삭제는 하지 않았다. 이후 npm 계열 명령은 CP7 `frontend` cwd·절대 `--prefix`와 CP7 ignored 고유 cache/TEMP/TMP에 고정하며, 기존 Next build·bundle PASS는 그대로 재사용한다.
+
+#### 12.28.4 B2 Next runtime 단위 로컬 인수
+
+- 실제 설치는 Next16.3.4·React/DOM19.2.8·React types19.2.18/DOM types19.2.7·lucide0.469.0·SWR2.4.1(manifest의 허용2.x 범위)이다. `npm ls` exit0(`exec-7d62697e`), production-only audit `exec-f0993741`은 exit0·알려진 advisory0이다. 전체 audit18건 중 critical2는 아직 갱신 전 Vitest/coverage이며 B2 전체 보안 완료로 선언하지 않는다. production audit0 역시 모든 취약점 부재의 보증은 아니다.
+- `middleware.ts→proxy.ts`와 export/test를 함께 전환했으며 실제 old-name code/docs 검색0이다. React19 보정은 반환 타입·nullable ref·비레거시 fixture의 `legacy_origin:null`에 한정한다. backend와 동결 weekly/mobile nav/globals/shipping step5 추가 diff0을 총괄이 확인했다.
+- 관련10파일110PASS(`exec-cd8e5f89`), fixture10PASS(`exec-6f7d41b8`), strict lint·앱/E2E 타입 exit0이다. 테스트 타입은 새 TS2769 10건의 원인 fixture만 보완한 뒤 exit0(담당자 집계 기존393/신규0)이며 baseline 확대는 없다. `exec-b0bea39c`는 production 산출물만 잠시 격리한 tsc exit0이다. dev 산출물까지 모두 없는 조건의 증거로 확대하지 않는다.
+- 실제 production build는 `exec-f3e0f75e` exit0, 같은 산출물의 bundle은 `exec-f2f71337` 2단위PASS·2,363,811bytes/승인2,553,282.56bytes다. 실제 Next dev에서 작업자 세션1PASS(`exec-9b627f1f`)와 모바일 재고 보정1PASS(`exec-372d78ea`)를 확인했다. 동결 screenshot1SKIP는 남겨 CP7 최종 characterization에서 검증한다. 두 E2E의 전용3300/8022 소유권 해제·임시 DB/seed/receipt/lock 부재·워크트리 DB family 불변 근거를 보존하며 기존3100 점유는 건드리지 않았다.
+- 명세 turn `01a07d2a-0fc2-7b90-9132-f838419e8c2c`은 C/I/M0·Ready예, 품질 turn `01a07d2a-29ad-7b93-8fd8-f69c42dde341`은 C0/I0/M1·Ready예다. **수용한 Minor1:** 추적 중인 자동 `next-env.d.ts`는 dev/build phase에 따라 생성 import 경로가 바뀐다. 런타임 실패가 아니며 추적 제외와 clean-install 타입 생성 계약을 묶는 대안은 존재한다. 이를 해결하려면 반드시 distDir 구조를 바꿔야 한다고 단정하지 않는다. 이번 Next 단위는 그 추가 변경을 섞지 않고 한계를 공개한다.
+- 총괄은 사용자 속도 조정에 따라 동일 전체 gate 반복 대신 실제 staged 영향 계획과 위 최신 관련 증거·문서 gate의 합집합을 인수한다. PlanOnly는 실행 PASS가 아니며 backend 전체·GitHub CI를 이 로컬 Next 단위에서 새로 통과했다고 표시하지 않는다. 정확19개 논리 경로(제품17+정본문서2)의 staged 확인·docs PASS 후 로컬 commit을 허용하고, Vitest/coverage→ESLint/PostCSS 뒤 한 번 push/실제 CI를 확인한다. B2/IC22 완료 체크는 그 이후다.
+
+#### 12.28.5 B2 Vitest·ESLint/PostCSS 로컬 커밋 인수
+
+- Next 단위는 실제 `c9435efc346a09514a1be9831f32a8c3da25d44e`로 고정됐다. 이후 Vitest/coverage3.2.7을 `65c0ed8cef79ffb81db4c880e602a201c3cd87c6`(부모c9435efc, 정확7경로), ESLint/PostCSS를 `8cf8ea434fec59005ecefa370f8c82671ed28458`(부모65c0ed8, 정확9경로)로 각각 로컬 커밋했다. 총괄은 단위별 부모·tree·한국어 제목을 실제 Git으로 대조했다(`256d98`, `b0e2dd`). Vitest 직후 clean은 writer가 기록했고 총괄 조회 때는 다음 단계 변경이 시작돼 있었으며, 마지막8cf8ea43 직후 clean·upstream3ahead/0behind는 총괄도 직접 확인했다. 아직 B2 push/전체 원격 검증 전이며 IC22 완료가 아니다.
+- Vitest는 기존 node/jsdom 대상 집합과 coverage4지표75%를 유지하며 `environmentMatchGlobs`를 projects로 전환했다. 새 도구 조합에서 발견한 부서 저장 문제는 정상화 직후 불필요한 재저장과 같은 React batch의 후속 편집 유실을 구분해 고쳤다. 후자는 실제 RED `f4dd5357` 뒤 안정된 setter가 ref를 state enqueue 전에 갱신하도록 최소 보완했고 `21abc1dc`의2파일9PASS로 확인했다. 새 사용자 편집의 정당한 다음 저장은 막지 않는다. IO fixture3곳은 대기 한도만 좁게 조정하고 기존 수량·호출·취소 assertion을 유지했다.
+- Vitest 원본 전체 실행2회는 모두 FAIL로 보존한다: 첫 `5c1d22cc`는278파일 중276PASS·2,594테스트 중2,590PASS, 두 번째 `c650de84`는278파일 중276PASS·2,594테스트 중2,591PASS다. 이후 직접 회복은 환경계약3PASS, 부서9PASS, IO15PASS, 출하 PA이름1PASS/필터skip148이며 새 전체 실행을 주장하지 않는다. 앱 타입 exit0, test-type 계약56PASS·manifest284·기존393/신규0, 직접 lint exit0다. **로컬 전체 coverage는 미보고**이며 B2 실제 CI에서 확인한다. 최종 명세 `01a07d50-ff31`·품질 `01a07d47-d3f8`은 C/I/M0다.
+- ESLint9 flat config 전환의 첫 strict 실행은225문제(새 compiler5규칙221error·새 경고4)였다. 기존 핵심 hook 규칙은 유지하고 확인된 신규 규칙만 legacy-equivalence 경계로 조정했다. 실제 계산된 `rules-of-hooks=error`, `exhaustive-deps=warn`과 최종 strict exit0을 확인했다(`2cdd09df`, `61aa3082`). 이는 기존225곳의 제품 코드를 모두 개선했다는 뜻이 아니며, 동결·무관 제품 추가 수정은0이다. ESLint9 vendor EOL 호환성 예외는 여전히 공개한다.
+- 제거된 Next lint CLI를 `verify_local.ps1`의 직접 ESLint changed-file 호출로 교체했다. 기존 정본 테스트의 next.cmd 고정2곳은 리뷰 Important로 검출됐고 RED `418d728d`(2FAIL/1PASS; 실패경로의 우연한 통과 포함)→GREEN `a012bb93`(3PASS)로 보완했다. 실제 runner `7fa049f0`도 changed-file gate를 실행해 통과했으며, mock 성공 경로는 strict 옵션과 일반·테스트 TS 파일 인자를 모두 검증한다. 마지막 두 리뷰 `01a07d64-d75b`·`01a07d64-e919`는 각각 C/I/M0다.
+- 추가 증거는 앱 타입 `16c11681` exit0, PostCSS8.5.28·Tailwind3.4.19·Autoprefixer10.4.27의 실제 CSS 변환 `16ffd29d` exit0, docs-scope5PASS다. staged smart `d83df01b`는9경로에서16gate를 **계획만 하고 실행0**이었다. 별도 docs `d29b22d5`는3/3gate PASS·15단위 중14PASS/권한상 symlink1SKIP(21,400.824ms)다. 기존 통과 증거와 새 직접 증거를 합쳐 로컬 커밋을 인수했으며, 이를 미실행 전체 gate PASS로 바꾸지 않는다.
+- 명령 격리 한계: 최초 docs-scope Python `e9bcf61b`는 외부 process의 TEMP/TMP를 명시하지 않았다. fixture의 자식 PowerShell은 별도 temp를 사용했고 context 종료 후 원래 임시 root 부재를 assert했으나, 이를 모든 임시 파일이 워크트리 안이었다는 증거로 확대하지 않는다. 외부 경로 검색·정리·검사 재실행은 하지 않았고 이후 Python/PowerShell에도 CP7 ignored 고유 TEMP/TMP를 명시했다. 설치 중 생긴 자기 자신 `file:` dependency는 정확 manifest/lock 항목과 소유 설치 상태만 제거했으며 새 tree에 남지 않는다.
+- 단계별 실제 audit는 Next18(critical2/high11/moderate3/low2)→Vitest14(0/11/1/2)→ESLint 안전 patch 전8→patch 후2(0/1/1/0)이며 production은 계속0이다. root `935c42`가 마지막 JSON을 직접 파싱했다. 알려진 advisory0도 모든 보안 위험 부재를 보장하지 않는다. 세부 명령·원본 실패·리뷰는 ignored `b2-vitest3/`, `b2-eslint9/` 및 총괄의 단위별 intake에 보존한다.
+
+#### 12.28.6 B2 잔여 Vite 보안 단위와 후속 배치
+
+- 마지막2건은 Vitest의 Vite5.4.21→esbuild0.21.5 개발 도구 체인이다. [공식 Vite 지원 정책](https://vite.dev/releases)은6.4에 보안 backport를 제공하고, 실제 registry 조회 `9c2d6f`는 patched6.4.3·Node20 허용·esbuild `^0.25.0`을 확인했다. 설치된 Vitest3.2.7과 plugin-react4.7.0도 이 범위를 허용한다(`110ace`). [Vite6 migration](https://v6.vite.dev/guide/migration)을 현재 설정과 대조하고 **관련 보안 후속4번째 로컬 rollback 단위**를 승인했다. 무관 major, force, override나 Next/Vitest 재업그레이드는 하지 않는다.
+- 실제 후속 설치는 exact direct devDependency `vite: 6.4.3`와 lockfile2경로에 한정됐다. `9f714c9c`에서 Vitest·vite-node·plugin-react의 Vite6.4.3 dedupe와 esbuild0.25.12를 확인했고, 무관 버전 이동·삭제·self dependency·force/override는 없다. 실제 node/jsdom 실행 `f1a570ee`는2파일3PASS, config가 포함된 test-type `d05c73c8`는manifest284·기존393/신규0이다. 최종 all/prod audit `b6654a78`·`eb73fc50`는 모두 exit0이며 총괄 `627b90`도 두 유효 JSON의 advisory0을 직접 확인했다.
+- 후속 명세 `01a07d6b-1f5f`와 품질 `01a07d6b-0a0f`는 각각 C/I/M0·로컬 rollback 단위 Ready다. 전체 unit/coverage의 로컬3번째 반복 대신 이전 단위와 이 직접 증거를 합쳐 인수하고 B2 전체를 한 번 push해 실제 CI를 확인한다. **Vite 로컬 검증은 완료했지만 IC22/B2 전체 완료는 아직 원격 CI 대기**다. 원래 local full2회FAIL, Next next-env Minor1과 ESLint9 EOL 예외는 그대로 보존한다.
+- 후속 DOC01/AT01/AT02도 논리 로컬 commit·직접 검증·새 diff 명세/품질 C/I0는 유지하되 같은 제품의 full/원격 CI는 최종 CP7 경계로 묶는다. 실제 login screenshot·asset 소비 경로·이동 parser/link 검증은 생략하지 않는다.
+- AT01의 기존 문서 참조가 있는 archive handoff3개는 승인 표에 명시된 **역사 내용 보존 이동+경로 참조 동시 갱신** 대상이다. 새 TODO나 역사적 업무 재작성은 금지한다. consumer가 새로 생긴 `seed_cleanup.py`는 보존하며, unsafe deploy는 실행 금지 표지와 parser-only 검증으로 attic에 격리한다. 실제 직원 명령 실행이나 데이터 삭제 권한을 부여하지 않는다. 자세한 현재 source/target·hash·참조 대조는 ignored `20260908-cp7-b5-b7-ready/parent-scope-decision.md`에 기록했다.
+
+#### 12.28.7 B2 원격 인수와 B3·B4 검증 배치
+
+- 네 번째 Vite 단위는 `129019038319c766b60b59295ae65a10fedae46a`(부모8cf8ea43, tree909d3908)로 커밋했다. 실제 날짜·한국어 제목·정확4경로(package/lock와 총괄docs2)·clean을 확인했고, 기존 CP7 branch에만 `1ad03e37..12901903` 일반 push를 했다. 총괄 actual `cbd29a`에서 upstream0/0도 확인했다. staged smart `798ea794`는10gate 계획·실행0이며 별도 docs3/3PASS·15단위 중14PASS/권한skip1을 미실행 full PASS로 바꾸지 않는다.
+- 총괄 actual `05297a`는 [CI34157355573](https://github.com/Hw-03/ERP/actions/runs/34157355573)의 exact129에서 frontend 전체(lint/type/coverage/build/bundle), E2E, PostgreSQL, Windows ops, 검증 정책5개 job 성공을 확인했다. **backend pytest는 진행 중이며 IC22/B2 최종 완료는 아직 유보한다.** 원격 coverage 성공과 원본 local full2회FAIL·local coverage 미보고는 서로 다른 증거다.
+- 최신 사용자 속도·자율 진행 지시에 따라 불변129 원격 snapshot의 backend 검사와 비중첩인 B3 frontend 로컬 구현·직접 검사·리뷰를 병행한다. 전체 B2 CI 성공 전 B3 commit/push·B4 진입은 금지한다. B3의 실제 네 핵심 업무 keyboard/axe를 기존 소유 nonce E2E의 blocking 검사로 연결하며 기본 localhost3000 standalone scanner는 실행하지 않는다.
+- B3와 B4는 카드별 RED→직접 GREEN·독립 명세/품질 C/I0·별도 로컬 rollback commit을 유지하고 두 단계 완료 후 한 번 push·실제 전체 CI를 실행한다. 카드의 로컬 인수와 최종 원격 완료를 구분한다. 마지막 CP7 full gate, 실제 PostgreSQL과 업무·권한 필수 검증은 생략하지 않는다.
+- B8 증분 원장도 기존 근거를 재사용했다. `1ad03e37..12901903`의 NUL Git diff는31레코드(28M/1A/1D/1R086), 양끝 추적 집합2,569개이며 총괄 `a778d1`이 각 status/rename/prior/new blob 불일치0을 확인했다. 이는 고정 B2 bridge이지 최종 CP7 전수 의미 검토나 B8 완료가 아니다.
+- **최종 B2 원격 인수:** 이후 총괄 actual `9ca4cc`는 같은 CI34157355573의 exact129·completed/success와 **6/6 job success**를 확인했다. 원본 `cp7-b2-ci-final.json`을 총괄 ignored 증거에 보존했다. IC22/B2는 완료이며, 앞의5/6 대기 상태는 역사적 중간 기록이다. 원격 전체 unit/coverage·build/bundle·backend·PG·E2E 성공을 원본 local FAIL의 삭제나 대체 근거로 사용하지 않는다. B3 완료·최종 CP7 완료는 아직 별도다.
+
+#### 12.28.8 B3 오류·focus·접근성 로컬 인수
+
+- 기준은 B2 `12901903`이다. 실제 desktop/mobile IO의 일반 오류·확인창 닫힘, 출하·불량의 초기 로드 실패와 키보드 재시도, 부서 색상 필드 연결·행 Enter/Space·확인창 trigger 복귀를 보완했다. 공용 `LoadFailureCard`의 이름/focus는 opt-in이며, 기존 정보 Notice·공용 ConfirmModal의 기본 계약은 바꾸지 않았다. 출하 초기 오류와 데이터가 남은 재조회 실패를 구분하고 기존 페이지·캐시 정책을 보존한다.
+- 직접 GREEN은 `exec-817ebd11`의4파일43PASS와 마지막 관리자 delta `exec-c275a362`의2파일11PASS다. 서로 겹치는 검사 수를 합쳐 고유 테스트 수처럼 표시하지 않는다. 앱 타입·변경 파일 strict lint·E2E 타입 exit0, `exec-83a9bbed`의 test manifest285·기존392/신규0을 확인했다. 같은 명령 뒤의 rg 문법 오류는 별도 검색 실패이며 타입 PASS로 숨기지 않았고, 후속 고정 문자열 조회에서 E2E `.focus()`0을 확인했다.
+- 소유 nonce E2E `exec-a2223062`는 핵심4/4PASS(38.9초), 관리자 테스트의 마지막 delta `exec-4136d0e3`는1/1PASS(32.4초)다. 네 실제 영역에서 light/dark·WCAG2A/AA·2.1A/AA axe를 모든 impact의 blocking assertion으로 실행했다. Tab/Shift+Tab/Enter/Space/Escape를 실제 사용하며 click은 인증 준비에만 쓴다. 이는 선택한 업무 영역의 증거이며 앱 전체 WCAG 인증을 뜻하지 않는다.
+- 리뷰에서 초기 모달 mock·직접 focus·누락된 역방향 키보드/오류 재시도 증거를 보완했다. 모달이 약속하지 않은 ‘취소 버튼 자동 포커스’를 새 제품 요구로 추가하지 않았다. 최종 독립 명세 `/root/b1_spec_review`와 품질 `/root/b1_quality_review`는 각각 C/I/M0·Ready Yes이며, 총괄 `bb2385`가 ignored `20260908-cp7-b3-final/review-evidence.md`의 원문을 인수했다. 이전 RED·중간 실패는 보존하고 같은 전체 테스트를 반복하지 않았다.
+- design 스킬에 따라 실제 렌더 경로와 light/dark token 대비를 확인했다. 공용 Button의 전역 변경은 제외하고 `FilterChip/KpiCard/StatusPill`의 선택적 text tone·수량 조절기의 기본 false인 대비 옵션으로 대상 화면만 보완했다. 총괄 `d57925`에서 공용 Button/ConfirmModal·동결 weekly/mobile nav/globals 추가 diff0과 출하 step5 카드 geometry 추가 diff0을 확인했다. backend/API/schema/migration 변경은 없다.
+- 두 최종 E2E는 CP7 합성 DB와3300/8022만 사용했고, worktree `mes.db/-wal/-shm` 불변·정리 완료·소유권 해제를 원본에서 확인했다. 기존3100 점유자를 포함한 모든 서버가 없다는 뜻은 아니다. 이 단계는 **LOCAL_VERIFIED**이며 별도 로컬 rollback commit 뒤 B4를 진행한다. IC23 최종 완료는 B3+B4 push의 실제 CI 이후이며, Next next-env Minor1·ESLint9 EOL·기존 타입 부채·최종 frozen 검증 대기는 그대로 남는다.
+- B3는 실제 `234d4f5b9871201ca0dac204efafafd68ac7b157`(부모12901903, tree8468ff16)로 커밋됐다. 총괄 `34ea83`은 한국어 제목·정확34경로(32M/2A)·clean·upstream1ahead/0behind를 확인했다. staged smart `765ec9`는34경로 계획·실행0이며, docs의 최초 Node24 환경4FAIL(`d2b821`)은 승인 Node20 PATH를 고정한 docs3종·staged diff-check PASS(`6fd6af`)로 회복했다. 제품 전체 검증을 다시 실행하거나 아직 push했다고 표시하지 않는다.
+
+#### 12.28.9 B4 정책 locality — 착수 경계
+
+- B3 `234d4f5b`를 고정 기준으로 IC24에 착수한다. 서버 `dept_hierarchy.py:29-49`와 부서 승인·큐의 역할 계약을 기준으로 frontend의 실제 두 큐 consumer만 연결하며, 같은 기존 helper를 쓰는 불량 기본 출처는 그대로 둔다. admin 단독의 타인 승인/부서 큐 권한 없음과 `sr_execution.py:651-694`의 기존 창고 자기요청 예외는 서로 다른 계약이다. 새 권한 정책으로 한꺼번에 바꾸지 않는다.
+- RV007의 고정 main 결정은 불량 즉시·무승인이다. preview와 실제 dispatch의 manual/custom BOM 입력을 맞추되 `APPROVAL_SUB_TYPES`를 단순 삭제하거나 `_submit_immediate`로 우회하지 않는다. 총괄 `d82c21`/`b53bb4`에서 `_link_stock_request`가 batch를 후기 연결하고 `sr_execution._execute_line`이 생성 시점에 line 식별자를 소비하는 경로를 확인했다. 재현 대상은 **TransactionLog.operation_line_id 누락**이며 기존 operation/domain 전체가 없다는 주장으로 확대하지 않는다. 기존 내부 입력의 optional 식별자 전달과 직접 SQL/취소 회귀까지만 허용한다.
+- 완료 StockRequest 일반 cancel의 기존422와 history/operation의 workflow 우회 차단409를 구분한다. 첫 surface를409로 바꾸거나 새 취소 엔진·원장·migration·backfill을 만들지 않는다. API wire와 transaction/lock 경계도 유지한다. 이 절은 착수 시 범위·근거이며 RED/GREEN·최종 리뷰·원격 PASS를 미리 선언하지 않는다.
+- **재현 후 범위 보완(B4-R1):** 같은 불량 통합 사례의 operation 취소 뒤 request/line은 submitted·정상/불량 수량은5/0으로 복원됐지만 연결 IoBatch ORM과 실제 `GET /api/io/{batch_id}`는 completed·기존 completed_at을 유지하는 RED가 확인됐다. 이는 새 line 식별자 전달이 만든 회귀가 아니라 기존 취소 연결 누락이다. 총괄의 정적 근거 `557897`/`55c228`과 담당자의 단일 동적 재현을 구분한다. 최신 자율 진행 권한으로 기존 request 집계 동기화의 같은 transaction 내 재사용과 필요한 owner 보호·실제 PostgreSQL 경합 검증을 추가 승인했다. 새 상태 정책·schema·원장 재설계·legacy 추정/backfill은 금지하며 최종 GREEN 전 완료로 승격하지 않는다.
+
+#### 12.28.10 B4 정책·연결 취소 원자성 로컬 인수
+
+- 기준은 B3 `234d4f5b`다. 실제 두 warehouse 큐는 부서 정/부·창고 정/부 권한 정책을 사용하고 기존 admin 창고 자기요청 및 불량 기본 출처 계약은 분리 보존한다. backend/frontend의 공통 역할 fixture와 실제 pending 요청의 HTTP list/count/approve/reject를 대조했다. 서로 다른 언어의 helper를 하나의 함수라고 과장하지 않으며 서버 권한 검증이 최종 경계다.
+- `io_preview.py:595-642`는 현재 DB BOM의 자식 집합·수량을 payload/ORM과 비교한다. draft/persist에서도 같은 DB 정본을 사용해 전체/부분 자식 누락의 승인 표시를 실제 submit과 맞췄다. 이전 Important의 RED를 보존하며 BOM 없는 품목의 정책은 바꾸지 않았다. 불량은 request-backed 즉시 완료와 기존 operation/batch 소유권을 보존하고 내부 optional line ID만 생성 시점에 전달한다. 생성 baseline/type 변경은 API 권한 설명 두 건이며 schema/wire 변화는 없다.
+- B4-R1은 같은 batch의 연결 StockRequest를 먼저 잠그고 IoBatch/line을 잠근 뒤, 취소 transaction 안에서 기존 전체 요청 집계를 재사용한다(`inventory_operation_cancellation.py:1285-1397,1703-1726,2017-2021`). 실제 HTTP/SQL 회귀는 재고·불량·request/line·batch 복원과 후속 예외 rollback·중복 취소를 검증한다. 원래 line ID 누락 및 stale batch RED와 테스트 fixture/환경 오류는 서로 구별해 보존한다.
+- 최종 직접 backend `6f64868b`는261PASS/exit0, frontend `36c67b46`은4파일177PASS/exit0이다. 초기5파일188PASS와 겹치므로 둘을 합쳐 고유 수처럼 세지 않는다. `fcce98ac`은 앱 타입 exit0·검증 계약56PASS/skip0·test manifest285·기존392/신규0을 확인했다. strict product Ruff와 변경 frontend ESLint는 통과했고, 변경 test 파일에 남은 기존 F841/E741은 신규 오류0과 구별한다. 전체 lint 부채가 사라졌다는 뜻은 아니다.
+- 실제 PostgreSQL16은 별도 nonce의 두 직접 node만 실행했다. `cc6105d2`/`5410887b`(run49586b…)는 동일 operation 중복 취소1PASS/skip0·성공1/거부1·batch partially_completed를 증명했다. 총괄이 이 사례만으로 새 sibling 잠금의 효과를 증명할 수 없음을 지적한 뒤, `9c2281ff`/`4b25688e`(runf14bd099…)는 **서로 다른 두 operation**의 동시 취소1PASS/skip0·합법적 성공2·최종 batch submitted/completed_at None·reversal2를 증명했다. 서로 다른 backend PID를 단언했고 두 node는 canonical PostgreSQL runner에 필수 등록됐다(`792fc1eb`). 같은 전체 runner는 반복하지 않았으며 원격 전체 검증은 아직 남는다.
+- OpenAPI baseline `a1199e53` 및 고유 임시 생성 타입 `897696d6`은 정규화된 정확 일치다. 첫 npx 경로 해석 실패는 own cache에 보존하고 로컬 고정 generator로 복구했으며 재설치하지 않았다. `ec36fac1` diff-check도 통과했다. model/migration/lockfile·responsive shell·동결 weekly/mobile nav/globals/shipping step5의 추가 diff는 없다.
+- 총괄 `f9f8a3`은 ignored `20260908-cp7-b4/review-evidence.md`의 최종 명세 `/root/b1_spec_review`와 품질 `/root/b1_quality_review` 원문을 읽었다. 두 final round2는 모두 C/I/M0·Ready Yes이며 과거 task 명칭의 B1은 이번 B4 리뷰 범위를 뜻하지 않는다. 품질 리뷰는 기존 승인/반려와 새 잠금 순서의 교착 역전 부재를 정적으로 대조했다. PG가 검증하지 않은 모든 교차 조합까지 동적 PASS라고 확대하지 않는다.
+- PG의 정상2회 및 환경/fixture 실패3회는 각 own nonce/PID/PGDATA/data_directory를 대조한 뒤 exact test DB와 cluster만 정리했고 status3·55437 AVAILABLE을 기록했다. PGDATA/evidence는 남겼다. root `f69237`도 마지막 기존 결과/cleanup 원본을 읽었으며 공유 환경을 새로 조회하지 않았다. 이 증거는 역사적 실행 경계 예외를 없애거나 전체 시스템 listener0을 주장하는 근거가 아니다.
+- 총괄은 정확27개 제품/테스트/생성 경로와 정본문서2개를 한 B4 로컬 rollback commit으로 인수한다. staged smart 영향 계획과 이미 통과한 직접 증거·문서 gate를 결합하며 PlanOnly를 실제 full PASS로 기록하지 않는다. B3/B4 일반 push 후 exact SHA의 실제 CI를 확인한다. 불변 원격 CI 대기 중 비중첩 B5 문서-only 작업·직접 검증만 병행하고, B6 진입과 IC23/24 원격 완료는 CI success 이후다. 최종 CP7 전체 gate·frozen 화면·최종 품질 통합/CI는 별도 필수다.
+
+#### 12.28.11 B3·B4 원격 검증과 국소 복구 경계
+
+- B4는 `113b4699df564a905f5c287155deebce6b84102c`(부모234d4f5b, tree7d40e9c9)로 커밋됐다. 총괄 `3d5ada`는 정확29경로(28M/1A)·제목·clean을, `b6cc1a`는 기존 CP7 branch 일반 push와 upstream0/0을 확인했다. staged smart `d1743501`은 계획·실행0이다. 별도 docs gate `9db52615`의3PASS·26,053.239ms와14PASS/권한skip1은 총괄 `f1f4d5`가 기존 원본을 읽어 인수했다.
+- [CI34166260511](https://github.com/Hw-03/ERP/actions/runs/34166260511)은 exact113을 검증한다. 총괄 `eeada9`/`cc5ffb`에서 Windows ops·검증 정책·실제 PostgreSQL 경합·frontend 전체(lint/type/coverage/build/bundle)4개 job은 성공했지만 **E2E는 실패, backend는 진행 중**이었다. 원격 전체 PASS가 아니다.
+- E2E job101877769545 원본 `28830c`는20PASS/2FAIL/2NOT_RUN이다. `cp6-final-evidence.spec.ts:89,321`의 로딩 표시와 `io-receive.spec.ts:46`의 부서 결재 완료 dialog가 재시도에서도 보이지 않았다. 원인 확정 전 테스트 결함·제품 결함·flaky로 단정하지 않는다. report upload 경로가 없어 screenshot/trace는 업로드되지 않았으며 runner는 `ownership-result=released phase=cleanup-complete`를 기록했다.
+- 같은 CP7 writer가 B5 문서 diff를 분리 보존하며 이 두 경로만 재현·진단·최소 보완한다. timeout 상향·assertion 삭제·skip으로 통과시키지 않고 관련 검사와 두 좁은 리뷰 후 recovery commit/CI를 진행한다. 이미 성공한 PostgreSQL·frontend 전체 검사를 로컬에서 반복하지 않는다. B6 진입과 IC23/24 원격 완료는 복구 SHA의 실제 CI 성공까지 유보한다.
+- **원격 최종 종료:** 이후 총괄 `bf40fb`는 같은 CI의completed/failure·4job success/2job failure를 확인했다. backend 원본 `d70476`/`34d2de`는 security mutation-manifest2건 실패이며, 새 공용 `approval_rules.approval_kind`와 `io_preview.has_declared_custom_process_bom`의 보안 분류가 빠졌다. writer가 실제 순수 계산/DB 읽기 책임을 대조해 정확한 분류를 등록하고 기존 exact-set/re-export 검사는 유지한다. 제품 함수를 숨기거나 검사 자체를 완화하지 않는다. 같은 recovery 단위의 직접 RED/GREEN·delta 리뷰로 처리하며 backend 전체를 다시 실행하지 않는다.
+
+#### 12.28.12 B5 / DOC01 문서 정합성 로컬 인수
+
+- 기준113b4699에서 README, ONBOARDING, ARCHITECTURE, OPERATIONS, hook CONTRACT, E2E README의6개 Markdown만 수정했다. 실제 Next16, React Query/legacy local hook 공존과 query/invalidate 책임, profile 명칭, canonical PlanOnly 경로, E2E token→ownership→합성 bootstrap→spawn→PID receipt→readiness→seed 순서를 현행 소스에 맞췄다.
+- 일반 운영 문서의 profile 설명은 삭제하거나 거짓 격리 주소로 바꾸지 않았다. 격리 품질 작업에서 일반 start/stop/bootstrap·직원 sync/deploy/register와 실환경 URL/port/DB 접근을 금지하는 적용 범위를 명시하고 승인된 합성 E2E 계약으로 연결했다. 과거 profile 무충돌 관찰에는 `[HISTORICAL — 재확인 금지]`를 표시했다. 기존 supervisor 실행 경계 예외는 보존하며 재조회하지 않는다.
+- 실제 정적 source/doc 대조 `017c5ae7`는27/27PASS, `e0e57ca1`은 maintained Markdown broken link0·변경 문서 PowerShell parser-only·diff-check PASS다. 최초 임시 검사기의 경로/문자열 해석 실패는 보존했고 실제 업무 명령·서버·DB·테스트 실행은 없었다. 문서 계약 증거이지 운영 동작 재검증이 아니다.
+- 총괄 `ba4814`/`e3b55d`는6개 전체 diff와 ignored `20260908-cp7-b5/review-evidence.md`를 읽었다. 독립 명세 최종 `01a07dff-81c6`와 품질 최종 `01a07dff-7068`도 직접 조회해 각각 **C/I/M0·Ready Yes**를 확인했다. 초기 hook 적용 범위·PlanOnly·token 순서·profile 명칭의 I/M 지적은 해당 문장만 수정하고 delta 리뷰로 닫았다.
+- DOC01은 **LOCAL_VERIFIED**이며 별도 docs rollback commit으로 보존한다. B3/B4 원격 실패, B6 이동, B7 자산 정리와 CP7 최종 gate/통합은 이 인수로 완료되지 않는다. 총괄 정본2개는 부모만 갱신한다.
+
+#### 12.28.13 B3·B4 CI 복구 로컬 인수
+
+- 복구 diff는 security mutation manifest1개와 E2E2개, 합계3파일10추가/4삭제다. 총괄 `8e91d6`/`473867`/`1fe00c`가 전체 diff·기준113을 직접 확인했다. B5 docs6개와 총괄docs2개는 별도 docs commit으로 분리한다. 원격 최초4PASS/2FAIL은 보존하며 아직 원격 복구 완료는 아니다.
+- 입고 테스트는 실제 DOM의 `입출고 반영 완료`와 `ioComposeOperations.ts:213-219`의즉시 반영 분기에 맞춰 제목만 교정했다. 성공 본문과 결재/재고 동작은 바꾸지 않았다. A4의 첫-request-only barrier는 재발급 GET도 같은 release까지 막도록 보완했고 로딩·응답·데이터 assertion과 timeout은 유지했다. 제품 `isLoading`을 바꿔 캐시를 깜빡이게 하지 않았다.
+- 수정 전 A4는 로컬 1회와 반복 3회 PASS였으므로 그것만으로 원격 실패를 flaky라고 판정하지 않았다. 보존한 수정 전 로컬 trace는 동일 endpoint 요청의 실패/재발급 200을 desktop/mobile에서 각각 기록한다. 총괄 `fcd27e`가 압축 network JSON의 두 status -1·두 200을 직접 읽었다. 원격에서 응답이 assertion보다 빨랐다는 설명은 원격 trace 부재로 **추론**이며 로컬 관찰과 구분한다. 원본은 ignored `20260908-cp7-b4-ci-recovery/pre-fix-a4-trace/`의 3,418,994bytes·SHA256 `F240BE04395FC2136AB653DEDB5AFACA15CFA88B8C3AE704C305B9EA1CD7FDF5`다.
+- 직접 E2E `bb467b56`은 3PASS/1SKIP·36.2초이며 skip은 최종 frozen 환경변수가 없는 선택 검사다. E2E 타입 `7d30d385`, 두 파일 lint `88601eb0`, 즉시 반영 분기 unit `973b9053` 11PASS를 인수했다. 소유 3300/8022·합성 DB를 사용했고 기존 worktree DB family 불변·정리·ownership release를 원본에서 확인했다. 같은 검사를 재실행해 숫자를 늘리지 않는다.
+- 실제 순수 `approval_kind`와 BOM SELECT 비교 `has_declared_custom_process_bom`만 `SERVICE_READ_ONLY_EXPORTS`에 등록했다. exact 1-class·canonical re-export·독립 AST write reachability 검사는 그대로다. security `d14379b3` 32PASS, 관련 approval/BOM `9cc5224c` 39PASS, 변경 manifest Ruff `d3124996` PASS다. 전체 backend/PG를 로컬에서 반복하지 않았다.
+- 총괄 `534242`는 최종 review-evidence를 읽고, 별도 명세 최종 `01a07e0e-4295`·품질 최종 `01a07e0e-3296` 원문도 직접 확인했다. 두 리뷰는 E2E 판정을 보존하며 manifest 증분을 대조했고 모두 C/I/M0·Ready다. staged smart 범위 계획·직접 증거·변경 docs gate 후 두 논리 commit을 한 번 push하고 새 exact SHA의 CI를 확인한다.
+- 잔여 관찰: 같은 E2E의 `DailyWorkActivity.tsx:145` 부모 state 갱신 React warning은 실패가 아니지만 B8에 남긴다. 총괄 `1fe00c`의 blame은 143~147행이 기존 `7d3fa7889`에서 온 코드임을 확인했다. 이번 recovery에서 제품 수정하지 않았으며 E2E PASS를 warning 0이라고 표현하지 않는다. CI의 github-only reporter/HTML artifact 경로 불일치도 원본 증거 보존 제약으로 남긴다.
+
+#### 12.28.14 복구·B5 커밋 인수와 최종 증거 경계
+
+- 복구는 `a5e1dad66304743be69d3ffd16d93520397370cc`의 정확3개 변경 파일, B5는 그 자식 `bff9dd73827f8511780f296d5ab26322f9a1ac81`의 정확8개 문서(담당6개·총괄2개)로 나눠 기존 CP7 branch에 일반 push했다. 총괄 `62c583`/`be92ff`는 제목·부모·tree·경로와 clean/upstream0·0을 확인했고, `331f61`/`5ce81c`는 이를 현재 Git과 다시 대조했다. 새 branch·main 변경·PR·배포는 없다.
+- B8 증분 원장의 복구3행·B5문서8행은 고정 커밋 객체의 before/after blob22개와 모두 일치한다(`5ce81c`). 이는 파일 내용과 근거의 연결 검증이며 전체 의미 검토나 새 동적 PASS를 뜻하지 않는다. ignored `20260908-cp7-b8-recovery-b5-delta/`의 두 enrichment와 총괄 `cp7-recovery-b5-commit-intake.json`을 연결한다.
+- [CI34168183559](https://github.com/Hw-03/ERP/actions/runs/34168183559)은 exact `bff9dd73`을 검증한다. 총괄 `71d6b2`/`40ce86`/`598528`에서 Windows ops·검증 정책·실제 PostgreSQL·E2E·frontend5개 job 성공, backend pytest/OpenAPI 진행 중임을 확인했다. E2E는23PASS/선택 frozen SKIP1이다. 이 중간 결과를6/6 또는 최종 frozen PASS로 기록하지 않는다. B6 이동 전 실제 원격 GREEN을 확인한다.
+- B5 문서 gate `9b639dc8`는 승인 Node20에서 통과했지만, 새 PowerShell에 TEMP/TMP가 고정되지 않아 symlink 테스트가 OS_TEMP fixture를 사용했다. 엄격한 worktree-only 임시 파일 증거가 아니며 기존 실행 경계 예외에 추가한다. 실제 main/직원 DB·서버 사용 증거와 구분하고 그 외부 임시 경로를 재조회·삭제하지 않는다. 후속 명령은 ignored `20260908-cp7-verification-environment.ps1`로 process-local Node20·TEMP/TMP·npm cache를 먼저 고정한다. 환경 설정만을 이유로 통과한 전체 검사를 반복하지 않는다.
+
+#### 12.28.15 B3·B4 복구·B5 원격 완료 및 B6 진입
+
+- 총괄의 기존 watch `ac07ad`는 exit0으로 종료했고, 후속 독립 조회 `75e58e`는 [CI34168183559](https://github.com/Hw-03/ERP/actions/runs/34168183559)의 exact `bff9dd73827f8511780f296d5ab26322f9a1ac81`·completed/success·6개 job 모두 success를 확인했다. backend pytest/OpenAPI까지 통과했으며 앞의5/6 대기 기록과 최초 CI34166260511 실패는 역사 증거로 보존한다. 원본 JSON은 총괄 ignored `cp7-b3-b4-recovery-b5-ci-final.json`이다.
+- 이에 따라 IC23·IC24 및 DOC01의 구현·직접 검증·독립 리뷰·해당 원격 검증 조건을 인수했다. 최종 CP7 full gate, 두 환경변수를 설정한 frozen characterization, B6/B7 이후 manifest·재고 matrix 재판정, 품질 브랜치 통합과 최종 CI는 아직 별도 미완료다. E2E23PASS/선택 SKIP1과 report artifact 부재, 외부 required-check NOT_VERIFIED를 과장하거나 삭제하지 않는다.
+- B6 담당자의 읽기 전용 `20260908-cp7-b6/preflight-evidence.md` 전체를 총괄 `8812e7`이 읽고, `79392a`에서 정확 source15개 SHA256과 target15개 부재를 독립 확인했다. Python11개는 root 계산6개·self-usage4개의 최소 경로 보정만 필요하다. unsafe deploy1개와 승인된 역사 handoff3개도 원래 이동 표와 일치하며 `seed_cleanup.py`는 test/security/wrapper consumer 때문에 보존한다. 실제 이동·parser/path·old-reference·두 리뷰는 이제 진행하므로 AT01 완료로 선취하지 않는다.
+
+#### 12.28.16 B6 / AT01 물리 이전 로컬 인수
+
+- 실제 변경은 Python11개·역사 deploy1개·완료 handoff3개, 정확15개 rename과 참조 문서3개다. 총괄 `b0c80c`가 전체 raw diff를 읽고 root 계산6파일·self-usage4파일 및 역사 경로 literal만 바뀌었음을 확인했다. seed_cleanup과 실제 consumer, 제품 runtime·migration·동결 UI는 보존했다. 총괄 정본2개를 포함한 change는20경로다.
+- 담당자 `a126ac68`의 의도한 치환 역적용 byte-exact, `592df3e1`의 Python AST11·root fixture6·PowerShell parser PASS와 `5fc8c9c4`의 비역사 old path0을 총괄이 실제 출력에서 읽었다. historical/source 표17건과 새 target의 old suffix7건은 명시 예외다. 원래 CRLF checkout과 Git blob의 차이를 구별했고 초기 mixed-EOL 실패는 원본으로 보존했다. 실제 import·one-off 스크립트·배포 명령·DB·서버 실행은 없다.
+- 총괄이 독립 명세 최종 `01a07e39-2ff4`와 품질 최종 `01a07e3d-9929` 원문을 확인했다. 둘 다 Critical/Important/Minor0·Ready Yes이며 품질 리뷰는18개 파일의 UTF-8 no-BOM·CRLF, 내용 보존 및 staged rename/unstaged content의 최종 staging 경계를 대조했다.
+- AT01의 로컬 구현 조건을 인수하고 정확 범위의 별도 rollback commit을 허용한다. 변경 문서 gate·staged 범위 검산 후 B7의 승인된 중복 이미지9개로 진행한다. B6/B7의 build·화면·전체 gate·원격 CI는 최종 CP7에서 한 번 검증하며 아직 통과로 기록하지 않는다. 원장·재고 matrix의 현재 증거 연결과 품질 브랜치 최종 통합도 남아 있다.
+
+#### 12.28.17 B6 커밋 및 B7 / AT02 중복 자산 정리 로컬 인수
+
+- B6은 `173cb894898b35b6a4a665ab4dc567f209743d0f`(부모 bff9dd73, tree7f3e103f)의20경로로 커밋됐다. 총괄 `4eb287`이 실제 제목·부모·tree·rename15/M5 및 당시 clean을 확인했다. docs `dbcbc341`은 Node20·worktree 내부 TEMP에서14PASS/Windows symlink 권한skip1·exit0이며 smart 영향 계획은 실제 full 실행과 구분한다. push는 최종 CP7에 묶는다.
+- B7은 `frontend/public/images/login/`의 `letter_C.png`, `letter_D.png`, `letter_E.png`, `letter_I.png`, `letter_N.png`, `letter_O.png`, `letter_W.png`, `letter_X.png`, `registered.png`만 정확 `git rm`했다. 삭제 전 copy/original9쌍 SHA256 일치, 삭제 후 `_attic/docs/design/ERP Login/assets/` 원본9개·hash 보존과173cb894 복구 blob9개를 확인했다. 개별 Git 복구 명령과 hash는 ignored `20260908-cp7-b7/preflight-evidence.md`에 있다. 폴더 재귀 삭제는 없고 사용자에게 삭제와 복구 가능성을 고지했다.
+- 총괄은 담당자의 원본 hash 출력 `f42180d5`, 증거 전문 `70e64a`, 실제 staged D9 목록 `d5b993`을 읽었다. frontend URL consumer0이며 basename 참조는 attic 디자인 원본의 consumer로 분리했다. 실제 로그인 `dexray-pointing-left.webp` 및 `MesLoginGate.tsx:297`·테스트 `:218` consumer는 유지했다. item 이미지·원본 data·동결 UI 추가 수정은 없다.
+- 독립 명세 최종 `01a07e4a-7fba`와 품질 최종 `01a07e4c-5c38`의 실제 원문을 총괄이 확인했고 각각 Critical/Important/Minor0·Ready Yes다. B7 로컬 정리 조건만 인수했다. 삭제9개와 총괄 정본2개를 별도 rollback commit으로 보존한 뒤, 최종 full gate·두 frozen 환경변수의 characterization·로그인 screenshot·실제 PostgreSQL·CI를 수행한다. 기존 CI6/6을 이 삭제 이후의 통과로 바꾸지 않는다.
+
+### 12.29 CP7 B8 최종 재감사 — 구현 이후의 현재 판정
+
+> **고정 코드:** `f3d63991c2e1235bea8637bcb62553eb0ead4116` (`bff9dd73` 이후 B6 경로 이전·B7 자산 정리 포함). 아래는 현재 코드와 기존 인수 증거를 재연결한 결과다. 최종 full·frozen·로그인·원격 CI·품질 브랜치 통합은 별도 종료 증거로 확인하며 이 재감사만으로 완료 선언하지 않는다.
+
+#### 12.29.1 작업자가 알아야 할 현재 상태
+
+원 감사 1~7절의 ‘출하 예약을 다른 작업이 선점한다’, ‘재시도마다 새 키를 만든다’, ‘일반 취소가 업무 상태를 남긴다’는 설명은 당시 실패 기록이다. CP4~CP5에서 잠금·의미 기반 멱등 재시도·공통 가용재고·전용 취소·물리 위치 원장·운영 무결성/백업/health 계약을 구현했고, CP6~CP7은 편집 유실·오래된 응답·캐시·DTO·접근성·문서 경계를 보완했다. 변경 카드별 실제 코드와 검증 근거는 아래 현재 표와 앞 절의 commit/CI 원본에 연결한다.
+
+현재의 업무별 증거를 **모든 흐름 무조건 VERIFIED**로 표기하지 않는다. 정상·부족·반려·취소·재시도·실패 주입·PostgreSQL 경합·UI 표시의 증거 범위가 다르며, 아래 PARTIAL은 어떤 증거가 아직 하나의 업무 단위로 연결되지 않았는지를 나타낸다. 이는 구현 카드 완료를 자동으로 되돌리거나 새로운 기능을 만들라는 지시가 아니다.
+
+최종 작업자 결론은12.30절의 **조건부 사용 가능**으로 고정한다. 직원 환경 DB와 실물은 대조하지 않았으며 실제 수량 일치는 별도 재고조사 사항이다. 외부 required-check 설정, 회사 도메인/HTTPS, 실제 main 통합·배포·cutover는 이번 코드 완료 범위 밖이다.
+
+#### 12.29.2 현재 재고 작업 매트릭스와 정적 누락 보완
+
+`W=창고 실재고`, `P/F=부서 정상/불량`, `T=Inventory.quantity`, `WP/PP=창고/부서 요청 예약`, `B/Z/U=박스/활성 특수구역/미배치`다. 과거 1~70번을 유지하고 71(품목 최초 재고)·72(관리자 총재고 복구)를 보완했다. 48번은 제거된 과거 API이며 활성 업무로 세지 않는다. 고정 snapshot의 활성 재고 변경 표면 정적 미매핑은0이다.
+
+다음 표의 source/test 연결은 실제 호출 경로와 assertion을 읽은 근거다. 테스트 존재와 실행 성공은 다르며, 기존 같은 표면·같은 코드의 인수 결과를 합성할 수 있다. 각 행마다 새로운 단일 ‘최종 JSON’을 요구하지 않는다. SQLite 독립 connection 경합을 PostgreSQL 증거로 바꾸지 않고 전체 CI 성공을 모든 UI·SQL·effect 조합의 증거로 확대하지 않는다.
+
+원본 current-inventory-matrix-72-parent.json은 historical_delta/current_delta를 별도 보존한다. 표는 현재값만 표시하고, 각 행의 부족한 근거를 숨기지 않는다. 현재 집계는 PARTIAL70·VERIFIED2(38의 일반 scrap 차단, 72의 maintenance API 계약에 한정)다.
+
+| ID · 업무 | 현재 진입/API·delta | 현재 판정·증거 | 미연결 또는 범위 한계 |
+|---|---|---|---|
+| 1 · receive_supplier | POST /api/io/submit -> io_actions.submit -> io_dispatch._submit_immediate<br>immediate W+q,U+q,T+q; one batch operation/effect; completed | PARTIAL<br>backend/app/services/io_preview.py:502-503 + backend/app/services/io_dispatch.py:868-880 + backend/app/services/inv_transfer.py:51-73 + backend/app/services/warehouse_map.py:450-453; backend/tests/test_io_v2.py:1892 test_io_submit_receive_is_immediate; backend/tests/test_inventory_location_ledger.py:107 test_warehouse_receipt_and_adjustment_keep_unplaced_in_sync | EVIDENCE_NOT_LINKED: this exact IO flow has no final UI/API/SQL/B-Z-U-U receipt and its semantic lost-response retry is not linked to an accepted row-specific run. |
+| 2 · warehouse_adjust_in | POST /api/io/submit -> io_dispatch._apply_adjust<br>warehouse primary/deputy only; immediate W+q,U+q,T+q | PARTIAL<br>backend/app/services/io_preview.py:308-343 + backend/app/services/io_dispatch.py:925-946 + backend/app/services/warehouse_map.py:450-453; backend/tests/test_io_v2.py:3885 test_warehouse_adjust_in_immediately_increases_warehouse_stock; backend/tests/test_inventory_location_ledger.py:107 test_warehouse_receipt_and_adjustment_keep_unplaced_in_sync | EVIDENCE_NOT_LINKED: no accepted row-specific result-unknown retry plus final UI/API/SQL/U receipt; authorization exists and is tested, so this is not an auth-implementation gap. |
+| 3 · warehouse_adjust_out | POST /api/io/submit -> io_dispatch._apply_adjust<br>warehouse primary/deputy only; immediate W-q,T-q and physical q consumed B->active-Z->U with stable row effects | PARTIAL<br>backend/app/services/io_preview.py:308-343 + backend/app/services/io_dispatch.py:925-951 + backend/app/services/warehouse_map.py:427-503; backend/tests/test_io_v2.py:3964 test_warehouse_adjust_out_immediately_decreases_warehouse_stock; backend/tests/test_inventory_location_ledger.py:166 test_outbound_consumes_box_then_active_zones_then_unplaced_when_toggle_is_off | EVIDENCE_NOT_LINKED: final UI/API/SQL effect receipt for this surface is absent; CP5 physical-ledger evidence proves the shared primitive, not this complete UI flow. |
+| 4 · warehouse_to_dept | POST /api/io/submit -> StockRequest WAREHOUSE_TO_DEPT<br>submit reserves WP+q; approval releases/consumes WP-q, decrements W-q via B->active-Z->U, increments P[to]+q, T0 | PARTIAL<br>backend/app/services/io_preview.py:504-505 + backend/app/services/sr_execution.py:107-111 + backend/app/services/inv_transfer.py:76-104; backend/tests/test_stock_requests.py:343 test_warehouse_to_dept_request_reserves_pending; backend/tests/test_stock_requests.py:449 test_approve_consumes_pending_and_moves_stock; backend/tests/test_io_v2.py:1980 test_io_submit_warehouse_to_dept_links_all_logs_to_batch | EVIDENCE_NOT_LINKED: no single accepted receipt joins this IO UI, approval API, WP/W/P SQL deltas, and B/Z/U effect; the existing reservation/approval tests are present but not that final joined oracle. |
+| 5 · dept_to_warehouse | POST /api/io/submit -> StockRequest DEPT_TO_WAREHOUSE<br>submit reserves PP[from]+q; approval releases/consumes PP-q, decrements P[from]-q, increments W+q and U+q, T0 | PARTIAL<br>backend/app/services/io_preview.py:506-507 + backend/app/services/sr_execution.py:114-118 + backend/app/services/inv_transfer.py:107-152; backend/tests/services/test_sr_execution.py:321 test_execute_line_dept_to_warehouse; backend/tests/services/test_sr_execution.py:1043 test_finalize_dept_to_warehouse_reserves_production_source | EVIDENCE_NOT_LINKED: no final UI/API/SQL receipt joins PP release, P decrement, W/U increment and operation effect for this surface. |
+| 6 · dept_transfer | POST /api/io/submit -> io_dispatch._apply_move<br>standard routed line is immediate P[from]-q,P[to]+q,T0; if a process manual/custom line requires department approval, its outbound source is PP-reserved before the same effect | PARTIAL<br>backend/app/services/io_preview.py:527-528 + backend/app/services/io_dispatch.py:896-908 + backend/app/services/inv_transfer.py:155-180; backend/tests/services/test_io_dispatch.py:403 test_apply_line_move_between_departments; backend/tests/services/test_io_dispatch.py:1089 test_mixed_process_manual_waits_for_department_approval_then_applies_all_lines | EVIDENCE_NOT_LINKED: no final UI/API/SQL receipt covers both the immediate and explicitly supported department-approval variant; this is not a missing department-authority implementation claim. |
+| 7 · produce | POST /api/io/submit -> io_dispatch process execution<br>result line P[to]+q,T+q; included component lines P[home]-q,T-q; default BOM is immediate, while manual/custom BOM requires department approval and reserves outbound PP when applicable | PARTIAL<br>backend/app/services/io_preview.py:513-519 + backend/app/services/io_dispatch.py:1230-1284; backend/tests/test_io_v2.py:4158 test_io_produce_component_sources_from_home_dept; backend/tests/test_io_v2.py:4798 test_io_default_process_bom_allows_blank_memo_and_completes_immediately; backend/tests/test_io_v2.py:4841 test_io_submit_custom_process_bom_requires_nonblank_memo_before_persisting | EVIDENCE_NOT_LINKED: no accepted final multi-line UI/API/SQL/effect receipt joins result, components, reservation, approval, cancellation and retry; existing tests prove the branches separately. |
+| 8 · disassemble | POST /api/io/submit -> io_dispatch process execution<br>parent result line P[from]-q,T-q; included child recovery lines P[home]+q,T+q; default BOM is immediate, while manual/custom BOM requires department approval and reserves outbound PP when applicable | PARTIAL<br>backend/app/services/io_preview.py:520-526 + backend/app/services/io_dispatch.py:1230-1284; backend/tests/services/test_io_dispatch.py:1529 test_default_disassemble_keeps_parent_out_and_child_recovery; backend/tests/test_io_v2.py:2994 test_io_submit_mixed_disassembly_outbound_waits_for_approval_and_logs_correction | EVIDENCE_NOT_LINKED: no accepted final multi-line UI/API/SQL/effect receipt covers default and custom approval paths plus cancellation/retry. |
+| 9 · adjust_in | POST /api/io/submit -> MANUAL_ADJUSTMENT department approval -> io_dispatch._apply_adjust<br>department approver self-approval may execute immediately; otherwise SUBMITTED with no inbound reservation, then approval P[to]+q,T+q | PARTIAL<br>backend/app/services/io_preview.py:529-531 + backend/app/services/stock_requests.py:276-335 + backend/app/services/io_dispatch.py:637-687; backend/tests/test_io_v2.py:2528 test_io_immediate_adjust_in_increases_production_quantity; backend/tests/services/test_io_dispatch.py:810 test_submit_dept_only_self_approval_executes_immediately | EVIDENCE_NOT_LINKED: no accepted non-self approval UI/API/SQL/effect receipt plus failure/retry oracle; authorization and approval routing do exist. |
+| 10 · adjust_out | POST /api/io/submit -> MANUAL_ADJUSTMENT department approval -> io_dispatch._apply_adjust<br>department approver self-approval may execute immediately without PP; otherwise reserve PP[from]+q, then approval releases PP-q and applies P[from]-q,T-q | PARTIAL<br>backend/app/services/io_preview.py:532-534 + backend/app/services/stock_requests.py:276-335 + backend/app/services/io_dispatch.py:925-951; backend/tests/test_io_v2.py:3818 test_io_immediate_adjust_out_decreases_production_quantity; backend/tests/services/test_io_dispatch.py:1008 test_submit_dept_only_outgoing_reserves_department_location; backend/tests/services/test_io_dispatch.py:1040 test_submit_dept_out_then_approve_releases_and_consumes | EVIDENCE_NOT_LINKED: no accepted final UI/API/SQL/effect receipt joins non-self PP reservation/release, approver authority, failure and retry. |
+| 11 · defect_quarantine warehouse | POST /api/io/submit -> request-backed MARK_DEFECTIVE_WH<br>approval kind none; requester executes immediately; W-q via B->active-Z->U, F[to]+q,T0, with linked StockRequest/operation/defect record | PARTIAL<br>backend/app/services/approval_rules.py:24-26,47-55 + backend/app/services/sr_execution.py:130-137,451-500 + backend/app/services/warehouse_map.py:484-503; backend/tests/test_inventory_location_ledger.py:299 test_warehouse_defect_move_consumes_the_same_physical_priority; backend/tests/services/test_sr_execution.py:397 test_execute_line_mark_defective_wh | EVIDENCE_NOT_LINKED: no accepted warehouse-source IO UI/API/SQL receipt joins no-approval display, B/Z/U depletion, F record, operation and cancel; policy/auth/zone support itself is implemented. |
+| 12 · defect_quarantine production | POST /api/io/submit -> request-backed MARK_DEFECTIVE_PROD<br>approval kind none; requester executes immediately; P[from]-q,F[to]+q,T0 with linked StockRequest/operation/defect record | PARTIAL<br>backend/app/services/approval_rules.py:24-26,47-55 + backend/app/services/sr_execution.py:140-153,451-500; backend/tests/test_io_v2.py:199 test_defect_quarantine_preview_submit_preserves_request_operation_and_cancel_owner; backend/tests/services/test_sr_execution.py:427 test_execute_line_mark_defective_prod | EVIDENCE_NOT_LINKED: existing HTTP test proves the production flow statically and in its prior run, but no matrix-final UI/API/SQL/ledger receipt is linked; do not reclassify this as approval-policy drift. |
+| 13 · supplier_return | POST /api/io/submit -> io_dispatch._apply_out(defective)<br>immediate F[from]-q,T-q; supplier-return transaction/effect recorded | PARTIAL<br>backend/app/services/io_preview.py:547-549 + backend/app/services/io_dispatch.py:883-893 + backend/app/services/inv_defective.py:164-255; backend/tests/services/test_io_dispatch.py:321 test_apply_line_out_defective_supplier_return; backend/tests/test_defect_flow.py:1126 test_defect_return_via_stock_request | EVIDENCE_NOT_LINKED: no final supplier-return IO UI/API/SQL/effect receipt with semantic retry; the service and existing tests are present. |
+| 14 · internal_use_out | POST /api/io/submit -> split StockRequest approvals<br>warehouse-source outbound reserves WP+q then approval consumes WP-q,W-q,T-q via B->active-Z->U; permitted department-source/return branches are split into their own requests and apply P deltas | PARTIAL<br>backend/app/services/io_preview.py:508-512 + backend/app/services/io_dispatch.py:434-557 + backend/app/services/sr_execution.py:169-185; backend/tests/test_io_v2.py:743 test_internal_use_submit_reserves_then_approval_consumes_only_warehouse; backend/tests/test_io_v2.py:1093 test_internal_use_parent_and_children_splits_outbound_and_return_approvals | EVIDENCE_NOT_LINKED: no final UI/API/SQL/effect receipt joins every explicitly supported split branch, rejection/cancel and retry; direct-request rejection is separately row 24. |
+| 15 · RAW_RECEIVE | POST /api/stock-requests -> sr_execution._handle_raw_receive<br>no source reservation; warehouse primary/deputy/admin self-approves to immediate W+q,U+q,T+q, otherwise request stays SUBMITTED until approval then applies the same delta | PARTIAL<br>backend/app/services/sr_validation.py:172-177 + backend/app/services/sr_execution.py:97-100,631-703 + backend/app/services/warehouse_map.py:450-453; backend/tests/services/test_sr_execution.py:196 test_execute_line_raw_receive; backend/tests/services/test_sr_execution.py:1074 test_finalize_inbound_only_approval_stays_submitted; backend/tests/services/test_sr_execution.py:883 test_finalize_warehouse_primary_self_approves | EVIDENCE_NOT_LINKED: no final route-level receipt covers both self-approval and later approval with W/U/T SQL/effect and duplicate-request retry; historical unconditional COMPLETED is not the current contract. |
+| 16 · RAW_SHIP | POST /api/stock-requests -> sr_execution._handle_raw_ship<br>submit reserves WP+q; approval consumes WP-q,W-q,T-q with physical depletion B->active-Z->U | PARTIAL<br>backend/app/services/sr_validation.py:178-183 + backend/app/services/sr_execution.py:102-105 + backend/app/services/warehouse_map.py:427-503; backend/tests/services/test_sr_execution.py:220 test_execute_line_raw_ship; backend/tests/concurrency/test_approve_concurrent.py:120 test_concurrent_approve_only_once | EVIDENCE_NOT_LINKED: accepted concurrency evidence exists, but no final UI/API/SQL/effect receipt joins WP and exact B/Z/U deltas for RAW_SHIP. |
+| 17 · WAREHOUSE_TO_DEPT | POST /api/stock-requests -> sr_execution._handle_warehouse_to_dept<br>submit reserves WP+q; approval releases/consumes WP-q, W-q via B->active-Z->U, P[to]+q,T0 | PARTIAL<br>backend/app/services/sr_validation.py:184-189 + backend/app/services/sr_execution.py:107-111 + backend/app/services/inv_transfer.py:76-104; backend/tests/test_stock_requests.py:343 test_warehouse_to_dept_request_reserves_pending; backend/tests/test_stock_requests.py:449 test_approve_consumes_pending_and_moves_stock | EVIDENCE_NOT_LINKED: no final direct-request UI/API/SQL/effect receipt joins reservation, approval and exact physical depletion. |
+| 18 · DEPT_TO_WAREHOUSE | POST /api/stock-requests -> sr_execution._handle_dept_to_warehouse<br>submit reserves PP[from]+q; approval releases/consumes PP-q, P[from]-q, W+q,U+q,T0 | PARTIAL<br>backend/app/services/sr_validation.py:190-195 + backend/app/services/sr_execution.py:114-118 + backend/app/services/inv_transfer.py:107-152; backend/tests/services/test_sr_execution.py:321 test_execute_line_dept_to_warehouse; backend/tests/services/test_sr_execution.py:1043 test_finalize_dept_to_warehouse_reserves_production_source | EVIDENCE_NOT_LINKED: no final direct-request UI/API/SQL/effect receipt joins PP/P/W/U, approval and retry. |
+| 19 · DEPT_INTERNAL | POST /api/stock-requests -> sr_execution._handle_dept_internal<br>no warehouse/department approval flag by default, so immediate P[from]-q,P[to]+q,T0; no transient PP is created on this immediate branch | PARTIAL<br>backend/app/services/sr_validation.py:196-201,314-317 + backend/app/services/sr_execution.py:121-127,640-668; backend/tests/test_stock_requests.py:716 test_dept_internal_request_completes_immediately; backend/tests/services/test_sr_execution.py:366 test_execute_line_dept_internal | EVIDENCE_NOT_LINKED: no final direct-request UI/API/SQL/effect receipt with failure/retry; source/target validation and execution tests exist. |
+| 20 · MARK_DEFECTIVE_WH | POST /api/stock-requests -> immediate defect request<br>requester executes immediately without approval/pending; W-q via B->active-Z->U, F[to]+q,T0, defect record and operation effect | PARTIAL<br>backend/app/services/stock_requests.py:219-273 + backend/app/services/sr_execution.py:130-137,451-500; backend/tests/services/test_sr_execution.py:397 test_execute_line_mark_defective_wh; backend/tests/test_inventory_location_ledger.py:299 test_warehouse_defect_move_consumes_the_same_physical_priority | EVIDENCE_NOT_LINKED: no final direct-request UI/API/SQL receipt joins physical priority, F record, operation and retry; immediate/no-approval policy is implemented. |
+| 21 · MARK_DEFECTIVE_PROD | POST /api/stock-requests -> immediate defect request<br>requester executes immediately without approval/pending; P[from]-q,F[to]+q,T0, defect record and operation effect | PARTIAL<br>backend/app/services/stock_requests.py:219-273 + backend/app/services/sr_execution.py:140-153,451-500; backend/tests/services/test_sr_execution.py:427 test_execute_line_mark_defective_prod; backend/tests/services/test_inv_defective.py:190 test_mark_defective_from_production_total_invariant | EVIDENCE_NOT_LINKED: no final direct-request UI/API/SQL/effect receipt with failure/retry; auth and department locking are implemented and tested separately. |
+| 22 · SUPPLIER_RETURN | POST /api/stock-requests -> sr_execution._handle_supplier_return<br>requester executes immediately without approval/pending; selected F[from]-q,T-q and supplier-return operation/log | PARTIAL<br>backend/app/services/stock_requests.py:229-273 + backend/app/services/sr_execution.py:156-160,403-418; backend/tests/test_defect_flow.py:1126 test_defect_return_via_stock_request; backend/tests/services/test_inv_defective.py:369 test_return_to_supplier_total_decreases | EVIDENCE_NOT_LINKED: no final UI/API/SQL/effect receipt joins the selected defect record decrement, total delta and retry. |
+| 23 · PACKAGE_OUT | POST /api/stock-requests -> sr_execution._handle_package_out<br>submit reserves WP+q; approval consumes WP-q,W-q,T-q via B->active-Z->U | PARTIAL<br>backend/app/services/sr_validation.py:220-224 + backend/app/services/sr_execution.py:163-166 + backend/app/services/warehouse_map.py:427-503; backend/tests/services/test_sr_execution.py:220 test_execute_line_raw_ship exercises the same warehouse-consume primitive; backend/tests/test_inventory_location_ledger.py:166 test_outbound_consumes_box_then_active_zones_then_unplaced_when_toggle_is_off | EVIDENCE_NOT_LINKED: no existing test found that selects PACKAGE_OUT itself end-to-end; shared primitive tests are not type-dispatch proof, and no final UI/API/SQL receipt is linked. |
+| 24 · INTERNAL_USE direct request rejection | POST /api/stock-requests<br>직접 StockRequest INTERNAL_USE는 거부: 비권한자 403, 권한자 422. 각 HTTP 테스트의 StockRequest 생성 수 0; 지원되는 사용출고는 IO batch 표면(행14). | PARTIAL<br>backend/app/services/sr_validation.py:80-105 + backend/app/routers/stock_requests.py:105-131; backend/tests/test_stock_requests.py:212 test_internal_use_direct_request_rejects_unauthorized_requester; backend/tests/test_stock_requests.py:243 test_internal_use_direct_request_rejects_authorized_requester; backend/tests/routers/test_stock_request_verified_actor.py:74 test_every_stock_request_action_claim_rejects_spoof_before_request_lookup | 인용된 HTTP 두 테스트는 응답 코드와 StockRequest.count()==0까지 확인한다. Inventory·pending·log·effect의 독립 SQL before/after 불변 assertion은 그 두 테스트에 없다. 별도 새 single-final receipt를 요구하는 것은 아니다. |
+| 25 · MANUAL_ADJUSTMENT | IoBatch process manual/custom -> create_manual_adjustment_request -> department approval<br>inbound waits SUBMITTED with no PP (or self-approves) then P+q,T+q; outbound reserves PP+q (or self-approves) then PP-q,P-q,T-q; move lines preserve T and operation effects | PARTIAL<br>backend/app/services/stock_requests.py:276-335 + backend/app/services/io_dispatch.py:598-687,744-820; backend/tests/services/test_io_dispatch.py:810 test_submit_dept_only_self_approval_executes_immediately; backend/tests/services/test_io_dispatch.py:1008 test_submit_dept_only_outgoing_reserves_department_location; backend/tests/services/test_io_dispatch.py:1040 test_submit_dept_out_then_approve_releases_and_consumes | EVIDENCE_NOT_LINKED: direct generic /stock-requests acceptance is not treated as the supported product surface, and no final IO UI/API/SQL/effect receipt joins every explicit in/out/move branch. |
+| 26 · DEFECT_SCRAP | POST /api/stock-requests -> immediate quarantine processing<br>requester executes immediately without approval/pending; selected F[from]-q,T-q, defect record decrement and scrap operation/log | PARTIAL<br>backend/app/services/stock_requests.py:229-273 + backend/app/services/sr_execution.py:188-203,403-418,469-487; backend/tests/test_defect_flow.py:767 test_defect_scrap_via_stock_request; backend/tests/services/test_inv_defective.py:331 test_scrap_defective_total_decreases | EVIDENCE_NOT_LINKED: no final UI/API/SQL/effect receipt joins selected-record decrement, total delta, rollback and retry. |
+| 27 · DEFECT_RETURN | POST /api/stock-requests -> immediate quarantine processing<br>requester executes immediately without approval/pending; selected F[from]-q,T-q, defect record decrement and supplier-return operation/log | PARTIAL<br>backend/app/services/stock_requests.py:229-273 + backend/app/services/sr_execution.py:206-211,403-418,469-487; backend/tests/test_defect_flow.py:1126 test_defect_return_via_stock_request; backend/tests/services/test_inv_defective.py:369 test_return_to_supplier_total_decreases | EVIDENCE_NOT_LINKED: no final UI/API/SQL/effect receipt joins selected-record decrement, total delta, rollback and retry. |
+| 28 · DEFECT_DISASSEMBLE | POST /api/stock-requests -> immediate defect disassembly<br>requester executes immediately without approval/pending; parent selected F-q,T-q; child decisions add P-normal and/or F-defective quantities, while scrap/no-receipt portions add zero; one operation owns the effects | PARTIAL<br>backend/app/services/stock_requests.py:229-273 + backend/app/services/sr_execution.py:299-327,428-447 + backend/app/services/dept_adjustment.py:1016-1045; backend/tests/test_defect_flow.py:1022 test_defect_disassemble_via_stock_request_executes_immediately_as_requester; backend/tests/services/test_sr_execution.py:586 test_execute_line_defect_disassemble_uses_three_way_child_split | EVIDENCE_NOT_LINKED: no final multi-line UI/API/SQL/effect receipt joins parent record, all explicit child decision branches, rollback/cancel and retry. |
+| 29 · SCRAP_NORMAL warehouse | POST /api/stock-requests -> immediate normal-stock processing<br>requester executes immediately without approval/pending; W-q,T-q via B->active-Z->U and scrap operation/log | PARTIAL<br>backend/app/services/stock_requests.py:219-228 + backend/app/services/sr_execution.py:214-226 + backend/app/services/inv_defective.py:388-406; backend/tests/test_defect_flow.py:673 test_normal_direct_processing_creates_one_final_log_without_quarantine[scrap_normal]; backend/tests/services/test_inv_defective.py:397 test_scrap_normal_warehouse_total_decreases | EVIDENCE_NOT_LINKED: no final UI/API/SQL receipt records the exact B/Z/U depletion for this request type plus failure/retry. |
+| 30 · SCRAP_NORMAL production | POST /api/stock-requests -> immediate normal-stock processing<br>requester executes immediately without approval/pending; P[from]-q,T-q and scrap operation/log | PARTIAL<br>backend/app/services/stock_requests.py:219-228 + backend/app/services/sr_execution.py:214-226 + backend/app/services/inv_defective.py:388-406; backend/tests/services/test_sr_execution.py:459 test_execute_line_scrap_normal_from_production; backend/tests/services/test_inv_defective.py:409 test_scrap_normal_production_total_decreases | EVIDENCE_NOT_LINKED: no final production-source UI/API/SQL/effect receipt with failure/retry; existing tests prove service deltas. |
+| 31 · RETURN_NORMAL warehouse | POST /api/stock-requests -> immediate normal-stock processing<br>requester executes immediately without approval/pending; W-q,T-q via B->active-Z->U and supplier-return operation/log | PARTIAL<br>backend/app/services/stock_requests.py:219-228 + backend/app/services/sr_execution.py:229-243 + backend/app/services/inv_defective.py:409-425; backend/tests/test_defect_flow.py:673 test_normal_direct_processing_creates_one_final_log_without_quarantine[return_normal]; backend/tests/services/test_inv_defective.py:467 test_return_from_normal_warehouse_total_decreases | EVIDENCE_NOT_LINKED: no final UI/API/SQL receipt records exact B/Z/U depletion for this type plus failure/retry. |
+| 32 · RETURN_NORMAL production | POST /api/stock-requests -> immediate normal-stock processing<br>requester executes immediately without approval/pending; P[from]-q,T-q and supplier-return operation/log | PARTIAL<br>backend/app/services/stock_requests.py:219-228 + backend/app/services/sr_execution.py:229-243 + backend/app/services/inv_defective.py:409-425; backend/tests/services/test_inv_defective.py:479 test_return_from_normal_production_total_decreases; backend/tests/test_defect_flow.py:1186 test_return_to_supplier_from_normal_production | EVIDENCE_NOT_LINKED: no final production-source UI/API/SQL/effect receipt with failure/retry; existing service tests are present. |
+| 33 · REWORK_NORMAL warehouse | POST /api/stock-requests -> immediate normal rework<br>requester executes immediately without approval/pending; warehouse parent W-q,T-q via B->active-Z->U; child decisions add P-normal and/or F-defective quantities, scrap/no-receipt adds zero | PARTIAL<br>backend/app/services/stock_requests.py:219-228 + backend/app/services/sr_execution.py:330-360 + backend/app/services/dept_adjustment.py:703-843,1048-1074; backend/tests/services/test_sr_execution.py:492 test_execute_line_rework_normal_splits_children_by_item_department exercises the child-decision operation; backend/tests/test_inventory_location_ledger.py:166 test_outbound_consumes_box_then_active_zones_then_unplaced_when_toggle_is_off exercises the warehouse primitive | EVIDENCE_NOT_LINKED: no existing test found that selects REWORK_NORMAL with a warehouse parent; child-decision and warehouse-depletion tests are separate, and no final UI/API/SQL/effect receipt joins them. |
+| 34 · REWORK_NORMAL production | POST /api/stock-requests -> immediate normal rework<br>requester executes immediately without approval/pending; production parent P[from]-q,T-q; child decisions add P-normal and/or F-defective quantities, scrap/no-receipt adds zero | PARTIAL<br>backend/app/services/stock_requests.py:219-228 + backend/app/services/sr_execution.py:330-360 + backend/app/services/dept_adjustment.py:703-843,1048-1074; backend/tests/services/test_sr_execution.py:492 test_execute_line_rework_normal_splits_children_by_item_department; backend/tests/services/test_dept_adjustment.py:254 test_normal_rework_records_one_operation_with_explicit_line_roles | EVIDENCE_NOT_LINKED: no final UI/API/SQL/effect receipt joins production parent, all explicit child decisions, cancellation/rollback and retry; existing tests cover the core operation but not that complete flow. |
+| 35 · department production | POST /api/dept-adjustment/submit; backend/app/services/dept_adjustment.py:505-547<br>submitted production creates department inventory operation and line effects; component P decreases and result P increases | PARTIAL<br>backend/tests/routers/test_dept_adjustment.py:145-172 test_submit_production_api asserts HTTP201, processed2, component P5→3/result P0→1 | EVIDENCE_NOT_LINKED: this route's SQL/effect or concurrency/cancel proof; CP5W3 PG79 is not cited for it |
+| 36 · department disassembly | POST /api/dept-adjustment/submit; dept_adjustment.py:505-547<br>submit_adjustment creates department_inventory/disassembly operation with parent/child effects | PARTIAL<br>backend/app/services/dept_adjustment.py:505-547 | EVIDENCE_NOT_LINKED: general department_inventory/disassembly cancel API plus SQL/effect proof; CP5C defect/rework_defective matrix is a different surface |
+| 37 · department correction | POST /api/dept-adjustment/submit<br>correction out line reduces department location/total through department-adjustment operation | PARTIAL<br>backend/tests/routers/test_dept_adjustment.py:174-194 test_submit_correction_api asserts HTTP201/processed1/P10→7 | EVIDENCE_NOT_LINKED: this route's concurrent/cancel/SQL-effect proof; CP4 transaction correction is separate |
+| 38 · department scrap rejection | POST /api/dept-adjustment/submit<br>422 before mutation; inventory/log unchanged | VERIFIED<br>IC-02 raw SQL invariant (A:450,1908); router/service RED→GREEN | none for rejected surface |
+| 39 · production receipt | POST /api/production/receipt; backend/app/services/production_receipt.py:154-253<br>same; verified actor and owner-state workflow cancel | PARTIAL<br>CP4 verified actor/PG29 (A:1908-1912); CP5C production receipt cancel matrix (A:1983-1987) | EVIDENCE_NOT_LINKED: final UI/API/SQL/effect receipt |
+| 40 · handover receive | POST /api/handovers/{id}/receive; routers/handover.py:181; services/handover.py:287<br>P[from]-q,P[to]+q,T0; SUBMITTED→RECEIVED; duplicate receive one success/one already_received conflict | PARTIAL<br>backend/tests/routers/test_handover_verified_actor.py:75-103의 actor mismatch; backend/tests/concurrency/test_cp4_command_postgres.py:1150-1221의 두 PG PID·receive 성공1/이미수령 충돌1·P5→3/2·log/operation/effect 각1과 ID 연결. | EVIDENCE_NOT_LINKED: final UI receipt; CP5C has no handover kind |
+| 41 · warehouse quarantine | POST /api/defects/quarantine; defects.py:510; defect_actions.py:32-131<br>warehouse→defective record/operation/effect transaction | PARTIAL<br>backend/tests/services/test_defect_actions.py:55-85의 service capture-failure rollback(W5/F0/log0), :127-184의 warehouse quarantine/restore movement-operation 연결; backend/tests/services/test_warehouse_map_postgres_locking.py:410의 warehouse placement-quarantine lock 범위. | EVIDENCE_NOT_LINKED: HTTP UI receipt |
+| 42 · production quarantine | POST /api/defects/quarantine; defect_actions.py:32-131<br>production→defective record/operation/effect transaction | PARTIAL<br>backend/app/services/defect_actions.py:32-131의 production-source 분기 정적 구현. backend/tests/services/test_defect_actions.py:127-184 및 test_warehouse_map_postgres_locking.py:410은 warehouse source이므로 이 행의 production 실행 근거에서 제외. | production source의 직접 quarantine HTTP·수량·record/effect·실패/재시도 실행 근거는 이 인용 묶음에 연결되지 않았다. warehouse 테스트로 대신하지 않는다. |
+| 43 · unquarantine | POST /api/defects/unquarantine; defects.py:584; defect_actions.py:134-215<br>defective→normal record/operation/effect transaction | PARTIAL<br>backend/tests/services/test_defect_actions.py:88-124의 restore capture-failure rollback, :127-184의 movement-operation 연결; backend/tests/services/test_warehouse_map_postgres_locking.py:668의 quarantine cancel-vs-restore PG 한승자 범위. | EVIDENCE_NOT_LINKED: HTTP UI receipt |
+| 44 · independent component conversion | shipping router:379-434; shipping.py:1535-1880<br>same; verified active actor/department authorization | PARTIAL<br>backend/tests/routers/test_shipping.py:560,969,1000; router _validate_component_change_actor:379 | EVIDENCE_NOT_LINKED: final UI/SQL effect receipt |
+| 45 · request-linked component conversion | shipping router:651-674; shipping_actions.py:342<br>same with request actor/department verification and transaction path | PARTIAL<br>backend/tests/routers/test_shipping.py:384,420,436,457,654; shipping_actions.py:342 | EVIDENCE_NOT_LINKED: final request conversion SQL/effect receipt |
+| 46 · shipping request create | POST /api/shipping/requests; shipping.py:696-723<br>inventory/allocation0; new PREPARING request plus REQUEST_CREATED event | PARTIAL<br>backend/tests/routers/test_shipping.py:228-275 asserts HTTP201, PREPARING, transaction_count0, REQUEST_CREATED | EVIDENCE_NOT_LINKED: independent SQL/effect receipt (no physical effect expected) |
+| 47 · shipping request edit/invoice | shipping_actions.py:242-273<br>inventory/allocation0; request lock then update request/invoice | PARTIAL<br>test_shipping.py:1731,1919 revision/event assertions | EVIDENCE_NOT_LINKED: route-specific receipt/SQL proof; CP5B command receipt excluded |
+| 48 · retired send-to-prep | POST /api/shipping/requests/{id}/send-to-prep (removed)<br>retired; no business command; endpoint 404/405 | PARTIAL<br>test_shipping.py:277-286 | current matrix excludes retired command from active-flow assurance |
+| 49 · checklist update/clear | shipping.py:861-889<br>PREPARING checklist checked state and updated_at only; no revision/event claim | PARTIAL<br>shipping.py:861-889; test_shipping.py:307-314 HTTP200 checked=true | EVIDENCE_NOT_LINKED: concurrent checklist-specific proof |
+| 50 · shipping request cancel | DELETE /api/shipping/requests/{id}; shipping_actions.py:254-263; shipping.py:817-832<br>PREPARING→CANCELLED; inventory/allocation/log remain0 | PARTIAL<br>backend/tests/routers/test_shipping.py:1731 test_shipping_invoice_revision_and_cancel_are_attributed_and_retained | EVIDENCE_NOT_LINKED: cancel SQL receipt/concurrency proof |
+| 51 · prepare complete | shipping router:695; shipping.py:2153; shipping_actions.py:367<br>same under request→inventory→B/Z/U/location→allocation/receipt locks | PARTIAL<br>test_shipping.py:1486,1509,1542,1609,1667; CP5B PG79 | EVIDENCE_NOT_LINKED: final UI/SQL effect receipt |
+| 52 · prepare cancel | shipping router:718; shipping.py:2213<br>same with receipt and exact allocation restoration | PARTIAL<br>test_shipping_command_receipts.py:277; CP5B PG79 | EVIDENCE_NOT_LINKED: final UI/effect receipt |
+| 53 · pickup complete | shipping router:741; shipping.py:2330<br>same under deterministic locks/receipt | PARTIAL<br>CP5B pickup×2 and pickup-vs-cancel PG79; test_shipping_command_receipts.py:134,208 | EVIDENCE_NOT_LINKED: final UI/API/SQL/effect receipt |
+| 54 · pickup cancel | shipping router:763; shipping.py:2380-2469<br>new shipping-operation path uses _cancel_shipping_operation; legacy fallback is separate reversal logic | PARTIAL<br>test_shipping_command_receipts.py:277; CP5C three-oracle workflow cancel | EVIDENCE_NOT_LINKED: new-operation versus legacy fallback comparison/UI receipt |
+| 55 · quantity correction | inventory transactions; transaction_actions.py:375-429<br>only single warehouse RECEIVE/SHIP once; workflow/multi/nonwarehouse/cancelled already-corrected mutation0 | PARTIAL<br>test_transaction_edit.py:507,602,707,913,1201,1594; CP4 correction PG29/CI33099973906 | EVIDENCE_NOT_LINKED: final UI receipt beyond exact cases |
+| 56 · single transaction cancel | inventory operations.py:291; inventory_operation_cancellation.py:1881<br>operation owner policy restores recorded state/effect; unsupported legacy 409 | PARTIAL<br>test_inventory_operations.py:336,455,483,634; CP5C 3-oracle/PG4 | EVIDENCE_NOT_LINKED: final UI receipt |
+| 57 · operation batch cancel | inventory_operation_cancellation.py:1881<br>effects plus linked IoBatch/StockRequest restore in one transaction | PARTIAL<br>B4-R1 A:2306-2311 two-node PG; exact bff9 CI34168183559 6/6 | EVIDENCE_NOT_LINKED: final integration UI/API/effect receipt |
+| 58 · legacy defect-disassemble cancel | inventory operation cancellation<br>owner-state policy restores supported v2; incomplete legacy is stable 409 | PARTIAL<br>test_inventory_operations.py:634,928,1229; CP5C | EVIDENCE_NOT_LINKED: final UI receipt |
+| 59 · warehouse self approval | stock_requests.py:502; sr_approval.py:42<br>warehouse self-approval follows approve_request branch | PARTIAL<br>sr_approval.py:42-107 | EVIDENCE_NOT_LINKED: direct self-approval actor/availability/receipt/rollback test |
+| 60 · department self approval | stock_requests.py:578; sr_approval.py:113<br>department self-approval follows approve_request_department branch | PARTIAL<br>sr_approval.py:113-189 | EVIDENCE_NOT_LINKED: direct self-approval role/receipt/rollback test |
+| 61 · warehouse approve | stock_requests.py:502; sr_approval.py:42<br>warehouse approval executes locked request and releases pending on completion | PARTIAL<br>backend/app/services/sr_approval.py:42-107; backend/tests/concurrency/test_stock_request_location_reservation.py:136-214의 approve_request-vs-cancel. backend/tests/concurrency/conftest.py:36-59,79-87은 파일 SQLite+NullPool+BEGIN IMMEDIATE이므로 PostgreSQL 증거가 아니다. | EVIDENCE_NOT_LINKED: route UI receipt |
+| 62 · department approve | stock_requests.py:578; sr_approval.py:113<br>department approval executes department role/line path | PARTIAL<br>backend/app/services/sr_approval.py:113-189의 approve_request_department 정적 구현. backend/tests/services/test_warehouse_map_postgres_locking.py:986-1005는 approve_request이며 부서 승인 증거에서 제외. | 이 department-approve 표면의 직접 HTTP/department role·line execution·rollback·UI 증거는 해당 인용에 연결되지 않았다. |
+| 63 · warehouse reject | stock_requests.py:539; sr_approval.py:238<br>warehouse rejection releases pending with no physical execution | PARTIAL<br>backend/app/services/sr_approval.py:238-267의 reject_request 정적 구현. approval 실패→FAILED_APPROVAL 테스트는 reject 증거에서 제외. | warehouse reject의 REJECTED·pending release·실패 rollback·UI를 직접 함께 확인한 증거는 해당 인용에 연결되지 않았다. |
+| 64 · department reject | stock_requests.py:616; sr_approval.py:276<br>department rejection releases location pending with no physical execution | PARTIAL<br>backend/app/services/sr_approval.py:276-316의 department reject 정적 구현. warehouse approve-vs-cancel 테스트는 department reject 증거에서 제외. | department reject의 REJECTED·location pending release·실패 rollback·UI를 직접 함께 확인한 증거는 해당 인용에 연결되지 않았다. |
+| 65 · approval execution failure | stock_request_actions.py:81-163<br>execution rollback precedes separate failure-state commit | PARTIAL<br>backend/tests/services/test_stock_request_actions.py:741-826의 failure approval rollback/실패상태와 :829+의 multiline late failure rollback. | EVIDENCE_NOT_LINKED: UI receipt |
+| 66 · request cancel | stock_requests.py:656; sr_approval.py:324<br>cancel synchronizes request/batch and releases pending | PARTIAL<br>backend/tests/services/test_stock_request_actions.py:672-738의 cancel batch-sync 실패 rollback(status/pending); backend/app/services/sr_approval.py:324-357. | EVIDENCE_NOT_LINKED: UI receipt |
+| 67 · revert-to-draft | stock_requests.py:725; stock_request_actions.py:183<br>same and deleted item cannot reactivate batch | PARTIAL<br>stock_request_actions.py:183; test_items_soft_delete.py:783 | EVIDENCE_NOT_LINKED: final resubmit UI/effect receipt |
+| 68 · box tracking toggle | warehouse_map boxes<br>setting toggle only; physical invariant is implemented at ledger level | PARTIAL<br>backend/tests/routers/test_admin_pin_guards.py:129-137 asserts admin PIN and enabled response; CP5W2 A:1196-1201 | EVIDENCE_NOT_LINKED: this test does not assert B+active-Z+U=W |
+| 69 · box CRUD/move/restack | warehouse_map boxes<br>box placement changes B; ledger invariant/effect applies only where physical operation records it | PARTIAL<br>backend/tests/routers/test_items_soft_delete.py:413-457 asserts positive box placement blocks delete | EVIDENCE_NOT_LINKED: direct move/restack B+active-Z+U=W or stable-row assertion |
+| 70 · special-zone CRUD/items | warehouse_map zones<br>active-zone placement participates in ledger invariant; stale inactive-zone operation cancel is conflict | PARTIAL<br>backend/tests/routers/test_inventory_operations.py:181+ inactive-zone preview/cancel conflict; CP5W2 A:1196-1201 | EVIDENCE_NOT_LINKED: direct zone CRUD/items invariant assertion |
+| 71 · item create with initial_quantity>0 | POST /api/items -> items.create_item<br>For q=initial_quantity>0, a=sum(initial_locations), and u=q-a: W+u; B0, active-Z0, U+u; P[each requested department]+allocated quantity (sum +a), F0; T+q. The same request creates Item/Inventory/U/location state, an items/initial_stock InventoryOperation and PRIMARY RECEIVE log/effect, and item.create audit. VerifiedActor plus X-Admin-Pin is required. No reservation/pending state is created. | PARTIAL<br>Runtime: backend/app/routers/items.py:157-163 requires VerifiedActor and require_admin_pin; items.py:227-269 validates allocation and creates T/W/U/P rows; items.py:271-301 creates the operation/log/effect, audit, and final commit. Actual request body/header helper: backend/tests/routers/test_items_create.py:40-63. Direct tests: backend/tests/routers/test_items_create.py:87 test_create_item_initializes_unplaced_with_the_warehouse_remainder (q=12,P=5,U=7); :108 test_create_item_positive_warehouse_records_v2_exact_physical_effect (q=12,W/U effects and PRIMARY log); :176 test_create_item_full_location_allocation_records_v2_location_effect (q=7,P=7,W/U=0 location effect); :469 test_create_sum_exceeds_initial_quantity_422. | EVIDENCE_NOT_LINKED: no accepted fixed-bff row-specific execution receipt joins the actual POST body to final Item/Inventory/P/W/U/T, audit and operation rows. Existing direct tests do not inject item.create audit/flush/final-commit failures, so request-wide rollback on those failures is not directly established; the generic admin dependency tests are not a route-specific wrong-PIN/no-mutation oracle. This audit omission is not itself a confirmed product defect. |
+| 72 · inventory integrity repair with dry_run=false | POST /api/settings/integrity/repair -> integrity.repair_inventory_totals<br>For each mismatch with dry_run=false: W0, P0, F0, B0, active-Z0, U0; T is overwritten from recorded T to W+sum(all InventoryLocation quantities), so delta-T=(W+sum(P/F))-recorded T. It creates no InventoryOperation/TransactionLog/effect and changes no reservation; it writes settings.integrity_repair audit and commits repair, audit, and any lazy admin-PIN migration once. Body is {pin,dry_run:false}; VerifiedActor, rate limit, admin PIN, and credential lock apply. With dry_run=true it reports mismatches but performs inventory/PIN/audit/flush/commit writes 0. | VERIFIED<br>Runtime request/schema/auth: backend/app/routers/settings.py:45-49,235-257,321-355. Runtime calculation: backend/app/services/integrity.py:74-84,120-175. Actual body plus independent raw-SQL observers: backend/tests/routers/test_settings_integrity.py:74-103,296 test_integrity_repair_commits_inventory_and_audit_atomically ({pin:'0000',dry_run:false}, corrected totals, repaired 2 rows audit, one commit); :329 test_integrity_repair_dry_run_has_zero_side_effects; :379 test_integrity_repair_migrates_legacy_pin_in_the_single_final_commit; :503 test_settings_admin_pin_failures_share_dependency_rate_limit; :598 test_integrity_repair_failure_rolls_back_pending_admin_pin_change; :650 test_integrity_repair_failures_rollback_inventory_and_audit (inventory flush/audit record/audit flush/final commit faults). Service transaction boundary: backend/tests/services/test_integrity.py:120 test_repair_flushes_without_committing_and_can_be_rolled_back and :147 test_repair_dry_run_has_no_flush_or_commit. Accepted IC-05 receipt: _attic/docs/research/2026-08-13-full-code-quality-audit-and-improvement-plan.md:735-745,1768-1770. | None for the defined maintenance contract: accepted IC-05 covers apply/dry-run, one final commit and independent-SQL inventory/audit rollback at all four faults (inventory_flush, audit_record, audit_flush, final_commit). Lazy/missing admin-PIN rollback is directly asserted only for audit_record and final_commit; the other two PIN outcomes follow the shared transaction statically and are not four separate PIN tests. This does not claim B+active-Z+U=W repair, PostgreSQL row-lock behavior, or a user UI; the endpoint intentionally repairs aggregate T only and settings.py:4 states the frontend does not use it. |
+
+72번 추가 행의 독립 검토는 Critical/Important0이다. Minor1 문구는 실제 `backend/tests/routers/test_settings_integrity.py:596-675`와 재대조해 inventory/audit 네 실패 경계와 PIN 두 실패 경계의 직접 증거를 분리했다. shared transaction에서 귀결되는 동작을 추가 직접 실행처럼 쓰지 않았다.
+
+#### 12.29.3 CQ·RV·IC 전수 현재 상태
+
+`COMPLETE`는 해당 카드의 명시 구현·검증 범위다. 외부 설정 미검증과 사전 부채를 지우지 않는다. CQ29개(원래 CQ-008 결번, CQ-030 포함), RV8개, IC27개는 정본 집합과 양방향 차집합0·중복0이다. 최종 집계는61 COMPLETE/3 NOT_VERIFIED이며 CQ-021의 B6/B7 후속 검증도 인수했다.
+
+| ID | 원래 문제·대응 | 현재 판정 | 근거·잔여 경계 |
+|---|---|---|---|
+| CQ-001 | 서버 검증 없는 actor 위장 mutation · IC-01 | COMPLETE | audit §12.13, canonical:1846; audit:15 |
+| CQ-002 | 일반 취소가 출하/생산 상태와 물리 재고를 분리 · IC-03 | COMPLETE | audit §12.22 Gate C, canonical:1980-1991 |
+| CQ-003 | 일반 부서조정 scrap의 무음 성공 · IC-02 | COMPLETE | audit §9 checkpoint-1 evidence, canonical:537; audit:88 |
+| CQ-004 | 무결성 repair와 audit/commit 분리 · checkpoint-1 integrity repair | COMPLETE | audit RESOLVED_CHECKPOINT_1 closeout, canonical:538; root-cause linkage:739 |
+| CQ-005 | 동일 key의 다른 의미 payload가 이전 성공처럼 반환 · IC-09 | COMPLETE | audit §CP4 final card, canonical:1915; QP linkage:617 |
+| CQ-006 | 출하 allocation과 다른 소비 primitive의 경쟁 · IC-07 | COMPLETE | audit §12.21 Gate B, canonical:1964-1976 |
+| CQ-007 | box/zone physical placement와 출고 effect 불일치 · IC-06 runtime, IC-07, IC-03 | COMPLETE | audit IC-06 physical ledger completion:1200-1201; §12.21-12.22 Gates B/C:1964-1991 |
+| CQ-009 | 삭제 품목이 신규 명령에 재사용 · IC-11 | COMPLETE | audit §CP4 final card, canonical:1915 |
+| CQ-010 | 부서 저장 완료 전 이동 · IC-12 | COMPLETE | audit §12.27.1, canonical:2110-2121 |
+| CQ-011 | 출하 dirty가 실제 수정 아닌 화면명으로 결정 · IC-13 | COMPLETE | audit §12.27.2, canonical:2123-2137 |
+| CQ-012 | readiness가 allocation/location 불일치를 hard-fail하지 않음 · IC-17 | COMPLETE | audit §12.23 W5, canonical:1995-2007 |
+| CQ-013 | backup verifier/restore가 전체 schema와 head를 증명하지 않음 · IC-18 | COMPLETE | audit §12.24 W6, canonical:2011-2022 |
+| CQ-014 | WAL freshness와 DB-absent readiness 위험 · IC-18 | COMPLETE | audit §12.24 W6, canonical:2011-2022 |
+| CQ-015 | E2E selector/자가승인 expectation과 console 실행 drift · IC-20 gate | COMPLETE | audit checkpoint-1 evidence, canonical:574; CP2 CI history:1823 |
+| CQ-016 | PostgreSQL concurrency/Ruff-mypy gate coverage · IC-20 | NOT_VERIFIED | audit canonical:575; actual CI/required-check note:15<br>외부 required-check 적용 증거; 전체 사전 Ruff 부채 해소는 이 카드의 완료 조건으로 추가하지 않는다. |
+| CQ-017 | frontend app/test/E2E type gate와 baseline drift · IC-20 | NOT_VERIFIED | audit canonical:576; actual CI/required-check note:15<br>외부 required-check 적용 증거; 기존 baseline debt는 별도 보존. |
+| CQ-018 | 수동 DTO와 backend contract drift · IC-21 / B1 | COMPLETE | audit §12.28.2 B1 CI acceptance, canonical:2225-2238 |
+| CQ-019 | 부서 server-state 다중 정본 · IC-14 | COMPLETE | audit §12.27.1, canonical:2110-2121 |
+| CQ-020 | 무제한 active shipping/N+1/mobile pagination · IC-16 | COMPLETE | audit §12.27.2, canonical:2123-2137 |
+| CQ-021 | orphan production deploy script의 안전한 운영 계약 부재 · AT-01 / B6 | COMPLETE | 12.28.16~17·12.30, B6 commit173cb894, parser/consumer/hash·독립 리뷰 C/I/M0, exact CP7 및 품질 통합 CI6/6. 배포 도구의 안전한 현역 기능을 새로 만든 것이 아니라 orphan을 운영 진입 경로에서 분리·보존한 완료다. |
+| CQ-022 | 운영/온보딩 문서 링크·환경 설명 drift · DOC-01 / B5 | COMPLETE | audit §12.28.12 B5, canonical:2322-2325; parent actual exact-bff9 CI34168183559 6/6 in cp7-b3-b4-recovery-b5-ci-final.json |
+| CQ-023 | dependency advisory와 production/dev 취약점 분리 · IC-22 / B2 | COMPLETE | audit §12.28.7 final B2 CI, canonical:2278-2283 |
+| CQ-024 | 부서 SHIP 정정이 warehouse 재고를 바꾸는 위치 오염 · CP4 correction guard/test | COMPLETE | CP4 Hard stop A / CI33099973906, canonical:1908; fixed CP4 blob source transaction_actions.py:375-429, backend/tests/routers/test_transaction_edit.py:507-599,1144-1197 |
+| CQ-025 | KPI와 drill-down 목록 모집단 불일치 · IC-25 | COMPLETE | audit §12.27.4, canonical:2154; scope evidence:2198 |
+| CQ-026 | 일일보고 첫 작성자 선택에도 붙는 animation 조건 drift · IC-26 | COMPLETE | audit original/root-cause and later-card linkage:583,998,1729,1741; CP6 A4/A5 scope:2154,2198 |
+| CQ-027 | DB helper가 실제 DATABASE_URL과 다른 DB를 보호/검증 · IC-27 | COMPLETE | audit canonical:548; checkpoint summary:87 |
+| CQ-028 | 일반 server start의 DB mutation/employee preflight 우회 · IC-27 | COMPLETE | audit canonical:549; checkpoint summary:87 |
+| CQ-029 | schema readiness 상태 label/exit drift · checkpoint-1 ops contract | COMPLETE | audit canonical:584 |
+| CQ-030 | E2E Node 20 계약 부재 · IC-20 gate | COMPLETE | audit canonical:585; B2 exact CI:2283 |
+| RV-001 | timeout 뒤 새 idempotency key 재시도 중복 반영 · IC-09 | COMPLETE | audit RV definition:557; QP/IC linkage:617,1915 |
+| RV-002 | cutover 뒤 open shipping pickup 정책 · IC-04 | COMPLETE | audit IC-04 status-table/kill-switch:1136-1137; local PG/review closeout:1806; actual-operation prohibition:35 |
+| RV-003 | shipping prepare/pickup/cancel race · IC-07, IC-08 | COMPLETE | audit RV definition:559; CP5 Gate B:1964-1976 |
+| RV-004 | handover/correction/cancel owning-row race · IC-10, IC-03; B4-R1 | COMPLETE | audit CP5 Gate C:1980-1991; B4 local evidence:2306-2312; parent actual exact-bff9 CI34168183559 6/6 in cp7-b3-b4-recovery-b5-ci-final.json |
+| RV-005 | warehouse optimistic rollback이 최신 성공을 덮음 · IC-15 | COMPLETE | audit RV definition:561; CP6 A3:2140-2153 |
+| RV-006 | BOM auto/manual 늦은 응답 state 경합 · IC-13 | COMPLETE | audit RV definition:562; CP6 A2:2123-2137 |
+| RV-007 | defect IO approval policy/preview-dispatch drift · IC-24 / B4 | COMPLETE | audit decided policy:2099; B4 linkage:2297-2310; parent actual exact-bff9 CI34168183559 6/6 in cp7-b3-b4-recovery-b5-ci-final.json |
+| RV-008 | 동시 schema prepare의 stop/backup/migrate race · IC-27 | COMPLETE | audit RV definition:564; checkpoint summary:87 |
+| IC-01 | 검증된 작업자 session/공통 actor 경계 · CP3 | COMPLETE | audit:1846; canonical:90 |
+| IC-02 | general department scrap fail-closed · checkpoint-1 | COMPLETE | audit:33,88,537 |
+| IC-03 | workflow cancellation/correction atomic restoration · CP4 then CP5 W4 | COMPLETE | audit Gate C:1980-1991; CP5 closeout:2036 |
+| IC-04 | inventory cutover fail-closed shipping lifecycle · checkpoint-2 | COMPLETE | audit:35; historical CI boundary:1823 |
+| IC-05 | integrity repair/audit transaction ownership · checkpoint-1 | COMPLETE | audit:88,538 |
+| IC-06 | read-only preflight 뒤 additive physical ledger(B+active Z+U=W), stable UUID effect, exact reversal · CP5 W1 then Gate-A-approved runtime/W2 | COMPLETE | audit explicit completion:1200-1201; W1/Gate A boundary:1947-1960; CP5 closeout:2036 |
+| IC-07 | common availability and shipping reservation · CP5 W3 | COMPLETE | audit:1964-1976; CP5 closeout:2036 |
+| IC-08 | IO/StockRequest conditional transition and shipping state machine · CP5 W3 | COMPLETE | audit:1964-1976; CP5 closeout:2036 |
+| IC-09 | semantic idempotency fingerprint/replay · CP4 | COMPLETE | audit:1915; QP linkage:617 |
+| IC-10 | handover/correction/cancel conditional locking · CP4 | COMPLETE | audit:1915 |
+| IC-11 | active/deleted item command separation · CP4 | COMPLETE | audit:1915 |
+| IC-12 | department dirty/Promise save/navigation guard · CP6 A1 | COMPLETE | audit:2110-2121 |
+| IC-13 | shipping BOM async ownership and dirty contract · CP6 A2 | COMPLETE | audit:2123-2137 |
+| IC-14 | department server-state single source · CP6 A1 | COMPLETE | audit:2110-2121 |
+| IC-15 | warehouse mutation ownership/rollback convergence · CP6 A3 | COMPLETE | audit:2140-2153 |
+| IC-16 | shipping paging/N+1/mobile load-more · CP6 A2 | COMPLETE | audit:2123-2137 |
+| IC-17 | blocking inventory integrity contract · CP5 W5 | COMPLETE | audit:1995-2007; CP5 closeout:2036 |
+| IC-18 | backup/restore schema and WAL proof · CP5 W6 | COMPLETE | audit:2011-2022; CP5 closeout:2036 |
+| IC-19 | live/ready/detailed health meaning separation · CP5 W7 | COMPLETE | audit:2026-2036 |
+| IC-20 | CI/e2e/type gate and required-check boundary · checkpoint-2 | NOT_VERIFIED | audit:1823; current boundary:15<br>implementation and actual CI history are complete; external required-check policy evidence remains separate. |
+| IC-21 | generated raw API type/adapter contract · CP7 B1 | COMPLETE | audit B1 final CI:2238 |
+| IC-22 | dependency advisory/compatibility staged update · CP7 B2 | COMPLETE | audit B2 final CI:2283 |
+| IC-23 | error summary/focus/keyboard/axe in core workflows · CP7 B3 | COMPLETE | audit B3 local evidence:2285-2293; parent actual exact-bff9 CI34168183559 6/6 in cp7-b3-b4-recovery-b5-ci-final.json |
+| IC-24 | approval policy locality and defect IO drift · CP7 B4 + recovery | COMPLETE | audit B4 local evidence:2302-2312; recovery boundary:2314-2320; parent actual exact-bff9 CI34168183559 6/6 in cp7-b3-b4-recovery-b5-ci-final.json |
+| IC-25 | KPI/list population explanation · CP6 A4 | COMPLETE | audit:2154; scope evidence:2198 |
+| IC-26 | 일일보고 첫 작성자/다른 작성자 전환 animation 계약 · CP6 A5 | COMPLETE | audit:2154; scope evidence:2198 |
+| IC-27 | read-only startup DB protection · checkpoint-1 | COMPLETE | audit:87; CQ27 linkage:548 |
+
+#### 12.29.4 QP-001~QP-023 재판정
+
+QP-013A/B를 분리한24행이다. 해결16·부분 해결7·근거 부족1이며 과거 판정을 병기한다. 현재 IC의 승인 범위를 구현했다는 사실을 ‘기존 코드의 모든 부채까지 해결’로 바꾸지 않는다.
+
+| QP | 과거 → 현재 | 근거 | 남은 범위 또는 해석 경계 |
+|---|---|---|---|
+| QP-001 | 해결 → 해결 | IC-09; audit:617 | 없음 |
+| QP-002 | 해결 → 해결 | IC-01; audit:618 | 없음 |
+| QP-003 | 부분 해결 → 부분 해결 | IC-27 startup identity, IC-20 CI gate; audit:619; exact-bff9 PostgreSQL CI job success | 후속 업무별 DB/dialect 경합 범위와 external required-check는 별도다. |
+| QP-004 | 부분 해결 → 부분 해결 | IC-24/RV-007 fixed policy and exact-bff9 CI; audit:620,2099,2302-2310 | IC24가 다룬 창고/부서 승인 큐의 role·list·count·button·approve/reject 및 기존 self/admin·defect 예외 분리는 exact-bff9 근거로 닫혔다. 이 증거를 다른 도메인의 모든 authorization을 단일 전역 함수로 합쳤다는 주장으로 확대하지 않는다. |
+| QP-005 | 해결 → 해결 | IC-01; audit:621 | 없음 |
+| QP-006 | 해결 → 해결 | IC-07/08; audit:622,1202 | 없음 |
+| QP-007 | 해결 → 해결 | IC-03/10 plus B4-R1 exact-bff9 CI; audit:623,1203,2306-2311 | 없음 |
+| QP-008 | 해결 → 해결 | IC-05; audit:624 | 없음 |
+| QP-009 | 해결 → 해결 | IC-11; audit:625 | 없음 |
+| QP-010 | 미해결 → 해결 | IC-12 CP6 A1 and CI lineage; audit:626,2110-2121 | 없음 |
+| QP-011 | 미해결 → 해결 | IC-13 CP6 A2 and CI lineage; audit:627,2123-2137 | frozen step-5 geometry is preserved; no broader UI refactor is asserted. |
+| QP-012 | 부분 해결 → 부분 해결 | IC-20 gate; 최종 전용 E2E24/24·frozen 두 flag의 기하/스타일 검증, exact CP7/품질 CI success | external required-check policy는 NOT_VERIFIED다. CI의23PASS/선택 frozen1SKIP과 로컬24/24·모바일 PNG 동일·desktop 기하/스타일 근거를 구분한다. |
+| QP-013A | 해결 → 해결 | IC-01; audit:629 | 없음 |
+| QP-013B | 해결 → 해결 | IC-01; audit:630 | HTTPS is a separately named SEC-01 follow-up, not this QP's reopened condition. |
+| QP-014 | 부분 해결 → 부분 해결 | exact-bff9 backend CI success with Ruff/mypy baseline; audit:631 | whole-backend Ruff debt and Python-matrix expansion are not claimed solved. |
+| QP-015 | 부분 해결 → 부분 해결 | exact-bff9 frontend lint/type/test-type/coverage/build/bundle success | known test-type debt 392/new 0, coverage expansion and baseline reduction remain; they are not CI failures. |
+| QP-016 | 미해결 → 해결 | IC-23 B3 focused keyboard/axe evidence and exact-bff9 CI; audit:633,2285-2293 | selected core workflows only; no app-wide WCAG certification is asserted. |
+| QP-017 | 부분 해결 → 해결 | IC-14 CP6 A1; audit:634,2110-2121 | 없음 |
+| QP-018 | 근거 부족 → 근거 부족 | audit:635 | shipping module refactor/remeasurement has not been performed or inferred. |
+| QP-019 | 해결 → 해결 | audit:636 | 없음 |
+| QP-020 | 미해결 → 해결 | IC-21/B1 exact CI; audit:637,2238 | 없음 |
+| QP-021 | 부분 해결 → 해결 | IC-16 pagination plus IC-19/27; audit:638,2123-2137 | 없음 |
+| QP-022 | 부분 해결 → 부분 해결 | B5 DOC-01 exact-bff9 CI; frontend build/bundle job success | responsive shell/static-import measurement and any resulting decision are not evidenced as complete. |
+| QP-023 | 부분 해결 → 부분 해결 | IC-22 dependency gate·IC-24 및 AT-01/02 최종 CP7/품질 CI; 12.30절 | 승인된 이동·중복 자산 정리·원본보존과 최종 통합을 완료했다. 기존의 더 넓은 측정형 위생 부채·Next Minor1·ESLint9 EOL 예외는 자동 해소하지 않는다. |
+
+#### 12.29.5 전체 파일 원장·역할·검토 깊이
+
+원 감사10절의 원장 수량은 역사 snapshot이다. 현재 정본은 Git 고정 tree와 파일별 원문 검토 record를 연결한 `b7-normalized-final-role-ledger.json`이다. 파일 전체 표를 본문에 중복하지 않고 path/blob·role·실제 consumer/test/finding·검토 깊이·근거 파일 SHA가 함께 있는 기계 원장을 정본으로 보존한다.
+
+| 검산 | 현재 고정 snapshot 결과 |
+|---|---|
+| 고정 커밋 / tree | f3d63991c2e1235bea8637bcb62553eb0ead4116 / 171452905c18f67a4f936c9abd0666e7275f23bc |
+| Git 추적 경로 / 원장 | 2,563 / 2,563 |
+| 경로 양방향 차집합 / 중복 / blob 불일치 | 0 / 0 / 0 |
+| 근거 파일 직접 SHA-256 대조 | 30개 모두 일치 |
+| 역할 미분류 | 0 |
+| primary role | runtime600, test551, migration40, CI23, ops78, dev-tool108, documentation174, generated4, asset553, frozen9, historical423 |
+| 원장 SHA-256 | aec6770bddff3d8b0e599c7a81da15b25794ac3ce64bd7390dd0f91886c9b3e2 |
+| exact-blob composer SHA-256 | 73de22ab8bdae278d00485b0c094bc1a7c8a415d279d6adcb84e52de451f4827 |
+| stale 역사 근거 | 178개는 현재 증명에서 제외하되 기록 보존 |
+
+총괄의 실제 `2e7fcf`는 Git 객체와 현재 원장을 독립 대조했다. primary frozen9에는 frozen 디렉터리의 테스트3개도 포함한다. 모바일 nav/pill·global opt-out은 파일 전체가 아니라 부분 동결이며 runtime과 sub-scope를 함께 보존한다. MobileWeeklyScreen의 source WEEKLY_READ_ONLY는 기록 속성이지 새 파일 전체 동결 승인으로 확대하지 않는다.
+
+원 source의 461종 설명형 역할을 총괄이 전부 읽고 의미별11개 역할에 명시 매핑했다. 역할 필드가 없던148개는 과거 purpose/consumer/contract와 exact blob을 사용해 보완했다. 이전 ‘미분류920’은 source JSON 형식(rows/files/records/compact entries)을 잘못 읽은 진단 오류였고 실제 역할누락으로 확정하지 않았다. `UNKNOWN`, `NOT_FOUND_IN_SCOPE`, metadata/AST-only 깊이는 그대로 보존하며 분류0을 전수 동적 PASS로 바꾸지 않는다.
+
+증거 경로: CP7 worktree의 `_attic/runtime/code-quality-improvement/20260908-cp7-b8-final-status-proposal/`에 normalized ledger·명시 role map·현재72행·CQ/RV/IC64행·QP24행이 있다. B1~B7 chronological enrichment는 `20260908-cp7-b8-b7-delta/b7-parent-composition.json`, 원 source/hash index는 품질 worktree의 `20260907-cp6-cp7-supervisor/cp7-b8-role-evidence-index.json`에 있다. 모든 source는 정확 path/blob와 SHA로 연결되며 제품 검증을 재실행하지 않는다.
+
+이 절과 최종 인수 문서2개 및 후속 waitFor 테스트1개는 f3d63991 이후의 별도 증분이다. 문서는 docs gate, 테스트는 직접 RED/GREEN·coverage·독립 리뷰와 증분 원장으로 새 tree에 연결한다. 이 테스트-only 수정 때문에 이미 통과한 backend 정적·PostgreSQL 검사를 반복하지 않는다.
+
+#### 12.29.6 최초 최종 full 결과와 남은 종료 검증
+
+최종 full은 CP7 전용 run `9615a0685eab41c99a187ee9d9f473df`에서 실제 실행됐고 **exit1·730,756.579ms**로 종료됐다. 검증 child PID48268·wrapper session29034·전용 PostgreSQL test_cp7_final_9615a0685eab@55438 및 Node20/ownTEMP, frozen 두 환경변수를 고정했다. 총괄2ffb5b/1a7fd9가 원본 timing/result/cleanup/실패 stack을 읽었다.
+
+| 실행 영역 | 실제 결과 |
+|---|---|
+| backend Ruff / mypy | PASS / PASS |
+| PostgreSQL 필수 검사 | FAIL. 복구 manifest·crash receipt 관련3개 FileNotFoundError; 긴 Windows 임시 경로 가능성을 조사하며 아직 제품 결함으로 확정하지 않음 |
+| frontend lint / app type / test type / E2E type | 4개 PASS. test type285파일·기존392/new0 |
+| frontend coverage | FAIL. 279파일 중278PASS/1FAIL, 2,632테스트 중2,631PASS/1FAIL. DesktopShippingView.test.tsx:3214의 Standard PA 기대 불일치; coverage 수치 통과로 승격하지 않음 |
+| 뒤의 backend full pytest/OpenAPI, build/bundle, docs, DB, E2E | 이 최초 명령에서는 미실행. 선행 실패와 분리해 후속 실행 필요 |
+| 출력 수집 | frontend stdout 파일 사용 중 오류도 원본 stderr에 보존. 영역 실패를 지우는 근거가 아님 |
+| 종료 | cleanup error0, PostgreSQL status3·소유55438 AVAILABLE, worktree DB family 불변, E2E 임시 DB/receipt/lock 부재. stopped own PGDATA는 ignored 안에 보존 |
+
+최초 full은 실패 사실을 그대로 유지한다. 성공한 정적 영역을 다시 돌리지 않고 두 실패의 원인을 분리해 직접 재현/국소 수정·검증한 뒤 미실행 영역을 이어간다. 실제 복구가 끝나기 전에 전체 PASS나 CP7 완료를 표시하지 않는다.
+
+마지막 인수에는 실패/미실행 영역 복구, 명세/품질 독립 리뷰, 두 frozen flags의 characterization·로그인 screenshot·UI/API/독립 SQL, DB family 불변/원래 부재 복원, own PG/E2E 종료, CP7 push/CI, 품질 fixed-base/exact-tree merge와 최종 CI·clean/upstream이 필요하다. main 역병합·PR·배포 및 새 main 동기화는 수행하지 않는다.
+
+문서 독립 검토는 C0/I0/M2였고, 두 Minor는 inventory matrix의 잘못된 docs-only key 이름과 MobileWeeklyScreen의 source-marker/동결 범위 표기를 교정했다. 부모bf105c가 수정된 marker·역할 집계·최종 원장 SHA를 확인했다. 행72의 inventory/audit/PIN fault 증거 범위도 부모182cab로 분리했다. 이 문서 검토는 아직 끝나지 않은 제품 full/CI 인수를 대체하지 않는다.
+
+#### 12.29.7 최종 full의 국소 복구 인수
+
+- PostgreSQL: 최초 실패한 정확3 selector만 새 전용 DB와 짧은 ignored basetemp에서 재실행했다. `pg-retry-2d86469d8c3049539a8ba079732ade43/command.json`, `result.json`, `pg-retry.xml`의 실제3PASS/skip0/failure0/error0·exit0을 총괄aad48c가 읽었다. 검사203.880초, 준비·정리 포함289,876.004ms이며 제품/migration 변경은 없다. 동일 검사와 코드에서 임시 경로만 줄여 통과했으므로 최초3실패는 Windows 긴 경로 환경 문제로 분류한다. 원본 full의 FAIL은 보존한다.
+- PostgreSQL 종료: 원본 종료 결과 cleanup error0·pg_ctl status3·전용55438 AVAILABLE 및 전용 DB drop exit0을 확인했다. stopped cluster 파일은 소유 ignored 경로에 보존한다. 총괄8fe075는 retry harness 전체의 고유 경로·실제 data_directory 대조·세 환경변수·정리 경계를 읽었다.
+- 화면 테스트: `frontend/app/mes/_components/__tests__/DesktopShippingView.test.tsx:3213-3218`이 PA/PF 생성 표시만이 아니라 실제 prefill 이름까지 함께 기다리도록 assertion 위치만 변경했다. 제품의 별도 effect(`DesktopShippingView.tsx:1716-1732`)와 후속 입력값 검사(:3231-3234)를 보존한다. 직접 selector RED→GREEN 뒤 독립 명세 `cp7_final_waitfor_spec_review`·품질 `cp7_final_waitfor_quality_review` 모두 C0/I0/M0를 인수했다. 검토 blob은 `b7b8db69b05b7f90c3103c930ac0759285e4426e`이며 `20260908-cp7-final/waitfor-parent-reviews.json`에 실제 명령·범위·한계를 기록했다. 이 테스트 검토는 CP7 전체 종료 검증을 대체하지 않는다.
+- coverage 후속 실행: shipping 기존 실패는 해소됐으나 `development-startup.test.ts:64`의 dev/start 두 검사에서5초 timeout이 발생했다. 실제278파일PASS/1FAIL·2,630테스트PASS/2FAIL·exit1(689,996.43ms)을 총괄0ad742/4e628c로 확인했다. backend 병행에 따른 자원 경합 가능성은 아직 가설이며 backend 종료 후 정확 두 항목을 단독 검증한다. 코드 불변 환경성 실패로 확인될 때만 같은 로컬 전체 coverage를 세 번째 반복하지 않고, 로컬 수치는 `NOT_REPORTED`로 보존한 채 최종 exact commit의 실제 GitHub 전체 coverage·threshold 성공을 필수 정본으로 인수한다. 실제 coverage 미달 또는 미해결 제품/테스트 실패는 이 예외에 포함하지 않는다.
+- 문서: 이 후속 증분 전의 정본 문서2개는 총괄 docs gate(session47826, ccf7a3)에서3PASS·단위14PASS/1Windows symlink 권한 SKIP·exit0이었다. 후속 최종 문서 증분은 종료 시 docs 검증으로 연결한다.
+- backend 전체 pytest 보충 실행: session42477은 exit1로 종료됐다. 원본 progress/실패 목록에서2,898건=2,682PASS/62FAIL/154SKIP·error0 및 중복 없는62개 실패를 총괄6049b0가 집계했고, timing497d00의 gate1,624,754.663ms를 확인했다. 긴 shared TEMP의 백업/restore pending 경로 FileNotFoundError·SQLite open 실패가 나타나지만 모든 실패를 일괄 환경 문제로 확정하지 않는다. 원인별로 대조하고 정확62개만 짧은 전용 basetemp에서 재검증한다. PostgreSQL 전용 skipped 항목은 별도 필수 PG 원본128PASS/3FAIL과 정확3개 복구PASS 근거로 구분하며, 나머지 skip을 자동 PASS로 바꾸지 않는다.
+- 보충 실행 직후 CP7의 `backend/mes.db`, `-wal`, `-shm`은 모두 원래와 같이 부재다(원본272c76·실제3b7d6f). 구현 작업은 일시적인 사용량 오류로 한 번 종료됐으나, 추가 결제·초기화 없이 같은 작업을 재개했다. 이 상태는 제품 검증 완료나 새 외부 blocker 판정을 뜻하지 않는다.
+- backend 국소 복구 완료: `backend-failed-retry/junit.xml`의62개 nodeid와 원본 FAILED62개를 총괄5fb790이 독립 변환·대조해 양방향 차집합0/중복0을 확인했다. 실제62PASS·failure/error/skip0·exit0,819,499.045ms다. `run-backend-failed-retry.ps1`은 새 ignored 경로 충돌을 거부하고 정확62개만 골라 실행했다(부모f75ae9). 제품·테스트 경로는 바꾸지 않았다. 계약 실행 전264자 복사 경로의 WinError206과 별도30초 timeout은 독립 읽기 전용 조사 `cp7_final_nonpath_failure_triage`로 분리했으며, 후자도 단독 중부하 실행에서 통과했다. 원본2,682PASS에 실패62개 복구를 합산하는 증거이지 원본 full 명령 exit0이나154SKIP의 자동 PASS를 뜻하지 않는다.
+- frontend 후속 인수: `frontend-startup-retry/`는 정확 mode dev/start2개가5초 제한을 바꾸지 않고 각각2,962/4,044ms로 통과했다(2PASS/필터15SKIP). 원본 coverage의 시간제한 실패를 부하성 환경 실패로 분리하고 로컬 coverage 수치는 `NOT_REPORTED`로 유지한다. 실제 production build `be67f018`은 exit0·82,317.423ms, bundle `c5f8e165`는2PASS·2,367,531bytes<승인2,553,282.56bytes·exit0이다. 첫 build 캡처의 상대 Tee 경로 오류는 보존하고 절대 로그 경로에서 실제 결과를 확보했다. OpenAPI exact는 `adf8aa2e` exit0·26,028.549ms였다. 이 통과 검사를 반복하지 않고 최종 E2E/CI 인수를 이어간다.
+
+- 공식 최종 E2E: `e2e-full/output.log`의 실제24/24PASS·exit0과 `result.json`의187,839.795ms를 총괄이 직접 확인했다(원본8bf4796f·총괄07c540). 두 frozen 환경변수를 사용했고 desktop step5/mobile nav PNG·layout metrics·A4/A5·독립 SQL/API/UI JSON이 생성됐다. 창고 보정 오라클은 SQL 총량498→499·창고436→437·부서62불변, 응답 총량499/창고437 및 화면 available499/창고437을 대조한다. 이 한 사례의 일치는 전체 작업 또는 operation effect까지의 동적 증명을 뜻하지 않는다. frozen 산출물의 의미·비교 범위는 별도 읽기 전용 리뷰로 인수한다.
+- E2E 종료: result의 `real_db_before/after`에서 CP7 `mes.db/-wal/-shm`은 모두 부재로 동일했고 `guarded_artifacts_present=[]`, 원본 runner는 ownership released/cleanup-complete였다. 이는 테스트 소유 자원 정리의 근거이지 알 수 없는 기존 listener까지0이라는 뜻은 아니다. 원본의 기존 DailyWorkActivity setState 경고와 aborted/ECONNRESET stderr도 보존하며 무경고 실행으로 바꾸지 않는다.
+- 최종 화면 명세 리뷰: `cp7_final_e2e_evidence_review`는 C0/I0/M0·PASS였다. 총괄84c022는 실제 테스트의 두 flag/skip guard·baseline 비교·style assertion·SQL/API/UI/ADJUST 이력 검사를 다시 읽었다. 최종 metrics는 같은 viewport의 baseline과 같고 변경품 목록58px·2열·내부 세로 scroll 계약을 유지한다. 모바일 PNG의 SHA-256은 기준과 동일한 `1d60bedd2e58d680bed1e8efd8080c223ca1813e371c705cba2d2defd6463952`다. 데스크톱은 box/style 계약 일치이며 PNG byte-identical 또는 전체 pixel0을 주장하지 않는다.
+- B7 로그인 증명: `b7-login/output.log` 실제1PASS·exit0 및 result44,461.785ms, 전용 frontend3300/backend8022·소유 자원 정리를 총괄b299d8로 확인했다. 1440×900 screenshot을 직접 보았고 logo naturalWidth2172·보존 mascot WebP260·삭제 PNG9개의 요청0을 JSON과 대조했다. 이미지 복사본 제거 후 실제 로그인 consumer가 유지됨을 증명하며 로그인 인증 전체 재감사를 의미하지 않는다.
+- 합성 DB read-only: 최초 wrapper는 Alembic 출력의 `(head)` 가정 오류로 canonical 배치 전에 중단했다. 두 번째 전용 fixture는 version/head `20260907_0034` 일치 후 배타 배치했고 공식 gate는847.992ms·exit0·mismatch0였다(총괄e18b17). 합성 원본과 검사 전후 본체 SHA-256은 모두 `881e22e5bdccbf99c63c38b0f1de3575619fda106e279722e3d9f417b7c62683`이다. 이 seed fixture의 품목/재고는0이며 검사 연결·schema·무변경 계약만 증명한다. 실제 재고 이동 증거는 위 E2E 및 업무별 원장/PG 자료와 별도로 인수한다.
+- 합성 DB 종료 복구: SQLite read-only 연결이 WAL-mode fixture에 만든0-byte WAL/32,768-byte SHM 때문에 wrapper 종료는 실패했다. 원본 `db-readonly-retry/result.json`을 보존했고, 추가 gate를 반복하지 않았다. 초기 부재·현재 hash·배타 접근을 확인한 정확 두 sidecar만 overwrite 없이 같은 run의 `leftover-sidecars/`로 회수했다. 총괄b471a3의 `cleanup-recovery.json`에서 canonical DB family3개 부재와 목적지 hash 보존을 확인했다. 합성 DB 본체/회수 sidecar는 ignored 증거로 남아 있으므로 파일 생성0·데이터삭제0 또는 처음부터 cleanup PASS로 표현하지 않는다. 실제 main/직원 DB는 이 검사에 사용하지 않았다.
+
+현재 남은 종료 검증은 최종 문서·증분 원장/리뷰, exact commit의 GitHub coverage 포함 전체 CI 및 품질 통합이다. 성공한 backend 정적·PG/pytest 국소 복구·frontend startup/OpenAPI/build/bundle/E2E/login/DB gate는 반복하지 않는다. 모든 구성 검사·최종 원격 CI·품질 통합이 끝나기 전에는 최초 full 성공, CP7 종료, Goal 완료로 기록하지 않는다.
+
+### 12.30 CP6·CP7 종료 및 품질 브랜치 인계 (2026-09-08)
+
+#### 12.30.1 작업자 최종 결론: 조건부 사용 가능
+
+승인된 재고 이동·예약·멱등 재시도·업무 취소·화면 갱신·무결성/복구 계약에는 코드와 격리 검증 근거가 있다. CP6는 저장 실패·편집 유실·늦은 응답·캐시·페이지 누락을, CP7은 타입·의존성·접근성·정책 중복·문서/보관 경계를 보완했다. 이는 입력한 수량을 일관되게 관리할 수 있다는 근거이며, 실물과 현재 직원 DB가 일치한다는 보증은 아니다.
+
+사용 조건은 다음과 같다.
+
+- 실제 반영 전에 그 시점의 main 추가 변경분을 별도 재감사하고, 승인된 배포·schema·blocking integrity·백업/복구·cutover 절차를 통과한다. 이 작업에서 실제 main 통합이나 배포는 하지 않았다.
+- 실물 재고와 시작 수량은 별도 재고조사로 대조한다. 무결성 blocking 오류를 무시하지 않고, 결과 불명 오류는 같은 명령의 재시도 계약을 따르며 업무별 전용 취소를 사용한다.
+- 재고 matrix는70 PARTIAL/2 VERIFIED를 그대로 유지한다. 모든 업무의 UI/API/SQL/effect·실패·취소·경합 조합을 한 번에 증명한 것으로 확대하지 않는다.
+
+#### 12.30.2 검증된 코드·원격 결과·남은 외부 경계
+
+| 항목 | 실제 인수 근거 |
+|---|---|
+| 고정 main | `d2b0dd2969883b2c8876c4375c99a456dcb6f21e`; S0 이후 추가 main 동기화 없음 |
+| CP6 | 최종 `d60f84ed`, CI34135084227·품질 CI34137728037 success; 12.27절 |
+| CP7 | `a9a3c344845cc18b1c4aefd94ec6659cf482142b`, [CI34179512339](https://github.com/Hw-03/ERP/actions/runs/34179512339) actual6/6 success |
+| 품질 통합 | `793d8f79f93cc6b6df25332d34c0e04173c1e6c5`, 부모 `7f232773`+`a9a3c344`, tree `13b19dd343711667d3cafea8353e269f19f481ba`로 CP7과 byte/blob 동일. [CI34181061472](https://github.com/Hw-03/ERP/actions/runs/34181061472) actual6/6 success |
+| 최종 프런트 검증 | CI 원본279파일/2,632테스트 PASS. 설정된 대상 module coverage: statements/lines93.01%, branches91.14%, functions90.56%, 각 threshold75% 통과. 앱 전체·전체 저장소 coverage라는 의미가 아니다. build/bundle도 PASS |
+| 백엔드·PostgreSQL | exact CP7/품질 CI의 전체 pytest·compile·OpenAPI drift 및 별도 실제 PostgreSQL two-connection job success. 플랫폼/전용 환경 skip은 해당 실행의 원본대로 보존하며 자동 PASS로 바꾸지 않는다 |
+| 화면·동결 | 소유 E2E24/24, A4/A5·SQL/API/UI·로그인 증거 및 모바일 PNG 동일, desktop step5 기하/스타일 계약 동일. CI의23PASS/선택 frozen1SKIP과 구분한다 |
+| 독립 리뷰 | 카드별 명세/품질과 최종 화면·통합 품질 인수 Critical/Important/Minor0. 기존 Next next-env Minor1 등 과거 승인 예외까지 없다는 의미는 아니다 |
+| 파일·과거 finding | exact a9 파일2,563개·역할11종·차집합/중복/미분류0. CQ/RV/IC64행=61 COMPLETE/3 NOT_VERIFIED. QP24행=해결16/부분7/근거부족1. 최종 문서2개 증분도 동일 원장에 blob 단위로 연결한다 |
+
+외부 required-check 강제 설정의 CQ-016·CQ-017·IC-20은 **NOT_VERIFIED**로 유지한다. 저장소 gate와 실제 PostgreSQL/CI 성공을 외부 GitHub 보호 정책 적용으로 바꾸지 않는다. 회사 도메인/HTTPS, 실제 직원 데이터/실물 대조, main 통합·배포는 별도다. 기존 테스트 타입 부채와 Next Minor1·ESLint9 EOL 예외도 후속 범위로 보존한다.
+
+#### 12.30.3 원본 실패·종료 자원·최종 문서 receipt
+
+- 최초 full의6PASS/2FAIL과 후속 local coverage 실패/NOT_REPORTED는 역사 원본이다. PG3·backend62·startup2 정확 실패 집합의 국소 복구와 actual CI success를 연결했으며, 최초 full 명령의 exit code를 PASS로 고치지 않았다. 마지막 CP7 staged PlanOnly8개는 실행0이고 기존 영역 증거·국소 복구·실제 docs gate를 재사용한 승인 배치다.
+- CP7 합성 DB는 gate PASS·본체 hash불변과 wrapper sidecar 실패/회수 복구를 함께 보존했다. 소유 canonical family는 부재로 복원됐고 E2E seed/lock/DB 및 소유 listener 정리가 확인됐다. stopped PostgreSQL cluster·합성 원본·회수 sidecar는 ignored 증거로 남는다. 알 수 없는 기존 listener를 조사·종료하거나 모든 임시 파일 삭제를 주장하지 않는다.
+- 품질 worktree DB 본체 SHA-256은 시작 값 `D0419DC051B881DA145B466AF99490570D18C47BCAAE990C57FFD4476FE28147`과 동일하다. 그 경로의 기존 WAL/SHM은 보존하며 CP7의 임시 합성 DB와 혼동하지 않는다. S0/CP6 당시의 main DB 읽기·임시 파일·전역 metadata 등 경계 예외는 active handoff의 역사 기록을 유지한다. 전 기간을 무조건 접근0으로 표현하지 않는다.
+- 이 종료 문서는 이미 성공한 CP7/품질 merge SHA와 CI를 근거로 작성한다. 문서 자체의 마지막 commit SHA·CI·clean/upstream·최종 blob 원장은 품질 ignored `_attic/runtime/code-quality-improvement/20260907-cp6-cp7-supervisor/quality-closeout-final-receipt.json`에 기록한다. 그 실제 CI 성공을 확인한 뒤에만 Goal을 완료하며, 자신의 미래 commit/CI를 미리 성공으로 기록하거나 같은 완료 기록을 위해 commit/CI를 반복하지 않는다.
+- 인계 위치는 품질 worktree/기존 품질 브랜치다. CP6·CP7 worktree와 branch를 보존한다. main merge/push·PR·force-push·배포는 시작하지 않으며, 이후 main 통합 전에는 추가 main delta를 별도 감사한다.

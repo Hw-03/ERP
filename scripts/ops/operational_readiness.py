@@ -74,7 +74,15 @@ def check_latest_backup(db_path: Path, backup_dir: Path, max_age_hours: float) -
         _print_result(False, "latest backup", f"older than database: {latest.name}")
         return False
 
-    result = _run_validator([sys.executable, str(VERIFY_BACKUP), str(latest)])
+    result = _run_validator(
+        [
+            sys.executable,
+            str(VERIFY_BACKUP),
+            str(latest),
+            "--source-db",
+            str(db_path),
+        ]
+    )
     if result.returncode != 0:
         _print_result(False, "latest backup", f"verification failed: {latest}")
         if result.stdout.strip():
@@ -116,8 +124,10 @@ def main() -> int:
     db_path = Path(args.db).resolve()
     backup_dir = runtime_path("backups", "sqlite")
 
+    if not check_database_file(db_path):
+        _print_result(False, "operational readiness")
+        return 1
     checks = [
-        check_database_file(db_path),
         check_latest_backup(db_path, backup_dir, args.max_backup_age_hours),
         check_inventory_integrity(db_path),
     ]

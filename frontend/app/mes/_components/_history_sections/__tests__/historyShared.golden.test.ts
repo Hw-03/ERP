@@ -69,6 +69,7 @@ function makeBundle(overrides: Partial<IoBundle> & { lines?: IoLine[] } = {}): I
     source_kind: "direct_item",
     title: "테스트 번들",
     source_item_id: null,
+    source_mes_code: null,
     quantity: 10,
     expanded_level: 0,
     lines: [],
@@ -85,6 +86,8 @@ function makeBatch(overrides: Partial<IoBatch> & { bundles?: IoBundle[] } = {}):
     requester_employee_id: "emp-1",
     requester_name: "홍길동",
     requester_department: "조립",
+    approver_employee_id: null,
+    approver_name: null,
     from_department: null,
     to_department: null,
     requires_approval: false,
@@ -1127,6 +1130,8 @@ describe("getPeriodStart", () => {
 
   it("WEEK → 이번 주 일요일 자정", () => {
     const result = getPeriodStart("WEEK", kstNextDay);
+    expect(result?.getFullYear()).toBe(2026);
+    expect(result?.getMonth()).toBe(7);
     expect(result?.getDay()).toBe(0);
     expect(result?.getDate()).toBe(23);
     expect(result?.getHours()).toBe(0);
@@ -1134,8 +1139,10 @@ describe("getPeriodStart", () => {
 
   it("MONTH → 이번 달 1일 자정", () => {
     const result = getPeriodStart("MONTH", kstNextDay);
+    expect(result?.getFullYear()).toBe(2026);
     expect(result?.getDate()).toBe(1);
     expect(result?.getMonth()).toBe(7);
+    expect(result?.getHours()).toBe(0);
   });
 
   it("ALL → null", () => {

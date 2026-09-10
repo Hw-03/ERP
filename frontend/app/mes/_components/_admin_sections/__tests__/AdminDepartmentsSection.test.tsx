@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DirtyGuardProvider } from "@/lib/ui/dirty-guard";
 import { AdminDepartmentsSection } from "../AdminDepartmentsSection";
@@ -12,7 +12,15 @@ const context = {
   addDepartmentMaster: vi.fn(),
   selectedDept: assembly,
   setSelectedDept: vi.fn(),
-  setDirty: vi.fn(),
+  deactivateDepartmentMaster: vi.fn(),
+  reactivateDepartmentMaster: vi.fn(),
+  hardDeleteDepartment: vi.fn(),
+  reorderDepartments: vi.fn(),
+  updateDepartmentColor: vi.fn(),
+  detailForm: { name: "조립", color_hex: "#2f74e7" },
+  setDetailForm: vi.fn(),
+  saveDepartment: vi.fn().mockResolvedValue({ status: "unchanged", department: assembly }),
+  dirty: false,
 };
 const defaultDepartments = [assembly];
 
@@ -26,15 +34,11 @@ vi.mock("../AdminDepartmentsContext", () => ({
   useAdminDepartmentsContext: () => context,
 }));
 
-vi.mock("../../DepartmentsContext", () => ({
-  useRefreshDepartments: () => vi.fn(),
-}));
-
 describe("AdminDepartmentsSection", () => {
   it("uses fixed list and status widths so full department statuses fit", () => {
     const { container } = render(
       <DirtyGuardProvider>
-        <AdminDepartmentsSection employees={[]} items={[]} adminPin="0000" setDepartments={vi.fn()} onStatusChange={vi.fn()} onError={vi.fn()} />
+        <AdminDepartmentsSection employees={[]} items={[]} />
       </DirtyGuardProvider>,
     );
 
@@ -56,7 +60,7 @@ describe("AdminDepartmentsSection", () => {
 
     const { container } = render(
       <DirtyGuardProvider>
-        <AdminDepartmentsSection employees={[]} items={[]} adminPin="0000" setDepartments={vi.fn()} onStatusChange={vi.fn()} onError={vi.fn()} />
+        <AdminDepartmentsSection employees={[]} items={[]} />
       </DirtyGuardProvider>,
     );
 
@@ -76,7 +80,7 @@ describe("AdminDepartmentsSection", () => {
     context.selectedDept = null as any;
     const { container } = render(
       <DirtyGuardProvider>
-        <AdminDepartmentsSection employees={[]} items={[]} adminPin="0000" setDepartments={vi.fn()} onStatusChange={vi.fn()} onError={vi.fn()} />
+        <AdminDepartmentsSection employees={[]} items={[]} />
       </DirtyGuardProvider>,
     );
     const row = container.querySelector("[data-admin-department-row='1']");
@@ -89,14 +93,34 @@ describe("AdminDepartmentsSection", () => {
 
     expect(context.setSelectedDept).toHaveBeenCalledWith(assembly);
     context.setSelectedDept.mockClear();
+    fireEvent.keyDown(row!, { key: "Enter" });
+    expect(context.setSelectedDept).toHaveBeenCalledWith(assembly);
+    context.setSelectedDept.mockClear();
     fireEvent.click(row!);
     expect(context.setSelectedDept).toHaveBeenCalledWith(assembly);
+  });
+
+  it("삭제 확인창을 닫으면 영구 삭제 버튼으로 포커스를 돌려준다", async () => {
+    render(
+      <DirtyGuardProvider>
+        <AdminDepartmentsSection employees={[]} items={[]} />
+      </DirtyGuardProvider>,
+    );
+
+    const trigger = screen.getByRole("button", { name: "영구 삭제" });
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    const cancel = screen.getByRole("button", { name: "취소" });
+    fireEvent.click(cancel);
+
+    await waitFor(() => expect(trigger).toHaveFocus());
   });
 
   it("passes the available detail height into the department workspace", () => {
     const { container } = render(
       <DirtyGuardProvider>
-        <AdminDepartmentsSection employees={[]} items={[]} adminPin="0000" setDepartments={vi.fn()} onStatusChange={vi.fn()} onError={vi.fn()} />
+        <AdminDepartmentsSection employees={[]} items={[]} />
       </DirtyGuardProvider>,
     );
 
@@ -106,7 +130,7 @@ describe("AdminDepartmentsSection", () => {
   it("uses the shared primary action size for the selected department save button", () => {
     render(
       <DirtyGuardProvider>
-        <AdminDepartmentsSection employees={[]} items={[]} adminPin="0000" setDepartments={vi.fn()} onStatusChange={vi.fn()} onError={vi.fn()} />
+        <AdminDepartmentsSection employees={[]} items={[]} />
       </DirtyGuardProvider>,
     );
 
@@ -126,10 +150,6 @@ describe("AdminDepartmentsSection", () => {
             { item_id: "tube", item_name: "튜브 품목", process_type_code: "TR", department: "조립" },
             { item_id: "unmapped", item_name: "미매핑 품목", process_type_code: null, department: "조립" },
           ] as any}
-          adminPin="0000"
-          setDepartments={vi.fn()}
-          onStatusChange={vi.fn()}
-          onError={vi.fn()}
         />
       </DirtyGuardProvider>,
     );

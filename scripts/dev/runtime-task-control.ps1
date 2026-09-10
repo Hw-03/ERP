@@ -2,15 +2,14 @@
 
 $script:RuntimeTaskUtf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
-function Get-RuntimeTaskSpecification {
+function New-RuntimeTaskSpecification {
     param(
-        [Parameter(Mandatory = $true)][string] $RepoRoot,
+        [Parameter(Mandatory = $true)][object] $Profile,
         [Parameter(Mandatory = $true)][ValidateSet("backend", "frontend")][string] $Service
     )
 
-    $resolvedRoot = [System.IO.Path]::GetFullPath($RepoRoot).TrimEnd('\')
-    $profile = & (Join-Path $PSScriptRoot "resolve-server-profile.ps1") -TestRepoRoot $resolvedRoot
-    $profileTitle = if ($profile.Name -eq "employee") { "Employee" } else { "Development" }
+    $resolvedRoot = [System.IO.Path]::GetFullPath([string] $Profile.RepoRoot).TrimEnd('\')
+    $profileTitle = if ($Profile.Name -eq "employee") { "Employee" } else { "Development" }
     $serviceTitle = if ($Service -eq "backend") { "Backend" } else { "Frontend" }
     $scriptPath = Join-Path $resolvedRoot "scripts\dev\start-$Service.ps1"
     $launcherPath = Join-Path $resolvedRoot "scripts\dev\runtime-task-host.vbs"
@@ -20,7 +19,7 @@ function Get-RuntimeTaskSpecification {
 
     return [pscustomobject]@{
         TaskName = "DEXCOWIN MES $profileTitle $serviceTitle"
-        Profile = $profile.Name
+        Profile = $Profile.Name
         Service = $Service
         RepoRoot = $resolvedRoot
         Execute = [System.IO.Path]::GetFullPath($windowsScriptHost)
@@ -41,6 +40,17 @@ function Get-RuntimeTaskSpecification {
         TaskSchemaVersion = "1.2"
         TriggerCount = 0
     }
+}
+
+function Get-RuntimeTaskSpecification {
+    param(
+        [Parameter(Mandatory = $true)][string] $RepoRoot,
+        [Parameter(Mandatory = $true)][ValidateSet("backend", "frontend")][string] $Service
+    )
+
+    $resolvedRoot = [System.IO.Path]::GetFullPath($RepoRoot).TrimEnd('\')
+    $profile = & (Join-Path $PSScriptRoot "resolve-server-profile.ps1") -RuntimeRepoRoot $resolvedRoot
+    return New-RuntimeTaskSpecification -Profile $profile -Service $Service
 }
 
 function Write-RuntimeTaskLaunchRequest {

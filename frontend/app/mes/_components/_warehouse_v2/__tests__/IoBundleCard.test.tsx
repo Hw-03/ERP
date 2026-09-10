@@ -466,7 +466,7 @@ describe("IoBundleCard", () => {
       pending_quantity: 5,
       available_quantity: 100,
       locations: [],
-    } as Item;
+    } as unknown as Item;
 
     render(
       <IoBundleCard
@@ -505,7 +505,7 @@ describe("IoBundleCard", () => {
         { department: "조립", status: "PRODUCTION", quantity: 65, pending_quantity: 5, available_quantity: 60 },
         { department: "고압", status: "PRODUCTION", quantity: 99, pending_quantity: 0, available_quantity: 99 },
       ],
-    } as Item;
+    } as unknown as Item;
 
     render(
       <IoBundleCard

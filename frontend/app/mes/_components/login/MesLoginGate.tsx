@@ -1,18 +1,51 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  Activity,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api, type OperatorSessionResponse } from "@/lib/api";
+import { operatorSessionApi } from "@/lib/api/operator-session";
+import {
+  ApiError,
+  AUTH_REQUIRED_EVENT,
+  establishAuthRequiredBoundary,
+} from "@/lib/api-core";
 import { warehouseMapApi } from "@/lib/api/warehouse-map";
 import { formatKstDate } from "@/lib/mes/date";
 import { queryKeys } from "@/lib/queries/keys";
 import { OperatorLoginCard } from "./OperatorLoginCard";
-import { clearCurrentOperator, getStoredBootId, readCurrentOperator } from "./useCurrentOperator";
-import { runLoginReadWithRetry, validateActiveEmployees, validateAppSession } from "./loginReadRetry";
+import {
+  clearCurrentOperator,
+  getStoredBootId,
+  hasPendingOperatorLogout,
+  OPERATOR_LOGOUT_PENDING_KEY,
+  OPERATOR_LOGOUT_PENDING_EVENT,
+  operatorFromEmployee,
+  readCurrentOperator,
+  restoreCurrentOperator,
+  retryPendingOperatorLogout,
+} from "./useCurrentOperator";
+import styles from "./MesLoginGate.module.css";
+import {
+  runLoginReadWithRetry,
+  validateActiveEmployees,
+  validateAppSession,
+} from "./loginReadRetry";
+import { useOperatorIdleSession } from "./useOperatorIdleSession";
 
-type GatePhase = "loading" | "intro" | "form" | "recovery" | "authed";
-type LogoState = "center" | "above-card";
+const PHASE_LOADING = 0;
+const PHASE_INTRO = 1;
+const PHASE_FORM = 2;
+const PHASE_AUTHED = 3;
+const PHASE_RECOVERY = 4;
+type GatePhase = 0 | 1 | 2 | 3 | 4;
 
 /*
  * 위치 계산 (영구 로고가 카드 위로 이동, 페이지 상단과 카드 상단의 정확한 중간에 위치)
@@ -44,17 +77,110 @@ interface MesLoginGateProps {
 
 export function MesLoginGate({ children }: MesLoginGateProps) {
   const queryClient = useQueryClient();
-  const [phase, setPhase] = useState<GatePhase>("loading");
-  const [logoState, setLogoState] = useState<LogoState>("center");
+  const queryClientRef = useRef(queryClient);
+  queryClientRef.current = queryClient;
+  const [phase, setPhase] = useState<GatePhase>(PHASE_LOADING);
+  const [logoutPending, setLogoutPending] = useState(false);
+  const [logoutRetrying, setLogoutRetrying] = useState(false);
+  const [logoAbove, setLogoAbove] = useState(false);
   // 항목 5-2 — 모바일(<1024px)만 인트로 시작 스케일을 작게(작게→크게 반전). 데스크톱은 현행 유지.
   const [isNarrow, setIsNarrow] = useState(false);
+  const pendingSequenceRef = useRef(0);
+  const pendingBoundaryActiveRef = useRef(false);
   const [recoveryAttempt, setRecoveryAttempt] = useState(0);
-  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const [operatorSession, setOperatorSession] = useState<OperatorSessionResponse | null>(null);
+  const [contentMounted, setContentMounted] = useState(false);
+  const contentMountedRef = useRef(false);
+  const contentOwnerIdRef = useRef<string | null>(null);
+  const idleLockedOwnerIdRef = useRef<string | null>(null);
+  const [contentKey, setContentKey] = useState(0);
 
-  const clearTimers = () => {
-    timersRef.current.forEach(clearTimeout);
-    timersRef.current = [];
-  };
+  const discardPreservedContent = useCallback(() => {
+    contentMountedRef.current = false;
+    contentOwnerIdRef.current = null;
+    idleLockedOwnerIdRef.current = null;
+    setContentMounted(false);
+    setOperatorSession(null);
+    setContentKey((value) => value + 1);
+  }, []);
+
+  const showLogin = useCallback((pending: boolean) => {
+    clearCurrentOperator();
+    discardPreservedContent();
+    pendingBoundaryActiveRef.current = pending;
+    setLogoutPending(pending);
+    setLogoAbove(true);
+    setPhase(PHASE_FORM);
+  }, [discardPreservedContent]);
+
+  const showIdleLogin = useCallback((employeeId: string) => {
+    if (!contentMountedRef.current || contentOwnerIdRef.current !== employeeId) {
+      showLogin(false);
+      return;
+    }
+    // 같은 직원 재인증까지 숨긴 화면의 작업자 연동 상태도 함께 보존한다.
+    // 서버 cookie가 권한 정본이므로 화면 전용 cache를 남겨도 mutation 권한은 생기지 않는다.
+    idleLockedOwnerIdRef.current = employeeId;
+    setOperatorSession(null);
+    pendingBoundaryActiveRef.current = false;
+    setLogoutPending(false);
+    setLogoAbove(true);
+    setPhase(PHASE_FORM);
+  }, [showLogin]);
+
+  const adoptServerSession = useCallback(
+    (session: Awaited<ReturnType<typeof operatorSessionApi.getOperatorSession>>) => {
+      pendingBoundaryActiveRef.current = false;
+      setLogoutPending(false);
+      restoreCurrentOperator(operatorFromEmployee(session.employee), session.boot_id);
+      if (contentOwnerIdRef.current !== session.employee.employee_id) {
+        if (contentOwnerIdRef.current !== null) setContentKey((value) => value + 1);
+        contentOwnerIdRef.current = session.employee.employee_id;
+      }
+      contentMountedRef.current = true;
+      setContentMounted(true);
+      setOperatorSession(session);
+      const weekMon = getWeekStartMonday(new Date());
+      const weekStart = formatKstDate(weekMon);
+      const weekEnd = formatKstDate(new Date(weekMon.getTime() + 6 * MS_PER_DAY));
+      void queryClientRef.current.prefetchQuery({
+        queryKey: queryKeys.weekly.report(weekStart, weekEnd),
+        queryFn: () => api.getWeeklyReport({ week_start: weekStart, week_end: weekEnd }),
+      });
+      void queryClientRef.current.prefetchQuery({
+        queryKey: queryKeys.warehouseMap.map(),
+        queryFn: () => warehouseMapApi.getMap(),
+      });
+      setPhase(PHASE_AUTHED);
+    },
+    [],
+  );
+
+  const handleIdleExpired = useCallback((_employeeId: string) => {
+    establishAuthRequiredBoundary("idle");
+  }, []);
+
+  const idleSession = useOperatorIdleSession({
+    session: operatorSession,
+    active: phase === PHASE_AUTHED,
+    onExpired: handleIdleExpired,
+  });
+
+  const reconcileClearedPendingLogout = useCallback(
+    async (sequence: number): Promise<void> => {
+      if (sequence !== pendingSequenceRef.current || hasPendingOperatorLogout()) return;
+      setLogoutPending(true);
+      try {
+        const session = await operatorSessionApi.getOperatorSession();
+        if (sequence !== pendingSequenceRef.current || hasPendingOperatorLogout()) return;
+        adoptServerSession(session);
+      } catch (error) {
+        if (sequence !== pendingSequenceRef.current || hasPendingOperatorLogout()) return;
+        showLogin(!(error instanceof ApiError && error.status === 401));
+      }
+    },
+    [adoptServerSession, showLogin],
+  );
 
   // 초기 인증 상태 확인
   // 페인트 전에 뷰포트 폭을 확정해 인트로 첫 프레임이 데스크톱 기본값(scale 1=840px)으로
@@ -64,74 +190,152 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
   }, []);
 
   useEffect(() => {
+    const requireLogin = (event: Event) => {
+      pendingSequenceRef.current += 1;
+      const reason = event instanceof CustomEvent
+        ? (event.detail as { reason?: string } | undefined)?.reason
+        : undefined;
+      if (reason === "idle" && contentOwnerIdRef.current) {
+        showIdleLogin(contentOwnerIdRef.current);
+        return;
+      }
+      // A confirmed auth failure ends reconciliation; only an actual revoke marker blocks login.
+      showLogin(hasPendingOperatorLogout());
+    };
+    const syncPendingLogout = (crossTab: boolean) => {
+      const pending = hasPendingOperatorLogout();
+      const sequence = ++pendingSequenceRef.current;
+      if (pending) {
+        const openBoundary = crossTab && !pendingBoundaryActiveRef.current;
+        pendingBoundaryActiveRef.current = true;
+        setLogoutPending(true);
+        if (openBoundary) establishAuthRequiredBoundary();
+        return;
+      }
+      if (!pendingBoundaryActiveRef.current) {
+        setLogoutPending(false);
+        return;
+      }
+      setLogoutPending(true);
+      void reconcileClearedPendingLogout(sequence);
+    };
+    const syncLocalPendingLogout = () => syncPendingLogout(false);
+    const syncStoredPendingLogout = (event: StorageEvent) => {
+      if (event.key !== null && event.key !== OPERATOR_LOGOUT_PENDING_KEY) return;
+      syncPendingLogout(true);
+    };
+    window.addEventListener(AUTH_REQUIRED_EVENT, requireLogin);
+    window.addEventListener(OPERATOR_LOGOUT_PENDING_EVENT, syncLocalPendingLogout);
+    window.addEventListener("storage", syncStoredPendingLogout);
+    return () => {
+      window.removeEventListener(AUTH_REQUIRED_EVENT, requireLogin);
+      window.removeEventListener(OPERATOR_LOGOUT_PENDING_EVENT, syncLocalPendingLogout);
+      window.removeEventListener("storage", syncStoredPendingLogout);
+    };
+  }, [reconcileClearedPendingLogout, showIdleLogin, showLogin]);
+
+  useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
     const goToLogin = () => {
       if (cancelled) return;
       const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       if (reduced) {
-        setLogoState("above-card");
-        setPhase("form");
+        setLogoAbove(true);
+        setPhase(PHASE_FORM);
       } else {
-        setPhase("intro");
+        setPhase(PHASE_INTRO);
       }
     };
+    const showRecovery = () => {
+      if (cancelled) return;
+      setLogoAbove(true);
+      setPhase(PHASE_RECOVERY);
+    };
 
-    const stored = readCurrentOperator();
-    if (!stored) {
-      goToLogin();
-      return () => { cancelled = true; };
-    }
-
-    const weekMon = getWeekStartMonday(new Date());
-    const weekStart = formatKstDate(weekMon);
-    const weekEnd = formatKstDate(new Date(weekMon.getTime() + 6 * MS_PER_DAY));
-    void queryClient.prefetchQuery({
-      queryKey: queryKeys.weekly.report(weekStart, weekEnd),
-      queryFn: () => api.getWeeklyReport({ week_start: weekStart, week_end: weekEnd }),
-    });
-    void queryClient.prefetchQuery({
-      queryKey: queryKeys.warehouseMap.map(),
-      queryFn: () => warehouseMapApi.getMap(),
-    });
-
-    const controller = new AbortController();
     void (async () => {
-      // boot_id 불일치 시 서버 재시작 감지 → 재로그인 강제
-      try {
-        const session = await runLoginReadWithRetry(
-          (readSignal) => api.getAppSession(readSignal),
-          { stage: "app_session", signal: controller.signal, validate: validateAppSession },
-        );
-        if (cancelled) return;
-        const storedBootId = getStoredBootId();
-        if (storedBootId !== session.boot_id) {
-          clearCurrentOperator();
-          goToLogin();
-          return;
+      if (hasPendingOperatorLogout()) {
+        clearCurrentOperator();
+        pendingBoundaryActiveRef.current = true;
+        setLogoutPending(true);
+        try {
+          await retryPendingOperatorLogout();
+        } catch {
+          if (cancelled) return;
+          showLogin(true);
         }
-      } catch {
-        if (cancelled) return;
-        setPhase("recovery");
         return;
       }
 
-      // 작업자 식별용 — 비활성 직원이면 자동 진입을 차단한다 (보안 인증 아님).
+      const restoreSequence = pendingSequenceRef.current;
+      let serverSession: Awaited<ReturnType<typeof operatorSessionApi.getOperatorSession>>;
       try {
-        const list = await runLoginReadWithRetry(
-          (readSignal) => api.getEmployees({ activeOnly: true }, readSignal),
-          { stage: "active_employees", signal: controller.signal, validate: validateActiveEmployees },
+        serverSession = await runLoginReadWithRetry(
+          (readSignal) => operatorSessionApi.getOperatorSession(readSignal),
+          { stage: "operator_session", signal: controller.signal },
         );
-        if (cancelled) return;
-        const stillActive = list.some((e) => e.employee_id === stored.employee_id);
-        if (stillActive) {
-          setPhase("authed");
+      } catch (error) {
+        if (cancelled || restoreSequence !== pendingSequenceRef.current) return;
+        if (error instanceof ApiError && error.status === 401) {
+          clearCurrentOperator();
+          goToLogin();
+        } else if (readCurrentOperator()) {
+          showRecovery();
         } else {
           clearCurrentOperator();
           goToLogin();
         }
+        return;
+      }
+      if (cancelled || restoreSequence !== pendingSequenceRef.current) return;
+
+      const stored = readCurrentOperator();
+      if (!stored) {
+        adoptServerSession(serverSession);
+        return;
+      }
+
+      try {
+        const appSession = await runLoginReadWithRetry(
+          (readSignal) => api.getAppSession(readSignal),
+          {
+            stage: "app_session",
+            signal: controller.signal,
+            validate: validateAppSession,
+          },
+        );
+        if (cancelled || restoreSequence !== pendingSequenceRef.current) return;
+        const storedBootId = getStoredBootId();
+        if (
+          storedBootId !== appSession.boot_id
+          || serverSession.boot_id !== appSession.boot_id
+        ) {
+          clearCurrentOperator();
+          goToLogin();
+          return;
+        }
+
+        const employees = await runLoginReadWithRetry(
+          (readSignal) => api.getEmployees({ activeOnly: true }, readSignal),
+          {
+            stage: "active_employees",
+            signal: controller.signal,
+            validate: validateActiveEmployees,
+          },
+        );
+        if (cancelled || restoreSequence !== pendingSequenceRef.current) return;
+        const stillActive = employees.some(
+          (employee) => employee.employee_id === serverSession.employee.employee_id,
+        );
+        if (!stillActive) {
+          clearCurrentOperator();
+          goToLogin();
+          return;
+        }
+        adoptServerSession(serverSession);
       } catch {
-        if (cancelled) return;
-        setPhase("recovery");
+        if (cancelled || restoreSequence !== pendingSequenceRef.current) return;
+        showRecovery();
       }
     })();
 
@@ -139,60 +343,177 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
       cancelled = true;
       controller.abort();
     };
-  }, [queryClient, recoveryAttempt]);
+  }, [adoptServerSession, recoveryAttempt, showLogin]);
+
+  const retryLogout = useCallback(async () => {
+    if (logoutRetrying) return;
+    setLogoutRetrying(true);
+    try {
+      if (hasPendingOperatorLogout()) {
+        await retryPendingOperatorLogout();
+      } else {
+        const sequence = ++pendingSequenceRef.current;
+        await reconcileClearedPendingLogout(sequence);
+      }
+    } catch {
+      setLogoutPending(true);
+    } finally {
+      setLogoutRetrying(false);
+    }
+  }, [logoutRetrying, reconcileClearedPendingLogout]);
 
   // 인트로 단계 진입 → 로고 축소 → 카드 등장 (≤ 1.5s 절제된 시퀀스)
   useEffect(() => {
-    if (phase !== "intro") return;
-    const t1 = setTimeout(() => setLogoState("above-card"), 600);
-    const t2 = setTimeout(() => setPhase("form"), 1100);
-    timersRef.current = [t1, t2];
-    return clearTimers;
+    if (phase !== PHASE_INTRO) return;
+    const t1 = setTimeout(() => setLogoAbove(true), 600);
+    const t2 = setTimeout(() => setPhase(PHASE_FORM), 1100);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
   }, [phase]);
 
-  const handleLogin = () => {
+  const handleLogin = (session: OperatorSessionResponse) => {
+    if (logoutPending) return;
+    const idleOwnerId = idleLockedOwnerIdRef.current;
+    const restoresIdleDraft = idleOwnerId === session.employee.employee_id;
+    if (idleOwnerId && !restoresIdleDraft) discardPreservedContent();
+    idleLockedOwnerIdRef.current = null;
     // 작업자 로그인 시 직전 메뉴와 무관하게 항상 대시보드로 진입.
-    if (typeof window !== "undefined") {
+    if (!restoresIdleDraft && typeof window !== "undefined") {
       const currentTab = new URLSearchParams(window.location.search).get("tab");
       if (currentTab !== "dashboard") {
         window.location.replace("/mes?tab=dashboard");
         return;
       }
     }
-    setPhase("authed");
+    adoptServerSession(session);
   };
 
   const retryStoredLogin = () => {
-    setPhase("loading");
+    setPhase(PHASE_LOADING);
     setRecoveryAttempt((attempt) => attempt + 1);
   };
 
   // SSR/hydration 깜빡임 방지
-  if (phase === "loading") return null;
+  if (phase === PHASE_LOADING) return null;
+
+  const preservedContent = contentMounted ? (
+    <Activity
+      key={contentKey}
+      mode={phase === PHASE_AUTHED && idleSession.warningSeconds !== 0 ? "visible" : "hidden"}
+    >
+      {children}
+    </Activity>
+  ) : null;
 
   // 로그인 완료 → 메인 화면
-  if (phase === "authed") return <>{children}</>;
+  if (phase === PHASE_AUTHED) {
+    return (
+      <>
+        {preservedContent}
+        {idleSession.warningSeconds === 0 && (
+          <div
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="idle-session-check-title"
+          >
+            <div
+              className="w-full max-w-sm rounded-[24px] border p-6 text-center"
+              style={{
+                background: "var(--c-s1)",
+                borderColor: "var(--c-border)",
+                boxShadow: "var(--c-card-shadow)",
+              }}
+            >
+              <h2 id="idle-session-check-title" className="text-lg font-semibold" style={{ color: "var(--c-text)" }}>
+                화면이 잠겼습니다
+              </h2>
+              <p className="mt-2 text-sm" style={{ color: "var(--c-muted)" }}>
+                서버에서 로그인 만료 여부를 확인하고 있습니다.
+              </p>
+              {idleSession.renewalError && (
+                <p className="mt-3 text-sm" role="alert" style={{ color: "var(--c-danger)" }}>
+                  {idleSession.renewalError}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => void idleSession.renewNow()}
+                disabled={idleSession.renewing}
+                className="mt-5 min-h-11 w-full rounded-[14px] px-4 py-3 text-base font-semibold text-white disabled:opacity-60"
+                style={{ background: "var(--c-blue)" }}
+              >
+                {idleSession.renewing ? "로그인 상태 확인 중..." : "다시 확인"}
+              </button>
+            </div>
+          </div>
+        )}
+        {idleSession.warningSeconds !== null && idleSession.warningSeconds > 0 && (
+          <div
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/35 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="idle-session-title"
+          >
+            <div
+              className="w-full max-w-sm rounded-[24px] border p-6 text-center"
+              style={{
+                background: "var(--c-s1)",
+                borderColor: "var(--c-border)",
+                boxShadow: "var(--c-card-shadow)",
+              }}
+            >
+              <h2 id="idle-session-title" className="text-lg font-semibold" style={{ color: "var(--c-text)" }}>
+                곧 자동 로그아웃됩니다
+              </h2>
+              <p className="mt-2 text-sm" style={{ color: "var(--c-muted)" }}>
+                마지막 활동 후 30분이 지나면 화면이 잠깁니다.
+              </p>
+              <p className="mt-4 text-2xl font-bold tabular-nums" style={{ color: "var(--c-blue)" }}>
+                {idleSession.warningSeconds}초
+              </p>
+              {idleSession.renewalError && (
+                <p className="mt-3 text-sm" role="alert" style={{ color: "var(--c-danger)" }}>
+                  {idleSession.renewalError}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => void idleSession.renewNow()}
+                disabled={idleSession.renewing}
+                className="mt-5 min-h-11 w-full rounded-[14px] px-4 py-3 text-base font-semibold text-white disabled:opacity-60"
+                style={{ background: "var(--c-blue)" }}
+              >
+                {idleSession.renewing ? "로그인 유지 확인 중..." : "로그인 유지"}
+              </button>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "var(--c-bg)" }}
-    >
+    <>
+      {preservedContent}
+      <div
+        className={styles.root}
+      >
       {/* 영구 로고 — phase 와 무관하게 항상 같은 element 로 렌더 (flicker 방지) */}
       {/* outer: 위치 이동 transform / inner: 인트로 fade+scale 애니메이션 (충돌 방지) */}
       <div
-        className="pointer-events-none absolute"
+        className={styles.logo}
         style={{
-          transform: logoState === "above-card"
+          transform: logoAbove
             ? SHRINK_TRANSFORM
             : isNarrow ? MOBILE_CENTER_TRANSFORM : CENTER_TRANSFORM,
-          transition: "transform 0.9s cubic-bezier(0.4, 0, 0.2, 1)",
-          transformOrigin: "center center",
         }}
       >
         <div
           style={{
-            animation: phase === "intro" ? "mes-logo-fade-in 0.5s ease both" : undefined,
+            animation: phase === PHASE_INTRO ? "mes-logo-fade-in 0.5s ease both" : undefined,
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -201,35 +522,23 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
             alt="DEXCOWIN"
             width={840}
             draggable={false}
-            style={{ width: 840, maxWidth: "none", height: "auto", userSelect: "none" }}
+            className={styles.logoImage}
           />
         </div>
       </div>
 
       {/* 배경 패턴 — form 단계에만 표시 */}
-      {(phase === "form" || phase === "recovery") && (
+      {(phase === PHASE_FORM || phase === PHASE_RECOVERY) && (
         <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            backgroundImage: `radial-gradient(circle, var(--c-border) 1px, transparent 1px)`,
-            backgroundSize: "28px 28px",
-            opacity: 0.5,
-          }}
+          className={styles.pattern}
         />
       )}
 
       {/* 데스크톱 로그인 여백에서 카드 방향을 안내하는 DEXRAY 마스코트 */}
-      {(phase === "form" || phase === "recovery") && (
+      {(phase === PHASE_FORM || phase === PHASE_RECOVERY) && (
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute hidden lg:block"
-          style={{
-            left: "calc(50% + clamp(200px, 13vw, 260px))",
-            bottom: "clamp(120px, 25vh, 228px)",
-            width: "clamp(260px, min(18vw, 40vh), 380px)",
-            animation: "mes-card-rise 0.7s 0.08s ease both",
-            filter: "drop-shadow(0 20px 28px color-mix(in srgb, var(--c-text) 12%, transparent))",
-          }}
+          className={`${styles.mascot} pointer-events-none absolute hidden lg:block`}
         >
           <Image
             src="/images/login/dexray-pointing-left.webp"
@@ -245,20 +554,19 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
       )}
 
       {/* 카드 — form 단계에만 등장 (rise 애니메이션) */}
-      {phase === "form" && (
+      {phase === PHASE_FORM && (
         <div
-          className="mes-card-anim w-full"
-          style={{
-            animation: "mes-card-rise 0.6s ease both",
-            // 카드만 top 정렬 + 고정 marginTop → 카드 height 가 변해도 카드 상단 위치 일정 (로고 겹침 방지)
-            alignSelf: "flex-start",
-            marginTop: "calc(50vh - 280px)",
-          }}
+          className={`${styles.card} mes-card-anim`}
         >
-          <OperatorLoginCard onLogin={handleLogin} />
+          <OperatorLoginCard
+            onLogin={handleLogin}
+            logoutPending={logoutPending}
+            logoutRetrying={logoutRetrying}
+            onRetryLogout={() => void retryLogout()}
+          />
         </div>
       )}
-      {phase === "recovery" && (
+      {phase === PHASE_RECOVERY && (
         <div
           className="mes-card-anim mx-auto w-full"
           style={{ maxWidth: 440, padding: "0 16px", animation: "mes-card-rise 0.35s ease both" }}
@@ -282,6 +590,7 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

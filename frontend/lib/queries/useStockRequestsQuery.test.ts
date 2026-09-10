@@ -45,7 +45,7 @@ describe("useApproveStockRequestMutation", () => {
       payload: { actor_employee_id: "e1", pin: "0000" },
     });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data?.status).toBe("approved");
+    expect(result.current.data?.status).toBe("completed");
   });
 
   it("잘못된 PIN으로 승인 실패(403)", async () => {

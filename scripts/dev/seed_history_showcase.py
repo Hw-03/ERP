@@ -5,6 +5,8 @@
 생성 로그에는 ``[HISTORY-DEMO]`` 표식을 남겨 입출고 내역에서 검색할 수 있다.
 """
 
+# ruff: noqa: E402 - 독립 실행 시 backend를 import path에 먼저 추가한다.
+
 from __future__ import annotations
 
 import argparse
@@ -38,15 +40,14 @@ from app.models import (
     StockRequestStatusEnum,
     StockRequestTypeEnum,
     TransactionLog,
-    TransactionTypeEnum,
 )
 from app.schemas import ProductionReceiptRequest
 from app.services import (
-    defect_actions,
+    defect_actions as defect_actions_svc,
     inv_effect,
     inventory as inventory_svc,
     shipping as shipping_svc,
-    sr_reservation,
+    shipping_actions as shipping_actions_svc,
     stock_requests,
 )
 from app.services import io_dispatch
@@ -310,28 +311,26 @@ def _run_production(db, plan: ShowcasePlan, marker: str) -> None:
             notes=f"{marker} BOM 생산",
         ),
         plan.production_parent,
-        plan.actor.name,
-        plan.actor.employee_id,
+        actor=plan.actor,
     )
 
 
 def _run_conversion(db, plan: ShowcasePlan, marker: str) -> None:
-    result = shipping_svc.execute_component_change_independent(
+    result = shipping_actions_svc.execute_component_change_independent(
         db,
         plan.conversion_source.item_id,
         plan.conversion_target.item_id,
         1,
         memo=f"{marker} 품목 전환",
         requested_mode="BOM",
-        requester_name=plan.actor.name,
-        requester_employee_id=plan.actor.employee_id,
+        actor=plan.actor,
     )
     for log in result["transactions"]:
         log.notes = f"{log.notes or ''} {marker}".strip()
 
 
 def _run_shipping(db, plan: ShowcasePlan, marker: str) -> None:
-    request = shipping_svc.create_request(
+    request = shipping_actions_svc.create_request(
         db,
         {
             "base_pf_item_id": plan.shipping_pf.item_id,
@@ -340,8 +339,13 @@ def _run_shipping(db, plan: ShowcasePlan, marker: str) -> None:
             "notes": f"{marker} 출하",
             "invoice_number": f"HISTORY-{uuid.uuid4().hex[:12].upper()}",
         },
+        plan.actor,
     )
-    _final_pa, final_pf = shipping_svc._require_final_items(db, request)
+    if request.final_pf_item_id is None:
+        raise RuntimeError("출하 요청 결과에 최종 PF 품목이 없습니다.")
+    final_pf = db.get(Item, request.final_pf_item_id)
+    if final_pf is None:
+        raise RuntimeError("출하 요청의 최종 PF 품목을 찾을 수 없습니다.")
     batch, bundle = _new_batch(db, plan, marker, "shipping_prepare_produce", final_pf)
     batch.work_type = "process"
     batch.sub_type = "produce"
@@ -364,14 +368,13 @@ def _run_shipping(db, plan: ShowcasePlan, marker: str) -> None:
     batch.status = "completed"
     batch.completed_at = datetime.now(UTC).replace(tzinfo=None)
     db.flush()
-    shipping_svc.prepare_complete(
+    shipping_actions_svc.prepare_complete(
         db,
         request.request_id,
         f"DEMO-SN-{request.request_id.hex[:8].upper()}",
-        prepared_by_employee_id=plan.actor.employee_id,
-        prepared_by_name=plan.actor.name,
+        actor=plan.actor,
     )
-    shipping_svc.pickup_complete(db, request.request_id)
+    shipping_actions_svc.pickup_complete(db, request.request_id, plan.actor)
     logs = db.query(TransactionLog).filter(TransactionLog.shipping_request_id == request.request_id).all()
     for log in logs:
         log.notes = f"{log.notes or ''} {marker}".strip()
@@ -422,7 +425,7 @@ def _run_unquarantine(
     department: DepartmentEnum,
     record_id: uuid.UUID,
 ) -> None:
-    defect_actions.unquarantine_inventory(
+    defect_actions_svc.unquarantine_inventory(
         db,
         record_id=record_id,
         item_id=item.item_id,
@@ -467,8 +470,7 @@ def _run_defects(db, plan: ShowcasePlan, marker: str) -> None:
         child_decisions,
         reason_category=DEMO_REASON_CATEGORY,
         reason_memo=marker,
-        actor=plan.actor.name,
-        actor_employee_id=plan.actor.employee_id,
+        actor=plan.actor,
     )
 
 
@@ -528,10 +530,20 @@ def _combined_effects(logs: list[TransactionLog]) -> tuple[dict[uuid.UUID, list[
                 status = str(effect["status"])
                 location_cells.add((log.item_id, value, status))
             elif scope == "warehouse_box":
-                value = str(effect["box_id"])
+                value = str(effect.get("row_id") or "")
+                status = str(effect["box_id"])
+            elif scope == "warehouse_zone":
+                value = str(effect.get("row_id") or "")
+                status = str(effect["zone_id"])
+            elif scope in {"warehouse", "warehouse_unplaced"}:
+                value = str(effect.get("row_id") or "")
                 status = ""
             else:
-                scope, value, status = "warehouse", "", ""
+                raise ValueError(f"Unsupported showcase inventory effect scope: {scope}")
+            if scope != "location" and not value:
+                raise ValueError(
+                    "Showcase cleanup requires v2 inventory effects with stable row IDs."
+                )
             key = (scope, value, status)
             cells[key] = cells.get(key, 0) + int(effect["delta"])
 
@@ -545,7 +557,11 @@ def _combined_effects(logs: list[TransactionLog]) -> tuple[dict[uuid.UUID, list[
             if scope == "location":
                 entry.update(department=value, status=status)
             elif scope == "warehouse_box":
-                entry["box_id"] = value
+                entry.update(row_id=value, box_id=status)
+            elif scope == "warehouse_zone":
+                entry.update(row_id=value, zone_id=int(status))
+            elif scope in {"warehouse", "warehouse_unplaced"}:
+                entry["row_id"] = value
             entries.append(entry)
         combined[item_id] = entries
     return combined, location_cells
@@ -590,19 +606,22 @@ def remove_showcase(db, marker: str) -> ShowcaseCleanupResult:
         if any(log_id not in marked_ids for (log_id,) in attached):
             raise ValueError(f"Unmarked transaction is attached to showcase shipping request: {request.request_id}")
 
-    reserved_lines = [
-        line
-        for request in marked_stock_requests
-        if request.status == StockRequestStatusEnum.RESERVED
-        for line in request.lines
-    ]
-    if reserved_lines:
-        sr_reservation.release_lines(db, reserved_lines)
+    for request in marked_stock_requests:
+        if request.status != StockRequestStatusEnum.RESERVED:
+            continue
+        requester = db.get(Employee, request.requester_employee_id)
+        if requester is None:
+            raise ValueError(f"Showcase request actor is missing: {request.request_id}")
+        stock_requests.release_reservation(db, request, actor=requester)
+        request.status = StockRequestStatusEnum.CANCELLED
+        for line in request.lines:
+            line.status = StockRequestStatusEnum.CANCELLED
+        db.flush()
     db.flush()
 
     effects, location_cells = _combined_effects(logs)
     for item_id, effect in effects.items():
-        inv_effect.apply_effect_reverse(db, item_id, effect)
+        inv_effect._apply_effect_reverse(db, item_id, effect)
     db.flush()
     for item_id, department, status in location_cells:
         location = (

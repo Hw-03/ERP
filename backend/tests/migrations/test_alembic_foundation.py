@@ -17,6 +17,11 @@ from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.schema import CreateTable
 
 from app.models import Base, InventoryLocation, Item
+from bootstrap.schema import (
+    _normalize_check_sql,
+    _normalize_computed_sql,
+    schema_differences,
+)
 from migration_type_compare import compare_migration_type
 
 
@@ -107,7 +112,7 @@ def test_empty_sqlite_upgrade_creates_current_schema_and_is_rerunnable(tmp_path)
         with engine.connect() as connection:
             assert connection.scalar(
                 sa.text("SELECT version_num FROM alembic_version")
-            ) == "20260903_0032"
+            ) == "20260907_0034"
             location_columns = {
                 column["name"]: column
                 for column in inspector.get_columns("inventory_locations")
@@ -362,7 +367,7 @@ def test_inventory_location_pending_migration_backfills_and_enforces_constraints
         )
         db.commit()
 
-    command.upgrade(_config(url), "head")
+    command.upgrade(_config(url), "20260812_0019")
 
     with sqlite3.connect(path) as db:
         assert db.execute(
@@ -447,7 +452,7 @@ def test_postgresql_offline_upgrade_compiles_without_sqlite_functions():
         output_buffer=output,
     )
 
-    command.upgrade(config, "head", sql=True)
+    command.upgrade(config, "20260828_0031", sql=True)
 
     sql = output.getvalue().lower()
     assert "create table items" in sql
@@ -456,6 +461,144 @@ def test_postgresql_offline_upgrade_compiles_without_sqlite_functions():
     assert "printf" not in sql
     assert "pragma" not in sql
     assert "now()" in sql or "current_timestamp" in sql
+
+
+def test_postgresql_shipping_enum_repair_replaces_default_around_type_change():
+    output = io.StringIO()
+    config = _config(
+        "postgresql+psycopg2://migration-test:unused@invalid/migration-test",
+        output_buffer=output,
+    )
+
+    command.upgrade(config, "20260807_0016", sql=True)
+
+    sql = " ".join(output.getvalue().lower().split())
+    drop_default = sql.index(
+        "alter table shipping_requests alter column finalization_mode drop default"
+    )
+    change_type = sql.index(
+        "alter table shipping_requests alter column finalization_mode type "
+        "shipping_finalization_mode_enum"
+    )
+    restore_default = sql.index(
+        "alter table shipping_requests alter column finalization_mode set default "
+        "'keep_base'::shipping_finalization_mode_enum"
+    )
+
+    assert drop_default < change_type < restore_default
+
+
+def test_postgresql_computed_normalization_preserves_semantic_grouping():
+    left_grouped = _normalize_computed_sql(
+        "(a + b) * c",
+        "postgresql",
+        discard_grouping_artifacts=True,
+    )
+    right_grouped = _normalize_computed_sql(
+        "a + (b * c)",
+        "postgresql",
+        discard_grouping_artifacts=True,
+    )
+
+    assert left_grouped != right_grouped
+
+
+def test_postgresql_mes_code_normalization_accepts_only_reflection_artifacts():
+    expected = (
+        "model_symbol || '-' || process_type_code || '-' || CASE "
+        "WHEN serial_no < 10 THEN '000' || CAST(serial_no AS VARCHAR) "
+        "WHEN serial_no < 100 THEN '00' || CAST(serial_no AS VARCHAR) "
+        "WHEN serial_no < 1000 THEN '0' || CAST(serial_no AS VARCHAR) "
+        "ELSE CAST(serial_no AS VARCHAR) END"
+    )
+    reflected = (
+        "((((model_symbol)::text || '-'::text) || (process_type_code)::text) "
+        "|| '-'::text) || (CASE WHEN (serial_no < 10) THEN "
+        "(('000'::text || ((serial_no)::character varying)::text))::character varying "
+        "WHEN (serial_no < 100) THEN "
+        "(('00'::text || ((serial_no)::character varying)::text))::character varying "
+        "WHEN (serial_no < 1000) THEN "
+        "(('0'::text || ((serial_no)::character varying)::text))::character varying "
+        "ELSE (serial_no)::character varying END)::text)"
+    )
+    changed = reflected.replace("'000'::text", "'999'::text")
+
+    expected_normalized = _normalize_computed_sql(
+        expected,
+        "postgresql",
+        discard_grouping_artifacts=True,
+    )
+
+    assert expected_normalized == _normalize_computed_sql(
+        reflected,
+        "postgresql",
+        discard_grouping_artifacts=True,
+    )
+    assert expected_normalized != _normalize_computed_sql(
+        changed,
+        "postgresql",
+        discard_grouping_artifacts=True,
+    )
+
+
+def test_postgresql_check_normalization_preserves_allowed_values():
+    expected = "outcome IN ('success', 'failed', 'cancelled')"
+    reflected = (
+        "outcome::text = ANY (ARRAY['success'::character varying, "
+        "'failed'::character varying, 'cancelled'::character varying]::text[])"
+    )
+    changed = reflected.replace("'cancelled'", "'ignored'")
+
+    expected_normalized = _normalize_check_sql(expected, "postgresql")
+
+    assert expected_normalized == _normalize_check_sql(reflected, "postgresql")
+    assert expected_normalized != _normalize_check_sql(changed, "postgresql")
+
+
+def test_postgresql_check_normalization_ignores_numeric_literal_casts():
+    expected = (
+        "standard_purchase_price >= 0 OR standard_purchase_price IS NULL"
+    )
+    reflected = (
+        "standard_purchase_price >= 0::numeric "
+        "OR standard_purchase_price IS NULL"
+    )
+    changed = reflected.replace("0::numeric", "1::numeric")
+
+    expected_normalized = _normalize_check_sql(expected, "postgresql")
+
+    assert expected_normalized == _normalize_check_sql(reflected, "postgresql")
+    assert expected_normalized != _normalize_check_sql(changed, "postgresql")
+
+
+def test_postgresql_check_normalization_preserves_numeric_casts_in_expressions():
+    integer_division = "amount >= 1 / 2"
+    numeric_division = "amount >= 1::numeric / 2"
+
+    assert _normalize_check_sql(
+        integer_division,
+        "postgresql",
+    ) != _normalize_check_sql(numeric_division, "postgresql")
+
+
+def test_postgresql_check_normalization_preserves_cast_text_inside_strings():
+    plain_text = "label = 'amount >= 1)'"
+    cast_text = "label = 'amount >= 1::numeric)'"
+
+    assert _normalize_check_sql(plain_text, "postgresql") != _normalize_check_sql(
+        cast_text,
+        "postgresql",
+    )
+
+
+def test_postgresql_check_normalization_preserves_numeric_typmod_rounding():
+    bare_literal = "amount >= 1.239"
+    rounded_numeric = "amount >= 1.239::numeric(3, 2)"
+
+    assert _normalize_check_sql(
+        bare_literal,
+        "postgresql",
+    ) != _normalize_check_sql(rounded_numeric, "postgresql")
 
 
 @pytest.mark.skipif(
@@ -472,6 +615,19 @@ def test_postgresql_upgrade_opt_in_uses_outer_rollback():
                 config.attributes["connection"] = connection
                 command.upgrade(config, "head")
                 assert "alembic_version" in sa.inspect(connection).get_table_names()
+                assert schema_differences(connection) == ()
+
+                connection.exec_driver_sql(
+                    "ALTER TABLE notifications "
+                    "ALTER COLUMN is_read SET DEFAULT TRUE"
+                )
+                default_differences = schema_differences(connection)
+                assert any(
+                    "modify_default" in difference
+                    and "notifications" in difference
+                    and "is_read" in difference
+                    for difference in default_differences
+                )
             finally:
                 transaction.rollback()
     finally:

@@ -9,17 +9,27 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Optional
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import Depends, Query, Response, status
 from sqlalchemy import and_, func, or_
-from sqlalchemy.orm import Session, aliased
+from sqlalchemy.orm import Session, aliased, joinedload, selectinload
 
-from app._actor import get_actor_emp, set_actor
 from app.database import get_db
+from app.dependencies.verified_actor import (
+    CurrentActor,
+    VerifiedActor,
+    VerifiedActorRouter,
+    ensure_actor_employee_id,
+    ensure_actor_employee_name,
+)
 from app.models import (
     DepartmentEnum,
     Employee,
     Item,
+    ShippingAllocation,
     ShippingRequest,
+    ShippingRequestBomLine,
+    ShippingRequestChecklistLine,
+    ShippingRequestCompanionLine,
     ShippingRequestRevision,
     ShippingRequestStatusEnum,
     TransactionLog,
@@ -39,9 +49,12 @@ from app.schemas.shipping import (
     ShippingCompanionLineResponse,
     ShippingPrepareCancelRequest,
     ShippingPrepareCompleteRequest,
+    ShippingPickupCancelRequest,
+    ShippingPickupCompleteRequest,
     ShippingInvoiceUpdate,
     ShippingHistoryMonthResponse,
     ShippingHistoryPageResponse,
+    ShippingRequestPageResponse,
     ShippingRequestRevisionResponse,
     ShippingRequestCreate,
     ShippingRequestResponse,
@@ -55,7 +68,7 @@ from app.services.shipping import ShippingConflictError, ShippingError
 from app.utils.search import build_normalized_search_filter
 
 
-router = APIRouter()
+router = VerifiedActorRouter()
 
 _COMPONENT_CHANGE_DEPARTMENTS = {
     DepartmentEnum.ASSEMBLY.value,
@@ -63,6 +76,8 @@ _COMPONENT_CHANGE_DEPARTMENTS = {
 }
 _KST = timezone(timedelta(hours=9))
 _LATEST_REVISION_UNSET = object()
+_TRANSACTIONS_UNSET = object()
+_STOCK_SHORTAGES_UNSET = object()
 
 
 def _line_payload(lines: list[ShippingBomLineInput] | None) -> list[dict] | None:
@@ -150,6 +165,8 @@ def _to_response(
     db: Session,
     req: ShippingRequest,
     latest_preparation_revision: ShippingRequestRevision | None | object = _LATEST_REVISION_UNSET,
+    transaction_rows: list[TransactionLog] | object = _TRANSACTIONS_UNSET,
+    stock_shortages: list[dict] | object = _STOCK_SHORTAGES_UNSET,
 ) -> ShippingRequestResponse:
     if latest_preparation_revision is _LATEST_REVISION_UNSET:
         latest_preparation_revision = (
@@ -161,12 +178,17 @@ def _to_response(
             .order_by(ShippingRequestRevision.created_at.desc(), ShippingRequestRevision.revision_id.desc())
             .first()
         )
-    tx_rows = (
-        db.query(TransactionLog)
-        .filter(TransactionLog.shipping_request_id == req.request_id)
-        .order_by(TransactionLog.created_at.asc(), TransactionLog.log_id.asc())
-        .all()
-    )
+    if transaction_rows is _TRANSACTIONS_UNSET:
+        transaction_rows = (
+            db.query(TransactionLog)
+            .filter(TransactionLog.shipping_request_id == req.request_id)
+            .order_by(TransactionLog.created_at.asc(), TransactionLog.log_id.asc())
+            .all()
+        )
+    tx_rows = transaction_rows if isinstance(transaction_rows, list) else []
+    if stock_shortages is _STOCK_SHORTAGES_UNSET:
+        stock_shortages = shipping_svc._prepare_stock_shortages(db, req)
+    shortage_rows = stock_shortages if isinstance(stock_shortages, list) else []
     return ShippingRequestResponse(
         request_id=req.request_id,
         status=req.status,
@@ -263,21 +285,95 @@ def _to_response(
         ],
         stock_shortages=[
             ShippingStockShortageResponse(**shortage)
-            for shortage in shipping_svc.prepare_stock_shortages(db, req)
+            for shortage in shortage_rows
         ],
         transaction_count=len(tx_rows),
     )
 
 
+def _request_response_options() -> tuple[Any, ...]:
+    return (
+        joinedload(ShippingRequest.base_pf_item),
+        joinedload(ShippingRequest.final_pa_item),
+        joinedload(ShippingRequest.final_pf_item),
+        selectinload(ShippingRequest.bom_lines).joinedload(ShippingRequestBomLine.child_item),
+        selectinload(ShippingRequest.companion_lines).joinedload(ShippingRequestCompanionLine.item),
+        selectinload(ShippingRequest.checklist_lines).joinedload(ShippingRequestChecklistLine.item),
+        selectinload(ShippingRequest.allocations).joinedload(ShippingAllocation.item),
+        selectinload(ShippingRequest.events),
+    )
+
+
+def _responses_for_rows(db: Session, rows: list[ShippingRequest]) -> list[ShippingRequestResponse]:
+    request_ids = [row.request_id for row in rows]
+    if not request_ids:
+        return []
+    latest_revisions = _latest_preparation_revisions(db, request_ids)
+    transaction_rows = (
+        db.query(TransactionLog)
+        .options(joinedload(TransactionLog.item))
+        .filter(TransactionLog.shipping_request_id.in_(request_ids))
+        .order_by(
+            TransactionLog.shipping_request_id.asc(),
+            TransactionLog.created_at.asc(),
+            TransactionLog.log_id.asc(),
+        )
+        .all()
+    )
+    transactions_by_request: dict[uuid.UUID, list[TransactionLog]] = {
+        request_id: [] for request_id in request_ids
+    }
+    for transaction in transaction_rows:
+        transactions_by_request[transaction.shipping_request_id].append(transaction)
+    shortages_by_request = shipping_svc.prepare_stock_shortages_many(db, rows)
+    return [
+        _to_response(
+            db,
+            row,
+            latest_revisions.get(row.request_id),
+            transactions_by_request[row.request_id],
+            shortages_by_request[row.request_id],
+        )
+        for row in rows
+    ]
+
+
 def _action_or_422(db: Session, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
     try:
         return func(db, *args, **kwargs)
+    except shipping_actions_svc.ShippingIdempotencyConflict as exc:
+        raise http_error(
+            status.HTTP_409_CONFLICT,
+            ErrorCode.IDEMPOTENCY_CONFLICT,
+            str(exc),
+        )
+    except shipping_actions_svc.ShippingStateConflict as exc:
+        raise http_error(
+            status.HTTP_409_CONFLICT,
+            ErrorCode.SHIPPING_STATE_CONFLICT,
+            str(exc),
+            current_status=exc.current_status,
+        )
     except ShippingConflictError as exc:
         raise http_error(status.HTTP_409_CONFLICT, ErrorCode.CONFLICT, str(exc))
     except ShippingError as exc:
         raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.BUSINESS_RULE, str(exc))
     except ValueError as exc:
         raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.STOCK_SHORTAGE, str(exc))
+
+
+def _shipping_command_response(
+    outcome: shipping_actions_svc.ShippingCommandOutcome,
+    response: Response,
+) -> dict[str, Any]:
+    """Expose the legacy keyless transport deprecation without changing its body."""
+
+    if outcome.legacy_transport:
+        response.headers["Deprecation"] = "true"
+        response.headers["Warning"] = (
+            '299 DEXCOWIN-MES "client_request_id is required for reliable retries"'
+        )
+    return outcome.response_snapshot
 
 
 def _validate_component_change_actor(requester: Employee) -> None:
@@ -312,31 +408,6 @@ def _load_component_change_requester(
     return requester
 
 
-def _load_component_change_actor(http_request: Request, db: Session) -> Employee:
-    employee_code = get_actor_emp(http_request)
-    if employee_code == "-":
-        raise http_error(status.HTTP_400_BAD_REQUEST, ErrorCode.BAD_REQUEST, "작업자 사번 헤더가 필요합니다.")
-    requester = db.query(Employee).filter(Employee.employee_code == employee_code).first()
-    if requester is None:
-        raise http_error(status.HTTP_404_NOT_FOUND, ErrorCode.NOT_FOUND, "작업자(직원)를 찾을 수 없습니다.")
-    _validate_component_change_actor(requester)
-    set_actor(http_request, requester)
-    return requester
-
-
-def _load_shipping_actor(http_request: Request, db: Session) -> Employee:
-    employee_code = get_actor_emp(http_request)
-    if employee_code == "-":
-        raise http_error(status.HTTP_400_BAD_REQUEST, ErrorCode.BAD_REQUEST, "작업자 사번 헤더가 필요합니다.")
-    actor = db.query(Employee).filter(Employee.employee_code == employee_code).first()
-    if actor is None:
-        raise http_error(status.HTTP_404_NOT_FOUND, ErrorCode.NOT_FOUND, "작업자 직원을 찾을 수 없습니다.")
-    if not bool(actor.is_active):
-        raise http_error(status.HTTP_403_FORBIDDEN, ErrorCode.FORBIDDEN, "비활성 직원은 출하 요청을 수정할 수 없습니다.")
-    set_actor(http_request, actor)
-    return actor
-
-
 @router.get("/component-change-preview", response_model=ShippingComponentChangePreviewResponse)
 def component_change_preview_independent(
     requester_employee_id: uuid.UUID = Query(...),
@@ -362,10 +433,10 @@ def component_change_preview_independent(
 @router.post("/component-change", response_model=ShippingComponentChangeResultResponse)
 def component_change_independent(
     payload: ShippingComponentChangeExecuteRequest,
-    http_request: Request,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
 ):
-    requester = _load_component_change_actor(http_request, db)
+    _validate_component_change_actor(actor)
 
     if payload.target_pa_item_id is None:
         raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.BUSINESS_RULE, "대상 PA를 선택해야 합니다.")
@@ -377,8 +448,7 @@ def component_change_independent(
             payload.quantity,
             payload.memo,
             payload.requested_mode,
-            requester_name=requester.name,
-            requester_employee_id=requester.employee_id,
+            actor=actor,
         )
         return ShippingComponentChangeResultResponse(
             **{key: value for key, value in result.items() if key != "transactions"},
@@ -389,35 +459,107 @@ def component_change_independent(
     except ValueError as exc:
         raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.STOCK_SHORTAGE, str(exc))
 
+def _active_requests_query(
+    db: Session,
+    status_filter: ShippingRequestStatusEnum | None,
+):
+    query = db.query(ShippingRequest).options(*_request_response_options())
+    if status_filter is not None:
+        return query.filter(ShippingRequest.status == status_filter)
+    return query.filter(ShippingRequest.status != ShippingRequestStatusEnum.CANCELLED)
+
+
+def _request_page_cursor(request: ShippingRequest) -> str:
+    payload = {
+        "sort_at": request.created_at.isoformat(),
+        "request_id": str(request.request_id),
+    }
+    return base64.urlsafe_b64encode(
+        json.dumps(payload, separators=(",", ":")).encode()
+    ).decode().rstrip("=")
+
+
+def _decode_request_page_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
+    try:
+        padded = cursor + "=" * (-len(cursor) % 4)
+        value = json.loads(base64.urlsafe_b64decode(padded.encode()).decode())
+        return datetime.fromisoformat(value["sort_at"]), uuid.UUID(value["request_id"])
+    except (ValueError, KeyError, TypeError, UnicodeDecodeError, json.JSONDecodeError, binascii.Error):
+        raise http_error(status.HTTP_400_BAD_REQUEST, ErrorCode.BAD_REQUEST, "유효하지 않은 출하 요청 커서입니다.")
+
+
 @router.get("/requests", response_model=list[ShippingRequestResponse])
 def list_requests(
     status_filter: Optional[ShippingRequestStatusEnum] = Query(None, alias="status"),
+    limit: int = Query(50, ge=1, le=50),
     db: Session = Depends(get_db),
 ):
-    query = db.query(ShippingRequest)
-    if status_filter is not None:
-        query = query.filter(ShippingRequest.status == status_filter)
-    else:
-        query = query.filter(ShippingRequest.status != ShippingRequestStatusEnum.CANCELLED)
-    rows = query.order_by(ShippingRequest.created_at.desc(), ShippingRequest.request_id.desc()).all()
-    latest_revisions = _latest_preparation_revisions(db, [row.request_id for row in rows])
-    return [_to_response(db, row, latest_revisions.get(row.request_id)) for row in rows]
+    """One-release list adapter; bounded while clients migrate to the page route."""
+
+    rows = (
+        _active_requests_query(db, status_filter)
+        .order_by(ShippingRequest.created_at.desc(), ShippingRequest.request_id.desc())
+        .limit(limit)
+        .all()
+    )
+    return _responses_for_rows(db, rows)
+
+
+@router.get("/requests/page", response_model=ShippingRequestPageResponse)
+def list_request_page(
+    status_filter: Optional[ShippingRequestStatusEnum] = Query(None, alias="status"),
+    cursor: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=50),
+    db: Session = Depends(get_db),
+):
+    query = _active_requests_query(db, status_filter)
+    if cursor:
+        cursor_at, cursor_id = _decode_request_page_cursor(cursor)
+        query = query.filter(or_(
+            ShippingRequest.created_at < cursor_at,
+            and_(
+                ShippingRequest.created_at == cursor_at,
+                ShippingRequest.request_id < cursor_id,
+            ),
+        ))
+    rows = (
+        query.order_by(ShippingRequest.created_at.desc(), ShippingRequest.request_id.desc())
+        .limit(limit + 1)
+        .all()
+    )
+    page = rows[:limit]
+    has_more = len(rows) > limit
+    return ShippingRequestPageResponse(
+        requests=_responses_for_rows(db, page),
+        next_cursor=_request_page_cursor(page[-1]) if has_more and page else None,
+        has_more=has_more,
+    )
 
 
 @router.get("/requests/{request_id}", response_model=ShippingRequestResponse)
 def get_request(request_id: uuid.UUID, db: Session = Depends(get_db)):
-    try:
-        req = shipping_svc.get_request(db, request_id)
-    except ShippingError as exc:
-        raise http_error(status.HTTP_404_NOT_FOUND, ErrorCode.NOT_FOUND, str(exc))
-    return _to_response(db, req)
+    req = (
+        db.query(ShippingRequest)
+        .options(*_request_response_options())
+        .filter(ShippingRequest.request_id == request_id)
+        .first()
+    )
+    if req is None:
+        raise http_error(
+            status.HTTP_404_NOT_FOUND,
+            ErrorCode.NOT_FOUND,
+            "출하 요청을 찾을 수 없습니다.",
+        )
+    return _responses_for_rows(db, [req])[0]
 
 
 @router.post("/requests", response_model=ShippingRequestResponse, status_code=status.HTTP_201_CREATED)
 def create_request(
     payload: ShippingRequestCreate,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
 ):
+    ensure_actor_employee_name(actor, payload.requested_by_name)
     req = _action_or_422(
         db,
         shipping_actions_svc.create_request,
@@ -425,7 +567,7 @@ def create_request(
             "base_pf_item_id": payload.base_pf_item_id,
             "finalization_mode": payload.finalization_mode,
             "reuse_pf_item_id": payload.reuse_pf_item_id,
-            "requested_by_name": payload.requested_by_name,
+            "requested_by_name": actor.name,
             "request_quantity": payload.request_quantity,
             "custom_pa_name": payload.custom_pa_name,
             "custom_pf_name": payload.custom_pf_name,
@@ -434,6 +576,7 @@ def create_request(
             "bom_lines": _line_payload(payload.bom_lines),
             "companion_lines": _companion_payload(payload.companion_lines),
         },
+        actor,
     )
     return _to_response(db, req)
 
@@ -442,11 +585,13 @@ def create_request(
 def update_request(
     request_id: uuid.UUID,
     payload: ShippingRequestUpdate,
-    http_request: Request,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
 ):
-    actor = _load_shipping_actor(http_request, db)
+    ensure_actor_employee_name(actor, payload.requested_by_name)
     update = payload.model_dump(exclude_unset=True)
+    if "requested_by_name" in update:
+        update["requested_by_name"] = actor.name
     if "bom_lines" in update:
         update["bom_lines"] = _line_payload(payload.bom_lines)
     if "companion_lines" in update:
@@ -456,8 +601,7 @@ def update_request(
 
 
 @router.delete("/requests/{request_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_request(request_id: uuid.UUID, http_request: Request, db: Session = Depends(get_db)):
-    actor = _load_shipping_actor(http_request, db)
+def delete_request(request_id: uuid.UUID, actor: VerifiedActor, db: Session = Depends(get_db)):
     _action_or_422(db, shipping_actions_svc.delete_request, request_id, actor)
     return None
 
@@ -466,10 +610,9 @@ def delete_request(request_id: uuid.UUID, http_request: Request, db: Session = D
 def update_invoice(
     request_id: uuid.UUID,
     payload: ShippingInvoiceUpdate,
-    http_request: Request,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
 ):
-    actor = _load_shipping_actor(http_request, db)
     req = _action_or_422(
         db,
         shipping_actions_svc.update_invoice,
@@ -492,42 +635,49 @@ def list_revisions(request_id: uuid.UUID, db: Session = Depends(get_db)):
     return [_revision_response(row) for row in rows]
 
 @router.patch("/requests/{request_id}/checklist", response_model=ShippingRequestResponse)
-def update_checklist(request_id: uuid.UUID, payload: ShippingChecklistUpdate, db: Session = Depends(get_db)):
+def update_checklist(request_id: uuid.UUID, payload: ShippingChecklistUpdate, actor: VerifiedActor, db: Session = Depends(get_db)):
     checks = {line.item_id: line.checked for line in payload.checks}
-    req = _action_or_422(db, shipping_actions_svc.update_checklist, request_id, checks)
+    req = _action_or_422(db, shipping_actions_svc.update_checklist, request_id, checks, actor)
     return _to_response(db, req)
 
 
 @router.post("/requests/{request_id}/checklist/clear", response_model=ShippingRequestResponse)
-def clear_checklist(request_id: uuid.UUID, db: Session = Depends(get_db)):
-    req = _action_or_422(db, shipping_actions_svc.clear_checklist, request_id)
+def clear_checklist(request_id: uuid.UUID, actor: VerifiedActor, db: Session = Depends(get_db)):
+    req = _action_or_422(db, shipping_actions_svc.clear_checklist, request_id, actor)
     return _to_response(db, req)
 
 
 @router.get("/requests/{request_id}/component-change-preview", response_model=ShippingComponentChangePreviewResponse)
 def component_change_preview(
     request_id: uuid.UUID,
-    requester_employee_id: uuid.UUID = Query(...),
+    actor: CurrentActor,
     source_pa_item_id: uuid.UUID = Query(...),
     quantity: int = Query(..., gt=0),
+    requester_employee_id: uuid.UUID | None = Query(None),
     requested_mode: str = Query("BOM", pattern="^(SPEC|BOM)$"),
     db: Session = Depends(get_db),
 ):
-    _load_component_change_requester(requester_employee_id, db)
-    try:
-        return shipping_svc.component_change_preview(db, request_id, source_pa_item_id, quantity, requested_mode)
-    except ShippingError as exc:
-        raise http_error(status.HTTP_422_UNPROCESSABLE_ENTITY, ErrorCode.BUSINESS_RULE, str(exc))
+    _validate_component_change_actor(actor)
+    ensure_actor_employee_id(actor, requester_employee_id)
+    return _action_or_422(
+        db,
+        shipping_actions_svc.component_change_preview,
+        request_id,
+        source_pa_item_id,
+        quantity,
+        requested_mode,
+        actor=actor,
+    )
 
 
 @router.post("/requests/{request_id}/component-change", response_model=ShippingRequestResponse)
 def component_change(
     request_id: uuid.UUID,
     payload: ShippingComponentChangeExecuteRequest,
-    http_request: Request,
+    actor: VerifiedActor,
     db: Session = Depends(get_db),
 ):
-    requester = _load_component_change_actor(http_request, db)
+    _validate_component_change_actor(actor)
     req = _action_or_422(
         db,
         shipping_actions_svc.execute_component_change,
@@ -536,8 +686,7 @@ def component_change(
         payload.quantity,
         payload.requested_mode,
         payload.memo,
-        requester_name=requester.name,
-        requester_employee_id=requester.employee_id,
+        actor=actor,
     )
     return _to_response(db, req)
 
@@ -546,59 +695,90 @@ def component_change(
 def prepare_complete(
     request_id: uuid.UUID,
     payload: ShippingPrepareCompleteRequest,
-    http_request: Request,
+    actor: VerifiedActor,
+    response: Response,
     db: Session = Depends(get_db),
 ):
-    actor = _load_shipping_actor(http_request, db)
-    req = _action_or_422(
+    outcome = _action_or_422(
         db,
-        shipping_actions_svc.prepare_complete,
+        shipping_actions_svc.prepare_complete_command,
         request_id,
         payload.serial_numbers,
-        prepared_by_employee_id=actor.employee_id,
-        prepared_by_name=actor.name,
+        _companion_payload(payload.companion_lines) or [],
+        actor=actor,
+        client_request_id=payload.client_request_id,
+        expected_status=payload.expected_status,
+        response_factory=_to_response,
+        expected_updated_at=payload.expected_updated_at,
     )
-    return _to_response(db, req)
+    return _shipping_command_response(outcome, response)
 
 
 @router.post("/requests/{request_id}/prepare-cancel", response_model=ShippingRequestResponse)
 def prepare_cancel(
     request_id: uuid.UUID,
-    payload: ShippingPrepareCancelRequest,
-    http_request: Request,
+    actor: VerifiedActor,
+    response: Response,
+    payload: ShippingPrepareCancelRequest | None = None,
     db: Session = Depends(get_db),
 ):
-    actor = _load_shipping_actor(http_request, db)
-    req = _action_or_422(
+    command = payload or ShippingPrepareCancelRequest()
+    outcome = _action_or_422(
         db,
-        shipping_actions_svc.prepare_cancel,
+        shipping_actions_svc.prepare_cancel_command,
         request_id,
-        payload.reason,
+        command.reason,
         actor=actor,
+        client_request_id=command.client_request_id,
+        expected_status=command.expected_status,
+        response_factory=_to_response,
+        expected_updated_at=command.expected_updated_at,
     )
-    return _to_response(db, req)
+    return _shipping_command_response(outcome, response)
 
 
 @router.post("/requests/{request_id}/pickup-complete", response_model=ShippingRequestResponse)
-def pickup_complete(request_id: uuid.UUID, db: Session = Depends(get_db)):
-    req = _action_or_422(db, shipping_actions_svc.pickup_complete, request_id)
-    return _to_response(db, req)
+def pickup_complete(
+    request_id: uuid.UUID,
+    actor: VerifiedActor,
+    response: Response,
+    payload: ShippingPickupCompleteRequest | None = None,
+    db: Session = Depends(get_db),
+):
+    command = payload or ShippingPickupCompleteRequest()
+    outcome = _action_or_422(
+        db,
+        shipping_actions_svc.pickup_complete_command,
+        request_id,
+        actor=actor,
+        client_request_id=command.client_request_id,
+        expected_status=command.expected_status,
+        response_factory=_to_response,
+        expected_updated_at=command.expected_updated_at,
+    )
+    return _shipping_command_response(outcome, response)
 
 
 @router.post("/requests/{request_id}/pickup-cancel", response_model=ShippingRequestResponse)
 def pickup_cancel(
     request_id: uuid.UUID,
-    http_request: Request,
+    actor: VerifiedActor,
+    response: Response,
+    payload: ShippingPickupCancelRequest | None = None,
     db: Session = Depends(get_db),
 ):
-    actor = _load_shipping_actor(http_request, db)
-    req = _action_or_422(
+    command = payload or ShippingPickupCancelRequest()
+    outcome = _action_or_422(
         db,
-        shipping_actions_svc.pickup_cancel,
+        shipping_actions_svc.pickup_cancel_command,
         request_id,
         actor=actor,
+        client_request_id=command.client_request_id,
+        expected_status=command.expected_status,
+        response_factory=_to_response,
+        expected_updated_at=command.expected_updated_at,
     )
-    return _to_response(db, req)
+    return _shipping_command_response(outcome, response)
 
 
 def _history_cursor(request: ShippingRequest, sort_at: datetime) -> str:
@@ -699,6 +879,7 @@ def history(
     )
     query = (
         db.query(ShippingRequest)
+        .options(*_request_response_options())
         .outerjoin(final_pf, ShippingRequest.final_pf_item_id == final_pf.item_id)
         .join(base_pf, ShippingRequest.base_pf_item_id == base_pf.item_id)
         .filter(ShippingRequest.status.in_(allowed))
@@ -719,9 +900,8 @@ def history(
     rows = query.order_by(sort_at.desc(), ShippingRequest.request_id.desc()).limit(limit + 1).all()
     page = rows[:limit]
     has_more = len(rows) > limit
-    latest_revisions = _latest_preparation_revisions(db, [row.request_id for row in page])
     return ShippingHistoryPageResponse(
-        requests=[_to_response(db, row, latest_revisions.get(row.request_id)) for row in page],
+        requests=_responses_for_rows(db, page),
         next_cursor=_history_cursor(page[-1], _history_sort_at(page[-1])) if has_more and page else None,
         has_more=has_more,
     )

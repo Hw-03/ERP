@@ -17,20 +17,23 @@ import { STALE_TIME } from "./client";
 import { queryKeys } from "./keys";
 
 /** 창고 승인 대기열 */
-export function useWarehouseQueueQuery() {
+export function useWarehouseQueueQuery(targetRequestId?: string | null) {
   return useQuery({
-    queryKey: queryKeys.stockRequests.warehouseQueue(),
-    queryFn: () => stockRequestsApi.listWarehouseQueue(),
+    queryKey: queryKeys.stockRequests.warehouseQueue(targetRequestId),
+    queryFn: () => stockRequestsApi.listWarehouseQueue(targetRequestId),
     // 승인 대기열: 제출~승인자 노출 지연을 줄여야 함 → 짧게 (R2-1).
     staleTime: STALE_TIME.VOLATILE,
   });
 }
 
 /** 부서 승인 대기열 */
-export function useDepartmentQueueQuery(actorEmployeeId: string) {
+export function useDepartmentQueueQuery(
+  actorEmployeeId: string,
+  targetRequestId?: string | null,
+) {
   return useQuery({
-    queryKey: queryKeys.stockRequests.departmentQueue(actorEmployeeId),
-    queryFn: () => stockRequestsApi.listDepartmentQueue(actorEmployeeId),
+    queryKey: queryKeys.stockRequests.departmentQueue(actorEmployeeId, targetRequestId),
+    queryFn: () => stockRequestsApi.listDepartmentQueue(actorEmployeeId, targetRequestId),
     enabled: !!actorEmployeeId,
     // 승인 대기열: 제출~승인자 노출 지연을 줄여야 함 → 짧게 (R2-1).
     staleTime: STALE_TIME.VOLATILE,
@@ -38,10 +41,13 @@ export function useDepartmentQueueQuery(actorEmployeeId: string) {
 }
 
 /** 내 요청 목록 */
-export function useMyStockRequestsQuery(employeeId: string) {
+export function useMyStockRequestsQuery(
+  employeeId: string,
+  targetRequestId?: string | null,
+) {
   return useQuery({
-    queryKey: queryKeys.stockRequests.myList(employeeId),
-    queryFn: () => stockRequestsApi.listMyStockRequests(employeeId),
+    queryKey: queryKeys.stockRequests.myList(employeeId, targetRequestId),
+    queryFn: () => stockRequestsApi.listMyStockRequests(employeeId, targetRequestId),
     enabled: !!employeeId,
     // 내 요청 상태가 승인 흐름 따라 자주 바뀜 → 짧게 (R2-1).
     staleTime: STALE_TIME.VOLATILE,

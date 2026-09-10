@@ -12,7 +12,7 @@
 ## 스택
 
 - 백엔드: Python 3.13 · FastAPI · SQLAlchemy · SQLite (WAL)
-- 프론트엔드: Next.js 14 (App Router) · React · Tailwind · TypeScript strict
+- 프론트엔드: Next.js 16 (App Router) · React · Tailwind · TypeScript strict
 
 ## 폴더 구조 (운영에 의미 있는 부분만)
 
@@ -135,7 +135,9 @@ PC 입출고 내역의 `display-groups`는 원본 처리 당시 잔고를 보존
 
 | 메서드 | 경로 | 의미 |
 |---|---|---|
-| GET | `/health`, `/health/detailed` | 헬스체크 (`detailed`는 DB 점검 + mismatch 카운트) |
+| GET | `/health/live` | DB와 무관한 process/event-loop liveness (`health-liveness/v1`) |
+| GET | `/health/ready` | DB 연결·Alembic head·필수 무결성 dependency·blocking verdict readiness (`health-readiness/v1`) |
+| GET | `/health/detailed` | readiness와 식별자를 제거한 무결성 check ID·count, 기존 상세 필드 (`health-detailed/v1`) |
 | GET | `/api/items` | 품목 목록 (bulk_compute로 N+1 제거) |
 | GET | `/api/inventory/summary` | 공정코드별 재고 요약 (`process_types` 18개 기준) |
 | POST | `/api/inventory/receive` | 창고 입고 |
@@ -156,7 +158,7 @@ PC 입출고 내역의 `display-groups`는 원본 처리 당시 잔고를 보존
 ## 프론트 레이어
 
 - App Router: 대부분의 페이지는 `/mes` 셸로 리다이렉트되거나 그 일부를 보여주는 단순 진입점이다. 실제 UI는 `frontend/app/mes/_components/` 안에 있다.
-- 데이터 페칭: `frontend/lib/api.ts` 의 단순 fetch 기반. SWR / React Query 사용 안 함. 페이지마다 `useState` + `useEffect` 패턴.
+- 데이터 페칭: transport는 `frontend/lib/api.ts` 계열을 유지한다. React Query 적용 영역(품목·부서·출하 list 등)은 `frontend/lib/queries/`의 hook·query key·invalidate 계약을 사용하고, 아직 전환되지 않은 legacy local fetch와 local UI 상태는 필요한 곳에서 기존 `useState` + `useEffect` 패턴을 유지한다.
 - 디자인 토큰: `_components/legacyUi.ts` 의 `LEGACY_COLORS` (CSS 변수 래퍼). 다크/라이트는 CSS 변수로 자동 전환.
 
 ### 입출고 wizard 흐름 (5단계)
