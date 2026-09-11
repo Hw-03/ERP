@@ -16,7 +16,7 @@ from app.main import app
 from app.models import Inventory
 
 
-ALEMBIC_HEAD = "20260907_0034"
+ALEMBIC_HEAD = "20260911_0035"
 
 
 class _FailingHealthSession:

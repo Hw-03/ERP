@@ -28,6 +28,7 @@ from app.services import defect_records as defect_records_svc
 from app.services import inventory_operations as operation_svc
 from app.services import warehouse_map as warehouse_map_svc
 from app.services._tx import transactional
+from app.services.inv_transfer import department_for_item
 
 
 @dataclass(frozen=True)
@@ -52,11 +53,22 @@ def quarantine_inventory(
     reason_category: Optional[str],
     reason_memo: Optional[str],
     client_request_id: Optional[str],
+    management_category: str = "DEFECT",
 ) -> Inventory:
     """재고 격리와 원장 기록을 하나의 업무 트랜잭션으로 확정한다."""
     with transactional(db):
-        if item_id not in item_repository.lock_active_many(db, [item_id]):
+        item = item_repository.lock_active_many(db, [item_id]).get(item_id)
+        if item is None:
             raise ValueError(f"품목을 찾을 수 없습니다: {item_id}")
+        if source == "production":
+            expected_dept = department_for_item(item)
+            if source_dept != expected_dept or target_dept != expected_dept:
+                raise ValueError(
+                    "생산 출처 불량 등록의 출발·격리 부서는 품목코드 기준 부서와 같아야 합니다."
+                )
+        elif source == "warehouse":
+            if source_dept is not None or target_dept != DepartmentEnum.WAREHOUSE:
+                raise ValueError("창고 출처 불량 등록은 source_dept 없이 격리 부서가 창고여야 합니다.")
         operation = operation_svc._create_business_operation(
             db,
             domain="defect",
@@ -105,6 +117,7 @@ def quarantine_inventory(
             actor_name=actor.name,
             reason_category=reason_category,
             memo=reason_memo,
+            management_category=management_category,
         )
         log = operation_svc._attach_transaction(
             TransactionLog(

@@ -40,12 +40,16 @@ def test_cp4_revision_remains_in_the_single_head_chain() -> None:
 
     script = ScriptDirectory.from_config(config)
 
-    assert script.get_heads() == ["20260907_0034"]
+    assert script.get_heads() == ["20260911_0035"]
     assert script.get_revision("20260831_0032").down_revision == MIGRATION_REVISION
     assert script.get_revision("20260831_0033").down_revision == "20260831_0032"
     assert script.get_revision("20260907_0034").down_revision == (
         "20260903_0032",
         "20260831_0033",
+    )
+    assert script.get_revision("20260911_0035").down_revision == (
+        "20260907_0034",
+        "20260910_0033",
     )
 
 

@@ -39,7 +39,8 @@ const testState = vi.hoisted(() => ({
   nextMonth: null as null | (() => void),
 }));
 
-vi.mock("@/lib/queries/realtime", () => ({
+vi.mock("@/lib/queries/realtime", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/queries/realtime")>(),
   useRealtimeRevision: () => testState.realtimeRevision,
 }));
 

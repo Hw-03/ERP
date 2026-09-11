@@ -31,6 +31,7 @@ from app.models import (
 from app.services import shipping as shipping_svc
 from app.services import shipping_actions as shipping_actions_svc
 from app.services import inventory_operation_cancellation as cancellation_svc
+from app.services import shipping_workflow_operations as workflow_ops
 from app.services import io as io_svc
 from app.services import io_actions as io_actions_svc
 from app.schemas.io import IoPreviewTarget, IoSubmitRequest
@@ -487,6 +488,119 @@ def _make_prepared_request(
     )
 
 
+@pytest.mark.parametrize("entrypoint", ["shipping", "common"])
+@pytest.mark.parametrize("cancel_prepare", [False, True])
+def test_shipping_cancel_retry_cycles_preserve_stock_and_history(
+    db_session, make_item, make_bom, make_location, entrypoint, cancel_prepare,
+):
+    request_id, _, pf_id, companion_id = _make_prepared_request(db_session, make_item, make_bom, make_location)
+    request = db_session.get(ShippingRequest, request_id)
+    actor = db_session.get(Employee, request.prepared_by_employee_id)
+    item_ids = [pf_id, companion_id]
+    stock_before = [_location_qty(db_session, item, DepartmentEnum.SHIPPING) for item in item_ids]
+    prepare_time = request.prepared_at
+
+    def cancel(action):
+        operation = workflow_ops.latest_operation(db_session, request_id, action, active_only=True)
+        plan = cancellation_svc.preview_cancellation(db_session, operation.operation_id)
+        assert plan.can_cancel, plan.blockers
+        expected = "PREPARING" if action == "prepare" else "PREPARED"
+        assert next(e.target_state['status'] for e in plan.effects if e.subject_type == 'ShippingRequest') == expected
+        if entrypoint == "common":
+            cancellation_svc.cancel_operation(db_session, operation_id=operation.operation_id,
+                canceller=actor, reason="cycle", plan_hash=plan.plan_hash)
+        elif action == "prepare":
+            shipping_actions_svc.prepare_cancel(db_session, request_id, "cycle", actor=actor)
+        else:
+            shipping_actions_svc.pickup_cancel(db_session, request_id, actor=actor)
+        assert not cancellation_svc.preview_cancellation(db_session, operation.operation_id).can_cancel
+
+    for _ in range(3):
+        shipping_actions_svc.pickup_complete(db_session, request_id, actor)
+        old_prepare = workflow_ops.latest_operation(db_session, request_id, "prepare", active_only=True)
+        assert not cancellation_svc.preview_cancellation(db_session, old_prepare.operation_id).can_cancel
+        cancel("pickup")
+        assert request.status == ShippingRequestStatusEnum.PREPARED
+        assert request.prepared_at == prepare_time
+        assert request.picked_up_at is None
+        assert [_location_qty(db_session, item, DepartmentEnum.SHIPPING) for item in item_ids] == stock_before
+        if not cancel_prepare:
+            continue
+        cancel("prepare")
+        assert request.status == ShippingRequestStatusEnum.PREPARING
+        assert request.prepared_by_name is None
+        assert request.serial_numbers == "SN-001"
+        assert db_session.query(ShippingAllocation).filter_by(request_id=request_id, status="RESERVED").count() == 0
+        shipping_actions_svc.prepare_complete(
+            db_session,
+            request_id,
+            "SN-001",
+            actor=actor,
+        )
+        prepare_time = request.prepared_at
+        active = db_session.query(ShippingAllocation).filter_by(request_id=request_id, status="RESERVED").all()
+        assert len(active) == 2 and sum(a.quantity for a in active) == 2
+        assert not cancellation_svc.preview_cancellation(db_session, old_prepare.operation_id).can_cancel
+
+    shipping_actions_svc.pickup_complete(db_session, request_id, actor)
+    assert [_location_qty(db_session, item, DepartmentEnum.SHIPPING) for item in item_ids] == [qty - 1 for qty in stock_before]
+    assert db_session.query(ShippingRequestEvent).filter_by(request_id=request_id, event_type="PREPARE_CANCELLED").count() == (3 if cancel_prepare else 0)
+    assert db_session.query(ShippingRequestEvent).filter_by(request_id=request_id, event_type="PICKUP_CANCELLED").count() == 3
+    assert db_session.query(TransactionLog).filter_by(shipping_request_id=request_id, shipping_phase="PREPARE").count() == 0
+    logs = db_session.query(TransactionLog).filter_by(shipping_request_id=request_id, shipping_phase="PICKUP").all()
+    assert sum(log.quantity_change for log in logs) == -2
+    assert len({log.operation_id for log in logs}) == 7
+    from app.routers.shipping import _to_response
+    response = _to_response(db_session, request)
+    pickup_logs = [log for log in response.transactions if log.shipping_phase == "PICKUP"]
+    assert sum(log.cancelled for log in pickup_logs) == 6
+    assert sum(log.quantity_change for log in pickup_logs if not log.cancelled and log.quantity_change < 0) == -2
+
+
+def test_shipping_changed_companions_do_not_reuse_released_allocations(
+    db_session, make_item, make_bom, make_location,
+):
+    request_id, _, pf_id, companion_id = _make_prepared_request(db_session, make_item, make_bom, make_location)
+    request = db_session.get(ShippingRequest, request_id)
+    actor = db_session.get(Employee, request.prepared_by_employee_id)
+    original = workflow_ops.latest_operation(db_session, request_id, "prepare")
+    # 기존 일회성 복구에서 변경된 키도 원장 연결로 찾는다.
+    original.idempotency_key += f":cancelled:{original.operation_id}"
+    db_session.commit()
+    shipping_actions_svc.pickup_complete(db_session, request_id, actor)
+    shipping_actions_svc.pickup_cancel(db_session, request_id, actor=actor)
+    shipping_actions_svc.prepare_cancel(db_session, request_id, "change", actor=actor)
+    shipping_actions_svc.update_request(db_session, request_id, {"companion_lines": []}, actor)
+    shipping_actions_svc.prepare_complete(
+        db_session,
+        request_id,
+        "SN-001",
+        actor=actor,
+    )
+    active = db_session.query(ShippingAllocation).filter_by(request_id=request_id, status="RESERVED").all()
+    assert [(a.item_id, a.quantity) for a in active] == [(pf_id, 1)]
+    assert db_session.query(ShippingAllocation).filter_by(request_id=request_id, item_id=companion_id, status="RELEASED").count() == 1
+    shipping_actions_svc.pickup_complete(db_session, request_id, actor)
+    assert _location_qty(db_session, companion_id, DepartmentEnum.SHIPPING) == 2
+
+
+def test_shipping_prepare_cancel_plan_changes_when_reservation_changes(
+    db_session, make_item, make_bom, make_location,
+):
+    request_id, _, _, _ = _make_prepared_request(db_session, make_item, make_bom, make_location)
+    request = db_session.get(ShippingRequest, request_id)
+    actor = db_session.get(Employee, request.prepared_by_employee_id)
+    operation = workflow_ops.latest_operation(db_session, request_id, "prepare")
+    plan = cancellation_svc.preview_cancellation(db_session, operation.operation_id)
+    allocation = db_session.query(ShippingAllocation).filter_by(request_id=request_id).first()
+    allocation.quantity += 1
+    db_session.commit()
+    with pytest.raises(cancellation_svc.CancellationPlanChanged):
+        cancellation_svc.cancel_operation(db_session, operation_id=operation.operation_id,
+            canceller=actor, reason="stale", plan_hash=plan.plan_hash)
+    assert db_session.get(ShippingRequest, request_id).status == ShippingRequestStatusEnum.PREPARED
+
+
 def test_create_request_rolls_back_full_graph_when_event_fails(
     db_session,
     make_item,
@@ -727,7 +841,7 @@ def test_prepare_cancel_restores_inventory_logs_allocation_and_status_when_event
     def fail_event(*_args, **_kwargs):
         raise RuntimeError("prepare cancel event failure")
 
-    monkeypatch.setattr(shipping_svc, "_record_event", fail_event)
+    monkeypatch.setattr(cancellation_svc, "_record_shipping_cancellation_event", fail_event)
 
     with pytest.raises(RuntimeError, match="prepare cancel event failure"):
         shipping_actions_svc.prepare_cancel(
@@ -992,6 +1106,8 @@ def test_prepare_cancel_restores_preparing_request_and_releases_allocations(
 
     assert cancelled.status == ShippingRequestStatusEnum.PREPARING
     assert cancelled.prepared_at is None
+    assert cancelled.prepared_by_employee_id is None
+    assert cancelled.prepared_by_name is None
     allocations = db_session.query(ShippingAllocation).filter_by(request_id=request_id).all()
     assert allocations
     assert {row.status for row in allocations} == {"RELEASED"}
@@ -1012,7 +1128,7 @@ def test_prepare_cancel_restores_preparing_request_and_releases_allocations(
     assert prepared_again.status == ShippingRequestStatusEnum.PREPARED
 
 
-def test_generic_operation_cancel_rejects_shipping_workflow_operation(
+def test_generic_operation_cancel_restores_preparing_request_and_releases_allocations(
     db_session,
     make_item,
     make_bom,
@@ -1039,25 +1155,23 @@ def test_generic_operation_cancel_rejects_shipping_workflow_operation(
         operation.operation_id,
     )
 
-    assert plan.can_cancel is False
-    assert any("출하 전용 취소" in blocker for blocker in plan.blockers)
-    with pytest.raises(cancellation_svc.CancellationNotAllowed, match="출하 전용 취소"):
-        cancellation_svc.cancel_operation(
-            db_session,
-            operation_id=operation.operation_id,
-            canceller=actor,
-            reason="generic cancel must fail closed",
-            plan_hash=plan.plan_hash,
-        )
+    assert plan.can_cancel is True
+    cancellation_svc.cancel_operation(
+        db_session,
+        operation_id=operation.operation_id,
+        canceller=actor,
+        reason="공통 취소",
+        plan_hash=plan.plan_hash,
+    )
     request = db_session.get(ShippingRequest, request_id)
     assert request is not None
-    assert request.status == ShippingRequestStatusEnum.PREPARED
+    assert request.status == ShippingRequestStatusEnum.PREPARING
     assert {
         allocation.status
         for allocation in db_session.query(ShippingAllocation).filter_by(
             request_id=request_id
         )
-    } == {"RESERVED"}
+    } == {"RELEASED"}
 
 
 def test_pickup_cancel_rolls_back_when_event_recording_fails(
@@ -1086,7 +1200,7 @@ def test_pickup_cancel_rolls_back_when_event_recording_fails(
     def fail_event(*_args, **_kwargs):
         raise RuntimeError("pickup cancel event failure")
 
-    monkeypatch.setattr(cancellation_svc, "_record_policy_cancel_event", fail_event)
+    monkeypatch.setattr(cancellation_svc, "_record_shipping_cancellation_event", fail_event)
 
     with pytest.raises(RuntimeError, match="pickup cancel event failure"):
         shipping_actions_svc.pickup_cancel(db_session, request_id, actor)

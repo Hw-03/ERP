@@ -16,6 +16,7 @@ import { DefectKpiCards, type DefectKpiKind } from "./DefectKpiCards";
 import { DefectFilterBar, type DefectScope } from "./DefectFilterBar";
 import { DefectSearchInput } from "./DefectSearchInput";
 import { DefectStatisticsView } from "./DefectStatisticsView";
+import { DefectStorageView, ManagementCategoryModal } from "./DefectStorageView";
 import { useDefectFilterPreferences } from "./useDefectFilterPreferences";
 import { filterDefectLocations } from "./defectCategoryFilter";
 import { DefectDepartmentList } from "./DefectDepartmentList";
@@ -29,6 +30,7 @@ import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { LoadFailureCard } from "../common/LoadFailureCard";
 import { matchesDefectSearch } from "./defectSearch";
 import { InlineErrorNote } from "./InlineErrorNote";
+import { ShieldAlert, Trash2 } from "lucide-react";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 const PRODUCTION_LINES = new Set(["튜브", "고압", "진공", "튜닝", "조립", "출하"]);
@@ -41,7 +43,6 @@ interface Props {
   // 격리 추가·바로 폐기(다품목 카트) 흐름용 — MobileDefectScreen 이 주입.
   items?: Item[];
   productModels?: ProductModel[];
-  defaultSource?: "warehouse" | "production";
 }
 
 export function DefectHubPanel({
@@ -49,7 +50,6 @@ export function DefectHubPanel({
   currentEmployee,
   items = EMPTY_ITEMS,
   productModels = EMPTY_MODELS,
-  defaultSource,
 }: Props) {
   const realtimeRevision = useRealtimeRevision();
   const [locations, setLocations] = useState<DefectLocation[]>([]);
@@ -59,7 +59,7 @@ export function DefectHubPanel({
   const hasLoadedRef = useRef(false);
   const requestGenerationRef = useRef(0);
 
-  const [view, setView] = useState<"hub" | "list" | "process" | "cart" | "statistics">("hub");
+  const [view, setView] = useState<"hub" | "work-choice" | "list" | "storage" | "process" | "cart" | "statistics">("hub");
   const isWarehouseEmployee = currentEmployee.warehouse_role === "primary"
     || currentEmployee.warehouse_role === "deputy";
   const defaultScope: DefectScope = defectDeptFilter
@@ -96,8 +96,10 @@ export function DefectHubPanel({
   const [search, setSearch] = useState("");
   const [processingLocations, setProcessingLocations] = useState<DefectLocation[]>([]);
   const [processingBatch, setProcessingBatch] = useState(false);
+  const [restoreOnlyProcess, setRestoreOnlyProcess] = useState(false);
   const [processingError, setProcessingError] = useState<string | null>(null);
   const [cartMode, setCartMode] = useState<DefectCartMode>("add");
+  const [managementLocation, setManagementLocation] = useState<DefectLocation | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
 
   const activeProcessingLocations = useMemo(
@@ -163,7 +165,7 @@ export function DefectHubPanel({
 
   // 부서·모델·공정과 격리 처리자 범위를 합성 — KPI 집계와 목록이 공유하는 모집단
   const scopedLocations = useMemo(() => {
-    let result = locations;
+    let result = locations.filter((location) => (location.management_category ?? "DEFECT") === "DEFECT");
 
     // 부서 범위 필터
     if (scope === "my") {
@@ -233,6 +235,7 @@ export function DefectHubPanel({
 
   // [처리] 버튼 클릭 → 데스크톱과 동일한 통합 처리 패널(전폭 view)로 전환.
   function handleProcess(location: DefectLocation) {
+    setRestoreOnlyProcess(false);
     setProcessingLocations([location]);
     setProcessingBatch(false);
     setView("process");
@@ -247,32 +250,42 @@ export function DefectHubPanel({
   }
 
   function handleProcessDone() {
+    const returnToStorage = restoreOnlyProcess;
     setProcessingLocations([]);
     setProcessingBatch(false);
+    setRestoreOnlyProcess(false);
     setReloadNonce((n) => n + 1);
-    setView("list"); // 처리 후 갱신된 목록을 바로 보여줌
+    window.history.replaceState({ defect: returnToStorage ? "storage" : "list" }, "");
+    setView(returnToStorage ? "storage" : "list");
   }
 
   function handleProcessCancel() {
+    const returnToStorage = restoreOnlyProcess;
     setProcessingLocations([]);
     setProcessingBatch(false);
-    setView("list");
+    setRestoreOnlyProcess(false);
+    setView(returnToStorage ? "storage" : "list");
   }
 
   // 격리 추가·바로 폐기(다품목 카트) 완료/취소 → 허브 복귀.
   function handleCartDone() {
     setReloadNonce((n) => n + 1);
+    window.history.replaceState({ defect: "hub" }, "");
     setView("hub");
   }
   function handleCartCancel() {
-    setView("hub");
+    window.history.back();
   }
 
   // 브라우저 history의 대상 state를 기준으로 허브·목록·통계 화면을 복원한다.
   useEffect(() => {
     function applyHistoryState(state: unknown): void {
       const target = state as { defect?: string; mode?: DefectCartMode } | null;
-      if (target?.defect === "list") {
+      if (target?.defect === "storage") {
+        setView("storage");
+      } else if (target?.defect === "work-choice") {
+        setView("work-choice");
+      } else if (target?.defect === "list") {
         setView("list");
       } else if (target?.defect === "statistics") {
         setView("statistics");
@@ -297,19 +310,32 @@ export function DefectHubPanel({
   }, []);
 
   function handleHubSelect(id: DefectHubCardId) {
-    if (id === "quarantine") {
-      setCartMode("add");
-      setView("cart");
-    } else if (id === "scrap") {
-      setCartMode("scrap");
-      setView("cart");
+    if (id === "work") {
+      window.history.pushState({ defect: "work-choice" }, "");
+      setView("work-choice");
     } else if (id === "list") {
       window.history.pushState({ defect: "list" }, "");
       setView("list");
+    } else if (id === "storage") {
+      window.history.pushState({ defect: "storage" }, "");
+      setView("storage");
     } else {
       window.history.pushState({ defect: "statistics" }, "");
       setView("statistics");
     }
+  }
+
+  function handleRestore(location: DefectLocation) {
+    setRestoreOnlyProcess(true);
+    setProcessingLocations([location]);
+    setProcessingBatch(false);
+    setView("process");
+  }
+
+  function openCart(mode: DefectCartMode) {
+    window.history.pushState({ defect: "cart", mode }, "");
+    setCartMode(mode);
+    setView("cart");
   }
 
   function handleKpiCardClick(kind: DefectKpiKind) {
@@ -324,6 +350,9 @@ export function DefectHubPanel({
 
   // 처리 화면 — 데스크톱 DefectProcessPanel 과 동일 동작의 모바일 통합 패널(전폭).
   if (view === "process" && activeProcessingLocations.length === 1 && !processingBatch) {
+    if (restoreOnlyProcess) {
+      return <DefectProcessPanel location={activeProcessingLocations[0]} currentEmployee={currentEmployee} restoreOnly onDone={handleProcessDone} onCancel={handleProcessCancel} />;
+    }
     return (
       <MobileDefectProcessPanel
         location={activeProcessingLocations[0]}
@@ -358,11 +387,25 @@ export function DefectHubPanel({
         items={items}
         productModels={productModels}
         currentEmployee={currentEmployee}
-        defaultSource={defaultSource}
         onDone={handleCartDone}
         onCancel={handleCartCancel}
       />
     );
+  }
+
+  if (view === "work-choice") {
+    return (
+      <div className="flex min-h-full flex-col gap-3">
+        <button type="button" onClick={() => window.history.back()} className="standard-hover self-start rounded-[10px] border px-3 py-1.5 text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}>← 작업 선택</button>
+        <div><h2 className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>불량 처리</h2><p className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>진행할 작업을 선택하세요.</p></div>
+        <button type="button" onClick={() => openCart("add")} className="flex min-h-[120px] flex-col justify-between rounded-[18px] border p-5 text-left" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}><ShieldAlert className="h-8 w-8" style={{ color: LEGACY_COLORS.red }} /><span className="text-lg font-black" style={{ color: LEGACY_COLORS.text }}>격리 등록</span><span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>품목을 격리하고 불량·B급·구형으로 분류합니다.</span></button>
+        <button type="button" onClick={() => openCart("scrap")} className="flex min-h-[120px] flex-col justify-between rounded-[18px] border p-5 text-left" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}><Trash2 className="h-8 w-8" style={{ color: LEGACY_COLORS.red }} /><span className="text-lg font-black" style={{ color: LEGACY_COLORS.text }}>바로 처리</span><span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>격리 없이 폐기 또는 재작업합니다.</span></button>
+      </div>
+    );
+  }
+
+  if (view === "storage") {
+    return <DefectStorageView locations={locations} items={items} productModels={productModels} currentEmployee={currentEmployee} loading={loading} loadError={error ?? refreshError} onRetry={() => setReloadNonce((value) => value + 1)} onBack={() => window.history.back()} onUpdated={(recordId, managementCategory) => setLocations((current) => current.map((location) => location.record_id === recordId ? { ...location, management_category: managementCategory } : location))} onMemoUpdated={(recordId, memo) => setLocations((current) => current.map((location) => location.record_id === recordId ? { ...location, reason_memo: memo } : location))} onRestore={handleRestore} />;
   }
 
   if (view === "statistics") {
@@ -478,14 +521,18 @@ export function DefectHubPanel({
           focusOnMount
         />
       ) : (
-        <DefectDepartmentList
-          locations={filteredLocations}
-          currentEmployee={currentEmployee}
-          onMemoUpdated={handleMemoUpdated}
-          onProcess={handleProcess}
-          onBatchProcess={handleBatchProcess}
-          searchActive={search.trim().length > 0}
-        />
+        <>
+          <DefectDepartmentList
+            locations={filteredLocations}
+            currentEmployee={currentEmployee}
+            onMemoUpdated={handleMemoUpdated}
+            onProcess={handleProcess}
+            onBatchProcess={handleBatchProcess}
+            searchActive={search.trim().length > 0}
+            onMoveToStorage={setManagementLocation}
+          />
+          {managementLocation && <ManagementCategoryModal location={managementLocation} currentEmployee={currentEmployee} onClose={() => setManagementLocation(null)} onUpdated={(managementCategory) => { setLocations((current) => current.map((location) => location.record_id === managementLocation.record_id ? { ...location, management_category: managementCategory } : location)); setManagementLocation(null); }} />}
+        </>
       )}
     </>
   );

@@ -102,6 +102,8 @@ from app.models.weekly_inventory_snapshot import (
     WeeklyInventorySnapshotItem,
 )
 from app.models.defect import (
+    DefectManagementCategoryEnum,
+    DefectQuarantineManagementCategoryRevision,
     DefectQuarantineMemoRevision,
     DefectQuarantineRecord,
     DefectQuarantineReconstruction,
@@ -197,6 +199,8 @@ __all__ = [
     # defect quarantine records
     "DefectQuarantineRecord",
     "DefectQuarantineMemoRevision",
+    "DefectManagementCategoryEnum",
+    "DefectQuarantineManagementCategoryRevision",
     "DefectQuarantineReconstruction",
     "DefectQuarantineReconstructionAllocation",
 ]

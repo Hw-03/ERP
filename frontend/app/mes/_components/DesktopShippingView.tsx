@@ -44,7 +44,7 @@ import {
   useShippingRevisionsQuery,
 } from "@/lib/queries/useShippingQuery";
 import { queryKeys } from "@/lib/queries/keys";
-import { useRealtimeRevision } from "@/lib/queries/realtime";
+import { invalidateOperationalQueries, useRealtimeRevision } from "@/lib/queries/realtime";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { formatBomQuantity } from "@/lib/mes/bomFormat";
@@ -954,6 +954,10 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   useEffect(() => {
     if (view !== "historyList" && view !== "historyWork") return;
     if (view === "historyWork") {
+      // 픽업 성공 직후의 이전 URL로 새 화면 이동을 덮어쓰지 않는다.
+      const pendingNavigation = pendingUrlSearchRef.current;
+      if (pendingNavigation?.from === searchParams.toString()
+        && new URLSearchParams(pendingNavigation.to).get("shippingView") !== searchParams.get("shippingView")) return;
       const selectedRequest = historyRows.find((request) => request.request_id === selectedHistoryId)
         ?? requests.find((request) => request.request_id === selectedHistoryId);
       const selectedStatus = selectedRequest?.status;
@@ -1652,9 +1656,11 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         onStatusChange("픽업 완료 처리했습니다.");
       }
       setConfirmAction(null);
+      void invalidateOperationalQueries(queryClient);
     } catch (err) {
       const fallback = action.kind === "prepare" ? "준비 완료 처리에 실패했습니다." : action.kind === "cancel" ? "준비 완료 취소에 실패했습니다." : action.kind === "delete" ? "요청 취소에 실패했습니다." : action.kind === "pickupCancel" ? "픽업 완료 취소에 실패했습니다." : "픽업 완료 처리에 실패했습니다.";
-      const msg = err instanceof Error ? err.message : fallback;
+      const msg = `${err instanceof Error ? err.message : fallback} 최신 상태를 확인한 뒤 다시 시도해 주세요.`;
+      void invalidateOperationalQueries(queryClient);
       setError(msg);
       onStatusChange(msg);
     } finally {
@@ -4036,7 +4042,7 @@ function TransactionLogList({ title = "연결 입출고 로그", logs }: { title
               >
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="rounded-full px-2 py-1 text-xs font-black" style={{ background: tint(tone, 18), color: tone }}>{phaseLabel(log.shipping_phase)}</span>
-                  <span className="rounded-full px-2 py-1 text-xs font-black" style={{ background: tint(tone, 10), color: tone }}>{txTypeLabel(log.transaction_type)}</span>
+                  <span className="rounded-full px-2 py-1 text-xs font-black" style={{ background: tint(tone, 10), color: tone }}>{log.transaction_type === "SHIP" && log.quantity_change > 0 ? "출하 취소 · 재고 복원" : txTypeLabel(log.transaction_type)}</span>
                 </div>
                 <div className="min-w-0">
                   <div className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{log.item_name}</div>
@@ -4152,9 +4158,9 @@ function ShippingActionConfirmModal({
   const description = isPrepare
     ? "최종 PF와 동반 출하품의 품목별 부서 재고를 확인한 뒤 대기 예약합니다. 재고를 추가로 변동하지 않습니다."
     : kind === "cancel"
-      ? "대기 예약을 해제합니다. 작업자가 처리한 BOM 입출고 재고는 변경하지 않습니다."
+      ? "준비 중으로 돌아가며 출하 예약을 해제합니다. 실물 재고는 변경하지 않습니다."
       : kind === "pickupCancel"
-        ? "픽업 완료 재고 반영을 취소하고, 준비 완료 상태와 출하 예약으로 되돌립니다."
+        ? "출고 재고를 복원하고 준비 완료 및 출하 예약 상태로 돌아갑니다."
       : kind === "delete"
         ? "재고 반영 전 요청이므로 요청과 준비 체크 내역을 삭제합니다."
         : "최종 PF와 동반 출하품을 출하 처리합니다.";
@@ -4166,7 +4172,7 @@ function ShippingActionConfirmModal({
     : kind === "cancel"
       ? request.transactions.filter((log) => log.shipping_phase === "PREPARE" && !log.cancelled).map((log) => `${txTypeLabel(log.transaction_type)} · ${log.item_name} ${log.quantity_change}`)
       : kind === "pickupCancel"
-        ? request.transactions.filter((log) => log.shipping_phase === "PICKUP" && !log.cancelled).map((log) => `${txTypeLabel(log.transaction_type)} · ${log.item_name} ${log.quantity_change}`)
+        ? request.transactions.filter((log) => log.shipping_phase === "PICKUP" && !log.cancelled && log.quantity_change < 0).map((log) => `${txTypeLabel(log.transaction_type)} · ${log.item_name} ${log.quantity_change}`)
       : kind === "delete"
         ? [`기준 PF · ${request.base_pf_item_name}`]
         : [

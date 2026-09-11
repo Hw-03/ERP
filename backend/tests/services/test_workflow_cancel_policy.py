@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 import uuid
 
@@ -45,6 +45,7 @@ from app.services.pin_auth import DEFAULT_PIN_HASH
 
 
 NOW = datetime(2026, 9, 2, 6, 0)
+CANCEL_NOW = NOW + timedelta(seconds=1)
 
 
 def _actor(db_session, *, code: str = "WF-CANCEL") -> Employee:
@@ -131,7 +132,7 @@ def _cancel(db_session, operation: InventoryOperation, actor: Employee):
     preview = cancellation_svc.preview_cancellation(
         db_session,
         operation.operation_id,
-        now=NOW,
+        now=CANCEL_NOW,
     )
     assert preview.can_cancel is True, preview.blockers
     return cancellation_svc.cancel_operation(
@@ -140,7 +141,7 @@ def _cancel(db_session, operation: InventoryOperation, actor: Employee):
         canceller=actor,
         reason="업무 취소",
         plan_hash=preview.plan_hash,
-        now=NOW,
+        now=CANCEL_NOW,
     )
 
 
@@ -387,6 +388,7 @@ def test_shipping_pickup_policy_restores_request_allocation_and_event(
             actor_employee_id=actor.employee_id,
             actor_employee_code=actor.employee_code,
             actor_name=actor.name,
+            created_at=NOW,
         )
     )
     db_session.commit()
@@ -1091,6 +1093,7 @@ def _seed_matrix_case(db_session, make_item, kind: str) -> _MatrixCase:
                 actor_employee_id=actor.employee_id,
                 actor_employee_code=actor.employee_code,
                 actor_name=actor.name,
+                created_at=NOW,
             )
         )
         owner_id = request.request_id

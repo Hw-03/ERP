@@ -30,6 +30,7 @@ from app.database import _is_sqlite
 from app.services import inventory as inventory_svc
 from app.services import inv_effect
 from app.services import inventory_operations as operation_svc
+from app.services.inv_transfer import department_for_item
 from app.services._tx import transactional
 from app.services.bom_stock_policy import (
     bom_template_claims,
@@ -557,20 +558,42 @@ def submit_adjustment(
 # ---------------------------------------------------------------------------
 
 
-def _rework_dept_for_item(db: Session, item_id: uuid.UUID, fallback: DepartmentEnum) -> DepartmentEnum:
-    item = item_repository.get_active(db, item_id)
+def _rework_dept_for_item(
+    db: Session,
+    item_id: uuid.UUID,
+    *,
+    locked_items: dict[uuid.UUID, Item] | None = None,
+) -> DepartmentEnum:
+    item = (locked_items or {}).get(item_id)
+    if item is None:
+        item = item_repository.get_active(db, item_id, for_update=True)
     if item is None:
         raise ValueError(f"품목을 찾을 수 없습니다: {item_id}")
-    code = (item.process_type_code or "").strip().upper()
-    prefix_map = {
-        "T": DepartmentEnum.TUBE,
-        "H": DepartmentEnum.HIGH_VOLTAGE,
-        "V": DepartmentEnum.VACUUM,
-        "N": DepartmentEnum.TUNING,
-        "A": DepartmentEnum.ASSEMBLY,
-        "P": DepartmentEnum.SHIPPING,
-    }
-    return prefix_map.get(code[:1], fallback)
+    return department_for_item(item)
+
+
+def _rework_child_departments(
+    db: Session,
+    child_decisions: list[dict],
+    *,
+    locked_items: dict[uuid.UUID, Item],
+) -> dict[uuid.UUID, DepartmentEnum]:
+    """첫 재고 변경 전에 모든 재작업 자식의 품목코드 부서를 확정한다."""
+    departments: dict[uuid.UUID, DepartmentEnum] = {}
+
+    def collect(decision: dict) -> None:
+        item_id = uuid.UUID(str(decision["item_id"]))
+        departments[item_id] = _rework_dept_for_item(
+            db,
+            item_id,
+            locked_items=locked_items,
+        )
+        for child in decision.get("children") or []:
+            collect(child)
+
+    for decision in child_decisions:
+        collect(decision)
+    return departments
 
 
 def _split_rework_quantities(decision: dict, qty: Decimal) -> tuple[Decimal, Decimal, Decimal]:
@@ -704,7 +727,7 @@ def _submit_rework_disassemble(
     db: Session,
     parent_item_id: uuid.UUID,
     parent_qty: Decimal,
-    parent_dept: DepartmentEnum,
+    parent_dept: DepartmentEnum | None,
     child_decisions: list[dict],
     *,
     parent_source: str,
@@ -721,8 +744,8 @@ def _submit_rework_disassemble(
     if not child_decisions:
         raise ValueError("자식 결정이 비어 있습니다.")
     item_ids = {parent_item_id, *_rework_decision_item_ids(child_decisions)}
-    active_items = item_repository.lock_active_many(db, item_ids)
-    missing = sorted(item_ids - set(active_items), key=str)
+    locked_items = item_repository.lock_active_many(db, item_ids)
+    missing = sorted(item_ids - set(locked_items), key=str)
     if missing:
         raise ValueError(f"품목을 찾을 수 없습니다: {missing[0]}")
     if parent_source == "defective":
@@ -733,12 +756,29 @@ def _submit_rework_disassemble(
             child_decisions,
         )
 
+    # Item 행을 부모·자식 전체의 전역 순서로 잠근 뒤에만 현재 공정코드 부서를 읽는다.
+    if parent_item_id not in locked_items:
+        raise ValueError(f"품목을 찾을 수 없습니다: {parent_item_id}")
+    if parent_source == "normal" and normal_source_kind == "production":
+        parent_dept = _rework_dept_for_item(
+            db,
+            parent_item_id,
+            locked_items=locked_items,
+        )
+    if parent_dept is None:
+        raise ValueError("재작업 부모 부서를 확인할 수 없습니다.")
+
     require_bom_template_token = parent_source == "normal"
     exempt_child_item_ids = _rework_bom_stock_exempt_item_ids(
         db,
         parent_item_id,
         child_decisions,
         require_bom_template_token=require_bom_template_token,
+    )
+    child_departments = _rework_child_departments(
+        db,
+        child_decisions,
+        locked_items=locked_items,
     )
     inventory_svc._ensure_and_lock_inventories(
         db,
@@ -831,7 +871,7 @@ def _submit_rework_disassemble(
             return
 
         normal_qty, defective_qty, scrap_qty = _split_rework_quantities(decision, qty)
-        child_dept = _rework_dept_for_item(db, item_id, parent_dept)
+        child_dept = child_departments[item_id]
         child_dept_value = getattr(child_dept, "value", child_dept)
         child_note = decision.get("reason_memo") or reason_memo or ""
 
@@ -1061,11 +1101,17 @@ def submit_normal_disassemble(
     """정상 품목 바로 재작업: 부모 정상 재고 차감 후 하위 정상/격리/폐기 3분할."""
     if not isinstance(actor, Employee):
         raise TypeError("actor must be an Employee")
+    if source_kind == "production":
+        parent_dept = None
+    elif source_kind == "warehouse":
+        parent_dept = DepartmentEnum.WAREHOUSE
+    else:
+        raise ValueError(f"알 수 없는 정상 재작업 부모 출처: {source_kind}")
     return _submit_rework_disassemble(
         db,
         parent_item_id,
         parent_qty,
-        source_dept,
+        parent_dept,
         child_decisions,
         parent_source="normal",
         normal_source_kind=source_kind,

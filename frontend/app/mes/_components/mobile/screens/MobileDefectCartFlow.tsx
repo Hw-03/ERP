@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import type { LucideIcon } from "lucide-react";
-import { ArrowLeft, Copy, Trash2, Warehouse, Wrench } from "lucide-react";
-import { departmentDisplayColor, LEGACY_COLORS, MES_DEPARTMENT_COLORS } from "@/lib/mes/color";
+import { ArrowLeft, Building2, Copy, Trash2, Warehouse, Wrench } from "lucide-react";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { defectsApi } from "@/lib/api/defects";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
-import type { Department } from "@/lib/api/types/shared";
 import type { Item, ProductModel } from "../../_warehouse_v2/types";
+import { itemDepartment } from "../../_warehouse_v2/itemPickerShared";
 import type { DefectCartMode } from "../../_defect_hub/DefectCartFlow";
 import { DefectItemPicker } from "../../_defect_hub/DefectItemPicker";
 import { ReasonFormFields } from "../../_defect_hub/ReasonFormFields";
@@ -21,21 +21,21 @@ import {
 } from "../../_defect_hub/DisassembleTree";
 import { ConfirmModal } from "@/lib/ui";
 import { makeClientRequestId } from "@/lib/uuid";
+import type { DefectManagementCategory } from "@/lib/api/types/defects";
+import { DefectManagementCategoryControl } from "../../_defect_hub/DefectManagementCategoryControl";
 import { TYPO } from "../tokens";
 import {
   IconButton,
   PrimaryActionButton,
   SectionCard,
-  SegmentedControl,
   StickyFooter,
   Stepper,
 } from "../primitives";
 
-const PRODUCTION_LINES = ["튜브", "고압", "진공", "튜닝", "조립", "출하"] as const;
-
 type SourceKind = "warehouse" | "production";
 type DirectAction = "scrap" | "rework";
 type FlowStep = 1 | 2 | 3;
+type CartHistoryState = { defect?: string; mode?: DefectCartMode; step?: number; directAction?: DirectAction | null; source?: SourceKind } | null;
 
 interface CartLine {
   key: string;
@@ -43,6 +43,7 @@ interface CartLine {
   qty: number;
   category: string;
   memo: string;
+  managementCategory: DefectManagementCategory;
   decisions: ChildDecision[];
 }
 
@@ -69,6 +70,10 @@ function submitLabelFor(mode: DefectCartMode, directAction: DirectAction | null)
   return "즉시 폐기";
 }
 
+function managementCategoryLabel(category: DefectManagementCategory): string {
+  return category === "B_GRADE" ? "B급" : category === "OBSOLETE" ? "구형" : "불량";
+}
+
 /**
  * 불량 격리 / 바로 처리 — 모바일 전용 다품목 흐름.
  *
@@ -80,7 +85,6 @@ export function MobileDefectCartFlow({
   items,
   productModels,
   currentEmployee,
-  defaultSource,
   onDone,
   onCancel,
 }: {
@@ -88,23 +92,55 @@ export function MobileDefectCartFlow({
   items: Item[];
   productModels: ProductModel[];
   currentEmployee: { employee_id: string; name: string; department: string };
-  defaultSource?: SourceKind;
   onDone: () => void;
   onCancel: () => void;
 }) {
   const [directAction, setDirectAction] = useState<DirectAction | null>(mode === "add" ? "scrap" : null);
-  const isProductionDept = PRODUCTION_LINES.includes(
-    currentEmployee.department as (typeof PRODUCTION_LINES)[number],
-  );
-
-  const [source, setSource] = useState<SourceKind>(defaultSource ?? "production");
-  const [dept, setDept] = useState<string>(isProductionDept ? currentEmployee.department : PRODUCTION_LINES[0]);
+  const [source, setSource] = useState<SourceKind>("production");
   const [step, setStep] = useState<FlowStep>(1);
   const [lines, setLines] = useState<CartLine[]>([]);
   const [requestIds, setRequestIds] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [failures, setFailures] = useState<LineFailure[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
+
+  useEffect(() => {
+    function restore(state: CartHistoryState) {
+      const validCart = state?.defect === "cart" && state.mode === mode;
+      const invalidAction = mode === "add"
+        ? state?.directAction !== undefined && state.directAction !== "scrap"
+        : state?.directAction === "rework" && state.step !== 2 && state.step !== 3;
+      const nextAction = invalidAction ? (mode === "add" ? "scrap" : null) : mode === "add" ? "scrap" : state?.directAction ?? null;
+      const nextSource = invalidAction ? "production" : state?.source === "warehouse" ? "warehouse" : "production";
+      const nextStep: FlowStep = mode === "add"
+        ? state?.step === 2 && !invalidAction ? 2 : 1
+        : nextAction === "rework"
+          ? 2
+          : nextAction === "scrap" && state?.step === 2 ? 2 : 1;
+      setDirectAction(nextAction);
+      setSource(nextSource);
+      setStep(nextStep);
+      if (nextStep === 1) setLines([]);
+      if (!validCart || invalidAction || state?.step !== nextStep || state?.directAction !== nextAction || state?.source !== nextSource) {
+        window.history.replaceState({ ...(window.history.state ?? {}), defect: "cart", mode, step: nextStep, directAction: nextAction, source: nextSource }, "");
+      }
+    }
+
+    restore(window.history.state as CartHistoryState);
+    function onPop(e: PopStateEvent) {
+      const state = e.state as CartHistoryState;
+      if (state?.defect !== "cart" || state.mode !== mode) {
+        setStep(1);
+        setLines([]);
+        setDirectAction(mode === "add" ? "scrap" : null);
+        setSource("production");
+        return;
+      }
+      restore(state);
+    }
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [mode]);
 
   const isDirect = mode === "scrap";
   const isRework = isDirect && directAction === "rework";
@@ -117,18 +153,13 @@ export function MobileDefectCartFlow({
   const reworkLineReady = Boolean(
     selectedReworkLine && Number.isFinite(selectedReworkLine.qty) && selectedReworkLine.qty > 0 && selectedReworkLine.category.trim() !== "",
   );
-  useEffect(() => {
-    if (isRework && source !== "production") setSource("production");
-  }, [isRework, source]);
-
-  const lockedMetaLabel = source === "warehouse" ? "진입 위치" : "진입 부서";
-  const lockedMetaValue = source === "warehouse" ? "창고" : dept;
 
   function newLine(item: Item): CartLine {
-    return { key: `${item.item_id}-${Date.now()}`, item, qty: 1, category: "", memo: "", decisions: [] };
+    return { key: `${item.item_id}-${Date.now()}`, item, qty: 1, category: "", memo: "", managementCategory: "DEFECT", decisions: [] };
   }
 
   function addItem(item: Item) {
+    if (source === "production" && itemDepartment(item) === null) return;
     setLines((prev) => {
       if (prev.some((l) => l.item.item_id === item.item_id)) return prev;
       const line = newLine(item);
@@ -173,40 +204,50 @@ export function MobileDefectCartFlow({
   }
 
   function goBack() {
-    if (step === 2) {
-      setStep(1);
+    if (step > 1) {
+      window.history.back();
       return;
     }
     if (isDirect && directAction !== null) {
-      setDirectAction(null);
-      setLines([]);
-      setFailures([]);
+      window.history.back();
       return;
     }
     onCancel();
+  }
+
+  function pushStep(nextStep: FlowStep, nextAction = directAction, nextSource = source) {
+    window.history.pushState({ defect: "cart", mode, step: nextStep, directAction: nextAction, source: nextSource }, "");
+    setStep(nextStep);
+  }
+
+  function selectSource(nextSource: SourceKind) {
+    window.history.replaceState({ ...(window.history.state ?? {}), defect: "cart", mode, step: 1, directAction, source: nextSource }, "");
+    setSource(nextSource);
   }
 
   const allValid =
     directAction !== null &&
     lines.length > 0 &&
     lines.every((l) => {
-      if (!Number.isFinite(l.qty) || l.qty <= 0) return false;
+      if (!Number.isFinite(l.qty) || l.qty <= 0 || (source === "production" && itemDepartment(l.item) === null)) return false;
       if (!isRework) return true;
       return l.category.trim() !== "" && l.decisions.length > 0 && validateDecisionTree(l.decisions);
     });
 
   async function submitLine(line: CartLine, requestId: string): Promise<void> {
+    const productionDepartment = itemDepartment(line.item);
+    if (source === "production" && !productionDepartment) throw new Error("품목 담당 부서를 확인할 수 없습니다.");
     if (mode === "add") {
       await defectsApi.quarantine({
         item_id: line.item.item_id,
         qty: line.qty,
         source,
-        source_dept: source === "production" ? dept : undefined,
-        target_dept: source === "warehouse" ? "창고" : dept,
+        ...(source === "production" ? { source_dept: productionDepartment!, target_dept: productionDepartment! } : { target_dept: "창고" }),
         reason_category: line.category || null,
         reason_memo: line.memo,
         actor_employee_id: currentEmployee.employee_id,
         client_request_id: requestId,
+        management_category: line.managementCategory,
       });
       return;
     }
@@ -225,7 +266,7 @@ export function MobileDefectCartFlow({
           item_id: line.item.item_id,
           quantity: line.qty,
           from_bucket: source === "warehouse" ? "warehouse" : "production",
-          from_department: source === "warehouse" ? null : (dept as Department),
+          ...(source === "production" ? { from_department: productionDepartment! } : {}),
           to_bucket: "none",
         },
       ],
@@ -284,17 +325,21 @@ export function MobileDefectCartFlow({
               title="폐기"
               desc="정상 재고를 격리 없이 바로 폐기합니다. 여러 품목을 한 번에 담을 수 있습니다."
               tone={LEGACY_COLORS.red}
-              onClick={() => setDirectAction("scrap")}
+              onClick={() => {
+                window.history.pushState({ defect: "cart", mode, step: 1, directAction: "scrap", source }, "");
+                setDirectAction("scrap");
+              }}
             />
             <MobileActionCard
               icon={Wrench}
               title="재작업"
               desc="BOM 있는 품목 한 개를 하위 품목 정상·격리·폐기로 나눠 처리합니다."
               tone={LEGACY_COLORS.yellow}
-              onClick={() => {
-                setSource("production");
-                setDirectAction("rework");
-              }}
+            onClick={() => {
+              setSource("production");
+              setDirectAction("rework");
+              pushStep(2, "rework", "production");
+            }}
             />
           </div>
         </div>
@@ -310,14 +355,6 @@ export function MobileDefectCartFlow({
         <h2 className={clsx(TYPO.title, "min-w-0 truncate font-black")} style={{ color: LEGACY_COLORS.text }}>
           {title}
         </h2>
-        {step >= 2 && (
-          <span
-            className={clsx(TYPO.caption, "hidden min-w-0 truncate rounded-full border px-2 py-0.5 font-bold min-[390px]:inline")}
-            style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
-          >
-            {lockedMetaLabel} · {lockedMetaValue}
-          </span>
-        )}
         <span
           className={clsx(TYPO.caption, "ml-auto shrink-0 font-bold uppercase tracking-[1px]")}
           style={{ color: LEGACY_COLORS.muted2 }}
@@ -333,80 +370,28 @@ export function MobileDefectCartFlow({
       <div className="flex h-full min-h-0 flex-col">
         <div className="shrink-0 pb-3">{header}</div>
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="flex min-h-full flex-col gap-4 pb-3">
-            <div className="flex flex-1 flex-col gap-2">
-              <span className={clsx(TYPO.caption, "font-black uppercase tracking-[1px]")} style={{ color: LEGACY_COLORS.muted2 }}>
-                출처
-              </span>
-              <SegmentedControl
-                tabs={isRework
-                  ? [{ id: "production", label: "부서 재고" }]
-                  : [
-                    { id: "production", label: "부서 재고" },
-                    { id: "warehouse", label: "창고 재고" },
-                  ]}
-                active={source}
-                onChange={(s) => setSource(s as SourceKind)}
-                size="lg"
-                className="flex-1"
-              />
-              <span className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.muted }}>
-                {source === "warehouse"
-                  ? "창고 보관 중인 정상 재고에서 처리합니다."
-                  : "생산 부서에서 사용 중인 재고에서 처리합니다."}
-              </span>
-            </div>
-
-            {source === "warehouse" ? (
-              <SectionCard padding="md">
-                <div className="flex items-center gap-3">
-                  <Warehouse className="h-7 w-7 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
-                  <div className="min-w-0">
-                    <div className={clsx(TYPO.title, "font-black")} style={{ color: LEGACY_COLORS.blue }}>
-                      창고
-                    </div>
-                    <div className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
-                      {mode === "add" ? "창고 불량 보관 구역으로 이동됩니다." : "창고 정상 재고에서 처리합니다."}
-                    </div>
-                  </div>
-                </div>
-              </SectionCard>
-            ) : (
-              <div className="flex flex-1 flex-col gap-2">
-                <span className={clsx(TYPO.caption, "font-black uppercase tracking-[1px]")} style={{ color: LEGACY_COLORS.muted2 }}>
-                  {mode === "add" ? "출처·격리 부서" : "출처 부서"}
-                </span>
-                <div className="grid flex-1 auto-rows-fr grid-cols-3 gap-2">
-                  {PRODUCTION_LINES.map((d) => {
-                    const active = dept === d;
-                    const c = departmentDisplayColor(MES_DEPARTMENT_COLORS[d] ?? LEGACY_COLORS.muted2, d);
-                    return (
-                      <button
-                        key={d}
-                        type="button"
-                        onClick={() => setDept(d)}
-                        className={clsx(
-                          "min-h-[64px] rounded-[14px] border font-black transition-[transform] active:scale-[0.98]",
-                          TYPO.title,
-                        )}
-                        style={{
-                          background: active ? tint(c, 14) : LEGACY_COLORS.s2,
-                          borderColor: active ? c : LEGACY_COLORS.border,
-                          borderWidth: active ? 2 : 1,
-                          color: active ? c : LEGACY_COLORS.muted2,
-                        }}
-                      >
-                        {d}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+          <div className="flex min-h-full flex-col gap-3 pb-3">
+            <span className={clsx(TYPO.caption, "font-black uppercase tracking-[1px]")} style={{ color: LEGACY_COLORS.muted2 }}>
+              출처 선택
+            </span>
+            <MobileSourceCard
+              icon={Building2}
+              title="부서 재고"
+              description="생산 부서에서 사용 중인 정상 재고를 처리합니다."
+              active={source === "production"}
+              onClick={() => selectSource("production")}
+            />
+            <MobileSourceCard
+              icon={Warehouse}
+              title="창고 재고"
+              description="창고 보관 중인 정상 재고를 처리합니다."
+              active={source === "warehouse"}
+              onClick={() => selectSource("warehouse")}
+            />
           </div>
         </div>
         <StickyFooter flat compact>
-          <PrimaryActionButton label="다음 →" intent="primary" onClick={() => setStep(2)} />
+          <PrimaryActionButton label="다음 →" intent="primary" onClick={() => pushStep(2)} />
         </StickyFooter>
       </div>
     );
@@ -440,7 +425,7 @@ export function MobileDefectCartFlow({
                 parentItemName={selectedReworkLine.item.item_name}
                 parentMesCode={selectedReworkLine.item.mes_code ?? ""}
                 parentQty={selectedReworkLine.qty}
-                parentDept={source === "warehouse" ? "창고" : dept}
+                parentDept={source === "warehouse" ? "창고" : itemDepartment(selectedReworkLine.item) ?? "부서 미지정"}
                 decisions={selectedReworkLine.decisions}
                 onChange={(decisions) => updateLine(selectedReworkLine.key, { decisions })}
               />
@@ -474,6 +459,9 @@ export function MobileDefectCartFlow({
           <p className={clsx(TYPO.body, "font-bold")} style={{ color: LEGACY_COLORS.text }}>
             선택한 품목을 즉시 재작업하고 하위 품목을 정상·격리·폐기로 나눕니다.
           </p>
+          <div className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
+            {lines.map((line) => <div key={line.key}>{line.item.item_name} · 수량 {line.qty} · 자동 부서 · {source === "warehouse" ? "창고" : itemDepartment(line.item) ?? "부서 미지정"}</div>)}
+          </div>
         </ConfirmModal>
       </div>
     );
@@ -490,8 +478,7 @@ export function MobileDefectCartFlow({
           <DefectItemPicker
             items={pickerItems}
             productModels={productModels}
-            targetDepartment={source === "warehouse" ? "창고" : dept}
-            lockedDepartment={source === "warehouse" ? "창고" : dept}
+            source={source}
             selectedIds={selectedIds}
             onAdd={addItem}
             onRemove={removeItemById}
@@ -524,6 +511,9 @@ export function MobileDefectCartFlow({
                           </div>
                           <div className={clsx(TYPO.body, "truncate font-black")} style={{ color: LEGACY_COLORS.text }}>
                             {line.item.item_name}
+                          </div>
+                          <div className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
+                            자동 부서 · {source === "warehouse" ? "창고" : itemDepartment(line.item) ?? "부서 미지정"}
                           </div>
                         </div>
                         <button
@@ -568,6 +558,16 @@ export function MobileDefectCartFlow({
                         required={isRework}
                       />
 
+                      {mode === "add" && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>관리 분류</span>
+                          <DefectManagementCategoryControl
+                            value={line.managementCategory}
+                            onChange={(managementCategory) => updateLine(line.key, { managementCategory })}
+                          />
+                        </div>
+                      )}
+
                       {isRework && (
                         <div className={clsx(TYPO.caption, "rounded-[10px] px-3 py-2 font-bold")} style={{ background: tint(LEGACY_COLORS.yellow, 10), color: LEGACY_COLORS.muted2 }}>
                           다음 단계에서 BOM 하위 품목을 정상·격리·폐기로 크게 확인합니다.
@@ -603,7 +603,7 @@ export function MobileDefectCartFlow({
           intent={isScrap || isRework ? "danger" : "primary"}
           disabled={isRework ? !reworkLineReady || busy : !allValid || busy}
           onClick={() => {
-            if (isRework) setStep(3);
+            if (isRework) pushStep(3);
             else setConfirmOpen(true);
           }}
         />
@@ -627,8 +627,11 @@ export function MobileDefectCartFlow({
             ? "선택한 품목을 즉시 재작업하고 하위 품목을 정상·격리·폐기로 나눕니다."
             : isScrap
               ? `${lines.length}건을 즉시 폐기합니다. 재고에서 차감되며 되돌릴 수 없습니다.`
-              : `${lines.length}건을 격리합니다.`}
+              : `${lines.length}건을 격리합니다. ${lines.map((line) => line.managementCategory === "B_GRADE" ? "B급" : line.managementCategory === "OBSOLETE" ? "구형" : "불량 격리").join(", ")} 분류로 보관됩니다.`}
         </p>
+        <div className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
+          {lines.map((line) => <div key={line.key}>{line.item.item_name} · 수량 {line.qty}{mode === "add" ? ` · 관리 분류 ${managementCategoryLabel(line.managementCategory)}` : ""} · 자동 부서 · {source === "warehouse" ? "창고" : itemDepartment(line.item) ?? "부서 미지정"}</div>)}
+        </div>
       </ConfirmModal>
     </div>
   );
@@ -650,6 +653,44 @@ function MobileActionCard({ icon: Icon, title, desc, tone, onClick }: { icon: Lu
       </div>
       <span className={clsx(TYPO.body, "font-bold leading-relaxed")} style={{ color: LEGACY_COLORS.muted2 }}>
         {desc}
+      </span>
+    </button>
+  );
+}
+
+function MobileSourceCard({
+  icon: Icon,
+  title,
+  description,
+  active,
+  onClick,
+}: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className="flex min-h-[132px] flex-1 flex-col justify-between gap-3 rounded-[20px] border p-5 text-left transition-[filter,transform] hover:brightness-110 active:scale-[0.98]"
+      style={{
+        background: active ? tint(LEGACY_COLORS.red, 7) : LEGACY_COLORS.s2,
+        borderColor: active ? LEGACY_COLORS.red : LEGACY_COLORS.border,
+        borderWidth: active ? 2 : 1,
+      }}
+    >
+      <div className="flex items-center gap-3">
+        <Icon className="h-8 w-8 shrink-0" style={{ color: active ? LEGACY_COLORS.red : LEGACY_COLORS.muted2 }} />
+        <span className={clsx(TYPO.headline, "font-black")} style={{ color: active ? LEGACY_COLORS.red : LEGACY_COLORS.text }}>
+          {title}
+        </span>
+      </div>
+      <span className={clsx(TYPO.body, "font-bold leading-relaxed")} style={{ color: active ? LEGACY_COLORS.red : LEGACY_COLORS.muted2 }}>
+        {description}
       </span>
     </button>
   );

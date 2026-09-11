@@ -8,8 +8,8 @@ describe("DefectHubEntry", () => {
     const { container } = render(<DefectHubEntry onSelect={onSelect} />);
 
     expect(screen.getAllByRole("button")).toHaveLength(4);
-    const labels = ["불량 격리", "바로 처리", "격리 목록", "불량 통계"];
-    const ids = ["quarantine", "scrap", "list", "statistics"];
+    const labels = ["불량 처리", "격리 목록", "B급·구형 자재", "불량 통계"];
+    const ids = ["work", "list", "storage", "statistics"];
     screen.getAllByRole("button").forEach((button, index) => {
       expect(button).toHaveTextContent(labels[index]);
       fireEvent.click(button);

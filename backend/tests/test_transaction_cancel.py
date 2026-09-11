@@ -121,7 +121,7 @@ def test_cancel_quarantine_restores_warehouse_and_defective(client, db_session, 
             "item_id": str(item.item_id),
             "qty": 30,
             "source": "warehouse",
-            "target_dept": DepartmentEnum.ASSEMBLY.value,
+            "target_dept": DepartmentEnum.WAREHOUSE.value,
             "reason_memo": "표면 흠집",
             "actor_employee_id": str(actor.employee_id),
         },
@@ -130,7 +130,7 @@ def test_cancel_quarantine_restores_warehouse_and_defective(client, db_session, 
 
     wh, total, locs = _cells(db_session, item.item_id)
     assert wh == 70
-    assert locs[(DepartmentEnum.ASSEMBLY.value, "DEFECTIVE")] == 30
+    assert locs[(DepartmentEnum.WAREHOUSE.value, "DEFECTIVE")] == 30
     assert total == 100  # 총량 불변
 
     log = (
@@ -138,11 +138,11 @@ def test_cancel_quarantine_restores_warehouse_and_defective(client, db_session, 
         .filter(TransactionLog.transaction_type == TransactionTypeEnum.MARK_DEFECTIVE)
         .first()
     )
-    # 효과가 캡처됐는지 — 창고 -30 / 조립 DEFECTIVE +30
+    # 효과가 캡처됐는지 — 창고 -30 / 창고 DEFECTIVE +30
     assert log.inventory_effect is not None
     deltas = {(c["scope"], c.get("department"), c.get("status")): c["delta"] for c in log.inventory_effect}
     assert deltas[("warehouse", None, None)] == -30
-    assert deltas[("location", DepartmentEnum.ASSEMBLY.value, "DEFECTIVE")] == 30
+    assert deltas[("location", DepartmentEnum.WAREHOUSE.value, "DEFECTIVE")] == 30
 
     res = _cancel(client, log.log_id)
     assert res.status_code == 200, res.text
@@ -1520,7 +1520,7 @@ def test_cancel_non_self_non_approver_forbidden(client, db_session, make_item):
         "/api/defects/quarantine",
         json={
             "item_id": str(item.item_id), "qty": 10, "source": "warehouse",
-            "target_dept": DepartmentEnum.ASSEMBLY.value, "reason_memo": "x",
+            "target_dept": DepartmentEnum.WAREHOUSE.value, "reason_memo": "x",
             "actor_employee_id": str(requester.employee_id),
         },
     )
@@ -1569,7 +1569,7 @@ def test_cancel_approver_can_cancel_others(client, db_session, make_item):
         "/api/defects/quarantine",
         json={
             "item_id": str(item.item_id), "qty": 10, "source": "warehouse",
-            "target_dept": DepartmentEnum.ASSEMBLY.value, "reason_memo": "x",
+            "target_dept": DepartmentEnum.WAREHOUSE.value, "reason_memo": "x",
             "actor_employee_id": str(requester.employee_id),
         },
     )

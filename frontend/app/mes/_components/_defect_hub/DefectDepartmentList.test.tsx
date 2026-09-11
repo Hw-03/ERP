@@ -6,6 +6,7 @@ import type { DefectLocation } from "@/lib/api/types/defects";
 const apiMocks = vi.hoisted(() => ({
   updateMemo: vi.fn(),
   getMemoHistory: vi.fn(),
+  getManagementCategoryHistory: vi.fn(),
 }));
 
 vi.mock("@/lib/api/defects", () => ({
@@ -45,6 +46,80 @@ describe("DefectDepartmentList", () => {
   beforeEach(() => {
     apiMocks.updateMemo.mockReset();
     apiMocks.getMemoHistory.mockReset();
+    apiMocks.getManagementCategoryHistory.mockReset();
+    apiMocks.getMemoHistory.mockResolvedValue([]);
+    apiMocks.getManagementCategoryHistory.mockResolvedValue([]);
+  });
+
+  it("storage mode reuses memo actions and expands same-item records without the long-quarantine warning", () => {
+    render(<DefectDepartmentList storageMode currentEmployee={currentEmployee} locations={[
+      makeLocation({ record_id: "b-grade-1", defective_at: "2024-01-01T00:00:00Z", management_category: "B_GRADE" }),
+      makeLocation({ record_id: "b-grade-2", management_category: "B_GRADE" }),
+    ]} onProcess={vi.fn()} />);
+
+    expect(screen.queryByText("1년 초과")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /격리 2건/ }));
+    expect(screen.getAllByLabelText("AX-100 격리 기록")).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "메모 수정" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "이력 보기" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "정상 복귀" })).toHaveLength(2);
+  });
+
+  it("places record actions by purpose and combines memo and category history", async () => {
+    apiMocks.getMemoHistory.mockResolvedValue([
+      {
+        revision_id: "memo-1",
+        previous_memo: "기존 메모",
+        next_memo: "수정 메모",
+        edited_by_employee_id: currentEmployee.employee_id,
+        edited_by_name: currentEmployee.name,
+        edited_at: "2026-07-03T01:30:00Z",
+        is_initial: false,
+      },
+    ]);
+    apiMocks.getManagementCategoryHistory.mockResolvedValue([
+      {
+        previous_category: "B_GRADE",
+        next_category: "OBSOLETE",
+        memo: "구형 전환",
+        edited_by_employee_id: currentEmployee.employee_id,
+        edited_by_name: currentEmployee.name,
+        edited_at: "2026-07-04T01:30:00Z",
+        is_initial: false,
+      },
+    ]);
+
+    render(
+      <DefectDepartmentList
+        storageMode
+        locations={[makeLocation({ management_category: "B_GRADE" })]}
+        currentEmployee={currentEmployee}
+        onMoveToStorage={vi.fn()}
+        onProcess={vi.fn()}
+      />,
+    );
+
+    const actions = screen.getByTestId("defect-memo-actions");
+    const historyButton = within(actions).getByRole("button", { name: "이력 보기" });
+    const recordActions = within(actions).getByTestId("defect-record-actions");
+    expect(recordActions).toHaveClass("ml-auto");
+    const recordButtons = within(recordActions).getAllByRole("button");
+    expect(recordButtons.map((button) => button.textContent)).toEqual([
+      "메모 수정",
+      "분류 변경",
+      "정상 복귀",
+    ]);
+    [historyButton, ...recordButtons].forEach((button) => {
+      expect(button).toHaveClass("min-h-11", "w-24", "justify-center", "px-3", "text-xs");
+    });
+
+    fireEvent.click(historyButton);
+    const history = await screen.findByTestId("defect-record-history");
+    expect(within(history).getByText("분류 변경 · B급 → 구형")).toBeInTheDocument();
+    expect(within(history).getByText("메모 수정")).toBeInTheDocument();
+    expect(within(history).getByText("메모: 구형 전환")).toBeInTheDocument();
+    expect(apiMocks.getMemoHistory).toHaveBeenCalledWith("record-1");
+    expect(apiMocks.getManagementCategoryHistory).toHaveBeenCalledWith("record-1");
   });
 
   it("distinguishes an empty search result from an empty defect list", () => {
@@ -435,9 +510,9 @@ describe("DefectDepartmentList", () => {
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
     expect(await screen.findByText("저장 실패")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "메모 이력 보기" }));
+    fireEvent.click(screen.getByRole("button", { name: "이력 보기" }));
     expect(await screen.findByText("최초 등록")).toBeInTheDocument();
-    const memoHistory = screen.getByTestId("defect-memo-history");
+    const memoHistory = screen.getByTestId("defect-record-history");
     expect(within(memoHistory).getByText("변경 전: left bracket scratched")).toBeInTheDocument();
     expect(within(memoHistory).getByText("변경 후: 수정 메모")).toBeInTheDocument();
     expect(apiMocks.getMemoHistory).toHaveBeenCalledWith("record-1");
@@ -474,7 +549,7 @@ describe("DefectDepartmentList", () => {
     expect(within(actions).getByLabelText("직원 PIN")).toBeInTheDocument();
     expect(within(actions).getByRole("button", { name: "저장" })).toBeInTheDocument();
     expect(within(actions).getByRole("button", { name: "취소" })).toBeInTheDocument();
-    expect(within(actions).getByRole("button", { name: "메모 이력 보기" })).toBeInTheDocument();
+    expect(within(actions).getByRole("button", { name: "이력 보기" })).toBeInTheDocument();
     expect(within(actions).getByRole("button", { name: "처리" })).toBeInTheDocument();
   });
 
@@ -523,7 +598,7 @@ describe("DefectDepartmentList", () => {
     });
   });
 
-  it("reloads an open memo history after a successful edit", async () => {
+  it("reloads an open record history after a successful memo edit", async () => {
     apiMocks.getMemoHistory
       .mockResolvedValueOnce([
         {
@@ -556,7 +631,7 @@ describe("DefectDepartmentList", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "메모 이력 보기" }));
+    fireEvent.click(screen.getByRole("button", { name: "이력 보기" }));
     expect(await screen.findByText("최초 등록")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "메모 수정" }));
     fireEvent.change(screen.getByRole("textbox", { name: "격리 메모" }), {
@@ -606,8 +681,8 @@ describe("DefectDepartmentList", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "메모 이력 보기" }));
-    const history = await screen.findByTestId("defect-memo-history");
+    fireEvent.click(screen.getByRole("button", { name: "이력 보기" }));
+    const history = await screen.findByTestId("defect-record-history");
     const revisions = within(history).getAllByRole("listitem");
 
     expect(within(revisions[0]).getByText("변경 전: TEST 2")).toBeInTheDocument();

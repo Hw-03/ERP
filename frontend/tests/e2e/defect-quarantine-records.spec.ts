@@ -19,6 +19,7 @@ async function openList(page: Page) {
   const defectState = await page.evaluate(() => history.state?.defect ?? null);
   if (defectState === "list") {
     await expect(listHeading).toBeVisible();
+    await page.getByRole("group", { name: "부서 구분" }).getByRole("button", { name: "전체", exact: true }).click();
     return;
   }
   await page
@@ -27,6 +28,7 @@ async function openList(page: Page) {
     .filter({ hasText: "격리 항목" })
     .click();
   await expect(listHeading).toBeVisible();
+  await page.getByRole("group", { name: "부서 구분" }).getByRole("button", { name: "전체", exact: true }).click();
 }
 
 async function expandItemRecords(page: Page, itemName: string) {
@@ -101,17 +103,17 @@ test.describe("불량 격리 건별 원장", () => {
     await cleanupItemRecords(
       page.request,
       seed.rawItem.item_id,
-      cleanupActor.department,
+      "창고",
       cleanupActor.employee_id,
     );
   });
 
-  test("같은 품목의 독립 행·부분 처리·메모 이력·즉시 처리 작업자 기록", async ({ page }) => {
+  test("같은 품목의 독립 행·부분 처리·통합 이력·즉시 처리 작업자 기록", async ({ page }) => {
     test.setTimeout(120_000);
     const seed = readSeed();
     const operator = await loginAsOperator(page, { role: "department" });
     const item = seed.rawItem;
-    const department = operator.department;
+    const department = "창고";
 
     await postJson(page.request, "/api/defects/quarantine", {
       item_id: item.item_id,
@@ -216,7 +218,7 @@ test.describe("불량 격리 건별 원장", () => {
       .filter({ visible: true })
       .filter({ hasText: "수정된 긴 메모" });
     await expect(refreshedSecondRow).toBeVisible();
-    await refreshedSecondRow.getByRole("button", { name: "메모 이력 보기" }).click();
+    await refreshedSecondRow.getByRole("button", { name: "이력 보기" }).click();
     await expect(refreshedSecondRow).toContainText("변경 전: 둘째 격리 메모");
     await expect(refreshedSecondRow).toContainText("변경 후: 수정된 긴 메모");
 
@@ -273,5 +275,87 @@ test.describe("불량 격리 건별 원장", () => {
     expect(Number(completedFirstRecordState.quantity)).toBe(2);
     expect(Number(completedFirstRecordState.pending_quantity)).toBe(0);
     expect(Number(completedFirstRecordState.available_quantity)).toBe(2);
+  });
+
+  test("B급 등록·분류 변경·일부 정상 복귀는 보관 목록에 남는다", async ({ page }) => {
+    test.setTimeout(120_000);
+    const seed = readSeed();
+    const operator = await loginAsOperator(page, { role: "department" });
+    const item = seed.rawItem;
+    const department = "창고";
+
+    await postJson(page.request, "/api/defects/quarantine", {
+      item_id: item.item_id,
+      qty: 5,
+      source: "warehouse",
+      target_dept: department,
+      reason_category: "외관 불량",
+      reason_memo: "B급 보관 E2E",
+      management_category: "B_GRADE",
+      actor_employee_id: operator.employee_id,
+    });
+
+    await page.goto("/mes?tab=defect");
+    const storageCard = page.getByRole("button").filter({ hasText: "B급·구형 자재", visible: true });
+    await expect(storageCard).toBeVisible({ timeout: 30_000 });
+    await storageCard.click();
+    await expect(page.getByRole("heading", { name: "B급·구형 자재" }).filter({ visible: true })).toBeVisible();
+
+    const record = page
+      .getByRole("article", { name: `${item.item_name} 격리 기록` })
+      .filter({ hasText: "B급 보관 E2E", visible: true });
+    await expect(record).toContainText("B급");
+    await record.getByRole("button", { name: "정상 복귀", exact: true }).click();
+    await expect(page.getByRole("button", { name: "전체 폐기", exact: true }).filter({ visible: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "반품", exact: true }).filter({ visible: true })).toHaveCount(0);
+    await page.getByRole("spinbutton").filter({ visible: true }).fill("2");
+    await page.getByRole("button", { name: "정상 복귀 →", exact: true }).filter({ visible: true }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "즉시 복귀", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "B급·구형 자재" }).filter({ visible: true })).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "B급·구형 자재" }).filter({ visible: true })).toBeVisible();
+    await expect(record.getByText("3개", { exact: true })).toBeVisible();
+
+    await record.getByRole("button", { name: "분류 변경", exact: true }).click();
+    const changeDialog = page.getByRole("dialog", { name: "보관 분류 변경" }).filter({ visible: true });
+    await changeDialog.getByRole("button", { name: "구형", exact: true }).click();
+    await changeDialog.getByRole("textbox", { name: "직원 PIN" }).fill(seed.operatorPin);
+    await changeDialog.getByRole("button", { name: "변경 저장", exact: true }).click();
+    await expect(record).toContainText("구형");
+
+    const locationsResponse = await page.request.get(
+      `/api/defects/locations?department=${encodeURIComponent(department)}&management_category=OBSOLETE`,
+    );
+    expect(locationsResponse.ok()).toBeTruthy();
+    const locations: any[] = await locationsResponse.json();
+    const updated = locations.find((entry) => entry.item_id === item.item_id && entry.reason_memo === "B급 보관 E2E");
+    expect(updated).toMatchObject({ management_category: "OBSOLETE" });
+    expect(Number(updated.quantity)).toBe(3);
+
+    const historyResponse = await page.request.get(
+      `/api/defects/records/${updated.record_id}/management-category-history`,
+    );
+    expect(historyResponse.ok()).toBeTruthy();
+    const history: any[] = await historyResponse.json();
+    expect(history).toEqual(expect.arrayContaining([
+      expect.objectContaining({ is_initial: true, next_category: "B_GRADE" }),
+      expect.objectContaining({ previous_category: "B_GRADE", next_category: "OBSOLETE" }),
+    ]));
+  });
+
+  test("불량 허브 4카드는 데스크톱과 모바일 폭에서 가로 넘침 없이 보인다", async ({ page }) => {
+    await loginAsOperator(page, { role: "department" });
+    for (const viewport of [
+      { width: 1916, height: 910 },
+      { width: 1366, height: 768 },
+      { width: 390, height: 844 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.goto("/mes?tab=defect");
+      for (const label of ["불량 처리", "격리 목록", "B급·구형 자재", "불량 통계"]) {
+        await expect(page.getByRole("button").filter({ hasText: label, visible: true })).toBeVisible();
+      }
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
+    }
   });
 });

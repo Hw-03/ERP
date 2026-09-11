@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { DefectActorScope, DefectProcessStep, DefectScope, DefectSort } from "./DefectFilterBar";
 
 const STORAGE_PREFIX = "dexcowin_mes_defect_filters:";
+const STORAGE_STORAGE_PREFIX = "dexcowin_mes_defect_storage_filters:";
 const STORAGE_VERSION = 2;
 const PRODUCTION_DEPARTMENTS = ["튜브", "고압", "진공", "튜닝", "조립", "출하"] as const;
 const VALID_SCOPES: DefectScope[] = ["my", "production", "all"];
@@ -36,6 +37,7 @@ interface UseDefectFilterPreferencesOptions {
   defaultSort: DefectSort;
   currentDept?: string;
   defectDeptFilter?: string | null;
+  storageScope?: "regular" | "storage";
 }
 
 function unique<T>(values: readonly T[]): T[] {
@@ -101,28 +103,28 @@ export function migrateDefectFilterSnapshot(
   };
 }
 
-function storageKey(employeeId: string): string {
-  return `${STORAGE_PREFIX}${employeeId}`;
+function storageKey(employeeId: string, storageScope: "regular" | "storage" = "regular"): string {
+  return `${storageScope === "storage" ? STORAGE_STORAGE_PREFIX : STORAGE_PREFIX}${employeeId}`;
 }
 
-function readSnapshot(employeeId: string, currentDept?: string): DefectFilterSnapshot | null {
+function readSnapshot(employeeId: string, currentDept?: string, storageScope: "regular" | "storage" = "regular"): DefectFilterSnapshot | null {
   try {
-    const raw = localStorage.getItem(storageKey(employeeId));
+    const raw = localStorage.getItem(storageKey(employeeId, storageScope));
     if (!raw) return null;
 
     const parsed = JSON.parse(raw) as unknown;
     const snapshot = migrateDefectFilterSnapshot(parsed, currentDept);
     if (!snapshot) {
-      localStorage.removeItem(storageKey(employeeId));
+      localStorage.removeItem(storageKey(employeeId, storageScope));
       return null;
     }
     if ((parsed as { version?: unknown }).version === 1) {
-      localStorage.setItem(storageKey(employeeId), JSON.stringify(snapshot));
+      localStorage.setItem(storageKey(employeeId, storageScope), JSON.stringify(snapshot));
     }
     return snapshot;
   } catch {
     try {
-      localStorage.removeItem(storageKey(employeeId));
+      localStorage.removeItem(storageKey(employeeId, storageScope));
     } catch {
       // localStorage가 차단된 환경에서는 화면 기본값으로 계속 동작한다.
     }
@@ -130,9 +132,9 @@ function readSnapshot(employeeId: string, currentDept?: string): DefectFilterSna
   }
 }
 
-function writeSnapshot(employeeId: string, snapshot: DefectFilterSnapshot): boolean {
+function writeSnapshot(employeeId: string, snapshot: DefectFilterSnapshot, storageScope: "regular" | "storage" = "regular"): boolean {
   try {
-    localStorage.setItem(storageKey(employeeId), JSON.stringify(snapshot));
+    localStorage.setItem(storageKey(employeeId, storageScope), JSON.stringify(snapshot));
     return true;
   } catch {
     return false;
@@ -145,6 +147,7 @@ export function useDefectFilterPreferences({
   defaultSort,
   currentDept,
   defectDeptFilter,
+  storageScope = "regular",
 }: UseDefectFilterPreferencesOptions) {
   const [scope, setScopeState] = useState<DefectScope>(defaultScope);
   const [actorScope, setActorScopeState] = useState<DefectActorScope>("all");
@@ -166,7 +169,7 @@ export function useDefectFilterPreferences({
   const filterLockedRef = useRef(false);
 
   useEffect(() => {
-    const saved = readSnapshot(employeeId, currentDept);
+    const saved = readSnapshot(employeeId, currentDept, storageScope);
     const effectiveScope = defectDeptFilter ? "my" : saved?.scope ?? defaultScope;
     const restoredValues: StoredFilterValues = {
       scope: effectiveScope,
@@ -187,14 +190,14 @@ export function useDefectFilterPreferences({
     setModelState(restoredValues.selectedModels);
     setProcessStepState(restoredValues.selectedProcessSteps);
     setFilterLockedState(filterLockedRef.current);
-  }, [employeeId, defaultScope, defaultSort, currentDept, defectDeptFilter]);
+  }, [employeeId, defaultScope, defaultSort, currentDept, defectDeptFilter, storageScope]);
 
   const persist = useCallback((next: StoredFilterValues): void => {
-    if (!writeSnapshot(employeeId, { version: STORAGE_VERSION, ...next })) {
+    if (!writeSnapshot(employeeId, { version: STORAGE_VERSION, ...next }, storageScope)) {
       filterLockedRef.current = false;
       setFilterLockedState(false);
     }
-  }, [employeeId]);
+  }, [employeeId, storageScope]);
 
   const updateValues = useCallback((next: Partial<StoredFilterValues>): StoredFilterValues => {
     const updated = { ...valuesRef.current, ...next };
@@ -256,7 +259,7 @@ export function useDefectFilterPreferences({
   const setFilterLocked = useCallback((locked: boolean): void => {
     if (!locked) {
       try {
-        localStorage.removeItem(storageKey(employeeId));
+        localStorage.removeItem(storageKey(employeeId, storageScope));
       } catch {
         // localStorage가 차단된 환경에서도 현재 화면 필터는 유지한다.
       }
@@ -264,11 +267,11 @@ export function useDefectFilterPreferences({
       setFilterLockedState(false);
       return;
     }
-    if (writeSnapshot(employeeId, { version: STORAGE_VERSION, ...valuesRef.current })) {
+    if (writeSnapshot(employeeId, { version: STORAGE_VERSION, ...valuesRef.current }, storageScope)) {
       filterLockedRef.current = true;
       setFilterLockedState(true);
     }
-  }, [employeeId]);
+  }, [employeeId, storageScope]);
 
   return {
     scope,

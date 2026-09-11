@@ -168,6 +168,7 @@ export function DefectStatisticsView({
           </button>
           <div className="min-w-0">
             <h2 className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>불량 통계</h2>
+            <p className="mt-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>현재 분류 기준 · B급·구형 제외</p>
           </div>
         </div>
 

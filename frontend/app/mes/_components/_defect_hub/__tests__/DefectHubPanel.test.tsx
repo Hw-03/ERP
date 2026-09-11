@@ -24,13 +24,17 @@ vi.mock("../../mobile/screens/MobileDefectProcessPanel", () => ({
 }));
 // 격리 추가·바로 처리 다품목 카트 모킹 — DOM 렌더만 검증
 vi.mock("../../mobile/screens/MobileDefectCartFlow", () => ({
-  MobileDefectCartFlow: ({ mode }: { mode: string }) => (
-    <div data-testid="cart-flow">{mode}</div>
+  MobileDefectCartFlow: ({ mode, defaultSource, onCancel }: { mode: string; defaultSource?: string; onCancel: () => void }) => (
+    <div data-testid="cart-flow" data-default-source={defaultSource ?? "unset"}>{mode}<button type="button" onClick={onCancel}>모바일 카트 취소</button></div>
   ),
 }));
 vi.mock("../DefectProcessPanel", () => ({
-  DefectProcessPanel: ({ locations }: { locations: DefectLocation[] }) => (
-    <div data-testid="batch-process-panel">{locations.map((location) => location.record_id).join(",")}</div>
+  DefectProcessPanel: ({ locations, location, restoreOnly, onDone }: { locations?: DefectLocation[]; location?: DefectLocation; restoreOnly?: boolean; onDone: () => void }) => (
+    <div data-testid="batch-process-panel">
+      {(locations ?? (location ? [location] : [])).map((record) => record.record_id).join(",")}
+      {restoreOnly && <span>정상 복귀 전용</span>}
+      <button type="button" onClick={onDone}>처리 완료</button>
+    </div>
   ),
 }));
 vi.mock("../DefectStatisticsView", () => ({
@@ -287,18 +291,74 @@ describe("DefectHubPanel", () => {
     });
   });
 
-  it("'불량 격리' 카드 클릭 시 다품목 카트(add)로 전환된다", async () => {
+  it("'불량 처리'에서 격리 등록을 선택하면 다품목 카트(add)로 전환된다", async () => {
     render(<DefectHubPanel currentEmployee={mockEmployee} />);
-    fireEvent.click(screen.getByText("불량 격리"));
+    fireEvent.click(screen.getByText("불량 처리"));
+    fireEvent.click(await screen.findByRole("button", { name: /격리 등록/ }));
     const cart = await screen.findByTestId("cart-flow");
     expect(cart).toHaveTextContent("add");
+    expect(cart).toHaveAttribute("data-default-source", "unset");
   });
 
-  it("'바로 처리' 카드 클릭 시 다품목 카트(scrap)로 전환된다", async () => {
+  it("모바일 격리 카트 취소는 허브 대신 작업 선택 history로 돌아간다", async () => {
+    const backSpy = vi.spyOn(window.history, "back").mockImplementation(() => {
+      window.dispatchEvent(new PopStateEvent("popstate", { state: { defect: "work-choice" } }));
+    });
+    try {
+      render(<DefectHubPanel currentEmployee={mockEmployee} />);
+      fireEvent.click(screen.getByText("불량 처리"));
+      fireEvent.click(await screen.findByRole("button", { name: /격리 등록/ }));
+      fireEvent.click(screen.getByRole("button", { name: "모바일 카트 취소" }));
+
+      expect(backSpy).toHaveBeenCalledOnce();
+      expect(screen.getByRole("button", { name: /바로 처리/ })).toBeInTheDocument();
+    } finally {
+      backSpy.mockRestore();
+    }
+  });
+
+  it("'불량 처리'에서 바로 처리를 선택하면 다품목 카트(scrap)로 전환된다", async () => {
     render(<DefectHubPanel currentEmployee={mockEmployee} />);
-    fireEvent.click(screen.getByText("바로 처리"));
+    fireEvent.click(screen.getByText("불량 처리"));
+    fireEvent.click(await screen.findByRole("button", { name: /바로 처리/ }));
     const cart = await screen.findByTestId("cart-flow");
     expect(cart).toHaveTextContent("scrap");
+  });
+
+  it("B급·구형 카드는 기존 fixture에 없는 관리 분류를 DEFECT로 보아 목록에서 제외한다", async () => {
+    vi.mocked(defectsApi.listDefects).mockResolvedValueOnce([
+      { ...mockLocations[0], management_category: "B_GRADE" },
+      { ...mockLocations[1], management_category: "DEFECT" },
+    ]);
+    render(<DefectHubPanel currentEmployee={{ ...mockEmployee, department: "기타" }} />);
+    openList();
+    expect(await screen.findByText("7-TR-0003")).toBeInTheDocument();
+    expect(screen.queryByText("7-TR-0001")).not.toBeInTheDocument();
+  });
+
+  it("B급·구형 보관 목록의 최초 로딩 상태를 표시한다", async () => {
+    const pendingLocations = deferred<DefectLocation[]>();
+    vi.mocked(defectsApi.listDefects).mockReturnValueOnce(pendingLocations.promise);
+    render(<DefectHubPanel currentEmployee={mockEmployee} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /B급·구형 자재/ }));
+    expect(await screen.findByRole("status")).toHaveTextContent("B급·구형 자재를 불러오는 중");
+
+    await act(async () => {
+      pendingLocations.resolve([]);
+    });
+  });
+
+  it("모바일 정상 복귀 완료 뒤 B급·구형 보관 목록으로 돌아오고 전용 상태를 해제한다", async () => {
+    vi.mocked(defectsApi.listDefects).mockResolvedValue([{ ...mockLocations[0], management_category: "B_GRADE" }]);
+    render(<DefectHubPanel currentEmployee={{ ...mockEmployee, department: "기타" }} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /B급·구형 자재/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "정상 복귀" }));
+    expect(await screen.findByText("정상 복귀 전용")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "처리 완료" }));
+    expect(await screen.findByRole("heading", { name: "B급·구형 자재" })).toBeInTheDocument();
   });
 
   it("'불량 통계' 카드 클릭 시 주·월·연 통계 화면으로 전환된다", async () => {
@@ -507,7 +567,8 @@ describe("DefectHubPanel realtime refresh", () => {
   it("reloads locations on revision without leaving an in-progress cart", async () => {
     const props = { currentEmployee: mockEmployee };
     const { rerender } = render(<DefectHubPanel {...props} />);
-    fireEvent.click(screen.getAllByRole("button")[0]);
+    fireEvent.click(screen.getByRole("button", { name: /불량 처리/ }));
+    fireEvent.click(screen.getByRole("button", { name: /격리 등록/ }));
     expect(await screen.findByTestId("cart-flow")).toHaveTextContent("add");
     await waitFor(() => {
       expect(defectsApi.listDefects).toHaveBeenCalledTimes(1);
@@ -549,6 +610,25 @@ describe("DefectHubPanel realtime refresh", () => {
     expect(await screen.findByText("7-TR-0001")).toBeInTheDocument();
 
     vi.mocked(defectsApi.listDefects).mockRejectedValueOnce(new Error("refresh failed"));
+    realtime.revision = 1;
+    rerender(<DefectHubPanel {...props} />);
+
+    expect(await screen.findByRole("button", { name: "다시 동기화" })).toBeInTheDocument();
+    expect(screen.getByText("7-TR-0001")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "다시 동기화" }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "다시 동기화" })).not.toBeInTheDocument());
+    expect(screen.getByText("7-TR-0001")).toBeInTheDocument();
+  });
+
+  it("keeps the B급·구형 보관 목록 visible after refresh failure and retries in place", async () => {
+    const props = { currentEmployee: { ...mockEmployee, department: "기타" } };
+    vi.mocked(defectsApi.listDefects).mockResolvedValue([{ ...mockLocations[0], management_category: "B_GRADE" }]);
+    const { rerender } = render(<DefectHubPanel {...props} />);
+    fireEvent.click(screen.getByRole("button", { name: /B급·구형 자재/ }));
+    expect(await screen.findByText("7-TR-0001")).toBeInTheDocument();
+
+    vi.mocked(defectsApi.listDefects).mockRejectedValueOnce(new Error("storage refresh failed"));
     realtime.revision = 1;
     rerender(<DefectHubPanel {...props} />);
 

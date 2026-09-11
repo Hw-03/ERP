@@ -19,7 +19,10 @@ from bootstrap.schema import schema_differences
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 MAIN_HEAD = "20260903_0032"
 QUALITY_HEAD = "20260831_0033"
-MERGE_HEAD = "20260907_0034"
+QUALITY_MERGE_HEAD = "20260907_0034"
+DEFECT_HEAD = "20260910_0033"
+MERGE_HEAD = "20260911_0035"
+MERGE_PARENTS = (QUALITY_MERGE_HEAD, DEFECT_HEAD)
 ORIGINS = ("base", MAIN_HEAD, QUALITY_HEAD)
 EMPLOYEE_ID = "e" * 32
 QUALITY_ITEM_ID = "a" * 32
@@ -209,9 +212,9 @@ def test_sqlite_explicit_parent_restamp_and_retry_are_schema_and_data_free(
         with engine.connect() as connection:
             before = sqlite_business_data_fingerprint(connection)
 
-        command.stamp(config, [MAIN_HEAD, QUALITY_HEAD], purge=True)
+        command.stamp(config, list(MERGE_PARENTS), purge=True)
         with engine.connect() as connection:
-            assert _revisions(connection) == sorted([MAIN_HEAD, QUALITY_HEAD])
+            assert _revisions(connection) == sorted(MERGE_PARENTS)
             assert sqlite_business_data_fingerprint(connection) == before
 
         command.upgrade(config, MERGE_HEAD)
@@ -288,9 +291,9 @@ def test_postgresql_explicit_parent_restamp_and_retry_preserve_data() -> None:
             with engine.connect() as connection:
                 before = _employee_fingerprint(connection)
 
-            command.stamp(config, [MAIN_HEAD, QUALITY_HEAD], purge=True)
+            command.stamp(config, list(MERGE_PARENTS), purge=True)
             with engine.connect() as connection:
-                assert _revisions(connection) == sorted([MAIN_HEAD, QUALITY_HEAD])
+                assert _revisions(connection) == sorted(MERGE_PARENTS)
                 assert _employee_fingerprint(connection) == before
 
             command.upgrade(config, MERGE_HEAD)

@@ -3,23 +3,25 @@
 import { useEffect, useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import { ArrowLeft, Building2, ChevronRight, Copy, Trash2, Warehouse, Wrench } from "lucide-react";
-import { departmentDisplayColor, LEGACY_COLORS, MES_DEPARTMENT_COLORS } from "@/lib/mes/color";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { defectsApi } from "@/lib/api/defects";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
-import type { Department } from "@/lib/api/types/shared";
 import type { Item, ProductModel } from "../_warehouse_v2/types";
+import { itemDepartment } from "../_warehouse_v2/itemPickerShared";
 import { DefectItemPicker } from "./DefectItemPicker";
 import { ReasonFormFields } from "./ReasonFormFields";
 import { ConfirmModal } from "@/lib/ui";
 import { DisassembleTree, toServerDecision, validateDecisionTree, type ChildDecision } from "./DisassembleTree";
 import { QuantityInput } from "../common/QuantityInput";
-
-const PRODUCTION_LINES = ["튜브", "고압", "진공", "튜닝", "조립", "출하"] as const;
+import { DefectManagementCategoryControl } from "./DefectManagementCategoryControl";
+import type { DefectManagementCategory } from "@/lib/api/types/defects";
 
 type SourceKind = "warehouse" | "production";
 type DirectAction = "scrap" | "rework";
 type FlowStep = 1 | 2 | 3;
+
+type CartHistoryState = { defect?: string; mode?: DefectCartMode; step?: number; directAction?: DirectAction | null; source?: SourceKind } | null;
 
 export type DefectCartMode = "add" | "scrap";
 
@@ -29,6 +31,7 @@ interface CartLine {
   qty: string;
   category: string;
   memo: string;
+  managementCategory: DefectManagementCategory;
   decisions: ChildDecision[];
 }
 
@@ -43,7 +46,6 @@ interface Props {
   items: Item[];
   productModels: ProductModel[];
   currentEmployee: { employee_id: string; name: string; department: string };
-  defaultSource?: SourceKind;
   onDone: (directAction: DirectAction | null) => void;
   onCancel: () => void;
 }
@@ -57,22 +59,20 @@ function validQty(value: string): boolean {
   return Number.isFinite(n) && n > 0;
 }
 
+function managementCategoryLabel(category: DefectManagementCategory): string {
+  return category === "B_GRADE" ? "B급" : category === "OBSOLETE" ? "구형" : "불량";
+}
+
 export function DefectCartFlow({
   mode,
   items,
   productModels,
   currentEmployee,
-  defaultSource,
   onDone,
   onCancel,
 }: Props) {
   const [directAction, setDirectAction] = useState<DirectAction | null>(mode === "add" ? "scrap" : null);
-  const [source, setSource] = useState<SourceKind>(defaultSource ?? "production");
-  const [dept, setDept] = useState<string>(
-    PRODUCTION_LINES.includes(currentEmployee.department as (typeof PRODUCTION_LINES)[number])
-      ? currentEmployee.department
-      : PRODUCTION_LINES[0],
-  );
+  const [source, setSource] = useState<SourceKind>("production");
   const [step, setStep] = useState<FlowStep>(1);
   const [lines, setLines] = useState<CartLine[]>([]);
   const [busy, setBusy] = useState(false);
@@ -80,24 +80,38 @@ export function DefectCartFlow({
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
-    window.history.replaceState({ ...(window.history.state ?? {}), defect: "cart", mode, step: 1 }, "");
+    function restore(state: CartHistoryState) {
+      const validCart = state?.defect === "cart" && state.mode === mode;
+      const invalidAction = mode === "add"
+        ? state?.directAction !== undefined && state.directAction !== "scrap"
+        : state?.directAction === "rework" && state.step !== 2 && state.step !== 3;
+      const nextAction = invalidAction ? (mode === "add" ? "scrap" : null) : mode === "add" ? "scrap" : state?.directAction ?? null;
+      const nextSource = invalidAction ? "production" : state?.source === "warehouse" ? "warehouse" : "production";
+      const nextStep: FlowStep = mode === "add"
+        ? state?.step === 2 && !invalidAction ? 2 : 1
+        : nextAction === "rework"
+          ? 2
+          : nextAction === "scrap" && state?.step === 2 ? 2 : 1;
+      setDirectAction(nextAction);
+      setSource(nextSource);
+      setStep(nextStep);
+      if (nextStep === 1) setLines([]);
+      if (!validCart || invalidAction || state?.step !== nextStep || state?.directAction !== nextAction || state?.source !== nextSource) {
+        window.history.replaceState({ ...(window.history.state ?? {}), defect: "cart", mode, step: nextStep, directAction: nextAction, source: nextSource }, "");
+      }
+    }
+
+    restore(window.history.state as CartHistoryState);
     function onPop(e: PopStateEvent) {
-      const s = e.state as { defect?: string; step?: number } | null;
-      if (s?.defect !== "cart") {
+      const s = e.state as CartHistoryState;
+      if (s?.defect !== "cart" || s.mode !== mode) {
         setStep(1);
         setLines([]);
+        setDirectAction(mode === "add" ? "scrap" : null);
+        setSource("production");
         return;
       }
-      if (s.step === 3) {
-        setStep(3);
-        return;
-      }
-      if (s.step === 2) {
-        setStep(2);
-        return;
-      }
-      setStep(1);
-      setLines([]);
+      restore(s);
     }
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -118,10 +132,11 @@ export function DefectCartFlow({
   const reworkLineReady = Boolean(selectedReworkLine && validQty(selectedReworkLine.qty) && selectedReworkLine.category.trim() !== "");
 
   function newLine(item: Item): CartLine {
-    return { key: `${item.item_id}-${Date.now()}`, item, qty: "1", category: "", memo: "", decisions: [] };
+    return { key: `${item.item_id}-${Date.now()}`, item, qty: "1", category: "", memo: "", managementCategory: "DEFECT", decisions: [] };
   }
 
   function addItem(item: Item) {
+    if (source === "production" && itemDepartment(item) === null) return;
     setLines((prev) => {
       if (prev.some((l) => l.item.item_id === item.item_id)) return prev;
       return isRework ? [newLine(item)] : [...prev, newLine(item)];
@@ -153,23 +168,25 @@ export function DefectCartFlow({
     directAction !== null &&
     lines.length > 0 &&
     lines.every((l) => {
-      if (!validQty(l.qty)) return false;
+      if (!validQty(l.qty) || (source === "production" && itemDepartment(l.item) === null)) return false;
       if (!isRework) return true;
       return l.category.trim() !== "" && l.decisions.length > 0 && validateDecisionTree(l.decisions);
     });
 
   async function submitLine(line: CartLine): Promise<void> {
     const qty = Number(line.qty);
+    const productionDepartment = itemDepartment(line.item);
+    if (source === "production" && !productionDepartment) throw new Error("품목 담당 부서를 확인할 수 없습니다.");
     if (mode === "add") {
       await defectsApi.quarantine({
         item_id: line.item.item_id,
         qty,
         source,
-        source_dept: source === "production" ? dept : undefined,
-        target_dept: source === "warehouse" ? "창고" : dept,
+        ...(source === "production" ? { source_dept: productionDepartment!, target_dept: productionDepartment! } : { target_dept: "창고" }),
         reason_category: line.category || null,
         reason_memo: line.memo,
         actor_employee_id: currentEmployee.employee_id,
+        management_category: line.managementCategory,
       });
       return;
     }
@@ -187,7 +204,7 @@ export function DefectCartFlow({
           item_id: line.item.item_id,
           quantity: qty,
           from_bucket: source === "warehouse" ? "warehouse" : "production",
-          from_department: source === "warehouse" ? null : (dept as Department),
+          ...(source === "production" ? { from_department: productionDepartment! } : {}),
           to_bucket: "none",
         },
       ],
@@ -222,9 +239,14 @@ export function DefectCartFlow({
     setStep(2);
   }
 
-  function pushStep(nextStep: FlowStep) {
-    window.history.pushState({ defect: "cart", mode, step: nextStep }, "");
+  function pushStep(nextStep: FlowStep, nextAction = directAction, nextSource = source) {
+    window.history.pushState({ defect: "cart", mode, step: nextStep, directAction: nextAction, source: nextSource }, "");
     setStep(nextStep);
+  }
+
+  function selectSource(nextSource: SourceKind) {
+    window.history.replaceState({ ...(window.history.state ?? {}), defect: "cart", mode, step: 1, directAction, source: nextSource }, "");
+    setSource(nextSource);
   }
 
   function goBack() {
@@ -233,9 +255,7 @@ export function DefectCartFlow({
       return;
     }
     if (isDirect && directAction !== null) {
-      setDirectAction(null);
-      setLines([]);
-      setFailures([]);
+      window.history.back();
       return;
     }
     onCancel();
@@ -257,7 +277,7 @@ export function DefectCartFlow({
           <div className="flex min-w-0 flex-col gap-0.5">
             <h2 className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>바로 처리</h2>
             <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-              ① 작업 선택 → ② 출처·부서 선택 → ③ 품목 선택
+              ① 작업 선택 → ② 출처 선택 → ③ 품목 선택
             </div>
           </div>
         </div>
@@ -267,7 +287,10 @@ export function DefectCartFlow({
             title="폐기"
             desc="정상 재고를 격리 없이 바로 폐기합니다. 여러 품목을 한 번에 담을 수 있습니다."
             tone={LEGACY_COLORS.red}
-            onClick={() => setDirectAction("scrap")}
+            onClick={() => {
+              window.history.pushState({ defect: "cart", mode, step: 1, directAction: "scrap", source }, "");
+              setDirectAction("scrap");
+            }}
           />
           <ActionCard
             icon={Wrench}
@@ -277,6 +300,7 @@ export function DefectCartFlow({
             onClick={() => {
               setSource("production");
               setDirectAction("rework");
+              pushStep(2, "rework", "production");
             }}
           />
         </div>
@@ -284,12 +308,13 @@ export function DefectCartFlow({
     );
   }
 
-  const flowSteps = [
-    ...(isDirect ? [{ number: 1, label: "작업 선택", active: false }] : []),
-    { number: isDirect ? 2 : 1, label: "출처·부서 선택", active: step === 1 },
-    { number: isDirect ? 3 : 2, label: "품목 선택", active: step === 2 },
-    ...(isRework ? [{ number: 4, label: "BOM 확인", active: step === 3 }] : []),
-  ];
+  const flowSteps = isRework
+    ? [{ number: 1, label: "작업 선택", active: false }, { number: 2, label: "품목 선택", active: step === 2 }, { number: 3, label: "BOM 확인", active: step === 3 }]
+    : [
+      ...(isDirect ? [{ number: 1, label: "작업 선택", active: false }] : []),
+      { number: isDirect ? 2 : 1, label: "출처 선택", active: step === 1 },
+      { number: isDirect ? 3 : 2, label: "품목 선택", active: step === 2 },
+    ];
   const stepIndicator = (
     <div data-testid="defect-flow-stepper" className="flex flex-wrap items-center justify-end gap-4 text-base font-black">
       {flowSteps.map((flowStep, idx) => {
@@ -315,9 +340,6 @@ export function DefectCartFlow({
       })}
     </div>
   );
-  const lockedMetaLabel = source === "warehouse" ? "진입 위치" : "진입 부서";
-  const lockedMetaValue = source === "warehouse" ? "창고" : dept;
-
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
       <div className="flex flex-wrap items-center gap-3">
@@ -334,11 +356,6 @@ export function DefectCartFlow({
         <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-8 gap-y-1">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h2 className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>{title}</h2>
-            {step >= 2 && (
-              <span data-testid="defect-entry-meta" className="inline-flex cursor-default select-none items-center text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-                {lockedMetaLabel} · {lockedMetaValue}
-              </span>
-            )}
           </div>
           <div className="min-w-[320px] flex-1">
             {stepIndicator}
@@ -348,17 +365,16 @@ export function DefectCartFlow({
 
       {step === 1 && (
         <div key="step1" className="animate-view-fade flex min-h-0 flex-1 flex-col gap-3">
-          <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
-            <div className="flex min-h-0 flex-col gap-2">
-              <div className="text-xs font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>출처</div>
-              <div className={`grid min-h-0 flex-1 gap-3 ${isRework ? "grid-rows-1" : "grid-rows-2"}`}>
-                {(isRework ? (["production"] as SourceKind[]) : (["production", "warehouse"] as SourceKind[])).map((s) => {
+          <div className="flex min-h-0 flex-1 flex-col gap-2">
+            <div className="text-xs font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>출처 선택</div>
+            <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
+                {(["production", "warehouse"] as SourceKind[]).map((s) => {
                   const active = source === s;
                   const Icon = s === "warehouse" ? Warehouse : Building2;
                   const label = s === "warehouse" ? "창고 재고" : "부서 재고";
                   const desc = s === "warehouse" ? "창고 보관 중인 정상 재고에서 처리합니다" : "생산 부서에서 사용 중인 재고에서 처리합니다";
                   return (
-                    <button key={s} type="button" onClick={() => setSource(s)} className="standard-hover flex h-full flex-col justify-between rounded-[22px] border p-7 text-left transition-all active:scale-[0.99]" style={{ background: active ? tint(LEGACY_COLORS.red, 7) : LEGACY_COLORS.s2, borderColor: active ? LEGACY_COLORS.red : LEGACY_COLORS.border, borderWidth: active ? 2 : 1 }}>
+                    <button key={s} type="button" aria-pressed={active} onClick={() => selectSource(s)} className="standard-hover flex h-full flex-col justify-between rounded-[22px] border p-7 text-left transition-all active:scale-[0.99]" style={{ background: active ? tint(LEGACY_COLORS.red, 7) : LEGACY_COLORS.s2, borderColor: active ? LEGACY_COLORS.red : LEGACY_COLORS.border, borderWidth: active ? 2 : 1 }}>
                       <div className="flex items-center gap-4">
                         <Icon className="h-9 w-9 shrink-0" style={{ color: active ? LEGACY_COLORS.red : LEGACY_COLORS.muted2 }} />
                         <span className="text-3xl font-black" style={{ color: active ? LEGACY_COLORS.red : LEGACY_COLORS.text }}>{label}</span>
@@ -367,32 +383,6 @@ export function DefectCartFlow({
                     </button>
                   );
                 })}
-              </div>
-            </div>
-
-            <div className="flex min-h-0 flex-col gap-2">
-              <div className="text-xs font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
-                {source === "warehouse" ? "처리 위치" : mode === "add" ? "출처·격리 부서" : "출처 부서"}
-              </div>
-              {source === "warehouse" ? (
-                <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 rounded-[22px] border-2" style={{ background: tint(LEGACY_COLORS.blue, 7), borderColor: LEGACY_COLORS.blue }}>
-                  <Warehouse className="h-16 w-16" style={{ color: LEGACY_COLORS.blue }} />
-                  <span className="text-4xl font-black" style={{ color: LEGACY_COLORS.blue }}>창고</span>
-                  <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>창고 정상 재고에서 처리합니다</span>
-                </div>
-              ) : (
-                <div className="grid min-h-0 flex-1 grid-cols-3 grid-rows-2 gap-3">
-                  {PRODUCTION_LINES.map((d) => {
-                    const active = dept === d;
-                    const deptColor = departmentDisplayColor(MES_DEPARTMENT_COLORS[d] ?? LEGACY_COLORS.muted2, d);
-                    return (
-                      <button key={d} type="button" onClick={() => setDept(d)} className="standard-hover h-full rounded-[18px] border text-3xl font-black transition-all active:scale-[0.99]" style={{ background: active ? tint(deptColor, 14) : LEGACY_COLORS.s2, borderColor: active ? deptColor : LEGACY_COLORS.border, borderWidth: active ? 2 : 1, color: active ? deptColor : LEGACY_COLORS.muted2 }}>
-                        {d}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
             </div>
           </div>
           <div className="flex shrink-0 justify-end">
@@ -410,8 +400,7 @@ export function DefectCartFlow({
               <DefectItemPicker
                 items={pickerItems}
                 productModels={productModels}
-                targetDepartment={source === "warehouse" ? "창고" : dept}
-                lockedDepartment={source === "warehouse" ? "창고" : dept}
+                source={source}
                 selectedIds={selectedIds}
                 onAdd={addItem}
                 onRemove={removeItemById}
@@ -437,6 +426,7 @@ export function DefectCartFlow({
                           <div className="min-w-0">
                             <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{line.item.mes_code ?? "(코드 없음)"}</div>
                             <div className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{line.item.item_name}</div>
+                            <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>자동 부서 · {source === "warehouse" ? "창고" : itemDepartment(line.item) ?? "부서 미지정"}</div>
                           </div>
                           <button type="button" onClick={() => removeLine(line.key)} className="standard-hover no-btn-inset flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors" style={{ color: LEGACY_COLORS.red, background: tint(LEGACY_COLORS.red, 10) }} aria-label="삭제">
                             <Trash2 className="h-4 w-4" />
@@ -455,6 +445,16 @@ export function DefectCartFlow({
                         </div>
 
                         <ReasonFormFields category={line.category} memo={line.memo} onCategoryChange={(c) => updateLine(line.key, { category: c })} onMemoChange={(m) => updateLine(line.key, { memo: m })} required={isRework} />
+
+                        {mode === "add" && (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>관리 분류</span>
+                            <DefectManagementCategoryControl
+                              value={line.managementCategory}
+                              onChange={(managementCategory) => updateLine(line.key, { managementCategory })}
+                            />
+                          </div>
+                        )}
 
                         {isRework && (
                           <div className="rounded-[10px] px-3 py-2 text-xs font-bold" style={{ background: tint(LEGACY_COLORS.yellow, 10), color: LEGACY_COLORS.muted2 }}>
@@ -522,7 +522,7 @@ export function DefectCartFlow({
               parentItemName={selectedReworkLine.item.item_name}
               parentMesCode={selectedReworkLine.item.mes_code ?? ""}
               parentQty={Number(selectedReworkLine.qty) || 0}
-              parentDept={source === "warehouse" ? "창고" : dept}
+              parentDept={source === "warehouse" ? "창고" : itemDepartment(selectedReworkLine.item) ?? "부서 미지정"}
               decisions={selectedReworkLine.decisions}
               onChange={(decisions) => updateLine(selectedReworkLine.key, { decisions })}
             />
@@ -545,8 +545,11 @@ export function DefectCartFlow({
             ? "선택한 품목을 즉시 재작업하고 하위 품목을 정상·격리·폐기로 나눕니다."
             : isScrap
               ? `${lines.length}건을 즉시 폐기합니다. 재고에서 차감되며 되돌릴 수 없습니다.`
-              : `${lines.length}건을 격리합니다.`}
+              : `${lines.length}건을 격리합니다. ${lines.map((line) => line.managementCategory === "B_GRADE" ? "B급" : line.managementCategory === "OBSOLETE" ? "구형" : "불량 격리").join(", ")} 분류로 보관됩니다.`}
         </p>
+        <div className="flex flex-col gap-1 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+          {lines.map((line) => <div key={line.key}>{line.item.item_name} · 수량 {line.qty}{mode === "add" ? ` · 관리 분류 ${managementCategoryLabel(line.managementCategory)}` : ""} · 자동 부서 · {source === "warehouse" ? "창고" : itemDepartment(line.item) ?? "부서 미지정"}</div>)}
+        </div>
       </ConfirmModal>
     </div>
   );

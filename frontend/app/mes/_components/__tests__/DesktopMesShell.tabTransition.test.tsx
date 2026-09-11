@@ -16,6 +16,7 @@ const queryClientMock = vi.hoisted(() => ({
 }));
 const shippingViewProps = vi.hoisted(() => vi.fn());
 const adminViewMounts = vi.hoisted(() => vi.fn());
+const defectViewStates = vi.hoisted(() => vi.fn());
 
 vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => queryClientMock,
@@ -136,7 +137,12 @@ vi.mock("../DesktopShippingView", () => ({
     return <main>shipping content</main>;
   },
 }));
-vi.mock("../DesktopDefectView", () => ({ DesktopDefectView: () => <main>defect content</main> }));
+vi.mock("../DesktopDefectView", () => ({
+  DesktopDefectView: () => {
+    defectViewStates(window.history.state?.defect ?? null);
+    return <main>defect content</main>;
+  },
+}));
 vi.mock("../DesktopHistoryView", () => ({ DesktopHistoryView: () => <main>history content</main> }));
 vi.mock("../DesktopDailyWorkReportView", async () => {
   const { useEffect } = await import("react");
@@ -180,6 +186,7 @@ describe("DesktopMesShell tab transition", () => {
     queryClientMock.prefetchInfiniteQuery.mockClear();
     shippingViewProps.mockClear();
     adminViewMounts.mockClear();
+    defectViewStates.mockClear();
     vi.mocked(sendClientEvent).mockClear();
     setAuditScreen.mockClear();
   });
@@ -289,6 +296,19 @@ describe("DesktopMesShell tab transition", () => {
     expect(params.get("tab")).toBe("warehouse");
     expect(params.get("section")).toBe("queue");
     expect(params.get("stockRequestId")).toBe("request-1");
+  });
+
+  it("returns an active defect tab to the hub when its sidebar button is selected again", async () => {
+    window.history.replaceState({ defect: "storage" }, "", "/mes?tab=defect");
+
+    render(<DesktopMesShell />);
+
+    expect(defectViewStates).toHaveBeenLastCalledWith("storage");
+
+    fireEvent.click(screen.getByRole("button", { name: "defect" }));
+
+    await waitFor(() => expect(defectViewStates).toHaveBeenLastCalledWith("hub"));
+    expect(window.history.state).toMatchObject({ defect: "hub" });
   });
 
   it("shows daily report controls in the top bar only while the daily tab is active", () => {

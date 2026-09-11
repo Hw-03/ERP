@@ -56,6 +56,8 @@ def test_preflight_allows_docstring_only_model_changes_without_a_migration(
         '"""새 설명."""\n\nclass Snapshot:\n    """새 클래스 설명."""\n\n    table = "snapshots"\n',
         encoding="utf-8",
     )
+
+
     target_model.write_text(
         '"""기존 설명."""\n\nclass Snapshot:\n    """기존 클래스 설명."""\n\n    table = "snapshots"\n',
         encoding="utf-8",
@@ -229,6 +231,8 @@ def test_inventory_location_ledger_declares_data_preserving_employee_policy() ->
         "20260903_0031_add_item_procurement_fields.py",
         "20260903_0032_add_item_purchase_memo.py",
         "20260907_0034_merge_procurement_and_shipping_heads.py",
+        "20260910_0033_defect_management_categories.py",
+        "20260911_0035_merge_quality_and_defect_heads.py",
     ],
 )
 def test_current_employee_schema_migrations_declare_auto_deploy_policy(filename: str) -> None:
@@ -237,3 +241,41 @@ def test_current_employee_schema_migrations_declare_auto_deploy_policy(filename:
     policy = module._policy_from_migration(MIGRATIONS / filename)
 
     assert policy.kind in {"schema-only", "data-preserving", "data-change"}
+
+
+
+@pytest.mark.parametrize("fail_operation", [False, True])
+def test_preflight_checks_operations_only_on_snapshot(tmp_path, monkeypatch, fail_operation):
+    module = _load_preflight_module()
+    database = tmp_path / "employee.db"
+    with module.sqlite3.connect(database) as connection:
+        connection.execute("CREATE TABLE items (id INTEGER PRIMARY KEY)")
+        connection.execute("INSERT INTO items VALUES (1)")
+    before = database.read_bytes()
+    args = module.parse_args([
+        "--employee-db", str(database), "--runtime-root", str(tmp_path / "runtime"),
+        "--backend-dir", str(tmp_path), "--target-backend-dir", str(tmp_path),
+        "--source-migrations", str(tmp_path), "--target-migrations", str(tmp_path),
+        "--verify-tool", str(tmp_path / "verify.py"),
+        "--inventory-tool", str(tmp_path / "inventory.py"),
+        "--operation-tool", str(tmp_path / "inventory_operation_admin.py"),
+    ])
+    monkeypatch.setattr(module, "load_preflight_policies", lambda *args: ())
+    calls = []
+
+    def run(command, cwd, environment):
+        calls.append(command)
+        assert str(database) not in " ".join(command)
+        assert environment["DATABASE_URL"] != f"sqlite:///{database.as_posix()}"
+        if "diagnose" in command and fail_operation:
+            raise module.PreflightError("operation integrity failed (exit 1)")
+
+    monkeypatch.setattr(module, "_run_checked", run)
+    if fail_operation:
+        with pytest.raises(module.PreflightError, match="operation integrity"):
+            module.run_preflight(args)
+    else:
+        module.run_preflight(args)
+    assert any("diagnose" in call for call in calls)
+    assert not any("activate" in call or "repair" in call for call in calls)
+    assert database.read_bytes() == before

@@ -773,6 +773,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/defects/records/{record_id}/management-category": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Management Category
+         * @description PIN 확인 뒤, 처리 대기 없는 활성 격리 원장의 관리 분류만 변경한다.
+         */
+        put: operations["update_management_category_api_defects_records__record_id__management_category_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/defects/records/{record_id}/management-category-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Management Category History
+         * @description 최초 격리부터 현재까지 관리 분류 이력을 시간순으로 반환한다.
+         */
+        get: operations["get_management_category_history_api_defects_records__record_id__management_category_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/defects/records/{record_id}/memo": {
         parameters: {
             query?: never;
@@ -4335,6 +4375,11 @@ export interface components {
             item_name: string;
             /** Legacy Origin */
             legacy_origin?: ("aggregate" | "reconstructed") | null;
+            /**
+             * Management Category
+             * @default DEFECT
+             */
+            management_category?: string;
             /** Mes Code */
             mes_code: string | null;
             /** Original Quantity */
@@ -4359,6 +4404,58 @@ export interface components {
              * Format: uuid
              */
             record_id: string;
+        };
+        /** DefectManagementCategoryRevisionItem */
+        DefectManagementCategoryRevisionItem: {
+            /**
+             * Edited At
+             * Format: date-time
+             */
+            edited_at: string;
+            /** Edited By Employee Id */
+            edited_by_employee_id: string | null;
+            /** Edited By Name */
+            edited_by_name: string;
+            /** Is Initial */
+            is_initial: boolean;
+            /** Memo */
+            memo: string | null;
+            /** Next Category */
+            next_category: string;
+            /** Previous Category */
+            previous_category: string | null;
+            /**
+             * Revision Id
+             * Format: uuid
+             */
+            revision_id: string;
+        };
+        /** DefectManagementCategoryUpdateRequest */
+        DefectManagementCategoryUpdateRequest: {
+            /**
+             * Actor Employee Id
+             * Format: uuid
+             */
+            actor_employee_id: string;
+            /**
+             * Expected Management Category
+             * @enum {string}
+             */
+            expected_management_category: "DEFECT" | "B_GRADE" | "OBSOLETE";
+            /**
+             * Management Category
+             * @enum {string}
+             */
+            management_category: "DEFECT" | "B_GRADE" | "OBSOLETE";
+            /** Memo */
+            memo?: string | null;
+            /** Pin */
+            pin: string;
+        };
+        /** DefectManagementCategoryUpdateResult */
+        DefectManagementCategoryUpdateResult: {
+            /** Management Category */
+            management_category: string;
         };
         /** DefectMemoRevisionItem */
         DefectMemoRevisionItem: {
@@ -6415,6 +6512,12 @@ export interface components {
              * Format: uuid
              */
             item_id: string;
+            /**
+             * Management Category
+             * @default DEFECT
+             * @enum {string}
+             */
+            management_category?: "DEFECT" | "B_GRADE" | "OBSOLETE";
             /** Qty */
             qty: number | string;
             /** Reason Category */
@@ -9804,7 +9907,9 @@ export interface operations {
     };
     get_defect_kpi_api_defects_kpi_get: {
         parameters: {
-            query?: never;
+            query?: {
+                management_category?: ("DEFECT" | "B_GRADE" | "OBSOLETE") | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -9820,6 +9925,15 @@ export interface operations {
                     "application/json": components["schemas"]["DefectKpi"];
                 };
             };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
     };
     list_defect_locations_api_defects_locations_get: {
@@ -9827,6 +9941,7 @@ export interface operations {
             query?: {
                 /** @description 부서 필터 (없으면 전체) */
                 department?: string | null;
+                management_category?: ("DEFECT" | "B_GRADE" | "OBSOLETE") | null;
             };
             header?: never;
             path?: never;
@@ -9874,6 +9989,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DefectActionResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_management_category_api_defects_records__record_id__management_category_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DefectManagementCategoryUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DefectManagementCategoryUpdateResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_management_category_history_api_defects_records__record_id__management_category_history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DefectManagementCategoryRevisionItem"][];
                 };
             };
             /** @description Validation Error */

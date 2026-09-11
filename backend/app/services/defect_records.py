@@ -11,6 +11,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import (
+    DefectManagementCategoryEnum,
+    DefectQuarantineManagementCategoryRevision,
     DefectQuarantineRecord,
     DefectQuarantineMemoRevision,
     StockRequestLine,
@@ -32,13 +34,17 @@ def _create_record(
     actor_name: Optional[str],
     reason_category: Optional[str],
     memo: Optional[str],
+    management_category: str = DefectManagementCategoryEnum.DEFECT.value,
     quarantined_at: Optional[datetime] = None,
 ) -> DefectQuarantineRecord:
-    """한 번의 격리와 최초 메모 감사 행을 같은 세션에 생성한다."""
+    """한 번의 격리와 최초 메모·관리 분류 감사 행을 같은 세션에 생성한다."""
     quantity = Decimal(str(quantity))
     if quantity <= 0:
         raise ValueError("격리 수량은 0보다 커야 합니다.")
     occurred_at = quarantined_at or datetime.utcnow()
+    category = str(getattr(management_category, "value", management_category or "DEFECT"))
+    if category not in {item.value for item in DefectManagementCategoryEnum}:
+        raise ValueError("지원하지 않는 격리 관리 분류입니다.")
     record = DefectQuarantineRecord(
         item_id=item_id,
         department=_department_value(department),
@@ -49,6 +55,7 @@ def _create_record(
         quarantined_by_name=actor_name,
         reason_category=reason_category,
         current_memo=memo,
+        management_category=category,
         is_legacy=False,
     )
     db.add(record)
@@ -58,6 +65,18 @@ def _create_record(
             record_id=record.record_id,
             previous_memo=None,
             next_memo=memo,
+            edited_by_employee_id=actor_employee_id,
+            edited_by_name=actor_name or "시스템",
+            edited_at=occurred_at,
+            is_initial=True,
+        )
+    )
+    db.add(
+        DefectQuarantineManagementCategoryRevision(
+            record_id=record.record_id,
+            previous_category=None,
+            next_category=category,
+            memo=memo,
             edited_by_employee_id=actor_employee_id,
             edited_by_name=actor_name or "시스템",
             edited_at=occurred_at,
@@ -148,6 +167,15 @@ def _ensure_available(
             f"선택한 격리 기록의 처리 가능 수량이 부족합니다: "
             f"가능 {available}개, 요청 {quantity}개."
         )
+
+
+def _ensure_defect_management_category(record: DefectQuarantineRecord) -> None:
+    """불량 처리 대상은 현재 불량 관리 분류의 원장만 허용한다."""
+    if (
+        getattr(record, "management_category", None)
+        or DefectManagementCategoryEnum.DEFECT.value
+    ) != DefectManagementCategoryEnum.DEFECT.value:
+        raise ValueError("B급·불용 관리 품목은 먼저 불량 격리로 이동한 뒤 처리해 주세요.")
 
 
 def _decrement_record(

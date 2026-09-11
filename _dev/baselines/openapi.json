@@ -1965,6 +1965,11 @@
             ],
             "title": "Legacy Origin"
           },
+          "management_category": {
+            "default": "DEFECT",
+            "title": "Management Category",
+            "type": "string"
+          },
           "mes_code": {
             "anyOf": [
               {
@@ -2059,6 +2064,141 @@
           "quarantined_by_employee_id"
         ],
         "title": "DefectLocationItem",
+        "type": "object"
+      },
+      "DefectManagementCategoryRevisionItem": {
+        "properties": {
+          "edited_at": {
+            "format": "date-time",
+            "title": "Edited At",
+            "type": "string"
+          },
+          "edited_by_employee_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edited By Employee Id"
+          },
+          "edited_by_name": {
+            "title": "Edited By Name",
+            "type": "string"
+          },
+          "is_initial": {
+            "title": "Is Initial",
+            "type": "boolean"
+          },
+          "memo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memo"
+          },
+          "next_category": {
+            "title": "Next Category",
+            "type": "string"
+          },
+          "previous_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Category"
+          },
+          "revision_id": {
+            "format": "uuid",
+            "title": "Revision Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "revision_id",
+          "previous_category",
+          "next_category",
+          "memo",
+          "edited_by_employee_id",
+          "edited_by_name",
+          "edited_at",
+          "is_initial"
+        ],
+        "title": "DefectManagementCategoryRevisionItem",
+        "type": "object"
+      },
+      "DefectManagementCategoryUpdateRequest": {
+        "properties": {
+          "actor_employee_id": {
+            "format": "uuid",
+            "title": "Actor Employee Id",
+            "type": "string"
+          },
+          "expected_management_category": {
+            "enum": [
+              "DEFECT",
+              "B_GRADE",
+              "OBSOLETE"
+            ],
+            "title": "Expected Management Category",
+            "type": "string"
+          },
+          "management_category": {
+            "enum": [
+              "DEFECT",
+              "B_GRADE",
+              "OBSOLETE"
+            ],
+            "title": "Management Category",
+            "type": "string"
+          },
+          "memo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memo"
+          },
+          "pin": {
+            "title": "Pin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "management_category",
+          "expected_management_category",
+          "actor_employee_id",
+          "pin"
+        ],
+        "title": "DefectManagementCategoryUpdateRequest",
+        "type": "object"
+      },
+      "DefectManagementCategoryUpdateResult": {
+        "properties": {
+          "management_category": {
+            "title": "Management Category",
+            "type": "string"
+          }
+        },
+        "required": [
+          "management_category"
+        ],
+        "title": "DefectManagementCategoryUpdateResult",
         "type": "object"
       },
       "DefectMemoRevisionItem": {
@@ -7691,6 +7831,16 @@
           "item_id": {
             "format": "uuid",
             "title": "Item Id",
+            "type": "string"
+          },
+          "management_category": {
+            "default": "DEFECT",
+            "enum": [
+              "DEFECT",
+              "B_GRADE",
+              "OBSOLETE"
+            ],
+            "title": "Management Category",
             "type": "string"
           },
           "qty": {
@@ -15603,6 +15753,29 @@
       "get": {
         "description": "KPI 카드 2개:\n- quarantined: 남은 수량이 있는 격리 기록 수\n- over_one_year: 격리 시각이 365일을 넘긴 활성 기록 수",
         "operationId": "get_defect_kpi_api_defects_kpi_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "management_category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "DEFECT",
+                    "B_GRADE",
+                    "OBSOLETE"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Management Category"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -15613,6 +15786,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Get Defect Kpi",
@@ -15642,6 +15825,27 @@
               ],
               "description": "부서 필터 (없으면 전체)",
               "title": "Department"
+            }
+          },
+          {
+            "in": "query",
+            "name": "management_category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "DEFECT",
+                    "B_GRADE",
+                    "OBSOLETE"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Management Category"
             }
           }
         ],
@@ -15714,6 +15918,108 @@
           }
         },
         "summary": "Quarantine",
+        "tags": [
+          "Defects"
+        ]
+      }
+    },
+    "/api/defects/records/{record_id}/management-category": {
+      "put": {
+        "description": "PIN 확인 뒤, 처리 대기 없는 활성 격리 원장의 관리 분류만 변경한다.",
+        "operationId": "update_management_category_api_defects_records__record_id__management_category_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Record Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DefectManagementCategoryUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefectManagementCategoryUpdateResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Management Category",
+        "tags": [
+          "Defects"
+        ]
+      }
+    },
+    "/api/defects/records/{record_id}/management-category-history": {
+      "get": {
+        "description": "최초 격리부터 현재까지 관리 분류 이력을 시간순으로 반환한다.",
+        "operationId": "get_management_category_history_api_defects_records__record_id__management_category_history_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Record Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DefectManagementCategoryRevisionItem"
+                  },
+                  "title": "Response Get Management Category History Api Defects Records  Record Id  Management Category History Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Management Category History",
         "tags": [
           "Defects"
         ]

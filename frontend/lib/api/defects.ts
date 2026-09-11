@@ -6,7 +6,10 @@
 import { fetcher, postJson, putJson, toApiUrl } from "../api-core";
 import type {
   DefectKpi,
+  DefectListQuery,
   DefectLocation,
+  DefectManagementCategoryRevision,
+  DefectManagementCategoryUpdatePayload,
   DefectMemoRevision,
   DefectMemoUpdatePayload,
   DefectMemoUpdateResult,
@@ -23,18 +26,21 @@ export const defectsApi = {
    * 남은 수량이 있는 건별 격리 기록 목록.
    * @param department 부서 필터 (없으면 전체)
    */
-  listDefects: (department?: string): Promise<DefectLocation[]> =>
-    fetcher<DefectLocation[]>(
-      toApiUrl(
-        `/api/defects/locations${department ? `?department=${encodeURIComponent(department)}` : ""}`,
-      ),
-    ),
+  listDefects: (departmentOrQuery?: string | DefectListQuery): Promise<DefectLocation[]> => {
+    const params = new URLSearchParams();
+    if (typeof departmentOrQuery === "string") params.set("department", departmentOrQuery);
+    else if (departmentOrQuery?.management_category) params.set("management_category", departmentOrQuery.management_category);
+    const query = params.toString();
+    return fetcher<DefectLocation[]>(
+      toApiUrl(`/api/defects/locations${query ? `?${query}` : ""}`),
+    );
+  },
 
   /**
    * 격리 기록 KPI 카드 2개 카운트.
    */
-  getDefectKpi: (): Promise<DefectKpi> =>
-    fetcher<DefectKpi>(toApiUrl("/api/defects/kpi")),
+  getDefectKpi: (query?: DefectListQuery): Promise<DefectKpi> =>
+    fetcher<DefectKpi>(toApiUrl(`/api/defects/kpi${query?.management_category ? `?management_category=${query.management_category}` : ""}`)),
 
   /**
    * 즉시 격리 (결재 없음).
@@ -60,6 +66,17 @@ export const defectsApi = {
   getMemoHistory: (recordId: string) =>
     fetcher<DefectMemoRevision[]>(
       toApiUrl(`/api/defects/records/${recordId}/memo-history`),
+    ),
+
+  updateManagementCategory: (recordId: string, payload: DefectManagementCategoryUpdatePayload) =>
+    putJson<void>(
+      toApiUrl(`/api/defects/records/${recordId}/management-category`),
+      payload,
+    ),
+
+  getManagementCategoryHistory: (recordId: string) =>
+    fetcher<DefectManagementCategoryRevision[]>(
+      toApiUrl(`/api/defects/records/${recordId}/management-category-history`),
     ),
 
   getStatistics: (query: DefectStatisticsQuery): Promise<DefectStatisticsResponse> => {

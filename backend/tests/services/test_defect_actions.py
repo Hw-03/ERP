@@ -40,12 +40,14 @@ def _actor(db_session) -> Employee:
     return actor
 
 
-def _defective_qty(db_session, item_id) -> Decimal:
+def _defective_qty(
+    db_session, item_id, department: DepartmentEnum = DepartmentEnum.WAREHOUSE
+) -> Decimal:
     row = (
         db_session.query(InventoryLocation)
         .filter(
             InventoryLocation.item_id == item_id,
-            InventoryLocation.department == DepartmentEnum.ASSEMBLY,
+            InventoryLocation.department == department,
             InventoryLocation.status == LocationStatusEnum.DEFECTIVE,
         )
         .first()
@@ -71,7 +73,7 @@ def test_quarantine_rolls_back_inventory_when_ledger_capture_fails(
             item_id=item.item_id,
             qty=Decimal("2"),
             source="warehouse",
-            target_dept=DepartmentEnum.ASSEMBLY,
+            target_dept=DepartmentEnum.WAREHOUSE,
             source_dept=None,
             actor=actor,
             reason_category="검사 불량",
@@ -121,7 +123,9 @@ def test_unquarantine_rolls_back_inventory_when_ledger_capture_fails(
     db_session.expire_all()
     inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
     assert inv.warehouse_qty == Decimal("3")
-    assert _defective_qty(db_session, item.item_id) == Decimal("2")
+    assert _defective_qty(
+        db_session, item.item_id, department=DepartmentEnum.ASSEMBLY
+    ) == Decimal("2")
     assert db_session.query(TransactionLog).count() == 0
 
 
@@ -143,7 +147,7 @@ def test_quarantine_and_restore_append_defect_movements_with_operations(
         item_id=item.item_id,
         qty=Decimal("2"),
         source="warehouse",
-        target_dept=DepartmentEnum.ASSEMBLY,
+        target_dept=DepartmentEnum.WAREHOUSE,
         source_dept=None,
         actor=actor,
         reason_category="검사 불량",
@@ -156,7 +160,7 @@ def test_quarantine_and_restore_append_defect_movements_with_operations(
         record_id=record.record_id,
         item_id=item.item_id,
         qty=Decimal("1"),
-        dept=DepartmentEnum.ASSEMBLY,
+        dept=DepartmentEnum.WAREHOUSE,
         actor=actor,
         reason_category="정상 판정",
         reason_memo="복귀",
@@ -197,7 +201,7 @@ def test_bulk_unquarantine_rolls_back_every_record_when_second_restore_fails(
             item_id=item.item_id,
             qty=Decimal("1"),
             source="warehouse",
-            target_dept=DepartmentEnum.ASSEMBLY,
+            target_dept=DepartmentEnum.WAREHOUSE,
             source_dept=None,
             actor=actor,
             reason_category="검사 불량",
@@ -228,7 +232,7 @@ def test_bulk_unquarantine_rolls_back_every_record_when_second_restore_fails(
                 svc.BulkUnquarantineLine(
                     record_id=record.record_id,
                     item_id=item.item_id,
-                    department=DepartmentEnum.ASSEMBLY,
+                    department=DepartmentEnum.WAREHOUSE,
                     quantity=Decimal("1"),
                 )
                 for record in records
@@ -298,7 +302,7 @@ def test_bulk_unquarantine_rejects_duplicate_or_mixed_lines_before_mutation(
             item_id=item.item_id,
             qty=Decimal("1"),
             source="warehouse",
-            target_dept=DepartmentEnum.ASSEMBLY,
+            target_dept=DepartmentEnum.WAREHOUSE,
             source_dept=None,
             actor=actor,
             reason_category="검사 불량",
@@ -310,7 +314,7 @@ def test_bulk_unquarantine_rejects_duplicate_or_mixed_lines_before_mutation(
         svc.BulkUnquarantineLine(
             record_id=record.record_id,
             item_id=item.item_id,
-            department=DepartmentEnum.ASSEMBLY,
+            department=DepartmentEnum.WAREHOUSE,
             quantity=Decimal("1"),
         )
         for record in records
@@ -339,7 +343,7 @@ def test_bulk_unquarantine_rejects_stale_or_missing_record(
         item_id=item.item_id,
         qty=Decimal("2"),
         source="warehouse",
-        target_dept=DepartmentEnum.ASSEMBLY,
+        target_dept=DepartmentEnum.WAREHOUSE,
         source_dept=None,
         actor=actor,
         reason_category="검사 불량",
@@ -350,7 +354,7 @@ def test_bulk_unquarantine_rejects_stale_or_missing_record(
     line = svc.BulkUnquarantineLine(
         record_id=record.record_id,
         item_id=item.item_id,
-        department=DepartmentEnum.ASSEMBLY,
+        department=DepartmentEnum.WAREHOUSE,
         quantity=Decimal("1"),
     )
 
@@ -366,7 +370,7 @@ def test_bulk_unquarantine_rejects_stale_or_missing_record(
     missing_line = svc.BulkUnquarantineLine(
         record_id=uuid.uuid4(),
         item_id=item.item_id,
-        department=DepartmentEnum.ASSEMBLY,
+        department=DepartmentEnum.WAREHOUSE,
         quantity=Decimal("2"),
     )
     with pytest.raises(ValueError, match="찾을 수 없습니다"):

@@ -5,11 +5,9 @@ import { Check, GripVertical, Plus, RotateCcw, Save, Search, Settings2 } from "l
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
-import { Tooltip } from "@/lib/ui";
 import { EmptyState } from "../common";
 import { useCurrentOperator } from "../login/useCurrentOperator";
 import { DEPT_OPTIONS, PAGE_SIZE, matchesSearch } from "../_warehouse_steps/_constants";
-import { DEPT_LETTER_TO_NAME, deptOf } from "../_admin_sections/_bom_workbench/bomDept";
 import { LabeledSelect } from "../_warehouse_v2/_atoms";
 import type { Item, ProductModel } from "../_warehouse_v2/types";
 import {
@@ -17,12 +15,11 @@ import {
   buildAssignedPriorityBySlot,
   buildDeptPriorityByLetter,
   buildEmployeeOrderRank,
-  getProdByDept,
+  itemDepartment,
   keepCodeOnOneLine,
   matchesDept,
   matchesModel,
   matchesStage,
-  renderDeptBreakdown,
   sortItemsForPicker,
 } from "../_warehouse_v2/itemPickerShared";
 import {
@@ -37,9 +34,7 @@ const INITIAL_DISPLAY_LIMIT = PAGE_SIZE * 2;
 interface Props {
   items: Item[];
   productModels: ProductModel[];
-  /** 정렬 우선순위 기준 대상 부서. */
-  targetDepartment?: string | null;
-  lockedDepartment?: string | null;
+  source: "warehouse" | "production";
   /** 이미 장바구니에 담긴 item_id 집합 — "담김" 표시·중복 추가 방지. */
   selectedIds: Set<string>;
   onAdd: (item: Item) => void;
@@ -54,8 +49,7 @@ interface Props {
 export function DefectItemPicker({
   items,
   productModels,
-  targetDepartment,
-  lockedDepartment,
+  source,
   selectedIds,
   onAdd,
   onRemove,
@@ -75,11 +69,9 @@ export function DefectItemPicker({
   const resetMyOrder = useResetMyItemOrderMutation();
 
   const keyword = search.trim().toLowerCase();
-  const effectiveDept = lockedDepartment ?? dept;
-
   const deptPriorityByLetter = useMemo(
-    () => buildDeptPriorityByLetter(targetDepartment),
-    [targetDepartment],
+    () => buildDeptPriorityByLetter(dept === "ALL" ? undefined : dept),
+    [dept],
   );
   const assignedPriorityBySlot = useMemo(
     () => buildAssignedPriorityBySlot(operator?.assigned_model_slots),
@@ -97,17 +89,18 @@ export function DefectItemPicker({
       (productModels.find((m) => m.model_name === model)?.slot ?? undefined);
     const filtered = items.filter(
       (item) =>
-        matchesDept(item, effectiveDept) &&
+        (source !== "warehouse" || Number(item.warehouse_qty) > 0) &&
+        matchesDept(item, dept) &&
         matchesModel(item, selectedModelSlot) &&
         matchesStage(item, stage) &&
         matchesSearch(item, keyword),
     );
     return sortItemsForPicker(filtered, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank);
-  }, [items, effectiveDept, model, stage, keyword, productModels, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank]);
+  }, [items, source, dept, model, stage, keyword, productModels, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank]);
 
   useEffect(() => {
     if (tableRef.current) tableRef.current.scrollTop = 0;
-  }, [effectiveDept, model, stage, keyword]);
+  }, [source, dept, model, stage, keyword]);
 
   const allItemsSorted = useMemo(() => {
     return sortItemsForPicker(items, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank);
@@ -142,7 +135,7 @@ export function DefectItemPicker({
     setEditItems([]);
   }
 
-  const hasActiveFilter = (!lockedDepartment && dept !== "ALL") || model !== "\uc804\uccb4" || stage !== "ALL" || keyword.length > 0;
+  const hasActiveFilter = dept !== "ALL" || model !== "\uc804\uccb4" || stage !== "ALL" || keyword.length > 0;
 
   function clearFilters() {
     setDept("ALL");
@@ -156,12 +149,8 @@ export function DefectItemPicker({
     label: v,
   }));
 
-  const filterGridClass = lockedDepartment
-    ? "grid flex-1 grid-cols-2 items-end gap-2 lg:grid-cols-[1fr_1fr_2fr]"
-    : "grid flex-1 grid-cols-3 items-end gap-2 lg:grid-cols-[1fr_1fr_1fr_2fr]";
-  const searchFieldClass = lockedDepartment
-    ? "col-span-2 flex flex-col gap-0.5 lg:col-span-1"
-    : "col-span-3 flex flex-col gap-0.5 lg:col-span-1";
+  const filterGridClass = "grid flex-1 grid-cols-3 items-end gap-2 lg:grid-cols-[1fr_1fr_1fr_2fr]";
+  const searchFieldClass = "col-span-3 flex flex-col gap-0.5 lg:col-span-1";
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
@@ -169,7 +158,7 @@ export function DefectItemPicker({
       <div className="flex shrink-0 flex-col gap-2">
         <div data-testid="defect-picker-toolbar" className="flex h-[50px] items-end justify-between gap-2">
           <div className={filterGridClass} style={{ opacity: editMode ? 0.4 : 1, pointerEvents: editMode ? "none" : undefined }}>
-            {!lockedDepartment && <LabeledSelect label="부서" value={dept} onChange={setDept} options={DEPT_OPTIONS} />}
+            <LabeledSelect label="부서" value={dept} onChange={setDept} options={DEPT_OPTIONS} />
             <LabeledSelect label="모델" value={model} onChange={setModel} options={modelOptions} />
             <LabeledSelect label="단계" value={stage} onChange={setStage} options={STAGE_OPTIONS} />
             {/* 모바일: 검색을 아래 전체폭 줄로(드롭다운 폭 확보). 데스크톱(lg): 기존 4열 인라인. */}
@@ -281,12 +270,10 @@ export function DefectItemPicker({
           />
         ) : (<>
         <table className="w-full border-collapse text-sm">
-          {/* 모바일(<sm): 숨긴 3열(품목코드/창고/부서)을 0폭으로 접고 품목명열이 남는 폭 흡수 → '추가'가 행 우측 끝.
-              데스크톱(sm:≥640): 원래 5열 비율 복원(회귀 0). */}
+          {/* 모바일(<sm): 숨긴 2열(품목코드/창고)을 0폭으로 접고 품목명열이 남는 폭 흡수 → '추가'가 행 우측 끝. */}
           <colgroup>
-            <col className="w-full sm:w-[58%]" />
+            <col className="w-full sm:w-[66%]" />
             <col className="w-0 sm:w-[16%]" />
-            <col className="w-0 sm:w-[8%]" />
             <col className="w-0 sm:w-[8%]" />
             <col className="w-auto sm:w-[10%]" />
           </colgroup>
@@ -295,13 +282,13 @@ export function DefectItemPicker({
               className="text-left text-[11px] font-bold uppercase tracking-[1.5px]"
               style={{ color: LEGACY_COLORS.muted2 }}
             >
-              {["품목명", "품목 코드", "창고", "부서", "추가"].map((h, i) => (
+              {["품목명", "품목 코드", "창고", "추가"].map((h, i) => (
                 <th
                   key={h}
                   className={
                     i === 0
                       ? "px-3 py-2"
-                      : i === 4
+                      : i === 3
                         ? "px-3 py-2 text-center"
                         : "hidden whitespace-nowrap px-3 py-2 text-center sm:table-cell"
                   }
@@ -317,20 +304,23 @@ export function DefectItemPicker({
           </thead>
           <tbody>
             {filteredItems.slice(0, displayLimit).map((item) => {
-              const prodByDept = getProdByDept(item);
-              const letter = deptOf(item.process_type_code);
-              const impliedDeptName = letter ? DEPT_LETTER_TO_NAME[letter] : null;
-              const impliedQty = impliedDeptName ? (prodByDept.get(impliedDeptName) ?? 0) : 0;
-              const hasOthers = Array.from(prodByDept.keys()).some((d) => d !== impliedDeptName);
-              const noDeptStock = prodByDept.size === 0;
+              const impliedDeptName = itemDepartment(item);
               const wQty = Number(item.warehouse_qty) || 0;
               const added = selectedIds.has(item.item_id);
+              const canAdd = source === "warehouse" || impliedDeptName !== null;
               return (
                 <tr key={item.item_id} data-testid={`defect-picker-row-${item.item_id}`} data-added={added ? "true" : "false"} className="transition-colors duration-150 hover:bg-[var(--c-s4)]" style={{ background: added ? tint(LEGACY_COLORS.blue, 7) : undefined }}>
                   <td className="px-3 py-2" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
                     <span className="text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
                       {item.item_name}
                     </span>
+                    <div className="sm:hidden text-xs font-bold" style={{ color: impliedDeptName || source === "warehouse" ? LEGACY_COLORS.muted2 : LEGACY_COLORS.red }}>
+                      {source === "warehouse"
+                        ? "자동 부서 · 창고"
+                        : impliedDeptName
+                          ? `자동 부서 · ${impliedDeptName}`
+                          : "부서 미지정 · 생산 출처에서 추가할 수 없습니다."}
+                    </div>
                   </td>
                   <td
                     className="hidden px-3 py-2 text-center sm:table-cell"
@@ -350,30 +340,6 @@ export function DefectItemPicker({
                     {formatQty(wQty)}
                   </td>
                   <td
-                    className="hidden px-3 py-2 text-center sm:table-cell"
-                    style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
-                  >
-                    {noDeptStock ? (
-                      <span className="text-base font-black" style={{ color: LEGACY_COLORS.muted2 }}>
-                        -
-                      </span>
-                    ) : (
-                      <Tooltip content={renderDeptBreakdown(prodByDept)} multiline>
-                        <span
-                          className="text-base font-black tabular-nums"
-                          style={{ color: impliedQty > 0 || hasOthers ? LEGACY_COLORS.text : LEGACY_COLORS.muted2 }}
-                        >
-                          {formatQty(impliedQty)}
-                          {hasOthers && (
-                            <span className="ml-0.5" style={{ color: LEGACY_COLORS.muted2 }}>
-                              +
-                            </span>
-                          )}
-                        </span>
-                      </Tooltip>
-                    )}
-                  </td>
-                  <td
                     className="whitespace-nowrap px-3 py-2 text-center"
                     style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
                   >
@@ -382,8 +348,9 @@ export function DefectItemPicker({
                     <button
                       type="button"
                       onClick={() => added ? onRemove(item) : onAdd(item)}
+                      disabled={!added && !canAdd}
                       aria-label={added ? `${item.item_name} 장바구니에서 제거` : `${item.item_name} 장바구니에 추가`}
-                      className={`standard-hover inline-flex items-center gap-1 rounded-[10px] border px-2.5 py-1 text-[12px] font-black transition-colors active:scale-[0.98] ${
+                      className={`standard-hover inline-flex items-center gap-1 rounded-[10px] border px-2.5 py-1 text-[12px] font-black transition-colors active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45 ${
                         added
                           ? "border-[var(--c-blue)] bg-[color-mix(in_srgb,var(--c-blue)_12%,transparent)] text-[var(--c-blue)]"
                           : "border-[var(--c-red)] bg-[var(--c-red)] text-white"

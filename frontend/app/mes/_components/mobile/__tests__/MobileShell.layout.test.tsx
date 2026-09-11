@@ -68,7 +68,7 @@ vi.mock("../screens", () => ({
     </>
   ),
   MobileWarehouseScreen: () => <div>warehouse screen</div>,
-  MobileDefectScreen: () => <div>defect screen</div>,
+  MobileDefectScreen: () => <div data-testid="defect-screen-state">{window.history.state?.defect ?? "none"}</div>,
   MobileHistoryScreen: () => <div>history screen</div>,
   MobileWeeklyScreen: ({ onExit }: { onExit?: () => void }) => (
     <>
@@ -231,6 +231,17 @@ describe("MobileShell layout", () => {
     });
     expect(sendClientEvent).toHaveBeenCalledTimes(1);
     expect(setAuditScreen).toHaveBeenLastCalledWith({ key: "mobile.warehouse", label: "입출고" });
+  });
+
+  it("returns an active defect tab to the hub and clears an in-progress cart history state", () => {
+    render(<MobileShell />);
+
+    fireEvent.click(screen.getByRole("button", { name: "불량" }));
+    window.history.replaceState({ defect: "cart", mode: "add", step: 2, source: "warehouse" }, "");
+    fireEvent.click(screen.getByRole("button", { name: "불량" }));
+
+    expect(window.history.state).toEqual({ defect: "hub" });
+    expect(screen.getByTestId("defect-screen-state")).toHaveTextContent("hub");
   });
 
   it("refreshes capacity on a realtime revision without leaving the active tab", async () => {

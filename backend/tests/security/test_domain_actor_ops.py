@@ -94,7 +94,7 @@ def test_defect_mutation_uses_session_actor_and_rejects_spoof_without_writes(
         "item_id": str(item.item_id),
         "qty": "2",
         "source": "warehouse",
-        "target_dept": DepartmentEnum.ASSEMBLY.value,
+        "target_dept": DepartmentEnum.WAREHOUSE.value,
         "reason_category": "외관불량",
         "reason_memo": "actor contract",
         "actor_employee_id": str(imposter.employee_id),
@@ -106,7 +106,7 @@ def test_defect_mutation_uses_session_actor_and_rejects_spoof_without_writes(
     assert rejected.json()["detail"]["code"] == "ACTOR_MISMATCH"
     assert _warehouse_qty(db_session, item.item_id) == Decimal("10")
     assert _production_qty(
-        db_session, item.item_id, DepartmentEnum.ASSEMBLY
+        db_session, item.item_id, DepartmentEnum.WAREHOUSE
     ) == Decimal("0")
     assert db_session.query(TransactionLog).count() == 0
 
@@ -123,7 +123,7 @@ def test_defect_mutation_uses_session_actor_and_rejects_spoof_without_writes(
     unquarantine = {
         "item_id": str(item.item_id),
         "qty": "2",
-        "dept": DepartmentEnum.ASSEMBLY.value,
+        "dept": DepartmentEnum.WAREHOUSE.value,
         "reason_category": "정상 판정",
         "reason_memo": "actor contract",
         "actor_employee_id": str(imposter.employee_id),
@@ -146,7 +146,7 @@ def test_defect_mutation_uses_session_actor_and_rejects_spoof_without_writes(
     assert all(row.produced_by == actor.name for row in logs)
     assert _warehouse_qty(db_session, item.item_id) == Decimal("8")
     assert _production_qty(
-        db_session, item.item_id, DepartmentEnum.ASSEMBLY
+        db_session, item.item_id, DepartmentEnum.WAREHOUSE
     ) == Decimal("2")
 
 
@@ -165,7 +165,7 @@ def test_defect_memo_edit_rejects_body_actor_different_from_session_actor(
                 "item_id": str(item.item_id),
                 "qty": "2",
                 "source": "warehouse",
-                "target_dept": DepartmentEnum.ASSEMBLY.value,
+                "target_dept": DepartmentEnum.WAREHOUSE.value,
                 "reason_category": "외관불량",
                 "reason_memo": "원본 메모",
                 "actor_employee_id": str(actor.employee_id),

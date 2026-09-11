@@ -306,6 +306,7 @@ def _load_quarantine_occurrences(
         .filter(
             DefectQuarantineRecord.quarantined_at >= start_utc,
             DefectQuarantineRecord.quarantined_at < end_utc,
+            DefectQuarantineRecord.management_category == "DEFECT",
         )
         .order_by(
             DefectQuarantineRecord.quarantined_at,

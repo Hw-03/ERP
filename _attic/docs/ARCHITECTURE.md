@@ -97,7 +97,7 @@ available = (warehouse_qty - warehouse_pending)
 |---|---|
 | warehouse_qty | 자재창고 보관량 |
 | production_total | 생산부서별 보관량 합계 (`InventoryLocation` 의 status=PRODUCTION) |
-| defective_total | 불량 격리 보관량 합계 (status=DEFECTIVE) |
+| defective_total | 불량 격리·B급·구형 보관량 합계 (모두 status=DEFECTIVE) |
 | warehouse_pending | 창고 OUT 예약량 (`Inventory.pending_quantity`) |
 | production_pending | 생산 위치 OUT 예약량 합계 (`InventoryLocation.pending_quantity`) |
 

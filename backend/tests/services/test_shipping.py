@@ -688,6 +688,7 @@ def test_update_request_rejects_every_non_preparing_status_with_exact_message(
     make_bom(pf.item_id, pa.item_id, Decimal("1"))
     request = _create_request(db_session, {"base_pf_item_id": pf.item_id})
     request.status = status
+    db_session.flush()
     actor = _shipping_actor(db_session)
 
     with pytest.raises(shipping_svc.ShippingError) as exc_info:

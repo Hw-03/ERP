@@ -25,7 +25,9 @@ ZONE_UNIQUE_INDEX = "uq_warehouse_zone_items_zone_item"
 UNPLACED_UNIQUE_INDEX = "uq_warehouse_unplaced_items_item_id"
 TEST_POSTGRES_URL = os.getenv("TEST_POSTGRES_URL")
 QUALITY_BRANCH_HEAD = "20260831_0033"
-CURRENT_HEAD = "20260907_0034"
+QUALITY_MERGE_HEAD = "20260907_0034"
+DEFECT_BRANCH_HEAD = "20260910_0033"
+CURRENT_HEAD = "20260911_0035"
 
 
 def _config(database_url: str) -> Config:
@@ -384,9 +386,13 @@ def test_0032_remains_on_the_quality_path_to_the_single_merge_head() -> None:
     script = ScriptDirectory.from_config(config)
     assert script.get_heads() == [CURRENT_HEAD]
     assert script.get_revision(QUALITY_BRANCH_HEAD).down_revision == MIGRATION_REVISION
-    assert script.get_revision(CURRENT_HEAD).down_revision == (
+    assert script.get_revision(QUALITY_MERGE_HEAD).down_revision == (
         "20260903_0032",
         QUALITY_BRANCH_HEAD,
+    )
+    assert script.get_revision(CURRENT_HEAD).down_revision == (
+        QUALITY_MERGE_HEAD,
+        DEFECT_BRANCH_HEAD,
     )
 
 

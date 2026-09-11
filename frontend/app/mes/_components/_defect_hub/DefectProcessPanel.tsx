@@ -23,6 +23,7 @@ interface Props {
   location?: DefectLocation;
   locations?: DefectLocation[];
   batchMode?: boolean;
+  restoreOnly?: boolean;
   currentEmployee: { employee_id: string; name: string; department: string };
   onDone: () => void;
   onCancel: () => void;
@@ -33,6 +34,7 @@ export function DefectProcessPanel({
   location: singleLocation,
   locations: selectedLocations,
   batchMode = false,
+  restoreOnly = false,
   currentEmployee,
   onDone,
   onCancel,
@@ -378,7 +380,7 @@ export function DefectProcessPanel({
         </button>
         <div>
           <h2 className="text-2xl font-black" style={{ color: LEGACY_COLORS.text }}>{isBatch ? "불량 여러 건 처리" : "불량 처리"}</h2>
-          {location.has_bom && (
+          {!restoreOnly && location.has_bom && (
             <div className="flex items-center gap-2 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
               <span style={{ color: LEGACY_COLORS.yellow }}>① 처리 선택</span>
               <span>→</span>
@@ -441,7 +443,7 @@ export function DefectProcessPanel({
               selected={action === "unquarantine"}
               onClick={() => setAction("unquarantine")}
             />
-            {location.has_bom && (
+            {!restoreOnly && location.has_bom && (
               <ActionCard
                 label="재작업"
                 desc="즉시 BOM 재작업 처리"
@@ -450,14 +452,14 @@ export function DefectProcessPanel({
                 onClick={() => setAction("disassemble")}
               />
             )}
-            <ActionCard
+            {!restoreOnly && <ActionCard
               label="전체 폐기"
               desc="즉시 격리 재고 차감"
               color={LEGACY_COLORS.red}
               selected={action === "scrap"}
               onClick={() => setAction("scrap")}
-            />
-            {isWarehouse && (
+            />}
+            {!restoreOnly && isWarehouse && (
               <ActionCard
                 label="반품"
                 desc="즉시 반품 처리"

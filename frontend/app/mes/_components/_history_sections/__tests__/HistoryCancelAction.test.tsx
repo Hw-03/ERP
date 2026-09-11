@@ -287,6 +287,7 @@ describe("HistoryCancelAction", () => {
   });
 
   it("shows a server business error without replacing its Korean message", async () => {
+    const onRetryScope = vi.fn();
     const onSubmit = vi.fn().mockRejectedValue(
       new ApiError("취소할 수 없는 이력입니다.", 422),
     );
@@ -294,6 +295,7 @@ describe("HistoryCancelAction", () => {
       <HistoryCancelAction
         panelOpen
         identity="log:business-error"
+        onRetryScope={onRetryScope}
         scope="single"
         effects={effects}
         cancelled={false}
@@ -308,6 +310,7 @@ describe("HistoryCancelAction", () => {
 
     await waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent("취소할 수 없는 이력입니다.");
+      expect(onRetryScope).toHaveBeenCalledOnce();
     });
   });
 

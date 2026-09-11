@@ -11,11 +11,20 @@ $script:EmployeeSyncOutput = @()
 function Invoke-EmployeeSync {
     param([string[]] $Arguments = @())
 
-    $script:EmployeeSyncOutput = @(
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $SyncScript @Arguments 2>&1
-    )
-    $script:EmployeeSyncExit = [int] $LASTEXITCODE
+    $previousPreference = $ErrorActionPreference
+    try {
+        # stderr 출력이 실제 하위 명령 exit를 1로 덮지 않도록 보존한다.
+        $ErrorActionPreference = "Continue"
+        $script:EmployeeSyncOutput = @(
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $SyncScript @Arguments 2>&1
+        )
+        $script:EmployeeSyncExit = [int] $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousPreference
+    }
     $script:EmployeeSyncOutput | Out-Host
+    Write-Host "AUTO_SYNC_COMMAND_EXIT=$($script:EmployeeSyncExit)"
 }
 
 Invoke-EmployeeSync -Arguments @("-DryRun", "-Force", "-ReportActivity")

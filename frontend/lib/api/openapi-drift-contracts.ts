@@ -90,11 +90,11 @@ export type DefectQuarantinePublicSourceClosed = Assert<Equal<
 >>;
 export type DefectLocationRawOptionalKeys = Assert<Equal<
   OptionalKeys<Raw["DefectLocationItem"]>,
-  "has_bom" | "is_legacy" | "legacy_origin" | "pending_quantity"
+  "has_bom" | "is_legacy" | "legacy_origin" | "management_category" | "pending_quantity"
 >>;
 export type DefectLocationPublicOptionalKeys = Assert<Equal<
   OptionalKeys<DefectLocation>,
-  "quarantined_by" | "quarantined_by_employee_id" | "reason_category" | "reason_memo"
+  "management_category" | "quarantined_by" | "quarantined_by_employee_id" | "reason_category" | "reason_memo"
 >>;
 export type DefectLegacyOriginRaw = Assert<Equal<
   Raw["DefectLocationItem"]["legacy_origin"],
@@ -102,11 +102,11 @@ export type DefectLegacyOriginRaw = Assert<Equal<
 >>;
 export type DefectQuarantineRawOptionalKeys = Assert<Equal<
   OptionalKeys<Raw["QuarantineRequest"]>,
-  "client_request_id" | "reason_category" | "source_dept"
+  "client_request_id" | "management_category" | "reason_category" | "source_dept"
 >>;
 export type DefectQuarantinePublicOptionalKeys = Assert<Equal<
   OptionalKeys<QuarantinePayload>,
-  "client_request_id" | "reason_category" | "source_dept"
+  "client_request_id" | "management_category" | "reason_category" | "source_dept"
 >>;
 
 // departments: 생략과 명시 null을 같은 값으로 보지 않는 requiredness 계약.

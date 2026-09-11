@@ -24,6 +24,7 @@ from app.dependencies.verified_actor import (
 from app.models import (
     DepartmentEnum,
     Employee,
+    InventoryOperation,
     Item,
     ShippingAllocation,
     ShippingRequest,
@@ -78,6 +79,7 @@ _KST = timezone(timedelta(hours=9))
 _LATEST_REVISION_UNSET = object()
 _TRANSACTIONS_UNSET = object()
 _STOCK_SHORTAGES_UNSET = object()
+_REVERSALS_UNSET = object()
 
 
 def _line_payload(lines: list[ShippingBomLineInput] | None) -> list[dict] | None:
@@ -92,7 +94,7 @@ def _companion_payload(lines) -> list[dict] | None:
     return [line.model_dump() for line in lines]
 
 
-def _tx_log_response(log: TransactionLog) -> ShippingTransactionLogResponse:
+def _tx_log_response(log: TransactionLog, reversal: InventoryOperation | None = None) -> ShippingTransactionLogResponse:
     return ShippingTransactionLogResponse(
         log_id=log.log_id,
         item_id=log.item_id,
@@ -110,9 +112,9 @@ def _tx_log_response(log: TransactionLog) -> ShippingTransactionLogResponse:
         notes=log.notes,
         shipping_phase=log.shipping_phase,
         created_at=log.created_at,
-        cancelled=bool(log.cancelled),
-        cancel_reason=log.cancel_reason,
-        cancelled_at=log.cancelled_at,
+        cancelled=bool(log.cancelled) or reversal is not None,
+        cancel_reason=reversal.reason if reversal else log.cancel_reason,
+        cancelled_at=reversal.effective_at if reversal else log.cancelled_at,
         inventory_effect=log.inventory_effect,
     )
 
@@ -167,6 +169,7 @@ def _to_response(
     latest_preparation_revision: ShippingRequestRevision | None | object = _LATEST_REVISION_UNSET,
     transaction_rows: list[TransactionLog] | object = _TRANSACTIONS_UNSET,
     stock_shortages: list[dict] | object = _STOCK_SHORTAGES_UNSET,
+    reversals_by_operation: dict[uuid.UUID, InventoryOperation] | object = _REVERSALS_UNSET,
 ) -> ShippingRequestResponse:
     if latest_preparation_revision is _LATEST_REVISION_UNSET:
         latest_preparation_revision = (
@@ -189,6 +192,19 @@ def _to_response(
     if stock_shortages is _STOCK_SHORTAGES_UNSET:
         stock_shortages = shipping_svc._prepare_stock_shortages(db, req)
     shortage_rows = stock_shortages if isinstance(stock_shortages, list) else []
+    if reversals_by_operation is _REVERSALS_UNSET:
+        operation_ids = {log.operation_id for log in tx_rows if log.operation_id}
+        reversals_by_operation = {
+            operation.reverses_operation_id: operation
+            for operation in db.query(InventoryOperation).filter(
+                InventoryOperation.reverses_operation_id.in_(operation_ids),
+            ).all()
+        } if operation_ids else {}
+    reversals = (
+        reversals_by_operation
+        if isinstance(reversals_by_operation, dict)
+        else {}
+    )
     return ShippingRequestResponse(
         request_id=req.request_id,
         status=req.status,
@@ -262,7 +278,7 @@ def _to_response(
             if isinstance(latest_preparation_revision, ShippingRequestRevision)
             else None
         ),
-        transactions=[_tx_log_response(log) for log in tx_rows],
+        transactions=[_tx_log_response(log, reversals.get(log.operation_id)) for log in tx_rows],
         allocations=[
             ShippingAllocationResponse(
                 allocation_id=allocation.allocation_id,
@@ -325,6 +341,17 @@ def _responses_for_rows(db: Session, rows: list[ShippingRequest]) -> list[Shippi
     }
     for transaction in transaction_rows:
         transactions_by_request[transaction.shipping_request_id].append(transaction)
+    operation_ids = {
+        transaction.operation_id
+        for transaction in transaction_rows
+        if transaction.operation_id is not None
+    }
+    reversals = {
+        operation.reverses_operation_id: operation
+        for operation in db.query(InventoryOperation).filter(
+            InventoryOperation.reverses_operation_id.in_(operation_ids),
+        ).all()
+    } if operation_ids else {}
     shortages_by_request = shipping_svc.prepare_stock_shortages_many(db, rows)
     return [
         _to_response(
@@ -333,6 +360,7 @@ def _responses_for_rows(db: Session, rows: list[ShippingRequest]) -> list[Shippi
             latest_revisions.get(row.request_id),
             transactions_by_request[row.request_id],
             shortages_by_request[row.request_id],
+            reversals,
         )
         for row in rows
     ]

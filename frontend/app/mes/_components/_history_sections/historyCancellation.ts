@@ -67,10 +67,13 @@ export function mergeHistoryLogUpdate(
     cancel_reason: updated.cancel_reason,
     cancelled_by: updated.cancelled_by,
     cancelled_at: updated.cancelled_at,
+    operation_effective_status: updated.operation_effective_status ?? log.operation_effective_status,
+    reversal_operation_id: updated.reversal_operation_id ?? log.reversal_operation_id,
   };
 }
 
 type HistoryCancellationTarget =
+  | { kind: "operation"; operationId: string }
   | { kind: "operation_batch"; batchId: string }
   | { kind: "reference"; referenceNo: string }
   | { kind: "log"; logId: string };
@@ -79,6 +82,9 @@ function getCancellationTarget(
   updated: TransactionLog,
   fallbackOperationBatchId: string | null,
 ): HistoryCancellationTarget {
+  if (updated.operation_id) {
+    return { kind: "operation", operationId: updated.operation_id };
+  }
   const operationBatchId = updated.operation_batch_id ?? fallbackOperationBatchId;
   if (operationBatchId) {
     return { kind: "operation_batch", batchId: operationBatchId };
@@ -93,6 +99,9 @@ function matchesCancellation(
   log: TransactionLog,
   target: HistoryCancellationTarget,
 ): boolean {
+  if (target.kind === "operation") {
+    return log.operation_id === target.operationId;
+  }
   if (target.kind === "operation_batch") {
     return log.operation_batch_id === target.batchId;
   }
@@ -130,11 +139,12 @@ export function applyHistoryCancellation(
   }
 
   let batchCache = state.batchCache;
-  if (target.kind === "operation_batch") {
-    const cached = state.batchCache.get(target.batchId);
+  const cancelledBatchId = target.kind === "operation_batch" ? target.batchId : updated.operation_batch_id;
+  if (cancelledBatchId) {
+    const cached = state.batchCache.get(cancelledBatchId);
     if (cached) {
       batchCache = new Map(state.batchCache);
-      batchCache.set(target.batchId, {
+      batchCache.set(cancelledBatchId, {
         ...cached,
         status: "cancelled",
         updated_at: updated.cancelled_at ?? cached.updated_at,

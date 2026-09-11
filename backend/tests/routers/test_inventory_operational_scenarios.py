@@ -128,7 +128,7 @@ def _assert_auditable(
 
 
 def test_inventory_day_flow_preserves_quantities_and_audit_trail(db_session, client, make_item):
-    item = make_item(name="ops-day-flow", process_type_code="AR", warehouse_qty=D("0"))
+    item = make_item(name="ops-day-flow", process_type_code="HR", warehouse_qty=D("0"))
     warehouse_user = _make_employee(
         db_session,
         code="OPWH1",
@@ -172,7 +172,7 @@ def test_inventory_day_flow_preserves_quantities_and_audit_trail(db_session, cli
             "quantity": "30",
             "from_bucket": "warehouse",
             "to_bucket": "production",
-            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "to_department": DepartmentEnum.HIGH_VOLTAGE.value,
         }],
     )
     assert move_to_dept["status"] == "reserved"
@@ -186,7 +186,7 @@ def test_inventory_day_flow_preserves_quantities_and_audit_trail(db_session, cli
     assert _inv(db_session, item.item_id).warehouse_qty == D("70")
     assert _inv(db_session, item.item_id).pending_quantity == D("0")
     assert _inv(db_session, item.item_id).quantity == D("100")
-    assert _loc_qty(db_session, item.item_id, department=DepartmentEnum.ASSEMBLY) == D("30")
+    assert _loc_qty(db_session, item.item_id, department=DepartmentEnum.HIGH_VOLTAGE) == D("30")
     _assert_auditable(
         _latest_log(db_session, item.item_id, TransactionTypeEnum.TRANSFER_TO_PROD),
         warehouse_user,
@@ -200,15 +200,15 @@ def test_inventory_day_flow_preserves_quantities_and_audit_trail(db_session, cli
             "item_id": str(item.item_id),
             "quantity": "12",
             "from_bucket": "production",
-            "from_department": DepartmentEnum.ASSEMBLY.value,
+            "from_department": DepartmentEnum.HIGH_VOLTAGE.value,
             "to_bucket": "production",
-            "to_department": DepartmentEnum.HIGH_VOLTAGE.value,
+            "to_department": DepartmentEnum.ASSEMBLY.value,
         }],
     )
     assert internal_move["status"] == "completed"
     db_session.expire_all()
-    assert _loc_qty(db_session, item.item_id, department=DepartmentEnum.ASSEMBLY) == D("18")
-    assert _loc_qty(db_session, item.item_id, department=DepartmentEnum.HIGH_VOLTAGE) == D("12")
+    assert _loc_qty(db_session, item.item_id, department=DepartmentEnum.HIGH_VOLTAGE) == D("18")
+    assert _loc_qty(db_session, item.item_id, department=DepartmentEnum.ASSEMBLY) == D("12")
     assert _inv(db_session, item.item_id).quantity == D("100")
     _assert_auditable(_latest_log(db_session, item.item_id, TransactionTypeEnum.TRANSFER_DEPT), worker)
 
@@ -224,7 +224,7 @@ def test_inventory_day_flow_preserves_quantities_and_audit_trail(db_session, cli
     })
     assert quarantine.status_code == 200, quarantine.text
     db_session.expire_all()
-    assert _loc_qty(db_session, item.item_id, department=DepartmentEnum.HIGH_VOLTAGE) == D("7")
+    assert _loc_qty(db_session, item.item_id, department=DepartmentEnum.HIGH_VOLTAGE) == D("13")
     assert _loc_qty(
         db_session,
         item.item_id,

@@ -1180,7 +1180,7 @@ describe("desktop history detail panels", () => {
       warnings: ["레거시 효과 위치는 추정하지 않습니다."],
       cells: [],
       defectRecords: [],
-      effects: [],
+      effects: [{ subject_type: "ShippingRequest", target_state: { status: "PREPARED" } }],
     });
     const selected = makeLog({
       operation_id: "operation-1",
@@ -1222,6 +1222,7 @@ describe("desktop history detail panels", () => {
     expect(screen.getByRole("status")).toHaveTextContent(
       "레거시 효과 위치는 추정하지 않습니다.",
     );
+    expect(screen.getByText("출고 재고를 복원하고 준비 완료 및 출하 예약 상태로 돌아갑니다.")).toBeInTheDocument();
     expect(
       within(screen.getByTestId("history-cancel-confirmation")).getByText("하위 자재 B"),
     ).toBeInTheDocument();

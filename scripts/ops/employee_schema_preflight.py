@@ -11,6 +11,8 @@ import os
 import sqlite3
 import subprocess
 import sys
+import uuid
+from contextlib import closing
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -310,8 +312,8 @@ def _copy_verified_snapshot(source: Path, runtime_root: Path) -> Path:
         raise PreflightError(f"employee database not found: {source}")
     snapshot_dir = runtime_root / "preflight"
     snapshot_dir.mkdir(parents=True, exist_ok=True)
-    snapshot = snapshot_dir / f"mes_preflight_{datetime.now():%Y%m%d_%H%M%S}.db"
-    with sqlite3.connect(source) as source_connection, sqlite3.connect(snapshot) as destination_connection:
+    snapshot = snapshot_dir / f"mes_preflight_{datetime.now():%Y%m%d_%H%M%S}_{uuid.uuid4().hex}.db"
+    with closing(sqlite3.connect(source.resolve().as_uri() + "?mode=ro", uri=True)) as source_connection, closing(sqlite3.connect(snapshot)) as destination_connection:
         source_connection.backup(destination_connection)
     with sqlite3.connect(snapshot) as connection:
         integrity = connection.execute("PRAGMA integrity_check").fetchone()
@@ -327,35 +329,49 @@ def _run_checked(command: list[str], working_directory: Path, environment: dict[
     if result.stderr:
         print(result.stderr, end="", file=sys.stderr)
     if result.returncode:
+        print(f"PREFLIGHT_COMMAND_EXIT={result.returncode}")
         raise PreflightError(f"{' '.join(command[1:])} failed (exit {result.returncode})")
 
 
 def run_preflight(args: argparse.Namespace) -> Path:
     """Migrate only an isolated backup and prove its declared data contract."""
+    print("PREFLIGHT_STAGE=policy")
     policies = load_preflight_policies(
         args.backend_dir,
         args.target_backend_dir,
         args.source_migrations,
         args.target_migrations,
     )
+    print("PREFLIGHT_STAGE=snapshot")
     snapshot = _copy_verified_snapshot(args.employee_db, args.runtime_root)
     print(f"PREFLIGHT_SNAPSHOT={snapshot}")
     before = snapshot_existing_rows(snapshot)
     environment = os.environ.copy()
     environment["DATABASE_URL"] = f"sqlite:///{snapshot.as_posix()}"
     backend = args.backend_dir.resolve()
+    print("PREFLIGHT_STAGE=migrate")
     _run_checked([sys.executable, "bootstrap_db.py", "--migrate"], backend, environment)
+    print("PREFLIGHT_STAGE=schema-check")
     _run_checked([sys.executable, "bootstrap_db.py", "--check"], backend, environment)
+    print("PREFLIGHT_STAGE=sqlite-fk")
     _run_checked(
         [sys.executable, str(args.verify_tool.resolve()), "--database", str(snapshot)],
         backend,
         environment,
     )
+    print("PREFLIGHT_STAGE=inventory")
     _run_checked(
         [sys.executable, str(args.inventory_tool.resolve()), "--db-url", environment["DATABASE_URL"]],
         backend,
         environment,
     )
+    print("PREFLIGHT_STAGE=operation-integrity")
+    _run_checked(
+        [sys.executable, str(args.operation_tool.resolve()), "diagnose", "--db-url", environment["DATABASE_URL"], "--json"],
+        backend,
+        environment,
+    )
+    print("PREFLIGHT_STAGE=data-contract")
     allowed_tables = frozenset().union(*(policy.allowed_tables for policy in policies))
     assert_existing_rows_unchanged(snapshot, before, allowed_tables)
     assert_policy_validators(snapshot, policies)
@@ -373,6 +389,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--target-migrations", required=True, type=Path)
     parser.add_argument("--verify-tool", required=True, type=Path)
     parser.add_argument("--inventory-tool", required=True, type=Path)
+    parser.add_argument("--operation-tool", type=Path, default=Path(__file__).with_name("inventory_operation_admin.py"))
     return parser.parse_args(argv)
 
 

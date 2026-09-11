@@ -832,7 +832,7 @@ def test_cancel_quarantine_reverses_physical_stock_and_defect_ledger(
         item_id=item.item_id,
         qty=Decimal("2"),
         source="warehouse",
-        target_dept=DepartmentEnum.ASSEMBLY,
+        target_dept=DepartmentEnum.WAREHOUSE,
         source_dept=None,
         actor=actor,
         reason_category="검사 불량",

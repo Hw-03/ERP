@@ -56,6 +56,7 @@ def _add_record(
     department: str = "조립",
     reason: str | None = "외관",
     is_legacy: bool = False,
+    management_category: str = "DEFECT",
 ) -> DefectQuarantineRecord:
     record = DefectQuarantineRecord(
         item_id=item.item_id,
@@ -67,10 +68,33 @@ def _add_record(
         reason_category=reason,
         current_memo="테스트",
         is_legacy=is_legacy,
+        management_category=management_category,
     )
     db_session.add(record)
     db_session.flush()
     return record
+
+
+def test_statistics_excludes_current_b_grade_and_includes_record_after_defect_return(
+    db_session, make_item
+) -> None:
+    item = make_item(name="B급 통계 제외", process_type_code="TR")
+    record = _add_record(
+        db_session, item, quantity=4, at=_kst_naive(2026, 9, 2),
+        management_category="B_GRADE",
+    )
+
+    excluded = get_defect_statistics(
+        db_session, period="month", anchor=date(2026, 9, 10),
+    )
+    record.management_category = "DEFECT"
+    db_session.flush()
+    included = get_defect_statistics(
+        db_session, period="month", anchor=date(2026, 9, 10),
+    )
+
+    assert excluded.summary.quantity == 0
+    assert included.summary.quantity == 4
 
 
 def _add_operation(
