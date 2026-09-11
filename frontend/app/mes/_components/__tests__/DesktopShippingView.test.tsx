@@ -4277,7 +4277,7 @@ describe("DesktopShippingView", () => {
     expect(root).toHaveClass("rounded-[28px]", "border", "px-4", "py-4");
     expect(root).not.toHaveClass("overflow-y-auto");
     expect(screen.getByTestId("shipping-root-viewport")).toHaveClass("overflow-y-auto", "lg:-right-2.5", "lg:[scrollbar-gutter:stable]");
-    const headerRight = within(viewHeader).getByTestId("shipping-view-header-right");
+    const headerRight = await within(viewHeader).findByTestId("shipping-view-header-right");
     expect(headerRight).toHaveClass("min-w-[min(100%,620px)]", "basis-[620px]", "flex-1", "flex-wrap");
     const serialSummary = within(viewHeader).getByTestId("shipping-history-serial-summary");
     expect(serialSummary).toHaveTextContent("34M25H0490 ~ 34M25H0493 (4개)");
