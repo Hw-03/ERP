@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MobileDefectCartFlow } from "../MobileDefectCartFlow";
 import { MobileDefectProcessPanel } from "../MobileDefectProcessPanel";
 import type { DefectLocation } from "@/lib/api/types/defects";
@@ -30,17 +30,35 @@ vi.mock("../../../_defect_hub/DefectItemPicker", () => ({
             mes_code: "MOCK-001",
             quantity: 10,
             has_bom: true,
+            process_type_code: "TR",
           })
         }
       >
         mock add
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          onAdd?.({
+            item_id: "mock-item-2",
+            item_name: "Mock second item",
+            mes_code: "MOCK-002",
+            quantity: 10,
+            has_bom: false,
+            process_type_code: "AF",
+          })
+        }
+      >
+        mock add second
       </button>
     </div>
   ),
 }));
 
 vi.mock("../../../_defect_hub/ReasonFormFields", () => ({
-  ReasonFormFields: () => <div data-testid="reason-form-fields" />,
+  ReasonFormFields: ({ onCategoryChange }: { onCategoryChange: (category: string) => void }) => (
+    <button type="button" onClick={() => onCategoryChange("기타")}>사유 선택</button>
+  ),
 }));
 
 vi.mock("@/lib/api/defects", () => ({
@@ -85,6 +103,10 @@ const location: DefectLocation = {
   has_bom: true,
 };
 
+beforeEach(() => {
+  window.history.replaceState({}, "");
+});
+
 describe("mobile defect compact headers", () => {
   it("keeps the direct action cards flush with the flow bottom for the common shell gap", () => {
     render(
@@ -122,6 +144,116 @@ describe("mobile defect compact headers", () => {
     fireEvent.click(container.querySelectorAll("button")[1]);
 
     expect(screen.getByText("STEP 1 / 2")).toBeInTheDocument();
+  });
+
+  it("opens rework directly at the item picker without a department source step", () => {
+    render(
+      <MobileDefectCartFlow
+        mode="scrap"
+        items={[item]}
+        productModels={[]}
+        currentEmployee={employee}
+        onDone={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /재작업/ }));
+
+    expect(screen.getByTestId("defect-item-picker")).toBeInTheDocument();
+    expect(screen.getByText("STEP 2 / 3")).toBeInTheDocument();
+    expect(screen.queryByText("출처·격리 부서")).not.toBeInTheDocument();
+  });
+
+  it("역할 기본값이 전달되어도 모바일 격리는 생산 출처로 시작한다", () => {
+    const legacySource = { defaultSource: "warehouse" } as unknown as Record<string, never>;
+    render(
+      <MobileDefectCartFlow {...legacySource} mode="add" items={[{ ...item, warehouse_qty: 0 }]} productModels={[]} currentEmployee={employee} onDone={() => {}} onCancel={() => {}} />,
+    );
+
+    expect(screen.getByRole("button", { name: /부서 재고/ })).toHaveStyle({ borderWidth: "2px" });
+  });
+
+  it("모바일 최종 격리 확인에 두 품목의 수량·관리 분류·자동 부서를 각각 표시한다", async () => {
+    render(
+      <MobileDefectCartFlow mode="add" items={[item]} productModels={[]} currentEmployee={employee} onDone={() => {}} onCancel={() => {}} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /다음/ }));
+    fireEvent.click(screen.getByRole("button", { name: "mock add" }));
+    fireEvent.click(screen.getByRole("button", { name: "mock add second" }));
+    const quantities = screen.getAllByRole("spinbutton");
+    fireEvent.change(quantities[0], { target: { value: "3" } });
+    fireEvent.change(quantities[1], { target: { value: "8" } });
+    const classifications = screen.getAllByRole("group", { name: "보관 분류" });
+    fireEvent.click(within(classifications[0]).getByRole("button", { name: "B급" }));
+    fireEvent.click(within(classifications[1]).getByRole("button", { name: "구형" }));
+    fireEvent.click(screen.getByRole("button", { name: /격리하기 \(2건\)/ }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("Mock item · 수량 3 · 관리 분류 B급 · 자동 부서 · 튜브");
+    expect(dialog).toHaveTextContent("Mock second item · 수량 8 · 관리 분류 구형 · 자동 부서 · 조립");
+  });
+
+  it("모바일 즉시 폐기 확인에는 관리 분류 없이 수량과 자동 부서만 표시한다", async () => {
+    render(
+      <MobileDefectCartFlow mode="scrap" items={[item]} productModels={[]} currentEmployee={employee} onDone={() => {}} onCancel={() => {}} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^폐기/ }));
+    fireEvent.click(screen.getByRole("button", { name: /다음/ }));
+    fireEvent.click(screen.getByRole("button", { name: "mock add" }));
+    fireEvent.click(screen.getByRole("button", { name: /즉시 폐기 \(1건\)/ }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("Mock item · 수량 1 · 자동 부서 · 튜브");
+    expect(dialog).not.toHaveTextContent("관리 분류");
+  });
+
+  it("모바일 즉시 재작업 확인에는 관리 분류 없이 수량과 자동 부서만 표시한다", async () => {
+    render(
+      <MobileDefectCartFlow mode="scrap" items={[item]} productModels={[]} currentEmployee={employee} onDone={() => {}} onCancel={() => {}} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^재작업/ }));
+    fireEvent.click(screen.getByRole("button", { name: "mock add" }));
+    fireEvent.click(screen.getByRole("button", { name: "사유 선택" }));
+    fireEvent.click(screen.getByRole("button", { name: /BOM 확인/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "set tree decision" }));
+    fireEvent.click(screen.getByRole("button", { name: /즉시 재작업 \(1건\)/ }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("Mock item · 수량 1 · 자동 부서 · 튜브");
+    expect(dialog).not.toHaveTextContent("관리 분류");
+  });
+
+  it("restores direct action selection instead of the removed department step on browser back", () => {
+    render(
+      <MobileDefectCartFlow
+        mode="scrap"
+        items={[item]}
+        productModels={[]}
+        currentEmployee={employee}
+        onDone={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^폐기/ }));
+    fireEvent.click(screen.getByRole("button", { name: /다음/ }));
+    fireEvent(window, new PopStateEvent("popstate", { state: { defect: "cart", mode: "scrap", step: 1 } }));
+
+    expect(screen.getByRole("heading", { name: "바로 처리" })).toBeInTheDocument();
+  });
+
+  it("restores a rework BOM history entry to the rework item picker when its cart line is unavailable", () => {
+    window.history.replaceState({ defect: "cart", mode: "scrap", directAction: "rework", source: "production", step: 3 }, "");
+    render(
+      <MobileDefectCartFlow mode="scrap" items={[item]} productModels={[]} currentEmployee={employee} onDone={() => {}} onCancel={() => {}} />,
+    );
+
+    expect(screen.getByTestId("defect-item-picker")).toBeInTheDocument();
+    expect(window.history.state).toMatchObject({ directAction: "rework", source: "production", step: 2 });
   });
 
   it("uses a compact process header on the BOM confirmation step", () => {

@@ -26,6 +26,8 @@ from app.database import get_db
 from app.models import (
     BOM,
     DepartmentEnum,
+    DefectManagementCategoryEnum,
+    DefectQuarantineManagementCategoryRevision,
     DefectQuarantineMemoRevision,
     DefectQuarantineRecord,
     DefectQuarantineReconstruction,
@@ -79,6 +81,7 @@ class DefectLocationItem(BaseModel):
     legacy_origin: Optional[Literal["aggregate", "reconstructed"]] = None
     # BOM 자식 보유 여부. 프론트 격리 처리 액션에서 "재작업" 옵션 노출 조건.
     has_bom: bool = False
+    management_category: str = DefectManagementCategoryEnum.DEFECT.value
 
 
 class DefectKpi(BaseModel):
@@ -94,6 +97,7 @@ class QuarantineRequest(BaseModel):
     target_dept: str
     reason_category: Optional[str] = None
     reason_memo: str
+    management_category: Literal["DEFECT", "B_GRADE", "OBSOLETE"] = "DEFECT"
     actor_employee_id: uuid.UUID
     client_request_id: Optional[str] = None
 
@@ -155,6 +159,29 @@ class DefectMemoRevisionItem(BaseModel):
     is_initial: bool
 
 
+class DefectManagementCategoryUpdateRequest(BaseModel):
+    management_category: Literal["DEFECT", "B_GRADE", "OBSOLETE"]
+    expected_management_category: Literal["DEFECT", "B_GRADE", "OBSOLETE"]
+    memo: Optional[str] = None
+    actor_employee_id: uuid.UUID
+    pin: str
+
+
+class DefectManagementCategoryUpdateResult(BaseModel):
+    management_category: str
+
+
+class DefectManagementCategoryRevisionItem(BaseModel):
+    revision_id: uuid.UUID
+    previous_category: Optional[str]
+    next_category: str
+    memo: Optional[str]
+    edited_by_employee_id: Optional[uuid.UUID]
+    edited_by_name: str
+    edited_at: datetime
+    is_initial: bool
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -197,8 +224,28 @@ def _sum_inventory_effect(
     return total
 
 
-def _matches_quarantine_request(log: TransactionLog, payload: QuarantineRequest) -> bool:
+def _matches_quarantine_request(
+    db: Session, log: TransactionLog, payload: QuarantineRequest
+) -> bool:
     """멱등 키가 같은 격리 로그가 현재 요청과 같은 업무 명령인지 검증한다."""
+    current_category = DefectManagementCategoryEnum.DEFECT.value
+    if log.defect_quarantine_record_id is not None:
+        record = db.get(DefectQuarantineRecord, log.defect_quarantine_record_id)
+        if record is None:
+            return False
+        initial_category = (
+            db.query(DefectQuarantineManagementCategoryRevision.next_category)
+            .filter(
+                DefectQuarantineManagementCategoryRevision.record_id == record.record_id,
+                DefectQuarantineManagementCategoryRevision.is_initial.is_(True),
+            )
+            .order_by(
+                DefectQuarantineManagementCategoryRevision.edited_at.asc(),
+                DefectQuarantineManagementCategoryRevision.revision_id.asc(),
+            )
+            .scalar()
+        )
+        current_category = initial_category or current_category
     if (
         log.transaction_type != TransactionTypeEnum.MARK_DEFECTIVE
         or log.item_id != payload.item_id
@@ -206,6 +253,7 @@ def _matches_quarantine_request(log: TransactionLog, payload: QuarantineRequest)
         or log.producer_employee_id != payload.actor_employee_id
         or log.reason_category != payload.reason_category
         or (log.reason_memo or "") != (payload.reason_memo or "")
+        or current_category != payload.management_category
     ):
         return False
 
@@ -249,6 +297,7 @@ def _find_client_request_log(db: Session, client_request_id: str) -> Optional[Tr
 @router.get("/locations", response_model=List[DefectLocationItem])
 def list_defect_locations(
     department: Optional[str] = Query(None, description="부서 필터 (없으면 전체)"),
+    management_category: Optional[Literal["DEFECT", "B_GRADE", "OBSOLETE"]] = Query(None),
     db: Session = Depends(get_db),
 ):
     """남은 수량이 있는 격리 기록을 격리 건 단위로 반환한다."""
@@ -259,6 +308,8 @@ def list_defect_locations(
     )
     if department:
         q = q.filter(DefectQuarantineRecord.department == department)
+    if management_category:
+        q = q.filter(DefectQuarantineRecord.management_category == management_category)
 
     record_rows = q.order_by(DefectQuarantineRecord.quarantined_at.asc()).all()
     record_ids = [record.record_id for record, _ in record_rows]
@@ -292,9 +343,13 @@ def list_defect_locations(
 
     # 배포 중 마이그레이션 전 상태나 오래된 테스트 데이터처럼 격리 위치만 있고
     # 건별 원장이 없는 경우에도 조회가 끊기지 않도록 읽기 전용 기존 합산 행을 제공한다.
-    covered_pairs = {
-        (record.item_id, str(record.department)) for record, _ in record_rows
-    }
+    covered_q = db.query(
+        DefectQuarantineRecord.item_id,
+        DefectQuarantineRecord.department,
+    ).filter(DefectQuarantineRecord.remaining_quantity > 0)
+    if department:
+        covered_q = covered_q.filter(DefectQuarantineRecord.department == department)
+    covered_pairs = {(item_id, str(record_department)) for item_id, record_department in covered_q.all()}
     location_q = (
         db.query(InventoryLocation, Item)
         .join(Item, Item.item_id == InventoryLocation.item_id)
@@ -305,6 +360,8 @@ def list_defect_locations(
     )
     if department:
         location_q = location_q.filter(InventoryLocation.department == department)
+    if management_category and management_category != DefectManagementCategoryEnum.DEFECT.value:
+        location_q = location_q.filter(False)
     fallback_rows = [
         (location, item)
         for location, item in location_q.all()
@@ -366,6 +423,7 @@ def list_defect_locations(
                     else ("aggregate" if record.is_legacy else None)
                 ),
                 has_bom=item.item_id in bom_items,
+                management_category=(record.management_category or DefectManagementCategoryEnum.DEFECT.value),
             )
         )
 
@@ -395,6 +453,7 @@ def list_defect_locations(
                 is_legacy=True,
                 legacy_origin="aggregate",
                 has_bom=item.item_id in bom_items,
+                management_category=DefectManagementCategoryEnum.DEFECT.value,
             )
         )
     return result
@@ -406,7 +465,10 @@ def list_defect_locations(
 
 
 @router.get("/kpi", response_model=DefectKpi)
-def get_defect_kpi(db: Session = Depends(get_db)):
+def get_defect_kpi(
+    management_category: Optional[Literal["DEFECT", "B_GRADE", "OBSOLETE"]] = Query(None),
+    db: Session = Depends(get_db),
+):
     """KPI 카드 2개:
     - quarantined: 남은 수량이 있는 격리 기록 수
     - over_one_year: 격리 시각이 365일을 넘긴 활성 기록 수
@@ -414,24 +476,13 @@ def get_defect_kpi(db: Session = Depends(get_db)):
     now = datetime.utcnow()
     one_year_ago = now - timedelta(days=365)
 
-    quarantined = (
-        db.query(func.count(DefectQuarantineRecord.record_id))
-        .filter(
-            DefectQuarantineRecord.remaining_quantity > 0,
-        )
-        .scalar()
-        or 0
-    )
-
-    over_one_year = (
-        db.query(func.count(DefectQuarantineRecord.record_id))
-        .filter(
-            DefectQuarantineRecord.remaining_quantity > 0,
-            DefectQuarantineRecord.quarantined_at <= one_year_ago,
-        )
-        .scalar()
-        or 0
-    )
+    filters = [DefectQuarantineRecord.remaining_quantity > 0]
+    if management_category:
+        filters.append(DefectQuarantineRecord.management_category == management_category)
+    quarantined = db.query(func.count(DefectQuarantineRecord.record_id)).filter(*filters).scalar() or 0
+    over_one_year = db.query(func.count(DefectQuarantineRecord.record_id)).filter(
+        *filters, DefectQuarantineRecord.quarantined_at <= one_year_ago,
+    ).scalar() or 0
 
     return DefectKpi(
         quarantined=quarantined,
@@ -554,6 +605,92 @@ def update_defect_memo(
     return DefectMemoUpdateResult(memo=payload.memo, changed=True)
 
 
+@router.get(
+    "/records/{record_id}/management-category-history",
+    response_model=List[DefectManagementCategoryRevisionItem],
+)
+def get_management_category_history(
+    record_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    """최초 격리부터 현재까지 관리 분류 이력을 시간순으로 반환한다."""
+    record = db.get(DefectQuarantineRecord, record_id)
+    if record is None:
+        raise http_error(404, ErrorCode.NOT_FOUND, "격리 기록을 찾을 수 없습니다.")
+    return (
+        db.query(DefectQuarantineManagementCategoryRevision)
+        .filter(DefectQuarantineManagementCategoryRevision.record_id == record.record_id)
+        .order_by(
+            DefectQuarantineManagementCategoryRevision.edited_at.asc(),
+            DefectQuarantineManagementCategoryRevision.revision_id.asc(),
+        )
+        .all()
+    )
+
+
+@router.put(
+    "/records/{record_id}/management-category",
+    response_model=DefectManagementCategoryUpdateResult,
+)
+def update_management_category(
+    record_id: uuid.UUID,
+    payload: DefectManagementCategoryUpdateRequest,
+    http_request: Request,
+    db: Session = Depends(get_db),
+):
+    """PIN 확인 뒤, 처리 대기 없는 활성 격리 원장의 관리 분류만 변경한다."""
+    record = db.get(DefectQuarantineRecord, record_id)
+    if record is None:
+        raise http_error(404, ErrorCode.NOT_FOUND, "격리 기록을 찾을 수 없습니다.")
+    if Decimal(str(record.remaining_quantity or 0)) <= 0:
+        raise http_error(422, ErrorCode.VALIDATION_ERROR, "처리 완료된 격리 기록은 관리 분류를 변경할 수 없습니다.")
+    pending = (
+        db.query(func.coalesce(func.sum(StockRequestLine.quantity), 0))
+        .filter(
+            StockRequestLine.defect_quarantine_record_id == record.record_id,
+            StockRequestLine.status == StockRequestStatusEnum.RESERVED,
+        )
+        .scalar()
+        or 0
+    )
+    if Decimal(str(pending)) > 0:
+        raise http_error(422, ErrorCode.VALIDATION_ERROR, "처리 대기 중인 격리 기록은 관리 분류를 변경할 수 없습니다.")
+    current_category = record.management_category or DefectManagementCategoryEnum.DEFECT.value
+    if current_category != payload.expected_management_category:
+        raise http_error(409, ErrorCode.CONFLICT, "관리 분류가 변경되었습니다. 목록을 새로고침해 주세요.")
+
+    actor = db.get(Employee, payload.actor_employee_id)
+    if actor is None:
+        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    if not bool(actor.is_active):
+        raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원입니다.")
+    validate_pin(payload.pin)
+    client_ip = getattr(getattr(http_request, "client", None), "host", None) or "unknown"
+    rate_limit_key = f"verify_pin:{actor.employee_id}:{client_ip}"
+    if rate_limit.is_blocked(rate_limit_key):
+        raise http_error(429, ErrorCode.TOO_MANY_REQUESTS, "PIN 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.")
+    if not verify_pin(actor.pin_hash, payload.pin):
+        rate_limit.record_failure(rate_limit_key)
+        raise http_error(403, ErrorCode.FORBIDDEN, "PIN이 올바르지 않습니다.")
+    rate_limit.record_success(rate_limit_key)
+    set_actor(http_request, actor)
+
+    if current_category != payload.management_category:
+        record.management_category = payload.management_category
+        db.add(DefectQuarantineManagementCategoryRevision(
+            record_id=record.record_id,
+            previous_category=current_category,
+            next_category=payload.management_category,
+            memo=payload.memo,
+            edited_by_employee_id=actor.employee_id,
+            edited_by_name=actor.name,
+            is_initial=False,
+        ))
+        db.commit()
+        _evt_emit("defect_management_category_change", request=http_request, record_id=str(record.record_id))
+    return DefectManagementCategoryUpdateResult(management_category=record.management_category)
+
+
 # ---------------------------------------------------------------------------
 # POST /api/defects/quarantine
 # ---------------------------------------------------------------------------
@@ -566,7 +703,7 @@ def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = 
     if payload.client_request_id:
         existing = _find_client_request_log(db, payload.client_request_id)
         if existing:
-            if _matches_quarantine_request(existing, payload):
+            if _matches_quarantine_request(db, existing, payload):
                 return DefectActionResult(item_id=payload.item_id, quantity=payload.qty, message="격리 완료")
             raise http_error(409, ErrorCode.CONFLICT, "이미 다른 요청에 사용된 요청 식별자입니다.")
 
@@ -597,6 +734,7 @@ def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = 
             reason_category=payload.reason_category,
             reason_memo=payload.reason_memo,
             client_request_id=payload.client_request_id,
+            management_category=payload.management_category,
         )
     except ValueError as exc:
         raise http_error(422, ErrorCode.VALIDATION_ERROR, str(exc))
@@ -606,7 +744,7 @@ def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = 
             # 식별 맵을 비우고 경합 승자의 커밋 결과를 새로 확인한다.
             db.expire_all()
             existing = _find_client_request_log(db, payload.client_request_id)
-            if existing is not None and _matches_quarantine_request(existing, payload):
+            if existing is not None and _matches_quarantine_request(db, existing, payload):
                 return DefectActionResult(item_id=payload.item_id, quantity=payload.qty, message="격리 완료")
         raise http_error(409, ErrorCode.CONFLICT, "격리 처리 중 충돌이 발생했습니다.")
     _evt_emit(

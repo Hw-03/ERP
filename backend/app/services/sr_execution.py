@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.database import _is_sqlite
 from app.models import (
+    DepartmentEnum,
     DefectQuarantineRecord,
     Employee,
     Item,
@@ -28,7 +29,7 @@ from app.services import inventory as inventory_svc
 from app.services import inv_effect
 from app.services import inventory_operations as operation_svc
 from app.services.dept_hierarchy import can_approve_department
-from app.services.inv_transfer import department_for_item
+from app.services.inv_transfer import department_for_item, lock_items_for_department_routing
 from app.services.sr_validation import (
     _TX_TYPE_BY_REQUEST,
     requires_exact_defect_selection,
@@ -111,6 +112,24 @@ _DEFAULT_REASON_CATEGORY = "기타"  # reason_category 미지정 시 폐기/반�
 def _source_from_bucket(line: StockRequestLine) -> str:
     """from_bucket 이 창고면 'warehouse', 그 외(생산)면 'production'."""
     return "warehouse" if line.from_bucket == RequestBucketEnum.WAREHOUSE else "production"
+
+
+def _normal_source_from_current_item(
+    db: Session, line: StockRequestLine, item_id: uuid.UUID
+) -> tuple[str, DepartmentEnum]:
+    """정상 폐기·재작업 실행은 저장된 부서 대신 현재 품목코드 부서를 사용한다."""
+    item = lock_items_for_department_routing(db, [item_id]).get(item_id)
+    if item is None:
+        raise ValueError(f"품목을 찾을 수 없습니다: {item_id}")
+    if line.from_bucket == RequestBucketEnum.WAREHOUSE:
+        if line.from_department is not None:
+            raise ValueError("창고 출처 정상 처리에는 from_department 를 지정할 수 없습니다.")
+        return "warehouse", DepartmentEnum.WAREHOUSE
+    if line.from_bucket == RequestBucketEnum.PRODUCTION:
+        department = department_for_item(item)
+        line.from_department = department.value
+        return "production", department
+    raise ValueError("정상 처리 원본은 창고 또는 생산부서만 허용됩니다.")
 
 
 def _handle_raw_receive(db, request, line, approver, qty, item_id) -> Decimal:
@@ -241,10 +260,10 @@ def _handle_defect_return(db, request, line, approver, qty, item_id) -> Decimal:
 
 def _handle_scrap_normal(db, request, line, approver, qty, item_id) -> Decimal:
     # R 정상 재고 바로 폐기 — 격리 미경유. 창고면 warehouse, 부서면 PRODUCTION 차감.
-    source = _source_from_bucket(line)
+    source, source_dept = _normal_source_from_current_item(db, line, item_id)
     inventory_svc.scrap_normal(
         db, item_id, qty,
-        inventory_svc.NormalSource(kind=source, dept_or_warehouse=line.from_department),
+        inventory_svc.NormalSource(kind=source, dept_or_warehouse=source_dept),
         inventory_svc.ReasonContext(
             category=request.reason_category or _DEFAULT_REASON_CATEGORY,
             memo=request.reason_memo or (request.notes or ""),
@@ -324,6 +343,35 @@ def _request_inventory_item_ids(
     return sorted(item_ids)
 
 
+def _request_department_routing_item_ids(
+    db: Session,
+    request: StockRequest,
+    lines: Iterable[StockRequestLine],
+) -> list[uuid.UUID]:
+    """재작업의 부모·결정 트리 전체를 Item 잠금 대상으로 모은다.
+
+    재고 미반영 BOM 자식도 공정코드 부서 산정 대상이므로 Inventory 잠금 목록과
+    분리한다. 유효하지 않은 결정은 이후 재작업 서비스가 거절하며 여기서는 부모
+    라인만 잠근다.
+    """
+    lines = list(lines)
+    item_ids = {line.item_id for line in lines}
+    if request.request_type not in {
+        StockRequestTypeEnum.REWORK_NORMAL,
+        StockRequestTypeEnum.DEFECT_DISASSEMBLE,
+    }:
+        return sorted(item_ids)
+    try:
+        child_decisions = _child_decisions_from_notes(request)
+        from app.services.dept_adjustment import rework_inventory_item_ids
+
+        for line in lines:
+            item_ids.update(rework_inventory_item_ids(line.item_id, child_decisions))
+    except (KeyError, TypeError, ValueError):
+        pass
+    return sorted(item_ids)
+
+
 def _handle_defect_disassemble(
     db,
     request,
@@ -368,10 +416,7 @@ def _handle_rework_normal(
 ) -> Decimal:
     from app.services.dept_adjustment import submit_normal_disassemble
 
-    source = _source_from_bucket(line)
-    if source == "production" and line.from_department is None:
-        raise ValueError("정상 재고 바로 재작업에는 from_department 가 필요합니다.")
-    source_dept = line.from_department or approver.department
+    source, source_dept = _normal_source_from_current_item(db, line, item_id)
     child_decisions = _child_decisions_from_notes(request)
     if not child_decisions:
         raise ValueError("재작업 자식 결정이 비어 있습니다.")
@@ -440,6 +485,12 @@ def _execute_line(
             department=line.from_department,
         )
         if record is not None:
+            if request.request_type in {
+                StockRequestTypeEnum.DEFECT_SCRAP,
+                StockRequestTypeEnum.DEFECT_RETURN,
+                StockRequestTypeEnum.DEFECT_DISASSEMBLE,
+            }:
+                defect_records_svc.ensure_defect_management_category(record)
             defect_records_svc.ensure_available(
                 db,
                 record,
@@ -607,6 +658,22 @@ def _execute_all_lines(
     is_approval: bool = False,
 ) -> None:
     lines = list(lines)
+    rework_request = request.request_type in {
+        StockRequestTypeEnum.REWORK_NORMAL,
+        StockRequestTypeEnum.DEFECT_DISASSEMBLE,
+    }
+    touched_inventory_item_ids = None
+    if rework_request:
+        # 모든 공정코드 판독 전, 부모와 결정 트리의 자식을 Item 순서로 잠근다.
+        # 이후 Inventory 잠금도 같은 요청의 전역 순서로 수행해 교착을 피한다.
+        lock_items_for_department_routing(
+            db,
+            _request_department_routing_item_ids(db, request, lines),
+        )
+        touched_inventory_item_ids = _request_inventory_item_ids(db, request, lines)
+    elif request.request_type == StockRequestTypeEnum.SCRAP_NORMAL:
+        # 개별 handler가 부서를 읽기 전에 모든 대상 Item을 전역 순서로 선잠금한다.
+        lock_items_for_department_routing(db, (line.item_id for line in lines))
     if requires_exact_defect_selection(
         request.request_type,
         len(lines),
@@ -632,6 +699,7 @@ def _execute_all_lines(
             )
             if record is None:
                 raise ValueError("선택한 격리 기록을 찾을 수 없습니다.")
+            defect_records_svc.ensure_defect_management_category(record)
             defect_records_svc.ensure_available(
                 db,
                 record,
@@ -647,7 +715,7 @@ def _execute_all_lines(
     if uses_multi_defect_sources and not _is_sqlite:
         inventory_svc.ensure_and_lock_inventories(
             db,
-            _request_inventory_item_ids(db, request, lines),
+            touched_inventory_item_ids or _request_inventory_item_ids(db, request, lines),
         )
     defect_disassemble_sources = (
         _prepare_defect_disassemble_sources(db, lines)
@@ -667,7 +735,11 @@ def _execute_all_lines(
     )
     # 정렬된 순서로 모든 아이템 선락 → 교착 방지 (PostgreSQL only; SQLite는 WAL 직렬화)
     if not _is_sqlite and not uses_multi_defect_sources:
-        all_item_ids = _request_inventory_item_ids(db, request, lines)
+        all_item_ids = touched_inventory_item_ids or _request_inventory_item_ids(
+            db,
+            request,
+            lines,
+        )
         inventory_svc.ensure_and_lock_inventories(db, all_item_ids)
     if defect_disassemble_sources is not None:
         _execute_defect_disassemble_sources(
@@ -731,6 +803,7 @@ def _prepare_defect_disassemble_sources(
         )
         if record is None:
             raise ValueError("선택한 격리 기록을 찾을 수 없습니다.")
+        defect_records_svc.ensure_defect_management_category(record)
         defect_records_svc.ensure_available(
             db,
             record,

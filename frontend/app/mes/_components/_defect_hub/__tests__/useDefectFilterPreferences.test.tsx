@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { migrateDefectFilterSnapshot, useDefectFilterPreferences } from "../useDefectFilterPreferences";
 
 const storageKey = (employeeId: string) => `dexcowin_mes_defect_filters:${employeeId}`;
+const storageViewKey = (employeeId: string) => `dexcowin_mes_defect_storage_filters:${employeeId}`;
 
 describe("useDefectFilterPreferences", () => {
   it("drops removed unclassified selections while preserving other saved filters", () => {
@@ -25,6 +26,21 @@ describe("useDefectFilterPreferences", () => {
     expect(result.current.actorScope).toBe("all");
     expect(result.current.sort).toBe("newest");
     expect(result.current.filterLocked).toBe(false);
+  });
+
+  it("keeps storage screen locks in a separate key from the regular quarantine list", () => {
+    const { result } = renderHook(() =>
+      useDefectFilterPreferences({
+        employeeId: "employee-1",
+        defaultScope: "all",
+        defaultSort: "newest",
+        storageScope: "storage",
+      }),
+    );
+
+    act(() => result.current.setFilterLocked(true));
+    expect(window.localStorage.getItem(storageKey("employee-1"))).toBeNull();
+    expect(window.localStorage.getItem(storageViewKey("employee-1"))).not.toBeNull();
   });
 
   it("shows the current department as selected when the unlocked default scope is my", () => {

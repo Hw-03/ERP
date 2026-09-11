@@ -38,6 +38,21 @@ const location: DefectLocation = {
 };
 
 describe("DefectProcessPanel normal recovery", () => {
+  it("restoreOnly 모드에서는 정상 복귀 외의 처리 선택을 노출하지 않는다", () => {
+    render(
+      <DefectProcessPanel
+        location={{ ...location, has_bom: true, department: "창고" }}
+        restoreOnly
+        currentEmployee={{ employee_id: "emp-1", name: "Kim", department: "Assembly" }}
+        onDone={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+
+    expect(screen.getAllByRole("button", { name: /정상 복귀/ })).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: /재작업|전체 폐기|반품/ })).not.toBeInTheDocument();
+  });
+
   it("opens confirmation before invoking unquarantine and invokes it once after confirmation", async () => {
     vi.mocked(defectsApi.unquarantine).mockResolvedValueOnce(undefined);
     const onDone = vi.fn();

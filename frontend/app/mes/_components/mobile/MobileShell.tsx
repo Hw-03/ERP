@@ -251,6 +251,10 @@ export function MobileShell({
     const target = canOpenMobileTab(tab) ? tab : fallbackTab;
     if (!canOpenMobileTab(target)) return;
     if (target === activeTab) {
+      if (target === "defect") {
+        window.history.replaceState({ defect: "hub" }, "");
+        setDefectDeptFilter(null);
+      }
       setRefreshNonce((n) => n + 1);
       return;
     }

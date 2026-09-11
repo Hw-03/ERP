@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render as rtlRender, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render as rtlRender, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { DefectCartFlow } from "../DefectCartFlow";
@@ -71,6 +71,7 @@ function selectReasonCategory(label = "기타") {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  window.history.replaceState({}, "");
   vi.mocked(defectsApi.quarantine).mockResolvedValue(undefined);
   vi.mocked(stockRequestsApi.createStockRequest).mockResolvedValue(undefined as never);
   vi.mocked(deptAdjustmentApi.getBomTemplate).mockResolvedValue({
@@ -101,7 +102,7 @@ describe("DefectCartFlow", () => {
     expect(screen.getByText("완제품")).toBeInTheDocument();
   });
 
-  it("Step 2에서 진입 부서를 헤더 메타로 보여주고 아이템 피커 배지는 숨긴다", () => {
+  it("출처 선택은 기본 생산으로 같은 크기의 부서·창고 재고 카드만 보여준다", () => {
     render(
       <DefectCartFlow
         mode="add"
@@ -113,13 +114,88 @@ describe("DefectCartFlow", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /다음/ }));
+    expect(screen.getAllByText("출처 선택")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: /부서 재고/ })).toHaveClass("h-full");
+    expect(screen.getByRole("button", { name: /창고 재고/ })).toHaveClass("h-full");
+    expect(screen.getByRole("button", { name: /부서 재고/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /창고 재고/ })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByText("출처·격리 부서")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "조립" })).not.toBeInTheDocument();
+  });
 
-    const entryMeta = screen.getByTestId("defect-entry-meta");
-    expect(entryMeta).toHaveTextContent(`진입 부서 · ${employee.department}`);
-    expect(entryMeta.tagName).toBe("SPAN");
-    expect(screen.queryByTestId("defect-locked-dept")).not.toBeInTheDocument();
-    expect(screen.getAllByRole("combobox")).toHaveLength(2);
+  it("이전 역할 기반 defaultSource가 전달되어도 생산 출처로 시작한다", () => {
+    const legacySource = { defaultSource: "warehouse" } as unknown as Record<string, never>;
+    const productionOnly = { ...rItem, item_id: "production-only", item_name: "생산 전용", warehouse_qty: 0 };
+    render(
+      <DefectCartFlow
+        {...legacySource}
+        mode="add"
+        items={[productionOnly]}
+        productModels={productModels}
+        currentEmployee={employee}
+        onDone={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /다음/ }));
+    expect(screen.getByText("생산 전용")).toBeInTheDocument();
+  });
+
+  it("생산 격리는 품목 공정 코드의 자동 부서를 payload와 장바구니에 쓴다", async () => {
+    const tubeItem = { ...rItem, item_id: "t-1", item_name: "튜브 원자재", process_type_code: "TR" };
+    render(
+      <DefectCartFlow
+        mode="add"
+        items={[tubeItem, fItem]}
+        productModels={productModels}
+        currentEmployee={employee}
+        onDone={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /다음/ }));
+    fireEvent.click(screen.getByRole("button", { name: "완제품 장바구니에 추가" }));
+    fireEvent.click(screen.getByRole("button", { name: "튜브 원자재 장바구니에 추가" }));
+
+    expect(screen.getAllByText("자동 부서 · 조립").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("자동 부서 · 튜브").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: /격리하기/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "격리하기" }));
+
+    await waitFor(() => {
+      expect(defectsApi.quarantine).toHaveBeenCalledWith(expect.objectContaining({
+        item_id: "f-1",
+        source_dept: "조립",
+        target_dept: "조립",
+      }));
+      expect(defectsApi.quarantine).toHaveBeenCalledWith(expect.objectContaining({
+        item_id: "t-1",
+        source_dept: "튜브",
+        target_dept: "튜브",
+      }));
+    });
+  });
+
+  it("바로 재작업은 출처 단계를 건너뛰고 품목 선택으로 연다", () => {
+    render(
+      <DefectCartFlow
+        mode="scrap"
+        items={[{ ...fItem, has_bom: true }]}
+        productModels={productModels}
+        currentEmployee={employee}
+        onDone={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^재작업/ }));
+
+    expect(screen.getByText("완제품")).toBeInTheDocument();
+    expect(screen.queryByText("출처 선택")).not.toBeInTheDocument();
+    expect(screen.getByTestId("defect-flow-stepper")).toHaveTextContent("1작업 선택2품목 선택3BOM 확인");
   });
 
   it("품목을 추가하면 Check 기반 담김 상태와 선택 행 강조를 보여준다", () => {
@@ -161,7 +237,6 @@ describe("DefectCartFlow", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: /^재작업/ }));
-    fireEvent.click(screen.getByRole("button", { name: /다음/ }));
 
     const stepper = screen.getByTestId("defect-flow-stepper");
     const stepGrid = screen.getByTestId("defect-step2-grid");
@@ -203,6 +278,9 @@ describe("DefectCartFlow", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "즉시 폐기" })).toBeInTheDocument();
     });
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent("원자재 · 수량 2 · 자동 부서 · 조립");
+    expect(dialog).not.toHaveTextContent("관리 분류");
     fireEvent.click(screen.getByRole("button", { name: "즉시 폐기" }));
 
     await waitFor(() => {
@@ -223,6 +301,53 @@ describe("DefectCartFlow", () => {
     });
   });
 
+  it("격리 등록은 줄의 B급 분류를 quarantine payload로 보낸다", async () => {
+    render(
+      <DefectCartFlow
+        mode="add"
+        items={[rItem]}
+        productModels={productModels}
+        currentEmployee={employee}
+        onDone={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /다음/ }));
+    fireEvent.click(screen.getByRole("button", { name: /추가/ }));
+    fireEvent.click(screen.getByRole("button", { name: "B급" }));
+    fireEvent.click(screen.getByRole("button", { name: /격리하기/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "격리하기" }));
+
+    await waitFor(() => {
+      expect(defectsApi.quarantine).toHaveBeenCalledWith(expect.objectContaining({
+        management_category: "B_GRADE",
+      }));
+    });
+  });
+
+  it("최종 격리 확인에 두 품목의 수량·관리 분류·자동 부서를 각각 표시한다", async () => {
+    const tubeItem = { ...rItem, item_id: "confirm-tube", item_name: "확인 튜브", process_type_code: "TR" };
+    render(
+      <DefectCartFlow mode="add" items={[fItem, tubeItem]} productModels={productModels} currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /다음/ }));
+    fireEvent.click(screen.getByRole("button", { name: "완제품 장바구니에 추가" }));
+    fireEvent.click(screen.getByRole("button", { name: "확인 튜브 장바구니에 추가" }));
+    const quantities = screen.getAllByPlaceholderText(/예: 3/);
+    fireEvent.change(quantities[0], { target: { value: "2" } });
+    fireEvent.change(quantities[1], { target: { value: "7" } });
+    const classifications = screen.getAllByRole("group", { name: "보관 분류" });
+    fireEvent.click(within(classifications[0]).getByRole("button", { name: "B급" }));
+    fireEvent.click(within(classifications[1]).getByRole("button", { name: "구형" }));
+    fireEvent.click(screen.getByRole("button", { name: /격리하기 \(2건\)/ }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("완제품 · 수량 2 · 관리 분류 B급 · 자동 부서 · 조립");
+    expect(dialog).toHaveTextContent("확인 튜브 · 수량 7 · 관리 분류 구형 · 자동 부서 · 튜브");
+  });
+
 
   it("바로 재작업 품목 선택에는 has_bom=true 품목만 보여준다", () => {
     render(
@@ -237,7 +362,6 @@ describe("DefectCartFlow", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: /^재작업/ }));
-    fireEvent.click(screen.getByRole("button", { name: /다음/ }));
 
     expect(screen.getByText("완제품")).toBeInTheDocument();
     expect(screen.queryByText("BOM 없는 조립품")).not.toBeInTheDocument();
@@ -256,7 +380,6 @@ describe("DefectCartFlow", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: /^재작업/ }));
-    fireEvent.click(screen.getByRole("button", { name: /다음/ }));
 
     expect(screen.queryByText("원자재")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /추가/ }));
@@ -270,6 +393,9 @@ describe("DefectCartFlow", () => {
     expect(screen.getByLabelText("하위 품목 정상 수량")).toHaveValue(1);
 
     fireEvent.click(screen.getByRole("button", { name: /즉시 재작업/ }));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("완제품 · 수량 1 · 자동 부서 · 조립");
+    expect(dialog).not.toHaveTextContent("관리 분류");
     fireEvent.click(await screen.findByRole("button", { name: "즉시 재작업" }));
 
     await waitFor(() => {
@@ -289,7 +415,7 @@ describe("DefectCartFlow", () => {
     });
     expect(onDone).toHaveBeenCalledWith("rework");
   });
-  it("browser history forward restores Step 2 after returning to Step 1", () => {
+  it("폐기는 품목에서 출처를 거쳐 바로 처리 선택으로 돌아간다", () => {
     render(
       <DefectCartFlow
         mode="scrap"
@@ -302,21 +428,56 @@ describe("DefectCartFlow", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: /^폐기/ }));
+    expect(window.history.state).toMatchObject({ defect: "cart", mode: "scrap", directAction: "scrap", source: "production", step: 1 });
+    fireEvent.click(screen.getByRole("button", { name: /창고 재고/ }));
+    expect(window.history.state).toMatchObject({ source: "warehouse", step: 1 });
     fireEvent.click(screen.getByRole("button", { name: /\uB2E4\uC74C/ }));
-    expect(screen.getByText(`\uC9C4\uC785 \uBD80\uC11C \u00B7 ${employee.department}`)).toBeInTheDocument();
-
-    fireEvent(
-      window,
-      new PopStateEvent("popstate", { state: { defect: "cart", mode: "scrap", step: 1 } }),
-    );
-    expect(screen.queryByText(`\uC9C4\uC785 \uBD80\uC11C \u00B7 ${employee.department}`)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /\uBD80\uC11C \uC7AC\uACE0/ })).toBeInTheDocument();
-
-    fireEvent(
-      window,
-      new PopStateEvent("popstate", { state: { defect: "cart", mode: "scrap", step: 2 } }),
-    );
-    expect(screen.getByText(`\uC9C4\uC785 \uBD80\uC11C \u00B7 ${employee.department}`)).toBeInTheDocument();
     expect(screen.getByText("\uC6D0\uC790\uC7AC")).toBeInTheDocument();
+
+    fireEvent(
+      window,
+      new PopStateEvent("popstate", { state: { defect: "cart", mode: "scrap", directAction: "scrap", source: "warehouse", step: 1 } }),
+    );
+    expect(screen.getAllByText("출처 선택")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: /창고 재고/ })).toHaveStyle({ borderWidth: "2px" });
+
+    fireEvent(
+      window,
+      new PopStateEvent("popstate", { state: { defect: "cart", mode: "scrap", directAction: null, source: "production", step: 1 } }),
+    );
+    expect(screen.getByRole("heading", { name: "바로 처리" })).toBeInTheDocument();
+  });
+
+  it.each([
+    [{ defect: "cart", mode: "add", directAction: "scrap", source: "warehouse", step: 2 }, "원자재"],
+    [{ defect: "cart", mode: "scrap", directAction: "scrap", source: "warehouse", step: 2 }, "원자재"],
+    [{ defect: "cart", mode: "scrap", directAction: "rework", source: "production", step: 2 }, "완제품"],
+  ] as const)("새로고침 시 유효한 카트 상태 %o를 복원한다", (state, expectedText) => {
+    window.history.replaceState(state, "");
+    render(
+      <DefectCartFlow mode={state.mode} items={[{ ...fItem, has_bom: true }, rItem]} productModels={productModels} currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} />,
+    );
+
+    expect(screen.getByText(expectedText)).toBeInTheDocument();
+  });
+
+  it("새로고침 시 직렬화되지 않은 재작업 BOM 단계는 재작업 품목 선택으로 안전 복원한다", () => {
+    window.history.replaceState({ defect: "cart", mode: "scrap", directAction: "rework", source: "production", step: 3 }, "");
+    render(
+      <DefectCartFlow mode="scrap" items={[{ ...fItem, has_bom: true }]} productModels={productModels} currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} />,
+    );
+
+    expect(screen.getByText("완제품")).toBeInTheDocument();
+    expect(window.history.state).toMatchObject({ directAction: "rework", source: "production", step: 2 });
+  });
+
+  it("새로고침 시 제거된 부서 단계 같은 잘못된 카트 상태는 첫 화면으로 정규화한다", () => {
+    window.history.replaceState({ defect: "cart", mode: "add", directAction: "rework", source: "warehouse", step: 3 }, "");
+    render(
+      <DefectCartFlow mode="add" items={[rItem]} productModels={productModels} currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} />,
+    );
+
+    expect(screen.getAllByText("출처 선택")).toHaveLength(2);
+    expect(window.history.state).toMatchObject({ mode: "add", directAction: "scrap", source: "production", step: 1 });
   });
 });

@@ -18,6 +18,7 @@ from app.database import get_db, _is_sqlite
 from app.models import (
     Employee,
     Item,
+    RequestBucketEnum,
     StockRequest,
     StockRequestLine,
     StockRequestStatusEnum,
@@ -44,6 +45,34 @@ from app._evt import emit as _evt_emit
 router = APIRouter()
 
 
+def _validate_normal_source_departments(
+    db: Session,
+    request_type: StockRequestTypeEnum,
+    lines,
+) -> None:
+    """정상 폐기·재작업 출처를 현재 품목코드 부서와 대조한다."""
+    if request_type not in {
+        StockRequestTypeEnum.SCRAP_NORMAL,
+        StockRequestTypeEnum.REWORK_NORMAL,
+    }:
+        return
+    for line in lines:
+        if line.from_bucket == RequestBucketEnum.WAREHOUSE:
+            if line.from_department is None:
+                continue
+            raise ValueError("창고 출처 정상 처리에는 from_department 를 지정할 수 없습니다.")
+        item = db.query(Item).filter(Item.item_id == line.item_id).first()
+        if item is None:
+            continue
+        expected = department_for_item(item).value
+        if line.from_bucket == RequestBucketEnum.PRODUCTION and line.from_department == expected:
+            continue
+        raise ValueError(
+            f"생산 출처 정상 처리의 from_department 는 품목코드 기준 부서여야 합니다: "
+            f"{item.mes_code or item.item_id} / 기대 {expected} / 요청 {line.from_department}"
+        )
+
+
 def _validate_direct_automatic_department_routes(
     db: Session,
     payload: StockRequestCreate | StockRequestDraftUpsert,
@@ -54,6 +83,7 @@ def _validate_direct_automatic_department_routes(
         StockRequestTypeEnum.DEPT_TO_WAREHOUSE: "from_department",
     }.get(payload.request_type)
     if expected_department_field is None:
+        _validate_normal_source_departments(db, payload.request_type, payload.lines)
         return
     for line in payload.lines:
         item = db.query(Item).filter(Item.item_id == line.item_id).first()
@@ -61,8 +91,10 @@ def _validate_direct_automatic_department_routes(
             # 기존 서비스가 동일한 422 메시지로 처리한다.
             continue
         expected = department_for_item(item).value
-        actual = getattr(line, expected_department_field)
-        if actual != expected:
+        if expected_department_field is not None:
+            actual = getattr(line, expected_department_field)
+            if actual == expected:
+                continue
             raise ValueError(
                 f"품목코드 기준 부서와 요청 부서가 다릅니다: "
                 f"{item.mes_code or item.item_id} / 기대 {expected} / 요청 {actual}"
@@ -85,6 +117,17 @@ def create_stock_request(payload: StockRequestCreate, db: Session = Depends(get_
         raise http_error(404, ErrorCode.NOT_FOUND, "요청자(직원)를 찾을 수 없습니다.")
     if not bool(requester.is_active):
         raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원은 요청할 수 없습니다.")
+
+    # 기존 요청은 당시의 유효한 명령 결과다. 재시도에서는 이후 품목 공정 변경으로
+    # 경로 검증이 달라져도 새 실행을 만들지 않고 동일 결과를 반환한다.
+    if payload.client_request_id:
+        existing = (
+            db.query(StockRequest)
+            .filter(StockRequest.client_request_id == payload.client_request_id)
+            .first()
+        )
+        if existing is not None:
+            return existing
 
     try:
         _validate_direct_automatic_department_routes(db, payload)
@@ -637,6 +680,16 @@ def submit_stock_request_draft(
     db: Session = Depends(get_db),
 ):
     """DRAFT → 제출 전환. status=DRAFT 만 허용, 본인만, 빈 lines 거부."""
+    draft = db.query(StockRequest).filter(StockRequest.request_id == request_id).first()
+    if (
+        draft is not None
+        and draft.requester_employee_id == payload.requester_employee_id
+        and draft.status == StockRequestStatusEnum.DRAFT
+    ):
+        try:
+            _validate_normal_source_departments(db, draft.request_type, draft.lines)
+        except ValueError as exc:
+            raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
     for attempt in range(2):
         try:
             request = svc.submit_draft_request(

@@ -61,7 +61,7 @@ def test_bulk_immediate_processing_is_atomic_for_plain_employee(
     for qty in (1, 2, 3):
         response = client.post("/api/defects/quarantine", json={
             "item_id": str(item.item_id), "qty": qty, "source": "warehouse",
-            "target_dept": DepartmentEnum.ASSEMBLY.value,
+            "target_dept": DepartmentEnum.WAREHOUSE.value,
             "actor_employee_id": str(actor.employee_id),
             "reason_memo": "통합 검증",
         })
@@ -95,7 +95,7 @@ def test_bulk_immediate_processing_is_atomic_for_plain_employee(
         "lines": [{
             "item_id": str(item.item_id), "record_id": str(record.record_id),
             "quantity": int(record.remaining_quantity), "from_bucket": "defective",
-            "from_department": DepartmentEnum.ASSEMBLY.value, "to_bucket": "none",
+            "from_department": DepartmentEnum.WAREHOUSE.value, "to_bucket": "none",
         } for record in selected],
     }
     response = client.post("/api/stock-requests", json=payload)
@@ -190,7 +190,7 @@ def test_quarantine_sets_defective_at_and_logs(db_session, client, make_item):
         "item_id": str(item.item_id),
         "qty": "3",
         "source": "warehouse",
-        "target_dept": DepartmentEnum.ASSEMBLY.value,
+        "target_dept": DepartmentEnum.WAREHOUSE.value,
         "reason_category": "외관불량",
         "reason_memo": "스크래치 발견",
         "actor_employee_id": str(actor.employee_id),
@@ -200,7 +200,7 @@ def test_quarantine_sets_defective_at_and_logs(db_session, client, make_item):
     db_session.expire_all()
     loc = db_session.query(InventoryLocation).filter(
         InventoryLocation.item_id == item.item_id,
-        InventoryLocation.department == DepartmentEnum.ASSEMBLY.value,
+        InventoryLocation.department == DepartmentEnum.WAREHOUSE.value,
         InventoryLocation.status == LocationStatusEnum.DEFECTIVE,
     ).first()
     assert loc is not None
@@ -241,7 +241,7 @@ def test_quarantine_rejects_client_request_id_owned_by_other_operation(
             "item_id": str(item.item_id),
             "qty": "2",
             "source": "warehouse",
-            "target_dept": DepartmentEnum.ASSEMBLY.value,
+            "target_dept": DepartmentEnum.WAREHOUSE.value,
             "reason_category": "외관불량",
             "reason_memo": "다른 작업이 소유한 키",
             "actor_employee_id": str(actor.employee_id),
@@ -291,7 +291,7 @@ def test_quarantine_rejects_retry_with_different_quantity(
             "item_id": str(item.item_id),
             "qty": "2",
             "source": "warehouse",
-            "target_dept": DepartmentEnum.ASSEMBLY.value,
+            "target_dept": DepartmentEnum.WAREHOUSE.value,
             "reason_category": "외관불량",
             "reason_memo": "첫 요청",
             "actor_employee_id": str(actor.employee_id),
@@ -339,7 +339,7 @@ def test_quarantine_rejects_retry_for_different_item(
             "item_id": str(retry_item.item_id),
             "qty": "2",
             "source": "warehouse",
-            "target_dept": DepartmentEnum.ASSEMBLY.value,
+            "target_dept": DepartmentEnum.WAREHOUSE.value,
             "reason_category": "외관불량",
             "reason_memo": "같은 수량 다른 품목",
             "actor_employee_id": str(actor.employee_id),
@@ -388,7 +388,7 @@ def test_quarantine_unrelated_integrity_error_is_not_reported_as_success(
             "item_id": str(item.item_id),
             "qty": "2",
             "source": "warehouse",
-            "target_dept": DepartmentEnum.ASSEMBLY.value,
+            "target_dept": DepartmentEnum.WAREHOUSE.value,
             "reason_category": "외관불량",
             "reason_memo": "무관한 제약 오류",
             "actor_employee_id": str(actor.employee_id),
@@ -418,7 +418,7 @@ def test_quarantine_exact_retry_is_idempotent(db_session, client, make_item):
         "item_id": str(item.item_id),
         "qty": "2",
         "source": "warehouse",
-        "target_dept": DepartmentEnum.ASSEMBLY.value,
+        "target_dept": DepartmentEnum.WAREHOUSE.value,
         "reason_category": "외관불량",
         "reason_memo": "같은 요청",
         "actor_employee_id": str(actor.employee_id),
@@ -474,7 +474,7 @@ def test_quarantine_duplicate_race_recovers_only_matching_committed_log(
             item_id=item_id,
             qty=Decimal("2"),
             source="warehouse",
-            target_dept=DepartmentEnum.ASSEMBLY,
+            target_dept=DepartmentEnum.WAREHOUSE,
             source_dept=None,
             actor=winner_actor,
             reason_category="외관불량",
@@ -528,7 +528,7 @@ def test_quarantine_duplicate_race_recovers_only_matching_committed_log(
                 "item_id": str(item_id),
                 "qty": "2",
                 "source": "warehouse",
-                "target_dept": DepartmentEnum.ASSEMBLY.value,
+                "target_dept": DepartmentEnum.WAREHOUSE.value,
                 "reason_category": "외관불량",
                 "reason_memo": "경합 재시도",
                 "actor_employee_id": str(actor_employee_id),
@@ -555,7 +555,7 @@ def test_quarantine_duplicate_race_recovers_only_matching_committed_log(
             verify_session.query(InventoryLocation)
             .filter(
                 InventoryLocation.item_id == item_id,
-                InventoryLocation.department == DepartmentEnum.ASSEMBLY.value,
+                InventoryLocation.department == DepartmentEnum.WAREHOUSE.value,
                 InventoryLocation.status == LocationStatusEnum.DEFECTIVE,
             )
             .one()
@@ -576,7 +576,7 @@ def test_quarantine_duplicate_race_recovers_only_matching_committed_log(
         )
         assert any(
             cell.get("scope") == "location"
-            and cell.get("department") == DepartmentEnum.ASSEMBLY.value
+            and cell.get("department") == DepartmentEnum.WAREHOUSE.value
             and cell.get("status") == LocationStatusEnum.DEFECTIVE.value
             and cell.get("delta") == 2
             for cell in log.inventory_effect
@@ -600,7 +600,7 @@ def test_unquarantine_clears_defective_at_and_logs(db_session, client, make_item
         "item_id": str(item.item_id),
         "qty": "2",
         "source": "warehouse",
-        "target_dept": DepartmentEnum.VACUUM.value,
+        "target_dept": DepartmentEnum.WAREHOUSE.value,
         "reason_category": "치수불량",
         "reason_memo": "",
         "actor_employee_id": str(actor.employee_id),
@@ -611,7 +611,7 @@ def test_unquarantine_clears_defective_at_and_logs(db_session, client, make_item
     res2 = client.post("/api/defects/unquarantine", json={
         "item_id": str(item.item_id),
         "qty": "2",
-        "dept": DepartmentEnum.VACUUM.value,
+        "dept": DepartmentEnum.WAREHOUSE.value,
         "reason_category": "검사통과",
         "reason_memo": "재검사 합격",
         "actor_employee_id": str(actor.employee_id),
@@ -621,7 +621,7 @@ def test_unquarantine_clears_defective_at_and_logs(db_session, client, make_item
     db_session.expire_all()
     loc = db_session.query(InventoryLocation).filter(
         InventoryLocation.item_id == item.item_id,
-        InventoryLocation.department == DepartmentEnum.VACUUM.value,
+        InventoryLocation.department == DepartmentEnum.WAREHOUSE.value,
         InventoryLocation.status == LocationStatusEnum.DEFECTIVE,
     ).first()
     # 복귀 후 불량 재고 0
@@ -650,7 +650,7 @@ def test_unquarantine_partially_updates_only_the_selected_record(
                 "item_id": str(item.item_id),
                 "qty": qty,
                 "source": "warehouse",
-                "target_dept": DepartmentEnum.VACUUM.value,
+                "target_dept": DepartmentEnum.WAREHOUSE.value,
                 "reason_memo": memo,
                 "actor_employee_id": str(actor.employee_id),
             },
@@ -671,7 +671,7 @@ def test_unquarantine_partially_updates_only_the_selected_record(
             "record_id": selected["record_id"],
             "item_id": str(item.item_id),
             "qty": "1",
-            "dept": DepartmentEnum.VACUUM.value,
+            "dept": DepartmentEnum.WAREHOUSE.value,
             "reason_category": "재검사 통과",
             "actor_employee_id": str(actor.employee_id),
         },
@@ -691,7 +691,7 @@ def test_unquarantine_partially_updates_only_the_selected_record(
         db_session.query(InventoryLocation)
         .filter(
             InventoryLocation.item_id == item.item_id,
-            InventoryLocation.department == DepartmentEnum.VACUUM.value,
+            InventoryLocation.department == DepartmentEnum.WAREHOUSE.value,
             InventoryLocation.status == LocationStatusEnum.DEFECTIVE,
         )
         .one()
@@ -725,7 +725,7 @@ def test_bulk_unquarantine_restores_selected_records_with_shared_reason(
                 "item_id": str(item.item_id),
                 "qty": qty,
                 "source": "warehouse",
-                "target_dept": DepartmentEnum.VACUUM.value,
+                "target_dept": DepartmentEnum.WAREHOUSE.value,
                 "reason_memo": memo,
                 "actor_employee_id": str(actor.employee_id),
             },
@@ -748,7 +748,7 @@ def test_bulk_unquarantine_restores_selected_records_with_shared_reason(
                 {
                     "record_id": str(record.record_id),
                     "item_id": str(item.item_id),
-                    "department": DepartmentEnum.VACUUM.value,
+                    "department": DepartmentEnum.WAREHOUSE.value,
                     "quantity": str(record.remaining_quantity),
                 }
                 for record in records
@@ -806,7 +806,7 @@ def test_bulk_unquarantine_rejects_reserved_record(db_session, client, make_item
             "item_id": str(item.item_id),
             "qty": "2",
             "source": "warehouse",
-            "target_dept": DepartmentEnum.ASSEMBLY.value,
+            "target_dept": DepartmentEnum.WAREHOUSE.value,
             "reason_memo": "예약 대상",
             "actor_employee_id": str(actor.employee_id),
         },
@@ -855,7 +855,7 @@ def test_bulk_unquarantine_rejects_reserved_record(db_session, client, make_item
             "lines": [{
                 "record_id": str(record.record_id), "item_id": str(item.item_id),
                 "quantity": 1, "from_bucket": "defective",
-                "from_department": DepartmentEnum.ASSEMBLY.value, "to_bucket": "none",
+                "from_department": DepartmentEnum.WAREHOUSE.value, "to_bucket": "none",
             }],
         })
 
@@ -876,7 +876,7 @@ def test_defect_disassemble_request_rejects_duplicate_source_record(
             "item_id": str(item.item_id),
             "qty": "2",
             "source": "warehouse",
-            "target_dept": DepartmentEnum.ASSEMBLY.value,
+            "target_dept": DepartmentEnum.WAREHOUSE.value,
             "reason_memo": "중복 방지",
             "actor_employee_id": str(actor.employee_id),
         },
@@ -890,7 +890,7 @@ def test_defect_disassemble_request_rejects_duplicate_source_record(
         "item_id": str(item.item_id),
         "quantity": 1,
         "from_bucket": "defective",
-        "from_department": DepartmentEnum.ASSEMBLY.value,
+        "from_department": DepartmentEnum.WAREHOUSE.value,
         "to_bucket": "none",
     }
 
@@ -925,7 +925,7 @@ def test_defect_disassemble_request_rejects_mixed_source_items(
                 "item_id": str(item.item_id),
                 "qty": "1",
                 "source": "warehouse",
-                "target_dept": DepartmentEnum.ASSEMBLY.value,
+                "target_dept": DepartmentEnum.WAREHOUSE.value,
                 "reason_memo": "혼합 방지",
                 "actor_employee_id": str(actor.employee_id),
             },
@@ -949,7 +949,7 @@ def test_defect_disassemble_request_rejects_mixed_source_items(
                     "item_id": str(item.item_id),
                     "quantity": 1,
                     "from_bucket": "defective",
-                    "from_department": DepartmentEnum.ASSEMBLY.value,
+                    "from_department": DepartmentEnum.WAREHOUSE.value,
                     "to_bucket": "none",
                 }
                 for item, record in zip(items, records)
@@ -983,7 +983,7 @@ def test_multi_defect_request_rejects_duplicate_and_mixed_source_records(
                 "item_id": str(item.item_id),
                 "qty": "2",
                 "source": "warehouse",
-                "target_dept": DepartmentEnum.ASSEMBLY.value,
+                "target_dept": DepartmentEnum.WAREHOUSE.value,
                 "reason_memo": "다건 검증",
                 "actor_employee_id": str(actor.employee_id),
             },
@@ -1044,7 +1044,7 @@ def test_single_record_batch_request_requires_exact_quantity_and_record_id(
             "item_id": str(item.item_id),
             "qty": "2",
             "source": "warehouse",
-            "target_dept": DepartmentEnum.ASSEMBLY.value,
+            "target_dept": DepartmentEnum.WAREHOUSE.value,
             "reason_memo": "단건 선택 검증",
             "actor_employee_id": str(actor.employee_id),
         },
@@ -1058,7 +1058,7 @@ def test_single_record_batch_request_requires_exact_quantity_and_record_id(
         "item_id": str(item.item_id),
         "quantity": 1,
         "from_bucket": "defective",
-        "from_department": DepartmentEnum.ASSEMBLY.value,
+        "from_department": DepartmentEnum.WAREHOUSE.value,
         "to_bucket": "none",
     }
 
@@ -1121,7 +1121,7 @@ def test_defect_disassemble_immediately_executes_multiple_source_records_once(
                 "item_id": str(parent.item_id),
                 "qty": quantity,
                 "source": "warehouse",
-                "target_dept": DepartmentEnum.ASSEMBLY.value,
+                "target_dept": DepartmentEnum.WAREHOUSE.value,
                 "reason_memo": f"재작업 {quantity}",
                 "actor_employee_id": str(requester.employee_id),
             },
@@ -1153,7 +1153,7 @@ def test_defect_disassemble_immediately_executes_multiple_source_records_once(
                 "item_id": str(parent.item_id),
                 "quantity": int(record.remaining_quantity),
                 "from_bucket": "defective",
-                "from_department": DepartmentEnum.ASSEMBLY.value,
+                "from_department": DepartmentEnum.WAREHOUSE.value,
                 "to_bucket": "none",
             }
             for record in records
@@ -1288,7 +1288,7 @@ def test_quarantine_then_scrap_preserves_two_audit_logs(
         "item_id": str(item.item_id),
         "qty": "2",
         "source": "warehouse",
-        "target_dept": DepartmentEnum.ASSEMBLY.value,
+        "target_dept": DepartmentEnum.WAREHOUSE.value,
         "reason_category": "외관불량",
         "reason_memo": "격리 사유",
         "actor_employee_id": str(requester.employee_id),
@@ -1304,7 +1304,7 @@ def test_quarantine_then_scrap_preserves_two_audit_logs(
             "item_id": str(item.item_id),
             "quantity": "2",
             "from_bucket": "defective",
-            "from_department": DepartmentEnum.ASSEMBLY.value,
+            "from_department": DepartmentEnum.WAREHOUSE.value,
             "to_bucket": "none",
         }],
     })
@@ -1337,7 +1337,7 @@ def test_defect_scrap_via_stock_request(db_session, client, make_item):
         "item_id": str(item.item_id),
         "qty": "4",
         "source": "warehouse",
-        "target_dept": DepartmentEnum.ASSEMBLY.value,
+        "target_dept": DepartmentEnum.WAREHOUSE.value,
         "reason_category": "기능불량",
         "reason_memo": "고장",
         "actor_employee_id": str(requester.employee_id),
@@ -1355,7 +1355,7 @@ def test_defect_scrap_via_stock_request(db_session, client, make_item):
             "item_id": str(item.item_id),
             "quantity": "4",
             "from_bucket": "defective",
-            "from_department": DepartmentEnum.ASSEMBLY.value,
+            "from_department": DepartmentEnum.WAREHOUSE.value,
             "to_bucket": "none",
         }],
         "notes": "폐기 처리",
@@ -1396,7 +1396,7 @@ def test_defect_request_executes_selected_record_immediately(
                 "item_id": str(item.item_id),
                 "qty": qty,
                 "source": "warehouse",
-                "target_dept": DepartmentEnum.ASSEMBLY.value,
+                "target_dept": DepartmentEnum.WAREHOUSE.value,
                 "reason_memo": memo,
                 "actor_employee_id": str(requester.employee_id),
             },
@@ -1425,7 +1425,7 @@ def test_defect_request_executes_selected_record_immediately(
                         "item_id": str(item.item_id),
                         "quantity": quantity,
                         "from_bucket": "defective",
-                        "from_department": DepartmentEnum.ASSEMBLY.value,
+                        "from_department": DepartmentEnum.WAREHOUSE.value,
                         "to_bucket": "none",
                     }
                 ],
@@ -1658,7 +1658,7 @@ def test_defect_disassemble_stale_bom_payload_returns_422_and_rolls_back(
             "item_id": str(parent.item_id),
             "quantity": "2",
             "from_bucket": "defective",
-            "from_department": DepartmentEnum.ASSEMBLY.value,
+            "from_department": DepartmentEnum.WAREHOUSE.value,
             "to_bucket": "none",
         }],
     })
@@ -1697,7 +1697,7 @@ def test_defect_return_via_stock_request(db_session, client, make_item):
         "item_id": str(item.item_id),
         "qty": "4",
         "source": "warehouse",
-        "target_dept": DepartmentEnum.ASSEMBLY.value,
+        "target_dept": DepartmentEnum.WAREHOUSE.value,
         "reason_category": "외관불량",
         "reason_memo": "불량 확인",
         "actor_employee_id": str(requester.employee_id),
@@ -1717,7 +1717,7 @@ def test_defect_return_via_stock_request(db_session, client, make_item):
             "item_id": str(item.item_id),
             "quantity": "3",
             "from_bucket": "defective",
-            "from_department": DepartmentEnum.ASSEMBLY.value,
+            "from_department": DepartmentEnum.WAREHOUSE.value,
             "to_bucket": "none",
         }],
         "notes": "공급처 반품",
@@ -1817,7 +1817,7 @@ def test_kpi_counts_active_quarantine_records_and_record_age(
                 "item_id": str(item.item_id),
                 "qty": qty,
                 "source": "warehouse",
-                "target_dept": DepartmentEnum.ASSEMBLY.value,
+                "target_dept": DepartmentEnum.WAREHOUSE.value,
                 "reason_memo": f"격리 {qty}",
                 "actor_employee_id": str(actor.employee_id),
             },
@@ -1854,7 +1854,7 @@ def test_locations_returns_defective_list(db_session, client, make_item):
         "item_id": str(item.item_id),
         "qty": "5",
         "source": "warehouse",
-        "target_dept": DepartmentEnum.ASSEMBLY.value,
+        "target_dept": DepartmentEnum.WAREHOUSE.value,
         "reason_category": "기능불량",
         "reason_memo": "",
         "actor_employee_id": str(actor.employee_id),
@@ -1981,7 +1981,7 @@ def test_locations_keeps_repeated_quarantines_as_separate_records(
                 "item_id": str(item.item_id),
                 "qty": qty,
                 "source": "warehouse",
-                "target_dept": DepartmentEnum.ASSEMBLY.value,
+                "target_dept": DepartmentEnum.WAREHOUSE.value,
                 "reason_category": "외관 불량",
                 "reason_memo": memo,
                 "actor_employee_id": str(actor.employee_id),
@@ -2027,7 +2027,7 @@ def test_quarantine_memo_edit_history_allows_any_employee_with_pin_and_empty_val
             "item_id": str(item.item_id),
             "qty": "2",
             "source": "warehouse",
-            "target_dept": DepartmentEnum.ASSEMBLY.value,
+            "target_dept": DepartmentEnum.WAREHOUSE.value,
             "reason_category": "외관 불량",
             "reason_memo": "최초 메모",
             "actor_employee_id": str(quarantiner.employee_id),
@@ -2235,7 +2235,7 @@ def test_defect_scrap_without_quarantine_rejected(db_session, client, make_item)
             "item_id": str(item.item_id),
             "quantity": "5",
             "from_bucket": "defective",
-            "from_department": DepartmentEnum.ASSEMBLY.value,
+            "from_department": DepartmentEnum.WAREHOUSE.value,
             "to_bucket": "none",
         }],
         "notes": "격리 안 한 채 폐기 시도",
@@ -2256,7 +2256,7 @@ def test_defect_scrap_with_insufficient_quarantine_rejected(db_session, client, 
         "item_id": str(item.item_id),
         "qty": "3",
         "source": "warehouse",
-        "target_dept": DepartmentEnum.ASSEMBLY.value,
+        "target_dept": DepartmentEnum.WAREHOUSE.value,
         "reason_category": "외관불량",
         "reason_memo": "",
         "actor_employee_id": str(requester.employee_id),
@@ -2269,7 +2269,7 @@ def test_defect_scrap_with_insufficient_quarantine_rejected(db_session, client, 
             "item_id": str(item.item_id),
             "quantity": "5",
             "from_bucket": "defective",
-            "from_department": DepartmentEnum.ASSEMBLY.value,
+            "from_department": DepartmentEnum.WAREHOUSE.value,
             "to_bucket": "none",
         }],
         "notes": "초과 폐기 시도",
@@ -2294,7 +2294,7 @@ def test_draft_upsert_preserves_reason_category(db_session, client, make_item):
         "item_id": str(item.item_id),
         "qty": "2",
         "source": "warehouse",
-        "target_dept": DepartmentEnum.ASSEMBLY.value,
+        "target_dept": DepartmentEnum.WAREHOUSE.value,
         "reason_category": "외관불량",
         "reason_memo": "",
         "actor_employee_id": str(requester.employee_id),
@@ -2310,7 +2310,7 @@ def test_draft_upsert_preserves_reason_category(db_session, client, make_item):
             "item_id": str(item.item_id),
             "quantity": "2",
             "from_bucket": "defective",
-            "from_department": DepartmentEnum.ASSEMBLY.value,
+            "from_department": DepartmentEnum.WAREHOUSE.value,
             "to_bucket": "none",
         }],
     })
@@ -2326,8 +2326,8 @@ def test_draft_upsert_preserves_reason_category(db_session, client, make_item):
     assert draft.reason_category == "기타"
     assert draft.reason_memo == "장바구니 단계 사유"
 
-def test_locations_reason_is_department_specific(db_session, client, make_item):
-    """GET /api/defects/locations keeps the latest reason per item and department."""
+def test_locations_keeps_reasons_for_each_warehouse_record(db_session, client, make_item):
+    """창고 격리도 건별 원장 사유를 분리해 반환한다."""
     item = make_item(name="REASON-DEPT", process_type_code="TR", warehouse_qty=Decimal("10"))
     actor = _make_employee(db_session, code="RDEP1", name="reason actor")
     db_session.commit()
@@ -2336,7 +2336,7 @@ def test_locations_reason_is_department_specific(db_session, client, make_item):
         "item_id": str(item.item_id),
         "qty": "2",
         "source": "warehouse",
-        "target_dept": DepartmentEnum.ASSEMBLY.value,
+        "target_dept": DepartmentEnum.WAREHOUSE.value,
         "reason_category": "assembly-category",
         "reason_memo": "assembly memo",
         "actor_employee_id": str(actor.employee_id),
@@ -2347,7 +2347,7 @@ def test_locations_reason_is_department_specific(db_session, client, make_item):
         "item_id": str(item.item_id),
         "qty": "3",
         "source": "warehouse",
-        "target_dept": DepartmentEnum.HIGH_VOLTAGE.value,
+        "target_dept": DepartmentEnum.WAREHOUSE.value,
         "reason_category": "high-voltage-category",
         "reason_memo": "high voltage memo",
         "actor_employee_id": str(actor.employee_id),
@@ -2356,12 +2356,12 @@ def test_locations_reason_is_department_specific(db_session, client, make_item):
 
     res = client.get("/api/defects/locations")
     assert res.status_code == 200, res.text
-    rows = {row["department"]: row for row in res.json() if row["item_id"] == str(item.item_id)}
+    rows = [row for row in res.json() if row["item_id"] == str(item.item_id)]
 
-    assert rows[DepartmentEnum.ASSEMBLY.value]["reason_category"] == "assembly-category"
-    assert rows[DepartmentEnum.ASSEMBLY.value]["reason_memo"] == "assembly memo"
-    assert rows[DepartmentEnum.HIGH_VOLTAGE.value]["reason_category"] == "high-voltage-category"
-    assert rows[DepartmentEnum.HIGH_VOLTAGE.value]["reason_memo"] == "high voltage memo"
+    assert {(row["department"], row["reason_category"], row["reason_memo"]) for row in rows} == {
+        (DepartmentEnum.WAREHOUSE.value, "assembly-category", "assembly memo"),
+        (DepartmentEnum.WAREHOUSE.value, "high-voltage-category", "high voltage memo"),
+    }
 
 
 def test_transactions_include_defect_reason_fields(db_session, client, make_item):
@@ -2374,7 +2374,7 @@ def test_transactions_include_defect_reason_fields(db_session, client, make_item
         "item_id": str(item.item_id),
         "qty": "1",
         "source": "warehouse",
-        "target_dept": DepartmentEnum.ASSEMBLY.value,
+        "target_dept": DepartmentEnum.WAREHOUSE.value,
         "reason_category": "tx-category",
         "reason_memo": "tx memo",
         "actor_employee_id": str(actor.employee_id),
@@ -2386,3 +2386,211 @@ def test_transactions_include_defect_reason_fields(db_session, client, make_item
     mark = next(row for row in history.json() if row["transaction_type"] == TransactionTypeEnum.MARK_DEFECTIVE.value)
     assert mark["reason_category"] == "tx-category"
     assert mark["reason_memo"] == "tx memo"
+
+
+def test_quarantine_management_category_defaults_and_tracks_initial_revision(
+    db_session, client, make_item
+):
+    item = make_item(name="MANAGEMENT-CATEGORY", warehouse_qty=Decimal("6"))
+    actor = _make_employee(db_session, code="MCAT-1", name="분류 작업자")
+    db_session.commit()
+
+    b_grade = client.post("/api/defects/quarantine", json={
+        "item_id": str(item.item_id), "qty": "2", "source": "warehouse",
+        "target_dept": DepartmentEnum.WAREHOUSE.value,
+        "reason_memo": "B급 격리", "management_category": "B_GRADE",
+        "actor_employee_id": str(actor.employee_id),
+    })
+    default = client.post("/api/defects/quarantine", json={
+        "item_id": str(item.item_id), "qty": "1", "source": "warehouse",
+        "target_dept": DepartmentEnum.WAREHOUSE.value,
+        "reason_memo": "기본 격리", "actor_employee_id": str(actor.employee_id),
+    })
+
+    assert b_grade.status_code == 200, b_grade.text
+    assert default.status_code == 200, default.text
+    rows = client.get("/api/defects/locations").json()
+    categories = {row["reason_memo"]: row["management_category"] for row in rows if row["item_id"] == str(item.item_id)}
+    assert categories == {"B급 격리": "B_GRADE", "기본 격리": "DEFECT"}
+    filtered = client.get("/api/defects/locations", params={"management_category": "B_GRADE"})
+    assert [row["reason_memo"] for row in filtered.json() if row["item_id"] == str(item.item_id)] == ["B급 격리"]
+    assert client.get("/api/defects/kpi", params={"management_category": "B_GRADE"}).json()["quarantined"] == 1
+    record = db_session.query(DefectQuarantineRecord).filter_by(current_memo="B급 격리").one()
+    assert record.management_category == "B_GRADE"
+
+
+def test_management_category_change_requires_pin_and_keeps_inventory_unchanged(
+    db_session, client, make_item
+):
+    item = make_item(name="MANAGEMENT-CHANGE", warehouse_qty=Decimal("3"))
+    actor = _make_employee(db_session, code="MCAT-2", name="변경 작업자")
+    db_session.commit()
+    assert client.post("/api/defects/quarantine", json={
+        "item_id": str(item.item_id), "qty": "2", "source": "warehouse",
+        "target_dept": DepartmentEnum.WAREHOUSE.value, "reason_memo": "변경 대상",
+        "actor_employee_id": str(actor.employee_id),
+    }).status_code == 200
+    record = db_session.query(DefectQuarantineRecord).filter_by(current_memo="변경 대상").one()
+    location = db_session.query(InventoryLocation).filter_by(
+        item_id=item.item_id, department=DepartmentEnum.WAREHOUSE.value,
+        status=LocationStatusEnum.DEFECTIVE,
+    ).one()
+    before_quantity = location.quantity
+
+    wrong_pin = client.put(f"/api/defects/records/{record.record_id}/management-category", json={
+        "management_category": "B_GRADE", "expected_management_category": "DEFECT",
+        "actor_employee_id": str(actor.employee_id), "pin": "1111",
+    })
+    changed = client.put(f"/api/defects/records/{record.record_id}/management-category", json={
+        "management_category": "B_GRADE", "expected_management_category": "DEFECT",
+        "memo": "등급 확정", "actor_employee_id": str(actor.employee_id), "pin": "0000",
+    })
+    history = client.get(f"/api/defects/records/{record.record_id}/management-category-history")
+
+    assert wrong_pin.status_code == 403
+    assert changed.status_code == 200, changed.text
+    assert changed.json()["management_category"] == "B_GRADE"
+    assert [entry["next_category"] for entry in history.json()] == ["DEFECT", "B_GRADE"]
+    db_session.expire_all()
+    assert db_session.get(DefectQuarantineRecord, record.record_id).remaining_quantity == Decimal("2")
+    assert db_session.get(InventoryLocation, location.location_id).quantity == before_quantity
+
+
+def test_management_category_change_rejects_pending_record(db_session, client, make_item):
+    item = make_item(name="MANAGEMENT-PENDING", warehouse_qty=Decimal("4"))
+    actor = _make_employee(db_session, code="MCAT-3", name="대기 작업자")
+    db_session.commit()
+    assert client.post("/api/defects/quarantine", json={
+        "item_id": str(item.item_id), "qty": "2", "source": "warehouse",
+        "target_dept": DepartmentEnum.WAREHOUSE.value, "reason_memo": "대기 변경",
+        "actor_employee_id": str(actor.employee_id),
+    }).status_code == 200
+    record = db_session.query(DefectQuarantineRecord).filter_by(current_memo="대기 변경").one()
+    request = StockRequest(
+        requester_employee_id=actor.employee_id, requester_name=actor.name,
+        requester_department=DepartmentEnum.ASSEMBLY.value,
+        request_type=StockRequestTypeEnum.DEFECT_SCRAP,
+        status=StockRequestStatusEnum.RESERVED,
+        requires_warehouse_approval=False,
+    )
+    db_session.add(request)
+    db_session.flush()
+    db_session.add(StockRequestLine(
+        request_id=request.request_id, item_id=item.item_id,
+        item_name_snapshot=item.item_name, mes_code_snapshot=item.mes_code, quantity=Decimal("1"),
+        from_bucket=RequestBucketEnum.DEFECTIVE, from_department=DepartmentEnum.ASSEMBLY.value,
+        to_bucket=RequestBucketEnum.NONE, status=StockRequestStatusEnum.RESERVED,
+        defect_quarantine_record_id=record.record_id,
+    ))
+    db_session.commit()
+
+    response = client.put(f"/api/defects/records/{record.record_id}/management-category", json={
+        "management_category": "B_GRADE", "expected_management_category": "DEFECT",
+        "actor_employee_id": str(actor.employee_id), "pin": "0000",
+    })
+
+    assert response.status_code == 422
+
+
+def test_b_grade_record_cannot_be_reserved_for_defect_processing(db_session, make_item):
+    """B급 원장은 실제 DEFECTIVE 출고 예약 경로에서 차단한다."""
+    from app.services import sr_reservation
+
+    item = make_item(name="B급 처리 차단", warehouse_qty=Decimal("0"))
+    location = _make_defective_location(
+        db_session, item.item_id, DepartmentEnum.ASSEMBLY, Decimal("2"),
+    )
+    record = DefectQuarantineRecord(
+        item_id=item.item_id, department=DepartmentEnum.ASSEMBLY.value,
+        original_quantity=Decimal("2"), remaining_quantity=Decimal("2"),
+        quarantined_by_name="분류 작업자", management_category="B_GRADE",
+    )
+    db_session.add(record)
+    db_session.flush()
+    line = StockRequestLine(
+        request_id=uuid.uuid4(), item_id=item.item_id, quantity=Decimal("1"),
+        from_bucket=RequestBucketEnum.DEFECTIVE,
+        from_department=DepartmentEnum.ASSEMBLY.value,
+        status=StockRequestStatusEnum.RESERVED,
+        defect_quarantine_record_id=record.record_id,
+    )
+
+    with pytest.raises(ValueError, match="불량 격리로 이동"):
+        sr_reservation.reserve_lines(db_session, [line])
+    assert location.pending_quantity in (None, Decimal("0"))
+
+
+@pytest.mark.parametrize("request_type", ["defect_scrap", "defect_return"])
+def test_b_grade_record_is_rejected_by_immediate_defect_action(
+    db_session, client, make_item, request_type
+):
+    """구형 즉시 실행 요청도 B급 원장을 불량 처리하지 못한다."""
+    item = make_item(name=f"B급 즉시 차단-{request_type}", warehouse_qty=Decimal("3"))
+    actor = _make_employee(db_session, code=f"MCAT-{request_type}", name="즉시 처리자")
+    db_session.commit()
+    assert client.post("/api/defects/quarantine", json={
+        "item_id": str(item.item_id), "qty": "2", "source": "warehouse",
+        "target_dept": DepartmentEnum.WAREHOUSE.value, "reason_memo": "B급 원장",
+        "management_category": "B_GRADE", "actor_employee_id": str(actor.employee_id),
+    }).status_code == 200
+    record = db_session.query(DefectQuarantineRecord).filter_by(current_memo="B급 원장").one()
+
+    response = client.post("/api/stock-requests", json={
+        "requester_employee_id": str(actor.employee_id), "request_type": request_type,
+        "lines": [{
+            "record_id": str(record.record_id), "item_id": str(item.item_id), "quantity": "1",
+            "from_bucket": "defective", "from_department": DepartmentEnum.WAREHOUSE.value,
+            "to_bucket": "none",
+        }],
+    })
+
+    assert response.status_code == 422, response.text
+    assert "불량 격리로 이동" in response.text
+    db_session.expire_all()
+    assert db_session.get(DefectQuarantineRecord, record.record_id).remaining_quantity == Decimal("2")
+
+
+def test_locations_defect_filter_does_not_turn_b_grade_record_into_fallback(
+    db_session, client, make_item
+):
+    item = make_item(name="B급 fallback 제외", warehouse_qty=Decimal("2"))
+    actor = _make_employee(db_session, code="MCAT-FALLBACK", name="필터 작업자")
+    db_session.commit()
+    assert client.post("/api/defects/quarantine", json={
+        "item_id": str(item.item_id), "qty": "1", "source": "warehouse",
+        "target_dept": DepartmentEnum.WAREHOUSE.value, "reason_memo": "B급만 존재",
+        "management_category": "B_GRADE", "actor_employee_id": str(actor.employee_id),
+    }).status_code == 200
+
+    rows = client.get("/api/defects/locations", params={"management_category": "DEFECT"}).json()
+
+    assert all(row["item_id"] != str(item.item_id) for row in rows)
+
+
+def test_quarantine_idempotency_uses_initial_management_category_after_change(
+    db_session, client, make_item
+):
+    item = make_item(name="최초 분류 멱등성", warehouse_qty=Decimal("4"))
+    actor = _make_employee(db_session, code="MCAT-IDEM", name="멱등 작업자")
+    db_session.commit()
+    payload = {
+        "item_id": str(item.item_id), "qty": "2", "source": "warehouse",
+        "target_dept": DepartmentEnum.WAREHOUSE.value, "reason_memo": "최초 B급",
+        "management_category": "B_GRADE", "actor_employee_id": str(actor.employee_id),
+        "client_request_id": "management-category-initial-idempotency",
+    }
+    assert client.post("/api/defects/quarantine", json=payload).status_code == 200
+    record = db_session.query(DefectQuarantineRecord).filter_by(current_memo="최초 B급").one()
+    assert client.put(f"/api/defects/records/{record.record_id}/management-category", json={
+        "management_category": "DEFECT", "expected_management_category": "B_GRADE",
+        "actor_employee_id": str(actor.employee_id), "pin": "0000",
+    }).status_code == 200
+
+    retry = client.post("/api/defects/quarantine", json=payload)
+
+    assert retry.status_code == 200, retry.text
+    db_session.expire_all()
+    assert db_session.get(DefectQuarantineRecord, record.record_id).remaining_quantity == Decimal("2")
+    assert db_session.query(TransactionLog).filter_by(
+        client_request_id=payload["client_request_id"],
+    ).count() == 1

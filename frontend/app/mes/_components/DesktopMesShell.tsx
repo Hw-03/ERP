@@ -192,6 +192,15 @@ function DesktopMesShellInner({
         if (tab === "warehouse" || tab === "shipping") {
           router.push(`?tab=${tab}`, { scroll: false });
         }
+        if (tab === "defect") {
+          const currentState = window.history.state;
+          window.history.replaceState(
+            currentState && typeof currentState === "object"
+              ? { ...currentState, defect: "hub" }
+              : { defect: "hub" },
+            "",
+          );
+        }
         if (tab !== "admin") {
           setRefreshNonce((n) => n + 1);
         }

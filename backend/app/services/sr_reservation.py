@@ -211,6 +211,7 @@ def reserve_lines(db: Session, lines: Iterable, *, employee=None) -> None:
         )
         if record is None:
             raise ValueError("선택한 격리 기록을 찾을 수 없습니다.")
+        defect_records_svc.ensure_defect_management_category(record)
         defect_records_svc.ensure_available(db, record, quantity)
 
     groups = aggregate_reservations(lines)

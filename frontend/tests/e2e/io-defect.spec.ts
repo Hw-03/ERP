@@ -10,19 +10,24 @@ import { loginAsOperator } from "./_helpers";
 
 test.describe("불량 — 격리 / 해제", () => {
   test.beforeEach(async ({ page }) => {
-    // 창고 역할로 로그인 — 기본 출처 "창고 재고", 격리 위치 "창고", 목록 기본 스코프 "전체".
+    // 창고 역할로 로그인 — 격리 위치 "창고", 목록 기본 스코프 "전체".
     await loginAsOperator(page, { role: "warehouse" });
   });
 
   test("새 불량 격리 → 정상 복귀", async ({ page }) => {
     await page.goto("/mes?tab=defect");
-    // hub 3장 카드 진입 화면 확인 — cold next dev 라우트 컴파일 흡수를 위해 첫 단언만 넉넉히.
-    await expect(page.getByRole("button").filter({ hasText: "불량 격리" })).toBeVisible({ timeout: 30_000 });
+    // 4장 허브의 통합 등록·처리 카드 확인 — 첫 컴파일만 넉넉히 기다린다.
+    const workCard = page.getByRole("button").filter({ hasText: "불량 처리", visible: true });
+    await expect(workCard).toBeVisible({ timeout: 30_000 });
 
     // ── 격리 ──────────────────────────────────────────────
-    // 사이드바 탭과 구분: 카드 description "정상 재고" 텍스트까지 filter.
-    await page.getByRole("button").filter({ hasText: "불량 격리" }).filter({ hasText: "정상 재고" }).click();
-    // Step 1: 출처(창고 재고)·격리 부서(조립) 기본값 유지 → Step 2로 이동
+    await workCard.click();
+    await page.getByRole("button").filter({ hasText: "격리 등록", visible: true }).click();
+    // Step 1: 출처만 고른다. 전역 격리 부서 선택은 표시하지 않는다.
+    await expect(page.getByRole("button", { name: /부서 재고/ }).filter({ visible: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /창고 재고/ }).filter({ visible: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "조립", exact: true }).filter({ visible: true })).toHaveCount(0);
+    await page.getByRole("button", { name: /창고 재고/ }).filter({ visible: true }).click();
     await page.getByRole("button", { name: /다음/ }).click();
     // Step 2: 시드 원자재 행 "추가".
     await page
@@ -48,7 +53,7 @@ test.describe("불량 — 격리 / 해제", () => {
 
     // 격리 후 hub 자동 복귀를 명시적으로 기다린 뒤 "격리 목록" 카드 진입 (재로드 경합 flaky 방지)
     await expect(
-      page.getByRole("button").filter({ hasText: "불량 격리" }).filter({ hasText: "정상 재고" }),
+      page.getByRole("button").filter({ hasText: "불량 처리", visible: true }),
     ).toBeVisible();
     await page.getByRole("button").filter({ hasText: "격리 목록" }).filter({ hasText: "격리 항목" }).click();
     // mes 는 모바일·데스크톱 셸을 CSS(lg:hidden)로 둘 다 DOM 에 렌더. 모바일 불량 허브가
@@ -76,7 +81,7 @@ test.describe("불량 — 격리 / 해제", () => {
 
     // 처리 후 hub 자동 복귀를 명시적으로 기다린 뒤 "격리 목록" 카드 재진입 (재로드 경합 flaky 방지)
     await expect(
-      page.getByRole("button").filter({ hasText: "불량 격리" }).filter({ hasText: "정상 재고" }),
+      page.getByRole("button").filter({ hasText: "불량 처리", visible: true }),
     ).toBeVisible();
     await page.getByRole("button").filter({ hasText: "격리 목록" }).filter({ hasText: "격리 항목" }).click();
     await expect(

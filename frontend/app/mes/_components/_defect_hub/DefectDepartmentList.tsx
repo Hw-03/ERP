@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, ChevronDown, ChevronUp, Clock3, History, Pencil } from "lucide-react";
 import { defectsApi } from "@/lib/api/defects";
-import type { DefectLocation, DefectMemoRevision } from "@/lib/api/types/defects";
+import type { DefectLocation, DefectManagementCategory, DefectManagementCategoryRevision, DefectMemoRevision } from "@/lib/api/types/defects";
 import { PIN_LENGTH } from "@/lib/auth/constants";
 import { LEGACY_COLORS, getDepartmentFallbackColor } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
@@ -11,6 +11,11 @@ import { formatQty } from "@/lib/mes/format";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 const RECORD_GRID_CLASS = "grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(110px,0.38fr)_minmax(110px,0.38fr)_minmax(0,2fr)] lg:gap-6";
+const MANAGEMENT_CATEGORY_LABEL: Record<DefectManagementCategory, string> = {
+  DEFECT: "불량 격리",
+  B_GRADE: "B급",
+  OBSOLETE: "구형",
+};
 
 interface CurrentEmployee {
   employee_id: string;
@@ -24,6 +29,8 @@ interface Props {
   onBatchProcess?: (locations: DefectLocation[]) => void;
   currentEmployee?: CurrentEmployee;
   onMemoUpdated?: (recordId: string, memo: string) => void;
+  onMoveToStorage?: (location: DefectLocation) => void;
+  storageMode?: boolean;
   /** 전체 보기 시 이 부서를 가장 위에 표시. */
   priorityDept?: string;
   searchActive?: boolean;
@@ -67,6 +74,8 @@ export function DefectDepartmentList({
   onBatchProcess,
   currentEmployee,
   onMemoUpdated,
+  onMoveToStorage,
+  storageMode = false,
   priorityDept,
   searchActive = false,
 }: Props) {
@@ -103,8 +112,7 @@ export function DefectDepartmentList({
     });
   }
 
-  function toggleItem(dept: string, itemId: string) {
-    const key = `${dept}:${itemId}`;
+  function toggleItem(key: string) {
     setExpandedItems((previous) => {
       const next = new Set(previous);
       if (next.has(key)) {
@@ -163,17 +171,21 @@ export function DefectDepartmentList({
 
             {!isCollapsed && (
               <div className="divide-y" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}>
-                {groupByItem(rows).map((records) => {
-                  const itemKey = `${dept}:${records[0].item_id}`;
+                {groupByItem(rows, storageMode).map((records) => {
+                  const itemKey = storageMode
+                    ? `${dept}:${records[0].item_id}:${records[0].management_category ?? "DEFECT"}`
+                    : `${dept}:${records[0].item_id}`;
                   return (
                     <DefectItemGroup
                       key={itemKey}
                       department={dept}
                       records={records}
                       expanded={expandedItems.has(itemKey)}
-                      onToggle={() => toggleItem(dept, records[0].item_id)}
+                      onToggle={() => toggleItem(itemKey)}
                       currentEmployee={currentEmployee}
                       onMemoUpdated={onMemoUpdated}
+                      onMoveToStorage={onMoveToStorage}
+                      storageMode={storageMode}
                       onProcess={onProcess}
                       batchEnabled={onBatchProcess !== undefined}
                       batchSelection={batchSelection?.groupKey === itemKey ? batchSelection.recordIds : null}
@@ -203,6 +215,8 @@ function DefectItemGroup({
   onToggle,
   currentEmployee,
   onMemoUpdated,
+  onMoveToStorage,
+  storageMode,
   onProcess,
   batchEnabled,
   batchSelection,
@@ -217,6 +231,8 @@ function DefectItemGroup({
   onToggle: () => void;
   currentEmployee?: CurrentEmployee;
   onMemoUpdated?: (recordId: string, memo: string) => void;
+  onMoveToStorage?: (location: DefectLocation) => void;
+  storageMode: boolean;
   onProcess: (location: DefectLocation) => void;
   batchEnabled: boolean;
   batchSelection: Set<string> | null;
@@ -231,6 +247,8 @@ function DefectItemGroup({
         location={records[0]}
         currentEmployee={currentEmployee}
         onMemoUpdated={onMemoUpdated}
+        onMoveToStorage={onMoveToStorage}
+        storageMode={storageMode}
         onProcess={onProcess}
       />
     );
@@ -309,6 +327,8 @@ function DefectItemGroup({
           hideItemIdentity
           currentEmployee={currentEmployee}
           onMemoUpdated={onMemoUpdated}
+          onMoveToStorage={onMoveToStorage}
+          storageMode={storageMode}
           onProcess={onProcess}
           selectionMode={batchSelection !== null}
           selected={batchSelection?.has(record.record_id) ?? false}
@@ -324,6 +344,8 @@ function DefectRecordRow({
   hideItemIdentity = false,
   currentEmployee,
   onMemoUpdated,
+  onMoveToStorage,
+  storageMode = false,
   onProcess,
   selectionMode = false,
   selected = false,
@@ -333,6 +355,8 @@ function DefectRecordRow({
   hideItemIdentity?: boolean;
   currentEmployee?: CurrentEmployee;
   onMemoUpdated?: (recordId: string, memo: string) => void;
+  onMoveToStorage?: (location: DefectLocation) => void;
+  storageMode?: boolean;
   onProcess: (location: DefectLocation) => void;
   selectionMode?: boolean;
   selected?: boolean;
@@ -345,7 +369,8 @@ function DefectRecordRow({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [history, setHistory] = useState<DefectMemoRevision[] | null>(null);
+  const [memoHistory, setMemoHistory] = useState<DefectMemoRevision[] | null>(null);
+  const [categoryHistory, setCategoryHistory] = useState<DefectManagementCategoryRevision[] | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const memoTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -391,7 +416,10 @@ function DefectRecordRow({
       setEditPin("");
       if (result.changed) {
         if (historyOpen) await loadHistory();
-        else setHistory(null);
+        else {
+          setMemoHistory(null);
+          setCategoryHistory(null);
+        }
       }
       onMemoUpdated?.(location.record_id, result.memo);
     } catch (error) {
@@ -408,7 +436,7 @@ function DefectRecordRow({
       return;
     }
     setHistoryOpen(true);
-    if (history !== null) return;
+    if (memoHistory !== null && categoryHistory !== null) return;
     await loadHistory();
   }
 
@@ -416,9 +444,14 @@ function DefectRecordRow({
     setHistoryLoading(true);
     setHistoryError(null);
     try {
-      setHistory(await defectsApi.getMemoHistory(location.record_id));
+      const [nextMemoHistory, nextCategoryHistory] = await Promise.all([
+        defectsApi.getMemoHistory(location.record_id),
+        defectsApi.getManagementCategoryHistory(location.record_id),
+      ]);
+      setMemoHistory(nextMemoHistory);
+      setCategoryHistory(nextCategoryHistory);
     } catch (error) {
-      setHistoryError(error instanceof Error ? error.message : "메모 이력을 불러오지 못했습니다.");
+      setHistoryError(error instanceof Error ? error.message : "이력을 불러오지 못했습니다.");
     } finally {
       setHistoryLoading(false);
     }
@@ -453,6 +486,7 @@ function DefectRecordRow({
           <p className="break-words text-sm font-bold leading-5" style={{ color: LEGACY_COLORS.muted2 }}>{formatDateTime(location.defective_at)}</p>
           <p className="mt-1 break-words text-base font-black leading-6" style={{ color: LEGACY_COLORS.text }}>{quarantinedBy}</p>
           <div className="mt-2 flex flex-wrap gap-1.5">
+            {storageMode && <StatusBadge label={location.management_category === "OBSOLETE" ? "구형" : location.management_category === "B_GRADE" ? "B급" : "불량 격리"} color={location.management_category === "B_GRADE" ? LEGACY_COLORS.purple : location.management_category === "OBSOLETE" ? LEGACY_COLORS.muted2 : LEGACY_COLORS.red} />}
             {location.is_legacy && location.legacy_origin !== "reconstructed" && (
               <StatusBadge
                 label="기존 합산"
@@ -460,7 +494,7 @@ function DefectRecordRow({
               />
             )}
             {pendingQty > 0 && <StatusBadge label={`처리 대기 ${formatQty(pendingQty)}개`} color={LEGACY_COLORS.yellow} />}
-            {warn && <StatusBadge label="1년 초과" color={LEGACY_COLORS.red} icon={<AlertTriangle className="h-3 w-3" />} />}
+            {!storageMode && warn && <StatusBadge label="1년 초과" color={LEGACY_COLORS.red} icon={<AlertTriangle className="h-3 w-3" />} />}
           </div>
         </div>
 
@@ -524,26 +558,42 @@ function DefectRecordRow({
                 <SmallActionButton label={saving ? "저장 중" : "저장"} onClick={() => void saveMemo()} disabled={saving || editPin.length !== PIN_LENGTH} />
                 <SmallActionButton label="취소" onClick={() => { setDraftMemo(memo); setEditPin(""); setSaveError(null); setEditing(false); }} disabled={saving} />
               </>
-            ) : canEditMemo ? (
-              <SmallActionButton label="메모 수정" icon={<Pencil className="h-3.5 w-3.5" />} onClick={() => { setDraftMemo(memo); setEditPin(""); setSaveError(null); setEditing(true); }} />
             ) : null}
             <SmallActionButton
-              label={historyOpen ? "메모 이력 닫기" : "메모 이력 보기"}
+              label={historyOpen ? "이력 닫기" : "이력 보기"}
               icon={<History className="h-3.5 w-3.5" />}
               onClick={() => void toggleHistory()}
+              uniformWidth={storageMode}
             />
-            <button
-              type="button"
-              onClick={() => onProcess(location)}
-              disabled={availableQty <= 0}
-              className="standard-hover ml-auto min-h-11 shrink-0 rounded-[10px] border px-4 text-sm font-black transition-colors disabled:cursor-not-allowed disabled:opacity-45"
-              style={{ background: tint(LEGACY_COLORS.red, 8), borderColor: tint(LEGACY_COLORS.red, 40), color: LEGACY_COLORS.red }}
-            >
-              처리
-            </button>
+            <div data-testid="defect-record-actions" className="ml-auto flex flex-wrap items-center justify-end gap-2">
+              {!editing && canEditMemo && (
+                <SmallActionButton label="메모 수정" icon={<Pencil className="h-3.5 w-3.5" />} onClick={() => { setDraftMemo(memo); setEditPin(""); setSaveError(null); setEditing(true); }} uniformWidth={storageMode} />
+              )}
+              {onMoveToStorage && (
+                <button
+                  type="button"
+                  onClick={() => onMoveToStorage(location)}
+                  disabled={location.is_legacy && location.legacy_origin === "aggregate"}
+                  title={location.is_legacy && location.legacy_origin === "aggregate" ? "기존 합산 기록은 B급·구형으로 이동할 수 없습니다." : undefined}
+                  className={`standard-hover inline-flex min-h-11 items-center rounded-[10px] border px-3 text-xs font-black disabled:cursor-not-allowed disabled:opacity-45 ${storageMode ? "w-24 justify-center" : ""}`}
+                  style={{ borderColor: tint(LEGACY_COLORS.purple, 32), background: tint(LEGACY_COLORS.purple, 8), color: LEGACY_COLORS.purple }}
+                >
+                  {storageMode ? "분류 변경" : "B급·구형으로 이동"}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => onProcess(location)}
+                disabled={availableQty <= 0}
+                className={`standard-hover min-h-11 shrink-0 rounded-[10px] border font-black transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${storageMode ? "w-24 justify-center px-3 text-xs" : "px-4 text-sm"}`}
+                style={{ background: tint(LEGACY_COLORS.red, 8), borderColor: tint(LEGACY_COLORS.red, 40), color: LEGACY_COLORS.red }}
+              >
+                {storageMode ? "정상 복귀" : "처리"}
+              </button>
+            </div>
           </div>
 
-          {historyOpen && <MemoHistory history={history} loading={historyLoading} error={historyError} />}
+          {historyOpen && <RecordHistory memoHistory={memoHistory} categoryHistory={categoryHistory} loading={historyLoading} error={historyError} />}
         </div>
       </div>
     </article>
@@ -630,13 +680,25 @@ function QuantitySummary({
   );
 }
 
-function SmallActionButton({ label, onClick, icon, disabled = false }: { label: string; onClick: () => void; icon?: ReactNode; disabled?: boolean }) {
+function SmallActionButton({
+  label,
+  onClick,
+  icon,
+  disabled = false,
+  uniformWidth = false,
+}: {
+  label: string;
+  onClick: () => void;
+  icon?: ReactNode;
+  disabled?: boolean;
+  uniformWidth?: boolean;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="standard-hover inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border px-3 text-xs font-black transition-colors disabled:opacity-50"
+      className={`standard-hover inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border px-3 text-xs font-black transition-colors disabled:opacity-50 ${uniformWidth ? "w-24 justify-center" : ""}`}
       style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2 }}
     >
       {icon}{label}
@@ -644,49 +706,72 @@ function SmallActionButton({ label, onClick, icon, disabled = false }: { label: 
   );
 }
 
-function MemoHistory({ history, loading, error }: { history: DefectMemoRevision[] | null; loading: boolean; error: string | null }) {
-  const orderedHistory = history
-    ? [...history].sort((left, right) => {
-        const leftTime = parseBackendTimestamp(left.edited_at)?.getTime() ?? 0;
-        const rightTime = parseBackendTimestamp(right.edited_at)?.getTime() ?? 0;
+function RecordHistory({
+  memoHistory,
+  categoryHistory,
+  loading,
+  error,
+}: {
+  memoHistory: DefectMemoRevision[] | null;
+  categoryHistory: DefectManagementCategoryRevision[] | null;
+  loading: boolean;
+  error: string | null;
+}) {
+  const orderedHistory = memoHistory && categoryHistory
+    ? [
+        ...memoHistory.map((revision) => ({ kind: "memo" as const, revision })),
+        ...categoryHistory.map((revision) => ({ kind: "category" as const, revision })),
+      ].sort((left, right) => {
+        const leftTime = parseBackendTimestamp(left.revision.edited_at)?.getTime() ?? 0;
+        const rightTime = parseBackendTimestamp(right.revision.edited_at)?.getTime() ?? 0;
         return rightTime - leftTime;
       })
     : null;
 
   return (
-    <div data-testid="defect-memo-history" className="mt-3 rounded-[10px] border p-2" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
+    <div data-testid="defect-record-history" className="mt-3 rounded-[10px] border p-2" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>
       {loading && <p className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted }}>이력을 불러오는 중...</p>}
       {error && <p className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>{error}</p>}
-      {!loading && !error && orderedHistory?.length === 0 && <p className="px-1 py-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted }}>메모 이력이 없습니다.</p>}
+      {!loading && !error && orderedHistory?.length === 0 && <p className="px-1 py-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted }}>이력이 없습니다.</p>}
       {!loading && !error && orderedHistory && orderedHistory.length > 0 && (
         <ol className="flex flex-col gap-2">
-          {orderedHistory.map((revision) => (
+          {orderedHistory.map((entry, index) => (
             <li
-              key={revision.revision_id}
+              key={entry.kind === "memo" ? entry.revision.revision_id : `${entry.revision.edited_at}-${entry.revision.next_category}-${index}`}
               className="flex min-w-0 gap-2 rounded-[10px] border px-3 py-2.5"
               style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}
             >
               <Clock3 className="mt-0.5 h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted }} />
               <div className="min-w-0 flex-1">
-                {revision.is_initial ? (
+                {entry.kind === "category" ? (
+                  <>
+                    <p className="text-sm font-black" style={{ color: LEGACY_COLORS.text }}>
+                      {entry.revision.is_initial
+                        ? `최초 분류 · ${MANAGEMENT_CATEGORY_LABEL[entry.revision.next_category]}`
+                        : `분류 변경 · ${MANAGEMENT_CATEGORY_LABEL[entry.revision.previous_category ?? "DEFECT"]} → ${MANAGEMENT_CATEGORY_LABEL[entry.revision.next_category]}`}
+                    </p>
+                    {entry.revision.memo && <p className="mt-1 whitespace-pre-wrap break-words text-sm font-medium" style={{ color: LEGACY_COLORS.text }}>{`메모: ${entry.revision.memo}`}</p>}
+                  </>
+                ) : entry.revision.is_initial ? (
                   <>
                     <p className="text-sm font-black" style={{ color: LEGACY_COLORS.text }}>최초 등록</p>
                     <p className="mt-1 whitespace-pre-wrap break-words text-sm font-medium" style={{ color: LEGACY_COLORS.text }}>
-                      {`등록 메모: ${historyMemoText(revision.next_memo)}`}
+                      {`등록 메모: ${historyMemoText(entry.revision.next_memo)}`}
                     </p>
                   </>
                 ) : (
                   <div className="flex min-w-0 flex-col gap-1">
+                    <p className="text-sm font-black" style={{ color: LEGACY_COLORS.text }}>메모 수정</p>
                     <p className="whitespace-pre-wrap break-words text-sm font-medium" style={{ color: LEGACY_COLORS.muted2 }}>
-                      {`변경 전: ${historyMemoText(revision.previous_memo)}`}
+                      {`변경 전: ${historyMemoText(entry.revision.previous_memo)}`}
                     </p>
                     <p className="whitespace-pre-wrap break-words text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
-                      {`변경 후: ${historyMemoText(revision.next_memo)}`}
+                      {`변경 후: ${historyMemoText(entry.revision.next_memo)}`}
                     </p>
                   </div>
                 )}
                 <p className="mt-2 border-t pt-2 text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}>
-                  {formatDateTime(revision.edited_at)} · {revision.edited_by_name || "처리자 미상"}
+                  {formatDateTime(entry.revision.edited_at)} · {entry.revision.edited_by_name || "처리자 미상"}
                 </p>
               </div>
             </li>
@@ -705,12 +790,13 @@ function groupByDepartment(locations: DefectLocation[]): Record<string, DefectLo
   }, {});
 }
 
-function groupByItem(locations: DefectLocation[]): DefectLocation[][] {
+function groupByItem(locations: DefectLocation[], storageMode = false): DefectLocation[][] {
   const groups = new Map<string, DefectLocation[]>();
   for (const location of locations) {
-    const records = groups.get(location.item_id);
+    const key = storageMode ? `${location.item_id}:${location.management_category ?? "DEFECT"}` : location.item_id;
+    const records = groups.get(key);
     if (records) records.push(location);
-    else groups.set(location.item_id, [location]);
+    else groups.set(key, [location]);
   }
   return Array.from(groups.values());
 }

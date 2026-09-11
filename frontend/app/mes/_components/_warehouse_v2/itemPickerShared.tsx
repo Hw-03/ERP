@@ -8,8 +8,9 @@
 
 import { formatQty } from "@/lib/mes/format";
 import { PROD_DEPTS } from "../_warehouse_steps/_constants";
-import { deptOf, stageOf, type DeptLetter } from "../_admin_sections/_bom_workbench/bomDept";
+import { DEPT_LETTER_TO_NAME, deptOf, stageOf, type DeptLetter } from "../_admin_sections/_bom_workbench/bomDept";
 import type { Item } from "./types";
+import type { Department } from "@/lib/api/types/shared";
 
 export const STAGE_OPTIONS = [
   { value: "ALL", label: "전체" },
@@ -33,6 +34,12 @@ export function matchesDept(item: Item, dept: string) {
   const letter = NAME_TO_LETTER[dept];
   if (!letter) return true;
   return deptOf(item.process_type_code) === letter;
+}
+
+/** 품목 공정 코드의 담당 생산 부서. 매핑할 수 없으면 null. */
+export function itemDepartment(item: Item): Department | null {
+  const letter = deptOf(item.process_type_code);
+  return letter ? (DEPT_LETTER_TO_NAME[letter] as Department) : null;
 }
 
 export function matchesStage(item: Item, stage: string) {

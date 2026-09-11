@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from enum import Enum
 
 from sqlalchemy import (
     Boolean,
@@ -24,9 +25,19 @@ from app.models.base import Base, IntQuantity, UUIDString
 __all__ = [
     "DefectQuarantineRecord",
     "DefectQuarantineMemoRevision",
+    "DefectManagementCategoryEnum",
+    "DefectQuarantineManagementCategoryRevision",
     "DefectQuarantineReconstruction",
     "DefectQuarantineReconstructionAllocation",
 ]
+
+
+class DefectManagementCategoryEnum(str, Enum):
+    """격리 재고의 현재 관리 목적을 구분한다."""
+
+    DEFECT = "DEFECT"
+    B_GRADE = "B_GRADE"
+    OBSOLETE = "OBSOLETE"
 
 
 class DefectQuarantineRecord(Base):
@@ -54,6 +65,13 @@ class DefectQuarantineRecord(Base):
     quarantined_by_name = Column(String(100), nullable=True)
     reason_category = Column(String(32), nullable=True)
     current_memo = Column(Text, nullable=True)
+    management_category = Column(
+        String(16),
+        nullable=False,
+        default=DefectManagementCategoryEnum.DEFECT.value,
+        server_default=DefectManagementCategoryEnum.DEFECT.value,
+        index=True,
+    )
     is_legacy = Column(Boolean, nullable=False, default=False, server_default="0")
     legacy_location_id = Column(
         UUIDString,
@@ -75,6 +93,12 @@ class DefectQuarantineRecord(Base):
         back_populates="record",
         cascade="all, delete-orphan",
         order_by="DefectQuarantineMemoRevision.edited_at",
+    )
+    management_category_revisions = relationship(
+        "DefectQuarantineManagementCategoryRevision",
+        back_populates="record",
+        cascade="all, delete-orphan",
+        order_by="DefectQuarantineManagementCategoryRevision.edited_at",
     )
 
     __table_args__ = (
@@ -117,6 +141,36 @@ class DefectQuarantineMemoRevision(Base):
     is_initial = Column(Boolean, nullable=False, default=False, server_default="0")
 
     record = relationship("DefectQuarantineRecord", back_populates="memo_revisions")
+
+
+class DefectQuarantineManagementCategoryRevision(Base):
+    """격리 원장의 관리 분류 최초 등록과 변경 이력."""
+
+    __tablename__ = "defect_quarantine_management_category_revisions"
+
+    revision_id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
+    record_id = Column(
+        UUIDString,
+        ForeignKey("defect_quarantine_records.record_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    previous_category = Column(String(16), nullable=True)
+    next_category = Column(String(16), nullable=False)
+    memo = Column(Text, nullable=True)
+    edited_by_employee_id = Column(
+        UUIDString,
+        ForeignKey("employees.employee_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    edited_by_name = Column(String(100), nullable=False)
+    edited_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
+    is_initial = Column(Boolean, nullable=False, default=False, server_default="0")
+
+    record = relationship(
+        "DefectQuarantineRecord",
+        back_populates="management_category_revisions",
+    )
 
 
 class DefectQuarantineReconstruction(Base):

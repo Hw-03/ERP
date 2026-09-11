@@ -573,7 +573,7 @@ def test_execute_line_mark_defective_prod(db_session, make_item, make_location):
 def test_execute_line_scrap_normal_from_production(db_session, make_item, make_location):
     """SCRAP_NORMAL: 부서 PRODUCTION 차감, 총량 감소, DEFECT_SCRAP 로그 생성."""
     item = make_item(name="SNP", warehouse_qty=D("0"))
-    make_location(item.item_id, department=ASSEMBLY,
+    make_location(item.item_id, department=DepartmentEnum.TUBE,
                   status=LocationStatusEnum.PRODUCTION, quantity=D("5"))
     inv = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
     inv.quantity = D("5")
@@ -589,13 +589,13 @@ def test_execute_line_scrap_normal_from_production(db_session, make_item, make_l
     line = _add_line(
         db_session, req, item, quantity=D("2"),
         from_bucket=RequestBucketEnum.PRODUCTION, to_bucket=RequestBucketEnum.NONE,
-        from_department=ASSEMBLY.value,
+        from_department=DepartmentEnum.TUBE.value,
     )
 
     svc._execute_line(db_session, req, line, approver=emp, is_approval=False)
     db_session.flush()
 
-    assert _prod_qty(db_session, item.item_id, ASSEMBLY) == D("3")
+    assert _prod_qty(db_session, item.item_id, DepartmentEnum.TUBE) == D("3")
     assert _total_qty(db_session, item.item_id) == D("3")
     logs = _logs(db_session, item.item_id)
     assert len(logs) == 1
@@ -611,7 +611,7 @@ def test_execute_line_rework_normal_splits_children_by_item_department(
     normal_child = make_item(name="TUBE-CHILD", process_type_code="TR", warehouse_qty=D("0"))
     defective_child = make_item(name="HV-CHILD", process_type_code="HR", warehouse_qty=D("0"))
     scrap_child = make_item(name="ASSY-CHILD", process_type_code="AR", warehouse_qty=D("0"))
-    make_location(parent.item_id, department=ASSEMBLY,
+    make_location(parent.item_id, department=DepartmentEnum.SHIPPING,
                   status=LocationStatusEnum.PRODUCTION, quantity=D("2"))
     inv = db_session.query(Inventory).filter(Inventory.item_id == parent.item_id).first()
     inv.quantity = D("2")
@@ -655,13 +655,13 @@ def test_execute_line_rework_normal_splits_children_by_item_department(
     line = _add_line(
         db_session, req, parent, quantity=D("2"),
         from_bucket=RequestBucketEnum.PRODUCTION, to_bucket=RequestBucketEnum.NONE,
-        from_department=ASSEMBLY.value,
+        from_department=DepartmentEnum.SHIPPING.value,
     )
 
     svc._execute_line(db_session, req, line, approver=emp, is_approval=False)
     db_session.flush()
 
-    assert _prod_qty(db_session, parent.item_id, ASSEMBLY) == D("0")
+    assert _prod_qty(db_session, parent.item_id, DepartmentEnum.SHIPPING) == D("0")
     assert _total_qty(db_session, parent.item_id) == D("0")
     assert _prod_qty(db_session, normal_child.item_id, DepartmentEnum.TUBE) == D("2")
     assert _defective_qty(db_session, defective_child.item_id, DepartmentEnum.HIGH_VOLTAGE) == D("1")
@@ -1740,3 +1740,68 @@ def test_rework_first_prelock_includes_recursive_child_tree(
         )
 
     assert events[0] == ("lock", expected_ids)
+
+
+@pytest.mark.parametrize(
+    "request_type",
+    [
+        StockRequestTypeEnum.REWORK_NORMAL,
+        StockRequestTypeEnum.DEFECT_DISASSEMBLE,
+    ],
+)
+def test_execute_all_lines_locks_all_rework_items_before_touched_inventories(
+    db_session, make_item, monkeypatch, request_type
+):
+    parent = make_item(name=f"{request_type.value}-lock-parent")
+    child = make_item(name=f"{request_type.value}-lock-child")
+    employee = _make_employee(db_session, code=f"LOCK-{request_type.value}")
+    request = _make_request(
+        db_session,
+        employee,
+        request_type=request_type,
+        requires_warehouse_approval=False,
+        notes=json.dumps({
+            "child_decisions": [{
+                "item_id": str(child.item_id),
+                "qty": "1",
+                "normal_qty": "1",
+                "defective_qty": "0",
+                "scrap_qty": "0",
+            }],
+        }),
+    )
+    line = _add_line(
+        db_session,
+        request,
+        parent,
+        quantity=D("1"),
+        from_bucket=RequestBucketEnum.PRODUCTION,
+        to_bucket=RequestBucketEnum.NONE,
+        from_department=ASSEMBLY.value,
+    )
+    expected_ids = sorted([parent.item_id, child.item_id])
+    events = []
+
+    monkeypatch.setattr(svc, "_is_sqlite", False)
+    monkeypatch.setattr(svc, "requires_exact_defect_selection", lambda *_args: False)
+    monkeypatch.setattr(
+        svc,
+        "lock_items_for_department_routing",
+        lambda _db, item_ids: events.append(("items", sorted(item_ids))) or {},
+    )
+    monkeypatch.setattr(
+        svc.inventory_svc,
+        "ensure_and_lock_inventories",
+        lambda _db, item_ids: events.append(("inventory", item_ids)) or {},
+    )
+    monkeypatch.setattr(svc, "_execute_line", lambda *_args, **_kwargs: None)
+
+    svc._execute_all_lines(
+        db_session,
+        request,
+        [line],
+        operator_name=employee.name,
+        approver=employee,
+    )
+
+    assert events[:2] == [("items", expected_ids), ("inventory", expected_ids)]

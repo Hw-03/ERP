@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Optional
+from typing import Iterable, Optional
 import uuid
 
 from sqlalchemy import func, update as sa_update
@@ -227,6 +227,29 @@ def department_for_item(item: Item) -> DepartmentEnum:
         code = item.mes_code or str(item.item_id)
         raise ValueError(f"품목코드로 부서를 찾을 수 없습니다: {code} / {item.item_name}")
     return dept
+
+
+def lock_items_for_department_routing(
+    db: Session,
+    item_ids: Iterable[uuid.UUID],
+) -> dict[uuid.UUID, Item]:
+    """부서 산정 전에 품목 행을 전역 item_id 순서로 잠근다.
+
+    SQLite는 ``FOR UPDATE`` 절을 생략하지만 SQLAlchemy의 잠금 쿼리 경로는
+    동일하게 거친다. 호출자는 반환된 Item으로 부서를 산정한 뒤 같은 트랜잭션에서
+    재고를 변경해야 한다.
+    """
+    ordered_item_ids = sorted(set(item_ids))
+    if not ordered_item_ids:
+        return {}
+    items = (
+        db.query(Item)
+        .filter(Item.item_id.in_(ordered_item_ids))
+        .order_by(Item.item_id)
+        .with_for_update()
+        .all()
+    )
+    return {item.item_id: item for item in items}
 
 
 def item_department_stock(db: Session, item: Item) -> tuple[DepartmentEnum, Decimal]:

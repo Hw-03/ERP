@@ -40,13 +40,27 @@ function makeItem(index: number): Item {
 }
 
 describe("DefectItemPicker mobile scroll", () => {
+  it("does not repeat the automatic department as a desktop table column", () => {
+    render(
+      <DefectItemPicker
+        items={[makeItem(1)]}
+        productModels={[]}
+        source="production"
+        selectedIds={new Set()}
+        onAdd={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+
+    expect(screen.queryByRole("columnheader", { name: "부서" })).not.toBeInTheDocument();
+  });
+
   it("makes the result table the touch scroll owner and resets it on search", async () => {
     const { container } = render(
       <DefectItemPicker
         items={Array.from({ length: 30 }, (_, index) => makeItem(index + 1))}
         productModels={[]}
-        targetDepartment="조립"
-        lockedDepartment="조립"
+        source="production"
         selectedIds={new Set()}
         onAdd={() => {}}
         onRemove={() => {}}
@@ -62,5 +76,53 @@ describe("DefectItemPicker mobile scroll", () => {
     fireEvent.change(input as HTMLInputElement, { target: { value: "SOLO item 2" } });
 
     await waitFor(() => expect(table.scrollTop).toBe(0));
+  });
+
+  it("keeps the department browse filter visible in warehouse source while requiring warehouse stock", () => {
+    const withoutWarehouse = { ...makeItem(1), item_id: "no-warehouse", item_name: "창고 없음", warehouse_qty: 0 };
+    render(
+      <DefectItemPicker
+        items={[makeItem(2), withoutWarehouse]}
+        productModels={[]}
+        source="warehouse"
+        selectedIds={new Set()}
+        onAdd={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+
+    expect(screen.getAllByRole("combobox")).toHaveLength(3);
+    expect(screen.getByText("SOLO item 2")).toBeInTheDocument();
+    expect(screen.queryByText("창고 없음")).not.toBeInTheDocument();
+  });
+
+  it("blocks an unmapped item only for production source", () => {
+    const unmapped = { ...makeItem(3), item_id: "unmapped", item_name: "미지정 품목", process_type_code: "XX" };
+    const { rerender } = render(
+      <DefectItemPicker
+        items={[unmapped]}
+        productModels={[]}
+        source="production"
+        selectedIds={new Set()}
+        onAdd={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("부서 미지정 · 생산 출처에서 추가할 수 없습니다.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "미지정 품목 장바구니에 추가" })).toBeDisabled();
+
+    rerender(
+      <DefectItemPicker
+        items={[unmapped]}
+        productModels={[]}
+        source="warehouse"
+        selectedIds={new Set()}
+        onAdd={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "미지정 품목 장바구니에 추가" })).toBeEnabled();
   });
 });

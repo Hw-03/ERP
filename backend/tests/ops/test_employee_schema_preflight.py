@@ -214,6 +214,7 @@ def test_manual_pf_pin_removal_declares_its_data_change_contract(tmp_path: Path)
         "20260826_0029_inventory_operations.py",
         "20260903_0031_add_item_procurement_fields.py",
         "20260903_0032_add_item_purchase_memo.py",
+        "20260910_0033_defect_management_categories.py",
     ],
 )
 def test_current_employee_schema_migrations_declare_auto_deploy_policy(filename: str) -> None:

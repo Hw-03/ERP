@@ -22,6 +22,32 @@ export interface DefectLocation {
   legacy_origin: "aggregate" | "reconstructed" | null;
   /** BOM 자식 보유 여부. 격리 처리 "재작업" 옵션 노출 조건. */
   has_bom: boolean;
+  /** 기존 기록은 서버 필드가 없을 수 있으므로 화면에서는 DEFECT로 정규화한다. */
+  management_category?: DefectManagementCategory;
+}
+
+export type DefectManagementCategory = "DEFECT" | "B_GRADE" | "OBSOLETE";
+
+export interface DefectListQuery {
+  management_category?: DefectManagementCategory;
+}
+
+export interface DefectManagementCategoryUpdatePayload {
+  management_category: DefectManagementCategory;
+  expected_management_category: DefectManagementCategory;
+  memo?: string | null;
+  actor_employee_id: string;
+  pin: string;
+}
+
+export interface DefectManagementCategoryRevision {
+  previous_category: DefectManagementCategory | null;
+  next_category: DefectManagementCategory;
+  memo: string | null;
+  edited_by_employee_id: string | null;
+  edited_by_name: string;
+  edited_at: string;
+  is_initial: boolean;
 }
 
 export interface DefectKpi {
@@ -39,6 +65,7 @@ export interface QuarantinePayload {
   reason_memo: string;
   actor_employee_id: string;
   client_request_id?: string;
+  management_category?: DefectManagementCategory;
 }
 
 export interface UnquarantinePayload {

@@ -46,8 +46,11 @@ vi.mock("../_defect_hub/DefectDepartmentList", () => ({
 }));
 
 vi.mock("../_defect_hub/DefectProcessPanel", () => ({
-  DefectProcessPanel: ({ location }: { location: { quantity: number } }) => (
-    <div data-testid="process-location">{location.quantity}</div>
+  DefectProcessPanel: ({ location, restoreOnly, onDone }: { location: { quantity: number }; restoreOnly?: boolean; onDone: () => void }) => (
+    <div data-testid="process-location">
+      {location.quantity}{restoreOnly && " restore-only"}
+      <button type="button" onClick={onDone}>Complete process</button>
+    </div>
   ),
 }));
 
@@ -111,6 +114,27 @@ describe("DesktopDefectView realtime refresh", () => {
     expect(viewport).toHaveAttribute("data-keep-scroll");
     expect(viewport).toHaveClass("overflow-y-auto", "lg:-right-2.5", "lg:[scrollbar-gutter:stable]");
     expect(viewport).not.toHaveClass("scrollbar-hide");
+  });
+
+  it("returns to storage after a desktop restore-only completion", async () => {
+    window.history.replaceState({ defect: "storage" }, "");
+    mocks.listDefects.mockResolvedValue([{ ...location, management_category: "B_GRADE" }]);
+    render(<DesktopDefectView operator={operator} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Process D-001" }));
+    expect(await screen.findByTestId("process-location")).toHaveTextContent("restore-only");
+    fireEvent.click(screen.getByRole("button", { name: "Complete process" }));
+
+    expect(await screen.findByRole("heading", { name: "B급·구형 자재" })).toBeInTheDocument();
+  });
+
+  it("uses the full desktop content width for the B급·구형 storage view", async () => {
+    window.history.replaceState({ defect: "storage" }, "");
+    render(<DesktopDefectView operator={operator} />);
+
+    const heading = await screen.findByRole("heading", { name: "B급·구형 자재" });
+    const storageView = heading.closest("header")?.parentElement;
+    expect(storageView).toHaveClass("flex-1");
   });
 
   it("preserves the dashboard model catalog order", async () => {
