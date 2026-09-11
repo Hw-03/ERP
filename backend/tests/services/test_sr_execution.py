@@ -1906,7 +1906,7 @@ def test_execute_all_lines_locks_all_rework_items_before_touched_inventories(
     monkeypatch.setattr(svc, "_requires_exact_defect_selection", lambda *_args: False)
     monkeypatch.setattr(
         svc,
-        "lock_items_for_department_routing",
+        "_lock_items_for_department_routing",
         lambda _db, item_ids: events.append(("items", sorted(item_ids))) or {},
     )
     monkeypatch.setattr(
