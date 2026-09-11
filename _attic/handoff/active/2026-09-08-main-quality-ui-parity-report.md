@@ -1,10 +1,10 @@
 # DEXCOWIN MES main–품질 개선 브라우저 동등성 검증 보고서
 
-검증·정리: 2026-09-08~2026-09-10 KST
+검증·정리: 2026-09-08~2026-09-11 KST
 
 비교 판정: **의도된 차이 안내 후 적용 가능**
 
-main 반영 상태: **미반영 — 사용자 승인 전 정지**
+main 반영 상태: **코드 후보 CI 6/6 통과 — 이 보고서 커밋을 포함한 fast-forward 승인됨**
 
 ## 직원 관점 한 페이지 결론
 
@@ -25,7 +25,7 @@ main 반영 상태: **미반영 — 사용자 승인 전 정지**
 
 품질 후보는 GitHub의 독립 PostgreSQL 16에서 필수 두 연결 잠금·경합 게이트를 통과했다. 고정 main의 동일 PostgreSQL A/B 실행은 하지 않았으므로 해당 비교 행 자체는 미검증으로 유지한다. SQLite 결과를 PostgreSQL 통과로 대신하지 않았다.
 
-후보를 만든 뒤 main이 `8d7fa611…`에서 `aa1a74a3…`으로 두 커밋 이동했다. 사용자는 이 두 커밋을 이번 검토에서 제외하고 나중에 확인하기로 했다. 따라서 이 보고서의 통합 후보 기준은 `8d7fa611…`이며, 현재 main에는 반영하지 않았다. 현재 main과 후보는 분기돼 있어 실제 반영 전에는 제외한 두 커밋을 별도로 검토해야 한다.
+기존 후보 뒤 main에 추가된 5개 커밋을 모두 검토해 최신 main `76a56416…`을 품질 브랜치에 정상 병합했다. 출하 취소 재처리, BOM 1EA 증분, 출하 재진행 배포 검증, B급·구형 자재 관리와 자동 부서 라우팅, 불량 화면 번들 예산을 유지하면서 품질 버전의 세션·권한·재고 안전장치를 함께 보존했다. 34개 내용 충돌을 기능별로 해결했고 최종 후보는 `94afc622…`이다.
 
 ## 비교 코드와 실행 환경
 
@@ -34,12 +34,13 @@ main 반영 상태: **미반영 — 사용자 승인 전 정지**
 | 최초 A/B 고정 main | `27e6c9dba5465d83f837788c12c89efc5bbf07fa` |
 | 품질 원본 HEAD | `d4a3bb103b4491d5731537dd611936d417525fc3` |
 | 최초 pending merge 완료 | `db58a2e640261e8b0205a8227048a1f0bcad67c1` — 부모에 고정 main 포함 |
-| 최종 후보의 main 기준 | `8d7fa6117a0369e0c731cd392c8081105f93af33` |
-| 통합 merge | `710270099b…` — `8d7fa611…`과 `db58a2e6…` 병합 |
-| 코드 검증 후보 | `ec13a9d16639ac3d97166a2eac040fc399f5bf8d` |
-| 원 품질 계보 | 공통 기준 `d2b0dd29…` 이후 품질 70커밋 전부가 후보의 조상 |
-| 후보 증가량 | 기준 main `8d7fa611…`보다 77커밋 앞섬 — 품질 70개와 merge·통합 수정 7개 |
-| 현재 main | `aa1a74a3b38e50e028ee17ba69d4c6612038633e` — 이번 범위에서 제외한 신규 2커밋 포함 |
+| 최종 후보의 main 기준 | `76a564166d48b839131a4d2c99cd965da236457b` |
+| 최신 main 추가 기능 | `9312c5bb…`부터 `76a56416…`까지 5커밋 전부 통합 |
+| 최신 main 통합 merge | `3b9c3924736b6bd7ba9d83fce06a4916766a614b` — 부모 `f950f20b…`, `76a56416…` |
+| 코드 검증 후보 | `94afc622cfd89cfdc9e78bf9f65a2491c0da922b` |
+| 원 품질 계보 | `d2b0dd2969883b2c8876c4375c99a456dcb6f21e..d4a3bb103b4491d5731537dd611936d417525fc3`의 품질 70커밋 전부가 후보의 조상 |
+| 후보 증가량 | 최신 main `76a56416…`보다 82커밋 앞섬; 원 품질 70개 SHA를 squash·rebase 없이 유지 |
+| 현재 main | `76a564166d48b839131a4d2c99cd965da236457b` — 최종 fast-forward 전 |
 | A/B 주소 | 고정 main `127.0.0.1:3301/8021`, 품질 `127.0.0.1:3302/8022` |
 | A/B DB | 각 버전 정식 schema/bootstrap으로 만든 별도 SQLite 합성 DB |
 | 브라우저 | 실제 Chrome/Playwright, PC 1440×900·모바일 390×844·경계 viewport, `ko-KR`, KST |
@@ -62,7 +63,8 @@ main 반영 상태: **미반영 — 사용자 승인 전 정지**
 - [Excel 호환 CSV](../../runtime/ui-parity-20260908-155732/parity-matrix.csv)
 - 브라우저 증거: `../../runtime/ui-parity-20260908-155732/evidence/browser/`
 - SQL snapshot: `../../runtime/ui-parity-20260908-155732/evidence/sql/`
-- 통합·CI 로그: `../../runtime/final-integration-20260910/logs/`
+- 최초 통합·CI 로그: `../../runtime/final-integration-20260910/logs/`
+- 최신 main 통합 manifest·검증 로그: `../../runtime/final-main-integration-20260911-102700/`
 
 실제 확인 영역은 PC 대시보드·입출고·내역·출하·불량·창고지도·주간보고·일일작업일보, 모바일 5탭·더보기·체크리스트·보고서·창고지도, 관리자 모델·품목·직원·부서·BOM·내보내기·정합성·보안이다. 숨긴 탭, 직접 URL, 비관리자, 담당 역할 조합, 빈 목록, 로딩·실패·재시도, 모달·시트·뒤로가기·포커스·키보드 조작도 개별 행으로 남겼다.
 
@@ -128,6 +130,11 @@ stale 부족 시험에서는 다른 UI 요청이 마지막 가용 1개를 먼저
 | 인수인계 작성 API 불일치 | 화면이 없는 부서가 직접 문서 생성 가능 | 튜브 부서 작성 정책을 서비스 경계에 적용; 관련 28개 검사 PASS |
 | 백업 복구 오류 범위 | 내부 백업 게시 복구에서 후속 파일 오류까지 없는 영수증으로 오인할 위험 | `FileNotFoundError` 허용을 복구 확인표 읽기에만 한정; 후속 오류 전파 검사 PASS |
 | BOM 상세 비동기 테스트 | CI가 헤더 mount 뒤 데이터 로드 전 즉시 판정 | BOM 배지 자체를 비동기로 대기; 관련 38개 검사와 스마트 게이트 PASS |
+| 출하 취소 재고 셀 연결 | 품질의 물리 위치 ID가 포함된 원장 키와 main의 논리 예약 키가 달라 픽업 취소를 오판 | 논리 셀 앞 4필드로 정확히 한 물리 셀을 찾고 준비 단계의 무재고 이동은 허용; 출하 102개 검사 PASS |
+| Alembic 양쪽 head 통합 | 최신 defect migration과 기존 품질 migration이 별도 head로 남음 | `20260911_0035` merge revision 추가; SQLite migration·backup 묶음 PASS, PostgreSQL head·경합 CI로 확인 |
+| PostgreSQL 경합 fixture | 창고 출처 불량 3건이 구 정책의 조립 격리 부서를 사용 | 창고 부서로 fixture·복귀·승인 조건을 일치시켜 실제 PostgreSQL 경합 PASS |
+| 출하 상세 비동기 테스트 | 느린 CI에서 상세 shell 뒤 헤더 데이터가 오기 전에 동기 판정 | 실제 헤더 요소를 비동기로 대기; 표적 검사 연속 5회와 프런트 전체 CI로 확인 |
+| 재작업 잠금 테스트 alias | 보안 manifest용 비공개 import alias 뒤 테스트 monkeypatch가 구 공개 이름을 참조 | 새 내부 alias로 테스트 대상을 맞춰 두 요청 유형 PASS |
 
 여기서 백업 `receipt`는 업무 영수증이나 스캔 기능이 아니라, DB 백업 파일 게시가 어느 단계까지 완료됐는지 기록하는 내부 복구 확인표다. 직원 화면·카메라·업무 문서와 관계없다.
 
@@ -146,24 +153,24 @@ stale 부족 시험에서는 다른 UI 요청이 마지막 가용 1개를 먼저
 
 | 검사 | 결과 |
 |---|---|
-| 로컬 필수 게이트 | Node 20.20.2에서 strict lint, 앱·테스트·E2E 타입, 프런트 전체, production build·bundle PASS |
-| 프런트 GitHub CI | 289 files / 2,807 tests PASS; statements·lines 92.98%, branches 91.42%, functions 90% |
-| production build·bundle | PASS; 2,798,388 bytes / 2,977,955.84 bytes 한도 |
-| 실제 Playwright E2E | 25 PASS, 조건부 1 skip, 실패·재시도 0; 전용 DB와 프로세스 소유권 정리 확인 |
+| 로컬 full gate 1회 | Ruff·mypy PASS 후 `TEST_POSTGRES_URL` 미설정과 상위 Node 24 환경 때문에 후속 gate 전 종료; 산출물 결함과 구분해 미실행 gate를 아래 표적 검사로 회수 |
+| 로컬 프런트 | Node 20.20.2에서 strict lint, 앱·테스트·E2E 타입, 291 files / 2,846 tests와 coverage PASS; production build·bundle PASS |
+| production build·bundle | PASS; 2.687 MiB / 2.860 MiB 한도 |
+| 실제 Playwright E2E | GitHub 전용 DB에서 27 PASS, 조건부 1 skip; 로컬 핵심 브라우저 흐름도 전용 DB와 소유 프로세스로 확인 |
 | PostgreSQL 16 | Alembic head와 필수 두 연결 잠금·경합 게이트 PASS |
 | Windows 운영 계약 | PASS |
 | 검증 정책 계약 | PASS |
 | 백엔드 전체 pytest·OpenAPI | PASS; 전체 pytest exit 0, OpenAPI 정본 exact match |
 
-코드 후보 CI는 [GitHub Actions run 34449901292](https://github.com/Hw-03/ERP/actions/runs/34449901292)다. 프런트·E2E·PostgreSQL·Windows·정책 로그는 `../../runtime/final-integration-20260910/logs/ci-34449901292-*.log`에 보존한다.
+최종 코드 후보 CI는 [GitHub Actions run 34559821873](https://github.com/Hw-03/ERP/actions/runs/34559821873)에서 백엔드·프런트·Playwright·PostgreSQL·Windows·검증 정책 6개 작업이 모두 성공했다. 백엔드 전체 pytest와 OpenAPI exact match, 프런트 291 files / 2,846 tests·production build·2.687 MiB 번들, Playwright 27 PASS·조건부 1 skip, PostgreSQL 16 두 연결 경합을 확인했다. 완료 로그는 `../../runtime/final-main-integration-20260911-102700/verification/ci-34559821873-*.log`에 보존한다.
 
-읽기 전용 독립 검토에서도 P1/P2 잔존 문제를 발견하지 못했다. 검토 기록은 `../../runtime/final-integration-20260910/reviews/final-artifact-review-20260910.md`에 보존한다.
+읽기 전용 독립 검토는 출하, 불량·마이그레이션, 권한·계약 세 영역으로 나눠 수행했다. 지적된 통합 fixture와 재고 셀 연결을 반영한 뒤 관련 표적 검사가 모두 통과했다. 요약은 `../../runtime/final-main-integration-20260911-102700/reviews/independent-review-summary.md`에 보존한다.
 
-## main 반영 전 조건
+## main 반영 절차와 남은 환경 조건
 
-1. 이 보고서와 active TODO를 포함한 최종 문서 SHA의 전체 CI가 성공해야 한다.
-2. 현재 main의 제외된 두 커밋 `9312c5bb…`, `aa1a74a3…`을 나중에 검토해야 한다. 현재 main과 후보가 분기돼 있어 그 전에는 `--ff-only` 반영할 수 없다.
+1. 코드 후보 `94afc622…`의 전체 CI는 run `34559821873`에서 6/6 성공했다.
+2. 보고서·active TODO의 문서 변경은 커밋 직전 로컬 문서 gate로 검증한다.
 3. 실제 벽시계 30분 시험을 출시 조건으로 다시 지정하면 `AUTH-15`를 별도로 실행한다. 현재는 사용자 결정으로 생략했다.
 4. 실물 모바일·카메라·네이티브 인쇄와 외부·직원 동기화는 승인된 실제 환경에서만 닫는다.
 
-후보 기준 기능 판정은 **의도된 차이 안내 후 적용 가능**이다. 다만 현재 main 반영은 제외한 신규 2커밋의 후속 검토와 사용자 승인을 기다리며 멈춘다. commit/push는 품질 후보 브랜치에만 수행했고 main 병합·main push·배포·직원 서버 조작은 수행하지 않았다.
+후보 기준 기능 판정은 **의도된 차이 안내 후 적용 가능**이다. 최신 main 기능 5개와 원 품질 70커밋을 함께 보존했고 전체 CI도 통과했다. 문서 gate 뒤 승인된 fast-forward·main push·main CI와 저장소 정리를 연속 수행하며, 최종 Git 영수증은 ignored runtime에 보존한다. 배포와 직원 서버 조작은 수행하지 않는다.
