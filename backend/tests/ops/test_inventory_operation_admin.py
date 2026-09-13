@@ -59,3 +59,33 @@ def test_apply_rejects_missing_validated_backup(tmp_path: Path):
             label="inventory-integrity-repair",
             verify=False,
         )
+
+
+@pytest.mark.parametrize("reject_backup", [False, True])
+def test_automatically_created_backup_is_reverified_before_apply(tmp_path, monkeypatch, reject_backup):
+    from scripts.ops import inventory_operation_admin as cli
+
+    database = tmp_path / "mes.db"
+    database.write_bytes(b"database")
+    backup = tmp_path / "full-backup.db"
+    calls = []
+
+    def create(path, label):
+        assert path == database
+        calls.append("create")
+        return backup
+
+    def verify(path):
+        assert path == backup
+        calls.append("verify")
+        if reject_backup:
+            raise CliSafetyError("backup verification failed")
+
+    monkeypatch.setattr(cli, "_create_backup", create)
+    monkeypatch.setattr(cli, "_verify_backup", verify)
+    if reject_backup:
+        with pytest.raises(CliSafetyError, match="backup verification"):
+            ensure_apply_backup(database_url=f"sqlite:///{database.as_posix()}", validated_backup=None, label="activation")
+    else:
+        assert ensure_apply_backup(database_url=f"sqlite:///{database.as_posix()}", validated_backup=None, label="activation") == backup
+    assert calls == ["create", "verify"]

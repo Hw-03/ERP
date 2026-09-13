@@ -403,12 +403,13 @@ function Recover-CrashLoopPortListeners {
 function Wait-RuntimeHttp200 {
     param(
         [Parameter(Mandatory = $true)][string] $Url,
-        [int] $Attempts = 30
+        [int] $Attempts = 30,
+        [int] $TimeoutSec = 2
     )
 
     for ($attempt = 0; $attempt -lt $Attempts; $attempt++) {
         try {
-            $response = Invoke-WebRequest -Uri $Url -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
+            $response = Invoke-WebRequest -Uri $Url -TimeoutSec $TimeoutSec -UseBasicParsing -ErrorAction Stop
             if ($response.StatusCode -eq 200) { return $true }
         }
         catch {
@@ -429,6 +430,30 @@ function Get-RuntimeAppSessionBootId {
     return [string] $session.boot_id
 }
 
+function Resolve-ProfileFrontendNodeCommand {
+    param(
+        [Parameter(Mandatory = $true)][object] $Profile,
+        [Parameter(Mandatory = $true)][string] $RuntimeRoot
+    )
+
+    # Each profile owns its toolchain; never inherit another profile's override.
+    $configPath = Join-Path $RuntimeRoot 'frontend-node-path.txt'
+    $nodeCommand = if (Test-Path -LiteralPath $configPath -PathType Leaf) {
+        (Get-Content -LiteralPath $configPath -Raw).Trim()
+    }
+    else {
+        (Get-Command node -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
+    }
+    if (-not [IO.Path]::IsPathRooted($nodeCommand) -or -not (Test-Path -LiteralPath $nodeCommand -PathType Leaf)) {
+        throw 'Frontend requires an absolute Node.js 20 executable path.'
+    }
+    $version = [string] (& $nodeCommand --version)
+    if ($LASTEXITCODE -ne 0 -or $version.Trim() -notmatch '^v20\.') {
+        throw "Frontend requires Node.js 20. Set $configPath to its absolute executable path."
+    }
+    return $nodeCommand
+}
+
 function Start-ProfileFrontendSupervisor {
     param(
         [Parameter(Mandatory = $true)][object] $Profile,
@@ -442,6 +467,7 @@ function Start-ProfileFrontendSupervisor {
     )
 
     $frontendMode = if ($Profile.Name -eq "employee") { "start" } else { "dev" }
+    $nodeCommand = Resolve-ProfileFrontendNodeCommand -Profile $Profile -RuntimeRoot $RuntimeRoot
 
     return Start-ServiceSupervisor `
         -Profile $Profile `
@@ -453,7 +479,7 @@ function Start-ProfileFrontendSupervisor {
         -ControlPath $ControlPath `
         -StdoutLog $StdoutLog `
         -StderrLog $StderrLog `
-        -ChildCommand @("node", "scripts/dev.js") `
+        -ChildCommand @($nodeCommand, "scripts/dev.js") `
         -Environment @{
             MES_RUNTIME_ROOT = $RuntimeRoot
             MES_RUNTIME_PROFILE = $Profile.Name
@@ -507,7 +533,7 @@ function Invoke-ProfileFrontendStartup {
         }
 
     $backendHealthUrl = "http://127.0.0.1:$($Profile.BackendPort)/health/ready"
-    if (-not (Wait-RuntimeHttp200 -Url $backendHealthUrl)) {
+    if (-not (Wait-RuntimeHttp200 -Url $backendHealthUrl -Attempts 6 -TimeoutSec 10)) {
         throw "[start-frontend] Backend is not ready at $backendHealthUrl. Start the profile backend first."
     }
 

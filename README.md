@@ -63,6 +63,18 @@ npm run dev
 
 프론트는 `scripts/next-server.js`의 raw socket 경계를 거쳐 기존 Next `/api` rewrite를 사용한다. 이 경계를 우회하는 직접 `next dev`/`next start` 실행은 client-IP 기반 PIN 시도 제한을 무력화하므로 사용하지 않는다.
 
+개발·직원 프론트는 각 환경의 ignored `_attic/runtime/frontend-node-path.txt`에서 Node.js 20 실행 파일의 절대 경로를 읽는다. 설정이 없으면 PATH의 Node 20을 사용하며 다른 주 버전이면 실행 전에 중단한다. 공용 Node 설치와 전역 PATH는 변경하지 않는다.
+
+직원 배포는 `scripts/dev/sync-to-employee.ps1 -PreflightOnly`로 정지 전 준비만 검증할 수 있다. 개발 runtime의 격리 폴더에서 같은 Node 배포본의 npm으로 잠금 파일 설치·production build·번들 검사와 직원 DB 온라인 복사본 검증을 수행한다. `SYNC_PREPARE_RESULT=READY`는 준비 완료이며 실제 반영 완료가 아니다. 예약 실행에서도 현재 소스와 산출물을 다시 확인하고 새 DB 스냅샷을 검증한다. 실패하면 직원 서버를 정지하지 않는다.
+
+실제 배포에서 프런트 코드·의존성·빌드·Node 설정을 함께 전환하고, DB 마이그레이션 전 실패는 검증된 이전 구성을 복구한다. 마이그레이션 이후에는 자동으로 이전 DB나 코드로 되돌리지 않으며 `POST_STOP` 복구 안내를 따른다. 미완료 배포 기록이 있으면 다음 자동 동기화도 중단한다.
+
+원장 활성화는 마이그레이션 이후 schema로 만든 전체 검증 백업을 사용한다. 정지 전 복사본 사전 검증에서도 전체 백업 검증과 활성화 dry-run을 수행한다. 마이그레이션 전 구조 전용 백업은 별도로 보존하며 활성화용 전체 백업으로 대체 사용하지 않는다.
+
+직원→개발 데이터 동기화는 개발 DB의 정지 전 온라인 백업을 보존하고, 개발 서비스 정지 후 다시 만든 전체 검증 백업을 교체·복구 기준으로 사용한다. 정지 후 백업 실패나 그 이후 DB 변경 감지 시 교체하지 않고 개발 서비스를 재기동한다. `SYNC_DATA_BACKUP_BEFORE_STOP`은 보존용이며 `SYNC_DATA_BACKUP`은 정지 후 검증된 복구 기준이다. 양쪽 동기화와 서버 기동 시 백엔드 readiness는 전체 정합성 검사 시간을 고려해 요청당 10초·최대 6회 확인하며, 프런트는 `/mes`를 확인한다. 서버 감독자의 최초 readiness 확인은 1회이며 liveness·프런트 요청의 기존 2초 제한은 유지한다. 배포 변경 비교에서도 자동 생성 타입 파일과 로컬 캐시·환경 설정을 제외해 실제 배포 대상이 같으면 서버를 재시작하지 않는다.
+
+매일 예약 동기화는 `powershell -NoProfile -ExecutionPolicy Bypass -File C:\ERP\scripts\dev\sync-employee-environments.ps1` 한 번으로 실행한다. 진입점이 코드 래퍼 성공(exit 0, `NO_CHANGES` 포함) 후에만 직원→개발 데이터 `-Apply`를 한 번 호출한다. `_attic/runtime/scheduled-sync/<실행 ID>/receipt.json`과 단계별 stdout/stderr를 보존하므로 도구 출력이 누락돼도 같은 실행의 파일에서 결과를 확인할 수 있다. 실행 중·실패·결과 불확실이면 명령을 다시 호출하지 않는다. 코드 또는 데이터 명령을 추가로 실행하지 않으며, 같은 진입점의 중복 실행은 차단한다.
+
 대표 접속 (dev):
 
 ```text

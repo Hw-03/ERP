@@ -22,10 +22,10 @@ def test_backend_startup_separates_scheduler_liveness_from_caller_readiness() ->
     assert '$LiveUrl = "http://127.0.0.1:$($Profile.BackendPort)/health/live"' in script
     assert '$ReadyUrl = "http://127.0.0.1:$($Profile.BackendPort)/health/ready"' in script
     assert "Wait-RuntimeHttp200 -Url $LiveUrl -Attempts 90" in supervisor
-    assert "Wait-RuntimeHttp200 -Url $ReadyUrl -Attempts 1" in supervisor
+    assert "Wait-RuntimeHttp200 -Url $ReadyUrl -Attempts 1 -TimeoutSec 10" in supervisor
     assert "service_not_ready" in supervisor
     assert "throw" not in supervisor[supervisor.index("$ReadyUrl") :]
-    assert "Wait-RuntimeHttp200 -Url $ReadyUrl -Attempts 120" in caller
+    assert "Wait-RuntimeHttp200 -Url $ReadyUrl -Attempts 6 -TimeoutSec 10" in caller
     assert "ready on $ReadyUrl" in caller
 
 
@@ -39,6 +39,7 @@ def test_frontend_and_e2e_startup_wait_for_backend_readiness() -> None:
     assert "/health/ready" in frontend_startup
     assert "/health/live" not in frontend_startup
     assert "Backend is not ready" in frontend_startup
+    assert "Wait-RuntimeHttp200 -Url $backendHealthUrl -Attempts 6 -TimeoutSec 10" in frontend_startup
     assert "`${backendUrl}/health/ready`" in e2e_lifecycle
     assert "`${backendUrl}/health/live`" not in e2e_lifecycle
 
@@ -78,5 +79,7 @@ def test_employee_sync_and_deploy_health_checks_are_static_readiness_consumers()
 
     assert "http://127.0.0.1:8011/health/ready" in sync_from
     assert "http://127.0.0.1:8011/health/live" not in sync_from
+    assert '"http://127.0.0.1:3001/mes"' in sync_from
     assert "http://127.0.0.1:8010/health/ready" in sync_to
     assert "http://127.0.0.1:8010/health/live" not in sync_to
+    assert '"http://127.0.0.1:3000/mes"' in sync_to

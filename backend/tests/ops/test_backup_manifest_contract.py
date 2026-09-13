@@ -298,7 +298,7 @@ def test_sqlite_backup_publishes_manifest_last_with_exact_evidence(
     }
     database = manifest["database"]
     assert database["engine"] == "sqlite"
-    assert database["alembic_revision"] == "20260911_0035"
+    assert database["alembic_revision"] == "20260911_0036"
     assert len(database["schema_fingerprint"]) == 64
     assert database["data_revision"]["revision"] >= 0
     assert len(database["snapshot_hash"]) == 64

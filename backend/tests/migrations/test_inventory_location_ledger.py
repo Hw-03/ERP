@@ -27,7 +27,7 @@ TEST_POSTGRES_URL = os.getenv("TEST_POSTGRES_URL")
 QUALITY_BRANCH_HEAD = "20260831_0033"
 QUALITY_MERGE_HEAD = "20260907_0034"
 DEFECT_BRANCH_HEAD = "20260910_0033"
-CURRENT_HEAD = "20260911_0035"
+CURRENT_HEAD = "20260911_0036"
 
 
 def _config(database_url: str) -> Config:
@@ -390,7 +390,8 @@ def test_0032_remains_on_the_quality_path_to_the_single_merge_head() -> None:
         "20260903_0032",
         QUALITY_BRANCH_HEAD,
     )
-    assert script.get_revision(CURRENT_HEAD).down_revision == (
+    assert script.get_revision(CURRENT_HEAD).down_revision == "20260911_0035"
+    assert script.get_revision("20260911_0035").down_revision == (
         QUALITY_MERGE_HEAD,
         DEFECT_BRANCH_HEAD,
     )

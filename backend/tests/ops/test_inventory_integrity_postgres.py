@@ -489,7 +489,7 @@ def _break_invariant(session: Session, item: Item, case_name: str) -> None:
     elif case_name == "post_cutover_v1_missing_effect":
         session.add(
             SystemSetting(
-                setting_key="inventory_operation_cutover_at",
+                setting_key="inventory_operation_v2_cutover_at",
                 setting_value="2026-09-02T00:00:00",
             )
         )
@@ -508,7 +508,7 @@ def _break_invariant(session: Session, item: Item, case_name: str) -> None:
     elif case_name == "post_cutover_v1_invalid_pre_cutover_log":
         session.add(
             SystemSetting(
-                setting_key="inventory_operation_cutover_at",
+                setting_key="inventory_operation_v2_cutover_at",
                 setting_value="2026-09-02T00:00:00",
             )
         )

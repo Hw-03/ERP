@@ -22,7 +22,7 @@ ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
 POSTGRES_PREREQUISITE_REVISION = "20260807_0015"
 PREVIOUS_REVISION = "20260825_0028"
 MIGRATION_REVISION = "20260826_0029"
-HEAD_REVISION = "20260911_0035"
+HEAD_REVISION = "20260911_0036"
 ROLE_ENUM_NAME = "inventory_operation_role_enum"
 ROLE_ENUM_LABELS = tuple(member.value for member in InventoryOperationRoleEnum)
 
@@ -401,7 +401,8 @@ def test_alembic_has_single_head() -> None:
     scripts = ScriptDirectory.from_config(config)
 
     assert scripts.get_heads() == [HEAD_REVISION]
-    assert scripts.get_revision(HEAD_REVISION).down_revision == (
+    assert scripts.get_revision(HEAD_REVISION).down_revision == "20260911_0035"
+    assert scripts.get_revision("20260911_0035").down_revision == (
         "20260907_0034",
         "20260910_0033",
     )

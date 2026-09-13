@@ -1044,10 +1044,33 @@ def test_contract_v1_operation_without_any_effect_is_warning_only(db_session) ->
     }
 
 
+def test_legacy_v1_ledger_cutover_does_not_require_v2_effects(db_session) -> None:
+    """The v1 ledger was already active before the v2 writer was deployed."""
+    db_session.add_all([
+        SystemSetting(setting_key="inventory_operation_cutover_at", setting_value="2026-08-26T00:00:00"),
+        SystemSetting(setting_key="inventory_operation_v2_cutover_at", setting_value="2026-09-11T00:00:00"),
+        _operation(version=1),
+    ])
+    db_session.flush()
+    result = diagnose_inventory_integrity(db_session)
+    assert result.blocking_count == 0
+    assert _check(result, "OPERATION_V1_EFFECT_MISSING").count == 1
+
+
+def test_v2_operations_remain_blocking_before_v2_cutover(db_session) -> None:
+    db_session.add_all([
+        SystemSetting(setting_key="inventory_operation_v2_cutover_at", setting_value="2026-09-11T00:00:00"),
+        _operation(version=2),
+    ])
+    db_session.flush()
+    result = diagnose_inventory_integrity(db_session)
+    assert _check(result, "OPERATION_V2_EFFECT_INVALID").count == 1
+
+
 def test_post_cutover_v1_operation_without_effect_is_blocking(db_session) -> None:
     db_session.add(
         SystemSetting(
-            setting_key="inventory_operation_cutover_at",
+            setting_key="inventory_operation_v2_cutover_at",
             setting_value="2026-09-02T00:00:00",
         )
     )
@@ -1069,7 +1092,7 @@ def test_post_cutover_v1_operation_with_pre_cutover_invalid_log_is_blocking(
     item = make_item(name="전환 후 v1 작업의 전환 전 로그")
     db_session.add(
         SystemSetting(
-            setting_key="inventory_operation_cutover_at",
+            setting_key="inventory_operation_v2_cutover_at",
             setting_value="2026-09-02T00:00:00",
         )
     )

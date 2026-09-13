@@ -23,7 +23,7 @@
     "typecheck:tests": "npm run test:verification-contract && node scripts/verify-test-typecheck-manifest.mjs tsconfig.tests.json && node scripts/typecheck-baseline.mjs tsconfig.tests.json scripts/typecheck-tests-baseline.json",
     "typecheck:tests:update-baseline": "node scripts/typecheck-baseline.mjs tsconfig.tests.json scripts/typecheck-tests-baseline.json --update-baseline",
     "typecheck:e2e": "tsc --project tsconfig.e2e.json",
-    "test:verification-contract": "node --test --test-concurrency=1 scripts/require-node-20.test.mjs scripts/typecheck-baseline.test.mjs scripts/next-server.integration.test.mjs scripts/e2e-lifecycle.test.mjs scripts/run-playwright-e2e.test.mjs",
+    "test:verification-contract": "node --test --test-concurrency=1 scripts/require-node-20.test.mjs scripts/next-config.test.mjs scripts/typecheck-baseline.test.mjs scripts/next-server.integration.test.mjs scripts/e2e-lifecycle.test.mjs scripts/run-playwright-e2e.test.mjs",
     "test:e2e": "node scripts/run-playwright-e2e.mjs",
     "test:e2e:headed": "node scripts/run-playwright-e2e.mjs --headed",
     "test:e2e:ui": "node scripts/run-playwright-e2e.mjs --ui",

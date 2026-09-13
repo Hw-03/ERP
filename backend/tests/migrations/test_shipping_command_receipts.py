@@ -19,7 +19,7 @@ PREVIOUS_REVISION = "20260831_0032"
 MIGRATION_REVISION = "20260831_0033"
 QUALITY_MERGE_HEAD = "20260907_0034"
 DEFECT_BRANCH_HEAD = "20260910_0033"
-CURRENT_HEAD = "20260911_0035"
+CURRENT_HEAD = "20260911_0036"
 TABLE_NAME = "shipping_command_receipts"
 UNIQUE_NAME = "uq_shipping_command_receipt_actor_route_key"
 ACTOR_INDEX = "ix_shipping_command_receipts_actor_employee_id"
@@ -111,7 +111,8 @@ def test_0033_is_a_parent_of_the_single_merge_head() -> None:
         "20260903_0032",
         MIGRATION_REVISION,
     )
-    assert script.get_revision(CURRENT_HEAD).down_revision == (
+    assert script.get_revision(CURRENT_HEAD).down_revision == "20260911_0035"
+    assert script.get_revision("20260911_0035").down_revision == (
         QUALITY_MERGE_HEAD,
         DEFECT_BRANCH_HEAD,
     )

@@ -155,7 +155,10 @@ def ensure_apply_backup(
         raise CliSafetyError("비 SQLite DB는 외부 검증 백업 경로가 필요합니다.")
     if not database_path.is_file():
         raise CliSafetyError("적용 대상 SQLite DB를 찾을 수 없습니다.")
-    return _create_backup(database_path, label)
+    backup = _create_backup(database_path, label)
+    if verify:
+        _verify_backup(backup)
+    return backup
 
 
 def _session_factory(database_url: str):

@@ -112,6 +112,10 @@ def _fake_inventory_operation_admin_tool() -> str:
         event, exit_variable = contracts[command]
         with Path(os.environ["SYNC_EVENT_LOG"]).open("a", encoding="utf-8") as handle:
             handle.write(f"{event}\\n")
+        if command == "activate" and "--validated-backup" in sys.argv:
+            supplied = Path(sys.argv[sys.argv.index("--validated-backup") + 1])
+            if supplied.read_bytes() == b"structural-only backup":
+                raise SystemExit(2)
         raise SystemExit(int(os.environ.get(exit_variable, "0")))
         """
     )
@@ -145,6 +149,43 @@ def _fake_runtime_task_control_script() -> str:
     )
 
 
+def _fake_frontend_release_tool() -> str:
+    return textwrap.dedent(
+        """
+        import os
+        from pathlib import Path
+        import sys
+        command = sys.argv[1]
+        events = {'prepare': 'frontend-prepare', 'install': 'frontend-install',
+                  'rollback': 'frontend-rollback', 'migrating': 'migration-boundary', 'confirm': 'frontend-confirm'}
+        if command in events:
+            with Path(os.environ['SYNC_EVENT_LOG']).open('a', encoding='utf-8') as output:
+                output.write(events[command] + '\\n')
+        if command == 'prepare':
+            code = int(os.environ.get('FAKE_FRONTEND_BUILD_EXIT', '0'))
+            if code: raise SystemExit(code)
+            runtime = Path(sys.argv[sys.argv.index('--runtime') + 1])
+            runtime.mkdir(parents=True, exist_ok=True)
+            print('FRONTEND_PREPARED_RELEASE=' + str(runtime / 'fixture'))
+        elif command == 'install':
+            employee = Path(sys.argv[sys.argv.index('--employee-root') + 1])
+            record = employee / '_attic/runtime/frontend-releases/fixture/journal.json'
+            record.parent.mkdir(parents=True, exist_ok=True)
+            record.write_text('{}')
+            print('FRONTEND_ROLLBACK_RECORD=' + str(record))
+            raise SystemExit(int(os.environ.get('FAKE_FRONTEND_INSTALL_EXIT', '0')))
+        elif command == 'check-pending':
+            raise SystemExit(int(os.environ.get('FAKE_PENDING_RELEASE_EXIT', '0')))
+        elif command in {'verify', 'install-preflight'}:
+            raise SystemExit(int(os.environ.get('FAKE_FRONTEND_VERIFY_EXIT', '0')))
+        elif command == 'snapshot-code':
+            print('SYNC_CODE_MANIFEST=' + str(Path(sys.argv[sys.argv.index('--runtime') + 1]) / 'code.json'))
+        elif command == 'verify-code':
+            raise SystemExit(int(os.environ.get('FAKE_CODE_VERIFY_EXIT', '0')))
+        """
+    )
+
+
 def _prepare_sync_sandbox(tmp_path: Path, overrides: dict[str, str]) -> tuple[Path, dict[str, str], Path]:
     dev_root = tmp_path / "dev"
     emp_root = tmp_path / "employee"
@@ -174,8 +215,14 @@ def _prepare_sync_sandbox(tmp_path: Path, overrides: dict[str, str]) -> tuple[Pa
         }
 
         function Invoke-WebRequest {
+            param([string] $Uri, [int] $TimeoutSec, [switch] $UseBasicParsing, [string] $ErrorAction)
+            if ($Uri -like '*:8010/*' -and $TimeoutSec -lt [int] $env:FAKE_CODE_BACKEND_MIN_TIMEOUT) {
+                throw [System.Threading.Tasks.TaskCanceledException]::new("readiness diagnostic timed out")
+            }
             return [pscustomobject] @{ StatusCode = 200 }
         }
+
+        function Start-Sleep { param([int] $Milliseconds) }
 
         function Start-Process {
             param([string] $FilePath, [string] $WindowStyle)
@@ -184,6 +231,7 @@ def _prepare_sync_sandbox(tmp_path: Path, overrides: dict[str, str]) -> tuple[Pa
     )
     _write(dev_root / "scripts" / "dev" / "checked-command.ps1", checked_command)
     _write(emp_root / "scripts" / "dev" / "checked-command.ps1", checked_command)
+    _write(dev_root / "scripts" / "ops" / "employee_frontend_release.py", _fake_frontend_release_tool())
     for script_name in RUNTIME_SCRIPTS:
         _write(dev_root / "scripts" / "dev" / script_name, "# fake runtime script\n")
         _write(emp_root / "scripts" / "dev" / script_name, "# fake runtime script\n")
@@ -197,6 +245,8 @@ def _prepare_sync_sandbox(tmp_path: Path, overrides: dict[str, str]) -> tuple[Pa
     )
     _write(dev_root / "scripts" / "dev" / "checked-command.ps1", checked_command)
     _write(emp_root / "scripts" / "dev" / "checked-command.ps1", checked_command)
+    _write(dev_root / "scripts" / "dev" / "runtime-control.ps1", "function Resolve-ProfileFrontendNodeCommand { param($Profile, $RuntimeRoot) return 'C:/fixture/node.exe' }\n")
+    shutil.copyfile(dev_root / "scripts" / "dev" / "runtime-control.ps1", emp_root / "scripts" / "dev" / "runtime-control.ps1")
     for runtime_root in (dev_root, emp_root):
         _write(runtime_root / "scripts" / "runtime_paths.py", "# fake runtime paths\n")
     for bat_name in ("start.bat", "watch.bat", "stop.bat", "status.bat"):
@@ -216,12 +266,17 @@ def _prepare_sync_sandbox(tmp_path: Path, overrides: dict[str, str]) -> tuple[Pa
     backup_body = """
     backup_path = Path(os.environ["FAKE_EMP_BACKUP_PATH"]).resolve()
     backup_path.parent.mkdir(parents=True, exist_ok=True)
-    backup_path.write_bytes(b"fake sqlite backup")
+    backup_path.write_bytes(b"structural-only backup")
     print(f"BACKUP_PATH={backup_path}")
     """
     _write(
         dev_root / "scripts" / "ops" / "employee_schema_preflight.py",
-        _fake_python_tool("deployment-preflight", "FAKE_DEPLOYMENT_PREFLIGHT_EXIT"),
+        _fake_python_tool("deployment-preflight", "FAKE_DEPLOYMENT_PREFLIGHT_EXIT", """
+        import sys
+        runtime = Path(sys.argv[sys.argv.index('--runtime-root') + 1])
+        runtime.mkdir(parents=True, exist_ok=True)
+        (runtime / 'preflight-marker').write_text('snapshot marker')
+        """),
     )
     _write(
         dev_root / "scripts" / "ops" / "backup_db.py",
@@ -324,6 +379,7 @@ def _prepare_sync_sandbox(tmp_path: Path, overrides: dict[str, str]) -> tuple[Pa
             "FAKE_SNAPSHOT_PREFLIGHT_EXIT": "0",
             "FAKE_SNAPSHOT_REGISTER_EXIT": "0",
             "FAKE_RUNTIME_TASK_VALIDATION_EXIT": "0",
+            "FAKE_CODE_BACKEND_MIN_TIMEOUT": "0",
         }
     )
     environment.update(overrides)
@@ -375,8 +431,9 @@ def _fake_data_backup_tool() -> str:
             event = "snapshot-source"
             failure = "FAKE_SOURCE_BACKUP_EXIT"
         elif source == target_db:
-            event = "backup-target"
-            failure = "FAKE_TARGET_BACKUP_EXIT"
+            stopped = "stop-frontend" in Path(os.environ["SYNC_EVENT_LOG"]).read_text(encoding="utf-8-sig")
+            event = "backup-target-stopped" if stopped else "backup-target"
+            failure = "FAKE_STOPPED_BACKUP_EXIT" if stopped else "FAKE_TARGET_BACKUP_EXIT"
         else:
             event = "backup-candidate"
             failure = "FAKE_CANDIDATE_BACKUP_EXIT"
@@ -479,6 +536,11 @@ def _fake_data_restore_tool() -> str:
             target.write_bytes(b"development-newer")
             print("RESTORE_RESULT=TARGET_CHANGED_AFTER_ROLLBACK", file=sys.stderr)
             raise SystemExit(3)
+        if not preparing and not rollback:
+            previous = Path(sys.argv[sys.argv.index("--preverified-rollback") + 1])
+            if previous.read_bytes() != target.read_bytes():
+                print("RESTORE_RESULT=TARGET_CHANGED_AFTER_ROLLBACK", file=sys.stderr)
+                raise SystemExit(3)
         exit_name = (
             "FAKE_PREPARE_EXIT" if preparing else "FAKE_ROLLBACK_EXIT" if rollback else "FAKE_INSTALL_EXIT"
         )
@@ -531,6 +593,13 @@ def _prepare_data_sync_sandbox(
                 [string] $ErrorAction
             )
             if ([int] $env:FAKE_HEALTH_EXIT -ne 0) { throw "fake health failure" }
+            if ($Uri -like '*:8011/*') {
+                if ([int] $env:FAKE_BACKEND_HEALTH_EXIT -ne 0) { throw "fake backend health failure" }
+                if ($TimeoutSec -lt [int] $env:FAKE_BACKEND_HEALTH_MIN_TIMEOUT) {
+                    throw [System.Threading.Tasks.TaskCanceledException]::new("readiness diagnostic timed out")
+                }
+            }
+            elseif ([int] $env:FAKE_FRONTEND_HEALTH_EXIT -ne 0) { throw "fake frontend health failure" }
             return [pscustomobject] @{ StatusCode = 200 }
         }
         """
@@ -570,6 +639,7 @@ def _prepare_data_sync_sandbox(
             "FAKE_TARGET_DB": str(target_db),
             "FAKE_SOURCE_BACKUP_EXIT": "0",
             "FAKE_TARGET_BACKUP_EXIT": "0",
+            "FAKE_STOPPED_BACKUP_EXIT": "0",
             "FAKE_MIGRATE_EXIT": "0",
             "FAKE_STAGE_CHECK_EXIT": "0",
             "FAKE_STAGE_VERIFY_EXIT": "0",
@@ -585,6 +655,9 @@ def _prepare_data_sync_sandbox(
             "FAKE_START_BACKEND_EXIT": "0",
             "FAKE_START_FRONTEND_EXIT": "0",
             "FAKE_HEALTH_EXIT": "0",
+            "FAKE_BACKEND_HEALTH_EXIT": "0",
+            "FAKE_FRONTEND_HEALTH_EXIT": "0",
+            "FAKE_BACKEND_HEALTH_MIN_TIMEOUT": "0",
             "FAKE_PORTS_FREE": "1",
             "FAKE_TARGET_CHANGED_AFTER_BACKUP": "0",
             "FAKE_CANDIDATE_MISSING": "0",
@@ -762,6 +835,69 @@ def test_employee_data_sync_target_backup_failure_does_not_stop_or_install(tmp_p
     assert target_db.read_bytes() == original_target
 
 
+def test_employee_data_sync_stopped_backup_failure_keeps_target_and_restarts(tmp_path: Path) -> None:
+    sync_path, environment, event_log, source_db, target_db = _prepare_data_sync_sandbox(
+        tmp_path, {"FAKE_STOPPED_BACKUP_EXIT": "15"}
+    )
+    original_source = source_db.read_bytes()
+    original_target = target_db.read_bytes()
+
+    result = _run_data_sync(sync_path, environment, "-Apply")
+    events = _event_kinds(event_log)
+
+    assert result.returncode == 13, result.stdout + result.stderr
+    assert events[-5:] == [
+        "stop-backend", "stop-frontend", "backup-target-stopped", "start-backend", "start-frontend"
+    ]
+    assert "install-stage" not in events
+    assert "rollback-target" not in events
+    assert source_db.read_bytes() == original_source
+    assert target_db.read_bytes() == original_target
+    assert "SYNC_DATA_RESULT=TARGET_CUTOVER_BACKUP_FAILED" in result.stdout
+    assert "SYNC_DATA_RECOVERY=NOT_NEEDED" in result.stdout
+
+
+@pytest.mark.parametrize("install_exit", ["0", "16"])
+def test_employee_data_sync_shutdown_change_uses_stopped_backup_for_install_and_recovery(
+    tmp_path: Path, install_exit: str
+) -> None:
+    sync_path, environment, event_log, source_db, target_db = _prepare_data_sync_sandbox(
+        tmp_path, {"FAKE_INSTALL_EXIT": install_exit}
+    )
+    stop_script = target_db.parent.parent / "scripts" / "dev" / "stop-frontend.ps1"
+    _write(
+        stop_script,
+        '[System.IO.File]::AppendAllText($env:FAKE_TARGET_DB, "|shutdown")\n'
+        + _fake_service_script("stop-frontend", "FAKE_STOP_FRONTEND_EXIT"),
+    )
+    original_source = source_db.read_bytes()
+
+    result = _run_data_sync(sync_path, environment, "-Apply")
+    events = _event_kinds(event_log)
+    backup_root = target_db.parent.parent / "_attic" / "runtime" / "backups" / "sqlite"
+    before_stop = backup_root / "mes_backup-target_fake.db"
+    stopped = backup_root / "mes_backup-target-stopped_fake.db"
+
+    assert result.returncode == (0 if install_exit == "0" else 15), result.stdout + result.stderr
+    assert "TARGET_CHANGED_AFTER_BACKUP" not in result.stdout
+    assert before_stop.read_bytes() == b"development-original"
+    assert stopped.read_bytes() == b"development-original|shutdown"
+    assert events.index("stop-frontend") < events.index("backup-target-stopped") < events.index("install-stage")
+    assert f"SYNC_DATA_BACKUP_BEFORE_STOP={before_stop}" in result.stdout
+    assert f"SYNC_DATA_BACKUP={stopped}" in result.stdout
+    assert all(
+        line == f"SYNC_DATA_BACKUP={stopped}"
+        for line in result.stdout.splitlines()
+        if line.startswith("SYNC_DATA_BACKUP=")
+    )
+    assert source_db.read_bytes() == original_source
+    if install_exit == "0":
+        assert target_db.read_bytes() == b"employee-source|migrated"
+    else:
+        assert target_db.read_bytes() == b"development-original|shutdown"
+        assert "SYNC_DATA_RECOVERY=SUCCESS" in result.stdout
+
+
 @pytest.mark.parametrize(
     "overrides",
     [
@@ -802,9 +938,10 @@ def test_employee_data_sync_install_failure_rolls_back_and_restarts(tmp_path: Pa
     output = result.stdout + result.stderr
 
     assert result.returncode != 0, output
-    assert events[-6:] == [
+    assert events[-7:] == [
         "stop-backend",
         "stop-frontend",
+        "backup-target-stopped",
         "install-stage",
         "rollback-target",
         "start-backend",
@@ -869,9 +1006,19 @@ def test_employee_data_sync_postcheck_failure_rolls_back_and_restarts(tmp_path: 
     assert "SYNC_DATA_RECOVERY=SUCCESS" in result.stdout
 
 
-def test_employee_data_sync_health_failure_rolls_back_and_restarts_again(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("overrides", "backend", "frontend"),
+    [
+        ({"FAKE_HEALTH_EXIT": "18"}, "FAILED", "FAILED"),
+        ({"FAKE_BACKEND_HEALTH_EXIT": "18"}, "FAILED", "OK"),
+        ({"FAKE_FRONTEND_HEALTH_EXIT": "18"}, "OK", "FAILED"),
+    ],
+)
+def test_employee_data_sync_health_failure_rolls_back_and_restarts_again(
+    tmp_path: Path, overrides: dict[str, str], backend: str, frontend: str
+) -> None:
     sync_path, environment, event_log, source_db, target_db = _prepare_data_sync_sandbox(
-        tmp_path, {"FAKE_HEALTH_EXIT": "18"}
+        tmp_path, overrides
     )
     original_source = source_db.read_bytes()
     original_target = target_db.read_bytes()
@@ -892,6 +1039,21 @@ def test_employee_data_sync_health_failure_rolls_back_and_restarts_again(tmp_pat
     assert source_db.read_bytes() == original_source
     assert target_db.read_bytes() == original_target
     assert "SYNC_DATA_RECOVERY_HEALTH=FAILED" in result.stdout
+    assert f"SYNC_DATA_HEALTH_BACKEND={backend}" in result.stdout
+    assert f"SYNC_DATA_HEALTH_FRONTEND={frontend}" in result.stdout
+
+
+def test_employee_data_sync_allows_full_readiness_diagnostic_to_finish(tmp_path: Path) -> None:
+    sync_path, environment, event_log, _, _ = _prepare_data_sync_sandbox(
+        tmp_path, {"FAKE_BACKEND_HEALTH_MIN_TIMEOUT": "3"}
+    )
+
+    result = _run_data_sync(sync_path, environment, "-Apply")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "rollback-target" not in _event_kinds(event_log)
+    assert "SYNC_DATA_HEALTH_BACKEND=OK" in result.stdout
+    assert "SYNC_DATA_HEALTH_FRONTEND=OK" in result.stdout
 
 
 @pytest.mark.parametrize(
@@ -940,6 +1102,7 @@ def test_employee_data_sync_apply_success_uses_safe_order_and_preserves_source(t
         "backup-target",
         "stop-backend",
         "stop-frontend",
+        "backup-target-stopped",
         "install-stage",
         "check-post",
         "post-sqlite-fk",
@@ -977,6 +1140,36 @@ def test_code_sync_dry_run_reports_machine_readable_no_change(tmp_path: Path) ->
     assert "SYNC_CHANGES=0" in result.stdout
     assert "snapshot-preflight" in _event_kinds(event_log)
     assert "snapshot-register" not in _event_kinds(event_log)
+
+
+def test_code_sync_allows_full_readiness_diagnostic_to_finish(tmp_path: Path) -> None:
+    sync_path, environment, event_log = _prepare_sync_sandbox(
+        tmp_path, {"FAKE_CODE_BACKEND_MIN_TIMEOUT": "3"}
+    )
+
+    result = _run_sync(sync_path, environment, "-Force")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "frontend-confirm" in _event_kinds(event_log)
+
+
+def test_preflight_only_never_stops_or_updates_employee(tmp_path: Path) -> None:
+    sync_path, environment, event_log = _prepare_sync_sandbox(tmp_path, {})
+    source_database = tmp_path / "employee" / "backend" / "mes.db"
+    before = source_database.read_bytes()
+    employee_root = tmp_path / "employee"
+    before_tree = {path.relative_to(employee_root): path.read_bytes() for path in employee_root.rglob('*') if path.is_file()}
+
+    result = _run_sync(sync_path, environment, "-PreflightOnly")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "SYNC_PREPARE_RESULT=READY" in result.stdout
+    events = _event_kinds(event_log)
+    assert "deployment-preflight" in events
+    assert "frontend-prepare" in events
+    assert not {"stop-backend", "stop-frontend", "robocopy-sync", "backup", "migrate", "snapshot-register"} & set(events)
+    assert source_database.read_bytes() == before
+    assert {path.relative_to(employee_root): path.read_bytes() for path in employee_root.rglob('*') if path.is_file()} == before_tree
 
 
 def test_code_sync_can_emit_minimal_activity_evidence_for_approved_schedule() -> None:
@@ -1118,10 +1311,21 @@ def test_employee_sync_deployment_preflight_failure_leaves_employee_untouched(tm
     before = database.read_bytes()
     result = _run_sync(sync_path, environment)
     assert result.returncode == 9, result.stdout + result.stderr
-    assert _event_kinds(event_log) == ["snapshot-preflight", "robocopy-dryrun", "deployment-preflight"]
+    assert _event_kinds(event_log) == ["snapshot-preflight", "robocopy-dryrun", "frontend-prepare", "deployment-preflight"]
     assert database.read_bytes() == before
     assert "SYNC_FAILURE_PHASE=PRE_STOP" in result.stdout
     assert "exit 19" in result.stdout
+
+
+@pytest.mark.parametrize("failure", ["FAKE_FRONTEND_VERIFY_EXIT", "FAKE_CODE_VERIFY_EXIT", "FAKE_PENDING_RELEASE_EXIT"])
+def test_changed_release_or_unfinished_deploy_blocks_before_stop(tmp_path: Path, failure: str) -> None:
+    sync_path, environment, event_log = _prepare_sync_sandbox(tmp_path, {failure: "9"})
+    result = _run_sync(sync_path, environment)
+    assert result.returncode == 9, result.stdout + result.stderr
+    events = _event_kinds(event_log) if event_log.exists() else []
+    assert "stop-backend" not in events
+    assert "migrate" not in events
+    assert "SYNC_PREPARE_RESULT=BLOCKED" in result.stdout
 
 
 def test_employee_sync_stop_failure_restarts_services_without_backup_or_sync(tmp_path: Path) -> None:
@@ -1136,6 +1340,7 @@ def test_employee_sync_stop_failure_restarts_services_without_backup_or_sync(tmp
     assert events == [
         "snapshot-preflight",
         "robocopy-dryrun",
+        "frontend-prepare",
         "deployment-preflight",
         "runtime-task-validate",
         "stop-backend",
@@ -1160,6 +1365,7 @@ def test_employee_sync_backup_failure_restarts_services_without_sync_or_migratio
     assert events == [
         "snapshot-preflight",
         "robocopy-dryrun",
+        "frontend-prepare",
         "deployment-preflight",
         "runtime-task-validate",
         "stop-backend",
@@ -1172,7 +1378,7 @@ def test_employee_sync_backup_failure_restarts_services_without_sync_or_migratio
     assert "migrate" not in events
 
 
-def test_employee_sync_frontend_build_failure_restores_services_before_backend_sync(tmp_path: Path) -> None:
+def test_employee_sync_frontend_build_failure_never_stops_services(tmp_path: Path) -> None:
     sync_path, environment, event_log = _prepare_sync_sandbox(
         tmp_path, {"FAKE_FRONTEND_BUILD_EXIT": "16"}
     )
@@ -1184,15 +1390,7 @@ def test_employee_sync_frontend_build_failure_restores_services_before_backend_s
     assert events == [
         "snapshot-preflight",
         "robocopy-dryrun",
-        "deployment-preflight",
-        "runtime-task-validate",
-        "stop-backend",
-        "stop-frontend",
-        "backup",
-        "robocopy-sync",
-        "frontend-build",
-        "start-backend",
-        "start-frontend",
+        "frontend-prepare",
     ]
     assert "migrate" not in events
 
@@ -1210,15 +1408,16 @@ def test_employee_sync_post_verify_failure_keeps_services_stopped_and_prints_rec
     assert events == [
         "snapshot-preflight",
         "robocopy-dryrun",
+        "frontend-prepare",
         "deployment-preflight",
         "runtime-task-validate",
         "stop-backend",
         "stop-frontend",
         "backup",
+        "frontend-install",
         "robocopy-sync",
-        "frontend-build",
         "robocopy-sync",
-        "robocopy-sync",
+        "migration-boundary",
         "migrate",
         "schema-check",
         "verify-schema",
@@ -1240,15 +1439,16 @@ def test_employee_sync_success_uses_migrate_then_read_only_head_check(tmp_path: 
     assert events == [
         "snapshot-preflight",
         "robocopy-dryrun",
+        "frontend-prepare",
         "deployment-preflight",
         "runtime-task-validate",
         "stop-backend",
         "stop-frontend",
         "backup",
+        "frontend-install",
         "robocopy-sync",
-        "frontend-build",
         "robocopy-sync",
-        "robocopy-sync",
+        "migration-boundary",
         "migrate",
         "schema-check",
         "verify-schema",
@@ -1258,7 +1458,7 @@ def test_employee_sync_success_uses_migrate_then_read_only_head_check(tmp_path: 
         "snapshot-register",
         "start-backend",
         "start-frontend",
-    ]
+        "frontend-confirm",    ]
 
 
 def test_employee_sync_snapshot_preflight_failure_stops_before_employee_mutation(
@@ -1288,7 +1488,7 @@ def test_employee_sync_runtime_task_validation_failure_stops_before_server_shutd
     events = _event_kinds(event_log)
 
     assert result.returncode == 11, result.stdout + result.stderr
-    assert events == ["snapshot-preflight", "robocopy-dryrun", "deployment-preflight", "runtime-task-validate"]
+    assert events == ["snapshot-preflight", "robocopy-dryrun", "frontend-prepare", "deployment-preflight", "runtime-task-validate"]
     assert "stop-backend" not in events
     assert "stop-frontend" not in events
     assert "backup" not in events
@@ -1356,7 +1556,7 @@ def test_employee_sync_ignores_failed_count_text_when_migrate_exit_is_zero(tmp_p
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "failed=99" in result.stdout
-    assert events[-2:] == ["start-backend", "start-frontend"]
+    assert events[-3:] == ["start-backend", "start-frontend", "frontend-confirm"]
 
 
 def test_employee_sync_operation_diagnosis_failure_keeps_legacy_mode_and_services_stopped(
@@ -1445,7 +1645,9 @@ def test_employee_sync_runs_schema_and_inventory_verification_before_start() -> 
 
     assert migrate < schema_check < schema_verify < inventory_verify < operation_diagnose < operation_activate < snapshot_register < start
     assert '"--db-url"' in script[inventory_verify:start]
-    assert '"--validated-backup"' in script[operation_activate:start]
+    # The pre-migration backup is structural rollback evidence. Activation must
+    # create and verify a separate full backup of the migrated schema itself.
+    assert '"--validated-backup"' not in script[operation_activate:start]
     assert '"--approved-by"' in script[operation_activate:start]
     assert "Write-RecoveryInstructions" in script[inventory_verify:start]
     assert "exit 8" in script[inventory_verify:start]
@@ -1478,19 +1680,20 @@ def test_employee_sync_excludes_local_test_and_build_caches() -> None:
     script = SYNC_SCRIPT.read_text(encoding="utf-8-sig")
 
     dry_run_backend = script[script.index("$backendDryRun"):script.index("$schemaHits")]
-    dry_run_frontend = script[script.index("$frontendDryRun"):script.index("$env:MES_RUNTIME_ROOT")]
-    sync_frontend_start = script.index('robocopy "$DevRoot\\frontend" $EmpFrontend /MIR')
+    dry_run_frontend = script[
+        script.index("$frontendDryRun = robocopy"):script.index("$frontendDryRunExit =")
+    ]
     sync_backend_start = script.index('robocopy "$DevRoot\\backend" $EmpBackend /MIR')
-    sync_frontend = script[sync_frontend_start:sync_backend_start]
     sync_backend = script[sync_backend_start:script.index("# ---------------------------------------------------------------\n# 6)", sync_backend_start)]
 
     for backend_copy in (dry_run_backend, sync_backend):
         assert "/XD __pycache__ .git .venv data logs .pytest_cache .ruff_cache _backup" in backend_copy
-        assert '".testmondata"' in backend_copy
-        assert '".testmondata-*"' in backend_copy
+        assert '".testmondata*"' in backend_copy
 
-    for frontend_copy in (dry_run_frontend, sync_frontend):
-        assert '"tsconfig.tsbuildinfo"' in frontend_copy
+    assert '"tsconfig.tsbuildinfo"' in dry_run_frontend
+    assert ".pytest_cache" in dry_run_frontend
+    assert '"next-env.d.ts"' in dry_run_frontend
+    assert "Invoke-FrontendRelease -Command 'install'" in script
 
 
 def test_employee_sync_auto_schema_preflight_runs_before_stopping_services() -> None:

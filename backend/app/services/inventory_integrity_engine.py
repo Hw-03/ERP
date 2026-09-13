@@ -155,6 +155,7 @@ class InventoryIntegritySnapshot:
     transactions: tuple[TransactionEffectState, ...] = ()
     operation_evidence: tuple[OperationEvidenceState, ...] = ()
     cutover_at: datetime | None = None
+    v2_cutover_at: datetime | None = None
     evaluated_at: datetime | None = None
 
 
@@ -819,7 +820,8 @@ def _is_post_cutover(
     snapshot: InventoryIntegritySnapshot,
     occurred_at: datetime,
 ) -> bool:
-    return snapshot.cutover_at is not None and occurred_at >= snapshot.cutover_at
+    # Ledger activation existed for v1; only the v2 rollout requires v2 evidence.
+    return snapshot.v2_cutover_at is not None and occurred_at >= snapshot.v2_cutover_at
 
 
 def _operation_check_id(

@@ -13,8 +13,10 @@
 #            9 프론트엔드 운영 빌드 실패 / 10 주간 스냅샷 예약 작업 실패 /
 #            11 직원 런타임 예약 작업 누락 또는 오구성
 
+[CmdletBinding()]
 param(
     [switch] $DryRun,
+    [switch] $PreflightOnly,
     [switch] $Force,
     [switch] $AllowSchemaChange,
     [switch] $AutoSchema,
@@ -27,6 +29,9 @@ $ErrorActionPreference = "Stop"
 
 $DevRoot = "C:\ERP"
 $DevBackend = Join-Path $DevRoot "backend"
+$PreparationRoot = Join-Path $DevRoot "_attic\runtime\sync-preparation"
+$FrontendReleaseTool = Join-Path $DevRoot "scripts\ops\employee_frontend_release.py"
+$script:FrontendRollbackRecord = $null
 $EmpRoot = "C:\ERP-dev"
 $EmpBackend = Join-Path $EmpRoot "backend"
 $EmpFrontend = Join-Path $EmpRoot "frontend"
@@ -35,7 +40,6 @@ $EmpBackupDir = Join-Path $EmpRoot "_attic\runtime\backups\sqlite"
 $EmpLog = Join-Path $EmpRoot "_attic\runtime\logs\backend\mes.log"
 $EmpLegacyLog = Join-Path $EmpBackend "logs\mes.log"
 $EmpDb = Join-Path $EmpBackend "mes.db"
-$EmpPreviousFrontendBuild = Join-Path $EmpRuntimeRoot "frontend-build\previous.next-prod"
 $runtimeScripts = @(
     "resolve-server-profile.ps1",
     "ensure-schema-ready.ps1",
@@ -60,6 +64,12 @@ $runtimeScripts = @(
 
 . (Join-Path $DevRoot "scripts\dev\checked-command.ps1")
 . (Join-Path $DevRoot "scripts\dev\runtime-task-control.ps1")
+. (Join-Path $DevRoot "scripts\dev\runtime-control.ps1")
+
+if ($PreflightOnly -and ($DryRun -or $Force -or $AllowSchemaChange -or $AutoSchema)) {
+    Write-Host "SYNC_PREPARE_RESULT=BLOCKED"
+    throw '-PreflightOnly cannot be combined with deployment or dry-run override switches.'
+}
 
 function Write-CheckedCommandResult {
     param(
@@ -102,58 +112,23 @@ function Restart-EmployeeServices {
     }
 }
 
-function Invoke-EmployeeFrontendBuild {
-    $activeBuild = Join-Path $EmpFrontend ".next-prod"
-    $previousBuildParent = Split-Path -Parent $EmpPreviousFrontendBuild
-    New-Item -ItemType Directory -Force -Path $previousBuildParent | Out-Null
+function Invoke-FrontendRelease {
+    param([string] $Command, [string[]] $Arguments = @())
+    return Invoke-CheckedExternalCommand -FilePath 'py.exe' -ArgumentList (@($FrontendReleaseTool, $Command) + $Arguments)
+}
 
-    if (Test-Path -LiteralPath $EmpPreviousFrontendBuild) {
-        if (Test-Path -LiteralPath $activeBuild) {
-            Remove-Item -LiteralPath $EmpPreviousFrontendBuild -Recurse -Force
-        }
-        else {
-            Move-Item -LiteralPath $EmpPreviousFrontendBuild -Destination $activeBuild
-        }
-    }
-    if (Test-Path -LiteralPath $activeBuild) {
-        Move-Item -LiteralPath $activeBuild -Destination $EmpPreviousFrontendBuild
-    }
-
-    $previousBackendUrl = $env:BACKEND_INTERNAL_URL
-    $previousTelemetry = $env:NEXT_TELEMETRY_DISABLED
-    $previousMesEnv = $env:NEXT_PUBLIC_MES_ENV
-    try {
-        $env:BACKEND_INTERNAL_URL = "http://localhost:8010"
-        $env:NEXT_TELEMETRY_DISABLED = "1"
-        $env:NEXT_PUBLIC_MES_ENV = "employee"
-        $result = Invoke-CheckedExternalCommand `
-            -FilePath "npm.cmd" `
-            -ArgumentList @("run", "build") `
-            -WorkingDirectory $EmpFrontend
-    }
-    finally {
-        $env:BACKEND_INTERNAL_URL = $previousBackendUrl
-        $env:NEXT_TELEMETRY_DISABLED = $previousTelemetry
-        $env:NEXT_PUBLIC_MES_ENV = $previousMesEnv
-    }
-
-    $buildIdPath = Join-Path $activeBuild "BUILD_ID"
-    $success = ($result.Success -and (Test-Path -LiteralPath $buildIdPath -PathType Leaf))
-    if ($success) {
-        Remove-Item -LiteralPath $EmpPreviousFrontendBuild -Recurse -Force -ErrorAction SilentlyContinue
-    }
-    else {
-        Remove-Item -LiteralPath $activeBuild -Recurse -Force -ErrorAction SilentlyContinue
-        if (Test-Path -LiteralPath $EmpPreviousFrontendBuild) {
-            Move-Item -LiteralPath $EmpPreviousFrontendBuild -Destination $activeBuild
+function Restore-EmployeePreMigration {
+    if ($script:FrontendRollbackRecord) {
+        $restore = Invoke-FrontendRelease -Command 'rollback' -Arguments @('--record', $script:FrontendRollbackRecord, '--employee-root', $EmpRoot)
+        Write-CheckedCommandResult -Label 'restore-frontend-release' -Result $restore
+        if (-not $restore.Success) {
+            Write-Host 'SYNC_FAILURE_PHASE=POST_STOP'
+            Write-Host "FRONTEND_ROLLBACK_RECORD=$($script:FrontendRollbackRecord)"
+            return
         }
     }
-
-    return [pscustomobject]@{
-        Success = $success
-        Command = $result
-        BuildIdPath = $buildIdPath
-    }
+    $restart = Restart-EmployeeServices
+    if (-not $restart.Success) { Write-Host 'SYNC_FAILURE_PHASE=POST_STOP' }
 }
 
 function Write-RecoveryInstructions {
@@ -203,6 +178,14 @@ function Test-SyncFileDifferent {
 }
 
 Write-Host "===================================================="
+
+$pending = Invoke-FrontendRelease -Command 'check-pending' -Arguments @('--employee-root', $EmpRoot)
+if (-not $pending.Success) {
+    Write-CheckedCommandResult -Label 'pending-release' -Result $pending
+    Write-Host 'SYNC_PREPARE_RESULT=BLOCKED'
+    Write-Host 'SYNC_FAILURE_PHASE=PRE_STOP'
+    exit 9
+}
 Write-Host " DEXCOWIN MES 직원 서버 동기화"
 Write-Host " $DevRoot -> $EmpRoot"
 Write-Host "===================================================="
@@ -253,7 +236,7 @@ if ($ReportActivity) {
     }
     Write-Host "ACTIVITY_GUARD_OVERRIDE=timestamp=$activityTimestamp;employee=$activityEmployee;source=$activitySource;event=$activityEvent"
 }
-if (-not $Force -and $activityLog) {
+if (-not $Force -and -not $PreflightOnly -and $activityLog) {
     if ($lastActivityLine -match '^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})') {
         $lastTs = [datetime]::ParseExact($Matches[1], "yyyy-MM-dd HH:mm:ss", $null)
         $elapsed = (Get-Date) - $lastTs
@@ -281,8 +264,8 @@ $schemaPatterns = @(
     'bootstrap_db\.py'
 )
 $backendDryRun = robocopy "$DevRoot\backend" $EmpBackend /L /MIR `
-    /XF mes.db mes.db-shm mes.db-wal "mes.db.backup-*" "*.pyc" ".testmondata" ".testmondata-*" `
-    /XD __pycache__ .git .venv data logs .pytest_cache .ruff_cache _backup `
+    /XF "*.db*" "*.sqlite*" "*.pyc" ".testmondata*" ".env*" ".npmrc" "next-env.d.ts" "tsconfig.tsbuildinfo" `
+    /XD __pycache__ .git .venv data logs .pytest_cache .ruff_cache _backup node_modules .next .next-prod _archive coverage test-results `
     /NJH /NDL /NP 2>&1 | Out-String -Stream
 $backendDryRunExit = $LASTEXITCODE
 if ($backendDryRunExit -ge 8) {
@@ -304,12 +287,12 @@ $opsFileChanges = @()
 $hasCodeChanges = $false
 if ($DryRun) {
     $frontendDryRun = robocopy "$DevRoot\frontend" $EmpFrontend /L /MIR `
-        /XD .next .next-prod node_modules _archive coverage test-results logs `
-        /XF .env.local "tsconfig.tsbuildinfo" `
+        /XD __pycache__ .git .venv data logs .pytest_cache .ruff_cache _backup node_modules .next .next-prod _archive coverage test-results `
+        /XF "*.db*" "*.sqlite*" "*.pyc" ".testmondata*" ".env*" ".npmrc" "next-env.d.ts" "tsconfig.tsbuildinfo" `
         /NJH /NDL /NP 2>&1 | Out-String -Stream
     $frontendDryRunExit = $LASTEXITCODE
     $opsDryRun = robocopy (Join-Path $DevRoot "scripts\ops") (Join-Path $EmpRoot "scripts\ops") /L /MIR `
-        /XD __pycache__ /XF "*.pyc" /NJH /NDL /NP 2>&1 | Out-String -Stream
+        /XD __pycache__ .git .venv data logs .pytest_cache .ruff_cache _backup node_modules .next .next-prod _archive coverage test-results /XF "*.db*" "*.sqlite*" "*.pyc" ".testmondata*" ".env*" ".npmrc" "next-env.d.ts" "tsconfig.tsbuildinfo" /NJH /NDL /NP 2>&1 | Out-String -Stream
     $opsDryRunExit = $LASTEXITCODE
     if ($frontendDryRunExit -ge 8 -or $opsDryRunExit -ge 8) {
         Write-Host "[dry-run] 코드 비교 실패 - frontend=$frontendDryRunExit ops=$opsDryRunExit"
@@ -356,7 +339,7 @@ if ($DryRun) {
     Write-Host "SYNC_CHANGES=$(if ($hasCodeChanges) { 1 } else { 0 })"
 }
 
-if ($schemaHits -and -not $AllowSchemaChange) {
+if ($schemaHits -and -not $AllowSchemaChange -and -not $PreflightOnly) {
     if ($AutoSchema) {
         Write-Host "[schema] 자동 사전 검증으로 변경을 확인합니다."
     }
@@ -387,6 +370,36 @@ if ($DryRun) {
 
 # 스키마 변경이 없어도 배포할 코드로 업무 원장까지 정지 전에 검증한다.
 if (-not $DryRun) {
+    $sourceSnapshot = Invoke-FrontendRelease -Command 'snapshot-code' -Arguments @('--source', $DevRoot, '--runtime', $PreparationRoot)
+    Write-CheckedCommandResult -Label 'source-manifest' -Result $sourceSnapshot
+    $sourceMatch = [regex]::Match(($sourceSnapshot.Output -join [Environment]::NewLine), '(?m)^SYNC_CODE_MANIFEST=(?<path>.+?)\s*$')
+    if (-not $sourceSnapshot.Success -or -not $sourceMatch.Success) {
+        Write-Host 'SYNC_PREPARE_RESULT=BLOCKED'
+        Write-Host 'SYNC_FAILURE_PHASE=PRE_STOP'
+        exit 9
+    }
+    $sourceRecord = $sourceMatch.Groups['path'].Value.Trim()
+    try {
+        $frontendNode = Resolve-ProfileFrontendNodeCommand -Profile ([pscustomobject]@{ Name = 'development' }) -RuntimeRoot (Join-Path $DevRoot '_attic\runtime')
+    }
+    catch {
+        Write-Host 'SYNC_PREPARE_RESULT=BLOCKED'
+        Write-Host 'SYNC_FAILURE_PHASE=PRE_STOP'
+        Write-Host $_.Exception.Message
+        exit 9
+    }
+    $prepareResult = Invoke-FrontendRelease -Command 'prepare' -Arguments @(
+        '--source', (Join-Path $DevRoot 'frontend'), '--runtime', (Join-Path $PreparationRoot 'frontend'), '--node', $frontendNode
+    )
+    Write-CheckedCommandResult -Label 'frontend-prepare' -Result $prepareResult
+    $preparedOutput = ($prepareResult.Output | ForEach-Object { [string] $_ }) -join [Environment]::NewLine
+    $preparedMatch = [regex]::Match($preparedOutput, '(?m)^FRONTEND_PREPARED_RELEASE=(?<path>.+?)\s*$')
+    if (-not $prepareResult.Success -or -not $preparedMatch.Success) {
+        Write-Host 'SYNC_PREPARE_RESULT=BLOCKED'
+        Write-Host 'SYNC_FAILURE_PHASE=PRE_STOP'
+        exit 9
+    }
+    $preparedFrontend = $preparedMatch.Groups['path'].Value.Trim()
     $preflightTool = Join-Path $DevRoot "scripts\ops\employee_schema_preflight.py"
     $preflightResult = Invoke-CheckedExternalCommand `
         -FilePath "py.exe" `
@@ -395,7 +408,7 @@ if (-not $DryRun) {
             "--employee-db", $EmpDb,
             "--backend-dir", $DevBackend,
             "--target-backend-dir", $EmpBackend,
-            "--runtime-root", $EmpRuntimeRoot,
+            "--runtime-root", $PreparationRoot,
             "--source-migrations", (Join-Path $DevBackend "alembic\versions"),
             "--target-migrations", (Join-Path $EmpBackend "alembic\versions"),
             "--verify-tool", (Join-Path $DevRoot "scripts\ops\_verify_backup.py"),
@@ -404,6 +417,7 @@ if (-not $DryRun) {
         )
     Write-CheckedCommandResult -Label "deployment-preflight" -Result $preflightResult
     if (-not $preflightResult.Success) {
+        Write-Host "SYNC_PREPARE_RESULT=BLOCKED"
         Write-Host "SYNC_FAILURE_PHASE=PRE_STOP"
         Write-Host "[preflight] 사전 검증 실패 - 직원 DB와 서버를 변경하지 않았습니다."
         exit 9
@@ -421,6 +435,30 @@ catch {
     exit 11
 }
 Write-Host "[runtime-task] 직원 런타임 예약 작업 구성 확인 완료"
+
+$installRequirements = @()
+foreach ($scriptName in $runtimeScripts) { $installRequirements += @('--required-file', "scripts/dev/$scriptName") }
+foreach ($relativePath in @('scripts/runtime_paths.py', 'start.bat', 'watch.bat', 'stop.bat', 'status.bat')) {
+    $installRequirements += @('--required-file', $relativePath)
+}
+$releaseCheck = Invoke-FrontendRelease -Command 'install-preflight' -Arguments (@(
+    '--release', $preparedFrontend, '--source', (Join-Path $DevRoot 'frontend'), '--node', $frontendNode, '--employee-root', $EmpRoot
+) + $installRequirements)
+$codeCheck = Invoke-FrontendRelease -Command 'verify-code' -Arguments @('--source', $DevRoot, '--record', $sourceRecord)
+Write-CheckedCommandResult -Label 'source-verify' -Result $codeCheck
+Write-CheckedCommandResult -Label 'prepared-release-verify' -Result $releaseCheck
+if (-not $releaseCheck.Success -or -not $codeCheck.Success) {
+    Write-Host 'SYNC_PREPARE_RESULT=BLOCKED'
+    Write-Host 'SYNC_FAILURE_PHASE=PRE_STOP'
+    exit 9
+}
+Write-Host "SYNC_PREPARED_RELEASE=$preparedFrontend"
+Write-Host "SYNC_CODE_MANIFEST=$sourceRecord"
+Write-Host 'SYNC_PREPARE_RESULT=READY'
+if ($PreflightOnly) {
+    Write-Host 'SYNC_PREPARE_EMPLOYEE_MUTATION=NONE'
+    exit 0
+}
 
 $env:MES_RUNTIME_ROOT = $EmpRuntimeRoot
 
@@ -490,36 +528,25 @@ if (-not $backupPath.StartsWith($expectedBackupPrefix, [System.StringComparison]
     }
     exit 7
 }
-Write-Host "[backup] 검증된 백업: $backupPath"
+Write-Host "[backup] 구조 복원용 백업: $backupPath"
 
 # ---------------------------------------------------------------
 # 5) 코드 동기화
 # ---------------------------------------------------------------
+try {
 Write-Host "[sync-frontend] 프론트엔드 동기화 중..."
-robocopy "$DevRoot\frontend" $EmpFrontend /MIR `
-    /XD .next .next-prod node_modules _archive coverage test-results logs `
-    /XF .env.local "tsconfig.tsbuildinfo" `
-    /NJH /NDL /NP /NS /NC | Out-Null
-$frontendExit = $LASTEXITCODE
-if ($frontendExit -ge 8) {
-    Write-Host "[sync-frontend] 프론트엔드 robocopy 실패 (exit $frontendExit)"
-    $restartAfterFrontendSyncFailure = Restart-EmployeeServices
-    exit 4
-}
-Remove-Item (Join-Path $EmpFrontend ".next") -Recurse -Force -ErrorAction SilentlyContinue
-
-Write-Host "[build-frontend] 직원용 production 빌드 중..."
-$frontendBuild = Invoke-EmployeeFrontendBuild
-Write-CheckedCommandResult -Label "build-frontend" -Result $frontendBuild.Command
-if (-not $frontendBuild.Success) {
-    Write-Host "[build-frontend] 실패 - 이전 빌드를 복원하고 기존 서비스를 재기동합니다."
-    $restartAfterFrontendBuildFailure = Restart-EmployeeServices
-    if (-not $restartAfterFrontendBuildFailure.Success) {
-        Write-Host "[build-frontend] 기존 서비스 재기동도 실패했습니다."
-    }
+$frontendInstall = Invoke-FrontendRelease -Command 'install' -Arguments @(
+    '--release', $preparedFrontend, '--source', (Join-Path $DevRoot 'frontend'), '--node', $frontendNode, '--employee-root', $EmpRoot
+)
+Write-CheckedCommandResult -Label 'frontend-install' -Result $frontendInstall
+$installOutput = ($frontendInstall.Output | ForEach-Object { [string] $_ }) -join [Environment]::NewLine
+$rollbackMatch = [regex]::Match($installOutput, '(?m)^FRONTEND_ROLLBACK_RECORD=(?<path>.+?)\s*$')
+if ($rollbackMatch.Success) { $script:FrontendRollbackRecord = $rollbackMatch.Groups['path'].Value.Trim() }
+if (-not $frontendInstall.Success -or -not $script:FrontendRollbackRecord) {
+    Restore-EmployeePreMigration
     exit 9
 }
-Write-Host "[build-frontend] 완료"
+$frontendExit = 0
 
 Write-Host "[sync] 직원 실행·운영 스크립트 갱신 중..."
 $EmpDevScriptDir = Join-Path $EmpRoot "scripts\dev"
@@ -531,10 +558,11 @@ foreach ($scriptName in $runtimeScripts) {
 New-Item -ItemType Directory -Force -Path (Join-Path $EmpRoot "scripts") | Out-Null
 Copy-Item (Join-Path $DevRoot "scripts\runtime_paths.py") (Join-Path $EmpRoot "scripts\runtime_paths.py") -Force
 robocopy (Join-Path $DevRoot "scripts\ops") (Join-Path $EmpRoot "scripts\ops") /MIR `
-    /XD __pycache__ /XF "*.pyc" /NJH /NDL /NP /NS /NC | Out-Null
+    /XD __pycache__ .git .venv data logs .pytest_cache .ruff_cache _backup node_modules .next .next-prod _archive coverage test-results /XF "*.db*" "*.sqlite*" "*.pyc" ".testmondata*" ".env*" ".npmrc" "next-env.d.ts" "tsconfig.tsbuildinfo" /NJH /NDL /NP /NS /NC | Out-Null
 $opsExit = $LASTEXITCODE
 if ($opsExit -ge 8) {
     Write-Host "[sync] 운영 스크립트 robocopy 실패 (exit $opsExit)"
+    Restore-EmployeePreMigration
     exit 4
 }
 
@@ -544,19 +572,38 @@ foreach ($batName in @("start.bat", "watch.bat", "stop.bat", "status.bat")) {
 
 Write-Host "[sync] 백엔드 동기화 중..."
 robocopy "$DevRoot\backend" $EmpBackend /MIR `
-    /XF mes.db mes.db-shm mes.db-wal "mes.db.backup-*" "*.pyc" ".testmondata" ".testmondata-*" `
-    /XD __pycache__ .git .venv data logs .pytest_cache .ruff_cache _backup `
+    /XF "*.db*" "*.sqlite*" "*.pyc" ".testmondata*" ".env*" ".npmrc" "next-env.d.ts" "tsconfig.tsbuildinfo" `
+    /XD __pycache__ .git .venv data logs .pytest_cache .ruff_cache _backup node_modules .next .next-prod _archive coverage test-results `
     /NJH /NDL /NP /NS /NC | Out-Null
 $backendExit = $LASTEXITCODE
 if ($backendExit -ge 8) {
     Write-Host "[sync] 백엔드 robocopy 실패 (exit $backendExit)"
+    Restore-EmployeePreMigration
+    exit 4
+}
+}
+catch {
+    Write-Host "[sync] 코드 전환 실패: $($_.Exception.Message)"
+    Restore-EmployeePreMigration
     exit 4
 }
 
 # ---------------------------------------------------------------
 # 6) DB 마이그레이션
 # ---------------------------------------------------------------
+$codeCheck = Invoke-FrontendRelease -Command 'verify-code' -Arguments @('--source', $DevRoot, '--record', $sourceRecord)
+if (-not $codeCheck.Success) {
+    Write-CheckedCommandResult -Label 'source-verify-before-migration' -Result $codeCheck
+    Restore-EmployeePreMigration
+    exit 9
+}
 Write-Host "[migrate] 실행 중..."
+$migrationBoundary = Invoke-FrontendRelease -Command 'migrating' -Arguments @('--record', $script:FrontendRollbackRecord, '--employee-root', $EmpRoot)
+if (-not $migrationBoundary.Success) {
+    Write-CheckedCommandResult -Label 'migration-boundary' -Result $migrationBoundary
+    Restore-EmployeePreMigration
+    exit 5
+}
 $migrateResult = Invoke-CheckedExternalCommand `
     -FilePath "py.exe" `
     -ArgumentList @("bootstrap_db.py", "--migrate") `
@@ -619,6 +666,8 @@ if (-not $operationDiagnoseResult.Success) {
     exit 8
 }
 
+# Keep the structural pre-migration backup for rollback. The activation CLI
+# creates and reverifies its own full backup against the migrated schema.
 $operationActivateResult = Invoke-CheckedExternalCommand `
     -FilePath "py.exe" `
     -ArgumentList @(
@@ -626,7 +675,6 @@ $operationActivateResult = Invoke-CheckedExternalCommand `
         "activate",
         "--db-url", $inventoryDbUrl,
         "--approved-by", "sync-to-employee",
-        "--validated-backup", $backupPath,
         "--apply"
     )
 Write-CheckedCommandResult -Label "post-verify-operation-activate" -Result $operationActivateResult
@@ -671,10 +719,11 @@ if (-not $startResult.Success) {
 # ---------------------------------------------------------------
 Write-Host "[health] 백엔드(8010) 확인 중..."
 $backendOk = $false
-for ($i = 0; $i -lt 60; $i++) {
+# Readiness includes inventory integrity work; do not queue retries every second.
+for ($i = 0; $i -lt 6; $i++) {
     Start-Sleep -Milliseconds 500
     try {
-        $resp = Invoke-WebRequest -Uri "http://127.0.0.1:8010/health/ready" -TimeoutSec 1 -UseBasicParsing -ErrorAction Stop
+        $resp = Invoke-WebRequest -Uri "http://127.0.0.1:8010/health/ready" -TimeoutSec 10 -UseBasicParsing -ErrorAction Stop
         if ($resp.StatusCode -eq 200) { $backendOk = $true; break }
     }
     catch {}
@@ -685,7 +734,7 @@ $frontendOk = $false
 for ($i = 0; $i -lt 240; $i++) {
     Start-Sleep -Milliseconds 500
     try {
-        $resp = Invoke-WebRequest -Uri "http://127.0.0.1:3000" -TimeoutSec 1 -UseBasicParsing -ErrorAction Stop
+        $resp = Invoke-WebRequest -Uri "http://127.0.0.1:3000/mes" -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
         if ($resp.StatusCode -eq 200) { $frontendOk = $true; break }
     }
     catch {}
@@ -695,7 +744,11 @@ if (-not $backendOk -or -not $frontendOk) {
     Write-Host "[health] 실패 - backend=$backendOk frontend=$frontendOk"
     exit 6
 }
-Start-Process -FilePath (Join-Path $EmpRoot "watch.bat") -WindowStyle Normal
+$confirmRelease = Invoke-FrontendRelease -Command 'confirm' -Arguments @('--record', $script:FrontendRollbackRecord, '--employee-root', $EmpRoot)
+if (-not $confirmRelease.Success) {
+    Write-CheckedCommandResult -Label 'confirm-release' -Result $confirmRelease
+    exit 6
+}
 
 Write-Host "===================================================="
 Write-Host " 동기화 완료"

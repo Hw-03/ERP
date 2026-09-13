@@ -107,7 +107,10 @@ describe("개발 서버 실행 경로", () => {
 
     expect(launcher).toMatch(/Invoke-ProfileFrontendStartup/);
     expect(runtimeControl).toMatch(
-      /-ChildCommand\s+@\(\s*"node"\s*,\s*"scripts\/dev\.js"\s*\)/
+      /\$nodeCommand\s*=\s*Resolve-ProfileFrontendNodeCommand\s+-Profile\s+\$Profile\s+-RuntimeRoot\s+\$RuntimeRoot/
+    );
+    expect(runtimeControl).toMatch(
+      /-ChildCommand\s+@\(\s*\$nodeCommand\s*,\s*"scripts\/dev\.js"\s*\)/
     );
     expect(`${launcher}\n${runtimeControl}`).not.toMatch(/\bnpm(?:\.cmd)?\s+run\s+dev\b/i);
   });

@@ -233,6 +233,7 @@ def test_inventory_location_ledger_declares_data_preserving_employee_policy() ->
         "20260907_0034_merge_procurement_and_shipping_heads.py",
         "20260910_0033_defect_management_categories.py",
         "20260911_0035_merge_quality_and_defect_heads.py",
+        "20260911_0036_legacy_ledger_boundary.py",
     ],
 )
 def test_current_employee_schema_migrations_declare_auto_deploy_policy(filename: str) -> None:
@@ -244,8 +245,8 @@ def test_current_employee_schema_migrations_declare_auto_deploy_policy(filename:
 
 
 
-@pytest.mark.parametrize("fail_operation", [False, True])
-def test_preflight_checks_operations_only_on_snapshot(tmp_path, monkeypatch, fail_operation):
+@pytest.mark.parametrize("fail_stage", [None, "diagnose", "backup", "backup-verify", "activate"])
+def test_preflight_checks_operations_only_on_snapshot(tmp_path, monkeypatch, fail_stage):
     module = _load_preflight_module()
     database = tmp_path / "employee.db"
     with module.sqlite3.connect(database) as connection:
@@ -259,23 +260,52 @@ def test_preflight_checks_operations_only_on_snapshot(tmp_path, monkeypatch, fai
         "--verify-tool", str(tmp_path / "verify.py"),
         "--inventory-tool", str(tmp_path / "inventory.py"),
         "--operation-tool", str(tmp_path / "inventory_operation_admin.py"),
+        "--backup-tool", str(tmp_path / "backup_db.py"),
     ])
     monkeypatch.setattr(module, "load_preflight_policies", lambda *args: ())
+    monkeypatch.setenv("MES_RUNTIME_ROOT", str(tmp_path / "forbidden-runtime"))
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("REQUIRE_POSTGRES", "1")
+    monkeypatch.setenv("PYTHONPATH", "unrelated-code")
     calls = []
+    backup = args.runtime_root / "backups" / "sqlite" / "full.db"
+    backup.parent.mkdir(parents=True)
+    backup.write_bytes(b"full backup fixture")
 
     def run(command, cwd, environment):
         calls.append(command)
         assert str(database) not in " ".join(command)
         assert environment["DATABASE_URL"] != f"sqlite:///{database.as_posix()}"
-        if "diagnose" in command and fail_operation:
-            raise module.PreflightError("operation integrity failed (exit 1)")
+        assert environment["MES_RUNTIME_ROOT"] == str(args.runtime_root.resolve())
+        assert environment["PYTHON_DOTENV_DISABLED"] == "1"
+        assert not environment.get("APP_ENV")
+        assert not environment.get("REQUIRE_POSTGRES")
+        assert not environment.get("PYTHONPATH")
+        stage = ("diagnose" if "diagnose" in command else
+                 "activate" if "activate" in command else
+                 "backup" if command[1] == str(args.backup_tool) else
+                 "backup-verify" if command[1] == str(args.verify_tool) and "--database" not in command else None)
+        if stage == fail_stage and fail_stage is not None:
+            raise module.PreflightError(f"{stage} failed (exit 1)")
+        if stage == "backup":
+            assert "--integrity-only" not in command
+            return f"BACKUP_PATH={backup}\n"
+        if stage == "activate":
+            assert "--apply" not in command
+        return ""
 
     monkeypatch.setattr(module, "_run_checked", run)
-    if fail_operation:
-        with pytest.raises(module.PreflightError, match="operation integrity"):
+    if fail_stage:
+        with pytest.raises(module.PreflightError, match=fail_stage):
             module.run_preflight(args)
     else:
         module.run_preflight(args)
     assert any("diagnose" in call for call in calls)
-    assert not any("activate" in call or "repair" in call for call in calls)
+    if fail_stage in (None, "activate"):
+        assert any("activate" in call for call in calls)
+        full_backup = next(i for i, call in enumerate(calls) if call[1] == str(args.backup_tool))
+        backup_verify = next(i for i, call in enumerate(calls) if call[1] == str(args.verify_tool) and "--database" not in call)
+        activation = next(i for i, call in enumerate(calls) if "activate" in call)
+        assert full_backup < backup_verify < activation
+    assert not any("repair" in call or "--apply" in call for call in calls)
     assert database.read_bytes() == before

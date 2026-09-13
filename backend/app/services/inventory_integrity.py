@@ -59,7 +59,7 @@ from app.services.inventory_integrity_engine import (
     WarehousePlacementState,
     evaluate_inventory_integrity,
 )
-from app.services.inventory_operations import cutover_at
+from app.services.inventory_operations import V2_CUTOVER_SETTING_KEY, cutover_at
 from app.services.weekly_report_contract import (
     FINISHED_CODES,
     WeeklyActivityClassificationError,
@@ -725,6 +725,7 @@ def _collect_integrity_snapshot(db: Session) -> InventoryIntegritySnapshot:
         ),
         operation_evidence=tuple(evidence),
         cutover_at=cutover_at(db),
+        v2_cutover_at=cutover_at(db, key=V2_CUTOVER_SETTING_KEY),
         evaluated_at=datetime.utcnow(),
     )
 

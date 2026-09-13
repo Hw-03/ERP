@@ -8,6 +8,7 @@ import ast
 import hashlib
 import json
 import os
+import re
 import sqlite3
 import subprocess
 import sys
@@ -322,7 +323,7 @@ def _copy_verified_snapshot(source: Path, runtime_root: Path) -> Path:
     return snapshot.resolve()
 
 
-def _run_checked(command: list[str], working_directory: Path, environment: dict[str, str]) -> None:
+def _run_checked(command: list[str], working_directory: Path, environment: dict[str, str]) -> str:
     result = subprocess.run(command, cwd=working_directory, env=environment, text=True, capture_output=True)
     if result.stdout:
         print(result.stdout, end="")
@@ -331,6 +332,7 @@ def _run_checked(command: list[str], working_directory: Path, environment: dict[
     if result.returncode:
         print(f"PREFLIGHT_COMMAND_EXIT={result.returncode}")
         raise PreflightError(f"{' '.join(command[1:])} failed (exit {result.returncode})")
+    return result.stdout
 
 
 def run_preflight(args: argparse.Namespace) -> Path:
@@ -348,6 +350,10 @@ def run_preflight(args: argparse.Namespace) -> Path:
     before = snapshot_existing_rows(snapshot)
     environment = os.environ.copy()
     environment["DATABASE_URL"] = f"sqlite:///{snapshot.as_posix()}"
+    environment["MES_RUNTIME_ROOT"] = str(args.runtime_root.resolve())
+    environment["PYTHON_DOTENV_DISABLED"] = "1"
+    for name in ("APP_ENV", "REQUIRE_POSTGRES", "PYTHONPATH"):
+        environment.pop(name, None)
     backend = args.backend_dir.resolve()
     print("PREFLIGHT_STAGE=migrate")
     _run_checked([sys.executable, "bootstrap_db.py", "--migrate"], backend, environment)
@@ -375,6 +381,30 @@ def run_preflight(args: argparse.Namespace) -> Path:
     allowed_tables = frozenset().union(*(policy.allowed_tables for policy in policies))
     assert_existing_rows_unchanged(snapshot, before, allowed_tables)
     assert_policy_validators(snapshot, policies)
+    # A structural old-schema backup is only rollback evidence. Prove the
+    # post-migration full-backup contract before stopping employee services.
+    print("PREFLIGHT_STAGE=activation-backup")
+    backup_output = _run_checked(
+        [sys.executable, str(args.backup_tool.resolve()), "--sqlite", str(snapshot),
+         "--label", "employee-activation-preflight"],
+        backend,
+        environment,
+    )
+    backup_match = re.search(r"(?m)^BACKUP_PATH=(.+?)\s*$", backup_output)
+    if backup_match is None:
+        raise PreflightError("Activation backup did not return BACKUP_PATH")
+    activation_backup = Path(backup_match.group(1).strip()).resolve()
+    expected_backups = args.runtime_root.resolve() / "backups" / "sqlite"
+    if not activation_backup.is_relative_to(expected_backups) or not activation_backup.is_file():
+        raise PreflightError("Activation backup is outside the isolated runtime or missing")
+    _run_checked([sys.executable, str(args.verify_tool.resolve()), str(activation_backup)], backend, environment)
+    print("PREFLIGHT_STAGE=activation-dry-run")
+    _run_checked(
+        [sys.executable, str(args.operation_tool.resolve()), "activate", "--db-url", environment["DATABASE_URL"],
+         "--approved-by", "employee-schema-preflight"],
+        backend,
+        environment,
+    )
     print("PREFLIGHT_RESULT=PASS")
     return snapshot
 
@@ -390,6 +420,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--verify-tool", required=True, type=Path)
     parser.add_argument("--inventory-tool", required=True, type=Path)
     parser.add_argument("--operation-tool", type=Path, default=Path(__file__).with_name("inventory_operation_admin.py"))
+    parser.add_argument("--backup-tool", type=Path, default=Path(__file__).with_name("backup_db.py"))
     return parser.parse_args(argv)
 
 

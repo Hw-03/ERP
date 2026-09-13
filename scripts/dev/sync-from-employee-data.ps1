@@ -21,7 +21,7 @@ $BackupTool = Join-Path $DevRoot "scripts\ops\backup_db.py"
 $RestoreTool = Join-Path $DevRoot "scripts\ops\restore_db.py"
 $VerifyTool = Join-Path $DevRoot "scripts\ops\_verify_backup.py"
 $InventoryTool = Join-Path $DevRoot "scripts\ops\check_inventory_integrity.py"
-$BackendHealthAttempts = 60
+$BackendHealthAttempts = 6
 $FrontendHealthAttempts = 240
 $script:StagingCandidate = $null
 
@@ -250,33 +250,43 @@ function Start-DevelopmentServices {
 function Test-HttpEndpoint {
     param(
         [string] $Uri,
-        [int] $Attempts
+        [int] $Attempts,
+        [int] $TimeoutSec
     )
 
+    $lastFailure = "no successful response"
     for ($attempt = 0; $attempt -lt $Attempts; $attempt++) {
         Start-Sleep -Milliseconds 500
         try {
             $response = Invoke-WebRequest `
                 -Uri $Uri `
-                -TimeoutSec 1 `
+                -TimeoutSec $TimeoutSec `
                 -UseBasicParsing `
                 -ErrorAction Stop
             if ($response.StatusCode -eq 200) {
                 return $true
             }
+            $lastFailure = "HTTP $($response.StatusCode)"
         }
-        catch {}
+        catch { $lastFailure = $_.Exception.GetType().FullName }
     }
+    Write-Host "[health] endpoint=$Uri attempts=$Attempts error=$lastFailure"
     return $false
 }
 
 function Test-DevelopmentHealth {
+    # Readiness includes a full integrity diagnostic. A short client timeout
+    # leaves that work running while retries queue more copies of the same work.
     $backend = Test-HttpEndpoint `
         -Uri "http://127.0.0.1:8011/health/ready" `
-        -Attempts $BackendHealthAttempts
+        -Attempts $BackendHealthAttempts `
+        -TimeoutSec 10
     $frontend = Test-HttpEndpoint `
-        -Uri "http://127.0.0.1:3001" `
-        -Attempts $FrontendHealthAttempts
+        -Uri "http://127.0.0.1:3001/mes" `
+        -Attempts $FrontendHealthAttempts `
+        -TimeoutSec 2
+    Write-Host "SYNC_DATA_HEALTH_BACKEND=$(if ($backend) { 'OK' } else { 'FAILED' })"
+    Write-Host "SYNC_DATA_HEALTH_FRONTEND=$(if ($frontend) { 'OK' } else { 'FAILED' })"
     return [pscustomobject] @{
         Success = ($backend -and $frontend)
         Backend = $backend
@@ -420,7 +430,7 @@ function Invoke-EmployeeDataSync {
         Write-Host "SYNC_DATA_RESULT=TARGET_BACKUP_FAILED"
         return 13
     }
-    Write-Host "SYNC_DATA_BACKUP=$($targetBackup.Path)"
+    Write-Host "SYNC_DATA_BACKUP_BEFORE_STOP=$($targetBackup.Path)"
 
     Write-Host "[stop] 개발 서비스 8011/3001 정지 중..."
     $stop = Stop-DevelopmentServices
@@ -438,6 +448,36 @@ function Invoke-EmployeeDataSync {
         Write-Host "SYNC_DATA_RESULT=STOP_FAILED"
         return 14
     }
+
+    # Shutdown may checkpoint/delete WAL without changing logical data. Keep the
+    # online backup, but bind the restore guard and recovery to the stopped DB.
+    Write-Host "[backup] 정지된 개발 DB의 교체·복구 기준 백업 검증 중..."
+    try {
+        $cutoverBackup = Invoke-DatabaseBackup `
+            -Database $DevDb `
+            -RuntimeRoot $DevRuntimeRoot `
+            -Label "employee-data-cutover"
+    }
+    catch {
+        Write-Host "[backup] 정지 후 백업 실패: $($_.Exception.Message)"
+        $cutoverBackup = [pscustomobject] @{ Success = $false; Path = $null }
+    }
+    if (-not $cutoverBackup.Success) {
+        $restart = Start-DevelopmentServices
+        $health = if ($restart.Success) {
+            Test-DevelopmentHealth
+        }
+        else {
+            [pscustomobject] @{ Success = $false; Backend = $false; Frontend = $false }
+        }
+        Write-Host "SYNC_DATA_RECOVERY=NOT_NEEDED"
+        Write-Host "SYNC_DATA_RECOVERY_HEALTH=$(if ($health.Success) { 'OK' } else { 'FAILED' })"
+        Write-Host "SYNC_DATA_RESULT=TARGET_CUTOVER_BACKUP_FAILED"
+        return 13
+    }
+    $targetBackup = $cutoverBackup
+    Write-Host "SYNC_DATA_CUTOVER_BACKUP=$($targetBackup.Path)"
+    Write-Host "SYNC_DATA_BACKUP=$($targetBackup.Path)"
 
     try {
         $previousRuntimeRoot = [Environment]::GetEnvironmentVariable("MES_RUNTIME_ROOT", "Process")

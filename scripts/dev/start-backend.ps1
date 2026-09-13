@@ -68,7 +68,7 @@ function Start-BackendSupervisor {
         $state = Get-RuntimeState -Path $StatePath
         throw "[start-backend] Backend did not respond on $LiveUrl. status=$($state.status). Check $EventPath"
     }
-    if (-not (Wait-RuntimeHttp200 -Url $ReadyUrl -Attempts 1)) {
+    if (-not (Wait-RuntimeHttp200 -Url $ReadyUrl -Attempts 1 -TimeoutSec 10)) {
         Add-RuntimeEvent -Path $EventPath -Profile $Profile.Name -Service "backend" `
             -Event "service_not_ready" `
             -Details @{ readyUrl = $ReadyUrl }
@@ -99,7 +99,7 @@ Add-RuntimeEvent -Path $EventPath -Profile $Profile.Name -Service "backend" `
     -Details @{ request = $request }
 Request-RuntimeTaskStart -RepoRoot $Profile.RepoRoot -Service "backend" | Out-Null
 
-if (-not (Wait-RuntimeHttp200 -Url $ReadyUrl -Attempts 120)) {
+if (-not (Wait-RuntimeHttp200 -Url $ReadyUrl -Attempts 6 -TimeoutSec 10)) {
     $state = Get-RuntimeState -Path $StatePath
     $task = Get-RuntimeTaskRegistration -RepoRoot $Profile.RepoRoot -Service "backend"
     throw "[start-backend] Backend did not become ready on $ReadyUrl. task=$($task.Status) runtime=$($state.status). Check $EventPath"
