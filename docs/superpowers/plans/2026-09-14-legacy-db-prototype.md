@@ -209,3 +209,9 @@ custom BOM 프런트의 방향 판정은 Friday와 보존본의 `ioWorkType.ts`�
 - 실제 activation은 두 번 모두 외부 기동 명령의 짧은 6회 readiness 대기 때문에 실패했다. 앱은 각각 18:26:40, 18:30:41에 실제 `/health/ready` 200을 기록했으나 시작 명령은 먼저 대기 횟수를 소진했다. 두 번 모두 안전 경로가 포트를 정지했으며 직원 쓰기는 재개하지 않았다. 세 번째 동일 재시도는 하지 않는다.
 - 원본으로의 공개 writer-fenced 복구는 종료 코드 0/PASS이다. `employee-recovery-after-startup-timeout-01.json` SHA256 `af3e8a669aae4b051407aea0394ab98573bdb1c61e461a2705a852d0c8fe2bd2`, 원본과 복구본의 전체 논리 해시 `a4b32e7de5dd90ee98db0df446dbe2b94a4928febb03f71d9751427062e63ace`가 일치한다. 검증된 receipt를 사용한 공개 코드 복귀를 진행한다.
 - 수정은 `start-backend.ps1` 외부 readiness 시도 횟수 6→90 한 줄이다. 기존 liveness 대기와 같은 충분한 시도 예산을 주며 `/health/ready` 200 요건, 각 요청 제한, 최종 실패 throw를 유지한다. 계약 테스트 두 줄도 정렬했다. 전체 장시간 게이트 재통과로 표기하지 않고 직접 관련 Python 9개, PowerShell runtime 계약 및 구문 검사 증거로 확인한다. 실제 재배포와 기동 성공은 별도 확인 전까지 미완료다.
+
+### 최종 완료 — 2026-09-14 18:50:56 KST
+
+- `b2ab4f95` 수정본을 일반 push한 뒤 새 FULL 백업·admission으로 재배포했다. 실제 직원 기동 명령 종료 코드 0 및 `FRIDAY_ACTIVATION_RESULT=CONFIRMED`, journal `CONFIRMED`, backend live, readiness 200, 공개 MES 200, 직접·프록시 boot ID 일치를 확인했다.
+- 실제 직원 DB revision은 `20260910_0033`이다. 오늘 업무 데이터와 복구 결과를 유지했으며 미완료 작업을 임의 처리하지 않았다.
+- 최종 보존 경로, 남긴 수정, 검증 범위와 인계 사항은 [완료 보고](2026-09-14-friday-cutover-result.md)에 정리했다. 위의 미완료·실패 기록은 당시의 역사 증거이며 최종 상태와 구분한다.
