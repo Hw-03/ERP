@@ -9,7 +9,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Iterable, Optional
+from typing import Callable, Iterable, Optional
 
 from sqlalchemy.orm import Session
 
@@ -743,8 +743,10 @@ def get_batch(db: Session, *, batch_id: uuid.UUID) -> Optional[dict]:
 def _normalize_automatic_batch_routes_with_draft_fingerprint_refresh(
     db: Session,
     batch: IoBatch,
+    *,
+    finalize_routes: Optional[Callable[[], None]] = None,
 ) -> None:
-    """서버 파생 자동 경로만 바뀐 draft 제출 지문을 현재 경로로 회전한다."""
+    """최종 반영 경로를 확정한 뒤 헤더와 일치하는 draft 제출 지문을 갱신한다."""
     current_draft_fingerprint = fingerprint_io_draft_submit(
         batch.requester_employee_id,
         batch.batch_id,
@@ -757,6 +759,8 @@ def _normalize_automatic_batch_routes_with_draft_fingerprint_refresh(
         sub_type=batch.sub_type,
         bundles=batch.bundles,
     )
+    if finalize_routes is not None:
+        finalize_routes()
     if batch.sub_type in {
         "warehouse_to_dept",
         "dept_to_warehouse",
@@ -852,7 +856,9 @@ def _sync_batch_from_stock_requests(
     else:
         batch.stock_request_id = None
     if batch.status in {"completed", "partially_completed"}:
-        _normalize_automatic_batch_routes_with_draft_fingerprint_refresh(db, batch)
+        from app.services.io_dispatch import normalize_department_approval_routes
+
+        normalize_department_approval_routes(db, batch, linked_requests)
     batch.updated_at = datetime.utcnow()
     db.flush()
 

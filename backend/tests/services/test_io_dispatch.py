@@ -29,6 +29,7 @@ from app.models import (
     IoBundle,
     IoLine,
     LocationStatusEnum,
+    RequestBucketEnum,
     StockRequest,
     StockRequestLine,
     StockRequestStatusEnum,
@@ -1281,7 +1282,7 @@ def test_custom_bom_child_quantity_requires_department_approval_even_when_edited
         approver=approver,
     )
 
-    assert _prod_qty(db_session, component.item_id) == D("7")
+    assert _prod_qty(db_session, component.item_id) == D("13")
     assert _prod_qty(db_session, result_item.item_id) == D("0")
     logs = db_session.query(TransactionLog).all()
     assert len(logs) == 1
@@ -1440,8 +1441,9 @@ def test_custom_disassemble_normalizes_every_included_child_to_department_out(
     ]
 
 
+@pytest.mark.parametrize("initial_stock, legacy_outbound", [(D("0"), False), (D("2"), False), (D("2"), True)])
 def test_custom_produce_normalizes_every_included_child_to_department_in(
-    make_bom, make_item, make_location, db_session
+    make_bom, make_item, make_location, db_session, initial_stock, legacy_outbound
 ):
     """하위 하나만 수정해도 커스텀 생산 묶음의 포함 하위 전체를 선택 입고한다."""
     parent = make_item(name="선택 입고 기준 BOM", process_type_code="AF")
@@ -1450,7 +1452,7 @@ def test_custom_produce_normalizes_every_included_child_to_department_in(
     make_bom(parent.item_id, changed_child.item_id, D("1"))
     make_bom(parent.item_id, unchanged_child.item_id, D("1"))
     make_location(parent.item_id, department=ASSEMBLY, quantity=D("0"))
-    make_location(changed_child.item_id, department=ASSEMBLY, quantity=D("2"))
+    make_location(changed_child.item_id, department=ASSEMBLY, quantity=initial_stock)
     make_location(unchanged_child.item_id, department=TUNING, quantity=D("1"))
     requester = _make_employee(db_session, department_role="none")
     batch = _build_batch(
@@ -1498,9 +1500,9 @@ def test_custom_produce_normalizes_every_included_child_to_department_in(
 
     assert result["requires_approval"] is True
     request = db_session.query(StockRequest).one()
-    assert batch.status == "reserved"
-    assert _loc_pending(db_session, changed_child.item_id) == D("2")
-    assert _loc_pending(db_session, unchanged_child.item_id, TUNING) == D("1")
+    assert batch.status == "submitted"
+    assert _loc_pending(db_session, changed_child.item_id) == D("0")
+    assert _loc_pending(db_session, unchanged_child.item_id, TUNING) == D("0")
     assert {
         (
             line.item_id,
@@ -1511,8 +1513,8 @@ def test_custom_produce_normalizes_every_included_child_to_department_in(
         )
         for line in request.lines
     } == {
-        (changed_child.item_id, "production", ASSEMBLY.value, "none", None),
-        (unchanged_child.item_id, "production", TUNING.value, "none", None),
+        (changed_child.item_id, "none", None, "production", ASSEMBLY.value),
+        (unchanged_child.item_id, "none", None, "production", TUNING.value),
     }
 
     approver = _make_employee(
@@ -1521,6 +1523,17 @@ def test_custom_produce_normalizes_every_included_child_to_department_in(
         name="선택 입고 결재자",
         department_role="primary",
     )
+    if legacy_outbound:
+        # 수정 전 이미 출고로 접수된 요청은 승인 시 입고로 바꾸지 않는다.
+        svc._normalize_automatic_batch_routes(db_session, batch)
+        for line in request.lines:
+            line.from_bucket = RequestBucketEnum.PRODUCTION
+            line.from_department = line.to_department
+            line.to_bucket = RequestBucketEnum.NONE
+            line.to_department = None
+    else:
+        # 접수 후 BOM이 바뀌어도 승인 대상의 입고 의미를 유지한다.
+        db_session.query(BOM).filter(BOM.parent_item_id == parent.item_id).delete(synchronize_session=False)
     request.department_approved_by_employee_id = approver.employee_id
     request.department_approved_by_name = approver.name
     release_reservation(db_session, request, actor=approver)
@@ -1531,11 +1544,11 @@ def test_custom_produce_normalizes_every_included_child_to_department_in(
     )
 
     assert _prod_qty(db_session, parent.item_id) == D("0")
-    assert _prod_qty(db_session, changed_child.item_id) == D("0")
-    assert _prod_qty(db_session, unchanged_child.item_id, TUNING) == D("0")
+    assert _prod_qty(db_session, changed_child.item_id) == (D("0") if legacy_outbound else initial_stock + D("2"))
+    assert _prod_qty(db_session, unchanged_child.item_id, TUNING) == (D("0") if legacy_outbound else D("2"))
     assert sorted(log.quantity_change for log in db_session.query(TransactionLog).all()) == [
-        D("-2"),
-        D("-1"),
+        D("-2") if legacy_outbound else D("1"),
+        D("-1") if legacy_outbound else D("2"),
     ]
 
 
@@ -1821,7 +1834,7 @@ def test_only_custom_bom_bundle_uses_child_only_execution(
     svc.execute_batch_after_dept_approval(db_session, request=request, approver=approver)
 
     assert _prod_qty(db_session, custom_parent.item_id) == D("0")
-    assert _prod_qty(db_session, custom_child.item_id) == D("7")
+    assert _prod_qty(db_session, custom_child.item_id) == D("13")
     assert _prod_qty(db_session, default_parent.item_id) == D("1")
     assert _prod_qty(db_session, default_child.item_id) == D("9")
 

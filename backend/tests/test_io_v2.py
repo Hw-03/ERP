@@ -5173,6 +5173,61 @@ def _preview_custom_produce_bundles(client, requester, parent, component):
     return bundles
 
 
+@pytest.mark.parametrize("submit_existing_draft", [False, True])
+def test_custom_produce_receipt_without_stock_keeps_inbound_on_retry(
+    client, db_session, make_item, make_bom, submit_existing_draft
+):
+    """재고 없는 선택 입고도 신규·초안 제출과 재시도에서 같은 입고 요청을 반환한다."""
+    parent = make_item(name="Receipt parent", process_type_code="AF")
+    component = make_item(name="Receipt component", process_type_code="AR")
+    make_bom(parent.item_id, component.item_id, Decimal("2"))
+    requester = _make_employee(db_session)
+    db_session.commit()
+    payload = {
+        "requester_employee_id": str(requester.employee_id),
+        "work_type": "process",
+        "sub_type": "produce",
+        "notes": "선택 입고",
+        "bundles": _preview_custom_produce_bundles(client, requester, parent, component),
+    }
+    if submit_existing_draft:
+        drafted = client.put("/api/io/draft", json=payload)
+        assert drafted.status_code == 200, drafted.text
+        url = f"/api/io/draft/{drafted.json()['batch_id']}/submit"
+        kwargs = {"params": {"requester_employee_id": str(requester.employee_id)}}
+    else:
+        url = "/api/io/submit"
+        kwargs = {"json": {**payload, "client_request_id": str(uuid.uuid4())}}
+
+    for _ in range(2):
+        response = client.post(url, **kwargs)
+        assert response.status_code == 201, response.text
+        assert response.json()["requires_approval"] is True
+        db_session.expire_all()
+        request = db_session.query(StockRequest).one()
+        assert len(request.lines) == 1
+        line = request.lines[0]
+        assert line.item_id == component.item_id
+        assert line.from_bucket.value == "none"
+        assert line.to_bucket.value == "production"
+        assert line.to_department == DepartmentEnum.ASSEMBLY
+        assert db_session.query(TransactionLog).count() == 0
+
+    approver = _make_employee(db_session, code="RECEIPT-APPROVER", department_role="primary")
+    db_session.commit()
+    approved = _approve_department_request(client, request.request_id, approver)
+    assert approved.status_code == 200, approved.text
+    db_session.expire_all()
+    batch = db_session.query(IoBatch).one()
+    child = next(line for bundle in batch.bundles for line in bundle.lines if line.origin == "bom_auto")
+    assert child.direction == "in"
+    assert batch.to_department == DepartmentEnum.ASSEMBLY.value
+    assert db_session.query(TransactionLog).one().quantity_change == Decimal("1")
+    replay = client.post(url, **kwargs)
+    assert replay.status_code == 201, replay.text
+    assert db_session.query(TransactionLog).count() == 1
+
+
 def _preview_process_bom_bundles(client, requester, parent, *, sub_type: str):
     preview = client.post(
         "/api/io/preview",

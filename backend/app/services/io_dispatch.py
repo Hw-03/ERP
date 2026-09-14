@@ -79,9 +79,20 @@ from app.services.io_persist import (
 CUSTOM_BOM_REFERENCE_EXCLUSION_NOTE = "커스텀 BOM 상위 미반영"
 
 
-def _normalize_automatic_batch_routes(db: Session, batch: IoBatch) -> None:
-    """실제 반영 직전에도 live 품목 코드로 자동 부서 경로를 확정한다."""
-    _normalize_automatic_batch_routes_with_draft_fingerprint_refresh(db, batch)
+def _normalize_automatic_batch_routes(
+    db: Session,
+    batch: IoBatch,
+    *,
+    custom_bundle_ids: Optional[set[uuid.UUID]] = None,
+) -> None:
+    """live 부서를 갱신하되 서버가 확정한 커스텀 BOM 낱개 입출고를 유지한다."""
+    _normalize_automatic_batch_routes_with_draft_fingerprint_refresh(
+        db,
+        batch,
+        finalize_routes=lambda: _normalize_custom_process_bom_effects(
+            batch, custom_bundle_ids or set(),
+        ),
+    )
 
 
 def _included_lines(batch: IoBatch) -> list[IoLine]:
@@ -748,6 +759,39 @@ def _is_no_effect_custom_bom_reference_request(batch: IoBatch, request: StockReq
     return True
 
 
+def normalize_department_approval_routes(
+    db: Session, batch: IoBatch, requests: Sequence[StockRequest],
+) -> None:
+    """접수된 입고 요청만 복원해 과거 출고 요청의 승인 의미를 보존한다."""
+    inbound_line_ids = {
+        line.operation_line_id
+        for request in requests
+        for line in request.lines
+        if line.from_bucket == RequestBucketEnum.NONE
+        and line.to_bucket == RequestBucketEnum.PRODUCTION
+    }
+    custom_receipt_bundle_ids = {
+        bundle.bundle_id
+        for bundle in batch.bundles
+        if batch.sub_type == "produce"
+        and bundle.source_kind == BOM_PARENT_SOURCE_KIND
+        and any(
+            line.origin == "direct"
+            and line.item_id == bundle.source_item_id
+            and not line.included
+            and line.exclusion_note == CUSTOM_BOM_REFERENCE_EXCLUSION_NOTE
+            for line in bundle.lines
+        )
+        and any(line.included and line.origin == "bom_auto" for line in bundle.lines)
+        and all(
+            line.line_id in inbound_line_ids
+            for line in bundle.lines
+            if line.included and line.origin == "bom_auto"
+        )
+    }
+    _normalize_automatic_batch_routes(db, batch, custom_bundle_ids=custom_receipt_bundle_ids)
+
+
 def execute_batch_after_dept_approval(
     db: Session, *, request: StockRequest, approver: Employee
 ) -> None:
@@ -766,8 +810,7 @@ def execute_batch_after_dept_approval(
         batch.stock_request_id = request.request_id
     if request.request_code and not batch.reference_no:
         batch.reference_no = request.request_code
-
-    _normalize_automatic_batch_routes(db, batch)
+    normalize_department_approval_routes(db, batch, [request])
 
     if _is_no_effect_custom_bom_reference_request(batch, request):
         _complete_no_effect_department_approval(batch=batch, request=request)
@@ -1270,7 +1313,11 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
             )
         # BOM 자동행 토큰은 미리보기 당시 경로로 먼저 검증한다. 이후 실제 제출 경로는
         # live 품목 코드 기준으로 다시 확정해 선택 부서나 오래된 초안을 실행하지 않는다.
-        _normalize_automatic_batch_routes(db, batch)
+        _normalize_automatic_batch_routes(
+            db,
+            batch,
+            custom_bundle_ids=custom_process_bom_bundle_ids if batch.sub_type == "produce" else None,
+        )
         included_lines = _included_lines(batch)
         if department_approval_required:
             # process 부서 승인만 필요 — 낱개 또는 기준과 다른 BOM 자동 하위.
