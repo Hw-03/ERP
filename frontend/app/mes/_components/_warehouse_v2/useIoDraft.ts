@@ -1,5 +1,10 @@
 import { useState } from "react";
 import { api, type IoBundle, type IoSubType, type IoWorkType } from "@/lib/api";
+import {
+  getPendingIoDraftRequest,
+  getPendingIoRequest,
+  PendingIoRequestError,
+} from "./ioPendingRequest";
 
 export function useIoDraft() {
   const [drafting, setDrafting] = useState(false);
@@ -15,6 +20,14 @@ export function useIoDraft() {
     batchId?: string | null;
     bundles: IoBundle[];
   }) {
+    const pending = getPendingIoRequest(payload.employeeId);
+    const pendingDraft = getPendingIoDraftRequest(payload.employeeId);
+    if (
+      (pending?.batch_id && pending.batch_id === payload.batchId)
+      || pendingDraft?.batchId === payload.batchId
+    ) {
+      throw new PendingIoRequestError();
+    }
     setDrafting(true);
     try {
       return await api.saveDraft({

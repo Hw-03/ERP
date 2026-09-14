@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -13,6 +13,7 @@ import { ReasonFormFields } from "./ReasonFormFields";
 import { InlineErrorNote } from "./InlineErrorNote";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { QuantityInput } from "../common/QuantityInput";
+import { makeClientRequestId } from "@/lib/uuid";
 
 type DisposalAction = "unquarantine" | "scrap" | "disassemble";
 
@@ -45,6 +46,11 @@ export function PaPfDefectWizard({
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const restoreRequestIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (open) restoreRequestIdRef.current = null;
+  }, [open, location.record_id]);
 
   // ESC 닫기
   useEffect(() => {
@@ -86,6 +92,8 @@ export function PaPfDefectWizard({
           reason_category: category,
           reason_memo: memo,
           actor_employee_id: currentEmployee.employee_id,
+          client_request_id: restoreRequestIdRef.current
+            ?? (restoreRequestIdRef.current = makeClientRequestId()),
         });
       } else if (action === "scrap") {
         await stockRequestsApi.createStockRequest({

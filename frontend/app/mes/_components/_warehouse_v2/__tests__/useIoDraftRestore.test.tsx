@@ -38,10 +38,12 @@ function Harness({
   subType,
   goTo,
   restoreStep,
+  canRestore = true,
 }: {
   subType: IoSubType;
   goTo: (step: number) => void;
   restoreStep?: 1 | 2 | 3 | 4 | 5;
+  canRestore?: boolean;
 }) {
   const restoredDraftRef = useRef<string | null>(null);
   const restoredNonceRef = useRef<number | null>(null);
@@ -69,6 +71,7 @@ function Harness({
     state: state as never,
     onStatusChange: vi.fn(),
     restoreStep,
+    canRestore,
   });
 
   return null;
@@ -210,6 +213,13 @@ function CanonicalProcessRestoreHarness() {
 }
 
 describe("useIoDraftRestore", () => {
+  it("현재 작업자가 허용받지 않은 유형의 draft는 복원하지 않는다", async () => {
+    const goTo = vi.fn();
+    render(<Harness subType="warehouse_to_dept" goTo={goTo} canRestore={false} />);
+
+    await waitFor(() => expect(goTo).not.toHaveBeenCalled());
+  });
+
   it("창고 입출고 초안의 체크됨·수량 0과 제외된 양수 수량을 제외 상태로 정규화한다", () => {
     const bundles = [{
       bundle_id: "warehouse-draft",

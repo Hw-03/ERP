@@ -5,6 +5,7 @@ import type { HistorySelection } from "../historyConstants";
 import {
   advanceHistoryLoadReconcileState,
   applyHistoryCancellation,
+  isHistoryCancellationUpdate,
   reconcileHistorySelection,
   type HistoryLoadReconcileState,
 } from "../historyCancellation";
@@ -42,6 +43,17 @@ function makeLog(overrides: Partial<TransactionLog> = {}): TransactionLog {
     ...overrides,
   };
 }
+
+it("recognizes an immutable reversal response without operation projection fields", () => {
+  expect(isHistoryCancellationUpdate(makeLog({
+    log_id: "reversal-1",
+    operation_id: "operation-cancellation",
+    operation_kind: null,
+    operation_effective_status: null,
+    reverses_log_id: "log-1",
+    cancelled: false,
+  }))).toBe(true);
+});
 
 it("cancels only the matching operation, preserving previous and retry rounds", () => {
   const original = makeLog({ operation_id: "pickup-2" });
@@ -82,6 +94,45 @@ function makeBatch(overrides: Partial<IoBatch> = {}): IoBatch {
 }
 
 describe("applyHistoryCancellation", () => {
+  it("immutable cancellation ledger 응답으로 원본 작업을 취소 확정한다", () => {
+    const original = makeLog({ operation_id: "operation-original" });
+    const companion = makeLog({ log_id: "log-2", operation_id: "operation-original" });
+    const selection: HistorySelection = { kind: "log", log: original };
+    const reversal = makeLog({
+      log_id: "reversal-1",
+      operation_id: "operation-cancellation",
+      operation_kind: "CANCELLATION",
+      operation_effective_status: "cancellation",
+      reverses_log_id: original.log_id,
+      reason_memo: "입력 오류",
+      requester_name: "취소 작업자",
+      requested_at: "2026-07-10T02:00:00Z",
+      cancelled: false,
+    });
+
+    const next = applyHistoryCancellation(
+      {
+        logs: [original, companion],
+        selection,
+        batchCache: new Map([["batch-1", makeBatch()]]),
+      },
+      reversal,
+      "batch-1",
+    );
+
+    expect(next.logs.map((log) => log.cancelled)).toEqual([true, true]);
+    expect(next.logs[0]).toMatchObject({
+      log_id: original.log_id,
+      cancel_reason: "입력 오류",
+      cancelled_by: "취소 작업자",
+      cancelled_at: "2026-07-10T02:00:00Z",
+      operation_effective_status: "cancelled",
+      reversal_operation_id: "operation-cancellation",
+    });
+    expect(next.selection).toMatchObject({ kind: "log", log: { log_id: original.log_id, cancelled: true } });
+    expect(next.batchCache.get("batch-1")?.status).toBe("cancelled");
+  });
+
   it("updates list logs, selection.logs, and batch cache in one patch", () => {
     const first = makeLog();
     const second = makeLog({ log_id: "log-2", item_id: "item-2", item_name: "부품 B" });

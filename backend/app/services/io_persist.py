@@ -43,6 +43,7 @@ from app.services.io_preview import (
     has_included_manual_line,
     normalize_automatic_department_routes,
     normalize_process_sub_type,
+    validate_receive_requester,
     validate_internal_use_bundles,
     validate_internal_use_operation,
     validate_internal_use_requester,
@@ -523,6 +524,11 @@ def _persist_batch(
         work_type=payload.work_type,
         sub_type=payload.sub_type,
         bundles=payload.bundles,
+    )
+    validate_receive_requester(
+        requester,
+        work_type=payload.work_type,
+        sub_type=payload.sub_type,
     )
     _lock_active_payload_items(db, payload)
     validate_internal_use_requester(

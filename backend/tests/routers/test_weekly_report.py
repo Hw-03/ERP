@@ -1335,6 +1335,11 @@ def test_vacuum_generator_scope_starts_with_week_of_2026_09_07(client, db_sessio
         model_symbol="3",
         qty=_dec(5),
     )
+    # 검사일이 다음 주로 넘어가도 확정 주차에 필요한 종료 스냅샷을 제공한다.
+    _add_snapshot(
+        db_session, week_end=date(2026, 9, 13),
+        item_quantities=[(target, _dec(5))], verified=True,
+    )
     _activate_verified_weekly_report(db_session, starts_at="2026-08-31T00:00:00+09:00")
     _add_snapshot(
         db_session,
@@ -1379,6 +1384,11 @@ def test_ceramic_tube_housing_scope_starts_with_week_of_2026_09_07(client, db_se
         model_symbol="3468",
         serial_no=6,
         qty=_dec(5),
+    )
+    # 검사일이 다음 주로 넘어가도 확정 주차에 필요한 종료 스냅샷을 제공한다.
+    _add_snapshot(
+        db_session, week_end=date(2026, 9, 13),
+        item_quantities=[(target, _dec(5))], verified=True,
     )
     _activate_verified_weekly_report(db_session, starts_at="2026-08-31T00:00:00+09:00")
     _add_snapshot(

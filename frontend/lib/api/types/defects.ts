@@ -76,6 +76,7 @@ export interface UnquarantinePayload {
   reason_category?: string | null;
   reason_memo?: string | null;
   actor_employee_id: string;
+  client_request_id?: string;
 }
 
 export interface BulkUnquarantinePayload {

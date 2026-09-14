@@ -149,6 +149,22 @@ describe("MobileWarehouseScreen compact step header", () => {
     currentPanelProps.value = null;
   });
 
+  it("창고 승인 건수 첫 조회 실패를 알리고 작성 화면을 유지한 채 다시 시도한다", async () => {
+    currentOperator.value = { ...currentOperator.value, warehouse_role: "primary" };
+    apiMocks.countWarehouseQueue
+      .mockRejectedValueOnce(new Error("count unavailable"))
+      .mockResolvedValueOnce({ count: 4 });
+
+    render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("창고 승인 건수 조회 실패");
+    expect(screen.getByTestId("compose-wizard")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "창고 승인 건수 다시 시도" }));
+
+    await waitFor(() => expect(screen.queryByText(/창고 승인 건수 .*실패/)).not.toBeInTheDocument());
+    expect(apiMocks.countWarehouseQueue).toHaveBeenCalledTimes(2);
+  });
+
   afterEach(() => {
     vi.useRealTimers();
   });

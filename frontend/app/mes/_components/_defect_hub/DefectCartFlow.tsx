@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import { ArrowLeft, Building2, ChevronRight, Copy, Trash2, Warehouse, Wrench } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -16,17 +16,19 @@ import { DisassembleTree, toServerDecision, validateDecisionTree, type ChildDeci
 import { QuantityInput } from "../common/QuantityInput";
 import { DefectManagementCategoryControl } from "./DefectManagementCategoryControl";
 import type { DefectManagementCategory } from "@/lib/api/types/defects";
+import { makeClientRequestId } from "@/lib/uuid";
 
 type SourceKind = "warehouse" | "production";
 type DirectAction = "scrap" | "rework";
 type FlowStep = 1 | 2 | 3;
 
-type CartHistoryState = { defect?: string; mode?: DefectCartMode; step?: number; directAction?: DirectAction | null; source?: SourceKind } | null;
+type CartHistoryState = { defect?: string; mode?: DefectCartMode; taskId?: string; step?: number; directAction?: DirectAction | null; source?: SourceKind } | null;
 
 export type DefectCartMode = "add" | "scrap";
 
 interface CartLine {
   key: string;
+  clientRequestId: string;
   item: Item;
   qty: string;
   category: string;
@@ -43,6 +45,7 @@ interface LineFailure {
 
 interface Props {
   mode: DefectCartMode;
+  taskId?: string;
   items: Item[];
   productModels: ProductModel[];
   currentEmployee: { employee_id: string; name: string; department: string };
@@ -65,12 +68,15 @@ function managementCategoryLabel(category: DefectManagementCategory): string {
 
 export function DefectCartFlow({
   mode,
+  taskId,
   items,
   productModels,
   currentEmployee,
   onDone,
   onCancel,
 }: Props) {
+  const taskIdRef = useRef(taskId ?? makeClientRequestId());
+  const flowTaskId = taskIdRef.current;
   const [directAction, setDirectAction] = useState<DirectAction | null>(mode === "add" ? "scrap" : null);
   const [source, setSource] = useState<SourceKind>("production");
   const [step, setStep] = useState<FlowStep>(1);
@@ -96,8 +102,8 @@ export function DefectCartFlow({
       setSource(nextSource);
       setStep(nextStep);
       if (nextStep === 1) setLines([]);
-      if (!validCart || invalidAction || state?.step !== nextStep || state?.directAction !== nextAction || state?.source !== nextSource) {
-        window.history.replaceState({ ...(window.history.state ?? {}), defect: "cart", mode, step: nextStep, directAction: nextAction, source: nextSource }, "");
+      if (!validCart || invalidAction || state?.taskId !== flowTaskId || state?.step !== nextStep || state?.directAction !== nextAction || state?.source !== nextSource) {
+        window.history.replaceState({ ...(window.history.state ?? {}), defect: "cart", mode, taskId: flowTaskId, step: nextStep, directAction: nextAction, source: nextSource }, "");
       }
     }
 
@@ -115,7 +121,7 @@ export function DefectCartFlow({
     }
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [mode]);
+  }, [flowTaskId, mode]);
 
   const isDirect = mode === "scrap";
   const isRework = isDirect && directAction === "rework";
@@ -132,7 +138,7 @@ export function DefectCartFlow({
   const reworkLineReady = Boolean(selectedReworkLine && validQty(selectedReworkLine.qty) && selectedReworkLine.category.trim() !== "");
 
   function newLine(item: Item): CartLine {
-    return { key: `${item.item_id}-${Date.now()}`, item, qty: "1", category: "", memo: "", managementCategory: "DEFECT", decisions: [] };
+    return { key: `${item.item_id}-${Date.now()}`, clientRequestId: makeClientRequestId(), item, qty: "1", category: "", memo: "", managementCategory: "DEFECT", decisions: [] };
   }
 
   function addItem(item: Item) {
@@ -144,7 +150,7 @@ export function DefectCartFlow({
     setFailures([]);
   }
 
-  function updateLine(key: string, patch: Partial<Omit<CartLine, "key" | "item">>) {
+  function updateLine(key: string, patch: Partial<Omit<CartLine, "key" | "clientRequestId" | "item">>) {
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   }
 
@@ -186,6 +192,7 @@ export function DefectCartFlow({
         reason_category: line.category || null,
         reason_memo: line.memo,
         actor_employee_id: currentEmployee.employee_id,
+        client_request_id: line.clientRequestId,
         management_category: line.managementCategory,
       });
       return;
@@ -240,12 +247,12 @@ export function DefectCartFlow({
   }
 
   function pushStep(nextStep: FlowStep, nextAction = directAction, nextSource = source) {
-    window.history.pushState({ defect: "cart", mode, step: nextStep, directAction: nextAction, source: nextSource }, "");
+    window.history.pushState({ defect: "cart", mode, taskId: flowTaskId, step: nextStep, directAction: nextAction, source: nextSource }, "");
     setStep(nextStep);
   }
 
   function selectSource(nextSource: SourceKind) {
-    window.history.replaceState({ ...(window.history.state ?? {}), defect: "cart", mode, step: 1, directAction, source: nextSource }, "");
+    window.history.replaceState({ ...(window.history.state ?? {}), defect: "cart", mode, taskId: flowTaskId, step: 1, directAction, source: nextSource }, "");
     setSource(nextSource);
   }
 
@@ -288,7 +295,7 @@ export function DefectCartFlow({
             desc="정상 재고를 격리 없이 바로 폐기합니다. 여러 품목을 한 번에 담을 수 있습니다."
             tone={LEGACY_COLORS.red}
             onClick={() => {
-              window.history.pushState({ defect: "cart", mode, step: 1, directAction: "scrap", source }, "");
+              window.history.pushState({ defect: "cart", mode, taskId: flowTaskId, step: 1, directAction: "scrap", source }, "");
               setDirectAction("scrap");
             }}
           />

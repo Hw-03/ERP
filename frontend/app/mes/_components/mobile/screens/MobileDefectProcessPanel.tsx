@@ -21,6 +21,7 @@ import { InlineErrorNote } from "../../_defect_hub/InlineErrorNote";
 import { REASON_CATEGORIES } from "../../_defect_hub/reasonCategories";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { IconButton, SectionCard, StickyFooter, Stepper } from "../primitives";
+import { makeClientRequestId } from "@/lib/uuid";
 
 type ProcessAction = "unquarantine" | "scrap" | "return" | "disassemble";
 
@@ -57,6 +58,7 @@ export function MobileDefectProcessPanel({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const locationIdentityRef = useRef(location.record_id);
+  const restoreRequestIdRef = useRef<string | null>(null);
   const boundedProcessQty = Math.max(1, Math.min(maxQty, processQty));
 
   useEffect(() => {
@@ -72,6 +74,7 @@ export function MobileDefectProcessPanel({
     setBusy(false);
     setErrorMsg(null);
     setConfirmOpen(false);
+    restoreRequestIdRef.current = null;
   }, [location.record_id, location.available_quantity]);
 
   useEffect(() => {
@@ -117,6 +120,8 @@ export function MobileDefectProcessPanel({
           reason_category: category || null,
           reason_memo: memo || null,
           actor_employee_id: currentEmployee.employee_id,
+          client_request_id: restoreRequestIdRef.current
+            ?? (restoreRequestIdRef.current = makeClientRequestId()),
         });
       } else if (action === "scrap" || action === "return") {
         await stockRequestsApi.createStockRequest({

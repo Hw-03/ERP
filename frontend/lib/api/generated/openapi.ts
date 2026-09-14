@@ -4036,8 +4036,10 @@ export interface components {
          * CapacityAfBlock
          * @description AF(조립 완제품) 기준 생산 가능 수량.
          *
-         *     재고 기준은 available(=warehouse+production-재고 요청 예약-활성 출하 예약)이며
-         *     **계획/대응 수량 지표**다.
+         *     ship_ready는 출하 예약분을 포함하고 재고 요청 예약만 뺀 정상 재고다.
+         *     fast_production과 total_production은
+         *     available(=warehouse+production-재고 요청 예약-활성 출하 예약) 기준이다.
+         *     모두 **계획/대응 수량 지표**다.
          *     생산 등록 가능성 검증(backflush, warehouse_available)이 아니다.
          *
          *     주의: summary.ship_ready / fast_production / total_production 은 'AF별 독립 계산의 합계'다.
@@ -4127,7 +4129,7 @@ export interface components {
             fast_production: number;
             /**
              * Ship Ready
-             * @description 출하 대기 — 창고에 있는 완성 PF 재고 합계.
+             * @description 출하 대기 — AF별 연결 PF 중 출하 예약분을 포함한 최대 정상 재고의 합계.
              */
             ship_ready: number;
             /**
@@ -4162,7 +4164,7 @@ export interface components {
             pf_name: string;
             /**
              * Ship Ready
-             * @description 출하 대기 — 이 PF 완성 재고.
+             * @description 출하 대기 — 출하 예약분을 포함한 이 PF의 정상 재고.
              */
             ship_ready: number;
             /**
@@ -8013,6 +8015,8 @@ export interface components {
              * Format: uuid
              */
             actor_employee_id: string;
+            /** Client Request Id */
+            client_request_id?: string | null;
             /** Dept */
             dept: string;
             /**

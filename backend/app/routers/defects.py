@@ -113,6 +113,7 @@ class UnquarantineRequest(BaseModel):
     reason_category: Optional[str] = None
     reason_memo: Optional[str] = None
     actor_employee_id: uuid.UUID
+    client_request_id: Optional[str] = None
 
 
 class DefectActionResult(BaseModel):
@@ -270,6 +271,8 @@ def _matches_quarantine_request(
         return False
 
     if payload.source == "warehouse":
+        if payload.source_dept is not None:
+            return False
         source_delta = _sum_inventory_effect(log, scope="warehouse")
     elif payload.source == "production" and payload.source_dept:
         source_delta = _sum_inventory_effect(
@@ -290,6 +293,43 @@ def _find_client_request_log(db: Session, client_request_id: str) -> Optional[Tr
         .filter(TransactionLog.client_request_id == client_request_id)
         .first()
     )
+
+
+def _matches_unquarantine_request(
+    log: TransactionLog, payload: UnquarantineRequest
+) -> bool:
+    """멱등 키가 같은 정상 복귀 로그와 요청의 업무 의미를 비교한다."""
+    if (
+        log.transaction_type != TransactionTypeEnum.UNMARK_DEFECTIVE
+        or log.item_id != payload.item_id
+        or log.reference_no
+        != defect_actions_svc.unquarantine_record_reference(payload.record_id)
+        or (
+            payload.record_id is not None
+            and log.defect_quarantine_record_id != payload.record_id
+        )
+        or log.department != payload.dept
+        or log.producer_employee_id != payload.actor_employee_id
+        or log.reason_category != payload.reason_category
+        or (log.reason_memo or "") != (payload.reason_memo or "")
+    ):
+        return False
+
+    defective_delta = _sum_inventory_effect(
+        log,
+        scope="location",
+        department=payload.dept,
+        status=LocationStatusEnum.DEFECTIVE.value,
+    )
+    if defective_delta != -payload.qty:
+        return False
+    restored_delta = _sum_inventory_effect(
+        log,
+        scope="location",
+        department=payload.dept,
+        status=LocationStatusEnum.PRODUCTION.value,
+    )
+    return restored_delta == payload.qty
 
 
 # ---------------------------------------------------------------------------
@@ -768,10 +808,21 @@ def unquarantine(
     http_request: Request,
     actor: VerifiedActor,
     db: Session = Depends(get_db),
-):
+) -> DefectActionResult:
     """정상 복귀 (즉시, 결재 없음). unmark_defective 래퍼."""
     ensure_actor_employee_id(actor, payload.actor_employee_id)
     payload = payload.model_copy(update={"actor_employee_id": actor.employee_id})
+
+    if payload.client_request_id:
+        existing = _find_client_request_log(db, payload.client_request_id)
+        if existing:
+            if _matches_unquarantine_request(existing, payload):
+                return DefectActionResult(
+                    item_id=payload.item_id,
+                    quantity=payload.qty,
+                    message="정상 복귀 완료",
+                )
+            raise http_error(409, ErrorCode.CONFLICT, "이미 다른 요청에 사용된 요청 식별자입니다.")
 
     item = item_repository.get_active(db, payload.item_id, for_update=True)
     if item is None:
@@ -792,9 +843,32 @@ def unquarantine(
             actor=actor,
             reason_category=payload.reason_category,
             reason_memo=payload.reason_memo,
+            client_request_id=payload.client_request_id,
         )
     except ValueError as exc:
+        if payload.client_request_id:
+            db.expire_all()
+            existing = _find_client_request_log(db, payload.client_request_id)
+            if existing is not None:
+                if _matches_unquarantine_request(existing, payload):
+                    return DefectActionResult(
+                        item_id=payload.item_id,
+                        quantity=payload.qty,
+                        message="정상 복귀 완료",
+                    )
+                raise http_error(409, ErrorCode.CONFLICT, "이미 다른 요청에 사용된 요청 식별자입니다.")
         raise http_error(422, ErrorCode.VALIDATION_ERROR, str(exc))
+    except IntegrityError:
+        if payload.client_request_id:
+            db.expire_all()
+            existing = _find_client_request_log(db, payload.client_request_id)
+            if existing is not None and _matches_unquarantine_request(existing, payload):
+                return DefectActionResult(
+                    item_id=payload.item_id,
+                    quantity=payload.qty,
+                    message="정상 복귀 완료",
+                )
+        raise http_error(409, ErrorCode.CONFLICT, "정상 복귀 처리 중 충돌이 발생했습니다.")
     _evt_emit(
         "defect_unmark",
         request=http_request,

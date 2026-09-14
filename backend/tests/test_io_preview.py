@@ -434,7 +434,7 @@ def test_preview_invalid_work_type(db_session, make_item):
 def test_preview_rejects_internal_use_work_sub_type_mismatch(
     db_session, make_item, work_type, sub_type
 ):
-    with pytest.raises(ValueError, match="internal_use"):
+    with pytest.raises(ValueError, match="조합"):
         iop.preview(
             db_session,
             work_type=work_type,

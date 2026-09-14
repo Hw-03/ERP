@@ -22,8 +22,20 @@ vi.mock("../_warehouse_hooks/useWarehouseData", () => ({
 }));
 
 vi.mock("../_defect_hub/DefectHubEntry", () => ({
-  DefectHubEntry: ({ onSelect }: { onSelect: (id: "list") => void }) => (
-    <button type="button" onClick={() => onSelect("list")}>Open list</button>
+  DefectHubEntry: ({ onSelect }: { onSelect: (id: "list" | "work") => void }) => (
+    <>
+      <button type="button" onClick={() => onSelect("list")}>Open list</button>
+      <button type="button" onClick={() => onSelect("work")}>Open work</button>
+    </>
+  ),
+}));
+
+vi.mock("../_defect_hub/DefectCartFlow", () => ({
+  DefectCartFlow: ({ taskId, onDone }: { taskId: string; onDone: (action: null) => void }) => (
+    <div>
+      <output data-testid="defect-cart-task-id">{taskId}</output>
+      <button type="button" onClick={() => onDone(null)}>Complete cart</button>
+    </div>
   ),
 }));
 
@@ -102,6 +114,7 @@ describe("DesktopDefectView realtime refresh", () => {
     mocks.listDefects.mockReset().mockResolvedValue([]);
     window.history.replaceState(null, "");
     window.localStorage.clear();
+    window.sessionStorage.clear();
   });
 
   it("announces the initial defect list loading state politely", () => {
@@ -111,6 +124,63 @@ describe("DesktopDefectView realtime refresh", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open list" }));
 
     expect(screen.getByRole("status")).toHaveTextContent("불량 데이터 로딩 중");
+  });
+
+  it("완료한 불량 작업은 다른 탭을 거쳐 다시 마운트해도 뒤로가기로 복원하지 않는다", async () => {
+    const { unmount } = render(<DesktopDefectView operator={operator} />);
+    await act(async () => { await Promise.resolve(); });
+    fireEvent.click(screen.getByRole("button", { name: "Open work" }));
+    fireEvent.click(screen.getByRole("button", { name: /격리 등록/ }));
+    const completedState = { ...window.history.state };
+    expect(screen.getByTestId("defect-cart-task-id")).toHaveTextContent(completedState.taskId);
+
+    fireEvent.click(screen.getByRole("button", { name: "Complete cart" }));
+    expect(screen.getByRole("button", { name: "Open work" })).toBeInTheDocument();
+    await waitFor(() => expect(mocks.listDefects).toHaveBeenCalledTimes(2));
+
+    unmount();
+    render(<DesktopDefectView operator={operator} />);
+    await act(async () => { await Promise.resolve(); });
+
+    act(() => window.dispatchEvent(new PopStateEvent("popstate", { state: completedState })));
+
+    expect(screen.getByRole("button", { name: "Open work" })).toBeInTheDocument();
+    expect(screen.queryByTestId("defect-cart-task-id")).not.toBeInTheDocument();
+    expect(window.history.state).toEqual({ defect: "hub" });
+  });
+
+  it("다른 직원에게는 이전 직원의 완료 작업 무효화를 적용하지 않는다", async () => {
+    const { unmount } = render(<DesktopDefectView operator={operator} />);
+    await act(async () => { await Promise.resolve(); });
+    fireEvent.click(screen.getByRole("button", { name: "Open work" }));
+    fireEvent.click(screen.getByRole("button", { name: /격리 등록/ }));
+    const completedState = { ...window.history.state };
+    fireEvent.click(screen.getByRole("button", { name: "Complete cart" }));
+    await waitFor(() => expect(mocks.listDefects).toHaveBeenCalledTimes(2));
+
+    unmount();
+    const otherOperator = { ...operator, employee_id: "employee-2" } as Operator;
+    render(<DesktopDefectView operator={otherOperator} />);
+    await act(async () => { await Promise.resolve(); });
+    act(() => window.dispatchEvent(new PopStateEvent("popstate", { state: completedState })));
+
+    expect(screen.getByTestId("defect-cart-task-id")).toHaveTextContent(completedState.taskId);
+  });
+
+  it("완료하지 않은 불량 작업은 다시 마운트한 뒤에도 뒤로가기로 계속 복원한다", async () => {
+    const { unmount } = render(<DesktopDefectView operator={operator} />);
+    await act(async () => { await Promise.resolve(); });
+    fireEvent.click(screen.getByRole("button", { name: "Open work" }));
+    fireEvent.click(screen.getByRole("button", { name: /격리 등록/ }));
+    const unfinishedState = { ...window.history.state };
+
+    act(() => window.dispatchEvent(new PopStateEvent("popstate", { state: { defect: "hub" } })));
+    unmount();
+    render(<DesktopDefectView operator={operator} />);
+    await act(async () => { await Promise.resolve(); });
+    act(() => window.dispatchEvent(new PopStateEvent("popstate", { state: unfinishedState })));
+
+    expect(screen.getByTestId("defect-cart-task-id")).toHaveTextContent(unfinishedState.taskId);
   });
 
   it("focuses a named alert and retries when the initial defect list load fails", async () => {

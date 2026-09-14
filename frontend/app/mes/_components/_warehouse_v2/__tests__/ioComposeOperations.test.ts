@@ -7,9 +7,11 @@ import {
   runWarehousePull,
   saveCompositionDraft,
   runCompositionSubmit,
+  recoverCompositionSubmit,
   useIoComposeOperationState,
   type IoOperationRefs,
 } from "../ioComposeOperations";
+import { PendingIoRequestError, toIoSubmitRequest } from "../ioPendingRequest";
 
 function operationRefs(): IoOperationRefs {
   return {
@@ -19,6 +21,192 @@ function operationRefs(): IoOperationRefs {
 }
 
 describe("ioComposeOperations", () => {
+  it("직원 화면이 unmount되면 늦은 복구 결과를 새 화면에 알리지 않는다", async () => {
+    const refs = { ...operationRefs(), mounted: { current: true } };
+    const setResult = vi.fn();
+    const onStatusChange = vi.fn();
+    const reset = vi.fn();
+    const input = { employeeId: "employee-1", workType: "receive" as const, subType: "receive_supplier" as const, bundles: [] };
+    await recoverCompositionSubmit({
+      recover: async () => {
+        refs.mounted.current = false;
+        return { request: toIoSubmitRequest(input), response: { requires_approval: false, message: "반영 완료" } as never };
+      },
+      getCurrentInput: () => input, operationRefs: refs,
+      setResult, reset, resetFilters: vi.fn(), onStatusChange,
+      refreshItems: async () => [], setItems: vi.fn(),
+    });
+    expect(setResult).not.toHaveBeenCalled();
+    expect(onStatusChange).not.toHaveBeenCalled();
+    expect(reset).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])("복구 중 작업이 바뀌어도 이전 요청 결과를 알리고 새 입력은 보존한다: failed=%s", async (failed) => {
+    const refs = operationRefs();
+    const reset = vi.fn();
+    const setResult = vi.fn();
+    const input = { employeeId: "employee-1", workType: "receive" as const, subType: "receive_supplier" as const, bundles: [] };
+    await recoverCompositionSubmit({
+      recover: async () => {
+        refs.generation.current += 1;
+        if (failed) throw new PendingIoRequestError();
+        return { request: toIoSubmitRequest(input), response: { requires_approval: false, message: "반영 완료" } as never };
+      },
+      getCurrentInput: () => input,
+      operationRefs: refs,
+      setResult, reset, resetFilters: vi.fn(), onStatusChange: vi.fn(),
+      refreshItems: async () => [], setItems: vi.fn(),
+    });
+    expect(reset).not.toHaveBeenCalled();
+    expect(setResult).toHaveBeenCalledWith(expect.objectContaining({ title: failed ? "처리 결과 확인 필요" : "이전 요청 완료" }));
+  });
+
+  it("결과 불명은 입력을 초기화하지 않고 결과 확인 필요로 안내한다", async () => {
+    const reset = vi.fn();
+    const setResult = vi.fn();
+    await runCompositionSubmit(
+      "employee-1", "receive_supplier", "조립", async () => {},
+      () => [], { current: null }, async () => { throw new PendingIoRequestError(); },
+      vi.fn(), vi.fn(), setResult, reset, vi.fn(), vi.fn(), async () => [], vi.fn(),
+    );
+    expect(reset).not.toHaveBeenCalled();
+    expect(setResult).toHaveBeenCalledWith(expect.objectContaining({ title: "처리 결과 확인 필요" }));
+  });
+
+  it.each([false, true])("원 요청 확인 뒤 현재 입력이 다르면 보존한다: changed=%s", async (changed) => {
+    const initial = {
+      employeeId: "employee-1", workType: "receive" as const, subType: "receive_supplier" as const,
+      bundles: [{ bundle_id: "bundle-1", title: "품목", quantity: 1, lines: [] } as unknown as IoBundle],
+    };
+    const current = { ...initial, bundles: [{ ...initial.bundles[0], quantity: changed ? 9 : 1 }] };
+    const reset = vi.fn();
+    const resetFilters = vi.fn();
+    const setResult = vi.fn();
+    const onSubmitSuccess = vi.fn();
+    await recoverCompositionSubmit({
+      recover: async () => ({
+        request: { ...toIoSubmitRequest(initial), client_request_id: "original-key" },
+        response: { requires_approval: false, message: "입출고가 반영되었습니다." } as never,
+      }),
+      getCurrentInput: () => current,
+      operationRefs: operationRefs(),
+      setResult, reset, resetFilters, onStatusChange: vi.fn(),
+      refreshItems: async () => [], setItems: vi.fn(), onSubmitSuccess,
+    });
+    expect(reset).toHaveBeenCalledTimes(changed ? 0 : 1);
+    expect(resetFilters).toHaveBeenCalledTimes(changed ? 0 : 1);
+    expect(onSubmitSuccess).toHaveBeenCalledTimes(changed ? 0 : 1);
+    expect(setResult).toHaveBeenCalledWith(expect.objectContaining({
+      kind: "success", title: "이전 요청 완료",
+      message: changed ? expect.stringContaining("현재 입력은 보존") : expect.any(String),
+    }));
+  });
+
+  it("복구 응답 batch가 원 draft와 다르면 현재 입력을 초기화하지 않는다", async () => {
+    const initial = {
+      employeeId: "employee-1", workType: "receive" as const, subType: "receive_supplier" as const,
+      batchId: "draft-current",
+      bundles: [{ bundle_id: "bundle-1", title: "품목", quantity: 1, lines: [] } as unknown as IoBundle],
+    };
+    const reset = vi.fn();
+    const onDraftSubmitted = vi.fn();
+    const setResult = vi.fn();
+
+    await recoverCompositionSubmit({
+      recover: async () => ({
+        request: { ...toIoSubmitRequest(initial), client_request_id: "original-key" },
+        response: {
+          batch: { batch_id: "draft-other" },
+          requires_approval: false,
+          message: "다른 임시저장 요청 완료",
+        } as never,
+      }),
+      getCurrentInput: () => initial,
+      operationRefs: operationRefs(),
+      setResult,
+      reset,
+      resetFilters: vi.fn(),
+      onStatusChange: vi.fn(),
+      refreshItems: async () => [],
+      setItems: vi.fn(),
+      onDraftSubmitted,
+    });
+
+    expect(reset).not.toHaveBeenCalled();
+    expect(onDraftSubmitted).not.toHaveBeenCalled();
+    expect(setResult).toHaveBeenCalledWith(expect.objectContaining({
+      kind: "error",
+      message: expect.stringContaining("현재 작업은 보존"),
+    }));
+  });
+
+  it("최초 제출 응답 전에 내용이 바뀌면 성공을 알리고 현재 입력은 초기화하지 않는다", async () => {
+    const refs = operationRefs();
+    const reset = vi.fn();
+    const resetFilters = vi.fn();
+    const onSubmitSuccess = vi.fn();
+    const setResult = vi.fn();
+
+    await runCompositionSubmit(
+      "employee-1", "adjust_in", "조립", async () => {},
+      () => [{ bundle_id: "bundle-1", lines: [] } as never],
+      { current: null },
+      async () => {
+        refs.contentRevision.current += 1;
+        return { requires_approval: false, message: "완료" } as never;
+      },
+      vi.fn(), vi.fn(), setResult, reset, resetFilters, vi.fn(), async () => [], vi.fn(),
+      onSubmitSuccess, undefined, undefined, refs,
+    );
+
+    expect(reset).not.toHaveBeenCalled();
+    expect(resetFilters).not.toHaveBeenCalled();
+    expect(onSubmitSuccess).not.toHaveBeenCalled();
+    expect(setResult).toHaveBeenCalledWith(expect.objectContaining({
+      kind: "success",
+      message: expect.stringContaining("현재 입력은 보존"),
+    }));
+  });
+
+  it("초안 제출 중 작업이 교체되면 완료 초안만 알리고 새 초안 연결은 보존한다", async () => {
+    const refs = operationRefs();
+    const draftRef = { current: "draft-old" as string | null };
+    const reset = vi.fn();
+    const onDraftSubmitted = vi.fn();
+
+    await runCompositionSubmit(
+      "employee-1", "adjust_in", "조립", async () => {},
+      () => [{ bundle_id: "bundle-1", lines: [] } as never],
+      draftRef,
+      vi.fn(),
+      vi.fn(),
+      vi.fn(),
+      vi.fn(),
+      reset,
+      vi.fn(),
+      vi.fn(),
+      async () => [],
+      vi.fn(),
+      undefined,
+      async () => {
+        draftRef.current = "draft-new";
+        refs.generation.current += 1;
+        return {
+          batch: { batch_id: "draft-old" },
+          requires_approval: false,
+          message: "완료",
+        } as never;
+      },
+      onDraftSubmitted,
+      refs,
+      async () => ({ batch_id: "draft-old" }),
+    );
+
+    expect(onDraftSubmitted).toHaveBeenCalledWith("draft-old");
+    expect(draftRef.current).toBe("draft-new");
+    expect(reset).not.toHaveBeenCalled();
+  });
+
   it("저장 응답 뒤 내용이 바뀌면 batch id만 보존하고 성공 전환은 막는다", async () => {
     const refs = operationRefs();
     const retainBatchId = vi.fn();

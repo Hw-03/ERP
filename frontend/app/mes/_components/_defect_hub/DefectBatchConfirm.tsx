@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ArrowLeft, Copy } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
@@ -11,6 +11,7 @@ import type { Department } from "@/lib/api/types/shared";
 import type { DefectLocation } from "@/lib/api/types/defects";
 import { ReasonFormFields } from "./ReasonFormFields";
 import { QuantityInput } from "../common/QuantityInput";
+import { makeClientRequestId } from "@/lib/uuid";
 
 export type BatchAction = "unquarantine" | "scrap" | "return";
 
@@ -58,6 +59,7 @@ export function DefectBatchConfirm({
   );
   const [busy, setBusy] = useState(false);
   const [failures, setFailures] = useState<RowFailure[]>([]);
+  const restoreRequestIdsRef = useRef<Record<string, string>>({});
 
   const allValid = useMemo(
     () =>
@@ -103,6 +105,8 @@ export function DefectBatchConfirm({
         reason_category: r.category,
         reason_memo: r.memo,
         actor_employee_id: currentEmployee.employee_id,
+        client_request_id: restoreRequestIdsRef.current[keyOf(loc)]
+          ?? (restoreRequestIdsRef.current[keyOf(loc)] = makeClientRequestId()),
       });
       return;
     }

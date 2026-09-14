@@ -298,6 +298,37 @@ beforeEach(() => {
 });
 
 describe("DesktopHistoryView history state", () => {
+  it("immutable cancellation ledger 응답을 원본 선택과 목록에 반영한 뒤 재조회한다", async () => {
+    const original = makeLog({ operation_id: "operation-original" });
+    testState.updated = makeLog({
+      log_id: "reversal-1",
+      operation_id: "operation-cancellation",
+      operation_kind: null,
+      operation_effective_status: null,
+      reverses_log_id: original.log_id,
+      reason_memo: "입력 오류",
+      requester_name: "취소 작업자",
+      requested_at: "2026-07-10T02:00:00Z",
+      cancelled: false,
+    });
+    setHistoryResult([original], false);
+    const { rerender } = render(<DesktopHistoryView />);
+    fireEvent.click(screen.getByRole("button", { name: "단건 선택" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "단건 취소 성공" }));
+    rerender(<DesktopHistoryView />);
+
+    await waitFor(() => {
+      expect(testState.historyResult.groups[0].logs[0]).toMatchObject({
+        log_id: original.log_id,
+        cancelled: true,
+      });
+      expect(screen.getByTestId("history-right-panel-state")).toHaveAttribute("data-name", "이전 객체");
+      expect(screen.getByTestId("history-right-panel-state")).toHaveAttribute("data-selection-cancelled", "yes");
+      expect(testState.historyResult.refreshLoaded).toHaveBeenCalledOnce();
+    });
+  });
+
   it("applies two rapid next-month actions without losing either move", async () => {
     render(<DesktopHistoryView />);
     fireEvent.click(screen.getByRole("button", { name: "8월 선택" }));

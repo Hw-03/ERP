@@ -29,7 +29,7 @@ const HANDOVER_RECEIVE_DEPTS = ["고압", "진공"];
 
 // 탭 전환 remount 사이 직전 카운트 보존 (세션 내 메모리 캐시) — DesktopWarehouseView 와 동일.
 const cartCountCache = new Map<string, number>();
-const warehouseQueueCountCache = { value: 0 };
+const warehouseQueueCountCache = { value: 0, hasValue: false };
 const deptQueueCountCache = new Map<string, number>();
 
 /**
@@ -100,10 +100,20 @@ export function MobileWarehouseScreen({
   const [warehouseQueueCount, setWarehouseQueueCount] = useState(
     () => warehouseQueueCountCache.value,
   );
+  const [warehouseQueueCountKnown, setWarehouseQueueCountKnown] = useState(
+    () => warehouseQueueCountCache.hasValue,
+  );
+  const [warehouseQueueCountFailed, setWarehouseQueueCountFailed] = useState(false);
   const [deptQueueCount, setDeptQueueCount] = useState(() => {
     const eid = operator?.employee_id ?? "";
     return eid ? deptQueueCountCache.get(eid) ?? 0 : 0;
   });
+  const [deptQueueCountKnown, setDeptQueueCountKnown] = useState(() => {
+    const eid = operator?.employee_id ?? "";
+    return Boolean(eid && deptQueueCountCache.has(eid));
+  });
+  const [deptQueueCountFailed, setDeptQueueCountFailed] = useState(false);
+  const [queueCountRefreshNonce, setQueueCountRefreshNonce] = useState(0);
   const [restoreIoDraft, setRestoreIoDraft] = useState<IoBatch | null>(null);
   const [urlDraftPending, setUrlDraftPending] = useState(() => Boolean(urlDraftId));
   const [urlDraftRestoreError, setUrlDraftRestoreError] = useState<string | null>(null);
@@ -210,12 +220,17 @@ export function MobileWarehouseScreen({
         if (!active) return;
         setWarehouseQueueCount(count);
         warehouseQueueCountCache.value = count;
+        warehouseQueueCountCache.hasValue = true;
+        setWarehouseQueueCountKnown(true);
+        setWarehouseQueueCountFailed(false);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (active) setWarehouseQueueCountFailed(true);
+      });
     return () => {
       active = false;
     };
-  }, [canSeeQueue, panelRefreshNonce, revision]);
+  }, [canSeeQueue, panelRefreshNonce, queueCountRefreshNonce, revision]);
 
   useEffect(() => {
     if (!canSeeDeptQueue || !operatorEmployeeId) return;
@@ -226,12 +241,16 @@ export function MobileWarehouseScreen({
         if (!active) return;
         setDeptQueueCount(count);
         deptQueueCountCache.set(operatorEmployeeId, count);
+        setDeptQueueCountKnown(true);
+        setDeptQueueCountFailed(false);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (active) setDeptQueueCountFailed(true);
+      });
     return () => {
       active = false;
     };
-  }, [canSeeDeptQueue, operatorEmployeeId, panelRefreshNonce, revision]);
+  }, [canSeeDeptQueue, operatorEmployeeId, panelRefreshNonce, queueCountRefreshNonce, revision]);
 
   useEffect(() => {
     if (!canReceiveHandover || !operatorEmployeeId) return;
@@ -282,6 +301,22 @@ export function MobileWarehouseScreen({
               deptQueueCount={deptQueueCount}
               handoverInboxCount={handoverInboxCount}
             />
+          </div>
+        )}
+        {((canSeeQueue && warehouseQueueCountFailed) || (canSeeDeptQueue && deptQueueCountFailed)) && (
+          <div className="mt-2 flex flex-col gap-2">
+            {canSeeQueue && warehouseQueueCountFailed && (
+              <div role="alert" className="flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-xs font-bold" style={{ borderColor: LEGACY_COLORS.red, color: LEGACY_COLORS.red }}>
+                <span>창고 승인 건수 {warehouseQueueCountKnown ? `${warehouseQueueCount}건 · 갱신 실패` : "조회 실패"}</span>
+                <button type="button" aria-label="창고 승인 건수 다시 시도" className="underline" onClick={() => setQueueCountRefreshNonce((value) => value + 1)}>다시 시도</button>
+              </div>
+            )}
+            {canSeeDeptQueue && deptQueueCountFailed && (
+              <div role="alert" className="flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-xs font-bold" style={{ borderColor: LEGACY_COLORS.red, color: LEGACY_COLORS.red }}>
+                <span>부서 승인 건수 {deptQueueCountKnown ? `${deptQueueCount}건 · 갱신 실패` : "조회 실패"}</span>
+                <button type="button" aria-label="부서 승인 건수 다시 시도" className="underline" onClick={() => setQueueCountRefreshNonce((value) => value + 1)}>다시 시도</button>
+              </div>
+            )}
           </div>
         )}
       </div>

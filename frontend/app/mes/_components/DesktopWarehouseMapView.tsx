@@ -1043,8 +1043,16 @@ export function DesktopWarehouseMapView({
 }
 
 type ZoneLine = { item_id: string; quantity: number };
+type ZoneDraftLine = { item_id: string; quantity: string };
 
-function WarehouseZonePanel({
+function zoneQuantityError(quantity: string): string | null {
+  if (quantity.trim() === "") return "수량을 입력하세요.";
+  const parsed = Number(quantity);
+  if (!Number.isInteger(parsed) || parsed < 0) return "수량은 0 이상의 정수로 입력하세요.";
+  return null;
+}
+
+export function WarehouseZonePanel({
   zone,
   items,
   editable = false,
@@ -1069,8 +1077,8 @@ function WarehouseZonePanel({
     width: String(zone.width),
     height: String(zone.height),
   });
-  const [lines, setLines] = useState<ZoneLine[]>(() =>
-    zone.items.map((item) => ({ item_id: item.item_id, quantity: item.quantity })),
+  const [lines, setLines] = useState<ZoneDraftLine[]>(() =>
+    zone.items.map((item) => ({ item_id: item.item_id, quantity: String(item.quantity) })),
   );
   const [selectedItemId, setSelectedItemId] = useState("");
 
@@ -1083,7 +1091,7 @@ function WarehouseZonePanel({
       width: String(zone.width),
       height: String(zone.height),
     });
-    setLines(zone.items.map((item) => ({ item_id: item.item_id, quantity: item.quantity })));
+    setLines(zone.items.map((item) => ({ item_id: item.item_id, quantity: String(item.quantity) })));
   }, [zone.id, zone.label, zone.zone_type, zone.pos_x, zone.pos_y, zone.width, zone.height, zone.items]);
 
   useEffect(() => {
@@ -1092,7 +1100,11 @@ function WarehouseZonePanel({
 
   const itemById = useMemo(() => new Map(items.map((item) => [item.item_id, item])), [items]);
   const zoneItemById = useMemo(() => new Map(zone.items.map((item) => [item.item_id, item])), [zone.items]);
-  const totalQty = lines.reduce((sum, line) => sum + line.quantity, 0);
+  const totalQty = lines.reduce((sum, line) => {
+    const parsed = Number(line.quantity);
+    return sum + (Number.isInteger(parsed) && parsed >= 0 ? parsed : 0);
+  }, 0);
+  const hasQuantityErrors = lines.some((line) => zoneQuantityError(line.quantity) !== null);
   const isPallet = zone.zone_type === "pallet";
 
   const inputStyle = {
@@ -1105,10 +1117,10 @@ function WarehouseZonePanel({
     width: "100%",
   } as const;
 
-  function updateLine(itemId: string, quantity: number) {
+  function updateLine(itemId: string, quantity: string) {
     setLines((prev) =>
       prev.map((line) =>
-        line.item_id === itemId ? { ...line, quantity: Math.max(0, Math.floor(quantity || 0)) } : line,
+        line.item_id === itemId ? { ...line, quantity } : line,
       ),
     );
   }
@@ -1123,10 +1135,12 @@ function WarehouseZonePanel({
       const existing = prev.find((line) => line.item_id === selectedItemId);
       if (existing) {
         return prev.map((line) =>
-          line.item_id === selectedItemId ? { ...line, quantity: line.quantity + 1 } : line,
+          line.item_id === selectedItemId
+            ? { ...line, quantity: String((Number.isInteger(Number(line.quantity)) ? Number(line.quantity) : 0) + 1) }
+            : line,
         );
       }
-      return [...prev, { item_id: selectedItemId, quantity: 1 }];
+      return [...prev, { item_id: selectedItemId, quantity: "1" }];
     });
   }
 
@@ -1150,11 +1164,12 @@ function WarehouseZonePanel({
   }
 
   async function saveItems() {
+    if (hasQuantityErrors) return;
     await onSaveItems(
       zone.id,
       lines
-        .filter((line) => line.quantity > 0)
-        .map((line) => ({ item_id: line.item_id, quantity: Math.floor(line.quantity) })),
+        .map((line) => ({ item_id: line.item_id, quantity: Number(line.quantity) }))
+        .filter((line) => line.quantity > 0),
     );
   }
 
@@ -1311,8 +1326,11 @@ function WarehouseZonePanel({
                     <>
                       <QuantityInput
                         min={0}
+                        step={1}
                         value={line.quantity}
-                        onChange={(e) => updateLine(line.item_id, Number(e.target.value))}
+                        aria-label={`${itemName(line.item_id)} 수량`}
+                        aria-invalid={zoneQuantityError(line.quantity) !== null}
+                        onChange={(e) => updateLine(line.item_id, e.target.value)}
                         style={{ ...inputStyle, textAlign: "center", padding: "6px 4px" }}
                       />
                       <button
@@ -1333,6 +1351,14 @@ function WarehouseZonePanel({
                       >
                         <X size={13} />
                       </button>
+                      {zoneQuantityError(line.quantity) && (
+                        <div
+                          role="alert"
+                          style={{ gridColumn: "1 / -1", fontSize: 11, fontWeight: 700, color: LEGACY_COLORS.red }}
+                        >
+                          {zoneQuantityError(line.quantity)}
+                        </div>
+                      )}
                     </>
                   ) : (
                     <div style={{ textAlign: "right", fontSize: 13, fontWeight: 800, color: LEGACY_COLORS.muted2 }}>×{line.quantity}</div>
@@ -1385,7 +1411,7 @@ function WarehouseZonePanel({
             <button
               type="button"
               onClick={() => void saveItems()}
-              disabled={busy}
+              disabled={busy || hasQuantityErrors}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -1398,8 +1424,8 @@ function WarehouseZonePanel({
                 color: LEGACY_COLORS.text,
                 fontSize: 13,
                 fontWeight: 800,
-                cursor: busy ? "not-allowed" : "pointer",
-                opacity: busy ? 0.5 : 1,
+                cursor: busy || hasQuantityErrors ? "not-allowed" : "pointer",
+                opacity: busy || hasQuantityErrors ? 0.5 : 1,
               }}
             >
               <Save size={14} /> 적재 품목 저장

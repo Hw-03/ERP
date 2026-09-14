@@ -19,8 +19,8 @@ type Props = {
 export function BomDetailModal({ itemId, open, onClose }: Props) {
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useFocusTrap<HTMLDivElement>(open, { initialFocusRef: closeRef });
   const [mounted, setMounted] = useState(false);
+  const panelRef = useFocusTrap<HTMLDivElement>(open && mounted, { initialFocusRef: closeRef });
   const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(() => new Set());
   const { tree, retry } = useBomTree(itemId, open, "desc");
   const currentTree = tree && tree.item_id === itemId ? tree : null;

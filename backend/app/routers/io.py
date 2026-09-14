@@ -136,6 +136,16 @@ def _tx_log_response(log: TransactionLog) -> ShippingTransactionLogResponse:
     )
 
 
+def _validate_io_access(actor: Employee, *, work_type: str, sub_type: str) -> None:
+    """공개 IO 진입점이 공유하는 유형 조합과 원자재 입고 권한을 검증한다."""
+    io_svc.validate_work_sub_type(work_type=work_type, sub_type=sub_type)
+    io_svc.validate_receive_requester(
+        actor,
+        work_type=work_type,
+        sub_type=sub_type,
+    )
+
+
 @router.get("/item-conversion-preview", response_model=ShippingComponentChangePreviewResponse)
 def item_conversion_preview(
     requester_employee_id: uuid.UUID = Query(...),
@@ -196,6 +206,11 @@ def preview_io(
 ) -> dict:
     ensure_actor_employee_id(actor, payload.requester_employee_id)
     try:
+        _validate_io_access(
+            actor,
+            work_type=payload.work_type,
+            sub_type=payload.sub_type,
+        )
         if payload.work_type == "internal_use" or payload.sub_type == "internal_use_out":
             if payload.requester_employee_id is None:
                 raise ValueError("사내 사용 미리보기에는 requester_employee_id가 필요합니다.")
@@ -238,6 +253,11 @@ def save_io_draft(
 ) -> dict:
     ensure_actor_employee_id(actor, payload.requester_employee_id)
     try:
+        _validate_io_access(
+            actor,
+            work_type=payload.work_type,
+            sub_type=payload.sub_type,
+        )
         draft = io_svc.save_draft(db, payload, requester=actor)
     except PermissionError as exc:
         db.rollback()
@@ -321,6 +341,16 @@ def submit_io(
     db: Session = Depends(get_db),
 ) -> dict:
     ensure_actor_employee_id(actor, payload.requester_employee_id)
+    try:
+        _validate_io_access(
+            actor,
+            work_type=payload.work_type,
+            sub_type=payload.sub_type,
+        )
+    except PermissionError as exc:
+        raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
+    except ValueError as exc:
+        raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
     request_fingerprint: str | None = None
     client_request_id = getattr(payload, "client_request_id", None)
     if client_request_id:

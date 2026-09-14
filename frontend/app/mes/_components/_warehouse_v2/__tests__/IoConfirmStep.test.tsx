@@ -46,7 +46,7 @@ const bundle = {
   lines: [parentLine, childLine],
 } satisfies IoBundle;
 
-function renderConfirmStep(submitButtonRef?: RefObject<HTMLButtonElement | null>) {
+function renderConfirmStep(submitButtonRef?: RefObject<HTMLButtonElement | null>, submissionBlocked = false) {
   return render(
     <IoConfirmStep
       workType="warehouse_io"
@@ -56,6 +56,7 @@ function renderConfirmStep(submitButtonRef?: RefObject<HTMLButtonElement | null>
       hasShortage={false}
       hasInvalidQuantity={false}
       submitting={false}
+      submissionBlocked={submissionBlocked}
       saving={false}
       approvalKind="warehouse"
       onNotesChange={() => {}}
@@ -65,6 +66,11 @@ function renderConfirmStep(submitButtonRef?: RefObject<HTMLButtonElement | null>
     />,
   );
 }
+
+it("이전 요청이 미확인 상태면 새로운 결재 요청 버튼을 막는다", () => {
+  renderConfirmStep(undefined, true);
+  expect(screen.getByRole("button", { name: /창고 결재 요청/ })).toBeDisabled();
+});
 
 function DepartmentSingleAdjustHarness({
   initialNotes = "",

@@ -229,6 +229,7 @@ function deferred<T>() {
 }
 
 beforeEach(() => {
+  sessionStorage.clear();
   vi.clearAllMocks();
   vi.mocked(api.getAllBOM).mockResolvedValue([]);
   vi.mocked(api.getItems).mockResolvedValue([]);
@@ -243,6 +244,53 @@ beforeEach(() => {
 });
 
 describe("IoComposeView navigation chrome", () => {
+  it("일반 직원의 권한 없는 원자재 수령 entry intent를 적용하지 않는다", async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <IoComposeView
+          globalSearch=""
+          operator={operator}
+          employees={[]}
+          items={[]}
+          productModels={[]}
+          setItems={() => {}}
+          onStatusChange={() => {}}
+          entryIntent={{ workType: "receive", subType: "receive_supplier" }}
+        />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.queryByTestId("io-step-nav")).not.toBeInTheDocument());
+    expect(screen.queryByText("원자재 수령")).not.toBeInTheDocument();
+    expect(screen.getByRole("alert", { name: "입출고 작업 오류" })).toHaveTextContent(
+      "권한이 없는 작업 유형입니다.",
+    );
+  });
+
+  it("입출고 선택 카드에 없는 defect entry intent를 적용하지 않는다", async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <IoComposeView
+          globalSearch=""
+          operator={operator}
+          employees={[]}
+          items={[]}
+          productModels={[]}
+          setItems={() => {}}
+          onStatusChange={() => {}}
+          entryIntent={{ workType: "defect", subType: "defect_quarantine" }}
+        />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.queryByTestId("io-step-nav")).not.toBeInTheDocument());
+    expect(screen.getByRole("alert", { name: "입출고 작업 오류" })).toHaveTextContent(
+      "권한이 없는 작업 유형입니다.",
+    );
+  });
+
   it("제출 오류를 이름 있는 alert로 알리고 오류 요약에 포커스를 둔다", async () => {
     render(
       <IoComposeView
@@ -274,7 +322,7 @@ describe("IoComposeView navigation chrome", () => {
     await waitFor(() => expect(alert).toHaveFocus());
   });
 
-  it("실패 결과 모달을 닫으면 제출 버튼으로 포커스를 돌려준다", async () => {
+  it("결과 불명 모달을 닫으면 이전 요청 확인 버튼으로 포커스를 돌려준다", async () => {
     vi.mocked(api.submitDraft).mockRejectedValueOnce(new Error("네트워크 오류"));
     render(
       <IoComposeView
@@ -301,10 +349,10 @@ describe("IoComposeView navigation chrome", () => {
 
     const submitButton = await screen.findByTestId("confirm-submit");
     fireEvent.click(submitButton);
-    expect(await screen.findByRole("dialog", { name: "제출 실패" })).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: "처리 결과 확인 필요" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "확인" }));
 
-    await waitFor(() => expect(submitButton).toHaveFocus());
+    await waitFor(() => expect(screen.getByRole("button", { name: "이전 요청 결과 확인" })).toHaveFocus());
   });
 
   it("자동 창고 이동 2단계 요약은 아직 선택 전에는 일반 방향을 표시한다", async () => {

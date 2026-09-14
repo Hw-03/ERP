@@ -192,7 +192,7 @@ def test_production_receipt_policy_reverses_the_whole_operation(
     assert reversal.reverses_operation_id == operation.operation_id
 
 
-def test_completed_io_batch_policy_restores_effect_before_state(
+def test_completed_immediate_io_batch_policy_closes_cancelled(
     db_session,
     make_item,
 ) -> None:
@@ -242,13 +242,13 @@ def test_completed_io_batch_policy_restores_effect_before_state(
     _cancel(db_session, operation, actor)
 
     db_session.expire_all()
-    assert db_session.get(IoBatch, batch.batch_id).status == "submitted"
+    assert db_session.get(IoBatch, batch.batch_id).status == "cancelled"
     reversal_effect = (
         db_session.query(InventoryOperationEffect)
         .filter(InventoryOperationEffect.reverses_effect_id.isnot(None))
         .one()
     )
-    assert reversal_effect.after_state == {"status": "submitted"}
+    assert reversal_effect.after_state == {"status": "cancelled"}
 
 
 def test_stock_request_policy_restores_reserved_pending_from_before_state(
@@ -1191,7 +1191,7 @@ def _assert_matrix_restored(db_session, case: _MatrixCase) -> None:
         )
     elif case.kind == "io_batch":
         assert state[:3] == (Decimal("0"), Decimal("0"), Decimal("0"))
-        assert state[3] == ("submitted", None)
+        assert state[3] == ("cancelled", None)
     elif case.kind == "defect_disassembly":
         assert state[:3] == (Decimal("0"), Decimal("0"), Decimal("0"))
         assert state[3] == (Decimal("0"), Decimal("0"))

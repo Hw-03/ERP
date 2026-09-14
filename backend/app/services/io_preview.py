@@ -43,14 +43,20 @@ from app.services.approval_rules import (  # noqa: F401
 )
 
 
-WORK_TYPES = {
-    "receive",
-    "warehouse_io",
-    "warehouse_adjust",
-    "process",
-    "defect",
-    "internal_use",
+WORK_SUB_TYPES: dict[str, frozenset[str]] = {
+    "receive": frozenset({"receive_supplier"}),
+    "warehouse_io": frozenset({"warehouse_to_dept", "dept_to_warehouse"}),
+    "warehouse_adjust": frozenset({"warehouse_adjust_in", "warehouse_adjust_out"}),
+    "process": frozenset(
+        {"produce", "disassemble", "dept_transfer", "adjust_in", "adjust_out"}
+    ),
+    # 기존 불량 배치·원장 경로도 유효 조합으로 유지한다.
+    "defect": frozenset(
+        {"defect_quarantine", "defect_restore", "defect_process", "supplier_return"}
+    ),
+    "internal_use": frozenset({"internal_use_out"}),
 }
+WORK_TYPES = frozenset(WORK_SUB_TYPES)
 INTERNAL_USE_WORK_TYPE = "internal_use"
 INTERNAL_USE_SUB_TYPE = "internal_use_out"
 INTERNAL_USE_SOURCE_LOCATIONS = frozenset({"warehouse", "department"})
@@ -75,6 +81,26 @@ AUTOMATIC_DEPARTMENT_SUB_TYPES = frozenset(
         "adjust_out",
     }
 )
+
+
+def validate_work_sub_type(*, work_type: str, sub_type: str) -> None:
+    """공개 IO 작업 유형과 세부 유형의 허용 조합을 단일 표로 검증한다."""
+    if sub_type not in WORK_SUB_TYPES.get(work_type, frozenset()):
+        raise ValueError("입출고 작업 유형과 세부 유형 조합이 올바르지 않습니다.")
+
+
+def validate_receive_requester(
+    requester: Employee,
+    *,
+    work_type: str,
+    sub_type: str,
+) -> None:
+    """창고 정·부 담당자만 공급처 원자재 입고를 사용할 수 있다."""
+    if (work_type, sub_type) != ("receive", "receive_supplier"):
+        return
+    warehouse_role = (requester.warehouse_role or "none").lower()
+    if warehouse_role not in WAREHOUSE_MANAGER_ROLES:
+        raise PermissionError("창고 정·부 담당자만 원자재 입고를 할 수 있습니다.")
 
 
 def validate_internal_use_operation(
@@ -769,6 +795,7 @@ def normalize_process_sub_type(
     반면 저장 payload는 여러 preview 결과를 합칠 수 있어, BOM parent의 결과 방향으로
     produce/disassemble을 결정한다. BOM 없는 낱개는 기존 adjust_in/adjust_out만 허용한다.
     """
+    validate_work_sub_type(work_type=work_type, sub_type=sub_type)
     if work_type != "process":
         return sub_type
     if sub_type not in PROCESS_SUB_TYPES:
@@ -1352,6 +1379,7 @@ def preview(
     from_department: Optional[str] = None,
     to_department: Optional[str] = None,
 ) -> dict:
+    validate_work_sub_type(work_type=work_type, sub_type=sub_type)
     validate_internal_use_operation(
         work_type=work_type,
         sub_type=sub_type,
@@ -1363,8 +1391,6 @@ def preview(
         from_department=from_department,
         to_department=to_department,
     )
-    if work_type not in WORK_TYPES:
-        raise ValueError(f"지원하지 않는 작업 유형입니다: {work_type}")
     validate_operation_sources(
         sub_type,
         (getattr(target, "source_kind", "direct_item") for target in targets),

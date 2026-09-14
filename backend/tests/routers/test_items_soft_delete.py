@@ -504,6 +504,7 @@ def test_delete_with_only_closed_references_preserves_history_and_rejects_new_co
     source = make_item(name="closed source", process_type_code="PA")
     active_parent = make_item(name="active BOM parent", process_type_code="PF")
     employee = _employee(db_session, "CLOSED")
+    employee.warehouse_role = "primary"
     _io_reference(
         db_session,
         employee=employee,

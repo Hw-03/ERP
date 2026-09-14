@@ -911,6 +911,37 @@ def _shipping_action(db: Session, effect: InventoryOperationEffect) -> str | Non
     return operation.action if operation and operation.domain == "shipping" else None
 
 
+def _policy_workflow_target(
+    db: Session,
+    effect: InventoryOperationEffect,
+    policy: CancelPolicy,
+) -> dict:
+    """즉시 IO는 종료하고, 승인 업무가 있는 작업만 실행 전 상태로 복원한다."""
+    if (
+        policy.domain == "inventory_io"
+        and effect.subject_type == "IoBatch"
+        and not db.query(InventoryOperationEffect.effect_id)
+        .filter(
+            InventoryOperationEffect.operation_id == effect.operation_id,
+            InventoryOperationEffect.effect_kind
+            == InventoryOperationEffectKindEnum.WORKFLOW,
+            InventoryOperationEffect.subject_type == "StockRequest",
+        )
+        .first()
+    ):
+        batch = db.get(IoBatch, effect.subject_id)
+        if (
+            batch is not None
+            and batch.requires_approval is False
+            and batch.stock_request_id is None
+            and not db.query(StockRequest.request_id)
+            .filter(StockRequest.operation_batch_id == batch.batch_id)
+            .first()
+        ):
+            return {"status": "cancelled"}
+    return dict(effect.before_state)
+
+
 def _effect_subject_plan(
     db: Session,
     effect: InventoryOperationEffect,
@@ -924,7 +955,11 @@ def _effect_subject_plan(
             effect.subject_id,
             _shipping_action(db, effect),
         )
-        target = dict(effect.before_state) if policy is not None else fallback_target
+        target = (
+            _policy_workflow_target(db, effect, policy)
+            if policy is not None
+            else fallback_target
+        )
     elif effect.effect_kind == InventoryOperationEffectKindEnum.ALLOCATION:
         allocation = db.get(ShippingAllocation, effect.subject_id)
         if allocation is None:
@@ -1642,10 +1677,34 @@ def _close_workflow_subject(
     return before, target
 
 
+def _restore_stock_request_approval_state(request: StockRequest) -> None:
+    """실행을 확정한 승인만 되돌리고 앞선 다단계 승인은 보존한다."""
+    department_was_final = bool(request.requires_department_approval)
+    same_step_warehouse_approval = (
+        bool(request.requires_warehouse_approval)
+        and request.approved_by_employee_id is not None
+        and request.approved_by_employee_id
+        == request.department_approved_by_employee_id
+        and request.approved_at is not None
+        and request.approved_at == request.department_approved_at
+    )
+    if department_was_final:
+        request.department_approved_by_employee_id = None
+        request.department_approved_by_name = None
+        request.department_approved_at = None
+    if bool(request.requires_warehouse_approval) and (
+        not department_was_final or same_step_warehouse_approval
+    ):
+        request.approved_by_employee_id = None
+        request.approved_by_name = None
+        request.approved_at = None
+
+
 def _restore_workflow_subject(
     db: Session,
     *,
     original: InventoryOperationEffect,
+    policy: CancelPolicy,
     cancellation: InventoryOperation,
     canceller: Employee,
 ) -> tuple[dict, dict]:
@@ -1656,7 +1715,7 @@ def _restore_workflow_subject(
         original.subject_id,
         _shipping_action(db, original),
     )
-    target = dict(original.before_state)
+    target = _policy_workflow_target(db, original, policy)
     target_status = target["status"]
     if original.subject_type == "ShippingRequest":
         subject = db.get(ShippingRequest, original.subject_id)
@@ -1683,6 +1742,7 @@ def _restore_workflow_subject(
             from app.services import sr_reservation
 
             sr_reservation.reserve_lines(db, lines, employee=canceller)
+        _restore_stock_request_approval_state(subject)
         subject.status = restored_status
         subject.completed_at = None
         subject.cancelled_at = None
@@ -1749,6 +1809,7 @@ def _reverse_operation_effect(
             before, after = _restore_workflow_subject(
                 db,
                 original=original,
+                policy=policy,
                 cancellation=cancellation,
                 canceller=canceller,
             )
@@ -1951,6 +2012,20 @@ def _assert_plan_applied(
         original_effect = db.get(InventoryOperationEffect, effect.effect_id)
         if original_effect is None:
             raise CancellationNotAllowed("취소 적용 후 업무 상태 검산에 실패했습니다.")
+        reversal_effect = (
+            db.query(InventoryOperationEffect)
+            .filter(
+                InventoryOperationEffect.operation_id == cancellation.operation_id,
+                InventoryOperationEffect.reverses_effect_id == original_effect.effect_id,
+            )
+            .one_or_none()
+        )
+        if (
+            reversal_effect is None
+            or reversal_effect.before_state != effect.current_state
+            or reversal_effect.after_state != effect.target_state
+        ):
+            raise CancellationNotAllowed("취소 적용 후 업무 역전 원장 검산에 실패했습니다.")
         current_state = _effect_subject_plan(
             db,
             original_effect,

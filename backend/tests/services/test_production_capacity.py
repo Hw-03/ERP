@@ -565,6 +565,176 @@ def test_fast_production_floors_packaging_material_per_unit(db_session, make_ite
     assert row["fast_production_limiting_item"] == _item_label(packing)
 
 
+def test_ship_ready_includes_shipping_reserved_pf_without_changing_buildable_counts(
+    db_session, make_item
+):
+    """출하 대기는 예약된 정상 PF도 포함하고 생산 대응량은 예약 제외를 유지한다."""
+    from app.services.production_capacity import (
+        build_reverse_bom,
+        compute_af_capacity,
+    )
+    from app.services.stock_math import StockFigures
+
+    pf = make_item(name="케어스트림 출하완제품", process_type_code="PF")
+    pa = make_item(name="케어스트림 포장완료품", process_type_code="PA")
+    af = make_item(name="케어스트림 조립완제품", process_type_code="AF")
+    packing = make_item(name="케어스트림 포장자재", process_type_code="PR")
+    component = make_item(name="케어스트림 조립자재", process_type_code="AR")
+    bom_cache = {
+        pf.item_id: [(pa.item_id, Decimal("1"))],
+        pa.item_id: [
+            (af.item_id, Decimal("1")),
+            (packing.item_id, Decimal("1")),
+        ],
+        af.item_id: [(component.item_id, Decimal("1"))],
+    }
+    fig_by_id = {
+        pf.item_id: StockFigures(
+            production_total=Decimal("100"),
+            shipping_reserved=Decimal("100"),
+        ),
+        af.item_id: StockFigures(warehouse_qty=Decimal("2")),
+        packing.item_id: StockFigures(warehouse_qty=Decimal("11")),
+        component.item_id: StockFigures(warehouse_qty=Decimal("9")),
+    }
+    assert fig_by_id[pf.item_id].available == 0
+
+    result = compute_af_capacity(
+        items=[pf, pa, af, packing, component],
+        bom_cache=bom_cache,
+        metadata_bom_cache=bom_cache,
+        reverse_bom=build_reverse_bom(bom_cache),
+        fig_by_id=fig_by_id,
+        items_map={
+            item.item_id: item for item in (pf, pa, af, packing, component)
+        },
+    )
+
+    variant = result["pf_variants"][0]
+    af_row = result["items"][0]
+    representative = result["auto_representatives"][0]
+    for row in (variant, af_row, representative):
+        assert (
+            row["ship_ready"],
+            row["fast_production"],
+            row["total_production"],
+        ) == (100, 2, 11)
+    assert result["summary"] == {
+        "ship_ready": 100,
+        "fast_production": 2,
+        "total_production": 11,
+    }
+
+
+def test_ship_ready_follows_shipping_pickup_cancel_and_retry_lifecycle(
+    db_session, make_item, make_bom, make_location
+):
+    """실제 출하 배정과 재고 이동을 거쳐도 출하 대기와 가용 재고 의미를 지킨다."""
+    from app.models import DepartmentEnum, Employee, EmployeeLevelEnum
+    from app.services import shipping_actions
+    from app.services.stock_math import compute_for
+
+    actor = Employee(
+        employee_code="CAPACITY-SHIPPING-ACTOR",
+        name="생산 가능 수량 출하 검증자",
+        role="worker",
+        department=DepartmentEnum.SALES.value,
+        level=EmployeeLevelEnum.STAFF,
+        display_order=0,
+        is_active=True,
+    )
+    pf = make_item(
+        name="상태 전이 케어스트림 PF",
+        process_type_code="PF",
+        model_symbol="9",
+        serial_no=1,
+    )
+    pa = make_item(
+        name="상태 전이 케어스트림 PA",
+        process_type_code="PA",
+        model_symbol="9",
+        serial_no=2,
+    )
+    af = make_item(
+        name="상태 전이 케어스트림 AF",
+        process_type_code="AF",
+        warehouse_qty=Decimal("2"),
+        model_symbol="9",
+        serial_no=3,
+    )
+    packing = make_item(
+        name="상태 전이 포장재",
+        process_type_code="PR",
+        warehouse_qty=Decimal("11"),
+        model_symbol="9",
+        serial_no=4,
+    )
+    component = make_item(
+        name="상태 전이 조립자재",
+        process_type_code="AR",
+        warehouse_qty=Decimal("9"),
+        model_symbol="9",
+        serial_no=5,
+    )
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pa.item_id, packing.item_id, Decimal("1"))
+    make_bom(af.item_id, component.item_id, Decimal("1"))
+    make_location(
+        pf.item_id,
+        department=DepartmentEnum.SHIPPING,
+        quantity=Decimal("100"),
+    )
+    db_session.add(actor)
+    db_session.commit()
+
+    request = shipping_actions.create_request(
+        db_session,
+        {
+            "base_pf_item_id": pf.item_id,
+            "invoice_number": "CAPACITY-SHIPPING-001",
+            "request_quantity": 100,
+        },
+        actor,
+    )
+
+    def snapshot() -> tuple[int, int, int, int, int]:
+        """현재 DB에서 PF의 출하 대기·가용·예약과 생산 대응량을 함께 읽는다."""
+        figures = compute_for(db_session, pf.item_id)
+        capacity = compute_capacity(db_session)
+        variant = next(
+            row
+            for row in capacity["af"]["pf_variants"]
+            if row["pf_item_id"] == str(pf.item_id)
+        )
+        return (
+            variant["ship_ready"],
+            int(figures.available),
+            int(figures.shipping_reserved),
+            variant["fast_production"],
+            variant["total_production"],
+        )
+
+    assert snapshot() == (100, 100, 0, 2, 111)
+
+    shipping_actions.prepare_complete(
+        db_session,
+        request.request_id,
+        "SN-CAPACITY",
+        actor=actor,
+    )
+    assert snapshot() == (100, 0, 100, 2, 11)
+
+    shipping_actions.pickup_complete(db_session, request.request_id, actor)
+    assert snapshot() == (0, 0, 0, 2, 11)
+
+    shipping_actions.pickup_cancel(db_session, request.request_id, actor)
+    assert snapshot() == (100, 0, 100, 2, 11)
+
+    shipping_actions.pickup_complete(db_session, request.request_id, actor)
+    assert snapshot() == (0, 0, 0, 2, 11)
+
+
 def test_legacy_fields_preserved(db_session, make_item, make_bom):
     """⑥ legacy(PF 합산) 필드는 기존과 같은 값을 유지."""
     # 기존 test_capacity_pf_stock_only 와 동일 시나리오

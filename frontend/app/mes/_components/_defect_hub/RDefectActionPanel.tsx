@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactElement } from "react";
+import { useEffect, useRef, useState, type ReactElement } from "react";
 import { AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { defectsApi } from "@/lib/api/defects";
@@ -8,6 +8,7 @@ import { stockRequestsApi } from "@/lib/api/stock-requests";
 import type { DefectLocation } from "@/lib/api/types/defects";
 import { ReasonFormFields } from "./ReasonFormFields";
 import { InlineErrorNote } from "./InlineErrorNote";
+import { makeClientRequestId } from "@/lib/uuid";
 
 type RAction = "unquarantine" | "scrap" | "return";
 
@@ -46,6 +47,7 @@ export function RDefectActionPanel({
   const [memo, setMemo] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const restoreRequestIdRef = useRef<string | null>(null);
 
   // location 이 바뀌면(다른 항목 선택) 폼 초기화.
   useEffect(() => {
@@ -54,6 +56,7 @@ export function RDefectActionPanel({
     setMemo("");
     setError(null);
     setBusy(false);
+    restoreRequestIdRef.current = null;
   }, [location.record_id]);
 
   const canSubmit = Boolean(category) && !busy;
@@ -73,6 +76,8 @@ export function RDefectActionPanel({
           reason_category: category,
           reason_memo: memo,
           actor_employee_id: currentEmployee.employee_id,
+          client_request_id: restoreRequestIdRef.current
+            ?? (restoreRequestIdRef.current = makeClientRequestId()),
         });
       } else {
         // 폐기 or 반품 — stock_requests 즉시 처리

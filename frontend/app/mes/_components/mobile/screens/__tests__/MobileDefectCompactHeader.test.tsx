@@ -340,6 +340,9 @@ describe("mobile defect compact headers", () => {
     fireEvent.click(Array.from(dialog.querySelectorAll("button")).at(-1)!);
 
     await waitFor(() => expect(defectsApi.unquarantine).toHaveBeenCalledTimes(1));
+    expect(defectsApi.unquarantine).toHaveBeenCalledWith(
+      expect.objectContaining({ client_request_id: expect.any(String) }),
+    );
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 

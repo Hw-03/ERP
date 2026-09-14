@@ -198,9 +198,37 @@ describe("DefectStatisticsView", () => {
       />,
     );
 
-    expect(await screen.findByText("통계 조회 실패")).toBeInTheDocument();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("통계 조회 실패");
+    await waitFor(() => expect(alert).toHaveFocus());
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
     expect(await screen.findAllByText("방사구 필터")).toHaveLength(2);
     expect(apiMocks.getStatistics).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the previous statistics and user focus on a background refresh error", async () => {
+    apiMocks.getStatistics
+      .mockResolvedValueOnce(response)
+      .mockRejectedValueOnce(new Error("최신 통계 동기화 실패"));
+    render(
+      <DefectStatisticsView
+        departmentOptions={[]}
+        modelOptions={[]}
+        currentDepartment="조립"
+        onBack={vi.fn()}
+      />,
+    );
+    expect(await screen.findByText("3건")).toBeInTheDocument();
+
+    const previous = screen.getByRole("button", { name: "이전 기간" });
+    previous.focus();
+    fireEvent.click(previous);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("최신 통계 동기화 실패");
+    expect(alert).not.toHaveFocus();
+    expect(previous).toHaveFocus();
+    expect(screen.getByText("3건")).toBeInTheDocument();
+    expect(screen.getByTestId("statistics-chart")).toBeInTheDocument();
   });
 });

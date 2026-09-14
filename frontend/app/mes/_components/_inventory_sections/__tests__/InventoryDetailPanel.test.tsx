@@ -345,7 +345,7 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
 
     const panel = await screen.findByTestId("bom-detail-modal-panel");
     expect(panel).toHaveClass("h-[84vh]");
-    expect(screen.getByTestId("bom-modal-header")).toHaveTextContent("완성품");
+    await waitFor(() => expect(screen.getByTestId("bom-modal-header")).toHaveTextContent("완성품"));
     expect(screen.getByTestId("bom-modal-header")).toHaveTextContent("현재 재고 3 EA");
     expect(screen.getByRole("button", { name: "모두 펼치기" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "모두 접기" })).toBeDisabled();

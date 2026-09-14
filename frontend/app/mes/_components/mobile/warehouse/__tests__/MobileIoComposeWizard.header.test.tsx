@@ -16,7 +16,12 @@ const wizardState = vi.hoisted(() => ({
   hasShortage: false,
   hasInvalidQuantity: false,
   canAdvance: { 4: false },
+  hasSelectedWorkType: false,
   setBundles: vi.fn(),
+  setWorkType: vi.fn(),
+  setSubType: vi.fn(),
+  setDeptIoDirection: vi.fn(),
+  setToDepartment: vi.fn(),
   setNotes: vi.fn(),
   goTo: vi.fn(),
   goPrev: vi.fn(),
@@ -67,7 +72,10 @@ vi.mock("../../../_warehouse_v2/useIoPreview", () => ({
 }));
 
 vi.mock("../../../_warehouse_v2/useIoSubmit", () => ({
-  useIoSubmit: () => ({ submitting: false, run: (work: () => Promise<unknown>) => work(), submit: submitIo }),
+  useIoSubmit: () => ({
+    submitting: false, run: (work: () => Promise<unknown>) => work(), submit: submitIo,
+    submitDraft: (batchId: string, payload: { employeeId: string }) => api.submitDraft(batchId, payload.employeeId),
+  }),
 }));
 
 vi.mock("../../../_warehouse_v2/IoConfirmStep", () => ({
@@ -112,6 +120,32 @@ beforeEach(() => {
 });
 
 describe("MobileIoComposeWizard Step 5 헤더", () => {
+  it("일반 직원의 권한 없는 원자재 수령 entry intent를 적용하지 않는다", () => {
+    const originalStep = wizardState.step;
+    wizardState.step = 1;
+    try {
+      render(
+        <MobileIoComposeWizard
+          globalSearch=""
+          operator={{ employee_id: "staff-1", name: "직원", department: "조립", warehouse_role: "none" }}
+          employees={[]}
+          items={[]}
+          setItems={vi.fn()}
+          onStatusChange={vi.fn()}
+          entryIntent={{ workType: "receive", subType: "receive_supplier" }}
+        />,
+      );
+
+      expect(wizardState.setWorkType).not.toHaveBeenCalled();
+      expect(wizardState.goTo).not.toHaveBeenCalledWith(3);
+      expect(screen.getByRole("alert", { name: "입출고 작업 오류" })).toHaveTextContent(
+        "권한이 없는 작업 유형입니다.",
+      );
+    } finally {
+      wizardState.step = originalStep;
+    }
+  });
+
   it("제출 오류를 이름 있는 alert로 알리고 오류 요약에 포커스를 둔다", async () => {
     render(
       <MobileIoComposeWizard
@@ -278,6 +312,9 @@ describe("MobileIoComposeWizard Step 5 헤더", () => {
 
       const workTypeButton = screen.getByRole("button", { name: /부서 입출고/ });
       expect(workTypeButton.parentElement?.parentElement).toHaveClass("pb-6");
+      const workTypeButtons = screen.getAllByRole("button")
+        .filter((button) => button.hasAttribute("aria-pressed"));
+      expect(workTypeButtons.every((button) => button.getAttribute("aria-pressed") === "false")).toBe(true);
     } finally {
       wizardState.step = originalStep;
     }

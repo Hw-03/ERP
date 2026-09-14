@@ -13,13 +13,15 @@ import { IoTargetPicker } from "./IoTargetPicker";
 import { IoBundleCart } from "./IoBundleCart";
 import { IoConfirmStep } from "./IoConfirmStep";
 import { IoSubmitModals, type IoSubmitResultState } from "./IoSubmitModals";
-import { IO_WORK_TYPES, approvalKind, deptVisibility, directionWord, ioDepartmentPayload, isAutoDepartmentRoute, isExitWorkType, mergePreviewBundles, pickerDirectionLabel, requiresDepartments, subTypeLabel, targetDepartmentOf } from "./ioWorkType";
+import { IO_WORK_TYPES, approvalKind, canSeeWorkType, deptVisibility, directionWord, ioDepartmentPayload, isAutoDepartmentRoute, isExitWorkType, mergePreviewBundles, pickerDirectionLabel, requiresDepartments, subTypeLabel, targetDepartmentOf } from "./ioWorkType";
 import { applyBundleQuantityChange, applyLineQuantityChange, applyToggleLine } from "./bomSync";
 import { collectShortageItemIds, shortageLines } from "./pullFromWarehouse";
 import { useIoDraftRestore } from "./useIoDraftRestore";
 import { useIoDraft } from "./useIoDraft";
 import { useIoPreview } from "./useIoPreview";
 import { useIoSubmit } from "./useIoSubmit";
+import { IoPendingRequestNotice } from "./IoPendingRequestNotice";
+import { getPendingIoRequest, PendingIoRequestError } from "./ioPendingRequest";
 import { IO_STEP_LABELS, useIoWorkState, type IoStep } from "./useIoWorkState";
 import { useIoUrlSync } from "./useIoUrlSync";
 import { useIoPreselect } from "./useIoPreselect";
@@ -43,6 +45,7 @@ import { LoadFailureCard } from "../common/LoadFailureCard";
 import {
   runWarehousePull,
   runCompositionSubmit,
+  recoverCompositionSubmit,
   refreshInternalUseBundle,
   saveCompositionDraft,
   useIoComposeOperationState,
@@ -151,6 +154,7 @@ export function IoComposeView({
   const [result, setResult] = useState<IoSubmitResultState | null>(null);
   const errorSummaryRef = useRef<HTMLDivElement>(null);
   const submitButtonRef = useRef<HTMLButtonElement>(null);
+  const recoverButtonRef = useRef<HTMLButtonElement>(null);
   const {
     notice: feedbackNotice,
     showNotice: showFeedbackNotice,
@@ -180,6 +184,16 @@ export function IoComposeView({
   const dirtyEffectMountedRef = useRef(false);
   const absorbedRestoreRef = useRef<string | null>(null);
   const state = useIoWorkState(defaultWorkType, operator?.department, getAvailable);
+  const authorizedEntryIntent = entryIntent
+    && IO_WORK_TYPES.some((row) => row.id === entryIntent.workType)
+    && canSeeWorkType(entryIntent.workType, operator)
+    ? entryIntent
+    : null;
+  const canRestoreDraft = Boolean(
+    draftToRestore
+      && IO_WORK_TYPES.some((row) => row.id === draftToRestore.work_type)
+      && canSeeWorkType(draftToRestore.work_type, operator),
+  );
   // 항목 7 — '창고에서 가져오기' 대상으로 선택한 부족 라인 line_id 집합. 0개면 부족 라인 전체 대상.
   const [
     pullSelected,
@@ -237,14 +251,24 @@ export function IoComposeView({
   function closeSubmitResult() {
     setResult(null);
     window.requestAnimationFrame(() => {
-      if (submitButtonRef.current?.isConnected) submitButtonRef.current.focus();
+      const target = recoverButtonRef.current ?? submitButtonRef.current;
+      if (target?.isConnected) target.focus();
     });
   }
   const intentAppliedRef = useRef(false);
 
   const { previewing, previewTarget } = useIoPreview();
   const { drafting, saveDraft } = useIoDraft();
-  const { submitting, run, submit } = useIoSubmit();
+  const {
+    submitting,
+    run,
+    submit,
+    submitDraft: submitSavedDraft,
+    pendingRequest,
+    pendingDraftRequest,
+    hasPendingRequest,
+    recoverPending,
+  } = useIoSubmit(employeeId);
 
   // 브라우저 뒤로/앞으로 ↔ step 동기화. URL ?step=N 으로 history 엔트리를 쌓아 입출고 위저드 내부에서도
   // 뒤/앞 버튼이 작동하게 함. effect 는 useIoUrlSync 로 격리.
@@ -260,7 +284,7 @@ export function IoComposeView({
     pathname,
     // step push 시 tab 을 항상 warehouse 로 고정 — 대시보드→창고 진입 순간 lagged searchParams 의
     // stale tab(=dashboard) 을 보존해 셸이 대시보드로 되돌리는 튕김을 차단한다.
-    suppressInitialSync: draftToRestore != null,
+    suppressInitialSync: canRestoreDraft || authorizedEntryIntent != null,
     tabParam: "warehouse",
   });
 
@@ -303,14 +327,19 @@ export function IoComposeView({
   useEffect(() => {
     if (!entryIntent || intentAppliedRef.current) return;
     intentAppliedRef.current = true;
-    state.setWorkType(entryIntent.workType);
-    if (entryIntent.workType === "process" && entryIntent.direction) {
-      state.setDeptIoDirection(entryIntent.direction);
-    } else if (entryIntent.subType) {
-      state.setSubType(entryIntent.subType);
+    if (!authorizedEntryIntent) {
+      setError("권한이 없는 작업 유형입니다.");
+      state.goTo(1);
+      return;
     }
-    if (entryIntent.toDepartment) {
-      state.setToDepartment(entryIntent.toDepartment);
+    state.setWorkType(authorizedEntryIntent.workType);
+    if (authorizedEntryIntent.workType === "process" && authorizedEntryIntent.direction) {
+      state.setDeptIoDirection(authorizedEntryIntent.direction);
+    } else if (authorizedEntryIntent.subType) {
+      state.setSubType(authorizedEntryIntent.subType);
+    }
+    if (authorizedEntryIntent.toDepartment) {
+      state.setToDepartment(authorizedEntryIntent.toDepartment);
     }
     state.goTo(3);
   // entryIntent는 마운트 시 1회만 적용 — deps 배열에 state 함수 넣으면 재실행되므로 의도적으로 생략.
@@ -345,6 +374,7 @@ export function IoComposeView({
     state,
     onStatusChange,
     restoreStep,
+    canRestore: canRestoreDraft,
     getAvailable,
     inventorySnapshot: items,
   });
@@ -431,7 +461,7 @@ export function IoComposeView({
   // preselect 자동 적용 — BOM 부모면 하이라이트만, 일반 품목이면 자동 카트 추가.
   // race 가드: bomParents 가 아직 로드 안 됐으면 보류 (S1 시연 결함 대응).
   useIoPreselect({
-    preselectedItem,
+    preselectedItem: entryIntent && !authorizedEntryIntent ? null : preselectedItem,
     bomParents,
     bomParentsLoaded,
     workType: state.workType,
@@ -439,7 +469,7 @@ export function IoComposeView({
     fromDepartment: state.fromDepartment,
     toDepartment: state.toDepartment,
     deptIoDirection: state.deptIoDirection,
-    forceManual: entryIntent?.forceManualItem,
+    forceManual: authorizedEntryIntent?.forceManualItem,
     addItem,
     setHighlightItemId,
   });
@@ -449,8 +479,8 @@ export function IoComposeView({
   const entryLeafAdvancedRef = useRef(false);
   useEffect(() => {
     if (entryLeafAdvancedRef.current) return;
-    if (!entryIntent || !preselectedItem || !bomParentsLoaded) return;
-    if (bomParents.has(preselectedItem.item_id) && !entryIntent.forceManualItem) {
+    if (!authorizedEntryIntent || !preselectedItem || !bomParentsLoaded) return;
+    if (bomParents.has(preselectedItem.item_id) && !authorizedEntryIntent.forceManualItem) {
       // BOM 부모 — Step3 유지(BOM/낱개 선택). 더 이상 처리하지 않음.
       entryLeafAdvancedRef.current = true;
       return;
@@ -461,7 +491,7 @@ export function IoComposeView({
       state.goTo(4);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entryIntent, preselectedItem, bomParentsLoaded, bomParents, state.bundles.length]);
+  }, [authorizedEntryIntent, preselectedItem, bomParentsLoaded, bomParents, state.bundles.length]);
 
   // 입출고 작업 중 다른 화면으로 이동 시 '저장할까요?' 모달.
   // 경고 조건: 로그인 상태에서 마지막 저장/복원 이후 사용자가 수정했을 때,
@@ -478,6 +508,7 @@ export function IoComposeView({
       if (currentBundles.length === 0) {
         // 모든 품목 삭제 후 "저장하고 나가기" = 서버 드래프트 삭제
         if (autosaveBatchIdRef.current) {
+          if (getPendingIoRequest(employeeId)?.batch_id === autosaveBatchIdRef.current) throw new PendingIoRequestError();
           await api.deleteDraft(autosaveBatchIdRef.current, employeeId);
           autosaveBatchIdRef.current = null;
         }
@@ -722,6 +753,10 @@ export function IoComposeView({
   }
 
   async function handleSubmit() {
+    if (hasPendingRequest) {
+      setResult({ kind: "error", title: "처리 결과 확인 필요", message: new PendingIoRequestError().message });
+      return;
+    }
     await run(() => runCompositionSubmit(
       employeeId,
       state.subType,
@@ -747,11 +782,18 @@ export function IoComposeView({
       () => api.getItems({ limit: 2000, search: globalSearch.trim() || undefined }),
       setItems,
       onSubmitSuccess,
-      (draftId) => api.submitDraft(draftId, employeeId),
+      (draftId) => submitSavedDraft(draftId, {
+        ...latestDraftFieldsRef.current,
+        ...ioDepartmentPayload(state.subType, state.fromDepartment, state.toDepartment),
+        bundles: latestBundlesRef.current,
+      }),
       (draftId) => {
-        restoredDraftRef.current = null;
-        restoredNonceRef.current = null;
-        setHasDraftOnServer(false);
+        if (autosaveBatchIdRef.current === draftId) {
+          autosaveBatchIdRef.current = null;
+          restoredDraftRef.current = null;
+          restoredNonceRef.current = null;
+          setHasDraftOnServer(false);
+        }
         onDraftSaved?.(draftId, state.step, false);
       },
       operationRefs,
@@ -769,6 +811,38 @@ export function IoComposeView({
         });
       },
     ));
+  }
+
+  async function handleRecoverPending() {
+    await run(() => recoverCompositionSubmit({
+      recover: recoverPending,
+      onDraftSubmitted: (draftId) => {
+        if (autosaveBatchIdRef.current === draftId) {
+          autosaveBatchIdRef.current = null;
+          restoredDraftRef.current = null;
+          restoredNonceRef.current = null;
+          setHasDraftOnServer(false);
+        }
+        onDraftSaved?.(draftId, state.step, false);
+      },
+      getCurrentInput: () => {
+        const fields = latestDraftFieldsRef.current;
+        return {
+          ...fields,
+          ...ioDepartmentPayload(fields.subType, fields.fromDepartment, fields.toDepartment),
+          bundles: latestBundlesRef.current,
+          batchId: autosaveBatchIdRef.current,
+        };
+      },
+      operationRefs,
+      setResult,
+      reset: state.reset,
+      resetFilters: resetTargetPickerFilters,
+      onStatusChange,
+      refreshItems: () => api.getItems({ limit: 2000, search: globalSearch.trim() || undefined }),
+      setItems,
+      onSubmitSuccess,
+    }));
   }
 
   const step = state.step;
@@ -1100,6 +1174,7 @@ export function IoComposeView({
 
   return (
     <div data-testid="io-compose-view" className="flex h-full min-h-0 flex-col gap-3">
+      <IoPendingRequestNotice request={pendingRequest} draftRequest={pendingDraftRequest} busy={submitting} onRecover={handleRecoverPending} buttonRef={recoverButtonRef} />
       {error && (
         <div
           ref={errorSummaryRef}
@@ -1381,6 +1456,7 @@ export function IoComposeView({
               hasShortage={state.hasShortage}
               hasInvalidQuantity={state.hasInvalidQuantity}
               submitting={submitting}
+              submissionBlocked={hasPendingRequest}
               saving={drafting}
               approvalKind={approvalKind(state.subType, state.bundles, state.fromDepartment)}
               onNotesChange={state.setNotes}

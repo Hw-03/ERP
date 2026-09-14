@@ -152,6 +152,7 @@ export function useIoDraftRestore(params: {
   state: IoWorkStateApi;
   onStatusChange: (status: string) => void;
   restoreStep?: IoStep;
+  canRestore?: boolean;
   getAvailable?: GetAvailable;
   inventorySnapshot?: unknown;
 }) {
@@ -164,6 +165,7 @@ export function useIoDraftRestore(params: {
     state,
     onStatusChange,
     restoreStep,
+    canRestore = true,
     getAvailable,
     inventorySnapshot,
   } = params;
@@ -179,6 +181,10 @@ export function useIoDraftRestore(params: {
     }
     restoredNonceRef.current = nonce;
     restoredDraftRef.current = draftToRestore.batch_id;
+    if (!canRestore) {
+      onStatusChange("권한이 없는 작업 유형의 임시저장은 불러올 수 없습니다.");
+      return;
+    }
     autosaveBatchIdRef.current = draftToRestore.batch_id;
     state.setWorkType(draftToRestore.work_type);
     state.setSubType(draftToRestore.sub_type);
@@ -206,10 +212,11 @@ export function useIoDraftRestore(params: {
         : "임시저장 작업을 불러왔습니다.",
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftToRestore?.batch_id, restoreNonce]);
+  }, [draftToRestore?.batch_id, restoreNonce, canRestore]);
 
   useEffect(() => {
     if (
+      !canRestore ||
       !draftToRestore ||
       draftToRestore.work_type !== "internal_use" ||
       draftToRestore.sub_type !== "internal_use_out" ||
@@ -224,5 +231,5 @@ export function useIoDraftRestore(params: {
     // 재고 스냅샷이 늦게 준비될 때 부족분만 갱신한다. state/getAvailable은 렌더마다
     // 바뀔 수 있어 의존성에 넣지 않고, 실제 재고 스냅샷 변경을 실행 신호로 사용한다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftToRestore?.batch_id, restoreNonce, inventorySnapshot]);
+  }, [draftToRestore?.batch_id, restoreNonce, canRestore, inventorySnapshot]);
 }

@@ -23,10 +23,13 @@ import { IoTargetPicker } from "../../_warehouse_v2/IoTargetPicker";
 import { IoBundleCart } from "../../_warehouse_v2/IoBundleCart";
 import { IoConfirmStep } from "../../_warehouse_v2/IoConfirmStep";
 import { IoSubmitModals, type IoSubmitResultState } from "../../_warehouse_v2/IoSubmitModals";
+import { IoPendingRequestNotice } from "../../_warehouse_v2/IoPendingRequestNotice";
+import { getPendingIoRequest, PendingIoRequestError } from "../../_warehouse_v2/ioPendingRequest";
 import { StatusTargetNotice, useStatusTargetNotice } from "../../common/StatusTargetNotice";
 import {
   IO_WORK_TYPES,
   approvalKind,
+  canSeeWorkType,
   ioDepartmentPayload,
   isExitWorkType,
   isSingleInlineSubType,
@@ -50,6 +53,7 @@ import { useIoWorkState, type IoStep } from "../../_warehouse_v2/useIoWorkState"
 import {
   runWarehousePull,
   runCompositionSubmit,
+  recoverCompositionSubmit,
   refreshInternalUseBundle,
   saveCompositionDraft,
   useIoComposeOperationState,
@@ -129,6 +133,7 @@ export function MobileIoComposeWizard({
   const [result, setResult] = useState<IoSubmitResultState | null>(null);
   const errorSummaryRef = useRef<HTMLDivElement>(null);
   const submitButtonRef = useRef<HTMLButtonElement>(null);
+  const recoverButtonRef = useRef<HTMLButtonElement>(null);
   const scannerTriggerRef = useRef<HTMLElement | null>(null);
   const {
     notice: feedbackNotice,
@@ -144,6 +149,16 @@ export function MobileIoComposeWizard({
   const itemAddBlocked = bomListQuery.isPending || bomListQuery.isError;
   const bomRevisionRef = useRef(revision);
   const state = useIoWorkState(defaultWorkType, operator?.department, getAvailable);
+  const authorizedEntryIntent = entryIntent
+    && IO_WORK_TYPES.some((row) => row.id === entryIntent.workType)
+    && canSeeWorkType(entryIntent.workType, operator)
+    ? entryIntent
+    : null;
+  const canRestoreDraft = Boolean(
+    draftToRestore
+      && IO_WORK_TYPES.some((row) => row.id === draftToRestore.work_type)
+      && canSeeWorkType(draftToRestore.work_type, operator),
+  );
   const [
     pullSelected,
     setPullSelected,
@@ -219,17 +234,23 @@ export function MobileIoComposeWizard({
   function closeSubmitResult() {
     setResult(null);
     window.requestAnimationFrame(() => {
-      if (submitButtonRef.current?.isConnected) submitButtonRef.current.focus();
+      const target = recoverButtonRef.current ?? submitButtonRef.current;
+      if (target?.isConnected) target.focus();
     });
   }
   useEffect(() => {
     if (!entryIntent || intentAppliedRef.current) return;
     intentAppliedRef.current = true;
-    state.setWorkType(entryIntent.workType);
-    if (entryIntent.workType === "process" && entryIntent.direction) {
-      state.setDeptIoDirection(entryIntent.direction);
-    } else if (entryIntent.subType) {
-      state.setSubType(entryIntent.subType);
+    if (!authorizedEntryIntent) {
+      setError("권한이 없는 작업 유형입니다.");
+      state.goTo(1);
+      return;
+    }
+    state.setWorkType(authorizedEntryIntent.workType);
+    if (authorizedEntryIntent.workType === "process" && authorizedEntryIntent.direction) {
+      state.setDeptIoDirection(authorizedEntryIntent.direction);
+    } else if (authorizedEntryIntent.subType) {
+      state.setSubType(authorizedEntryIntent.subType);
     }
     state.goTo(3);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -237,7 +258,16 @@ export function MobileIoComposeWizard({
 
   const { previewing, previewTarget } = useIoPreview();
   const { drafting, saveDraft } = useIoDraft();
-  const { submitting, run, submit } = useIoSubmit();
+  const {
+    submitting,
+    run,
+    submit,
+    submitDraft: submitSavedDraft,
+    pendingRequest,
+    pendingDraftRequest,
+    hasPendingRequest,
+    recoverPending,
+  } = useIoSubmit(employeeId);
 
   useEffect(() => {
     setSearch(globalSearch);
@@ -258,6 +288,7 @@ export function MobileIoComposeWizard({
     state,
     onStatusChange,
     restoreStep,
+    canRestore: canRestoreDraft,
     getAvailable,
     inventorySnapshot: items,
   });
@@ -370,7 +401,7 @@ export function MobileIoComposeWizard({
   }
 
   useIoPreselect({
-    preselectedItem,
+    preselectedItem: entryIntent && !authorizedEntryIntent ? null : preselectedItem,
     bomParents,
     bomParentsLoaded,
     workType: state.workType,
@@ -378,7 +409,7 @@ export function MobileIoComposeWizard({
     fromDepartment: state.fromDepartment,
     toDepartment: state.toDepartment,
     deptIoDirection: state.deptIoDirection,
-    forceManual: entryIntent?.forceManualItem,
+    forceManual: authorizedEntryIntent?.forceManualItem,
     addItem,
     setHighlightItemId,
   });
@@ -540,6 +571,10 @@ export function MobileIoComposeWizard({
   }
 
   async function handleSubmit() {
+    if (hasPendingRequest) {
+      setResult({ kind: "error", title: "처리 결과 확인 필요", message: new PendingIoRequestError().message });
+      return;
+    }
     await run(() => runCompositionSubmit(
       employeeId,
       state.subType,
@@ -565,10 +600,17 @@ export function MobileIoComposeWizard({
       () => api.getItems({ limit: 2000, search: globalSearch.trim() || undefined }),
       setItems,
       onSubmitSuccess,
-      (draftId) => api.submitDraft(draftId, employeeId),
+      (draftId) => submitSavedDraft(draftId, {
+        ...latestDraftFieldsRef.current,
+        ...ioDepartmentPayload(state.subType, state.fromDepartment, state.toDepartment),
+        bundles: latestBundlesRef.current,
+      }),
       (draftId) => {
-        restoredDraftRef.current = null;
-        restoredNonceRef.current = null;
+        if (autosaveBatchIdRef.current === draftId) {
+          autosaveBatchIdRef.current = null;
+          restoredDraftRef.current = null;
+          restoredNonceRef.current = null;
+        }
         onDraftSaved?.(draftId, state.step, false);
       },
       operationRefs,
@@ -586,6 +628,37 @@ export function MobileIoComposeWizard({
         });
       },
     ));
+  }
+
+  async function handleRecoverPending() {
+    await run(() => recoverCompositionSubmit({
+      recover: recoverPending,
+      onDraftSubmitted: (draftId) => {
+        if (autosaveBatchIdRef.current === draftId) {
+          autosaveBatchIdRef.current = null;
+          restoredDraftRef.current = null;
+          restoredNonceRef.current = null;
+        }
+        onDraftSaved?.(draftId, state.step, false);
+      },
+      getCurrentInput: () => {
+        const fields = latestDraftFieldsRef.current;
+        return {
+          ...fields,
+          ...ioDepartmentPayload(fields.subType, fields.fromDepartment, fields.toDepartment),
+          bundles: latestBundlesRef.current,
+          batchId: autosaveBatchIdRef.current,
+        };
+      },
+      operationRefs,
+      setResult,
+      reset: state.reset,
+      resetFilters: resetTargetPickerFilters,
+      onStatusChange,
+      refreshItems: () => api.getItems({ limit: 2000, search: globalSearch.trim() || undefined }),
+      setItems,
+      onSubmitSuccess,
+    }));
   }
 
   const step = state.step;
@@ -638,6 +711,7 @@ export function MobileIoComposeWizard({
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col" style={{ background: LEGACY_COLORS.bg }}>
+      <IoPendingRequestNotice request={pendingRequest} draftRequest={pendingDraftRequest} busy={submitting} onRecover={handleRecoverPending} buttonRef={recoverButtonRef} />
       {/* 헤더: 뒤로 + 진행바. in-flow(non-scroll 첫 자식)라 셸 헤더 아래에 머물며 본문만
           스크롤된다. (이전 fixed top-0 는 셸 헤더 DEXCOWIN MES 를 덮는 버그였음)
           항목 6 — 페이지 배경과 같은 톤으로 두어 위 섹션 탭과 자연스럽게 이어지게(카드감 제거). */}
@@ -688,7 +762,7 @@ export function MobileIoComposeWizard({
 
         {step === 1 && (
           <MobileWorkTypeStep
-            workType={state.workType}
+            selectedWorkType={state.hasSelectedWorkType ? state.workType : null}
             operator={operator}
             onWorkTypeChange={handleWorkTypeChange}
           />
@@ -907,6 +981,7 @@ export function MobileIoComposeWizard({
             hasShortage={state.hasShortage}
             hasInvalidQuantity={state.hasInvalidQuantity}
             submitting={submitting}
+            submissionBlocked={hasPendingRequest}
             saving={drafting}
             approvalKind={approvalKind(state.subType, state.bundles, state.fromDepartment)}
             onNotesChange={state.setNotes}

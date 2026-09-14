@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 
 import pytest
@@ -19,13 +20,20 @@ from app.models import (
     EmployeeLevelEnum,
     Inventory,
     InventoryLocation,
+    InventoryOperation,
+    InventoryOperationEffect,
+    IoBatch,
     LocationStatusEnum,
+    StockRequest,
+    StockRequestStatusEnum,
+    SystemSetting,
     TransactionLog,
     TransactionTypeEnum,
     WarehouseUnplacedItem,
 )
 from app.routers.inventory import transactions as transactions_router
 from app.services import transaction_actions
+from app.services.inventory_integrity import diagnose_inventory_integrity
 from app.services.pin_auth import DEFAULT_PIN_HASH
 
 
@@ -78,6 +86,15 @@ def _approve(client, request_id, approver: Employee):
     return client.post(
         f"/api/stock-requests/{request_id}/approve",
         json={"actor_employee_id": str(approver.employee_id), "pin": "0000"},
+    )
+
+
+def _enable_operation_ledger(db_session) -> None:
+    db_session.add(
+        SystemSetting(
+            setting_key="inventory_operation_cutover_at",
+            setting_value="2026-01-01T00:00:00",
+        )
     )
 
 
@@ -449,7 +466,7 @@ def test_cancel_source_quarantine_rejects_when_record_has_downstream_usage(
 
 def test_cancel_receive_restores_warehouse(client, db_session, make_item):
     item = make_item(name="입고품", warehouse_qty=Decimal("0"))
-    actor = _make_employee(db_session, code="RC01")
+    actor = _make_employee(db_session, code="RC01", warehouse_role="primary")
     db_session.commit()
     res = _receive_v2(client, item, actor, 50)
     wh, _, _ = _cells(db_session, item.item_id)
@@ -1311,7 +1328,13 @@ def test_cancel_maps_location_pending_invasion_to_business_error(
 def test_cancel_io_v2_receive_restores(client, db_session, make_item):
     """IO v2 경로(io_dispatch) 즉시 입고 → 취소 → 창고 원복. is_self 는 배치 요청자로 판정."""
     item = make_item(name="IO입고품", warehouse_qty=Decimal("0"))
-    requester = _make_employee(db_session, code="IOV1", name="IO요청자")
+    requester = _make_employee(
+        db_session,
+        code="IOV1",
+        name="IO요청자",
+        warehouse_role="primary",
+    )
+    _enable_operation_ledger(db_session)
     db_session.commit()
 
     preview = client.post(
@@ -1346,9 +1369,435 @@ def test_cancel_io_v2_receive_restores(client, db_session, make_item):
 
     res = _cancel(client, log.log_id, code="IOV1")
     assert res.status_code == 200, res.text
-    assert res.json()["cancelled"] is True
     wh, _, _ = _cells(db_session, item.item_id)
     assert wh == 0
+
+    db_session.expire_all()
+    batch = db_session.get(IoBatch, log.operation_batch_id)
+    assert batch.status == "cancelled"
+    assert batch.completed_at is None
+
+    original_operation = db_session.get(InventoryOperation, log.operation_id)
+    original_effect = (
+        db_session.query(InventoryOperationEffect)
+        .filter(InventoryOperationEffect.operation_id == original_operation.operation_id)
+        .one()
+    )
+    cancellation_effect = (
+        db_session.query(InventoryOperationEffect)
+        .join(
+            InventoryOperation,
+            InventoryOperation.operation_id == InventoryOperationEffect.operation_id,
+        )
+        .filter(InventoryOperation.reverses_operation_id == original_operation.operation_id)
+        .one()
+    )
+    assert original_effect.before_state == {"status": "submitted"}
+    assert original_effect.after_state == {"status": "completed"}
+    assert db_session.get(TransactionLog, log.log_id).cancelled is False
+    assert cancellation_effect.before_state == {"status": "completed"}
+    assert cancellation_effect.after_state == {"status": "cancelled"}
+    assert cancellation_effect.reverses_effect_id == original_effect.effect_id
+
+
+def test_cancelled_io_v2_receive_idempotent_retry_reports_cancelled_without_reexecution(
+    client,
+    db_session,
+    make_item,
+):
+    item = make_item(name="IO멱등취소품", warehouse_qty=Decimal("0"))
+    requester = _make_employee(
+        db_session,
+        code="IO-IDEM-CANCEL",
+        name="IO멱등취소자",
+        warehouse_role="primary",
+    )
+    _enable_operation_ledger(db_session)
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "receive",
+            "sub_type": "receive_supplier",
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "item_id": str(item.item_id),
+                    "quantity": "9",
+                }
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    payload = {
+        "requester_employee_id": str(requester.employee_id),
+        "work_type": "receive",
+        "sub_type": "receive_supplier",
+        "client_request_id": "cancelled-receive-retry-001",
+        "bundles": preview.json()["bundles"],
+    }
+    submitted = client.post("/api/io/submit", json=payload)
+    assert submitted.status_code == 201, submitted.text
+    log = (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.transaction_type == TransactionTypeEnum.RECEIVE)
+        .one()
+    )
+    assert _cancel(client, log.log_id, code=requester.employee_code).status_code == 200
+    assert _cells(db_session, item.item_id)[0] == 0
+
+    retried = client.post("/api/io/submit", json=payload)
+
+    assert retried.status_code == 201, retried.text
+    assert retried.json()["status"] == "cancelled"
+    assert retried.json()["batch"]["status"] == "cancelled"
+    assert retried.json()["message"] == "이미 취소된 입출고 작업입니다."
+    assert _cells(db_session, item.item_id)[0] == 0
+    assert db_session.query(TransactionLog).count() == 2
+
+
+def test_cancel_io_v2_receive_chain_latest_then_previous(
+    client,
+    db_session,
+    make_item,
+):
+    item = make_item(name="IO연쇄취소품", warehouse_qty=Decimal("0"))
+    requester = _make_employee(
+        db_session,
+        code="IO-CANCEL-CHAIN",
+        name="IO연쇄취소자",
+        warehouse_role="primary",
+    )
+    _enable_operation_ledger(db_session)
+    db_session.commit()
+
+    _receive_v2(client, item, requester, 4)
+    _receive_v2(client, item, requester, 6)
+    logs = (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.transaction_type == TransactionTypeEnum.RECEIVE)
+        .order_by(TransactionLog.created_at.asc(), TransactionLog.log_id.asc())
+        .all()
+    )
+    assert len(logs) == 2
+    assert _cells(db_session, item.item_id)[0] == 10
+
+    assert _cancel(client, logs[1].log_id, code=requester.employee_code).status_code == 200
+    assert _cells(db_session, item.item_id)[0] == 4
+    assert _cancel(client, logs[0].log_id, code=requester.employee_code).status_code == 200
+
+    db_session.expire_all()
+    assert _cells(db_session, item.item_id)[0] == 0
+    batches = db_session.query(IoBatch).order_by(IoBatch.created_at.asc()).all()
+    assert [batch.status for batch in batches] == ["cancelled", "cancelled"]
+
+
+@pytest.mark.parametrize(
+    ("sub_type", "expected_waiting_status", "expected_pending", "approved_quantity"),
+    [
+        ("produce", StockRequestStatusEnum.SUBMITTED, Decimal("0"), Decimal("6")),
+        ("disassemble", StockRequestStatusEnum.RESERVED, Decimal("1"), Decimal("4")),
+    ],
+)
+def test_cancel_approved_custom_process_restores_preapproval_state_and_reservation(
+    client,
+    db_session,
+    make_item,
+    make_bom,
+    make_location,
+    sub_type,
+    expected_waiting_status,
+    expected_pending,
+    approved_quantity,
+    monkeypatch,
+):
+    from app.services import inventory_operations as operation_svc
+
+    fixed_now = datetime(2026, 9, 14, 1, 0)
+
+    class FrozenDateTime(datetime):
+        @classmethod
+        def utcnow(cls) -> datetime:
+            return fixed_now
+
+    monkeypatch.setattr(operation_svc, "datetime", FrozenDateTime)
+    monkeypatch.setattr(transaction_actions, "datetime", FrozenDateTime)
+
+    parent = make_item(name=f"승인 취소 상위 {sub_type}", process_type_code="AF")
+    component = make_item(name=f"승인 취소 하위 {sub_type}", process_type_code="AR")
+    make_bom(parent.item_id, component.item_id, Decimal("2"))
+    make_location(
+        parent.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        quantity=Decimal("5"),
+    )
+    component_location = make_location(
+        component.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        quantity=Decimal("5"),
+    )
+    for item in (parent, component):
+        db_session.query(Inventory).filter(
+            Inventory.item_id == item.item_id
+        ).one().quantity = Decimal("5")
+    requester = _make_employee(db_session, code=f"CUSTOM-CANCEL-{sub_type}")
+    approver = _make_employee(
+        db_session,
+        code=f"CUSTOM-APPROVE-{sub_type}",
+        department_role="primary",
+    )
+    _enable_operation_ledger(db_session)
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": sub_type,
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "targets": [{"item_id": str(parent.item_id), "quantity": 1}],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    bundles = preview.json()["bundles"]
+    component_line = next(
+        line
+        for bundle in bundles
+        for line in bundle["lines"]
+        if line["item_id"] == str(component.item_id)
+    )
+    component_line["quantity"] = 1
+    submitted = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "process",
+            "sub_type": sub_type,
+            "to_department": DepartmentEnum.ASSEMBLY.value,
+            "notes": "승인형 취소 복원 계약",
+            "bundles": bundles,
+        },
+    )
+    assert submitted.status_code == 201, submitted.text
+    request = db_session.get(
+        StockRequest,
+        submitted.json()["stock_request_id"],
+    )
+    batch = db_session.get(IoBatch, submitted.json()["batch"]["batch_id"])
+    assert request.status == expected_waiting_status
+    assert batch.status == expected_waiting_status.value
+    db_session.refresh(component_location)
+    assert component_location.pending_quantity == expected_pending
+
+    approved = client.post(
+        f"/api/stock-requests/{request.request_id}/department-approve",
+        json={"actor_employee_id": str(approver.employee_id), "pin": "0000"},
+    )
+    assert approved.status_code == 200, approved.text
+    log = db_session.query(TransactionLog).filter(
+        TransactionLog.item_id == component.item_id,
+    ).one()
+    db_session.refresh(component_location)
+    assert component_location.quantity == approved_quantity
+    assert component_location.pending_quantity == Decimal("0")
+
+    cancelled = _cancel(client, log.log_id, code=requester.employee_code)
+    assert cancelled.status_code == 200, cancelled.text
+
+    db_session.expire_all()
+    request = db_session.get(StockRequest, request.request_id)
+    batch = db_session.get(IoBatch, batch.batch_id)
+    component_location = db_session.get(InventoryLocation, component_location.location_id)
+    assert request.status == expected_waiting_status
+    assert all(line.status == expected_waiting_status for line in request.lines)
+    assert request.completed_at is None
+    assert request.department_approved_by_employee_id is None
+    assert request.department_approved_by_name is None
+    assert request.department_approved_at is None
+    assert batch.status == expected_waiting_status.value
+    assert batch.completed_at is None
+    assert component_location.quantity == Decimal("5")
+    assert component_location.pending_quantity == expected_pending
+
+    reapproved = client.post(
+        f"/api/stock-requests/{request.request_id}/department-approve",
+        json={"actor_employee_id": str(approver.employee_id), "pin": "0000"},
+    )
+
+    assert reapproved.status_code == 200, reapproved.text
+    db_session.refresh(component_location)
+    assert component_location.quantity == approved_quantity
+    assert component_location.pending_quantity == Decimal("0")
+
+    first_reapproval_operation = (
+        db_session.query(InventoryOperation)
+        .filter(
+            InventoryOperation.domain == "inventory_io",
+            InventoryOperation.action == sub_type,
+            InventoryOperation.reverses_operation_id.is_(None),
+            InventoryOperation.idempotency_key.contains(":retry:"),
+        )
+        .one()
+    )
+    reapproval_log = (
+        db_session.query(TransactionLog)
+        .filter(
+            TransactionLog.operation_id == first_reapproval_operation.operation_id,
+            TransactionLog.item_id == component.item_id,
+        )
+        .one()
+    )
+    assert reapproval_log.log_id != log.log_id
+
+    recancelled = _cancel(
+        client,
+        reapproval_log.log_id,
+        code=requester.employee_code,
+    )
+    assert recancelled.status_code == 200, recancelled.text
+
+    db_session.expire_all()
+    request = db_session.get(StockRequest, request.request_id)
+    component_location = db_session.get(
+        InventoryLocation,
+        component_location.location_id,
+    )
+    assert request.status == expected_waiting_status
+    assert request.department_approved_by_employee_id is None
+    assert request.department_approved_by_name is None
+    assert request.department_approved_at is None
+    assert component_location.quantity == Decimal("5")
+    assert component_location.pending_quantity == expected_pending
+
+    second_reapproved = client.post(
+        f"/api/stock-requests/{request.request_id}/department-approve",
+        json={"actor_employee_id": str(approver.employee_id), "pin": "0000"},
+    )
+    assert second_reapproved.status_code == 200, second_reapproved.text
+
+    db_session.expire_all()
+    component_location = db_session.get(
+        InventoryLocation,
+        component_location.location_id,
+    )
+    assert component_location.quantity == approved_quantity
+    assert component_location.pending_quantity == Decimal("0")
+    operations = (
+        db_session.query(InventoryOperation)
+        .filter(
+            InventoryOperation.domain == "inventory_io",
+            InventoryOperation.action == sub_type,
+        )
+        .all()
+    )
+    business_operations = [
+        operation
+        for operation in operations
+        if operation.reverses_operation_id is None
+    ]
+    cancellation_operations = [
+        operation
+        for operation in operations
+        if operation.reverses_operation_id is not None
+    ]
+    execution_keys = [
+        operation.idempotency_key for operation in business_operations
+    ]
+    assert len(business_operations) == 3
+    assert len(cancellation_operations) == 2
+    assert len(set(execution_keys)) == 3
+    assert all(key is not None and len(key) <= 160 for key in execution_keys)
+    assert all(operation.effective_at == fixed_now for operation in operations)
+    first_business_operation = next(
+        operation
+        for operation in business_operations
+        if ":retry:" not in operation.idempotency_key
+    )
+    first_cancellation_operation = next(
+        operation
+        for operation in cancellation_operations
+        if operation.reverses_operation_id == first_business_operation.operation_id
+    )
+    second_business_operation = next(
+        operation
+        for operation in business_operations
+        if operation.idempotency_key.endswith(
+            f":retry:{first_cancellation_operation.operation_id}"
+        )
+    )
+    second_cancellation_operation = next(
+        operation
+        for operation in cancellation_operations
+        if operation.reverses_operation_id == second_business_operation.operation_id
+    )
+    assert any(
+        operation.idempotency_key.endswith(
+            f":retry:{second_cancellation_operation.operation_id}"
+        )
+        for operation in business_operations
+    )
+    integrity = diagnose_inventory_integrity(db_session)
+    assert integrity.blocking_count == 0, [
+        (check.check_id, check.count, check.samples)
+        for check in integrity.checks
+        if check.count
+    ]
+
+
+def test_cancelled_io_v2_existing_draft_submit_retry_reports_cancelled_without_reexecution(
+    client,
+    db_session,
+    make_item,
+):
+    item = make_item(name="IO draft 취소 재시도", warehouse_qty=Decimal("0"))
+    requester = _make_employee(
+        db_session,
+        code="IO-DRAFT-CANCEL-RETRY",
+        warehouse_role="primary",
+    )
+    _enable_operation_ledger(db_session)
+    db_session.commit()
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "receive",
+            "sub_type": "receive_supplier",
+            "targets": [{"item_id": str(item.item_id), "quantity": 3}],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    drafted = client.put(
+        "/api/io/draft",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "receive",
+            "sub_type": "receive_supplier",
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert drafted.status_code == 200, drafted.text
+    submit_url = f"/api/io/draft/{drafted.json()['batch_id']}/submit"
+    submit_params = {"requester_employee_id": str(requester.employee_id)}
+    submitted = client.post(submit_url, params=submit_params)
+    assert submitted.status_code == 201, submitted.text
+    log = db_session.query(TransactionLog).filter(
+        TransactionLog.item_id == item.item_id,
+        TransactionLog.transaction_type == TransactionTypeEnum.RECEIVE,
+    ).one()
+    assert _cancel(client, log.log_id, code=requester.employee_code).status_code == 200
+
+    retried = client.post(submit_url, params=submit_params)
+
+    assert retried.status_code == 201, retried.text
+    assert retried.json()["status"] == "cancelled"
+    assert retried.json()["batch"]["status"] == "cancelled"
+    assert retried.json()["message"] == "이미 취소된 입출고 작업입니다."
+    assert _cells(db_session, item.item_id)[0] == 0
+    assert db_session.query(TransactionLog).count() == 2
 
 
 # ---------------------------------------------------------------------------
@@ -1358,7 +1807,7 @@ def test_cancel_io_v2_receive_restores(client, db_session, make_item):
 
 def test_cancel_blocked_when_would_go_negative(client, db_session, make_item):
     item = make_item(name="음수품", warehouse_qty=Decimal("0"))
-    actor = _make_employee(db_session, code="NG01")
+    actor = _make_employee(db_session, code="NG01", warehouse_role="primary")
     db_session.commit()
 
     # 입고 50 → 창고 50
@@ -1446,7 +1895,7 @@ def test_cancel_blocks_zero_delta_inventory_effect_without_mutating_stock(client
 
 def test_cancel_idempotent_double(client, db_session, make_item):
     item = make_item(name="cancel-duplicate", warehouse_qty=Decimal("0"))
-    actor = _make_employee(db_session, code="DUP1")
+    actor = _make_employee(db_session, code="DUP1", warehouse_role="primary")
     db_session.commit()
 
     _receive_v2(client, item, actor, 10)
@@ -1585,7 +2034,7 @@ def test_cancel_approver_can_cancel_others(client, db_session, make_item):
 
 def test_cancel_wrong_pin_forbidden(client, db_session, make_item):
     item = make_item(name="cancel-wrong-pin", warehouse_qty=Decimal("0"))
-    actor = _make_employee(db_session, code="PIN1")
+    actor = _make_employee(db_session, code="PIN1", warehouse_role="primary")
     db_session.commit()
     _receive_v2(client, item, actor, 5)
     log = db_session.query(TransactionLog).filter(

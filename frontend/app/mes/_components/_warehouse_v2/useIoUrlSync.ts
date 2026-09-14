@@ -91,6 +91,13 @@ export function useIoUrlSync(args: UseIoUrlSyncArgs): UseIoUrlSyncApi {
   // URL step 변경 (뒤로/앞으로) → state.goTo (도달 불가 step 은 clamp)
   useEffect(() => {
     if (suppressInitialSyncRef.current) return;
+    if (typeof window !== "undefined") {
+      const liveRaw = Number(new URLSearchParams(window.location.search).get("step"));
+      const liveUrlStep = liveRaw >= 1 && liveRaw <= 5 ? (liveRaw as IoStep) : 1;
+      // router.push 직후 useSearchParams가 이전 query를 한 렌더 더 노출할 수 있다.
+      // 주소창보다 늦은 snapshot으로 사용자가 이미 진행한 state를 되감지 않는다.
+      if (liveUrlStep !== urlStep) return;
+    }
     if (urlStep === step) {
       // URL 이 state 를 따라잡았을 때 — 보류된 다음 단계가 있으면 advance.
       if (pendingFinalStepRef.current != null && pendingFinalStepRef.current !== step) {
@@ -109,7 +116,8 @@ export function useIoUrlSync(args: UseIoUrlSyncArgs): UseIoUrlSyncApi {
     }
     // URL 으로 들어온 변경은 pending 을 취소 (사용자가 뒤로/앞으로 누른 경우 자동 advance 중단).
     pendingFinalStepRef.current = null;
-    skipNextPushRef.current = true;
+    const shouldMoveState = target !== step;
+    if (shouldMoveState) skipNextPushRef.current = true;
     if (target !== urlStep) {
       const next = new URLSearchParams(
         typeof window !== "undefined" ? window.location.search : searchParams.toString(),
@@ -118,7 +126,7 @@ export function useIoUrlSync(args: UseIoUrlSyncArgs): UseIoUrlSyncApi {
       if (tabParam) next.set("tab", tabParam);
       router.push(`${pathname}?${next.toString()}`, { scroll: false });
     }
-    goTo(target);
+    if (shouldMoveState) goTo(target);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlStep]);
 

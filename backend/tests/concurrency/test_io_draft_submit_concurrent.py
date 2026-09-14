@@ -39,6 +39,7 @@ def _setup_draft(make_session):
         role="창고/사원",
         department=DepartmentEnum.WAREHOUSE.value,
         level=EmployeeLevelEnum.STAFF,
+        warehouse_role="primary",
         is_active=True,
         display_order=0,
     )

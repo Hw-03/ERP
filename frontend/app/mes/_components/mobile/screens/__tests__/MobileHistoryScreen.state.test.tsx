@@ -229,6 +229,38 @@ beforeEach(() => {
 });
 
 describe("MobileHistoryScreen history state", () => {
+  it("immutable cancellation ledger 응답을 현재 원본 선택과 목록에 반영한다", async () => {
+    const original = makeLog({ operation_id: "operation-original" });
+    testState.updated = makeLog({
+      log_id: "reversal-1",
+      operation_id: "operation-cancellation",
+      operation_kind: null,
+      operation_effective_status: null,
+      reverses_log_id: original.log_id,
+      reason_memo: "입력 오류",
+      requester_name: "취소 작업자",
+      requested_at: "2026-07-10T02:00:00Z",
+      cancelled: false,
+    });
+    setHistoryResult([original], false);
+    const { rerender } = render(<MobileHistoryScreen />);
+    fireEvent.click(screen.getByRole("button", { name: "모바일 단건 선택" }));
+    fireEvent.click(screen.getByRole("button", { name: "모바일 취소 콜백 보관" }));
+
+    act(() => {
+      testState.capturedLogUpdated?.(testState.updated);
+    });
+    rerender(<MobileHistoryScreen />);
+
+    await waitFor(() => {
+      expect(testState.historyResult.logs[0]).toMatchObject({
+        log_id: original.log_id,
+        cancelled: true,
+      });
+      expect(screen.getByTestId("mobile-log-detail-state")).toHaveAttribute("data-name", "이전 객체");
+    });
+  });
+
   it("keeps selection for failed loads and refreshes or closes it after successful loads", async () => {
     const { rerender } = render(<MobileHistoryScreen />);
     fireEvent.click(screen.getByRole("button", { name: "모바일 단건 선택" }));

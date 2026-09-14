@@ -23,6 +23,7 @@ import { resolveHistoryDateRange, type SelectedHistoryMonth } from "./_history_s
 import {
   advanceHistoryLoadReconcileState,
   applyHistoryCancellation,
+  isHistoryCancellationUpdate,
   mergeHistoryLogUpdate,
   reconcileHistorySelection,
   type HistoryLoadReconcileState,
@@ -349,7 +350,7 @@ export function DesktopHistoryView() {
   }
 
   function handleLogUpdated(updated: TransactionLog) {
-    if (updated.cancelled) {
+    if (isHistoryCancellationUpdate(updated)) {
       applyCancellationUpdate(updated, updated.operation_batch_id);
       return;
     }

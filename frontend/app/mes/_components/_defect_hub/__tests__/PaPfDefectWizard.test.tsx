@@ -173,7 +173,7 @@ describe("PaPfDefectWizard", () => {
     await waitFor(() => expect(screen.getByText("필라멘트")).toBeInTheDocument());
   });
 
-  it("'정상 복귀' 선택 시 DisassembleTree 미표시, 버튼 텍스트 변경", async () => {
+  it("'정상 복귀' 선택 시 단건 복귀 요청 ID를 전송한다", async () => {
     render(<PaPfDefectWizard {...defaultProps} />);
 
     // 정상 복귀 라디오 클릭
@@ -187,8 +187,11 @@ describe("PaPfDefectWizard", () => {
       target: { value: "기능 불량" },
     });
 
-    // 버튼 텍스트
-    expect(screen.getByText("정상 복귀로 변경")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "정상 복귀로 변경" }));
+
+    await waitFor(() => expect(defectsApi.unquarantine).toHaveBeenCalledWith(
+      expect.objectContaining({ client_request_id: expect.any(String) }),
+    ));
   });
 
   it("'전부 폐기' 선택 → DisassembleTree 미표시, 즉시 폐기 → 확인팝업 → createStockRequest(DEFECT_SCRAP)", async () => {

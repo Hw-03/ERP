@@ -115,6 +115,7 @@ describe("RDefectActionModal", () => {
           record_id: "record-001",
           item_id: "item-001",
           qty: 5,
+          client_request_id: expect.any(String),
           dept: "조립",
           reason_category: "검사 통과",
           actor_employee_id: "emp-001",

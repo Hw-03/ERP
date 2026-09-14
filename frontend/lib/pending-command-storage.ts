@@ -13,6 +13,11 @@ function storage(key: string, value?: unknown): unknown {
   return value;
 }
 
+/** 저장된 원 요청을 변경하지 않고 읽어 명시적인 결과 확인에 사용한다. */
+export function readPendingCommand<T>(key: string): T | null {
+  return (storage(key) as T | null) ?? null;
+}
+
 /** 결과 불명 명령의 exact 요청을 성공 또는 확정 4xx까지 보존한다. */
 export function runPendingCommand<T, R>(
   key: string,

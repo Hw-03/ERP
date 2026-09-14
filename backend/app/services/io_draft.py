@@ -255,8 +255,10 @@ def find_by_client_request_id(
 
 
 def build_idempotent_response(batch: IoBatch, *, db: Session) -> dict:
-    """이미 처리 완료된 batch에 대해 IoSubmitResponse 모양 dict 생성 (재제출 멱등 응답)."""
-    if batch.status in {"submitted", "reserved"}:
+    """이미 처리된 batch에 대해 IoSubmitResponse 모양 dict 생성 (재제출 멱등 응답)."""
+    if batch.status == "cancelled":
+        message = "이미 취소된 입출고 작업입니다."
+    elif batch.status in {"submitted", "reserved"}:
         message = "승인 요청이 생성되었습니다."
     elif not any(line.included for bundle in batch.bundles for line in bundle.lines):
         message = "BOM 재고 미반영 품목만 포함되어 재고 변동 없이 처리되었습니다."

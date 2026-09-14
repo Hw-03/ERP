@@ -12,6 +12,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from decimal import Decimal
 from pathlib import Path
+from threading import Barrier
 
 import pytest
 
@@ -47,6 +48,7 @@ def _setup_reserved_request(make_session, suffix: str):
         department=DepartmentEnum.ASSEMBLY.value,
         level=EmployeeLevelEnum.STAFF,
         is_active=True,
+        pin_hash=DEFAULT_PIN_HASH,
         display_order=0,
     )
     approver = Employee(
@@ -136,15 +138,21 @@ def test_approve_cancel_conflict(concurrent_engine, make_session):
     item_id = ids["item_id"]
 
     results = []
+    entered = []
+    start = Barrier(2)
 
     def try_approve():
+        start.wait(timeout=5)
         session = make_session()
         try:
             req = session.query(StockRequest).filter(StockRequest.request_id == req_id).first()
             approver = session.query(Employee).filter(Employee.employee_id == approver_id).first()
+            entered.append("approve")
             svc.approve_request(session, req, approver=approver, pin="0000")
             session.commit()
             results.append("approved")
+        except TypeError:
+            raise
         except Exception as e:
             results.append(f"approve_fail:{e}")
             try: session.rollback()
@@ -153,13 +161,17 @@ def test_approve_cancel_conflict(concurrent_engine, make_session):
             session.close()
 
     def try_cancel():
+        start.wait(timeout=5)
         session = make_session()
         try:
             req = session.query(StockRequest).filter(StockRequest.request_id == req_id).first()
             requester = session.query(Employee).filter(Employee.employee_id == requester_id).first()
-            svc.cancel_request(session, req, actor=requester)
+            entered.append("cancel")
+            svc.cancel_request(session, req, requester=requester, pin="0000")
             session.commit()
             results.append("cancelled")
+        except TypeError:
+            raise
         except Exception as e:
             results.append(f"cancel_fail:{e}")
             try: session.rollback()
@@ -167,8 +179,8 @@ def test_approve_cancel_conflict(concurrent_engine, make_session):
         finally:
             session.close()
 
-    with ThreadPoolExecutor(max_workers=20) as ex:
-        futures = [ex.submit(fn) for _ in range(10) for fn in (try_approve, try_cancel)]
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        futures = [ex.submit(fn) for fn in (try_approve, try_cancel)]
         for f in as_completed(futures):
             f.result()
 
@@ -178,10 +190,25 @@ def test_approve_cancel_conflict(concurrent_engine, make_session):
     log_count = verify.query(TransactionLog).filter(TransactionLog.item_id == item_id).count()
     verify.close()
 
+    approve_attempts = [result for result in results if result.startswith("approve")]
+    assert sorted(entered) == ["approve", "cancel"]
+    cancel_attempts = [result for result in results if result.startswith("cancel")]
+    assert len(approve_attempts) == 1
+    assert len(cancel_attempts) == 1
+    assert not any("unexpected keyword argument 'actor'" in result for result in cancel_attempts)
+    assert sum(result in {"approved", "cancelled"} for result in results) == 1
     assert req.status in TERMINAL, f"비터미널 상태: {req.status}"
     assert inv.warehouse_qty >= Decimal("0"), f"창고 음수: {inv.warehouse_qty}"
+    assert inv.pending_quantity == Decimal("0"), f"예약 잔존: {inv.pending_quantity}"
     if req.status == StockRequestStatusEnum.COMPLETED:
         assert log_count == 1, f"COMPLETED TransactionLog {log_count}건 (1건이어야)"
+        assert inv.warehouse_qty == Decimal("9")
+        assert inv.quantity == Decimal("9")
+    else:
+        assert req.status == StockRequestStatusEnum.CANCELLED
+        assert log_count == 0
+        assert inv.warehouse_qty == Decimal("10")
+        assert inv.quantity == Decimal("10")
 
 
 @pytest.mark.usefixtures("concurrent_engine")
@@ -194,8 +221,10 @@ def test_reject_cancel_conflict(concurrent_engine, make_session):
     item_id = ids["item_id"]
 
     results = []
+    start = Barrier(2)
 
     def try_reject():
+        start.wait(timeout=5)
         session = make_session()
         try:
             req = session.query(StockRequest).filter(StockRequest.request_id == req_id).first()
@@ -211,11 +240,12 @@ def test_reject_cancel_conflict(concurrent_engine, make_session):
             session.close()
 
     def try_cancel():
+        start.wait(timeout=5)
         session = make_session()
         try:
             req = session.query(StockRequest).filter(StockRequest.request_id == req_id).first()
             requester = session.query(Employee).filter(Employee.employee_id == requester_id).first()
-            svc.cancel_request(session, req, actor=requester)
+            svc.cancel_request(session, req, requester=requester, pin="0000")
             session.commit()
             results.append("cancelled")
         except Exception as e:
@@ -225,8 +255,8 @@ def test_reject_cancel_conflict(concurrent_engine, make_session):
         finally:
             session.close()
 
-    with ThreadPoolExecutor(max_workers=20) as ex:
-        futures = [ex.submit(fn) for _ in range(10) for fn in (try_reject, try_cancel)]
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        futures = [ex.submit(fn) for fn in (try_reject, try_cancel)]
         for f in as_completed(futures):
             f.result()
 
@@ -235,8 +265,15 @@ def test_reject_cancel_conflict(concurrent_engine, make_session):
     inv = verify.query(Inventory).filter(Inventory.item_id == item_id).first()
     verify.close()
 
+    reject_attempts = [result for result in results if result.startswith("reject")]
+    cancel_attempts = [result for result in results if result.startswith("cancel")]
+    assert len(reject_attempts) == 1
+    assert len(cancel_attempts) == 1
+    assert not any("unexpected keyword argument 'actor'" in result for result in cancel_attempts)
+    assert sum(result in {"rejected", "cancelled"} for result in results) == 1
     assert req.status in TERMINAL, f"비터미널 상태: {req.status}"
     assert inv.warehouse_qty >= Decimal("0"), f"창고 음수: {inv.warehouse_qty}"
+    assert inv.pending_quantity == Decimal("0"), f"예약 잔존: {inv.pending_quantity}"
 
 
 @pytest.mark.usefixtures("concurrent_engine")

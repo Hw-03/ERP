@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { DirtyGuardProvider } from "@/lib/ui/dirty-guard";
 import { AdminModelsSection } from "../AdminModelsSection";
@@ -11,6 +11,7 @@ const context = {
   setModelAddSymbol: vi.fn(),
   addModel: vi.fn(),
   deleteModel: vi.fn(),
+  deletingModelSlot: null as number | null,
   editForm: { model_name: "DX3000", symbol: "A" },
   setEditForm: vi.fn(),
   editDirty: false,
@@ -76,8 +77,12 @@ describe("AdminModelsSection", () => {
     expect(screen.getByRole("button", { name: "이 모델 삭제" })).toHaveClass("mt-auto");
   });
 
-  it("keeps the model delete button connected to its confirmation handler", async () => {
+  it("삭제 성공 전에는 확인창과 선택 모델을 유지하고 성공 뒤에만 닫는다", async () => {
     context.deleteModel.mockClear();
+    let completeDelete: (() => void) | undefined;
+    context.deleteModel.mockImplementation((_slot, onSuccess) => {
+      completeDelete = onSuccess;
+    });
     render(
       <DirtyGuardProvider>
         <AdminModelsSection items={[]} allBomRows={[]} />
@@ -89,9 +94,12 @@ describe("AdminModelsSection", () => {
     const dialog = await screen.findByRole("dialog");
     fireEvent.click(within(dialog).getAllByRole("button")[1]);
 
-    await waitFor(() => {
-      expect(context.deleteModel).toHaveBeenCalledWith(1);
-    });
+    expect(context.deleteModel).toHaveBeenCalledWith(1, expect.any(Function));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: "DX3000 A 사용 중" })).toHaveAttribute("aria-selected", "true");
+
+    act(() => completeDelete?.());
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
   it("모델 기호를 목록과 상세에 표시하고 슬롯 기반 코드는 노출하지 않는다", async () => {

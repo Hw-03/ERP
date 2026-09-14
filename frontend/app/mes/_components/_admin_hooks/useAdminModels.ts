@@ -25,7 +25,8 @@ export type AdminModelsState = {
   modelAddSymbol: string;
   setModelAddSymbol: (v: string) => void;
   addModel: () => void;
-  deleteModel: (slot: number) => void;
+  deleteModel: (slot: number, onSuccess?: () => void) => void;
+  deletingModelSlot: number | null;
   // 인라인 편집
   editForm: import("./useAdminModelsForm").ModelEditForm;
   setEditForm: (
@@ -63,6 +64,7 @@ export function useAdminModels({
     setModelAddSymbol: commands.setModelAddSymbol,
     addModel: commands.add,
     deleteModel: commands.delete,
+    deletingModelSlot: commands.deletingSlot,
     editForm: form.form,
     setEditForm: form.setForm,
     editDirty: form.dirty,

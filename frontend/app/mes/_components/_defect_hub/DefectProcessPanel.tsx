@@ -69,6 +69,7 @@ export function DefectProcessPanel({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const locationIdentity = processingLocations.map((current) => current.record_id).join(":");
   const locationIdentityRef = useRef(locationIdentity);
+  const restoreRequestIdRef = useRef<string | null>(null);
   const batchRequestIdsRef = useRef<Partial<Record<ProcessAction, string>>>({});
   const batchSnapshot = processingLocations.map((current) =>
     `${current.record_id}:${current.available_quantity}:${current.pending_quantity}`,
@@ -99,6 +100,7 @@ export function DefectProcessPanel({
     setErrorMsg(null);
     setConfirmOpen(false);
     batchRequestIdsRef.current = {};
+    restoreRequestIdRef.current = null;
   }, [locationIdentity, availableQty]);
 
   useEffect(() => {
@@ -161,6 +163,8 @@ export function DefectProcessPanel({
             reason_category: category || null,
             reason_memo: memo || null,
             actor_employee_id: currentEmployee.employee_id,
+            client_request_id: restoreRequestIdRef.current
+              ?? (restoreRequestIdRef.current = makeClientRequestId()),
           });
         }
       } else if (action === "scrap") {

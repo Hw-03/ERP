@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import type { WarehouseMap } from "@/lib/api/warehouse-map";
-import { DesktopWarehouseMapView } from "../DesktopWarehouseMapView";
+import { DesktopWarehouseMapView, WarehouseZonePanel } from "../DesktopWarehouseMapView";
 
 const mapApiMock = vi.hoisted(() => ({
   getMap: vi.fn(),
@@ -62,6 +62,61 @@ function renderWithClient(ui: ReactElement) {
 }
 
 describe("DesktopWarehouseMapView fullscreen", () => {
+  it("구역 수량은 빈칸 편집을 허용하되 소수·음수 저장을 오류로 막는다", async () => {
+    const zone = {
+      id: 1,
+      label: "팔레트 1",
+      zone_type: "pallet" as const,
+      pos_x: 10,
+      pos_y: 10,
+      width: 80,
+      height: 60,
+      display_order: 1,
+      is_active: true,
+      items: [{
+        item_id: "item-1",
+        item_name: "구역 품목",
+        mes_code: "ZONE-1",
+        quantity: 3,
+        department: null,
+        color_hex: null,
+      }],
+    };
+    const saveItems = vi.fn(() => Promise.resolve());
+
+    renderWithClient(
+      <WarehouseZonePanel
+        zone={zone}
+        items={[]}
+        editable
+        onSaveZone={vi.fn(() => Promise.resolve())}
+        onSaveItems={saveItems}
+        onDeleteZone={vi.fn(() => Promise.resolve())}
+      />,
+    );
+    const quantity = await screen.findByRole("spinbutton", { name: "구역 품목 수량" });
+    expect(quantity).toHaveAttribute("min", "0");
+    expect(quantity).toHaveAttribute("step", "1");
+
+    fireEvent.change(quantity, { target: { value: "" } });
+    expect(quantity).toHaveValue(null);
+    expect(screen.getByText("수량을 입력하세요.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "적재 품목 저장" }));
+    expect(saveItems).not.toHaveBeenCalled();
+
+    fireEvent.change(quantity, { target: { value: "1.5" } });
+    expect(quantity).toHaveValue(1.5);
+    expect(screen.getByText("수량은 0 이상의 정수로 입력하세요.")).toBeInTheDocument();
+    fireEvent.change(quantity, { target: { value: "-2" } });
+    expect(quantity).toHaveValue(-2);
+    expect(saveItems).not.toHaveBeenCalled();
+
+    fireEvent.change(quantity, { target: { value: "9" } });
+    expect(screen.queryByText("수량은 0 이상의 정수로 입력하세요.")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "적재 품목 저장" }));
+    await waitFor(() => expect(saveItems).toHaveBeenCalledWith(1, [{ item_id: "item-1", quantity: 9 }]));
+  });
+
   it("keeps the current map visible when a background refresh fails and retries in place", async () => {
     mapApiMock.getMap.mockReset().mockResolvedValueOnce(mapFixture).mockRejectedValue(new Error("refresh failed"));
     const { client } = renderWithClient(<DesktopWarehouseMapView />);

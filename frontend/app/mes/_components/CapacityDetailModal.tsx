@@ -146,7 +146,7 @@ export function CapacityDetailModal({
                 <div className="grid min-w-0 flex-1 grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-3">
                   <div className="flex min-w-0 items-center gap-1.5 text-xs leading-5 sm:text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
                     <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: LEGACY_COLORS.cyan }} />
-                    <span><span className="font-bold" style={{ color: LEGACY_COLORS.cyan }}>출하 대기</span> — 박스 포장까지 완료되어 픽업을 기다리는 재고</span>
+                    <span><span className="font-bold" style={{ color: LEGACY_COLORS.cyan }}>출하 대기</span> — 출하 예약된 픽업 대기분을 포함한 정상 재고(박스 포장 완료)</span>
                   </div>
                   <div className="flex min-w-0 items-center gap-1.5 text-xs leading-5 sm:text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
                     <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: LEGACY_COLORS.blue }} />

@@ -24,10 +24,35 @@ import { DefectProcessPanel } from "./_defect_hub/DefectProcessPanel";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { LoadFailureCard } from "./common/LoadFailureCard";
 import { matchesDefectSearch } from "./_defect_hub/defectSearch";
+import { makeClientRequestId } from "@/lib/uuid";
 
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 const PRODUCTION_LINES = new Set(["튜브", "고압", "진공", "튜닝", "조립", "출하"]);
+const COMPLETED_CART_TASKS_KEY_PREFIX = "dexcowin_mes_defect_completed_cart_tasks:";
+
+function readCompletedCartTaskIds(employeeId: string): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const parsed: unknown = JSON.parse(
+      window.sessionStorage.getItem(`${COMPLETED_CART_TASKS_KEY_PREFIX}${employeeId}`) ?? "[]",
+    );
+    return new Set(Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveCompletedCartTaskIds(employeeId: string, taskIds: Set<string>): void {
+  try {
+    window.sessionStorage.setItem(
+      `${COMPLETED_CART_TASKS_KEY_PREFIX}${employeeId}`,
+      JSON.stringify(Array.from(taskIds)),
+    );
+  } catch {
+    // 저장소를 사용할 수 없는 환경에서도 현재 마운트의 중복 복원 차단은 유지한다.
+  }
+}
 
 /** 화면 모드 — hub가 진입점. list 외에는 좌측 목록을 덮는 전폭 작업 화면. */
 type ViewMode =
@@ -36,7 +61,7 @@ type ViewMode =
   | { kind: "list" }
   | { kind: "storage" }
   | { kind: "statistics" }
-  | { kind: "cart"; mode: DefectCartMode }
+  | { kind: "cart"; mode: DefectCartMode; taskId: string }
   | { kind: "process"; locations: DefectLocation[]; batch: boolean; restoreOnly?: boolean };
 
 interface Props {
@@ -129,6 +154,10 @@ function DefectViewInner({
   const [view, setView] = useState<ViewMode>({ kind: "hub" });
   const [managementLocation, setManagementLocation] = useState<DefectLocation | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
+  const completedCartTaskIds = useMemo(
+    () => readCompletedCartTaskIds(operator.employee_id),
+    [operator.employee_id],
+  );
 
   useEffect(() => {
     const generation = ++requestGenerationRef.current;
@@ -259,13 +288,20 @@ function DefectViewInner({
   // 마운트 시 현재 엔트리에 defect state가 있으면 뷰 복원 (다른 탭에서 뒤로가기로 복귀하는 경우).
   // defect state가 없으면 hub로 replaceState — 항상 스택 바닥이 hub.
   useEffect(() => {
-    const cur = window.history.state as { defect?: string; mode?: string } | null;
+    const cur = window.history.state as { defect?: string; mode?: string; taskId?: string } | null;
     if (cur?.defect === "storage") {
       setView({ kind: "storage" });
     } else if (cur?.defect === "work-choice") {
       setView({ kind: "work-choice" });
     } else if (cur?.defect === "cart" && (cur.mode === "add" || cur.mode === "scrap")) {
-      setView({ kind: "cart", mode: cur.mode });
+      const taskId = cur.taskId ?? makeClientRequestId();
+      if (completedCartTaskIds.has(taskId)) {
+        window.history.replaceState({ defect: "hub" }, "");
+        setView({ kind: "hub" });
+      } else {
+        setView({ kind: "cart", mode: cur.mode, taskId });
+        if (!cur.taskId) window.history.replaceState({ ...cur, taskId }, "");
+      }
     } else if (cur?.defect === "list") {
       setView({ kind: "list" });
     } else if (cur?.defect === "statistics") {
@@ -279,7 +315,7 @@ function DefectViewInner({
     }
 
     function onPop(e: PopStateEvent) {
-      const s = e.state as { defect?: string; mode?: string } | null;
+      const s = e.state as { defect?: string; mode?: string; taskId?: string } | null;
       if (!s?.defect || s.defect === "hub") {
         setView({ kind: "hub" });
       } else if (s.defect === "storage") {
@@ -291,7 +327,14 @@ function DefectViewInner({
       } else if (s.defect === "statistics") {
         setView({ kind: "statistics" });
       } else if (s.defect === "cart" && (s.mode === "add" || s.mode === "scrap")) {
-        setView({ kind: "cart", mode: s.mode });
+        const taskId = s.taskId ?? makeClientRequestId();
+        if (completedCartTaskIds.has(taskId)) {
+          window.history.replaceState({ defect: "hub" }, "");
+          setView({ kind: "hub" });
+        } else {
+          setView({ kind: "cart", mode: s.mode, taskId });
+          if (!s.taskId) window.history.replaceState({ ...s, taskId }, "");
+        }
       } else {
         setView({ kind: "list" });
       }
@@ -299,7 +342,7 @@ function DefectViewInner({
 
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, []); // mount only
+  }, [completedCartTaskIds]);
 
   function handleHubSelect(id: DefectHubCardId) {
     if (id === "work") {
@@ -318,8 +361,9 @@ function DefectViewInner({
   }
 
   function openCart(mode: DefectCartMode) {
-    window.history.pushState({ defect: "cart", mode }, "");
-    setView({ kind: "cart", mode });
+    const taskId = makeClientRequestId();
+    window.history.pushState({ defect: "cart", mode, taskId }, "");
+    setView({ kind: "cart", mode, taskId });
   }
 
   function handleProcessed(message: string, returnToStorage = false) {
@@ -421,20 +465,24 @@ function DefectViewInner({
           >
             {view.kind === "cart" && (
               <DefectCartFlow
+                key={view.taskId}
                 mode={view.mode}
+                taskId={view.taskId}
                 items={items}
                 productModels={productModels}
                 currentEmployee={employee}
                 onCancel={() => window.history.back()}
-                onDone={(directAction) =>
+                onDone={(directAction) => {
+                  completedCartTaskIds.add(view.taskId);
+                  saveCompletedCartTaskIds(operator.employee_id, completedCartTaskIds);
                   handleProcessed(
                     view.mode === "add"
                       ? "새 불량 격리 완료"
                       : directAction === "rework"
                         ? "즉시 재작업 완료"
                         : "즉시 폐기 완료",
-                  )
-                }
+                  );
+                }}
               />
             )}
             {view.kind === "work-choice" && (

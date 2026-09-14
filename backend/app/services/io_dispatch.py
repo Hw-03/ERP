@@ -56,6 +56,8 @@ from app.services.io_preview import (
     _get_item,
     normalize_process_sub_type,
     validate_process_bom_parent_lines,
+    validate_receive_requester,
+    validate_work_sub_type,
     validate_saved_operation_sources,
     validate_internal_use_bundles,
     validate_internal_use_operation,
@@ -77,6 +79,7 @@ from app.services.io_persist import (
 
 
 CUSTOM_BOM_REFERENCE_EXCLUSION_NOTE = "커스텀 BOM 상위 미반영"
+INVENTORY_OPERATION_IDEMPOTENCY_KEY_MAX_LENGTH = 160
 
 
 def _normalize_automatic_batch_routes(
@@ -762,18 +765,22 @@ def _is_no_effect_custom_bom_reference_request(batch: IoBatch, request: StockReq
 def normalize_department_approval_routes(
     db: Session, batch: IoBatch, requests: Sequence[StockRequest],
 ) -> None:
-    """접수된 입고 요청만 복원해 과거 출고 요청의 승인 의미를 보존한다."""
-    inbound_line_ids = {
+    """접수된 요청 방향과 일치하는 커스텀 BOM 효과만 live 부서로 복원한다."""
+    expected_endpoints = (
+        (RequestBucketEnum.NONE, RequestBucketEnum.PRODUCTION)
+        if batch.sub_type == "produce"
+        else (RequestBucketEnum.PRODUCTION, RequestBucketEnum.NONE)
+    )
+    matching_line_ids = {
         line.operation_line_id
         for request in requests
         for line in request.lines
-        if line.from_bucket == RequestBucketEnum.NONE
-        and line.to_bucket == RequestBucketEnum.PRODUCTION
+        if (line.from_bucket, line.to_bucket) == expected_endpoints
     }
-    custom_receipt_bundle_ids = {
+    custom_effect_bundle_ids = {
         bundle.bundle_id
         for bundle in batch.bundles
-        if batch.sub_type == "produce"
+        if batch.sub_type in {"produce", "disassemble"}
         and bundle.source_kind == BOM_PARENT_SOURCE_KIND
         and any(
             line.origin == "direct"
@@ -784,12 +791,12 @@ def normalize_department_approval_routes(
         )
         and any(line.included and line.origin == "bom_auto" for line in bundle.lines)
         and all(
-            line.line_id in inbound_line_ids
+            line.line_id in matching_line_ids
             for line in bundle.lines
             if line.included and line.origin == "bom_auto"
         )
     }
-    _normalize_automatic_batch_routes(db, batch, custom_bundle_ids=custom_receipt_bundle_ids)
+    _normalize_automatic_batch_routes(db, batch, custom_bundle_ids=custom_effect_bundle_ids)
 
 
 def execute_batch_after_dept_approval(
@@ -1060,6 +1067,61 @@ def _create_execution_operation(
     execution_key: str,
 ) -> InventoryOperation | None:
     """실재고가 반영되는 한 번의 입출고 실행 작업을 만든다."""
+    base_idempotency_key = f"io:{batch.batch_id}:{execution_key}"
+    previous_executions = (
+        db.query(
+            InventoryOperation.operation_id,
+            InventoryOperation.idempotency_key,
+        )
+        .filter(
+            InventoryOperation.domain == "inventory_io",
+            InventoryOperation.action == batch.sub_type,
+            (
+                (InventoryOperation.idempotency_key == base_idempotency_key)
+                | InventoryOperation.idempotency_key.startswith(
+                    f"{base_idempotency_key}:retry:"
+                )
+            ),
+        )
+        .all()
+    )
+    idempotency_key = base_idempotency_key
+    if previous_executions:
+        execution_keys_by_id = dict(previous_executions)
+        execution_ids = set(execution_keys_by_id)
+        reversals = (
+            db.query(
+                InventoryOperation.operation_id,
+                InventoryOperation.reverses_operation_id,
+            )
+            .filter(InventoryOperation.reverses_operation_id.in_(execution_ids))
+            .all()
+        )
+        reversed_execution_ids = {
+            reverses_operation_id for _, reverses_operation_id in reversals
+        }
+        if reversed_execution_ids != execution_ids:
+            raise ValueError("이미 실행된 입출고 승인 작업입니다.")
+        consumed_reversal_ids = {
+            reversal_id
+            for reversal_id, _ in reversals
+            if any(
+                execution_key
+                == f"{base_idempotency_key}:retry:{reversal_id}"
+                for execution_key in execution_keys_by_id.values()
+            )
+        }
+        terminal_reversal_ids = {
+            reversal_id for reversal_id, _ in reversals
+        } - consumed_reversal_ids
+        if len(terminal_reversal_ids) != 1:
+            raise ValueError("입출고 승인 재실행 이력이 올바르지 않습니다.")
+        terminal_reversal_id = terminal_reversal_ids.pop()
+        idempotency_key = (
+            f"{base_idempotency_key}:retry:{terminal_reversal_id}"
+        )
+        if len(idempotency_key) > INVENTORY_OPERATION_IDEMPOTENCY_KEY_MAX_LENGTH:
+            raise ValueError("입출고 실행 멱등 키 길이가 허용 범위를 초과했습니다.")
     return operation_svc._create_business_operation(
         db,
         domain="inventory_io",
@@ -1069,7 +1131,7 @@ def _create_execution_operation(
         actor_employee_id=actor.employee_id,
         department=batch.requester_department,
         reason=batch.notes,
-        idempotency_key=f"io:{batch.batch_id}:{execution_key}",
+        idempotency_key=idempotency_key,
     )
 
 
@@ -1236,6 +1298,11 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
         sub_type=batch.sub_type,
         bundles=batch.bundles,
     )
+    validate_receive_requester(
+        requester,
+        work_type=batch.work_type,
+        sub_type=batch.sub_type,
+    )
     # An old draft token proves the original BOM/inclusion intent.  Validate it
     # and rotate it for the live route before stock-exempt handling reads it.
     normalize_automatic_routes_with_bom_token_refresh(
@@ -1316,7 +1383,7 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
         _normalize_automatic_batch_routes(
             db,
             batch,
-            custom_bundle_ids=custom_process_bom_bundle_ids if batch.sub_type == "produce" else None,
+            custom_bundle_ids=custom_process_bom_bundle_ids,
         )
         included_lines = _included_lines(batch)
         if department_approval_required:
@@ -1387,6 +1454,11 @@ def submit(
         sub_type=payload.sub_type,
         bundles=payload.bundles,
     )
+    validate_receive_requester(
+        requester,
+        work_type=payload.work_type,
+        sub_type=payload.sub_type,
+    )
     if not bool(requester.is_active):
         raise PermissionError("비활성 직원은 입출고 작업을 제출할 수 없습니다.")
     batch = _persist_batch(
@@ -1413,6 +1485,12 @@ def submit_existing_draft(
     if batch.requester_employee_id != requester.employee_id:
         raise PermissionError("본인 임시저장 작업만 제출할 수 있습니다.")
     ensure_batch_is_mutable(batch)
+    validate_work_sub_type(work_type=batch.work_type, sub_type=batch.sub_type)
+    validate_receive_requester(
+        requester,
+        work_type=batch.work_type,
+        sub_type=batch.sub_type,
+    )
     if batch.status != "draft":
         expected_fingerprint = fingerprint_io_draft_submit(
             requester.employee_id,

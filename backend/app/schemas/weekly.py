@@ -191,7 +191,13 @@ CapacityAfStatus = Literal[
 
 
 class CapacityAfSummary(BaseModel):
-    ship_ready: int = Field(..., description="출하 대기 — 창고에 있는 완성 PF 재고 합계.")
+    ship_ready: int = Field(
+        ...,
+        description=(
+            "출하 대기 — AF별 연결 PF 중 출하 예약분을 포함한 "
+            "최대 정상 재고의 합계."
+        ),
+    )
     fast_production: int = Field(..., description="빠른 생산 — 현재 AF 재고와 포장 자재로 PA·PF까지 완성 가능한 수량 합계.")
     total_production: int = Field(..., description="총생산 — PF 루트 BOM 전체 재귀 이론 최대 합계.")
 
@@ -233,7 +239,10 @@ class CapacityPfVariant(BaseModel):
     pf_name: str
     model_symbol: Optional[str] = None
     af_item_id: Optional[str] = None
-    ship_ready: int = Field(..., description="출하 대기 — 이 PF 완성 재고.")
+    ship_ready: int = Field(
+        ...,
+        description="출하 대기 — 출하 예약분을 포함한 이 PF의 정상 재고.",
+    )
     fast_production: int = Field(..., description="빠른 생산 — 현재 AF 재고와 포장 자재로 이 PF까지 완성 가능한 수량.")
     total_production: int = Field(..., description="총생산 — 이 PF 루트로 BOM 전체 재귀 이론 최대.")
     fast_production_limiting_item: Optional[str] = None
@@ -244,8 +253,10 @@ class CapacityPfVariant(BaseModel):
 class CapacityAfBlock(BaseModel):
     """AF(조립 완제품) 기준 생산 가능 수량.
 
-    재고 기준은 available(=warehouse+production-재고 요청 예약-활성 출하 예약)이며
-    **계획/대응 수량 지표**다.
+    ship_ready는 출하 예약분을 포함하고 재고 요청 예약만 뺀 정상 재고다.
+    fast_production과 total_production은
+    available(=warehouse+production-재고 요청 예약-활성 출하 예약) 기준이다.
+    모두 **계획/대응 수량 지표**다.
     생산 등록 가능성 검증(backflush, warehouse_available)이 아니다.
 
     주의: summary.ship_ready / fast_production / total_production 은 'AF별 독립 계산의 합계'다.

@@ -4,6 +4,7 @@
  */
 
 import { fetcher, postJson, putJson, toApiUrl } from "../api-core";
+import { runPendingCommand } from "../pending-command-storage";
 import type {
   DefectKpi,
   DefectListQuery,
@@ -45,14 +46,32 @@ export const defectsApi = {
   /**
    * 즉시 격리 (결재 없음).
    */
-  quarantine: (payload: QuarantinePayload): Promise<void> =>
-    postJson<void>(toApiUrl("/api/defects/quarantine"), payload),
+  quarantine: (payload: QuarantinePayload): Promise<void> => {
+    const execute = (request: QuarantinePayload) =>
+      postJson<void>(toApiUrl("/api/defects/quarantine"), request);
+    return payload.client_request_id
+      ? runPendingCommand(
+          `defect:q:${payload.client_request_id}`,
+          payload,
+          execute,
+        )
+      : execute(payload);
+  },
 
   /**
    * 즉시 정상 복귀 (결재 없음).
    */
-  unquarantine: (payload: UnquarantinePayload): Promise<void> =>
-    postJson<void>(toApiUrl("/api/defects/unquarantine"), payload),
+  unquarantine: (payload: UnquarantinePayload): Promise<void> => {
+    const execute = (request: UnquarantinePayload) =>
+      postJson<void>(toApiUrl("/api/defects/unquarantine"), request);
+    return payload.client_request_id
+      ? runPendingCommand(
+          `defect:r:${payload.client_request_id}`,
+          payload,
+          execute,
+        )
+      : execute(payload);
+  },
 
   unquarantineBulk: (payload: BulkUnquarantinePayload): Promise<BulkUnquarantineResult> =>
     postJson<BulkUnquarantineResult>(toApiUrl("/api/defects/unquarantine/bulk"), payload),

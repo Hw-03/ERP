@@ -63,6 +63,41 @@ describe("useAdminModelsCommands", () => {
     expect(createMutate.mock.calls[0]![0]).toEqual({ model_name: "ADX", symbol: "A" });
   });
 
+  it("delete — native confirm 없이 PIN을 유지하고 중복 제출을 막는다", () => {
+    const confirmSpy = vi.spyOn(window, "confirm");
+    const args = baseArgs({
+      productModels: [{ slot: 1, model_name: "DX3000" } as any],
+    });
+    const { result } = renderHook(() => useAdminModelsCommands(args), { wrapper });
+
+    act(() => {
+      result.current.delete(1);
+      result.current.delete(1);
+    });
+
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(deleteMutate).toHaveBeenCalledTimes(1);
+    expect(deleteMutate.mock.calls[0]![0]).toEqual({ slot: 1, pin: "1234" });
+    expect(result.current.deletingSlot).toBe(1);
+    confirmSpy.mockRestore();
+  });
+
+  it("delete — 실패하면 모델과 PIN을 유지하고 같은 모델을 다시 시도할 수 있다", () => {
+    const args = baseArgs({
+      productModels: [{ slot: 1, model_name: "DX3000" } as any],
+    });
+    const { result } = renderHook(() => useAdminModelsCommands(args), { wrapper });
+
+    act(() => result.current.delete(1));
+    act(() => deleteMutate.mock.calls[0]![1].onError(new Error("삭제 거절")));
+
+    expect(args.setProductModels).not.toHaveBeenCalled();
+    expect(args.onError).toHaveBeenCalledWith("삭제 거절");
+    expect(result.current.deletingSlot).toBeNull();
+    act(() => result.current.delete(1));
+    expect(deleteMutate.mock.calls[1]![0]).toEqual({ slot: 1, pin: "1234" });
+  });
+
   it("reorder — 로컬 setProductModels 즉시 호출 + mutation.mutate 호출", () => {
     const args = baseArgs();
     const { result } = renderHook(() => useAdminModelsCommands(args), { wrapper });

@@ -32,6 +32,7 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
     setModelAddSymbol,
     addModel,
     deleteModel,
+    deletingModelSlot,
     editForm,
     setEditForm,
     editDirty,
@@ -170,9 +171,11 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
 
   function handleConfirmDelete() {
     if (deleteTarget === null) return;
-    deleteModel(deleteTarget);
-    if (selectedSlot === deleteTarget) setSelectedSlot(null);
-    setDeleteTarget(null);
+    const target = deleteTarget;
+    deleteModel(target, () => {
+      if (selectedSlot === target) setSelectedSlot(null);
+      setDeleteTarget(null);
+    });
   }
 
   const deleteTargetModel = deleteTarget !== null ? productModels.find((m) => m.slot === deleteTarget) : null;
@@ -379,6 +382,8 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
         confirmLabel="삭제"
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleConfirmDelete}
+        busy={deleteTarget !== null && deletingModelSlot === deleteTarget}
+        busyLabel="삭제 중..."
       />
     </>
   );

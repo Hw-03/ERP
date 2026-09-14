@@ -493,7 +493,9 @@ def test_io_submit_exposes_the_related_batch_for_request_audit(monkeypatch):
         employee_code="AUDIT-DIRECT-01",
         name="직접 호출 작업자",
     )
-    payload = SimpleNamespace(requester_employee_id=actor.employee_id)
+    payload = SimpleNamespace(
+        requester_employee_id=actor.employee_id, work_type="process", sub_type="produce",
+    )
     batch_id = str(uuid.uuid4())
     monkeypatch.setattr(
         io_router.io_actions_svc,

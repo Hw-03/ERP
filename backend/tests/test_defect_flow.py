@@ -445,6 +445,34 @@ def test_quarantine_exact_retry_is_idempotent(db_session, client, make_item):
     )
 
 
+def test_quarantine_retry_key_rejects_added_warehouse_source_department(
+    db_session, client, make_item
+):
+    item = make_item(name="R001-IDEM-SOURCE-DEPT", warehouse_qty=Decimal("10"))
+    actor = _make_employee(db_session, code="E01-IDEM-SD", name="멱등 출처 작업자")
+    db_session.commit()
+    payload = {
+        "item_id": str(item.item_id),
+        "qty": "2",
+        "source": "warehouse",
+        "target_dept": DepartmentEnum.WAREHOUSE.value,
+        "reason_category": "외관불량",
+        "reason_memo": "창고 출처",
+        "actor_employee_id": str(actor.employee_id),
+        "client_request_id": "defect-idem-source-dept",
+    }
+
+    first = client.post("/api/defects/quarantine", json=payload)
+    retry = client.post(
+        "/api/defects/quarantine",
+        json={**payload, "source_dept": DepartmentEnum.ASSEMBLY.value},
+    )
+
+    assert first.status_code == 200, first.json()
+    assert retry.status_code == 409
+    assert retry.json()["detail"]["code"] == "CONFLICT"
+
+
 def test_quarantine_duplicate_race_recovers_only_matching_committed_log(
     db_session, client, make_item, monkeypatch
 ):
@@ -707,6 +735,367 @@ def test_unquarantine_partially_updates_only_the_selected_record(
         .one()
     )
     assert str(log.defect_quarantine_record_id) == selected["record_id"]
+
+
+def test_unquarantine_exact_retry_after_full_restore_is_idempotent(
+    db_session, client, make_item
+):
+    item = make_item(name="R002-RESTORE-IDEM", warehouse_qty=Decimal("10"))
+    actor = _make_employee(db_session, code="E02-RESTORE-I", name="복귀 재시도 작업자")
+    db_session.commit()
+    quarantined = client.post(
+        "/api/defects/quarantine",
+        json={
+            "item_id": str(item.item_id),
+            "qty": "2",
+            "source": "warehouse",
+            "target_dept": DepartmentEnum.WAREHOUSE.value,
+            "reason_memo": "복귀 재시도 대상",
+            "actor_employee_id": str(actor.employee_id),
+        },
+    )
+    assert quarantined.status_code == 200, quarantined.json()
+    record = (
+        db_session.query(DefectQuarantineRecord)
+        .filter(DefectQuarantineRecord.item_id == item.item_id)
+        .one()
+    )
+    payload = {
+        "record_id": str(record.record_id),
+        "item_id": str(item.item_id),
+        "qty": "2",
+        "dept": DepartmentEnum.WAREHOUSE.value,
+        "reason_category": "검사통과",
+        "reason_memo": "응답 유실 재시도",
+        "actor_employee_id": str(actor.employee_id),
+        "client_request_id": "restore-exact-retry",
+    }
+
+    first = client.post("/api/defects/unquarantine", json=payload)
+    second = client.post("/api/defects/unquarantine", json=payload)
+
+    assert first.status_code == 200, first.json()
+    assert second.status_code == 200, second.json()
+    db_session.expire_all()
+    assert record.remaining_quantity == Decimal("0")
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.quantity == Decimal("10")
+    assert inventory.warehouse_qty == Decimal("8")
+    restored = db_session.query(InventoryLocation).filter(
+        InventoryLocation.item_id == item.item_id,
+        InventoryLocation.department == DepartmentEnum.WAREHOUSE.value,
+        InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+    ).one()
+    assert restored.quantity == Decimal("2")
+    logs = (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.client_request_id == payload["client_request_id"])
+        .all()
+    )
+    assert len(logs) == 1
+    assert logs[0].transaction_type == TransactionTypeEnum.UNMARK_DEFECTIVE
+
+
+def test_unquarantine_exact_retry_preserves_automatic_record_selection(
+    db_session, client, make_item
+):
+    item = make_item(name="R002-RESTORE-AUTO-IDEM", warehouse_qty=Decimal("10"))
+    actor = _make_employee(db_session, code="E02-RESTORE-AUTO", name="자동 기록 복귀 작업자")
+    db_session.commit()
+    assert client.post(
+        "/api/defects/quarantine",
+        json={
+            "item_id": str(item.item_id), "qty": "2", "source": "warehouse",
+            "target_dept": DepartmentEnum.WAREHOUSE.value,
+            "reason_memo": "자동 기록 복귀 대상", "actor_employee_id": str(actor.employee_id),
+        },
+    ).status_code == 200
+    payload = {
+        "item_id": str(item.item_id), "qty": "2",
+        "dept": DepartmentEnum.WAREHOUSE.value, "reason_category": "검사통과",
+        "reason_memo": "자동 기록 재시도", "actor_employee_id": str(actor.employee_id),
+        "client_request_id": "restore-auto-exact-retry",
+    }
+
+    first = client.post("/api/defects/unquarantine", json=payload)
+    second = client.post("/api/defects/unquarantine", json=payload)
+
+    assert first.status_code == 200, first.json()
+    assert second.status_code == 200, second.json()
+    log = db_session.query(TransactionLog).filter(
+        TransactionLog.client_request_id == payload["client_request_id"],
+    ).one()
+    assert log.reference_no == "defect-restore-record:auto"
+    explicit_retry = client.post(
+        "/api/defects/unquarantine",
+        json={**payload, "record_id": str(log.defect_quarantine_record_id)},
+    )
+    assert explicit_retry.status_code == 409
+
+
+@pytest.mark.parametrize(
+    ("field", "changed"),
+    [
+        ("qty", "1"),
+        ("dept", DepartmentEnum.ASSEMBLY.value),
+        ("reason_category", "기타"),
+        ("reason_memo", "다른 메모"),
+    ],
+)
+def test_unquarantine_retry_key_rejects_changed_command(
+    db_session, client, make_item, field, changed
+):
+    item = make_item(name=f"R002-RESTORE-CONFLICT-{field}", warehouse_qty=Decimal("10"))
+    actor = _make_employee(db_session, code=f"E02-RC-{field[:5]}", name="복귀 충돌 작업자")
+    db_session.commit()
+    assert client.post(
+        "/api/defects/quarantine",
+        json={
+            "item_id": str(item.item_id), "qty": "2", "source": "warehouse",
+            "target_dept": DepartmentEnum.WAREHOUSE.value,
+            "reason_memo": "복귀 충돌 대상", "actor_employee_id": str(actor.employee_id),
+        },
+    ).status_code == 200
+    record = db_session.query(DefectQuarantineRecord).filter(
+        DefectQuarantineRecord.item_id == item.item_id,
+    ).one()
+    payload = {
+        "record_id": str(record.record_id), "item_id": str(item.item_id), "qty": "2",
+        "dept": DepartmentEnum.WAREHOUSE.value, "reason_category": "검사통과",
+        "reason_memo": "원본 메모", "actor_employee_id": str(actor.employee_id),
+        "client_request_id": f"restore-conflict-{field}",
+    }
+    assert client.post("/api/defects/unquarantine", json=payload).status_code == 200
+
+    changed_payload = {**payload, field: changed}
+    retry = client.post("/api/defects/unquarantine", json=changed_payload)
+
+    assert retry.status_code == 409
+    assert retry.json()["detail"]["code"] == "CONFLICT"
+
+
+def test_unquarantine_retry_key_rejects_changed_identity(
+    db_session, client, make_item
+):
+    item = make_item(name="R002-RESTORE-CONFLICT-IDENTITY", warehouse_qty=Decimal("10"))
+    other_item = make_item(name="R002-RESTORE-OTHER-ITEM", warehouse_qty=Decimal("1"))
+    actor = _make_employee(db_session, code="E02-RC-ID", name="복귀 원본 작업자")
+    other_actor = _make_employee(db_session, code="E02-RC-OTHER", name="복귀 다른 작업자")
+    db_session.commit()
+    assert client.post(
+        "/api/defects/quarantine",
+        json={
+            "item_id": str(item.item_id), "qty": "2", "source": "warehouse",
+            "target_dept": DepartmentEnum.WAREHOUSE.value,
+            "reason_memo": "복귀 식별자 충돌 대상",
+            "actor_employee_id": str(actor.employee_id),
+        },
+    ).status_code == 200
+    record = db_session.query(DefectQuarantineRecord).filter(
+        DefectQuarantineRecord.item_id == item.item_id,
+    ).one()
+    payload = {
+        "record_id": str(record.record_id), "item_id": str(item.item_id), "qty": "2",
+        "dept": DepartmentEnum.WAREHOUSE.value, "reason_category": "검사통과",
+        "reason_memo": "원본 메모", "actor_employee_id": str(actor.employee_id),
+        "client_request_id": "restore-conflict-identity",
+    }
+    assert client.post("/api/defects/unquarantine", json=payload).status_code == 200
+
+    for changed in (
+        {"item_id": str(other_item.item_id)},
+        {"record_id": str(uuid.uuid4())},
+        {"record_id": None},
+        {"actor_employee_id": str(other_actor.employee_id)},
+    ):
+        retry = client.post("/api/defects/unquarantine", json={**payload, **changed})
+        assert retry.status_code == 409
+        assert retry.json()["detail"]["code"] == "CONFLICT"
+
+
+def test_unquarantine_duplicate_race_recovers_matching_committed_log(
+    db_session, client, make_item, monkeypatch
+):
+    from sqlalchemy import event
+    from sqlalchemy.orm import sessionmaker
+    from app.routers import defects as defects_router
+
+    item = make_item(name="R002-RESTORE-IDEM-RACE", warehouse_qty=Decimal("10"))
+    actor = _make_employee(db_session, code="E02-RESTORE-RACE", name="복귀 경합 작업자")
+    db_session.add(
+        SystemSetting(
+            setting_key="inventory_operation_cutover_at",
+            setting_value="2026-01-01T00:00:00",
+        )
+    )
+    db_session.commit()
+    quarantined = client.post(
+        "/api/defects/quarantine",
+        json={
+            "item_id": str(item.item_id), "qty": "2", "source": "warehouse",
+            "target_dept": DepartmentEnum.WAREHOUSE.value,
+            "reason_memo": "복귀 경합 대상", "actor_employee_id": str(actor.employee_id),
+        },
+    )
+    assert quarantined.status_code == 200, quarantined.json()
+    record = db_session.query(DefectQuarantineRecord).filter(
+        DefectQuarantineRecord.item_id == item.item_id,
+    ).one()
+    item_id = item.item_id
+    record_id = record.record_id
+    actor_employee_id = actor.employee_id
+    request_id = "restore-idem-matching-race"
+    db_session.commit()
+
+    original_action = defects_router.defect_actions_svc.unquarantine_inventory
+    session_factory = sessionmaker(
+        autocommit=False,
+        autoflush=False,
+        bind=db_session.get_bind(),
+        join_transaction_mode="create_savepoint",
+    )
+    winner_session = session_factory()
+    winner_session_identity = id(winner_session)
+    try:
+        winner_actor = winner_session.get(Employee, actor_employee_id)
+        original_action(
+            winner_session,
+            record_id=record_id,
+            item_id=item_id,
+            qty=Decimal("2"),
+            dept=DepartmentEnum.WAREHOUSE,
+            actor=winner_actor,
+            reason_category="검사통과",
+            reason_memo="경합 재시도",
+            client_request_id=request_id,
+        )
+    finally:
+        winner_session.close()
+
+    transaction_events = {"commit": 0, "rollback": 0}
+    rollback_calls = 0
+    find_calls = 0
+    real_rollback = db_session.rollback
+    real_find = defects_router._find_client_request_log
+
+    def record_commit(_session):
+        transaction_events["commit"] += 1
+
+    def record_rollback(_session):
+        transaction_events["rollback"] += 1
+
+    def count_rollback():
+        nonlocal rollback_calls
+        rollback_calls += 1
+        return real_rollback()
+
+    def simulate_precheck_snapshot_then_read_winner(db, client_request_id):
+        nonlocal find_calls
+        find_calls += 1
+        assert db is db_session
+        assert id(db) != winner_session_identity
+        if find_calls == 1:
+            return None
+        assert transaction_events == {"commit": 0, "rollback": 1}
+        assert rollback_calls == 1
+        assert db.is_active
+        return real_find(db, client_request_id)
+
+    event.listen(db_session, "after_commit", record_commit)
+    event.listen(db_session, "after_rollback", record_rollback)
+    monkeypatch.setattr(db_session, "rollback", count_rollback)
+    monkeypatch.setattr(
+        defects_router,
+        "_find_client_request_log",
+        simulate_precheck_snapshot_then_read_winner,
+    )
+    try:
+        response = client.post(
+            "/api/defects/unquarantine",
+            json={
+                "record_id": str(record_id), "item_id": str(item_id), "qty": "2",
+                "dept": DepartmentEnum.WAREHOUSE.value, "reason_category": "검사통과",
+                "reason_memo": "경합 재시도", "actor_employee_id": str(actor_employee_id),
+                "client_request_id": request_id,
+            },
+        )
+    finally:
+        event.remove(db_session, "after_commit", record_commit)
+        event.remove(db_session, "after_rollback", record_rollback)
+
+    assert response.status_code == 200, response.json()
+    assert transaction_events == {"commit": 0, "rollback": 1}
+    assert rollback_calls == 1
+    assert find_calls == 2
+
+    verify_session = session_factory()
+    try:
+        refreshed_record = verify_session.get(DefectQuarantineRecord, record_id)
+        restored = verify_session.query(InventoryLocation).filter(
+            InventoryLocation.item_id == item_id,
+            InventoryLocation.department == DepartmentEnum.WAREHOUSE.value,
+            InventoryLocation.status == LocationStatusEnum.PRODUCTION,
+        ).one()
+        logs = verify_session.query(TransactionLog).filter(
+            TransactionLog.client_request_id == request_id,
+        ).all()
+        assert refreshed_record.remaining_quantity == Decimal("0")
+        assert restored.quantity == Decimal("2")
+        assert len(logs) == 1
+    finally:
+        verify_session.close()
+
+
+def test_unquarantine_stale_precheck_returns_conflict_for_changed_retry(
+    db_session, client, make_item, monkeypatch
+):
+    from app.routers import defects as defects_router
+
+    item = make_item(name="R002-RESTORE-STALE-CONFLICT", warehouse_qty=Decimal("10"))
+    actor = _make_employee(db_session, code="E02-RESTORE-STALE", name="복귀 stale 작업자")
+    db_session.commit()
+    assert client.post(
+        "/api/defects/quarantine",
+        json={
+            "item_id": str(item.item_id), "qty": "2", "source": "warehouse",
+            "target_dept": DepartmentEnum.WAREHOUSE.value,
+            "reason_memo": "stale 충돌 대상", "actor_employee_id": str(actor.employee_id),
+        },
+    ).status_code == 200
+    record = db_session.query(DefectQuarantineRecord).filter(
+        DefectQuarantineRecord.item_id == item.item_id,
+    ).one()
+    payload = {
+        "record_id": str(record.record_id), "item_id": str(item.item_id), "qty": "2",
+        "dept": DepartmentEnum.WAREHOUSE.value, "reason_category": "검사통과",
+        "reason_memo": "stale 원본", "actor_employee_id": str(actor.employee_id),
+        "client_request_id": "restore-stale-changed-retry",
+    }
+    assert client.post("/api/defects/unquarantine", json=payload).status_code == 200
+
+    real_find = defects_router._find_client_request_log
+    find_calls = 0
+
+    def miss_precheck_then_find_winner(db, client_request_id):
+        nonlocal find_calls
+        find_calls += 1
+        if find_calls == 1:
+            return None
+        return real_find(db, client_request_id)
+
+    monkeypatch.setattr(
+        defects_router,
+        "_find_client_request_log",
+        miss_precheck_then_find_winner,
+    )
+    response = client.post(
+        "/api/defects/unquarantine",
+        json={**payload, "qty": "1"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "CONFLICT"
+    assert find_calls == 2
 
 
 def test_bulk_unquarantine_restores_selected_records_with_shared_reason(

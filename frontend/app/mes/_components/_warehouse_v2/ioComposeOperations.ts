@@ -6,11 +6,12 @@ import {
   type DependencyList,
   type MutableRefObject,
 } from "react";
-import type { IoSubmitResponse, Item } from "@/lib/api";
+import type { IoDraftPayload, IoSubmitResponse, Item } from "@/lib/api";
 import { ApiError } from "@/lib/api-core";
 import type { IoBundle } from "./types";
 import type { IoSubType, IoWorkType } from "./types";
 import { approvalKind, ioDepartmentPayload } from "./ioWorkType";
+import { matchesPendingIoRequest, PendingIoRequestError, type IoSubmitInput } from "./ioPendingRequest";
 import {
   buildInternalUseBomPreviewTarget,
   hasUnselectedInternalUseBomMode,
@@ -20,6 +21,7 @@ import {
 export interface IoOperationRefs {
   generation: MutableRefObject<number>;
   contentRevision: MutableRefObject<number>;
+  mounted?: MutableRefObject<boolean>;
 }
 
 type OperationVersion = readonly [generation: number, contentRevision: number];
@@ -35,6 +37,7 @@ export function useIoComposeOperationState(
   const refs: IoOperationRefs = {
     generation: useRef(0),
     contentRevision: useRef(0),
+    mounted: useRef(true),
   };
 
   useLayoutEffect(() => {
@@ -47,9 +50,13 @@ export function useIoComposeOperationState(
     refs.generation.current += 1;
   }, [refs.generation, restoredDraftId, restoreNonce]);
 
-  useEffect(() => () => {
-    refs.generation.current += 1;
-  }, [refs.generation]);
+  useEffect(() => {
+    refs.mounted!.current = true;
+    return () => {
+      refs.mounted!.current = false;
+      refs.generation.current += 1;
+    };
+  }, [refs.generation, refs.mounted]);
 
   function togglePull(lineId: string) {
     setPullSelected((previous) => {
@@ -217,7 +224,6 @@ async function submitComposition(
           ? "부서 결재 요청 완료"
           : "창고 결재 요청 완료"
       : "입출고 반영 완료";
-    if (draftIdRef.current === draftId) draftIdRef.current = null;
     return { response, title, submittedDraftId: draftId };
   } catch (error) {
     if (error instanceof ApiError && error.isUnavailable) {
@@ -308,19 +314,94 @@ export async function runCompositionSubmit(
       submit,
       submitExistingDraft,
     );
-    if (submittedDraftId) onDraftSubmitted?.(submittedDraftId);
-    setResult({ kind: "success", title, message: response.message });
-    reset();
-    resetFilters();
+    const currentOperation = !operationRefs
+      || !operationVersion
+      || isCurrentIoOperation(operationRefs, operationVersion);
+    if (submittedDraftId) {
+      onDraftSubmitted?.(submittedDraftId);
+      if (draftIdRef.current === submittedDraftId) draftIdRef.current = null;
+    }
+    setResult({
+      kind: "success",
+      title,
+      message: `${response.message}${currentOperation ? "" : "\n현재 입력은 보존했습니다. 내용을 확인한 뒤 별도로 제출하세요."}`,
+    });
+    if (currentOperation) {
+      reset();
+      resetFilters();
+    }
     onStatusChange(response.message);
     try {
       setItems(await refreshItems());
     } catch {
       // 제출은 성공했으므로 후속 목록 갱신 실패는 무시한다.
     }
-    onSubmitSuccess?.();
+    if (currentOperation) onSubmitSuccess?.();
   } catch (error) {
     const message = error instanceof Error ? error.message : "제출 중 오류가 발생했습니다.";
-    setResult({ kind: "error", title: "제출 실패", message });
+    setResult({ kind: "error", title: error instanceof PendingIoRequestError ? "처리 결과 확인 필요" : "제출 실패", message });
+  }
+}
+
+/** 원 요청 결과를 확인하되 다른 작성 내용에는 완료·초기화를 적용하지 않는다. */
+export async function recoverCompositionSubmit(options: {
+  recover: () => Promise<{
+    request: IoDraftPayload | null;
+    draftBatchId?: string;
+    response: IoSubmitResponse;
+  } | null>;
+  getCurrentInput: () => IoSubmitInput;
+  operationRefs: IoOperationRefs;
+  setResult: (result: { kind: "success" | "error"; title: string; message: string }) => void;
+  reset: () => void;
+  resetFilters: () => void;
+  onStatusChange: (message: string) => void;
+  refreshItems: () => Promise<Item[]>;
+  setItems: (items: Item[]) => void;
+  onSubmitSuccess?: () => void;
+  onDraftSubmitted?: (draftId: string) => void;
+}): Promise<void> {
+  const generation = options.operationRefs.generation.current;
+  try {
+    const recovered = await options.recover();
+    if (!recovered || options.operationRefs.mounted?.current === false) return;
+    const expectedDraftId = recovered.request?.batch_id ?? recovered.draftBatchId;
+    if (expectedDraftId && recovered.response.batch?.batch_id !== expectedDraftId) {
+      options.setResult({
+        kind: "error",
+        title: "이전 요청 확인 실패",
+        message: "이전 다른 임시저장 요청이 완료되었습니다. 현재 작업은 보존했으니 다시 제출하세요.",
+      });
+      options.onStatusChange(recovered.response.message);
+      return;
+    }
+    const sameInput = recovered.request && options.operationRefs.generation.current === generation
+      ? matchesPendingIoRequest(recovered.request, options.getCurrentInput())
+      : false;
+    if (expectedDraftId) options.onDraftSubmitted?.(expectedDraftId);
+    options.setResult({
+      kind: "success",
+      title: recovered.response.requires_approval ? "이전 결재 요청 완료" : "이전 요청 완료",
+      message: `${recovered.response.message}${sameInput ? "" : "\n현재 입력은 보존했습니다. 내용을 확인한 뒤 별도로 제출하세요."}`,
+    });
+    if (sameInput) {
+      options.reset();
+      options.resetFilters();
+      options.onSubmitSuccess?.();
+    }
+    options.onStatusChange(recovered.response.message);
+    try {
+      const items = await options.refreshItems();
+      if (options.operationRefs.generation.current === generation) options.setItems(items);
+    } catch {
+      // 원 요청은 확인됐으므로 목록 조회 실패가 업무 실패로 바뀌어서는 안 된다.
+    }
+  } catch (error) {
+    if (options.operationRefs.mounted?.current === false) return;
+    options.setResult({
+      kind: "error",
+      title: error instanceof PendingIoRequestError ? "처리 결과 확인 필요" : "이전 요청 확인 실패",
+      message: error instanceof Error ? error.message : "이전 요청 결과를 확인하지 못했습니다.",
+    });
   }
 }

@@ -1,8 +1,11 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { useEffect, useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppNotification } from "@/lib/api/types";
 
 const setAuditScreen = vi.hoisted(() => vi.fn());
+const flushWarehouseDraft = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+const warehouseMounts = vi.hoisted(() => ({ count: 0 }));
 
 const state = vi.hoisted(() => ({
   notifications: {
@@ -67,7 +70,31 @@ vi.mock("../screens", () => ({
       <output data-testid="capacity-immediate">{capacityData?.immediate ?? "none"}</output>
     </>
   ),
-  MobileWarehouseScreen: () => <div>warehouse screen</div>,
+  MobileWarehouseScreen: ({
+    onComposeDirtyChange,
+    flushDraftRef,
+  }: {
+    onComposeDirtyChange?: (dirty: boolean) => void;
+    flushDraftRef?: { current: (() => Promise<void>) | null };
+  }) => {
+    const [mountId] = useState(() => ++warehouseMounts.count);
+    useEffect(() => {
+      if (!flushDraftRef) return;
+      flushDraftRef.current = flushWarehouseDraft;
+      return () => {
+        flushDraftRef.current = null;
+      };
+    }, [flushDraftRef]);
+    return (
+      <>
+        <div>warehouse screen</div>
+        <output data-testid="warehouse-mount">{mountId}</output>
+        <button type="button" onClick={() => onComposeDirtyChange?.(true)}>
+          mark warehouse dirty
+        </button>
+      </>
+    );
+  },
   MobileDefectScreen: () => <div data-testid="defect-screen-state">{window.history.state?.defect ?? "none"}</div>,
   MobileHistoryScreen: () => <div>history screen</div>,
   MobileWeeklyScreen: ({ onExit }: { onExit?: () => void }) => (
@@ -134,6 +161,8 @@ describe("MobileShell layout", () => {
     state.notifications = { items: [], unread_count: 0 };
     state.operator.hidden_sidebar_tabs = [];
     state.revision = null;
+    warehouseMounts.count = 0;
+    flushWarehouseDraft.mockReset().mockResolvedValue(undefined);
     vi.mocked(sendClientEvent).mockClear();
     setAuditScreen.mockClear();
   });
@@ -242,6 +271,57 @@ describe("MobileShell layout", () => {
 
     expect(window.history.state).toEqual({ defect: "hub" });
     expect(screen.getByTestId("defect-screen-state")).toHaveTextContent("hub");
+  });
+
+  it("resets a clean active warehouse tab and removes stale compose URL state", () => {
+    window.history.replaceState({}, "", "/mes?tab=warehouse&section=compose&step=4&draftId=draft-1");
+    render(<MobileShell />);
+
+    expect(screen.getByTestId("warehouse-mount")).toHaveTextContent("1");
+    fireEvent.click(screen.getByRole("button", { name: "입출고" }));
+
+    expect(window.location.search).toBe("?tab=warehouse");
+    expect(screen.getByTestId("warehouse-mount")).toHaveTextContent("2");
+  });
+
+  it("keeps a dirty active warehouse tab and its URL when same-tab reset is cancelled", () => {
+    window.history.replaceState({}, "", "/mes?tab=warehouse&section=compose&step=4&draftId=draft-1");
+    render(<MobileShell />);
+    fireEvent.click(screen.getByRole("button", { name: "mark warehouse dirty" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "입출고" }));
+
+    expect(screen.getByRole("dialog", { name: "작성 중 이동 확인" })).toBeInTheDocument();
+    expect(window.location.search).toBe("?tab=warehouse&section=compose&step=4&draftId=draft-1");
+    expect(screen.getByTestId("warehouse-mount")).toHaveTextContent("1");
+
+    fireEvent.click(screen.getByRole("button", { name: "계속 작성" }));
+
+    expect(screen.queryByRole("dialog", { name: "작성 중 이동 확인" })).not.toBeInTheDocument();
+    expect(window.location.search).toBe("?tab=warehouse&section=compose&step=4&draftId=draft-1");
+    expect(screen.getByTestId("warehouse-mount")).toHaveTextContent("1");
+  });
+
+  it("flushes and resets a dirty active warehouse tab after same-tab confirmation", async () => {
+    const draftSave = deferred<void>();
+    flushWarehouseDraft.mockReturnValueOnce(draftSave.promise);
+    window.history.replaceState({}, "", "/mes?tab=warehouse&section=compose&step=4&draftId=draft-1");
+    render(<MobileShell />);
+    fireEvent.click(screen.getByRole("button", { name: "mark warehouse dirty" }));
+    fireEvent.click(screen.getByRole("button", { name: "입출고" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "임시저장하고 이동" }));
+
+    await vi.waitFor(() => expect(flushWarehouseDraft).toHaveBeenCalledTimes(1));
+    expect(window.location.search).toBe("?tab=warehouse&section=compose&step=4&draftId=draft-1");
+    expect(screen.getByTestId("warehouse-mount")).toHaveTextContent("1");
+
+    await act(async () => draftSave.resolve(undefined));
+    await vi.waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "작성 중 이동 확인" })).not.toBeInTheDocument();
+    });
+    expect(window.location.search).toBe("?tab=warehouse");
+    expect(screen.getByTestId("warehouse-mount")).toHaveTextContent("2");
   });
 
   it("refreshes capacity on a realtime revision without leaving the active tab", async () => {

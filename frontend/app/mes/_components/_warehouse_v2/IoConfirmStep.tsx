@@ -51,6 +51,7 @@ interface Props {
   onNotesChange: (value: string) => void;
   onValidationError?: (message: string) => void;
   onSubmit: () => void;
+  submissionBlocked?: boolean;
   onSaveDraft: () => void;
   submitButtonRef?: RefObject<HTMLButtonElement | null>;
 }
@@ -188,6 +189,7 @@ export function IoConfirmStep({
   onNotesChange,
   onValidationError,
   onSubmit,
+  submissionBlocked = false,
   onSaveDraft,
   submitButtonRef,
 }: Props) {
@@ -250,7 +252,7 @@ export function IoConfirmStep({
     subType === "internal_use_out" && hasUnselectedInternalUseBomMode(bundles);
 
   const submitDisabled =
-    submitting || saving ||
+    submitting || saving || submissionBlocked ||
     (effectIncludedLines.length === 0 && !allowsNoEffectCustomBomApproval) ||
     hasShortage || hasInvalidQuantity || missingInternalUseBomMode;
   const saveDisabled = submitting || saving || bundles.length === 0;

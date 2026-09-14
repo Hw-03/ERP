@@ -1282,7 +1282,7 @@
         "type": "object"
       },
       "CapacityAfBlock": {
-        "description": "AF(조립 완제품) 기준 생산 가능 수량.\n\n재고 기준은 available(=warehouse+production-재고 요청 예약-활성 출하 예약)이며\n**계획/대응 수량 지표**다.\n생산 등록 가능성 검증(backflush, warehouse_available)이 아니다.\n\n주의: summary.ship_ready / fast_production / total_production 은 'AF별 독립 계산의 합계'다.\n여러 AF 가 같은 하위 자재를 공유하면 모든 AF 수량을 동시에 보장하지는 않는다.",
+        "description": "AF(조립 완제품) 기준 생산 가능 수량.\n\nship_ready는 출하 예약분을 포함하고 재고 요청 예약만 뺀 정상 재고다.\nfast_production과 total_production은\navailable(=warehouse+production-재고 요청 예약-활성 출하 예약) 기준이다.\n모두 **계획/대응 수량 지표**다.\n생산 등록 가능성 검증(backflush, warehouse_available)이 아니다.\n\n주의: summary.ship_ready / fast_production / total_production 은 'AF별 독립 계산의 합계'다.\n여러 AF 가 같은 하위 자재를 공유하면 모든 AF 수량을 동시에 보장하지는 않는다.",
         "properties": {
           "auto_representatives": {
             "description": "모델별 PF 후보 중 출하 대기+빠른 생산+총생산 합계가 가장 큰 자동 기준 PF. 동점은 총생산, 빠른 생산, 출하 대기, PF 코드, 품목 ID 순으로 결정.",
@@ -1461,7 +1461,7 @@
             "type": "integer"
           },
           "ship_ready": {
-            "description": "출하 대기 — 창고에 있는 완성 PF 재고 합계.",
+            "description": "출하 대기 — AF별 연결 PF 중 출하 예약분을 포함한 최대 정상 재고의 합계.",
             "title": "Ship Ready",
             "type": "integer"
           },
@@ -1547,7 +1547,7 @@
             "type": "string"
           },
           "ship_ready": {
-            "description": "출하 대기 — 이 PF 완성 재고.",
+            "description": "출하 대기 — 출하 예약분을 포함한 이 PF의 정상 재고.",
             "title": "Ship Ready",
             "type": "integer"
           },
@@ -12141,6 +12141,17 @@
             "format": "uuid",
             "title": "Actor Employee Id",
             "type": "string"
+          },
+          "client_request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Request Id"
           },
           "dept": {
             "title": "Dept",

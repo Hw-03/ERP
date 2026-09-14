@@ -22,6 +22,7 @@ import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
 import { DefectCategoryFilters } from "./DefectCategoryFilters";
 import type { DefectProcessStep } from "./DefectFilterBar";
+import { LoadFailureCard } from "../common/LoadFailureCard";
 
 interface Props {
   departmentOptions: string[];
@@ -238,16 +239,19 @@ export function DefectStatisticsView({
         onResetCategoryFilters={resetCategories}
       />
 
+      {error && (
+        <LoadFailureCard
+          prefix={result ? "최신 불량 통계를 동기화하지 못했습니다" : "불량 통계를 불러오지 못했습니다"}
+          message={error}
+          retryLabel="다시 시도"
+          onRetry={() => setRetryNonce((value) => value + 1)}
+          focusOnMount={!result}
+        />
+      )}
+
       {loading && !result ? (
         <div className="flex min-h-[240px] items-center justify-center rounded-[20px] border text-sm font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
           불량 통계 불러오는 중...
-        </div>
-      ) : error ? (
-        <div className="flex min-h-[220px] flex-col items-center justify-center gap-3 rounded-[20px] border px-4 text-center" style={{ background: tint(LEGACY_COLORS.red, 5), borderColor: tint(LEGACY_COLORS.red, 28) }}>
-          <p className="text-sm font-bold" style={{ color: LEGACY_COLORS.red }}>{error}</p>
-          <button type="button" onClick={() => setRetryNonce((value) => value + 1)} className="standard-hover min-h-11 rounded-[12px] border px-4 text-sm font-black" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}>
-            다시 시도
-          </button>
         </div>
       ) : result ? (
         <>

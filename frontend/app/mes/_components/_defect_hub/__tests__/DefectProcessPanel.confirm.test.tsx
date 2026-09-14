@@ -73,8 +73,36 @@ describe("DefectProcessPanel normal recovery", () => {
 
     await waitFor(() => expect(defectsApi.unquarantine).toHaveBeenCalledTimes(1));
     expect(defectsApi.unquarantine).toHaveBeenCalledWith(
-      expect.objectContaining({ record_id: "record-1", qty: 3 }),
+      expect.objectContaining({ record_id: "record-1", qty: 3, client_request_id: expect.any(String) }),
     );
     expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it("응답 유실 뒤 재시도해도 최초 정상 복귀 요청 ID와 payload를 보존한다", async () => {
+    vi.mocked(defectsApi.unquarantine)
+      .mockReset()
+      .mockRejectedValueOnce(new Error("연결 실패"))
+      .mockResolvedValueOnce(undefined);
+    const { container } = render(
+      <DefectProcessPanel
+        location={location}
+        currentEmployee={{ employee_id: "emp-1", name: "Kim", department: "Assembly" }}
+        onDone={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+
+    const submit = () => fireEvent.click(Array.from(container.querySelectorAll("button")).at(-1)!);
+    submit();
+    fireEvent.click(Array.from(screen.getByRole("dialog").querySelectorAll("button")).at(-1)!);
+    expect(await screen.findByText("연결 실패")).toBeInTheDocument();
+    const firstPayload = vi.mocked(defectsApi.unquarantine).mock.calls[0][0];
+
+    submit();
+    fireEvent.click(Array.from(screen.getByRole("dialog").querySelectorAll("button")).at(-1)!);
+
+    await waitFor(() => expect(defectsApi.unquarantine).toHaveBeenCalledTimes(2));
+    expect(firstPayload.client_request_id).toEqual(expect.any(String));
+    expect(vi.mocked(defectsApi.unquarantine).mock.calls[1][0]).toEqual(firstPayload);
   });
 });

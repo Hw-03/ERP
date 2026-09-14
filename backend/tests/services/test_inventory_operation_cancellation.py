@@ -26,6 +26,7 @@ from app.models import (
     ShippingAllocation,
     ShippingRequest,
     ShippingRequestStatusEnum,
+    StockRequest,
     SystemSetting,
     TransactionEditLog,
     TransactionLog,
@@ -123,6 +124,64 @@ def _reserve_shipping(db_session, item, quantity: int) -> None:
         )
     )
     db_session.commit()
+
+
+def test_restore_stock_request_approval_state_preserves_earlier_warehouse_approval() -> None:
+    warehouse_approved_at = datetime(2026, 8, 25, 2, 0)
+    completed_at = datetime(2026, 8, 25, 3, 0)
+    request = StockRequest(
+        requester_employee_id=uuid.uuid4(),
+        requester_name="요청자",
+        requester_department=DepartmentEnum.ASSEMBLY,
+        request_type="warehouse_to_dept",
+        status="completed",
+        requires_warehouse_approval=True,
+        requires_department_approval=True,
+        approved_by_employee_id=uuid.uuid4(),
+        approved_by_name="창고 승인자",
+        approved_at=warehouse_approved_at,
+        department_approved_by_employee_id=uuid.uuid4(),
+        department_approved_by_name="부서 승인자",
+        department_approved_at=completed_at,
+        completed_at=completed_at,
+    )
+    cancellation_svc._restore_stock_request_approval_state(request)
+
+    assert request.approved_by_employee_id is not None
+    assert request.approved_by_name == "창고 승인자"
+    assert request.approved_at == warehouse_approved_at
+    assert request.department_approved_by_employee_id is None
+    assert request.department_approved_by_name is None
+    assert request.department_approved_at is None
+
+
+def test_restore_stock_request_approval_state_clears_same_step_self_approvals() -> None:
+    completed_at = datetime(2026, 8, 25, 3, 0)
+    approver_id = uuid.uuid4()
+    request = StockRequest(
+        requester_employee_id=approver_id,
+        requester_name="자가 승인자",
+        requester_department=DepartmentEnum.ASSEMBLY,
+        request_type="warehouse_to_dept",
+        status="completed",
+        requires_warehouse_approval=True,
+        requires_department_approval=True,
+        approved_by_employee_id=approver_id,
+        approved_by_name="자가 승인자",
+        approved_at=completed_at,
+        department_approved_by_employee_id=approver_id,
+        department_approved_by_name="자가 승인자",
+        department_approved_at=completed_at,
+        completed_at=completed_at,
+    )
+    cancellation_svc._restore_stock_request_approval_state(request)
+
+    assert request.approved_by_employee_id is None
+    assert request.approved_by_name is None
+    assert request.approved_at is None
+    assert request.department_approved_by_employee_id is None
+    assert request.department_approved_by_name is None
+    assert request.department_approved_at is None
 
 
 def test_cancel_creates_separate_reversal_operation_and_opposite_log(
@@ -1055,3 +1114,42 @@ def test_handover_cancel_requires_exact_legacy_contract_and_closes_workflow(
     effects = db_session.query(InventoryOperationEffect).all()
     assert len(effects) == 2
     assert effects[1].reverses_effect_id == effects[0].effect_id
+
+
+@pytest.mark.parametrize(
+    ("requires_approval", "request_link", "expected"),
+    [(False, None, "cancelled"), (True, None, "submitted"),
+     (False, "batch", "submitted"), (False, "request", "submitted")],
+)
+def test_io_policy_requires_positive_evidence_of_immediate_work(
+    db_session, requires_approval: bool, request_link: str | None, expected: str,
+) -> None:
+    """승인 원장 효과가 빠져도 승인 배치를 즉시 작업으로 오판하지 않는다."""
+    from app.models import IoBatch
+
+    actor = _actor(db_session)
+    batch = IoBatch(
+        work_type="process", sub_type="produce", status="completed",
+        requester_employee_id=actor.employee_id, requester_name=actor.name,
+        requester_department=actor.department, requires_approval=requires_approval,
+    )
+    db_session.add(batch)
+    db_session.flush()
+    if request_link == "batch":
+        batch.stock_request_id = uuid.uuid4()
+    elif request_link == "request":
+        db_session.add(StockRequest(
+            requester_employee_id=actor.employee_id, requester_name=actor.name,
+            requester_department=actor.department, request_type="warehouse_to_dept",
+            status="reserved", operation_batch_id=batch.batch_id,
+        ))
+    db_session.flush()
+    effect = InventoryOperationEffect(
+        operation_id=uuid.uuid4(), subject_type="IoBatch", subject_id=batch.batch_id,
+        before_state={"status": "submitted"}, after_state={"status": "completed"},
+    )
+    target = cancellation_svc._policy_workflow_target(
+        db_session, effect,
+        cancellation_svc.CancelPolicy(domain="inventory_io", action="produce"),
+    )
+    assert target == {"status": expected}

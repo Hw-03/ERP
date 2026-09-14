@@ -827,7 +827,8 @@ describe("useIoWorkState 초기 상태", () => {
 
   it("초기 canAdvance: 1=true 2=true(receive) 3=false 4=false 5=true", () => {
     const { result } = renderHook(() => useIoWorkState());
-    expect(result.current.canAdvance).toEqual({ 1: true, 2: true, 3: false, 4: false, 5: true });
+    expect(result.current.hasSelectedWorkType).toBe(false);
+    expect(result.current.canAdvance).toEqual({ 1: false, 2: true, 3: false, 4: false, 5: true });
   });
 });
 
@@ -842,6 +843,8 @@ describe("useIoWorkState setWorkType", () => {
       result.current.goTo(3);
     });
     act(() => result.current.setWorkType("process"));
+    expect(result.current.hasSelectedWorkType).toBe(true);
+    expect(result.current.canAdvance[1]).toBe(true);
     expect(result.current.workType).toBe("process");
     expect(result.current.subType).toBe("produce");
     expect(result.current.deptIoDirection).toBeNull();
@@ -1306,6 +1309,8 @@ describe("useIoWorkState step/line 조작", () => {
     expect(result.current.step).toBe(1);
     expect(result.current.workType).toBe("warehouse_io"); // 보존
     expect(result.current.subType).toBe("warehouse_to_dept"); // 보존
+    expect(result.current.hasSelectedWorkType).toBe(false);
+    expect(result.current.canAdvance[1]).toBe(false);
   });
 });
 

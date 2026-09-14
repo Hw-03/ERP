@@ -326,6 +326,39 @@ describe("DefectCartFlow", () => {
     });
   });
 
+  it("격리 응답 유실 뒤 같은 줄을 재시도하면 최초 요청 ID와 payload를 그대로 보낸다", async () => {
+    vi.mocked(defectsApi.quarantine)
+      .mockRejectedValueOnce(new Error("연결 실패"))
+      .mockResolvedValueOnce(undefined);
+    const onDone = vi.fn();
+    render(
+      <DefectCartFlow
+        mode="add"
+        items={[rItem]}
+        productModels={productModels}
+        currentEmployee={employee}
+        onDone={onDone}
+        onCancel={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /다음/ }));
+    fireEvent.click(screen.getByRole("button", { name: /추가/ }));
+    fireEvent.change(screen.getByPlaceholderText(/예: 3/), { target: { value: "2" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /격리하기/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "격리하기" }));
+    expect(await screen.findByText("실패: 연결 실패")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /격리하기/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "격리하기" }));
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+
+    const [first, second] = vi.mocked(defectsApi.quarantine).mock.calls.map(([payload]) => payload);
+    expect(first.client_request_id).toEqual(expect.any(String));
+    expect(first.client_request_id).not.toBe("");
+    expect(second).toEqual(first);
+  });
+
   it("최종 격리 확인에 두 품목의 수량·관리 분류·자동 부서를 각각 표시한다", async () => {
     const tubeItem = { ...rItem, item_id: "confirm-tube", item_name: "확인 튜브", process_type_code: "TR" };
     render(

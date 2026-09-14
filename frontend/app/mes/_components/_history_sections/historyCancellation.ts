@@ -51,12 +51,21 @@ export type HistoryLoadReconcileState = {
   loadingLogs: TransactionLog[] | null;
 };
 
+export function isHistoryCancellationUpdate(log: TransactionLog): boolean {
+  return log.cancelled
+    || Boolean(log.reverses_log_id)
+    || log.operation_kind === "CANCELLATION"
+    || log.operation_effective_status === "cancellation";
+}
+
 /** 직접 변경 응답에 재계산 필드가 없으면 목록에서 받은 projection을 보존한다. */
 export function mergeHistoryLogUpdate(
   log: TransactionLog,
   updated: TransactionLog,
 ): TransactionLog {
-  if (log.log_id === updated.log_id) {
+  const isImmutableCancellation = isHistoryCancellationUpdate(updated)
+    && Boolean(updated.reverses_log_id);
+  if (log.log_id === updated.log_id && !isImmutableCancellation) {
     return updated.request_order_stock == null
       ? { ...updated, request_order_stock: log.request_order_stock }
       : updated;
@@ -64,11 +73,21 @@ export function mergeHistoryLogUpdate(
   return {
     ...log,
     cancelled: true,
-    cancel_reason: updated.cancel_reason,
-    cancelled_by: updated.cancelled_by,
-    cancelled_at: updated.cancelled_at,
-    operation_effective_status: updated.operation_effective_status ?? log.operation_effective_status,
-    reversal_operation_id: updated.reversal_operation_id ?? log.reversal_operation_id,
+    cancel_reason: updated.cancel_reason ?? updated.reason_memo ?? log.cancel_reason,
+    cancelled_by: updated.cancelled_by
+      ?? updated.requester_name
+      ?? updated.produced_by
+      ?? log.cancelled_by,
+    cancelled_at: updated.cancelled_at
+      ?? updated.requested_at
+      ?? updated.created_at
+      ?? log.cancelled_at,
+    operation_effective_status: isImmutableCancellation
+      ? "cancelled"
+      : updated.operation_effective_status ?? log.operation_effective_status,
+    reversal_operation_id: updated.reversal_operation_id
+      ?? (isImmutableCancellation ? updated.operation_id : null)
+      ?? log.reversal_operation_id,
   };
 }
 
@@ -79,9 +98,35 @@ type HistoryCancellationTarget =
   | { kind: "log"; logId: string };
 
 function getCancellationTarget(
+  state: HistoryStateSnapshot,
   updated: TransactionLog,
   fallbackOperationBatchId: string | null,
 ): HistoryCancellationTarget {
+  if (isHistoryCancellationUpdate(updated) && updated.reverses_log_id) {
+    const selectionLogs = state.selection?.kind === "batch"
+      ? state.selection.logs
+      : state.selection?.kind === "log"
+        ? [state.selection.log]
+        : [];
+    const original = [...state.logs, ...selectionLogs]
+      .find((log) => log.log_id === updated.reverses_log_id);
+    if (original?.operation_id) {
+      return { kind: "operation", operationId: original.operation_id };
+    }
+    if (original?.operation_batch_id) {
+      return { kind: "operation_batch", batchId: original.operation_batch_id };
+    }
+    if (original && isHistoryReferenceCancellationGroup(original) && original.reference_no) {
+      return { kind: "reference", referenceNo: original.reference_no };
+    }
+    if (original) {
+      return { kind: "log", logId: original.log_id };
+    }
+    if (fallbackOperationBatchId) {
+      return { kind: "operation_batch", batchId: fallbackOperationBatchId };
+    }
+    return { kind: "log", logId: updated.reverses_log_id };
+  }
   if (updated.operation_id) {
     return { kind: "operation", operationId: updated.operation_id };
   }
@@ -119,7 +164,7 @@ export function applyHistoryCancellation(
   const fallbackOperationBatchId = requestedBatchKey && state.batchCache.has(requestedBatchKey)
     ? requestedBatchKey
     : null;
-  const target = getCancellationTarget(updated, fallbackOperationBatchId);
+  const target = getCancellationTarget(state, updated, fallbackOperationBatchId);
   const patchLog = (log: TransactionLog) =>
     matchesCancellation(log, target)
       ? mergeHistoryLogUpdate(log, updated)

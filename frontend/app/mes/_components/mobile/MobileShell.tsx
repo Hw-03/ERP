@@ -221,6 +221,17 @@ export function MobileShell({
     setActiveTab(target);
   }, [activeTab]);
 
+  const resetActiveMobileTab = useCallback((target: MobileTabId) => {
+    if (target === "warehouse") {
+      window.history.pushState(null, "", `${window.location.pathname}?tab=warehouse`);
+    }
+    if (target === "defect") {
+      window.history.replaceState({ defect: "hub" }, "");
+      setDefectDeptFilter(null);
+    }
+    setRefreshNonce((n) => n + 1);
+  }, []);
+
   const canOpenMobileTab = useCallback((tab: MobileTabId) => {
     if (!operator) return true;
     if (tab === "more" || tab === "assemblyChecklist") return true;
@@ -250,21 +261,17 @@ export function MobileShell({
   const handleTabChange = useCallback((tab: MobileTabId) => {
     const target = canOpenMobileTab(tab) ? tab : fallbackTab;
     if (!canOpenMobileTab(target)) return;
-    if (target === activeTab) {
-      if (target === "defect") {
-        window.history.replaceState({ defect: "hub" }, "");
-        setDefectDeptFilter(null);
-      }
-      setRefreshNonce((n) => n + 1);
-      return;
-    }
-    // 항목 16 — 입출고 작성 중 다른 탭으로 이탈 시 확인 시트(PC 일관성). 확인 시 draft flush 후 전환.
+    // 항목 16 — 입출고 작성 중 탭 이동·같은 탭 초기화 시 확인 시트(PC 일관성). 확인 시 draft flush 후 전환.
     if ((activeTab === "warehouse" && warehouseDirty) || (activeTab === "dailyReport" && dailyReportDirty)) {
       setPendingNavTab(target);
       return;
     }
+    if (target === activeTab) {
+      resetActiveMobileTab(target);
+      return;
+    }
     commitMobileTab(target);
-  }, [activeTab, canOpenMobileTab, commitMobileTab, dailyReportDirty, fallbackTab, warehouseDirty]);
+  }, [activeTab, canOpenMobileTab, commitMobileTab, dailyReportDirty, fallbackTab, resetActiveMobileTab, warehouseDirty]);
 
   const handleNotificationNavigate = useCallback(({ tab, section, relatedRequestId }: NotificationNavigationTarget) => {
     if (!(VALID_TAB_IDS as string[]).includes(tab)) return;
@@ -526,7 +533,7 @@ export function MobileShell({
 
       {/* 항목 3-1 — 기존 하단 토스트 큐 제거(에러 포함 모든 메시지를 상단 헤더 칩으로 통일). */}
 
-      {/* 항목 16 — 입출고 작성 중 하단 네비 이탈 확인(draft 자동저장 flush 후 전환) */}
+      {/* 항목 16 — 입출고 작성 중 탭 이동·초기화 확인(draft 자동저장 flush 후 전환) */}
       <MobileDirtyLeaveSheet
         open={pendingNavTab !== null}
         onCancel={() => setPendingNavTab(null)}
@@ -538,12 +545,22 @@ export function MobileShell({
               return;
             }
           }
-          warehouseFlushRef.current?.(); // 700ms 디바운스 창의 마지막 변경까지 즉시 저장
+          if (activeTab === "warehouse") {
+            try {
+              await warehouseFlushRef.current?.(); // 700ms 디바운스 창의 마지막 변경까지 즉시 저장
+            } catch {
+              return;
+            }
+          }
           const next = pendingNavTab;
           setPendingNavTab(null);
           setWarehouseDirty(false);
           setDailyReportDirty(false);
-          if (next) commitMobileTab(canOpenMobileTab(next) ? next : fallbackTab);
+          if (next) {
+            const target = canOpenMobileTab(next) ? next : fallbackTab;
+            if (target === activeTab) resetActiveMobileTab(target);
+            else commitMobileTab(target);
+          }
         }}
         onDiscard={() => {
           // 항목 3-4 — 저장(flush) 없이 이동. 위저드는 언마운트되어 작성 내용이 폐기된다.
@@ -551,7 +568,11 @@ export function MobileShell({
           setPendingNavTab(null);
           setWarehouseDirty(false);
           setDailyReportDirty(false);
-          if (next) commitMobileTab(canOpenMobileTab(next) ? next : fallbackTab);
+          if (next) {
+            const target = canOpenMobileTab(next) ? next : fallbackTab;
+            if (target === activeTab) resetActiveMobileTab(target);
+            else commitMobileTab(target);
+          }
         }}
       />
 

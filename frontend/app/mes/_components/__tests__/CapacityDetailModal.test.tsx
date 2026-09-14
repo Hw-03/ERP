@@ -266,7 +266,7 @@ describe("CapacityDetailModal 데스크톱 요약과 PF BOM 상세", () => {
     const onClose = vi.fn();
     renderModal(capacityData, onClose);
 
-    expect(screen.getByText(/박스 포장까지 완료되어 픽업을 기다리는 재고/)).toBeInTheDocument();
+    expect(screen.getByText(/출하 예약된 픽업 대기분을 포함한 정상 재고/)).toBeInTheDocument();
     expect(screen.getByText(/테스트 완료 완제품과 포장 자재로 빠르게 포장 가능한 수량/)).toBeInTheDocument();
     const closeButton = screen.getAllByRole("button", { name: "닫기" })
       .find((button) => button.classList.contains("ml-auto"));

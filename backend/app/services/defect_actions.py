@@ -155,6 +155,11 @@ def quarantine_inventory(
     return inv
 
 
+def unquarantine_record_reference(record_id: Optional[uuid.UUID]) -> str:
+    """멱등 재시도에서 기록 자동 선택 여부까지 구분하는 요청 스냅샷을 만든다."""
+    return f"defect-restore-record:{record_id if record_id is not None else 'auto'}"
+
+
 def unquarantine_inventory(
     db: Session,
     *,
@@ -165,6 +170,7 @@ def unquarantine_inventory(
     actor: Employee,
     reason_category: Optional[str],
     reason_memo: Optional[str],
+    client_request_id: Optional[str] = None,
 ) -> Inventory:
     """정상 복귀와 원장 기록을 하나의 업무 트랜잭션으로 확정한다."""
     with transactional(db):
@@ -174,14 +180,6 @@ def unquarantine_inventory(
             include_boxes_for_item_ids=True,
             include_zones_for_item_ids=True,
         )
-        record = defect_records_svc._get_record_for_action(
-            db,
-            record_id=record_id,
-            item_id=item_id,
-            department=dept,
-        )
-        if record is not None:
-            defect_records_svc._ensure_available(db, record, qty)
         operation = operation_svc._create_business_operation(
             db,
             domain="defect",
@@ -191,7 +189,20 @@ def unquarantine_inventory(
             actor_employee_id=actor.employee_id,
             department=dept.value,
             reason=reason_memo,
+            idempotency_key=(
+                f"defect:restore:{client_request_id}"
+                if client_request_id
+                else None
+            ),
         )
+        record = defect_records_svc._get_record_for_action(
+            db,
+            record_id=record_id,
+            item_id=item_id,
+            department=dept,
+        )
+        if record is not None:
+            defect_records_svc._ensure_available(db, record, qty)
         inv = inventory_svc._get_or_create_inventory(db, item_id)
         qty_before = inv.quantity or Decimal("0")
         cells_before = inv_effect._snapshot_cells(db, item_id)
@@ -221,8 +232,14 @@ def unquarantine_inventory(
                 produced_by=actor.name,
                 producer_employee_id=actor.employee_id,
                 notes=f"정상 복귀: {dept.value}",
+                reference_no=(
+                    unquarantine_record_reference(record_id)
+                    if client_request_id
+                    else None
+                ),
                 reason_category=reason_category,
                 reason_memo=reason_memo or None,
+                client_request_id=client_request_id,
                 department=dept.value,
                 defect_quarantine_record_id=(record.record_id if record else None),
                 **inv_effect._capture_log_stock_snapshot(db, item_id, cells_before),

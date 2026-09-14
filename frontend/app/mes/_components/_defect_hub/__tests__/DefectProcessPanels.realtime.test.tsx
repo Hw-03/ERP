@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ComponentType } from "react";
 import type { DefectLocation } from "@/lib/api/types/defects";
@@ -107,10 +107,45 @@ describe.each(panels)("%s defect process panel realtime location updates", (_nam
         record_id: "record-1",
         item_id: "item-1",
         qty: 3,
+        client_request_id: expect.any(String),
         reason_category: REASON_CATEGORIES[0],
         reason_memo: "Unsaved memo",
       }));
     });
+  });
+
+  it("keeps the restore request ID when realtime quantity changes after an uncertain result", async () => {
+    apiMocks.unquarantine
+      .mockRejectedValueOnce(new Error("lost response"))
+      .mockResolvedValueOnce(undefined);
+    const props = { currentEmployee: employee, onDone: vi.fn(), onCancel: vi.fn() };
+    const { rerender } = render(<Panel {...props} location={location} />);
+
+    const submit = async () => {
+      const submitButtons = screen.getAllByRole("button", { name: /정상 복귀/ });
+      fireEvent.click(submitButtons[submitButtons.length - 1]);
+      const dialog = await screen.findByRole("dialog");
+      await act(async () => {
+        fireEvent.click(Array.from(dialog.querySelectorAll("button")).at(-1)!);
+      });
+    };
+
+    await submit();
+    await waitFor(() => expect(apiMocks.unquarantine).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText("lost response")).toBeInTheDocument();
+    const firstRequestId = apiMocks.unquarantine.mock.calls[0][0].client_request_id;
+
+    rerender(
+      <Panel
+        {...props}
+        location={{ ...location, quantity: 8, available_quantity: 8 }}
+      />,
+    );
+    await waitFor(() => expect(screen.getByRole("spinbutton")).toHaveValue(8));
+    await submit();
+
+    await waitFor(() => expect(apiMocks.unquarantine).toHaveBeenCalledTimes(2));
+    expect(apiMocks.unquarantine.mock.calls[1][0].client_request_id).toBe(firstRequestId);
   });
 
   it("preserves the decision draft when realtime quantity changes but effective parent quantity does not", async () => {

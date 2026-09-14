@@ -3,7 +3,7 @@
 // W5: Models 도메인 Commands sub-hook.
 // 책임: list-level mutation — add / delete / reorder + 추가 form state.
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { ProductModel } from "@/lib/api";
 import {
   useCreateModelMutation,
@@ -25,7 +25,8 @@ export type UseAdminModelsCommandsState = {
   modelAddSymbol: string;
   setModelAddSymbol: (v: string) => void;
   add: () => void;
-  delete: (slot: number) => void;
+  delete: (slot: number, onSuccess?: () => void) => void;
+  deletingSlot: number | null;
   reorder: (ordered: ProductModel[]) => void;
 };
 
@@ -38,6 +39,8 @@ export function useAdminModelsCommands({
 }: UseAdminModelsCommandsArgs): UseAdminModelsCommandsState {
   const [modelAddName, setModelAddName] = useState("");
   const [modelAddSymbol, setModelAddSymbol] = useState("");
+  const [deletingSlot, setDeletingSlot] = useState<number | null>(null);
+  const deletingSlotRef = useRef<number | null>(null);
 
   const createModelMutation = useCreateModelMutation();
   const deleteModelMutation = useDeleteModelMutation();
@@ -59,24 +62,29 @@ export function useAdminModelsCommands({
     );
   }
 
-  function deleteCmd(slot: number) {
+  function deleteCmd(slot: number, afterSuccess?: () => void) {
+    if (deletingSlotRef.current !== null) return;
     const model = productModels.find((m) => m.slot === slot);
     if (!model) return;
-    if (
-      !confirm(
-        `'${model.model_name}' 모델을 삭제하시겠습니까?\n이 모델을 사용하는 품목이 있으면 삭제되지 않습니다.`,
-      )
-    ) {
-      return;
-    }
+    deletingSlotRef.current = slot;
+    setDeletingSlot(slot);
+    const finishDelete = () => {
+      deletingSlotRef.current = null;
+      setDeletingSlot(null);
+    };
     deleteModelMutation.mutate(
       { slot, pin: adminPin },
       {
         onSuccess: () => {
           setProductModels((prev) => prev.filter((m) => m.slot !== slot));
           onStatusChange(`'${model.model_name}' 모델을 삭제했습니다.`);
+          finishDelete();
+          afterSuccess?.();
         },
-        onError: (err) => onError(err instanceof Error ? err.message : "삭제 실패"),
+        onError: (err) => {
+          finishDelete();
+          onError(err instanceof Error ? err.message : "삭제 실패");
+        },
       },
     );
   }
@@ -101,6 +109,7 @@ export function useAdminModelsCommands({
     setModelAddSymbol,
     add,
     delete: deleteCmd,
+    deletingSlot,
     reorder,
   };
 }

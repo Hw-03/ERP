@@ -1287,7 +1287,7 @@ def test_postgres_cross_route_same_key_race_has_one_owner() -> None:
         prefix="CROSS",
         warehouse_qty=Decimal("10"),
         department=DepartmentEnum.ASSEMBLY,
-        warehouse_role="none",
+        warehouse_role="primary",
     )
     start_barrier = Barrier(2)
 

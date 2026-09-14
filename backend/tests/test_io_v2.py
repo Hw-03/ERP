@@ -1776,7 +1776,7 @@ def test_io_preview_receive_does_not_expand_bom(client, db_session, make_item, m
     parent = make_item(name="Parent", warehouse_qty=Decimal("0"))
     child = make_item(name="Child", warehouse_qty=Decimal("0"))
     make_bom(parent.item_id, child.item_id, Decimal("2"))
-    requester = _make_employee(db_session)
+    requester = _make_employee(db_session, warehouse_role="primary")
     db_session.commit()
 
     res = client.post(
@@ -1891,7 +1891,7 @@ def test_io_submit_approval_uses_only_included_lines(client, db_session, make_it
 
 def test_io_submit_receive_is_immediate(client, db_session, make_item):
     item = make_item(name="Raw", warehouse_qty=Decimal("0"))
-    requester = _make_employee(db_session)
+    requester = _make_employee(db_session, warehouse_role="primary")
     db_session.commit()
 
     preview = client.post(
@@ -2164,7 +2164,7 @@ def test_io_submit_draft_endpoint_replays_without_duplicate_effects(
     from app.routers import io as io_router
 
     item = make_item(name="Raw Draft", warehouse_qty=Decimal("0"))
-    requester = _make_employee(db_session)
+    requester = _make_employee(db_session, warehouse_role="primary")
     db_session.commit()
 
     preview = client.post(
@@ -2259,7 +2259,9 @@ def test_io_submit_draft_replay_fails_closed_for_actor_content_and_legacy_state(
     client, db_session, make_item
 ):
     item = make_item(name="Scoped Draft", warehouse_qty=Decimal("0"))
-    requester = _make_employee(db_session, code="IO-DRAFT-SCOPE-1")
+    requester = _make_employee(
+        db_session, code="IO-DRAFT-SCOPE-1", warehouse_role="primary"
+    )
     other = _make_employee(db_session, code="IO-DRAFT-SCOPE-2")
     db_session.commit()
 
@@ -2600,7 +2602,7 @@ def test_io_submit_mixed_code_departments_keeps_one_batch_and_request(
 def test_io_submit_idempotent_with_client_request_id(client, db_session, make_item):
     """같은 client_request_id로 두 번 submit 시 같은 batch 멱등 반환, 재고 한 번만 차감."""
     item = make_item(name="Idem Raw", warehouse_qty=Decimal("0"))
-    requester = _make_employee(db_session)
+    requester = _make_employee(db_session, warehouse_role="primary")
     db_session.commit()
 
     preview = client.post(
@@ -2692,7 +2694,9 @@ def test_io_submit_same_key_changed_payload_conflicts_without_mutation(
     client, db_session, make_item
 ):
     item = make_item(name="Semantic Idem Raw", warehouse_qty=Decimal("0"))
-    requester = _make_employee(db_session, code="IO-IDEM-CHANGED")
+    requester = _make_employee(
+        db_session, code="IO-IDEM-CHANGED", warehouse_role="primary"
+    )
     db_session.commit()
     preview = client.post(
         "/api/io/preview",
@@ -2743,7 +2747,9 @@ def test_io_submit_legacy_null_fingerprint_conflicts_without_mutation(
     client, db_session, make_item
 ):
     item = make_item(name="Legacy Idem Raw", warehouse_qty=Decimal("0"))
-    requester = _make_employee(db_session, code="IO-IDEM-LEGACY")
+    requester = _make_employee(
+        db_session, code="IO-IDEM-LEGACY", warehouse_role="primary"
+    )
     db_session.commit()
     preview = client.post(
         "/api/io/preview",
@@ -2787,8 +2793,12 @@ def test_io_submit_same_key_other_actor_and_route_conflict_without_mutation(
     client, db_session, make_item
 ):
     item = make_item(name="Scoped Idem Raw", warehouse_qty=Decimal("0"))
-    requester = _make_employee(db_session, code="IO-IDEM-SCOPE-1")
-    other = _make_employee(db_session, code="IO-IDEM-SCOPE-2")
+    requester = _make_employee(
+        db_session, code="IO-IDEM-SCOPE-1", warehouse_role="primary"
+    )
+    other = _make_employee(
+        db_session, code="IO-IDEM-SCOPE-2", warehouse_role="primary"
+    )
     db_session.commit()
     preview = client.post(
         "/api/io/preview",
@@ -4689,7 +4699,7 @@ def test_io_submit_adjust_out_blocks_on_shortage(
 def test_io_submit_without_client_request_id_skips_idempotency(client, db_session, make_item):
     """client_request_id 미전송 시 매번 신규 batch 생성 — 기존 클라이언트 호환성 보장."""
     item = make_item(name="No Idem Raw", warehouse_qty=Decimal("0"))
-    requester = _make_employee(db_session)
+    requester = _make_employee(db_session, warehouse_role="primary")
     db_session.commit()
 
     def _fresh_payload():
@@ -4802,6 +4812,7 @@ def test_io_write_rejects_fractional_quantity_without_persisting(
     requester = _make_employee(
         db_session,
         code=f"IO-FRAC-{method.upper()}-{fractional_field.upper()}",
+        warehouse_role="primary",
     )
     db_session.commit()
     bundles = _preview_receive_bundles(client, requester, item, qty="1")
@@ -4950,7 +4961,7 @@ def test_io_draft_save_stacks_new_slots(client, db_session, make_item):
     """batch_id 없이 저장하면 같은 (work_type, sub_type)라도 새 슬롯이 누적된다."""
     item_a = make_item(name="Draft A", warehouse_qty=Decimal("0"))
     item_b = make_item(name="Draft B", warehouse_qty=Decimal("0"))
-    requester = _make_employee(db_session)
+    requester = _make_employee(db_session, warehouse_role="primary")
     db_session.commit()
 
     r1 = _put_receive_draft(client, requester, _preview_receive_bundles(client, requester, item_a))
@@ -4968,7 +4979,7 @@ def test_io_draft_save_stacks_new_slots(client, db_session, make_item):
 def test_io_draft_save_with_batch_id_updates_in_place(client, db_session, make_item):
     """batch_id를 실어 보내면 해당 draft만 갱신되고 슬롯 수는 늘지 않는다."""
     item = make_item(name="Draft Inplace", warehouse_qty=Decimal("0"))
-    requester = _make_employee(db_session)
+    requester = _make_employee(db_session, warehouse_role="primary")
     db_session.commit()
 
     bundles = _preview_receive_bundles(client, requester, item)
@@ -4990,8 +5001,12 @@ def test_io_draft_save_with_batch_id_updates_in_place(client, db_session, make_i
 def test_io_draft_update_others_batch_forbidden(client, db_session, make_item):
     """타인의 draft batch_id로 갱신 시도 시 403."""
     item = make_item(name="Draft Owner", warehouse_qty=Decimal("0"))
-    owner = _make_employee(db_session, code="OWN1", name="Owner")
-    other = _make_employee(db_session, code="OTH1", name="Other")
+    owner = _make_employee(
+        db_session, code="OWN1", name="Owner", warehouse_role="primary"
+    )
+    other = _make_employee(
+        db_session, code="OTH1", name="Other", warehouse_role="primary"
+    )
     db_session.commit()
 
     first = _put_receive_draft(client, owner, _preview_receive_bundles(client, owner, item))
@@ -5006,7 +5021,7 @@ def test_io_draft_update_others_batch_forbidden(client, db_session, make_item):
 def test_io_draft_update_unknown_batch_unprocessable(client, db_session, make_item):
     """존재하지 않는 batch_id로 갱신 시도 시 422."""
     item = make_item(name="Draft Unknown", warehouse_qty=Decimal("0"))
-    requester = _make_employee(db_session)
+    requester = _make_employee(db_session, warehouse_role="primary")
     db_session.commit()
 
     res = _put_receive_draft(
@@ -5225,6 +5240,89 @@ def test_custom_produce_receipt_without_stock_keeps_inbound_on_retry(
     assert db_session.query(TransactionLog).one().quantity_change == Decimal("1")
     replay = client.post(url, **kwargs)
     assert replay.status_code == 201, replay.text
+    assert db_session.query(TransactionLog).count() == 1
+
+
+@pytest.mark.parametrize("submit_existing_draft", [False, True])
+def test_custom_disassemble_issue_keeps_outbound_on_retry_and_approval(
+    client, db_session, make_item, make_bom, make_location, submit_existing_draft
+):
+    """선택 출고는 신규·초안·재시도·승인 전 과정에서 출고 방향을 유지한다."""
+    parent = make_item(name="Issue parent", process_type_code="AF")
+    component = make_item(name="Issue component", process_type_code="AR")
+    make_bom(parent.item_id, component.item_id, Decimal("2"))
+    make_location(
+        parent.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        quantity=Decimal("7"),
+    )
+    component_location = make_location(
+        component.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        quantity=Decimal("5"),
+    )
+    requester = _make_employee(db_session, code="ISSUE-REQUESTER")
+    db_session.commit()
+    bundles = _preview_process_bom_bundles(
+        client,
+        requester,
+        parent,
+        sub_type="disassemble",
+    )
+    next(
+        line
+        for bundle in bundles
+        for line in bundle["lines"]
+        if line["item_id"] == str(component.item_id)
+    )["quantity"] = 1
+    payload = {
+        "requester_employee_id": str(requester.employee_id),
+        "work_type": "process",
+        "sub_type": "disassemble",
+        "notes": "선택 출고",
+        "bundles": bundles,
+    }
+    if submit_existing_draft:
+        drafted = client.put("/api/io/draft", json=payload)
+        assert drafted.status_code == 200, drafted.text
+        url = f"/api/io/draft/{drafted.json()['batch_id']}/submit"
+        kwargs = {"params": {"requester_employee_id": str(requester.employee_id)}}
+    else:
+        url = "/api/io/submit"
+        kwargs = {"json": {**payload, "client_request_id": str(uuid.uuid4())}}
+
+    first = client.post(url, **kwargs)
+    retry = client.post(url, **kwargs)
+
+    assert first.status_code == 201, first.text
+    assert retry.status_code == 201, retry.text
+    assert retry.json() == first.json()
+    request = db_session.query(StockRequest).one()
+    request_line = request.lines[0]
+    assert request.status == StockRequestStatusEnum.RESERVED
+    assert request_line.from_bucket.value == "production"
+    assert request_line.from_department == DepartmentEnum.ASSEMBLY
+    assert request_line.to_bucket.value == "none"
+    db_session.refresh(component_location)
+    assert component_location.quantity == Decimal("5")
+    assert component_location.pending_quantity == Decimal("1")
+    assert db_session.query(TransactionLog).count() == 0
+
+    approver = _make_employee(
+        db_session,
+        code="ISSUE-APPROVER",
+        department_role="primary",
+    )
+    db_session.commit()
+    approved = _approve_department_request(client, request.request_id, approver)
+
+    assert approved.status_code == 200, approved.text
+    db_session.refresh(component_location)
+    assert component_location.quantity == Decimal("4")
+    assert component_location.pending_quantity == Decimal("0")
+    assert db_session.query(TransactionLog).one().quantity_change == Decimal("-1")
+    completed_replay = client.post(url, **kwargs)
+    assert completed_replay.status_code == 201, completed_replay.text
     assert db_session.query(TransactionLog).count() == 1
 
 

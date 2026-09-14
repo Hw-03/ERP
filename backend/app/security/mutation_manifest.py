@@ -50,6 +50,7 @@ SERVICE_ACTOR_CONSUMERS: dict[str, str] = {
     "app.services.io_draft.delete_draft": "requester",
     "app.services.io_draft.save_draft": "requester",
     "app.services.io_preview.validate_internal_use_requester": "requester",
+    "app.services.io_preview.validate_receive_requester": "requester",
     "app.services.io_preview.validate_warehouse_adjust_requester": "requester",
     "app.services.legacy_inventory_operation_adoption.adopt_and_cancel": "canceller",
     "app.services.production_receipt.execute_production_receipt": "actor",
@@ -149,6 +150,7 @@ SERVICE_READ_ONLY_EXPORTS: frozenset[str] = frozenset(
         "app.services.dept_hierarchy.approvable_departments",
         "app.services.dept_hierarchy.can_approve_department",
         "app.services.dept_hierarchy.is_production_line",
+        "app.services.defect_actions.unquarantine_record_reference",
         "app.services.defect_statistics.calculate_statistics_period",
         "app.services.defect_statistics.get_defect_statistics",
         "app.services.export_helpers.csv_streaming_response",
@@ -188,7 +190,9 @@ SERVICE_READ_ONLY_EXPORTS: frozenset[str] = frozenset(
         "app.services.io_preview.validate_process_bom_parent_lines",
         "app.services.io_preview.validate_saved_operation_sources",
         "app.services.io_preview.validate_warehouse_adjust_operation",
+        "app.services.io_preview.validate_work_sub_type",
         "app.services.inventory_integrity.diagnose_inventory_integrity",
+        "app.services.inventory_integrity.expected_workflow_effect_status",
         "app.services.inventory_integrity_engine.evaluate_inventory_integrity",
         "app.services.inventory_operation_cancellation.is_same_kst_week",
         "app.services.inventory_operation_cancellation.normalized_effect_for_cancellation",
@@ -292,12 +296,15 @@ _IDEMPOTENCY_LOCK_INFRASTRUCTURE_REASON = (
 _INVENTORY_OPERATION_MAINTENANCE_REASON = (
     "명시적 재고 원장 운영 CLI의 진단 보정·전향 활성화를 담당하는 기반 경계"
 )
+_IO_ROUTE_NORMALIZATION_REASON = (
+    "인증된 IO 제출·부서 승인 transaction 내부에서 저장된 자동 부서 경로를 재정규화하는 중첩 mutation 경계"
+)
 _WEEKLY_SNAPSHOT_INFRASTRUCTURE_REASON = (
     "첫 write 또는 예약 작업에서 주간 재고 snapshot을 원자적으로 확정하는 기반 경계"
 )
 
 
-# Non-business infrastructure mutations cannot accept a VerifiedActor by design.
+# Actorless infrastructure and nested mutations cannot accept a VerifiedActor by design.
 # This is an exact, reasoned set: no module/name heuristic can auto-admit additions.
 SERVICE_INFRASTRUCTURE_MUTATION_REASONS: dict[str, str] = {
     "app.services._tx.transactional": _RUNTIME_INFRASTRUCTURE_REASON,
@@ -311,6 +318,7 @@ SERVICE_INFRASTRUCTURE_MUTATION_REASONS: dict[str, str] = {
     "app.services.audit_csv.list_available_months": _AUDIT_INFRASTRUCTURE_REASON,
     "app.services.audit_csv.path_for_month": _AUDIT_INFRASTRUCTURE_REASON,
     "app.services.audit_csv.register_session_listeners": _AUDIT_INFRASTRUCTURE_REASON,
+    "app.services.io_dispatch.normalize_department_approval_routes": _IO_ROUTE_NORMALIZATION_REASON,
     "app.services.inventory_integrity_repair.repair_inventory_integrity_issue": _INVENTORY_OPERATION_MAINTENANCE_REASON,
     "app.services.inventory_operation_activation.activate_inventory_operation_contract": _INVENTORY_OPERATION_MAINTENANCE_REASON,
     "app.services.operator_session.create_session": _AUTH_INFRASTRUCTURE_REASON,

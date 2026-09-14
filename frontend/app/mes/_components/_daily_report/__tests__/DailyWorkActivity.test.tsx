@@ -1,8 +1,38 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { StrictMode, useState } from "react";
+import { describe, expect, it, vi } from "vitest";
 import { DailyWorkActivity } from "../DailyWorkActivity";
 
 describe("DailyWorkActivity", () => {
+  it("상세 토글은 StrictMode에서도 상위 상태를 한 번만 갱신한다", () => {
+    const onDetailOpenChange = vi.fn();
+
+    function Harness() {
+      const [, setDetailOpen] = useState(false);
+      return (
+        <DailyWorkActivity
+          activity={{
+            work_date: "2026-09-14",
+            employee_id: "employee-1",
+            cancelled_count: 0,
+            summary: [{ operation_key: "warehouse", operation_label: "창고", work_count: 1, quantity_by_unit: { EA: 1 } }],
+            details: [],
+          } as never}
+          onDetailOpenChange={(open) => {
+            onDetailOpenChange(open);
+            setDetailOpen(open);
+          }}
+        />
+      );
+    }
+
+    render(<StrictMode><Harness /></StrictMode>);
+    fireEvent.click(screen.getByRole("button", { name: "창고 거래 상세 펼치기" }));
+
+    expect(onDetailOpenChange).toHaveBeenCalledTimes(1);
+    expect(onDetailOpenChange).toHaveBeenLastCalledWith(true);
+  });
+
   it("작업 기록 칩 하나로 수량을 보이고 상세를 펼치고 접는다", () => {
     render(
       <DailyWorkActivity

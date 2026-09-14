@@ -29,6 +29,7 @@ import { MobileHistoryList } from "../history/MobileHistoryList";
 import {
   advanceHistoryLoadReconcileState,
   applyHistoryCancellation,
+  isHistoryCancellationUpdate,
   reconcileHistorySelection,
   type HistoryLoadReconcileState,
 } from "../../_history_sections/historyCancellation";
@@ -350,7 +351,7 @@ export function MobileHistoryScreen() {
   }
 
   function handleLogUpdated(updated: TransactionLog) {
-    if (updated.cancelled) {
+    if (isHistoryCancellationUpdate(updated)) {
       applyCancellationUpdate(updated, updated.operation_batch_id);
       return;
     }

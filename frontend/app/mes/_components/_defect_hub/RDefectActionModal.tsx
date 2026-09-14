@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState, type ReactElement } from "react";
+import { useEffect, useId, useRef, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -10,6 +10,7 @@ import { stockRequestsApi } from "@/lib/api/stock-requests";
 import type { DefectLocation } from "@/lib/api/types/defects";
 import { ReasonFormFields } from "./ReasonFormFields";
 import { InlineErrorNote } from "./InlineErrorNote";
+import { makeClientRequestId } from "@/lib/uuid";
 
 type RAction = "unquarantine" | "scrap" | "return";
 
@@ -51,6 +52,7 @@ export function RDefectActionModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const restoreRequestIdRef = useRef<string | null>(null);
 
   const titleId = useId();
   const panelRef = useFocusTrap<HTMLDivElement>(open);
@@ -67,8 +69,9 @@ export function RDefectActionModal({
       setMemo("");
       setError(null);
       setBusy(false);
+      restoreRequestIdRef.current = null;
     }
-  }, [open]);
+  }, [open, location.record_id]);
 
   // ESC 닫기
   useEffect(() => {
@@ -99,6 +102,8 @@ export function RDefectActionModal({
           reason_category: category,
           reason_memo: memo,
           actor_employee_id: currentEmployee.employee_id,
+          client_request_id: restoreRequestIdRef.current
+            ?? (restoreRequestIdRef.current = makeClientRequestId()),
         });
       } else {
         // 폐기 or 반품 — stock_requests 즉시 처리

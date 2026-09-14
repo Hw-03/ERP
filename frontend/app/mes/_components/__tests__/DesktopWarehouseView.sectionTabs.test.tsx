@@ -16,6 +16,7 @@ const currentWorkAreaProps = vi.hoisted(() => ({
   value: null as null | {
     onEmptyStateChange?: (empty: boolean) => void;
     targetRequestId?: string | null;
+    bumpRefresh?: () => void;
   },
 }));
 
@@ -59,13 +60,15 @@ vi.mock("@/app/mes/_components/_warehouse_sections/WarehouseDraftPanelTabs", () 
     onContinueIoDraft,
     onEmptyStateChange,
     targetRequestId,
+    bumpRefresh,
   }: {
     sectionTab: string;
     onContinueIoDraft?: (draft: never) => void;
     onEmptyStateChange?: (empty: boolean) => void;
     targetRequestId?: string | null;
+    bumpRefresh?: () => void;
   }) => {
-    currentWorkAreaProps.value = { onEmptyStateChange, targetRequestId };
+    currentWorkAreaProps.value = { onEmptyStateChange, targetRequestId, bumpRefresh };
     if (sectionTab === "compose") return null;
 
     return (
@@ -127,6 +130,38 @@ describe("DesktopWarehouseView", () => {
     };
     currentComposeProps.value = null;
     currentWorkAreaProps.value = null;
+  });
+
+  it("창고 승인 건수 첫 조회 실패를 알리고 본문을 유지한 채 다시 시도한다", async () => {
+    currentOperator.value = { ...currentOperator.value, warehouse_role: "primary" };
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=queue");
+    apiMocks.countWarehouseQueue
+      .mockRejectedValueOnce(new Error("count unavailable"))
+      .mockResolvedValueOnce({ count: 4 });
+
+    render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("창고 승인 건수 조회 실패");
+    expect(screen.getByRole("button", { name: "continue draft" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "창고 승인 건수 다시 시도" }));
+
+    await waitFor(() => expect(screen.queryByText(/창고 승인 건수 .*실패/)).not.toBeInTheDocument());
+    expect(screen.getByRole("tab", { name: /창고 승인함.*4/ })).toBeInTheDocument();
+  });
+
+  it("창고 승인 건수 갱신 실패 때 직전 값을 유지한다", async () => {
+    currentOperator.value = { ...currentOperator.value, warehouse_role: "primary" };
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=queue");
+    apiMocks.countWarehouseQueue
+      .mockResolvedValueOnce({ count: 7 })
+      .mockRejectedValueOnce(new Error("refresh unavailable"));
+
+    render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+    await screen.findByRole("tab", { name: /창고 승인함.*7/ });
+    act(() => currentWorkAreaProps.value?.bumpRefresh?.());
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("창고 승인 건수 7건 · 갱신 실패");
+    expect(screen.getByRole("tab", { name: /창고 승인함.*7/ })).toBeInTheDocument();
   });
 
   it.each([

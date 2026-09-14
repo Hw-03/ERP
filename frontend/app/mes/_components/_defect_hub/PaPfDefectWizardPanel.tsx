@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { defectsApi } from "@/lib/api/defects";
@@ -12,6 +12,7 @@ import { ReasonFormFields } from "./ReasonFormFields";
 import { InlineErrorNote } from "./InlineErrorNote";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { QuantityInput } from "../common/QuantityInput";
+import { makeClientRequestId } from "@/lib/uuid";
 
 type DisposalAction = "unquarantine" | "scrap" | "disassemble";
 
@@ -41,6 +42,7 @@ export function PaPfDefectWizardPanel({
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const restoreRequestIdRef = useRef<string | null>(null);
 
   // location 이 바뀌면(다른 항목 선택) 폼 초기화.
   useEffect(() => {
@@ -52,6 +54,7 @@ export function PaPfDefectWizardPanel({
     setErrorMsg(null);
     setBusy(false);
     setConfirmOpen(false);
+    restoreRequestIdRef.current = null;
   }, [location.record_id, location.available_quantity]);
 
   // action 변경 시 decisions 초기화
@@ -84,6 +87,8 @@ export function PaPfDefectWizardPanel({
           reason_category: category,
           reason_memo: memo,
           actor_employee_id: currentEmployee.employee_id,
+          client_request_id: restoreRequestIdRef.current
+            ?? (restoreRequestIdRef.current = makeClientRequestId()),
         });
       } else if (action === "scrap") {
         await stockRequestsApi.createStockRequest({
