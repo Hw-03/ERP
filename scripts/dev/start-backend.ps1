@@ -99,7 +99,7 @@ Add-RuntimeEvent -Path $EventPath -Profile $Profile.Name -Service "backend" `
     -Details @{ request = $request }
 Request-RuntimeTaskStart -RepoRoot $Profile.RepoRoot -Service "backend" | Out-Null
 
-if (-not (Wait-RuntimeHttp200 -Url $ReadyUrl -Attempts 6 -TimeoutSec 10)) {
+if (-not (Wait-RuntimeHttp200 -Url $ReadyUrl -Attempts 90 -TimeoutSec 10)) {
     $state = Get-RuntimeState -Path $StatePath
     $task = Get-RuntimeTaskRegistration -RepoRoot $Profile.RepoRoot -Service "backend"
     throw "[start-backend] Backend did not become ready on $ReadyUrl. task=$($task.Status) runtime=$($state.status). Check $EventPath"

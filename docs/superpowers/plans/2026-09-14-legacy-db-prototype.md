@@ -200,3 +200,12 @@ custom BOM 프런트의 방향 판정은 Friday와 보존본의 `ioWorkType.ts`�
 - 커밋 직후 독립 검토에서 target snapshot 고정과 파일 세대 측정 사이의 `sqlite_sequence` WAL commit을 놓치는 경로가 재현되어 전환을 보류했다. 앞선 secure 복구 리허설만으로 최종 승인하지 않는다.
 - 읽기 전용 keeper로 WAL 파일 생명주기를 안정화한 다음, 파일 세대 기준을 snapshot 고정보다 먼저 측정하도록 최소 보강했다. snapshot 직후의 실제 sequence commit 회귀와 idle WAL 정상 경로를 포함해 독립 표적 5개 PASS, 부모의 해당 테스트 파일 전체 25개 실행 종료 코드 0, diff-check PASS를 확인했다. 전체 장시간 게이트를 다시 통과했다고 주장하지 않으며 마지막 복구 변경의 직접 검증 결과로 기록한다.
 - 개발 서버 3001/8011은 표준 stop 명령 종료 코드 0으로 중지했다. 직원 3000/8010도 listener 없음이다. 예약 작업 중 실행 중인 DEXCOWIN MES 작업은 없으며 다음 DB 백업은 22:00, 주간 snapshot은 2026-09-21 00:00이다.
+
+### 직원 전환 실행과 기동 대기 보강
+
+- `30958f5f`까지 main에 fast-forward 반영하고 일반 push 및 원격 SHA 일치를 확인했다. main의 기존 108개 변경은 보존 브랜치와 해시 차이 0을 재확인한 뒤 stash `a2fbfbb93035a76153dead4e1646b4d1fd3c3717`에도 추가 보존했다.
+- keeper 수정 후 격리 공개 순·역방향 리허설과 부모의 복구 receipt 재검증이 PASS했다. `public-cutover-rehearsal-02/receipts/recovery-receipt.json` SHA256은 `9b9d1b978075f02c97af9cfbfcad7007addb04bbce8bb88930c6db020cdfe2de`이다. 최신 복구 파일 테스트 26개 PASS이며 마지막 추가 회귀도 부모가 직접 재확인했다.
+- 실제 직원 admission `employee-cutover-admission-01.json` SHA256 `3d2da967a7dae49893204d8efa93d6158eb53cda1610b139b40f43f9a11d7667`: 양측 FULL/원본 최신성 PASS. frontend install, code install, begin-friday-cutover, Friday DB restore 모두 종료 코드 0이었다. 배포 journal은 `C:/ERP-dev/_attic/runtime/frontend-releases/77d679f71e1441ddac7f13d2945c9026/journal.json`이다.
+- 실제 activation은 두 번 모두 외부 기동 명령의 짧은 6회 readiness 대기 때문에 실패했다. 앱은 각각 18:26:40, 18:30:41에 실제 `/health/ready` 200을 기록했으나 시작 명령은 먼저 대기 횟수를 소진했다. 두 번 모두 안전 경로가 포트를 정지했으며 직원 쓰기는 재개하지 않았다. 세 번째 동일 재시도는 하지 않는다.
+- 원본으로의 공개 writer-fenced 복구는 종료 코드 0/PASS이다. `employee-recovery-after-startup-timeout-01.json` SHA256 `af3e8a669aae4b051407aea0394ab98573bdb1c61e461a2705a852d0c8fe2bd2`, 원본과 복구본의 전체 논리 해시 `a4b32e7de5dd90ee98db0df446dbe2b94a4928febb03f71d9751427062e63ace`가 일치한다. 검증된 receipt를 사용한 공개 코드 복귀를 진행한다.
+- 수정은 `start-backend.ps1` 외부 readiness 시도 횟수 6→90 한 줄이다. 기존 liveness 대기와 같은 충분한 시도 예산을 주며 `/health/ready` 200 요건, 각 요청 제한, 최종 실패 throw를 유지한다. 계약 테스트 두 줄도 정렬했다. 전체 장시간 게이트 재통과로 표기하지 않고 직접 관련 Python 9개, PowerShell runtime 계약 및 구문 검사 증거로 확인한다. 실제 재배포와 기동 성공은 별도 확인 전까지 미완료다.

@@ -193,7 +193,7 @@ Assert-ContentNotMatch $SyncToEmployeeScript '&\s+.*restore_db\.py' "employee de
 Assert-ContentMatch $StartBackendScript 'Start-ServiceSupervisor' "start-backend.ps1 must launch the shared supervisor."
 Assert-ContentMatch $StartBackendScript 'backend-runtime\.json' "start-backend.ps1 must write backend runtime metadata."
 Assert-ContentMatch $StartBackendScript '(?s)\$LiveUrl\s*=.*?health/live.*?function\s+Start-BackendSupervisor.*?Wait-RuntimeHttp200\s+-Url\s+\$LiveUrl.*?service_not_ready' "the scheduler-owned backend must use liveness for restart ownership and record non-readiness without throwing."
-Assert-ContentMatch $StartBackendScript '(?s)if\s*\(\$RuntimeTaskHost\).*?exit\s+\$hostExit.*?Wait-RuntimeHttp200\s+-Url\s+\$ReadyUrl\s+-Attempts\s+6\s+-TimeoutSec\s+10' "the external backend startup caller must allow the full readiness diagnostic to finish."
+Assert-ContentMatch $StartBackendScript '(?s)if\s*\(\$RuntimeTaskHost\).*?exit\s+\$hostExit.*?Wait-RuntimeHttp200\s+-Url\s+\$ReadyUrl\s+-Attempts\s+90\s+-TimeoutSec\s+10' "the external backend startup caller must allow a cold startup to finish its readiness diagnostic."
 Assert-ContentMatch $StartFrontendScript 'Invoke-ProfileFrontendStartup' "start-frontend.ps1 must launch through shared profile startup orchestration."
 Assert-ContentMatch $RuntimeControlScript '(?s)function\s+Start-ProfileFrontendSupervisor.*?Start-ServiceSupervisor' "runtime-control.ps1 must launch the frontend through the shared supervisor."
 Assert-ContentMatch $StartFrontendScript 'frontend-runtime\.json' "start-frontend.ps1 must write frontend runtime metadata."
