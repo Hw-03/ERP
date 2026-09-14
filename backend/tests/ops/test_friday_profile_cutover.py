@@ -646,6 +646,96 @@ def test_compare_exact_database_rejects_wal_commit_during_comparison(
         writer.close()
 
 
+def test_compare_exact_database_rejects_wal_commit_after_target_snapshot_pin(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inputs = _prepare_inputs(tmp_path)
+    candidate = Path(inputs["candidate"])
+    target = Path(inputs["target"])
+    with (
+        sqlite3.connect(f"file:{candidate.as_posix()}?mode=ro", uri=True) as source,
+        sqlite3.connect(target) as destination,
+    ):
+        source.backup(destination)
+
+    writer = sqlite3.connect(target)
+    writer.execute("PRAGMA journal_mode=WAL")
+    writer.execute("PRAGMA wal_autocheckpoint=0")
+    original_reader = cutover._read_complete_snapshot
+    committed = False
+
+    def reader_with_concurrent_commit(path: Path) -> sqlite3.Connection:
+        nonlocal committed
+        connection = original_reader(path)
+        if path.resolve() == target.resolve() and not committed:
+            writer.execute(
+                "UPDATE sqlite_sequence SET seq=99 WHERE name='sequence_probe'"
+            )
+            writer.commit()
+            committed = True
+            assert Path(f"{target}-wal").stat().st_size > 0
+        return connection
+
+    monkeypatch.setattr(cutover, "_read_complete_snapshot", reader_with_concurrent_commit)
+    try:
+        with pytest.raises(
+            cutover.CutoverAdmissionError,
+            match="installed Friday target inputs changed during comparison",
+        ):
+            cutover.compare_exact_database(
+                candidate,
+                target,
+                label="installed Friday target",
+            )
+    finally:
+        writer.close()
+
+
+def test_compare_exact_database_rejects_wal_commit_between_baseline_and_target_pin(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inputs = _prepare_inputs(tmp_path)
+    candidate = Path(inputs["candidate"])
+    target = Path(inputs["target"])
+    with (
+        sqlite3.connect(f"file:{candidate.as_posix()}?mode=ro", uri=True) as source,
+        sqlite3.connect(target) as destination,
+    ):
+        source.backup(destination)
+
+    writer = sqlite3.connect(target)
+    writer.execute("PRAGMA journal_mode=WAL")
+    writer.execute("PRAGMA wal_autocheckpoint=0")
+    original_reader = cutover._read_complete_snapshot
+    committed = False
+
+    def reader_with_concurrent_commit(path: Path) -> sqlite3.Connection:
+        nonlocal committed
+        connection = original_reader(path)
+        if path.resolve() == candidate.resolve() and not committed:
+            writer.execute("PRAGMA user_version=99")
+            writer.commit()
+            committed = True
+            assert Path(f"{target}-wal").stat().st_size > 0
+        return connection
+
+    monkeypatch.setattr(cutover, "_read_complete_snapshot", reader_with_concurrent_commit)
+    try:
+        with pytest.raises(
+            cutover.CutoverAdmissionError,
+            match="installed Friday target inputs changed during comparison",
+        ):
+            cutover.compare_exact_database(
+                candidate,
+                target,
+                label="installed Friday target",
+            )
+    finally:
+        writer.close()
+
+
 def test_compare_exact_database_rejects_index_change_with_same_rows(
     tmp_path: Path,
 ) -> None:

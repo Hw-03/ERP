@@ -193,3 +193,10 @@ custom BOM 프런트의 방향 판정은 Friday와 보존본의 `ioWorkType.ts`�
 - `final-backend-03.junit.xml`: 전체 2,576개 중 2,520 PASS, 56 SKIP, 실패 0, 오류 0, 실행 종료 코드 0. skip은 PostgreSQL 환경 등 개별 선행 조건이며 PostgreSQL 운영 검증 성공을 뜻하지 않는다. 전체 frontend 2,607 PASS, E2E 19 PASS, production build/TypeScript/bundle PASS, OpenAPI 일치, 문서 도구 15개 중 1개 symlink 권한 skip 외 PASS 및 링크 검사 PASS를 함께 확보했다. 실패했던 첫 smart gate가 성공한 것으로 기록을 바꾸지 않고 이후 각 해당 명령의 재검증 증거로 대체한다.
 - 최종 직원 FULL 백업: `C:/ERP-dev/_attic/runtime/backups/sqlite/mes-before-final-friday-cutover-20260914-20260914-175219-5da56bbc.db`, SHA256 `dc97df4e568b587a04f20932aaf6fbb05f59a74e1fa005a137b7716343a96caf`. manifest의 schema/FK/SQLite/verification PASS 및 blocking 0. 16:21 원본 백업과 database 증거 객체 전체가 동일하고 기존 현대 V1 경고 4,797개도 동일하다. artifact 바이트 hash 차이는 업무 행 변경의 증거가 아니며 실제 전환 admission에서 다시 전체 행을 대조한다.
 - 백업 실행 첫 호출의 runtime 경로 지정으로 `C:/ERP-dev/backups/sqlite/mes-before-final-friday-cutover-20260914-20260914-175056-5df00ae6.db`에도 검증된 추가 복구본이 생겼다. 삭제하지 않았으며 운영 전환에는 위 표준 `_attic/runtime` 경로의 최종 백업을 사용한다. 원본 직원 DB는 변경하지 않았다.
+
+### 복원 커밋 이후 최종 동시성 보강
+
+- 복원 후보를 `0aacf11a85ecee327f42821d7d56ea6c8e46df71`로 커밋했다. main과 직원 환경은 아직 전환하지 않았다.
+- 커밋 직후 독립 검토에서 target snapshot 고정과 파일 세대 측정 사이의 `sqlite_sequence` WAL commit을 놓치는 경로가 재현되어 전환을 보류했다. 앞선 secure 복구 리허설만으로 최종 승인하지 않는다.
+- 읽기 전용 keeper로 WAL 파일 생명주기를 안정화한 다음, 파일 세대 기준을 snapshot 고정보다 먼저 측정하도록 최소 보강했다. snapshot 직후의 실제 sequence commit 회귀와 idle WAL 정상 경로를 포함해 독립 표적 5개 PASS, 부모의 해당 테스트 파일 전체 25개 실행 종료 코드 0, diff-check PASS를 확인했다. 전체 장시간 게이트를 다시 통과했다고 주장하지 않으며 마지막 복구 변경의 직접 검증 결과로 기록한다.
+- 개발 서버 3001/8011은 표준 stop 명령 종료 코드 0으로 중지했다. 직원 3000/8010도 listener 없음이다. 예약 작업 중 실행 중인 DEXCOWIN MES 작업은 없으며 다음 DB 백업은 22:00, 주간 snapshot은 2026-09-21 00:00이다.

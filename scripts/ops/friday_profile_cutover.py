@@ -275,6 +275,15 @@ def _read_complete_snapshot(path: Path) -> sqlite3.Connection:
     return connection
 
 
+def _read_stability_keeper(path: Path) -> sqlite3.Connection:
+    """Keep SQLite's read-side WAL files stable without pinning a snapshot."""
+
+    connection = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)
+    connection.execute("PRAGMA query_only=ON")
+    connection.execute("SELECT 1 FROM sqlite_master LIMIT 1").fetchone()
+    return connection
+
+
 def _logical_snapshot_identity(path: Path, *, label: str) -> dict[str, object]:
     """Reuse the backup manifest's complete schema and business-row identity."""
 
@@ -672,45 +681,52 @@ def compare_exact_database(
     source = _physical(source_path, require_file=True)
     installed = _physical(installed_path, require_file=True)
     with (
-        closing(_read_complete_snapshot(source)) as expected,
-        closing(_read_complete_snapshot(installed)) as actual,
+        closing(_read_stability_keeper(source)),
+        closing(_read_stability_keeper(installed)),
     ):
         initial_generations = (
             backup_manifest.sqlite_file_generation(source),
             backup_manifest.sqlite_file_generation(installed),
         )
-        expected_identity = _logical_snapshot_identity(
-            source,
-            label=f"{label} FULL source",
-        )
-        actual_identity = _logical_snapshot_identity(installed, label=label)
-        if expected_identity["schema_fingerprint"] != actual_identity["schema_fingerprint"]:
-            raise CutoverAdmissionError(f"{label} schema does not match FULL source")
-        _assert_integrity(expected, label=f"{label} FULL source")
-        _assert_integrity(actual, label=label)
-        expected_shapes = _shapes(expected)
-        actual_shapes = _shapes(actual)
-        if expected_shapes != actual_shapes:
-            raise CutoverAdmissionError(f"{label} schema does not match FULL source")
-        evidence: list[dict[str, object]] = []
-        for table, columns in sorted(expected_shapes.items()):
-            expected_rows = _row_hashes(_rows(expected, table, columns))
-            actual_rows = _row_hashes(_rows(actual, table, columns))
-            if expected_rows != actual_rows:
-                raise CutoverAdmissionError(
-                    f"{label} data does not match FULL source: {table}"
+        with (
+            closing(_read_complete_snapshot(source)) as expected,
+            closing(_read_complete_snapshot(installed)) as actual,
+        ):
+            expected_identity = _logical_snapshot_identity(
+                source,
+                label=f"{label} FULL source",
+            )
+            actual_identity = _logical_snapshot_identity(installed, label=label)
+            if (
+                expected_identity["schema_fingerprint"]
+                != actual_identity["schema_fingerprint"]
+            ):
+                raise CutoverAdmissionError(f"{label} schema does not match FULL source")
+            _assert_integrity(expected, label=f"{label} FULL source")
+            _assert_integrity(actual, label=label)
+            expected_shapes = _shapes(expected)
+            actual_shapes = _shapes(actual)
+            if expected_shapes != actual_shapes:
+                raise CutoverAdmissionError(f"{label} schema does not match FULL source")
+            evidence: list[dict[str, object]] = []
+            for table, columns in sorted(expected_shapes.items()):
+                expected_rows = _row_hashes(_rows(expected, table, columns))
+                actual_rows = _row_hashes(_rows(actual, table, columns))
+                if expected_rows != actual_rows:
+                    raise CutoverAdmissionError(
+                        f"{label} data does not match FULL source: {table}"
+                    )
+                evidence.append(
+                    {
+                        "table": table,
+                        "columns": columns,
+                        "rows": sorted(expected_rows.items()),
+                    }
                 )
-            evidence.append(
-                {
-                    "table": table,
-                    "columns": columns,
-                    "rows": sorted(expected_rows.items()),
-                }
-            )
-        if _sqlite_sequence_state(expected) != _sqlite_sequence_state(actual):
-            raise CutoverAdmissionError(
-                f"{label} sqlite_sequence does not match FULL source"
-            )
+            if _sqlite_sequence_state(expected) != _sqlite_sequence_state(actual):
+                raise CutoverAdmissionError(
+                    f"{label} sqlite_sequence does not match FULL source"
+                )
         if (
             backup_manifest.sqlite_file_generation(source),
             backup_manifest.sqlite_file_generation(installed),
