@@ -20,7 +20,6 @@ const state = vi.hoisted(() => ({
   changeMyPin: vi.fn(),
   setLoginPopup: vi.fn(),
   updateCurrentOperatorPreferences: vi.fn(),
-  returnToOperatorLogin: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({ api: { changeMyPin: state.changeMyPin } }));
@@ -28,7 +27,6 @@ vi.mock("@/lib/api/employees", () => ({ employeesApi: { setLoginPopup: state.set
 vi.mock("../login/useCurrentOperator", () => ({
   useCurrentOperator: () => state.operator,
   updateCurrentOperatorPreferences: state.updateCurrentOperatorPreferences,
-  returnToOperatorLogin: state.returnToOperatorLogin,
 }));
 
 const initialPreferences: AppearancePreferences = { theme: "light", sidebarMode: "hover" };
@@ -47,7 +45,6 @@ describe("DesktopSettingsView", () => {
     state.setLoginPopup.mockReset();
     state.setLoginPopup.mockResolvedValue({});
     state.updateCurrentOperatorPreferences.mockReset();
-    state.returnToOperatorLogin.mockReset();
   });
 
   it("renders as normal settings content without a page-covering settings dialog", () => {
@@ -102,7 +99,7 @@ describe("DesktopSettingsView", () => {
     fireEvent.click(screen.getByRole("button", { name: "PIN 변경 저장" }));
 
     await waitFor(() => expect(state.changeMyPin).toHaveBeenCalledWith("emp-1", "1234", "5678"));
-    expect(state.returnToOperatorLogin).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText("PIN이 변경되었습니다.")).toBeInTheDocument();
   });
 
   it("updates the login popup preference immediately", async () => {

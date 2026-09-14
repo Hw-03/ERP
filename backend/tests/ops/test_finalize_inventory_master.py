@@ -5,10 +5,16 @@ from decimal import Decimal
 from datetime import datetime
 from pathlib import Path
 import sqlite3
+import sys
 from typing import Any
 
 import pytest
 from sqlalchemy import select
+
+
+ROOT = Path(__file__).resolve().parents[3]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 
 def _write_employee_db(path: Path, rows: list[dict[str, Any]]) -> None:

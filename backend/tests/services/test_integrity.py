@@ -7,30 +7,11 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import event, text
 
-from app.models import Employee, LocationStatusEnum
+from app.models import LocationStatusEnum
 from app.services.integrity import check_inventory_consistency, repair_inventory_totals
 
 
 D = Decimal
-
-
-@pytest.fixture()
-def integrity_actor(db_session):
-    actor = Employee(
-        employee_code="INTEGRITY-ACTOR",
-        name="Integrity actor",
-        role="admin",
-        department="관리",
-        is_active=True,
-    )
-    db_session.add(actor)
-    db_session.flush()
-    return actor
-
-
-def test_repair_requires_explicit_actor(db_session):
-    with pytest.raises(TypeError):
-        repair_inventory_totals(db_session, dry_run=True)
 
 
 def test_check_consistency_no_mismatch(make_item, db_session):
@@ -84,7 +65,7 @@ def test_check_consistency_quantity_too_low(make_item, db_session):
     assert mismatches[0].delta == D("-7")
 
 
-def test_repair_dry_run_does_not_write(make_item, db_session, integrity_actor):
+def test_repair_dry_run_does_not_write(make_item, db_session):
     """dry_run=True 면 mismatched 만 카운트, DB 변경 없음."""
     from app.models import Inventory
     item = make_item(warehouse_qty=D("5"))
@@ -92,7 +73,7 @@ def test_repair_dry_run_does_not_write(make_item, db_session, integrity_actor):
     inv.quantity = D("9")
     db_session.flush()
 
-    report = repair_inventory_totals(db_session, actor=integrity_actor, dry_run=True)
+    report = repair_inventory_totals(db_session, dry_run=True)
     assert report.dry_run is True
     assert report.mismatched == 1
     assert report.repaired == 0
@@ -102,7 +83,7 @@ def test_repair_dry_run_does_not_write(make_item, db_session, integrity_actor):
     assert inv2.quantity == D("9")
 
 
-def test_repair_actually_fixes(make_item, db_session, integrity_actor):
+def test_repair_actually_fixes(make_item, db_session):
     """dry_run=False 면 quantity 가 computed 로 갱신."""
     from app.models import Inventory
     item = make_item(warehouse_qty=D("5"))
@@ -110,7 +91,7 @@ def test_repair_actually_fixes(make_item, db_session, integrity_actor):
     inv.quantity = D("12")
     db_session.flush()
 
-    report = repair_inventory_totals(db_session, actor=integrity_actor, dry_run=False)
+    report = repair_inventory_totals(db_session, dry_run=False)
     assert report.repaired == 1
 
     inv2 = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).first()
@@ -118,7 +99,7 @@ def test_repair_actually_fixes(make_item, db_session, integrity_actor):
 
 
 def test_repair_flushes_without_committing_and_can_be_rolled_back(
-    make_item, make_location, db_session, integrity_actor
+    make_item, make_location, db_session
 ):
     """실제 복구는 flush까지만 하고 호출자 transaction에 남긴다."""
     from app.models import Inventory
@@ -132,7 +113,7 @@ def test_repair_flushes_without_committing_and_can_be_rolled_back(
     flushes: list[bool] = []
     event.listen(db_session, "after_flush", lambda *_args: flushes.append(True))
 
-    report = repair_inventory_totals(db_session, actor=integrity_actor, dry_run=False)
+    report = repair_inventory_totals(db_session, dry_run=False)
 
     assert report.checked == 1
     assert report.mismatched == 1
@@ -144,7 +125,7 @@ def test_repair_flushes_without_committing_and_can_be_rolled_back(
     assert db_session.execute(text("SELECT quantity FROM inventory")).scalar_one() == 12
 
 
-def test_repair_dry_run_has_no_flush_or_commit(make_item, db_session, integrity_actor):
+def test_repair_dry_run_has_no_flush_or_commit(make_item, db_session):
     """dry-run은 mismatch를 보고해도 write/flush/commit을 전혀 만들지 않는다."""
     from app.models import Inventory
 
@@ -165,7 +146,7 @@ def test_repair_dry_run_has_no_flush_or_commit(make_item, db_session, integrity_
         lambda *_args: boundaries.__setitem__("commit", boundaries["commit"] + 1),
     )
 
-    report = repair_inventory_totals(db_session, actor=integrity_actor, dry_run=True)
+    report = repair_inventory_totals(db_session, dry_run=True)
 
     assert report.checked == 1
     assert report.mismatched == 1
@@ -174,7 +155,7 @@ def test_repair_dry_run_has_no_flush_or_commit(make_item, db_session, integrity_
     assert db_session.execute(text("SELECT quantity FROM inventory")).scalar_one() == 9
 
 
-def test_repair_samples_capped_at_20(make_item, db_session, integrity_actor):
+def test_repair_samples_capped_at_20(make_item, db_session):
     """미스매치 25건 → samples 는 20건만."""
     from app.models import Inventory
     items = [make_item(name=f"X{i}", warehouse_qty=D("1")) for i in range(25)]
@@ -183,7 +164,7 @@ def test_repair_samples_capped_at_20(make_item, db_session, integrity_actor):
         inv.quantity = D("99")
     db_session.flush()
 
-    report = repair_inventory_totals(db_session, actor=integrity_actor, dry_run=True)
+    report = repair_inventory_totals(db_session, dry_run=True)
     assert report.checked == 25
     assert report.mismatched == 25
     assert report.repaired == 0
@@ -211,7 +192,7 @@ def test_check_consistency_with_orphan_location(make_item, make_location, db_ses
     assert check_inventory_consistency(db_session) == []
 
 
-def test_repair_dry_run_idempotent(make_item, db_session, integrity_actor):
+def test_repair_dry_run_idempotent(make_item, db_session):
     """dry_run 두 번 호출 시 같은 결과 (DB 미변경)."""
     from app.models import Inventory
     item = make_item(warehouse_qty=D("4"))
@@ -219,17 +200,17 @@ def test_repair_dry_run_idempotent(make_item, db_session, integrity_actor):
     inv.quantity = D("7")
     db_session.flush()
 
-    r1 = repair_inventory_totals(db_session, actor=integrity_actor, dry_run=True)
-    r2 = repair_inventory_totals(db_session, actor=integrity_actor, dry_run=True)
+    r1 = repair_inventory_totals(db_session, dry_run=True)
+    r2 = repair_inventory_totals(db_session, dry_run=True)
     assert r1.mismatched == r2.mismatched == 1
     assert r1.repaired == r2.repaired == 0
 
 
-def test_repair_handles_inventory_with_no_locations(make_item, db_session, integrity_actor):
+def test_repair_handles_inventory_with_no_locations(make_item, db_session):
     """Inventory 만 있고 location 0건 — quantity == warehouse 정합."""
-    make_item(warehouse_qty=D("8"))
+    item = make_item(warehouse_qty=D("8"))
     # 처음 make_item 이 quantity=warehouse_qty=8 로 동기화 → mismatch 0
-    report = repair_inventory_totals(db_session, actor=integrity_actor, dry_run=True)
+    report = repair_inventory_totals(db_session, dry_run=True)
     assert report.mismatched == 0
     assert report.repaired == 0
 

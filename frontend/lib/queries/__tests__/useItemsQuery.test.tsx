@@ -119,12 +119,7 @@ describe("useCreateItemMutation", () => {
       wrapper: makeWrapper(client),
     });
 
-    await result.current.mutateAsync({
-      item_name: "신규",
-      initial_quantity: 0,
-      model_slots: [],
-      unit: "EA",
-    });
+    await result.current.mutateAsync({ item_name: "신규" });
 
     const init = fetchSpy.mock.calls[0][1] as RequestInit;
     expect(init.method).toBe("POST");

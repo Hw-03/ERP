@@ -22,16 +22,15 @@ from app.models import (
 
 
 CUTOVER_SETTING_KEY = "inventory_operation_cutover_at"
-V2_CUTOVER_SETTING_KEY = "inventory_operation_v2_cutover_at"
 
 
 class OperationCutoverConfigurationError(RuntimeError):
     """원장 활성화 시각이 손상되어 신규 쓰기를 안전하게 판정할 수 없음."""
 
 
-def cutover_at(db: Session, *, key: str = CUTOVER_SETTING_KEY) -> Optional[datetime]:
+def cutover_at(db: Session) -> Optional[datetime]:
     """저장된 UTC-naive 전향 적용 시각을 반환하고 잘못된 값은 실패 폐쇄한다."""
-    setting = db.get(SystemSetting, key)
+    setting = db.get(SystemSetting, CUTOVER_SETTING_KEY)
     if setting is None:
         return None
     try:
@@ -51,7 +50,7 @@ def is_ledger_active(db: Session, *, at: Optional[datetime] = None) -> bool:
     return configured is not None and (at or datetime.utcnow()) >= configured
 
 
-def _create_business_operation(
+def create_business_operation(
     db: Session,
     *,
     domain: str,
@@ -80,14 +79,14 @@ def _create_business_operation(
         reason=reason,
         idempotency_key=idempotency_key,
         effective_at=occurred_at,
-        contract_version=2,
+        contract_version=1,
     )
     db.add(operation)
     db.flush()
     return operation
 
 
-def _adopt_legacy_business_operation(
+def adopt_legacy_business_operation(
     db: Session,
     *,
     domain: str,
@@ -130,7 +129,7 @@ def _adopt_legacy_business_operation(
     return operation
 
 
-def _create_cancellation_operation(
+def create_cancellation_operation(
     db: Session,
     *,
     original: InventoryOperation,
@@ -159,7 +158,7 @@ def _create_cancellation_operation(
     return operation
 
 
-def _attach_transaction(
+def attach_transaction(
     log: TransactionLog,
     operation: Optional[InventoryOperation],
     role: InventoryOperationRoleEnum,
@@ -171,7 +170,7 @@ def _attach_transaction(
     return log
 
 
-def _record_effect(
+def record_effect(
     db: Session,
     *,
     operation: Optional[InventoryOperation],
@@ -198,7 +197,7 @@ def _record_effect(
     return effect
 
 
-def _record_defect_movement(
+def record_defect_movement(
     db: Session,
     *,
     operation: Optional[InventoryOperation],

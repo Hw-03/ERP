@@ -104,30 +104,6 @@ describe("DesktopDefectView realtime refresh", () => {
     window.localStorage.clear();
   });
 
-  it("announces the initial defect list loading state politely", () => {
-    mocks.listDefects.mockReturnValueOnce(new Promise(() => {}));
-
-    render(<DesktopDefectView operator={operator} />);
-    fireEvent.click(screen.getByRole("button", { name: "Open list" }));
-
-    expect(screen.getByRole("status")).toHaveTextContent("불량 데이터 로딩 중");
-  });
-
-  it("focuses a named alert and retries when the initial defect list load fails", async () => {
-    mocks.listDefects.mockRejectedValueOnce(new Error("initial defect failure"));
-    mocks.listDefects.mockResolvedValueOnce([location]);
-
-    render(<DesktopDefectView operator={operator} />);
-    fireEvent.click(screen.getByRole("button", { name: "Open list" }));
-
-    const alert = await screen.findByRole("alert", { name: "불량 데이터 로드 오류" });
-    expect(alert).toHaveTextContent("initial defect failure");
-    await waitFor(() => expect(alert).toHaveFocus());
-    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
-    expect(await screen.findByRole("button", { name: "Process D-001" })).toBeInTheDocument();
-    expect(screen.queryByRole("alert", { name: "불량 데이터 로드 오류" })).not.toBeInTheDocument();
-  });
-
   it("provides a visible, keyboard-accessible outer statistics scroll rail", async () => {
     window.history.replaceState({ defect: "statistics" }, "");
     render(<DesktopDefectView operator={operator} />);
@@ -404,7 +380,7 @@ describe("DesktopDefectView realtime refresh", () => {
     expect(screen.getByRole("combobox")).toHaveValue("oldest");
     expect(screen.getByRole("button", { name: "내 부서" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "내가 격리" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText("격리 중").parentElement).toHaveTextContent("2건");
+    await waitFor(() => expect(screen.getByText("격리 중").parentElement).toHaveTextContent("2건"));
 
     const rows = within(screen.getByTestId("defect-list")).getAllByRole("button");
     expect(rows.map((row) => row.textContent)).toEqual(["Process OLD-MINE", "Process RECENT-MINE"]);

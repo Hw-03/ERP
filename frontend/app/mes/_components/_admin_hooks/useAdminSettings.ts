@@ -13,7 +13,6 @@ import { isAdminPinLengthValid, type AdminPinForm } from "./adminPinValidation";
 export interface UseAdminSettingsOptions {
   onStatusChange: (status: string) => void;
   onError: (message: string) => void;
-  onPinChanged: (pin: string) => void;
 }
 
 export interface UseAdminSettingsResult {
@@ -26,7 +25,7 @@ export interface UseAdminSettingsResult {
 }
 
 export function useAdminSettings(opts: UseAdminSettingsOptions): UseAdminSettingsResult {
-  const { onStatusChange, onError, onPinChanged } = opts;
+  const { onStatusChange, onError } = opts;
 
   const [pinForm, setPinForm] = useState<AdminPinForm>({ current_pin: "", new_pin: "", confirm_pin: "" });
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
@@ -64,7 +63,6 @@ export function useAdminSettings(opts: UseAdminSettingsOptions): UseAdminSetting
     }
 
     try {
-      onPinChanged(pinForm.new_pin);
       setPinForm({ current_pin: "", new_pin: "", confirm_pin: "" });
       showSave(response.message);
       onStatusChange(response.message);

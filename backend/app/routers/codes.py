@@ -2,11 +2,10 @@
 
 from typing import Annotated, List
 
-from fastapi import Depends, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies.verified_actor import VerifiedActorRouter
 from app.dependencies.admin import require_admin_pin
 from app.models import ProcessType, ProductSymbol
 from app.routers._errors import ErrorCode, http_error
@@ -22,7 +21,7 @@ from app.services import audit
 from app.services import codes as code_svc
 from app.services._tx import commit_and_refresh
 
-router = VerifiedActorRouter()
+router = APIRouter()
 
 
 # ---- Product Symbols (100 slots) -------------------------------------------

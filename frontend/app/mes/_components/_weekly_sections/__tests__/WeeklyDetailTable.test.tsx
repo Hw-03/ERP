@@ -36,7 +36,6 @@ describe("WeeklyDetailTable verified columns", () => {
       <WeeklyDetailTable
         group={group}
         stockBasis="normal"
-        onItemSelect={() => {}}
       />,
     );
 

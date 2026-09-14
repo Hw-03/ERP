@@ -7,12 +7,9 @@ import { normalizeDepartment } from "@/lib/mes/department";
 import { PIN_LENGTH } from "@/lib/auth/constants";
 import { StatusPill, inferToneFromStatus } from "./common";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
+import { ResultModal } from "./common/ResultModal";
 import { api } from "@/lib/api";
-import {
-  logoutCurrentOperator,
-  returnToOperatorLogin,
-  useCurrentOperator,
-} from "./login/useCurrentOperator";
+import { clearCurrentOperator, useCurrentOperator } from "./login/useCurrentOperator";
 import { NotificationBell } from "./notifications/NotificationBell";
 import type { NotificationNavigationTarget } from "./notifications/NotificationBell";
 
@@ -63,6 +60,7 @@ export function DesktopTopbar({
   const [pinConfirm, setPinConfirm] = useState("");
   const [pinError, setPinError] = useState<string | null>(null);
   const [pinBusy, setPinBusy] = useState(false);
+  const [pinSuccessOpen, setPinSuccessOpen] = useState(false);
 
   useEffect(() => {
     if (!dropdownOpen) return;
@@ -101,7 +99,7 @@ export function DesktopTopbar({
         </div>
 
         {status && (
-          <span data-testid="desktop-status-target" data-status-target="desktop" key={statusNonce} style={{ animation: "statusFlash 0.35s ease-out" }}>
+          <span data-testid="desktop-status-target" key={statusNonce} style={{ animation: "statusFlash 0.35s ease-out" }}>
             {(() => {
               const isBrand = status === DEFAULT_STATUS;
               const tone = isBrand ? "brand" : inferToneFromStatus(status);
@@ -244,8 +242,8 @@ export function DesktopTopbar({
         confirmLabel="로그아웃"
         onClose={() => setShowLogoutModal(false)}
         onConfirm={() => {
-          setShowLogoutModal(false);
-          void logoutCurrentOperator();
+          clearCurrentOperator();
+          window.location.reload();
         }}
       >
         로그아웃하시겠습니까?
@@ -270,7 +268,7 @@ export function DesktopTopbar({
             setPinCurrent("");
             setPinNew("");
             setPinConfirm("");
-            returnToOperatorLogin();
+            setPinSuccessOpen(true);
           } catch (e) {
             setPinError(e instanceof Error ? e.message : "PIN 변경에 실패했습니다.");
           } finally {
@@ -302,6 +300,13 @@ export function DesktopTopbar({
         </div>
       </ConfirmModal>
 
+      <ResultModal
+        open={pinSuccessOpen}
+        kind="success"
+        title="PIN이 변경되었습니다."
+        closeLabel="확인"
+        onClose={() => setPinSuccessOpen(false)}
+      />
     </header>
   );
 }

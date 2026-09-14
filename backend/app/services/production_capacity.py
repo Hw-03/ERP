@@ -10,15 +10,17 @@
 
 세 PF 수량 정의 (모두 PF 기준):
 
-- **ship_ready**(출하 대기) : PF 완성 재고. 부품 확인 없이 즉시 출하 가능.
+- **ship_ready**(출하 대기) : 재고 요청 예약을 뺀 PF 정상 재고. 이미 출하에
+  예약되어 픽업을 기다리는 수량도 포함한다.
 - **fast_production**(빠른 생산) : 현재 AF 재고와 포장 자재로 PA·PF까지
   완성할 수 있는 수. AF 자체는 추가 조립하지 않는다.
 - **total_production**(총생산) : PF 루트로 BOM 전체 재귀 이론 최대.
 
-모든 수량은 `StockFigures.available`
+`fast_production`과 `total_production`은 `StockFigures.available`
 (warehouse＋production−재고 요청 예약−활성 출하 예약)을 기준으로 한다.
-이는 **계획/대응 수량 지표**이며, 생산 등록 가능성 검증(backflush, `warehouse_available`)이
-아니다.
+`ship_ready`는 활성 출하 예약을 다시 포함한 정상 재고를 기준으로 한다. 이 값들은
+**계획/대응 수량 지표**이며, 생산 등록 가능성 검증(backflush,
+`warehouse_available`)이 아니다.
 """
 
 from __future__ import annotations
@@ -91,6 +93,18 @@ def select_auto_representatives(variants: List[dict]) -> List[dict]:
 def _own_available(item_id: uuid.UUID, fig_by_id: FigById) -> int:
     """해당 품목의 가용 재고(음수 클램프, 정수)."""
     return max(int(fig_by_id.get(item_id, stock_math.StockFigures()).available), 0)
+
+
+def _ship_ready(item_id: uuid.UUID, fig_by_id: FigById) -> int:
+    """출하 예약분을 포함하고 재고 요청 예약만 뺀 PF 정상 재고를 반환한다."""
+    figures = fig_by_id.get(item_id, stock_math.StockFigures())
+    normal_stock = (
+        figures.warehouse_qty
+        + figures.production_total
+        - figures.pending
+        - figures.production_pending
+    )
+    return max(int(normal_stock), 0)
 
 
 def _reduce_children(
@@ -622,7 +636,7 @@ def compute_af_capacity(
         best_total_btl: uuid.UUID | None = None
 
         for pf_id in pf_ids:
-            pf_own = _own_available(pf_id, fig_by_id)
+            pf_own = _ship_ready(pf_id, fig_by_id)
             fast_qty, fast_btl = _fast_production_variant(
                 pf_id,
                 af_id,

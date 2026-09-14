@@ -1,9 +1,4 @@
-"""Source-cell availability shared by every inventory consumer.
-
-Mutation callers lock Item/Inventory and the physical warehouse or location rows
-before asking this module to lock active shipping allocations.  That preserves
-the global owner -> item/inventory -> physical -> reservation order.
-"""
+"""모든 재고 소비자가 공유하는 물리 셀 가용량 계산."""
 
 from __future__ import annotations
 
@@ -39,7 +34,7 @@ def _department_value(value: object | None) -> str | None:
 
 @dataclass(frozen=True)
 class AvailabilityCell:
-    """Stable identity for one warehouse or InventoryLocation stock cell."""
+    """창고 또는 한 부서 위치 재고 셀의 안정적인 식별자."""
 
     item_id: uuid.UUID
     department: str | None = None
@@ -73,7 +68,7 @@ class AvailabilityCell:
 
 @dataclass(frozen=True)
 class AvailabilityFigure:
-    """Physical stock minus StockRequest pending and active shipping reserved."""
+    """물리 재고와 재고 요청·활성 출하 예약을 함께 나타낸다."""
 
     physical: Decimal
     stock_request_pending: Decimal
@@ -97,7 +92,7 @@ def calculate_available(
     *,
     owner_shipping_reserved: Decimal = _ZERO,
 ) -> Decimal:
-    """Return canonical availability, optionally exempting the caller's reservation."""
+    """호출 출하 요청의 자기 예약만 예외로 둔 표준 가용량을 반환한다."""
 
     return (
         physical
@@ -123,6 +118,8 @@ def _active_allocations(
     *,
     lock: bool,
 ) -> list[ShippingAllocation]:
+    """품목 순서로 활성 출하 예약을 읽고 변경 경로에서는 함께 잠근다."""
+
     ordered_item_ids = sorted(set(item_ids))
     if not ordered_item_ids:
         return []
@@ -150,7 +147,7 @@ def figures_for_cells(
     owner_request_id: uuid.UUID | None = None,
     lock_allocations: bool = False,
 ) -> dict[AvailabilityCell, AvailabilityFigure]:
-    """Read figures for already locked cells, then optionally lock allocations."""
+    """이미 잠근 물리 셀의 재고·예약 수치를 일괄 반환한다."""
 
     ordered_cells = sorted(set(cells), key=lambda cell: cell.sort_key)
     allocations = _active_allocations(
@@ -206,7 +203,7 @@ def figure_for_cell(
     owner_request_id: uuid.UUID | None = None,
     lock_allocations: bool = False,
 ) -> AvailabilityFigure:
-    """Return one cell figure through the same batch policy."""
+    """단일 셀도 일괄 계산과 같은 정책으로 반환한다."""
 
     return figures_for_cells(
         db,
@@ -220,7 +217,7 @@ def bulk_reserved_by_cell(
     db: Session,
     item_ids: Iterable[uuid.UUID],
 ) -> dict[AvailabilityCell, Decimal]:
-    """Return active shipping reservation totals keyed by physical stock cell."""
+    """활성 출하 예약을 물리 재고 셀별로 합산한다."""
 
     ids = list(dict.fromkeys(item_ids))
     if not ids:
@@ -257,7 +254,7 @@ def location_available_quantity(
     location: InventoryLocation,
     reserved_by_cell: Mapping[AvailabilityCell, Decimal],
 ) -> Decimal:
-    """Return canonical availability for one location response row."""
+    """위치 응답 한 행의 표준 가용량을 반환한다."""
 
     cell = AvailabilityCell.location(
         location.item_id,
@@ -275,7 +272,7 @@ def bulk_reserved_by_item(
     db: Session,
     item_ids: Iterable[uuid.UUID],
 ) -> tuple[dict[uuid.UUID, Decimal], dict[uuid.UUID, Decimal]]:
-    """Return total and warehouse-only active shipping reservation aggregates."""
+    """품목별 전체 및 창고 전용 활성 출하 예약 합계를 반환한다."""
 
     total: dict[uuid.UUID, Decimal] = {}
     warehouse: dict[uuid.UUID, Decimal] = {}

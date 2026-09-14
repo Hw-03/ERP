@@ -38,6 +38,7 @@ class InventoryIntegrityCheck(BaseModel):
 
 class InventoryIntegrityResponse(BaseModel):
     contract: Literal["inventory-integrity/v1"]
+    profile: Literal["modern", "friday-0033"] = "modern"
     status: Literal["pass", "warning", "fail"]
     blocking_count: int
     warning_count: int
@@ -49,11 +50,13 @@ class InventoryIntegrityResponse(BaseModel):
     issues: list[InventoryIntegrityIssue]
 
     def contract_payload(self) -> dict[str, Any]:
-        """Return only the stable v1 fields shared by CLI and health."""
+        """FULL backup reader가 소비하는 안정적인 v1 필드만 반환한다."""
+
         return self.model_dump(
             mode="json",
             include={
                 "contract",
+                "profile",
                 "status",
                 "blocking_count",
                 "warning_count",

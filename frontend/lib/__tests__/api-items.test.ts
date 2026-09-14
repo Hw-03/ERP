@@ -113,20 +113,10 @@ describe("itemsApi.createItem / updateItem", () => {
       Promise.resolve(makeResponse({ body: { item_id: "new" } })),
     );
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
-    await itemsApi.createItem({
-      item_name: "A",
-      initial_quantity: 0,
-      model_slots: [],
-      unit: "EA",
-    });
+    await itemsApi.createItem({ item_name: "A" });
     const init = fetchSpy.mock.calls[0][1] as RequestInit;
     expect(init.method).toBe("POST");
-    expect(JSON.parse(init.body as string)).toEqual({
-      item_name: "A",
-      initial_quantity: 0,
-      model_slots: [],
-      unit: "EA",
-    });
+    expect(JSON.parse(init.body as string)).toEqual({ item_name: "A" });
   });
 
   it("updateItem PUTs to /api/items/{id} (R4-1 PUT 메서드 정합)", async () => {
@@ -148,9 +138,6 @@ describe("itemsApi.createItem / updateItem", () => {
 
     await itemsApi.createItem({
       item_name: "A",
-      initial_quantity: 0,
-      model_slots: [],
-      unit: "EA",
       bom_stock_exempt: true,
       sales_review_required: true,
     });
@@ -170,14 +157,11 @@ describe("itemsApi.createItem / updateItem", () => {
   });
 
   it("accepts nullable stock and purchase master fields for create and update", async () => {
-    const fetchSpy = vi.fn<typeof fetch>(() => Promise.resolve(makeResponse({ body: { item_id: "abc" } })));
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({ body: { item_id: "abc" } })));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
 
     await itemsApi.createItem({
       item_name: "A",
-      initial_quantity: 0,
-      model_slots: [],
-      unit: "EA",
       supplier_item_code: "SUP-1",
       standard_purchase_price: "1234.50",
       purchase_price_effective_date: "2026-09-01",
@@ -187,7 +171,6 @@ describe("itemsApi.createItem / updateItem", () => {
       purchase_memo: "납기 전 연락",
     });
     await itemsApi.updateItem("abc", {
-      mes_code: null,
       supplier: null,
       supplier_item_code: null,
       standard_purchase_price: null,
@@ -206,7 +189,6 @@ describe("itemsApi.createItem / updateItem", () => {
       purchase_memo: "납기 전 연락",
     });
     expect(JSON.parse((fetchSpy.mock.calls[1][1] as RequestInit).body as string)).toMatchObject({
-      mes_code: null,
       supplier: null,
       standard_purchase_price: null,
       minimum_order_quantity: null,

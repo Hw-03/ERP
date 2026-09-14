@@ -31,7 +31,7 @@ interface Props {
 
 export function DepartmentQueuePanel({ approverEmployeeId, refreshNonce, onChanged, onEmptyStateChange, targetRequestId }: Props) {
   const { data: items = [], isLoading: loading, error: qError, refetch } =
-    useDepartmentQueueQuery(approverEmployeeId, targetRequestId);
+    useDepartmentQueueQuery(approverEmployeeId);
   const approveMutation = useApproveStockRequestDepartmentMutation();
   const rejectMutation = useRejectStockRequestDepartmentMutation();
   const error = qError

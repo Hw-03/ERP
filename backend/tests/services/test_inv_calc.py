@@ -13,12 +13,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from app.models import (
-    DepartmentEnum,
-    LocationStatusEnum,
-    ShippingAllocation,
-    ShippingRequest,
-)
+from app.models import LocationStatusEnum
 from app.services import inv_calc
 
 D = Decimal
@@ -77,38 +72,14 @@ def test_available_excludes_defective_and_pending(make_item, make_location, db_s
         item.item_id, status=LocationStatusEnum.DEFECTIVE, quantity=D("100")
     )
     defective.pending_quantity = D("90")
-    request = ShippingRequest(
-        base_pf_item_id=item.item_id,
-        request_quantity=1,
-        requested_by_name="inv-calc-test",
-    )
-    db_session.add(request)
-    db_session.flush()
-    db_session.add_all(
-        (
-            ShippingAllocation(
-                request_id=request.request_id,
-                item_id=item.item_id,
-                quantity=D("2"),
-                department=None,
-                status="RESERVED",
-            ),
-            ShippingAllocation(
-                request_id=request.request_id,
-                item_id=item.item_id,
-                quantity=D("1"),
-                department=DepartmentEnum.ASSEMBLY.value,
-                status="RESERVED",
-            ),
-        )
-    )
     db_session.flush()
     inv = item.inventory
-    assert inv_calc.available(inv, db=db_session) == D("7")
+    # available = (warehouse - wh pending) + (production - production pending).
+    assert inv_calc.available(inv, db=db_session) == D("10")
 
 
-def test_available_requires_db_for_canonical_reservations(make_item, db_session):
+def test_available_warehouse_only_without_db(make_item, db_session):
     item = make_item(warehouse_qty=D("8"), pending=D("3"))
     inv = item.inventory
-    with pytest.raises(TypeError):
-        inv_calc.available(inv)
+    # db 없으면 production 미계산 → warehouse - pending = 5
+    assert inv_calc.available(inv) == D("5")

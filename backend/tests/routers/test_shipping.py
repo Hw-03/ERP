@@ -6,23 +6,16 @@ from decimal import Decimal
 from typing import Any, Callable
 
 import pytest
-from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 from app.models import (
     DepartmentEnum,
     Employee,
     EmployeeLevelEnum,
-    ShippingAllocation,
     ShippingRequest,
-    ShippingRequestBomLine,
-    ShippingRequestCompanionLine,
     ShippingRequestStatusEnum,
     TransactionLog,
-    TransactionTypeEnum,
 )
-from app.services import shipping as shipping_svc
-from app.services.pin_auth import hash_pin
 
 
 def _line(item, qty=1, stage="PA", *, included=True, origin="CUSTOM"):
@@ -52,8 +45,6 @@ def _employee(
         level=EmployeeLevelEnum.STAFF,
         display_order=0,
         is_active=is_active,
-        pin_hash=hash_pin("2468"),
-        pin_requires_change=False,
     )
     db_session.add(employee)
     db_session.flush()
@@ -107,12 +98,9 @@ def _shipping_actor_header(client, db_session):
         department=DepartmentEnum.ASSEMBLY,
     )
     db_session.commit()
-    login = client.post(
-        "/api/operator-session",
-        json={"employee_id": str(actor.employee_id), "pin": "2468"},
-    )
-    assert login.status_code == 200, login.text
-    yield actor
+    client.headers["X-MES-Employee-Code"] = actor.employee_code
+    yield
+    client.headers.pop("X-MES-Employee-Code", None)
 
 
 def _component_change_payload(
@@ -208,7 +196,7 @@ def _prepared_shipping_component_change(
         "/api/shipping/requests",
         json={
             "base_pf_item_id": str(base_pf.item_id),
-            "requested_by_name": "출하 테스트 작업자",
+            "requested_by_name": "출하 요청 생성자",
             "custom_pa_name": "Request Changed PA",
             "custom_pf_name": "Request Changed PF",
             "request_quantity": 1,
@@ -225,8 +213,13 @@ def _prepared_shipping_component_change(
 
 
 
-def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, make_bom, make_location, _shipping_actor_header):
-    component_change_actor = _shipping_actor_header
+def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, make_bom, make_location):
+    component_change_actor = _employee(
+        db_session,
+        code="shipping-request-workflow-actor",
+        name="출하 워크플로 실행자",
+        department=DepartmentEnum.SHIPPING,
+    )
     af = make_item(name="AF Main", process_type_code="AF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=1)
     pouch = make_item(name="Pouch", process_type_code="PR", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)
     carton = make_item(name="Carton", process_type_code="PR", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
@@ -243,7 +236,7 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
         "/api/shipping/requests",
         json={
                 "base_pf_item_id": str(base_pf.item_id),
-                "requested_by_name": component_change_actor.name,
+                "requested_by_name": "shipping-user",
                 "invoice_number": "workflow-001",
                 "custom_pa_name": "Base PF with Pouch PA",
             "custom_pf_name": "Base PF with Pouch",
@@ -262,16 +255,6 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
     assert create.json()["companion_lines"][0]["quantity"] == 2
     assert len(create.json()["bom_lines"]) == 3
     assert create.json()["transaction_count"] == 0
-    created_event = next(
-        event
-        for event in create.json()["events"]
-        if event["event_type"] == "REQUEST_CREATED"
-    )
-    assert created_event["actor_employee_id"] == str(
-        component_change_actor.employee_id
-    )
-    assert created_event["actor_employee_code"] == component_change_actor.employee_code
-    assert created_event["actor_name"] == component_change_actor.name
     assert any(line["item_name"] == "Pouch" for line in create.json()["checklist_lines"])
 
     requested_filter = client.get(
@@ -288,6 +271,7 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
     preview = client.get(
         f"/api/shipping/requests/{request_id}/component-change-preview",
         params={
+            "requester_employee_id": str(component_change_actor.employee_id),
             "source_pa_item_id": str(base_pa.item_id),
             "quantity": 2,
         },
@@ -299,6 +283,7 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
 
     component_change = client.post(
         f"/api/shipping/requests/{request_id}/component-change",
+        headers={"X-MES-Employee-Code": component_change_actor.employee_code},
         json={"source_pa_item_id": str(base_pa.item_id), "quantity": 2, "memo": "출하 구성 전환"},
     )
     assert component_change.status_code == 200, component_change.text
@@ -417,7 +402,7 @@ def test_shipping_request_component_change_attributes_all_logs_to_executor(
     assert {log.producer_employee_id for log in logs} == {executor.employee_id}
 
 
-def test_shipping_request_component_change_uses_session_without_employee_header(
+def test_shipping_request_component_change_requires_employee_header(
     client, db_session, make_item, make_bom, make_location
 ):
     request_id, payload = _prepared_shipping_component_change(
@@ -428,12 +413,17 @@ def test_shipping_request_component_change_uses_session_without_employee_header(
         make_location,
     )
 
+    client.headers.pop("X-MES-Employee-Code")
     response = client.post(f"/api/shipping/requests/{request_id}/component-change", json=payload)
 
-    assert response.status_code == 200, response.text
+    assert response.status_code == 400, response.text
+    assert response.json()["detail"] == {
+        "code": "BAD_REQUEST",
+        "message": "작업자 사번 헤더가 필요합니다.",
+    }
 
 
-def test_shipping_request_component_change_rejects_unknown_actor_header(
+def test_shipping_request_component_change_returns_404_for_unknown_header_employee(
     client, db_session, make_item, make_bom, make_location
 ):
     request_id, payload = _prepared_shipping_component_change(
@@ -450,8 +440,11 @@ def test_shipping_request_component_change_rejects_unknown_actor_header(
         json=payload,
     )
 
-    assert response.status_code == 403, response.text
-    assert response.json()["detail"]["code"] == "ACTOR_MISMATCH"
+    assert response.status_code == 404, response.text
+    assert response.json()["detail"] == {
+        "code": "NOT_FOUND",
+        "message": "작업자(직원)를 찾을 수 없습니다.",
+    }
 
 
 def test_shipping_request_component_change_returns_403_for_inactive_header_employee(
@@ -479,8 +472,8 @@ def test_shipping_request_component_change_returns_403_for_inactive_header_emplo
 
     assert response.status_code == 403, response.text
     assert response.json()["detail"] == {
-        "code": "EMPLOYEE_INACTIVE",
-        "message": "비활성 직원입니다.",
+        "code": "FORBIDDEN",
+        "message": "비활성 직원은 품목 전환을 실행할 수 없습니다.",
     }
 
 
@@ -499,7 +492,7 @@ def test_shipping_request_duplicate_custom_pa_name_returns_readable_korean_error
         "/api/shipping/requests",
         json={
             "base_pf_item_id": str(base_pf.item_id),
-            "requested_by_name": "출하 테스트 작업자",
+            "requested_by_name": "shipping-user",
             "custom_pa_name": "UI TEST",
             "custom_pf_name": "UI TEST PF",
             "bom_lines": [_line(af), _line(pouch)],
@@ -524,7 +517,7 @@ def test_shipping_request_update_can_reuse_its_generated_pa_pf_names(client, db_
         "/api/shipping/requests",
         json={
             "base_pf_item_id": str(base_pf.item_id),
-            "requested_by_name": "출하 테스트 작업자",
+            "requested_by_name": "shipping-user",
             "custom_pa_name": "UI TEST",
             "custom_pf_name": "UI TEST",
             "bom_lines": [_line(af), _line(pouch)],
@@ -686,15 +679,28 @@ def test_shipping_request_component_change_rejects_other_department_preview_and_
     assert executed.status_code == 403, executed.text
 
 
-def test_independent_component_change_preview_requires_requester_employee_id(client):
-    response = client.get(
-        "/api/shipping/component-change-preview",
-        params={
-            "source_pa_item_id": "00000000-0000-0000-0000-000000000001",
-            "target_pa_item_id": "00000000-0000-0000-0000-000000000002",
-            "quantity": 1,
-        },
-    )
+@pytest.mark.parametrize(
+    ("path", "params"),
+    [
+        (
+            "/api/shipping/component-change-preview",
+            {
+                "source_pa_item_id": "00000000-0000-0000-0000-000000000001",
+                "target_pa_item_id": "00000000-0000-0000-0000-000000000002",
+                "quantity": 1,
+            },
+        ),
+        (
+            "/api/shipping/requests/00000000-0000-0000-0000-000000000003/component-change-preview",
+            {
+                "source_pa_item_id": "00000000-0000-0000-0000-000000000004",
+                "quantity": 1,
+            },
+        ),
+    ],
+)
+def test_component_change_preview_requires_requester_employee_id(client, path, params):
+    response = client.get(path, params=params)
 
     assert response.status_code == 422, response.text
     detail = response.json()["detail"]
@@ -702,15 +708,20 @@ def test_independent_component_change_preview_requires_requester_employee_id(cli
     assert any(row["loc"][-1] == "requester_employee_id" for row in detail)
 
 
-def test_component_change_api_uses_session_without_employee_header(client, db_session, make_item, make_bom, make_location):
+def test_component_change_api_requires_employee_header(client, db_session, make_item, make_bom, make_location):
     payload = _component_change_payload(db_session, make_item, make_bom, make_location)
 
+    client.headers.pop("X-MES-Employee-Code")
     response = client.post("/api/shipping/component-change", json=payload)
 
-    assert response.status_code == 200, response.text
+    assert response.status_code == 400, response.text
+    assert response.json()["detail"] == {
+        "code": "BAD_REQUEST",
+        "message": "작업자 사번 헤더가 필요합니다.",
+    }
 
 
-def test_component_change_api_rejects_unknown_actor_header(
+def test_component_change_api_returns_404_for_unknown_header_employee(
     client, db_session, make_item, make_bom, make_location
 ):
     payload = _component_change_payload(db_session, make_item, make_bom, make_location)
@@ -721,8 +732,11 @@ def test_component_change_api_rejects_unknown_actor_header(
         json=payload,
     )
 
-    assert response.status_code == 403, response.text
-    assert response.json()["detail"]["code"] == "ACTOR_MISMATCH"
+    assert response.status_code == 404, response.text
+    assert response.json()["detail"] == {
+        "code": "NOT_FOUND",
+        "message": "작업자(직원)를 찾을 수 없습니다.",
+    }
 
 
 def test_component_change_api_returns_403_for_inactive_header_employee(
@@ -744,8 +758,8 @@ def test_component_change_api_returns_403_for_inactive_header_employee(
 
     assert response.status_code == 403, response.text
     assert response.json()["detail"] == {
-        "code": "EMPLOYEE_INACTIVE",
-        "message": "비활성 직원입니다.",
+        "code": "FORBIDDEN",
+        "message": "비활성 직원은 품목 전환을 실행할 수 없습니다.",
     }
 
 
@@ -928,7 +942,7 @@ def test_item_conversion_api_requires_requester_employee_id(client):
     )
 
 
-def test_item_conversion_api_rejects_unknown_requester_claim(client):
+def test_item_conversion_api_returns_404_for_unknown_requester(client):
     response = client.post(
         "/api/io/item-conversion",
         json={
@@ -939,8 +953,8 @@ def test_item_conversion_api_rejects_unknown_requester_claim(client):
         },
     )
 
-    assert response.status_code == 403, response.text
-    assert response.json()["detail"]["code"] == "ACTOR_MISMATCH"
+    assert response.status_code == 404, response.text
+    assert response.json()["detail"]["code"] == "NOT_FOUND"
 
 
 def test_item_conversion_api_returns_403_for_inactive_requester(client, db_session):
@@ -963,7 +977,7 @@ def test_item_conversion_api_returns_403_for_inactive_requester(client, db_sessi
     )
 
     assert response.status_code == 403, response.text
-    assert response.json()["detail"]["code"] == "EMPLOYEE_INACTIVE"
+    assert response.json()["detail"]["code"] == "FORBIDDEN"
 
 
 def test_item_conversion_api_allows_only_assembly_or_shipping_department(
@@ -1143,7 +1157,7 @@ def test_shipping_mobile_list_is_read_only_shape(client, db_session, make_item, 
 
     create = client.post(
         "/api/shipping/requests",
-            json={"base_pf_item_id": str(pf.item_id), "requested_by_name": "출하 테스트 작업자", "invoice_number": "prepared-delete-001"},
+            json={"base_pf_item_id": str(pf.item_id), "requested_by_name": "shipping-user", "invoice_number": "prepared-delete-001"},
     )
     assert create.status_code == 201, create.text
     request_id = create.json()["request_id"]
@@ -1152,211 +1166,6 @@ def test_shipping_mobile_list_is_read_only_shape(client, db_session, make_item, 
     assert rows.status_code == 200, rows.text
     assert rows.json()[0]["request_id"] == request_id
     assert any(line["item_name"] == "Pouch" for line in rows.json()[0]["checklist_lines"])
-
-
-def test_shipping_active_page_uses_a_stable_cursor_for_equal_timestamps(
-    client,
-    db_session,
-    make_item,
-):
-    pf = make_item(name="Paged PF", process_type_code="PF", model_symbol="4", serial_no=1)
-    created_at = datetime(2026, 9, 7, 9, 0)
-    requests = [
-        ShippingRequest(
-            base_pf_item_id=pf.item_id,
-            status=ShippingRequestStatusEnum.PREPARING,
-            created_at=created_at,
-        )
-        for _ in range(3)
-    ]
-    db_session.add_all(requests)
-    db_session.commit()
-    expected_ids = [str(row.request_id) for row in sorted(requests, key=lambda row: row.request_id, reverse=True)]
-
-    first = client.get("/api/shipping/requests/page", params={"limit": 2})
-    assert first.status_code == 200, first.text
-    assert first.json()["has_more"] is True
-    assert first.json()["next_cursor"]
-
-    second = client.get(
-        "/api/shipping/requests/page",
-        params={"limit": 2, "cursor": first.json()["next_cursor"]},
-    )
-    assert second.status_code == 200, second.text
-    combined_ids = [row["request_id"] for row in first.json()["requests"] + second.json()["requests"]]
-    assert combined_ids == expected_ids
-    assert len(combined_ids) == len(set(combined_ids))
-    assert second.json()["has_more"] is False
-
-
-def test_shipping_page_query_count_does_not_scale_with_response_rows(
-    client,
-    db_session,
-    make_item,
-    make_bom,
-    make_location,
-):
-    af = make_item(name="Query Count AF", process_type_code="AF", model_symbol="4", serial_no=1)
-    pa = make_item(name="Query Count PA", process_type_code="PA", model_symbol="4", serial_no=2)
-    pf = make_item(name="Query Count PF", process_type_code="PF", model_symbol="4", serial_no=3)
-    companion = make_item(name="Query Count Companion", process_type_code="PR", model_symbol="4", serial_no=4)
-    make_bom(pa.item_id, af.item_id, Decimal("1"))
-    make_bom(pf.item_id, pa.item_id, Decimal("1"))
-    for item in (pa, af, companion):
-        make_location(
-            item.item_id,
-            department=shipping_svc.inventory_svc.department_for_item(item),
-            quantity=Decimal("1"),
-        )
-    db_session.commit()
-    request_ids: list[str] = []
-    for _index in range(4):
-        created = client.post(
-            "/api/shipping/requests",
-            json={
-                "base_pf_item_id": str(pf.item_id),
-                "request_quantity": 2,
-                "companion_lines": [
-                    {"item_id": str(companion.item_id), "quantity": 2, "unit": "EA"},
-                ],
-            },
-        )
-        assert created.status_code == 201, created.text
-        request_ids.append(created.json()["request_id"])
-    db_session.add(
-        ShippingAllocation(
-            request_id=request_ids[0],
-            item_id=companion.item_id,
-            quantity=1,
-            unit="EA",
-            department=shipping_svc.inventory_svc.department_for_item(companion).value,
-            status="RESERVED",
-        )
-    )
-    db_session.commit()
-
-    def select_count(limit: int) -> int:
-        statements: list[str] = []
-
-        def capture_select(_conn, _cursor, statement, _parameters, _context, _executemany):
-            if statement.lstrip().upper().startswith("SELECT"):
-                statements.append(statement)
-
-        event.listen(db_session.bind, "before_cursor_execute", capture_select)
-        try:
-            response = client.get("/api/shipping/requests/page", params={"limit": limit})
-        finally:
-            event.remove(db_session.bind, "before_cursor_execute", capture_select)
-        assert response.status_code == 200, response.text
-        assert len(response.json()["requests"]) == limit
-        assert all(row["stock_shortages"] for row in response.json()["requests"])
-        return len(statements)
-
-    assert select_count(1) == select_count(4)
-
-
-def test_shipping_request_detail_query_count_does_not_scale_with_child_rows(
-    client,
-    db_session,
-    make_item,
-):
-    pa = make_item(name="Detail Query PA", process_type_code="PA", model_symbol="4", serial_no=1)
-    pf = make_item(name="Detail Query PF", process_type_code="PF", model_symbol="4", serial_no=2)
-    bom_items = [
-        make_item(name=f"Detail BOM {index}", process_type_code="PR", model_symbol="4", serial_no=10 + index)
-        for index in range(3)
-    ]
-    companion_items = [
-        make_item(name=f"Detail Companion {index}", process_type_code="PR", model_symbol="4", serial_no=20 + index)
-        for index in range(3)
-    ]
-    transaction_items = [
-        make_item(name=f"Detail Transaction {index}", process_type_code="PR", model_symbol="4", serial_no=30 + index)
-        for index in range(3)
-    ]
-    sparse = ShippingRequest(
-        base_pf_item_id=pf.item_id,
-        final_pa_item_id=pa.item_id,
-        final_pf_item_id=pf.item_id,
-        status=ShippingRequestStatusEnum.PREPARING,
-    )
-    dense = ShippingRequest(
-        base_pf_item_id=pf.item_id,
-        final_pa_item_id=pa.item_id,
-        final_pf_item_id=pf.item_id,
-        status=ShippingRequestStatusEnum.PREPARING,
-    )
-    db_session.add_all([sparse, dense])
-    db_session.flush()
-
-    def add_children(request, count: int) -> None:
-        db_session.add_all([
-            ShippingRequestBomLine(
-                request_id=request.request_id,
-                parent_stage="PA",
-                child_item_id=item.item_id,
-                quantity=1,
-                unit="EA",
-                included=True,
-                origin="CUSTOM",
-                sort_order=index,
-            )
-            for index, item in enumerate(bom_items[:count])
-        ])
-        db_session.add_all([
-            ShippingRequestCompanionLine(
-                request_id=request.request_id,
-                item_id=item.item_id,
-                quantity=1,
-                unit="EA",
-                sort_order=index,
-            )
-            for index, item in enumerate(companion_items[:count])
-        ])
-        db_session.add_all([
-            TransactionLog(
-                item_id=item.item_id,
-                transaction_type=TransactionTypeEnum.SHIP,
-                quantity_change=-1,
-                quantity_before=1,
-                quantity_after=0,
-                shipping_request_id=request.request_id,
-                shipping_phase="PICKUP",
-                inventory_effect=[],
-            )
-            for item in transaction_items[:count]
-        ])
-
-    add_children(sparse, 1)
-    add_children(dense, 3)
-    db_session.commit()
-
-    def select_count(request_id: uuid.UUID) -> tuple[int, dict[str, Any]]:
-        statements: list[str] = []
-
-        def capture_select(_conn, _cursor, statement, _parameters, _context, _executemany):
-            if statement.lstrip().upper().startswith("SELECT"):
-                statements.append(statement)
-
-        db_session.expire_all()
-        event.listen(db_session.bind, "before_cursor_execute", capture_select)
-        try:
-            response = client.get(f"/api/shipping/requests/{request_id}")
-        finally:
-            event.remove(db_session.bind, "before_cursor_execute", capture_select)
-        assert response.status_code == 200, response.text
-        return len(statements), response.json()
-
-    sparse_count, sparse_body = select_count(sparse.request_id)
-    dense_count, dense_body = select_count(dense.request_id)
-
-    assert len(sparse_body["bom_lines"]) == 1
-    assert len(dense_body["bom_lines"]) == 3
-    assert len(sparse_body["companion_lines"]) == 1
-    assert len(dense_body["companion_lines"]) == 3
-    assert sparse_body["transaction_count"] == 1
-    assert dense_body["transaction_count"] == 3
-    assert sparse_count == dense_count
 
 
 def test_shipping_bom_included_origin_and_match_flags(client, db_session, make_item, make_bom):
@@ -1373,7 +1182,7 @@ def test_shipping_bom_included_origin_and_match_flags(client, db_session, make_i
         "/api/shipping/requests",
         json={
             "base_pf_item_id": str(pf.item_id),
-            "requested_by_name": "출하 테스트 작업자",
+            "requested_by_name": "shipping-user",
             "bom_lines": [
                 _line(pa, stage="PF", origin="DEFAULT"),
                 _line(af, stage="PA", origin="DEFAULT"),
@@ -1436,7 +1245,7 @@ def test_preparing_shipping_requests_can_be_deleted(client, db_session, make_ite
 
     create = client.post(
         "/api/shipping/requests",
-            json={"base_pf_item_id": str(pf.item_id), "requested_by_name": "출하 테스트 작업자", "invoice_number": "shortage-001"},
+            json={"base_pf_item_id": str(pf.item_id), "requested_by_name": "shipping-user", "invoice_number": "shortage-001"},
     )
     assert create.status_code == 201, create.text
     request_id = create.json()["request_id"]
@@ -1459,7 +1268,7 @@ def test_prepared_and_picked_up_shipping_requests_cannot_be_deleted(client, db_s
 
     create = client.post(
         "/api/shipping/requests",
-        json={"base_pf_item_id": str(pf.item_id), "requested_by_name": "출하 테스트 작업자", "invoice_number": "prepared-delete-001"},
+        json={"base_pf_item_id": str(pf.item_id), "requested_by_name": "shipping-user", "invoice_number": "prepared-delete-001"},
     )
     assert create.status_code == 201, create.text
     request_id = create.json()["request_id"]
@@ -1493,7 +1302,7 @@ def test_shipping_prepare_complete_requires_final_pf_shipping_department_stock(c
 
     create = client.post(
         "/api/shipping/requests",
-        json={"base_pf_item_id": str(pf.item_id), "requested_by_name": "출하 테스트 작업자", "invoice_number": "shortage-001"},
+        json={"base_pf_item_id": str(pf.item_id), "requested_by_name": "shipping-user", "invoice_number": "shortage-001"},
     )
     assert create.status_code == 201, create.text
     request_id = create.json()["request_id"]
@@ -1519,7 +1328,7 @@ def test_shipping_prepare_complete_accepts_preproduced_pf_in_shipping_department
 
     create = client.post(
         "/api/shipping/requests",
-        json={"base_pf_item_id": str(pf.item_id), "requested_by_name": "출하 테스트 작업자", "invoice_number": "shipping-stock-001"},
+        json={"base_pf_item_id": str(pf.item_id), "requested_by_name": "shipping-user", "invoice_number": "shipping-stock-001"},
     )
     assert create.status_code == 201, create.text
     request_id = create.json()["request_id"]
@@ -1559,7 +1368,7 @@ def test_shipping_prepare_actor_is_snapshotted_cleared_and_used_for_pickup_logs(
         "/api/shipping/requests",
         json={
             "base_pf_item_id": str(pf.item_id),
-            "requested_by_name": actor.name,
+            "requested_by_name": "Different requester",
             "invoice_number": "prepared-actor-001",
         },
     )
@@ -1604,7 +1413,7 @@ def test_shipping_prepare_actor_is_snapshotted_cleared_and_used_for_pickup_logs(
 
 @pytest.mark.parametrize(
     ("actor_mode", "expected_status"),
-    [("inactive", 403)],
+    [("missing", 400), ("inactive", 403)],
 )
 def test_shipping_prepare_complete_rejects_invalid_actor_without_state_changes(
     client,
@@ -1713,7 +1522,7 @@ def test_shipping_preparing_response_includes_stock_shortages(client, db_session
         "/api/shipping/requests",
         json={
             "base_pf_item_id": str(pf.item_id),
-            "requested_by_name": "출하 테스트 작업자",
+            "requested_by_name": "shipping-user",
             "companion_lines": [{"item_id": str(companion.item_id), "quantity": 2, "unit": "EA"}],
         },
     )
@@ -1827,13 +1636,14 @@ def test_shipping_invoice_revision_and_cancel_are_attributed_and_retained(client
     assert sum(row["count"] for row in months.json()) == 2
 
 
-def test_shipping_session_allows_missing_header_and_rejects_spoofed_actors(client, db_session, make_item, make_bom):
+def test_shipping_actor_header_rejects_missing_unknown_and_inactive(client, db_session, make_item, make_bom):
     af = make_item(name="Actor AF", process_type_code="AF", model_symbol="4", serial_no=1)
     pa = make_item(name="Actor PA", process_type_code="PA", model_symbol="4", serial_no=2)
     pf = make_item(name="Actor PF", process_type_code="PF", model_symbol="4", serial_no=3)
     make_bom(pa.item_id, af.item_id, Decimal("1"))
     make_bom(pf.item_id, pa.item_id, Decimal("1"))
     db_session.commit()
+    client.headers.pop("X-MES-Employee-Code")
     created = client.post(
         "/api/shipping/requests",
         json={"base_pf_item_id": str(pf.item_id), "invoice_number": "ACTOR-HEADER"},
@@ -1841,12 +1651,12 @@ def test_shipping_session_allows_missing_header_and_rejects_spoofed_actors(clien
     assert created.status_code == 201, created.text
     path = f"/api/shipping/requests/{created.json()['request_id']}"
 
-    assert client.patch(path, json={"notes": "session actor"}).status_code == 200
+    assert client.patch(path, json={"notes": "missing"}).status_code == 400
     assert client.patch(
         path,
         headers={"X-MES-Employee-Code": "unknown-actor"},
         json={"notes": "unknown"},
-    ).status_code == 403
+    ).status_code == 404
     inactive = _employee(
         db_session,
         code="inactive-shipping-actor",

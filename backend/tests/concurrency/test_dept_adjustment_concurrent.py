@@ -17,32 +17,12 @@ BACKEND_DIR = Path(__file__).resolve().parents[2]
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from app.models import (  # noqa: E402
-    DepartmentEnum,
-    Employee,
-    EmployeeLevelEnum,
-    Inventory,
-    InventoryLocation,
-    Item,
-    LocationStatusEnum,
-)
-from app.models import DeptAdjSubTypeEnum  # noqa: E402
-from app.services.pin_auth import hash_pin  # noqa: E402
+from app.models import DepartmentEnum, Inventory, InventoryLocation, Item, LocationStatusEnum
+from app.models import DeptAdjSubTypeEnum
 
 
 def _setup_two_items(make_session, loc_qty: Decimal, dept: DepartmentEnum):
     session = make_session()
-    actor = Employee(
-        employee_code="CONCURRENT-DEPT",
-        name="동시 조정자",
-        role=f"{dept.value}/staff",
-        department=dept,
-        level=EmployeeLevelEnum.STAFF,
-        display_order=0,
-        is_active=True,
-        pin_hash=hash_pin("2468"),
-        pin_requires_change=False,
-    )
     item_a = Item(
         item_name="조정테스트A", process_type_code="TR", unit="EA",
         model_symbol="9", serial_no=1,
@@ -51,7 +31,7 @@ def _setup_two_items(make_session, loc_qty: Decimal, dept: DepartmentEnum):
         item_name="조정테스트B", process_type_code="TR", unit="EA",
         model_symbol="9", serial_no=2,
     )
-    session.add_all([actor, item_a, item_b])
+    session.add_all([item_a, item_b])
     session.flush()
 
     for item in [item_a, item_b]:
@@ -72,7 +52,7 @@ def _setup_two_items(make_session, loc_qty: Decimal, dept: DepartmentEnum):
         session.add(loc)
 
     session.commit()
-    ids = item_a.item_id, item_b.item_id, actor.employee_id
+    ids = item_a.item_id, item_b.item_id
     session.close()
     return ids
 
@@ -84,7 +64,7 @@ def test_concurrent_dept_adjustment_no_deadlock(concurrent_engine, make_session)
 
     dept = DepartmentEnum.ASSEMBLY
     loc_qty = Decimal("20")
-    item_a_id, item_b_id, actor_id = _setup_two_items(make_session, loc_qty, dept)
+    item_a_id, item_b_id = _setup_two_items(make_session, loc_qty, dept)
 
     successes = []
     failures = []
@@ -97,13 +77,7 @@ def test_concurrent_dept_adjustment_no_deadlock(concurrent_engine, make_session)
                 AdjLine(item_id=item_a_id, direction="out", quantity=Decimal("1"), department=dept),
                 AdjLine(item_id=item_b_id, direction="out", quantity=Decimal("1"), department=dept),
             ]
-            actor = session.query(Employee).filter(Employee.employee_id == actor_id).one()
-            submit_adjustment(
-                session,
-                DeptAdjSubTypeEnum.CORRECTION,
-                lines,
-                actor=actor,
-            )
+            submit_adjustment(session, DeptAdjSubTypeEnum.CORRECTION, lines)
             session.commit()
             successes.append("ab")
         except ValueError as e:
@@ -123,13 +97,7 @@ def test_concurrent_dept_adjustment_no_deadlock(concurrent_engine, make_session)
                 AdjLine(item_id=item_b_id, direction="out", quantity=Decimal("1"), department=dept),
                 AdjLine(item_id=item_a_id, direction="out", quantity=Decimal("1"), department=dept),
             ]
-            actor = session.query(Employee).filter(Employee.employee_id == actor_id).one()
-            submit_adjustment(
-                session,
-                DeptAdjSubTypeEnum.CORRECTION,
-                lines,
-                actor=actor,
-            )
+            submit_adjustment(session, DeptAdjSubTypeEnum.CORRECTION, lines)
             session.commit()
             successes.append("ba")
         except ValueError as e:

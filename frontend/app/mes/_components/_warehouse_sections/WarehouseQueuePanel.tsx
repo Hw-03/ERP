@@ -20,8 +20,7 @@ interface Props {
 }
 
 export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChanged, onEmptyStateChange, targetRequestId }: Props) {
-  const { data: items = [], isLoading: loading, error: qError, refetch } =
-    useWarehouseQueueQuery(targetRequestId);
+  const { data: items = [], isLoading: loading, error: qError, refetch } = useWarehouseQueueQuery();
   const approveMutation = useApproveStockRequestMutation();
   const rejectMutation = useRejectStockRequestMutation();
   const error = qError ? (qError instanceof Error ? qError.message : "승인함을 불러오지 못했습니다.") : null;

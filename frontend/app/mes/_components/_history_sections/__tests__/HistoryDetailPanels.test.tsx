@@ -180,7 +180,6 @@ beforeEach(() => {
     planHash: "a".repeat(64),
     canCancel: true,
     blockers: [],
-    warnings: [],
     cells: [],
     defectRecords: [],
     effects: [],
@@ -1172,14 +1171,8 @@ describe("desktop history detail panels", () => {
   });
 
   it("previews and cancels every line of a new-ledger operation with the reviewed plan hash", async () => {
-    vi.mocked((productionApi as any).previewInventoryOperationCancellation).mockResolvedValue({
-      operationId: "operation-1",
-      planHash: "a".repeat(64),
-      canCancel: true,
-      blockers: [],
-      warnings: ["레거시 효과 위치는 추정하지 않습니다."],
-      cells: [],
-      defectRecords: [],
+    vi.mocked(productionApi.previewInventoryOperationCancellation).mockResolvedValue({
+      operationId: "operation-1", planHash: "a".repeat(64), canCancel: true, blockers: [], cells: [], defectRecords: [],
       effects: [{ subject_type: "ShippingRequest", target_state: { status: "PREPARED" } }],
     });
     const selected = makeLog({
@@ -1219,9 +1212,6 @@ describe("desktop history detail panels", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "이 내역 취소" }));
     expect(await screen.findByText("취소할 내역 2건")).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "레거시 효과 위치는 추정하지 않습니다.",
-    );
     expect(screen.getByText("출고 재고를 복원하고 준비 완료 및 출하 예약 상태로 돌아갑니다.")).toBeInTheDocument();
     expect(
       within(screen.getByTestId("history-cancel-confirmation")).getByText("하위 자재 B"),

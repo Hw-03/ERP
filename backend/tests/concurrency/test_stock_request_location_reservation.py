@@ -15,7 +15,6 @@ from app.models import (
     StockRequest,
     StockRequestStatusEnum,
     StockRequestTypeEnum,
-    WarehouseUnplacedItem,
 )
 from app.services import inventory as inventory_svc
 from app.services import sr_approval
@@ -40,16 +39,13 @@ def _seed_item(make_session, *, assembly_qty: int, tube_qty: int = 0):
     )
     session.add(item)
     session.flush()
-    session.add_all(
-        [
-            Inventory(
-                item_id=item.item_id,
-                quantity=assembly_qty + tube_qty,
-                warehouse_qty=0,
-                pending_quantity=0,
-            ),
-            WarehouseUnplacedItem(item_id=item.item_id, quantity=0),
-        ]
+    session.add(
+        Inventory(
+            item_id=item.item_id,
+            quantity=assembly_qty + tube_qty,
+            warehouse_qty=0,
+            pending_quantity=0,
+        )
     )
     for department, quantity in ((ASSEMBLY, assembly_qty), (TUBE, tube_qty)):
         if quantity:
@@ -74,7 +70,7 @@ def test_concurrent_same_location_cannot_oversubscribe(make_session):
     def reserve() -> bool:
         session = make_session()
         try:
-            inventory_svc._reserve_location(
+            inventory_svc.reserve_location(
                 session,
                 item_id,
                 D("4"),
@@ -108,7 +104,7 @@ def test_concurrent_different_departments_reserve_independently(make_session):
     def reserve(department: DepartmentEnum) -> None:
         session = make_session()
         try:
-            inventory_svc._reserve_location(
+            inventory_svc.reserve_location(
                 session,
                 item_id,
                 D("4"),

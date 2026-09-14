@@ -42,7 +42,7 @@ def _create_current_head_dev_db(
     item_name: str,
     warehouse_qty: int,
 ) -> str:
-    from app.models import Inventory, Item, ProcessType, WarehouseUnplacedItem
+    from app.models import Inventory, Item, ProcessType
     from bootstrap.schema import ensure_schema
     from sqlalchemy import create_engine
     from sqlalchemy.orm import Session
@@ -69,12 +69,6 @@ def _create_current_head_dev_db(
                     quantity=warehouse_qty,
                     warehouse_qty=warehouse_qty,
                     pending_quantity=0,
-                )
-            )
-            session.add(
-                WarehouseUnplacedItem(
-                    item_id=item.item_id,
-                    quantity=warehouse_qty,
                 )
             )
             session.commit()

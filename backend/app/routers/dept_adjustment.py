@@ -13,24 +13,19 @@ import uuid
 from decimal import Decimal
 from typing import Literal, List, Optional
 
-from fastapi import Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies.verified_actor import (
-    VerifiedActor,
-    VerifiedActorRouter,
-    ensure_actor_employee_code,
-    ensure_actor_employee_name,
-)
-from app.models import DepartmentEnum, DeptAdjSubTypeEnum
+from app.models import DepartmentEnum, DeptAdjSubTypeEnum, Item
 from app.routers._errors import ErrorCode, http_error
 from app.services import dept_adjustment as svc
 from app._evt import emit as _evt_emit
 from app.repositories import item_repository
+from app.routers.inventory._tx_helper import resolve_producer
 
-router = VerifiedActorRouter()
+router = APIRouter()
 
 logger = logging.getLogger("mes")
 
@@ -133,7 +128,7 @@ def get_bom_template(
     db: Session = Depends(get_db),
 ):
     """BOM 기반 초기 라인 세트 반환."""
-    item = item_repository.get_active(db, item_id)
+    item = item_repository.get(db, item_id)
     if item is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
@@ -173,13 +168,9 @@ def expand_component(
 def submit_adjustment(
     payload: DeptAdjSubmitRequest,
     http_request: Request,
-    actor: VerifiedActor,
     db: Session = Depends(get_db),
 ):
     """부서 재고 조정 배치 원자 처리."""
-    ensure_actor_employee_code(actor, payload.operator_employee_code)
-    ensure_actor_employee_name(actor, payload.operator_name)
-
     sub_type_enum = DeptAdjSubTypeEnum(payload.sub_type)
 
     adj_lines: list[svc.AdjLine] = []
@@ -199,12 +190,15 @@ def submit_adjustment(
             bom_auto_token=ln.bom_auto_token,
         ))
 
+    _, producer_id = resolve_producer(db, payload.operator_employee_code)
+
     try:
         log_ids = svc.submit_adjustment(
             db,
             sub_type_enum,
             adj_lines,
-            actor=actor,
+            operator_name=payload.operator_name,
+            producer_employee_id=producer_id,
             reference_no=payload.reference_no,
             notes=payload.notes,
         )
@@ -220,7 +214,7 @@ def submit_adjustment(
         request=http_request,
         sub_type=payload.sub_type,
         lines=len(log_ids),
-        operator=actor.name,
+        operator=payload.operator_name or "-",
     )
 
     sub_label = {"production": "생산/조립", "disassembly": "분해/회수", "correction": "수량 보정"}

@@ -36,6 +36,7 @@ export interface AdminSectionContentProps {
   productModels: ProductModel[];
   setProductModels: Dispatch<SetStateAction<ProductModel[]>>;
   departments: DepartmentMaster[];
+  setDepartments: Dispatch<SetStateAction<DepartmentMaster[]>>;
   selectedDept: DepartmentMaster | null;
   setSelectedDept: Dispatch<SetStateAction<DepartmentMaster | null>>;
   allBomRows: BOMDetailEntry[];
@@ -55,7 +56,7 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
     items, setItems,
     employees, setEmployees,
     productModels, setProductModels,
-    departments,
+    departments, setDepartments,
     selectedDept, setSelectedDept,
     allBomRows, refreshAllBom, refreshItems,
     pinForm, setPinForm,
@@ -120,13 +121,21 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
     return (
       <AdminDepartmentsProvider
         departments={departments}
+        setDepartments={setDepartments}
         selectedDept={selectedDept}
         setSelectedDept={setSelectedDept}
         onStatusChange={onStatusChange}
         onError={setMessage}
         adminPin={adminPin}
       >
-        <AdminDepartmentsSection employees={employees} items={items} />
+        <AdminDepartmentsSection
+          employees={employees}
+          items={items}
+          adminPin={adminPin}
+          setDepartments={setDepartments}
+          onStatusChange={onStatusChange}
+          onError={setMessage}
+        />
       </AdminDepartmentsProvider>
     );
   }

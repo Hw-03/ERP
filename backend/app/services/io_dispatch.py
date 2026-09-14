@@ -29,7 +29,6 @@ from app.models import (
     TransactionLog,
     TransactionTypeEnum,
 )
-from app.schemas import IoSubmitRequest
 from app.services import inventory as inventory_svc
 from app.services import inv_effect
 from app.services import inventory_operations as operation_svc
@@ -41,21 +40,18 @@ from app.services.bom_stock_policy import (
     io_bom_auto_claims,
     is_bom_generated_line,
 )
-from app.services.command_idempotency import (
-    IdempotencyConflict,
-    fingerprint_io_draft_submit,
-    require_matching_fingerprint,
-)
-from app.services import io_draft
 from app.services.io_preview import (
     APPROVAL_SUB_TYPES,
     INTERNAL_USE_SUB_TYPE,
     MANUAL_LINE_ORIGINS,
+    automatic_department_headers,
     _bucket_available,
     _d,
     _get_item,
     normalize_process_sub_type,
+    normalize_automatic_department_routes,
     validate_process_bom_parent_lines,
+    validate_receive_requester,
     validate_saved_operation_sources,
     validate_internal_use_bundles,
     validate_internal_use_operation,
@@ -63,16 +59,14 @@ from app.services.io_preview import (
     validate_warehouse_adjust_operation,
     validate_warehouse_adjust_requester,
 )
-from app.services.approval_rules import approval_kind
 from app.services.io_persist import (
     _batch_to_payload,
     ensure_batch_is_mutable,
+    _load_requester,
     _persist_batch,
-    _lock_active_batch_items,
-    _normalize_batch_bom_stock_exempt,
-    _normalize_automatic_batch_routes_with_draft_fingerprint_refresh,
-    _sync_batch_from_stock_requests,
+    normalize_batch_bom_stock_exempt,
     normalize_automatic_routes_with_bom_token_refresh,
+    sync_batch_from_stock_requests,
 )
 
 
@@ -86,13 +80,17 @@ def _normalize_automatic_batch_routes(
     custom_bundle_ids: Optional[set[uuid.UUID]] = None,
 ) -> None:
     """live 부서를 갱신하되 서버가 확정한 커스텀 BOM 낱개 입출고를 유지한다."""
-    _normalize_automatic_batch_routes_with_draft_fingerprint_refresh(
+    normalized = normalize_automatic_department_routes(
         db,
-        batch,
-        finalize_routes=lambda: _normalize_custom_process_bom_effects(
-            batch, custom_bundle_ids or set(),
-        ),
+        work_type=batch.work_type,
+        sub_type=batch.sub_type,
+        bundles=batch.bundles,
     )
+    _normalize_custom_process_bom_effects(batch, custom_bundle_ids or set())
+    if normalized or batch.sub_type in {
+        "warehouse_to_dept", "dept_to_warehouse", "produce", "disassemble", "adjust_in", "adjust_out",
+    }:
+        batch.from_department, batch.to_department = automatic_department_headers(batch.bundles)
 
 
 def _included_lines(batch: IoBatch) -> list[IoLine]:
@@ -446,7 +444,7 @@ def _normalize_custom_process_bom_effects(
 def _prelock_line_inventories(db: Session, lines: Sequence[IoLine]) -> None:
     """다품목 실행 전에 부모 Inventory를 전역 순서로 잠근다."""
     item_ids = sorted({line.item_id for line in lines})
-    inventory_svc._ensure_and_lock_inventories(db, item_ids)
+    inventory_svc.ensure_and_lock_inventories(db, item_ids)
 
 
 def _submit_internal_use_approvals(
@@ -503,7 +501,7 @@ def _submit_internal_use_approvals(
             update_batch=False,
         )
         requests.append(request)
-        notif_svc._notify_request_arrived(db, request)
+        notif_svc.notify_request_arrived(db, request)
 
     returns_by_department: dict[str, list[IoLine]] = {}
     for line in return_lines:
@@ -570,9 +568,9 @@ def _submit_internal_use_approvals(
                 request_status_before=request_status_before,
             )
         requests.append(request)
-        notif_svc._notify_request_arrived(db, request)
+        notif_svc.notify_request_arrived(db, request)
 
-    _sync_batch_from_stock_requests(db, batch, requests)
+    sync_batch_from_stock_requests(db, batch, requests)
 
 
 def _submit_approval(
@@ -591,7 +589,6 @@ def _submit_approval(
             from_department=line.from_department,
             to_bucket=_request_bucket(line.to_bucket),
             to_department=line.to_department,
-            operation_line_id=line.line_id,
         )
         for line in lines
     ]
@@ -610,7 +607,7 @@ def _submit_approval(
     )
     _link_stock_request(db, batch=batch, request=request, lines=lines)
     # 창고 결재 대기 요청 도착 → 창고 정/부에게 알림 (io 라우터가 커밋).
-    notif_svc._notify_request_arrived(db, request)
+    notif_svc.notify_request_arrived(db, request)
 
 
 def _submit_dept_only_approval(
@@ -667,7 +664,7 @@ def _submit_dept_only_approval(
         if not effect_lines:
             _complete_no_effect_department_approval(batch=batch, request=request)
             db.flush()
-            notif_svc._notify_request_arrived(db, request)
+            notif_svc.notify_request_arrived(db, request)
             return
         batch_status_before = batch.status
         request_status_before = request.status
@@ -704,9 +701,9 @@ def _submit_dept_only_approval(
         )
         db.flush()
 
-    # 자가승인으로 즉시 완료된 경우엔 _notify_request_arrived 가 상태 가드로 아무 것도 안 한다.
+    # 자가승인으로 즉시 완료된 경우엔 notify_request_arrived 가 상태 가드로 아무 것도 안 한다.
     # 부서 결재 대기로 남은 경우에만 부서 승인자에게 도착 알림 (io 라우터가 커밋).
-    notif_svc._notify_request_arrived(db, request)
+    notif_svc.notify_request_arrived(db, request)
 
 
 def _complete_no_effect_department_approval(*, batch: IoBatch, request: StockRequest) -> None:
@@ -762,18 +759,22 @@ def _is_no_effect_custom_bom_reference_request(batch: IoBatch, request: StockReq
 def normalize_department_approval_routes(
     db: Session, batch: IoBatch, requests: Sequence[StockRequest],
 ) -> None:
-    """접수된 입고 요청만 복원해 과거 출고 요청의 승인 의미를 보존한다."""
-    inbound_line_ids = {
+    """접수된 요청 방향과 일치하는 커스텀 BOM 효과만 live 부서로 복원한다."""
+    expected_endpoints = (
+        (RequestBucketEnum.NONE, RequestBucketEnum.PRODUCTION)
+        if batch.sub_type == "produce"
+        else (RequestBucketEnum.PRODUCTION, RequestBucketEnum.NONE)
+    )
+    matching_line_ids = {
         line.operation_line_id
         for request in requests
         for line in request.lines
-        if line.from_bucket == RequestBucketEnum.NONE
-        and line.to_bucket == RequestBucketEnum.PRODUCTION
+        if (line.from_bucket, line.to_bucket) == expected_endpoints
     }
-    custom_receipt_bundle_ids = {
+    custom_effect_bundle_ids = {
         bundle.bundle_id
         for bundle in batch.bundles
-        if batch.sub_type == "produce"
+        if batch.sub_type in {"produce", "disassemble"}
         and bundle.source_kind == BOM_PARENT_SOURCE_KIND
         and any(
             line.origin == "direct"
@@ -784,12 +785,12 @@ def normalize_department_approval_routes(
         )
         and any(line.included and line.origin == "bom_auto" for line in bundle.lines)
         and all(
-            line.line_id in inbound_line_ids
+            line.line_id in matching_line_ids
             for line in bundle.lines
             if line.included and line.origin == "bom_auto"
         )
     }
-    _normalize_automatic_batch_routes(db, batch, custom_bundle_ids=custom_receipt_bundle_ids)
+    _normalize_automatic_batch_routes(db, batch, custom_bundle_ids=custom_effect_bundle_ids)
 
 
 def execute_batch_after_dept_approval(
@@ -810,6 +811,7 @@ def execute_batch_after_dept_approval(
         batch.stock_request_id = request.request_id
     if request.request_code and not batch.reference_no:
         batch.reference_no = request.request_code
+
     normalize_department_approval_routes(db, batch, [request])
 
     if _is_no_effect_custom_bom_reference_request(batch, request):
@@ -890,7 +892,7 @@ def _log_immediate(
     operation_role: InventoryOperationRoleEnum = InventoryOperationRoleEnum.PRIMARY,
 ) -> None:
     db.add(
-        operation_svc._attach_transaction(TransactionLog(
+        operation_svc.attach_transaction(TransactionLog(
             item_id=line.item_id,
             transaction_type=tx_type,
             quantity_change=quantity_change,
@@ -919,7 +921,7 @@ _BUCKET_NONE = "none"
 
 def _apply_in(db: Session, line: IoLine, qty: Decimal) -> tuple[TransactionTypeEnum, Decimal]:
     bucket = _BUCKET_PRODUCTION if line.to_bucket == _BUCKET_PRODUCTION else _BUCKET_WAREHOUSE
-    inventory_svc._receive_confirmed(
+    inventory_svc.receive_confirmed(
         db,
         line.item_id,
         qty,
@@ -934,34 +936,34 @@ def _apply_in(db: Session, line: IoLine, qty: Decimal) -> tuple[TransactionTypeE
 
 def _apply_out(db: Session, line: IoLine, qty: Decimal) -> tuple[TransactionTypeEnum, Decimal]:
     if line.from_bucket == _BUCKET_WAREHOUSE:
-        inventory_svc._consume_warehouse(db, line.item_id, qty)
+        inventory_svc.consume_warehouse(db, line.item_id, qty)
         tx_type = TransactionTypeEnum.SHIP
     elif line.from_bucket == _BUCKET_DEFECTIVE:
-        inventory_svc._return_to_supplier(db, line.item_id, qty, line.from_department)
+        inventory_svc.return_to_supplier(db, line.item_id, qty, line.from_department)
         tx_type = TransactionTypeEnum.SUPPLIER_RETURN
     else:
-        inventory_svc._consume_from_department(db, line.item_id, qty, line.from_department)
+        inventory_svc.consume_from_department(db, line.item_id, qty, line.from_department)
         tx_type = TransactionTypeEnum.BACKFLUSH
     return tx_type, -qty
 
 
 def _apply_move(db: Session, line: IoLine, qty: Decimal) -> tuple[TransactionTypeEnum, Decimal]:
     if line.from_bucket == _BUCKET_PRODUCTION and line.to_bucket == _BUCKET_PRODUCTION:
-        inventory_svc._transfer_between_departments(
+        inventory_svc.transfer_between_departments(
             db, line.item_id, qty, line.from_department, line.to_department
         )
         tx_type = TransactionTypeEnum.TRANSFER_DEPT
     elif line.from_bucket == _BUCKET_WAREHOUSE:
-        inventory_svc._transfer_to_production(db, line.item_id, qty, line.to_department)
+        inventory_svc.transfer_to_production(db, line.item_id, qty, line.to_department)
         tx_type = TransactionTypeEnum.TRANSFER_TO_PROD
     else:
-        inventory_svc._transfer_to_warehouse(db, line.item_id, qty, line.from_department)
+        inventory_svc.transfer_to_warehouse(db, line.item_id, qty, line.from_department)
         tx_type = TransactionTypeEnum.TRANSFER_TO_WH
     return tx_type, Decimal("0")
 
 
 def _apply_defective(db: Session, line: IoLine, qty: Decimal) -> tuple[TransactionTypeEnum, Decimal]:
-    inventory_svc._mark_defective(
+    inventory_svc.mark_defective(
         db,
         line.item_id,
         qty,
@@ -976,7 +978,7 @@ def _apply_defective(db: Session, line: IoLine, qty: Decimal) -> tuple[Transacti
 
 def _apply_adjust(db: Session, line: IoLine, qty: Decimal) -> tuple[TransactionTypeEnum, Decimal]:
     if line.to_bucket == _BUCKET_WAREHOUSE and line.from_bucket == _BUCKET_NONE:
-        inventory_svc._receive_confirmed(
+        inventory_svc.receive_confirmed(
             db,
             line.item_id,
             qty,
@@ -985,10 +987,10 @@ def _apply_adjust(db: Session, line: IoLine, qty: Decimal) -> tuple[TransactionT
         )
         quantity_change = qty
     elif line.from_bucket == _BUCKET_WAREHOUSE and line.to_bucket == _BUCKET_NONE:
-        inventory_svc._consume_warehouse(db, line.item_id, qty)
+        inventory_svc.consume_warehouse(db, line.item_id, qty)
         quantity_change = -qty
     elif line.to_bucket == _BUCKET_PRODUCTION and line.from_bucket == _BUCKET_NONE:
-        inventory_svc._receive_confirmed(
+        inventory_svc.receive_confirmed(
             db,
             line.item_id,
             qty,
@@ -997,7 +999,7 @@ def _apply_adjust(db: Session, line: IoLine, qty: Decimal) -> tuple[TransactionT
         )
         quantity_change = qty
     elif line.from_bucket == _BUCKET_PRODUCTION and line.to_bucket == _BUCKET_NONE:
-        inventory_svc._consume_from_department(
+        inventory_svc.consume_from_department(
             db, line.item_id, qty, line.from_department
         )
         quantity_change = -qty
@@ -1060,7 +1062,7 @@ def _create_execution_operation(
     execution_key: str,
 ) -> InventoryOperation | None:
     """실재고가 반영되는 한 번의 입출고 실행 작업을 만든다."""
-    return operation_svc._create_business_operation(
+    return operation_svc.create_business_operation(
         db,
         domain="inventory_io",
         action=batch.sub_type,
@@ -1083,7 +1085,7 @@ def _record_execution_workflow(
     request_status_before: StockRequestStatusEnum | None = None,
 ) -> None:
     """실행에 연결된 배치·요청을 취소 시 최종 종료할 근거로 남긴다."""
-    operation_svc._record_effect(
+    operation_svc.record_effect(
         db,
         operation=operation,
         effect_kind=InventoryOperationEffectKindEnum.WORKFLOW,
@@ -1094,7 +1096,7 @@ def _record_execution_workflow(
         after_state={"status": "completed"},
     )
     if request is not None and request_status_before is not None:
-        operation_svc._record_effect(
+        operation_svc.record_effect(
             db,
             operation=operation,
             effect_kind=InventoryOperationEffectKindEnum.WORKFLOW,
@@ -1115,10 +1117,10 @@ def _apply_line(
     operation: InventoryOperation | None = None,
 ) -> None:
     qty = _d(line.quantity)
-    inv = inventory_svc._get_or_create_inventory(db, line.item_id)
+    inv = inventory_svc.get_or_create_inventory(db, line.item_id)
     before = _d(inv.quantity)
     # 취소 역재생용 — mutation 전 재고 셀 스냅샷.
-    cells_before = inv_effect._snapshot_cells(db, line.item_id)
+    cells_before = inv_effect.snapshot_cells(db, line.item_id)
 
     if line.direction == "in":
         tx_type, quantity_change = _apply_in(db, line, qty)
@@ -1137,7 +1139,7 @@ def _apply_line(
     if line.direction == "defective":
         from app.services import defect_records as defect_records_svc
 
-        quarantine_record = defect_records_svc._create_record(
+        quarantine_record = defect_records_svc.create_record(
             db,
             item_id=line.item_id,
             department=line.to_department,
@@ -1149,7 +1151,7 @@ def _apply_line(
         )
 
     db.flush()
-    inv = inventory_svc._get_or_create_inventory(db, line.item_id)
+    inv = inventory_svc.get_or_create_inventory(db, line.item_id)
     after = _d(inv.quantity)
     _log_immediate(
         db,
@@ -1162,7 +1164,7 @@ def _apply_line(
         operator_name=requester.name,
         producer_employee_id=requester.employee_id,
         department=_dept_for_line(line, tx_type),
-        stock_snapshot=inv_effect._capture_log_stock_snapshot(db, line.item_id, cells_before),
+        stock_snapshot=inv_effect.capture_log_stock_snapshot(db, line.item_id, cells_before),
         defect_quarantine_record_id=(
             quarantine_record.record_id if quarantine_record else None
         ),
@@ -1170,7 +1172,7 @@ def _apply_line(
         operation_role=_operation_role_for_line(batch, line),
     )
     if quarantine_record is not None:
-        operation_svc._record_defect_movement(
+        operation_svc.record_defect_movement(
             db,
             operation=operation,
             record_id=quarantine_record.record_id,
@@ -1207,7 +1209,7 @@ def _submit_immediate(db: Session, *, requester: Employee, batch: IoBatch) -> No
     batch.status = "completed"
     batch.completed_at = now
     batch.updated_at = now
-    operation_svc._record_effect(
+    operation_svc.record_effect(
         db,
         operation=operation,
         effect_kind=InventoryOperationEffectKindEnum.WORKFLOW,
@@ -1236,6 +1238,11 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
         sub_type=batch.sub_type,
         bundles=batch.bundles,
     )
+    validate_receive_requester(
+        requester,
+        work_type=batch.work_type,
+        sub_type=batch.sub_type,
+    )
     # An old draft token proves the original BOM/inclusion intent.  Validate it
     # and rotate it for the live route before stock-exempt handling reads it.
     normalize_automatic_routes_with_bom_token_refresh(
@@ -1244,7 +1251,7 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
         sub_type=batch.sub_type,
         bundles=batch.bundles,
     )
-    _normalize_batch_bom_stock_exempt(db, batch)
+    normalize_batch_bom_stock_exempt(db, batch)
     _validate_process_bom_parent_lines(batch)
     _normalize_process_bom_auto_inclusion(batch)
     validate_internal_use_requester(
@@ -1287,12 +1294,10 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
     custom_process_bom_bundle_ids = _custom_process_bom_bundle_ids(db, batch)
     custom_process_bom = bool(custom_process_bom_bundle_ids)
     included_lines = _included_lines(batch)
-    department_approval_required = approval_kind(
-        work_type=batch.work_type,
-        sub_type=batch.sub_type,
-        has_manual_line=_has_manual_line(included_lines),
-        has_custom_process_bom=custom_process_bom,
-    ) == "department"
+    department_approval_required = (
+        batch.work_type == "process"
+        and (_has_manual_line(included_lines) or custom_process_bom)
+    )
     if department_approval_required and not (batch.notes or "").strip():
         raise ValueError("부서 결재 요청에는 메모를 입력해야 합니다.")
 
@@ -1316,7 +1321,7 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
         _normalize_automatic_batch_routes(
             db,
             batch,
-            custom_bundle_ids=custom_process_bom_bundle_ids if batch.sub_type == "produce" else None,
+            custom_bundle_ids=custom_process_bom_bundle_ids,
         )
         included_lines = _included_lines(batch)
         if department_approval_required:
@@ -1345,7 +1350,8 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
         elif not included_lines:
             _complete_without_inventory(batch)
         elif batch.sub_type in APPROVAL_SUB_TYPES:
-            # StockRequest 기반 실행 sub_type. 실제 결재 필요 여부는 approval_kind가 정한다.
+            # 창고 승인 sub_type — manual line 유무 무관, 창고 승인 1회로만.
+            # 새 정책: 모든 요청은 창고 또는 부서 중 하나로만 결재.
             _submit_approval(db, requester=requester, batch=batch)
         else:
             _submit_immediate(db, requester=requester, batch=batch)
@@ -1375,27 +1381,24 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
     }
 
 
-def submit(
-    db: Session,
-    payload: IoSubmitRequest,
-    *,
-    requester: Employee,
-    request_fingerprint: str | None = None,
-) -> dict:
+def submit(db: Session, payload) -> dict:
     payload.sub_type = normalize_process_sub_type(
         work_type=payload.work_type,
         sub_type=payload.sub_type,
         bundles=payload.bundles,
     )
-    if not bool(requester.is_active):
-        raise PermissionError("비활성 직원은 입출고 작업을 제출할 수 없습니다.")
+    requester = _load_requester(db, payload.requester_employee_id)
+    validate_receive_requester(
+        requester,
+        work_type=payload.work_type,
+        sub_type=payload.sub_type,
+    )
     batch = _persist_batch(
         db,
         requester=requester,
         payload=payload,
         status="submitted",
         submitted_at=datetime.utcnow(),
-        request_fingerprint=request_fingerprint,
     )
     return _execute_submission(db, requester=requester, batch=batch)
 
@@ -1404,40 +1407,28 @@ def submit_existing_draft(
     db: Session,
     *,
     batch_id: uuid.UUID,
-    requester: Employee,
+    requester_employee_id: uuid.UUID,
 ) -> dict:
-    """저장된 draft를 한 번 실행하고 동일 명령 재시도에는 결과만 재생한다."""
+    """저장된 draft를 재제출. 새 batch 생성 없이 기존 라인을 그대로 실행."""
     batch = db.query(IoBatch).filter(IoBatch.batch_id == batch_id).first()
     if batch is None:
         raise ValueError("작업 묶음을 찾을 수 없습니다.")
-    if batch.requester_employee_id != requester.employee_id:
+    if batch.requester_employee_id != requester_employee_id:
         raise PermissionError("본인 임시저장 작업만 제출할 수 있습니다.")
     ensure_batch_is_mutable(batch)
-    if batch.status != "draft":
-        expected_fingerprint = fingerprint_io_draft_submit(
-            requester.employee_id,
-            batch_id,
-            _batch_to_payload(batch),
-        )
-        require_matching_fingerprint(
-            batch.request_fingerprint,
-            expected_fingerprint,
-        )
-        replay = io_draft.build_idempotent_response(batch, db=db)
-        replay["_idempotent_replay"] = True
-        return replay
-    if not bool(requester.is_active):
-        raise PermissionError("비활성 직원은 입출고 작업을 제출할 수 없습니다.")
-    if batch.request_fingerprint is not None:
-        raise IdempotencyConflict("draft_command_ambiguous")
+    requester = _load_requester(db, requester_employee_id)
+    validate_receive_requester(
+        requester,
+        work_type=batch.work_type,
+        sub_type=batch.sub_type,
+    )
     submitted_at = datetime.utcnow()
     transition = db.execute(
         update(IoBatch)
         .where(
             IoBatch.batch_id == batch_id,
-            IoBatch.requester_employee_id == requester.employee_id,
+            IoBatch.requester_employee_id == requester_employee_id,
             IoBatch.status == "draft",
-            IoBatch.request_fingerprint.is_(None),
         )
         .values(
             status="submitted",
@@ -1446,36 +1437,7 @@ def submit_existing_draft(
         )
     )
     if transition.rowcount != 1:
-        db.expire_all()
-        winner = db.query(IoBatch).filter(IoBatch.batch_id == batch_id).first()
-        if winner is None:
-            raise ValueError("작업 묶음을 찾을 수 없습니다.")
-        if winner.requester_employee_id != requester.employee_id:
-            raise PermissionError("본인 임시저장 작업만 제출할 수 있습니다.")
-        if winner.status == "draft" and winner.request_fingerprint is None:
-            raise ValueError("임시저장 상태가 아닙니다.")
-        winner_fingerprint = fingerprint_io_draft_submit(
-            requester.employee_id,
-            batch_id,
-            _batch_to_payload(winner),
-        )
-        require_matching_fingerprint(
-            winner.request_fingerprint,
-            winner_fingerprint,
-        )
-        replay = io_draft.build_idempotent_response(winner, db=db)
-        replay["_idempotent_replay"] = True
-        return replay
+        raise ValueError("임시저장 상태가 아닙니다.")
     db.flush()
     db.refresh(batch)
-    _lock_active_batch_items(db, batch)
-    _execute_submission(db, requester=requester, batch=batch)
-    batch.request_fingerprint = fingerprint_io_draft_submit(
-        requester.employee_id,
-        batch_id,
-        _batch_to_payload(batch),
-    )
-    db.flush()
-    result = io_draft.build_idempotent_response(batch, db=db)
-    result["_idempotent_replay"] = False
-    return result
+    return _execute_submission(db, requester=requester, batch=batch)

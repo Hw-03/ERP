@@ -10,14 +10,13 @@ interface Props {
   unit?: string;
   hint?: string;
   tone: string;
-  textTone?: string;
   active?: boolean;
   onClick?: () => void;
   compact?: boolean;
   headerCompact?: boolean;
 }
 
-function KpiCardImpl({ label, value, unit, hint, tone, textTone, active = false, onClick, compact = false, headerCompact = false }: Props) {
+function KpiCardImpl({ label, value, unit, hint, tone, active = false, onClick, compact = false, headerCompact = false }: Props) {
   const [hovered, setHovered] = useState(false);
 
   const bg = active
@@ -26,7 +25,6 @@ function KpiCardImpl({ label, value, unit, hint, tone, textTone, active = false,
     ? tint(tone, 16)
     : tint(tone, 8);
   const border = active || hovered ? tone : tint(tone, 35);
-  const resolvedTextTone = textTone ?? tone;
 
   const boxCls = headerCompact
     ? "rounded-[12px] border px-3 py-2"
@@ -36,10 +34,10 @@ function KpiCardImpl({ label, value, unit, hint, tone, textTone, active = false,
 
   const content = headerCompact ? (
     <div className="flex items-center justify-between gap-2">
-      <div className="min-w-0 truncate text-[14px] font-black leading-tight" style={{ color: resolvedTextTone }}>
+      <div className="min-w-0 truncate text-[14px] font-black leading-tight" style={{ color: tone }}>
         {label}
       </div>
-      <div className="shrink-0 text-[24px] font-black leading-none" style={{ color: resolvedTextTone }}>
+      <div className="shrink-0 text-[24px] font-black leading-none" style={{ color: tone }}>
         {value}
         {unit && (
           <span className="ml-0.5 text-[12px] font-bold" style={{ opacity: 0.7 }}>
@@ -53,14 +51,14 @@ function KpiCardImpl({ label, value, unit, hint, tone, textTone, active = false,
       <div className="flex min-w-0 flex-col gap-0.5">
         <div
           className="truncate text-[22px] font-black leading-tight tracking-[-0.02em]"
-          style={{ color: resolvedTextTone }}
+          style={{ color: tone }}
         >
           {label}
         </div>
         {hint && (
           <div
             className="truncate text-[12px] font-semibold leading-tight"
-            style={{ color: resolvedTextTone, opacity: textTone ? undefined : 0.7 }}
+            style={{ color: tone, opacity: 0.7 }}
           >
             {hint}
           </div>
@@ -68,7 +66,7 @@ function KpiCardImpl({ label, value, unit, hint, tone, textTone, active = false,
       </div>
       <div
         className="-mt-1 shrink-0 text-[32px] font-black leading-none"
-        style={{ color: resolvedTextTone }}
+        style={{ color: tone }}
       >
         {value}
         {unit && (
@@ -81,10 +79,10 @@ function KpiCardImpl({ label, value, unit, hint, tone, textTone, active = false,
   ) : (
     <>
       <div className="flex items-baseline justify-between gap-2">
-        <div className="text-[22px] font-black tracking-[-0.02em]" style={{ color: resolvedTextTone }}>
+        <div className="text-[22px] font-black tracking-[-0.02em]" style={{ color: tone }}>
           {label}
         </div>
-        <div className="text-[32px] font-black leading-none" style={{ color: resolvedTextTone }}>
+        <div className="text-[32px] font-black leading-none" style={{ color: tone }}>
           {value}
           {unit && (
             <span className="ml-0.5 text-[15px] font-bold" style={{ opacity: 0.7 }}>
@@ -94,7 +92,7 @@ function KpiCardImpl({ label, value, unit, hint, tone, textTone, active = false,
         </div>
       </div>
       {hint && (
-        <div className="mt-2 text-[12px] font-semibold" style={{ color: resolvedTextTone, opacity: textTone ? undefined : 0.7 }}>
+        <div className="mt-2 text-[12px] font-semibold" style={{ color: tone, opacity: 0.7 }}>
           {hint}
         </div>
       )}

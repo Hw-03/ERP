@@ -29,7 +29,6 @@ from app.models import (
     IoBundle,
     IoLine,
     LocationStatusEnum,
-    RequestBucketEnum,
     StockRequest,
     StockRequestLine,
     StockRequestStatusEnum,
@@ -40,8 +39,7 @@ from app.models import (
     TransactionTypeEnum,
 )
 from app.services import io_dispatch as svc
-from app.services.bom_stock_policy import _issue_bom_auto_token, io_bom_auto_claims
-from app.services.command_idempotency import IdempotencyConflict
+from app.services.bom_stock_policy import io_bom_auto_claims, issue_bom_auto_token
 from app.services.pin_auth import DEFAULT_PIN_HASH
 from app.services.sr_execution import release_reservation
 from app.routers.inventory._tx_filters import _batch_name_map
@@ -165,10 +163,10 @@ def _prod_qty(db_session, item_id, dept=ASSEMBLY) -> Decimal:
     return loc.quantity if loc else D("0")
 
 
-def _assign_bom_auto_token(db_session, batch: IoBatch, line: IoLine) -> None:
+def _issue_bom_auto_token(db_session, batch: IoBatch, line: IoLine) -> None:
     """미리보기에서 받은 자동 BOM 행을 서비스 단위 테스트에 재현한다."""
     bundle = line.bundle
-    line.bom_auto_token = _issue_bom_auto_token(
+    line.bom_auto_token = issue_bom_auto_token(
         db_session,
         flow="io",
         claims=io_bom_auto_claims(
@@ -502,8 +500,8 @@ def test_apply_line_adjust_in_and_out(make_item, make_location, db_session):
 
     logs = db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id).all()
     assert len(logs) == 2
-    assert all(log.transaction_type == TransactionTypeEnum.ADJUST for log in logs)
-    changes = sorted(log.quantity_change for log in logs)
+    assert all(l.transaction_type == TransactionTypeEnum.ADJUST for l in logs)
+    changes = sorted(l.quantity_change for l in logs)
     assert changes == [D("-1"), D("4")]
 
 
@@ -836,7 +834,7 @@ def test_submit_dept_only_self_approval_executes_immediately(
     assert log.transaction_type == TransactionTypeEnum.ADJUST
 
 
-def test_submit_dept_only_warehouse_primary_waits_for_department_approval(
+def test_submit_dept_only_warehouse_primary_self_approval_executes_immediately(
     make_item, make_location, db_session
 ):
     item = make_item(name="창고 담당 부서 자가승인")
@@ -845,7 +843,6 @@ def test_submit_dept_only_warehouse_primary_waits_for_department_approval(
         db_session,
         code="DEPT-WH-SELF",
         warehouse_role="primary",
-        department_role="none",
     )
     batch = _build_batch(
         db_session,
@@ -867,10 +864,10 @@ def test_submit_dept_only_warehouse_primary_waits_for_department_approval(
     svc._submit_dept_only_approval(db_session, requester=requester, batch=batch)
 
     request = db_session.query(StockRequest).one()
-    assert request.status == StockRequestStatusEnum.RESERVED
-    assert request.department_approved_by_employee_id is None
-    assert _loc_pending(db_session, item.item_id) == D("2")
-    assert _prod_qty(db_session, item.item_id) == D("5")
+    assert request.status == StockRequestStatusEnum.COMPLETED
+    assert request.department_approved_by_employee_id == requester.employee_id
+    assert _loc_pending(db_session, item.item_id) == D("0")
+    assert _prod_qty(db_session, item.item_id) == D("3")
 
 
 def test_submit_dept_only_admin_without_role_waits_for_approval(
@@ -1162,7 +1159,7 @@ def test_produce_dept_approval_recomputes_bom_component_route_from_live_item_cod
     )
     db_session.flush()
     db_session.refresh(batch)
-    _assign_bom_auto_token(
+    _issue_bom_auto_token(
         db_session,
         batch,
         next(line for line in batch.bundles[0].lines if line.origin == "bom_auto"),
@@ -1250,20 +1247,25 @@ def test_custom_bom_child_quantity_requires_department_approval_even_when_edited
     child = next(line for line in batch.bundles[0].lines if line.item_id == component.item_id)
     child.edited = False
     batch.notes = "커스텀 BOM 수량 변경"
-    _assign_bom_auto_token(db_session, batch, child)
+    _issue_bom_auto_token(db_session, batch, child)
 
     result = svc._execute_submission(db_session, requester=requester, batch=batch)
 
     request = db_session.query(StockRequest).one()
     assert result["requires_approval"] is True
     assert request.requires_department_approval is True
-    assert batch.status in {"submitted", "reserved"}
+    assert batch.status == "submitted"
     assert _prod_qty(db_session, component.item_id) == D("10")
+    assert _loc_pending(db_session, component.item_id) == D("0")
     assert _prod_qty(db_session, result_item.item_id) == D("0")
     assert db_session.query(TransactionLog).count() == 0
 
     assert len(request.lines) == 1
     assert request.lines[0].item_id == component.item_id
+    assert request.lines[0].from_bucket.value == "none"
+    assert request.lines[0].from_department is None
+    assert request.lines[0].to_bucket.value == "production"
+    assert request.lines[0].to_department == ASSEMBLY
     parent = next(line for line in batch.bundles[0].lines if line.item_id == result_item.item_id)
     assert parent.included is False
     approver = _make_employee(
@@ -1275,7 +1277,7 @@ def test_custom_bom_child_quantity_requires_department_approval_even_when_edited
     request.department_approved_by_employee_id = approver.employee_id
     request.department_approved_by_name = approver.name
 
-    release_reservation(db_session, request, actor=approver)
+    release_reservation(db_session, request)
     svc.execute_batch_after_dept_approval(
         db_session,
         request=request,
@@ -1283,10 +1285,12 @@ def test_custom_bom_child_quantity_requires_department_approval_even_when_edited
     )
 
     assert _prod_qty(db_session, component.item_id) == D("13")
+    assert _loc_pending(db_session, component.item_id) == D("0")
     assert _prod_qty(db_session, result_item.item_id) == D("0")
     logs = db_session.query(TransactionLog).all()
     assert len(logs) == 1
     assert logs[0].item_id == component.item_id
+    assert logs[0].quantity_change == D("3")
 
 
 def test_custom_process_bom_blank_memo_is_rejected_before_parent_is_mutated(
@@ -1327,7 +1331,7 @@ def test_custom_process_bom_blank_memo_is_rejected_before_parent_is_mutated(
     )
     batch.notes = " \t "
     child = next(line for line in batch.bundles[0].lines if line.item_id == component.item_id)
-    _assign_bom_auto_token(db_session, batch, child)
+    _issue_bom_auto_token(db_session, batch, child)
 
     with pytest.raises(ValueError, match="메모"):
         svc._execute_submission(db_session, requester=requester, batch=batch)
@@ -1390,19 +1394,19 @@ def test_custom_disassemble_normalizes_every_included_child_to_department_out(
     )
     for line in batch.bundles[0].lines:
         if line.origin == "bom_auto":
-            _assign_bom_auto_token(db_session, batch, line)
+            _issue_bom_auto_token(db_session, batch, line)
 
     batch.notes = "분해 구성품 선택 출고"
     result = svc._execute_submission(db_session, requester=requester, batch=batch)
 
     assert result["requires_approval"] is True
     request = db_session.query(StockRequest).one()
-    assert batch.status == "submitted"
+    assert batch.status == "reserved"
     assert _prod_qty(db_session, parent.item_id) == D("7")
     assert _prod_qty(db_session, changed_child.item_id) == D("45")
     assert _prod_qty(db_session, unchanged_child.item_id, TUNING) == D("10")
-    assert _loc_pending(db_session, changed_child.item_id) == D("0")
-    assert _loc_pending(db_session, unchanged_child.item_id, TUNING) == D("0")
+    assert _loc_pending(db_session, changed_child.item_id) == D("2")
+    assert _loc_pending(db_session, unchanged_child.item_id, TUNING) == D("1")
     assert {
         (
             line.item_id,
@@ -1413,8 +1417,8 @@ def test_custom_disassemble_normalizes_every_included_child_to_department_out(
         )
         for line in request.lines
     } == {
-        (changed_child.item_id, "none", None, "production", ASSEMBLY.value),
-        (unchanged_child.item_id, "none", None, "production", TUNING.value),
+        (changed_child.item_id, "production", ASSEMBLY.value, "none", None),
+        (unchanged_child.item_id, "production", TUNING.value, "none", None),
     }
 
     approver = _make_employee(
@@ -1425,7 +1429,7 @@ def test_custom_disassemble_normalizes_every_included_child_to_department_out(
     )
     request.department_approved_by_employee_id = approver.employee_id
     request.department_approved_by_name = approver.name
-    release_reservation(db_session, request, actor=approver)
+    release_reservation(db_session, request)
     svc.execute_batch_after_dept_approval(
         db_session,
         request=request,
@@ -1433,17 +1437,18 @@ def test_custom_disassemble_normalizes_every_included_child_to_department_out(
     )
 
     assert _prod_qty(db_session, parent.item_id) == D("7")
-    assert _prod_qty(db_session, changed_child.item_id) == D("47")
-    assert _prod_qty(db_session, unchanged_child.item_id, TUNING) == D("11")
+    assert _prod_qty(db_session, changed_child.item_id) == D("43")
+    assert _prod_qty(db_session, unchanged_child.item_id, TUNING) == D("9")
+    assert _loc_pending(db_session, changed_child.item_id) == D("0")
+    assert _loc_pending(db_session, unchanged_child.item_id, TUNING) == D("0")
     assert sorted(log.quantity_change for log in db_session.query(TransactionLog).all()) == [
-        D("1"),
-        D("2"),
+        D("-2"),
+        D("-1"),
     ]
 
 
-@pytest.mark.parametrize("initial_stock, legacy_outbound", [(D("0"), False), (D("2"), False), (D("2"), True)])
 def test_custom_produce_normalizes_every_included_child_to_department_in(
-    make_bom, make_item, make_location, db_session, initial_stock, legacy_outbound
+    make_bom, make_item, make_location, db_session
 ):
     """하위 하나만 수정해도 커스텀 생산 묶음의 포함 하위 전체를 선택 입고한다."""
     parent = make_item(name="선택 입고 기준 BOM", process_type_code="AF")
@@ -1452,7 +1457,7 @@ def test_custom_produce_normalizes_every_included_child_to_department_in(
     make_bom(parent.item_id, changed_child.item_id, D("1"))
     make_bom(parent.item_id, unchanged_child.item_id, D("1"))
     make_location(parent.item_id, department=ASSEMBLY, quantity=D("0"))
-    make_location(changed_child.item_id, department=ASSEMBLY, quantity=initial_stock)
+    make_location(changed_child.item_id, department=ASSEMBLY, quantity=D("2"))
     make_location(unchanged_child.item_id, department=TUNING, quantity=D("1"))
     requester = _make_employee(db_session, department_role="none")
     batch = _build_batch(
@@ -1493,7 +1498,7 @@ def test_custom_produce_normalizes_every_included_child_to_department_in(
     )
     for line in batch.bundles[0].lines:
         if line.origin == "bom_auto":
-            _assign_bom_auto_token(db_session, batch, line)
+            _issue_bom_auto_token(db_session, batch, line)
 
     batch.notes = "생산 구성품 선택 입고"
     result = svc._execute_submission(db_session, requester=requester, batch=batch)
@@ -1523,20 +1528,9 @@ def test_custom_produce_normalizes_every_included_child_to_department_in(
         name="선택 입고 결재자",
         department_role="primary",
     )
-    if legacy_outbound:
-        # 수정 전 이미 출고로 접수된 요청은 승인 시 입고로 바꾸지 않는다.
-        svc._normalize_automatic_batch_routes(db_session, batch)
-        for line in request.lines:
-            line.from_bucket = RequestBucketEnum.PRODUCTION
-            line.from_department = line.to_department
-            line.to_bucket = RequestBucketEnum.NONE
-            line.to_department = None
-    else:
-        # 접수 후 BOM이 바뀌어도 승인 대상의 입고 의미를 유지한다.
-        db_session.query(BOM).filter(BOM.parent_item_id == parent.item_id).delete(synchronize_session=False)
     request.department_approved_by_employee_id = approver.employee_id
     request.department_approved_by_name = approver.name
-    release_reservation(db_session, request, actor=approver)
+    release_reservation(db_session, request)
     svc.execute_batch_after_dept_approval(
         db_session,
         request=request,
@@ -1544,11 +1538,13 @@ def test_custom_produce_normalizes_every_included_child_to_department_in(
     )
 
     assert _prod_qty(db_session, parent.item_id) == D("0")
-    assert _prod_qty(db_session, changed_child.item_id) == (D("0") if legacy_outbound else initial_stock + D("2"))
-    assert _prod_qty(db_session, unchanged_child.item_id, TUNING) == (D("0") if legacy_outbound else D("2"))
+    assert _prod_qty(db_session, changed_child.item_id) == D("4")
+    assert _prod_qty(db_session, unchanged_child.item_id, TUNING) == D("2")
+    assert _loc_pending(db_session, changed_child.item_id) == D("0")
+    assert _loc_pending(db_session, unchanged_child.item_id, TUNING) == D("0")
     assert sorted(log.quantity_change for log in db_session.query(TransactionLog).all()) == [
-        D("-2") if legacy_outbound else D("1"),
-        D("-1") if legacy_outbound else D("2"),
+        D("1"),
+        D("2"),
     ]
 
 
@@ -1589,7 +1585,7 @@ def test_default_disassemble_keeps_parent_out_and_child_recovery(
             },
         ],
     )
-    _assign_bom_auto_token(db_session, batch, batch.bundles[0].lines[1])
+    _issue_bom_auto_token(db_session, batch, batch.bundles[0].lines[1])
 
     result = svc._execute_submission(db_session, requester=requester, batch=batch)
 
@@ -1640,7 +1636,7 @@ def test_custom_disassemble_rejects_tampered_bom_child_route(
         ],
     )
     child_line = batch.bundles[0].lines[1]
-    _assign_bom_auto_token(db_session, batch, child_line)
+    _issue_bom_auto_token(db_session, batch, child_line)
     db_session.query(BOM).filter(
         BOM.parent_item_id == parent.item_id,
         BOM.child_item_id == child.item_id,
@@ -1657,15 +1653,15 @@ def test_custom_disassemble_rejects_tampered_bom_child_route(
     assert db_session.query(TransactionLog).count() == 0
 
 
-def test_custom_disassemble_recovers_child_to_code_department(
+def test_custom_disassemble_issues_child_from_code_department(
     make_bom, make_item, make_location, db_session
 ):
-    """커스텀 분해 회수품도 선택 부서가 아닌 품목 코드 부서로 입고한다."""
+    """커스텀 분해 선택 출고품은 품목 코드 부서에서 예약하고 차감한다."""
     parent = make_item(name="부족 검증 분해 상위", process_type_code="AF")
     child = make_item(name="부족 검증 분해 하위")
     make_bom(parent.item_id, child.item_id, D("1"))
     make_location(parent.item_id, department=ASSEMBLY, quantity=D("7"))
-    make_location(child.item_id, department=ASSEMBLY, quantity=D("1"))
+    make_location(child.item_id, department=DepartmentEnum.TUBE, quantity=D("2"))
     requester = _make_employee(db_session)
     batch = _build_batch(
         db_session,
@@ -1694,20 +1690,39 @@ def test_custom_disassemble_recovers_child_to_code_department(
             },
         ],
     )
-    _assign_bom_auto_token(db_session, batch, batch.bundles[0].lines[1])
+    _issue_bom_auto_token(db_session, batch, batch.bundles[0].lines[1])
     batch.notes = "분해 구성품 재고 부족 확인"
 
     result = svc._execute_submission(db_session, requester=requester, batch=batch)
 
     request = db_session.query(StockRequest).one()
     assert result["requires_approval"] is True
-    assert request.lines[0].from_bucket.value == "none"
-    assert request.lines[0].to_bucket.value == "production"
-    assert request.lines[0].to_department == DepartmentEnum.TUBE
+    assert request.status == StockRequestStatusEnum.RESERVED
+    assert request.lines[0].from_bucket.value == "production"
+    assert request.lines[0].from_department == DepartmentEnum.TUBE
+    assert request.lines[0].to_bucket.value == "none"
     assert _prod_qty(db_session, parent.item_id) == D("7")
-    assert _prod_qty(db_session, child.item_id) == D("1")
+    assert _prod_qty(db_session, child.item_id, DepartmentEnum.TUBE) == D("2")
+    assert _loc_pending(db_session, child.item_id, DepartmentEnum.TUBE) == D("2")
     assert db_session.query(StockRequest).count() == 1
     assert db_session.query(TransactionLog).count() == 0
+
+    approver = _make_employee(
+        db_session,
+        code="CUSTOM-DISASSEMBLE-CODE-APPROVER",
+        department_role="primary",
+    )
+    request.department_approved_by_employee_id = approver.employee_id
+    request.department_approved_by_name = approver.name
+    release_reservation(db_session, request)
+    svc.execute_batch_after_dept_approval(db_session, request=request, approver=approver)
+
+    assert _prod_qty(db_session, child.item_id, DepartmentEnum.TUBE) == D("0")
+    assert _loc_pending(db_session, child.item_id, DepartmentEnum.TUBE) == D("0")
+    logs = db_session.query(TransactionLog).all()
+    assert [(log.item_id, log.quantity_change) for log in logs] == [
+        (child.item_id, D("-2"))
+    ]
 
 
 def test_only_custom_bom_bundle_uses_child_only_execution(
@@ -1794,7 +1809,7 @@ def test_only_custom_bom_bundle_uses_child_only_execution(
     for bundle in batch.bundles:
         for line in bundle.lines:
             if line.origin == "bom_auto":
-                _assign_bom_auto_token(db_session, batch, line)
+                _issue_bom_auto_token(db_session, batch, line)
 
     batch.notes = "커스텀 BOM 하위만 처리"
     svc._execute_submission(db_session, requester=requester, batch=batch)
@@ -1822,6 +1837,13 @@ def test_only_custom_bom_bundle_uses_child_only_execution(
     )
     assert custom_parent_line.included is False
     assert default_parent_line.included is True
+    custom_request_line = next(
+        line for line in request.lines if line.item_id == custom_child.item_id
+    )
+    assert custom_request_line.from_bucket.value == "none"
+    assert custom_request_line.to_bucket.value == "production"
+    assert _loc_pending(db_session, custom_child.item_id) == D("0")
+    assert _loc_pending(db_session, default_child.item_id) == D("1")
     approver = _make_employee(
         db_session,
         code="MIXED-BOM-APPROVER",
@@ -1831,12 +1853,24 @@ def test_only_custom_bom_bundle_uses_child_only_execution(
     request.department_approved_by_employee_id = approver.employee_id
     request.department_approved_by_name = approver.name
 
+    release_reservation(db_session, request)
     svc.execute_batch_after_dept_approval(db_session, request=request, approver=approver)
 
     assert _prod_qty(db_session, custom_parent.item_id) == D("0")
     assert _prod_qty(db_session, custom_child.item_id) == D("13")
     assert _prod_qty(db_session, default_parent.item_id) == D("1")
     assert _prod_qty(db_session, default_child.item_id) == D("9")
+    assert _loc_pending(db_session, custom_child.item_id) == D("0")
+    assert _loc_pending(db_session, default_child.item_id) == D("0")
+    ledger = {
+        log.item_id: log.quantity_change
+        for log in db_session.query(TransactionLog).all()
+    }
+    assert ledger == {
+        custom_child.item_id: D("3"),
+        default_parent.item_id: D("1"),
+        default_child.item_id: D("-1"),
+    }
 
 
 def test_missing_db_bom_child_requires_department_approval(
@@ -1879,7 +1913,7 @@ def test_missing_db_bom_child_requires_department_approval(
         ],
     )
     batch.notes = "DB BOM 구성 누락"
-    _assign_bom_auto_token(db_session, batch, batch.bundles[0].lines[1])
+    _issue_bom_auto_token(db_session, batch, batch.bundles[0].lines[1])
 
     result = svc._execute_submission(db_session, requester=requester, batch=batch)
 
@@ -1946,7 +1980,7 @@ def test_explicitly_excluded_positive_bom_child_requires_memo_before_submission(
     )
     for line in batch.bundles[0].lines:
         if line.origin == "bom_auto":
-            _assign_bom_auto_token(db_session, batch, line)
+            _issue_bom_auto_token(db_session, batch, line)
     batch.notes = " \t "
 
     with pytest.raises(ValueError, match="메모"):
@@ -2014,7 +2048,7 @@ def test_explicitly_excluded_positive_bom_child_creates_department_approval_with
     )
     for line in batch.bundles[0].lines:
         if line.origin == "bom_auto":
-            _assign_bom_auto_token(db_session, batch, line)
+            _issue_bom_auto_token(db_session, batch, line)
     batch.notes = "양수 BOM 자재 제외"
 
     result = svc._execute_submission(db_session, requester=requester, batch=batch)
@@ -2037,7 +2071,7 @@ def test_stale_disassemble_bom_child_with_valid_server_token_creates_department_
     child = make_item(name="stale 분해 하위")
     make_bom(parent.item_id, child.item_id, D("1"))
     make_location(parent.item_id, department=ASSEMBLY, quantity=D("7"))
-    make_location(child.item_id, department=ASSEMBLY, quantity=D("10"))
+    make_location(child.item_id, department=DepartmentEnum.TUBE, quantity=D("10"))
     requester = _make_employee(db_session)
     batch = _build_batch(
         db_session,
@@ -2067,7 +2101,7 @@ def test_stale_disassemble_bom_child_with_valid_server_token_creates_department_
         ],
     )
     child_line = batch.bundles[0].lines[1]
-    _assign_bom_auto_token(db_session, batch, child_line)
+    _issue_bom_auto_token(db_session, batch, child_line)
     db_session.query(BOM).filter(
         BOM.parent_item_id == parent.item_id,
         BOM.child_item_id == child.item_id,
@@ -2080,8 +2114,12 @@ def test_stale_disassemble_bom_child_with_valid_server_token_creates_department_
     assert result["requires_approval"] is True
     assert request.requires_department_approval is True
     assert [line.item_id for line in request.lines] == [child.item_id]
+    assert request.lines[0].from_bucket.value == "production"
+    assert request.lines[0].from_department == DepartmentEnum.TUBE
+    assert request.lines[0].to_bucket.value == "none"
     assert _prod_qty(db_session, parent.item_id) == D("7")
-    assert _prod_qty(db_session, child.item_id) == D("10")
+    assert _prod_qty(db_session, child.item_id, DepartmentEnum.TUBE) == D("10")
+    assert _loc_pending(db_session, child.item_id, DepartmentEnum.TUBE) == D("1")
     assert db_session.query(TransactionLog).count() == 0
 
 
@@ -2132,7 +2170,7 @@ def test_custom_bom_with_only_excluded_or_zero_child_creates_no_effect_departmen
         ],
     )
     child_line = batch.bundles[0].lines[1]
-    _assign_bom_auto_token(db_session, batch, child_line)
+    _issue_bom_auto_token(db_session, batch, child_line)
     batch.notes = "구성품 전체 제외"
 
     result = svc._execute_submission(db_session, requester=requester, batch=batch)
@@ -2210,7 +2248,7 @@ def test_zero_bom_parent_resets_saved_auto_children_before_submission(
     )
     child = batch.bundles[0].lines[1]
     child.edited = True
-    _assign_bom_auto_token(db_session, batch, child)
+    _issue_bom_auto_token(db_session, batch, child)
 
     svc._execute_submission(db_session, requester=requester, batch=batch)
 
@@ -2247,7 +2285,7 @@ def test_process_bom_bundle_without_direct_parent_is_rejected_without_inventory_
             },
         ],
     )
-    _assign_bom_auto_token(db_session, batch, batch.bundles[0].lines[0])
+    _issue_bom_auto_token(db_session, batch, batch.bundles[0].lines[0])
 
     with pytest.raises(ValueError, match="BOM 상위 결과 라인"):
         svc._execute_submission(db_session, requester=requester, batch=batch)
@@ -2292,7 +2330,7 @@ def test_execute_submission_skips_flagged_bom_component_but_keeps_result_invento
             },
         ],
     )
-    _assign_bom_auto_token(
+    _issue_bom_auto_token(
         db_session,
         batch,
         next(line for line in batch.bundles[0].lines if line.item_id == component.item_id),
@@ -2533,7 +2571,7 @@ def test_execute_batch_after_dept_approval_preserves_bom_stock_exempt_snapshot(
     )
     component_line.bom_stock_exempt = True
     component_line.exclusion_note = "BOM 재고 미반영"
-    _assign_bom_auto_token(db_session, batch, component_line)
+    _issue_bom_auto_token(db_session, batch, component_line)
     request = StockRequest(
         request_id=uuid.uuid4(),
         requester_employee_id=requester.employee_id,
@@ -2658,7 +2696,7 @@ def test_execute_batch_after_dept_approval_missing_batch_raises(db_session):
 def test_submit_existing_draft_completes_immediate(make_item, db_session):
     """draft 재제출: 새 batch 없이 기존 라인 즉시 실행 → completed."""
     item = make_item(name="임시저장", warehouse_qty=D("0"))
-    requester = _make_employee(db_session)
+    requester = _make_employee(db_session, warehouse_role="primary")
     batch = _build_batch(
         db_session,
         requester=requester,
@@ -2673,12 +2711,46 @@ def test_submit_existing_draft_completes_immediate(make_item, db_session):
     result = svc.submit_existing_draft(
         db_session,
         batch_id=batch.batch_id,
-        requester=requester,
+        requester_employee_id=requester.employee_id,
     )
 
     assert result["status"] == "completed"
     assert _warehouse_qty(db_session, item.item_id) == D("7")
     assert db_session.query(IoBatch).count() == 1
+
+
+def test_submit_existing_receive_draft_rejects_non_warehouse_requester_before_mutation(
+    make_item, db_session
+):
+    item = make_item(name="권한 없는 원자재 초안", warehouse_qty=D("0"))
+    requester = _make_employee(db_session, code="RECEIVE-NONE")
+    batch = _build_batch(
+        db_session,
+        requester=requester,
+        sub_type="receive_supplier",
+        work_type="receive",
+        status="draft",
+        lines=[
+            {
+                "item_id": item.item_id,
+                "direction": "in",
+                "from_bucket": "none",
+                "to_bucket": "warehouse",
+                "quantity": D("7"),
+            }
+        ],
+    )
+
+    with pytest.raises(PermissionError, match="창고 정·부 담당자"):
+        svc.submit_existing_draft(
+            db_session,
+            batch_id=batch.batch_id,
+            requester_employee_id=requester.employee_id,
+        )
+
+    assert batch.status == "draft"
+    assert _warehouse_qty(db_session, item.item_id) == D("0")
+    assert db_session.query(TransactionLog).count() == 0
 
 
 def test_submit_existing_draft_applies_current_bom_stock_exempt_setting(
@@ -2708,14 +2780,14 @@ def test_submit_existing_draft_applies_current_bom_stock_exempt_setting(
             }
         ],
     )
-    _assign_bom_auto_token(db_session, batch, _single_line(batch))
+    _issue_bom_auto_token(db_session, batch, _single_line(batch))
     component.bom_stock_exempt = True
     db_session.flush()
 
     result = svc.submit_existing_draft(
         db_session,
         batch_id=batch.batch_id,
-        requester=requester,
+        requester_employee_id=requester.employee_id,
     )
 
     line = _single_line(batch)
@@ -2747,14 +2819,14 @@ def test_submit_existing_draft_wrong_owner_raises(make_item, db_session):
         svc.submit_existing_draft(
             db_session,
             batch_id=batch.batch_id,
-            requester=other,
+            requester_employee_id=other.employee_id,
         )
 
 
 def test_submit_existing_draft_non_draft_status_raises(make_item, db_session):
-    """지문 없는 과거 완료 batch 재제출은 모호하므로 실패 폐쇄한다."""
+    """draft 가 아닌 batch 재제출 시 ValueError."""
     item = make_item(name="이미제출", warehouse_qty=D("0"))
-    requester = _make_employee(db_session)
+    requester = _make_employee(db_session, warehouse_role="primary")
     batch = _build_batch(
         db_session,
         requester=requester,
@@ -2765,10 +2837,9 @@ def test_submit_existing_draft_non_draft_status_raises(make_item, db_session):
                 "to_bucket": "warehouse", "quantity": D("3")}],
     )
     db_session.flush()
-    with pytest.raises(IdempotencyConflict) as raised:
+    with pytest.raises(ValueError, match="임시저장 상태가 아닙니다"):
         svc.submit_existing_draft(
             db_session,
             batch_id=batch.batch_id,
-            requester=requester,
+            requester_employee_id=requester.employee_id,
         )
-    assert raised.value.reason == "legacy_fingerprint_missing"

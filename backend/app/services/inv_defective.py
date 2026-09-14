@@ -21,13 +21,12 @@ from app.models import (
     LocationStatusEnum,
 )
 from app.services.inv_base import (
-    _lock_inventory,
     _lock_location,
-    _get_or_create_inventory,
+    get_or_create_inventory,
 )
 from app.services.inv_calc import _sync_total
 from app.repositories import inventory_repository
-from app.services.inv_transfer import _consume_warehouse, _require_location_available
+from app.services.inv_transfer import consume_warehouse, _require_location_available
 
 
 # ---------------------------------------------------------------------------
@@ -77,7 +76,7 @@ class NormalSource:
     supplier_name: str = ""
 
 
-def _mark_defective(
+def mark_defective(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,
@@ -94,31 +93,23 @@ def _mark_defective(
     if kind not in ("warehouse", "production"):
         raise ValueError(f"알 수 없는 source: {kind} (warehouse 또는 production)")
 
-    _get_or_create_inventory(db, item_id)
-    if kind == "warehouse":
-        from app.services import warehouse_map as warehouse_map_svc
+    get_or_create_inventory(db, item_id)
+    locations = [(target_dept, LocationStatusEnum.DEFECTIVE)]
+    if kind == "production":
+        locations.append((source_dept, LocationStatusEnum.PRODUCTION))
+    for department, status in sorted(
+        locations,
+        key=lambda location: (
+            location[0].value if hasattr(location[0], "value") else str(location[0]),
+            location[1].value,
+        ),
+    ):
+        _lock_location(db, item_id, department, status)
+    db.flush()
 
-        warehouse_map_svc._lock_warehouse_ledger(db, item_id)
-        _lock_location(db, item_id, target_dept, LocationStatusEnum.DEFECTIVE)
-        db.flush()
-        _consume_warehouse(db, item_id, qty)
+    if kind == "warehouse":
+        consume_warehouse(db, item_id, qty)
     else:  # source == "production"
-        _lock_inventory(db, item_id)
-        locations = [
-            (target_dept, LocationStatusEnum.DEFECTIVE),
-            (source_dept, LocationStatusEnum.PRODUCTION),
-        ]
-        for department, status in sorted(
-            locations,
-            key=lambda location: (
-                location[0].value
-                if hasattr(location[0], "value")
-                else str(location[0]),
-                location[1].value,
-            ),
-        ):
-            _lock_location(db, item_id, department, status)
-        db.flush()
         _require_location_available(db, item_id, qty, source_dept)
         result = db.execute(
             sa_update(InventoryLocation)
@@ -161,7 +152,7 @@ def _mark_defective(
     return inv
 
 
-def _return_to_supplier(
+def return_to_supplier(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,
@@ -170,7 +161,7 @@ def _return_to_supplier(
     """공급업체 반품: 부서별 DEFECTIVE 차감, 총량 감소."""
     if qty <= 0:
         raise ValueError("반품 수량은 0보다 커야 합니다.")
-    _get_or_create_inventory(db, item_id)
+    get_or_create_inventory(db, item_id)
     _lock_location(db, item_id, from_dept, LocationStatusEnum.DEFECTIVE)
     db.flush()
 
@@ -203,7 +194,7 @@ def _return_to_supplier(
     return inv
 
 
-def _unmark_defective(
+def unmark_defective(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,
@@ -217,7 +208,7 @@ def _unmark_defective(
     if qty <= 0:
         raise ValueError("복귀 수량은 0보다 커야 합니다.")
 
-    _get_or_create_inventory(db, item_id)
+    get_or_create_inventory(db, item_id)
     defective_loc = _lock_location(db, item_id, dept, LocationStatusEnum.DEFECTIVE)
     _lock_location(db, item_id, dept, LocationStatusEnum.PRODUCTION)
     db.flush()
@@ -255,7 +246,7 @@ def _unmark_defective(
     return inv
 
 
-def _scrap_defective(
+def scrap_defective(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,
@@ -266,7 +257,7 @@ def _scrap_defective(
     if qty <= 0:
         raise ValueError("폐기 수량은 0보다 커야 합니다.")
 
-    _get_or_create_inventory(db, item_id)
+    get_or_create_inventory(db, item_id)
     defective_loc = _lock_location(db, item_id, dept, LocationStatusEnum.DEFECTIVE)
     db.flush()
 
@@ -295,7 +286,7 @@ def _scrap_defective(
     return inv
 
 
-def _receive_defective(
+def receive_defective(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,
@@ -312,7 +303,7 @@ def _receive_defective(
     if qty <= 0:
         raise ValueError("격리 수량은 0보다 커야 합니다.")
 
-    _get_or_create_inventory(db, item_id)
+    get_or_create_inventory(db, item_id)
     _lock_location(db, item_id, dept, LocationStatusEnum.DEFECTIVE)
     db.flush()
 
@@ -348,11 +339,8 @@ def _consume_normal_source(
     scrap_normal / return_to_supplier_from_normal 공통 본문.
     """
     if source == "warehouse":
-        _consume_warehouse(db, item_id, qty)
+        consume_warehouse(db, item_id, qty)
     else:
-        _lock_inventory(db, item_id)
-        _lock_location(db, item_id, dept_or_warehouse, LocationStatusEnum.PRODUCTION)
-        db.flush()
         _require_location_available(db, item_id, qty, dept_or_warehouse)
         result = db.execute(
             sa_update(InventoryLocation)
@@ -385,7 +373,7 @@ def _consume_normal_source(
     return inv
 
 
-def _scrap_normal(
+def scrap_normal(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,
@@ -402,11 +390,11 @@ def _scrap_normal(
     if source.kind not in ("warehouse", "production"):
         raise ValueError(f"알 수 없는 source: {source.kind} (warehouse 또는 production)")
 
-    _get_or_create_inventory(db, item_id)
+    get_or_create_inventory(db, item_id)
     return _consume_normal_source(db, item_id, qty, source.kind, source.dept_or_warehouse)
 
 
-def _return_to_supplier_from_normal(
+def return_to_supplier_from_normal(
     db: Session,
     item_id: uuid.UUID,
     qty: Decimal,
@@ -423,5 +411,5 @@ def _return_to_supplier_from_normal(
     if source.kind not in ("warehouse", "production"):
         raise ValueError(f"알 수 없는 source: {source.kind} (warehouse 또는 production)")
 
-    _get_or_create_inventory(db, item_id)
+    get_or_create_inventory(db, item_id)
     return _consume_normal_source(db, item_id, qty, source.kind, source.dept_or_warehouse)

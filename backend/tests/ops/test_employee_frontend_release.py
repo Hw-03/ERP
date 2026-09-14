@@ -158,7 +158,7 @@ def test_migration_boundary_blocks_automatic_rollback_and_pending_deploy(tmp_pat
     with pytest.raises(module.ReleaseError, match="recovery"):
         module.assert_no_pending(employee)
     module.mark(record, employee, "MIGRATING")
-    with pytest.raises(module.ReleaseError, match="migration boundary"):
+    with pytest.raises(module.ReleaseError, match="verified Friday database recovery"):
         module.rollback(record, employee)
     assert (employee / "backend" / "mes.db").read_text() == "business rows"
     module.mark(record, employee, "CONFIRMED")

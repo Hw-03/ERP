@@ -24,7 +24,7 @@ def _department_value(department: object) -> str:
     return str(getattr(department, "value", department))
 
 
-def _create_record(
+def create_record(
     db: Session,
     *,
     item_id: uuid.UUID,
@@ -86,7 +86,7 @@ def _create_record(
     return record
 
 
-def _get_record_for_action(
+def get_record_for_action(
     db: Session,
     *,
     record_id: Optional[uuid.UUID],
@@ -121,7 +121,7 @@ def _get_record_for_action(
     return record
 
 
-def _pending_quantity(
+def pending_quantity(
     db: Session,
     record_id: uuid.UUID,
     *,
@@ -137,7 +137,7 @@ def _pending_quantity(
     return Decimal(str(query.scalar() or 0))
 
 
-def _ensure_available(
+def ensure_available(
     db: Session,
     record: DefectQuarantineRecord,
     quantity: Decimal,
@@ -147,7 +147,7 @@ def _ensure_available(
 ) -> None:
     """남은 수량에서 다른 승인 대기 수량을 뺀 처리 가능 수량을 검증한다."""
     quantity = Decimal(str(quantity))
-    pending = _pending_quantity(
+    pending = pending_quantity(
         db,
         record.record_id,
         exclude_line_id=exclude_line_id,
@@ -169,16 +169,13 @@ def _ensure_available(
         )
 
 
-def _ensure_defect_management_category(record: DefectQuarantineRecord) -> None:
+def ensure_defect_management_category(record: DefectQuarantineRecord) -> None:
     """불량 처리 대상은 현재 불량 관리 분류의 원장만 허용한다."""
-    if (
-        getattr(record, "management_category", None)
-        or DefectManagementCategoryEnum.DEFECT.value
-    ) != DefectManagementCategoryEnum.DEFECT.value:
+    if (record.management_category or DefectManagementCategoryEnum.DEFECT.value) != DefectManagementCategoryEnum.DEFECT.value:
         raise ValueError("B급·불용 관리 품목은 먼저 불량 격리로 이동한 뒤 처리해 주세요.")
 
 
-def _decrement_record(
+def decrement_record(
     db: Session,
     record: DefectQuarantineRecord,
     quantity: Decimal,
@@ -187,7 +184,7 @@ def _decrement_record(
 ) -> None:
     """검증된 수량만 선택 기록에서 차감한다."""
     quantity = Decimal(str(quantity))
-    _ensure_available(
+    ensure_available(
         db,
         record,
         quantity,

@@ -20,15 +20,14 @@ from app.models import (
     LocationStatusEnum,
     TransactionLog,
     TransactionTypeEnum,
+    Item,
 )
-from app.repositories import item_repository
 from app.services import inv_effect
 from app.services import inventory as inventory_svc
 from app.services import defect_records as defect_records_svc
 from app.services import inventory_operations as operation_svc
-from app.services import warehouse_map as warehouse_map_svc
 from app.services._tx import transactional
-from app.services.inv_transfer import department_for_item
+from app.services.inv_transfer import department_for_item, lock_items_for_department_routing
 
 
 @dataclass(frozen=True)
@@ -57,7 +56,7 @@ def quarantine_inventory(
 ) -> Inventory:
     """재고 격리와 원장 기록을 하나의 업무 트랜잭션으로 확정한다."""
     with transactional(db):
-        item = item_repository.lock_active_many(db, [item_id]).get(item_id)
+        item = lock_items_for_department_routing(db, [item_id]).get(item_id)
         if item is None:
             raise ValueError(f"품목을 찾을 수 없습니다: {item_id}")
         if source == "production":
@@ -69,7 +68,7 @@ def quarantine_inventory(
         elif source == "warehouse":
             if source_dept is not None or target_dept != DepartmentEnum.WAREHOUSE:
                 raise ValueError("창고 출처 불량 등록은 source_dept 없이 격리 부서가 창고여야 합니다.")
-        operation = operation_svc._create_business_operation(
+        operation = operation_svc.create_business_operation(
             db,
             domain="defect",
             action="quarantine",
@@ -84,11 +83,11 @@ def quarantine_inventory(
                 else None
             ),
         )
-        inv = inventory_svc._get_or_create_inventory(db, item_id)
+        inv = inventory_svc.get_or_create_inventory(db, item_id)
         qty_before = inv.quantity or Decimal("0")
-        cells_before = inv_effect._snapshot_cells(db, item_id)
+        cells_before = inv_effect.snapshot_cells(db, item_id)
 
-        inventory_svc._mark_defective(
+        inventory_svc.mark_defective(
             db,
             item_id,
             qty,
@@ -107,8 +106,8 @@ def quarantine_inventory(
             .execution_options(synchronize_session=False)
         )
         db.flush()
-        inv = inventory_svc._get_or_create_inventory(db, item_id)
-        record = defect_records_svc._create_record(
+        inv = inventory_svc.get_or_create_inventory(db, item_id)
+        record = defect_records_svc.create_record(
             db,
             item_id=item_id,
             department=target_dept,
@@ -119,7 +118,7 @@ def quarantine_inventory(
             memo=reason_memo,
             management_category=management_category,
         )
-        log = operation_svc._attach_transaction(
+        log = operation_svc.attach_transaction(
             TransactionLog(
                 item_id=item_id,
                 transaction_type=TransactionTypeEnum.MARK_DEFECTIVE,
@@ -134,13 +133,13 @@ def quarantine_inventory(
                 client_request_id=client_request_id,
                 department=target_dept.value,
                 defect_quarantine_record_id=record.record_id,
-                **inv_effect._capture_log_stock_snapshot(db, item_id, cells_before),
+                **inv_effect.capture_log_stock_snapshot(db, item_id, cells_before),
             ),
             operation,
             InventoryOperationRoleEnum.PRIMARY,
         )
         db.add(log)
-        operation_svc._record_defect_movement(
+        operation_svc.record_defect_movement(
             db,
             operation=operation,
             record_id=record.record_id,
@@ -168,21 +167,15 @@ def unquarantine_inventory(
 ) -> Inventory:
     """정상 복귀와 원장 기록을 하나의 업무 트랜잭션으로 확정한다."""
     with transactional(db):
-        warehouse_map_svc.lock_warehouse_map_rows(
-            db,
-            item_ids=[item_id],
-            include_boxes_for_item_ids=True,
-            include_zones_for_item_ids=True,
-        )
-        record = defect_records_svc._get_record_for_action(
+        record = defect_records_svc.get_record_for_action(
             db,
             record_id=record_id,
             item_id=item_id,
             department=dept,
         )
         if record is not None:
-            defect_records_svc._ensure_available(db, record, qty)
-        operation = operation_svc._create_business_operation(
+            defect_records_svc.ensure_available(db, record, qty)
+        operation = operation_svc.create_business_operation(
             db,
             domain="defect",
             action="restore",
@@ -192,11 +185,11 @@ def unquarantine_inventory(
             department=dept.value,
             reason=reason_memo,
         )
-        inv = inventory_svc._get_or_create_inventory(db, item_id)
+        inv = inventory_svc.get_or_create_inventory(db, item_id)
         qty_before = inv.quantity or Decimal("0")
-        cells_before = inv_effect._snapshot_cells(db, item_id)
+        cells_before = inv_effect.snapshot_cells(db, item_id)
 
-        inventory_svc._unmark_defective(
+        inventory_svc.unmark_defective(
             db,
             item_id,
             qty,
@@ -209,9 +202,9 @@ def unquarantine_inventory(
         )
         db.flush()
         if record is not None:
-            defect_records_svc._decrement_record(db, record, qty)
-        inv = inventory_svc._get_or_create_inventory(db, item_id)
-        log = operation_svc._attach_transaction(
+            defect_records_svc.decrement_record(db, record, qty)
+        inv = inventory_svc.get_or_create_inventory(db, item_id)
+        log = operation_svc.attach_transaction(
             TransactionLog(
                 item_id=item_id,
                 transaction_type=TransactionTypeEnum.UNMARK_DEFECTIVE,
@@ -225,14 +218,14 @@ def unquarantine_inventory(
                 reason_memo=reason_memo or None,
                 department=dept.value,
                 defect_quarantine_record_id=(record.record_id if record else None),
-                **inv_effect._capture_log_stock_snapshot(db, item_id, cells_before),
+                **inv_effect.capture_log_stock_snapshot(db, item_id, cells_before),
             ),
             operation,
             InventoryOperationRoleEnum.PRIMARY,
         )
         db.add(log)
         if record is not None:
-            operation_svc._record_defect_movement(
+            operation_svc.record_defect_movement(
                 db,
                 operation=operation,
                 record_id=record.record_id,
@@ -268,16 +261,10 @@ def unquarantine_inventory_bulk(
         raise ValueError("정상 복귀는 같은 부서의 격리 기록만 함께 처리할 수 있습니다.")
 
     with transactional(db):
-        warehouse_map_svc.lock_warehouse_map_rows(
-            db,
-            item_ids={line.item_id for line in lines},
-            include_boxes_for_item_ids=True,
-            include_zones_for_item_ids=True,
-        )
         by_record_id = {line.record_id: line for line in lines}
         for record_id in sorted(record_ids, key=str):
             line = by_record_id[record_id]
-            record = defect_records_svc._get_record_for_action(
+            record = defect_records_svc.get_record_for_action(
                 db,
                 record_id=record_id,
                 item_id=line.item_id,
@@ -285,7 +272,7 @@ def unquarantine_inventory_bulk(
             )
             if record is None:
                 raise ValueError("선택한 격리 기록을 찾을 수 없습니다.")
-            pending = defect_records_svc._pending_quantity(db, record.record_id)
+            pending = defect_records_svc.pending_quantity(db, record.record_id)
             if pending > 0:
                 raise ValueError("처리 대기 또는 예약 중인 격리 기록은 정상 복귀할 수 없습니다.")
             remaining = Decimal(str(record.remaining_quantity or 0))

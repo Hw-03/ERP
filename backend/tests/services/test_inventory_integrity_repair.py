@@ -186,7 +186,6 @@ def test_activation_dry_run_then_sets_ledger_now_and_weekly_next_monday(db_sessi
     assert preview.ledger_starts_at == now
     assert preview.weekly_starts_at.isoformat() == "2026-08-31T00:00:00+09:00"
     assert db_session.get(SystemSetting, CUTOVER_SETTING_KEY) is None
-    assert db_session.get(SystemSetting, "inventory_operation_v2_cutover_at") is None
     assert db_session.get(SystemSetting, WEEKLY_V2_SETTING_KEY) is None
 
     applied = activate_inventory_operation_contract(
@@ -199,16 +198,10 @@ def test_activation_dry_run_then_sets_ledger_now_and_weekly_next_monday(db_sessi
 
     assert applied.applied is True
     assert db_session.get(SystemSetting, CUTOVER_SETTING_KEY).setting_value == now.isoformat()
-    assert db_session.get(SystemSetting, "inventory_operation_v2_cutover_at").setting_value == now.isoformat()
     assert (
         db_session.get(SystemSetting, WEEKLY_V2_SETTING_KEY).setting_value
         == "2026-08-31T00:00:00+09:00"
     )
-
-    activate_inventory_operation_contract(
-        db_session, approved_by="배포 관리자", now=datetime(2026, 9, 11, tzinfo=UTC), apply=True,
-    )
-    assert db_session.get(SystemSetting, "inventory_operation_v2_cutover_at").setting_value == now.isoformat()
 
 
 def test_activation_seeds_existing_defect_opening_balance_once(
@@ -217,6 +210,8 @@ def test_activation_seeds_existing_defect_opening_balance_once(
 ):
     now = datetime(2026, 8, 25, 6, 30, tzinfo=UTC)
     item = make_item(name="전환 기준선", process_type_code="VF")
+    inventory = db_session.query(Inventory).filter_by(item_id=item.item_id).one()
+    inventory.quantity = Decimal("2")
     db_session.add_all(
         [
             InventoryLocation(
@@ -235,7 +230,6 @@ def test_activation_seeds_existing_defect_opening_balance_once(
             ),
         ]
     )
-    db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one().quantity = Decimal("2")
     db_session.commit()
 
     preview = activate_inventory_operation_contract(

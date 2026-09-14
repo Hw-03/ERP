@@ -17,7 +17,6 @@ interface QuantityStepperProps {
   step?: number | "any";
   inputRef?: Ref<HTMLInputElement>;
   className?: string;
-  highContrastControls?: boolean;
 }
 
 function safeMinimum(value: number) {
@@ -40,7 +39,6 @@ export function QuantityStepper({
   step = 1,
   inputRef,
   className = "",
-  highContrastControls = false,
 }: QuantityStepperProps) {
   const minimum = safeMinimum(min);
   const current = safeQuantity(Number(value), minimum);
@@ -66,10 +64,10 @@ export function QuantityStepper({
         {label}
       </span>
       <div className="flex items-center gap-1">
-        <StepButton tone={LEGACY_COLORS.red} highContrast={highContrastControls} disabled={minusDisabled} onClick={() => changeBy(-10)}>
+        <StepButton tone={LEGACY_COLORS.red} disabled={minusDisabled} onClick={() => changeBy(-10)}>
           -10
         </StepButton>
-        <StepButton tone={LEGACY_COLORS.red} highContrast={highContrastControls} disabled={minusDisabled} onClick={() => changeBy(-1)}>
+        <StepButton tone={LEGACY_COLORS.red} disabled={minusDisabled} onClick={() => changeBy(-1)}>
           -1
         </StepButton>
         <QuantityInput
@@ -84,10 +82,10 @@ export function QuantityStepper({
           onFocus={(event) => event.currentTarget.select()}
           className="h-11 min-h-[44px] w-[72px] rounded-[10px] border px-2 py-2 text-base font-black"
         />
-        <StepButton tone={LEGACY_COLORS.green} highContrast={highContrastControls} disabled={plusDisabled} onClick={() => changeBy(1)}>
+        <StepButton tone={LEGACY_COLORS.green} disabled={plusDisabled} onClick={() => changeBy(1)}>
           +1
         </StepButton>
-        <StepButton tone={LEGACY_COLORS.green} highContrast={highContrastControls} disabled={plusDisabled} onClick={() => changeBy(10)}>
+        <StepButton tone={LEGACY_COLORS.green} disabled={plusDisabled} onClick={() => changeBy(10)}>
           +10
         </StepButton>
       </div>
@@ -99,13 +97,11 @@ function StepButton({
   tone,
   onClick,
   disabled,
-  highContrast,
   children,
 }: {
   tone: string;
   onClick: () => void;
   disabled?: boolean;
-  highContrast?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -117,9 +113,7 @@ function StepButton({
       style={{
         background: tint(tone, 10),
         borderColor: tint(tone, 30),
-        color: highContrast
-          ? `color-mix(in srgb, ${tone} 70%, ${LEGACY_COLORS.text})`
-          : tone,
+        color: tone,
       }}
     >
       {children}

@@ -32,6 +32,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from scripts.runtime_paths import runtime_path  # noqa: E402
 from scripts.ops import backup_manifest  # noqa: E402
+from scripts.ops import friday_profile_cutover  # noqa: E402
 from scripts.ops.durable_file import (  # noqa: E402
     durable_replace as _shared_durable_replace,
     windows_write_through_replace as _shared_windows_write_through_replace,
@@ -349,7 +350,14 @@ def _verify_sqlite_install_snapshot(
     return backup_manifest.verify_database_evidence(manifest, evidence)
 
 
-def _resolve_preverified_rollback(path: str, target_path: Path, restore_source: Path) -> Path:
+def _resolve_preverified_rollback(
+    path: str,
+    target_path: Path,
+    restore_source: Path,
+    *,
+    friday_cutover_admission: tuple[Path, str] | None = None,
+    friday_cutover_recovery: bool = False,
+) -> Path:
     """Validate an explicit rollback receipt inside the bounded runtime backup set."""
     rollback = Path(path).resolve()
     backup_dir = runtime_path("backups", "sqlite").resolve()
@@ -362,23 +370,39 @@ def _resolve_preverified_rollback(path: str, target_path: Path, restore_source: 
             file=sys.stderr,
         )
         raise SystemExit(1)
-    result = backup_manifest.verify_sqlite_backup(
-        rollback,
-        source_path=None if rollback == restore_source.resolve() else target_path,
-    )
-    if result.status is backup_manifest.BackupStatus.STALE:
-        print(
-            f"[RESTORE] preverified rollback does not match current target: {rollback}",
-            file=sys.stderr,
+    if friday_cutover_admission is not None:
+        receipt_path, receipt_sha256 = friday_cutover_admission
+        try:
+            friday_profile_cutover.verify_admission(
+                receipt_path=receipt_path,
+                expected_receipt_sha256=receipt_sha256,
+                candidate_path=rollback if friday_cutover_recovery else restore_source,
+                original_path=restore_source if friday_cutover_recovery else rollback,
+                target_path=target_path,
+                friday_validator_root=PROJECT_ROOT,
+                recovery=friday_cutover_recovery,
+            )
+        except friday_profile_cutover.CutoverAdmissionError as exc:
+            print(f"[RESTORE] Friday cutover admission failed: {exc}", file=sys.stderr)
+            raise SystemExit(1) from exc
+    else:
+        result = backup_manifest.verify_sqlite_backup(
+            rollback,
+            source_path=None if rollback == restore_source.resolve() else target_path,
         )
-        print("RESTORE_RESULT=TARGET_CHANGED_AFTER_ROLLBACK", file=sys.stderr)
-        raise SystemExit(3)
-    if result.status is not backup_manifest.BackupStatus.PASS:
-        print(
-            f"[RESTORE] preverified rollback is not PASS: {result.status.value}",
-            file=sys.stderr,
-        )
-        raise SystemExit(1)
+        if result.status is backup_manifest.BackupStatus.STALE:
+            print(
+                f"[RESTORE] preverified rollback does not match current target: {rollback}",
+                file=sys.stderr,
+            )
+            print("RESTORE_RESULT=TARGET_CHANGED_AFTER_ROLLBACK", file=sys.stderr)
+            raise SystemExit(3)
+        if result.status is not backup_manifest.BackupStatus.PASS:
+            print(
+                f"[RESTORE] preverified rollback is not PASS: {result.status.value}",
+                file=sys.stderr,
+            )
+            raise SystemExit(1)
     restoring_the_rollback = rollback == restore_source.resolve()
     if not restoring_the_rollback and _sqlite_snapshot_digest(rollback) != _sqlite_snapshot_digest(target_path):
         print(
@@ -540,6 +564,7 @@ def _replace_sqlite_atomically(
     expected_target_digest: str | None = None,
     expected_target_absent: bool = False,
     expected_absent_sidecar_digests: dict[str, str] | None = None,
+    candidate_check: Callable[[Path], None] | None = None,
     postcheck: Callable[[Path], None] | None = None,
 ) -> None:
     """Install and post-check a staged DB before releasing its old rollback files."""
@@ -552,7 +577,9 @@ def _replace_sqlite_atomically(
     operation_error: BaseException | None = None
     try:
         shutil.copy2(source_path, staged)
-        if source_integrity_only:
+        if candidate_check is not None:
+            candidate_check(staged)
+        elif source_integrity_only:
             _verify_sqlite_integrity(staged)
         elif manifest is not None:
             verification = backup_manifest.verify_sqlite_candidate(staged, manifest)
@@ -830,6 +857,10 @@ def restore_sqlite(
     source_integrity_only: bool = False,
     structural_rollback: bool = False,
     offline_target: bool = False,
+    friday_cutover_admission: str | None = None,
+    friday_cutover_admission_sha256: str | None = None,
+    friday_cutover_recovery: bool = False,
+    friday_cutover_recovery_output: str | None = None,
 ) -> None:
     original_src = _resolve_sqlite_backup(backup_path)
     dst = Path(target_path).resolve()
@@ -843,6 +874,52 @@ def restore_sqlite(
         if not target_existed_at_start
         else {}
     )
+    admission_values = (
+        Path(friday_cutover_admission).resolve(),
+        friday_cutover_admission_sha256,
+    ) if friday_cutover_admission and friday_cutover_admission_sha256 else None
+
+    if bool(friday_cutover_admission) != bool(friday_cutover_admission_sha256):
+        print(
+            "[RESTORE] Friday cutover requires both admission path and SHA-256",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    if friday_cutover_recovery and (
+        admission_values is None or run_check or not friday_cutover_recovery_output
+    ):
+        print(
+            "[RESTORE] Friday cutover recovery requires one admission pair, one "
+            "recovery output, and no --check",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    if friday_cutover_recovery_output and not friday_cutover_recovery:
+        print(
+            "[RESTORE] Friday recovery output is only valid with recovery mode",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    recovery_output = (
+        Path(friday_cutover_recovery_output).resolve()
+        if friday_cutover_recovery_output
+        else None
+    )
+    if recovery_output is not None and recovery_output.exists():
+        print(f"[RESTORE] recovery output already exists: {recovery_output}", file=sys.stderr)
+        raise SystemExit(2)
+    if admission_values is not None and (
+        not preverified_rollback
+        or source_integrity_only
+        or structural_rollback
+        or not target_existed_at_start
+    ):
+        print(
+            "[RESTORE] Friday cutover requires an existing target and one FULL "
+            "--preverified-rollback without structural flags",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
 
     if preverified_rollback and not target_existed_at_start:
         print("[RESTORE] preverified rollback requires an existing target DB", file=sys.stderr)
@@ -874,6 +951,8 @@ def restore_sqlite(
             preverified_rollback,
             dst,
             original_src,
+            friday_cutover_admission=admission_values,
+            friday_cutover_recovery=friday_cutover_recovery,
         )
 
     if not original_src.exists():
@@ -926,6 +1005,8 @@ def restore_sqlite(
                 else:
                     _verify_sqlite_integrity(src)
                 source_manifest = None
+            elif friday_cutover_recovery:
+                source_manifest = None
             else:
                 source_manifest = _verify_sqlite_backup(src)
 
@@ -938,6 +1019,8 @@ def restore_sqlite(
                     preverified_rollback,
                     dst,
                     original_src,
+                    friday_cutover_admission=admission_values,
+                    friday_cutover_recovery=friday_cutover_recovery,
                 )
 
             expected_target_digest = None
@@ -952,32 +1035,60 @@ def restore_sqlite(
                 print(f"ROLLBACK_PATH={snapshot.resolve()}")
                 expected_target_digest = _sqlite_snapshot_digest(dst)
                 if snapshot.resolve() != original_src.resolve():
-                    rollback_freshness = backup_manifest.verify_sqlite_backup(
-                        snapshot,
-                        source_path=dst,
-                    )
-                    if rollback_freshness.status is backup_manifest.BackupStatus.STALE:
-                        print(
-                            "[RESTORE] target changed while rollback snapshot was created",
-                            file=sys.stderr,
+                    if admission_values is not None:
+                        snapshot = _resolve_preverified_rollback(
+                            preverified_rollback,
+                            dst,
+                            original_src,
+                            friday_cutover_admission=admission_values,
+                            friday_cutover_recovery=friday_cutover_recovery,
                         )
-                        print(
-                            "RESTORE_RESULT=TARGET_CHANGED_AFTER_ROLLBACK",
-                            file=sys.stderr,
+                        if _sqlite_snapshot_digest(snapshot) != expected_target_digest:
+                            print(
+                                "[RESTORE] target changed while rollback snapshot was verified",
+                                file=sys.stderr,
+                            )
+                            print(
+                                "RESTORE_RESULT=TARGET_CHANGED_AFTER_ROLLBACK",
+                                file=sys.stderr,
+                            )
+                            raise SystemExit(3)
+                    else:
+                        rollback_freshness = backup_manifest.verify_sqlite_backup(
+                            snapshot,
+                            source_path=dst,
                         )
-                        raise SystemExit(3)
-                    allowed_rollback_statuses = {
-                        backup_manifest.BackupStatus.PASS,
-                        backup_manifest.BackupStatus.STRUCTURAL_ONLY,
-                    }
-                    if rollback_freshness.status not in allowed_rollback_statuses:
-                        raise backup_manifest.BackupValidationError(
-                            "rollback snapshot verification failed: "
-                            + "; ".join(rollback_freshness.errors)
-                        )
+                        if rollback_freshness.status is backup_manifest.BackupStatus.STALE:
+                            print(
+                                "[RESTORE] target changed while rollback snapshot was created",
+                                file=sys.stderr,
+                            )
+                            print(
+                                "RESTORE_RESULT=TARGET_CHANGED_AFTER_ROLLBACK",
+                                file=sys.stderr,
+                            )
+                            raise SystemExit(3)
+                        allowed_rollback_statuses = {
+                            backup_manifest.BackupStatus.PASS,
+                            backup_manifest.BackupStatus.STRUCTURAL_ONLY,
+                        }
+                        if rollback_freshness.status not in allowed_rollback_statuses:
+                            raise backup_manifest.BackupValidationError(
+                                "rollback snapshot verification failed: "
+                                + "; ".join(rollback_freshness.errors)
+                            )
 
             def verify_installed_target(verification_target: Path) -> None:
-                if source_manifest is not None:
+                if friday_cutover_recovery:
+                    assert admission_values is not None
+                    receipt_path, receipt_sha256 = admission_values
+                    friday_profile_cutover.verify_recovery_install(
+                        receipt_path=receipt_path,
+                        expected_receipt_sha256=receipt_sha256,
+                        original_path=original_src,
+                        installed_path=verification_target,
+                    )
+                elif source_manifest is not None:
                     installed = _verify_sqlite_install_snapshot(
                         verification_target,
                         source_manifest,
@@ -997,6 +1108,30 @@ def restore_sqlite(
                     _run_integrity_check(
                         db_url=f"sqlite:///{verification_target.as_posix()}"
                     )
+                if friday_cutover_recovery:
+                    assert admission_values is not None
+                    assert recovery_output is not None
+                    receipt_path, receipt_sha256 = admission_values
+                    friday_profile_cutover.create_recovery_receipt(
+                        cutover_receipt_path=receipt_path,
+                        expected_cutover_receipt_sha256=receipt_sha256,
+                        original_path=original_src,
+                        target_path=dst,
+                        installed_snapshot_path=verification_target,
+                        output_path=recovery_output,
+                    )
+
+            def verify_staged_candidate(staged_candidate: Path) -> None:
+                if not friday_cutover_recovery:
+                    return
+                assert admission_values is not None
+                receipt_path, receipt_sha256 = admission_values
+                friday_profile_cutover.verify_recovery_install(
+                    receipt_path=receipt_path,
+                    expected_receipt_sha256=receipt_sha256,
+                    original_path=original_src,
+                    installed_path=staged_candidate,
+                )
 
             dst.parent.mkdir(parents=True, exist_ok=True)
             _replace_sqlite_atomically(
@@ -1007,9 +1142,15 @@ def restore_sqlite(
                 expected_target_digest=expected_target_digest,
                 expected_target_absent=not target_existed_at_start,
                 expected_absent_sidecar_digests=expected_absent_sidecar_digests,
+                candidate_check=(
+                    verify_staged_candidate if friday_cutover_recovery else None
+                ),
                 postcheck=verify_installed_target,
             )
-    except backup_manifest.BackupValidationError as exc:
+    except (
+        backup_manifest.BackupValidationError,
+        friday_profile_cutover.CutoverAdmissionError,
+    ) as exc:
         print(f"[RESTORE] SQLite restore failed: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
 
@@ -2730,6 +2871,23 @@ def parse_args() -> argparse.Namespace:
         help="Verified rollback snapshot in the runtime backup directory; skips a duplicate pre-restore snapshot",
     )
     parser.add_argument(
+        "--friday-cutover-admission",
+        help="Pinned one-shot Friday profile admission receipt",
+    )
+    parser.add_argument(
+        "--friday-cutover-admission-sha256",
+        help="Externally pinned SHA-256 of the Friday cutover admission receipt",
+    )
+    parser.add_argument(
+        "--friday-cutover-recovery",
+        action="store_true",
+        help="Recover the admitted modern FULL snapshot after a failed Friday restart",
+    )
+    parser.add_argument(
+        "--friday-cutover-recovery-output",
+        help="Exclusive PASS receipt written after writer-fenced modern recovery post-check",
+    )
+    parser.add_argument(
         "--source-integrity-only",
         action="store_true",
         help="Allow a structurally valid legacy SQLite source only for a new pre-migration candidate",
@@ -2767,16 +2925,28 @@ def main() -> int:
 
     if args.sqlite:
         restore_sqlite(
-            args.sqlite,
-            args.target,
-            args.check,
-            args.preverified_rollback,
-            args.source_integrity_only,
-            args.structural_rollback,
-            args.offline_target,
+            backup_path=args.sqlite,
+            target_path=args.target,
+            run_check=args.check,
+            preverified_rollback=args.preverified_rollback,
+            source_integrity_only=args.source_integrity_only,
+            structural_rollback=args.structural_rollback,
+            offline_target=args.offline_target,
+            friday_cutover_admission=args.friday_cutover_admission,
+            friday_cutover_admission_sha256=args.friday_cutover_admission_sha256,
+            friday_cutover_recovery=args.friday_cutover_recovery,
+            friday_cutover_recovery_output=args.friday_cutover_recovery_output,
         )
     elif args.postgres:
-        if args.source_integrity_only or args.structural_rollback or args.offline_target:
+        if (
+            args.source_integrity_only
+            or args.structural_rollback
+            or args.offline_target
+            or args.friday_cutover_admission
+            or args.friday_cutover_admission_sha256
+            or args.friday_cutover_recovery
+            or args.friday_cutover_recovery_output
+        ):
             print("[RESTORE] structural SQLite flags are not valid for PostgreSQL", file=sys.stderr)
             return 2
         restore_postgres(

@@ -29,7 +29,7 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 from app import models as _models  # noqa: E402, F401
-from app.models import Inventory, Item, ProcessType, WarehouseUnplacedItem  # noqa: E402
+from app.models import Inventory, Item, ProcessType  # noqa: E402
 from bootstrap.schema import ensure_schema  # noqa: E402
 from scripts.ops import (  # noqa: E402
     backup_db,
@@ -124,11 +124,6 @@ def _seed_valid_inventory(path: Path) -> None:
                         quantity=5,
                         warehouse_qty=5,
                         pending_quantity=0,
-                    ),
-                    WarehouseUnplacedItem(
-                        id="00000000000000000000000000000003",
-                        item_id=item.item_id,
-                        quantity=5,
                     ),
                 ]
             )
@@ -298,7 +293,7 @@ def test_sqlite_backup_publishes_manifest_last_with_exact_evidence(
     }
     database = manifest["database"]
     assert database["engine"] == "sqlite"
-    assert database["alembic_revision"] == "20260911_0036"
+    assert database["alembic_revision"] == "20260910_0033"
     assert len(database["schema_fingerprint"]) == 64
     assert database["data_revision"]["revision"] >= 0
     assert len(database["snapshot_hash"]) == 64
@@ -561,7 +556,7 @@ def test_schema_damage_fails_closed_after_artifact_receipt_is_refreshed(
         if damage == "wrong-head":
             connection.execute("UPDATE alembic_version SET version_num = '20260831_0032'")
         elif damage == "missing-table":
-            connection.execute("DROP TABLE shipping_command_receipts")
+            connection.execute("DROP TABLE shipping_request_events")
         elif damage == "missing-column":
             connection.execute("ALTER TABLE data_revision DROP COLUMN updated_at")
         else:
@@ -1238,7 +1233,7 @@ def test_failed_staged_restore_preserves_target_and_last_valid_manifest(
     target_before = _sha256(target)
 
     with sqlite3.connect(candidate) as connection:
-        connection.execute("DROP TABLE shipping_command_receipts")
+        connection.execute("DROP TABLE shipping_request_events")
         connection.commit()
     _refresh_artifact_receipt(candidate)
 

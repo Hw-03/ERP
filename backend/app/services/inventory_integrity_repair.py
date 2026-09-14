@@ -20,7 +20,10 @@ from app.models import (
     StockRequest,
     StockRequestStatusEnum,
 )
-from app.services.inventory_integrity import diagnose_inventory_integrity
+from app.services.inventory_integrity import (
+    diagnose_inventory_integrity,
+    expected_workflow_effect_status,
+)
 
 
 class InventoryIntegrityRepairError(RuntimeError):
@@ -55,7 +58,7 @@ def _set_workflow_status(
     subject = _workflow_subject(db, effect)
     if subject is None:
         raise InventoryIntegrityRepairError("연결 업무를 찾을 수 없어 복구할 수 없습니다.")
-    expected = str((effect.after_state or {}).get("status") or "")
+    expected = expected_workflow_effect_status(db, effect)
     enum_by_type = {
         "HandoverDoc": HandoverStatusEnum,
         "ShippingRequest": ShippingRequestStatusEnum,

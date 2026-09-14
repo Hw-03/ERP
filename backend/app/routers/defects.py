@@ -16,18 +16,13 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import List, Literal, Optional
 
-from fastapi import Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies.verified_actor import (
-    VerifiedActor,
-    VerifiedActorRouter,
-    ensure_actor_employee_id,
-)
 from app.models import (
     BOM,
     DepartmentEnum,
@@ -36,6 +31,7 @@ from app.models import (
     DefectQuarantineMemoRevision,
     DefectQuarantineRecord,
     DefectQuarantineReconstruction,
+    Employee,
     InventoryLocation,
     Item,
     LocationStatusEnum,
@@ -47,8 +43,9 @@ from app.models import (
 from app.routers._errors import ErrorCode, http_error
 from app.services import rate_limit
 from app.services import defect_actions as defect_actions_svc
-from app.services.pin_auth import validate_pin
+from app.services.pin_auth import validate_pin, verify_pin
 from app._evt import emit as _evt_emit
+from app._actor import set_actor
 from app.repositories import item_repository
 from app.schemas.defect_statistics import (
     DefectStatisticsFilters,
@@ -57,7 +54,7 @@ from app.schemas.defect_statistics import (
 )
 from app.services.defect_statistics import get_defect_statistics
 
-router = VerifiedActorRouter()
+router = APIRouter()
 
 
 # ---------------------------------------------------------------------------
@@ -552,7 +549,6 @@ def update_defect_memo(
     record_id: uuid.UUID,
     payload: DefectMemoUpdateRequest,
     http_request: Request,
-    actor: VerifiedActor,
     db: Session = Depends(get_db),
 ):
     """PIN으로 확인한 직원이 격리 메모를 수정하고 변경 전후를 보존한다."""
@@ -560,23 +556,30 @@ def update_defect_memo(
     if record is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "격리 기록을 찾을 수 없습니다.")
 
-    ensure_actor_employee_id(actor, payload.actor_employee_id)
+    actor = db.get(Employee, payload.actor_employee_id)
+    if actor is None:
+        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    if not bool(actor.is_active):
+        raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원입니다.")
 
     validate_pin(payload.pin)
-    try:
-        pin_is_valid = rate_limit.verify_operator_pin(actor, payload.pin, http_request)
-    except rate_limit.OperatorPinRateLimitExceeded as exc:
+    client_ip = getattr(getattr(http_request, "client", None), "host", None) or "unknown"
+    rate_limit_key = f"verify_pin:{actor.employee_id}:{client_ip}"
+    if rate_limit.is_blocked(rate_limit_key):
         raise http_error(
             429,
             ErrorCode.TOO_MANY_REQUESTS,
-            str(exc),
+            "PIN 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.",
         )
-    if not pin_is_valid:
+    if not verify_pin(actor.pin_hash, payload.pin):
+        rate_limit.record_failure(rate_limit_key)
         raise http_error(
             403,
             ErrorCode.FORBIDDEN,
             "PIN이 올바르지 않습니다.",
         )
+    rate_limit.record_success(rate_limit_key)
+    set_actor(http_request, actor)
 
     if record.current_memo == payload.memo:
         return DefectMemoUpdateResult(memo=payload.memo, changed=False)
@@ -633,7 +636,6 @@ def update_management_category(
     record_id: uuid.UUID,
     payload: DefectManagementCategoryUpdateRequest,
     http_request: Request,
-    actor: VerifiedActor,
     db: Session = Depends(get_db),
 ):
     """PIN 확인 뒤, 처리 대기 없는 활성 격리 원장의 관리 분류만 변경한다."""
@@ -657,14 +659,21 @@ def update_management_category(
     if current_category != payload.expected_management_category:
         raise http_error(409, ErrorCode.CONFLICT, "관리 분류가 변경되었습니다. 목록을 새로고침해 주세요.")
 
-    ensure_actor_employee_id(actor, payload.actor_employee_id)
+    actor = db.get(Employee, payload.actor_employee_id)
+    if actor is None:
+        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    if not bool(actor.is_active):
+        raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원입니다.")
     validate_pin(payload.pin)
-    try:
-        pin_is_valid = rate_limit.verify_operator_pin(actor, payload.pin, http_request)
-    except rate_limit.OperatorPinRateLimitExceeded as exc:
-        raise http_error(429, ErrorCode.TOO_MANY_REQUESTS, str(exc))
-    if not pin_is_valid:
+    client_ip = getattr(getattr(http_request, "client", None), "host", None) or "unknown"
+    rate_limit_key = f"verify_pin:{actor.employee_id}:{client_ip}"
+    if rate_limit.is_blocked(rate_limit_key):
+        raise http_error(429, ErrorCode.TOO_MANY_REQUESTS, "PIN 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.")
+    if not verify_pin(actor.pin_hash, payload.pin):
+        rate_limit.record_failure(rate_limit_key)
         raise http_error(403, ErrorCode.FORBIDDEN, "PIN이 올바르지 않습니다.")
+    rate_limit.record_success(rate_limit_key)
+    set_actor(http_request, actor)
 
     if current_category != payload.management_category:
         record.management_category = payload.management_category
@@ -688,16 +697,8 @@ def update_management_category(
 
 
 @router.post("/quarantine", response_model=DefectActionResult)
-def quarantine(
-    payload: QuarantineRequest,
-    http_request: Request,
-    actor: VerifiedActor,
-    db: Session = Depends(get_db),
-):
+def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = Depends(get_db)):
     """격리 (즉시, 결재 없음). mark_defective 래퍼 + defective_at 채움."""
-    ensure_actor_employee_id(actor, payload.actor_employee_id)
-    payload = payload.model_copy(update={"actor_employee_id": actor.employee_id})
-
     # 멱등성: 동일 키뿐 아니라 같은 격리 명령임이 확인될 때만 성공으로 재사용한다.
     if payload.client_request_id:
         existing = _find_client_request_log(db, payload.client_request_id)
@@ -706,7 +707,12 @@ def quarantine(
                 return DefectActionResult(item_id=payload.item_id, quantity=payload.qty, message="격리 완료")
             raise http_error(409, ErrorCode.CONFLICT, "이미 다른 요청에 사용된 요청 식별자입니다.")
 
-    item = item_repository.get_active(db, payload.item_id, for_update=True)
+    actor = db.query(Employee).filter(Employee.employee_id == payload.actor_employee_id).first()
+    if actor is None:
+        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    set_actor(http_request, actor)
+
+    item = item_repository.get(db, payload.item_id)
     if item is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
@@ -763,17 +769,14 @@ def quarantine(
 
 
 @router.post("/unquarantine", response_model=DefectActionResult)
-def unquarantine(
-    payload: UnquarantineRequest,
-    http_request: Request,
-    actor: VerifiedActor,
-    db: Session = Depends(get_db),
-):
+def unquarantine(payload: UnquarantineRequest, http_request: Request, db: Session = Depends(get_db)):
     """정상 복귀 (즉시, 결재 없음). unmark_defective 래퍼."""
-    ensure_actor_employee_id(actor, payload.actor_employee_id)
-    payload = payload.model_copy(update={"actor_employee_id": actor.employee_id})
+    actor = db.query(Employee).filter(Employee.employee_id == payload.actor_employee_id).first()
+    if actor is None:
+        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    set_actor(http_request, actor)
 
-    item = item_repository.get_active(db, payload.item_id, for_update=True)
+    item = item_repository.get(db, payload.item_id)
     if item is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
 
@@ -814,11 +817,15 @@ def unquarantine(
 def unquarantine_bulk(
     payload: BulkUnquarantineRequest,
     http_request: Request,
-    actor: VerifiedActor,
     db: Session = Depends(get_db),
 ):
     """선택한 동일 품목·부서 격리 기록을 전부 정상 복귀한다."""
-    ensure_actor_employee_id(actor, payload.actor_employee_id)
+    actor = db.query(Employee).filter(
+        Employee.employee_id == payload.actor_employee_id
+    ).first()
+    if actor is None:
+        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    set_actor(http_request, actor)
 
     try:
         lines = [

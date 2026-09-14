@@ -341,7 +341,7 @@ def test_normal_rework_rejects_unmapped_child_before_parent_stock_changes(
             }],
             reason_category="기타",
             reason_memo="미매핑 거절",
-            actor=_employee(db_session),
+            actor="자동 부서 작업자",
         )
 
     assert _production_quantity(db_session, parent.item_id, DepartmentEnum.ASSEMBLY) == Decimal("2")
@@ -421,7 +421,7 @@ def test_normal_rework_service_uses_parent_item_department_not_passed_source_dep
         }],
         reason_category="기타",
         reason_memo="직접 호출",
-        actor=_employee(db_session),
+        actor="자동 부서 작업자",
     )
 
     parent_log = db_session.query(TransactionLog).filter(

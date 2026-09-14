@@ -683,7 +683,7 @@ describe("DefectDepartmentList", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "이력 보기" }));
     const history = await screen.findByTestId("defect-record-history");
-    const revisions = within(history).getAllByRole("listitem");
+    const revisions = await within(history).findAllByRole("listitem");
 
     expect(within(revisions[0]).getByText("변경 전: TEST 2")).toBeInTheDocument();
     expect(within(revisions[0]).getByText("변경 후: TEST 3")).toBeInTheDocument();

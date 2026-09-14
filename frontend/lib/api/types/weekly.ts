@@ -1,5 +1,3 @@
-import type { components } from "../generated/openapi";
-
 export interface WeeklyItemReport {
   item_id: string;
   mes_code: string | null;
@@ -32,7 +30,7 @@ export interface WeeklyGroupReport {
 }
 
 export interface WeeklyWarning {
-  level: components["schemas"]["WeeklyWarning"]["level"];
+  level: "danger" | "warn" | "good";
   title: string;
   message: string;
 }

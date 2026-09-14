@@ -20,7 +20,6 @@ from app.models import (
     WarehouseAngle,
     WarehouseBox,
     WarehouseBoxItem,
-    WarehouseUnplacedItem,
 )
 from app.services import warehouse_map as warehouse_map_svc
 
@@ -81,14 +80,7 @@ def _setup(make_session, warehouse_qty: Decimal):
         )
         ordered_boxes.append((box.box_id, quantity))
 
-    session.add(
-        WarehouseUnplacedItem(
-            item_id=item.item_id,
-            quantity=0,
-        )
-    )
-
-    warehouse_map_svc._set_box_tracking_enabled(session, True)
+    warehouse_map_svc.set_box_tracking_enabled(session, True)
     session.commit()
     item_id = item.item_id
     session.close()
@@ -106,7 +98,7 @@ def test_concurrent_consume_warehouse_no_negative(concurrent_engine, make_sessio
     def try_consume():
         session = make_session()
         try:
-            inventory_svc._consume_warehouse(session, item_id, Decimal("1"))
+            inventory_svc.consume_warehouse(session, item_id, Decimal("1"))
             session.commit()
             return "success"
         except ValueError:
@@ -173,27 +165,17 @@ def test_consume_warehouse_rolls_back_inventory_and_boxes_when_r1_depletion_fail
     expected_in_transaction[first_box_id] = Decimal(first_box_quantity) - consume_qty
 
     observed = {}
-    original_apply = warehouse_map_svc._apply_warehouse_ledger_delta
+    original_deplete = warehouse_map_svc.deplete_boxes_by_order
 
-    def fail_after_physical_delta(
-        db,
-        deplete_item_id,
-        delta,
-        *,
-        consume_mode="available",
-    ):
-        original_apply(
-            db,
-            deplete_item_id,
-            delta,
-            consume_mode=consume_mode,
-        )
+    def fail_after_partial_depletion(db, deplete_item_id, qty):
         inventory = (
             db.query(Inventory)
             .filter(Inventory.item_id == deplete_item_id)
             .one()
         )
         observed["inventory_after_decrement"] = inventory.warehouse_qty
+
+        original_deplete(db, deplete_item_id, qty)
         box_rows = (
             db.query(WarehouseBoxItem)
             .filter(WarehouseBoxItem.item_id == deplete_item_id)
@@ -206,14 +188,14 @@ def test_consume_warehouse_rolls_back_inventory_and_boxes_when_r1_depletion_fail
 
     monkeypatch.setattr(
         warehouse_map_svc,
-        "_apply_warehouse_ledger_delta",
-        fail_after_physical_delta,
+        "deplete_boxes_by_order",
+        fail_after_partial_depletion,
     )
 
     session = make_session()
     try:
         with pytest.raises(RuntimeError, match="injected R1 depletion failure"):
-            inventory_svc._consume_warehouse(session, item_id, consume_qty)
+            inventory_svc.consume_warehouse(session, item_id, consume_qty)
 
         assert observed["inventory_after_decrement"] == warehouse_qty - consume_qty
         assert observed["boxes_after_depletion"] == expected_in_transaction

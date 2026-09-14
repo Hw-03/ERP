@@ -80,7 +80,6 @@ export function MobileWarehouseMapScreen({
 }) {
   const revision = useRealtimeRevision();
   const [map, setMap] = useState<WarehouseMap | null>(null);
-  const [boxTrackingEnabled, setBoxTrackingEnabled] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
@@ -96,17 +95,10 @@ export function MobileWarehouseMapScreen({
     let cancelled = false;
     setLoading(true);
     setError(null);
-    Promise.all([
-      warehouseMapApi.getMap(),
-      warehouseMapApi
-        .getBoxTracking()
-        .catch(() => ({ enabled: true })),
-    ])
-      .then(([res, preference]) => {
-        if (!cancelled) {
-          setMap(res);
-          setBoxTrackingEnabled(preference.enabled);
-        }
+    warehouseMapApi
+      .getMap()
+      .then((res) => {
+        if (!cancelled) setMap(res);
       })
       .catch(() => {
         if (!cancelled) {
@@ -122,11 +114,7 @@ export function MobileWarehouseMapScreen({
     };
   }, [reloadNonce, onStatusChange, revision]);
 
-  const visibleBoxes = useMemo(
-    () => (boxTrackingEnabled ? map?.boxes ?? [] : []),
-    [boxTrackingEnabled, map],
-  );
-  const cellIndex = useMemo(() => buildCellIndex(visibleBoxes), [visibleBoxes]);
+  const cellIndex = useMemo(() => buildCellIndex(map?.boxes ?? []), [map]);
   const angles = useMemo(
     () =>
       (map?.angles ?? [])
@@ -137,12 +125,12 @@ export function MobileWarehouseMapScreen({
   const curAngle = angles.find((a) => a.id === curAngleId) ?? null;
 
   const searchResults = useMemo<CellHit[]>(() => {
-    if (!normalizeSearchText(search)) return [];
+    if (!normalizeSearchText(search) || !map) return [];
     const byCell = new Map<
       string,
       { angleId: number; row: number; layer: number; names: Set<string> }
     >();
-    for (const b of visibleBoxes) {
+    for (const b of map.boxes) {
       for (const it of b.items) {
         if (matchesSearchText(it.item_name, search) || matchesSearchText(it.mes_code, search)) {
           const k = cellKey(b.angle_id, b.row_no, b.layer_no);
@@ -161,7 +149,7 @@ export function MobileWarehouseMapScreen({
       layer: e.layer,
       names: Array.from(e.names),
     }));
-  }, [search, visibleBoxes]);
+  }, [search, map]);
 
   function openAngle(a: WarehouseAngle) {
     setCurAngleId(a.id);

@@ -16,7 +16,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[2]
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from app.models import (  # noqa: E402
+from app.models import (
     DepartmentEnum,
     Employee,
     EmployeeLevelEnum,
@@ -27,9 +27,8 @@ from app.models import (  # noqa: E402
     StockRequestLine,
     StockRequestStatusEnum,
     StockRequestTypeEnum,
-    WarehouseUnplacedItem,
 )
-from app.services import stock_requests as svc  # noqa: E402
+from app.services import stock_requests as svc
 
 
 def _setup(make_session):
@@ -61,9 +60,6 @@ def _setup(make_session):
         pending_quantity=Decimal("0"),
     )
     session.add(inv)
-    session.add(
-        WarehouseUnplacedItem(item_id=item.item_id, quantity=Decimal("100"))
-    )
 
     # DRAFT 1개 생성 (라인 포함)
     req = StockRequest(
@@ -116,12 +112,10 @@ def test_submit_draft_concurrent(concurrent_engine, make_session):
     def try_submit():
         session = make_session()
         try:
-            requester = session.get(Employee, emp_id)
-            assert requester is not None
             svc.submit_draft_request(
                 session,
                 request_id=req_id,
-                requester=requester,
+                requester_employee_id=emp_id,
             )
             session.commit()
             successes.append("ok")

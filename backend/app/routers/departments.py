@@ -2,15 +2,14 @@
 
 from typing import Annotated, List, Optional
 
-from fastapi import Body, Depends, Query, status
+from fastapi import APIRouter, Body, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies.verified_actor import VerifiedActorRouter
 from app.routers._errors import ErrorCode, http_error
 from app.dependencies.admin import require_admin_pin
 from app.models import Department
-from app.services.reorder import _reorder_by_display_order
+from app.services.reorder import reorder_by_display_order
 from app.schemas import (
     DepartmentCreate,
     DepartmentDeleteRequest,
@@ -19,7 +18,7 @@ from app.schemas import (
     DepartmentUpdate,
 )
 
-router = VerifiedActorRouter()
+router = APIRouter()
 
 
 @router.get("", response_model=List[DepartmentResponse])
@@ -60,7 +59,7 @@ def reorder_departments(
     _admin: Annotated[None, Depends(require_admin_pin)],
     db: Session = Depends(get_db),
 ):
-    _reorder_by_display_order(
+    reorder_by_display_order(
         db, Department, "id",
         [(item.id, item.display_order) for item in payload.items],
     )
@@ -99,12 +98,18 @@ def update_department(
 def delete_department(
     dept_id: int,
     _admin: Annotated[None, Depends(require_admin_pin)],
-    _body: Optional[DepartmentDeleteRequest] = Body(None),
+    pin: Optional[str] = Query(
+        None,
+        description="관리자 PIN (deprecated — body 사용 권장)",
+        deprecated=True,
+    ),
+    body: Optional[DepartmentDeleteRequest] = Body(None),
     db: Session = Depends(get_db),
 ):
     """관리자 PIN 으로 부서 삭제.
 
-    PIN은 `X-Admin-Pin` 헤더 또는 request body로만 전달한다.
+    PIN 은 request body(`{"pin": "..."}`) 로 전달하면 access log 에 남지 않는다.
+    하위호환을 위해 body 가 없으면 query string `pin` 으로 폴백한다.
     """
     dept = db.query(Department).filter(Department.id == dept_id).first()
     if not dept:

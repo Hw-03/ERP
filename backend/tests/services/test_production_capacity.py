@@ -35,6 +35,27 @@ def _item_label(item: Item) -> str:
     return f"{item.item_name} ({item.mes_code})"
 
 
+def test_ship_ready_keeps_reserved_physical_stock_while_buildable_excludes_it():
+    """출하대기는 예약 포함 물리 정상재고, 생산 가용량은 예약 차감값이다."""
+    import uuid
+
+    from app.services import production_capacity
+    from app.services.stock_math import StockFigures
+
+    assert "shipping_reserved" in StockFigures.__dataclass_fields__
+    item_id = uuid.uuid4()
+    figures = StockFigures(
+        warehouse_qty=Decimal("10"),
+        production_total=Decimal("5"),
+        pending=Decimal("2"),
+        production_pending=Decimal("1"),
+        shipping_reserved=Decimal("6"),
+    )
+
+    assert figures.available == Decimal("6")
+    assert production_capacity._ship_ready(item_id, {item_id: figures}) == 12
+
+
 def test_additional_producible_quantity_uses_available_stock_and_excludes_root_stock():
     """예약을 뺀 자재 가용분만 쓰며, 기존 루트 재고는 추가분에서 제외한다."""
     from app.services.production_capacity import compute_additional_producible_quantity

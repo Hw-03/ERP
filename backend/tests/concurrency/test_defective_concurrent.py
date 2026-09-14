@@ -1,4 +1,4 @@
-"""동시성 테스트: _mark_defective() — 창고/부서에서 불량 격리 시 음수 재고 없음."""
+"""동시성 테스트: mark_defective() — 창고/부서에서 불량 격리 시 음수 재고 없음."""
 
 from __future__ import annotations
 
@@ -13,14 +13,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[2]
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from app.models import (
-    DepartmentEnum,
-    Inventory,
-    InventoryLocation,
-    Item,
-    LocationStatusEnum,
-    WarehouseUnplacedItem,
-)
+from app.models import DepartmentEnum, Inventory, InventoryLocation, Item, LocationStatusEnum
 
 
 def _setup_warehouse(make_session, warehouse_qty: Decimal):
@@ -37,15 +30,7 @@ def _setup_warehouse(make_session, warehouse_qty: Decimal):
         warehouse_qty=warehouse_qty,
         pending_quantity=Decimal("0"),
     )
-    session.add_all(
-        [
-            inv,
-            WarehouseUnplacedItem(
-                item_id=item.item_id,
-                quantity=int(warehouse_qty),
-            ),
-        ]
-    )
+    session.add(inv)
     session.commit()
     item_id = item.item_id
     session.close()
@@ -66,9 +51,7 @@ def _setup_production_location(make_session, loc_qty: Decimal, dept: DepartmentE
         warehouse_qty=Decimal("0"),
         pending_quantity=Decimal("0"),
     )
-    session.add_all(
-        [inv, WarehouseUnplacedItem(item_id=item.item_id, quantity=0)]
-    )
+    session.add(inv)
     session.flush()
     loc = InventoryLocation(
         item_id=item.item_id,
@@ -98,7 +81,7 @@ def test_concurrent_mark_defective_from_warehouse(concurrent_engine, make_sessio
     def try_defective():
         session = make_session()
         try:
-            inventory_svc._mark_defective(
+            inventory_svc.mark_defective(
                 session, item_id, Decimal("1"),
                 inventory_svc.DefectSource(kind="warehouse", target_dept=dept),
             )
@@ -150,7 +133,7 @@ def test_concurrent_mark_defective_from_production(concurrent_engine, make_sessi
     def try_defective():
         session = make_session()
         try:
-            inventory_svc._mark_defective(
+            inventory_svc.mark_defective(
                 session, item_id, Decimal("1"),
                 inventory_svc.DefectSource(kind="production", target_dept=dept, source_dept=dept),
             )

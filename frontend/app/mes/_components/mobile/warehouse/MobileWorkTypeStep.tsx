@@ -24,11 +24,11 @@ const PROD_DEPTS = ["튜브", "고압", "진공", "튜닝", "조립", "출하"];
  * 그대로 재사용하고 레이아웃만 모바일 1열 카드로 다시 그린다.
  */
 export function MobileWorkTypeStep({
-  workType,
+  selectedWorkType,
   operator,
   onWorkTypeChange,
 }: {
-  workType: IoWorkType;
+  selectedWorkType: IoWorkType | null;
   operator: OperatorLike | null;
   onWorkTypeChange: (workType: IoWorkType) => void;
 }) {
@@ -38,7 +38,7 @@ export function MobileWorkTypeStep({
     <div className="flex min-h-full flex-col gap-2.5">
       {visible.map((row) => {
         const Icon = row.icon;
-        const active = workType === row.id;
+        const active = selectedWorkType === row.id;
         const accent = isExitWorkType(row.id) ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
         // 활성 카드 텍스트: 연한 틴트 위 brand 색은 AA 미달 → text 색과 섞어 어둡게
         const accentText = `color-mix(in srgb, ${accent} 42%, ${LEGACY_COLORS.text})`;

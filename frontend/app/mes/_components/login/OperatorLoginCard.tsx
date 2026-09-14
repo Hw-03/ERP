@@ -1,70 +1,49 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+/**
+ * 작업자 식별용 PIN 로그인 카드 — 단일 카드 구조.
+ *
+ * 로그인된 작업자 정보는 입출고/수정 작업의 produced_by 기본값으로 사용된다.
+ * 실제 보안 인증이 아닌 식별용.
+ */
+
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { ArrowRight, Loader2, Lock } from "lucide-react";
-import { api, type Employee, type OperatorSessionResponse } from "@/lib/api";
-import { operatorSessionApi } from "@/lib/api/operator-session";
+import { api, type Employee } from "@/lib/api";
 import { ApiError } from "@/lib/api-core";
 import { PIN_LENGTH } from "@/lib/auth/constants";
-import {
-  markLoginNotificationPopupPending,
-  operatorFromEmployee,
-  setCurrentOperator,
-  type Operator,
-} from "./useCurrentOperator";
+import { normalizeSidebarMode } from "@/lib/sidebar-mode";
+import { markLoginNotificationPopupPending, setCurrentOperator, type Operator } from "./useCurrentOperator";
 import { useLoginEmployees } from "./useLoginEmployees";
 import { EmployeeCombobox } from "./EmployeeCombobox";
 import { runLoginReadWithRetry, validateAppSession } from "./loginReadRetry";
-import styles from "./OperatorLoginCard.module.css";
 
 interface OperatorLoginCardProps {
-  onLogin: (session: OperatorSessionResponse) => void;
-  logoutPending?: boolean;
-  logoutRetrying?: boolean;
-  onRetryLogout?: () => void;
+  onLogin: () => void;
 }
 
-export function OperatorLoginCard({
-  onLogin,
-  logoutPending = false,
-  logoutRetrying = false,
-  onRetryLogout,
-}: OperatorLoginCardProps) {
+export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
   const employeeList = useLoginEmployees();
   const [selected, setSelected] = useState<Employee | null>(null);
-  const [changingPin, setChangingPin] = useState(false);
   const [pin, setPin] = useState("");
-  const [newPin, setNewPin] = useState("");
-  const [confirmPin, setConfirmPin] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [pendingOperator, setPendingOperator] = useState<Operator | null>(null);
-  const [pendingSession, setPendingSession] = useState<OperatorSessionResponse | null>(null);
   const pinInputRef = useRef<HTMLInputElement>(null);
   const requestControllerRef = useRef<AbortController | null>(null);
 
-  const disabled = loading || logoutPending || employeeList.status !== "ready";
-  const canSubmit = !!selected && !disabled && (
-    pendingOperator
-      ? true
-      : changingPin
-        ? newPin.length === PIN_LENGTH && confirmPin.length === PIN_LENGTH
-        : pin.length === PIN_LENGTH
-  );
+  const canSubmit = !!selected && pin.length === PIN_LENGTH && !loading && employeeList.status === "ready";
 
   useEffect(() => () => requestControllerRef.current?.abort(), []);
 
-  const handlePinChange = (raw: string, setter: (value: string) => void) => {
-    setter(raw.replace(/\D/g, "").slice(0, PIN_LENGTH));
+  const handlePinChange = (raw: string) => {
+    const digits = raw.replace(/\D/g, "").slice(0, PIN_LENGTH);
+    setPin(digits);
     setPendingOperator(null);
-    setPendingSession(null);
     if (error) setError("");
   };
 
-  const completeLogin = useCallback(async (
-    operator: Operator,
-    operatorSession: OperatorSessionResponse,
-  ) => {
+  const completeLogin = useCallback(async (op: Operator) => {
     const controller = new AbortController();
     requestControllerRef.current?.abort();
     requestControllerRef.current = controller;
@@ -74,21 +53,16 @@ export function OperatorLoginCard({
         { stage: "app_session", signal: controller.signal, validate: validateAppSession },
       );
       if (controller.signal.aborted) return;
-      if (session.boot_id !== operatorSession.boot_id) {
-        throw new Error("operator/app session boot mismatch");
+      if (op.theme && typeof document !== "undefined") {
+        if (op.theme === "dark") document.documentElement.classList.add("dark");
+        else if (op.theme === "light") document.documentElement.classList.remove("dark");
       }
-      if (operator.theme) {
-        document.documentElement.classList.toggle("dark", operator.theme === "dark");
-      }
-      if (operator.loginPopupEnabled) {
-        markLoginNotificationPopupPending(operator.employee_id);
-      }
-      setCurrentOperator(operator, session.boot_id);
-      onLogin(operatorSession);
-    } catch {
+      if (op.loginPopupEnabled) markLoginNotificationPopupPending(op.employee_id);
+      setCurrentOperator(op, session.boot_id);
+      onLogin();
+    } catch (failure) {
       if (controller.signal.aborted) return;
-      setPendingOperator(operator);
-      setPendingSession(operatorSession);
+      setPendingOperator(op);
       setError("연결 상태를 확인하지 못했습니다. 다시 시도해 주세요.");
     } finally {
       if (requestControllerRef.current === controller && !controller.signal.aborted) {
@@ -98,42 +72,9 @@ export function OperatorLoginCard({
     }
   }, [onLogin]);
 
-  const returnToLogin = (message = "") => {
-    setChangingPin(false);
-    setPendingOperator(null);
-    setPendingSession(null);
-    setPin("");
-    setNewPin("");
-    setConfirmPin("");
-    setError(message);
-    requestAnimationFrame(() => pinInputRef.current?.focus());
-  };
-
-  const revokeChallengeAndReturn = async (message = "") => {
-    if (!selected) return;
-    try {
-      await operatorSessionApi.cancelPinChangeChallenge(selected.employee_id);
-    } catch {
-      setError("PIN 변경 취소를 서버에 반영하지 못했습니다. 다시 시도해 주세요.");
-      return;
-    }
-    returnToLogin(message);
-  };
-
-  const cancelPinChange = async () => {
-    if (loading) return;
-    setLoading(true);
-    setError("");
-    try {
-      await revokeChallengeAndReturn();
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const pinErrorMessage = (failure: unknown): string => {
     if (failure instanceof ApiError) {
-      if (failure.code === "INVALID_CREDENTIALS") return "PIN 번호가 올바르지 않습니다.";
+      if (failure.status === 403) return "PIN 번호가 올바르지 않습니다.";
       if (failure.status === 429) return "로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.";
       if (failure.status >= 500) return "서버 연결을 확인하지 못했습니다. 다시 시도해 주세요.";
       return failure.message || "로그인을 확인하지 못했습니다. 다시 시도해 주세요.";
@@ -141,178 +82,190 @@ export function OperatorLoginCard({
     return "서버 연결을 확인하지 못했습니다. 다시 시도해 주세요.";
   };
 
-  const submit = async () => {
-    if (!canSubmit || !selected) return;
+  const submit = useCallback(async () => {
+    if (!selected || pin.length !== PIN_LENGTH || loading) return;
     setLoading(true);
     setError("");
-    if (pendingOperator && pendingSession) {
-      await completeLogin(pendingOperator, pendingSession);
+    if (pendingOperator) {
+      await completeLogin(pendingOperator);
       return;
     }
     try {
-      if (!changingPin) {
-        try {
-          const session = await operatorSessionApi.createOperatorSession(selected.employee_id, pin);
-          await completeLogin(operatorFromEmployee(session.employee), session);
-        } catch (failure) {
-          if (failure instanceof ApiError && failure.code === "PIN_CHANGE_REQUIRED") {
-            setChangingPin(true);
-            setError("");
-            setPin("");
-          } else {
-            setError(pinErrorMessage(failure));
-            if (failure instanceof ApiError && (failure.status === 401 || failure.status === 403)) {
-              setPin("");
-              requestAnimationFrame(() => pinInputRef.current?.focus());
-            }
-          }
-        }
-        return;
-      }
-      if (newPin !== confirmPin) {
-        setError("새 PIN과 확인 PIN이 일치하지 않습니다.");
-        return;
-      }
-      let changed = false;
-      try {
-        await operatorSessionApi.completeOperatorPinChange(selected.employee_id, newPin);
-        changed = true;
-        const session = await operatorSessionApi.createOperatorSession(selected.employee_id, newPin);
-        await completeLogin(operatorFromEmployee(session.employee), session);
-      } catch (failure) {
-        if (changed) {
-          await revokeChallengeAndReturn("PIN은 변경되었습니다. 새 PIN으로 다시 로그인해 주세요.");
-        } else if (failure instanceof ApiError && failure.status === 422) {
-          setError(failure.message);
-        } else {
-          await revokeChallengeAndReturn("PIN 설정을 완료하지 못했습니다. 로그인부터 다시 시도해 주세요.");
-        }
+      const emp = await api.verifyEmployeePin(selected.employee_id, pin);
+      const op: Operator = {
+        employee_id: emp.employee_id,
+        name: emp.name,
+        role: emp.role,
+        department: emp.department,
+        level: emp.level,
+        employee_code: emp.employee_code,
+        warehouse_role: emp.warehouse_role ?? "none",
+        department_role: emp.department_role ?? "none",
+        theme: emp.theme ?? null,
+        sidebar_mode: normalizeSidebarMode(emp.sidebar_mode) ?? "hover",
+        assigned_model_slots: emp.assigned_model_slots ?? [],
+        io_enabled: emp.io_enabled ?? true,
+        hidden_sidebar_tabs: emp.hidden_sidebar_tabs ?? [],
+        loginPopupEnabled: emp.login_notification_popup_enabled ?? true,
+      };
+
+      await completeLogin(op);
+    } catch (failure) {
+      setError(pinErrorMessage(failure));
+      if (failure instanceof ApiError && failure.status === 403) {
+        setPin("");
+        requestAnimationFrame(() => pinInputRef.current?.focus());
       }
     } finally {
       if (!requestControllerRef.current) setLoading(false);
     }
+  }, [completeLogin, loading, pendingOperator, pin, selected]);
+
+  const handlePinKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && canSubmit) {
+      e.preventDefault();
+      void submit();
+    }
   };
 
-  const pinFields: Array<{
-    id: string;
-    label: string;
-    value: string;
-    setter: (value: string) => void;
-    inputRef?: typeof pinInputRef;
-    autoComplete?: string;
-  }> = changingPin
-    ? [
-        { id: "mes-new-pin", label: "새 PIN", value: newPin, setter: setNewPin },
-        { id: "mes-confirm-pin", label: "새 PIN 확인", value: confirmPin, setter: setConfirmPin },
-      ]
-    : [{
-        id: "mes-login-pin",
-        label: "PIN 번호",
-        value: pin,
-        setter: setPin,
-        inputRef: pinInputRef,
-        autoComplete: "off",
-      }];
-
   return (
-    <div className={styles.root}>
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          void submit();
+    <div className="mx-auto w-full" style={{ maxWidth: 440, padding: "0 16px" }}>
+      <div
+        className="relative flex w-full flex-col rounded-[24px] border"
+        style={{
+          background: "var(--c-s1)",
+          borderColor: "var(--c-border)",
+          boxShadow: "var(--c-card-shadow)",
+          padding: "40px 36px 32px",
         }}
-        className={styles.card}
       >
-        {logoutPending && (
-          <div className={styles.pending}>
-            <p role="alert">로그아웃 완료를 확인하지 못했습니다. 다시 시도해 주세요.</p>
-            <button
-              type="button"
-              onClick={onRetryLogout}
-              disabled={logoutRetrying}
-              className={styles.link}
-              data-loading={logoutRetrying}
-            >
-              {logoutRetrying ? "로그아웃 확인 중..." : "로그아웃 재시도"}
-            </button>
-          </div>
-        )}
-        <div className={styles.employee}>
+        {/* 직원 선택 — 드롭다운이 형제 필드들 위에 오도록 stacking 보장 */}
+        <div
+          style={{
+            animation: "mes-field-rise 0.5s 0.05s ease both",
+            position: "relative",
+            zIndex: 30,
+          }}
+        >
           <EmployeeCombobox
             employees={employeeList.employees}
             value={selected}
-            onChange={(employee) => {
-              setSelected(employee);
-              returnToLogin();
+            onChange={(emp) => {
+              setSelected(emp);
+              setPin("");
+              setPendingOperator(null);
+              setError("");
+              // 직원 선택 직후 PIN 입력으로 흐름 자동 연결
+              requestAnimationFrame(() => pinInputRef.current?.focus());
             }}
             autoFocus
-            disabled={disabled || changingPin}
+            disabled={loading || employeeList.status !== "ready"}
           />
           {employeeList.status === "loading" && (
             <p className="mt-2 text-sm" style={{ color: "var(--c-muted)" }}>직원 목록을 불러오는 중입니다.</p>
           )}
           {employeeList.status === "error" && (
             <p className="mt-2 text-sm" role="alert" style={{ color: "var(--c-red)" }}>
-              직원 목록을 불러오지 못했습니다.{" "}
-              <button type="button" onClick={employeeList.retry} className="underline">다시 시도</button>
+              직원 목록을 불러오지 못했습니다. <button type="button" onClick={employeeList.retry} className="underline">다시 시도</button>
             </p>
           )}
         </div>
 
-        <div className={styles.fields} data-changing={changingPin}>
-          {changingPin && <p>기본 PIN 대신 사용할 새 PIN을 설정해 주세요.</p>}
-          {pinFields.map(({ id, label, value, setter, inputRef, autoComplete }) => (
-            <div className={styles.field} key={id}>
-              <label htmlFor={id}>{label}</label>
-              <div className={styles.inputShell} data-error={!!error} data-loading={loading}>
-                <Lock size={16} />
-                <input
-                  id={id}
-                  ref={inputRef}
-                  type="password"
-                  inputMode="numeric"
-                  autoComplete={autoComplete ?? "new-password"}
-                  maxLength={PIN_LENGTH}
-                  placeholder="숫자 4자리"
-                  value={value}
-                  onChange={(event) => handlePinChange(event.target.value, setter)}
-                  disabled={disabled}
-                />
-              </div>
-            </div>
-          ))}
-          {changingPin && (
-            <button
-              type="button"
-              onClick={() => void cancelPinChange()}
-              disabled={disabled}
-              className={`${styles.link} ${styles.cancel}`}
-              data-loading={loading}
+        {/* PIN 입력 */}
+        <div
+          className="mt-5"
+          style={{ animation: "mes-field-rise 0.5s 0.15s ease both" }}
+        >
+          <label
+            htmlFor="mes-login-pin"
+            className="mb-2 block text-sm font-semibold"
+            style={{ color: "var(--c-text)" }}
+          >
+            PIN 번호
+          </label>
+          <div
+            className="flex items-center gap-3 rounded-[14px] border px-4 py-3.5 transition-colors focus-within:border-[var(--c-blue)]"
+            style={{
+              background: "var(--c-s2)",
+              borderColor: error ? "var(--c-red)" : "var(--c-border)",
+              opacity: loading ? 0.6 : 1,
+            }}
+          >
+            <Lock size={16} style={{ color: "var(--c-muted)", flexShrink: 0 }} />
+            <input
+              id="mes-login-pin"
+              ref={pinInputRef}
+              type="password"
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={PIN_LENGTH}
+              placeholder="숫자 4자리"
+              value={pin}
+              onChange={(e) => handlePinChange(e.target.value)}
+              onKeyDown={handlePinKey}
+              disabled={loading || employeeList.status !== "ready"}
+              className="min-w-0 flex-1 bg-transparent text-base tracking-[0.4em] outline-none placeholder:tracking-normal placeholder:text-[var(--c-muted)]"
+              style={{ color: "var(--c-text)" }}
+            />
+          </div>
+          {error && (
+            <p
+              className="mt-2 text-sm"
+              role="alert"
+              style={{ color: "var(--c-red)" }}
             >
-              로그인으로 돌아가기
-            </button>
+              {error}
+            </p>
           )}
         </div>
 
-        {error && <p className={styles.error} role="alert">{error}</p>}
-
-        <div className={styles.submitWrap}>
-          <button type="submit" disabled={!canSubmit} className={styles.submit} data-enabled={canSubmit}>
+        {/* 로그인 버튼 — wrapper 가 애니메이션, 버튼 inline opacity 보존 */}
+        <div
+          className="mt-6"
+          style={{ animation: "mes-field-rise 0.5s 0.25s ease both" }}
+        >
+          <button
+            type="button"
+            onClick={() => void submit()}
+            disabled={!canSubmit}
+            className="flex w-full items-center justify-center gap-2 rounded-[14px] py-3.5 text-base font-semibold text-white transition-all"
+            style={{
+              background: "var(--c-blue)",
+              opacity: canSubmit ? 1 : 0.45,
+              cursor: canSubmit ? "pointer" : "not-allowed",
+            }}
+          >
             {loading ? (
-              <><Loader2 size={18} className="animate-spin" />확인 중...</>
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                확인 중...
+              </>
             ) : (
-              <>{pendingOperator ? "다시 시도" : changingPin ? "PIN 설정 및 로그인" : "로그인"}<ArrowRight size={18} /></>
+              <>
+                {pendingOperator ? "다시 시도" : "로그인"}
+                <ArrowRight size={18} />
+              </>
             )}
           </button>
         </div>
 
-        <div className={styles.footer}>
-          <div>
+        {/* 하단 보안 안내 */}
+        <div
+          className="mt-7 border-t pt-5"
+          style={{
+            borderColor: "var(--c-border)",
+            animation: "mes-field-rise 0.5s 0.35s ease both",
+          }}
+        >
+          <div
+            className="text-center text-xs leading-relaxed"
+            style={{ color: "var(--c-muted)" }}
+          >
             <p>사내 승인된 직원만 접근할 수 있습니다.</p>
             <p>모든 접속은 보안 정책에 따라 기록 및 관리됩니다.</p>
           </div>
         </div>
-      </form>
+      </div>
     </div>
   );
 }

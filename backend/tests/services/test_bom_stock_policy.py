@@ -5,14 +5,10 @@ from __future__ import annotations
 import uuid
 from types import SimpleNamespace
 
-import pytest
-
-from app.models import SystemSetting
 from app.services.bom_stock_policy import (
-    BOM_AUTO_TOKEN_SETTING_KEY,
     BOM_STOCK_EXEMPT_NOTE,
-    _issue_bom_auto_token,
     has_valid_bom_auto_token,
+    issue_bom_auto_token,
     should_skip_bom_inventory,
 )
 
@@ -53,7 +49,7 @@ def test_server_issued_bom_auto_token_cannot_be_reused_for_another_child(db_sess
         "to_department": None,
     }
 
-    token = _issue_bom_auto_token(db_session, flow="io", claims=claims)
+    token = issue_bom_auto_token(db_session, flow="io", claims=claims)
 
     assert has_valid_bom_auto_token(db_session, flow="io", claims=claims, token=token)
     assert not has_valid_bom_auto_token(
@@ -62,17 +58,3 @@ def test_server_issued_bom_auto_token_cannot_be_reused_for_another_child(db_sess
         claims={**claims, "item_id": uuid.uuid4()},
         token=token,
     )
-
-
-def test_bom_auto_token_issue_fails_closed_without_persisting_missing_secret(
-    db_session,
-) -> None:
-    db_session.query(SystemSetting).filter(
-        SystemSetting.setting_key == BOM_AUTO_TOKEN_SETTING_KEY
-    ).delete(synchronize_session=False)
-    db_session.flush()
-
-    with pytest.raises(RuntimeError, match="bootstrap"):
-        _issue_bom_auto_token(db_session, flow="io", claims={"line_id": "missing"})
-
-    assert db_session.get(SystemSetting, BOM_AUTO_TOKEN_SETTING_KEY) is None

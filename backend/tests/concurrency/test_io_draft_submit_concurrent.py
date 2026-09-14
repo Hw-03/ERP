@@ -13,7 +13,6 @@ from app.models import (
     Employee,
     EmployeeLevelEnum,
     Inventory,
-    InventoryOperation,
     IoBatch,
     IoBundle,
     IoLine,
@@ -24,7 +23,6 @@ from app.models import (
     StockRequestStatusEnum,
     StockRequestTypeEnum,
     TransactionLog,
-    WarehouseUnplacedItem,
 )
 from app.services import io_actions
 from app.services import stock_request_actions
@@ -39,6 +37,7 @@ def _setup_draft(make_session):
         role="창고/사원",
         department=DepartmentEnum.WAREHOUSE.value,
         level=EmployeeLevelEnum.STAFF,
+        warehouse_role="primary",
         is_active=True,
         display_order=0,
     )
@@ -51,16 +50,13 @@ def _setup_draft(make_session):
     )
     session.add_all([requester, item])
     session.flush()
-    session.add_all(
-        [
-            Inventory(
-                item_id=item.item_id,
-                quantity=Decimal("0"),
-                warehouse_qty=Decimal("0"),
-                pending_quantity=Decimal("0"),
-            ),
-            WarehouseUnplacedItem(item_id=item.item_id, quantity=0),
-        ]
+    session.add(
+        Inventory(
+            item_id=item.item_id,
+            quantity=Decimal("0"),
+            warehouse_qty=Decimal("0"),
+            pending_quantity=Decimal("0"),
+        )
     )
     batch = IoBatch(
         batch_id=uuid.uuid4(),
@@ -128,16 +124,13 @@ def _setup_reserved_revert_request(make_session):
     )
     session.add_all([requester, item])
     session.flush()
-    session.add_all(
-        [
-            Inventory(
-                item_id=item.item_id,
-                quantity=Decimal("5"),
-                warehouse_qty=Decimal("5"),
-                pending_quantity=Decimal("2"),
-            ),
-            WarehouseUnplacedItem(item_id=item.item_id, quantity=5),
-        ]
+    session.add(
+        Inventory(
+            item_id=item.item_id,
+            quantity=Decimal("5"),
+            warehouse_qty=Decimal("5"),
+            pending_quantity=Decimal("2"),
+        )
     )
     batch = IoBatch(
         batch_id=uuid.uuid4(),
@@ -185,23 +178,18 @@ def test_concurrent_existing_draft_submit_applies_exactly_one_effect(
     concurrent_engine, make_session
 ):
     batch_id, requester_id, item_id = _setup_draft(make_session)
-    replays: list[bool] = []
+    successes: list[str] = []
     failures: list[str] = []
 
     def submit_once() -> None:
         session = make_session()
         try:
-            requester = (
-                session.query(Employee)
-                .filter(Employee.employee_id == requester_id)
-                .one()
-            )
-            result = io_actions.submit_existing_draft(
+            io_actions.submit_existing_draft(
                 session,
                 batch_id=batch_id,
-                requester=requester,
+                requester_employee_id=requester_id,
             )
-            replays.append(bool(result.get("_idempotent_replay")))
+            successes.append("ok")
         except ValueError as exc:
             failures.append(str(exc))
         finally:
@@ -216,17 +204,13 @@ def test_concurrent_existing_draft_submit_applies_exactly_one_effect(
     batch = verify.query(IoBatch).filter(IoBatch.batch_id == batch_id).one()
     inventory = verify.query(Inventory).filter(Inventory.item_id == item_id).one()
     log_count = verify.query(TransactionLog).filter(TransactionLog.item_id == item_id).count()
-    operation_count = verify.query(InventoryOperation).count()
-    request_count = verify.query(StockRequest).count()
     verify.close()
 
-    assert sorted(replays) == [False, True]
-    assert failures == []
+    assert successes == ["ok"]
+    assert len(failures) == 1
     assert batch.status == "completed"
     assert inventory.warehouse_qty == Decimal("1")
     assert log_count == 1
-    assert operation_count <= 1
-    assert request_count == 0
 
 
 @pytest.mark.usefixtures("concurrent_engine")

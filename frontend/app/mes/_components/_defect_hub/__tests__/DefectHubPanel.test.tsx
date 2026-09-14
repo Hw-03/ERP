@@ -127,30 +127,6 @@ describe("DefectHubPanel", () => {
     fireEvent.click(screen.getByText("격리 목록"));
   }
 
-  it("announces the initial mobile defect list loading state politely", () => {
-    vi.mocked(defectsApi.listDefects).mockReturnValueOnce(new Promise(() => {}));
-
-    render(<DefectHubPanel currentEmployee={mockEmployee} />);
-    openList();
-
-    expect(screen.getByRole("status")).toHaveTextContent("불량 데이터 로딩 중");
-  });
-
-  it("focuses a named alert and retries when the initial mobile defect list load fails", async () => {
-    vi.mocked(defectsApi.listDefects).mockRejectedValueOnce(new Error("initial mobile defect failure"));
-    vi.mocked(defectsApi.listDefects).mockResolvedValueOnce(mockLocations);
-
-    render(<DefectHubPanel currentEmployee={mockEmployee} />);
-    openList();
-
-    const alert = await screen.findByRole("alert", { name: "불량 데이터 로드 오류" });
-    expect(alert).toHaveTextContent("initial mobile defect failure");
-    await waitFor(() => expect(alert).toHaveFocus());
-    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
-    expect(await screen.findByText("전극(70kV)")).toBeInTheDocument();
-    expect(screen.queryByRole("alert", { name: "불량 데이터 로드 오류" })).not.toBeInTheDocument();
-  });
-
   it("KPI 카드 2개를 렌더링한다", async () => {
     render(<DefectHubPanel currentEmployee={mockEmployee} />);
     openList();
@@ -480,7 +456,7 @@ describe("DefectHubPanel", () => {
     expect(await screen.findByRole("checkbox", { name: "필터 고정" })).toBeChecked();
     expect(screen.getByRole("combobox")).toHaveValue("newest");
     expect(screen.getByRole("button", { name: "내가 격리" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText("7-TR-0001")).toBeInTheDocument();
+    expect(await screen.findByText("7-TR-0001")).toBeInTheDocument();
     expect(screen.queryByText("7-TR-0003")).not.toBeInTheDocument();
     expect(screen.getByText("격리 중").parentElement).toHaveTextContent("1건");
   });

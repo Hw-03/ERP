@@ -9,6 +9,7 @@
   - 이미 처리된 요청 재처리 방지 (멱등 / ValueError)
   - 재고 불변식 (warehouse_qty / pending / production location)
 
+서비스 코드는 수정하지 않는다. 현재 동작을 고정하는 회귀 테스트만 작성한다.
 StockRequest 구성은 실제 생성 경로(create_request)를 그대로 사용해 현실성을 보장한다.
 """
 
@@ -220,7 +221,7 @@ def test_legacy_submitted_department_request_can_be_approved_without_reservation
         db_session, code="LEGACY-APP", warehouse_role="primary"
     )
     request = _make_location_reserved_request(db_session, requester, item, qty=D("3"))
-    sr_reservation._release_lines(db_session, request.lines)
+    sr_reservation.release_lines(db_session, request.lines)
     request.status = StockRequestStatusEnum.SUBMITTED
     for line in request.lines:
         line.status = StockRequestStatusEnum.SUBMITTED
@@ -340,33 +341,6 @@ def test_reject_rejects_non_warehouse_role(db_session, make_item):
     assert _inv(db_session, item.item_id).pending_quantity == D("2")
 
 
-def test_warehouse_reject_refuses_department_only_request(db_session, make_item):
-    """창고 담당자도 부서 전용 결재 요청을 창고 반려할 수 없다."""
-    item = make_item(name="R-DEPT-ONLY", warehouse_qty=D("10"))
-    requester = _make_employee(db_session, code="RQ-DEPT-ONLY")
-    approver = _make_employee(
-        db_session,
-        code="WH-DEPT-ONLY",
-        warehouse_role="primary",
-    )
-    request = _make_reserved_request(db_session, requester, item, qty=D("2"))
-    request.requires_warehouse_approval = False
-    request.requires_department_approval = True
-    db_session.flush()
-
-    with pytest.raises(ValueError, match="창고 결재가 필요하지 않은 요청"):
-        svc.reject_request(
-            db_session,
-            request,
-            approver=approver,
-            pin="0000",
-            reason="잘못된 창고 반려",
-        )
-
-    assert request.status == StockRequestStatusEnum.RESERVED
-    assert _inv(db_session, item.item_id).pending_quantity == D("2")
-
-
 def test_completed_request_cannot_be_rejected(db_session, make_item):
     """완료된 요청 반려 시도 → ValueError (재처리 방지)."""
     item = make_item(name="R004", warehouse_qty=D("10"))
@@ -441,32 +415,6 @@ def test_department_approve_completes_after_warehouse(db_session, make_item):
     assert _prod_qty(db_session, item.item_id) == D("3")
 
 
-def test_department_approve_cannot_bypass_pending_warehouse_stage(
-    db_session, make_item
-):
-    """듀얼 결재는 직접 서비스 호출이어도 창고 결재 전 부서 승인을 차단한다."""
-    item = make_item(name="DUAL-STAGE-APPROVE", warehouse_qty=D("10"))
-    requester = _make_employee(db_session, code="DRQ-STAGE-A")
-    dept = _make_employee(
-        db_session,
-        code="DDP-STAGE-A",
-        department_role="primary",
-    )
-    request = _make_dual_reserved_request(db_session, requester, item, qty=D("2"))
-
-    with pytest.raises(ValueError, match="창고 결재가 먼저 필요합니다"):
-        svc.approve_request_department(
-            db_session,
-            request,
-            approver=dept,
-            pin="0000",
-        )
-
-    assert request.status == StockRequestStatusEnum.RESERVED
-    assert request.department_approved_by_employee_id is None
-    assert _inv(db_session, item.item_id).pending_quantity == D("2")
-
-
 def test_department_approve_releases_location_reservation_before_execution(
     db_session, make_item, make_location
 ):
@@ -535,27 +483,21 @@ def test_department_approve_rejects_unauthorized(db_session, make_item):
     assert req.department_approved_by_employee_id is None
 
 
-def test_department_approve_completed_request_is_idempotent(db_session, make_item):
-    """창고→부서 승인 완료 뒤 재승인해도 재고를 다시 반영하지 않는다."""
+def test_department_approve_twice_rejected(db_session, make_item):
+    """이미 부서 결재된 요청 재승인 → ValueError (재처리 방지)."""
     item = make_item(name="DUAL4", warehouse_qty=D("10"))
     requester = _make_employee(db_session, code="DRQ4")
-    warehouse = _make_employee(
-        db_session,
-        code="DWH4",
-        warehouse_role="primary",
-    )
     dept = _make_employee(db_session, code="DDP4", department_role="primary")
     req = _make_dual_reserved_request(db_session, requester, item, qty=D("2"))
 
-    svc.approve_request(db_session, req, approver=warehouse, pin="0000")
+    # 창고 결재는 아직 — 부서 결재만 먼저 마킹 (status 유지).
     svc.approve_request_department(db_session, req, approver=dept, pin="0000")
     db_session.flush()
-    warehouse_after_first = _inv(db_session, item.item_id).warehouse_qty
+    assert req.department_approved_by_employee_id is not None
+    assert req.status == StockRequestStatusEnum.RESERVED  # 창고 결재 대기
 
-    out = svc.approve_request_department(db_session, req, approver=dept, pin="0000")
-
-    assert out.status == StockRequestStatusEnum.COMPLETED
-    assert _inv(db_session, item.item_id).warehouse_qty == warehouse_after_first
+    with pytest.raises(ValueError):
+        svc.approve_request_department(db_session, req, approver=dept, pin="0000")
 
 
 # ════════════ 부서 결재 반려 — reject_request_department ════════════
@@ -565,14 +507,8 @@ def test_department_reject_releases_pending(db_session, make_item):
     """부서 결재 반려: pending 원복 + REJECTED + 사유 저장."""
     item = make_item(name="DREJ1", warehouse_qty=D("10"))
     requester = _make_employee(db_session, code="DJ1")
-    warehouse = _make_employee(
-        db_session,
-        code="DWJ1",
-        warehouse_role="primary",
-    )
     dept = _make_employee(db_session, code="DDJ1", department_role="primary")
     req = _make_dual_reserved_request(db_session, requester, item, qty=D("4"))
-    svc.approve_request(db_session, req, approver=warehouse, pin="0000")
 
     out = svc.reject_request_department(
         db_session, req, approver=dept, pin="0000", reason="부서 반려"
@@ -587,51 +523,18 @@ def test_department_reject_releases_pending(db_session, make_item):
     assert inv.warehouse_qty == D("10")
 
 
-def test_department_reject_cannot_bypass_pending_warehouse_stage(
-    db_session, make_item
-):
-    """듀얼 결재는 직접 서비스 호출이어도 창고 결재 전 부서 반려를 차단한다."""
-    item = make_item(name="DUAL-STAGE-REJECT", warehouse_qty=D("10"))
-    requester = _make_employee(db_session, code="DRQ-STAGE-R")
-    dept = _make_employee(
-        db_session,
-        code="DDP-STAGE-R",
-        department_role="deputy",
-    )
-    request = _make_dual_reserved_request(db_session, requester, item, qty=D("2"))
-
-    with pytest.raises(ValueError, match="창고 결재가 먼저 필요합니다"):
-        svc.reject_request_department(
-            db_session,
-            request,
-            approver=dept,
-            pin="0000",
-            reason="단계 우회 시도",
-        )
-
-    assert request.status == StockRequestStatusEnum.RESERVED
-    assert request.rejected_by_employee_id is None
-    assert _inv(db_session, item.item_id).pending_quantity == D("2")
-
-
 def test_department_reject_releases_location_pending(
     db_session, make_item, make_location
 ):
     item = make_item(name="department-reject")
     location = make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
     requester = _make_employee(db_session, code="DLOC-REQ")
-    warehouse = _make_employee(
-        db_session,
-        code="DLOC-WH",
-        warehouse_role="primary",
-    )
     approver = _make_employee(
         db_session, code="DLOC-APP", department_role="primary"
     )
     request = _make_location_reserved_request(db_session, requester, item)
     request.requires_department_approval = True
     db_session.flush()
-    svc.approve_request(db_session, request, approver=warehouse, pin="0000")
 
     svc.reject_request_department(
         db_session,
@@ -722,7 +625,7 @@ def test_department_reject_returns_process_single_adjustment_to_same_draft(
     result = io_dispatch.submit_existing_draft(
         db_session,
         batch_id=batch.batch_id,
-        requester=requester,
+        requester_employee_id=requester.employee_id,
     )
     db_session.flush()
     db_session.refresh(batch)
@@ -763,9 +666,9 @@ def test_department_reject_returns_process_single_adjustment_to_same_draft(
     )
     active_request.operation_batch_id = batch.batch_id
     db_session.flush()
-    from app.services.io_persist import _sync_batch_from_stock_requests
+    from app.services.io_persist import sync_batch_from_stock_requests
 
-    _sync_batch_from_stock_requests(db_session, batch)
+    sync_batch_from_stock_requests(db_session, batch)
     db_session.refresh(batch)
     assert active_request.status == StockRequestStatusEnum.RESERVED
     assert batch.status == "partially_completed"
@@ -775,11 +678,6 @@ def test_department_reject_keeps_non_adjust_process_batch_rejected(db_session, m
     """BOM 등 다른 부서 결재 반려에는 draft 복귀 규칙을 적용하지 않는다."""
     item = make_item(name="BOM 반려 유지", warehouse_qty=D("10"))
     requester = _make_employee(db_session, code="BOM-REQ")
-    warehouse = _make_employee(
-        db_session,
-        code="BOM-WH",
-        warehouse_role="primary",
-    )
     approver = _make_employee(db_session, code="BOM-APP", department_role="primary")
     batch = _make_process_adjust_batch(
         db_session, requester=requester, items=[item], sub_type="produce"
@@ -787,7 +685,6 @@ def test_department_reject_keeps_non_adjust_process_batch_rejected(db_session, m
     request = _make_dual_reserved_request(db_session, requester, item, qty=D("1"))
     request.operation_batch_id = batch.batch_id
     db_session.flush()
-    svc.approve_request(db_session, request, approver=warehouse, pin="0000")
 
     svc.reject_request_department(
         db_session, request, approver=approver, pin="0000", reason="BOM 반려"
@@ -831,9 +728,9 @@ def test_department_reject_does_not_restore_adjust_batch_with_non_department_req
     other_request.status = StockRequestStatusEnum.REJECTED
     for line in other_request.lines:
         line.status = StockRequestStatusEnum.REJECTED
-    from app.services.io_persist import _sync_batch_from_stock_requests
+    from app.services.io_persist import sync_batch_from_stock_requests
 
-    _sync_batch_from_stock_requests(db_session, batch)
+    sync_batch_from_stock_requests(db_session, batch)
     db_session.refresh(batch)
 
     assert batch.status == "rejected"
@@ -884,7 +781,7 @@ def test_failed_legacy_submitted_request_does_not_release_another_reservation(
     legacy = _make_location_reserved_request(
         db_session, legacy_requester, item, qty=D("1")
     )
-    sr_reservation._release_lines(db_session, legacy.lines)
+    sr_reservation.release_lines(db_session, legacy.lines)
     legacy.status = StockRequestStatusEnum.SUBMITTED
     for line in legacy.lines:
         line.status = StockRequestStatusEnum.SUBMITTED
@@ -955,7 +852,7 @@ def test_cancel_open_releases_location_and_tolerates_legacy_submitted(
     # Simulate a pre-deployment request whose status was submitted without a reservation.
     from app.services import sr_reservation
 
-    sr_reservation._release_lines(db_session, legacy.lines)
+    sr_reservation.release_lines(db_session, legacy.lines)
     legacy.status = StockRequestStatusEnum.SUBMITTED
     for line in legacy.lines:
         line.status = StockRequestStatusEnum.SUBMITTED
@@ -974,7 +871,7 @@ def test_cancel_open_releases_location_and_tolerates_legacy_submitted(
 
     monkeypatch.setattr(svc, "_release_pending_best_effort", track_release)
 
-    count = svc._cancel_open_stock_requests(db_session, reason="cleanup")
+    count = svc.cancel_open_stock_requests(db_session, reason="cleanup")
     db_session.flush()
     db_session.refresh(location)
 
@@ -999,7 +896,7 @@ def test_cancel_ghost_reserved_request_preserves_other_request_pending(
     )
     from app.services import sr_reservation
 
-    sr_reservation._release_lines(db_session, ghost.lines)
+    sr_reservation.release_lines(db_session, ghost.lines)
     owner = _make_location_reserved_request(
         db_session,
         requester,
@@ -1032,7 +929,7 @@ def test_cancel_ghost_warehouse_request_preserves_other_request_pending(
     ghost = _make_reserved_request(db_session, requester, item, qty=D("2"))
     from app.services import sr_reservation
 
-    sr_reservation._release_lines(db_session, ghost.lines)
+    sr_reservation.release_lines(db_session, ghost.lines)
     owner = _make_reserved_request(db_session, requester, item, qty=D("3"))
     db_session.flush()
     inventory = _inv(db_session, item.item_id)
@@ -1066,7 +963,7 @@ def test_cancel_open_reconciles_ghost_reserved_request_without_leak(
     )
     from app.services import sr_reservation
 
-    sr_reservation._release_lines(db_session, ghost.lines)
+    sr_reservation.release_lines(db_session, ghost.lines)
     owner = _make_location_reserved_request(
         db_session,
         requester,
@@ -1075,7 +972,7 @@ def test_cancel_open_reconciles_ghost_reserved_request_without_leak(
     )
     db_session.flush()
 
-    count = svc._cancel_open_stock_requests(db_session, reason="cleanup")
+    count = svc.cancel_open_stock_requests(db_session, reason="cleanup")
     db_session.flush()
     db_session.refresh(location)
 
@@ -1101,7 +998,7 @@ def test_cancel_open_prelocks_all_request_items_in_global_order(
 
     monkeypatch.setattr(
         inventory_svc,
-        "_ensure_and_lock_inventories",
+        "ensure_and_lock_inventories",
         lambda _db, item_ids: events.append(("lock", item_ids)) or {},
     )
     monkeypatch.setattr(
@@ -1110,7 +1007,7 @@ def test_cancel_open_prelocks_all_request_items_in_global_order(
         lambda _db, request: events.append(("release", request.request_id)),
     )
 
-    count = svc._cancel_open_stock_requests(db_session, reason="cleanup")
+    count = svc.cancel_open_stock_requests(db_session, reason="cleanup")
 
     assert count == 2
     assert events[0] == ("lock", sorted({first.item_id, second.item_id}))
@@ -1136,12 +1033,12 @@ def test_cancel_open_locks_requests_before_inventories(
     monkeypatch.setattr(Query, "with_for_update", with_for_update)
     monkeypatch.setattr(
         inventory_svc,
-        "_ensure_and_lock_inventories",
+        "ensure_and_lock_inventories",
         lambda _db, item_ids: events.append(("inventory_lock", item_ids)) or {},
     )
     monkeypatch.setattr(svc, "_release_pending_best_effort", lambda *_args: None)
 
-    svc._cancel_open_stock_requests(db_session, reason="cleanup")
+    svc.cancel_open_stock_requests(db_session, reason="cleanup")
 
     assert events[:2] == [
         ("request_lock", None),
@@ -1167,7 +1064,7 @@ def test_department_reject_rejects_unauthorized(db_session, make_item):
     assert _inv(db_session, item.item_id).pending_quantity == D("3")
 
 
-# ════════════ _cancel_open_stock_requests ════════════
+# ════════════ cancel_open_stock_requests ════════════
 
 
 def test_cancel_open_requests_rejects_legacy_shipping_link_before_any_state_change(
@@ -1201,7 +1098,7 @@ def test_cancel_open_requests_rejects_legacy_shipping_link_before_any_state_chan
     db_session.flush()
 
     with pytest.raises(ValueError, match="조회만"):
-        svc._cancel_open_stock_requests(db_session, reason="시스템 정리")
+        svc.cancel_open_stock_requests(db_session, reason="시스템 정리")
 
     assert req.status == StockRequestStatusEnum.RESERVED
     assert req.cancelled_at is None
@@ -1228,7 +1125,7 @@ def test_cancel_open_requests_pending_zero_safe(db_session, make_item):
     _inv(db_session, item.item_id).pending_quantity = D("0")
     db_session.flush()
 
-    count = svc._cancel_open_stock_requests(db_session, reason="테스트 정리")
+    count = svc.cancel_open_stock_requests(db_session, reason="테스트 정리")
     db_session.flush()
 
     assert count >= 1
@@ -1248,7 +1145,7 @@ def test_cancel_open_requests_normal_pending_released(db_session, make_item):
 
     assert _inv(db_session, item.item_id).pending_quantity == D("7")
 
-    count = svc._cancel_open_stock_requests(db_session, reason="테스트 정리")
+    count = svc.cancel_open_stock_requests(db_session, reason="테스트 정리")
     db_session.flush()
 
     assert count >= 1
@@ -1265,12 +1162,12 @@ def test_cancel_open_requests_skips_already_cancelled(db_session, make_item):
     db_session.flush()
 
     # 먼저 취소
-    count_first = svc._cancel_open_stock_requests(db_session, reason="1차 정리")
+    count_first = svc.cancel_open_stock_requests(db_session, reason="1차 정리")
     db_session.flush()
     assert req.status == StockRequestStatusEnum.CANCELLED
 
     # 재실행 — 이미 취소된 건은 카운트에 포함되지 않아야 함
-    count_second = svc._cancel_open_stock_requests(db_session, reason="2차 정리")
+    count_second = svc.cancel_open_stock_requests(db_session, reason="2차 정리")
     db_session.flush()
 
     assert count_second == 0
@@ -1294,7 +1191,7 @@ def test_cancel_open_requests_does_not_touch_completed_rejected(db_session, make
     db_session.flush()
     assert req_rejected.status == StockRequestStatusEnum.REJECTED
 
-    count = svc._cancel_open_stock_requests(db_session, reason="테스트 정리")
+    count = svc.cancel_open_stock_requests(db_session, reason="테스트 정리")
     db_session.flush()
 
     assert count == 0

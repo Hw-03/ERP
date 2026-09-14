@@ -56,7 +56,6 @@ function makeOperation(overrides: Partial<InventoryOperation> = {}): InventoryOp
     reversalOperationId: null,
     canCancel: true,
     cancelBlockers: [],
-    cancelWarnings: [],
     lines: [],
     matchingLines: [{
       logId: "log-1",

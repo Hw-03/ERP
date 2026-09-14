@@ -10,17 +10,17 @@ import { QueryProvider } from "@/lib/queries/client";
 
 export default function MesPage() {
   return (
-    <QueryProvider>
-      <MesLoginGate>
-        <AdminSessionProvider>
-          <DepartmentsProvider>
+    <AdminSessionProvider>
+      <QueryProvider>
+        <DepartmentsProvider>
+          <MesLoginGate>
             <Suspense>
               <MesBody />
             </Suspense>
-          </DepartmentsProvider>
-        </AdminSessionProvider>
-      </MesLoginGate>
-    </QueryProvider>
+          </MesLoginGate>
+        </DepartmentsProvider>
+      </QueryProvider>
+    </AdminSessionProvider>
   );
 }
 

@@ -4,7 +4,7 @@ import type { StockRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
 import { formatKstDateTime, formatQty } from "@/lib/mes/format";
-import { formatRequestNotes, getRequestTypePresentation } from "./ioRequestLabels";
+import { REQUEST_TYPE_LABEL, formatRequestNotes } from "./ioRequestLabels";
 
 /**
  * Round-13 (#7) 추출 — DraftCartPanel 의 단일 draft 카드.
@@ -26,7 +26,6 @@ export function DraftCartItemRow({
 }: DraftCartItemRowProps) {
   const totalQty = draft.lines.reduce((sum, l) => sum + (Number(l.quantity) || 0), 0);
   const noteText = formatRequestNotes(draft.notes);
-  const requestType = getRequestTypePresentation(draft.request_type);
 
   return (
     <div
@@ -44,7 +43,7 @@ export function DraftCartItemRow({
           작성중
         </span>
         <span className="font-bold" style={{ color: LEGACY_COLORS.text }}>
-          {requestType.label}
+          {REQUEST_TYPE_LABEL[draft.request_type] ?? draft.request_type}
         </span>
         <span className="text-xs" style={{ color: LEGACY_COLORS.muted }}>
           {draft.lines.length}건 · 총 {formatQty(totalQty)}
@@ -90,7 +89,7 @@ export function DraftCartItemRow({
         </div>
       )}
 
-      {requestType.commandSafe && <div className="mt-3 flex flex-wrap justify-end gap-2">
+      <div className="mt-3 flex flex-wrap justify-end gap-2">
         <button
           type="button"
           onClick={onContinue}
@@ -119,7 +118,7 @@ export function DraftCartItemRow({
         >
           삭제
         </button>
-      </div>}
+      </div>
     </div>
   );
 }

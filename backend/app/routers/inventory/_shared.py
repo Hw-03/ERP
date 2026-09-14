@@ -88,7 +88,6 @@ def _build_response(
         defective_total=fig.defective_total,
         pending_quantity=fig.pending,
         department_pending_quantity=fig.department_pending,
-        warehouse_available_quantity=fig.warehouse_available,
         available_quantity=fig.available,
         last_reserver_name=inv.last_reserver_name,
         location=inv.location,

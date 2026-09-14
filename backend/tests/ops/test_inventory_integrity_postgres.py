@@ -45,10 +45,11 @@ from app.models import (
     SystemSetting,
     TransactionLog,
     TransactionTypeEnum,
+    WarehouseAngle,
     WarehouseBox,
+    WarehouseBoxItem,
     WarehouseSpecialZone,
     WarehouseSpecialZoneItem,
-    WarehouseUnplacedItem,
 )
 from app.services.inventory_integrity import diagnose_inventory_integrity
 
@@ -92,16 +93,13 @@ def _seed_clean(session: Session) -> Item:
     )
     session.add(item)
     session.flush()
-    session.add_all(
-        [
-            Inventory(
-                item_id=item.item_id,
-                quantity=5,
-                warehouse_qty=5,
-                pending_quantity=0,
-            ),
-            WarehouseUnplacedItem(item_id=item.item_id, quantity=5),
-        ]
+    session.add(
+        Inventory(
+            item_id=item.item_id,
+            quantity=5,
+            warehouse_qty=5,
+            pending_quantity=0,
+        )
     )
     session.commit()
     return item
@@ -125,6 +123,28 @@ def _add_location(
     inventory = session.query(Inventory).filter_by(item_id=item.item_id).one()
     inventory.quantity = 5 + quantity
     return location
+
+
+def _add_box_placement(session: Session, item: Item, *, quantity: int) -> None:
+    angle = WarehouseAngle(label="IC-17", rows=1, layers=1, jaris_per_cell=1)
+    session.add(angle)
+    session.flush()
+    box = WarehouseBox(
+        angle_id=angle.id,
+        row_no=1,
+        layer_no=1,
+        jari_index=0,
+        size=BoxSizeEnum.SMALL,
+    )
+    session.add(box)
+    session.flush()
+    session.add(
+        WarehouseBoxItem(
+            box_id=box.box_id,
+            item_id=item.item_id,
+            quantity=quantity,
+        )
+    )
 
 
 def _break_invariant(session: Session, item: Item, case_name: str) -> None:
@@ -262,13 +282,12 @@ def _break_invariant(session: Session, item: Item, case_name: str) -> None:
             )
         )
     elif case_name == "warehouse_physical":
-        session.query(WarehouseUnplacedItem).filter_by(item_id=item.item_id).one().quantity = 2
-    elif case_name == "inactive_zone":
-        session.query(WarehouseUnplacedItem).filter_by(item_id=item.item_id).one().quantity = 4
+        _add_box_placement(session, item, quantity=6)
+    elif case_name == "active_zone_overdraw":
         zone = WarehouseSpecialZone(
-            label="IC-17 inactive",
+            label="IC-17 active",
             zone_type="pallet",
-            is_active=False,
+            is_active=True,
         )
         session.add(zone)
         session.flush()
@@ -276,17 +295,17 @@ def _break_invariant(session: Session, item: Item, case_name: str) -> None:
             WarehouseSpecialZoneItem(
                 zone_id=zone.id,
                 item_id=item.item_id,
-                quantity=1,
+                quantity=6,
             )
         )
     elif case_name == "negative_placement":
         session.execute(
             text(
-                "ALTER TABLE warehouse_unplaced_items DROP CONSTRAINT "
-                "ck_warehouse_unplaced_items_quantity_nonnegative"
+                "ALTER TABLE warehouse_box_items DROP CONSTRAINT "
+                "ck_wh_boxitem_qty_nonneg"
             )
         )
-        session.query(WarehouseUnplacedItem).filter_by(item_id=item.item_id).one().quantity = -1
+        _add_box_placement(session, item, quantity=-1)
     elif case_name == "orphan_location":
         orphan_item = Item(
             item_name="IC-17 orphan",
@@ -360,7 +379,7 @@ def _break_invariant(session: Session, item: Item, case_name: str) -> None:
                 quantity_change=1,
                 operation_id=operation.operation_id,
                 operation_role=InventoryOperationRoleEnum.PRIMARY,
-                inventory_effect=[{"scope": "warehouse", "delta": 1}],
+                inventory_effect=[{"scope": "warehouse", "delta": "invalid"}],
             )
         )
     elif case_name == "operation_effect_wrong_item":
@@ -379,10 +398,6 @@ def _break_invariant(session: Session, item: Item, case_name: str) -> None:
             warehouse_qty=1,
             pending_quantity=0,
         )
-        other_unplaced = WarehouseUnplacedItem(
-            item_id=other_item.item_id,
-            quantity=1,
-        )
         operation = InventoryOperation(
             kind=InventoryOperationKindEnum.BUSINESS,
             domain="ic17-postgres",
@@ -392,7 +407,7 @@ def _break_invariant(session: Session, item: Item, case_name: str) -> None:
             actor_name="IC-17 PostgreSQL",
             contract_version=2,
         )
-        session.add_all([other_inventory, other_unplaced, operation])
+        session.add_all([other_inventory, operation])
         session.flush()
         session.add(
             TransactionLog(
@@ -409,23 +424,11 @@ def _break_invariant(session: Session, item: Item, case_name: str) -> None:
                         "after_quantity": 1,
                         "delta": 1,
                     },
-                    {
-                        "scope": "warehouse_unplaced",
-                        "row_id": str(other_unplaced.id),
-                        "before_quantity": 0,
-                        "after_quantity": 1,
-                        "delta": 1,
-                    },
                 ],
             )
         )
     elif case_name == "operation_effect_quantity_mismatch":
         inventory = session.query(Inventory).filter_by(item_id=item.item_id).one()
-        unplaced = (
-            session.query(WarehouseUnplacedItem)
-            .filter_by(item_id=item.item_id)
-            .one()
-        )
         operation = InventoryOperation(
             kind=InventoryOperationKindEnum.BUSINESS,
             domain="ic17-postgres",
@@ -448,13 +451,6 @@ def _break_invariant(session: Session, item: Item, case_name: str) -> None:
                     {
                         "scope": "warehouse",
                         "row_id": str(inventory.inventory_id),
-                        "before_quantity": 0,
-                        "after_quantity": 1,
-                        "delta": 1,
-                    },
-                    {
-                        "scope": "warehouse_unplaced",
-                        "row_id": str(unplaced.id),
                         "before_quantity": 0,
                         "after_quantity": 1,
                         "delta": 1,
@@ -566,7 +562,7 @@ def _run_cli(schema_url: str) -> subprocess.CompletedProcess[str]:
         ("shipping_location_stock", "SHIPPING_ALLOCATION_MISMATCH"),
         ("shipping_allocation_nonpositive", "SHIPPING_ALLOCATION_MISMATCH"),
         ("warehouse_physical", "WAREHOUSE_PHYSICAL_MISMATCH"),
-        ("inactive_zone", "WAREHOUSE_PHYSICAL_MISMATCH"),
+        ("active_zone_overdraw", "WAREHOUSE_PHYSICAL_MISMATCH"),
         ("negative_placement", "WAREHOUSE_PHYSICAL_MISMATCH"),
         ("orphan_location", "ORPHAN_REFERENCE"),
         ("box_angle_orphan", "ORPHAN_REFERENCE"),

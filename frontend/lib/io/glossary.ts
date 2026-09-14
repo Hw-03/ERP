@@ -16,7 +16,6 @@
 
 import type { IoBucket, IoSubType, IoWorkType } from "@/lib/api/types/io";
 import type { TransactionType } from "@/lib/api/types/shared";
-import type { StockRequestCommandType } from "@/lib/api/types/stock-requests";
 
 // ──────────────────────────────────────────────────────────────────
 // Work Type
@@ -110,7 +109,7 @@ export const TRANSACTION_TYPE_LABEL: Record<TransactionType, string> = {
 // Request Type (결재 요청 큐 — backend stock_requests.request_type)
 // ──────────────────────────────────────────────────────────────────
 
-const REQUEST_TYPE_LABEL_BY_COMMAND = {
+export const REQUEST_TYPE_LABEL: Record<string, string> = {
   raw_receive: "원자재 입고",
   raw_ship: "원자재 출고",
   warehouse_to_dept: "창고 → 부서",
@@ -129,9 +128,7 @@ const REQUEST_TYPE_LABEL_BY_COMMAND = {
   scrap_normal: "정상 폐기",
   rework_normal: "정상 재작업",
   return_normal: "정상 반품",
-} satisfies Record<StockRequestCommandType, string>;
-
-export const REQUEST_TYPE_LABEL: Record<string, string> = REQUEST_TYPE_LABEL_BY_COMMAND;
+};
 
 // ──────────────────────────────────────────────────────────────────
 // Ship (출하) 정책 — P0-2

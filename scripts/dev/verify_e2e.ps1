@@ -60,7 +60,7 @@ $PreviousFrontendPort = $env:E2E_FRONTEND_PORT
 $PreviousBaseUrl = $env:E2E_BASE_URL
 $env:E2E_BACKEND_PORT = [string] $BackendPort
 $env:E2E_FRONTEND_PORT = [string] $FrontendPort
-$env:E2E_BASE_URL = "http://127.0.0.1:$FrontendPort"
+$env:E2E_BASE_URL = "http://localhost:$FrontendPort"
 Push-Location $FrontendRoot
 try {
     npm run test:e2e

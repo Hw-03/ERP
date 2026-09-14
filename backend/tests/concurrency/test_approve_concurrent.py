@@ -30,7 +30,6 @@ from app.models import (
     StockRequestStatusEnum,
     StockRequestTypeEnum,
     TransactionLog,
-    WarehouseUnplacedItem,
 )
 from app.services import stock_requests as svc
 from app.services.pin_auth import DEFAULT_PIN_HASH
@@ -76,9 +75,7 @@ def _setup(make_session):
         warehouse_qty=Decimal("10"),
         pending_quantity=Decimal("1"),  # 1개 예약됨
     )
-    session.add_all(
-        [inv, WarehouseUnplacedItem(item_id=item.item_id, quantity=10)]
-    )
+    session.add(inv)
     session.flush()
 
     # RESERVED 요청 직접 생성 (reserve() 로직은 별도 테스트)

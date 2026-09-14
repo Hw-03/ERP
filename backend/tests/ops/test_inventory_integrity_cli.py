@@ -22,7 +22,6 @@ from app.models import (
     InventoryOperationKindEnum,
     InventoryOperationStatusEnum,
     Item,
-    WarehouseUnplacedItem,
 )
 
 
@@ -52,6 +51,26 @@ def _load_script_module():
     return module
 
 
+def _insert_box_item(connection: sqlite3.Connection, *, quantity: int) -> None:
+    item_id = connection.execute("SELECT item_id FROM items").fetchone()[0]
+    cursor = connection.execute(
+        "INSERT INTO warehouse_angles "
+        "(label, angle_type, rows, layers, jaris_per_cell, pos_x, pos_y, width, height, "
+        "display_order, is_active) VALUES ('IC-17', 'angle', 1, 1, 1, 0, 0, 1, 1, 0, 1)"
+    )
+    box_id = str(uuid.uuid4())
+    connection.execute(
+        "INSERT INTO warehouse_boxes "
+        "(box_id, angle_id, row_no, layer_no, jari_index, size, stack_order) "
+        "VALUES (?, ?, 1, 1, 0, 'SMALL', 0)",
+        (box_id, cursor.lastrowid),
+    )
+    connection.execute(
+        "INSERT INTO warehouse_box_items (id, box_id, item_id, quantity) VALUES (?, ?, ?, ?)",
+        (str(uuid.uuid4()), box_id, item_id, quantity),
+    )
+
+
 def _create_database(path: Path, *, warehouse_quantity: int = 4) -> None:
     engine = create_engine(_database_url(path))
     try:
@@ -66,19 +85,13 @@ def _create_database(path: Path, *, warehouse_quantity: int = 4) -> None:
             )
             session.add(item)
             session.flush()
-            session.add_all(
-                [
-                    Inventory(
-                        item_id=item.item_id,
-                        quantity=warehouse_quantity,
-                        warehouse_qty=warehouse_quantity,
-                        pending_quantity=0,
-                    ),
-                    WarehouseUnplacedItem(
-                        item_id=item.item_id,
-                        quantity=warehouse_quantity,
-                    ),
-                ]
+            session.add(
+                Inventory(
+                    item_id=item.item_id,
+                    quantity=warehouse_quantity,
+                    warehouse_qty=warehouse_quantity,
+                    pending_quantity=0,
+                )
             )
             session.commit()
     finally:
@@ -96,6 +109,7 @@ def test_cli_json_pass_and_blocking_exit_codes(tmp_path: Path) -> None:
     assert hashlib.sha256(database.read_bytes()).hexdigest() == before_hash
     payload = json.loads(passing.stdout)
     assert payload["contract"] == "inventory-integrity/v1"
+    assert payload["profile"] == "friday-0033"
     assert payload["status"] == "pass"
     assert payload["blocking_count"] == 0
     assert all(
@@ -103,12 +117,8 @@ def test_cli_json_pass_and_blocking_exit_codes(tmp_path: Path) -> None:
         for check in payload["checks"]
     )
 
-    engine = create_engine(_database_url(database))
-    try:
-        with engine.begin() as connection:
-            connection.exec_driver_sql("UPDATE warehouse_unplaced_items SET quantity = 1")
-    finally:
-        engine.dispose()
+    with sqlite3.connect(database) as connection:
+        _insert_box_item(connection, quantity=5)
 
     blocking = _run("--db-url", _database_url(database), "--json")
 
@@ -202,9 +212,6 @@ def test_sqlite_diagnostic_session_keeps_one_wal_snapshot(tmp_path: Path) -> Non
                 connection.exec_driver_sql(
                     "UPDATE inventory SET warehouse_qty = 9, quantity = 9"
                 )
-                connection.exec_driver_sql(
-                    "UPDATE warehouse_unplaced_items SET quantity = 9"
-                )
             during = session.execute(
                 text("SELECT warehouse_qty FROM inventory")
             ).scalar_one()
@@ -248,12 +255,12 @@ def test_sqlite_cli_blocks_box_with_missing_angle(tmp_path: Path) -> None:
     )
 
 
-def test_sqlite_cli_blocks_negative_unplaced_quantity(tmp_path: Path) -> None:
-    database = tmp_path / "negative-unplaced.db"
+def test_sqlite_cli_blocks_negative_warehouse_placement_quantity(tmp_path: Path) -> None:
+    database = tmp_path / "negative-placement.db"
     _create_database(database)
     with sqlite3.connect(database) as connection:
         connection.execute("PRAGMA ignore_check_constraints = ON")
-        connection.execute("UPDATE warehouse_unplaced_items SET quantity = -1")
+        _insert_box_item(connection, quantity=-1)
 
     result = _run("--db-url", _database_url(database), "--json")
 

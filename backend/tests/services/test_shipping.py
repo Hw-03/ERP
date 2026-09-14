@@ -6,7 +6,7 @@ from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
-from sqlalchemy import event, select, update
+from sqlalchemy import event
 
 from app.models import (
     BOM,
@@ -20,12 +20,8 @@ from app.models import (
     InventoryOperationRoleEnum,
     InventoryLocation,
     IoBatch,
-    Item,
     LocationStatusEnum,
     ShippingAllocation,
-    ShippingFinalizationModeEnum,
-    ShippingRequest,
-    ShippingRequestBomLine,
     ShippingRequestCompanionLine,
     ShippingRequestStatusEnum,
     SystemSetting,
@@ -36,6 +32,7 @@ from app.services import shipping as shipping_svc
 from app.services import shipping_actions as shipping_actions_svc
 from app.services import io as io_svc
 from app.services import io_actions as io_actions_svc
+from app.services import inventory_operation_cancellation as cancellation_svc
 from app.schemas.io import IoPreviewTarget, IoSubmitRequest
 
 
@@ -66,11 +63,6 @@ def test_pickup_consumption_prelocks_sorted_unique_inventories(
     second = SimpleNamespace(item_id=uuid.UUID(int=2), item_name="second")
     final_pf = SimpleNamespace(item_id=uuid.UUID(int=3), item_name="final")
     request = SimpleNamespace(request_id=request_id, companion_lines=[])
-    actor = SimpleNamespace(
-        employee_id=uuid.UUID(int=4),
-        employee_code="PICKER",
-        name="Picker",
-    )
     allocations = [
         SimpleNamespace(
             item=second,
@@ -98,54 +90,27 @@ def test_pickup_consumption_prelocks_sorted_unique_inventories(
     )
     monkeypatch.setattr(
         shipping_svc.inventory_svc,
-        "_get_or_create_inventory",
+        "get_or_create_inventory",
         lambda *_args: None,
     )
     monkeypatch.setattr(
-        shipping_svc.item_repository,
-        "lock_active_many",
-        lambda _db, item_ids: events.append(("item_lock", item_ids))
-        or {item_id: object() for item_id in item_ids},
-    )
-    monkeypatch.setattr(
         shipping_svc.inventory_svc,
-        "_ensure_and_lock_inventories",
+        "lock_inventories",
         lambda _db, item_ids: events.append(("lock", item_ids))
         or {item_id: object() for item_id in item_ids},
     )
     monkeypatch.setattr(
         shipping_svc,
         "_ship_from_item_location",
-        lambda _db, _req, item, _qty, _notes, _actor, **_kwargs: events.append(
-            ("ship", item.item_id)
-        ),
+        lambda _db, _req, item, _qty, _notes, **_kwargs: events.append(("ship", item.item_id)),
     )
 
-    shipping_svc._consume_pickup_allocations(db_session, request, final_pf, 1, actor)
+    shipping_svc._consume_pickup_allocations(db_session, request, final_pf, 1)
 
     assert events[0] == (
-        "item_lock",
-        sorted({first.item_id, second.item_id, final_pf.item_id}),
-    )
-    assert events[1] == (
         "lock",
         sorted({first.item_id, second.item_id, final_pf.item_id}),
     )
-
-
-def test_generic_effect_reverse_rejects_shipping_owner_exemption(
-    db_session,
-    make_item,
-):
-    item = make_item(name="No reverse owner exemption", process_type_code="PR")
-
-    with pytest.raises(TypeError, match="owner_request_id"):
-        shipping_svc.inv_effect._apply_effect_reverse(
-            db_session,
-            item.item_id,
-            [],
-            owner_request_id=uuid.uuid4(),
-        )
 
 
 def _effect_scopes(log):
@@ -186,13 +151,6 @@ def _bom_line(item, qty=1, stage="PA", *, included=True, origin="CUSTOM"):
 
 
 def _shipping_actor(db_session) -> Employee:
-    existing = (
-        db_session.query(Employee)
-        .filter(Employee.employee_code == "SHIPPING-SERVICE-ACTOR")
-        .first()
-    )
-    if existing is not None:
-        return existing
     actor = Employee(
         employee_code="SHIPPING-SERVICE-ACTOR",
         name="Shipping service actor",
@@ -205,150 +163,6 @@ def _shipping_actor(db_session) -> Employee:
     db_session.add(actor)
     db_session.flush()
     return actor
-
-
-def _create_request(db_session, payload: dict, actor: Employee | None = None):
-    return shipping_actions_svc.create_request(
-        db_session,
-        payload,
-        actor or _shipping_actor(db_session),
-    )
-
-
-def _unfinalized_preparing_request(db_session, make_item, make_bom):
-    component = make_item(name="unfinalized component", process_type_code="AF")
-    source_pa = make_item(name="unfinalized source PA", process_type_code="PA")
-    base_pf = make_item(name="unfinalized base PF", process_type_code="PF")
-    make_bom(source_pa.item_id, component.item_id, Decimal("1"))
-    make_bom(base_pf.item_id, source_pa.item_id, Decimal("1"))
-    request = ShippingRequest(
-        status=ShippingRequestStatusEnum.PREPARING,
-        base_pf_item_id=base_pf.item_id,
-        finalization_mode=ShippingFinalizationModeEnum.CREATE_NEW,
-        custom_pa_name="lazy-created final PA",
-        custom_pf_name="lazy-created final PF",
-        requested_by_name="shipping-user",
-    )
-    request.bom_lines = [
-        ShippingRequestBomLine(
-            parent_stage="PA",
-            child_item_id=component.item_id,
-            quantity=1,
-            unit="EA",
-            included=True,
-            origin="DEFAULT",
-            sort_order=0,
-        ),
-        ShippingRequestBomLine(
-            parent_stage="PF",
-            child_item_id=source_pa.item_id,
-            quantity=1,
-            unit="EA",
-            included=True,
-            origin="DEFAULT",
-            sort_order=1,
-        ),
-    ]
-    db_session.add(request)
-    db_session.flush()
-    return request, source_pa
-
-
-def _update_checklist(db_session, request_id, checks, actor: Employee | None = None):
-    return shipping_actions_svc.update_checklist(
-        db_session,
-        request_id,
-        checks,
-        actor or _shipping_actor(db_session),
-    )
-
-
-def _clear_checklist(db_session, request_id, actor: Employee | None = None):
-    return shipping_actions_svc.clear_checklist(
-        db_session,
-        request_id,
-        actor or _shipping_actor(db_session),
-    )
-
-
-def _execute_component_change_independent(
-    db_session,
-    source_pa_item_id,
-    target_pa_item_id,
-    quantity,
-    memo=None,
-    requested_mode="BOM",
-    *,
-    actor: Employee | None = None,
-):
-    return shipping_actions_svc.execute_component_change_independent(
-        db_session,
-        source_pa_item_id,
-        target_pa_item_id,
-        quantity,
-        memo,
-        requested_mode,
-        actor=actor or _shipping_actor(db_session),
-    )
-
-
-def _execute_component_change(
-    db_session,
-    request_id,
-    source_pa_item_id,
-    quantity,
-    requested_mode="BOM",
-    memo=None,
-    *,
-    actor: Employee | None = None,
-):
-    return shipping_actions_svc.execute_component_change(
-        db_session,
-        request_id,
-        source_pa_item_id,
-        quantity,
-        requested_mode,
-        memo,
-        actor=actor or _shipping_actor(db_session),
-    )
-
-
-def _prepare_complete(
-    db_session,
-    request_id,
-    serial_numbers,
-    *,
-    actor: Employee | None = None,
-):
-    return shipping_actions_svc.prepare_complete(
-        db_session,
-        request_id,
-        serial_numbers,
-        actor=actor or _shipping_actor(db_session),
-    )
-
-
-def _prepare_cancel(
-    db_session,
-    request_id,
-    reason=None,
-    *,
-    actor: Employee | None = None,
-):
-    return shipping_actions_svc.prepare_cancel(
-        db_session,
-        request_id,
-        reason,
-        actor=actor or _shipping_actor(db_session),
-    )
-
-
-def _pickup_complete(db_session, request_id, actor: Employee | None = None):
-    return shipping_actions_svc.pickup_complete(
-        db_session,
-        request_id,
-        actor or _shipping_actor(db_session),
-    )
 
 
 def _add_linked_prepare_log(
@@ -424,7 +238,6 @@ def _submit_final_pf_production(
             to_department=DepartmentEnum.SHIPPING.value,
             bundles=preview["bundles"],
         ),
-        requester=actor,
     )
 
 
@@ -457,13 +270,7 @@ def _simulate_legacy_prepare(db_session, request) -> None:
     request.status = shipping_svc.ShippingRequestStatusEnum.PREPARED
     request.prepared_at = datetime.utcnow()
     request.updated_at = datetime.utcnow()
-    shipping_svc._record_event(
-        db_session,
-        request,
-        "PREPARED",
-        "legacy prepare test",
-        actor=_shipping_actor(db_session),
-    )
+    shipping_svc._record_event(db_session, request, "PREPARED", "legacy prepare test")
     db_session.flush()
 
 
@@ -483,191 +290,13 @@ def test_create_request_starts_preparing_with_checklist_and_creation_event(
     make_bom(pa.item_id, af.item_id, Decimal("1"))
     make_bom(pf.item_id, pa.item_id, Decimal("1"))
 
-    request = _create_request(db_session, {"base_pf_item_id": pf.item_id})
+    request = shipping_svc.create_request(db_session, {"base_pf_item_id": pf.item_id})
 
     assert not hasattr(ShippingRequestStatusEnum, "REQUESTED")
     assert request.status is ShippingRequestStatusEnum.PREPARING
     assert [line.item_id for line in request.checklist_lines] == [pa.item_id]
     assert request.events[-1].event_type == "REQUEST_CREATED"
     assert request.events[-1].message == "출하 요청 생성 및 준비 시작"
-
-
-def test_clear_checklist_advances_request_updated_at(
-    db_session,
-    make_item,
-    make_bom,
-):
-    pa = make_item(name="Checklist version PA", process_type_code="PA")
-    pf = make_item(name="Checklist version PF", process_type_code="PF")
-    make_bom(pf.item_id, pa.item_id, Decimal("1"))
-    request = _create_request(db_session, {"base_pf_item_id": pf.item_id})
-    request.checklist_lines[0].checked = True
-    request.updated_at = datetime(2020, 1, 1)
-    db_session.commit()
-    previous_updated_at = request.updated_at
-
-    cleared = _clear_checklist(db_session, request.request_id)
-
-    assert cleared.updated_at > previous_updated_at
-    assert all(line.checked is False for line in cleared.checklist_lines)
-
-
-def test_create_request_locks_complete_item_graph_once_in_uuid_order(
-    db_session,
-    make_item,
-    make_bom,
-    monkeypatch,
-):
-    af = make_item(name="Single lock AF", process_type_code="AF", model_symbol="3")
-    pa = make_item(name="Single lock PA", process_type_code="PA", model_symbol="3")
-    pf = make_item(name="Single lock PF", process_type_code="PF", model_symbol="3")
-    make_bom(pa.item_id, af.item_id, Decimal("1"))
-    make_bom(pf.item_id, pa.item_id, Decimal("1"))
-    calls: list[list[uuid.UUID]] = []
-    real_lock = shipping_svc.item_repository.lock_active_many
-
-    def lock_active_many(db, item_ids):
-        calls.append(sorted(set(item_ids)))
-        return real_lock(db, item_ids)
-
-    monkeypatch.setattr(
-        shipping_svc.item_repository,
-        "lock_active_many",
-        lock_active_many,
-    )
-
-    _create_request(db_session, {"base_pf_item_id": pf.item_id})
-
-    assert calls == [sorted({af.item_id, pa.item_id, pf.item_id})]
-
-
-def test_update_request_locks_current_and_new_item_graph_once_in_uuid_order(
-    db_session,
-    make_item,
-    make_bom,
-    monkeypatch,
-):
-    af = make_item(name="Update lock AF", process_type_code="AF", model_symbol="3")
-    pa = make_item(name="Update lock PA", process_type_code="PA", model_symbol="3")
-    pf = make_item(name="Update lock PF", process_type_code="PF", model_symbol="3")
-    companion = make_item(name="Update lock companion", process_type_code="PR")
-    make_bom(pa.item_id, af.item_id, Decimal("1"))
-    make_bom(pf.item_id, pa.item_id, Decimal("1"))
-    request = _create_request(db_session, {"base_pf_item_id": pf.item_id})
-    calls: list[list[uuid.UUID]] = []
-    real_lock = shipping_svc.item_repository.lock_active_many
-
-    def lock_active_many(db, item_ids):
-        calls.append(sorted(set(item_ids)))
-        return real_lock(db, item_ids)
-
-    monkeypatch.setattr(
-        shipping_svc.item_repository,
-        "lock_active_many",
-        lock_active_many,
-    )
-
-    shipping_actions_svc.update_request(
-        db_session,
-        request.request_id,
-        {
-            "bom_lines": [
-                {
-                    "parent_stage": "PA",
-                    "child_item_id": af.item_id,
-                    "quantity": 1,
-                    "unit": "EA",
-                },
-                {
-                    "parent_stage": "PF",
-                    "child_item_id": pa.item_id,
-                    "quantity": 1,
-                    "unit": "EA",
-                },
-            ],
-            "companion_lines": [
-                {"item_id": companion.item_id, "quantity": 1, "unit": "EA"}
-            ],
-        },
-        _shipping_actor(db_session),
-    )
-
-    assert calls == [
-        sorted({af.item_id, pa.item_id, pf.item_id, companion.item_id})
-    ]
-
-
-def test_create_request_reloads_bom_after_waiting_for_item_locks(
-    db_session,
-    make_item,
-    make_bom,
-    monkeypatch,
-):
-    af = make_item(name="Fresh BOM AF", process_type_code="AF", model_symbol="3")
-    pa = make_item(name="Fresh BOM PA", process_type_code="PA", model_symbol="3")
-    pf = make_item(name="Fresh BOM PF", process_type_code="PF", model_symbol="3")
-    pa_bom = make_bom(pa.item_id, af.item_id, Decimal("1"))
-    make_bom(pf.item_id, pa.item_id, Decimal("1"))
-    real_lock = shipping_svc.item_repository.lock_active_many
-
-    def lock_then_change_bom(db, item_ids):
-        locked = real_lock(db, item_ids)
-        db.execute(
-            update(BOM)
-            .where(BOM.bom_id == pa_bom.bom_id)
-            .values(quantity=Decimal("2")),
-            execution_options={"synchronize_session": False},
-        )
-        return locked
-
-    monkeypatch.setattr(
-        shipping_svc.item_repository,
-        "lock_active_many",
-        lock_then_change_bom,
-    )
-
-    with pytest.raises(shipping_svc.ShippingError, match="BOM이 변경"):
-        _create_request(db_session, {"base_pf_item_id": pf.item_id})
-
-    assert db_session.query(ShippingRequest).count() == 0
-
-
-def test_require_final_items_reloads_candidate_after_item_lock(
-    db_session,
-    make_item,
-    make_bom,
-    monkeypatch,
-):
-    af = make_item(name="Fallback fresh AF", process_type_code="AF", model_symbol="3")
-    pa = make_item(name="Fallback fresh PA", process_type_code="PA", model_symbol="3")
-    pf = make_item(name="Fallback fresh PF", process_type_code="PF", model_symbol="3")
-    pa_bom = make_bom(pa.item_id, af.item_id, Decimal("1"))
-    make_bom(pf.item_id, pa.item_id, Decimal("1"))
-    request = _create_request(db_session, {"base_pf_item_id": pf.item_id})
-    request.final_pa_item_id = None
-    request.final_pf_item_id = None
-    db_session.flush()
-    db_session.expire(request, ["final_pa_item", "final_pf_item"])
-    real_lock = shipping_svc.item_repository.lock_active_many
-
-    def lock_then_change_bom(db, item_ids):
-        locked = real_lock(db, item_ids)
-        db.execute(
-            update(BOM)
-            .where(BOM.bom_id == pa_bom.bom_id)
-            .values(quantity=Decimal("2")),
-            execution_options={"synchronize_session": False},
-        )
-        return locked
-
-    monkeypatch.setattr(
-        shipping_svc.item_repository,
-        "lock_active_many",
-        lock_then_change_bom,
-    )
-
-    with pytest.raises(shipping_svc.ShippingError, match="BOM이 변경"):
-        shipping_svc._require_final_items(db_session, request)
 
 
 @pytest.mark.parametrize(
@@ -686,13 +315,12 @@ def test_update_request_rejects_every_non_preparing_status_with_exact_message(
     pf = make_item(name=f"Update guard {status.value} PF", process_type_code="PF", model_symbol="3")
     make_bom(pa.item_id, af.item_id, Decimal("1"))
     make_bom(pf.item_id, pa.item_id, Decimal("1"))
-    request = _create_request(db_session, {"base_pf_item_id": pf.item_id})
+    request = shipping_svc.create_request(db_session, {"base_pf_item_id": pf.item_id})
     request.status = status
-    db_session.flush()
     actor = _shipping_actor(db_session)
 
     with pytest.raises(shipping_svc.ShippingError) as exc_info:
-        shipping_actions_svc.update_request(
+        shipping_svc.update_request(
             db_session,
             request.request_id,
             {"notes": "blocked"},
@@ -708,11 +336,11 @@ def test_prepare_without_invoice_keeps_request_and_events_unchanged(db_session, 
     pf = make_item(name="Invoice guard PF", process_type_code="PF", model_symbol="3", serial_no=3)
     make_bom(pa.item_id, af.item_id, Decimal("1"))
     make_bom(pf.item_id, pa.item_id, Decimal("1"))
-    request = _create_request(db_session, {"base_pf_item_id": pf.item_id})
+    request = shipping_svc.create_request(db_session, {"base_pf_item_id": pf.item_id})
     event_count = len(request.events)
 
     with pytest.raises(shipping_svc.ShippingError, match="인보이스"):
-        _prepare_complete(db_session, request.request_id, "SN-001")
+        shipping_svc.prepare_complete(db_session, request.request_id, "SN-001")
 
     assert request.status.value == "PREPARING"
     assert len(request.events) == event_count
@@ -726,14 +354,14 @@ def test_prepare_complete_rejects_blank_serial_numbers_before_state_or_events(
     pf = make_item(name="SN guard PF", process_type_code="PF", model_symbol="3", serial_no=6)
     make_bom(pa.item_id, af.item_id, Decimal("1"))
     make_bom(pf.item_id, pa.item_id, Decimal("1"))
-    request = _create_request(
+    request = shipping_svc.create_request(
         db_session,
         {"base_pf_item_id": pf.item_id, "invoice_number": "SN-GUARD-001"},
     )
     event_count = len(request.events)
 
     with pytest.raises(shipping_svc.ShippingError, match="SN"):
-        _prepare_complete(db_session, request.request_id, " \n\t ")
+        shipping_svc.prepare_complete(db_session, request.request_id, " \n\t ")
 
     assert request.status.value == "PREPARING"
     assert len(request.events) == event_count
@@ -748,13 +376,13 @@ def test_prepare_complete_stores_trimmed_multiline_serial_numbers_and_overwrites
     pf = make_item(name="SN store PF", process_type_code="PF", model_symbol="3", serial_no=9)
     make_bom(pa.item_id, af.item_id, Decimal("1"))
     make_bom(pf.item_id, pa.item_id, Decimal("1"))
-    request = _create_request(
+    request = shipping_svc.create_request(
         db_session,
         {"base_pf_item_id": pf.item_id, "invoice_number": "SN-STORE-001"},
     )
     make_location(pf.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
 
-    prepared = _prepare_complete(
+    prepared = shipping_svc.prepare_complete(
         db_session,
         request.request_id,
         "  SN-001\nSN-002  ",
@@ -765,9 +393,9 @@ def test_prepare_complete_stores_trimmed_multiline_serial_numbers_and_overwrites
     reloaded = shipping_svc._get_request(db_session, request.request_id)
     assert reloaded.serial_numbers == "SN-001\nSN-002"
 
-    cancelled = _prepare_cancel(db_session, request.request_id, reason="retry")
+    cancelled = shipping_svc.prepare_cancel(db_session, request.request_id, reason="retry")
     assert cancelled.serial_numbers == "SN-001\nSN-002"
-    prepared_again = _prepare_complete(db_session, request.request_id, "SN-003")
+    prepared_again = shipping_svc.prepare_complete(db_session, request.request_id, "SN-003")
     assert prepared_again.serial_numbers == "SN-003"
 
 
@@ -779,7 +407,7 @@ def test_prepare_complete_reserves_final_pf_from_shipping_stock_without_linked_o
     pf = make_item(name="Linked prepare PF", process_type_code="PF", model_symbol="8", serial_no=2)
     make_bom(pa.item_id, af.item_id, Decimal("1"))
     make_bom(pf.item_id, pa.item_id, Decimal("1"))
-    request = _create_request(
+    request = shipping_svc.create_request(
         db_session,
         {
             "base_pf_item_id": pf.item_id,
@@ -790,7 +418,7 @@ def test_prepare_complete_reserves_final_pf_from_shipping_stock_without_linked_o
     make_location(pf.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("2"))
     before_log_count = db_session.query(TransactionLog).count()
 
-    prepared = _prepare_complete(db_session, request.request_id, "SN-001")
+    prepared = shipping_svc.prepare_complete(db_session, request.request_id, "SN-001")
 
     assert prepared.status.value == "PREPARED"
     assert db_session.query(TransactionLog).count() == before_log_count
@@ -811,7 +439,7 @@ def test_prepare_complete_rejects_insufficient_shipping_pf_stock_even_with_linke
     )
     make_bom(pa.item_id, af.item_id, Decimal("1"))
     make_bom(pf.item_id, pa.item_id, Decimal("1"))
-    request = _create_request(
+    request = shipping_svc.create_request(
         db_session,
         {
             "base_pf_item_id": pf.item_id,
@@ -829,7 +457,7 @@ def test_prepare_complete_rejects_insufficient_shipping_pf_stock_even_with_linke
     )
 
     with pytest.raises(shipping_svc.ShippingError, match="출하 준비 재고 부족"):
-        _prepare_complete(db_session, request.request_id, "SN-001")
+        shipping_svc.prepare_complete(db_session, request.request_id, "SN-001")
 
     assert request.status.value == "PREPARING"
     assert request.serial_numbers is None
@@ -846,18 +474,18 @@ def test_prepare_complete_reserves_final_pf_against_another_prepared_request(
     make_bom(pf.item_id, pa.item_id, Decimal("1"))
     make_location(pf.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
 
-    first = _create_request(
+    first = shipping_svc.create_request(
         db_session,
         {"base_pf_item_id": pf.item_id, "invoice_number": "RESERVED-PF-001"},
     )
-    second = _create_request(
+    second = shipping_svc.create_request(
         db_session,
         {"base_pf_item_id": pf.item_id, "invoice_number": "RESERVED-PF-002"},
     )
-    _prepare_complete(db_session, first.request_id, "SN-001")
+    shipping_svc.prepare_complete(db_session, first.request_id, "SN-001")
 
     with pytest.raises(shipping_svc.ShippingError, match="출하 준비 재고 부족"):
-        _prepare_complete(db_session, second.request_id, "SN-002")
+        shipping_svc.prepare_complete(db_session, second.request_id, "SN-002")
 
     assert _active_allocation_qty(db_session, first.request_id, pf) == 1
     assert second.status.value == "PREPARING"
@@ -869,7 +497,7 @@ def test_prepare_cancel_keeps_linked_io_inventory_log_active(db_session, make_it
     pf = make_item(name="Linked cancel PF", process_type_code="PF", model_symbol="8", serial_no=6)
     make_bom(pa.item_id, af.item_id, Decimal("1"))
     make_bom(pf.item_id, pa.item_id, Decimal("1"))
-    request = _create_request(
+    request = shipping_svc.create_request(
         db_session,
         {
             "base_pf_item_id": pf.item_id,
@@ -884,75 +512,12 @@ def test_prepare_cancel_keeps_linked_io_inventory_log_active(db_session, make_it
         actor=_shipping_actor(db_session),
     )
     make_location(pf.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
-    _prepare_complete(db_session, request.request_id, "SN-001")
+    shipping_svc.prepare_complete(db_session, request.request_id, "SN-001")
 
-    _prepare_cancel(db_session, request.request_id, reason="retry")
+    shipping_svc.prepare_cancel(db_session, request.request_id, reason="retry")
 
     assert request.status.value == "PREPARING"
     assert linked_log.cancelled is False
-
-
-def test_operation_prepare_cancel_prelocks_allocation_items(
-    db_session, make_item, make_bom, make_location, monkeypatch
-):
-    af = make_item(name="Cancel lock AF", process_type_code="AF", model_symbol="8", serial_no=9)
-    pa = make_item(name="Cancel lock PA", process_type_code="PA", model_symbol="8", serial_no=9)
-    pf = make_item(name="Cancel lock PF", process_type_code="PF", model_symbol="8", serial_no=10)
-    companion = make_item(
-        name="Cancel lock companion",
-        process_type_code="PR",
-        model_symbol="8",
-        serial_no=11,
-    )
-    make_bom(pa.item_id, af.item_id, Decimal("1"))
-    make_bom(pf.item_id, pa.item_id, Decimal("1"))
-    make_location(pf.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
-    make_location(
-        companion.item_id,
-        department=DepartmentEnum.SHIPPING,
-        quantity=Decimal("1"),
-    )
-    request = _create_request(
-        db_session,
-        {
-            "base_pf_item_id": pf.item_id,
-            "invoice_number": "CANCEL-LOCK-001",
-            "companion_lines": [
-                {"item_id": companion.item_id, "quantity": 1, "unit": "EA"}
-            ],
-        },
-    )
-    _prepare_complete(db_session, request.request_id, "SN-CANCEL-LOCK")
-    allocation_item_ids = sorted(
-        {
-            allocation.item_id
-            for allocation in db_session.query(ShippingAllocation)
-            .filter(ShippingAllocation.request_id == request.request_id)
-            .all()
-        }
-    )
-    assert allocation_item_ids == sorted({pf.item_id, companion.item_id})
-
-    lock_calls = []
-    real_lock = shipping_svc.warehouse_map_svc.lock_warehouse_map_rows
-
-    def lock_warehouse_rows(db, **kwargs):
-        lock_calls.append(kwargs)
-        return real_lock(db, **kwargs)
-
-    monkeypatch.setattr(
-        shipping_svc.warehouse_map_svc,
-        "lock_warehouse_map_rows",
-        lock_warehouse_rows,
-    )
-
-    _prepare_cancel(db_session, request.request_id, reason="lock graph")
-
-    assert lock_calls[0] == {
-        "item_ids": allocation_item_ids,
-        "include_boxes_for_item_ids": True,
-        "include_zones_for_item_ids": True,
-    }
 
 
 def test_default_shipping_bom_lines_use_standard_child_order(db_session, make_item, make_bom):
@@ -969,7 +534,7 @@ def test_default_shipping_bom_lines_use_standard_child_order(db_session, make_it
         make_bom(pa.item_id, child.item_id, Decimal("1"))
     db_session.commit()
 
-    request = _create_request(
+    request = shipping_svc.create_request(
         db_session,
         {"base_pf_item_id": pf.item_id, "requested_by_name": "shipping-user"},
     )
@@ -1109,7 +674,7 @@ def test_request_finalization_uses_only_the_explicitly_selected_pf_candidate(db_
         _bom_line(base_pa, stage="PF", origin="DEFAULT"),
         _bom_line(requested_component, stage="PA"),
     ]
-    reused = _create_request(
+    reused = shipping_svc.create_request(
         db_session,
         {
             "base_pf_item_id": base_pf.item_id,
@@ -1118,7 +683,7 @@ def test_request_finalization_uses_only_the_explicitly_selected_pf_candidate(db_
             "bom_lines": bom_lines,
         },
     )
-    created = _create_request(
+    created = shipping_svc.create_request(
         db_session,
         {
             "base_pf_item_id": base_pf.item_id,
@@ -1152,7 +717,7 @@ def test_component_change_then_prepare_and_pickup_reserves_companions(
     make_location(carton.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("5"))
     db_session.commit()
 
-    req = _create_request(
+    req = shipping_svc.create_request(
         db_session,
         {
             "base_pf_item_id": base_pf.item_id,
@@ -1171,13 +736,7 @@ def test_component_change_then_prepare_and_pickup_reserves_companions(
     assert req.final_pf_item.item_name == "Target PF with Cable"
     assert db_session.query(TransactionLog).filter(TransactionLog.shipping_request_id == req.request_id).count() == 0
 
-    preview = shipping_actions_svc.component_change_preview(
-        db_session,
-        req.request_id,
-        source_pa.item_id,
-        1,
-        actor=_shipping_actor(db_session),
-    )
+    preview = shipping_svc.component_change_preview(db_session, req.request_id, source_pa.item_id, 1)
     assert preview["source_item_id"] == source_pa.item_id
     assert preview["target_item_id"] == req.final_pa_item_id
     added = [line for line in preview["lines"] if line["item_id"] == cable.item_id][0]
@@ -1192,7 +751,7 @@ def test_component_change_then_prepare_and_pickup_reserves_companions(
     )
     db_session.commit()
 
-    changed = _execute_component_change(
+    changed = shipping_svc.execute_component_change(
         db_session,
         req.request_id,
         source_pa.item_id,
@@ -1233,7 +792,7 @@ def test_component_change_then_prepare_and_pickup_reserves_companions(
         request=req,
         actor=shipping_actor,
     )
-    prepared = _prepare_complete(db_session, req.request_id, "SN-001")
+    prepared = shipping_svc.prepare_complete(db_session, req.request_id, "SN-001")
 
     assert prepared.final_pa_item_id == final_pa.item_id
     assert prepared.final_pf_item_id == final_pf.item_id
@@ -1250,7 +809,7 @@ def test_component_change_then_prepare_and_pickup_reserves_companions(
     )
     assert prepare_logs == []
 
-    _pickup_complete(db_session, req.request_id)
+    shipping_svc.pickup_complete(db_session, req.request_id)
 
     assert _location_qty(db_session, final_pf, DepartmentEnum.SHIPPING) == 0
     assert _location_qty(db_session, carton, DepartmentEnum.SHIPPING) == 4
@@ -1265,9 +824,8 @@ def test_component_change_then_prepare_and_pickup_reserves_companions(
         TransactionTypeEnum.SHIP,
         TransactionTypeEnum.SHIP,
     ]
-    actor = _shipping_actor(db_session)
-    assert {log.produced_by for log in pickup_logs} == {actor.name}
-    assert {log.producer_employee_id for log in pickup_logs} == {actor.employee_id}
+    assert {log.produced_by for log in pickup_logs} == {"shipping-user"}
+    assert all(log.producer_employee_id is None for log in pickup_logs)
     pickup_operation = (
         db_session.query(InventoryOperation)
         .filter(
@@ -1289,10 +847,16 @@ def test_component_change_then_prepare_and_pickup_reserves_companions(
         ("PREPARING", "PREPARED"),
         ("PREPARED", "PICKED_UP"),
     }
-    shipping_actions_svc.pickup_cancel(
+    preview = cancellation_svc.preview_cancellation(
         db_session,
-        req.request_id,
-        actor=shipping_actor,
+        pickup_operation.operation_id,
+    )
+    cancellation_svc.cancel_operation(
+        db_session,
+        operation_id=pickup_operation.operation_id,
+        canceller=shipping_actor,
+        reason="픽업 처리 취소",
+        plan_hash=preview.plan_hash,
     )
     db_session.refresh(req)
     assert req.status == ShippingRequestStatusEnum.PREPARED
@@ -1304,115 +868,6 @@ def test_component_change_then_prepare_and_pickup_reserves_companions(
         .filter(ShippingAllocation.request_id == req.request_id)
         .all()
     } == {"RESERVED"}
-
-
-def test_component_change_preview_does_not_lazy_create_final_items(
-    db_session, make_item, make_bom
-):
-    request, source_pa = _unfinalized_preparing_request(
-        db_session,
-        make_item,
-        make_bom,
-    )
-    before = (
-        db_session.query(Item).count(),
-        db_session.query(BOM).count(),
-        db_session.query(Inventory).count(),
-    )
-    with pytest.raises(shipping_svc.ShippingError, match="최종 출하 품목"):
-        shipping_actions_svc.component_change_preview(
-            db_session,
-            request.request_id,
-            source_pa.item_id,
-            1,
-            actor=_shipping_actor(db_session),
-        )
-
-    assert request.final_pa_item_id is None
-    assert request.final_pf_item_id is None
-    assert (
-        db_session.query(Item).count(),
-        db_session.query(BOM).count(),
-        db_session.query(Inventory).count(),
-    ) == before
-
-
-def test_prepare_stock_shortages_does_not_lazy_create_final_items(
-    db_session, make_item, make_bom
-):
-    request, _source_pa = _unfinalized_preparing_request(
-        db_session,
-        make_item,
-        make_bom,
-    )
-    before = (
-        db_session.query(Item).count(),
-        db_session.query(BOM).count(),
-        db_session.query(Inventory).count(),
-    )
-    assert shipping_svc._prepare_stock_shortages(db_session, request) == []
-    assert request.final_pa_item_id is None
-    assert request.final_pf_item_id is None
-    assert (
-        db_session.query(Item).count(),
-        db_session.query(BOM).count(),
-        db_session.query(Inventory).count(),
-    ) == before
-
-
-def test_prepare_stock_shortages_many_matches_single_with_bom_companion_and_reservation(
-    db_session,
-    make_item,
-    make_bom,
-    make_location,
-):
-    component = make_item(name="bulk-shortage-component", process_type_code="AF")
-    pa = make_item(name="bulk-shortage-pa", process_type_code="PA")
-    pf = make_item(name="bulk-shortage-pf", process_type_code="PF")
-    companion = make_item(name="bulk-shortage-companion", process_type_code="PR")
-    make_bom(pa.item_id, component.item_id, Decimal("1"))
-    make_bom(pf.item_id, pa.item_id, Decimal("1"))
-    request = _create_request(
-        db_session,
-        {
-            "base_pf_item_id": pf.item_id,
-            "request_quantity": 2,
-            "companion_lines": [
-                {"item_id": companion.item_id, "quantity": 2, "unit": "EA"},
-            ],
-        },
-    )
-    stocked_items = [request.final_pa_item, component, companion]
-    for item in stocked_items:
-        make_location(
-            item.item_id,
-            department=shipping_svc.inventory_svc.department_for_item(item),
-            quantity=Decimal("1"),
-        )
-    db_session.add(
-        ShippingAllocation(
-            request_id=request.request_id,
-            item_id=companion.item_id,
-            quantity=1,
-            unit="EA",
-            department=shipping_svc.inventory_svc.department_for_item(companion).value,
-            status="RESERVED",
-        )
-    )
-    db_session.flush()
-
-    single = shipping_svc._prepare_stock_shortages(db_session, request)
-    bulk = shipping_svc.prepare_stock_shortages_many(db_session, [request])[request.request_id]
-
-    assert bulk == single
-    assert {row["item_name"] for row in bulk} == {
-        "bulk-shortage-pa",
-        "bulk-shortage-component",
-        "bulk-shortage-companion",
-    }
-    companion_shortage = next(row for row in bulk if row["item_id"] == companion.item_id)
-    assert companion_shortage["allocated_quantity"] == 1
-    assert companion_shortage["available_quantity"] == 0
 
 
 def test_shipping_bom_stock_exempt_child_is_skipped_in_prepare_and_component_change(
@@ -1433,7 +888,7 @@ def test_shipping_bom_stock_exempt_child_is_skipped_in_prepare_and_component_cha
     make_location(common.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
     db_session.commit()
 
-    request = _create_request(
+    request = shipping_svc.create_request(
         db_session,
         {"base_pf_item_id": base_pf.item_id, "requested_by_name": "shipping-user"},
     )
@@ -1456,7 +911,7 @@ def test_shipping_bom_stock_exempt_child_is_skipped_in_prepare_and_component_cha
             make_location(item_id, department=department, quantity=Decimal("10"))
         else:
             location.quantity = Decimal("10")
-    prepare_shortages = shipping_svc._prepare_stock_shortages(db_session, request)
+    prepare_shortages = shipping_svc.prepare_stock_shortages(db_session, request)
     assert prepare_shortages == [], {row["item_name"] for row in prepare_shortages}
 
     preview = shipping_svc.component_change_preview_independent(
@@ -1470,7 +925,7 @@ def test_shipping_bom_stock_exempt_child_is_skipped_in_prepare_and_component_cha
     assert exempt_line["bom_stock_exempt"] is True
     assert exempt_line["shortage_quantity"] == 0
 
-    result = _execute_component_change_independent(
+    result = shipping_svc.execute_component_change_independent(
         db_session,
         source_pa.item_id,
         target_pa.item_id,
@@ -1514,7 +969,7 @@ def test_component_change_moves_only_direct_children_when_nested_leaves_match(
     assert lines_by_item_id[target_aa.item_id]["available_quantity"] == 2
     assert shared_leaf.item_id not in lines_by_item_id
 
-    result = _execute_component_change_independent(
+    result = shipping_svc.execute_component_change_independent(
         db_session,
         source_af.item_id,
         target_af.item_id,
@@ -1611,7 +1066,7 @@ def test_shipping_prepare_keeps_custom_flagged_bom_line_in_shortage_check(
     make_bom(base_pf.item_id, base_pa.item_id, Decimal("1"))
     db_session.flush()
 
-    request = _create_request(
+    request = shipping_svc.create_request(
         db_session,
         {
             "base_pf_item_id": base_pf.item_id,
@@ -1627,7 +1082,7 @@ def test_shipping_prepare_keeps_custom_flagged_bom_line_in_shortage_check(
     )
     for item in (request.final_pa_item, base_pa, default_component):
         make_location(item.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
-    shortages = shipping_svc._prepare_stock_shortages(db_session, request)
+    shortages = shipping_svc.prepare_stock_shortages(db_session, request)
 
     custom_line = next(line for line in request.bom_lines if line.child_item_id == custom_component.item_id)
     assert custom_line.origin == "CUSTOM"
@@ -1664,10 +1119,10 @@ def test_independent_component_change_rejects_invalid_pairs_and_shortages(
     assert same_bom_preview["lines"] == []
 
     with pytest.raises(shipping_svc.ShippingError):
-        _execute_component_change_independent(db_session, source_pa.item_id, target_pa.item_id, 2)
+        shipping_svc.execute_component_change_independent(db_session, source_pa.item_id, target_pa.item_id, 2)
 
     with pytest.raises(shipping_svc.ShippingError):
-        _execute_component_change_independent(db_session, source_pa.item_id, target_pa.item_id, 1)
+        shipping_svc.execute_component_change_independent(db_session, source_pa.item_id, target_pa.item_id, 1)
 
 
 def test_component_change_prelocks_all_mutated_items_in_sorted_order(
@@ -1695,7 +1150,7 @@ def test_component_change_prelocks_all_mutated_items_in_sorted_order(
         lock_inventories,
     )
 
-    _execute_component_change_independent(
+    shipping_svc.execute_component_change_independent(
         db_session,
         source_pa.item_id,
         target_pa.item_id,
@@ -1718,7 +1173,7 @@ def test_prepare_cancel_reverses_prepare_logs_and_releases_allocations(
     make_location(carton.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
     db_session.commit()
 
-    req = _create_request(
+    req = shipping_svc.create_request(
         db_session,
         {
             "base_pf_item_id": base_pf.item_id,
@@ -1730,12 +1185,11 @@ def test_prepare_cancel_reverses_prepare_logs_and_releases_allocations(
     assert req.final_pa_item_id == base_pa.item_id
     assert req.final_pf_item_id == base_pf.item_id
     _simulate_legacy_prepare(db_session, req)
-    db_session.commit()
 
     with pytest.raises(shipping_svc.ShippingError):
-        _update_checklist(db_session, req.request_id, {})
+        shipping_svc.update_checklist(db_session, req.request_id, {})
     with pytest.raises(shipping_svc.ShippingError):
-        _clear_checklist(db_session, req.request_id)
+        shipping_svc.clear_checklist(db_session, req.request_id)
 
     assert _location_qty(db_session, base_pa, DepartmentEnum.SHIPPING) == 0
     assert _location_qty(db_session, base_pf, DepartmentEnum.SHIPPING) == 1
@@ -1750,69 +1204,28 @@ def test_prepare_cancel_reverses_prepare_logs_and_releases_allocations(
             if log.operation_batch_id is None
         }
     )
-    allocation_item_ids = {
-        allocation.item_id
-        for allocation in db_session.query(ShippingAllocation)
-        .filter(
-            ShippingAllocation.request_id == req.request_id,
-            ShippingAllocation.status == "RESERVED",
-        )
-        .all()
-    }
-    expected_lock_item_ids = sorted({*legacy_item_ids, *allocation_item_ids})
     lock_calls = []
-    real_lock = shipping_svc.warehouse_map_svc.lock_warehouse_map_rows
+    real_lock = shipping_svc.inventory_svc.lock_inventories
 
-    def lock_warehouse_rows(db, **kwargs):
-        lock_calls.append(kwargs)
-        return real_lock(db, **kwargs)
-
-    monkeypatch.setattr(
-        shipping_svc.warehouse_map_svc,
-        "lock_warehouse_map_rows",
-        lock_warehouse_rows,
-    )
-    reverse_observations = []
-    real_reverse = shipping_svc.inv_effect._apply_effect_reverse
-
-    def reverse_after_owner_release(
-        db,
-        item_id,
-        effect,
-    ):
-        persisted_statuses = db.connection().execute(
-            select(ShippingAllocation.status)
-            .where(ShippingAllocation.request_id == req.request_id)
-            .order_by(ShippingAllocation.allocation_id.asc())
-        ).scalars().all()
-        reverse_observations.append(persisted_statuses)
-        return real_reverse(db, item_id, effect)
+    def lock_inventories(db, item_ids):
+        lock_calls.append(item_ids)
+        return real_lock(db, item_ids)
 
     monkeypatch.setattr(
-        shipping_svc.inv_effect,
-        "_apply_effect_reverse",
-        reverse_after_owner_release,
+        shipping_svc.inventory_svc,
+        "lock_inventories",
+        lock_inventories,
     )
 
-    actor = _shipping_actor(db_session)
-    _prepare_cancel(db_session, req.request_id, reason="change", actor=actor)
+    shipping_svc.prepare_cancel(db_session, req.request_id, reason="change")
 
-    assert reverse_observations
-    assert all(
-        statuses and set(statuses) == {"RELEASED"}
-        for statuses in reverse_observations
-    )
-    assert lock_calls[0] == {
-        "item_ids": expected_lock_item_ids,
-        "include_boxes_for_item_ids": True,
-        "include_zones_for_item_ids": True,
-    }
+    assert lock_calls == [legacy_item_ids]
 
     actor = _shipping_actor(db_session)
     with pytest.raises(shipping_svc.ShippingError, match="인보이스"):
-        shipping_actions_svc.update_request(db_session, req.request_id, {"invoice_number": None}, actor)
+        shipping_svc.update_request(db_session, req.request_id, {"invoice_number": None}, actor)
     with pytest.raises(shipping_svc.ShippingError, match="인보이스"):
-        shipping_actions_svc.update_invoice(db_session, req.request_id, None, actor)
+        shipping_svc.update_invoice(db_session, req.request_id, None, actor)
     assert req.invoice_number == "SERVICE-INV-002"
 
     assert req.final_pa_item_id == base_pa.item_id
@@ -1828,7 +1241,6 @@ def test_prepare_cancel_reverses_prepare_logs_and_releases_allocations(
     )
     assert cancelled
     assert all(log.cancelled for log in cancelled)
-    assert {log.cancelled_by for log in cancelled} == {actor.employee_id}
 
 
 def test_request_mutations_require_actor_before_writing(db_session, make_item):
@@ -1838,26 +1250,19 @@ def test_request_mutations_require_actor_before_writing(db_session, make_item):
     db_session.add(BOM(parent_item_id=pa.item_id, child_item_id=af.item_id, quantity=1, unit="EA"))
     db_session.add(BOM(parent_item_id=pf.item_id, child_item_id=pa.item_id, quantity=1, unit="EA"))
     db_session.commit()
-    request = _create_request(db_session, {"base_pf_item_id": pf.item_id})
+    request = shipping_svc.create_request(db_session, {"base_pf_item_id": pf.item_id})
     event_count = len(request.events)
 
     with pytest.raises(shipping_svc.ShippingError, match="작업자"):
-        shipping_actions_svc.update_request(db_session, request.request_id, {"notes": "no actor"}, None)
+        shipping_svc.update_request(db_session, request.request_id, {"notes": "no actor"}, None)
     with pytest.raises(shipping_svc.ShippingError, match="작업자"):
         shipping_actions_svc.update_invoice(db_session, request.request_id, "ACTOR-INV", None)
     with pytest.raises(shipping_svc.ShippingError, match="작업자"):
-        shipping_actions_svc.delete_request(db_session, request.request_id, None)
-    with pytest.raises(TypeError, match="Employee"):
-        shipping_actions_svc.update_invoice(
-            db_session,
-            request.request_id,
-            "FAKE-ACTOR-INV",
-            object(),
-        )
+        shipping_svc.delete_request(db_session, request.request_id, None)
     inactive_actor = _shipping_actor(db_session)
     inactive_actor.is_active = False
     with pytest.raises(shipping_svc.ShippingError, match="비활성"):
-        shipping_actions_svc.update_invoice(db_session, request.request_id, "INACTIVE-INV", inactive_actor)
+        shipping_svc.update_invoice(db_session, request.request_id, "INACTIVE-INV", inactive_actor)
 
     assert request.notes is None
     assert request.invoice_number is None
@@ -1872,22 +1277,22 @@ def test_cancelled_without_history_can_clear_but_legacy_picked_up_cannot(db_sess
     make_bom(pa.item_id, af.item_id, Decimal("1"))
     make_bom(pf.item_id, pa.item_id, Decimal("1"))
     actor = _shipping_actor(db_session)
-    request = _create_request(
+    request = shipping_svc.create_request(
         db_session,
         {"base_pf_item_id": pf.item_id, "invoice_number": "CANCEL-CLEAR"},
     )
 
-    shipping_actions_svc.delete_request(db_session, request.request_id, actor)
-    updated = shipping_actions_svc.update_invoice(db_session, request.request_id, None, actor)
+    shipping_svc.delete_request(db_session, request.request_id, actor)
+    updated = shipping_svc.update_invoice(db_session, request.request_id, None, actor)
 
     assert updated.status.value == "CANCELLED"
     assert updated.invoice_number is None
 
-    shipping_actions_svc.update_invoice(db_session, request.request_id, "PICKED-LEGACY", actor)
+    shipping_svc.update_invoice(db_session, request.request_id, "PICKED-LEGACY", actor)
     request.status = shipping_svc.ShippingRequestStatusEnum.PICKED_UP
     request.prepared_at = None
     with pytest.raises(shipping_svc.ShippingError, match="인보이스"):
-        shipping_actions_svc.update_invoice(db_session, request.request_id, None, actor)
+        shipping_svc.update_invoice(db_session, request.request_id, None, actor)
     assert request.invoice_number == "PICKED-LEGACY"
 
 
@@ -1904,7 +1309,7 @@ def test_same_bom_is_resolved_on_request_and_companion_lines_do_not_create_trans
     make_location(carton.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
     db_session.commit()
 
-    req = _create_request(
+    req = shipping_svc.create_request(
         db_session,
         {
             "base_pf_item_id": pf.item_id,
@@ -1924,7 +1329,7 @@ def test_same_bom_is_resolved_on_request_and_companion_lines_do_not_create_trans
         request=req,
         actor=_shipping_actor(db_session),
     )
-    _prepare_complete(db_session, req.request_id, "SN-001")
+    shipping_svc.prepare_complete(db_session, req.request_id, "SN-001")
 
     assert db_session.query(TransactionLog).filter(TransactionLog.item_id == carton.item_id).count() == 0
     assert _active_allocation_qty(db_session, req.request_id, carton) == 1
@@ -1946,7 +1351,7 @@ def test_request_quantity_multiplies_prepare_and_pickup_and_preserves_companions
     make_location(carton.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("2"))
     db_session.commit()
 
-    req = _create_request(
+    req = shipping_svc.create_request(
         db_session,
         {
             "base_pf_item_id": pf.item_id,
@@ -1962,7 +1367,7 @@ def test_request_quantity_multiplies_prepare_and_pickup_and_preserves_companions
         actor=_shipping_actor(db_session),
     )
 
-    prepared = _prepare_complete(db_session, req.request_id, "SN-001")
+    prepared = shipping_svc.prepare_complete(db_session, req.request_id, "SN-001")
 
     assert prepared.request_quantity == 3
     assert len(prepared.companion_lines) == 1
@@ -1981,7 +1386,7 @@ def test_request_quantity_multiplies_prepare_and_pickup_and_preserves_companions
     )
     assert prepare_logs == []
 
-    _prepare_cancel(db_session, req.request_id, reason="change")
+    shipping_svc.prepare_cancel(db_session, req.request_id, reason="change")
     assert req.status.value == "PREPARING"
     assert len(req.companion_lines) == 1
     assert _location_qty(db_session, pa, DepartmentEnum.SHIPPING) == 0
@@ -1989,8 +1394,8 @@ def test_request_quantity_multiplies_prepare_and_pickup_and_preserves_companions
     assert _active_allocation_qty(db_session, req.request_id, pf) == 0
     assert _active_allocation_qty(db_session, req.request_id, carton) == 0
 
-    _prepare_complete(db_session, req.request_id, "SN-001")
-    _pickup_complete(db_session, req.request_id)
+    shipping_svc.prepare_complete(db_session, req.request_id, "SN-001")
+    shipping_svc.pickup_complete(db_session, req.request_id)
 
     assert _location_qty(db_session, pf, DepartmentEnum.SHIPPING) == 0
     assert _location_qty(db_session, carton, DepartmentEnum.SHIPPING) == 0
@@ -2014,7 +1419,7 @@ def test_custom_bom_requires_names_at_request_time_when_no_existing_match(db_ses
     db_session.commit()
 
     with pytest.raises(shipping_svc.ShippingError):
-        _create_request(
+        shipping_svc.create_request(
             db_session,
             {
                 "base_pf_item_id": base_pf.item_id,
@@ -2036,7 +1441,7 @@ def test_excluded_default_bom_line_is_saved_but_ignored_by_checklist_and_prepare
     make_bom(pf.item_id, pa.item_id, Decimal("1"))
     db_session.commit()
 
-    req = _create_request(
+    req = shipping_svc.create_request(
         db_session,
         {
             "base_pf_item_id": pf.item_id,
@@ -2063,7 +1468,7 @@ def test_excluded_default_bom_line_is_saved_but_ignored_by_checklist_and_prepare
         request=req,
         actor=_shipping_actor(db_session),
     )
-    prepared = _prepare_complete(db_session, req.request_id, "SN-001")
+    prepared = shipping_svc.prepare_complete(db_session, req.request_id, "SN-001")
 
     assert prepared.final_pa_item.item_name == "Cable excluded PA"
     assert _warehouse_qty(db_session, af) == 1
@@ -2099,7 +1504,7 @@ def test_changed_bom_creates_a_new_pa_and_pf_when_no_existing_pf_candidate_is_se
     assert match["requires_pa_name"] is False
     assert match["requires_pf_name"] is True
 
-    req = _create_request(
+    req = shipping_svc.create_request(
         db_session,
         {
             "base_pf_item_id": pf.item_id,
@@ -2121,7 +1526,7 @@ def test_changed_bom_creates_a_new_pa_and_pf_when_no_existing_pf_candidate_is_se
         request=req,
         actor=_shipping_actor(db_session),
     )
-    prepared = _prepare_complete(db_session, req.request_id, "SN-001")
+    prepared = shipping_svc.prepare_complete(db_session, req.request_id, "SN-001")
 
     assert prepared.final_pa_item_id == req.final_pa_item_id
     assert prepared.final_pf_item.item_name == "Bracket PF"

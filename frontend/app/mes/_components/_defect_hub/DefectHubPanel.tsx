@@ -25,11 +25,11 @@ import { MobileDefectProcessPanel } from "../mobile/screens/MobileDefectProcessP
 import { MobileDefectCartFlow } from "../mobile/screens/MobileDefectCartFlow";
 import type { DefectCartMode } from "./DefectCartFlow";
 import type { Item, ProductModel } from "../_warehouse_v2/types";
+import { InlineErrorNote } from "./InlineErrorNote";
 import { tint } from "@/lib/mes/colorUtils";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { LoadFailureCard } from "../common/LoadFailureCard";
 import { matchesDefectSearch } from "./defectSearch";
-import { InlineErrorNote } from "./InlineErrorNote";
 import { ShieldAlert, Trash2 } from "lucide-react";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
@@ -503,23 +503,13 @@ export function DefectHubPanel({
         />
       )}
       {loading ? (
-        <div
-          className="py-10 text-center text-sm font-bold"
-          style={{ color: `color-mix(in srgb, ${LEGACY_COLORS.muted} 60%, ${LEGACY_COLORS.text})` }}
-          role="status"
-          aria-live="polite"
-        >
+        <div className="py-10 text-center text-sm font-bold" style={{ color: LEGACY_COLORS.muted }}>
           불량 데이터 로딩 중...
         </div>
       ) : error ? (
-        <LoadFailureCard
-          prefix="불량 데이터를 불러오지 못했습니다"
-          message={error}
-          retryLabel="다시 시도"
-          onRetry={() => setReloadNonce((value) => value + 1)}
-          ariaLabel="불량 데이터 로드 오류"
-          focusOnMount
-        />
+        <InlineErrorNote variant="block" className="!text-sm">
+          {error}
+        </InlineErrorNote>
       ) : (
         <>
           <DefectDepartmentList

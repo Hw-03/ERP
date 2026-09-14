@@ -11,13 +11,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from app.models import (
-    Inventory,
-    InventoryLocation,
-    Item,
-    LocationStatusEnum,
-    WarehouseUnplacedItem,
-)
+from app.models import Inventory, InventoryLocation, Item, LocationStatusEnum
 
 try:
     import openpyxl
@@ -168,7 +162,6 @@ def run_cleanup_import(
 
     inventories = []
     locations = []
-    unplaced_rows = []
     for item_obj, p in zip(items_to_add, parsed):
         qty = p["quantity"]
         inventories.append(Inventory(
@@ -177,9 +170,6 @@ def run_cleanup_import(
             warehouse_qty=Decimal("0"),
             pending_quantity=Decimal("0"),
         ))
-        unplaced_rows.append(
-            WarehouseUnplacedItem(item_id=item_obj.item_id, quantity=0)
-        )
         if qty > 0:
             locations.append(InventoryLocation(
                 item_id=item_obj.item_id,
@@ -190,7 +180,6 @@ def run_cleanup_import(
 
     db.add_all(inventories)
     db.add_all(locations)
-    db.add_all(unplaced_rows)
     db.commit()
 
     return {"rows": len(parsed), "total_qty": total_qty, "ok": not errors, "errors": errors}

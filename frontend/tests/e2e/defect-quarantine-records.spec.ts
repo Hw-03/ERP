@@ -97,14 +97,13 @@ async function cleanupItemRecords(
 }
 
 test.describe("불량 격리 건별 원장", () => {
-  test.afterEach(async ({ page }) => {
+  test.afterEach(async ({ request }) => {
     const seed = readSeed();
-    const cleanupActor = await loginAsOperator(page, { role: "department" });
     await cleanupItemRecords(
-      page.request,
+      request,
       seed.rawItem.item_id,
       "창고",
-      cleanupActor.employee_id,
+      seed.departmentEmployee.employee_id,
     );
   });
 
@@ -124,7 +123,6 @@ test.describe("불량 격리 건별 원장", () => {
       reason_memo: "첫 격리 메모",
       actor_employee_id: operator.employee_id,
     });
-    const secondOperator = await loginAsOperator(page);
     await postJson(page.request, "/api/defects/quarantine", {
       item_id: item.item_id,
       qty: 4,
@@ -132,9 +130,8 @@ test.describe("불량 격리 건별 원장", () => {
       target_dept: department,
       reason_category: "기능 불량",
       reason_memo: "둘째 격리 메모",
-      actor_employee_id: secondOperator.employee_id,
+      actor_employee_id: seed.plainEmployee.employee_id,
     });
-    await loginAsOperator(page, { role: "department" });
 
     const listResponse = await page.request.get(
       `/api/defects/locations?department=${encodeURIComponent(department)}`,
@@ -176,7 +173,7 @@ test.describe("불량 격리 건별 원장", () => {
     await expect(firstRow).toContainText("2026-07-01 09:00");
     await expect(firstRow).toContainText(operator.name);
     await expect(secondRow).toContainText("2026-07-02 10:30");
-    await expect(secondRow).toContainText(secondOperator.name);
+    await expect(secondRow).toContainText(seed.plainEmployee.name);
     await expect(firstRow.getByText("5개", { exact: true })).toBeVisible();
     await expect(secondRow.getByText("4개", { exact: true })).toBeVisible();
 
@@ -200,14 +197,8 @@ test.describe("불량 격리 건별 원장", () => {
     await editableRow.getByRole("textbox", { name: "격리 메모" }).fill(
       "수정된 긴 메모 — 보관 중 가장 하단에 깔린 제품이라 외관 손상이 확인됨",
     );
-    await editableRow.getByRole("textbox", { name: "직원 PIN" }).fill(seed.operatorPin);
-    const memoResponsePromise = page.waitForResponse(
-      (response) =>
-        response.request().method() === "PUT"
-        && response.url().includes(`/api/defects/records/${secondRecord.record_id}/memo`),
-    );
+    await editableRow.getByRole("textbox", { name: "직원 PIN" }).fill("0000");
     await editableRow.getByRole("button", { name: "저장", exact: true }).click();
-    expect((await memoResponsePromise).ok()).toBeTruthy();
     await expect(editableRow).toContainText("수정된 긴 메모");
 
     await page.reload();
@@ -222,9 +213,8 @@ test.describe("불량 격리 건별 원장", () => {
     await expect(refreshedSecondRow).toContainText("변경 전: 둘째 격리 메모");
     await expect(refreshedSecondRow).toContainText("변경 후: 수정된 긴 메모");
 
-    const requester = await loginAsOperator(page);
     const createImmediateRequest = () => postJson(page.request, "/api/stock-requests", {
-      requester_employee_id: requester.employee_id,
+      requester_employee_id: seed.plainEmployee.employee_id,
       request_type: "defect_scrap",
       reason_category: "외관 불량",
       reason_memo: "즉시 처리 검증",
@@ -258,8 +248,8 @@ test.describe("불량 격리 건별 원장", () => {
     const transactions: any[] = await transactionsResponse.json();
     expect(transactions).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        produced_by: requester.name,
-        producer_employee_id: requester.employee_id,
+        produced_by: seed.plainEmployee.name,
+        producer_employee_id: seed.plainEmployee.employee_id,
       }),
     ]));
 
@@ -319,7 +309,7 @@ test.describe("불량 격리 건별 원장", () => {
     await record.getByRole("button", { name: "분류 변경", exact: true }).click();
     const changeDialog = page.getByRole("dialog", { name: "보관 분류 변경" }).filter({ visible: true });
     await changeDialog.getByRole("button", { name: "구형", exact: true }).click();
-    await changeDialog.getByRole("textbox", { name: "직원 PIN" }).fill(seed.operatorPin);
+    await changeDialog.getByRole("textbox", { name: "직원 PIN" }).fill("0000");
     await changeDialog.getByRole("button", { name: "변경 저장", exact: true }).click();
     await expect(record).toContainText("구형");
 

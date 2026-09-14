@@ -221,6 +221,19 @@ export function MobileShell({
     setActiveTab(target);
   }, [activeTab]);
 
+  const resetActiveMobileTab = useCallback((target: MobileTabId) => {
+    if (target === "warehouse") {
+      setWarehousePreselected(null);
+      setWarehouseIntent(null);
+      window.history.replaceState(null, "", `${window.location.pathname}?tab=warehouse`);
+    }
+    if (target === "defect") {
+      window.history.replaceState({ defect: "hub" }, "");
+      setDefectDeptFilter(null);
+    }
+    setRefreshNonce((n) => n + 1);
+  }, []);
+
   const canOpenMobileTab = useCallback((tab: MobileTabId) => {
     if (!operator) return true;
     if (tab === "more" || tab === "assemblyChecklist") return true;
@@ -250,40 +263,22 @@ export function MobileShell({
   const handleTabChange = useCallback((tab: MobileTabId) => {
     const target = canOpenMobileTab(tab) ? tab : fallbackTab;
     if (!canOpenMobileTab(target)) return;
-    if (target === activeTab) {
-      if (target === "defect") {
-        window.history.replaceState({ defect: "hub" }, "");
-        setDefectDeptFilter(null);
-      }
-      setRefreshNonce((n) => n + 1);
-      return;
-    }
-    // 항목 16 — 입출고 작성 중 다른 탭으로 이탈 시 확인 시트(PC 일관성). 확인 시 draft flush 후 전환.
+    // 항목 16 — 입출고 작성 중 탭 이동·같은 탭 초기화 시 확인 시트(PC 일관성). 확인 시 draft flush 후 전환.
     if ((activeTab === "warehouse" && warehouseDirty) || (activeTab === "dailyReport" && dailyReportDirty)) {
       setPendingNavTab(target);
       return;
     }
+    if (target === activeTab) {
+      resetActiveMobileTab(target);
+      return;
+    }
     commitMobileTab(target);
-  }, [activeTab, canOpenMobileTab, commitMobileTab, dailyReportDirty, fallbackTab, warehouseDirty]);
+  }, [activeTab, canOpenMobileTab, commitMobileTab, dailyReportDirty, fallbackTab, resetActiveMobileTab, warehouseDirty]);
 
-  const handleNotificationNavigate = useCallback(({ tab, section, relatedRequestId }: NotificationNavigationTarget) => {
+  const handleNotificationNavigate = useCallback(({ tab, section }: NotificationNavigationTarget) => {
     if (!(VALID_TAB_IDS as string[]).includes(tab)) return;
     const target = tab as MobileTabId;
     if (!canOpenMobileTab(target)) return;
-    const params = new URLSearchParams(window.location.search);
-    params.set("tab", target);
-    if (section) params.set("section", section);
-    else params.delete("section");
-    if (target === "warehouse" && relatedRequestId) {
-      params.set("stockRequestId", relatedRequestId);
-    } else {
-      params.delete("stockRequestId");
-    }
-    window.history.pushState(
-      { ...(window.history.state || {}), notificationTarget: relatedRequestId },
-      "",
-      `${window.location.pathname}?${params.toString()}`,
-    );
     handleTabChange(target);
     if (target === "defect" && section) setDefectDeptFilter(section);
   }, [canOpenMobileTab, handleTabChange]);
@@ -538,12 +533,22 @@ export function MobileShell({
               return;
             }
           }
-          warehouseFlushRef.current?.(); // 700ms 디바운스 창의 마지막 변경까지 즉시 저장
+          if (activeTab === "warehouse") {
+            try {
+              await warehouseFlushRef.current?.(); // 700ms 디바운스 창의 마지막 변경까지 즉시 저장
+            } catch {
+              return;
+            }
+          }
           const next = pendingNavTab;
           setPendingNavTab(null);
           setWarehouseDirty(false);
           setDailyReportDirty(false);
-          if (next) commitMobileTab(canOpenMobileTab(next) ? next : fallbackTab);
+          if (next) {
+            const target = canOpenMobileTab(next) ? next : fallbackTab;
+            if (target === activeTab) resetActiveMobileTab(target);
+            else commitMobileTab(target);
+          }
         }}
         onDiscard={() => {
           // 항목 3-4 — 저장(flush) 없이 이동. 위저드는 언마운트되어 작성 내용이 폐기된다.
@@ -551,7 +556,11 @@ export function MobileShell({
           setPendingNavTab(null);
           setWarehouseDirty(false);
           setDailyReportDirty(false);
-          if (next) commitMobileTab(canOpenMobileTab(next) ? next : fallbackTab);
+          if (next) {
+            const target = canOpenMobileTab(next) ? next : fallbackTab;
+            if (target === activeTab) resetActiveMobileTab(target);
+            else commitMobileTab(target);
+          }
         }}
       />
 

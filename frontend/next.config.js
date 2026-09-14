@@ -1,8 +1,4 @@
-const {
-  PHASE_DEVELOPMENT_SERVER,
-  PHASE_PRODUCTION_BUILD,
-} = require("next/constants");
-const os = require("node:os");
+const { PHASE_DEVELOPMENT_SERVER } = require("next/constants");
 
 /**
  * dev (npm run dev) 와 production build/start 가 같은 `.next/` 를 공유하면
@@ -21,13 +17,6 @@ module.exports = (phase) => {
   /** @type {import('next').NextConfig} */
   const config = {
     devIndicators: false,
-    allowedDevOrigins: phase === PHASE_DEVELOPMENT_SERVER
-      ? Object.values(os.networkInterfaces()).flat()
-        .filter((address) => address?.family === "IPv4")
-        .map((address) => address.address)
-      : undefined,
-    agentRules: false,
-    compiler: { reactRemoveProperties: phase === PHASE_PRODUCTION_BUILD },
     async rewrites() {
       return [
         {

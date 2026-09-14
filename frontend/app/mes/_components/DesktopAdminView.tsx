@@ -59,7 +59,7 @@ export function DesktopAdminView({
     items, setItems,
     employees, setEmployees,
     productModels, setProductModels,
-    departments,
+    departments, setDepartments,
     allBomRows,
     refreshAllBom,
     refreshItems,
@@ -79,7 +79,6 @@ export function DesktopAdminView({
   } = useAdminSettings({
     onStatusChange,
     onError: setMessage,
-    onPinChanged: unlock,
   });
 
   // message / saveMessage → 공통 상태 대상 알림으로 동기화.
@@ -124,6 +123,7 @@ export function DesktopAdminView({
               productModels={productModels}
               setProductModels={setProductModels}
               departments={departments}
+              setDepartments={setDepartments}
               selectedDept={selectedDept}
               setSelectedDept={setSelectedDept}
               allBomRows={allBomRows}

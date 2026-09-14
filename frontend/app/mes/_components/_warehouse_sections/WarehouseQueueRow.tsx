@@ -6,10 +6,10 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { normalizeDepartment } from "@/lib/mes/department";
 import { formatKstDateTime } from "@/lib/mes/format";
 import {
+  REQUEST_TYPE_LABEL,
   formatRequestNotes,
   getRequestFlowLabel,
   getRequestStatusPresentation,
-  getRequestTypePresentation,
 } from "./ioRequestLabels";
 import { StockRequestLineTable } from "./StockRequestLineTable";
 
@@ -58,8 +58,7 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
   } = props;
 
   const noteText = formatRequestNotes(req.notes);
-  const requestType = getRequestTypePresentation(req.request_type);
-  const typeLabel = requestType.label;
+  const typeLabel = REQUEST_TYPE_LABEL[req.request_type] ?? req.request_type;
   const status = getRequestStatusPresentation(req.status);
   const flowLabel = getRequestFlowLabel(req.request_type, req.lines);
 
@@ -123,13 +122,7 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
         </div>
       )}
 
-      {!requestType.commandSafe ? (
-        noteText ? (
-          <div className="mt-3 text-base" style={{ color: LEGACY_COLORS.muted }}>
-            비고: {noteText}
-          </div>
-        ) : null
-      ) : approvePinFor === req.request_id ? (
+      {approvePinFor === req.request_id ? (
         <div
           className="mt-3 flex flex-wrap items-center gap-2 rounded-[12px] border px-3 py-2"
           style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
@@ -143,7 +136,6 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
           <input
             type="password"
             inputMode="numeric"
-            aria-label="승인 PIN"
             value={approvePin}
             onChange={(e) => setApprovePin(normalizePin(e.target.value))}
             onKeyDown={(e) => {
@@ -199,7 +191,6 @@ export function WarehouseQueueRow(props: WarehouseQueueRowProps) {
             <input
               type="password"
               inputMode="numeric"
-              aria-label="반려 PIN"
               value={rejectPin}
               onChange={(e) => setRejectPin(normalizePin(e.target.value))}
               onKeyDown={(e) => {

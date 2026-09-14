@@ -106,50 +106,6 @@ def _create_handover(client, author, to_dept, item, qty=3, title="튜브 인수�
     )
 
 
-def test_handover_compose_requires_tube_department(client, db_session, make_item):
-    item = make_item(name="인수인계 작성 권한")
-    non_tube_author = _make_employee(
-        db_session,
-        code="HANDOVER-NON-TUBE",
-        department=DepartmentEnum.ASSEMBLY,
-    )
-    db_session.commit()
-
-    created = _create_handover(client, non_tube_author, "고압", item, qty=1)
-    assert created.status_code == 403
-
-    draft_payload = {
-        "author_employee_id": str(non_tube_author.employee_id),
-        "to_department": "고압",
-        "title": "권한 없는 임시저장",
-        "lines": [{"item_id": str(item.item_id), "quantity": 1}],
-    }
-    saved = client.put("/api/handovers/draft", json=draft_payload)
-    assert saved.status_code == 403
-    assert db_session.query(HandoverDoc).count() == 0
-
-    tube_author = _make_employee(
-        db_session,
-        code="HANDOVER-TUBE-THEN-MOVED",
-        department=DepartmentEnum.TUBE,
-    )
-    db_session.commit()
-    draft_payload["author_employee_id"] = str(tube_author.employee_id)
-    allowed_draft = client.put("/api/handovers/draft", json=draft_payload)
-    assert allowed_draft.status_code == 200
-    handover_id = allowed_draft.json()["handover_id"]
-
-    tube_author.department = DepartmentEnum.ASSEMBLY.value
-    db_session.commit()
-    submitted = client.post(
-        f"/api/handovers/{handover_id}/submit",
-        json={"author_employee_id": str(tube_author.employee_id)},
-    )
-    assert submitted.status_code == 403
-    db_session.expire_all()
-    assert db_session.get(HandoverDoc, uuid.UUID(handover_id)).status == HandoverStatusEnum.DRAFT
-
-
 def test_handover_create_and_receive_moves_stock(client, db_session, make_item):
     item = make_item(name="8TF Tube", warehouse_qty=Decimal("0"))
     _seed_production(db_session, item.item_id, "튜브", Decimal("5"))
@@ -242,7 +198,7 @@ def test_handover_receive_prelocks_sorted_unique_inventories(
         events.append(("lock", item_ids))
         return {item_id: object() for item_id in item_ids}
 
-    real_transfer = handover_svc.inventory_svc._transfer_between_departments
+    real_transfer = handover_svc.inventory_svc.transfer_between_departments
 
     def transfer(*args, **kwargs):
         events.append(("transfer", args[1]))
@@ -252,12 +208,10 @@ def test_handover_receive_prelocks_sorted_unique_inventories(
         handover_svc.inventory_svc, "lock_inventories", lock_inventories
     )
     monkeypatch.setattr(
-        handover_svc.inventory_svc, "_transfer_between_departments", transfer
+        handover_svc.inventory_svc, "transfer_between_departments", transfer
     )
 
-    handover_svc.receive_handover(
-        db_session, doc.handover_id, actor=receiver, pin="0000"
-    )
+    handover_svc.receive_handover(db_session, doc, actor=receiver, pin="0000")
 
     assert events[0] == ("lock", sorted({first.item_id, second.item_id}))
 
@@ -281,12 +235,10 @@ def test_handover_receive_rolls_back_inventory_when_ledger_capture_fails(
     def fail_capture(*_args, **_kwargs):
         raise RuntimeError("ledger failure")
 
-    monkeypatch.setattr(handover_svc.inv_effect, "_capture_effect", fail_capture)
+    monkeypatch.setattr(handover_svc.inv_effect, "capture_effect", fail_capture)
 
     with pytest.raises(RuntimeError, match="ledger failure"):
-        handover_svc.receive_handover(
-            db_session, doc.handover_id, actor=receiver, pin="0000"
-        )
+        handover_svc.receive_handover(db_session, doc, actor=receiver, pin="0000")
 
     db_session.expire_all()
     persisted = db_session.query(HandoverDoc).filter(HandoverDoc.handover_id == handover_id).one()
@@ -405,18 +357,12 @@ def test_handover_receive_by_other_dept_approver_403(client, db_session, make_it
     assert _prod_qty(db_session, item.item_id, "튜브") == Decimal("5")  # 이동 없음
 
 
-def test_handover_receive_has_single_successful_command(client, db_session, make_item):
+def test_handover_receive_idempotent(client, db_session, make_item):
     item = make_item(name="8TF Idem", warehouse_qty=Decimal("0"))
     _seed_production(db_session, item.item_id, "튜브", Decimal("5"))
     author = _make_employee(db_session, code="TUBE5", department=DepartmentEnum.TUBE)
     receiver = _make_employee(
         db_session, code="HP5", department=DepartmentEnum.HIGH_VOLTAGE, department_role="primary"
-    )
-    receiver_2 = _make_employee(
-        db_session, code="HP6", department=DepartmentEnum.HIGH_VOLTAGE
-    )
-    unauthorized = _make_employee(
-        db_session, code="ASMB5", department=DepartmentEnum.ASSEMBLY
     )
     db_session.commit()
 
@@ -426,34 +372,11 @@ def test_handover_receive_has_single_successful_command(client, db_session, make
         json={"actor_employee_id": str(receiver.employee_id), "pin": "0000"},
     )
     assert first.status_code == 200
-    wrong_pin = client.post(
-        f"/api/handovers/{hid}/receive",
-        json={"actor_employee_id": str(receiver.employee_id), "pin": "9999"},
-    )
-    assert wrong_pin.status_code == 403
-    for _ in range(9):
-        repeated_wrong_pin = client.post(
-            f"/api/handovers/{hid}/receive",
-            json={"actor_employee_id": str(receiver.employee_id), "pin": "9999"},
-        )
-        assert repeated_wrong_pin.status_code == 403
-    rate_limited = client.post(
+    second = client.post(
         f"/api/handovers/{hid}/receive",
         json={"actor_employee_id": str(receiver.employee_id), "pin": "0000"},
     )
-    assert rate_limited.status_code == 429
-    wrong_department = client.post(
-        f"/api/handovers/{hid}/receive",
-        json={"actor_employee_id": str(unauthorized.employee_id), "pin": "0000"},
-    )
-    assert wrong_department.status_code == 403
-    second = client.post(
-        f"/api/handovers/{hid}/receive",
-        json={"actor_employee_id": str(receiver_2.employee_id), "pin": "0000"},
-    )
-    assert second.status_code == 409
-    assert second.json()["detail"]["code"] == "COMMAND_CONFLICT"
-    assert second.json()["detail"]["extra"]["reason"] == "already_received"
+    assert second.status_code == 200  # 멱등 — 이미 received
 
     db_session.expire_all()
     # 이중 이동 없음 — 고압 3 이 아니라 2

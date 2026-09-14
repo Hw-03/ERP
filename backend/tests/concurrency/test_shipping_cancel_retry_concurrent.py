@@ -9,7 +9,6 @@ from app.models import (
     DepartmentEnum, Employee, EmployeeLevelEnum, Inventory, InventoryLocation,
     Item, LocationStatusEnum, ShippingAllocation, ShippingRequest,
     ShippingRequestEvent, ShippingRequestStatusEnum, SystemSetting, TransactionLog,
-    WarehouseUnplacedItem,
 )
 from app.services import inventory_operation_cancellation as cancellation
 from app.services import shipping, shipping_actions, shipping_workflow_operations as workflow
@@ -25,7 +24,6 @@ def seed_request(make_session):
         db.add_all([actor, pa, pf, SystemSetting(setting_key="inventory_operation_cutover_at", setting_value="2026-01-01T00:00:00")])
         db.flush()
         db.add(Inventory(item_id=pf.item_id, quantity=1, warehouse_qty=0, pending_quantity=0))
-        db.add(WarehouseUnplacedItem(item_id=pf.item_id, quantity=0))
         db.add(InventoryLocation(item_id=pf.item_id, department=DepartmentEnum.SHIPPING.value,
                                  status=LocationStatusEnum.PRODUCTION, quantity=1, pending_quantity=0))
         request = ShippingRequest(base_pf_item_id=pf.item_id, final_pa_item_id=pa.item_id,
@@ -44,9 +42,9 @@ def test_shipping_duplicate_commands_apply_once(make_session, command):
     with make_session() as db:
         actor = db.get(Employee, actor_id)
         if command != "prepare":
-            shipping_actions.prepare_complete(db, request_id, "RACE-SN", actor=actor)
+            shipping_actions.prepare_complete(db, request_id, "RACE-SN", prepared_by_employee_id=actor_id, prepared_by_name=actor.name)
         if command == "cancel_pickup":
-            shipping_actions.pickup_complete(db, request_id, actor)
+            shipping_actions.pickup_complete(db, request_id)
         if command.startswith("cancel_"):
             operation = workflow.latest_operation(db, request_id, command.removeprefix("cancel_"))
             operation_id = operation.operation_id
@@ -57,9 +55,9 @@ def test_shipping_duplicate_commands_apply_once(make_session, command):
             try:
                 actor = db.get(Employee, actor_id)
                 if command == "prepare":
-                    shipping_actions.prepare_complete(db, request_id, "RACE-SN", actor=actor)
+                    shipping_actions.prepare_complete(db, request_id, "RACE-SN", prepared_by_employee_id=actor_id, prepared_by_name=actor.name)
                 elif command == "pickup":
-                    shipping_actions.pickup_complete(db, request_id, actor)
+                    shipping_actions.pickup_complete(db, request_id)
                 elif entrypoint == "common":
                     cancellation.cancel_operation(db, operation_id=operation_id, canceller=actor, reason="race", plan_hash=plan_hash)
                 elif command == "cancel_prepare":

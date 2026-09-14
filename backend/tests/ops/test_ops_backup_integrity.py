@@ -31,7 +31,6 @@ from app.models import (  # noqa: E402
     InventoryLocation,
     Item,
     ProcessType,
-    WarehouseUnplacedItem,
 )
 from bootstrap.schema import ensure_schema  # noqa: E402
 
@@ -187,16 +186,13 @@ def _create_current_integrity_db(
             session.add(item)
             session.flush()
             if not orphan_location:
-                session.add_all(
-                    [
-                        Inventory(
-                            item_id=item.item_id,
-                            quantity=8 if mismatch else 7,
-                            warehouse_qty=5,
-                            pending_quantity=0,
-                        ),
-                        WarehouseUnplacedItem(item_id=item.item_id, quantity=5),
-                    ]
+                session.add(
+                    Inventory(
+                        item_id=item.item_id,
+                        quantity=8 if mismatch else 7,
+                        warehouse_qty=5,
+                        pending_quantity=0,
+                    )
                 )
             session.add(
                 InventoryLocation(
@@ -258,11 +254,6 @@ def _create_head_schema_db(path: Path, *, item_name: str = "Part A") -> None:
                         status="PRODUCTION",
                         quantity=2,
                         pending_quantity=0,
-                    ),
-                    WarehouseUnplacedItem(
-                        id="00000000000000000000000000000004",
-                        item_id=item.item_id,
-                        quantity=5,
                     ),
                 ]
             )

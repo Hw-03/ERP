@@ -174,11 +174,6 @@ def test_operational_readiness_surfaces_inventory_integrity_warnings(tmp_path):
             (CURRENT_ITEM_ID,),
         )
         conn.execute(
-            "INSERT INTO warehouse_unplaced_items (id, item_id, quantity) "
-            "VALUES ('unplaced-1', ?, 1)",
-            (CURRENT_ITEM_ID,),
-        )
-        conn.execute(
             "INSERT INTO transaction_logs "
             "(log_id, item_id, transaction_type, quantity_change, created_at, inventory_effect) "
             "VALUES ('tx-1', ?, 'RECEIVE', 1, '2099-01-01', NULL)",

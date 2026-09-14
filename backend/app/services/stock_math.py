@@ -91,7 +91,7 @@ class StockFigures:
 # 단건 계산
 # ---------------------------------------------------------------------------
 def compute_for(db: Session, item_id: uuid.UUID) -> StockFigures:
-    """단일 품목의 재고 수치. 쿼리 2회 (Inventory + InventoryLocation GROUP BY)."""
+    """단일 품목의 재고 수치. 재고·위치·출하 예약을 각각 조회한다."""
     inv = inventory_repository.get(db, item_id)
     wh = _as_decimal(inv.warehouse_qty if inv else None)
     pending = _as_decimal(inv.pending_quantity if inv else None)
@@ -139,7 +139,7 @@ def compute_for(db: Session, item_id: uuid.UUID) -> StockFigures:
 # 다건 bulk 계산 (items list / inventory list 용)
 # ---------------------------------------------------------------------------
 def bulk_compute(db: Session, item_ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, StockFigures]:
-    """여러 품목을 3개 bulk 쿼리로 계산한다(출하 예약 + Inventory + Location).
+    """여러 품목의 재고·위치·출하 예약을 각각 bulk 조회한다.
 
     item_ids 에 없는 건 dict 에 포함하지 않는다. 호출측에서 default 처리.
     """
@@ -196,3 +196,16 @@ def bulk_compute(db: Session, item_ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, 
             warehouse_shipping_reserved=warehouse_shipping_reserved_by_id.get(iid, _D0),
         )
     return result
+
+
+def figures_from_inventory(inv: Inventory | None, prod: Decimal = _D0, defect: Decimal = _D0) -> StockFigures:
+    """이미 Inventory + prod/defect 가 계산돼 있을 때 StockFigures 로 포장하는 thin wrapper.
+
+    (라우터 조립 경로에서 쿼리 중복을 피하려고 쓴다.)
+    """
+    return StockFigures(
+        warehouse_qty=_as_decimal(inv.warehouse_qty if inv else None),
+        production_total=_as_decimal(prod),
+        defective_total=_as_decimal(defect),
+        pending=_as_decimal(inv.pending_quantity if inv else None),
+    )

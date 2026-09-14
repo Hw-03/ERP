@@ -12,7 +12,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
-from app.models import Inventory, Item, ProcessType, WarehouseUnplacedItem
+from app.models import Inventory, Item, ProcessType
 from bootstrap.schema import ensure_schema
 from scripts.ops import backup_manifest
 
@@ -548,11 +548,6 @@ def test_apply_creates_verified_current_head_backup_before_mutation(tmp_path: Pa
                         quantity=5,
                         warehouse_qty=5,
                         pending_quantity=0,
-                    ),
-                    WarehouseUnplacedItem(
-                        id="00000000000000000000000000000003",
-                        item_id=item.item_id,
-                        quantity=5,
                     ),
                 ]
             )

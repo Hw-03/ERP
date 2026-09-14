@@ -32,6 +32,7 @@ export function useIoWorkState(
 ) {
   const defaultDepartment = initialDepartment || "조립";
   const [workType, setWorkTypeBase] = useState<IoWorkType>(initialWorkType ?? "receive");
+  const [hasSelectedWorkType, setHasSelectedWorkType] = useState(false);
   const [selectedSubType, setSelectedSubType] = useState<IoSubType>("receive_supplier");
   const [fromDepartment, setFromDepartment] = useState<string>(defaultDepartment);
   const [toDepartment, setToDepartment] = useState<string>(defaultDepartment);
@@ -55,6 +56,7 @@ export function useIoWorkState(
 
   function setWorkType(next: IoWorkType) {
     setWorkTypeBase(next);
+    setHasSelectedWorkType(true);
     setSelectedSubType(DEFAULT_SUB_TYPE[next]);
     setToDepartment(next === "internal_use" ? "" : defaultDepartment);
     setDeptIoDirectionBase(null);
@@ -115,7 +117,7 @@ export function useIoWorkState(
 
   const canAdvance = useMemo<Record<IoStep, boolean>>(() => {
     return {
-      1: true,
+      1: hasSelectedWorkType,
       2: workType === "process" || workType === "warehouse_adjust"
         ? deptIoDirection != null
         : workType === "internal_use"
@@ -129,7 +131,7 @@ export function useIoWorkState(
         !hasMissingInternalUseBomMode,
       5: true,
     };
-  }, [workType, deptIoDirection, toDepartment, bundles.length, effectIncludedLines.length, hasShortage, hasInvalidQuantity, hasMissingInternalUseBomMode]);
+  }, [hasSelectedWorkType, workType, deptIoDirection, toDepartment, bundles.length, effectIncludedLines.length, hasShortage, hasInvalidQuantity, hasMissingInternalUseBomMode]);
 
   function goNext() {
     setStep((s) => (s < 5 ? ((s + 1) as IoStep) : s));
@@ -168,10 +170,12 @@ export function useIoWorkState(
     setNotes("");
     setReferenceNo("");
     setStep(1);
+    setHasSelectedWorkType(false);
   }
 
   return {
     workType,
+    hasSelectedWorkType,
     subType,
     fromDepartment,
     toDepartment,

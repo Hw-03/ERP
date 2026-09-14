@@ -13,6 +13,7 @@ from typing import Literal, Mapping, Sequence
 
 IntegritySeverity = Literal["blocking", "warning"]
 IntegrityStatus = Literal["pass", "warning", "fail"]
+IntegrityProfile = Literal["modern", "friday-0033"]
 
 CHECK_DEFINITIONS: tuple[tuple[str, IntegritySeverity], ...] = (
     ("INVENTORY_TOTAL_MISMATCH", "blocking"),
@@ -176,6 +177,7 @@ class IntegrityCheckResult:
 @dataclass(frozen=True)
 class InventoryIntegrityResult:
     contract: Literal["inventory-integrity/v1"]
+    profile: IntegrityProfile
     status: IntegrityStatus
     blocking_count: int
     warning_count: int
@@ -460,7 +462,11 @@ def _shipping_findings(snapshot: InventoryIntegritySnapshot) -> list[IntegrityFi
     return findings
 
 
-def _warehouse_findings(snapshot: InventoryIntegritySnapshot) -> list[IntegrityFinding]:
+def _warehouse_findings(
+    snapshot: InventoryIntegritySnapshot,
+    *,
+    profile: IntegrityProfile,
+) -> list[IntegrityFinding]:
     box: dict[str, Decimal] = defaultdict(Decimal)
     zone: dict[str, Decimal] = defaultdict(Decimal)
     unplaced: dict[str, Decimal] = defaultdict(Decimal)
@@ -510,6 +516,21 @@ def _warehouse_findings(snapshot: InventoryIntegritySnapshot) -> list[IntegrityF
                         "WAREHOUSE_PHYSICAL_MISMATCH",
                         item_id=item_id,
                         reason="missing_inventory",
+                    )
+                )
+            continue
+        if profile == "friday-0033":
+            tracked = box[item_id] + zone[item_id]
+            if tracked > inventory.warehouse_quantity:
+                findings.append(
+                    _finding(
+                        "WAREHOUSE_PHYSICAL_MISMATCH",
+                        box_quantity=_quantity(box[item_id]),
+                        item_id=item_id,
+                        reason="tracked_exceeds_warehouse",
+                        special_zone_quantity=_quantity(zone[item_id]),
+                        tracked_quantity=_quantity(tracked),
+                        warehouse_quantity=_quantity(inventory.warehouse_quantity),
                     )
                 )
             continue
@@ -816,6 +837,134 @@ def _valid_inventory_effect(
     )
 
 
+def _valid_friday_inventory_effect(
+    transaction: TransactionEffectState,
+    *,
+    inventory_items_by_row: Mapping[str, str],
+    location_keys: frozenset[tuple[str, str, str]],
+    location_key_by_row: Mapping[str, tuple[str, str, str]],
+    placement_by_scope_row: Mapping[tuple[str, str], WarehousePlacementState],
+    box_item_keys: frozenset[tuple[str, str]],
+) -> bool:
+    """Validate Friday's real scope/delta ledger without synthesizing projections."""
+
+    effect = transaction.inventory_effect
+    quantity_change = transaction.quantity_change
+    if (
+        not quantity_change.is_finite()
+        or quantity_change != quantity_change.to_integral_value()
+    ):
+        return False
+    if (
+        effect == []
+        and (transaction.reference_no or "").startswith("defect-disassemble:")
+        and transaction.transaction_type == "DEFECT_SCRAP"
+        and transaction.operation_role == "REWORK_CHILD_SCRAP"
+        and transaction.notes == "[rework:scrap_child]"
+    ):
+        return quantity_change < 0
+    if not isinstance(effect, list) or not effect:
+        return False
+
+    valid_scopes = {"warehouse", "location", "warehouse_box"}
+    effect_identities: set[tuple[str, ...]] = set()
+    warehouse_delta = Decimal("0")
+    box_delta = Decimal("0")
+    logical_delta = Decimal("0")
+    has_box_effect = False
+    inventory_item_ids = frozenset(inventory_items_by_row.values())
+
+    for cell in effect:
+        if not isinstance(cell, dict) or cell.get("scope") not in valid_scopes:
+            return False
+        try:
+            delta = Decimal(str(cell["delta"]))
+        except (KeyError, InvalidOperation, TypeError, ValueError):
+            return False
+        if (
+            not delta.is_finite()
+            or delta != delta.to_integral_value()
+            or delta == 0
+        ):
+            return False
+
+        has_before = "before_quantity" in cell
+        has_after = "after_quantity" in cell
+        if has_before != has_after:
+            return False
+        if has_before:
+            try:
+                before = Decimal(str(cell["before_quantity"]))
+                after = Decimal(str(cell["after_quantity"]))
+            except (InvalidOperation, TypeError, ValueError):
+                return False
+            if any(
+                not quantity.is_finite()
+                or quantity != quantity.to_integral_value()
+                or quantity < 0
+                for quantity in (before, after)
+            ):
+                return False
+            if after - before != delta:
+                return False
+
+        scope = str(cell["scope"])
+        has_row_id = "row_id" in cell
+        row_id = str(cell.get("row_id") or "")
+        if has_row_id and not row_id:
+            return False
+        if scope == "warehouse":
+            if row_id:
+                if inventory_items_by_row.get(row_id) != transaction.item_id:
+                    return False
+            elif transaction.item_id not in inventory_item_ids:
+                return False
+            identity = (scope,)
+            warehouse_delta += delta
+            logical_delta += delta
+        elif scope == "location":
+            department = str(cell.get("department") or "")
+            status = str(cell.get("status") or "")
+            key = (transaction.item_id, department, status)
+            if not department or status not in {"PRODUCTION", "DEFECTIVE"}:
+                return False
+            if key not in location_keys:
+                return False
+            if row_id and location_key_by_row.get(row_id) != key:
+                return False
+            identity = (scope, department, status)
+            logical_delta += delta
+        else:
+            box_id = str(cell.get("box_id") or "")
+            if not box_id:
+                return False
+            if row_id:
+                placement = placement_by_scope_row.get((scope, row_id))
+                if placement is None:
+                    if not _is_uuid(row_id) or not _is_uuid(box_id):
+                        return False
+                elif (
+                    placement.item_id != transaction.item_id
+                    or placement.container_id != box_id
+                ):
+                    return False
+            elif (transaction.item_id, box_id) not in box_item_keys:
+                if not _is_uuid(box_id):
+                    return False
+            identity = (scope, box_id)
+            box_delta += delta
+            has_box_effect = True
+
+        if identity in effect_identities:
+            return False
+        effect_identities.add(identity)
+
+    return (
+        logical_delta == quantity_change
+        and (not has_box_effect or warehouse_delta == box_delta)
+    )
+
+
 def _is_post_cutover(
     snapshot: InventoryIntegritySnapshot,
     occurred_at: datetime,
@@ -844,7 +993,11 @@ def _operation_check_id(
     return "OPERATION_V1_EFFECT_MISSING"
 
 
-def _operation_findings(snapshot: InventoryIntegritySnapshot) -> list[IntegrityFinding]:
+def _operation_findings(
+    snapshot: InventoryIntegritySnapshot,
+    *,
+    profile: IntegrityProfile,
+) -> list[IntegrityFinding]:
     operations = {row.operation_id: row for row in snapshot.operations}
     transactions_by_operation: dict[str, list[TransactionEffectState]] = defaultdict(list)
     evidence_by_operation: dict[str, list[OperationEvidenceState]] = defaultdict(list)
@@ -862,6 +1015,10 @@ def _operation_findings(snapshot: InventoryIntegritySnapshot) -> list[IntegrityF
         (row.item_id, row.department, row.status)
         for row in snapshot.locations
     )
+    location_key_by_row = {
+        row.row_id: (row.item_id, row.department, row.status)
+        for row in snapshot.locations
+    }
     placement_scope = {
         "box": "warehouse_box",
         "special_zone": "warehouse_zone",
@@ -871,8 +1028,22 @@ def _operation_findings(snapshot: InventoryIntegritySnapshot) -> list[IntegrityF
         (placement_scope[row.scope], row.row_id): row
         for row in snapshot.warehouse_placements
     }
+    box_item_keys = frozenset(
+        (row.item_id, str(row.container_id))
+        for row in snapshot.warehouse_placements
+        if row.scope == "box" and row.container_id is not None
+    )
 
     def valid_inventory_effect(transaction: TransactionEffectState) -> bool:
+        if profile == "friday-0033":
+            return _valid_friday_inventory_effect(
+                transaction,
+                inventory_items_by_row=inventory_items_by_row,
+                location_keys=location_keys,
+                location_key_by_row=location_key_by_row,
+                placement_by_scope_row=placement_by_scope_row,
+                box_item_keys=box_item_keys,
+            )
         return _valid_inventory_effect(
             transaction,
             inventory_items_by_row=inventory_items_by_row,
@@ -948,17 +1119,20 @@ def _operation_findings(snapshot: InventoryIntegritySnapshot) -> list[IntegrityF
 def evaluate_inventory_integrity(
     snapshot: InventoryIntegritySnapshot,
     *,
+    profile: IntegrityProfile = "modern",
     supplemental_findings: Sequence[IntegrityFinding] = (),
 ) -> InventoryIntegrityResult:
     """Evaluate a normalized snapshot and return a stable versioned verdict."""
+    if profile not in {"modern", "friday-0033"}:
+        raise ValueError(f"Unknown inventory integrity profile: {profile}")
     findings = [
         *_inventory_findings(snapshot),
         *_reservation_findings(snapshot),
         *_stock_request_findings(snapshot),
         *_shipping_findings(snapshot),
-        *_warehouse_findings(snapshot),
+        *_warehouse_findings(snapshot, profile=profile),
         *_orphan_findings(snapshot),
-        *_operation_findings(snapshot),
+        *_operation_findings(snapshot, profile=profile),
         *supplemental_findings,
     ]
     grouped: dict[str, list[dict[str, object]]] = defaultdict(list)
@@ -998,6 +1172,7 @@ def evaluate_inventory_integrity(
     )
     return InventoryIntegrityResult(
         contract="inventory-integrity/v1",
+        profile=profile,
         status=status,
         blocking_count=blocking_count,
         warning_count=warning_count,

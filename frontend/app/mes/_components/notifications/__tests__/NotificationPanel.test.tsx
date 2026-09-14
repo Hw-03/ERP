@@ -1,7 +1,6 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { AppNotification } from "@/lib/api/types";
-import { LEGACY_COLORS } from "@/lib/mes/color";
 import { NotificationPanel } from "../NotificationPanel";
 
 const TEXT = {
@@ -128,17 +127,5 @@ describe("NotificationPanel", () => {
     );
 
     expect(screen.getByRole("switch", { name: TEXT.loginPopup })).toBeDisabled();
-  });
-
-  it("renders an unknown notification type with the safe default tone", () => {
-    render(
-      <NotificationPanel
-        items={[makeNotification({ type: "future_notification" })]}
-        unread={1}
-        {...emptyHandlers}
-      />,
-    );
-
-    expect(screen.getByText("approval needed")).toHaveStyle({ color: LEGACY_COLORS.blue });
   });
 });

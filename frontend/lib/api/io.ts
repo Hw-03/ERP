@@ -1,5 +1,4 @@
 import { deleteJson, fetcher, postJson, putJson, toApiUrl } from "../api-core";
-import { runPendingCommand } from "../pending-command-storage";
 import type {
   ItemConversionPayload,
   ItemConversionPreview,
@@ -63,15 +62,11 @@ export const ioApi = {
     postJson<IoSubmitResponse>(toApiUrl("/api/io/submit"), payload),
 
   submitDraft: (batchId: string, employeeId: string) =>
-    runPendingCommand(
-      `io:draft-submit:${employeeId}`,
-      { batchId, employeeId },
-      (request) => postJson<IoSubmitResponse>(
-        toApiUrl(
-          `/api/io/draft/${encodeURIComponent(request.batchId)}/submit?requester_employee_id=${encodeURIComponent(request.employeeId)}`,
-        ),
-        {},
+    postJson<IoSubmitResponse>(
+      toApiUrl(
+        `/api/io/draft/${encodeURIComponent(batchId)}/submit?requester_employee_id=${encodeURIComponent(employeeId)}`,
       ),
+      {},
     ),
 
   getBatch: (batchId: string, opts?: { signal?: AbortSignal }) =>

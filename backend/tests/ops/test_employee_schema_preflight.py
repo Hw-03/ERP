@@ -186,17 +186,6 @@ def test_manual_pf_pin_removal_declares_its_data_change_contract(tmp_path: Path)
     module.assert_policy_validators(database, (policy,))
 
 
-def test_inventory_location_ledger_declares_data_preserving_employee_policy() -> None:
-    module = _load_preflight_module()
-
-    policy = module._policy_from_migration(
-        MIGRATIONS / "20260831_0032_inventory_location_ledger.py"
-    )
-
-    assert policy.kind == "data-preserving"
-    assert policy.allowed_tables == frozenset()
-
-
 @pytest.mark.parametrize(
     "filename",
     [
@@ -223,17 +212,9 @@ def test_inventory_location_ledger_declares_data_preserving_employee_policy() ->
         "20260824_0027_defect_quarantine_records.py",
         "20260825_0028_reconstruct_legacy_defect_records.py",
         "20260826_0029_inventory_operations.py",
-        "20260827_0030_add_operator_sessions.py",
-        "20260828_0031_cp4_command_integrity.py",
-        "20260831_0032_inventory_location_ledger.py",
-        "20260831_0033_shipping_command_receipts.py",
-        "20260903_0030_defect_movement_baselines.py",
         "20260903_0031_add_item_procurement_fields.py",
         "20260903_0032_add_item_purchase_memo.py",
-        "20260907_0034_merge_procurement_and_shipping_heads.py",
         "20260910_0033_defect_management_categories.py",
-        "20260911_0035_merge_quality_and_defect_heads.py",
-        "20260911_0036_legacy_ledger_boundary.py",
     ],
 )
 def test_current_employee_schema_migrations_declare_auto_deploy_policy(filename: str) -> None:
@@ -281,10 +262,17 @@ def test_preflight_checks_operations_only_on_snapshot(tmp_path, monkeypatch, fai
         assert not environment.get("APP_ENV")
         assert not environment.get("REQUIRE_POSTGRES")
         assert not environment.get("PYTHONPATH")
-        stage = ("diagnose" if "diagnose" in command else
-                 "activate" if "activate" in command else
-                 "backup" if command[1] == str(args.backup_tool) else
-                 "backup-verify" if command[1] == str(args.verify_tool) and "--database" not in command else None)
+        stage = (
+            "diagnose"
+            if "diagnose" in command
+            else "activate"
+            if "activate" in command
+            else "backup"
+            if command[1] == str(args.backup_tool)
+            else "backup-verify"
+            if command[1] == str(args.verify_tool) and "--database" not in command
+            else None
+        )
         if stage == fail_stage and fail_stage is not None:
             raise module.PreflightError(f"{stage} failed (exit 1)")
         if stage == "backup":
@@ -304,7 +292,11 @@ def test_preflight_checks_operations_only_on_snapshot(tmp_path, monkeypatch, fai
     if fail_stage in (None, "activate"):
         assert any("activate" in call for call in calls)
         full_backup = next(i for i, call in enumerate(calls) if call[1] == str(args.backup_tool))
-        backup_verify = next(i for i, call in enumerate(calls) if call[1] == str(args.verify_tool) and "--database" not in call)
+        backup_verify = next(
+            i
+            for i, call in enumerate(calls)
+            if call[1] == str(args.verify_tool) and "--database" not in call
+        )
         activation = next(i for i, call in enumerate(calls) if "activate" in call)
         assert full_backup < backup_verify < activation
     assert not any("repair" in call or "--apply" in call for call in calls)

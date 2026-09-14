@@ -1,9 +1,4 @@
-export type InventoryEffectScope =
-  | "warehouse"
-  | "location"
-  | "warehouse_box"
-  | "warehouse_zone"
-  | "warehouse_unplaced";
+export type InventoryEffectScope = "warehouse" | "location" | "warehouse_box";
 
 export type InventoryEffectCell = {
   scope: string;
@@ -11,9 +6,7 @@ export type InventoryEffectCell = {
   department?: string | null;
   status?: string | null;
   location_id?: string | null;
-  row_id?: string | null;
   box_id?: string | null;
-  zone_id?: string | number | null;
 };
 
 export type InventoryEffectOwner = {
@@ -29,9 +22,7 @@ export type InventoryEffectRow = {
   itemName: string;
   unit: string;
   locationId: string | null;
-  rowId: string | null;
   boxId: string | null;
-  zoneId: string | null;
   department: string | null;
   status: string | null;
   label: string;
@@ -43,8 +34,6 @@ const CANONICAL_SCOPES = new Set<InventoryEffectScope>([
   "warehouse",
   "location",
   "warehouse_box",
-  "warehouse_zone",
-  "warehouse_unplaced",
 ]);
 
 function normalizeDelta(value: number | string): number {
@@ -57,12 +46,6 @@ function normalizeText(value?: string | null): string | null {
   return text || null;
 }
 
-function normalizeIdentifier(value?: string | number | null): string | null {
-  if (value == null) return null;
-  const text = String(value).trim();
-  return text || null;
-}
-
 function cellLabel(
   scope: InventoryEffectScope,
   cell: InventoryEffectCell,
@@ -71,8 +54,6 @@ function cellLabel(
 ): string {
   if (scope === "warehouse") return "창고 재고";
   if (scope === "warehouse_box") return "박스 재고";
-  if (scope === "warehouse_zone") return "특수구역 재고";
-  if (scope === "warehouse_unplaced") return "미배치 재고";
   const department = normalizeText(cell.department);
   if (normalizeText(cell.status) === "DEFECTIVE") return "불량 재고";
   if (department) return `${department} 재고`;
@@ -92,12 +73,10 @@ export function toInventoryEffectRows(
     if (delta === 0) return [];
 
     const locationId = normalizeText(cell.location_id);
-    const rowId = normalizeIdentifier(cell.row_id);
-    const boxId = normalizeIdentifier(cell.box_id);
-    const zoneId = normalizeIdentifier(cell.zone_id);
+    const boxId = normalizeText(cell.box_id);
     const department = normalizeText(cell.department);
     const status = normalizeText(cell.status);
-    let key = [
+    const key = [
       owner.itemId,
       owner.unit,
       scope,
@@ -106,7 +85,6 @@ export function toInventoryEffectRows(
       status ?? "",
       boxId ?? "",
     ].join(":");
-    if (rowId || zoneId) key += `:${zoneId ?? ""}:${rowId ?? ""}`;
 
     return [{
       key,
@@ -115,9 +93,7 @@ export function toInventoryEffectRows(
       itemName: owner.itemName,
       unit: owner.unit,
       locationId,
-      rowId,
       boxId,
-      zoneId,
       department,
       status,
       label: cellLabel(scope, cell, locationId, boxId),

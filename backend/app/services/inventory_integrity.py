@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from collections import Counter, defaultdict
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Iterable, Optional
 
@@ -29,13 +29,13 @@ from app.models import (
     ShippingRequest,
     StockRequest,
     StockRequestLine,
+    SystemSetting,
     TransactionLog,
     WarehouseAngle,
     WarehouseBox,
     WarehouseBoxItem,
     WarehouseSpecialZone,
     WarehouseSpecialZoneItem,
-    WarehouseUnplacedItem,
 )
 from app.schemas.inventory_integrity import (
     InventoryIntegrityCheck,
@@ -59,7 +59,10 @@ from app.services.inventory_integrity_engine import (
     WarehousePlacementState,
     evaluate_inventory_integrity,
 )
-from app.services.inventory_operations import V2_CUTOVER_SETTING_KEY, cutover_at
+from app.services.inventory_operations import (
+    OperationCutoverConfigurationError,
+    cutover_at,
+)
 from app.services.weekly_report_contract import (
     FINISHED_CODES,
     WeeklyActivityClassificationError,
@@ -333,6 +336,88 @@ def _subject_status(db: Session, subject_type: str, subject_id: str) -> Optional
     return str(getattr(subject.status, "value", subject.status))
 
 
+def _has_later_request_cancellation_evidence(
+    db: Session,
+    effect: InventoryOperationEffect,
+) -> bool:
+    """효과 복원 뒤 요청자가 정상 취소한 IO 상태만 후속 전이로 인정한다."""
+
+    def cancelled_after_effect(request: StockRequest) -> bool:
+        status = str(getattr(request.status, "value", request.status))
+        return (
+            status == "cancelled"
+            and request.cancelled_at is not None
+            and effect.created_at is not None
+            and request.cancelled_at > effect.created_at
+        )
+
+    if effect.subject_type == "StockRequest":
+        request = db.get(StockRequest, effect.subject_id)
+        return request is not None and cancelled_after_effect(request)
+    if effect.subject_type != "IoBatch":
+        return False
+
+    batch = db.get(IoBatch, effect.subject_id)
+    if batch is None or batch.status != "cancelled":
+        return False
+    linked_requests = {
+        str(request.request_id): request
+        for request in db.query(StockRequest)
+        .filter(StockRequest.operation_batch_id == batch.batch_id)
+        .all()
+    }
+    if batch.stock_request_id is not None:
+        request = db.get(StockRequest, batch.stock_request_id)
+        if request is not None:
+            linked_requests[str(request.request_id)] = request
+    return bool(linked_requests) and all(
+        cancelled_after_effect(request) for request in linked_requests.values()
+    )
+
+
+def expected_workflow_effect_status(
+    db: Session,
+    effect: InventoryOperationEffect,
+    *,
+    operation: InventoryOperation | None = None,
+) -> str:
+    """불변 효과를 유지하면서 현재 취소 정책의 최종 업무 상태로 해석한다."""
+    expected = str((effect.after_state or {}).get("status") or "")
+    operation = operation or db.get(InventoryOperation, effect.operation_id)
+    if (
+        effect.subject_type != "IoBatch"
+        or operation is None
+        or operation.kind != InventoryOperationKindEnum.CANCELLATION
+        or operation.domain != "inventory_io"
+        or int(operation.contract_version or 1) < 2
+        or operation.reverses_operation_id is None
+    ):
+        return expected
+    batch = db.get(IoBatch, effect.subject_id)
+    if (
+        batch is None
+        or batch.requires_approval is not False
+        or batch.stock_request_id is not None
+        or db.query(StockRequest.request_id)
+        .filter(StockRequest.operation_batch_id == batch.batch_id)
+        .first()
+        is not None
+    ):
+        return expected
+    has_stock_request_effect = (
+        db.query(InventoryOperationEffect.effect_id)
+        .filter(
+            InventoryOperationEffect.operation_id == operation.reverses_operation_id,
+            InventoryOperationEffect.effect_kind
+            == InventoryOperationEffectKindEnum.WORKFLOW,
+            InventoryOperationEffect.subject_type == "StockRequest",
+        )
+        .first()
+        is not None
+    )
+    return expected if has_stock_request_effect else "cancelled"
+
+
 def _shipping_workflow_issues(db: Session) -> list[InventoryIntegrityIssue]:
     """과거 취소가 현재 회차를 덮지 않도록 마지막 커밋 상태만 비교한다."""
     histories = defaultdict(list)
@@ -385,8 +470,83 @@ def _shipping_workflow_issues(db: Session) -> list[InventoryIntegrityIssue]:
     return issues
 
 
+def _non_shipping_workflow_issues(db: Session) -> list[InventoryIntegrityIssue]:
+    """취소 이력이 있는 비출하 업무를 최신 커밋 효과 기준으로 검증한다."""
+    histories = defaultdict(list)
+    for effect, operation in (
+        db.query(InventoryOperationEffect, InventoryOperation)
+        .join(
+            InventoryOperation,
+            InventoryOperation.operation_id == InventoryOperationEffect.operation_id,
+        )
+        .filter(
+            InventoryOperation.status == InventoryOperationStatusEnum.COMMITTED,
+            InventoryOperation.kind.in_([
+                InventoryOperationKindEnum.BUSINESS,
+                InventoryOperationKindEnum.CANCELLATION,
+            ]),
+            InventoryOperationEffect.effect_kind
+            == InventoryOperationEffectKindEnum.WORKFLOW,
+            InventoryOperationEffect.subject_type != "ShippingRequest",
+        )
+        .all()
+    ):
+        histories[(effect.subject_type, effect.subject_id)].append((effect, operation))
+
+    issues = []
+    for (subject_type, subject_id), history in histories.items():
+        if not any(op.kind == InventoryOperationKindEnum.CANCELLATION for _, op in history):
+            continue
+        latest_time = max(op.created_at for _, op in history)
+        candidates = [(effect, op) for effect, op in history if op.created_at == latest_time]
+        candidates = [
+            (effect, op)
+            for effect, op in candidates
+            if not any(
+                later.reverses_operation_id == op.operation_id
+                and reversal.reverses_effect_id == effect.effect_id
+                for reversal, later in candidates
+            )
+        ]
+        states = {
+            expected_workflow_effect_status(db, effect, operation=operation)
+            for effect, operation in candidates
+        }
+        ambiguous = len(states) != 1 or "" in states
+        effect, operation = min(
+            candidates or history,
+            key=lambda row: str(row[0].effect_id),
+        )
+        expected = " / ".join(sorted(states)) if ambiguous else next(iter(states))
+        current = _subject_status(db, subject_type, subject_id)
+        if not ambiguous and current == expected:
+            continue
+        if not ambiguous and _has_later_request_cancellation_evidence(db, effect):
+            continue
+        issues.append(
+            _issue(
+                category="WORKFLOW_STATE_RESIDUE",
+                identity=(subject_type, subject_id, operation.operation_id),
+                title="최신 업무 상태 불일치",
+                description=(
+                    "같은 시각의 원장 순서를 확정할 수 없습니다."
+                    if ambiguous
+                    else "현재 업무 상태가 최신 커밋된 업무 효과와 다릅니다."
+                ),
+                cause_ids=(operation.operation_id, effect.effect_id, subject_id),
+                current_value=f"현재 상태 {current or '대상 없음'}",
+                expected_value=f"최종 상태 {expected or '확정 불가'}",
+                repairable=(
+                    not ambiguous
+                    and operation.kind == InventoryOperationKindEnum.CANCELLATION
+                ),
+            )
+        )
+    return issues
+
+
 def _workflow_and_allocation_issues(db: Session) -> list[InventoryIntegrityIssue]:
-    issues = _shipping_workflow_issues(db)
+    issues = [*_shipping_workflow_issues(db), *_non_shipping_workflow_issues(db)]
     rows = (
         db.query(InventoryOperationEffect)
         .join(
@@ -399,23 +559,7 @@ def _workflow_and_allocation_issues(db: Session) -> list[InventoryIntegrityIssue
     for effect in rows:
         expected = str((effect.after_state or {}).get("status") or "cancelled")
         if effect.effect_kind == InventoryOperationEffectKindEnum.WORKFLOW:
-            if effect.subject_type == "ShippingRequest":
-                continue
-            current = _subject_status(db, effect.subject_type, effect.subject_id)
-            if current == expected:
-                continue
-            issues.append(
-                _issue(
-                    category="WORKFLOW_STATE_RESIDUE",
-                    identity=(effect.subject_type, effect.subject_id, effect.operation_id),
-                    title="취소된 작업의 업무 상태 잔존",
-                    description="재고는 취소됐지만 연결 업무가 최종 취소 상태로 닫히지 않았습니다.",
-                    cause_ids=(effect.operation_id, effect.effect_id, effect.subject_id),
-                    current_value=f"현재 상태 {current or '대상 없음'}",
-                    expected_value=f"최종 상태 {expected}",
-                    repairable=True,
-                )
-            )
+            continue
         elif effect.effect_kind == InventoryOperationEffectKindEnum.ALLOCATION:
             allocation = db.get(ShippingAllocation, effect.subject_id)
             current = allocation.status if allocation is not None else None
@@ -508,8 +652,26 @@ def _enum_value(value: object) -> str:
     return str(getattr(value, "value", value))
 
 
+def _setting_datetime(db: Session, key: str) -> Optional[datetime]:
+    """보존된 전향 설정을 변경하지 않고 UTC-naive 시각으로 읽는다."""
+
+    setting = db.get(SystemSetting, key)
+    if setting is None:
+        return None
+    try:
+        parsed = datetime.fromisoformat(setting.setting_value)
+    except ValueError as exc:
+        raise OperationCutoverConfigurationError(
+            "재고 작업 원장 활성화 시각이 올바르지 않습니다."
+        ) from exc
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(UTC).replace(tzinfo=None)
+    return parsed
+
+
 def _collect_integrity_snapshot(db: Session) -> InventoryIntegritySnapshot:
-    """Read and normalize the database state without mutating it."""
+    """Friday 0033의 실제 행을 같은 읽기 트랜잭션에서 정규화한다."""
+
     items = db.query(Item.item_id, Item.deleted_at).all()
     inventories = db.query(Inventory).all()
     locations = db.query(InventoryLocation).all()
@@ -535,7 +697,6 @@ def _collect_integrity_snapshot(db: Session) -> InventoryIntegritySnapshot:
     }
     box_items = db.query(WarehouseBoxItem).all()
     zone_items = db.query(WarehouseSpecialZoneItem).all()
-    unplaced_items = db.query(WarehouseUnplacedItem).all()
     operations = db.query(InventoryOperation).all()
     transactions = db.query(TransactionLog).all()
     operation_effects = db.query(InventoryOperationEffect).all()
@@ -564,15 +725,6 @@ def _collect_integrity_snapshot(db: Session) -> InventoryIntegritySnapshot:
                 active=zones.get(str(row.zone_id), False),
             )
             for row in zone_items
-        ),
-        *(
-            WarehousePlacementState(
-                row_id=str(row.id),
-                item_id=str(row.item_id),
-                scope="unplaced",
-                quantity=Decimal(str(row.quantity or 0)),
-            )
-            for row in unplaced_items
         ),
     ]
     evidence = [
@@ -725,7 +877,7 @@ def _collect_integrity_snapshot(db: Session) -> InventoryIntegritySnapshot:
         ),
         operation_evidence=tuple(evidence),
         cutover_at=cutover_at(db),
-        v2_cutover_at=cutover_at(db, key=V2_CUTOVER_SETTING_KEY),
+        v2_cutover_at=_setting_datetime(db, "inventory_operation_v2_cutover_at"),
         evaluated_at=datetime.utcnow(),
     )
 
@@ -743,6 +895,7 @@ def diagnose_inventory_integrity(db: Session) -> InventoryIntegrityResponse:
     counts = Counter(issue.category for issue in issues)
     evaluation = evaluate_inventory_integrity(
         _collect_integrity_snapshot(db),
+        profile="friday-0033",
         supplemental_findings=tuple(
             IntegrityFinding(
                 check_id=issue.category,
@@ -758,6 +911,7 @@ def diagnose_inventory_integrity(db: Session) -> InventoryIntegrityResponse:
     )
     return InventoryIntegrityResponse(
         contract=evaluation.contract,
+        profile=evaluation.profile,
         status=evaluation.status,
         blocking_count=evaluation.blocking_count,
         warning_count=evaluation.warning_count,

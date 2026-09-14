@@ -1,4 +1,4 @@
-"""부서 재고 조정 서비스 — 생산/조립·분해/회수·수량 보정.
+﻿"""부서 재고 조정 서비스 — 생산/조립·분해/회수·수량 보정.
 
 처리 정책:
 - 부서 PRODUCTION 재고끼리만 움직임 (즉시 처리, 창고 승인 불필요).
@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Literal, Optional
 
@@ -18,11 +18,11 @@ from app.models import (
     BOM,
     DepartmentEnum,
     DeptAdjSubTypeEnum,
-    Employee,
     Inventory,
     InventoryOperation,
     InventoryOperationRoleEnum,
     Item,
+    LocationStatusEnum,
     TransactionLog,
     TransactionTypeEnum,
 )
@@ -30,12 +30,12 @@ from app.database import _is_sqlite
 from app.services import inventory as inventory_svc
 from app.services import inv_effect
 from app.services import inventory_operations as operation_svc
-from app.services.inv_transfer import department_for_item
+from app.services.inv_transfer import department_for_item, lock_items_for_department_routing
 from app.services._tx import transactional
 from app.services.bom_stock_policy import (
     bom_template_claims,
     has_valid_bom_auto_token,
-    _issue_bom_auto_token,
+    issue_bom_auto_token,
     should_skip_bom_inventory,
 )
 from app.repositories import item_repository
@@ -78,13 +78,8 @@ def _enrich(db: Session, lines: list[AdjLine]) -> list[AdjLine]:
     ids = list({ln.item_id for ln in lines})
     items_map: dict[uuid.UUID, Item] = {
         i.item_id: i
-        for i in db.query(Item)
-        .filter(Item.item_id.in_(ids), Item.deleted_at.is_(None))
-        .all()
+        for i in db.query(Item).filter(Item.item_id.in_(ids)).all()
     }
-    missing = sorted(set(ids) - set(items_map), key=str)
-    if missing:
-        raise ValueError(f"품목을 찾을 수 없습니다: {missing[0]}")
     for ln in lines:
         item = items_map.get(ln.item_id)
         if item:
@@ -113,7 +108,7 @@ def _mark_bom_template_lines(
         if line.bom_expected is None:
             continue
         line.bom_parent_item_id = parent_item_id
-        line.bom_auto_token = _issue_bom_auto_token(
+        line.bom_auto_token = issue_bom_auto_token(
             db,
             flow="bom_template",
             claims=bom_template_claims(
@@ -146,7 +141,7 @@ def build_production_template(
     결과품: direction="in", 마지막 라인.
     BOM 직계 구성품: direction="out".
     """
-    item = item_repository.get_active(db, item_id)
+    item = item_repository.get(db, item_id)
     if item is None:
         raise ValueError(f"품목을 찾을 수 없습니다: {item_id}")
 
@@ -155,10 +150,8 @@ def build_production_template(
 
     lines: list[AdjLine] = []
     for row in bom_rows:
-        child = item_repository.get_active(db, row.child_item_id)
-        if child is None:
-            raise ValueError(f"품목을 찾을 수 없습니다: {row.child_item_id}")
-        child_dept = base_dept or _dept_for_item(child)
+        child = item_repository.get(db, row.child_item_id)
+        child_dept = base_dept or (_dept_for_item(child) if child else result_dept)
         lines.append(AdjLine(
             item_id=row.child_item_id,
             direction="out",
@@ -194,7 +187,7 @@ def build_disassembly_template(
     BOM 직계 구성품: direction="in" (일반 부서조정에서는 in/defective로 변경 가능).
     폐기는 별도 재작업의 scrap_qty 흐름에서 처리한다.
     """
-    item = item_repository.get_active(db, item_id)
+    item = item_repository.get(db, item_id)
     if item is None:
         raise ValueError(f"품목을 찾을 수 없습니다: {item_id}")
 
@@ -211,10 +204,8 @@ def build_disassembly_template(
     ]
 
     for row in bom_rows:
-        child = item_repository.get_active(db, row.child_item_id)
-        if child is None:
-            raise ValueError(f"품목을 찾을 수 없습니다: {row.child_item_id}")
-        child_dept = base_dept or _dept_for_item(child)
+        child = item_repository.get(db, row.child_item_id)
+        child_dept = base_dept or (_dept_for_item(child) if child else target_dept)
         lines.append(AdjLine(
             item_id=row.child_item_id,
             direction="in",
@@ -240,7 +231,7 @@ def expand_component(
     """중간공정품 1단계 선택 전개 — 직계 자식 라인 반환."""
     bom_rows = db.query(BOM).filter(BOM.parent_item_id == item_id).all()
     if not bom_rows:
-        raise ValueError("BOM 구성품이 없는 품목입니다.")
+        raise ValueError(f"BOM 구성품이 없는 품목입니다.")
 
     lines = [
         AdjLine(
@@ -315,11 +306,7 @@ def _stock_tracked_adjustment_lines(
     tracked: list[AdjLine] = []
     for line in lines:
         item = items_by_id.get(line.item_id)
-        parent_line = (
-            parent_lines.get(line.bom_parent_item_id)
-            if line.bom_parent_item_id is not None
-            else None
-        )
+        parent_line = parent_lines.get(line.bom_parent_item_id)
         parent_item = (
             items_by_id.get(line.bom_parent_item_id)
             if line.bom_parent_item_id is not None
@@ -396,7 +383,7 @@ def _apply_adjustment(
     # 정렬된 순서로 모든 아이템 선락 → 교착 방지
     if not _is_sqlite:
         all_item_ids = sorted({ln.item_id for ln in lines})
-        inventory_svc._ensure_and_lock_inventories(db, all_item_ids)
+        inventory_svc.ensure_and_lock_inventories(db, all_item_ids)
 
     sub_str = sub_type.value
     ordered = (
@@ -416,21 +403,21 @@ def _apply_adjustment(
         log_notes = f"{tag} {op_str}: {reason_str}".strip(": ").strip()
 
         tx_type = _TRANSACTION_TYPE_MAP[(ln.direction, sub_str)]
-        cells_before = inv_effect._snapshot_cells(db, ln.item_id)
+        cells_before = inv_effect.snapshot_cells(db, ln.item_id)
         quarantine_record = None
 
         if ln.direction == "out":
-            inv = inventory_svc._consume_from_department(db, ln.item_id, qty, dept_enum)
+            inv = inventory_svc.consume_from_department(db, ln.item_id, qty, dept_enum)
             qty_before = (inv.quantity or Decimal("0")) + qty
 
         elif ln.direction == "in":
-            inv = inventory_svc._receive_confirmed(
+            inv = inventory_svc.receive_confirmed(
                 db, ln.item_id, qty, bucket="production", dept=dept_enum
             )
             qty_before = (inv.quantity or Decimal("0")) - qty
 
         elif ln.direction == "defective":
-            inv = inventory_svc._mark_defective(
+            inv = inventory_svc.mark_defective(
                 db, ln.item_id, qty,
                 inventory_svc.DefectSource(
                     kind="production",
@@ -441,7 +428,7 @@ def _apply_adjustment(
             qty_before = inv.quantity or Decimal("0")
             from app.services import defect_records as defect_records_svc
 
-            quarantine_record = defect_records_svc._create_record(
+            quarantine_record = defect_records_svc.create_record(
                 db,
                 item_id=ln.item_id,
                 department=dept_enum,
@@ -467,7 +454,7 @@ def _apply_adjustment(
                 else InventoryOperationRoleEnum.PRODUCT_OUTPUT
             )
 
-        log = operation_svc._attach_transaction(TransactionLog(
+        log = operation_svc.attach_transaction(TransactionLog(
             item_id=ln.item_id,
             transaction_type=tx_type,
             quantity_change=(qty if ln.direction == "in" else -qty),
@@ -481,11 +468,11 @@ def _apply_adjustment(
             defect_quarantine_record_id=(
                 quarantine_record.record_id if quarantine_record else None
             ),
-            **inv_effect._capture_log_stock_snapshot(db, ln.item_id, cells_before),
+            **inv_effect.capture_log_stock_snapshot(db, ln.item_id, cells_before),
         ), operation, role)
         db.add(log)
         if quarantine_record is not None:
-            operation_svc._record_defect_movement(
+            operation_svc.record_defect_movement(
                 db,
                 operation=operation,
                 record_id=quarantine_record.record_id,
@@ -508,22 +495,16 @@ def submit_adjustment(
     sub_type: DeptAdjSubTypeEnum,
     lines: list[AdjLine],
     *,
-    actor: Employee,
+    operator_name: Optional[str] = None,
+    producer_employee_id: Optional[uuid.UUID] = None,
     reference_no: Optional[str] = None,
     notes: Optional[str] = None,
 ) -> list[uuid.UUID]:
-    """서버가 검증한 작업자로 부서 재고 조정과 원장을 확정한다."""
-    if not isinstance(actor, Employee):
-        raise TypeError("actor must be an Employee")
+    """부서 재고 조정과 원장을 하나의 업무 트랜잭션으로 확정한다."""
     _validate_adjustment_lines(lines)
+    tracked_lines = _stock_tracked_adjustment_lines(db, sub_type, lines)
     with transactional(db):
-        item_ids = {line.item_id for line in lines}
-        active_items = item_repository.lock_active_many(db, item_ids)
-        missing = sorted(item_ids - set(active_items), key=str)
-        if missing:
-            raise ValueError(f"품목을 찾을 수 없습니다: {missing[0]}")
-        tracked_lines = _stock_tracked_adjustment_lines(db, sub_type, lines)
-        operation = operation_svc._create_business_operation(
+        operation = operation_svc.create_business_operation(
             db,
             domain="department_inventory",
             action=sub_type.value,
@@ -532,16 +513,16 @@ def submit_adjustment(
                 DeptAdjSubTypeEnum.DISASSEMBLY: "분해·회수",
                 DeptAdjSubTypeEnum.CORRECTION: "부서 입출고",
             }[sub_type],
-            actor_name=actor.name,
-            actor_employee_id=actor.employee_id,
+            actor_name=operator_name or "시스템",
+            actor_employee_id=producer_employee_id,
             reason=notes,
         )
         log_ids = _apply_adjustment(
             db,
             sub_type,
             tracked_lines,
-            operator_name=actor.name,
-            producer_employee_id=actor.employee_id,
+            operator_name=operator_name,
+            producer_employee_id=producer_employee_id,
             reference_no=reference_no,
             notes=notes,
             operation=operation,
@@ -566,7 +547,7 @@ def _rework_dept_for_item(
 ) -> DepartmentEnum:
     item = (locked_items or {}).get(item_id)
     if item is None:
-        item = item_repository.get_active(db, item_id, for_update=True)
+        item = db.query(Item).filter(Item.item_id == item_id).first()
     if item is None:
         raise ValueError(f"품목을 찾을 수 없습니다: {item_id}")
     return department_for_item(item)
@@ -743,11 +724,6 @@ def _submit_rework_disassemble(
         raise ValueError("재작업 수량은 0보다 커야 합니다.")
     if not child_decisions:
         raise ValueError("자식 결정이 비어 있습니다.")
-    item_ids = {parent_item_id, *_rework_decision_item_ids(child_decisions)}
-    locked_items = item_repository.lock_active_many(db, item_ids)
-    missing = sorted(item_ids - set(locked_items), key=str)
-    if missing:
-        raise ValueError(f"품목을 찾을 수 없습니다: {missing[0]}")
     if parent_source == "defective":
         _validate_decision_tree_against_bom(
             db,
@@ -757,6 +733,10 @@ def _submit_rework_disassemble(
         )
 
     # Item 행을 부모·자식 전체의 전역 순서로 잠근 뒤에만 현재 공정코드 부서를 읽는다.
+    locked_items = lock_items_for_department_routing(
+        db,
+        {parent_item_id, *_rework_decision_item_ids(child_decisions)},
+    )
     if parent_item_id not in locked_items:
         raise ValueError(f"품목을 찾을 수 없습니다: {parent_item_id}")
     if parent_source == "normal" and normal_source_kind == "production":
@@ -780,7 +760,7 @@ def _submit_rework_disassemble(
         child_decisions,
         locked_items=locked_items,
     )
-    inventory_svc._ensure_and_lock_inventories(
+    inventory_svc.ensure_and_lock_inventories(
         db,
         rework_inventory_item_ids(
             parent_item_id,
@@ -798,7 +778,7 @@ def _submit_rework_disassemble(
         memo=reason_memo,
         actor=actor,
     )
-    operation = operation or operation_svc._create_business_operation(
+    operation = operation or operation_svc.create_business_operation(
         db,
         domain="defect",
         action=("rework_defective" if parent_source == "defective" else "rework_normal"),
@@ -809,14 +789,14 @@ def _submit_rework_disassemble(
         reason=reason_memo,
     )
 
-    parent_cells_before = inv_effect._snapshot_cells(db, parent_item_id)
+    parent_cells_before = inv_effect.snapshot_cells(db, parent_item_id)
     if parent_source == "defective":
-        parent_inv = inventory_svc._scrap_defective(
+        parent_inv = inventory_svc.scrap_defective(
             db, parent_item_id, parent_qty, parent_dept, reason
         )
     elif parent_source == "normal":
         source_kind = normal_source_kind or "production"
-        parent_inv = inventory_svc._scrap_normal(
+        parent_inv = inventory_svc.scrap_normal(
             db,
             parent_item_id,
             parent_qty,
@@ -830,7 +810,7 @@ def _submit_rework_disassemble(
     parent_note = "[rework:normal]" if parent_source == "normal" else "[rework:defective]"
     if reason_memo:
         parent_note += f" {reason_memo}"
-    parent_log = operation_svc._attach_transaction(TransactionLog(
+    parent_log = operation_svc.attach_transaction(TransactionLog(
         item_id=parent_item_id,
         transaction_type=TransactionTypeEnum.DISASSEMBLE,
         quantity_change=-parent_qty,
@@ -844,7 +824,7 @@ def _submit_rework_disassemble(
         reference_no=batch_ref,
         department=parent_dept_value,
         defect_quarantine_record_id=defect_quarantine_record_id,
-        **inv_effect._capture_log_stock_snapshot(db, parent_item_id, parent_cells_before),
+        **inv_effect.capture_log_stock_snapshot(db, parent_item_id, parent_cells_before),
     ), operation, (
         InventoryOperationRoleEnum.REWORK_PARENT_DEFECTIVE
         if parent_source == "defective"
@@ -876,14 +856,14 @@ def _submit_rework_disassemble(
         child_note = decision.get("reason_memo") or reason_memo or ""
 
         if normal_qty > 0:
-            cells_before = inv_effect._snapshot_cells(db, item_id)
-            child_inv = inventory_svc._receive_confirmed(
+            cells_before = inv_effect.snapshot_cells(db, item_id)
+            child_inv = inventory_svc.receive_confirmed(
                 db, item_id, normal_qty,
                 bucket="production",
                 dept=child_dept,
             )
             qty_before_child = (child_inv.quantity or Decimal("0")) - normal_qty
-            log = operation_svc._attach_transaction(TransactionLog(
+            log = operation_svc.attach_transaction(TransactionLog(
                 item_id=item_id,
                 transaction_type=TransactionTypeEnum.RECEIVE,
                 quantity_change=normal_qty,
@@ -896,15 +876,15 @@ def _submit_rework_disassemble(
                 reason_memo=child_note or None,
                 reference_no=batch_ref,
                 department=child_dept_value,
-                **inv_effect._capture_log_stock_snapshot(db, item_id, cells_before),
+                **inv_effect.capture_log_stock_snapshot(db, item_id, cells_before),
             ), operation, InventoryOperationRoleEnum.REWORK_CHILD_NORMAL)
             db.add(log)
             db.flush()
             child_log_ids.append(log.log_id)
 
         if defective_qty > 0:
-            cells_before = inv_effect._snapshot_cells(db, item_id)
-            child_inv = inventory_svc._receive_defective(
+            cells_before = inv_effect.snapshot_cells(db, item_id)
+            child_inv = inventory_svc.receive_defective(
                 db,
                 item_id,
                 defective_qty,
@@ -918,7 +898,7 @@ def _submit_rework_disassemble(
             qty_before_child = (child_inv.quantity or Decimal("0")) - defective_qty
             from app.services import defect_records as defect_records_svc
 
-            child_record = defect_records_svc._create_record(
+            child_record = defect_records_svc.create_record(
                 db,
                 item_id=item_id,
                 department=child_dept,
@@ -928,7 +908,7 @@ def _submit_rework_disassemble(
                 reason_category=reason_category,
                 memo=child_note or None,
             )
-            log = operation_svc._attach_transaction(TransactionLog(
+            log = operation_svc.attach_transaction(TransactionLog(
                 item_id=item_id,
                 transaction_type=TransactionTypeEnum.MARK_DEFECTIVE,
                 quantity_change=defective_qty,
@@ -942,10 +922,10 @@ def _submit_rework_disassemble(
                 reference_no=batch_ref,
                 department=child_dept_value,
                 defect_quarantine_record_id=child_record.record_id,
-                **inv_effect._capture_log_stock_snapshot(db, item_id, cells_before),
+                **inv_effect.capture_log_stock_snapshot(db, item_id, cells_before),
             ), operation, InventoryOperationRoleEnum.REWORK_CHILD_DEFECTIVE)
             db.add(log)
-            operation_svc._record_defect_movement(
+            operation_svc.record_defect_movement(
                 db,
                 operation=operation,
                 record_id=child_record.record_id,
@@ -961,9 +941,9 @@ def _submit_rework_disassemble(
             child_log_ids.append(log.log_id)
 
         if scrap_qty > 0:
-            cells_before = inv_effect._snapshot_cells(db, item_id)
-            child_inv = inventory_svc._get_or_create_inventory(db, item_id)
-            log = operation_svc._attach_transaction(TransactionLog(
+            cells_before = inv_effect.snapshot_cells(db, item_id)
+            child_inv = inventory_svc.get_or_create_inventory(db, item_id)
+            log = operation_svc.attach_transaction(TransactionLog(
                 item_id=item_id,
                 transaction_type=TransactionTypeEnum.DEFECT_SCRAP,
                 quantity_change=-scrap_qty,
@@ -976,7 +956,7 @@ def _submit_rework_disassemble(
                 reason_memo=child_note or None,
                 reference_no=batch_ref,
                 department=child_dept_value,
-                **inv_effect._capture_log_stock_snapshot(db, item_id, cells_before),
+                **inv_effect.capture_log_stock_snapshot(db, item_id, cells_before),
             ), operation, InventoryOperationRoleEnum.REWORK_CHILD_SCRAP)
             db.add(log)
             db.flush()
@@ -1062,13 +1042,12 @@ def submit_defective_disassemble(
     *,
     reason_category: str,
     reason_memo: str,
-    actor: Employee,
+    actor: str,
+    actor_employee_id: Optional[uuid.UUID] = None,
     defect_quarantine_record_id: Optional[uuid.UUID] = None,
     operation: Optional[InventoryOperation] = None,
 ) -> dict:
     """격리 품목 재작업: 부모 DEFECTIVE 차감 후 하위 정상/격리/폐기 3분할."""
-    if not isinstance(actor, Employee):
-        raise TypeError("actor must be an Employee")
     return _submit_rework_disassemble(
         db,
         parent_item_id,
@@ -1078,8 +1057,8 @@ def submit_defective_disassemble(
         parent_source="defective",
         reason_category=reason_category,
         reason_memo=reason_memo,
-        actor=actor.name,
-        actor_employee_id=actor.employee_id,
+        actor=actor,
+        actor_employee_id=actor_employee_id,
         defect_quarantine_record_id=defect_quarantine_record_id,
         operation=operation,
     )
@@ -1095,12 +1074,11 @@ def submit_normal_disassemble(
     *,
     reason_category: str,
     reason_memo: str,
-    actor: Employee,
+    actor: str,
+    actor_employee_id: Optional[uuid.UUID] = None,
     operation: Optional[InventoryOperation] = None,
 ) -> dict:
     """정상 품목 바로 재작업: 부모 정상 재고 차감 후 하위 정상/격리/폐기 3분할."""
-    if not isinstance(actor, Employee):
-        raise TypeError("actor must be an Employee")
     if source_kind == "production":
         parent_dept = None
     elif source_kind == "warehouse":
@@ -1117,7 +1095,7 @@ def submit_normal_disassemble(
         normal_source_kind=source_kind,
         reason_category=reason_category,
         reason_memo=reason_memo,
-        actor=actor.name,
-        actor_employee_id=actor.employee_id,
+        actor=actor,
+        actor_employee_id=actor_employee_id,
         operation=operation,
     )

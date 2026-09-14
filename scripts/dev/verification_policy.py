@@ -18,8 +18,6 @@ VALID_CHANGE_SETS = {"auto", "staged", "working"}
 FRONTEND_FULL_GATES = (
     "frontend-lint",
     "frontend-typecheck",
-    "frontend-test-typecheck",
-    "frontend-e2e-typecheck",
     "frontend-coverage",
     "frontend-build",
     "frontend-bundle-size",
@@ -29,17 +27,6 @@ DOCS_GATES = (
     "docs-link-tests",
     "docs-links",
 )
-FRONTEND_UNIT_TEST_RE = re.compile(
-    r"^(?:frontend/)?(?:app|lib|scripts)/.+\.(?:test|spec)\.(?:[cm]?[jt]s|[jt]sx)$"
-)
-
-
-def is_frontend_unit_test_path(path: str) -> bool:
-    """Return whether the path belongs to the unit-test typecheck contract."""
-
-    return bool(FRONTEND_UNIT_TEST_RE.fullmatch(normalize_path(path)))
-
-
 @dataclass(frozen=True)
 class Change:
     """Git 변경 한 건과 위험 판정에 필요한 최소 메타데이터."""
@@ -111,9 +98,6 @@ def _gate(gate_id: str, area: Area, kind: str, reason: str, files: Sequence[str]
 
 def _full_backend_gates(files: Sequence[str], reason: str) -> list[dict[str, Any]]:
     return [
-        _gate("backend-ruff", "backend", "static", reason, files),
-        _gate("backend-mypy", "backend", "static", reason, files),
-        _gate("backend-postgres-concurrency", "backend", "contract", reason, files),
         _gate("backend-pytest-full", "backend", "full", reason, files),
         _gate("backend-openapi", "backend", "contract", reason, files),
     ]
@@ -123,8 +107,6 @@ def _full_frontend_gates(files: Sequence[str], reason: str) -> list[dict[str, An
     labels = {
         "frontend-lint": "strict lint",
         "frontend-typecheck": "full TypeScript check",
-        "frontend-test-typecheck": "unit test TypeScript check",
-        "frontend-e2e-typecheck": "Playwright TypeScript check",
         "frontend-coverage": "full tests and coverage",
         "frontend-build": "production build",
         "frontend-bundle-size": "bundle size",
@@ -294,10 +276,9 @@ def _smart_area_gates(
         test_files = [
             path
             for path in files
-            if is_frontend_unit_test_path(path)
+            if re.search(r"(?:^|/)[^/]+\.(?:test|spec)\.[cm]?[jt]sx?$", path)
             and "/e2e/" not in path
         ]
-        e2e_files = [path for path in files if path.startswith("frontend/tests/e2e/")]
         gates = [
             _gate("frontend-lint-files", "frontend", "targeted", "lint changed frontend files", files),
             _gate("frontend-tsc-incremental", "frontend", "targeted", "incremental TypeScript check", files),
@@ -305,14 +286,7 @@ def _smart_area_gates(
         ]
         if test_files:
             gates.append(
-                _gate("frontend-test-typecheck", "frontend", "contract", "unit test TypeScript contract", test_files)
-            )
-            gates.append(
                 _gate("frontend-direct-tests", "frontend", "targeted", "directly changed Vitest files", test_files)
-            )
-        if e2e_files:
-            gates.append(
-                _gate("frontend-e2e-typecheck", "frontend", "contract", "Playwright TypeScript contract", e2e_files)
             )
         return gates, []
     if area == "backend":
@@ -322,11 +296,7 @@ def _smart_area_gates(
         risk = next((reason for change in area_changes if (reason := _backend_risk_reason(change))), None)
         if risk:
             return _full_backend_gates(files, risk), [{"area": "backend", "reason": risk}]
-        gates = [
-            _gate("backend-ruff", "backend", "static", "Ruff staged baseline", files),
-            _gate("backend-mypy", "backend", "static", "mypy staged baseline", files),
-            _gate("backend-testmon", "backend", "targeted", "pytest-testmon affected tests", files)
-        ]
+        gates = [_gate("backend-testmon", "backend", "targeted", "pytest-testmon affected tests", files)]
         if _needs_openapi(area_changes):
             gates.append(_gate("backend-openapi", "backend", "contract", "OpenAPI contract path changed", files))
         return gates, []

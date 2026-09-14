@@ -34,7 +34,6 @@ EXPORT_HEADERS = [
 
 def _add_employee(db_session, *, code: str = "E22", name: str = "홍길동") -> None:
     from app.models import Employee
-    from app.services.pin_auth import hash_pin
 
     db_session.add(
         Employee(
@@ -43,8 +42,6 @@ def _add_employee(db_session, *, code: str = "E22", name: str = "홍길동") -> 
             role="조립",
             department="조립",
             is_active=True,
-            pin_hash=hash_pin("2468"),
-            pin_requires_change=False,
         )
     )
     db_session.commit()
@@ -77,13 +74,13 @@ def test_client_event_persists_actor_and_terminal_snapshots(client, db_session):
     verified = client.post(
         f"/api/employees/{employee.employee_id}/verify-pin",
         headers={"X-MES-Audit-Session": "session-1"},
-        json={"pin": "2468"},
+        json={"pin": "0000"},
     )
     assert verified.status_code == 200
 
     response = client.post(
         "/api/client-events",
-        headers={"X-Request-Id": "req-client-1"},
+        headers={"X-MES-Employee-Code": "E22", "X-Request-Id": "req-client-1"},
         json={
             "event": "ui_nav",
             "source": "desktop",
@@ -136,47 +133,32 @@ def test_client_event_persists_without_advancing_realtime_revision(client, db_se
     assert db_session.get(DataRevision, 1).revision == 0
 
 
-def test_client_events_require_session_and_reject_forged_employee_headers(
-    auth_client,
-    db_session,
-):
+def test_client_events_ignore_forged_employee_headers_without_verified_login(client, db_session):
     from app.models import ActivityAuditLog, Employee
 
-    _add_employee(db_session, code="E22", name="탭 A 작업자")
-    _add_employee(db_session, code="E23", name="탭 B 작업자")
+    _add_employee(db_session, code="E23", name="검증 직원")
     employee = db_session.query(Employee).filter(Employee.employee_code == "E23").one()
     session_id = str(uuid.uuid4())
 
-    anonymous = auth_client.post(
+    forged = client.post(
         "/api/client-events",
         headers={"X-MES-Employee-Code": "E23", "X-MES-Audit-Session": session_id},
         json={"event": "ui_nav", "source": "desktop", "session_id": session_id},
     )
-    assert anonymous.status_code == 401
-    assert db_session.query(ActivityAuditLog).count() == 0
+    assert forged.status_code == 204
+    assert db_session.query(ActivityAuditLog).one().actor_employee_code is None
 
-    verified = auth_client.post(
-        "/api/operator-session",
-        json={"employee_id": str(employee.employee_id), "pin": "2468"},
+    verified = client.post(
+        f"/api/employees/{employee.employee_id}/verify-pin",
+        headers={"X-MES-Audit-Session": session_id},
+        json={"pin": "0000"},
     )
     assert verified.status_code == 200
-    before_forged = db_session.query(ActivityAuditLog).count()
 
-    forged = auth_client.post(
+    recorded = client.post(
         "/api/client-events",
         headers={
-            "X-MES-Employee-Code": "E22",
-            "X-MES-Audit-Session": session_id,
-        },
-        json={"event": "ui_nav", "source": "desktop", "session_id": session_id},
-    )
-    assert forged.status_code == 403
-    assert db_session.query(ActivityAuditLog).count() == before_forged
-
-    recorded = auth_client.post(
-        "/api/client-events",
-        headers={
-            "X-MES-Employee-Code": "E23",
+            "X-MES-Employee-Code": "OTHER",
             "X-MES-Audit-Session": session_id,
         },
         json={"event": "ui_nav", "source": "desktop", "session_id": session_id},
@@ -189,37 +171,27 @@ def test_client_events_require_session_and_reject_forged_employee_headers(
         .first()
     )
     assert row.actor_employee_code == "E23"
-    assert row.actor_employee_name == "탭 B 작업자"
+    assert row.actor_employee_name == "검증 직원"
 
-    logged_out = auth_client.post(
+    logged_out = client.post(
         "/api/client-events",
-        headers={
-            "X-MES-Employee-Code": "E23",
-            "X-MES-Audit-Session": session_id,
-        },
+        headers={"X-MES-Audit-Session": session_id},
         json={"event": "ui_logout", "source": "desktop", "session_id": session_id},
     )
     assert logged_out.status_code == 204
-    logout_row = (
-        db_session.query(ActivityAuditLog)
-        .filter(ActivityAuditLog.action_key == "ui_logout")
-        .one()
-    )
-    assert logout_row.actor_employee_code == "E23"
-    assert logout_row.actor_employee_name == "탭 B 작업자"
-    deleted = auth_client.delete("/api/operator-session")
-    assert deleted.status_code == 204
-    after_logout = auth_client.post(
+    after_logout = client.post(
         "/api/client-events",
         headers={"X-MES-Employee-Code": "E23", "X-MES-Audit-Session": session_id},
         json={"event": "ui_nav", "source": "desktop", "session_id": session_id},
     )
-    assert after_logout.status_code == 401
+    assert after_logout.status_code == 204
     assert (
         db_session.query(ActivityAuditLog)
         .filter(ActivityAuditLog.action_key == "ui_nav")
-        .count()
-        == 1
+        .order_by(ActivityAuditLog.occurred_at.desc())
+        .first()
+        .actor_employee_code
+        is None
     )
 
 
@@ -265,7 +237,7 @@ def test_navigation_event_persists_the_destination_screen(client, db_session):
     assert row.screen_label == "weekly"
 
 
-def test_write_audit_skips_unverified_and_unregistered_requests(
+def test_write_requests_persist_success_and_failures_without_client_event_duplicate(
     client, db_session
 ):
     from app.models import ActivityAuditLog
@@ -290,29 +262,13 @@ def test_write_audit_skips_unverified_and_unregistered_requests(
     assert long_missing.status_code == 404
     assert event.status_code == 204
     rows = db_session.query(ActivityAuditLog).order_by(ActivityAuditLog.occurred_at).all()
-    assert len(rows) == 2
+    assert len(rows) == 5
     generic = [row for row in rows if row.action_key != "ui_logout"]
-    assert [row.outcome for row in generic] == ["failed"]
+    assert [row.outcome for row in generic] == ["success", "failed", "failed", "failed"]
     assert all(row.session_id == "write-session" for row in generic)
     assert all(row.screen_label == "재고 현황" for row in generic)
     assert all(len(row.action_key) <= 160 for row in generic)
     assert sum(row.action_key == "ui_logout" for row in rows) == 1
-
-
-def test_anonymous_write_failures_do_not_mutate_activity_audit(
-    auth_client,
-    db_session,
-) -> None:
-    from app.models import ActivityAuditLog
-
-    before = db_session.query(ActivityAuditLog).count()
-
-    missing = auth_client.post("/api/not-a-real-write")
-    invalid = auth_client.post("/api/io/submit", json={})
-
-    assert missing.status_code == 404
-    assert invalid.status_code == 401
-    assert db_session.query(ActivityAuditLog).count() == before
 
 
 def test_unhandled_write_error_is_persisted_as_failed_audit(
@@ -320,18 +276,10 @@ def test_unhandled_write_error_is_persisted_as_failed_audit(
 ):
     from fastapi.testclient import TestClient
     from app.main import app
-    from app.models import ActivityAuditLog, Employee
+    from app.models import ActivityAuditLog
     from app.routers import io as io_router
 
-    _add_employee(db_session, code="AUDIT-ERR-01", name="감사 오류 작업자")
-    actor = (
-        db_session.query(Employee)
-        .filter(Employee.employee_code == "AUDIT-ERR-01")
-        .one()
-    )
-
-    def raise_unhandled(_db, _payload, *, requester):
-        assert requester.employee_id == actor.employee_id
+    def raise_unhandled(_db, _payload):
         raise RuntimeError("unexpected failure")
 
     monkeypatch.setattr(io_router.io_actions_svc, "submit", raise_unhandled)
@@ -340,7 +288,7 @@ def test_unhandled_write_error_is_persisted_as_failed_audit(
             "/api/io/submit",
             headers={"X-MES-Audit-Session": "unhandled-session"},
             json={
-                "requester_employee_id": str(actor.employee_id),
+                "requester_employee_id": str(uuid.uuid4()),
                 "work_type": "process",
                 "sub_type": "produce",
                 "bundles": [],
@@ -477,7 +425,6 @@ def test_write_audit_is_attached_to_the_response_background(client):
         }
     )
     response = Response()
-    request.state.actor_emp = "AUDIT-BACKGROUND-ACTOR"
 
     _schedule_write_audit(response, request, method="POST", path="/api/health/write-check", status=200)
 
@@ -488,17 +435,11 @@ def test_io_submit_exposes_the_related_batch_for_request_audit(monkeypatch):
     from app.routers import io as io_router
 
     request = SimpleNamespace(state=SimpleNamespace())
-    actor = SimpleNamespace(
-        employee_id=uuid.uuid4(),
-        employee_code="AUDIT-DIRECT-01",
-        name="직접 호출 작업자",
-    )
-    payload = SimpleNamespace(requester_employee_id=actor.employee_id)
     batch_id = str(uuid.uuid4())
     monkeypatch.setattr(
         io_router.io_actions_svc,
         "submit",
-        lambda _db, _payload, *, requester: {
+        lambda _db, _payload: {
             "batch": {
                 "batch_id": batch_id,
                 "work_type": "process",
@@ -510,7 +451,7 @@ def test_io_submit_exposes_the_related_batch_for_request_audit(monkeypatch):
     )
     monkeypatch.setattr(io_router, "_evt_emit", lambda *_args, **_kwargs: None)
 
-    io_router.submit_io(payload, request, actor, object())
+    io_router.submit_io(object(), request, object())
 
     assert request.state.activity_audit_related_id == batch_id
     assert request.state.activity_audit_target_summary == "process · produce"

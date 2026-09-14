@@ -13,7 +13,7 @@ import { IoTargetPicker } from "./IoTargetPicker";
 import { IoBundleCart } from "./IoBundleCart";
 import { IoConfirmStep } from "./IoConfirmStep";
 import { IoSubmitModals, type IoSubmitResultState } from "./IoSubmitModals";
-import { IO_WORK_TYPES, approvalKind, deptVisibility, directionWord, ioDepartmentPayload, isAutoDepartmentRoute, isExitWorkType, mergePreviewBundles, pickerDirectionLabel, requiresDepartments, subTypeLabel, targetDepartmentOf } from "./ioWorkType";
+import { IO_WORK_TYPES, approvalKind, canSeeWorkType, deptVisibility, directionWord, ioDepartmentPayload, isAutoDepartmentRoute, isExitWorkType, mergePreviewBundles, pickerDirectionLabel, requiresDepartments, subTypeLabel, targetDepartmentOf } from "./ioWorkType";
 import { applyBundleQuantityChange, applyLineQuantityChange, applyToggleLine } from "./bomSync";
 import { collectShortageItemIds, shortageLines } from "./pullFromWarehouse";
 import { useIoDraftRestore } from "./useIoDraftRestore";
@@ -149,8 +149,6 @@ export function IoComposeView({
   );
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<IoSubmitResultState | null>(null);
-  const errorSummaryRef = useRef<HTMLDivElement>(null);
-  const submitButtonRef = useRef<HTMLButtonElement>(null);
   const {
     notice: feedbackNotice,
     showNotice: showFeedbackNotice,
@@ -180,6 +178,16 @@ export function IoComposeView({
   const dirtyEffectMountedRef = useRef(false);
   const absorbedRestoreRef = useRef<string | null>(null);
   const state = useIoWorkState(defaultWorkType, operator?.department, getAvailable);
+  const authorizedEntryIntent = entryIntent
+    && IO_WORK_TYPES.some((row) => row.id === entryIntent.workType)
+    && canSeeWorkType(entryIntent.workType, operator)
+    ? entryIntent
+    : null;
+  const canRestoreDraft = Boolean(
+    draftToRestore
+      && IO_WORK_TYPES.some((row) => row.id === draftToRestore.work_type)
+      && canSeeWorkType(draftToRestore.work_type, operator),
+  );
   // 항목 7 — '창고에서 가져오기' 대상으로 선택한 부족 라인 line_id 집합. 0개면 부족 라인 전체 대상.
   const [
     pullSelected,
@@ -229,17 +237,6 @@ export function IoComposeView({
     notes: state.notes,
   };
   const internalUsePreviewLock = useInternalUseBomPreviewLock();
-
-  useEffect(() => {
-    if (error) errorSummaryRef.current?.focus();
-  }, [error]);
-
-  function closeSubmitResult() {
-    setResult(null);
-    window.requestAnimationFrame(() => {
-      if (submitButtonRef.current?.isConnected) submitButtonRef.current.focus();
-    });
-  }
   const intentAppliedRef = useRef(false);
 
   const { previewing, previewTarget } = useIoPreview();
@@ -260,7 +257,7 @@ export function IoComposeView({
     pathname,
     // step push 시 tab 을 항상 warehouse 로 고정 — 대시보드→창고 진입 순간 lagged searchParams 의
     // stale tab(=dashboard) 을 보존해 셸이 대시보드로 되돌리는 튕김을 차단한다.
-    suppressInitialSync: draftToRestore != null,
+    suppressInitialSync: canRestoreDraft || authorizedEntryIntent != null,
     tabParam: "warehouse",
   });
 
@@ -303,14 +300,19 @@ export function IoComposeView({
   useEffect(() => {
     if (!entryIntent || intentAppliedRef.current) return;
     intentAppliedRef.current = true;
-    state.setWorkType(entryIntent.workType);
-    if (entryIntent.workType === "process" && entryIntent.direction) {
-      state.setDeptIoDirection(entryIntent.direction);
-    } else if (entryIntent.subType) {
-      state.setSubType(entryIntent.subType);
+    if (!authorizedEntryIntent) {
+      setError("권한이 없는 작업 유형입니다.");
+      state.goTo(1);
+      return;
     }
-    if (entryIntent.toDepartment) {
-      state.setToDepartment(entryIntent.toDepartment);
+    state.setWorkType(authorizedEntryIntent.workType);
+    if (authorizedEntryIntent.workType === "process" && authorizedEntryIntent.direction) {
+      state.setDeptIoDirection(authorizedEntryIntent.direction);
+    } else if (authorizedEntryIntent.subType) {
+      state.setSubType(authorizedEntryIntent.subType);
+    }
+    if (authorizedEntryIntent.toDepartment) {
+      state.setToDepartment(authorizedEntryIntent.toDepartment);
     }
     state.goTo(3);
   // entryIntent는 마운트 시 1회만 적용 — deps 배열에 state 함수 넣으면 재실행되므로 의도적으로 생략.
@@ -345,6 +347,7 @@ export function IoComposeView({
     state,
     onStatusChange,
     restoreStep,
+    canRestore: canRestoreDraft,
     getAvailable,
     inventorySnapshot: items,
   });
@@ -431,7 +434,7 @@ export function IoComposeView({
   // preselect 자동 적용 — BOM 부모면 하이라이트만, 일반 품목이면 자동 카트 추가.
   // race 가드: bomParents 가 아직 로드 안 됐으면 보류 (S1 시연 결함 대응).
   useIoPreselect({
-    preselectedItem,
+    preselectedItem: entryIntent && !authorizedEntryIntent ? null : preselectedItem,
     bomParents,
     bomParentsLoaded,
     workType: state.workType,
@@ -439,7 +442,7 @@ export function IoComposeView({
     fromDepartment: state.fromDepartment,
     toDepartment: state.toDepartment,
     deptIoDirection: state.deptIoDirection,
-    forceManual: entryIntent?.forceManualItem,
+    forceManual: authorizedEntryIntent?.forceManualItem,
     addItem,
     setHighlightItemId,
   });
@@ -449,8 +452,8 @@ export function IoComposeView({
   const entryLeafAdvancedRef = useRef(false);
   useEffect(() => {
     if (entryLeafAdvancedRef.current) return;
-    if (!entryIntent || !preselectedItem || !bomParentsLoaded) return;
-    if (bomParents.has(preselectedItem.item_id) && !entryIntent.forceManualItem) {
+    if (!authorizedEntryIntent || !preselectedItem || !bomParentsLoaded) return;
+    if (bomParents.has(preselectedItem.item_id) && !authorizedEntryIntent.forceManualItem) {
       // BOM 부모 — Step3 유지(BOM/낱개 선택). 더 이상 처리하지 않음.
       entryLeafAdvancedRef.current = true;
       return;
@@ -461,7 +464,7 @@ export function IoComposeView({
       state.goTo(4);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entryIntent, preselectedItem, bomParentsLoaded, bomParents, state.bundles.length]);
+  }, [authorizedEntryIntent, preselectedItem, bomParentsLoaded, bomParents, state.bundles.length]);
 
   // 입출고 작업 중 다른 화면으로 이동 시 '저장할까요?' 모달.
   // 경고 조건: 로그인 상태에서 마지막 저장/복원 이후 사용자가 수정했을 때,
@@ -1099,14 +1102,9 @@ export function IoComposeView({
   }
 
   return (
-    <div data-testid="io-compose-view" className="flex h-full min-h-0 flex-col gap-3">
+    <div className="flex h-full min-h-0 flex-col gap-3">
       {error && (
         <div
-          ref={errorSummaryRef}
-          role="alert"
-          aria-label="입출고 작업 오류"
-          aria-atomic="true"
-          tabIndex={-1}
           className="rounded-[12px] border px-4 py-3 text-sm font-bold"
           style={{
             background: tint(LEGACY_COLORS.red, 10),
@@ -1387,7 +1385,6 @@ export function IoComposeView({
               onValidationError={(message) => showFeedbackNotice(message, "error")}
               onSubmit={handleSubmit}
               onSaveDraft={handleSaveDraft}
-              submitButtonRef={submitButtonRef}
             />
           </WizardStepCard>
         </div>
@@ -1395,7 +1392,7 @@ export function IoComposeView({
 
       <IoSubmitModals
         result={result}
-        onClose={closeSubmitResult}
+        onClose={() => setResult(null)}
         onGoToMap={() => router.push("?tab=warehouseMap", { scroll: false })}
       />
       {draftSaveNotice && (

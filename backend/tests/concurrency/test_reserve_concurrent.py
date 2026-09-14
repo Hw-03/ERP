@@ -19,7 +19,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[2]
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from app.models import Employee, Inventory, Item  # noqa: E402
+from app.models import Inventory, Item
 
 
 def _setup_item_with_inventory(make_session, warehouse_qty: Decimal):
@@ -38,20 +38,10 @@ def _setup_item_with_inventory(make_session, warehouse_qty: Decimal):
         pending_quantity=Decimal("0"),
     )
     session.add(inv)
-    employee = Employee(
-        employee_code=f"RESERVE-{warehouse_qty}",
-        name="동시 예약 작업자",
-        role="테스트",
-        department="조립",
-        display_order=1,
-        is_active="true",
-    )
-    session.add(employee)
     session.commit()
     item_id = item.item_id
-    employee_id = employee.employee_id
     session.close()
-    return item_id, employee_id
+    return item_id
 
 
 @pytest.mark.usefixtures("concurrent_engine")
@@ -60,7 +50,7 @@ def test_concurrent_reserve_no_negative(concurrent_engine, make_session):
     from app.services import inventory as inventory_svc
 
     warehouse_qty = Decimal("10")
-    item_id, employee_id = _setup_item_with_inventory(make_session, warehouse_qty)
+    item_id = _setup_item_with_inventory(make_session, warehouse_qty)
 
     successes = []
     failures = []
@@ -68,14 +58,7 @@ def test_concurrent_reserve_no_negative(concurrent_engine, make_session):
     def try_reserve():
         session = make_session()
         try:
-            employee = session.get(Employee, employee_id)
-            assert employee is not None
-            inventory_svc.reserve(
-                session,
-                item_id,
-                Decimal("1"),
-                employee=employee,
-            )
+            inventory_svc.reserve(session, item_id, Decimal("1"))
             session.commit()
             successes.append("ok")
         except ValueError as e:
@@ -108,7 +91,7 @@ def test_concurrent_reserve_exact_match(concurrent_engine, make_session):
     from app.services import inventory as inventory_svc
 
     warehouse_qty = Decimal("5")
-    item_id, employee_id = _setup_item_with_inventory(make_session, warehouse_qty)
+    item_id = _setup_item_with_inventory(make_session, warehouse_qty)
 
     successes = []
     failures = []
@@ -116,14 +99,7 @@ def test_concurrent_reserve_exact_match(concurrent_engine, make_session):
     def try_reserve():
         session = make_session()
         try:
-            employee = session.get(Employee, employee_id)
-            assert employee is not None
-            inventory_svc.reserve(
-                session,
-                item_id,
-                Decimal("1"),
-                employee=employee,
-            )
+            inventory_svc.reserve(session, item_id, Decimal("1"))
             session.commit()
             successes.append("ok")
         except ValueError:

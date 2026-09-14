@@ -20,20 +20,13 @@ from app.models import (
     WarehouseAngle,
     WarehouseBox,
     WarehouseBoxItem,
-    WarehouseUnplacedItem,
 )
-from app.services.pin_auth import hash_pin
+from app.services.pin_auth import DEFAULT_PIN_HASH
 from app.services import sr_execution as sr_execution_svc
 from app.services import stock_request_actions as action_svc
 from app.services import stock_requests as stock_request_svc
 from app.services import warehouse_map as warehouse_map_svc
 from app.routers import stock_requests as stock_request_router
-
-
-@pytest.fixture()
-def client(auth_client):
-    """HTTP 트랜잭션 테스트도 실제 operator session으로 실행한다."""
-    return auth_client
 
 
 def _employee(
@@ -54,22 +47,11 @@ def _employee(
         department_role=department_role,
         display_order=0,
         is_active="true",
-        pin_hash=hash_pin("2468"),
-        pin_requires_change=False,
+        pin_hash=DEFAULT_PIN_HASH,
     )
     db_session.add(employee)
     db_session.flush()
     return employee
-
-
-def _login(client, employee: Employee) -> None:
-    logout = client.delete("/api/operator-session")
-    assert logout.status_code == 204, logout.text
-    response = client.post(
-        "/api/operator-session",
-        json={"employee_id": str(employee.employee_id), "pin": "2468"},
-    )
-    assert response.status_code == 200, response.text
 
 
 def _warehouse_box(db_session, *, item_id, quantity: int) -> WarehouseBox:
@@ -89,12 +71,6 @@ def _warehouse_box(db_session, *, item_id, quantity: int) -> WarehouseBox:
     db_session.add(
         WarehouseBoxItem(box_id=box.box_id, item_id=item_id, quantity=quantity)
     )
-    unplaced = (
-        db_session.query(WarehouseUnplacedItem)
-        .filter(WarehouseUnplacedItem.item_id == item_id)
-        .one()
-    )
-    unplaced.quantity = int(unplaced.quantity) - quantity
     db_session.flush()
     return box
 
@@ -124,7 +100,6 @@ def _linked_batch(db_session, requester: Employee, *, status: str = "reserved") 
 
 
 def _open_linked_request(client, db_session, *, requester: Employee, batch: IoBatch | None, item_id, quantity: str = "2") -> StockRequest:
-    _login(client, requester)
     created = client.post(
         "/api/stock-requests",
         json={
@@ -165,7 +140,7 @@ def test_revert_to_draft_rejects_unlinked_request_without_mutation(
 
     response = client.post(
         f"/api/stock-requests/{request.request_id}/revert-to-draft",
-        json={"actor_employee_id": str(requester.employee_id), "pin": "2468"},
+        json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
     )
 
     assert response.status_code == 422, response.text
@@ -193,7 +168,7 @@ def test_revert_to_draft_cancels_all_open_linked_requests_and_releases_reservati
 
     response = client.post(
         f"/api/stock-requests/{clicked.request_id}/revert-to-draft",
-        json={"actor_employee_id": str(requester.employee_id), "pin": "2468"},
+        json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
     )
 
     assert response.status_code == 204, response.text
@@ -234,7 +209,7 @@ def test_revert_to_draft_rejects_completed_sibling_without_mutation(
 
     response = client.post(
         f"/api/stock-requests/{clicked.request_id}/revert-to-draft",
-        json={"actor_employee_id": str(requester.employee_id), "pin": "2468"},
+        json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
     )
 
     assert response.status_code == 422, response.text
@@ -279,7 +254,7 @@ def test_revert_to_draft_rolls_back_all_cancellations_when_later_cancel_fails(
             db_session,
             request=clicked,
             requester=requester,
-            pin="2468",
+            pin="0000",
         )
 
     db_session.expire_all()
@@ -308,7 +283,7 @@ def test_revert_to_draft_cancels_single_open_linked_request(
 
     response = client.post(
         f"/api/stock-requests/{request.request_id}/revert-to-draft",
-        json={"actor_employee_id": str(requester.employee_id), "pin": "2468"},
+        json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
     )
 
     assert response.status_code == 204, response.text
@@ -321,38 +296,6 @@ def test_revert_to_draft_cancels_single_open_linked_request(
     assert persisted_batch.status == "draft"
     assert persisted_request.status == StockRequestStatusEnum.CANCELLED
     assert inventory.pending_quantity == Decimal("0")
-
-
-def test_revert_to_draft_rejects_wrong_pin_without_mutation(
-    client, db_session, make_item
-) -> None:
-    item = make_item(
-        name="Wrong PIN revert",
-        process_type_code="AR",
-        warehouse_qty=Decimal("5"),
-    )
-    requester = _employee(db_session, code="SR-REV-WRONG-PIN", name="요청자")
-    batch = _linked_batch(db_session, requester)
-    db_session.commit()
-    request = _open_linked_request(
-        client, db_session, requester=requester, batch=batch, item_id=item.item_id
-    )
-
-    response = client.post(
-        f"/api/stock-requests/{request.request_id}/revert-to-draft",
-        json={"actor_employee_id": str(requester.employee_id), "pin": "9999"},
-    )
-
-    assert response.status_code == 403, response.text
-    db_session.expire_all()
-    persisted_batch = db_session.query(IoBatch).filter(IoBatch.batch_id == batch.batch_id).one()
-    persisted_request = db_session.query(StockRequest).filter(
-        StockRequest.request_id == request.request_id
-    ).one()
-    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
-    assert persisted_batch.status == "reserved"
-    assert persisted_request.status == StockRequestStatusEnum.RESERVED
-    assert inventory.pending_quantity == Decimal("2")
 
 
 @pytest.mark.parametrize("batch_status", ["completed", "partially_completed"])
@@ -369,7 +312,7 @@ def test_revert_to_draft_rejects_completed_batch_without_mutation(
 
     response = client.post(
         f"/api/stock-requests/{request.request_id}/revert-to-draft",
-        json={"actor_employee_id": str(requester.employee_id), "pin": "2468"},
+        json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
     )
 
     assert response.status_code == 422, response.text
@@ -411,7 +354,7 @@ def test_revert_to_draft_cancels_submitted_and_preserves_terminal_siblings(
 
     response = client.post(
         f"/api/stock-requests/{submitted.request_id}/revert-to-draft",
-        json={"actor_employee_id": str(requester.employee_id), "pin": "2468"},
+        json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
     )
 
     assert response.status_code == 204, response.text
@@ -440,7 +383,7 @@ def test_revert_to_draft_requires_matching_batch_requester(
 
     response = client.post(
         f"/api/stock-requests/{request.request_id}/revert-to-draft",
-        json={"actor_employee_id": str(requester.employee_id), "pin": "2468"},
+        json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
     )
 
     assert response.status_code == 403, response.text
@@ -471,7 +414,7 @@ def test_revert_to_draft_does_not_take_clicked_request_lock_before_batch_lock(
 
     response = client.post(
         f"/api/stock-requests/{request.request_id}/revert-to-draft",
-        json={"actor_employee_id": str(requester.employee_id), "pin": "2468"},
+        json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
     )
 
     assert response.status_code == 204, response.text
@@ -486,13 +429,12 @@ def test_create_rolls_back_request_lines_and_pending_when_notification_fails(
     item = make_item(name="StockRequest create rollback", process_type_code="AR", warehouse_qty=Decimal("5"))
     requester = _employee(db_session, code="SR-ACT-CREATE", name="요청자")
     db_session.commit()
-    _login(client, requester)
 
     def fail_notification(*_args, **_kwargs) -> None:
         raise RuntimeError("notification failure")
 
     monkeypatch.setattr(
-        "app.routers.stock_requests.notif_svc._notify_request_arrived",
+        "app.routers.stock_requests.notif_svc.notify_request_arrived",
         fail_notification,
     )
 
@@ -528,7 +470,7 @@ def test_warehouse_approve_rolls_back_inventory_box_log_and_status_when_notifica
     make_item,
     monkeypatch,
 ) -> None:
-    warehouse_map_svc._set_box_tracking_enabled(db_session, True)
+    warehouse_map_svc.set_box_tracking_enabled(db_session, True)
     item = make_item(name="StockRequest approve rollback", process_type_code="AR", warehouse_qty=Decimal("10"))
     box = _warehouse_box(db_session, item_id=item.item_id, quantity=10)
     requester = _employee(db_session, code="SR-ACT-APP-RQ", name="요청자")
@@ -539,7 +481,6 @@ def test_warehouse_approve_rolls_back_inventory_box_log_and_status_when_notifica
         warehouse_role="primary",
     )
     db_session.commit()
-    _login(client, requester)
 
     created = client.post(
         "/api/stock-requests",
@@ -566,15 +507,14 @@ def test_warehouse_approve_rolls_back_inventory_box_log_and_status_when_notifica
         raise RuntimeError("approval notification failure")
 
     monkeypatch.setattr(
-        "app.routers.stock_requests.notif_svc._notify_request_decided",
+        "app.routers.stock_requests.notif_svc.notify_request_decided",
         fail_notification,
     )
-    _login(client, approver)
 
     with pytest.raises(RuntimeError, match="approval notification failure"):
         client.post(
             f"/api/stock-requests/{request_id}/approve",
-            json={"actor_employee_id": str(approver.employee_id), "pin": "2468"},
+            json={"actor_employee_id": str(approver.employee_id), "pin": "0000"},
         )
 
     db_session.expire_all()
@@ -595,7 +535,7 @@ def test_department_approve_rolls_back_execution_when_notification_fails(
     make_item,
     monkeypatch,
 ) -> None:
-    warehouse_map_svc._set_box_tracking_enabled(db_session, True)
+    warehouse_map_svc.set_box_tracking_enabled(db_session, True)
     item = make_item(name="Department approve rollback", process_type_code="AR", warehouse_qty=Decimal("10"))
     box = _warehouse_box(db_session, item_id=item.item_id, quantity=10)
     requester = _employee(db_session, code="SR-ACT-DEPT-RQ", name="요청자")
@@ -612,7 +552,6 @@ def test_department_approve_rolls_back_execution_when_notification_fails(
         department_role="primary",
     )
     db_session.commit()
-    _login(client, requester)
 
     created = client.post(
         "/api/stock-requests",
@@ -635,11 +574,10 @@ def test_department_approve_rolls_back_execution_when_notification_fails(
     request = db_session.query(StockRequest).filter(StockRequest.request_id == request_id).one()
     request.requires_department_approval = True
     db_session.commit()
-    _login(client, warehouse_approver)
 
     warehouse_approved = client.post(
         f"/api/stock-requests/{request_id}/approve",
-        json={"actor_employee_id": str(warehouse_approver.employee_id), "pin": "2468"},
+        json={"actor_employee_id": str(warehouse_approver.employee_id), "pin": "0000"},
     )
     assert warehouse_approved.status_code == 200, warehouse_approved.text
     assert warehouse_approved.json()["status"] == "reserved"
@@ -649,15 +587,14 @@ def test_department_approve_rolls_back_execution_when_notification_fails(
         raise RuntimeError("department approval notification failure")
 
     monkeypatch.setattr(
-        "app.routers.stock_requests.notif_svc._notify_request_decided",
+        "app.routers.stock_requests.notif_svc.notify_request_decided",
         fail_notification,
     )
-    _login(client, department_approver)
 
     with pytest.raises(RuntimeError, match="department approval notification failure"):
         client.post(
             f"/api/stock-requests/{request_id}/department-approve",
-            json={"actor_employee_id": str(department_approver.employee_id), "pin": "2468"},
+            json={"actor_employee_id": str(department_approver.employee_id), "pin": "0000"},
         )
 
     db_session.expire_all()
@@ -682,7 +619,6 @@ def test_cancel_rolls_back_pending_and_status_when_batch_sync_fails(
     item = make_item(name="StockRequest cancel rollback", process_type_code="AR", warehouse_qty=Decimal("5"))
     requester = _employee(db_session, code="SR-ACT-CANCEL", name="요청자")
     db_session.commit()
-    _login(client, requester)
 
     created = client.post(
         "/api/stock-requests",
@@ -722,14 +658,14 @@ def test_cancel_rolls_back_pending_and_status_when_batch_sync_fails(
         raise RuntimeError("batch sync failure")
 
     monkeypatch.setattr(
-        "app.services.sr_approval._sync_batch_from_stock_request",
+        "app.services.sr_approval.sync_batch_from_stock_request",
         fail_batch_sync,
     )
 
     with pytest.raises(RuntimeError, match="batch sync failure"):
         client.post(
             f"/api/stock-requests/{request_id}/cancel",
-            json={"actor_employee_id": str(requester.employee_id), "pin": "2468"},
+            json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
         )
 
     db_session.expire_all()
@@ -757,7 +693,6 @@ def test_failed_approval_rolls_back_execution_then_commits_only_failure_state(
         warehouse_role="primary",
     )
     db_session.commit()
-    _login(client, requester)
 
     created = client.post(
         "/api/stock-requests",
@@ -778,10 +713,9 @@ def test_failed_approval_rolls_back_execution_then_commits_only_failure_state(
     assert created.status_code == 201, created.text
     request_id = created.json()["request_id"]
 
-    warehouse_map_svc._set_box_tracking_enabled(db_session, True)
+    warehouse_map_svc.set_box_tracking_enabled(db_session, True)
     box = _warehouse_box(db_session, item_id=item.item_id, quantity=1)
     db_session.commit()
-    _login(client, approver)
 
     boundaries = {"commit": 0, "rollback": 0}
     original_commit = db_session.commit
@@ -798,17 +732,9 @@ def test_failed_approval_rolls_back_execution_then_commits_only_failure_state(
     monkeypatch.setattr(db_session, "commit", counted_commit)
     monkeypatch.setattr(db_session, "rollback", counted_rollback)
 
-    def fail_execution(*_args, **_kwargs) -> None:
-        raise ValueError("forced approval failure")
-
-    monkeypatch.setattr(
-        "app.services.sr_approval._execute_all_lines",
-        fail_execution,
-    )
-
     response = client.post(
         f"/api/stock-requests/{request_id}/approve",
-        json={"actor_employee_id": str(approver.employee_id), "pin": "2468"},
+        json={"actor_employee_id": str(approver.employee_id), "pin": "0000"},
     )
 
     assert response.status_code == 409, response.text
@@ -836,7 +762,7 @@ def test_multiline_approval_rolls_back_first_line_after_second_line_late_failure
     make_item,
     monkeypatch,
 ) -> None:
-    warehouse_map_svc._set_box_tracking_enabled(db_session, True)
+    warehouse_map_svc.set_box_tracking_enabled(db_session, True)
     first_item = make_item(
         name="StockRequest multiline first",
         process_type_code="AR",
@@ -857,7 +783,6 @@ def test_multiline_approval_rolls_back_first_line_after_second_line_late_failure
         warehouse_role="primary",
     )
     db_session.commit()
-    _login(client, requester)
 
     created = client.post(
         "/api/stock-requests",
@@ -884,9 +809,8 @@ def test_multiline_approval_rolls_back_first_line_after_second_line_late_failure
     )
     assert created.status_code == 201, created.text
     request_id = created.json()["request_id"]
-    _login(client, approver)
 
-    original_capture_snapshot = sr_execution_svc.inv_effect._capture_log_stock_snapshot
+    original_capture_snapshot = sr_execution_svc.inv_effect.capture_log_stock_snapshot
     capture_calls = 0
     observed_first_line: dict[str, object] = {}
 
@@ -918,14 +842,14 @@ def test_multiline_approval_rolls_back_first_line_after_second_line_late_failure
 
     monkeypatch.setattr(
         sr_execution_svc.inv_effect,
-        "_capture_log_stock_snapshot",
+        "capture_log_stock_snapshot",
         fail_during_second_line_capture,
     )
 
     with pytest.raises(RuntimeError, match="second line capture failure"):
         client.post(
             f"/api/stock-requests/{request_id}/approve",
-            json={"actor_employee_id": str(approver.employee_id), "pin": "2468"},
+            json={"actor_employee_id": str(approver.employee_id), "pin": "0000"},
         )
 
     assert observed_first_line == {

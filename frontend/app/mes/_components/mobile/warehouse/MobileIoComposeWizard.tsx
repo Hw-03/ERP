@@ -27,6 +27,7 @@ import { StatusTargetNotice, useStatusTargetNotice } from "../../common/StatusTa
 import {
   IO_WORK_TYPES,
   approvalKind,
+  canSeeWorkType,
   ioDepartmentPayload,
   isExitWorkType,
   isSingleInlineSubType,
@@ -127,9 +128,6 @@ export function MobileIoComposeWizard({
   );
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<IoSubmitResultState | null>(null);
-  const errorSummaryRef = useRef<HTMLDivElement>(null);
-  const submitButtonRef = useRef<HTMLButtonElement>(null);
-  const scannerTriggerRef = useRef<HTMLElement | null>(null);
   const {
     notice: feedbackNotice,
     showNotice: showFeedbackNotice,
@@ -144,6 +142,16 @@ export function MobileIoComposeWizard({
   const itemAddBlocked = bomListQuery.isPending || bomListQuery.isError;
   const bomRevisionRef = useRef(revision);
   const state = useIoWorkState(defaultWorkType, operator?.department, getAvailable);
+  const authorizedEntryIntent = entryIntent
+    && IO_WORK_TYPES.some((row) => row.id === entryIntent.workType)
+    && canSeeWorkType(entryIntent.workType, operator)
+    ? entryIntent
+    : null;
+  const canRestoreDraft = Boolean(
+    draftToRestore
+      && IO_WORK_TYPES.some((row) => row.id === draftToRestore.work_type)
+      && canSeeWorkType(draftToRestore.work_type, operator),
+  );
   const [
     pullSelected,
     setPullSelected,
@@ -198,38 +206,19 @@ export function MobileIoComposeWizard({
   };
   const internalUsePreviewLock = useInternalUseBomPreviewLock();
   const intentAppliedRef = useRef(false);
-
-  useEffect(() => {
-    if (error) errorSummaryRef.current?.focus();
-  }, [error]);
-
-  function openScanner() {
-    const activeElement = document.activeElement;
-    scannerTriggerRef.current = activeElement instanceof HTMLElement ? activeElement : null;
-    setScanOpen(true);
-  }
-
-  function closeScanner() {
-    setScanOpen(false);
-    window.requestAnimationFrame(() => {
-      if (scannerTriggerRef.current?.isConnected) scannerTriggerRef.current.focus();
-    });
-  }
-
-  function closeSubmitResult() {
-    setResult(null);
-    window.requestAnimationFrame(() => {
-      if (submitButtonRef.current?.isConnected) submitButtonRef.current.focus();
-    });
-  }
   useEffect(() => {
     if (!entryIntent || intentAppliedRef.current) return;
     intentAppliedRef.current = true;
-    state.setWorkType(entryIntent.workType);
-    if (entryIntent.workType === "process" && entryIntent.direction) {
-      state.setDeptIoDirection(entryIntent.direction);
-    } else if (entryIntent.subType) {
-      state.setSubType(entryIntent.subType);
+    if (!authorizedEntryIntent) {
+      setError("권한이 없는 작업 유형입니다.");
+      state.goTo(1);
+      return;
+    }
+    state.setWorkType(authorizedEntryIntent.workType);
+    if (authorizedEntryIntent.workType === "process" && authorizedEntryIntent.direction) {
+      state.setDeptIoDirection(authorizedEntryIntent.direction);
+    } else if (authorizedEntryIntent.subType) {
+      state.setSubType(authorizedEntryIntent.subType);
     }
     state.goTo(3);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -258,6 +247,7 @@ export function MobileIoComposeWizard({
     state,
     onStatusChange,
     restoreStep,
+    canRestore: canRestoreDraft,
     getAvailable,
     inventorySnapshot: items,
   });
@@ -370,7 +360,7 @@ export function MobileIoComposeWizard({
   }
 
   useIoPreselect({
-    preselectedItem,
+    preselectedItem: entryIntent && !authorizedEntryIntent ? null : preselectedItem,
     bomParents,
     bomParentsLoaded,
     workType: state.workType,
@@ -378,7 +368,7 @@ export function MobileIoComposeWizard({
     fromDepartment: state.fromDepartment,
     toDepartment: state.toDepartment,
     deptIoDirection: state.deptIoDirection,
-    forceManual: entryIntent?.forceManualItem,
+    forceManual: authorizedEntryIntent?.forceManualItem,
     addItem,
     setHighlightItemId,
   });
@@ -670,11 +660,6 @@ export function MobileIoComposeWizard({
       <div className="sg min-h-0 flex-1 overflow-y-auto px-3 pb-6">
         {error && (
           <div
-            ref={errorSummaryRef}
-            role="alert"
-            aria-label="입출고 작업 오류"
-            aria-atomic="true"
-            tabIndex={-1}
             className="mb-3 rounded-[12px] border px-4 py-3 text-sm font-bold"
             style={{
               background: tint(LEGACY_COLORS.red, 10),
@@ -688,7 +673,7 @@ export function MobileIoComposeWizard({
 
         {step === 1 && (
           <MobileWorkTypeStep
-            workType={state.workType}
+            selectedWorkType={state.hasSelectedWorkType ? state.workType : null}
             operator={operator}
             onWorkTypeChange={handleWorkTypeChange}
           />
@@ -747,7 +732,7 @@ export function MobileIoComposeWizard({
                 state.setBundles((prev) => prev.filter((b) => b.bundle_id !== bundleId))
               }
               getAvailable={getAvailable}
-              onScan={openScanner}
+              onScan={() => setScanOpen(true)}
               onSaveDraft={() => {
                 void handleSaveDraft();
               }}
@@ -779,7 +764,7 @@ export function MobileIoComposeWizard({
                 <PrimaryActionButton
                   label="스캔으로 시작"
                   icon={ScanLine}
-                  onClick={openScanner}
+                  onClick={() => setScanOpen(true)}
                 />
               </div>
               <IoTargetPicker
@@ -913,7 +898,6 @@ export function MobileIoComposeWizard({
             onValidationError={(message) => showFeedbackNotice(message, "error")}
             onSubmit={handleSubmit}
             onSaveDraft={handleSaveDraft}
-            submitButtonRef={submitButtonRef}
           />
         )}
       </div>
@@ -937,7 +921,7 @@ export function MobileIoComposeWizard({
         </StickyFooter>
       )}
 
-      <IoSubmitModals result={result} onClose={closeSubmitResult} />
+      <IoSubmitModals result={result} onClose={() => setResult(null)} />
       {feedbackNotice && (
         <StatusTargetNotice
           key={feedbackNotice.id}
@@ -949,7 +933,7 @@ export function MobileIoComposeWizard({
       {scanOpen && (
         <BarcodeScannerModal
           onDetected={handleScanDetected}
-          onClose={closeScanner}
+          onClose={() => setScanOpen(false)}
         />
       )}
     </div>

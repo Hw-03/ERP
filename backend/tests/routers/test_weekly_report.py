@@ -1326,8 +1326,10 @@ def test_verified_weekly_report_groups_ceramic_tube_housing_under_hf(client, db_
     assert matrix["SOLO"]["hf_qty"] == 2
 
 
-def test_vacuum_generator_scope_starts_with_week_of_2026_09_07(client, db_session):
+def test_vacuum_generator_scope_starts_with_week_of_2026_09_07(client, db_session, monkeypatch):
     """9/6 경계 백필은 다음 주 기준선이며 8월 5주차 표의 신규 범위를 소급하지 않는다."""
+    from app.routers.inventory import weekly_report
+    monkeypatch.setattr(weekly_report, "_today_kst", lambda: date(2026, 9, 11))
     target = _make_prod_item(
         db_session,
         name="발생부 (진공) [DX3000]",
@@ -1370,8 +1372,10 @@ def test_vacuum_generator_scope_starts_with_week_of_2026_09_07(client, db_sessio
     assert [row["item_id"] for row in vf_group["items"]] == [str(target.item_id)]
 
 
-def test_ceramic_tube_housing_scope_starts_with_week_of_2026_09_07(client, db_session):
+def test_ceramic_tube_housing_scope_starts_with_week_of_2026_09_07(client, db_session, monkeypatch):
     """9/6 경계의 HA 추가는 다음 주 고압 보고에서만 보인다."""
+    from app.routers.inventory import weekly_report
+    monkeypatch.setattr(weekly_report, "_today_kst", lambda: date(2026, 9, 11))
     target = _make_prod_item(
         db_session,
         name="세라믹튜브 70KV 하우징 [DXDR-070] [DX3000, ADX4000W, ADX6000, SOLO]",

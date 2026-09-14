@@ -66,7 +66,6 @@ const location = {
   quarantined_by: "Operator",
   quarantined_by_employee_id: "employee-1",
   is_legacy: false,
-  legacy_origin: null,
   has_bom: true,
 } satisfies DefectLocation;
 

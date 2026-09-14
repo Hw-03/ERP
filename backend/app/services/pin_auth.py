@@ -1,17 +1,17 @@
-"""직원 PIN의 버전형 해시 생성과 legacy 검증."""
+"""PIN 해싱 및 검증 유틸리티.
 
-from __future__ import annotations
+작업자 식별용 — 실제 보안 인증이 아님.
+4자리 PIN으로 작업자를 식별하는 경량 인증 헬퍼.
+"""
 
 import base64
-from dataclasses import dataclass
 import hashlib
 import hmac
-import secrets
 
+from fastapi import HTTPException
 
 DEFAULT_PIN = "0000"
 PBKDF2_ALGORITHM = "pbkdf2_sha256"
-PBKDF2_ITERATIONS = 600_000
 PBKDF2_SALT_BYTES = 16
 PBKDF2_DIGEST_BYTES = 32
 _MAX_ACCEPTED_ITERATIONS = 2_000_000
@@ -30,55 +30,32 @@ _BASE64URL_ALPHABET = frozenset(
 )
 
 
-def _legacy_hash_pin(pin: str) -> str:
+def validate_pin(pin: str) -> None:
+    """PIN이 정확히 4자리 숫자인지 검증. 아니면 HTTP 422."""
+    if not (len(pin) == 4 and pin.isdigit()):
+        raise HTTPException(status_code=422, detail="PIN 은 4자리 숫자여야 합니다")
+
+
+def hash_pin(pin: str) -> str:
+    """PIN 문자열을 SHA-256 해시로 변환."""
     return hashlib.sha256(pin.encode("utf-8")).hexdigest()
 
 
-# 마이그레이션과 legacy fixture 판별 전용이다. 신규 저장에는 사용하지 않는다.
-DEFAULT_PIN_HASH: str = _legacy_hash_pin(DEFAULT_PIN)
-
-
-@dataclass(frozen=True)
-class PinVerificationResult:
-    """검증 결과와 같은 transaction에서 저장할 선택적 업그레이드 해시."""
-
-    is_valid: bool
-    upgraded_hash: str | None = None
-
-
-def validate_pin(pin: str) -> None:
-    """PIN이 정확히 4자리 숫자인지 검증한다."""
-    if not (len(pin) == 4 and pin.isascii() and pin.isdigit()):
-        raise ValueError("PIN 은 4자리 숫자여야 합니다")
-
-
 def _encode(value: bytes) -> str:
+    """PBKDF2 구성 요소를 canonical URL-safe Base64로 인코딩한다."""
     return base64.urlsafe_b64encode(value).decode("ascii")
 
 
 def _decode(value: str) -> bytes:
+    """검증을 마친 Base64 구성 요소를 엄격하게 디코딩한다."""
     return base64.b64decode(value.encode("ascii"), altchars=b"-_", validate=True)
 
 
-def hash_pin(pin: str, *, iterations: int = PBKDF2_ITERATIONS) -> str:
-    """각 credential마다 새 salt를 사용하는 PBKDF2-HMAC-SHA256 해시를 만든다."""
-    if not isinstance(iterations, int) or not (
-        PBKDF2_ITERATIONS <= iterations <= _MAX_ACCEPTED_ITERATIONS
-    ):
-        raise ValueError("iterations must use the approved PBKDF2 work factor")
-    salt = secrets.token_bytes(PBKDF2_SALT_BYTES)
-    digest = hashlib.pbkdf2_hmac(
-        "sha256",
-        pin.encode("utf-8"),
-        salt,
-        iterations,
-        dklen=PBKDF2_DIGEST_BYTES,
-    )
-    return f"{PBKDF2_ALGORITHM}${iterations}${_encode(salt)}${_encode(digest)}"
-
-
 def _is_legacy_sha256(value: str) -> bool:
-    return len(value) == 64 and all(character in "0123456789abcdef" for character in value)
+    """레거시 소문자 SHA-256 hex 형식인지 판별한다."""
+    return len(value) == 64 and all(
+        character in "0123456789abcdef" for character in value
+    )
 
 
 def _has_canonical_base64url_shape(
@@ -87,12 +64,16 @@ def _has_canonical_base64url_shape(
     encoded_length: int,
     padding: str,
 ) -> bool:
+    """디코딩 전에 고정 길이와 URL-safe alphabet을 제한한다."""
     if len(value) != encoded_length or not value.endswith(padding):
         return False
-    return all(character in _BASE64URL_ALPHABET for character in value[: -len(padding)])
+    return all(
+        character in _BASE64URL_ALPHABET for character in value[: -len(padding)]
+    )
 
 
 def _verify_pbkdf2(stored_hash: str, input_pin: str) -> bool:
+    """비용과 구성 요소 크기를 제한하며 canonical PBKDF2 해시를 검증한다."""
     if len(stored_hash) > _MAX_PBKDF2_HASH_LENGTH:
         return False
     segments = stored_hash.split("$")
@@ -143,27 +124,15 @@ def _verify_pbkdf2(stored_hash: str, input_pin: str) -> bool:
     return hmac.compare_digest(actual, expected)
 
 
-def verify_pin_and_upgrade(
-    stored_hash: str | None,
-    input_pin: str,
-) -> PinVerificationResult:
-    """PBKDF2와 legacy SHA-256을 검증하고 legacy 성공 시 새 해시를 반환한다."""
-    if stored_hash is None:
-        valid = hmac.compare_digest(input_pin, DEFAULT_PIN)
-        return PinVerificationResult(valid, hash_pin(input_pin) if valid else None)
-    if stored_hash.startswith(f"{PBKDF2_ALGORITHM}$"):
-        valid = _verify_pbkdf2(stored_hash, input_pin)
-        if not valid:
-            return PinVerificationResult(False)
-        iterations = int(stored_hash.split("$", 2)[1])
-        upgraded_hash = hash_pin(input_pin) if iterations < PBKDF2_ITERATIONS else None
-        return PinVerificationResult(True, upgraded_hash)
-    if not _is_legacy_sha256(stored_hash):
-        return PinVerificationResult(False)
-    valid = hmac.compare_digest(stored_hash, _legacy_hash_pin(input_pin))
-    return PinVerificationResult(valid, hash_pin(input_pin) if valid else None)
-
-
 def verify_pin(stored_hash: str | None, input_pin: str) -> bool:
-    """저장 형식과 무관하게 PIN을 검증한다."""
-    return verify_pin_and_upgrade(stored_hash, input_pin).is_valid
+    """PBKDF2 또는 legacy SHA-256 해시를 읽기 전용으로 검증한다."""
+    if stored_hash is None:
+        return hmac.compare_digest(hash_pin(input_pin), DEFAULT_PIN_HASH)
+    if stored_hash.startswith(f"{PBKDF2_ALGORITHM}$"):
+        return _verify_pbkdf2(stored_hash, input_pin)
+    if not _is_legacy_sha256(stored_hash):
+        return False
+    return hmac.compare_digest(stored_hash, hash_pin(input_pin))
+
+
+DEFAULT_PIN_HASH: str = hash_pin(DEFAULT_PIN)

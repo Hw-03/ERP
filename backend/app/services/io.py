@@ -34,6 +34,7 @@ from app.services.io_preview import (  # noqa: F401
 from app.services.io_persist import (  # noqa: F401
     _load_requester,
     get_batch,
+    sync_batch_from_stock_request,
 )
 
 # ---------------------------------------------------------------------------

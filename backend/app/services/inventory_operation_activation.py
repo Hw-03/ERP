@@ -20,7 +20,7 @@ from app.models import (
     SystemSetting,
 )
 from app.services.inventory_integrity import diagnose_inventory_integrity
-from app.services.inventory_operations import CUTOVER_SETTING_KEY, V2_CUTOVER_SETTING_KEY
+from app.services.inventory_operations import CUTOVER_SETTING_KEY
 from app.services.weekly_report_contract import WEEKLY_V2_SETTING_KEY
 
 
@@ -207,13 +207,7 @@ def activate_inventory_operation_contract(
         _seed_defect_cutover_baselines(db, ledger_start=ledger_start)
         diagnostic = diagnose_inventory_integrity(db)
         if not diagnostic.is_consistent:
-            sample_ids = [
-                check.check_id
-                for check in diagnostic.checks
-                if check.severity == "blocking" and check.count
-            ]
-            sample_ids.extend(issue.problem_id for issue in diagnostic.issues)
-            sample = ", ".join(list(dict.fromkeys(sample_ids))[:5])
+            sample = ", ".join(issue.problem_id for issue in diagnostic.issues[:5])
             raise InventoryOperationActivationError(
                 f"정합성 진단이 통과하지 않아 활성화할 수 없습니다: {sample}"
             )
@@ -223,8 +217,6 @@ def activate_inventory_operation_contract(
             return report
 
         _upsert_setting(db, CUTOVER_SETTING_KEY, ledger_start)
-        if _stored_datetime(db, V2_CUTOVER_SETTING_KEY) is None:
-            _upsert_setting(db, V2_CUTOVER_SETTING_KEY, resolved_now.astimezone(UTC))
         _upsert_setting(db, WEEKLY_V2_SETTING_KEY, weekly_start)
         db.add(
             AdminAuditLog(

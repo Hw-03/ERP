@@ -10,7 +10,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useIoUrlSync } from "../useIoUrlSync";
-import type { IoStep } from "../useIoWorkState";
+import { useIoWorkState, type IoStep } from "../useIoWorkState";
 
 function makeSearchParams(query: string) {
   const usp = new URLSearchParams(query);
@@ -23,6 +23,62 @@ function makeSearchParams(query: string) {
 const ALL_TRUE: Record<IoStep, boolean> = { 1: true, 2: true, 3: true, 4: true, 5: true };
 
 describe("useIoUrlSync", () => {
+  it("새 작업 진입에서는 URL step만으로 작업 유형 선택을 건너뛰지 않는다", () => {
+    window.history.replaceState(null, "", "/wh?step=5");
+    const push = vi.fn();
+
+    const { result } = renderHook(() => {
+      const state = useIoWorkState();
+      useIoUrlSync({
+        step: state.step,
+        goTo: state.goTo,
+        canAdvance: state.canAdvance,
+        router: { push },
+        searchParams: makeSearchParams("step=5"),
+        pathname: "/wh",
+      });
+      return state;
+    });
+
+    expect(result.current.step).toBe(1);
+    expect(result.current.hasSelectedWorkType).toBe(false);
+    expect(push).toHaveBeenCalledWith("/wh?step=1", { scroll: false });
+  });
+
+  it("clamp한 URL 반영이 늦어도 이미 진행한 작업 단계를 되돌리지 않는다", () => {
+    window.history.replaceState(null, "", "/wh?step=5");
+    const push = vi.fn((href: string) => {
+      window.history.pushState(null, "", href);
+    });
+    const { result, rerender } = renderHook(
+      ({ searchParams }: { searchParams: ReturnType<typeof makeSearchParams> }) => {
+        const state = useIoWorkState();
+        useIoUrlSync({
+          step: state.step,
+          goTo: state.goTo,
+          canAdvance: state.canAdvance,
+          router: { push },
+          searchParams,
+          pathname: "/wh",
+        });
+        return state;
+      },
+      { initialProps: { searchParams: makeSearchParams("step=5") } },
+    );
+
+    expect(result.current.step).toBe(1);
+    act(() => {
+      result.current.setWorkType("process");
+      result.current.goTo(2);
+    });
+    expect(result.current.step).toBe(2);
+
+    rerender({ searchParams: makeSearchParams("step=1") });
+
+    expect(result.current.step).toBe(2);
+    expect(window.location.search).toBe("?step=2");
+  });
+
   it("state.step 이 URL 과 다르면 router.push 로 ?step=N 갱신", () => {
     window.history.replaceState(null, "", "/wh?step=1");
     const push = vi.fn();
@@ -50,6 +106,7 @@ describe("useIoUrlSync", () => {
   });
 
   it("URL step 이 state 보다 앞서면 goTo 호출", () => {
+    window.history.replaceState(null, "", "/wh?step=1");
     const goTo = vi.fn();
     const { rerender } = renderHook(
       ({ searchParams }: { searchParams: ReturnType<typeof makeSearchParams> }) =>
@@ -67,6 +124,7 @@ describe("useIoUrlSync", () => {
     expect(goTo).not.toHaveBeenCalled();
 
     // 뒤로/앞으로 → URL ?step=3
+    window.history.replaceState(null, "", "/wh?step=3");
     rerender({ searchParams: makeSearchParams("step=3") });
     expect(goTo).toHaveBeenCalledWith(3);
   });
@@ -112,6 +170,7 @@ describe("useIoUrlSync", () => {
   });
 
   it("pendingFinalStepRef 가 채워지면 URL 따라잡힌 직후 자동 goTo", () => {
+    window.history.replaceState(null, "", "/wh?step=3");
     const goTo = vi.fn();
     let pendingRef: React.MutableRefObject<IoStep | null> | null = null;
     const { rerender } = renderHook(
@@ -136,6 +195,7 @@ describe("useIoUrlSync", () => {
     });
 
     // URL 이 4 로 따라잡힘
+    window.history.replaceState(null, "", "/wh?step=4");
     rerender({ step: 4 as IoStep, searchParams: makeSearchParams("step=4") });
 
     expect(goTo).toHaveBeenCalledWith(5);

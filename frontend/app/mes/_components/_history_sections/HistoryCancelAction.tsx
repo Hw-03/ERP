@@ -28,7 +28,6 @@ export type HistoryCancelController = {
   reason: string;
   pin: string;
   error: string;
-  warnings: string[];
   scopeStatus: HistoryCancelScopeStatus;
   openConfirmation: () => void;
   closeConfirmation: () => void;
@@ -44,7 +43,6 @@ type HistoryCancellationScopeState = {
   logs: TransactionLog[];
   planHash: string | null;
   blocker: string | null;
-  warnings: string[];
   workflowMessage: string | null;
 };
 
@@ -52,13 +50,7 @@ function scopeState(
   scopeKey: string,
   status: HistoryCancelScopeStatus,
   logs: TransactionLog[] = [],
-  preview?: {
-    planHash: string;
-    canCancel: boolean;
-    blockers: string[];
-    warnings: string[];
-    effects?: Array<Record<string, unknown>>;
-  } | null,
+  preview?: { planHash: string; canCancel: boolean; blockers: string[]; effects?: Array<Record<string, unknown>> } | null,
 ): HistoryCancellationScopeState {
   const workflow = preview?.effects?.find((effect) => effect.subject_type === "ShippingRequest");
   const target = workflow?.target_state as { status?: string } | undefined;
@@ -75,7 +67,6 @@ function scopeState(
     blocker: preview && !preview.canCancel
       ? preview.blockers[0] ?? "현재 상태에서는 이 작업을 취소할 수 없습니다."
       : null,
-    warnings: preview?.warnings ?? [],
   };
 }
 
@@ -232,7 +223,6 @@ export function HistoryCancelAction({
   cancelled,
   scopeStatus = "ready",
   blocker,
-  warnings = [],
   onRetryScope,
   onSubmit,
   triggerLabel,
@@ -250,7 +240,6 @@ export function HistoryCancelAction({
   cancelled: boolean;
   scopeStatus?: HistoryCancelScopeStatus;
   blocker?: string | null;
-  warnings?: string[];
   onRetryScope?: () => void;
   onSubmit: (credentials: HistoryCancelCredentials) => Promise<void>;
   triggerLabel?: string;
@@ -343,7 +332,6 @@ export function HistoryCancelAction({
     reason,
     pin,
     error,
-    warnings,
     scopeStatus,
     openConfirmation: () => {
       if (!available) return;
@@ -383,7 +371,6 @@ export function HistoryCancelAction({
       <div className={desktopCancellationOpen ? "hc-confirm-summary--desktop" : undefined}>
         <strong>취소 내용 확인</strong>
         <p>{workflowMessage ?? copy.description}</p>
-        <HistoryCancelWarnings warnings={warnings} />
         <HistoryCancelImpactPreview effects={effects} scopeCount={scopeCount} />
       </div>
 
@@ -429,16 +416,6 @@ export function HistoryCancelAction({
   }
 
   return pinToDesktopFooter && !desktopCancellationOpen ? <DesktopRightPanelFooter>{content}</DesktopRightPanelFooter> : content;
-}
-
-function HistoryCancelWarnings({ warnings }: { warnings: string[] }) {
-  if (warnings.length === 0) return null;
-  return (
-    <div className="hc-warning" role="status">
-      <strong>취소 전 확인</strong>
-      {warnings.map((warning) => <p key={warning}>{warning}</p>)}
-    </div>
-  );
 }
 
 function HistoryCancelImpactPreview({
@@ -500,7 +477,6 @@ export function HistoryMobileCancelConfirmation({
     <div className="hc-mobile">
       <strong>취소 범위 확인</strong>
       <p className="hc-scope">{workflowMessage ?? scopeDescription}</p>
-      <HistoryCancelWarnings warnings={controller.warnings} />
       <HistoryCancelImpactPreview effects={effects} scopeCount={scopeCount} />
       <textarea
         aria-label="취소 사유"

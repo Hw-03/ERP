@@ -1,6 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { RefObject } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Item, ItemConversionResult } from "@/lib/api";
 import { api } from "@/lib/api";
@@ -48,16 +47,14 @@ vi.mock("../IoConfirmStep", () => ({
     onSaveDraft,
     onSubmit,
     onValidationError,
-    submitButtonRef,
   }: {
     onSaveDraft: () => void;
     onSubmit: () => void;
     onValidationError?: (message: string) => void;
-    submitButtonRef?: RefObject<HTMLButtonElement | null>;
   }) => (
     <>
       <button type="button" data-testid="draft-save" onClick={onSaveDraft}>save</button>
-      <button ref={submitButtonRef} type="button" data-testid="confirm-submit" onClick={onSubmit}>submit</button>
+      <button type="button" data-testid="confirm-submit" onClick={onSubmit}>submit</button>
       <button type="button" data-testid="confirm-memo-error" onClick={() => onValidationError?.("메모가 없어 부서 결재 요청을 진행할 수 없습니다.")}>memo error</button>
     </>
   ),
@@ -87,14 +84,7 @@ function conversionItem(id: string, name: string, quantity: number): Item {
     legacy_part: null,
     legacy_item_type: null,
     supplier: null,
-    supplier_item_code: null,
-    standard_purchase_price: null,
-    purchase_price_effective_date: null,
     min_stock: null,
-    reorder_point: null,
-    procurement_lead_time_days: null,
-    minimum_order_quantity: null,
-    purchase_memo: null,
     mes_code: id,
     model_symbol: null,
     model_slots: [],
@@ -243,68 +233,32 @@ beforeEach(() => {
 });
 
 describe("IoComposeView navigation chrome", () => {
-  it("제출 오류를 이름 있는 alert로 알리고 오류 요약에 포커스를 둔다", async () => {
-    render(
-      <IoComposeView
-        globalSearch=""
-        operator={null}
-        employees={[]}
-        items={[]}
-        productModels={[]}
-        setItems={() => {}}
-        onStatusChange={() => {}}
-        restoreStep={5}
-        restoreDraft={{
-          batch_id: "missing-operator-draft",
-          work_type: "warehouse_io",
-          sub_type: "warehouse_to_dept",
-          from_department: null,
-          to_department: "조립",
-          reference_no: null,
-          notes: null,
-          bundles: [],
-        } as never}
-      />,
-    );
+  it("새 작업 화면에서는 사용자가 고르기 전 어떤 작업 유형도 선택 표시하지 않는다", () => {
+    renderCompose();
 
-    fireEvent.click(await screen.findByTestId("confirm-submit"));
-
-    const alert = await screen.findByRole("alert", { name: "입출고 작업 오류" });
-    expect(alert).toHaveTextContent("작업자를 선택하세요.");
-    await waitFor(() => expect(alert).toHaveFocus());
+    expect(workTypeCards().every((button) => button.getAttribute("aria-pressed") === "false")).toBe(true);
   });
 
-  it("실패 결과 모달을 닫으면 제출 버튼으로 포커스를 돌려준다", async () => {
-    vi.mocked(api.submitDraft).mockRejectedValueOnce(new Error("네트워크 오류"));
+  it("일반 직원의 권한 없는 원자재 수령 entry intent를 적용하지 않는다", async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
-      <IoComposeView
-        globalSearch=""
-        operator={operator}
-        employees={[]}
-        items={[]}
-        productModels={[]}
-        setItems={() => {}}
-        onStatusChange={() => {}}
-        restoreStep={5}
-        restoreDraft={{
-          batch_id: "failed-submit-draft",
-          work_type: "warehouse_io",
-          sub_type: "warehouse_to_dept",
-          from_department: null,
-          to_department: "조립",
-          reference_no: null,
-          notes: null,
-          bundles: [],
-        } as never}
-      />,
+      <QueryClientProvider client={queryClient}>
+        <IoComposeView
+          globalSearch=""
+          operator={operator}
+          employees={[]}
+          items={[]}
+          productModels={[]}
+          setItems={() => {}}
+          onStatusChange={() => {}}
+          entryIntent={{ workType: "receive", subType: "receive_supplier" }}
+        />
+      </QueryClientProvider>,
     );
 
-    const submitButton = await screen.findByTestId("confirm-submit");
-    fireEvent.click(submitButton);
-    expect(await screen.findByRole("dialog", { name: "제출 실패" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "확인" }));
-
-    await waitFor(() => expect(submitButton).toHaveFocus());
+    await waitFor(() => expect(screen.queryByTestId("io-step-nav")).not.toBeInTheDocument());
+    expect(screen.queryByText("원자재 수령")).not.toBeInTheDocument();
+    expect(screen.getByText("권한이 없는 작업 유형입니다.")).toBeInTheDocument();
   });
 
   it("자동 창고 이동 2단계 요약은 아직 선택 전에는 일반 방향을 표시한다", async () => {

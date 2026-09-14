@@ -187,8 +187,8 @@ def _assert_terminal_shipping_commands_fail(
 ) -> None:
     commands = (
         lambda: shipping_actions.prepare_cancel(db, request_id, actor=actor),
-        lambda: shipping_actions.pickup_complete(db, request_id, actor),
-        lambda: shipping_actions.pickup_cancel(db, request_id, actor),
+        lambda: shipping_actions.pickup_complete(db, request_id),
+        lambda: shipping_actions.pickup_cancel(db, request_id, actor=actor),
     )
     for command in commands:
         with pytest.raises(shipping_service.ShippingError):
@@ -993,15 +993,6 @@ def test_cutover_lock_rejects_unsupported_database_dialect():
 
     with pytest.raises(CutoverInputError, match="does not support.*mysql"):
         cutover._acquire_cutover_write_lock(FakeSession())
-
-
-def test_postgres_concurrency_runner_requires_cutover_table_lock_evidence():
-    runner = (ROOT / "backend" / "scripts" / "verify_postgres_concurrency.py").read_text(encoding="utf-8")
-
-    assert (
-        "tests/ops/test_inventory_cutover_postgres_locking.py::"
-        "test_postgres_cutover_lock_blocks_shipping_writer_until_rollback"
-    ) in runner
 
 
 def test_run_cutover_clears_history_map_and_reloads_inventory(cutover_session_factory):

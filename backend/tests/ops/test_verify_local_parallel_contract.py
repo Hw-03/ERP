@@ -80,9 +80,11 @@ def test_smart_frontend_gates_use_local_windows_bins_and_thread_pool() -> None:
     script = _script()
 
     assert 'Join-Path $FrontendRoot "node_modules\\.bin\\eslint.cmd"' in script
-    assert 'Join-Path $FrontendRoot "node_modules\\.bin\\tsc.cmd"' in script
     assert 'Join-Path $FrontendRoot "node_modules\\.bin\\vitest.cmd"' in script
     assert "& $FrontendEslintBin --max-warnings=0 @SourceFiles" in script
+    assert "npm run typecheck:app -- --incremental" in script
+    assert "function Assert-Node20" in script
+    assert "$nodeVersion -notmatch '^v20\\.'" in script
     assert "npx vitest related" not in script
     assert "npx vitest run @TestFiles" not in script
     assert "--pool=threads" in script

@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import Depends, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
-from app.dependencies.verified_actor import VerifiedActorRouter
 from app.models import (
     AssemblyChecklist,
     AssemblyChecklistItem,
@@ -30,7 +29,7 @@ from app.schemas.assembly_checklist import (
 )
 
 
-router = VerifiedActorRouter()
+router = APIRouter()
 
 
 def _checklist_query(db: Session):

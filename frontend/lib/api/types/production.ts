@@ -10,11 +10,7 @@ export interface InventoryEffectCell {
   delta: number | string;
   department?: string | null;
   status?: string | null;
-  row_id?: string | null;
   box_id?: string | null;
-  zone_id?: string | number | null;
-  before_quantity?: number | string | null;
-  after_quantity?: number | string | null;
   quantity_before?: number;
   quantity_after?: number;
 }
@@ -129,7 +125,6 @@ export interface InventoryOperation {
   reversalOperationId: string | null;
   canCancel: boolean;
   cancelBlockers: string[];
-  cancelWarnings: string[];
   lines: InventoryOperationLine[];
   matchingLines: InventoryOperationLine[];
   effects: InventoryOperationEffect[];
@@ -145,9 +140,7 @@ export interface InventoryOperationCancellationCell {
   scope: string;
   department: string | null;
   status: string | null;
-  rowId: string | null;
   boxId: string | null;
-  zoneId: string | null;
   quantityChange: number;
   currentQuantity: number;
   reservedQuantity: number;
@@ -159,7 +152,6 @@ export interface InventoryOperationCancellationPreview {
   planHash: string;
   canCancel: boolean;
   blockers: string[];
-  warnings: string[];
   cells: InventoryOperationCancellationCell[];
   defectRecords: Array<Record<string, unknown>>;
   effects: Array<Record<string, unknown>>;

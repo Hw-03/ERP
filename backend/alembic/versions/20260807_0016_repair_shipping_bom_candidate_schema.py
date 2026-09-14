@@ -142,17 +142,8 @@ def _upgrade_postgresql_offline() -> None:
     )
     op.execute(
         "ALTER TABLE shipping_requests "
-        "ALTER COLUMN finalization_mode DROP DEFAULT"
-    )
-    op.execute(
-        "ALTER TABLE shipping_requests "
         "ALTER COLUMN finalization_mode TYPE shipping_finalization_mode_enum "
         "USING finalization_mode::shipping_finalization_mode_enum"
-    )
-    op.execute(
-        "ALTER TABLE shipping_requests "
-        "ALTER COLUMN finalization_mode SET DEFAULT "
-        "'KEEP_BASE'::shipping_finalization_mode_enum"
     )
     op.execute(
         "ALTER TABLE shipping_requests "
@@ -218,10 +209,6 @@ def upgrade() -> None:
     if bind.dialect.name == "postgresql":
         if needs_finalization_mode_repair:
             FINALIZATION_MODE_TYPE.create(bind, checkfirst=True)
-            op.execute(
-                "ALTER TABLE shipping_requests "
-                "ALTER COLUMN finalization_mode DROP DEFAULT"
-            )
             op.alter_column(
                 "shipping_requests",
                 "finalization_mode",
@@ -229,11 +216,6 @@ def upgrade() -> None:
                 type_=FINALIZATION_MODE_TYPE,
                 existing_nullable=False,
                 postgresql_using="finalization_mode::shipping_finalization_mode_enum",
-            )
-            op.execute(
-                "ALTER TABLE shipping_requests "
-                "ALTER COLUMN finalization_mode SET DEFAULT "
-                "'KEEP_BASE'::shipping_finalization_mode_enum"
             )
         if needs_reuse_pf_type_repair:
             op.alter_column(
