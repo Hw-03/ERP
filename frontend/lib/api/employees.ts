@@ -28,6 +28,7 @@ export const employeesApi = {
     level?: EmployeeLevel;
     warehouse_role?: WarehouseRole;
     department_role?: DepartmentRole;
+    as_research_approver?: boolean;
     display_order?: number;
     is_active?: boolean;
     /** W12-#7: 직원별 입출고 권한. 부서 io_enabled 와 AND 결합. */
@@ -49,6 +50,7 @@ export const employeesApi = {
       level?: EmployeeLevel;
       warehouse_role?: WarehouseRole;
       department_role?: DepartmentRole;
+      as_research_approver?: boolean;
       display_order?: number;
       is_active?: boolean;
       /** W12-#7: 직원별 입출고 권한. */

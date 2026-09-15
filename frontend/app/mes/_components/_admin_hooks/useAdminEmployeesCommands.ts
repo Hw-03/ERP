@@ -50,6 +50,7 @@ export function useAdminEmployeesCommands({
         phone: input.phone.trim() || undefined,
         warehouse_role: input.warehouse_role,
         department_role: input.department_role,
+        as_research_approver: input.as_research_approver,
         assigned_model_slots: isAssembly ? input.assigned_model_slots : [],
       });
       setEmployees((current) => [...current, created]);

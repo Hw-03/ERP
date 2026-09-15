@@ -58,6 +58,7 @@ export interface IoLine {
   has_children: boolean;
   shortage: number;
   exclusion_note: string | null;
+  approval_outcome: "approved" | "rejected" | null;
 }
 
 export interface IoBundle {
@@ -152,14 +153,16 @@ export interface IoStockRequestSummary {
   status: string;
   from_bucket: IoBucket;
   from_department: Department | string | null;
-  approval_kind: "warehouse" | "department" | "none";
+  approval_kind: "warehouse" | "as_research" | "department" | "none";
   requires_warehouse_approval: boolean;
+  requires_as_research_approval: boolean;
   requires_department_approval: boolean;
   approver_employee_id: string | null;
   approver_name: string | null;
   rejected_by_name?: string | null;
   rejected_at?: string | null;
   rejected_reason?: string | null;
+  approval_outcome: "approved" | "rejected" | null;
   /** 결재 요청이 실제로 반영하는 IoLine. 구 응답에는 없을 수 있다. */
   operation_line_ids?: string[];
 }

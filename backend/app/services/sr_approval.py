@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app._actor import set_actor
 from app.models import (
     Employee,
+    IoBatch,
     StockRequest,
     StockRequestStatusEnum,
     StockRequestTypeEnum,
@@ -34,7 +35,29 @@ from app.services.sr_execution import (
 
 
 class FailedApprovalError(Exception):
-    """승인 시점 시스템 검증 실패. 라우터가 catch 해서 별도 트랜잭션으로 status 기록."""
+    """승인 실행 실패. internal-use는 잠금 UoW, 일반 요청은 별도 UoW에 기록한다."""
+
+
+def _settle_internal_use_or_fail(
+    db: Session,
+    *,
+    batch: IoBatch,
+    requests: list[StockRequest],
+    actor: Employee,
+) -> None:
+    """결정 기록은 보존하고 실제 정산 변경만 SAVEPOINT로 원복한다."""
+    from app.services import internal_use_approval
+
+    try:
+        with db.begin_nested():
+            internal_use_approval.settle_if_decided(
+                db,
+                batch=batch,
+                requests=requests,
+                actor=actor,
+            )
+    except Exception as exc:
+        raise FailedApprovalError(str(exc)) from exc
 
 
 def approve_request(
@@ -59,6 +82,23 @@ def approve_request(
         raise PermissionError("PIN이 일치하지 않습니다.")
     set_actor(http_request, approver)
     ensure_stock_request_batch_is_mutable(db, request)
+
+    from app.services import internal_use_approval
+
+    if internal_use_approval.is_internal_use_request(db, request):
+        batch, requests, request = internal_use_approval.locked_request(db, request)
+        if not request.requires_warehouse_approval:
+            raise ValueError("창고 결재가 필요하지 않은 요청입니다.")
+        if request.status not in (StockRequestStatusEnum.RESERVED, StockRequestStatusEnum.SUBMITTED):
+            raise ValueError(f"승인할 수 없는 상태입니다: {request.status.value}")
+        if request.approved_at is None:
+            now = datetime.utcnow()
+            request.approved_by_employee_id = approver.employee_id
+            request.approved_by_name = approver.name
+            request.approved_at = now
+        db.flush()
+        _settle_internal_use_or_fail(db, batch=batch, requests=requests, actor=approver)
+        return request
 
     # 이미 완료된 경우 멱등 반환 (중복 승인 클릭 / 동시 승인 2번째 요청)
     if request.status == StockRequestStatusEnum.COMPLETED:
@@ -132,7 +172,14 @@ def approve_request_department(
     #   - admin level 단독: 결재 권한 없음
     # 사람 이름 박지 않음. 자세한 룰은 `dept_hierarchy.can_approve_department`.
     approval_department = request.approval_department or request.requester_department
-    if not can_approve_department(approver, approval_department):
+    from app.services import internal_use_approval
+
+    is_internal_use = internal_use_approval.is_internal_use_request(db, request)
+    department_role = (approver.department_role or "none").lower()
+    if (
+        not can_approve_department(approver, approval_department)
+        or (is_internal_use and department_role not in ("primary", "deputy"))
+    ):
         raise PermissionError(
             "결재 권한이 없습니다 (부서 정/부 또는 창고 정/부 필요)."
         )
@@ -140,6 +187,19 @@ def approve_request_department(
         raise PermissionError("PIN이 일치하지 않습니다.")
     set_actor(http_request, approver)
     ensure_stock_request_batch_is_mutable(db, request)
+
+    if is_internal_use:
+        batch, requests, request = internal_use_approval.locked_request(db, request)
+        if request.status not in (StockRequestStatusEnum.RESERVED, StockRequestStatusEnum.SUBMITTED):
+            raise ValueError(f"승인할 수 없는 상태입니다: {request.status.value}")
+        if request.department_approved_at is None:
+            now = datetime.utcnow()
+            request.department_approved_by_employee_id = approver.employee_id
+            request.department_approved_by_name = approver.name
+            request.department_approved_at = now
+        db.flush()
+        _settle_internal_use_or_fail(db, batch=batch, requests=requests, actor=approver)
+        return request
 
     if request.status == StockRequestStatusEnum.COMPLETED:
         return request
@@ -253,6 +313,31 @@ def reject_request(
     ensure_stock_request_batch_is_mutable(db, request)
     if not reason or not reason.strip():
         raise ValueError("반려 사유를 입력하세요.")
+    from app.services import internal_use_approval
+
+    if internal_use_approval.is_internal_use_request(db, request):
+        batch, requests, request = internal_use_approval.locked_request(db, request)
+        if not request.requires_warehouse_approval:
+            raise ValueError("창고 결재가 필요하지 않은 요청입니다.")
+        if request.approved_at is not None:
+            raise ValueError("이미 승인된 창고 요청은 반려할 수 없습니다.")
+        if request.status == StockRequestStatusEnum.REJECTED:
+            return request
+        if request.status not in (StockRequestStatusEnum.RESERVED, StockRequestStatusEnum.SUBMITTED):
+            raise ValueError(f"반려할 수 없는 상태입니다: {request.status.value}")
+        internal_use_approval.prelock_reservation_sources(db, requests)
+        release_reservation(db, request)
+        now = datetime.utcnow()
+        request.status = StockRequestStatusEnum.REJECTED
+        request.rejected_by_employee_id = approver.employee_id
+        request.rejected_by_name = approver.name
+        request.rejected_at = now
+        request.rejected_reason = reason.strip()
+        for line in request.lines:
+            line.status = StockRequestStatusEnum.REJECTED
+        db.flush()
+        _settle_internal_use_or_fail(db, batch=batch, requests=requests, actor=approver)
+        return request
     # 이미 반려된 경우 멱등 반환
     if request.status == StockRequestStatusEnum.REJECTED:
         return request
@@ -290,7 +375,14 @@ def reject_request_department(
         raise ValueError("부서 결재가 필요하지 않은 요청입니다.")
 
     approval_department = request.approval_department or request.requester_department
-    if not can_approve_department(approver, approval_department):
+    from app.services import internal_use_approval
+
+    is_internal_use = internal_use_approval.is_internal_use_request(db, request)
+    department_role = (approver.department_role or "none").lower()
+    if (
+        not can_approve_department(approver, approval_department)
+        or (is_internal_use and department_role not in ("primary", "deputy"))
+    ):
         raise PermissionError(
             "결재 권한이 없습니다 (부서 정/부 또는 창고 정/부 필요)."
         )
@@ -300,6 +392,28 @@ def reject_request_department(
     ensure_stock_request_batch_is_mutable(db, request)
     if not reason or not reason.strip():
         raise ValueError("반려 사유를 입력하세요.")
+
+    if is_internal_use:
+        batch, requests, request = internal_use_approval.locked_request(db, request)
+        if request.department_approved_at is not None:
+            raise ValueError("이미 승인된 부서 요청은 반려할 수 없습니다.")
+        if request.status == StockRequestStatusEnum.REJECTED:
+            return request
+        if request.status not in (StockRequestStatusEnum.RESERVED, StockRequestStatusEnum.SUBMITTED):
+            raise ValueError(f"반려할 수 없는 상태입니다: {request.status.value}")
+        internal_use_approval.prelock_reservation_sources(db, requests)
+        release_reservation(db, request)
+        now = datetime.utcnow()
+        request.status = StockRequestStatusEnum.REJECTED
+        request.rejected_by_employee_id = approver.employee_id
+        request.rejected_by_name = approver.name
+        request.rejected_at = now
+        request.rejected_reason = reason.strip()
+        for line in request.lines:
+            line.status = StockRequestStatusEnum.REJECTED
+        db.flush()
+        _settle_internal_use_or_fail(db, batch=batch, requests=requests, actor=approver)
+        return request
 
     if request.status == StockRequestStatusEnum.REJECTED:
         return request
@@ -318,6 +432,88 @@ def reject_request_department(
     for line in request.lines:
         line.status = StockRequestStatusEnum.REJECTED
     sync_batch_from_stock_request(db, request)
+    return request
+
+
+def approve_request_as_research(
+    db: Session,
+    request: StockRequest,
+    *,
+    approver: Employee,
+    pin: str,
+    http_request: Optional[Request] = None,
+) -> StockRequest:
+    """활성 AS·연구 전용 승인자의 PIN 결재를 기록하고 batch settle을 시도한다."""
+    from app.services import internal_use_approval
+
+    approver = internal_use_approval.lock_and_refresh_employee(
+        db,
+        approver.employee_id,
+    )
+    if not bool(approver.is_active) or not bool(approver.as_research_approver):
+        raise PermissionError("AS·연구 승인자만 승인할 수 있습니다.")
+    if not verify_pin(approver.pin_hash, pin):
+        raise PermissionError("PIN이 일치하지 않습니다.")
+    set_actor(http_request, approver)
+    batch, requests, request = internal_use_approval.locked_request(db, request)
+    if not request.requires_as_research_approval:
+        raise ValueError("AS·연구 결재가 필요하지 않은 요청입니다.")
+    if request.status not in (StockRequestStatusEnum.RESERVED, StockRequestStatusEnum.SUBMITTED):
+        raise ValueError(f"승인할 수 없는 상태입니다: {request.status.value}")
+    if request.as_research_approved_at is None:
+        now = datetime.utcnow()
+        request.as_research_approved_by_employee_id = approver.employee_id
+        request.as_research_approved_by_name = approver.name
+        request.as_research_approved_at = now
+    db.flush()
+    _settle_internal_use_or_fail(db, batch=batch, requests=requests, actor=approver)
+    return request
+
+
+def reject_request_as_research(
+    db: Session,
+    request: StockRequest,
+    *,
+    approver: Employee,
+    pin: str,
+    reason: str,
+    http_request: Optional[Request] = None,
+) -> StockRequest:
+    """활성 AS·연구 전용 승인자의 PIN 반려를 기록하고 batch settle을 시도한다."""
+    from app.services import internal_use_approval
+
+    approver = internal_use_approval.lock_and_refresh_employee(
+        db,
+        approver.employee_id,
+    )
+    if not bool(approver.is_active) or not bool(approver.as_research_approver):
+        raise PermissionError("AS·연구 승인자만 반려할 수 있습니다.")
+    if not verify_pin(approver.pin_hash, pin):
+        raise PermissionError("PIN이 일치하지 않습니다.")
+    if not reason or not reason.strip():
+        raise ValueError("반려 사유를 입력하세요.")
+    set_actor(http_request, approver)
+    batch, requests, request = internal_use_approval.locked_request(db, request)
+    if not request.requires_as_research_approval:
+        raise ValueError("AS·연구 결재가 필요하지 않은 요청입니다.")
+    if request.as_research_approved_at is not None:
+        raise ValueError("이미 승인된 AS·연구 요청은 반려할 수 없습니다.")
+    if request.status == StockRequestStatusEnum.REJECTED:
+        return request
+    if request.status not in (StockRequestStatusEnum.RESERVED, StockRequestStatusEnum.SUBMITTED):
+        raise ValueError(f"반려할 수 없는 상태입니다: {request.status.value}")
+    internal_use_approval.prelock_reservation_sources(db, requests)
+    release_reservation(db, request)
+    now = datetime.utcnow()
+    request.status = StockRequestStatusEnum.REJECTED
+    request.rejected_by_employee_id = approver.employee_id
+    request.rejected_by_name = approver.name
+    request.rejected_at = now
+    request.rejected_reason = reason.strip()
+    for line in request.lines:
+        line.status = StockRequestStatusEnum.REJECTED
+    db.flush()
+    _settle_internal_use_or_fail(db, batch=batch, requests=requests, actor=approver)
     return request
 
 

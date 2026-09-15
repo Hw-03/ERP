@@ -6,6 +6,9 @@ import type { AppNotification } from "@/lib/api/types";
 const setAuditScreen = vi.hoisted(() => vi.fn());
 const flushWarehouseDraft = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 const warehouseMounts = vi.hoisted(() => ({ count: 0 }));
+const notificationNavigation = vi.hoisted(() => ({
+  current: undefined as undefined | ((target: { tab: string; section: string | null; relatedRequestId: string | null }) => void),
+}));
 
 const state = vi.hoisted(() => ({
   notifications: {
@@ -20,6 +23,7 @@ const state = vi.hoisted(() => ({
     employee_code: "E1",
     warehouse_role: "none",
     department_role: "none",
+    as_research_approver: true,
     theme: null,
     assigned_model_slots: [],
     io_enabled: true,
@@ -83,11 +87,15 @@ vi.mock("../screens", () => ({
     flushDraftRef,
     preselectedItem,
     entryIntent,
+    notificationSection,
+    targetRequestId,
   }: {
     onComposeDirtyChange?: (dirty: boolean) => void;
     flushDraftRef?: { current: (() => Promise<void>) | null };
     preselectedItem?: { item_id?: number } | null;
     entryIntent?: { workType?: string } | null;
+    notificationSection?: string | null;
+    targetRequestId?: string | null;
   }) => {
     const [mountId] = useState(() => ++warehouseMounts.count);
     useEffect(() => {
@@ -103,8 +111,13 @@ vi.mock("../screens", () => ({
         <output data-testid="warehouse-mount">{mountId}</output>
         <output data-testid="warehouse-preselected">{preselectedItem?.item_id ?? "none"}</output>
         <output data-testid="warehouse-intent">{entryIntent?.workType ?? "none"}</output>
+        <output data-testid="warehouse-notification-section">{notificationSection ?? "none"}</output>
+        <output data-testid="warehouse-notification-request">{targetRequestId ?? "none"}</output>
         <button type="button" onClick={() => onComposeDirtyChange?.(true)}>
           mark warehouse dirty
+        </button>
+        <button type="button" onClick={() => notificationNavigation.current?.({ tab: "warehouse", section: "as-research-queue", relatedRequestId: "as-request-2" })}>
+          open deferred AS notification
         </button>
       </>
     );
@@ -129,17 +142,21 @@ vi.mock("../screens", () => ({
     onChecklist,
     onWeekly,
     visibleEntries,
+    onNotificationNavigate,
   }: {
     onChecklist?: () => void;
     onWeekly?: () => void;
     visibleEntries?: string[];
-  }) => (
-    <>
+    onNotificationNavigate?: (target: { tab: string; section: string | null; relatedRequestId: string | null }) => void;
+  }) => {
+    notificationNavigation.current = onNotificationNavigate;
+    return <>
       <div data-testid="more-entry-order">{visibleEntries?.join(",")}</div>
       <button type="button" onClick={onChecklist}>open checklist</button>
       <button type="button" onClick={onWeekly}>open weekly</button>
-    </>
-  ),
+      <button type="button" onClick={() => onNotificationNavigate?.({ tab: "warehouse", section: "as-research-queue", relatedRequestId: "as-request-1" })}>open AS notification</button>
+    </>;
+  },
 }));
 
 import { MobileShell } from "../MobileShell";
@@ -160,6 +177,7 @@ describe("MobileShell layout", () => {
     state.operator.hidden_sidebar_tabs = [];
     state.revision = null;
     warehouseMounts.count = 0;
+    notificationNavigation.current = undefined;
     flushWarehouseDraft.mockReset().mockResolvedValue(undefined);
     vi.mocked(sendClientEvent).mockClear();
     setAuditScreen.mockClear();
@@ -199,6 +217,72 @@ describe("MobileShell layout", () => {
     fireEvent.click(screen.getByRole("button", { name: "dashboard screen" }));
 
     expect(screen.queryByText("item added")).not.toBeInTheDocument();
+  });
+
+  it("AS·연구 승인 알림은 모바일 입출고의 전용 탭과 대상 요청으로 전달한다", () => {
+    render(<MobileShell />);
+
+    fireEvent.click(screen.getByRole("button", { name: "더보기" }));
+    fireEvent.click(screen.getByRole("button", { name: "open AS notification" }));
+
+    expect(screen.getByTestId("warehouse-notification-section")).toHaveTextContent("as-research-queue");
+    expect(screen.getByTestId("warehouse-notification-request")).toHaveTextContent("as-request-1");
+  });
+
+  it("작성 중인 입출고에서 새 AS 알림을 취소하면 보류 대상은 적용하지 않는다", () => {
+    render(<MobileShell />);
+
+    fireEvent.click(screen.getByRole("button", { name: "더보기" }));
+    fireEvent.click(screen.getByRole("button", { name: "open AS notification" }));
+    fireEvent.click(screen.getByRole("button", { name: "mark warehouse dirty" }));
+    fireEvent.click(screen.getByRole("button", { name: "open deferred AS notification" }));
+
+    expect(screen.getByRole("dialog", { name: "작성 중 이동 확인" })).toBeInTheDocument();
+    expect(screen.getByTestId("warehouse-notification-request")).toHaveTextContent("as-request-1");
+    fireEvent.click(screen.getByRole("button", { name: "계속 작성" }));
+
+    expect(screen.queryByRole("dialog", { name: "작성 중 이동 확인" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("warehouse-notification-request")).toHaveTextContent("as-request-1");
+  });
+
+  it("작성 중인 입출고에서 새 AS 알림을 폐기 확인하면 보류 대상을 적용한다", () => {
+    render(<MobileShell />);
+
+    fireEvent.click(screen.getByRole("button", { name: "더보기" }));
+    fireEvent.click(screen.getByRole("button", { name: "open AS notification" }));
+    fireEvent.click(screen.getByRole("button", { name: "mark warehouse dirty" }));
+    fireEvent.click(screen.getByRole("button", { name: "open deferred AS notification" }));
+    fireEvent.click(screen.getByRole("button", { name: "저장 안 하고 나가기" }));
+
+    expect(screen.queryByRole("dialog", { name: "작성 중 이동 확인" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("warehouse-notification-section")).toHaveTextContent("as-research-queue");
+    expect(screen.getByTestId("warehouse-notification-request")).toHaveTextContent("as-request-2");
+  });
+
+  it("AS·연구 승인 알림을 떠난 뒤 빠른 입출고로 다시 열면 과거 대상 요청을 버린다", () => {
+    render(<MobileShell />);
+
+    fireEvent.click(screen.getByRole("button", { name: "더보기" }));
+    fireEvent.click(screen.getByRole("button", { name: "open AS notification" }));
+    fireEvent.click(screen.getByRole("button", { name: "대시보드" }));
+    fireEvent.click(screen.getByRole("button", { name: "quick warehouse" }));
+
+    expect(screen.getByTestId("warehouse-preselected")).toHaveTextContent("101");
+    expect(screen.getByTestId("warehouse-notification-section")).toHaveTextContent("none");
+    expect(screen.getByTestId("warehouse-notification-request")).toHaveTextContent("none");
+  });
+
+  it("AS·연구 승인 알림을 떠난 뒤 하단 입출고 탭으로 열면 compose로 초기화한다", () => {
+    render(<MobileShell />);
+
+    fireEvent.click(screen.getByRole("button", { name: "더보기" }));
+    fireEvent.click(screen.getByRole("button", { name: "open AS notification" }));
+    fireEvent.click(screen.getByRole("button", { name: "대시보드" }));
+    fireEvent.click(screen.getByRole("button", { name: "입출고" }));
+
+    expect(screen.getByTestId("warehouse-preselected")).toHaveTextContent("none");
+    expect(screen.getByTestId("warehouse-notification-section")).toHaveTextContent("none");
+    expect(screen.getByTestId("warehouse-notification-request")).toHaveTextContent("none");
   });
 
   it("opens the checklist from More while keeping the More slot active", () => {

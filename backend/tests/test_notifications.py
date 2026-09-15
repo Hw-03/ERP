@@ -17,6 +17,7 @@ from app.models import (
     Notification,
     StockRequest,
     StockRequestLine,
+    StockRequestStatusEnum,
     StockRequestTypeEnum,
 )
 from app.services import notifications as notif_svc
@@ -31,6 +32,7 @@ def _make_employee(
     department: DepartmentEnum = DepartmentEnum.ASSEMBLY,
     warehouse_role: str = "none",
     department_role: str = "none",
+    as_research_approver: bool = False,
     level: EmployeeLevelEnum = EmployeeLevelEnum.STAFF,
 ) -> Employee:
     emp = Employee(
@@ -41,6 +43,7 @@ def _make_employee(
         level=level,
         warehouse_role=warehouse_role,
         department_role=department_role,
+        as_research_approver=as_research_approver,
         display_order=0,
         is_active="true",
         pin_hash=DEFAULT_PIN_HASH,
@@ -147,6 +150,42 @@ def test_department_recipients_follow_can_approve_rule(db_session):
     }
     assert "DP" not in wh_codes
     assert "WP" in wh_codes
+
+
+def test_as_research_request_notifies_only_active_special_approvers(db_session):
+    requester = _make_employee(db_session, code="AS-REQ")
+    special = _make_employee(
+        db_session,
+        code="AS-APP",
+        as_research_approver=True,
+    )
+    inactive = _make_employee(
+        db_session,
+        code="AS-OFF",
+        as_research_approver=True,
+    )
+    inactive.is_active = "false"
+    _make_employee(db_session, code="AS-WH", warehouse_role="primary")
+    request = StockRequest(
+        requester_employee_id=requester.employee_id,
+        requester_name=requester.name,
+        requester_department=requester.department,
+        request_type=StockRequestTypeEnum.INTERNAL_USE,
+        status=StockRequestStatusEnum.RESERVED,
+        requires_warehouse_approval=False,
+        requires_department_approval=False,
+        requires_as_research_approval=True,
+    )
+    db_session.add(request)
+    db_session.flush()
+
+    notif_svc.notify_request_arrived(db_session, request)
+    db_session.flush()
+
+    notes = db_session.query(Notification).all()
+    assert [note.recipient_employee_id for note in notes] == [special.employee_id]
+    assert notes[0].target_tab == "warehouse"
+    assert notes[0].target_section == "as-research-queue"
 
 
 # ---------------------------------------------------------------------------

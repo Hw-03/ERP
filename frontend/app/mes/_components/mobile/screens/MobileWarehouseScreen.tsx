@@ -31,6 +31,7 @@ const HANDOVER_RECEIVE_DEPTS = ["고압", "진공"];
 const cartCountCache = new Map<string, number>();
 const warehouseQueueCountCache = { value: 0 };
 const deptQueueCountCache = new Map<string, number>();
+const asResearchQueueCountCache = new Map<string, number>();
 
 /**
  * 입출고 모바일 화면.
@@ -48,6 +49,8 @@ export function MobileWarehouseScreen({
   onSubmitSuccess,
   onComposeDirtyChange,
   flushDraftRef: externalFlushRef,
+  notificationSection,
+  targetRequestId,
 }: {
   globalSearch: string;
   onStatusChange: (status: string) => void;
@@ -58,6 +61,8 @@ export function MobileWarehouseScreen({
   // 상위가 이탈 직전 draft flush 를 호출할 수 있게 ref 를 공유받는다.
   onComposeDirtyChange?: (dirty: boolean) => void;
   flushDraftRef?: MutableRefObject<(() => Promise<void>) | null>;
+  notificationSection?: string | null;
+  targetRequestId?: string | null;
 }) {
   const revision = useRealtimeRevision();
   const { employees, items, productModels, loadFailure, setItems } = useWarehouseData({
@@ -66,6 +71,19 @@ export function MobileWarehouseScreen({
   });
 
   const operator = typeof window !== "undefined" ? readCurrentOperator() : null;
+  const resolveNotificationSection = (section: string | null | undefined): WarehouseSectionTab => {
+    if (section === "queue") {
+      const role = operator?.warehouse_role ?? "none";
+      return role === "primary" || role === "deputy" ? section : "compose";
+    }
+    if (section === "dept-queue") return isDepartmentApprover(operator) ? section : "compose";
+    if (section === "as-research-queue") return operator?.as_research_approver ? section : "compose";
+    if (section === "handover") {
+      const dept = operator?.department ?? "";
+      return dept === "튜브" || HANDOVER_RECEIVE_DEPTS.includes(dept) ? section : "compose";
+    }
+    return section === "cart" || section === "mine" ? section : "compose";
+  };
   const [employeeId, setEmployeeId] = useState<string>(operator?.employee_id ?? "");
   const urlDraftId = typeof window === "undefined"
     ? null
@@ -73,7 +91,7 @@ export function MobileWarehouseScreen({
   const urlRestoreStep = typeof window === "undefined"
     ? undefined
     : parseWarehouseStep(new URLSearchParams(window.location.search).get("step"));
-  const [sectionTab, setSectionTab] = useState<WarehouseSectionTab>("compose");
+  const [sectionTab, setSectionTab] = useState<WarehouseSectionTab>(() => resolveNotificationSection(notificationSection));
   const [panelRefreshNonce, setPanelRefreshNonce] = useState(0);
   const [cartCount, setCartCount] = useState(() => {
     const eid = operator?.employee_id ?? "";
@@ -85,6 +103,10 @@ export function MobileWarehouseScreen({
   const [deptQueueCount, setDeptQueueCount] = useState(() => {
     const eid = operator?.employee_id ?? "";
     return eid ? deptQueueCountCache.get(eid) ?? 0 : 0;
+  });
+  const [asResearchQueueCount, setAsResearchQueueCount] = useState(() => {
+    const eid = operator?.employee_id ?? "";
+    return eid ? asResearchQueueCountCache.get(eid) ?? 0 : 0;
   });
   const [restoreIoDraft, setRestoreIoDraft] = useState<IoBatch | null>(null);
   const [urlDraftPending, setUrlDraftPending] = useState(() => Boolean(urlDraftId));
@@ -123,6 +145,7 @@ export function MobileWarehouseScreen({
     (operator?.warehouse_role ?? "none") === "primary" ||
     (operator?.warehouse_role ?? "none") === "deputy";
   const canSeeDeptQueue = isDepartmentApprover(operator);
+  const canSeeAsResearchQueue = operator?.as_research_approver === true;
   // 인수인계: 작성(튜브) 또는 인수 확인(받는 부서 소속)이면 탭 노출 — 데스크톱 동일. 결재권자는 제외.
   const canReceiveHandover = HANDOVER_RECEIVE_DEPTS.includes(operator?.department ?? "");
   const showHandover = (operator?.department ?? "") === "튜브" || canReceiveHandover;
@@ -130,6 +153,12 @@ export function MobileWarehouseScreen({
   useEffect(() => {
     if (operator && employeeId === "") setEmployeeId(operator.employee_id);
   }, [operator, employeeId]);
+
+  useEffect(() => {
+    if (notificationSection) setSectionTab(resolveNotificationSection(notificationSection));
+    // notificationSection 이 바뀔 때만 외부 알림 목적지를 적용한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notificationSection]);
 
   useEffect(() => {
     if (!operatorEmployeeId) return;
@@ -216,6 +245,19 @@ export function MobileWarehouseScreen({
   }, [canSeeDeptQueue, operatorEmployeeId, panelRefreshNonce, revision]);
 
   useEffect(() => {
+    if (!canSeeAsResearchQueue || !operatorEmployeeId) return;
+    let active = true;
+    api.countAsResearchQueue(operatorEmployeeId)
+      .then(({ count }) => {
+        if (!active) return;
+        setAsResearchQueueCount(count);
+        asResearchQueueCountCache.set(operatorEmployeeId, count);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [canSeeAsResearchQueue, operatorEmployeeId, panelRefreshNonce, revision]);
+
+  useEffect(() => {
     if (!canReceiveHandover || !operatorEmployeeId) return;
     let active = true;
     api
@@ -258,10 +300,12 @@ export function MobileWarehouseScreen({
               onChange={handleSectionChange}
               showQueue={canSeeQueue}
               showDeptQueue={canSeeDeptQueue}
+              showAsResearchQueue={canSeeAsResearchQueue}
               showHandover={showHandover}
               cartCount={cartCount}
               queueCount={warehouseQueueCount}
               deptQueueCount={deptQueueCount}
+              asResearchQueueCount={asResearchQueueCount}
               handoverInboxCount={handoverInboxCount}
             />
           </div>
@@ -322,6 +366,7 @@ export function MobileWarehouseScreen({
               sectionTab={sectionTab}
               canSeeQueue={canSeeQueue}
               canSeeDeptQueue={canSeeDeptQueue}
+              canSeeAsResearchQueue={canSeeAsResearchQueue}
               operator={operator}
               operatorEmployeeId={operator?.employee_id}
               employeeId={employeeId}
@@ -343,6 +388,7 @@ export function MobileWarehouseScreen({
                 setCartCount(n);
                 if (operatorEmployeeId) cartCountCache.set(operatorEmployeeId, n);
               }}
+              targetRequestId={targetRequestId}
             />
           </div>
         )}

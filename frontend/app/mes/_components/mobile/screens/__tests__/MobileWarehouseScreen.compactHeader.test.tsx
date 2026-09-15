@@ -11,9 +11,26 @@ const currentWizardProps = vi.hoisted(() => ({
   },
 }));
 
+const currentTabsProps = vi.hoisted(() => ({
+  showAsResearchQueue: undefined as boolean | undefined,
+  active: undefined as string | undefined,
+}));
+
+const operatorState = vi.hoisted(() => ({
+  value: {
+    employee_id: "emp-1",
+    name: "Kim",
+    department: "Assembly",
+    warehouse_role: "none",
+    department_role: "none",
+    as_research_approver: false,
+  },
+}));
+
 const apiMocks = vi.hoisted(() => ({
   listStockRequestDrafts: vi.fn(),
   listDrafts: vi.fn(),
+  countAsResearchQueue: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -31,13 +48,7 @@ vi.mock("../../../_warehouse_hooks/useWarehouseData", () => ({
 }));
 
 vi.mock("../../../login/useCurrentOperator", () => ({
-  readCurrentOperator: () => ({
-    employee_id: "emp-1",
-    name: "Kim",
-    department: "Assembly",
-    warehouse_role: "none",
-    department_role: "none",
-  }),
+  readCurrentOperator: () => operatorState.value,
 }));
 
 vi.mock("../../../_warehouse_sections/WarehouseHeader", () => ({
@@ -45,7 +56,10 @@ vi.mock("../../../_warehouse_sections/WarehouseHeader", () => ({
 }));
 
 vi.mock("../../../_warehouse_sections/WarehouseSectionTabs", () => ({
-  WarehouseSectionTabs: ({ onChange }: { onChange: (next: string) => void }) => (
+  WarehouseSectionTabs: ({ onChange, showAsResearchQueue, active }: { onChange: (next: string) => void; showAsResearchQueue?: boolean; active: string }) => {
+    currentTabsProps.showAsResearchQueue = showAsResearchQueue;
+    currentTabsProps.active = active;
+    return (
     <div data-testid="warehouse-section-tabs">
       <button type="button" onClick={() => onChange("compose")}>
         compose
@@ -57,12 +71,13 @@ vi.mock("../../../_warehouse_sections/WarehouseSectionTabs", () => ({
         mine
       </button>
     </div>
-  ),
+    );
+  },
 }));
 
 vi.mock("../../../_warehouse_sections/WarehouseDraftPanelTabs", () => ({
-  WarehouseDraftPanelTabs: ({ onContinueIoDraft }: { onContinueIoDraft?: (draft: never) => void }) => (
-    <div data-testid="draft-panels">
+  WarehouseDraftPanelTabs: ({ onContinueIoDraft, sectionTab, targetRequestId }: { onContinueIoDraft?: (draft: never) => void; sectionTab: string; targetRequestId?: string | null }) => (
+    <div data-testid="draft-panels" data-section-tab={sectionTab} data-target-request-id={targetRequestId ?? ""}>
       <button
         type="button"
         onClick={() => onContinueIoDraft?.({ batch_id: "adjust-draft", sub_type: "adjust_out" } as never)}
@@ -94,9 +109,21 @@ describe("MobileWarehouseScreen compact step header", () => {
     window.history.replaceState({}, "", "/mes?tab=warehouse&section=compose");
     apiMocks.listStockRequestDrafts.mockReset();
     apiMocks.listDrafts.mockReset();
+    apiMocks.countAsResearchQueue.mockReset();
     apiMocks.listStockRequestDrafts.mockReturnValue(new Promise(() => {}));
     apiMocks.listDrafts.mockReturnValue(new Promise(() => {}));
+    apiMocks.countAsResearchQueue.mockResolvedValue({ count: 0 });
     currentWizardProps.value = null;
+    currentTabsProps.showAsResearchQueue = undefined;
+    currentTabsProps.active = undefined;
+    operatorState.value = {
+      employee_id: "emp-1",
+      name: "Kim",
+      department: "Assembly",
+      warehouse_role: "none",
+      department_role: "none",
+      as_research_approver: false,
+    };
   });
 
   afterEach(() => {
@@ -114,6 +141,33 @@ describe("MobileWarehouseScreen compact step header", () => {
 
     expect(new URLSearchParams(window.location.search).get("draftId")).toBeNull();
     expect(currentWizardProps.value?.restoreDraft).toBeNull();
+  });
+
+  it("전용 권한 없이 AS·연구 승인함 딥링크를 열어도 탭과 패널을 노출하지 않는다", () => {
+    window.history.replaceState({}, "", "/mes?tab=warehouse&section=as-research-queue");
+
+    render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />);
+
+    expect(currentTabsProps.showAsResearchQueue).toBe(false);
+    expect(screen.getByTestId("compose-wizard")).toBeInTheDocument();
+    expect(screen.queryByTestId("draft-panels")).not.toBeInTheDocument();
+  });
+
+  it("권한 있는 AS·연구 승인 알림은 전용 대기열과 대상 요청을 연다", () => {
+    operatorState.value = { ...operatorState.value, as_research_approver: true };
+
+    render(
+      <MobileWarehouseScreen
+        globalSearch=""
+        onStatusChange={() => {}}
+        notificationSection="as-research-queue"
+        targetRequestId="as-request-1"
+      />,
+    );
+
+    expect(currentTabsProps.active).toBe("as-research-queue");
+    expect(screen.getByTestId("draft-panels")).toHaveAttribute("data-section-tab", "as-research-queue");
+    expect(screen.getByTestId("draft-panels")).toHaveAttribute("data-target-request-id", "as-request-1");
   });
 
   it("수동 입출고 초안 이어서 작업은 수량 조정 단계로 이동한다", () => {

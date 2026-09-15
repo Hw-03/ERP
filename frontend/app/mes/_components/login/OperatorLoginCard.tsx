@@ -101,6 +101,7 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
         employee_code: emp.employee_code,
         warehouse_role: emp.warehouse_role ?? "none",
         department_role: emp.department_role ?? "none",
+        as_research_approver: emp.as_research_approver ?? false,
         theme: emp.theme ?? null,
         sidebar_mode: normalizeSidebarMode(emp.sidebar_mode) ?? "hover",
         assigned_model_slots: emp.assigned_model_slots ?? [],

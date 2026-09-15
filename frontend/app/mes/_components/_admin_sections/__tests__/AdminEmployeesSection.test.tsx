@@ -92,6 +92,7 @@ describe("AdminEmployeesSection", () => {
       level: defaultEmployee.level,
       warehouse_role: defaultEmployee.warehouse_role,
       department_role: defaultEmployee.department_role,
+      as_research_approver: false,
       hidden_sidebar_tabs: [],
       assigned_model_slots: [],
     };
@@ -112,6 +113,26 @@ describe("AdminEmployeesSection", () => {
     expect(container.querySelectorAll("svg[data-lucide='grip-vertical']")).toHaveLength(0);
     expect(container.querySelector("[data-admin-employee-row='emp-1']")).toHaveTextContent("활성");
     expect(container.querySelector("[data-admin-employee-row='emp-2']")).toHaveTextContent("비활성");
+  });
+
+  it("선택한 직원의 상세 권한 편집기에 AS·연구 승인 권한을 연결한다", () => {
+    context.selectedEmployee = defaultEmployee;
+    context.editForm = {
+      name: defaultEmployee.name,
+      role: defaultEmployee.role,
+      phone: "",
+      department: defaultEmployee.department,
+      level: defaultEmployee.level,
+      warehouse_role: "none",
+      department_role: "none",
+      as_research_approver: false,
+      hidden_sidebar_tabs: [],
+      assigned_model_slots: [],
+    };
+
+    render(<DirtyGuardProvider><AdminEmployeesSection /></DirtyGuardProvider>);
+
+    expect(screen.getByRole("checkbox", { name: "AS·연구 승인 권한" })).toBeInTheDocument();
   });
 
   it("직원 표 행은 세 gridcell과 키보드 선택을 제공한다", () => {

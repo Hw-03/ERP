@@ -261,7 +261,12 @@ def ensure_stock_request_batch_is_mutable(db: Session, request: StockRequest) ->
         ensure_batch_is_mutable(batch)
 
 
-def _line_to_dict(line: IoLine) -> dict:
+def _line_to_dict(
+    line: IoLine,
+    *,
+    approval_kind: str | None = None,
+    approval_outcome: str | None = None,
+) -> dict:
     return {
         "line_id": line.line_id,
         "item_id": line.item_id,
@@ -284,6 +289,8 @@ def _line_to_dict(line: IoLine) -> dict:
         "has_children": line.has_children_snapshot,
         "shortage": line.shortage,
         "exclusion_note": line.exclusion_note,
+        "approval_kind": approval_kind,
+        "approval_outcome": approval_outcome,
     }
 
 
@@ -345,7 +352,11 @@ def _bom_fallback_child_lines(
 
 def _stock_request_summary(request: StockRequest) -> dict:
     first_line = request.lines[0] if request.lines else None
-    if request.requires_warehouse_approval:
+    if request.requires_as_research_approval:
+        approval_kind = "as_research"
+        approver_employee_id = request.as_research_approved_by_employee_id
+        approver_name = request.as_research_approved_by_name
+    elif request.requires_warehouse_approval:
         approval_kind = "warehouse"
         approver_employee_id = request.approved_by_employee_id
         approver_name = request.approved_by_name
@@ -368,6 +379,14 @@ def _stock_request_summary(request: StockRequest) -> dict:
         "approval_kind": approval_kind,
         "requires_warehouse_approval": bool(request.requires_warehouse_approval),
         "requires_department_approval": bool(request.requires_department_approval),
+        "requires_as_research_approval": bool(request.requires_as_research_approval),
+        "approval_outcome": (
+            "approved"
+            if request.status == StockRequestStatusEnum.COMPLETED
+            else "rejected"
+            if request.status == StockRequestStatusEnum.REJECTED
+            else None
+        ),
         "approver_employee_id": approver_employee_id,
         "approver_name": approver_name,
         "rejected_by_name": request.rejected_by_name,
@@ -382,9 +401,42 @@ def _stock_request_summary(request: StockRequest) -> dict:
 
 
 def _batch_to_payload(batch: IoBatch, db: Optional[Session] = None) -> dict:
+    linked_requests: list[StockRequest] = []
+    if db is not None:
+        linked_requests = (
+            db.query(StockRequest)
+            .filter(StockRequest.operation_batch_id == batch.batch_id)
+            .order_by(StockRequest.created_at.asc(), StockRequest.request_id.asc())
+            .all()
+        )
+        if not linked_requests and batch.stock_request_id is not None:
+            legacy_request = (
+                db.query(StockRequest)
+                .filter(StockRequest.request_id == batch.stock_request_id)
+                .first()
+            )
+            if legacy_request is not None:
+                linked_requests = [legacy_request]
+    approval_by_line_id: dict[uuid.UUID, tuple[str, str | None]] = {}
+    for request in linked_requests:
+        summary = _stock_request_summary(request)
+        for request_line in request.lines:
+            if request_line.operation_line_id is not None:
+                approval_by_line_id[request_line.operation_line_id] = (
+                    summary["approval_kind"],
+                    summary["approval_outcome"],
+                )
+
     bundles_payload: list[dict] = []
     for bundle in batch.bundles:
-        lines_payload = [_line_to_dict(line) for line in bundle.lines]
+        lines_payload = [
+            _line_to_dict(
+                line,
+                approval_kind=approval_by_line_id.get(line.line_id, (None, None))[0],
+                approval_outcome=approval_by_line_id.get(line.line_id, (None, None))[1],
+            )
+            for line in bundle.lines
+        ]
         # 옛 데이터 회귀 보완 — BOM 부모 bundle 인데 자식 라인이 누락된 경우 BOM 마스터로 보충.
         if (
             db is not None
@@ -412,23 +464,6 @@ def _batch_to_payload(batch: IoBatch, db: Optional[Session] = None) -> dict:
                 "lines": lines_payload,
             }
         )
-    linked_requests: list[StockRequest] = []
-    if db is not None:
-        linked_requests = (
-            db.query(StockRequest)
-            .filter(StockRequest.operation_batch_id == batch.batch_id)
-            .order_by(StockRequest.created_at.asc(), StockRequest.request_id.asc())
-            .all()
-        )
-        if not linked_requests and batch.stock_request_id is not None:
-            legacy_request = (
-                db.query(StockRequest)
-                .filter(StockRequest.request_id == batch.stock_request_id)
-                .first()
-            )
-            if legacy_request is not None:
-                linked_requests = [legacy_request]
-
     # 복수 결재 요청의 승인자를 하나로 대표하지 않는다. 단일·즉시처리는 기존 호환 규칙 유지.
     approver_employee_id: Optional[uuid.UUID] = batch.requester_employee_id
     approver_name: Optional[str] = batch.requester_name
@@ -754,7 +789,9 @@ def sync_batch_from_stock_requests(
         batch.completed_at = None
 
     batch.requires_approval = any(
-        request.requires_warehouse_approval or request.requires_department_approval
+        request.requires_warehouse_approval
+        or request.requires_department_approval
+        or request.requires_as_research_approval
         for request in linked_requests
     )
     if len(linked_requests) == 1:

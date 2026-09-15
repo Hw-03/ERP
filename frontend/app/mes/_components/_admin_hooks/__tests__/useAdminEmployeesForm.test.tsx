@@ -12,6 +12,7 @@ const employee = (over: Partial<any> = {}): any => ({
   level: "staff",
   warehouse_role: "none",
   department_role: "none",
+  as_research_approver: false,
   io_enabled: true,
   assigned_model_slots: [],
   hidden_sidebar_tabs: ["weekly", "admin"],
@@ -58,5 +59,19 @@ describe("useAdminEmployeesForm", () => {
 
     expect(result.current.editForm.role).toBe(expectedRole);
     expect(result.current.dirty).toBe(false);
+  });
+
+  it("AS·연구 승인 권한 변경을 저장 전 수정으로 추적한다", async () => {
+    const emp = employee({ as_research_approver: false });
+    const { result } = renderHook(() => useAdminEmployeesForm([emp]));
+    await act(async () => {
+      result.current.setSelectedEmployee(emp);
+    });
+
+    await act(async () => {
+      result.current.setEditForm((form) => ({ ...form, as_research_approver: true }));
+    });
+
+    expect(result.current.dirty).toBe(true);
   });
 });

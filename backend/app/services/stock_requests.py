@@ -88,11 +88,13 @@ from app.services.sr_approval import (  # noqa: F401
     FailedApprovalError,
     approve_request,
     approve_request_department,
+    approve_request_as_research,
     cancel_open_stock_requests,
     cancel_request,
     mark_failed_approval,
     reject_request,
     reject_request_department,
+    reject_request_as_research,
 )
 
 
@@ -115,6 +117,7 @@ def _build_request_and_lines(
     client_request_id: Optional[str] = None,
     requires_warehouse_approval_override: Optional[bool] = None,
     requires_department_approval: bool = False,
+    requires_as_research_approval: bool = False,
     approval_department: Optional[str] = None,
     reason_category: Optional[str] = None,
     reason_memo: Optional[str] = None,
@@ -145,6 +148,7 @@ def _build_request_and_lines(
         status=status,
         requires_warehouse_approval=requires_approval,
         requires_department_approval=requires_department_approval,
+        requires_as_research_approval=requires_as_research_approval,
         submitted_at=submitted_at,
         reference_no=reference_no,
         notes=notes,
@@ -191,6 +195,10 @@ def create_request(
     notes: Optional[str],
     client_request_id: Optional[str] = None,
     requires_department_approval: bool = False,
+    requires_as_research_approval: bool = False,
+    requires_warehouse_approval_override: Optional[bool] = None,
+    approval_department: Optional[str] = None,
+    defer_execution: bool = False,
     reason_category: Optional[str] = None,
     reason_memo: Optional[str] = None,
     allow_internal_use: bool = False,
@@ -229,8 +237,7 @@ def create_request(
         len(lines_input),
         client_request_id,
     )
-    warehouse_override: Optional[bool] = None
-    approval_department: Optional[str] = None
+    warehouse_override: Optional[bool] = requires_warehouse_approval_override
     if request_type in _IMMEDIATE_DEFECT_TYPES:
         warehouse_override = False
         requires_department_approval = False
@@ -255,6 +262,14 @@ def create_request(
                 raise ValueError("선택 격리 처리 요청에 중복된 기록이 있습니다.")
 
     _validate_lines(request_type, lines_input)
+    if sum(
+        (
+            bool(warehouse_override),
+            bool(requires_department_approval),
+            bool(requires_as_research_approval),
+        )
+    ) > 1:
+        raise ValueError("결재 요청은 한 종류의 승인만 요구할 수 있습니다.")
     _preflight_inventory_check(db, request_type, lines_input)
     _preflight_defective_check(
         db,
@@ -276,11 +291,18 @@ def create_request(
         client_request_id=client_request_id,
         requires_warehouse_approval_override=warehouse_override,
         requires_department_approval=requires_department_approval,
+        requires_as_research_approval=requires_as_research_approval,
         approval_department=approval_department,
         reason_category=reason_category,
         reason_memo=reason_memo,
     )
-    return _finalize_submission(db, request=request, requester=requester, now=now)
+    return _finalize_submission(
+        db,
+        request=request,
+        requester=requester,
+        now=now,
+        defer_execution=defer_execution,
+    )
 
 
 def create_manual_adjustment_request(

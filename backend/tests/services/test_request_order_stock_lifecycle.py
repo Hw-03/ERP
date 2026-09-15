@@ -262,7 +262,26 @@ def test_partial_batch_projects_only_the_approved_source(
     )
     db_session.flush()
 
+    assert batch.status == "reserved"
+    assert db_session.query(TransactionLog).count() == 0
+    assert load_request_order_stock(
+        db_session,
+        {warehouse_item.item_id, department_item.item_id},
+        request_date_expr=expression,
+    ) == {}
+
+    sr_approval.reject_request_department(
+        db_session,
+        department_request,
+        approver=department_approver,
+        pin="0000",
+        reason="부분 반려 검증",
+    )
+    db_session.flush()
+
     assert batch.status == "partially_completed"
+    assert warehouse_request.status == StockRequestStatusEnum.COMPLETED
+    assert department_request.status == StockRequestStatusEnum.REJECTED
     logs = db_session.query(TransactionLog).all()
     assert [log.item_id for log in logs] == [warehouse_item.item_id]
     projected = load_request_order_stock(
@@ -275,21 +294,3 @@ def test_partial_batch_projects_only_the_approved_source(
         projected[logs[0].log_id].warehouse_qty_before,
         projected[logs[0].log_id].warehouse_qty_after,
     ) == (5, 4)
-
-    sr_approval.reject_request_department(
-        db_session,
-        department_request,
-        approver=department_approver,
-        pin="0000",
-        reason="부분 반려 검증",
-    )
-    db_session.flush()
-
-    assert warehouse_request.status == StockRequestStatusEnum.COMPLETED
-    assert department_request.status == StockRequestStatusEnum.REJECTED
-    assert db_session.query(TransactionLog).count() == 1
-    assert set(load_request_order_stock(
-        db_session,
-        {warehouse_item.item_id, department_item.item_id},
-        request_date_expr=expression,
-    )) == {logs[0].log_id}

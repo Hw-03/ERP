@@ -4,6 +4,7 @@ import { api, type IoBatch, type Item, type StockRequest } from "@/lib/api";
 import { MyRequestsPanel } from "./MyRequestsPanel";
 import { WarehouseQueuePanel } from "./WarehouseQueuePanel";
 import { DepartmentQueuePanel } from "./DepartmentQueuePanel";
+import { AsResearchQueuePanel } from "./AsResearchQueuePanel";
 import { DraftCartPanel } from "./DraftCartPanel";
 import { HandoverSectionPanel } from "./HandoverSectionPanel";
 import type { WarehouseSectionTab } from "./WarehouseSectionTabs";
@@ -20,6 +21,7 @@ export interface WarehouseDraftPanelTabsProps {
   sectionTab: WarehouseSectionTab;
   canSeeQueue: boolean;
   canSeeDeptQueue: boolean;
+  canSeeAsResearchQueue: boolean;
   operator: Operator | null;
   operatorEmployeeId: string | undefined;
   employeeId: string;
@@ -43,6 +45,7 @@ export function WarehouseDraftPanelTabs({
   sectionTab,
   canSeeQueue,
   canSeeDeptQueue,
+  canSeeAsResearchQueue,
   operator,
   operatorEmployeeId,
   employeeId,
@@ -130,6 +133,27 @@ export function WarehouseDraftPanelTabs({
         refreshNonce={refreshNonce}
         onChanged={() => {
           bumpRefresh();
+          onSubmitSuccess?.();
+        }}
+      />
+    );
+  }
+
+  if (sectionTab === "as-research-queue" && canSeeAsResearchQueue && operatorEmployeeId) {
+    return (
+      <AsResearchQueuePanel
+        targetRequestId={targetRequestId}
+        approverEmployeeId={operatorEmployeeId}
+        refreshNonce={refreshNonce}
+        onEmptyStateChange={onEmptyStateChange}
+        onChanged={async () => {
+          bumpRefresh();
+          try {
+            const refreshed = await api.getItems({ limit: 2000, search: globalSearch.trim() || undefined });
+            setItems(refreshed);
+          } catch {
+            /* 무시 */
+          }
           onSubmitSuccess?.();
         }}
       />

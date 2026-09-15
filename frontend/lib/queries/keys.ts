@@ -100,6 +100,8 @@ export const queryKeys = {
     warehouseQueue: () => ["stockRequests", "warehouseQueue"] as const,
     departmentQueue: (actorId: string) =>
       ["stockRequests", "departmentQueue", actorId] as const,
+    asResearchQueue: (actorId: string) =>
+      ["stockRequests", "asResearchQueue", actorId] as const,
     myList: (employeeId: string) =>
       ["stockRequests", "myList", employeeId] as const,
     drafts: (employeeId: string) =>

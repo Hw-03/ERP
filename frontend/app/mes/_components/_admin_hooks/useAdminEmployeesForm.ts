@@ -21,6 +21,7 @@ export type EmployeeEditForm = {
   level: EmployeeLevel;
   warehouse_role: WarehouseRole;
   department_role: DepartmentRole;
+  as_research_approver: boolean;
   /** 직원별 좌측 사이드바/모바일 탭 숨김 목록. */
   hidden_sidebar_tabs: string[];
   /** 조립 부서 직원의 담당 모델 slot 목록 (배열 순서 = 우선순위, 0=1순위). */
@@ -35,6 +36,7 @@ const EMPTY_EDIT_FORM: EmployeeEditForm = {
   level: "staff",
   warehouse_role: "none",
   department_role: "none",
+  as_research_approver: false,
   hidden_sidebar_tabs: [],
   assigned_model_slots: [],
 };
@@ -48,6 +50,7 @@ function toEditForm(emp: Employee): EmployeeEditForm {
     level: (emp.level ?? "staff") as EmployeeLevel,
     warehouse_role: (emp.warehouse_role ?? "none") as WarehouseRole,
     department_role: (emp.department_role ?? "none") as DepartmentRole,
+    as_research_approver: emp.as_research_approver ?? false,
     hidden_sidebar_tabs: emp.hidden_sidebar_tabs ?? [],
     assigned_model_slots: emp.assigned_model_slots ?? [],
   };
@@ -94,6 +97,7 @@ export function useAdminEmployeesForm(employees: Employee[]) {
     if (orig.level !== editForm.level) return true;
     if (orig.warehouse_role !== editForm.warehouse_role) return true;
     if (orig.department_role !== editForm.department_role) return true;
+    if (orig.as_research_approver !== editForm.as_research_approver) return true;
     const hiddenA = orig.hidden_sidebar_tabs;
     const hiddenB = editForm.hidden_sidebar_tabs;
     if (hiddenA.length !== hiddenB.length) return true;

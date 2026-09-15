@@ -13,9 +13,18 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from sqlalchemy import text
 
-from app.models import Department, Employee, EmployeeLevelEnum
+from app.models import (
+    Department,
+    Employee,
+    EmployeeLevelEnum,
+    StockRequest,
+    StockRequestStatusEnum,
+    StockRequestTypeEnum,
+)
 
 ADMIN_HEADERS = {"X-Admin-Pin": "0000"}
 
@@ -56,6 +65,188 @@ def test_create_employee_explicit_io_enabled_false(db_session, client):
     assert resp.status_code == 201, resp.text
     data = resp.json()
     assert data["io_enabled"] is False
+
+
+def test_as_research_approver_create_update_and_list_round_trip(
+    db_session,
+    client,
+    monkeypatch,
+):
+    from app.services import internal_use_approval
+
+    roster_events = []
+    original_add = db_session.add
+
+    def track_roster_lock(session):
+        roster_events.append("lock")
+
+    def track_add(instance, *args, **kwargs):
+        if isinstance(instance, Employee):
+            roster_events.append("employee-add")
+        return original_add(instance, *args, **kwargs)
+
+    monkeypatch.setattr(internal_use_approval, "lock_approver_roster", track_roster_lock)
+    monkeypatch.setattr(db_session, "add", track_add)
+    create_resp = client.post(
+        "/api/employees",
+        headers=ADMIN_HEADERS,
+        json=_emp_payload(name="AS 연구 승인자", as_research_approver=True),
+    )
+    assert create_resp.status_code == 201, create_resp.text
+    assert roster_events[0] == "lock"
+    employee_id = create_resp.json()["employee_id"]
+    assert create_resp.json()["as_research_approver"] is True
+
+    original_flush = db_session.flush
+
+    def track_flush(*args, **kwargs):
+        roster_events.append("flush")
+        return original_flush(*args, **kwargs)
+
+    monkeypatch.setattr(db_session, "flush", track_flush)
+    roster_events.clear()
+    update_resp = client.put(
+        f"/api/employees/{employee_id}",
+        headers=ADMIN_HEADERS,
+        json={"as_research_approver": False},
+    )
+    assert update_resp.status_code == 200, update_resp.text
+    assert roster_events[0] == "lock"
+    assert update_resp.json()["as_research_approver"] is False
+
+    listed = client.get("/api/employees").json()
+    saved = next(row for row in listed if row["employee_id"] == employee_id)
+    assert saved["as_research_approver"] is False
+
+
+def test_delete_active_special_approver_locks_roster_before_deactivation_flush(
+    db_session,
+    client,
+    monkeypatch,
+):
+    created = client.post(
+        "/api/employees",
+        headers=ADMIN_HEADERS,
+        json=_emp_payload(name="삭제 잠금 승인자", as_research_approver=True),
+    ).json()
+    employee_id = created["employee_id"]
+    db_session.add(
+        StockRequest(
+            requester_employee_id=employee_id,
+            requester_name=created["name"],
+            requester_department=created["department"],
+            request_type=StockRequestTypeEnum.INTERNAL_USE,
+            status=StockRequestStatusEnum.COMPLETED,
+        )
+    )
+    db_session.commit()
+
+    from app.services import internal_use_approval
+
+    roster_events = []
+    original_flush = db_session.flush
+
+    def track_roster_lock(session):
+        roster_events.append("lock")
+
+    def track_flush(*args, **kwargs):
+        roster_events.append("flush")
+        return original_flush(*args, **kwargs)
+
+    monkeypatch.setattr(internal_use_approval, "lock_approver_roster", track_roster_lock)
+    monkeypatch.setattr(db_session, "flush", track_flush)
+    response = client.delete(
+        f"/api/employees/{employee_id}",
+        headers=ADMIN_HEADERS,
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {"result": "deactivated"}
+    assert roster_events[0] == "lock"
+    db_session.expire_all()
+    assert db_session.get(Employee, employee_id).is_active is False
+
+
+def test_special_request_fallback_waits_for_last_active_approver_and_is_one_way(
+    db_session,
+    client,
+):
+    first = client.post(
+        "/api/employees",
+        headers=ADMIN_HEADERS,
+        json=_emp_payload(name="특수 승인자 1", as_research_approver=True),
+    ).json()
+    second = client.post(
+        "/api/employees",
+        headers=ADMIN_HEADERS,
+        json=_emp_payload(name="특수 승인자 2", as_research_approver=True),
+    ).json()
+    bystander = client.post(
+        "/api/employees",
+        headers=ADMIN_HEADERS,
+        json=_emp_payload(name="일반 활성 직원"),
+    )
+    assert bystander.status_code == 201, bystander.text
+    requester_id = first["employee_id"]
+    open_request = StockRequest(
+        requester_employee_id=requester_id,
+        requester_name=first["name"],
+        requester_department=first["department"],
+        request_type=StockRequestTypeEnum.INTERNAL_USE,
+        status=StockRequestStatusEnum.RESERVED,
+        requires_warehouse_approval=False,
+        requires_department_approval=False,
+        requires_as_research_approval=True,
+    )
+    approved_request = StockRequest(
+        requester_employee_id=requester_id,
+        requester_name=first["name"],
+        requester_department=first["department"],
+        request_type=StockRequestTypeEnum.INTERNAL_USE,
+        status=StockRequestStatusEnum.RESERVED,
+        requires_warehouse_approval=False,
+        requires_department_approval=False,
+        requires_as_research_approval=True,
+        as_research_approved_by_employee_id=first["employee_id"],
+        as_research_approved_by_name=first["name"],
+        as_research_approved_at=datetime.utcnow(),
+    )
+    db_session.add_all([open_request, approved_request])
+    db_session.commit()
+
+    first_disabled = client.put(
+        f"/api/employees/{first['employee_id']}",
+        headers=ADMIN_HEADERS,
+        json={"is_active": False},
+    )
+    assert first_disabled.status_code == 200, first_disabled.text
+    db_session.expire_all()
+    assert db_session.get(StockRequest, open_request.request_id).requires_as_research_approval is True
+
+    second_disabled = client.put(
+        f"/api/employees/{second['employee_id']}",
+        headers=ADMIN_HEADERS,
+        json={"is_active": False},
+    )
+    assert second_disabled.status_code == 200, second_disabled.text
+    db_session.expire_all()
+    fallback = db_session.get(StockRequest, open_request.request_id)
+    approved = db_session.get(StockRequest, approved_request.request_id)
+    assert fallback.requires_as_research_approval is False
+    assert fallback.requires_department_approval is True
+    assert approved.requires_as_research_approval is True
+    assert approved.requires_department_approval is False
+
+    replacement = client.post(
+        "/api/employees",
+        headers=ADMIN_HEADERS,
+        json=_emp_payload(name="특수 승인자 재생성", as_research_approver=True),
+    )
+    assert replacement.status_code == 201, replacement.text
+    db_session.expire_all()
+    persisted = db_session.get(StockRequest, open_request.request_id)
+    assert persisted.requires_as_research_approval is False
+    assert persisted.requires_department_approval is True
 
 
 # ────────────────────────── 케이스 2: update 토글 ──────────────────────────

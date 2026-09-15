@@ -24,6 +24,7 @@ const baseOperator: Operator = {
   employee_code: "E1",
   warehouse_role: "none",
   department_role: "none",
+  as_research_approver: false,
   theme: null,
   assigned_model_slots: [],
   io_enabled: true,

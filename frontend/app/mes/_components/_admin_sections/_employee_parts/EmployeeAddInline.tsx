@@ -83,6 +83,24 @@ export function EmployeeAddInline({ form, setForm, departments, productModels, o
             }))}
           />
         </FieldRow>
+        <FieldRow label="AS·연구 승인 권한">
+          <label className="flex cursor-pointer items-start gap-2 rounded-[10px] border px-3 py-2" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}>
+            <input
+              type="checkbox"
+              aria-label="AS·연구 승인 권한"
+              checked={form.as_research_approver}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setForm((f) => ({ ...f, as_research_approver: checked }));
+              }}
+              className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border"
+              style={{ accentColor: LEGACY_COLORS.blue, borderColor: LEGACY_COLORS.border }}
+            />
+            <span className="text-[12px] leading-5" style={{ color: LEGACY_COLORS.muted2 }}>
+              AS·연구 사용출고 중 부서 재고의 AR·AA 품목 승인. 대상 직원은 다음 로그인부터 승인함 탭 반영
+            </span>
+          </label>
+        </FieldRow>
       </div>
       {form.department === ASSEMBLY_DEPT ? (
         <FieldRow label="담당 모델 (우선순위 순)">

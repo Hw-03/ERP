@@ -4,7 +4,7 @@ import { useState } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 
-export type WarehouseSectionTab = "compose" | "cart" | "mine" | "queue" | "dept-queue" | "handover";
+export type WarehouseSectionTab = "compose" | "cart" | "mine" | "queue" | "as-research-queue" | "dept-queue" | "handover";
 
 /**
  * DesktopWarehouseView 의 섹션 탭. 권한별로 "창고 승인함" / "부서 승인함" 가시성 분기.
@@ -15,10 +15,12 @@ interface Props {
   onChange: (next: WarehouseSectionTab) => void;
   showQueue: boolean;
   showDeptQueue: boolean;
+  showAsResearchQueue?: boolean;
   showHandover?: boolean;
   cartCount?: number;
   queueCount?: number;
   deptQueueCount?: number;
+  asResearchQueueCount?: number;
   handoverInboxCount?: number;
 }
 
@@ -29,10 +31,12 @@ export function WarehouseSectionTabs({
   onChange,
   showQueue,
   showDeptQueue,
+  showAsResearchQueue = false,
   showHandover = false,
   cartCount = 0,
   queueCount = 0,
   deptQueueCount = 0,
+  asResearchQueueCount = 0,
   handoverInboxCount = 0,
 }: Props) {
   const tabs: TabDef[] = [
@@ -41,6 +45,7 @@ export function WarehouseSectionTabs({
     { id: "mine", label: "내 요청", tone: LEGACY_COLORS.purple },
   ];
   if (showQueue) tabs.push({ id: "queue", label: "창고 승인함", tone: LEGACY_COLORS.yellow });
+  if (showAsResearchQueue) tabs.push({ id: "as-research-queue", label: "AS·연구 승인함", tone: LEGACY_COLORS.blue });
   if (showDeptQueue) tabs.push({ id: "dept-queue", label: "부서 승인함", tone: LEGACY_COLORS.cyan });
   if (showHandover) tabs.push({ id: "handover", label: "인수인계", tone: LEGACY_COLORS.red });
 
@@ -48,6 +53,7 @@ export function WarehouseSectionTabs({
     if (id === "cart" && cartCount > 0) return cartCount;
     if (id === "queue" && queueCount > 0) return queueCount;
     if (id === "dept-queue" && deptQueueCount > 0) return deptQueueCount;
+    if (id === "as-research-queue" && asResearchQueueCount > 0) return asResearchQueueCount;
     if (id === "handover" && handoverInboxCount > 0) return handoverInboxCount;
     return null;
   };

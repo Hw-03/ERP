@@ -39,6 +39,7 @@ def _make_employee(
     department: DepartmentEnum = DepartmentEnum.ASSEMBLY,
     warehouse_role: str = "none",
     department_role: str = "none",
+    as_research_approver: bool = False,
 ) -> Employee:
     employee = Employee(
         employee_code=code,
@@ -48,6 +49,7 @@ def _make_employee(
         level=EmployeeLevelEnum.STAFF,
         warehouse_role=warehouse_role,
         department_role=department_role,
+        as_research_approver=as_research_approver,
         display_order=0,
         is_active="true",
         pin_hash=DEFAULT_PIN_HASH,
@@ -907,7 +909,7 @@ def test_internal_use_parent_and_children_splits_outbound_and_return_approvals(
     assert outbound.status == StockRequestStatusEnum.RESERVED
     assert returned.status == StockRequestStatusEnum.SUBMITTED
     assert returned.requester_department == DepartmentEnum.RESEARCH.value
-    assert returned.approval_department == DepartmentEnum.HIGH_VOLTAGE.value
+    assert returned.approval_department == requester.department
     assert returned.requires_department_approval is True
 
     parent_inventory = (
@@ -926,7 +928,7 @@ def test_internal_use_parent_and_children_splits_outbound_and_return_approvals(
     department_approver = _make_employee(
         db_session,
         code="IU-BOM-DEPT-APP",
-        department=DepartmentEnum.HIGH_VOLTAGE,
+        department=DepartmentEnum.RESEARCH,
         department_role="primary",
     )
     db_session.commit()
@@ -937,11 +939,11 @@ def test_internal_use_parent_and_children_splits_outbound_and_return_approvals(
     assert approved_outbound.status_code == 200, approved_outbound.text
     db_session.expire_all()
     batch = db_session.query(IoBatch).one()
-    assert batch.status == "partially_completed"
+    assert batch.status == "reserved"
     parent_inventory = (
         db_session.query(Inventory).filter(Inventory.item_id == parent.item_id).one()
     )
-    assert parent_inventory.warehouse_qty == Decimal("4")
+    assert parent_inventory.warehouse_qty == Decimal("5")
     child_location = (
         db_session.query(InventoryLocation)
         .filter(
@@ -952,6 +954,7 @@ def test_internal_use_parent_and_children_splits_outbound_and_return_approvals(
         .one()
     )
     assert child_location.quantity == Decimal("1")
+    assert db_session.query(TransactionLog).count() == 0
 
     approved_return = _approve_department_request(
         client, returned.request_id, department_approver
@@ -1402,6 +1405,78 @@ def test_internal_use_children_only_consumes_selected_children_without_parent_ch
         unselected_child.item_id: Decimal("5"),
     }
     assert db_session.query(IoBatch).one().status == "completed"
+
+
+def test_internal_use_bom_child_uses_actual_child_process_for_special_approval(
+    client, db_session, make_item, make_bom, make_location
+):
+    parent = make_item(
+        name="일반 공정 상위품",
+        process_type_code="AF",
+        warehouse_qty=Decimal("0"),
+    )
+    child = make_item(
+        name="AS 실제 하위품",
+        process_type_code="AR",
+        warehouse_qty=Decimal("0"),
+    )
+    make_bom(parent.item_id, child.item_id, Decimal("1"))
+    make_location(
+        child.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        quantity=Decimal("2"),
+    )
+    requester = _make_employee(
+        db_session,
+        code="IU-BOM-ACTUAL-CHILD",
+        department=DepartmentEnum.AS,
+    )
+    _make_employee(
+        db_session,
+        code="IU-BOM-SPECIAL",
+        department=DepartmentEnum.RESEARCH,
+        as_research_approver=True,
+    )
+    db_session.commit()
+
+    preview = client.post(
+        "/api/io/preview",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "internal_use",
+            "sub_type": "internal_use_out",
+            "to_department": DepartmentEnum.AS.value,
+            "targets": [
+                {
+                    "source_kind": "direct_item",
+                    "source_location": "department",
+                    "item_id": str(parent.item_id),
+                    "quantity": 1,
+                    "internal_use_bom_mode": "children_only",
+                    "component_selections": [
+                        {"item_id": str(child.item_id), "selected": True}
+                    ],
+                }
+            ],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    submitted = client.post(
+        "/api/io/submit",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "work_type": "internal_use",
+            "sub_type": "internal_use_out",
+            "to_department": DepartmentEnum.AS.value,
+            "bundles": preview.json()["bundles"],
+        },
+    )
+    assert submitted.status_code == 201, submitted.text
+
+    request = db_session.query(StockRequest).one()
+    assert request.requires_as_research_approval is True
+    assert request.requires_department_approval is False
+    assert [line.item_id for line in request.lines] == [child.item_id]
 
 
 def test_internal_use_rejects_unauthorized_requester_and_tampered_line(

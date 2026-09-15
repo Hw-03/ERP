@@ -224,13 +224,13 @@ describe("MobileIoComposeWizard Step 5 헤더", () => {
             {
               stock_request_id: "old", request_code: "SR-old", status: "rejected", from_bucket: "production",
               from_department: "조립", approval_kind: "department", requires_warehouse_approval: false,
-              requires_department_approval: true, approver_employee_id: null, approver_name: null,
+              requires_as_research_approval: false, requires_department_approval: true, approval_outcome: "rejected", approver_employee_id: null, approver_name: null,
               rejected_by_name: "이전 결재자", rejected_at: "2026-08-04T00:05:00Z", rejected_reason: "이전 사유",
             },
             {
               stock_request_id: "new", request_code: "SR-new", status: "rejected", from_bucket: "production",
               from_department: "조립", approval_kind: "department", requires_warehouse_approval: false,
-              requires_department_approval: true, approver_employee_id: null, approver_name: null,
+              requires_as_research_approval: false, requires_department_approval: true, approval_outcome: "rejected", approver_employee_id: null, approver_name: null,
               rejected_by_name: "최신 결재자", rejected_at: "2026-08-04T01:05:00Z", rejected_reason: "최신 사유",
             },
           ],

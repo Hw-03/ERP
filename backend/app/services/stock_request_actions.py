@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from datetime import datetime
 from typing import Optional, Sequence
 
@@ -77,6 +78,64 @@ def _record_failed_approval(
         )
 
 
+def _record_failed_decision(
+    db: Session,
+    *,
+    request_id: uuid.UUID,
+    approver_id: uuid.UUID,
+    reason: str,
+) -> None:
+    """일반 단건 승인 실패 결과를 rollback 뒤 별도 트랜잭션에 남긴다."""
+    _record_failed_approval(
+        db,
+        request_id=request_id,
+        approver_id=approver_id,
+        reason=reason,
+    )
+
+
+def _run_decision_with_failure_boundary(
+    db: Session,
+    *,
+    request_id: uuid.UUID,
+    approver: Employee,
+    internal_use_batch_id: uuid.UUID | None,
+    command: Callable[[], None],
+    rejected_request_id: uuid.UUID | None = None,
+    rejected_reason: str | None = None,
+) -> None:
+    """internal-use 실패는 잠금을 유지해 기록하고 일반 요청만 기존처럼 재기록한다."""
+    post_commit_error: stock_request_svc.FailedApprovalError | None = None
+    try:
+        with transactional(db):
+            try:
+                command()
+            except stock_request_svc.FailedApprovalError as exc:
+                if internal_use_batch_id is None:
+                    raise
+                from app.services.internal_use_approval import mark_batch_failed
+
+                mark_batch_failed(
+                    db,
+                    batch_id=internal_use_batch_id,
+                    approver=approver,
+                    reason=str(exc),
+                    rejected_request_id=rejected_request_id,
+                    rejected_reason=rejected_reason,
+                )
+                post_commit_error = exc
+    except stock_request_svc.FailedApprovalError as exc:
+        _record_failed_decision(
+            db,
+            request_id=request_id,
+            approver_id=approver.employee_id,
+            reason=str(exc),
+        )
+        raise
+    if post_commit_error is not None:
+        raise post_commit_error
+
+
 def approve_warehouse_request(
     db: Session,
     request: StockRequest,
@@ -87,34 +146,40 @@ def approve_warehouse_request(
 ) -> StockRequest:
     """창고 승인 실행과 완료 알림을 확정하고 검증 실패만 별도 기록한다."""
     request_id = request.request_id
-    approver_id = approver.employee_id
-    try:
-        with transactional(db):
-            previous_status = request.status
-            stock_request_svc.approve_request(
+    from app.services import internal_use_approval
+
+    internal_use_batch_id = (
+        request.operation_batch_id
+        if internal_use_approval.is_internal_use_request(db, request)
+        else None
+    )
+
+    def decide() -> None:
+        previous_status = request.status
+        stock_request_svc.approve_request(
+            db,
+            request,
+            approver=approver,
+            pin=pin,
+            http_request=http_request,
+        )
+        if (
+            request.status == StockRequestStatusEnum.COMPLETED
+            and previous_status != StockRequestStatusEnum.COMPLETED
+        ):
+            notification_svc.notify_request_decided(
                 db,
                 request,
-                approver=approver,
-                pin=pin,
-                http_request=http_request,
+                decision="approved",
             )
-            if (
-                request.status == StockRequestStatusEnum.COMPLETED
-                and previous_status != StockRequestStatusEnum.COMPLETED
-            ):
-                notification_svc.notify_request_decided(
-                    db,
-                    request,
-                    decision="approved",
-                )
-    except stock_request_svc.FailedApprovalError as exc:
-        _record_failed_approval(
-            db,
-            request_id=request_id,
-            approver_id=approver_id,
-            reason=str(exc),
-        )
-        raise
+
+    _run_decision_with_failure_boundary(
+        db,
+        request_id=request_id,
+        approver=approver,
+        internal_use_batch_id=internal_use_batch_id,
+        command=decide,
+    )
     return request
 
 
@@ -128,34 +193,200 @@ def approve_department_request(
 ) -> StockRequest:
     """부서 승인 실행과 완료 알림을 확정하고 검증 실패만 별도 기록한다."""
     request_id = request.request_id
-    approver_id = approver.employee_id
-    try:
-        with transactional(db):
-            previous_status = request.status
-            stock_request_svc.approve_request_department(
+    from app.services import internal_use_approval
+
+    internal_use_batch_id = (
+        request.operation_batch_id
+        if internal_use_approval.is_internal_use_request(db, request)
+        else None
+    )
+
+    def decide() -> None:
+        previous_status = request.status
+        stock_request_svc.approve_request_department(
+            db,
+            request,
+            approver=approver,
+            pin=pin,
+            http_request=http_request,
+        )
+        if (
+            request.status == StockRequestStatusEnum.COMPLETED
+            and previous_status != StockRequestStatusEnum.COMPLETED
+        ):
+            notification_svc.notify_request_decided(
                 db,
                 request,
-                approver=approver,
-                pin=pin,
-                http_request=http_request,
+                decision="approved",
             )
-            if (
-                request.status == StockRequestStatusEnum.COMPLETED
-                and previous_status != StockRequestStatusEnum.COMPLETED
-            ):
-                notification_svc.notify_request_decided(
-                    db,
-                    request,
-                    decision="approved",
-                )
-    except stock_request_svc.FailedApprovalError as exc:
-        _record_failed_approval(
+
+    _run_decision_with_failure_boundary(
+        db,
+        request_id=request_id,
+        approver=approver,
+        internal_use_batch_id=internal_use_batch_id,
+        command=decide,
+    )
+    return request
+
+
+def approve_as_research_request(
+    db: Session,
+    request: StockRequest,
+    *,
+    approver: Employee,
+    pin: str,
+    http_request: Optional[Request] = None,
+) -> StockRequest:
+    """AS·연구 승인 실행과 완료 알림을 하나의 트랜잭션으로 확정한다."""
+    request_id = request.request_id
+    batch_id = request.operation_batch_id
+
+    def decide() -> None:
+        previous_status = request.status
+        stock_request_svc.approve_request_as_research(
             db,
-            request_id=request_id,
-            approver_id=approver_id,
-            reason=str(exc),
+            request,
+            approver=approver,
+            pin=pin,
+            http_request=http_request,
         )
-        raise
+        if (
+            request.status == StockRequestStatusEnum.COMPLETED
+            and previous_status != StockRequestStatusEnum.COMPLETED
+        ):
+            notification_svc.notify_request_decided(db, request, decision="approved")
+
+    _run_decision_with_failure_boundary(
+        db,
+        request_id=request_id,
+        approver=approver,
+        internal_use_batch_id=batch_id,
+        command=decide,
+    )
+    return request
+
+
+def reject_as_research_request(
+    db: Session,
+    request: StockRequest,
+    *,
+    approver: Employee,
+    pin: str,
+    reason: str,
+    http_request: Optional[Request] = None,
+) -> StockRequest:
+    """AS·연구 반려와 batch settle을 하나의 트랜잭션으로 확정한다."""
+    request_id = request.request_id
+    batch_id = request.operation_batch_id
+
+    def decide() -> None:
+        stock_request_svc.reject_request_as_research(
+            db,
+            request,
+            approver=approver,
+            pin=pin,
+            reason=reason,
+            http_request=http_request,
+        )
+        notification_svc.notify_request_decided(db, request, decision="rejected")
+
+    _run_decision_with_failure_boundary(
+        db,
+        request_id=request_id,
+        approver=approver,
+        internal_use_batch_id=batch_id,
+        command=decide,
+        rejected_request_id=request_id,
+        rejected_reason=reason.strip(),
+    )
+    return request
+
+
+def reject_warehouse_request(
+    db: Session,
+    request: StockRequest,
+    *,
+    approver: Employee,
+    pin: str,
+    reason: str,
+    http_request: Optional[Request] = None,
+) -> StockRequest:
+    return _reject_request(
+        db,
+        request,
+        approver=approver,
+        pin=pin,
+        reason=reason,
+        department=False,
+        http_request=http_request,
+    )
+
+
+def reject_department_request(
+    db: Session,
+    request: StockRequest,
+    *,
+    approver: Employee,
+    pin: str,
+    reason: str,
+    http_request: Optional[Request] = None,
+) -> StockRequest:
+    return _reject_request(
+        db,
+        request,
+        approver=approver,
+        pin=pin,
+        reason=reason,
+        department=True,
+        http_request=http_request,
+    )
+
+
+def _reject_request(
+    db: Session,
+    request: StockRequest,
+    *,
+    approver: Employee,
+    pin: str,
+    reason: str,
+    department: bool,
+    http_request: Optional[Request],
+) -> StockRequest:
+    request_id = request.request_id
+    from app.services import internal_use_approval
+
+    batch_id = (
+        request.operation_batch_id
+        if internal_use_approval.is_internal_use_request(db, request)
+        else None
+    )
+
+    def decide() -> None:
+        reject = (
+            stock_request_svc.reject_request_department
+            if department
+            else stock_request_svc.reject_request
+        )
+        reject(
+            db,
+            request,
+            approver=approver,
+            pin=pin,
+            reason=reason,
+            http_request=http_request,
+        )
+        notification_svc.notify_request_decided(db, request, decision="rejected")
+
+    _run_decision_with_failure_boundary(
+        db,
+        request_id=request_id,
+        approver=approver,
+        internal_use_batch_id=batch_id,
+        command=decide,
+        rejected_request_id=request_id,
+        rejected_reason=reason.strip(),
+    )
     return request
 
 
@@ -169,6 +400,31 @@ def cancel_request(
 ) -> StockRequest:
     """점유 해제·요청 취소·연결 배치 동기화를 한 번에 확정한다."""
     with transactional(db):
+        from app.services import internal_use_approval
+
+        if internal_use_approval.is_internal_use_request(db, request):
+            batch, requests, request = internal_use_approval.locked_request(db, request)
+            if batch.requester_employee_id != requester.employee_id:
+                raise PermissionError("본인 작업 묶음만 취소할 수 있습니다.")
+            if not verify_pin(requester.pin_hash, pin):
+                raise PermissionError("PIN이 일치하지 않습니다.")
+            if batch.status in {"completed", "partially_completed", "rejected", "failed"}:
+                raise ValueError(f"취소할 수 없는 작업 묶음 상태입니다: {batch.status}")
+            internal_use_approval.prelock_reservation_sources(db, requests)
+            now = datetime.utcnow()
+            for linked in requests:
+                if linked.status == StockRequestStatusEnum.COMPLETED:
+                    raise ValueError("완료된 연결 요청이 있어 취소할 수 없습니다.")
+                stock_request_svc.release_reservation(db, linked)
+                linked.status = StockRequestStatusEnum.CANCELLED
+                linked.cancelled_at = now
+                for line in linked.lines:
+                    line.status = StockRequestStatusEnum.CANCELLED
+            batch.status = "cancelled"
+            batch.completed_at = None
+            batch.updated_at = now
+            db.flush()
+            return request
         stock_request_svc.cancel_request(
             db,
             request,
@@ -193,19 +449,28 @@ def revert_to_draft(
         if batch_id is None:
             raise ValueError("연결된 입출고 작업 묶음이 없습니다.")
 
-        requests_query = (
-            db.query(StockRequest)
-            .filter(StockRequest.operation_batch_id == batch_id)
-            .order_by(StockRequest.created_at.asc(), StockRequest.request_id.asc())
-            .populate_existing()
-        )
-        batch_query = db.query(IoBatch).filter(IoBatch.batch_id == batch_id)
-        if db.bind is not None and db.bind.dialect.name != "sqlite":
-            requests_query = requests_query.with_for_update()
-        linked_requests = requests_query.all()
-        if db.bind is not None and db.bind.dialect.name != "sqlite":
-            batch_query = batch_query.with_for_update()
-        batch = batch_query.first()
+        from app.services import internal_use_approval
+
+        is_internal_use = internal_use_approval.is_internal_use_request(db, request)
+        if is_internal_use:
+            batch, linked_requests = internal_use_approval.lock_batch_requests(
+                db,
+                batch_id=batch_id,
+            )
+        else:
+            requests_query = (
+                db.query(StockRequest)
+                .filter(StockRequest.operation_batch_id == batch_id)
+                .order_by(StockRequest.created_at.asc(), StockRequest.request_id.asc())
+                .populate_existing()
+            )
+            batch_query = db.query(IoBatch).filter(IoBatch.batch_id == batch_id)
+            if db.bind is not None and db.bind.dialect.name != "sqlite":
+                requests_query = requests_query.with_for_update()
+            linked_requests = requests_query.all()
+            if db.bind is not None and db.bind.dialect.name != "sqlite":
+                batch_query = batch_query.with_for_update()
+            batch = batch_query.first()
         if batch is None:
             raise ValueError("연결된 입출고 작업 묶음을 찾을 수 없습니다.")
         clicked_request = next(
@@ -223,6 +488,8 @@ def revert_to_draft(
         ensure_batch_is_mutable(batch)
         if batch.status in {"completed", "partially_completed"}:
             raise ValueError("완료된 작업 묶음은 수정할 수 없습니다.")
+        if is_internal_use:
+            raise ValueError("사용출고 작업은 수정할 수 없습니다. 전체 취소 후 다시 요청하세요.")
 
         open_statuses = {
             StockRequestStatusEnum.SUBMITTED,

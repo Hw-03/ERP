@@ -64,6 +64,8 @@ class Employee(Base):
     warehouse_role = Column(String(20), nullable=False, default="none", server_default="none")
     # 부서 결재 역할: 낱개(manual/adjust_in/adjust_out) IO 작업 승인 권한. warehouse_role 와 별개.
     department_role = Column(String(20), nullable=False, default="none", server_default="none")
+    # AS·연구 사용출고 전용 승인 권한. 창고/부서 결재 역할과 서로 독립이다.
+    as_research_approver = Column(Boolean, nullable=False, default=False, server_default="0")
     # 2026-05-24 (W12-#7): 직원별 입출고 권한 토글. 부서 io_enabled 와 AND 결합.
     # 기본값 True — 신규 직원은 부서 권한만 만족하면 입출고 가능.
     io_enabled = Column(Boolean, nullable=False, default=True, server_default="true")

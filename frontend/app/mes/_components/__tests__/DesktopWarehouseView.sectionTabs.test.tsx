@@ -15,12 +15,24 @@ const currentComposeProps = vi.hoisted(() => ({
 const currentWorkAreaProps = vi.hoisted(() => ({
   value: null as null | {
     onEmptyStateChange?: (empty: boolean) => void;
+    targetRequestId?: string | null;
   },
 }));
 
 const apiMocks = vi.hoisted(() => ({
   listStockRequestDrafts: vi.fn(),
   listDrafts: vi.fn(),
+  countAsResearchQueue: vi.fn(),
+}));
+
+const operatorState = vi.hoisted(() => ({
+  value: {
+    employee_id: "emp-1",
+    warehouse_role: "none",
+    department_role: "none",
+    department: "조립",
+    as_research_approver: false,
+  },
 }));
 
 vi.mock("@/lib/api", () => ({ api: apiMocks }));
@@ -44,12 +56,14 @@ vi.mock("@/app/mes/_components/_warehouse_sections/WarehouseDraftPanelTabs", () 
     sectionTab,
     onContinueIoDraft,
     onEmptyStateChange,
+    targetRequestId,
   }: {
     sectionTab: string;
     onContinueIoDraft?: (draft: never) => void;
     onEmptyStateChange?: (empty: boolean) => void;
+    targetRequestId?: string | null;
   }) => {
-    currentWorkAreaProps.value = { onEmptyStateChange };
+    currentWorkAreaProps.value = { onEmptyStateChange, targetRequestId };
     if (sectionTab === "compose") return null;
 
     return (
@@ -86,12 +100,7 @@ vi.mock("@/app/mes/_components/_warehouse_v2/IoComposeView", () => ({
 }));
 
 vi.mock("@/app/mes/_components/login/useCurrentOperator", () => ({
-  readCurrentOperator: () => ({
-    employee_id: "emp-1",
-    warehouse_role: "none",
-    department_role: "none",
-    department: "조립",
-  }),
+  readCurrentOperator: () => operatorState.value,
 }));
 
 describe("DesktopWarehouseView", () => {
@@ -99,8 +108,17 @@ describe("DesktopWarehouseView", () => {
     window.history.replaceState(null, "", "/mes?tab=warehouse&section=mine");
     apiMocks.listStockRequestDrafts.mockReset();
     apiMocks.listDrafts.mockReset();
+    apiMocks.countAsResearchQueue.mockReset();
     apiMocks.listStockRequestDrafts.mockReturnValue(new Promise(() => {}));
     apiMocks.listDrafts.mockReturnValue(new Promise(() => {}));
+    apiMocks.countAsResearchQueue.mockResolvedValue({ count: 0 });
+    operatorState.value = {
+      employee_id: "emp-1",
+      warehouse_role: "none",
+      department_role: "none",
+      department: "조립",
+      as_research_approver: false,
+    };
     currentComposeProps.value = null;
     currentWorkAreaProps.value = null;
   });
@@ -120,6 +138,33 @@ describe("DesktopWarehouseView", () => {
     expect(tabs[1]).toHaveTextContent("작성 중");
     expect(tabs[2]).toHaveTextContent("내 요청");
     tabs.forEach((tab) => expect(tab).toBeVisible());
+  });
+
+  it("AS·연구 권한 없이 전용 딥링크로 진입하면 승인함과 패널을 열지 않는다", () => {
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=as-research-queue");
+
+    render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+
+    expect(screen.queryByRole("tab", { name: /AS·연구 승인함/ })).not.toBeInTheDocument();
+    expect(screen.getByTestId("io-compose-view")).toBeInTheDocument();
+  });
+
+  it("AS·연구 승인함도 다른 승인함처럼 남은 작업 영역 높이를 사용한다", () => {
+    operatorState.value = { ...operatorState.value, as_research_approver: true };
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=as-research-queue");
+
+    render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+
+    expect(screen.getByTestId("warehouse-section-work-area")).toHaveClass("flex-1", "min-h-0");
+  });
+
+  it("AS·연구 승인 알림의 stockRequestId를 전용 대기열에 전달한다", () => {
+    operatorState.value = { ...operatorState.value, as_research_approver: true };
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=as-research-queue&stockRequestId=as-request-1");
+
+    render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+
+    expect(currentWorkAreaProps.value?.targetRequestId).toBe("as-request-1");
   });
 
   it("keeps the section tabs sticky above a long Mine list", () => {

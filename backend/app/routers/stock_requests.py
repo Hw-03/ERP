@@ -9,14 +9,15 @@ import uuid
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query, Request, Response, status
-from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy import func, or_
+from sqlalchemy.orm import Query as SAQuery, Session
 
 from sqlalchemy.exc import IntegrityError
 
 from app.database import get_db, _is_sqlite
 from app.models import (
     Employee,
+    IoBatch,
     Item,
     RequestBucketEnum,
     StockRequest,
@@ -40,6 +41,28 @@ from app.services import stock_request_actions as action_svc
 from app.services._tx import commit_and_refresh, commit_only
 from app.services import notifications as notif_svc
 from app._evt import emit as _evt_emit
+
+
+def _scope_internal_use_department_queue(
+    db: Session,
+    query: SAQuery,
+    actor: Employee,
+) -> SAQuery:
+    """사용출고 부서 큐는 활성 부서 정/부에게만 노출한다."""
+    if bool(actor.is_active) and (actor.department_role or "none").lower() in (
+        "primary",
+        "deputy",
+    ):
+        return query
+    internal_use_batch_ids = db.query(IoBatch.batch_id).filter(
+        IoBatch.sub_type == "internal_use_out"
+    )
+    return query.filter(
+        or_(
+            StockRequest.operation_batch_id.is_(None),
+            ~StockRequest.operation_batch_id.in_(internal_use_batch_ids),
+        )
+    )
 
 
 router = APIRouter()
@@ -292,6 +315,7 @@ def list_department_queue(
                 StockRequest.requester_department,
             ).in_(list(visible))
         )
+    base_query = _scope_internal_use_department_queue(db, base_query, actor)
 
     return (
         base_query.order_by(StockRequest.created_at.desc()).limit(limit).all()
@@ -332,8 +356,65 @@ def count_department_queue(
                 StockRequest.requester_department,
             ).in_(list(visible))
         )
+    base_query = _scope_internal_use_department_queue(db, base_query, actor)
 
     return {"count": int(base_query.count())}
+
+
+@router.get("/as-research-queue", response_model=List[StockRequestResponse])
+def list_as_research_queue(
+    actor_employee_id: uuid.UUID = Query(..., description="현재 AS·연구 승인자 ID"),
+    db: Session = Depends(get_db),
+    limit: int = Query(100, ge=1, le=500),
+):
+    """AS·연구 전용 승인 대기 목록."""
+    actor = db.query(Employee).filter(Employee.employee_id == actor_employee_id).first()
+    if actor is None:
+        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    if not bool(actor.is_active):
+        raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원입니다.")
+    if not bool(actor.as_research_approver):
+        raise http_error(403, ErrorCode.FORBIDDEN, "AS·연구 승인자만 접근할 수 있습니다.")
+    return (
+        db.query(StockRequest)
+        .filter(
+            StockRequest.requires_as_research_approval.is_(True),
+            StockRequest.as_research_approved_at.is_(None),
+            StockRequest.status.in_(
+                (StockRequestStatusEnum.RESERVED, StockRequestStatusEnum.SUBMITTED)
+            ),
+        )
+        .order_by(StockRequest.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+
+
+@router.get("/as-research-queue/count")
+def count_as_research_queue(
+    actor_employee_id: uuid.UUID = Query(..., description="현재 AS·연구 승인자 ID"),
+    db: Session = Depends(get_db),
+) -> dict:
+    """AS·연구 전용 승인 대기 건수."""
+    actor = db.query(Employee).filter(Employee.employee_id == actor_employee_id).first()
+    if actor is None:
+        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    if not bool(actor.is_active):
+        raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원입니다.")
+    if not bool(actor.as_research_approver):
+        raise http_error(403, ErrorCode.FORBIDDEN, "AS·연구 승인자만 접근할 수 있습니다.")
+    count = (
+        db.query(StockRequest)
+        .filter(
+            StockRequest.requires_as_research_approval.is_(True),
+            StockRequest.as_research_approved_at.is_(None),
+            StockRequest.status.in_(
+                (StockRequestStatusEnum.RESERVED, StockRequestStatusEnum.SUBMITTED)
+            ),
+        )
+        .count()
+    )
+    return {"count": int(count)}
 
 
 @router.get("/reservations", response_model=List[ReservationLineResponse])
@@ -485,11 +566,22 @@ def get_stock_request(request_id: uuid.UUID, db: Session = Depends(get_db)):
 def _load_request_for_action(db: Session, request_id: uuid.UUID) -> StockRequest:
     """승인/반려/취소 전용 조회 — PostgreSQL: FOR UPDATE 행 잠금으로 중복 처리 방지."""
     q = db.query(StockRequest).filter(StockRequest.request_id == request_id)
-    if not _is_sqlite:
-        q = q.with_for_update()
     request = q.first()
     if request is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "요청을 찾을 수 없습니다.")
+    is_internal_use = False
+    if request.operation_batch_id is not None:
+        is_internal_use = (
+            db.query(IoBatch.batch_id)
+            .filter(
+                IoBatch.batch_id == request.operation_batch_id,
+                IoBatch.sub_type == "internal_use_out",
+            )
+            .first()
+            is not None
+        )
+    if not _is_sqlite and not is_internal_use:
+        request = q.with_for_update().populate_existing().one()
     return request
 
 
@@ -549,19 +641,19 @@ def reject_stock_request(
         raise http_error(422, ErrorCode.UNPROCESSABLE, "반려 사유를 입력하세요.")
 
     try:
-        svc.reject_request(
+        action_svc.reject_warehouse_request(
             db, request, approver=approver, pin=payload.pin, reason=payload.reason,
             http_request=http_request,
         )
     except PermissionError as exc:
         db.rollback()
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
+    except svc.FailedApprovalError as exc:
+        raise http_error(409, ErrorCode.CONFLICT, f"승인 실패: {exc}")
     except ValueError as exc:
         db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
 
-    notif_svc.notify_request_decided(db, request, decision="rejected")
-    commit_and_refresh(db, request)
     _evt_emit(
         "sr_reject_warehouse",
         request=http_request,
@@ -620,25 +712,80 @@ def department_reject_stock_request(
         raise http_error(422, ErrorCode.UNPROCESSABLE, "반려 사유를 입력하세요.")
 
     try:
-        svc.reject_request_department(
+        action_svc.reject_department_request(
             db, request, approver=approver, pin=payload.pin, reason=payload.reason,
             http_request=http_request,
         )
     except PermissionError as exc:
         db.rollback()
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
+    except svc.FailedApprovalError as exc:
+        raise http_error(409, ErrorCode.CONFLICT, f"승인 실패: {exc}")
     except ValueError as exc:
         db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
 
-    notif_svc.notify_request_decided(db, request, decision="rejected")
-    commit_and_refresh(db, request)
     _evt_emit(
         "sr_reject_dept",
         request=http_request,
         req_id=str(request.request_id)[:8],
         approver_emp=approver.employee_code,
     )
+    return request
+
+
+@router.post("/{request_id}/as-research-approve", response_model=StockRequestResponse)
+def as_research_approve_stock_request(
+    request_id: uuid.UUID,
+    payload: StockRequestActionRequest,
+    http_request: Request,
+    db: Session = Depends(get_db),
+):
+    request = _load_request_for_action(db, request_id)
+    approver = _load_actor(db, payload.actor_employee_id)
+    try:
+        action_svc.approve_as_research_request(
+            db,
+            request,
+            approver=approver,
+            pin=payload.pin,
+            http_request=http_request,
+        )
+    except PermissionError as exc:
+        raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
+    except svc.FailedApprovalError as exc:
+        raise http_error(409, ErrorCode.CONFLICT, f"승인 실패: {exc}")
+    except ValueError as exc:
+        raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
+    return request
+
+
+@router.post("/{request_id}/as-research-reject", response_model=StockRequestResponse)
+def as_research_reject_stock_request(
+    request_id: uuid.UUID,
+    payload: StockRequestActionRequest,
+    http_request: Request,
+    db: Session = Depends(get_db),
+):
+    request = _load_request_for_action(db, request_id)
+    approver = _load_actor(db, payload.actor_employee_id)
+    if not payload.reason or not payload.reason.strip():
+        raise http_error(422, ErrorCode.UNPROCESSABLE, "반려 사유를 입력하세요.")
+    try:
+        action_svc.reject_as_research_request(
+            db,
+            request,
+            approver=approver,
+            pin=payload.pin,
+            reason=payload.reason,
+            http_request=http_request,
+        )
+    except PermissionError as exc:
+        raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
+    except svc.FailedApprovalError as exc:
+        raise http_error(409, ErrorCode.CONFLICT, f"승인 실패: {exc}")
+    except ValueError as exc:
+        raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
     return request
 
 

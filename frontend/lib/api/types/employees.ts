@@ -20,6 +20,8 @@ export interface Employee {
   warehouse_role: WarehouseRole;
   /** 부서 결재 역할 — 낱개(manual/adjust) 입출고 작업 승인 권한. warehouse_role 와 별개. */
   department_role: DepartmentRole;
+  /** AS·연구 사용출고 중 부서 재고의 AR·AA 품목 승인 권한. */
+  as_research_approver: boolean;
   /**
    * W12-#7: 직원별 입출고 권한. 부서 io_enabled 와 AND 결합되어 입출고 화면 진입 가드.
    * 마이그레이션 이전 응답 호환을 위해 optional (없으면 true 로 간주).

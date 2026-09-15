@@ -24,6 +24,7 @@ import { LoadFailureCard } from "./common/LoadFailureCard";
 const cartCountCache = new Map<string, number>();
 const warehouseQueueCountCache = { value: 0 };
 const deptQueueCountCache = new Map<string, number>();
+const asResearchQueueCountCache = new Map<string, number>();
 
 // 인수인계를 받는 부서 — 이 부서 소속이면 결재자가 아니어도 인수 확인 가능.
 const HANDOVER_RECEIVE_DEPTS = ["고압", "진공"];
@@ -58,16 +59,20 @@ export function DesktopWarehouseView({
   const urlRestoreStep = typeof window === "undefined"
     ? undefined
     : parseWarehouseStep(new URLSearchParams(window.location.search).get("step"));
+  const [targetRequestId, setTargetRequestId] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("stockRequestId"),
+  );
   const [employeeId, setEmployeeId] = useState<string>(operator?.employee_id ?? "");
   // 알림 클릭 딥링크 — URL ?section= 으로 초기 섹션 결정 (권한 없으면 compose 폴백).
   const [sectionTab, setSectionTab] = useState<WarehouseSectionTab>(() => {
     if (typeof window === "undefined") return "compose";
     const s = new URLSearchParams(window.location.search).get("section");
-    const valid: WarehouseSectionTab[] = ["compose", "cart", "mine", "queue", "dept-queue", "handover"];
+    const valid: WarehouseSectionTab[] = ["compose", "cart", "mine", "queue", "as-research-queue", "dept-queue", "handover"];
     if (!s || !valid.includes(s as WarehouseSectionTab)) return "compose";
     const whRole = operator?.warehouse_role ?? "none";
     if (s === "queue" && whRole !== "primary" && whRole !== "deputy") return "compose";
     if (s === "dept-queue" && !isDepartmentApprover(operator)) return "compose";
+    if (s === "as-research-queue" && !operator?.as_research_approver) return "compose";
     if (s === "handover") {
       const dept = operator?.department ?? "";
       const ok = dept === "튜브" || HANDOVER_RECEIVE_DEPTS.includes(dept);
@@ -87,6 +92,10 @@ export function DesktopWarehouseView({
     const eid = operator?.employee_id ?? "";
     return eid ? deptQueueCountCache.get(eid) ?? 0 : 0;
   });
+  const [asResearchQueueCount, setAsResearchQueueCount] = useState(() => {
+    const eid = operator?.employee_id ?? "";
+    return eid ? asResearchQueueCountCache.get(eid) ?? 0 : 0;
+  });
   const [restoreIoDraft, setRestoreIoDraft] = useState<IoBatch | null>(null);
   const [urlDraftPending, setUrlDraftPending] = useState(() => Boolean(urlDraftId));
   const [urlDraftRestoreError, setUrlDraftRestoreError] = useState<string | null>(null);
@@ -103,14 +112,16 @@ export function DesktopWarehouseView({
     (operator?.warehouse_role ?? "none") === "primary" ||
     (operator?.warehouse_role ?? "none") === "deputy";
   const canSeeDeptQueue = isDepartmentApprover(operator);
+  const canSeeAsResearchQueue = operator?.as_research_approver === true;
   // 인수인계: 작성(튜브 부서원) 또는 인수 확인(받는 부서 소속)이면 탭 노출. 결재권자는 제외.
   const canReceiveHandover = HANDOVER_RECEIVE_DEPTS.includes(operator?.department ?? "");
   const showHandover = (operator?.department ?? "") === "튜브" || canReceiveHandover;
   const normalizeSectionTab = (value: string | null): WarehouseSectionTab => {
-    const valid: WarehouseSectionTab[] = ["compose", "cart", "mine", "queue", "dept-queue", "handover"];
+    const valid: WarehouseSectionTab[] = ["compose", "cart", "mine", "queue", "as-research-queue", "dept-queue", "handover"];
     if (!value || !valid.includes(value as WarehouseSectionTab)) return "compose";
     if (value === "queue" && !canSeeQueue) return "compose";
     if (value === "dept-queue" && !canSeeDeptQueue) return "compose";
+    if (value === "as-research-queue" && !canSeeAsResearchQueue) return "compose";
     if (value === "handover" && !showHandover) return "compose";
     return value as WarehouseSectionTab;
   };
@@ -121,13 +132,15 @@ export function DesktopWarehouseView({
 
   useEffect(() => {
     const handlePopState = () => {
-      const next = normalizeSectionTab(new URLSearchParams(window.location.search).get("section"));
+      const params = new URLSearchParams(window.location.search);
+      const next = normalizeSectionTab(params.get("section"));
       if (next !== sectionTab) {
         if (next !== "compose") setItemConversionFocused(false);
         onItemPickerFullscreenChange?.(false);
         setWorkAreaEmpty(false);
       }
       setSectionTab(next);
+      setTargetRequestId(params.get("stockRequestId"));
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
@@ -218,6 +231,19 @@ export function DesktopWarehouseView({
   }, [canSeeDeptQueue, operatorEmployeeId, panelRefreshNonce, revision]);
 
   useEffect(() => {
+    if (!canSeeAsResearchQueue || !operatorEmployeeId) return;
+    let active = true;
+    api.countAsResearchQueue(operatorEmployeeId)
+      .then(({ count }) => {
+        if (!active) return;
+        setAsResearchQueueCount(count);
+        asResearchQueueCountCache.set(operatorEmployeeId, count);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [canSeeAsResearchQueue, operatorEmployeeId, panelRefreshNonce, revision]);
+
+  useEffect(() => {
     if (!canReceiveHandover || !operatorEmployeeId) return;
     let active = true;
     api
@@ -262,7 +288,7 @@ export function DesktopWarehouseView({
   }
 
   const isComposeSection = sectionTab === "compose";
-  const isWorkAreaSection = sectionTab === "cart" || sectionTab === "queue" || sectionTab === "dept-queue";
+  const isWorkAreaSection = sectionTab === "cart" || sectionTab === "queue" || sectionTab === "as-research-queue" || sectionTab === "dept-queue";
   const hideSectionTabs = isComposeSection && itemConversionFocused;
   const removeWorkAreaBottomSpace = isWorkAreaSection && workAreaEmpty;
 
@@ -285,10 +311,12 @@ export function DesktopWarehouseView({
               onChange={handleSectionTabChange}
               showQueue={canSeeQueue}
               showDeptQueue={canSeeDeptQueue}
+              showAsResearchQueue={canSeeAsResearchQueue}
               showHandover={showHandover}
               cartCount={cartCount}
               queueCount={warehouseQueueCount}
               deptQueueCount={deptQueueCount}
+              asResearchQueueCount={asResearchQueueCount}
               handoverInboxCount={handoverInboxCount}
             />
           </div>
@@ -304,6 +332,7 @@ export function DesktopWarehouseView({
               sectionTab={sectionTab}
               canSeeQueue={canSeeQueue}
               canSeeDeptQueue={canSeeDeptQueue}
+              canSeeAsResearchQueue={canSeeAsResearchQueue}
               operator={operator}
               operatorEmployeeId={operator?.employee_id}
               employeeId={employeeId}
@@ -330,6 +359,7 @@ export function DesktopWarehouseView({
               }}
               onEmptyStateChange={setWorkAreaEmpty}
               onStartCompose={() => handleSectionTabChange("compose")}
+              targetRequestId={targetRequestId}
             />
           </div>
         )}

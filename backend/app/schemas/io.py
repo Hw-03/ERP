@@ -46,6 +46,8 @@ class IoLinePayload(BaseModel):
     has_children: bool = False
     shortage: int = 0
     exclusion_note: Optional[str] = None
+    approval_kind: Optional[Literal["warehouse", "department", "as_research", "none"]] = None
+    approval_outcome: Optional[Literal["approved", "rejected"]] = None
 
 
 class IoBundlePayload(BaseModel):
@@ -111,9 +113,11 @@ class IoStockRequestSummary(BaseModel):
     status: str
     from_bucket: str
     from_department: Optional[str] = None
-    approval_kind: Literal["warehouse", "department", "none"]
+    approval_kind: Literal["warehouse", "department", "as_research", "none"]
     requires_warehouse_approval: bool
     requires_department_approval: bool
+    requires_as_research_approval: bool = False
+    approval_outcome: Optional[Literal["approved", "rejected"]] = None
     approver_employee_id: Optional[uuid.UUID] = None
     approver_name: Optional[str] = None
     rejected_by_name: Optional[str] = None

@@ -237,4 +237,181 @@ describe("MyRequestRow presentation", () => {
     expect(screen.queryByRole("button", { name: "수정" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "요청 취소" })).toBeInTheDocument();
   });
+
+  it("연결된 한 작업 묶음의 창고·AS 연구·부서 승인 상태와 처리자를 세 줄로 표시한다", () => {
+    render(
+      <MyRequestRow
+        req={makeRequest({
+          status: "reserved",
+          requires_warehouse_approval: true,
+          approved_by_name: "창고 승인자",
+        })}
+        linkedRequests={[
+          makeRequest({
+            request_id: "as-research", status: "reserved", requires_as_research_approval: true,
+            as_research_approved_by_name: "연구 승인자",
+          }),
+          makeRequest({
+            request_id: "department", status: "submitted", requires_department_approval: true,
+            department_approved_by_name: null,
+          }),
+        ]}
+        onCancelRequest={vi.fn()}
+      />,
+    );
+
+    const approvals = screen.getByTestId("my-request-approvals");
+    expect(approvals).toHaveTextContent("창고 승인·승인·창고 승인자");
+    expect(approvals).toHaveTextContent("AS·연구 승인·승인·연구 승인자");
+    expect(approvals).toHaveTextContent("부서 승인·대기");
+  });
+
+  it("서로 다른 승인 요청을 한 batch 카드로 합쳐 품목·부분 완료·반려 처리자를 표시하고 열린 형제로 취소한다", () => {
+    const onCancelRequest = vi.fn();
+    const rejectedWarehouse = makeRequest({
+      request_id: "warehouse-rejected",
+      operation_batch_id: "batch-approval",
+      status: "rejected",
+      requires_warehouse_approval: true,
+      rejected_by_name: "창고 반려자",
+      rejected_reason: "창고 재고 부족",
+      lines: [{ ...makeLine(1), item_name_snapshot: "창고 품목" }],
+    });
+    const approvedAsResearch = makeRequest({
+      request_id: "as-approved",
+      operation_batch_id: "batch-approval",
+      status: "completed",
+      requires_as_research_approval: true,
+      as_research_approved_by_name: "연구 승인자",
+      lines: [{ ...makeLine(2), item_name_snapshot: "AS 연구 품목" }],
+    });
+    const openDepartment = makeRequest({
+      request_id: "department-open",
+      operation_batch_id: "batch-approval",
+      status: "submitted",
+      requires_department_approval: true,
+      lines: [{ ...makeLine(3), item_name_snapshot: "부서 품목" }],
+    });
+
+    render(
+      <MyRequestRow
+        req={rejectedWarehouse}
+        linkedRequests={[approvedAsResearch, openDepartment]}
+        onCancelRequest={onCancelRequest}
+        onRevertToDraft={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("my-request-summary")).toHaveTextContent("3건");
+    expect(screen.getByText("창고 품목")).toBeInTheDocument();
+    expect(screen.getByText("AS 연구 품목")).toBeInTheDocument();
+    expect(screen.getByText("부서 품목")).toBeInTheDocument();
+    expect(screen.getByText("승인 대기")).toBeInTheDocument();
+    expect(screen.getByTestId("my-request-approvals")).toHaveTextContent("창고 승인·반려·창고 반려자·창고 재고 부족");
+    expect(screen.getByTestId("my-request-approvals")).toHaveTextContent("AS·연구 승인·승인·연구 승인자");
+    expect(screen.getByTestId("my-request-approvals")).toHaveTextContent("부서 승인·대기");
+    expect(screen.getByRole("button", { name: "요청 취소" })).toBeInTheDocument();
+  });
+
+  it("승인과 반려만 섞인 완료 batch를 부분 완료로 집계한다", () => {
+    render(
+      <MyRequestRow
+        req={makeRequest({ status: "rejected", requires_warehouse_approval: true })}
+        linkedRequests={[makeRequest({ request_id: "completed", status: "completed", requires_department_approval: true })]}
+        onCancelRequest={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("부분 완료")).toBeInTheDocument();
+  });
+
+  it("완료와 취소가 섞인 결정 완료 batch를 부분 완료로 집계한다", () => {
+    render(
+      <MyRequestRow
+        req={makeRequest({ status: "completed", requires_warehouse_approval: true })}
+        linkedRequests={[makeRequest({ request_id: "cancelled", status: "cancelled", requires_department_approval: true })]}
+        onCancelRequest={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("부분 완료")).toBeInTheDocument();
+  });
+
+  it("완료와 승인 실패가 섞인 결정 완료 batch를 부분 완료로 집계한다", () => {
+    render(
+      <MyRequestRow
+        req={makeRequest({ status: "completed", requires_warehouse_approval: true })}
+        linkedRequests={[makeRequest({ request_id: "failed", status: "failed_approval", requires_department_approval: true })]}
+        onCancelRequest={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("부분 완료")).toBeInTheDocument();
+  });
+
+  it("승인 실패 형제가 있어도 미결 요청이 남으면 전체를 승인 대기로 집계한다", () => {
+    render(
+      <MyRequestRow
+        req={makeRequest({ status: "failed_approval", requires_warehouse_approval: true })}
+        linkedRequests={[makeRequest({ request_id: "open", status: "submitted", requires_department_approval: true })]}
+        onCancelRequest={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("승인 대기")).toBeInTheDocument();
+  });
+
+  it("모두 취소된 batch와 취소된 승인 종류를 취소로 표시한다", () => {
+    render(
+      <MyRequestRow
+        req={makeRequest({ status: "cancelled", requires_warehouse_approval: true })}
+        linkedRequests={[makeRequest({ request_id: "department-cancelled", status: "cancelled", requires_department_approval: true })]}
+        onCancelRequest={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("my-request-heading")).toHaveTextContent("취소");
+    expect(screen.getByTestId("my-request-approvals")).toHaveTextContent("창고 승인·취소");
+    expect(screen.getByTestId("my-request-approvals")).toHaveTextContent("부서 승인·취소");
+  });
+
+  it("완료·반려 terminal 혼합은 대표 요청 순서와 무관하게 부분 완료로 집계한다", () => {
+    const completed = makeRequest({ request_id: "completed", status: "completed", requires_warehouse_approval: true });
+    const rejected = makeRequest({ request_id: "rejected", status: "rejected", requires_department_approval: true });
+    const { rerender } = render(<MyRequestRow req={completed} linkedRequests={[rejected]} onCancelRequest={vi.fn()} />);
+
+    expect(screen.getByText("부분 완료")).toBeInTheDocument();
+    rerender(<MyRequestRow req={rejected} linkedRequests={[completed]} onCancelRequest={vi.fn()} />);
+    expect(screen.getByText("부분 완료")).toBeInTheDocument();
+  });
+
+  it("AS·연구 사용출고 작업 묶음은 모든 승인이 열려 있어도 취소만 허용하고 수정은 숨긴다", () => {
+    render(
+      <MyRequestRow
+        req={makeRequest({
+          operation_batch_id: "internal-use-batch",
+          status: "submitted",
+          requires_warehouse_approval: true,
+          approved_at: null,
+          department_approved_at: null,
+          as_research_approved_at: null,
+        })}
+        linkedRequests={[makeRequest({
+          request_id: "as-open",
+          operation_batch_id: "internal-use-batch",
+          status: "reserved",
+          requires_as_research_approval: true,
+          approved_at: null,
+          department_approved_at: null,
+          as_research_approved_at: null,
+        })]}
+        isGroupedInternalUseBatch
+        onCancelRequest={vi.fn()}
+        onRevertToDraft={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "수정" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "요청 취소" })).toBeInTheDocument();
+  });
 });

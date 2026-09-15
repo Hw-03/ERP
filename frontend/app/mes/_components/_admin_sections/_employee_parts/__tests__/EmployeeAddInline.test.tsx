@@ -35,4 +35,29 @@ describe("EmployeeAddInline", () => {
     fireEvent.click(selectors[0]);
     expect(screen.getByRole("option", { name: "책임연구원" })).toBeInTheDocument();
   });
+
+  it("AS·연구 사용출고의 AR·AA 부서 재고 승인 권한을 별도 boolean으로 설정한다", () => {
+    const setForm = vi.fn();
+    render(
+      <EmployeeAddInline
+        form={{
+          name: "", role: "사원", phone: "", department: "조립",
+          warehouse_role: "none", department_role: "none", as_research_approver: false,
+          assigned_model_slots: [],
+        }}
+        setForm={setForm}
+        departments={departments}
+        productModels={[]}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    const toggle = screen.getByRole("checkbox", { name: "AS·연구 승인 권한" });
+    expect(screen.getByText(/AS·연구 사용출고 중 부서 재고의 AR·AA 품목 승인/)).toBeInTheDocument();
+    expect(screen.getByText(/대상 직원은 다음 로그인부터 승인함 탭 반영/)).toBeInTheDocument();
+    expect(toggle).not.toBeChecked();
+    fireEvent.click(toggle);
+    expect(setForm).toHaveBeenCalledOnce();
+    expect(setForm.mock.calls[0][0]({ as_research_approver: false }).as_research_approver).toBe(true);
+  });
 });

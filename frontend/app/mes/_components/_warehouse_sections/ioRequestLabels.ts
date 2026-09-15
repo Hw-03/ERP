@@ -24,6 +24,7 @@ const REQUEST_STATUS_PRESENTATION: Record<string, RequestStatusPresentationTuple
   rejected: ["반려", LEGACY_COLORS.red],
   cancelled: ["취소", LEGACY_COLORS.muted2],
   completed: ["완료", LEGACY_COLORS.green],
+  partially_completed: ["부분 완료", LEGACY_COLORS.yellow],
   failed_approval: ["승인 실패", LEGACY_COLORS.red],
 };
 

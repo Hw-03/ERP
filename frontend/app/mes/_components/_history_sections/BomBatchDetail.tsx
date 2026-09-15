@@ -421,6 +421,7 @@ function BomLineRow({
   const targetPadX = compact ? "px-2" : "px-4";
   const statusPadX = "px-2";
   const cancelled = batch.status === "cancelled";
+  const rejected = line.approval_outcome === "rejected";
   const searchMatched = log != null && matchedLogIds?.includes(log.log_id) === true;
   const highlighted = highlightItemId === line.item_id || searchMatched;
   const internalUseEffect = batch.sub_type === "internal_use_out" && bundle.source_kind === "bom_parent"
@@ -430,7 +431,8 @@ function BomLineRow({
     <tr
       id={rowId}
       data-history-cancelled={cancelled || undefined}
-      className={HISTORY_CHILD_ROW_CLASS}
+      data-history-rejected={rejected || undefined}
+      className={`${HISTORY_CHILD_ROW_CLASS}${rejected ? " opacity-55" : ""}`}
       data-history-focus-line={highlighted ? "true" : undefined}
       data-history-search-match={searchMatched ? "true" : undefined}
       style={{
@@ -450,7 +452,7 @@ function BomLineRow({
           <Package className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
           <TruncatedText
             accessibilityLabel={line.item_name}
-            className="truncate text-xs font-semibold leading-snug"
+            className={`truncate text-xs font-semibold leading-snug${rejected ? " line-through" : ""}`}
             style={{ color: LEGACY_COLORS.text }}
           >
             {line.item_name}
@@ -465,8 +467,14 @@ function BomLineRow({
       <StockSnapshotCell log={log} dense quantityWidth={snapshotQuantityWidth} />
       <td className={`${HISTORY_CHILD_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="flex flex-wrap justify-center gap-1">
-          {internalUseEffect && <InternalUseEffectBadge label={internalUseEffect} />}
-          <StatusBadge shortage={line.shortage} />
+          {rejected ? (
+            <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>반려 · 재고 미차감</span>
+          ) : (
+            <>
+              {internalUseEffect && <InternalUseEffectBadge label={internalUseEffect} />}
+              <StatusBadge shortage={line.shortage} />
+            </>
+          )}
         </div>
       </td>
     </tr>

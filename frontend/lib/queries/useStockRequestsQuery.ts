@@ -37,6 +37,16 @@ export function useDepartmentQueueQuery(actorEmployeeId: string) {
   });
 }
 
+/** AS·연구 사용출고 승인 대기열 */
+export function useAsResearchQueueQuery(actorEmployeeId: string) {
+  return useQuery({
+    queryKey: queryKeys.stockRequests.asResearchQueue(actorEmployeeId),
+    queryFn: () => stockRequestsApi.listAsResearchQueue(actorEmployeeId),
+    enabled: !!actorEmployeeId,
+    staleTime: STALE_TIME.VOLATILE,
+  });
+}
+
 /** 내 요청 목록 */
 export function useMyStockRequestsQuery(employeeId: string) {
   return useQuery({
@@ -111,6 +121,26 @@ export function useRejectStockRequestDepartmentMutation() {
     }) => stockRequestsApi.rejectStockRequestDepartment(requestId, payload),
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: queryKeys.stockRequests.all }),
+  });
+}
+
+/** AS·연구 사용출고 승인 */
+export function useApproveStockRequestAsResearchMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ requestId, payload }: { requestId: string; payload: StockRequestActionPayload }) =>
+      stockRequestsApi.approveStockRequestAsResearch(requestId, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.stockRequests.all }),
+  });
+}
+
+/** AS·연구 사용출고 반려 */
+export function useRejectStockRequestAsResearchMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ requestId, payload }: { requestId: string; payload: StockRequestActionPayload }) =>
+      stockRequestsApi.rejectStockRequestAsResearch(requestId, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.stockRequests.all }),
   });
 }
 

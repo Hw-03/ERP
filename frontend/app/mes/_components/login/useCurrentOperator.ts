@@ -23,6 +23,8 @@ export interface Operator {
   warehouse_role: WarehouseRole;
   /** 부서 결재 역할 — 낱개(manual/adjust) IO 결재 권한. 누락 시 "none". */
   department_role: DepartmentRole;
+  /** AS·연구 사용출고 승인함 접근 권한. 누락 시 false. */
+  as_research_approver: boolean;
   /** 개인별 테마 설정 (light | dark | null). 누락 시 null. */
   theme?: string | null;
   /** 데스크톱 사이드바 표시 방식. 누락되거나 잘못된 값은 읽을 때 hover로 정규화. */
@@ -81,6 +83,7 @@ function readOperator(): Operator | null {
       employee_code: parsed.employee_code as string,
       warehouse_role: (wh === "primary" || wh === "deputy" ? wh : "none") as WarehouseRole,
       department_role: (dept === "primary" || dept === "deputy" ? dept : "none") as DepartmentRole,
+      as_research_approver: parsed.as_research_approver === true,
       theme: parsed.theme ?? null,
       sidebar_mode: normalizeSidebarMode(parsed.sidebar_mode) ?? "hover",
       assigned_model_slots: slots,

@@ -102,6 +102,10 @@ class StockRequestResponse(BaseModel):
     department_approved_by_employee_id: Optional[uuid.UUID] = None
     department_approved_by_name: Optional[str] = None
     department_approved_at: Optional[UtcDatetime] = None
+    requires_as_research_approval: bool = False
+    as_research_approved_by_employee_id: Optional[uuid.UUID] = None
+    as_research_approved_by_name: Optional[str] = None
+    as_research_approved_at: Optional[UtcDatetime] = None
     cancelled_at: Optional[UtcDatetime] = None
     completed_at: Optional[UtcDatetime] = None
     reference_no: Optional[str] = None

@@ -26,6 +26,7 @@ function line(overrides: Partial<IoLine> = {}): IoLine {
     has_children: false,
     shortage: 0,
     exclusion_note: null,
+    approval_outcome: null,
     ...overrides,
   };
 }

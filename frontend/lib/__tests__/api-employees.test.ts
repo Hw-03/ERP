@@ -94,16 +94,34 @@ describe("employeesApi.deleteEmployee", () => {
   });
 });
 
+describe("employeesApi.createEmployee", () => {
+  it("POST payload에 AS·연구 승인 권한을 보존한다", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({ employee_id: "emp-1" })));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await employeesApi.createEmployee({
+      name: "연구 승인자",
+      role: "사원",
+      department: "연구",
+      as_research_approver: true,
+    });
+
+    const init = fetchSpy.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toMatchObject({ as_research_approver: true });
+  });
+});
+
 describe("employeesApi.updateEmployee", () => {
-  it("PUTs partial payload", async () => {
+  it("PUT partial payload에 AS·연구 승인 권한을 보존한다", async () => {
     const fetchSpy = vi.fn(() =>
       Promise.resolve(makeResponse({ employee_id: "emp-1", is_active: false })),
     );
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
-    await employeesApi.updateEmployee("emp-1", { is_active: false });
+    await employeesApi.updateEmployee("emp-1", { is_active: false, as_research_approver: true });
     const init = fetchSpy.mock.calls[0][1] as RequestInit;
     expect(init.method).toBe("PUT");
-    expect(JSON.parse(init.body as string)).toEqual({ is_active: false });
+    expect(JSON.parse(init.body as string)).toEqual({ is_active: false, as_research_approver: true });
   });
 });
 describe("employeesApi.setLoginPopup", () => {

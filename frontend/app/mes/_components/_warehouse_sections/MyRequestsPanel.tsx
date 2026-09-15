@@ -20,6 +20,12 @@ interface Props {
   onChanged: () => void;
 }
 
+interface BatchActionTarget {
+  request: StockRequest;
+  isGroupedBatch: boolean;
+  isAsResearchBatch: boolean;
+}
+
 export function MyRequestsPanel({ employeeId, refreshNonce, onChanged, targetRequestId }: Props) {
   const { data: items = [], isLoading: loading, error: qError, refetch } =
     useMyStockRequestsQuery(employeeId ?? "");
@@ -30,7 +36,7 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged, targetReq
       ? qError.message
       : "요청 목록을 불러오지 못했습니다."
     : null;
-  const [cancelTarget, setCancelTarget] = useState<StockRequest | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<BatchActionTarget | null>(null);
   const [cancelPin, setCancelPin] = useState("");
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [revertTarget, setRevertTarget] = useState<StockRequest | null>(null);
@@ -43,8 +49,8 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged, targetReq
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshNonce]);
 
-  const openCancel = (request: StockRequest) => {
-    setCancelTarget(request);
+  const openCancel = (request: StockRequest, isGroupedBatch: boolean, isAsResearchBatch: boolean) => {
+    setCancelTarget({ request, isGroupedBatch, isAsResearchBatch });
     setCancelPin("");
     setCancelError(null);
   };
@@ -92,8 +98,8 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged, targetReq
     setCancelError(null);
     cancelMutation.mutate(
       {
-        requestId: cancelTarget.request_id,
-        payload: { actor_employee_id: cancelTarget.requester_employee_id, pin: cancelPin },
+        requestId: cancelTarget.request.request_id,
+        payload: { actor_employee_id: cancelTarget.request.requester_employee_id, pin: cancelPin },
       },
       {
         onSuccess: () => {
@@ -124,15 +130,35 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged, targetReq
       {!loading && items.length === 0 && !loadError && (
         <EmptyState variant="no-data" compact title="아직 제출한 요청이 없습니다." />
       )}
-      {prioritizeTargetRequest(items, targetRequestId).map((req) => (
-        <MyRequestRow
-          key={req.request_id}
-          req={req}
-          highlighted={req.request_id === targetRequestId}
-          onCancelRequest={() => openCancel(req)}
-          onRevertToDraft={() => openRevert(req)}
-        />
-      ))}
+      {prioritizeTargetRequest(items, targetRequestId).filter((req, index, requests) => {
+        const isInternalUseBatch = Boolean(req.operation_batch_id) && requests.some(
+          (candidate) => candidate.operation_batch_id === req.operation_batch_id && candidate.request_type === "internal_use",
+        );
+        return !isInternalUseBatch || requests.findIndex((candidate) => candidate.operation_batch_id === req.operation_batch_id) === index;
+      }).map((req) => {
+        const isInternalUseBatch = Boolean(req.operation_batch_id) && items.some(
+          (candidate) => candidate.operation_batch_id === req.operation_batch_id && candidate.request_type === "internal_use",
+        );
+        const batchRequests = isInternalUseBatch
+          ? items.filter((candidate) => candidate.operation_batch_id === req.operation_batch_id)
+          : [req];
+        const representativeRequest = isInternalUseBatch
+          ? batchRequests.find((candidate) => candidate.request_type === "internal_use") ?? req
+          : req;
+        const actionTarget = batchRequests.find((candidate) => candidate.status === "submitted" || candidate.status === "reserved") ?? req;
+        const isAsResearchBatch = batchRequests.some((candidate) => candidate.requires_as_research_approval);
+        return (
+          <MyRequestRow
+            key={representativeRequest.request_id}
+            req={representativeRequest}
+            linkedRequests={batchRequests.filter((candidate) => candidate.request_id !== representativeRequest.request_id)}
+            isGroupedInternalUseBatch={isInternalUseBatch}
+            highlighted={batchRequests.some((candidate) => candidate.request_id === targetRequestId)}
+            onCancelRequest={() => openCancel(actionTarget, isInternalUseBatch, isAsResearchBatch)}
+            onRevertToDraft={() => openRevert(actionTarget)}
+          />
+        );
+      })}
 
       <ConfirmModal
         open={revertTarget !== null}
@@ -180,7 +206,11 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged, targetReq
         onConfirm={submitCancel}
       >
         <p className="mb-3 text-sm" style={{ color: LEGACY_COLORS.text }}>
-          본인 PIN을 입력하면 이 요청이 취소됩니다.
+          {cancelTarget?.isGroupedBatch
+            ? cancelTarget.isAsResearchBatch
+              ? "본인 PIN을 입력하면 AS·연구 작업 묶음 전체가 취소됩니다."
+              : "본인 PIN을 입력하면 이 작업 묶음 전체가 취소됩니다."
+            : "본인 PIN을 입력하면 이 요청이 취소됩니다."}
         </p>
         {cancelError && (
           <p className="mb-2 text-xs" style={{ color: LEGACY_COLORS.red }}>

@@ -2855,6 +2855,11 @@
       },
       "EmployeeCreate": {
         "properties": {
+          "as_research_approver": {
+            "default": false,
+            "title": "As Research Approver",
+            "type": "boolean"
+          },
           "assigned_model_slots": {
             "anyOf": [
               {
@@ -3027,6 +3032,11 @@
       },
       "EmployeeResponse": {
         "properties": {
+          "as_research_approver": {
+            "default": false,
+            "title": "As Research Approver",
+            "type": "boolean"
+          },
           "assigned_model_slots": {
             "items": {
               "type": "integer"
@@ -3198,6 +3208,17 @@
       },
       "EmployeeUpdate": {
         "properties": {
+          "as_research_approver": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Research Approver"
+          },
           "assigned_model_slots": {
             "anyOf": [
               {
@@ -4789,6 +4810,38 @@
       },
       "IoLinePayload": {
         "properties": {
+          "approval_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "warehouse",
+                  "department",
+                  "as_research",
+                  "none"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Kind"
+          },
+          "approval_outcome": {
+            "anyOf": [
+              {
+                "enum": [
+                  "approved",
+                  "rejected"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Outcome"
+          },
           "bom_auto_token": {
             "anyOf": [
               {
@@ -5104,10 +5157,26 @@
             "enum": [
               "warehouse",
               "department",
+              "as_research",
               "none"
             ],
             "title": "Approval Kind",
             "type": "string"
+          },
+          "approval_outcome": {
+            "anyOf": [
+              {
+                "enum": [
+                  "approved",
+                  "rejected"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Outcome"
           },
           "approver_employee_id": {
             "anyOf": [
@@ -5199,6 +5268,11 @@
               }
             ],
             "title": "Request Code"
+          },
+          "requires_as_research_approval": {
+            "default": false,
+            "title": "Requires As Research Approval",
+            "type": "boolean"
           },
           "requires_department_approval": {
             "title": "Requires Department Approval",
@@ -10327,6 +10401,41 @@
             ],
             "title": "Approved By Name"
           },
+          "as_research_approved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Research Approved At"
+          },
+          "as_research_approved_by_employee_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Research Approved By Employee Id"
+          },
+          "as_research_approved_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Research Approved By Name"
+          },
           "cancelled_at": {
             "anyOf": [
               {
@@ -10510,6 +10619,11 @@
           "requester_name": {
             "title": "Requester Name",
             "type": "string"
+          },
+          "requires_as_research_approval": {
+            "default": false,
+            "title": "Requires As Research Approval",
+            "type": "boolean"
           },
           "requires_department_approval": {
             "default": false,
@@ -23222,6 +23336,116 @@
         ]
       }
     },
+    "/api/stock-requests/as-research-queue": {
+      "get": {
+        "description": "AS·연구 전용 승인 대기 목록.",
+        "operationId": "list_as_research_queue_api_stock_requests_as_research_queue_get",
+        "parameters": [
+          {
+            "description": "현재 AS·연구 승인자 ID",
+            "in": "query",
+            "name": "actor_employee_id",
+            "required": true,
+            "schema": {
+              "description": "현재 AS·연구 승인자 ID",
+              "format": "uuid",
+              "title": "Actor Employee Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StockRequestResponse"
+                  },
+                  "title": "Response List As Research Queue Api Stock Requests As Research Queue Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List As Research Queue",
+        "tags": [
+          "Stock Requests"
+        ]
+      }
+    },
+    "/api/stock-requests/as-research-queue/count": {
+      "get": {
+        "description": "AS·연구 전용 승인 대기 건수.",
+        "operationId": "count_as_research_queue_api_stock_requests_as_research_queue_count_get",
+        "parameters": [
+          {
+            "description": "현재 AS·연구 승인자 ID",
+            "in": "query",
+            "name": "actor_employee_id",
+            "required": true,
+            "schema": {
+              "description": "현재 AS·연구 승인자 ID",
+              "format": "uuid",
+              "title": "Actor Employee Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Count As Research Queue Api Stock Requests As Research Queue Count Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Count As Research Queue",
+        "tags": [
+          "Stock Requests"
+        ]
+      }
+    },
     "/api/stock-requests/department-queue": {
       "get": {
         "description": "부서 결재 정/부 승인 대기 목록.\n\n노출 부서 범위 (그릴 합의 — docs/defect-handling-redesign.md):\n  - 부서 정/부: 생산 라인 6개(튜브/고압/진공/튜닝/조립/출하)\n  - 창고 정/부 / admin: 모든 부서",
@@ -23738,6 +23962,112 @@
           }
         },
         "summary": "Approve Stock Request",
+        "tags": [
+          "Stock Requests"
+        ]
+      }
+    },
+    "/api/stock-requests/{request_id}/as-research-approve": {
+      "post": {
+        "operationId": "as_research_approve_stock_request_api_stock_requests__request_id__as_research_approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockRequestActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockRequestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "As Research Approve Stock Request",
+        "tags": [
+          "Stock Requests"
+        ]
+      }
+    },
+    "/api/stock-requests/{request_id}/as-research-reject": {
+      "post": {
+        "operationId": "as_research_reject_stock_request_api_stock_requests__request_id__as_research_reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockRequestActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockRequestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "As Research Reject Stock Request",
         "tags": [
           "Stock Requests"
         ]

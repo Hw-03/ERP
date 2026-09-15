@@ -155,6 +155,8 @@ export function MobileShell({
   const employeeId = operator?.employee_id;
   const { data: notificationsData } = useNotificationsQuery(employeeId);
   const [activeTab, setActiveTab] = useState<MobileTabId>("dashboard");
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [defectDeptFilter, setDefectDeptFilter] = useState<string | null>(null);
@@ -178,16 +180,22 @@ export function MobileShell({
   const [weekMon, setWeekMon] = useState<Date>(() => getWeekStartMonday(new Date()));
   const [warehousePreselected, setWarehousePreselected] = useState<Item | null>(null);
   const [warehouseIntent, setWarehouseIntent] = useState<IoEntryIntent | null>(null);
+  const [warehouseNotificationTarget, setWarehouseNotificationTarget] = useState<NotificationNavigationTarget | null>(null);
   const [capacityData, setCapacityData] = useState<ProductionCapacity | null>(null);
   const capacityRequestRef = useRef(0);
   const [capacityModal, setCapacityModal] = useState(false);
   const [stockWarnings, setStockWarnings] = useState<{ low: number; zero: number } | null>(null);
   // 항목 16 — 입출고 작성 중(담은 묶음 있음) 하단 네비로 이탈 시 확인 시트.
   const [warehouseDirty, setWarehouseDirty] = useState(false);
+  const warehouseDirtyRef = useRef(warehouseDirty);
+  warehouseDirtyRef.current = warehouseDirty;
   const warehouseFlushRef = useRef<(() => Promise<void>) | null>(null);
   const [dailyReportDirty, setDailyReportDirty] = useState(false);
+  const dailyReportDirtyRef = useRef(dailyReportDirty);
+  dailyReportDirtyRef.current = dailyReportDirty;
   const dailyReportFlushRef = useRef<(() => Promise<void>) | null>(null);
   const [pendingNavTab, setPendingNavTab] = useState<MobileTabId | null>(null);
+  const [pendingWarehouseNotificationTarget, setPendingWarehouseNotificationTarget] = useState<NotificationNavigationTarget | null>(null);
 
   const flushBeforeViewportSwitch = useCallback(async () => {
     if (activeTab === "dailyReport") {
@@ -225,6 +233,7 @@ export function MobileShell({
     if (target === "warehouse") {
       setWarehousePreselected(null);
       setWarehouseIntent(null);
+      setWarehouseNotificationTarget(null);
       window.history.replaceState(null, "", `${window.location.pathname}?tab=warehouse`);
     }
     if (target === "defect") {
@@ -260,7 +269,7 @@ export function MobileShell({
     }
   }, [activeTab, canOpenMobileTab, commitMobileTab, fallbackTab, operator]);
 
-  const handleTabChange = useCallback((tab: MobileTabId) => {
+  const handleTabChange = useCallback((tab: MobileTabId, preserveWarehouseNotification = false) => {
     const target = canOpenMobileTab(tab) ? tab : fallbackTab;
     if (!canOpenMobileTab(target)) return;
     // 항목 16 — 입출고 작성 중 탭 이동·같은 탭 초기화 시 확인 시트(PC 일관성). 확인 시 draft flush 후 전환.
@@ -268,18 +277,34 @@ export function MobileShell({
       setPendingNavTab(target);
       return;
     }
+    if (target === "warehouse" && !preserveWarehouseNotification) setWarehouseNotificationTarget(null);
     if (target === activeTab) {
+      if (target === "warehouse" && preserveWarehouseNotification) {
+        setRefreshNonce((n) => n + 1);
+        return;
+      }
       resetActiveMobileTab(target);
       return;
     }
     commitMobileTab(target);
   }, [activeTab, canOpenMobileTab, commitMobileTab, dailyReportDirty, fallbackTab, resetActiveMobileTab, warehouseDirty]);
 
-  const handleNotificationNavigate = useCallback(({ tab, section }: NotificationNavigationTarget) => {
+  const handleNotificationNavigate = useCallback((targetInfo: NotificationNavigationTarget) => {
+    const { tab, section } = targetInfo;
     if (!(VALID_TAB_IDS as string[]).includes(tab)) return;
     const target = tab as MobileTabId;
     if (!canOpenMobileTab(target)) return;
-    handleTabChange(target);
+    const active = activeTabRef.current;
+    const hasDirtyActiveScreen =
+      (active === "warehouse" && warehouseDirtyRef.current) ||
+      (active === "dailyReport" && dailyReportDirtyRef.current);
+    if (target === "warehouse" && hasDirtyActiveScreen) {
+      setPendingWarehouseNotificationTarget(targetInfo);
+      setPendingNavTab(target);
+      return;
+    }
+    if (target === "warehouse") setWarehouseNotificationTarget(targetInfo);
+    handleTabChange(target, target === "warehouse");
     if (target === "defect" && section) setDefectDeptFilter(section);
   }, [canOpenMobileTab, handleTabChange]);
 
@@ -287,6 +312,7 @@ export function MobileShell({
 
   const handleGoToWarehouse = useCallback((item: Item, intent?: IoEntryIntent) => {
     if (!canOpenMobileTab("warehouse")) return;
+    setWarehouseNotificationTarget(null);
     setWarehousePreselected(item);
     setWarehouseIntent(intent ?? null);
     commitMobileTab("warehouse");
@@ -371,6 +397,8 @@ export function MobileShell({
           onStatusChange={handleStatusChange}
           preselectedItem={warehousePreselected}
           entryIntent={warehouseIntent}
+          notificationSection={warehouseNotificationTarget?.section}
+          targetRequestId={warehouseNotificationTarget?.relatedRequestId}
           onSubmitSuccess={loadCapacity}
           onComposeDirtyChange={setWarehouseDirty}
           flushDraftRef={warehouseFlushRef}
@@ -427,6 +455,8 @@ export function MobileShell({
     refreshNonce,
     warehousePreselected,
     warehouseIntent,
+    warehouseNotificationTarget?.relatedRequestId,
+    warehouseNotificationTarget?.section,
     handleGoToWarehouse,
     handleStatusChange,
     canOpenMobileTab,
@@ -524,7 +554,10 @@ export function MobileShell({
       {/* 항목 16 — 입출고 작성 중 하단 네비 이탈 확인(draft 자동저장 flush 후 전환) */}
       <MobileDirtyLeaveSheet
         open={pendingNavTab !== null}
-        onCancel={() => setPendingNavTab(null)}
+        onCancel={() => {
+          setPendingNavTab(null);
+          setPendingWarehouseNotificationTarget(null);
+        }}
         onConfirm={async () => {
           if (activeTab === "dailyReport") {
             try {
@@ -541,24 +574,36 @@ export function MobileShell({
             }
           }
           const next = pendingNavTab;
+          const pendingNotification = pendingWarehouseNotificationTarget;
           setPendingNavTab(null);
+          setPendingWarehouseNotificationTarget(null);
           setWarehouseDirty(false);
           setDailyReportDirty(false);
           if (next) {
             const target = canOpenMobileTab(next) ? next : fallbackTab;
-            if (target === activeTab) resetActiveMobileTab(target);
+            if (pendingNotification && target === "warehouse") {
+              setWarehouseNotificationTarget(pendingNotification);
+              if (target === activeTab) setRefreshNonce((n) => n + 1);
+              else commitMobileTab(target);
+            } else if (target === activeTab) resetActiveMobileTab(target);
             else commitMobileTab(target);
           }
         }}
         onDiscard={() => {
           // 항목 3-4 — 저장(flush) 없이 이동. 위저드는 언마운트되어 작성 내용이 폐기된다.
           const next = pendingNavTab;
+          const pendingNotification = pendingWarehouseNotificationTarget;
           setPendingNavTab(null);
+          setPendingWarehouseNotificationTarget(null);
           setWarehouseDirty(false);
           setDailyReportDirty(false);
           if (next) {
             const target = canOpenMobileTab(next) ? next : fallbackTab;
-            if (target === activeTab) resetActiveMobileTab(target);
+            if (pendingNotification && target === "warehouse") {
+              setWarehouseNotificationTarget(pendingNotification);
+              if (target === activeTab) setRefreshNonce((n) => n + 1);
+              else commitMobileTab(target);
+            } else if (target === activeTab) resetActiveMobileTab(target);
             else commitMobileTab(target);
           }
         }}

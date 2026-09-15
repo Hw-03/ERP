@@ -35,6 +35,7 @@ class EmployeeCreate(BaseModel):
     level: EmployeeLevelEnum = EmployeeLevelEnum.STAFF
     warehouse_role: str = Field("none", description="창고 결재 역할 (none/primary/deputy)")
     department_role: str = Field("none", description="부서 결재 역할 (none/primary/deputy)")
+    as_research_approver: bool = False
     display_order: int = 0
     is_active: bool = True
     # W12-#7: 직원별 입출고 권한. 부서 io_enabled 와 AND 결합.
@@ -54,6 +55,7 @@ class EmployeeUpdate(BaseModel):
     level: Optional[EmployeeLevelEnum] = None
     warehouse_role: Optional[str] = Field(None, description="창고 결재 역할 (none/primary/deputy)")
     department_role: Optional[str] = Field(None, description="부서 결재 역할 (none/primary/deputy)")
+    as_research_approver: Optional[bool] = None
     display_order: Optional[int] = None
     is_active: Optional[bool] = None
     # W12-#7: 직원별 입출고 권한. None=변경 없음.
@@ -77,6 +79,7 @@ class EmployeeResponse(BaseModel):
     level: EmployeeLevelEnum
     warehouse_role: str = "none"
     department_role: str = "none"
+    as_research_approver: bool = False
     display_order: int
     is_active: bool
     # W12-#7: 직원별 입출고 권한. 마이그레이션 이전 응답 호환을 위해 기본 True.

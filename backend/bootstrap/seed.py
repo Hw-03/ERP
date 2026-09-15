@@ -235,6 +235,7 @@ def seed_reference_data() -> dict[str, int]:
                         level=level,
                         display_order=idx,
                         is_active="true",
+                        as_research_approver=code in {"E02", "E03"},
                         pin_hash=DEFAULT_PIN_HASH,  # 기본 PIN: 0000
                     )
                 )

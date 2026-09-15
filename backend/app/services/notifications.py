@@ -32,7 +32,12 @@ _PENDING_STATUSES = (
 
 
 def _active_employees(db: Session) -> list[Employee]:
-    return [e for e in db.query(Employee).all() if bool(e.is_active)]
+    return [
+        e
+        for e in db.query(Employee).all()
+        if e.is_active is True
+        or (isinstance(e.is_active, str) and e.is_active.lower() == "true")
+    ]
 
 
 def recipients_for_warehouse_approval(db: Session) -> list[Employee]:
@@ -47,6 +52,24 @@ def recipients_for_warehouse_approval(db: Session) -> list[Employee]:
 def recipients_for_department_approval(db: Session, target_dept: str | None) -> list[Employee]:
     """부서 결재 대기 요청을 볼 수 있는 직원 — can_approve_department 단일 원천 사용."""
     return [e for e in _active_employees(db) if can_approve_department(e, target_dept)]
+
+
+def recipients_for_internal_use_department_approval(
+    db: Session,
+    target_dept: str | None,
+) -> list[Employee]:
+    """사용출고 부서 결재는 활성 부서 정/부에게만 알린다."""
+    return [
+        employee
+        for employee in _active_employees(db)
+        if (employee.department_role or "none").lower() in ("primary", "deputy")
+        and can_approve_department(employee, target_dept)
+    ]
+
+
+def recipients_for_as_research_approval(db: Session) -> list[Employee]:
+    """AS·연구 결재 대기 요청을 볼 수 있는 활성 전용 승인자."""
+    return [e for e in _active_employees(db) if bool(e.as_research_approver)]
 
 
 # 결재 요청 유형 → 한국어 라벨. 프론트 frontend/lib/io/glossary.ts REQUEST_TYPE_LABEL 미러
@@ -123,7 +146,13 @@ def notify_request_arrived(db: Session, request: StockRequest) -> None:
         return
 
     recipients: Iterable[Employee]
-    if request.requires_warehouse_approval and request.approved_by_employee_id is None:
+    if (
+        request.requires_as_research_approval
+        and request.as_research_approved_by_employee_id is None
+    ):
+        recipients = recipients_for_as_research_approval(db)
+        target_section = "as-research-queue"
+    elif request.requires_warehouse_approval and request.approved_by_employee_id is None:
         recipients = recipients_for_warehouse_approval(db)
         target_section = "queue"
     elif (
@@ -131,7 +160,14 @@ def notify_request_arrived(db: Session, request: StockRequest) -> None:
         and not request.requires_warehouse_approval
         and request.department_approved_by_employee_id is None
     ):
-        recipients = recipients_for_department_approval(db, request.requester_department)
+        target_department = request.approval_department or request.requester_department
+        from app.services import internal_use_approval
+
+        recipients = (
+            recipients_for_internal_use_department_approval(db, target_department)
+            if internal_use_approval.is_internal_use_request(db, request)
+            else recipients_for_department_approval(db, target_department)
+        )
         target_section = "dept-queue"
     else:
         return

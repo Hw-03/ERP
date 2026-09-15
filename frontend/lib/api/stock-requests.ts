@@ -38,6 +38,15 @@ export const stockRequestsApi = {
       ),
     ),
 
+  listAsResearchQueue: (actorEmployeeId: string) =>
+    fetcher<StockRequest[]>(
+      toApiUrl(
+        `/api/stock-requests/as-research-queue?actor_employee_id=${encodeURIComponent(
+          actorEmployeeId,
+        )}`,
+      ),
+    ),
+
   countWarehouseQueue: () =>
     fetcher<{ count: number }>(toApiUrl("/api/stock-requests/warehouse-queue/count")),
 
@@ -45,6 +54,15 @@ export const stockRequestsApi = {
     fetcher<{ count: number }>(
       toApiUrl(
         `/api/stock-requests/department-queue/count?actor_employee_id=${encodeURIComponent(
+          actorEmployeeId,
+        )}`,
+      ),
+    ),
+
+  countAsResearchQueue: (actorEmployeeId: string) =>
+    fetcher<{ count: number }>(
+      toApiUrl(
+        `/api/stock-requests/as-research-queue/count?actor_employee_id=${encodeURIComponent(
           actorEmployeeId,
         )}`,
       ),
@@ -71,6 +89,24 @@ export const stockRequestsApi = {
   ) =>
     postJson<StockRequest>(
       toApiUrl(`/api/stock-requests/${requestId}/department-reject`),
+      payload,
+    ),
+
+  approveStockRequestAsResearch: (
+    requestId: string,
+    payload: StockRequestActionPayload,
+  ) =>
+    postJson<StockRequest>(
+      toApiUrl(`/api/stock-requests/${requestId}/as-research-approve`),
+      payload,
+    ),
+
+  rejectStockRequestAsResearch: (
+    requestId: string,
+    payload: StockRequestActionPayload,
+  ) =>
+    postJson<StockRequest>(
+      toApiUrl(`/api/stock-requests/${requestId}/as-research-reject`),
       payload,
     ),
 

@@ -39,6 +39,7 @@ function makeLine(overrides: Partial<IoLine>): IoLine {
     has_children: false,
     shortage: 0,
     exclusion_note: null,
+    approval_outcome: null,
     ...overrides,
   };
 }
@@ -738,6 +739,21 @@ describe("BomBatchDetail", () => {
     fireEvent.click(screen.getByRole("button", { name: "BOM 구성 펼치기" }));
     const lineRow = screen.getByText("아주 긴 구성품 라인 이름").closest("tr")!;
     expect(within(lineRow).getAllByText("—")).toHaveLength(1);
+  });
+
+  it("부분 완료 이력에서 반려된 승인 라인은 재고 미차감으로 흐리게 표시한다", () => {
+    const batch = makeBatch();
+    batch.status = "partially_completed";
+    batch.bundles[0].lines[1].approval_outcome = "rejected";
+
+    render(
+      <table><tbody><BomBatchDetail batchId={batch.batch_id} colSpan={8} cache={new Map([[batch.batch_id, batch]])} onCached={vi.fn()} /></tbody></table>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "BOM 구성 펼치기" }));
+    const rejectedRow = screen.getByText("아주 긴 구성품 라인 이름").closest("tr")!;
+    expect(rejectedRow).toHaveAttribute("data-history-rejected", "true");
+    expect(within(rejectedRow).getByText("반려 · 재고 미차감")).toBeInTheDocument();
   });
 
   it("shows the internal-use BOM mode and every child inventory effect", () => {

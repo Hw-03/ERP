@@ -30,6 +30,14 @@ export const stockRequestsHandlers = [
     HttpResponse.json([sampleRequest]),
   ),
 
+  http.get("*/api/stock-requests/as-research-queue", () =>
+    HttpResponse.json([sampleRequest]),
+  ),
+
+  http.get("*/api/stock-requests/as-research-queue/count", () =>
+    HttpResponse.json({ count: 1 }),
+  ),
+
   http.get("*/api/stock-requests", () =>
     HttpResponse.json([sampleRequest]),
   ),
@@ -63,6 +71,14 @@ export const stockRequestsHandlers = [
       status: "rejected",
     });
   }),
+
+  http.post("*/api/stock-requests/:id/as-research-approve", async ({ params }) =>
+    HttpResponse.json({ ...sampleRequest, request_id: String(params.id), status: "approved" }),
+  ),
+
+  http.post("*/api/stock-requests/:id/as-research-reject", async ({ params }) =>
+    HttpResponse.json({ ...sampleRequest, request_id: String(params.id), status: "rejected" }),
+  ),
 
   http.post("*/api/stock-requests/:id/cancel", async ({ params }) =>
     HttpResponse.json({

@@ -872,6 +872,7 @@ def _finalize_submission(
     request: StockRequest,
     requester: Employee,
     now: datetime,
+    defer_execution: bool = False,
 ) -> StockRequest:
     """제출 시점 분기 — request 와 lines 가 SUBMITTED 상태로 flush 된 직후 호출.
 
@@ -887,8 +888,36 @@ def _finalize_submission(
     is_admin = requester_level == "admin"
     can_self_approve_department = can_approve_department(
         requester,
-        request.requester_department,
+        request.approval_department or request.requester_department,
     )
+
+    if defer_execution:
+        if request.requires_warehouse_approval and requester_role in ("primary", "deputy"):
+            request.approved_by_employee_id = requester.employee_id
+            request.approved_by_name = requester.name
+            request.approved_at = now
+        if (
+            request.requires_department_approval
+            and (requester.department_role or "none").lower() in ("primary", "deputy")
+            and can_self_approve_department
+        ):
+            request.department_approved_by_employee_id = requester.employee_id
+            request.department_approved_by_name = requester.name
+            request.department_approved_at = now
+        if request.requires_as_research_approval and bool(requester.as_research_approver):
+            request.as_research_approved_by_employee_id = requester.employee_id
+            request.as_research_approved_by_name = requester.name
+            request.as_research_approved_at = now
+
+        from app.services import sr_reservation
+
+        if sr_reservation.aggregate_reservations(lines):
+            sr_reservation.reserve_lines(db, lines, employee=requester)
+            request.status = StockRequestStatusEnum.RESERVED
+            request.reserved_at = now
+            for line in lines:
+                line.status = StockRequestStatusEnum.RESERVED
+        return request
 
     warehouse_ok = (
         (not request.requires_warehouse_approval)

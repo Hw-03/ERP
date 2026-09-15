@@ -44,11 +44,43 @@ describe("stockRequestsApi", () => {
     expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/stock-requests/warehouse-queue");
   });
 
+  it("listAsResearchQueue encodes actor_employee_id", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse([])));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    await stockRequestsApi.listAsResearchQueue("E 1");
+    expect(String(fetchSpy.mock.calls[0][0])).toContain(
+      "/api/stock-requests/as-research-queue?actor_employee_id=E%201",
+    );
+  });
+
+  it("countAsResearchQueue encodes actor_employee_id", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({ count: 0 })));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    await stockRequestsApi.countAsResearchQueue("E 1");
+    expect(String(fetchSpy.mock.calls[0][0])).toContain(
+      "/api/stock-requests/as-research-queue/count?actor_employee_id=E%201",
+    );
+  });
+
   it("approveStockRequest POST /{id}/approve", async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
     await stockRequestsApi.approveStockRequest("r-1", { actor_employee_id: "e1", pin: "0000" });
     expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/stock-requests/r-1/approve");
+  });
+
+  it("approveStockRequestAsResearch POST /{id}/as-research-approve", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    await stockRequestsApi.approveStockRequestAsResearch("r-1", { actor_employee_id: "e1", pin: "0000" });
+    expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/stock-requests/r-1/as-research-approve");
+  });
+
+  it("rejectStockRequestAsResearch POST /{id}/as-research-reject", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    await stockRequestsApi.rejectStockRequestAsResearch("r-1", { actor_employee_id: "e1", pin: "0000", reason: "사유" });
+    expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/stock-requests/r-1/as-research-reject");
   });
 
   it("submitStockRequestDraft POST /{id}/submit", async () => {

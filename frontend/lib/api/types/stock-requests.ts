@@ -13,6 +13,7 @@ export type StockRequestStatus =
   | "rejected"
   | "cancelled"
   | "completed"
+  | "partially_completed"
   | "failed_approval";
 
 export type StockRequestType =
@@ -77,6 +78,10 @@ export interface StockRequest {
   department_approved_by_employee_id: string | null;
   department_approved_by_name: string | null;
   department_approved_at: string | null;
+  requires_as_research_approval: boolean;
+  as_research_approved_by_employee_id: string | null;
+  as_research_approved_by_name: string | null;
+  as_research_approved_at: string | null;
   cancelled_at: string | null;
   completed_at: string | null;
   reference_no: string | null;

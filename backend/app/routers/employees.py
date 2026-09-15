@@ -294,6 +294,10 @@ def create_employee(
         hidden_sidebar_tabs=hidden_tabs,
         is_active=bool(payload.is_active),
     )
+    if bool(payload.is_active) and bool(payload.as_research_approver):
+        from app.services.internal_use_approval import lock_approver_roster
+
+        lock_approver_roster(db)
     employee = Employee(
         employee_code=code,
         name=payload.name,
@@ -303,6 +307,7 @@ def create_employee(
         level=payload.level,
         warehouse_role=role_value,
         department_role=dept_role_value,
+        as_research_approver=bool(payload.as_research_approver),
         io_enabled=io_enabled,
         hidden_sidebar_tabs=_serialize_hidden_sidebar_tabs(hidden_tabs),
         login_notification_popup_enabled=bool(payload.login_notification_popup_enabled),
@@ -367,6 +372,10 @@ def update_employee(
         hidden_sidebar_tabs=candidate_hidden_tabs,
         is_active=candidate_is_active,
     )
+    if payload.as_research_approver is not None or payload.is_active is not None:
+        from app.services.internal_use_approval import lock_and_refresh_employee
+
+        employee = lock_and_refresh_employee(db, employee.employee_id)
     changed: list[str] = []
     if payload.name is not None and employee.name != payload.name:
         employee.name = payload.name; changed.append("name")
@@ -400,6 +409,12 @@ def update_employee(
         if (employee.department_role or "none") != new_dept_role:
             employee.department_role = new_dept_role
             changed.append("department_role")
+    if (
+        payload.as_research_approver is not None
+        and bool(employee.as_research_approver) != bool(payload.as_research_approver)
+    ):
+        employee.as_research_approver = bool(payload.as_research_approver)
+        changed.append("as_research_approver")
     if payload.display_order is not None and employee.display_order != payload.display_order:
         employee.display_order = payload.display_order; changed.append("display_order")
     if payload.is_active is not None:
@@ -428,6 +443,13 @@ def update_employee(
 
     employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
 
+    if payload.as_research_approver is not None or payload.is_active is not None:
+        from app.services.internal_use_approval import (
+            reclassify_undecided_if_no_active_approver,
+        )
+
+        reclassify_undecided_if_no_active_approver(db)
+
     if changed:
         audit.record(
             db,
@@ -452,6 +474,9 @@ def delete_employee(
     employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
     if not employee:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    from app.services.internal_use_approval import lock_and_refresh_employee
+
+    employee = lock_and_refresh_employee(db, employee.employee_id)
 
     has_requests = db.query(StockRequest).filter(
         StockRequest.requester_employee_id == employee_id
@@ -463,6 +488,11 @@ def delete_employee(
     if has_requests or has_daily_work_reports:
         employee.is_active = False
         employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
+        from app.services.internal_use_approval import (
+            reclassify_undecided_if_no_active_approver,
+        )
+
+        reclassify_undecided_if_no_active_approver(db)
         audit.record(
             db,
             request=request,
@@ -483,6 +513,11 @@ def delete_employee(
             payload_summary=f"{employee.name} ({employee.employee_code}) — 영구 삭제",
         )
         db.delete(employee)
+        from app.services.internal_use_approval import (
+            reclassify_undecided_if_no_active_approver,
+        )
+
+        reclassify_undecided_if_no_active_approver(db)
         commit_only(db)
         return JSONResponse(status_code=200, content={"result": "deleted"})
 
@@ -673,6 +708,7 @@ def _to_response(
         level=employee.level,
         warehouse_role=(employee.warehouse_role or "none"),
         department_role=(employee.department_role or "none"),
+        as_research_approver=bool(getattr(employee, "as_research_approver", False)),
         display_order=int(employee.display_order),
         is_active=bool(employee.is_active),
         io_enabled=bool(getattr(employee, "io_enabled", True)),

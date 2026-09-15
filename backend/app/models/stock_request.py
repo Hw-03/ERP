@@ -125,6 +125,14 @@ class StockRequest(Base):
     )
     department_approved_by_name = Column(String(100), nullable=True)
     department_approved_at = Column(DateTime, nullable=True)
+    requires_as_research_approval = Column(Boolean, nullable=False, default=False, server_default="0")
+    as_research_approved_by_employee_id = Column(
+        UUIDString,
+        ForeignKey("employees.employee_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    as_research_approved_by_name = Column(String(100), nullable=True)
+    as_research_approved_at = Column(DateTime, nullable=True)
     cancelled_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     reference_no = Column(String(100), nullable=True)

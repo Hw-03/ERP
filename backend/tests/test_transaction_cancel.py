@@ -472,7 +472,8 @@ def test_cancel_internal_use_restores_warehouse_total(client, db_session, make_i
         },
     )
     assert submitted.status_code == 201, submitted.text
-    approved = _approve(client, submitted.json()["stock_request_id"], approver)
+    request_id = submitted.json()["stock_requests"][0]["stock_request_id"]
+    approved = _approve(client, request_id, approver)
     assert approved.status_code == 200, approved.text
     log = db_session.query(TransactionLog).filter(
         TransactionLog.transaction_type == TransactionTypeEnum.INTERNAL_USE
@@ -526,7 +527,8 @@ def test_cancel_internal_use_batch_restores_all_items(
         },
     )
     assert submitted.status_code == 201, submitted.text
-    approved = _approve(client, submitted.json()["stock_request_id"], approver)
+    request_id = submitted.json()["stock_requests"][0]["stock_request_id"]
+    approved = _approve(client, request_id, approver)
     assert approved.status_code == 200, approved.text
 
     logs = (
@@ -930,7 +932,8 @@ def test_cancel_batch_rolls_back_first_reversal_when_second_reversal_fails(
         },
     )
     assert submitted.status_code == 201, submitted.text
-    approved = _approve(client, submitted.json()["stock_request_id"], approver)
+    request_id = submitted.json()["stock_requests"][0]["stock_request_id"]
+    approved = _approve(client, request_id, approver)
     assert approved.status_code == 200, approved.text
 
     logs = (

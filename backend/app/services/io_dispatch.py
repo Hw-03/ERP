@@ -22,6 +22,7 @@ from app.models import (
     IoBatch,
     IoBundle,
     IoLine,
+    Item,
     RequestBucketEnum,
     StockRequest,
     StockRequestStatusEnum,
@@ -66,7 +67,6 @@ from app.services.io_persist import (
     _persist_batch,
     normalize_batch_bom_stock_exempt,
     normalize_automatic_routes_with_bom_token_refresh,
-    sync_batch_from_stock_requests,
 )
 
 
@@ -177,7 +177,9 @@ def _link_stock_request(
             batch.reference_no = request.request_code
         # 창고 또는 부서 결재 어느 쪽이든 필요하면 결재 대기로 표시.
         batch.requires_approval = bool(
-            request.requires_warehouse_approval or request.requires_department_approval
+            request.requires_warehouse_approval
+            or request.requires_department_approval
+            or request.requires_as_research_approval
         )
         if request.status == StockRequestStatusEnum.COMPLETED:
             batch.status = "completed"
@@ -453,25 +455,50 @@ def _submit_internal_use_approvals(
     requester: Employee,
     batch: IoBatch,
 ) -> None:
-    """사용출고 라인을 출고 원본별 요청과 재입고 대상 부서별 요청으로 분리한다."""
+    """사용출고 라인을 창고/AS·연구/부서 승인 종류별 최대 3건으로 분리한다."""
     lines = _included_lines(batch)
     _validate_included_lines(db, lines)
-    outbound_lines = [line for line in lines if line.direction == "out"]
-    return_lines = [line for line in lines if line.direction == "in"]
-    grouped: dict[tuple[str, Optional[str]], list[IoLine]] = {}
-    for line in outbound_lines:
-        key = (line.from_bucket, line.from_department)
-        grouped.setdefault(key, []).append(line)
+    from app.services import internal_use_approval
+
+    requester = internal_use_approval.lock_and_refresh_employee(
+        db,
+        requester.employee_id,
+    )
+    if not bool(requester.is_active):
+        raise PermissionError("비활성 직원은 입출고 작업을 제출할 수 없습니다.")
+    item_process_types = {
+        item.item_id: item.process_type_code
+        for item in db.query(Item).filter(Item.item_id.in_({line.item_id for line in lines})).all()
+    }
+    active_special_approver_exists = (
+        db.query(Employee.employee_id)
+        .filter(
+            Employee.as_research_approver.is_(True),
+            Employee.is_active == "true",
+        )
+        .first()
+        is not None
+    )
+    grouped: dict[str, list[IoLine]] = {}
+    for line in lines:
+        if line.direction == "out" and line.from_bucket == "warehouse":
+            kind = "warehouse"
+        elif (
+            line.direction == "out"
+            and line.from_bucket == "production"
+            and item_process_types.get(line.item_id) in {"AR", "AA"}
+            and active_special_approver_exists
+        ):
+            kind = "as_research"
+        else:
+            kind = "department"
+        grouped.setdefault(kind, []).append(line)
 
     requests: list[StockRequest] = []
-    ordered_groups = sorted(
-        grouped.items(),
-        key=lambda entry: (
-            0 if entry[0][0] == "warehouse" else 1,
-            entry[0][1] or "",
-        ),
-    )
-    for (from_bucket, _from_department), group_lines in ordered_groups:
+    for kind in ("warehouse", "as_research", "department"):
+        group_lines = grouped.get(kind)
+        if not group_lines:
+            continue
         inputs = [
             stock_request_svc.LineInput(
                 item_id=line.item_id,
@@ -486,12 +513,20 @@ def _submit_internal_use_approvals(
         request = stock_request_svc.create_request(
             db,
             requester=requester,
-            request_type=StockRequestTypeEnum.INTERNAL_USE,
+            request_type=(
+                StockRequestTypeEnum.INTERNAL_USE
+                if all(line.direction == "out" for line in group_lines)
+                else StockRequestTypeEnum.MANUAL_ADJUSTMENT
+            ),
             lines_input=inputs,
             reference_no=batch.reference_no,
             notes=batch.notes,
-            requires_department_approval=from_bucket == "production",
+            requires_warehouse_approval_override=kind == "warehouse",
+            requires_department_approval=kind == "department",
+            requires_as_research_approval=kind == "as_research",
+            approval_department=batch.to_department if kind == "department" else None,
             allow_internal_use=True,
+            defer_execution=True,
         )
         _link_stock_request(
             db,
@@ -502,75 +537,20 @@ def _submit_internal_use_approvals(
         )
         requests.append(request)
         notif_svc.notify_request_arrived(db, request)
-
-    returns_by_department: dict[str, list[IoLine]] = {}
-    for line in return_lines:
-        if line.to_bucket != "production" or not line.to_department:
-            raise ValueError("사용출고 재입고 대상 부서가 올바르지 않습니다.")
-        returns_by_department.setdefault(line.to_department, []).append(line)
-
-    for approval_department, group_lines in sorted(returns_by_department.items()):
-        inputs = [
-            stock_request_svc.LineInput(
-                item_id=line.item_id,
-                quantity=line.quantity,
-                from_bucket=_request_bucket(line.from_bucket),
-                from_department=line.from_department,
-                to_bucket=_request_bucket(line.to_bucket),
-                to_department=line.to_department,
-            )
-            for line in group_lines
-        ]
-        request = stock_request_svc.create_manual_adjustment_request(
-            db,
-            requester=requester,
-            lines_input=inputs,
-            reference_no=batch.reference_no,
-            notes=batch.notes,
-            approval_department=approval_department,
-        )
-        _link_stock_request(
-            db,
-            batch=batch,
-            request=request,
-            lines=group_lines,
-            update_batch=False,
-        )
-        if request.department_approved_by_employee_id is not None:
-            batch_status_before = batch.status
-            request_status_before = request.status
-            _prelock_line_inventories(db, group_lines)
-            operation = _create_execution_operation(
+    try:
+        with db.begin_nested():
+            internal_use_approval.settle_if_decided(
                 db,
                 batch=batch,
+                requests=requests,
                 actor=requester,
-                execution_key=f"request:{request.request_id}",
             )
-            for line in group_lines:
-                _apply_line(
-                    db,
-                    batch=batch,
-                    line=line,
-                    requester=requester,
-                    operation=operation,
-                )
-            now = datetime.utcnow()
-            request.status = StockRequestStatusEnum.COMPLETED
-            request.completed_at = now
-            for request_line in request.lines:
-                request_line.status = StockRequestStatusEnum.COMPLETED
-            _record_execution_workflow(
-                db,
-                operation=operation,
-                batch=batch,
-                batch_status_before=batch_status_before,
-                request=request,
-                request_status_before=request_status_before,
-            )
-        requests.append(request)
-        notif_svc.notify_request_arrived(db, request)
-
-    sync_batch_from_stock_requests(db, batch, requests)
+    except Exception as exc:
+        raise internal_use_approval.InternalUseSubmissionSettlementError(
+            batch_id=batch.batch_id,
+            approver_id=requester.employee_id,
+            original=exc,
+        ) from exc
 
 
 def _submit_approval(
@@ -1017,7 +997,7 @@ def _dept_for_line(line: IoLine, tx_type: TransactionTypeEnum) -> str | None:
             return None
         return v.value if hasattr(v, "value") else str(v)
 
-    if tx_type in (TransactionTypeEnum.PRODUCE,):
+    if tx_type in (TransactionTypeEnum.PRODUCE, TransactionTypeEnum.INTERNAL_USE):
         return _val(line.to_department)
     if tx_type in (TransactionTypeEnum.BACKFLUSH, TransactionTypeEnum.SUPPLIER_RETURN):
         return _val(line.from_department)
@@ -1134,6 +1114,9 @@ def _apply_line(
         tx_type, quantity_change = _apply_adjust(db, line, qty)
     else:
         raise ValueError(f"지원하지 않는 라인 방향입니다: {line.direction}")
+
+    if batch.sub_type == INTERNAL_USE_SUB_TYPE and line.direction == "out":
+        tx_type = TransactionTypeEnum.INTERNAL_USE
 
     quarantine_record = None
     if line.direction == "defective":
@@ -1301,6 +1284,8 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
     if department_approval_required and not (batch.notes or "").strip():
         raise ValueError("부서 결재 요청에는 메모를 입력해야 합니다.")
 
+    from app.services.internal_use_approval import InternalUseSubmissionSettlementError
+
     try:
         if custom_process_bom:
             _mark_custom_process_bom_parents_reference_only(
@@ -1355,6 +1340,8 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
             _submit_approval(db, requester=requester, batch=batch)
         else:
             _submit_immediate(db, requester=requester, batch=batch)
+    except InternalUseSubmissionSettlementError:
+        raise
     except Exception:
         # 어느 분기서 실패하든 batch 를 failed 로 확정(flush)한 뒤 그대로 전파 — 부분상태 방지.
         batch.status = "failed"

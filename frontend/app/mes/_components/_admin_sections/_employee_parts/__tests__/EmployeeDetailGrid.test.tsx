@@ -15,6 +15,7 @@ const employee: Employee = {
   level: "staff",
   warehouse_role: "none",
   department_role: "none",
+  as_research_approver: false,
   io_enabled: true,
   display_order: 1,
   is_active: true,
@@ -32,6 +33,7 @@ const form: EmployeeEditForm = {
   level: employee.level,
   warehouse_role: employee.warehouse_role,
   department_role: employee.department_role,
+  as_research_approver: employee.as_research_approver,
   hidden_sidebar_tabs: employee.hidden_sidebar_tabs ?? [],
   assigned_model_slots: employee.assigned_model_slots ?? [],
 };
@@ -192,5 +194,27 @@ describe("EmployeeDetailGrid", () => {
     expect(permissionsCard).toHaveClass("h-full");
     expect(actionArea).toHaveClass("h-full", "grid-rows-[auto_minmax(0,1fr)]");
     expect(dangerCard).toHaveClass("h-full");
+  });
+
+  it("AS·연구 승인 권한은 정·부 역할과 분리된 checkbox로 변경한다", () => {
+    const setForm = vi.fn();
+    render(
+      <EmployeeDetailGrid
+        employee={employee}
+        form={form}
+        setForm={setForm}
+        departments={departments}
+        productModels={[]}
+        onRequestPinReset={vi.fn()}
+        onToggle={vi.fn()}
+        onRequestDelete={vi.fn()}
+      />,
+    );
+
+    const toggle = screen.getByRole("checkbox", { name: "AS·연구 승인 권한" });
+    expect(screen.getByText(/AS·연구 사용출고 중 부서 재고의 AR·AA 품목 승인/)).toBeInTheDocument();
+    expect(screen.getByText(/대상 직원은 다음 로그인부터 승인함 탭 반영/)).toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(setForm.mock.calls[0][0]({ ...form, as_research_approver: false }).as_research_approver).toBe(true);
   });
 });

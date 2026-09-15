@@ -47,6 +47,7 @@ export const EMPTY_EMPLOYEE_FORM = {
   department: "조립",
   warehouse_role: "none" as "none" | "primary" | "deputy",
   department_role: "none" as "none" | "primary" | "deputy",
+  as_research_approver: false,
   // 조립 부서 직원의 담당 모델 slot 목록 (배열 순서 = 우선순위, 0=1순위).
   assigned_model_slots: [] as number[],
 };
