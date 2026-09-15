@@ -17,6 +17,10 @@ module.exports = (phase) => {
   /** @type {import('next').NextConfig} */
   const config = {
     devIndicators: false,
+    // 기존 로컬·사내 IP의 개발 HMR만 허용하고 나머지 출처는 계속 차단한다.
+    ...(phase === PHASE_DEVELOPMENT_SERVER
+      ? { allowedDevOrigins: ["127.0.0.1", "192.168.0.63"] }
+      : {}),
     async rewrites() {
       return [
         {

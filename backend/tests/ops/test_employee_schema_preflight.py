@@ -28,6 +28,24 @@ def _write_migration(path: Path, revision: str, policy: str | None) -> None:
     )
 
 
+@pytest.mark.parametrize("content_changed", [False, True])
+def test_preflight_normalizes_only_line_endings(tmp_path: Path, content_changed: bool) -> None:
+    module = _load_preflight_module()
+    source, target = tmp_path / "source", tmp_path / "target"
+    for root in (source, target):
+        (root / "alembic" / "versions").mkdir(parents=True)
+    for relative in ("alembic/versions/old.py", "bootstrap_db.py", "alembic.ini"):
+        content = b'revision = "old"\nvalue = 1\n'
+        (target / relative).write_bytes(content.replace(b"\n", b"\r\n"))
+        (source / relative).write_bytes(content.replace(b'value = 1', b'value = 2') if content_changed else content)
+    args = (source, target, source / "alembic/versions", target / "alembic/versions")
+    if content_changed:
+        with pytest.raises(module.PreflightPolicyError, match="policy"):
+            module.load_preflight_policies(*args)
+    else:
+        assert module.load_preflight_policies(*args) == ()
+
+
 def test_changed_migrations_require_declared_auto_deploy_policy(tmp_path: Path) -> None:
     module = _load_preflight_module()
     source = tmp_path / "source"

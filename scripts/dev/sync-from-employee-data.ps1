@@ -1,11 +1,16 @@
-# scripts/dev/sync-from-employee-data.ps1
+﻿# scripts/dev/sync-from-employee-data.ps1
 # 직원 업무 DB의 online snapshot을 현재 개발 코드로 migration/검증한 뒤 개발 DB에 반영한다.
 # 기본값은 DryRun이며, C:\ERP\backend\mes.db 교체는 명시적인 -Apply에서만 수행한다.
 
 [CmdletBinding()]
 param(
     [switch] $DryRun,
-    [switch] $Apply
+    [switch] $Apply,
+    [switch] $CrossSchemaDevelopmentSync,
+    [string] $RollbackValidatorRoot,
+    [string] $TrustedRollbackValidatorSha256,
+    [string] $TrustedRollbackBackupToolSha256,
+    [string] $PythonExecutable = "py.exe"
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,6 +26,7 @@ $BackupTool = Join-Path $DevRoot "scripts\ops\backup_db.py"
 $RestoreTool = Join-Path $DevRoot "scripts\ops\restore_db.py"
 $VerifyTool = Join-Path $DevRoot "scripts\ops\_verify_backup.py"
 $InventoryTool = Join-Path $DevRoot "scripts\ops\check_inventory_integrity.py"
+$CutoverTool = Join-Path $DevRoot "scripts\ops\friday_profile_cutover.py"
 $BackendHealthAttempts = 6
 $FrontendHealthAttempts = 240
 $script:StagingCandidate = $null
@@ -75,18 +81,19 @@ function Invoke-DatabaseBackup {
         [string] $Database,
         [string] $RuntimeRoot,
         [string] $Label,
-        [switch] $IntegrityOnly
+        [switch] $IntegrityOnly,
+        [string] $ToolPath = $BackupTool
     )
 
     $previousRuntimeRoot = [Environment]::GetEnvironmentVariable("MES_RUNTIME_ROOT", "Process")
     try {
         $env:MES_RUNTIME_ROOT = $RuntimeRoot
-        $arguments = @($BackupTool, "--sqlite", $Database)
+        $arguments = @($ToolPath, "--sqlite", $Database)
         if ($IntegrityOnly) {
             $arguments += "--integrity-only"
         }
         $result = Invoke-CheckedExternalCommand `
-            -FilePath "py.exe" `
+            -FilePath $PythonExecutable `
             -ArgumentList $arguments
     }
     finally {
@@ -114,6 +121,50 @@ function Invoke-DatabaseBackup {
     return [pscustomobject] @{ Success = $true; Path = $path }
 }
 
+function Invoke-DevelopmentSyncAdmission {
+    param(
+        [string] $Candidate,
+        [string] $Rollback,
+        [pscustomobject] $PinEvidence
+    )
+
+    $admissionDirectory = Join-Path $StageRuntimeRoot "admissions"
+    New-Item -ItemType Directory -Force -Path $admissionDirectory | Out-Null
+    $output = Join-Path $admissionDirectory "development-sync-$([guid]::NewGuid().ToString('N')).json"
+    $arguments = @(
+        $CutoverTool,
+        "prepare-development-sync",
+        "--candidate", $Candidate,
+        "--rollback", $Rollback,
+        "--target", $DevDb,
+        "--rollback-validator-root", $PinEvidence.Root,
+        "--candidate-validator-root", $DevRoot,
+        "--trusted-rollback-validator-sha256", $PinEvidence.RollbackValidatorSha256,
+        "--trusted-candidate-validator-sha256", $PinEvidence.CandidateValidatorSha256,
+        "--output", $output
+    )
+    $result = Invoke-CheckedExternalCommand -FilePath $PythonExecutable -ArgumentList $arguments
+    Write-CheckedCommandResult -Label "development-sync-admission" -Result $result
+    if (-not $result.Success) {
+        return [pscustomobject] @{ Success = $false; Path = $null; Sha256 = $null }
+    }
+    $receipt = Get-CheckedJsonOutput -Result $result
+    $expectedPath = [System.IO.Path]::GetFullPath($output)
+    if ($null -eq $receipt -or
+        [string] $receipt.status -ne "ADMITTED" -or
+        [System.IO.Path]::GetFullPath([string] $receipt.receipt) -ne $expectedPath -or
+        [string] $receipt.receipt_sha256 -notmatch '^[0-9a-f]{64}$' -or
+        -not (Test-Path -LiteralPath $expectedPath -PathType Leaf)) {
+        Write-Host "[admission] 유효한 development sync receipt를 받지 못했습니다."
+        return [pscustomobject] @{ Success = $false; Path = $null; Sha256 = $null }
+    }
+    return [pscustomobject] @{
+        Success = $true
+        Path = $expectedPath
+        Sha256 = [string] $receipt.receipt_sha256
+    }
+}
+
 function Remove-StagingDatabase {
     param([string] $Database)
 
@@ -131,7 +182,10 @@ function Invoke-RestoreDatabase {
         [string] $Target,
         [string] $PreverifiedRollback,
         [switch] $SourceIntegrityOnly,
-        [switch] $Check
+        [switch] $Check,
+        [string] $DevelopmentSyncAdmission,
+        [string] $DevelopmentSyncAdmissionSha256,
+        [switch] $DevelopmentSyncRecovery
     )
 
     $arguments = @($RestoreTool, "--sqlite", $Source, "--target", $Target)
@@ -144,7 +198,16 @@ function Invoke-RestoreDatabase {
     if ($Check) {
         $arguments += "--check"
     }
-    $result = Invoke-CheckedExternalCommand -FilePath "py.exe" -ArgumentList $arguments
+    if ($DevelopmentSyncAdmission -and $DevelopmentSyncAdmissionSha256) {
+        $arguments += @(
+            "--development-sync-admission", $DevelopmentSyncAdmission,
+            "--development-sync-admission-sha256", $DevelopmentSyncAdmissionSha256
+        )
+    }
+    if ($DevelopmentSyncRecovery) {
+        $arguments += "--development-sync-recovery"
+    }
+    $result = Invoke-CheckedExternalCommand -FilePath $PythonExecutable -ArgumentList $arguments
     Write-CheckedCommandResult -Label "restore" -Result $result
     return $result
 }
@@ -164,7 +227,7 @@ function Invoke-Bootstrap {
         $env:DATABASE_URL = "sqlite:///$($Database.Replace('\', '/'))"
         $env:MES_RUNTIME_ROOT = $RuntimeRoot
         $result = Invoke-CheckedExternalCommand `
-            -FilePath "py.exe" `
+            -FilePath $PythonExecutable `
             -ArgumentList @("bootstrap_db.py", $Mode) `
             -WorkingDirectory $DevBackend
     }
@@ -192,7 +255,7 @@ function Invoke-DatabaseVerification {
         return $false
     }
 
-    $sqlite = Invoke-CheckedExternalCommand -FilePath "py.exe" -ArgumentList @($VerifyTool, "--database", $Database)
+    $sqlite = Invoke-CheckedExternalCommand -FilePath $PythonExecutable -ArgumentList @($VerifyTool, "--database", $Database)
     Write-CheckedCommandResult -Label "$Phase-sqlite-fk" -Result $sqlite
     if (-not $sqlite.Success) {
         return $false
@@ -200,7 +263,7 @@ function Invoke-DatabaseVerification {
 
     $databaseUrl = "sqlite:///$($Database.Replace('\', '/'))"
     $inventory = Invoke-CheckedExternalCommand `
-        -FilePath "py.exe" `
+        -FilePath $PythonExecutable `
         -ArgumentList @($InventoryTool, "--db-url", $databaseUrl)
     Write-CheckedCommandResult -Label "$Phase-inventory" -Result $inventory
     return [bool] $inventory.Success
@@ -274,6 +337,109 @@ function Test-HttpEndpoint {
     return $false
 }
 
+function Get-CheckedJsonOutput {
+    param([pscustomobject] $Result)
+
+    for ($index = $Result.Output.Count - 1; $index -ge 0; $index--) {
+        try {
+            return ([string] $Result.Output[$index] | ConvertFrom-Json -ErrorAction Stop)
+        }
+        catch { }
+    }
+    return $null
+}
+
+function Get-Sha256 {
+    param([string] $Path)
+
+    $stream = [System.IO.File]::OpenRead($Path)
+    try {
+        $sha256 = [System.Security.Cryptography.SHA256]::Create()
+        try {
+            return ([System.BitConverter]::ToString($sha256.ComputeHash($stream))).Replace("-", "").ToLowerInvariant()
+        }
+        finally {
+            $sha256.Dispose()
+        }
+    }
+    finally {
+        $stream.Dispose()
+    }
+}
+
+function Invoke-ValidatorBundleHash {
+    param([string] $Root)
+
+    $result = Invoke-CheckedExternalCommand `
+        -FilePath $PythonExecutable `
+        -ArgumentList @($CutoverTool, "hash-validator", "--root", $Root)
+    Write-CheckedCommandResult -Label "validator-hash" -Result $result
+    if (-not $result.Success) {
+        return $null
+    }
+    return Get-CheckedJsonOutput -Result $result
+}
+
+function Test-DevelopmentSyncPins {
+    $root = [System.IO.Path]::GetFullPath($RollbackValidatorRoot)
+    $employee = [System.IO.Path]::GetFullPath($EmployeeRoot)
+    if ($root.Equals($employee, [System.StringComparison]::OrdinalIgnoreCase) -or
+        (Test-ChildPath -Path $root -Parent $employee)) {
+        Write-Host "[pin] 직원 코드 경로는 rollback validator로 사용할 수 없습니다: $root"
+        return $null
+    }
+    $backupTool = Join-Path $root "scripts\ops\backup_db.py"
+    if (-not (Test-Path -LiteralPath $backupTool -PathType Leaf)) {
+        Write-Host "[pin] rollback backup tool을 찾을 수 없습니다: $backupTool"
+        return $null
+    }
+    if ($TrustedRollbackBackupToolSha256 -notmatch '^[0-9a-fA-F]{64}$' -or
+        $TrustedRollbackValidatorSha256 -notmatch '^[0-9a-fA-F]{64}$') {
+        Write-Host "[pin] 신뢰 SHA-256 형식이 잘못되었습니다."
+        return $null
+    }
+    $actualBackupToolHash = Get-Sha256 -Path $backupTool
+    if ($actualBackupToolHash -ne $TrustedRollbackBackupToolSha256.ToLowerInvariant()) {
+        Write-Host "[pin] rollback backup tool SHA-256 불일치"
+        return $null
+    }
+    $rollbackBundle = Invoke-ValidatorBundleHash -Root $root
+    if ($null -eq $rollbackBundle -or
+        [string] $rollbackBundle.root -ne $root -or
+        [string] $rollbackBundle.validator_bundle_sha256 -ne $TrustedRollbackValidatorSha256.ToLowerInvariant()) {
+        Write-Host "[pin] rollback validator bundle SHA-256 불일치"
+        return $null
+    }
+    $candidateBundle = Invoke-ValidatorBundleHash -Root $DevRoot
+    if ($null -eq $candidateBundle -or
+        [string] $candidateBundle.root -ne [System.IO.Path]::GetFullPath($DevRoot) -or
+        [string] $candidateBundle.validator_bundle_sha256 -notmatch '^[0-9a-f]{64}$') {
+        Write-Host "[pin] candidate validator bundle 확인 실패"
+        return $null
+    }
+    return [pscustomobject] @{
+        Root = $root
+        BackupTool = $backupTool
+        RollbackValidatorSha256 = $TrustedRollbackValidatorSha256.ToLowerInvariant()
+        CandidateValidatorSha256 = [string] $candidateBundle.validator_bundle_sha256
+    }
+}
+
+function Confirm-DevelopmentSyncPins {
+    param([pscustomobject] $Expected)
+
+    $current = Test-DevelopmentSyncPins
+    if ($null -eq $current -or
+        $current.Root -ne $Expected.Root -or
+        $current.BackupTool -ne $Expected.BackupTool -or
+        $current.RollbackValidatorSha256 -ne $Expected.RollbackValidatorSha256 -or
+        $current.CandidateValidatorSha256 -ne $Expected.CandidateValidatorSha256) {
+        Write-Host "[pin] 작업 중 validator 또는 backup tool 핀이 변경되었습니다."
+        return $false
+    }
+    return $true
+}
+
 function Test-DevelopmentHealth {
     # Readiness includes a full integrity diagnostic. A short client timeout
     # leaves that work running while retries queue more copies of the same work.
@@ -297,7 +463,10 @@ function Test-DevelopmentHealth {
 function Invoke-DevelopmentRecovery {
     param(
         [string] $BackupPath,
-        [bool] $StopBeforeRestore
+        [bool] $StopBeforeRestore,
+        [string] $DevelopmentSyncAdmission,
+        [string] $DevelopmentSyncAdmissionSha256,
+        [switch] $KeepStopped
     )
 
     $stopSuccess = $true
@@ -311,11 +480,22 @@ function Invoke-DevelopmentRecovery {
         $previousRuntimeRoot = [Environment]::GetEnvironmentVariable("MES_RUNTIME_ROOT", "Process")
         try {
             $env:MES_RUNTIME_ROOT = $DevRuntimeRoot
-            $restore = Invoke-RestoreDatabase `
-                -Source $BackupPath `
-                -Target $DevDb `
-                -PreverifiedRollback $BackupPath `
-                -Check
+            if ($DevelopmentSyncAdmission) {
+                $restore = Invoke-RestoreDatabase `
+                    -Source $BackupPath `
+                    -Target $DevDb `
+                    -PreverifiedRollback $BackupPath `
+                    -DevelopmentSyncAdmission $DevelopmentSyncAdmission `
+                    -DevelopmentSyncAdmissionSha256 $DevelopmentSyncAdmissionSha256 `
+                    -DevelopmentSyncRecovery
+            }
+            else {
+                $restore = Invoke-RestoreDatabase `
+                    -Source $BackupPath `
+                    -Target $DevDb `
+                    -PreverifiedRollback $BackupPath `
+                    -Check
+            }
             $restoreSuccess = $restore.Success
         }
         finally {
@@ -323,16 +503,31 @@ function Invoke-DevelopmentRecovery {
         }
     }
 
-    $start = Start-DevelopmentServices
-    $health = if ($start.Success) {
-        Test-DevelopmentHealth
+    if ($KeepStopped) {
+        $start = [pscustomobject] @{ Success = $true }
+        $health = [pscustomobject] @{ Success = $true; Backend = $false; Frontend = $false }
     }
     else {
-        [pscustomobject] @{ Success = $false; Backend = $false; Frontend = $false }
+        $start = Start-DevelopmentServices
+        $health = if ($start.Success) {
+            Test-DevelopmentHealth
+        }
+        else {
+            [pscustomobject] @{ Success = $false; Backend = $false; Frontend = $false }
+        }
     }
     $success = $stopSuccess -and $restoreSuccess -and $start.Success -and $health.Success
     Write-Host "SYNC_DATA_RECOVERY=$(if ($success) { 'SUCCESS' } else { 'FAILED' })"
-    Write-Host "SYNC_DATA_RECOVERY_HEALTH=$(if ($health.Success) { 'OK' } else { 'FAILED' })"
+    $recoveryHealth = if ($KeepStopped) {
+        if ($stopSuccess) { "STOPPED" } else { "FAILED" }
+    }
+    elseif ($health.Success) {
+        "OK"
+    }
+    else {
+        "FAILED"
+    }
+    Write-Host "SYNC_DATA_RECOVERY_HEALTH=$recoveryHealth"
     Write-Host "SYNC_DATA_BACKUP=$BackupPath"
     return [pscustomobject] @{
         Success = $success
@@ -345,6 +540,33 @@ function Invoke-DevelopmentRecovery {
 function Invoke-EmployeeDataSync {
     if ($Apply -and $DryRun) {
         Write-Host "[args] -Apply와 -DryRun은 함께 사용할 수 없습니다."
+        Write-Host "SYNC_DATA_RESULT=INVALID_ARGUMENTS"
+        return 2
+    }
+
+    $hasDevelopmentSyncPins = [bool] (
+        $RollbackValidatorRoot -or
+        $TrustedRollbackValidatorSha256 -or
+        $TrustedRollbackBackupToolSha256
+    )
+    if ($CrossSchemaDevelopmentSync) {
+        if (-not $Apply -or
+            -not $RollbackValidatorRoot -or
+            -not $TrustedRollbackValidatorSha256 -or
+            -not $TrustedRollbackBackupToolSha256) {
+            Write-Host "[args] cross-schema development sync는 -Apply와 세 개의 rollback 핀이 모두 필요합니다."
+            Write-Host "SYNC_DATA_RESULT=INVALID_ARGUMENTS"
+            return 2
+        }
+        $pinEvidence = Test-DevelopmentSyncPins
+        if ($null -eq $pinEvidence) {
+            Write-Host "SYNC_DATA_RESULT=ROLLBACK_PIN_FAILED"
+            return 2
+        }
+        Write-Host "SYNC_DATA_PROFILE=CROSS_SCHEMA_DEVELOPMENT_SYNC"
+    }
+    elseif ($hasDevelopmentSyncPins) {
+        Write-Host "[args] rollback 핀은 -CrossSchemaDevelopmentSync와 함께 사용해야 합니다."
         Write-Host "SYNC_DATA_RESULT=INVALID_ARGUMENTS"
         return 2
     }
@@ -422,10 +644,16 @@ function Invoke-EmployeeDataSync {
     }
 
     Write-Host "[backup] 현재 개발 DB online backup 생성 중..."
+    if ($CrossSchemaDevelopmentSync -and -not (Confirm-DevelopmentSyncPins -Expected $pinEvidence)) {
+        Write-Host "SYNC_DATA_RESULT=ROLLBACK_PIN_CHANGED"
+        return 13
+    }
+    $targetBackupTool = if ($CrossSchemaDevelopmentSync) { $pinEvidence.BackupTool } else { $BackupTool }
     $targetBackup = Invoke-DatabaseBackup `
         -Database $DevDb `
         -RuntimeRoot $DevRuntimeRoot `
-        -Label "employee-data-rollback"
+        -Label "employee-data-rollback" `
+        -ToolPath $targetBackupTool
     if (-not $targetBackup.Success) {
         Write-Host "SYNC_DATA_RESULT=TARGET_BACKUP_FAILED"
         return 13
@@ -436,15 +664,20 @@ function Invoke-EmployeeDataSync {
     $stop = Stop-DevelopmentServices
     if (-not $stop.Success) {
         Write-Host "[stop] 개발 서비스 정지 확인 실패 - DB는 교체하지 않습니다."
-        $restart = Start-DevelopmentServices
-        $health = if ($restart.Success) {
-            Test-DevelopmentHealth
+        if ($CrossSchemaDevelopmentSync) {
+            $health = [pscustomobject] @{ Success = $true }
         }
         else {
-            [pscustomobject] @{ Success = $false; Backend = $false; Frontend = $false }
+            $restart = Start-DevelopmentServices
+            $health = if ($restart.Success) {
+                Test-DevelopmentHealth
+            }
+            else {
+                [pscustomobject] @{ Success = $false; Backend = $false; Frontend = $false }
+            }
         }
         Write-Host "SYNC_DATA_RECOVERY=NOT_NEEDED"
-        Write-Host "SYNC_DATA_RECOVERY_HEALTH=$(if ($health.Success) { 'OK' } else { 'FAILED' })"
+        Write-Host "SYNC_DATA_RECOVERY_HEALTH=$(if ($CrossSchemaDevelopmentSync) { 'FAILED' } elseif ($health.Success) { 'OK' } else { 'FAILED' })"
         Write-Host "SYNC_DATA_RESULT=STOP_FAILED"
         return 14
     }
@@ -453,31 +686,59 @@ function Invoke-EmployeeDataSync {
     # online backup, but bind the restore guard and recovery to the stopped DB.
     Write-Host "[backup] 정지된 개발 DB의 교체·복구 기준 백업 검증 중..."
     try {
+        if ($CrossSchemaDevelopmentSync -and -not (Confirm-DevelopmentSyncPins -Expected $pinEvidence)) {
+            throw "stopped backup 직전 rollback pin 재검증 실패"
+        }
         $cutoverBackup = Invoke-DatabaseBackup `
             -Database $DevDb `
             -RuntimeRoot $DevRuntimeRoot `
-            -Label "employee-data-cutover"
+            -Label "employee-data-cutover" `
+            -ToolPath $targetBackupTool
     }
     catch {
         Write-Host "[backup] 정지 후 백업 실패: $($_.Exception.Message)"
         $cutoverBackup = [pscustomobject] @{ Success = $false; Path = $null }
     }
     if (-not $cutoverBackup.Success) {
-        $restart = Start-DevelopmentServices
-        $health = if ($restart.Success) {
-            Test-DevelopmentHealth
+        if ($CrossSchemaDevelopmentSync) {
+            $health = [pscustomobject] @{ Success = $true }
         }
         else {
-            [pscustomobject] @{ Success = $false; Backend = $false; Frontend = $false }
+            $restart = Start-DevelopmentServices
+            $health = if ($restart.Success) {
+                Test-DevelopmentHealth
+            }
+            else {
+                [pscustomobject] @{ Success = $false; Backend = $false; Frontend = $false }
+            }
         }
         Write-Host "SYNC_DATA_RECOVERY=NOT_NEEDED"
-        Write-Host "SYNC_DATA_RECOVERY_HEALTH=$(if ($health.Success) { 'OK' } else { 'FAILED' })"
+        Write-Host "SYNC_DATA_RECOVERY_HEALTH=$(if ($CrossSchemaDevelopmentSync) { 'STOPPED' } elseif ($health.Success) { 'OK' } else { 'FAILED' })"
         Write-Host "SYNC_DATA_RESULT=TARGET_CUTOVER_BACKUP_FAILED"
         return 13
     }
     $targetBackup = $cutoverBackup
     Write-Host "SYNC_DATA_CUTOVER_BACKUP=$($targetBackup.Path)"
     Write-Host "SYNC_DATA_BACKUP=$($targetBackup.Path)"
+
+    $developmentAdmissionPath = $null
+    $developmentAdmissionSha256 = $null
+    if ($CrossSchemaDevelopmentSync) {
+        $developmentAdmission = Invoke-DevelopmentSyncAdmission `
+            -Candidate $verifiedCandidate.Path `
+            -Rollback $targetBackup.Path `
+            -PinEvidence $pinEvidence
+        if (-not $developmentAdmission.Success) {
+            Write-Host "SYNC_DATA_RECOVERY=NOT_NEEDED"
+            Write-Host "SYNC_DATA_RECOVERY_HEALTH=STOPPED"
+            Write-Host "SYNC_DATA_RESULT=ADMISSION_FAILED"
+            return 13
+        }
+        $developmentAdmissionPath = $developmentAdmission.Path
+        $developmentAdmissionSha256 = $developmentAdmission.Sha256
+        Write-Host "SYNC_DATA_ADMISSION=$developmentAdmissionPath"
+        Write-Host "SYNC_DATA_ADMISSION_SHA256=$developmentAdmissionSha256"
+    }
 
     try {
         $previousRuntimeRoot = [Environment]::GetEnvironmentVariable("MES_RUNTIME_ROOT", "Process")
@@ -486,53 +747,85 @@ function Invoke-EmployeeDataSync {
             $install = Invoke-RestoreDatabase `
                 -Source $verifiedCandidate.Path `
                 -Target $DevDb `
-                -PreverifiedRollback $targetBackup.Path
+                -PreverifiedRollback $targetBackup.Path `
+                -DevelopmentSyncAdmission $developmentAdmissionPath `
+                -DevelopmentSyncAdmissionSha256 $developmentAdmissionSha256
         }
         finally {
             Set-EnvironmentValue -Name "MES_RUNTIME_ROOT" -Value $previousRuntimeRoot
         }
         if (-not $install.Success) {
             if ($install.ExitCode -eq 3) {
-                $restart = Start-DevelopmentServices
-                $restartHealth = if ($restart.Success) {
-                    Test-DevelopmentHealth
+                if ($CrossSchemaDevelopmentSync) {
+                    $restartHealth = [pscustomobject] @{ Success = $true }
                 }
                 else {
-                    [pscustomobject] @{ Success = $false; Backend = $false; Frontend = $false }
+                    $restart = Start-DevelopmentServices
+                    $restartHealth = if ($restart.Success) {
+                        Test-DevelopmentHealth
+                    }
+                    else {
+                        [pscustomobject] @{ Success = $false; Backend = $false; Frontend = $false }
+                    }
                 }
                 Write-Host "SYNC_DATA_RECOVERY=NOT_NEEDED"
-                Write-Host "SYNC_DATA_RECOVERY_HEALTH=$(if ($restartHealth.Success) { 'OK' } else { 'FAILED' })"
+                Write-Host "SYNC_DATA_RECOVERY_HEALTH=$(if ($CrossSchemaDevelopmentSync) { 'STOPPED' } elseif ($restartHealth.Success) { 'OK' } else { 'FAILED' })"
                 Write-Host "SYNC_DATA_RESULT=TARGET_CHANGED_AFTER_BACKUP"
                 return 15
             }
-            Invoke-DevelopmentRecovery -BackupPath $targetBackup.Path -StopBeforeRestore $false | Out-Null
+            Invoke-DevelopmentRecovery `
+                -BackupPath $targetBackup.Path `
+                -StopBeforeRestore $false `
+                -DevelopmentSyncAdmission $developmentAdmissionPath `
+                -DevelopmentSyncAdmissionSha256 $developmentAdmissionSha256 `
+                -KeepStopped:$CrossSchemaDevelopmentSync | Out-Null
             Write-Host "SYNC_DATA_RESULT=INSTALL_FAILED"
             return 15
         }
 
         if (-not (Invoke-DatabaseVerification -Database $DevDb -Phase "post" -RuntimeRoot $DevRuntimeRoot)) {
-            Invoke-DevelopmentRecovery -BackupPath $targetBackup.Path -StopBeforeRestore $false | Out-Null
+            Invoke-DevelopmentRecovery `
+                -BackupPath $targetBackup.Path `
+                -StopBeforeRestore $false `
+                -DevelopmentSyncAdmission $developmentAdmissionPath `
+                -DevelopmentSyncAdmissionSha256 $developmentAdmissionSha256 `
+                -KeepStopped:$CrossSchemaDevelopmentSync | Out-Null
             Write-Host "SYNC_DATA_RESULT=POSTCHECK_FAILED"
             return 16
         }
 
         $start = Start-DevelopmentServices
         if (-not $start.Success) {
-            Invoke-DevelopmentRecovery -BackupPath $targetBackup.Path -StopBeforeRestore $true | Out-Null
+            Invoke-DevelopmentRecovery `
+                -BackupPath $targetBackup.Path `
+                -StopBeforeRestore $true `
+                -DevelopmentSyncAdmission $developmentAdmissionPath `
+                -DevelopmentSyncAdmissionSha256 $developmentAdmissionSha256 `
+                -KeepStopped:$CrossSchemaDevelopmentSync | Out-Null
             Write-Host "SYNC_DATA_RESULT=START_FAILED"
             return 17
         }
         $health = Test-DevelopmentHealth
         if (-not $health.Success) {
             Write-Host "[health] 실패 - backend=$($health.Backend) frontend=$($health.Frontend)"
-            Invoke-DevelopmentRecovery -BackupPath $targetBackup.Path -StopBeforeRestore $true | Out-Null
+            Invoke-DevelopmentRecovery `
+                -BackupPath $targetBackup.Path `
+                -StopBeforeRestore $true `
+                -DevelopmentSyncAdmission $developmentAdmissionPath `
+                -DevelopmentSyncAdmissionSha256 $developmentAdmissionSha256 `
+                -KeepStopped:$CrossSchemaDevelopmentSync | Out-Null
             Write-Host "SYNC_DATA_RESULT=HEALTH_FAILED"
             return 17
         }
     }
     catch {
         Write-Host "[apply] 예외: $($_.Exception.Message)"
-        Invoke-DevelopmentRecovery -BackupPath $targetBackup.Path -StopBeforeRestore $true | Out-Null
+        Invoke-DevelopmentRecovery `
+            -BackupPath $targetBackup.Path `
+            -StopBeforeRestore $true `
+            -DevelopmentSyncAdmission $developmentAdmissionPath `
+            -DevelopmentSyncAdmissionSha256 $developmentAdmissionSha256 `
+            -KeepStopped:$CrossSchemaDevelopmentSync | Out-Null
         Write-Host "SYNC_DATA_RESULT=APPLY_FAILED"
         return 18
     }

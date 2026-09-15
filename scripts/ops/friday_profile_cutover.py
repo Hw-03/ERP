@@ -35,7 +35,9 @@ from scripts.ops.project_legacy_effects import (  # noqa: E402
 
 ADMISSION_CONTRACT = "friday-profile-cutover-admission/v1"
 RECOVERY_CONTRACT = "friday-profile-recovery/v1"
+DEVELOPMENT_SYNC_CONTRACT = "development-sync-admission/v1"
 CUTOVER_PROFILE = "modern-0036-to-friday-0033-latest-data"
+DEVELOPMENT_SYNC_PROFILE = "modern-0036-rollback-with-friday-0033-employee-data"
 FRIDAY_PROFILE = "friday-0033"
 MODERN_REVISION = "20260911_0036"
 FRIDAY_REVISION = "20260910_0033"
@@ -879,6 +881,115 @@ def create_admission(
     return receipt
 
 
+def create_development_sync_admission(
+    *,
+    candidate_path: Path,
+    rollback_path: Path,
+    target_path: Path,
+    rollback_validator_root: Path,
+    candidate_validator_root: Path,
+    trusted_rollback_validator_sha256: str,
+    trusted_candidate_validator_sha256: str,
+    output_path: Path,
+) -> dict[str, object]:
+    """Bind unlike development data sets to their own pinned FULL validators."""
+
+    candidate = _physical(candidate_path, require_file=True)
+    rollback = _physical(rollback_path, require_file=True)
+    target = _physical(target_path, require_file=True)
+    rollback_root = _physical(rollback_validator_root)
+    candidate_root = _physical(candidate_validator_root)
+    output = _physical(output_path)
+    if output.exists():
+        raise CutoverAdmissionError(f"admission output already exists: {output}")
+    rollback_hash = validator_bundle_sha256(rollback_root)
+    candidate_hash = validator_bundle_sha256(candidate_root)
+    if rollback_hash != trusted_rollback_validator_sha256.lower():
+        raise CutoverAdmissionError("rollback validator bundle hash mismatch")
+    if candidate_hash != trusted_candidate_validator_sha256.lower():
+        raise CutoverAdmissionError("candidate validator bundle hash mismatch")
+
+    rollback_manifest = _manifest(rollback)
+    candidate_manifest = _manifest(candidate)
+    _require_manifest_profile(
+        rollback_manifest,
+        revision=MODERN_REVISION,
+        friday_profile=False,
+    )
+    _require_manifest_profile(
+        candidate_manifest,
+        revision=FRIDAY_REVISION,
+        friday_profile=True,
+    )
+    _run_public_full_validator(
+        rollback_root,
+        rollback,
+        source_path=target,
+        label="rollback FULL freshness",
+    )
+    _run_public_full_validator(
+        candidate_root,
+        candidate,
+        label="candidate FULL",
+    )
+    _require_validator_bundle_unchanged(
+        rollback_root,
+        expected_sha256=rollback_hash,
+        label="rollback",
+    )
+    _require_validator_bundle_unchanged(
+        candidate_root,
+        expected_sha256=candidate_hash,
+        label="candidate",
+    )
+
+    receipt: dict[str, object] = {
+        "contract": DEVELOPMENT_SYNC_CONTRACT,
+        "profile": DEVELOPMENT_SYNC_PROFILE,
+        "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "target_path": str(target),
+        "candidate": {
+            "path": str(candidate),
+            "artifact_sha256": _sha256(candidate),
+            "manifest_sha256": _sha256(backup_manifest.manifest_path_for(candidate)),
+            "snapshot_hash": _manifest_snapshot_hash(candidate_manifest),
+            "revision": FRIDAY_REVISION,
+        },
+        "rollback": {
+            "path": str(rollback),
+            "artifact_sha256": _sha256(rollback),
+            "manifest_sha256": _sha256(backup_manifest.manifest_path_for(rollback)),
+            "snapshot_hash": _manifest_snapshot_hash(rollback_manifest),
+            "revision": MODERN_REVISION,
+        },
+        "validators": {
+            "rollback_root": str(rollback_root),
+            "rollback_bundle_sha256": rollback_hash,
+            "candidate_root": str(candidate_root),
+            "candidate_bundle_sha256": candidate_hash,
+        },
+        "validation": {
+            "candidate_full": "PASS",
+            "rollback_full": "PASS",
+            "rollback_freshness": "PASS",
+        },
+    }
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with output.open("xb") as stream:
+        stream.write(
+            json.dumps(
+                receipt,
+                ensure_ascii=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            ).encode("utf-8")
+            + b"\n"
+        )
+        stream.flush()
+        os.fsync(stream.fileno())
+    return receipt
+
+
 def _load_admission(path: Path) -> dict[str, object]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -890,6 +1001,20 @@ def _load_admission(path: Path) -> dict[str, object]:
         or payload.get("profile") != CUTOVER_PROFILE
     ):
         raise CutoverAdmissionError("cutover admission contract is invalid")
+    return payload
+
+
+def _load_development_sync_admission(path: Path) -> dict[str, object]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise CutoverAdmissionError("development sync admission JSON is invalid") from exc
+    if (
+        not isinstance(payload, dict)
+        or payload.get("contract") != DEVELOPMENT_SYNC_CONTRACT
+        or payload.get("profile") != DEVELOPMENT_SYNC_PROFILE
+    ):
+        raise CutoverAdmissionError("development sync admission contract is invalid")
     return payload
 
 
@@ -985,6 +1110,328 @@ def verify_admission(
     }:
         raise CutoverAdmissionError("cutover validation evidence is incomplete")
     return receipt
+
+
+def verify_development_sync_admission(
+    *,
+    receipt_path: Path,
+    expected_receipt_sha256: str,
+    candidate_path: Path,
+    rollback_path: Path,
+    target_path: Path,
+    candidate_validator_root: Path,
+    recovery: bool = False,
+) -> dict[str, object]:
+    """Revalidate unlike candidate/rollback FULL artifacts without comparing rows."""
+
+    receipt_file = _physical(receipt_path, require_file=True)
+    if not _valid_sha256(expected_receipt_sha256):
+        raise CutoverAdmissionError("trusted admission SHA-256 is invalid")
+    if _sha256(receipt_file) != expected_receipt_sha256.lower():
+        raise CutoverAdmissionError("development sync admission SHA-256 mismatch")
+    receipt = _load_development_sync_admission(receipt_file)
+    candidate = _physical(candidate_path, require_file=True)
+    rollback = _physical(rollback_path, require_file=True)
+    target = _physical(target_path, require_file=True)
+    candidate_root = _physical(candidate_validator_root)
+    candidate_section = _receipt_section(receipt, "candidate")
+    rollback_section = _receipt_section(receipt, "rollback")
+    validators = _receipt_section(receipt, "validators")
+    if receipt.get("target_path") != str(target):
+        raise CutoverAdmissionError("development sync target path mismatch")
+    if candidate_section.get("path") != str(candidate):
+        raise CutoverAdmissionError("development sync candidate path mismatch")
+    if rollback_section.get("path") != str(rollback):
+        raise CutoverAdmissionError("development sync rollback path mismatch")
+    if candidate_section.get("artifact_sha256") != _sha256(candidate):
+        raise CutoverAdmissionError("candidate artifact hash mismatch")
+    if candidate_section.get("manifest_sha256") != _sha256(
+        _physical(backup_manifest.manifest_path_for(candidate), require_file=True)
+    ):
+        raise CutoverAdmissionError("candidate manifest hash mismatch")
+    if rollback_section.get("artifact_sha256") != _sha256(rollback):
+        raise CutoverAdmissionError("rollback artifact hash mismatch")
+    if rollback_section.get("manifest_sha256") != _sha256(
+        _physical(backup_manifest.manifest_path_for(rollback), require_file=True)
+    ):
+        raise CutoverAdmissionError("rollback manifest hash mismatch")
+
+    recorded_rollback_root = validators.get("rollback_root")
+    recorded_candidate_root = validators.get("candidate_root")
+    rollback_hash = validators.get("rollback_bundle_sha256")
+    candidate_hash = validators.get("candidate_bundle_sha256")
+    if not isinstance(recorded_rollback_root, str):
+        raise CutoverAdmissionError("rollback validator root is invalid")
+    rollback_root = _physical(Path(recorded_rollback_root))
+    if recorded_candidate_root != str(candidate_root):
+        raise CutoverAdmissionError("candidate validator root mismatch")
+    if not _valid_sha256(rollback_hash) or validator_bundle_sha256(
+        rollback_root
+    ) != rollback_hash:
+        raise CutoverAdmissionError("rollback validator bundle hash mismatch")
+    if not _valid_sha256(candidate_hash) or validator_bundle_sha256(
+        candidate_root
+    ) != candidate_hash:
+        raise CutoverAdmissionError("candidate validator bundle hash mismatch")
+
+    rollback_manifest = _manifest(rollback)
+    candidate_manifest = _manifest(candidate)
+    _require_manifest_profile(
+        rollback_manifest,
+        revision=MODERN_REVISION,
+        friday_profile=False,
+    )
+    _require_manifest_profile(
+        candidate_manifest,
+        revision=FRIDAY_REVISION,
+        friday_profile=True,
+    )
+    _run_public_full_validator(
+        rollback_root,
+        rollback,
+        source_path=None if recovery else target,
+        label="rollback FULL" if recovery else "rollback FULL freshness",
+    )
+    _run_public_full_validator(
+        candidate_root,
+        candidate,
+        label="candidate FULL",
+    )
+    if recovery:
+        _run_public_database_validator(
+            candidate_root,
+            target,
+            label="installed candidate",
+        )
+        compare_exact_database(candidate, target, label="installed candidate")
+    _require_validator_bundle_unchanged(
+        rollback_root,
+        expected_sha256=str(rollback_hash),
+        label="rollback",
+    )
+    _require_validator_bundle_unchanged(
+        candidate_root,
+        expected_sha256=str(candidate_hash),
+        label="candidate",
+    )
+    if rollback_section.get("snapshot_hash") != _manifest_snapshot_hash(
+        rollback_manifest
+    ):
+        raise CutoverAdmissionError("rollback snapshot hash mismatch")
+    if candidate_section.get("snapshot_hash") != _manifest_snapshot_hash(
+        candidate_manifest
+    ):
+        raise CutoverAdmissionError("candidate snapshot hash mismatch")
+    validation = _receipt_section(receipt, "validation")
+    if validation != {
+        "candidate_full": "PASS",
+        "rollback_full": "PASS",
+        "rollback_freshness": "PASS",
+    }:
+        raise CutoverAdmissionError("development sync validation evidence is incomplete")
+    return receipt
+
+
+def verify_development_sync_install(
+    *,
+    receipt_path: Path,
+    expected_receipt_sha256: str,
+    candidate_path: Path,
+    installed_path: Path,
+    candidate_validator_root: Path,
+) -> str:
+    """Prove the installed Friday DB exactly matches the admitted candidate."""
+
+    receipt_file = _physical(receipt_path, require_file=True)
+    if not _valid_sha256(expected_receipt_sha256):
+        raise CutoverAdmissionError("trusted admission SHA-256 is invalid")
+    if _sha256(receipt_file) != expected_receipt_sha256.lower():
+        raise CutoverAdmissionError("development sync admission SHA-256 mismatch")
+    receipt = _load_development_sync_admission(receipt_file)
+    candidate = _physical(candidate_path, require_file=True)
+    installed = _physical(installed_path, require_file=True)
+    candidate_root = _physical(candidate_validator_root)
+    candidate_section = _receipt_section(receipt, "candidate")
+    validators = _receipt_section(receipt, "validators")
+    candidate_hash = validators.get("candidate_bundle_sha256")
+    if (
+        candidate_section.get("path") != str(candidate)
+        or candidate_section.get("artifact_sha256") != _sha256(candidate)
+        or candidate_section.get("manifest_sha256")
+        != _sha256(_physical(backup_manifest.manifest_path_for(candidate), require_file=True))
+    ):
+        raise CutoverAdmissionError("candidate binding mismatch")
+    if validators.get("candidate_root") != str(candidate_root):
+        raise CutoverAdmissionError("candidate validator root mismatch")
+    if not _valid_sha256(candidate_hash) or validator_bundle_sha256(
+        candidate_root
+    ) != candidate_hash:
+        raise CutoverAdmissionError("candidate validator bundle hash mismatch")
+    _run_public_full_validator(
+        candidate_root,
+        candidate,
+        label="candidate FULL",
+    )
+    _run_public_database_validator(
+        candidate_root,
+        installed,
+        label="installed candidate",
+    )
+    _require_validator_bundle_unchanged(
+        candidate_root,
+        expected_sha256=str(candidate_hash),
+        label="candidate",
+    )
+    return compare_exact_database(candidate, installed, label="installed candidate")
+
+
+def verify_development_sync_recovery_install(
+    *,
+    receipt_path: Path,
+    expected_receipt_sha256: str,
+    rollback_path: Path,
+    installed_path: Path,
+) -> str:
+    """Prove recovery exactly restored the admitted modern rollback FULL."""
+
+    receipt_file = _physical(receipt_path, require_file=True)
+    if not _valid_sha256(expected_receipt_sha256):
+        raise CutoverAdmissionError("trusted admission SHA-256 is invalid")
+    if _sha256(receipt_file) != expected_receipt_sha256.lower():
+        raise CutoverAdmissionError("development sync admission SHA-256 mismatch")
+    receipt = _load_development_sync_admission(receipt_file)
+    rollback = _physical(rollback_path, require_file=True)
+    installed = _physical(installed_path, require_file=True)
+    rollback_section = _receipt_section(receipt, "rollback")
+    validators = _receipt_section(receipt, "validators")
+    recorded_rollback_root = validators.get("rollback_root")
+    rollback_hash = validators.get("rollback_bundle_sha256")
+    if (
+        rollback_section.get("path") != str(rollback)
+        or rollback_section.get("artifact_sha256") != _sha256(rollback)
+        or rollback_section.get("manifest_sha256")
+        != _sha256(_physical(backup_manifest.manifest_path_for(rollback), require_file=True))
+    ):
+        raise CutoverAdmissionError("rollback binding mismatch")
+    if not isinstance(recorded_rollback_root, str):
+        raise CutoverAdmissionError("rollback validator root is invalid")
+    rollback_root = _physical(Path(recorded_rollback_root))
+    if not _valid_sha256(rollback_hash) or validator_bundle_sha256(
+        rollback_root
+    ) != rollback_hash:
+        raise CutoverAdmissionError("rollback validator bundle hash mismatch")
+    _run_public_full_validator(
+        rollback_root,
+        rollback,
+        label="rollback FULL",
+    )
+    _run_public_database_validator(
+        rollback_root,
+        installed,
+        label="recovered rollback",
+    )
+    _require_validator_bundle_unchanged(
+        rollback_root,
+        expected_sha256=str(rollback_hash),
+        label="rollback",
+    )
+    return compare_exact_database(rollback, installed, label="recovered rollback")
+
+
+def classify_development_sync_recovery_target(
+    *,
+    receipt_path: Path,
+    expected_receipt_sha256: str,
+    target_path: Path,
+    candidate_validator_root: Path,
+) -> str:
+    """Return candidate/rollback only when the target exactly matches one admitted side."""
+
+    receipt_file = _physical(receipt_path, require_file=True)
+    if not _valid_sha256(expected_receipt_sha256):
+        raise CutoverAdmissionError("trusted admission SHA-256 is invalid")
+    if _sha256(receipt_file) != expected_receipt_sha256.lower():
+        raise CutoverAdmissionError("development sync admission SHA-256 mismatch")
+    receipt = _load_development_sync_admission(receipt_file)
+    target = _physical(target_path, require_file=True)
+    if receipt.get("target_path") != str(target):
+        raise CutoverAdmissionError("development sync target path mismatch")
+    candidate_section = _receipt_section(receipt, "candidate")
+    rollback_section = _receipt_section(receipt, "rollback")
+    validators = _receipt_section(receipt, "validators")
+    candidate_value = candidate_section.get("path")
+    rollback_value = rollback_section.get("path")
+    rollback_root_value = validators.get("rollback_root")
+    if not all(
+        isinstance(value, str)
+        for value in (candidate_value, rollback_value, rollback_root_value)
+    ):
+        raise CutoverAdmissionError("development sync receipt paths are invalid")
+    candidate = _physical(Path(str(candidate_value)), require_file=True)
+    rollback = _physical(Path(str(rollback_value)), require_file=True)
+    candidate_root = _physical(candidate_validator_root)
+    rollback_root = _physical(Path(str(rollback_root_value)))
+    candidate_hash = validators.get("candidate_bundle_sha256")
+    rollback_hash = validators.get("rollback_bundle_sha256")
+    if validators.get("candidate_root") != str(candidate_root):
+        raise CutoverAdmissionError("candidate validator root mismatch")
+    for label, artifact, section in (
+        ("candidate", candidate, candidate_section),
+        ("rollback", rollback, rollback_section),
+    ):
+        if (
+            section.get("artifact_sha256") != _sha256(artifact)
+            or section.get("manifest_sha256")
+            != _sha256(
+                _physical(backup_manifest.manifest_path_for(artifact), require_file=True)
+            )
+        ):
+            raise CutoverAdmissionError(f"{label} binding mismatch")
+    if not _valid_sha256(candidate_hash) or validator_bundle_sha256(
+        candidate_root
+    ) != candidate_hash:
+        raise CutoverAdmissionError("candidate validator bundle hash mismatch")
+    if not _valid_sha256(rollback_hash) or validator_bundle_sha256(
+        rollback_root
+    ) != rollback_hash:
+        raise CutoverAdmissionError("rollback validator bundle hash mismatch")
+    _run_public_full_validator(candidate_root, candidate, label="candidate FULL")
+    _run_public_full_validator(rollback_root, rollback, label="rollback FULL")
+    _require_validator_bundle_unchanged(
+        candidate_root,
+        expected_sha256=str(candidate_hash),
+        label="candidate",
+    )
+    _require_validator_bundle_unchanged(
+        rollback_root,
+        expected_sha256=str(rollback_hash),
+        label="rollback",
+    )
+
+    try:
+        _run_public_database_validator(
+            candidate_root,
+            target,
+            label="recovery target candidate",
+        )
+        compare_exact_database(candidate, target, label="recovery target candidate")
+    except CutoverAdmissionError as candidate_error:
+        try:
+            _run_public_database_validator(
+                rollback_root,
+                target,
+                label="recovery target rollback",
+            )
+            compare_exact_database(rollback, target, label="recovery target rollback")
+        except CutoverAdmissionError as rollback_error:
+            failure = CutoverAdmissionError(
+                "development sync recovery target is neither admitted candidate nor rollback"
+            )
+            failure.add_note(f"candidate comparison: {candidate_error}")
+            failure.add_note(f"rollback comparison: {rollback_error}")
+            raise failure from rollback_error
+        return "rollback"
+    return "candidate"
 
 
 def verify_recovery_install(
@@ -1172,11 +1619,34 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     verify.add_argument("--target", type=Path, required=True)
     verify.add_argument("--friday-validator-root", type=Path, required=True)
     verify.add_argument("--recovery", action="store_true")
+    development = subparsers.add_parser("prepare-development-sync")
+    development.add_argument("--candidate", type=Path, required=True)
+    development.add_argument("--rollback", type=Path, required=True)
+    development.add_argument("--target", type=Path, required=True)
+    development.add_argument("--rollback-validator-root", type=Path, required=True)
+    development.add_argument("--candidate-validator-root", type=Path, required=True)
+    development.add_argument("--trusted-rollback-validator-sha256", required=True)
+    development.add_argument("--trusted-candidate-validator-sha256", required=True)
+    development.add_argument("--output", type=Path, required=True)
+    validator_hash = subparsers.add_parser("hash-validator")
+    validator_hash.add_argument("--root", type=Path, required=True)
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    if args.command == "hash-validator":
+        root = _physical(args.root)
+        print(
+            json.dumps(
+                {
+                    "root": str(root),
+                    "validator_bundle_sha256": validator_bundle_sha256(root),
+                },
+                ensure_ascii=False,
+            )
+        )
+        return 0
     if args.command == "prepare":
         create_admission(
             candidate_path=args.candidate,
@@ -1189,6 +1659,20 @@ def main(argv: list[str] | None = None) -> int:
             output_path=args.output,
         )
         receipt = args.output
+        profile = CUTOVER_PROFILE
+    elif args.command == "prepare-development-sync":
+        create_development_sync_admission(
+            candidate_path=args.candidate,
+            rollback_path=args.rollback,
+            target_path=args.target,
+            rollback_validator_root=args.rollback_validator_root,
+            candidate_validator_root=args.candidate_validator_root,
+            trusted_rollback_validator_sha256=args.trusted_rollback_validator_sha256,
+            trusted_candidate_validator_sha256=args.trusted_candidate_validator_sha256,
+            output_path=args.output,
+        )
+        receipt = args.output
+        profile = DEVELOPMENT_SYNC_PROFILE
     else:
         verify_admission(
             receipt_path=args.receipt,
@@ -1200,11 +1684,12 @@ def main(argv: list[str] | None = None) -> int:
             recovery=args.recovery,
         )
         receipt = args.receipt
+        profile = CUTOVER_PROFILE
     print(
         json.dumps(
             {
                 "status": "ADMITTED",
-                "profile": CUTOVER_PROFILE,
+                "profile": profile,
                 "receipt": str(receipt.resolve()),
                 "receipt_sha256": _sha256(receipt.resolve()),
             },

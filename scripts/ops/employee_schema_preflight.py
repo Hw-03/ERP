@@ -115,6 +115,11 @@ def _policy_from_migration(path: Path) -> MigrationPolicy:
     )
 
 
+def _newline_normalized_bytes(path: Path) -> bytes:
+    """Ignore checkout CRLF/LF differences without ignoring content or encoding changes."""
+    return path.read_bytes().replace(b"\r\n", b"\n")
+
+
 def load_changed_migration_policies(
     source_dir: Path,
     target_dir: Path,
@@ -129,7 +134,7 @@ def load_changed_migration_policies(
         path
         for path in sorted(source_dir.glob("*.py"))
         if not (target_dir / path.name).is_file()
-        or path.read_bytes() != (target_dir / path.name).read_bytes()
+        or _newline_normalized_bytes(path) != _newline_normalized_bytes(target_dir / path.name)
     ]
     if not changed and require_changes:
         raise PreflightPolicyError("schema change has no changed Alembic migration policy")
@@ -197,7 +202,7 @@ def assert_only_nonsemantic_schema_changes(source_backend: Path, target_backend:
     for relative_path in sorted(source_files, key=str):
         source_path = source_files[relative_path]
         target_path = target_files[relative_path]
-        if source_path.read_bytes() == target_path.read_bytes():
+        if _newline_normalized_bytes(source_path) == _newline_normalized_bytes(target_path):
             continue
         if _is_model_python(relative_path) and (
             _python_ast_without_docstrings(source_path) == _python_ast_without_docstrings(target_path)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 import shutil
 import subprocess
@@ -554,6 +555,41 @@ def _fake_data_restore_tool() -> str:
     )
 
 
+def _fake_development_sync_admission_tool() -> str:
+    return textwrap.dedent(
+        """
+        import hashlib
+        import json
+        import os
+        import sys
+        from pathlib import Path
+
+        command = sys.argv[1]
+        with Path(os.environ["SYNC_EVENT_LOG"]).open("a", encoding="utf-8") as handle:
+            handle.write(f"admission-{command}\\n")
+        if command == "hash-validator":
+            root = Path(sys.argv[sys.argv.index("--root") + 1]).resolve()
+            rollback_root = Path(os.environ["FAKE_ROLLBACK_VALIDATOR_ROOT"]).resolve()
+            digest = (
+                os.environ["FAKE_ROLLBACK_VALIDATOR_HASH"]
+                if root == rollback_root
+                else os.environ["FAKE_CANDIDATE_VALIDATOR_HASH"]
+            )
+            print(json.dumps({"root": str(root), "validator_bundle_sha256": digest}))
+            raise SystemExit(0)
+        output = Path(sys.argv[sys.argv.index("--output") + 1]).resolve()
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(b"development-sync-admission")
+        print(json.dumps({
+            "status": "ADMITTED",
+            "profile": "modern-0036-rollback-with-friday-0033-employee-data",
+            "receipt": str(output),
+            "receipt_sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
+        }))
+        """
+    )
+
+
 def _prepare_data_sync_sandbox(
     tmp_path: Path, overrides: dict[str, str]
 ) -> tuple[Path, dict[str, str], Path, Path, Path]:
@@ -562,12 +598,14 @@ def _prepare_data_sync_sandbox(
     event_log = tmp_path / "data-sync-events.log"
     source_db = employee_root / "backend" / "mes.db"
     target_db = dev_root / "backend" / "mes.db"
+    rollback_validator_root = tmp_path / "rollback-validator"
 
     for directory in (
         dev_root / "backend",
         dev_root / "scripts" / "dev",
         dev_root / "scripts" / "ops",
         employee_root / "backend",
+        rollback_validator_root / "scripts" / "ops",
     ):
         directory.mkdir(parents=True, exist_ok=True)
     source_db.write_bytes(b"employee-source")
@@ -614,6 +652,14 @@ def _prepare_data_sync_sandbox(
         _write(dev_root / "scripts" / "dev" / script_name, content)
     _write(dev_root / "scripts" / "ops" / "backup_db.py", _fake_data_backup_tool())
     _write(dev_root / "scripts" / "ops" / "restore_db.py", _fake_data_restore_tool())
+    _write(
+        dev_root / "scripts" / "ops" / "friday_profile_cutover.py",
+        _fake_development_sync_admission_tool(),
+    )
+    _write(
+        rollback_validator_root / "scripts" / "ops" / "backup_db.py",
+        _fake_data_backup_tool(),
+    )
     _write(dev_root / "scripts" / "ops" / "_verify_backup.py", _fake_data_verify_tool("sqlite-fk"))
     _write(
         dev_root / "scripts" / "ops" / "check_inventory_integrity.py",
@@ -661,6 +707,9 @@ def _prepare_data_sync_sandbox(
             "FAKE_PORTS_FREE": "1",
             "FAKE_TARGET_CHANGED_AFTER_BACKUP": "0",
             "FAKE_CANDIDATE_MISSING": "0",
+            "FAKE_ROLLBACK_VALIDATOR_ROOT": str(rollback_validator_root),
+            "FAKE_ROLLBACK_VALIDATOR_HASH": "b" * 64,
+            "FAKE_CANDIDATE_VALIDATOR_HASH": "c" * 64,
         }
     )
     environment.update(overrides)
@@ -1112,9 +1161,126 @@ def test_employee_data_sync_apply_success_uses_safe_order_and_preserves_source(t
     ]
     assert source_db.read_bytes() == original_source
     assert target_db.read_bytes() == b"employee-source|migrated"
-    assert not list((sync_path.parent / "dev" / "_attic" / "runtime" / "employee-data-sync" / "staging").glob("*.db"))
+
+
+def _development_sync_arguments(environment: dict[str, str]) -> list[str]:
+    rollback_root = Path(environment["FAKE_ROLLBACK_VALIDATOR_ROOT"])
+    backup_tool = rollback_root / "scripts" / "ops" / "backup_db.py"
+    return [
+        "-Apply",
+        "-CrossSchemaDevelopmentSync",
+        "-RollbackValidatorRoot",
+        str(rollback_root),
+        "-TrustedRollbackValidatorSha256",
+        environment["FAKE_ROLLBACK_VALIDATOR_HASH"],
+        "-TrustedRollbackBackupToolSha256",
+        hashlib.sha256(backup_tool.read_bytes()).hexdigest(),
+    ]
+
+
+def test_cross_schema_development_sync_pins_tools_and_uses_separate_admission(
+    tmp_path: Path,
+) -> None:
+    sync_path, environment, event_log, source_db, target_db = _prepare_data_sync_sandbox(
+        tmp_path,
+        {},
+    )
+
+    result = _run_data_sync(
+        sync_path,
+        environment,
+        *_development_sync_arguments(environment),
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    events = _event_kinds(event_log)
+    assert events[:2] == ["admission-hash-validator", "admission-hash-validator"]
+    assert "admission-prepare-development-sync" in events
+    assert events.index("backup-target-stopped") < events.index(
+        "admission-prepare-development-sync"
+    ) < events.index("install-stage")
+    assert source_db.read_bytes() == b"employee-source"
+    assert target_db.read_bytes() == b"employee-source|migrated"
+    assert "SYNC_DATA_ADMISSION=" in result.stdout
     assert "SYNC_DATA_RESULT=APPLIED" in result.stdout
-    assert "SYNC_DATA_HEALTH=OK" in result.stdout
+
+
+def test_cross_schema_development_sync_rejects_backup_tool_pin_before_execution(
+    tmp_path: Path,
+) -> None:
+    sync_path, environment, event_log, _, target_db = _prepare_data_sync_sandbox(
+        tmp_path,
+        {},
+    )
+    arguments = _development_sync_arguments(environment)
+    arguments[-1] = "0" * 64
+
+    result = _run_data_sync(sync_path, environment, *arguments)
+
+    assert result.returncode == 2
+    assert not event_log.exists()
+    assert target_db.read_bytes() == b"development-original"
+    assert "SYNC_DATA_RESULT=ROLLBACK_PIN_FAILED" in result.stdout
+
+
+def test_cross_schema_development_sync_install_failure_recovers_and_stays_stopped(
+    tmp_path: Path,
+) -> None:
+    sync_path, environment, event_log, _, target_db = _prepare_data_sync_sandbox(
+        tmp_path,
+        {"FAKE_INSTALL_EXIT": "19"},
+    )
+
+    result = _run_data_sync(
+        sync_path,
+        environment,
+        *_development_sync_arguments(environment),
+    )
+
+    assert result.returncode == 15
+    events = _event_kinds(event_log)
+    assert "rollback-target" in events
+    assert "start-backend" not in events
+    assert "start-frontend" not in events
+    assert target_db.read_bytes() == b"development-original"
+    assert "SYNC_DATA_RECOVERY=SUCCESS" in result.stdout
+    assert "SYNC_DATA_RECOVERY_HEALTH=STOPPED" in result.stdout
+    staging = (
+        sync_path.parent
+        / "dev"
+        / "_attic"
+        / "runtime"
+        / "employee-data-sync"
+        / "staging"
+    )
+    assert not list(staging.glob("*.db"))
+    assert "SYNC_DATA_RESULT=INSTALL_FAILED" in result.stdout
+
+
+def test_cross_schema_development_sync_stop_failure_never_claims_stopped_or_ok(
+    tmp_path: Path,
+) -> None:
+    sync_path, environment, event_log, _, target_db = _prepare_data_sync_sandbox(
+        tmp_path,
+        {"FAKE_STOP_BACKEND_EXIT": "19"},
+    )
+
+    result = _run_data_sync(
+        sync_path,
+        environment,
+        *_development_sync_arguments(environment),
+    )
+
+    assert result.returncode == 14
+    events = _event_kinds(event_log)
+    assert "backup-target-stopped" not in events
+    assert "start-backend" not in events
+    assert "start-frontend" not in events
+    assert target_db.read_bytes() == b"development-original"
+    assert "SYNC_DATA_RECOVERY=NOT_NEEDED" in result.stdout
+    assert "SYNC_DATA_RECOVERY_HEALTH=FAILED" in result.stdout
+    assert "SYNC_DATA_RECOVERY_HEALTH=STOPPED" not in result.stdout
+    assert "SYNC_DATA_RECOVERY_HEALTH=OK" not in result.stdout
 
 
 def test_employee_data_sync_uses_online_backup_and_never_raw_copies_source() -> None:
@@ -1129,6 +1295,44 @@ def test_employee_data_sync_uses_online_backup_and_never_raw_copies_source() -> 
     assert '"--label"' not in script
     assert '"--preverified-rollback"' in script
     assert "finally" in script[script.rindex("try {") :]
+
+
+def test_employee_data_sync_parses_in_windows_powershell_5_with_utf8_bom() -> None:
+    powershell = shutil.which("powershell.exe")
+    if powershell is None:
+        pytest.skip("Windows PowerShell is required")
+    assert DATA_SYNC_SCRIPT.read_bytes().startswith(b"\xef\xbb\xbf")
+    environment = os.environ.copy()
+    environment["PARSE_TARGET"] = str(DATA_SYNC_SCRIPT)
+    command = textwrap.dedent(
+        """
+        $tokens = $null
+        $errors = $null
+        [void] [System.Management.Automation.Language.Parser]::ParseFile(
+            $env:PARSE_TARGET,
+            [ref] $tokens,
+            [ref] $errors
+        )
+        Write-Output "PS_MAJOR=$($PSVersionTable.PSVersion.Major)"
+        foreach ($parseError in $errors) {
+            Write-Error $parseError.Message
+        }
+        if ($errors.Count -ne 0) { exit 1 }
+        """
+    )
+
+    result = subprocess.run(
+        [powershell, "-NoProfile", "-Command", command],
+        env=environment,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        capture_output=True,
+        check=False,
+    )
+
+    assert "PS_MAJOR=5" in result.stdout
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_code_sync_dry_run_reports_machine_readable_no_change(tmp_path: Path) -> None:

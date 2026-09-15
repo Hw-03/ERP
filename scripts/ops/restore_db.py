@@ -56,6 +56,8 @@ STOP_BACKEND = PROJECT_ROOT / "scripts" / "dev" / "stop-backend.ps1"
 POSTGRES_CUTOVER_RECOVERY_CONTRACT = "postgres-cutover-recovery/v1"
 POSTGRES_RESTORE_OPERATION_CONTRACT = "postgres-restore-operation/v1"
 POSTGRES_CLUSTER_RECOVERY_PREFIX = "DEXCOWIN_MES_IC18_RECOVERY:"
+DEVELOPMENT_SYNC_PROJECT_ROOT = Path(r"C:\ERP").resolve()
+DEVELOPMENT_SYNC_TARGET = DEVELOPMENT_SYNC_PROJECT_ROOT / "backend" / "mes.db"
 
 
 def _run(cmd: list[str]) -> None:
@@ -357,6 +359,8 @@ def _resolve_preverified_rollback(
     *,
     friday_cutover_admission: tuple[Path, str] | None = None,
     friday_cutover_recovery: bool = False,
+    development_sync_admission: tuple[Path, str] | None = None,
+    development_sync_recovery: bool = False,
 ) -> Path:
     """Validate an explicit rollback receipt inside the bounded runtime backup set."""
     rollback = Path(path).resolve()
@@ -385,6 +389,26 @@ def _resolve_preverified_rollback(
         except friday_profile_cutover.CutoverAdmissionError as exc:
             print(f"[RESTORE] Friday cutover admission failed: {exc}", file=sys.stderr)
             raise SystemExit(1) from exc
+    elif development_sync_admission is not None and not development_sync_recovery:
+        receipt_path, receipt_sha256 = development_sync_admission
+        try:
+            friday_profile_cutover.verify_development_sync_admission(
+                receipt_path=receipt_path,
+                expected_receipt_sha256=receipt_sha256,
+                candidate_path=restore_source,
+                rollback_path=rollback,
+                target_path=target_path,
+                candidate_validator_root=PROJECT_ROOT,
+            )
+        except friday_profile_cutover.CutoverAdmissionError as exc:
+            print(
+                f"[RESTORE] development sync admission failed: {exc}",
+                file=sys.stderr,
+            )
+            raise SystemExit(1) from exc
+    elif development_sync_admission is not None:
+        # Recovery target classification already authenticated both FULL artifacts.
+        pass
     else:
         result = backup_manifest.verify_sqlite_backup(
             rollback,
@@ -861,6 +885,10 @@ def restore_sqlite(
     friday_cutover_admission_sha256: str | None = None,
     friday_cutover_recovery: bool = False,
     friday_cutover_recovery_output: str | None = None,
+    development_sync_admission: str | None = None,
+    development_sync_admission_sha256: str | None = None,
+    development_sync_recovery: bool = False,
+    allow_development_sync_test_target: bool = False,
 ) -> None:
     original_src = _resolve_sqlite_backup(backup_path)
     dst = Path(target_path).resolve()
@@ -878,10 +906,26 @@ def restore_sqlite(
         Path(friday_cutover_admission).resolve(),
         friday_cutover_admission_sha256,
     ) if friday_cutover_admission and friday_cutover_admission_sha256 else None
+    development_sync_values = (
+        Path(development_sync_admission).resolve(),
+        development_sync_admission_sha256,
+    ) if development_sync_admission and development_sync_admission_sha256 else None
 
     if bool(friday_cutover_admission) != bool(friday_cutover_admission_sha256):
         print(
             "[RESTORE] Friday cutover requires both admission path and SHA-256",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    if bool(development_sync_admission) != bool(development_sync_admission_sha256):
+        print(
+            "[RESTORE] development sync requires both admission path and SHA-256",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    if admission_values is not None and development_sync_values is not None:
+        print(
+            "[RESTORE] Friday cutover and development sync admissions are mutually exclusive",
             file=sys.stderr,
         )
         raise SystemExit(2)
@@ -900,6 +944,37 @@ def restore_sqlite(
             file=sys.stderr,
         )
         raise SystemExit(2)
+    if development_sync_recovery and (
+        development_sync_values is None
+        or run_check
+        or not preverified_rollback
+        or Path(preverified_rollback).resolve() != original_src
+    ):
+        print(
+            "[RESTORE] development sync recovery requires its admission, the admitted "
+            "rollback as source/preverified rollback, and no --check",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    if development_sync_values is not None and (
+        not preverified_rollback
+        or source_integrity_only
+        or structural_rollback
+        or not target_existed_at_start
+    ):
+        print(
+            "[RESTORE] development sync requires an existing target and one FULL "
+            "--preverified-rollback without structural flags",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    if development_sync_values is not None and not allow_development_sync_test_target:
+        if PROJECT_ROOT.resolve() != DEVELOPMENT_SYNC_PROJECT_ROOT or dst != DEVELOPMENT_SYNC_TARGET:
+            print(
+                "[RESTORE] development sync is restricted to C:\\ERP\\backend\\mes.db",
+                file=sys.stderr,
+            )
+            raise SystemExit(2)
     recovery_output = (
         Path(friday_cutover_recovery_output).resolve()
         if friday_cutover_recovery_output
@@ -953,11 +1028,43 @@ def restore_sqlite(
             original_src,
             friday_cutover_admission=admission_values,
             friday_cutover_recovery=friday_cutover_recovery,
+            development_sync_admission=development_sync_values,
+            development_sync_recovery=development_sync_recovery,
         )
 
     if not original_src.exists():
         print(f"[RESTORE] backup file not found: {original_src}", file=sys.stderr)
         raise SystemExit(1)
+
+    development_recovery_target_digest = None
+    if development_sync_recovery:
+        assert development_sync_values is not None
+        receipt_path, receipt_sha256 = development_sync_values
+        development_recovery_target_digest = _sqlite_snapshot_digest(dst)
+        try:
+            recovery_state = friday_profile_cutover.classify_development_sync_recovery_target(
+                receipt_path=receipt_path,
+                expected_receipt_sha256=receipt_sha256,
+                target_path=dst,
+                candidate_validator_root=PROJECT_ROOT,
+            )
+        except friday_profile_cutover.CutoverAdmissionError as exc:
+            print(
+                f"[RESTORE] development sync recovery admission failed: {exc}",
+                file=sys.stderr,
+            )
+            raise SystemExit(1) from exc
+        if _sqlite_snapshot_digest(dst) != development_recovery_target_digest:
+            print(
+                "[RESTORE] development sync recovery target changed during admission",
+                file=sys.stderr,
+            )
+            print("RESTORE_RESULT=TARGET_CHANGED_AFTER_ROLLBACK", file=sys.stderr)
+            raise SystemExit(3)
+        if recovery_state == "rollback":
+            print("[RESTORE] admitted rollback is already installed")
+            print("RESTORE_RESULT=ROLLBACK_ALREADY_PRESENT")
+            return
 
     runtime_check = _requires_runtime_recovery_check(dst)
     if target_existed_at_start and not runtime_check and not offline_target:
@@ -1005,7 +1112,7 @@ def restore_sqlite(
                 else:
                     _verify_sqlite_integrity(src)
                 source_manifest = None
-            elif friday_cutover_recovery:
+            elif friday_cutover_recovery or development_sync_values is not None:
                 source_manifest = None
             else:
                 source_manifest = _verify_sqlite_backup(src)
@@ -1021,6 +1128,8 @@ def restore_sqlite(
                     original_src,
                     friday_cutover_admission=admission_values,
                     friday_cutover_recovery=friday_cutover_recovery,
+                    development_sync_admission=development_sync_values,
+                    development_sync_recovery=development_sync_recovery,
                 )
 
             expected_target_digest = None
@@ -1033,15 +1142,21 @@ def restore_sqlite(
                     )
                 print(f"[RESTORE] current DB rollback: {snapshot}")
                 print(f"ROLLBACK_PATH={snapshot.resolve()}")
-                expected_target_digest = _sqlite_snapshot_digest(dst)
+                expected_target_digest = (
+                    development_recovery_target_digest
+                    if development_recovery_target_digest is not None
+                    else _sqlite_snapshot_digest(dst)
+                )
                 if snapshot.resolve() != original_src.resolve():
-                    if admission_values is not None:
+                    if admission_values is not None or development_sync_values is not None:
                         snapshot = _resolve_preverified_rollback(
                             preverified_rollback,
                             dst,
                             original_src,
                             friday_cutover_admission=admission_values,
                             friday_cutover_recovery=friday_cutover_recovery,
+                            development_sync_admission=development_sync_values,
+                            development_sync_recovery=development_sync_recovery,
                         )
                         if _sqlite_snapshot_digest(snapshot) != expected_target_digest:
                             print(
@@ -1079,7 +1194,24 @@ def restore_sqlite(
                             )
 
             def verify_installed_target(verification_target: Path) -> None:
-                if friday_cutover_recovery:
+                if development_sync_values is not None:
+                    receipt_path, receipt_sha256 = development_sync_values
+                    if development_sync_recovery:
+                        friday_profile_cutover.verify_development_sync_recovery_install(
+                            receipt_path=receipt_path,
+                            expected_receipt_sha256=receipt_sha256,
+                            rollback_path=original_src,
+                            installed_path=verification_target,
+                        )
+                    else:
+                        friday_profile_cutover.verify_development_sync_install(
+                            receipt_path=receipt_path,
+                            expected_receipt_sha256=receipt_sha256,
+                            candidate_path=original_src,
+                            installed_path=verification_target,
+                            candidate_validator_root=PROJECT_ROOT,
+                        )
+                elif friday_cutover_recovery:
                     assert admission_values is not None
                     receipt_path, receipt_sha256 = admission_values
                     friday_profile_cutover.verify_recovery_install(
@@ -1122,6 +1254,24 @@ def restore_sqlite(
                     )
 
             def verify_staged_candidate(staged_candidate: Path) -> None:
+                if development_sync_values is not None:
+                    receipt_path, receipt_sha256 = development_sync_values
+                    if development_sync_recovery:
+                        friday_profile_cutover.verify_development_sync_recovery_install(
+                            receipt_path=receipt_path,
+                            expected_receipt_sha256=receipt_sha256,
+                            rollback_path=original_src,
+                            installed_path=staged_candidate,
+                        )
+                    else:
+                        friday_profile_cutover.verify_development_sync_install(
+                            receipt_path=receipt_path,
+                            expected_receipt_sha256=receipt_sha256,
+                            candidate_path=original_src,
+                            installed_path=staged_candidate,
+                            candidate_validator_root=PROJECT_ROOT,
+                        )
+                    return
                 if not friday_cutover_recovery:
                     return
                 assert admission_values is not None
@@ -1143,7 +1293,9 @@ def restore_sqlite(
                 expected_target_absent=not target_existed_at_start,
                 expected_absent_sidecar_digests=expected_absent_sidecar_digests,
                 candidate_check=(
-                    verify_staged_candidate if friday_cutover_recovery else None
+                    verify_staged_candidate
+                    if friday_cutover_recovery or development_sync_values is not None
+                    else None
                 ),
                 postcheck=verify_installed_target,
             )
@@ -2888,6 +3040,19 @@ def parse_args() -> argparse.Namespace:
         help="Exclusive PASS receipt written after writer-fenced modern recovery post-check",
     )
     parser.add_argument(
+        "--development-sync-admission",
+        help="Pinned admission for unlike employee candidate and development rollback data",
+    )
+    parser.add_argument(
+        "--development-sync-admission-sha256",
+        help="Externally pinned SHA-256 of the development sync admission receipt",
+    )
+    parser.add_argument(
+        "--development-sync-recovery",
+        action="store_true",
+        help="Recover the admitted development rollback and leave service lifecycle to the caller",
+    )
+    parser.add_argument(
         "--source-integrity-only",
         action="store_true",
         help="Allow a structurally valid legacy SQLite source only for a new pre-migration candidate",
@@ -2936,6 +3101,9 @@ def main() -> int:
             friday_cutover_admission_sha256=args.friday_cutover_admission_sha256,
             friday_cutover_recovery=args.friday_cutover_recovery,
             friday_cutover_recovery_output=args.friday_cutover_recovery_output,
+            development_sync_admission=args.development_sync_admission,
+            development_sync_admission_sha256=args.development_sync_admission_sha256,
+            development_sync_recovery=args.development_sync_recovery,
         )
     elif args.postgres:
         if (
@@ -2946,6 +3114,9 @@ def main() -> int:
             or args.friday_cutover_admission_sha256
             or args.friday_cutover_recovery
             or args.friday_cutover_recovery_output
+            or args.development_sync_admission
+            or args.development_sync_admission_sha256
+            or args.development_sync_recovery
         ):
             print("[RESTORE] structural SQLite flags are not valid for PostgreSQL", file=sys.stderr)
             return 2

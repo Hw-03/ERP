@@ -400,6 +400,24 @@ def _create_admission(tmp_path: Path, inputs: dict[str, Path | str]) -> Path:
     return receipt
 
 
+def _create_development_sync_admission(
+    tmp_path: Path,
+    inputs: dict[str, Path | str],
+) -> Path:
+    receipt = tmp_path / "development-sync-admission.json"
+    cutover.create_development_sync_admission(
+        candidate_path=Path(inputs["candidate"]),
+        rollback_path=Path(inputs["rollback"]),
+        target_path=Path(inputs["target"]),
+        rollback_validator_root=Path(inputs["modern_root"]),
+        candidate_validator_root=Path(inputs["friday_root"]),
+        trusted_rollback_validator_sha256=str(inputs["modern_hash"]),
+        trusted_candidate_validator_sha256=str(inputs["friday_hash"]),
+        output_path=receipt,
+    )
+    return receipt
+
+
 @pytest.mark.parametrize(
     "relative_path",
     (
@@ -465,6 +483,204 @@ def test_admission_requires_pinned_full_validators_and_actual_conversion_equalit
         ("shipping_request_events", "actor_name"),
         ("stock_requests", "request_fingerprint"),
     }
+
+
+def test_development_sync_admission_allows_different_business_data_without_conversion(
+    tmp_path: Path,
+) -> None:
+    inputs = _prepare_inputs(tmp_path)
+    candidate = Path(inputs["candidate"])
+    with sqlite3.connect(candidate) as connection:
+        connection.execute(
+            "UPDATE inventory SET warehouse_qty=12 WHERE item_id=?",
+            (ITEM_ID,),
+        )
+    _write_manifest(
+        candidate,
+        revision=cutover.FRIDAY_REVISION,
+        profile=cutover.FRIDAY_PROFILE,
+    )
+
+    receipt = _create_development_sync_admission(tmp_path, inputs)
+    receipt_hash = hashlib.sha256(receipt.read_bytes()).hexdigest()
+    result = cutover.verify_development_sync_admission(
+        receipt_path=receipt,
+        expected_receipt_sha256=receipt_hash,
+        candidate_path=candidate,
+        rollback_path=Path(inputs["rollback"]),
+        target_path=Path(inputs["target"]),
+        candidate_validator_root=Path(inputs["friday_root"]),
+    )
+
+    assert result["contract"] == cutover.DEVELOPMENT_SYNC_CONTRACT
+    assert result["profile"] == cutover.DEVELOPMENT_SYNC_PROFILE
+    assert result["validation"] == {
+        "candidate_full": "PASS",
+        "rollback_full": "PASS",
+        "rollback_freshness": "PASS",
+    }
+    assert "conversion" not in result
+
+
+def test_development_sync_admission_rejects_stale_rollback_target(
+    tmp_path: Path,
+) -> None:
+    inputs = _prepare_inputs(tmp_path)
+    receipt = _create_development_sync_admission(tmp_path, inputs)
+    target = Path(inputs["target"])
+    with sqlite3.connect(target) as connection:
+        connection.execute("UPDATE data_revision SET revision=8 WHERE id=1")
+
+    with pytest.raises(
+        cutover.CutoverAdmissionError,
+        match="rollback FULL freshness FULL validation failed",
+    ):
+        cutover.verify_development_sync_admission(
+            receipt_path=receipt,
+            expected_receipt_sha256=hashlib.sha256(receipt.read_bytes()).hexdigest(),
+            candidate_path=Path(inputs["candidate"]),
+            rollback_path=Path(inputs["rollback"]),
+            target_path=target,
+            candidate_validator_root=Path(inputs["friday_root"]),
+        )
+
+
+def test_development_sync_cli_prepares_pinned_receipt(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    inputs = _prepare_inputs(tmp_path)
+    receipt = tmp_path / "development-sync-cli.json"
+
+    assert cutover.main(
+        [
+            "prepare-development-sync",
+            "--candidate",
+            str(inputs["candidate"]),
+            "--rollback",
+            str(inputs["rollback"]),
+            "--target",
+            str(inputs["target"]),
+            "--rollback-validator-root",
+            str(inputs["modern_root"]),
+            "--candidate-validator-root",
+            str(inputs["friday_root"]),
+            "--trusted-rollback-validator-sha256",
+            str(inputs["modern_hash"]),
+            "--trusted-candidate-validator-sha256",
+            str(inputs["friday_hash"]),
+            "--output",
+            str(receipt),
+        ]
+    ) == 0
+
+    output = json.loads(capsys.readouterr().out.strip())
+    assert output["status"] == "ADMITTED"
+    assert output["profile"] == cutover.DEVELOPMENT_SYNC_PROFILE
+    assert output["receipt"] == str(receipt.resolve())
+    assert output["receipt_sha256"] == hashlib.sha256(receipt.read_bytes()).hexdigest()
+
+
+def test_validator_hash_cli_reports_trusted_bundle_without_executing_it(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    root = _create_validator_root(tmp_path / "validator", cutover.MODERN_REVISION)
+
+    assert cutover.main(["hash-validator", "--root", str(root)]) == 0
+
+    output = json.loads(capsys.readouterr().out.strip())
+    assert output == {
+        "root": str(root.resolve()),
+        "validator_bundle_sha256": cutover.validator_bundle_sha256(root),
+    }
+
+
+def test_development_sync_postchecks_compare_each_installed_same_schema_source(
+    tmp_path: Path,
+) -> None:
+    inputs = _prepare_inputs(tmp_path)
+    candidate = Path(inputs["candidate"])
+    rollback = Path(inputs["rollback"])
+    target = Path(inputs["target"])
+    with sqlite3.connect(candidate) as connection:
+        connection.execute(
+            "UPDATE inventory SET warehouse_qty=12 WHERE item_id=?",
+            (ITEM_ID,),
+        )
+    _write_manifest(
+        candidate,
+        revision=cutover.FRIDAY_REVISION,
+        profile=cutover.FRIDAY_PROFILE,
+    )
+    receipt = _create_development_sync_admission(tmp_path, inputs)
+    receipt_hash = hashlib.sha256(receipt.read_bytes()).hexdigest()
+
+    shutil.copy2(candidate, target)
+    candidate_hash = cutover.verify_development_sync_install(
+        receipt_path=receipt,
+        expected_receipt_sha256=receipt_hash,
+        candidate_path=candidate,
+        installed_path=target,
+        candidate_validator_root=Path(inputs["friday_root"]),
+    )
+    assert candidate_hash == cutover.compare_exact_database(candidate, target)
+
+    shutil.copy2(rollback, target)
+    rollback_hash = cutover.verify_development_sync_recovery_install(
+        receipt_path=receipt,
+        expected_receipt_sha256=receipt_hash,
+        rollback_path=rollback,
+        installed_path=target,
+    )
+    assert rollback_hash == cutover.compare_exact_database(rollback, target)
+
+    with sqlite3.connect(target) as connection:
+        connection.execute("UPDATE data_revision SET revision=9 WHERE id=1")
+    with pytest.raises(cutover.CutoverAdmissionError, match="recovered rollback data"):
+        cutover.verify_development_sync_recovery_install(
+            receipt_path=receipt,
+            expected_receipt_sha256=receipt_hash,
+            rollback_path=rollback,
+            installed_path=target,
+        )
+
+
+def test_development_sync_recovery_classifies_only_exact_candidate_or_rollback(
+    tmp_path: Path,
+) -> None:
+    inputs = _prepare_inputs(tmp_path)
+    receipt = _create_development_sync_admission(tmp_path, inputs)
+    receipt_hash = hashlib.sha256(receipt.read_bytes()).hexdigest()
+    target = Path(inputs["target"])
+
+    assert cutover.classify_development_sync_recovery_target(
+        receipt_path=receipt,
+        expected_receipt_sha256=receipt_hash,
+        target_path=target,
+        candidate_validator_root=Path(inputs["friday_root"]),
+    ) == "rollback"
+
+    shutil.copy2(Path(inputs["candidate"]), target)
+    assert cutover.classify_development_sync_recovery_target(
+        receipt_path=receipt,
+        expected_receipt_sha256=receipt_hash,
+        target_path=target,
+        candidate_validator_root=Path(inputs["friday_root"]),
+    ) == "candidate"
+
+    with sqlite3.connect(target) as connection:
+        connection.execute("UPDATE data_revision SET revision=9 WHERE id=1")
+    with pytest.raises(
+        cutover.CutoverAdmissionError,
+        match="neither admitted candidate nor rollback",
+    ):
+        cutover.classify_development_sync_recovery_target(
+            receipt_path=receipt,
+            expected_receipt_sha256=receipt_hash,
+            target_path=target,
+            candidate_validator_root=Path(inputs["friday_root"]),
+        )
 
 
 def test_conversion_rejects_unapproved_source_only_table(tmp_path: Path) -> None:
@@ -982,6 +1198,173 @@ def test_restore_profile_requires_a_full_preverified_rollback_pair(tmp_path: Pat
             offline_target=True,
             friday_cutover_admission=str(receipt),
             friday_cutover_admission_sha256=hashlib.sha256(receipt.read_bytes()).hexdigest(),
+        )
+
+
+def test_development_sync_restore_rejects_noncanonical_target_without_test_opt_in(
+    tmp_path: Path,
+) -> None:
+    inputs = _prepare_inputs(tmp_path)
+    receipt = _create_development_sync_admission(tmp_path, inputs)
+
+    with pytest.raises(SystemExit, match="2"):
+        restore_db.restore_sqlite(
+            str(inputs["candidate"]),
+            str(inputs["target"]),
+            run_check=False,
+            preverified_rollback=str(inputs["rollback"]),
+            offline_target=True,
+            development_sync_admission=str(receipt),
+            development_sync_admission_sha256=hashlib.sha256(
+                receipt.read_bytes()
+            ).hexdigest(),
+        )
+
+
+def test_restore_cli_exposes_development_sync_without_test_target_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "restore_db.py",
+            "--sqlite",
+            "candidate.db",
+            "--preverified-rollback",
+            "rollback.db",
+            "--development-sync-admission",
+            "admission.json",
+            "--development-sync-admission-sha256",
+            "a" * 64,
+            "--development-sync-recovery",
+        ],
+    )
+
+    args = restore_db.parse_args()
+
+    assert args.development_sync_admission == "admission.json"
+    assert args.development_sync_admission_sha256 == "a" * 64
+    assert args.development_sync_recovery is True
+    assert not hasattr(args, "allow_development_sync_test_target")
+
+
+def test_development_sync_restore_installs_candidate_and_recovers_original(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inputs = _prepare_inputs(tmp_path)
+    candidate = Path(inputs["candidate"])
+    rollback = Path(inputs["rollback"])
+    target = Path(inputs["target"])
+    with sqlite3.connect(candidate) as connection:
+        connection.execute(
+            "UPDATE inventory SET warehouse_qty=12 WHERE item_id=?",
+            (ITEM_ID,),
+        )
+    _write_manifest(
+        candidate,
+        revision=cutover.FRIDAY_REVISION,
+        profile=cutover.FRIDAY_PROFILE,
+    )
+    receipt = _create_development_sync_admission(tmp_path, inputs)
+    receipt_hash = hashlib.sha256(receipt.read_bytes()).hexdigest()
+    original_hash = _database_hash(rollback)
+    monkeypatch.setenv("MES_RUNTIME_ROOT", str(tmp_path / "runtime"))
+    monkeypatch.setattr(restore_db, "PROJECT_ROOT", Path(inputs["friday_root"]))
+
+    restore_db.restore_sqlite(
+        str(candidate),
+        str(target),
+        run_check=False,
+        preverified_rollback=str(rollback),
+        offline_target=True,
+        development_sync_admission=str(receipt),
+        development_sync_admission_sha256=receipt_hash,
+        allow_development_sync_test_target=True,
+    )
+    assert _database_hash(target) == _database_hash(candidate)
+
+    restore_db.restore_sqlite(
+        str(rollback),
+        str(target),
+        run_check=False,
+        preverified_rollback=str(rollback),
+        offline_target=True,
+        development_sync_admission=str(receipt),
+        development_sync_admission_sha256=receipt_hash,
+        development_sync_recovery=True,
+        allow_development_sync_test_target=True,
+    )
+    assert _database_hash(target) == original_hash
+
+
+def test_development_sync_recovery_does_not_rewrite_existing_rollback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inputs = _prepare_inputs(tmp_path)
+    receipt = _create_development_sync_admission(tmp_path, inputs)
+    monkeypatch.setenv("MES_RUNTIME_ROOT", str(tmp_path / "runtime"))
+    monkeypatch.setattr(restore_db, "PROJECT_ROOT", Path(inputs["friday_root"]))
+    monkeypatch.setattr(
+        restore_db,
+        "_replace_sqlite_atomically",
+        lambda *_args, **_kwargs: pytest.fail("already-restored target must not be rewritten"),
+    )
+
+    restore_db.restore_sqlite(
+        str(inputs["rollback"]),
+        str(inputs["target"]),
+        run_check=False,
+        preverified_rollback=str(inputs["rollback"]),
+        offline_target=True,
+        development_sync_admission=str(receipt),
+        development_sync_admission_sha256=hashlib.sha256(
+            receipt.read_bytes()
+        ).hexdigest(),
+        development_sync_recovery=True,
+        allow_development_sync_test_target=True,
+    )
+
+
+def test_development_sync_recovery_rejects_target_change_after_classification(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inputs = _prepare_inputs(tmp_path)
+    receipt = _create_development_sync_admission(tmp_path, inputs)
+    target = Path(inputs["target"])
+    shutil.copy2(Path(inputs["candidate"]), target)
+    monkeypatch.setenv("MES_RUNTIME_ROOT", str(tmp_path / "runtime"))
+    monkeypatch.setattr(restore_db, "PROJECT_ROOT", Path(inputs["friday_root"]))
+    original_classifier = cutover.classify_development_sync_recovery_target
+
+    def classify_then_mutate(**kwargs: object) -> str:
+        state = original_classifier(**kwargs)  # type: ignore[arg-type]
+        with sqlite3.connect(target) as connection:
+            connection.execute("UPDATE data_revision SET revision=9 WHERE id=1")
+        return state
+
+    monkeypatch.setattr(
+        cutover,
+        "classify_development_sync_recovery_target",
+        classify_then_mutate,
+    )
+
+    with pytest.raises(SystemExit, match="3"):
+        restore_db.restore_sqlite(
+            str(inputs["rollback"]),
+            str(target),
+            run_check=False,
+            preverified_rollback=str(inputs["rollback"]),
+            offline_target=True,
+            development_sync_admission=str(receipt),
+            development_sync_admission_sha256=hashlib.sha256(
+                receipt.read_bytes()
+            ).hexdigest(),
+            development_sync_recovery=True,
+            allow_development_sync_test_target=True,
         )
 
 
