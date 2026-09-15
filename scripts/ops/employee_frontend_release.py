@@ -672,7 +672,7 @@ def _require_employee_database_binding(employee: Path, database: Path) -> None:
     )
     try:
         result = subprocess.run(
-            ["py", "-B", "-c", command],
+            [sys.executable, "-B", "-c", command],
             cwd=backend,
             env=os.environ.copy(),
             capture_output=True,

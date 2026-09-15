@@ -403,7 +403,6 @@ param([string] $RuntimeRepoRoot)
     assert release._require_employee_runtime(employee) == _profile(employee.resolve())
 
 
-@pytest.mark.skipif(os.name != "nt", reason="Windows Python launcher contract")
 def test_effective_backend_database_must_be_the_canonical_employee_database(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -428,6 +427,42 @@ DATABASE_URL = os.getenv(
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{alternate.as_posix()}")
     with pytest.raises(release.ReleaseError, match="canonical employee database"):
         release._require_employee_database_binding(employee, database)
+
+
+def test_database_binding_uses_the_current_python_interpreter(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    employee, _record, database = _fixture(tmp_path)
+    module = employee / "backend" / "app" / "database.py"
+    _write(module, "DATABASE_URL = 'sqlite:///mes.db'")
+    selected_python = str(tmp_path / "selected-python")
+    commands: list[list[str]] = []
+
+    def record_command(
+        command: list[str],
+        **_kwargs: object,
+    ) -> release.subprocess.CompletedProcess[str]:
+        commands.append(command)
+        return release.subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=json.dumps(
+                {
+                    "module": str(module.resolve()),
+                    "backend": "sqlite",
+                    "path": str(database.resolve()),
+                }
+            ),
+            stderr="",
+        )
+
+    monkeypatch.setattr(release.sys, "executable", selected_python)
+    monkeypatch.setattr(release.subprocess, "run", record_command)
+
+    release._require_employee_database_binding(employee, database)
+
+    assert commands[0][0] == selected_python
 
 
 def test_activation_rejects_installed_frontend_drift_before_writer_fence(
