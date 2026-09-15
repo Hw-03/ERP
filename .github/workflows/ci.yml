@@ -89,7 +89,9 @@ jobs:
 
       - name: Run ops profile contract tests
         working-directory: backend
-        run: pytest tests/ops/test_runtime_paths.py -q -k "profile_resolver_test_root or ops_batches_treat_a_fake_http_503_as_failure_before_success_flow"
+        run: |
+          pytest tests/ops/test_runtime_paths.py -q -k "profile_resolver_test_root or ops_batches_treat_a_fake_http_503_as_failure_before_success_flow"
+          pytest tests/ops/test_employee_release_activation.py -q -k "employee_runtime_profile_is_resolved_by_the_installed_fixed_script or effective_backend_database_must_be_the_canonical_employee_database"
 
   frontend:
     name: Frontend (lint + tsc + vitest+coverage + build)

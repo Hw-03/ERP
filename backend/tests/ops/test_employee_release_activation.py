@@ -376,6 +376,7 @@ def test_activation_rejects_wrong_profile_or_unbound_journal_before_lock(
     _writer_is_available(database)
 
 
+@pytest.mark.skipif(os.name != "nt", reason="Windows PowerShell launcher contract")
 def test_employee_runtime_profile_is_resolved_by_the_installed_fixed_script(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -402,6 +403,7 @@ param([string] $RuntimeRepoRoot)
     assert release._require_employee_runtime(employee) == _profile(employee.resolve())
 
 
+@pytest.mark.skipif(os.name != "nt", reason="Windows Python launcher contract")
 def test_effective_backend_database_must_be_the_canonical_employee_database(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
