@@ -122,10 +122,19 @@ describe("formatDefectReason", () => {
 });
 describe("historyPresentation", () => {
   it("uses menu-level labels in the list while retaining the detailed movement elsewhere", () => {
+    expect(getHistoryListOperationLabel(makeLog({ transaction_type: "PRODUCE" }))).toBe("생산 입고");
+    expect(getHistoryListOperationLabel(
+      makeLog({ transaction_type: "PRODUCE" }),
+      makeBatch({ work_type: "process", sub_type: "produce" }),
+    )).toBe("생산 입고");
+    expect(getHistoryListOperationLabel(
+      makeLog({ transaction_type: "PRODUCE" }),
+      makeBatch({ work_type: "process", sub_type: "disassemble" }),
+    )).toBe("분해 출고");
     expect(getHistoryListOperationLabel(makeLog({ transaction_type: "ADJUST" }))).toBe("부서 입출고");
     expect(getHistoryListOperationLabel(
       makeLog({ transaction_type: "ADJUST", department: "창고" }),
-    )).toBe("수량 조정");
+    )).toBe("창고 수량 조정");
     expect(getHistoryListOperationLabel(
       makeLog({ transaction_type: "DISASSEMBLE", reference_no: "defect-disassemble:1" }),
     )).toBe("재작업");
@@ -133,6 +142,18 @@ describe("historyPresentation", () => {
       makeLog({ transaction_type: "SHIP", shipping_phase: "PICKUP" }),
     )).toBe("출하");
     expect(getHistoryListOperationLabel(makeLog({ transaction_type: "UNMARK_DEFECTIVE" }))).toBe("불량 정상 복귀");
+  });
+
+  it("목록의 사내 사용처와 취소 여부를 짧게 표시한다", () => {
+    const log = makeLog({ transaction_type: "INTERNAL_USE" });
+    const asBatch = makeBatch({ work_type: "internal_use", sub_type: "internal_use_out", to_department: "AS" });
+    const researchBatch = makeBatch({ work_type: "internal_use", sub_type: "internal_use_out", to_department: "연구" });
+
+    expect(getHistoryListOperationLabel({ ...log, department: "AS" })).toBe("AS 사용");
+    expect(getHistoryListOperationLabel({ ...log, department: "연구" }, researchBatch)).toBe("연구소 사용");
+    expect(getHistoryListOperationLabel({ ...log, department: "AS", operation_kind: "CANCELLATION" }, asBatch)).toBe("AS 사용 취소");
+    expect(getHistoryListOperationLabel({ ...log, department: "연구", operation_kind: "CANCELLATION" }, researchBatch)).toBe("연구소 사용 취소");
+    expect(getHistoryListOperationLabel({ ...log, department: null })).toBe("AS·연구 사용");
   });
 
   it("internal use의 stock 표시는 창고 수량을 우선 사용한다", () => {
@@ -462,6 +483,16 @@ describe("historyPresentation", () => {
       "batch",
     )).toEqual({ label: "단품 출고", tone: "muted" });
   });
+
+  it.each(["TRANSFER_TO_PROD", "TRANSFER_TO_WH", "TRANSFER_DEPT"] as const)(
+    "labels %s batch children as moved items",
+    (transactionType) => {
+      expect(getReferenceBatchLinePresentation(
+        makeLog({ transaction_type: transactionType }),
+        "batch",
+      )).toEqual({ label: "이동 품목", tone: "muted" });
+    },
+  );
 
   it("uses the prepare completer as the shipping history actor", () => {
     const row = getHistoryRowPresentation(makeLog({

@@ -92,16 +92,40 @@ def build_display_groups(
     for log in logs:
         if log.operation_id:
             operations.setdefault(log.operation_id, []).append(log)
-        elif log.operation_batch_id:
+        if log.operation_batch_id:
             op_batches.setdefault(log.operation_batch_id, []).append(log)
         elif log.reference_no:
             reference_batches.setdefault(_reference_group_key(log), []).append(log)
+
+    grouped_operation_batch_ids = {
+        batch_id
+        for batch_id, batch_logs in op_batches.items()
+        if any(log.operation_id is None for log in batch_logs)
+        or (
+            len({log.operation_id for log in batch_logs if log.operation_id}) > 1
+            and all(log.operation_kind == "BUSINESS" for log in batch_logs)
+            and all(log.operation_effective_status == "active" for log in batch_logs)
+        )
+    }
 
     groups: list[TransactionDisplayGroupResponse] = []
     seen_operation_batches: set[uuid.UUID] = set()
     seen_operations: set[uuid.UUID] = set()
     seen_reference_batches: set[str] = set()
     for log in logs:
+        if log.operation_batch_id is not None and log.operation_batch_id in grouped_operation_batch_ids:
+            batch_id = log.operation_batch_id
+            if batch_id in seen_operation_batches:
+                continue
+            seen_operation_batches.add(batch_id)
+            groups.append(
+                TransactionDisplayGroupResponse(
+                    type="op_batch",
+                    key=str(batch_id),
+                    logs=op_batches[batch_id],
+                )
+            )
+            continue
         if log.operation_id:
             if log.operation_id in seen_operations:
                 continue

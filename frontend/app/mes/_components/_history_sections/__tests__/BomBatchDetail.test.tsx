@@ -202,7 +202,7 @@ beforeEach(() => {
 });
 
 describe("BomBatchDetail", () => {
-  it("커스텀 BOM 이력은 실행되지 않은 상위의 수량 문구를 목록에서 숨긴다", () => {
+  it("커스텀 BOM 이력은 실행되지 않은 상위를 숨기고 낱개 수량보정으로 표시한다", () => {
     const batch = makeBatch();
     batch.bundles[0].lines[0] = {
       ...batch.bundles[0].lines[0],
@@ -224,10 +224,9 @@ describe("BomBatchDetail", () => {
       <table><tbody><BomBatchDetail batchId={batch.batch_id} colSpan={8} cache={new Map([[batch.batch_id, batch]])} onCached={vi.fn()} logs={[childLog]} /></tbody></table>,
     );
 
-    const parentRow = screen.getByText("아주 긴 완제품 구성 묶음 이름").closest("tr");
-    expect(parentRow).not.toBeNull();
-    expect(within(parentRow!).queryByText("상위 미반영")).not.toBeInTheDocument();
-    expect(within(parentRow!).queryByText("+1 EA")).not.toBeInTheDocument();
+    expect(screen.getByText("수량보정 입고")).toBeInTheDocument();
+    expect(screen.queryByText("아주 긴 완제품 구성 묶음 이름")).not.toBeInTheDocument();
+    expect(screen.queryByText("상위 미반영")).not.toBeInTheDocument();
   });
 
   it("단품 출고는 실행 로그의 감소 부호와 재고 스냅샷을 함께 표시한다", () => {

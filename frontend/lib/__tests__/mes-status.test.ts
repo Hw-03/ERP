@@ -112,8 +112,8 @@ describe("transactionColor", () => {
     expect(transactionColor("TRANSFER_DEPT")).toBe(LEGACY_COLORS.blue);
   });
 
-  it("위험 거래 → red", () => {
-    expect(transactionColor("SHIP")).toBe(LEGACY_COLORS.red);
+  it("출하는 purple, 위험 거래는 red", () => {
+    expect(transactionColor("SHIP")).toBe(LEGACY_COLORS.purple);
     expect(transactionColor("MARK_DEFECTIVE")).toBe(LEGACY_COLORS.red);
     // history-rework-color-2026-05-15: DISASSEMBLE("재작업") 은 되돌림 성격이라 red 로 격상.
     expect(transactionColor("DISASSEMBLE")).toBe(LEGACY_COLORS.red);

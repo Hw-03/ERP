@@ -17,6 +17,7 @@ import {
   getHistoryBomParentLine,
   getDisplayBundles,
   getHistoryLineExecutionLog,
+  isCustomBomSingleAdjustmentBatch,
   isManualOnlyProductionBatch,
 } from "./historyBatchInterpreter";
 import {
@@ -166,24 +167,29 @@ export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact, hig
 function getAdjustmentDisplayBundles(batch: IoBatch): IoBundle[] {
   const bundles = getDisplayBundles(batch);
   const isLegacyAdjustmentIn = isManualOnlyProductionBatch(batch);
+  const isCustomBomAdjustment = isCustomBomSingleAdjustmentBatch(batch);
   const isMultiItemAdjustment = (
     batch.sub_type === "adjust_in"
     || batch.sub_type === "adjust_out"
     || batch.sub_type === "warehouse_adjust_in"
     || batch.sub_type === "warehouse_adjust_out"
     || isLegacyAdjustmentIn
+    || isCustomBomAdjustment
   )
-    && bundles.length > 1;
+    && (bundles.length > 1 || isCustomBomAdjustment);
 
   if (!isMultiItemAdjustment) return bundles;
 
-  const lines = bundles.flatMap((bundle) => bundle.lines.map((line) => ({ ...line })));
+  const lines = bundles.flatMap((bundle) => bundle.lines
+    .filter((line) => !isCustomBomAdjustment || line.included)
+    .map((line) => ({ ...line })));
   return [{
     bundle_id: `history-adjustment-${batch.batch_id}`,
     source_kind: "manual",
     title: batch.sub_type === "adjust_in"
       || batch.sub_type === "warehouse_adjust_in"
       || isLegacyAdjustmentIn
+      || (isCustomBomAdjustment && batch.sub_type === "produce")
       ? "수량보정 입고"
       : batch.sub_type === "warehouse_adjust_out"
         ? "수량보정 출고"

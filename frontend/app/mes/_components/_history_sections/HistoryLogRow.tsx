@@ -32,9 +32,11 @@ type Props = {
   separationHint?: string | null;
   toggleLabel?: string;
   additionalItemCount?: number;
+  displayType?: TransactionLog["transaction_type"];
+  operationLabel?: string;
 };
 
-function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, controlsId, separationHint, toggleLabel, additionalItemCount }: Props) {
+function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, controlsId, separationHint, toggleLabel, additionalItemCount, displayType, operationLabel }: Props) {
   const [hovered, setHovered] = useState(false);
   const padX = "px-4";
   const targetPadX = "px-4";
@@ -43,7 +45,8 @@ function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, contro
   const presentation = separationHint
     ? { ...basePresentation, statusChips: [...basePresentation.statusChips, { label: separationHint, tone: "muted" as const }] }
     : basePresentation;
-  const tcolor = isReworkOperation(log) ? LEGACY_COLORS.red : transactionColor(log.transaction_type);
+  const badgeType = displayType ?? log.transaction_type;
+  const tcolor = isReworkOperation(log) ? LEGACY_COLORS.red : transactionColor(badgeType);
 
   const rowBackground = selected
     ? tint(tcolor, hovered ? 18 : 10)
@@ -92,7 +95,7 @@ function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, contro
         </div>
       </td>
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${padX} text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
-        <FlowBadge type={log.transaction_type} label={getHistoryListOperationLabel(log)} color={tcolor} />
+        <FlowBadge type={badgeType} label={operationLabel ?? getHistoryListOperationLabel(log)} color={tcolor} />
       </td>
       <td className={`${HISTORY_MAIN_CELL_CLASS} ${targetPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <TargetSummaryBlock

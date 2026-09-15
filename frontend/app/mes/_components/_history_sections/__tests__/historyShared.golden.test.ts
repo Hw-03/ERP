@@ -356,6 +356,76 @@ describe("getHistoryFlowLabel", () => {
 // getBatchFlowEndpoints
 // ──────────────────────────────────────────────────────────────────
 describe("getBatchFlowEndpoints", () => {
+  it.each([
+    {
+      subType: "produce" as const,
+      direction: "in" as const,
+      fromBucket: "none" as const,
+      toBucket: "production" as const,
+      fromDepartment: null,
+      toDepartment: "조립",
+      expectedLabel: "수량보정 입고",
+      expectedFlow: { from: "수량 조정", to: "조립", mixed: false },
+    },
+    {
+      subType: "disassemble" as const,
+      direction: "out" as const,
+      fromBucket: "production" as const,
+      toBucket: "none" as const,
+      fromDepartment: "조립",
+      toDepartment: null,
+      expectedLabel: "출고",
+      expectedFlow: { from: "조립", to: "수량 조정", mixed: false },
+    },
+  ])("커스텀 BOM $subType 이력을 낱개 수량보정처럼 표시한다", ({
+    subType,
+    direction,
+    fromBucket,
+    toBucket,
+    fromDepartment,
+    toDepartment,
+    expectedLabel,
+    expectedFlow,
+  }) => {
+    const parent = makeLine({
+      line_id: "parent",
+      item_id: "PARENT",
+      direction,
+      from_bucket: fromBucket,
+      to_bucket: toBucket,
+      from_department: fromDepartment,
+      to_department: toDepartment,
+      included: false,
+      origin: "direct",
+      exclusion_note: "커스텀 BOM 상위 미반영",
+    });
+    const child = makeLine({
+      line_id: "child",
+      item_id: "CHILD",
+      direction,
+      from_bucket: fromBucket,
+      to_bucket: toBucket,
+      from_department: fromDepartment,
+      to_department: toDepartment,
+      origin: "bom_auto",
+    });
+    const batch = makeBatch({
+      work_type: "process",
+      sub_type: subType,
+      from_department: fromDepartment,
+      to_department: toDepartment,
+      bundles: [makeBundle({
+        source_kind: "bom_parent",
+        source_item_id: "PARENT",
+        lines: [parent, child],
+      })],
+    });
+
+    expect(getHistoryOperationLabel({ transaction_type: "ADJUST" }, batch)).toBe(expectedLabel);
+    expect(getHistoryDisplaySubLabel({ transaction_type: "ADJUST" }, batch)).toBe("재고 수량 직접 수정");
+    expect(getBatchFlowEndpoints(batch)).toEqual(expectedFlow);
+  });
+
   it("창고 수량보정 입고·출고를 수량 조정과 창고 사이 흐름으로 표시한다", () => {
     const inboundLine = makeLine({
       direction: "adjust",
@@ -378,7 +448,7 @@ describe("getBatchFlowEndpoints", () => {
       bundles: [makeBundle({ lines: [outboundLine] })],
     });
 
-    expect(getHistoryOperationLabel({ transaction_type: "ADJUST" }, inbound)).toBe("수량 조정");
+    expect(getHistoryOperationLabel({ transaction_type: "ADJUST" }, inbound)).toBe("창고 수량 조정");
     expect(getBatchFlowEndpoints(inbound)).toEqual({ from: "수량 조정", to: "창고", mixed: false });
     expect(getBatchFlowEndpoints(outbound)).toEqual({ from: "창고", to: "수량 조정", mixed: false });
     expect(getHistoryLineSignedQuantity(inboundLine, inbound).sign).toBe("+");

@@ -106,6 +106,42 @@ def test_display_groups_pages_complete_groups_by_representative_row(client, db_s
     assert second_body["next_cursor"] is None
 
 
+def test_display_groups_merge_multiple_operations_from_one_io_batch(client, db_session, make_item):
+    first_item = make_item(name="한 번에 처리한 품목 A")
+    second_item = make_item(name="한 번에 처리한 품목 B")
+    base = datetime(2026, 9, 15, 3, 16)
+    batch = _add_batch(db_session, "multi-operation")
+    batch.submitted_at = base
+    operations = [
+        InventoryOperation(
+            kind="BUSINESS",
+            domain="internal_use",
+            action="consume",
+            display_label="AS 사용",
+            actor_name="관리자",
+            effective_at=base,
+        )
+        for _ in range(2)
+    ]
+    db_session.add_all(operations)
+    db_session.flush()
+    logs = [
+        _add_log(db_session, item, created_at=base, operation_batch_id=batch.batch_id)
+        for item in (first_item, second_item)
+    ]
+    for log, operation in zip(logs, operations, strict=True):
+        log.operation_id = operation.operation_id
+    db_session.commit()
+
+    response = client.get("/api/inventory/transactions/display-groups")
+
+    assert response.status_code == 200, response.text
+    group = response.json()["groups"][0]
+    assert group["type"] == "op_batch"
+    assert group["key"] == str(batch.batch_id)
+    assert {row["log_id"] for row in group["logs"]} == {str(log.log_id) for log in logs}
+
+
 @pytest.mark.parametrize("group_type", ["op_batch", "operation", "batch"])
 def test_component_search_preserves_complete_groups_and_cursor(client, db_session, make_item, group_type):
     component = make_item(name="Search connector")

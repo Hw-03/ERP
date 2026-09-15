@@ -59,8 +59,25 @@ export function isManualOnlyProductionBatch(batch: IoBatch | null | undefined): 
   });
 }
 
+export function isCustomBomSingleAdjustmentBatch(batch: IoBatch): boolean {
+  if (batch.sub_type !== "produce" && batch.sub_type !== "disassemble") return false;
+  return batch.bundles.some((bundle) =>
+    bundle.source_kind === "bom_parent"
+    && bundle.lines.some((line) =>
+      line.origin === "direct"
+      && line.item_id === bundle.source_item_id
+      && !line.included
+      && line.exclusion_note === "커스텀 BOM 상위 미반영",
+    ),
+  );
+}
+
 function _historySubType(batch: IoBatch): string {
-  return isManualOnlyProductionBatch(batch) ? "adjust_in" : batch.sub_type;
+  if (isManualOnlyProductionBatch(batch)) return "adjust_in";
+  if (isCustomBomSingleAdjustmentBatch(batch)) {
+    return batch.sub_type === "produce" ? "adjust_in" : "adjust_out";
+  }
+  return batch.sub_type;
 }
 
 function _internalUseDepartment(
@@ -172,7 +189,9 @@ export function getHistoryDisplayTransactionType(
   log: { transaction_type: string },
   batch?: IoBatch | null,
 ): string {
-  return isManualOnlyProductionBatch(batch) ? "ADJUST" : log.transaction_type;
+  if (isManualOnlyProductionBatch(batch) || (batch && isCustomBomSingleAdjustmentBatch(batch))) return "ADJUST";
+  if (batch?.sub_type === "disassemble") return "DISASSEMBLE";
+  return log.transaction_type;
 }
 
 function _bucketSlotKey(s: BucketSlot): string {
@@ -389,8 +408,8 @@ const _SUB_TYPE_OPERATION: Record<string, string> = {
   dept_transfer: _SUB_LABEL.dept_transfer,
   adjust_in: _SUB_LABEL.adjust_in,
   adjust_out: _SUB_LABEL.adjust_out,
-  warehouse_adjust_in: _TX_LABEL.ADJUST,
-  warehouse_adjust_out: _TX_LABEL.ADJUST,
+  warehouse_adjust_in: "창고 수량 조정",
+  warehouse_adjust_out: "창고 수량 조정",
   receive_supplier: _SUB_LABEL.receive_supplier,
   supplier_return: _SUB_LABEL.supplier_return,
   defect_quarantine: "불량 격리",

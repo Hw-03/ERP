@@ -724,7 +724,8 @@ export function buildGroups(logs: TransactionLog[]): LogGroup[] {
       const group = operations.get(log.operation_id) ?? [];
       group.push(log);
       operations.set(log.operation_id, group);
-    } else if (log.operation_batch_id) {
+    }
+    if (log.operation_batch_id) {
       const g = opBatches.get(log.operation_batch_id) ?? [];
       g.push(log);
       opBatches.set(log.operation_batch_id, g);
@@ -736,12 +737,36 @@ export function buildGroups(logs: TransactionLog[]): LogGroup[] {
     }
   }
 
+  const groupedOperationBatchIds = new Set(
+    [...opBatches.entries()]
+      .filter(([, batchLogs]) => (
+        batchLogs.some((entry) => !entry.operation_id)
+        || (
+          new Set(batchLogs.flatMap((entry) => entry.operation_id ? [entry.operation_id] : [])).size > 1
+          && batchLogs.every((entry) => entry.operation_kind === "BUSINESS")
+          && batchLogs.every((entry) => entry.operation_effective_status === "active")
+        )
+      ))
+      .map(([batchId]) => batchId),
+  );
+
   const groups: LogGroup[] = [];
   const seenOp = new Set<string>();
   const seenOperations = new Set<string>();
   const seenRef = new Set<string>();
 
   for (const log of logs) {
+    if (log.operation_batch_id && groupedOperationBatchIds.has(log.operation_batch_id)) {
+      if (seenOp.has(log.operation_batch_id)) continue;
+      seenOp.add(log.operation_batch_id);
+      groups.push({
+        type: "op_batch",
+        batchId: log.operation_batch_id,
+        refNo: log.reference_no ?? null,
+        logs: opBatches.get(log.operation_batch_id) ?? [log],
+      });
+      continue;
+    }
     if (log.operation_id) {
       if (seenOperations.has(log.operation_id)) continue;
       seenOperations.add(log.operation_id);
@@ -1084,6 +1109,7 @@ export function ReferenceBatchDetail({
   onSelectLog,
   controlsId,
   flat = false,
+  singleAdjustment = false,
 }: {
   logs: TransactionLog[];
   compact?: boolean;
@@ -1092,6 +1118,7 @@ export function ReferenceBatchDetail({
   onSelectLog?: (log: TransactionLog) => void;
   controlsId?: string;
   flat?: boolean;
+  singleAdjustment?: boolean;
 }) {
   const presentation = getReferenceBatchPresentation(logs);
 
@@ -1110,6 +1137,7 @@ export function ReferenceBatchDetail({
             matchedLogIds={matchedLogIds}
             onSelectLog={onSelectLog}
             rowId={index === 0 ? controlsId : undefined}
+            sectionLabel={singleAdjustment ? (log.quantity_change >= 0 ? "단품 입고" : "단품 출고") : undefined}
           />
         ))}
       </>
@@ -1400,7 +1428,7 @@ function ReferenceBatchLineRow({
       <td className={`${HISTORY_CHILD_CELL_CLASS} ${padX}`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }} />
       <td className={`whitespace-nowrap ${HISTORY_CHILD_CELL_CLASS} ${padX} text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
         <FlowBadge
-          type={log.transaction_type}
+          type={sectionLabel ? "ADJUST" : log.transaction_type}
           label={sectionLabel ?? lineLabel}
           color={lineColor}
           compact={compact}
@@ -1497,10 +1525,10 @@ export function OpBatchHeader({
   const first = group.logs[0];
   const representativeLog = getOpBatchRepresentativeLog(group.logs, batch);
   const displayBundles = batch ? getDisplayBundles(batch) : [];
-  const titleText = displayBundles[0]?.title ?? first.item_name;
+  const titleText = representativeLog?.item_name ?? displayBundles[0]?.title ?? first.item_name;
   const additionalItemCount = getAdditionalDistinctItemCount(
     group.logs,
-    displayBundles.length > 0 ? representativeLog : first,
+    displayBundles.length > 0 ? representativeLog ?? first : first,
   );
   const rawPrimaryType = (group.logs.find((l) => l.transaction_type !== "BACKFLUSH") ?? first).transaction_type;
   const primaryType = getHistoryDisplayTransactionType({ transaction_type: rawPrimaryType }, batch);
@@ -1517,6 +1545,7 @@ export function OpBatchHeader({
     target: {
       ...basePresentation.target,
       title: titleText,
+      code: representativeLog?.mes_code ?? basePresentation.target.code,
       meta: [],
     },
     statusChips: separationHint
@@ -1596,6 +1625,17 @@ function getOpBatchRepresentativeLog(logs: TransactionLog[], batch?: IoBatch | n
   if (targets.length === 0) return logs.length === 1 ? first : null;
   if (targets.length > 1) return null;
   const target = targets[0];
+  const sourceLine = target.lines.find((line) =>
+    line.included
+    && line.item_id === target.source_item_id
+    && line.origin === "direct"
+    && (batch.sub_type !== "disassemble" || line.direction === "out"),
+  );
+  if (sourceLine) {
+    const sourceLog = logs.find((log) => log.operation_line_id === sourceLine.line_id)
+      ?? logs.find((log) => log.item_id === sourceLine.item_id);
+    if (sourceLog) return sourceLog;
+  }
   return logs.find((log) => target.source_item_id && log.item_id === target.source_item_id)
     ?? logs.find((log) => target.source_mes_code && log.mes_code === target.source_mes_code)
     ?? logs.find((log) => log.item_name === target.title)

@@ -179,6 +179,16 @@ describe("StockSnapshotCell request-order stock", () => {
 });
 
 describe("buildGroups shipping phase grouping", () => {
+  it("keeps multiple inventory operations from one I/O batch in one display group", () => {
+    const groups = buildGroups([
+      makeLog({ log_id: "line-a", operation_id: "operation-a", operation_batch_id: "batch-1", operation_kind: "BUSINESS", operation_effective_status: "active" }),
+      makeLog({ log_id: "line-b", operation_id: "operation-b", operation_batch_id: "batch-1", operation_kind: "BUSINESS", operation_effective_status: "active" }),
+    ]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({ type: "op_batch", batchId: "batch-1" });
+  });
+
   it("separates prepare and pickup logs that share a shipping request reference", () => {
     const groups = buildGroups([
       makeLog({ log_id: "prep-pa", transaction_type: "BACKFLUSH", shipping_phase: "PREPARE", item_id: "PA" }),
@@ -1195,6 +1205,22 @@ describe("history table helper rendering policies", () => {
     fireEvent.click(screen.getByText("구성품 라인"));
     expect(onSelectLog).toHaveBeenCalledWith(expect.objectContaining({ log_id: "child-log" }));
     expect(screen.getByText("구성품 라인").closest("tr")).toHaveClass("h-[40px]");
+  });
+
+  it("uses the adjustment icon for flat single-item outbound rows", () => {
+    const child = makeLog({
+      log_id: "single-outbound",
+      item_name: "단품 출고 품목",
+      transaction_type: "BACKFLUSH",
+      quantity_change: -1,
+    });
+
+    render(
+      <table><tbody><ReferenceBatchDetail logs={[child]} flat singleAdjustment /></tbody></table>,
+    );
+
+    const badge = screen.getByText("단품 출고").parentElement!;
+    expect(badge.querySelector("svg")).toHaveClass("lucide-sliders-vertical");
   });
 
   it("keeps multiple reference items behind a collapsed section", () => {

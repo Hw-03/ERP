@@ -133,7 +133,7 @@ export function transactionColor(type: TransactionType | string): string {
     case "RECEIVE":
       return LEGACY_COLORS.green;
     case "SHIP":
-      return LEGACY_COLORS.red;
+      return LEGACY_COLORS.purple;
     case "ADJUST":
       return LEGACY_COLORS.yellow;
     case "PRODUCE":

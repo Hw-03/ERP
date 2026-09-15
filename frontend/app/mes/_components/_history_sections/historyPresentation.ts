@@ -8,6 +8,7 @@ import {
   getHistoryChildResultBatchOperationLabel,
   getHistoryBomParentLine,
   getHistoryDisplayLabel,
+  getHistoryDisplayTransactionType,
   getHistoryDisplaySubLabel,
   getHistoryFlowLabel,
   getHistoryMovementSummary,
@@ -206,6 +207,9 @@ export function getReferenceBatchLinePresentation(
     return { label: "출하 구성", tone: "muted" };
   }
   if (kind === "outbound") return { label: "출고품", tone: "danger" };
+  if (["TRANSFER_TO_PROD", "TRANSFER_TO_WH", "TRANSFER_DEPT"].includes(log.transaction_type)) {
+    return { label: "이동 품목", tone: "muted" };
+  }
   if (log.operation_role === "CORRECTION") {
     return { label: log.quantity_change >= 0 ? "단품 입고" : "단품 출고", tone: "muted" };
   }
@@ -573,6 +577,13 @@ function getStatusChips(
   return chips;
 }
 
+function getInternalUseListLabel(log: TransactionLog, batch?: IoBatch | null): string {
+  const destination = batch?.to_department?.trim() || log.department?.trim();
+  if (destination === "AS") return "AS 사용";
+  if (destination === "연구" || destination === "연구소") return "연구소 사용";
+  return "AS·연구 사용";
+}
+
 /** 입출고 내역 목록에서는 세부 작업명 대신 사용자가 선택한 메뉴 분류만 표시한다. */
 export function getHistoryListOperationLabel(
   log: TransactionLog,
@@ -591,7 +602,15 @@ export function getHistoryListOperationLabel(
   if (phaseLabel) return phaseLabel;
   if (log.transaction_type === "SHIP" && isShippingReference(log)) return "출하";
 
-  if (batch) return getHistoryWorkTypeLabel(batch.work_type);
+  if (batch) {
+    if (batch.work_type === "internal_use") return getInternalUseListLabel(log, batch);
+    const displayType = getHistoryDisplayTransactionType(log, batch);
+    if (displayType === "PRODUCE") return "생산 입고";
+    if (displayType === "DISASSEMBLE") return "분해 출고";
+    return batch.work_type === "warehouse_adjust"
+      ? "창고 수량 조정"
+      : getHistoryWorkTypeLabel(batch.work_type);
+  }
 
   switch (log.transaction_type) {
     case "RECEIVE":
@@ -600,12 +619,13 @@ export function getHistoryListOperationLabel(
     case "TRANSFER_TO_WH":
       return "창고 입출고";
     case "PRODUCE":
+      return "생산 입고";
     case "DISASSEMBLE":
     case "BACKFLUSH":
     case "TRANSFER_DEPT":
       return "부서 입출고";
     case "ADJUST":
-      return log.department === "창고" ? "수량 조정" : "부서 입출고";
+      return log.department === "창고" ? "창고 수량 조정" : "부서 입출고";
     case "MARK_DEFECTIVE":
     case "DEFECT_SCRAP":
     case "SUPPLIER_RETURN":
@@ -613,7 +633,7 @@ export function getHistoryListOperationLabel(
     case "SHIP":
       return "출하";
     case "INTERNAL_USE":
-      return "AS·연구 사용출고";
+      return getInternalUseListLabel(log);
     default:
       return getHistoryDisplayLabel(log, batch);
   }

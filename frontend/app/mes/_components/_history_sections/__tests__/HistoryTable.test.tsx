@@ -289,8 +289,8 @@ describe("HistoryTable hierarchy", () => {
 
     renderTable(groups, new Map([["batch-1", makeBatch()]]));
 
-    expect(screen.getByText("BOM 구성품")).toBeInTheDocument();
-    expect(screen.getByText("BOM 구성품").closest("tr")).toHaveAttribute("data-history-search-match", "true");
+    const matchedRows = screen.getAllByText("BOM 구성품").map((element) => element.closest("tr"));
+    expect(matchedRows.some((row) => row?.getAttribute("data-history-search-match") === "true")).toBe(true);
   });
 
   it("opens and highlights a matched result inside a multi-item rework group", () => {
@@ -654,11 +654,11 @@ describe("HistoryTable hierarchy", () => {
       { type: "operation", operationId: "operation-1", logs: [originalParent, originalChild] },
     ]);
 
-    const cancellationRow = screen.getByText("부서 입출고 취소").closest("tr");
+    const cancellationRow = screen.getByText("생산 입고 취소").closest("tr");
     expect(cancellationRow).not.toHaveAttribute("data-history-cancelled");
     expect(cancellationRow).toHaveAttribute("data-history-cancellation", "true");
     expect(within(cancellationRow as HTMLElement).queryByText("생산 -1 EA")).not.toBeInTheDocument();
-    const originalRow = screen.getByText("부서 입출고").closest("tr");
+    const originalRow = screen.getByText("생산 입고").closest("tr");
     expect(originalRow).toHaveAttribute("data-history-cancelled", "true");
     expect(originalRow).not.toHaveAttribute("data-history-cancellation");
     const toggles = screen.getAllByRole("button", { name: "작업 구성 펼치기" });
@@ -827,6 +827,75 @@ describe("HistoryTable hierarchy", () => {
     const inventory = within(row).getByLabelText("재고 변동: 조립 4 +1→5");
     expect(within(inventory).getByLabelText("조립 4 +1→5")).toBeInTheDocument();
     expect(within(inventory).queryByLabelText(/^창고 /)).not.toBeInTheDocument();
+  });
+
+  it("uses the decreased parent as the title of a disassembly operation", () => {
+    const component = makeLog({
+      log_id: "component",
+      item_id: "COMP-1",
+      item_name: "분해 구성품",
+      transaction_type: "PRODUCE",
+      operation_id: "operation-disassembly",
+      operation_role: "PRIMARY",
+      operation_display_label: "disassemble",
+    });
+    const parent = makeLog({
+      log_id: "parent",
+      item_name: "분해 대상 품목",
+      mes_code: "7-AA-0054",
+      transaction_type: "BACKFLUSH",
+      quantity_change: -1,
+      operation_id: "operation-disassembly",
+      operation_role: "PRIMARY",
+      operation_display_label: "disassemble",
+      warehouse_qty_before: 0,
+      warehouse_qty_after: 0,
+      department_qty_before: 23,
+      department_qty_after: 22,
+    });
+
+    renderTable([{ type: "operation", operationId: "operation-disassembly", logs: [component, parent] }]);
+
+    const row = screen.getByText("분해 대상 품목").closest("tr")!;
+    expect(within(row).getByText("분해 출고")).toBeInTheDocument();
+    expect(within(row).getByLabelText("재고 변동: 조립 23 −1→22")).toBeInTheDocument();
+  });
+
+  it("uses the decreased BOM parent as the disassembly summary row", () => {
+    const batch = makeBatch();
+    batch.sub_type = "disassemble";
+    batch.bundles[0].lines[0] = { ...batch.bundles[0].lines[0], direction: "out", from_bucket: "production", to_bucket: "none" };
+    batch.bundles[0].lines[1] = { ...batch.bundles[0].lines[1], direction: "in", from_bucket: "none", to_bucket: "production" };
+    const component = makeLog({
+      log_id: "component",
+      item_id: "COMP-1",
+      item_name: "분해 구성품",
+      mes_code: "3-AR-0001",
+      transaction_type: "PRODUCE",
+      operation_batch_id: "batch-1",
+      operation_line_id: "child",
+    });
+    const parent = makeLog({
+      log_id: "parent",
+      item_name: "분해 대상 품목",
+      transaction_type: "BACKFLUSH",
+      quantity_change: -1,
+      operation_batch_id: "batch-1",
+      operation_line_id: "parent",
+      warehouse_qty_before: 0,
+      warehouse_qty_after: 0,
+      department_qty_before: 23,
+      department_qty_after: 22,
+    });
+
+    renderTable(
+      [{ type: "op_batch", batchId: "batch-1", refNo: null, logs: [component, parent] }],
+      new Map([["batch-1", batch]]),
+    );
+
+    const row = screen.getByText("분해 대상 품목").closest("tr")!;
+    expect(within(row).getByText("분해 출고")).toBeInTheDocument();
+    expect(within(row).getByLabelText("재고 변동: 조립 23 −1→22")).toBeInTheDocument();
   });
 
   it("does not reuse a component snapshot when a custom BOM parent was not executed", () => {
