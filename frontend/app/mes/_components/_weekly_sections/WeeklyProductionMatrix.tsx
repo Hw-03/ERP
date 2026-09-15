@@ -17,7 +17,7 @@ const COLS: { key: NumCol; label: string; dept: string }[] = [
   { key: "vf_qty", label: "진공", dept: "진공" },
   { key: "nf_qty", label: "튜닝", dept: "튜닝" },
   { key: "af_qty", label: "조립", dept: "조립" },
-  { key: "pf_qty", label: "출하", dept: "출하" },
+  { key: "pf_qty", label: "출하 완료", dept: "출하" },
 ];
 
 function fmt(n: number): string {

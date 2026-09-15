@@ -12,7 +12,9 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 
 from app.models import (
+    DefectInventoryMovement,
     InventoryOperation,
+    InventoryOperationEffect,
     InventoryOperationKindEnum,
     InventoryOperationRoleEnum,
     Item,
@@ -34,7 +36,9 @@ from app.schemas import (
     WeeklyValidationFailure,
     WeeklyWarning,
 )
-from app.services.weekly_inventory_snapshot import load_dashboard_finished_stock
+from app.services.inventory_operation_cancellation import is_reporting_neutral_shipping_prepare
+from app.services.pf_shipping_completion import list_pf_shipping_completions
+from app.services.weekly_inventory_snapshot import load_dashboard_finished_stock, sunday_cutoff_utc
 from app.services.weekly_report_scope import (
     FINISHED_PROCESS_CODES,
     includes_ceramic_tube_housing_for_week,
@@ -446,6 +450,58 @@ def _collect_activities(
         .all()
     )
     operation_by_id = {str(operation.operation_id): operation for operation in operations}
+    cross_week_original_ids = {
+        str(operation.reverses_operation_id)
+        for operation in operations
+        if (
+            operation.kind == InventoryOperationKindEnum.CANCELLATION
+            and operation.reverses_operation_id is not None
+            and str(operation.reverses_operation_id) not in operation_by_id
+        )
+    }
+    cross_week_originals = {
+        str(operation.operation_id): operation
+        for operation in (
+            db.query(InventoryOperation)
+            .filter(InventoryOperation.operation_id.in_(cross_week_original_ids))
+            .all()
+            if cross_week_original_ids
+            else []
+        )
+    }
+    cross_week_logs: dict[str, list[TransactionLog]] = {
+        operation_id: [] for operation_id in cross_week_original_ids
+    }
+    for log in (
+        db.query(TransactionLog)
+        .filter(TransactionLog.operation_id.in_(cross_week_original_ids))
+        .all()
+        if cross_week_original_ids
+        else []
+    ):
+        cross_week_logs.setdefault(str(log.operation_id), []).append(log)
+    cross_week_movements: dict[str, list[DefectInventoryMovement]] = {
+        operation_id: [] for operation_id in cross_week_original_ids
+    }
+    for movement in (
+        db.query(DefectInventoryMovement)
+        .filter(DefectInventoryMovement.operation_id.in_(cross_week_original_ids))
+        .all()
+        if cross_week_original_ids
+        else []
+    ):
+        cross_week_movements.setdefault(str(movement.operation_id), []).append(movement)
+    cross_week_effects: dict[str, list[InventoryOperationEffect]] = {
+        operation_id: [] for operation_id in cross_week_original_ids
+    }
+    for effect in (
+        db.query(InventoryOperationEffect)
+        .filter(InventoryOperationEffect.operation_id.in_(cross_week_original_ids))
+        .all()
+        if cross_week_original_ids
+        else []
+    ):
+        cross_week_effects.setdefault(str(effect.operation_id), []).append(effect)
     excluded: set[str] = set()
     for operation in operations:
         if operation.kind != InventoryOperationKindEnum.CANCELLATION:
@@ -454,6 +510,15 @@ def _collect_activities(
         if original_id in operation_by_id:
             excluded.update({str(operation.operation_id), original_id})
         else:
+            original = cross_week_originals.get(original_id)
+            if original is not None:
+                if is_reporting_neutral_shipping_prepare(
+                    original,
+                    logs=cross_week_logs[original_id],
+                    movements=cross_week_movements[original_id],
+                    effects=cross_week_effects[original_id],
+                ):
+                    continue
             failures.append(
                 _failure(
                     week_start=week_start,
@@ -570,6 +635,9 @@ def _production_matrix(
     *,
     activities: dict[str, _ActivityTotal],
     boundary_items: list[_BoundaryItem],
+    start_at: datetime,
+    end_at: datetime,
+    cancellation_as_of: datetime,
 ) -> list[WeeklyProductionModelRow]:
     items = {
         str(item.item_id): item
@@ -590,12 +658,23 @@ def _production_matrix(
             continue
         model_name = symbol_names.get(item.model_symbol)
         group_code = boundary_groups.get(item_id)
-        if model_name is None or group_code not in FINISHED_CODES:
+        if model_name is None or group_code not in FINISHED_CODES or group_code == "PF":
             continue
         matrix.setdefault(model_name, {})[group_code] = (
             matrix.setdefault(model_name, {}).get(group_code, Decimal("0"))
             + total.produce
         )
+    for completion in list_pf_shipping_completions(
+        db,
+        start_at=start_at,
+        end_at=end_at,
+        cancellation_as_of=cancellation_as_of,
+    ):
+        model_name = symbol_names.get(completion.model_symbol)
+        if model_name is None:
+            continue
+        model_values = matrix.setdefault(model_name, {})
+        model_values["PF"] = model_values.get("PF", Decimal("0")) + completion.quantity
     rows: list[WeeklyProductionModelRow] = []
     for symbol in symbols:
         if len(symbol.symbol or "") != 1:
@@ -740,7 +819,18 @@ def build_verified_weekly_report(
         groups=groups,
         summary=summary,
         warnings=[],
-        production_matrix=_production_matrix(db, activities=activities, boundary_items=items),
+        production_matrix=_production_matrix(
+            db,
+            activities=activities,
+            boundary_items=items,
+            start_at=_kst_start_utc(week_start),
+            end_at=_kst_start_utc(week_end + timedelta(days=1)),
+            cancellation_as_of=(
+                datetime.now(UTC).replace(tzinfo=None)
+                if week_start <= today <= week_end
+                else sunday_cutoff_utc(week_end)
+            ),
+        ),
         basis_version=2,
         report_status="verified",
         validation=WeeklyReportValidation(

@@ -50,6 +50,7 @@ from app.services.weekly_inventory_snapshot import (
     sunday_cutoff_utc,
 )
 from app.services import weekly_report_contract
+from app.services.pf_shipping_completion import list_pf_shipping_completions
 from app.services.weekly_report_scope import (
     FINISHED_PROCESS_CODES,
     includes_ceramic_tube_housing_for_week,
@@ -649,12 +650,43 @@ def get_weekly_report(
             if snapshot_context is not None
             else item.process_type_code
         ) or ""
-        if proc not in _PROD_CODES:
+        if proc not in _PROD_CODES or proc == "PF":
             continue
         val = abs(Decimal(str(qty_sum)))
         if model_key not in matrix:
             matrix[model_key] = {}
         matrix[model_key][proc] = matrix[model_key].get(proc, Decimal("0")) + val
+
+    pf_start_at = (
+        snapshot_context.tx_start_utc
+        if snapshot_context is not None
+        else _kst_date_start_utc(week_start)
+    )
+    pf_end_at = (
+        snapshot_context.tx_end_utc_exclusive
+        if snapshot_context is not None
+        else _kst_date_start_utc(week_end + timedelta(days=1))
+    )
+    pf_cancellation_as_of = (
+        snapshot_context.transaction_as_of_utc
+        if snapshot_context is not None
+        else (
+            datetime.now(UTC).replace(tzinfo=None)
+            if week_start <= _today_kst() <= week_end
+            else sunday_cutoff_utc(week_end)
+        )
+    )
+    for completion in list_pf_shipping_completions(
+        db,
+        start_at=pf_start_at,
+        end_at=pf_end_at,
+        cancellation_as_of=pf_cancellation_as_of,
+    ):
+        model_key = _resolve_model(completion.model_symbol, symbol_map)
+        if model_key is None:
+            continue
+        model_values = matrix.setdefault(model_key, {})
+        model_values["PF"] = model_values.get("PF", Decimal("0")) + completion.quantity
 
     ordered_keys = ordered_models
 

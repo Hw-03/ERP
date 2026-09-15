@@ -27,5 +27,7 @@ describe("WeeklyProductionMatrix", () => {
     );
 
     expect(screen.getByRole("columnheader", { name: "조립" }).getAttribute("style")).toContain("#123456");
+    expect(screen.getByRole("columnheader", { name: "출하 완료" })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "출하" })).not.toBeInTheDocument();
   });
 });

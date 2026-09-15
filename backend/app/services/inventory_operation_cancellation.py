@@ -145,6 +145,30 @@ def is_same_kst_week(left: datetime, right: datetime) -> bool:
     return _week_start(left) == _week_start(right)
 
 
+def is_reporting_neutral_shipping_prepare(
+    operation: InventoryOperation,
+    *,
+    logs: list[TransactionLog],
+    movements: list[DefectInventoryMovement],
+    effects: list[InventoryOperationEffect],
+) -> bool:
+    """재고를 건드리지 않은 출하 준비 예약 작업인지 판정한다."""
+    return (
+        operation.domain == "shipping"
+        and operation.action == "prepare"
+        and not logs
+        and not movements
+        and bool(effects)
+        and all(
+            effect.effect_kind in {
+                InventoryOperationEffectKindEnum.ALLOCATION,
+                InventoryOperationEffectKindEnum.WORKFLOW,
+            }
+            for effect in effects
+        )
+    )
+
+
 def normalized_effect_for_cancellation(log: TransactionLog) -> list[dict]:
     """신규 원장의 셀 효과를 검증 가능한 목록으로 정규화한다."""
     effect = log.inventory_effect
@@ -458,10 +482,6 @@ def preview_cancellation(
     if existing_reversal is not None:
         blockers.append("이미 취소된 작업입니다.")
 
-    resolved_now = now or datetime.utcnow()
-    if not is_same_kst_week(operation.effective_at, resolved_now):
-        blockers.append(PREVIOUS_WEEK_MESSAGE)
-
     logs = (
         db.query(TransactionLog)
         .filter(TransactionLog.operation_id == operation.operation_id)
@@ -486,6 +506,17 @@ def preview_cancellation(
         )
         .all()
     )
+    resolved_now = now or datetime.utcnow()
+    if (
+        not is_same_kst_week(operation.effective_at, resolved_now)
+        and not is_reporting_neutral_shipping_prepare(
+            operation,
+            logs=logs,
+            movements=movements,
+            effects=operation_effects,
+        )
+    ):
+        blockers.append(PREVIOUS_WEEK_MESSAGE)
     changes: dict[tuple[str, str, str, str, str], int] = {}
     try:
         for log in logs:

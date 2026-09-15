@@ -97,4 +97,31 @@ describe("WeeklyGroupCards", () => {
 
     expect(screen.getByText("조립").getAttribute("style")).toContain("var(--c-text)");
   });
+
+  it("keeps the PF card label as 출하", () => {
+    render(
+      <WeeklyGroupCards
+        groups={[{
+          process_code: "PF",
+          dept_name: "출하",
+          label: "출하",
+          item_count: 0,
+          prev_qty: 0,
+          increase_qty: 0,
+          decrease_qty: 0,
+          produce_qty: 0,
+          receive_qty: 0,
+          out_qty: 0,
+          current_qty: 0,
+          delta: 0,
+          items: [],
+        }]}
+        selected="PF"
+        onSelect={() => undefined}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /출하/ })).toHaveTextContent("출하");
+    expect(screen.queryByText("출하 완료")).not.toBeInTheDocument();
+  });
 });

@@ -446,6 +446,51 @@ def test_previous_week_operation_is_blocked_with_confirmed_message(
     assert preview.blockers == (cancellation_svc.PREVIOUS_WEEK_MESSAGE,)
 
 
+def test_previous_week_shipping_prepare_with_inventory_log_stays_blocked(
+    db_session, make_item
+) -> None:
+    item = make_item(name="레거시 출하 준비", warehouse_qty=Decimal("1"))
+    db_session.add(
+        SystemSetting(
+            setting_key="inventory_operation_cutover_at",
+            setting_value="2026-01-01T00:00:00",
+        )
+    )
+    db_session.flush()
+    operation = operation_svc.create_business_operation(
+        db_session,
+        domain="shipping",
+        action="prepare",
+        display_label="출하 준비",
+        actor_name="출하 담당자",
+        actor_employee_id=None,
+        effective_at=datetime(2026, 8, 16, 14, 59),
+    )
+    assert operation is not None
+    db_session.add(
+        TransactionLog(
+            item_id=item.item_id,
+            transaction_type=TransactionTypeEnum.PRODUCE,
+            quantity_change=Decimal("1"),
+            quantity_before=Decimal("0"),
+            quantity_after=Decimal("1"),
+            operation_id=operation.operation_id,
+            inventory_effect=[{"scope": "warehouse", "delta": 1}],
+            created_at=operation.effective_at,
+        )
+    )
+    db_session.commit()
+
+    preview = cancellation_svc.preview_cancellation(
+        db_session,
+        operation.operation_id,
+        now=datetime(2026, 8, 25, 3, 0),
+    )
+
+    assert preview.can_cancel is False
+    assert cancellation_svc.PREVIOUS_WEEK_MESSAGE in preview.blockers
+
+
 def test_kst_monday_boundary_blocks_sunday_operation_immediately(
     db_session, make_item
 ) -> None:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -908,6 +909,35 @@ def test_prepare_cancel_restores_preparing_and_releases_allocations(
     assert original is not None
     assert original.action == "prepare"
     assert shipping_actions_svc.prepare_complete(db_session, request_id, "SN-002").status == ShippingRequestStatusEnum.PREPARED
+
+
+def test_prepare_cancel_allows_previous_week_when_only_reservations_exist(
+    db_session,
+    make_item,
+    make_bom,
+    make_location,
+) -> None:
+    request_id, _final_pa_id, _final_pf_id, _companion_id = _make_prepared_request(
+        db_session,
+        make_item,
+        make_bom,
+        make_location,
+    )
+    prepare = workflow_ops.latest_operation(db_session, request_id, "prepare", active_only=True)
+    assert prepare is not None
+    prepare.effective_at = datetime.utcnow() - timedelta(days=8)
+    db_session.commit()
+
+    cancelled = shipping_actions_svc.prepare_cancel(
+        db_session,
+        request_id,
+        "장기 출하 대기 취소",
+    )
+
+    assert cancelled.status == ShippingRequestStatusEnum.PREPARING
+    assert db_session.query(TransactionLog).filter_by(operation_id=prepare.operation_id).count() == 0
+    allocations = db_session.query(ShippingAllocation).filter_by(request_id=request_id).all()
+    assert {row.status for row in allocations} == {"RELEASED"}
 
 
 def test_pickup_cancel_rolls_back_when_event_recording_fails(

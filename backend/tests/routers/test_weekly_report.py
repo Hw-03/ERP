@@ -11,18 +11,22 @@ from decimal import Decimal
 from itertools import count
 
 import pytest
+from sqlalchemy import event
 from app.services import weekly_report_scope
 from app.models import (
     DepartmentEnum,
     Inventory,
     InventoryLocation,
     InventoryOperation,
+    InventoryOperationEffect,
+    InventoryOperationEffectKindEnum,
     InventoryOperationKindEnum,
     InventoryOperationRoleEnum,
     InventoryOperationStatusEnum,
     Item,
     LocationStatusEnum,
     ProductSymbol,
+    ShippingRequest,
     SystemSetting,
     TransactionLog,
     TransactionTypeEnum,
@@ -81,7 +85,8 @@ def _make_prod_item(db_session, *, name: str, process_code: str,
 
 
 def _add_log(db_session, item_id, *, tx_type: TransactionTypeEnum,
-             qty: Decimal, at: datetime, shipping_phase: str | None = None) -> TransactionLog:
+             qty: Decimal, at: datetime, shipping_phase: str | None = None,
+             shipping_request_id=None) -> TransactionLog:
     log = TransactionLog(
         item_id=item_id,
         transaction_type=tx_type,
@@ -89,6 +94,7 @@ def _add_log(db_session, item_id, *, tx_type: TransactionTypeEnum,
         quantity_before=Decimal("0"),
         quantity_after=qty,
         shipping_phase=shipping_phase,
+        shipping_request_id=shipping_request_id,
     )
     log.created_at = at
     db_session.add(log)
@@ -160,10 +166,12 @@ def _add_operation_log(
     display_label: str,
     at: datetime = _WEEK_MID,
     shipping_phase: str | None = None,
+    shipping_request_id=None,
+    domain: str = "weekly-test",
 ) -> TransactionLog:
     operation = InventoryOperation(
         kind=InventoryOperationKindEnum.BUSINESS,
-        domain="weekly-test",
+        domain=domain,
         action=action,
         status=InventoryOperationStatusEnum.COMMITTED,
         display_label=display_label,
@@ -184,6 +192,7 @@ def _add_operation_log(
         inventory_effect=effects,
         created_at=at,
         shipping_phase=shipping_phase,
+        shipping_request_id=shipping_request_id,
     )
     db_session.add(log)
     db_session.flush()
@@ -213,6 +222,288 @@ def test_production_matrix_basic(client, db_session):
     assert _dec(matrix["DX3000"]["total_qty"]) == _dec(5)
     assert _dec(matrix["ADX6000"]["vf_qty"]) == _dec(3)
     assert _dec(matrix["ADX6000"]["total_qty"]) == _dec(3)
+
+
+def test_legacy_matrix_counts_only_final_pf_pickup_completion(client, db_session):
+    """PF PRODUCE·동반품·일반 출고·취소 출하는 PF 매트릭스에서 제외한다."""
+    final_pf = _make_prod_item(
+        db_session, name="DX3000 최종 PF", process_code="PF", model_symbol="3"
+    )
+    companion_pf = _make_prod_item(
+        db_session, name="DX3000 동반 PF", process_code="PF", model_symbol="3"
+    )
+    request = ShippingRequest(
+        base_pf_item_id=final_pf.item_id,
+        final_pf_item_id=final_pf.item_id,
+        request_quantity=1,
+    )
+    db_session.add(request)
+    db_session.flush()
+    _add_log(
+        db_session, final_pf.item_id, tx_type=TransactionTypeEnum.PRODUCE,
+        qty=_dec(19), at=_WEEK_MID,
+    )
+    _add_log(
+        db_session, final_pf.item_id, tx_type=TransactionTypeEnum.SHIP,
+        qty=_dec(-3), at=_WEEK_MID, shipping_phase="PICKUP",
+        shipping_request_id=request.request_id,
+    )
+    _add_log(
+        db_session, companion_pf.item_id, tx_type=TransactionTypeEnum.SHIP,
+        qty=_dec(-2), at=_WEEK_MID, shipping_phase="PICKUP",
+        shipping_request_id=request.request_id,
+    )
+    _add_log(
+        db_session, final_pf.item_id, tx_type=TransactionTypeEnum.SHIP,
+        qty=_dec(-7), at=_WEEK_MID, shipping_phase="PICKUP",
+    )
+    cancelled = _add_log(
+        db_session, final_pf.item_id, tx_type=TransactionTypeEnum.SHIP,
+        qty=_dec(-5), at=_WEEK_MID, shipping_phase="PICKUP",
+        shipping_request_id=request.request_id,
+    )
+    cancelled.cancelled = True
+    cancelled.cancelled_at = _WEEK_MID
+    db_session.commit()
+
+    response = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
+
+    assert response.status_code == 200, response.text
+    dx3000 = {row["model_key"]: row for row in response.json()["production_matrix"]}["DX3000"]
+    assert dx3000["pf_qty"] == 3
+    assert dx3000["total_qty"] == 3
+
+
+def test_legacy_matrix_uses_kst_half_open_window_for_pf_pickups(client, db_session):
+    """PF 완료는 KST 월요일 00:00부터 다음 월요일 직전까지 집계한다."""
+    final_pf = _make_prod_item(
+        db_session, name="DX3000 KST 경계 PF", process_code="PF", model_symbol="3"
+    )
+    request = ShippingRequest(
+        base_pf_item_id=final_pf.item_id,
+        final_pf_item_id=final_pf.item_id,
+        request_quantity=1,
+    )
+    db_session.add(request)
+    db_session.flush()
+    for quantity, created_at in (
+        (11, datetime(2026, 5, 3, 14, 59, 59)),       # KST 일요일 23:59:59
+        (2, datetime(2026, 5, 3, 15, 0, 0)),           # KST 월요일 00:00:00
+        (3, datetime(2026, 5, 3, 23, 59, 59, 999999)),  # KST 월요일 08:59:59
+        (5, datetime(2026, 5, 10, 14, 59, 59, 999999)), # KST 일요일 23:59:59
+        (7, datetime(2026, 5, 10, 15, 0, 0)),           # 다음 KST 월요일 00:00:00
+    ):
+        _add_log(
+            db_session,
+            final_pf.item_id,
+            tx_type=TransactionTypeEnum.SHIP,
+            qty=_dec(-quantity),
+            at=created_at,
+            shipping_phase="PICKUP",
+            shipping_request_id=request.request_id,
+        )
+    db_session.commit()
+
+    response = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
+
+    assert response.status_code == 200, response.text
+    dx3000 = {row["model_key"]: row for row in response.json()["production_matrix"]}["DX3000"]
+    assert dx3000["pf_qty"] == 10
+
+
+def test_legacy_matrix_keeps_pf_pickup_cancelled_after_sunday_cutoff(client, db_session):
+    """과거 주차의 일요일 마감 뒤 취소는 당시 PF 완료 집계에 남긴다."""
+    final_pf = _make_prod_item(
+        db_session, name="DX3000 마감 후 취소 PF", process_code="PF", model_symbol="3"
+    )
+    request = ShippingRequest(
+        base_pf_item_id=final_pf.item_id,
+        final_pf_item_id=final_pf.item_id,
+        request_quantity=1,
+    )
+    db_session.add(request)
+    db_session.flush()
+    pickup = _add_log(
+        db_session,
+        final_pf.item_id,
+        tx_type=TransactionTypeEnum.SHIP,
+        qty=_dec(-4),
+        at=_WEEK_MID,
+        shipping_phase="PICKUP",
+        shipping_request_id=request.request_id,
+    )
+    pickup.cancelled = True
+    pickup.cancelled_at = datetime(2026, 5, 10, 15, 0, 0)  # KST 다음 월요일 00:00
+    db_session.commit()
+
+    response = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
+
+    assert response.status_code == 200, response.text
+    dx3000 = {row["model_key"]: row for row in response.json()["production_matrix"]}["DX3000"]
+    assert dx3000["pf_qty"] == 4
+
+
+def test_verified_matrix_counts_final_pf_pickup_not_pf_produce(client, db_session):
+    """검증 v2도 PF 생산은 숨기고 최종 PF 픽업 완료만 PF 열에 넣는다."""
+    final_pf = _make_prod_item(
+        db_session, name="DX3000 검증 최종 PF", process_code="PF", model_symbol="3"
+    )
+    request = ShippingRequest(
+        base_pf_item_id=final_pf.item_id,
+        final_pf_item_id=final_pf.item_id,
+        request_quantity=1,
+    )
+    db_session.add(request)
+    db_session.flush()
+    _activate_verified_weekly_report(db_session)
+    _add_operation_log(
+        db_session, item=final_pf, tx_type=TransactionTypeEnum.PRODUCE,
+        role=InventoryOperationRoleEnum.PRODUCT_OUTPUT, quantity_change=19,
+        effects=[{"scope": "location", "department": "출하", "status": "PRODUCTION", "delta": 19}],
+        action="produce", display_label="PF 생산",
+    )
+    _add_operation_log(
+        db_session, item=final_pf, tx_type=TransactionTypeEnum.SHIP,
+        role=InventoryOperationRoleEnum.PRIMARY, quantity_change=-5,
+        effects=[{"scope": "location", "department": "출하", "status": "PRODUCTION", "delta": -5}],
+        action="pickup", display_label="PF 픽업", shipping_phase="PICKUP",
+        shipping_request_id=request.request_id, domain="shipping",
+    )
+    _add_snapshot(
+        db_session, week_end=date(2026, 5, 3), item_quantities=[(final_pf, _dec(0))], verified=True,
+    )
+    _add_snapshot(
+        db_session, week_end=date(2026, 5, 10), item_quantities=[(final_pf, _dec(14))], verified=True,
+    )
+    db_session.commit()
+
+    response = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["report_status"] == "verified"
+    dx3000 = {row["model_key"]: row for row in body["production_matrix"]}["DX3000"]
+    assert dx3000["pf_qty"] == 5
+    assert dx3000["total_qty"] == 5
+
+
+def test_verified_report_ignores_cross_week_neutral_shipping_prepare_cancellation(client, db_session):
+    """재고가 없는 출하 준비 예약의 다음 주 취소는 검산 실패가 아니다."""
+    item = _make_prod_item(db_session, name="PF 예약", process_code="PF", model_symbol="3")
+    _activate_verified_weekly_report(db_session)
+    original = InventoryOperation(
+        kind=InventoryOperationKindEnum.BUSINESS,
+        domain="shipping",
+        action="prepare",
+        status=InventoryOperationStatusEnum.COMMITTED,
+        display_label="출하 준비",
+        actor_name="관리자",
+        effective_at=_WEEK_BEFORE,
+        contract_version=1,
+    )
+    db_session.add(original)
+    db_session.flush()
+    db_session.add(
+        InventoryOperationEffect(
+            operation_id=original.operation_id,
+            effect_kind=InventoryOperationEffectKindEnum.WORKFLOW,
+            subject_type="ShippingRequest",
+            subject_id="weekly-neutral-request",
+            role="shipping_request",
+            before_state={"status": "PREPARING"},
+            after_state={"status": "PREPARED"},
+        )
+    )
+    cancellation = InventoryOperation(
+        kind=InventoryOperationKindEnum.CANCELLATION,
+        domain="shipping",
+        action="prepare",
+        status=InventoryOperationStatusEnum.COMMITTED,
+        display_label="출하 준비 취소",
+        actor_name="관리자",
+        effective_at=_WEEK_MID,
+        contract_version=1,
+        reverses_operation_id=original.operation_id,
+    )
+    db_session.add(cancellation)
+    _add_snapshot(
+        db_session, week_end=date(2026, 5, 3), item_quantities=[(item, _dec(0))], verified=True,
+    )
+    _add_snapshot(
+        db_session, week_end=date(2026, 5, 10), item_quantities=[(item, _dec(0))], verified=True,
+    )
+    db_session.commit()
+
+    response = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
+
+    assert response.status_code == 200, response.text
+    assert response.json()["report_status"] == "verified"
+
+
+def test_verified_report_batches_cross_week_neutral_prepare_lookups(client, db_session):
+    """여러 교차주 준비 취소도 원 작업 조회를 묶어 검산한다."""
+    item = _make_prod_item(db_session, name="PF 예약 배치", process_code="PF", model_symbol="3")
+    _activate_verified_weekly_report(db_session)
+    for sequence in (1, 2):
+        original = InventoryOperation(
+            kind=InventoryOperationKindEnum.BUSINESS,
+            domain="shipping",
+            action="prepare",
+            status=InventoryOperationStatusEnum.COMMITTED,
+            display_label="출하 준비",
+            actor_name="관리자",
+            effective_at=_WEEK_BEFORE,
+            contract_version=1,
+        )
+        db_session.add(original)
+        db_session.flush()
+        db_session.add(
+            InventoryOperationEffect(
+                operation_id=original.operation_id,
+                effect_kind=InventoryOperationEffectKindEnum.WORKFLOW,
+                subject_type="ShippingRequest",
+                subject_id=f"weekly-neutral-request-{sequence}",
+                role="shipping_request",
+                before_state={"status": "PREPARING"},
+                after_state={"status": "PREPARED"},
+            )
+        )
+        db_session.add(
+            InventoryOperation(
+                kind=InventoryOperationKindEnum.CANCELLATION,
+                domain="shipping",
+                action="prepare",
+                status=InventoryOperationStatusEnum.COMMITTED,
+                display_label="출하 준비 취소",
+                actor_name="관리자",
+                effective_at=_WEEK_MID,
+                contract_version=1,
+                reverses_operation_id=original.operation_id,
+            )
+        )
+    _add_snapshot(
+        db_session, week_end=date(2026, 5, 3), item_quantities=[(item, _dec(0))], verified=True,
+    )
+    _add_snapshot(
+        db_session, week_end=date(2026, 5, 10), item_quantities=[(item, _dec(0))], verified=True,
+    )
+    db_session.commit()
+
+    operation_selects: list[str] = []
+
+    def _capture_operation_select(_conn, _cursor, statement, _parameters, _context, _executemany):
+        if "FROM inventory_operations" in statement:
+            operation_selects.append(statement)
+
+    event.listen(db_session.bind, "before_cursor_execute", _capture_operation_select)
+    try:
+        response = client.get(f"/api/inventory/weekly-report?week_start={WEEK_START}&week_end={WEEK_END}")
+    finally:
+        event.remove(db_session.bind, "before_cursor_execute", _capture_operation_select)
+
+    assert response.status_code == 200, response.text
+    assert response.json()["report_status"] == "verified"
+    assert len(operation_selects) == 2
 
 
 def test_legacy_weekly_report_groups_vacuum_generator_va_items_under_vf(client, db_session, monkeypatch):
@@ -357,8 +648,8 @@ def test_legacy_weekly_report_treats_component_change_as_out_and_receive(client,
     assert solo["af_qty"] == 21
 
 
-def test_production_matrix_includes_tf_pf(client, db_session):
-    """TF·PF PRODUCE 로그도 production_matrix에 합산되고 total_qty는 6개 합계다."""
+def test_production_matrix_excludes_pf_produce(client, db_session):
+    """TF·HF PRODUCE만 매트릭스에 합산하고 PF PRODUCE는 출하 완료와 분리한다."""
     tf_item = _make_prod_item(db_session, name="DX3000 TF 튜브완료", process_code="TF",
                               model_symbol="3", qty=_dec(7))
     pf_item = _make_prod_item(db_session, name="DX3000 PF 출하완료", process_code="PF",
@@ -376,8 +667,8 @@ def test_production_matrix_includes_tf_pf(client, db_session):
 
     assert _dec(row["tf_qty"]) == _dec(7)
     assert _dec(row["hf_qty"]) == _dec(4)
-    assert _dec(row["pf_qty"]) == _dec(2)
-    assert _dec(row["total_qty"]) == _dec(13)
+    assert _dec(row["pf_qty"]) == _dec(0)
+    assert _dec(row["total_qty"]) == _dec(11)
 
 
 def test_production_matrix_always_has_seeded_models(client, db_session):

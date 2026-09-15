@@ -9,7 +9,7 @@ from io import BytesIO
 
 from openpyxl import load_workbook
 
-from app.models import ProductSymbol, TransactionLog, TransactionTypeEnum
+from app.models import ProductSymbol, ShippingRequest, TransactionLog, TransactionTypeEnum
 from app.services.f705_02_production_log import collect_daily_quantities, render_workbook
 
 
@@ -34,6 +34,34 @@ def _add_log(
             shipping_phase=shipping_phase,
         )
     )
+
+
+def _add_shipping_request(db_session, final_pf):
+    request = ShippingRequest(
+        base_pf_item_id=final_pf.item_id,
+        final_pf_item_id=final_pf.item_id,
+        request_quantity=1,
+    )
+    db_session.add(request)
+    db_session.flush()
+    return request
+
+
+def _add_pickup_log(db_session, *, request, item, quantity: int, occurred_at: datetime):
+    log = TransactionLog(
+        log_id=uuid.uuid4(),
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.SHIP,
+        quantity_change=Decimal(str(-quantity)),
+        quantity_before=Decimal(str(quantity)),
+        quantity_after=Decimal("0"),
+        shipping_request_id=request.request_id if request is not None else None,
+        shipping_phase="PICKUP",
+        created_at=occurred_at,
+    )
+    db_session.add(log)
+    db_session.flush()
+    return log
 
 
 def test_collect_daily_quantities_uses_produce_only_and_abs_item_day_sum(db_session, make_item):
@@ -62,6 +90,78 @@ def test_collect_daily_quantities_uses_produce_only_and_abs_item_day_sum(db_sess
             ("HF", "DX3000"): 7,
             ("AF", "SOLO"): 4,
         }
+    }
+
+
+def test_collect_daily_quantities_uses_final_pf_pickups_instead_of_pf_produce(db_session, make_item):
+    db_session.add_all(
+        [
+            ProductSymbol(slot=3, symbol="3", model_name="DX3000"),
+            ProductSymbol(slot=8, symbol="8", model_name="SOLO"),
+        ]
+    )
+    hf = make_item(name="HF DX", process_type_code="HF", model_symbol="3")
+    final_pf = make_item(name="최종 PF", process_type_code="PF", model_symbol="8")
+    companion_pf = make_item(name="동반 PF", process_type_code="PF", model_symbol="8")
+    request = _add_shipping_request(db_session, final_pf)
+    _add_log(db_session, hf, quantity=7, occurred_at=datetime(2026, 1, 3, 9, 0))
+    _add_log(db_session, final_pf, quantity=99, occurred_at=datetime(2026, 1, 3, 9, 0))
+    _add_pickup_log(
+        db_session,
+        request=request,
+        item=final_pf,
+        quantity=3,
+        occurred_at=datetime(2026, 1, 3, 10, 0),
+    )
+    _add_pickup_log(
+        db_session,
+        request=request,
+        item=companion_pf,
+        quantity=4,
+        occurred_at=datetime(2026, 1, 3, 10, 1),
+    )
+    _add_pickup_log(
+        db_session,
+        request=None,
+        item=final_pf,
+        quantity=5,
+        occurred_at=datetime(2026, 1, 3, 10, 2),
+    )
+    cancelled = _add_pickup_log(
+        db_session,
+        request=request,
+        item=final_pf,
+        quantity=2,
+        occurred_at=datetime(2026, 1, 4, 10, 0),
+    )
+    db_session.add(
+        TransactionLog(
+            log_id=uuid.uuid4(),
+            item_id=final_pf.item_id,
+            transaction_type=TransactionTypeEnum.SHIP,
+            quantity_change=Decimal("2"),
+            quantity_before=Decimal("0"),
+            quantity_after=Decimal("2"),
+            shipping_request_id=request.request_id,
+            shipping_phase="PICKUP",
+            reverses_log_id=cancelled.log_id,
+            created_at=datetime(2026, 1, 4, 11, 0),
+        )
+    )
+    _add_pickup_log(
+        db_session,
+        request=request,
+        item=final_pf,
+        quantity=2,
+        occurred_at=datetime(2026, 1, 5, 10, 0),
+    )
+    db_session.commit()
+
+    quantities = collect_daily_quantities(db_session, 2026)
+
+    assert quantities == {
+        date(2026, 1, 3): {("HF", "DX3000"): 7, ("PF", "SOLO"): 3},
+        date(2026, 1, 5): {("PF", "SOLO"): 2},
     }
 
 

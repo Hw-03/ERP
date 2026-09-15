@@ -22,6 +22,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.models import Item, ProductSymbol, TransactionLog, TransactionTypeEnum
+from app.services.pf_shipping_completion import list_pf_shipping_completions
 
 
 TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "assets" / "f705_02_template.xlsx"
@@ -80,7 +81,7 @@ def collect_daily_quantities(db: Session, year: int) -> DailyQuantities:
         db.query(Item, TransactionLog.quantity_change, TransactionLog.created_at)
         .join(TransactionLog, Item.item_id == TransactionLog.item_id)
         .filter(
-            Item.process_type_code.in_(_PROCESS_CODES),
+            Item.process_type_code.in_(_PROCESS_CODES[:-1]),
             TransactionLog.transaction_type == TransactionTypeEnum.PRODUCE,
             or_(
                 TransactionLog.shipping_phase.is_(None),
@@ -120,6 +121,17 @@ def collect_daily_quantities(db: Session, year: int) -> DailyQuantities:
             continue
         daily_quantities = quantities.setdefault(occurred_on, {})
         daily_quantities[(process, model)] = daily_quantities.get((process, model), 0) + absolute_quantity
+
+    for completion in list_pf_shipping_completions(db, start_at=start, end_at=end):
+        symbol = (completion.model_symbol or "").strip()
+        model = symbols.get(symbol)
+        if model not in _MODELS:
+            continue
+        quantity = int(completion.quantity)
+        if quantity == 0:
+            continue
+        daily_quantities = quantities.setdefault(completion.completed_at.date(), {})
+        daily_quantities[("PF", model)] = daily_quantities.get(("PF", model), 0) + quantity
     return quantities
 
 
