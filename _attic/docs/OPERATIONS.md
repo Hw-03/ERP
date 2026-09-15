@@ -315,114 +315,49 @@ GET /api/admin/audit-logs?since=2026-04-26T00:00:00    # 시각 이후
 
 보존 정책: 현재 무한 보관. 향후 정리 정책이 필요하면 별도 작업.
 
-## 작업자 PIN·서버 세션 운영 (CP3)
+## 작업자 PIN·화면 식별 운영
 
-### 최초 PIN 설정
+> 현재 `main`의 롤백 기준이다. 품질 보존 브랜치에 있던 `/api/operator-session`, `operator_sessions`, `VerifiedActor`, 30분 서버 세션은 현재 코드에 없으므로 운영 기능으로 간주하지 않는다.
 
-- 신규 직원과 관리자 초기화 직원의 PIN은 `0000`이며, 이 상태에서는 조회용 challenge 외의 업무 mutation을 실행할 수 없다.
-- `0000`은 공개 초기값이므로 본인 확인 수단이 아니다. 관리자가 직원과 대면한 상태에서 로그인 화면의 최초 PIN 변경을 즉시 완료하게 한다.
-- 새 PIN은 4자리 숫자이고 `0000`과 달라야 한다. 최초 변경이 끝난 뒤 새 PIN으로 다시 로그인해야 작업자 세션이 생긴다.
-- 최초 변경 감사 행은 verified actor가 아니라 `bootstrap_employee_id`와 `request_id`로 추적한다.
+### 작업자 식별 계약
 
-### 세션 계약
+- 로그인 화면은 `POST /api/employees/{employee_id}/verify-pin`으로 활성 직원과 4자리 PIN을 확인한다. 이 흐름은 작업자 식별과 감사 연결을 위한 것이며, 코드가 명시하듯 실제 보안 인증 경계가 아니다.
+- 검증된 직원 정보와 `GET /api/app-session`의 `boot_id`는 현재 탭의 `sessionStorage`에 각각 `dexcowin_mes_operator`, `dexcowin_mes_boot_id`로 저장한다. 같은 탭의 새로고침에는 남지만 새 탭과 공유되지 않고 브라우저 탭을 닫으면 사라진다. 과거 `localStorage` 값은 읽을 때 제거한다.
+- 화면 진입 시 저장된 `boot_id`가 현재 backend의 값과 다르거나 저장된 직원이 더 이상 활성 상태가 아니면 작업자 정보를 지우고 다시 로그인하게 한다. `boot_id`는 UI의 오래된 식별 상태를 제거하기 위한 재시작 표식이지 서버 인증 세션 ID가 아니다.
+- 로그아웃은 현재 탭의 작업자·`boot_id`·알림 표식과 브라우저 감사 세션 ID를 제거하고 `ui_logout` 이벤트를 best-effort로 보낸다. 삭제할 서버 작업자 세션 행은 없다.
+- 기본 PIN은 `0000`이며 관리자 화면에서 직원별로 초기화할 수 있다. 현재 코드는 `0000` 로그인을 차단하거나 최초 로그인 직후 변경을 강제하지 않는다. 운영자는 직원 생성·PIN 초기화 직후 대면 상태에서 변경하도록 관리한다. 본인 PIN 변경은 현재 PIN과 새 4자리 PIN을 확인하고, 관리자 초기화는 관리자 PIN 검증을 별도로 요구한다.
+- PIN 실패 제한은 직원 ID와 요청의 client IP 조합을 기준으로 적용하며 현재 backend 프로세스 메모리에만 유지된다. `429 TOO_MANY_REQUESTS`가 나오면 자동 재시도하지 말고 잠시 기다린 뒤 직원 선택과 PIN을 확인한다.
 
-- 브라우저에는 원문 opaque token을 `dexcowin_operator_session` HttpOnly·SameSite=Lax·Path=/ 쿠키로만 저장한다. DB에는 SHA-256 digest만 저장하고, 로그에는 원문 token·digest·전체 session UUID·PIN을 모두 남기지 않는다.
-- 작업자 세션은 마지막으로 서버가 확인한 사용자 활동부터 30분에 만료된다. 클릭·키보드 입력·스크롤을 받은 프런트가 `POST /api/operator-session/activity`를 제한된 빈도로 보내며, 서버가 Employee→session 잠금 뒤 아직 유효한 세션만 서버 시각 기준 30분 연장한다. 일반 조회·자동 갱신·알림·탭 활성화는 만료를 연장하지 않는다. 화면은 29분에 남은 시간과 `로그인 유지` 버튼을 표시하고, 로컬 만료 시 즉시 민감 내용을 가린 뒤 서버 상태를 재확인한다. 다른 탭에서 연장된 동일 직원·동일 boot 세션은 서버 응답으로만 수용하고, 만료·폐기된 세션은 활동 요청으로 되살리지 않는다.
-- 새 operator 행 발급은 직원과 검증된 실제 client IP별 5분/10회로 제한하며 성공해도 예산을 초기화하지 않는다. 현재 boot에서 한 직원의 미폐기·미소비·미만료 operator 행은 Employee 잠금 아래 최대 32개다. 같은 유효 cookie 재로그인은 기존 행을 재사용하므로 이 발급 예산과 hard cap을 소비하지 않는다. 초과 시 `429 TOO_MANY_REQUESTS`, auth `Set-Cookie` 0, DB 변경 0이다.
-- 일반 로그아웃은 유효한 operator와 같은 직원의 PIN-change capability만 직원 행 잠금 뒤 폐기하며, foreign challenge와 같은 직원의 다른 브라우저 세션은 보존한다. operator 없이 유효 challenge만 남은 일반 DELETE는 `X-MES-Employee-Code`가 잠금 뒤 다시 확인한 challenge 직원 코드와 같아야 하며, claim 누락·불일치는 `403 ACTOR_MISMATCH`이고 session·AdminAudit·ActivityAudit 변경은 없다. 공통 HTTP DB 감사는 서버가 검증한 actor가 있는 일반 write만 기록하고, 미검증 bootstrap 실패는 bounded access log에만 남는다. claim 없는 익명 DELETE는 유효 capability가 없을 때만 204 idempotent다. 최초 PIN 화면의 취소는 예상 직원 query claim으로 그 challenge만 폐기하고 `bootstrap_employee_id`가 든 별도 AdminAudit 행을 남긴다. 같은 cookie로 겹친 재로그인은 새 세션을 만들지 않고 잠금 뒤 재검증한 기존 capability를 재사용하며 만료 시각을 현재 서버 시각부터 30분으로 갱신한다. 본인 PIN 변경, 관리자 PIN 초기화, 직원 비활성화·삭제는 대상 직원의 기존 세션을 모두 즉시 폐기한다. hard delete된 직원의 세션 행은 FK cascade로 함께 삭제된다. 지연된 응답이 그 사이 발급된 다른 탭의 cookie를 지우지 않도록 로그아웃·PIN 변경 응답은 auth cookie 만료 `Set-Cookie`를 보내지 않는다. operator cookie는 브라우저 session cookie라서 DB에서 권한을 잃은 뒤에도 브라우저 종료 또는 다음 성공 login이 덮어쓸 때까지 원문이 남을 수 있지만 서버는 이를 다시 허용하지 않는다.
-- backend 재시작은 새 `boot_id`를 만들므로 재시작 전 세션은 즉시 무효다. 현재 배포는 backend worker 1개만 허용한다. process-local `boot_id` 상태에서 worker를 여러 개 띄우면 요청마다 세션 판정이 달라질 수 있으므로 shared boot identity 설계 전에는 multi-worker를 사용하지 않는다.
-- `401 AUTH_REQUIRED`는 로그인 쿠키가 없거나 해석할 수 없다는 뜻이다. `401 SESSION_EXPIRED`는 만료·폐기·이전 boot 세션이다. `403 ACTOR_MISMATCH`는 body/header의 직원 주장이 로그인 작업자와 다르다는 뜻이며 요청값을 고쳐 재전송하기 전에 실제 로그인 작업자를 확인한다.
-- PIN 실패가 반복되어 `429 TOO_MANY_REQUESTS`가 나오면 자동 재시도하지 않고 잠시 기다린 뒤 직원 선택과 PIN을 확인한다.
-- 존재 직원의 로그인 실패 예산은 서버가 조회한 직원 ID와 검증된 실제 client IP별로 분리한다. 미존재 직원 ID의 dummy PIN 검증은 별도 bounded client-IP 예산을 공유하므로 random ID flood가 존재 직원의 로그인 예산을 소진하지 않는다. 이 둘과 별개로 known/unknown 및 성공/실패를 가리지 않은 실제 로그인 KDF는 client IP당 5분/60회 총예산을 공유하며 성공해도 초기화하지 않는다.
-- 모든 canonical frontend 실행은 `scripts/next-server.js`에서 실제 `socket.remoteAddress`를 읽는다. 이 경계는 외부 요청의 `Forwarded`, `X-Forwarded-For`, `X-Real-IP`와 내부 assertion 헤더를 먼저 폐기한 뒤 실제 peer로 assertion을 다시 만든다. backend는 loopback Next hop 또는 60초 이내 유효한 HMAC assertion만 인정하고, 실패·누락·backend 직접 요청은 TCP peer로 fail-closed한다. backend launcher의 `--no-proxy-headers`를 유지하며 `FORWARDED_ALLOW_IPS`와 wildcard proxy 신뢰를 사용하지 않는다.
-- Docker 실행 전 32-byte 이상의 무작위 `MES_PROXY_SHARED_SECRET`을 shell 환경에 설정한다. compose는 동일 값을 frontend와 backend에만 주입하며 값이 없으면 기동을 거부한다. 실제 값을 저장소·문서·로그에 기록하지 않는다.
+### 감사 행위자 쿠키
 
-  ```powershell
-  $env:MES_PROXY_SHARED_SECRET = py -3 -c "import secrets; print(secrets.token_hex(32))"
-  docker compose -f docker/docker-compose.yml up -d
-  ```
+- 직원 PIN 검증 성공 시 backend는 `dexcowin_audit_actor`라는 서명된 HttpOnly·SameSite=Lax 쿠키를 발급한다. 유효 시간은 12시간이며 `APP_ENV=production`일 때만 `Secure` 속성을 붙인다.
+- 이 쿠키는 access log와 activity audit의 작업자 사번 연결에만 사용한다. DB 기반 작업자 세션이나 mutation 권한을 만들지 않으며, 브라우저의 `sessionStorage` 작업자 정보도 서버 권한 증명이 아니다.
+- `ui_logout` 이벤트를 서버가 정상 수신하면 감사 행위자 쿠키를 제거한다. 전송이 끝나기 전에 탭이나 네트워크가 종료되면 쿠키가 만료 시각까지 남을 수 있다. backend 프로세스 시작 시 환경 변수 `AUDIT_ACTOR_SESSION_SECRET`이 없으면 임시 서명 키가 새로 생성되므로 이전 프로세스가 발급한 쿠키는 재시작 뒤 검증되지 않는다.
+- PIN, 쿠키 원문과 서명 값은 로그·장애 보고서에 복사하지 않는다.
+
+### 관리자 PIN 상태
+
+- 관리자 화면은 `POST /api/settings/verify-pin`으로 PIN을 확인한다. 확인된 관리자 PIN은 React 메모리에만 보관하고 이후 관리자 API 요청의 `X-Admin-Pin` 헤더에 넣는다.
+- 이 값은 서버 세션·DB 세션·브라우저 저장소에 보관되지 않으므로 새로고침하거나 전체 로그아웃하면 다시 입력해야 한다.
+- 관리자 PIN을 변경한 뒤에는 화면을 새로고침하고 새 PIN으로 다시 관리자 인증한다. PIN 원문을 로그·장애 보고서에 기록하지 않는다.
+
+### 업무 변경 권한 경계
+
+- 재고 이동·취소·승인·관리자 변경 등은 각 API가 요구하는 직원 ID, 역할, PIN 또는 관리자 PIN을 서버에서 별도로 검증해야 한다. 화면에 저장된 작업자 정보나 감사 쿠키만으로 변경 권한이 생긴다고 판단하지 않는다.
+- 새 mutation을 추가하거나 기존 mutation을 변경할 때는 해당 route와 service의 실제 권한 검사를 확인하고 회귀 테스트를 붙인다. 품질 보존 브랜치의 `VerifiedActor` 계약을 현재 코드에 존재하는 것처럼 참조하지 않는다.
+- 현재 방식은 신뢰된 사내망의 경량 식별 흐름이다. PIN과 요청이 평문 HTTP 구간을 통과할 수 있으므로 신뢰할 수 없는 네트워크나 인터넷에 공개하지 않는다. 외부 공개가 필요하면 HTTPS와 서버 측 인증·세션·권한 모델을 별도 설계하고 검증한다.
 
 ### 운영 점검
 
-아래 조회는 read-only다. `:current_boot_id`에는 `GET /api/app-session` 응답의 현재 `boot_id`를 사용한다. 직원 수·세션 수는 고정값을 기대하지 말고 추세와 비정상 잔존 여부를 판단한다.
+```powershell
+# backend 재시작 표식 확인
+Invoke-RestMethod http://127.0.0.1:8011/api/app-session
 
-```sql
--- 만료됐지만 아직 보존 중인 세션
-SELECT COUNT(*) AS expired_retained
-FROM operator_sessions
-WHERE expires_at <= CURRENT_TIMESTAMP;
-
--- 활성 직원별 현재 boot의 미폐기·미소비·미만료 작업자 세션
-SELECT e.employee_code, COUNT(*) AS active_sessions
-FROM operator_sessions s
-JOIN employees e ON e.employee_id = s.employee_id
-WHERE s.purpose = 'operator'
-  AND s.revoked_at IS NULL
-  AND s.consumed_at IS NULL
-  AND s.expires_at > CURRENT_TIMESTAMP
-  AND s.boot_id = :current_boot_id
-GROUP BY e.employee_code
-ORDER BY e.employee_code;
-
--- 다른 boot에서 활성처럼 보이는 잔존 행. 인증에는 성공하지 않아야 한다.
-SELECT COUNT(*) AS previous_boot_unrevoked
-FROM operator_sessions
-WHERE revoked_at IS NULL
-  AND consumed_at IS NULL
-  AND expires_at > CURRENT_TIMESTAMP
-  AND boot_id <> :current_boot_id;
-
--- 최초 PIN 변경이 필요한 활성 직원
-SELECT COUNT(*) AS active_pin_change_required
-FROM employees
-WHERE pin_requires_change = TRUE
-  AND LOWER(CAST(is_active AS VARCHAR)) IN ('true', '1');
+# 로그인 PIN 검증의 403·429 발생 확인
+Select-String -Path _attic/runtime/logs/backend/mes.log -Pattern '/api/employees/.*/verify-pin.*status=(403|429)'
 ```
 
-인증 실패와 rate-limit 발생은 `_attic/runtime/logs/backend/mes.log`에서 `/api/operator-session`의 `status=401`, `status=403`, `status=409`, `status=429`를 request ID와 함께 확인한다. session UUID 전체, cookie 값, PIN은 로그나 장애 보고서에 복사하지 않는다.
-
-로그아웃과 PIN 변경 성공 후에도 브라우저 저장소에 opaque auth cookie가 잠시 보일 수 있다. 이는 늦은 응답이 더 최근 로그인 cookie를 삭제하는 교차 탭 경합을 막기 위한 정상 동작이다. 권한 정본은 `operator_sessions.revoked_at`/`consumed_at`이며, 잔존 cookie로 `GET /api/operator-session`과 mutation이 성공하면 안 된다. 새 login/challenge가 같은 이름을 덮어쓰거나 브라우저 session 종료 시 자연 제거된다.
-
-로그아웃 DB 반영이 실패하면 로그인 카드에 `로그아웃 재시도`가 표시되고 업무 UI와 새 로그인은 차단된다. 브라우저의 비민감 pending-revoke 표식에는 상태와 원래 표시 사번만 들어가며 직원 UUID·이름·역할·PIN·token은 들어가지 않는다. 새로고침해도 그 사번 claim으로 서버 `DELETE`를 먼저 재시도하며, 204를 받은 뒤에만 세션 복원 확인과 새 로그인을 진행한다. 그 사이 origin cookie가 다른 작업자로 바뀌면 `403 ACTOR_MISMATCH`로 다른 작업자 세션은 보존된다. 이 상태에서 저장소 표식을 임의 삭제하지 말고 DB 연결을 복구한 뒤 화면의 재시도를 사용한다.
-
-필수 PostgreSQL 경합 runner는 직원 lifecycle 요청도 실제 route decorator와 `VerifiedActor`의 actor/target 정렬 잠금, route의 잠긴 target 소비 경계로 검증한다. 전용 `TEST_POSTGRES_URL`이 없으면 이 항목은 통과가 아니라 `NOT_VERIFIED`로 기록한다.
-
-### 세션 행 보존·정리
-
-만료·폐기·소비 세션 행은 원인 조사와 감사 상관관계를 위해 기준 시각 이후 최소 90일 보존한다. 자동 정리 작업은 아직 등록하지 않으며, 승인된 유지보수 시간에 백업과 위 read-only 건수 확인을 마친 뒤 500행 이하 batch로 삭제한다. 정리 실패는 로그인이나 mutation transaction과 분리해 롤백하고 업무를 계속한다.
-
-SQLite 예시:
-
-```sql
-DELETE FROM operator_sessions
-WHERE session_id IN (
-  SELECT session_id
-  FROM operator_sessions
-  WHERE COALESCE(consumed_at, revoked_at, expires_at) < datetime('now', '-90 days')
-  LIMIT 500
-);
-```
-
-PostgreSQL 예시:
-
-```sql
-WITH expired AS (
-  SELECT session_id
-  FROM operator_sessions
-  WHERE COALESCE(consumed_at, revoked_at, expires_at)
-        < CURRENT_TIMESTAMP - INTERVAL '90 days'
-  LIMIT 500
-)
-DELETE FROM operator_sessions s
-USING expired
-WHERE s.session_id = expired.session_id;
-```
-
-### HTTP 전송 위험과 후속 경계
-
-현재 HTTP LAN에서는 cookie의 `Secure` 속성을 사용할 수 없으므로 PIN·session challenge·operator token이 전송 구간에서 탈취될 위험이 남는다. 신뢰할 수 없는 네트워크나 인터넷에 공개할 수 있는 상태로 판정하지 않는다. HTTPS 적용 전에는 `SESSION_COOKIE_SECURE=1`을 켜지 않는다. HTTP에서 이 값을 켜면 브라우저가 cookie를 다시 보내지 않아 로그인 복원이 실패한다.
-
-HTTPS, 인증서, HTTP→HTTPS redirect, 운영 환경 `Secure` cookie fail-closed는 후속 `SEC-01` 범위다. 이번 CP3는 해당 인프라를 변경하지 않는다.
+브라우저에서 재시작 전 로그인 상태가 남으면 `GET /api/app-session` 응답의 `boot_id`와 해당 탭 `sessionStorage`의 `dexcowin_mes_boot_id`를 비교한다. 값이 다른데도 업무 화면으로 진입하면 로그인 복구 흐름의 결함으로 기록한다. 감사 주체가 비거나 잘못 표시되면 access/activity audit 기록과 `dexcowin_audit_actor` 발급·로그아웃 제거 흐름을 함께 확인한다.
 
 ## 자동 실행 등록 (선택 — Windows Task Scheduler)
 
