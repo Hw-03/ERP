@@ -646,6 +646,13 @@ def test_internal_use_department_group_targets_batch_department_for_queue_notifi
     )
     assert approved.status_code == 200, approved.text
     assert approved.json()["status"] == "completed"
+    db_session.expire_all()
+    department_notification = db_session.query(Notification).filter_by(
+        recipient_employee_id=department_approver.employee_id,
+        related_request_id=request.request_id,
+        target_section="dept-queue",
+    ).one()
+    assert department_notification.is_read is True
 
 
 def test_internal_use_department_self_approval_uses_actual_approval_department(
@@ -806,6 +813,13 @@ def test_as_research_queue_and_pin_approval_are_isolated_from_warehouse_role(
     assert approved.status_code == 200, approved.text
     assert approved.json()["status"] == "completed"
     assert approved.json()["as_research_approved_by_employee_id"] == str(special_approver.employee_id)
+    db_session.expire_all()
+    as_research_notification = db_session.query(Notification).filter_by(
+        recipient_employee_id=special_approver.employee_id,
+        related_request_id=request_id,
+        target_section="as-research-queue",
+    ).one()
+    assert as_research_notification.is_read is True
     assert client.get(
         "/api/stock-requests/as-research-queue/count",
         params={"actor_employee_id": str(special_approver.employee_id)},
@@ -1529,6 +1543,18 @@ def test_internal_use_final_reject_execution_failure_preserves_rejected_request(
     assert persisted_rejection.rejected_by_employee_id == reject_actor.employee_id
     assert persisted_rejection.rejected_by_name == reject_actor.name
     assert persisted_rejection.rejected_reason == rejection_reason
+    rejection_target_section = {
+        "warehouse": "queue",
+        "department": "dept-queue",
+        "as_research": "as-research-queue",
+    }[final_reject_kind]
+    rejection_notifications = db_session.query(Notification).filter_by(
+        related_request_id=rejected_request.request_id,
+        target_section=rejection_target_section,
+        type="approval_request",
+    ).all()
+    assert rejection_notifications
+    assert all(note.is_read is True for note in rejection_notifications)
     assert db_session.query(TransactionLog).count() == 0
     warehouse_inventory = db_session.query(Inventory).filter_by(item_id=warehouse_item.item_id).one()
     production_location = (

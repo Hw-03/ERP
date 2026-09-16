@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import Iterable
 
 from sqlalchemy.orm import Session
@@ -133,6 +134,25 @@ def _add(
             target_section=target_section,
             related_request_id=request.request_id,
         )
+    )
+
+
+def mark_approval_request_notifications_read(
+    db: Session,
+    *,
+    request_id: uuid.UUID,
+    target_section: str,
+) -> int:
+    """처리된 요청 단계의 결재 알림을 모든 수신자에게 읽음 처리한다."""
+    return int(
+        db.query(Notification)
+        .filter(
+            Notification.related_request_id == request_id,
+            Notification.target_section == target_section,
+            Notification.type == NotificationTypeEnum.APPROVAL_REQUEST.value,
+            Notification.is_read.is_(False),
+        )
+        .update({Notification.is_read: True}, synchronize_session="fetch")
     )
 
 

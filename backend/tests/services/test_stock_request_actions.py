@@ -527,6 +527,12 @@ def test_warehouse_approve_rolls_back_inventory_box_log_and_status_when_notifica
     assert _box_quantity(db_session, box.box_id) == 10
     assert db_session.query(TransactionLog).count() == 0
     assert db_session.query(Notification).count() == notifications_before
+    approval_notification = db_session.query(Notification).filter_by(
+        recipient_employee_id=approver.employee_id,
+        related_request_id=request_id,
+        target_section="queue",
+    ).one()
+    assert approval_notification.is_read is False
 
 
 def test_department_approve_rolls_back_execution_when_notification_fails(

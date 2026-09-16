@@ -10,11 +10,18 @@
  *   useCancelStockRequestMutation / useDraftOperations
  */
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
 import type { StockRequestActionPayload, StockRequestCreatePayload } from "@/lib/api/types";
 import { STALE_TIME } from "./client";
 import { queryKeys } from "./keys";
+
+function invalidateDecisionQueries(qc: QueryClient) {
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: queryKeys.stockRequests.all }),
+    qc.invalidateQueries({ queryKey: queryKeys.notifications.all }),
+  ]);
+}
 
 /** 창고 승인 대기열 */
 export function useWarehouseQueueQuery() {
@@ -71,8 +78,7 @@ export function useApproveStockRequestMutation() {
       requestId: string;
       payload: StockRequestActionPayload;
     }) => stockRequestsApi.approveStockRequest(requestId, payload),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: queryKeys.stockRequests.all }),
+    onSuccess: () => invalidateDecisionQueries(qc),
   });
 }
 
@@ -87,8 +93,7 @@ export function useRejectStockRequestMutation() {
       requestId: string;
       payload: StockRequestActionPayload;
     }) => stockRequestsApi.rejectStockRequest(requestId, payload),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: queryKeys.stockRequests.all }),
+    onSuccess: () => invalidateDecisionQueries(qc),
   });
 }
 
@@ -103,8 +108,7 @@ export function useApproveStockRequestDepartmentMutation() {
       requestId: string;
       payload: StockRequestActionPayload;
     }) => stockRequestsApi.approveStockRequestDepartment(requestId, payload),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: queryKeys.stockRequests.all }),
+    onSuccess: () => invalidateDecisionQueries(qc),
   });
 }
 
@@ -119,8 +123,7 @@ export function useRejectStockRequestDepartmentMutation() {
       requestId: string;
       payload: StockRequestActionPayload;
     }) => stockRequestsApi.rejectStockRequestDepartment(requestId, payload),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: queryKeys.stockRequests.all }),
+    onSuccess: () => invalidateDecisionQueries(qc),
   });
 }
 
@@ -130,7 +133,7 @@ export function useApproveStockRequestAsResearchMutation() {
   return useMutation({
     mutationFn: ({ requestId, payload }: { requestId: string; payload: StockRequestActionPayload }) =>
       stockRequestsApi.approveStockRequestAsResearch(requestId, payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.stockRequests.all }),
+    onSuccess: () => invalidateDecisionQueries(qc),
   });
 }
 
@@ -140,7 +143,7 @@ export function useRejectStockRequestAsResearchMutation() {
   return useMutation({
     mutationFn: ({ requestId, payload }: { requestId: string; payload: StockRequestActionPayload }) =>
       stockRequestsApi.rejectStockRequestAsResearch(requestId, payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.stockRequests.all }),
+    onSuccess: () => invalidateDecisionQueries(qc),
   });
 }
 

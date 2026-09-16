@@ -103,6 +103,7 @@ def _run_decision_with_failure_boundary(
     command: Callable[[], None],
     rejected_request_id: uuid.UUID | None = None,
     rejected_reason: str | None = None,
+    rejected_target_section: str | None = None,
 ) -> None:
     """internal-use 실패는 잠금을 유지해 기록하고 일반 요청만 기존처럼 재기록한다."""
     post_commit_error: stock_request_svc.FailedApprovalError | None = None
@@ -123,6 +124,12 @@ def _run_decision_with_failure_boundary(
                     rejected_request_id=rejected_request_id,
                     rejected_reason=rejected_reason,
                 )
+                if rejected_request_id is not None and rejected_target_section is not None:
+                    notification_svc.mark_approval_request_notifications_read(
+                        db,
+                        request_id=rejected_request_id,
+                        target_section=rejected_target_section,
+                    )
                 post_commit_error = exc
     except stock_request_svc.FailedApprovalError as exc:
         _record_failed_decision(
@@ -162,6 +169,11 @@ def approve_warehouse_request(
             approver=approver,
             pin=pin,
             http_request=http_request,
+        )
+        notification_svc.mark_approval_request_notifications_read(
+            db,
+            request_id=request.request_id,
+            target_section="queue",
         )
         if (
             request.status == StockRequestStatusEnum.COMPLETED
@@ -210,6 +222,11 @@ def approve_department_request(
             pin=pin,
             http_request=http_request,
         )
+        notification_svc.mark_approval_request_notifications_read(
+            db,
+            request_id=request.request_id,
+            target_section="dept-queue",
+        )
         if (
             request.status == StockRequestStatusEnum.COMPLETED
             and previous_status != StockRequestStatusEnum.COMPLETED
@@ -251,6 +268,11 @@ def approve_as_research_request(
             pin=pin,
             http_request=http_request,
         )
+        notification_svc.mark_approval_request_notifications_read(
+            db,
+            request_id=request.request_id,
+            target_section="as-research-queue",
+        )
         if (
             request.status == StockRequestStatusEnum.COMPLETED
             and previous_status != StockRequestStatusEnum.COMPLETED
@@ -289,6 +311,11 @@ def reject_as_research_request(
             reason=reason,
             http_request=http_request,
         )
+        notification_svc.mark_approval_request_notifications_read(
+            db,
+            request_id=request.request_id,
+            target_section="as-research-queue",
+        )
         notification_svc.notify_request_decided(db, request, decision="rejected")
 
     _run_decision_with_failure_boundary(
@@ -299,6 +326,7 @@ def reject_as_research_request(
         command=decide,
         rejected_request_id=request_id,
         rejected_reason=reason.strip(),
+        rejected_target_section="as-research-queue",
     )
     return request
 
@@ -376,6 +404,11 @@ def _reject_request(
             reason=reason,
             http_request=http_request,
         )
+        notification_svc.mark_approval_request_notifications_read(
+            db,
+            request_id=request.request_id,
+            target_section="dept-queue" if department else "queue",
+        )
         notification_svc.notify_request_decided(db, request, decision="rejected")
 
     _run_decision_with_failure_boundary(
@@ -386,6 +419,7 @@ def _reject_request(
         command=decide,
         rejected_request_id=request_id,
         rejected_reason=reason.strip(),
+        rejected_target_section="dept-queue" if department else "queue",
     )
     return request
 

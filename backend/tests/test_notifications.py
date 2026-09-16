@@ -188,6 +188,73 @@ def test_as_research_request_notifies_only_active_special_approvers(db_session):
     assert notes[0].target_section == "as-research-queue"
 
 
+def test_mark_approval_request_notifications_read_scopes_to_request_and_section(db_session):
+    requester = _make_employee(db_session, code="SCOPE-REQ")
+    recipients = [_make_employee(db_session, code=f"SCOPE-{index}") for index in range(5)]
+    request = StockRequest(
+        requester_employee_id=requester.employee_id,
+        requester_name=requester.name,
+        requester_department=requester.department,
+        request_type=StockRequestTypeEnum.WAREHOUSE_TO_DEPT,
+        status=StockRequestStatusEnum.RESERVED,
+    )
+    other_request = StockRequest(
+        requester_employee_id=requester.employee_id,
+        requester_name=requester.name,
+        requester_department=requester.department,
+        request_type=StockRequestTypeEnum.WAREHOUSE_TO_DEPT,
+        status=StockRequestStatusEnum.RESERVED,
+    )
+    db_session.add_all([request, other_request])
+    db_session.flush()
+    matching = [
+        Notification(
+            recipient_employee_id=recipients[index].employee_id,
+            type="approval_request",
+            title="새 결재 요청",
+            target_section="queue",
+            related_request_id=request.request_id,
+        )
+        for index in range(2)
+    ]
+    untouched = [
+        Notification(
+            recipient_employee_id=recipients[2].employee_id,
+            type="approval_request",
+            title="다음 단계 결재 요청",
+            target_section="dept-queue",
+            related_request_id=request.request_id,
+        ),
+        Notification(
+            recipient_employee_id=recipients[3].employee_id,
+            type="approval_request",
+            title="다른 요청",
+            target_section="queue",
+            related_request_id=other_request.request_id,
+        ),
+        Notification(
+            recipient_employee_id=recipients[4].employee_id,
+            type="approval_approved",
+            title="결재 승인됨",
+            target_section="queue",
+            related_request_id=request.request_id,
+        ),
+    ]
+    db_session.add_all([*matching, *untouched])
+    db_session.flush()
+
+    updated = notif_svc.mark_approval_request_notifications_read(
+        db_session,
+        request_id=request.request_id,
+        target_section="queue",
+    )
+    db_session.flush()
+
+    assert updated == 2
+    assert all(note.is_read is True for note in matching)
+    assert all(note.is_read is False for note in untouched)
+
+
 # ---------------------------------------------------------------------------
 # 도착 / 승인 / 반려 (E2E)
 # ---------------------------------------------------------------------------
@@ -214,6 +281,7 @@ def test_approve_notifies_requester(client, db_session, make_item):
     item = make_item(name="W002", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="REQ2", name="요청자2")
     wh_primary = _make_employee(db_session, code="WHP2", name="창고정2", warehouse_role="primary")
+    wh_deputy = _make_employee(db_session, code="WHD2", name="창고부2", warehouse_role="deputy")
     db_session.commit()
 
     out = _w2d_request(client, requester, item)
@@ -231,12 +299,16 @@ def test_approve_notifies_requester(client, db_session, make_item):
         headers=_actor_headers(requester),
     ).json()["items"]
     assert any(n["type"] == "approval_approved" for n in items)
+    assert _unread(client, requester) == 1
+    assert _unread(client, wh_primary) == 0
+    assert _unread(client, wh_deputy) == 0
 
 
 def test_reject_notifies_requester(client, db_session, make_item):
     item = make_item(name="W003", warehouse_qty=Decimal("10"))
     requester = _make_employee(db_session, code="REQ3", name="요청자3")
     wh_primary = _make_employee(db_session, code="WHP3", name="창고정3", warehouse_role="primary")
+    wh_deputy = _make_employee(db_session, code="WHD3", name="창고부3", warehouse_role="deputy")
     db_session.commit()
 
     out = _w2d_request(client, requester, item)
@@ -253,6 +325,9 @@ def test_reject_notifies_requester(client, db_session, make_item):
         headers=_actor_headers(requester),
     ).json()["items"]
     assert any(n["type"] == "approval_rejected" for n in items)
+    assert _unread(client, requester) == 1
+    assert _unread(client, wh_primary) == 0
+    assert _unread(client, wh_deputy) == 0
 
 
 # ---------------------------------------------------------------------------
