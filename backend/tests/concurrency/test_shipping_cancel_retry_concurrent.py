@@ -44,7 +44,7 @@ def test_shipping_duplicate_commands_apply_once(make_session, command):
         if command != "prepare":
             shipping_actions.prepare_complete(db, request_id, "RACE-SN", prepared_by_employee_id=actor_id, prepared_by_name=actor.name)
         if command == "cancel_pickup":
-            shipping_actions.pickup_complete(db, request_id)
+            shipping_actions.pickup_complete(db, request_id, actor=actor)
         if command.startswith("cancel_"):
             operation = workflow.latest_operation(db, request_id, command.removeprefix("cancel_"))
             operation_id = operation.operation_id
@@ -57,7 +57,7 @@ def test_shipping_duplicate_commands_apply_once(make_session, command):
                 if command == "prepare":
                     shipping_actions.prepare_complete(db, request_id, "RACE-SN", prepared_by_employee_id=actor_id, prepared_by_name=actor.name)
                 elif command == "pickup":
-                    shipping_actions.pickup_complete(db, request_id)
+                    shipping_actions.pickup_complete(db, request_id, actor=actor)
                 elif entrypoint == "common":
                     cancellation.cancel_operation(db, operation_id=operation_id, canceller=actor, reason="race", plan_hash=plan_hash)
                 elif command == "cancel_prepare":

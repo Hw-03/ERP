@@ -371,7 +371,7 @@ def _run_shipping(db, plan: ShowcasePlan, marker: str) -> None:
         prepared_by_employee_id=plan.actor.employee_id,
         prepared_by_name=plan.actor.name,
     )
-    shipping_svc.pickup_complete(db, request.request_id)
+    shipping_svc.pickup_complete(db, request.request_id, actor=plan.actor)
     logs = db.query(TransactionLog).filter(TransactionLog.shipping_request_id == request.request_id).all()
     for log in logs:
         log.notes = f"{log.notes or ''} {marker}".strip()

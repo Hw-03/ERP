@@ -187,7 +187,7 @@ def _assert_terminal_shipping_commands_fail(
 ) -> None:
     commands = (
         lambda: shipping_actions.prepare_cancel(db, request_id, actor=actor),
-        lambda: shipping_actions.pickup_complete(db, request_id),
+        lambda: shipping_actions.pickup_complete(db, request_id, actor=actor),
         lambda: shipping_actions.pickup_cancel(db, request_id, actor=actor),
     )
     for command in commands:

@@ -1682,6 +1682,8 @@ def _consume_pickup_allocations(
     req: ShippingRequest,
     final_pf: Item,
     request_qty: int,
+    *,
+    actor: Employee,
     operation: InventoryOperation | None = None,
 ) -> None:
     """Deduct reserved pickup items, with a direct-deduction fallback for legacy requests."""
@@ -1698,6 +1700,7 @@ def _consume_pickup_allocations(
             final_pf,
             request_qty,
             f"출하 픽업: {final_pf.item_name} x {request_qty}",
+            actor=actor,
             operation=operation,
         )
         for line in req.companion_lines:
@@ -1707,6 +1710,7 @@ def _consume_pickup_allocations(
                 line.item,
                 int(line.quantity),
                 f"동반 출하: {line.item.item_name}",
+                actor=actor,
                 operation=operation,
             )
         return
@@ -1724,6 +1728,7 @@ def _consume_pickup_allocations(
                 allocation.item,
                 int(allocation.quantity or 0),
                 f"출하 픽업: {allocation.item.item_name} x {int(allocation.quantity or 0)}",
+                actor=actor,
                 operation=operation,
             )
             allocation.status = ALLOCATION_CONSUMED
@@ -1746,6 +1751,7 @@ def _consume_pickup_allocations(
             final_pf,
             request_qty,
             f"출하 픽업: {final_pf.item_name} x {request_qty}",
+            actor=actor,
             operation=operation,
         )
 
@@ -1758,6 +1764,7 @@ def _consume_pickup_allocations(
             allocation.item,
             int(allocation.quantity or 0),
             f"동반 출하: {allocation.item.item_name}",
+            actor=actor,
             operation=operation,
         )
         allocation.status = ALLOCATION_CONSUMED
@@ -1896,6 +1903,7 @@ def _ship_from_item_location(
     qty: int,
     notes: str,
     *,
+    actor: Employee,
     operation: InventoryOperation | None = None,
 ) -> None:
     reference_no = f"SHIP-{req.request_id.hex[:8]}"
@@ -1913,8 +1921,8 @@ def _ship_from_item_location(
         quantity_change=-qty,
         quantity_before=int(qty_before),
         reference_no=reference_no,
-        produced_by=req.prepared_by_name or req.requested_by_name,
-        producer_employee_id=req.prepared_by_employee_id,
+        produced_by=actor.name,
+        producer_employee_id=actor.employee_id,
         notes=notes,
         before_cells=before,
         request_id=req.request_id,
@@ -1926,7 +1934,13 @@ def _ship_from_item_location(
 
 
 
-def pickup_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
+def pickup_complete(
+    db: Session,
+    request_id: uuid.UUID,
+    *,
+    actor: Employee,
+) -> ShippingRequest:
+    actor = _require_actor(actor)
     req = _lock_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PREPARED:
         raise ShippingError("준비 완료 요청에서만 픽업 완료할 수 있습니다.")
@@ -1938,8 +1952,8 @@ def pickup_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
         domain="shipping",
         action="pickup",
         display_label="출하 픽업",
-        actor_name=req.prepared_by_name or req.requested_by_name,
-        actor_employee_id=req.prepared_by_employee_id,
+        actor_name=actor.name,
+        actor_employee_id=actor.employee_id,
         reason=req.notes,
         idempotency_key=workflow_ops.next_operation_key(db, req.request_id, "pickup"),
     )
@@ -1948,6 +1962,7 @@ def pickup_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
         req,
         req.final_pf_item,
         request_qty,
+        actor=actor,
         operation=operation,
     )
     req.status = ShippingRequestStatusEnum.PICKED_UP

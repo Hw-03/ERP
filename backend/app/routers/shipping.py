@@ -588,8 +588,18 @@ def prepare_cancel(
 
 
 @router.post("/requests/{request_id}/pickup-complete", response_model=ShippingRequestResponse)
-def pickup_complete(request_id: uuid.UUID, db: Session = Depends(get_db)):
-    req = _action_or_422(db, shipping_actions_svc.pickup_complete, request_id)
+def pickup_complete(
+    request_id: uuid.UUID,
+    http_request: Request,
+    db: Session = Depends(get_db),
+):
+    actor = _load_shipping_actor(http_request, db)
+    req = _action_or_422(
+        db,
+        shipping_actions_svc.pickup_complete,
+        request_id,
+        actor=actor,
+    )
     return _to_response(db, req)
 
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from decimal import Decimal
+import uuid
 
 import pytest
 from sqlalchemy.orm import Session
@@ -414,6 +415,15 @@ def _make_prepared_request(
     )
 
 
+def _prepared_actor(db_session: Session, request_id: uuid.UUID) -> Employee:
+    request = db_session.get(ShippingRequest, request_id)
+    assert request is not None
+    assert request.prepared_by_employee_id is not None
+    actor = db_session.get(Employee, request.prepared_by_employee_id)
+    assert actor is not None
+    return actor
+
+
 @pytest.mark.parametrize("entrypoint", ["shipping", "common"])
 @pytest.mark.parametrize("cancel_prepare", [False, True])
 def test_shipping_cancel_retry_cycles_preserve_stock_and_history(
@@ -442,7 +452,7 @@ def test_shipping_cancel_retry_cycles_preserve_stock_and_history(
         assert not cancellation_svc.preview_cancellation(db_session, operation.operation_id).can_cancel
 
     for _ in range(3):
-        shipping_actions_svc.pickup_complete(db_session, request_id)
+        shipping_actions_svc.pickup_complete(db_session, request_id, actor=actor)
         old_prepare = workflow_ops.latest_operation(db_session, request_id, "prepare", active_only=True)
         assert not cancellation_svc.preview_cancellation(db_session, old_prepare.operation_id).can_cancel
         cancel("pickup")
@@ -464,7 +474,7 @@ def test_shipping_cancel_retry_cycles_preserve_stock_and_history(
         assert len(active) == 2 and sum(a.quantity for a in active) == 2
         assert not cancellation_svc.preview_cancellation(db_session, old_prepare.operation_id).can_cancel
 
-    shipping_actions_svc.pickup_complete(db_session, request_id)
+    shipping_actions_svc.pickup_complete(db_session, request_id, actor=actor)
     assert [_location_qty(db_session, item, DepartmentEnum.SHIPPING) for item in item_ids] == [qty - 1 for qty in stock_before]
     assert db_session.query(ShippingRequestEvent).filter_by(request_id=request_id, event_type="PREPARE_CANCELLED").count() == (3 if cancel_prepare else 0)
     assert db_session.query(ShippingRequestEvent).filter_by(request_id=request_id, event_type="PICKUP_CANCELLED").count() == 3
@@ -489,7 +499,7 @@ def test_shipping_changed_companions_do_not_reuse_released_allocations(
     # 기존 일회성 복구에서 변경된 키도 원장 연결로 찾는다.
     original.idempotency_key += f":cancelled:{original.operation_id}"
     db_session.commit()
-    shipping_actions_svc.pickup_complete(db_session, request_id)
+    shipping_actions_svc.pickup_complete(db_session, request_id, actor=actor)
     shipping_actions_svc.pickup_cancel(db_session, request_id, actor=actor)
     shipping_actions_svc.prepare_cancel(db_session, request_id, "change", actor=actor)
     shipping_actions_svc.update_request(db_session, request_id, {"companion_lines": []}, actor)
@@ -497,7 +507,7 @@ def test_shipping_changed_companions_do_not_reuse_released_allocations(
     active = db_session.query(ShippingAllocation).filter_by(request_id=request_id, status="RESERVED").all()
     assert [(a.item_id, a.quantity) for a in active] == [(pf_id, 1)]
     assert db_session.query(ShippingAllocation).filter_by(request_id=request_id, item_id=companion_id, status="RELEASED").count() == 1
-    shipping_actions_svc.pickup_complete(db_session, request_id)
+    shipping_actions_svc.pickup_complete(db_session, request_id, actor=actor)
     assert _location_qty(db_session, companion_id, DepartmentEnum.SHIPPING) == 2
 
 
@@ -794,7 +804,11 @@ def test_pickup_complete_restores_inventory_logs_allocation_and_status_when_even
     monkeypatch.setattr(shipping_svc, "_record_event", fail_event)
 
     with pytest.raises(RuntimeError, match="pickup event failure"):
-        shipping_actions_svc.pickup_complete(db_session, request_id)
+        shipping_actions_svc.pickup_complete(
+            db_session,
+            request_id,
+            actor=_prepared_actor(db_session, request_id),
+        )
 
     db_session.expire_all()
     with Session(bind=db_session.get_bind()) as verify_db:
@@ -822,7 +836,11 @@ def test_pickup_cancel_creates_reversal_operation_and_restores_prepared_request(
     prepared_final_pf_qty = _location_qty(db_session, final_pf_id, DepartmentEnum.SHIPPING)
     prepared_companion_qty = _location_qty(db_session, companion_id, DepartmentEnum.SHIPPING)
 
-    shipping_actions_svc.pickup_complete(db_session, request_id)
+    shipping_actions_svc.pickup_complete(
+        db_session,
+        request_id,
+        actor=_prepared_actor(db_session, request_id),
+    )
     pickup_item_ids = sorted(
         {
             log.item_id
@@ -954,7 +972,11 @@ def test_pickup_cancel_rolls_back_when_event_recording_fails(
         make_location,
     )
     item_ids = (final_pa_id, final_pf_id, companion_id)
-    shipping_actions_svc.pickup_complete(db_session, request_id)
+    shipping_actions_svc.pickup_complete(
+        db_session,
+        request_id,
+        actor=_prepared_actor(db_session, request_id),
+    )
     with Session(bind=db_session.get_bind()) as verify_db:
         before = _prepared_request_state(verify_db, request_id, item_ids)
     assert before["request"][0] == ShippingRequestStatusEnum.PICKED_UP

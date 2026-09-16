@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from types import SimpleNamespace
 
 import pytest
 
@@ -181,6 +182,7 @@ def test_pickup_can_consume_own_reservation_but_not_another_requests(
         item,
         60,
         "자기 예약 픽업",
+        actor=SimpleNamespace(name="예약 픽업 작업자", employee_id=None),
     )
 
     db_session.expire_all()

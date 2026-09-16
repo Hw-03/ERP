@@ -287,6 +287,23 @@ describe("fetcher / write helpers", () => {
     expect(headers["X-Employee-Code"]).toBeUndefined();
   });
 
+  it("postJson keeps the current operator code on write requests", async () => {
+    window.sessionStorage.setItem(
+      "dexcowin_mes_operator",
+      JSON.stringify({ employee_id: "emp-1", name: "Kim", employee_code: "E22" }),
+    );
+    const fetchSpy = vi.fn(() =>
+      Promise.resolve(makeResponse({ ok: true, body: { ok: true } })),
+    );
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await postJson("/api/shipping/requests/test/pickup-complete", {});
+
+    const init = fetchSpy.mock.calls[0][1] as RequestInit;
+    const headers = init.headers as Record<string, string>;
+    expect(headers["X-MES-Employee-Code"]).toBe("E22");
+  });
+
   it("fetcher skips the log-only employee header before login", async () => {
     const fetchSpy = vi.fn(() =>
       Promise.resolve(makeResponse({ ok: true, body: { ok: true } })),

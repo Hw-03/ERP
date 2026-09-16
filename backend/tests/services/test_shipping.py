@@ -105,7 +105,13 @@ def test_pickup_consumption_prelocks_sorted_unique_inventories(
         lambda _db, _req, item, _qty, _notes, **_kwargs: events.append(("ship", item.item_id)),
     )
 
-    shipping_svc._consume_pickup_allocations(db_session, request, final_pf, 1)
+    shipping_svc._consume_pickup_allocations(
+        db_session,
+        request,
+        final_pf,
+        1,
+        actor=SimpleNamespace(name="pickup actor", employee_id=uuid.uuid4()),
+    )
 
     assert events[0] == (
         "lock",
@@ -809,7 +815,7 @@ def test_component_change_then_prepare_and_pickup_reserves_companions(
     )
     assert prepare_logs == []
 
-    shipping_svc.pickup_complete(db_session, req.request_id)
+    shipping_svc.pickup_complete(db_session, req.request_id, actor=shipping_actor)
 
     assert _location_qty(db_session, final_pf, DepartmentEnum.SHIPPING) == 0
     assert _location_qty(db_session, carton, DepartmentEnum.SHIPPING) == 4
@@ -824,8 +830,8 @@ def test_component_change_then_prepare_and_pickup_reserves_companions(
         TransactionTypeEnum.SHIP,
         TransactionTypeEnum.SHIP,
     ]
-    assert {log.produced_by for log in pickup_logs} == {"shipping-user"}
-    assert all(log.producer_employee_id is None for log in pickup_logs)
+    assert {log.produced_by for log in pickup_logs} == {shipping_actor.name}
+    assert {log.producer_employee_id for log in pickup_logs} == {shipping_actor.employee_id}
     pickup_operation = (
         db_session.query(InventoryOperation)
         .filter(
@@ -1361,10 +1367,11 @@ def test_request_quantity_multiplies_prepare_and_pickup_and_preserves_companions
             "companion_lines": [{"item_id": carton.item_id, "quantity": 2, "unit": "EA"}],
         },
     )
+    shipping_actor = _shipping_actor(db_session)
     _submit_final_pf_production(
         db_session,
         request=req,
-        actor=_shipping_actor(db_session),
+        actor=shipping_actor,
     )
 
     prepared = shipping_svc.prepare_complete(db_session, req.request_id, "SN-001")
@@ -1395,7 +1402,7 @@ def test_request_quantity_multiplies_prepare_and_pickup_and_preserves_companions
     assert _active_allocation_qty(db_session, req.request_id, carton) == 0
 
     shipping_svc.prepare_complete(db_session, req.request_id, "SN-001")
-    shipping_svc.pickup_complete(db_session, req.request_id)
+    shipping_svc.pickup_complete(db_session, req.request_id, actor=shipping_actor)
 
     assert _location_qty(db_session, pf, DepartmentEnum.SHIPPING) == 0
     assert _location_qty(db_session, carton, DepartmentEnum.SHIPPING) == 0

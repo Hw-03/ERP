@@ -143,10 +143,15 @@ def prepare_cancel(
         return shipping_svc.prepare_cancel(db, request_id, reason, actor=actor)
 
 
-def pickup_complete(db: Session, request_id: uuid.UUID) -> ShippingRequest:
+def pickup_complete(
+    db: Session,
+    request_id: uuid.UUID,
+    *,
+    actor: Employee,
+) -> ShippingRequest:
     """픽업의 재고·원장·배정·상태를 원자적으로 확정한다."""
     with transactional(db):
-        return shipping_svc.pickup_complete(db, request_id)
+        return shipping_svc.pickup_complete(db, request_id, actor=actor)
 
 
 def pickup_cancel(

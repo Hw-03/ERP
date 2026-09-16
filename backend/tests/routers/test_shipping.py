@@ -12,8 +12,10 @@ from app.models import (
     DepartmentEnum,
     Employee,
     EmployeeLevelEnum,
+    InventoryOperation,
     ShippingRequest,
     ShippingRequestStatusEnum,
+    SystemSetting,
     TransactionLog,
 )
 
@@ -1348,7 +1350,7 @@ def test_shipping_prepare_complete_accepts_preproduced_pf_in_shipping_department
     )
 
 
-def test_shipping_prepare_actor_is_snapshotted_cleared_and_used_for_pickup_logs(
+def test_shipping_prepare_actor_is_retained_and_picker_is_recorded_in_pickup_ledgers(
     client, db_session, make_item, make_bom, make_location
 ):
     af = make_item(name="Prepared actor AF", process_type_code="AF", model_symbol="4", serial_no=21)
@@ -1357,6 +1359,12 @@ def test_shipping_prepare_actor_is_snapshotted_cleared_and_used_for_pickup_logs(
     make_bom(pa.item_id, af.item_id, Decimal("1"))
     make_bom(pf.item_id, pa.item_id, Decimal("1"))
     make_location(pf.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
+    db_session.add(
+        SystemSetting(
+            setting_key="inventory_operation_cutover_at",
+            setting_value="2026-01-01T00:00:00",
+        )
+    )
     actor = (
         db_session.query(Employee)
         .filter(Employee.employee_code == "shipping-test-actor")
@@ -1395,8 +1403,19 @@ def test_shipping_prepare_actor_is_snapshotted_cleared_and_used_for_pickup_logs(
         json={"serial_numbers": "SN-ACTOR-002"},
     )
     assert prepared_again.status_code == 200, prepared_again.text
+
+    picker = _employee(
+        db_session,
+        code="shipping-pickup-actor",
+        name="픽업 테스트 작업자",
+        department=DepartmentEnum.SHIPPING,
+    )
+    db_session.commit()
+    client.headers["X-MES-Employee-Code"] = picker.employee_code
     picked_up = client.post(f"/api/shipping/requests/{request_id}/pickup-complete")
     assert picked_up.status_code == 200, picked_up.text
+    assert picked_up.json()["prepared_by_employee_id"] == str(actor.employee_id)
+    assert picked_up.json()["prepared_by_name"] == actor.name
 
     pickup_logs = (
         db_session.query(TransactionLog)
@@ -1407,8 +1426,95 @@ def test_shipping_prepare_actor_is_snapshotted_cleared_and_used_for_pickup_logs(
         .all()
     )
     assert pickup_logs
-    assert {log.produced_by for log in pickup_logs} == {actor.name}
-    assert {log.producer_employee_id for log in pickup_logs} == {actor.employee_id}
+    assert {log.produced_by for log in pickup_logs} == {picker.name}
+    assert {log.producer_employee_id for log in pickup_logs} == {picker.employee_id}
+    pickup_operation = (
+        db_session.query(InventoryOperation)
+        .filter(
+            InventoryOperation.domain == "shipping",
+            InventoryOperation.action == "pickup",
+        )
+        .one()
+    )
+    assert pickup_operation.actor_name == picker.name
+    assert pickup_operation.actor_employee_id == picker.employee_id
+
+
+@pytest.mark.parametrize(
+    ("actor_mode", "expected_status"),
+    [("missing", 400), ("inactive", 403)],
+)
+def test_shipping_pickup_complete_rejects_invalid_actor_without_state_changes(
+    client,
+    db_session,
+    make_item,
+    make_bom,
+    make_location,
+    actor_mode,
+    expected_status,
+):
+    af = make_item(name=f"Pickup guard {actor_mode} AF", process_type_code="AF", model_symbol="4", serial_no=41)
+    pa = make_item(name=f"Pickup guard {actor_mode} PA", process_type_code="PA", model_symbol="4", serial_no=42)
+    pf = make_item(name=f"Pickup guard {actor_mode} PF", process_type_code="PF", model_symbol="4", serial_no=43)
+    make_bom(pa.item_id, af.item_id, Decimal("1"))
+    make_bom(pf.item_id, pa.item_id, Decimal("1"))
+    make_location(pf.item_id, department=DepartmentEnum.SHIPPING, quantity=Decimal("1"))
+    db_session.add(
+        SystemSetting(
+            setting_key="inventory_operation_cutover_at",
+            setting_value="2026-01-01T00:00:00",
+        )
+    )
+    db_session.commit()
+
+    create = client.post(
+        "/api/shipping/requests",
+        json={
+            "base_pf_item_id": str(pf.item_id),
+            "invoice_number": f"pickup-guard-{actor_mode}",
+        },
+    )
+    assert create.status_code == 201, create.text
+    request_id = create.json()["request_id"]
+    prepared = client.post(
+        f"/api/shipping/requests/{request_id}/prepare-complete",
+        json={"serial_numbers": "SN-PICKUP-GUARD-001"},
+    )
+    assert prepared.status_code == 200, prepared.text
+
+    if actor_mode == "missing":
+        client.headers.pop("X-MES-Employee-Code", None)
+    else:
+        inactive = _employee(
+            db_session,
+            code="inactive-pickup-actor",
+            name="Inactive pickup actor",
+            is_active=False,
+            department=DepartmentEnum.SHIPPING,
+        )
+        db_session.commit()
+        client.headers["X-MES-Employee-Code"] = inactive.employee_code
+
+    response = client.post(f"/api/shipping/requests/{request_id}/pickup-complete")
+    assert response.status_code == expected_status, response.text
+
+    db_session.expire_all()
+    request = (
+        db_session.query(ShippingRequest)
+        .filter(ShippingRequest.request_id == uuid.UUID(request_id))
+        .one()
+    )
+    assert request.status is ShippingRequestStatusEnum.PREPARED
+    assert request.picked_up_at is None
+    assert (
+        db_session.query(TransactionLog)
+        .filter(
+            TransactionLog.shipping_request_id == uuid.UUID(request_id),
+            TransactionLog.shipping_phase == "PICKUP",
+        )
+        .count()
+        == 0
+    )
 
 
 @pytest.mark.parametrize(
