@@ -24,10 +24,12 @@ def test_full_area_runner_uses_hidden_processes_logs_and_heartbeats() -> None:
     assert "WaitForExit" in script
 
 
-def test_backend_worker_cap_uses_half_the_available_cpu_up_to_four() -> None:
+def test_backend_worker_count_accepts_a_validated_environment_override() -> None:
     script = _script()
 
     assert "function Get-BackendWorkerCount" in script
+    assert "DEXCOWIN_BACKEND_WORKERS" in script
+    assert "must be a positive integer" in script
     assert "[Math]::Floor([Environment]::ProcessorCount / 2)" in script
     assert "[Math]::Min(4" in script
     assert "[Math]::Max(1" in script
@@ -74,6 +76,23 @@ def test_smart_targeted_gates_use_independent_hidden_children() -> None:
     ):
         assert f'"{gate_id}"' in script
     assert "-InternalGateFile" in script
+
+
+def test_backend_full_gates_use_the_existing_parallel_child_runner() -> None:
+    script = _script()
+
+    assert "Running backend full gates in parallel" in script
+    assert "Invoke-ParallelGates -Gates $BackendFullGates" in script
+    assert '"backend-pytest-full"' in script
+    assert '"backend-openapi"' in script
+
+
+def test_self_tested_tooling_gate_uses_node_test_on_node_20() -> None:
+    script = _script()
+
+    assert '"tooling-node-tests"' in script
+    assert '[string] $Gate.area -in @("frontend", "tooling")' in script
+    assert "node --test @ToolingTestFiles" in script
 
 
 def test_smart_frontend_gates_use_local_windows_bins_and_thread_pool() -> None:

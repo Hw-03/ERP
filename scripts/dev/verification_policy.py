@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Literal, Sequence
 
 
-Area = Literal["frontend", "backend", "docs", "infra", "unknown"]
+Area = Literal["frontend", "backend", "docs", "tooling", "infra", "unknown"]
 VALID_MODES = {"smart", "auto", "full", "frontend", "backend", "docs"}
 VALID_CHANGE_SETS = {"auto", "staged", "working"}
 
@@ -86,6 +86,30 @@ def classify_path(path: str) -> Area:
     return "unknown"
 
 
+def _self_tested_tooling_test_path(change: Change, known_paths: set[str]) -> str | None:
+    """인접 Node 테스트가 있는 안전한 개발 생성기만 경량 tooling 게이트로 분류한다."""
+
+    if change.status.upper().startswith(("D", "R", "C")) or change.old_path:
+        return None
+
+    path = normalize_path(change.path)
+    test_match = re.fullmatch(r"scripts/dev/(generate-[^/]+)\.test\.mjs", path)
+    generator_match = re.fullmatch(r"scripts/dev/(generate-[^/]+)\.mjs", path)
+    if test_match:
+        stem = test_match.group(1)
+        test_path = path
+    elif generator_match:
+        stem = generator_match.group(1)
+        test_path = f"scripts/dev/{stem}.test.mjs"
+    else:
+        return None
+
+    generator_path = f"scripts/dev/{stem}.mjs"
+    if generator_path not in known_paths or test_path not in known_paths:
+        return None
+    return test_path
+
+
 def _gate(gate_id: str, area: Area, kind: str, reason: str, files: Sequence[str]) -> dict[str, Any]:
     return {
         "id": gate_id,
@@ -126,6 +150,30 @@ def _docs_gates(files: Sequence[str], reason: str) -> list[dict[str, Any]]:
     return [
         _gate(gate_id, "docs", "targeted", f"{reason}: {labels[gate_id]}", files)
         for gate_id in DOCS_GATES
+    ]
+
+
+def _tooling_gates(
+    changes: Sequence[Change],
+    known_paths: set[str],
+) -> list[dict[str, Any]]:
+    test_files = sorted(
+        {
+            test_path
+            for change in changes
+            if (test_path := _self_tested_tooling_test_path(change, known_paths))
+        }
+    )
+    if not test_files:
+        return []
+    return [
+        _gate(
+            "tooling-node-tests",
+            "tooling",
+            "targeted",
+            "self-tested dev generator changed",
+            test_files,
+        )
     ]
 
 
@@ -247,16 +295,18 @@ def _conflicting_paths(staged: Sequence[Change], working: Sequence[Change]) -> l
     return sorted(staged_paths & working_paths)
 
 
-def _change_areas(change: Change) -> set[Area]:
+def _change_areas(change: Change, known_paths: set[str]) -> set[Area]:
     """A move belongs to both its source and destination verification areas."""
 
+    if _self_tested_tooling_test_path(change, known_paths):
+        return {"tooling"}
     paths = (change.path, change.old_path)
     return {classify_path(path) for path in paths if path}
 
 
-def _areas(changes: Sequence[Change]) -> list[Area]:
-    present = {area for change in changes for area in _change_areas(change)}
-    return [area for area in ("backend", "frontend", "docs", "infra", "unknown") if area in present]
+def _areas(changes: Sequence[Change], known_paths: set[str]) -> list[Area]:
+    present = {area for change in changes for area in _change_areas(change, known_paths)}
+    return [area for area in ("backend", "frontend", "docs", "tooling", "infra", "unknown") if area in present]
 
 
 def _smart_area_gates(
@@ -264,11 +314,14 @@ def _smart_area_gates(
     area: Area,
     selected: Sequence[Change],
     testmon_cache_exists: bool,
+    known_paths: set[str],
 ) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
-    area_changes = [change for change in selected if area in _change_areas(change)]
+    area_changes = [change for change in selected if area in _change_areas(change, known_paths)]
     files = _paths(area_changes)
     if area == "docs":
         return _docs_gates(files, "docs changed"), []
+    if area == "tooling":
+        return _tooling_gates(area_changes, known_paths), []
     if area == "frontend":
         risk = next((reason for change in area_changes if (reason := _frontend_risk_reason(change))), None)
         if risk:
@@ -310,6 +363,7 @@ def make_plan(
     staged_changes: Sequence[Change],
     working_changes: Sequence[Change],
     testmon_cache_exists: bool,
+    known_paths: Sequence[str] = (),
 ) -> dict[str, Any]:
     """변경 집합과 캐시 상태만으로 실행할 검증 게이트를 결정한다."""
 
@@ -319,6 +373,7 @@ def make_plan(
         raise ValueError(f"unsupported change set: {change_set}")
     staged = _unique_changes(staged_changes)
     working = _unique_changes(working_changes)
+    normalized_known_paths = {normalize_path(path) for path in known_paths}
 
     if mode == "smart":
         selected_kind = "staged" if change_set == "auto" and staged else change_set
@@ -334,7 +389,7 @@ def make_plan(
                 "selected_files": _paths(selected),
                 "ignored_files": _paths(ignored),
                 "conflicts": conflicts,
-                "areas": _areas(selected),
+                "areas": _areas(selected, normalized_known_paths),
                 "escalations": [],
                 "gates": [],
                 "testmon_cache_exists": testmon_cache_exists,
@@ -346,7 +401,7 @@ def make_plan(
         conflicts = []
 
     files = _paths(selected)
-    selected_areas = _areas(selected)
+    selected_areas = _areas(selected, normalized_known_paths)
     selected_has_docs = "docs" in selected_areas
     escalations: list[dict[str, str]] = []
     gates: list[dict[str, Any]] = []
@@ -382,6 +437,8 @@ def make_plan(
                 gates.extend(_full_frontend_gates(files, "legacy auto frontend scope"))
             if "docs" in selected_areas:
                 gates.extend(_docs_gates(files, "legacy auto docs scope"))
+            if "tooling" in selected_areas:
+                gates.extend(_tooling_gates(selected, normalized_known_paths))
             if "backend" in selected_areas and "frontend" in selected_areas:
                 gates.append(_gate("git-status", "infra", "report", "legacy combined scope", files))
     else:
@@ -394,13 +451,14 @@ def make_plan(
                 gates = [*_docs_gates(files, reason), *gates]
             selected_areas = ["backend", "frontend"]
         else:
-            for area in ("backend", "frontend", "docs"):
+            for area in ("backend", "frontend", "docs", "tooling"):
                 if area not in selected_areas:
                     continue
                 area_gates, area_escalations = _smart_area_gates(
                     area=area,
                     selected=selected,
                     testmon_cache_exists=testmon_cache_exists,
+                    known_paths=normalized_known_paths,
                 )
                 gates.extend(area_gates)
                 escalations.extend(area_escalations)
@@ -530,6 +588,18 @@ def _load_changes_for_plan(
     return staged, _enrich_changes_with_patches(repo_root, working, staged=False)
 
 
+def _known_paths(repo_root: Path) -> list[str]:
+    """추적·미추적 파일을 함께 읽어 인접 tooling 테스트 존재 여부를 판단한다."""
+
+    return _run_git(
+        repo_root,
+        "ls-files",
+        "--cached",
+        "--others",
+        "--exclude-standard",
+    ).splitlines()
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Git 상태를 읽어 PowerShell이 소비할 JSON 계획을 표준 출력에 기록한다."""
 
@@ -555,6 +625,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         staged_changes=staged_changes,
         working_changes=working_changes,
         testmon_cache_exists=(repo_root / "backend" / ".testmondata").is_file(),
+        known_paths=_known_paths(repo_root),
     )
     print(json.dumps(plan, ensure_ascii=False, separators=(",", ":")))
     return 0

@@ -40,6 +40,7 @@ $TotalWatch = [System.Diagnostics.Stopwatch]::StartNew()
 $GateTimings = New-Object System.Collections.Generic.List[object]
 $Plan = $null
 $FailureMessage = $null
+$script:VerificationNode20Ready = $false
 $PostgresTestEnvironmentNames = @(
     "TEST_POSTGRES_URL",
     "DATABASE_URL",
@@ -216,6 +217,7 @@ function Get-GateName {
         "docs-whitespace"          { return "Docs whitespace check" }
         "docs-link-tests"          { return "Maintained Markdown link checker tests" }
         "docs-links"               { return "Maintained Markdown links" }
+        "tooling-node-tests"       { return "Self-tested dev generator" }
         "frontend-lint-files"      { return "Frontend changed-file lint" }
         "frontend-tsc-incremental" { return "Frontend incremental type check" }
         "frontend-vitest-related"  { return "Frontend related tests" }
@@ -236,9 +238,34 @@ function Get-GateName {
 }
 
 function Assert-Node20 {
+    if ($script:VerificationNode20Ready) {
+        return
+    }
+
+    $RuntimeRoot = [Environment]::GetEnvironmentVariable("MES_RUNTIME_ROOT", "Process")
+    if ([string]::IsNullOrWhiteSpace($RuntimeRoot)) {
+        $RuntimeRoot = Join-Path $RepoRoot "_attic\runtime"
+    }
+    elseif (-not [IO.Path]::IsPathRooted($RuntimeRoot)) {
+        $RuntimeRoot = Join-Path $RepoRoot $RuntimeRoot
+    }
+    $RuntimeRoot = [IO.Path]::GetFullPath($RuntimeRoot)
+    $NodeConfigPath = Join-Path $RuntimeRoot "frontend-node-path.txt"
+    $NodeCommand = $null
+    if (Test-Path -LiteralPath $NodeConfigPath -PathType Leaf) {
+        $NodeCommand = (Get-Content -LiteralPath $NodeConfigPath -Raw).Trim()
+        if (-not [IO.Path]::IsPathRooted($NodeCommand) -or -not (Test-Path -LiteralPath $NodeCommand -PathType Leaf)) {
+            throw "Configured Node.js executable does not exist: $NodeCommand"
+        }
+    }
+    else {
+        $NodeCommand = (Get-Command node -CommandType Application -ErrorAction SilentlyContinue |
+            Select-Object -First 1).Source
+    }
+
     $nodeVersion = $null
     try {
-        $nodeVersion = (& node --version 2>$null | Select-Object -First 1)
+        $nodeVersion = (& $NodeCommand --version 2>$null | Select-Object -First 1)
     }
     catch {
         $nodeVersion = $null
@@ -246,9 +273,30 @@ function Assert-Node20 {
     if (-not $nodeVersion -or $nodeVersion -notmatch '^v20\.') {
         throw "Frontend verification requires Node.js 20 (current: $nodeVersion)."
     }
+    $NodeDirectory = Split-Path -Parent $NodeCommand
+    $NpmCommand = Join-Path $NodeDirectory "npm.cmd"
+    if ((Test-Path -LiteralPath $NodeConfigPath -PathType Leaf) -and -not (Test-Path -LiteralPath $NpmCommand -PathType Leaf)) {
+        throw "Configured Node.js 20 is missing npm.cmd: $NpmCommand"
+    }
+    $env:PATH = "$NodeDirectory$([IO.Path]::PathSeparator)$env:PATH"
+    $script:VerificationNode20Ready = $true
 }
 
 function Get-BackendWorkerCount {
+    $RequestedWorkers = $env:DEXCOWIN_BACKEND_WORKERS
+    $RequestedWorkersIsSet = [Environment]::GetEnvironmentVariables("Process").Contains(
+        "DEXCOWIN_BACKEND_WORKERS"
+    )
+    if ($RequestedWorkersIsSet) {
+        $ParsedWorkers = 0
+        if (
+            -not [int]::TryParse($RequestedWorkers, [ref] $ParsedWorkers) -or
+            $ParsedWorkers -lt 1
+        ) {
+            throw "DEXCOWIN_BACKEND_WORKERS must be a positive integer."
+        }
+        return $ParsedWorkers
+    }
     $HalfCpu = [Math]::Floor([Environment]::ProcessorCount / 2)
     return [int] [Math]::Max(1, [Math]::Min(4, $HalfCpu))
 }
@@ -404,7 +452,7 @@ function Invoke-ParallelAreaGates {
     }
 }
 
-function Invoke-ParallelTargetedGates {
+function Invoke-ParallelGates {
     param([Parameter(Mandatory = $true)] [object[]] $Gates)
 
     $GateRecords = New-Object System.Collections.Generic.List[object]
@@ -446,7 +494,7 @@ function Invoke-ParallelTargetedGates {
             if ($ParallelWatch.Elapsed.TotalSeconds -ge $NextHeartbeat) {
                 $RunningCount = @($GateRecords | Where-Object { -not $_.Process.HasExited }).Count
                 Write-Host (
-                    "Smart parallel verification {0}s: {1}/{2} running" -f
+                    "Parallel verification {0}s: {1}/{2} running" -f
                     [Math]::Floor($ParallelWatch.Elapsed.TotalSeconds),
                     $RunningCount,
                     $GateRecords.Count
@@ -474,7 +522,7 @@ function Invoke-ParallelTargetedGates {
             }
         }
         if ($FailedGates.Count -gt 0) {
-            throw "Parallel targeted verification failed: $($FailedGates -join ', ')"
+            throw "Parallel verification failed: $($FailedGates -join ', ')"
         }
     }
     finally {
@@ -495,6 +543,22 @@ function Invoke-ParallelTargetedGates {
             }
             $Record.Process.Dispose()
         }
+    }
+}
+
+function Invoke-ParallelTargetedGates {
+    param([Parameter(Mandatory = $true)] [object[]] $Gates)
+
+    try {
+        Invoke-ParallelGates -Gates $Gates
+    }
+    catch {
+        $Message = $_.Exception.Message
+        $GenericPrefix = "Parallel verification failed: "
+        if ($Message.StartsWith($GenericPrefix, [System.StringComparison]::Ordinal)) {
+            $Message = $Message.Substring($GenericPrefix.Length)
+        }
+        throw "Parallel targeted verification failed: $Message"
     }
 }
 
@@ -542,7 +606,7 @@ function Invoke-Gate {
 
     $GateId = [string] $Gate.id
     $GateFiles = @($Gate.files)
-    if ([string] $Gate.area -eq "frontend") {
+    if ([string] $Gate.area -in @("frontend", "tooling")) {
         Assert-Node20
     }
     switch ($GateId) {
@@ -574,6 +638,12 @@ function Invoke-Gate {
         "docs-links" {
             Invoke-Check $GateId (Get-GateName $GateId) $RepoRoot {
                 python scripts/dev/check_markdown_links.py --root $RepoRoot
+            }
+        }
+        "tooling-node-tests" {
+            $ToolingTestFiles = @($GateFiles)
+            Invoke-Check $GateId (Get-GateName $GateId) $RepoRoot {
+                node --test @ToolingTestFiles
             }
         }
         "frontend-lint-files" {
@@ -793,6 +863,23 @@ try {
                 Invoke-ParallelAreaGates -Gates $PlannedGates
                 $PlannedGates = @(
                     $PlannedGates | Where-Object { [string] $_.id -notin $ParallelGateIds }
+                )
+            }
+
+            $BackendFullGates = @(
+                $PlannedGates | Where-Object { [string] $_.id -in $BackendFullIds }
+            )
+            $CanRunBackendFullGatesInParallel = (
+                -not $CanRunFullAreasInParallel -and
+                [Environment]::ProcessorCount -ge $ParallelCpuThreshold -and
+                (Test-ContainsGateIds -Gates $BackendFullGates -RequiredIds $BackendFullIds)
+            )
+            if ($CanRunBackendFullGatesInParallel) {
+                Write-Host ""
+                Write-Host "==> Running backend full gates in parallel"
+                Invoke-ParallelGates -Gates $BackendFullGates
+                $PlannedGates = @(
+                    $PlannedGates | Where-Object { [string] $_.id -notin $BackendFullIds }
                 )
             }
 

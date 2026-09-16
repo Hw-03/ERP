@@ -115,6 +115,128 @@ def _mock_full_gate_runtime(
     }
 
 
+def _mock_backend_full_parallel_runtime(
+    tmp_path: Path,
+    *,
+    pytest_exit_code: int = 0,
+) -> tuple[Path, dict[str, str], Path]:
+    """백엔드 전체 게이트 두 개의 병렬 실행과 실패 회수를 실제 PowerShell에서 검증한다."""
+
+    repo = _verification_repo(tmp_path)
+    baseline = repo / "_dev" / "baselines" / "openapi.json"
+    baseline.parent.mkdir(parents=True)
+    baseline.write_bytes(b"{}\r\n")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-qm", "openapi baseline")
+
+    gate_log = tmp_path / "backend full gate log" / "events.log"
+    gate_log.parent.mkdir()
+    fake_bin = tmp_path / "fake-bin"
+    fake_bin.mkdir()
+    real_python = Path(sys.executable)
+    (fake_bin / "python.cmd").write_text(
+        "\r\n".join(
+            [
+                "@echo off",
+                'if /I "%~nx1"=="verification_policy.py" (',
+                f'  "{real_python}" %*',
+                "  exit /b %ERRORLEVEL%",
+                ")",
+                'if "%~1"=="-" (',
+                '  >>"%DEXCOWIN_MOCK_GATE_LOG%.backend-openapi" echo backend-openapi start',
+                "  more >nul",
+                "  ping -n 8 127.0.0.1 >nul",
+                '  >"%~2" echo {}',
+                '  >>"%DEXCOWIN_MOCK_GATE_LOG%.backend-openapi" echo backend-openapi end',
+                "  exit /b 0",
+                ")",
+                'if "%~1"=="-m" (',
+                '  if /I "%~2"=="pytest" (',
+                '    >>"%DEXCOWIN_MOCK_GATE_LOG%.backend-pytest-full" echo backend-pytest-full start %*',
+                "    ping -n 8 127.0.0.1 >nul",
+                '    >>"%DEXCOWIN_MOCK_GATE_LOG%.backend-pytest-full" echo backend-pytest-full end %*',
+                f"    exit /b {pytest_exit_code}",
+                "  )",
+                ")",
+                "exit /b 0",
+                "",
+            ]
+        ),
+        encoding="ascii",
+    )
+    (fake_bin / "node.cmd").write_text(
+        "@echo off\r\necho v20.20.2\r\nexit /b 0\r\n",
+        encoding="ascii",
+    )
+    return repo, {
+        "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+        "DEXCOWIN_VERIFY_PARALLEL_CPU_THRESHOLD": "1",
+        "DEXCOWIN_MOCK_GATE_LOG": str(gate_log),
+    }, gate_log
+
+
+def _mock_tooling_runtime(
+    tmp_path: Path,
+    *,
+    change_test: bool = False,
+) -> tuple[Path, dict[str, str], Path]:
+    """Node 20 shim으로 self-tested generator 게이트의 실제 인수와 실행을 검증한다."""
+
+    repo = _verification_repo(tmp_path)
+    generator = repo / "scripts" / "dev" / "generate-report.mjs"
+    generator_test = repo / "scripts" / "dev" / "generate-report.test.mjs"
+    generator.write_text("export const report = 'baseline'\n", encoding="utf-8")
+    generator_test.write_text("import test from 'node:test'\n", encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-qm", "generator baseline")
+    if change_test:
+        generator_test.write_text("import test from 'node:test'\n// changed\n", encoding="utf-8")
+    else:
+        generator.write_text("export const report = 'changed'\n", encoding="utf-8")
+
+    gate_log = tmp_path / "tooling gate log" / "events.log"
+    gate_log.parent.mkdir()
+    fake_bin = tmp_path / "fake-bin"
+    fake_bin.mkdir()
+    real_python = Path(sys.executable)
+    (fake_bin / "python.cmd").write_text(
+        "\r\n".join(
+            [
+                "@echo off",
+                'if /I "%~nx1"=="verification_policy.py" (',
+                f'  "{real_python}" %*',
+                "  exit /b %ERRORLEVEL%",
+                ")",
+                "exit /b 0",
+                "",
+            ]
+        ),
+        encoding="ascii",
+    )
+    (fake_bin / "node.cmd").write_text(
+        "\r\n".join(
+            [
+                "@echo off",
+                'if "%~1"=="--version" (',
+                "  echo v20.20.2",
+                "  exit /b 0",
+                ")",
+                'if "%~1"=="--test" (',
+                '  >"%DEXCOWIN_MOCK_GATE_LOG%.tooling-node-tests" echo %*',
+                "  exit /b 0",
+                ")",
+                "exit /b 2",
+                "",
+            ]
+        ),
+        encoding="ascii",
+    )
+    return repo, {
+        "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+        "DEXCOWIN_MOCK_GATE_LOG": str(gate_log),
+    }, gate_log
+
+
 def _mock_smart_targeted_runtime(
     tmp_path: Path,
     *,
@@ -446,6 +568,188 @@ def test_parallel_failure_waits_for_other_area_and_stops_followup_gates(tmp_path
         "backend-openapi": "passed",
         "frontend-lint": "failed",
     }
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="PowerShell runtime test is Windows-only")
+def test_backend_mode_runs_pytest_and_openapi_in_parallel(tmp_path: Path) -> None:
+    repo, extra_env, gate_log = _mock_backend_full_parallel_runtime(tmp_path)
+    timing = repo / "backend-timings.json"
+
+    result = _run_verify(
+        repo,
+        "-Mode",
+        "backend",
+        "-TimingOutput",
+        str(timing),
+        extra_env=extra_env,
+    )
+
+    output = _output(result)
+    assert result.returncode == 0, output
+    assert "Running backend full gates in parallel" in output
+    report = json.loads(timing.read_text(encoding="utf-8-sig"))
+    assert {gate["id"] for gate in report["gates"]} == {
+        "backend-pytest-full",
+        "backend-openapi",
+    }
+    assert report["total_ms"] < sum(gate["duration_ms"] for gate in report["gates"])
+    assert _gate_event_lines(gate_log, "backend-pytest-full")[-1].startswith("backend-pytest-full end")
+    assert _gate_event_lines(gate_log, "backend-openapi")[-1] == "backend-openapi end"
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="PowerShell runtime test is Windows-only")
+def test_backend_parallel_failure_waits_for_openapi_and_keeps_both_timings(tmp_path: Path) -> None:
+    repo, extra_env, gate_log = _mock_backend_full_parallel_runtime(tmp_path, pytest_exit_code=17)
+    timing = repo / "failed-backend-timings.json"
+
+    result = _run_verify(
+        repo,
+        "-Mode",
+        "backend",
+        "-TimingOutput",
+        str(timing),
+        extra_env=extra_env,
+    )
+
+    output = _output(result)
+    assert result.returncode != 0
+    assert "Parallel verification failed: backend-pytest-full=1" in output
+    assert _gate_event_lines(gate_log, "backend-openapi")[-1] == "backend-openapi end"
+    statuses = {
+        gate["id"]: gate["status"]
+        for gate in json.loads(timing.read_text(encoding="utf-8-sig"))["gates"]
+    }
+    assert statuses == {"backend-pytest-full": "failed", "backend-openapi": "passed"}
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="PowerShell runtime test is Windows-only")
+def test_backend_worker_environment_override_is_forwarded_to_pytest(tmp_path: Path) -> None:
+    repo, extra_env, gate_log = _mock_backend_full_parallel_runtime(tmp_path)
+
+    result = _run_verify(
+        repo,
+        "-Mode",
+        "backend",
+        extra_env={**extra_env, "DEXCOWIN_BACKEND_WORKERS": "6"},
+    )
+
+    output = _output(result)
+    assert result.returncode == 0, output
+    assert "-n 6" in _gate_event_lines(gate_log, "backend-pytest-full")[0]
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="PowerShell runtime test is Windows-only")
+def test_invalid_backend_worker_environment_override_fails_clearly(tmp_path: Path) -> None:
+    repo, extra_env, _gate_log = _mock_backend_full_parallel_runtime(tmp_path)
+
+    result = _run_verify(
+        repo,
+        "-Mode",
+        "backend",
+        extra_env={**extra_env, "DEXCOWIN_BACKEND_WORKERS": "zero"},
+    )
+
+    output = _output(result)
+    assert result.returncode != 0
+    assert "DEXCOWIN_BACKEND_WORKERS must be a positive integer" in output
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="PowerShell runtime test is Windows-only")
+def test_self_tested_generator_runs_its_node_test_without_full_area_gates(tmp_path: Path) -> None:
+    repo, extra_env, gate_log = _mock_tooling_runtime(tmp_path)
+
+    result = _run_verify(repo, "-Mode", "smart", "-ChangeSet", "working", extra_env=extra_env)
+
+    output = _output(result)
+    assert result.returncode == 0, output
+    assert "tooling-node-tests" in output
+    assert "backend-pytest-full" not in output
+    assert "frontend-coverage" not in output
+    assert "--test scripts/dev/generate-report.test.mjs" in _gate_event_lines(
+        gate_log,
+        "tooling-node-tests",
+    )[0]
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="PowerShell runtime test is Windows-only")
+def test_changed_generator_test_runs_without_full_area_gates(tmp_path: Path) -> None:
+    repo, extra_env, gate_log = _mock_tooling_runtime(tmp_path, change_test=True)
+
+    result = _run_verify(repo, "-Mode", "smart", "-ChangeSet", "working", extra_env=extra_env)
+
+    output = _output(result)
+    assert result.returncode == 0, output
+    assert "tooling-node-tests" in output
+    assert "backend-pytest-full" not in output
+    assert "--test scripts/dev/generate-report.test.mjs" in _gate_event_lines(
+        gate_log,
+        "tooling-node-tests",
+    )[0]
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="PowerShell runtime test is Windows-only")
+def test_empty_backend_worker_environment_override_fails_clearly(tmp_path: Path) -> None:
+    repo, extra_env, _gate_log = _mock_backend_full_parallel_runtime(tmp_path)
+
+    result = _run_verify(
+        repo,
+        "-Mode",
+        "backend",
+        extra_env={**extra_env, "DEXCOWIN_BACKEND_WORKERS": ""},
+    )
+
+    output = _output(result)
+    assert result.returncode != 0
+    assert "DEXCOWIN_BACKEND_WORKERS must be a positive integer" in output
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="PowerShell runtime test is Windows-only")
+def test_configured_node20_overrides_path_node_for_frontend_gates(tmp_path: Path) -> None:
+    repo, extra_env = _mock_full_gate_runtime(tmp_path)
+    configured_bin = tmp_path / "configured-node20"
+    configured_bin.mkdir()
+    configured_log = tmp_path / "configured-npm.log"
+    (configured_bin / "node.cmd").write_text(
+        "@echo off\r\necho v20.20.2\r\nexit /b 0\r\n",
+        encoding="ascii",
+    )
+    (configured_bin / "npm.cmd").write_text(
+        f'@echo off\r\n>>"{configured_log}" echo %*\r\nexit /b 0\r\n',
+        encoding="ascii",
+    )
+    runtime_root = repo / "_attic" / "runtime"
+    runtime_root.mkdir(parents=True)
+    (runtime_root / "frontend-node-path.txt").write_text(
+        str(configured_bin / "node.cmd"),
+        encoding="utf-8",
+    )
+    path_node = Path(extra_env["PATH"].split(os.pathsep, 1)[0]) / "node.cmd"
+    path_node.write_text(
+        "@echo off\r\necho v24.15.0\r\nexit /b 0\r\n",
+        encoding="ascii",
+    )
+
+    result = _run_verify(repo, "-Mode", "frontend", extra_env=extra_env)
+
+    output = _output(result)
+    assert result.returncode == 0, output
+    assert configured_log.is_file()
+    assert "run lint:strict" in configured_log.read_text(encoding="utf-8")
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="PowerShell runtime test is Windows-only")
+def test_invalid_configured_node20_does_not_fall_back_to_path(tmp_path: Path) -> None:
+    repo, extra_env = _mock_full_gate_runtime(tmp_path)
+    runtime_root = repo / "_attic" / "runtime"
+    runtime_root.mkdir(parents=True)
+    missing_node = tmp_path / "missing-node20" / "node.exe"
+    (runtime_root / "frontend-node-path.txt").write_text(str(missing_node), encoding="utf-8")
+
+    result = _run_verify(repo, "-Mode", "frontend", extra_env=extra_env)
+
+    output = _output(result)
+    assert result.returncode != 0
+    assert str(missing_node) in output
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="PowerShell runtime test is Windows-only")

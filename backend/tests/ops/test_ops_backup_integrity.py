@@ -6,6 +6,7 @@ import sqlite3
 import subprocess
 import sys
 import time
+from contextlib import closing
 from pathlib import Path
 
 import pytest
@@ -43,6 +44,21 @@ CLEANUP_BACKUPS = ROOT / "scripts" / "ops" / "cleanup_backups.py"
 BACKUP_DB_BAT = ROOT / "scripts" / "ops" / "backup_db.bat"
 RESTORE_DB_BAT = ROOT / "scripts" / "ops" / "restore_db.bat"
 CURRENT_ITEM_ID = "00000000000000000000000000000001"
+
+
+def _quarantine_artifacts(directory: Path, target_name: str) -> list[Path]:
+    """Return only app-owned quarantine names with their exact casing."""
+
+    prefix = f".{target_name}.quarantine-"
+    return sorted(path for path in directory.iterdir() if path.name.startswith(prefix))
+
+
+def test_quarantine_artifact_scan_is_case_sensitive(tmp_path: Path) -> None:
+    retained_wal = tmp_path / ".mes.db.quarantine-abc-wal"
+    retained_wal.write_bytes(b"wal")
+    (tmp_path / ".MES.DB.QUARANTINE-ABC-SHM.tmp").write_bytes(b"transient")
+
+    assert _quarantine_artifacts(tmp_path, "mes.db") == [retained_wal]
 
 
 def _run_script(script: Path, *args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -1141,7 +1157,7 @@ def test_restore_rolls_back_when_quarantining_a_sidecar_fails(
     assert target.read_bytes() == target_bytes
     for suffix, content in sidecar_bytes.items():
         assert Path(f"{target}{suffix}").read_bytes() == content
-    assert not list(tmp_path.glob(".mes.db.quarantine-*"))
+    assert not _quarantine_artifacts(tmp_path, target.name)
     assert not list(tmp_path.glob(".mes.db.restore-*.tmp"))
 
 
@@ -1176,7 +1192,7 @@ def test_restore_rolls_back_after_main_quarantine_when_install_fails(
     assert main_quarantined
     assert target.read_bytes() == target_bytes
     assert Path(f"{target}-wal").read_bytes() == b"old wal"
-    assert not list(tmp_path.glob(".mes.db.quarantine-*"))
+    assert not _quarantine_artifacts(tmp_path, target.name)
     assert not list(tmp_path.glob(".mes.db.restore-*.tmp"))
 
 
@@ -1189,8 +1205,9 @@ def test_restore_cleanup_failure_leaves_new_target_active_without_stale_sidecars
     target = tmp_path / "mes.db"
     _create_ops_schema_db(source)
     _create_ops_schema_db(target)
-    with sqlite3.connect(source) as source_db:
+    with closing(sqlite3.connect(source)) as source_db:
         source_db.execute("UPDATE items SET item_name = 'Restored Part' WHERE item_id = 'item-1'")
+        source_db.commit()
     sidecar_bytes = {
         "-wal": b"old wal",
         "-shm": b"old shm",
@@ -1211,13 +1228,17 @@ def test_restore_cleanup_failure_leaves_new_target_active_without_stale_sidecars
 
     for suffix in sidecar_bytes:
         assert not Path(f"{target}{suffix}").exists()
-    with sqlite3.connect(target) as restored:
+    with closing(sqlite3.connect(target)) as restored:
         assert restored.execute("SELECT item_name FROM items WHERE item_id = 'item-1'").fetchone() == (
             "Restored Part",
         )
-    leftovers = list(tmp_path.glob(".mes.db.quarantine-*-wal"))
+    leftovers = [
+        path
+        for path in _quarantine_artifacts(tmp_path, target.name)
+        if path.name.endswith("-wal")
+    ]
     assert len(leftovers) == 1
-    assert list(tmp_path.glob(".mes.db.quarantine-*")) == leftovers
+    assert _quarantine_artifacts(tmp_path, target.name) == leftovers
     assert leftovers[0].read_bytes() == b"old wal"
     assert str(leftovers[0]) in capsys.readouterr().err
 

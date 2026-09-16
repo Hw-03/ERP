@@ -91,6 +91,7 @@ def test_staged_and_working_change_to_same_file_stops_the_plan() -> None:
         ("_dev/baselines/openapi.json", "backend"),
         ("README.md", "docs"),
         ("scripts/dev/verify_local.ps1", "infra"),
+        ("scripts/dev/generate-report.mjs", "infra"),
         ("mystery.bin", "unknown"),
     ],
 )
@@ -313,6 +314,86 @@ def test_docs_only_smart_plan_runs_all_maintained_docs_gates() -> None:
 
     assert plan["areas"] == ["docs"]
     assert [gate["id"] for gate in plan["gates"]] == DOCS_GATE_IDS
+
+
+def test_self_tested_dev_generator_uses_only_its_node_test() -> None:
+    plan = make_plan(
+        mode="smart",
+        change_set="working",
+        staged_changes=[],
+        working_changes=[Change(status="M", path="scripts/dev/generate-report.mjs")],
+        testmon_cache_exists=True,
+        known_paths=[
+            "scripts/dev/generate-report.mjs",
+            "scripts/dev/generate-report.test.mjs",
+        ],
+    )
+
+    assert plan["areas"] == ["tooling"]
+    assert plan["escalations"] == []
+    assert plan["gates"] == [
+        {
+            "id": "tooling-node-tests",
+            "area": "tooling",
+            "kind": "targeted",
+            "reason": "self-tested dev generator changed",
+            "files": ["scripts/dev/generate-report.test.mjs"],
+        }
+    ]
+
+
+def test_self_tested_dev_generator_test_file_uses_its_node_test() -> None:
+    plan = make_plan(
+        mode="smart",
+        change_set="working",
+        staged_changes=[],
+        working_changes=[Change(status="M", path="scripts/dev/generate-report.test.mjs")],
+        testmon_cache_exists=True,
+        known_paths=[
+            "scripts/dev/generate-report.mjs",
+            "scripts/dev/generate-report.test.mjs",
+        ],
+    )
+
+    assert plan["areas"] == ["tooling"]
+    assert [gate["id"] for gate in plan["gates"]] == ["tooling-node-tests"]
+    assert plan["gates"][0]["files"] == ["scripts/dev/generate-report.test.mjs"]
+
+
+def test_self_tested_dev_generator_keeps_docs_gates_for_docs_changes() -> None:
+    plan = make_plan(
+        mode="smart",
+        change_set="working",
+        staged_changes=[],
+        working_changes=[
+            Change(status="M", path="README.md"),
+            Change(status="M", path="scripts/dev/generate-report.mjs"),
+        ],
+        testmon_cache_exists=True,
+        known_paths=[
+            "scripts/dev/generate-report.mjs",
+            "scripts/dev/generate-report.test.mjs",
+        ],
+    )
+
+    assert plan["areas"] == ["docs", "tooling"]
+    assert [gate["id"] for gate in plan["gates"]] == [
+        *DOCS_GATE_IDS,
+        "tooling-node-tests",
+    ]
+
+
+def test_dev_generator_without_adjacent_test_stays_full_infra() -> None:
+    plan = make_plan(
+        mode="smart",
+        change_set="working",
+        staged_changes=[],
+        working_changes=[Change(status="M", path="scripts/dev/generate-report.mjs")],
+        testmon_cache_exists=True,
+        known_paths=["scripts/dev/generate-report.mjs"],
+    )
+
+    assert plan["escalations"] == [{"area": "infra", "reason": "infra change requires full verification"}]
 
 
 def test_docs_and_infra_smart_plan_keeps_docs_gates_during_full_escalation() -> None:

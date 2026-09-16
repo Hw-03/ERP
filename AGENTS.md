@@ -90,6 +90,8 @@ For Codex plans, also include the recommended execution shape when useful: solo 
 - Never create or switch branches unless the user explicitly asks.
 - Commit and push only when the user explicitly asks.
 - When explicitly asked to commit and push, run the required local checks first to avoid GitHub CI failures, and unless told otherwise, commit and push only the changes made in the current session.
+- 커밋푸시는 현재 작업 파일만 명시적으로 stage하고 `git diff --cached --check`을 먼저 통과시킨다. 동일한 staged 범위가 이후 코드 변경 없이 이미 필요한 검증을 통과했다면 그 결과를 재사용한다. 그렇지 않을 때만 커밋 직전 `verify_local.ps1 -Mode smart -ChangeSet staged`를 한 번 실행한다.
+- 사용자가 CI 대기를 명시하지 않으면 push 성공을 커밋푸시 완료로 보고하고, GitHub 전체 CI는 링크와 시작 상태만 알린다. DB·마이그레이션·공통 설정·검증 인프라 변경은 smart 정책이 로컬 전체 게이트로 승격한다.
 - **Required commit message format: `YYYY-MM-DD area: summary`**
   - **Always check the real date immediately before committing** using `date +%Y-%m-%d` (Bash) or `Get-Date -Format yyyy-MM-dd` (PowerShell). Do not reuse the date baked into session context; sessions can span midnight.
   - Commit subjects and bodies must be written in Korean, except for technical identifiers, paths, branch names, and commands.
@@ -116,6 +118,12 @@ For Codex plans, also include the recommended execution shape when useful: solo 
 - Starting the server must not change the DB.
 - Before DB-changing work, briefly explain the impact first.
 - 브라우저로 개발 서버를 검증할 때는 관리자 계정 비밀번호 `0000`으로 로그인해 필요한 화면과 흐름을 자유롭게 검증한다. 이 자격 증명은 로컬 개발 서버 검증에만 사용한다.
+- Node.js 20이 없거나 로컬 프로필 경로가 아직 구성되지 않았다면 전역 Node를 교체하지 말고 다음 명령으로 저장소 전용 런타임을 설치한다. 설치기는 공식 배포 ZIP의 SHA256을 확인하고 `_attic/runtime/frontend-node-path.txt`를 구성한다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\setup-node20.ps1
+```
+
 - For setup, schema changes, migrations, or seed work:
 
 ```bash

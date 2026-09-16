@@ -82,6 +82,8 @@ Start from Light or Medium. Recommend High or above only when the plan can state
 - Never create or switch branches unless the user explicitly asks.
 - Commit and push only when the user explicitly asks.
 - When explicitly asked to commit and push, run the required local checks first to avoid GitHub CI failures, and unless told otherwise, commit and push only the changes made in the current session.
+- For commit/push, explicitly stage only the current task files and run `git diff --cached --check` first. Reuse the required verification when the same staged scope already passed and no code changed afterward. Otherwise, run `verify_local.ps1 -Mode smart -ChangeSet staged` once immediately before committing.
+- Unless the user explicitly asks to wait for CI, treat a successful push as complete and report only the GitHub CI link and initial state. DB, migration, shared configuration, and verification-infrastructure changes remain locally full-gate eligible through the smart policy.
 - **Required commit message format: `YYYY-MM-DD area: summary`**
   - **Always check the real date immediately before committing** using `date +%Y-%m-%d` (Bash) or `Get-Date -Format yyyy-MM-dd` (PowerShell). Do not reuse the date baked into session context — sessions can span midnight.
   - Commit subjects and bodies must be written in Korean, except for technical identifiers, paths, branch names, and commands.
@@ -108,6 +110,12 @@ Start from Light or Medium. Recommend High or above only when the plan can state
 - Starting the server must not change the DB.
 - Before DB-changing work, briefly explain the impact first.
 - For browser verification against the development server, sign in as an administrator with password `0000` and freely verify the required screens and flows. Use this credential only for local development-server verification.
+- If Node.js 20 or the local profile path is not configured, do not replace the global Node installation. Install the repository-local runtime with the command below. The installer verifies the official ZIP SHA256 and configures `_attic/runtime/frontend-node-path.txt`.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\setup-node20.ps1
+```
+
 - For setup, schema changes, migrations, or seed work:
 
 ```bash

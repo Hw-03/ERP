@@ -171,6 +171,7 @@ describe("BomWorkbench", () => {
     await waitFor(() => {
       expect(getBom).toHaveBeenCalledTimes(1);
       expect(getWhereUsed).toHaveBeenCalledTimes(1);
+      expect(container.querySelector("div[data-bom-row-surface]")).not.toBeNull();
     });
     const currentRow = container.querySelector("div[data-bom-row-surface]")!;
     fireEvent.click(currentRow.querySelector("button")!);
@@ -184,8 +185,10 @@ describe("BomWorkbench", () => {
     await waitFor(() => {
       expect(getBom).toHaveBeenCalledTimes(2);
       expect(getWhereUsed).toHaveBeenCalledTimes(2);
+      expect(
+        container.querySelector("div[data-bom-row-surface] input[type=number]"),
+      ).toHaveValue(7);
     });
-    expect(currentRow.querySelector("input[type=number]")).toHaveValue(7);
   });
 
   it("stores only stable user navigation states and preserves other history namespaces", async () => {

@@ -82,12 +82,15 @@ class VerifyLocalDocsScopeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary_directory:
             temporary_root = Path(temporary_directory)
             repo = temporary_root / "repo"
+            command_directory = temporary_root / "commands"
             process_temp_directory = temporary_root / "process-temp"
             command_log = temporary_root / "commands.log"
             repo.mkdir()
+            command_directory.mkdir()
             process_temp_directory.mkdir()
 
             self.prepare_repository(repo, ["frontend/app/page.tsx"])
+            self.write_fake_node_command(command_directory)
             eslint_bin = repo / "frontend" / "node_modules" / ".bin" / "eslint.cmd"
             eslint_bin.parent.mkdir(parents=True)
             eslint_bin.write_text(
@@ -110,6 +113,7 @@ class VerifyLocalDocsScopeTests(unittest.TestCase):
             environment = os.environ.copy()
             environment.update(
                 {
+                    "PATH": f"{command_directory}{os.pathsep}{environment['PATH']}",
                     "FAKE_COMMAND_LOG": str(command_log),
                     "TEMP": str(process_temp_directory),
                     "TMP": str(process_temp_directory),
@@ -180,6 +184,7 @@ class VerifyLocalDocsScopeTests(unittest.TestCase):
 
     def write_fake_commands(self, command_directory: Path) -> None:
         """Record gates while allowing the real policy process to inspect Git."""
+        self.write_fake_node_command(command_directory)
         (command_directory / "python.cmd").write_text(
             f"""@echo off
 if /I \"%~nx1\"==\"verification_policy.py\" (
@@ -200,6 +205,13 @@ exit /b 0
                 f"@echo off\necho {command}:%*>> \"%FAKE_COMMAND_LOG%\"\nexit /b 0\n",
                 encoding="ascii",
             )
+
+    def write_fake_node_command(self, command_directory: Path) -> None:
+        """Expose a Node 20 PATH fallback without invoking a real frontend runtime."""
+        (command_directory / "node.cmd").write_text(
+            "@echo off\necho v20.20.2\n",
+            encoding="ascii",
+        )
 
     def assert_docs_gates_once(self, commands: list[str]) -> None:
         docs_unit_tests = [

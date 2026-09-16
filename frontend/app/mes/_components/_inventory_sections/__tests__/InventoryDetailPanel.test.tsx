@@ -323,7 +323,7 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     fireEvent.click(screen.getByRole("button", { name: "하위 구성 보기" }));
 
     const dialog = await screen.findByRole("dialog", { name: "BOM 구성 보기" });
-    expect(dialog).toHaveTextContent("구성품 A");
+    expect(await within(dialog).findByText("구성품 A")).toBeInTheDocument();
     expect(dialog).toHaveTextContent("10 EA");
     expect(api.getBOMTree).toHaveBeenCalledWith("item-1", { departmentOrder: "desc" });
     expect(screen.getByRole("button", { name: "닫기" })).toHaveFocus();
@@ -344,9 +344,10 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     fireEvent.click(screen.getByRole("button", { name: "하위 구성 보기" }));
 
     const panel = await screen.findByTestId("bom-detail-modal-panel");
+    const header = screen.getByTestId("bom-modal-header");
     expect(panel).toHaveClass("h-[84vh]");
-    expect(screen.getByTestId("bom-modal-header")).toHaveTextContent("완성품");
-    expect(screen.getByTestId("bom-modal-header")).toHaveTextContent("현재 재고 3 EA");
+    expect(await within(header).findByText("완성품")).toBeInTheDocument();
+    expect(header).toHaveTextContent("현재 재고 3 EA");
     expect(screen.getByRole("button", { name: "모두 펼치기" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "모두 접기" })).toBeDisabled();
   });
@@ -373,7 +374,7 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     fireEvent.click(screen.getByRole("button", { name: "하위 구성 보기" }));
 
     const header = await screen.findByTestId("bom-modal-header");
-    expect(within(header).getByText("현재 재고 0 EA")).toHaveStyle({ color: LEGACY_COLORS.red });
+    expect(await within(header).findByText("현재 재고 0 EA")).toHaveStyle({ color: LEGACY_COLORS.red });
     const zeroStockCell = screen.getByText("0 EA", { exact: true });
     const zeroStockRow = zeroStockCell.closest("[data-testid='bom-modal-row']")!;
     expect(zeroStockCell).toHaveStyle({ color: LEGACY_COLORS.red });
@@ -545,7 +546,7 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     fireEvent.click(screen.getByRole("button", { name: "하위 구성 보기" }));
 
     const header = await screen.findByTestId("bom-modal-header");
-    const current = within(header).getByTestId("bom-current-stock-badge");
+    const current = await within(header).findByTestId("bom-current-stock-badge");
     const additional = within(header).getByTestId("bom-additional-producible-badge");
     const expand = within(header).getByRole("button", { name: "모두 펼치기" });
     const collapse = within(header).getByRole("button", { name: "모두 접기" });
@@ -575,8 +576,8 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
 
     realtimeState.revision = 2;
     rerender(<BomDetailModal itemId="item-1" open onClose={() => {}} />);
-    const unavailableBadge = await screen.findByTestId("bom-additional-producible-badge");
-    expect(unavailableBadge).toHaveTextContent("추가 생산 가능 계산 불가");
+    const unavailableBadge = screen.getByTestId("bom-additional-producible-badge");
+    await waitFor(() => expect(unavailableBadge).toHaveTextContent("추가 생산 가능 계산 불가"));
     expect(unavailableBadge).toHaveStyle({ color: LEGACY_COLORS.muted2 });
     expect(screen.queryByText("추가 생산 가능 0 EA")).not.toBeInTheDocument();
   });
