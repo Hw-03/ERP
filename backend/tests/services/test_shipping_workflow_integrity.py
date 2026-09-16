@@ -9,7 +9,7 @@ import pytest
 from app.models import (
     InventoryOperation, InventoryOperationEffect, InventoryOperationEffectKindEnum,
     InventoryOperationKindEnum, InventoryOperationStatusEnum, ShippingRequest,
-    ShippingRequestStatusEnum,
+    ShippingAllocation, ShippingRequestStatusEnum,
 )
 from app.services.inventory_integrity import diagnose_inventory_integrity
 from app.services.inventory_integrity_repair import (
@@ -106,3 +106,81 @@ def test_stale_repair_id_cannot_revert_reprepared_request(db_session, make_item)
     with pytest.raises(InventoryIntegrityRepairError):
         repair_inventory_integrity_issue(db_session, problem_id=stale_id, approved_by="test", apply=True)
     assert request.status == ShippingRequestStatusEnum.PREPARED
+
+
+def test_latest_allocation_effect_ignores_reversed_cancellation_state(db_session, make_item):
+    item = make_item(process_type_code="PF")
+    request = ShippingRequest(
+        base_pf_item_id=item.item_id,
+        request_quantity=Decimal("1"),
+        status=ShippingRequestStatusEnum.PREPARED,
+    )
+    db_session.add(request)
+    db_session.flush()
+    allocation = ShippingAllocation(
+        request_id=request.request_id,
+        item_id=item.item_id,
+        quantity=Decimal("1"),
+        status="RELEASED",
+    )
+    db_session.add(allocation)
+    db_session.flush()
+    for index, status in enumerate(("RESERVED", "RELEASED")):
+        original = InventoryOperation(
+            operation_id=uuid.uuid4(),
+            domain="shipping",
+            action="pickup",
+            kind=InventoryOperationKindEnum.BUSINESS,
+            status=InventoryOperationStatusEnum.COMMITTED,
+            display_label="test",
+            actor_name="test",
+            contract_version=1,
+            created_at=datetime(2026, 9, 1) + timedelta(seconds=index * 2),
+            effective_at=datetime(2026, 9, 1) + timedelta(seconds=index * 2),
+        )
+        db_session.add(original)
+        db_session.flush()
+        original_effect = InventoryOperationEffect(
+            operation_id=original.operation_id,
+            effect_kind=InventoryOperationEffectKindEnum.ALLOCATION,
+            subject_type="ShippingAllocation",
+            subject_id=str(allocation.allocation_id),
+            role="shipping_allocation",
+            before_state={"status": "RESERVED"},
+            after_state={"status": "CONSUMED" if index == 0 else "RESERVED"},
+        )
+        db_session.add(original_effect)
+        db_session.flush()
+        operation = InventoryOperation(
+            operation_id=uuid.uuid4(),
+            domain="shipping",
+            action="cancel",
+            kind=InventoryOperationKindEnum.CANCELLATION,
+            status=InventoryOperationStatusEnum.COMMITTED,
+            display_label="test",
+            actor_name="test",
+            contract_version=1,
+            created_at=datetime(2026, 9, 1) + timedelta(seconds=index * 2 + 1),
+            effective_at=datetime(2026, 9, 1) + timedelta(seconds=index * 2 + 1),
+            reverses_operation_id=original.operation_id,
+        )
+        db_session.add(operation)
+        db_session.flush()
+        db_session.add(InventoryOperationEffect(
+            operation_id=operation.operation_id,
+            effect_kind=InventoryOperationEffectKindEnum.ALLOCATION,
+            subject_type="ShippingAllocation",
+            subject_id=str(allocation.allocation_id),
+            role="shipping_allocation",
+            before_state={"status": "CONSUMED" if index == 0 else "RESERVED"},
+            after_state={"status": status},
+            reverses_effect_id=original_effect.effect_id,
+        ))
+    db_session.commit()
+
+    issues = [
+        row for row in diagnose_inventory_integrity(db_session).issues
+        if row.category == "SHIPPING_ALLOCATION_MISMATCH"
+    ]
+
+    assert issues == []

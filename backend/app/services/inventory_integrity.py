@@ -547,36 +547,59 @@ def _non_shipping_workflow_issues(db: Session) -> list[InventoryIntegrityIssue]:
 
 def _workflow_and_allocation_issues(db: Session) -> list[InventoryIntegrityIssue]:
     issues = [*_shipping_workflow_issues(db), *_non_shipping_workflow_issues(db)]
-    rows = (
-        db.query(InventoryOperationEffect)
+    histories = defaultdict(list)
+    for effect, operation in (
+        db.query(InventoryOperationEffect, InventoryOperation)
         .join(
             InventoryOperation,
             InventoryOperation.operation_id == InventoryOperationEffect.operation_id,
         )
-        .filter(InventoryOperation.kind == InventoryOperationKindEnum.CANCELLATION)
+        .filter(
+            InventoryOperation.status == InventoryOperationStatusEnum.COMMITTED,
+            InventoryOperationEffect.effect_kind == InventoryOperationEffectKindEnum.ALLOCATION,
+            InventoryOperationEffect.subject_type == "ShippingAllocation",
+        )
         .all()
-    )
-    for effect in rows:
-        expected = str((effect.after_state or {}).get("status") or "cancelled")
-        if effect.effect_kind == InventoryOperationEffectKindEnum.WORKFLOW:
+    ):
+        histories[effect.subject_id].append((effect, operation))
+
+    for subject_id, history in histories.items():
+        if not any(op.kind == InventoryOperationKindEnum.CANCELLATION for _, op in history):
             continue
-        elif effect.effect_kind == InventoryOperationEffectKindEnum.ALLOCATION:
-            allocation = db.get(ShippingAllocation, effect.subject_id)
-            current = allocation.status if allocation is not None else None
-            if current == expected:
-                continue
-            issues.append(
-                _issue(
-                    category="SHIPPING_ALLOCATION_MISMATCH",
-                    identity=(effect.subject_id, effect.operation_id),
-                    title="취소된 출하의 배정 상태 불일치",
-                    description="취소된 출하 작업에 연결된 재고 배정이 해제되지 않았습니다.",
-                    cause_ids=(effect.operation_id, effect.effect_id, effect.subject_id),
-                    current_value=f"현재 배정 상태 {current or '대상 없음'}",
-                    expected_value=f"배정 상태 {expected}",
-                    repairable=True,
-                )
+        latest_time = max(op.created_at for _, op in history)
+        candidates = [(effect, op) for effect, op in history if op.created_at == latest_time]
+        candidates = [
+            (effect, op) for effect, op in candidates
+            if not any(
+                later.reverses_operation_id == op.operation_id
+                and reversal.reverses_effect_id == effect.effect_id
+                for reversal, later in candidates
             )
+        ]
+        states = {str((effect.after_state or {}).get("status") or "") for effect, _ in candidates}
+        ambiguous = len(states) != 1 or "" in states
+        effect, operation = min(candidates or history, key=lambda row: str(row[0].effect_id))
+        expected = " / ".join(sorted(states)) if ambiguous else next(iter(states))
+        allocation = db.get(ShippingAllocation, subject_id)
+        current = allocation.status if allocation is not None else None
+        if not ambiguous and current == expected:
+            continue
+        issues.append(
+            _issue(
+                category="SHIPPING_ALLOCATION_MISMATCH",
+                identity=(subject_id, effect.operation_id),
+                title="취소된 출하의 배정 상태 불일치",
+                description=(
+                    "같은 시각의 배정 원장 순서를 확정할 수 없습니다."
+                    if ambiguous
+                    else "취소된 출하 작업에 연결된 재고 배정이 해제되지 않았습니다."
+                ),
+                cause_ids=(effect.operation_id, effect.effect_id, subject_id),
+                current_value=f"현재 배정 상태 {current or '대상 없음'}",
+                expected_value=f"배정 상태 {expected or '확정 불가'}",
+                repairable=not ambiguous and operation.kind == InventoryOperationKindEnum.CANCELLATION,
+            )
+        )
     return issues
 
 

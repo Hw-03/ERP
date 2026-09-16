@@ -1,0 +1,1101 @@
+{
+  "schemaVersion": 1,
+  "source": "browser-localStorage",
+  "capturedAt": "2026-09-15T23:56:21.425Z",
+  "reviews": {
+    "8.1-01": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T04:57:00.484Z"
+    },
+    "8.1-02": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T04:57:22.805Z"
+    },
+    "8.1-03": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T04:57:32.136Z"
+    },
+    "8.1-04": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T04:57:47.678Z"
+    },
+    "8.1-05": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:00:20.388Z"
+    },
+    "8.1-06": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:14:06.455Z"
+    },
+    "8.2-01": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:14:35.768Z"
+    },
+    "8.2-02": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:15:10.702Z"
+    },
+    "8.2-03": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:15:16.207Z"
+    },
+    "8.2-04": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:15:27.609Z"
+    },
+    "8.2-05": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:15:38.974Z"
+    },
+    "8.2-06": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:15:46.316Z"
+    },
+    "8.2-07": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:16:00.354Z"
+    },
+    "8.2-08": {
+      "note": "",
+      "updatedAt": "2026-09-15T05:16:17.077Z",
+      "verdict": "hold"
+    },
+    "8.3-01": {
+      "note": "내가 뭘 확인해야한다는거지",
+      "updatedAt": "2026-09-15T05:19:44.757Z",
+      "verdict": "hold"
+    },
+    "8.3-02": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:20:01.733Z"
+    },
+    "8.3-03": {
+      "note": "실제 확인이랑 기대 반응이랑 뭐가 다른지 모르겠음",
+      "updatedAt": "2026-09-15T23:19:31.761Z",
+      "verdict": "hold"
+    },
+    "8.3-04": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:20:37.701Z"
+    },
+    "8.3-05": {
+      "note": "근데 이건, 그 안에 세부 적으로 뭔가 있어서 결론적으론 다 필터링 되지 않나\n",
+      "updatedAt": "2026-09-15T05:21:09.879Z",
+      "verdict": "hold"
+    },
+    "8.3-06": {
+      "verdict": "revision",
+      "updatedAt": "2026-09-15T05:21:27.850Z",
+      "note": "펼쳐봤을때 알 수 있으면 괜찮을듯"
+    },
+    "8.4-01": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:21:47.687Z"
+    },
+    "8.4-02": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:24:24.347Z"
+    },
+    "8.4-03": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:25:32.078Z"
+    },
+    "8.4-04": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:25:37.210Z"
+    },
+    "8.4-05": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:25:41.384Z"
+    },
+    "8.4-06": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:25:47.078Z"
+    },
+    "8.4-07": {
+      "note": "머무르기 같은게 있었나",
+      "updatedAt": "2026-09-15T05:26:02.513Z",
+      "verdict": "hold"
+    },
+    "8.5-01": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:27:06.571Z"
+    },
+    "8.5-02": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:27:09.722Z"
+    },
+    "8.5-03": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:27:19.932Z"
+    },
+    "8.5-04": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:27:25.124Z"
+    },
+    "8.5-05": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:27:30.682Z"
+    },
+    "8.5-06": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:27:37.696Z"
+    },
+    "8.5-07": {
+      "verdict": "revision",
+      "updatedAt": "2026-09-15T05:28:02.915Z",
+      "note": "카테고리 선택했으면 메모는 안해도 돼. 둘 중에 하나는 해야지\n"
+    },
+    "8.5-08": {
+      "note": "애초에 시스템 관리자라는건 과거 잔재라서 필요 없고, 그냥 불량 탭에 접근할 수 있는 사람은 다 할 수 있어",
+      "updatedAt": "2026-09-15T05:31:03.194Z",
+      "verdict": "revision"
+    },
+    "8.5-09": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:29:48.633Z"
+    },
+    "8.5-10": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:29:56.833Z"
+    },
+    "8.5-11": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:31:27.534Z"
+    },
+    "8.6-01": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:31:55.449Z"
+    },
+    "8.6-02": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:32:00.803Z"
+    },
+    "8.6-03": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:42:29.976Z"
+    },
+    "8.6-04": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:43:36.210Z"
+    },
+    "8.6-05": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:43:39.866Z"
+    },
+    "8.6-06": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:43:43.556Z"
+    },
+    "8.6-07": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:44:19.242Z"
+    },
+    "8.6-08": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:46:01.723Z"
+    },
+    "8.6-09": {
+      "note": "맞아 메모랑 카테고리랑 지금 중첩돼서 나오고 있긴한데 고치기 귀찮아서 안 고치고 있었어 ㅎㅎ 어떻게 하는게 좋을지 생각해보긴 해야해",
+      "updatedAt": "2026-09-15T05:46:36.179Z",
+      "verdict": "revision"
+    },
+    "8.6-10": {
+      "verdict": "revision",
+      "updatedAt": "2026-09-15T05:47:33.145Z",
+      "note": "기존 조사 판정이 맞아."
+    },
+    "8.7-01": {
+      "note": "뭐가 달라서 실제 확인 반응이 기대 반응이랑 다르다는건지 모르겠네.\n그 안에 들어가면 기대 반응 대로 할 수 있지 않나",
+      "updatedAt": "2026-09-15T05:48:31.138Z",
+      "verdict": "hold"
+    },
+    "8.7-02": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:48:41.173Z"
+    },
+    "8.7-03": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:48:47.747Z"
+    },
+    "8.7-04": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:48:55.625Z"
+    },
+    "8.7-05": {
+      "verdict": "hold",
+      "updatedAt": "2026-09-15T05:49:18.675Z",
+      "note": "근데, 입출고 내역에서 취소 하면 복구 되지 않나"
+    },
+    "8.7-06": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:49:26.444Z"
+    },
+    "8.7-07": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:49:40.344Z"
+    },
+    "8.7-08": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:49:51.645Z"
+    },
+    "8.7-09": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:52:54.618Z"
+    },
+    "8.7-10": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:53:05.998Z"
+    },
+    "8.8-01": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:53:10.709Z"
+    },
+    "8.8-02": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:53:22.019Z"
+    },
+    "8.8-03": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:53:26.259Z"
+    },
+    "8.8-04": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:53:33.296Z"
+    },
+    "8.8-05": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:53:36.815Z"
+    },
+    "8.8-06": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:53:39.423Z"
+    },
+    "8.8-07": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:53:46.709Z"
+    },
+    "8.8-08": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:54:02.548Z"
+    },
+    "8.8-09": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:54:15.916Z"
+    },
+    "8.9-01": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T05:55:57.101Z"
+    },
+    "8.9-02": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T07:35:45.112Z"
+    },
+    "8.9-03": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T07:35:56.584Z"
+    },
+    "8.9-04": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T07:36:03.642Z"
+    },
+    "8.9-05": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T07:36:12.917Z"
+    },
+    "8.9-06": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T07:36:42.690Z"
+    },
+    "8.9-07": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T07:37:04.249Z"
+    },
+    "8.9-08": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T07:37:11.820Z"
+    },
+    "8.10-01": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T07:48:28.103Z"
+    },
+    "8.10-02": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T07:48:36.033Z"
+    },
+    "8.10-03": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T07:48:38.701Z"
+    },
+    "8.10-04": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T07:48:46.735Z"
+    },
+    "8.10-05": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T07:48:52.810Z"
+    },
+    "8.10-06": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T07:49:06.939Z"
+    },
+    "8.10-07": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T07:49:15.283Z"
+    },
+    "8.10-08": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T07:49:19.491Z"
+    },
+    "8.11-01": {
+      "note": "세...는게 맞을거 같아 아무튼 양품이 아닌거니까",
+      "updatedAt": "2026-09-15T07:50:38.707Z",
+      "verdict": "revision"
+    },
+    "8.11-02": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T07:50:46.330Z"
+    },
+    "8.11-03": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T07:50:54.343Z"
+    },
+    "8.11-04": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T07:51:01.909Z"
+    },
+    "8.11-05": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T07:51:05.523Z"
+    },
+    "8.11-06": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:19:47.607Z"
+    },
+    "8.11-07": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:19:55.134Z"
+    },
+    "8.13-01": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:20:14.085Z"
+    },
+    "8.13-02": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:20:18.360Z"
+    },
+    "8.13-03": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:20:27.964Z"
+    },
+    "8.13-04": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:20:31.880Z"
+    },
+    "8.13-05": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:20:38.670Z"
+    },
+    "8.13-06": {
+      "note": "위에도 이런거 있는거 같은데, 불량 관련해서 재고 변동 쪽에 불량 수량을 새로 표시하는 방향으로 생각해야겠다",
+      "updatedAt": "2026-09-15T23:21:10.126Z",
+      "verdict": "revision"
+    },
+    "8.13-07": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:21:17.536Z"
+    },
+    "8.13-08": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:21:21.887Z"
+    },
+    "8.13-09": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:21:24.804Z"
+    },
+    "8.13-10": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:21:28.520Z"
+    },
+    "8.13-11": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:21:30.066Z"
+    },
+    "8.13-12": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:21:37.526Z"
+    },
+    "8.13-13": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:21:42.211Z"
+    },
+    "8.12-01": {
+      "verdict": "hold",
+      "updatedAt": "2026-09-15T23:22:06.852Z"
+    },
+    "8.12-02": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:22:15.664Z"
+    },
+    "8.12-03": {
+      "verdict": "hold",
+      "updatedAt": "2026-09-15T23:24:26.280Z"
+    },
+    "8.12-04": {
+      "verdict": "hold",
+      "updatedAt": "2026-09-15T23:24:39.527Z"
+    },
+    "8.12-05": {
+      "verdict": "hold",
+      "updatedAt": "2026-09-15T23:24:44.982Z"
+    },
+    "8.12-06": {
+      "verdict": "hold",
+      "updatedAt": "2026-09-15T23:24:54.583Z"
+    },
+    "8.12-07": {
+      "verdict": "hold",
+      "updatedAt": "2026-09-15T23:24:56.110Z"
+    },
+    "8.12-08": {
+      "verdict": "hold",
+      "updatedAt": "2026-09-15T23:25:03.341Z"
+    },
+    "8.12-09": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:25:10.349Z"
+    },
+    "8.12-10": {
+      "verdict": "hold",
+      "updatedAt": "2026-09-15T23:25:21.588Z"
+    },
+    "8.12-11": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:25:27.364Z"
+    },
+    "8.12-12": {
+      "verdict": "hold",
+      "updatedAt": "2026-09-15T23:25:31.725Z"
+    },
+    "8.12-13": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:25:39.969Z"
+    },
+    "8.12-14": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:25:47.112Z"
+    },
+    "8.12-15": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:25:48.677Z"
+    },
+    "8.12-16": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:25:55.713Z"
+    },
+    "8.14-01": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:26:29.464Z"
+    },
+    "8.14-02": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:26:37.645Z"
+    },
+    "8.14-03": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:26:45.659Z"
+    },
+    "8.14-04": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:26:57.486Z"
+    },
+    "8.14-05": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:27:03.839Z"
+    },
+    "8.14-06": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:27:08.978Z"
+    },
+    "8.14-07": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:27:14.036Z"
+    },
+    "8.14-08": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:27:18.882Z"
+    },
+    "8.15-01": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:28:03.970Z"
+    },
+    "8.15-02": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:28:06.709Z"
+    },
+    "8.15-03": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:28:10.817Z"
+    },
+    "8.15-04": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:28:12.232Z"
+    },
+    "8.15-05": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:28:13.873Z"
+    },
+    "8.15-06": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:28:19.346Z"
+    },
+    "8.15-07": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:28:21.827Z"
+    },
+    "8.15-08": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:28:28.962Z"
+    },
+    "8.15-09": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:28:34.264Z"
+    },
+    "8.15-10": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:28:36.775Z"
+    },
+    "8.16-01": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:28:48.296Z"
+    },
+    "8.16-02": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:28:51.492Z"
+    },
+    "8.16-03": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:29:00.807Z"
+    },
+    "8.16-04": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:29:07.285Z"
+    },
+    "8.16-05": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:29:09.941Z"
+    },
+    "8.16-06": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:29:13.586Z"
+    },
+    "8.16-07": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:29:15.759Z"
+    },
+    "8.16-08": {
+      "verdict": "hold",
+      "updatedAt": "2026-09-15T23:29:34.648Z"
+    },
+    "8.16-09": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:29:40.011Z"
+    },
+    "8.16-10": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:29:44.322Z"
+    },
+    "8.16-11": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:29:56.639Z"
+    },
+    "8.16-12": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:30:04.019Z"
+    },
+    "8.16-13": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:30:08.259Z"
+    },
+    "8.16-14": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:30:11.869Z"
+    },
+    "8.17-01": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:30:24.817Z"
+    },
+    "8.17-02": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:30:30.516Z"
+    },
+    "8.17-03": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:30:34.736Z"
+    },
+    "8.17-04": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:30:41.783Z"
+    },
+    "8.17-05": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:30:45.408Z"
+    },
+    "8.17-06": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:30:47.998Z"
+    },
+    "8.17-07": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:30:53.084Z"
+    },
+    "8.17-08": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:30:57.062Z"
+    },
+    "8.17-09": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:31:01.002Z"
+    },
+    "8.17-10": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:31:08.983Z"
+    },
+    "8.18-01": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:35:46.606Z"
+    },
+    "8.18-02": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:36:01.389Z"
+    },
+    "8.18-03": {
+      "verdict": "hold",
+      "updatedAt": "2026-09-15T23:36:21.340Z"
+    },
+    "8.18-04": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:36:26.253Z"
+    },
+    "8.18-05": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:36:29.254Z"
+    },
+    "8.18-06": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:36:32.707Z"
+    },
+    "8.18-07": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:36:38.320Z"
+    },
+    "8.19-01": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:36:57.318Z"
+    },
+    "8.19-02": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:36:59.617Z"
+    },
+    "8.19-03": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:37:08.681Z"
+    },
+    "8.19-04": {
+      "verdict": "hold",
+      "updatedAt": "2026-09-15T23:37:29.113Z"
+    },
+    "8.19-05": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:37:35.721Z"
+    },
+    "8.19-06": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:37:40.626Z"
+    },
+    "8.19-07": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:37:48.860Z"
+    },
+    "8.19-08": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:37:51.985Z"
+    },
+    "8.19-09": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:37:55.217Z"
+    },
+    "8.19-10": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:38:00.461Z"
+    },
+    "8.19-11": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:38:11.750Z"
+    },
+    "8.19-12": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:38:29.503Z"
+    },
+    "8.19-13": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:38:33.899Z"
+    },
+    "8.19-14": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:38:35.718Z"
+    },
+    "8.19-15": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:38:38.759Z"
+    },
+    "8.19-16": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:38:44.117Z"
+    },
+    "8.19-17": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:38:46.350Z"
+    },
+    "8.19-18": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:38:54.313Z"
+    },
+    "8.19-19": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:38:56.688Z"
+    },
+    "8.19-20": {
+      "verdict": "hold",
+      "updatedAt": "2026-09-15T23:39:09.251Z"
+    },
+    "8.19-21": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:39:12.056Z"
+    },
+    "8.19-22": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:39:21.473Z"
+    },
+    "8.19-23": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:39:24.798Z"
+    },
+    "8.19-24": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:39:27.425Z"
+    },
+    "8.19-25": {
+      "verdict": "hold",
+      "updatedAt": "2026-09-15T23:39:33.530Z"
+    },
+    "8.19-26": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:39:36.438Z"
+    },
+    "8.20-01": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:39:48.672Z"
+    },
+    "8.20-02": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:39:53.640Z"
+    },
+    "8.20-03": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:40:01.459Z"
+    },
+    "8.20-04": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:40:04.992Z"
+    },
+    "8.20-05": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:40:07.965Z"
+    },
+    "8.20-06": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:40:14.380Z"
+    },
+    "8.20-07": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:40:17.446Z"
+    },
+    "8.20-08": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:40:21.533Z"
+    },
+    "8.20-09": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:40:27.341Z"
+    },
+    "8.20-10": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:40:31.953Z"
+    },
+    "8.20-11": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:40:35.242Z"
+    },
+    "8.20-12": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:40:39.108Z"
+    },
+    "8.21-01": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:40:44.402Z"
+    },
+    "8.21-02": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:40:47.068Z"
+    },
+    "8.21-03": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:40:51.581Z"
+    },
+    "8.21-04": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:40:53.825Z"
+    },
+    "8.21-05": {
+      "verdict": "hold",
+      "updatedAt": "2026-09-15T23:41:03.297Z"
+    },
+    "8.21-06": {
+      "verdict": "hold",
+      "updatedAt": "2026-09-15T23:41:12.957Z"
+    },
+    "8.21-07": {
+      "verdict": "hold",
+      "updatedAt": "2026-09-15T23:41:17.250Z"
+    },
+    "8.21-08": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:41:23.732Z"
+    },
+    "8.21-09": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:41:29.902Z"
+    },
+    "8.21-10": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:41:37.083Z"
+    },
+    "8.21-11": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:41:41.264Z"
+    },
+    "8.22-01": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:41:54.276Z"
+    },
+    "8.22-02": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:41:57.503Z"
+    },
+    "8.22-03": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:42:01.359Z"
+    },
+    "8.22-04": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:42:06.908Z"
+    },
+    "8.22-05": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:42:13.046Z"
+    },
+    "8.22-06": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:42:15.465Z"
+    },
+    "8.22-07": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:42:22.045Z"
+    },
+    "8.22-08": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:42:29.509Z"
+    },
+    "8.22-09": {
+      "verdict": "hold",
+      "updatedAt": "2026-09-15T23:42:43.288Z"
+    },
+    "8.22-10": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:42:52.704Z"
+    },
+    "8.22-11": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:42:55.700Z"
+    },
+    "8.22-12": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:43:03.479Z"
+    },
+    "8.23-01": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:43:17.856Z"
+    },
+    "8.23-02": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:45:26.416Z"
+    },
+    "8.23-03": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:45:28.432Z"
+    },
+    "8.23-04": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:45:32.442Z"
+    },
+    "8.23-05": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:45:34.311Z"
+    },
+    "8.23-06": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:45:35.552Z"
+    },
+    "8.23-07": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:45:39.343Z"
+    },
+    "8.23-08": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:45:41.193Z"
+    },
+    "8.23-09": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:45:42.578Z"
+    },
+    "8.23-10": {
+      "verdict": "hold",
+      "updatedAt": "2026-09-15T23:46:04.562Z"
+    },
+    "8.23-11": {
+      "verdict": "hold",
+      "updatedAt": "2026-09-15T23:46:25.727Z"
+    },
+    "8.23-12": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:46:27.788Z"
+    },
+    "8.23-13": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:46:34.245Z"
+    },
+    "8.24-01": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:46:38.763Z"
+    },
+    "8.24-02": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:46:40.470Z"
+    },
+    "8.24-03": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:46:42.916Z"
+    },
+    "8.24-04": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:46:47.272Z"
+    },
+    "8.24-05": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:46:49.874Z"
+    },
+    "8.24-06": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:46:50.893Z"
+    },
+    "8.24-07": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:46:53.318Z"
+    },
+    "8.24-08": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:46:57.856Z"
+    },
+    "8.24-09": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:47:01.474Z"
+    },
+    "8.24-10": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:47:04.305Z"
+    },
+    "8.24-11": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:47:05.568Z"
+    },
+    "8.24-12": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:47:07.004Z"
+    },
+    "8.24-13": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:47:15.081Z"
+    },
+    "8.24-14": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:47:18.158Z"
+    },
+    "8.24-15": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:47:23.546Z"
+    },
+    "8.24-16": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:47:24.817Z"
+    },
+    "8.25-01": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:47:29.812Z"
+    },
+    "8.25-02": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:47:31.685Z"
+    },
+    "8.25-03": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:47:33.440Z"
+    },
+    "8.25-04": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:47:36.271Z"
+    },
+    "8.25-05": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:47:41.379Z"
+    },
+    "8.25-06": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:47:43.336Z"
+    },
+    "8.25-07": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:47:44.669Z"
+    },
+    "8.25-08": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:47:56.490Z"
+    },
+    "8.25-09": {
+      "verdict": "hold",
+      "updatedAt": "2026-09-15T23:48:11.351Z"
+    },
+    "8.25-10": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:48:15.537Z"
+    },
+    "8.25-11": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:48:16.660Z"
+    },
+    "8.25-12": {
+      "verdict": "approved",
+      "updatedAt": "2026-09-15T23:48:18.517Z"
+    }
+  }
+}
