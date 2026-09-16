@@ -105,8 +105,7 @@ test.describe.serial("입출고 V2 — 창고 수량보정", () => {
 
     await page.getByRole("button", { name: "확인", exact: true }).click();
     await page.goto("/mes?tab=history");
-    await expect(page.getByText("수량 조정", { exact: true }).first()).toBeVisible();
-    await expect(page.getByText("창고", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("창고 수량 조정", { exact: true }).first()).toBeVisible();
   });
 
   test("모바일 보정 출고 → 압축 입력 → 즉시 완료", async ({ page }) => {
