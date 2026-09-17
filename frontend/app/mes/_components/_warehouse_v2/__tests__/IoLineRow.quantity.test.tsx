@@ -74,7 +74,7 @@ describe("IoLineRow quantity", () => {
     expect(expectedAfter(outbound, 5)).toBe(2);
   });
 
-  it("shows actual warehouse stock and expected stock while using available stock for shortage", () => {
+  it("8.16-04: 창고 수량보정은 실제 창고 수량과 실행 후 수량을 표시한다", () => {
     const onQuantityChange = vi.fn();
     render(
       <IoLineRow
@@ -99,7 +99,7 @@ describe("IoLineRow quantity", () => {
       />,
     );
 
-    expect(screen.getByText("현재 창고")).toBeInTheDocument();
+    expect(screen.getByText("창고 수량")).toBeInTheDocument();
     expect(screen.getByText("10")).toBeInTheDocument();
     expect(screen.getByText("7")).toBeInTheDocument();
 
@@ -107,7 +107,7 @@ describe("IoLineRow quantity", () => {
     expect(onQuantityChange).toHaveBeenCalledWith(9, 1);
   });
 
-  it("does not mark supplier receipt as shortage when current stock is zero", () => {
+  it("8.17-04: 원자재 입고는 창고 수량을 표시하고 현재 재고 문구를 쓰지 않는다", () => {
     const onQuantityChange = vi.fn();
     render(
       <IoLineRow
@@ -124,6 +124,8 @@ describe("IoLineRow quantity", () => {
     fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "24" } });
 
     expect(onQuantityChange).toHaveBeenCalledWith(24, 0);
+    expect(screen.getByText("창고 수량")).toBeInTheDocument();
+    expect(screen.queryByText("현재 재고")).not.toBeInTheDocument();
   });
 
   it("uses the shared accessible quantity stepper on mobile rows", () => {
@@ -253,8 +255,8 @@ describe("IoLineRow quantity", () => {
       gridTemplateColumns:
         "32px minmax(0,1.6fr) minmax(70px,auto) auto minmax(80px,auto) minmax(80px,auto) 44px",
     });
-    expect(screen.getByText("현재 재고").parentElement).toHaveClass("text-center");
-    expect(screen.getByText("현재 재고").parentElement).not.toHaveClass("lg:text-right");
+    expect(screen.getByText("창고 수량").parentElement).toHaveClass("text-center");
+    expect(screen.getByText("창고 수량").parentElement).not.toHaveClass("lg:text-right");
     expect(removeButton).toHaveClass("h-11", "w-11");
     expect(removeButton.querySelector("svg")).toHaveClass("h-5", "w-5");
   });

@@ -206,10 +206,10 @@ describe("desktop history detail panels", () => {
     render(kind === "single"
       ? <HistoryDetailPanel panelOpen selected={selected} onSelectLog={() => {}} onLogUpdated={() => {}} variant="desktop" />
       : <HistoryBatchDetailPanel panelOpen batchId={batch.batch_id} logs={[selected]} batchCache={new Map([[batch.batch_id, batch]])} setBatchCache={() => {}} onBatchCancelled={() => {}} variant="desktop" />);
-    expect(screen.getByText("실제 처리 당시 재고")).toBeInTheDocument();
+    expect(screen.getByText("재고 이동")).toBeInTheDocument();
     await act(async () => { pending.resolve([{ ...selected, request_order_stock: undefined }]); });
-    expect(screen.getByText("실제 처리 당시 재고")).toBeInTheDocument();
-    expect(screen.getByText("실제 처리 당시 재고").parentElement).toHaveTextContent(/정상 부서\s*94\s*50/);
+    const stockMovement = screen.getByTestId("history-stock-movement-summary");
+    expect(stockMovement).toHaveTextContent(/조립\s*94\s*50/);
   });
 
   it("모바일 상세는 묶음의 실행 로그를 사용해 단품 출고를 감소로 표시한다", async () => {
@@ -692,6 +692,28 @@ describe("desktop history detail panels", () => {
     render(<HistoryDetailMemo notes="동반 출하: 현장 전달 사항" transactionType="RECEIVE" />);
 
     expect(screen.getByText("동반 출하: 현장 전달 사항")).toBeInTheDocument();
+  });
+
+  it("8.6-09 separates a defect category from the free memo without duplication", () => {
+    render(
+      <HistoryDetailPanel
+        panelOpen
+        selected={makeLog({
+          transaction_type: "MARK_DEFECTIVE",
+          reason_category: "파손",
+          reason_memo: "좌측 브래킷 찍힘",
+          notes: "좌측 브래킷 찍힘",
+        })}
+        onSelectLog={() => {}}
+        onLogUpdated={() => {}}
+        variant="desktop"
+      />,
+    );
+
+    expect(screen.getByText("불량 사유")).toBeInTheDocument();
+    expect(screen.getByText("파손")).toBeInTheDocument();
+    expect(screen.getByText("메모")).toBeInTheDocument();
+    expect(screen.getAllByText("좌측 브래킷 찍힘")).toHaveLength(1);
   });
 
   it("uses one key-point summary for a single log and puts cancel at the bottom", () => {

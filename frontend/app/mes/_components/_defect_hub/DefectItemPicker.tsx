@@ -28,6 +28,7 @@ import {
   useResetMyItemOrderMutation,
 } from "@/lib/queries/useMyItemOrderQuery";
 import { useItemOrderDrag, type UseItemOrderDragResult } from "../_warehouse_v2/useItemOrderDrag";
+import { defectSourceStock } from "./defectCartValidation";
 
 const INITIAL_DISPLAY_LIMIT = PAGE_SIZE * 2;
 
@@ -282,7 +283,7 @@ export function DefectItemPicker({
               className="text-left text-[11px] font-bold uppercase tracking-[1.5px]"
               style={{ color: LEGACY_COLORS.muted2 }}
             >
-              {["품목명", "품목 코드", "창고", "추가"].map((h, i) => (
+              {["품목명", "품목 코드", source === "warehouse" ? "창고 가용" : "부서 가용", "추가"].map((h, i) => (
                 <th
                   key={h}
                   className={
@@ -305,7 +306,7 @@ export function DefectItemPicker({
           <tbody>
             {filteredItems.slice(0, displayLimit).map((item) => {
               const impliedDeptName = itemDepartment(item);
-              const wQty = Number(item.warehouse_qty) || 0;
+              const stock = defectSourceStock(item, source);
               const added = selectedIds.has(item.item_id);
               const canAdd = source === "warehouse" || impliedDeptName !== null;
               return (
@@ -316,9 +317,9 @@ export function DefectItemPicker({
                     </span>
                     <div className="sm:hidden text-xs font-bold" style={{ color: impliedDeptName || source === "warehouse" ? LEGACY_COLORS.muted2 : LEGACY_COLORS.red }}>
                       {source === "warehouse"
-                        ? "자동 부서 · 창고"
+                        ? `창고 · 보유 ${formatQty(stock.current)} · 예약 ${formatQty(stock.pending)} · 가용 ${formatQty(stock.available)}`
                         : impliedDeptName
-                          ? `자동 부서 · ${impliedDeptName}`
+                          ? `${impliedDeptName} · 보유 ${formatQty(stock.current)} · 예약 ${formatQty(stock.pending)} · 가용 ${formatQty(stock.available)}`
                           : "부서 미지정 · 생산 출처에서 추가할 수 없습니다."}
                     </div>
                   </td>
@@ -331,13 +332,13 @@ export function DefectItemPicker({
                     </span>
                   </td>
                   <td
-                    className="hidden px-3 py-2 text-center text-base font-black tabular-nums sm:table-cell"
+                    className="hidden px-3 py-2 text-center text-sm font-black tabular-nums sm:table-cell"
                     style={{
-                      color: wQty > 0 ? LEGACY_COLORS.text : LEGACY_COLORS.muted2,
+                      color: stock.available > 0 ? LEGACY_COLORS.text : LEGACY_COLORS.red,
                       borderBottom: `1px solid ${LEGACY_COLORS.border}`,
                     }}
                   >
-                    {formatQty(wQty)}
+                    {formatQty(stock.available)}
                   </td>
                   <td
                     className="whitespace-nowrap px-3 py-2 text-center"

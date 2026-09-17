@@ -13,7 +13,7 @@ import { IoTargetPicker } from "./IoTargetPicker";
 import { IoBundleCart } from "./IoBundleCart";
 import { IoConfirmStep } from "./IoConfirmStep";
 import { IoSubmitModals, type IoSubmitResultState } from "./IoSubmitModals";
-import { IO_WORK_TYPES, approvalKind, canSeeWorkType, deptVisibility, directionWord, ioDepartmentPayload, isAutoDepartmentRoute, isExitWorkType, mergePreviewBundles, pickerDirectionLabel, requiresDepartments, subTypeLabel, targetDepartmentOf } from "./ioWorkType";
+import { IO_WORK_TYPES, approvalKind, canAutoApprove, canSeeWorkType, deptVisibility, directionWord, inventoryEffectLines, ioDepartmentPayload, isAutoDepartmentRoute, isExitWorkType, mergePreviewBundles, pickerDirectionLabel, requiresDepartments, subTypeLabel, targetDepartmentOf } from "./ioWorkType";
 import { applyBundleQuantityChange, applyLineQuantityChange, applyToggleLine } from "./bomSync";
 import { collectShortageItemIds, shortageLines } from "./pullFromWarehouse";
 import { useIoDraftRestore } from "./useIoDraftRestore";
@@ -810,7 +810,7 @@ export function IoComposeView({
     if (vis.to) return `${subTypeText} · ${state.toDepartment}`;
     return subTypeText;
   })();
-  const includedCount = state.includedLines.length;
+  const includedCount = inventoryEffectLines(state.subType, state.bundles).length;
   const excludedCount = state.excludedLines.length;
   // 항목 7 — 생산(produce)·출고(disassemble) 4단계에서 '창고에서 가져오기' 노출. (데스크톱 전용)
   const pullEnabled = state.subType === "produce" || state.subType === "disassemble";
@@ -1381,6 +1381,10 @@ export function IoComposeView({
               submitting={submitting}
               saving={drafting}
               approvalKind={approvalKind(state.subType, state.bundles, state.fromDepartment)}
+              autoApprove={state.subType !== "internal_use_out" && canAutoApprove(
+                approvalKind(state.subType, state.bundles, state.fromDepartment),
+                operator,
+              )}
               onNotesChange={state.setNotes}
               onValidationError={(message) => showFeedbackNotice(message, "error")}
               onSubmit={handleSubmit}

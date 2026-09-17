@@ -96,10 +96,33 @@ class QuarantineRequest(BaseModel):
     source_dept: Optional[str] = None
     target_dept: str
     reason_category: Optional[str] = None
-    reason_memo: str
+    reason_memo: Optional[str] = None
     management_category: Literal["DEFECT", "B_GRADE", "OBSOLETE"] = "DEFECT"
     actor_employee_id: uuid.UUID
     client_request_id: Optional[str] = None
+
+
+class BulkQuarantineLine(BaseModel):
+    item_id: uuid.UUID
+    qty: Decimal
+    source: str
+    source_dept: Optional[str] = None
+    target_dept: str
+    reason_category: Optional[str] = None
+    reason_memo: Optional[str] = None
+    management_category: Literal["DEFECT", "B_GRADE", "OBSOLETE"] = "DEFECT"
+
+
+class BulkQuarantineRequest(BaseModel):
+    actor_employee_id: uuid.UUID
+    client_request_id: Optional[str] = Field(None, max_length=48)
+    lines: List[BulkQuarantineLine] = Field(..., min_length=1, max_length=100)
+
+
+class BulkQuarantineResult(BaseModel):
+    processed_lines: int
+    total_quantity: Decimal
+    message: str
 
 
 class UnquarantineRequest(BaseModel):
@@ -287,6 +310,25 @@ def _find_client_request_log(db: Session, client_request_id: str) -> Optional[Tr
         .filter(TransactionLog.client_request_id == client_request_id)
         .first()
     )
+
+
+def _has_quarantine_reason(reason_category: Optional[str], reason_memo: Optional[str]) -> bool:
+    return bool((reason_category or "").strip() or (reason_memo or "").strip())
+
+
+def _bulk_quarantine_payloads(payload: BulkQuarantineRequest) -> list[QuarantineRequest]:
+    return [
+        QuarantineRequest(
+            **line.model_dump(),
+            actor_employee_id=payload.actor_employee_id,
+            client_request_id=(
+                f"{payload.client_request_id}:{index}"
+                if payload.client_request_id
+                else None
+            ),
+        )
+        for index, line in enumerate(payload.lines)
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -699,6 +741,8 @@ def update_management_category(
 @router.post("/quarantine", response_model=DefectActionResult)
 def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = Depends(get_db)):
     """격리 (즉시, 결재 없음). mark_defective 래퍼 + defective_at 채움."""
+    if not _has_quarantine_reason(payload.reason_category, payload.reason_memo):
+        raise http_error(422, ErrorCode.VALIDATION_ERROR, "사유 카테고리 또는 메모 중 하나를 입력하세요.")
     # 멱등성: 동일 키뿐 아니라 같은 격리 명령임이 확인될 때만 성공으로 재사용한다.
     if payload.client_request_id:
         existing = _find_client_request_log(db, payload.client_request_id)
@@ -759,6 +803,83 @@ def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = 
     return DefectActionResult(
         item_id=payload.item_id,
         quantity=payload.qty,
+        message="격리 완료",
+    )
+
+
+@router.post("/quarantine/bulk", response_model=BulkQuarantineResult)
+def quarantine_bulk(
+    payload: BulkQuarantineRequest,
+    http_request: Request,
+    db: Session = Depends(get_db),
+):
+    """복수 격리를 한 트랜잭션으로 확정하며 같은 요청의 재시도를 멱등 처리한다."""
+    line_payloads = _bulk_quarantine_payloads(payload)
+    if any(not _has_quarantine_reason(line.reason_category, line.reason_memo) for line in line_payloads):
+        raise http_error(422, ErrorCode.VALIDATION_ERROR, "모든 품목에 사유 카테고리 또는 메모 중 하나를 입력하세요.")
+
+    actor = db.query(Employee).filter(Employee.employee_id == payload.actor_employee_id).first()
+    if actor is None:
+        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    set_actor(http_request, actor)
+
+    replayed = 0
+    for line in line_payloads:
+        if not line.client_request_id:
+            continue
+        existing = _find_client_request_log(db, line.client_request_id)
+        if existing is None:
+            continue
+        if not _matches_quarantine_request(db, existing, line):
+            raise http_error(409, ErrorCode.CONFLICT, "이미 다른 요청에 사용된 요청 식별자입니다.")
+        replayed += 1
+    if replayed:
+        if replayed != len(line_payloads):
+            raise http_error(409, ErrorCode.CONFLICT, "일부 품목만 처리된 요청 식별자는 다시 사용할 수 없습니다.")
+        return BulkQuarantineResult(
+            processed_lines=len(line_payloads),
+            total_quantity=sum((line.qty for line in line_payloads), Decimal("0")),
+            message="격리 완료",
+        )
+
+    service_lines: list[defect_actions_svc.BulkQuarantineLine] = []
+    try:
+        for line in line_payloads:
+            service_lines.append(
+                defect_actions_svc.BulkQuarantineLine(
+                    item_id=line.item_id,
+                    quantity=line.qty,
+                    source=line.source,
+                    target_department=_dept_enum(line.target_dept),
+                    source_department=_dept_enum(line.source_dept) if line.source_dept else None,
+                    reason_category=line.reason_category,
+                    reason_memo=line.reason_memo,
+                    client_request_id=line.client_request_id,
+                    management_category=line.management_category,
+                )
+            )
+        defect_actions_svc.quarantine_inventory_bulk(db, lines=service_lines, actor=actor)
+    except ValueError as exc:
+        raise http_error(422, ErrorCode.VALIDATION_ERROR, str(exc))
+    except IntegrityError:
+        db.expire_all()
+        if all(
+            line.client_request_id
+            and (existing := _find_client_request_log(db, line.client_request_id)) is not None
+            and _matches_quarantine_request(db, existing, line)
+            for line in line_payloads
+        ):
+            return BulkQuarantineResult(
+                processed_lines=len(line_payloads),
+                total_quantity=sum((line.qty for line in line_payloads), Decimal("0")),
+                message="격리 완료",
+            )
+        raise http_error(409, ErrorCode.CONFLICT, "격리 처리 중 충돌이 발생했습니다.")
+
+    _evt_emit("defect_mark_bulk", request=http_request, count=len(line_payloads))
+    return BulkQuarantineResult(
+        processed_lines=len(line_payloads),
+        total_quantity=sum((line.qty for line in line_payloads), Decimal("0")),
         message="격리 완료",
     )
 

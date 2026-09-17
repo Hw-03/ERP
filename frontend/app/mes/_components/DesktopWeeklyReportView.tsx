@@ -6,7 +6,6 @@ import { adminApi } from "@/lib/api/admin";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatKstDate } from "@/lib/mes/date";
 import { Button } from "@/lib/ui/Button";
-import type { WeeklyProductionModelRow } from "@/lib/api/types/weekly";
 import { useWeeklyReportQuery } from "@/lib/queries/useWeeklyQuery";
 import { WeeklyGroupCards } from "./_weekly_sections/WeeklyGroupCards";
 import { WeeklyDetailTable } from "./_weekly_sections/WeeklyDetailTable";
@@ -46,19 +45,9 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
     data?.report_status === "verified" && data.basis_version === 2 ? "normal" : "legacy";
 
   const matrixRows = data?.production_matrix ?? [];
-  const hasProduction = matrixRows.some((r) => r.total_qty > 0);
-
-  // KPI 계산
-  const totalQty = matrixRows.reduce((s, r) => s + r.total_qty, 0);
-  const topModel = matrixRows.reduce(
-    (best, r) => (r.total_qty > (best?.total_qty ?? 0) ? r : best),
-    null as WeeklyProductionModelRow | null
-  );
-  const activeDepts = data?.groups.filter((g) => {
-    const key = `${g.process_code.toLowerCase()}_qty` as keyof WeeklyProductionModelRow;
-    return matrixRows.some((row) => Number(row[key]) > 0);
-  }).length ?? 0;
-  const totalDepts = data?.groups.length ?? 0;
+  const totalProduceQty = data?.summary?.total_produce_qty ?? 0;
+  const hasOverallProduction = totalProduceQty > 0;
+  const hasModelProduction = matrixRows.some((r) => r.total_qty > 0);
 
   async function handleF705Download(): Promise<void> {
     if (f705Downloading) return;
@@ -137,7 +126,7 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
             </div>
           );
         }
-        if (!hasProduction) {
+        if (!hasOverallProduction) {
           return (
             <div data-testid="weekly-production-card" className="weekly-card weekly-production-empty">
               <div>
@@ -151,29 +140,24 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
             </div>
           );
         }
+        if (!hasModelProduction) {
+          return (
+            <div data-testid="weekly-production-card" className="weekly-card weekly-production-empty">
+              <div>
+                <b>생산 현황</b>
+                <span>전체 생산 {totalProduceQty.toLocaleString()}개</span>
+                <span>모델별 집계 0</span>
+                <span>모델 정보가 없거나 공용인 품목은 모델별 집계에서 제외됩니다.</span>
+                {f705DownloadButton}
+              </div>
+              {f705DownloadError && <p role="alert" className="weekly-download-error">{f705DownloadError}</p>}
+            </div>
+          );
+        }
         return (
           <div data-testid="weekly-production-card" className="weekly-card weekly-production">
-            {/* 헤더: 타이틀 + KPI 배지 */}
             <div className="weekly-production-head">
               <h2>생산 현황</h2>
-              {/* KPI 배지 */}
-              <span
-                data-tone="total"
-              >
-                총 {totalQty.toLocaleString()}개
-              </span>
-              {topModel && (
-                <span
-                  data-tone="top"
-                >
-                  최다 {topModel.model_label} ({topModel.total_qty.toLocaleString()})
-                </span>
-              )}
-              <span
-                data-tone="department"
-              >
-                생산 부서 {activeDepts}/{totalDepts}
-              </span>
               {f705DownloadButton}
             </div>
             {f705DownloadError && <p role="alert" className="weekly-download-error">{f705DownloadError}</p>}

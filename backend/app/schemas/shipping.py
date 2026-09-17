@@ -292,8 +292,10 @@ class ShippingRequestResponse(BaseModel):
     request_quantity: int = 1
     final_pa_item_id: Optional[uuid.UUID] = None
     final_pa_item_name: Optional[str] = None
+    final_pa_mes_code: Optional[str] = None
     final_pf_item_id: Optional[uuid.UUID] = None
     final_pf_item_name: Optional[str] = None
+    final_pf_mes_code: Optional[str] = None
     finalization_mode: ShippingFinalizationModeEnum
     reuse_pf_item_id: Optional[uuid.UUID] = None
     requested_by_name: Optional[str] = None

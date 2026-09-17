@@ -40,6 +40,21 @@ class BulkUnquarantineLine:
     quantity: Decimal
 
 
+@dataclass(frozen=True)
+class BulkQuarantineLine:
+    """한 번에 확정할 정상 재고 격리 라인."""
+
+    item_id: uuid.UUID
+    quantity: Decimal
+    source: str
+    target_department: DepartmentEnum
+    source_department: Optional[DepartmentEnum]
+    reason_category: Optional[str]
+    reason_memo: Optional[str]
+    client_request_id: Optional[str]
+    management_category: str
+
+
 def quarantine_inventory(
     db: Session,
     *,
@@ -123,6 +138,7 @@ def quarantine_inventory(
                 item_id=item_id,
                 transaction_type=TransactionTypeEnum.MARK_DEFECTIVE,
                 quantity_change=Decimal("0"),
+                transfer_qty=qty,
                 quantity_before=qty_before,
                 quantity_after=inv.quantity,
                 produced_by=actor.name,
@@ -152,6 +168,40 @@ def quarantine_inventory(
             actor_employee_id=actor.employee_id,
         )
     return inv
+
+
+def quarantine_inventory_bulk(
+    db: Session,
+    *,
+    lines: Sequence[BulkQuarantineLine],
+    actor: Employee,
+) -> list[Inventory]:
+    """복수 격리를 하나의 트랜잭션으로 처리해 일부 라인만 반영되는 일을 막는다."""
+    if not lines:
+        raise ValueError("격리할 품목을 한 개 이상 선택하세요.")
+    item_ids = [line.item_id for line in lines]
+    if len(item_ids) != len(set(item_ids)):
+        raise ValueError("같은 품목을 한 요청에 중복해 격리할 수 없습니다.")
+
+    inventories: list[Inventory] = []
+    with transactional(db):
+        for line in sorted(lines, key=lambda current: str(current.item_id)):
+            inventories.append(
+                quarantine_inventory(
+                    db,
+                    item_id=line.item_id,
+                    qty=line.quantity,
+                    source=line.source,
+                    target_dept=line.target_department,
+                    source_dept=line.source_department,
+                    actor=actor,
+                    reason_category=line.reason_category,
+                    reason_memo=line.reason_memo,
+                    client_request_id=line.client_request_id,
+                    management_category=line.management_category,
+                )
+            )
+    return inventories
 
 
 def unquarantine_inventory(
@@ -209,6 +259,7 @@ def unquarantine_inventory(
                 item_id=item_id,
                 transaction_type=TransactionTypeEnum.UNMARK_DEFECTIVE,
                 quantity_change=Decimal("0"),
+                transfer_qty=qty,
                 quantity_before=qty_before,
                 quantity_after=inv.quantity,
                 produced_by=actor.name,

@@ -26,6 +26,8 @@ import {
   hasManualLine,
   hasCustomBomQuantity,
   processBomEffectLine,
+  inventoryEffectLines,
+  canAutoApprove,
   approvalKind,
   isBomForced,
   canonicalProcessSubType,
@@ -220,6 +222,42 @@ describe("canSeeWorkType", () => {
       expect(canSeeWorkType(wt, null)).toBe(true);
       expect(canSeeWorkType(wt, { warehouse_role: "none" })).toBe(true);
     }
+  });
+});
+
+describe("결재권자와 실제 재고 효과", () => {
+  it("8.16-04, 8.17-05: 원자재 입고와 창고 수량보정은 수동 라인이어도 결재 작업으로 바꾸지 않는다", () => {
+    const manual = makeBundle({ lines: [makeLine({ origin: "manual" })] });
+    expect(approvalKind("receive_supplier", [manual])).toBe("none");
+    expect(approvalKind("warehouse_adjust_in", [manual])).toBe("none");
+    expect(approvalKind("warehouse_adjust_out", [manual])).toBe("none");
+  });
+
+  it("8.22-09, 8.25-04: 서버와 같은 역할 기준으로 창고·부서 자가 승인을 판정한다", () => {
+    expect(canAutoApprove("warehouse", { warehouse_role: "primary" })).toBe(true);
+    expect(canAutoApprove("warehouse", { level: "admin", warehouse_role: "none" })).toBe(true);
+    expect(canAutoApprove("warehouse", { warehouse_role: "none" })).toBe(false);
+    expect(canAutoApprove("department", { department_role: "deputy" })).toBe(true);
+    expect(canAutoApprove("department", { warehouse_role: "primary" })).toBe(true);
+    expect(canAutoApprove("department", { level: "admin", warehouse_role: "none", department_role: "none" })).toBe(false);
+  });
+
+  it("8.22-07, 8.22-08: 커스텀 BOM은 상위 참고 품목을 빼고 선택한 하위만 효과로 센다", () => {
+    const parent = makeLine({ origin: "direct", item_id: "parent", quantity: 1 });
+    const child = makeLine({
+      line_id: "child",
+      item_id: "child",
+      origin: "bom_auto",
+      bom_expected: 1,
+      quantity: 2,
+      edited: true,
+      from_bucket: "production",
+      from_department: "조립",
+      to_bucket: "none",
+    });
+    const bundle = makeBundle({ source_kind: "bom_parent", quantity: 1, lines: [parent, child] });
+
+    expect(inventoryEffectLines("produce", [bundle]).map((line) => line.item_id)).toEqual(["child"]);
   });
 });
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import type { LucideIcon } from "lucide-react";
 import { ArrowLeft, Building2, Copy, Trash2, Warehouse, Wrench } from "lucide-react";
@@ -23,6 +24,8 @@ import { ConfirmModal } from "@/lib/ui";
 import { makeClientRequestId } from "@/lib/uuid";
 import type { DefectManagementCategory } from "@/lib/api/types/defects";
 import { DefectManagementCategoryControl } from "../../_defect_hub/DefectManagementCategoryControl";
+import { defectCartLineErrors } from "../../_defect_hub/defectCartValidation";
+import { queryKeys } from "@/lib/queries/keys";
 import { TYPO } from "../tokens";
 import {
   IconButton,
@@ -95,11 +98,13 @@ export function MobileDefectCartFlow({
   onDone: () => void;
   onCancel: () => void;
 }) {
+  const queryClient = useQueryClient();
   const [directAction, setDirectAction] = useState<DirectAction | null>(mode === "add" ? "scrap" : null);
   const [source, setSource] = useState<SourceKind>("production");
   const [step, setStep] = useState<FlowStep>(1);
   const [lines, setLines] = useState<CartLine[]>([]);
   const [requestIds, setRequestIds] = useState<Record<string, string>>({});
+  const [batchRequestId, setBatchRequestId] = useState(() => makeClientRequestId());
   const [busy, setBusy] = useState(false);
   const [failures, setFailures] = useState<LineFailure[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -151,7 +156,8 @@ export function MobileDefectCartFlow({
   const selectedIds = useMemo(() => new Set(lines.map((l) => l.item.item_id)), [lines]);
   const selectedReworkLine = isRework ? lines[0] : null;
   const reworkLineReady = Boolean(
-    selectedReworkLine && Number.isFinite(selectedReworkLine.qty) && selectedReworkLine.qty > 0 && selectedReworkLine.category.trim() !== "",
+    selectedReworkLine
+      && defectCartLineErrors({ ...selectedReworkLine, qty: String(selectedReworkLine.qty), source }).length === 0,
   );
 
   function newLine(item: Item): CartLine {
@@ -164,11 +170,13 @@ export function MobileDefectCartFlow({
       if (prev.some((l) => l.item.item_id === item.item_id)) return prev;
       const line = newLine(item);
       setRequestIds((ids) => ({ ...ids, [line.key]: makeClientRequestId() }));
+      setBatchRequestId(makeClientRequestId());
       return isRework ? [line] : [...prev, line];
     });
   }
 
   function updateLine(key: string, patch: Partial<Omit<CartLine, "key" | "item">>) {
+    setBatchRequestId(makeClientRequestId());
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   }
 
@@ -179,6 +187,7 @@ export function MobileDefectCartFlow({
       delete next[key];
       return next;
     });
+    setBatchRequestId(makeClientRequestId());
   }
 
   function removeItemById(item: Item) {
@@ -191,6 +200,7 @@ export function MobileDefectCartFlow({
           return next;
         });
       }
+      setBatchRequestId(makeClientRequestId());
       return prev.filter((l) => l.item.item_id !== item.item_id);
     });
   }
@@ -225,30 +235,44 @@ export function MobileDefectCartFlow({
     setSource(nextSource);
   }
 
+  const lineErrorsByKey = useMemo(
+    () => new Map(lines.map((line) => [
+      line.key,
+      defectCartLineErrors({ ...line, qty: String(line.qty), source }),
+    ])),
+    [lines, source],
+  );
+
   const allValid =
     directAction !== null &&
     lines.length > 0 &&
     lines.every((l) => {
-      if (!Number.isFinite(l.qty) || l.qty <= 0 || (source === "production" && itemDepartment(l.item) === null)) return false;
+      if ((lineErrorsByKey.get(l.key)?.length ?? 0) > 0) return false;
       if (!isRework) return true;
-      return l.category.trim() !== "" && l.decisions.length > 0 && validateDecisionTree(l.decisions);
+      return l.decisions.length > 0 && validateDecisionTree(l.decisions);
     });
+
+  function quarantinePayload(line: CartLine, requestId: string) {
+    const productionDepartment = itemDepartment(line.item);
+    if (source === "production" && !productionDepartment) throw new Error("품목 담당 부서를 확인할 수 없습니다.");
+    return {
+      item_id: line.item.item_id,
+      qty: line.qty,
+      source,
+      ...(source === "production" ? { source_dept: productionDepartment!, target_dept: productionDepartment! } : { target_dept: "창고" }),
+      reason_category: line.category || null,
+      reason_memo: line.memo || null,
+      actor_employee_id: currentEmployee.employee_id,
+      client_request_id: requestId,
+      management_category: line.managementCategory,
+    };
+  }
 
   async function submitLine(line: CartLine, requestId: string): Promise<void> {
     const productionDepartment = itemDepartment(line.item);
     if (source === "production" && !productionDepartment) throw new Error("품목 담당 부서를 확인할 수 없습니다.");
     if (mode === "add") {
-      await defectsApi.quarantine({
-        item_id: line.item.item_id,
-        qty: line.qty,
-        source,
-        ...(source === "production" ? { source_dept: productionDepartment!, target_dept: productionDepartment! } : { target_dept: "창고" }),
-        reason_category: line.category || null,
-        reason_memo: line.memo,
-        actor_employee_id: currentEmployee.employee_id,
-        client_request_id: requestId,
-        management_category: line.managementCategory,
-      });
+      await defectsApi.quarantine(quarantinePayload(line, requestId));
       return;
     }
 
@@ -277,6 +301,29 @@ export function MobileDefectCartFlow({
     if (!allValid || busy) return;
     setBusy(true);
     setFailures([]);
+    if (mode === "add" && lines.length > 1) {
+      try {
+        await defectsApi.quarantineBulk({
+          actor_employee_id: currentEmployee.employee_id,
+          client_request_id: batchRequestId,
+          lines: lines.map((line) => {
+            const { actor_employee_id: _actorEmployeeId, client_request_id: _clientRequestId, ...payload } = quarantinePayload(
+              line,
+              requestIds[line.key] ?? makeClientRequestId(),
+            );
+            return payload;
+          }),
+        });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.items.all });
+        setBusy(false);
+        onDone();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "처리 실패";
+        setFailures(lines.map((line) => ({ key: line.key, itemName: line.item.item_name, message })));
+        setBusy(false);
+      }
+      return;
+    }
     const results = await Promise.allSettled(
       lines.map((l) => submitLine(l, requestIds[l.key] ?? makeClientRequestId())),
     );
@@ -295,6 +342,7 @@ export function MobileDefectCartFlow({
     });
     setBusy(false);
     if (nextFailures.length === 0) {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.items.all });
       onDone();
       return;
     }
@@ -456,11 +504,27 @@ export function MobileDefectCartFlow({
           busy={busy}
           busyLabel="처리 중..."
         >
-          <p className={clsx(TYPO.body, "font-bold")} style={{ color: LEGACY_COLORS.text }}>
+          <p className={clsx(TYPO.body, "mb-3 font-bold")} style={{ color: LEGACY_COLORS.text }}>
             선택한 품목을 즉시 재작업하고 하위 품목을 정상·격리·폐기로 나눕니다.
           </p>
-          <div className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
-            {lines.map((line) => <div key={line.key}>{line.item.item_name} · 수량 {line.qty} · 자동 부서 · {source === "warehouse" ? "창고" : itemDepartment(line.item) ?? "부서 미지정"}</div>)}
+          <div className="flex max-h-64 flex-col gap-2 overflow-y-auto">
+            {lines.map((line) => (
+              <div
+                key={line.key}
+                data-testid="mobile-defect-confirm-line"
+                className="rounded-[14px] border px-3 py-2.5"
+                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+              >
+                <div className={clsx(TYPO.body, "truncate font-black")} style={{ color: LEGACY_COLORS.text }}>
+                  {line.item.item_name}
+                </div>
+                <div className={clsx(TYPO.caption, "mt-1 flex items-center gap-1.5 font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
+                  <span>수량 {line.qty}</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{source === "warehouse" ? "창고" : itemDepartment(line.item) ?? "부서 미지정"}</span>
+                </div>
+              </div>
+            ))}
           </div>
         </ConfirmModal>
       </div>
@@ -498,11 +562,12 @@ export function MobileDefectCartFlow({
               <div className="flex flex-col gap-2">
                 {lines.map((line, idx) => {
                   const fail = failures.find((f) => f.key === line.key);
+                  const validationErrors = lineErrorsByKey.get(line.key) ?? [];
                   return (
                     <div
                       key={line.key}
                       className="flex flex-col gap-2 rounded-[14px] border p-3"
-                      style={{ background: LEGACY_COLORS.s1, borderColor: fail ? tint(LEGACY_COLORS.red, 30) : LEGACY_COLORS.border }}
+                      style={{ background: LEGACY_COLORS.s1, borderColor: fail || validationErrors.length > 0 ? tint(LEGACY_COLORS.red, 30) : LEGACY_COLORS.border }}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
@@ -555,7 +620,7 @@ export function MobileDefectCartFlow({
                         memo={line.memo}
                         onCategoryChange={(c) => updateLine(line.key, { category: c })}
                         onMemoChange={(m) => updateLine(line.key, { memo: m })}
-                        required={isRework}
+                        requireAny
                       />
 
                       {mode === "add" && (
@@ -579,6 +644,11 @@ export function MobileDefectCartFlow({
                           실패: {fail.message}
                         </div>
                       )}
+                      {validationErrors.map((message) => (
+                        <div key={message} className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.red }}>
+                          {message}
+                        </div>
+                      ))}
                     </div>
                   );
                 })}
@@ -622,15 +692,36 @@ export function MobileDefectCartFlow({
         busy={busy}
         busyLabel="처리 중..."
       >
-        <p className={clsx(TYPO.body, "font-bold")} style={{ color: LEGACY_COLORS.text }}>
-          {isRework
-            ? "선택한 품목을 즉시 재작업하고 하위 품목을 정상·격리·폐기로 나눕니다."
-            : isScrap
-              ? `${lines.length}건을 즉시 폐기합니다. 재고에서 차감되며 되돌릴 수 없습니다.`
-              : `${lines.length}건을 격리합니다. ${lines.map((line) => line.managementCategory === "B_GRADE" ? "B급" : line.managementCategory === "OBSOLETE" ? "구형" : "불량 격리").join(", ")} 분류로 보관됩니다.`}
-        </p>
-        <div className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
-          {lines.map((line) => <div key={line.key}>{line.item.item_name} · 수량 {line.qty}{mode === "add" ? ` · 관리 분류 ${managementCategoryLabel(line.managementCategory)}` : ""} · 자동 부서 · {source === "warehouse" ? "창고" : itemDepartment(line.item) ?? "부서 미지정"}</div>)}
+        {isRework && (
+          <p className={clsx(TYPO.body, "mb-3 font-bold")} style={{ color: LEGACY_COLORS.text }}>
+            선택한 품목을 즉시 재작업하고 하위 품목을 정상·격리·폐기로 나눕니다.
+          </p>
+        )}
+        <div className="flex max-h-64 flex-col gap-2 overflow-y-auto">
+          {lines.map((line) => (
+            <div
+              key={line.key}
+              data-testid="mobile-defect-confirm-line"
+              className="flex items-center justify-between gap-3 rounded-[14px] border px-3 py-2.5"
+              style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+            >
+              <div className="min-w-0">
+                <div className={clsx(TYPO.body, "truncate font-black")} style={{ color: LEGACY_COLORS.text }}>
+                  {line.item.item_name}
+                </div>
+                <div className={clsx(TYPO.caption, "mt-1 flex items-center gap-1.5 font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
+                  <span>수량 {line.qty}</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{source === "warehouse" ? "창고" : itemDepartment(line.item) ?? "부서 미지정"}</span>
+                </div>
+              </div>
+              {mode === "add" && (
+                <span className={clsx(TYPO.caption, "shrink-0 rounded-full px-2.5 py-1 font-black")} style={{ background: tint(LEGACY_COLORS.red, 10), color: LEGACY_COLORS.red }}>
+                  {managementCategoryLabel(line.managementCategory)}
+                </span>
+              )}
+            </div>
+          ))}
         </div>
       </ConfirmModal>
     </div>

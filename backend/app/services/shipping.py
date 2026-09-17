@@ -581,7 +581,6 @@ def update_request(
     if "bom_lines" in payload:
         _replace_bom_lines(db, req, _normalize_bom_lines(db, req.base_pf_item, payload.get("bom_lines")))
         db.refresh(req)
-        _sync_checklist(db, req)
     if "finalization_mode" in payload or "reuse_pf_item_id" in payload:
         _apply_finalization_choice(db, req, payload, infer_when_missing=False)
     elif "bom_lines" in payload:
@@ -592,6 +591,8 @@ def update_request(
     db.refresh(req)
     _resolve_final_items(db, req)
     db.refresh(req)
+    if {"bom_lines", "finalization_mode", "reuse_pf_item_id"} & payload.keys():
+        _sync_checklist(db, req)
     after = _revision_snapshot(req)
     changes = _snapshot_changes(before, after)
     if not changes:
@@ -888,6 +889,34 @@ def _create_or_update_request_pf(db: Session, req: ShippingRequest, final_pa: It
     return pf
 
 
+def _sync_request_final_pa_line(db: Session, req: ShippingRequest, final_pa: Item) -> None:
+    """Keep the request's visible PF composition aligned with its selected final PA."""
+    pf_lines = _request_stage_lines(req, "PF", included_only=False)
+    for line in sorted(pf_lines, key=lambda value: int(value.sort_order or 0)):
+        child_item = line.child_item or _get_item(db, line.child_item_id)
+        if not line.included or child_item.process_type_code != "PA":
+            continue
+        if line.child_item_id != final_pa.item_id:
+            line.child_item = final_pa
+            line.origin = "CUSTOM"
+            db.flush()
+        return
+
+    db.add(
+        ShippingRequestBomLine(
+            request_id=req.request_id,
+            parent_stage="PF",
+            child_item_id=final_pa.item_id,
+            quantity=1,
+            unit="EA",
+            included=True,
+            origin="CUSTOM",
+            sort_order=min((int(line.sort_order or 0) for line in pf_lines), default=1) - 1,
+        )
+    )
+    db.flush()
+
+
 def _resolve_final_items(db: Session, req: ShippingRequest) -> tuple[Item, Item]:
     if req.finalization_mode == ShippingFinalizationModeEnum.KEEP_BASE:
         candidate = _matching_candidate_for_pf(db, req, req.base_pf_item_id)
@@ -906,6 +935,7 @@ def _resolve_final_items(db: Session, req: ShippingRequest) -> tuple[Item, Item]
     else:
         final_pa = _create_or_update_request_pa(db, req)
         final_pf = _create_or_update_request_pf(db, req, final_pa)
+    _sync_request_final_pa_line(db, req, final_pa)
     req.final_pa_item_id = final_pa.item_id
     req.final_pf_item_id = final_pf.item_id
     db.flush()

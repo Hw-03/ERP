@@ -35,11 +35,11 @@ export function getDefaultHistoryScopeForOperator(
 // ──────────────────────────────────────────────────────────────────
 
 export const WAREHOUSE_INVOLVED_TYPES: readonly TransactionType[] = [
-  "RECEIVE", "SHIP", "TRANSFER_TO_PROD", "TRANSFER_TO_WH", "INTERNAL_USE",
+  "RECEIVE", "TRANSFER_TO_PROD", "TRANSFER_TO_WH",
 ] as const;
 
 export const DEPT_INTERNAL_TYPES: readonly TransactionType[] = [
-  "TRANSFER_DEPT", "BACKFLUSH", "PRODUCE", "DISASSEMBLE",
+  "SHIP", "INTERNAL_USE", "TRANSFER_DEPT", "BACKFLUSH", "PRODUCE", "DISASSEMBLE",
 ] as const;
 
 // 타입만으로 scope 확정 불가 — IoBatch.lines.from_bucket/to_bucket 참고 필요.

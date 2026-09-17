@@ -137,7 +137,7 @@ def test_summary_empty_db(client):
     }
 
 
-def test_internal_use_is_warehouse_kpi_with_destination_department(
+def test_internal_use_is_not_warehouse_kpi_with_destination_department(
     client, db_session, make_item
 ):
     item = make_item(name="내부 사용 집계품", warehouse_qty=Decimal("0"))
@@ -156,8 +156,37 @@ def test_internal_use_is_warehouse_kpi_with_destination_department(
         params={"operation_keys": "warehouse"},
     )
     assert summary.status_code == 200, summary.text
-    assert summary.json()["warehouse_count"] == 1
+    assert summary.json()["warehouse_count"] == 0
+    assert summary.json()["dept_count"] == 1
     assert summary.json()["department_counts"] == {"연구": 1}
+
+
+def test_shipping_filter_does_not_count_shipping_location_as_warehouse(
+    client, db_session, make_item
+):
+    item = make_item(name="출하 집계품", warehouse_qty=Decimal("0"))
+    _seed_log(
+        db_session,
+        item,
+        TransactionTypeEnum.SHIP,
+        Decimal("-1"),
+        department="출하",
+    )
+    db_session.commit()
+
+    summary = client.get(
+        "/api/inventory/transactions/summary",
+        params={"operation_keys": "shipping"},
+    )
+
+    assert summary.status_code == 200, summary.text
+    assert summary.json() == {
+        "total": 1,
+        "warehouse_count": 0,
+        "dept_count": 1,
+        "adjust_count": 0,
+        "department_counts": {"출하": 1},
+    }
 
 
 def test_unsupported_operation_key_returns_no_history_rows_or_summary(
@@ -366,8 +395,20 @@ def test_summary_categorizes_by_transaction_type(client, db_session, make_item):
     _seed_log(db_session, item, TransactionTypeEnum.RECEIVE, Decimal("10"))
     _seed_log(db_session, item, TransactionTypeEnum.RECEIVE, Decimal("20"))
     _seed_log(db_session, item, TransactionTypeEnum.RECEIVE, Decimal("30"))
-    _seed_log(db_session, item, TransactionTypeEnum.SHIP, Decimal("-5"))
-    _seed_log(db_session, item, TransactionTypeEnum.SHIP, Decimal("-10"))
+    _seed_log(
+        db_session,
+        item,
+        TransactionTypeEnum.SHIP,
+        Decimal("-5"),
+        department="출하",
+    )
+    _seed_log(
+        db_session,
+        item,
+        TransactionTypeEnum.SHIP,
+        Decimal("-10"),
+        department="출하",
+    )
     _seed_log(db_session, item, TransactionTypeEnum.TRANSFER_TO_PROD, Decimal("0"))
     _seed_log(
         db_session,
@@ -395,17 +436,17 @@ def test_summary_categorizes_by_transaction_type(client, db_session, make_item):
     res = client.get("/api/inventory/transactions/summary")
     assert res.status_code == 200, res.text
     body = res.json()
-    # warehouse_involved: RECEIVE(3) + SHIP(2) + TRANSFER_TO_PROD(1) = 6
-    # dept_internal: PRODUCE(1) + BACKFLUSH(1) = 2
+    # warehouse_involved: RECEIVE(3) + TRANSFER_TO_PROD(1) = 4
+    # department activity: SHIP(2) + PRODUCE(1) + BACKFLUSH(1) = 4
     # adjust: 1
     # total: 9
-    # RECEIVE(3)+SHIP(2)+TRANSFER_TO_PROD(1) 는 창고계열 → '창고' 6건
+    # 출하는 출하/부서 위치 작업이므로 창고 집계에서 제외한다.
     assert body == {
         "total": 9,
-        "warehouse_count": 6,
-        "dept_count": 2,
+        "warehouse_count": 4,
+        "dept_count": 4,
         "adjust_count": 1,
-        "department_counts": {"창고": 7, "조립": 2},
+        "department_counts": {"창고": 5, "출하": 2, "조립": 2},
     }
 
 
@@ -472,8 +513,8 @@ def test_summary_counts_each_new_operation_once_and_excludes_cancellation_from_a
     assert response.json() == {
         "total": 2,
         "warehouse_count": 0,
-        "dept_count": 0,
-        "adjust_count": 1,
+        "dept_count": 2,
+        "adjust_count": 0,
         "department_counts": {"고압": 2},
     }
 
@@ -501,7 +542,7 @@ def test_summary_search_filter_applies(client, db_session, make_item):
     body = res.json()
     # 알파품목 매칭만 → RECEIVE 1 + SHIP 1 = 2
     assert body["total"] == 2
-    assert body["warehouse_count"] == 2
+    assert body["warehouse_count"] == 1
     assert body["adjust_count"] == 0
 
 

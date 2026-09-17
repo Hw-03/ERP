@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { Item } from "../../_warehouse_v2/types";
 import { DefectItemPicker } from "../DefectItemPicker";
@@ -40,6 +40,38 @@ function makeItem(index: number): Item {
 }
 
 describe("DefectItemPicker mobile scroll", () => {
+  it("keeps the department availability header while showing only the available quantity", () => {
+    const item = {
+      ...makeItem(1),
+      process_type_code: "TR",
+      production_total: 5,
+      locations: [
+        {
+          department: "튜브",
+          status: "PRODUCTION",
+          quantity: 5,
+          pending_quantity: 1,
+          available_quantity: 4,
+        },
+      ],
+    } as unknown as Item;
+
+    render(
+      <DefectItemPicker
+        items={[item]}
+        productModels={[]}
+        source="production"
+        selectedIds={new Set()}
+        onAdd={() => {}}
+        onRemove={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole("columnheader", { name: "부서 가용" })).toBeInTheDocument();
+    const row = screen.getByTestId("defect-picker-row-item-1");
+    expect(within(row).getAllByRole("cell")[2]).toHaveTextContent(/^4$/);
+  });
+
   it("does not repeat the automatic department as a desktop table column", () => {
     render(
       <DefectItemPicker

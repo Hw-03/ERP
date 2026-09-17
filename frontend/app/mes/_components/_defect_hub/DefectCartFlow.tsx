@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { LucideIcon } from "lucide-react";
 import { ArrowLeft, Building2, ChevronRight, Copy, Trash2, Warehouse, Wrench } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -16,6 +17,9 @@ import { DisassembleTree, toServerDecision, validateDecisionTree, type ChildDeci
 import { QuantityInput } from "../common/QuantityInput";
 import { DefectManagementCategoryControl } from "./DefectManagementCategoryControl";
 import type { DefectManagementCategory } from "@/lib/api/types/defects";
+import { makeClientRequestId } from "@/lib/uuid";
+import { queryKeys } from "@/lib/queries/keys";
+import { defectCartLineErrors } from "./defectCartValidation";
 
 type SourceKind = "warehouse" | "production";
 type DirectAction = "scrap" | "rework";
@@ -54,11 +58,6 @@ function isReworkCandidate(item: Item): boolean {
   return item.has_bom === true;
 }
 
-function validQty(value: string): boolean {
-  const n = Number(value);
-  return Number.isFinite(n) && n > 0;
-}
-
 function managementCategoryLabel(category: DefectManagementCategory): string {
   return category === "B_GRADE" ? "B급" : category === "OBSOLETE" ? "구형" : "불량";
 }
@@ -71,10 +70,13 @@ export function DefectCartFlow({
   onDone,
   onCancel,
 }: Props) {
+  const queryClient = useQueryClient();
   const [directAction, setDirectAction] = useState<DirectAction | null>(mode === "add" ? "scrap" : null);
   const [source, setSource] = useState<SourceKind>("production");
   const [step, setStep] = useState<FlowStep>(1);
   const [lines, setLines] = useState<CartLine[]>([]);
+  const [requestIds, setRequestIds] = useState<Record<string, string>>({});
+  const [batchRequestId, setBatchRequestId] = useState(() => makeClientRequestId());
   const [busy, setBusy] = useState(false);
   const [failures, setFailures] = useState<LineFailure[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -129,7 +131,10 @@ export function DefectCartFlow({
   const pickerItems = isRework ? items.filter(isReworkCandidate) : items;
   const selectedIds = useMemo(() => new Set(lines.map((l) => l.item.item_id)), [lines]);
   const selectedReworkLine = isRework ? lines[0] : null;
-  const reworkLineReady = Boolean(selectedReworkLine && validQty(selectedReworkLine.qty) && selectedReworkLine.category.trim() !== "");
+  const reworkLineReady = Boolean(
+    selectedReworkLine
+      && defectCartLineErrors({ ...selectedReworkLine, source }).length === 0,
+  );
 
   function newLine(item: Item): CartLine {
     return { key: `${item.item_id}-${Date.now()}`, item, qty: "1", category: "", memo: "", managementCategory: "DEFECT", decisions: [] };
@@ -139,21 +144,42 @@ export function DefectCartFlow({
     if (source === "production" && itemDepartment(item) === null) return;
     setLines((prev) => {
       if (prev.some((l) => l.item.item_id === item.item_id)) return prev;
-      return isRework ? [newLine(item)] : [...prev, newLine(item)];
+      const line = newLine(item);
+      setRequestIds((ids) => ({ ...ids, [line.key]: makeClientRequestId() }));
+      setBatchRequestId(makeClientRequestId());
+      return isRework ? [line] : [...prev, line];
     });
     setFailures([]);
   }
 
   function updateLine(key: string, patch: Partial<Omit<CartLine, "key" | "item">>) {
+    setBatchRequestId(makeClientRequestId());
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   }
 
   function removeLine(key: string) {
     setLines((prev) => prev.filter((l) => l.key !== key));
+    setRequestIds((ids) => {
+      const next = { ...ids };
+      delete next[key];
+      return next;
+    });
+    setBatchRequestId(makeClientRequestId());
   }
 
   function removeItemById(item: Item) {
-    setLines((prev) => prev.filter((l) => l.item.item_id !== item.item_id));
+    setLines((prev) => {
+      const target = prev.find((line) => line.item.item_id === item.item_id);
+      if (target) {
+        setRequestIds((ids) => {
+          const next = { ...ids };
+          delete next[target.key];
+          return next;
+        });
+      }
+      setBatchRequestId(makeClientRequestId());
+      return prev.filter((l) => l.item.item_id !== item.item_id);
+    });
   }
 
   function copyReasonDown(index: number) {
@@ -164,30 +190,43 @@ export function DefectCartFlow({
     });
   }
 
+  const lineErrorsByKey = useMemo(
+    () => new Map(lines.map((line) => [line.key, defectCartLineErrors({ ...line, source })])),
+    [lines, source],
+  );
+
   const allValid =
     directAction !== null &&
     lines.length > 0 &&
     lines.every((l) => {
-      if (!validQty(l.qty) || (source === "production" && itemDepartment(l.item) === null)) return false;
+      if ((lineErrorsByKey.get(l.key)?.length ?? 0) > 0) return false;
       if (!isRework) return true;
-      return l.category.trim() !== "" && l.decisions.length > 0 && validateDecisionTree(l.decisions);
+      return l.decisions.length > 0 && validateDecisionTree(l.decisions);
     });
 
-  async function submitLine(line: CartLine): Promise<void> {
+  function quarantinePayload(line: CartLine, requestId: string) {
+    const qty = Number(line.qty);
+    const productionDepartment = itemDepartment(line.item);
+    if (source === "production" && !productionDepartment) throw new Error("품목 담당 부서를 확인할 수 없습니다.");
+    return {
+      item_id: line.item.item_id,
+      qty,
+      source,
+      ...(source === "production" ? { source_dept: productionDepartment!, target_dept: productionDepartment! } : { target_dept: "창고" }),
+      reason_category: line.category || null,
+      reason_memo: line.memo || null,
+      actor_employee_id: currentEmployee.employee_id,
+      client_request_id: requestId,
+      management_category: line.managementCategory,
+    };
+  }
+
+  async function submitLine(line: CartLine, requestId: string): Promise<void> {
     const qty = Number(line.qty);
     const productionDepartment = itemDepartment(line.item);
     if (source === "production" && !productionDepartment) throw new Error("품목 담당 부서를 확인할 수 없습니다.");
     if (mode === "add") {
-      await defectsApi.quarantine({
-        item_id: line.item.item_id,
-        qty,
-        source,
-        ...(source === "production" ? { source_dept: productionDepartment!, target_dept: productionDepartment! } : { target_dept: "창고" }),
-        reason_category: line.category || null,
-        reason_memo: line.memo,
-        actor_employee_id: currentEmployee.employee_id,
-        management_category: line.managementCategory,
-      });
+      await defectsApi.quarantine(quarantinePayload(line, requestId));
       return;
     }
 
@@ -199,6 +238,7 @@ export function DefectCartFlow({
       notes: isRework
         ? JSON.stringify({ child_decisions: line.decisions.map(toServerDecision) })
         : line.memo || null,
+      client_request_id: requestId,
       lines: [
         {
           item_id: line.item.item_id,
@@ -215,7 +255,33 @@ export function DefectCartFlow({
     if (!allValid || busy) return;
     setBusy(true);
     setFailures([]);
-    const results = await Promise.allSettled(lines.map((l) => submitLine(l)));
+    if (mode === "add" && lines.length > 1) {
+      try {
+        await defectsApi.quarantineBulk({
+          actor_employee_id: currentEmployee.employee_id,
+          client_request_id: batchRequestId,
+          lines: lines.map((line) => {
+            const { actor_employee_id: _actorEmployeeId, client_request_id: _clientRequestId, ...payload } = quarantinePayload(
+              line,
+              requestIds[line.key] ?? makeClientRequestId(),
+            );
+            return payload;
+          }),
+        });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.items.all });
+        setBusy(false);
+        onDone(directAction);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "처리 실패";
+        setFailures(lines.map((line) => ({ key: line.key, itemName: line.item.item_name, message })));
+        setBusy(false);
+      }
+      return;
+    }
+
+    const results = await Promise.allSettled(
+      lines.map((line) => submitLine(line, requestIds[line.key] ?? makeClientRequestId())),
+    );
     const nextFailures: LineFailure[] = [];
     const failedKeys = new Set<string>();
     results.forEach((res, i) => {
@@ -231,6 +297,7 @@ export function DefectCartFlow({
     });
     setBusy(false);
     if (nextFailures.length === 0) {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.items.all });
       onDone(directAction);
       return;
     }
@@ -420,8 +487,9 @@ export function DefectCartFlow({
                   <div className="flex flex-col gap-3 p-3">
                   {lines.map((line, idx) => {
                     const fail = failures.find((f) => f.key === line.key);
+                    const validationErrors = lineErrorsByKey.get(line.key) ?? [];
                     return (
-                      <div key={line.key} className="flex flex-col gap-2 rounded-[12px] border px-3 py-2" style={{ background: LEGACY_COLORS.s1, borderColor: fail ? tint(LEGACY_COLORS.red, 30) : LEGACY_COLORS.border }}>
+                      <div key={line.key} className="flex flex-col gap-2 rounded-[12px] border px-3 py-2" style={{ background: LEGACY_COLORS.s1, borderColor: fail || validationErrors.length > 0 ? tint(LEGACY_COLORS.red, 30) : LEGACY_COLORS.border }}>
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{line.item.mes_code ?? "(코드 없음)"}</div>
@@ -444,7 +512,7 @@ export function DefectCartFlow({
                           )}
                         </div>
 
-                        <ReasonFormFields category={line.category} memo={line.memo} onCategoryChange={(c) => updateLine(line.key, { category: c })} onMemoChange={(m) => updateLine(line.key, { memo: m })} required={isRework} />
+                        <ReasonFormFields category={line.category} memo={line.memo} onCategoryChange={(c) => updateLine(line.key, { category: c })} onMemoChange={(m) => updateLine(line.key, { memo: m })} requireAny />
 
                         {mode === "add" && (
                           <div className="flex flex-wrap items-center gap-2">
@@ -463,6 +531,9 @@ export function DefectCartFlow({
                         )}
 
                         {fail && <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>실패: {fail.message}</div>}
+                        {validationErrors.map((message) => (
+                          <div key={message} className="text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>{message}</div>
+                        ))}
                       </div>
                     );
                   })}
@@ -539,17 +610,60 @@ export function DefectCartFlow({
         </div>
       )}
 
-      <ConfirmModal open={confirmOpen} onClose={() => setConfirmOpen(false)} onConfirm={() => { setConfirmOpen(false); void handleSubmit(); }} tone={isScrap || isRework ? "danger" : "normal"} title={isRework ? "즉시 재작업 확인" : isScrap ? "즉시 폐기 확인" : "불량 격리 확인"} confirmLabel={submitLabel} busy={busy} busyLabel="처리 중...">
-        <p className="mb-2 text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
-          {isRework
-            ? "선택한 품목을 즉시 재작업하고 하위 품목을 정상·격리·폐기로 나눕니다."
-            : isScrap
-              ? `${lines.length}건을 즉시 폐기합니다. 재고에서 차감되며 되돌릴 수 없습니다.`
-              : `${lines.length}건을 격리합니다. ${lines.map((line) => line.managementCategory === "B_GRADE" ? "B급" : line.managementCategory === "OBSOLETE" ? "구형" : "불량 격리").join(", ")} 분류로 보관됩니다.`}
-        </p>
-        <div className="flex flex-col gap-1 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-          {lines.map((line) => <div key={line.key}>{line.item.item_name} · 수량 {line.qty}{mode === "add" ? ` · 관리 분류 ${managementCategoryLabel(line.managementCategory)}` : ""} · 자동 부서 · {source === "warehouse" ? "창고" : itemDepartment(line.item) ?? "부서 미지정"}</div>)}
-        </div>
+      <ConfirmModal open={confirmOpen} onClose={() => setConfirmOpen(false)} onConfirm={() => { setConfirmOpen(false); void handleSubmit(); }} tone={isScrap || isRework ? "danger" : "normal"} title={isRework ? "즉시 재작업 확인" : isScrap ? "즉시 폐기 확인" : "불량 격리 확인"} confirmLabel={submitLabel} busy={busy} busyLabel="처리 중..." wide={mode === "add"}>
+        {isRework && (
+          <p className="mb-3 text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
+            선택한 품목을 즉시 재작업하고 하위 품목을 정상·격리·폐기로 나눕니다.
+          </p>
+        )}
+        {mode === "add" ? (
+          <div className="sg flex max-h-64 flex-col gap-2 overflow-y-auto pr-1">
+            {lines.map((line) => (
+              <div
+                key={line.key}
+                data-testid="defect-confirm-line"
+                className="flex items-center justify-between gap-4 rounded-[14px] border px-4 py-3"
+                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{line.item.item_name}</div>
+                  <div className="mt-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{line.item.mes_code ?? "코드 없음"}</div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2 text-xs font-black">
+                  <span className="rounded-full px-3 py-1.5" style={{ background: tint(LEGACY_COLORS.blue, 12), color: LEGACY_COLORS.blue }}>
+                    {line.qty} {line.item.unit || "EA"}
+                  </span>
+                  <span className="rounded-full px-3 py-1.5" style={{ background: LEGACY_COLORS.s3, color: LEGACY_COLORS.muted2 }}>
+                    {source === "warehouse" ? "창고" : itemDepartment(line.item) ?? "부서 미지정"}
+                  </span>
+                  <span className="rounded-full px-3 py-1.5" style={{ background: tint(LEGACY_COLORS.red, 10), color: LEGACY_COLORS.red }}>
+                    {managementCategoryLabel(line.managementCategory)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex max-h-64 flex-col gap-2 overflow-y-auto">
+            {lines.map((line) => (
+              <div
+                key={line.key}
+                data-testid="defect-confirm-line"
+                className="rounded-[14px] border px-4 py-3"
+                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+              >
+                <div className="truncate text-base font-black" style={{ color: LEGACY_COLORS.text }}>
+                  {line.item.item_name}
+                </div>
+                <div className="mt-1 flex items-center gap-1.5 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                  <span>수량 {line.qty}</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{source === "warehouse" ? "창고" : itemDepartment(line.item) ?? "부서 미지정"}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </ConfirmModal>
     </div>
   );

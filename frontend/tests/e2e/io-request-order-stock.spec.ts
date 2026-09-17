@@ -130,13 +130,12 @@ test.describe("입출고 내역 — 요청 순 재고", () => {
     await expect(assemblyRow.getByText("COCOON 조립", { exact: true })).toBeVisible();
     await expect(assemblyRow).not.toContainText("44");
 
-    const actualStockHeading = page.getByText("실제 처리 당시 재고", { exact: true });
-    await expect(actualStockHeading).toBeVisible();
-    const actualStock = actualStockHeading.locator("..");
+    const actualStock = page.getByTestId("history-stock-movement-summary");
+    await expect(actualStock).toBeVisible();
+    await expect(actualStock).toContainText(/재고 이동/);
     await expect(actualStock).toContainText(/창고\s*94\s*50/);
-    await expect(actualStock).toContainText(/정상 부서\s*7\s*7/);
-    await expect(actualStock).toContainText(/요청 시각\s*2026년 9월 8일\s*10시 00분/);
-    await expect(actualStock).toContainText(/처리 시각\s*2026년 9월 8일\s*12시 00분/);
+    await expect(actualStock).not.toContainText("정상 부서");
+    await expect(page.getByText("실제 처리 당시 재고", { exact: true })).toHaveCount(0);
 
     const stockHelp = table.getByLabel("재고 변동 계산 기준");
     await stockHelp.hover();

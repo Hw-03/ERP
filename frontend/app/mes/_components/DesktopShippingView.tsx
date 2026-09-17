@@ -368,6 +368,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   const [notes, setNotes] = useState("");
   const [draftLines, setDraftLines] = useState<DraftLine[]>([]);
   const [matchResult, setMatchResult] = useState<ShippingBomMatchResponse | null>(null);
+  const [bomMatchStale, setBomMatchStale] = useState(false);
   const [finalizationMode, setFinalizationMode] = useState<ShippingFinalizationMode>("KEEP_BASE");
   const [reusePfItemId, setReusePfItemId] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
@@ -1125,6 +1126,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         setCompanionDraft(requestCompanionDraft(found));
         setDraftLines(requestBomLines(found));
         setMatchResult(null);
+        setBomMatchStale(false);
         setRequestWizardStep(nextRequestStep);
         setView("requestWork");
         void ensureItemsLoaded(requestDraftGenerationRef.current);
@@ -1146,6 +1148,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     setNotes("");
     setDraftLines([]);
     setMatchResult(null);
+    setBomMatchStale(false);
     setFinalizationMode("KEEP_BASE");
     setReusePfItemId(null);
     setView("requestWork");
@@ -1173,6 +1176,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     setNotes("");
     setDraftLines([]);
     setMatchResult(null);
+    setBomMatchStale(false);
     setFinalizationMode("KEEP_BASE");
     setReusePfItemId(null);
     void ensurePfItemsLoaded();
@@ -1196,6 +1200,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     setCompanionDraft(requestCompanionDraft(req));
     setDraftLines(requestBomLines(req));
     setMatchResult(null);
+    setBomMatchStale(false);
     setFinalizationMode(req.finalization_mode ?? "KEEP_BASE");
     setReusePfItemId(req.reuse_pf_item_id ?? null);
     setRequestWizardStep(nextView === "requestWork" ? 2 : 1);
@@ -1246,6 +1251,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
       if (!isCurrentRequestDraftGeneration(generation)) return;
       setDraftLines(lines);
       setMatchResult(null);
+      setBomMatchStale(false);
       setFinalizationMode("KEEP_BASE");
       setReusePfItemId(null);
       onStatusChange("기본 BOM을 출하 요청에 불러왔습니다.");
@@ -1376,6 +1382,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
       });
       if (!isCurrentRequestDraftGeneration(generation)) return false;
       setMatchResult(result);
+      setBomMatchStale(false);
       const usesCandidateSelection = result.base_pf_matches !== undefined;
       const resolvedMode = result.base_pf_matches ? "KEEP_BASE" : finalizationMode;
       if (result.base_pf_matches !== undefined) {
@@ -1444,6 +1451,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         bom_lines: draftPayload().bom_lines,
       });
       setMatchResult(result);
+      setBomMatchStale(false);
       if (result.base_pf_matches) {
         setFinalizationMode("KEEP_BASE");
         setReusePfItemId(null);
@@ -1537,6 +1545,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   function updateDraftLine(key: string, patch: Partial<DraftLine>) {
     setDraftLines((prev) => prev.map((line) => (line.key === key ? { ...line, ...patch } : line)));
     setMatchResult(null);
+    setBomMatchStale(true);
     setFinalizationMode("CREATE_NEW");
     setReusePfItemId(null);
   }
@@ -1553,6 +1562,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
       return [...prev, { key: lineKey(), parent_stage: stage, child_item_id: itemId, quantity: 1, unit: item?.unit ?? "EA", included: true, origin: "CUSTOM" }];
     });
     setMatchResult(null);
+    setBomMatchStale(true);
     setFinalizationMode("CREATE_NEW");
     setReusePfItemId(null);
   }
@@ -1560,6 +1570,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   function removeDraftLine(key: string) {
     setDraftLines((prev) => prev.filter((line) => line.key !== key));
     setMatchResult(null);
+    setBomMatchStale(true);
     setFinalizationMode("CREATE_NEW");
     setReusePfItemId(null);
   }
@@ -1578,10 +1589,13 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
       }));
     if (bomLines.length === 0) return;
 
+    let cancelled = false;
     const timer = window.setTimeout(() => {
       api.matchShippingBom({ base_pf_item_id: basePfId, bom_lines: bomLines })
         .then((result) => {
+          if (cancelled) return;
           setMatchResult(result);
+          setBomMatchStale(false);
           if (result.base_pf_matches !== undefined) {
             setFinalizationMode((current) => result.base_pf_matches ? "KEEP_BASE" : current === "KEEP_BASE" ? "CREATE_NEW" : current);
             if (result.base_pf_matches) setReusePfItemId(null);
@@ -1590,7 +1604,10 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         .catch(() => undefined);
     }, 350);
 
-    return () => window.clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [basePfId, draftLines, itemById, view]);
 
   useEffect(() => {
@@ -1678,6 +1695,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
             notes={notes}
             draftLines={draftLines}
             matchResult={matchResult}
+            bomMatchStale={bomMatchStale}
             finalizationMode={finalizationMode}
             reusePfItemId={reusePfItemId}
             canEditDraft={canEditDraft}
@@ -2088,6 +2106,10 @@ function RequestDetailEntry({ request, onBack, onEdit, onDelete, onPrepareComple
           </div>
         </div>
 
+        {request.transactions.length > 0 && (
+          <div className="mt-3"><TransactionLogList logs={request.transactions} /></div>
+        )}
+
         <div className="mt-3"><RevisionHistory request={request} /></div>
       </div>
     </div>
@@ -2127,6 +2149,13 @@ function InvoiceNumberEditor({ request, onSaved }: { request: ShippingRequest; o
     || Boolean(request.prepared_at)
     || request.events.some((event) => event.event_type === "PREPARED");
   const cannotClearExisting = Boolean(request.invoice_number) && !value.trim() && hasPreparationHistory;
+  const fieldMessage = error
+    ? { text: error, tone: LEGACY_COLORS.red }
+    : cannotClearExisting
+      ? { text: "준비 완료 이력이 있어 기존 인보이스 번호를 비울 수 없습니다.", tone: LEGACY_COLORS.red }
+      : !request.invoice_number
+        ? { text: "인보이스 번호를 입력해야 준비 완료 처리를 진행할 수 있습니다.", tone: LEGACY_COLORS.yellow }
+        : null;
   return (
     <section data-testid="shipping-invoice-editor" className="min-w-[280px] basis-[280px] grow" aria-label="인보이스 번호 편집">
       <div
@@ -2134,11 +2163,18 @@ function InvoiceNumberEditor({ request, onSaved }: { request: ShippingRequest; o
         className="flex min-h-[64px] min-w-0 items-center gap-2 rounded-[14px] border px-3 py-2 transition-shadow focus-within:ring-2 focus-within:ring-[color:var(--c-blue)]"
         style={{
           background: LEGACY_COLORS.bg,
-          borderColor: request.invoice_number ? LEGACY_COLORS.border : tint(LEGACY_COLORS.yellow, 42),
+          borderColor: fieldMessage ? tint(fieldMessage.tone, 42) : LEGACY_COLORS.border,
         }}
       >
         <label className="min-w-0 flex-1">
-          <span className="block text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>인보이스 번호</span>
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="shrink-0 text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>인보이스 번호</span>
+            {fieldMessage && (
+              <span data-testid="shipping-invoice-field-message" className="min-w-0 truncate text-[10px] font-bold" style={{ color: fieldMessage.tone }}>
+                {fieldMessage.text}
+              </span>
+            )}
+          </span>
           <input
             aria-label="인보이스 번호"
             value={value}
@@ -2159,16 +2195,6 @@ function InvoiceNumberEditor({ request, onSaved }: { request: ShippingRequest; o
           {saving ? "저장 중" : "저장"}
         </button>
       </div>
-      {cannotClearExisting ? (
-        <div className="mt-2 text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>
-          준비 완료 이력이 있어 기존 인보이스 번호를 비울 수 없습니다.
-        </div>
-      ) : !request.invoice_number && (
-        <div className="mt-2 text-xs font-bold" style={{ color: LEGACY_COLORS.yellow }}>
-          인보이스 번호를 입력해야 준비 완료 처리를 진행할 수 있습니다.
-        </div>
-      )}
-      {error && <div className="mt-2 text-xs font-bold" style={{ color: LEGACY_COLORS.red }}>{error}</div>}
     </section>
   );
 }
@@ -2741,6 +2767,7 @@ function RequestSection(props: {
   notes: string;
   draftLines: DraftLine[];
   matchResult: ShippingBomMatchResponse | null;
+  bomMatchStale: boolean;
   finalizationMode: ShippingFinalizationMode;
   reusePfItemId: string | null;
   canEditDraft: boolean;
@@ -2812,7 +2839,7 @@ function RequestSection(props: {
   const missingNewBomNames = Boolean(props.matchResult && (paNameNeedsChange || pfNameNeedsChange));
   const validRequestQuantity = isValidPositiveInt(props.requestQuantity);
   const finalActionIsUpdateOnly = props.selectedRequest?.status === "PREPARING";
-  const finalActionDisabled = props.pending !== null || locked || !props.basePfId || !validRequestQuantity || missingNewBomNames || candidateChoiceMissing || props.selectedRequest?.status === "PREPARED";
+  const finalActionDisabled = props.pending !== null || locked || !props.basePfId || !validRequestQuantity || props.bomMatchStale || missingNewBomNames || candidateChoiceMissing || props.selectedRequest?.status === "PREPARED";
   const stepTitles = ["기준 PF 선택", "BOM 구성 조정", "BOM 매칭", "요청 정보", "출하 요청 확인"];
   const matchedPaItem = props.matchResult?.matched_pa_item_id ? props.itemById.get(props.matchResult.matched_pa_item_id) : undefined;
   const matchedPfItem = props.matchResult?.matched_pf_item_id ? props.itemById.get(props.matchResult.matched_pf_item_id) : undefined;
@@ -2842,18 +2869,39 @@ function RequestSection(props: {
   const shipmentCode = reusingExistingPf || requiresPfName
     ? finalPfSummary.code
     : basePfItem ? itemCodeText(basePfItem) : finalPfSummary.code;
+  const linkedPa = selectedCandidate
+    ? {
+        itemId: selectedCandidate.pa_item_id,
+        itemName: selectedCandidate.pa_item_name,
+        code: selectedCandidate.pa_mes_code ?? "-",
+        testId: `shipping-final-line-pf-${selectedCandidate.pa_item_id}`,
+      }
+    : requiresPaName && requiresPfName
+      ? {
+          itemName: finalPaSummary.name,
+          code: finalPaSummary.code,
+          testId: "shipping-final-new-pa-link",
+        }
+      : reusingExistingPa && (matchedPaItem || props.matchResult?.matched_pa_item_name)
+        ? {
+            itemId: matchedPaItem?.item_id ?? props.matchResult?.matched_pa_item_id ?? undefined,
+            itemName: props.matchResult?.matched_pa_item_name ?? itemNameText(matchedPaItem),
+            code: itemCodeText(matchedPaItem),
+            testId: `shipping-final-line-pf-${matchedPaItem?.item_id ?? props.matchResult?.matched_pa_item_id ?? "matched-pa"}`,
+          }
+        : null;
   const hasBomChanges = bomChangedLines.length > 0;
   const canOpenStep = (step: RequestWizardStep) => {
     if (locked && step !== props.wizardStep) return false;
     if (props.pending !== null && step !== props.wizardStep) return false;
     if (step >= 2 && (!props.basePfId || !validRequestQuantity)) return false;
-    if (step >= 4 && (missingNewBomNames || candidateChoiceMissing)) return false;
+    if (step >= 4 && (props.bomMatchStale || missingNewBomNames || candidateChoiceMissing)) return false;
     return true;
   };
   const canGoNext = props.pending === null && !locked && (
     props.wizardStep === 1 ? Boolean(props.basePfId && validRequestQuantity) :
     props.wizardStep === 2 ? true :
-    props.wizardStep === 3 ? !missingNewBomNames && !candidateChoiceMissing :
+    props.wizardStep === 3 ? !props.bomMatchStale && !missingNewBomNames && !candidateChoiceMissing :
     props.wizardStep < 5
   );
   const nameChangePromptActive = props.wizardStep === 3 && missingNewBomNames && props.pending === null && !locked;
@@ -3015,6 +3063,9 @@ function RequestSection(props: {
             <section data-testid="shipping-wizard-step-3" className="flex h-full min-h-0 flex-col">
               <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,7fr)_minmax(120px,3fr)_auto] gap-4 overflow-y-auto pr-1">
                 <div className="grid content-start gap-4">
+                  {props.bomMatchStale && (
+                    <Notice tone={LEGACY_COLORS.yellow} title="변경된 BOM을 다시 확인 중입니다" body="확인이 끝나기 전에는 다음 단계와 출하 요청을 진행할 수 없습니다." />
+                  )}
                   <ShippingConclusionCard
                     metrics={[
                       { value: finalPaSummary.label, name: finalPaSummary.name, code: finalPaSummary.code, tone: processTypeColor("PA"), testId: "shipping-final-pa-summary" },
@@ -3112,10 +3163,9 @@ function RequestSection(props: {
                   companionLines={props.companionDraft}
                   paTitle={paRequirementTitle}
                   pfTitle={pfRequirementTitle}
-                  paCode={requiresPaName ? finalPaSummary.code : undefined}
-                  pfCode={requiresPfName ? finalPfSummary.code : undefined}
-                  newPaName={requiresPaName && requiresPfName ? finalPaSummary.name : null}
-                  newPaCode={requiresPaName && requiresPfName ? finalPaSummary.code : null}
+                  paCode={requiresPaName || reusingExistingPa ? finalPaSummary.code : undefined}
+                  pfCode={requiresPfName || reusingExistingPf ? finalPfSummary.code : undefined}
+                  linkedPa={linkedPa}
                   itemById={props.itemById}
                   requestQuantity={requestQty}
                 />
@@ -3272,6 +3322,21 @@ function PrepSection({
   const stockShortages = selected?.stock_shortages ?? EMPTY_STOCK_SHORTAGES;
   const shortageByItemId = useMemo(() => new Map(stockShortages.map((line) => [line.item_id, line])), [stockShortages]);
   const shortageKindByItemId = useMemo(() => buildShippingShortageKindMap(selected), [selected]);
+  const actualPfName = selected?.final_pf_item_name ?? selected?.base_pf_item_name ?? "-";
+  const hasDifferentActualPf = Boolean(selected && (
+    selected.final_pf_item_id
+      ? selected.final_pf_item_id !== selected.base_pf_item_id
+      : selected.final_pf_item_name && selected.final_pf_item_name !== selected.base_pf_item_name
+  ));
+  const actualPfCode = selected?.final_pf_mes_code ?? (hasDifferentActualPf ? null : selected?.base_pf_mes_code);
+  const basePfContext = selected && hasDifferentActualPf
+    ? `기준 PF ${selected.base_pf_item_name}`
+    : null;
+  const prepSubtitle = selected
+    ? [actualPfCode ?? "코드 미지정", basePfContext, `총 ${requestQty}대 출하`, `요청자 ${selected.requested_by_name ?? "-"}`, formatDate(selected.created_at)]
+        .filter(Boolean)
+        .join(" · ")
+    : "";
 
   return (
     <div className={showList ? "grid min-h-[620px] gap-3 xl:grid-cols-[360px_minmax(0,1fr)]" : "flex min-h-0 flex-1 flex-col"}>
@@ -3296,7 +3361,7 @@ function PrepSection({
         ) : (
           <div className="flex min-h-0 flex-1 flex-col gap-4">
             <div className={SHIPPING_TOP_ROW_CLASS}>
-              <PanelTitle icon={Truck} title={selected.base_pf_item_name} subtitle={`총 ${requestQty}대 출하 · 요청자 ${selected.requested_by_name ?? "-"} · ${formatDate(selected.created_at)}`} />
+              <PanelTitle icon={Truck} title={actualPfName} subtitle={prepSubtitle} />
               <StatusBadge status={selected.status} />
             </div>
 
@@ -3332,8 +3397,8 @@ function PrepSection({
               )}
             </div>
 
-            {selected.status === "PREPARED" && (
-              <TransactionLogList title="재고 반영 이력" logs={selected.transactions.filter((log) => log.shipping_phase === "PREPARE")} />
+            {selected.status === "PREPARED" && selected.transactions.length > 0 && (
+              <TransactionLogList logs={selected.transactions} />
             )}
           </div>
         )}
@@ -3982,7 +4047,9 @@ function ShippingActionConfirmModal({
         ...request.companion_lines.map((line) => `동반 · ${line.item_name} x ${line.quantity}${line.unit ? ` ${line.unit}` : ""}`),
       ]
     : kind === "cancel"
-      ? request.transactions.filter((log) => log.shipping_phase === "PREPARE" && !log.cancelled).map((log) => `${txTypeLabel(log.transaction_type)} · ${log.item_name} ${log.quantity_change}`)
+      ? request.allocations
+          .filter((allocation) => allocation.status === "RESERVED")
+          .map((allocation) => `${allocation.item_name} · ${allocation.mes_code ?? "-"} · ${allocation.quantity} ${allocation.unit}${allocation.department ? ` · ${allocation.department}` : ""}`)
       : kind === "pickupCancel"
         ? request.transactions.filter((log) => log.shipping_phase === "PICKUP" && !log.cancelled && log.quantity_change < 0).map((log) => `${txTypeLabel(log.transaction_type)} · ${log.item_name} ${log.quantity_change}`)
       : kind === "delete"
@@ -3996,7 +4063,7 @@ function ShippingActionConfirmModal({
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: "color-mix(in srgb, var(--c-bg) 72%, transparent)" }}>
       <div className="w-full max-w-xl rounded-[18px] border p-5 shadow-xl" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
         <div className={SHIPPING_TOP_ROW_CLASS}>
-          <PanelTitle icon={PackageCheck} title={title} subtitle={request.base_pf_item_name} />
+          <PanelTitle icon={PackageCheck} title={title} subtitle={`실제 출하품 · ${request.final_pf_item_name ?? request.base_pf_item_name} · 기준 PF · ${request.base_pf_item_name}`} />
           <StatusBadge status={request.status} />
         </div>
         <div className="mt-4 rounded-[12px] border px-3 py-2 text-sm font-bold" style={{ background: tint(tone, 10), borderColor: tint(tone, 35), color: LEGACY_COLORS.text }}>
@@ -4043,18 +4110,24 @@ type RequestRowLayout = "default" | "requestBoard" | "historyList";
 
 function RequestRow({ request, active, layout = "default", onClick }: { request: ShippingRequest; active: boolean; layout?: RequestRowLayout; onClick: () => void }) {
   const finalPfName = request.final_pf_item_name ?? request.base_pf_item_name;
+  const hasDifferentBasePf = Boolean(
+    request.final_pf_item_id && request.final_pf_item_id !== request.base_pf_item_id,
+  );
+  const finalPfCode = hasDifferentBasePf
+    ? request.final_pf_mes_code ?? "코드 미지정"
+    : request.final_pf_mes_code ?? request.base_pf_mes_code ?? "-";
   const dateLabel = request.status === "PICKED_UP" ? "출하 완료" : request.status === "CANCELLED" ? "요청 취소" : "요청 일시";
   const dateValue = request.status === "PICKED_UP"
     ? request.picked_up_at
     : request.status === "CANCELLED"
       ? request.cancelled_at ?? null
       : request.created_at;
-  const hasDifferentBasePf = Boolean(request.final_pf_item_name && request.final_pf_item_name !== request.base_pf_item_name);
   const baseLabel = hasDifferentBasePf
     ? ` · 기준 ${request.base_pf_item_name}`
     : "";
   const legacyDateLabel = request.status === "PICKED_UP" || request.status === "CANCELLED" ? dateLabel : `${dateLabel}:`;
   const structuredLayout = layout !== "default";
+  const showBasePf = layout === "historyList";
   const metadata = [
     { key: "date", label: dateLabel, value: formatDate(dateValue), tabular: true },
     { key: "requester", label: "요청자", value: request.requested_by_name ?? "요청자 없음", tabular: false },
@@ -4079,20 +4152,19 @@ function RequestRow({ request, active, layout = "default", onClick }: { request:
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <div
-            className={structuredLayout
-              ? "truncate text-sm font-black leading-5"
-              : "truncate text-sm font-black"}
-            title={structuredLayout ? finalPfName : undefined}
-          >
-            {finalPfName}
+          <div className={structuredLayout ? "flex min-w-0 items-center gap-1.5 leading-5" : "truncate text-sm font-black"}>
+            {showBasePf && <span className="shrink-0 text-[11px] font-black" style={{ color: LEGACY_COLORS.blue }}>실제 출하품</span>}
+            <span className={structuredLayout ? "min-w-0 truncate text-sm font-black" : undefined} title={structuredLayout ? finalPfName : undefined}>{finalPfName}</span>
           </div>
           <div className={structuredLayout
             ? "flex min-w-0 items-center gap-2 truncate text-xs font-bold leading-4"
             : "flex min-w-0 items-center gap-1 truncate text-xs font-bold"} style={{ color: LEGACY_COLORS.muted2 }}>
-            <SummaryCode code={request.base_pf_mes_code ?? "-"} testId={`shipping-request-code-${request.request_id}`} className={structuredLayout ? "shrink-0" : undefined} />
-            {structuredLayout && hasDifferentBasePf && (
-              <span className="min-w-0 truncate" title={`기준 PF · ${request.base_pf_item_name}`}>기준 PF · {request.base_pf_item_name}</span>
+            <SummaryCode code={finalPfCode} testId={`shipping-request-code-${request.request_id}`} className={structuredLayout ? "shrink-0" : undefined} />
+            {showBasePf && (
+              <span className="flex min-w-0 items-center gap-1 truncate" title={`기준 PF · ${request.base_pf_item_name} · ${request.base_pf_mes_code ?? "-"}`}>
+                <span className="min-w-0 truncate">기준 PF · {request.base_pf_item_name}</span>
+                <SummaryCode code={request.base_pf_mes_code ?? "-"} testId={`shipping-request-base-code-${request.request_id}`} className="shrink-0" />
+              </span>
             )}
           </div>
         </div>
@@ -4257,8 +4329,7 @@ function FinalRequirementReview({
   pfTitle,
   paCode,
   pfCode,
-  newPaName,
-  newPaCode,
+  linkedPa,
   itemById,
   requestQuantity,
 }: {
@@ -4269,15 +4340,28 @@ function FinalRequirementReview({
   pfTitle: string;
   paCode?: string;
   pfCode?: string;
-  newPaName: string | null;
-  newPaCode: string | null;
+  linkedPa: { itemId?: string; itemName: string; code: string; testId: string } | null;
   itemById: Map<string, Item>;
   requestQuantity: number;
 }) {
   const paRows = paLines.map((line) => ({ id: `pa-${line.child_item_id}`, testId: `shipping-final-line-pa-${line.child_item_id}`, itemId: line.child_item_id, quantity: line.quantity * requestQuantity, unit: line.unit || "EA" }));
+  const linkedPaSource = linkedPa
+    ? pfLines.find((line) => itemById.get(line.child_item_id)?.process_type_code === "PA")
+    : undefined;
+  const visiblePfLines = linkedPa
+    ? pfLines.filter((line) => itemById.get(line.child_item_id)?.process_type_code !== "PA")
+    : pfLines;
   const pfRows = [
-    ...(newPaName ? [{ id: "new-pa", testId: "shipping-final-new-pa-link", itemName: newPaName, code: newPaCode ?? "-", quantity: requestQuantity, unit: "EA" }] : []),
-    ...pfLines.map((line) => ({ id: `pf-${line.child_item_id}`, testId: `shipping-final-line-pf-${line.child_item_id}`, itemId: line.child_item_id, quantity: line.quantity * requestQuantity, unit: line.unit || "EA" })),
+    ...(linkedPa ? [{
+      id: linkedPa.itemId ? `linked-pa-${linkedPa.itemId}` : "new-pa",
+      testId: linkedPa.testId,
+      itemId: linkedPa.itemId,
+      itemName: linkedPa.itemName,
+      code: linkedPa.code,
+      quantity: (linkedPaSource?.quantity ?? 1) * requestQuantity,
+      unit: linkedPaSource?.unit || "EA",
+    }] : []),
+    ...visiblePfLines.map((line) => ({ id: `pf-${line.child_item_id}`, testId: `shipping-final-line-pf-${line.child_item_id}`, itemId: line.child_item_id, quantity: line.quantity * requestQuantity, unit: line.unit || "EA" })),
   ];
   const companionRows = companionLines.map((line) => ({ id: `companion-${line.item_id}`, testId: `shipping-final-line-companion-${line.item_id}`, itemId: line.item_id, quantity: line.quantity, unit: line.unit || "EA" }));
   const groups = [

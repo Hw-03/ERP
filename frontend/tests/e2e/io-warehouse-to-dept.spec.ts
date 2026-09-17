@@ -1,19 +1,17 @@
 /**
- * P2-1 / 시나리오 2: 창고 → 부서 결재 요청.
+ * P2-1 / 시나리오 2: 창고 → 부서 자동 승인.
  *
- * 라이브 정책(2026-06-04 확인): warehouse_to_dept 는 requiresApproval → approvalKind
- * "warehouse" → 창고 결재. 최종 버튼 "창고 결재 요청 N건" → 확인 다이얼로그 "결재 요청"
- * → "창고 결재 요청 완료" 다이얼로그. 창고 정/부(이필욱)에게 "창고 승인함" 큐도 존재.
+ * 라이브 정책: 창고 결재권자가 요청한 warehouse_to_dept 는 자동 승인되어 즉시 반영된다.
  */
 import { expect, test } from "@playwright/test";
 import { advanceToQuantityStep, clickNextStep, gotoWarehouseCompose, loginAsOperator, pickWorkType } from "./_helpers";
 
-test.describe("입출고 V2 — 창고 → 부서 결재 요청", () => {
+test.describe("입출고 V2 — 창고 → 부서 자동 승인", () => {
   test.beforeEach(async ({ page }) => {
     await loginAsOperator(page, { role: "warehouse" });
   });
 
-  test("창고 → 부서 wizard → 창고 결재 요청 생성", async ({ page }) => {
+  test("창고 → 부서 wizard → 자동 승인 후 즉시 반영", async ({ page }) => {
     await gotoWarehouseCompose(page);
 
     // 1. 작업 유형: 창고 입출고
@@ -33,12 +31,14 @@ test.describe("입출고 V2 — 창고 → 부서 결재 요청", () => {
     // 4. 품목 확인 → 제출확인
     await page.getByRole("button", { name: /제출확인/ }).click();
 
-    // 5. 최종 확인 — 창고 결재 요청
-    await page.getByRole("button", { name: /창고 결재 요청/ }).click();
-    await expect(page.getByRole("dialog", { name: /하시겠습니까/ })).toBeVisible();
-    await page.getByRole("button", { name: "결재 요청", exact: true }).click();
+    // 5. 최종 확인 — 창고 결재권자 자동 승인
+    await page.getByRole("button", { name: /자동 승인 후 즉시 반영/ }).click();
+    await expect(page.getByRole("dialog", { name: /창고 반출을 진행하시겠습니까/ })).toBeVisible();
+    await page.getByRole("button", { name: "자동 승인 후 즉시 반영", exact: true }).click();
 
-    // 종착: 창고 결재 요청 완료
-    await expect(page.getByRole("dialog", { name: /창고 결재 요청 완료/ })).toBeVisible();
+    // 종착: 자동 승인 후 즉시 반영 완료
+    const doneDialog = page.getByRole("dialog", { name: /입출고 반영 완료/ });
+    await expect(doneDialog).toBeVisible();
+    await expect(doneDialog.getByText("자동 승인되어 입출고가 반영되었습니다")).toBeVisible();
   });
 });

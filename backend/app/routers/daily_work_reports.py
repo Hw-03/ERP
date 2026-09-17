@@ -27,6 +27,7 @@ from app.schemas import (
     DailyWorkReportUpsertRequest,
 )
 from app.services._tx import commit_and_refresh
+from app.services.inventory_effect_history import load_inventory_effect_quantities
 from app.services.transaction_display_groups import build_display_groups
 
 
@@ -98,12 +99,23 @@ def _operation_for(log: TransactionLog, batch: IoBatch | None) -> tuple[str, str
     return _OPERATION_BY_TX.get(log.transaction_type, ("process", "공정"))
 
 
-def _activity_summary(rows: list[tuple[TransactionLog, Item, IoBatch | None]]):
+def _activity_summary(
+    rows: list[tuple[TransactionLog, Item, IoBatch | None]],
+    inventory_effects_by_log_id: dict[uuid.UUID, list[dict]] | None = None,
+):
     """취소 거래를 제외한 화면 표시 묶음 단위의 작업 건수와 수량을 계산한다."""
-    responses = [
-        _to_log_response(log, item, requester_name=batch.requester_name if batch else None)
-        for log, item, batch in rows
-    ]
+    inventory_effects_by_log_id = inventory_effects_by_log_id or {}
+    responses = []
+    for log, item, batch in rows:
+        response = _to_log_response(
+            log,
+            item,
+            requester_name=batch.requester_name if batch else None,
+        )
+        enriched_effect = inventory_effects_by_log_id.get(log.log_id)
+        if enriched_effect is not None:
+            response = response.model_copy(update={"inventory_effect": enriched_effect})
+        responses.append(response)
     details = build_display_groups(responses)
     row_by_log_id = {log.log_id: (log, batch) for log, _, batch in rows}
     aggregate: dict[str, dict[str, object]] = {}
@@ -244,7 +256,11 @@ def get_daily_work_activity(employee_id: uuid.UUID, work_date: date, db: Session
         .order_by(TransactionLog.created_at.desc(), TransactionLog.log_id.desc())
         .all()
     )
-    summary, details = _activity_summary(rows)
+    inventory_effects = load_inventory_effect_quantities(
+        db,
+        [log for log, _, _ in rows],
+    )
+    summary, details = _activity_summary(rows, inventory_effects)
     return DailyWorkActivityResponse(
         work_date=work_date,
         employee_id=employee_id,

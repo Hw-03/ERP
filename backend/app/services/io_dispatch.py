@@ -1189,6 +1189,7 @@ def _submit_immediate(db: Session, *, requester: Employee, batch: IoBatch) -> No
             operation=operation,
         )
     now = datetime.utcnow()
+    batch.requires_approval = False
     batch.status = "completed"
     batch.completed_at = now
     batch.updated_at = now
@@ -1348,20 +1349,34 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
         db.flush()
         raise
 
+    batch_payload = _batch_to_payload(batch, db=db)
+    request_summaries = batch_payload["stock_requests"]
+    pending_approval = any(
+        summary["status"] in {"submitted", "reserved"}
+        for summary in request_summaries
+    )
+    auto_approved = bool(request_summaries) and not pending_approval and any(
+        summary["approval_kind"] != "none"
+        and summary["approval_outcome"] == "approved"
+        for summary in request_summaries
+    )
     message = (
         "승인 요청이 생성되었습니다."
-        if batch.status in {"submitted", "reserved"}
+        if pending_approval
         else (
             "BOM 재고 미반영 품목만 포함되어 재고 변동 없이 처리되었습니다."
             if not _included_lines(batch)
-            else "입출고가 반영되었습니다."
+            else (
+                "자동 승인되어 입출고가 반영되었습니다"
+                if auto_approved
+                else "입출고가 반영되었습니다."
+            )
         )
     )
-    batch_payload = _batch_to_payload(batch, db=db)
     return {
         "batch": batch_payload,
         "status": batch.status,
-        "requires_approval": batch.requires_approval,
+        "requires_approval": pending_approval,
         "stock_request_id": batch.stock_request_id,
         "stock_requests": batch_payload["stock_requests"],
         "message": message,

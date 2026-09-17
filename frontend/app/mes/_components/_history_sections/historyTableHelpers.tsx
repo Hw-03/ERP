@@ -475,10 +475,36 @@ export function StockSnapshotCell({
     : changedDepartments.size === 0 && log.department?.trim() && log.department.trim() !== "창고"
       ? log.department.trim()
       : "부서";
-  const changedSnapshots = [
+  const normalSnapshots = [
     { label: "창고", before: warehouseBefore, after: warehouseAfter, beforeText: warehouseBeforeText, afterText: warehouseAfterText },
     { label: departmentLabel, before: departmentBefore, after: departmentAfter, beforeText: departmentBeforeText, afterText: departmentAfterText },
-  ].filter((snapshot) => snapshot.before !== snapshot.after);
+  ].filter((stockSnapshot) => stockSnapshot.before !== stockSnapshot.after);
+  const showsDefectiveStock = ["MARK_DEFECTIVE", "UNMARK_DEFECTIVE", "SUPPLIER_RETURN"].includes(log.transaction_type);
+  const defectiveDelta = showsDefectiveStock
+    ? (log.inventory_effect ?? [])
+      .filter((effect) => effect.status === "DEFECTIVE")
+      .reduce((sum, effect) => sum + Number(effect.delta), 0)
+    : 0;
+  const actualWarehouseBefore = log.warehouse_qty_before ?? warehouseBefore;
+  const actualWarehouseAfter = log.warehouse_qty_after ?? warehouseAfter;
+  const actualDepartmentBefore = log.department_qty_before ?? departmentBefore;
+  const actualDepartmentAfter = log.department_qty_after ?? departmentAfter;
+  const defectiveBefore = log.quantity_before == null
+    ? null
+    : log.quantity_before - actualWarehouseBefore - actualDepartmentBefore;
+  const defectiveAfter = log.quantity_after == null
+    ? null
+    : log.quantity_after - actualWarehouseAfter - actualDepartmentAfter;
+  const defectiveSnapshot = defectiveDelta !== 0 && defectiveBefore != null && defectiveAfter != null
+    ? [{
+      label: "불량",
+      before: defectiveBefore,
+      after: defectiveAfter,
+      beforeText: formatQty(defectiveBefore),
+      afterText: formatQty(defectiveAfter),
+    }]
+    : [];
+  const changedSnapshots = [...normalSnapshots, ...defectiveSnapshot];
   const chipQuantityWidthPx = Math.max(
     STOCK_SNAPSHOT_MIN_QUANTITY_WIDTH_PX,
     quantityWidth ?? Math.max(...changedSnapshots.flatMap((snapshot) => [snapshot.beforeText.length, snapshot.afterText.length])) * STOCK_SNAPSHOT_DIGIT_WIDTH_PX,

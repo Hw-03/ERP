@@ -1,10 +1,19 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render as rtlRender, screen, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MobileDefectCartFlow } from "../MobileDefectCartFlow";
 import { MobileDefectProcessPanel } from "../MobileDefectProcessPanel";
 import type { DefectLocation } from "@/lib/api/types/defects";
 import { defectsApi } from "@/lib/api/defects";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
+
+function render(ui: ReactElement, client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })) {
+  return {
+    ...rtlRender(<QueryClientProvider client={client}>{ui}</QueryClientProvider>),
+    queryClient: client,
+  };
+}
 
 vi.mock("../../../_defect_hub/DisassembleTree", () => ({
   DisassembleTree: ({ onChange }: { onChange: (decisions: unknown[]) => void }) => (
@@ -29,6 +38,9 @@ vi.mock("../../../_defect_hub/DefectItemPicker", () => ({
             item_name: "Mock item",
             mes_code: "MOCK-001",
             quantity: 10,
+            warehouse_qty: 20,
+            pending_quantity: 0,
+            locations: [{ department: "튜브", status: "PRODUCTION", quantity: 20, pending_quantity: 0, available_quantity: 20 }],
             has_bom: true,
             process_type_code: "TR",
           })
@@ -44,6 +56,9 @@ vi.mock("../../../_defect_hub/DefectItemPicker", () => ({
             item_name: "Mock second item",
             mes_code: "MOCK-002",
             quantity: 10,
+            warehouse_qty: 20,
+            pending_quantity: 0,
+            locations: [{ department: "조립", status: "PRODUCTION", quantity: 20, pending_quantity: 0, available_quantity: 20 }],
             has_bom: false,
             process_type_code: "AF",
           })
@@ -64,6 +79,7 @@ vi.mock("../../../_defect_hub/ReasonFormFields", () => ({
 vi.mock("@/lib/api/defects", () => ({
   defectsApi: {
     quarantine: vi.fn(),
+    quarantineBulk: vi.fn(),
     unquarantine: vi.fn(),
   },
 }));
@@ -104,7 +120,11 @@ const location: DefectLocation = {
 };
 
 beforeEach(() => {
+  vi.clearAllMocks();
   window.history.replaceState({}, "");
+  vi.mocked(defectsApi.quarantine).mockResolvedValue(undefined);
+  vi.mocked(defectsApi.quarantineBulk).mockResolvedValue(undefined as never);
+  vi.mocked(stockRequestsApi.createStockRequest).mockResolvedValue(undefined as never);
 });
 
 describe("mobile defect compact headers", () => {
@@ -174,7 +194,7 @@ describe("mobile defect compact headers", () => {
     expect(screen.getByRole("button", { name: /부서 재고/ })).toHaveStyle({ borderWidth: "2px" });
   });
 
-  it("모바일 최종 격리 확인에 두 품목의 수량·관리 분류·자동 부서를 각각 표시한다", async () => {
+  it("모바일 최종 격리 확인에 두 품목의 수량·관리 분류·부서를 각각 표시한다", async () => {
     render(
       <MobileDefectCartFlow mode="add" items={[item]} productModels={[]} currentEmployee={employee} onDone={() => {}} onCancel={() => {}} />,
     );
@@ -188,14 +208,17 @@ describe("mobile defect compact headers", () => {
     const classifications = screen.getAllByRole("group", { name: "보관 분류" });
     fireEvent.click(within(classifications[0]).getByRole("button", { name: "B급" }));
     fireEvent.click(within(classifications[1]).getByRole("button", { name: "구형" }));
+    screen.getAllByRole("button", { name: "사유 선택" }).forEach((button) => fireEvent.click(button));
     fireEvent.click(screen.getByRole("button", { name: /격리하기 \(2건\)/ }));
 
     const dialog = await screen.findByRole("dialog");
-    expect(dialog).toHaveTextContent("Mock item · 수량 3 · 관리 분류 B급 · 자동 부서 · 튜브");
-    expect(dialog).toHaveTextContent("Mock second item · 수량 8 · 관리 분류 구형 · 자동 부서 · 조립");
+    const confirmLines = screen.getAllByTestId("mobile-defect-confirm-line");
+    expect(confirmLines[0]).toHaveTextContent("Mock item수량 3·튜브B급");
+    expect(confirmLines[1]).toHaveTextContent("Mock second item수량 8·조립구형");
+    expect(dialog).not.toHaveTextContent("자동 부서");
   });
 
-  it("모바일 즉시 폐기 확인에는 관리 분류 없이 수량과 자동 부서만 표시한다", async () => {
+  it("[8.7-05] 모바일 즉시 폐기 확인은 설명 없이 품목·수량·실제 부서를 강조한다", async () => {
     render(
       <MobileDefectCartFlow mode="scrap" items={[item]} productModels={[]} currentEmployee={employee} onDone={() => {}} onCancel={() => {}} />,
     );
@@ -203,14 +226,40 @@ describe("mobile defect compact headers", () => {
     fireEvent.click(screen.getByRole("button", { name: /^폐기/ }));
     fireEvent.click(screen.getByRole("button", { name: /다음/ }));
     fireEvent.click(screen.getByRole("button", { name: "mock add" }));
+    fireEvent.click(screen.getByRole("button", { name: "사유 선택" }));
     fireEvent.click(screen.getByRole("button", { name: /즉시 폐기 \(1건\)/ }));
 
     const dialog = await screen.findByRole("dialog");
-    expect(dialog).toHaveTextContent("Mock item · 수량 1 · 자동 부서 · 튜브");
+    const confirmLine = screen.getByTestId("mobile-defect-confirm-line");
+    expect(confirmLine).toHaveClass("rounded-[14px]", "border", "px-3", "py-2.5");
+    expect(confirmLine).toHaveTextContent("Mock item수량 1·튜브");
+    expect(dialog).not.toHaveTextContent("입출고 내역에서 취소·복구할 수 있습니다");
+    expect(dialog).not.toHaveTextContent("되돌릴 수 없습니다");
+    expect(dialog).not.toHaveTextContent("자동 부서");
     expect(dialog).not.toHaveTextContent("관리 분류");
   });
 
-  it("모바일 즉시 재작업 확인에는 관리 분류 없이 수량과 자동 부서만 표시한다", async () => {
+  it("모바일 폐기 성공 후 품목 재조회 완료를 기다리지 않고 완료 화면으로 이동한다", async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries").mockReturnValue(new Promise<void>(() => {}));
+    const onDone = vi.fn();
+    render(
+      <MobileDefectCartFlow mode="scrap" items={[item]} productModels={[]} currentEmployee={employee} onDone={onDone} onCancel={() => {}} />,
+      queryClient,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^폐기/ }));
+    fireEvent.click(screen.getByRole("button", { name: /다음/ }));
+    fireEvent.click(screen.getByRole("button", { name: "mock add" }));
+    fireEvent.click(screen.getByRole("button", { name: "사유 선택" }));
+    fireEvent.click(screen.getByRole("button", { name: /즉시 폐기 \(1건\)/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "즉시 폐기" }));
+
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ["items"] }));
+    expect(onDone).toHaveBeenCalledOnce();
+  });
+
+  it("모바일 즉시 재작업 확인에는 관리 분류 없이 품목·수량·부서만 표시한다", async () => {
     render(
       <MobileDefectCartFlow mode="scrap" items={[item]} productModels={[]} currentEmployee={employee} onDone={() => {}} onCancel={() => {}} />,
     );
@@ -223,7 +272,8 @@ describe("mobile defect compact headers", () => {
     fireEvent.click(screen.getByRole("button", { name: /즉시 재작업 \(1건\)/ }));
 
     const dialog = await screen.findByRole("dialog");
-    expect(dialog).toHaveTextContent("Mock item · 수량 1 · 자동 부서 · 튜브");
+    expect(screen.getByTestId("mobile-defect-confirm-line")).toHaveTextContent("Mock item수량 1·튜브");
+    expect(dialog).not.toHaveTextContent("자동 부서");
     expect(dialog).not.toHaveTextContent("관리 분류");
   });
 
@@ -289,6 +339,57 @@ describe("mobile defect compact headers", () => {
 
     expect(screen.getByTestId("mobile-defect-picker-pane")).toHaveClass("min-h-[300px]", "flex-[1_1_300px]");
     expect(screen.getByTestId("mobile-defect-cart-scroll")).toHaveClass("max-h-[min(26dvh,220px)]", "overflow-y-auto");
+  });
+
+  it("[8.5-07] 모바일도 사유 카테고리와 메모가 모두 없으면 다음 진행을 막는다", () => {
+    render(
+      <MobileDefectCartFlow mode="add" items={[item]} productModels={[]} currentEmployee={employee} onDone={() => {}} onCancel={() => {}} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /다음/ }));
+    fireEvent.click(screen.getByRole("button", { name: "mock add" }));
+
+    expect(screen.getByRole("button", { name: /격리하기 \(1건\)/ })).toBeDisabled();
+    expect(screen.getByText("사유 카테고리 또는 메모 중 하나를 입력하세요.")).toBeInTheDocument();
+  });
+
+  it("[8.10-05] 모바일 복수 품목 오류를 모두 표시하고 확인창과 API를 차단한다", () => {
+    render(
+      <MobileDefectCartFlow mode="add" items={[item]} productModels={[]} currentEmployee={employee} onDone={() => {}} onCancel={() => {}} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /다음/ }));
+    fireEvent.click(screen.getByRole("button", { name: "mock add" }));
+    fireEvent.click(screen.getByRole("button", { name: "mock add second" }));
+    screen.getAllByRole("button", { name: "사유 선택" }).forEach((button) => fireEvent.click(button));
+    const quantities = screen.getAllByRole("spinbutton");
+    fireEvent.change(quantities[0], { target: { value: "21" } });
+    fireEvent.change(quantities[1], { target: { value: "22" } });
+
+    const submit = screen.getByRole("button", { name: /격리하기 \(2건\)/ });
+    expect(submit).toBeDisabled();
+    expect(screen.getByText("튜브 가용 20개보다 1개 많습니다.")).toBeInTheDocument();
+    expect(screen.getByText("조립 가용 20개보다 2개 많습니다.")).toBeInTheDocument();
+    fireEvent.click(submit);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(defectsApi.quarantine).not.toHaveBeenCalled();
+    expect(defectsApi.quarantineBulk).not.toHaveBeenCalled();
+  });
+
+  it("[8.10-05] 모바일 유효한 복수 격리는 하나의 원자적 bulk 요청으로 제출한다", async () => {
+    render(
+      <MobileDefectCartFlow mode="add" items={[item]} productModels={[]} currentEmployee={employee} onDone={() => {}} onCancel={() => {}} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /다음/ }));
+    fireEvent.click(screen.getByRole("button", { name: "mock add" }));
+    fireEvent.click(screen.getByRole("button", { name: "mock add second" }));
+    screen.getAllByRole("button", { name: "사유 선택" }).forEach((button) => fireEvent.click(button));
+    fireEvent.click(screen.getByRole("button", { name: /격리하기 \(2건\)/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "격리하기" }));
+
+    await waitFor(() => expect(defectsApi.quarantineBulk).toHaveBeenCalledTimes(1));
+    expect(defectsApi.quarantine).not.toHaveBeenCalled();
   });
 
   it("opens confirmation before mobile normal recovery and calls unquarantine once after confirmation", async () => {

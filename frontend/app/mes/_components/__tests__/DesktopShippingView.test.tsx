@@ -3,7 +3,7 @@ import { act, render as rtlRender, screen, fireEvent, waitFor, within } from "@t
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ComponentProps, ReactElement, ReactNode } from "react";
 import { DesktopShippingView } from "../DesktopShippingView";
-import type { Item, ShippingHistoryMonth, ShippingRequest } from "@/lib/api";
+import type { Item, ShippingBomMatchResponse, ShippingHistoryMonth, ShippingRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { queryKeys } from "@/lib/queries/keys";
 
@@ -113,8 +113,10 @@ function request(overrides: Partial<ShippingRequest> = {}): ShippingRequest {
     base_pf_mes_code: "PF-001",
     final_pa_item_id: null,
     final_pa_item_name: null,
+    final_pa_mes_code: null,
     final_pf_item_id: null,
     final_pf_item_name: null,
+    final_pf_mes_code: null,
     requested_by_name: "shipping",
     custom_pa_name: null,
     custom_pf_name: null,
@@ -2514,6 +2516,122 @@ describe("DesktopShippingView", () => {
     expect(preparedActions.compareDocumentPosition(preparedRevisionHistory) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it("8.12-10 lists every active reservation in the preparation-cancel confirmation", async () => {
+    const prepared = request({
+      request_id: "prepared-reservations",
+      status: "PREPARED",
+      prepared_at: "2026-09-16T01:00:00Z",
+      allocations: [
+        {
+          allocation_id: "allocation-pf",
+          request_id: "prepared-reservations",
+          item_id: "pf-final",
+          item_name: "실제 출하 PF",
+          mes_code: "9-PF-0046",
+          process_type_code: "PF",
+          quantity: 2,
+          unit: "EA",
+          department: "조립",
+          status: "RESERVED",
+          reference_no: "SHIP-prepared-reservations",
+          created_at: "2026-09-16T01:00:00Z",
+          released_at: null,
+          consumed_at: null,
+          released_reason: null,
+        },
+        {
+          allocation_id: "allocation-companion",
+          request_id: "prepared-reservations",
+          item_id: "carton-1",
+          item_name: "Carton Box",
+          mes_code: "R-BOX",
+          process_type_code: "R",
+          quantity: 4,
+          unit: "EA",
+          department: "포장",
+          status: "RESERVED",
+          reference_no: "SHIP-prepared-reservations",
+          created_at: "2026-09-16T01:00:00Z",
+          released_at: null,
+          consumed_at: null,
+          released_reason: null,
+        },
+      ],
+      transactions: [],
+    });
+    navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=prepared-reservations";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([prepared]);
+
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    fireEvent.click(await screen.findByTestId("shipping-prepare-cancel-from-detail"));
+
+    const dialog = screen.getByText("준비 완료 취소 확인").closest(".fixed") as HTMLElement;
+    expect(within(dialog).getByText(/실제 출하 PF.*9-PF-0046.*2 EA/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Carton Box.*R-BOX.*4 EA/)).toBeInTheDocument();
+    expect(within(dialog).queryByText("표시할 항목이 없습니다.")).not.toBeInTheDocument();
+  });
+
+  it("8.12-16 keeps forward and reverse pickup transactions visible in the request detail", async () => {
+    const transaction = {
+      log_id: "pickup-forward",
+      item_id: "pf-1",
+      item_name: "Standard PF",
+      mes_code: "PF-001",
+      item_process_type_code: "PF",
+      transaction_type: "SHIP" as const,
+      quantity_change: -1,
+      quantity_before: 2,
+      quantity_after: 1,
+      warehouse_qty_before: 0,
+      warehouse_qty_after: 0,
+      reference_no: "SHIP-restored-detail",
+      produced_by: "실제 픽업 담당자",
+      notes: "픽업 출고",
+      shipping_phase: "PICKUP",
+      created_at: "2026-09-16T01:00:00Z",
+      cancelled: true,
+      cancel_reason: "픽업 취소",
+      cancelled_at: "2026-09-16T02:00:00Z",
+      inventory_effect: [],
+    };
+    const restored = request({
+      request_id: "restored-detail",
+      status: "PREPARED",
+      final_pf_item_id: "pf-final",
+      final_pf_item_name: "실제 출하 PF",
+      final_pf_mes_code: null,
+      prepared_at: "2026-09-16T00:00:00Z",
+      picked_up_at: null,
+      transactions: [
+        transaction,
+        {
+          ...transaction,
+          log_id: "pickup-reverse",
+          quantity_change: 1,
+          quantity_before: 1,
+          quantity_after: 2,
+          cancelled: false,
+          notes: "픽업 취소 재고 복원",
+          created_at: "2026-09-16T02:00:00Z",
+        },
+      ],
+      transaction_count: 2,
+    });
+    navigationMock.search = "tab=shipping&shippingView=prepWork&shippingRequestId=restored-detail";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([restored]);
+
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    const detail = await screen.findByTestId("shipping-prep-detail");
+    expect(await within(detail).findByText("실제 출하 PF")).toBeInTheDocument();
+    expect(within(detail).getByText(/코드 미지정 · 기준 PF Standard PF/)).toBeInTheDocument();
+    expect(await within(detail).findByText("연결 입출고 로그")).toBeInTheDocument();
+    expect(within(detail).getByText("출하 차감")).toBeInTheDocument();
+    expect(within(detail).getByText("출하 취소 · 재고 복원")).toBeInTheDocument();
+    expect(within(detail).queryByText("입출고 로그 없음")).not.toBeInTheDocument();
+  });
+
   it("completes preparation from a preparing request detail when an invoice exists", async () => {
     navigationMock.search = "tab=shipping&shippingView=requestDetail&shippingRequestId=req-1";
     vi.mocked(api.getShippingRequests).mockResolvedValue([
@@ -2784,7 +2902,7 @@ describe("DesktopShippingView", () => {
     expect(within(missing).getByText("요청자 없음")).toBeInTheDocument();
   });
 
-  it("lays out request-board cards with one-line history-style metadata", async () => {
+  it("8.12-01 keeps request cards focused on the actual shipment", async () => {
     const finalPfName = "DX-7020s_70kV, 2mA_호주_iM3 긴 품명 카드";
     const longInvoice = "DEXCO-20260907-LONG-INVOICE-NUMBER";
     vi.mocked(api.getShippingRequests).mockResolvedValue([
@@ -2793,15 +2911,22 @@ describe("DesktopShippingView", () => {
         status: "PREPARING",
         request_quantity: 20,
         final_pf_item_name: finalPfName,
+        final_pf_mes_code: "9-PF-0046",
         requested_by_name: null,
         invoice_number: longInvoice,
-      }),
+      } as Partial<ShippingRequest>),
       request({
         request_id: "request-board-prepared-layout",
         status: "PREPARED",
         request_quantity: 3,
         requested_by_name: "김건호",
         invoice_number: null,
+      }),
+      request({
+        request_id: "request-board-final-code-missing",
+        final_pf_item_id: "pf-final-without-code",
+        final_pf_item_name: "코드 미지정 실제 출하품",
+        final_pf_mes_code: null,
       }),
     ]);
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
@@ -2814,6 +2939,7 @@ describe("DesktopShippingView", () => {
     const title = within(row).getByText(finalPfName);
     const preparedRow = container.querySelector('[data-shipping-request-id="request-board-prepared-layout"]') as HTMLElement;
     const preparedMetadata = within(preparedRow).getByTestId("shipping-request-metadata-request-board-prepared-layout");
+    const missingFinalCodeRow = container.querySelector('[data-shipping-request-id="request-board-final-code-missing"]') as HTMLElement;
 
     expect(row).toHaveAttribute("data-shipping-card-layout", "requestBoard");
     expect(row).toHaveClass("h-[112px]", "rounded-[16px]", "py-3", "standard-hover", "active:scale-[0.995]", "focus-visible:ring-2");
@@ -2823,7 +2949,12 @@ describe("DesktopShippingView", () => {
     expect(title).not.toHaveClass("line-clamp-2", "min-h-10");
     expect(within(row).queryByTestId("shipping-request-board-quantity-request-board-layout")).not.toBeInTheDocument();
     expect(metadata).toHaveClass("grid", "grid-cols-[1.5fr_1fr_1fr_2fr]", "border-t", "pt-1.5");
-    expect(within(row).getByText("기준 PF · Standard PF")).toBeInTheDocument();
+    expect(within(row).queryByText("실제 출하품")).not.toBeInTheDocument();
+    expect(within(row).getByTestId("shipping-request-code-request-board-layout")).toHaveTextContent("9-PF-0046");
+    expect(within(row).queryByText(/기준 PF/)).not.toBeInTheDocument();
+    expect(within(row).queryByTestId("shipping-request-base-code-request-board-layout")).not.toBeInTheDocument();
+    expect(within(missingFinalCodeRow).getByTestId("shipping-request-code-request-board-final-code-missing")).toHaveTextContent("코드 미지정");
+    expect(within(missingFinalCodeRow).queryByTestId("shipping-request-base-code-request-board-final-code-missing")).not.toBeInTheDocument();
     expect(date).toHaveTextContent("요청 일시");
     expect(date).not.toHaveTextContent("Standard PF");
     expect(metadata).toHaveTextContent("요청자");
@@ -3391,6 +3522,71 @@ describe("DesktopShippingView", () => {
     expect(screen.getByTestId("shipping-final-quantity-pa-acc-1")).toHaveClass("self-center", "tabular-nums");
     expect(screen.getByTestId("shipping-final-quantity-pa-acc-1")).toHaveTextContent("4EA");
     expect(screen.getByTestId("shipping-final-line-companion-carton-1")).toHaveTextContent("Carton Box");
+  });
+
+  it("8.12-05 shows the selected final PF linked PA instead of the base PA on the final step", async () => {
+    vi.mocked(api.matchShippingBom).mockResolvedValue({
+      base_pf_matches: false,
+      pf_candidates: [{
+        pf_item_id: "pf-candidate",
+        pf_item_name: "실제 출하 PF",
+        pf_mes_code: "9-PF-0046",
+        pa_item_id: "pa-target",
+        pa_item_name: "Custom PA",
+        pa_mes_code: "PA-T",
+      }],
+      matched_pa_item_id: null,
+      matched_pf_item_id: null,
+      matched_pa_item_name: null,
+      matched_pf_item_name: null,
+      requires_pa_name: true,
+      requires_pf_name: true,
+    });
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    await openHubCard(container, "request");
+    await openNewRequest(container);
+    await selectBasePf();
+    await waitFor(() => expect(api.matchShippingBom).toHaveBeenCalled());
+    nextStep(container);
+    nextStep(container);
+    fireEvent.click(await screen.findByTestId("shipping-bom-candidate-pf-candidate"));
+    nextStep(container);
+    nextStep(container);
+
+    const pfGroup = await screen.findByTestId("shipping-final-group-pf");
+    expect(within(pfGroup).getByText("Custom PA")).toBeInTheDocument();
+    expect(within(pfGroup).getByText("PA-T")).toBeInTheDocument();
+    expect(within(pfGroup).queryByText("Standard PA")).not.toBeInTheDocument();
+  });
+
+  it("8.12-12 blocks later steps while the changed BOM is not matched again", async () => {
+    const pendingRematch = deferred<ShippingBomMatchResponse>();
+    vi.mocked(api.matchShippingBom)
+      .mockResolvedValueOnce({
+        matched_pa_item_id: "pa-1",
+        matched_pf_item_id: null,
+        matched_pa_item_name: "Standard PA",
+        matched_pf_item_name: null,
+        requires_pa_name: false,
+        requires_pf_name: true,
+      })
+      .mockImplementation(() => pendingRematch.promise);
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    await openHubCard(container, "request");
+    await openNewRequest(container);
+    await selectBasePf();
+    await waitFor(() => expect(api.matchShippingBom).toHaveBeenCalledTimes(1));
+    nextStep(container);
+    fireEvent.click(await screen.findByRole("button", { name: /Cable Set/ }));
+    nextStep(container);
+
+    const next = await screen.findByTestId("shipping-wizard-next");
+    expect(next).toBeDisabled();
+    expect(screen.getByTestId("shipping-wizard-step-3")).toHaveTextContent("변경된 BOM을 다시 확인");
   });
 
   it("moves the final submit action into the bottom action bar", async () => {
@@ -4144,7 +4340,10 @@ describe("DesktopShippingView", () => {
     render(<DesktopShippingView onStatusChange={() => {}} />);
 
     expect(await screen.findByRole("textbox", { name: "인보이스 번호" })).toBeInTheDocument();
-    expect(screen.getByText(/인보이스 번호를 입력해야 준비 완료/)).toBeInTheDocument();
+    const invoiceShell = screen.getByTestId("shipping-invoice-field-shell");
+    const invoiceGuidance = screen.getByText(/인보이스 번호를 입력해야 준비 완료/);
+    expect(invoiceShell).toContainElement(invoiceGuidance);
+    expect(invoiceShell).toHaveClass("min-h-[64px]");
     expect(screen.getByRole("button", { name: "준비 완료" })).toBeDisabled();
 
     fireEvent.change(screen.getByRole("textbox", { name: "인보이스 번호" }), { target: { value: "inv-ready" } });

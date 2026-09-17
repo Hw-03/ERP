@@ -27,6 +27,7 @@ import { StatusTargetNotice, useStatusTargetNotice } from "../../common/StatusTa
 import {
   IO_WORK_TYPES,
   approvalKind,
+  canAutoApprove,
   canSeeWorkType,
   ioDepartmentPayload,
   isExitWorkType,
@@ -894,6 +895,10 @@ export function MobileIoComposeWizard({
             submitting={submitting}
             saving={drafting}
             approvalKind={approvalKind(state.subType, state.bundles, state.fromDepartment)}
+            autoApprove={state.subType !== "internal_use_out" && canAutoApprove(
+              approvalKind(state.subType, state.bundles, state.fromDepartment),
+              operator,
+            )}
             onNotesChange={state.setNotes}
             onValidationError={(message) => showFeedbackNotice(message, "error")}
             onSubmit={handleSubmit}

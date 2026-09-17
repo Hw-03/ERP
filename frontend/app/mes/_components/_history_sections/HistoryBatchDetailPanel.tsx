@@ -255,7 +255,11 @@ export function HistoryBatchDetailPanel({
                 제외 {excludedLineCount}개
               </div>
             )}
-            <HistoryDetailMemo notes={first.notes} transactionType={first.transaction_type} />
+            <HistoryDetailMemo
+              notes={first.notes}
+              reasonMemo={first.reason_memo}
+              transactionType={first.transaction_type}
+            />
           </>
         )}
 
@@ -321,7 +325,11 @@ export function HistoryBatchDetailPanel({
             </div>
           )}
 
-          <HistoryDetailMemo notes={first.notes} transactionType={first.transaction_type} />
+          <HistoryDetailMemo
+            notes={first.notes}
+            reasonMemo={first.reason_memo}
+            transactionType={first.transaction_type}
+          />
           <HistoryMobileCancelConfirmation
             workflowMessage={cancellationScope.workflowMessage}
             controller={controller}

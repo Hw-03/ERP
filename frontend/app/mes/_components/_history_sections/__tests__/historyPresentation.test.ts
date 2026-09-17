@@ -144,6 +144,103 @@ describe("historyPresentation", () => {
     expect(getHistoryListOperationLabel(makeLog({ transaction_type: "UNMARK_DEFECTIVE" }))).toBe("불량 정상 복귀");
   });
 
+  it("[8.13-05][8.13-12] distinguishes supplier returns and their cancellations", () => {
+    expect(getHistoryListOperationLabel(makeLog({ transaction_type: "SUPPLIER_RETURN" }))).toBe("반품");
+    expect(getHistoryListOperationLabel(makeLog({
+      transaction_type: "SUPPLIER_RETURN",
+      operation_kind: "CANCELLATION",
+    }))).toBe("반품 취소");
+  });
+
+  it("[8.13-06][8.13-12] summarizes normal and defective inventory effects separately", () => {
+    const returned = getHistoryRowPresentation(makeLog({
+      transaction_type: "SUPPLIER_RETURN",
+      quantity_change: 0,
+      transfer_qty: 1,
+      inventory_effect: [
+        { scope: "location", department: "조립", status: "DEFECTIVE", delta: -1 },
+      ],
+    }));
+    const restored = getHistoryRowPresentation(makeLog({
+      transaction_type: "SUPPLIER_RETURN",
+      operation_kind: "CANCELLATION",
+      quantity_change: 0,
+      transfer_qty: 1,
+      inventory_effect: [
+        { scope: "location", department: "조립", status: "DEFECTIVE", delta: 1 },
+      ],
+    }));
+
+    expect(returned.movement.parts.map((part) => part.label)).toEqual(["불량 재고 -1 EA"]);
+    expect(restored.movement.parts.map((part) => part.label)).toEqual(["불량 재고 +1 EA"]);
+  });
+
+  it("8.15-09 uses the actual department deduction as the internal-use source", () => {
+    const batch = makeBatch({
+      work_type: "internal_use",
+      sub_type: "internal_use_out",
+      from_department: "튜브",
+      to_department: "AS",
+      bundles: [makeBundle({
+        source_kind: "manual",
+        lines: [makeLine({
+          direction: "out",
+          from_bucket: "production",
+          from_department: "튜브",
+          to_bucket: "none",
+          to_department: "AS",
+        })],
+      })],
+    });
+    const row = getHistoryRowPresentation(makeLog({
+      transaction_type: "INTERNAL_USE",
+      department: "AS",
+      inventory_effect: [
+        { scope: "location", department: "튜브", status: "PRODUCTION", delta: -1 },
+      ],
+    }), batch);
+
+    expect(row.flow).toMatchObject({ label: "튜브 → AS", from: "튜브", to: "AS" });
+  });
+
+  it("8.20-08 gives cancellations their real type and reverse direction", () => {
+    const batch = makeBatch({
+      work_type: "warehouse",
+      sub_type: "receive_supplier",
+      from_department: null,
+      to_department: "창고",
+      bundles: [makeBundle({
+        source_kind: "manual",
+        lines: [makeLine({ from_bucket: "none", to_bucket: "warehouse", to_department: null })],
+      })],
+    });
+    const row = getHistoryRowPresentation(makeLog({
+      transaction_type: "RECEIVE",
+      operation_kind: "CANCELLATION",
+      quantity_change: -1,
+      inventory_effect: [{ scope: "warehouse", delta: -1 }],
+    }), batch);
+
+    expect(row.operation.label).toBe("원자재 입고 취소");
+    expect(row.flow).toMatchObject({ label: "창고 → 외부", from: "창고", to: "외부" });
+  });
+
+  it("8.23-10 keeps an approved department IO operation out of quantity-correction labels", () => {
+    const batch = makeBatch({
+      work_type: "process",
+      sub_type: "produce",
+      bundles: [makeBundle({
+        source_kind: "manual",
+        lines: [makeLine({ origin: "manual", direction: "in", from_bucket: "none", to_bucket: "production" })],
+      })],
+    });
+
+    const row = getHistoryRowPresentation(makeLog({ transaction_type: "PRODUCE" }), batch);
+
+    expect(getHistoryListOperationLabel(makeLog({ transaction_type: "PRODUCE" }), batch)).toBe("부서 입출고");
+    expect(row.operation.label).toBe("부서 입출고");
+  });
+
   it("목록의 사내 사용처와 취소 여부를 짧게 표시한다", () => {
     const log = makeLog({ transaction_type: "INTERNAL_USE" });
     const asBatch = makeBatch({ work_type: "internal_use", sub_type: "internal_use_out", to_department: "AS" });
@@ -198,7 +295,11 @@ describe("historyPresentation", () => {
   ] as const)("keeps %s in the defect list while showing %s in detail", (transactionType, detailLabel) => {
     const log = makeLog({ transaction_type: transactionType });
 
-    expect(getHistoryListOperationLabel(log)).toBe(transactionType === "UNMARK_DEFECTIVE" ? "불량 정상 복귀" : "불량");
+    expect(getHistoryListOperationLabel(log)).toBe(
+      transactionType === "UNMARK_DEFECTIVE"
+        ? "불량 정상 복귀"
+        : transactionType === "SUPPLIER_RETURN" ? "반품" : "불량",
+    );
     expect(getHistoryRowPresentation(log).operation.label).toBe(detailLabel);
   });
 

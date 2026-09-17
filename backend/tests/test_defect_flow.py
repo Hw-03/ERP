@@ -176,6 +176,14 @@ def _make_defective_location(db_session, item_id, dept: DepartmentEnum, qty: Dec
     return loc
 
 
+def _location_total(db_session, item_id, status: LocationStatusEnum) -> Decimal:
+    rows = db_session.query(InventoryLocation).filter(
+        InventoryLocation.item_id == item_id,
+        InventoryLocation.status == status,
+    ).all()
+    return sum((Decimal(str(row.quantity or 0)) for row in rows), Decimal("0"))
+
+
 # ---------------------------------------------------------------------------
 # 시나리오 1: 격리 → defective_at 채움, MARK_DEFECTIVE 로그
 # ---------------------------------------------------------------------------
@@ -213,10 +221,159 @@ def test_quarantine_sets_defective_at_and_logs(db_session, client, make_item):
     ).first()
     assert log is not None
     assert log.reason_category == "외관불량"
+    assert log.transfer_qty == Decimal("3")
     assert log.warehouse_qty_before == Decimal("10")
     assert log.warehouse_qty_after == Decimal("7")
     assert log.department_qty_before == Decimal("0")
     assert log.department_qty_after == Decimal("0")
+
+
+def test_quarantine_operation_history_recovers_legacy_movement_quantity(
+    db_session, client, make_item,
+):
+    """기존 격리 로그의 transfer_qty가 비어 있어도 이동 원장에서 처리 수량을 복원한다."""
+    item = make_item(name="LEGACY-QUARANTINE-QTY", process_type_code="TR", warehouse_qty=Decimal("10"))
+    actor = _make_employee(db_session, code="LEGACY-QTY", name="기존 격리 작업자")
+    db_session.add(SystemSetting(
+        setting_key="inventory_operation_cutover_at",
+        setting_value="2026-01-01T00:00:00",
+    ))
+    db_session.commit()
+
+    response = client.post("/api/defects/quarantine", json={
+        "item_id": str(item.item_id),
+        "qty": "3",
+        "source": "warehouse",
+        "target_dept": DepartmentEnum.WAREHOUSE.value,
+        "reason_memo": "기존 로그 복원 확인",
+        "actor_employee_id": str(actor.employee_id),
+    })
+    assert response.status_code == 200, response.text
+
+    log = db_session.query(TransactionLog).filter(
+        TransactionLog.item_id == item.item_id,
+        TransactionLog.transaction_type == TransactionTypeEnum.MARK_DEFECTIVE,
+    ).one()
+    log.transfer_qty = None
+    db_session.commit()
+
+    history = client.get(f"/api/inventory/operations/{log.operation_id}")
+    assert history.status_code == 200, history.text
+    assert history.json()["matching_lines"][0]["transfer_qty"] == "3"
+
+
+@pytest.mark.parametrize(
+    ("reason_category", "reason_memo", "expected_status"),
+    [
+        (None, None, 422),
+        ("기타", None, 200),
+        (None, "자유 메모만 입력", 200),
+    ],
+)
+def test_quarantine_requires_reason_category_or_memo(
+    db_session, client, make_item, reason_category, reason_memo, expected_status,
+):
+    """[8.5-07] 카테고리와 메모가 모두 없을 때만 격리를 거부한다."""
+    item = make_item(name="REASON-REQUIRED", process_type_code="TR", warehouse_qty=Decimal("5"))
+    actor = _make_employee(db_session, code=f"REASON-{expected_status}-{bool(reason_category)}", name="사유 작업자")
+    db_session.commit()
+    payload = {
+        "item_id": str(item.item_id),
+        "qty": 1,
+        "source": "warehouse",
+        "target_dept": DepartmentEnum.WAREHOUSE.value,
+        "actor_employee_id": str(actor.employee_id),
+    }
+    if reason_category is not None:
+        payload["reason_category"] = reason_category
+    if reason_memo is not None:
+        payload["reason_memo"] = reason_memo
+
+    response = client.post("/api/defects/quarantine", json=payload)
+    assert response.status_code == expected_status, response.json()
+
+    db_session.expire_all()
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    expected_warehouse = Decimal("5") if expected_status == 422 else Decimal("4")
+    assert inventory.warehouse_qty == expected_warehouse
+
+
+def test_bulk_quarantine_rolls_back_every_line_when_one_item_is_short(
+    db_session, client, make_item,
+):
+    """[8.10-05] 복수 격리 중 한 품목이라도 실패하면 모든 위치와 원장을 원복한다."""
+    enough = make_item(name="BULK-ENOUGH", process_type_code="TR", warehouse_qty=Decimal("5"))
+    short = make_item(name="BULK-SHORT", process_type_code="TR", warehouse_qty=Decimal("1"))
+    actor = _make_employee(db_session, code="BULK-QUARANTINE-FAIL", name="복수 격리 작업자")
+    db_session.commit()
+    before_logs = db_session.query(TransactionLog).count()
+
+    response = client.post("/api/defects/quarantine/bulk", json={
+        "actor_employee_id": str(actor.employee_id),
+        "client_request_id": "bulk-quarantine-atomic-failure",
+        "lines": [
+            {
+                "item_id": str(enough.item_id), "qty": 2, "source": "warehouse",
+                "target_dept": DepartmentEnum.WAREHOUSE.value, "reason_memo": "복수 검증",
+            },
+            {
+                "item_id": str(short.item_id), "qty": 2, "source": "warehouse",
+                "target_dept": DepartmentEnum.WAREHOUSE.value, "reason_category": "기타",
+            },
+        ],
+    })
+    assert response.status_code == 422, response.json()
+
+    db_session.expire_all()
+    inventories = {
+        inventory.item_id: inventory
+        for inventory in db_session.query(Inventory).filter(Inventory.item_id.in_([enough.item_id, short.item_id])).all()
+    }
+    assert inventories[enough.item_id].warehouse_qty == Decimal("5")
+    assert inventories[short.item_id].warehouse_qty == Decimal("1")
+    assert _location_total(db_session, enough.item_id, LocationStatusEnum.DEFECTIVE) == Decimal("0")
+    assert _location_total(db_session, short.item_id, LocationStatusEnum.DEFECTIVE) == Decimal("0")
+    assert db_session.query(TransactionLog).count() == before_logs
+
+
+def test_bulk_quarantine_exact_retry_is_idempotent(db_session, client, make_item):
+    """[8.5-06][8.10-05] 같은 복수 격리 재시도는 재고와 원장을 한 번만 변경한다."""
+    first = make_item(name="BULK-FIRST", process_type_code="TR", warehouse_qty=Decimal("5"))
+    second = make_item(name="BULK-SECOND", process_type_code="TR", warehouse_qty=Decimal("5"))
+    actor = _make_employee(db_session, code="BULK-QUARANTINE-RETRY", name="복수 재시도 작업자")
+    db_session.commit()
+    payload = {
+        "actor_employee_id": str(actor.employee_id),
+        "client_request_id": "bulk-quarantine-idempotent",
+        "lines": [
+            {
+                "item_id": str(first.item_id), "qty": 2, "source": "warehouse",
+                "target_dept": DepartmentEnum.WAREHOUSE.value, "reason_memo": "재시도 검증",
+            },
+            {
+                "item_id": str(second.item_id), "qty": 3, "source": "warehouse",
+                "target_dept": DepartmentEnum.WAREHOUSE.value, "reason_category": "기타",
+            },
+        ],
+    }
+
+    first_response = client.post("/api/defects/quarantine/bulk", json=payload)
+    retry_response = client.post("/api/defects/quarantine/bulk", json=payload)
+    assert first_response.status_code == 200, first_response.json()
+    assert retry_response.status_code == 200, retry_response.json()
+
+    db_session.expire_all()
+    inventories = {
+        inventory.item_id: inventory
+        for inventory in db_session.query(Inventory).filter(Inventory.item_id.in_([first.item_id, second.item_id])).all()
+    }
+    assert inventories[first.item_id].warehouse_qty == Decimal("3")
+    assert inventories[second.item_id].warehouse_qty == Decimal("2")
+    logs = db_session.query(TransactionLog).filter(
+        TransactionLog.item_id.in_([first.item_id, second.item_id]),
+        TransactionLog.transaction_type == TransactionTypeEnum.MARK_DEFECTIVE,
+    ).all()
+    assert len(logs) == 2
 
 
 def test_quarantine_rejects_client_request_id_owned_by_other_operation(
@@ -634,6 +791,7 @@ def test_unquarantine_clears_defective_at_and_logs(db_session, client, make_item
     ).first()
     assert unmark_log is not None
     assert unmark_log.reason_category == "검사통과"
+    assert unmark_log.transfer_qty == Decimal("2")
 
 
 def test_unquarantine_partially_updates_only_the_selected_record(
@@ -1196,6 +1354,46 @@ def test_transaction_log_reason_category_uses_32_char_storage_limit():
     log_limit = TransactionLog.__table__.c.reason_category.type.length
 
     assert log_limit == 32
+
+
+@pytest.mark.parametrize(
+    ("reason_category", "reason_memo", "expected_status"),
+    [
+        (None, None, 422),
+        ("기타", None, 201),
+        (None, "메모만 입력", 201),
+    ],
+)
+def test_direct_defect_request_requires_category_or_memo(
+    db_session, client, make_item, reason_category, reason_memo, expected_status
+):
+    """[8.5-07] 즉시 폐기 API도 사유가 모두 비어 있으면 거절한다."""
+    item = make_item(name="DIRECT-REASON", process_type_code="TR", warehouse_qty=Decimal("5"))
+    requester = _make_employee(
+        db_session,
+        code=f"DR-{expected_status}-{bool(reason_category)}",
+        name="direct reason actor",
+    )
+    db_session.commit()
+
+    payload = {
+        "requester_employee_id": str(requester.employee_id),
+        "request_type": "scrap_normal",
+        "lines": [{
+            "item_id": str(item.item_id),
+            "quantity": "2",
+            "from_bucket": "warehouse",
+            "to_bucket": "none",
+        }],
+    }
+    if reason_category is not None:
+        payload["reason_category"] = reason_category
+    if reason_memo is not None:
+        payload["reason_memo"] = reason_memo
+
+    res = client.post("/api/stock-requests", json=payload)
+
+    assert res.status_code == expected_status, res.json()
 
 
 def test_stock_request_rejects_reason_category_over_transaction_log_limit(

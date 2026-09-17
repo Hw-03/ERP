@@ -63,13 +63,32 @@ describe("HistoryKeyPointSummary", () => {
     expect(screen.queryByText(/처리 전|처리 후|창고 401/)).not.toBeInTheDocument();
   });
 
-  it("shows the original processing stock and request/processing timestamps separately", () => {
+  it("8.15-08/8.22-10/8.24-13 labels every audit role in detail", () => {
+    render(<HistoryKeyPointSummary summary={summary({
+      participants: [
+        { label: "요청자", name: "요청자 김", at: "2026-07-10T01:00:00Z" },
+        { label: "승인자", name: "승인자 박", at: "2026-07-10T01:03:00Z" },
+        { label: "실행자", name: "실행자 이", at: "2026-07-10T01:05:00Z" },
+      ],
+    })} />);
+
+    expect(screen.getByText("요청자")).toBeInTheDocument();
+    expect(screen.getByText("요청자 김")).toBeInTheDocument();
+    expect(screen.getByText("승인자")).toBeInTheDocument();
+    expect(screen.getByText("승인자 박")).toBeInTheDocument();
+    expect(screen.getByText("실행자")).toBeInTheDocument();
+    expect(screen.getByText("실행자 이")).toBeInTheDocument();
+  });
+
+  it("combines the movement route with only changed processing stock", () => {
     const detailedSummary = Object.assign(summary(), {
+      flow: { label: "튜브 재고", from: "외부", to: "튜브" },
       actualStock: {
         warehouseBefore: 94,
-        warehouseAfter: 50,
-        departmentBefore: 30,
-        departmentAfter: 30,
+        warehouseAfter: 94,
+        departmentName: "튜브",
+        departmentBefore: 0,
+        departmentAfter: 1,
         requestedAt: "2026-07-10T01:00:00Z",
         processedAt: "2026-07-10T02:00:00Z",
       },
@@ -77,15 +96,21 @@ describe("HistoryKeyPointSummary", () => {
 
     render(<HistoryKeyPointSummary summary={detailedSummary} />);
 
-    const block = screen.getByText("실제 처리 당시 재고").parentElement!;
-    expect(within(block).getByText(/창고/).parentElement).toHaveTextContent("94");
-    expect(within(block).getByText(/창고/).parentElement).toHaveTextContent("50");
-    expect(within(block).getByText(/정상 부서/).parentElement).toHaveTextContent("30");
-    expect(within(block).getByText(/요청 시각/).parentElement).toHaveTextContent(/2026년 7월 10일/);
-    expect(within(block).getByText(/처리 시각/).parentElement).toHaveTextContent(/2026년 7월 10일/);
+    const block = screen.getByTestId("history-stock-movement-summary");
+    expect(within(block).getByText("재고 이동")).toBeInTheDocument();
+    expect(within(block).getByText("외부")).toBeInTheDocument();
+    expect(within(block).getAllByText("튜브")).toHaveLength(2);
+    expect(within(block).queryByText("창고")).not.toBeInTheDocument();
+    expect(within(block).queryByText("정상 부서")).not.toBeInTheDocument();
+    expect(within(block).getAllByText("튜브")[1].parentElement).toHaveTextContent("0");
+    expect(within(block).getAllByText("튜브")[1].parentElement).toHaveTextContent("1");
+    expect(within(block).queryByText("처리 직전 → 직후 재고")).not.toBeInTheDocument();
+    expect(within(block).queryByText("위치 / 이동 경로")).not.toBeInTheDocument();
+    expect(within(block).queryByText(/요청 시각|처리 시각/)).not.toBeInTheDocument();
+    expect(within(block).queryByText(/목록은 요청 순서/)).not.toBeInTheDocument();
   });
 
-  it("renders the requester name without a redundant requester label", () => {
+  it("aligns a single requester with multi-participant name and time columns without a redundant label", () => {
     render(
       <HistoryKeyPointSummary
         summary={summary({
@@ -101,6 +126,11 @@ describe("HistoryKeyPointSummary", () => {
     expect(screen.getByText("준비 완료자 B")).toBeInTheDocument();
     expect(screen.queryByText("담당자")).not.toBeInTheDocument();
     expect(screen.queryByText("요청자")).not.toBeInTheDocument();
+    expect(screen.getByTestId("history-participant-row")).toHaveClass(
+      "grid",
+      "sm:grid-cols-[4rem_minmax(0,1fr)_auto]",
+      "sm:items-center",
+    );
   });
 
   it("keeps the operation and location route on their section title lines", () => {
@@ -114,13 +144,13 @@ describe("HistoryKeyPointSummary", () => {
     );
 
     const operation = screen.getByTestId("history-operation-summary");
-    const flow = screen.getByTestId("history-flow-summary");
+    const flow = screen.getByTestId("history-stock-movement-summary");
 
     expect(operation).toHaveClass("items-center");
     expect(within(operation).getByText("불량 격리")).toBeInTheDocument();
     expect(within(operation).queryByText("작업")).not.toBeInTheDocument();
-    expect(flow).toHaveClass("items-center", "flex-nowrap");
-    expect(within(flow).getByText("위치 / 이동 경로")).toBeInTheDocument();
+    expect(within(flow).getByText("재고 이동").parentElement).toHaveClass("items-center", "flex-nowrap");
+    expect(within(flow).getByText("재고 이동")).toBeInTheDocument();
     expect(within(flow).getByText("불량 재고")).toBeInTheDocument();
     expect(within(flow).getByText("조립 재고")).toBeInTheDocument();
   });
@@ -398,12 +428,12 @@ describe("HistoryKeyPointSummary", () => {
       />,
     );
 
-    expect(screen.getByText("위치 / 이동 경로")).toBeInTheDocument();
+    expect(screen.getByText("재고 이동")).toBeInTheDocument();
     expect(screen.getByText("창고")).toBeInTheDocument();
     expect(screen.getByText("조립")).toBeInTheDocument();
 
     rerender(<HistoryKeyPointSummary summary={summary({ flow: null })} />);
-    expect(screen.queryByText("위치 / 이동 경로")).not.toBeInTheDocument();
+    expect(screen.queryByText("재고 이동")).not.toBeInTheDocument();
   });
 
   it("keeps partial impacts hidden while the complete scope is loading or failed", () => {

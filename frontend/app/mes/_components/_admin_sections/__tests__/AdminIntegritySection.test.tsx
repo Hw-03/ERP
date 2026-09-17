@@ -43,7 +43,7 @@ describe("AdminIntegritySection", () => {
     });
   });
 
-  it("문제 ID와 현재·기대값을 읽기 전용으로 표시한다", async () => {
+  it("[8.19-25] 문제 ID와 현재·기대값만 읽기 전용으로 표시한다", async () => {
     render(<AdminIntegritySection />);
 
     expect(await screen.findByText("취소된 작업의 업무 상태 잔존")).toBeInTheDocument();

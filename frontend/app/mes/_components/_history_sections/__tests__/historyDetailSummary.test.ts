@@ -109,8 +109,61 @@ describe("buildHistoryDetailSummary", () => {
     });
   });
 
+  it("8.15-08/8.17-09/8.22-10/8.23-10/8.24-13 keeps requester, approver, and executor as separate roles", () => {
+    const summary = buildHistoryDetailSummary([makeLog({
+      requester_name: "요청자 김",
+      approver_name: "승인자 박",
+      produced_by: "실행자 이",
+      requested_at: "2026-07-10T01:00:00Z",
+      approved_at: "2026-07-10T01:03:00Z",
+      created_at: "2026-07-10T01:05:00Z",
+    })], null);
+
+    expect(summary.participants).toEqual([
+      { label: "요청자", name: "요청자 김", at: "2026-07-10T01:00:00Z" },
+      { label: "승인자", name: "승인자 박", at: "2026-07-10T01:03:00Z" },
+      { label: "실행자", name: "실행자 이", at: "2026-07-10T01:05:00Z" },
+    ]);
+  });
+
+  it("compacts duplicate audit roles when one person requested, approved, and executed", () => {
+    const summary = buildHistoryDetailSummary([makeLog({
+      requester_name: "관리자",
+      approver_name: "관리자",
+      produced_by: "관리자",
+      requested_at: "2026-07-10T01:00:00Z",
+      approved_at: "2026-07-10T01:03:00Z",
+      created_at: "2026-07-10T01:05:00Z",
+    })], null);
+
+    expect(summary.participants).toEqual([
+      { label: "요청자", name: "관리자", at: "2026-07-10T01:05:00Z" },
+    ]);
+  });
+
+  it("keeps different people separate while compacting repeated approval and execution", () => {
+    const summary = buildHistoryDetailSummary([makeLog({
+      requester_name: "김현우",
+      approver_name: "관리자",
+      produced_by: "관리자",
+      requested_at: "2026-07-10T01:00:00Z",
+      approved_at: "2026-07-10T01:03:00Z",
+      created_at: "2026-07-10T01:05:00Z",
+    })], null);
+
+    expect(summary.participants).toEqual([
+      { label: "요청자", name: "김현우", at: "2026-07-10T01:00:00Z" },
+      { label: "승인자", name: "관리자", at: "2026-07-10T01:05:00Z" },
+    ]);
+  });
+
   it("keeps the raw processing snapshots separate from request-order stock", () => {
     const log = Object.assign(makeLog({
+      department: null,
+      inventory_effect: [
+        { scope: "warehouse", delta: -44 },
+        { scope: "location", department: "튜브", status: "PRODUCTION", delta: 44 },
+      ],
       warehouse_qty_before: 94,
       warehouse_qty_after: 50,
       department_qty_before: 30,
@@ -133,6 +186,7 @@ describe("buildHistoryDetailSummary", () => {
       actualStock: {
         warehouseBefore: 94,
         warehouseAfter: 50,
+        departmentName: "튜브",
         departmentBefore: 30,
         departmentAfter: 30,
         requestedAt: "2026-07-10T01:00:00Z",

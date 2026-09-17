@@ -75,7 +75,7 @@ test.describe.serial("입출고 V2 — 창고 수량보정", () => {
     await advanceToQuantityStep(page);
 
     await expect(page.getByText("보정 입고", { exact: true }).filter({ visible: true })).toBeVisible();
-    const before = await stockValue(page, "현재 창고");
+    const before = await stockValue(page, "창고 수량");
     const after = await stockValue(page, "실행 후");
     expect(after - before).toBe(1);
 

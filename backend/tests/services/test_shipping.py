@@ -660,6 +660,7 @@ def test_match_bom_lists_all_exact_pf_candidates_without_auto_selection(db_sessi
 
 
 def test_request_finalization_uses_only_the_explicitly_selected_pf_candidate(db_session, make_item, make_bom):
+    """8.12-05: 최종 PF를 고르면 요청 구성도 그 PF에 연결된 PA를 유지한다."""
     base_component = make_item(name="Base component", process_type_code="AF", model_symbol="4", serial_no=1)
     requested_component = make_item(name="Requested component", process_type_code="AF", model_symbol="4", serial_no=2)
     base_pa = make_item(name="Vector PA", process_type_code="PA", model_symbol="4", serial_no=3)
@@ -703,14 +704,45 @@ def test_request_finalization_uses_only_the_explicitly_selected_pf_candidate(db_
     assert reused.finalization_mode.value == "REUSE_CANDIDATE"
     assert reused.final_pf_item_id == candidate_b_pf.item_id
     assert reused.final_pa_item_id == candidate_b_pa.item_id
+    reused_pf_item_ids = {
+        line.child_item_id
+        for line in reused.bom_lines
+        if line.parent_stage == "PF" and line.included
+    }
+    assert candidate_b_pa.item_id in reused_pf_item_ids
+    assert base_pa.item_id not in reused_pf_item_ids
     assert created.finalization_mode.value == "CREATE_NEW"
     assert created.final_pf_item_id not in {candidate_a_pf.item_id, candidate_b_pf.item_id}
+    assert created.final_pa_item_id in {
+        line.child_item_id
+        for line in created.bom_lines
+        if line.parent_stage == "PF" and line.included
+    }
+
+    updated = shipping_svc.update_request(
+        db_session,
+        reused.request_id,
+        {
+            "finalization_mode": "REUSE_CANDIDATE",
+            "reuse_pf_item_id": candidate_a_pf.item_id,
+        },
+        actor=_shipping_actor(db_session),
+    )
+    updated_pf_item_ids = {
+        line.child_item_id
+        for line in updated.bom_lines
+        if line.parent_stage == "PF" and line.included
+    }
+    assert updated.final_pa_item_id == candidate_a_pa.item_id
+    assert candidate_a_pa.item_id in updated_pf_item_ids
+    assert candidate_b_pa.item_id not in updated_pf_item_ids
 
 
 
 def test_component_change_then_prepare_and_pickup_reserves_companions(
     db_session, make_item, make_bom, make_location
 ):
+    """8.12-05/12/13/16: 선택 품목·예약·실행자·정/역거래를 전체 주기에서 보존한다."""
     af = make_item(name="AF body", process_type_code="AF", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=1)
     cable = make_item(name="Cable", process_type_code="PR", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=2)
     carton = make_item(name="Carton", process_type_code="PR", warehouse_qty=Decimal("0"), model_symbol="4", serial_no=3)
@@ -866,6 +898,8 @@ def test_component_change_then_prepare_and_pickup_reserves_companions(
     )
     db_session.refresh(req)
     assert req.status == ShippingRequestStatusEnum.PREPARED
+    assert req.final_pa_item_id == final_pa.item_id
+    assert req.final_pf_item_id == final_pf.item_id
     assert _location_qty(db_session, final_pf, DepartmentEnum.SHIPPING) == 1
     assert _location_qty(db_session, carton, DepartmentEnum.SHIPPING) == 5
     assert {
@@ -874,6 +908,16 @@ def test_component_change_then_prepare_and_pickup_reserves_companions(
         .filter(ShippingAllocation.request_id == req.request_id)
         .all()
     } == {"RESERVED"}
+    pickup_and_reverse_logs = (
+        db_session.query(TransactionLog)
+        .filter(
+            TransactionLog.shipping_request_id == req.request_id,
+            TransactionLog.shipping_phase == "PICKUP",
+        )
+        .all()
+    )
+    assert any(log.quantity_change < 0 for log in pickup_and_reverse_logs)
+    assert any(log.quantity_change > 0 for log in pickup_and_reverse_logs)
 
 
 def test_shipping_bom_stock_exempt_child_is_skipped_in_prepare_and_component_change(

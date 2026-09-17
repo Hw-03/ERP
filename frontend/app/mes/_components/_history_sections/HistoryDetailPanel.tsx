@@ -25,7 +25,7 @@ import {
 } from "./historyTableHelpers";
 import { HistoryDetailEditHistory } from "./HistoryDetailEditHistory";
 import { toInventoryEffectRows } from "./historyInventoryEffect";
-import { formatDefectReason, getHistoryRowPresentation } from "./historyPresentation";
+import { getHistoryRowPresentation } from "./historyPresentation";
 import { buildHistoryDetailSummary } from "./historyDetailSummary";
 import { HistoryKeyPointSummary } from "./HistoryKeyPointSummary";
 import {
@@ -297,7 +297,11 @@ export function HistoryDetailPanel({
       {!isDesktopCancellationOpen && (
         <>
           <HistoryDetailReason log={selected} />
-          <HistoryDetailMemo notes={selected.notes} transactionType={selected.transaction_type} />
+          <HistoryDetailMemo
+            notes={selected.notes}
+            reasonMemo={selected.reason_memo}
+            transactionType={selected.transaction_type}
+          />
         </>
       )}
 
@@ -612,11 +616,11 @@ function HistoryDetailMetaStrip({
  */
 
 function HistoryDetailReason({ log }: { log: TransactionLog }) {
-  const reason = formatDefectReason(log);
+  const reason = log.reason_category?.trim();
   if (!reason) return null;
   return (
     <div className="rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-      <div className="mb-2 text-xs font-bold" style={{ color: LEGACY_COLORS.yellow }}>사유</div>
+      <div className="mb-2 text-xs font-bold" style={{ color: LEGACY_COLORS.yellow }}>불량 사유</div>
       <div className="whitespace-pre-wrap break-words text-sm leading-relaxed" style={{ color: LEGACY_COLORS.text }}>
         {reason}
       </div>
@@ -625,12 +629,15 @@ function HistoryDetailReason({ log }: { log: TransactionLog }) {
 }
 export function HistoryDetailMemo({
   notes,
+  reasonMemo,
   transactionType,
 }: {
   notes: string | null | undefined;
+  reasonMemo?: string | null;
   transactionType?: TransactionLog["transaction_type"];
 }) {
-  const { userMemo } = parseTransactionNotes(notes, transactionType);
+  const parsedMemo = parseTransactionNotes(notes, transactionType).userMemo;
+  const userMemo = reasonMemo?.trim() || parsedMemo;
   if (!userMemo) return null;
   return (
     <div

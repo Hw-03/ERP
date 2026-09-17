@@ -75,10 +75,13 @@ vi.mock("@/lib/queries/useTransactionsQuery", () => ({
 }));
 
 vi.mock("../_history_sections/HistoryStatsBar", () => ({
-  HistoryStatsBar: ({ baseline, currentCount, loading }: any) => (
+  HistoryStatsBar: ({ baseline, currentSummary, currentCount, loading }: any) => (
     <div
       data-testid="history-stats-state"
       data-baseline={baseline?.total ?? ""}
+      data-current-warehouse={currentSummary?.warehouseCount ?? ""}
+      data-current-dept={currentSummary?.deptCount ?? ""}
+      data-current-adjust={currentSummary?.adjustCount ?? ""}
       data-current={currentCount ?? ""}
       data-loading={loading ? "yes" : "no"}
     />
@@ -422,6 +425,37 @@ describe("DesktopHistoryView history state", () => {
     render(<DesktopHistoryView />);
     expect(screen.getByTestId("history-stats-state")).toHaveAttribute("data-current", "796");
     expect(screen.getByTestId("history-stats-state")).toHaveAttribute("data-loading", "no");
+  });
+
+  it("8.3-03 sends the filtered summary to every KPI card", () => {
+    const filteredSummary = {
+      total: 9,
+      warehouseCount: 1,
+      deptCount: 7,
+      adjustCount: 1,
+      departmentCounts: {},
+    };
+    const periodSummary = {
+      total: 437,
+      warehouseCount: 67,
+      deptCount: 336,
+      adjustCount: 12,
+      departmentCounts: {},
+    };
+    testState.summaryQuery.mockImplementation((params: Record<string, unknown>) => ({
+      data: Object.hasOwn(params, "operationKeys") ? filteredSummary : periodSummary,
+      isLoading: false,
+      refetch: vi.fn(),
+    }));
+
+    render(<DesktopHistoryView />);
+
+    const stats = screen.getByTestId("history-stats-state");
+    expect(stats).toHaveAttribute("data-current", "9");
+    expect(stats).toHaveAttribute("data-baseline", "437");
+    expect(stats).toHaveAttribute("data-current-warehouse", "1");
+    expect(stats).toHaveAttribute("data-current-dept", "7");
+    expect(stats).toHaveAttribute("data-current-adjust", "1");
   });
 
   it("keeps the history group query independent from a changing summary total", async () => {

@@ -116,7 +116,7 @@ def test_repair_issue_dry_run_does_not_mutate_or_audit(db_session, make_item):
     assert db_session.query(AdminAuditLog).count() == 0
 
 
-def test_repair_issue_applies_one_problem_and_writes_audit(db_session, make_item):
+def test_8_19_25_repair_issue_applies_one_problem_and_writes_audit(db_session, make_item):
     request, issue = _workflow_residue(db_session, make_item)
 
     report = repair_inventory_integrity_issue(
@@ -204,7 +204,7 @@ def test_activation_dry_run_then_sets_ledger_now_and_weekly_next_monday(db_sessi
     )
 
 
-def test_activation_seeds_existing_defect_opening_balance_once(
+def test_8_19_25_activation_seeds_existing_defect_opening_balance_once(
     db_session,
     make_item,
 ):

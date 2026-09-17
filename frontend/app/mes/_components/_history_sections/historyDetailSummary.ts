@@ -1,5 +1,6 @@
 import type { TransactionLog } from "@/lib/api";
 import type { IoBatch, IoLine } from "@/lib/api/types/io";
+import { normalizeDepartment } from "@/lib/mes/department";
 import {
   toInventoryEffectRows,
   type InventoryEffectRow,
@@ -30,6 +31,12 @@ export type HistoryDetailImpact = InventoryEffectRow & {
   mismatchLabel: string | null;
 };
 
+export type HistoryDetailActor = {
+  label: string;
+  name: string;
+  at: string;
+};
+
 type HistoryConversionEndpoint = {
   itemId: string;
   itemName: string;
@@ -54,9 +61,11 @@ export type HistoryDetailSummary = {
     name: string;
     at: string;
   };
+  participants?: HistoryDetailActor[];
   actualStock: {
     warehouseBefore: number;
     warehouseAfter: number;
+    departmentName: string;
     departmentBefore: number;
     departmentAfter: number;
     requestedAt: string;
@@ -80,11 +89,29 @@ function mergeEffects(effects: InventoryEffectRow[]): InventoryEffectRow[] {
       continue;
     }
     const delta = existing.delta + effect.delta;
-    byIdentity.set(effect.key, {
+    const merged = {
       ...existing,
       delta,
       deltaLabel: delta > 0 ? `+${delta}` : String(delta),
-    });
+    };
+    delete merged.quantityBefore;
+    delete merged.quantityAfter;
+    if (
+      effect.quantityAfter != null
+      && existing.quantityBefore != null
+      && effect.quantityAfter === existing.quantityBefore
+    ) {
+      merged.quantityBefore = effect.quantityBefore;
+      merged.quantityAfter = existing.quantityAfter;
+    } else if (
+      existing.quantityAfter != null
+      && effect.quantityBefore != null
+      && existing.quantityAfter === effect.quantityBefore
+    ) {
+      merged.quantityBefore = existing.quantityBefore;
+      merged.quantityAfter = effect.quantityAfter;
+    }
+    byIdentity.set(effect.key, merged);
   }
   return Array.from(byIdentity.values()).filter((effect) => effect.delta !== 0);
 }
@@ -284,14 +311,36 @@ function getActualProcessingStock(log: TransactionLog): HistoryDetailSummary["ac
     || log.department_qty_before == null
     || log.department_qty_after == null
   ) return null;
+  const effectDepartment = log.inventory_effect?.find(
+    (effect) => effect.scope === "location"
+      && effect.status !== "DEFECTIVE"
+      && effect.department?.trim(),
+  )?.department;
   return {
     warehouseBefore: log.warehouse_qty_before,
     warehouseAfter: log.warehouse_qty_after,
+    departmentName: normalizeDepartment(log.department?.trim() || effectDepartment),
     departmentBefore: log.department_qty_before,
     departmentAfter: log.department_qty_after,
     requestedAt: log.requested_at ?? log.created_at,
     processedAt: log.created_at,
   };
+}
+
+function compactParticipants(participants: HistoryDetailActor[]): HistoryDetailActor[] {
+  const people = new Map<string, HistoryDetailActor>();
+
+  for (const participant of participants) {
+    const existing = people.get(participant.name);
+    if (!existing) {
+      people.set(participant.name, { ...participant });
+      continue;
+    }
+
+    existing.at = participant.at;
+  }
+
+  return Array.from(people.values());
 }
 
 export function buildHistoryDetailSummary(
@@ -303,6 +352,38 @@ export function buildHistoryDetailSummary(
   const reworkFlow = getLegacyReworkFlow(logs);
   const isCancellationOperation = primary.operation_kind === "CANCELLATION"
     || primary.operation_effective_status === "cancellation";
+  const requester: HistoryDetailSummary["requester"] = {
+    label: isCancellationOperation
+      ? "취소자"
+      : primary.transaction_type === "SHIP" ? "담당자" : "요청자",
+    name: isCancellationOperation
+      ? primary.executor_name?.trim() || primary.produced_by?.trim() || primary.requester_name?.trim() || presentation.people.requester
+      : primary.transaction_type === "SHIP"
+        ? presentation.people.requester
+        : batch?.requester_name?.trim() || presentation.people.requester,
+    at: isCancellationOperation
+      ? primary.requested_at ?? primary.created_at
+      : batch?.submitted_at ?? primary.requested_at ?? primary.created_at,
+  };
+  const participants: HistoryDetailActor[] = [requester];
+  const approverName = isCancellationOperation
+    ? ""
+    : batch?.approver_name?.trim() || primary.approver_name?.trim() || "";
+  if (approverName) {
+    participants.push({
+      label: "승인자",
+      name: approverName,
+      at: primary.approved_at ?? primary.created_at,
+    });
+  }
+  const executorName = primary.executor_name?.trim() || primary.produced_by?.trim() || "";
+  if (executorName) {
+    participants.push({
+      label: "실행자",
+      name: executorName,
+      at: primary.created_at,
+    });
+  }
 
   return {
     target: {
@@ -314,19 +395,8 @@ export function buildHistoryDetailSummary(
     status: getStatus(logs, batch),
     impactGroups: buildImpactGroups(logs, batch),
     conversion: getItemConversion(logs),
-    requester: {
-      label: isCancellationOperation
-        ? "취소자"
-        : primary.transaction_type === "SHIP" ? "담당자" : "요청자",
-      name: isCancellationOperation
-        ? primary.produced_by?.trim() || primary.requester_name?.trim() || presentation.people.requester
-        : primary.transaction_type === "SHIP"
-          ? presentation.people.requester
-          : batch?.requester_name?.trim() || presentation.people.requester,
-      at: isCancellationOperation
-        ? primary.requested_at ?? primary.created_at
-        : batch?.submitted_at ?? primary.requested_at ?? primary.created_at,
-    },
+    requester,
+    participants: compactParticipants(participants),
     actualStock: getActualProcessingStock(primary),
     flow: reworkFlow ?? (presentation.flow.label
       ? {
