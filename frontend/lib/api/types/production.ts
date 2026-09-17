@@ -48,6 +48,8 @@ export interface TransactionLog {
   transfer_qty: number | null;
   reference_no: string | null;
   produced_by: string | null;
+  /** 재고 효과를 실제로 실행한 사람. 요청자·승인자와 동일할 수도 있다. */
+  executor_name?: string | null;
   requester_name: string | null;
   /** 승인자(요청을 수락한 사람). 직접 처리 시 = 요청자. */
   approver_name: string | null;

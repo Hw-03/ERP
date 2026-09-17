@@ -8,7 +8,9 @@ import { tint } from "@/lib/mes/colorUtils";
 export interface HistoryStatsBarProps {
   /** 기간만 필터한 전체 — 박스 숫자/Y(분모). 필터와 무관하게 고정. */
   baseline: TransactionSummary | null;
-  /** 현재 필터(거래종류/검색/부서/모델)가 적용된 건수 — X(분자). */
+  /** 현재 필터(거래종류/검색/부서/모델)가 적용된 요약. */
+  currentSummary?: TransactionSummary | null;
+  /** 현재 필터가 적용된 건수 — X(분자). */
   currentCount: number | null;
   loading: boolean;
   /** PC 첫 진입에서는 최종 카드 구조를 유지하는 중립 블록을 사용한다. */
@@ -27,11 +29,13 @@ const NUM = (loading: boolean, n: number | null | undefined) =>
  */
 export function HistoryStatsBar({
   baseline,
+  currentSummary,
   currentCount,
   loading,
   loadingDisplay = "ellipsis",
   periodLabel,
 }: HistoryStatsBarProps) {
+  const filtered = currentSummary ?? baseline;
   const countsMatch = currentCount != null && baseline?.total != null && currentCount === baseline.total;
   return (
     <section className="card desktop-flat-surface" style={{ paddingTop: 16, paddingBottom: 16 }}>
@@ -64,7 +68,7 @@ export function HistoryStatsBar({
         <StatBox
           icon={<Building2 className="h-3.5 w-3.5" />}
           label="창고"
-          value={baseline?.warehouseCount}
+          value={filtered?.warehouseCount}
           loading={loading}
           loadingDisplay={loadingDisplay}
           sub="창고 재고가 움직인 작업"
@@ -73,16 +77,16 @@ export function HistoryStatsBar({
         <StatBox
           icon={<Layers className="h-3.5 w-3.5" />}
           label="부서"
-          value={baseline?.deptCount}
+          value={filtered?.deptCount}
           loading={loading}
           loadingDisplay={loadingDisplay}
-          sub="부서 안에서만 움직인 작업"
+          sub="부서 재고가 움직인 작업"
           color={LEGACY_COLORS.cyan}
         />
         <StatBox
           icon={<Sliders className="h-3.5 w-3.5" />}
           label="수량조정"
-          value={baseline?.adjustCount}
+          value={filtered?.adjustCount}
           loading={loading}
           loadingDisplay={loadingDisplay}
           sub="재고 수량을 직접 조정한 거래"

@@ -35,7 +35,7 @@ def test_repair_command_requires_problem_id_and_approver():
     assert args.apply is False
 
 
-def test_apply_accepts_only_existing_validated_backup(tmp_path: Path):
+def test_8_19_25_apply_accepts_only_existing_validated_backup(tmp_path: Path):
     database = tmp_path / "mes.db"
     database.write_bytes(b"database")
     backup = tmp_path / "backup.db"
@@ -51,7 +51,7 @@ def test_apply_accepts_only_existing_validated_backup(tmp_path: Path):
     assert resolved == backup.resolve()
 
 
-def test_apply_rejects_missing_validated_backup(tmp_path: Path):
+def test_8_19_25_apply_rejects_missing_validated_backup(tmp_path: Path):
     with pytest.raises(CliSafetyError, match="백업"):
         ensure_apply_backup(
             database_url=f"sqlite:///{(tmp_path / 'mes.db').as_posix()}",

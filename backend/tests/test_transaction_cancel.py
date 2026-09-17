@@ -153,6 +153,105 @@ def test_cancel_quarantine_restores_warehouse_and_defective(client, db_session, 
     assert record.remaining_quantity == Decimal("0")
 
 
+def test_8_7_05_cancel_direct_scrap_restores_only_original_normal_stock(
+    client,
+    db_session,
+    make_item,
+    make_location,
+):
+    """[8.7-05] 즉시 폐기와 취소는 선택 정상 위치만 정확히 왕복한다."""
+    item = make_item(
+        name="즉시 폐기 취소품",
+        process_type_code="AR",
+        warehouse_qty=Decimal("7"),
+        pending=Decimal("2"),
+    )
+    production = make_location(
+        item.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        status=LocationStatusEnum.PRODUCTION,
+        quantity=Decimal("5"),
+    )
+    defective = make_location(
+        item.item_id,
+        department=DepartmentEnum.ASSEMBLY,
+        status=LocationStatusEnum.DEFECTIVE,
+        quantity=Decimal("25"),
+    )
+    other_department = make_location(
+        item.item_id,
+        department=DepartmentEnum.TUNING,
+        status=LocationStatusEnum.PRODUCTION,
+        quantity=Decimal("3"),
+    )
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    inventory.quantity = Decimal("40")
+    actor = _make_employee(db_session, code="DIRECT-SCRAP-CANCEL")
+    db_session.commit()
+
+    submitted = client.post(
+        "/api/stock-requests",
+        json={
+            "requester_employee_id": str(actor.employee_id),
+            "request_type": "scrap_normal",
+            "reason_category": "폐기",
+            "reason_memo": "즉시 폐기 회귀",
+            "lines": [
+                {
+                    "item_id": str(item.item_id),
+                    "quantity": "1",
+                    "from_bucket": "production",
+                    "from_department": DepartmentEnum.ASSEMBLY.value,
+                    "to_bucket": "none",
+                }
+            ],
+        },
+    )
+
+    assert submitted.status_code == 201, submitted.text
+    assert submitted.json()["status"] == "completed"
+    db_session.expire_all()
+    assert db_session.get(InventoryLocation, production.location_id).quantity == Decimal("4")
+    assert db_session.get(InventoryLocation, defective.location_id).quantity == Decimal("25")
+    assert db_session.get(InventoryLocation, other_department.location_id).quantity == Decimal("3")
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("7")
+    assert inventory.pending_quantity == Decimal("2")
+    assert inventory.quantity == Decimal("39")
+    disposal_logs = (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.transaction_type == TransactionTypeEnum.DEFECT_SCRAP)
+        .all()
+    )
+    assert len(disposal_logs) == 1
+    original = disposal_logs[0]
+
+    cancelled = _cancel(
+        client,
+        original.log_id,
+        code=actor.employee_code,
+        reason="즉시 폐기 입력 취소",
+    )
+
+    assert cancelled.status_code == 200, cancelled.text
+    db_session.expire_all()
+    assert db_session.get(InventoryLocation, production.location_id).quantity == Decimal("5")
+    assert db_session.get(InventoryLocation, defective.location_id).quantity == Decimal("25")
+    assert db_session.get(InventoryLocation, other_department.location_id).quantity == Decimal("3")
+    inventory = db_session.query(Inventory).filter(Inventory.item_id == item.item_id).one()
+    assert inventory.warehouse_qty == Decimal("7")
+    assert inventory.pending_quantity == Decimal("2")
+    assert inventory.quantity == Decimal("40")
+    db_session.refresh(original)
+    assert original.cancelled is True
+    assert original.cancel_reason == "즉시 폐기 입력 취소"
+    assert (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.transaction_type == TransactionTypeEnum.DEFECT_SCRAP)
+        .count()
+    ) == 1
+
+
 def test_cancel_direct_defect_outgoing_restores_selected_record(
     db_session,
     make_item,

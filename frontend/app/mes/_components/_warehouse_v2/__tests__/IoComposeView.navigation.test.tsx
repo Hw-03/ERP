@@ -286,6 +286,57 @@ describe("IoComposeView navigation chrome", () => {
     expect(within(nav).getByText("입고 · 튜브")).toBeInTheDocument();
   });
 
+  it("8.22-07: 커스텀 BOM 단계 요약은 상위 참고 품목을 빼고 실제 하위 효과만 센다", async () => {
+    render(
+      <IoComposeView
+        globalSearch=""
+        operator={{ ...operator, department_role: "primary" }}
+        employees={[]}
+        items={[]}
+        productModels={[]}
+        setItems={() => {}}
+        onStatusChange={() => {}}
+        restoreStep={5}
+        restoreDraft={{
+          batch_id: "custom-bom-count",
+          work_type: "process",
+          sub_type: "produce",
+          from_department: null,
+          to_department: "조립",
+          reference_no: null,
+          notes: "커스텀 BOM",
+          bundles: [{
+            bundle_id: "custom-bundle",
+            source_kind: "bom_parent",
+            title: "커스텀 상위",
+            source_item_id: "parent",
+            source_mes_code: "PARENT",
+            quantity: 1,
+            expanded_level: 1,
+            lines: [
+              {
+                line_id: "parent-line", item_id: "parent", item_name: "커스텀 상위", mes_code: "PARENT", unit: "EA",
+                direction: "in", from_bucket: "none", from_department: null, to_bucket: "production", to_department: "조립",
+                quantity: 1, bom_expected: null, included: true, origin: "direct", edited: false, has_children: true,
+                shortage: 0, exclusion_note: null,
+              },
+              {
+                line_id: "child-line", item_id: "child", item_name: "선택 하위", mes_code: "CHILD", unit: "EA",
+                direction: "out", from_bucket: "production", from_department: "조립", to_bucket: "none", to_department: null,
+                quantity: 2, bom_expected: 1, included: true, origin: "bom_auto", edited: true, has_children: false,
+                shortage: 0, exclusion_note: null,
+              },
+            ],
+          }],
+        } as never}
+      />,
+    );
+
+    const nav = await screen.findByTestId("io-step-nav");
+    expect(within(nav).getByText("반영 1개 · 제외 0개")).toBeInTheDocument();
+    expect(within(nav).queryByText("반영 2개 · 제외 0개")).not.toBeInTheDocument();
+  });
+
   it("최종 확인의 메모 검증 오류를 상태 대상 알림으로 표시한다", async () => {
     render(
       <IoComposeView

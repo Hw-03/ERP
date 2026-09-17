@@ -32,12 +32,12 @@ from app.utils.search import build_normalized_search_filter
 # /transactions/summary 카테고리 — 프론트 historyShared.ts 의 scope 멤버와 일치.
 _SUMMARY_WAREHOUSE_TYPES = [
     TransactionTypeEnum.RECEIVE,
-    TransactionTypeEnum.SHIP,
     TransactionTypeEnum.TRANSFER_TO_PROD,
     TransactionTypeEnum.TRANSFER_TO_WH,
-    TransactionTypeEnum.INTERNAL_USE,
 ]
 _SUMMARY_DEPT_TYPES = [
+    TransactionTypeEnum.SHIP,
+    TransactionTypeEnum.INTERNAL_USE,
     TransactionTypeEnum.TRANSFER_DEPT,
     TransactionTypeEnum.BACKFLUSH,
     TransactionTypeEnum.PRODUCE,
@@ -45,6 +45,7 @@ _SUMMARY_DEPT_TYPES = [
 ]
 _SUMMARY_ADJUST_TYPES = [TransactionTypeEnum.ADJUST]
 _WAREHOUSE_ADJUST_SUBTYPES = {"warehouse_adjust_in", "warehouse_adjust_out"}
+_DEPARTMENT_IO_SUBTYPES = {"adjust_in", "adjust_out"}
 _SUMMARY_DEFECT_TYPES = [
     TransactionTypeEnum.MARK_DEFECTIVE,
     TransactionTypeEnum.UNMARK_DEFECTIVE,
@@ -528,8 +529,7 @@ def _batch_name_map(
     """operation_batch_id 집합 → _BatchInfo(이름+시각) 매핑.
 
     list_transactions 와 export(csv/xlsx) 가 공유 — 요청자/승인자명·시각을 동일 규칙으로 채운다.
-    요청자=결재자(자동결재/즉시처리)면 승인자 null, approved_at null(별도 승인 없음).
-    approved_at null 시 호출부에서 log.created_at fallback 적용.
+    자동 승인도 상세 감사 화면에서 역할을 구분할 수 있도록 승인자를 보존한다.
     """
     batch_map: dict[uuid.UUID, _BatchInfo] = {}
     if not batch_ids:
@@ -563,11 +563,10 @@ def _batch_name_map(
             .filter(StockRequest.request_id.in_(sr_ids))
             .all()
         ):
-            # 요청자와 결재자가 다른 경우만 별도 승인자로 인정.
-            if app_emp_id and app_emp_id != req_emp_id:
+            if app_emp_id:
                 sr_approver[sr_id] = app_name
                 sr_approved_at[sr_id] = app_at
-            elif dept_emp_id and dept_emp_id != req_emp_id:
+            elif dept_emp_id:
                 sr_approver[sr_id] = dept_name
                 sr_approved_at[sr_id] = dept_at
             else:
@@ -607,12 +606,11 @@ def _stock_request_info_map(
     for row in rows:
         approver_name = None
         approved_at = None
-        if row.approved_by_employee_id and row.approved_by_employee_id != row.requester_employee_id:
+        if row.approved_by_employee_id:
             approver_name = row.approved_by_name
             approved_at = row.approved_at
         elif (
             row.department_approved_by_employee_id
-            and row.department_approved_by_employee_id != row.requester_employee_id
         ):
             approver_name = row.department_approved_by_name
             approved_at = row.department_approved_at
@@ -669,6 +667,7 @@ def _to_log_response(
         department=log.department,
         reference_no=log.reference_no,
         produced_by=log.produced_by,
+        executor_name=operation.actor_name if operation else log.produced_by,
         producer_employee_id=log.producer_employee_id,
         requester_name=operation.actor_name if is_cancellation and operation else requester_name,
         approver_name=None if is_cancellation else approver_name,

@@ -3,7 +3,7 @@
 from typing import List, Optional
 import uuid
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.models import (
     RequestBucketEnum,
@@ -33,6 +33,19 @@ class StockRequestCreate(BaseModel):
     client_request_id: Optional[str] = Field(None, max_length=64)
     reason_category: Optional[str] = Field(None, max_length=32)
     reason_memo: Optional[str] = None
+
+    @model_validator(mode="after")
+    def require_direct_defect_reason(self) -> "StockRequestCreate":
+        """즉시 불량 처리는 감사 가능한 사유 하나 이상을 요구한다."""
+        reason_required = {
+            StockRequestTypeEnum.SCRAP_NORMAL,
+            StockRequestTypeEnum.RETURN_NORMAL,
+            StockRequestTypeEnum.REWORK_NORMAL,
+        }
+        has_reason = bool((self.reason_category or "").strip() or (self.reason_memo or "").strip())
+        if self.request_type in reason_required and not has_reason:
+            raise ValueError("사유 카테고리 또는 메모 중 하나를 입력하세요.")
+        return self
 
 
 class StockRequestDraftUpsert(BaseModel):

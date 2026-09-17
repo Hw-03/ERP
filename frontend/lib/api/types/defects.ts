@@ -62,10 +62,22 @@ export interface QuarantinePayload {
   source_dept?: string;
   target_dept: string;
   reason_category?: string | null;
-  reason_memo: string;
+  reason_memo?: string | null;
   actor_employee_id: string;
   client_request_id?: string;
   management_category?: DefectManagementCategory;
+}
+
+export interface BulkQuarantinePayload {
+  actor_employee_id: string;
+  client_request_id?: string;
+  lines: Array<Omit<QuarantinePayload, "actor_employee_id" | "client_request_id">>;
+}
+
+export interface BulkQuarantineResult {
+  processed_lines: number;
+  total_quantity: number;
+  message: string;
 }
 
 export interface UnquarantinePayload {

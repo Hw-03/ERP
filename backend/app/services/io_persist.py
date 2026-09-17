@@ -578,7 +578,10 @@ def _persist_batch(
         to_department=payload.to_department,
         requires_approval=(
             payload.sub_type in APPROVAL_SUB_TYPES
-            or has_included_manual_line(payload.bundles)
+            or (
+                payload.work_type == "process"
+                and has_included_manual_line(payload.bundles)
+            )
         ),
         reference_no=payload.reference_no,
         notes=payload.notes,

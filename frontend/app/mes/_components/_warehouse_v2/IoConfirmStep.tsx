@@ -20,7 +20,8 @@ import {
   isBomForced,
   isCustomProcessBomBundle,
   isWarehouseAdjustSubType,
-  processBomEffectLine,
+  inventoryEffectLines,
+  inventoryMethodLabel,
   requiresDepartmentApprovalMemo,
   subTypeLabel,
   type ApprovalKind,
@@ -48,6 +49,7 @@ interface Props {
   submitting: boolean;
   saving: boolean;
   approvalKind: ApprovalKind;
+  autoApprove?: boolean;
   onNotesChange: (value: string) => void;
   onValidationError?: (message: string) => void;
   onSubmit: () => void;
@@ -90,6 +92,15 @@ const MIXED_SOURCE_APPROVAL_META = {
   accentColor: "yellow" as const,
 };
 
+const AUTO_APPROVAL_META = {
+  summaryLabel: "자동 승인 후 즉시 반영",
+  badgeText: "자동 승인 후 즉시 반영",
+  submitText: (n: number) => `자동 승인 후 즉시 반영 ${n}건`,
+  accentColor: "green" as const,
+};
+
+const MEMO_REQUIRED_MESSAGE = "메모를 입력해야 작업을 진행할 수 있습니다.";
+
 function directionAccent(subType: IoSubType): string {
   if (
     subType === "defect_quarantine" ||
@@ -110,10 +121,15 @@ function directionAccent(subType: IoSubType): string {
 function confirmCopy(
   subType: IoSubType,
   approvalKind: ApprovalKind,
+  autoApprove: boolean,
 ): { title: string; tone: ConfirmTone; confirmLabel: string } {
-  const needsApproval = approvalKind !== "none";
+  const needsApproval = approvalKind !== "none" && !autoApprove;
   const verb = needsApproval ? "요청하시겠습니까?" : "진행하시겠습니까?";
-  const confirmLabel = needsApproval ? "결재 요청" : "즉시 반영";
+  const confirmLabel = needsApproval
+    ? "결재 요청"
+    : autoApprove
+      ? "자동 승인 후 즉시 반영"
+      : "즉시 반영";
   if (subType === "defect_quarantine") {
     return { title: `불량 격리를 ${verb}`, tone: "danger", confirmLabel };
   }
@@ -184,6 +200,7 @@ export function IoConfirmStep({
   submitting,
   saving,
   approvalKind,
+  autoApprove = false,
   onNotesChange,
   onValidationError,
   onSubmit,
@@ -192,10 +209,10 @@ export function IoConfirmStep({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [memoValidationAttempted, setMemoValidationAttempted] = useState(false);
   const memoInputRef = useRef<HTMLInputElement>(null);
-  const isApproval = approvalKind !== "none";
-  const copy = confirmCopy(subType, approvalKind);
+  const isApproval = approvalKind !== "none" && !autoApprove;
+  const copy = confirmCopy(subType, approvalKind, autoApprove);
   const headerLabel = workType === "process"
-    ? (deptIoDisplayLabel(subType) ?? subTypeLabel(subType))
+    ? (deptIoDisplayLabel(subType) ?? subTypeLabel(subType)).replace(/ · (BOM|낱개)$/, "")
     : subTypeLabel(subType);
   const allLines = bundles.flatMap((bundle) => bundle.lines);
   const includedLines = allLines.filter((line) => line.included);
@@ -206,30 +223,30 @@ export function IoConfirmStep({
       line.from_bucket === "production" ||
       (line.direction === "in" && line.to_bucket === "production"),
     );
-  const meta = internalUseHasWarehouse && internalUseHasDepartment
+  const meta = autoApprove
+    ? AUTO_APPROVAL_META
+    : internalUseHasWarehouse && internalUseHasDepartment
     ? MIXED_SOURCE_APPROVAL_META
     : internalUseHasDepartment
       ? APPROVAL_META.department
       : APPROVAL_META[approvalKind];
   // BOM 부모 라인(생산 결과품 등)은 묶음 카드 헤더에서 이미 표시되므로 표시 라인 목록에선 숨긴다.
   const bomParentLineIds = new Set<string>();
-  const effectLineById = new Map<string, IoLine>();
   for (const b of bundles) {
     for (const l of b.lines) {
-      const effectLine = processBomEffectLine(subType, b, l);
-      if (effectLine) effectLineById.set(l.line_id, effectLine);
       if (b.source_kind === "bom_parent" && l.origin === "direct") {
         bomParentLineIds.add(l.line_id);
       }
     }
   }
-  const effectIncludedLines = Array.from(effectLineById.values());
-  const visibleIncludedLines = includedLines.filter(
-    (line) => !bomParentLineIds.has(line.line_id),
+  const effectIncludedLines = inventoryEffectLines(subType, bundles);
+  const effectLineById = new Map(
+    effectIncludedLines.map((line) => [line.line_id, line]),
   );
-  const headerSummary = subType === "internal_use_out" || isWarehouseAdjustSubType(subType)
-    ? `${headerLabel} · 반영 ${visibleIncludedLines.length}건`
-    : `${headerLabel} · BOM · 반영 ${visibleIncludedLines.length}건`;
+  const methodLabel = inventoryMethodLabel(subType, bundles);
+  const headerSummary = methodLabel
+    ? `${headerLabel} · ${methodLabel} · 반영 ${effectIncludedLines.length}건`
+    : `${headerLabel} · 반영 ${effectIncludedLines.length}건`;
   const displayBundles = bundles.filter((b) =>
     subType === "internal_use_out" && b.source_kind === "bom_parent"
       ? b.lines.some((line) => !bomParentLineIds.has(line.line_id))
@@ -371,7 +388,7 @@ export function IoConfirmStep({
             onClick={() => {
               if (memoMissing) {
                 setMemoValidationAttempted(true);
-                onValidationError?.("메모가 없어 부서 결재 요청을 진행할 수 없습니다.");
+                onValidationError?.(MEMO_REQUIRED_MESSAGE);
                 memoInputRef.current?.focus();
                 return;
               }
@@ -391,7 +408,11 @@ export function IoConfirmStep({
         open={confirmOpen}
         title={copy.title}
         tone={copy.tone}
-        cautionMessage="제출 후 수정·취소는 관리자의 승인이 필요합니다."
+        cautionMessage={autoApprove
+          ? "제출 즉시 승인되어 재고에 반영됩니다."
+          : isApproval
+            ? "승인이 완료되면 재고에 반영됩니다."
+            : "제출 즉시 재고에 반영됩니다."}
         confirmLabel={copy.confirmLabel}
         cancelLabel="취소"
         busy={submitting}
@@ -786,14 +807,14 @@ function Field({
         id="department-approval-memo"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
+        placeholder={invalid ? MEMO_REQUIRED_MESSAGE : placeholder}
         required={required}
         aria-required={required}
         aria-invalid={invalid || undefined}
         aria-describedby={invalid ? errorId : undefined}
         className={`h-14 rounded-[16px] border px-4 text-base font-bold outline-none focus-visible:ring-2 ${
           invalid
-            ? "focus-visible:ring-[var(--c-red)]"
+            ? "placeholder:font-bold placeholder:text-[var(--c-red)] focus-visible:ring-[var(--c-red)]"
             : "focus-visible:border-[var(--c-blue)] focus-visible:ring-[var(--c-blue)]"
         }`}
         style={{
@@ -803,8 +824,8 @@ function Field({
         }}
       />
       {invalid && (
-        <span id={errorId} className="text-sm font-bold" style={{ color: LEGACY_COLORS.red }}>
-          메모를 입력해야 부서 결재 요청을 할 수 있습니다.
+        <span id={errorId} className="sr-only">
+          {MEMO_REQUIRED_MESSAGE}
         </span>
       )}
     </label>

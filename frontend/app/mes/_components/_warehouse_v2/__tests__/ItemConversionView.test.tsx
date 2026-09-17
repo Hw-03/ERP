@@ -378,6 +378,71 @@ describe("ItemConversionView", () => {
     expect(screen.queryByText("소스·대상 다시 선택")).not.toBeInTheDocument();
   });
 
+  it("[8.16-12] 실행 불가 시 부족한 상위·하위 품목을 위치와 재고 계산까지 모두 표시한다", async () => {
+    apiMock.getItemConversionPreview.mockResolvedValue({
+      ...result,
+      executable: false,
+      blocking_reason: "추가 구성품 재고가 부족합니다.",
+      quantity: 2,
+      source_current_quantity: 3,
+      source_available_quantity: 1,
+      source_shortage_quantity: 1,
+      lines: [
+        {
+          ...result.lines[0],
+          item_id: "part-1",
+          item_name: "Cable Set",
+          mes_code: "3-PR-0001",
+          department: "출하",
+          current_quantity: 3,
+          available_quantity: 1,
+          total_delta: 3,
+          shortage_quantity: 2,
+        },
+        {
+          ...result.lines[0],
+          item_id: "part-2",
+          item_name: "Bracket",
+          mes_code: "3-PR-0002",
+          department: "조립",
+          current_quantity: 5,
+          available_quantity: 2,
+          total_delta: 4,
+          shortage_quantity: 2,
+        },
+      ],
+    });
+    render(
+      <ItemConversionWorkView
+        items={items}
+        loading={false}
+        requesterEmployeeId={requesterEmployeeId}
+        onComplete={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("item-conversion-source-option-af-1"));
+    fireEvent.click(screen.getByTestId("item-conversion-target-option-af-2"));
+    fireEvent.change(screen.getByTestId("item-conversion-quantity"), { target: { value: "2" } });
+    fireEvent.click(screen.getByTestId("item-conversion-next-button"));
+
+    const details = await screen.findByTestId("item-conversion-shortage-details");
+    expect(details).toHaveClass("w-full");
+    expect(details).toHaveTextContent("3-AF-0001");
+    expect(details).toHaveTextContent("assembly 현재고 3 EA");
+    expect(details).toHaveTextContent("3-PR-0001");
+    expect(details).toHaveTextContent("출하 현재고 3 EA");
+    expect(details).toHaveTextContent("3-PR-0002");
+    expect(details).toHaveTextContent("조립 현재고 5 EA");
+    expect(details).not.toHaveTextContent("예약");
+    expect(details).not.toHaveTextContent("가용");
+    expect(details).not.toHaveTextContent("필요");
+    expect(details).not.toHaveTextContent("부족 1 EA");
+    expect(screen.getAllByTestId("item-conversion-shortage-row")).toHaveLength(3);
+    expect(screen.queryByText("추가 구성품 재고가 부족합니다.")).not.toBeInTheDocument();
+    expect(screen.getByTestId("item-conversion-execute-next-button")).toBeDisabled();
+  });
+
   it("reports each forward transition to the item conversion history owner", async () => {
     const onHistoryStepChange = vi.fn();
     render(

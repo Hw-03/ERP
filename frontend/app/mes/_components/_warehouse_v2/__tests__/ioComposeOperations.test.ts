@@ -239,6 +239,44 @@ describe("ioComposeOperations", () => {
     expect(submitExisting).not.toHaveBeenCalled();
   });
 
+  it("8.25-08: 자동 승인 완료 응답은 결재 요청이 아니라 반영 완료로 표시한다", async () => {
+    const batchRef = { current: null as string | null };
+    const setResult = vi.fn();
+    const submitNew = vi.fn(async () => ({
+      batch_id: "auto-approved-batch",
+      requires_approval: false,
+      message: "자동 승인되어 입출고가 반영되었습니다",
+      stock_requests: [{
+        approval_kind: "warehouse",
+        approval_outcome: "approved",
+      }],
+    } as never));
+
+    await runCompositionSubmit(
+      "warehouse-approver",
+      "warehouse_to_dept",
+      "창고",
+      async () => {},
+      () => [{ bundle_id: "bundle-1", lines: [] } as never],
+      batchRef,
+      submitNew,
+      vi.fn(),
+      vi.fn(),
+      setResult,
+      vi.fn(),
+      vi.fn(),
+      vi.fn(),
+      async () => [],
+      vi.fn(),
+    );
+
+    expect(setResult).toHaveBeenCalledWith({
+      kind: "success",
+      title: "입출고 반영 완료",
+      message: "자동 승인되어 입출고가 반영되었습니다",
+    });
+  });
+
   it("내용 변경과 작업 교체 세대를 서로 다른 ref로 추적한다", () => {
     const { result, rerender, unmount } = renderHook(
       ({ value, draftId }) => useIoComposeOperationState([value], draftId, 0),

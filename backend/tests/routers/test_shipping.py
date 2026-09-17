@@ -252,7 +252,9 @@ def test_shipping_request_api_full_pc_workflow(client, db_session, make_item, ma
     assert create.json()["status"] == ShippingRequestStatusEnum.PREPARING.value
     assert create.json()["request_quantity"] == 2
     assert create.json()["final_pa_item_name"] == "Base PF with Pouch PA"
+    assert create.json()["final_pa_mes_code"]
     assert create.json()["final_pf_item_name"] == "Base PF with Pouch"
+    assert create.json()["final_pf_mes_code"]
     assert create.json()["companion_lines"][0]["item_name"] == "Carton"
     assert create.json()["companion_lines"][0]["quantity"] == 2
     assert len(create.json()["bom_lines"]) == 3
@@ -1353,6 +1355,7 @@ def test_shipping_prepare_complete_accepts_preproduced_pf_in_shipping_department
 def test_shipping_prepare_actor_is_retained_and_picker_is_recorded_in_pickup_ledgers(
     client, db_session, make_item, make_bom, make_location
 ):
+    """8.12-13: 요청자가 아니라 실제 픽업 실행자를 원장과 작업에 기록한다."""
     af = make_item(name="Prepared actor AF", process_type_code="AF", model_symbol="4", serial_no=21)
     pa = make_item(name="Prepared actor PA", process_type_code="PA", model_symbol="4", serial_no=22)
     pf = make_item(name="Prepared actor PF", process_type_code="PF", model_symbol="4", serial_no=23)

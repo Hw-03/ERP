@@ -34,6 +34,13 @@ export function HistoryKeyPointSummary({
   const panelBody = useDesktopRightPanelBody();
   const hasMultipleImpactLocations = summary.impactGroups.length > 1;
   const impactLayoutKey = `${impactStatus}:${summary.impactGroups.map((group) => `${group.key}:${group.effects.length}`).join("|")}`;
+  const participants = summary.participants?.length ? summary.participants : [summary.requester];
+  const changedActualStockLines = summary.actualStock
+    ? [
+        { label: "창고", before: summary.actualStock.warehouseBefore, after: summary.actualStock.warehouseAfter },
+        { label: summary.actualStock.departmentName, before: summary.actualStock.departmentBefore, after: summary.actualStock.departmentAfter },
+      ].filter((line) => line.before !== line.after)
+    : [];
 
   useEffect(() => {
     setExpandedImpactGroups(new Set());
@@ -92,72 +99,68 @@ export function HistoryKeyPointSummary({
         </span>
       </div>
 
-      <div
-        className="grid gap-2 border-t px-4 py-3 text-xs sm:grid-cols-[minmax(0,1fr)_auto]"
-        style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
-      >
-        <div className="flex min-w-0 items-center gap-2">
-          <UserRound className="h-4 w-4 shrink-0" />
-          <span className="truncate font-bold" style={{ color: LEGACY_COLORS.text }}>
-            {summary.requester.name}
-          </span>
-        </div>
-        <div className="flex min-w-0 items-center gap-2">
-          <Clock3 className="h-4 w-4 shrink-0" />
-          <span className="whitespace-nowrap font-medium leading-snug">{formatHistoryDateTimeLong(summary.requester.at)}</span>
+      <div className="border-t px-4 py-3 text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+        <div className="grid gap-2">
+          {participants.map((participant) => (
+            <div
+              key={`${participant.label}:${participant.name}:${participant.at}`}
+              data-testid="history-participant-row"
+              className="grid min-w-0 gap-2 sm:grid-cols-[4rem_minmax(0,1fr)_auto] sm:items-center"
+            >
+              {participants.length > 1 ? (
+                <span className="font-bold">{participant.label}</span>
+              ) : (
+                <span aria-hidden="true" className="hidden sm:block" />
+              )}
+              <div className="flex min-w-0 items-center gap-2">
+                <UserRound className="h-4 w-4 shrink-0" />
+                <span className="truncate font-bold" style={{ color: LEGACY_COLORS.text }}>
+                  {participant.name}
+                </span>
+              </div>
+              <div className="flex min-w-0 items-center gap-2">
+                <Clock3 className="h-4 w-4 shrink-0" />
+                <span className="whitespace-nowrap font-medium leading-snug">{formatHistoryDateTimeLong(participant.at)}</span>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
-      {summary.actualStock && (
-        <div className="border-t px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-          <div className="mb-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-            실제 처리 당시 재고
-          </div>
-          <p className="mb-2 text-xs leading-relaxed" style={{ color: LEGACY_COLORS.muted2 }}>
-            목록은 요청 순서로 계산하므로, 실제 처리 당시 수량과 다를 수 있습니다.
-          </p>
-          <div className="grid gap-2 text-xs sm:grid-cols-2">
-            <ActualStockLine
-              label="창고"
-              before={summary.actualStock.warehouseBefore}
-              after={summary.actualStock.warehouseAfter}
-            />
-            <ActualStockLine
-              label="정상 부서"
-              before={summary.actualStock.departmentBefore}
-              after={summary.actualStock.departmentAfter}
-            />
-          </div>
-          <div className="mt-2 grid gap-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-            <span>
-              요청 시각 <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>{formatHistoryDateTimeLong(summary.actualStock.requestedAt)}</span>
-            </span>
-            <span>
-              처리 시각 <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>{formatHistoryDateTimeLong(summary.actualStock.processedAt)}</span>
-            </span>
-          </div>
-        </div>
-      )}
-
-      {summary.flow && (
-        <div className="border-t px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
-          <div data-testid="history-flow-summary" className="flex min-w-0 flex-nowrap items-center gap-2 text-xs">
+      {(summary.flow || changedActualStockLines.length > 0) && (
+        <div
+          data-testid="history-stock-movement-summary"
+          className="border-t px-4 py-3"
+          style={{ borderColor: LEGACY_COLORS.border }}
+        >
+          <div className="flex min-w-0 flex-nowrap items-center gap-2 text-xs">
             <span className="shrink-0 font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-              위치 / 이동 경로
+              재고 이동
             </span>
-            <MapPin className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
-            <span className="min-w-0 truncate rounded-full border px-2.5 py-0.5 font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
-              {summary.flow.from ?? summary.flow.label}
-            </span>
-            {summary.flow.from && summary.flow.to && summary.flow.from !== summary.flow.to && (
+            {summary.flow && (
               <>
-                <ArrowRight className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
+                <MapPin className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
                 <span className="min-w-0 truncate rounded-full border px-2.5 py-0.5 font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
-                  {summary.flow.to}
+                  {summary.flow.from ?? summary.flow.label}
                 </span>
+                {summary.flow.from && summary.flow.to && summary.flow.from !== summary.flow.to && (
+                  <>
+                    <ArrowRight className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
+                    <span className="min-w-0 truncate rounded-full border px-2.5 py-0.5 font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
+                      {summary.flow.to}
+                    </span>
+                  </>
+                )}
               </>
             )}
           </div>
+          {changedActualStockLines.length > 0 && (
+            <div className="mt-2 grid gap-2 text-xs sm:grid-cols-2">
+              {changedActualStockLines.map((line) => (
+                <ActualStockLine key={line.label} {...line} />
+              ))}
+            </div>
+          )}
         </div>
       )}
 

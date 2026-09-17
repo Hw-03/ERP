@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app._actor import set_actor
 from app.database import get_db
 from app.models import (
+    DefectInventoryMovement,
     Employee,
     InventoryOperation,
     InventoryOperationEffect,
@@ -36,7 +37,13 @@ class OperationCancelRequest(BaseModel):
     plan_hash: str = Field(..., min_length=64, max_length=64)
 
 
-def _line_payload(log: TransactionLog, item: Item | None) -> dict:
+def _line_payload(
+    log: TransactionLog,
+    item: Item | None,
+    *,
+    movement_quantity: object | None = None,
+) -> dict:
+    transfer_qty = log.transfer_qty if log.transfer_qty is not None else movement_quantity
     return {
         "log_id": str(log.log_id),
         "item_id": str(log.item_id),
@@ -50,7 +57,7 @@ def _line_payload(log: TransactionLog, item: Item | None) -> dict:
         "quantity_after": (
             str(log.quantity_after) if log.quantity_after is not None else None
         ),
-        "transfer_qty": str(log.transfer_qty) if log.transfer_qty is not None else None,
+        "transfer_qty": str(transfer_qty) if transfer_qty is not None else None,
         "department": log.department,
         "operation_role": log.operation_role.value if log.operation_role else None,
         "reverses_log_id": str(log.reverses_log_id) if log.reverses_log_id else None,
@@ -91,6 +98,19 @@ def _operation_payload(
         )
         .all()
     )
+    movement_quantities = {
+        item_id: abs(quantity)
+        for item_id, quantity in (
+            db.query(
+                DefectInventoryMovement.item_id,
+                func.sum(DefectInventoryMovement.quantity_delta),
+            )
+            .filter(DefectInventoryMovement.operation_id == operation.operation_id)
+            .group_by(DefectInventoryMovement.item_id)
+            .all()
+        )
+        if quantity is not None and quantity != 0
+    }
     if operation.kind == InventoryOperationKindEnum.CANCELLATION:
         effective_status = "cancellation"
     elif reversal is not None:
@@ -98,7 +118,11 @@ def _operation_payload(
     else:
         effective_status = "active"
     matching_lines = [
-        _line_payload(log, items.get(log.item_id))
+        _line_payload(
+            log,
+            items.get(log.item_id),
+            movement_quantity=movement_quantities.get(log.item_id),
+        )
         for log in logs
         if selected_item_id is None or log.item_id == selected_item_id
     ]
@@ -134,7 +158,14 @@ def _operation_payload(
         "reversal_operation_id": str(reversal.operation_id) if reversal else None,
         "can_cancel": can_cancel,
         "cancel_blockers": cancel_blockers,
-        "lines": [_line_payload(log, items.get(log.item_id)) for log in logs],
+        "lines": [
+            _line_payload(
+                log,
+                items.get(log.item_id),
+                movement_quantity=movement_quantities.get(log.item_id),
+            )
+            for log in logs
+        ],
         "matching_lines": matching_lines,
         "effects": [
             {

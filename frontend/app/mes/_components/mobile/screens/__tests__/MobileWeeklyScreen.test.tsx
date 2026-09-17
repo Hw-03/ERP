@@ -100,6 +100,44 @@ describe("MobileWeeklyScreen", () => {
     );
   });
 
+  it("8.21-05 전체 생산은 있지만 모델별 집계가 0이면 생산 없음으로 표시하지 않는다", async () => {
+    state.getWeeklyReport.mockResolvedValue({
+      groups: [],
+      summary: { total_produce_qty: 8 },
+      production_matrix: [],
+    });
+
+    render(<MobileWeeklyScreen weekMon={new Date("2026-08-31T00:00:00")} />);
+
+    expect(await screen.findByText("전체 생산 8개")).toBeInTheDocument();
+    expect(screen.getByText("모델별 집계 0")).toBeInTheDocument();
+    expect(screen.getByText(/모델 정보가 없거나 공용인 품목은 모델별 집계에서 제외/)).toBeInTheDocument();
+    expect(screen.queryByText(/생산 실적이 없습니다/)).not.toBeInTheDocument();
+  });
+
+  it("모바일 전체 생산 합계는 모델별 매트릭스 합계와 별도로 표시한다", async () => {
+    state.getWeeklyReport.mockResolvedValue({
+      groups: [],
+      summary: { total_produce_qty: 8 },
+      production_matrix: [{
+        model_key: "DX3000",
+        model_label: "DX3000",
+        tf_qty: 0,
+        hf_qty: 0,
+        vf_qty: 0,
+        nf_qty: 0,
+        af_qty: 0,
+        pf_qty: 4,
+        total_qty: 4,
+      }],
+    });
+
+    render(<MobileWeeklyScreen weekMon={new Date("2026-08-31T00:00:00")} />);
+
+    expect(await screen.findByText("총 8개")).toBeInTheDocument();
+    expect(screen.queryByText("총 4개")).not.toBeInTheDocument();
+  });
+
   it("opens the selected item BOM in a mobile sheet", async () => {
     state.getWeeklyReport.mockResolvedValue({
       groups: [{

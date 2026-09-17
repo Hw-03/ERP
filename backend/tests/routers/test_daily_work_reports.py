@@ -272,6 +272,58 @@ def test_daily_activity_keeps_cancelled_details_but_excludes_them_from_summary(c
     assert sum(len(group["logs"]) for group in body["details"]) == 2
 
 
+def test_daily_activity_adds_exact_before_after_quantities_to_each_inventory_effect(
+    client,
+    db_session,
+    make_item,
+    make_location,
+):
+    worker = _employee(db_session, name="재고흐름작업자")
+    item = make_item(name="재고 흐름 품목", warehouse_qty=Decimal("3"))
+    make_location(item.item_id, quantity=Decimal("4"))
+    db_session.add(
+        TransactionLog(
+            item_id=item.item_id,
+            transaction_type=TransactionTypeEnum.TRANSFER_TO_PROD,
+            quantity_change=Decimal("0"),
+            transfer_qty=Decimal("1"),
+            producer_employee_id=worker.employee_id,
+            inventory_effect=[
+                {"scope": "warehouse", "delta": -1},
+                {
+                    "scope": "location",
+                    "department": "조립",
+                    "status": "PRODUCTION",
+                    "delta": 1,
+                },
+            ],
+            created_at=datetime(2026, 7, 26, 16, 0),
+        )
+    )
+    db_session.commit()
+
+    response = client.get(f"/api/daily-work-reports/{worker.employee_id}/{WORK_DATE}/activity")
+
+    assert response.status_code == 200, response.text
+    effects = response.json()["details"][0]["logs"][0]["inventory_effect"]
+    assert effects == [
+        {
+            "scope": "warehouse",
+            "delta": -1,
+            "quantity_before": 4,
+            "quantity_after": 3,
+        },
+        {
+            "scope": "location",
+            "department": "조립",
+            "status": "PRODUCTION",
+            "delta": 1,
+            "quantity_before": 3,
+            "quantity_after": 4,
+        },
+    ]
+
+
 def test_daily_activity_hides_draft_and_submitted_batch_logs(client, db_session, make_item):
     worker = _employee(db_session, name="배치가시성")
     item = make_item(name="배치 가시성 품목")

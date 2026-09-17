@@ -59,4 +59,17 @@ describe("useAdminMasterItemsList", () => {
     });
     expect(result.current.filter).toEqual({ itemSearch: "i", globalSearch: "g" });
   });
+
+  it("[8.19-04] 1050개 목록의 마지막 품목도 검색에서 누락되지 않는다", () => {
+    const largeItems = Array.from({ length: 1050 }, (_, index) =>
+      I(String(index + 1), `품목 ${index + 1}`, `CODE-${String(index + 1).padStart(4, "0")}`),
+    );
+    const { result } = renderHook(() =>
+      useAdminMasterItemsList({ items: largeItems, globalSearch: "" }),
+    );
+
+    expect(result.current.visibleItems).toHaveLength(1050);
+    act(() => result.current.setItemSearch("CODE-1050"));
+    expect(result.current.visibleItems.map((candidate) => candidate.item_id)).toEqual(["1050"]);
+  });
 });

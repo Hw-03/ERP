@@ -1161,6 +1161,146 @@
         "title": "BoxTrackingUpdate",
         "type": "object"
       },
+      "BulkQuarantineLine": {
+        "properties": {
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "management_category": {
+            "default": "DEFECT",
+            "enum": [
+              "DEFECT",
+              "B_GRADE",
+              "OBSOLETE"
+            ],
+            "title": "Management Category",
+            "type": "string"
+          },
+          "qty": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Qty"
+          },
+          "reason_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category"
+          },
+          "reason_memo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Memo"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "source_dept": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Dept"
+          },
+          "target_dept": {
+            "title": "Target Dept",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "qty",
+          "source",
+          "target_dept"
+        ],
+        "title": "BulkQuarantineLine",
+        "type": "object"
+      },
+      "BulkQuarantineRequest": {
+        "properties": {
+          "actor_employee_id": {
+            "format": "uuid",
+            "title": "Actor Employee Id",
+            "type": "string"
+          },
+          "client_request_id": {
+            "anyOf": [
+              {
+                "maxLength": 48,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Request Id"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/BulkQuarantineLine"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Lines",
+            "type": "array"
+          }
+        },
+        "required": [
+          "actor_employee_id",
+          "lines"
+        ],
+        "title": "BulkQuarantineRequest",
+        "type": "object"
+      },
+      "BulkQuarantineResult": {
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "processed_lines": {
+            "title": "Processed Lines",
+            "type": "integer"
+          },
+          "total_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Quantity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "processed_lines",
+          "total_quantity",
+          "message"
+        ],
+        "title": "BulkQuarantineResult",
+        "type": "object"
+      },
       "BulkUnquarantineLine": {
         "properties": {
           "department": {
@@ -7508,8 +7648,15 @@
             "title": "Reason Category"
           },
           "reason_memo": {
-            "title": "Reason Memo",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Memo"
           },
           "source": {
             "title": "Source",
@@ -7536,7 +7683,6 @@
           "qty",
           "source",
           "target_dept",
-          "reason_memo",
           "actor_employee_id"
         ],
         "title": "QuarantineRequest",
@@ -9313,6 +9459,17 @@
             ],
             "title": "Final Pa Item Name"
           },
+          "final_pa_mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Pa Mes Code"
+          },
           "final_pf_item_id": {
             "anyOf": [
               {
@@ -9335,6 +9492,17 @@
               }
             ],
             "title": "Final Pf Item Name"
+          },
+          "final_pf_mes_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Pf Mes Code"
           },
           "finalization_mode": {
             "$ref": "#/components/schemas/ShippingFinalizationModeEnum"
@@ -11015,6 +11183,17 @@
             "default": 0,
             "title": "Edit Count",
             "type": "integer"
+          },
+          "executor_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Executor Name"
           },
           "inventory_effect": {
             "anyOf": [
@@ -15570,6 +15749,48 @@
           }
         },
         "summary": "Quarantine",
+        "tags": [
+          "Defects"
+        ]
+      }
+    },
+    "/api/defects/quarantine/bulk": {
+      "post": {
+        "description": "복수 격리를 한 트랜잭션으로 확정하며 같은 요청의 재시도를 멱등 처리한다.",
+        "operationId": "quarantine_bulk_api_defects_quarantine_bulk_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkQuarantineRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkQuarantineResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Quarantine Bulk",
         "tags": [
           "Defects"
         ]

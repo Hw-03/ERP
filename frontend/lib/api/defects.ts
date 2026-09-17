@@ -17,6 +17,8 @@ import type {
   DefectStatisticsResponse,
   BulkUnquarantinePayload,
   BulkUnquarantineResult,
+  BulkQuarantinePayload,
+  BulkQuarantineResult,
   QuarantinePayload,
   UnquarantinePayload,
 } from "./types/defects";
@@ -47,6 +49,9 @@ export const defectsApi = {
    */
   quarantine: (payload: QuarantinePayload): Promise<void> =>
     postJson<void>(toApiUrl("/api/defects/quarantine"), payload),
+
+  quarantineBulk: (payload: BulkQuarantinePayload): Promise<BulkQuarantineResult> =>
+    postJson<BulkQuarantineResult>(toApiUrl("/api/defects/quarantine/bulk"), payload),
 
   /**
    * 즉시 정상 복귀 (결재 없음).

@@ -199,7 +199,12 @@ function _bucketSlotKey(s: BucketSlot): string {
 }
 
 /** none bucket 라벨 — sub_type 컨텍스트 의존. 매핑 안 되면 null. */
-function _labelNoneBucket(subType: string | null | undefined, side: "from" | "to"): string | null {
+function _labelNoneBucket(
+  subType: string | null | undefined,
+  side: "from" | "to",
+  workType?: string | null,
+  rawSubType?: string | null,
+): string | null {
   switch (subType) {
     case "receive_supplier":
       return side === "from" ? "외부" : null;
@@ -211,6 +216,9 @@ function _labelNoneBucket(subType: string | null | undefined, side: "from" | "to
       return "재작업";
     case "adjust_in":
     case "adjust_out":
+      return workType === "process" && (rawSubType === "adjust_in" || rawSubType === "adjust_out")
+        ? "외부"
+        : "수량 조정";
     case "warehouse_adjust_in":
     case "warehouse_adjust_out":
       return "수량 조정";
@@ -219,12 +227,18 @@ function _labelNoneBucket(subType: string | null | undefined, side: "from" | "to
   }
 }
 
-function _labelBucketSlot(slot: BucketSlot, subType: string | null | undefined, side: "from" | "to"): string | null {
+function _labelBucketSlot(
+  slot: BucketSlot,
+  subType: string | null | undefined,
+  side: "from" | "to",
+  workType?: string | null,
+  rawSubType?: string | null,
+): string | null {
   switch (slot.bucket) {
     case "warehouse": return "창고";
     case "production": return slot.dept || "부서";
     case "defective": return slot.dept ? `${slot.dept} 불량` : "불량";
-    case "none": return _labelNoneBucket(subType, side);
+    case "none": return _labelNoneBucket(subType, side, workType, rawSubType);
     default: return null;
   }
 }
@@ -284,7 +298,7 @@ export function getBatchFlowEndpoints(batch: IoBatch): BatchFlowEndpoints | null
   let mixedFrom = false;
   if (fromSlots.size === 1) {
     const slot = fromSlots.values().next().value as BucketSlot;
-    const lbl = _labelBucketSlot(slot, subType, "from");
+    const lbl = _labelBucketSlot(slot, subType, "from", batch.work_type, batch.sub_type);
     if (!lbl) return null;
     fromLabel = lbl;
   } else {
@@ -296,7 +310,7 @@ export function getBatchFlowEndpoints(batch: IoBatch): BatchFlowEndpoints | null
   let mixedTo = false;
   if (toSlots.size === 1) {
     const slot = toSlots.values().next().value as BucketSlot;
-    const lbl = _labelBucketSlot(slot, subType, "to");
+    const lbl = _labelBucketSlot(slot, subType, "to", batch.work_type, batch.sub_type);
     if (!lbl) return null;
     toLabel = lbl;
   } else {

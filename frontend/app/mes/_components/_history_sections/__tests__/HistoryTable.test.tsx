@@ -611,6 +611,43 @@ describe("HistoryTable hierarchy", () => {
     expect(within(inventory).queryByLabelText(/^부서 /)).not.toBeInTheDocument();
   });
 
+  it("8.13-06/12 shows defective stock changes instead of a false no-change marker", () => {
+    const returned = makeLog({
+      item_name: "반품 품목",
+      transaction_type: "SUPPLIER_RETURN",
+      quantity_change: -1,
+      quantity_before: 99,
+      quantity_after: 98,
+      warehouse_qty_before: 0,
+      warehouse_qty_after: 0,
+      department_qty_before: 97,
+      department_qty_after: 97,
+      inventory_effect: [{ scope: "location", department: "창고", status: "DEFECTIVE", delta: -1 }],
+    });
+    const quarantined = makeLog({
+      log_id: "defect-quarantine",
+      item_name: "격리 품목",
+      transaction_type: "MARK_DEFECTIVE",
+      quantity_change: 0,
+      quantity_before: 5,
+      quantity_after: 5,
+      warehouse_qty_before: 0,
+      warehouse_qty_after: 0,
+      department_qty_before: 5,
+      department_qty_after: 4,
+      department: "튜브",
+      inventory_effect: [
+        { scope: "location", department: "튜브", status: "DEFECTIVE", delta: 1 },
+        { scope: "location", department: "튜브", status: "PRODUCTION", delta: -1 },
+      ],
+    });
+
+    renderTable([{ type: "solo", log: returned }, { type: "solo", log: quarantined }]);
+
+    expect(screen.getByLabelText("재고 변동: 불량 2 −1→1")).toBeInTheDocument();
+    expect(screen.getByLabelText("재고 변동: 튜브 5 −1→4, 불량 0 +1→1")).toBeInTheDocument();
+  });
+
   it("renders operation and cancellation groups as separate expandable rows", () => {
     const originalParent = makeLog({
       log_id: "original-parent",

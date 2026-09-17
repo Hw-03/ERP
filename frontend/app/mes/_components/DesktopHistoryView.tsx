@@ -529,6 +529,7 @@ export function DesktopHistoryView() {
             <div className="flex flex-col gap-2">
           <HistoryStatsBar
             baseline={baselineSummary}
+            currentSummary={summary}
             currentCount={summary?.total ?? null}
             loading={summaryLoading || baselineLoading}
             loadingDisplay="skeleton"

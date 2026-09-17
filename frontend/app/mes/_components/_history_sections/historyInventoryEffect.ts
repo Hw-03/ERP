@@ -7,6 +7,8 @@ export type InventoryEffectCell = {
   status?: string | null;
   location_id?: string | null;
   box_id?: string | null;
+  quantity_before?: number;
+  quantity_after?: number;
 };
 
 export type InventoryEffectOwner = {
@@ -28,6 +30,8 @@ export type InventoryEffectRow = {
   label: string;
   delta: number;
   deltaLabel: string;
+  quantityBefore?: number;
+  quantityAfter?: number;
 };
 
 const CANONICAL_SCOPES = new Set<InventoryEffectScope>([
@@ -76,6 +80,7 @@ export function toInventoryEffectRows(
     const boxId = normalizeText(cell.box_id);
     const department = normalizeText(cell.department);
     const status = normalizeText(cell.status);
+    const hasSnapshot = Number.isFinite(cell.quantity_before) && Number.isFinite(cell.quantity_after);
     const key = [
       owner.itemId,
       owner.unit,
@@ -99,6 +104,10 @@ export function toInventoryEffectRows(
       label: cellLabel(scope, cell, locationId, boxId),
       delta,
       deltaLabel: delta > 0 ? `+${delta}` : String(delta),
+      ...(hasSnapshot ? {
+        quantityBefore: cell.quantity_before,
+        quantityAfter: cell.quantity_after,
+      } : {}),
     }];
   });
 }

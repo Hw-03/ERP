@@ -26,6 +26,14 @@ interface WorkProps {
 type ConversionStepId = 1 | 2 | 3;
 type ConversionStepState = "done" | "active" | "locked";
 type PickerKind = "source" | "target";
+type ConversionShortageRow = {
+  key: string;
+  itemName: string;
+  mesCode: string | null;
+  location: string;
+  unit: string;
+  current: number;
+};
 
 const ALLOWED_PROCESS_TYPES = ["PA", "AF", "AA"];
 const CONVERSION_STEPS: Array<{ id: ConversionStepId; title: string }> = [
@@ -69,6 +77,32 @@ function filterCandidates(candidates: Item[], query: string): Item[] {
   return candidates.filter((item) => {
     return matchesSearchText(item.item_name, query) || matchesSearchText(item.mes_code, query) || matchesSearchText(item.process_type_code, query);
   });
+}
+
+function conversionShortageRows(preview: ItemConversionPreview): ConversionShortageRow[] {
+  const rows: ConversionShortageRow[] = [];
+  if (preview.source_shortage_quantity > 0) {
+    rows.push({
+      key: `source-${preview.source_item_id}`,
+      itemName: preview.source_item_name,
+      mesCode: preview.source_mes_code,
+      location: preview.source_department ?? "창고",
+      unit: "EA",
+      current: preview.source_current_quantity,
+    });
+  }
+  preview.lines.forEach((line) => {
+    if (line.shortage_quantity <= 0) return;
+    rows.push({
+      key: `${line.item_id}-${line.line_kind}`,
+      itemName: line.item_name,
+      mesCode: line.mes_code,
+      location: line.department ?? "창고",
+      unit: line.unit,
+      current: line.current_quantity,
+    });
+  });
+  return rows;
 }
 
 export function ItemConversionWorkView({
@@ -627,6 +661,7 @@ function ReviewStep({
   onMemo: (value: string) => void;
   onNext: () => void;
 }) {
+  const shortageRows = conversionShortageRows(preview);
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3" data-testid="item-conversion-preview">
       <PreviewSummary preview={preview} />
@@ -654,9 +689,33 @@ function ReviewStep({
           다음
         </button>
       </div>
-      {!preview.executable && preview.blocking_reason && <ErrorNotice message={preview.blocking_reason} />}
+      {!preview.executable && <ConversionShortageDetails rows={shortageRows} />}
+      {!preview.executable && shortageRows.length === 0 && preview.blocking_reason && <ErrorNotice message={preview.blocking_reason} />}
       {error && <ErrorNotice message={error} />}
     </div>
+  );
+}
+
+function ConversionShortageDetails({ rows }: { rows: ConversionShortageRow[] }) {
+  if (rows.length === 0) return null;
+
+  return (
+    <section data-testid="item-conversion-shortage-details" className="ic-error max-h-52 w-full flex-col overflow-hidden" style={{ alignItems: "stretch" }}>
+      <div className="shrink-0 text-sm font-black">재고 부족 품목</div>
+      <div className="sg grid min-h-0 w-full grid-cols-1 gap-2 overflow-y-auto pr-1 lg:grid-cols-2">
+        {rows.map((row) => (
+          <div key={row.key} data-testid="item-conversion-shortage-row" className="icf flex min-w-0 items-center justify-between gap-3 rounded-[12px] border px-3 py-2">
+            <div className="min-w-0">
+              <div className="ict truncate text-sm font-black">{row.itemName}</div>
+              <div className="icm mt-0.5 text-xs font-bold">{row.mesCode ?? "-"}</div>
+            </div>
+            <div className="ic-red shrink-0 text-sm font-black">
+              {row.location} 현재고 {formatQty(row.current, row.unit)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 

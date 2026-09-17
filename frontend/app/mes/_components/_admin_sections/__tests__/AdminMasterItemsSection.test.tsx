@@ -66,6 +66,7 @@ function findByClasses(container: HTMLElement, ...classes: string[]) {
 }
 
 afterEach(() => {
+  context.visibleItems = [item];
   context.selectedItem = null;
   context.addMode = false;
   context.addForm = {};
@@ -73,6 +74,32 @@ afterEach(() => {
 });
 
 describe("AdminMasterItemsSection", () => {
+  it("[8.19-04] 1050개 visibleItems의 KPI·상태 합·목록·끝행이 같은 모집단을 사용한다", () => {
+    context.visibleItems = Array.from({ length: 1050 }, (_, index) => ({
+      ...item,
+      item_id: `item-${index + 1}`,
+      item_name: `품목 ${String(index + 1).padStart(4, "0")}`,
+      mes_code: `MES-${String(index + 1).padStart(4, "0")}`,
+      quantity: index < 432 ? 10 : index < 684 ? 1 : 0,
+      min_stock: index < 432 ? 1 : index < 684 ? 2 : 1,
+    }));
+
+    render(
+      <DirtyGuardProvider>
+        <AdminMasterItemsSection allBomRows={[]} />
+      </DirtyGuardProvider>,
+    );
+
+    const grid = screen.getByRole("grid", { name: "품목 목록" });
+    expect(screen.getByText("1,050건")).toBeInTheDocument();
+    expect(screen.getByText("전체 품목").parentElement).toHaveTextContent("1050");
+    expect(screen.getAllByText("정상")[0]?.parentElement).toHaveTextContent("432");
+    expect(screen.getAllByText("부족")[0]?.parentElement).toHaveTextContent("252");
+    expect(screen.getAllByText("품절")[0]?.parentElement).toHaveTextContent("366");
+    expect(within(grid).getAllByRole("row")).toHaveLength(1051);
+    expect(within(grid).getByRole("row", { name: /품목 1050/ })).toBeInTheDocument();
+  });
+
   it("locks item reordering while the list is filtered", () => {
     context.canReorderItems = false;
     render(

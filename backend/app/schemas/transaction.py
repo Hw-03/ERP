@@ -86,6 +86,7 @@ class TransactionLogResponse(BaseModel):
     department: Optional[str] = None
     reference_no: Optional[str]
     produced_by: Optional[str]
+    executor_name: Optional[str] = None
     producer_employee_id: Optional[uuid.UUID] = None
     requester_name: Optional[str] = None
     approver_name: Optional[str] = None

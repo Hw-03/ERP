@@ -650,6 +650,29 @@ def test_submit_immediate_skips_excluded_lines(make_item, db_session):
     assert db_session.query(TransactionLog).count() == 1
 
 
+def test_submit_immediate_clears_stale_approval_flag(make_item, db_session):
+    """8.17-05: 즉시 입고는 저장 단계의 오래된 결재 플래그를 완료 응답에 남기지 않는다."""
+    item = make_item(name="즉시 입고 결재 플래그", warehouse_qty=D("0"))
+    requester = _make_employee(db_session, warehouse_role="primary")
+    batch = _build_batch(
+        db_session,
+        requester=requester,
+        sub_type="receive_supplier",
+        work_type="receive",
+        source_kind="manual",
+        source_item_id=item.item_id,
+        lines=[{"item_id": item.item_id, "direction": "in", "from_bucket": "none",
+                "to_bucket": "warehouse", "quantity": D("1"), "origin": "manual"}],
+    )
+    batch.requires_approval = True
+
+    result = svc._execute_submission(db_session, requester=requester, batch=batch)
+
+    assert batch.requires_approval is False
+    assert result["requires_approval"] is False
+    assert result["message"] == "입출고가 반영되었습니다."
+
+
 def test_submit_immediate_zero_qty_raises(make_item, db_session):
     """체크된 라인 수량 <= 0 → ValueError (재고 불변)."""
     item = make_item(name="제로", warehouse_qty=D("0"))
@@ -832,6 +855,33 @@ def test_submit_dept_only_self_approval_executes_immediately(
     assert _prod_qty(db_session, item.item_id) == D("4")
     log = db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id).one()
     assert log.transaction_type == TransactionTypeEnum.ADJUST
+
+
+def test_execute_submission_reports_self_approved_department_request_as_reflected(
+    make_item, make_location, db_session
+):
+    """8.22-09: 감사용 결재 플래그와 달리 응답은 남은 결재가 없다고 알려야 한다."""
+    item = make_item(name="자가승인 응답")
+    make_location(item.item_id, department=ASSEMBLY, quantity=D("0"))
+    requester = _make_employee(db_session, department_role="primary")
+    batch = _build_batch(
+        db_session,
+        requester=requester,
+        sub_type="adjust_in",
+        source_kind="manual",
+        source_item_id=item.item_id,
+        lines=[{"item_id": item.item_id, "direction": "adjust",
+                "from_bucket": "none", "to_bucket": "production",
+                "to_department": ASSEMBLY, "quantity": D("4"), "origin": "adjust_in"}],
+    )
+    batch.notes = "자가승인 확인"
+
+    result = svc._execute_submission(db_session, requester=requester, batch=batch)
+
+    assert batch.requires_approval is True
+    assert result["requires_approval"] is False
+    assert result["message"] == "자동 승인되어 입출고가 반영되었습니다"
+    assert result["stock_requests"][0]["approval_outcome"] == "approved"
 
 
 def test_submit_dept_only_warehouse_primary_self_approval_executes_immediately(
@@ -2176,7 +2226,7 @@ def test_custom_bom_with_only_excluded_or_zero_child_creates_no_effect_departmen
     result = svc._execute_submission(db_session, requester=requester, batch=batch)
 
     request = db_session.query(StockRequest).one()
-    assert result["requires_approval"] is True
+    assert result["requires_approval"] is not self_approved
     assert request.requires_department_approval is True
     assert len(request.lines) == 1
     assert request.lines[0].operation_line_id == batch.bundles[0].lines[0].line_id

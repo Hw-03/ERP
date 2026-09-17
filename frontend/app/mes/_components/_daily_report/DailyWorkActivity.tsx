@@ -1,9 +1,10 @@
 "use client";
 
-import { Activity, ArrowRight, ChevronRight, ClipboardList, Clock3, Factory, MapPin, PackageCheck, RotateCcw, Truck, UserRound, Warehouse } from "lucide-react";
+import { ArrowRight, ChevronRight, ClipboardList, Clock3, Factory, PackageCheck, RotateCcw, Truck, UserRound, Warehouse } from "lucide-react";
 import { useState } from "react";
 import type { DailyWorkActivity as DailyWorkActivityData } from "@/lib/api/types/daily-work-reports";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { TruncatedText } from "@/lib/ui/TruncatedText";
 import { formatHistoryDateTimeLong } from "../_history_sections/historyFormat";
 import { buildHistoryDetailSummary, type HistoryDetailSummaryTone } from "../_history_sections/historyDetailSummary";
 
@@ -18,6 +19,39 @@ function formatQuantities(quantities: Record<string, number>): string {
   return Object.entries(quantities)
     .map(([unit, quantity]) => `${quantity.toLocaleString()} ${unit}`)
     .join(" · ");
+}
+
+function StockChange({
+  before,
+  after,
+  delta,
+  unit,
+}: {
+  before?: number;
+  after?: number;
+  delta: number;
+  unit: string;
+}) {
+  const hasSnapshot = before != null && after != null;
+  const unitSuffix = unit ? ` ${unit}` : "";
+  const directionLabel = delta > 0 ? "증가" : delta < 0 ? "감소" : "변동 없음";
+  const changeLabel = delta === 0
+    ? directionLabel
+    : `${Math.abs(delta).toLocaleString()}${unitSuffix} ${directionLabel}`;
+  const changeColor = delta > 0 ? LEGACY_COLORS.green : delta < 0 ? LEGACY_COLORS.red : LEGACY_COLORS.muted2;
+  const changeBackground = delta > 0 ? LEGACY_COLORS.successBg : delta < 0 ? LEGACY_COLORS.errorBg : LEGACY_COLORS.s2;
+  return (
+    <span className="flex shrink-0 items-center gap-2">
+      {hasSnapshot && (
+        <span className="whitespace-nowrap text-sm font-bold tabular-nums" style={{ color: LEGACY_COLORS.muted2 }}>
+          재고 {before.toLocaleString()}{unitSuffix} → {after.toLocaleString()}{unitSuffix}
+        </span>
+      )}
+      <strong className="whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-black tabular-nums" style={{ color: changeColor, background: changeBackground }}>
+        {changeLabel}
+      </strong>
+    </span>
+  );
 }
 
 function operationKeyForGroup(group: DailyWorkActivityData["details"][number]): string {
@@ -51,72 +85,120 @@ function DailyWorkActivityDetail({ group }: { group: DailyWorkActivityData["deta
   const impactColumns = impacts.length > 1
     ? [impacts.slice(0, impactMidpoint), impacts.slice(impactMidpoint)]
     : [impacts];
+  const hasMultipleItems = new Set(impacts.map((impact) => impact.itemId)).size > 1;
+  const stockSectionLabel = impacts.some((impact) => impact.delta < 0)
+    && impacts.some((impact) => impact.delta > 0)
+    ? "재고 이동"
+    : "재고 반영";
   const statusColor = STATUS_COLORS[summary.status.tone];
 
   return (
-    <article className="overflow-hidden rounded-[14px] border" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-      <div className="flex min-h-11 items-start gap-2 px-3.5 py-3">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px]" style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s1 }}>
+    <article
+      data-testid="daily-work-activity-card"
+      className={`grid grid-cols-1 overflow-hidden rounded-[14px] border ${impacts.length > 0 ? "lg:grid-cols-[minmax(250px,1fr)_minmax(230px,0.8fr)_minmax(360px,1.6fr)]" : "lg:grid-cols-[minmax(250px,1fr)_minmax(300px,2fr)]"}`}
+      style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+    >
+      <div data-testid="daily-work-activity-primary" className="flex items-center gap-3 px-4 py-3">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px]" style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s1 }}>
           <ClipboardList className="h-4 w-4" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-black">{summary.target.itemName}</p>
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-            {summary.target.mesCode && <span className="font-medium">{summary.target.mesCode}</span>}
-            <span className="font-bold" style={{ color: LEGACY_COLORS.text }}>작업 {summary.operationLabel}</span>
-            <span className="rounded-full px-2 py-0.5 font-bold" style={{ color: statusColor, background: `color-mix(in srgb, ${statusColor} 14%, transparent)` }}>{summary.status.label}</span>
-            <span className="flex min-w-0 items-center gap-1.5"><UserRound className="h-3.5 w-3.5 shrink-0" />{summary.requester.label} <strong style={{ color: LEGACY_COLORS.text }}>{summary.requester.name}</strong></span>
-            <span className="flex min-w-0 items-center gap-1.5"><Clock3 className="h-3.5 w-3.5 shrink-0" />{formatHistoryDateTimeLong(summary.requester.at)}</span>
-            {summary.flow && (
-              <span className="flex min-w-0 items-center gap-1.5 font-bold" style={{ color: LEGACY_COLORS.text }}>
-                <MapPin className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
-                {summary.flow.from && summary.flow.to && summary.flow.from !== summary.flow.to ? (
-                  <>{summary.flow.from}<ArrowRight className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />{summary.flow.to}</>
-                ) : summary.flow.label}
-              </span>
-            )}
-            {summary.conversion && (
-              <span className="flex min-w-0 items-center gap-1.5 font-bold" style={{ color: LEGACY_COLORS.text }}>
-                <PackageCheck className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
-                <span className="truncate">{summary.conversion.source.itemName}</span><ArrowRight className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} /><span className="truncate">{summary.conversion.target.itemName}</span>
-              </span>
-            )}
+          <TruncatedText className="truncate text-sm font-black" accessibilityLabel={summary.target.itemName}>
+            {summary.target.itemName}
+          </TruncatedText>
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs font-medium" style={{ color: LEGACY_COLORS.muted2 }}>
+            {summary.target.mesCode && <span>{summary.target.mesCode}</span>}
+            {summary.target.mesCode && <span aria-hidden="true">·</span>}
+            <span>{summary.operationLabel}</span>
+            {group.logs.length > 1 && <><span aria-hidden="true">·</span><span>{group.logs.length}건</span></>}
           </div>
         </div>
-        <span className="shrink-0 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{group.logs.length}건</span>
+        <span
+          data-testid="daily-work-activity-status"
+          className="flex h-7 w-16 shrink-0 items-center justify-center whitespace-nowrap rounded-full text-xs font-bold leading-none"
+          style={{ color: statusColor, background: `color-mix(in srgb, ${statusColor} 14%, transparent)` }}
+        >
+          {summary.status.label}
+        </span>
+      </div>
+
+      <div data-testid="daily-work-activity-meta" className="flex flex-col justify-center gap-1.5 border-t px-4 py-3 text-xs lg:border-l lg:border-t-0" style={{ color: LEGACY_COLORS.muted2, borderColor: LEGACY_COLORS.border }}>
+        <span className="flex min-w-0 items-center gap-1.5"><UserRound className="h-3.5 w-3.5 shrink-0" />{summary.requester.label} <strong style={{ color: LEGACY_COLORS.text }}>{summary.requester.name}</strong></span>
+        <span className="flex min-w-0 items-center gap-1.5"><Clock3 className="h-3.5 w-3.5 shrink-0" />{formatHistoryDateTimeLong(summary.requester.at)}</span>
+        {(impacts.length === 0 || hasMultipleItems) && summary.flow && (
+          <span className="flex min-w-0 items-center gap-1.5 font-bold" style={{ color: LEGACY_COLORS.text }}>
+            {summary.flow.from && summary.flow.to && summary.flow.from !== summary.flow.to ? (
+              <>{summary.flow.from}<ArrowRight className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />{summary.flow.to}</>
+            ) : summary.flow.label}
+          </span>
+        )}
+        {summary.conversion && (
+          <span className="flex min-w-0 items-center gap-1.5 font-bold" style={{ color: LEGACY_COLORS.text }}>
+            <PackageCheck className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
+            <span className="truncate">{summary.conversion.source.itemName}</span><ArrowRight className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} /><span className="truncate">{summary.conversion.target.itemName}</span>
+          </span>
+        )}
       </div>
 
       {impacts.length > 0 && (
-        <div className="border-t px-3.5 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
-          <div className="flex min-h-10 items-center gap-1.5 px-3.5 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-            <Activity className="h-4 w-4" />재고 변화 <span className="ml-auto">{impacts.length}품목</span>
+        <div className="flex flex-col justify-center border-t px-4 py-3 lg:border-l lg:border-t-0" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+          <div className={`${hasMultipleItems ? "mb-2" : "mb-1.5"} flex items-center justify-between gap-3 text-xs font-bold`} style={{ color: LEGACY_COLORS.muted2 }}>
+            <span>{stockSectionLabel}</span>
+            {hasMultipleItems && <span>{impacts.length}개 항목</span>}
           </div>
-          <div data-testid="daily-work-activity-impacts" className="grid grid-cols-1 gap-x-5 lg:grid-cols-2">
-            {impactColumns.map((column, columnIndex) => (
-              <div key={columnIndex}>
-                {column.map((impact) => {
-                  const color = impact.delta > 0 ? LEGACY_COLORS.green : LEGACY_COLORS.red;
-                  return (
-                    <div key={impact.key} className="flex min-h-10 items-center justify-between gap-3 border-t py-1.5" style={{ borderColor: LEGACY_COLORS.border }}>
-                      <div className="min-w-0">
-                        <div className="flex min-w-0 items-center gap-1.5">
-                          {impact.role && <span className="shrink-0 text-xs font-bold" style={{ color: LEGACY_COLORS.blue }}>{impact.role}</span>}
-                          <span className="truncate text-sm font-bold">{impact.itemName}</span>
+          {hasMultipleItems ? (
+            <div data-testid="daily-work-activity-impacts" className="grid grid-cols-1 gap-x-5 lg:grid-cols-2">
+              {impactColumns.map((column, columnIndex) => (
+                <div key={columnIndex}>
+                  {column.map((impact) => {
+                    return (
+                      <div key={impact.key} className="flex min-h-11 items-center justify-between gap-3 border-t py-2 first:border-t-0" style={{ borderColor: LEGACY_COLORS.border }}>
+                        <div className="min-w-0">
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            {impact.role && <span className="shrink-0 text-xs font-bold" style={{ color: LEGACY_COLORS.blue }}>{impact.role}</span>}
+                            <TruncatedText className="truncate text-sm font-bold" accessibilityLabel={impact.itemName}>
+                              {impact.itemName}
+                            </TruncatedText>
+                          </div>
+                          <p className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{impact.label.replace(/ 재고$/, "")}</p>
                         </div>
-                        <p className="truncate text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{impact.label}</p>
+                        <StockChange
+                          before={impact.quantityBefore}
+                          after={impact.quantityAfter}
+                          delta={impact.delta}
+                          unit={impact.unit}
+                        />
                       </div>
-                      <span className="shrink-0 text-sm font-black" style={{ color }}>{impact.deltaLabel}{impact.unit ? ` ${impact.unit}` : ""}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div data-testid="daily-work-activity-stock-flow" className="flex w-full flex-wrap items-center gap-2">
+              {impacts.map((impact, index) => {
+                return (
+                  <div key={impact.key} className="flex min-w-[170px] flex-1 items-center gap-2">
+                    {index > 0 && <ArrowRight className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />}
+                    <span className="flex min-h-9 min-w-0 flex-1 items-center justify-between gap-3 rounded-[10px] border px-3 text-sm font-bold" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                      <span className="truncate">{impact.label.replace(/ 재고$/, "")}</span>
+                      <StockChange
+                        before={impact.quantityBefore}
+                        after={impact.quantityAfter}
+                        delta={impact.delta}
+                        unit={impact.unit}
+                      />
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
       {summary.status.reason && (
-        <div className="border-t px-3.5 py-2 text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.red }}>
+        <div className="border-t px-3.5 py-2 text-xs lg:col-span-full" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.red }}>
           <strong>취소 사유</strong><span className="ml-2">{summary.status.reason}</span>
         </div>
       )}
@@ -140,11 +222,11 @@ export function DailyWorkActivity({ activity, onDetailOpenChange }: { activity: 
             <button
               key={summary.operation_key}
               type="button"
-              onClick={() => setOpenOperation((current) => {
-                const next = current === summary.operation_key ? null : summary.operation_key;
+              onClick={() => {
+                const next = isOpen ? null : summary.operation_key;
+                setOpenOperation(next);
                 onDetailOpenChange?.(next !== null);
-                return next;
-              })}
+              }}
               aria-label={`${summary.operation_label} 거래 상세 ${isOpen ? "접기" : "펼치기"}`}
               className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-[14px] border px-3 text-left transition active:scale-[0.98]"
               style={{ background: isOpen ? LEGACY_COLORS.s3 : LEGACY_COLORS.s2, borderColor: isOpen ? LEGACY_COLORS.blue : LEGACY_COLORS.border }}

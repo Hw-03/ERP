@@ -325,7 +325,11 @@ export function IoLineRow({
           className="text-[9px] font-bold uppercase tracking-[1.5px]"
           style={{ color: LEGACY_COLORS.muted2 }}
         >
-          {isWarehouseAdjust ? "현재 창고" : isOutgoing(effectLine) ? "가능 재고" : "현재 재고"}
+          {isWarehouseAdjust || subType === "receive_supplier"
+            ? "창고 수량"
+            : isOutgoing(effectLine)
+              ? "가능 재고"
+              : "현재 재고"}
         </div>
         <div
           className="text-base font-black tabular-nums"

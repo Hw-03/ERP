@@ -230,6 +230,30 @@ describe("InventoryRecentHistoryPanel", () => {
     expect(screen.queryByText("0 EA")).not.toBeInTheDocument();
   });
 
+  it("기존 불량 격리 이력은 불량 위치 증감으로 실제 처리 수량을 복원한다", () => {
+    testState.legacyQueryResult = {
+      data: [makeLegacyLog({
+        transaction_type: "MARK_DEFECTIVE",
+        quantity_change: 0,
+        transfer_qty: null,
+        notes: "격리: production → 조립",
+        inventory_effect: [
+          { scope: "location", department: "조립", status: "DEFECTIVE", delta: 30 },
+          { scope: "location", department: "조립", status: "PRODUCTION", delta: -30 },
+        ],
+      })],
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    };
+
+    render(<InventoryRecentHistoryPanel item={makeItem()} />);
+
+    expect(screen.getByText("새 불량")).toBeInTheDocument();
+    expect(screen.getByText("30 EA")).toBeInTheDocument();
+    expect(screen.queryByText("수량 미기록")).not.toBeInTheDocument();
+  });
+
   it("서버가 준 최신순을 유지하면서 최대 5건만 표시한다", () => {
     testState.queryResult = {
       data: {

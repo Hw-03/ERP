@@ -490,6 +490,7 @@ export function MobileHistoryScreen() {
         <div className="mhf flex flex-col gap-3 p-3 pb-6">
           <HistoryStatsBar
             baseline={baselineSummary}
+            currentSummary={summary}
             currentCount={summary?.total ?? null}
             loading={summaryLoading || baselineLoading}
             periodLabel={periodLabel}

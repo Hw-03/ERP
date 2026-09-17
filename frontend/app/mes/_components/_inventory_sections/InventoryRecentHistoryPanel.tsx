@@ -1,6 +1,7 @@
 "use client";
 
 import type { InventoryOperation, Item, TransactionLog } from "@/lib/api";
+import type { InventoryEffectCell } from "@/lib/api/types/production";
 import { useInventoryOperationsQuery } from "@/lib/queries/useInventoryOperationsQuery";
 import { useTransactionsQuery } from "@/lib/queries/useTransactionsQuery";
 import { EmptyState, LoadFailureCard, LoadingSkeleton } from "../common";
@@ -13,6 +14,7 @@ type RecentLine = {
   quantityChange: number;
   transferQty?: number | null;
   notes?: string | null;
+  inventoryEffect?: InventoryEffectCell[] | null;
 };
 
 const LEGACY_NOTE_QUANTITY_PATTERN = /\/\s*(-?\d+(?:\.\d+)?)개\s*(?:\/|$)/;
@@ -52,6 +54,15 @@ function getLegacyNoteQuantity(notes: string | null | undefined): number | null 
   return Number.isFinite(quantity) && quantity !== 0 ? Math.abs(quantity) : null;
 }
 
+function getDefectMovementQuantity(line: RecentLine): number | null {
+  if (line.transactionType !== "MARK_DEFECTIVE" && line.transactionType !== "UNMARK_DEFECTIVE") return null;
+  const defectiveCell = line.inventoryEffect?.find((cell) => {
+    const delta = Number(cell.delta);
+    return cell.scope === "location" && cell.status === "DEFECTIVE" && Number.isFinite(delta) && delta !== 0;
+  });
+  return defectiveCell ? Math.abs(Number(defectiveCell.delta)) : null;
+}
+
 function formatProcessedQuantity(line: RecentLine, unit: string): string {
   const transferQty = Number(line.transferQty);
   const quantityChange = Number(line.quantityChange);
@@ -59,7 +70,7 @@ function formatProcessedQuantity(line: RecentLine, unit: string): string {
     ? Math.abs(transferQty)
     : Number.isFinite(quantityChange) && quantityChange !== 0
       ? Math.abs(quantityChange)
-      : getLegacyNoteQuantity(line.notes);
+      : getLegacyNoteQuantity(line.notes) ?? getDefectMovementQuantity(line);
   return quantity == null ? "수량 미기록" : `${formatQty(quantity)} ${unit}`;
 }
 
@@ -115,6 +126,7 @@ function LegacyRows({ logs }: { logs: TransactionLog[] }) {
           quantityChange: log.quantity_change,
           transferQty: log.transfer_qty,
           notes: log.notes,
+          inventoryEffect: log.inventory_effect,
         }, log.item_unit);
         return (
           <li key={log.log_id}>

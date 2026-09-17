@@ -52,7 +52,7 @@ def test_integrity_endpoint_requires_admin_pin(client):
     assert response.json()["detail"]["message"] == "관리자 PIN이 필요합니다."
 
 
-def test_integrity_endpoint_is_read_only_and_problem_ids_are_stable(
+def test_8_19_25_integrity_endpoint_is_read_only_and_problem_ids_are_stable(
     client,
     db_session,
     make_item,

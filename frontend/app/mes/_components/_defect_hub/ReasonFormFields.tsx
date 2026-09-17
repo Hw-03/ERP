@@ -11,6 +11,7 @@ export interface ReasonFormFieldsProps {
   onCategoryChange: (cat: string) => void;
   onMemoChange: (memo: string) => void;
   required?: boolean;
+  requireAny?: boolean;
 }
 
 /**
@@ -23,6 +24,7 @@ export function ReasonFormFields({
   onCategoryChange,
   onMemoChange,
   required = false,
+  requireAny = false,
 }: ReasonFormFieldsProps): ReactElement {
   const categoryMissing = required && !category;
 
@@ -37,7 +39,7 @@ export function ReasonFormFields({
           사유 카테고리
           {required
             ? <span className="ml-0.5" style={{ color: LEGACY_COLORS.red }}>*</span>
-            : <span className="ml-1 font-bold" style={{ color: LEGACY_COLORS.muted }}>(선택)</span>
+            : <span className="ml-1 font-bold" style={{ color: LEGACY_COLORS.muted }}>({requireAny ? "메모와 둘 중 하나 필수" : "선택"})</span>
           }
         </label>
         <AppSelect
@@ -65,7 +67,7 @@ export function ReasonFormFields({
           className="text-xs font-black"
           style={{ color: LEGACY_COLORS.muted2 }}
         >
-          메모 <span style={{ color: LEGACY_COLORS.muted }}>(선택)</span>
+          메모 <span style={{ color: LEGACY_COLORS.muted }}>({requireAny ? "카테고리와 둘 중 하나 필수" : "선택"})</span>
         </label>
         <textarea
           value={memo}

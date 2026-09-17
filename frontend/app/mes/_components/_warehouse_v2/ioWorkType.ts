@@ -207,6 +207,51 @@ export function processBomEffectLine(
 
 export type ApprovalKind = "none" | "warehouse" | "department";
 
+/** 제출 시 서버가 같은 요청자를 곧바로 승인자로 사용할 수 있는지 판정한다. */
+export function canAutoApprove(
+  kind: ApprovalKind,
+  operator: {
+    warehouse_role?: string | null;
+    department_role?: string | null;
+    level?: string | null;
+  } | null | undefined,
+): boolean {
+  if (kind === "none" || !operator) return false;
+  const warehouseApprover =
+    operator.warehouse_role === "primary" || operator.warehouse_role === "deputy";
+  if (kind === "warehouse") {
+    return warehouseApprover || operator.level === "admin";
+  }
+  return warehouseApprover ||
+    operator.department_role === "primary" ||
+    operator.department_role === "deputy";
+}
+
+/** 화면의 반영 건수와 제출 검증이 함께 사용하는 실제 재고 효과 라인. */
+export function inventoryEffectLines(subType: IoSubType, bundles: IoBundle[]): IoLine[] {
+  const byId = new Map<string, IoLine>();
+  for (const bundle of bundles) {
+    for (const line of bundle.lines) {
+      const effectLine = processBomEffectLine(subType, bundle, line);
+      if (effectLine) byId.set(line.line_id, effectLine);
+    }
+  }
+  return Array.from(byId.values());
+}
+
+/** 최종 확인에서 실제 작업 방식을 낱개·기본 BOM·커스텀 BOM으로 구분한다. */
+export function inventoryMethodLabel(
+  subType: IoSubType,
+  bundles: IoBundle[],
+): "낱개" | "기본 BOM" | "커스텀 BOM" | null {
+  if (subType === "internal_use_out" || isWarehouseAdjustSubType(subType)) return null;
+  const bomBundles = bundles.filter((bundle) => bundle.source_kind === "bom_parent");
+  if (bomBundles.length === 0) return "낱개";
+  return bomBundles.some((bundle) => isCustomProcessBomBundle(subType, bundle))
+    ? "커스텀 BOM"
+    : "기본 BOM";
+}
+
 /** subType + 라인 origin 으로 결재 종류 판정.
  *  새 정책: 모든 요청은 창고 또는 부서 중 하나로만 결재 (동시 결재 금지).
  *  - warehouse: warehouse_to_dept/dept_to_warehouse/internal_use_out (manual line 섞여도 창고 승인 1회로만)
@@ -224,6 +269,13 @@ export function approvalKind(
 ): ApprovalKind {
   if (requiresApproval(subType)) {
     return "warehouse";
+  }
+  if (
+    subType === "receive_supplier" ||
+    subType === "warehouse_adjust_in" ||
+    subType === "warehouse_adjust_out"
+  ) {
+    return "none";
   }
   // 불량 관련 작업은 항상 즉시 처리 — manual line 여부 무관하게 "none".
   if (_DEFECT_SUB_TYPES.includes(subType)) return "none";

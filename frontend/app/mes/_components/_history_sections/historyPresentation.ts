@@ -2,6 +2,7 @@ import type { TransactionLog } from "@/lib/api/types/production";
 import type { TransactionReferenceSummary } from "@/lib/api/production";
 import type { IoBatch } from "@/lib/api/types/io";
 import { formatQty } from "@/lib/mes/format";
+import { toInventoryEffectRows } from "./historyInventoryEffect";
 import {
   getBatchFlowEndpoints,
   getHistoryActor,
@@ -357,6 +358,11 @@ function getHistoryOperationPresentationLabel(
   log: TransactionLog,
   batch?: IoBatch | null,
 ): string {
+  if (log.operation_kind === "CANCELLATION") return getHistoryListOperationLabel(log, batch);
+  if (log.transaction_type === "SUPPLIER_RETURN") return getHistoryListOperationLabel(log, batch);
+  if (batch && getHistoryDisplayTransactionType(log, batch) === "ADJUST") {
+    return getHistoryListOperationLabel(log, batch);
+  }
   const phaseLabel = getShippingPhaseOperationLabel(log.shipping_phase);
   if (phaseLabel) return phaseLabel;
   if (!batch && log.transaction_type === "SHIP" && isShippingReference(log)) return "출하";
@@ -404,9 +410,10 @@ export function getHistoryRowPresentation(
   };
   const target = getTargetPresentation(log, batch, batchStats);
   const flow = getFlowPresentation(log, batch, operation.hint);
-  const movement = batch
+  const effectMovement = getDefectInventoryEffectMovement(log);
+  const movement = effectMovement ?? (batch
     ? getHistoryMovementSummary(log, batch)
-    : { parts: [getSingleLogMovement(log)] };
+    : { parts: [getSingleLogMovement(log)] });
   const stock = getStockPresentation(log);
   const requester = getRequesterPresentation(log, batch);
   const rawApprover = (batch?.approver_name ?? log.approver_name ?? "").trim();
@@ -421,6 +428,30 @@ export function getHistoryRowPresentation(
     people: { requester, approver },
     statusChips: getStatusChips(log, batch, batchStats),
     batchStats,
+  };
+}
+
+const DEFECT_EFFECT_TRANSACTION_TYPES = new Set([
+  "MARK_DEFECTIVE",
+  "UNMARK_DEFECTIVE",
+  "DEFECT_SCRAP",
+  "SUPPLIER_RETURN",
+]);
+
+function getDefectInventoryEffectMovement(log: TransactionLog): MovementSummary | null {
+  if (!DEFECT_EFFECT_TRANSACTION_TYPES.has(log.transaction_type)) return null;
+  const rows = toInventoryEffectRows(log.inventory_effect, {
+    itemId: log.item_id,
+    itemName: log.item_name,
+    unit: log.item_unit,
+  });
+  if (rows.length === 0) return null;
+  const unit = log.item_unit?.trim();
+  return {
+    parts: rows.map((row) => ({
+      label: `${row.label} ${row.delta > 0 ? "+" : ""}${formatQty(row.delta)}${unit ? ` ${unit}` : ""}`,
+      tone: row.delta > 0 ? "success" : "danger",
+    })),
   };
 }
 
@@ -491,19 +522,41 @@ function getFlowPresentation(
   if (!batch && log.transaction_type === "DEFECT_SCRAP") {
     return { label: "격리 → 폐기", from: "격리", to: "폐기" };
   }
+  const internalUseFlow = getInternalUseInventoryEffectFlow(log, batch);
+  if (internalUseFlow) return internalUseFlow;
   if (batch) {
     const endpoints = getBatchFlowEndpoints(batch);
     if (endpoints) {
+      const from = log.operation_kind === "CANCELLATION" ? endpoints.to : endpoints.from;
+      const to = log.operation_kind === "CANCELLATION" ? endpoints.from : endpoints.to;
       return {
-        label: endpoints.from === endpoints.to ? endpoints.from : `${endpoints.from} → ${endpoints.to}`,
-        from: endpoints.from,
-        to: endpoints.to,
+        label: from === to ? from : `${from} → ${to}`,
+        from,
+        to,
         mixed: endpoints.mixed,
         hint: endpoints.mixed ? hint : undefined,
       };
     }
   }
   return { label: getHistoryFlowLabel(log, batch), hint: undefined };
+}
+
+function getInternalUseInventoryEffectFlow(
+  log: TransactionLog,
+  batch: IoBatch | null | undefined,
+): HistoryFlowPresentation | null {
+  if (log.transaction_type !== "INTERNAL_USE" && batch?.work_type !== "internal_use") return null;
+  const stockCell = log.inventory_effect?.find((cell) => Number(cell.delta) !== 0);
+  if (!stockCell) return null;
+  const stockLocation = stockCell.scope === "warehouse"
+    ? "창고"
+    : stockCell.department?.trim() || batch?.from_department?.trim() || "부서";
+  const useLocation = batch?.to_department?.trim() || log.department?.trim();
+  if (!useLocation) return null;
+  const isCancellation = log.operation_kind === "CANCELLATION";
+  const from = isCancellation ? useLocation : stockLocation;
+  const to = isCancellation ? stockLocation : useLocation;
+  return { label: `${from} → ${to}`, from, to };
 }
 
 function getStockPresentation(log: TransactionLog): HistoryStockPresentation | null {
@@ -596,6 +649,7 @@ export function getHistoryListOperationLabel(
     return `${getHistoryListOperationLabel({ ...log, operation_kind: null }, batch)} 취소`;
   }
   if (log.transaction_type === "UNMARK_DEFECTIVE") return "불량 정상 복귀";
+  if (log.transaction_type === "SUPPLIER_RETURN") return "반품";
   if (log.reference_no?.startsWith("defect-disassemble:")) return "재작업";
 
   const phaseLabel = getShippingPhaseOperationLabel(log.shipping_phase);
@@ -603,6 +657,9 @@ export function getHistoryListOperationLabel(
   if (log.transaction_type === "SHIP" && isShippingReference(log)) return "출하";
 
   if (batch) {
+    if (log.transaction_type === "RECEIVE" && batch.sub_type === "receive_supplier") {
+      return "원자재 입고";
+    }
     if (batch.work_type === "internal_use") return getInternalUseListLabel(log, batch);
     const displayType = getHistoryDisplayTransactionType(log, batch);
     if (displayType === "PRODUCE") return "생산 입고";
@@ -628,7 +685,6 @@ export function getHistoryListOperationLabel(
       return log.department === "창고" ? "창고 수량 조정" : "부서 입출고";
     case "MARK_DEFECTIVE":
     case "DEFECT_SCRAP":
-    case "SUPPLIER_RETURN":
       return "불량";
     case "SHIP":
       return "출하";

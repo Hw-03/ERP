@@ -89,8 +89,51 @@ def test_history_exposes_request_actor_and_inventory_effect_for_approved_transfe
     assert row["reference_no"] == request_body["request_code"]
     assert row["requester_name"] == "Requester"
     assert row["approver_name"] == "Warehouse"
+    assert row["executor_name"] == "Warehouse"
     assert row["quantity_change"] == 0
 
     effects = _effect_by_cell(row)
     assert effects[("warehouse", None, None)] == -3
     assert effects[("location", DepartmentEnum.ASSEMBLY.value, "PRODUCTION")] == 3
+
+
+def test_8_22_10_history_keeps_self_approval_and_executor_roles(
+    client,
+    db_session,
+    make_item,
+):
+    """자가승인도 목록 중복 표시는 피하되 상세 감사 데이터에서는 역할을 보존한다."""
+    item = make_item(name="Self Audit Item", process_type_code="AR", warehouse_qty=Decimal("5"))
+    requester = _make_employee(
+        db_session,
+        code="SELF1",
+        name="Self Approver",
+        warehouse_role="primary",
+    )
+    db_session.commit()
+
+    create_res = client.post(
+        "/api/stock-requests",
+        json={
+            "requester_employee_id": str(requester.employee_id),
+            "request_type": "warehouse_to_dept",
+            "lines": [
+                {
+                    "item_id": str(item.item_id),
+                    "quantity": "1",
+                    "from_bucket": "warehouse",
+                    "to_bucket": "production",
+                    "to_department": DepartmentEnum.ASSEMBLY.value,
+                }
+            ],
+        },
+    )
+    assert create_res.status_code == 201, create_res.text
+    assert create_res.json()["status"] == "completed"
+
+    history_res = client.get(f"/api/inventory/transactions?item_id={item.item_id}&limit=10")
+    assert history_res.status_code == 200, history_res.text
+    row = history_res.json()[0]
+    assert row["requester_name"] == "Self Approver"
+    assert row["approver_name"] == "Self Approver"
+    assert row["executor_name"] == "Self Approver"

@@ -23,6 +23,8 @@ import {
 import {
   classifyHistoryScope,
   getDefaultHistoryScopeForOperator,
+  isDepartmentInternalType,
+  isWarehouseInvolvedType,
   isExceptionLike,
   isAdjustmentLike,
   isReworkOperation,
@@ -357,6 +359,34 @@ describe("getHistoryFlowLabel", () => {
 // getBatchFlowEndpoints
 // ──────────────────────────────────────────────────────────────────
 describe("getBatchFlowEndpoints", () => {
+  it("8.23-10 부서 입출고는 수량 조정이 아니라 실제 부서와 외부 사이 흐름으로 표시한다", () => {
+    const inbound = makeBatch({
+      work_type: "process",
+      sub_type: "adjust_in",
+      bundles: [makeBundle({
+        lines: [makeLine({
+          from_bucket: "none",
+          to_bucket: "production",
+          to_department: "조립",
+        })],
+      })],
+    });
+    const outbound = makeBatch({
+      work_type: "process",
+      sub_type: "adjust_out",
+      bundles: [makeBundle({
+        lines: [makeLine({
+          from_bucket: "production",
+          from_department: "조립",
+          to_bucket: "none",
+        })],
+      })],
+    });
+
+    expect(getBatchFlowEndpoints(inbound)).toEqual({ from: "외부", to: "조립", mixed: false });
+    expect(getBatchFlowEndpoints(outbound)).toEqual({ from: "조립", to: "외부", mixed: false });
+  });
+
   it.each([
     {
       subType: "produce" as const,
@@ -926,6 +956,13 @@ describe("getHistoryLineStatusLabel", () => {
 // classifyHistoryScope
 // ──────────────────────────────────────────────────────────────────
 describe("classifyHistoryScope", () => {
+  it("8.3-03 출하와 부서 출처 AS·연구 사용은 창고가 아니라 부서 작업 건수로 분류한다", () => {
+    expect(isWarehouseInvolvedType("SHIP")).toBe(false);
+    expect(isWarehouseInvolvedType("INTERNAL_USE")).toBe(false);
+    expect(isDepartmentInternalType("SHIP")).toBe(true);
+    expect(isDepartmentInternalType("INTERNAL_USE")).toBe(true);
+  });
+
   it("RECEIVE (no batch) → warehouse_involved", () => {
     expect(classifyHistoryScope({ transaction_type: "RECEIVE" })).toBe("warehouse_involved");
   });

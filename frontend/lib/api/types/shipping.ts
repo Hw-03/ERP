@@ -225,8 +225,10 @@ export interface ShippingRequest {
   request_quantity: number;
   final_pa_item_id: string | null;
   final_pa_item_name: string | null;
+  final_pa_mes_code: string | null;
   final_pf_item_id: string | null;
   final_pf_item_name: string | null;
+  final_pf_mes_code: string | null;
   finalization_mode?: ShippingFinalizationMode;
   reuse_pf_item_id?: string | null;
   requested_by_name: string | null;

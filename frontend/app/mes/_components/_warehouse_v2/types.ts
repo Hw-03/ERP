@@ -20,6 +20,7 @@ export interface OperatorLike {
   name: string;
   department: string;
   warehouse_role?: string;
+  department_role?: string;
   level?: string;
 }
 

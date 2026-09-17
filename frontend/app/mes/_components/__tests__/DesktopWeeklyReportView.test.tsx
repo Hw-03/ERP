@@ -73,6 +73,7 @@ describe("DesktopWeeklyReportView F705-02 다운로드", () => {
     state.useWeeklyReportQuery.mockReturnValue({
       data: {
         groups: [],
+        summary: { total_produce_qty: 1 },
         production_matrix: [{ model_key: "M1", model_label: "M1", total_qty: 1 }],
       },
       isLoading: false,
@@ -85,21 +86,43 @@ describe("DesktopWeeklyReportView F705-02 다운로드", () => {
     vi.restoreAllMocks();
   });
 
-  it("생산 부서 수는 상세의 A 품목 생산을 제외한 매트릭스로 계산한다", () => {
+  it("모델별 생산이 있으면 중복 요약 없이 생산 매트릭스만 표시한다", () => {
     state.useWeeklyReportQuery.mockReturnValue({
       data: {
         groups: [
           { process_code: "TF", produce_qty: 11, items: [] },
           { process_code: "VF", produce_qty: 22, items: [] },
         ],
+        summary: { total_produce_qty: 11 },
         production_matrix: [{ model_key: "SOLO", model_label: "SOLO", tf_qty: 11, vf_qty: 0, total_qty: 11 }],
       },
       isLoading: false,
       error: null,
     });
     renderWeekly();
-    expect(screen.getByText("생산 부서 1/2")).toBeInTheDocument();
-    expect(screen.getByText("총 11개")).toBeInTheDocument();
+    expect(screen.getByText("생산 매트릭스")).toBeInTheDocument();
+    expect(screen.queryByText("생산 부서 1/2")).not.toBeInTheDocument();
+    expect(screen.queryByText("전체 생산 11개")).not.toBeInTheDocument();
+    expect(screen.queryByText("최다 SOLO (11)")).not.toBeInTheDocument();
+  });
+
+  it("8.21-05 전체 생산은 있지만 모델별 집계가 0이면 제외 기준을 따로 안내한다", () => {
+    state.useWeeklyReportQuery.mockReturnValue({
+      data: {
+        groups: [],
+        summary: { total_produce_qty: 8 },
+        production_matrix: [],
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderWeekly();
+
+    expect(screen.queryByText(/생산 실적 없음/)).not.toBeInTheDocument();
+    expect(screen.getByText("전체 생산 8개")).toBeInTheDocument();
+    expect(screen.getByText("모델별 집계 0")).toBeInTheDocument();
+    expect(screen.getByText(/모델 정보가 없거나 공용인 품목은 모델별 집계에서 제외/)).toBeInTheDocument();
   });
 
   it("KST 월요일부터 일요일까지를 주간보고 조회 기간으로 사용한다", () => {

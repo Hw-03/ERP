@@ -95,8 +95,9 @@ export function MobileWeeklyScreen({
   }, [weekStart, weekEnd, reloadNonce]);
 
   const matrixRows = data?.production_matrix ?? [];
-  const hasProduction = matrixRows.some((r) => r.total_qty > 0);
-  const totalQty = matrixRows.reduce((s, r) => s + r.total_qty, 0);
+  const totalProduceQty = data?.summary?.total_produce_qty ?? 0;
+  const hasOverallProduction = totalProduceQty > 0;
+  const hasModelProduction = matrixRows.some((r) => r.total_qty > 0);
   const topModel = matrixRows.reduce(
     (best, r) => (r.total_qty > (best?.total_qty ?? 0) ? r : best),
     null as WeeklyProductionModelRow | null,
@@ -143,10 +144,14 @@ export function MobileWeeklyScreen({
             <div className={clsx(TYPO.overline, "mb-2")} style={{ color: LEGACY_COLORS.muted2 }}>
               생산 현황
             </div>
-            {hasProduction ? (
+            {!hasOverallProduction ? (
+              <div className={TYPO.body} style={{ color: LEGACY_COLORS.muted2 }}>
+                이번 주 생산 실적이 없습니다.
+              </div>
+            ) : hasModelProduction ? (
               <>
                 <div className="mb-3 flex flex-wrap gap-1.5">
-                  <Kpi label={`총 ${totalQty.toLocaleString()}개`} />
+                  <Kpi label={`총 ${totalProduceQty.toLocaleString()}개`} />
                   {topModel && <Kpi label={`최다 ${topModel.model_label}`} tone={LEGACY_COLORS.blue} />}
                   <Kpi label={`생산부서 ${activeDepts}/${totalDepts}`} />
                 </div>
@@ -154,8 +159,16 @@ export function MobileWeeklyScreen({
                 <WeeklyProductionMatrix rows={matrixRows} />
               </>
             ) : (
-              <div className={TYPO.body} style={{ color: LEGACY_COLORS.muted2 }}>
-                이번 주 생산 실적이 없습니다.
+              <div className="space-y-1">
+                <div className={TYPO.body} style={{ color: LEGACY_COLORS.text }}>
+                  전체 생산 {totalProduceQty.toLocaleString()}개
+                </div>
+                <div className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>
+                  모델별 집계 0
+                </div>
+                <div className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>
+                  모델 정보가 없거나 공용인 품목은 모델별 집계에서 제외됩니다.
+                </div>
               </div>
             )}
           </section>

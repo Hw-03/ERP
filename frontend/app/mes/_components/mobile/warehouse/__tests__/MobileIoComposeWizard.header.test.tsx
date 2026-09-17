@@ -73,11 +73,14 @@ vi.mock("../../../_warehouse_v2/IoConfirmStep", () => ({
   IoConfirmStep: ({
     onSubmit,
     onValidationError,
+    autoApprove,
   }: {
     onSubmit: () => void;
     onValidationError?: (message: string) => void;
+    autoApprove?: boolean;
   }) => (
     <>
+      <span>{autoApprove ? "자동 승인" : "결재 요청"}</span>
       <button type="button" onClick={onSubmit}>모바일 제출</button>
       <button type="button" onClick={() => onValidationError?.("메모가 없어 부서 결재 요청을 진행할 수 없습니다.")}>메모 오류</button>
     </>
@@ -94,6 +97,25 @@ beforeEach(() => {
 });
 
 describe("MobileIoComposeWizard Step 5 헤더", () => {
+  it("8.25-04: 모바일도 창고 결재권자의 요청을 자동 승인으로 안내한다", () => {
+    render(
+      <MobileIoComposeWizard
+        globalSearch=""
+        operator={{
+          employee_id: "warehouse-approver",
+          name: "창고 결재자",
+          department: "조립",
+          warehouse_role: "primary",
+        }}
+        items={[]}
+        setItems={vi.fn()}
+        onStatusChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("자동 승인")).toBeInTheDocument();
+  });
+
   it.each([
     ["창고 입출고", "warehouse_io", "warehouse_to_dept"],
     ["부서 입출고", "process", "produce"],

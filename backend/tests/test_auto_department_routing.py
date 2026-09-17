@@ -140,6 +140,7 @@ def test_stock_request_exact_retry_survives_later_item_department_change(
     payload = {
         "requester_employee_id": str(employee.employee_id),
         "request_type": "scrap_normal",
+        "reason_category": "기타",
         "client_request_id": "retry-after-process-change",
         "lines": [{
             "item_id": str(item.item_id),
@@ -186,6 +187,7 @@ def test_warehouse_normal_request_does_not_require_item_department_mapping(
     response = client.post("/api/stock-requests", json={
         "requester_employee_id": str(employee.employee_id),
         "request_type": "scrap_normal",
+        "reason_category": "기타",
         "lines": [{
             "item_id": str(item.item_id),
             "quantity": 1,
@@ -239,6 +241,7 @@ def test_stock_request_rejects_nonautomatic_normal_source_department(
     response = client.post("/api/stock-requests", json={
         "requester_employee_id": str(employee.employee_id),
         "request_type": request_type,
+        "reason_category": "기타",
         "lines": [{
             "item_id": str(item.item_id),
             "quantity": 1,
@@ -267,6 +270,7 @@ def test_stock_request_allows_each_production_line_its_own_item_department(
     response = client.post("/api/stock-requests", json={
         "requester_employee_id": str(employee.employee_id),
         "request_type": "scrap_normal",
+        "reason_category": "기타",
         "lines": [
             {"item_id": str(tube.item_id), "quantity": 1, "from_bucket": "production", "from_department": DepartmentEnum.TUBE.value, "to_bucket": "none"},
             {"item_id": str(vacuum.item_id), "quantity": 1, "from_bucket": "production", "from_department": DepartmentEnum.VACUUM.value, "to_bucket": "none"},
@@ -370,6 +374,7 @@ def test_draft_submit_rejects_department_stale_after_item_process_change(
     draft = client.put("/api/stock-requests/draft", json={
         "requester_employee_id": str(employee.employee_id),
         "request_type": "scrap_normal",
+        "reason_category": "기타",
         "lines": [{
             "item_id": str(item.item_id),
             "quantity": 1,

@@ -52,6 +52,7 @@ from app.routers.inventory._tx_filters import (
     _SUMMARY_DEPT_TYPES,
     _SUMMARY_ADJUST_TYPES,
     _WAREHOUSE_ADJUST_SUBTYPES,
+    _DEPARTMENT_IO_SUBTYPES,
     _department_label_expr,
     _apply_common_filters,
     _history_visibility_filter,
@@ -660,8 +661,24 @@ def get_transactions_summary(
         ),
         else_=literal("log:") + cast(TransactionLog.log_id, String),
     )
+    is_department_activity = or_(
+        TransactionLog.transaction_type.in_(_SUMMARY_DEPT_TYPES),
+        InventoryOperation.domain == "department_inventory",
+        and_(
+            TransactionLog.transaction_type == TransactionTypeEnum.ADJUST,
+            IoBatch.sub_type.in_(_DEPARTMENT_IO_SUBTYPES),
+        ),
+    )
     is_adjustment = and_(
         TransactionLog.transaction_type.in_(_SUMMARY_ADJUST_TYPES),
+        or_(
+            InventoryOperation.operation_id.is_(None),
+            InventoryOperation.domain != "department_inventory",
+        ),
+        or_(
+            IoBatch.batch_id.is_(None),
+            IoBatch.sub_type.notin_(_DEPARTMENT_IO_SUBTYPES),
+        ),
         or_(
             InventoryOperation.kind.is_(None),
             InventoryOperation.kind != InventoryOperationKindEnum.CANCELLATION,
@@ -690,7 +707,7 @@ def get_transactions_summary(
         func.count(
             func.distinct(
                 case(
-                    (TransactionLog.transaction_type.in_(_SUMMARY_DEPT_TYPES), work_key)
+                    (is_department_activity, work_key)
                 )
             )
         ).label("dept_count"),
