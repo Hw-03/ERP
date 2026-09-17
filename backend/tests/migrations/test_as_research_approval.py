@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.database import Base
 from app.models import Employee
 from bootstrap import seed as seed_module
+from bootstrap.schema import ensure_schema
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -39,6 +40,9 @@ def test_migration_adds_fields_backfills_employee_codes_and_preserves_history(
     request_id = uuid.uuid4().hex
     partial_batch_id = uuid.uuid4().hex
     partial_request_id = uuid.uuid4().hex
+    item_id = uuid.uuid4().hex
+    line_id = uuid.uuid4().hex
+    notification_id = uuid.uuid4().hex
     with sqlite3.connect(path) as db:
         db.executemany(
             "INSERT INTO employees "
@@ -77,8 +81,46 @@ def test_migration_adds_fields_backfills_employee_codes_and_preserves_history(
             "'2026-09-02 02:03:04', '기존 반려', ?)",
             (partial_request_id, employee_ids["E04"], partial_batch_id),
         )
+        db.execute(
+            "INSERT INTO process_types (code, prefix, suffix, stage_order) "
+            "VALUES ('AR', 'A', 'R', 1)"
+        )
+        db.execute(
+            "INSERT INTO items "
+            "(item_id, item_name, unit, model_symbol, process_type_code, serial_no) "
+            "VALUES (?, '기존 품목', 'EA', '3', 'AR', 1)",
+            (item_id,),
+        )
+        db.execute(
+            "INSERT INTO stock_request_lines "
+            "(line_id, request_id, item_id, item_name_snapshot, quantity, "
+            "from_bucket, to_bucket, status) "
+            "VALUES (?, ?, ?, '기존 품목', 2, 'WAREHOUSE', 'PRODUCTION', 'COMPLETED')",
+            (line_id, request_id, item_id),
+        )
+        db.execute(
+            "UPDATE io_batches SET stock_request_id = ? WHERE batch_id = ?",
+            (partial_request_id, partial_batch_id),
+        )
+        db.execute(
+            "INSERT INTO notifications "
+            "(notification_id, recipient_employee_id, type, title, related_request_id) "
+            "VALUES (?, ?, 'approval_approved', '기존 알림', ?)",
+            (notification_id, employee_ids["E04"], request_id),
+        )
+        line_before = db.execute(
+            "SELECT * FROM stock_request_lines WHERE line_id = ?",
+            (line_id,),
+        ).fetchone()
 
-    command.upgrade(config, MIGRATION_REVISION)
+    engine = sa.create_engine(f"sqlite:///{path.as_posix()}")
+    try:
+        with engine.connect() as connection:
+            connection.exec_driver_sql("PRAGMA foreign_keys = ON")
+            connection.commit()
+            result = ensure_schema(connection=connection)
+    finally:
+        engine.dispose()
 
     with sqlite3.connect(path) as db:
         employee_columns = {row[1] for row in db.execute("PRAGMA table_info(employees)")}
@@ -102,6 +144,23 @@ def test_migration_adds_fields_backfills_employee_codes_and_preserves_history(
             "WHERE b.batch_id = ?",
             (partial_batch_id,),
         ).fetchone()
+        line_after = db.execute(
+            "SELECT * FROM stock_request_lines WHERE line_id = ?",
+            (line_id,),
+        ).fetchone()
+        batch_request_id = db.execute(
+            "SELECT stock_request_id FROM io_batches WHERE batch_id = ?",
+            (partial_batch_id,),
+        ).fetchone()[0]
+        notification_request_id = db.execute(
+            "SELECT related_request_id FROM notifications WHERE notification_id = ?",
+            (notification_id,),
+        ).fetchone()[0]
+        request_foreign_keys = {
+            (row[3], row[2], row[4], row[6])
+            for row in db.execute("PRAGMA foreign_key_list(stock_requests)")
+        }
+        foreign_key_violations = db.execute("PRAGMA foreign_key_check").fetchall()
         revision = db.execute("SELECT version_num FROM alembic_version").fetchone()[0]
 
     assert "as_research_approver" in employee_columns
@@ -124,6 +183,17 @@ def test_migration_adds_fields_backfills_employee_codes_and_preserves_history(
         "2026-09-02 02:03:04",
         "기존 반려",
     )
+    assert line_after == line_before
+    assert batch_request_id == partial_request_id
+    assert notification_request_id == request_id
+    assert (
+        "as_research_approved_by_employee_id",
+        "employees",
+        "employee_id",
+        "SET NULL",
+    ) in request_foreign_keys
+    assert foreign_key_violations == []
+    assert result.revision == MIGRATION_REVISION
     assert revision == MIGRATION_REVISION
 
 

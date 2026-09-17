@@ -265,7 +265,7 @@ $schemaPatterns = @(
 )
 $backendDryRun = robocopy "$DevRoot\backend" $EmpBackend /L /MIR `
     /XF "*.db*" "*.sqlite*" "*.pyc" ".testmondata*" ".env*" ".npmrc" "next-env.d.ts" "tsconfig.tsbuildinfo" `
-    /XD __pycache__ .git .venv data logs .pytest_cache .ruff_cache _backup node_modules .next .next-prod _archive coverage test-results `
+    /XD __pycache__ .git .venv data logs .pytest_cache .ruff_cache _backup node_modules .next .next-prod _archive coverage test-results tests `
     /NJH /NDL /NP 2>&1 | Out-String -Stream
 $backendDryRunExit = $LASTEXITCODE
 if ($backendDryRunExit -ge 8) {
@@ -287,7 +287,7 @@ $opsFileChanges = @()
 $hasCodeChanges = $false
 if ($DryRun) {
     $frontendDryRun = robocopy "$DevRoot\frontend" $EmpFrontend /L /MIR `
-        /XD __pycache__ .git .venv data logs .pytest_cache .ruff_cache _backup node_modules .next .next-prod _archive coverage test-results `
+        /XD __pycache__ .git .venv data logs .pytest_cache .ruff_cache _backup node_modules .next .next-prod _archive coverage test-results tests `
         /XF "*.db*" "*.sqlite*" "*.pyc" ".testmondata*" ".env*" ".npmrc" "next-env.d.ts" "tsconfig.tsbuildinfo" `
         /NJH /NDL /NP 2>&1 | Out-String -Stream
     $frontendDryRunExit = $LASTEXITCODE
@@ -573,7 +573,7 @@ foreach ($batName in @("start.bat", "watch.bat", "stop.bat", "status.bat")) {
 Write-Host "[sync] 백엔드 동기화 중..."
 robocopy "$DevRoot\backend" $EmpBackend /MIR `
     /XF "*.db*" "*.sqlite*" "*.pyc" ".testmondata*" ".env*" ".npmrc" "next-env.d.ts" "tsconfig.tsbuildinfo" `
-    /XD __pycache__ .git .venv data logs .pytest_cache .ruff_cache _backup node_modules .next .next-prod _archive coverage test-results `
+    /XD __pycache__ .git .venv data logs .pytest_cache .ruff_cache _backup node_modules .next .next-prod _archive coverage test-results tests `
     /NJH /NDL /NP /NS /NC | Out-Null
 $backendExit = $LASTEXITCODE
 if ($backendExit -ge 8) {

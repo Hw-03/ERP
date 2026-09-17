@@ -4,6 +4,8 @@ $RepoRoot = "C:\ERP"
 $RunRoot = Join-Path $RepoRoot "_attic\runtime\scheduled-sync"
 $PowerShell = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
 $Utf8 = New-Object System.Text.UTF8Encoding($false)
+$ReceiptReplaceMaxAttempts = 50
+$ReceiptReplaceRetryMilliseconds = 100
 $script:Receipt = $null
 $script:ReceiptPath = $null
 $lockHandle = $null
@@ -14,11 +16,26 @@ function Save-SyncReceipt {
     $temporaryPath = $script:ReceiptPath + ".tmp"
     $json = $script:Receipt | ConvertTo-Json -Depth 8
     [System.IO.File]::WriteAllText($temporaryPath, $json, $Utf8)
-    if (Test-Path -LiteralPath $script:ReceiptPath) {
-        [System.IO.File]::Replace($temporaryPath, $script:ReceiptPath, [NullString]::Value)
-    }
-    else {
-        [System.IO.File]::Move($temporaryPath, $script:ReceiptPath)
+    for ($attempt = 1; $attempt -le $ReceiptReplaceMaxAttempts; $attempt++) {
+        try {
+            if (Test-Path -LiteralPath $script:ReceiptPath) {
+                [System.IO.File]::Replace($temporaryPath, $script:ReceiptPath, [NullString]::Value)
+            }
+            else {
+                [System.IO.File]::Move($temporaryPath, $script:ReceiptPath)
+            }
+            return
+        }
+        catch {
+            $isTransientFileLock = (
+                $_.Exception -is [System.IO.IOException] -or
+                $_.Exception -is [System.UnauthorizedAccessException]
+            )
+            if (-not $isTransientFileLock -or $attempt -eq $ReceiptReplaceMaxAttempts) {
+                throw
+            }
+            Start-Sleep -Milliseconds $ReceiptReplaceRetryMilliseconds
+        }
     }
 }
 

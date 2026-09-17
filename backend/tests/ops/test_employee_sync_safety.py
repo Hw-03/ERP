@@ -1892,10 +1892,12 @@ def test_employee_sync_excludes_local_test_and_build_caches() -> None:
 
     for backend_copy in (dry_run_backend, sync_backend):
         assert "/XD __pycache__ .git .venv data logs .pytest_cache .ruff_cache _backup" in backend_copy
+        assert " tests " in backend_copy
         assert '".testmondata*"' in backend_copy
 
     assert '"tsconfig.tsbuildinfo"' in dry_run_frontend
     assert ".pytest_cache" in dry_run_frontend
+    assert " tests " in dry_run_frontend
     assert '"next-env.d.ts"' in dry_run_frontend
     assert "Invoke-FrontendRelease -Command 'install'" in script
 

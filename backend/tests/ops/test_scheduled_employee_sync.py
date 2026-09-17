@@ -176,3 +176,33 @@ def test_receipt_failure_keeps_lock_until_running_child_exits(tmp_path: Path) ->
     receipt = _receipt(tmp_path)
     assert receipt["result"] == "WRAPPER_FAILED"
     assert receipt["data"]["status"] == "NOT_STARTED"
+
+
+def test_transient_receipt_replace_lock_is_retried_before_data_handoff(tmp_path: Path) -> None:
+    script, env = _prepare(tmp_path)
+    source = script.read_text(encoding="utf-8-sig")
+    replace_call = (
+        "[System.IO.File]::Replace($temporaryPath, $script:ReceiptPath, "
+        "[NullString]::Value)"
+    )
+    assert replace_call in source
+    source = source.replace(
+        replace_call,
+        "if ($script:Receipt.code.exitCode -eq 0 -and "
+        "-not $script:InjectedReceiptReplaceFailure) {\n"
+        "            $script:InjectedReceiptReplaceFailure = $true\n"
+        "            throw [System.IO.IOException]::new('Injected transient receipt lock')\n"
+        "        }\n"
+        f"        {replace_call}",
+    )
+    script.write_text(source, encoding="utf-8-sig")
+
+    result = _run(script, env)
+
+    assert result.returncode == 0, result.stderr
+    assert (tmp_path / "events.log").read_text(encoding="utf-8-sig").splitlines() == [
+        "CODE:", "DATA:-Apply",
+    ]
+    receipt = _receipt(tmp_path)
+    assert receipt["result"] == "COMPLETED"
+    assert receipt["code"]["status"] == receipt["data"]["status"] == "COMPLETED"

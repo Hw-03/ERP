@@ -1,0 +1,3 @@
+display_name: Commit Push
+short_description: Commit and push only the current task's changes.
+default_prompt: Commit and push the current task's changes, excluding unrelated work.

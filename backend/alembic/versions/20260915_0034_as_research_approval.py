@@ -84,6 +84,21 @@ def upgrade() -> None:
             for foreign_key in inspector.get_foreign_keys("stock_requests")
         )
         if not has_foreign_key:
+            if bind.dialect.name == "sqlite":
+                bind.exec_driver_sql(
+                    "CREATE TEMP TABLE _as_research_stock_request_lines AS "
+                    "SELECT * FROM stock_request_lines"
+                )
+                bind.exec_driver_sql(
+                    "CREATE TEMP TABLE _as_research_io_batch_refs AS "
+                    "SELECT batch_id, stock_request_id FROM io_batches "
+                    "WHERE stock_request_id IS NOT NULL"
+                )
+                bind.exec_driver_sql(
+                    "CREATE TEMP TABLE _as_research_notification_refs AS "
+                    "SELECT notification_id, related_request_id FROM notifications "
+                    "WHERE related_request_id IS NOT NULL"
+                )
             with op.batch_alter_table("stock_requests") as batch_op:
                 batch_op.create_foreign_key(
                     "fk_stock_requests_as_research_approved_by_employee_id",
@@ -92,6 +107,27 @@ def upgrade() -> None:
                     ["employee_id"],
                     ondelete="SET NULL",
                 )
+            if bind.dialect.name == "sqlite":
+                bind.exec_driver_sql(
+                    "INSERT INTO stock_request_lines "
+                    "SELECT * FROM _as_research_stock_request_lines"
+                )
+                bind.exec_driver_sql(
+                    "UPDATE io_batches SET stock_request_id = ("
+                    "SELECT saved.stock_request_id FROM _as_research_io_batch_refs AS saved "
+                    "WHERE saved.batch_id = io_batches.batch_id) "
+                    "WHERE batch_id IN (SELECT batch_id FROM _as_research_io_batch_refs)"
+                )
+                bind.exec_driver_sql(
+                    "UPDATE notifications SET related_request_id = ("
+                    "SELECT saved.related_request_id FROM _as_research_notification_refs AS saved "
+                    "WHERE saved.notification_id = notifications.notification_id) "
+                    "WHERE notification_id IN ("
+                    "SELECT notification_id FROM _as_research_notification_refs)"
+                )
+                bind.exec_driver_sql("DROP TABLE _as_research_stock_request_lines")
+                bind.exec_driver_sql("DROP TABLE _as_research_io_batch_refs")
+                bind.exec_driver_sql("DROP TABLE _as_research_notification_refs")
 
         bind.execute(
             sa.text(
