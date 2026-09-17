@@ -21,9 +21,8 @@ import { filterDefectLocations } from "./_defect_hub/defectCategoryFilter";
 import { DefectDepartmentList } from "./_defect_hub/DefectDepartmentList";
 import { DefectCartFlow, type DefectCartMode } from "./_defect_hub/DefectCartFlow";
 import { DefectProcessPanel } from "./_defect_hub/DefectProcessPanel";
-import { InlineErrorNote } from "./_defect_hub/InlineErrorNote";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
-import { LoadFailureCard } from "./common/LoadFailureCard";
+import { ReadEmpty, ReadFailure, ReadLoading } from "./common/ReadState";
 import { matchesDefectSearch } from "./_defect_hub/defectSearch";
 
 
@@ -537,25 +536,23 @@ function DefectViewInner({
             <DefectSearchInput value={search} onChange={setSearch} />
 
             {refreshError && (
-              <LoadFailureCard
-                prefix="최신 불량 격리 목록을 동기화하지 못했습니다"
+              <ReadFailure
+                refresh
                 message={refreshError}
-                retryLabel="다시 동기화"
                 onRetry={() => setReloadNonce((value) => value + 1)}
               />
             )}
 
             {loading ? (
-              <div className="py-10 text-center text-sm font-bold" style={{ color: LEGACY_COLORS.muted }}>
-                불량 데이터 로딩 중...
-              </div>
+              <ReadLoading label="불량 데이터 로딩 중..." />
             ) : error ? (
-              <InlineErrorNote variant="block" className="!text-sm">
-                {error}
-              </InlineErrorNote>
+              <ReadFailure message={error} onRetry={() => setReloadNonce((value) => value + 1)} />
             ) : (
               <>
                 <DefectDepartmentList
+                  emptyContent={<ReadEmpty hasSearch={!!search.trim()} hasFilters={locations.length > 0}
+                    title={!search.trim() && locations.length === 0 ? "격리된 불량 재고가 없습니다." : undefined}
+                    onReset={() => { setSearch(""); setScope("all"); resetCategoryFilters(); setKpiFilter(null); }} />}
                   locations={filteredLocations}
                   currentEmployee={employee}
                   onMemoUpdated={handleMemoUpdated}

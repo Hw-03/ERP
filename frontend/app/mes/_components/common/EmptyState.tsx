@@ -28,6 +28,7 @@ interface Props {
   action?: { label: string; onClick: () => void };
   compact?: boolean;
   className?: string;
+  comfortable?: boolean;
 }
 
 function EmptyStateImpl({
@@ -38,6 +39,7 @@ function EmptyStateImpl({
   action,
   compact = false,
   className = "",
+  comfortable = false,
 }: Props) {
   const fallback = VARIANT_DEFAULTS[variant];
   const finalTitle = title ?? fallback.title;
@@ -53,7 +55,7 @@ function EmptyStateImpl({
         {finalTitle}
       </div>
       {finalDescription && (
-        <div className={compact ? "text-[11px]" : "text-xs"} style={{ color: LEGACY_COLORS.muted2 }}>
+        <div className={comfortable ? "text-sm" : compact ? "text-[11px]" : "text-xs"} style={{ color: LEGACY_COLORS.muted2 }}>
           {finalDescription}
         </div>
       )}
@@ -61,7 +63,7 @@ function EmptyStateImpl({
         <button
           type="button"
           onClick={action.onClick}
-          className="standard-hover mt-2 rounded-[12px] border px-3 py-1.5 text-xs font-bold transition-colors"
+          className={`standard-hover mt-2 rounded-[12px] border px-3 py-1.5 font-bold transition-colors ${comfortable ? "min-h-11 text-sm" : "text-xs"}`}
           style={{
             borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 30%, ${LEGACY_COLORS.border})`,
             color: LEGACY_COLORS.blue,

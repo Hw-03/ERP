@@ -87,7 +87,6 @@ export function useDesktopHistoryGroups({
   const [hasMore, setHasMore] = useState(initialCached?.hasMore ?? false);
   const queryIdentityRef = useRef(queryIdentity);
   const generationRef = useRef(0);
-  const isFirstRunRef = useRef(true);
   const retryQueryIdentityRef = useRef<string | null>(null);
   const refreshRetryQueryIdentityRef = useRef<string | null>(null);
   const refreshLoadedQueryIdentityRef = useRef<string | null>(null);
@@ -108,6 +107,7 @@ export function useDesktopHistoryGroups({
     refreshLoadedQueryIdentityRef.current = null;
     const queryChanged = queryIdentityRef.current !== queryIdentity;
     if (queryChanged) hasSuccessfulLoadRef.current = false;
+    const backgroundRefresh = !queryChanged && hasSuccessfulLoadRef.current;
     const revisionChanged = realtimeRevisionRef.current !== realtimeRevision;
     const shouldRefreshLoadedDepth = (revisionChanged || isRefreshRetry || isExplicitRefresh)
       && !queryChanged
@@ -116,10 +116,7 @@ export function useDesktopHistoryGroups({
     const refreshAnchorGroupKey = shouldRefreshLoadedDepth ? loadedTailGroupKeyRef.current : null;
     queryIdentityRef.current = queryIdentity;
     const params = pageParams();
-    const skipReset = isRetry
-      || shouldRefreshLoadedDepth
-      || (isFirstRunRef.current && initialCached !== undefined);
-    isFirstRunRef.current = false;
+    const skipReset = isRetry || backgroundRefresh;
     setError(null);
     setRefreshError(null);
     loadingMoreRef.current = false;
@@ -174,7 +171,7 @@ export function useDesktopHistoryGroups({
     }).catch((caught: unknown) => {
       if (generationRef.current !== generation || queryIdentityRef.current !== queryIdentity) return;
       const message = historyLoadError(caught, "입출고 내역을 불러오지 못했습니다.");
-      if (shouldRefreshLoadedDepth) setRefreshError(message);
+      if (backgroundRefresh) setRefreshError(message);
       else setError(message);
       loadingRef.current = false;
       setLoading(false);

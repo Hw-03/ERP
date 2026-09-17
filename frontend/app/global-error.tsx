@@ -4,6 +4,7 @@
 // HTML/body 를 직접 렌더해야 한다(이 경우 layout 이 동작하지 않음).
 
 import { useEffect } from "react";
+import { RecoveryScreen } from "./RecoveryScreen";
 
 export default function GlobalError({
   error,
@@ -18,27 +19,8 @@ export default function GlobalError({
 
   return (
     <html lang="ko">
-      <body style={{ margin: 0, fontFamily: "system-ui, sans-serif", padding: "48px 24px", textAlign: "center" }}>
-        <h1 style={{ fontSize: 28, fontWeight: 900, marginBottom: 12 }}>
-          치명적인 오류가 발생했습니다
-        </h1>
-        <p style={{ fontSize: 14, opacity: 0.8, marginBottom: 16 }}>
-          {error.message || "알 수 없는 오류"}
-        </p>
-        <button
-          type="button"
-          onClick={() => reset()}
-          style={{
-            padding: "10px 20px",
-            border: "1px solid #888",
-            borderRadius: 12,
-            fontWeight: 700,
-            cursor: "pointer",
-            background: "transparent",
-          }}
-        >
-          다시 시도
-        </button>
+      <body style={{ margin: 0 }}>
+        <RecoveryScreen title="DEXCOWIN MES를 열지 못했습니다" description="잠시 후 다시 시도하거나 대시보드로 이동해 주세요." onRetry={reset} />
       </body>
     </html>
   );

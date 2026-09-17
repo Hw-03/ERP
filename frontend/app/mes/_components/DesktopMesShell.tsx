@@ -1,6 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { LoadingSkeleton } from "./common/LoadingSkeleton";
+import { InventoryItemsTable } from "./_inventory_sections/InventoryItemsTable";
+import { HistoryTableSkeleton } from "./_history_sections/HistoryTable";
+import { HistoryStatsBar } from "./_history_sections/HistoryStatsBar";
 import type { ElementType, ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
@@ -108,6 +112,7 @@ function DesktopMesShellInner({
   })();
 
   const [activeTab, setActiveTab] = useState<DesktopTabId>(initialTab);
+  const contentTab = useDeferredValue(activeTab);
   const [status, setStatus] = useState(DEFAULT_STATUS);
   const [statusNonce, setStatusNonce] = useState(0);
   const [refreshNonce, setRefreshNonce] = useState(0);
@@ -379,8 +384,8 @@ function DesktopMesShellInner({
   }, [canOpenTab, commitDesktopTab]);
 
   const content = useMemo(() => {
-    const key = activeTab === "admin" ? `admin-${adminPinEntryNonce}` : `${activeTab}-${refreshNonce}`;
-    if (activeTab === "dashboard") {
+    const key = contentTab === "admin" ? `admin-${adminPinEntryNonce}` : `${contentTab}-${refreshNonce}`;
+    if (contentTab === "dashboard") {
       return (
         <DesktopInventoryView
           key={key}
@@ -395,7 +400,7 @@ function DesktopMesShellInner({
         />
       );
     }
-    if (activeTab === "warehouse") {
+    if (contentTab === "warehouse") {
       return (
         <DesktopWarehouseView
           key={key}
@@ -412,7 +417,7 @@ function DesktopMesShellInner({
         />
       );
     }
-    if (activeTab === "shipping") {
+    if (contentTab === "shipping") {
       return (
         <DesktopShippingView
           key={key}
@@ -422,7 +427,7 @@ function DesktopMesShellInner({
         />
       );
     }
-    if (activeTab === "warehouseMap") {
+    if (contentTab === "warehouseMap") {
       return (
         <DesktopWarehouseMapTab
           key={key}
@@ -432,7 +437,7 @@ function DesktopMesShellInner({
         />
       );
     }
-    if (activeTab === "defect") {
+    if (contentTab === "defect") {
       return (
         <DesktopDefectView
           key={key}
@@ -442,16 +447,16 @@ function DesktopMesShellInner({
         />
       );
     }
-    if (activeTab === "history") {
+    if (contentTab === "history") {
       return <DesktopHistoryView key={key} />;
     }
-    if (activeTab === "dailyReport") {
+    if (contentTab === "dailyReport") {
       return <DesktopDailyWorkReportView key={key} operator={operator} onTopbarControlsChange={handleDailyReportTopbarControlsChange} />;
     }
-    if (activeTab === "weekly") {
+    if (contentTab === "weekly") {
       return <DesktopWeeklyReportView key={key} weekMon={weekMon} />;
     }
-    if (activeTab === "settings") {
+    if (contentTab === "settings") {
       return (
         <DesktopSettingsView
           key={key}
@@ -467,7 +472,7 @@ function DesktopMesShellInner({
     // setStockWarnings/setCapacityModal(setter), handleTabChange 는 안정적이거나 결과에
     // 영향이 없어 의도적으로 제외 — 누락이 아니라 최소 deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, refreshNonce, adminPinEntryNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, clearWarehouseEntry, canOpenWarehouse, canReceive, capacityData, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen, isItemPickerFullscreen, preferences, savePreferences, canOpenTab, handleOpenAdminPinEntry, handleDailyReportTopbarControlsChange]);
+  }, [contentTab, refreshNonce, adminPinEntryNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, clearWarehouseEntry, canOpenWarehouse, canReceive, capacityData, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen, isItemPickerFullscreen, preferences, savePreferences, canOpenTab, handleOpenAdminPinEntry, handleDailyReportTopbarControlsChange]);
 
   return (
     <>
@@ -522,7 +527,7 @@ function DesktopMesShellInner({
                 data-active-tab={activeTab}
                 className="animate-desktop-tab-enter flex min-h-0 min-w-0 flex-1"
               >
-                {content}
+                {activeTab === contentTab ? content : <DesktopTabLoading tab={activeTab} />}
               </div>
             </div>
           </div>
@@ -530,4 +535,17 @@ function DesktopMesShellInner({
       </div>
     </>
   );
+}
+
+/** 메뉴·제목을 먼저 그리는 동안 대상 화면의 공간을 유지한다. */
+function DesktopTabLoading({ tab }: { tab: DesktopTabId }) {
+  return <div role="status" aria-busy="true" aria-label={`${TAB_META[tab].title} 화면을 불러오는 중입니다`} className="min-w-0 w-full space-y-3 overflow-hidden">
+    {tab === "history"
+      ? <HistoryStatsBar baseline={null} currentCount={null} loading loadingDisplay="skeleton" periodLabel="이번달" />
+      : <LoadingSkeleton variant="card" rows={4} />}
+    {tab === "dashboard" ? <InventoryItemsTable loading error={null} filteredItems={[]} displayLimit={100}
+      setDisplayLimit={() => {}} selectedItem={null} onSelectItem={() => {}} activeFilterCount={0}
+      hasKpiFilter={false} onRetry={() => {}} onResetAllFilters={() => {}} />
+      : tab === "history" ? <HistoryTableSkeleton /> : <LoadingSkeleton variant="card" />}
+  </div>;
 }

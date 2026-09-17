@@ -5,7 +5,8 @@ import { ClipboardCheck } from "lucide-react";
 import { ApiError } from "@/lib/api-core";
 import { PIN_LENGTH } from "@/lib/auth/constants";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { LoadFailureCard, LoadingSkeleton } from "../common";
+import { ReadFailure } from "../common/ReadState";
+import { WarehouseLoadingWorkArea } from "./WarehouseLoadingWorkArea";
 import { WarehouseQueueRow } from "./WarehouseQueueRow";
 import { useWarehouseQueueQuery, useApproveStockRequestMutation, useRejectStockRequestMutation } from "@/lib/queries/useStockRequestsQuery";
 import { prioritizeTargetRequest } from "./prioritizeTargetRequest";
@@ -20,7 +21,8 @@ interface Props {
 }
 
 export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChanged, onEmptyStateChange, targetRequestId }: Props) {
-  const { data: items = [], isLoading: loading, error: qError, refetch } = useWarehouseQueueQuery();
+  const query = useWarehouseQueueQuery();
+  const { data: items = [], isLoading: loading, error: qError, refetch } = query;
   const approveMutation = useApproveStockRequestMutation();
   const rejectMutation = useRejectStockRequestMutation();
   const error = qError ? (qError instanceof Error ? qError.message : "승인함을 불러오지 못했습니다.") : null;
@@ -34,7 +36,7 @@ export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChange
   const [approveError, setApproveError] = useState<string | null>(null);
 
   useEffect(() => {
-    onEmptyStateChange?.(!loading && items.length === 0 && !error);
+    onEmptyStateChange?.(loading || (items.length === 0 && !error));
   }, [error, items.length, loading, onEmptyStateChange]);
 
   // refreshNonce 변경 시 수동 refetch (외부 트리거 지원)
@@ -107,9 +109,9 @@ export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChange
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      {loading && <LoadingSkeleton variant="list" rows={2} />}
-      {error && <LoadFailureCard message={error} onRetry={() => void refetch()} />}
-      {!loading && items.length === 0 && !error && (
+      {loading && <WarehouseLoadingWorkArea label="결재 요청을 불러오고 있습니다…" />}
+      {error && <ReadFailure message={error} refresh={query.data !== undefined} onRetry={() => void refetch()} />}
+      {!loading && items.length === 0 && (query.data !== undefined || !error) && (
         <WarehouseEmptyWorkArea
           icon={<ClipboardCheck style={{ color: LEGACY_COLORS.green }} />}
           title="승인 대기 중인 요청이 없습니다."

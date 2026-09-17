@@ -11,6 +11,14 @@ import { transactionColor } from "@/lib/mes-status";
 import { HistoryTable } from "../HistoryTable";
 import type { HistorySelection } from "../historyConstants";
 import type { LogGroup } from "../historyTableHelpers";
+import * as historyHelpers from "../historyTableHelpers";
+
+it("skips local grouping when the server supplies groups, including an empty page", () => {
+  const build = vi.spyOn(historyHelpers, "buildGroups");
+  renderTable([]);
+  expect(build).not.toHaveBeenCalled();
+  build.mockRestore();
+});
 
 function makeLog(overrides: Partial<TransactionLog> = {}): TransactionLog {
   return {
@@ -1026,7 +1034,7 @@ describe("HistoryTable hierarchy", () => {
     expect(screen.getByRole("table").parentElement).toBe(surface);
     expect(screen.getByRole("alert")).toHaveTextContent("최신 입출고 내역을 동기화하지 못했습니다");
     expect(surface).not.toContainElement(screen.getByRole("alert"));
-    fireEvent.click(screen.getByRole("button", { name: "다시 동기화" }));
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
     expect(retryRefresh).toHaveBeenCalledOnce();
   });
 

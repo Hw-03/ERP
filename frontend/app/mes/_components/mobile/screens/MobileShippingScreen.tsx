@@ -1,4 +1,5 @@
 "use client";
+import { ReadEmpty, ReadFailure, ReadLoading } from "../../common/ReadState";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -10,7 +11,6 @@ import { tint } from "@/lib/mes/colorUtils";
 import { queryKeys } from "@/lib/queries/keys";
 import { useShippingHistoryQuery, useShippingRequestsQuery } from "@/lib/queries/useShippingQuery";
 import { ExpandableItemName } from "../../_warehouse_v2/ExpandableItemName";
-import { LoadFailureCard } from "../../common/LoadFailureCard";
 
 type MobileShippingTab = "requests" | "prep" | "history";
 
@@ -151,13 +151,12 @@ export function MobileShippingScreen() {
         <TabButton active={tab === "history"} icon={History} label="이력" onClick={() => setTab("history")} />
       </div>
 
-      {loading && <InlineState title="로딩 중" body="출하 데이터를 불러오고 있습니다." />}
-      {initialError && <InlineState title="오류" body={initialError} tone={LEGACY_COLORS.red} />}
+      {loading && <ReadLoading label="출하 데이터를 불러오고 있습니다." />}
+      {initialError && <ReadFailure message={initialError} onRetry={retryRefresh} />}
       {refreshError && (
-        <LoadFailureCard
+        <ReadFailure
           message={refreshError}
-          prefix="최신 출하 내역을 동기화하지 못했습니다"
-          retryLabel="다시 동기화"
+          refresh
           onRetry={retryRefresh}
         />
       )}
@@ -165,7 +164,7 @@ export function MobileShippingScreen() {
       {!loading && !initialError && tab === "requests" && (
         <div className="mw0 grid gap-2">
           {activeRequests.length === 0 ? (
-            <InlineState title="요청 없음" body="PC에서 새 출하 요청을 만들 수 있습니다." />
+            <ReadEmpty title="출하 요청이 없습니다" description="PC에서 새 출하 요청을 만들 수 있습니다." />
           ) : (
             activeRequests.map((req) => <MobileRequestCard key={req.request_id} request={req} />)
           )}
@@ -175,7 +174,7 @@ export function MobileShippingScreen() {
       {!loading && !initialError && tab === "prep" && (
         <div className="mw0 grid gap-2">
           {prepRequests.length === 0 ? (
-            <InlineState title="준비 중 없음" body="PC에서 새 출하 요청을 만들면 바로 표시됩니다." />
+            <ReadEmpty title="준비 중인 출하가 없습니다" description="PC에서 새 출하 요청을 만들면 바로 표시됩니다." />
           ) : (
             prepRequests.map((req) => (
               <MobilePrepCard
@@ -194,7 +193,7 @@ export function MobileShippingScreen() {
       {!loading && !initialError && tab === "history" && (
         <div className="mw0 grid gap-2">
           {history.length === 0 ? (
-            <InlineState title="이력 없음" body="픽업 완료된 출하가 아직 없습니다." />
+            <ReadEmpty title="출하 이력이 없습니다" description="픽업 완료된 출하가 아직 없습니다." />
           ) : (
             history.map((req) => <MobileRequestCard key={req.request_id} request={req} />)
           )}

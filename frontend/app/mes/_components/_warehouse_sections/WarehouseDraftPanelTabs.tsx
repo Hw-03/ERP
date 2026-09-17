@@ -94,6 +94,7 @@ export function WarehouseDraftPanelTabs({
         <MyRequestsPanel
           targetRequestId={targetRequestId}
         employeeId={employeeId || operatorEmployeeId || null}
+        onEmptyStateChange={onEmptyStateChange}
         refreshNonce={refreshNonce}
         onChanged={() => {
           bumpRefresh();

@@ -184,7 +184,9 @@ describe("MobileShell layout", () => {
   });
 
   it("does not render the old mobile top header controls", () => {
+    document.title = "MES 개발";
     render(<MobileShell />);
+    expect(document.title).toBe("MES 개발");
 
     expect(screen.queryByTestId("desktop-status-target")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "알림" })).not.toBeInTheDocument();

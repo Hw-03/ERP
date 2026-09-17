@@ -1,4 +1,5 @@
 "use client";
+import { ReadLoading } from "./common/ReadState";
 
 import { useEffect, useRef, useState } from "react";
 import { api, type IoBatch, type Item, type StockRequest } from "@/lib/api";
@@ -288,7 +289,7 @@ export function DesktopWarehouseView({
   }
 
   const isComposeSection = sectionTab === "compose";
-  const isWorkAreaSection = sectionTab === "cart" || sectionTab === "queue" || sectionTab === "as-research-queue" || sectionTab === "dept-queue";
+  const isWorkAreaSection = sectionTab === "cart" || sectionTab === "mine" || sectionTab === "queue" || sectionTab === "as-research-queue" || sectionTab === "dept-queue";
   const hideSectionTabs = isComposeSection && itemConversionFocused;
   const removeWorkAreaBottomSpace = isWorkAreaSection && workAreaEmpty;
 
@@ -367,12 +368,11 @@ export function DesktopWarehouseView({
         {isComposeSection && (
           <div className="min-h-0 flex-1">
             {urlDraftPending ? (
-              <div className="flex h-full items-center justify-center text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-                저장한 작업을 불러오는 중입니다.
-              </div>
+              <ReadLoading label="저장한 작업을 불러오는 중입니다." variant="card" />
             ) : urlDraftRestoreError ? (
               <div className="flex h-full items-center justify-center px-4">
                 <LoadFailureCard
+                  comfortable
                   prefix={urlDraftRestoreError}
                   message="현재 작업 위치를 유지했습니다."
                   retryLabel="다시 시도"

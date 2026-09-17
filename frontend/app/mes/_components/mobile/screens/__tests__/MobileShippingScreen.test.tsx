@@ -196,15 +196,15 @@ describe("MobileShippingScreen", () => {
     fireEvent.focus(window);
 
     expect(await screen.findByText("Standard PF")).toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: "다시 동기화" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "다시 시도" })).toBeInTheDocument();
 
     vi.mocked(api.getShippingRequests).mockResolvedValueOnce([
       request({ base_pf_item_name: "Fresh PF" }),
     ]);
-    fireEvent.click(screen.getByRole("button", { name: "다시 동기화" }));
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
 
     expect(await screen.findByText("Fresh PF")).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByRole("button", { name: "다시 동기화" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("button", { name: "다시 시도" })).not.toBeInTheDocument());
   });
 
   it("visible 전환과 focus가 연속 발생해도 한 번만 다시 조회한다", async () => {

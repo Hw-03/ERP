@@ -3,29 +3,65 @@
 from __future__ import annotations
 
 import uuid
-from typing import Optional
+from dataclasses import dataclass
+from datetime import datetime
+from decimal import Decimal
+from typing import Generic, Optional, TypeVar
 
 from app.models import TransactionTypeEnum
 from app.schemas import TransactionDisplayGroupResponse, TransactionLogResponse
 
 
-def _reference_group_key(log: TransactionLogResponse) -> str:
+@dataclass(frozen=True)
+class DisplayGroupRecord:
+    """Only fields needed for grouping, search membership and cursor ordering."""
+    log_id: uuid.UUID
+    item_id: uuid.UUID
+    transaction_type: TransactionTypeEnum
+    quantity_change: Decimal
+    created_at: datetime
+    requested_at: datetime
+    operation_id: Optional[uuid.UUID]
+    operation_batch_id: Optional[uuid.UUID]
+    reference_no: Optional[str]
+    shipping_phase: Optional[str]
+    produced_by: Optional[str]
+    requester_name: Optional[str]
+    department: Optional[str]
+    reason_category: Optional[str]
+    reason_memo: Optional[str]
+    operation_kind: Optional[str]
+    operation_effective_status: Optional[str]
+
+
+GroupLog = TypeVar("GroupLog", TransactionLogResponse, DisplayGroupRecord)
+
+
+@dataclass
+class DisplayGroup(Generic[GroupLog]):
+    """Internal group keeps original records without constructing detail responses."""
+    type: str
+    key: str
+    logs: list[GroupLog]
+
+
+def _reference_group_key(log: TransactionLogResponse | DisplayGroupRecord) -> str:
     return f"{log.reference_no or ''}::{log.shipping_phase or ''}"
 
 
-def _defect_actor(log: TransactionLogResponse) -> Optional[str]:
+def _defect_actor(log: TransactionLogResponse | DisplayGroupRecord) -> Optional[str]:
     return (log.requester_name or log.produced_by or "").strip() or None
 
 
-def _defect_reason_key(log: TransactionLogResponse) -> Optional[str]:
+def _defect_reason_key(log: TransactionLogResponse | DisplayGroupRecord) -> Optional[str]:
     category = (log.reason_category or "").strip()
     memo = (log.reason_memo or "").strip()
     return f"{category}::{memo}" if category or memo else None
 
 
 def _is_matching_defect_lifecycle(
-    parent: TransactionLogResponse,
-    child: TransactionLogResponse,
+    parent: TransactionLogResponse | DisplayGroupRecord,
+    child: TransactionLogResponse | DisplayGroupRecord,
 ) -> bool:
     if child.transaction_type not in {
         TransactionTypeEnum.DEFECT_SCRAP,
@@ -50,11 +86,11 @@ def _is_matching_defect_lifecycle(
 
 
 def _find_defect_lifecycle_pairs(
-    logs: list[TransactionLogResponse],
-) -> list[tuple[TransactionLogResponse, TransactionLogResponse]]:
+    logs: list[GroupLog],
+) -> list[tuple[GroupLog, GroupLog]]:
     chronological = sorted(logs, key=lambda log: log.created_at)
     used: set[uuid.UUID] = set()
-    pairs: list[tuple[TransactionLogResponse, TransactionLogResponse]] = []
+    pairs: list[tuple[GroupLog, GroupLog]] = []
     for index, parent in enumerate(chronological):
         if parent.transaction_type != TransactionTypeEnum.MARK_DEFECTIVE or parent.log_id in used:
             continue
@@ -72,17 +108,17 @@ def _find_defect_lifecycle_pairs(
     return pairs
 
 
-def build_display_groups(
-    logs: list[TransactionLogResponse],
-) -> list[TransactionDisplayGroupResponse]:
+def group_display_records(
+    logs: list[GroupLog],
+) -> list[DisplayGroup[GroupLog]]:
     """기존 입출고 이력과 동일한 논리 단위로 거래 상세를 묶는다."""
-    operations: dict[uuid.UUID, list[TransactionLogResponse]] = {}
-    op_batches: dict[uuid.UUID, list[TransactionLogResponse]] = {}
-    reference_batches: dict[str, list[TransactionLogResponse]] = {}
+    operations: dict[uuid.UUID, list[GroupLog]] = {}
+    op_batches: dict[uuid.UUID, list[GroupLog]] = {}
+    reference_batches: dict[str, list[GroupLog]] = {}
     pairs = _find_defect_lifecycle_pairs(logs)
     pair_by_log_id: dict[
         uuid.UUID,
-        tuple[TransactionLogResponse, TransactionLogResponse, uuid.UUID],
+        tuple[GroupLog, GroupLog, uuid.UUID],
     ] = {}
     log_positions = {log.log_id: index for index, log in enumerate(logs)}
     for parent, child in pairs:
@@ -108,7 +144,7 @@ def build_display_groups(
         )
     }
 
-    groups: list[TransactionDisplayGroupResponse] = []
+    groups: list[DisplayGroup[GroupLog]] = []
     seen_operation_batches: set[uuid.UUID] = set()
     seen_operations: set[uuid.UUID] = set()
     seen_reference_batches: set[str] = set()
@@ -119,7 +155,7 @@ def build_display_groups(
                 continue
             seen_operation_batches.add(batch_id)
             groups.append(
-                TransactionDisplayGroupResponse(
+                DisplayGroup(
                     type="op_batch",
                     key=str(batch_id),
                     logs=op_batches[batch_id],
@@ -132,7 +168,7 @@ def build_display_groups(
             seen_operations.add(log.operation_id)
             operation_logs = operations[log.operation_id]
             groups.append(
-                TransactionDisplayGroupResponse(
+                DisplayGroup(
                     type="operation",
                     key=str(log.operation_id),
                     logs=operation_logs,
@@ -144,7 +180,7 @@ def build_display_groups(
             parent, child, anchor_id = pair
             if anchor_id == log.log_id:
                 groups.append(
-                    TransactionDisplayGroupResponse(
+                    DisplayGroup(
                         type="defect_lifecycle",
                         key=f"defect-lifecycle:{parent.log_id}:{child.log_id}",
                         logs=[parent, child],
@@ -158,7 +194,7 @@ def build_display_groups(
             seen_operation_batches.add(batch_id)
             batch_logs = op_batches[batch_id]
             groups.append(
-                TransactionDisplayGroupResponse(
+                DisplayGroup(
                     type="solo" if len(batch_logs) == 1 else "op_batch",
                     key=str(batch_id) if len(batch_logs) > 1 else f"solo:{batch_logs[0].log_id}",
                     logs=batch_logs,
@@ -171,7 +207,7 @@ def build_display_groups(
             seen_reference_batches.add(reference_key)
             reference_logs = reference_batches[reference_key]
             groups.append(
-                TransactionDisplayGroupResponse(
+                DisplayGroup(
                     type="solo" if len(reference_logs) == 1 else "batch",
                     key=reference_key if len(reference_logs) > 1 else f"solo:{reference_logs[0].log_id}",
                     logs=reference_logs,
@@ -179,10 +215,18 @@ def build_display_groups(
             )
         else:
             groups.append(
-                TransactionDisplayGroupResponse(
+                DisplayGroup(
                     type="solo",
                     key=f"solo:{log.log_id}",
                     logs=[log],
                 )
             )
     return groups
+
+
+def build_display_groups(logs: list[TransactionLogResponse]) -> list[TransactionDisplayGroupResponse]:
+    """Preserve the public detail response contract for existing consumers."""
+    return [
+        TransactionDisplayGroupResponse(type=group.type, key=group.key, logs=group.logs)
+        for group in group_display_records(logs)
+    ]

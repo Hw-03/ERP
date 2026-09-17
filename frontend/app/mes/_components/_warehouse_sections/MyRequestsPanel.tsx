@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ClipboardList } from "lucide-react";
 import type { StockRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { EmptyState, LoadFailureCard, LoadingSkeleton } from "../common";
+import { EmptyState } from "../common";
+import { ReadFailure } from "../common/ReadState";
+import { WarehouseLoadingWorkArea } from "./WarehouseLoadingWorkArea";
+import { WarehouseEmptyWorkArea } from "./WarehouseEmptyWorkArea";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { MyRequestRow } from "./MyRequestRow";
 import {
@@ -18,6 +22,7 @@ interface Props {
   employeeId: string | null;
   refreshNonce: number;
   onChanged: () => void;
+  onEmptyStateChange?: (empty: boolean) => void;
 }
 
 interface BatchActionTarget {
@@ -26,9 +31,9 @@ interface BatchActionTarget {
   isAsResearchBatch: boolean;
 }
 
-export function MyRequestsPanel({ employeeId, refreshNonce, onChanged, targetRequestId }: Props) {
-  const { data: items = [], isLoading: loading, error: qError, refetch } =
-    useMyStockRequestsQuery(employeeId ?? "");
+export function MyRequestsPanel({ employeeId, refreshNonce, onChanged, targetRequestId, onEmptyStateChange }: Props) {
+  const query = useMyStockRequestsQuery(employeeId ?? "");
+  const { data: items = [], isLoading: loading, error: qError, refetch } = query;
   const cancelMutation = useCancelStockRequestMutation();
   const revertMutation = useRevertToDraftMutation();
   const loadError = qError
@@ -42,6 +47,10 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged, targetReq
   const [revertTarget, setRevertTarget] = useState<StockRequest | null>(null);
   const [revertPin, setRevertPin] = useState("");
   const [revertError, setRevertError] = useState<string | null>(null);
+
+  useEffect(() => {
+    onEmptyStateChange?.(loading || (items.length === 0 && !loadError));
+  }, [items.length, loading, loadError, onEmptyStateChange]);
 
   // refreshNonce 변경 시 수동 refetch (외부 트리거). 30초 폴링은 훅의 refetchInterval 이 담당.
   useEffect(() => {
@@ -124,11 +133,15 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged, targetReq
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      {loading && <LoadingSkeleton variant="list" rows={2} />}
-      {loadError && <LoadFailureCard message={loadError} onRetry={() => void refetch()} />}
-      {!loading && items.length === 0 && !loadError && (
-        <EmptyState variant="no-data" compact title="아직 제출한 요청이 없습니다." />
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      {loading && <WarehouseLoadingWorkArea label="요청 내역을 불러오고 있습니다…" />}
+      {loadError && <ReadFailure message={loadError} refresh={query.data !== undefined} onRetry={() => void refetch()} />}
+      {!loading && items.length === 0 && (query.data !== undefined || !loadError) && (
+        <WarehouseEmptyWorkArea
+          icon={<ClipboardList style={{ color: LEGACY_COLORS.purple }} />}
+          title="아직 제출한 요청이 없습니다."
+          description="요청을 제출하면 진행 상태를 여기에서 확인할 수 있습니다."
+        />
       )}
       {prioritizeTargetRequest(items, targetRequestId).filter((req, index, requests) => {
         const isInternalUseBatch = Boolean(req.operation_batch_id) && requests.some(

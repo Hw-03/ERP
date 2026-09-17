@@ -186,7 +186,7 @@ export function MobileHistoryScreen() {
 
   // 연 뷰 — 그 해 12개월 거래 건수 집계.
   // /monthly-counts?year=YYYY 신 endpoint — limit 제한 없이 집계값만 반환.
-  const { data: monthlyCountsRaw } = useMonthlyCountsQuery(calendarYear);
+  const { data: monthlyCountsRaw } = useMonthlyCountsQuery(calendarYear, { enabled: calendarOpen });
   const monthlyCountMap = useMemo(() => {
     const m = new Map<number, number>();
     if (!monthlyCountsRaw) return m;
@@ -556,6 +556,12 @@ export function MobileHistoryScreen() {
 
           <MobileHistoryList
             loading={loading}
+            hasSearch={!!search.trim()}
+            hasFilters={selectedDepts.length > 0 || selectedModels.length > 0 || selectedOps.length > 0 || dateFilter !== "MONTH" || !!selectedDay || !!selectedMonth}
+            onResetFilters={() => {
+              setSearch(""); setSelectedDepts([]); setSelectedModels([]); setSelectedOps([]);
+              setDateFilter("MONTH"); setSelectedDay(null); setSelectedMonth(null);
+            }}
             error={historyError}
             refreshError={refreshError}
             filteredLogs={logs}

@@ -9,6 +9,7 @@ interface Props {
   onRetry?: () => void;
   retryLabel?: string;
   prefix?: string;
+  comfortable?: boolean;
 }
 
 function LoadFailureCardImpl({
@@ -16,6 +17,7 @@ function LoadFailureCardImpl({
   onRetry,
   retryLabel = "동기화",
   prefix = "데이터를 불러오지 못했습니다",
+  comfortable = false,
 }: Props) {
   const handleRetry = onRetry ?? (() => window.location.reload());
   return (
@@ -30,14 +32,14 @@ function LoadFailureCardImpl({
     >
       <div className="flex min-w-0 items-center gap-2">
         <AlertTriangle className="h-4 w-4 shrink-0" />
-        <span className="truncate font-bold">
+        <span className={comfortable ? "break-words font-bold" : "truncate font-bold"}>
           {prefix ? `${prefix} — ${message}` : message}
         </span>
       </div>
       <button
         type="button"
         onClick={handleRetry}
-        className="standard-hover shrink-0 rounded-[10px] border px-3 py-1.5 text-xs font-bold transition-colors"
+        className={`standard-hover shrink-0 rounded-[10px] border px-3 py-1.5 font-bold transition-colors ${comfortable ? "min-h-11 text-sm" : "text-xs"}`}
         style={{
           borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 40%, transparent)`,
           color: LEGACY_COLORS.red,

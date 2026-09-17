@@ -1048,7 +1048,7 @@ describe("DesktopShippingView", () => {
     const createRequest = deferred<ShippingRequest>();
     vi.mocked(api.createShippingRequest).mockReturnValue(createRequest.promise);
     const statusChange = vi.fn();
-    const client = makeClient({ staleTime: 5 * 60_000 });
+    const client = makeClient({ gcTime: 5 * 60_000, staleTime: 5 * 60_000 });
     const { container, rerender, unmount } = rtlRender(<DesktopShippingView onStatusChange={statusChange} />, {
       wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
     });
@@ -1685,12 +1685,12 @@ describe("DesktopShippingView", () => {
     realtimeMock.revision = 2;
     rerender(<DesktopShippingView onStatusChange={() => {}} />);
 
-    expect(await screen.findByRole("button", { name: "다시 동기화" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "다시 시도" })).toBeInTheDocument();
     expect(screen.getByText(/INV-INITIAL/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "다시 동기화" }));
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
     expect(await screen.findByText(/INV-FRESH/)).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByRole("button", { name: "다시 동기화" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("button", { name: "다시 시도" })).not.toBeInTheDocument());
   });
 
   it("preserves a new request draft when browser Back returns from the request list", async () => {

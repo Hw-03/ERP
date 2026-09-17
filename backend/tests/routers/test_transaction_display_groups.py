@@ -9,6 +9,47 @@ import pytest
 from app.models import Employee, InventoryOperation, IoBatch, TransactionLog, TransactionTypeEnum
 
 
+def test_display_groups_only_hydrates_selected_page(client, db_session, make_item, monkeypatch):
+    """Detail conversion must scale with the page, not all matching history."""
+    from app.routers.inventory import transactions
+
+    item = make_item(name="page hydration")
+    for index in range(5):
+        _add_log(db_session, item, created_at=datetime(2026, 9, 1, 12, index))
+    db_session.commit()
+    original = transactions._to_log_response
+    converted = []
+
+    def tracked(*args, **kwargs):
+        converted.append(args[0].log_id)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(transactions, "_to_log_response", tracked)
+    response = client.get("/api/inventory/transactions/display-groups", params={"limit": 2})
+    assert response.status_code == 200, response.text
+    returned = {row["log_id"] for group in response.json()["groups"] for row in group["logs"]}
+    assert {str(log_id) for log_id in converted} == returned
+
+
+def test_display_groups_same_timestamp_cursor_has_no_gaps(client, db_session, make_item):
+    """UUID tie-breaking must survive the lightweight grouping pass."""
+    item = make_item(name="same timestamp")
+    logs = [_add_log(db_session, item, created_at=datetime(2026, 9, 1, 12)) for _ in range(5)]
+    expected = sorted((str(log.log_id) for log in logs), reverse=True)
+    db_session.commit()
+    actual = []
+    params = {"limit": 2}
+    while True:
+        response = client.get("/api/inventory/transactions/display-groups", params=params)
+        assert response.status_code == 200, response.text
+        body = response.json()
+        actual.extend(log["log_id"] for group in body["groups"] for log in group["logs"])
+        if not body["has_more"]:
+            break
+        params["cursor"] = body["next_cursor"]
+    assert actual == expected
+
+
 def _add_log(
     db_session,
     item,
@@ -106,7 +147,8 @@ def test_display_groups_pages_complete_groups_by_representative_row(client, db_s
     assert second_body["next_cursor"] is None
 
 
-def test_display_groups_merge_multiple_operations_from_one_io_batch(client, db_session, make_item):
+@pytest.mark.parametrize("reversed_operation", [False, True])
+def test_display_groups_merge_multiple_operations_from_one_io_batch(client, db_session, make_item, reversed_operation):
     first_item = make_item(name="한 번에 처리한 품목 A")
     second_item = make_item(name="한 번에 처리한 품목 B")
     base = datetime(2026, 9, 15, 3, 16)
@@ -131,11 +173,23 @@ def test_display_groups_merge_multiple_operations_from_one_io_batch(client, db_s
     ]
     for log, operation in zip(logs, operations, strict=True):
         log.operation_id = operation.operation_id
+    if reversed_operation:
+        db_session.add(InventoryOperation(
+            kind="CANCELLATION", domain="internal_use", action="cancel",
+            display_label="취소", actor_name="취소 담당자", effective_at=base + timedelta(minutes=1),
+            reverses_operation_id=operations[0].operation_id,
+        ))
     db_session.commit()
 
     response = client.get("/api/inventory/transactions/display-groups")
 
     assert response.status_code == 200, response.text
+    if reversed_operation:
+        groups = response.json()["groups"]
+        assert len(groups) == 2
+        assert all(group["type"] == "operation" for group in groups)
+        assert {row["operation_effective_status"] for group in groups for row in group["logs"]} == {"active", "cancelled"}
+        return
     group = response.json()["groups"][0]
     assert group["type"] == "op_batch"
     assert group["key"] == str(batch.batch_id)

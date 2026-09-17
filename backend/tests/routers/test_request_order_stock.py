@@ -7,6 +7,26 @@ import pytest
 from app.models import Employee, Inventory, InventoryLocation, IoBatch, TransactionLog, TransactionTypeEnum
 
 
+def test_stock_loader_reads_only_calculation_columns(db_session, delayed_adjustment):
+    from sqlalchemy import event
+    from app.services.request_order_stock import load_request_order_stock
+    from app.routers.inventory._tx_filters import _history_request_date_expr
+
+    statements = []
+    bind = db_session.get_bind()
+    def capture(_conn, _cursor, statement, _parameters, _context, _many):
+        statements.append(statement)
+    event.listen(bind, "before_cursor_execute", capture)
+    try:
+        result = load_request_order_stock(db_session, [delayed_adjustment[0].item_id], request_date_expr=_history_request_date_expr())
+    finally:
+        event.remove(bind, "before_cursor_execute", capture)
+    assert len(result) == 3
+    assert any("transaction_logs.inventory_effect" in sql for sql in statements)
+    for excluded in ("notes", "reason_memo", "produced_by", "quantity_before", "quantity_after", "*"):
+        assert all(f"transaction_logs.{excluded}" not in sql for sql in statements)
+
+
 @pytest.fixture
 def delayed_adjustment(db_session, make_item):
     item = make_item(name="COCOON 지연 승인 재현", warehouse_qty=0)

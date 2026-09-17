@@ -7,6 +7,7 @@ import { queryKeys } from "@/lib/queries/keys";
 import { DesktopHistoryView } from "../DesktopHistoryView";
 
 const testState = vi.hoisted(() => ({
+  monthlyQuery: vi.fn(() => ({ data: {} })),
   historyResult: null as any,
   historyArgs: null as any,
   batch: null as any,
@@ -61,7 +62,7 @@ vi.mock("@/lib/queries/realtime", async (importOriginal) => ({
 }));
 
 vi.mock("@/lib/queries/useTransactionsQuery", () => ({
-  useMonthlyCountsQuery: () => ({ data: {} }),
+  useMonthlyCountsQuery: (...args: any[]) => testState.monthlyQuery(...args),
   useTransactionsSummaryQuery: (params: any) => {
     if (Object.hasOwn(params, "operationKeys")) testState.currentSummaryParams.push(params);
     else testState.baselineSummaryParams.push(params);
@@ -298,6 +299,12 @@ beforeEach(() => {
 });
 
 describe("DesktopHistoryView history state", () => {
+  it("enables monthly counts only while the calendar is open", async () => {
+    render(<DesktopHistoryView />);
+    expect(testState.monthlyQuery).toHaveBeenLastCalledWith(expect.any(Number), { enabled: false });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "달력 토글" })); });
+    expect(testState.monthlyQuery).toHaveBeenLastCalledWith(expect.any(Number), { enabled: true });
+  });
   it("applies two rapid next-month actions without losing either move", async () => {
     render(<DesktopHistoryView />);
     fireEvent.click(screen.getByRole("button", { name: "8월 선택" }));

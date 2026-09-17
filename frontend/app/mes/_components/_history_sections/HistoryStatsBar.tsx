@@ -11,7 +11,7 @@ export interface HistoryStatsBarProps {
   /** 현재 필터(거래종류/검색/부서/모델)가 적용된 건수 — X(분자). */
   currentCount: number | null;
   loading: boolean;
-  /** PC 첫 진입에서는 최종 카드 구조를 유지하는 중립 블록을 사용한다. */
+  /** PC 첫 진입에서는 최종 카드 구조와 숫자 색상을 유지한다. */
   loadingDisplay?: "ellipsis" | "skeleton";
   /** "이번달" / "오늘" / "이번주" / "전체" / 선택한 날짜. */
   periodLabel: string;
@@ -102,14 +102,14 @@ function HistoryCountValue({
   loading: boolean;
   value: number | null | undefined;
   display: "ellipsis" | "skeleton";
-  size: "large" | "small";
+  size: "large" | "small" | "card";
 }) {
   if (display === "skeleton" && (loading || value == null)) {
     return (
       <span
         aria-label="집계 중"
-        className={`inline-block animate-pulse rounded-[6px] align-middle ${size === "large" ? "h-7 w-20" : "h-5 w-14"}`}
-        style={{ background: LEGACY_COLORS.s3 }}
+        className={`inline-block motion-safe:animate-pulse rounded-[6px] align-middle ${size === "large" ? "h-7 w-20" : size === "card" ? "h-6 w-16" : "h-5 w-14"}`}
+        style={{ background: "color-mix(in srgb, currentColor 18%, transparent)" }}
       />
     );
   }
@@ -149,7 +149,7 @@ function StatBox({
         className="text-2xl font-black tabular-nums"
         style={{ color: `color-mix(in srgb, ${color} 55%, ${LEGACY_COLORS.text})` }}
       >
-        <HistoryCountValue loading={loading} value={value} display={loadingDisplay} size="small" />
+        <HistoryCountValue loading={loading} value={value} display={loadingDisplay} size="card" />
       </div>
       <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
         {sub}

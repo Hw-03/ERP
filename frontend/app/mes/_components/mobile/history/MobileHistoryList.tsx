@@ -4,7 +4,7 @@ import { Layers, Loader2, Package } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { transactionColor } from "@/lib/mes-status";
-import { EmptyState, LoadFailureCard, LoadingSkeleton } from "../../common";
+import { ReadEmpty, ReadFailure, ReadLoading } from "../../common/ReadState";
 import { formatHistoryDate } from "../../_history_sections/historyFormat";
 import { rowTint } from "../../_history_sections/historyTheme";
 import {
@@ -23,6 +23,9 @@ import { MovementSummaryCell, buildGroups } from "../../_history_sections/histor
  */
 export function MobileHistoryList({
   loading,
+  hasSearch = false,
+  hasFilters = false,
+  onResetFilters,
   error,
   refreshError,
   filteredLogs,
@@ -36,6 +39,9 @@ export function MobileHistoryList({
   onLoadMore,
 }: {
   loading: boolean;
+  hasSearch?: boolean;
+  hasFilters?: boolean;
+  onResetFilters?: () => void;
   error: string | null;
   refreshError?: string | null;
   filteredLogs: TransactionLog[];
@@ -51,26 +57,25 @@ export function MobileHistoryList({
   if (loading) {
     return (
       <div className="py-2">
-        <LoadingSkeleton variant="list" rows={8} />
+        <ReadLoading label="입출고 내역을 불러오고 있습니다…" />
       </div>
     );
   }
   if (error && filteredLogs.length === 0) {
     return (
       <div className="py-2">
-        <LoadFailureCard
+        <ReadFailure
           message={error}
           onRetry={onRetry}
-          retryLabel="다시 시도"
-          prefix="입출고 내역을 불러오지 못했습니다"
         />
       </div>
     );
   }
-  if (filteredLogs.length === 0 && !refreshError) {
+  if (filteredLogs.length === 0) {
     return (
       <div className="py-10">
-        <EmptyState variant="no-data" />
+        {refreshError && <ReadFailure message={refreshError} onRetry={onRetryRefresh ?? onRetry} refresh />}
+        <ReadEmpty hasSearch={hasSearch} hasFilters={hasFilters} onReset={onResetFilters} />
       </div>
     );
   }
@@ -80,11 +85,10 @@ export function MobileHistoryList({
   return (
     <div className="flex flex-col gap-2 pb-4">
       {refreshError && (
-        <LoadFailureCard
+        <ReadFailure
           message={refreshError}
-          onRetry={onRetryRefresh}
-          retryLabel="다시 동기화"
-          prefix="최신 입출고 내역을 동기화하지 못했습니다"
+          onRetry={onRetryRefresh ?? onRetry}
+          refresh
         />
       )}
 

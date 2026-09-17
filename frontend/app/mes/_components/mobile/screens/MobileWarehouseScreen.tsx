@@ -1,4 +1,5 @@
 "use client";
+import { ReadFailure, ReadLoading } from "../../common/ReadState";
 
 import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { api, type IoBatch, type Item, type StockRequest } from "@/lib/api";
@@ -19,7 +20,6 @@ import {
 } from "../../_warehouse_v2/warehouseDraftUrl";
 import { MobileIoComposeWizard } from "../warehouse/MobileIoComposeWizard";
 import { MobileDirtyLeaveSheet } from "../warehouse/MobileDirtyLeaveSheet";
-import { AsyncState } from "../primitives/AsyncState";
 import panelStyles from "./mobileWarehousePanels.module.css";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -314,18 +314,13 @@ export function MobileWarehouseScreen({
 
       <div className="min-h-0 flex-1 overflow-hidden">
         {sectionTab === "compose" ? urlDraftPending ? (
-          <div className="flex h-full items-center justify-center px-4 text-center text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-            저장한 작업을 불러오는 중입니다.
-          </div>
+          <ReadLoading label="저장한 작업을 불러오는 중입니다." />
         ) : urlDraftRestoreError ? (
-          <div role="alert" className="h-full overflow-y-auto px-4 py-6">
-            <AsyncState
-              loading={false}
-              error={`${urlDraftRestoreError} 현재 작업 위치를 유지했습니다.`}
+          <div className="h-full overflow-y-auto px-4 py-6">
+            <ReadFailure
+              message={`${urlDraftRestoreError} 현재 작업 위치를 유지했습니다.`}
               onRetry={() => setUrlDraftRestoreNonce((value) => value + 1)}
-            >
-              {null}
-            </AsyncState>
+            />
           </div>
         ) : (
           <MobileIoComposeWizard

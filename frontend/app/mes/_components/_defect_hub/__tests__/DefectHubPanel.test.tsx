@@ -368,9 +368,9 @@ describe("DefectHubPanel", () => {
     render(<DefectHubPanel currentEmployee={{ ...mockEmployee, department: "기타" }} />);
     openList();
 
-    fireEvent.click(await screen.findByRole("button", { name: "여러 건 선택" }));
-    const checkboxes = screen
-      .getAllByTestId("defect-child-selection")
+    const selectMany = await screen.findByRole("button", { name: "여러 건 선택" });
+    await act(async () => { fireEvent.click(selectMany); });
+    const checkboxes = (await screen.findAllByTestId("defect-child-selection"))
       .map((container) => within(container).getByRole("checkbox"));
     fireEvent.click(checkboxes[0]);
     fireEvent.click(checkboxes[1]);
@@ -479,7 +479,7 @@ describe("DefectHubPanel", () => {
     expect(screen.getByText("1년 이상 ⚠").parentElement).toHaveTextContent("0건");
 
     fireEvent.change(search, { target: { value: "없는 검색어" } });
-    expect(screen.getByText("검색 결과가 없습니다.")).toBeInTheDocument();
+    expect(screen.getByText("검색 결과가 없습니다")).toBeInTheDocument();
 
     fireEvent.change(search, { target: { value: "TARGET" } });
     vi.mocked(defectsApi.listDefects).mockResolvedValueOnce([
@@ -589,11 +589,11 @@ describe("DefectHubPanel realtime refresh", () => {
     realtime.revision = 1;
     rerender(<DefectHubPanel {...props} />);
 
-    expect(await screen.findByRole("button", { name: "다시 동기화" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "다시 시도" })).toBeInTheDocument();
     expect(screen.getByText("7-TR-0001")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "다시 동기화" }));
-    await waitFor(() => expect(screen.queryByRole("button", { name: "다시 동기화" })).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "다시 시도" })).not.toBeInTheDocument());
     expect(screen.getByText("7-TR-0001")).toBeInTheDocument();
   });
 

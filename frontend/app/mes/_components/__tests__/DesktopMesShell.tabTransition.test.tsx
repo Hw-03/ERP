@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DesktopMesShell } from "../DesktopMesShell";
@@ -16,6 +16,8 @@ const queryClientMock = vi.hoisted(() => ({
 const shippingViewProps = vi.hoisted(() => vi.fn());
 const adminViewMounts = vi.hoisted(() => vi.fn());
 const defectViewStates = vi.hoisted(() => vi.fn());
+const slowDashboard = vi.hoisted(() => ({ pending: false, promise: new Promise<void>(() => {}) }));
+const slowHistory = vi.hoisted(() => ({ pending: false, promise: new Promise<void>(() => {}) }));
 
 vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => queryClientMock,
@@ -91,15 +93,36 @@ vi.mock("../DesktopSidebar", () => ({
 }));
 
 vi.mock("../DesktopTopbar", () => ({
-  DesktopTopbar: ({ title, titleAddon }: { title: string; titleAddon?: ReactNode }) => (
+  DesktopTopbar: ({ title, titleAddon, actionSlot }: { title: string; titleAddon?: ReactNode; actionSlot?: ReactNode }) => (
     <header>
       {title}
       <div data-testid="desktop-topbar-title-addon">{titleAddon}</div>
+      <div data-testid="desktop-topbar-actions">{actionSlot}</div>
     </header>
   ),
 }));
 
-vi.mock("../DesktopInventoryView", () => ({ DesktopInventoryView: () => <main>dashboard content</main> }));
+vi.mock("../DesktopInventoryView", () => ({ DesktopInventoryView: () => {
+  if (slowDashboard.pending) throw slowDashboard.promise;
+  return <main>dashboard content</main>;
+} }));
+
+it("updates the selected menu and header before a slow destination renders", () => {
+  window.history.replaceState(null, "", "/mes?tab=history");
+  render(<Suspense fallback={<div>root loading</div>}><DesktopMesShell /></Suspense>);
+  slowDashboard.pending = true;
+  try {
+    fireEvent.click(screen.getByRole("button", { name: "dashboard", exact: true }));
+    expect(screen.getByRole("button", { name: "dashboard", exact: true })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("banner")).toHaveTextContent("대시보드");
+    expect(screen.getByRole("status", { name: "대시보드 화면을 불러오는 중입니다" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "history", exact: true }));
+    expect(screen.getByText("history content")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "history", exact: true })).toHaveAttribute("aria-current", "page");
+  } finally {
+    slowDashboard.pending = false;
+  }
+});
 vi.mock("../DesktopWarehouseView", () => ({
   DesktopWarehouseView: ({ onSubmitSuccess }: { onSubmitSuccess?: () => void }) => (
     <main>
@@ -119,7 +142,27 @@ vi.mock("../DesktopDefectView", () => ({
     return <main>defect content</main>;
   },
 }));
-vi.mock("../DesktopHistoryView", () => ({ DesktopHistoryView: () => <main>history content</main> }));
+vi.mock("../DesktopHistoryView", () => ({ DesktopHistoryView: () => {
+  if (slowHistory.pending) throw slowHistory.promise;
+  return <main>history content</main>;
+} }));
+
+it("keeps summary card details while the history screen is preparing", () => {
+  window.history.replaceState(null, "", "/mes?tab=history");
+  render(<Suspense fallback={<div>root loading</div>}><DesktopMesShell /></Suspense>);
+  fireEvent.click(screen.getByRole("button", { name: "dashboard", exact: true }));
+  slowHistory.pending = true;
+  try {
+    fireEvent.click(screen.getByRole("button", { name: "history", exact: true }));
+    expect(screen.getByRole("status", { name: "입출고 내역 화면을 불러오는 중입니다" })).toBeInTheDocument();
+    expect(screen.getByText("창고 재고가 움직인 작업")).toBeInTheDocument();
+    expect(screen.getByText("부서 안에서만 움직인 작업")).toBeInTheDocument();
+    expect(screen.getByText("재고 수량을 직접 조정한 거래")).toBeInTheDocument();
+    expect(screen.getAllByLabelText("집계 중")).toHaveLength(5);
+  } finally {
+    slowHistory.pending = false;
+  }
+});
 vi.mock("../DesktopDailyWorkReportView", async () => {
   const { useEffect } = await import("react");
   return {
@@ -170,6 +213,11 @@ describe("DesktopMesShell tab transition", () => {
     document.startViewTransition = originalStartViewTransition;
   });
 
+  it("전역 검색 진입점을 표시하지 않는다", () => {
+    render(<DesktopMesShell />);
+    expect(screen.getByTestId("desktop-topbar-actions")).toBeEmptyDOMElement();
+  });
+
   it("commits a tab click immediately and updates the URL without App Router navigation", () => {
     document.startViewTransition = vi.fn();
     const pushState = vi.spyOn(window.history, "pushState");
@@ -200,7 +248,9 @@ describe("DesktopMesShell tab transition", () => {
   });
 
   it("prefetches the default history page before the first history tab visit", () => {
+    document.title = "MES 개발";
     render(<DesktopMesShell />);
+    expect(document.title).toBe("MES 개발");
 
     expect(queryClientMock.prefetchQuery.mock.calls[0][0].queryKey.slice(0, 2)).toEqual([
       "transactions",

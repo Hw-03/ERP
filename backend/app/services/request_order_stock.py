@@ -169,17 +169,24 @@ def load_request_order_stock(
         )
     }
     rows = (
-        db.query(TransactionLog, request_date_expr.label("request_order_at"))
+        db.query(
+            TransactionLog.log_id, TransactionLog.item_id, TransactionLog.created_at,
+            TransactionLog.warehouse_qty_before, TransactionLog.department_qty_before,
+            TransactionLog.warehouse_qty_after, TransactionLog.department_qty_after,
+            TransactionLog.inventory_effect, TransactionLog.cancelled,
+            TransactionLog.cancelled_at, TransactionLog.reverses_log_id,
+            request_date_expr.label("request_order_at"),
+        )
         .outerjoin(IoBatch, TransactionLog.operation_batch_id == IoBatch.batch_id)
         .filter(TransactionLog.item_id.in_(item_ids))
         .all()
     )
     histories: dict[UUID, list[StockHistoryEntry]] = defaultdict(list)
-    for log, requested_at in rows:
+    for log in rows:
         histories[log.item_id].append(StockHistoryEntry(
             log_id=log.log_id,
             created_at=log.created_at,
-            requested_at=requested_at,
+            requested_at=log.request_order_at,
             before=_totals(log.warehouse_qty_before, log.department_qty_before),
             after=_totals(log.warehouse_qty_after, log.department_qty_after),
             inventory_effect=log.inventory_effect,

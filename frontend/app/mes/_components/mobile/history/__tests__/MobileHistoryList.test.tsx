@@ -34,6 +34,17 @@ function log(id: string, phase: string): TransactionLog {
 }
 
 describe("MobileHistoryList", () => {
+  it("keeps a successful empty result visible after refresh failure", () => {
+    const retry = vi.fn();
+    render(<MobileHistoryList loading={false} error={null} refreshError="조회 실패"
+      filteredLogs={[]} selectedKey={null} onSelectLog={vi.fn()} onSelectBatch={vi.fn()}
+      onRetry={retry} canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} />);
+    expect(screen.getByText("표시할 데이터가 없습니다")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("기존 내용을 표시합니다");
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(retry).toHaveBeenCalledOnce();
+  });
+
   it("opens a new-ledger operation group with its operation id", () => {
     const onSelectBatch = vi.fn();
     const first = { ...log("operation-1", ""), operation_id: "operation-id" };
@@ -202,8 +213,8 @@ describe("MobileHistoryList", () => {
     );
 
     expect(screen.getByText("Shipping item cached")).toBeInTheDocument();
-    expect(screen.getByRole("alert")).toHaveTextContent("최신 입출고 내역을 동기화하지 못했습니다");
-    fireEvent.click(screen.getByRole("button", { name: "다시 동기화" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("기존 내용을 표시합니다");
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
     expect(retryRefresh).toHaveBeenCalledOnce();
   });
 });

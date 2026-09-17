@@ -333,6 +333,7 @@ export function MobileDashboardScreen({
               onSelectItem={setSelectedItem}
               activeFilterCount={activeFilterCount}
               hasKpiFilter={kpi !== "ALL"}
+              hasSearch={!!localSearch.trim()}
               onRetry={() => void loadItems()}
               onResetAllFilters={resetAllFilters}
               imageManifest={imageManifest}

@@ -6,6 +6,8 @@ import base64
 import binascii
 import csv
 import json
+import logging
+from time import perf_counter
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
@@ -41,7 +43,7 @@ from app.schemas import (
 from app.services import transaction_actions as transaction_actions_svc
 from app.services import inventory_operation_cancellation as operation_cancellation_svc
 from app.services import legacy_inventory_operation_adoption as legacy_adoption_svc
-from app.services.transaction_display_groups import build_display_groups as _build_display_groups
+from app.services.transaction_display_groups import DisplayGroup, DisplayGroupRecord, group_display_records
 from app.services.request_order_stock import load_request_order_stock
 from app.services.export_helpers import csv_streaming_response
 from app.services.pin_auth import verify_pin
@@ -67,6 +69,7 @@ from app.repositories import item_repository, inventory_repository
 
 
 router = APIRouter()
+logger = logging.getLogger("mes")
 
 
 # 단일 export 요청에서 허용하는 최대 행 수. 운영 PC 메모리 보호용 안전 상한.
@@ -106,7 +109,7 @@ class ReferenceSummaryResponse(BaseModel):
     unit: Optional[str] = None
 
 
-def _display_group_cursor(group: TransactionDisplayGroupResponse) -> str:
+def _display_group_cursor(group: TransactionDisplayGroupResponse | DisplayGroup[DisplayGroupRecord]) -> str:
     """대표 행의 정렬 기준과 안정 키를 포함한 불투명 커서."""
     sort_at, created_at, log_id = _display_group_sort_tuple(group)
     payload = {
@@ -134,7 +137,7 @@ def _decode_display_group_cursor(cursor: str) -> dict[str, str | None]:
 
 
 def _display_group_sort_tuple(
-    group: TransactionDisplayGroupResponse,
+    group: TransactionDisplayGroupResponse | DisplayGroup[DisplayGroupRecord],
 ) -> tuple[str, str, str]:
     # 불량 lifecycle은 화면 의미상 부모→후속 로그 순서를 보존한다. 다만 대표 행의
     # 정렬·커서는 실제 목록에서 먼저 나타나는(가장 최신인) 후속 로그를 기준으로 삼아야
@@ -155,7 +158,7 @@ def _display_group_sort_tuple(
 
 
 def _is_after_display_group_cursor(
-    group: TransactionDisplayGroupResponse,
+    group: TransactionDisplayGroupResponse | DisplayGroup[DisplayGroupRecord],
     cursor: dict[str, str | None],
 ) -> bool:
     """내림차순 대표 행 정렬에서 커서 뒤에 남아야 하는 그룹인지 판단한다."""
@@ -425,14 +428,9 @@ def list_transaction_display_groups(
     db: Session = Depends(get_db),
 ) -> TransactionDisplayGroupPageResponse:
     """검색 일치 로그가 속한 작업을 보존하고 완결된 그룹 단위로 반환한다."""
-    edit_count_sq = (
-        select(func.count(TransactionEditLog.edit_id))
-        .where(TransactionEditLog.original_log_id == TransactionLog.log_id)
-        .correlate(TransactionLog)
-        .scalar_subquery()
-    )
+    started = perf_counter()
     query = (
-        db.query(TransactionLog, Item, edit_count_sq.label("edit_count"))
+        db.query(TransactionLog)
         .join(Item, TransactionLog.item_id == Item.item_id)
         .outerjoin(IoBatch, TransactionLog.operation_batch_id == IoBatch.batch_id)
     )
@@ -464,62 +462,109 @@ def list_transaction_display_groups(
         if search_filter is not None else None
     )
     requested_at_order = _history_request_date_expr()
-    rows = query.add_columns(requested_at_order.label("request_order_at")).order_by(
-        requested_at_order.desc(),
-        TransactionLog.created_at.desc(),
-        TransactionLog.log_id.desc(),
+    rows = query.with_entities(
+        TransactionLog.log_id, TransactionLog.item_id, TransactionLog.transaction_type,
+        TransactionLog.quantity_change, TransactionLog.created_at,
+        TransactionLog.operation_id, TransactionLog.operation_batch_id,
+        TransactionLog.reference_no, TransactionLog.shipping_phase,
+        TransactionLog.produced_by, TransactionLog.department,
+        TransactionLog.reason_category, TransactionLog.reason_memo,
+        requested_at_order.label("request_order_at"),
+    ).order_by(
+        requested_at_order.desc(), TransactionLog.created_at.desc(), TransactionLog.log_id.desc(),
     ).all()
-    batch_ids = {log.operation_batch_id for log, _, _, _ in rows if log.operation_batch_id}
-    batch_map = _batch_name_map(db, batch_ids)
-    reference_nos = {log.reference_no for log, _, _, _ in rows if log.reference_no}
-    stock_request_map = _stock_request_info_map(db, reference_nos)
-    operation_map = _operation_info_map(
-        db,
-        {log.operation_id for log, _, _, _ in rows if log.operation_id},
-    )
-    logs = []
-    for log, item, edit_count, request_order_at in rows:
-        info = stock_request_map.get(log.reference_no) if log.reference_no else None
-        if info is None:
-            info = batch_map.get(log.operation_batch_id)
-        operation_info = operation_map.get(log.operation_id)
-        logs.append(
-            _to_log_response(
-                log,
-                item,
-                int(edit_count or 0),
+    batch_map = _batch_name_map(db, {row.operation_batch_id for row in rows if row.operation_batch_id})
+    stock_request_map = _stock_request_info_map(db, {row.reference_no for row in rows if row.reference_no})
+    operation_map = _operation_info_map(db, {row.operation_id for row in rows if row.operation_id})
+    queried_at = perf_counter()
+    records = []
+    for row in rows:
+        info = stock_request_map.get(row.reference_no) or batch_map.get(row.operation_batch_id)
+        operation_info = operation_map.get(row.operation_id)
+        operation = operation_info.operation if operation_info else None
+        reversal = operation_info.reversal if operation_info else None
+        is_cancellation = operation is not None and operation.kind == InventoryOperationKindEnum.CANCELLATION
+        records.append(DisplayGroupRecord(
+            log_id=row.log_id, item_id=row.item_id, transaction_type=row.transaction_type,
+            quantity_change=row.quantity_change, created_at=row.created_at,
+            requested_at=operation.effective_at if is_cancellation else row.request_order_at or row.created_at,
+            operation_id=row.operation_id, operation_batch_id=row.operation_batch_id,
+            reference_no=row.reference_no, shipping_phase=row.shipping_phase,
+            produced_by=row.produced_by,
+            requester_name=operation.actor_name if is_cancellation else info.requester_name if info else None,
+            department=row.department, reason_category=row.reason_category, reason_memo=row.reason_memo,
+            operation_kind=operation.kind.value if operation else None,
+            operation_effective_status=(
+                "cancellation" if is_cancellation else
+                "cancelled" if operation and operation.kind == InventoryOperationKindEnum.BUSINESS and reversal else
+                "active" if operation else None
+            ),
+        ))
+    groups = group_display_records(records)
+    if matched_log_ids is not None:
+        groups = [group for group in groups if any(log.log_id in matched_log_ids for log in group.logs)]
+    if cursor:
+        cursor_value = _decode_display_group_cursor(cursor)
+        groups = [group for group in groups if _is_after_display_group_cursor(group, cursor_value)]
+    selected_groups = groups[:limit]
+    grouped_at = perf_counter()
+    selected_ids = {log.log_id for group in selected_groups for log in group.logs}
+    details = {}
+    if selected_ids:
+        # The expensive detail fields and edit counts are needed only for this page.
+        edit_counts = dict(
+            db.query(TransactionEditLog.original_log_id, func.count(TransactionEditLog.edit_id))
+            .filter(TransactionEditLog.original_log_id.in_(selected_ids))
+            .group_by(TransactionEditLog.original_log_id).all()
+        )
+        detail_rows = (
+            db.query(TransactionLog, Item).join(Item, TransactionLog.item_id == Item.item_id)
+            .filter(TransactionLog.log_id.in_(selected_ids)).all()
+        )
+        requested_at_by_id = {row.log_id: row.request_order_at for row in rows if row.log_id in selected_ids}
+        for log, item in detail_rows:
+            info = stock_request_map.get(log.reference_no) or batch_map.get(log.operation_batch_id)
+            operation_info = operation_map.get(log.operation_id)
+            details[log.log_id] = _to_log_response(
+                log, item, int(edit_counts.get(log.log_id, 0)),
                 requester_name=info.requester_name if info else None,
                 approver_name=info.approver_name if info else None,
-                requested_at=request_order_at,
+                requested_at=requested_at_by_id[log.log_id],
                 approved_at=info.approved_at if info else None,
                 operation=operation_info.operation if operation_info else None,
                 reversal=operation_info.reversal if operation_info else None,
             )
+    page_groups = [
+        TransactionDisplayGroupResponse(
+            type=group.type, key=group.key, logs=[details[log.log_id] for log in group.logs],
+            matched_log_ids=(
+                [log.log_id for log in group.logs if log.log_id in matched_log_ids]
+                if matched_log_ids is not None else None
+            ),
         )
-    groups = _build_display_groups(logs)
-    if matched_log_ids is not None:
-        groups = [group for group in groups if any(log.log_id in matched_log_ids for log in group.logs)]
-        for group in groups:
-            group.matched_log_ids = [log.log_id for log in group.logs if log.log_id in matched_log_ids]
-    if cursor:
-        cursor_value = _decode_display_group_cursor(cursor)
-        groups = [group for group in groups if _is_after_display_group_cursor(group, cursor_value)]
-    page_groups = groups[:limit]
+        for group in selected_groups
+    ]
+    hydrated_at = perf_counter()
     request_order_stock = load_request_order_stock(
-        db,
-        {log.item_id for group in page_groups for log in group.logs},
+        db, {log.item_id for group in page_groups for log in group.logs},
         request_date_expr=requested_at_order,
     )
     for group in page_groups:
         for log in group.logs:
             log.request_order_stock = request_order_stock[log.log_id]
+    finished_at = perf_counter()
+    logger.debug(
+        "evt=history_display_groups_timing query_ms=%.1f group_ms=%.1f detail_ms=%.1f stock_ms=%.1f total_ms=%.1f",
+        (queried_at - started) * 1000, (grouped_at - queried_at) * 1000,
+        (hydrated_at - grouped_at) * 1000, (finished_at - hydrated_at) * 1000,
+        (finished_at - started) * 1000,
+    )
     has_more = len(page_groups) < len(groups)
     return TransactionDisplayGroupPageResponse(
         groups=page_groups,
         next_cursor=_display_group_cursor(page_groups[-1]) if has_more and page_groups else None,
         has_more=has_more,
     )
-
 
 @router.get(
     "/transactions/reference-summaries",

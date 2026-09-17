@@ -5,7 +5,9 @@ import { useEffect, useState } from "react";
 import type { IoBatch, StockRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
-import { EmptyState, LoadFailureCard, LoadingSkeleton } from "../common";
+import { EmptyState } from "../common";
+import { ReadFailure } from "../common/ReadState";
+import { WarehouseLoadingWorkArea } from "./WarehouseLoadingWorkArea";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { DraftCartItemRow } from "./DraftCartItemRow";
 import { IoDraftWorkCard } from "./IoDraftWorkCard";
@@ -58,11 +60,11 @@ export function DraftCartPanel({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
   const [opError, setOpError] = useState<string | null>(null);
-  const empty = Boolean(employeeId) && !loading && drafts.length === 0 && ioDrafts.length === 0 && !loadError;
+  const empty = Boolean(employeeId) && !loading && drafts.length === 0 && ioDrafts.length === 0 && (data !== undefined || !loadError);
 
   useEffect(() => {
-    onEmptyStateChange?.(empty && !opError);
-  }, [empty, onEmptyStateChange, opError]);
+    onEmptyStateChange?.(loading || (empty && !opError));
+  }, [empty, loading, onEmptyStateChange, opError]);
 
   // refreshNonce 변경 시 수동 refetch (외부 트리거)
   useEffect(() => {
@@ -116,8 +118,8 @@ export function DraftCartPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      {loading && <LoadingSkeleton variant="list" rows={2} />}
-      {loadError && <LoadFailureCard message={loadError} onRetry={() => void refetch()} />}
+      {loading && <WarehouseLoadingWorkArea label="요청 내역을 불러오고 있습니다…" />}
+      {loadError && <ReadFailure message={loadError} refresh={data !== undefined} onRetry={() => void refetch()} />}
       {opError && (
         <div
           className="rounded-[12px] border px-4 py-3 text-sm"

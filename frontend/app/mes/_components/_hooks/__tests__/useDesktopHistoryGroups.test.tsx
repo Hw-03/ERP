@@ -49,6 +49,21 @@ afterEach(() => {
 });
 
 describe("useDesktopHistoryGroups", () => {
+  it.each([{ groups: [] }, { groups: [makeGroup(0)] }])("keeps cached data on a failed stale remount", async ({ groups }) => {
+    globalThis.fetch = vi.fn().mockResolvedValue(makeResponse({ groups, next_cursor: null, has_more: false })) as unknown as typeof fetch;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = makeWrapper(client);
+    const first = renderHook(() => useDesktopHistoryGroups(baseArgs), { wrapper });
+    await waitFor(() => expect(first.result.current.loading).toBe(false));
+    first.unmount();
+    await client.invalidateQueries();
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error("refresh offline")) as unknown as typeof fetch;
+    const next = renderHook(() => useDesktopHistoryGroups(baseArgs), { wrapper, reactStrictMode: true });
+    expect(next.result.current.loading).toBe(false);
+    expect(next.result.current.groups).toEqual(groups);
+    await waitFor(() => expect(next.result.current.refreshError).toContain("API 연결에 실패했습니다"));
+    expect(next.result.current.error).toBeNull();
+  });
   it("uses the shared selected-month range in the desktop group request", async () => {
     const fetchSpy = vi.fn().mockResolvedValue(makeResponse({ groups: [], next_cursor: null, has_more: false }));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;

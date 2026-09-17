@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import { ThemeColor } from "./ThemeColor";
 
 // Pretendard 변수 폰트를 self-host 로드 — OS/브라우저와 무관하게 동일 렌더.
 // 변수 폰트(45~920)라 font-black(900)·font-extrabold(800)까지 한 파일로 커버한다.
@@ -39,7 +40,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: "#ffffff",
+  themeColor: "#eff4fb",
 };
 
 export default function RootLayout({
@@ -49,7 +50,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko" className={pretendard.variable}>
-      <body className="antialiased">{children}</body>
+      <body className="antialiased"><ThemeColor />{children}</body>
     </html>
   );
 }

@@ -75,10 +75,11 @@ export function useMetaEditTransactionMutation() {
   });
 }
 
-export function useMonthlyCountsQuery(year: number) {
+export function useMonthlyCountsQuery(year: number, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.transactions.monthlyCounts(year),
     queryFn: () => productionApi.getMonthlyCounts(year),
+    enabled: options?.enabled ?? true,
   });
 }
 

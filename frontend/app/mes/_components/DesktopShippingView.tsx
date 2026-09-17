@@ -1,4 +1,5 @@
 "use client";
+import { ReadEmpty, ReadFailure, ReadLoading } from "./common/ReadState";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent, ReactNode, SyntheticEvent } from "react";
@@ -341,11 +342,12 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   );
   const [mutationError, setMutationError] = useState<string | null>(null);
   const setError = setMutationError;
-  const error = mutationError ?? (shippingRequestsQuery.error
+  const readError = shippingRequestsQuery.error
     ? shippingRequestsQuery.error instanceof Error
       ? shippingRequestsQuery.error.message
       : "출하 데이터를 불러오지 못했습니다."
-    : null);
+    : null;
+  const error = mutationError ?? readError;
   const loading = shippingRequestsQuery.isLoading;
   const [itemsLoading, setItemsLoading] = useState(false);
   const [pfItemsLoading, setPfItemsLoading] = useState(false);
@@ -1832,7 +1834,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   if (loading) {
     return (
       <div className="flex h-full min-h-0 flex-1 items-center justify-center px-6">
-        <div className="text-sm font-black" style={{ color: LEGACY_COLORS.muted2 }}>출하 데이터를 불러오는 중입니다.</div>
+        <div className="w-full"><ReadLoading label="출하 데이터를 불러오는 중입니다." variant="card" /></div>
       </div>
     );
   }
@@ -1840,8 +1842,9 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   const usesExternalRootRail = view === "requestDetail" || view === "historyList" || view === "historyWork";
   const rootContent = (
     <>
-      {error && <Notice tone={LEGACY_COLORS.red} title="오류" body={error} />}
-      {renderActiveView()}
+      {mutationError && <Notice tone={LEGACY_COLORS.red} title="오류" body={mutationError} />}
+      {readError && <ReadFailure message={readError} refresh={shippingRequestsQuery.data !== undefined} onRetry={() => void shippingRequestsQuery.refetch()} />}
+      {(!readError || shippingRequestsQuery.data !== undefined) && renderActiveView()}
     </>
   );
   return (
@@ -2506,7 +2509,7 @@ function HistoryListEntry({
   onYear: (year: number) => void;
   onMonth: (year: number, month: number) => void;
   onSearchChange: (value: string) => void;
-  onSearch: () => void;
+  onSearch: (query?: string) => void;
   onLoadMore: () => void;
   onOpen: (request: ShippingRequest) => void;
 }) {
@@ -2621,18 +2624,19 @@ function HistoryListEntry({
               <LoadFailureCard
                 message={error}
                 prefix="최신 출하 이력을 동기화하지 못했습니다"
-                retryLabel="다시 동기화"
+                retryLabel="다시 시도"
+                comfortable
                 onRetry={onRetry}
               />
             </div>
           )}
           {error && rows.length === 0 ? (
-            <div className="flex flex-1 items-center justify-center"><EmptyState title="출하 이력을 불러오지 못했습니다" body={error} /></div>
+            <div className="flex-1"><ReadFailure message={error} onRetry={onRetry} /></div>
           ) : loading && rows.length === 0 ? (
-            <div className="flex flex-1 items-center justify-center"><EmptyState title="출하 이력을 불러오는 중입니다" body="잠시만 기다려주세요." /></div>
+            <div className="flex-1"><ReadLoading label="출하 이력을 불러오는 중입니다" /></div>
           ) : appliedSearch ? (
             searchGroups.length === 0 ? (
-              <div className="flex flex-1 items-center justify-center"><EmptyState title="검색 결과 없음" body="인보이스 번호 또는 PF 품명을 확인하세요." /></div>
+              <div className="flex-1"><ReadEmpty hasSearch onReset={() => { onSearchChange(""); onSearch(""); }} /></div>
             ) : (
               <div className="grid flex-1 content-start gap-2">
                 {Array.from(new Set(searchGroups.map((group) => group.year))).map((year, yearIndex) => (
@@ -2651,7 +2655,7 @@ function HistoryListEntry({
               </div>
             )
           ) : years.length === 0 ? (
-            <div className="flex flex-1 items-center justify-center"><EmptyState title="출하 이력 없음" body={historyEmptyBody} /></div>
+            <div className="flex-1"><ReadEmpty title="출하 이력이 없습니다" description={historyEmptyBody} /></div>
           ) : (
             <div className="grid flex-1 content-start gap-2">
               {years.map((year) => {

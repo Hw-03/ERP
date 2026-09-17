@@ -259,12 +259,12 @@ describe("DesktopDefectView realtime refresh", () => {
     mocks.revision = 1;
     rerender(<DesktopDefectView operator={operator} />);
 
-    expect(await screen.findByRole("button", { name: "다시 동기화" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "다시 시도" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Process D-001" })).toBeInTheDocument();
 
     mocks.listDefects.mockResolvedValueOnce([{ ...location, quantity: 2, available_quantity: 2 }]);
-    fireEvent.click(screen.getByRole("button", { name: "다시 동기화" }));
-    await waitFor(() => expect(screen.queryByRole("button", { name: "다시 동기화" })).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "다시 시도" })).not.toBeInTheDocument());
     expect(screen.getByRole("button", { name: "Process D-001" })).toBeInTheDocument();
   });
 

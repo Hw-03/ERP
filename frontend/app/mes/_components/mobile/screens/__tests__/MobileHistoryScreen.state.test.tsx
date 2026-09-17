@@ -7,6 +7,7 @@ import { queryKeys } from "@/lib/queries/keys";
 import { MobileHistoryScreen } from "../MobileHistoryScreen";
 
 const testState = vi.hoisted(() => ({
+  monthlyQuery: vi.fn(() => ({ data: {} })),
   historyResult: null as any,
   batch: null as any,
   updated: null as any,
@@ -44,7 +45,7 @@ vi.mock("@/lib/queries/useModelsQuery", () => ({
 }));
 
 vi.mock("@/lib/queries/useTransactionsQuery", () => ({
-  useMonthlyCountsQuery: () => ({ data: {} }),
+  useMonthlyCountsQuery: (...args: any[]) => testState.monthlyQuery(...args),
 }));
 
 vi.mock("@/lib/ui/BottomSheet", () => ({
@@ -229,6 +230,10 @@ beforeEach(() => {
 });
 
 describe("MobileHistoryScreen history state", () => {
+  it("does not query annual counts while the calendar is closed", () => {
+    render(<MobileHistoryScreen />);
+    expect(testState.monthlyQuery).toHaveBeenLastCalledWith(expect.any(Number), { enabled: false });
+  });
   it("keeps selection for failed loads and refreshes or closes it after successful loads", async () => {
     const { rerender } = render(<MobileHistoryScreen />);
     fireEvent.click(screen.getByRole("button", { name: "모바일 단건 선택" }));

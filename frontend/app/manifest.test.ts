@@ -13,8 +13,8 @@ describe("PWA manifest", () => {
       start_url: "/mes",
       scope: "/",
       display: "standalone",
-      background_color: "#ffffff",
-      theme_color: "#ffffff",
+      background_color: "#eff4fb",
+      theme_color: "#eff4fb",
     });
 
     expect(appManifest.icons).toEqual([

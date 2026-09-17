@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { Building2 } from "lucide-react";
 import { ApiError } from "@/lib/api-core";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { LoadFailureCard, LoadingSkeleton } from "../common";
+import { ReadFailure } from "../common/ReadState";
+import { WarehouseLoadingWorkArea } from "./WarehouseLoadingWorkArea";
 import { WarehouseQueueRow } from "./WarehouseQueueRow";
 import {
   useApproveStockRequestDepartmentMutation,
@@ -30,8 +31,8 @@ interface Props {
 }
 
 export function DepartmentQueuePanel({ approverEmployeeId, refreshNonce, onChanged, onEmptyStateChange, targetRequestId }: Props) {
-  const { data: items = [], isLoading: loading, error: qError, refetch } =
-    useDepartmentQueueQuery(approverEmployeeId);
+  const query = useDepartmentQueueQuery(approverEmployeeId);
+  const { data: items = [], isLoading: loading, error: qError, refetch } = query;
   const approveMutation = useApproveStockRequestDepartmentMutation();
   const rejectMutation = useRejectStockRequestDepartmentMutation();
   const error = qError
@@ -49,7 +50,7 @@ export function DepartmentQueuePanel({ approverEmployeeId, refreshNonce, onChang
   const [approveError, setApproveError] = useState<string | null>(null);
 
   useEffect(() => {
-    onEmptyStateChange?.(!loading && items.length === 0 && !error);
+    onEmptyStateChange?.(loading || (items.length === 0 && !error));
   }, [error, items.length, loading, onEmptyStateChange]);
 
   // refreshNonce 변경 시 수동 refetch (외부 트리거 지원)
@@ -131,9 +132,9 @@ export function DepartmentQueuePanel({ approverEmployeeId, refreshNonce, onChang
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      {loading && <LoadingSkeleton variant="list" rows={2} />}
-      {error && <LoadFailureCard message={error} onRetry={() => void refetch()} />}
-      {!loading && items.length === 0 && !error && (
+      {loading && <WarehouseLoadingWorkArea label="결재 요청을 불러오고 있습니다…" />}
+      {error && <ReadFailure message={error} refresh={query.data !== undefined} onRetry={() => void refetch()} />}
+      {!loading && items.length === 0 && (query.data !== undefined || !error) && (
         <WarehouseEmptyWorkArea
           icon={<Building2 style={{ color: LEGACY_COLORS.blue }} />}
           title="부서 결재 대기 요청이 없습니다."

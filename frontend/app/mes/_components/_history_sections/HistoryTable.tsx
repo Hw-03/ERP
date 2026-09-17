@@ -8,7 +8,8 @@ import { ioApi } from "@/lib/api/io";
 import type { IoBatch } from "@/lib/api/types/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { Tooltip } from "@/lib/ui/Tooltip";
-import { EmptyState, LoadFailureCard } from "../common";
+import { LoadFailureCard } from "../common";
+import { ReadEmpty } from "../common/ReadState";
 import type { HistorySelection } from "./historyConstants";
 import { HistoryLogRow } from "./HistoryLogRow";
 import {
@@ -37,6 +38,9 @@ export type HistoryTableFocusTarget = {
 
 type Props = {
   loading: boolean;
+  hasSearch?: boolean;
+  hasFilters?: boolean;
+  onResetFilters?: () => void;
   error?: string | null;
   onRetry?: () => void;
   refreshError?: string | null;
@@ -125,7 +129,7 @@ function HistoryTableCornerMask() {
   );
 }
 
-function HistoryTableSkeleton() {
+export function HistoryTableSkeleton() {
   return (
     <div
       data-testid="history-table-surface"
@@ -212,6 +216,9 @@ function getOperationPrimaryLog(logs: TransactionLog[]): TransactionLog {
 
 export function HistoryTable({
   loading,
+  hasSearch = false,
+  hasFilters = false,
+  onResetFilters,
   error,
   onRetry,
   refreshError,
@@ -271,8 +278,7 @@ export function HistoryTable({
     return () => window.clearTimeout(handle);
   }, [focusTarget]);
 
-  const localGroups = useMemo(() => buildGroups(filteredLogs), [filteredLogs]);
-  const groups = displayGroups ?? localGroups;
+  const groups = useMemo(() => displayGroups ?? buildGroups(filteredLogs), [displayGroups, filteredLogs]);
   const searchMetadataActive = groups.some((group) => group.matchedLogIds != null);
   const previousSearchMetadataActiveRef = useRef(searchMetadataActive);
 
@@ -479,17 +485,15 @@ export function HistoryTable({
         <HistoryTableSkeleton />
       ) : error ? (
         <LoadFailureCard
+          comfortable
           message={error}
           onRetry={onRetry}
           retryLabel="다시 시도"
           prefix="입출고 내역을 불러오지 못했습니다"
         />
       ) : groups.length === 0 ? (
-        <EmptyState
-          variant="no-data"
-          title="거래 이력이 없습니다."
-          description="조건에 맞는 거래가 없거나 아직 기록이 없습니다."
-        />
+        <ReadEmpty hasSearch={hasSearch} hasFilters={hasFilters} onReset={onResetFilters}
+          title={!hasSearch && !hasFilters ? "거래 이력이 없습니다." : undefined} />
       ) : (
         <div
           data-testid="history-table-surface"
@@ -750,9 +754,10 @@ export function HistoryTable({
         <div className="mt-4">
           <LoadFailureCard
             message={refreshError}
-            onRetry={onRetryRefresh}
-            retryLabel="다시 동기화"
-            prefix="최신 입출고 내역을 동기화하지 못했습니다"
+            onRetry={onRetryRefresh ?? onRetry}
+            retryLabel="다시 시도"
+            comfortable
+            prefix="최신 입출고 내역을 동기화하지 못했습니다. 기존 내용을 표시합니다"
           />
         </div>
       )}

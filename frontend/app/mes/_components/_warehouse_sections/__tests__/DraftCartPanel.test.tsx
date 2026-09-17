@@ -7,13 +7,14 @@ const mockDraftData = vi.hoisted(() => ({
   stockDrafts: [] as unknown[],
   ioDrafts: [] as unknown[],
 }));
+const mockFailure = vi.hoisted(() => ({ error: null as Error | null, refetch: vi.fn() }));
 
 vi.mock("@/lib/queries/useDraftCartQuery", () => ({
   useDraftCartQuery: () => ({
     data: mockDraftData,
     isLoading: false,
-    error: null,
-    refetch: vi.fn(),
+    error: mockFailure.error,
+    refetch: mockFailure.refetch,
   }),
   useDeleteIoDraftMutation: () => ({ mutate: vi.fn() }),
   useDeleteStockRequestDraftMutation: () => ({ mutate: vi.fn() }),
@@ -49,6 +50,18 @@ describe("DraftCartPanel empty state", () => {
   beforeEach(() => {
     mockDraftData.stockDrafts = [];
     mockDraftData.ioDrafts = [];
+    mockFailure.error = null;
+    mockFailure.refetch.mockClear();
+  });
+
+  it("preserves successful empty drafts when refresh fails", () => {
+    mockFailure.error = new Error("갱신 실패");
+    render(<DraftCartPanel employeeId="emp-1" refreshNonce={0} onContinue={vi.fn()} onChanged={vi.fn()} />);
+    expect(screen.getByText("작업 중인 요청이 없습니다.")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("기존 내용을 표시합니다");
+    mockFailure.refetch.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(mockFailure.refetch).toHaveBeenCalledOnce();
   });
 
   it("offers a request-compose action when there is no work in progress", () => {

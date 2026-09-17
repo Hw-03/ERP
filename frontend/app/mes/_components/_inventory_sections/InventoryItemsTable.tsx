@@ -1,12 +1,10 @@
 "use client";
 
 import { useMemo } from "react";
-import { PackageSearch } from "lucide-react";
 import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
-import { EmptyState } from "../common/EmptyState";
-import { LoadFailureCard } from "../common/LoadFailureCard";
+import { ReadEmpty, ReadFailure, ReadLoading } from "../common/ReadState";
 import { InventoryItemRow } from "./InventoryItemRow";
 import { useChunkedRender } from "../_hooks/useChunkedRender";
 
@@ -23,6 +21,7 @@ type Props = {
   onSelectItem: (item: Item | null) => void;
   activeFilterCount: number;
   hasKpiFilter: boolean;
+  hasSearch?: boolean;
   onRetry: () => void;
   onResetAllFilters: () => void;
   imageManifest?: Record<string, string>;
@@ -40,6 +39,7 @@ export function InventoryItemsTable({
   onSelectItem,
   activeFilterCount,
   hasKpiFilter,
+  hasSearch = false,
   onRetry,
   onResetAllFilters,
   imageManifest,
@@ -69,44 +69,22 @@ export function InventoryItemsTable({
   const { visible: chunkedItems, sentinelRef, hasMore: hasMoreChunk } = useChunkedRender(displayedItems, 20);
 
   if (error) {
-    return <LoadFailureCard message={error} onRetry={onRetry} />;
+    return <ReadFailure message={error} onRetry={onRetry} />;
   }
-  if (loading) {
-    return (
-      <div
-        className="rounded-[24px] border px-4 py-4 text-base"
-        style={{
-          borderColor: LEGACY_COLORS.border,
-          background: LEGACY_COLORS.s2,
-          color: LEGACY_COLORS.muted2,
-        }}
-      >
-        재고 데이터를 불러오는 중입니다...
-      </div>
-    );
+  if (loading && compact) {
+    return <ReadLoading label="재고 데이터를 불러오는 중입니다..." variant={compact ? "list" : "table"} />;
   }
-  if (filteredItems.length === 0) {
+  if (!loading && filteredItems.length === 0) {
     return (
       <div className="space-y-3">
         {refreshError && (
-          <LoadFailureCard
+          <ReadFailure
             message={refreshError}
-            prefix="최신 재고 목록 동기화 실패"
-            retryLabel="다시 동기화"
+            refresh
             onRetry={onRetry}
           />
         )}
-        <EmptyState
-        variant={activeFilterCount > 0 || hasKpiFilter ? "filtered-out" : "no-search-result"}
-        icon={<PackageSearch className="h-8 w-8" />}
-        title="검색 결과가 없습니다."
-        description="검색어 또는 필터를 초기화해 전체 품목을 다시 확인하세요."
-        action={
-          activeFilterCount > 0 || hasKpiFilter
-            ? { label: "필터 초기화", onClick: onResetAllFilters }
-            : undefined
-        }
-        />
+        <ReadEmpty hasSearch={hasSearch} hasFilters={activeFilterCount > Number(hasSearch) || hasKpiFilter} onReset={onResetAllFilters} />
       </div>
     );
   }
@@ -114,10 +92,9 @@ export function InventoryItemsTable({
     <>
       {refreshError && (
         <div className="mb-3">
-          <LoadFailureCard
+          <ReadFailure
             message={refreshError}
-            prefix="최신 재고 목록 동기화 실패"
-            retryLabel="다시 동기화"
+            refresh
             onRetry={onRetry}
           />
         </div>
@@ -142,7 +119,8 @@ export function InventoryItemsTable({
             />
           </div>
         )}
-        <table className="min-w-full border-separate border-spacing-0 text-sm">
+        {loading && <span role="status" className="sr-only">재고 데이터를 불러오는 중입니다...</span>}
+        <table aria-busy={loading || undefined} className="min-w-full border-separate border-spacing-0 text-sm">
           <thead className={`sticky ${compact ? "top-0" : "top-[71px]"} z-10`}>
             <tr>
               {headerColumns.map(({ label, nowrap, width, minWidth, center, hidden }, columnIndex) => (
@@ -180,7 +158,18 @@ export function InventoryItemsTable({
             </tr>
           </thead>
           <tbody>
-            {chunkedItems.map((item) => (
+            {loading ? Array.from({ length: 8 }, (_, index) => (
+              <tr key={index} data-testid="inventory-skeleton-row" aria-hidden="true">
+                {Array.from({ length: 7 }, (_, column) => (
+                  <td key={column} className={`border-b px-4 py-5 align-middle${column !== 0 && column !== 2 && column !== 5 ? " hidden sm:table-cell" : ""}`} style={{ borderColor: LEGACY_COLORS.border }}>
+                    {column === 2 ? <div className="flex h-12 flex-col justify-center gap-3 motion-safe:animate-pulse">
+                      <div className="h-4 w-2/3 rounded" style={{ background: LEGACY_COLORS.borderStrong }} />
+                      <div className="h-1.5 w-full rounded-full" style={{ background: LEGACY_COLORS.border }} />
+                    </div> : <div className={`mx-auto motion-safe:animate-pulse ${column === 1 ? "h-12 w-12 rounded-lg" : column === 0 || column === 4 ? "h-6 w-14 rounded-full" : "h-4 w-12 rounded"}`} style={{ background: LEGACY_COLORS.borderStrong }} />}
+                  </td>
+                ))}
+              </tr>
+            )) : chunkedItems.map((item) => (
               <InventoryItemRow
                 key={item.item_id}
                 item={item}
