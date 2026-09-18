@@ -1,0 +1,12 @@
+{
+  "runId": "PC-AUDIT-20260917-151013",
+  "startedAt": "2026-09-17T15:10:13+09:00",
+  "head": "be653ce8369384ae028ff73bd6e1c800807dde90",
+  "frontendUrl": "http://192.168.0.63:3001",
+  "backendUrl": "http://192.168.0.63:8011",
+  "database": {
+    "source": "backend/mes.db",
+    "sha256": "01DA8E6848BD6DC85CBD0CCC79968A38672718DBBF38B20B7DA8EAF0D697C7E8",
+    "backupPath": "_attic/runtime/backups/sqlite/mes-before-pc-audit-20260917-151013-20260917-151015-0e0c9202.db"
+  }
+}

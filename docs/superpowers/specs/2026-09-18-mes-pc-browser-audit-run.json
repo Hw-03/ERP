@@ -1,0 +1,41 @@
+{
+  "runId": "PC-BROWSER-AUDIT-20260918",
+  "startedAt": "2026-09-18T14:12:52+09:00",
+  "head": "be653ce8369384ae028ff73bd6e1c800807dde90",
+  "frontendUrl": "http://192.168.0.63:3001",
+  "backendUrl": "http://192.168.0.63:8011",
+  "database": {
+    "source": "backend/mes.db",
+    "sha256": "01DA8E6848BD6DC85CBD0CCC79968A38672718DBBF38B20B7DA8EAF0D697C7E8",
+    "backupPath": "_attic/runtime/backups/sqlite/mes-before-pc-audit-20260917-151013-20260917-151015-0e0c9202.db",
+    "sha256AtBrowserCompletionStart": "B78EC2FB562A03D625067FC0410407FB97F8073488D6D9C5583453BB11C535A3"
+  },
+  "sourceRunId": "PC-AUDIT-20260917-151013",
+  "sourceThreadId": "01a09d7b-c14e-7673-9fef-c72708bb2f03",
+  "browserPolicy": {
+    "newActions": "CODEX_IN_APP_BROWSER_ONLY",
+    "employeeServerReferences": 0,
+    "newChromeActions": 0
+  },
+  "completion": {
+    "completedAt": "2026-09-18T16:13:13+09:00",
+    "temporaryPermissionsRestored": true,
+    "finalFrontendUrl": "http://192.168.0.63:3001/mes?tab=dashboard",
+    "qaArtifactsDeleted": false,
+    "qaArtifactsCleanupPerformed": true,
+    "qaArtifactsPreservedReason": "지도 조회 계정에는 창고 정·부 역할이 없어 편집 UI가 노출되지 않았고, 접근 가능한 창고 부관리자 계정의 본인 PIN을 확인할 수 없어 권한·PIN 변경 없이 지도 데이터만 보존",
+    "qaArtifactsRemoved": [
+      "QA-PC-AUDIT-BOM-PARENT-01 → QA-PC-AUDIT-ITEM-RENAMED BOM 관계 영구 삭제",
+      "QA-PC-AUDIT-BOM-PARENT-01 및 QA-PC-AUDIT-ITEM-RENAMED 품목을 DX3000으로 재배정한 뒤 소프트 삭제",
+      "QA-PC-AUDIT-MODEL-RENAMED 모델 영구 삭제",
+      "QA-PC-AUDIT-DEPT-RENAMED 부서 영구 삭제"
+    ],
+    "qaArtifacts": [
+      "QA-PC-AUDIT-A10 A열 1층 자리2 지도 박스(34-HR-0001 ×2)",
+      "QA-PC-AUDIT-A10 앵글(3×2)",
+      "QA-PC-AUDIT-PASSAGE-01 통로(2×2)",
+      "QA-PC-AUDIT-PL-02 팔레트 구역(2×2)"
+    ],
+    "auditHistoryDeleted": false
+  }
+}
