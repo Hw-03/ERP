@@ -10,7 +10,7 @@
  */
 
 import { deleteJson, fetcher, patchJson, postJson, putJson, toApiUrl } from "../api-core";
-import type { Item } from "./types";
+import type { BomUnmatchedStatus, Item } from "./types";
 
 export interface ItemOrderEntry {
   item_id: string;
@@ -91,6 +91,9 @@ export const itemsApi = {
   /** BOM 완료 상태 토글 — 사용자가 명시적으로 "완료로 표시"/"완료 해제"를 누를 때만 호출. */
   updateBomCompletion: async (itemId: string, completed: boolean) =>
     patchJson<Item>(toApiUrl(`/api/items/${itemId}/bom-completion`), { completed }),
+
+  updateBomUnmatchedStatus: async (itemId: string, status: BomUnmatchedStatus | null) =>
+    patchJson<Item>(toApiUrl(`/api/items/${itemId}/bom-unmatched-status`), { status }),
 
   softDeleteItem: (itemId: string) =>
     patchJson<Item>(toApiUrl(`/api/items/${itemId}/soft-delete`), {}),

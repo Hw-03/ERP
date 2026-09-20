@@ -21,6 +21,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
 PREVIOUS_REVISION = "20260910_0033"
 MIGRATION_REVISION = "20260915_0034"
+HEAD_REVISION = "20260917_0035"
 
 
 def _config(path: Path) -> Config:
@@ -193,8 +194,8 @@ def test_migration_adds_fields_backfills_employee_codes_and_preserves_history(
         "SET NULL",
     ) in request_foreign_keys
     assert foreign_key_violations == []
-    assert result.revision == MIGRATION_REVISION
-    assert revision == MIGRATION_REVISION
+    assert result.revision == HEAD_REVISION
+    assert revision == HEAD_REVISION
 
 
 def test_fresh_bootstrap_seed_grants_special_permission_only_to_employee_codes(

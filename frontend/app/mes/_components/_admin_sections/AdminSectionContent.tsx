@@ -96,6 +96,7 @@ export function AdminSectionContent(props: AdminSectionContentProps) {
     return (
       <BomWorkbench
         items={items}
+        setItems={setItems}
         allBomRows={allBomRows}
         refreshAllBom={refreshAllBom}
         refreshItems={refreshItems}

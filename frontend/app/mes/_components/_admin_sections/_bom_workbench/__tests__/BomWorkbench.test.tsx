@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, type BOMEntry, type Item } from "@/lib/api";
+import { itemsApi } from "@/lib/api/items";
 import { BomWorkbench } from "../BomWorkbench";
 
 const realtime = vi.hoisted(() => ({ revision: null as number | null }));
@@ -23,6 +24,16 @@ const selectedParent = {
   process_type_code: "AA",
   bom_completed_at: null,
 } as Item;
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((nextResolve, nextReject) => {
+    resolve = nextResolve;
+    reject = nextReject;
+  });
+  return { promise, resolve, reject };
+}
 
 describe("BomWorkbench", () => {
   beforeEach(() => {
@@ -58,6 +69,226 @@ describe("BomWorkbench", () => {
 
     const parentListCard = closestWithClass(parentScrollRegion!, "rounded-2xl");
     expect(parentListCard.parentElement).toHaveClass("flex", "flex-1", "min-h-0", "flex-col");
+  });
+
+  it("saves an unmatched raw disposition, disables only its three controls, then refreshes items", async () => {
+    vi.spyOn(api, "getBOM").mockResolvedValue([]);
+    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    const raw = {
+      item_id: "raw-1",
+      item_name: "Unmatched raw",
+      mes_code: "RAW-001",
+      process_type_code: "AR",
+      bom_completed_at: null,
+      bom_unmatched_status: null,
+    } as Item;
+    const secondRaw = { ...raw, item_id: "raw-2", item_name: "Second raw", mes_code: "RAW-002" };
+    const refresh = deferred<void>();
+    const update = vi.spyOn(itemsApi, "updateBomUnmatchedStatus").mockResolvedValue({
+      ...raw,
+      bom_unmatched_status: "HOLD",
+    });
+    const refreshItems = vi.fn(() => refresh.promise);
+    const onStatusChange = vi.fn();
+    let currentItems = [selectedParent, raw, secondRaw];
+    const setItems = vi.fn((updater: ((previous: Item[]) => Item[]) | Item[]) => {
+      currentItems = typeof updater === "function" ? updater(currentItems) : updater;
+    });
+
+    const { rerender } = render(
+      <BomWorkbench
+        items={currentItems}
+        setItems={setItems}
+        allBomRows={[]}
+        refreshAllBom={() => undefined}
+        refreshItems={refreshItems}
+        onStatusChange={onStatusChange}
+        onError={() => undefined}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /미배치 원자재/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Unmatched raw (RAW-001) 보류" }));
+    expect(screen.getByRole("checkbox", { name: "Unmatched raw (RAW-001) 불용" })).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "Unmatched raw (RAW-001) 보류" })).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "Unmatched raw (RAW-001) 중복" })).toBeDisabled();
+    expect(update).toHaveBeenCalledWith("raw-1", "HOLD");
+
+    await waitFor(() => expect(setItems).toHaveBeenCalledTimes(1));
+    rerender(
+      <BomWorkbench
+        items={currentItems}
+        setItems={setItems}
+        allBomRows={[]}
+        refreshAllBom={() => undefined}
+        refreshItems={refreshItems}
+        onStatusChange={onStatusChange}
+        onError={() => undefined}
+      />,
+    );
+    await waitFor(() => expect(refreshItems).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("checkbox", { name: "Unmatched raw (RAW-001) 보류" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Second raw (RAW-002) 보류" })).toBeEnabled();
+    expect(onStatusChange).not.toHaveBeenCalled();
+
+    refresh.resolve(undefined);
+    await waitFor(() => expect(onStatusChange).toHaveBeenCalledWith('"Unmatched raw" 보류 처리됨'));
+  });
+
+  it("keeps the PATCH response visible and reports refresh failure separately", async () => {
+    vi.spyOn(api, "getBOM").mockResolvedValue([]);
+    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    const raw = {
+      item_id: "raw-1",
+      item_name: "Unmatched raw",
+      mes_code: "RAW-001",
+      process_type_code: "AR",
+      bom_completed_at: null,
+      bom_unmatched_status: null,
+    } as Item;
+    vi.spyOn(itemsApi, "updateBomUnmatchedStatus").mockResolvedValue({ ...raw, bom_unmatched_status: "HOLD" });
+    const onStatusChange = vi.fn();
+    const onError = vi.fn();
+    let currentItems = [selectedParent, raw];
+    const setItems = vi.fn((updater: ((previous: Item[]) => Item[]) | Item[]) => {
+      currentItems = typeof updater === "function" ? updater(currentItems) : updater;
+    });
+
+    const { rerender } = render(
+      <BomWorkbench
+        items={currentItems}
+        setItems={setItems}
+        allBomRows={[]}
+        refreshAllBom={() => undefined}
+        refreshItems={async () => { throw new Error("새로고침 실패"); }}
+        onStatusChange={onStatusChange}
+        onError={onError}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /미배치 원자재/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Unmatched raw (RAW-001) 보류" }));
+
+    await waitFor(() => expect(onError).toHaveBeenCalledWith("상태는 저장됐지만 목록 새로고침에 실패했습니다."));
+    rerender(
+      <BomWorkbench
+        items={currentItems}
+        setItems={setItems}
+        allBomRows={[]}
+        refreshAllBom={() => undefined}
+        refreshItems={async () => { throw new Error("새로고침 실패"); }}
+        onStatusChange={onStatusChange}
+        onError={onError}
+      />,
+    );
+    expect(screen.getByRole("checkbox", { name: "Unmatched raw (RAW-001) 보류" })).toBeChecked();
+    expect(onStatusChange).not.toHaveBeenCalled();
+  });
+
+  it("renders later parent item replacements and removals without local status state", async () => {
+    vi.spyOn(api, "getBOM").mockResolvedValue([]);
+    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    const heldRaw = {
+      item_id: "raw-1",
+      item_name: "Unmatched raw",
+      mes_code: "RAW-001",
+      process_type_code: "AR",
+      bom_completed_at: null,
+      bom_unmatched_status: "HOLD",
+    } as Item;
+    const props = {
+      setItems: vi.fn(),
+      allBomRows: [],
+      refreshAllBom: () => undefined,
+      refreshItems: async () => undefined,
+      onStatusChange: () => undefined,
+      onError: () => undefined,
+    };
+    const { rerender } = render(<BomWorkbench {...props} items={[selectedParent, heldRaw]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /미배치 원자재/ }));
+    expect(screen.getByRole("checkbox", { name: "Unmatched raw (RAW-001) 보류" })).toBeChecked();
+
+    await act(async () => {
+      rerender(<BomWorkbench {...props} items={[selectedParent, { ...heldRaw, bom_unmatched_status: "DUPLICATE" }]} />);
+    });
+    expect(screen.getByRole("checkbox", { name: "Unmatched raw (RAW-001) 중복" })).toBeChecked();
+
+    await act(async () => {
+      rerender(<BomWorkbench {...props} items={[selectedParent]} />);
+    });
+    expect(screen.queryByText("Unmatched raw")).not.toBeInTheDocument();
+  });
+
+  it("excludes deleted raw items from the unmatched count and expanded list", async () => {
+    vi.spyOn(api, "getBOM").mockResolvedValue([]);
+    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    const activeRaw = {
+      item_id: "raw-active",
+      item_name: "Active unmatched raw",
+      mes_code: "RAW-ACTIVE",
+      process_type_code: "AR",
+      bom_completed_at: null,
+      bom_unmatched_status: null,
+      deleted_at: null,
+    } as Item;
+    const deletedRaw = {
+      ...activeRaw,
+      item_id: "raw-deleted",
+      item_name: "Deleted unmatched raw",
+      mes_code: "RAW-DELETED",
+      deleted_at: "2026-09-18T00:00:00Z",
+    };
+
+    await act(async () => {
+      render(
+        <BomWorkbench
+          items={[selectedParent, activeRaw, deletedRaw]}
+          allBomRows={[]}
+          refreshAllBom={() => undefined}
+          refreshItems={async () => undefined}
+          onStatusChange={() => undefined}
+          onError={() => undefined}
+        />,
+      );
+    });
+
+    expect(screen.getByText("1건")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /미배치 원자재/ }));
+    expect(screen.getByRole("checkbox", { name: "Active unmatched raw (RAW-ACTIVE) 불용" })).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Deleted unmatched raw (RAW-DELETED) 불용" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the visible status unchanged and reports an error when unmatched raw saving fails", async () => {
+    vi.spyOn(api, "getBOM").mockResolvedValue([]);
+    vi.spyOn(api, "getBOMWhereUsed").mockResolvedValue([]);
+    const raw = {
+      item_id: "raw-1",
+      item_name: "Unmatched raw",
+      mes_code: "RAW-001",
+      process_type_code: "AR",
+      bom_completed_at: null,
+      bom_unmatched_status: null,
+    } as Item;
+    vi.spyOn(itemsApi, "updateBomUnmatchedStatus").mockRejectedValue(new Error("저장 실패"));
+    const onError = vi.fn();
+
+    render(
+      <BomWorkbench
+        items={[selectedParent, raw]}
+        allBomRows={[]}
+        refreshAllBom={() => undefined}
+        refreshItems={async () => undefined}
+        onStatusChange={() => undefined}
+        onError={onError}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /미배치 원자재/ }));
+    const hold = screen.getByRole("checkbox", { name: "Unmatched raw (RAW-001) 보류" });
+    fireEvent.click(hold);
+    expect(hold).not.toBeChecked();
+    await waitFor(() => expect(onError).toHaveBeenCalledWith("저장 실패"));
   });
 
   it("keeps each BOM list's scroll owner in a stable external desktop rail without shifting table columns", async () => {

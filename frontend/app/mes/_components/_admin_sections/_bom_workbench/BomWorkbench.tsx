@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { ArrowRightLeft, Network, Pencil } from "lucide-react";
 import { api } from "@/lib/api";
 import type { BOMDetailEntry, BOMEntry, Item } from "@/lib/api";
+import { itemsApi } from "@/lib/api/items";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { Button } from "@/lib/ui/Button";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
@@ -22,6 +23,7 @@ import { useRealtimeRevision } from "@/lib/queries/realtime";
 
 interface Props {
   items: Item[];
+  setItems: Dispatch<SetStateAction<Item[]>>;
   allBomRows: BOMDetailEntry[];
   refreshAllBom: () => void;
   refreshItems: () => Promise<void>;
@@ -72,6 +74,7 @@ function candidatesFor(items: Item[], dept: BomDeptFilter, mode: Mode): Item[] {
 
 export function BomWorkbench({
   items,
+  setItems,
   allBomRows,
   refreshAllBom,
   refreshItems,
@@ -90,6 +93,7 @@ export function BomWorkbench({
   const [reviewOpen, setReviewOpen] = useState(false);
   const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [unmatchedStatusBusyItemIds, setUnmatchedStatusBusyItemIds] = useState<Set<string>>(new Set());
   const [historyReady, setHistoryReady] = useState(false);
   const [historyValidationDeferred, setHistoryValidationDeferred] = useState(false);
   const itemsRef = useRef(items);
@@ -256,11 +260,11 @@ export function BomWorkbench({
 
   const rawItems = useMemo(
     () =>
-      items.filter((i) => {
+      activeItems.filter((i) => {
         if (dept !== "ALL" && i.process_type_code?.[0] !== dept) return false;
         return stageOf(i.process_type_code) === "R";
       }),
-    [items, dept],
+    [activeItems, dept],
   );
   const childIdSet = useMemo(
     () => new Set(allBomRows.map((r) => r.child_item_id)),
@@ -342,6 +346,33 @@ export function BomWorkbench({
       );
     } catch (err) {
       onError(err instanceof Error ? err.message : "완료 상태 변경 실패");
+    }
+  }
+
+  async function handleUnmatchedStatusChange(itemId: string, status: Item["bom_unmatched_status"]): Promise<void> {
+    const item = items.find((candidate) => candidate.item_id === itemId);
+    if (!item) return;
+    setUnmatchedStatusBusyItemIds((current) => new Set(current).add(itemId));
+    try {
+      const updated = await itemsApi.updateBomUnmatchedStatus(itemId, status);
+      setItems((current) => current.map((candidate) => candidate.item_id === itemId ? updated : candidate));
+      try {
+        await refreshItems();
+        const label = status === "DISUSED" ? "불용" : status === "HOLD" ? "보류" : status === "DUPLICATE" ? "중복" : "미처리";
+        onStatusChange(
+          status ? `"${item.item_name}" ${label} 처리됨` : `"${item.item_name}" 미처리 상태로 되돌렸습니다.`,
+        );
+      } catch {
+        onError("상태는 저장됐지만 목록 새로고침에 실패했습니다.");
+      }
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "미배치 원자재 상태 변경 실패");
+    } finally {
+      setUnmatchedStatusBusyItemIds((current) => {
+        const next = new Set(current);
+        next.delete(itemId);
+        return next;
+      });
     }
   }
 
@@ -488,7 +519,14 @@ export function BomWorkbench({
       </div>
 
       {/* 하단: 미배치 원자재 (편집 모드에서만) */}
-      {mode === "edit" && <BomUnmatchedRawsDrawer rawItems={rawItems} childIdSet={childIdSet} />}
+      {mode === "edit" && (
+        <BomUnmatchedRawsDrawer
+          rawItems={rawItems}
+          childIdSet={childIdSet}
+          busyItemIds={unmatchedStatusBusyItemIds}
+          onStatusChange={handleUnmatchedStatusChange}
+        />
+      )}
 
       {/* 검토 · 완료 모달 */}
       {reviewOpen && parent && (

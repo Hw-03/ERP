@@ -109,6 +109,8 @@ class Item(Base):
     # 제거 금지(CLAUDE.md 명시). 새 코드에서도 list/filter API 가 이 필드로 동작 중.
     legacy_part = Column(String(50), nullable=True, index=True)       # 자재창고/조립출하/고압파트/진공파트/튜닝파트/출하
     legacy_item_type = Column(String(50), nullable=True)              # part_type from CSV
+    bom_unmatched_status = Column(String(20), nullable=True)
+    pre_disused_legacy_item_type = Column(String(50), nullable=True)
     supplier = Column(String(200), nullable=True)
     min_stock = Column(IntQuantity, nullable=True)
     supplier_item_code = Column(String(100), nullable=True)

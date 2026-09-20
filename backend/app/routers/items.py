@@ -16,6 +16,7 @@ from app.models import BOM, DepartmentEnum, Inventory, InventoryLocation, Item, 
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     BomCompletionUpdate,
+    BomUnmatchedStatusUpdate,
     InventoryLocationResponse,
     ItemCreate,
     ItemReorderPayload,
@@ -107,6 +108,7 @@ def _to_item_with_inventory(
         unit=item.unit,
         legacy_part=item.legacy_part,
         legacy_item_type=item.legacy_item_type,
+        bom_unmatched_status=item.bom_unmatched_status,
         supplier=item.supplier,
         min_stock=item.min_stock,
         supplier_item_code=item.supplier_item_code,
@@ -549,6 +551,14 @@ def update_item(
         if new_val is not None and getattr(item, field) != new_val:
             setattr(item, field, new_val)
             changed.append(field)
+    if (
+        item.bom_unmatched_status == "DISUSED"
+        and payload.legacy_item_type is not None
+        and payload.legacy_item_type != "불용"
+    ):
+        item.bom_unmatched_status = None
+        item.pre_disused_legacy_item_type = None
+        changed.extend(["bom_unmatched_status", "pre_disused_legacy_item_type"])
     for field in (
         "supplier",
         "min_stock",
@@ -640,6 +650,59 @@ def update_item(
         )
     # 응답에 inventory 동봉 — 좌측 list API 와 동일한 ItemWithInventory 형태로 보내
     # 저장 직후 우측 카드의 재고/창고 표시가 빈칸이 되는 잔여 UI 버그 방지.
+    inventory = inventory_repository.get(db, item.item_id)
+    return _to_item_with_inventory(db, item, inventory)
+
+
+@router.patch("/{item_id}/bom-unmatched-status", response_model=ItemWithInventory)
+def update_bom_unmatched_status(
+    item_id: uuid.UUID,
+    payload: BomUnmatchedStatusUpdate,
+    request: Request,
+    _admin: Annotated[None, Depends(require_admin_pin)],
+    db: Session = Depends(get_db),
+):
+    """BOM 미매칭 검토 상태와 불용 분류의 원래 값을 함께 관리한다."""
+    item = item_repository.get(db, item_id)
+    if not item:
+        raise http_error(404, ErrorCode.NOT_FOUND, "품목을 찾을 수 없습니다.")
+
+    previous_status = item.bom_unmatched_status
+    if previous_status == payload.status:
+        inventory = inventory_repository.get(db, item.item_id)
+        return _to_item_with_inventory(db, item, inventory)
+
+    changed = ["bom_unmatched_status"]
+    if payload.status == "DISUSED":
+        item.pre_disused_legacy_item_type = item.legacy_item_type
+        item.legacy_item_type = "불용"
+        changed.extend(["legacy_item_type", "pre_disused_legacy_item_type"])
+    elif previous_status == "DISUSED":
+        item.legacy_item_type = item.pre_disused_legacy_item_type
+        item.pre_disused_legacy_item_type = None
+        changed.extend(["legacy_item_type", "pre_disused_legacy_item_type"])
+
+    item.bom_unmatched_status = payload.status
+    item.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    audit.record(
+        db,
+        request=request,
+        action="item.update",
+        target_type="item",
+        target_id=str(item.item_id),
+        payload_summary=(
+            f"{item.item_name}: bom_unmatched_status "
+            f"{previous_status or '-'} → {payload.status or '-'}"
+        ),
+    )
+    commit_and_refresh(db, item)
+    _evt_emit(
+        "item_update",
+        request=request,
+        item=item.mes_code or "-",
+        changed=",".join(changed),
+    )
+
     inventory = inventory_repository.get(db, item.item_id)
     return _to_item_with_inventory(db, item, inventory)
 

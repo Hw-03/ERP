@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { BomUnmatchedRawsDrawer } from "../BomUnmatchedRawsDrawer";
@@ -28,6 +28,7 @@ function rawItem(overrides: Partial<Item> = {}): Item {
     process_type_code: "TR",
     serial_no: null,
     bom_completed_at: null,
+    bom_unmatched_status: null,
     deleted_at: null,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
@@ -63,5 +64,61 @@ describe("BomUnmatchedRawsDrawer", () => {
     expect(list.style.borderTop).toBe(`1px solid ${LEGACY_COLORS.border}`);
     expect(screen.getByText("Raw material").closest(".grid")?.style.borderBottom).toBe(`1px solid ${LEGACY_COLORS.border}`);
     expect(screen.getByText("RAW-001")).toBeInTheDocument();
+  });
+
+  it("keeps status-marked unmatched raws visible while showing the completed header state", () => {
+    render(
+      <BomUnmatchedRawsDrawer
+        rawItems={[rawItem({ bom_unmatched_status: "HOLD" })]}
+        childIdSet={new Set()}
+        onStatusChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("처리 완료")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button"));
+    expect(screen.getByText("Raw material")).toBeInTheDocument();
+  });
+
+  it("reports mutually exclusive statuses and clears the current status when clicked again", () => {
+    const onStatusChange = vi.fn();
+    const { rerender } = render(
+      <BomUnmatchedRawsDrawer rawItems={[rawItem()]} childIdSet={new Set()} onStatusChange={onStatusChange} />,
+    );
+
+    fireEvent.click(screen.getByRole("button"));
+    const disused = screen.getByRole("checkbox", { name: "Raw material (RAW-001) 불용" });
+    const row = screen.getByText("Raw material").closest(".grid");
+    expect(row?.firstElementChild).toContainElement(disused);
+    expect(disused).toHaveAttribute("aria-label", "Raw material (RAW-001) 불용");
+    fireEvent.click(disused);
+    expect(onStatusChange).toHaveBeenLastCalledWith("raw-1", "DISUSED");
+
+    rerender(
+      <BomUnmatchedRawsDrawer
+        rawItems={[rawItem({ bom_unmatched_status: "DISUSED" })]}
+        childIdSet={new Set()}
+        onStatusChange={onStatusChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole("checkbox", { name: "Raw material (RAW-001) 불용" }));
+    expect(onStatusChange).toHaveBeenLastCalledWith("raw-1", null);
+  });
+
+  it("distinguishes same-name status controls with their MES code or item ID", () => {
+    render(
+      <BomUnmatchedRawsDrawer
+        rawItems={[
+          rawItem(),
+          rawItem({ item_id: "raw-2", mes_code: null }),
+        ]}
+        childIdSet={new Set()}
+        onStatusChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button"));
+    expect(screen.getByRole("checkbox", { name: "Raw material (RAW-001) 불용" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Raw material (raw-2) 불용" })).toBeInTheDocument();
   });
 });

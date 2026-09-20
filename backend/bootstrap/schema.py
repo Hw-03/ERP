@@ -58,6 +58,8 @@ POST_LEGACY_ADDITIVE_SCHEMA_MARKERS = (
     "minimum_order_quantity",
     "reorder_point",
     "purchase_memo",
+    "bom_unmatched_status",
+    "pre_disused_legacy_item_type",
     "bom_auto_token",
     "invoice_number",
     "cancelled_at",

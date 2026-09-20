@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ChevronUp, ChevronDown, AlertCircle, CheckCircle2 } from "lucide-react";
-import type { Item } from "@/lib/api";
+import type { BomUnmatchedStatus, Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TruncatedText } from "@/lib/ui";
 import { BomBadge } from "./BomBadge";
@@ -16,13 +16,28 @@ import { BomBadge } from "./BomBadge";
 interface Props {
   rawItems: Item[]; // 부서 R 단계 전체
   childIdSet: Set<string>; // 자식으로 등록된 모든 item_id
+  busyItemIds?: ReadonlySet<string>;
+  onStatusChange?: (itemId: string, status: BomUnmatchedStatus | null) => void;
 }
 
-export function BomUnmatchedRawsDrawer({ rawItems, childIdSet }: Props) {
+const UNMATCHED_STATUS_OPTIONS: { value: BomUnmatchedStatus; label: string; color: string }[] = [
+  { value: "DISUSED", label: "불용", color: LEGACY_COLORS.red },
+  { value: "HOLD", label: "보류", color: LEGACY_COLORS.yellow },
+  { value: "DUPLICATE", label: "중복", color: LEGACY_COLORS.purple },
+];
+
+export function BomUnmatchedRawsDrawer({
+  rawItems,
+  childIdSet,
+  busyItemIds = new Set(),
+  onStatusChange,
+}: Props) {
   const [open, setOpen] = useState(false);
   const unmatched = rawItems.filter((i) => !childIdSet.has(i.item_id));
   const isEmpty = unmatched.length === 0;
-  const accent = isEmpty ? LEGACY_COLORS.green : LEGACY_COLORS.red;
+  const unprocessedCount = unmatched.filter((i) => !i.bom_unmatched_status).length;
+  const isHandled = !isEmpty && unprocessedCount === 0;
+  const accent = isEmpty || isHandled ? LEGACY_COLORS.green : LEGACY_COLORS.red;
 
   return (
     <div
@@ -50,7 +65,7 @@ export function BomUnmatchedRawsDrawer({ rawItems, childIdSet }: Props) {
               color: accent,
             }}
           >
-            {isEmpty ? "전부 매칭됨" : `${unmatched.length}건`}
+            {isEmpty ? "전부 매칭됨" : isHandled ? "처리 완료" : `${unprocessedCount}건`}
           </span>
         </div>
         {open ? (
@@ -67,12 +82,40 @@ export function BomUnmatchedRawsDrawer({ rawItems, childIdSet }: Props) {
           {unmatched.map((i) => (
             <div
               key={i.item_id}
-              className="grid items-center gap-3 px-3 py-1.5"
+              className="grid items-center gap-2 px-3 py-1.5"
               style={{
-                gridTemplateColumns: "auto 1fr auto",
+                gridTemplateColumns: "auto auto minmax(0, 1fr) auto",
                 borderBottom: `1px solid ${LEGACY_COLORS.border}`,
               }}
             >
+              <div className="flex items-center gap-0.5">
+                {UNMATCHED_STATUS_OPTIONS.map((option) => {
+                  const isSelected = i.bom_unmatched_status === option.value;
+                  const isBusy = busyItemIds.has(i.item_id);
+                  const itemIdentifier = i.mes_code ?? i.item_id;
+                  return (
+                    <label
+                      key={option.value}
+                      className="flex h-11 min-w-11 cursor-pointer items-center gap-1 px-1 text-xs font-bold transition-opacity has-[:disabled]:cursor-wait has-[:disabled]:opacity-50"
+                      style={{ color: isSelected ? option.color : LEGACY_COLORS.muted2 }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        disabled={isBusy}
+                        aria-label={`${i.item_name} (${itemIdentifier}) ${option.label}`}
+                        onChange={() => onStatusChange?.(
+                          i.item_id,
+                          isSelected ? null : option.value,
+                        )}
+                        className="h-3.5 w-3.5 shrink-0 cursor-pointer rounded border focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-wait"
+                        style={{ accentColor: option.color, borderColor: LEGACY_COLORS.borderStrong }}
+                      />
+                      <span>{option.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
               <BomBadge processTypeCode={i.process_type_code} small />
               <div className="min-w-0">
                 <TruncatedText className="truncate text-sm" style={{ color: LEGACY_COLORS.text }}>

@@ -101,6 +101,8 @@ def _ensure_bom_auto_token_secret() -> None:
 _MIGRATION_DDL: list[str] = [
     "ALTER TABLE items ADD COLUMN legacy_part VARCHAR(50)",
     "ALTER TABLE items ADD COLUMN legacy_item_type VARCHAR(50)",
+    "ALTER TABLE items ADD COLUMN bom_unmatched_status VARCHAR(20)",
+    "ALTER TABLE items ADD COLUMN pre_disused_legacy_item_type VARCHAR(50)",
     "ALTER TABLE items ADD COLUMN supplier VARCHAR(200)",
     "ALTER TABLE items ADD COLUMN min_stock NUMERIC(15,4)",
     # M1: 3-part item code
@@ -656,6 +658,8 @@ def _drop_dead_m1_objects() -> None:
                         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
                         legacy_part VARCHAR(50),
                         legacy_item_type VARCHAR(50),
+                        bom_unmatched_status VARCHAR(20),
+                        pre_disused_legacy_item_type VARCHAR(50),
                         supplier VARCHAR(200),
                         min_stock NUMERIC(15, 4),
                         sales_review_required BOOLEAN NOT NULL DEFAULT 0,
@@ -673,12 +677,14 @@ def _drop_dead_m1_objects() -> None:
                 cur.execute("""
                     INSERT INTO items_new
                         (item_id, item_name, sort_order, unit, created_at, updated_at,
-                         legacy_part, legacy_item_type, supplier, min_stock,
+                         legacy_part, legacy_item_type, bom_unmatched_status,
+                         pre_disused_legacy_item_type, supplier, min_stock,
                          sales_review_required, bom_stock_exempt,
                          model_symbol, process_type_code, serial_no,
                          bom_completed_at, item_code, deleted_at)
                     SELECT item_id, item_name, sort_order, unit, created_at, updated_at,
-                           legacy_part, legacy_item_type, supplier, min_stock,
+                           legacy_part, legacy_item_type, bom_unmatched_status,
+                           pre_disused_legacy_item_type, supplier, min_stock,
                            sales_review_required, bom_stock_exempt,
                            model_symbol, process_type_code, serial_no,
                            bom_completed_at, item_code, deleted_at
@@ -1117,6 +1123,8 @@ def _recreate_items_with_generated_mes_code() -> None:
                     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
                     legacy_part VARCHAR(50),
                     legacy_item_type VARCHAR(50),
+                    bom_unmatched_status VARCHAR(20),
+                    pre_disused_legacy_item_type VARCHAR(50),
                     supplier VARCHAR(200),
                     min_stock INTEGER,
                     sales_review_required BOOLEAN NOT NULL DEFAULT 0,
@@ -1139,11 +1147,13 @@ def _recreate_items_with_generated_mes_code() -> None:
                 """
                 INSERT INTO items_new
                     (item_id, item_name, sort_order, unit, created_at, updated_at,
-                     legacy_part, legacy_item_type, supplier, min_stock,
+                     legacy_part, legacy_item_type, bom_unmatched_status,
+                     pre_disused_legacy_item_type, supplier, min_stock,
                      sales_review_required, bom_stock_exempt,
                      model_symbol, process_type_code, serial_no, bom_completed_at, deleted_at)
                 SELECT item_id, item_name, sort_order, unit, created_at, updated_at,
-                       legacy_part, legacy_item_type, supplier, min_stock,
+                       legacy_part, legacy_item_type, bom_unmatched_status,
+                       pre_disused_legacy_item_type, supplier, min_stock,
                        sales_review_required, bom_stock_exempt,
                        model_symbol, process_type_code, serial_no, bom_completed_at, deleted_at
                 FROM items

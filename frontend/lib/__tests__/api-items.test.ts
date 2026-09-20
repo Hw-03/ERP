@@ -105,6 +105,24 @@ describe("itemsApi.getItem", () => {
   });
 });
 
+describe("itemsApi.updateBomUnmatchedStatus", () => {
+  it("PATCHes the BOM-unmatched disposition and returns the updated item", async () => {
+    const fetchSpy = vi.fn(() =>
+      Promise.resolve(makeResponse({ body: { item_id: "raw-1", bom_unmatched_status: "HOLD" } })),
+    );
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    const result = await itemsApi.updateBomUnmatchedStatus("raw-1", "HOLD");
+
+    const url = String(fetchSpy.mock.calls[0][0]);
+    const init = fetchSpy.mock.calls[0][1] as RequestInit;
+    expect(url).toContain("/api/items/raw-1/bom-unmatched-status");
+    expect(init.method).toBe("PATCH");
+    expect(JSON.parse(init.body as string)).toEqual({ status: "HOLD" });
+    expect(result).toMatchObject({ item_id: "raw-1", bom_unmatched_status: "HOLD" });
+  });
+});
+
 // createItem / updateItem ---------------------------------------
 
 describe("itemsApi.createItem / updateItem", () => {

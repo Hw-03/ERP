@@ -2,7 +2,7 @@
 
 from datetime import date
 from decimal import Decimal
-from typing import List, Optional
+from typing import List, Literal, Optional
 import uuid
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -86,6 +86,7 @@ class ItemResponse(BaseModel):
     unit: str
     legacy_part: Optional[str] = None
     legacy_item_type: Optional[str] = None
+    bom_unmatched_status: Optional[Literal["DISUSED", "HOLD", "DUPLICATE"]] = None
     supplier: Optional[str] = None
     min_stock: Optional[int] = None
     supplier_item_code: Optional[str] = None
@@ -139,6 +140,10 @@ class BOMUpdate(BaseModel):
 
 class BomCompletionUpdate(BaseModel):
     completed: bool = Field(..., description="True=완료로 표시, False=완료 해제")
+
+
+class BomUnmatchedStatusUpdate(BaseModel):
+    status: Optional[Literal["DISUSED", "HOLD", "DUPLICATE"]]
 
 
 class ItemReorderItem(BaseModel):

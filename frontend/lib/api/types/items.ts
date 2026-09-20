@@ -7,6 +7,8 @@
 
 import type { Department, InventoryLocationRow } from "./shared";
 
+export type BomUnmatchedStatus = "DISUSED" | "HOLD" | "DUPLICATE";
+
 export interface Item {
   item_id: string;
   item_name: string;
@@ -37,6 +39,7 @@ export interface Item {
   model_slots: number[];
   process_type_code: string | null;
   bom_stock_exempt?: boolean;
+  bom_unmatched_status: BomUnmatchedStatus | null;
   sales_review_required?: boolean;
   has_bom?: boolean;
   serial_no: number | null;

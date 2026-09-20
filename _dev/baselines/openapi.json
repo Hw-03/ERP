@@ -1133,6 +1133,31 @@
         "title": "BomTemplateResponse",
         "type": "object"
       },
+      "BomUnmatchedStatusUpdate": {
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "DISUSED",
+                  "HOLD",
+                  "DUPLICATE"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "BomUnmatchedStatusUpdate",
+        "type": "object"
+      },
       "BoxTrackingResponse": {
         "description": "창고 박스 자동 차감 활성 여부.",
         "properties": {
@@ -5929,6 +5954,22 @@
             "title": "Bom Stock Exempt",
             "type": "boolean"
           },
+          "bom_unmatched_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "DISUSED",
+                  "HOLD",
+                  "DUPLICATE"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bom Unmatched Status"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -6410,6 +6451,22 @@
             "default": false,
             "title": "Bom Stock Exempt",
             "type": "boolean"
+          },
+          "bom_unmatched_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "DISUSED",
+                  "HOLD",
+                  "DUPLICATE"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bom Unmatched Status"
           },
           "created_at": {
             "format": "date-time",
@@ -21063,6 +21120,96 @@
           }
         },
         "summary": "Update Bom Completion",
+        "tags": [
+          "Items"
+        ]
+      }
+    },
+    "/api/items/{item_id}/bom-unmatched-status": {
+      "patch": {
+        "description": "BOM 미매칭 검토 상태와 불용 분류의 원래 값을 함께 관리한다.",
+        "operationId": "update_bom_unmatched_status_api_items__item_id__bom_unmatched_status_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "deprecated": true,
+            "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
+            "in": "query",
+            "name": "pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "deprecated": true,
+              "description": "관리자 PIN (deprecated — X-Admin-Pin 헤더 사용 권장)",
+              "title": "Pin"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Admin-Pin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Pin"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BomUnmatchedStatusUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemWithInventory"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Bom Unmatched Status",
         "tags": [
           "Items"
         ]

@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import pytest
 
+from app.models import AdminAuditLog
+
 ADMIN_HEADERS = {"X-Admin-Pin": "0000"}
 
 
@@ -262,3 +264,238 @@ def test_update_item_can_toggle_bom_stock_exempt(client, make_item):
     reread = client.get(f"/api/items/{item.item_id}")
     assert reread.status_code == 200
     assert reread.json()["bom_stock_exempt"] is True
+
+
+def _set_legacy_item_type(db_session, item, value):
+    item.legacy_item_type = value
+    db_session.flush()
+
+
+@pytest.mark.parametrize(
+    "original_type",
+    ["원자재", "부자재", "기타", None, "불용"],
+)
+def test_bom_unmatched_disused_round_trip_restores_original_type(
+    client,
+    db_session,
+    make_item,
+    original_type,
+):
+    item = make_item(name=f"BOM 미매칭 원복 {original_type}")
+    _set_legacy_item_type(db_session, item, original_type)
+
+    disused = client.patch(
+        f"/api/items/{item.item_id}/bom-unmatched-status",
+        headers=ADMIN_HEADERS,
+        json={"status": "DISUSED"},
+    )
+    assert disused.status_code == 200, disused.text
+    assert disused.json()["bom_unmatched_status"] == "DISUSED"
+    assert disused.json()["legacy_item_type"] == "불용"
+    assert "pre_disused_legacy_item_type" not in disused.json()
+    db_session.refresh(item)
+    assert item.pre_disused_legacy_item_type == original_type
+
+    cleared = client.patch(
+        f"/api/items/{item.item_id}/bom-unmatched-status",
+        headers=ADMIN_HEADERS,
+        json={"status": None},
+    )
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["bom_unmatched_status"] is None
+    assert cleared.json()["legacy_item_type"] == original_type
+    db_session.refresh(item)
+    assert item.pre_disused_legacy_item_type is None
+
+
+@pytest.mark.parametrize("status", ["HOLD", "DUPLICATE"])
+def test_bom_unmatched_non_disused_status_preserves_item_type(
+    client,
+    db_session,
+    make_item,
+    status,
+):
+    item = make_item(name=f"BOM 미매칭 {status}")
+    _set_legacy_item_type(db_session, item, "부자재")
+
+    response = client.patch(
+        f"/api/items/{item.item_id}/bom-unmatched-status",
+        headers=ADMIN_HEADERS,
+        json={"status": status},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["bom_unmatched_status"] == status
+    assert response.json()["legacy_item_type"] == "부자재"
+    db_session.refresh(item)
+    assert item.pre_disused_legacy_item_type is None
+
+
+@pytest.mark.parametrize("next_status", ["HOLD", "DUPLICATE"])
+def test_bom_unmatched_leaving_disused_restores_original_type(
+    client,
+    db_session,
+    make_item,
+    next_status,
+):
+    item = make_item(name=f"BOM 미매칭 {next_status} 전환")
+
+    item.legacy_item_type = "기타"
+    entered = client.patch(
+        f"/api/items/{item.item_id}/bom-unmatched-status",
+        headers=ADMIN_HEADERS,
+        json={"status": "DISUSED"},
+    )
+    assert entered.status_code == 200, entered.text
+
+    transitioned = client.patch(
+        f"/api/items/{item.item_id}/bom-unmatched-status",
+        headers=ADMIN_HEADERS,
+        json={"status": next_status},
+    )
+
+    assert transitioned.status_code == 200, transitioned.text
+    assert transitioned.json()["bom_unmatched_status"] == next_status
+    assert transitioned.json()["legacy_item_type"] == "기타"
+    db_session.refresh(item)
+    assert item.bom_unmatched_status == next_status
+    assert item.legacy_item_type == "기타"
+    assert item.pre_disused_legacy_item_type is None
+
+
+def test_bom_unmatched_status_requires_admin_pin(client, make_item):
+    item = make_item(name="BOM 미매칭 권한")
+
+    response = client.patch(
+        f"/api/items/{item.item_id}/bom-unmatched-status",
+        json={"status": "HOLD"},
+    )
+
+    assert response.status_code == 400
+
+
+def test_bom_unmatched_status_rejects_unknown_status(client, make_item):
+    item = make_item(name="BOM 미매칭 검증")
+
+    response = client.patch(
+        f"/api/items/{item.item_id}/bom-unmatched-status",
+        headers=ADMIN_HEADERS,
+        json={"status": "UNKNOWN"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_bom_unmatched_status_requires_status_field(client, make_item):
+    item = make_item(name="BOM 미매칭 상태 필드")
+
+    response = client.patch(
+        f"/api/items/{item.item_id}/bom-unmatched-status",
+        headers=ADMIN_HEADERS,
+        json={},
+    )
+
+    assert response.status_code == 422
+
+
+def test_bom_unmatched_same_status_is_idempotent(
+    client,
+    db_session,
+    make_item,
+    monkeypatch,
+):
+    from app.routers import items as items_router
+
+    item = make_item(name="BOM 미매칭 멱등")
+    _set_legacy_item_type(db_session, item, "원자재")
+    emitted: list[tuple[str, dict]] = []
+    monkeypatch.setattr(
+        items_router,
+        "_evt_emit",
+        lambda action, **kwargs: emitted.append((action, kwargs)),
+    )
+
+    first = client.patch(
+        f"/api/items/{item.item_id}/bom-unmatched-status",
+        headers=ADMIN_HEADERS,
+        json={"status": "DISUSED"},
+    )
+    assert first.status_code == 200, first.text
+    audit_count = (
+        db_session.query(AdminAuditLog)
+        .filter(
+            AdminAuditLog.action == "item.update",
+            AdminAuditLog.target_id == str(item.item_id),
+        )
+        .count()
+    )
+    assert audit_count == 1
+    assert [action for action, _kwargs in emitted] == ["item_update"]
+
+    second = client.patch(
+        f"/api/items/{item.item_id}/bom-unmatched-status",
+        headers=ADMIN_HEADERS,
+        json={"status": "DISUSED"},
+    )
+
+    assert second.status_code == 200, second.text
+    assert second.json()["legacy_item_type"] == "불용"
+    db_session.refresh(item)
+    assert item.pre_disused_legacy_item_type == "원자재"
+    assert (
+        db_session.query(AdminAuditLog)
+        .filter(
+            AdminAuditLog.action == "item.update",
+            AdminAuditLog.target_id == str(item.item_id),
+        )
+        .count()
+        == audit_count
+    )
+    assert [action for action, _kwargs in emitted] == ["item_update"]
+
+
+def test_update_item_manual_type_override_clears_disused_status(
+    client,
+    db_session,
+    make_item,
+    monkeypatch,
+):
+    from app.routers import items as items_router
+
+    item = make_item(name="BOM 미매칭 수동 분류")
+    _set_legacy_item_type(db_session, item, "원자재")
+    emitted: list[str] = []
+    monkeypatch.setattr(
+        items_router,
+        "_evt_emit",
+        lambda action, **_kwargs: emitted.append(action),
+    )
+    entered = client.patch(
+        f"/api/items/{item.item_id}/bom-unmatched-status",
+        headers=ADMIN_HEADERS,
+        json={"status": "DISUSED"},
+    )
+    assert entered.status_code == 200, entered.text
+    assert emitted == ["item_update"]
+
+    updated = client.put(
+        f"/api/items/{item.item_id}",
+        headers=ADMIN_HEADERS,
+        json={"legacy_item_type": "부자재"},
+    )
+
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["legacy_item_type"] == "부자재"
+    assert updated.json()["bom_unmatched_status"] is None
+    db_session.refresh(item)
+    assert item.pre_disused_legacy_item_type is None
+    assert (
+        db_session.query(AdminAuditLog)
+        .filter(
+            AdminAuditLog.action == "item.update",
+            AdminAuditLog.target_id == str(item.item_id),
+        )
+        .count()
+        == 2
+    )
+    assert emitted == ["item_update", "item_update"]
