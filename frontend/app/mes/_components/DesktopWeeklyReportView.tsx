@@ -10,7 +10,8 @@ import { useWeeklyReportQuery } from "@/lib/queries/useWeeklyQuery";
 import { WeeklyGroupCards } from "./_weekly_sections/WeeklyGroupCards";
 import { WeeklyDetailTable } from "./_weekly_sections/WeeklyDetailTable";
 import { WeeklyProductionMatrix } from "./_weekly_sections/WeeklyProductionMatrix";
-import { LoadingSkeleton } from "./common";
+import { WeeklyLoadingValue } from "./_weekly_sections/WeeklyLoadingValue";
+import { PROCESS_TO_DEPT } from "@/lib/mes/process";
 import { BomDetailModal } from "./_inventory_sections/BomDetailModal";
 
 interface Props {
@@ -41,8 +42,9 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
   }, [data]);
 
   const selectedGroup = data?.groups.find((g) => g.process_code === selectedCode);
+  const selectedDepartment = selectedGroup?.dept_name ?? (loading ? PROCESS_TO_DEPT[selectedCode] : undefined);
   const stockBasis =
-    data?.report_status === "verified" && data.basis_version === 2 ? "normal" : "legacy";
+    !data || (data.report_status === "verified" && data.basis_version === 2) ? "normal" : "legacy";
 
   const matrixRows = data?.production_matrix ?? [];
   const totalProduceQty = data?.summary?.total_produce_qty ?? 0;
@@ -121,8 +123,12 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
       {(() => {
         if (loading && !data) {
           return (
-            <div className="weekly-card weekly-loading">
-              <LoadingSkeleton variant="card" rows={1} />
+            <div data-testid="weekly-production-card" aria-busy="true" aria-label="주간 생산 현황 불러오는 중" className="weekly-card weekly-production-empty">
+              <div>
+                <b>생산 현황</b>
+                <span><WeeklyLoadingValue loading width="32ch" /></span>
+                {f705DownloadButton}
+              </div>
             </div>
           );
         }
@@ -174,16 +180,13 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
             <h2>공정별 변화</h2>
           </header>
           <div>
-            {loading && !data ? (
-              <LoadingSkeleton variant="card" rows={4} />
-            ) : (
-              <WeeklyGroupCards
-                groups={data?.groups ?? []}
-                selected={selectedCode}
-                onSelect={setSelectedCode}
-                cols={1}
-              />
-            )}
+            <WeeklyGroupCards
+              loading={loading}
+              groups={data?.groups ?? []}
+              selected={selectedCode}
+              onSelect={setSelectedCode}
+              cols={1}
+            />
           </div>
         </div>
 
@@ -194,24 +197,22 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
           <div>
             <header>
               <h2>
-                {selectedGroup ? `${selectedGroup.dept_name} 품목 상세` : "품목 상세"}
+                {selectedDepartment ? `${selectedDepartment} 품목 상세` : "품목 상세"}
               </h2>
             </header>
             <div
               className="weekly-detail-content"
               role="region"
-              aria-label={`${selectedGroup?.dept_name ?? "선택 공정"} 품목 상세`}
+              aria-label={`${selectedDepartment ?? "선택 공정"} 품목 상세`}
               tabIndex={0}
             >
-              {loading && !data ? (
-                <LoadingSkeleton variant="list" rows={8} />
-              ) : (
-                <WeeklyDetailTable
-                  group={selectedGroup}
-                  stockBasis={stockBasis}
-                  onItemSelect={(item) => setSelectedBomItemId(item.item_id)}
-                />
-              )}
+              <WeeklyDetailTable
+                loading={loading}
+                loadingProcessCode={selectedCode}
+                group={selectedGroup}
+                stockBasis={stockBasis}
+                onItemSelect={(item) => setSelectedBomItemId(item.item_id)}
+              />
             </div>
           </div>
         </div>

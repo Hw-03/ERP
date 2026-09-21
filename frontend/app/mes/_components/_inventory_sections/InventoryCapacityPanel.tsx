@@ -29,10 +29,13 @@ const SHARED_HINT =
 export function InventoryCapacityPanel({
   capacityData,
   onClick,
+  loading = false,
 }: {
   capacityData: ProductionCapacity | null | undefined;
   onClick?: () => void;
+  loading?: boolean;
 }) {
+  if (loading && !capacityData) return <InventoryCapacitySkeleton />;
   if (!capacityData) return null;
   const interactive = typeof onClick === "function";
 
@@ -297,6 +300,25 @@ function ModelChip({
         </span>
       )}
     </span>
+  );
+}
+
+export function InventoryCapacitySkeleton() {
+  return (
+    <div
+      className="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 rounded-[14px] border px-3 py-3 text-left lg:gap-x-4 lg:px-5 lg:py-4"
+      style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 8%, transparent)`, borderColor: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 30%, transparent)` }}
+      role="status"
+      aria-label="생산 가능 수량 불러오는 중"
+    >
+      <Zap className="hidden h-5 w-5 shrink-0 sm:block" style={{ color: LEGACY_COLORS.cyan }} />
+      <span className="hidden shrink-0 text-base font-semibold sm:inline" style={{ color: LEGACY_COLORS.cyan }}>생산 가능</span>
+      <div className="hidden min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 sm:flex">
+        <ModelLegend />
+        <div className="h-4 min-w-0 flex-1 motion-safe:animate-pulse rounded" style={{ background: LEGACY_COLORS.s3 }} />
+      </div>
+      <span className="mt-0.5 hidden w-full shrink-0 text-right text-sm sm:block lg:mt-0 lg:ml-auto lg:w-auto" style={{ color: LEGACY_COLORS.cyan }}>자세히 보기</span>
+    </div>
   );
 }
 

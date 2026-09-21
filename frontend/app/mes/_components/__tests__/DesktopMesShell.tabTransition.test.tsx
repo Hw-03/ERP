@@ -43,7 +43,7 @@ vi.mock("@/lib/ui/dirty-guard", () => ({
 }));
 
 vi.mock("@/lib/queries/useProductionQuery", () => ({
-  useProductionCapacityQuery: () => ({ data: null, refetch: vi.fn() }),
+  useProductionCapacityQuery: () => ({ data: null, isLoading: true, refetch: vi.fn() }),
 }));
 
 vi.mock("../login/useCurrentOperator", () => ({
@@ -156,7 +156,7 @@ it("keeps summary card details while the history screen is preparing", () => {
     fireEvent.click(screen.getByRole("button", { name: "history", exact: true }));
     expect(screen.getByRole("status", { name: "입출고 내역 화면을 불러오는 중입니다" })).toBeInTheDocument();
     expect(screen.getByText("창고 재고가 움직인 작업")).toBeInTheDocument();
-    expect(screen.getByText("부서 안에서만 움직인 작업")).toBeInTheDocument();
+    expect(screen.getByText("부서 재고가 움직인 작업")).toBeInTheDocument();
     expect(screen.getByText("재고 수량을 직접 조정한 거래")).toBeInTheDocument();
     expect(screen.getAllByLabelText("집계 중")).toHaveLength(5);
   } finally {
@@ -217,6 +217,17 @@ describe("DesktopMesShell tab transition", () => {
     render(<DesktopMesShell />);
     expect(screen.getByTestId("desktop-topbar-actions")).toBeEmptyDOMElement();
   });
+
+  it.each(["warehouse", "defect", "settings"] as const)(
+    "%s 정적 허브는 공용 카드 스켈레톤 없이 즉시 렌더링한다",
+    (tab) => {
+      render(<DesktopMesShell />);
+
+      fireEvent.click(screen.getByRole("button", { name: tab }));
+
+      expect(screen.queryByRole("status", { name: `${tab === "warehouse" ? "입출고" : tab === "defect" ? "불량" : "설정"} 화면을 불러오는 중입니다` })).not.toBeInTheDocument();
+    },
+  );
 
   it("commits a tab click immediately and updates the URL without App Router navigation", () => {
     document.startViewTransition = vi.fn();

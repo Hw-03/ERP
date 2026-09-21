@@ -25,6 +25,7 @@ export function DailyWorkReportEditor({
   onEdit,
   saveRef,
   fillAvailableHeight = false,
+  loading = false,
 }: {
   initialContent: string;
   initialUpdatedAt?: string | null;
@@ -37,6 +38,7 @@ export function DailyWorkReportEditor({
   onEdit?: () => void;
   saveRef?: React.MutableRefObject<(() => Promise<void>) | null>;
   fillAvailableHeight?: boolean;
+  loading?: boolean;
 }) {
   const [content, setContent] = useState(initialContent);
   const [savedContent, setSavedContent] = useState(initialContent);
@@ -120,7 +122,7 @@ export function DailyWorkReportEditor({
   };
 
   useEffect(() => {
-    if (saveRef) saveRef.current = save;
+    if (saveRef) saveRef.current = loading ? null : save;
     return () => {
       if (saveRef) saveRef.current = null;
     };
@@ -138,7 +140,7 @@ export function DailyWorkReportEditor({
           </div>
         </div>
         <p className={`mt-5 whitespace-pre-wrap rounded-[16px] border px-4 py-4 text-sm leading-7 ${fillAvailableHeight ? "lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1" : ""}`} style={{ color: initialContent ? LEGACY_COLORS.text : LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-          {initialContent || "작성된 일보가 없습니다."}
+          {loading ? <span role="status" aria-label="작업 내역 불러오는 중" className="block h-7 w-2/3 rounded motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s3 }} /> : initialContent || "작성된 일보가 없습니다."}
         </p>
       </section>
     );
@@ -155,7 +157,7 @@ export function DailyWorkReportEditor({
           : null;
 
   return (
-    <section className={`rounded-[20px] border p-4 lg:p-5 ${fillAvailableHeight ? "lg:flex lg:min-h-0 lg:flex-1 lg:flex-col" : ""}`} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+    <section aria-busy={loading || undefined} className={`rounded-[20px] border p-4 lg:p-5 ${fillAvailableHeight ? "lg:flex lg:min-h-0 lg:flex-1 lg:flex-col" : ""}`} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
       <div className="flex shrink-0 items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px]" style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>
@@ -166,10 +168,13 @@ export function DailyWorkReportEditor({
           </div>
         </div>
         <span className="shrink-0 rounded-full px-2.5 py-1 text-xs font-black" style={{ color: dirty ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}>
-          {content.length.toLocaleString()} / 5,000
+          {loading ? <span aria-label="글자 수 불러오는 중" className="inline-block h-3 w-4 motion-safe:animate-pulse rounded" style={{ background: LEGACY_COLORS.s3 }} /> : content.length.toLocaleString()} / 5,000
         </span>
       </div>
-      <textarea
+      {loading ? <div data-testid="daily-report-editor-skeleton" role="status" aria-label="작업 내역 불러오는 중" className={`mt-4 min-h-44 w-full rounded-[16px] border px-4 py-3.5 ${fillAvailableHeight ? "lg:min-h-0 lg:flex-1" : ""}`} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+        <div className="h-5 w-4/5 motion-safe:animate-pulse rounded" style={{ background: LEGACY_COLORS.s3 }} />
+        <div className="mt-2 h-5 w-2/3 motion-safe:animate-pulse rounded" style={{ background: LEGACY_COLORS.s3 }} />
+      </div> : <textarea
         aria-label="작업 내역"
         value={content}
         maxLength={5000}
@@ -184,7 +189,7 @@ export function DailyWorkReportEditor({
         }}
         className={`mt-4 min-h-44 w-full resize-none rounded-[16px] border px-4 py-3.5 text-lg leading-7 outline-none transition focus-visible:ring-2 ${fillAvailableHeight ? "lg:min-h-0 lg:flex-1" : ""}`}
         style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-      />
+      />}
       {(validationError || saveError || localSaveError) && <p role="alert" className="mt-3 rounded-[12px] px-3 py-2 text-sm font-bold" style={{ color: LEGACY_COLORS.red, background: LEGACY_COLORS.errorBg }}>{validationError || saveError || localSaveError}</p>}
       <div className="mt-4 flex shrink-0 flex-wrap items-center justify-end gap-3">
         <p className="flex items-center gap-1.5 text-xs font-medium" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -195,7 +200,7 @@ export function DailyWorkReportEditor({
         <button
           type="button"
           onClick={() => { void save().catch(() => {}); }}
-          disabled={saving || savingLocal}
+          disabled={loading || saving || savingLocal}
           className="flex min-h-11 items-center gap-2 rounded-[12px] px-4 text-sm font-black text-white transition active:scale-[0.98] disabled:opacity-50"
           style={{ background: LEGACY_COLORS.blueSolid }}
         >

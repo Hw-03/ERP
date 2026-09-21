@@ -3,6 +3,11 @@ import { describe, expect, it } from "vitest";
 import { HistoryStatsBar } from "../HistoryStatsBar";
 
 describe("HistoryStatsBar", () => {
+  it("keeps the unfiltered period heading while the totals are pending", () => {
+    render(<HistoryStatsBar baseline={null} currentCount={null} loading loadingDisplay="skeleton" periodLabel="이번달" hasListFilters={false} />);
+    expect(screen.queryByText("목록 조건")).not.toBeInTheDocument();
+    expect(screen.getAllByLabelText("집계 중")).toHaveLength(4);
+  });
   it("uses fixed neutral placeholders instead of ellipsis during desktop loading", () => {
     render(
       <HistoryStatsBar
@@ -25,7 +30,7 @@ describe("HistoryStatsBar", () => {
       expect(card.querySelector("svg")).toBeInTheDocument();
     }
     expect(screen.getByText("창고 재고가 움직인 작업")).toBeInTheDocument();
-    expect(screen.getByText("부서 안에서만 움직인 작업")).toBeInTheDocument();
+    expect(screen.getByText("부서 재고가 움직인 작업")).toBeInTheDocument();
     expect(screen.getByText("재고 수량을 직접 조정한 거래")).toBeInTheDocument();
   });
 

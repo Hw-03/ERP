@@ -21,6 +21,7 @@ export function FloorStage({
   pulseAngleId,
   onAngleClick,
   onZoneClick,
+  loading = false,
 }: {
   angles: WarehouseAngle[];
   specialZones?: WarehouseSpecialZone[];
@@ -28,6 +29,7 @@ export function FloorStage({
   pulseAngleId?: number | null;
   onAngleClick: (a: WarehouseAngle) => void;
   onZoneClick?: (zone: WarehouseSpecialZone) => void;
+  loading?: boolean;
 }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -96,6 +98,7 @@ export function FloorStage({
               backgroundSize: "40px 40px",
             }}
           />
+          {loading && <div data-testid="warehouse-map-canvas-skeleton" role="status" aria-busy="true" aria-label="창고 지도 불러오는 중" className="absolute inset-4 rounded-[14px] motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s2 }} />}
           {specialZones?.map((zone) => {
             const totalQty = zone.items.reduce((sum, item) => sum + item.quantity, 0);
             const isPallet = zone.zone_type === "pallet";

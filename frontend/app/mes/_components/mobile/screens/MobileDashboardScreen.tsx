@@ -45,6 +45,7 @@ export function MobileDashboardScreen({
   onStatusChange,
   onGoToWarehouse,
   capacityData,
+  capacityLoading = false,
   onCapacityClick,
   onSummaryChange,
   canReceive,
@@ -55,6 +56,7 @@ export function MobileDashboardScreen({
   onGoToWarehouseTab?: () => void;
   onSummaryChange?: (s: { low: number; zero: number }) => void;
   capacityData?: ProductionCapacity | null;
+  capacityLoading?: boolean;
   onCapacityClick?: () => void;
   canReceive?: boolean;
 }) {
@@ -180,12 +182,23 @@ export function MobileDashboardScreen({
             <InventoryKpiPanel
               cards={kpiCards}
               activeKey={kpi}
+              loading={loading && items.length === 0}
               onChange={(key) => {
                 if (key === "ALL") resetAllFilters();
                 else setKpi(key);
               }}
             />
-            {capacityData && (
+            {capacityLoading && !capacityData ? (
+              <div
+                className="flex min-h-[42px] w-full items-center justify-between gap-2 rounded-[12px] border px-3 py-2.5"
+                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+                role="status"
+                aria-label="생산 가능 수량 불러오는 중"
+              >
+                <div className="h-4 w-32 motion-safe:animate-pulse rounded" style={{ background: LEGACY_COLORS.s3 }} />
+                <div className="h-4 w-4 motion-safe:animate-pulse rounded" style={{ background: LEGACY_COLORS.s3 }} />
+              </div>
+            ) : capacityData ? (
               <div>
                 <button
                   type="button"
@@ -240,7 +253,7 @@ export function MobileDashboardScreen({
                   </div>
                 )}
               </div>
-            )}
+            ) : null}
           </section>
 
           {/* 검색/필터 영역은 배경 위 도구줄로 두고, 입력 컨트롤 자체만 테두리를 가진다. */}

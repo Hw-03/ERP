@@ -59,6 +59,16 @@ function renderWithClient(ui: ReactElement) {
 }
 
 describe("DesktopWarehouseMapView fullscreen", () => {
+  it("최초 조회 중에도 검색 도구줄과 지도 캔버스 자리를 유지한다", () => {
+    mapApiMock.getMap.mockReturnValue(new Promise(() => {}));
+
+    renderWithClient(<DesktopWarehouseMapView />);
+
+    expect(screen.getByPlaceholderText(/품목명.*코드 검색/)).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "창고 지도 불러오는 중" })).toBeInTheDocument();
+    expect(screen.getByTestId("warehouse-map-canvas-skeleton")).toBeInTheDocument();
+  });
+
   it("keeps the current map visible when a background refresh fails and retries in place", async () => {
     mapApiMock.getMap.mockReset().mockResolvedValueOnce(mapFixture).mockRejectedValue(new Error("refresh failed"));
     const { client } = renderWithClient(<DesktopWarehouseMapView />);

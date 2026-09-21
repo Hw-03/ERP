@@ -8,7 +8,6 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { QuantityInput } from "./common/QuantityInput";
 import { matchesSearchText, normalizeSearchText } from "@/lib/searchText";
 import { SlidePanel } from "./common/SlidePanel";
-import { LoadingSkeleton } from "./common/LoadingSkeleton";
 import { LoadFailureCard } from "./common/LoadFailureCard";
 import {
   warehouseMapApi,
@@ -1024,9 +1023,7 @@ export function DesktopWarehouseMapView({
             </div>
           )}
           {loading ? (
-            <div style={{ flex: 1, padding: 24 }}>
-              <LoadingSkeleton variant="card" rows={6} />
-            </div>
+            <FloorStage angles={angles} onAngleClick={openAngle} loading />
           ) : error && !map ? (
             <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: LEGACY_COLORS.red, fontSize: 14 }}>
               {error}

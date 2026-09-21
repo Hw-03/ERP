@@ -17,6 +17,8 @@ export interface HistoryStatsBarProps {
   loadingDisplay?: "ellipsis" | "skeleton";
   /** "이번달" / "오늘" / "이번주" / "전체" / 선택한 날짜. */
   periodLabel: string;
+  /** Known filter state keeps the count heading stable before data arrives. */
+  hasListFilters?: boolean;
 }
 
 const NUM = (loading: boolean, n: number | null | undefined) =>
@@ -34,9 +36,11 @@ export function HistoryStatsBar({
   loading,
   loadingDisplay = "ellipsis",
   periodLabel,
+  hasListFilters,
 }: HistoryStatsBarProps) {
   const filtered = currentSummary ?? baseline;
-  const countsMatch = currentCount != null && baseline?.total != null && currentCount === baseline.total;
+  const countsMatch = (loading && hasListFilters === false)
+    || (currentCount != null && baseline?.total != null && currentCount === baseline.total);
   return (
     <section className="card desktop-flat-surface" style={{ paddingTop: 16, paddingBottom: 16 }}>
       {/* 정직 카운트 */}
@@ -110,11 +114,14 @@ function HistoryCountValue({
 }) {
   if (display === "skeleton" && (loading || value == null)) {
     return (
-      <span
+      <span className="relative inline-block">
+        <span className="invisible" aria-hidden="true">000건</span>
+        <span
         aria-label="집계 중"
-        className={`inline-block motion-safe:animate-pulse rounded-[6px] align-middle ${size === "large" ? "h-7 w-20" : size === "card" ? "h-6 w-16" : "h-5 w-14"}`}
+        className={`absolute left-0 top-1/2 -translate-y-1/2 motion-safe:animate-pulse rounded-[6px] ${size === "large" ? "h-7 w-20" : size === "card" ? "h-6 w-16" : "h-5 w-14"}`}
         style={{ background: "color-mix(in srgb, currentColor 18%, transparent)" }}
       />
+      </span>
     );
   }
   return <>{NUM(loading, value)}건</>;

@@ -18,6 +18,7 @@ import {
   HISTORY_ITEM_CODE_WIDTH_PX,
   HISTORY_STOCK_SNAPSHOT_WIDTH_PX,
   OpBatchHeader,
+  StockSnapshotCell,
   ReferenceBatchDetail,
   buildGroups,
   getAdditionalDistinctItemCount,
@@ -129,6 +130,21 @@ function HistoryTableCornerMask() {
   );
 }
 
+function HistoryColumnLabel({ column }: { column: ColSpec }) {
+  return column.help ? (
+    <Tooltip
+      content={<span className="block whitespace-pre text-left">{column.help}</span>}
+      triggerTabIndex={0}
+      triggerAriaLabel="재고 변동 계산 기준"
+    >
+      <span className="inline-flex items-center gap-1">
+        {column.label}
+        <CircleHelp aria-hidden="true" className="h-3.5 w-3.5" />
+      </span>
+    </Tooltip>
+  ) : <>{column.label}</>;
+}
+
 export function HistoryTableSkeleton() {
   return (
     <div
@@ -154,26 +170,35 @@ export function HistoryTableSkeleton() {
                 className={historyTableHeaderClass(column, index)}
                 style={{ background: "var(--c-history-table-header)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: column.width, minWidth: column.minWidth, transition: HISTORY_CELL_TRANSITION }}
               >
-                {column.label}
+                <HistoryColumnLabel column={column} />
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
           {Array.from({ length: 8 }, (_, rowIndex) => (
-            <tr key={rowIndex} data-history-loading-row="true" className="h-[64px]">
+            <tr key={rowIndex} data-history-loading-row="true" className="h-[65px]">
               {COLUMNS.map((column, columnIndex) => (
+                columnIndex === 4 ? <StockSnapshotCell key={column.label} loading /> :
                 <td
                   key={`${column.label}-${columnIndex}`}
                   colSpan={column.colSpan}
                   className="border-b px-4 py-2 align-middle"
                   style={{ borderColor: LEGACY_COLORS.border }}
                 >
-                  <div
+                  {columnIndex === 0 ? (
+                    <div aria-hidden="true" data-history-loading-date className="flex items-center justify-center gap-1.5 whitespace-nowrap text-xs">
+                      <span className="h-5 w-5 shrink-0 rounded-[6px] motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s3 }} />
+                      <span className="relative shrink-0">
+                        <span className="invisible">00/00 00:00</span>
+                        <span className="absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 rounded-[4px] motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s3 }} />
+                      </span>
+                    </div>
+                  ) : <div
                     aria-hidden="true"
-                    className="mx-auto h-4 animate-pulse rounded-[6px]"
+                    className="mx-auto h-4 motion-safe:animate-pulse rounded-[6px]"
                     style={{ background: LEGACY_COLORS.s3, width: columnIndex === 2 ? "72%" : "58%" }}
-                  />
+                  />}
                 </td>
               ))}
             </tr>
@@ -517,18 +542,7 @@ export function HistoryTable({
                     className={historyTableHeaderClass(column, index)}
                     style={{ background: "var(--c-history-table-header)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: column.width, minWidth: column.minWidth, transition: HISTORY_CELL_TRANSITION }}
                   >
-                    {column.help ? (
-                      <Tooltip
-                        content={<span className="block whitespace-pre text-left">{column.help}</span>}
-                        triggerTabIndex={0}
-                        triggerAriaLabel="재고 변동 계산 기준"
-                      >
-                        <span className="inline-flex items-center gap-1">
-                          {column.label}
-                          <CircleHelp aria-hidden="true" className="h-3.5 w-3.5" />
-                        </span>
-                      </Tooltip>
-                    ) : column.label}
+                    <HistoryColumnLabel column={column} />
                   </th>
                 ))}
               </tr>

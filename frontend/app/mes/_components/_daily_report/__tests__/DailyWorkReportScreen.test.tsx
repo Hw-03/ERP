@@ -14,17 +14,36 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-const queryState = {
-  report: { data: null as { employee_name: string; department: string; content: string } | null, isError: false },
-  selectedReport: { data: null as { employee_name: string; department: string; content: string } | null, isError: false },
+type ReportQueryState = {
+  data: { employee_name: string; department: string; content: string } | null;
+  isError: boolean;
+  isLoading?: boolean;
+};
+
+type ActivityQueryState = {
+  data: any;
+  isError: boolean;
+  isLoading?: boolean;
+};
+
+const queryState: {
+  report: ReportQueryState;
+  selectedReport: ReportQueryState;
+  reports: Array<{ employee_id: string; employee_name: string; department: string }>;
+  reportsLoading?: boolean;
+  activity: ActivityQueryState;
+  saveMutation: { isPending: boolean; mutateAsync: ReturnType<typeof vi.fn> };
+} = {
+  report: { data: null as { employee_name: string; department: string; content: string } | null, isError: false, isLoading: false as boolean | undefined },
+  selectedReport: { data: null as { employee_name: string; department: string; content: string } | null, isError: false, isLoading: false as boolean | undefined },
   reports: [] as Array<{ employee_id: string; employee_name: string; department: string }>,
-  activity: { data: { work_date: "2026-08-03", employee_id: "employee-1", summary: [], cancelled_count: 0, details: [] }, isError: false },
+  activity: { data: { work_date: "2026-08-03", employee_id: "employee-1", summary: [], cancelled_count: 0, details: [] } as any, isError: false, isLoading: false as boolean | undefined },
   saveMutation: { isPending: false, mutateAsync: vi.fn() },
 };
 
 vi.mock("@/lib/queries/useDailyWorkReportsQuery", () => ({
   useDailyWorkReportQuery: (employeeId: string | null | undefined) => employeeId === "employee-2" ? queryState.selectedReport : queryState.report,
-  useDailyWorkReportsQuery: () => ({ data: queryState.reports, isError: false }),
+  useDailyWorkReportsQuery: () => ({ data: queryState.reports, isError: false, isLoading: queryState.reportsLoading }),
   useDailyWorkActivityQuery: () => queryState.activity,
   useSaveDailyWorkReport: () => queryState.saveMutation,
 }));
@@ -35,12 +54,39 @@ vi.mock("@/lib/ui/dirty-guard", () => ({
 
 describe("DailyWorkReportScreen", () => {
   beforeEach(() => {
-    queryState.report = { data: null, isError: false };
-    queryState.selectedReport = { data: null, isError: false };
+    queryState.report = { data: null, isError: false, isLoading: false };
+    queryState.selectedReport = { data: null, isError: false, isLoading: false };
     queryState.reports = [];
-    queryState.activity = { data: { work_date: "2026-08-03", employee_id: "employee-1", summary: [], cancelled_count: 0, details: [] }, isError: false };
+    queryState.reportsLoading = false;
+    queryState.activity = { data: { work_date: "2026-08-03", employee_id: "employee-1", summary: [], cancelled_count: 0, details: [] }, isError: false, isLoading: false };
     queryState.saveMutation = { isPending: false, mutateAsync: vi.fn() };
     registerDirtyMock.mockClear();
+  });
+
+  it("최초 조회 중에는 MES 기록과 편집기 형상을 유지하고 빈 편집기를 노출하지 않는다", () => {
+    queryState.report.isLoading = true;
+    queryState.activity = { data: null, isError: false, isLoading: true };
+
+    render(
+      <DailyWorkReportScreen
+        employeeId="employee-1"
+        operator={{ employee_id: "employee-1", name: "김현우", department: "조립" } as never}
+      />,
+    );
+
+    expect(screen.getByRole("status", { name: "일일 작업 일보 불러오는 중" })).toBeInTheDocument();
+    expect(screen.getByTestId("daily-report-activity-skeleton")).toBeInTheDocument();
+    expect(screen.getByTestId("daily-report-editor-skeleton")).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "작업 내역" })).not.toBeInTheDocument();
+  });
+
+  it("작성자 조회 중에는 미작성 또는 0명으로 표시하지 않는다", () => {
+    queryState.reportsLoading = true;
+    render(<DailyWorkReportScreen employeeId="employee-1" />);
+    fireEvent.click(screen.getByRole("tab", { name: "전체 일보" }));
+    expect(screen.getByRole("status", { name: "작성자 목록 불러오는 중" })).toBeInTheDocument();
+    expect(screen.queryByText("작성된 일보가 없습니다.")).not.toBeInTheDocument();
+    expect(screen.queryByText("0명")).not.toBeInTheDocument();
   });
 
   it("registers its controls in the desktop top bar and removes the duplicate inner header", () => {

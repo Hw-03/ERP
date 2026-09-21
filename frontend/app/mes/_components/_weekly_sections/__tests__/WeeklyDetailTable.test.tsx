@@ -31,6 +31,16 @@ const group = {
 };
 
 describe("WeeklyDetailTable verified columns", () => {
+  it("keeps the summary, colgroup and table headers during initial loading", () => {
+    const { container } = render(<WeeklyDetailTable group={undefined} stockBasis="normal" loading loadingProcessCode="TF" onItemSelect={vi.fn()} />);
+    expect(screen.getByTestId("weekly-detail-summary")).toHaveTextContent("튜브");
+    expect(screen.getAllByRole("columnheader")).toHaveLength(9);
+    expect(container.querySelectorAll("colgroup col")).toHaveLength(9);
+    expect(container.querySelector("table")).toHaveAttribute("aria-busy", "true");
+    expect(container.querySelectorAll("tbody tr")).toHaveLength(8);
+    expect(container.querySelector("tbody tr")).not.toHaveAttribute("role", "button");
+    expect(screen.queryByText("해당 공정완료품 데이터가 없습니다.")).not.toBeInTheDocument();
+  });
   it("uses normal-stock labels for a verified report", () => {
     render(
       <WeeklyDetailTable

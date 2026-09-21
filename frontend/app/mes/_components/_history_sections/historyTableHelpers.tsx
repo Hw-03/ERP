@@ -416,13 +416,28 @@ export function StockSnapshotCell({
   log,
   dense = false,
   quantityWidth,
+  loading = false,
 }: {
   log?: TransactionLog | null;
   dense?: boolean;
   /** 같은 작업 묶음의 최장 재고 표기 폭. */
   quantityWidth?: number;
+  loading?: boolean;
 }) {
   const cellClass = dense ? HISTORY_CHILD_CELL_CLASS : HISTORY_MAIN_CELL_CLASS;
+  if (loading) {
+    return (
+      <td className={`${cellClass} px-1 text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
+        <span aria-hidden="true" data-history-loading-stock className="mx-auto flex w-fit items-center leading-4">
+          {[28, STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH_PX, STOCK_SNAPSHOT_DELTA_WIDTH_PX, STOCK_SNAPSHOT_ARROW_WIDTH_PX, STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH_PX].map((width, index) => (
+            <span key={index} className="flex shrink-0 items-center" style={{ width, justifyContent: index === 1 ? "flex-end" : index === 3 ? "center" : "flex-start" }}>
+              {index === 3 ? <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>→</span> : <span className="h-3 rounded-[4px] motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s3, width: width - 6 }} />}
+            </span>
+          ))}
+        </span>
+      </td>
+    );
+  }
   if (!log) {
     return (
       <td className={`${cellClass} px-1 text-center text-xs font-semibold`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>

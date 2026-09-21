@@ -537,13 +537,23 @@ describe("DesktopShippingView", () => {
     expect(api.getShippingHistory).not.toHaveBeenCalled();
   });
 
-  it("keeps the shipping hub mounted while the first request fetch is pending", () => {
+  it("reserves the final two-card shipping hub while the first request fetch is pending", () => {
     vi.mocked(api.getShippingRequests).mockReturnValue(new Promise(() => {}));
 
-    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+    render(<DesktopShippingView onStatusChange={() => {}} />);
 
-    expect(screen.queryByText("출하 데이터를 불러오는 중입니다.")).not.toBeInTheDocument();
-    expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy();
+    expect(screen.getByRole("status", { name: "출하 데이터를 불러오는 중입니다" })).toBeInTheDocument();
+    expect(screen.getByText("출하 관리")).toBeInTheDocument();
+    expect(screen.getByText("출하 이력")).toBeInTheDocument();
+    expect(screen.getByTestId("shipping-hub-count-request")).not.toHaveTextContent("0");
+  });
+
+  it("keeps request columns loading when entering the real hub before the read completes", async () => {
+    vi.mocked(api.getShippingRequests).mockReturnValue(new Promise(() => {}));
+    const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
+    await openHubCard(container, "request");
+    expect(screen.getAllByRole("status", { name: /출하 요청 불러오는 중/ })).toHaveLength(2);
+    expect(screen.queryByText("표시할 출하 요청이 없습니다.")).not.toBeInTheDocument();
   });
 
   it("loads PF candidates separately and delays the full item list until PF selection", async () => {
@@ -2865,7 +2875,7 @@ describe("DesktopShippingView", () => {
 
     expect(screen.queryByText("바로 열기")).not.toBeInTheDocument();
     const badge = screen.getByTestId("shipping-hub-count-request");
-    expect(badge).toHaveTextContent(/\d+/);
+    await waitFor(() => expect(badge).toHaveTextContent(/\d+/));
     expect(badge.className).toContain("min-h-12");
     expect(screen.getByText("요청 생성부터 준비 체크, 픽업 완료까지 이어서 처리합니다.")).toBeInTheDocument();
   });

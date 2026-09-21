@@ -7,6 +7,16 @@ vi.mock("../../DepartmentsContext", () => ({
 }));
 
 describe("WeeklyGroupCards", () => {
+  it("retains process buttons and labels while only quantities are loading", () => {
+    render(<WeeklyGroupCards groups={[]} selected="TF" onSelect={vi.fn()} loading />);
+    const cards = screen.getAllByRole("button");
+    expect(cards).toHaveLength(6);
+    expect(cards[0]).toHaveTextContent("튜브");
+    expect(cards[0]).toHaveTextContent("생산");
+    expect(cards[0]).toHaveAttribute("aria-busy", "true");
+    expect(cards[0].querySelectorAll("[data-weekly-loading-value]")).toHaveLength(6);
+    expect(screen.queryByText("+0")).not.toBeInTheDocument();
+  });
   it("keeps the department accent while showing both inventory change sides", () => {
     render(
       <WeeklyGroupCards

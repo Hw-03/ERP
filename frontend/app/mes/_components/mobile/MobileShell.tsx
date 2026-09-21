@@ -182,6 +182,7 @@ export function MobileShell({
   const [warehouseIntent, setWarehouseIntent] = useState<IoEntryIntent | null>(null);
   const [warehouseNotificationTarget, setWarehouseNotificationTarget] = useState<NotificationNavigationTarget | null>(null);
   const [capacityData, setCapacityData] = useState<ProductionCapacity | null>(null);
+  const [capacityLoading, setCapacityLoading] = useState(true);
   const capacityRequestRef = useRef(0);
   const [capacityModal, setCapacityModal] = useState(false);
   const [stockWarnings, setStockWarnings] = useState<{ low: number; zero: number } | null>(null);
@@ -325,7 +326,10 @@ export function MobileShell({
       .then((nextCapacity) => {
         if (requestId === capacityRequestRef.current) setCapacityData(nextCapacity);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (requestId === capacityRequestRef.current) setCapacityLoading(false);
+      });
   }, []);
 
   useEffect(() => {
@@ -384,6 +388,7 @@ export function MobileShell({
           onGoToWarehouseTab={() => handleTabChange("warehouse")}
           onSummaryChange={setStockWarnings}
           capacityData={capacityData}
+          capacityLoading={capacityLoading && !capacityData}
           onCapacityClick={() => setCapacityModal(true)}
           canReceive={canReceive}
         />
@@ -462,6 +467,7 @@ export function MobileShell({
     canOpenMobileTab,
     canReceive,
     capacityData,
+    capacityLoading,
     weekMon,
     handleTabChange,
     loadCapacity,

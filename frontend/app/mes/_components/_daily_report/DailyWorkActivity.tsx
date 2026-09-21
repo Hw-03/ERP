@@ -206,7 +206,7 @@ function DailyWorkActivityDetail({ group }: { group: DailyWorkActivityData["deta
   );
 }
 
-export function DailyWorkActivity({ activity, onDetailOpenChange }: { activity: DailyWorkActivityData; onDetailOpenChange?: (isOpen: boolean) => void }) {
+export function DailyWorkActivity({ activity, onDetailOpenChange, loading = false }: { activity?: DailyWorkActivityData; onDetailOpenChange?: (isOpen: boolean) => void; loading?: boolean }) {
   const [openOperation, setOpenOperation] = useState<string | null>(null);
 
   return (
@@ -216,7 +216,8 @@ export function DailyWorkActivity({ activity, onDetailOpenChange }: { activity: 
           <ClipboardList className="h-5 w-5" />
         </span>
         <h2 id="daily-work-activity-title" className="shrink-0 whitespace-nowrap text-lg font-black">MES 작업 기록</h2>
-        {activity.summary.map((summary) => {
+        {loading && <span data-testid="daily-report-activity-skeleton" aria-label="MES 작업 기록 불러오는 중" role="status" className="h-11 min-w-0 flex-1 motion-safe:animate-pulse rounded-[14px]" style={{ background: LEGACY_COLORS.s2 }} />}
+        {activity?.summary.map((summary) => {
           const isOpen = openOperation === summary.operation_key;
           return (
             <button
@@ -239,20 +240,20 @@ export function DailyWorkActivity({ activity, onDetailOpenChange }: { activity: 
             </button>
           );
         })}
-        {activity.cancelled_count > 0 && (
+        {activity && activity.cancelled_count > 0 && (
           <span className="shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-black" style={{ color: LEGACY_COLORS.red, background: LEGACY_COLORS.errorBg }}>
             취소 {activity.cancelled_count}건
           </span>
         )}
       </div>
 
-      {activity.summary.length === 0 && (
+      {(loading || activity?.summary.length === 0) && (
         <div className="mt-3 rounded-[14px] border px-3.5 py-3 text-sm font-medium" style={{ color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-          완료된 MES 거래가 생기면 작업 종류와 수량이 이곳에 자동으로 나타납니다.
+          {loading ? <span aria-hidden="true" className="block h-5 w-2/3 rounded motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s3 }} /> : "완료된 MES 거래가 생기면 작업 종류와 수량이 이곳에 자동으로 나타납니다."}
         </div>
       )}
 
-      {openOperation && activity.details.length > 0 && (
+      {openOperation && activity && activity.details.length > 0 && (
         <div data-testid="daily-work-activity-details" className="mt-2 space-y-2">
           {activity.details.filter((group) => operationKeyForGroup(group) === openOperation).map((group) => (
             <DailyWorkActivityDetail key={group.key} group={group} />

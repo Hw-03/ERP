@@ -3,6 +3,8 @@
 import { memo, useMemo, useState } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
+import { PROCESS_TO_DEPT } from "@/lib/mes/process";
+import { WeeklyLoadingValue } from "./WeeklyLoadingValue";
 import { formatQty } from "@/lib/mes/format";
 import type { WeeklyGroupReport } from "@/lib/api/types/weekly";
 import { useDeptColorLookup } from "../DepartmentsContext";
@@ -17,20 +19,21 @@ interface Props {
   selected: string;
   onSelect: (code: string) => void;
   cols?: 1;
+  loading?: boolean;
 }
 
-function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
+function WeeklyGroupCardsImpl({ groups, selected, onSelect, loading = false }: Props) {
   const [hovered, setHovered] = useState<string | null>(null);
   const getDeptColor = useDeptColorLookup();
 
   // 튜브→고압→진공→튜닝→조립→출하 순 고정 (주차마다 순서 흔들림 방지)
-  const sortedGroups = useMemo(
+  const sortedGroups = useMemo<Array<Pick<WeeklyGroupReport, "process_code" | "dept_name"> & Partial<WeeklyGroupReport>>>(
     () =>
-      [...groups].sort(
+      (loading ? Object.keys(PROCESS_ORDER).map((process_code) => ({ process_code, dept_name: PROCESS_TO_DEPT[process_code] })) : [...groups]).sort(
         (a, b) =>
           (PROCESS_ORDER[a.process_code] ?? 99) - (PROCESS_ORDER[b.process_code] ?? 99),
       ),
-    [groups],
+    [groups, loading],
   );
 
   return (
@@ -38,7 +41,7 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
       {sortedGroups.map((g) => {
         const isActive = g.process_code === selected;
         const isHover = hovered === g.process_code;
-        const hasInventoryActivity = g.increase_qty > 0 || g.decrease_qty > 0;
+        const hasInventoryActivity = (g.increase_qty ?? 0) > 0 || (g.decrease_qty ?? 0) > 0;
         const isQuiet = !hasInventoryActivity && !isActive;
         const accentColor = getDeptColor(g.dept_name);
 
@@ -50,6 +53,7 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
             onMouseEnter={() => setHovered(g.process_code)}
             onMouseLeave={() => setHovered(null)}
             aria-pressed={isActive}
+            aria-busy={loading || undefined}
             className="relative flex min-h-0 flex-1 flex-col justify-center overflow-hidden rounded-[12px] border text-left transition-colors hover:brightness-110"
             style={{
               background: isActive
@@ -102,15 +106,15 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
               <div className="ml-auto flex shrink-0 items-center gap-1.5">
                 <span
                   className="text-[17px] font-black leading-none tabular-nums"
-                  style={{ color: g.increase_qty > 0 ? LEGACY_COLORS.green : ZERO_FADE }}
+                  style={{ color: (g.increase_qty ?? 0) > 0 ? LEGACY_COLORS.green : ZERO_FADE }}
                 >
-                  +{formatQty(g.increase_qty)}
+                  <WeeklyLoadingValue loading={loading}>+{formatQty(g.increase_qty ?? 0)}</WeeklyLoadingValue>
                 </span>
                 <span
                   className="text-[17px] font-black leading-none tabular-nums"
-                  style={{ color: g.decrease_qty > 0 ? LEGACY_COLORS.red : ZERO_FADE }}
+                  style={{ color: (g.decrease_qty ?? 0) > 0 ? LEGACY_COLORS.red : ZERO_FADE }}
                 >
-                  -{formatQty(g.decrease_qty)}
+                  <WeeklyLoadingValue loading={loading}>-{formatQty(g.decrease_qty ?? 0)}</WeeklyLoadingValue>
                 </span>
               </div>
             </div>
@@ -123,26 +127,26 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
               style={{ borderColor: tint(LEGACY_COLORS.border, 60, "transparent") }}
             >
               <span
-                className={`text-left ${g.produce_qty > 0 ? "font-semibold" : "font-medium"}`}
+                className={`text-left ${(g.produce_qty ?? 0) > 0 ? "font-semibold" : "font-medium"}`}
                 style={{
                   color:
-                    g.produce_qty > 0
+                    (g.produce_qty ?? 0) > 0
                       ? `color-mix(in srgb, ${LEGACY_COLORS.green} 55%, ${LEGACY_COLORS.text})`
                       : ZERO_FADE,
                 }}
               >
-                생산 {formatQty(g.produce_qty)}
+                생산 <WeeklyLoadingValue loading={loading}>{formatQty(g.produce_qty ?? 0)}</WeeklyLoadingValue>
               </span>
               <span
-                className={`text-center ${g.out_qty > 0 ? "font-semibold" : "font-medium"}`}
+                className={`text-center ${(g.out_qty ?? 0) > 0 ? "font-semibold" : "font-medium"}`}
                 style={{
                   color:
-                    g.out_qty > 0
+                    (g.out_qty ?? 0) > 0
                       ? `color-mix(in srgb, ${LEGACY_COLORS.red} 55%, ${LEGACY_COLORS.text})`
                       : ZERO_FADE,
                 }}
               >
-                출고 {formatQty(g.out_qty)}
+                출고 <WeeklyLoadingValue loading={loading}>{formatQty(g.out_qty ?? 0)}</WeeklyLoadingValue>
               </span>
               <span
                 className={`text-center ${(g.defect_qty ?? 0) > 0 ? "font-semibold" : "font-medium"}`}
@@ -153,15 +157,15 @@ function WeeklyGroupCardsImpl({ groups, selected, onSelect }: Props) {
                       : ZERO_FADE,
                 }}
               >
-                불량 {formatQty(g.defect_qty ?? 0)}
+                불량 <WeeklyLoadingValue loading={loading}>{formatQty(g.defect_qty ?? 0)}</WeeklyLoadingValue>
               </span>
               <span
-                className={`text-right ${g.current_qty > 0 ? "font-semibold" : "font-medium"}`}
+                className={`text-right ${(g.current_qty ?? 0) > 0 ? "font-semibold" : "font-medium"}`}
                 style={{
-                  color: g.current_qty > 0 ? LEGACY_COLORS.muted2 : ZERO_FADE,
+                  color: (g.current_qty ?? 0) > 0 ? LEGACY_COLORS.muted2 : ZERO_FADE,
                 }}
               >
-                현재 {formatQty(g.current_qty)}
+                현재 <WeeklyLoadingValue loading={loading}>{formatQty(g.current_qty ?? 0)}</WeeklyLoadingValue>
               </span>
             </div>
           </button>

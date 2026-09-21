@@ -237,6 +237,8 @@ export function DailyWorkReportScreen({
   }
 
   const reportLoadFailed = tab === "mine" ? reportQuery.isError : selectedReportQuery.isError;
+  const reportLoading = tab === "mine" ? reportQuery.isLoading : selectedReportQuery.isLoading;
+  const initialContentLoading = Boolean(reportLoading || activityQuery.isLoading);
 
   return (
     <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-3 py-3 lg:flex lg:flex-col lg:overflow-hidden lg:px-0 lg:py-0 lg:pr-4">
@@ -269,11 +271,12 @@ export function DailyWorkReportScreen({
                 <h2 className="text-base font-black">작성한 직원</h2>
                 <p className="mt-1 text-sm font-medium" style={{ color: LEGACY_COLORS.muted2 }}>직원을 선택하면 해당 날짜의 일보와 MES 거래를 읽을 수 있습니다.</p>
               </div>
-              <span className="rounded-full px-2.5 py-1 text-xs font-black" style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>{reports.length}명</span>
+              <span className="rounded-full px-2.5 py-1 text-xs font-black" style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>{reportsQuery.isLoading ? <span className="inline-block h-3 w-6 rounded motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s3 }} /> : reports.length}명</span>
             </div>
             {reportsQuery.isError ? <div className="mt-4"><Failure message="작성자 목록을 불러오지 못했습니다." /></div> : (
               <div data-testid="daily-work-report-author-chips" className="mt-4 flex flex-wrap gap-2 lg:max-h-36 lg:overflow-y-auto lg:pr-1">
-                {reports.length === 0 && <p className="rounded-[14px] border px-3 py-3 text-sm font-medium" style={{ color: LEGACY_COLORS.muted2, borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>작성된 일보가 없습니다.</p>}
+                {reportsQuery.isLoading && <div role="status" aria-label="작성자 목록 불러오는 중" className="h-11 w-40 rounded-[12px] motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s2 }} />}
+                {!reportsQuery.isLoading && reports.length === 0 && <p className="rounded-[14px] border px-3 py-3 text-sm font-medium" style={{ color: LEGACY_COLORS.muted2, borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>작성된 일보가 없습니다.</p>}
                 {reports.map((entry) => {
                   const selected = selectedEmployeeId === entry.employee_id;
                   const departmentColor = getDepartmentFallbackColor(entry.department);
@@ -295,10 +298,11 @@ export function DailyWorkReportScreen({
         )}
 
         {targetEmployeeId ? (
-          <div key={tab === "all" ? targetEmployeeId : "mine"} data-testid="daily-work-report-result" className={`min-w-0 space-y-3 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:gap-3 lg:space-y-0 ${tab === "all" && selectedEmployeeId ? "animate-view-fade" : ""}`}>
-            {reportLoadFailed && <Failure message="일보를 불러오지 못했습니다." />}
-            {activityQuery.isError ? <Failure message="MES 거래를 불러오지 못했습니다." /> : activityQuery.data ? <DailyWorkActivity activity={activityQuery.data} onDetailOpenChange={setIsActivityDetailOpen} /> : <PanelPlaceholder>MES 거래를 불러오는 중입니다.</PanelPlaceholder>}
-            <DailyWorkReportEditor
+          <div key={tab === "all" ? targetEmployeeId : "mine"} data-testid="daily-work-report-result" role={initialContentLoading ? "status" : undefined} aria-busy={initialContentLoading || undefined} aria-label={initialContentLoading ? "일일 작업 일보 불러오는 중" : undefined} className={`min-w-0 space-y-3 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:gap-3 lg:space-y-0 ${tab === "all" && selectedEmployeeId ? "animate-view-fade" : ""}`}>
+              {reportLoadFailed && <Failure message="일보를 불러오지 못했습니다." />}
+              {activityQuery.isError ? <Failure message="MES 거래를 불러오지 못했습니다." /> : <DailyWorkActivity activity={activityQuery.data} loading={activityQuery.isLoading} onDetailOpenChange={setIsActivityDetailOpen} />}
+              <DailyWorkReportEditor
+              loading={reportLoading}
               initialContent={report?.content ?? ""}
               initialUpdatedAt={report?.updated_at ?? null}
               resetKey={editorResetKey}
@@ -313,7 +317,7 @@ export function DailyWorkReportScreen({
               }}
               saveRef={editorSaveRef}
               fillAvailableHeight={!isActivityDetailOpen}
-            />
+              />
           </div>
         ) : tab === "all" ? <PanelPlaceholder>작성한 직원을 선택하세요.</PanelPlaceholder> : null}
       </div>

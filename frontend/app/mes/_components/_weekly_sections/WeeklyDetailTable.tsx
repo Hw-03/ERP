@@ -1,5 +1,7 @@
 "use client";
 
+import { WeeklyLoadingValue } from "./WeeklyLoadingValue";
+import { PROCESS_TO_DEPT } from "@/lib/mes/process";
 import { memo } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
@@ -13,11 +15,13 @@ interface Props {
   group: WeeklyGroupReport | undefined;
   stockBasis: "legacy" | "normal";
   onItemSelect: (item: WeeklyItemReport) => void;
+  loading?: boolean;
+  loadingProcessCode?: string;
 }
 
 
-function WeeklyDetailTableImpl({ group, stockBasis, onItemSelect }: Props) {
-  if (!group || group.items.length === 0) {
+function WeeklyDetailTableImpl({ group, stockBasis, onItemSelect, loading = false, loadingProcessCode = "TF" }: Props) {
+  if (!loading && (!group || group.items.length === 0)) {
     return (
       <EmptyState
         variant="no-data"
@@ -28,6 +32,9 @@ function WeeklyDetailTableImpl({ group, stockBasis, onItemSelect }: Props) {
     );
   }
 
+  const processCode = group?.process_code ?? loadingProcessCode;
+  const departmentName = group?.dept_name ?? PROCESS_TO_DEPT[processCode];
+  const rows: Array<WeeklyItemReport | null> = loading ? Array.from({ length: 8 }, () => null) : group?.items ?? [];
   const usesNormalStock = stockBasis === "normal";
   const previousStockLabel = usesNormalStock ? "전주 정상재고" : "전주 재고";
   const currentStockLabel = usesNormalStock ? "현재 정상재고" : "현재 재고";
@@ -41,58 +48,58 @@ function WeeklyDetailTableImpl({ group, stockBasis, onItemSelect }: Props) {
         style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
       >
         <span className="text-[13px] font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-          {group.dept_name}
+          {departmentName}
           <span
             className="ml-1 text-[11px] font-bold"
             style={{ color: LEGACY_COLORS.muted2 }}
           >
-            · {group.process_code}
+            · {processCode}
           </span>
         </span>
         <span className="text-[12px]" style={{ color: LEGACY_COLORS.muted2 }}>
-          {currentStockLabel} {formatQty(group.current_qty)}
+          {currentStockLabel} <WeeklyLoadingValue loading={loading}>{formatQty((group?.current_qty ?? 0))}</WeeklyLoadingValue>
         </span>
         <span
           className="text-[12px]"
-          style={{ color: group.produce_qty > 0 ? LEGACY_COLORS.green : ZERO_FADE }}
+          style={{ color: (group?.produce_qty ?? 0) > 0 ? LEGACY_COLORS.green : ZERO_FADE }}
         >
-          생산 {formatQty(group.produce_qty)}
+          생산 <WeeklyLoadingValue loading={loading}>{formatQty((group?.produce_qty ?? 0))}</WeeklyLoadingValue>
         </span>
         <span
           className="text-[12px]"
-          style={{ color: group.receive_qty > 0 ? LEGACY_COLORS.blue : ZERO_FADE }}
+          style={{ color: (group?.receive_qty ?? 0) > 0 ? LEGACY_COLORS.blue : ZERO_FADE }}
         >
-          입고 {formatQty(group.receive_qty)}
+          입고 <WeeklyLoadingValue loading={loading}>{formatQty((group?.receive_qty ?? 0))}</WeeklyLoadingValue>
         </span>
         <span
           className="text-[12px]"
-          style={{ color: group.out_qty > 0 ? LEGACY_COLORS.red : ZERO_FADE }}
+          style={{ color: (group?.out_qty ?? 0) > 0 ? LEGACY_COLORS.red : ZERO_FADE }}
         >
-          출고 {formatQty(group.out_qty)}
+          출고 <WeeklyLoadingValue loading={loading}>{formatQty((group?.out_qty ?? 0))}</WeeklyLoadingValue>
         </span>
         <span
           className="text-[12px]"
-          style={{ color: (group.defect_qty ?? 0) > 0 ? LEGACY_COLORS.red : ZERO_FADE }}
+          style={{ color: (group?.defect_qty ?? 0) > 0 ? LEGACY_COLORS.red : ZERO_FADE }}
         >
-          불량 {formatQty(group.defect_qty ?? 0)}
+          불량 <WeeklyLoadingValue loading={loading}>{formatQty(group?.defect_qty ?? 0)}</WeeklyLoadingValue>
         </span>
         <span
           className="text-[12px]"
           style={{
             color:
-              group.delta > 0
+              (group?.delta ?? 0) > 0
                 ? LEGACY_COLORS.green
-                : group.delta < 0
+                : (group?.delta ?? 0) < 0
                 ? LEGACY_COLORS.red
                 : ZERO_FADE,
           }}
         >
           증감{" "}
-          {group.delta > 0
-            ? `+${formatQty(group.delta)}`
-            : group.delta < 0
-            ? formatQty(group.delta)
-            : "±0"}
+          <WeeklyLoadingValue loading={loading}>{(group?.delta ?? 0) > 0
+            ? `+${formatQty((group?.delta ?? 0))}`
+            : (group?.delta ?? 0) < 0
+            ? formatQty((group?.delta ?? 0))
+            : "±0"}</WeeklyLoadingValue>
         </span>
         <span
           className="ml-auto rounded-[6px] px-2 py-0.5 text-[11px] font-bold tabular-nums"
@@ -101,14 +108,14 @@ function WeeklyDetailTableImpl({ group, stockBasis, onItemSelect }: Props) {
             color: LEGACY_COLORS.muted2,
           }}
         >
-          품목 {group.items.length}건
+          품목 <WeeklyLoadingValue loading={loading}>{group?.items.length}</WeeklyLoadingValue>건
         </span>
       </div>
 
       {/* 모바일(<lg): 카드 리스트 — 데스크탑 와이드 테이블(minWidth 680)이
           393px 에서 가로 오버플로/스크롤영역 a11y 위반을 일으켜 카드로 대체. */}
       <div className="flex flex-col gap-2 lg:hidden">
-        {group.items.map((row) => {
+        {(group?.items ?? []).map((row) => {
           const d = row.delta;
           const deltaColor =
             d > 0 ? LEGACY_COLORS.green : d < 0 ? LEGACY_COLORS.red : LEGACY_COLORS.muted2;
@@ -174,7 +181,7 @@ function WeeklyDetailTableImpl({ group, stockBasis, onItemSelect }: Props) {
         className="hidden lg:block"
         data-testid="weekly-detail-table"
       >
-        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "0 2px", minWidth: 760, tableLayout: "fixed" }}>
+        <table aria-busy={loading || undefined} aria-label={loading ? "주간 품목 상세 불러오는 중" : undefined} style={{ width: "100%", borderCollapse: "separate", borderSpacing: "0 2px", minWidth: 760, tableLayout: "fixed" }}>
           <colgroup>
             <col style={{ width: "100px" }} />
             <col />
@@ -215,8 +222,8 @@ function WeeklyDetailTableImpl({ group, stockBasis, onItemSelect }: Props) {
             </tr>
           </thead>
           <tbody>
-            {group.items.map((row, idx) => {
-              const delta = row.delta;
+            {rows.map((row, idx) => {
+              const delta = row?.delta ?? 0;
               const isDecreasing = delta < 0;
               const isEvenRow = idx % 2 === 1;
               const rowBg = isDecreasing
@@ -230,14 +237,14 @@ function WeeklyDetailTableImpl({ group, stockBasis, onItemSelect }: Props) {
 
               return (
                 <tr
-                  key={row.item_id}
-                  data-testid={`weekly-detail-desktop-row-${row.item_id}`}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`${row.item_name} BOM 구성 보기`}
-                  onClick={() => onItemSelect(row)}
+                  key={row?.item_id ?? `loading-${idx}`}
+                  data-testid={row ? `weekly-detail-desktop-row-${row.item_id}` : "weekly-detail-loading-row"}
+                  role={row ? "button" : undefined}
+                  tabIndex={row ? 0 : undefined}
+                  aria-label={row ? `${row.item_name} BOM 구성 보기` : undefined}
+                  onClick={row ? () => onItemSelect(row) : undefined}
                   onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
+                    if (row && (event.key === "Enter" || event.key === " ")) {
                       event.preventDefault();
                       onItemSelect(row);
                     }
@@ -255,7 +262,7 @@ function WeeklyDetailTableImpl({ group, stockBasis, onItemSelect }: Props) {
                       overflowWrap: "anywhere",
                     }}
                   >
-                    {row.mes_code ?? "—"}
+                    <WeeklyLoadingValue loading={!row} width="100%">{row?.mes_code ?? "—"}</WeeklyLoadingValue>
                   </td>
                   {/* 품명 */}
                   <td
@@ -268,15 +275,15 @@ function WeeklyDetailTableImpl({ group, stockBasis, onItemSelect }: Props) {
                       wordBreak: "keep-all",
                       lineHeight: 1.35,
                     }}
-                    title={row.item_name}
+                    title={row?.item_name}
                   >
-                    {row.item_name}
+                    <WeeklyLoadingValue loading={!row} width="75%">{row?.item_name}</WeeklyLoadingValue>
                   </td>
                   {/* 전주 재고 */}
-                  <Num val={row.prev_qty} bg={rowBg} border={rowBorder} />
+                  <Num val={row?.prev_qty} bg={rowBg} border={rowBorder} />
                   {/* 생산 (PRODUCE만) */}
                   <Num
-                    val={row.produce_qty}
+                    val={row?.produce_qty}
                     bg={rowBg}
                     border={rowBorder}
                     color={LEGACY_COLORS.green}
@@ -284,7 +291,7 @@ function WeeklyDetailTableImpl({ group, stockBasis, onItemSelect }: Props) {
                   />
                   {/* 입고 (RECEIVE) */}
                   <Num
-                    val={row.receive_qty}
+                    val={row?.receive_qty}
                     bg={rowBg}
                     border={rowBorder}
                     color={LEGACY_COLORS.blue}
@@ -292,7 +299,7 @@ function WeeklyDetailTableImpl({ group, stockBasis, onItemSelect }: Props) {
                   />
                   {/* 출고 내역 */}
                   <Num
-                    val={row.out_qty}
+                    val={row?.out_qty}
                     bg={rowBg}
                     border={rowBorder}
                     color={LEGACY_COLORS.red}
@@ -300,14 +307,14 @@ function WeeklyDetailTableImpl({ group, stockBasis, onItemSelect }: Props) {
                   />
                   {/* 불량 */}
                   <Num
-                    val={row.defect_qty ?? 0}
+                    val={row ? row.defect_qty ?? 0 : undefined}
                     bg={rowBg}
                     border={rowBorder}
                     color={LEGACY_COLORS.red}
                     highlightColor={LEGACY_COLORS.red}
                   />
                   {/* 현재 재고 */}
-                  <Num val={row.current_qty} bg={rowBg} border={rowBorder} />
+                  <Num val={row?.current_qty} bg={rowBg} border={rowBorder} />
                   {/* 증감 */}
                   {(() => {
                     const deltaTone =
@@ -329,7 +336,7 @@ function WeeklyDetailTableImpl({ group, stockBasis, onItemSelect }: Props) {
                           whiteSpace: "nowrap",
                         }}
                       >
-                        {delta > 0 ? `+${formatQty(delta)}` : delta < 0 ? formatQty(delta) : "±0"}
+                        <WeeklyLoadingValue loading={!row}>{delta > 0 ? `+${formatQty(delta)}` : delta < 0 ? formatQty(delta) : "±0"}</WeeklyLoadingValue>
                       </td>
                     );
                   })()}
@@ -350,13 +357,13 @@ function Num({
   color,
   highlightColor,
 }: {
-  val: number;
+  val: number | undefined;
   bg: string;
   border: string;
   color?: string;
   highlightColor?: string;
 }) {
-  const isZero = Number(val) === 0;
+  const isZero = val === undefined || Number(val) === 0;
   const c = isZero ? ZERO_FADE : (color ?? LEGACY_COLORS.text);
   const cellBg =
     !isZero && highlightColor
@@ -372,7 +379,7 @@ function Num({
         whiteSpace: "nowrap",
       }}
     >
-      {val === 0 ? "—" : formatQty(val)}
+      <WeeklyLoadingValue loading={val === undefined}>{val === 0 ? "—" : formatQty(val ?? 0)}</WeeklyLoadingValue>
     </td>
   );
 }

@@ -1,4 +1,4 @@
-import { render, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { ProductionCapacity } from "@/lib/api/types/production";
 import { LEGACY_COLORS } from "@/lib/mes/color";
@@ -82,6 +82,19 @@ const incompleteCapacityData = {
 } satisfies ProductionCapacity;
 
 describe("InventoryCapacityPanel 모바일 표", () => {
+  it("최초 조회 중에는 데스크톱 패널 높이를 예약한다", () => {
+    render(<InventoryCapacityPanel capacityData={null} loading />);
+
+    expect(screen.getByRole("status", { name: "생산 가능 수량 불러오는 중" })).toBeInTheDocument();
+  });
+
+  it("데이터가 있으면 loading 값이 남아 있어도 실제 내용을 유지한다", () => {
+    render(<InventoryCapacityPanel capacityData={capacityData} loading />);
+
+    expect(screen.getByText("생산 가능")).toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: "생산 가능 수량 불러오는 중" })).not.toBeInTheDocument();
+  });
+
   it("부분 BOM 미등록 상태도 메인에서는 생산 가능으로 요약한다", () => {
     const { container } = render(<InventoryCapacityPanel capacityData={incompleteCapacityData} />);
 

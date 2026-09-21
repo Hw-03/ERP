@@ -22,6 +22,7 @@ interface Props {
   deptQueueCount?: number;
   asResearchQueueCount?: number;
   handoverInboxCount?: number;
+  loadingCounts?: WarehouseSectionTab[];
 }
 
 type TabDef = { id: WarehouseSectionTab; label: string; tone: string };
@@ -38,6 +39,7 @@ export function WarehouseSectionTabs({
   deptQueueCount = 0,
   asResearchQueueCount = 0,
   handoverInboxCount = 0,
+  loadingCounts = [],
 }: Props) {
   const tabs: TabDef[] = [
     { id: "compose", label: "요청 작성", tone: LEGACY_COLORS.blue },
@@ -70,6 +72,7 @@ export function WarehouseSectionTabs({
           key={t.id}
           label={t.label}
           badge={badgeFor(t.id)}
+          loading={loadingCounts.includes(t.id)}
           tone={t.tone}
           active={active === t.id}
           onClick={() => onChange(t.id)}
@@ -85,12 +88,14 @@ function TabButton({
   tone,
   active,
   onClick,
+  loading = false,
 }: {
   label: string;
   badge: number | null;
   tone: string;
   active: boolean;
   onClick: () => void;
+  loading?: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
   const bg = active ? tint(tone, 22) : hovered ? tint(tone, 16) : tint(tone, 8);
@@ -120,12 +125,12 @@ function TabButton({
           {label}
         </span>
       </div>
-      {badge !== null && (
+      {(loading || badge !== null) && (
         <div
           className="absolute right-0.5 top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-black leading-none text-white lg:right-3 lg:top-1/2 lg:h-5 lg:min-w-[20px] lg:-translate-y-1/2 lg:px-1.5 lg:text-[11px]"
           style={{ background: tone }}
         >
-          {badge}
+          {loading ? <span role="status" aria-label={`${label} 건수 불러오는 중`} className="h-2.5 w-2 rounded motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.white }} /> : badge}
         </div>
       )}
     </button>

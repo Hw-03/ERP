@@ -161,11 +161,13 @@ export function InventoryItemsTable({
             {loading ? Array.from({ length: 8 }, (_, index) => (
               <tr key={index} data-testid="inventory-skeleton-row" aria-hidden="true">
                 {Array.from({ length: 7 }, (_, column) => (
-                  <td key={column} className={`border-b px-4 py-5 align-middle${column !== 0 && column !== 2 && column !== 5 ? " hidden sm:table-cell" : ""}`} style={{ borderColor: LEGACY_COLORS.border }}>
-                    {column === 2 ? <div className="flex h-12 flex-col justify-center gap-3 motion-safe:animate-pulse">
-                      <div className="h-4 w-2/3 rounded" style={{ background: LEGACY_COLORS.borderStrong }} />
-                      <div className="h-1.5 w-full rounded-full" style={{ background: LEGACY_COLORS.border }} />
-                    </div> : <div className={`mx-auto motion-safe:animate-pulse ${column === 1 ? "h-12 w-12 rounded-lg" : column === 0 || column === 4 ? "h-6 w-14 rounded-full" : "h-4 w-12 rounded"}`} style={{ background: LEGACY_COLORS.borderStrong }} />}
+                  <td key={column} className={`border-b ${column === 1 ? "px-1" : "px-4"} py-5 align-middle${column !== 0 && column !== 2 && column !== 5 ? " hidden sm:table-cell" : ""}`} style={{ borderColor: LEGACY_COLORS.border, width: column === 1 ? 60 : undefined }}>
+                    {column === 2 ? <div className="motion-safe:animate-pulse">
+                      <div className="h-5 w-2/3 rounded" style={{ background: LEGACY_COLORS.borderStrong }} />
+                      <div className="mt-[20px] h-[6px] w-full rounded-full" style={{ background: LEGACY_COLORS.border }} />
+                    </div> : column === 0 ? <span className="inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-sm font-bold motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.borderStrong }}>
+                      <span className="h-3.5 w-3.5 shrink-0" /><span className="invisible">품절</span>
+                    </span> : <div className={column === 4 ? "min-w-[190px]" : ""}><div className={`mx-auto motion-safe:animate-pulse ${column === 1 ? "h-[46px] w-[46px] rounded-lg" : column === 4 ? "h-6 w-14 rounded-full" : "h-4 w-12 rounded"}`} style={{ background: LEGACY_COLORS.borderStrong }} /></div>}
                   </td>
                 ))}
               </tr>

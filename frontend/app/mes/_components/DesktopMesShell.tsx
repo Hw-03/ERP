@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { LoadingSkeleton } from "./common/LoadingSkeleton";
 import { InventoryItemsTable } from "./_inventory_sections/InventoryItemsTable";
+import { InventoryKpiPanel } from "./_inventory_sections/InventoryKpiPanel";
+import { InventoryCapacitySkeleton } from "./_inventory_sections/InventoryCapacityPanel";
 import { HistoryTableSkeleton } from "./_history_sections/HistoryTable";
 import { HistoryStatsBar } from "./_history_sections/HistoryStatsBar";
 import type { ElementType, ReactNode } from "react";
@@ -112,7 +113,8 @@ function DesktopMesShellInner({
   })();
 
   const [activeTab, setActiveTab] = useState<DesktopTabId>(initialTab);
-  const contentTab = useDeferredValue(activeTab);
+  const deferredTab = useDeferredValue(activeTab);
+  const contentTab = activeTab === "dashboard" || activeTab === "history" ? deferredTab : activeTab;
   const [status, setStatus] = useState(DEFAULT_STATUS);
   const [statusNonce, setStatusNonce] = useState(0);
   const [refreshNonce, setRefreshNonce] = useState(0);
@@ -365,7 +367,11 @@ function DesktopMesShellInner({
     // 초기 URL 에 defect_dept 쿼리가 있으면 읽어 둔다
     return searchParams.get("defect_dept");
   });
-  const { data: capacityData = null, refetch: refetchCapacity } = useProductionCapacityQuery();
+  const {
+    data: capacityData = null,
+    isLoading: capacityLoading,
+    refetch: refetchCapacity,
+  } = useProductionCapacityQuery();
   const [capacityModal, setCapacityModal] = useState(false);
   const [stockWarnings, setStockWarnings] = useState<{ low: number; zero: number } | null>(null);
 
@@ -395,6 +401,7 @@ function DesktopMesShellInner({
           onGoToWarehouseTab={() => handleTabChange("warehouse")}
           onSummaryChange={setStockWarnings}
           capacityData={capacityData}
+          capacityLoading={capacityLoading && !capacityData}
           onCapacityClick={() => setCapacityModal(true)}
           canReceive={canReceive}
         />
@@ -472,7 +479,7 @@ function DesktopMesShellInner({
     // setStockWarnings/setCapacityModal(setter), handleTabChange 는 안정적이거나 결과에
     // 영향이 없어 의도적으로 제외 — 누락이 아니라 최소 deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contentTab, refreshNonce, adminPinEntryNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, clearWarehouseEntry, canOpenWarehouse, canReceive, capacityData, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen, isItemPickerFullscreen, preferences, savePreferences, canOpenTab, handleOpenAdminPinEntry, handleDailyReportTopbarControlsChange]);
+  }, [contentTab, refreshNonce, adminPinEntryNonce, warehousePreselected, warehouseIntent, handleGoToWarehouse, clearWarehouseEntry, canOpenWarehouse, canReceive, capacityData, capacityLoading, refetchCapacity, weekMon, defectDeptFilter, operator, warehouseMapFullscreen, isItemPickerFullscreen, preferences, savePreferences, canOpenTab, handleOpenAdminPinEntry, handleDailyReportTopbarControlsChange]);
 
   return (
     <>
@@ -542,10 +549,11 @@ function DesktopTabLoading({ tab }: { tab: DesktopTabId }) {
   return <div role="status" aria-busy="true" aria-label={`${TAB_META[tab].title} 화면을 불러오는 중입니다`} className="min-w-0 w-full space-y-3 overflow-hidden">
     {tab === "history"
       ? <HistoryStatsBar baseline={null} currentCount={null} loading loadingDisplay="skeleton" periodLabel="이번달" />
-      : <LoadingSkeleton variant="card" rows={4} />}
+      : <InventoryKpiPanel cards={[]} activeKey="ALL" onChange={() => {}} loading />}
+    {tab === "dashboard" ? <InventoryCapacitySkeleton /> : null}
     {tab === "dashboard" ? <InventoryItemsTable loading error={null} filteredItems={[]} displayLimit={100}
       setDisplayLimit={() => {}} selectedItem={null} onSelectItem={() => {}} activeFilterCount={0}
       hasKpiFilter={false} onRetry={() => {}} onResetAllFilters={() => {}} />
-      : tab === "history" ? <HistoryTableSkeleton /> : <LoadingSkeleton variant="card" />}
+      : <HistoryTableSkeleton />}
   </div>;
 }

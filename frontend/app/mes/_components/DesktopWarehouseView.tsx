@@ -1,7 +1,7 @@
 "use client";
 import { ReadLoading } from "./common/ReadState";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type IoBatch, type Item, type StockRequest } from "@/lib/api";
 import { isDepartmentApprover } from "./_warehouse_steps";
 import { useWarehouseData } from "./_warehouse_hooks/useWarehouseData";
@@ -23,7 +23,7 @@ import { LoadFailureCard } from "./common/LoadFailureCard";
 // 탭 전환 remount 사이 직전 카운트 보존 (세션 내 메모리 캐시).
 // 새로고침 시 휘발 — 첫 진입은 항상 fresh fetch.
 const cartCountCache = new Map<string, number>();
-const warehouseQueueCountCache = { value: 0 };
+const warehouseQueueCountCache = { value: 0, loaded: false };
 const deptQueueCountCache = new Map<string, number>();
 const asResearchQueueCountCache = new Map<string, number>();
 
@@ -107,6 +107,19 @@ export function DesktopWarehouseView({
   const [handoverInboxCount, setHandoverInboxCount] = useState(0);
   const [itemConversionFocused, setItemConversionFocused] = useState(false);
   const [workAreaEmpty, setWorkAreaEmpty] = useState(false);
+  const [loadingCounts, setLoadingCounts] = useState<WarehouseSectionTab[]>(() => {
+    const id = operator?.employee_id ?? "";
+    const pending: WarehouseSectionTab[] = [];
+    if (!cartCountCache.has(id)) pending.push("cart");
+    if (!warehouseQueueCountCache.loaded) pending.push("queue");
+    if (!deptQueueCountCache.has(id)) pending.push("dept-queue");
+    if (!asResearchQueueCountCache.has(id)) pending.push("as-research-queue");
+    if (HANDOVER_RECEIVE_DEPTS.includes(operator?.department ?? "")) pending.push("handover");
+    return pending;
+  });
+  const finishCountLoading = useCallback((tab: WarehouseSectionTab) => {
+    setLoadingCounts((pending) => pending.filter((entry) => entry !== tab));
+  }, []);
 
   const operatorEmployeeId = operator?.employee_id ?? employeeId;
   const canSeeQueue =
@@ -161,6 +174,7 @@ export function DesktopWarehouseView({
         const n = legacyCount + ioCount;
         setCartCount(n);
         cartCountCache.set(operatorEmployeeId, n);
+        finishCountLoading("cart");
       });
 
     if (!urlDraftId || restoredUrlDraftRef.current === urlDraftId) {
@@ -197,7 +211,7 @@ export function DesktopWarehouseView({
     return () => {
       cancelled = true;
     };
-  }, [operatorEmployeeId, panelRefreshNonce, revision, urlDraftId, urlDraftRestoreNonce]);
+  }, [operatorEmployeeId, panelRefreshNonce, revision, urlDraftId, urlDraftRestoreNonce, finishCountLoading]);
 
   useEffect(() => {
     if (!canSeeQueue) return;
@@ -208,12 +222,14 @@ export function DesktopWarehouseView({
         if (!active) return;
         setWarehouseQueueCount(count);
         warehouseQueueCountCache.value = count;
+        warehouseQueueCountCache.loaded = true;
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => { if (active) finishCountLoading("queue"); });
     return () => {
       active = false;
     };
-  }, [canSeeQueue, panelRefreshNonce, revision]);
+  }, [canSeeQueue, panelRefreshNonce, revision, finishCountLoading]);
 
   useEffect(() => {
     if (!canSeeDeptQueue || !operatorEmployeeId) return;
@@ -225,11 +241,12 @@ export function DesktopWarehouseView({
         setDeptQueueCount(count);
         deptQueueCountCache.set(operatorEmployeeId, count);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => { if (active) finishCountLoading("dept-queue"); });
     return () => {
       active = false;
     };
-  }, [canSeeDeptQueue, operatorEmployeeId, panelRefreshNonce, revision]);
+  }, [canSeeDeptQueue, operatorEmployeeId, panelRefreshNonce, revision, finishCountLoading]);
 
   useEffect(() => {
     if (!canSeeAsResearchQueue || !operatorEmployeeId) return;
@@ -240,9 +257,10 @@ export function DesktopWarehouseView({
         setAsResearchQueueCount(count);
         asResearchQueueCountCache.set(operatorEmployeeId, count);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => { if (active) finishCountLoading("as-research-queue"); });
     return () => { active = false; };
-  }, [canSeeAsResearchQueue, operatorEmployeeId, panelRefreshNonce, revision]);
+  }, [canSeeAsResearchQueue, operatorEmployeeId, panelRefreshNonce, revision, finishCountLoading]);
 
   useEffect(() => {
     if (!canReceiveHandover || !operatorEmployeeId) return;
@@ -252,11 +270,12 @@ export function DesktopWarehouseView({
       .then(({ count }) => {
         if (active) setHandoverInboxCount(count);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => { if (active) finishCountLoading("handover"); });
     return () => {
       active = false;
     };
-  }, [canReceiveHandover, operatorEmployeeId, panelRefreshNonce, revision]);
+  }, [canReceiveHandover, operatorEmployeeId, panelRefreshNonce, revision, finishCountLoading]);
 
 
   function handleLegacyDraftContinue(_draft: StockRequest) {
@@ -319,6 +338,7 @@ export function DesktopWarehouseView({
               deptQueueCount={deptQueueCount}
               asResearchQueueCount={asResearchQueueCount}
               handoverInboxCount={handoverInboxCount}
+              loadingCounts={loadingCounts}
             />
           </div>
         )}

@@ -3,6 +3,11 @@ import { render, screen } from "@testing-library/react";
 import { WarehouseSectionTabs } from "../WarehouseSectionTabs";
 
 describe("WarehouseSectionTabs", () => {
+  it("keeps approval badges in place while their counts are pending", () => {
+    render(<WarehouseSectionTabs active="compose" onChange={vi.fn()} showQueue showDeptQueue loadingCounts={["queue", "dept-queue"]} />);
+    expect(screen.getAllByRole("status")).toHaveLength(2);
+    expect(screen.getByRole("tab", { name: /창고 승인함/ })).toHaveTextContent("창고 승인함");
+  });
   it("shows the renamed cart tab label", () => {
     render(
       <WarehouseSectionTabs

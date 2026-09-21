@@ -2,19 +2,13 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { MobileDashboardScreen } from "../MobileDashboardScreen";
 
+const inventoryState = vi.hoisted(() => ({ loading: false, items: [{ item_id: "item-1", item_name: "테스트 품목", quantity: 10, warehouse_qty: 10, locations: [], model_slots: [] }] }));
+const kpiProps = vi.hoisted(() => vi.fn());
+
 vi.mock("../../../_hooks/useInventoryData", () => ({
   useInventoryData: () => ({
-    items: [
-      {
-        item_id: "item-1",
-        item_name: "테스트 품목",
-        quantity: 10,
-        warehouse_qty: 10,
-        locations: [],
-        model_slots: [],
-      },
-    ],
-    loading: false,
+    items: inventoryState.items,
+    loading: inventoryState.loading,
     error: null,
     loadItems: vi.fn(),
   }),
@@ -38,7 +32,10 @@ vi.mock("../../../_hooks/useDesktopInventoryDerivations", () => ({
 }));
 
 vi.mock("../../../_inventory_sections/InventoryKpiPanel", () => ({
-  InventoryKpiPanel: () => <div data-testid="kpi-panel">전체 1</div>,
+  InventoryKpiPanel: (props: { loading?: boolean }) => {
+    kpiProps(props);
+    return <div data-testid="kpi-panel">전체 1</div>;
+  },
 }));
 
 vi.mock("../../../_inventory_sections/InventoryCapacityPanel", () => ({
@@ -77,6 +74,26 @@ vi.mock("../../../_inventory_sections/InventoryDetailPanel", () => ({
 }));
 
 describe("MobileDashboardScreen", () => {
+  it("최초 조회 중에는 KPI와 생산 가능 접이식 버튼 자리를 유지한다", () => {
+    inventoryState.loading = true;
+    inventoryState.items = [];
+
+    render(
+      <MobileDashboardScreen
+        globalSearch=""
+        onStatusChange={() => {}}
+        onGoToWarehouse={() => {}}
+        capacityLoading
+      />,
+    );
+
+    expect(kpiProps).toHaveBeenLastCalledWith(expect.objectContaining({ loading: true }));
+    expect(screen.getByRole("status", { name: "생산 가능 수량 불러오는 중" })).toBeInTheDocument();
+
+    inventoryState.loading = false;
+    inventoryState.items = [{ item_id: "item-1", item_name: "테스트 품목", quantity: 10, warehouse_qty: 10, locations: [], model_slots: [] }];
+  });
+
   it("does not repeat the total item count below search controls", () => {
     render(
       <MobileDashboardScreen

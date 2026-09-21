@@ -8,10 +8,21 @@ import type { IoBatch } from "@/lib/api/types/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { transactionColor } from "@/lib/mes-status";
-import { HistoryTable } from "../HistoryTable";
+import { HistoryTable, HistoryTableSkeleton } from "../HistoryTable";
 import type { HistorySelection } from "../historyConstants";
 import type { LogGroup } from "../historyTableHelpers";
 import * as historyHelpers from "../historyTableHelpers";
+
+it("reserves the timestamp toggle and stock quantity slots in loading rows", () => {
+  const { container } = render(<HistoryTableSkeleton />);
+  const row = container.querySelector("[data-history-loading-row]")!;
+  expect(row.querySelector("[data-history-loading-date] .w-5")).toBeInTheDocument();
+  expect(row.querySelector("[data-history-loading-date]")).toHaveClass("gap-1.5");
+  const stock = row.querySelector("[data-history-loading-stock]")!;
+  expect(stock).toBeInTheDocument();
+  expect(Array.from(stock.children).map((slot) => (slot as HTMLElement).style.width)).toEqual(["28px", "24px", "40px", "24px", "24px"]);
+  expect(row.children[4]).toHaveClass("px-1");
+});
 
 it("skips local grouping when the server supplies groups, including an empty page", () => {
   const build = vi.spyOn(historyHelpers, "buildGroups");
@@ -1005,6 +1016,7 @@ describe("HistoryTable hierarchy", () => {
     );
 
     expect(screen.getByRole("table", { name: "입출고 내역 불러오는 중" })).toBeInTheDocument();
+    expect(screen.getByLabelText("재고 변동 계산 기준")).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "작업" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "품목코드" })).toBeInTheDocument();
     const surface = screen.getByTestId("history-table-surface");

@@ -40,6 +40,7 @@ export function DesktopInventoryView({
   onGoToWarehouseTab,
   onSummaryChange,
   capacityData,
+  capacityLoading = false,
   onCapacityClick,
   canReceive,
 }: {
@@ -49,6 +50,7 @@ export function DesktopInventoryView({
   onGoToWarehouseTab?: () => void;
   onSummaryChange?: (s: { low: number; zero: number }) => void;
   capacityData?: ProductionCapacity | null;
+  capacityLoading?: boolean;
   onCapacityClick?: () => void;
   canReceive?: boolean;
 }) {
@@ -174,13 +176,14 @@ export function DesktopInventoryView({
             <InventoryKpiPanel
               cards={kpiCards}
               activeKey={kpi}
+              loading={loading && items.length === 0}
               onChange={(key) => {
                 if (key === "ALL") resetAllFilters();
                 else setKpi(key);
               }}
             />
             <div className="mt-3 flex items-stretch gap-2">
-              <InventoryCapacityPanel capacityData={capacityData} onClick={onCapacityClick} />
+              <InventoryCapacityPanel capacityData={capacityData} loading={capacityLoading} onClick={onCapacityClick} />
               <InventoryFilterToggleButton
                 filtersOpen={filtersOpen}
                 logic={filterLogic}

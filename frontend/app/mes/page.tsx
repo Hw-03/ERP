@@ -7,6 +7,7 @@ import { MesLoginGate } from "./_components/login/MesLoginGate";
 import { DepartmentsProvider } from "./_components/DepartmentsContext";
 import { AdminSessionProvider } from "@/lib/auth/admin-session";
 import { QueryProvider } from "@/lib/queries/client";
+import { MesViewportSkeleton } from "./_components/MesViewportSkeleton";
 
 export default function MesPage() {
   return (
@@ -68,7 +69,7 @@ function MesBody() {
     return () => mediaQuery.removeEventListener("change", handleViewportChange);
   }, []);
 
-  if (isDesktop === null) return null;
+  if (isDesktop === null) return <MesViewportSkeleton />;
 
   return (
     <>

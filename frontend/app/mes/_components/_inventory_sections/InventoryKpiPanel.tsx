@@ -10,9 +10,11 @@ type Props = {
   cards: KpiCardData[];
   activeKey: KpiFilter;
   onChange: (key: KpiFilter) => void;
+  loading?: boolean;
 };
 
-export function InventoryKpiPanel({ cards, activeKey, onChange }: Props) {
+export function InventoryKpiPanel({ cards, activeKey, onChange, loading = false }: Props) {
+
   return (
     <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
       {cards.map((card) => (
@@ -20,6 +22,7 @@ export function InventoryKpiPanel({ cards, activeKey, onChange }: Props) {
           key={card.key}
           label={card.label}
           value={formatQty(card.value)}
+          loading={loading}
           hint={card.hint}
           tone={card.tone}
           active={activeKey === card.key}

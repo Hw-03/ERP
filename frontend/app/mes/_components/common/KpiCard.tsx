@@ -14,10 +14,17 @@ interface Props {
   onClick?: () => void;
   compact?: boolean;
   headerCompact?: boolean;
+  loading?: boolean;
 }
 
-function KpiCardImpl({ label, value, unit, hint, tone, active = false, onClick, compact = false, headerCompact = false }: Props) {
+function KpiCardImpl({ label, value, unit, hint, tone, active = false, onClick, compact = false, headerCompact = false, loading = false }: Props) {
   const [hovered, setHovered] = useState(false);
+  const displayValue = loading ? (
+    <span className="relative inline-block" aria-label="집계 중" role="status">
+      <span className="invisible" aria-hidden="true">000</span>
+      <span aria-hidden="true" className="absolute inset-0 motion-safe:animate-pulse rounded" style={{ background: tint(tone, 18) }} />
+    </span>
+  ) : value;
 
   const bg = active
     ? tint(tone, 22)
@@ -38,7 +45,7 @@ function KpiCardImpl({ label, value, unit, hint, tone, active = false, onClick, 
         {label}
       </div>
       <div className="shrink-0 text-[24px] font-black leading-none" style={{ color: tone }}>
-        {value}
+        {displayValue}
         {unit && (
           <span className="ml-0.5 text-[12px] font-bold" style={{ opacity: 0.7 }}>
             {unit}
@@ -68,7 +75,7 @@ function KpiCardImpl({ label, value, unit, hint, tone, active = false, onClick, 
         className="-mt-1 shrink-0 text-[32px] font-black leading-none"
         style={{ color: tone }}
       >
-        {value}
+        {displayValue}
         {unit && (
           <span className="ml-0.5 text-[15px] font-bold" style={{ opacity: 0.7 }}>
             {unit}
@@ -83,7 +90,7 @@ function KpiCardImpl({ label, value, unit, hint, tone, active = false, onClick, 
           {label}
         </div>
         <div className="text-[32px] font-black leading-none" style={{ color: tone }}>
-          {value}
+          {displayValue}
           {unit && (
             <span className="ml-0.5 text-[15px] font-bold" style={{ opacity: 0.7 }}>
               {unit}
@@ -107,6 +114,8 @@ function KpiCardImpl({ label, value, unit, hint, tone, active = false, onClick, 
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         aria-pressed={active}
+        aria-busy={loading || undefined}
+        disabled={loading}
         className={`${boxCls} text-left transition-colors hover:brightness-110`}
         style={{ background: bg, borderColor: border }}
       >

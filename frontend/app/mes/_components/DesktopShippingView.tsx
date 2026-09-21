@@ -348,7 +348,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
       : "출하 데이터를 불러오지 못했습니다."
     : null;
   const error = mutationError ?? readError;
-  const loading = shippingRequestsQuery.isLoading;
+  const loading = shippingRequestsQuery.isLoading || shippingRequestsQuery.isPlaceholderData;
   const [itemsLoading, setItemsLoading] = useState(false);
   const [pfItemsLoading, setPfItemsLoading] = useState(false);
   const [pfItemsLoaded, setPfItemsLoaded] = useState(false);
@@ -1639,13 +1639,14 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     };
 
     if (view === "hub") {
-      return <ShippingHubEntry counts={counts} onOpen={openSection} />;
+      return <ShippingHubEntry counts={counts} onOpen={openSection} loading={loading} />;
     }
 
     if (view === "requestList") {
       const entry = (
         <RequestListEntry
           requests={activeRequests}
+          loading={loading}
           onBack={() => navigateView("hub")}
           onNew={clearDraft}
           onOpen={(req) => loadRequestIntoDraft(req, "requestDetail")}
@@ -1849,14 +1850,6 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     );
   }
 
-  if (loading) {
-    return (
-      <div className="flex h-full min-h-0 flex-1 items-center justify-center px-6">
-        <div className="w-full"><ReadLoading label="출하 데이터를 불러오는 중입니다." variant="card" /></div>
-      </div>
-    );
-  }
-
   const usesExternalRootRail = view === "requestDetail" || view === "historyList" || view === "historyWork";
   const rootContent = (
     <>
@@ -1923,6 +1916,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   );
 }
 
+
 function ViewHeader({ title, subtitle, onBack, right, dataTestId }: { title: string; subtitle?: string; onBack: () => void; right?: ReactNode; dataTestId?: string }) {
   return (
     <div data-testid={dataTestId} className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-[18px] border px-4 py-3" style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}>
@@ -1947,9 +1941,9 @@ function ViewHeader({ title, subtitle, onBack, right, dataTestId }: { title: str
 }
 
 
-function ShippingHubEntry({ counts, onOpen }: { counts: Record<SectionTab, number>; onOpen: (section: SectionTab) => void }) {
+function ShippingHubEntry({ counts, onOpen, loading = false }: { counts: Record<SectionTab, number>; onOpen: (section: SectionTab) => void; loading?: boolean }) {
   return (
-    <div className="grid h-full min-h-0 flex-1 gap-3 xl:grid-cols-2">
+    <div className="grid h-full min-h-0 flex-1 gap-3 xl:grid-cols-2" role={loading ? "status" : undefined} aria-busy={loading || undefined} aria-label={loading ? "출하 데이터를 불러오는 중입니다" : undefined}>
       <DesktopWorkHubCard
         shippingHubCardId="request"
         icon={ClipboardList}
@@ -1958,7 +1952,7 @@ function ShippingHubEntry({ counts, onOpen }: { counts: Record<SectionTab, numbe
         tone={LEGACY_COLORS.blue}
         onClick={() => onOpen("request")}
         className="min-h-[360px]"
-        meta={<span data-testid="shipping-hub-count-request" className="flex min-h-12 min-w-12 shrink-0 items-center justify-center rounded-full px-4 text-lg font-black" style={{ background: tint(LEGACY_COLORS.blue, 18), color: LEGACY_COLORS.blue }}>{counts.request}</span>}
+        meta={<span data-testid="shipping-hub-count-request" className="flex min-h-12 min-w-12 shrink-0 items-center justify-center rounded-full px-4 text-lg font-black" style={{ background: tint(LEGACY_COLORS.blue, 18), color: LEGACY_COLORS.blue }}>{loading ? <span className="h-6 w-4 motion-safe:animate-pulse rounded" style={{ background: tint(LEGACY_COLORS.blue, 25) }} /> : counts.request}</span>}
       />
       <DesktopWorkHubCard
         shippingHubCardId="history"
@@ -1968,13 +1962,13 @@ function ShippingHubEntry({ counts, onOpen }: { counts: Record<SectionTab, numbe
         tone={LEGACY_COLORS.purple}
         onClick={() => onOpen("history")}
         className="min-h-[360px]"
-        meta={<span data-testid="shipping-hub-count-history" className="flex min-h-12 min-w-12 shrink-0 items-center justify-center rounded-full px-4 text-lg font-black" style={{ background: tint(LEGACY_COLORS.purple, 18), color: LEGACY_COLORS.purple }}>{counts.history}</span>}
+        meta={<span data-testid="shipping-hub-count-history" className="flex min-h-12 min-w-12 shrink-0 items-center justify-center rounded-full px-4 text-lg font-black" style={{ background: tint(LEGACY_COLORS.purple, 18), color: LEGACY_COLORS.purple }}>{loading ? <span className="h-6 w-4 motion-safe:animate-pulse rounded" style={{ background: tint(LEGACY_COLORS.purple, 25) }} /> : counts.history}</span>}
       />
     </div>
   );
 }
 
-function RequestListEntry({ requests, onBack, onNew, onOpen }: { requests: ShippingRequest[]; onBack: () => void; onNew: () => void; onOpen: (request: ShippingRequest) => void }) {
+function RequestListEntry({ requests, onBack, onNew, onOpen, loading = false }: { requests: ShippingRequest[]; onBack: () => void; onNew: () => void; onOpen: (request: ShippingRequest) => void; loading?: boolean }) {
   const groups: Array<{ status: ShippingRequestStatus; label: string }> = [
     { status: "PREPARING", label: "준비 중" },
     { status: "PREPARED", label: "준비 완료" },
@@ -2008,10 +2002,15 @@ function RequestListEntry({ requests, onBack, onNew, onOpen }: { requests: Shipp
               key={group.status}
               icon={ClipboardList}
               title={group.label}
-              subtitle={`${rows.length}건`}
+              subtitle={loading ? <span className="inline-block h-3 w-8 rounded motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s3 }} /> : `${rows.length}건`}
               bodyDataTestId={`shipping-request-column-body-${group.status}`}
             >
-              {rows.length === 0 ? (
+              {loading ? (
+                <div role="status" aria-label={`${group.label} 출하 요청 불러오는 중`} className="min-h-[136px] rounded-[14px] border px-4 py-6" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                  <div className="h-5 w-2/3 rounded motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s3 }} />
+                  <div className="mt-3 h-4 w-1/2 rounded motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s3 }} />
+                </div>
+              ) : rows.length === 0 ? (
                 <EmptyState title={`${group.label} 없음`} body="표시할 출하 요청이 없습니다." />
               ) : (
                 rows.map((request) => <RequestRow key={request.request_id} request={request} active={false} layout="requestBoard" onClick={() => onOpen(request)} />)
@@ -4217,7 +4216,7 @@ function Panel({ children, dataTestId, className }: { children: ReactNode; dataT
   );
 }
 
-function PanelTitle({ icon: Icon, title, subtitle }: { icon: typeof PackageCheck; title: string; subtitle?: string }) {
+function PanelTitle({ icon: Icon, title, subtitle }: { icon: typeof PackageCheck; title: string; subtitle?: ReactNode }) {
   return (
     <div className={SHIPPING_ROW_CLASS}>
       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]" style={{ background: tint(LEGACY_COLORS.blue, 14), color: LEGACY_COLORS.blue }}>
@@ -4507,7 +4506,7 @@ function ExternalRailFrame({ dataTestId, radiusClass = "rounded-[14px]", cornerR
   );
 }
 
-function ListColumn({ icon: Icon, title, subtitle, children, bodyDataTestId, action }: { icon: typeof PackageCheck; title: string; subtitle: string; children: ReactNode; bodyDataTestId?: string; action?: ReactNode }) {
+function ListColumn({ icon: Icon, title, subtitle, children, bodyDataTestId, action }: { icon: typeof PackageCheck; title: string; subtitle: ReactNode; children: ReactNode; bodyDataTestId?: string; action?: ReactNode }) {
   return (
     <section className="flex h-full min-h-0 min-w-0 flex-col rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
       <div className="flex min-w-0 items-center justify-between gap-3">
