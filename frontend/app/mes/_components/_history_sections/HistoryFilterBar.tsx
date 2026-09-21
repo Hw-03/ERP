@@ -53,7 +53,7 @@ export function HistoryFilterBar({
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="품명 · 코드 · 담당자 · 메모"
+            placeholder="작업 · 품명 · 코드 · 담당자 · 메모"
             className="h-11 flex-1 bg-transparent text-sm outline-none lg:h-auto"
             style={{ color: LEGACY_COLORS.text }}
           />

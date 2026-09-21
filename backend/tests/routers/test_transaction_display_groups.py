@@ -299,6 +299,115 @@ def test_display_groups_search_ignores_spaces_and_separators(client, db_session,
     assert [row["log_id"] for group in response.json()["groups"] for row in group["logs"]] == [str(log.log_id)]
 
 
+@pytest.mark.parametrize(
+    ("search", "transaction_type", "log_fields"),
+    [
+        ("원자재입고", TransactionTypeEnum.RECEIVE, {}),
+        ("출하준비", TransactionTypeEnum.SHIP, {"shipping_phase": "PREPARE"}),
+        ("불량정상복귀", TransactionTypeEnum.UNMARK_DEFECTIVE, {}),
+        ("AS사용", TransactionTypeEnum.INTERNAL_USE, {"department": "AS"}),
+        (
+            "부서위치조정",
+            TransactionTypeEnum.TRANSFER_DEPT,
+            {"reference_no": "DEPT-CORRECTION-SEARCH-01"},
+        ),
+        (
+            "재작업",
+            TransactionTypeEnum.DEFECT_SCRAP,
+            {"reference_no": "defect-disassemble:search-01"},
+        ),
+    ],
+)
+def test_transaction_search_matches_visible_operation_labels(
+    client,
+    db_session,
+    make_item,
+    search,
+    transaction_type,
+    log_fields,
+):
+    item = make_item(name="작업명 검색 대상")
+    log = _add_log(
+        db_session,
+        item,
+        created_at=datetime(2026, 9, 10, 12, 0),
+        transaction_type=transaction_type,
+        **log_fields,
+    )
+    db_session.commit()
+
+    response = client.get("/api/inventory/transactions", params={"search": search})
+
+    assert response.status_code == 200, response.text
+    assert [row["log_id"] for row in response.json()] == [str(log.log_id)]
+
+
+def test_display_group_search_by_visible_batch_label_keeps_complete_group(
+    client,
+    db_session,
+    make_item,
+):
+    result = make_item(name="배치 결과품")
+    component = make_item(name="배치 구성품")
+    batch = _add_batch(db_session, "visible-operation-label")
+    produced = _add_log(
+        db_session,
+        result,
+        created_at=datetime(2026, 9, 10, 12, 0),
+        operation_batch_id=batch.batch_id,
+        transaction_type=TransactionTypeEnum.PRODUCE,
+    )
+    consumed = _add_log(
+        db_session,
+        component,
+        created_at=datetime(2026, 9, 10, 11, 59),
+        operation_batch_id=batch.batch_id,
+        transaction_type=TransactionTypeEnum.BACKFLUSH,
+    )
+    db_session.commit()
+
+    response = client.get(
+        "/api/inventory/transactions/display-groups",
+        params={"search": "생산입고"},
+    )
+
+    assert response.status_code == 200, response.text
+    groups = response.json()["groups"]
+    assert len(groups) == 1
+    assert {row["log_id"] for row in groups[0]["logs"]} == {
+        str(produced.log_id),
+        str(consumed.log_id),
+    }
+    assert groups[0]["matched_log_ids"] == [str(produced.log_id)]
+
+
+def test_transaction_search_matches_visible_cancellation_label(client, db_session, make_item):
+    item = make_item(name="취소 작업명 검색 대상")
+    operation = InventoryOperation(
+        kind="CANCELLATION",
+        domain="defect_inventory",
+        action="supplier_return",
+        display_label="공급사 반품 취소",
+        actor_name="테스트 작업자",
+        effective_at=datetime(2026, 9, 10, 12, 0),
+    )
+    db_session.add(operation)
+    db_session.flush()
+    log = _add_log(
+        db_session,
+        item,
+        created_at=datetime(2026, 9, 10, 12, 0),
+        transaction_type=TransactionTypeEnum.SUPPLIER_RETURN,
+    )
+    log.operation_id = operation.operation_id
+    db_session.commit()
+
+    response = client.get("/api/inventory/transactions", params={"search": "반품취소"})
+
+    assert response.status_code == 200, response.text
+    assert [row["log_id"] for row in response.json()] == [str(log.log_id)]
+
+
 def test_reference_summaries_search_ignores_spaces_and_separators(client, db_session, make_item):
     item = make_item(name="Reference- Summary/01")
     other = make_item(name="Other reference summary")

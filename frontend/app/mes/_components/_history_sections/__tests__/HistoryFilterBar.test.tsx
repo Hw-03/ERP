@@ -24,6 +24,12 @@ function renderFilterBar(flatSurface?: boolean) {
 }
 
 describe("HistoryFilterBar", () => {
+  it("describes visible operation labels as a search target", () => {
+    renderFilterBar();
+
+    expect(screen.getByPlaceholderText("작업 · 품명 · 코드 · 담당자 · 메모")).toBeInTheDocument();
+  });
+
   it("keeps the mobile-default card surface when flatSurface is omitted", () => {
     renderFilterBar();
 

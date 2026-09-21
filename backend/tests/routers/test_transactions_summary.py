@@ -586,6 +586,56 @@ def test_summary_search_ignores_spaces_and_separators(client, db_session, make_i
     assert response.json()["total"] == 1
 
 
+def test_visible_operation_label_search_is_shared_by_history_endpoints(
+    client,
+    db_session,
+    make_item,
+):
+    matching = make_item(name="공통 작업명 검색 대상")
+    other = make_item(name="비교 거래 대상")
+    _seed_log(
+        db_session,
+        matching,
+        TransactionTypeEnum.RECEIVE,
+        Decimal("1"),
+        notes="일반 메모",
+    )
+    _seed_log(
+        db_session,
+        other,
+        TransactionTypeEnum.SHIP,
+        Decimal("-1"),
+        notes="다른 메모",
+    )
+    db_session.flush()
+    matching_log = (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.item_id == matching.item_id)
+        .one()
+    )
+    matching_log.reference_no = "VISIBLE-LABEL-REF"
+    db_session.commit()
+
+    params = {"search": "원자재입고"}
+    list_response = client.get("/api/inventory/transactions", params=params)
+    groups_response = client.get("/api/inventory/transactions/display-groups", params=params)
+    references_response = client.get("/api/inventory/transactions/reference-summaries", params=params)
+    summary_response = client.get("/api/inventory/transactions/summary", params=params)
+
+    assert list_response.status_code == 200, list_response.text
+    assert [row["log_id"] for row in list_response.json()] == [str(matching_log.log_id)]
+    assert groups_response.status_code == 200, groups_response.text
+    assert [
+        row["log_id"]
+        for group in groups_response.json()["groups"]
+        for row in group["logs"]
+    ] == [str(matching_log.log_id)]
+    assert references_response.status_code == 200, references_response.text
+    assert [row["reference_no"] for row in references_response.json()] == ["VISIBLE-LABEL-REF"]
+    assert summary_response.status_code == 200, summary_response.text
+    assert summary_response.json()["total"] == 1
+
+
 def test_summary_transaction_types_filter(client, db_session, make_item):
     """transaction_types 쉼표 필터 — 지정된 타입만 카운트."""
     item = make_item(name="타입필터품", warehouse_qty=Decimal("0"))

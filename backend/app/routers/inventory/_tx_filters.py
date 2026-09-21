@@ -12,7 +12,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from typing import NamedTuple, Optional
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import ColumnElement, and_, case, false, func, not_, or_, select
+from sqlalchemy import ColumnElement, and_, case, false, func, literal, not_, or_, select
 from sqlalchemy.orm import Query, Session
 
 from app.models import (
@@ -468,12 +468,119 @@ def _history_search_filter(search: Optional[str]) -> Optional[ColumnElement[bool
     """목록과 묶음 내 검색 일치 여부에 동일한 정규화 조건을 사용한다."""
     return build_normalized_search_filter(
         search,
+        _history_list_operation_label_expr(),
         Item.item_name,
         Item.mes_code,
         TransactionLog.reference_no,
         TransactionLog.notes,
         TransactionLog.produced_by,
         IoBatch.requester_name,
+    )
+
+
+def _history_list_operation_label_expr() -> ColumnElement[str]:
+    """입출고 내역 목록의 ``작업`` 배지와 같은 검색용 라벨을 만든다.
+
+    프런트 ``getHistoryListOperationLabel``의 우선순위를 SQL로 옮긴 표현식이다.
+    목록·묶음·요약이 페이지네이션 전에 같은 작업명 검색을 적용하도록 한다.
+    """
+    operation_kind = (
+        select(InventoryOperation.kind)
+        .where(InventoryOperation.operation_id == TransactionLog.operation_id)
+        .correlate(TransactionLog)
+        .scalar_subquery()
+    )
+
+    destination = func.coalesce(
+        func.nullif(func.trim(IoBatch.to_department), ""),
+        func.nullif(func.trim(TransactionLog.department), ""),
+    )
+    internal_use_label = case(
+        (destination == "AS", "AS 사용"),
+        (destination.in_(("연구", "연구소")), "연구소 사용"),
+        else_="AS·연구 사용",
+    )
+    batch_label = case(
+        (
+            and_(
+                TransactionLog.transaction_type == TransactionTypeEnum.RECEIVE,
+                IoBatch.sub_type == "receive_supplier",
+            ),
+            "원자재 입고",
+        ),
+        (IoBatch.work_type == "internal_use", internal_use_label),
+        (IoBatch.sub_type == "disassemble", "분해 출고"),
+        (
+            TransactionLog.transaction_type == TransactionTypeEnum.PRODUCE,
+            "생산 입고",
+        ),
+        (IoBatch.work_type == "warehouse_adjust", "창고 수량 조정"),
+        (IoBatch.work_type == "receive", "원자재 입고"),
+        (IoBatch.work_type == "warehouse_io", "창고 입출고"),
+        (IoBatch.work_type == "process", "부서 입출고"),
+        (IoBatch.work_type == "defect", "불량"),
+        else_=IoBatch.work_type,
+    )
+    plain_label = case(
+        (TransactionLog.transaction_type == TransactionTypeEnum.RECEIVE, "원자재 입고"),
+        (
+            TransactionLog.transaction_type.in_(
+                (TransactionTypeEnum.TRANSFER_TO_PROD, TransactionTypeEnum.TRANSFER_TO_WH)
+            ),
+            "창고 입출고",
+        ),
+        (TransactionLog.transaction_type == TransactionTypeEnum.PRODUCE, "생산 입고"),
+        (
+            TransactionLog.transaction_type.in_(
+                (
+                    TransactionTypeEnum.DISASSEMBLE,
+                    TransactionTypeEnum.BACKFLUSH,
+                    TransactionTypeEnum.TRANSFER_DEPT,
+                )
+            ),
+            "부서 입출고",
+        ),
+        (
+            TransactionLog.transaction_type == TransactionTypeEnum.ADJUST,
+            case(
+                (TransactionLog.department == "창고", "창고 수량 조정"),
+                else_="부서 입출고",
+            ),
+        ),
+        (
+            TransactionLog.transaction_type.in_(
+                (TransactionTypeEnum.MARK_DEFECTIVE, TransactionTypeEnum.DEFECT_SCRAP)
+            ),
+            "불량",
+        ),
+        (TransactionLog.transaction_type == TransactionTypeEnum.SHIP, "출하"),
+        (TransactionLog.transaction_type == TransactionTypeEnum.INTERNAL_USE, internal_use_label),
+        else_=TransactionLog.transaction_type,
+    )
+    department_correction = and_(
+        TransactionLog.transaction_type == TransactionTypeEnum.TRANSFER_DEPT,
+        TransactionLog.reference_no.like("DEPT-CORRECTION-%"),
+    )
+    base_label = case(
+        (department_correction, "부서 위치 조정"),
+        (TransactionLog.transaction_type == TransactionTypeEnum.UNMARK_DEFECTIVE, "불량 정상 복귀"),
+        (TransactionLog.transaction_type == TransactionTypeEnum.SUPPLIER_RETURN, "반품"),
+        (
+            TransactionLog.reference_no.like(f"{LEGACY_DEFECT_REWORK_REFERENCE_PREFIX}%"),
+            "재작업",
+        ),
+        (TransactionLog.shipping_phase == "COMPONENT_CHANGE", "품목 전환"),
+        (TransactionLog.shipping_phase == "PREPARE", "출하 준비"),
+        (TransactionLog.shipping_phase == "PICKUP", "출하"),
+        (IoBatch.batch_id.isnot(None), batch_label),
+        else_=plain_label,
+    )
+    return case(
+        (
+            operation_kind == InventoryOperationKindEnum.CANCELLATION,
+            base_label + literal(" 취소"),
+        ),
+        else_=base_label,
     )
 
 
