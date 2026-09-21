@@ -8,6 +8,8 @@ const mockDraftData = vi.hoisted(() => ({
   ioDrafts: [] as unknown[],
 }));
 const mockFailure = vi.hoisted(() => ({ error: null as Error | null, refetch: vi.fn() }));
+const mockDeleteIoDraft = vi.hoisted(() => vi.fn());
+const mockDeleteStockRequestDraft = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/queries/useDraftCartQuery", () => ({
   useDraftCartQuery: () => ({
@@ -16,8 +18,8 @@ vi.mock("@/lib/queries/useDraftCartQuery", () => ({
     error: mockFailure.error,
     refetch: mockFailure.refetch,
   }),
-  useDeleteIoDraftMutation: () => ({ mutate: vi.fn() }),
-  useDeleteStockRequestDraftMutation: () => ({ mutate: vi.fn() }),
+  useDeleteIoDraftMutation: () => ({ mutate: mockDeleteIoDraft }),
+  useDeleteStockRequestDraftMutation: () => ({ mutate: mockDeleteStockRequestDraft }),
 }));
 
 function makeIoDraft(): IoBatch {
@@ -52,6 +54,8 @@ describe("DraftCartPanel empty state", () => {
     mockDraftData.ioDrafts = [];
     mockFailure.error = null;
     mockFailure.refetch.mockClear();
+    mockDeleteIoDraft.mockClear();
+    mockDeleteStockRequestDraft.mockClear();
   });
 
   it("preserves successful empty drafts when refresh fails", () => {
@@ -101,5 +105,27 @@ describe("DraftCartPanel empty state", () => {
     rerender(<DraftCartPanel {...commonProps} layout="mobile" />);
     expect(screen.queryByRole("columnheader", { name: "예정 변동" })).not.toBeInTheDocument();
     expect(screen.getByLabelText("작업 카드: 부서 입출고, 출고 · BOM")).toBeInTheDocument();
+  });
+
+  it("locks the confirmation after the first delete request", () => {
+    mockDraftData.ioDrafts = [makeIoDraft()];
+    render(
+      <DraftCartPanel
+        layout="desktop"
+        employeeId="emp-1"
+        refreshNonce={0}
+        onContinue={vi.fn()}
+        onChanged={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "작업 삭제" }));
+    const confirmButton = screen.getByRole("button", { name: "삭제" });
+    fireEvent.click(confirmButton);
+    fireEvent.click(confirmButton);
+    fireEvent.keyDown(window, { key: "Enter" });
+
+    expect(mockDeleteIoDraft).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "삭제 중..." })).toBeDisabled();
   });
 });

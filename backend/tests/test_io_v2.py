@@ -371,6 +371,56 @@ def test_legacy_shipping_linked_draft_is_readable_but_cannot_be_updated_submitte
     assert db_session.query(TransactionLog).count() == 0
 
 
+def test_delete_io_draft_is_idempotent(client, db_session):
+    requester = _make_employee(db_session, code="DELETE-DRAFT")
+    batch = IoBatch(
+        work_type="process",
+        sub_type="produce",
+        status="draft",
+        requester_employee_id=requester.employee_id,
+        requester_name=requester.name,
+        requester_department=requester.department,
+    )
+    db_session.add(batch)
+    db_session.commit()
+
+    params = {"requester_employee_id": str(requester.employee_id)}
+    first = client.delete(f"/api/io/draft/{batch.batch_id}", params=params)
+    repeated = client.delete(f"/api/io/draft/{batch.batch_id}", params=params)
+
+    assert first.status_code == 204
+    assert repeated.status_code == 204
+
+
+def test_delete_io_draft_preserves_owner_and_status_guards(client, db_session):
+    owner = _make_employee(db_session, code="DELETE-OWNER")
+    intruder = _make_employee(db_session, code="DELETE-INTRUDER")
+    batch = IoBatch(
+        work_type="process",
+        sub_type="produce",
+        status="draft",
+        requester_employee_id=owner.employee_id,
+        requester_name=owner.name,
+        requester_department=owner.department,
+    )
+    db_session.add(batch)
+    db_session.commit()
+
+    forbidden = client.delete(
+        f"/api/io/draft/{batch.batch_id}",
+        params={"requester_employee_id": str(intruder.employee_id)},
+    )
+    assert forbidden.status_code == 403
+
+    batch.status = "completed"
+    db_session.commit()
+    not_draft = client.delete(
+        f"/api/io/draft/{batch.batch_id}",
+        params={"requester_employee_id": str(owner.employee_id)},
+    )
+    assert not_draft.status_code == 422
+
+
 @pytest.mark.parametrize(
     ("path", "method"),
     [("/api/io/draft", "put"), ("/api/io/submit", "post")],

@@ -79,7 +79,7 @@ export function DraftCartPanel({
   }, [drafts.length, ioDrafts.length]);
 
   const handleDeleteConfirm = () => {
-    if (!employeeId || !deleteTarget) return;
+    if (!employeeId || !deleteTarget || busyId) return;
     const targetId =
       deleteTarget.kind === "stock"
         ? deleteTarget.draft.request_id
@@ -178,6 +178,8 @@ export function DraftCartPanel({
         title="작업 삭제"
         tone="danger"
         confirmLabel="삭제"
+        busy={busyId !== null}
+        busyLabel="삭제 중..."
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDeleteConfirm}
       >

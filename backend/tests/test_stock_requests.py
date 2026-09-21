@@ -1184,6 +1184,12 @@ def test_delete_draft_removes_row_and_lines_no_pending_change(
     )
     assert res.status_code == 204
 
+    repeated = client.delete(
+        f"/api/stock-requests/draft/{request_id}"
+        f"?requester_employee_id={requester.employee_id}"
+    )
+    assert repeated.status_code == 204
+
     db_session.expire_all()
     request_uuid = uuid.UUID(request_id)
     assert (

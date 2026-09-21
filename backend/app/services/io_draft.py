@@ -210,9 +210,10 @@ def list_drafts(db: Session, *, requester_employee_id: uuid.UUID) -> list[dict]:
 
 
 def delete_draft(db: Session, *, batch_id: uuid.UUID, requester_employee_id: uuid.UUID) -> None:
+    """임시저장을 삭제하며, 이미 없는 대상은 성공한 재시도로 간주한다."""
     batch = db.query(IoBatch).filter(IoBatch.batch_id == batch_id).first()
     if batch is None:
-        raise ValueError("임시저장 작업을 찾을 수 없습니다.")
+        return
     if batch.requester_employee_id != requester_employee_id:
         raise PermissionError("본인 임시저장 작업만 삭제할 수 있습니다.")
     if batch.status != "draft":

@@ -166,12 +166,12 @@ def delete_draft_request(
     request_id: uuid.UUID,
     requester_employee_id: uuid.UUID,
 ) -> None:
-    """DRAFT 삭제. cascade 의존하지 않고 lines 명시 삭제 후 request 삭제."""
+    """DRAFT를 삭제하며, 이미 없는 대상은 성공한 재시도로 간주한다."""
     request = (
         db.query(StockRequest).filter(StockRequest.request_id == request_id).first()
     )
     if request is None:
-        raise ValueError("장바구니를 찾을 수 없습니다.")
+        return
     if request.requester_employee_id != requester_employee_id:
         raise PermissionError("본인 장바구니만 삭제할 수 있습니다.")
     if request.status != StockRequestStatusEnum.DRAFT:
