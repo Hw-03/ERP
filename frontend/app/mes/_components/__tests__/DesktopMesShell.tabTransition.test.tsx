@@ -1,5 +1,7 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { Suspense, type ReactNode } from "react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { Suspense, useState, type ReactNode } from "react";
+import { useDesktopTabHome } from "../DesktopTabHome";
+import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DesktopMesShell } from "../DesktopMesShell";
@@ -36,11 +38,6 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams("tab=history"),
 }));
 
-vi.mock("@/lib/ui/dirty-guard", () => ({
-  DirtyGuardProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
-  useConfirmNavigation: () => (next: () => void) => next(),
-  useFlushDirtyEntries: () => async () => {},
-}));
 
 vi.mock("@/lib/queries/useProductionQuery", () => ({
   useProductionCapacityQuery: () => ({ data: null, isLoading: true, refetch: vi.fn() }),
@@ -123,23 +120,73 @@ it("updates the selected menu and header before a slow destination renders", () 
     slowDashboard.pending = false;
   }
 });
+
+it("keeps the dashboard filter controls visible while the screen is preparing", () => {
+  window.history.replaceState(null, "", "/mes?tab=history");
+  render(<Suspense fallback={<div>root loading</div>}><DesktopMesShell /></Suspense>);
+  slowDashboard.pending = true;
+  try {
+    fireEvent.click(screen.getByRole("button", { name: "dashboard", exact: true }));
+
+    expect(screen.getByRole("status", { name: "대시보드 화면을 불러오는 중입니다" })).toBeInTheDocument();
+    const kpiButtons = screen.getAllByRole("status", { name: "집계 중" }).map((status) => status.closest("button"));
+    expect(kpiButtons).toHaveLength(4);
+    expect(kpiButtons.map((button) => button?.textContent)).toEqual(expect.arrayContaining([
+      expect.stringContaining("전체"),
+      expect.stringContaining("정상"),
+      expect.stringContaining("부족"),
+      expect.stringContaining("품절"),
+    ]));
+    expect(screen.getByRole("textbox", { name: "자재 검색" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "필터", exact: true })).toBeDisabled();
+  } finally {
+    slowDashboard.pending = false;
+  }
+});
+
+it("does not animate the dashboard skeleton before the real screen is ready", () => {
+  window.history.replaceState(null, "", "/mes?tab=history");
+  render(<Suspense fallback={<div>root loading</div>}><DesktopMesShell /></Suspense>);
+  slowDashboard.pending = true;
+  try {
+    fireEvent.click(screen.getByRole("button", { name: "dashboard", exact: true }));
+
+    expect(screen.getByRole("status", { name: "대시보드 화면을 불러오는 중입니다" })).toBeInTheDocument();
+    expect(screen.getByTestId("desktop-tab-transition")).not.toHaveClass("animate-desktop-tab-enter");
+  } finally {
+    slowDashboard.pending = false;
+  }
+});
 vi.mock("../DesktopWarehouseView", () => ({
-  DesktopWarehouseView: ({ onSubmitSuccess }: { onSubmitSuccess?: () => void }) => (
+  DesktopWarehouseView: ({ onSubmitSuccess }: { onSubmitSuccess?: () => void }) => {
+    const [home, setHome] = useState(true);
+    const [draft, setDraft] = useState("");
+    useRegisterDirty("warehouse-test", !!draft, () => {}, undefined, { mode: "confirm-only" });
+    useDesktopTabHome("warehouse-test", { isHome: home, returnHome: () => { setHome(true); setDraft(""); } });
+    return (
     <main>
+      <input aria-label="테스트 작업 입력" value={draft} onChange={(event) => setDraft(event.target.value)} />
+      <span>{home ? "warehouse home" : "warehouse detail"}</span>
+      <button onClick={() => setHome(false)}>warehouse detail entry</button>
       <button type="button" onClick={() => onSubmitSuccess?.()}>warehouse submit</button>
     </main>
-  ),
+    );
+  },
 }));
 vi.mock("../DesktopShippingView", () => ({
   DesktopShippingView: (props: Record<string, unknown>) => {
+    const [home, setHome] = useState(true);
+    useDesktopTabHome("shipping-test", { isHome: home, returnHome: () => setHome(true) });
     shippingViewProps(props);
-    return <main>shipping content</main>;
+    return <main>shipping content<button onClick={() => setHome(false)}>shipping detail entry</button></main>;
   },
 }));
 vi.mock("../DesktopDefectView", () => ({
   DesktopDefectView: () => {
-    defectViewStates(window.history.state?.defect ?? null);
-    return <main>defect content</main>;
+    const [view, setView] = useState(window.history.state?.defect ?? "hub");
+    useDesktopTabHome("defect-test", { isHome: view === "hub", returnHome: () => setView("hub") });
+    defectViewStates(view);
+    return <main>defect content<button onClick={() => setView("list")}>defect detail entry</button></main>;
   },
 }));
 vi.mock("../DesktopHistoryView", () => ({ DesktopHistoryView: () => {
@@ -158,7 +205,11 @@ it("keeps summary card details while the history screen is preparing", () => {
     expect(screen.getByText("창고 재고가 움직인 작업")).toBeInTheDocument();
     expect(screen.getByText("부서 재고가 움직인 작업")).toBeInTheDocument();
     expect(screen.getByText("재고 수량을 직접 조정한 거래")).toBeInTheDocument();
-    expect(screen.getAllByLabelText("집계 중")).toHaveLength(5);
+    expect(screen.getAllByLabelText("집계 중")).toHaveLength(4);
+    expect(screen.getByPlaceholderText("작업 · 품명 · 코드 · 담당자 · 메모")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "전체", exact: true })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "필터", exact: true })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "달력", exact: true })).toBeDisabled();
   } finally {
     slowHistory.pending = false;
   }
@@ -187,7 +238,11 @@ vi.mock("../DesktopAdminView", async () => {
     },
   };
 });
-vi.mock("../DesktopWarehouseMapTab", () => ({ DesktopWarehouseMapTab: () => <main>warehouse map content</main> }));
+vi.mock("../DesktopWarehouseMapTab", () => ({ DesktopWarehouseMapTab: () => {
+  const [detail, setDetail] = useState(false);
+  useDesktopTabHome("map-test", { isHome: !detail, returnHome: () => setDetail(false) });
+  return <main>warehouse map content<button onClick={() => setDetail(true)}>map detail entry</button></main>;
+} }));
 vi.mock("../CapacityDetailModal", () => ({ CapacityDetailModal: () => <div /> }));
 vi.mock("../_weekly_sections/WeeklyWeekPicker", () => ({
   WeeklyWeekPicker: () => <div />,
@@ -198,6 +253,7 @@ describe("DesktopMesShell tab transition", () => {
   const originalStartViewTransition = document.startViewTransition;
 
   beforeEach(() => {
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: false })));
     window.history.replaceState({}, "", "/mes?tab=history");
     routerPush.mockClear();
     routerReplace.mockClear();
@@ -211,11 +267,107 @@ describe("DesktopMesShell tab transition", () => {
 
   afterEach(() => {
     document.startViewTransition = originalStartViewTransition;
+    vi.unstubAllGlobals();
   });
 
   it("전역 검색 진입점을 표시하지 않는다", () => {
     render(<DesktopMesShell />);
     expect(screen.getByTestId("desktop-topbar-actions")).toBeEmptyDOMElement();
+  });
+
+  it("실제 경고 취소는 URL과 입력을 유지하고 폐기 복귀에만 한 번 모션을 재생한다", () => {
+    const animate = vi.fn(() => ({ cancel: vi.fn() }));
+    render(<DesktopMesShell />);
+    const menu = screen.getByRole("button", { name: "warehouse", exact: true });
+    fireEvent.click(menu);
+    const body = screen.getByTestId("desktop-tab-transition");
+    Object.defineProperty(body, "animate", { value: animate });
+    fireEvent.click(screen.getByText("warehouse detail entry"));
+    fireEvent.change(screen.getByLabelText("테스트 작업 입력"), { target: { value: "미저장" } });
+    window.history.replaceState({ keep: true }, "", "/mes?tab=warehouse&section=mine&unrelated=keep");
+    const length = window.history.length;
+    fireEvent.click(menu);
+    fireEvent.click(screen.getByText("계속 머무르기"));
+    expect(window.location.search).toContain("section=mine");
+    expect(screen.getByLabelText("테스트 작업 입력")).toHaveValue("미저장");
+    expect(animate).not.toHaveBeenCalled();
+    fireEvent.click(menu);
+    fireEvent.click(screen.getByText("나가기", { exact: true }));
+    expect(screen.getByTestId("desktop-tab-transition")).toBe(body);
+    expect(window.location.search).toBe("?tab=warehouse&unrelated=keep");
+    expect(window.history.state).toMatchObject({ keep: true });
+    expect(window.history.length).toBe(length + 1);
+    expect(animate).toHaveBeenCalledWith([{ opacity: 0.7 }, { opacity: 1 }], { duration: 180, easing: "ease-out" });
+    fireEvent.click(menu);
+    expect(animate).toHaveBeenCalledOnce();
+  });
+
+  it.each(["shipping", "defect"] as const)("%s 허브 복귀는 명확한 페이드를 한 번 적용하고 첫 화면 연타에는 재생하지 않는다", (tab) => {
+    render(<DesktopMesShell />);
+    const menu = screen.getByRole("button", { name: tab, exact: true });
+    fireEvent.click(menu);
+    const body = screen.getByTestId("desktop-tab-transition");
+    const animate = vi.fn(() => ({ cancel: vi.fn() }));
+    Object.defineProperty(body, "animate", { value: animate });
+    fireEvent.click(screen.getByText(`${tab} detail entry`));
+    fireEvent.click(menu);
+    expect(screen.getByTestId("desktop-tab-transition")).toBe(body);
+    expect(animate).toHaveBeenCalledWith([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: "ease-out" });
+    fireEvent.click(menu);
+    expect(animate).toHaveBeenCalledOnce();
+  });
+
+  it.each(["warehouse", "warehouseMap"] as const)(
+    "%s 현재 탭을 연타해도 화면을 다시 마운트하지 않는다",
+    (tab) => {
+      render(<DesktopMesShell />);
+      const menu = screen.getByRole("button", { name: tab, exact: true });
+      fireEvent.click(menu);
+      const content = screen.getByRole("main");
+      for (let click = 0; click < 5; click += 1) fireEvent.click(menu);
+      expect(screen.getByRole("main")).toBe(content);
+      expect(routerPush).not.toHaveBeenCalled();
+    },
+  );
+
+  it("지도 복귀 기록은 상세 위치만 지우고 다른 브라우저 상태를 보존한다", () => {
+    render(<DesktopMesShell />);
+    fireEvent.click(screen.getByRole("button", { name: "warehouseMap", exact: true }));
+    fireEvent.click(screen.getByText("map detail entry"));
+    window.history.replaceState({ wm: { stage: "row", angleId: 1, row: 2 }, wmDepth: 2, unrelated: "keep" }, "", "/mes?tab=warehouseMap&other=keep");
+    fireEvent.click(screen.getByRole("button", { name: "warehouseMap", exact: true }));
+    expect(window.history.state).toMatchObject({ wmDepth: 0, unrelated: "keep" });
+    expect(window.history.state.wm).toBeUndefined();
+    expect(window.location.search).toBe("?tab=warehouseMap&other=keep");
+  });
+
+  it.each(["step=2", "section=mine", "draftId=draft-1", "stockRequestId=request-1"])(
+    "입출고 하위 화면(%s)에서는 기존 첫 메뉴 복귀를 유지한다",
+    (query) => {
+      render(<DesktopMesShell />);
+      const menu = screen.getByRole("button", { name: "warehouse", exact: true });
+      fireEvent.click(menu);
+      const content = screen.getByRole("main");
+      window.history.replaceState({}, "", `/mes?tab=warehouse&${query}`);
+      fireEvent.click(screen.getByText("warehouse detail entry"));
+      fireEvent.click(menu);
+      expect(screen.getByRole("main")).toBe(content);
+      expect(screen.getByText("warehouse home")).toBeInTheDocument();
+      expect(window.location.search).toBe("?tab=warehouse");
+    },
+  );
+
+  it("품목 전환 중에는 같은 입출고 탭으로 첫 메뉴에 복귀한다", () => {
+    render(<DesktopMesShell />);
+    const menu = screen.getByRole("button", { name: "warehouse", exact: true });
+    fireEvent.click(menu);
+    const content = screen.getByRole("main");
+    window.history.replaceState({ wic: 1 }, "", "/mes?tab=warehouse");
+    fireEvent.click(screen.getByText("warehouse detail entry"));
+    fireEvent.click(menu);
+    expect(screen.getByRole("main")).toBe(content);
+    expect(screen.getByText("warehouse home")).toBeInTheDocument();
+    expect(window.history.state.wic).toBeUndefined();
   });
 
   it.each(["warehouse", "defect", "settings"] as const)(
@@ -306,7 +458,41 @@ describe("DesktopMesShell tab transition", () => {
     fireEvent.click(screen.getByRole("button", { name: tab }));
 
     expect(screen.getByTestId("desktop-tab-transition")).toHaveAttribute("data-active-tab", tab);
-    expect(screen.getByTestId("desktop-tab-transition")).toHaveClass("animate-desktop-tab-enter");
+    if (tab === "dashboard" || tab === "history") {
+      expect(screen.getByTestId("desktop-tab-transition")).not.toHaveClass("animate-desktop-tab-enter");
+    } else {
+      expect(screen.getByTestId("desktop-tab-transition")).toHaveClass("animate-desktop-tab-enter");
+    }
+  });
+
+  it.each(["dashboard", "history"] as const)("%s retains the skeleton over ready content until the dissolve ends", async (tab) => {
+    window.history.replaceState({}, "", `/mes?tab=${tab === "dashboard" ? "history" : "dashboard"}`);
+    const slow = tab === "dashboard" ? slowDashboard : slowHistory;
+    let resolve!: () => void;
+    slow.promise = new Promise<void>((done) => { resolve = done; });
+    render(<Suspense fallback={<div>root loading</div>}><DesktopMesShell /></Suspense>);
+    slow.pending = true;
+    try {
+      fireEvent.click(screen.getByRole("button", { name: tab, exact: true }));
+      const cover = screen.getByTestId("desktop-loading-cover");
+      expect(cover).not.toHaveAttribute("aria-hidden");
+
+      await act(async () => {
+        slow.pending = false;
+        resolve();
+        await slow.promise;
+      });
+
+      expect(screen.getByText(`${tab} content`)).toBeInTheDocument();
+      expect(screen.getByTestId("desktop-loading-cover")).toBe(cover);
+      expect(cover).toHaveAttribute("aria-hidden", "true");
+      expect(cover).toHaveAttribute("inert");
+      expect(cover).toHaveClass("desktop-loading-cover-exit");
+      await waitFor(() => expect(screen.queryByTestId("desktop-loading-cover")).not.toBeInTheDocument());
+    } finally {
+      slow.pending = false;
+      resolve();
+    }
   });
 
   it("does not restart the shared transition when the active tab is refreshed", () => {

@@ -26,6 +26,7 @@ type Props = {
   onResetAllFilters: () => void;
   imageManifest?: Record<string, string>;
   compact?: boolean;
+  skeletonRowCount?: number;
 };
 
 export function InventoryItemsTable({
@@ -44,6 +45,7 @@ export function InventoryItemsTable({
   onResetAllFilters,
   imageManifest,
   compact,
+  skeletonRowCount = 8,
 }: Props) {
   const headerColumns = compact
     ? [
@@ -157,8 +159,8 @@ export function InventoryItemsTable({
               )}
             </tr>
           </thead>
-          <tbody>
-            {loading ? Array.from({ length: 8 }, (_, index) => (
+          <tbody className={loading ? undefined : "mes-data-reveal"}>
+            {loading ? Array.from({ length: skeletonRowCount }, (_, index) => (
               <tr key={index} data-testid="inventory-skeleton-row" aria-hidden="true">
                 {Array.from({ length: 7 }, (_, column) => (
                   <td key={column} className={`border-b ${column === 1 ? "px-1" : "px-4"} py-5 align-middle${column !== 0 && column !== 2 && column !== 5 ? " hidden sm:table-cell" : ""}`} style={{ borderColor: LEGACY_COLORS.border, width: column === 1 ? 60 : undefined }}>

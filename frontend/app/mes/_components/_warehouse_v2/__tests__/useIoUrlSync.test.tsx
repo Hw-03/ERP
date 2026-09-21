@@ -23,6 +23,44 @@ function makeSearchParams(query: string) {
 const ALL_TRUE: Record<IoStep, boolean> = { 1: true, 2: true, 3: true, 4: true, 5: true };
 
 describe("useIoUrlSync", () => {
+  it("PC 첫 화면 재마운트에서 이전 URL 스냅샷으로 step=1을 추가하지 않는다", () => {
+    window.history.replaceState(null, "", "/mes?tab=warehouse");
+    const historyPush = vi.spyOn(window.history, "pushState");
+    renderHook(() => useIoUrlSync({ step: 1, goTo: vi.fn(), canAdvance: ALL_TRUE, router: { push: vi.fn() }, synchronousHistory: true, searchParams: makeSearchParams("tab=warehouse&step=5"), pathname: "/mes" }));
+    expect(historyPush).not.toHaveBeenCalled();
+    historyPush.mockRestore();
+  });
+  it("PC 단계 기록은 즉시 반영하고 복귀 후 지연된 단계 스냅샷을 무시한다", () => {
+    window.history.replaceState({ unrelated: "keep" }, "", "/mes?tab=warehouse");
+    const push = vi.fn();
+    const goTo = vi.fn();
+    const { result, rerender } = renderHook(({ step, query }: { step: IoStep; query: string }) => useIoUrlSync({
+      step, goTo, canAdvance: ALL_TRUE, router: { push }, synchronousHistory: true,
+      searchParams: makeSearchParams(query), pathname: "/mes",
+    }), { initialProps: { step: 1 as IoStep, query: "tab=warehouse" } });
+    rerender({ step: 2, query: "tab=warehouse" });
+    expect(window.location.search).toBe("?tab=warehouse&step=2");
+    expect(window.history.state.unrelated).toBe("keep");
+    act(() => {
+      result.current.resetForHome();
+      window.history.pushState(window.history.state, "", "/mes?tab=warehouse");
+    });
+    rerender({ step: 1, query: "tab=warehouse&step=2" });
+    expect(window.location.search).toBe("?tab=warehouse");
+    expect(goTo).not.toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
+  });
+  it("첫 단계의 품목 전환 복귀 후 다음 작업의 URL 갱신을 막지 않는다", () => {
+    window.history.replaceState(null, "", "/mes?tab=warehouse");
+    const push = vi.fn();
+    const { result, rerender } = renderHook(({ step }: { step: IoStep }) => useIoUrlSync({
+      step, goTo: vi.fn(), canAdvance: ALL_TRUE, router: { push },
+      searchParams: makeSearchParams("tab=warehouse"), pathname: "/mes",
+    }), { initialProps: { step: 1 as IoStep } });
+    act(() => result.current.resetForHome());
+    rerender({ step: 2 });
+    expect(push).toHaveBeenCalledWith("/mes?tab=warehouse&step=2", { scroll: false });
+  });
   it("새 작업 진입에서는 URL step만으로 작업 유형 선택을 건너뛰지 않는다", () => {
     window.history.replaceState(null, "", "/wh?step=5");
     const push = vi.fn();

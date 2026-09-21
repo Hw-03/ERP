@@ -2,8 +2,32 @@ import { StrictMode, useState } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { DailyWorkActivity } from "../DailyWorkActivity";
+import { DirtyGuardProvider } from "@/lib/ui/dirty-guard";
+import { DesktopTabHomeProvider, useDesktopTabHomeController } from "../../DesktopTabHome";
 
 describe("DailyWorkActivity", () => {
+  it("같은 탭 복귀는 재마운트 없이 실제 거래 상세를 닫는다", () => {
+    function ReturnButton() {
+      const { requestHome } = useDesktopTabHomeController();
+      return <button onClick={() => requestHome()}>메뉴 복귀</button>;
+    }
+    const onDetailOpenChange = vi.fn();
+    render(<DirtyGuardProvider><DesktopTabHomeProvider>
+      <ReturnButton />
+      <DailyWorkActivity activity={{
+        work_date: "2026-08-03", employee_id: "employee-1", cancelled_count: 0,
+        summary: [{ operation_key: "warehouse", operation_label: "창고", work_count: 1, quantity_by_unit: { EA: 1 } }],
+        details: [{ type: "solo", key: "log-1", logs: [] }],
+      } as never} onDetailOpenChange={onDetailOpenChange} />
+    </DesktopTabHomeProvider></DirtyGuardProvider>);
+    const section = screen.getByRole("region", { name: "MES 작업 기록" });
+    fireEvent.click(screen.getByRole("button", { name: "창고 거래 상세 펼치기" }));
+    expect(screen.getByTestId("daily-work-activity-details")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "메뉴 복귀" }));
+    expect(screen.queryByTestId("daily-work-activity-details")).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "MES 작업 기록" })).toBe(section);
+    expect(onDetailOpenChange).toHaveBeenLastCalledWith(false);
+  });
   it("8.20-09 상세 토글은 렌더 도중 부모 상태를 갱신하지 않는다", () => {
     function ActivityHarness() {
       const [isDetailOpen, setIsDetailOpen] = useState(false);

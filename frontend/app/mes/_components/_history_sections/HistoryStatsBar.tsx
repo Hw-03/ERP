@@ -124,6 +124,9 @@ function HistoryCountValue({
       </span>
     );
   }
+  if (display === "skeleton" && !loading) {
+    return <span className="mes-data-reveal">{NUM(loading, value)}건</span>;
+  }
   return <>{NUM(loading, value)}건</>;
 }
 

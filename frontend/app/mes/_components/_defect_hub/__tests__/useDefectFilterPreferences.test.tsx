@@ -1,4 +1,7 @@
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
+import { DirtyGuardProvider } from "@/lib/ui/dirty-guard";
+import { DesktopTabHomeProvider } from "../../DesktopTabHome";
 import { beforeEach, describe, expect, it } from "vitest";
 import { migrateDefectFilterSnapshot, useDefectFilterPreferences } from "../useDefectFilterPreferences";
 
@@ -6,6 +9,22 @@ const storageKey = (employeeId: string) => `dexcowin_mes_defect_filters:${employ
 const storageViewKey = (employeeId: string) => `dexcowin_mes_defect_storage_filters:${employeeId}`;
 
 describe("useDefectFilterPreferences", () => {
+  it("PC 하위 화면을 다시 열면 고정하지 않은 조회 조건도 유지한다", () => {
+    function Filters() {
+      const filters = useDefectFilterPreferences({ employeeId: "employee-1", defaultScope: "all", defaultSort: "newest" });
+      return <button onClick={() => filters.setSelectedModels(["SOLO"])}>{filters.selectedModels.join() || "전체 모델"}</button>;
+    }
+    function Screen() {
+      const [open, setOpen] = useState(true);
+      return <><button onClick={() => setOpen(!open)}>하위 화면</button>{open && <Filters />}</>;
+    }
+    render(<DirtyGuardProvider><DesktopTabHomeProvider><Screen /></DesktopTabHomeProvider></DirtyGuardProvider>);
+    fireEvent.click(screen.getByText("전체 모델"));
+    fireEvent.click(screen.getByText("하위 화면"));
+    fireEvent.click(screen.getByText("하위 화면"));
+    expect(screen.getByText("SOLO")).toBeInTheDocument();
+    expect(window.localStorage.getItem(storageKey("employee-1"))).toBeNull();
+  });
   it("drops removed unclassified selections while preserving other saved filters", () => {
     expect(migrateDefectFilterSnapshot({version: 2, scope: "all", actorScope: "mine", sort: "newest", selectedDepartments: ["조립"], selectedModels: ["미분류", "DX3000"], selectedProcessSteps: ["UNCLASSIFIED", "DISUSED", "R"]})).toEqual({version: 2, scope: "all", actorScope: "mine", sort: "newest", selectedDepartments: ["조립"], selectedModels: ["DX3000"], selectedProcessSteps: ["DISUSED", "R"]});
   });

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useDesktopTabHome } from "../DesktopTabHome";
+import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import { Check, ChevronLeft, Search } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { QuantityInput } from "../common/QuantityInput";
@@ -57,6 +59,9 @@ export function AddBoxScreen({
   );
   const [reconcileCache, setReconcileCache] = useState<Map<string, ReconcileRow>>(new Map());
   const [reconcileLoading, setReconcileLoading] = useState<Set<string>>(new Set());
+  const [initialBox] = useState(() => JSON.stringify([size, [...cart].sort()]));
+  useRegisterDirty("warehouse-box", JSON.stringify([size, [...cart].sort()]) !== initialBox, () => submit(true));
+  useDesktopTabHome("warehouse-box-busy", { isHome: true, busy, returnHome: () => {} });
 
   // 편집 모드: 미리 채워진 품목들의 "여유 재고"를 mount 시 한 번에 조회.
   useEffect(() => {
@@ -131,14 +136,18 @@ export function AddBoxScreen({
       return { name, qty, avail };
     });
 
-  async function submit() {
+  async function submit(propagateError = false) {
     const lines = Array.from(cart.entries())
       .filter(([, qty]) => qty > 0)
       .map(([item_id, quantity]) => ({ item_id, quantity }));
-    if (!lines.length || overflow) return;
+    if (!lines.length || overflow || anyExceeds) {
+      if (propagateError) throw new Error("박스 품목과 수량을 확인하세요.");
+      return;
+    }
     try {
       await onSubmit({ jariIndex, size, lines });
-    } catch {
+    } catch (error) {
+      if (propagateError) throw error;
       /* 부모가 onError로 표시 — 화면 유지 */
     }
   }
@@ -409,7 +418,7 @@ export function AddBoxScreen({
           <Button variant="secondary" onClick={onCancel} disabled={busy}>
             취소
           </Button>
-          <Button onClick={submit} disabled={busy || overflow || cartCount === 0 || anyExceeds}>
+          <Button onClick={() => void submit()} disabled={busy || overflow || cartCount === 0 || anyExceeds}>
             {isEdit ? "저장" : "배치"}
           </Button>
         </div>

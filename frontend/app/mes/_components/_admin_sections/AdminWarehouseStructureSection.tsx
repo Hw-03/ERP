@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRegisterDirty } from "@/lib/ui/dirty-guard";
+import { useDesktopTabHome } from "../DesktopTabHome";
 import { Plus, Save, Trash2, Warehouse } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { Button } from "@/lib/ui/Button";
@@ -67,6 +69,8 @@ function structureVisual(kind: WarehouseAngleType) {
 
 export function AdminWarehouseStructureSection({ onStatusChange, onError }: Props) {
   const [angles, setAngles] = useState<WarehouseAngle[]>([]);
+  const [savedAngles, setSavedAngles] = useState<WarehouseAngle[]>([]);
+  const [pendingWrites, setPendingWrites] = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [pendingAddKind, setPendingAddKind] = useState<WarehouseAngleType | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<WarehouseAngle | null>(null);
@@ -83,7 +87,7 @@ export function AdminWarehouseStructureSection({ onStatusChange, onError }: Prop
   const load = () =>
     warehouseMapApi
       .getStructure()
-      .then(setAngles)
+      .then((rows) => { setAngles(rows); setSavedAngles(rows); })
       .catch((e) => onError(e instanceof Error ? e.message : "구조 로드 실패"));
 
   useEffect(() => {
@@ -123,10 +127,15 @@ export function AdminWarehouseStructureSection({ onStatusChange, onError }: Prop
             height: Math.max(GRID, snap(a.height)),
           };
           setAngles((prev) => prev.map((x) => (x.id === d.id ? { ...x, ...snapped } : x)));
+          setPendingWrites((count) => count + 1);
           warehouseMapApi
             .updateAngle(a.id, snapped)
-            .then(() => onStatusChange("앵글 배치를 저장했습니다."))
-            .catch((e) => onError(e instanceof Error ? e.message : "저장 실패"));
+            .then(() => {
+              setSavedAngles((rows) => rows.map((row) => row.id === a.id ? { ...row, ...snapped } : row));
+              onStatusChange("앵글 배치를 저장했습니다.");
+            })
+            .catch((e) => onError(e instanceof Error ? e.message : "저장 실패"))
+            .finally(() => setPendingWrites((count) => count - 1));
         }
       }
     }
@@ -155,31 +164,45 @@ export function AdminWarehouseStructureSection({ onStatusChange, onError }: Prop
   }, []);
 
   const selected = useMemo(() => angles.find((a) => a.id === selectedId) ?? null, [angles, selectedId]);
+  const changedAngles = angles.filter((angle) => JSON.stringify(angle) !== JSON.stringify(savedAngles.find((saved) => saved.id === angle.id)));
+  useRegisterDirty("warehouse-structure", changedAngles.length > 0, async () => {
+    for (const angle of changedAngles) await persistAngle(angle);
+  });
+  useDesktopTabHome("warehouse-structure-busy", { isHome: true, busy: pendingWrites > 0, returnHome: () => {} });
 
   function patchSelected(patch: Partial<WarehouseAngle>) {
     if (selectedId == null) return;
     setAngles((prev) => prev.map((a) => (a.id === selectedId ? { ...a, ...patch } : a)));
   }
 
-  async function saveSelected() {
-    if (!selected) return;
+  async function persistAngle(angle: WarehouseAngle): Promise<void> {
+    setPendingWrites((count) => count + 1);
     try {
-      await warehouseMapApi.updateAngle(selected.id, {
-        label: selected.label,
-        rows: selected.rows,
-        layers: selected.layers,
-        pos_x: selected.pos_x,
-        pos_y: selected.pos_y,
-        width: selected.width,
-        height: selected.height,
+      await warehouseMapApi.updateAngle(angle.id, {
+        label: angle.label,
+        rows: angle.rows,
+        layers: angle.layers,
+        pos_x: angle.pos_x,
+        pos_y: angle.pos_y,
+        width: angle.width,
+        height: angle.height,
       });
-      onStatusChange(`${selected.label} 저장됨`);
+      setSavedAngles((rows) => rows.map((row) => row.id === angle.id ? angle : row));
+      onStatusChange(`${angle.label} 저장됨`);
     } catch (e) {
       onError(e instanceof Error ? e.message : "저장 실패");
+      throw e;
+    } finally {
+      setPendingWrites((count) => count - 1);
     }
   }
 
+  async function saveSelected(): Promise<void> {
+    if (selected) await persistAngle(selected).catch(() => {});
+  }
+
   async function addStructure(kind: WarehouseAngleType) {
+    setPendingWrites((count) => count + 1);
     const count = angles.filter((angle) => structureKind(angle) === kind).length;
     const isAngle = kind === "angle";
     const isPallet = kind === "pallet";
@@ -201,10 +224,13 @@ export function AdminWarehouseStructureSection({ onStatusChange, onError }: Prop
       onStatusChange(`${label} \uCD94\uAC00\uD588\uC2B5\uB2C8\uB2E4.`);
     } catch (e) {
       onError(e instanceof Error ? e.message : "\uCD94\uAC00 \uC2E4\uD328");
+    } finally {
+      setPendingWrites((count) => count - 1);
     }
   }
 
   async function deleteAngle(target: WarehouseAngle) {
+    setPendingWrites((count) => count + 1);
     try {
       await warehouseMapApi.deleteAngle(target.id);
       setSelectedId(null);
@@ -212,6 +238,8 @@ export function AdminWarehouseStructureSection({ onStatusChange, onError }: Prop
       onStatusChange(DELETE_SUCCESS_MESSAGE[structureKind(target)]);
     } catch (e) {
       onError(e instanceof Error ? e.message : "삭제 실패 (박스가 남아 있으면 먼저 비워주세요)");
+    } finally {
+      setPendingWrites((count) => count - 1);
     }
   }
 

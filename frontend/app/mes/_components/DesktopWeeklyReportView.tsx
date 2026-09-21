@@ -1,4 +1,5 @@
 "use client";
+import { useDesktopTabHome } from "./DesktopTabHome";
 
 import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
@@ -21,6 +22,7 @@ interface Props {
 export function DesktopWeeklyReportView({ weekMon }: Props) {
   const [selectedCode, setSelectedCode] = useState("TF");
   const [selectedBomItemId, setSelectedBomItemId] = useState<string | null>(null);
+  useDesktopTabHome("weekly", { isHome: selectedBomItemId === null, returnHome: () => setSelectedBomItemId(null) });
   const [f705Downloading, setF705Downloading] = useState(false);
   const [f705DownloadError, setF705DownloadError] = useState<string | null>(null);
 

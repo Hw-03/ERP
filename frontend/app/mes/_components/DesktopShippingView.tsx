@@ -2,6 +2,7 @@
 import { ReadEmpty, ReadFailure, ReadLoading } from "./common/ReadState";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useDesktopTabHome } from "./DesktopTabHome";
 import type { MouseEvent, ReactNode, SyntheticEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -61,7 +62,7 @@ function isShippingViewMode(value: string | null): value is ViewMode {
 }
 type RequestWizardStep = 1 | 2 | 3 | 4 | 5;
 type RequestWizardNavigation = "push" | "replace";
-type ViewNavigationOptions = { animateFromHub?: boolean };
+type ViewNavigationOptions = { animateFromHub?: boolean; immediate?: boolean };
 type PendingUrlSearch = { from: string; to: string };
 type RequestWizardPushEntry = {
   fromSearch: string;
@@ -357,6 +358,8 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   const [requestWizardStep, setRequestWizardStep] = useState<RequestWizardStep>(1);
 
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [originalRequest, setOriginalRequest] = useState<ShippingRequest | null>(null);
+  const [savedInputSignature, setSavedInputSignature] = useState<string | null>(null);
   const [selectedPrepId, setSelectedPrepId] = useState<string | null>(null);
   const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
   const [basePfId, setBasePfId] = useState("");
@@ -468,9 +471,52 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     return view === "historyWork" && selectedHistoryId ? null : historyRows[0] ?? null;
   }, [historyRows, requests, selectedHistoryId, view]);
   const canEditDraft = !selectedRequest || selectedRequest.status === "PREPARING";
-  const shippingWorkDirty = view === "requestWork" || view === "prepWork" || view === "historyWork";
+  const inputSignature = JSON.stringify([basePfId, invoiceNumber, requestedBy, requestQuantity, customPaName,
+    customPfName, notes, finalizationMode, reusePfItemId, draftLines, companionDraft]);
+  const shippingWorkDirty = view === "requestWork" && (savedInputSignature !== null ? inputSignature !== savedInputSignature : (
+    basePfId !== (originalRequest?.base_pf_item_id ?? "")
+    || invoiceNumber !== (originalRequest?.invoice_number ?? "")
+    || requestedBy !== (originalRequest?.requested_by_name ?? operator?.name ?? "")
+    || requestQuantity !== (originalRequest?.request_quantity ?? 1)
+    || customPaName !== (originalRequest?.custom_pa_name ?? "")
+    || customPfName !== (originalRequest?.custom_pf_name ?? "")
+    || notes !== (originalRequest?.notes ?? "")
+    || finalizationMode !== (originalRequest?.finalization_mode ?? "KEEP_BASE")
+    || reusePfItemId !== (originalRequest?.reuse_pf_item_id ?? null)
+    || JSON.stringify(draftLines) !== JSON.stringify(originalRequest ? requestBomLines(originalRequest) : [])
+    || JSON.stringify(companionDraft) !== JSON.stringify(originalRequest ? requestCompanionDraft(originalRequest) : [])
+  ));
   const saveShippingWork = useCallback(() => {}, []);
   useRegisterDirty("shipping-work", shippingWorkDirty, saveShippingWork, undefined, { mode: "confirm-only" });
+  useDesktopTabHome("shipping", {
+    isHome: view === "hub",
+    busy: pending !== null && pending !== "load",
+    returnHome: () => {
+      navigateView("hub", undefined, undefined, undefined, { immediate: true });
+      requestDraftIdentityRef.current = UNINITIALIZED_REQUEST_DRAFT;
+      requestDraftLegacyAliasesRef.current = null;
+      setEditingId(null);
+      setOriginalRequest(null);
+      setSavedInputSignature(null);
+      setBasePfId("");
+      setInvoiceNumber("");
+      setRequestedBy(operator?.name ?? "");
+      setRequestQuantity(1);
+      setCustomPaName("");
+      setCustomPfName("");
+      setNotes("");
+      setDraftLines([]);
+      setCompanionDraft([]);
+      setMatchResult(null);
+      setBomMatchStale(false);
+      setFinalizationMode("KEEP_BASE");
+      setReusePfItemId(null);
+      setSelectedPrepId(null);
+      setSelectedHistoryId(null);
+      setRequestWizardStep(1);
+      setConfirmAction(null);
+    },
+  });
   function buildShippingUrl(
     nextView: ViewMode,
     requestId?: string | null,
@@ -516,7 +562,8 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     pendingUrlSearchRef.current = { from: searchParams.toString(), to: toSearch };
     setHubEntryAnimationView(options?.animateFromHub ? nextView : null);
     setView(nextView);
-    router.push(url, { scroll: false });
+    if (options?.immediate) window.history.pushState({ ...window.history.state }, "", url);
+    else router.push(url, { scroll: false });
   }
 
   function navigateRequestWizardStep(nextStep: RequestWizardStep, navigation: RequestWizardNavigation = "push"): void {
@@ -1115,6 +1162,8 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
           requestDraftLegacyAliasesRef.current = null;
         }
         requestDraftIdentityRef.current = found.request_id;
+        setOriginalRequest(found);
+        setSavedInputSignature(null);
         setEditingId(found.request_id);
         setBasePfId(found.base_pf_item_id);
         setInvoiceNumber(found.invoice_number ?? "");
@@ -1137,6 +1186,8 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
     requestDraftLegacyAliasesRef.current = null;
     requestDraftIdentityRef.current = null;
     setEditingId(null);
+    setOriginalRequest(null);
+    setSavedInputSignature(null);
     setBasePfId("");
     setInvoiceNumber("");
     setRequestedBy(operator?.name ?? "");
@@ -1159,6 +1210,8 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   }, [searchParams, requests, loading, view, historyStatus, editingId, basePfId, requestQuantity, requestWizardStep, matchResult, customPaName, customPfName, ensurePfItemsLoaded, ensureItemsLoaded]);
 
   function clearDraft() {
+    setOriginalRequest(null);
+    setSavedInputSignature(null);
     advanceRequestDraftGeneration();
     clearRequestWizardHistory();
     requestDraftLegacyAliasesRef.current = null;
@@ -1183,6 +1236,8 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   }
 
   function loadRequestIntoDraft(req: ShippingRequest, nextView: ViewMode = "requestWork", syncUrl = true) {
+    setOriginalRequest(req);
+    setSavedInputSignature(null);
     advanceRequestDraftGeneration();
     clearRequestWizardHistory();
     if (requestDraftLegacyAliasesRef.current?.requestId !== req.request_id) {
@@ -1326,6 +1381,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         await queryClient.invalidateQueries({ queryKey: queryKeys.shipping.revisions(saved.request_id) });
       }
       if (!isCurrentRequestDraftGeneration(generation)) return saved;
+      setSavedInputSignature(inputSignature);
       requestDraftIdentityRef.current = saved.request_id;
       setEditingId(saved.request_id);
       if (wasNewDraft) {
@@ -2126,7 +2182,7 @@ function InvoiceNumberEditor({ request, onSaved }: { request: ShippingRequest; o
     setError(null);
   }, [request.request_id, request.invoice_number]);
 
-  async function saveInvoice() {
+  async function saveInvoice(propagateError = false) {
     const normalizedInput = value.trim();
     setSaving(true);
     setError(null);
@@ -2137,6 +2193,7 @@ function InvoiceNumberEditor({ request, onSaved }: { request: ShippingRequest; o
       await queryClient.invalidateQueries({ queryKey: queryKeys.shipping.revisions(request.request_id) });
     } catch (err) {
       setError(err instanceof Error ? err.message : "인보이스 번호를 저장하지 못했습니다.");
+      if (propagateError) throw err;
     } finally {
       setSaving(false);
     }
@@ -2148,6 +2205,11 @@ function InvoiceNumberEditor({ request, onSaved }: { request: ShippingRequest; o
     || Boolean(request.prepared_at)
     || request.events.some((event) => event.event_type === "PREPARED");
   const cannotClearExisting = Boolean(request.invoice_number) && !value.trim() && hasPreparationHistory;
+  useRegisterDirty("shipping-invoice", !unchanged, async () => {
+    if (cannotClearExisting) throw new Error("인보이스 번호를 비울 수 없습니다.");
+    await saveInvoice(true);
+  });
+  useDesktopTabHome("shipping-invoice-busy", { isHome: true, busy: saving, returnHome: () => {} });
   const fieldMessage = error
     ? { text: error, tone: LEGACY_COLORS.red }
     : cannotClearExisting
@@ -3637,6 +3699,7 @@ function HistorySection({ showList = true, rows, selected, emptyBody, refreshErr
               <Metric label="입출고 로그" value={`${selected.transaction_count}건`} />
             </div>
             <LineSummary request={selected} />
+            {selected.notes && <div data-testid="shipping-history-request-memo"><Notice tone={LEGACY_COLORS.cyan} title="요청 메모" body={selected.notes} /></div>}
             <TransactionLogList logs={selected.transactions} />
             <div className="grid gap-2">
               <div className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>이벤트 이력</div>

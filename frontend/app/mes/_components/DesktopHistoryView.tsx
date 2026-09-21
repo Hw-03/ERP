@@ -1,4 +1,5 @@
 "use client";
+import { useDesktopTabHome } from "./DesktopTabHome";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -115,6 +116,17 @@ export function DesktopHistoryView() {
   const lastSelectionRef = useRef<HistorySelection | null>(null);
   // 13-2번: navigateToLog 가 다른 날짜로 이동했을 때 그 거래 행을 리스트에서 찾아 scrollIntoView.
   const pendingScrollLogIdRef = useRef<string | null>(null);
+  useDesktopTabHome("history", {
+    isHome: selection === null && selectionStack.length === 0 && !calendarOpen,
+    returnHome: () => {
+      setSelection(null);
+      setSelectionStack([]);
+      setFocusTarget(null);
+      setCalendarOpen(false);
+      setCollapseRequestNonce((value) => value + 1);
+      pendingScrollLogIdRef.current = null;
+    },
+  });
 
   const selectedDateRange = useMemo(
     () => resolveHistoryDateRange(dateFilter, selectedDay, selectedMonth),

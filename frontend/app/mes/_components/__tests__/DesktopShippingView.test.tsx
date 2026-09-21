@@ -6,6 +6,8 @@ import { DesktopShippingView } from "../DesktopShippingView";
 import type { Item, ShippingBomMatchResponse, ShippingHistoryMonth, ShippingRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { queryKeys } from "@/lib/queries/keys";
+import { DirtyGuardProvider } from "@/lib/ui/dirty-guard";
+import { DesktopTabHomeProvider, useDesktopTabHomeController } from "../DesktopTabHome";
 
 const navigationMock = vi.hoisted(() => ({
   push: vi.fn(),
@@ -223,6 +225,14 @@ function render(ui: ReactElement) {
   return rtlRender(ui, { wrapper: Wrapper });
 }
 
+function HomeButton() {
+  const { requestHome } = useDesktopTabHomeController();
+  return <button onClick={() => requestHome()}>같은 출하 탭</button>;
+}
+function shippingWithHome() {
+  return <DirtyGuardProvider><DesktopTabHomeProvider><HomeButton /><DesktopShippingView onStatusChange={() => {}} /></DesktopTabHomeProvider></DirtyGuardProvider>;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   realtimeMock.revision = 1;
@@ -344,6 +354,50 @@ beforeEach(() => {
 });
 
 describe("DesktopShippingView", () => {
+  it.each([1, 2, 3, 4, 5])("같은 탭 클릭은 작성 %i단계에서 직접 허브로 돌아간다", async (step) => {
+    window.history.replaceState({ preserved: true }, "", "/mes?tab=shipping");
+    const { container } = render(shippingWithHome());
+    await openHubCard(container, "request");
+    await openNewRequest(container);
+    if (step > 1) {
+      await selectBasePf();
+      await waitFor(() => expect(api.getBOM).toHaveBeenCalledWith("pa-1"));
+      nextStep(container);
+      await screen.findByTestId("shipping-wizard-step-2");
+    }
+    if (step > 2) {
+      nextStep(container);
+      fireEvent.change(await screen.findByTestId("shipping-new-pf-name"), { target: { value: "Custom PF" } });
+    }
+    if (step > 3) { nextStep(container); await screen.findByTestId("shipping-wizard-step-4"); }
+    if (step > 4) { nextStep(container); await screen.findByTestId("shipping-wizard-step-5"); }
+    fireEvent.click(screen.getByText("같은 출하 탭"));
+    if (step > 1) {
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+      fireEvent.click(screen.getByText("계속 머무르기"));
+      expect(screen.getByTestId(`shipping-wizard-step-${step}`)).toBeInTheDocument();
+      fireEvent.click(screen.getByText("같은 출하 탭"));
+      fireEvent.click(screen.getByText("나가기", { exact: true }));
+    }
+    await waitFor(() => expect(container.querySelector('[data-shipping-hub-card="request"]')).toBeTruthy());
+    expect(api.createShippingRequest).not.toHaveBeenCalled();
+    expect(api.updateShippingRequest).not.toHaveBeenCalled();
+    expect(window.location.search).toBe("?tab=shipping");
+    expect(window.history.state).toMatchObject({ preserved: true });
+  });
+
+  it("상세 인보이스 저장 실패는 복귀하지 않고 입력을 유지한다", async () => {
+    vi.mocked(api.updateShippingInvoice).mockRejectedValue(new Error("저장 실패"));
+    const { container } = render(shippingWithHome());
+    await openHubCard(container, "request");
+    await openRequestById(container, "req-1");
+    fireEvent.change(await screen.findByRole("textbox", { name: "인보이스 번호", exact: true }), { target: { value: "UNSAVED" } });
+    fireEvent.click(screen.getByText("같은 출하 탭"));
+    fireEvent.click(screen.getByText("저장하고 이동"));
+    await waitFor(() => expect(api.updateShippingInvoice).toHaveBeenCalled());
+    expect(screen.getByRole("textbox", { name: "인보이스 번호", exact: true })).toHaveValue("UNSAVED");
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
   it("uses a flat root surface without a desktop card shadow", async () => {
     const { container } = render(<DesktopShippingView onStatusChange={() => {}} />);
 
@@ -1395,6 +1449,48 @@ describe("DesktopShippingView", () => {
     expect(await screen.findByTestId("shipping-history-detail")).toBeInTheDocument();
     expect(screen.queryByText("SHIP-req")).not.toBeInTheDocument();
     expect(screen.getAllByText("픽업 완료").length).toBeGreaterThan(0);
+  });
+
+  it("shows the request memo between the line summary and transaction logs in completed history", async () => {
+    const completed = request({
+      request_id: "history-with-memo",
+      status: "PICKED_UP",
+      notes: "출하 완료 후 확인할 메모",
+      picked_up_at: "2026-06-26T01:00:00Z",
+    });
+    navigationMock.search = "tab=shipping&shippingView=historyWork&shippingRequestId=history-with-memo&shippingHistoryStatus=PICKED_UP";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([completed]);
+    vi.mocked(api.getShippingHistory).mockResolvedValue({ requests: [completed], next_cursor: null, has_more: false });
+    vi.mocked(api.getShippingRequest).mockResolvedValue(completed);
+
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    const detail = await screen.findByTestId("shipping-history-detail");
+    const summary = within(detail).getByTestId("shipping-line-summary");
+    const memo = within(detail).getByTestId("shipping-history-request-memo");
+    const transactionLogs = within(detail).getByText("연결 입출고 로그").parentElement;
+    expect(memo).toHaveTextContent("요청 메모");
+    expect(memo).toHaveTextContent("출하 완료 후 확인할 메모");
+    expect(summary.compareDocumentPosition(memo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(memo.compareDocumentPosition(transactionLogs!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("does not reserve a memo area for completed history without a request memo", async () => {
+    const completed = request({
+      request_id: "history-without-memo",
+      status: "PICKED_UP",
+      notes: null,
+      picked_up_at: "2026-06-26T01:00:00Z",
+    });
+    navigationMock.search = "tab=shipping&shippingView=historyWork&shippingRequestId=history-without-memo&shippingHistoryStatus=PICKED_UP";
+    vi.mocked(api.getShippingRequests).mockResolvedValue([completed]);
+    vi.mocked(api.getShippingHistory).mockResolvedValue({ requests: [completed], next_cursor: null, has_more: false });
+    vi.mocked(api.getShippingRequest).mockResolvedValue(completed);
+
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    const detail = await screen.findByTestId("shipping-history-detail");
+    expect(within(detail).queryByTestId("shipping-history-request-memo")).not.toBeInTheDocument();
   });
 
   it("refreshes the current shipping history page when the first realtime snapshot arrives", async () => {

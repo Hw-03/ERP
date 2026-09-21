@@ -9,6 +9,7 @@ type Props = {
   logic: InventoryFilterLogic;
   onLogicChange: (logic: InventoryFilterLogic) => void;
   onToggle: () => void;
+  disabled?: boolean;
 };
 
 export function InventoryFilterLogicToggle({
@@ -57,11 +58,13 @@ export function InventoryFilterToggleButton({
   logic,
   onLogicChange,
   onToggle,
+  disabled = false,
 }: Props) {
   return (
     <div className="flex shrink-0 self-stretch items-stretch gap-1.5">
       <button
         onClick={onToggle}
+        disabled={disabled}
         className="flex h-full shrink-0 items-center gap-1.5 rounded-[14px] border px-3 py-2 text-sm font-semibold transition-colors hover:brightness-110"
         style={{
           background: filtersOpen

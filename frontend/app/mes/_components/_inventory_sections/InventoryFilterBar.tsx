@@ -183,6 +183,7 @@ type StickyHeaderProps = {
   count: number;
   isFiltered: boolean;
   onResetAllFilters?: () => void;
+  disabled?: boolean;
 };
 
 export function InventoryTableStickyHeader({
@@ -190,6 +191,7 @@ export function InventoryTableStickyHeader({
   onSearchChange,
   isFiltered,
   onResetAllFilters,
+  disabled = false,
 }: StickyHeaderProps) {
   return (
     <div
@@ -208,6 +210,7 @@ export function InventoryTableStickyHeader({
             value={searchValue}
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder="품명 · 품목 코드 · 위치 · 공급처 검색"
+            disabled={disabled}
             className="flex-1 bg-transparent text-base outline-none"
             style={{ color: LEGACY_COLORS.text }}
             aria-label="자재 검색"

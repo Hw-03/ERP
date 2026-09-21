@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useDesktopQueryState } from "../DesktopTabHome";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   Bar,
@@ -93,11 +94,11 @@ export function DefectStatisticsView({
   currentDepartment,
   onBack,
 }: Props) {
-  const [period, setPeriod] = useState<DefectStatisticsPeriodKind>("week");
-  const [anchor, setAnchor] = useState(todayInKst);
-  const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
-  const [selectedModels, setSelectedModels] = useState<string[]>([]);
-  const [selectedProcessSteps, setSelectedProcessSteps] = useState<DefectProcessStep[]>([]);
+  const [period, setPeriod] = useDesktopQueryState<DefectStatisticsPeriodKind>("defect-statistics-period", "week");
+  const [anchor, setAnchor] = useDesktopQueryState("defect-statistics-date", todayInKst);
+  const [selectedDepartments, setSelectedDepartments] = useDesktopQueryState<string[]>("defect-statistics-departments", []);
+  const [selectedModels, setSelectedModels] = useDesktopQueryState<string[]>("defect-statistics-models", []);
+  const [selectedProcessSteps, setSelectedProcessSteps] = useDesktopQueryState<DefectProcessStep[]>("defect-statistics-processes", []);
   const [historicalDepartments, setHistoricalDepartments] = useState<string[]>([]);
   const [result, setResult] = useState<DefectStatisticsResponse | null>(null);
   const [loading, setLoading] = useState(true);

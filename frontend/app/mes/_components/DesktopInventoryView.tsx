@@ -1,4 +1,5 @@
 "use client";
+import { useDesktopTabHome } from "./DesktopTabHome";
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { api, type Item, type ProductModel, type ProductionCapacity } from "@/lib/api";
@@ -55,6 +56,7 @@ export function DesktopInventoryView({
   canReceive?: boolean;
 }) {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  useDesktopTabHome("inventory", { isHome: selectedItem === null, returnHome: () => setSelectedItem(null) });
   // R7-HOOK2: items/loading/error + loadItems 훅으로 분리
   const onSelectedSync = useCallback(
     (next: Item[]) =>

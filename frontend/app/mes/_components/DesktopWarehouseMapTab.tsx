@@ -13,6 +13,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useDesktopTabHome } from "./DesktopTabHome";
 import { AlertTriangle, Eye, Pencil, ShieldCheck } from "lucide-react";
 import type { Item } from "@/lib/api";
 import { employeesApi } from "@/lib/api/employees";
@@ -157,6 +158,18 @@ export function DesktopWarehouseMapTab({
     setEditorError(null);
     onStatusChange?.("창고 지도");
   }
+
+  useDesktopTabHome("warehouse-map-mode", {
+    isHome: !editMode && !pinOpen && !fullscreen,
+    busy: verifying,
+    returnHome: () => {
+      exitEditMode();
+      setPinOpen(false);
+      setPin("");
+      setEditorTab("map");
+      onFullscreenChange?.(false);
+    },
+  });
 
   if (fullscreen) {
     return (

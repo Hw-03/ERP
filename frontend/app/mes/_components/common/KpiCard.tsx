@@ -24,7 +24,7 @@ function KpiCardImpl({ label, value, unit, hint, tone, active = false, onClick, 
       <span className="invisible" aria-hidden="true">000</span>
       <span aria-hidden="true" className="absolute inset-0 motion-safe:animate-pulse rounded" style={{ background: tint(tone, 18) }} />
     </span>
-  ) : value;
+  ) : <span className="mes-data-reveal">{value}</span>;
 
   const bg = active
     ? tint(tone, 22)

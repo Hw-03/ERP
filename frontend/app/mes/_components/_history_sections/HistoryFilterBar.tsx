@@ -24,6 +24,7 @@ type Props = {
   selectedMonth: SelectedHistoryMonth | null;
   onClearSelectedMonth: () => void;
   flatSurface?: boolean;
+  disabled?: boolean;
 };
 
 export function HistoryFilterBar({
@@ -41,6 +42,7 @@ export function HistoryFilterBar({
   selectedMonth,
   onClearSelectedMonth,
   flatSurface = false,
+  disabled = false,
 }: Props) {
   return (
     <section className={flatSurface ? "card desktop-flat-surface" : "card"} style={{ paddingTop: 14, paddingBottom: 14 }}>
@@ -54,6 +56,7 @@ export function HistoryFilterBar({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="작업 · 품명 · 코드 · 담당자 · 메모"
+            disabled={disabled}
             className="h-11 flex-1 bg-transparent text-sm outline-none lg:h-auto"
             style={{ color: LEGACY_COLORS.text }}
           />
@@ -75,7 +78,7 @@ export function HistoryFilterBar({
             }}
           >
             선택: {selectedDay}
-            <button type="button" aria-label="선택 날짜 해제" onClick={onClearSelectedDay}>
+            <button type="button" aria-label="선택 날짜 해제" onClick={onClearSelectedDay} disabled={disabled}>
               <X className="h-3 w-3" />
             </button>
           </span>
@@ -90,7 +93,7 @@ export function HistoryFilterBar({
             }}
           >
             선택: {formatHistoryMonthLabel(selectedMonth)}
-            <button type="button" aria-label="선택 월 해제" onClick={onClearSelectedMonth}>
+            <button type="button" aria-label="선택 월 해제" onClick={onClearSelectedMonth} disabled={disabled}>
               <X className="h-3 w-3" />
             </button>
           </span>
@@ -104,6 +107,7 @@ export function HistoryFilterBar({
               <button
                 key={opt.value}
                 onClick={() => setDateFilter(opt.value)}
+                disabled={disabled}
                 className="flex min-h-[44px] items-center justify-center px-3 py-2 text-xs font-bold transition-colors lg:min-h-0"
                 style={{
                   background: active ? `color-mix(in srgb, ${LEGACY_COLORS.purple} 20%, transparent)` : "transparent",
@@ -120,6 +124,7 @@ export function HistoryFilterBar({
         <button
           type="button"
           onClick={onToggleFilterPanel}
+          disabled={disabled}
           aria-expanded={filterPanelOpen}
           className="flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-[12px] border px-3 py-2 text-xs font-bold transition-colors lg:min-h-0"
           style={{
@@ -150,6 +155,7 @@ export function HistoryFilterBar({
         <button
           type="button"
           onClick={onToggleCalendar}
+          disabled={disabled}
           aria-expanded={calendarOpen}
           className="flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-[12px] border px-3 py-2 text-xs font-bold transition-colors lg:min-h-0"
           style={{

@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronDown, CircleHelp } from "lucide-react";
+import { useDesktopTabHome } from "../DesktopTabHome";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TransactionLog } from "@/lib/api";
 import type { TransactionReferenceSummary } from "@/lib/api/production";
@@ -312,6 +313,17 @@ export function HistoryTable({
   }, [focusTarget]);
 
   const groups = useMemo(() => displayGroups ?? buildGroups(filteredLogs), [displayGroups, filteredLogs]);
+  const searchGroupKeys = groups.flatMap((group) => {
+    if (group.matchedLogIds == null || group.type === "solo") return [];
+    return [group.type === "operation" ? group.operationId : group.type === "op_batch" ? group.batchId : group.type === "batch" ? group.refKey : group.key];
+  });
+  useDesktopTabHome("history-expanded-row", {
+    isHome: expandedGroupKey === null && searchGroupKeys.every((key) => collapsedSearchGroupKeys.has(key)),
+    returnHome: () => {
+      setExpandedGroupKey(null);
+      setCollapsedSearchGroupKeys((previous) => new Set([...previous, ...searchGroupKeys]));
+    },
+  });
   const searchMetadataActive = groups.some((group) => group.matchedLogIds != null);
   const previousSearchMetadataActiveRef = useRef(searchMetadataActive);
 
@@ -555,7 +567,7 @@ export function HistoryTable({
                 ))}
               </tr>
             </thead>
-            <tbody>
+            <tbody className="mes-data-reveal">
               {groups.map((group, index) => {
                 const rawSeparationHint = getHistorySeparationHint(
                   index > 0 ? getGroupPrimaryLog(groups[index - 1]) : null,

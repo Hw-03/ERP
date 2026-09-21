@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { DefectCartFlow } from "../DefectCartFlow";
 import type { Item, ProductModel } from "../../_warehouse_v2/types";
+import { DesktopHomeHarness } from "../../__tests__/DesktopHomeHarness";
 
 function render(ui: ReactElement, client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -99,6 +100,23 @@ beforeEach(() => {
 });
 
 describe("DefectCartFlow", () => {
+  it.each(["add", "scrap"] as const)("%s 작성 입력은 복귀 확인 취소로 보존되고 폐기할 때만 닫힌다", (mode) => {
+    render(<DesktopHomeHarness><DefectCartFlow mode={mode} items={[rItem, fItem]} productModels={productModels}
+      currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} /></DesktopHomeHarness>);
+    if (mode === "scrap") fireEvent.click(screen.getByRole("button", { name: /^폐기/ }));
+    fireEvent.click(screen.getByRole("button", { name: /다음/ }));
+    fireEvent.click(screen.getByRole("button", { name: "원자재 장바구니에 추가" }));
+    enterReasonMemos("미저장 사유");
+    fireEvent.click(screen.getByText("현재 메뉴 복귀"));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("계속 머무르기"));
+    expect(screen.getByPlaceholderText(/스크래치 다수/)).toHaveValue("미저장 사유");
+    fireEvent.click(screen.getByText("현재 메뉴 복귀"));
+    fireEvent.click(screen.getByText("나가기", { exact: true }));
+    expect(screen.getByText("메뉴 첫 화면")).toBeInTheDocument();
+    expect(defectsApi.quarantineBulk).not.toHaveBeenCalled();
+    expect(stockRequestsApi.createStockRequest).not.toHaveBeenCalled();
+  });
   it("scrap 모드에서 R과 비R 품목을 모두 보여준다", () => {
     render(
       <DefectCartFlow

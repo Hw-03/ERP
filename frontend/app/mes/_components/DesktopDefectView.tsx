@@ -1,4 +1,5 @@
 "use client";
+import { useDesktopTabHome } from "./DesktopTabHome";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ShieldAlert, Trash2 } from "lucide-react";
@@ -129,6 +130,13 @@ function DefectViewInner({
   const [view, setView] = useState<ViewMode>({ kind: "hub" });
   const [managementLocation, setManagementLocation] = useState<DefectLocation | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
+  useDesktopTabHome("defect", {
+    isHome: view.kind === "hub" && managementLocation === null,
+    returnHome: () => {
+      setView({ kind: "hub" });
+      setManagementLocation(null);
+    },
+  });
 
   useEffect(() => {
     const generation = ++requestGenerationRef.current;

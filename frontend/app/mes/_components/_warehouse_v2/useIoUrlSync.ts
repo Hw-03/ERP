@@ -1,8 +1,8 @@
 /**
  * URL ?step=N 양방향 동기화 effect 추출.
  *
- * IoComposeView 에 인라인이던 router.push / urlStep → state.goTo 두 effect 를
- * 그대로 옮긴 것. 부수효과·실행 시점·의존성 배열은 원본과 동일하다.
+ * PC에서는 단계 history를 즉시 반영해 복귀 이후 늦은 탐색이 덮어쓰지 않게 한다.
+ * 모바일은 기존 router 경로를 유지한다.
  *
  * - state.step → URL push (skipNextPushRef 로 1회 차단 가능)
  * - URL step → state.goTo (도달 불가 step 은 clamp)
@@ -31,6 +31,7 @@ export type UseIoUrlSyncArgs = {
   searchParams: SearchParamsLike;
   pathname: string;
   suppressInitialSync?: boolean;
+  synchronousHistory?: boolean;
   /**
    * 지정 시 step push 마다 `tab` 을 이 값으로 강제한다.
    * 대시보드→창고 교차 진입 순간 React searchParams 가 아직 직전 탭(tab=dashboard)으로
@@ -41,6 +42,8 @@ export type UseIoUrlSyncArgs = {
 };
 
 export type UseIoUrlSyncApi = {
+  /** Owner already wrote the home URL; do not add a duplicate step entry. */
+  resetForHome: () => void;
   /**
    * Step 3 (bundles>0 로 Step 4 가 동시 노출된 상태) 에서 곧장 5 로 점프하면
    * URL history 에 step=4 가 안 쌓여 뒤로 가기가 step=3 으로 떨어진다.
@@ -50,7 +53,11 @@ export type UseIoUrlSyncApi = {
 };
 
 export function useIoUrlSync(args: UseIoUrlSyncArgs): UseIoUrlSyncApi {
-  const { step, goTo, canAdvance, router, searchParams, pathname, tabParam, suppressInitialSync = false } = args;
+  const { step, goTo, canAdvance, router, searchParams, pathname, tabParam, suppressInitialSync = false, synchronousHistory = false } = args;
+  function pushStep(href: string): void {
+    if (synchronousHistory) window.history.pushState({ ...window.history.state }, "", href);
+    else router.push(href, { scroll: false });
+  }
 
   const urlStep = useMemo<IoStep>(() => {
     const raw = Number(searchParams.get("step"));
@@ -76,14 +83,16 @@ export function useIoUrlSync(args: UseIoUrlSyncArgs): UseIoUrlSyncApi {
       return;
     }
     const forceInitialStepPush = forceInitialStepPushRef.current;
-    if (!forceInitialStepPush && urlStep === step) return;
+    const liveRaw = synchronousHistory ? Number(new URLSearchParams(window.location.search).get("step")) : urlStep;
+    const currentUrlStep = liveRaw >= 1 && liveRaw <= 5 ? liveRaw : 1;
+    if (!forceInitialStepPush && currentUrlStep === step) return;
     const next = new URLSearchParams(
       typeof window !== "undefined" ? window.location.search : searchParams.toString(),
     );
     next.set("step", String(step));
     // lagged searchParams 로 인한 stale tab 보존을 차단 — 위저드가 속한 탭으로 고정.
     if (tabParam) next.set("tab", tabParam);
-    router.push(`${pathname}?${next.toString()}`, { scroll: false });
+    pushStep(`${pathname}?${next.toString()}`);
     forceInitialStepPushRef.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
@@ -124,11 +133,15 @@ export function useIoUrlSync(args: UseIoUrlSyncArgs): UseIoUrlSyncApi {
       );
       next.set("step", String(target));
       if (tabParam) next.set("tab", tabParam);
-      router.push(`${pathname}?${next.toString()}`, { scroll: false });
+      pushStep(`${pathname}?${next.toString()}`);
     }
     if (shouldMoveState) goTo(target);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlStep]);
 
-  return { pendingFinalStepRef };
+  return { pendingFinalStepRef, resetForHome: () => {
+    pendingFinalStepRef.current = null;
+    skipNextPushRef.current = step !== 1;
+    forceInitialStepPushRef.current = false;
+  } };
 }

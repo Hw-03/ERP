@@ -1,4 +1,5 @@
 "use client";
+import { useDesktopWorkGuard } from "../DesktopTabHome";
 
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
@@ -127,6 +128,7 @@ export function ItemConversionWorkView({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [executeConfirmOpen, setExecuteConfirmOpen] = useState(false);
+  useDesktopWorkGuard("item-conversion", !!sourceId || !!targetId || quantity !== 1 || !!memo, busy);
 
   const candidates = useMemo(
     () => items.filter(isConvertibleItem).sort((a, b) => (a.mes_code ?? "").localeCompare(b.mes_code ?? "")),

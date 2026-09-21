@@ -4,6 +4,8 @@ import type { ReactElement } from "react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import type { WarehouseMap } from "@/lib/api/warehouse-map";
 import { DesktopWarehouseMapView } from "../DesktopWarehouseMapView";
+import { DesktopTabHomeProvider, useDesktopTabHomeController } from "../DesktopTabHome";
+import { DirtyGuardProvider } from "@/lib/ui/dirty-guard";
 
 const mapApiMock = vi.hoisted(() => ({
   getMap: vi.fn(),
@@ -59,6 +61,22 @@ function renderWithClient(ui: ReactElement) {
 }
 
 describe("DesktopWarehouseMapView fullscreen", () => {
+  it("동일 탭 복귀는 앵글 상세만 닫고 검색과 지도 컨테이너를 유지한다", async () => {
+    mapApiMock.getMap.mockResolvedValue(mapFixture);
+    function HomeButton() {
+      const { requestHome } = useDesktopTabHomeController();
+      return <button onClick={() => requestHome()}>지도 첫 화면</button>;
+    }
+    renderWithClient(<DirtyGuardProvider><DesktopTabHomeProvider><HomeButton /><DesktopWarehouseMapView /></DesktopTabHomeProvider></DirtyGuardProvider>);
+    fireEvent.change(screen.getByPlaceholderText(/품목명.*코드 검색/), { target: { value: "전극" } });
+    fireEvent.click(await screen.findByRole("button", { name: "앵글 1 1 x 1" }));
+    const card = screen.getByTestId("warehouse-map-card");
+    expect(screen.getByRole("button", { name: "뒤로" })).toBeInTheDocument();
+    fireEvent.click(screen.getByText("지도 첫 화면"));
+    expect(screen.getByRole("button", { name: "앵글 1 1 x 1" })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/품목명.*코드 검색/)).toHaveValue("전극");
+    expect(screen.getByTestId("warehouse-map-card")).toBe(card);
+  });
   it("최초 조회 중에도 검색 도구줄과 지도 캔버스 자리를 유지한다", () => {
     mapApiMock.getMap.mockReturnValue(new Promise(() => {}));
 

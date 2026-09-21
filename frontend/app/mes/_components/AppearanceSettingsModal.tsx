@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState, type ElementType, type ReactNode } from "react";
+import { useDesktopTabHome, useDesktopWorkGuard } from "./DesktopTabHome";
+import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import { BellRing, Check, KeyRound, Moon, PanelLeftClose, PanelLeftDashed, PanelLeftOpen, Settings2, Sun, X } from "lucide-react";
 import { api } from "@/lib/api";
 import { employeesApi } from "@/lib/api/employees";
@@ -110,17 +112,22 @@ export function DesktopSettingsView({
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [pinExpanded, closePinPopup]);
 
-  const handleSave = async () => {
+  const handleSave = async (propagateError = false) => {
     setSaving(true);
     setError(null);
     try {
       await onSave(draft);
-    } catch {
+    } catch (saveError) {
       setError("설정을 저장하지 못했습니다. 다시 시도해 주세요.");
+      if (propagateError) throw saveError;
     } finally {
       setSaving(false);
     }
   };
+
+  useRegisterDirty("desktop-settings", JSON.stringify(draft) !== JSON.stringify(preferences), () => handleSave(true));
+  useDesktopWorkGuard("desktop-settings-pin", !!pinCurrent || !!pinNew || !!pinConfirm, busy);
+  useDesktopTabHome("settings", { isHome: !pinExpanded, busy, preservesDraft: !pinCurrent && !pinNew && !pinConfirm, returnHome: resetPinSettings });
 
   const openAdminPinEntry = () => {
     if (busy || !canOpenAdmin || !onOpenAdminPinEntry) return;
@@ -417,7 +424,7 @@ export function DesktopSettingsView({
           <button
             type="button"
             disabled={busy}
-            onClick={handleSave}
+            onClick={() => void handleSave()}
             className="standard-hover rounded-xl px-5 py-3 text-sm font-black transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             style={{ color: LEGACY_COLORS.white, background: LEGACY_COLORS.blueSolid }}
           >

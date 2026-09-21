@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useDesktopQueryState, useDesktopTabHome } from "./DesktopTabHome";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, MapPin, Maximize2, Plus, Save, Search, Trash2, X } from "lucide-react";
 import type { Item } from "@/lib/api";
@@ -136,7 +137,7 @@ export function DesktopWarehouseMapView({
   const [busy, setBusy] = useState(false);
   const [zoneBusy, setZoneBusy] = useState(false);
 
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useDesktopQueryState("warehouse-map-search", "");
   // 품목 단위 후보(드롭다운). 선택 전에는 여기에 후보들이, 선택 후에는 null.
   const [itemMatches, setItemMatches] = useState<ItemMatch[] | null>(null);
   // 현재 선택된 품목(칩 스트립 라벨·선택 상태 표시용). 선택 전 null.
@@ -150,6 +151,25 @@ export function DesktopWarehouseMapView({
   const searchInputRef = useRef<HTMLInputElement>(null);
   // history drill depth — 드릴다운을 browser history에 쌓아 브라우저 뒤로가기 지원 (DesktopHistoryView 선례)
   const wmDepthRef = useRef(0);
+  useDesktopTabHome("warehouse-map-detail", {
+    isHome: stage === "floor" && !panel && !zonePanel && !addBox && !selectedItem,
+    busy: busy || zoneBusy,
+    returnHome: () => {
+      stageRef.current = "floor";
+      setStageAnimationSeq(0);
+      setStage("floor");
+      setCurAngle(null);
+      setCurRow(1);
+      setPanel(null);
+      setZonePanel(null);
+      setAddBox(null);
+      setSelectedItem(null);
+      setLocGuide(null);
+      setActiveHitKey(null);
+      setPulse(null);
+      wmDepthRef.current = 0;
+    },
+  });
 
   useEffect(() => {
     const nextMap = mapQuery.data;

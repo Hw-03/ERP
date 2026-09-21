@@ -1,4 +1,5 @@
 "use client";
+import { useDesktopTabHome } from "../DesktopTabHome";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -248,7 +249,8 @@ export function IoComposeView({
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
-  const { pendingFinalStepRef } = useIoUrlSync({
+  const { pendingFinalStepRef, resetForHome } = useIoUrlSync({
+    synchronousHistory: true,
     step: state.step,
     goTo: state.goTo,
     canAdvance: state.canAdvance,
@@ -884,6 +886,25 @@ export function IoComposeView({
     restoredNonceRef.current = null;
     state.goTo(1);
   }
+
+  useDesktopTabHome("warehouse-compose", {
+    isHome: state.step === 1 && itemConversionView === "compose",
+    busy: submitting || drafting || pulling,
+    returnHome: () => {
+      bumpOperationGeneration();
+      autosaveBatchIdRef.current = null;
+      restoredDraftRef.current = null;
+      restoredNonceRef.current = null;
+      setHasDraftOnServer(false);
+      setContentDirty(false);
+      setResult(null);
+      setError(null);
+      setItemConversionView("compose");
+      setItemConversionHistoryStep(1);
+      resetForHome();
+      state.reset();
+    },
+  });
 
   const workChrome = itemPickerFullscreen ? undefined : (
     <div className="iwc">

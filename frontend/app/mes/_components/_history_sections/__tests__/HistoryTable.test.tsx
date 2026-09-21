@@ -12,6 +12,8 @@ import { HistoryTable, HistoryTableSkeleton } from "../HistoryTable";
 import type { HistorySelection } from "../historyConstants";
 import type { LogGroup } from "../historyTableHelpers";
 import * as historyHelpers from "../historyTableHelpers";
+import { DirtyGuardProvider } from "@/lib/ui/dirty-guard";
+import { DesktopTabHomeProvider, useDesktopTabHomeController } from "../../DesktopTabHome";
 
 it("reserves the timestamp toggle and stock quantity slots in loading rows", () => {
   const { container } = render(<HistoryTableSkeleton />);
@@ -324,6 +326,20 @@ describe("HistoryTable hierarchy", () => {
     );
     expect(screen.queryByText(child.item_name)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "작업 구성 펼치기" })).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("같은 탭 복귀는 검색으로 자동 펼쳐진 행도 접는다", () => {
+    const { child, groups } = makeOperationGroup();
+    function HomeButton() {
+      const { requestHome } = useDesktopTabHomeController();
+      return <button onClick={() => requestHome()}>내역 첫 화면</button>;
+    }
+    render(<DirtyGuardProvider><DesktopTabHomeProvider><HomeButton />
+      <HistoryTable loading={false} displayGroups={[{ ...groups[0], matchedLogIds: [child.log_id] }]} selection={null} onSelectLog={vi.fn()} onSelectBatch={vi.fn()} batchCache={new Map()} setBatchCache={vi.fn()} canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} />
+    </DesktopTabHomeProvider></DirtyGuardProvider>);
+    expect(screen.getByText(child.item_name)).toBeInTheDocument();
+    fireEvent.click(screen.getByText("내역 첫 화면"));
+    expect(screen.queryByText(child.item_name)).not.toBeInTheDocument();
   });
 
   it("opens the matched BOM line inside a search-matched operation batch", () => {

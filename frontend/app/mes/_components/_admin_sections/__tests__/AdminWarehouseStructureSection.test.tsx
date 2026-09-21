@@ -18,6 +18,7 @@ vi.mock("@/lib/api/warehouse-map", () => ({
 }));
 
 import { AdminWarehouseStructureSection } from "../AdminWarehouseStructureSection";
+import { DesktopHomeHarness } from "../../__tests__/DesktopHomeHarness";
 
 const structures = [
   {
@@ -84,6 +85,15 @@ describe("AdminWarehouseStructureSection 확인 동작", () => {
     }));
     state.deleteAngle.mockResolvedValue(undefined);
     vi.stubGlobal("ResizeObserver", ResizeObserverStub);
+  });
+
+  it("구조 추가 처리 중에는 같은 탭 복귀를 차단한다", async () => {
+    state.createAngle.mockReturnValue(new Promise(() => {}));
+    render(<DesktopHomeHarness><AdminWarehouseStructureSection onStatusChange={vi.fn()} onError={vi.fn()} /></DesktopHomeHarness>);
+    fireEvent.click(await screen.findByRole("button", { name: "앵글 추가", exact: true }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "추가", exact: true }));
+    fireEvent.click(screen.getByText("현재 메뉴 복귀"));
+    expect(screen.queryByText("메뉴 첫 화면")).not.toBeInTheDocument();
   });
 
   it.each([

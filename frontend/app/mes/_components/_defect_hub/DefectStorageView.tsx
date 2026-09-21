@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useDesktopQueryState, useDesktopWorkGuard } from "../DesktopTabHome";
 import { createPortal } from "react-dom";
 import { ArrowLeft, LoaderCircle } from "lucide-react";
 import { defectsApi } from "@/lib/api/defects";
@@ -53,8 +54,8 @@ export function DefectStorageView({
   loadError?: string | null;
   onRetry?: () => void;
 }) {
-  const [filter, setFilter] = useState<StorageFilter>("ALL");
-  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useDesktopQueryState<StorageFilter>("defect-storage-filter", "ALL");
+  const [search, setSearch] = useDesktopQueryState("defect-storage-search", "");
   const [selected, setSelected] = useState<DefectLocation | null>(null);
   const {
     scope, actorScope, sort, filterLocked, setScope, setActorScope, setSort, setFilterLocked,
@@ -121,6 +122,7 @@ export function ManagementCategoryModal({
   const [memo, setMemo] = useState("");
   const [pin, setPin] = useState("");
   const [saving, setSaving] = useState(false);
+  useDesktopWorkGuard("defect-management", category !== initialCategory || !!memo || !!pin, saving);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => setMounted(true), []);

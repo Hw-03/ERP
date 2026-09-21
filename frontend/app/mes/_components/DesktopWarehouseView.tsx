@@ -1,5 +1,6 @@
 "use client";
 import { ReadLoading } from "./common/ReadState";
+import { useDesktopTabHome } from "./DesktopTabHome";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type IoBatch, type Item, type StockRequest } from "@/lib/api";
@@ -107,6 +108,20 @@ export function DesktopWarehouseView({
   const [handoverInboxCount, setHandoverInboxCount] = useState(0);
   const [itemConversionFocused, setItemConversionFocused] = useState(false);
   const [workAreaEmpty, setWorkAreaEmpty] = useState(false);
+  useDesktopTabHome("warehouse-section", {
+    isHome: sectionTab === "compose" && !targetRequestId && !restoreIoDraft && !urlDraftPending && !itemConversionFocused,
+    returnHome: () => {
+      restoredUrlDraftRef.current = urlDraftId;
+      setSectionTab("compose");
+      setTargetRequestId(null);
+      setRestoreIoDraft(null);
+      setUrlDraftPending(false);
+      setUrlDraftRestoreError(null);
+      setItemConversionFocused(false);
+      setWorkAreaEmpty(false);
+      onItemPickerFullscreenChange?.(false);
+    },
+  });
   const [loadingCounts, setLoadingCounts] = useState<WarehouseSectionTab[]>(() => {
     const id = operator?.employee_id ?? "";
     const pending: WarehouseSectionTab[] = [];
@@ -190,6 +205,7 @@ export function DesktopWarehouseView({
     void ioDraftsPromise
       .then((ioRows) => {
         if (cancelled) return;
+        if (new URLSearchParams(window.location.search).get("draftId") !== urlDraftId) return;
         const matchingDraft = ioRows.find((draft) => draft.batch_id === urlDraftId);
         if (!matchingDraft) {
           setUrlDraftRestoreError("저장한 작업을 찾을 수 없습니다.");

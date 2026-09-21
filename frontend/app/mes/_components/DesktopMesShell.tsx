@@ -1,11 +1,15 @@
 "use client";
 
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { DesktopTabHomeProvider, useDesktopTabHome, useDesktopTabHomeController } from "./DesktopTabHome";
 import { InventoryItemsTable } from "./_inventory_sections/InventoryItemsTable";
 import { InventoryKpiPanel } from "./_inventory_sections/InventoryKpiPanel";
 import { InventoryCapacitySkeleton } from "./_inventory_sections/InventoryCapacityPanel";
+import { InventoryFilterToggleButton } from "./_inventory_sections/InventoryFilterToggleButton";
+import { InventoryTableStickyHeader } from "./_inventory_sections/InventoryFilterBar";
 import { HistoryTableSkeleton } from "./_history_sections/HistoryTable";
 import { HistoryStatsBar } from "./_history_sections/HistoryStatsBar";
+import { HistoryFilterBar } from "./_history_sections/HistoryFilterBar";
 import type { ElementType, ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
@@ -77,7 +81,9 @@ export function DesktopMesShell({
 }) {
   return (
     <DirtyGuardProvider>
+      <DesktopTabHomeProvider>
       <DesktopMesShellInner onBeforeViewportSwitchChange={onBeforeViewportSwitchChange} />
+      </DesktopTabHomeProvider>
     </DirtyGuardProvider>
   );
 }
@@ -91,6 +97,19 @@ function DesktopMesShellInner({
   const router = useRouter();
   const queryClient = useQueryClient();
   const confirmAdminNavigation = useConfirmNavigation();
+  const { requestHome, returnSequence } = useDesktopTabHomeController();
+  const homeMotionRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (!returnSequence || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const body = homeMotionRef.current;
+    // Large menu cards need a full reveal; a 70% start looks like an instant swap.
+    const isCardHub = body?.dataset.activeTab === "shipping" || body?.dataset.activeTab === "defect";
+    const animation = body?.animate?.(
+      [{ opacity: isCardHub ? 0 : 0.7 }, { opacity: 1 }],
+      { duration: isCardHub ? 200 : 180, easing: "ease-out" },
+    );
+    return () => animation?.cancel();
+  }, [returnSequence]);
   const flushDirtyEntries = useFlushDirtyEntries();
   const operator = useCurrentOperator();
   const { preferences, savePreferences } = useAppearancePreferences();
@@ -184,10 +203,6 @@ function DesktopMesShellInner({
   }, [activeTab]);
 
   function handleTabChange(tab: DesktopTabId) {
-    if (warehouseMapFullscreen && tab === activeTab) {
-      commitDesktopTab(tab, { navigation: "none" });
-      return;
-    }
     if (!canOpenTab(tab)) {
       if (fallbackTab !== activeTab) {
         commitDesktopTab(fallbackTab);
@@ -195,28 +210,19 @@ function DesktopMesShellInner({
       return;
     }
     if (tab === activeTab) {
-      const doReset = () => {
-        if (tab === "warehouse" || tab === "shipping") {
-          router.push(`?tab=${tab}`, { scroll: false });
+      if (activeTab !== contentTab) return;
+      requestHome(() => {
+        if (tab === "shipping") return; // Its owner synchronizes the guarded URL transition.
+        const url = new URL(window.location.href);
+        const state = { ...window.history.state };
+        if (tab === "warehouse") {
+          for (const name of ["section", "step", "draftId", "stockRequestId"]) url.searchParams.delete(name);
+          delete state.wic;
         }
-        if (tab === "defect") {
-          const currentState = window.history.state;
-          window.history.replaceState(
-            currentState && typeof currentState === "object"
-              ? { ...currentState, defect: "hub" }
-              : { defect: "hub" },
-            "",
-          );
-        }
-        if (tab !== "admin") {
-          setRefreshNonce((n) => n + 1);
-        }
-      };
-      if (tab === "warehouse" || tab === "shipping") {
-        confirmAdminNavigation(doReset);
-      } else {
-        doReset();
-      }
+        if (tab === "defect") state.defect = "hub";
+        if (tab === "warehouseMap") { delete state.wm; state.wmDepth = 0; }
+        window.history.pushState(state, "", url);
+      });
       return;
     }
     // 트리거 (c) — 메인 탭 변경. dirty 등록된 섹션(admin / warehouse-io)이 있으면
@@ -373,6 +379,14 @@ function DesktopMesShellInner({
     refetch: refetchCapacity,
   } = useProductionCapacityQuery();
   const [capacityModal, setCapacityModal] = useState(false);
+  useDesktopTabHome("shell-overlays", {
+    isHome: !capacityModal && !(activeTab === "warehouse" && (warehousePreselected || warehouseIntent || itemPickerFullscreen)),
+    returnHome: () => {
+      setCapacityModal(false);
+      clearWarehouseEntry();
+      setItemPickerFullscreen(false);
+    },
+  });
   const [stockWarnings, setStockWarnings] = useState<{ low: number; zero: number } | null>(null);
 
   const activeMeta = TAB_META[activeTab];
@@ -530,11 +544,16 @@ function DesktopMesShellInner({
             <div className={`${warehouseMapFullscreen || isItemPickerFullscreen ? "" : "mt-3"} desktop-tab-content min-h-0 flex-1 overflow-hidden flex`}>
               <div
                 key={activeTab}
+                ref={homeMotionRef}
                 data-testid="desktop-tab-transition"
                 data-active-tab={activeTab}
-                className="animate-desktop-tab-enter flex min-h-0 min-w-0 flex-1"
+                className={`${activeTab !== "dashboard" && activeTab !== "history" ? "animate-desktop-tab-enter " : ""}flex min-h-0 min-w-0 flex-1`}
               >
-                {activeTab === contentTab ? content : <DesktopTabLoading tab={activeTab} />}
+                {activeTab === "dashboard" || activeTab === "history" ? (
+                  <DesktopDataTransition ready={activeTab === contentTab} tab={activeTab}>
+                    {content}
+                  </DesktopDataTransition>
+                ) : content}
               </div>
             </div>
           </div>
@@ -545,15 +564,81 @@ function DesktopMesShellInner({
 }
 
 /** 메뉴·제목을 먼저 그리는 동안 대상 화면의 공간을 유지한다. */
+function DesktopDataTransition({ ready, tab, children }: { ready: boolean; tab: DesktopTabId; children: ReactNode }) {
+  const [coverVisible, setCoverVisible] = useState(!ready);
+
+  // 실제 내용을 먼저 마운트하고 덮개만 걷어내므로 카드와 검색창이 배경으로 깜빡이지 않는다.
+  useEffect(() => {
+    if (!ready || !coverVisible) return;
+    const timer = window.setTimeout(() => setCoverVisible(false), 240);
+    return () => window.clearTimeout(timer);
+  }, [ready, coverVisible]);
+
+  return (
+    <div className="desktop-data-transition relative flex min-h-0 min-w-0 flex-1">
+      {ready && children}
+      {coverVisible && (
+        <div
+          data-testid="desktop-loading-cover"
+          aria-hidden={ready || undefined}
+          inert={ready || undefined}
+          className={`absolute inset-0 z-40 flex ${ready ? "desktop-loading-cover-exit pointer-events-none" : ""}`}
+          style={{ background: LEGACY_COLORS.bg }}
+        >
+          <DesktopTabLoading tab={tab} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DesktopTabLoading({ tab }: { tab: DesktopTabId }) {
-  return <div role="status" aria-busy="true" aria-label={`${TAB_META[tab].title} 화면을 불러오는 중입니다`} className="min-w-0 w-full space-y-3 overflow-hidden">
-    {tab === "history"
-      ? <HistoryStatsBar baseline={null} currentCount={null} loading loadingDisplay="skeleton" periodLabel="이번달" />
-      : <InventoryKpiPanel cards={[]} activeKey="ALL" onChange={() => {}} loading />}
-    {tab === "dashboard" ? <InventoryCapacitySkeleton /> : null}
-    {tab === "dashboard" ? <InventoryItemsTable loading error={null} filteredItems={[]} displayLimit={100}
-      setDisplayLimit={() => {}} selectedItem={null} onSelectItem={() => {}} activeFilterCount={0}
-      hasKpiFilter={false} onRetry={() => {}} onResetAllFilters={() => {}} />
-      : <HistoryTableSkeleton />}
+  if (tab === "dashboard") return <DashboardTabLoading />;
+  if (tab === "history") return <HistoryTabLoading />;
+  return null;
+}
+
+function DashboardTabLoading() {
+  return <div role="status" aria-busy="true" aria-label="대시보드 화면을 불러오는 중입니다" className="flex min-h-0 min-w-0 flex-1 pl-0 lg:pr-4">
+    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="sg min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable] sm:block sm:overflow-y-scroll">
+        <div className="min-h-full">
+          <div className="flex flex-col gap-3">
+            <section className="card desktop-flat-surface" style={{ padding: "14px 16px" }}>
+              <InventoryKpiPanel cards={[]} activeKey="ALL" onChange={() => {}} loading />
+              <div className="mt-3 flex items-stretch gap-2">
+                <InventoryCapacitySkeleton />
+                <InventoryFilterToggleButton filtersOpen={false} logic="AND" onLogicChange={() => {}} onToggle={() => {}} disabled />
+              </div>
+            </section>
+            <section aria-label="자재 목록" className="card desktop-flat-surface">
+              <InventoryTableStickyHeader searchValue="" onSearchChange={() => {}} count={0} isFiltered={false} disabled />
+              <InventoryItemsTable loading error={null} filteredItems={[]} displayLimit={100} skeletonRowCount={20}
+                setDisplayLimit={() => {}} selectedItem={null} onSelectItem={() => {}} activeFilterCount={0}
+                hasKpiFilter={false} onRetry={() => {}} onResetAllFilters={() => {}} />
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>;
+}
+
+function HistoryTabLoading() {
+  return <div role="status" aria-busy="true" aria-label="입출고 내역 화면을 불러오는 중입니다" className="flex min-h-0 min-w-0 flex-1 pl-0 lg:pr-1">
+    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="sg min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable] sm:block sm:overflow-y-scroll">
+        <div className="min-h-full">
+          <div className="flex flex-col gap-2">
+            <HistoryStatsBar baseline={null} currentCount={null} loading loadingDisplay="skeleton" periodLabel="이번달" hasListFilters={false} />
+            <HistoryFilterBar search="" setSearch={() => {}} dateFilter="MONTH" setDateFilter={() => {}}
+              filterPanelOpen={false} onToggleFilterPanel={() => {}} activeFilterCount={0}
+              calendarOpen={false} onToggleCalendar={() => {}} selectedDay={null} onClearSelectedDay={() => {}}
+              selectedMonth={null} onClearSelectedMonth={() => {}} flatSurface disabled />
+            <HistoryTableSkeleton />
+          </div>
+        </div>
+      </div>
+    </div>
   </div>;
 }

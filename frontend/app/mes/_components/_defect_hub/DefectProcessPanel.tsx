@@ -1,4 +1,5 @@
 "use client";
+import { useDesktopWorkGuard } from "../DesktopTabHome";
 
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
@@ -67,6 +68,7 @@ export function DefectProcessPanel({
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  useDesktopWorkGuard("defect-process", processQty !== availableQty || !!category || !!memo || decisions.length > 0, busy);
   const locationIdentity = processingLocations.map((current) => current.record_id).join(":");
   const locationIdentityRef = useRef(locationIdentity);
   const batchRequestIdsRef = useRef<Partial<Record<ProcessAction, string>>>({});

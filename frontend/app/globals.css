@@ -608,12 +608,31 @@
 
 /* === 데스크톱 메인 탭 전환 === */
 @keyframes desktopTabEnter {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .animate-desktop-tab-enter {
-  animation: desktopTabEnter 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  animation: desktopTabEnter 140ms ease-out;
+}
+
+/* 데이터 교체 시 외곽은 유지하고 스켈레톤 덮개와 값만 부드럽게 전환한다. */
+@keyframes desktopLoadingCoverExit {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.desktop-loading-cover-exit {
+  animation: desktopLoadingCoverExit 240ms ease-in-out both;
+}
+
+.desktop-data-transition .mes-data-reveal {
+  animation: desktopTabEnter 240ms ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-loading-cover-exit { animation: none; opacity: 0; }
+  .desktop-data-transition .mes-data-reveal { animation: none; }
 }
 
 /* === 불량 탭 내부 뷰 전환 === */

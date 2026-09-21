@@ -21,6 +21,7 @@ type ModalState = {
   save: () => Promise<void> | void;
   proceed: () => void;
   confirmOnly: boolean;
+  cancel?: () => void;
 };
 
 type DirtyEntry = {
@@ -31,7 +32,7 @@ type DirtyEntry = {
 };
 
 type ProviderContextValue = {
-  openModal: (save: () => Promise<void> | void, proceed: () => void, confirmOnly?: boolean) => void;
+  openModal: (save: () => Promise<void> | void, proceed: () => void, confirmOnly?: boolean, cancel?: () => void) => void;
   registryRef: React.MutableRefObject<Map<string, DirtyEntry>>;
 };
 
@@ -193,6 +194,7 @@ function DirtyModal({
 }
 export function DirtyGuardProvider({ children }: { children: ReactNode }) {
   const registryRef = useRef<Map<string, DirtyEntry>>(new Map());
+  const afterSaveRef = useRef<(() => void) | null>(null);
   const [modal, setModal] = useState<ModalState>({
     open: false,
     busy: false,
@@ -201,8 +203,8 @@ export function DirtyGuardProvider({ children }: { children: ReactNode }) {
     confirmOnly: false,
   });
 
-  const openModal = useCallback((save: () => Promise<void> | void, proceed: () => void, confirmOnly = false) => {
-    setModal({ open: true, busy: false, save, proceed, confirmOnly });
+  const openModal = useCallback((save: () => Promise<void> | void, proceed: () => void, confirmOnly = false, cancel?: () => void) => {
+    setModal({ open: true, busy: false, save, proceed, confirmOnly, cancel });
   }, []);
 
   useEffect(() => {
@@ -218,15 +220,22 @@ export function DirtyGuardProvider({ children }: { children: ReactNode }) {
 
   const ctx: ProviderContextValue = { openModal, registryRef };
 
+  useEffect(() => {
+    if (modal.open || !afterSaveRef.current) return;
+    const proceed = afterSaveRef.current;
+    afterSaveRef.current = null;
+    // The saved screen's busy/dirty state must commit before navigation reads it.
+    proceed();
+  }, [modal.open]);
+
   const handleSaveAndProceed = useCallback(() => {
     if (modal.busy) return;
     setModal((prev) => ({ ...prev, busy: true }));
     Promise.resolve()
       .then(() => modal.save())
       .then(() => {
-        const proceed = modal.proceed;
+        afterSaveRef.current = modal.proceed;
         setModal((prev) => ({ ...prev, open: false, busy: false }));
-        proceed();
       })
       .catch(() => {
         setModal((prev) => ({ ...prev, busy: false }));
@@ -247,8 +256,9 @@ export function DirtyGuardProvider({ children }: { children: ReactNode }) {
 
   const handleCancel = useCallback(() => {
     if (modal.busy) return;
+    modal.cancel?.();
     setModal((prev) => ({ ...prev, open: false }));
-  }, [modal.busy]);
+  }, [modal]);
 
   return (
     <DirtyGuardContext.Provider value={ctx}>
@@ -294,14 +304,14 @@ export function useRegisterDirty(
   }, [ctx, key, dirty, options?.mode]);
 }
 
-export function useConfirmNavigation(): (proceed: () => void) => void {
+export function useConfirmNavigation(): (proceed: () => void, cancel?: () => void) => void {
   const ctx = useContext(DirtyGuardContext);
   if (!ctx) {
     throw new Error("useConfirmNavigation must be used inside <DirtyGuardProvider>");
   }
 
   return useCallback(
-    (proceed: () => void) => {
+    (proceed: () => void, cancel?: () => void) => {
       const dirtyEntries = Array.from(ctx.registryRef.current.values()).filter((entry) => entry.dirty);
       if (dirtyEntries.length === 0) {
         proceed();
@@ -312,7 +322,7 @@ export function useConfirmNavigation(): (proceed: () => void) => void {
           await Promise.resolve(entry.save());
         }
       };
-      ctx.openModal(aggregateSave, proceed, dirtyEntries.every((entry) => entry.confirmOnly));
+      ctx.openModal(aggregateSave, proceed, dirtyEntries.some((entry) => entry.confirmOnly), cancel);
     },
     [ctx],
   );

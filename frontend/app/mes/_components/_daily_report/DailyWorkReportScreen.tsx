@@ -1,4 +1,5 @@
 "use client";
+import { useDesktopTabHome } from "../DesktopTabHome";
 
 import { CircleAlert, ClipboardList, FileText, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -122,6 +123,12 @@ export function DailyWorkReportScreen({
   const selectedReportQuery = useDailyWorkReportQuery(targetEmployeeId, workDate);
   const activityQuery = useDailyWorkActivityQuery(targetEmployeeId, workDate, { live: workDate === today });
   const saveMutation = useSaveDailyWorkReport();
+  useDesktopTabHome("daily-report", {
+    isHome: tab === "mine" && !isActivityDetailOpen,
+    busy: saveMutation.isPending,
+    preservesDraft: tab === "mine",
+    returnHome: () => { setTab("mine"); setSelectedEmployeeId(null); setIsActivityDetailOpen(false); },
+  });
   const editable = Boolean(employeeId && targetEmployeeId === employeeId);
   const report = tab === "mine" ? reportQuery.data : selectedReportQuery.data;
   const reports = sortReportsByDepartment([...(reportsQuery.data ?? [])]);

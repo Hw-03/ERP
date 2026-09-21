@@ -2,6 +2,7 @@
 
 import { ArrowRight, ChevronRight, ClipboardList, Clock3, Factory, PackageCheck, RotateCcw, Truck, UserRound, Warehouse } from "lucide-react";
 import { useState } from "react";
+import { useDesktopTabHome } from "../DesktopTabHome";
 import type { DailyWorkActivity as DailyWorkActivityData } from "@/lib/api/types/daily-work-reports";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TruncatedText } from "@/lib/ui/TruncatedText";
@@ -208,6 +209,11 @@ function DailyWorkActivityDetail({ group }: { group: DailyWorkActivityData["deta
 
 export function DailyWorkActivity({ activity, onDetailOpenChange, loading = false }: { activity?: DailyWorkActivityData; onDetailOpenChange?: (isOpen: boolean) => void; loading?: boolean }) {
   const [openOperation, setOpenOperation] = useState<string | null>(null);
+  useDesktopTabHome("daily-work-activity", {
+    isHome: openOperation === null,
+    preservesDraft: true,
+    returnHome: () => { setOpenOperation(null); onDetailOpenChange?.(false); },
+  });
 
   return (
     <section className="rounded-[20px] border p-4 lg:shrink-0 lg:px-5 lg:py-4" aria-labelledby="daily-work-activity-title" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>

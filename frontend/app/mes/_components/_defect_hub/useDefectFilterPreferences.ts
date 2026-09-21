@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useDesktopQueryState } from "../DesktopTabHome";
 import type { DefectActorScope, DefectProcessStep, DefectScope, DefectSort } from "./DefectFilterBar";
 
 const STORAGE_PREFIX = "dexcowin_mes_defect_filters:";
@@ -149,6 +150,9 @@ export function useDefectFilterPreferences({
   defectDeptFilter,
   storageScope = "regular",
 }: UseDefectFilterPreferencesOptions) {
+  const [retained, setRetained] = useDesktopQueryState<{ values: StoredFilterValues; locked: boolean } | null>(`defect-filters:${employeeId}:${storageScope}`, null);
+  const restoreKey = JSON.stringify([employeeId, defaultScope, defaultSort, currentDept, defectDeptFilter, storageScope]);
+  const initialRetainedRef = useRef({ key: restoreKey, value: retained });
   const [scope, setScopeState] = useState<DefectScope>(defaultScope);
   const [actorScope, setActorScopeState] = useState<DefectActorScope>("all");
   const [sort, setSortState] = useState<DefectSort>(defaultSort);
@@ -170,6 +174,7 @@ export function useDefectFilterPreferences({
 
   useEffect(() => {
     const saved = readSnapshot(employeeId, currentDept, storageScope);
+    const retained = initialRetainedRef.current.key === restoreKey ? initialRetainedRef.current.value : null;
     const effectiveScope = defectDeptFilter ? "my" : saved?.scope ?? defaultScope;
     const restoredValues: StoredFilterValues = {
       scope: effectiveScope,
@@ -181,16 +186,21 @@ export function useDefectFilterPreferences({
       selectedModels: saved?.selectedModels ?? [],
       selectedProcessSteps: saved?.selectedProcessSteps ?? [],
     };
-    valuesRef.current = restoredValues;
-    filterLockedRef.current = saved !== null;
-    setScopeState(effectiveScope);
-    setActorScopeState(restoredValues.actorScope);
-    setSortState(restoredValues.sort);
-    setDepartmentState(restoredValues.selectedDepartments);
-    setModelState(restoredValues.selectedModels);
-    setProcessStepState(restoredValues.selectedProcessSteps);
+    const values = retained && !defectDeptFilter ? retained.values : restoredValues;
+    valuesRef.current = values;
+    filterLockedRef.current = retained?.locked ?? saved !== null;
+    setScopeState(values.scope);
+    setActorScopeState(values.actorScope);
+    setSortState(values.sort);
+    setDepartmentState(values.selectedDepartments);
+    setModelState(values.selectedModels);
+    setProcessStepState(values.selectedProcessSteps);
     setFilterLockedState(filterLockedRef.current);
-  }, [employeeId, defaultScope, defaultSort, currentDept, defectDeptFilter, storageScope]);
+  }, [employeeId, defaultScope, defaultSort, currentDept, defectDeptFilter, storageScope, restoreKey]);
+
+  useEffect(() => {
+    setRetained({ values: { scope, actorScope, sort, selectedDepartments, selectedModels, selectedProcessSteps }, locked: filterLocked });
+  }, [scope, actorScope, sort, selectedDepartments, selectedModels, selectedProcessSteps, filterLocked, setRetained]);
 
   const persist = useCallback((next: StoredFilterValues): void => {
     if (!writeSnapshot(employeeId, { version: STORAGE_VERSION, ...next }, storageScope)) {

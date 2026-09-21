@@ -6,6 +6,7 @@ import type { Item, ItemConversionResult } from "@/lib/api";
 import { api } from "@/lib/api";
 import { IoWorkTypeStep } from "../IoWorkTypeStep";
 import { ItemConversionWorkView } from "../ItemConversionView";
+import { DesktopHomeHarness } from "../../__tests__/DesktopHomeHarness";
 
 vi.mock("@/lib/api", () => ({
   api: {
@@ -119,6 +120,27 @@ afterEach(() => {
 });
 
 describe("ItemConversionView", () => {
+  it.each([2, 3, 4])("품목 전환 %s단계 입력은 취소 시 유지하고 폐기 시에만 복귀한다", async (step) => {
+    render(<DesktopHomeHarness><ItemConversionWorkView items={items} loading={false} requesterEmployeeId={requesterEmployeeId} onComplete={() => {}} /></DesktopHomeHarness>);
+    fireEvent.change(screen.getByTestId("item-conversion-source-search"), { target: { value: "Domestic" } });
+    fireEvent.click(screen.getByTestId("item-conversion-source-option-af-1"));
+    fireEvent.change(screen.getByTestId("item-conversion-target-search"), { target: { value: "Export" } });
+    fireEvent.click(screen.getByTestId("item-conversion-target-option-af-2"));
+    if (step >= 3) {
+      fireEvent.click(screen.getByTestId("item-conversion-next-button"));
+      await screen.findByTestId("item-conversion-preview");
+      fireEvent.change(screen.getByTestId("item-conversion-memo"), { target: { value: "전환 검증 메모" } });
+    }
+    if (step === 4) fireEvent.click(screen.getByTestId("item-conversion-execute-next-button"));
+    fireEvent.click(screen.getByText("현재 메뉴 복귀"));
+    fireEvent.click(screen.getByRole("button", { name: "계속 머무르기" }));
+    expect(screen.queryByText("메뉴 첫 화면")).not.toBeInTheDocument();
+    expect(screen.getAllByTestId("item-conversion-step-nav-item")[step - 1]).toHaveAttribute("data-state", "active");
+    fireEvent.click(screen.getByText("현재 메뉴 복귀"));
+    fireEvent.click(screen.getByRole("button", { name: "나가기", exact: true }));
+    expect(screen.getByText("메뉴 첫 화면")).toBeInTheDocument();
+    expect(apiMock.executeItemConversion).not.toHaveBeenCalled();
+  });
   it("finds conversion candidates when code punctuation is omitted", () => {
     render(
       <ItemConversionWorkView

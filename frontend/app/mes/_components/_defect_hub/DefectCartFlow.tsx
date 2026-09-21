@@ -1,4 +1,5 @@
 "use client";
+import { useDesktopWorkGuard } from "../DesktopTabHome";
 
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -80,6 +81,7 @@ export function DefectCartFlow({
   const [busy, setBusy] = useState(false);
   const [failures, setFailures] = useState<LineFailure[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  useDesktopWorkGuard("defect-cart", lines.length > 0, busy);
 
   useEffect(() => {
     function restore(state: CartHistoryState) {
