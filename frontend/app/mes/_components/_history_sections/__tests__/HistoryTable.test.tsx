@@ -209,6 +209,43 @@ function makeDepartmentCorrectionOperationGroup() {
 }
 
 describe("HistoryTable hierarchy", () => {
+  it("uses the actual pickup item as the parent when a companion shipment is listed first", () => {
+    const companion = makeLog({
+      log_id: "shipment-companion",
+      item_name: "DX3000, ADX4000W 카톤 박스 [490x460x370 mm]",
+      transaction_type: "SHIP",
+      quantity_change: -5,
+      shipping_phase: "PICKUP",
+      notes: "동반 출하: DX3000_65kV, 1.7mA_USA_Vector [Black] x 10",
+      operation_id: "shipment-operation",
+      operation_role: "PRIMARY",
+      operation_kind: "BUSINESS",
+      operation_display_label: "출하 픽업",
+    });
+    const pickup = makeLog({
+      log_id: "shipment-pickup",
+      item_name: "DX3000_65kV, 1.7mA_USA_Vector [Black]",
+      transaction_type: "SHIP",
+      quantity_change: -10,
+      shipping_phase: "PICKUP",
+      notes: "출하 픽업: DX3000_65kV, 1.7mA_USA_Vector [Black] x 10",
+      operation_id: "shipment-operation",
+      operation_role: "PRIMARY",
+      operation_kind: "BUSINESS",
+      operation_display_label: "출하 픽업",
+    });
+
+    renderTable([{ type: "operation", operationId: "shipment-operation", logs: [companion, pickup] }]);
+
+    expect(screen.getByText(pickup.item_name).closest("tr")).toBeInTheDocument();
+    expect(screen.queryByText(companion.item_name)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "작업 구성 펼치기" }));
+
+    const companionRow = screen.getByText(companion.item_name).closest("tr")!;
+    expect(within(companionRow).getByText("동반 출하")).toBeInTheDocument();
+  });
+
   it("expands every search-matched operation group and highlights only matched children", () => {
     const first = makeOperationGroup();
     const secondPrimary = makeLog({

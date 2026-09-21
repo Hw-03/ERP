@@ -195,7 +195,7 @@ export function getReferenceBatchLinePresentation(
       return { label: "출하 준비", tone: "info" };
     }
     if (log.shipping_phase === "PICKUP") {
-      if (log.transaction_type === "SHIP") return { label: isShippingCompanionLog(log) ? "동반 출하품" : "출하품 출고", tone: "danger" };
+      if (log.transaction_type === "SHIP") return { label: isShippingCompanionLog(log) ? "동반 출하" : "출하품 출고", tone: "danger" };
       return { label: "출하 픽업", tone: "muted" };
     }
     if (log.transaction_type === "BACKFLUSH") return { label: "구성품 차감", tone: "warning" };
@@ -203,7 +203,7 @@ export function getReferenceBatchLinePresentation(
       return { label: "출하품 준비", tone: "info" };
     }
     if (log.transaction_type === "SHIP") {
-      return { label: isShippingCompanionLog(log) ? "동반 출하품" : "출하 대상", tone: "danger" };
+      return { label: isShippingCompanionLog(log) ? "동반 출하" : "출하 대상", tone: "danger" };
     }
     return { label: "출하 구성", tone: "muted" };
   }

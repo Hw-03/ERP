@@ -1237,6 +1237,35 @@ describe("history table helper rendering policies", () => {
     expect(screen.getByText("출고 품목 B")).toBeInTheDocument();
   });
 
+  it("uses the actual shipped item as the shipment title when its companion arrives first", () => {
+    const companion = makeLog({
+      log_id: "companion-carton",
+      item_id: "CARTON",
+      item_name: "DX3000, ADX4000W 카톤 박스 [490x460x370 mm]",
+      mes_code: "34-PR-0117",
+      shipping_phase: "PICKUP",
+      notes: "동반 출하: DX3000, ADX4000W 카톤 박스 [490x460x370 mm]",
+    });
+    const shipped = makeLog({
+      log_id: "actual-shipment",
+      item_id: "PF-0047",
+      item_name: "DX3000_65kV, 1.7mA_USA_Vector [Black]",
+      mes_code: "3-PF-0047",
+      shipping_phase: "PICKUP",
+      notes: "출하 픽업: DX3000_65kV, 1.7mA_USA_Vector [Black] x 10",
+    });
+
+    render(<table><tbody><ReferenceBatchDetail logs={[companion, shipped]} /></tbody></table>);
+
+    expect(screen.getByText("DX3000_65kV, 1.7mA_USA_Vector [Black]")).toBeInTheDocument();
+    expect(screen.queryByText("DX3000, ADX4000W 카톤 박스 [490x460x370 mm]")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "출하 구성 펼치기" }));
+
+    expect(screen.getByText("DX3000, ADX4000W 카톤 박스 [490x460x370 mm]")).toBeInTheDocument();
+    expect(screen.getByText("동반 출하")).toBeInTheDocument();
+  });
+
   it.each(["click", "Enter", " "])("toggles an expandable reference row with %s without selecting its log", (interaction) => {
     const onSelectLog = vi.fn();
     const first = makeLog({ log_id: "shipment-a", item_name: "출고 품목 A", transaction_type: "SHIP", shipping_phase: "PICKUP" });

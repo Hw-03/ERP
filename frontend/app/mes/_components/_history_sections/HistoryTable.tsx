@@ -27,6 +27,7 @@ import {
   type LogGroup,
 } from "./historyTableHelpers";
 import { BomBatchDetail } from "./BomBatchDetail";
+import { isShippingCompanionNote } from "./historyBatchInterpreter";
 import { ReworkBatchHeader } from "./ReworkBatchHeader";
 import { ReworkBatchDetail } from "./ReworkBatchDetail";
 
@@ -221,6 +222,13 @@ function getGroupPrimaryLog(group: LogGroup): TransactionLog {
 }
 
 function getOperationPrimaryLog(logs: TransactionLog[]): TransactionLog {
+  const pickupLog = logs.find((log) => (
+    log.transaction_type === "SHIP"
+    && log.shipping_phase === "PICKUP"
+    && !isShippingCompanionNote(log.notes)
+  ));
+  if (pickupLog) return pickupLog;
+
   const operationLabel = logs.find((log) => log.operation_display_label)?.operation_display_label ?? "";
   if (operationLabel.startsWith("disassemble")) {
     const disassemblyParent = logs.find((log) => log.transaction_type === "BACKFLUSH");

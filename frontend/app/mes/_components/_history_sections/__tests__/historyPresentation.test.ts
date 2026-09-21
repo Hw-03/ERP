@@ -559,11 +559,11 @@ describe("historyPresentation", () => {
     expect(getReferenceBatchLinePresentation(
       makeLog({ transaction_type: "SHIP", notes: "출하 동반 품목: PA 보드" }),
       "shipment",
-    ).label).toBe("동반 출하품");
+    ).label).toBe("동반 출하");
     expect(getReferenceBatchLinePresentation(
       makeLog({ transaction_type: "SHIP", notes: "동반 출하: PA 보드" }),
       "shipment",
-    ).label).toBe("동반 출하품");
+    ).label).toBe("동반 출하");
     expect(getReferenceBatchLinePresentation(
       makeLog({ transaction_type: "PRODUCE" }),
       "shipment",
@@ -653,6 +653,27 @@ describe("history immediate UX presentation policies", () => {
     expect(shipment.representativeLogId).toBe("pickup-1");
     expect(shipment.targetMeta).toEqual([]);
     expect(shipment.movement.parts[0]?.label).toContain("출하");
+  });
+
+  it("uses the pickup item as the representative when a companion shipment arrives first", () => {
+    const shipment = getReferenceBatchPresentation([
+      makeLog({
+        log_id: "companion-carton",
+        transaction_type: "SHIP",
+        shipping_phase: "PICKUP",
+        item_name: "DX3000, ADX4000W 카톤 박스 [490x460x370 mm]",
+        notes: "동반 출하: DX3000, ADX4000W 카톤 박스 [490x460x370 mm]",
+      }),
+      makeLog({
+        log_id: "actual-pickup",
+        transaction_type: "SHIP",
+        shipping_phase: "PICKUP",
+        item_name: "DX3000_65kV, 1.7mA_USA_Vector [Black]",
+        notes: "출하 픽업: DX3000_65kV, 1.7mA_USA_Vector [Black] x 10",
+      }),
+    ]);
+
+    expect(shipment.representativeLogId).toBe("actual-pickup");
   });
 
   it("labels shipping flow as shipment and stock label with its source scope", () => {

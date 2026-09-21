@@ -1249,8 +1249,9 @@ function ReferenceBatchSectionRow({
   const [expanded, setExpanded] = useState(false);
   const [searchCollapsed, setSearchCollapsed] = useState(false);
   const sectionId = `${controlsId ?? "history-reference"}-items`;
-  const [first, ...children] = logs;
+  const first = logs.find((log) => log.log_id === presentation.representativeLogId) ?? logs[0];
   if (!first) return null;
+  const children = logs.filter((log) => log.log_id !== first.log_id);
   const sectionExpanded = matchedLogIds != null ? !searchCollapsed : expanded;
 
   return (
@@ -1511,7 +1512,7 @@ function getReferenceBatchLineOrder(
   if (log.shipping_phase === "COMPONENT_CHANGE") return getComponentChangeLineOrder(log);
   const line = getReferenceBatchLinePresentation(log, kind);
   if (line.label === "출하 대상") return 0;
-  if (line.label === "동반 출하품") return 1;
+  if (line.label === "동반 출하") return 1;
   if (line.label === "출하 준비") return 2;
   return 3;
 }
