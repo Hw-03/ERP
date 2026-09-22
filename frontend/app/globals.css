@@ -370,17 +370,20 @@
   .hc-mobile .hc-actions button { font-size: 13px; }
   .hc-scope { border: 1px solid var(--c-border); border-radius: 12px; padding: .5rem .75rem; color: var(--c-red); font-size: .75rem; font-weight: 700; }
 
+  .inventory-recent-panel { display: flex; min-height: 100%; flex: 1 1 auto; flex-direction: column; }
+  .inventory-recent-empty { min-height: 100%; flex: 1 1 auto; }
   .inventory-recent { display: flex; flex-direction: column; }
   .inventory-recent-divider { margin: .75rem 0; border: 0; border-top: 2px solid color-mix(in srgb, var(--c-blue) 38%, var(--c-border)); }
   .inventory-recent > li { border-top: 1px solid var(--c-border); padding: .75rem 0; }
   .inventory-recent > li:first-child { border-top: 0; padding-top: .5rem; }
   .inventory-recent-main,
   .inventory-recent-meta { display: flex; min-width: 0; align-items: flex-start; justify-content: space-between; gap: .75rem; }
-  .inventory-recent-main { color: var(--c-text); font-size: .875rem; font-weight: 700; }
+  .inventory-recent-main { flex-wrap: wrap; color: var(--c-text); font-size: .875rem; font-weight: 700; }
   .inventory-recent-main > span,
   .inventory-recent-meta > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .inventory-recent-main > b,
   .inventory-recent-meta > time { flex-shrink: 0; }
+  .inventory-recent-main > :last-child { min-width: 0; flex: 0 0 auto; }
   .inventory-recent-main > b { font-weight: 900; }
   .inventory-recent-meta { margin-top: .25rem; color: var(--c-muted2); font-size: .75rem; }
   .inventory-recent > li[data-cancelled] :is(.inventory-recent-main > *, time) { opacity: .55; text-decoration: line-through; }
@@ -647,6 +650,11 @@
   animation: desktopTabEnter 140ms ease-out;
 }
 
+/* 사이드바와 업무 메뉴 진입은 입출고 화면의 복귀 속도를 공유한다. */
+.animate-desktop-navigation-enter {
+  animation: desktopTabEnter 180ms ease-out;
+}
+
 /* 데이터 교체 시 외곽은 유지하고 스켈레톤 덮개와 값만 부드럽게 전환한다. */
 @keyframes desktopLoadingCoverExit {
   from { opacity: 1; }
@@ -654,11 +662,12 @@
 }
 
 .desktop-loading-cover-exit {
-  animation: desktopLoadingCoverExit 240ms ease-in-out both;
+  animation: desktopLoadingCoverExit 180ms ease-out both;
 }
 
 .desktop-data-transition .mes-data-reveal {
-  animation: desktopTabEnter 240ms ease-in-out;
+  /* 탭 래퍼와 덮개가 전환을 담당하므로 개별 값은 중복 페이드하지 않는다. */
+  animation: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1288,6 +1297,7 @@
   .flow-arrow,
   .animate-fade-in,
   .animate-desktop-tab-enter,
+  .animate-desktop-navigation-enter,
   .animate-view-fade,
   .animate-pulse-slow,
   [data-anim="sheetUp"] {

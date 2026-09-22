@@ -433,7 +433,7 @@ export function DefectCartFlow({
       </div>
 
       {step === 1 && (
-        <div key="step1" className="animate-view-fade flex min-h-0 flex-1 flex-col gap-3">
+        <div key="step1" className="animate-desktop-navigation-enter flex min-h-0 flex-1 flex-col gap-3">
           <div className="flex min-h-0 flex-1 flex-col gap-2">
             <div className="text-xs font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>출처 선택</div>
             <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
@@ -463,7 +463,7 @@ export function DefectCartFlow({
       )}
 
       {step === 2 && (
-        <div key="step2" className="animate-view-fade flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+        <div key="step2" className="animate-desktop-navigation-enter flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
           <div data-testid="defect-step2-grid" className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[1.3fr_1fr]">
             <div data-testid="defect-picker-pane" className="h-full min-h-0">
               <DefectItemPicker
@@ -567,7 +567,7 @@ export function DefectCartFlow({
       )}
 
       {step === 3 && isRework && selectedReworkLine && (
-        <div key="step3" className="animate-view-fade flex min-h-0 flex-1 flex-col gap-3">
+        <div key="step3" className="animate-desktop-navigation-enter flex min-h-0 flex-1 flex-col gap-3">
           <div className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-stretch rounded-[16px] border px-5 py-4" style={{ background: tint(LEGACY_COLORS.blue, 8), borderColor: tint(LEGACY_COLORS.blue, 35) }}>
             <div className="min-w-0">
               <div className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>품목</div>

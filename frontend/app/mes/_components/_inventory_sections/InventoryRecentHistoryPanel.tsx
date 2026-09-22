@@ -1,118 +1,97 @@
 "use client";
 
-import type { InventoryOperation, Item, TransactionLog } from "@/lib/api";
-import type { InventoryEffectCell } from "@/lib/api/types/production";
+import type { ReactNode } from "react";
+import type { InventoryOperation, Item, TransactionLog, TransactionType } from "@/lib/api";
+import type { InventoryOperationLine } from "@/lib/api/types/production";
+import type { IoBatch } from "@/lib/api/types/io";
+import { LEGACY_COLORS } from "@/lib/mes/color";
+import { transactionColor } from "@/lib/mes-status";
 import { useInventoryOperationsQuery } from "@/lib/queries/useInventoryOperationsQuery";
 import { useTransactionsQuery } from "@/lib/queries/useTransactionsQuery";
 import { EmptyState, LoadFailureCard, LoadingSkeleton } from "../common";
 import { formatHistoryDate } from "../_history_sections/historyFormat";
-import { formatQty } from "@/lib/mes/format";
-import { SUB_TYPE_LABEL, TRANSACTION_TYPE_LABEL } from "@/lib/io/glossary";
-
-type RecentLine = {
-  transactionType: TransactionLog["transaction_type"];
-  quantityChange: number;
-  transferQty?: number | null;
-  notes?: string | null;
-  inventoryEffect?: InventoryEffectCell[] | null;
-};
-
-const LEGACY_NOTE_QUANTITY_PATTERN = /\/\s*(-?\d+(?:\.\d+)?)개\s*(?:\/|$)/;
+import { getHistoryListOperationLabel } from "../_history_sections/historyPresentation";
+import { FlowBadge, StockSnapshotContent } from "../_history_sections/historyTableHelpers";
+import { isReworkOperation } from "../_history_sections/transactionTaxonomy";
 
 function appendCancellation(label: string, isCancellation: boolean): string {
   return isCancellation && !label.endsWith(" 취소") ? `${label} 취소` : label;
 }
 
-function getTransferLabel(transactionType: RecentLine["transactionType"]): string | null {
-  if (transactionType === "TRANSFER_TO_PROD") return "창고 → 부서 이동";
-  if (transactionType === "TRANSFER_TO_WH") return "부서 → 창고 이동";
-  if (transactionType === "TRANSFER_DEPT") return "부서 이동";
-  return null;
+function getFallbackOperationLabel(operation: InventoryOperation): string {
+  const displayLabel = operation.displayLabel.trim();
+  const isInternalCode = !displayLabel || displayLabel === operation.action || /^[a-z0-9_:-]+$/i.test(displayLabel);
+  return appendCancellation(isInternalCode ? "기타 작업" : displayLabel, operation.kind === "CANCELLATION");
 }
 
-function getLegacyOperationLabel(log: TransactionLog): string {
-  const label = getTransferLabel(log.transaction_type)
-    ?? TRANSACTION_TYPE_LABEL[log.transaction_type];
-  return appendCancellation(label, log.operation_kind === "CANCELLATION");
-}
-
-function getOperationLabel(operation: InventoryOperation): string {
-  const ioLabel = SUB_TYPE_LABEL[operation.action as keyof typeof SUB_TYPE_LABEL];
-  const label = operation.domain === "inventory_io" && operation.action === "dept_transfer"
-    ? "부서 이동"
-    : operation.domain === "inventory_io" && ioLabel
-      ? ioLabel
-      : operation.domain === "department_inventory" && operation.action === "correction"
-        ? "수량 보정"
-        : operation.displayLabel;
-  return appendCancellation(label, operation.kind === "CANCELLATION");
-}
-
-function getLegacyNoteQuantity(notes: string | null | undefined): number | null {
-  const match = notes?.match(LEGACY_NOTE_QUANTITY_PATTERN);
-  const quantity = match?.[1] == null ? NaN : Number(match[1]);
-  return Number.isFinite(quantity) && quantity !== 0 ? Math.abs(quantity) : null;
-}
-
-function getDefectMovementQuantity(line: RecentLine): number | null {
-  if (line.transactionType !== "MARK_DEFECTIVE" && line.transactionType !== "UNMARK_DEFECTIVE") return null;
-  const defectiveCell = line.inventoryEffect?.find((cell) => {
-    const delta = Number(cell.delta);
-    return cell.scope === "location" && cell.status === "DEFECTIVE" && Number.isFinite(delta) && delta !== 0;
-  });
-  return defectiveCell ? Math.abs(Number(defectiveCell.delta)) : null;
-}
-
-function formatProcessedQuantity(line: RecentLine, unit: string): string {
-  const transferQty = Number(line.transferQty);
-  const quantityChange = Number(line.quantityChange);
-  const quantity = Number.isFinite(transferQty) && transferQty !== 0
-    ? Math.abs(transferQty)
-    : Number.isFinite(quantityChange) && quantityChange !== 0
-      ? Math.abs(quantityChange)
-      : getLegacyNoteQuantity(line.notes) ?? getDefectMovementQuantity(line);
-  return quantity == null ? "수량 미기록" : `${formatQty(quantity)} ${unit}`;
-}
-
-function getWorkContext(operation: InventoryOperation): string {
+function getWorkContext(operation: InventoryOperation, line: InventoryOperationLine): string {
   const context = [operation.department, operation.actorName]
     .filter((value): value is string => Boolean(value?.trim()))
     .join(" · ");
-
-  return context || operation.matchingLines[0]?.referenceNo || "업무 정보 없음";
+  return context || line.referenceNo || "업무 정보 없음";
 }
 
-function getLegacyWorkContext(log: TransactionLog): string {
-  const context = [log.department, log.requester_name ?? log.produced_by]
-    .filter((value): value is string => Boolean(value?.trim()))
-    .join(" · ");
-
-  return context || log.reference_no || "업무 정보 없음";
+function getHistoryLabel(log: TransactionLog): string {
+  const batch = log.history_batch;
+  if (!batch) return normalizeHistoryLabel(getHistoryListOperationLabel(log));
+  // 목록 라벨 계산에는 이 세 필드와 빈 bundles 만 필요하다. 재고·수량을 만들지 않는다.
+  const labelBatch = { ...batch, bundles: [] } as unknown as IoBatch;
+  return normalizeHistoryLabel(getHistoryListOperationLabel(log, labelBatch));
 }
 
-function OperationRows({ item, operations }: { item: Item; operations: InventoryOperation[] }) {
+function normalizeHistoryLabel(label: string): string {
+  const cancellationSuffix = label.endsWith(" 취소") ? " 취소" : "";
+  const base = cancellationSuffix ? label.slice(0, -cancellationSuffix.length) : label;
+  return /^[a-z0-9_:-]+$/i.test(base) ? `기타 작업${cancellationSuffix}` : label;
+}
+
+function RecentLine({
+  type,
+  label,
+  log,
+  context,
+  effectiveAt,
+  cancelled,
+}: {
+  type: TransactionType;
+  label: string;
+  log: TransactionLog | null;
+  context: string;
+  effectiveAt: string;
+  cancelled: boolean;
+}) {
+  const color = log && isReworkOperation(log) ? LEGACY_COLORS.red : transactionColor(type);
+  return (
+    <li data-cancelled={cancelled || undefined}>
+      <div className="inventory-recent-main">
+        <FlowBadge type={type} label={label} color={color} variant="panel" />
+        <StockSnapshotContent log={log} emptyLogLabel="기록 없음" />
+      </div>
+      <div className="inventory-recent-meta">
+        <span>{context}</span>
+        <time dateTime={effectiveAt}>{formatHistoryDate(effectiveAt)}</time>
+      </div>
+    </li>
+  );
+}
+
+function OperationRows({ operations }: { operations: InventoryOperation[] }) {
   return (
     <ul className="inventory-recent">
-      {operations.map((operation) => {
-        const line = operation.matchingLines[0];
-        if (!line) return null;
-        const cancelledOriginal = operation.effectiveStatus === "cancelled";
-        const quantity = formatProcessedQuantity(line, item.unit);
+      {operations.flatMap((operation) => operation.matchingLines.map((line) => {
+        const log = line.historyLog ?? null;
         return (
-          <li key={operation.operationId} data-cancelled={cancelledOriginal || undefined}>
-            <div className="inventory-recent-main">
-              <span>{getOperationLabel(operation)}</span>
-              <b>{quantity}</b>
-            </div>
-            <div className="inventory-recent-meta">
-              <span>{getWorkContext(operation)}</span>
-              <time dateTime={operation.effectiveAt}>
-                {formatHistoryDate(operation.effectiveAt)}
-              </time>
-            </div>
-          </li>
+          <RecentLine
+            key={`${operation.operationId}-${line.logId}`}
+            type={log?.transaction_type ?? line.transactionType}
+            label={log ? getHistoryLabel(log) : getFallbackOperationLabel(operation)}
+            log={log}
+            context={getWorkContext(operation, line)}
+            effectiveAt={operation.effectiveAt}
+            cancelled={operation.effectiveStatus === "cancelled" || Boolean(log?.cancelled)}
+          />
         );
-      })}
+      }))}
     </ul>
   );
 }
@@ -120,72 +99,47 @@ function OperationRows({ item, operations }: { item: Item; operations: Inventory
 function LegacyRows({ logs }: { logs: TransactionLog[] }) {
   return (
     <ul className="inventory-recent">
-      {logs.map((log) => {
-        const quantity = formatProcessedQuantity({
-          transactionType: log.transaction_type,
-          quantityChange: log.quantity_change,
-          transferQty: log.transfer_qty,
-          notes: log.notes,
-          inventoryEffect: log.inventory_effect,
-        }, log.item_unit);
-        return (
-          <li key={log.log_id}>
-            <div className="inventory-recent-main">
-              <span>{getLegacyOperationLabel(log)}</span>
-              <b>{quantity}</b>
-            </div>
-            <div className="inventory-recent-meta">
-              <span>{getLegacyWorkContext(log)}</span>
-              <time dateTime={log.requested_at ?? log.created_at}>
-                {formatHistoryDate(log.requested_at ?? log.created_at)}
-              </time>
-            </div>
-          </li>
-        );
-      })}
+      {logs.map((log) => (
+        <RecentLine
+          key={log.log_id}
+          type={log.transaction_type}
+          label={getHistoryLabel(log)}
+          log={log}
+          context={[log.department, log.requester_name ?? log.produced_by]
+            .filter((value): value is string => Boolean(value?.trim()))
+            .join(" · ") || log.reference_no || "업무 정보 없음"}
+          effectiveAt={log.requested_at ?? log.created_at}
+          cancelled={log.cancelled}
+        />
+      ))}
     </ul>
   );
 }
 
 export function InventoryRecentHistoryPanel({ item }: { item: Item }) {
-  const operationQuery = useInventoryOperationsQuery({
-    itemId: item.item_id,
-    limit: 5,
-  });
-  const legacyQuery = useTransactionsQuery({
-    itemId: item.item_id,
-    unlinkedOnly: true,
-    limit: 5,
-  });
+  const operationQuery = useInventoryOperationsQuery({ itemId: item.item_id, limit: 5 });
+  const legacyQuery = useTransactionsQuery({ itemId: item.item_id, unlinkedOnly: true, limit: 5 });
   const operations = operationQuery.data?.items ?? [];
   const legacyLogs = (legacyQuery.data ?? []).filter((log) => !log.operation_id).slice(0, 5);
   const isLoading = operationQuery.isLoading || legacyQuery.isLoading;
   const isError = operationQuery.isError || legacyQuery.isError;
   const error = operationQuery.error ?? legacyQuery.error;
 
-  if (isLoading) return <LoadingSkeleton rows={3} />;
-
-  if (isError) {
-    return (
-      <LoadFailureCard
-        prefix="최근 입출고 내역을 불러오지 못했습니다"
-        message={error instanceof Error ? error.message : "잠시 후 다시 시도해 주세요."}
-        retryLabel="다시 시도"
-        onRetry={() => void Promise.all([operationQuery.refetch(), legacyQuery.refetch()])}
-      />
+  let content: ReactNode;
+  if (isLoading) {
+    content = <LoadingSkeleton rows={3} />;
+  } else if (isError) {
+    content = <LoadFailureCard prefix="최근 입출고 내역을 불러오지 못했습니다" message={error instanceof Error ? error.message : "잠시 후 다시 시도해 주세요."} retryLabel="다시 시도" onRetry={() => void Promise.all([operationQuery.refetch(), legacyQuery.refetch()])} />;
+  } else if (operations.length === 0 && legacyLogs.length === 0) {
+    content = <EmptyState compact illustrated className="inventory-recent-empty" title="최근 입출고 내역이 없습니다." description="" />;
+  } else {
+    content = (
+      <div className="inventory-recent-groups">
+        {operations.length > 0 && <OperationRows operations={operations.slice(0, 5)} />}
+        {operations.length > 0 && legacyLogs.length > 0 && <hr className="inventory-recent-divider" />}
+        {legacyLogs.length > 0 && <LegacyRows logs={legacyLogs} />}
+      </div>
     );
   }
-
-  if (operations.length === 0 && legacyLogs.length === 0) {
-    return <EmptyState compact illustrated title="최근 입출고 내역이 없습니다." description="" />;
-  }
-
-  return (
-    <div className="inventory-recent-groups">
-      {operations.length > 0 && <OperationRows item={item} operations={operations.slice(0, 5)} />}
-      {/* 새 원장 이력과 원장에 연결되지 않은 기존 이력의 경계. */}
-      {operations.length > 0 && legacyLogs.length > 0 && <hr className="inventory-recent-divider" />}
-      {legacyLogs.length > 0 && <LegacyRows logs={legacyLogs} />}
-    </div>
-  );
+  return <div className="inventory-recent-panel">{content}</div>;
 }

@@ -65,6 +65,15 @@ class RequestOrderStockResponse(BaseModel):
     department_qty_after: Optional[int] = None
 
 
+class TransactionHistoryBatchResponse(BaseModel):
+    """작업 이력 라벨에 필요한 IoBatch의 최소 문맥."""
+
+    work_type: str
+    sub_type: str
+    to_department: Optional[str] = None
+    display_transaction_type: Optional[str] = None
+
+
 class TransactionLogResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -113,6 +122,7 @@ class TransactionLogResponse(BaseModel):
     cancelled_at: Optional[UtcDatetime] = None
     inventory_effect: Optional[list[dict[str, Any]]] = None
     request_order_stock: Optional[RequestOrderStockResponse] = None
+    history_batch: Optional[TransactionHistoryBatchResponse] = None
 
 
 class TransactionDisplayGroupResponse(BaseModel):

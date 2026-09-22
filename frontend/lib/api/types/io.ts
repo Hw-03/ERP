@@ -150,6 +150,8 @@ export interface IoBatch {
   submitted_at: string | null;
   completed_at: string | null;
   bundles: IoBundle[];
+  /** 최근 이력의 축약 배치가 표와 같은 작업 분류를 재사용할 때만 전달된다. */
+  display_transaction_type?: string | null;
   stock_requests?: IoStockRequestSummary[];
 }
 

@@ -11,12 +11,7 @@ const testState = vi.hoisted(() => ({
     isError: false,
     refetch: vi.fn(),
   },
-  legacyQueryResult: {
-    data: [] as TransactionLog[],
-    isLoading: false,
-    isError: false,
-    refetch: vi.fn(),
-  },
+  legacyQueryResult: { data: [] as TransactionLog[], isLoading: false, isError: false, refetch: vi.fn() },
 }));
 
 vi.mock("@/lib/queries/useInventoryOperationsQuery", () => ({
@@ -25,7 +20,6 @@ vi.mock("@/lib/queries/useInventoryOperationsQuery", () => ({
     return testState.queryResult;
   },
 }));
-
 vi.mock("@/lib/queries/useTransactionsQuery", () => ({
   useTransactionsQuery: (...args: unknown[]) => {
     testState.legacyQueryArgs = args;
@@ -39,376 +33,142 @@ function makeItem(): Item {
   return { item_id: "item-1", item_name: "테스트 품목", mes_code: "46-AA-0080", unit: "EA" } as Item;
 }
 
-function makeOperation(overrides: Partial<InventoryOperation> = {}): InventoryOperation {
+function makeLog(overrides: Partial<TransactionLog> = {}): TransactionLog {
   return {
-    operationId: "operation-1",
-    kind: "BUSINESS",
-    domain: "inventory_io",
-    action: "receive_supplier",
-    displayLabel: "원자재 입고",
-    effectiveStatus: "active",
-    actorEmployeeId: "employee-1",
-    actorName: "김작업",
-    department: "조립",
-    reason: null,
-    effectiveAt: "2026-08-14T01:30:00Z",
-    reversesOperationId: null,
-    reversalOperationId: null,
-    canCancel: true,
-    cancelBlockers: [],
-    lines: [],
-    matchingLines: [{
-      logId: "log-1",
-      itemId: "item-1",
-      itemName: "테스트 품목",
-      mesCode: "46-AA-0080",
-      transactionType: "RECEIVE",
-      quantityChange: 12,
-      quantityBefore: 3,
-      quantityAfter: 15,
-      transferQty: null,
-      department: "조립",
-      operationRole: "PRIMARY",
-      reversesLogId: null,
-      referenceNo: null,
-      notes: null,
-      createdAt: "2026-08-14T01:30:00Z",
-    }],
-    effects: [],
-    ...overrides,
-  };
+    log_id: "log-1", item_id: "item-1", mes_code: "46-AA-0080", item_name: "테스트 품목", item_process_type_code: null,
+    item_unit: "EA", transaction_type: "RECEIVE", quantity_change: 12, quantity_before: 15, quantity_after: 27,
+    warehouse_qty_before: 15, warehouse_qty_after: 27, department_qty_before: 4, department_qty_after: 4,
+    transfer_qty: null, reference_no: null, produced_by: "김작업", requester_name: null, approver_name: null,
+    department: "조립", notes: null, operation_batch_id: null, operation_id: "operation-1", created_at: "2026-08-14T01:30:00Z",
+    cancelled: false, cancel_reason: null, cancelled_by: null, cancelled_at: null, ...overrides,
+  } as TransactionLog;
 }
 
-function makeLegacyLog(overrides: Partial<TransactionLog> = {}): TransactionLog {
+function makeOperation(overrides: Partial<InventoryOperation> = {}): InventoryOperation {
+  const log = makeLog();
   return {
-    log_id: "legacy-log-1",
-    item_id: "item-1",
-    mes_code: "46-AA-0080",
-    item_name: "테스트 품목",
-    item_process_type_code: null,
-    item_unit: "EA",
-    transaction_type: "SHIP",
-    quantity_change: -50,
-    quantity_before: 50,
-    quantity_after: 0,
-    warehouse_qty_before: 50,
-    warehouse_qty_after: 0,
-    transfer_qty: null,
-    reference_no: null,
-    produced_by: "김민재",
-    requester_name: null,
-    approver_name: null,
-    department: "조립",
-    notes: null,
-    operation_batch_id: null,
-    operation_id: null,
-    created_at: "2026-07-28T04:51:00Z",
-    cancelled: false,
-    cancel_reason: null,
-    cancelled_by: null,
-    cancelled_at: null,
-    ...overrides,
-  } as TransactionLog;
+    operationId: "operation-1", kind: "BUSINESS", domain: "inventory_io", action: "receive_supplier", displayLabel: "원자재 입고",
+    effectiveStatus: "active", actorEmployeeId: "employee-1", actorName: "김작업", department: "조립", reason: null,
+    effectiveAt: "2026-08-14T01:30:00Z", reversesOperationId: null, reversalOperationId: null, canCancel: true, cancelBlockers: [], lines: [],
+    matchingLines: [{
+      logId: log.log_id, itemId: log.item_id, itemName: log.item_name, mesCode: log.mes_code, transactionType: log.transaction_type,
+      quantityChange: log.quantity_change, quantityBefore: log.quantity_before, quantityAfter: log.quantity_after, transferQty: log.transfer_qty,
+      department: log.department, operationRole: "PRIMARY", reversesLogId: null, referenceNo: null, notes: null, createdAt: log.created_at, historyLog: log,
+    }],
+    effects: [], ...overrides,
+  };
 }
 
 describe("InventoryRecentHistoryPanel", () => {
   beforeEach(() => {
     testState.queryArgs = undefined;
     testState.legacyQueryArgs = undefined;
-    testState.queryResult = {
-      data: { items: [], nextCursor: null },
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    };
-    testState.legacyQueryResult = {
-      data: [],
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    };
+    testState.queryResult = { data: { items: [], nextCursor: null }, isLoading: false, isError: false, refetch: vi.fn() };
+    testState.legacyQueryResult = { data: [], isLoading: false, isError: false, refetch: vi.fn() };
   });
 
-  it("원장과 기존 거래 사이를 제목 없이 구분선으로 나눈다", () => {
+  it("이력 표와 같은 배지 분류로 창고 이동·불량·출하·취소를 표시한다", () => {
+    testState.queryResult = {
+      data: { items: [
+        makeOperation({ matchingLines: [{ ...makeOperation().matchingLines[0], historyLog: makeLog({ transaction_type: "TRANSFER_TO_PROD" }) }] }),
+        makeOperation({ operationId: "defect", matchingLines: [{ ...makeOperation().matchingLines[0], historyLog: makeLog({ log_id: "defect-log", transaction_type: "MARK_DEFECTIVE" }) }] }),
+        makeOperation({ operationId: "shipping", matchingLines: [{ ...makeOperation().matchingLines[0], historyLog: makeLog({ log_id: "ship-log", transaction_type: "SHIP" }) }] }),
+        makeOperation({ operationId: "cancel", kind: "CANCELLATION", effectiveStatus: "cancellation", matchingLines: [{ ...makeOperation().matchingLines[0], historyLog: makeLog({ log_id: "cancel-log", transaction_type: "TRANSFER_TO_WH", operation_kind: "CANCELLATION" }) }] }),
+      ], nextCursor: null },
+      isLoading: false, isError: false, refetch: vi.fn(),
+    };
+    render(<InventoryRecentHistoryPanel item={makeItem()} />);
+    expect(screen.getByText("창고 입출고")).toBeInTheDocument();
+    expect(screen.getByText("불량")).toBeInTheDocument();
+    expect(screen.getByText("출하")).toBeInTheDocument();
+    expect(screen.getByText("창고 입출고 취소")).toBeInTheDocument();
+    expect(screen.queryByText("TRANSFER_TO_PROD")).not.toBeInTheDocument();
+  });
+
+  it("한 작업 그룹의 모든 선택 품목 라인과 각 위치 재고 변동을 표시한다", () => {
+    const first = makeLog({ log_id: "line-1", warehouse_qty_before: 15, warehouse_qty_after: 27 });
+    const second = makeLog({ log_id: "line-2", transaction_type: "TRANSFER_DEPT", warehouse_qty_before: 27, warehouse_qty_after: 27, department_qty_before: 4, department_qty_after: 9 });
+    testState.queryResult = { data: { items: [makeOperation({ matchingLines: [
+      { ...makeOperation().matchingLines[0], logId: first.log_id, historyLog: first },
+      { ...makeOperation().matchingLines[0], logId: second.log_id, historyLog: second },
+    ] })], nextCursor: null }, isLoading: false, isError: false, refetch: vi.fn() };
+    render(<InventoryRecentHistoryPanel item={makeItem()} />);
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    expect(screen.getByLabelText("재고 변동: 창고 15 +12→27")).toBeInTheDocument();
+    expect(screen.getByLabelText("재고 변동: 조립 4 +5→9")).toBeInTheDocument();
+  });
+
+  it("이력 로그의 배치 투영으로 분해 작업을 이력 표와 같은 메뉴명으로 표시한다", () => {
+    const log = makeLog({
+      transaction_type: "PRODUCE",
+      history_batch: { work_type: "process", sub_type: "disassemble", to_department: "조립" },
+    });
+    testState.queryResult = { data: { items: [makeOperation({ matchingLines: [{ ...makeOperation().matchingLines[0], historyLog: log }] })], nextCursor: null }, isLoading: false, isError: false, refetch: vi.fn() };
+
+    render(<InventoryRecentHistoryPanel item={makeItem()} />);
+
+    expect(screen.getByText("분해 출고")).toBeInTheDocument();
+    expect(screen.queryByText("생산 입고")).not.toBeInTheDocument();
+  });
+
+  it("이력 로그가 없는 기존 응답에서는 재고 수치를 만들어내지 않고 기타 작업으로 표시한다", () => {
+    testState.queryResult = { data: { items: [makeOperation({ displayLabel: "adjust_in", action: "adjust_in", matchingLines: [{ ...makeOperation().matchingLines[0], historyLog: null }] })], nextCursor: null }, isLoading: false, isError: false, refetch: vi.fn() };
+    render(<InventoryRecentHistoryPanel item={makeItem()} />);
+    expect(screen.getByText("기타 작업")).toBeInTheDocument();
+    expect(screen.getByText("기록 없음")).toBeInTheDocument();
+    expect(screen.queryByText("12 EA")).not.toBeInTheDocument();
+  });
+
+  it("계산 불가와 변동 없음을 이력 표와 같은 규칙으로 표시한다", () => {
+    const unavailable = makeLog({ log_id: "unavailable", request_order_stock: { status: "unavailable", reason: "ambiguous_order", warehouse_qty_before: null, warehouse_qty_after: null, department_qty_before: null, department_qty_after: null } });
+    const unchanged = makeLog({ log_id: "unchanged", warehouse_qty_after: 15, department_qty_after: 4 });
+    testState.queryResult = { data: { items: [makeOperation({ matchingLines: [
+      { ...makeOperation().matchingLines[0], logId: unavailable.log_id, historyLog: unavailable },
+      { ...makeOperation().matchingLines[0], logId: unchanged.log_id, historyLog: unchanged },
+    ] })], nextCursor: null }, isLoading: false, isError: false, refetch: vi.fn() };
+    render(<InventoryRecentHistoryPanel item={makeItem()} />);
+    expect(screen.getByText("계산 불가")).toBeInTheDocument();
+    expect(screen.getByText("변동 없음")).toBeInTheDocument();
+  });
+
+  it("알 수 없는 실제 거래 코드는 내부 코드를 노출하지 않고 기타 작업으로 표시한다", () => {
+    testState.legacyQueryResult = { data: [makeLog({ operation_id: null, transaction_type: "UNMAPPED" as TransactionLog["transaction_type"] })], isLoading: false, isError: false, refetch: vi.fn() };
+
+    render(<InventoryRecentHistoryPanel item={makeItem()} />);
+
+    expect(screen.getByText("기타 작업")).toBeInTheDocument();
+    expect(screen.queryByText("UNMAPPED")).not.toBeInTheDocument();
+  });
+
+  it("원장과 연결되지 않은 기존 이력은 중복 없이 구분선 아래에 유지한다", () => {
     testState.queryResult = { data: { items: [makeOperation()], nextCursor: null }, isLoading: false, isError: false, refetch: vi.fn() };
-    testState.legacyQueryResult = { data: [makeLegacyLog()], isLoading: false, isError: false, refetch: vi.fn() };
-
+    testState.legacyQueryResult = { data: [makeLog({ log_id: "legacy", operation_id: null, transaction_type: "BACKFLUSH", quantity_change: -60, warehouse_qty_before: 40, warehouse_qty_after: 40, department_qty_before: 60, department_qty_after: 0 })], isLoading: false, isError: false, refetch: vi.fn() };
     const { container } = render(<InventoryRecentHistoryPanel item={makeItem()} />);
-
-    expect(screen.queryByText("원장 작업 내역")).not.toBeInTheDocument();
-    expect(screen.queryByText("기존 입출고 내역")).not.toBeInTheDocument();
     expect(container.querySelector(".inventory-recent-divider")).not.toBeNull();
-    expect(screen.getByText("50 EA")).toBeInTheDocument();
-    expect(screen.getByText("조립 · 김민재")).toBeInTheDocument();
+    expect(screen.getByText("부서 입출고")).toBeInTheDocument();
+    expect(screen.getByLabelText("재고 변동: 조립 60 −60→0")).toBeInTheDocument();
     expect(testState.legacyQueryArgs).toEqual([{ itemId: "item-1", unlinkedOnly: true, limit: 5 }]);
   });
 
-  it("기존 거래만 있으면 구분선 없이 표시한다", () => {
-    testState.legacyQueryResult = { data: [makeLegacyLog()], isLoading: false, isError: false, refetch: vi.fn() };
-
-    const { container } = render(<InventoryRecentHistoryPanel item={makeItem()} />);
-
-    expect(container.querySelector(".inventory-recent-divider")).toBeNull();
-  });
-
-  it("현재 품목의 최근 5건만 조회하고 거래 구분·수량·일시·업무 맥락을 표시한다", () => {
-    testState.queryResult = { data: { items: [makeOperation()], nextCursor: null }, isLoading: false, isError: false, refetch: vi.fn() };
+  it("작업 그룹은 최신순 5건으로 제한하고 각 그룹의 날짜와 업무 메타를 보존한다", () => {
+    testState.queryResult = { data: { items: Array.from({ length: 6 }, (_, index) => makeOperation({ operationId: `operation-${index + 1}`, actorName: `작업자 ${index + 1}` })), nextCursor: null }, isLoading: false, isError: false, refetch: vi.fn() };
     render(<InventoryRecentHistoryPanel item={makeItem()} />);
-
-    expect(testState.queryArgs).toEqual([{ itemId: "item-1", limit: 5 }]);
-    expect(screen.getByText("원자재 입고")).toBeInTheDocument();
-    expect(screen.getByText("12 EA")).toBeInTheDocument();
-    expect(screen.getByText("08/14 10:30")).toBeInTheDocument();
-    expect(screen.getByText("조립 · 김작업")).toBeInTheDocument();
-    expect(screen.queryByText("원장 작업 내역")).not.toBeInTheDocument();
-    expect(screen.queryByText("기존 입출고 내역")).not.toBeInTheDocument();
-  });
-
-  it("부서 이동은 실제 작업명과 이동 수량으로 표시한다", () => {
-    testState.queryResult = {
-      data: {
-        items: [makeOperation({
-          action: "dept_transfer",
-          displayLabel: "dept_transfer",
-          matchingLines: [{
-            ...makeOperation().matchingLines[0],
-            transactionType: "TRANSFER_DEPT",
-            quantityChange: 0,
-            transferQty: 30,
-          }],
-        })],
-        nextCursor: null,
-      },
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    };
-
-    render(<InventoryRecentHistoryPanel item={makeItem()} />);
-
-    expect(screen.getByText("부서 이동")).toBeInTheDocument();
-    expect(screen.getByText("30 EA")).toBeInTheDocument();
-    expect(screen.getByText("조립 · 김작업")).toBeInTheDocument();
-    expect(screen.getByText("08/14 10:30")).toBeInTheDocument();
-    expect(screen.queryByText("부서 입출고")).not.toBeInTheDocument();
-    expect(screen.queryByText("0 EA")).not.toBeInTheDocument();
-  });
-
-  it("기존 이력도 포괄 분류 대신 실제 처리 작업과 수량을 표시한다", () => {
-    testState.legacyQueryResult = {
-      data: [makeLegacyLog({ transaction_type: "BACKFLUSH", quantity_change: -60 })],
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    };
-
-    render(<InventoryRecentHistoryPanel item={makeItem()} />);
-
-    expect(screen.getByText("자동 차감")).toBeInTheDocument();
-    expect(screen.getByText("60 EA")).toBeInTheDocument();
-    expect(screen.queryByText("부서 입출고")).not.toBeInTheDocument();
-    expect(screen.queryByText("-60 EA")).not.toBeInTheDocument();
-  });
-
-  it("기존 이동 이력은 자동 기록된 수량으로 0 대신 실제 이동량을 표시한다", () => {
-    testState.legacyQueryResult = {
-      data: [makeLegacyLog({
-        transaction_type: "TRANSFER_TO_PROD",
-        quantity_change: 0,
-        transfer_qty: null,
-        notes: "요청 승인 처리: SR-001 / 창고 → 조립 이동 / 30.0000개 / 요청자 김민재",
-      })],
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    };
-
-    render(<InventoryRecentHistoryPanel item={makeItem()} />);
-
-    expect(screen.getByText("창고 → 부서 이동")).toBeInTheDocument();
-    expect(screen.getByText("30 EA")).toBeInTheDocument();
-    expect(screen.queryByText("0 EA")).not.toBeInTheDocument();
-  });
-
-  it("기존 불량 격리 이력은 불량 위치 증감으로 실제 처리 수량을 복원한다", () => {
-    testState.legacyQueryResult = {
-      data: [makeLegacyLog({
-        transaction_type: "MARK_DEFECTIVE",
-        quantity_change: 0,
-        transfer_qty: null,
-        notes: "격리: production → 조립",
-        inventory_effect: [
-          { scope: "location", department: "조립", status: "DEFECTIVE", delta: 30 },
-          { scope: "location", department: "조립", status: "PRODUCTION", delta: -30 },
-        ],
-      })],
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    };
-
-    render(<InventoryRecentHistoryPanel item={makeItem()} />);
-
-    expect(screen.getByText("새 불량")).toBeInTheDocument();
-    expect(screen.getByText("30 EA")).toBeInTheDocument();
-    expect(screen.queryByText("수량 미기록")).not.toBeInTheDocument();
-  });
-
-  it("서버가 준 최신순을 유지하면서 최대 5건만 표시한다", () => {
-    testState.queryResult = {
-      data: {
-        items: Array.from({ length: 6 }, (_, index) =>
-          makeOperation({ operationId: `operation-${index + 1}`, actorName: `작업자 ${index + 1}` }),
-        ),
-        nextCursor: null,
-      },
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    };
-
-    render(<InventoryRecentHistoryPanel item={makeItem()} />);
-
     expect(screen.getAllByRole("listitem")).toHaveLength(5);
     expect(screen.getByText("조립 · 작업자 1")).toBeInTheDocument();
-    expect(screen.getByText("조립 · 작업자 5")).toBeInTheDocument();
+    expect(screen.getAllByText("08/14 10:30")).toHaveLength(5);
     expect(screen.queryByText("조립 · 작업자 6")).not.toBeInTheDocument();
   });
 
-  it("조회 실패를 알리고 재시도한다", () => {
+  it("조회 실패를 재시도하고 최근 내역이 없으면 국소 빈 상태를 표시한다", () => {
     const refetch = vi.fn();
     const legacyRefetch = vi.fn();
     testState.queryResult = { data: { items: [], nextCursor: null }, isLoading: false, isError: true, refetch };
-    testState.legacyQueryResult = { data: [], isLoading: false, isError: false, refetch: legacyRefetch };
     render(<InventoryRecentHistoryPanel item={makeItem()} />);
-
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
     expect(refetch).toHaveBeenCalledOnce();
-    expect(legacyRefetch).toHaveBeenCalledOnce();
-  });
-
-  it("내역이 없을 때 빈 상태를 표시한다", () => {
     testState.queryResult = { data: { items: [], nextCursor: null }, isLoading: false, isError: false, refetch: vi.fn() };
+    testState.legacyQueryResult = { data: [], isLoading: false, isError: false, refetch: legacyRefetch };
     render(<InventoryRecentHistoryPanel item={makeItem()} />);
-
     expect(screen.getByText("최근 입출고 내역이 없습니다.")).toBeInTheDocument();
-  });
-
-  it("취소 작업을 별도 최근 행으로 실제 작업명과 처리 수량으로 표시한다", () => {
-    testState.queryResult = {
-      data: {
-        items: [makeOperation({
-          operationId: "cancel-1",
-          kind: "CANCELLATION",
-          displayLabel: "부서 입출고 취소",
-          effectiveStatus: "cancellation",
-          matchingLines: [{
-            ...makeOperation().matchingLines[0],
-            logId: "cancel-log-1",
-            transactionType: "SHIP",
-            quantityChange: 7,
-            reversesLogId: "original-log-1",
-          }],
-        })],
-        nextCursor: null,
-      },
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    };
-
-    render(<InventoryRecentHistoryPanel item={makeItem()} />);
-
-    expect(screen.getByText("원자재 입고 취소")).toBeInTheDocument();
-    expect(screen.getByText("7 EA")).toBeInTheDocument();
-    expect(screen.getByText("원자재 입고 취소").closest("li")).not.toHaveAttribute("data-cancelled");
-  });
-
-  it("부서 재고 보정은 실제 작업명으로 표시한다", () => {
-    testState.queryResult = {
-      data: {
-        items: [
-          makeOperation({
-            operationId: "department-original",
-            domain: "department_inventory",
-            action: "correction",
-            displayLabel: "수량 보정",
-          }),
-          makeOperation({
-            operationId: "department-cancel",
-            kind: "CANCELLATION",
-            domain: "department_inventory",
-            action: "correction",
-            displayLabel: "수량 보정 취소",
-            effectiveStatus: "cancellation",
-          }),
-        ],
-        nextCursor: null,
-      },
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    };
-
-    render(<InventoryRecentHistoryPanel item={makeItem()} />);
-
-    expect(screen.getByText("수량 보정")).toBeInTheDocument();
-    expect(screen.getByText("수량 보정 취소")).toBeInTheDocument();
-  });
-
-  it("원장 입출고 조정은 실제 세부 작업명으로 표시한다", () => {
-    testState.queryResult = {
-      data: {
-        items: [
-          makeOperation({
-            operationId: "io-adjust-original",
-            action: "adjust_in",
-            displayLabel: "adjust_in",
-          }),
-          makeOperation({
-            operationId: "io-adjust-cancel",
-            kind: "CANCELLATION",
-            action: "adjust_in",
-            displayLabel: "adjust_in",
-            effectiveStatus: "cancellation",
-          }),
-        ],
-        nextCursor: null,
-      },
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    };
-
-    render(<InventoryRecentHistoryPanel item={makeItem()} />);
-
-    expect(screen.getByText("수량보정 입고")).toBeInTheDocument();
-    expect(screen.getByText("수량보정 입고 취소")).toBeInTheDocument();
-    expect(screen.queryByText("adjust_in")).not.toBeInTheDocument();
-  });
-
-  it("취소된 원 작업은 작업명·수량·시각만 선택적으로 취소 표시한다", () => {
-    testState.queryResult = {
-      data: {
-        items: [makeOperation({
-          effectiveStatus: "cancelled",
-          displayLabel: "부서 입출고",
-          actorName: "원 작업자",
-        })],
-        nextCursor: null,
-      },
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    };
-
-    render(<InventoryRecentHistoryPanel item={makeItem()} />);
-
-    const row = screen.getByText("원자재 입고").closest("li");
-    expect(row).toHaveAttribute("data-cancelled", "true");
-    expect(screen.getByText("원자재 입고").parentElement).toHaveClass("inventory-recent-main");
-    expect(screen.getByText("12 EA")).toBeInTheDocument();
-    expect(screen.getByText("08/14 10:30")).toBeInTheDocument();
-    expect(screen.getByText("조립 · 원 작업자").parentElement).toHaveClass("inventory-recent-meta");
   });
 });

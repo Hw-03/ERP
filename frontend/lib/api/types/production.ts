@@ -30,6 +30,14 @@ export interface RequestOrderStock {
   department_qty_after: number | null;
 }
 
+/** 최근 내역에서 작업 묶음의 목록 라벨을 이력 표와 맞추기 위한 최소 투영. */
+export interface HistoryBatchProjection {
+  work_type: string;
+  sub_type: string;
+  to_department?: string | null;
+  display_transaction_type?: string | null;
+}
+
 export interface TransactionLog {
   log_id: string;
   item_id: string;
@@ -80,6 +88,7 @@ export interface TransactionLog {
   inventory_effect?: InventoryEffectCell[] | null;
   /** 요청 시각 순으로 재계산한 창고/정상 부서 재고. absent/null은 구 API 원본 스냅샷을 사용한다. */
   request_order_stock?: RequestOrderStock | null;
+  history_batch?: HistoryBatchProjection | null;
 }
 
 export interface InventoryOperationLine {
@@ -98,6 +107,8 @@ export interface InventoryOperationLine {
   referenceNo: string | null;
   notes: string | null;
   createdAt: string;
+  /** 최근 내역에서 이력 표와 같은 분류·재고 스냅샷을 그릴 실제 거래 로그. */
+  historyLog?: TransactionLog | null;
 }
 
 export interface InventoryOperationEffect {

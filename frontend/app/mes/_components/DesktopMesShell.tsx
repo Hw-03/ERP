@@ -102,11 +102,9 @@ function DesktopMesShellInner({
   useLayoutEffect(() => {
     if (!returnSequence || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const body = homeMotionRef.current;
-    // Large menu cards need a full reveal; a 70% start looks like an instant swap.
-    const isCardHub = body?.dataset.activeTab === "shipping" || body?.dataset.activeTab === "defect";
     const animation = body?.animate?.(
-      [{ opacity: isCardHub ? 0 : 0.7 }, { opacity: 1 }],
-      { duration: isCardHub ? 200 : 180, easing: "ease-out" },
+      [{ opacity: 0.7 }, { opacity: 1 }],
+      { duration: 180, easing: "ease-out" },
     );
     return () => animation?.cancel();
   }, [returnSequence]);
@@ -547,7 +545,7 @@ function DesktopMesShellInner({
                 ref={homeMotionRef}
                 data-testid="desktop-tab-transition"
                 data-active-tab={activeTab}
-                className={`${activeTab !== "dashboard" && activeTab !== "history" ? "animate-desktop-tab-enter " : ""}flex min-h-0 min-w-0 flex-1`}
+                className="animate-desktop-navigation-enter flex min-h-0 min-w-0 flex-1"
               >
                 {activeTab === "dashboard" || activeTab === "history" ? (
                   <DesktopDataTransition ready={activeTab === contentTab} tab={activeTab}>
@@ -570,7 +568,7 @@ function DesktopDataTransition({ ready, tab, children }: { ready: boolean; tab: 
   // 실제 내용을 먼저 마운트하고 덮개만 걷어내므로 카드와 검색창이 배경으로 깜빡이지 않는다.
   useEffect(() => {
     if (!ready || !coverVisible) return;
-    const timer = window.setTimeout(() => setCoverVisible(false), 240);
+    const timer = window.setTimeout(() => setCoverVisible(false), 180);
     return () => window.clearTimeout(timer);
   }, [ready, coverVisible]);
 

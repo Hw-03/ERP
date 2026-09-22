@@ -23,8 +23,17 @@ from app.models import (
     TransactionLog,
 )
 from app.routers._errors import ErrorCode, http_error
+from app.routers.inventory._tx_filters import (
+    _batch_name_map,
+    _history_batch_response,
+    _history_request_date_expr,
+    _stock_request_info_map,
+    _to_log_response,
+)
+from app.schemas import RequestOrderStockResponse, TransactionLogResponse
 from app.services import inventory_operation_cancellation as cancellation_svc
 from app.services.pin_auth import verify_pin
+from app.services.request_order_stock import load_request_order_stock
 
 
 router = APIRouter()
@@ -42,6 +51,7 @@ def _line_payload(
     item: Item | None,
     *,
     movement_quantity: object | None = None,
+    history_log: TransactionLogResponse | None = None,
 ) -> dict:
     transfer_qty = log.transfer_qty if log.transfer_qty is not None else movement_quantity
     return {
@@ -64,7 +74,47 @@ def _line_payload(
         "reference_no": log.reference_no,
         "notes": log.notes,
         "created_at": log.created_at,
+        "history_log": history_log,
     }
+
+
+def _history_log_map(
+    db: Session,
+    logs: list[TransactionLog],
+    items: dict[uuid.UUID, Item],
+    operation: InventoryOperation,
+    reversal: InventoryOperation | None,
+    request_order_stock: dict[uuid.UUID, RequestOrderStockResponse],
+) -> dict[uuid.UUID, TransactionLogResponse]:
+    """작업 행을 기존 거래 이력과 동일한 감사 응답으로 보강한다."""
+    batch_map = _batch_name_map(
+        db, {log.operation_batch_id for log in logs if log.operation_batch_id}
+    )
+    stock_request_map = _stock_request_info_map(
+        db, {log.reference_no for log in logs if log.reference_no}
+    )
+    response_by_log_id: dict[uuid.UUID, TransactionLogResponse] = {}
+    for log in logs:
+        item = items.get(log.item_id)
+        if item is None:
+            continue
+        info = stock_request_map.get(log.reference_no) if log.reference_no else None
+        if info is None:
+            info = batch_map.get(log.operation_batch_id)
+        response = _to_log_response(
+            log,
+            item,
+            requester_name=info.requester_name if info else None,
+            approver_name=info.approver_name if info else None,
+            requested_at=info.requested_at if info else None,
+            approved_at=info.approved_at if info else None,
+            operation=operation,
+            reversal=reversal,
+            history_batch=_history_batch_response(batch_map.get(log.operation_batch_id)),
+        )
+        response.request_order_stock = request_order_stock.get(log.log_id)
+        response_by_log_id[log.log_id] = response
+    return response_by_log_id
 
 
 def _operation_payload(
@@ -72,6 +122,7 @@ def _operation_payload(
     operation: InventoryOperation,
     *,
     selected_item_id: uuid.UUID | None = None,
+    request_order_stock: dict[uuid.UUID, RequestOrderStockResponse] | None = None,
 ) -> dict:
     logs = (
         db.query(TransactionLog)
@@ -117,11 +168,26 @@ def _operation_payload(
         effective_status = "cancelled"
     else:
         effective_status = "active"
+    if request_order_stock is None:
+        request_order_stock = load_request_order_stock(
+            db,
+            item_ids,
+            request_date_expr=_history_request_date_expr(),
+        )
+    history_logs = _history_log_map(
+        db,
+        logs,
+        items,
+        operation,
+        reversal,
+        request_order_stock,
+    )
     matching_lines = [
         _line_payload(
             log,
             items.get(log.item_id),
             movement_quantity=movement_quantities.get(log.item_id),
+            history_log=history_logs.get(log.log_id),
         )
         for log in logs
         if selected_item_id is None or log.item_id == selected_item_id
@@ -163,6 +229,7 @@ def _operation_payload(
                 log,
                 items.get(log.item_id),
                 movement_quantity=movement_quantities.get(log.item_id),
+                history_log=history_logs.get(log.log_id),
             )
             for log in logs
         ],
@@ -254,9 +321,28 @@ def list_operations(
     if has_more and rows:
         last = rows[-1]
         next_cursor = f"{last.effective_at.isoformat()}|{last.operation_id}"
+    page_item_ids = {
+        item_id
+        for (item_id,) in (
+            db.query(TransactionLog.item_id)
+            .filter(TransactionLog.operation_id.in_([row.operation_id for row in rows]))
+            .distinct()
+            .all()
+        )
+    } if rows else set()
+    request_order_stock = load_request_order_stock(
+        db,
+        page_item_ids,
+        request_date_expr=_history_request_date_expr(),
+    )
     return {
         "items": [
-            _operation_payload(db, operation, selected_item_id=item_id)
+            _operation_payload(
+                db,
+                operation,
+                selected_item_id=item_id,
+                request_order_stock=request_order_stock,
+            )
             for operation in rows
         ],
         "next_cursor": next_cursor,
@@ -271,7 +357,25 @@ def get_operation(
     operation = db.get(InventoryOperation, operation_id)
     if operation is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "작업을 찾을 수 없습니다.")
-    return _operation_payload(db, operation)
+    item_ids = {
+        item_id
+        for (item_id,) in (
+            db.query(TransactionLog.item_id)
+            .filter(TransactionLog.operation_id == operation.operation_id)
+            .distinct()
+            .all()
+        )
+    }
+    request_order_stock = load_request_order_stock(
+        db,
+        item_ids,
+        request_date_expr=_history_request_date_expr(),
+    )
+    return _operation_payload(
+        db,
+        operation,
+        request_order_stock=request_order_stock,
+    )
 
 
 @router.post("/operations/{operation_id}/cancel/preview")
