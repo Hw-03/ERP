@@ -173,6 +173,103 @@ def test_operation_list_preview_cancel_and_summary(client, db_session, make_item
     assert summary.json()["cancellation_count"] == 1
 
 
+def test_operation_lines_embed_the_same_history_log_as_legacy_history(
+    client, db_session, make_item
+) -> None:
+    item, actor, operation, log = _seed_operation(db_session, make_item)
+    batch = IoBatch(
+        work_type="process",
+        sub_type="disassemble",
+        status="completed",
+        requester_employee_id=actor.employee_id,
+        requester_name=actor.name,
+        requester_department="창고",
+        to_department="연구",
+    )
+    db_session.add(batch)
+    db_session.flush()
+    log.operation_batch_id = batch.batch_id
+    db_session.commit()
+
+    operation_response = client.get(
+        f"/api/inventory/operations/{operation.operation_id}"
+    )
+    legacy_response = client.get(
+        "/api/inventory/transactions",
+        params={"operation_id": str(operation.operation_id)},
+    )
+
+    assert operation_response.status_code == 200, operation_response.text
+    assert legacy_response.status_code == 200, legacy_response.text
+    payload = operation_response.json()
+    history_log = payload["lines"][0]["history_log"]
+    assert history_log == legacy_response.json()[0]
+    assert payload["matching_lines"][0]["history_log"] == history_log
+    assert history_log["log_id"] == str(log.log_id)
+    assert history_log["department"] == "창고"
+    assert history_log["inventory_effect"] == log.inventory_effect
+    assert history_log["history_batch"] == {
+        "work_type": "process",
+        "sub_type": "disassemble",
+        "to_department": "연구",
+        "display_transaction_type": None,
+    }
+    # 시드 로그의 저장된 전후 수량이 현재 재고 이력과 맞지 않으므로, 기존 이력 API와
+    # 같은 계산 불가 사유를 보존해야 한다. 최근 내역이 임의의 수량을 만들면 안 된다.
+    assert history_log["request_order_stock"] == {
+        "status": "unavailable",
+        "reason": "inconsistent_history",
+        "warehouse_qty_before": None,
+        "warehouse_qty_after": None,
+        "department_qty_before": None,
+        "department_qty_after": None,
+    }
+
+
+def test_operation_list_hydrates_history_logs_once_and_preserves_cancellation_fields(
+    client, db_session, make_item, monkeypatch
+) -> None:
+    import app.routers.inventory.operations as operations_router
+
+    item, actor, operation, original_log = _seed_operation(db_session, make_item)
+    preview = client.post(
+        f"/api/inventory/operations/{operation.operation_id}/cancel/preview"
+    ).json()
+    cancelled = client.post(
+        f"/api/inventory/operations/{operation.operation_id}/cancel",
+        json={
+            "reason": "입고 취소 감사 검증",
+            "employee_code": actor.employee_code,
+            "pin": "0000",
+            "plan_hash": preview["plan_hash"],
+        },
+    )
+    assert cancelled.status_code == 200, cancelled.text
+
+    calls = []
+    real_loader = operations_router.load_request_order_stock
+
+    def tracked_loader(*args, **kwargs):
+        calls.append((args, kwargs))
+        return real_loader(*args, **kwargs)
+
+    monkeypatch.setattr(operations_router, "load_request_order_stock", tracked_loader)
+    response = client.get("/api/inventory/operations", params={"item_id": str(item.item_id)})
+
+    assert response.status_code == 200, response.text
+    assert len(calls) == 1
+    rows = response.json()["items"]
+    original = next(row for row in rows if row["operation_id"] == str(operation.operation_id))
+    cancellation = next(row for row in rows if row["kind"] == "CANCELLATION")
+    original_history = original["lines"][0]["history_log"]
+    cancellation_history = cancellation["lines"][0]["history_log"]
+    assert original_history["cancelled"] is True
+    assert original_history["cancel_reason"] == "입고 취소 감사 검증"
+    assert original_history["reversal_operation_id"] == cancellation_history["operation_id"]
+    assert cancellation_history["operation_effective_status"] == "cancellation"
+    assert cancellation_history["reverses_log_id"] == str(original_log.log_id)
+
+
 def test_legacy_log_cancel_endpoint_delegates_new_logs_to_operation_reversal(
     client, db_session, make_item
 ) -> None:

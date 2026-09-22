@@ -102,6 +102,40 @@ describe("productionApi", () => {
     expect(String(fetchSpy.mock.calls[0][0])).toContain("operation_id=operation-1");
   });
 
+  it("inventory operation lines map the nested history log for history presentation", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({
+      items: [inventoryOperationWire({
+        matching_lines: [{
+          log_id: "log-1",
+          item_id: "item-1",
+          item_name: "저항",
+          mes_code: "46-AA-0080",
+          transaction_type: "TRANSFER_TO_PROD",
+          quantity_change: "12",
+          quantity_before: "15",
+          quantity_after: "27",
+          transfer_qty: null,
+          department: "조립",
+          operation_role: "PRIMARY",
+          reverses_log_id: null,
+          reference_no: null,
+          notes: null,
+          created_at: "2026-08-25T06:00:00Z",
+          history_log: { log_id: "log-1", transaction_type: "TRANSFER_TO_PROD", quantity_change: 12 },
+        }],
+      })],
+      next_cursor: null,
+    })));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    const page = await productionApi.getInventoryOperations({ itemId: "item-1" });
+
+    expect(page.items[0].matchingLines[0]).toMatchObject({
+      quantityChange: 12,
+      historyLog: { log_id: "log-1", transaction_type: "TRANSFER_TO_PROD" },
+    });
+  });
+
   it("maps display-group matched log ids from the wire response", async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({
       groups: [{

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, date, datetime, time, timedelta
+from collections import defaultdict
 from typing import NamedTuple, Optional
 from zoneinfo import ZoneInfo
 
@@ -17,6 +18,8 @@ from sqlalchemy.orm import Query, Session
 
 from app.models import (
     IoBatch,
+    IoBundle,
+    IoLine,
     InventoryOperation,
     InventoryOperationKindEnum,
     Item,
@@ -25,7 +28,7 @@ from app.models import (
     TransactionLog,
     TransactionTypeEnum,
 )
-from app.schemas import TransactionLogResponse
+from app.schemas import TransactionHistoryBatchResponse, TransactionLogResponse
 from app.utils.search import build_normalized_search_filter
 
 
@@ -590,6 +593,10 @@ class _BatchInfo(NamedTuple):
     approver_name: Optional[str]
     requested_at: Optional[datetime]
     approved_at: Optional[datetime]
+    work_type: Optional[str]
+    sub_type: Optional[str]
+    to_department: Optional[str]
+    display_transaction_type: Optional[str]
 
 
 class _OperationInfo(NamedTuple):
@@ -648,6 +655,9 @@ def _batch_name_map(
             IoBatch.stock_request_id,
             IoBatch.submitted_at,
             IoBatch.created_at,
+            IoBatch.work_type,
+            IoBatch.sub_type,
+            IoBatch.to_department,
         )
         .filter(IoBatch.batch_id.in_(batch_ids))
         .all()
@@ -679,11 +689,63 @@ def _batch_name_map(
             else:
                 sr_approver[sr_id] = None
                 sr_approved_at[sr_id] = None  # 즉시 처리 시 approved_at fallback은 호출부에서 log.created_at
+    bundle_rows = (
+        db.query(
+            IoBundle.batch_id, IoBundle.bundle_id, IoBundle.source_kind, IoBundle.source_item_id,
+            IoLine.item_id, IoLine.included, IoLine.origin, IoLine.direction,
+            IoLine.from_bucket, IoLine.to_bucket, IoLine.exclusion_note,
+        )
+        .outerjoin(IoLine, IoLine.bundle_id == IoBundle.bundle_id)
+        .filter(IoBundle.batch_id.in_(batch_ids))
+        .all()
+    )
+    bundles_by_batch: dict[uuid.UUID, dict[uuid.UUID, dict]] = defaultdict(dict)
+    for row in bundle_rows:
+        bundle = bundles_by_batch[row.batch_id].setdefault(row.bundle_id, {
+            "source_kind": row.source_kind, "source_item_id": row.source_item_id, "lines": [],
+        })
+        if row.item_id is not None:
+            bundle["lines"].append(row)
+
+    def display_type(batch_id: uuid.UUID, sub_type: str | None) -> str | None:
+        bundles = list(bundles_by_batch.get(batch_id, {}).values())
+        if sub_type not in {"produce", "disassemble"}:
+            return None
+        manual_only = bool(bundles) and all(
+            bundle["source_kind"] == "manual"
+            and any(line.included for line in bundle["lines"])
+            and all(
+                line.origin == "manual" and line.direction == "in"
+                and line.from_bucket == "none" and line.to_bucket == "production"
+                for line in bundle["lines"] if line.included
+            )
+            for bundle in bundles
+        )
+        custom_adjustment = any(
+            bundle["source_kind"] == "bom_parent"
+            and any(
+                line.origin == "direct" and line.item_id == bundle["source_item_id"]
+                and not line.included and line.exclusion_note == "커스텀 BOM 상위 미반영"
+                for line in bundle["lines"]
+            )
+            for bundle in bundles
+        )
+        return "ADJUST" if manual_only or custom_adjustment else None
+
     for b in batches:
         approver = sr_approver.get(b.stock_request_id) if b.stock_request_id else None
         approved_at = sr_approved_at.get(b.stock_request_id) if b.stock_request_id else None
         requested_at = b.submitted_at or b.created_at
-        batch_map[b.batch_id] = _BatchInfo(b.requester_name, approver, requested_at, approved_at)
+        batch_map[b.batch_id] = _BatchInfo(
+            b.requester_name,
+            approver,
+            requested_at,
+            approved_at,
+            b.work_type,
+            b.sub_type,
+            b.to_department,
+            display_type(b.batch_id, b.sub_type),
+        )
     return batch_map
 
 
@@ -726,8 +788,26 @@ def _stock_request_info_map(
             approver_name,
             row.submitted_at or row.created_at,
             approved_at,
+            None,
+            None,
+            None,
+            None,
         )
     return out
+
+
+def _history_batch_response(
+    info: _BatchInfo | None,
+) -> TransactionHistoryBatchResponse | None:
+    """IoBatch가 있는 거래에만 이력 작업 라벨용 최소 문맥을 붙인다."""
+    if info is None or info.work_type is None or info.sub_type is None:
+        return None
+    return TransactionHistoryBatchResponse(
+        work_type=info.work_type,
+        sub_type=info.sub_type,
+        to_department=info.to_department,
+        display_transaction_type=info.display_transaction_type,
+    )
 
 
 def _to_log_response(
@@ -740,6 +820,7 @@ def _to_log_response(
     approved_at: Optional[datetime] = None,
     operation: Optional[InventoryOperation] = None,
     reversal: Optional[InventoryOperation] = None,
+    history_batch: TransactionHistoryBatchResponse | None = None,
 ) -> TransactionLogResponse:
     is_cancellation = bool(
         operation and operation.kind == InventoryOperationKindEnum.CANCELLATION
@@ -810,4 +891,5 @@ def _to_log_response(
         ),
         cancelled_at=reversal.effective_at if is_reversed and reversal else log.cancelled_at,
         inventory_effect=log.inventory_effect,
+        history_batch=history_batch,
     )

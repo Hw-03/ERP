@@ -358,7 +358,7 @@ function DefectViewInner({
   const isFullWidthWork = view.kind !== "list" && view.kind !== "hub" && view.kind !== "storage";
 
   if (view.kind === "storage") {
-    return <div className="flex min-h-0 min-w-0 flex-1 overflow-y-auto rounded-[28px] border p-4" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}><DefectStorageView locations={locations} items={items} productModels={productModels} currentEmployee={employee} loading={loading} loadError={error ?? refreshError} onRetry={() => setReloadNonce((value) => value + 1)} onBack={() => window.history.back()} onUpdated={(recordId, managementCategory) => setLocations((current) => current.map((location) => location.record_id === recordId ? { ...location, management_category: managementCategory } : location))} onMemoUpdated={handleMemoUpdated} onRestore={handleRestoreRow} /></div>;
+    return <div className="animate-desktop-navigation-enter flex min-h-0 min-w-0 flex-1 overflow-y-auto rounded-[28px] border p-4" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}><DefectStorageView locations={locations} items={items} productModels={productModels} currentEmployee={employee} loading={loading} loadError={error ?? refreshError} onRetry={() => setReloadNonce((value) => value + 1)} onBack={() => window.history.back()} onUpdated={(recordId, managementCategory) => setLocations((current) => current.map((location) => location.record_id === recordId ? { ...location, management_category: managementCategory } : location))} onMemoUpdated={handleMemoUpdated} onRestore={handleRestoreRow} /></div>;
   }
 
   function handleRestoreRow(loc: DefectLocation) {
@@ -378,7 +378,7 @@ function DefectViewInner({
             className="absolute inset-y-0 left-0 right-0 overflow-y-auto lg:-right-2.5 lg:[scrollbar-gutter:stable]"
           >
             <div
-              className="animate-view-fade min-h-full min-w-full p-[17px]"
+              className="animate-desktop-navigation-enter min-h-full min-w-full p-[17px]"
               style={{ background: LEGACY_COLORS.s1 }}
             >
               <DefectStatisticsView
@@ -424,7 +424,7 @@ function DefectViewInner({
         {isFullWidthWork && (
           <div
             key={view.kind}
-            className="animate-view-fade flex min-h-0 min-w-0 flex-1 flex-col px-4 py-4"
+            className="animate-desktop-navigation-enter flex min-h-0 min-w-0 flex-1 flex-col px-4 py-4"
           >
             {view.kind === "cart" && (
               <DefectCartFlow
@@ -477,7 +477,7 @@ function DefectViewInner({
         )}
 
         {view.kind === "list" && (
-          <div key="list" className="animate-view-fade flex min-h-0 flex-1 flex-col gap-4 px-4 py-4 pb-6">
+          <div key="list" className="animate-desktop-navigation-enter flex min-h-0 flex-1 flex-col gap-4 px-4 py-4 pb-6">
             <div className="flex items-center gap-3">
               <button
                 type="button"

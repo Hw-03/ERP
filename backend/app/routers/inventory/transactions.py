@@ -62,6 +62,7 @@ from app.routers.inventory._tx_filters import (
     _history_search_filter,
     _kst_date_to_utc_naive_bounds,
     _batch_name_map,
+    _history_batch_response,
     _operation_info_map,
     _stock_request_info_map,
     _to_log_response,
@@ -386,9 +387,10 @@ def list_transactions(
 
     result = []
     for log, item, edit_count in rows:
+        batch_info = batch_map.get(log.operation_batch_id)
         info = sr_map.get(log.reference_no) if log.reference_no else None
         if info is None:
-            info = batch_map.get(log.operation_batch_id)
+            info = batch_info
         operation_info = operation_map.get(log.operation_id)
         result.append(
             _to_log_response(
@@ -401,8 +403,16 @@ def list_transactions(
                 approved_at=info.approved_at if info else None,
                 operation=operation_info.operation if operation_info else None,
                 reversal=operation_info.reversal if operation_info else None,
+                history_batch=_history_batch_response(batch_info),
             )
         )
+    request_order_stock = load_request_order_stock(
+        db,
+        {log.item_id for log, _, _ in rows},
+        request_date_expr=requested_at_order,
+    )
+    for response in result:
+        response.request_order_stock = request_order_stock.get(response.log_id)
     return result
 
 

@@ -312,7 +312,7 @@ describe("DesktopMesShell tab transition", () => {
     fireEvent.click(screen.getByText(`${tab} detail entry`));
     fireEvent.click(menu);
     expect(screen.getByTestId("desktop-tab-transition")).toBe(body);
-    expect(animate).toHaveBeenCalledWith([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: "ease-out" });
+    expect(animate).toHaveBeenCalledWith([{ opacity: 0.7 }, { opacity: 1 }], { duration: 180, easing: "ease-out" });
     fireEvent.click(menu);
     expect(animate).toHaveBeenCalledOnce();
   });
@@ -329,6 +329,17 @@ describe("DesktopMesShell tab transition", () => {
       expect(routerPush).not.toHaveBeenCalled();
     },
   );
+
+  it("모션 감소 설정에서는 허브 복귀 애니메이션을 실행하지 않는다", () => {
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true })));
+    render(<DesktopMesShell />);
+    fireEvent.click(screen.getByRole("button", { name: "shipping", exact: true }));
+    const animate = vi.fn(() => ({ cancel: vi.fn() }));
+    Object.defineProperty(screen.getByTestId("desktop-tab-transition"), "animate", { value: animate });
+    fireEvent.click(screen.getByText("shipping detail entry"));
+    fireEvent.click(screen.getByRole("button", { name: "shipping", exact: true }));
+    expect(animate).not.toHaveBeenCalled();
+  });
 
   it("지도 복귀 기록은 상세 위치만 지우고 다른 브라우저 상태를 보존한다", () => {
     render(<DesktopMesShell />);
@@ -458,11 +469,7 @@ describe("DesktopMesShell tab transition", () => {
     fireEvent.click(screen.getByRole("button", { name: tab }));
 
     expect(screen.getByTestId("desktop-tab-transition")).toHaveAttribute("data-active-tab", tab);
-    if (tab === "dashboard" || tab === "history") {
-      expect(screen.getByTestId("desktop-tab-transition")).not.toHaveClass("animate-desktop-tab-enter");
-    } else {
-      expect(screen.getByTestId("desktop-tab-transition")).toHaveClass("animate-desktop-tab-enter");
-    }
+    expect(screen.getByTestId("desktop-tab-transition")).toHaveClass("animate-desktop-navigation-enter");
   });
 
   it.each(["dashboard", "history"] as const)("%s retains the skeleton over ready content until the dissolve ends", async (tab) => {

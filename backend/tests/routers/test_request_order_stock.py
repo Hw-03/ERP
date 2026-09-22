@@ -112,13 +112,49 @@ def test_archived_approval_is_hidden_but_still_part_of_current_balance(client, d
     assert rows[0]["request_order_stock"]["department_qty_before"] == 0
 
 
-def test_ordinary_transaction_response_keeps_actual_snapshot(client, delayed_adjustment):
+def test_ordinary_transaction_response_keeps_actual_snapshot_and_request_order_projection(client, delayed_adjustment):
     item, logs = delayed_adjustment
     response = client.get("/api/inventory/transactions", params={"item_id": str(item.item_id)})
     assert response.status_code == 200, response.text
     produced = next(row for row in response.json() if row["log_id"] == str(logs[2].log_id))
-    assert produced["request_order_stock"] is None
+    assert produced["request_order_stock"] == {
+        "status": "available",
+        "reason": None,
+        "warehouse_qty_before": 0,
+        "warehouse_qty_after": 0,
+        "department_qty_before": 0,
+        "department_qty_after": 50,
+    }
     assert (produced["department_qty_before"], produced["department_qty_after"]) == (44, 94)
+
+
+def test_ordinary_transaction_response_exposes_missing_history_as_unavailable(
+    client, db_session, make_item
+):
+    item = make_item(name="요청순 이력 누락 API", warehouse_qty=0)
+    log = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.RECEIVE,
+        quantity_change=5,
+        quantity_before=0,
+        quantity_after=5,
+        created_at=datetime(2026, 9, 8, 9, 0),
+    )
+    db_session.add(log)
+    db_session.commit()
+
+    response = client.get("/api/inventory/transactions", params={"item_id": str(item.item_id)})
+
+    assert response.status_code == 200, response.text
+    history = response.json()[0]["request_order_stock"]
+    assert history == {
+        "status": "unavailable",
+        "reason": "missing_history",
+        "warehouse_qty_before": None,
+        "warehouse_qty_after": None,
+        "department_qty_before": None,
+        "department_qty_after": None,
+    }
 
 
 def test_read_service_uses_fixed_query_count_for_multiple_items(db_session, make_item):

@@ -1710,12 +1710,13 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         />
       );
       return hubEntryAnimationView === "requestList"
-        ? <div data-testid="shipping-hub-entry-animation" className="animate-view-fade flex min-h-0 flex-1 flex-col">{entry}</div>
+        ? <div data-testid="shipping-hub-entry-animation" className="animate-desktop-navigation-enter flex min-h-0 flex-1 flex-col">{entry}</div>
         : entry;
     }
 
     if (view === "requestDetail") {
       return (
+        <div className="animate-desktop-navigation-enter">
         <RequestDetailEntry
           request={selectedRequest}
           onBack={() => navigateView("requestList")}
@@ -1727,11 +1728,13 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
           onInvoiceSaved={handleInvoiceSaved}
           pending={pending}
         />
+        </div>
       );
     }
 
     if (view === "requestWork") {
       return (
+        <div className="animate-desktop-navigation-enter">
         <RequestSection
             showList={false}
             onBack={() => navigateView(selectedRequest ? "requestDetail" : "requestList", selectedRequest?.request_id)}
@@ -1794,6 +1797,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
             onSave={() => void saveRequest()}
             onSubmit={() => void submitRequest()}
           />
+        </div>
       );
     }
 
@@ -1867,13 +1871,13 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         />
       );
       return hubEntryAnimationView === "historyList"
-        ? <div data-testid="shipping-hub-entry-animation" className="animate-view-fade flex min-h-0 flex-1 flex-col">{entry}</div>
+        ? <div data-testid="shipping-hub-entry-animation" className="animate-desktop-navigation-enter flex min-h-0 flex-1 flex-col">{entry}</div>
         : entry;
     }
 
     const hasPickedUpSerialNumbers = selectedHistory?.status === "PICKED_UP" && Boolean(selectedHistory.serial_numbers?.trim());
     return (
-      <div className="grid gap-3">
+      <div className="animate-desktop-navigation-enter grid gap-3">
         <ViewHeader
           dataTestId="shipping-history-view-header"
           title="출하 상세 이력"

@@ -189,6 +189,7 @@ export function getHistoryDisplayTransactionType(
   log: { transaction_type: string },
   batch?: IoBatch | null,
 ): string {
+  if (batch?.display_transaction_type) return batch.display_transaction_type;
   if (isManualOnlyProductionBatch(batch) || (batch && isCustomBomSingleAdjustmentBatch(batch))) return "ADJUST";
   if (batch?.sub_type === "disassemble") return "DISASSEMBLE";
   return log.transaction_type;

@@ -4293,7 +4293,7 @@ describe("DesktopShippingView", () => {
 
     await openHubCard(container, "request");
     const animatedEntry = await screen.findByTestId("shipping-hub-entry-animation");
-    expect(animatedEntry).toHaveClass("animate-view-fade", "flex", "flex-1", "min-h-0", "flex-col");
+    expect(animatedEntry).toHaveClass("animate-desktop-navigation-enter", "flex", "flex-1", "min-h-0", "flex-col");
 
     navigationMock.search = "tab=shipping&shippingView=requestList";
     rerender(<DesktopShippingView onStatusChange={() => {}} />);

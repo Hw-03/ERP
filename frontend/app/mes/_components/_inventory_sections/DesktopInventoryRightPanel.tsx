@@ -143,7 +143,7 @@ export function DesktopInventoryRightPanel({
               />
             </div>
           ) : selectedItem?.item_id === displayItem.item_id ? (
-            <div id={INVENTORY_HISTORY_PANEL_ID} role="tabpanel" aria-labelledby={INVENTORY_HISTORY_TAB_ID}>
+            <div id={INVENTORY_HISTORY_PANEL_ID} role="tabpanel" aria-labelledby={INVENTORY_HISTORY_TAB_ID} className="flex h-full min-h-0 flex-col">
               <InventoryRecentHistoryPanel key={selectedItem.item_id} item={selectedItem} />
             </div>
           ) : null}

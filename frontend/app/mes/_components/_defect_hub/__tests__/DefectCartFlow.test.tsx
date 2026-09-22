@@ -100,6 +100,21 @@ beforeEach(() => {
 });
 
 describe("DefectCartFlow", () => {
+  it("불량 작성 단계는 공통 탭 진입 모션을 사용한다", () => {
+    const { container } = render(
+      <DefectCartFlow
+        mode="add"
+        items={[rItem, fItem]}
+        productModels={productModels}
+        currentEmployee={employee}
+        onDone={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    expect(container.querySelector(".animate-desktop-navigation-enter")).toHaveTextContent("출처 선택");
+  });
+
   it.each(["add", "scrap"] as const)("%s 작성 입력은 복귀 확인 취소로 보존되고 폐기할 때만 닫힌다", (mode) => {
     render(<DesktopHomeHarness><DefectCartFlow mode={mode} items={[rItem, fItem]} productModels={productModels}
       currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} /></DesktopHomeHarness>);

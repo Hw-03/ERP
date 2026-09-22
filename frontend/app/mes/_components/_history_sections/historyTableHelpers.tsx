@@ -425,33 +425,50 @@ export function StockSnapshotCell({
   loading?: boolean;
 }) {
   const cellClass = dense ? HISTORY_CHILD_CELL_CLASS : HISTORY_MAIN_CELL_CLASS;
+  return (
+    <td className={`${cellClass} px-1 text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
+      <StockSnapshotContent log={log} dense={dense} quantityWidth={quantityWidth} loading={loading} />
+    </td>
+  );
+}
+
+/** 표 셀과 최근 내역이 동일한 재고 위치 전후·증감 표기를 공유한다. */
+export function StockSnapshotContent({
+  log,
+  dense = false,
+  quantityWidth,
+  loading = false,
+  emptyLogLabel = "—",
+}: {
+  log?: TransactionLog | null;
+  dense?: boolean;
+  /** 같은 작업 묶음의 최장 재고 표기 폭. */
+  quantityWidth?: number;
+  loading?: boolean;
+  /** 로그 자체가 없을 때 표기할 문구. 표는 기존 대시(—)를 유지한다. */
+  emptyLogLabel?: string;
+}) {
   if (loading) {
     return (
-      <td className={`${cellClass} px-1 text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <span aria-hidden="true" data-history-loading-stock className="mx-auto flex w-fit items-center leading-4">
-          {[28, STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH_PX, STOCK_SNAPSHOT_DELTA_WIDTH_PX, STOCK_SNAPSHOT_ARROW_WIDTH_PX, STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH_PX].map((width, index) => (
-            <span key={index} className="flex shrink-0 items-center" style={{ width, justifyContent: index === 1 ? "flex-end" : index === 3 ? "center" : "flex-start" }}>
-              {index === 3 ? <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>→</span> : <span className="h-3 rounded-[4px] motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s3, width: width - 6 }} />}
-            </span>
-          ))}
-        </span>
-      </td>
+      <span aria-hidden="true" data-history-loading-stock className="mx-auto flex w-fit items-center leading-4">
+        {[28, STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH_PX, STOCK_SNAPSHOT_DELTA_WIDTH_PX, STOCK_SNAPSHOT_ARROW_WIDTH_PX, STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH_PX].map((width, index) => (
+          <span key={index} className="flex shrink-0 items-center" style={{ width, justifyContent: index === 1 ? "flex-end" : index === 3 ? "center" : "flex-start" }}>
+            {index === 3 ? <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>→</span> : <span className="h-3 rounded-[4px] motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s3, width: width - 6 }} />}
+          </span>
+        ))}
+      </span>
     );
   }
   if (!log) {
     return (
-      <td className={`${cellClass} px-1 text-center text-xs font-semibold`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-        —
-      </td>
+      <span className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>{emptyLogLabel}</span>
     );
   }
 
   const departmentCorrectionFlow = getDepartmentCorrectionStockFlow(log);
   if (departmentCorrectionFlow) {
     return (
-      <td className={`${cellClass} px-1 text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <DepartmentCorrectionStockFlow flow={departmentCorrectionFlow} />
-      </td>
+      <DepartmentCorrectionStockFlow flow={departmentCorrectionFlow} />
     );
   }
 
@@ -459,18 +476,16 @@ export function StockSnapshotCell({
   if (snapshot.status === "unavailable") {
     const accessibleLabel = `요청 순 재고 계산 불가: ${snapshot.reason}`;
     return (
-      <td className={`${cellClass} px-1 text-center text-xs font-semibold`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.yellow }}>
+      <span className="text-xs font-semibold" style={{ color: LEGACY_COLORS.yellow }}>
         <Tooltip content={snapshot.reason} multiline triggerTabIndex={0} triggerAriaLabel={accessibleLabel}>
           <span>계산 불가</span>
         </Tooltip>
-      </td>
+      </span>
     );
   }
   if (snapshot.status === "missing") {
     return (
-      <td className={`${cellClass} px-1 text-center text-xs font-semibold`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
-        기록 없음
-      </td>
+      <span className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>기록 없음</span>
     );
   }
   const { warehouseBefore, warehouseAfter, departmentBefore, departmentAfter } = snapshot;
@@ -530,18 +545,16 @@ export function StockSnapshotCell({
     : `재고 변동: ${changedSnapshots.map((snapshot) => `${snapshot.label} ${snapshot.beforeText} ${formatStockDelta(snapshot.after - snapshot.before)}→${snapshot.afterText}`).join(", ")}`;
 
   return (
-    <td className={`${cellClass} px-1 text-center`} style={{ borderColor: LEGACY_COLORS.border }}>
-      <div
-        aria-label={snapshotLabel}
-        className={`mx-auto flex w-fit min-w-0 flex-col items-start ${dense ? "gap-0" : "gap-0.5"}`}
-      >
-        {changedSnapshots.length === 0 ? (
-          <span aria-hidden="true" className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>변동 없음</span>
-        ) : changedSnapshots.map((snapshot) => (
-          <StockSnapshotLine key={snapshot.label} label={snapshot.label} beforeText={snapshot.beforeText} afterText={snapshot.afterText} delta={snapshot.after - snapshot.before} beforeQuantityWidthPx={beforeQuantityWidthPx} afterQuantityWidthPx={STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH_PX} increased={snapshot.after > snapshot.before} decreased={snapshot.after < snapshot.before} cancelled={log.cancelled} />
-        ))}
-      </div>
-    </td>
+    <div
+      aria-label={snapshotLabel}
+      className={`mx-auto flex w-fit min-w-0 flex-col items-start ${dense ? "gap-0" : "gap-0.5"}`}
+    >
+      {changedSnapshots.length === 0 ? (
+        <span aria-hidden="true" className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>변동 없음</span>
+      ) : changedSnapshots.map((snapshot) => (
+        <StockSnapshotLine key={snapshot.label} label={snapshot.label} beforeText={snapshot.beforeText} afterText={snapshot.afterText} delta={snapshot.after - snapshot.before} beforeQuantityWidthPx={beforeQuantityWidthPx} afterQuantityWidthPx={STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH_PX} increased={snapshot.after > snapshot.before} decreased={snapshot.after < snapshot.before} cancelled={log.cancelled} />
+      ))}
+    </div>
   );
 }
 

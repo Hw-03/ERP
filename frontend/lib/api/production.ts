@@ -75,6 +75,7 @@ type InventoryOperationLineWire = {
   reference_no: string | null;
   notes: string | null;
   created_at: string;
+  history_log?: TransactionLog | null;
 };
 
 type InventoryOperationWire = {
@@ -148,8 +149,12 @@ function apiQuery<T extends object>(path: string, params?: T): string {
 
 function mapInventoryOperation(operation: InventoryOperationWire): InventoryOperation {
   const mapped = mapWire<InventoryOperation>(operation);
-  mapped.lines = operation.lines.map((line) => mapWire<InventoryOperationLine>(line));
-  mapped.matchingLines = operation.matching_lines.map((line) => mapWire<InventoryOperationLine>(line));
+  const mapLine = (line: InventoryOperationLineWire): InventoryOperationLine => ({
+    ...mapWire<InventoryOperationLine>(line),
+    historyLog: line.history_log ?? null,
+  });
+  mapped.lines = operation.lines.map(mapLine);
+  mapped.matchingLines = operation.matching_lines.map(mapLine);
   mapped.effects = operation.effects.map((effect) => mapWire(effect));
   return mapped;
 }
