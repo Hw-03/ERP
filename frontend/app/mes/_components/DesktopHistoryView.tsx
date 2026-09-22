@@ -538,7 +538,7 @@ export function DesktopHistoryView() {
             data-testid="history-scroll-surface"
             className="min-h-full"
           >
-            <div className="flex flex-col gap-2">
+            <div className="flex min-h-full flex-col gap-2">
           <HistoryStatsBar
             baseline={baselineSummary}
             currentSummary={summary}

@@ -1,6 +1,7 @@
 "use client";
 
-import { memo, type ReactNode } from "react";
+import { memo, useEffect, useRef, useState, type ReactNode } from "react";
+import Image from "next/image";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 
 export type EmptyStateVariant = "no-data" | "no-search-result" | "filtered-out";
@@ -29,6 +30,8 @@ interface Props {
   compact?: boolean;
   className?: string;
   comfortable?: boolean;
+  prominent?: boolean;
+  illustrated?: boolean;
 }
 
 function EmptyStateImpl({
@@ -40,22 +43,33 @@ function EmptyStateImpl({
   compact = false,
   className = "",
   comfortable = false,
+  prominent = false,
+  illustrated = false,
 }: Props) {
+  const areaRef = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState("small");
+  useEffect(() => {
+    if (!illustrated || !areaRef.current || typeof ResizeObserver === "undefined") return;
+    // Measure the available frame, not the artwork, so resizing cannot grow its own container.
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      setSize(!compact && width >= 480 && height >= 420 ? "large" : height >= 300 ? "medium" : "small");
+    });
+    observer.observe(areaRef.current);
+    return () => observer.disconnect();
+  }, [illustrated, compact]);
   const fallback = VARIANT_DEFAULTS[variant];
   const finalTitle = title ?? fallback.title;
   const finalDescription = description ?? fallback.description;
 
-  return (
-    <div
-      className={`flex flex-col items-center justify-center gap-2 text-center ${compact ? "py-6" : "py-12"} ${className}`}
-      style={{ color: LEGACY_COLORS.muted2 }}
-    >
-      {icon && <div className="opacity-70">{icon}</div>}
-      <div className={`${compact ? "text-sm" : "text-base"} font-bold`} style={{ color: LEGACY_COLORS.text }}>
+  const content = (
+    <>
+      {illustrated ? <Image src="/images/dexray/history-empty.webp" alt="" width={540} height={360} className="dexray-empty-mascot hidden object-contain lg:block" /> : icon && <div className={prominent ? "opacity-100" : "opacity-70"}>{icon}</div>}
+      <div className={`dexray-empty-title ${prominent ? "text-2xl" : compact ? "text-sm" : "text-base"} font-bold`} style={{ color: LEGACY_COLORS.text }}>
         {finalTitle}
       </div>
       {finalDescription && (
-        <div className={comfortable ? "text-sm" : compact ? "text-[11px]" : "text-xs"} style={{ color: LEGACY_COLORS.muted2 }}>
+        <div className={`dexray-empty-description ${prominent ? "text-base" : comfortable ? "text-sm" : compact ? "text-[11px]" : "text-xs"}`} style={{ color: LEGACY_COLORS.muted2 }}>
           {finalDescription}
         </div>
       )}
@@ -63,7 +77,7 @@ function EmptyStateImpl({
         <button
           type="button"
           onClick={action.onClick}
-          className={`standard-hover mt-2 rounded-[12px] border px-3 py-1.5 font-bold transition-colors ${comfortable ? "min-h-11 text-sm" : "text-xs"}`}
+          className={`standard-hover rounded-[12px] border font-bold transition-colors ${prominent ? "mt-1 min-h-12 px-5 py-2.5 text-base" : `mt-2 px-3 py-1.5 ${comfortable ? "min-h-11 text-sm" : "text-xs"}`}`}
           style={{
             borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 30%, ${LEGACY_COLORS.border})`,
             color: LEGACY_COLORS.blue,
@@ -73,6 +87,13 @@ function EmptyStateImpl({
           {action.label}
         </button>
       )}
+    </>
+  );
+  return (
+    <div ref={areaRef} data-empty-size={illustrated ? size : undefined}
+      className={`flex flex-col items-center justify-center text-center ${illustrated ? `dexray-empty-state py-6 lg:py-0 ${compact ? "dexray-empty-compact" : ""}` : prominent ? "gap-4 px-8 py-12" : `gap-2 ${compact ? "py-6" : "py-12"}`} ${className}`}
+      style={{ color: LEGACY_COLORS.muted2 }}>
+      {illustrated ? <div className="dexray-empty-content flex flex-col items-center justify-center gap-2">{content}</div> : content}
     </div>
   );
 }

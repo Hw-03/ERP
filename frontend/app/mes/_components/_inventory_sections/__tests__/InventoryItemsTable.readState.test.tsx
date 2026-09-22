@@ -25,7 +25,7 @@ it.each([[1, "검색 지우기"], [2, "필터 초기화"]])("distinguishes searc
   render(<InventoryItemsTable error={null} loading={false} filteredItems={[]} displayLimit={100}
     setDisplayLimit={vi.fn()} selectedItem={null} onSelectItem={vi.fn()} activeFilterCount={count}
     hasKpiFilter={false} hasSearch onRetry={vi.fn()} onResetAllFilters={reset} />);
-  expect(screen.getByText("검색 결과가 없습니다")).toBeInTheDocument();
+  expect(screen.getByText("현재 조건에 맞는 자재가 없습니다")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: label }));
   expect(reset).toHaveBeenCalledOnce();
 });

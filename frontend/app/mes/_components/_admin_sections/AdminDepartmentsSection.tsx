@@ -230,6 +230,7 @@ export function AdminDepartmentsSection({
               <EmptyState
                 variant={search ? "no-search-result" : "no-data"}
                 compact
+                illustrated
                 title={search ? "검색 결과가 없습니다." : "부서가 없습니다."}
               />
             }
@@ -332,11 +333,14 @@ export function AdminDepartmentsSection({
                 onDirtyChange={setDirty}
               />
             ) : (
-              <EmptyState
-                variant="no-data"
-                title="좌측에서 부서를 선택하세요"
-                description="부서를 클릭하면 상세 정보·색상 변경·소속 직원을 확인할 수 있습니다."
-              />
+              <div className="flex min-h-full flex-col">
+                <EmptyState
+                  variant="no-data"
+                  illustrated
+                  title="좌측에서 부서를 선택하세요"
+                  description="부서를 클릭하면 상세 정보·색상 변경·소속 직원을 확인할 수 있습니다."
+                />
+              </div>
             )}
           </AdminDetailCard>
         </div>

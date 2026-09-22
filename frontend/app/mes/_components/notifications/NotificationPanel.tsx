@@ -5,6 +5,7 @@ import { tint } from "@/lib/mes/colorUtils";
 import { REQUEST_TYPE_LABEL } from "@/lib/io/glossary";
 import type { AppNotification } from "@/lib/api/types";
 import { formatKstDateTime } from "@/lib/mes-format";
+import { EmptyState } from "../common/EmptyState";
 
 const TONE: Record<string, string> = {
   approval_request: LEGACY_COLORS.blue,
@@ -144,9 +145,7 @@ export function NotificationPanel({
       <div className="my-1 border-t" style={{ borderColor: LEGACY_COLORS.border }} />
       <div className="max-h-[440px] overflow-y-auto">
         {items.length === 0 ? (
-          <div className="px-3 py-6 text-center text-sm" style={{ color: LEGACY_COLORS.muted }}>
-            알림이 없습니다.
-          </div>
+          <EmptyState compact illustrated className="min-h-[200px]" title="알림이 없습니다." description="" />
         ) : (
           items.map((n) => {
             const tone = TONE[n.type] ?? LEGACY_COLORS.blue;

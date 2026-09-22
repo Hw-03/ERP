@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pencil, Printer, Trash2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { EmptyState } from "../common/EmptyState";
 import { tint } from "@/lib/mes/colorUtils";
 import { Button } from "@/lib/ui/Button";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
@@ -115,7 +116,7 @@ export function HandoverSectionPanel({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       {tabs.length > 1 && (
         <div className="flex gap-2">
           {tabs.map((t) => {
@@ -259,12 +260,7 @@ function HandoverCardList({
 }) {
   if (docs.length === 0) {
     return (
-      <div
-        className="rounded-[14px] border px-4 py-8 text-center text-sm"
-        style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}
-      >
-        {emptyText}
-      </div>
+      <EmptyState illustrated title={emptyText} description="" className="rounded-[14px] border border-[var(--c-border)]" />
     );
   }
   return (

@@ -132,7 +132,8 @@ describe("SupplierPickerStep", () => {
     api.updateSupplier.mockResolvedValue({ ...inactiveSupplier, is_active: true });
     render(<SupplierPickerStep employeeId="warehouse-1" selectedSupplierId={null} onSelect={vi.fn()} variant="mobile" />);
 
-    await screen.findByText("등록된 공급업체가 없습니다. 위에서 새 업체를 추가하세요.");
+    await screen.findByText("등록된 공급업체가 없습니다.");
+    expect(screen.getByText("위에서 새 업체를 추가하세요.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "숨김 업체 관리" }));
     fireEvent.click(await screen.findByRole("button", { name: "덕스윈상사 복원" }));
 

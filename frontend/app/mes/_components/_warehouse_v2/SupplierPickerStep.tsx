@@ -7,6 +7,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { matchesSearchText } from "@/lib/searchText";
 import { Button } from "@/lib/ui/Button";
+import { EmptyState } from "../common/EmptyState";
 
 type SupplierPickerStepProps = {
   employeeId: string;
@@ -204,11 +205,11 @@ export function SupplierPickerStep({
         </div>
       )}
 
-      <div className={`min-h-0 flex-1 overflow-y-auto rounded-[16px] border p-2 ${compact ? "max-h-[360px]" : ""}`} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+      <div className={`flex min-h-0 flex-1 flex-col overflow-y-auto rounded-[16px] border p-2 ${compact ? "max-h-[360px]" : ""}`} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
         {loading ? (
           <p className="p-3 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>공급업체 목록을 불러오는 중입니다.</p>
         ) : visibleSuppliers.length === 0 ? (
-          <p className="p-3 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>등록된 공급업체가 없습니다. 위에서 새 업체를 추가하세요.</p>
+          <EmptyState illustrated title="등록된 공급업체가 없습니다." description="위에서 새 업체를 추가하세요." />
         ) : (
           <ul className="space-y-2">
             {visibleSuppliers.map((supplier) => {

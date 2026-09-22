@@ -477,7 +477,7 @@ function DefectViewInner({
         )}
 
         {view.kind === "list" && (
-          <div key="list" className="animate-view-fade flex flex-col gap-4 px-4 py-4 pb-6">
+          <div key="list" className="animate-view-fade flex min-h-0 flex-1 flex-col gap-4 px-4 py-4 pb-6">
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -559,6 +559,8 @@ function DefectViewInner({
               <>
                 <DefectDepartmentList
                   emptyContent={<ReadEmpty hasSearch={!!search.trim()} hasFilters={locations.length > 0}
+                    illustrated
+                    className="min-h-[260px] flex-1"
                     title={!search.trim() && locations.length === 0 ? "격리된 불량 재고가 없습니다." : undefined}
                     onReset={() => { setSearch(""); setScope("all"); resetCategoryFilters(); setKpiFilter(null); }} />}
                   locations={filteredLocations}

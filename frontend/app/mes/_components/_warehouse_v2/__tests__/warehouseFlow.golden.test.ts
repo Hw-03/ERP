@@ -995,7 +995,7 @@ describe("useIoWorkState canAdvance[2] process 게이트", () => {
 
   it("원자재 입고 외 비 process workType은 방향 무관 2단계를 진행한다", () => {
     const { result } = renderHook(() => useIoWorkState());
-    for (const wt of ["warehouse_io", "defect"] as IoWorkType[]) {
+    for (const wt of ["defect"] as IoWorkType[]) {
       act(() => result.current.setWorkType(wt));
       expect(result.current.canAdvance[2]).toBe(true);
     }

@@ -140,13 +140,13 @@ export function BomParentList({
           data-scrollbar-rail-viewport
           className="absolute inset-y-0 left-0 right-0 overflow-y-auto lg:-right-2.5 lg:[scrollbar-gutter:stable]"
         >
-          <div className="min-h-full min-w-full" style={{ background: LEGACY_COLORS.s2, borderTop: `1px solid ${LEGACY_COLORS.border}` }}>
+          <div className="flex min-h-full min-w-full flex-col" style={{ background: LEGACY_COLORS.s2, borderTop: `1px solid ${LEGACY_COLORS.border}` }}>
             <BomTableHeader
               variant={mode === "edit" ? "parent" : "whereused"}
               gridTemplateColumns={mode === "edit" ? BOM_EDIT_LIST_GRID_TEMPLATE : WHERE_USED_LIST_GRID_TEMPLATE}
             />
             {list.length === 0 ? (
-              <EmptyState variant="no-search-result" compact />
+              <EmptyState variant="no-search-result" compact illustrated />
             ) : (
               list.map((i) => {
                 const isSelected = i.item_id === selectedId;

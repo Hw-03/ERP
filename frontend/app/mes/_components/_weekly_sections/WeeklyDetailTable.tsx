@@ -26,8 +26,10 @@ function WeeklyDetailTableImpl({ group, stockBasis, onItemSelect, loading = fals
       <EmptyState
         variant="no-data"
         title="해당 공정완료품 데이터가 없습니다."
-        description="선택한 주차에 집계할 품목 또는 거래 내역이 없습니다."
+        description=""
         compact
+        illustrated
+        className="min-h-[200px]"
       />
     );
   }

@@ -8,6 +8,7 @@ import { itemsApi } from "@/lib/api/items";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { Button } from "@/lib/ui/Button";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
+import { EmptyState } from "../../common";
 import { AdminPageHeader } from "../_admin_primitives";
 import { BomDeptTabs } from "./BomDeptTabs";
 import { BomParentList } from "./BomParentList";
@@ -482,14 +483,15 @@ export function BomWorkbench({
                 />
               ) : (
                 <div
-                  className="flex min-h-0 flex-1 items-center justify-center rounded-2xl border text-sm"
-                  style={{
-                    background: LEGACY_COLORS.s2,
-                    borderColor: LEGACY_COLORS.border,
-                    color: LEGACY_COLORS.muted2,
-                  }}
+                  className="flex min-h-0 flex-1 flex-col rounded-2xl border"
+                  style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
                 >
-                  좌측에서 상위 품목을 먼저 선택하세요.
+                  <EmptyState
+                    variant="no-data"
+                    illustrated
+                    title="좌측에서 상위 품목을 먼저 선택하세요"
+                    description="선택한 품목의 하위 구성품을 이곳에서 추가할 수 있습니다."
+                  />
                 </div>
               )}
             </div>

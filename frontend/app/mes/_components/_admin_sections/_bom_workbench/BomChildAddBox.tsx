@@ -205,13 +205,13 @@ export function BomChildAddBox({ parent, bomRows, items, onAdd, isLocked = false
           data-scrollbar-rail-viewport
           className="absolute inset-y-0 left-0 right-0 overflow-y-auto lg:-right-2.5 lg:[scrollbar-gutter:stable]"
         >
-          <div className="min-h-full min-w-full" style={{ background: LEGACY_COLORS.s2, borderTop: `1px solid ${LEGACY_COLORS.border}` }}>
+          <div className="flex min-h-full min-w-full flex-col" style={{ background: LEGACY_COLORS.s2, borderTop: `1px solid ${LEGACY_COLORS.border}` }}>
             <BomTableHeader
               variant="candidate"
               gridTemplateColumns={BOM_EDIT_LIST_GRID_TEMPLATE}
             />
             {candidates.length === 0 ? (
-              <EmptyState variant="no-search-result" compact />
+              <EmptyState variant="no-search-result" compact illustrated />
             ) : (
               candidates.map((c) => {
             const already = childIdSet.has(c.item_id);

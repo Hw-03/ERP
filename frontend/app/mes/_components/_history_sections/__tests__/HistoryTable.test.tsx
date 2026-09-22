@@ -33,6 +33,28 @@ it("skips local grouping when the server supplies groups, including an empty pag
   build.mockRestore();
 });
 
+it("explains an empty filtered history with the history mascot", () => {
+  render(
+    <HistoryTable
+      loading={false}
+      displayGroups={[]}
+      hasFilters
+      selection={null}
+      onSelectLog={vi.fn()}
+      onSelectBatch={vi.fn()}
+      batchCache={new Map()}
+      setBatchCache={vi.fn()}
+      canLoadMore={false}
+      loadingMore={false}
+      onLoadMore={vi.fn()}
+    />,
+  );
+
+  expect(screen.getByText("현재 조건에 맞는 입출고 내역이 없습니다")).toBeInTheDocument();
+  expect(screen.getByText("기간이나 검색 조건을 바꾸거나 필터를 초기화해 보세요.")).toBeInTheDocument();
+  expect(screen.getByTestId("history-empty-mascot")).toHaveAttribute("src", expect.stringContaining("history-empty.webp"));
+});
+
 function makeLog(overrides: Partial<TransactionLog> = {}): TransactionLog {
   return {
     log_id: "log-1", item_id: "ITEM-1", mes_code: "3-AA-0005", item_name: "대표 품목", item_process_type_code: "AA", item_unit: "EA",

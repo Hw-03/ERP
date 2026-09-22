@@ -8,6 +8,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { useFocusTrap } from "@/lib/mes/useFocusTrap";
 import { DesktopPanelCloseButton } from "../DesktopRightPanel";
+import { EmptyState } from "../common/EmptyState";
 import { getBomBranchItemIds, ModalBomTree, useBomTree } from "../_warehouse_v2/BomSubExpander";
 
 type Props = {
@@ -177,12 +178,7 @@ export function BomDetailModal({ itemId, open, onClose }: Props) {
             </button>
           </div>}
           {currentTree && (currentTree.children.length === 0 ? (
-            <div
-              className="flex flex-1 items-center justify-center rounded-[18px] border px-4 py-8 text-center text-sm"
-              style={{ color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-            >
-              하위 품목이 없습니다.
-            </div>
+            <EmptyState compact illustrated className="flex-1 rounded-[18px] border border-[var(--c-border)] bg-[var(--c-s2)]" title="하위 품목이 없습니다." description="" />
           ) : <ModalBomTree tree={currentTree} expandedItemIds={expandedItemIds} onToggleItem={toggleItem} />)}
         </div>
       </div>

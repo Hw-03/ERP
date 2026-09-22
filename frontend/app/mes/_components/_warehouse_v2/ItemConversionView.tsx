@@ -12,6 +12,7 @@ import {
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { matchesSearchText } from "@/lib/searchText";
 import { QuantityInput } from "../common/QuantityInput";
+import { EmptyState } from "../common/EmptyState";
 
 interface WorkProps {
   items: Item[];
@@ -560,8 +561,8 @@ function CandidatePanel({
             <div className="ict text-base font-black">{title}</div>
           </div>
         </div>
-        <div data-testid={`item-conversion-${kind}-guide`} className="icpnl flex min-h-[160px] flex-1 items-center justify-center rounded-[14px] border px-5 py-4 text-center text-sm font-bold">
-          {emptyText}
+        <div data-testid={`item-conversion-${kind}-guide`} className="icpnl flex min-h-[160px] flex-1 flex-col items-center justify-center rounded-[14px] border px-5 py-4 text-center text-sm font-bold">
+          <EmptyState illustrated title={emptyText} description="기존 품목을 선택하면 전환할 수 있는 품목이 표시됩니다." />
         </div>
       </section>
     );
@@ -590,11 +591,9 @@ function CandidatePanel({
           data-testid={`item-conversion-${kind}-candidate-list`}
           className="sg absolute inset-y-0 left-0 right-0 overflow-y-auto lg:-right-2.5 lg:[scrollbar-gutter:stable]"
         >
-          <div className="icpnl min-h-full min-w-full p-2">
+          <div className="icpnl flex min-h-full min-w-full flex-col p-2">
             {candidates.length === 0 ? (
-              <div className="icm flex h-full min-h-[180px] items-center justify-center text-sm font-bold">
-                {emptyText}
-              </div>
+              <EmptyState illustrated title={emptyText} description="검색어를 바꾸거나 지워서 다시 확인하세요." />
             ) : (
               <div className="grid gap-2">
                 {candidates.map((item) => {
@@ -822,9 +821,7 @@ function PreviewDifferencePanels({
 }) {
   if (preview.lines.length === 0) {
     return (
-      <div className="icm flex min-h-0 flex-1 items-center justify-center rounded-[18px] border text-sm font-bold">
-        변경되는 구성품이 없습니다. 기존 품목 차감과 대상 품목 입고만 처리합니다.
-      </div>
+      <EmptyState illustrated title="변경되는 구성품이 없습니다." description="기존 품목 차감과 대상 품목 입고만 처리합니다." className="rounded-[18px] border border-[var(--c-border)]" />
     );
   }
 
@@ -891,9 +888,7 @@ function DifferencePanel({
       </div>
       <div className="sg mt-3 min-h-0 flex-1 overflow-y-auto pr-1">
         {lines.length === 0 ? (
-          <div className="icm flex h-full min-h-[180px] items-center justify-center rounded-[14px] border text-sm font-bold">
-            {emptyText}
-          </div>
+          <EmptyState illustrated compact title={emptyText} description="" className="h-full rounded-[14px] border border-[var(--c-border)]" />
         ) : (
           <div className="grid gap-2">
             {lines.map((line) => (

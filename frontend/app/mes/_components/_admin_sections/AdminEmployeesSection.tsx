@@ -190,6 +190,7 @@ export function AdminEmployeesSection() {
               <EmptyState
                 variant={search ? "no-search-result" : "no-data"}
                 compact
+                illustrated
                 title={search ? "검색 결과가 없습니다." : "직원이 없습니다."}
               />
             }
@@ -311,11 +312,14 @@ export function AdminEmployeesSection() {
                 onRequestDelete={requestDelete}
               />
             ) : (
-              <EmptyState
-                variant="no-data"
-                title="좌측에서 직원을 선택하세요"
-                description="직원을 클릭하면 권한·PIN·상태 정보를 확인할 수 있습니다."
-              />
+              <div className="flex min-h-full flex-col">
+                <EmptyState
+                  variant="no-data"
+                  illustrated
+                  title="좌측에서 직원을 선택하세요"
+                  description="직원을 클릭하면 권한·PIN·상태 정보를 확인할 수 있습니다."
+                />
+              </div>
             )}
           </AdminDetailCard>
         </div>

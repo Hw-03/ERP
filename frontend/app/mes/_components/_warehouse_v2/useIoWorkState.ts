@@ -70,6 +70,13 @@ export function useIoWorkState(
     setStep(1);
   }
 
+  function setSubType(next: IoSubType) {
+    setSelectedSubType(next);
+    if (next === "warehouse_to_dept" || next === "dept_to_warehouse") {
+      setDeptIoDirectionBase(next === "warehouse_to_dept" ? "out" : "in");
+    }
+  }
+
   // 방향 설정 — 작업 유형에 맞는 sub_type으로 바꾸고 기존 bundle을 비운다.
   function setDeptIoDirection(dir: DeptIoDirection) {
     setDeptIoDirectionBase(dir);
@@ -124,7 +131,7 @@ export function useIoWorkState(
   const canAdvance = useMemo<Record<IoStep, boolean>>(() => {
     return {
       1: hasSelectedWorkType,
-      2: workType === "process" || workType === "warehouse_adjust"
+      2: workType === "process" || workType === "warehouse_adjust" || workType === "warehouse_io"
         ? deptIoDirection != null
         : workType === "internal_use"
           ? toDepartment === "AS" || toDepartment === "연구"
@@ -208,7 +215,7 @@ export function useIoWorkState(
     hasMissingInternalUseBomMode,
     canAdvance,
     setWorkType,
-    setSubType: setSelectedSubType,
+    setSubType,
     setFromDepartment,
     setToDepartment,
     setBundles,

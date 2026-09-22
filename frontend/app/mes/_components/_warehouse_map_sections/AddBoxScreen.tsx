@@ -6,6 +6,7 @@ import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import { Check, ChevronLeft, Search } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { QuantityInput } from "../common/QuantityInput";
+import { EmptyState } from "../common/EmptyState";
 import type { Item } from "@/lib/api";
 import { Button } from "@/lib/ui/Button";
 import { matchesSearchText } from "@/lib/searchText";
@@ -283,11 +284,9 @@ export function AddBoxScreen({
       </div>
 
       {/* 품목 리스트 */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+      <div className="flex flex-col" style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
         {filtered.length === 0 ? (
-          <div style={{ padding: "32px 16px", textAlign: "center", fontSize: 13, color: LEGACY_COLORS.muted }}>
-            검색 결과 없음
-          </div>
+          <EmptyState compact illustrated className="min-h-[200px] flex-1" title="검색 결과가 없습니다." description="" />
         ) : (
           filtered.map((it) => {
             const selected = cart.has(it.item_id);

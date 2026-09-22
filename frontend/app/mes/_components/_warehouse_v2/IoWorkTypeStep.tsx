@@ -168,18 +168,22 @@ export function IoSubTypeStep({
           }}
         >
           {subRows.map((row) => {
-            const active = subType === row.id;
+            const isWarehouse = workType === "warehouse_io";
+            const active = subType === row.id && (!isWarehouse || deptIoDirection != null);
+            const tone = isWarehouse && row.id === "warehouse_to_dept" ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
             return (
               <button
                 key={row.id}
                 type="button"
                 onClick={() => onSubTypeChange(row.id)}
+                aria-pressed={active}
                 title={row.description}
-                className="standard-hover flex h-full min-h-[120px] flex-col items-center justify-center gap-3 rounded-[20px] border px-6 py-6 text-center transition-all"
+                className={`${isWarehouse ? "hover:shadow-md" : "standard-hover"} flex h-full min-h-[120px] flex-col items-center justify-center gap-3 rounded-[20px] border px-6 py-6 text-center transition-all`}
                 style={{
-                  background: active ? tint(LEGACY_COLORS.blue, 14) : LEGACY_COLORS.s2,
-                  borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-                  color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
+                  background: isWarehouse ? tint(tone, active ? 16 : 7) : active ? tint(tone, 14) : LEGACY_COLORS.s2,
+                  borderColor: active ? tone : isWarehouse ? tint(tone, 25) : LEGACY_COLORS.border,
+                  borderWidth: active ? 2 : 1,
+                  color: active ? tone : LEGACY_COLORS.text,
                 }}
               >
                 <span className="text-3xl font-black leading-tight">{row.label}</span>
@@ -315,7 +319,7 @@ function DirectionCard({
     <button
       type="button"
       onClick={onClick}
-      className="standard-hover relative flex h-full min-h-[96px] items-center justify-center gap-3 rounded-[18px] border p-4 text-left transition-all sm:gap-5 sm:p-6"
+      className="relative flex h-full min-h-[96px] items-center justify-center gap-3 rounded-[18px] border p-4 text-left transition-all hover:shadow-md sm:gap-5 sm:p-6"
       style={{
         background: variant === "process" ? tint(activeColor, active ? 16 : 7) : active ? tint(activeColor, 14) : LEGACY_COLORS.s2,
         borderColor: active ? activeColor : variant === "process" ? tint(activeColor, 25) : LEGACY_COLORS.border,

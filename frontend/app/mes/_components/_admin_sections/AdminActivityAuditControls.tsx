@@ -154,6 +154,7 @@ export function AdminActivityAuditControls(): ReactNode {
         <EmptyState
           variant="no-data"
           compact
+          illustrated
           title="아직 누적된 작업 감사 이력이 없습니다"
           description="적용 이후 사용자 활동이 기록되면 월별 파일을 내려받을 수 있습니다."
         />
