@@ -7,7 +7,15 @@ function Get-RuntimeState {
 
     if (-not (Test-Path $Path)) { return $null }
     try {
-        return Get-Content -Raw $Path | ConvertFrom-Json
+        $state = Get-Content -Raw $Path | ConvertFrom-Json
+        # PowerShell 7 parses ISO dates as DateTime; string casts drop fractions.
+        # Normalize before callers cast timestamps for PID ownership checks.
+        foreach ($name in @('startedAt', 'childStartedAt', 'heartbeatAt')) {
+            if ($state.$name -is [DateTime] -or $state.$name -is [DateTimeOffset]) {
+                $state.$name = $state.$name.ToString('o')
+            }
+        }
+        return $state
     }
     catch {
         return $null

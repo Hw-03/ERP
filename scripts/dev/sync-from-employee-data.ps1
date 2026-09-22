@@ -460,6 +460,47 @@ function Test-DevelopmentHealth {
     }
 }
 
+function Invoke-DevelopmentSchemaPreparation {
+    param([bool] $ApplyChanges)
+
+    $tool = Join-Path $DevRoot "scripts\ops\development_schema_prepare.py"
+    Write-Host "SYNC_DEV_PREP_PHASE=PRE_STOP"
+    $probe = Invoke-CheckedExternalCommand -FilePath $PythonExecutable `
+        -ArgumentList @($tool, "probe", "--root", $DevRoot)
+    Write-CheckedCommandResult -Label "development-schema-probe" -Result $probe
+    $state = Get-CheckedJsonOutput -Result $probe
+    if (-not $probe.Success -or $null -eq $state) { return $false }
+    if (-not $state.needs_migration) { return $true }
+
+    $rehearsal = Invoke-CheckedExternalCommand -FilePath $PythonExecutable `
+        -ArgumentList @($tool, "rehearse", "--root", $DevRoot)
+    Write-CheckedCommandResult -Label "development-schema-rehearsal" -Result $rehearsal
+    if (-not $rehearsal.Success) { return $false }
+    if (-not $ApplyChanges) { return $true }
+
+    $stop = Stop-DevelopmentServices
+    if (-not $stop.Success) {
+        Write-Host "SYNC_DEV_PREP_RESULT=STOP_FAILED"
+        return $false
+    }
+    Write-Host "SYNC_DEV_PREP_PHASE=POST_STOP"
+    $apply = Invoke-CheckedExternalCommand -FilePath $PythonExecutable `
+        -ArgumentList @($tool, "apply-stopped", "--root", $DevRoot)
+    Write-CheckedCommandResult -Label "development-schema-apply" -Result $apply
+    if (-not $apply.Success) {
+        Write-Host "SYNC_DEV_PREP_RESULT=APPLY_FAILED"
+        Write-Host "SYNC_DATA_RECOVERY=NOT_ATTEMPTED"
+        Write-Host "SYNC_DATA_RECOVERY_HEALTH=STOPPED"
+        return $false
+    }
+    $start = Start-DevelopmentServices
+    if (-not $start.Success) { return $false }
+    $health = Test-DevelopmentHealth
+    if (-not $health.Success) { return $false }
+    Write-Host "SYNC_DEV_PREP_RESULT=APPLIED"
+    return $true
+}
+
 function Invoke-DevelopmentRecovery {
     param(
         [string] $BackupPath,
@@ -637,6 +678,12 @@ function Invoke-EmployeeDataSync {
     Write-Host "SYNC_DATA_SOURCE_SNAPSHOT=$($sourceSnapshot.Path)"
     Write-Host "SYNC_DATA_STAGING=$($verifiedCandidate.Path)"
     Write-Host "SYNC_DATA_SOURCE_MUTATION=NONE"
+    if (-not $CrossSchemaDevelopmentSync) {
+        if (-not (Invoke-DevelopmentSchemaPreparation -ApplyChanges $isApply)) {
+            Write-Host "SYNC_DATA_RESULT=TARGET_SCHEMA_PREPARATION_FAILED"
+            return 13
+        }
+    }
     if (-not $isApply) {
         Write-Host "[dry-run] 개발 DB와 8011/3001 서비스를 변경하지 않았습니다."
         Write-Host "SYNC_DATA_RESULT=VERIFIED"

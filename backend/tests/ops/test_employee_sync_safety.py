@@ -666,6 +666,17 @@ def _prepare_data_sync_sandbox(
         _fake_data_verify_tool("inventory"),
     )
     _write(dev_root / "backend" / "bootstrap_db.py", _fake_data_bootstrap_tool())
+    _write(dev_root / "scripts" / "ops" / "development_schema_prepare.py", textwrap.dedent('''
+        import json, os, sys
+        from pathlib import Path
+        mode = sys.argv[1]
+        with Path(os.environ["SYNC_EVENT_LOG"]).open("a") as stream:
+            stream.write("dev-prepare-" + mode + "\\n")
+        code = int(os.environ.get("FAKE_DEV_PREP_" + mode.upper().replace("-", "_") + "_EXIT", "0"))
+        if code:
+            raise SystemExit(code)
+        print(json.dumps({"revision": "old", "head": "new", "needs_migration": os.environ.get("FAKE_DEV_PREP_NEEDED") == "1"}))
+    '''))
 
     script_copy = DATA_SYNC_SCRIPT.read_text(encoding="utf-8-sig")
     script_copy = script_copy.replace('$DevRoot = "C:\\ERP"', f'$DevRoot = "{dev_root.as_posix()}"')
@@ -812,6 +823,7 @@ def test_employee_data_sync_defaults_to_verified_dry_run_without_target_mutation
         "stage-sqlite-fk",
         "stage-inventory",
         "backup-candidate",
+        "dev-prepare-probe",
     ]
     assert source_db.read_bytes() == original_source
     assert target_db.read_bytes() == original_target
@@ -864,6 +876,51 @@ def test_employee_data_sync_preflight_failure_never_backs_up_or_installs_target(
     assert "install-stage" not in events
     assert source_db.read_bytes() == original_source
     assert target_db.read_bytes() == original_target
+
+
+@pytest.mark.parametrize("mode", ["PROBE", "REHEARSE"])
+def test_development_preparation_failure_blocks_before_service_stop(tmp_path: Path, mode: str) -> None:
+    script, env, events, source, target = _prepare_data_sync_sandbox(
+        tmp_path, {"FAKE_DEV_PREP_NEEDED": "1", f"FAKE_DEV_PREP_{mode}_EXIT": "13"}
+    )
+    original = target.read_bytes()
+    result = _run_data_sync(script, env, "-Apply")
+    assert result.returncode == 13
+    assert target.read_bytes() == original
+    assert "stop-backend" not in events.read_text()
+    assert "install-stage" not in events.read_text()
+
+
+def test_development_preparation_runs_before_target_backup(tmp_path: Path) -> None:
+    script, env, events, _, _ = _prepare_data_sync_sandbox(tmp_path, {"FAKE_DEV_PREP_NEEDED": "1"})
+    result = _run_data_sync(script, env, "-Apply")
+    assert result.returncode == 0, result.stdout + result.stderr
+    recorded = events.read_text()
+    assert recorded.index("dev-prepare-rehearse") < recorded.index("stop-backend")
+    assert recorded.index("stop-frontend") < recorded.index("dev-prepare-apply-stopped")
+    assert recorded.index("dev-prepare-apply-stopped") < recorded.index("install-stage")
+
+
+def test_development_preparation_apply_failure_keeps_services_stopped(tmp_path: Path) -> None:
+    script, env, events, _, target = _prepare_data_sync_sandbox(
+        tmp_path, {"FAKE_DEV_PREP_NEEDED": "1", "FAKE_DEV_PREP_APPLY_STOPPED_EXIT": "13"}
+    )
+    original = target.read_bytes()
+    result = _run_data_sync(script, env, "-Apply")
+    assert result.returncode == 13
+    assert target.read_bytes() == original
+    assert "install-stage" not in events.read_text()
+    assert "start-backend" not in events.read_text()
+
+
+def test_development_preparation_dry_run_never_applies(tmp_path: Path) -> None:
+    script, env, events, _, _ = _prepare_data_sync_sandbox(tmp_path, {"FAKE_DEV_PREP_NEEDED": "1"})
+    result = _run_data_sync(script, env, "-DryRun")
+    assert result.returncode == 0, result.stdout + result.stderr
+    recorded = events.read_text()
+    assert "dev-prepare-rehearse" in recorded
+    assert "dev-prepare-apply-stopped" not in recorded
+    assert "stop-backend" not in recorded
 
 
 def test_employee_data_sync_target_backup_failure_does_not_stop_or_install(tmp_path: Path) -> None:
@@ -1148,6 +1205,7 @@ def test_employee_data_sync_apply_success_uses_safe_order_and_preserves_source(t
         "stage-sqlite-fk",
         "stage-inventory",
         "backup-candidate",
+        "dev-prepare-probe",
         "backup-target",
         "stop-backend",
         "stop-frontend",
