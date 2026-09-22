@@ -175,8 +175,7 @@ export function useRevertToDraftMutation() {
       payload: StockRequestActionPayload;
     }) => stockRequestsApi.revertToDraft(requestId, payload),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.stockRequests.all });
-      qc.invalidateQueries({ queryKey: ["io-drafts"] });
+      void qc.invalidateQueries({ queryKey: queryKeys.stockRequests.all });
     },
   });
 }

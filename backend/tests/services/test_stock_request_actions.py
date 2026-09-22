@@ -1,5 +1,6 @@
 """StockRequest HTTP command의 application-service 트랜잭션 계약."""
 
+from datetime import datetime
 from decimal import Decimal
 
 import pytest
@@ -156,6 +157,16 @@ def test_revert_to_draft_cancels_all_open_linked_requests_and_releases_reservati
 ) -> None:
     first = make_item(name="Multi revert first", process_type_code="AR", warehouse_qty=Decimal("5"))
     second = make_item(name="Multi revert second", process_type_code="AR", warehouse_qty=Decimal("5"))
+    unrelated_item = make_item(
+        name="Unrelated revert notification",
+        process_type_code="AR",
+        warehouse_qty=Decimal("5"),
+    )
+    previous_generation_item = make_item(
+        name="Previous generation revert notification",
+        process_type_code="AR",
+        warehouse_qty=Decimal("5"),
+    )
     requester = _employee(db_session, code="SR-REV-MULTI", name="요청자")
     batch = _linked_batch(db_session, requester)
     db_session.commit()
@@ -165,13 +176,82 @@ def test_revert_to_draft_cancels_all_open_linked_requests_and_releases_reservati
     sibling = _open_linked_request(
         client, db_session, requester=requester, batch=batch, item_id=second.item_id
     )
+    unrelated_request = _open_linked_request(
+        client,
+        db_session,
+        requester=requester,
+        batch=None,
+        item_id=unrelated_item.item_id,
+    )
+    previously_cancelled = _open_linked_request(
+        client,
+        db_session,
+        requester=requester,
+        batch=batch,
+        item_id=previous_generation_item.item_id,
+    )
+    previously_cancelled.status = StockRequestStatusEnum.CANCELLED
+    previously_cancelled.cancelled_at = datetime.utcnow()
+    for line in previously_cancelled.lines:
+        line.status = StockRequestStatusEnum.CANCELLED
+    stale_approval_notes = [
+        Notification(
+            recipient_employee_id=requester.employee_id,
+            type="approval_request",
+            title="이전 결재 요청",
+            target_section=target_section,
+            related_request_id=clicked.request_id,
+        )
+        for target_section in ("queue", "dept-queue", "as-research-queue")
+    ]
+    sibling_note = Notification(
+        recipient_employee_id=requester.employee_id,
+        type="approval_request",
+        title="같은 배치 결재 요청",
+        target_section="queue",
+        related_request_id=sibling.request_id,
+    )
+    previous_generation_note = Notification(
+        recipient_employee_id=requester.employee_id,
+        type="approval_request",
+        title="이전 세대 결재 요청",
+        target_section="dept-queue",
+        related_request_id=previously_cancelled.request_id,
+    )
+    unrelated_note = Notification(
+        recipient_employee_id=requester.employee_id,
+        type="approval_request",
+        title="다른 배치 결재 요청",
+        target_section="queue",
+        related_request_id=unrelated_request.request_id,
+    )
+    other_type_note = Notification(
+        recipient_employee_id=requester.employee_id,
+        type="approval_approved",
+        title="기존 승인 결과",
+        target_section="queue",
+        related_request_id=clicked.request_id,
+    )
+    db_session.add_all(
+        [
+            *stale_approval_notes,
+            sibling_note,
+            previous_generation_note,
+            unrelated_note,
+            other_type_note,
+        ]
+    )
+    db_session.commit()
 
     response = client.post(
         f"/api/stock-requests/{clicked.request_id}/revert-to-draft",
         json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
     )
 
-    assert response.status_code == 204, response.text
+    assert response.status_code == 200, response.text
+    assert response.json()["batch_id"] == str(batch.batch_id)
+    assert response.json()["status"] == "draft"
+    assert len(response.json()["stock_requests"]) == 3
     db_session.expire_all()
     persisted_batch = db_session.query(IoBatch).filter(IoBatch.batch_id == batch.batch_id).one()
     requests = db_session.query(StockRequest).filter(
@@ -183,9 +263,15 @@ def test_revert_to_draft_cancels_all_open_linked_requests_and_releases_reservati
     assert [request.status for request in requests] == [
         StockRequestStatusEnum.CANCELLED,
         StockRequestStatusEnum.CANCELLED,
+        StockRequestStatusEnum.CANCELLED,
     ]
     assert persisted_batch.status == "draft"
     assert all(inventory.pending_quantity == Decimal("0") for inventory in inventories)
+    assert all(note.is_read is True for note in stale_approval_notes)
+    assert sibling_note.is_read is True
+    assert previous_generation_note.is_read is True
+    assert unrelated_note.is_read is False
+    assert other_type_note.is_read is False
 
 
 def test_revert_to_draft_rejects_completed_sibling_without_mutation(
@@ -286,7 +372,7 @@ def test_revert_to_draft_cancels_single_open_linked_request(
         json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
     )
 
-    assert response.status_code == 204, response.text
+    assert response.status_code == 200, response.text
     db_session.expire_all()
     persisted_batch = db_session.query(IoBatch).filter(IoBatch.batch_id == batch.batch_id).one()
     persisted_request = db_session.query(StockRequest).filter(
@@ -357,7 +443,7 @@ def test_revert_to_draft_cancels_submitted_and_preserves_terminal_siblings(
         json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
     )
 
-    assert response.status_code == 204, response.text
+    assert response.status_code == 200, response.text
     db_session.expire_all()
     requests = db_session.query(StockRequest).filter(
         StockRequest.operation_batch_id == batch.batch_id
@@ -417,7 +503,7 @@ def test_revert_to_draft_does_not_take_clicked_request_lock_before_batch_lock(
         json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
     )
 
-    assert response.status_code == 204, response.text
+    assert response.status_code == 200, response.text
 
 
 def test_create_rolls_back_request_lines_and_pending_when_notification_fails(

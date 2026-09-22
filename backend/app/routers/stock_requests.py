@@ -8,8 +8,8 @@ from __future__ import annotations
 import uuid
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Query, Request, Response, status
-from sqlalchemy import func, or_
+from fastapi import APIRouter, Depends, Query, Request, status
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Query as SAQuery, Session
 
 from sqlalchemy.exc import IntegrityError
@@ -35,10 +35,12 @@ from app.schemas import (
     StockRequestResponse,
     StockRequestSubmitPayload,
 )
+from app.schemas.io import IoBatchResponse
 from app.services import stock_requests as svc
 from app.services.inv_transfer import department_for_item
 from app.services import stock_request_actions as action_svc
 from app.services._tx import commit_and_refresh, commit_only
+from app.services.io_persist import get_batch
 from app.services import notifications as notif_svc
 from app._evt import emit as _evt_emit
 
@@ -223,7 +225,23 @@ def list_stock_requests(
         query = query.filter(StockRequest.status == status_filter)
     else:
         # status 미지정 시 DRAFT 제외 — '내 요청' 목록에 장바구니가 섞이면 안 됨.
-        query = query.filter(StockRequest.status != StockRequestStatusEnum.DRAFT)
+        # 수정 뒤 같은 batch를 재제출하면, 이전 세대의 취소본은 현재 요청이 아니다.
+        query = (
+            query.outerjoin(IoBatch, StockRequest.operation_batch_id == IoBatch.batch_id)
+            .filter(StockRequest.status != StockRequestStatusEnum.DRAFT)
+            .filter(
+                ~func.coalesce(
+                    and_(
+                        StockRequest.status == StockRequestStatusEnum.CANCELLED,
+                        or_(
+                            IoBatch.status == "draft",
+                            StockRequest.cancelled_at < IoBatch.submitted_at,
+                        ),
+                    ),
+                    False,
+                )
+            )
+        )
     rows = query.order_by(StockRequest.created_at.desc()).limit(limit).all()
     return rows
 
@@ -863,7 +881,7 @@ def submit_stock_request_draft(
             raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
 
 
-@router.post("/{request_id}/revert-to-draft", status_code=204)
+@router.post("/{request_id}/revert-to-draft", response_model=IoBatchResponse)
 def revert_stock_request_to_draft(
     request_id: uuid.UUID,
     payload: StockRequestActionRequest,
@@ -877,7 +895,7 @@ def revert_stock_request_to_draft(
     requester = _load_actor(db, payload.actor_employee_id)
 
     try:
-        action_svc.revert_to_draft(
+        batch = action_svc.revert_to_draft(
             db,
             request=request,
             requester=requester,
@@ -891,4 +909,4 @@ def revert_stock_request_to_draft(
         db.rollback()
         raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc))
 
-    return Response(status_code=204)
+    return get_batch(db, batch_id=batch.batch_id)

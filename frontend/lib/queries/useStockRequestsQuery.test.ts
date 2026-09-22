@@ -7,11 +7,14 @@ import { describe, it, expect, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement, type ReactNode } from "react";
+import { http, HttpResponse } from "msw";
+import { server } from "@/lib/__tests__/msw/server";
 import {
   useWarehouseQueueQuery,
   useApproveStockRequestMutation,
   useRejectStockRequestMutation,
   useCancelStockRequestMutation,
+  useRevertToDraftMutation,
 } from "./useStockRequestsQuery";
 
 function makeQueryClient() {
@@ -99,5 +102,43 @@ describe("useCancelStockRequestMutation", () => {
     });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.status).toBe("cancelled");
+  });
+});
+
+describe("useRevertToDraftMutation", () => {
+  it("캐시 무효화가 끝나기를 기다리지 않고 호출별 성공 콜백을 실행한다", async () => {
+    let releaseInvalidation!: () => void;
+    const invalidation = new Promise<void>((resolve) => {
+      releaseInvalidation = resolve;
+    });
+    const qc = makeQueryClient();
+    const invalidateSpy = vi.spyOn(qc, "invalidateQueries").mockReturnValue(invalidation);
+    const onSuccess = vi.fn();
+    server.use(
+      http.post("*/api/stock-requests/:id/revert-to-draft", () =>
+        HttpResponse.json({ batch_id: "reverted-draft" }),
+      ),
+    );
+    const { result } = renderHook(() => useRevertToDraftMutation(), {
+      wrapper: makeWrapper(qc),
+    });
+
+    result.current.mutate(
+      { requestId: "req-1", payload: { actor_employee_id: "e1", pin: "0000" } },
+      { onSuccess },
+    );
+
+    try {
+      await waitFor(() =>
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["stockRequests"] }),
+      );
+      await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+      expect(onSuccess.mock.calls[0][0]).toEqual(
+        expect.objectContaining({ batch_id: "reverted-draft" }),
+      );
+    } finally {
+      releaseInvalidation();
+      await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+    }
   });
 });

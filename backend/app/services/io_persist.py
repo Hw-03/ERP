@@ -744,7 +744,20 @@ def sync_batch_from_stock_requests(
     if not linked_requests:
         return
 
-    statuses = {_enum_value(request.status) for request in linked_requests}
+    status_requests = [
+        request
+        for request in linked_requests
+        if not (
+            _enum_value(request.status) == StockRequestStatusEnum.CANCELLED.value
+            and request.cancelled_at is not None
+            and batch.submitted_at is not None
+            and request.cancelled_at < batch.submitted_at
+        )
+    ]
+    if not status_requests:
+        return
+
+    statuses = {_enum_value(request.status) for request in status_requests}
     is_rejected_adjust_resubmission = (
         batch.work_type == "process"
         and batch.sub_type in {"adjust_in", "adjust_out"}
@@ -752,17 +765,17 @@ def sync_batch_from_stock_requests(
             StockRequestStatusEnum.REJECTED.value,
             StockRequestStatusEnum.COMPLETED.value,
         }
-        and all(request.requires_department_approval for request in linked_requests)
+        and all(request.requires_department_approval for request in status_requests)
     )
     if statuses == {StockRequestStatusEnum.COMPLETED.value} or is_rejected_adjust_resubmission:
         batch.status = "completed"
         batch.completed_at = max(
-            (request.completed_at or datetime.utcnow()) for request in linked_requests
+            (request.completed_at or datetime.utcnow()) for request in status_requests
         )
     elif StockRequestStatusEnum.COMPLETED.value in statuses:
         batch.status = "partially_completed"
         batch.completed_at = max(
-            (request.completed_at for request in linked_requests if request.completed_at),
+            (request.completed_at for request in status_requests if request.completed_at),
             default=datetime.utcnow(),
         )
     elif StockRequestStatusEnum.RESERVED.value in statuses:
@@ -781,7 +794,7 @@ def sync_batch_from_stock_requests(
         statuses == {StockRequestStatusEnum.REJECTED.value}
         and batch.work_type == "process"
         and batch.sub_type in {"adjust_in", "adjust_out"}
-        and all(request.requires_department_approval for request in linked_requests)
+        and all(request.requires_department_approval for request in status_requests)
     ):
         # 부서 낱개 입출고 조정만 반려 뒤 같은 작성 중 batch로 복귀한다.
         # StockRequest 자체는 REJECTED 감사 이력을 유지하며, 재제출 때 새 요청을 만든다.

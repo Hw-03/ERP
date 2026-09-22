@@ -10,6 +10,7 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -80,8 +81,7 @@ POSTGRES_TEST_NEXT_CANDIDATE = "ic18_restore_candidate_222222222222"
 
 @pytest.fixture
 def runtime_dir() -> Iterator[Path]:
-    root = ROOT / "_attic" / "runtime" / "ic18-tests" / uuid4().hex[:12]
-    root.mkdir(parents=True)
+    root = Path(tempfile.mkdtemp(prefix="dexcowin-ic18-"))
     try:
         yield root
     finally:

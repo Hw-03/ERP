@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { StockRequest } from "@/lib/api";
+import type { IoBatch, StockRequest } from "@/lib/api";
 import { MyRequestsPanel } from "../MyRequestsPanel";
 
 const hooks = vi.hoisted(() => ({
@@ -73,6 +73,7 @@ describe("MyRequestsPanel", () => {
   beforeEach(() => {
     requests = internalUseRequests;
     hooks.cancel.mutate.mockClear();
+    hooks.revert.mutate.mockClear();
   });
 
   it("대표가 반려여도 열린 형제를 batch 취소 대상으로 선택하고 AS·연구 batch 영향 범위를 안내한다", () => {
@@ -128,5 +129,59 @@ describe("MyRequestsPanel", () => {
     expect(screen.getByText("AS 사용출고 비고")).toBeInTheDocument();
     expect(screen.getByTestId("my-request-rejection")).toHaveTextContent("AS 반려 사유");
     expect(screen.queryByText("수량 조정 비고")).not.toBeInTheDocument();
+  });
+
+  it("수정 성공 시 반환된 입출고 draft를 이어서 작업 콜백으로 전달한다", () => {
+    requests = [request({ request_id: "editable-request", request_type: "warehouse_to_dept", status: "submitted" })];
+    const onContinueIoDraft = vi.fn();
+    const restoredDraft = { batch_id: "reverted-draft" } as IoBatch;
+
+    render(
+      <MyRequestsPanel
+        employeeId="requester"
+        refreshNonce={0}
+        onChanged={vi.fn()}
+        onContinueIoDraft={onContinueIoDraft}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "수정" }));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent("결재 요청을 작성 중으로 되돌립니다");
+    fireEvent.change(screen.getByPlaceholderText("PIN"), { target: { value: "0000" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "수정 시작" }));
+
+    expect(hooks.revert.mutate).toHaveBeenCalledWith(
+      { requestId: "editable-request", payload: { actor_employee_id: "requester", pin: "0000" } },
+      expect.any(Object),
+    );
+    act(() => {
+      (hooks.revert.mutate.mock.calls[0][1] as { onSuccess: (draft: IoBatch) => void }).onSuccess(restoredDraft);
+    });
+    expect(onContinueIoDraft).toHaveBeenCalledWith(restoredDraft);
+  });
+
+  it("수정 실패 시 모달을 유지하고 이어서 작업으로 이동하지 않는다", () => {
+    requests = [request({ request_id: "editable-request", request_type: "warehouse_to_dept", status: "submitted" })];
+    const onContinueIoDraft = vi.fn();
+
+    render(
+      <MyRequestsPanel
+        employeeId="requester"
+        refreshNonce={0}
+        onChanged={vi.fn()}
+        onContinueIoDraft={onContinueIoDraft}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "수정" }));
+    fireEvent.change(screen.getByPlaceholderText("PIN"), { target: { value: "0000" } });
+    fireEvent.click(screen.getByRole("button", { name: "수정 시작" }));
+    act(() => {
+      (hooks.revert.mutate.mock.calls[0][1] as { onError: (error: Error) => void }).onError(new Error("PIN 오류"));
+    });
+
+    expect(screen.getByRole("dialog")).toHaveTextContent("PIN 오류");
+    expect(onContinueIoDraft).not.toHaveBeenCalled();
   });
 });

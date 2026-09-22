@@ -556,6 +556,12 @@ def revert_to_draft(
                     http_request=http_request,
                 )
 
+        for linked_request in linked_requests:
+            notification_svc.mark_approval_request_notifications_read(
+                db,
+                request_id=linked_request.request_id,
+            )
+
         batch.status = "draft"
         batch.completed_at = None
         batch.updated_at = datetime.utcnow()

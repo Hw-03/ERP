@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -25,6 +26,7 @@ from app.models import (
     EmployeeLevelEnum,
     Inventory,
     InventoryLocation,
+    IoBatch,
     LocationStatusEnum,
     StockRequest,
     StockRequestLine,
@@ -1484,6 +1486,106 @@ def test_draft_does_not_appear_in_my_requests_or_warehouse_queue(
     assert res_q.status_code == 200
     assert all(r["status"] != "draft" for r in res_q.json())
     assert len(res_q.json()) == 0
+
+
+def test_default_my_requests_hides_only_superseded_cancelled_generations(
+    db_session, client, make_item
+):
+    item = make_item(
+        name="수정 대체 취소 요청",
+        process_type_code="AR",
+        warehouse_qty=Decimal("10"),
+    )
+    requester = _make_employee(db_session, code="EDIT-LIST", name="수정 목록 요청자")
+    db_session.commit()
+
+    def create_request() -> StockRequest:
+        created = _create_request_via_api(
+            client,
+            requester_id=str(requester.employee_id),
+            request_type="warehouse_to_dept",
+            lines=[
+                {
+                    "item_id": str(item.item_id),
+                    "quantity": "1",
+                    "from_bucket": "warehouse",
+                    "to_bucket": "production",
+                    "to_department": DepartmentEnum.ASSEMBLY.value,
+                }
+            ],
+        )
+        assert created["status_code"] == 201, created["body"]
+        return db_session.query(StockRequest).filter(
+            StockRequest.request_id == uuid.UUID(created["body"]["request_id"])
+        ).one()
+
+    cancelled_at = datetime.utcnow()
+    draft_generation = create_request()
+    resubmitted_generation = create_request()
+    no_cancelled_at_generation = create_request()
+    equal_timestamp_generation = create_request()
+    equal_timestamp = cancelled_at + timedelta(seconds=3)
+    for request, batch_status, submitted_at, request_cancelled_at in (
+        (draft_generation, "draft", None, cancelled_at),
+        (
+            resubmitted_generation,
+            "submitted",
+            cancelled_at + timedelta(seconds=1),
+            cancelled_at,
+        ),
+        (
+            no_cancelled_at_generation,
+            "submitted",
+            cancelled_at + timedelta(seconds=2),
+            None,
+        ),
+        (equal_timestamp_generation, "submitted", equal_timestamp, equal_timestamp),
+    ):
+        batch = IoBatch(
+            work_type="warehouse_io",
+            sub_type="warehouse_to_dept",
+            status=batch_status,
+            requester_employee_id=requester.employee_id,
+            requester_name=requester.name,
+            requester_department=requester.department,
+            requires_approval=True,
+            submitted_at=submitted_at,
+        )
+        db_session.add(batch)
+        db_session.flush()
+        request.operation_batch_id = batch.batch_id
+        request.status = StockRequestStatusEnum.CANCELLED
+        request.cancelled_at = request_cancelled_at
+
+    normal_cancelled = create_request()
+    db_session.commit()
+    cancelled = client.post(
+        f"/api/stock-requests/{normal_cancelled.request_id}/cancel",
+        json={"actor_employee_id": str(requester.employee_id), "pin": "0000"},
+    )
+    assert cancelled.status_code == 200, cancelled.text
+
+    default_rows = client.get(
+        f"/api/stock-requests?requester_employee_id={requester.employee_id}"
+    )
+    assert default_rows.status_code == 200, default_rows.text
+    assert {row["request_id"] for row in default_rows.json()} == {
+        str(normal_cancelled.request_id),
+        str(no_cancelled_at_generation.request_id),
+        str(equal_timestamp_generation.request_id),
+    }
+
+    cancelled_rows = client.get(
+        f"/api/stock-requests?requester_employee_id={requester.employee_id}&status=cancelled"
+    )
+    assert cancelled_rows.status_code == 200, cancelled_rows.text
+    assert {row["request_id"] for row in cancelled_rows.json()} == {
+        str(draft_generation.request_id),
+        str(resubmitted_generation.request_id),
+        str(no_cancelled_at_generation.request_id),
+        str(equal_timestamp_generation.request_id),
+        str(normal_cancelled.request_id),
+    }
 
 
 # ---------------------------------------------------------------------------

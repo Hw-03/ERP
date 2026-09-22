@@ -15,6 +15,7 @@ StockRequest 구성은 실제 생성 경로(create_request)를 그대로 사용�
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -672,6 +673,62 @@ def test_department_reject_returns_process_single_adjustment_to_same_draft(
     db_session.refresh(batch)
     assert active_request.status == StockRequestStatusEnum.RESERVED
     assert batch.status == "partially_completed"
+
+
+def test_sync_batch_ignores_cancelled_requests_from_previous_submission_generation(
+    db_session, make_item
+):
+    item = make_item(name="수정 후 재제출 완료", warehouse_qty=D("10"))
+    requester = _make_employee(db_session, code="EDIT-GEN-REQ")
+    batch = _make_process_adjust_batch(
+        db_session, requester=requester, items=[item], sub_type="produce"
+    )
+    cancelled_request = _make_reserved_request(db_session, requester, item, qty=D("1"))
+    replacement_request = _make_reserved_request(db_session, requester, item, qty=D("1"))
+    cancelled_request.operation_batch_id = batch.batch_id
+    replacement_request.operation_batch_id = batch.batch_id
+    cancelled_at = datetime.utcnow()
+    cancelled_request.status = StockRequestStatusEnum.CANCELLED
+    cancelled_request.cancelled_at = cancelled_at
+    replacement_request.status = StockRequestStatusEnum.COMPLETED
+    replacement_request.completed_at = cancelled_at + timedelta(seconds=2)
+    for line in replacement_request.lines:
+        line.status = StockRequestStatusEnum.COMPLETED
+    batch.submitted_at = cancelled_at + timedelta(seconds=1)
+    db_session.flush()
+
+    from app.services.io_persist import sync_batch_from_stock_requests
+
+    sync_batch_from_stock_requests(db_session, batch)
+    db_session.refresh(batch)
+
+    assert batch.status == "completed"
+    assert batch.completed_at == replacement_request.completed_at
+
+
+def test_sync_batch_does_not_reaggregate_only_previous_generation_cancellations(
+    db_session, make_item
+):
+    item = make_item(name="수정 후 재제출 대기", warehouse_qty=D("10"))
+    requester = _make_employee(db_session, code="EDIT-GEN-PENDING")
+    batch = _make_process_adjust_batch(
+        db_session, requester=requester, items=[item], sub_type="produce"
+    )
+    cancelled_request = _make_reserved_request(db_session, requester, item, qty=D("1"))
+    cancelled_request.operation_batch_id = batch.batch_id
+    cancelled_at = datetime.utcnow()
+    cancelled_request.status = StockRequestStatusEnum.CANCELLED
+    cancelled_request.cancelled_at = cancelled_at
+    batch.status = "submitted"
+    batch.submitted_at = cancelled_at + timedelta(seconds=1)
+    db_session.flush()
+
+    from app.services.io_persist import sync_batch_from_stock_requests
+
+    sync_batch_from_stock_requests(db_session, batch)
+    db_session.refresh(batch)
+
+    assert batch.status == "submitted"
 
 
 def test_department_reject_keeps_non_adjust_process_batch_rejected(db_session, make_item):

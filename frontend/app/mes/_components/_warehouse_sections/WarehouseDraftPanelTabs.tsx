@@ -100,6 +100,7 @@ export function WarehouseDraftPanelTabs({
           bumpRefresh();
           onSubmitSuccess?.();
         }}
+        onContinueIoDraft={onContinueIoDraft}
       />
     );
   }

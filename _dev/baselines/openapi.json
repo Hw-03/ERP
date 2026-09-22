@@ -24682,7 +24682,14 @@
           "required": true
         },
         "responses": {
-          "204": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IoBatchResponse"
+                }
+              }
+            },
             "description": "Successful Response"
           },
           "422": {

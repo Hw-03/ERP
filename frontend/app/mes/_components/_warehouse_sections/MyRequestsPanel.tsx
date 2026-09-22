@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ClipboardList } from "lucide-react";
-import type { StockRequest } from "@/lib/api";
+import type { IoBatch, StockRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { EmptyState } from "../common";
 import { ReadFailure } from "../common/ReadState";
@@ -22,6 +22,7 @@ interface Props {
   employeeId: string | null;
   refreshNonce: number;
   onChanged: () => void;
+  onContinueIoDraft?: (draft: IoBatch) => void;
   onEmptyStateChange?: (empty: boolean) => void;
 }
 
@@ -31,7 +32,7 @@ interface BatchActionTarget {
   isAsResearchBatch: boolean;
 }
 
-export function MyRequestsPanel({ employeeId, refreshNonce, onChanged, targetRequestId, onEmptyStateChange }: Props) {
+export function MyRequestsPanel({ employeeId, refreshNonce, onChanged, onContinueIoDraft, targetRequestId, onEmptyStateChange }: Props) {
   const query = useMyStockRequestsQuery(employeeId ?? "");
   const { data: items = [], isLoading: loading, error: qError, refetch } = query;
   const cancelMutation = useCancelStockRequestMutation();
@@ -91,9 +92,10 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged, targetReq
         payload: { actor_employee_id: revertTarget.requester_employee_id, pin: revertPin },
       },
       {
-        onSuccess: () => {
+        onSuccess: (draft) => {
           closeRevert();
           onChanged();
+          onContinueIoDraft?.(draft);
         },
         onError: (err) => {
           setRevertError(err instanceof Error ? err.message : "수정 전환에 실패했습니다.");
@@ -177,14 +179,14 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged, targetReq
         open={revertTarget !== null}
         title="요청 수정 — PIN 확인"
         tone="normal"
-        confirmLabel="수정하기"
+        confirmLabel="수정 시작"
         cancelLabel="닫기"
         busy={revertMutation.isPending}
         onClose={closeRevert}
         onConfirm={submitRevert}
       >
         <p className="mb-3 text-sm" style={{ color: LEGACY_COLORS.text }}>
-          이 작업 묶음에 진행 중인 결재 요청이 모두 취소되고 작업 중 목록으로 이동합니다. 내용을 수정한 뒤 다시 제출하세요.
+          결재 요청을 작성 중으로 되돌립니다
         </p>
         {revertError && (
           <p className="mb-2 text-xs" style={{ color: LEGACY_COLORS.red }}>

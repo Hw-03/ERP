@@ -12,6 +12,7 @@ import type {
   StockRequestDraftUpsertPayload,
   StockRequestReservationLine,
   StockRequestType,
+  IoBatch,
 } from "./types";
 
 export const stockRequestsApi = {
@@ -114,7 +115,7 @@ export const stockRequestsApi = {
     postJson<StockRequest>(toApiUrl(`/api/stock-requests/${requestId}/cancel`), payload),
 
   revertToDraft: (requestId: string, payload: StockRequestActionPayload) =>
-    postJson<void>(toApiUrl(`/api/stock-requests/${requestId}/revert-to-draft`), payload),
+    postJson<IoBatch>(toApiUrl(`/api/stock-requests/${requestId}/revert-to-draft`), payload),
 
   getItemReservations: (itemId: string) =>
     fetcher<StockRequestReservationLine[]>(
