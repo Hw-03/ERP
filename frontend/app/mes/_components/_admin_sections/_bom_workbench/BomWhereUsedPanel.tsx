@@ -23,11 +23,12 @@ export function BomWhereUsedPanel({ selected, rows, items, onSelectParent }: Pro
   if (!selected) {
     return (
       <div
-        className="flex min-h-0 flex-1 items-center justify-center rounded-2xl border"
+        className="flex min-h-0 flex-1 flex-col rounded-2xl border"
         style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
       >
         <EmptyState
           variant="no-data"
+          illustrated
           title="좌측에서 품목을 선택하세요"
           description="이 품목이 자식으로 들어가는 BOM을 표시합니다."
         />
@@ -51,11 +52,14 @@ export function BomWhereUsedPanel({ selected, rows, items, onSelectParent }: Pro
         >
           사용처 ({rows.length}건)
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           {rows.length === 0 ? (
-            <div className="px-4 py-8 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-              이 품목을 자식으로 사용하는 BOM이 없습니다.
-            </div>
+            <EmptyState
+              variant="no-data"
+              illustrated
+              title="사용처 BOM이 없습니다"
+              description="이 품목을 자식으로 사용하는 BOM이 없습니다."
+            />
           ) : (
             rows.map((r) => {
               const parent = itemMap.get(r.parent_item_id);

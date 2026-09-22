@@ -103,6 +103,7 @@ export function AdminAuditCsvControls(): ReactNode {
       <EmptyState
         variant="no-data"
         compact
+        illustrated
         title="아직 누적된 파일이 없습니다"
         description="재고 이동 거래가 발생하면 원본 로그를 내려받을 수 있습니다."
       />

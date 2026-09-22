@@ -23,6 +23,7 @@ import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
 import { DefectCategoryFilters } from "./DefectCategoryFilters";
 import type { DefectProcessStep } from "./DefectFilterBar";
+import { EmptyState } from "../common/EmptyState";
 
 interface Props {
   departmentOptions: string[];
@@ -271,7 +272,7 @@ export function DefectStatisticsView({
             <section className="h-[340px] min-w-0 rounded-[20px] border p-5 xl:col-start-1" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
               <h3 className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>기간별 불량 추이</h3>
               {result.summary.record_count === 0 ? (
-                <div className="flex h-[250px] items-center justify-center text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>선택한 기간에 불량 발생 기록이 없습니다.</div>
+                <EmptyState compact illustrated className="h-[250px]" title="선택한 기간에 불량 발생 기록이 없습니다." description="" />
               ) : (
                 <div className="mt-4 h-[250px]">
                   <ResponsiveContainer width="100%" height="100%">
@@ -310,7 +311,7 @@ function BreakdownPanel({
     <section className={`flex h-[340px] min-h-0 min-w-0 flex-col rounded-[20px] border p-5 ${showCode ? "xl:col-start-2 xl:row-start-1 xl:row-span-3 xl:h-auto" : "xl:col-start-1"}`} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
       <h3 className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>{title}</h3>
       {entries.length === 0 ? (
-        <p className="flex flex-1 items-center justify-center text-center text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>집계 결과가 없습니다.</p>
+        <EmptyState compact illustrated className="flex-1" title="집계 결과가 없습니다." description="" />
       ) : (
         // 카드의 고정 프레임은 유지하고, 여백(20px)·테두리(1px) 밖으로 레일만 분리한다.
         <div className="relative mt-3 min-h-0 flex-1 lg:-mx-[21px]">

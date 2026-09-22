@@ -10,6 +10,7 @@ import {
   ModalBomTree,
   useBomTree,
 } from "../_warehouse_v2/BomSubExpander";
+import { EmptyState } from "../common/EmptyState";
 
 type Props = {
   variant: ProductionCapacityPfVariant;
@@ -178,12 +179,7 @@ export function DesktopCapacityPfWorkspace({ variant, onBack, onClose }: Props) 
             불러오는 중…
           </div>
         ) : currentTree.children.length === 0 ? (
-          <div
-            className="flex min-h-0 flex-1 items-center justify-center rounded-[18px] border px-4 py-8 text-center text-sm"
-            style={{ color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-          >
-            하위 품목이 없습니다.
-          </div>
+          <EmptyState compact illustrated className="min-h-0 flex-1 rounded-[18px] border border-[var(--c-border)] bg-[var(--c-s2)]" title="하위 품목이 없습니다." description="" />
         ) : (
           <ModalBomTree
             tree={currentTree}

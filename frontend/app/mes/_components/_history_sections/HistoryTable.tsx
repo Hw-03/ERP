@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { ChevronDown, CircleHelp } from "lucide-react";
 import { useDesktopTabHome } from "../DesktopTabHome";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -525,7 +526,7 @@ export function HistoryTable({
   const detailPanelOpen = selection !== null;
 
   return (
-    <div className="min-w-0">
+    <div className="flex min-w-0 flex-1 flex-col">
       {loading ? (
         <HistoryTableSkeleton />
       ) : error ? (
@@ -538,7 +539,12 @@ export function HistoryTable({
         />
       ) : groups.length === 0 ? (
         <ReadEmpty hasSearch={hasSearch} hasFilters={hasFilters} onReset={onResetFilters}
-          title={!hasSearch && !hasFilters ? "거래 이력이 없습니다." : undefined} />
+          prominent
+          className="min-h-[420px] flex-1"
+          title={hasSearch || hasFilters ? "현재 조건에 맞는 입출고 내역이 없습니다" : "아직 입출고 내역이 없습니다"}
+          description={hasSearch || hasFilters ? "기간이나 검색 조건을 바꾸거나 필터를 초기화해 보세요." : "입출고 작업이 완료되면 이곳에서 확인할 수 있습니다."}
+          icon={<Image data-testid="history-empty-mascot" src="/images/dexray/history-empty.webp" alt="" width={540} height={360} className="mb-1 h-52 w-auto object-contain" />}
+        />
       ) : (
         <div
           data-testid="history-table-surface"

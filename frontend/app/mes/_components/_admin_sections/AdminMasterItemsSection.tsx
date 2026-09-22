@@ -249,6 +249,7 @@ export function AdminMasterItemsSection({ allBomRows }: Props) {
             <EmptyState
               variant={itemSearch ? "no-search-result" : "no-data"}
               compact
+              illustrated
               title={itemSearch ? "검색 결과가 없습니다." : "등록된 품목이 없습니다."}
             />
           }
@@ -597,11 +598,14 @@ function BomList({
 
 function ItemEmptyHint({ onAdd }: { onAdd: () => void }) {
   return (
-    <EmptyState
-      variant="no-data"
-      title="품목을 선택하거나 추가하세요"
-      description="좌측 목록에서 품목을 클릭하면 정보를 확인·수정할 수 있습니다."
-      action={{ label: "+ 품목 추가", onClick: onAdd }}
-    />
+    <div className="flex min-h-full flex-col">
+      <EmptyState
+        variant="no-data"
+        illustrated
+        title="품목을 선택하거나 추가하세요"
+        description="좌측 목록에서 품목을 클릭하면 정보를 확인·수정할 수 있습니다."
+        action={{ label: "+ 품목 추가", onClick: onAdd }}
+      />
+    </div>
   );
 }

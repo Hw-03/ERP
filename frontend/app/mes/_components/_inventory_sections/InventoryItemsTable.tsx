@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
@@ -47,6 +48,15 @@ export function InventoryItemsTable({
   compact,
   skeletonRowCount = 8,
 }: Props) {
+  const emptySpaceRef = useRef<HTMLDivElement>(null);
+  const [largeEmpty, setLargeEmpty] = useState(false);
+  useEffect(() => {
+    const element = emptySpaceRef.current;
+    if (!element || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) => setLargeEmpty(entry.contentRect.height >= 380));
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [loading, filteredItems.length, compact, error]);
   const headerColumns = compact
     ? [
         { label: "상태", nowrap: true, width: "90px", center: true },
@@ -78,7 +88,7 @@ export function InventoryItemsTable({
   }
   if (!loading && filteredItems.length === 0) {
     return (
-      <div className="space-y-3">
+      <div className={compact ? "space-y-3" : "flex flex-1 flex-col gap-3"}>
         {refreshError && (
           <ReadFailure
             message={refreshError}
@@ -86,7 +96,15 @@ export function InventoryItemsTable({
             onRetry={onRetry}
           />
         )}
-        <ReadEmpty hasSearch={hasSearch} hasFilters={activeFilterCount > Number(hasSearch) || hasKpiFilter} onReset={onResetAllFilters} />
+        <div ref={emptySpaceRef} className={compact ? undefined : `inventory-empty-space ${largeEmpty ? "inventory-empty-large" : ""}`}>
+          <ReadEmpty hasSearch={hasSearch} hasFilters={activeFilterCount > Number(hasSearch) || hasKpiFilter} onReset={onResetAllFilters}
+            title={hasSearch || activeFilterCount > 0 || hasKpiFilter ? "현재 조건에 맞는 자재가 없습니다" : "아직 등록된 자재가 없습니다"}
+            description={hasSearch || activeFilterCount > 0 || hasKpiFilter ? "검색어를 바꾸거나 필터를 초기화해 보세요." : "자재를 등록하면 이곳에서 확인할 수 있습니다."}
+            prominent={!compact}
+            className={compact ? undefined : "inventory-empty-content"}
+            icon={!compact ? <Image src="/images/dexray/history-empty.webp" alt="" width={540} height={360} className="inventory-empty-mascot object-contain" /> : undefined}
+          />
+        </div>
       </div>
     );
   }

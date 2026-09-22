@@ -83,7 +83,7 @@ export function IoBundleCart({
     <div className="flex h-full min-h-0 flex-col gap-4">
       {bundles.length === 0 ? (
         <EmptyState
-          compact
+          illustrated
           variant="no-data"
           title="아직 선택된 품목이 없습니다."
           description="이전 단계에서 대상을 다시 선택하세요."

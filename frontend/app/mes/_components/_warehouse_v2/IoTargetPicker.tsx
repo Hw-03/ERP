@@ -537,7 +537,7 @@ export function IoTargetPicker({
           style={{ overscrollBehavior: "contain" }}
         >
           <div
-            className="min-h-full min-w-full"
+            className="flex min-h-full min-w-full flex-col"
             style={{ background: LEGACY_COLORS.s2 }}
           >
             {editMode ? (
@@ -1147,23 +1147,15 @@ function ItemTable({
               </HighlightableRow>
             );
           })}
-          {items.length === 0 && (
-            <tr>
-              <td colSpan={isInternalUse ? 4 : 5} className="px-3 py-6">
-                <EmptyState
-                  variant={hasActiveFilter ? "filtered-out" : "no-data"}
-                  compact
-                  title={hasActiveFilter ? "필터에 맞는 품목 없음" : "조회할 품목 없음"}
-                  description={
-                    hasActiveFilter ? "필터를 해제하면 다시 표시됩니다." : "다른 키워드를 시도하세요."
-                  }
-                  action={hasActiveFilter ? { label: "필터 해제", onClick: clearFilters } : undefined}
-                />
-              </td>
-            </tr>
-          )}
         </tbody>
       </table>
+
+      {items.length === 0 && <EmptyState illustrated comfortable
+        variant={hasActiveFilter ? "filtered-out" : "no-data"}
+        title={hasActiveFilter ? "필터에 맞는 품목 없음" : "조회할 품목 없음"}
+        description={hasActiveFilter ? "필터를 해제하면 다시 표시됩니다." : "다른 키워드를 시도하세요."}
+        action={hasActiveFilter ? { label: "필터 해제", onClick: clearFilters } : undefined}
+      />}
 
       {items.length > displayLimit && (
         <div className="p-2">

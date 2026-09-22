@@ -171,8 +171,8 @@ export function DesktopInventoryView({
           data-testid="inventory-left-content"
           className="sg min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable] sm:block sm:overflow-y-scroll"
         >
-          <div data-testid="inventory-scroll-surface" className="min-h-full">
-            <div className="flex flex-col gap-3">
+          <div data-testid="inventory-scroll-surface" className="flex min-h-full flex-col">
+            <div className="flex flex-1 flex-col gap-3">
           {/* ── 컴팩트 상단: KPI + 생산가능 + (접힘형) 필터 ── */}
           <section className="card desktop-flat-surface" style={{ padding: "14px 16px" }}>
             <InventoryKpiPanel
@@ -223,7 +223,7 @@ export function DesktopInventoryView({
           </section>
 
           {/* ── 재고 테이블 ── */}
-          <section data-testid="inventory-list-card" aria-label="자재 목록" className="card desktop-flat-surface">
+          <section data-testid="inventory-list-card" aria-label="자재 목록" className="card desktop-flat-surface flex flex-1 flex-col">
             <InventoryTableStickyHeader
               searchValue={localSearch}
               onSearchChange={setLocalSearch}

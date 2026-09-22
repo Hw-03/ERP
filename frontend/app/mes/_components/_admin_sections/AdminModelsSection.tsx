@@ -222,7 +222,7 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
               <span role="columnheader" className="text-center">상태</span>
             </div>
           }
-          emptyState={<EmptyState variant="no-data" compact title="등록된 모델이 없습니다." />}
+          emptyState={<EmptyState variant="no-data" compact illustrated title="등록된 모델이 없습니다." />}
           renderItem={(model) => {
             const active = selected?.slot === model.slot;
             const modelNameLabel = model.model_name?.trim() || "미등록 모델";
@@ -361,11 +361,14 @@ export function AdminModelsSection({ items, allBomRows }: Props) {
               onRequestDelete={() => handleDelete(selected.slot)}
             />
           ) : (
-            <EmptyState
-              variant="no-data"
-              title="좌측에서 모델을 선택하세요"
-              description="등록된 모델을 클릭하면 상세 정보와 연결 품목을 확인할 수 있습니다."
-            />
+            <div className="flex min-h-full flex-col">
+              <EmptyState
+                variant="no-data"
+                illustrated
+                title="좌측에서 모델을 선택하세요"
+                description="등록된 모델을 클릭하면 상세 정보와 연결 품목을 확인할 수 있습니다."
+              />
+            </div>
           )}
         </AdminDetailCard>
       </div>

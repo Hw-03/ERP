@@ -16,6 +16,7 @@ import { DefectFilterBar, type DefectScope } from "./DefectFilterBar";
 import { useDefectFilterPreferences } from "./useDefectFilterPreferences";
 import { filterDefectLocations } from "./defectCategoryFilter";
 import { LoadFailureCard } from "../common/LoadFailureCard";
+import { EmptyState } from "../common/EmptyState";
 import type { Item, ProductModel } from "../_warehouse_v2/types";
 import { DesktopPanelCloseButton } from "../DesktopRightPanel";
 
@@ -99,7 +100,13 @@ export function DefectStorageView({
     <DefectFilterBar scope={scope} actorScope={actorScope} sort={sort} filterLocked={filterLocked} onScopeChange={setScope} onActorScopeChange={setActorScope} onSortChange={setSort} onFilterLockedChange={setFilterLocked} currentDept={currentEmployee.department} departments={departmentOptions} selectedDepartments={selectedDepartments} onDepartmentsChange={setSelectedDepartments} models={modelOptions} selectedModels={selectedModels} onModelsChange={setSelectedModels} selectedProcessSteps={selectedProcessSteps} onProcessStepsChange={setSelectedProcessSteps} onResetCategoryFilters={resetCategoryFilters} />
     <input aria-label="B급·구형 검색" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="품목명 · 품목 코드 · 사유 검색" className="min-h-11 rounded-[10px] border px-3 text-sm font-bold outline-none" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }} />
     {loadError && <LoadFailureCard prefix="최신 B급·구형 보관 목록을 동기화하지 못했습니다" message={loadError} retryLabel="다시 동기화" onRetry={onRetry} />}
-    {storage.length === 0 ? <div className="rounded-[14px] border px-6 py-8 text-center text-sm font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}>{search.trim() ? "검색 결과가 없습니다." : "보관 중인 B급·구형 자재가 없습니다."}</div> : <DefectDepartmentList storageMode locations={storage} currentEmployee={currentEmployee} onProcess={onRestore} onMoveToStorage={setSelected} onMemoUpdated={onMemoUpdated} searchActive={search.trim().length > 0} />}
+    {storage.length === 0 ? <EmptyState
+      illustrated
+      className="min-h-[260px] flex-1"
+      variant={search.trim() ? "no-search-result" : "no-data"}
+      title={search.trim() ? "검색 결과가 없습니다." : "보관 중인 B급·구형 자재가 없습니다."}
+      description=""
+    /> : <DefectDepartmentList storageMode locations={storage} currentEmployee={currentEmployee} onProcess={onRestore} onMoveToStorage={setSelected} onMemoUpdated={onMemoUpdated} searchActive={search.trim().length > 0} />}
     </>}
     {selected && <ManagementCategoryModal location={selected} currentEmployee={currentEmployee} onClose={() => setSelected(null)} onUpdated={(category) => { onUpdated(selected.record_id, category); setSelected(null); }} />}
   </div>;

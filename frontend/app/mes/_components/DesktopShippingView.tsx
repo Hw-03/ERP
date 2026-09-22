@@ -1,5 +1,6 @@
 "use client";
 import { ReadEmpty, ReadFailure, ReadLoading } from "./common/ReadState";
+import { EmptyState as IllustratedEmptyState } from "./common/EmptyState";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDesktopTabHome } from "./DesktopTabHome";
@@ -1866,7 +1867,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
         />
       );
       return hubEntryAnimationView === "historyList"
-        ? <div data-testid="shipping-hub-entry-animation" className="animate-view-fade">{entry}</div>
+        ? <div data-testid="shipping-hub-entry-animation" className="animate-view-fade flex min-h-0 flex-1 flex-col">{entry}</div>
         : entry;
     }
 
@@ -2067,7 +2068,7 @@ function RequestListEntry({ requests, onBack, onNew, onOpen, loading = false }: 
                   <div className="mt-3 h-4 w-1/2 rounded motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s3 }} />
                 </div>
               ) : rows.length === 0 ? (
-                <EmptyState title={`${group.label} 없음`} body="표시할 출하 요청이 없습니다." />
+                <EmptyState illustrated title={`${group.label} 없음`} body="표시할 출하 요청이 없습니다." />
               ) : (
                 rows.map((request) => <RequestRow key={request.request_id} request={request} active={false} layout="requestBoard" onClick={() => onOpen(request)} />)
               )}
@@ -2091,8 +2092,8 @@ function RequestDetailEntry({ request, onBack, onEdit, onDelete, onPrepareComple
             </button>
             <PanelTitle icon={PackageCheck} title="요청 상세" subtitle="목록에서 출하 요청을 선택하세요." />
           </div>
-          <div className="mt-4 flex min-h-0 flex-1 items-center justify-center">
-            <EmptyState title="선택된 요청 없음" body="목록에서 출하 요청을 선택하세요." />
+          <div className="mt-4 flex min-h-0 flex-1 flex-col items-center justify-center">
+            <EmptyState illustrated title="선택된 요청 없음" body="목록에서 출하 요청을 선택하세요." />
           </div>
         </Panel>
       </div>
@@ -2519,8 +2520,8 @@ function PrepListEntry({ requests, onBack, onOpen }: { requests: ShippingRequest
         </div>
         <div className={SHIPPING_MODAL_BODY_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
           {requests.length === 0 ? (
-            <div className="flex flex-1 items-center justify-center">
-              <EmptyState title="준비 중 요청 없음" body="새 출하 요청이 생성되면 여기에 표시됩니다." />
+            <div className="flex flex-1 flex-col items-center justify-center">
+              <EmptyState illustrated title="준비 중 요청 없음" body="새 출하 요청이 생성되면 여기에 표시됩니다." />
             </div>
           ) : (
             <div className="grid flex-1 content-start gap-2 overflow-y-auto pr-1">
@@ -2644,8 +2645,8 @@ function HistoryListEntry({
   );
 
   return (
-    <div className="flex min-w-0 flex-col">
-      <div data-testid="shipping-history-list" data-surface="layout-only" className="flex min-w-0 flex-col">
+    <div className="flex min-w-0 flex-1 flex-col">
+      <div data-testid="shipping-history-list" data-surface="layout-only" className="flex min-w-0 flex-1 flex-col">
         <div className={SHIPPING_TOP_ROW_CLASS}>
           <div className="flex min-h-11 items-center gap-3">
             <button type="button" aria-label="작업 선택으로 돌아가기" onClick={onBack} className={SHIPPING_ICON_BOX_CLASS} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>
@@ -2705,7 +2706,7 @@ function HistoryListEntry({
           </button>
         </form>
 
-        <div data-testid="shipping-history-list-body" data-surface="layout-only" className="mt-4 flex min-h-0 flex-1 overflow-y-auto lg:flex-none lg:overflow-visible">
+        <div data-testid="shipping-history-list-body" data-surface="layout-only" className={`mt-4 flex min-h-0 flex-1 flex-col overflow-y-auto lg:overflow-visible ${(!appliedSearch && years.length > 0) || (appliedSearch && searchGroups.length > 0) ? "lg:flex-none" : ""}`}>
           {error && rows.length > 0 && (
             <div className="mb-3">
               <LoadFailureCard
@@ -2723,7 +2724,7 @@ function HistoryListEntry({
             <div className="flex-1"><ReadLoading label="출하 이력을 불러오는 중입니다" /></div>
           ) : appliedSearch ? (
             searchGroups.length === 0 ? (
-              <div className="flex-1"><ReadEmpty hasSearch onReset={() => { onSearchChange(""); onSearch(""); }} /></div>
+              <ReadEmpty illustrated hasSearch onReset={() => { onSearchChange(""); onSearch(""); }} />
             ) : (
               <div className="grid flex-1 content-start gap-2">
                 {Array.from(new Set(searchGroups.map((group) => group.year))).map((year, yearIndex) => (
@@ -2742,7 +2743,7 @@ function HistoryListEntry({
               </div>
             )
           ) : years.length === 0 ? (
-            <div className="flex-1"><ReadEmpty title="출하 이력이 없습니다" description={historyEmptyBody} /></div>
+            <ReadEmpty illustrated title="출하 이력이 없습니다" description={historyEmptyBody} />
           ) : (
             <div className="grid flex-1 content-start gap-2">
               {years.map((year) => {
@@ -3070,13 +3071,13 @@ function RequestSection(props: {
                   />
                 </Field>
                 <div data-testid="shipping-pf-selection-scroll-shell" className="relative min-h-0 flex-1">
-                  <div data-testid="shipping-pf-selection-viewport" className="absolute inset-y-0 left-0 right-0 grid content-start gap-2 overflow-y-auto p-2 lg:-right-2.5 lg:[scrollbar-gutter:stable]" style={{ background: LEGACY_COLORS.s2 }}>
+                  <div data-testid="shipping-pf-selection-viewport" className="absolute inset-y-0 left-0 right-0 flex flex-col gap-2 overflow-y-auto p-2 lg:-right-2.5 lg:[scrollbar-gutter:stable] [&>button]:shrink-0" style={{ background: LEGACY_COLORS.s2 }}>
                     {props.pfItemsLoading ? (
                       <EmptyState title="PF 후보를 불러오는 중입니다." body="잠시만 기다려주세요." />
                     ) : props.pfItemsError ? (
                       <EmptyState title="PF 후보를 불러오지 못했습니다." body={props.pfItemsError} />
                     ) : filteredPfItems.length === 0 ? (
-                      <EmptyState title="선택 가능한 PF 없음" body="검색어를 바꾸거나 품목 목록을 확인하세요." />
+                      <EmptyState illustrated title="선택 가능한 PF 없음" body="검색어를 바꾸거나 품목 목록을 확인하세요." />
                     ) : (
                       filteredPfItems.slice(0, 80).map((item) => {
                         const selected = props.basePfId === item.item_id;
@@ -3109,7 +3110,7 @@ function RequestSection(props: {
           {props.wizardStep === 2 && (
             <WorkStep number={2} title="BOM 구성 조정" body="BOM·동반품" dataTestId="shipping-wizard-step-2" showHeader={false}>
               {!props.basePfId ? (
-                <EmptyState title="기준 PF를 먼저 선택하세요" body="PF를 선택하면 PA 구성품과 PF 구성품을 나눠 보여줍니다." />
+                <EmptyState illustrated title="기준 PF를 먼저 선택하세요" body="PF를 선택하면 PA 구성품과 PF 구성품을 나눠 보여줍니다." />
               ) : (
                 <div className="grid min-h-0 flex-1 gap-3 overflow-hidden xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_360px]">
                   <BomEditor basePfName={basePfName} stage="PA" lines={grouped.PA} itemById={props.itemById} itemOptions={props.itemOptions} disabled={locked} onUpdate={props.onUpdateLine} onAdd={props.onAddLine} onRemove={props.onRemoveLine} />
@@ -3418,7 +3419,7 @@ function PrepSection({
 
       <Panel dataTestId="shipping-prep-detail" className="flex min-h-0 flex-col">
         {!selected ? (
-          <EmptyState title="선택된 준비 작업 없음" body="준비 작업을 선택하세요." />
+          <EmptyState illustrated title="선택된 준비 작업 없음" body="준비 작업을 선택하세요." />
         ) : (
           <div className="flex min-h-0 flex-1 flex-col gap-4">
             <div className={SHIPPING_TOP_ROW_CLASS}>
@@ -3668,7 +3669,7 @@ function HistorySection({ showList = true, rows, selected, emptyBody, refreshErr
       )}
       <Panel dataTestId="shipping-history-detail">
         {!selected ? (
-          <EmptyState title="선택된 이력 없음" body={emptyBody ?? "왼쪽에서 완료 이력을 선택하세요."} />
+          <EmptyState illustrated title="선택된 이력 없음" body={emptyBody ?? "왼쪽에서 완료 이력을 선택하세요."} />
         ) : (
           <div className="grid gap-4">
             {refreshError && (
@@ -3704,7 +3705,7 @@ function HistorySection({ showList = true, rows, selected, emptyBody, refreshErr
             <div className="grid gap-2">
               <div className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>이벤트 이력</div>
               {selected.events.length === 0 ? (
-                <EmptyState title="이벤트 없음" body="이 요청에 기록된 이벤트가 없습니다." />
+                <IllustratedEmptyState illustrated compact title="이벤트 없음" description="이 요청에 기록된 이벤트가 없습니다." />
               ) : (
                 selected.events.map((event) => (
                   <div key={event.event_id} className="flex items-center justify-between gap-3 rounded-[10px] border px-3 py-2" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
@@ -3966,7 +3967,7 @@ function TransactionLogList({ title = "연결 입출고 로그", logs }: { title
     <div className="grid gap-2">
       <div className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>{title}</div>
       {logs.length === 0 ? (
-        <EmptyState title="입출고 로그 없음" body="이 출하 요청에 연결된 입출고 로그가 없습니다." />
+        <IllustratedEmptyState illustrated compact title="입출고 로그 없음" description="이 출하 요청에 연결된 입출고 로그가 없습니다." />
       ) : (
         <div className="grid gap-2">
           {logs.map((log) => {
@@ -4576,13 +4577,14 @@ function ListColumn({ icon: Icon, title, subtitle, children, bodyDataTestId, act
         <PanelTitle icon={Icon} title={title} subtitle={subtitle} />
         {action}
       </div>
-      <div data-testid={bodyDataTestId} className="mt-3 grid min-h-0 flex-1 content-start gap-2 overflow-y-auto pr-1">{children}</div>
+      <div data-testid={bodyDataTestId} className="mt-3 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1 [&>button]:shrink-0">{children}</div>
     </section>
   );
 }
 
 
-function EmptyState({ title, body }: { title: string; body: string }) {
+function EmptyState({ title, body, illustrated = false }: { title: string; body: string; illustrated?: boolean }) {
+  if (illustrated) return <IllustratedEmptyState illustrated title={title} description={body} />;
   return (
     <div className="flex min-h-[136px] flex-col items-center justify-center rounded-[14px] border px-4 py-6 text-center" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
       <div className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>{title}</div>

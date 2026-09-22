@@ -34,11 +34,12 @@ export function BomEditPanel({
   if (!parent) {
     return (
       <div
-        className="flex min-h-0 flex-1 items-center justify-center rounded-2xl border"
+        className="flex min-h-0 flex-1 flex-col rounded-2xl border"
         style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
       >
         <EmptyState
           variant="no-data"
+          illustrated
           title="좌측에서 상위 품목을 선택하세요"
           description="부서탭 → 품목 클릭 시 이곳에 현재 BOM 구성이 표시됩니다."
         />
@@ -66,15 +67,18 @@ export function BomEditPanel({
             data-scrollbar-rail-viewport
             className="absolute inset-y-0 left-0 right-0 overflow-y-auto lg:-right-2.5 lg:[scrollbar-gutter:stable]"
           >
-            <div className="min-h-full min-w-full" style={{ background: LEGACY_COLORS.s1 }}>
+            <div className="flex min-h-full min-w-full flex-col" style={{ background: LEGACY_COLORS.s1 }}>
               <BomTableHeader
                 variant="current"
                 gridTemplateColumns={BOM_CURRENT_ROW_GRID_TEMPLATE}
               />
               {bomRows.length === 0 ? (
-                <div className="px-4 py-6 text-center text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
-                  등록된 BOM 이 없습니다. 가운데에서 하위품목을 선택해 추가하세요.
-                </div>
+                <EmptyState
+                  variant="no-data"
+                  illustrated
+                  title="등록된 BOM 이 없습니다"
+                  description="가운데에서 하위품목을 선택해 추가하세요."
+                />
               ) : (
                 bomRows.map((r) => (
                   <BomRow

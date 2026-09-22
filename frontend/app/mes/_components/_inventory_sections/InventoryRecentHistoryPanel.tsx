@@ -177,7 +177,7 @@ export function InventoryRecentHistoryPanel({ item }: { item: Item }) {
   }
 
   if (operations.length === 0 && legacyLogs.length === 0) {
-    return <EmptyState compact title="최근 입출고 내역이 없습니다." />;
+    return <EmptyState compact illustrated title="최근 입출고 내역이 없습니다." description="" />;
   }
 
   return (

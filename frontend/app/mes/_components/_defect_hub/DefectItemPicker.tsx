@@ -255,13 +255,14 @@ export function DefectItemPicker({
       {/* 결과 표 */}
       <div
         ref={tableRef}
-        data-testid="defect-picker-table" className="min-h-0 flex-1 touch-pan-y overflow-y-auto overflow-x-auto overscroll-contain rounded-[16px] border"
+        data-testid="defect-picker-table" className="flex min-h-0 flex-1 flex-col touch-pan-y overflow-y-auto overflow-x-auto overscroll-contain rounded-[16px] border"
         style={{
           background: LEGACY_COLORS.s2,
           borderColor: LEGACY_COLORS.border,
           WebkitOverflowScrolling: "touch",
         }}
       >
+        <div className="flex min-h-full min-w-full flex-col">
         {editMode ? (
           <DefectEditOrderTable
             items={editItems}
@@ -373,23 +374,17 @@ export function DefectItemPicker({
                 </tr>
               );
             })}
-            {filteredItems.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-3 py-6">
-                  <EmptyState
-                    variant={hasActiveFilter ? "filtered-out" : "no-data"}
-                    compact
-                    title={hasActiveFilter ? "필터에 맞는 품목 없음" : "조회할 품목 없음"}
-                    description={
-                      hasActiveFilter ? "필터를 해제하면 다시 표시됩니다." : "다른 키워드를 시도하세요."
-                    }
-                    action={hasActiveFilter ? { label: "필터 해제", onClick: clearFilters } : undefined}
-                  />
-                </td>
-              </tr>
-            )}
           </tbody>
         </table>
+
+        {filteredItems.length === 0 && <EmptyState
+          illustrated
+          className="flex-1"
+          variant={hasActiveFilter ? "filtered-out" : "no-data"}
+          title={hasActiveFilter ? "필터에 맞는 품목 없음" : "조회할 품목 없음"}
+          description={hasActiveFilter ? "필터를 해제하면 다시 표시됩니다." : "다른 키워드를 시도하세요."}
+          action={hasActiveFilter ? { label: "필터 해제", onClick: clearFilters } : undefined}
+        />}
 
         {filteredItems.length > displayLimit && (
           <div className="p-2">
@@ -407,7 +402,7 @@ export function DefectItemPicker({
             </button>
           </div>
         )}
-        </>)}
+        </>)}</div>
       </div>
     </div>
   );

@@ -11,6 +11,7 @@ import { DailyWorkDatePicker } from "./DailyWorkDatePicker";
 import { DailyWorkReportEditor } from "./DailyWorkReportEditor";
 import { toKstDateKey } from "./dailyReportDate";
 import type { Operator } from "../login/useCurrentOperator";
+import { EmptyState } from "../common/EmptyState";
 
 type ReportTab = "mine" | "all";
 
@@ -40,11 +41,10 @@ function Failure({ message }: { message: string }) {
   );
 }
 
-function PanelPlaceholder({ children }: { children: React.ReactNode }) {
+function PanelPlaceholder({ title }: { title: string }) {
   return (
-    <div className="rounded-[20px] border px-5 py-10 text-center" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-      <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-[16px]" style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}><Users className="h-5 w-5" /></span>
-      <p className="mt-3 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{children}</p>
+    <div className="flex min-h-[260px] rounded-[20px] border lg:flex-1" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+      <EmptyState illustrated className="flex-1" title={title} description="" />
     </div>
   );
 }
@@ -326,7 +326,7 @@ export function DailyWorkReportScreen({
               fillAvailableHeight={!isActivityDetailOpen}
               />
           </div>
-        ) : tab === "all" ? <PanelPlaceholder>작성한 직원을 선택하세요.</PanelPlaceholder> : null}
+        ) : tab === "all" ? <PanelPlaceholder title="작성한 직원을 선택하세요." /> : null}
       </div>
     </div>
   );
