@@ -103,15 +103,22 @@ test("직원 서버 주소와 자격 증명 숫자를 HTML 원본에서 차단�
   );
 });
 
-test("기본 필터는 DIFFERENCE + 미검토이고 불필요한 원장 정보는 출력하지 않는다", async () => {
+test("기본 화면은 전체 항목이며 판정·저장 상태를 명확한 한글로 표시한다", async () => {
   const { buildReviewModel, renderReviewHtml } = await loadGenerator();
   const html = renderReviewHtml(buildReviewModel(makeAudit()));
 
-  assert.match(html, /data-default-scope="difference"/);
-  assert.match(html, /id="unreviewedOnly"[^>]*checked/);
-  assert.match(html, /기대값 맞음/);
-  assert.match(html, /기대값 수정/);
-  assert.match(html, /보류/);
+  assert.match(html, /data-default-scope="all"/);
+  assert.doesNotMatch(html, /id="unreviewedOnly"[^>]*checked/);
+  assert.match(html, /기대대로 동작/);
+  assert.match(html, /기대와 다르게 동작/);
+  assert.match(html, /전체 항목/);
+  assert.match(html, /기대 문구에 대한 내 판단/);
+  assert.match(html, /이 기대 문구가 맞음/);
+  assert.match(html, /기대 문구 수정 필요/);
+  assert.match(html, /판단 보류/);
+  assert.match(html, /판정 지우기/);
+  assert.match(html, /아직 저장된 판정 없음/);
+  assert.match(html, /dexcowin-mes-pc-review-v3:/);
   assert.doesNotMatch(html, /SECRET_ACTOR|SECRET_PREREQUISITE|SECRET_STEP/);
   assert.doesNotMatch(html, /SECRET_INVENTORY|SECRET_EVIDENCE|SECRET_TEST|SECRET_LAYER/);
   assert.doesNotMatch(html, /CSV|전체 펼치기|전체 접기/);
@@ -135,7 +142,7 @@ test("검토 결과 스키마와 실행 ID를 검증한다", async () => {
   const { normalizeReviewExport } = await loadGenerator();
   const validIds = ["8.1-01"];
   const valid = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     auditRunId: "PC-BROWSER-AUDIT-20260918",
     exportedAt: "2026-09-18T00:00:00.000Z",
     reviews: {
@@ -156,8 +163,8 @@ test("검토 결과 스키마와 실행 ID를 검증한다", async () => {
     /실행 ID/,
   );
   assert.throws(
-    () => normalizeReviewExport({ ...valid, schemaVersion: 1 }, "PC-BROWSER-AUDIT-20260918", validIds),
-    /schemaVersion/,
+    () => normalizeReviewExport({ ...valid, schemaVersion: 2 }, "PC-BROWSER-AUDIT-20260918", validIds),
+    /이전 검토 형식이라 불러오지 않았습니다/,
   );
   assert.throws(
     () => normalizeReviewExport({ ...valid, reviews: { "8.1-01": { verdict: "maybe" } } }, "PC-BROWSER-AUDIT-20260918", validIds),
@@ -192,7 +199,44 @@ test("생성된 HTML은 원장 345개 ID와 실행 가능한 인라인 스크립
   assert.doesNotMatch(html, /(?:비밀번호|password|pin)[^\r\n]{0,24}\b\d{4,}\b/i);
 });
 
-test("생성된 HTML에서 필터·판정·의견 자동 저장과 새로고침 복원이 동작한다", () => {
+test("생성된 HTML은 이전 저장값을 무시하고 전체 345개를 미검토로 시작한다", () => {
+  const repoRoot = path.resolve(TEST_DIR, "../..");
+  const { JSDOM } = REQUIRE(path.join(repoRoot, "frontend/node_modules/jsdom"));
+  const reviewPath = path.join(
+    repoRoot,
+    "docs/superpowers/specs/2026-09-18-mes-pc-expected-actual-review.html",
+  );
+  const html = fs.readFileSync(reviewPath, "utf8");
+  const dataStartMarker = '<script id="review-data" type="application/json">';
+  const dataStart = html.indexOf(dataStartMarker);
+  const dataEnd = html.indexOf("</script>", dataStart);
+  const model = JSON.parse(html.slice(dataStart + dataStartMarker.length, dataEnd));
+
+  const dom = new JSDOM(html, {
+    runScripts: "dangerously",
+    url: "https://review.local/expected-actual.html",
+    beforeParse(window) {
+      const oldPayload = JSON.stringify({
+        schemaVersion: 2,
+        auditRunId: model.auditRunId,
+        reviews: { [model.items[0].id]: { verdict: "approved", note: "", updatedAt: new Date().toISOString() } },
+      });
+      window.localStorage.setItem(`dexcowin-mes-regression-review-v1`, oldPayload);
+      window.localStorage.setItem(`dexcowin-mes-pc-review-v2:${model.auditRunId}`, oldPayload);
+    },
+  });
+  const { document } = dom.window;
+  assert.equal(document.querySelectorAll(".card").length, 345);
+  assert.equal(document.getElementById("unreviewedOnly").checked, false);
+  assert.equal(document.querySelector('[data-scope="all"]').getAttribute("aria-pressed"), "true");
+  assert.equal(document.getElementById("summary").textContent, "전체 345개 · 검토 완료 0개 · 미검토 345개");
+  assert.equal(document.getElementById("statusMessage").textContent, "아직 저장된 판정 없음");
+  assert.doesNotMatch(document.querySelector(".system-verdict").textContent, /PASS|DIFFERENCE|BLOCKED/);
+  assert.match(document.querySelector(".system-verdict").textContent, /^실측 결과 · /);
+  dom.window.close();
+});
+
+test("생성된 HTML에서 필터·판정·의견·초기화와 v3 저장 복원이 동작한다", () => {
   const repoRoot = path.resolve(TEST_DIR, "../..");
   const { JSDOM } = REQUIRE(path.join(repoRoot, "frontend/node_modules/jsdom"));
   const reviewPath = path.join(
@@ -206,14 +250,13 @@ test("생성된 HTML에서 필터·판정·의견 자동 저장과 새로고침 
   const model = JSON.parse(html.slice(dataStart + dataStartMarker.length, dataEnd));
   const differenceCount = model.items.filter((item) => item.verdict === "DIFFERENCE").length;
   const passCount = model.items.filter((item) => item.verdict === "PASS").length;
-  const storageKey = `dexcowin-mes-pc-review-v2:${model.auditRunId}`;
+  const storageKey = `dexcowin-mes-pc-review-v3:${model.auditRunId}`;
 
   const dom = new JSDOM(html, {
     runScripts: "dangerously",
     url: "https://review.local/expected-actual.html",
   });
   const { document, Event } = dom.window;
-  assert.equal(document.querySelectorAll(".card").length, differenceCount);
 
   const firstDifference = model.items.find((item) => item.verdict === "DIFFERENCE");
   const search = document.getElementById("search");
@@ -226,22 +269,34 @@ test("생성된 HTML에서 필터·판정·의견 자동 저장과 새로고침 
   document.querySelector('[data-scope="pass"]').click();
   assert.equal(document.querySelectorAll(".card").length, passCount);
   document.querySelector('[data-scope="difference"]').click();
+  assert.equal(document.querySelectorAll(".card").length, differenceCount);
 
   const reviewCards = document.querySelectorAll(".card");
   const approvedId = reviewCards[0].dataset.itemId;
-  reviewCards[0].querySelector('[data-verdict="approved"]').click();
+  const approvedButton = reviewCards[0].querySelector('[data-verdict="approved"]');
+  approvedButton.click();
+  assert.equal(approvedButton.dataset.selected, "true");
+  assert.match(approvedButton.textContent, /^✓ /);
+  assert.equal(document.getElementById("summary").textContent, "전체 345개 · 검토 완료 1개 · 미검토 344개");
+  assert.match(document.getElementById("statusMessage").textContent, /이 브라우저에 자동 저장 · 판정 1개 · 마지막 저장 \d{2}:\d{2}:\d{2}/);
+
   const revisionId = reviewCards[1].dataset.itemId;
   reviewCards[1].querySelector('[data-verdict="revision"]').click();
   const textarea = reviewCards[1].querySelector("textarea");
   assert.equal(textarea.closest(".note-wrap").hidden, false);
+  assert.equal(document.getElementById("summary").textContent, "전체 345개 · 검토 완료 1개 · 미검토 344개");
   textarea.value = "직원 기대 문구를 실제 업무 기준으로 수정";
   textarea.dispatchEvent(new Event("input", { bubbles: true }));
+  assert.equal(document.getElementById("summary").textContent, "전체 345개 · 검토 완료 2개 · 미검토 343개");
+
+  reviewCards[0].querySelector(".clear-review").click();
+  assert.equal(document.getElementById("summary").textContent, "전체 345개 · 검토 완료 1개 · 미검토 344개");
 
   const stored = dom.window.localStorage.getItem(storageKey);
   const payload = JSON.parse(stored);
-  assert.equal(payload.schemaVersion, 2);
+  assert.equal(payload.schemaVersion, 3);
   assert.equal(payload.auditRunId, model.auditRunId);
-  assert.equal(payload.reviews[approvedId].verdict, "approved");
+  assert.equal(payload.reviews[approvedId], undefined);
   assert.equal(payload.reviews[revisionId].note, textarea.value);
   dom.window.close();
 
@@ -252,9 +307,9 @@ test("생성된 HTML에서 필터·판정·의견 자동 저장과 새로고침 
       window.localStorage.setItem(storageKey, stored);
     },
   });
-  assert.equal(
-    restored.window.document.querySelectorAll(".card").length,
-    differenceCount - 2,
-  );
+  const restoredDocument = restored.window.document;
+  assert.equal(restoredDocument.querySelectorAll(".card").length, 345);
+  assert.equal(restoredDocument.querySelector(`[data-item-id="${revisionId}"] [data-verdict="revision"]`).dataset.selected, "true");
+  assert.equal(restoredDocument.getElementById("statusMessage").textContent, "저장된 판정 1개를 불러옴");
   restored.window.close();
 });

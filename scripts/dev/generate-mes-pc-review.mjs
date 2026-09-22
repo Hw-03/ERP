@@ -66,7 +66,10 @@ export function normalizeReviewExport(payload, expectedRunId, validIds) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new Error("검토 결과 JSON 객체가 아닙니다.");
   }
-  if (payload.schemaVersion !== 2) {
+  if (payload.schemaVersion === 1 || payload.schemaVersion === 2) {
+    throw new Error("이전 검토 형식이라 불러오지 않았습니다.");
+  }
+  if (payload.schemaVersion !== 3) {
     throw new Error("지원하지 않는 schemaVersion입니다.");
   }
   if (payload.auditRunId !== expectedRunId) {
@@ -219,7 +222,7 @@ export function renderReviewHtml(model) {
       border-radius: 14px;
       background: var(--surface-muted);
     }
-    .scope button, .button, .verdict-button {
+    .scope button, .button, .verdict-button, .clear-review {
       border: 1px solid transparent;
       border-radius: 10px;
       background: transparent;
@@ -233,8 +236,18 @@ export function renderReviewHtml(model) {
     .check input { width: 18px; height: 18px; accent-color: var(--blue); }
     .button { min-height: 44px; padding: 8px 14px; border-color: var(--line); background: var(--surface); }
     .button.primary { border-color: var(--blue); background: var(--blue); color: white; }
-    .button:hover, .verdict-button:hover { border-color: var(--blue); }
-    .status-row { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 13px; }
+    .button:hover, .verdict-button:hover, .clear-review:hover { border-color: var(--blue); }
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 11px 13px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--surface-muted);
+      color: var(--muted);
+      font-size: 13px;
+    }
     .status-message[data-kind="error"] { color: var(--red); font-weight: 750; }
     .status-message[data-kind="success"] { color: var(--green); font-weight: 750; }
     .cards { display: grid; gap: 18px; }
@@ -268,6 +281,9 @@ export function renderReviewHtml(model) {
     .verdict-button[data-selected="true"][data-verdict="approved"] { border-color: var(--green); background: var(--green-soft); color: var(--green); }
     .verdict-button[data-selected="true"][data-verdict="revision"] { border-color: var(--blue); background: var(--blue-soft); color: var(--blue); }
     .verdict-button[data-selected="true"][data-verdict="hold"] { border-color: var(--amber); background: var(--amber-soft); color: var(--amber); }
+    .review-actions { display: flex; justify-content: flex-end; margin-top: 10px; }
+    .clear-review { min-height: 44px; padding: 8px 13px; border-color: var(--line); background: var(--surface); color: var(--muted); }
+    .clear-review[hidden] { display: none; }
     .note-wrap { margin-top: 12px; }
     .note-wrap[hidden] { display: none; }
     textarea { width: 100%; min-height: 96px; resize: vertical; padding: 11px 13px; }
@@ -294,7 +310,7 @@ export function renderReviewHtml(model) {
     }
   </style>
 </head>
-<body data-default-scope="difference">
+<body data-default-scope="all">
   <main class="page">
     <header class="hero">
       <div>
@@ -316,11 +332,11 @@ export function renderReviewHtml(model) {
           <select id="category"><option value="">모든 업무 분류</option></select>
         </label>
         <div class="scope" aria-label="시스템 판정 범위">
-          <button id="scope-difference" type="button" data-scope="difference" aria-pressed="true">검토 필요</button>
-          <button type="button" data-scope="pass" aria-pressed="false">일치</button>
-          <button type="button" data-scope="all" aria-pressed="false">전체</button>
+          <button type="button" data-scope="pass" aria-pressed="false">기대대로 동작</button>
+          <button id="scope-difference" type="button" data-scope="difference" aria-pressed="false">기대와 다르게 동작</button>
+          <button type="button" data-scope="all" aria-pressed="true">전체 항목</button>
         </div>
-        <label class="check"><input id="unreviewedOnly" type="checkbox" checked> 미검토만</label>
+        <label class="check"><input id="unreviewedOnly" type="checkbox"> 미검토만</label>
       </div>
       <div class="toolbar-actions">
         <button class="button primary" id="nextUnreviewed" type="button">다음 미검토</button>
@@ -330,7 +346,7 @@ export function renderReviewHtml(model) {
       </div>
       <div class="status-row">
         <span id="summary" aria-live="polite"></span>
-        <span class="status-message" id="statusMessage" aria-live="polite"></span>
+        <span class="status-message" id="statusMessage" aria-live="polite">아직 저장된 판정 없음</span>
       </div>
     </section>
 
@@ -342,9 +358,9 @@ export function renderReviewHtml(model) {
     "use strict";
     const MODEL = JSON.parse(document.getElementById("review-data").textContent);
     const VALID_IDS = MODEL.items.map(function (item) { return item.id; });
-    const STORAGE_KEY = "dexcowin-mes-pc-review-v2:" + MODEL.auditRunId;
+    const STORAGE_KEY = "dexcowin-mes-pc-review-v3:" + MODEL.auditRunId;
     const normalizeReviewExport = ${importValidator};
-    const state = { search: "", category: "", scope: "difference", unreviewedOnly: true };
+    const state = { search: "", category: "", scope: "all", unreviewedOnly: false };
     let reviews = {};
 
     const cards = document.getElementById("cards");
@@ -355,7 +371,7 @@ export function renderReviewHtml(model) {
     const statusMessage = document.getElementById("statusMessage");
 
     function reviewPayload() {
-      return { schemaVersion: 2, auditRunId: MODEL.auditRunId, exportedAt: new Date().toISOString(), reviews: reviews };
+      return { schemaVersion: 3, auditRunId: MODEL.auditRunId, exportedAt: new Date().toISOString(), reviews: reviews };
     }
 
     function setStatus(message, kind) {
@@ -365,18 +381,27 @@ export function renderReviewHtml(model) {
 
     function saveReviews() {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(reviewPayload()));
-        setStatus("자동 저장됨", "success");
+        const payload = reviewPayload();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        const savedCount = Object.keys(reviews).length;
+        const savedTime = new Date(payload.exportedAt).toLocaleTimeString("ko-KR", {
+          hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+        });
+        setStatus("이 브라우저에 자동 저장 · 판정 " + savedCount + "개 · 마지막 저장 " + savedTime, "success");
       } catch (error) {
         setStatus("자동 저장 실패: " + error.message, "error");
       }
     }
 
     function loadReviews() {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
       try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) {
+          setStatus("아직 저장된 판정 없음", "");
+          return;
+        }
         reviews = normalizeReviewExport(JSON.parse(raw), MODEL.auditRunId, VALID_IDS);
+        setStatus("저장된 판정 " + Object.keys(reviews).length + "개를 불러옴", "success");
       } catch (error) {
         reviews = {};
         setStatus("저장된 검토 결과를 읽지 못했습니다: " + error.message, "error");
@@ -409,9 +434,9 @@ export function renderReviewHtml(model) {
       return element;
     }
 
-    function updateSummary(visibleCount) {
+    function updateSummary() {
       const reviewedCount = MODEL.items.filter(function (item) { return isReviewed(item.id); }).length;
-      summary.textContent = "표시 " + visibleCount + "개 / 전체 " + MODEL.items.length + "개 · 검토 완료 " + reviewedCount + "개";
+      summary.textContent = "전체 " + MODEL.items.length + "개 · 검토 완료 " + reviewedCount + "개 · 미검토 " + (MODEL.items.length - reviewedCount) + "개";
     }
 
     function syncReviewUi(card, id) {
@@ -419,17 +444,28 @@ export function renderReviewHtml(model) {
       card.querySelectorAll("[data-verdict]").forEach(function (button) {
         button.dataset.selected = String(Boolean(review && review.verdict === button.dataset.verdict));
         button.setAttribute("aria-pressed", button.dataset.selected);
+        button.textContent = (button.dataset.selected === "true" ? "✓ " : "") + button.dataset.label;
       });
       const noteWrap = card.querySelector(".note-wrap");
       const textarea = card.querySelector("textarea");
+      textarea.value = review ? review.note : "";
       const showNote = Boolean(review && (review.verdict === "revision" || review.verdict === "hold"));
       noteWrap.hidden = !showNote;
       textarea.required = Boolean(review && review.verdict === "revision");
+      card.querySelector(".clear-review").hidden = !review;
       const help = card.querySelector(".note-help");
       help.textContent = textarea.required && textarea.value.trim() === ""
         ? "기대값 수정 내용을 입력해야 검토 완료로 집계됩니다."
         : "의견은 이 실행의 검토 결과에만 저장됩니다.";
       help.classList.toggle("error", textarea.required && textarea.value.trim() === "");
+    }
+
+    function systemVerdictLabel(verdict) {
+      return {
+        PASS: "실측 결과 · 기대대로 동작",
+        DIFFERENCE: "실측 결과 · 기대와 다르게 동작",
+        BLOCKED: "실측 결과 · 확인하지 못함",
+      }[verdict];
     }
 
     function buildCard(item) {
@@ -442,7 +478,7 @@ export function renderReviewHtml(model) {
       const identity = make("div", "identity");
       identity.append(make("span", "id", item.id), make("span", "category", item.category));
       titleBox.append(identity, make("h2", "action", item.action));
-      const systemVerdict = make("span", "system-verdict " + item.verdict.toLowerCase(), item.verdict);
+      const systemVerdict = make("span", "system-verdict " + item.verdict.toLowerCase(), systemVerdictLabel(item.verdict));
       head.append(titleBox, systemVerdict);
 
       const comparison = make("div", "comparison");
@@ -455,17 +491,18 @@ export function renderReviewHtml(model) {
       card.append(head, comparison);
       if (item.verdict === "DIFFERENCE" && item.note) {
         const differenceNote = make("p", "difference-note");
-        differenceNote.append(make("strong", "", "차이 요약"), document.createTextNode(item.note));
+        differenceNote.append(make("strong", "", "실측에서 확인된 차이"), document.createTextNode(item.note));
         card.append(differenceNote);
       }
 
       const reviewSection = make("section", "review");
-      reviewSection.append(make("p", "review-label", "내 검토 판정"));
+      reviewSection.append(make("p", "review-label", "기대 문구에 대한 내 판단"));
       const verdicts = make("div", "verdicts");
-      [["approved", "기대값 맞음"], ["revision", "기대값 수정"], ["hold", "보류"]].forEach(function (choice) {
+      [["approved", "이 기대 문구가 맞음"], ["revision", "기대 문구 수정 필요"], ["hold", "판단 보류"]].forEach(function (choice) {
         const button = make("button", "verdict-button", choice[1]);
         button.type = "button";
         button.dataset.verdict = choice[0];
+        button.dataset.label = choice[1];
         button.dataset.selected = "false";
         button.setAttribute("aria-pressed", "false");
         button.addEventListener("click", function () {
@@ -473,7 +510,7 @@ export function renderReviewHtml(model) {
           reviews[item.id] = { verdict: choice[0], note: previousNote, updatedAt: new Date().toISOString() };
           saveReviews();
           syncReviewUi(card, item.id);
-          updateSummary(filteredItems().length);
+          updateSummary();
           if (choice[0] === "revision" || choice[0] === "hold") textarea.focus();
         });
         verdicts.append(button);
@@ -493,10 +530,21 @@ export function renderReviewHtml(model) {
         reviews[item.id].updatedAt = new Date().toISOString();
         saveReviews();
         syncReviewUi(card, item.id);
-        updateSummary(filteredItems().length);
+        updateSummary();
       });
       noteWrap.append(noteLabel, textarea, make("p", "note-help", "의견은 이 실행의 검토 결과에만 저장됩니다."));
-      reviewSection.append(verdicts, noteWrap);
+      const reviewActions = make("div", "review-actions");
+      const clearReview = make("button", "clear-review", "판정 지우기");
+      clearReview.type = "button";
+      clearReview.hidden = true;
+      clearReview.addEventListener("click", function () {
+        delete reviews[item.id];
+        saveReviews();
+        syncReviewUi(card, item.id);
+        updateSummary();
+      });
+      reviewActions.append(clearReview);
+      reviewSection.append(verdicts, noteWrap, reviewActions);
       card.append(reviewSection);
       syncReviewUi(card, item.id);
       return card;
@@ -512,7 +560,7 @@ export function renderReviewHtml(model) {
         items.forEach(function (item) { fragment.append(buildCard(item)); });
         cards.append(fragment);
       }
-      updateSummary(items.length);
+      updateSummary();
     }
 
     function initializeCategories() {
