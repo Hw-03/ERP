@@ -374,7 +374,8 @@
   .weekly-production-empty span { color: var(--c-muted2); font-size: 12px; }
   .weekly-download { display: flex; align-items: center; margin-left: auto; }
   .weekly-download-error { margin: .5rem 0; color: var(--c-red); font-size: 12px; font-weight: 700; }
-  .weekly-production { padding: .75rem 1rem; }
+  .weekly-production { min-height: 356px; padding: .75rem 1rem; }
+  .weekly-production-placeholder { display: flex; flex-direction: column; }
   .weekly-production-head { margin-bottom: .5rem; flex-wrap: wrap; gap: .5rem; }
   .weekly-production-head h2,
   :is(.weekly-group-panel, .weekly-detail-panel) h2 { color: var(--c-text); font-size: 15px; font-weight: 900; }

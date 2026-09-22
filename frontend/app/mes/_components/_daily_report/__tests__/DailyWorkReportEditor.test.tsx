@@ -13,6 +13,18 @@ function deferred<T>() {
 }
 
 describe("DailyWorkReportEditor", () => {
+  it("빈 입력의 안내 이미지는 포커스와 내용에 따라 숨긴다", () => {
+    render(<DailyWorkReportEditor initialContent="" editable saving={false} saveError={null} onSave={vi.fn()} />);
+    const input = screen.getByLabelText("작업 내역");
+    expect(screen.getByTestId("daily-empty-mascot")).toBeInTheDocument();
+    fireEvent.focus(input);
+    expect(screen.queryByTestId("daily-empty-mascot")).not.toBeInTheDocument();
+    fireEvent.change(input, { target: { value: "기록" } });
+    fireEvent.blur(input);
+    expect(screen.queryByTestId("daily-empty-mascot")).not.toBeInTheDocument();
+    fireEvent.change(input, { target: { value: "" } });
+    expect(screen.getByTestId("daily-empty-mascot")).toBeInTheDocument();
+  });
   it("저장 실패 뒤에도 입력한 내용을 유지한다", async () => {
     const onSave = vi.fn().mockRejectedValueOnce(new Error("저장 실패")).mockResolvedValueOnce("2026-08-04T02:30:00Z");
     render(<DailyWorkReportEditor initialContent="기존 내용" editable saving={false} saveError={null} onSave={onSave} />);

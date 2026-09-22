@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { useDesktopTabHome } from "./DesktopTabHome";
 
 import { useEffect, useState } from "react";
@@ -49,6 +50,7 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
     !data || (data.report_status === "verified" && data.basis_version === 2) ? "normal" : "legacy";
 
   const matrixRows = data?.production_matrix ?? [];
+  const productionCardStyle = { minHeight: Math.max(356, 92 + matrixRows.length * 44) };
   const totalProduceQty = data?.summary?.total_produce_qty ?? 0;
   const hasOverallProduction = totalProduceQty > 0;
   const hasModelProduction = matrixRows.some((r) => r.total_qty > 0);
@@ -121,28 +123,29 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
         <div className="weekly-error">{error}</div>
       )}
 
-      {/* ── 행1: 생산 현황 (빈 상태는 얇은 노트로 축소) ── */}
+      {/* 빈 주차에도 생산 표와 같은 공간을 확보한다. */}
       {(() => {
         if (loading && !data) {
           return (
-            <div data-testid="weekly-production-card" aria-busy="true" aria-label="주간 생산 현황 불러오는 중" className="weekly-card weekly-production-empty">
-              <div>
-                <b>생산 현황</b>
-                <span><WeeklyLoadingValue loading width="32ch" /></span>
+            <div data-testid="weekly-production-card" aria-busy="true" aria-label="주간 생산 현황 불러오는 중" className="weekly-card weekly-production weekly-production-placeholder" style={productionCardStyle}>
+              <div className="weekly-production-head">
+                <h2>생산 현황</h2>
                 {f705DownloadButton}
               </div>
+              <div className="flex flex-1 items-center justify-center"><WeeklyLoadingValue loading width="32ch" /></div>
             </div>
           );
         }
         if (!hasOverallProduction) {
           return (
-            <div data-testid="weekly-production-card" className="weekly-card weekly-production-empty">
-              <div>
-                <b>생산 현황</b>
-                <span>
-                  이번 주 생산 실적 없음 · 모델별 공정 생산 기록이 없습니다.
-                </span>
+            <div data-testid="weekly-production-card" className="weekly-card weekly-production weekly-production-placeholder" style={productionCardStyle}>
+              <div className="weekly-production-head">
+                <h2>생산 현황</h2>
                 {f705DownloadButton}
+              </div>
+              <div className="flex flex-1 flex-col items-center justify-center gap-2 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+                {!error && <Image src="/images/dexray/weekly-empty.webp" alt="" width={300} height={200} className="h-40 w-auto object-contain" />}
+                <span>{error ?? "이번 주 생산 실적 없음 · 모델별 공정 생산 기록이 없습니다."}</span>
               </div>
               {f705DownloadError && <p role="alert" className="weekly-download-error">{f705DownloadError}</p>}
             </div>
@@ -150,20 +153,23 @@ export function DesktopWeeklyReportView({ weekMon }: Props) {
         }
         if (!hasModelProduction) {
           return (
-            <div data-testid="weekly-production-card" className="weekly-card weekly-production-empty">
-              <div>
-                <b>생산 현황</b>
+            <div data-testid="weekly-production-card" className="weekly-card weekly-production weekly-production-placeholder" style={productionCardStyle}>
+              <div className="weekly-production-head">
+                <h2>생산 현황</h2>
+                {f705DownloadButton}
+              </div>
+              <div className="flex flex-1 flex-col items-center justify-center gap-2 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+                <Image src="/images/dexray/weekly-empty.webp" alt="" width={300} height={200} className="h-36 w-auto object-contain" />
                 <span>전체 생산 {totalProduceQty.toLocaleString()}개</span>
                 <span>모델별 집계 0</span>
                 <span>모델 정보가 없거나 공용인 품목은 모델별 집계에서 제외됩니다.</span>
-                {f705DownloadButton}
               </div>
               {f705DownloadError && <p role="alert" className="weekly-download-error">{f705DownloadError}</p>}
             </div>
           );
         }
         return (
-          <div data-testid="weekly-production-card" className="weekly-card weekly-production">
+          <div data-testid="weekly-production-card" className="weekly-card weekly-production" style={productionCardStyle}>
             <div className="weekly-production-head">
               <h2>생산 현황</h2>
               {f705DownloadButton}

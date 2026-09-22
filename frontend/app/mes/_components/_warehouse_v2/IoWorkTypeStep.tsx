@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { ArrowDownToLine, ArrowUpFromLine, PackageCheck } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
@@ -174,7 +175,7 @@ export function IoSubTypeStep({
                 type="button"
                 onClick={() => onSubTypeChange(row.id)}
                 title={row.description}
-                className="standard-hover flex h-full min-h-[120px] items-center justify-center rounded-[20px] border px-6 py-6 text-center transition-all"
+                className="standard-hover flex h-full min-h-[120px] flex-col items-center justify-center gap-3 rounded-[20px] border px-6 py-6 text-center transition-all"
                 style={{
                   background: active ? tint(LEGACY_COLORS.blue, 14) : LEGACY_COLORS.s2,
                   borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
@@ -182,6 +183,9 @@ export function IoSubTypeStep({
                 }}
               >
                 <span className="text-3xl font-black leading-tight">{row.label}</span>
+                {workType === "warehouse_io" && (
+                  <Image src={`/images/warehouse/dexray-stock-${row.id === "warehouse_to_dept" ? "out" : "in"}.webp`} alt="" width={840} height={560} sizes="220px" className="pointer-events-none h-auto max-h-[40%] w-[min(220px,65%)] object-contain" draggable={false} />
+                )}
               </button>
             );
           })}
@@ -311,19 +315,31 @@ function DirectionCard({
     <button
       type="button"
       onClick={onClick}
-      className="standard-hover flex h-full min-h-[96px] items-center justify-center gap-5 rounded-[18px] border p-6 text-left transition-all"
+      className="standard-hover relative flex h-full min-h-[96px] items-center justify-center gap-3 rounded-[18px] border p-4 text-left transition-all sm:gap-5 sm:p-6"
       style={{
-        background: active ? tint(activeColor, 14) : LEGACY_COLORS.s2,
-        borderColor: active ? activeColor : LEGACY_COLORS.border,
+        background: variant === "process" ? tint(activeColor, active ? 16 : 7) : active ? tint(activeColor, 14) : LEGACY_COLORS.s2,
+        borderColor: active ? activeColor : variant === "process" ? tint(activeColor, 25) : LEGACY_COLORS.border,
         borderWidth: active ? 2 : 1,
         color: active ? activeColor : LEGACY_COLORS.text,
       }}
     >
-      <Icon className="h-16 w-16 shrink-0" />
+      {variant === "process" ? (
+        <Image
+          src={`/images/warehouse/dexray-stock-${dir}.webp`}
+          alt=""
+          width={840}
+          height={560}
+          sizes="(max-width: 767px) 28vw, 220px"
+          className="pointer-events-none absolute left-1/2 top-[calc(50%+20px)] h-auto max-h-[calc(50%-28px)] w-[min(220px,65%)] -translate-x-1/2 object-contain"
+          draggable={false}
+        />
+      ) : (
+        <Icon className="h-16 w-16 shrink-0" />
+      )}
       {variant === "warehouse_adjust" ? (
         <span className="text-4xl font-black">{dir === "in" ? "입고" : "출고"}</span>
       ) : dir === "in" ? (
-        <div className="flex flex-col items-center gap-2 leading-tight">
+        <div className="flex -translate-y-4 flex-col items-center gap-2 leading-tight">
           <span className="text-4xl font-black">생산</span>
           <span
             className="h-[4px] w-28 rounded-full"
@@ -332,7 +348,7 @@ function DirectionCard({
           <span className="text-4xl font-black">입고</span>
         </div>
       ) : (
-        <div className="flex flex-col items-center gap-2 leading-tight">
+        <div className="flex -translate-y-4 flex-col items-center gap-2 leading-tight">
           <span className="text-4xl font-black">분해</span>
           <span
             className="h-[4px] w-28 rounded-full"

@@ -79,10 +79,10 @@ describe("DesktopWeeklyReportView F705-02 다운로드", () => {
     expect(screen.getByTestId("weekly-detail-table")).toHaveAttribute("data-loading", "false");
     expect(screen.getByTestId("weekly-production-card")).not.toHaveAttribute("aria-busy");
   });
-  it("keeps the compact production header and download control while loading", () => {
+  it("keeps the full production card and download control while loading", () => {
     state.useWeeklyReportQuery.mockReturnValue({ data: undefined, isLoading: true, error: null });
     renderWeekly();
-    expect(screen.getByTestId("weekly-production-card")).toHaveClass("weekly-production-empty");
+    expect(screen.getByTestId("weekly-production-card")).toHaveClass("weekly-production", "weekly-production-placeholder");
     expect(screen.getByText("생산 현황")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "F705-02 생산일지 다운로드" })).toBeInTheDocument();
     expect(screen.queryByText(/생산 실적 없음/)).not.toBeInTheDocument();
@@ -178,9 +178,10 @@ describe("DesktopWeeklyReportView F705-02 다운로드", () => {
     expect(screen.getAllByRole("button", { name: "F705-02 생산일지 다운로드" })).toHaveLength(1);
   });
 
-  it("생산 기록이 있는 카드만 F705-02 버튼을 데스크톱 우상단에 절대 배치한다", () => {
+  it("생산 기록 유무와 관계없이 같은 카드 높이와 다운로드 위치를 유지한다", () => {
     const { rerender } = renderWeekly();
     const populatedCard = screen.getByTestId("weekly-production-card");
+    const populatedHeight = populatedCard.style.minHeight;
     const populatedAnchor = screen.getByTestId("weekly-f705-download-anchor");
 
     expect(populatedCard).toHaveClass("weekly-card", "weekly-production");
@@ -195,8 +196,9 @@ describe("DesktopWeeklyReportView F705-02 다운로드", () => {
 
     const emptyCard = screen.getByTestId("weekly-production-card");
     const emptyAnchor = screen.getByTestId("weekly-f705-download-anchor");
-    expect(emptyCard).toHaveClass("weekly-card", "weekly-production-empty");
+    expect(emptyCard).toHaveClass("weekly-card", "weekly-production", "weekly-production-placeholder");
     expect(emptyAnchor).toHaveClass("weekly-download");
+    expect(emptyCard.style.minHeight).toBe(populatedHeight);
 
     const css = readFileSync(resolve(process.cwd(), "app", "globals.css"), "utf8");
     const desktopRules = css.match(/@media \(min-width: 1024px\) \{([\s\S]*?)\n  \}/)?.[1] ?? "";
