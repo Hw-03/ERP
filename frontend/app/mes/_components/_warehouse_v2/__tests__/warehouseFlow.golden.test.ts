@@ -843,6 +843,13 @@ describe("IO_STEP_LABELS", () => {
 // useIoWorkState — 초기 상태
 // ──────────────────────────────────────────────────────────────────
 describe("useIoWorkState 초기 상태", () => {
+  it("원자재 입고는 공급업체 선택 전 2단계를 진행할 수 없다", () => {
+    const { result } = renderHook(() => useIoWorkState());
+
+    expect(result.current.selectedSupplierId).toBeNull();
+    expect(result.current.canAdvance[2]).toBe(false);
+  });
+
   it("initialDepartment 없음 → 조립 기본", () => {
     const { result } = renderHook(() => useIoWorkState());
     expect(result.current.workType).toBe("receive");
@@ -865,7 +872,7 @@ describe("useIoWorkState 초기 상태", () => {
   it("작업 유형을 실제 선택하기 전에는 첫 단계를 진행할 수 없다", () => {
     const { result } = renderHook(() => useIoWorkState());
     expect(result.current.hasSelectedWorkType).toBe(false);
-    expect(result.current.canAdvance).toEqual({ 1: false, 2: true, 3: false, 4: false, 5: true });
+    expect(result.current.canAdvance).toEqual({ 1: false, 2: false, 3: false, 4: false, 5: true });
   });
 });
 
@@ -986,12 +993,22 @@ describe("useIoWorkState canAdvance[2] process 게이트", () => {
     expect(result.current.subType).toBe("disassemble");
   });
 
-  it("비 process workType → 방향 무관 canAdvance[2]=true", () => {
+  it("원자재 입고 외 비 process workType은 방향 무관 2단계를 진행한다", () => {
     const { result } = renderHook(() => useIoWorkState());
-    for (const wt of ["receive", "warehouse_io", "defect"] as IoWorkType[]) {
+    for (const wt of ["warehouse_io", "defect"] as IoWorkType[]) {
       act(() => result.current.setWorkType(wt));
       expect(result.current.canAdvance[2]).toBe(true);
     }
+  });
+
+  it("원자재 입고는 활성 공급업체 선택 후에만 2단계를 진행한다", () => {
+    const { result } = renderHook(() => useIoWorkState());
+    act(() => result.current.setWorkType("receive"));
+    expect(result.current.canAdvance[2]).toBe(false);
+
+    act(() => result.current.setSupplier({ supplier_id: "supplier-1", name: "덕스윈" }));
+    act(() => result.current.setSupplierSelectionReady(true));
+    expect(result.current.canAdvance[2]).toBe(true);
   });
 
   it("setDeptIoDirectionRaw → bundle 보존 + subType 변경 없음", () => {

@@ -21,7 +21,10 @@ test.describe("입출고 V2 — 원자재 입고", () => {
     // 1. 작업 유형: 원자재 입고
     await pickWorkType(page, /원자재 입고/);
 
-    // 2. 세부 작업(원자재 입고 단일) → 다음 단계로
+    // 2. 공급업체 추가·선택 → 다음 단계로
+    await page.getByPlaceholder("새 공급업체 이름").fill("E2E 공급업체");
+    await page.getByRole("button", { name: "추가하고 선택" }).click();
+    await expect(page.getByRole("button", { name: "E2E 공급업체 선택됨" })).toBeVisible();
     await clickNextStep(page);
 
     // 3. 입고 품목 선택 — 시드 원자재 행의 "선택"

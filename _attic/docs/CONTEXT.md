@@ -54,7 +54,7 @@ DEXCOWIN — 정밀 X-Ray 장비 제조사. 제조 흐름은 부서 계열과 R/
 현재 활성 입력 UI: `frontend/app/mes/_components/_warehouse_v2/IoComposeView.tsx`.
 
 작업 분기는 다음 work type으로 구성된다:
-- **`receive`** — 원자재 입고 (창고 정/부만 가능)
+- **`receive`** — 원자재 입고 (창고 정/부만 가능, 활성 공급업체 선택 필수)
 - **`warehouse_io`** — 창고 ↔ 부서 (결재 필요한 흐름)
 - **`warehouse_adjust`** — 창고 수량 보정 입출고
 - **`process`** — 부서 내 작업 (생산/분해/수량보정)
@@ -94,7 +94,9 @@ work type으로 취급하지 않는다.
 
 `_warehouse_v2/useIoWorkState.ts`가 현재 wizard의 상태 정본이다. 단계는 `작업 유형` → `세부 작업`
 → `대상 선택` → `실제 반영` → `제출 확인`이며, 상태 묶음은 `workType`·`subType`·출발/도착 부서·
-`deptIoDirection`·`bundles`·메모·참조번호·현재 단계로 구성된다. `bundles`의 포함/제외 line, 부족 수량,
+`deptIoDirection`·원자재 입고 공급업체·`bundles`·메모·참조번호·현재 단계로 구성된다. 원자재 입고의
+2단계는 세부 작업을 다시 고르는 대신 활성 공급업체를 선택·관리하며, 제출 배치에는 업체 ID와 당시
+이름 스냅샷을 보존한다. `bundles`의 포함/제외 line, 부족 수량,
 유효 수량이 다음 단계 진행을 결정한다. `process`와 `warehouse_adjust`는 세부 작업에서 입고/출고 방향을
 선택해야 한다. `process`의 생산·분해·수량보정은 품목 선택 뒤 품목코드로 부서가 자동 결정되며,
 `internal_use`만 도착 부서를 AS 또는 연구로 선택해야 한다.

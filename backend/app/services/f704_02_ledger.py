@@ -187,6 +187,14 @@ def _counterpart(
     delta: int,
 ) -> str:
     """실제 라인을 우선해 입/출고처를 정하고, 구형 로그는 보수적으로 표기한다."""
+    supplier_name = getattr(batch, "supplier_name_snapshot", None) if batch is not None else None
+    if (
+        batch is not None
+        and batch.sub_type == "receive_supplier"
+        and supplier_name
+        and supplier_name.strip()
+    ):
+        return supplier_name.strip()
     if line is not None:
         return _counterpart_from_line(line, delta)
     if batch is not None:

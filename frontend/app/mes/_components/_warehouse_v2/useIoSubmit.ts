@@ -28,6 +28,7 @@ export function useIoSubmit() {
     toDepartment?: string | null;
     referenceNo?: string | null;
     notes?: string | null;
+    supplierId?: string | null;
     bundles: IoBundle[];
   }) {
     // 폼 세션 멱등 키: 동일 시도 재전송 시 서버가 기존 batch 멱등 반환 → 재고 이중 차감 방지
@@ -43,6 +44,7 @@ export function useIoSubmit() {
         to_department: payload.toDepartment || null,
         reference_no: payload.referenceNo || null,
         notes: payload.notes || null,
+        supplier_id: payload.supplierId ?? null,
         client_request_id: clientRequestIdRef.current,
         bundles: payload.bundles,
       });

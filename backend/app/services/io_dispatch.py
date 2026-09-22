@@ -68,6 +68,7 @@ from app.services.io_persist import (
     normalize_batch_bom_stock_exempt,
     normalize_automatic_routes_with_bom_token_refresh,
 )
+from app.services.supplier import validate_supplier_for_operation
 
 
 CUSTOM_BOM_REFERENCE_EXCLUSION_NOTE = "커스텀 BOM 상위 미반영"
@@ -1424,6 +1425,14 @@ def submit_existing_draft(
         work_type=batch.work_type,
         sub_type=batch.sub_type,
     )
+    supplier = validate_supplier_for_operation(
+        db,
+        work_type=batch.work_type,
+        sub_type=batch.sub_type,
+        supplier_id=batch.supplier_id,
+    )
+    if supplier is not None:
+        batch.supplier_name_snapshot = supplier.name
     submitted_at = datetime.utcnow()
     transition = db.execute(
         update(IoBatch)

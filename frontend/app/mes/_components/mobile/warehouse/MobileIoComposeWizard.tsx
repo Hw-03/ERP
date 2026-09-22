@@ -18,6 +18,7 @@ import {
 import { IconButton, PrimaryActionButton, StickyFooter, WizardProgress } from "../primitives";
 import { BarcodeScannerModal } from "../../BarcodeScannerModal";
 import { MobileWorkTypeStep, MobileSubTypeStep } from "./MobileWorkTypeStep";
+import { SupplierPickerStep } from "../../_warehouse_v2/SupplierPickerStep";
 import { MobileSingleAdjustForm } from "./MobileSingleAdjustForm";
 import { IoTargetPicker } from "../../_warehouse_v2/IoTargetPicker";
 import { IoBundleCart } from "../../_warehouse_v2/IoBundleCart";
@@ -174,6 +175,7 @@ export function MobileIoComposeWizard({
     state.subType,
     state.toDepartment,
     state.workType,
+    state.selectedSupplierId,
   ], draftToRestore?.batch_id, restoreNonce);
   // BOM 부모 품목으로 진입한 경우 자동 추가하지 않고 picker 에서 row 만 강조.
   const [highlightItemId, setHighlightItemId] = useState<string | null>(null);
@@ -195,6 +197,7 @@ export function MobileIoComposeWizard({
     toDepartment: state.toDepartment,
     referenceNo: state.referenceNo,
     notes: state.notes,
+    supplierId: state.selectedSupplierId,
   });
   latestDraftFieldsRef.current = {
     employeeId,
@@ -204,6 +207,7 @@ export function MobileIoComposeWizard({
     toDepartment: state.toDepartment,
     referenceNo: state.referenceNo,
     notes: state.notes,
+    supplierId: state.selectedSupplierId,
   };
   const internalUsePreviewLock = useInternalUseBomPreviewLock();
   const intentAppliedRef = useRef(false);
@@ -221,7 +225,7 @@ export function MobileIoComposeWizard({
     } else if (authorizedEntryIntent.subType) {
       state.setSubType(authorizedEntryIntent.subType);
     }
-    state.goTo(3);
+    state.goTo(authorizedEntryIntent.workType === "receive" ? 2 : 3);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entryIntent]);
 
@@ -361,7 +365,7 @@ export function MobileIoComposeWizard({
   }
 
   useIoPreselect({
-    preselectedItem: entryIntent && !authorizedEntryIntent ? null : preselectedItem,
+    preselectedItem: entryIntent && !authorizedEntryIntent || state.workType === "receive" && !state.selectedSupplierId ? null : preselectedItem,
     bomParents,
     bomParentsLoaded,
     workType: state.workType,
@@ -467,6 +471,7 @@ export function MobileIoComposeWizard({
         ...ioDepartmentPayload(state.subType, state.fromDepartment, state.toDepartment),
         referenceNo: state.referenceNo,
         notes: state.notes,
+        supplierId: state.selectedSupplierId,
         batchId: autosaveBatchIdRef.current,
         bundles,
       }),
@@ -545,6 +550,7 @@ export function MobileIoComposeWizard({
         ...ioDepartmentPayload(state.subType, state.fromDepartment, state.toDepartment),
         referenceNo: state.referenceNo,
         notes: state.notes,
+        supplierId: state.selectedSupplierId,
         bundles,
       }),
       setError,
@@ -572,6 +578,7 @@ export function MobileIoComposeWizard({
           ...ioDepartmentPayload(fields.subType, fields.fromDepartment, fields.toDepartment),
           referenceNo: fields.referenceNo,
           notes: fields.notes,
+          supplierId: fields.supplierId,
           batchId: autosaveBatchIdRef.current,
           bundles,
         });
@@ -616,7 +623,9 @@ export function MobileIoComposeWizard({
     step === 1
       ? "작업 유형 선택"
       : step === 2
-      ? state.workType === "warehouse_adjust"
+      ? state.workType === "receive"
+        ? "공급업체 선택"
+        : state.workType === "warehouse_adjust"
         ? "입고·출고 방향 선택"
         : state.workType === "process" || state.workType === "warehouse_io"
           ? "세부 작업 선택"
@@ -649,8 +658,9 @@ export function MobileIoComposeWizard({
             {stepTitle}
           </h2>
           <WizardProgress
-            steps={STEP_META}
+            steps={state.workType === "receive" ? [{ key: "1", label: "작업 유형" }, { key: "2", label: "공급업체" }, ...STEP_META.slice(2)] : STEP_META}
             current={step - 1}
+            currentLabel={state.workType === "receive" && step === 2 ? "공급업체" : undefined}
             variant="inline"
             className="flex-1"
           />
@@ -681,22 +691,33 @@ export function MobileIoComposeWizard({
         )}
 
         {step === 2 && (
-          <MobileSubTypeStep
-            workType={state.workType}
-            subType={state.subType}
-            fromDepartment={state.fromDepartment}
-            toDepartment={state.toDepartment}
-            deptIoDirection={state.deptIoDirection}
-            onSubTypeChange={handleSubTypeChange}
-            onFromDepartmentChange={changeFromDepartment}
-            onToDepartmentChange={changeToDepartment}
-            onDeptIoDirectionChange={(dir) => {
-              const had = state.bundles.length > 0;
-              state.setDeptIoDirection(dir);
-              beginNewCompositionSlot();
-              if (had) onStatusChange("방향 변경으로 작업 묶음을 초기화했습니다.");
-            }}
-          />
+          state.workType === "receive" ? (
+            <SupplierPickerStep
+              employeeId={employeeId}
+              selectedSupplierId={state.selectedSupplierId}
+              selectedSupplierName={state.selectedSupplierName}
+              onSelect={state.setSupplier}
+              onLoadStateChange={state.setSupplierSelectionReady}
+              variant="mobile"
+            />
+          ) : (
+            <MobileSubTypeStep
+              workType={state.workType}
+              subType={state.subType}
+              fromDepartment={state.fromDepartment}
+              toDepartment={state.toDepartment}
+              deptIoDirection={state.deptIoDirection}
+              onSubTypeChange={handleSubTypeChange}
+              onFromDepartmentChange={changeFromDepartment}
+              onToDepartmentChange={changeToDepartment}
+              onDeptIoDirectionChange={(dir) => {
+                const had = state.bundles.length > 0;
+                state.setDeptIoDirection(dir);
+                beginNewCompositionSlot();
+                if (had) onStatusChange("방향 변경으로 작업 묶음을 초기화했습니다.");
+              }}
+            />
+          )
         )}
 
         {step === 3 &&
@@ -914,7 +935,9 @@ export function MobileIoComposeWizard({
           <PrimaryActionButton
             label={state.canAdvance[2]
               ? "다음 단계로 →"
-              : state.workType === "warehouse_adjust"
+                : state.workType === "receive"
+                  ? "공급업체를 선택하세요"
+                  : state.workType === "warehouse_adjust"
                 ? "입고 또는 출고를 선택하세요"
                 : "세부 작업을 선택하세요"}
             intent={isExitWorkType(state.workType) ? "danger" : "primary"}

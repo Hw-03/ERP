@@ -13,7 +13,16 @@ from types import SimpleNamespace
 from openpyxl import load_workbook
 import pytest
 
-from app.services.f704_02_ledger import F704LedgerEntry, TEMPLATE_PATH, _remark, _requester, render_workbook
+from app.models import Employee, IoBatch, TransactionLog, TransactionTypeEnum
+from app.services.f704_02_ledger import (
+    F704LedgerEntry,
+    TEMPLATE_PATH,
+    _counterpart,
+    _remark,
+    _requester,
+    collect_entries,
+    render_workbook,
+)
 
 
 _IGNORABLE_ATTRIBUTE_RE = re.compile(rb"(?:[A-Za-z_][\w.-]*:)?Ignorable=[\"']([^\"']+)[\"']")
@@ -106,6 +115,96 @@ def test_remark_hides_daily_development_notes():
 
     for note in hidden_notes:
         assert _remark(SimpleNamespace(notes=note), None, None) == ""
+
+
+@pytest.mark.parametrize("delta", [1, -1])
+def test_supplier_receipt_snapshot_is_counterpart_for_receipt_and_reversal(delta: int):
+    """공급처 입고 배치의 정방향·취소 역방향 모두 저장된 업체명을 쓴다."""
+    batch = SimpleNamespace(sub_type="receive_supplier", supplier_name_snapshot="대성자재")
+    line = SimpleNamespace(
+        from_bucket="none",
+        from_department=None,
+        to_bucket="warehouse",
+        to_department=None,
+    )
+
+    assert _counterpart(SimpleNamespace(), batch, line, delta) == "대성자재"
+
+
+def test_legacy_receive_without_supplier_snapshot_keeps_external_receipt_fallback():
+    """스냅샷이 없는 과거 RECEIVE 로그는 기존 외부입고 표기를 유지한다."""
+    batch = SimpleNamespace(sub_type="receive_supplier", supplier_name_snapshot=None)
+    line = SimpleNamespace(
+        from_bucket="none",
+        from_department=None,
+        to_bucket="warehouse",
+        to_department=None,
+    )
+
+    assert _counterpart(SimpleNamespace(), batch, line, 1) == "외부입고"
+
+
+def test_collect_and_render_supplier_receipt_reversal_uses_snapshot_counterpart(
+    db_session, make_item
+):
+    """취소 역거래도 실제 collect·render 경로에서 H열 업체명 스냅샷을 유지한다."""
+    requester = Employee(
+        employee_code="F704-SUPPLIER",
+        name="F704 담당자",
+        role="창고 담당",
+        department="창고",
+        warehouse_role="primary",
+        is_active=True,
+    )
+    item = make_item(name="F704 취소 원자재")
+    db_session.add(requester)
+    db_session.flush()
+    batch = IoBatch(
+        work_type="receive",
+        sub_type="receive_supplier",
+        status="cancelled",
+        requester_employee_id=requester.employee_id,
+        requester_name=requester.name,
+        requester_department="창고",
+        supplier_name_snapshot="취소 공급업체",
+        requires_approval=False,
+    )
+    db_session.add(batch)
+    db_session.flush()
+    original = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.RECEIVE,
+        quantity_change=4,
+        warehouse_qty_before=0,
+        warehouse_qty_after=4,
+        operation_batch_id=batch.batch_id,
+        cancelled=True,
+        created_at=datetime(2026, 1, 2, 0, 0),
+    )
+    reversal = TransactionLog(
+        item_id=item.item_id,
+        transaction_type=TransactionTypeEnum.RECEIVE,
+        quantity_change=-4,
+        warehouse_qty_before=4,
+        warehouse_qty_after=0,
+        operation_batch_id=batch.batch_id,
+        reverses_log_id=original.log_id,
+        cancelled=False,
+        created_at=datetime(2026, 1, 3, 0, 0),
+    )
+    db_session.add(original)
+    db_session.flush()
+    reversal.reverses_log_id = original.log_id
+    db_session.add(reversal)
+    db_session.flush()
+
+    entries = collect_entries(db_session, 2026)
+    worksheet = load_workbook(BytesIO(render_workbook(entries)), data_only=False)["양식"]
+
+    assert len(entries) == 1
+    assert entries[0].direction == "출고"
+    assert entries[0].counterpart == "취소 공급업체"
+    assert worksheet["H4"].value == "취소 공급업체"
 
 
 def test_template_keeps_both_forms_but_has_no_ledger_values():

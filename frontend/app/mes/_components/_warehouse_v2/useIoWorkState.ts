@@ -39,6 +39,9 @@ export function useIoWorkState(
   const [bundles, setBundlesBase] = useState<IoBundle[]>([]);
   const [notes, setNotes] = useState("");
   const [referenceNo, setReferenceNo] = useState("");
+  const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
+  const [selectedSupplierName, setSelectedSupplierName] = useState<string | null>(null);
+  const [supplierSelectionReady, setSupplierSelectionReady] = useState(false);
   const [step, setStep] = useState<IoStep>(1);
   // process/warehouse_adjust 방향(입고/출고) 선택. null = 미선택 → Step 2 advance 차단.
   const [deptIoDirection, setDeptIoDirectionBase] = useState<DeptIoDirection | null>(null);
@@ -61,6 +64,9 @@ export function useIoWorkState(
     setToDepartment(next === "internal_use" ? "" : defaultDepartment);
     setDeptIoDirectionBase(null);
     setBundles([]);
+    setSelectedSupplierId(null);
+    setSelectedSupplierName(null);
+    setSupplierSelectionReady(false);
     setStep(1);
   }
 
@@ -122,7 +128,9 @@ export function useIoWorkState(
         ? deptIoDirection != null
         : workType === "internal_use"
           ? toDepartment === "AS" || toDepartment === "연구"
-          : true,
+          : workType === "receive"
+            ? selectedSupplierId != null && supplierSelectionReady
+            : true,
       3: bundles.length > 0,
       4:
         effectIncludedLines.length > 0 &&
@@ -131,7 +139,12 @@ export function useIoWorkState(
         !hasMissingInternalUseBomMode,
       5: true,
     };
-  }, [hasSelectedWorkType, workType, deptIoDirection, toDepartment, bundles.length, effectIncludedLines.length, hasShortage, hasInvalidQuantity, hasMissingInternalUseBomMode]);
+  }, [hasSelectedWorkType, workType, deptIoDirection, toDepartment, selectedSupplierId, supplierSelectionReady, bundles.length, effectIncludedLines.length, hasShortage, hasInvalidQuantity, hasMissingInternalUseBomMode]);
+
+  function setSupplier(supplier: { supplier_id: string; name: string } | null) {
+    setSelectedSupplierId(supplier?.supplier_id ?? null);
+    setSelectedSupplierName(supplier?.name ?? null);
+  }
 
   function goNext() {
     setStep((s) => (s < 5 ? ((s + 1) as IoStep) : s));
@@ -169,6 +182,7 @@ export function useIoWorkState(
     setBundles([]);
     setNotes("");
     setReferenceNo("");
+    setSupplier(null);
     setStep(1);
     setHasSelectedWorkType(false);
   }
@@ -182,6 +196,9 @@ export function useIoWorkState(
     bundles,
     notes,
     referenceNo,
+    selectedSupplierId,
+    selectedSupplierName,
+    supplierSelectionReady,
     step,
     deptIoDirection,
     includedLines,
@@ -197,6 +214,8 @@ export function useIoWorkState(
     setBundles,
     setNotes,
     setReferenceNo,
+    setSupplier,
+    setSupplierSelectionReady,
     setDeptIoDirection,
     setDeptIoDirectionRaw,
     updateLine,

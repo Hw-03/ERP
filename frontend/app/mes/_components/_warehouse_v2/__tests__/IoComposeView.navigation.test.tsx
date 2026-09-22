@@ -8,9 +8,11 @@ import { IoComposeView } from "../IoComposeView";
 const routerPush = vi.fn();
 const setAuditScreen = vi.hoisted(() => vi.fn());
 const sendClientEvent = vi.hoisted(() => vi.fn());
+const registerDirty = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/activity-audit-context", () => ({ setAuditScreen }));
 vi.mock("@/lib/client-events", () => ({ sendClientEvent }));
+vi.mock("@/lib/ui/dirty-guard", () => ({ useRegisterDirty: registerDirty }));
 vi.mock("@/lib/queries/useBomQuery", () => ({
   useBomListQuery: () => ({ data: [], isSuccess: true, isPending: false, isError: false, refetch: vi.fn() }),
 }));
@@ -33,6 +35,9 @@ vi.mock("@/lib/api", () => ({
     submitDraft: vi.fn(),
     getItemConversionPreview: vi.fn(),
     executeItemConversion: vi.fn(),
+    listSuppliers: vi.fn(),
+    createSupplier: vi.fn(),
+    updateSupplier: vi.fn(),
   },
 }));
 
@@ -227,12 +232,65 @@ beforeEach(() => {
   } as never));
   vi.mocked(api.getItemConversionPreview).mockResolvedValue(conversionResult);
   vi.mocked(api.executeItemConversion).mockResolvedValue(conversionResult);
+  vi.mocked(api.listSuppliers).mockResolvedValue([
+    {
+      supplier_id: "supplier-1",
+      name: "기존 공급업체",
+      is_active: true,
+      created_at: "2026-09-21T00:00:00Z",
+      updated_at: "2026-09-21T00:00:00Z",
+    },
+    {
+      supplier_id: "supplier-2",
+      name: "변경 공급업체",
+      is_active: true,
+      created_at: "2026-09-21T00:00:00Z",
+      updated_at: "2026-09-21T00:00:00Z",
+    },
+  ]);
   routerPush.mockClear();
   setAuditScreen.mockClear();
   sendClientEvent.mockClear();
+  registerDirty.mockClear();
 });
 
 describe("IoComposeView navigation chrome", () => {
+  it("복원한 원자재 입고에서 공급업체만 바꾸면 이탈 경고용 dirty 상태가 된다", async () => {
+    render(
+      <IoComposeView
+        globalSearch=""
+        operator={{ ...operator, warehouse_role: "primary" }}
+        employees={[]}
+        items={[]}
+        productModels={[]}
+        setItems={() => {}}
+        onStatusChange={() => {}}
+        restoreStep={2}
+        restoreDraft={{
+          batch_id: "receive-draft-1",
+          work_type: "receive",
+          sub_type: "receive_supplier",
+          supplier_id: "supplier-1",
+          supplier_name_snapshot: "기존 공급업체",
+          from_department: null,
+          to_department: null,
+          notes: "",
+          reference_no: null,
+          bundles: [],
+        } as never}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "변경 공급업체" }));
+
+    await waitFor(() => expect(registerDirty).toHaveBeenLastCalledWith(
+      "warehouse-io",
+      true,
+      expect.any(Function),
+      expect.any(Function),
+    ));
+  });
+
   it("새 작업 화면에서는 사용자가 고르기 전 어떤 작업 유형도 선택 표시하지 않는다", () => {
     renderCompose();
 
@@ -759,6 +817,7 @@ describe("IoComposeView navigation chrome", () => {
       reference_no: "EDIT-REF-7",
       notes: "최종 메모",
       batch_id: "edited-desktop-draft",
+      supplier_id: null,
       bundles: finalBundles,
     });
     expect(vi.mocked(api.saveDraft).mock.calls[0]?.[0]?.bundles[0]?.lines).not.toEqual(expect.arrayContaining([
@@ -783,6 +842,47 @@ describe("IoComposeView navigation chrome", () => {
       expect(screen.getByRole("button", { name: /AS·연구 사용출고/ })).toBeInTheDocument();
       expect(screen.queryByTestId("warehouse-item-conversion-card")).not.toBeInTheDocument();
     });
+  });
+
+  it("빠른 원자재 입고는 공급업체를 선택할 때까지 품목 미리보기를 보류한 뒤 재개한다", async () => {
+    const item = conversionItem("receive-item", "빠른 입고 품목", 0);
+    vi.mocked(api.preview).mockResolvedValue({
+      bundles: [{
+        bundle_id: "receive-bundle",
+        source_kind: "direct_item",
+        title: "빠른 입고 품목",
+        source_item_id: item.item_id,
+        source_mes_code: item.mes_code,
+        quantity: 1,
+        expanded_level: 0,
+        lines: [],
+      }],
+    } as never);
+
+    render(
+      <IoComposeView
+        globalSearch=""
+        operator={{ ...operator, warehouse_role: "primary" }}
+        employees={[]}
+        items={[item]}
+        productModels={[]}
+        setItems={() => {}}
+        onStatusChange={() => {}}
+        entryIntent={{ workType: "receive", subType: "receive_supplier" }}
+        preselectedItem={item}
+      />,
+    );
+
+    expect(await screen.findByText("공급업체 선택")).toBeInTheDocument();
+    expect(api.preview).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "기존 공급업체" }));
+
+    await waitFor(() => expect(api.preview).toHaveBeenCalledWith(expect.objectContaining({
+      work_type: "receive",
+      sub_type: "receive_supplier",
+      targets: [expect.objectContaining({ item_id: "receive-item" })],
+    })));
   });
 
   it("AS·연구 사용출고의 부서 원본 선택을 미리보기 요청에 전달한다", async () => {

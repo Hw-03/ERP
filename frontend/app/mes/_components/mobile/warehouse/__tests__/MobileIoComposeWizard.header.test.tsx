@@ -117,9 +117,10 @@ describe("MobileIoComposeWizard Step 5 헤더", () => {
   });
 
   it.each([
+    ["원자재 입고", "receive", "receive_supplier", "공급업체 선택"],
     ["창고 입출고", "warehouse_io", "warehouse_to_dept"],
     ["부서 입출고", "process", "produce"],
-  ])("%s는 부서 선택기 없는 2단계 헤더를 세부 작업 선택으로 표시한다", (_label, workType, subType) => {
+  ])("%s의 2단계 헤더를 올바르게 표시한다", (_label, workType, subType, expectedTitle = "세부 작업 선택") => {
     const originalStep = wizardState.step;
     const originalWorkType = wizardState.workType;
     const originalSubType = wizardState.subType;
@@ -137,7 +138,8 @@ describe("MobileIoComposeWizard Step 5 헤더", () => {
         />,
       );
 
-      expect(screen.getByText("세부 작업 선택")).toBeInTheDocument();
+      expect(screen.getByText(expectedTitle)).toBeInTheDocument();
+      if (workType === "receive") expect(screen.getByText("공급업체")).toBeInTheDocument();
     } finally {
       wizardState.step = originalStep;
       wizardState.workType = originalWorkType;

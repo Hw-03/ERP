@@ -6,16 +6,14 @@ import asyncio
 import hashlib
 import json
 import os
-import shutil
 import sqlite3
 import subprocess
 import sys
-import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
-from uuid import uuid4
 
 import pytest
 import sqlalchemy as sa
@@ -81,11 +79,9 @@ POSTGRES_TEST_NEXT_CANDIDATE = "ic18_restore_candidate_222222222222"
 
 @pytest.fixture
 def runtime_dir() -> Iterator[Path]:
-    root = Path(tempfile.mkdtemp(prefix="dexcowin-ic18-"))
-    try:
-        yield root
-    finally:
-        shutil.rmtree(root, ignore_errors=True)
+    """긴 worktree에서도 Windows MAX_PATH를 넘지 않는 격리 런타임을 제공한다."""
+    with TemporaryDirectory(prefix="ic18-", ignore_cleanup_errors=True) as root:
+        yield Path(root)
 
 
 def _create_head_db(path: Path) -> None:
@@ -293,7 +289,7 @@ def test_sqlite_backup_publishes_manifest_last_with_exact_evidence(
     }
     database = manifest["database"]
     assert database["engine"] == "sqlite"
-    assert database["alembic_revision"] == "20260917_0035"
+    assert database["alembic_revision"] == "20260921_0036"
     assert len(database["schema_fingerprint"]) == 64
     assert database["data_revision"]["revision"] >= 0
     assert len(database["snapshot_hash"]) == 64

@@ -21,7 +21,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
 PREVIOUS_REVISION = "20260910_0033"
 MIGRATION_REVISION = "20260915_0034"
-HEAD_REVISION = "20260917_0035"
+HEAD_REVISION = "20260921_0036"
 
 
 def _config(path: Path) -> Config:

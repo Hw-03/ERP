@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
-MIGRATION_REVISION = "20260917_0035"
+HEAD_REVISION = "20260921_0036"
 
 
 def _config(database_path: Path) -> Config:
@@ -59,7 +59,7 @@ def test_inventory_operation_migration_adds_append_only_ledger_contract(tmp_path
 
     with engine.connect() as connection:
         revision = connection.execute(sa.text("SELECT version_num FROM alembic_version")).scalar_one()
-    assert revision == MIGRATION_REVISION
+    assert revision == HEAD_REVISION
 
 
 def test_inventory_operation_migration_preserves_0028_defect_dependents(
@@ -137,7 +137,7 @@ def test_inventory_operation_migration_preserves_0028_defect_dependents(
 
     assert tuple(allocation) == (log_id, record_id, 1)
     assert violations == []
-    assert revision == MIGRATION_REVISION
+    assert revision == HEAD_REVISION
 
 
 def test_inventory_operation_migration_preserves_handover_lines(

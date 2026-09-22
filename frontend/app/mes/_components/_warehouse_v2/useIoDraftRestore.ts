@@ -199,13 +199,20 @@ export function useIoDraftRestore(params: {
     state.setToDepartment(draftToRestore.to_department || state.toDepartment);
     state.setReferenceNo(draftToRestore.reference_no || "");
     state.setNotes(draftToRestore.notes || "");
+    state.setSupplier(
+      draftToRestore.supplier_id && draftToRestore.supplier_name_snapshot
+        ? { supplier_id: draftToRestore.supplier_id, name: draftToRestore.supplier_name_snapshot }
+        : null,
+    );
     const restoredBundles = restoreInternalUseBundles(draftToRestore, getAvailable);
     state.setBundles(
       draftToRestore.work_type === "warehouse_io"
         ? normalizeWarehouseIoDraftBundles(restoredBundles)
         : restoredBundles,
     );
-    state.goTo(restoreStep ?? 4);
+    state.goTo(
+      draftToRestore.work_type === "receive" ? 2 : (restoreStep ?? 4),
+    );
     onStatusChange(
       draftToRestore.department_routes_normalized
         ? "품목코드 기준으로 부서 경로를 자동 갱신했습니다."

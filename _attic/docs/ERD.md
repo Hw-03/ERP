@@ -18,7 +18,7 @@
 | 품목·코드 | `items`, `bom`, `process_types`, `product_symbols` | 품목 마스터, BOM, 공정·모델 코드 |
 | 직원·업무 기록 | `departments`, `employees`, `employee_assigned_models`, `employee_item_orders`, `daily_work_reports`, `assembly_checklists`, `assembly_checklist_sections`, `assembly_checklist_items` | 조직, 담당 모델·품목 순서, 일보, 조립 체크리스트 |
 | 재고·거래 | `inventory`, `inventory_locations`, `transaction_logs`, `transaction_edit_logs` | 재고 잔량·위치와 변동/수정 이력 |
-| 입출고 V2·결재 | `io_batches`, `io_bundles`, `io_lines`, `stock_requests`, `stock_request_lines` | 제출 배치, BOM 전개 라인, 결재 요청 |
+| 입출고 V2·결재 | `suppliers`, `io_batches`, `io_bundles`, `io_lines`, `stock_requests`, `stock_request_lines` | 공급업체 마스터, 제출 배치, BOM 전개 라인, 결재 요청 |
 | 출하 | `shipping_requests`, `shipping_request_bom_lines`, `shipping_request_companion_lines`, `shipping_allocations`, `shipping_request_checklist_lines`, `shipping_request_events`, `shipping_request_revisions` | 출하 요청, 준비·배정·체크·이력 |
 | 창고 지도 | `warehouse_angles`, `warehouse_boxes`, `warehouse_box_items`, `warehouse_special_zones`, `warehouse_special_zone_items`, `warehouse_special_zone_audits` | 랙/박스와 자유 영역의 배치·감사 |
 | 알림·인수인계 | `notifications`, `handovers`, `handover_lines` | 결재/인수 알림과 인수인계 문서 |
@@ -198,6 +198,7 @@ erDiagram
 ```mermaid
 erDiagram
     Employee ||--o{ IoBatch : "requester_employee_id"
+    Supplier o|--o{ IoBatch : "supplier_id (nullable)"
     ShippingRequest o|--o{ IoBatch : "shipping_request_id (nullable)"
     IoBatch ||--o{ IoBundle : "batch_id"
     IoBundle ||--o{ IoLine : "bundle_id"
@@ -210,9 +211,17 @@ erDiagram
     Item ||--o{ StockRequestLine : "item_id"
     IoLine o|--o{ StockRequestLine : "operation_line_id (nullable)"
 
+    Supplier {
+        uuid supplier_id PK
+        string name
+        string normalized_name UK
+        bool is_active
+    }
     IoBatch {
         uuid batch_id PK
         uuid requester_employee_id FK
+        uuid supplier_id FK "nullable"
+        string supplier_name_snapshot "nullable"
         uuid shipping_request_id FK "nullable"
         uuid stock_request_id "참조값, FK 없음"
         string work_type
@@ -249,6 +258,7 @@ erDiagram
 ```
 
 - **IoBatch → IoBundle → IoLine**은 입출고 V2의 제출·전개·실제 반영 후보 라인 구조다. 제외된 `io_lines`도 감사 내역으로 남는다.
+- 원자재 입고 배치는 `suppliers`의 활성 업체를 참조하고 완료 시점의 업체명을 `supplier_name_snapshot`으로 보존한다. 이후 업체 이름 변경·숨김은 완료된 입고 이력과 F704-02 입/출고처를 바꾸지 않는다.
 - `io_batches.stock_request_id`는 저장된 참조값이고 모델 FK가 아니다. 결재 요청의 실제 배치 연결은 `stock_requests.operation_batch_id` FK다.
 
 ## 5. 출하

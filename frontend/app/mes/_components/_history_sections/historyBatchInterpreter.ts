@@ -204,10 +204,11 @@ function _labelNoneBucket(
   side: "from" | "to",
   workType?: string | null,
   rawSubType?: string | null,
+  supplierNameSnapshot?: string | null,
 ): string | null {
   switch (subType) {
     case "receive_supplier":
-      return side === "from" ? "외부" : null;
+      return side === "from" ? supplierNameSnapshot?.trim() || "외부" : null;
     case "supplier_return":
       return side === "to" ? "외부" : null;
     case "produce":
@@ -233,12 +234,13 @@ function _labelBucketSlot(
   side: "from" | "to",
   workType?: string | null,
   rawSubType?: string | null,
+  supplierNameSnapshot?: string | null,
 ): string | null {
   switch (slot.bucket) {
     case "warehouse": return "창고";
     case "production": return slot.dept || "부서";
     case "defective": return slot.dept ? `${slot.dept} 불량` : "불량";
-    case "none": return _labelNoneBucket(subType, side, workType, rawSubType);
+    case "none": return _labelNoneBucket(subType, side, workType, rawSubType, supplierNameSnapshot);
     default: return null;
   }
 }
@@ -298,7 +300,14 @@ export function getBatchFlowEndpoints(batch: IoBatch): BatchFlowEndpoints | null
   let mixedFrom = false;
   if (fromSlots.size === 1) {
     const slot = fromSlots.values().next().value as BucketSlot;
-    const lbl = _labelBucketSlot(slot, subType, "from", batch.work_type, batch.sub_type);
+    const lbl = _labelBucketSlot(
+      slot,
+      subType,
+      "from",
+      batch.work_type,
+      batch.sub_type,
+      batch.supplier_name_snapshot,
+    );
     if (!lbl) return null;
     fromLabel = lbl;
   } else {
@@ -310,7 +319,14 @@ export function getBatchFlowEndpoints(batch: IoBatch): BatchFlowEndpoints | null
   let mixedTo = false;
   if (toSlots.size === 1) {
     const slot = toSlots.values().next().value as BucketSlot;
-    const lbl = _labelBucketSlot(slot, subType, "to", batch.work_type, batch.sub_type);
+    const lbl = _labelBucketSlot(
+      slot,
+      subType,
+      "to",
+      batch.work_type,
+      batch.sub_type,
+      batch.supplier_name_snapshot,
+    );
     if (!lbl) return null;
     toLabel = lbl;
   } else {

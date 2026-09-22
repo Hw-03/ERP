@@ -47,6 +47,7 @@ from app.services.io_preview import (
     validate_warehouse_adjust_operation,
     validate_warehouse_adjust_requester,
 )
+from app.services.supplier import validate_supplier_for_operation
 
 
 LEGACY_SHIPPING_LINK_READ_ONLY_MESSAGE = "폐기된 출하 준비 연결 작업은 조회만 가능합니다."
@@ -483,6 +484,8 @@ def _batch_to_payload(batch: IoBatch, db: Optional[Session] = None) -> dict:
         "requester_employee_id": batch.requester_employee_id,
         "requester_name": batch.requester_name,
         "requester_department": batch.requester_department,
+        "supplier_id": batch.supplier_id,
+        "supplier_name_snapshot": batch.supplier_name_snapshot,
         "approver_employee_id": approver_employee_id,
         "approver_name": approver_name,
         "from_department": batch.from_department,
@@ -565,6 +568,12 @@ def _persist_batch(
         bundles=payload.bundles,
         requested_department=payload.to_department,
     )
+    supplier = validate_supplier_for_operation(
+        db,
+        work_type=payload.work_type,
+        sub_type=payload.sub_type,
+        supplier_id=getattr(payload, "supplier_id", None),
+    )
     now = datetime.utcnow()
     batch = IoBatch(
         batch_id=_new_id(),
@@ -574,6 +583,8 @@ def _persist_batch(
         requester_employee_id=requester.employee_id,
         requester_name=requester.name,
         requester_department=_enum_value(requester.department) or "",
+        supplier_id=supplier.supplier_id if supplier is not None else None,
+        supplier_name_snapshot=supplier.name if supplier is not None else None,
         from_department=payload.from_department,
         to_department=payload.to_department,
         requires_approval=(

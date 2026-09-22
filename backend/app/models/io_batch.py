@@ -43,6 +43,13 @@ class IoBatch(Base):
     )
     requester_name = Column(String(100), nullable=False)
     requester_department = Column(String(50), nullable=False)
+    supplier_id = Column(
+        UUIDString,
+        ForeignKey("suppliers.supplier_id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    supplier_name_snapshot = Column(String(100), nullable=True)
     from_department = Column(String(50), nullable=True)
     to_department = Column(String(50), nullable=True)
     requires_approval = Column(Boolean, nullable=False, default=False)

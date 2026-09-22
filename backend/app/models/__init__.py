@@ -37,6 +37,7 @@ from app.models.io_batch import (
     IoBundle,
     IoLine,
 )
+from app.models.supplier import Supplier
 from app.models.notification import (
     Notification,
     NotificationTypeEnum,
@@ -163,6 +164,7 @@ __all__ = [
     "IoBatch",
     "IoBundle",
     "IoLine",
+    "Supplier",
     # notifications
     "Notification",
     "NotificationTypeEnum",

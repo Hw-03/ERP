@@ -207,6 +207,7 @@ describe("historyPresentation", () => {
     const batch = makeBatch({
       work_type: "warehouse",
       sub_type: "receive_supplier",
+      supplier_name_snapshot: "브라우저 검증 공급업체",
       from_department: null,
       to_department: "창고",
       bundles: [makeBundle({
@@ -222,7 +223,11 @@ describe("historyPresentation", () => {
     }), batch);
 
     expect(row.operation.label).toBe("원자재 입고 취소");
-    expect(row.flow).toMatchObject({ label: "창고 → 외부", from: "창고", to: "외부" });
+    expect(row.flow).toMatchObject({
+      label: "창고 → 브라우저 검증 공급업체",
+      from: "창고",
+      to: "브라우저 검증 공급업체",
+    });
   });
 
   it("8.23-10 keeps an approved department IO operation out of quantity-correction labels", () => {

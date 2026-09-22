@@ -10,6 +10,7 @@ import { tint } from "@/lib/mes/colorUtils";
 import { api, type IoBundle, type IoInternalUseBomMode, type IoLine, type IoSourceKind, type IoSourceLocation, type IoSubType, type IoWorkType, type Item } from "@/lib/api";
 import { WizardStepCard } from "./_atoms";
 import { IoWorkTypeStep, IoSubTypeStep } from "./IoWorkTypeStep";
+import { SupplierPickerStep } from "./SupplierPickerStep";
 import { IoTargetPicker } from "./IoTargetPicker";
 import { IoBundleCart } from "./IoBundleCart";
 import { IoConfirmStep } from "./IoConfirmStep";
@@ -211,6 +212,7 @@ export function IoComposeView({
     state.subType,
     state.toDepartment,
     state.workType,
+    state.selectedSupplierId,
   ], draftToRestore?.batch_id, restoreNonce);
   const [itemConversionView, setItemConversionView] = useState<"compose" | "work">("compose");
   const [itemConversionHistoryStep, setItemConversionHistoryStep] = useState<ItemConversionHistoryStep>(1);
@@ -227,6 +229,7 @@ export function IoComposeView({
     toDepartment: state.toDepartment,
     referenceNo: state.referenceNo,
     notes: state.notes,
+    supplierId: state.selectedSupplierId,
   });
   latestDraftFieldsRef.current = {
     employeeId,
@@ -236,6 +239,7 @@ export function IoComposeView({
     toDepartment: state.toDepartment,
     referenceNo: state.referenceNo,
     notes: state.notes,
+    supplierId: state.selectedSupplierId,
   };
   const internalUsePreviewLock = useInternalUseBomPreviewLock();
   const intentAppliedRef = useRef(false);
@@ -316,7 +320,7 @@ export function IoComposeView({
     if (authorizedEntryIntent.toDepartment) {
       state.setToDepartment(authorizedEntryIntent.toDepartment);
     }
-    state.goTo(3);
+    state.goTo(authorizedEntryIntent.workType === "receive" ? 2 : 3);
   // entryIntent는 마운트 시 1회만 적용 — deps 배열에 state 함수 넣으면 재실행되므로 의도적으로 생략.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entryIntent]);
@@ -386,6 +390,7 @@ export function IoComposeView({
     state.toDepartment,
     state.workType,
     state.subType,
+    state.selectedSupplierId,
   ]);
 
   async function addItem(
@@ -436,7 +441,7 @@ export function IoComposeView({
   // preselect 자동 적용 — BOM 부모면 하이라이트만, 일반 품목이면 자동 카트 추가.
   // race 가드: bomParents 가 아직 로드 안 됐으면 보류 (S1 시연 결함 대응).
   useIoPreselect({
-    preselectedItem: entryIntent && !authorizedEntryIntent ? null : preselectedItem,
+    preselectedItem: entryIntent && !authorizedEntryIntent || state.workType === "receive" && !state.selectedSupplierId ? null : preselectedItem,
     bomParents,
     bomParentsLoaded,
     workType: state.workType,
@@ -455,6 +460,7 @@ export function IoComposeView({
   useEffect(() => {
     if (entryLeafAdvancedRef.current) return;
     if (!authorizedEntryIntent || !preselectedItem || !bomParentsLoaded) return;
+    if (state.workType === "receive" && !state.selectedSupplierId) return;
     if (bomParents.has(preselectedItem.item_id) && !authorizedEntryIntent.forceManualItem) {
       // BOM 부모 — Step3 유지(BOM/낱개 선택). 더 이상 처리하지 않음.
       entryLeafAdvancedRef.current = true;
@@ -466,7 +472,7 @@ export function IoComposeView({
       state.goTo(4);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authorizedEntryIntent, preselectedItem, bomParentsLoaded, bomParents, state.bundles.length]);
+  }, [authorizedEntryIntent, preselectedItem, bomParentsLoaded, bomParents, state.bundles.length, state.workType, state.selectedSupplierId]);
 
   // 입출고 작업 중 다른 화면으로 이동 시 '저장할까요?' 모달.
   // 경고 조건: 로그인 상태에서 마지막 저장/복원 이후 사용자가 수정했을 때,
@@ -496,6 +502,7 @@ export function IoComposeView({
         ...ioDepartmentPayload(state.subType, state.fromDepartment, state.toDepartment),
         referenceNo: state.referenceNo,
         notes: state.notes,
+        supplierId: state.selectedSupplierId,
         batchId: autosaveBatchIdRef.current,
         bundles: currentBundles,
       });
@@ -643,6 +650,7 @@ export function IoComposeView({
           ...ioDepartmentPayload(state.subType, state.fromDepartment, state.toDepartment),
           referenceNo: state.referenceNo,
           notes: state.notes,
+          supplierId: state.selectedSupplierId,
           batchId: autosaveBatchIdRef.current,
           bundles,
         }),
@@ -741,6 +749,7 @@ export function IoComposeView({
         ...ioDepartmentPayload(state.subType, state.fromDepartment, state.toDepartment),
         referenceNo: state.referenceNo,
         notes: state.notes,
+        supplierId: state.selectedSupplierId,
         bundles,
       }),
       setError,
@@ -769,6 +778,7 @@ export function IoComposeView({
           ...ioDepartmentPayload(fields.subType, fields.fromDepartment, fields.toDepartment),
           referenceNo: fields.referenceNo,
           notes: fields.notes,
+          supplierId: fields.supplierId,
           batchId: autosaveBatchIdRef.current,
           bundles,
         });
@@ -795,6 +805,7 @@ export function IoComposeView({
     return departmentNames.size > 1 ? "여러 부서" : "부서";
   })();
   const stepTwoSummary = (() => {
+    if (state.workType === "receive") return state.selectedSupplierName ?? "공급업체 미선택";
     if (state.workType === "process") {
       return `${directionWord(state.deptIoDirection)} · ${autoDepartmentSummary}`;
     }
@@ -865,7 +876,9 @@ export function IoComposeView({
     return stepId === 1
       ? "작업 유형 선택"
       : stepId === 2
-        ? state.workType === "warehouse_adjust"
+        ? state.workType === "receive"
+          ? "공급업체 선택"
+          : state.workType === "warehouse_adjust"
           ? "입고·출고 방향 선택"
           : state.workType === "process" || state.workType === "warehouse_io"
             ? "세부 작업 선택"
@@ -1182,22 +1195,33 @@ export function IoComposeView({
             >
               <div className="flex h-full min-h-0 flex-col">
                 <div className="min-h-0 flex-1">
-                  <IoSubTypeStep
-                    workType={state.workType}
-                    subType={state.subType}
-                    fromDepartment={state.fromDepartment}
-                    toDepartment={state.toDepartment}
-                    deptIoDirection={state.deptIoDirection}
-                    onSubTypeChange={handleSubTypeChange}
-                    onFromDepartmentChange={changeFromDepartment}
-                    onToDepartmentChange={changeToDepartment}
-                    onDeptIoDirectionChange={(dir) => {
-                      const had = state.bundles.length > 0;
-                      state.setDeptIoDirection(dir);
-                      beginNewCompositionSlot();
-                      if (had) onStatusChange("방향 변경으로 작업 묶음을 초기화했습니다.");
-                    }}
-                  />
+                  {state.workType === "receive" ? (
+                    <SupplierPickerStep
+                      employeeId={employeeId}
+                      selectedSupplierId={state.selectedSupplierId}
+                      selectedSupplierName={state.selectedSupplierName}
+                      onSelect={state.setSupplier}
+                      onLoadStateChange={state.setSupplierSelectionReady}
+                      variant="desktop"
+                    />
+                  ) : (
+                    <IoSubTypeStep
+                      workType={state.workType}
+                      subType={state.subType}
+                      fromDepartment={state.fromDepartment}
+                      toDepartment={state.toDepartment}
+                      deptIoDirection={state.deptIoDirection}
+                      onSubTypeChange={handleSubTypeChange}
+                      onFromDepartmentChange={changeFromDepartment}
+                      onToDepartmentChange={changeToDepartment}
+                      onDeptIoDirectionChange={(dir) => {
+                        const had = state.bundles.length > 0;
+                        state.setDeptIoDirection(dir);
+                        beginNewCompositionSlot();
+                        if (had) onStatusChange("방향 변경으로 작업 묶음을 초기화했습니다.");
+                      }}
+                    />
+                  )}
                 </div>
                 <div className="mt-auto pt-5">
                   <Button
@@ -1210,7 +1234,9 @@ export function IoComposeView({
                   >
                     {state.canAdvance[2]
                       ? "다음 단계로 →"
-                      : state.workType === "warehouse_adjust"
+                      : state.workType === "receive"
+                        ? "공급업체를 선택하세요"
+                        : state.workType === "warehouse_adjust"
                         ? "입고 또는 출고를 선택하세요"
                         : "세부 작업을 선택하세요"}
                   </Button>

@@ -7,11 +7,14 @@ import { TYPO } from "../tokens";
 export function WizardProgress({
   steps,
   current,
+  currentLabel,
   className,
   variant = "stacked",
 }: {
   steps: { key: string; label: string }[];
   current: number;
+  /** 좁은 헤더에서 현재 단계의 짧은 업무명을 함께 보여줄 때만 전달한다. */
+  currentLabel?: string;
   className?: string;
   variant?: "stacked" | "inline";
 }) {
@@ -53,6 +56,14 @@ export function WizardProgress({
     return (
       <div className={clsx("flex min-w-0 flex-row items-center gap-2", className)}>
         {bars}
+        {currentLabel && (
+          <span
+            className={clsx(TYPO.caption, "shrink-0 font-bold")}
+            style={{ color: LEGACY_COLORS.muted2 }}
+          >
+            {currentLabel}
+          </span>
+        )}
         {stepLabel}
       </div>
     );

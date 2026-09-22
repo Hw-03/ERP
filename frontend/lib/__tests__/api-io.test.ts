@@ -81,6 +81,25 @@ describe("ioApi.preview", () => {
   });
 });
 
+// ── suppliers ───────────────────────────────────────────────────────────────
+
+describe("ioApi suppliers", () => {
+  it("active suppliers are queried with the requester and inactive flag", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse([])));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    const supplierApi = ioApi as unknown as {
+      listSuppliers: (employeeId: string, includeInactive?: boolean) => Promise<unknown>;
+    };
+    await supplierApi.listSuppliers("warehouse-1", true);
+
+    const url = String(fetchSpy.mock.calls[0][0]);
+    expect(url).toContain("/api/suppliers");
+    expect(url).toContain("requester_employee_id=warehouse-1");
+    expect(url).toContain("include_inactive=true");
+  });
+});
+
 // ── submit ───────────────────────────────────────────────────────────────────
 
 describe("ioApi.submit", () => {
@@ -96,6 +115,7 @@ describe("ioApi.submit", () => {
       requester_employee_id: "e-1",
       work_type: "receive",
       sub_type: "receive_supplier",
+      supplier_id: "supplier-1",
       bundles: [],
     });
 
@@ -104,6 +124,7 @@ describe("ioApi.submit", () => {
     expect((init as RequestInit).method).toBe("POST");
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body.requester_employee_id).toBe("e-1");
+    expect(body.supplier_id).toBe("supplier-1");
     expect(body).not.toHaveProperty("shipping_request_id");
   });
 

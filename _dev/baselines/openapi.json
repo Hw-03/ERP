@@ -4724,6 +4724,29 @@
             ],
             "title": "Submitted At"
           },
+          "supplier_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supplier Id"
+          },
+          "supplier_name_snapshot": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supplier Name Snapshot"
+          },
           "to_department": {
             "anyOf": [
               {
@@ -4948,6 +4971,18 @@
           "sub_type": {
             "title": "Sub Type",
             "type": "string"
+          },
+          "supplier_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supplier Id"
           },
           "to_department": {
             "anyOf": [
@@ -5543,6 +5578,18 @@
           "sub_type": {
             "title": "Sub Type",
             "type": "string"
+          },
+          "supplier_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supplier Id"
           },
           "to_department": {
             "anyOf": [
@@ -10956,6 +11003,99 @@
         ],
         "title": "StockRequestTypeEnum",
         "type": "string"
+      },
+      "SupplierCreate": {
+        "properties": {
+          "name": {
+            "maxLength": 100,
+            "title": "Name",
+            "type": "string"
+          },
+          "requester_employee_id": {
+            "format": "uuid",
+            "title": "Requester Employee Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "requester_employee_id",
+          "name"
+        ],
+        "title": "SupplierCreate",
+        "type": "object"
+      },
+      "SupplierResponse": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "supplier_id": {
+            "format": "uuid",
+            "title": "Supplier Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "supplier_id",
+          "name",
+          "is_active",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "SupplierResponse",
+        "type": "object"
+      },
+      "SupplierUpdate": {
+        "properties": {
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "requester_employee_id": {
+            "format": "uuid",
+            "title": "Requester Employee Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "requester_employee_id"
+        ],
+        "title": "SupplierUpdate",
+        "type": "object"
       },
       "TransactionCancelRequest": {
         "properties": {
@@ -24763,6 +24903,155 @@
         ]
       }
     },
+    "/api/suppliers": {
+      "get": {
+        "operationId": "list_suppliers_api_suppliers_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "requester_employee_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Requester Employee Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_inactive",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Inactive",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SupplierResponse"
+                  },
+                  "title": "Response List Suppliers Api Suppliers Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Suppliers",
+        "tags": [
+          "Suppliers"
+        ]
+      },
+      "post": {
+        "operationId": "create_supplier_api_suppliers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupplierCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Supplier",
+        "tags": [
+          "Suppliers"
+        ]
+      }
+    },
+    "/api/suppliers/{supplier_id}": {
+      "patch": {
+        "operationId": "update_supplier_api_suppliers__supplier_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "supplier_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Supplier Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupplierUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Supplier",
+        "tags": [
+          "Suppliers"
+        ]
+      }
+    },
     "/api/warehouse-map/angles": {
       "post": {
         "operationId": "create_angle_api_warehouse_map_angles_post",
@@ -26190,6 +26479,10 @@
     {
       "description": "입출고 업무 처리.",
       "name": "Inventory IO"
+    },
+    {
+      "description": "원자재 입고 공급업체 마스터.",
+      "name": "Suppliers"
     },
     {
       "description": "출하 요청과 준비·완료 처리.",

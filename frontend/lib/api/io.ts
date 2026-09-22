@@ -1,4 +1,4 @@
-import { deleteJson, fetcher, postJson, putJson, toApiUrl } from "../api-core";
+import { deleteJson, fetcher, patchJson, postJson, putJson, toApiUrl } from "../api-core";
 import type {
   ItemConversionPayload,
   ItemConversionPreview,
@@ -9,9 +9,34 @@ import type {
   IoPreviewResponse,
   IoSubmitResponse,
   IoWorkType,
+  Supplier,
 } from "./types";
 
 export const ioApi = {
+  listSuppliers: (employeeId: string, includeInactive = false) => {
+    const query = new URLSearchParams({
+      requester_employee_id: employeeId,
+      include_inactive: String(includeInactive),
+    });
+    return fetcher<Supplier[]>(toApiUrl(`/api/suppliers?${query.toString()}`));
+  },
+
+  createSupplier: (employeeId: string, name: string) =>
+    postJson<Supplier>(toApiUrl("/api/suppliers"), {
+      requester_employee_id: employeeId,
+      name,
+    }),
+
+  updateSupplier: (
+    supplierId: string,
+    employeeId: string,
+    update: { name?: string; is_active?: boolean },
+  ) =>
+    patchJson<Supplier>(
+      toApiUrl(`/api/suppliers/${encodeURIComponent(supplierId)}`),
+      { requester_employee_id: employeeId, ...update },
+    ),
+
   preview: (payload: IoPreviewPayload) =>
     postJson<IoPreviewResponse>(toApiUrl("/api/io/preview"), payload),
 

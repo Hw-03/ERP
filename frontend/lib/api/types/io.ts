@@ -108,6 +108,8 @@ export interface IoDraftPayload {
   requester_employee_id: string;
   work_type: IoWorkType;
   sub_type: IoSubType;
+  /** 원자재 입고(receive_supplier)에서만 사용하는 공급업체 ID. */
+  supplier_id?: string | null;
   from_department?: Department | string | null;
   to_department?: Department | string | null;
   reference_no?: string | null;
@@ -139,12 +141,24 @@ export interface IoBatch {
   shipping_request_id?: string | null;
   reference_no: string | null;
   notes: string | null;
+  /** 레거시 배치는 null일 수 있다. */
+  supplier_id?: string | null;
+  /** 완료 시점 공급업체명 보존용 스냅샷. */
+  supplier_name_snapshot?: string | null;
   created_at: string;
   updated_at: string;
   submitted_at: string | null;
   completed_at: string | null;
   bundles: IoBundle[];
   stock_requests?: IoStockRequestSummary[];
+}
+
+export interface Supplier {
+  supplier_id: string;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface IoStockRequestSummary {

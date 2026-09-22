@@ -22,6 +22,7 @@ from app.models import (
     StockRequestLine,
     StockRequestStatusEnum,
     StockRequestTypeEnum,
+    Supplier,
     TransactionLog,
 )
 from app.services import io_actions
@@ -48,7 +49,12 @@ def _setup_draft(make_session):
         model_symbol="9",
         serial_no=1,
     )
-    session.add_all([requester, item])
+    supplier = Supplier(
+        name="동시 제출 공급업체",
+        normalized_name="동시 제출 공급업체".casefold(),
+        is_active=True,
+    )
+    session.add_all([requester, item, supplier])
     session.flush()
     session.add(
         Inventory(
@@ -67,6 +73,8 @@ def _setup_draft(make_session):
         requester_name=requester.name,
         requester_department=requester.department,
         requires_approval=False,
+        supplier_id=supplier.supplier_id,
+        supplier_name_snapshot=supplier.name,
     )
     session.add(batch)
     session.flush()

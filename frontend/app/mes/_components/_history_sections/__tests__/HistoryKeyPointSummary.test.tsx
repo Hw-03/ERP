@@ -82,7 +82,7 @@ describe("HistoryKeyPointSummary", () => {
 
   it("combines the movement route with only changed processing stock", () => {
     const detailedSummary = Object.assign(summary(), {
-      flow: { label: "튜브 재고", from: "외부", to: "튜브" },
+      flow: { label: "튜브 재고", from: "브라우저 검증 공급업체", to: "튜브" },
       actualStock: {
         warehouseBefore: 94,
         warehouseAfter: 94,
@@ -98,7 +98,7 @@ describe("HistoryKeyPointSummary", () => {
 
     const block = screen.getByTestId("history-stock-movement-summary");
     expect(within(block).getByText("재고 이동")).toBeInTheDocument();
-    expect(within(block).getByText("외부")).toBeInTheDocument();
+    expect(within(block).getByText("브라우저 검증 공급업체")).toBeInTheDocument();
     expect(within(block).getAllByText("튜브")).toHaveLength(2);
     expect(within(block).queryByText("창고")).not.toBeInTheDocument();
     expect(within(block).queryByText("정상 부서")).not.toBeInTheDocument();

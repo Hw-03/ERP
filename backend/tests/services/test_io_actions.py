@@ -1960,12 +1960,18 @@ def test_submit_existing_draft_rejects_when_conditional_draft_transition_loses_r
 ):
     item = make_item(name="IO draft conditional transition", warehouse_qty=Decimal("0"))
     requester = _make_requester(db_session)
+    from app.models import Supplier
+
+    supplier = Supplier(name="Draft race supplier", normalized_name="draft race supplier")
+    db_session.add(supplier)
+    db_session.flush()
     draft = io_draft.save_draft(
         db_session,
         IoSubmitRequest(
             requester_employee_id=requester.employee_id,
-            work_type="receive",
-            sub_type="receive_supplier",
+                work_type="receive",
+                sub_type="receive_supplier",
+                supplier_id=supplier.supplier_id,
             bundles=[{
                 "bundle_id": str(uuid.uuid4()),
                 "source_kind": "direct_item",

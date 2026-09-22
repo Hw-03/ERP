@@ -23,6 +23,7 @@ from app.models import (
     StockRequestLine,
     StockRequestStatusEnum,
     StockRequestTypeEnum,
+    Supplier,
     SystemSetting,
     TransactionLog,
     TransactionTypeEnum,
@@ -57,6 +58,19 @@ def _make_employee(
     db_session.add(employee)
     db_session.flush()
     return employee
+
+
+def _make_active_supplier(db_session, *, name: str | None = None) -> Supplier:
+    """입고 성공 경로에 필요한 활성 공급업체를 명시적으로 만든다."""
+    supplier_name = name or f"Test Supplier {uuid.uuid4().hex}"
+    supplier = Supplier(
+        name=supplier_name,
+        normalized_name=supplier_name.casefold(),
+        is_active=True,
+    )
+    db_session.add(supplier)
+    db_session.flush()
+    return supplier
 
 
 def _preview_internal_use(client, requester: Employee, item, *, to_department: str = "AS"):
@@ -1758,6 +1772,7 @@ def test_io_submit_receive_is_immediate(client, db_session, make_item):
     """8.17-05: 원자재 입고는 수동 라인이어도 결재 대기 없이 즉시 완료한다."""
     item = make_item(name="Raw", warehouse_qty=Decimal("0"))
     requester = _make_employee(db_session, warehouse_role="primary")
+    supplier = _make_active_supplier(db_session)
     db_session.commit()
 
     preview = client.post(
@@ -1783,6 +1798,7 @@ def test_io_submit_receive_is_immediate(client, db_session, make_item):
             "requester_employee_id": str(requester.employee_id),
             "work_type": "receive",
             "sub_type": "receive_supplier",
+            "supplier_id": str(supplier.supplier_id),
             "bundles": preview.json()["bundles"],
         },
     )
@@ -2001,6 +2017,7 @@ def test_warehouse_approval_reroutes_linked_batch_lines_from_live_item_code(
 def test_io_submit_draft_endpoint_completes_batch(client, db_session, make_item):
     item = make_item(name="Raw Draft", warehouse_qty=Decimal("0"))
     requester = _make_employee(db_session, warehouse_role="primary")
+    supplier = _make_active_supplier(db_session)
     db_session.commit()
 
     preview = client.post(
@@ -2026,6 +2043,7 @@ def test_io_submit_draft_endpoint_completes_batch(client, db_session, make_item)
             "requester_employee_id": str(requester.employee_id),
             "work_type": "receive",
             "sub_type": "receive_supplier",
+            "supplier_id": str(supplier.supplier_id),
             "bundles": preview.json()["bundles"],
         },
     )
@@ -2322,6 +2340,7 @@ def test_io_submit_idempotent_with_client_request_id(client, db_session, make_it
     """같은 client_request_id로 두 번 submit 시 같은 batch 멱등 반환, 재고 한 번만 차감."""
     item = make_item(name="Idem Raw", warehouse_qty=Decimal("0"))
     requester = _make_employee(db_session, warehouse_role="primary")
+    supplier = _make_active_supplier(db_session)
     db_session.commit()
 
     preview = client.post(
@@ -2345,6 +2364,7 @@ def test_io_submit_idempotent_with_client_request_id(client, db_session, make_it
         "requester_employee_id": str(requester.employee_id),
         "work_type": "receive",
         "sub_type": "receive_supplier",
+        "supplier_id": str(supplier.supplier_id),
         "client_request_id": "test-idem-key-001",
         "bundles": preview.json()["bundles"],
     }
@@ -4326,6 +4346,7 @@ def test_io_submit_without_client_request_id_skips_idempotency(client, db_sessio
     """client_request_id 미전송 시 매번 신규 batch 생성 — 기존 클라이언트 호환성 보장."""
     item = make_item(name="No Idem Raw", warehouse_qty=Decimal("0"))
     requester = _make_employee(db_session, warehouse_role="primary")
+    supplier = _make_active_supplier(db_session)
     db_session.commit()
 
     def _fresh_payload():
@@ -4348,6 +4369,7 @@ def test_io_submit_without_client_request_id_skips_idempotency(client, db_sessio
             "requester_employee_id": str(requester.employee_id),
             "work_type": "receive",
             "sub_type": "receive_supplier",
+            "supplier_id": str(supplier.supplier_id),
             "bundles": preview.json()["bundles"],
         }
 
@@ -4380,11 +4402,12 @@ def _preview_receive_bundles(client, requester, item, qty: str = "3"):
     return res.json()["bundles"]
 
 
-def _put_receive_draft(client, requester, bundles, batch_id=None):
+def _put_receive_draft(client, requester, bundles, supplier_id, batch_id=None):
     body = {
         "requester_employee_id": str(requester.employee_id),
         "work_type": "receive",
         "sub_type": "receive_supplier",
+        "supplier_id": str(supplier_id),
         "bundles": bundles,
     }
     if batch_id is not None:
@@ -4587,11 +4610,12 @@ def test_io_draft_save_stacks_new_slots(client, db_session, make_item):
     item_a = make_item(name="Draft A", warehouse_qty=Decimal("0"))
     item_b = make_item(name="Draft B", warehouse_qty=Decimal("0"))
     requester = _make_employee(db_session)
+    supplier = _make_active_supplier(db_session)
     db_session.commit()
 
-    r1 = _put_receive_draft(client, requester, _preview_receive_bundles(client, requester, item_a))
+    r1 = _put_receive_draft(client, requester, _preview_receive_bundles(client, requester, item_a), supplier.supplier_id)
     assert r1.status_code == 200, r1.json()
-    r2 = _put_receive_draft(client, requester, _preview_receive_bundles(client, requester, item_b))
+    r2 = _put_receive_draft(client, requester, _preview_receive_bundles(client, requester, item_b), supplier.supplier_id)
     assert r2.status_code == 200, r2.json()
 
     assert r1.json()["batch_id"] != r2.json()["batch_id"]
@@ -4605,14 +4629,15 @@ def test_io_draft_save_with_batch_id_updates_in_place(client, db_session, make_i
     """batch_id를 실어 보내면 해당 draft만 갱신되고 슬롯 수는 늘지 않는다."""
     item = make_item(name="Draft Inplace", warehouse_qty=Decimal("0"))
     requester = _make_employee(db_session)
+    supplier = _make_active_supplier(db_session)
     db_session.commit()
 
     bundles = _preview_receive_bundles(client, requester, item)
-    first = _put_receive_draft(client, requester, bundles)
+    first = _put_receive_draft(client, requester, bundles, supplier.supplier_id)
     assert first.status_code == 200, first.json()
     batch_id = first.json()["batch_id"]
 
-    again = _put_receive_draft(client, requester, bundles, batch_id=batch_id)
+    again = _put_receive_draft(client, requester, bundles, supplier.supplier_id, batch_id=batch_id)
     assert again.status_code == 200, again.json()
     assert again.json()["batch_id"] == batch_id
 
@@ -4628,13 +4653,14 @@ def test_io_draft_update_others_batch_forbidden(client, db_session, make_item):
     item = make_item(name="Draft Owner", warehouse_qty=Decimal("0"))
     owner = _make_employee(db_session, code="OWN1", name="Owner")
     other = _make_employee(db_session, code="OTH1", name="Other")
+    supplier = _make_active_supplier(db_session)
     db_session.commit()
 
-    first = _put_receive_draft(client, owner, _preview_receive_bundles(client, owner, item))
+    first = _put_receive_draft(client, owner, _preview_receive_bundles(client, owner, item), supplier.supplier_id)
     batch_id = first.json()["batch_id"]
 
     res = _put_receive_draft(
-        client, other, _preview_receive_bundles(client, other, item), batch_id=batch_id
+        client, other, _preview_receive_bundles(client, other, item), supplier.supplier_id, batch_id=batch_id
     )
     assert res.status_code == 403, res.json()
 
@@ -4643,12 +4669,14 @@ def test_io_draft_update_unknown_batch_unprocessable(client, db_session, make_it
     """존재하지 않는 batch_id로 갱신 시도 시 422."""
     item = make_item(name="Draft Unknown", warehouse_qty=Decimal("0"))
     requester = _make_employee(db_session)
+    supplier = _make_active_supplier(db_session)
     db_session.commit()
 
     res = _put_receive_draft(
         client,
         requester,
         _preview_receive_bundles(client, requester, item),
+        supplier.supplier_id,
         batch_id=str(uuid.uuid4()),
     )
     assert res.status_code == 422, res.json()

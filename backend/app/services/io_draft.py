@@ -38,6 +38,7 @@ from app.services.io_persist import (
     normalize_payload_bom_stock_exempt,
     normalize_automatic_routes_with_bom_token_refresh,
 )
+from app.services.supplier import validate_supplier_for_operation
 
 
 def _draft_to_current_stock_payload(db: Session, batch: IoBatch) -> dict:
@@ -155,11 +156,19 @@ def save_draft(db: Session, payload) -> dict:
         if batch.requester_employee_id != requester.employee_id:
             raise PermissionError("본인 임시저장 작업만 수정할 수 있습니다.")
         ensure_batch_is_mutable(batch)
+        supplier = validate_supplier_for_operation(
+            db,
+            work_type=payload.work_type,
+            sub_type=payload.sub_type,
+            supplier_id=payload.supplier_id,
+        )
         # 메타 갱신 + 자식 교체. client_request_id 는 보존(submit 멱등성).
         batch.work_type = payload.work_type
         batch.sub_type = payload.sub_type
         batch.from_department = payload.from_department
         batch.to_department = payload.to_department
+        batch.supplier_id = supplier.supplier_id if supplier is not None else None
+        batch.supplier_name_snapshot = supplier.name if supplier is not None else None
         batch.requires_approval = (
             payload.sub_type in APPROVAL_SUB_TYPES
             or has_included_manual_line(payload.bundles)

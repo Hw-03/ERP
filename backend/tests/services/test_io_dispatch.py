@@ -32,6 +32,7 @@ from app.models import (
     StockRequest,
     StockRequestLine,
     StockRequestStatusEnum,
+    Supplier,
     ShippingRequest,
     ShippingRequestStatusEnum,
     SystemSetting,
@@ -90,6 +91,7 @@ def _build_batch(
     to_department=None,
     source_kind: str = "bom_parent",
     source_item_id=None,
+    with_supplier: bool = True,
     lines: list[dict],
 ) -> IoBatch:
     """라인 dict 목록으로 IoBatch/IoBundle/IoLine 한 묶음을 DB 에 만든다.
@@ -97,6 +99,15 @@ def _build_batch(
     line dict keys: direction, from_bucket, to_bucket, item_id, quantity,
     그리고 옵션 from_department/to_department/included/origin.
     """
+    supplier = None
+    if with_supplier and (work_type, sub_type) == ("receive", "receive_supplier"):
+        supplier = Supplier(
+            name=f"디스패치 공급업체 {uuid.uuid4().hex[:8]}",
+            normalized_name=f"dispatch supplier {uuid.uuid4().hex}",
+            is_active=True,
+        )
+        db_session.add(supplier)
+        db_session.flush()
     batch = IoBatch(
         batch_id=uuid.uuid4(),
         work_type=work_type,
@@ -105,6 +116,8 @@ def _build_batch(
         requester_employee_id=requester.employee_id,
         requester_name=requester.name,
         requester_department=requester.department.value,
+        supplier_id=supplier.supplier_id if supplier is not None else None,
+        supplier_name_snapshot=supplier.name if supplier is not None else None,
         from_department=from_department,
         to_department=to_department,
         requires_approval=False,

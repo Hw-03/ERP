@@ -58,6 +58,7 @@ function Harness({
     setToDepartment: vi.fn(),
     setReferenceNo: vi.fn(),
     setNotes: vi.fn(),
+    setSupplier: vi.fn(),
     setBundles: vi.fn(),
     goTo,
   };
@@ -138,6 +139,7 @@ function RestoreShortageHarness({
     setToDepartment: vi.fn(),
     setReferenceNo: vi.fn(),
     setNotes: vi.fn(),
+    setSupplier: vi.fn(),
     setBundles,
     goTo: vi.fn(),
   };
@@ -212,7 +214,34 @@ function CanonicalProcessRestoreHarness() {
   return <span data-testid="canonical-restored-subtype">{state.subType}</span>;
 }
 
+function SupplierReceiptRestoreHarness() {
+  const restoredDraftRef = useRef<string | null>(null);
+  const restoredNonceRef = useRef<number | null>(null);
+  const autosaveBatchIdRef = useRef<string | null>(null);
+  const state = useIoWorkState();
+  useIoDraftRestore({
+    draftToRestore: {
+      ...makeDraft("receive_supplier"),
+      work_type: "receive",
+      supplier_id: "supplier-1",
+      supplier_name_snapshot: "숨김 예정 업체",
+    },
+    restoreNonce: 1,
+    restoredDraftRef,
+    restoredNonceRef,
+    autosaveBatchIdRef,
+    state,
+    onStatusChange: vi.fn(),
+  });
+  return <span data-testid="supplier-receipt-restore-step">{state.step}</span>;
+}
+
 describe("useIoDraftRestore", () => {
+  it("공급업체가 있는 원자재 입고 초안도 활성 여부 확인을 위해 2단계로 복원한다", async () => {
+    render(<SupplierReceiptRestoreHarness />);
+    await waitFor(() => expect(screen.getByTestId("supplier-receipt-restore-step")).toHaveTextContent("2"));
+  });
+
   it("현재 작업자가 허용받지 않은 유형의 draft는 복원하지 않는다", async () => {
     const goTo = vi.fn();
     render(<Harness subType="warehouse_to_dept" goTo={goTo} canRestore={false} />);
@@ -524,7 +553,7 @@ describe("useIoDraftRestore", () => {
       fromDepartment: "조립", toDepartment: "조립",
       setWorkType: vi.fn(), setSubType: vi.fn(), setDeptIoDirectionRaw: vi.fn(),
       setFromDepartment: vi.fn(), setToDepartment: vi.fn(), setReferenceNo: vi.fn(),
-      setNotes: vi.fn(), setBundles: vi.fn(), goTo: vi.fn(),
+      setNotes: vi.fn(), setSupplier: vi.fn(), setBundles: vi.fn(), goTo: vi.fn(),
     };
     function NormalizedHarness() {
       useIoDraftRestore({

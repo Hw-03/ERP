@@ -60,6 +60,7 @@ from app.routers import (
     settings,
     shipping,
     stock_requests,
+    suppliers,
     warehouse_map,
 )
 from app.services import audit_csv as audit_csv_svc
@@ -111,6 +112,7 @@ app = FastAPI(
         {"name": "Departments", "description": "부서 마스터 관리."},
         {"name": "Dept Adjustment", "description": "부서 재고 조정."},
         {"name": "Inventory IO", "description": "입출고 업무 처리."},
+        {"name": "Suppliers", "description": "원자재 입고 공급업체 마스터."},
         {"name": "Shipping", "description": "출하 요청과 준비·완료 처리."},
         {"name": "Stock Requests", "description": "재고 요청과 결재 처리."},
         {"name": "Warehouse Map", "description": "창고 배치도 관리."},
@@ -302,6 +304,7 @@ app.include_router(settings.router, prefix="/api/settings", tags=["Settings"])
 app.include_router(shipping.router, prefix="/api/shipping", tags=["Shipping"])
 app.include_router(inventory.router, prefix="/api/inventory", tags=["Inventory"])
 app.include_router(io.router, prefix="/api/io", tags=["Inventory IO"])
+app.include_router(suppliers.router, prefix="/api/suppliers", tags=["Suppliers"])
 app.include_router(bom.router, prefix="/api/bom", tags=["BOM"])
 app.include_router(production.router, prefix="/api/production", tags=["Production"])
 app.include_router(codes.router, prefix="/api/codes", tags=["Codes"])

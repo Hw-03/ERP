@@ -486,12 +486,28 @@ describe("getBatchFlowEndpoints", () => {
     expect(getHistoryLineSignedQuantity(outboundLine, outbound).sign).toBe("-");
   });
 
-  it("receive_supplier: none→warehouse → 외부→창고, mixed=false", () => {
+  it("receive_supplier: 공급업체 스냅샷이 있으면 업체명→창고, mixed=false", () => {
     const line = makeLine({ from_bucket: "none", to_bucket: "warehouse" });
     const bundle = makeBundle({ lines: [line] });
-    const batch = makeBatch({ sub_type: "receive_supplier", bundles: [bundle] });
+    const batch = makeBatch({
+      sub_type: "receive_supplier",
+      supplier_name_snapshot: "브라우저 검증 공급업체",
+      bundles: [bundle],
+    });
     const result = getBatchFlowEndpoints(batch);
-    expect(result).toEqual({ from: "외부", to: "창고", mixed: false });
+    expect(result).toEqual({ from: "브라우저 검증 공급업체", to: "창고", mixed: false });
+  });
+
+  it.each([null, "   "])("receive_supplier: 스냅샷이 %j이면 외부→창고를 유지한다", (supplierName) => {
+    const line = makeLine({ from_bucket: "none", to_bucket: "warehouse" });
+    const bundle = makeBundle({ lines: [line] });
+    const batch = makeBatch({
+      sub_type: "receive_supplier",
+      supplier_name_snapshot: supplierName,
+      bundles: [bundle],
+    });
+
+    expect(getBatchFlowEndpoints(batch)).toEqual({ from: "외부", to: "창고", mixed: false });
   });
 
   it("warehouse_to_dept: warehouse→production(조립) → 창고→조립, mixed=false", () => {

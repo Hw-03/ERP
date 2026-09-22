@@ -20,6 +20,7 @@ from app.models import (
     Inventory,
     InventoryLocation,
     LocationStatusEnum,
+    Supplier,
     TransactionLog,
     TransactionTypeEnum,
 )
@@ -54,6 +55,14 @@ def _make_employee(
     return emp
 
 
+def _make_active_supplier(db_session, *, name: str = "취소 테스트 공급업체") -> Supplier:
+    """입고 취소 회귀가 실제 공급업체 스냅샷 경로를 사용하게 한다."""
+    supplier = Supplier(name=name, normalized_name=name.casefold(), is_active=True)
+    db_session.add(supplier)
+    db_session.flush()
+    return supplier
+
+
 def _cells(db_session, item_id):
     """(warehouse_qty, {(dept,status): qty}) 스냅샷."""
     inv = db_session.query(Inventory).filter(Inventory.item_id == item_id).first()
@@ -78,7 +87,9 @@ def _approve(client, request_id, approver: Employee):
     )
 
 
-def _receive_v2(client, item, requester: Employee, quantity: int):
+def _receive_v2(client, db_session, item, requester: Employee, quantity: int):
+    supplier = _make_active_supplier(db_session, name=f"취소 공급업체 {requester.employee_code}")
+    db_session.commit()
     preview = client.post(
         "/api/io/preview",
         json={
@@ -95,6 +106,7 @@ def _receive_v2(client, item, requester: Employee, quantity: int):
             "requester_employee_id": str(requester.employee_id),
             "work_type": "receive",
             "sub_type": "receive_supplier",
+            "supplier_id": str(supplier.supplier_id),
             "bundles": preview.json()["bundles"],
         },
     )
@@ -487,7 +499,7 @@ def test_cancel_receive_restores_warehouse(client, db_session, make_item):
     item = make_item(name="입고품", warehouse_qty=Decimal("0"))
     actor = _make_employee(db_session, code="RC01", warehouse_role="primary")
     db_session.commit()
-    res = _receive_v2(client, item, actor, 50)
+    res = _receive_v2(client, db_session, item, actor, 50)
     wh, _, _ = _cells(db_session, item.item_id)
     assert wh == 50
 
@@ -1316,6 +1328,7 @@ def test_cancel_io_v2_receive_restores(client, db_session, make_item):
     requester = _make_employee(
         db_session, code="IOV1", name="IO요청자", warehouse_role="primary"
     )
+    supplier = _make_active_supplier(db_session)
     db_session.commit()
 
     preview = client.post(
@@ -1334,6 +1347,7 @@ def test_cancel_io_v2_receive_restores(client, db_session, make_item):
             "requester_employee_id": str(requester.employee_id),
             "work_type": "receive",
             "sub_type": "receive_supplier",
+            "supplier_id": str(supplier.supplier_id),
             "bundles": preview.json()["bundles"],
         },
     )
@@ -1366,7 +1380,7 @@ def test_cancel_blocked_when_would_go_negative(client, db_session, make_item):
     db_session.commit()
 
     # 입고 50 → 창고 50
-    res = _receive_v2(client, item, actor, 50)
+    res = _receive_v2(client, db_session, item, actor, 50)
     log = db_session.query(TransactionLog).filter(
         TransactionLog.transaction_type == TransactionTypeEnum.RECEIVE
     ).first()
@@ -1447,7 +1461,7 @@ def test_cancel_idempotent_double(client, db_session, make_item):
     actor = _make_employee(db_session, code="DUP1", warehouse_role="primary")
     db_session.commit()
 
-    _receive_v2(client, item, actor, 10)
+    _receive_v2(client, db_session, item, actor, 10)
     log = db_session.query(TransactionLog).filter(
         TransactionLog.transaction_type == TransactionTypeEnum.RECEIVE
     ).first()
@@ -1585,7 +1599,7 @@ def test_cancel_wrong_pin_forbidden(client, db_session, make_item):
     item = make_item(name="cancel-wrong-pin", warehouse_qty=Decimal("0"))
     actor = _make_employee(db_session, code="PIN1", warehouse_role="primary")
     db_session.commit()
-    _receive_v2(client, item, actor, 5)
+    _receive_v2(client, db_session, item, actor, 5)
     log = db_session.query(TransactionLog).filter(
         TransactionLog.transaction_type == TransactionTypeEnum.RECEIVE
     ).first()
