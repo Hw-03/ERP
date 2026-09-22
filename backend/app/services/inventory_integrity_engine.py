@@ -740,6 +740,7 @@ def _valid_inventory_effect(
     inventory_items_by_row: Mapping[str, str],
     location_keys: frozenset[tuple[str, str, str]],
     placement_by_scope_row: Mapping[tuple[str, str], WarehousePlacementState],
+    is_reversal: bool = False,
 ) -> bool:
     effect = transaction.inventory_effect
     quantity_change = transaction.quantity_change
@@ -753,9 +754,9 @@ def _valid_inventory_effect(
         and (transaction.reference_no or "").startswith("defect-disassemble:")
         and transaction.transaction_type == "DEFECT_SCRAP"
         and transaction.operation_role == "REWORK_CHILD_SCRAP"
-        and transaction.notes == "[rework:scrap_child]"
+        and (transaction.notes or "").startswith("[rework:scrap_child]")
     ):
-        return quantity_change < 0
+        return quantity_change < 0 or (is_reversal and quantity_change > 0)
     if not isinstance(effect, list) or not effect:
         return False
     valid_scopes = {
@@ -845,6 +846,7 @@ def _valid_friday_inventory_effect(
     location_key_by_row: Mapping[str, tuple[str, str, str]],
     placement_by_scope_row: Mapping[tuple[str, str], WarehousePlacementState],
     box_item_keys: frozenset[tuple[str, str]],
+    is_reversal: bool = False,
 ) -> bool:
     """Validate Friday's real scope/delta ledger without synthesizing projections."""
 
@@ -860,9 +862,9 @@ def _valid_friday_inventory_effect(
         and (transaction.reference_no or "").startswith("defect-disassemble:")
         and transaction.transaction_type == "DEFECT_SCRAP"
         and transaction.operation_role == "REWORK_CHILD_SCRAP"
-        and transaction.notes == "[rework:scrap_child]"
+        and (transaction.notes or "").startswith("[rework:scrap_child]")
     ):
-        return quantity_change < 0
+        return quantity_change < 0 or (is_reversal and quantity_change > 0)
     if not isinstance(effect, list) or not effect:
         return False
 
@@ -1035,6 +1037,8 @@ def _operation_findings(
     )
 
     def valid_inventory_effect(transaction: TransactionEffectState) -> bool:
+        operation = operations.get(transaction.operation_id or "")
+        is_reversal = operation is not None and operation.reverses_operation_id is not None
         if profile == "friday-0033":
             return _valid_friday_inventory_effect(
                 transaction,
@@ -1043,12 +1047,14 @@ def _operation_findings(
                 location_key_by_row=location_key_by_row,
                 placement_by_scope_row=placement_by_scope_row,
                 box_item_keys=box_item_keys,
+                is_reversal=is_reversal,
             )
         return _valid_inventory_effect(
             transaction,
             inventory_items_by_row=inventory_items_by_row,
             location_keys=location_keys,
             placement_by_scope_row=placement_by_scope_row,
+            is_reversal=is_reversal,
         )
 
     findings: list[IntegrityFinding] = []
@@ -1093,11 +1099,11 @@ def _operation_findings(
     for transaction in snapshot.transactions:
         if transaction.operation_id is not None:
             continue
-        is_post_cutover = (
-            snapshot.cutover_at is not None
-            and transaction.created_at >= snapshot.cutover_at
-        )
-        if is_post_cutover:
+        if snapshot.cutover_at is not None and transaction.created_at < snapshot.cutover_at:
+            # 원장 활성화 전 거래에는 operation/effect 계약이 존재하지 않았다.
+            # 과거 이력을 현재 계약으로 역산해 경고하지 않는다.
+            continue
+        if snapshot.cutover_at is not None:
             findings.append(
                 _finding(
                     "OPERATION_V2_EFFECT_INVALID",

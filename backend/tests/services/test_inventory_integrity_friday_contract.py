@@ -97,6 +97,70 @@ def _operation_snapshot(module, effect, *, quantity_change=5):
     )
 
 
+def test_friday_ignores_pre_ledger_transaction_without_operation() -> None:
+    module = _engine()
+    snapshot = module.InventoryIntegritySnapshot(
+        item_ids=frozenset({"item-1"}),
+        active_item_ids=frozenset({"item-1"}),
+        transactions=(
+            module.TransactionEffectState(
+                log_id="legacy-log",
+                item_id="item-1",
+                operation_id=None,
+                created_at=datetime(2026, 8, 26, 22, 25),
+                transaction_type="RECEIVE",
+                operation_role=None,
+                quantity_change=Decimal("1"),
+                reference_no=None,
+                notes=None,
+                inventory_effect=None,
+            ),
+        ),
+        cutover_at=datetime(2026, 8, 26, 22, 26),
+        v2_cutover_at=datetime(2026, 9, 11, 10, 31),
+    )
+
+    result = module.evaluate_inventory_integrity(snapshot, profile="friday-0033")
+
+    assert _check(result, "OPERATION_V1_EFFECT_MISSING").count == 0
+
+
+def test_friday_accepts_rework_scrap_effect_with_memo() -> None:
+    module = _engine()
+    snapshot = module.InventoryIntegritySnapshot(
+        item_ids=frozenset({"item-1"}),
+        active_item_ids=frozenset({"item-1"}),
+        operations=(
+            module.OperationState(
+                operation_id="rework-operation",
+                contract_version=1,
+                effective_at=datetime(2026, 9, 8, 5, 57),
+                reverses_operation_id="original-rework-operation",
+            ),
+        ),
+        transactions=(
+            module.TransactionEffectState(
+                log_id="rework-scrap-log",
+                item_id="item-1",
+                operation_id="rework-operation",
+                created_at=datetime(2026, 9, 8, 5, 57),
+                transaction_type="DEFECT_SCRAP",
+                operation_role="REWORK_CHILD_SCRAP",
+                quantity_change=Decimal("1"),
+                reference_no="defect-disassemble:rework-record",
+                notes="[rework:scrap_child] 메모: 재작업",
+                inventory_effect=[],
+            ),
+        ),
+        cutover_at=datetime(2026, 8, 26, 22, 26),
+        v2_cutover_at=datetime(2026, 9, 11, 10, 31),
+    )
+
+    result = module.evaluate_inventory_integrity(snapshot, profile="friday-0033")
+
+    assert _check(result, "OPERATION_V1_EFFECT_MISSING").count == 0
+
+
 def test_transport_profile_defaults_to_modern_for_existing_callers() -> None:
     response = InventoryIntegrityResponse(
         contract="inventory-integrity/v1",
