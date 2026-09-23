@@ -51,7 +51,11 @@ def test_only_warehouse_managers_can_manage_and_hidden_supplier_can_be_restored(
     primary = _warehouse_employee(db_session)
     deputy = _warehouse_employee(db_session, warehouse_role="deputy")
     staff = _warehouse_employee(db_session, warehouse_role="none")
-    forbidden = client.get(f"/api/suppliers?requester_employee_id={staff.employee_id}")
+    active_only = client.get(f"/api/suppliers?requester_employee_id={staff.employee_id}")
+    assert active_only.status_code == 200
+    forbidden = client.get(
+        f"/api/suppliers?requester_employee_id={staff.employee_id}&include_inactive=true"
+    )
     assert forbidden.status_code == 403
     empty = client.post(
         "/api/suppliers",

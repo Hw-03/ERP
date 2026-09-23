@@ -43,6 +43,7 @@ def upsert_draft_request(
     notes: Optional[str],
     reason_category: Optional[str] = None,
     reason_memo: Optional[str] = None,
+    supplier_id: uuid.UUID | None = None,
 ) -> StockRequest:
     """직원 + request_type 기준 active draft 를 upsert.
 
@@ -56,6 +57,14 @@ def upsert_draft_request(
         allow_internal_use=False,
     )
     _validate_lines(request_type, lines_input, allow_empty=True)
+    from app.services.supplier import validate_supplier_for_stock_request
+
+    supplier = validate_supplier_for_stock_request(
+        db,
+        request_type=request_type,
+        supplier_id=supplier_id,
+        allow_missing_draft=True,
+    )
 
     existing = (
         db.query(StockRequest)
@@ -79,6 +88,8 @@ def upsert_draft_request(
         existing.notes = notes
         existing.reason_category = reason_category
         existing.reason_memo = reason_memo
+        existing.supplier_id = supplier.supplier_id if supplier is not None else None
+        existing.supplier_name_snapshot = supplier.name if supplier is not None else None
         existing.requires_warehouse_approval = any(
             line_requires_approval(li.from_bucket, li.to_bucket) for li in lines_input
         )
@@ -122,6 +133,8 @@ def upsert_draft_request(
         submitted_at=None,
         reason_category=reason_category,
         reason_memo=reason_memo,
+        supplier_id=supplier.supplier_id if supplier is not None else None,
+        supplier_name_snapshot=supplier.name if supplier is not None else None,
     )
 
 
@@ -220,6 +233,14 @@ def submit_draft_request(
         request.request_type,
         allow_internal_use=False,
     )
+    from app.services.supplier import validate_supplier_for_stock_request
+
+    supplier = validate_supplier_for_stock_request(
+        db,
+        request_type=request.request_type,
+        supplier_id=request.supplier_id,
+    )
+    request.supplier_name_snapshot = supplier.name if supplier is not None else None
     db_lines = list(request.lines)
     if not db_lines:
         raise ValueError("요청 라인이 비어 있습니다.")

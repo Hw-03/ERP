@@ -37,6 +37,7 @@ from app.models import (
     StockRequest,
     StockRequestStatusEnum,
     StockRequestTypeEnum,
+    Supplier,
     TransactionLog,
     TransactionTypeEnum,
 )
@@ -65,6 +66,7 @@ DEMO_REASON_CATEGORY = "기타"
 @dataclass(frozen=True)
 class ShowcasePlan:
     actor: Employee
+    supplier: Supplier
     general_item: Item
     production_parent: Item
     conversion_source: Item
@@ -118,6 +120,18 @@ def _active_admin(db) -> Employee:
     if actor is None:
         raise RuntimeError("[HISTORY-DEMO] 활성 관리자 직원이 필요합니다.")
     return actor
+
+
+def _active_supplier(db) -> Supplier:
+    supplier = (
+        db.query(Supplier)
+        .filter(Supplier.is_active.is_(True))
+        .order_by(Supplier.name, Supplier.supplier_id)
+        .first()
+    )
+    if supplier is None:
+        raise RuntimeError("[HISTORY-DEMO] 불량 반품에 사용할 활성 공급업체가 필요합니다.")
+    return supplier
 
 
 def _find_general_item(db) -> Item:
@@ -205,6 +219,7 @@ def build_showcase_plan(db) -> ShowcasePlan:
     source, target = _find_conversion_pair(db)
     return ShowcasePlan(
         actor=actor,
+        supplier=_active_supplier(db),
         general_item=_find_general_item(db),
         production_parent=_find_production_parent(db),
         conversion_source=source,
@@ -411,6 +426,11 @@ def _run_stock_request(
         client_request_id=f"history-demo-{uuid.uuid4()}",
         reason_category=DEMO_REASON_CATEGORY,
         reason_memo=marker,
+        supplier_id=(
+            plan.supplier.supplier_id
+            if request_type == StockRequestTypeEnum.DEFECT_RETURN
+            else None
+        ),
     )
 
 

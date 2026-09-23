@@ -100,6 +100,11 @@ export function MyRequestRow({
             >
               {status.label}
             </span>
+            {req.request_type === "defect_return" && req.supplier_name_snapshot && (
+              <span className="rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ background: LEGACY_COLORS.s1, color: LEGACY_COLORS.blue }}>
+                공급업체 · {req.supplier_name_snapshot}
+              </span>
+            )}
           </div>
         </div>
         {req.rejected_reason && (

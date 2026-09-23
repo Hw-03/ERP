@@ -16,7 +16,7 @@ from bootstrap.schema import (
 )
 
 
-HEAD_REVISION = "20260921_0036"
+HEAD_REVISION = "20260922_0037"
 
 
 def _ensured() -> SchemaEnsureResult:

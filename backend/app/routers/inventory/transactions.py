@@ -824,6 +824,7 @@ def export_transactions_csv(
         TransactionLog.reference_no,
         TransactionLog.notes,
         TransactionLog.produced_by,
+        TransactionLog.supplier_name_snapshot,
         IoBatch.requester_name,
     )
     if search_filter is not None:
@@ -854,6 +855,7 @@ def export_transactions_csv(
             "produced_by",
             "requester_name",
             "approver_name",
+            "supplier_name",
             "notes",
         ]
     )
@@ -877,6 +879,7 @@ def export_transactions_csv(
                 log.produced_by or "",
                 requester or "",
                 approver or "",
+                log.supplier_name_snapshot or "",
                 log.notes or "",
             ]
         )
@@ -918,6 +921,7 @@ def export_transactions_xlsx(
         TransactionLog.reference_no,
         TransactionLog.notes,
         TransactionLog.produced_by,
+        TransactionLog.supplier_name_snapshot,
         IoBatch.requester_name,
     )
     if search_filter is not None:
@@ -947,7 +951,7 @@ def export_transactions_xlsx(
 
     columns = [
         "일시", "유형", "품목 코드", "품목명", "공정코드",
-        "수량변화", "이전재고", "이후재고", "참조번호", "담당자", "요청자", "승인자", "메모",
+        "수량변화", "이전재고", "이후재고", "참조번호", "담당자", "요청자", "승인자", "공급업체", "메모",
     ]
     apply_header(ws, columns)
 
@@ -980,6 +984,7 @@ def export_transactions_xlsx(
             log.produced_by or "",
             requester or "",
             approver or "",
+            log.supplier_name_snapshot or "",
             log.notes or "",
         ]
         ws.append(row_data)

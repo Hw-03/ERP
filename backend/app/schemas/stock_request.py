@@ -33,6 +33,7 @@ class StockRequestCreate(BaseModel):
     client_request_id: Optional[str] = Field(None, max_length=64)
     reason_category: Optional[str] = Field(None, max_length=32)
     reason_memo: Optional[str] = None
+    supplier_id: Optional[uuid.UUID] = None
 
     @model_validator(mode="after")
     def require_direct_defect_reason(self) -> "StockRequestCreate":
@@ -57,6 +58,7 @@ class StockRequestDraftUpsert(BaseModel):
     lines: List[StockRequestLineCreate] = Field(default_factory=list)
     reason_category: Optional[str] = Field(None, max_length=32)
     reason_memo: Optional[str] = None
+    supplier_id: Optional[uuid.UUID] = None
 
 
 class StockRequestSubmitPayload(BaseModel):
@@ -124,6 +126,8 @@ class StockRequestResponse(BaseModel):
     reference_no: Optional[str] = None
     notes: Optional[str] = None
     operation_batch_id: Optional[uuid.UUID] = None
+    supplier_id: Optional[uuid.UUID] = None
+    supplier_name_snapshot: Optional[str] = None
     created_at: UtcDatetime
     updated_at: UtcDatetime
     lines: List[StockRequestLineResponse] = []

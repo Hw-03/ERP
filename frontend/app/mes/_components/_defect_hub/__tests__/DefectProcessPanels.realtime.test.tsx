@@ -7,6 +7,11 @@ import { REASON_CATEGORIES } from "../reasonCategories";
 const apiMocks = vi.hoisted(() => ({
   unquarantine: vi.fn(),
   createStockRequest: vi.fn(),
+  listSuppliers: vi.fn(),
+}));
+
+vi.mock("@/lib/api", () => ({
+  api: { listSuppliers: apiMocks.listSuppliers },
 }));
 
 vi.mock("@/lib/api/defects", () => ({
@@ -78,6 +83,13 @@ describe.each(panels)("%s defect process panel realtime location updates", (_nam
   beforeEach(() => {
     apiMocks.unquarantine.mockReset().mockResolvedValue(undefined);
     apiMocks.createStockRequest.mockReset().mockResolvedValue(undefined);
+    apiMocks.listSuppliers.mockReset().mockResolvedValue([{
+      supplier_id: "supplier-1",
+      name: "HLP",
+      is_active: true,
+      created_at: "2026-09-01T00:00:00Z",
+      updated_at: "2026-09-01T00:00:00Z",
+    }]);
   });
 
   it("preserves valid drafts, clamps only above the fresh max, and submits the fresh quantity", async () => {
@@ -189,5 +201,24 @@ describe.each(panels)("%s defect process panel realtime location updates", (_nam
         }),
       );
     });
+  });
+
+  it("requires supplier selection before defect return and sends the supplier id", async () => {
+    const props = { currentEmployee: employee, onDone: vi.fn(), onCancel: vi.fn() };
+    render(<Panel {...props} location={{ ...location, department: "창고" }} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /반품/ }));
+    fireEvent.click(screen.getByRole("button", { name: "공급업체 선택 →" }));
+    expect(await screen.findByText("반품 공급업체 선택")).toBeInTheDocument();
+    expect(apiMocks.createStockRequest).not.toHaveBeenCalled();
+
+    fireEvent.click(await screen.findByRole("button", { name: "HLP" }));
+    fireEvent.click(screen.getByRole("button", { name: "반품 확인" }));
+    expect(await screen.findByRole("dialog")).toHaveTextContent("HLP에 반품합니다");
+    fireEvent.click(screen.getByRole("button", { name: "즉시 반품" }));
+
+    await waitFor(() => expect(apiMocks.createStockRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ request_type: "defect_return", supplier_id: "supplier-1" }),
+    ));
   });
 });

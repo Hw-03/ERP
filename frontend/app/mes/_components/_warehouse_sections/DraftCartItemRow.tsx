@@ -48,6 +48,11 @@ export function DraftCartItemRow({
         <span className="text-xs" style={{ color: LEGACY_COLORS.muted }}>
           {draft.lines.length}건 · 총 {formatQty(totalQty)}
         </span>
+        {draft.request_type === "defect_return" && draft.supplier_name_snapshot && (
+          <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.blue }}>
+            공급업체 · {draft.supplier_name_snapshot}
+          </span>
+        )}
         <span
           className="ml-auto whitespace-nowrap text-xs tabular-nums"
           style={{ color: LEGACY_COLORS.muted }}

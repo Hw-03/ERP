@@ -121,6 +121,8 @@ def _build_request_and_lines(
     approval_department: Optional[str] = None,
     reason_category: Optional[str] = None,
     reason_memo: Optional[str] = None,
+    supplier_id: uuid.UUID | None = None,
+    supplier_name_snapshot: str | None = None,
 ) -> StockRequest:
     """StockRequest + StockRequestLine row 생성. 호출자가 사전 검증 책임.
 
@@ -154,6 +156,8 @@ def _build_request_and_lines(
         notes=notes,
         reason_category=reason_category,
         reason_memo=reason_memo,
+        supplier_id=supplier_id,
+        supplier_name_snapshot=supplier_name_snapshot,
     )
     db.add(request)
     db.flush()
@@ -202,6 +206,7 @@ def create_request(
     reason_category: Optional[str] = None,
     reason_memo: Optional[str] = None,
     allow_internal_use: bool = False,
+    supplier_id: uuid.UUID | None = None,
 ) -> StockRequest:
     """요청 생성. 호출자가 db.commit() 책임.
 
@@ -215,6 +220,13 @@ def create_request(
         requester,
         request_type,
         allow_internal_use=allow_internal_use,
+    )
+    from app.services.supplier import validate_supplier_for_stock_request
+
+    supplier = validate_supplier_for_stock_request(
+        db,
+        request_type=request_type,
+        supplier_id=supplier_id,
     )
 
     # 불량 등록·처리는 모두 요청자가 즉시 실행한다. 격리 처리도 한 부서의 기록만
@@ -295,6 +307,8 @@ def create_request(
         approval_department=approval_department,
         reason_category=reason_category,
         reason_memo=reason_memo,
+        supplier_id=supplier.supplier_id if supplier is not None else None,
+        supplier_name_snapshot=supplier.name if supplier is not None else None,
     )
     return _finalize_submission(
         db,

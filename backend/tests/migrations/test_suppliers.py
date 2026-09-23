@@ -76,6 +76,13 @@ def _seed_io_batch_dependents(db: sqlite3.Connection) -> None:
         "VALUES ('supplier-io-line', 'supplier-io-bundle', 'supplier-child-item', "
         "'공급업체 자식 품목', 'EA', 'in', 'none', 'warehouse', 1, 0, 1, 1, 'direct', 0, 0, 0)"
     )
+    db.execute(
+        "INSERT INTO transaction_logs "
+        "(log_id, item_id, transaction_type, quantity_change, quantity_before, quantity_after, "
+        "created_at, operation_batch_id, operation_line_id) "
+        "VALUES ('supplier-transaction-log', 'supplier-child-item', 'RECEIVE', 1, 0, 1, "
+        "CURRENT_TIMESTAMP, 'supplier-io-batch', 'supplier-io-line')"
+    )
 
 
 def test_supplier_revision_adds_master_and_nullable_io_batch_snapshot_columns(tmp_path: Path):
@@ -108,7 +115,7 @@ def test_supplier_revision_preserves_io_batch_dependents_with_sqlite_foreign_key
         _seed_io_batch_dependents(db)
         before = {
             table: db.execute(f"SELECT * FROM {table} ORDER BY 1").fetchall()
-            for table in ("io_batches", "io_bundles", "io_lines")
+            for table in ("io_batches", "io_bundles", "io_lines", "transaction_logs")
         }
 
     _upgrade_with_sqlite_foreign_keys(config, REVISION)
@@ -116,7 +123,7 @@ def test_supplier_revision_preserves_io_batch_dependents_with_sqlite_foreign_key
     with sqlite3.connect(path) as db:
         after = {
             table: db.execute(f"SELECT * FROM {table} ORDER BY 1").fetchall()
-            for table in ("io_batches", "io_bundles", "io_lines")
+            for table in ("io_batches", "io_bundles", "io_lines", "transaction_logs")
         }
         foreign_key_errors = db.execute("PRAGMA foreign_key_check").fetchall()
 

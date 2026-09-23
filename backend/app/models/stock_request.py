@@ -145,6 +145,13 @@ class StockRequest(Base):
         nullable=True,
         index=True,
     )
+    supplier_id = Column(
+        UUIDString,
+        ForeignKey("suppliers.supplier_id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    supplier_name_snapshot = Column(String(100), nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now(), index=True)
     updated_at = Column(
         DateTime,
