@@ -474,6 +474,7 @@ def _history_search_filter(search: Optional[str]) -> Optional[ColumnElement[bool
         TransactionLog.reference_no,
         TransactionLog.notes,
         TransactionLog.produced_by,
+        TransactionLog.supplier_name_snapshot,
         IoBatch.requester_name,
     )
 
@@ -783,6 +784,8 @@ def _to_log_response(
         notes=log.notes,
         reason_category=log.reason_category,
         reason_memo=log.reason_memo,
+        supplier_id=log.supplier_id,
+        supplier_name_snapshot=log.supplier_name_snapshot,
         operation_batch_id=log.operation_batch_id,
         operation_line_id=log.operation_line_id,
         operation_id=log.operation_id,

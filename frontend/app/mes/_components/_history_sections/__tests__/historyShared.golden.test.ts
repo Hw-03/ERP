@@ -353,6 +353,21 @@ describe("getHistoryFlowLabel", () => {
   it("unknown tx (no batch) → tx 그대로", () => {
     expect(getHistoryFlowLabel({ transaction_type: "UNKNOWN" })).toBe("UNKNOWN");
   });
+
+  it("불량 반품은 완료 당시 업체명으로 흐름을 표시하고 취소는 반전한다", () => {
+    const original = {
+      transaction_type: "SUPPLIER_RETURN",
+      department: "창고",
+      supplier_name_snapshot: " HLP ",
+    };
+    const reversal = { ...original, reverses_log_id: "original-log" };
+
+    expect(getHistoryFlowLabel(original)).toBe("창고 불량 격리 → HLP");
+    expect(getHistoryFlowLabel(reversal)).toBe("HLP → 창고 불량 격리");
+    expect(getHistoryDisplaySubLabel(original)).toBe("창고 불량 격리 → HLP");
+    expect(getHistoryFlowLabel({ transaction_type: "SUPPLIER_RETURN", department: "창고" }))
+      .toBe("원자재 반품");
+  });
 });
 
 // ──────────────────────────────────────────────────────────────────

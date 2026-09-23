@@ -548,9 +548,20 @@ export function getHistoryDisplayLabel(
 
 /** 화면 정본 보조문구. 의미문구 우선, 없고 단일 명확한 흐름이면 "{from} → {to}". */
 export function getHistoryDisplaySubLabel(
-  log: { transaction_type: string; department?: string | null; item_id?: string | null },
+  log: {
+    transaction_type: string;
+    department?: string | null;
+    item_id?: string | null;
+    supplier_name_snapshot?: string | null;
+    reverses_log_id?: string | null;
+    operation_kind?: string | null;
+  },
   batch?: IoBatch | null,
 ): string | undefined {
+  const supplierName = log.supplier_name_snapshot?.trim();
+  if (log.transaction_type === "SUPPLIER_RETURN" && supplierName) {
+    return getHistoryFlowLabel(log, batch);
+  }
   if (_internalUseReturnLine(log, batch)) {
     return "선택 해제 자재를 소속 부서에 재입고";
   }
@@ -569,9 +580,22 @@ export function getHistoryDisplaySubLabel(
 
 /** 작업 흐름 라벨. batch 있고 명확하면 부서/창고/불량/생산 등으로, 그 외 거래 타입 추론. */
 export function getHistoryFlowLabel(
-  log: { transaction_type: string; department?: string | null; item_id?: string | null },
+  log: {
+    transaction_type: string;
+    department?: string | null;
+    item_id?: string | null;
+    supplier_name_snapshot?: string | null;
+    reverses_log_id?: string | null;
+    operation_kind?: string | null;
+  },
   batch?: IoBatch | null,
 ): string {
+  const supplierName = log.supplier_name_snapshot?.trim();
+  if (log.transaction_type === "SUPPLIER_RETURN" && supplierName) {
+    const quarantine = `${log.department?.trim() || "창고"} 불량 격리`;
+    const reversed = Boolean(log.reverses_log_id) || log.operation_kind === "CANCELLATION";
+    return reversed ? `${supplierName} → ${quarantine}` : `${quarantine} → ${supplierName}`;
+  }
   const batchContext = getHistoryChildResultBatchOperationLabel(log, batch);
   if (batchContext) return batchContext;
   const returnLine = _internalUseReturnLine(log, batch);

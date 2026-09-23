@@ -9,10 +9,23 @@ from unittest.mock import Mock
 
 from sqlalchemy import event
 
-from app.models import DepartmentEnum, Employee, EmployeeLevelEnum, InventoryLocation, LocationStatusEnum
+from app.models import (
+    DepartmentEnum,
+    Employee,
+    EmployeeLevelEnum,
+    InventoryLocation,
+    LocationStatusEnum,
+    Supplier,
+)
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "dev" / "seed_history_showcase.py"
+
+
+def _add_supplier(db_session, name: str = "이력 검증 공급업체") -> Supplier:
+    supplier = Supplier(name=name, normalized_name=name.casefold(), is_active=True)
+    db_session.add(supplier)
+    return supplier
 
 
 def _load_showcase_module():
@@ -36,6 +49,7 @@ def test_showcase_dry_run_selects_real_workflow_candidates(db_session, make_item
         is_active=True,
     )
     db_session.add(actor)
+    supplier = _add_supplier(db_session)
 
     raw = make_item(name="검증 일반 자재", process_type_code="AR", warehouse_qty=Decimal("20"))
     component_a = make_item(name="검증 구성품 A", process_type_code="AR", warehouse_qty=Decimal("20"))
@@ -57,6 +71,7 @@ def test_showcase_dry_run_selects_real_workflow_candidates(db_session, make_item
     plan = module.build_showcase_plan(db_session)
 
     assert plan.actor.employee_id == actor.employee_id
+    assert plan.supplier.supplier_id == supplier.supplier_id
     assert plan.general_item.inventory.warehouse_qty >= Decimal("5")
     assert plan.production_parent.item_id in {source_pa.item_id, target_pa.item_id, shipping_pf.item_id}
     assert plan.conversion_source.item_id == source_pa.item_id
@@ -76,6 +91,7 @@ def test_showcase_apply_rolls_back_everything_when_a_late_step_fails(db_session,
         is_active=True,
     )
     db_session.add(actor)
+    _add_supplier(db_session)
     raw = make_item(name="롤백 일반 자재", process_type_code="AR", warehouse_qty=Decimal("20"))
     component_a = make_item(name="롤백 구성품 A", process_type_code="AR", warehouse_qty=Decimal("20"))
     component_b = make_item(name="롤백 구성품 B", process_type_code="AR", warehouse_qty=Decimal("20"))
@@ -127,6 +143,7 @@ def test_showcase_apply_creates_searchable_real_inventory_history(db_session, ma
         is_active=True,
     )
     db_session.add(actor)
+    supplier = _add_supplier(db_session)
     raw = make_item(name="실행 일반 자재", process_type_code="AR", warehouse_qty=Decimal("30"))
     component_a = make_item(name="실행 구성품 A", process_type_code="AR", warehouse_qty=Decimal("30"))
     component_b = make_item(name="실행 구성품 B", process_type_code="AR", warehouse_qty=Decimal("30"))
@@ -195,6 +212,13 @@ def test_showcase_apply_creates_searchable_real_inventory_history(db_session, ma
     assert shipping_request.serial_numbers == f"DEMO-SN-{shipping_request.request_id.hex[:8].upper()}"
     assert shipping_request.prepared_by_employee_id == actor.employee_id
     assert shipping_request.prepared_by_name == actor.name
+    supplier_return = next(
+        log
+        for log in logs
+        if log.transaction_type == module.TransactionTypeEnum.SUPPLIER_RETURN
+    )
+    assert supplier_return.supplier_id == supplier.supplier_id
+    assert supplier_return.supplier_name_snapshot == supplier.name
 
 
 def test_showcase_remove_restores_inventory_and_deletes_marked_records(db_session, make_item, make_location, make_bom):
@@ -208,6 +232,7 @@ def test_showcase_remove_restores_inventory_and_deletes_marked_records(db_sessio
         is_active=True,
     )
     db_session.add(actor)
+    _add_supplier(db_session)
     raw = make_item(name="정리 일반 자재", process_type_code="AR", warehouse_qty=Decimal("30"))
     component_a = make_item(name="정리 구성품 A", process_type_code="AR", warehouse_qty=Decimal("30"))
     component_b = make_item(name="정리 구성품 B", process_type_code="AR", warehouse_qty=Decimal("30"))

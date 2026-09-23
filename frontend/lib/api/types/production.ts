@@ -61,6 +61,8 @@ export interface TransactionLog {
   notes: string | null;
   reason_category?: string | null;
   reason_memo?: string | null;
+  supplier_id?: string | null;
+  supplier_name_snapshot?: string | null;
   operation_batch_id: string | null;
   operation_line_id?: string | null;
   operation_id?: string | null;

@@ -15,6 +15,7 @@ type SupplierPickerStepProps = {
   onSelect: (supplier: Supplier | null) => void;
   onLoadStateChange?: (ready: boolean) => void;
   variant: "desktop" | "mobile";
+  mode?: "manage" | "select";
 };
 
 function errorMessage(error: unknown): string {
@@ -32,6 +33,7 @@ export function SupplierPickerStep({
   onSelect,
   onLoadStateChange,
   variant,
+  mode = "manage",
 }: SupplierPickerStepProps) {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [search, setSearch] = useState("");
@@ -45,7 +47,11 @@ export function SupplierPickerStep({
   const [invalidSupplierName, setInvalidSupplierName] = useState<string | null>(null);
   const supplierLoadRequestRef = useRef(0);
 
-  const loadSuppliers = async (includeInactive = showInactive || selectedSupplierId != null) => {
+  const canManage = mode === "manage";
+  const selectedSupplierLoadKey = canManage ? selectedSupplierId : null;
+  const loadSuppliers = async (
+    includeInactive = canManage && (showInactive || selectedSupplierId != null),
+  ) => {
     const requestId = ++supplierLoadRequestRef.current;
     if (!employeeId) {
       setSuppliers([]);
@@ -83,15 +89,17 @@ export function SupplierPickerStep({
   };
 
   useEffect(() => {
-    void loadSuppliers(showInactive || selectedSupplierId != null);
+    void loadSuppliers(canManage && (showInactive || selectedSupplierId != null));
     // employeeId/showInactive 변경 때만 새 목록을 조회한다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [employeeId, showInactive, selectedSupplierId]);
+  }, [employeeId, showInactive, selectedSupplierLoadKey, canManage]);
 
   const visibleSuppliers = useMemo(() => {
-    const activeOrManaged = suppliers.filter((supplier) => showInactive || supplier.is_active || supplier.supplier_id === selectedSupplierId);
+    const activeOrManaged = suppliers.filter((supplier) => (
+      (canManage && showInactive) || supplier.is_active
+    ));
     return activeOrManaged.filter((supplier) => matchesSearchText(supplier.name, search));
-  }, [search, selectedSupplierId, showInactive, suppliers]);
+  }, [canManage, search, showInactive, suppliers]);
 
   async function addSupplier() {
     const name = newName.trim();
@@ -166,18 +174,20 @@ export function SupplierPickerStep({
             />
           </span>
         </label>
-        <Button
-          variant="ghost"
-          size="md"
-          onClick={() => setShowInactive((value) => !value)}
-          className="min-h-11 text-sm"
-          aria-pressed={showInactive}
-        >
-          {showInactive ? "숨김 업체 닫기" : "숨김 업체 관리"}
-        </Button>
+        {canManage && (
+          <Button
+            variant="ghost"
+            size="md"
+            onClick={() => setShowInactive((value) => !value)}
+            className="min-h-11 text-sm"
+            aria-pressed={showInactive}
+          >
+            {showInactive ? "숨김 업체 닫기" : "숨김 업체 관리"}
+          </Button>
+        )}
       </div>
 
-      <form
+      {canManage && <form
         className="flex flex-wrap gap-2 rounded-[16px] border p-3"
         style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
         onSubmit={(event) => { event.preventDefault(); void addSupplier(); }}
@@ -195,7 +205,7 @@ export function SupplierPickerStep({
         <Button variant="primary" size="md" loading={saving} disabled={!newName.trim() || !employeeId} iconLeft={<Plus />} className="min-h-11 text-sm" onClick={() => void addSupplier()}>
           추가하고 선택
         </Button>
-      </form>
+      </form>}
 
       {error && (
         <div role="alert" className="flex items-center justify-between gap-3 rounded-[12px] border px-3 py-2.5 text-sm font-bold" style={{ background: tint(LEGACY_COLORS.red, 10), borderColor: tint(LEGACY_COLORS.red, 35), color: LEGACY_COLORS.red }}>
@@ -208,7 +218,9 @@ export function SupplierPickerStep({
         {loading ? (
           <p className="p-3 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>공급업체 목록을 불러오는 중입니다.</p>
         ) : visibleSuppliers.length === 0 ? (
-          <p className="p-3 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>등록된 공급업체가 없습니다. 위에서 새 업체를 추가하세요.</p>
+          <p className="p-3 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+            {canManage ? "등록된 공급업체가 없습니다. 위에서 새 업체를 추가하세요." : "선택할 수 있는 활성 공급업체가 없습니다."}
+          </p>
         ) : (
           <ul className="space-y-2">
             {visibleSuppliers.map((supplier) => {
@@ -217,7 +229,7 @@ export function SupplierPickerStep({
               return (
                 <li key={supplier.supplier_id} className="rounded-[12px] border p-2.5" style={{ background: selected ? tint(LEGACY_COLORS.blue, 10) : LEGACY_COLORS.s2, borderColor: selected ? LEGACY_COLORS.blue : LEGACY_COLORS.border }}>
                   <div className="flex min-h-11 items-center gap-2">
-                    {editing ? (
+                    {canManage && editing ? (
                       <input
                         autoFocus
                         value={editingName}
@@ -231,12 +243,12 @@ export function SupplierPickerStep({
                         <span className="flex items-center gap-2"><span className="truncate">{supplier.name}</span>{selected && <Check aria-label="선택됨" className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}{!supplier.is_active && <span className="rounded-full px-2 py-0.5 text-xs" style={{ background: tint(LEGACY_COLORS.muted2, 12) }}>숨김</span>}</span>
                       </button>
                     )}
-                    {editing ? (
+                    {canManage && editing ? (
                       <>
                         <Button variant="primary" size="sm" onClick={() => void saveName(supplier)} disabled={!editingName.trim()} className="min-h-11" aria-label="이름 저장"><Check /></Button>
                         <Button variant="ghost" size="sm" onClick={() => setEditingId(null)} className="min-h-11" aria-label="이름 수정 취소"><X /></Button>
                       </>
-                    ) : (
+                    ) : canManage ? (
                       <>
                         <Button variant="ghost" size="sm" onClick={() => { setEditingId(supplier.supplier_id); setEditingName(supplier.name); }} className="min-h-11" aria-label={`${supplier.name} 이름 수정`}><Pencil /></Button>
                         {supplier.is_active ? (
@@ -245,7 +257,7 @@ export function SupplierPickerStep({
                           <Button variant="secondary" size="sm" onClick={() => void setActive(supplier, true)} className="min-h-11" aria-label={`${supplier.name} 복원`}><RotateCcw /></Button>
                         )}
                       </>
-                    )}
+                    ) : null}
                   </div>
                 </li>
               );

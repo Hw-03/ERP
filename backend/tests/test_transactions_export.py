@@ -362,6 +362,40 @@ def test_export_csv_search_matches_requester_name(client, db_session):
     assert "ExportItem" in resp.text  # requester_name 검색으로 매칭됨
 
 
+def test_history_search_and_exports_include_supplier_snapshot(client, db_session):
+    item = _seed_batch_transaction(db_session)
+    log = (
+        db_session.query(TransactionLog)
+        .filter(TransactionLog.item_id == item.item_id)
+        .one()
+    )
+    log.supplier_name_snapshot = "반품 당시 업체"
+    db_session.commit()
+
+    listed = client.get(
+        "/api/inventory/transactions",
+        params={"search": "반품당시업체", "limit": 2000},
+    )
+    assert listed.status_code == 200, listed.text
+    assert [row["supplier_name_snapshot"] for row in listed.json()] == ["반품 당시 업체"]
+
+    csv_response = client.get(
+        f"/api/inventory/transactions/export.csv?search=반품당시업체&{_range()}"
+    )
+    assert csv_response.status_code == 200, csv_response.text
+    csv_rows = list(csv.DictReader(StringIO(csv_response.text)))
+    assert [row["supplier_name"] for row in csv_rows] == ["반품 당시 업체"]
+
+    xlsx_response = client.get(
+        f"/api/inventory/transactions/export.xlsx?search=반품당시업체&{_range()}"
+    )
+    assert xlsx_response.status_code == 200, xlsx_response.text
+    workbook = load_workbook(BytesIO(xlsx_response.content), read_only=True)
+    rows = list(workbook.active.iter_rows(values_only=True))
+    assert rows[0][12] == "공급업체"
+    assert [row[12] for row in rows[1:]] == ["반품 당시 업체"]
+
+
 def test_export_csv_search_ignores_spaces_and_separators(client, db_session):
     item = _seed_batch_transaction(db_session)
     db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id).one().reference_no = "TX- 12/3"

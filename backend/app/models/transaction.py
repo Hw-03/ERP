@@ -121,6 +121,13 @@ class TransactionLog(Base):
         nullable=True,
         index=True,
     )
+    supplier_id = Column(
+        UUIDString,
+        ForeignKey("suppliers.supplier_id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    supplier_name_snapshot = Column(String(100), nullable=True)
     cancelled = Column(Boolean, nullable=False, default=False, server_default="0")
     cancel_reason = Column(Text, nullable=True)
     cancelled_by = Column(

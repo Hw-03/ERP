@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
-HEAD_REVISION = "20260921_0036"
+HEAD_REVISION = "20260922_0037"
 
 
 def _config(database_path: Path) -> Config:

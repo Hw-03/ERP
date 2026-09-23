@@ -637,6 +637,16 @@ def _execute_line(
             notes=note,
             reason_category=request.reason_category,
             reason_memo=request.reason_memo,
+            supplier_id=(
+                request.supplier_id
+                if rt == StockRequestTypeEnum.DEFECT_RETURN
+                else None
+            ),
+            supplier_name_snapshot=(
+                request.supplier_name_snapshot
+                if rt == StockRequestTypeEnum.DEFECT_RETURN
+                else None
+            ),
             operation_batch_id=getattr(request, "operation_batch_id", None),
             operation_line_id=line.operation_line_id,
             department=str(department) if department else None,
@@ -658,6 +668,15 @@ def _execute_all_lines(
     is_approval: bool = False,
 ) -> None:
     lines = list(lines)
+    if request.request_type == StockRequestTypeEnum.DEFECT_RETURN:
+        from app.services.supplier import validate_supplier_for_stock_request
+
+        supplier = validate_supplier_for_stock_request(
+            db,
+            request_type=request.request_type,
+            supplier_id=request.supplier_id,
+        )
+        request.supplier_name_snapshot = supplier.name
     rework_request = request.request_type in {
         StockRequestTypeEnum.REWORK_NORMAL,
         StockRequestTypeEnum.DEFECT_DISASSEMBLE,
