@@ -104,6 +104,8 @@ class TransactionLogResponse(BaseModel):
     notes: Optional[str]
     reason_category: Optional[str] = None
     reason_memo: Optional[str] = None
+    supplier_id: Optional[uuid.UUID] = None
+    supplier_name_snapshot: Optional[str] = None
     operation_batch_id: Optional[uuid.UUID] = None
     operation_line_id: Optional[uuid.UUID] = None
     operation_id: Optional[uuid.UUID] = None

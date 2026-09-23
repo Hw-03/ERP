@@ -33,6 +33,7 @@ from app.models import (
     StockRequestLine,
     StockRequestStatusEnum,
     StockRequestTypeEnum,
+    Supplier,
     SystemSetting,
     TransactionLog,
     TransactionTypeEnum,
@@ -56,6 +57,7 @@ def test_bulk_immediate_processing_is_atomic_for_plain_employee(
     child = make_item(name="BULK-CHILD", process_type_code="AR", warehouse_qty=Decimal("0"))
     make_bom(item.item_id, child.item_id, Decimal("2"))
     actor = _make_employee(db_session, code="BULK-STAFF", name="일반 직원")
+    supplier = _make_supplier(db_session) if request_type == "defect_return" else None
     db_session.add(SystemSetting(setting_key="inventory_operation_cutover_at", setting_value="2026-01-01T00:00:00"))
     db_session.commit()
     for qty in (1, 2, 3):
@@ -98,6 +100,8 @@ def test_bulk_immediate_processing_is_atomic_for_plain_employee(
             "from_department": DepartmentEnum.WAREHOUSE.value, "to_bucket": "none",
         } for record in selected],
     }
+    if supplier is not None:
+        payload["supplier_id"] = str(supplier.supplier_id)
     response = client.post("/api/stock-requests", json=payload)
     db_session.expire_all()
     if fail_second:
@@ -150,6 +154,17 @@ def _make_employee(
     db_session.add(emp)
     db_session.flush()
     return emp
+
+
+def _make_supplier(db_session, *, name: str = "테스트 반품 업체") -> Supplier:
+    supplier = Supplier(
+        name=name,
+        normalized_name=f"{name.casefold()}-{uuid.uuid4().hex[:8]}",
+        is_active=True,
+    )
+    db_session.add(supplier)
+    db_session.flush()
+    return supplier
 
 
 def _make_defective_location(db_session, item_id, dept: DepartmentEnum, qty: Decimal) -> InventoryLocation:
@@ -1888,6 +1903,7 @@ def test_defect_return_via_stock_request(db_session, client, make_item):
     """격리 재고에서 공급처 반품을 즉시 처리하고 요청자를 작업자로 남긴다."""
     item = make_item(name="R004", process_type_code="TR", warehouse_qty=Decimal("8"))
     requester = _make_employee(db_session, code="E05", name="발의자E")
+    supplier = _make_supplier(db_session, name="R004 반품 업체")
     db_session.commit()
 
     # 격리 먼저 (warehouse 4개 → DEFECTIVE)
@@ -1910,6 +1926,7 @@ def test_defect_return_via_stock_request(db_session, client, make_item):
     res = client.post("/api/stock-requests", json={
         "requester_employee_id": str(requester.employee_id),
         "request_type": "defect_return",
+        "supplier_id": str(supplier.supplier_id),
         "requires_department_approval": True,
         "lines": [{
             "item_id": str(item.item_id),
@@ -2725,6 +2742,7 @@ def test_b_grade_record_is_rejected_by_immediate_defect_action(
     """구형 즉시 실행 요청도 B급 원장을 불량 처리하지 못한다."""
     item = make_item(name=f"B급 즉시 차단-{request_type}", warehouse_qty=Decimal("3"))
     actor = _make_employee(db_session, code=f"MCAT-{request_type}", name="즉시 처리자")
+    supplier = _make_supplier(db_session) if request_type == "defect_return" else None
     db_session.commit()
     assert client.post("/api/defects/quarantine", json={
         "item_id": str(item.item_id), "qty": "2", "source": "warehouse",
@@ -2733,14 +2751,17 @@ def test_b_grade_record_is_rejected_by_immediate_defect_action(
     }).status_code == 200
     record = db_session.query(DefectQuarantineRecord).filter_by(current_memo="B급 원장").one()
 
-    response = client.post("/api/stock-requests", json={
+    payload = {
         "requester_employee_id": str(actor.employee_id), "request_type": request_type,
         "lines": [{
             "record_id": str(record.record_id), "item_id": str(item.item_id), "quantity": "1",
             "from_bucket": "defective", "from_department": DepartmentEnum.WAREHOUSE.value,
             "to_bucket": "none",
         }],
-    })
+    }
+    if supplier is not None:
+        payload["supplier_id"] = str(supplier.supplier_id)
+    response = client.post("/api/stock-requests", json=payload)
 
     assert response.status_code == 422, response.text
     assert "불량 격리로 이동" in response.text

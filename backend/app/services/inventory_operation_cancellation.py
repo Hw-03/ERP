@@ -708,6 +708,8 @@ def _reverse_log(
         shipping_phase=original.shipping_phase,
         department=original.department,
         defect_quarantine_record_id=original.defect_quarantine_record_id,
+        supplier_id=original.supplier_id,
+        supplier_name_snapshot=original.supplier_name_snapshot,
         **inv_effect.capture_log_stock_snapshot(db, original.item_id, before_cells),
     )
     db.add(reversal_log)

@@ -120,6 +120,7 @@ erDiagram
     Employee o|--o{ Inventory : "last_reserver_employee_id (nullable)"
     Item ||--o{ InventoryLocation : "item_id"
     Item ||--o{ TransactionLog : "item_id"
+    Supplier o|--o{ TransactionLog : "supplier_id (nullable)"
     InventoryOperation ||--o{ TransactionLog : "operation_id"
     InventoryOperation o|--o| InventoryOperation : "reverses_operation_id"
     InventoryOperation ||--o{ InventoryOperationEffect : "operation_id"
@@ -150,6 +151,8 @@ erDiagram
         uuid reverses_log_id FK "nullable, unique"
         uuid operation_batch_id FK "nullable"
         uuid shipping_request_id FK "nullable"
+        uuid supplier_id FK "nullable"
+        string supplier_name_snapshot "nullable"
         string transaction_type
         int quantity_change
     }
@@ -199,6 +202,7 @@ erDiagram
 erDiagram
     Employee ||--o{ IoBatch : "requester_employee_id"
     Supplier o|--o{ IoBatch : "supplier_id (nullable)"
+    Supplier o|--o{ StockRequest : "supplier_id (nullable)"
     ShippingRequest o|--o{ IoBatch : "shipping_request_id (nullable)"
     IoBatch ||--o{ IoBundle : "batch_id"
     IoBundle ||--o{ IoLine : "bundle_id"
@@ -246,6 +250,8 @@ erDiagram
     StockRequest {
         uuid requester_employee_id FK
         uuid operation_batch_id FK "nullable"
+        uuid supplier_id FK "nullable"
+        string supplier_name_snapshot "nullable"
         string request_type
         string status
     }
@@ -259,6 +265,7 @@ erDiagram
 
 - **IoBatch → IoBundle → IoLine**은 입출고 V2의 제출·전개·실제 반영 후보 라인 구조다. 제외된 `io_lines`도 감사 내역으로 남는다.
 - 원자재 입고 배치는 `suppliers`의 활성 업체를 참조하고 완료 시점의 업체명을 `supplier_name_snapshot`으로 보존한다. 이후 업체 이름 변경·숨김은 완료된 입고 이력과 F704-02 입/출고처를 바꾸지 않는다.
+- 불량 반품 요청은 `stock_requests.supplier_id`로 활성 업체를 참조하며 요청·실행 시점의 이름을 `stock_requests.supplier_name_snapshot`과 `transaction_logs.supplier_name_snapshot`에 보존한다. 취소 로그는 원로그의 두 업체 필드를 복사하고, 이 정보는 F704-02에 사용하지 않는다.
 - `io_batches.stock_request_id`는 저장된 참조값이고 모델 FK가 아니다. 결재 요청의 실제 배치 연결은 `stock_requests.operation_batch_id` FK다.
 
 ## 5. 출하

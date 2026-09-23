@@ -9,6 +9,7 @@ from app.models import (
     Inventory,
     InventoryLocation,
     LocationStatusEnum,
+    Supplier,
     TransactionLog,
     TransactionTypeEnum,
 )
@@ -143,6 +144,12 @@ def test_inventory_day_flow_preserves_quantities_and_audit_trail(db_session, cli
         department=DepartmentEnum.HIGH_VOLTAGE,
         department_role="primary",
     )
+    supplier = Supplier(
+        name="operational return supplier",
+        normalized_name="operational return supplier",
+        is_active=True,
+    )
+    db_session.add(supplier)
     db_session.commit()
 
     received = _stock_request(
@@ -240,6 +247,7 @@ def test_inventory_day_flow_preserves_quantities_and_audit_trail(db_session, cli
         client,
         requester=worker,
         request_type="defect_return",
+        supplier_id=str(supplier.supplier_id),
         requires_department_approval=True,
         lines=[{
             "item_id": str(item.item_id),

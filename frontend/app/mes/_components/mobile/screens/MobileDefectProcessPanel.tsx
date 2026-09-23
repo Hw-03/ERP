@@ -21,6 +21,8 @@ import { InlineErrorNote } from "../../_defect_hub/InlineErrorNote";
 import { REASON_CATEGORIES } from "../../_defect_hub/reasonCategories";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { IconButton, SectionCard, StickyFooter, Stepper } from "../primitives";
+import type { Supplier } from "@/lib/api";
+import { SupplierPickerStep } from "../../_warehouse_v2/SupplierPickerStep";
 
 type ProcessAction = "unquarantine" | "scrap" | "return" | "disassemble";
 
@@ -46,7 +48,7 @@ export function MobileDefectProcessPanel({
   const isWarehouse = location.department === "창고";
   const maxQty = Math.max(1, Number(location.available_quantity) || 1);
 
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [action, setAction] = useState<ProcessAction>("unquarantine");
   const [processQty, setProcessQty] = useState<number>(maxQty);
   const [category, setCategory] = useState("");
@@ -56,6 +58,8 @@ export function MobileDefectProcessPanel({
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  const [supplierListReady, setSupplierListReady] = useState(false);
   const locationIdentityRef = useRef(location.record_id);
   const boundedProcessQty = Math.max(1, Math.min(maxQty, processQty));
 
@@ -72,6 +76,8 @@ export function MobileDefectProcessPanel({
     setBusy(false);
     setErrorMsg(null);
     setConfirmOpen(false);
+    setSelectedSupplier(null);
+    setSupplierListReady(false);
   }, [location.record_id, location.available_quantity]);
 
   useEffect(() => {
@@ -83,6 +89,10 @@ export function MobileDefectProcessPanel({
     if (action !== "disassemble") {
       setDecisions([]);
       setDecisionParentQty(null);
+    }
+    if (action !== "return") {
+      setSelectedSupplier(null);
+      setSupplierListReady(false);
     }
   }, [action]);
 
@@ -104,7 +114,7 @@ export function MobileDefectProcessPanel({
   }
 
   async function handleSubmit() {
-    if (busy || (action === "disassemble" && !reworkReady)) return;
+    if (busy || (action === "disassemble" && !reworkReady) || (action === "return" && !selectedSupplier)) return;
     setBusy(true);
     setErrorMsg(null);
     try {
@@ -122,6 +132,7 @@ export function MobileDefectProcessPanel({
         await stockRequestsApi.createStockRequest({
           requester_employee_id: currentEmployee.employee_id,
           request_type: action === "scrap" ? "defect_scrap" : "defect_return",
+          supplier_id: action === "return" ? selectedSupplier!.supplier_id : undefined,
           reason_category: category || null,
           reason_memo: memo || null,
           notes: memo || null,
@@ -171,6 +182,58 @@ export function MobileDefectProcessPanel({
     return: LEGACY_COLORS.muted2,
   };
   const formatDate = (iso: string | null) => (iso ? iso.slice(0, 10) : "-");
+
+  if (step === 3) {
+    return (
+      <div className="flex h-full min-h-0 flex-col gap-3">
+        <div className="flex shrink-0 items-center gap-2">
+          <IconButton icon={ArrowLeft} label="이전" size="md" onClick={() => setStep(1)} />
+          <div className="min-w-0">
+            <h2 className={clsx(TYPO.title, "font-black")} style={{ color: LEGACY_COLORS.text }}>반품 공급업체 선택</h2>
+            <p className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
+              {location.item_name} · {formatQty(boundedProcessQty)}개 · {location.department} 불량 격리
+            </p>
+          </div>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <SupplierPickerStep
+            employeeId={currentEmployee.employee_id}
+            selectedSupplierId={selectedSupplier?.supplier_id ?? null}
+            selectedSupplierName={selectedSupplier?.name ?? null}
+            onSelect={setSelectedSupplier}
+            onLoadStateChange={setSupplierListReady}
+            variant="mobile"
+            mode="select"
+          />
+        </div>
+        <StickyFooter>
+          <button
+            type="button"
+            disabled={busy || !supplierListReady || !selectedSupplier}
+            onClick={() => setConfirmOpen(true)}
+            className={clsx("w-full rounded-[16px] px-4 py-[14px] font-black text-white disabled:opacity-40", TYPO.body)}
+            style={{ background: LEGACY_COLORS.blueSolid }}
+          >
+            반품 확인
+          </button>
+        </StickyFooter>
+        <ConfirmModal
+          open={confirmOpen}
+          title="반품 확인"
+          tone="danger"
+          cautionMessage="확인하면 즉시 재고에 반영됩니다."
+          confirmLabel="즉시 반품"
+          busy={busy}
+          onClose={() => setConfirmOpen(false)}
+          onConfirm={() => { setConfirmOpen(false); void handleSubmit(); }}
+        >
+          <span style={{ color: LEGACY_COLORS.text }}>
+            {location.item_name} × {boundedProcessQty}개를 {selectedSupplier?.name}에 반품합니다.
+          </span>
+        </ConfirmModal>
+      </div>
+    );
+  }
 
   // ── Step 2: BOM 재작업 ──────────────────────────────────────────
   if (step === 2) {
@@ -404,6 +467,8 @@ export function MobileDefectProcessPanel({
           onClick={() => {
             if (action === "disassemble") {
               setStep(2);
+            } else if (action === "return") {
+              setStep(3);
             } else {
               setConfirmOpen(true);
             }
@@ -422,7 +487,7 @@ export function MobileDefectProcessPanel({
             ? "정상 복귀 →"
             : action === "scrap"
             ? "즉시 폐기 →"
-            : "즉시 반품 →"}
+            : "공급업체 선택 →"}
         </button>
       </StickyFooter>
 

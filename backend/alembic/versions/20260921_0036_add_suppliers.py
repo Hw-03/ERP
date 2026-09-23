@@ -63,7 +63,27 @@ def _snapshot_sqlite_dependents(
             snapshots.append((table_name, columns, primary_keys, rows))
         remaining.difference_update(children)
         parents.update(children)
-    return snapshots
+    snapshots_by_name = {snapshot[0]: snapshot for snapshot in snapshots}
+    pending = set(snapshots_by_name)
+    ordered: list[tuple[str, list[str], list[str], list[tuple[object, ...]]]] = []
+    while pending:
+        ready = sorted(
+            table_name
+            for table_name in pending
+            if not any(
+                foreign_key["referred_table"] in pending
+                and foreign_key["referred_table"] != table_name
+                for foreign_key in inspector.get_foreign_keys(table_name)
+            )
+        )
+        if not ready:
+            raise RuntimeError(
+                "SQLite io_batches dependent tables contain a foreign key cycle: "
+                + ", ".join(sorted(pending))
+            )
+        ordered.extend(snapshots_by_name[table_name] for table_name in ready)
+        pending.difference_update(ready)
+    return ordered
 
 
 def _restore_sqlite_dependents(

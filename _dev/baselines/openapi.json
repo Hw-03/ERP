@@ -10370,6 +10370,18 @@
             "format": "uuid",
             "title": "Requester Employee Id",
             "type": "string"
+          },
+          "supplier_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supplier Id"
           }
         },
         "required": [
@@ -10443,6 +10455,18 @@
             "format": "uuid",
             "title": "Requester Employee Id",
             "type": "string"
+          },
+          "supplier_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supplier Id"
           }
         },
         "required": [
@@ -10932,6 +10956,29 @@
               }
             ],
             "title": "Submitted At"
+          },
+          "supplier_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supplier Id"
+          },
+          "supplier_name_snapshot": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supplier Name Snapshot"
           },
           "updated_at": {
             "format": "date-time",
@@ -11687,6 +11734,29 @@
               }
             ],
             "title": "Shipping Phase"
+          },
+          "supplier_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supplier Id"
+          },
+          "supplier_name_snapshot": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supplier Name Snapshot"
           },
           "transaction_type": {
             "$ref": "#/components/schemas/TransactionTypeEnum"

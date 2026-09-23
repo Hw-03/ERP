@@ -112,6 +112,25 @@ describe("SupplierPickerStep", () => {
     expect(onSelect).toHaveBeenCalledWith(supplier);
   });
 
+  it("선택 전용 모드에서는 활성 목록만 조회하고 관리 기능을 숨긴다", async () => {
+    render(
+      <SupplierPickerStep
+        employeeId="employee-1"
+        selectedSupplierId={null}
+        onSelect={vi.fn()}
+        variant="desktop"
+        mode="select"
+      />,
+    );
+
+    await screen.findByRole("button", { name: "덕스윈상사" });
+    expect(api.listSuppliers).toHaveBeenCalledWith("employee-1", false);
+    expect(screen.queryByPlaceholderText("새 공급업체 이름")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "숨김 업체 관리" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "덕스윈상사 이름 수정" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "덕스윈상사 숨김" })).not.toBeInTheDocument();
+  });
+
   it("선택된 공급업체의 이름을 수정하면 현재 선택 표시명도 갱신한다", async () => {
     const onSelect = vi.fn();
     const renamed = { ...supplier, name: "덕스윈 주식회사" };

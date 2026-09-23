@@ -33,9 +33,22 @@ def _warehouse_manager(db: Session, employee_id: uuid.UUID) -> Employee:
     return employee
 
 
+def _active_employee(db: Session, employee_id: uuid.UUID) -> Employee:
+    """반품 업체 선택에 필요한 활성 목록 조회자를 검증한다."""
+    employee = db.get(Employee, employee_id)
+    if employee is None:
+        raise http_error(404, ErrorCode.NOT_FOUND, "요청자(직원)를 찾을 수 없습니다.")
+    if not bool(employee.is_active):
+        raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원은 공급업체를 조회할 수 없습니다.")
+    return employee
+
+
 @router.get("", response_model=list[SupplierResponse])
 def list_suppliers(requester_employee_id: uuid.UUID = Query(...), include_inactive: bool = Query(False), db: Session = Depends(get_db)) -> list[Supplier]:
-    _warehouse_manager(db, requester_employee_id)
+    if include_inactive:
+        _warehouse_manager(db, requester_employee_id)
+    else:
+        _active_employee(db, requester_employee_id)
     query = db.query(Supplier)
     if not include_inactive:
         query = query.filter(Supplier.is_active.is_(True))
