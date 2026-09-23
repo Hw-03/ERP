@@ -22,7 +22,7 @@ Keep both files aligned so Claude Code and Codex can work on DEXCOWIN MES with t
   - Use `subagent-driven-development` when executing a plan with independent implementation tasks in the current session.
   - Keep final integration, verification, commit, push, and deployment decisions in the parent session.
   - Do not dispatch multiple implementation subagents to edit the same files or tightly coupled behavior at the same time.
-  - When spawning a subagent, select its GPT-5.6 model and reasoning level for the delegated task's complexity, risk, and expected depth. For all new parent and subagent work, use only GPT-5.6 Sol, Terra, or Luna; do not select any other model family.
+  - When spawning a subagent, select its GPT-6 model and reasoning level for the delegated task's complexity, risk, and expected depth. For all new parent and subagent work, use only GPT-6 Astra, Sol, or Luna; do not recommend any other model family.
 - Keep `.agents/skills/` aligned with the user's Claude/Codex skill set when intentionally updating shared workflows.
 
 ## Project Rules
@@ -61,17 +61,16 @@ Keep both files aligned so Claude Code and Codex can work on DEXCOWIN MES with t
 
 After completing a plan, always place the recommended Codex model, exactly one reasoning level, and execution shape at the very top of the plan shown to the user. The model and reasoning-level names must match the labels shown in the Codex UI:
 
-> **추천 모델: GPT-5.6 Terra** - [한 줄 이유]
+> **추천 모델: GPT-6 Sol** - [한 줄 이유]
 > **추천 추론 수준: Medium** - [한 줄 이유]
 > **실행 방식: 단독 작업** - [한 줄 이유]
 
-추론 수준은 반드시 `Light`, `Medium`, `High`, `Extra High`, `최대`, `울트라` 중 정확히 하나만 추천한다. 별도의 `울트라: 사용함/사용 안 함` 줄은 절대 넣지 않는다. 울트라가 적합하면 `**추천 추론 수준: 울트라**`로 바로 표기하고, 실행 방식 줄에서 하위 에이전트의 역할을 설명한다.
+추론 수준은 반드시 `Light`, `Medium`, `High`, `Extra High`, `최대`, `울트라` 중 해당 모델이 지원하는 하나만 추천한다. GPT-6 Luna에는 `울트라`를 추천하지 않는다. 별도의 `울트라: 사용함/사용 안 함` 줄은 절대 넣지 않는다. 울트라가 적합하면 `**추천 추론 수준: 울트라**`로 바로 표기하고, 실행 방식 줄에서 하위 에이전트의 역할을 설명한다.
 
 모델 선택 기준:
-- **GPT-6 Astra**: 가장 어려운 엔드투엔드 작업의 기본 후보다. 불명확한 요구를 해석하면서 장기 다단계 작업을 끝까지 수행해야 하거나, 넓은 아키텍처 판단, 고위험 보안·권한·데이터 정합성 변경, 복잡한 코드·브라우저·문서 작업의 통합이 필요한 플랜에 사용한다. 단순히 파일 수가 많거나 오래 걸린다는 이유만으로 선택하지 않는다.
-- **GPT-5.6 Sol**: 복잡한 전문 개발 작업에 사용한다. Astra까지는 필요 없지만, 여러 모듈의 비자명한 구현·디버깅·검토 판단이 필요한 경우가 대상이다.
-- **GPT-5.6 Terra**: 성능과 사용량의 균형이 필요한 일반 DEXCOWIN MES 개발의 기본값이다. 보통의 기능 개발, 프론트엔드·백엔드 연동, 국소 버그 수정, 중간 규모 리팩터링, 테스트 계획에 사용한다.
-- **GPT-5.6 Luna**: 좁고 빠르며 저위험인 작업에 사용한다. 파일 탐색, 문서 수정, 단순 이름 변경, 작은 UI 문구·스타일 수정, 기계적 정리에 적합하다.
+- **GPT-6 Astra**: 가장 어려운 엔드투엔드 작업에 사용한다. 불명확한 요구를 해석하면서 장기 다단계 작업을 끝까지 수행해야 하거나, 넓은 아키텍처 판단, 고위험 보안·권한·데이터 정합성 변경, 복잡한 코드·브라우저·문서 작업의 통합이 필요한 플랜이 대상이다. 단순히 파일 수가 많거나 오래 걸린다는 이유만으로 선택하지 않는다.
+- **GPT-6 Sol**: 일반 DEXCOWIN MES 개발의 기본값이다. 기능 개발, 프론트엔드·백엔드 연동, 버그 수정, 중간 규모 리팩터링과 복잡한 코딩·에이전트 작업에 사용한다. 판단 위험이 특히 높고 작업 전반의 통합이 어려우면 Astra를 선택한다.
+- **GPT-6 Luna**: 범위가 좁고 결과가 명확한 저위험 작업에 사용한다. 파일 탐색, 문서 수정, 단순 이름 변경, 작은 UI 문구·스타일 수정, 기계적 정리와 반복 작업에 적합하다.
 
 UI 추론 수준과 선택 기준:
 - **Light**: 답이나 변경 방법이 이미 명확하고, 탐색·도구 호출·검증에 깊은 판단이 거의 필요 없는 지연 시간 우선 작업. 파일 탐색, 기계적 이름 변경, 단순 문구·상수 변경, 좁은 문서 수정에 사용한다.

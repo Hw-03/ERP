@@ -23,16 +23,16 @@ Load plan, review critically, execute all tasks, report when complete.
 
 ### Step 2: Apply Plan Metadata
 
-1. Read the plan header's **"추천 모델"**, **"추천 Effort"**, and **"팀 구성"** fields
-2. **Effort:** If the header recommends an Effort level (anything other than "해당 없음") and the current session is not already at it, tell the user once — e.g. *"이 플랜은 Effort `xhigh`를 추천합니다 — `/effort xhigh`로 맞추면 좋습니다."* You cannot change your own Effort; only the user can via `/effort`. Don't block on it — proceed either way.
-3. If team execution is recommended: Prepare to dispatch multiple agents (one per independent task group) using the model specified in each task
-4. If solo execution: All tasks run with the recommended model from the header
+1. Read the plan header's **"추천 모델"**, **"추천 추론 수준"**, and **"실행 방식"** fields
+2. If the current session uses a different reasoning level, tell the user once. Continue with the current setting unless the user changes it.
+3. If subagent parallel work is recommended: Prepare independent task groups using only the GPT-6 model specified in each task
+4. If solo execution is recommended: Use the plan header's GPT-6 model recommendation for the work
 
 ### Step 3: Execute Tasks
 
 For each task:
 1. Mark as in_progress
-2. Note the task's model tag `[Haiku|Sonnet|Opus]` and parallel indicator `[병렬 가능|순차]`
+2. Note the task's model tag `[GPT-6 Luna|GPT-6 Sol|GPT-6 Astra]`, supported `추천 추론 수준`, and parallel indicator `[병렬 가능|순차]`
 3. If marked `[병렬 가능]` and team is active: Dispatch this task as an independent agent with the specified model
 4. If marked `[순차]`: Execute immediately in sequence
 5. Follow each step exactly (plan has bite-sized steps)

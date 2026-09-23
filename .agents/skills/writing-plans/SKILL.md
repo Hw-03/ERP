@@ -1,6 +1,6 @@
 ---
 name: writing-plans
-description: Use when writing any implementation plan — in plan mode or on request. Automatically analyzes whether a team of agents is more efficient than solo execution, selects the appropriate model AND Effort level (low/medium/high/xhigh/max, constrained to what the chosen model supports) based on task complexity, and embeds all three recommendations into the plan header and each task. Always use this skill in plan mode before writing the final plan.
+description: Use when writing any implementation plan — in plan mode or on request. Select a GPT-6 model, supported reasoning level, and execution shape for the plan and its tasks. Always use this skill in plan mode before writing the final plan.
 ---
 
 # Writing Plans
@@ -63,27 +63,29 @@ Otherwise, recommend solo execution.
 
 ### Model Complexity Assessment
 
-Based on task content, select one Codex model for the entire plan:
-- **GPT-5.6 Luna** — Variable renames, file searches, text edits, simple documentation changes, and small mechanical cleanup
-- **GPT-5.6 Terra** — Bug fixes, router additions, API integrations, backend+frontend feature work, moderate refactors, and most DEXCOWIN MES development plans
-- **GPT-5.6 Sol** — State machine redesigns, security-critical auth changes, structural changes spanning many files, complex architectural decisions, and high-risk data-flow changes
+Based on task content, select only one GPT-6 Codex model for the entire plan:
+- **GPT-6 Luna** — Narrow, clear, low-risk work such as file searches, text edits, simple documentation changes, and mechanical cleanup
+- **GPT-6 Sol** — Default for DEXCOWIN MES development: bug fixes, routers, API integrations, backend+frontend work, moderate refactors, and complex coding or agentic workflows
+- **GPT-6 Astra** — The hardest end-to-end work: ambiguous requirements, high-risk security or data-integrity changes, broad architecture, and difficult multi-step integration across tools or modules
 
 ### Effort Level Assessment
 
-Effort is the reasoning-depth setting. It is **model-dependent** — only recommend a level the chosen model actually supports:
+Reasoning level is **model-dependent**. Use the exact Codex UI label and recommend only a level the chosen model supports:
 
-| Recommended model | Selectable Effort levels |
+| Recommended model | Selectable reasoning levels |
 |---|---|
-| **GPT-5.6 Luna** | `낮음` · `중간` |
-| **GPT-5.6 Terra** | `낮음` · `중간` · `높음` |
-| **GPT-5.6 Sol** | `중간` · `높음` · `매우 높음` |
+| **GPT-6 Luna** | `Light` · `Medium` · `High` · `Extra High` · `최대` |
+| **GPT-6 Sol** | `Light` · `Medium` · `High` · `Extra High` · `최대` · `울트라` |
+| **GPT-6 Astra** | `Light` · `Medium` · `High` · `Extra High` · `최대` · `울트라` |
 
 Pick the level by how much reasoning the work genuinely needs:
-- **낮음 / 중간** — short, well-scoped, repetitive, or latency-sensitive work
-- **높음** — standard DEXCOWIN MES development with meaningful regression risk; the safe baseline for Terra
-- **매우 높음** — deep reasoning: tricky logic, architecture judgment, high-risk cross-file changes, and security/state-machine work (**Sol only**)
+- **Light / Medium** — Clear, repetitive, or latency-sensitive work; Medium is the balanced starting point for normal development
+- **High** — Concrete dependency, exception, or regression risks where extra reasoning improves the result
+- **Extra High** — Ambiguous root causes, competing designs, permissions, concurrency, or state transitions that require exploration and verification
+- **최대** — The hardest quality-first work where failures in security, data integrity, or architecture have high cost
+- **울트라** — Independent, high-value workstreams benefit from parallel subagents and integrating their results is the bottleneck; recommend only with Sol or Astra and describe the parallel roles in the execution shape
 
-If you recommend a level the model can't reach (e.g. `매우 높음` on Terra), the UI may fall back or reject it — keep recommendations inside the table to avoid surprise.
+Start with Light or Medium; recommend High or above only when the reason states a concrete failure risk or, for 울트라, a concrete parallelization benefit. Never add a separate `울트라: 사용함/사용 안 함` line.
 
 Keep model strength, reasoning depth, and team/subagent execution separate: model = capability, reasoning = depth, team configuration = parallelism.
 
@@ -95,6 +97,10 @@ Write the assessment into the plan header (see below).
 
 ```markdown
 # [Feature Name] Implementation Plan
+
+> **추천 모델: [GPT-6 Luna|GPT-6 Sol|GPT-6 Astra]** — [One-line reason: complexity, file types affected, judgment required]
+> **추천 추론 수준: [Light|Medium|High|Extra High|최대|울트라]** — [One-line reason. Select exactly one level supported by the recommended model.]
+> **실행 방식: [단독 작업|하위 에이전트 병렬 작업]** — [Reason: independent workstreams or sequential dependencies]
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -108,14 +114,6 @@ Write the assessment into the plan header (see below).
 
 ---
 
-## Execution Strategy
-
-**추천 모델: [GPT-5.6 Luna|GPT-5.6 Terra|GPT-5.6 Sol]** — [One-line reason: complexity, file types affected, judgment required]
-
-**추천 추론 수준: [낮음|중간|높음|매우 높음]** — [One-line reason. Must stay within the recommended model's supported range — see the Effort table above.]
-
-**팀 구성: [필요|불필요]** — [Reason: e.g., "3 independent tasks can run in parallel" OR "sequential dependencies throughout, solo is efficient"]
-
 ---
 ```
 
@@ -124,7 +122,9 @@ Write the assessment into the plan header (see below).
 Each task includes a model tag and parallel-work indicator:
 
 ````markdown
-### Task N: [Component Name] `[GPT-5.6 Luna|GPT-5.6 Terra|GPT-5.6 Sol] [병렬 가능|순차]`
+### Task N: [Component Name] `[GPT-6 Luna|GPT-6 Sol|GPT-6 Astra] [병렬 가능|순차]`
+
+**추천 추론 수준: [Light|Medium|High|Extra High|최대|울트라]** — [Choose one level supported by this task's model.]
 
 **Files:**
 - Create: `exact/path/to/file.py`
