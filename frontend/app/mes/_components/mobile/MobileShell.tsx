@@ -191,9 +191,6 @@ export function MobileShell({
   const warehouseDirtyRef = useRef(warehouseDirty);
   warehouseDirtyRef.current = warehouseDirty;
   const warehouseFlushRef = useRef<(() => Promise<void>) | null>(null);
-  const [dailyReportDirty, setDailyReportDirty] = useState(false);
-  const dailyReportDirtyRef = useRef(dailyReportDirty);
-  dailyReportDirtyRef.current = dailyReportDirty;
   const dailyReportFlushRef = useRef<(() => Promise<void>) | null>(null);
   const [pendingNavTab, setPendingNavTab] = useState<MobileTabId | null>(null);
   const [pendingWarehouseNotificationTarget, setPendingWarehouseNotificationTarget] = useState<NotificationNavigationTarget | null>(null);
@@ -273,22 +270,29 @@ export function MobileShell({
   const handleTabChange = useCallback((tab: MobileTabId, preserveWarehouseNotification = false) => {
     const target = canOpenMobileTab(tab) ? tab : fallbackTab;
     if (!canOpenMobileTab(target)) return;
-    // 항목 16 — 입출고 작성 중 탭 이동·같은 탭 초기화 시 확인 시트(PC 일관성). 확인 시 draft flush 후 전환.
-    if ((activeTab === "warehouse" && warehouseDirty) || (activeTab === "dailyReport" && dailyReportDirty)) {
+    const navigate = () => {
+      if (target === "warehouse" && !preserveWarehouseNotification) setWarehouseNotificationTarget(null);
+      if (target === activeTab) {
+        if (target === "warehouse" && preserveWarehouseNotification) {
+          setRefreshNonce((n) => n + 1);
+          return;
+        }
+        resetActiveMobileTab(target);
+        return;
+      }
+      commitMobileTab(target);
+    };
+    if (activeTab === "dailyReport") {
+      void (dailyReportFlushRef.current?.() ?? Promise.resolve()).then(navigate).catch(() => {});
+      return;
+    }
+    // 입출고 초안은 사용자가 이어서 작성할 수 있도록 기존 이동 확인 시트를 유지한다.
+    if (activeTab === "warehouse" && warehouseDirty) {
       setPendingNavTab(target);
       return;
     }
-    if (target === "warehouse" && !preserveWarehouseNotification) setWarehouseNotificationTarget(null);
-    if (target === activeTab) {
-      if (target === "warehouse" && preserveWarehouseNotification) {
-        setRefreshNonce((n) => n + 1);
-        return;
-      }
-      resetActiveMobileTab(target);
-      return;
-    }
-    commitMobileTab(target);
-  }, [activeTab, canOpenMobileTab, commitMobileTab, dailyReportDirty, fallbackTab, resetActiveMobileTab, warehouseDirty]);
+    navigate();
+  }, [activeTab, canOpenMobileTab, commitMobileTab, dailyReportFlushRef, fallbackTab, resetActiveMobileTab, warehouseDirty]);
 
   const handleNotificationNavigate = useCallback((targetInfo: NotificationNavigationTarget) => {
     const { tab, section } = targetInfo;
@@ -296,9 +300,7 @@ export function MobileShell({
     const target = tab as MobileTabId;
     if (!canOpenMobileTab(target)) return;
     const active = activeTabRef.current;
-    const hasDirtyActiveScreen =
-      (active === "warehouse" && warehouseDirtyRef.current) ||
-      (active === "dailyReport" && dailyReportDirtyRef.current);
+    const hasDirtyActiveScreen = active === "warehouse" && warehouseDirtyRef.current;
     if (target === "warehouse" && hasDirtyActiveScreen) {
       setPendingWarehouseNotificationTarget(targetInfo);
       setPendingNavTab(target);
@@ -440,7 +442,7 @@ export function MobileShell({
       return <MobileAssemblyChecklistScreen key={key} onExit={() => handleTabChange("more")} />;
     }
     if (activeTab === "dailyReport") {
-      return <MobileDailyWorkReportScreen key={key} operator={operator} onDirtyChange={setDailyReportDirty} flushSaveRef={dailyReportFlushRef} />;
+      return <MobileDailyWorkReportScreen key={key} operator={operator} flushSaveRef={dailyReportFlushRef} />;
     }
     if (activeTab === "weekly") {
       return <MobileWeeklyScreen key={key} weekMon={weekMon} onWeekChange={setWeekMon} onExit={() => handleTabChange("more")} />;
@@ -584,7 +586,6 @@ export function MobileShell({
           setPendingNavTab(null);
           setPendingWarehouseNotificationTarget(null);
           setWarehouseDirty(false);
-          setDailyReportDirty(false);
           if (next) {
             const target = canOpenMobileTab(next) ? next : fallbackTab;
             if (pendingNotification && target === "warehouse") {
@@ -602,7 +603,6 @@ export function MobileShell({
           setPendingNavTab(null);
           setPendingWarehouseNotificationTarget(null);
           setWarehouseDirty(false);
-          setDailyReportDirty(false);
           if (next) {
             const target = canOpenMobileTab(next) ? next : fallbackTab;
             if (pendingNotification && target === "warehouse") {

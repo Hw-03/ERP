@@ -52,6 +52,17 @@ function ConfirmOnlyRegisteredSection({
   return <NavButton onProceed={onProceed} />;
 }
 
+function AutoSaveRegisteredSection({
+  save,
+  onProceed,
+}: {
+  save: () => Promise<void> | void;
+  onProceed: () => void;
+}) {
+  useRegisterDirty("autosave", true, save, undefined, { mode: "auto-save", warnOnUnload: false });
+  return <NavButton onProceed={onProceed} />;
+}
+
 function LocalSection({
   dirty,
   save,
@@ -120,6 +131,29 @@ describe("dirty-guard", () => {
     expect(screen.getByRole("button", { name: "저장 안 하고 나가기" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "계속 작성" })).toBeInTheDocument();
     expect(proceed).not.toHaveBeenCalled();
+  });
+
+  it("auto-save 항목은 팝업 없이 저장을 기다린 뒤 이동하고 이탈 경고에서 제외한다", async () => {
+    let resolveSave!: () => void;
+    const save = vi.fn(() => new Promise<void>((resolve) => { resolveSave = resolve; }));
+    const proceed = vi.fn();
+    render(
+      <DirtyGuardProvider>
+        <AutoSaveRegisteredSection save={save} onProceed={proceed} />
+      </DirtyGuardProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "이동" }));
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(proceed).not.toHaveBeenCalled();
+
+    const beforeUnload = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(beforeUnload);
+    expect(beforeUnload.defaultPrevented).toBe(false);
+
+    resolveSave();
+    await waitFor(() => expect(proceed).toHaveBeenCalledTimes(1));
   });
 
   it("저장하고 이동은 save 후 proceed를 호출한다", async () => {

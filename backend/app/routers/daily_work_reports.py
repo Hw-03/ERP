@@ -7,7 +7,7 @@ from collections import defaultdict
 from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy import case, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -233,6 +233,36 @@ def upsert_daily_work_report(
         report.content = content
         commit_and_refresh(db, report)
     return report
+
+
+@router.delete("/{employee_id}/{work_date}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_daily_work_report(
+    employee_id: uuid.UUID,
+    work_date: date,
+    actor_employee_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    """본인이 작성한 해당 날짜의 일보를 삭제한다."""
+    if actor_employee_id != employee_id:
+        raise http_error(403, ErrorCode.FORBIDDEN, "본인 일보만 삭제할 수 있습니다.")
+    if work_date > datetime.now(KST).date():
+        raise http_error(422, ErrorCode.BUSINESS_RULE, "미래 날짜의 일보는 삭제할 수 없습니다.")
+
+    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
+    if not employee:
+        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    if not employee.is_active:
+        raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원은 일보를 삭제할 수 없습니다.")
+
+    report = (
+        db.query(DailyWorkReport)
+        .filter(DailyWorkReport.employee_id == employee_id, DailyWorkReport.work_date == work_date)
+        .first()
+    )
+    if report:
+        db.delete(report)
+        db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/{employee_id}/{work_date}/activity", response_model=DailyWorkActivityResponse)

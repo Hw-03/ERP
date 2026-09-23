@@ -15600,6 +15600,61 @@
       }
     },
     "/api/daily-work-reports/{employee_id}/{work_date}": {
+      "delete": {
+        "description": "본인이 작성한 해당 날짜의 일보를 삭제한다.",
+        "operationId": "delete_daily_work_report_api_daily_work_reports__employee_id___work_date__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "employee_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Employee Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "work_date",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "Work Date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "actor_employee_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Actor Employee Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Daily Work Report",
+        "tags": [
+          "Daily Work Reports"
+        ]
+      },
       "get": {
         "description": "미작성 일자는 null로 반환해 클라이언트가 작성 상태를 구분하게 한다.",
         "operationId": "get_daily_work_report_api_daily_work_reports__employee_id___work_date__get",

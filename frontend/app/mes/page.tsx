@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useLayoutEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { MobileShell } from "./_components/mobile/MobileShell";
 import { DesktopMesShell } from "./_components/DesktopMesShell";
 import { MesLoginGate } from "./_components/login/MesLoginGate";
@@ -8,6 +8,7 @@ import { DepartmentsProvider } from "./_components/DepartmentsContext";
 import { AdminSessionProvider } from "@/lib/auth/admin-session";
 import { QueryProvider } from "@/lib/queries/client";
 import { MesViewportSkeleton } from "./_components/MesViewportSkeleton";
+import { blockBrowserSaveShortcut } from "@/lib/mes/blockBrowserSaveShortcut";
 
 export default function MesPage() {
   return (
@@ -31,6 +32,11 @@ function MesBody() {
   const isDesktopRef = useRef<boolean | null>(null);
   const switchSequenceRef = useRef(0);
   const beforeViewportSwitchRef = useRef<(() => Promise<void>) | null>(null);
+
+  useEffect(() => {
+    window.addEventListener("keydown", blockBrowserSaveShortcut, true);
+    return () => window.removeEventListener("keydown", blockBrowserSaveShortcut, true);
+  }, []);
 
   const registerBeforeViewportSwitch = useCallback((handler: (() => Promise<void>) | null) => {
     beforeViewportSwitchRef.current = handler;

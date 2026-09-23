@@ -148,6 +148,27 @@ def test_daily_work_report_put_rejects_impersonation_inactive_and_invalid_conten
     assert future.status_code == 422
 
 
+def test_daily_work_report_delete_removes_own_report_and_rejects_impersonation(client, db_session):
+    employee = _employee(db_session, name="삭제작성자")
+    other = _employee(db_session, name="다른작업자")
+    db_session.commit()
+    assert _put(client, employee, "삭제할 내용").status_code == 200
+
+    forbidden = client.delete(
+        f"/api/daily-work-reports/{employee.employee_id}/{WORK_DATE}",
+        params={"actor_employee_id": str(other.employee_id)},
+    )
+    assert forbidden.status_code == 403
+
+    deleted = client.delete(
+        f"/api/daily-work-reports/{employee.employee_id}/{WORK_DATE}",
+        params={"actor_employee_id": str(employee.employee_id)},
+    )
+    assert deleted.status_code == 204
+    assert client.get(f"/api/daily-work-reports/{employee.employee_id}/{WORK_DATE}").json() is None
+    assert client.get("/api/daily-work-reports", params={"work_date": WORK_DATE}).json() == []
+
+
 def test_daily_work_report_content_limit_applies_after_trimming(client, db_session):
     employee = _employee(db_session, name="공백검증")
     db_session.commit()
@@ -459,4 +480,5 @@ def test_daily_work_reports_are_in_openapi(client):
     paths = client.app.openapi()["paths"]
     assert "/api/daily-work-reports" in paths
     assert "/api/daily-work-reports/{employee_id}/{work_date}" in paths
+    assert "delete" in paths["/api/daily-work-reports/{employee_id}/{work_date}"]
     assert "/api/daily-work-reports/{employee_id}/{work_date}/activity" in paths

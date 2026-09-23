@@ -1,8 +1,8 @@
 "use client";
 
-import { CheckCircle2, PencilLine, Save } from "lucide-react";
+import { CheckCircle2, PencilLine } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 
 function formatKstTime(timestamp: string): string {
@@ -34,7 +34,7 @@ export function DailyWorkReportEditor({
   editable: boolean;
   saving: boolean;
   saveError: string | null;
-  onSave: (content: string) => Promise<string>;
+  onSave: (content: string) => Promise<string | null>;
   onDirtyChange?: (dirty: boolean) => void;
   onEdit?: () => void;
   saveRef?: React.MutableRefObject<(() => Promise<void>) | null>;
@@ -44,7 +44,6 @@ export function DailyWorkReportEditor({
   const [content, setContent] = useState(initialContent);
   const [focused, setFocused] = useState(false);
   const [savedContent, setSavedContent] = useState(initialContent);
-  const [validationError, setValidationError] = useState<string | null>(null);
   const [savingLocal, setSavingLocal] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(initialUpdatedAt ?? null);
   const [saveFailed, setSaveFailed] = useState(false);
@@ -52,7 +51,12 @@ export function DailyWorkReportEditor({
   const appliedResetKeyRef = useRef(resetKey);
   const userEditedRef = useRef(false);
   const savePromiseRef = useRef<Promise<void> | null>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const contentVersionRef = useRef(0);
+  const contentRef = useRef(initialContent);
+  const savedContentRef = useRef(initialContent);
+  const dirtyRef = useRef(false);
+  const saveLatestRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const dirty = content !== savedContent;
 
   useEffect(() => {
@@ -61,9 +65,11 @@ export function DailyWorkReportEditor({
       contentVersionRef.current += 1;
       savePromiseRef.current = null;
       userEditedRef.current = false;
+      contentRef.current = initialContent;
+      savedContentRef.current = initialContent;
+      dirtyRef.current = false;
       setContent(initialContent);
       setSavedContent(initialContent);
-      setValidationError(null);
       setSavedAt(initialUpdatedAt ?? null);
       setSaveFailed(false);
       setLocalSaveError(null);
@@ -71,6 +77,8 @@ export function DailyWorkReportEditor({
       return;
     }
     if (!userEditedRef.current) {
+      contentRef.current = initialContent;
+      savedContentRef.current = initialContent;
       setContent(initialContent);
       setSavedContent(initialContent);
       setSavedAt(initialUpdatedAt ?? null);
@@ -78,6 +86,7 @@ export function DailyWorkReportEditor({
   }, [initialContent, initialUpdatedAt, resetKey]);
 
   useEffect(() => {
+    dirtyRef.current = dirty;
     onDirtyChange?.(dirty);
   }, [dirty, onDirtyChange]);
 
@@ -85,25 +94,33 @@ export function DailyWorkReportEditor({
     contentVersionRef.current += 1;
   }, []);
 
-  const save = async () => {
-    if (savingLocal && savePromiseRef.current) return savePromiseRef.current;
-    const next = content.trim();
-    if (!next) {
-      const error = new Error("일보 내용을 입력하세요.");
-      setValidationError(error.message);
-      return Promise.reject(error);
+  const save = useCallback(async () => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
     }
-    if (saving) return Promise.reject(new Error("저장 중입니다."));
-    setValidationError(null);
+    const targetKey = resetKey;
+    if (savePromiseRef.current) {
+      await savePromiseRef.current;
+      if (appliedResetKeyRef.current === targetKey && dirtyRef.current) {
+        return saveLatestRef.current();
+      }
+      return;
+    }
+    if (!dirtyRef.current) return;
     setLocalSaveError(null);
     setSaveFailed(false);
     setSavingLocal(true);
+    const next = contentRef.current.trim();
     const contentVersion = contentVersionRef.current;
     let promise: Promise<void>;
     promise = onSave(next)
       .then((updatedAt) => {
         if (contentVersion !== contentVersionRef.current) return;
         userEditedRef.current = false;
+        contentRef.current = next;
+        savedContentRef.current = next;
+        dirtyRef.current = false;
         setContent(next);
         setSavedContent(next);
         setSavedAt(updatedAt);
@@ -120,8 +137,29 @@ export function DailyWorkReportEditor({
         setSavingLocal(false);
       });
     savePromiseRef.current = promise;
-    return promise;
-  };
+    await promise;
+    if (appliedResetKeyRef.current === targetKey && dirtyRef.current) {
+      return saveLatestRef.current();
+    }
+  }, [onSave, resetKey]);
+  saveLatestRef.current = save;
+
+  useEffect(() => {
+    if (!editable || loading || !dirty) return;
+    autoSaveTimerRef.current = setTimeout(() => { void save().catch(() => {}); }, 1000);
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    };
+  }, [content, dirty, editable, loading, save]);
+
+  useEffect(() => {
+    const onPageHide = () => {
+      if (dirtyRef.current) void saveLatestRef.current().catch(() => {});
+    };
+    window.addEventListener("pagehide", onPageHide);
+    return () => window.removeEventListener("pagehide", onPageHide);
+  }, []);
 
   useEffect(() => {
     if (saveRef) saveRef.current = loading ? null : save;
@@ -153,7 +191,7 @@ export function DailyWorkReportEditor({
     : saveFailed || saveError
       ? "저장 실패 · 다시 시도하세요"
       : dirty
-        ? "저장 필요"
+        ? "저장 대기 중"
         : savedAt
           ? `저장됨 · ${formatKstTime(savedAt)}`
           : null;
@@ -188,6 +226,8 @@ export function DailyWorkReportEditor({
           const nextContent = event.target.value;
           contentVersionRef.current += 1;
           userEditedRef.current = true;
+          contentRef.current = nextContent;
+          dirtyRef.current = nextContent !== savedContentRef.current;
           setSaveFailed(false);
           setLocalSaveError(null);
           onEdit?.();
@@ -196,23 +236,13 @@ export function DailyWorkReportEditor({
         className={`min-h-44 w-full flex-1 resize-none rounded-[16px] border px-4 py-3.5 text-lg leading-7 outline-none transition focus-visible:ring-2 ${fillAvailableHeight ? "lg:min-h-0 lg:flex-1" : ""}`}
         style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
       /></div>}
-      {(validationError || saveError || localSaveError) && <p role="alert" className="mt-3 rounded-[12px] px-3 py-2 text-sm font-bold" style={{ color: LEGACY_COLORS.red, background: LEGACY_COLORS.errorBg }}>{validationError || saveError || localSaveError}</p>}
+      {(saveError || localSaveError) && <p role="alert" className="mt-3 rounded-[12px] px-3 py-2 text-sm font-bold" style={{ color: LEGACY_COLORS.red, background: LEGACY_COLORS.errorBg }}>{saveError || localSaveError}</p>}
       <div className="mt-4 flex shrink-0 flex-wrap items-center justify-end gap-3">
         <p className="flex items-center gap-1.5 text-xs font-medium" style={{ color: LEGACY_COLORS.muted2 }}>
           <CheckCircle2 className="h-4 w-4" style={{ color: LEGACY_COLORS.green }} />
-          저장 후에도 과거 일보는 수정할 수 있습니다.
+          과거 일보도 수정할 수 있습니다.
         </p>
         <p aria-live="polite" className="text-xs font-bold" style={{ color: saveStatus?.startsWith("저장 실패") ? LEGACY_COLORS.red : LEGACY_COLORS.muted2 }}>{saveStatus}</p>
-        <button
-          type="button"
-          onClick={() => { void save().catch(() => {}); }}
-          disabled={loading || saving || savingLocal}
-          className="flex min-h-11 items-center gap-2 rounded-[12px] px-4 text-sm font-black text-white transition active:scale-[0.98] disabled:opacity-50"
-          style={{ background: LEGACY_COLORS.blueSolid }}
-        >
-          <Save className="h-4 w-4" />
-          {saving ? "저장 중" : "저장"}
-        </button>
       </div>
     </section>
   );

@@ -13,7 +13,7 @@ import { AlertTriangle, Save, X } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 
-type DirtyGuardMode = "save" | "confirm-only";
+type DirtyGuardMode = "save" | "confirm-only" | "auto-save";
 
 type ModalState = {
   open: boolean;
@@ -29,6 +29,8 @@ type DirtyEntry = {
   save: () => Promise<void> | void;
   discard?: () => Promise<void> | void;
   confirmOnly: boolean;
+  autoSave: boolean;
+  warnOnUnload: boolean;
 };
 
 type ProviderContextValue = {
@@ -209,7 +211,7 @@ export function DirtyGuardProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
-      const anyDirty = Array.from(registryRef.current.values()).some((entry) => entry.dirty);
+      const anyDirty = Array.from(registryRef.current.values()).some((entry) => entry.dirty && entry.warnOnUnload);
       if (!anyDirty) return;
       e.preventDefault();
       e.returnValue = "";
@@ -278,7 +280,7 @@ export function useRegisterDirty(
   dirty: boolean,
   save: () => Promise<void> | void,
   discard?: () => Promise<void> | void,
-  options?: { mode?: DirtyGuardMode },
+  options?: { mode?: DirtyGuardMode; warnOnUnload?: boolean },
 ): void {
   const ctx = useContext(DirtyGuardContext);
   const saveRef = useRef(save);
@@ -297,11 +299,13 @@ export function useRegisterDirty(
       save: () => saveRef.current(),
       discard: () => discardRef.current?.(),
       confirmOnly: options?.mode === "confirm-only",
+      autoSave: options?.mode === "auto-save",
+      warnOnUnload: options?.warnOnUnload ?? true,
     });
     return () => {
       ctx.registryRef.current.delete(key);
     };
-  }, [ctx, key, dirty, options?.mode]);
+  }, [ctx, key, dirty, options?.mode, options?.warnOnUnload]);
 }
 
 export function useConfirmNavigation(): (proceed: () => void, cancel?: () => void) => void {
@@ -322,6 +326,10 @@ export function useConfirmNavigation(): (proceed: () => void, cancel?: () => voi
           await Promise.resolve(entry.save());
         }
       };
+      if (dirtyEntries.every((entry) => entry.autoSave)) {
+        void aggregateSave().then(proceed).catch(() => {});
+        return;
+      }
       ctx.openModal(aggregateSave, proceed, dirtyEntries.some((entry) => entry.confirmOnly), cancel);
     },
     [ctx],

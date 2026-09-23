@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DailyWorkReportScreen } from "../DailyWorkReportScreen";
+import { formatWorkDateLabel, toKstDateKey } from "../dailyReportDate";
 
 const { registerDirtyMock } = vi.hoisted(() => ({ registerDirtyMock: vi.fn() }));
 
@@ -30,22 +31,42 @@ const queryState: {
   report: ReportQueryState;
   selectedReport: ReportQueryState;
   reports: Array<{ employee_id: string; employee_name: string; department: string }>;
+  reportsByDate: Record<string, Array<{ employee_id: string; employee_name: string; department: string }>>;
   reportsLoading?: boolean;
   activity: ActivityQueryState;
   saveMutation: { isPending: boolean; mutateAsync: ReturnType<typeof vi.fn> };
+  deleteMutation: { isPending: boolean; mutateAsync: ReturnType<typeof vi.fn> };
 } = {
   report: { data: null as { employee_name: string; department: string; content: string } | null, isError: false, isLoading: false as boolean | undefined },
   selectedReport: { data: null as { employee_name: string; department: string; content: string } | null, isError: false, isLoading: false as boolean | undefined },
   reports: [] as Array<{ employee_id: string; employee_name: string; department: string }>,
+  reportsByDate: {} as Record<string, Array<{ employee_id: string; employee_name: string; department: string }>>,
   activity: { data: { work_date: "2026-08-03", employee_id: "employee-1", summary: [], cancelled_count: 0, details: [] } as any, isError: false, isLoading: false as boolean | undefined },
   saveMutation: { isPending: false, mutateAsync: vi.fn() },
+  deleteMutation: { isPending: false, mutateAsync: vi.fn() },
 };
+
+async function flushRegisteredSave() {
+  const { promise } = await startRegisteredSave();
+  await act(async () => { await promise?.catch(() => {}); });
+}
+
+async function startRegisteredSave() {
+  const save = [...registerDirtyMock.mock.calls].reverse().find((args) => args[1])?.[2] as (() => Promise<void>) | undefined;
+  let promise: Promise<void> | undefined;
+  await act(async () => {
+    promise = save?.();
+    void promise?.catch(() => {});
+  });
+  return { promise };
+}
 
 vi.mock("@/lib/queries/useDailyWorkReportsQuery", () => ({
   useDailyWorkReportQuery: (employeeId: string | null | undefined) => employeeId === "employee-2" ? queryState.selectedReport : queryState.report,
-  useDailyWorkReportsQuery: () => ({ data: queryState.reports, isError: false, isLoading: queryState.reportsLoading }),
+  useDailyWorkReportsQuery: (workDate: string) => ({ data: queryState.reportsByDate[workDate] ?? queryState.reports, isError: false, isLoading: queryState.reportsLoading, isFetching: queryState.reportsLoading }),
   useDailyWorkActivityQuery: () => queryState.activity,
   useSaveDailyWorkReport: () => queryState.saveMutation,
+  useDeleteDailyWorkReport: () => queryState.deleteMutation,
 }));
 
 vi.mock("@/lib/ui/dirty-guard", () => ({
@@ -57,9 +78,11 @@ describe("DailyWorkReportScreen", () => {
     queryState.report = { data: null, isError: false, isLoading: false };
     queryState.selectedReport = { data: null, isError: false, isLoading: false };
     queryState.reports = [];
+    queryState.reportsByDate = {};
     queryState.reportsLoading = false;
     queryState.activity = { data: { work_date: "2026-08-03", employee_id: "employee-1", summary: [], cancelled_count: 0, details: [] }, isError: false, isLoading: false };
     queryState.saveMutation = { isPending: false, mutateAsync: vi.fn() };
+    queryState.deleteMutation = { isPending: false, mutateAsync: vi.fn() };
     registerDirtyMock.mockClear();
   });
 
@@ -262,6 +285,58 @@ describe("DailyWorkReportScreen", () => {
       expect(chips[index].compareDocumentPosition(chips[index + 1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     }
   });
+
+  it("선택한 작성자가 없는 날짜에서는 선택을 숨겼다가 해당 작성자의 글이 있는 날 다시 선택한다", () => {
+    const today = toKstDateKey();
+    const [year, month, day] = today.split("-").map(Number);
+    const previousDate = toKstDateKey(new Date(Date.UTC(year, month - 1, day - 1, 3)));
+    const author = { employee_id: "employee-2", employee_name: "다른 작성자", department: "조립" };
+    queryState.reportsByDate[today] = [author];
+    queryState.reportsByDate[previousDate] = [];
+
+    render(<DailyWorkReportScreen employeeId="employee-1" />);
+    fireEvent.click(screen.getByRole("tab", { name: "전체 일보" }));
+    fireEvent.click(screen.getByRole("button", { name: "다른 작성자 조립" }));
+    expect(screen.getByTestId("daily-work-report-result")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "전일" }));
+    expect(screen.queryByTestId("daily-work-report-result")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "다음 날" }));
+    expect(screen.getByTestId("daily-work-report-result")).toBeInTheDocument();
+  });
+
+  it("편집 내용을 전부 지우면 해당 날짜 일보를 삭제 요청한다", async () => {
+    queryState.report = { data: { employee_name: "김현우", department: "조립", content: "삭제할 내용" }, isError: false };
+    queryState.deleteMutation = { isPending: false, mutateAsync: vi.fn().mockResolvedValue(undefined) };
+    render(<DailyWorkReportScreen employeeId="employee-1" />);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "작업 내역" }), { target: { value: "" } });
+    await flushRegisteredSave();
+
+    expect(queryState.deleteMutation.mutateAsync).toHaveBeenCalledWith({
+      employeeId: "employee-1",
+      workDate: toKstDateKey(),
+      actorEmployeeId: "employee-1",
+    });
+  });
+
+  it("날짜 변경은 대기 중인 자동 저장이 끝날 때까지 대기하고 확인 팝업을 띄우지 않는다", async () => {
+    const pending = deferred<{ updated_at: string }>();
+    queryState.report = { data: { employee_name: "김현우", department: "조립", content: "기존 내용" }, isError: false };
+    queryState.saveMutation = { isPending: false, mutateAsync: vi.fn().mockReturnValue(pending.promise) };
+    const confirmSpy = vi.spyOn(window, "confirm");
+    render(<DailyWorkReportScreen employeeId="employee-1" />);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "작업 내역" }), { target: { value: "새 작업 내용" } });
+    const { promise: savePromise } = await startRegisteredSave();
+    fireEvent.click(screen.getByRole("button", { name: "전일" }));
+    expect(screen.getByRole("button", { name: "일보 날짜 선택" })).toHaveTextContent(formatWorkDateLabel(toKstDateKey()));
+    expect(confirmSpy).not.toHaveBeenCalled();
+
+    await act(async () => { pending.resolve({ updated_at: "2026-08-04T02:30:00Z" }); await savePromise; });
+    expect(screen.getByRole("button", { name: "일보 날짜 선택" })).not.toHaveTextContent(formatWorkDateLabel(toKstDateKey()));
+  });
   it("헤더를 한 줄 정보행으로 보이고 MES 거래 요약을 작업 내역보다 먼저 배치한다", () => {
     render(
       <DailyWorkReportScreen
@@ -381,7 +456,7 @@ describe("DailyWorkReportScreen", () => {
     render(<DailyWorkReportScreen employeeId="employee-1" operator={{ employee_id: "employee-1", name: "김현우", department: "조립" } as never} confirmNavigation={(proceed) => proceed()} />);
 
     fireEvent.change(screen.getByRole("textbox", { name: "작업 내역" }), { target: { value: "실패할 내용" } });
-    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    await flushRegisteredSave();
     expect(await screen.findByText("저장 실패 · 다시 시도하세요")).toBeInTheDocument();
 
     const todayParts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" })
@@ -397,7 +472,7 @@ describe("DailyWorkReportScreen", () => {
     fireEvent.click(screen.getByRole("tab", { name: "전체 일보" }));
     fireEvent.click(screen.getByRole("button", { name: "김현우 조립" }));
     fireEvent.change(screen.getByRole("textbox", { name: "작업 내역" }), { target: { value: "다시 실패할 내용" } });
-    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    await flushRegisteredSave();
     expect(await screen.findByText("저장 실패 · 다시 시도하세요")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "다른 작성자 조립" }));
@@ -406,7 +481,7 @@ describe("DailyWorkReportScreen", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByRole("textbox", { name: "작업 내역" }), { target: { value: "탭 전환 전 실패" } });
-    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    await flushRegisteredSave();
     expect(await screen.findByText("저장 실패 · 다시 시도하세요")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "내 일보" }));
     expect(screen.queryByText("저장 실패 · 다시 시도하세요")).not.toBeInTheDocument();
@@ -421,12 +496,12 @@ describe("DailyWorkReportScreen", () => {
 
     const input = screen.getByRole("textbox", { name: "작업 내역" });
     fireEvent.change(input, { target: { value: "실패할 내용" } });
-    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    await flushRegisteredSave();
     expect(await screen.findByText("저장 실패 · 다시 시도하세요")).toBeInTheDocument();
 
     fireEvent.change(input, { target: { value: "수정한 내용" } });
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(screen.getByText("저장 필요")).toBeInTheDocument();
+    expect(screen.getByText("저장 대기 중")).toBeInTheDocument();
   });
 
   it("대상이 바뀐 뒤 이전 저장 실패 응답은 Screen 오류 상태를 갱신하지 않는다", async () => {
@@ -437,11 +512,12 @@ describe("DailyWorkReportScreen", () => {
     render(<DailyWorkReportScreen employeeId="employee-1" operator={{ employee_id: "employee-1", name: "김현우", department: "조립" } as never} confirmNavigation={(proceed) => proceed()} />);
 
     fireEvent.change(screen.getByRole("textbox", { name: "작업 내역" }), { target: { value: "저장 요청 내용" } });
-    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    const { promise: savePromise } = await startRegisteredSave();
     fireEvent.click(screen.getByRole("tab", { name: "전체 일보" }));
     fireEvent.click(screen.getByRole("tab", { name: "내 일보" }));
 
     await act(async () => { pending.reject(new Error("저장 실패")); });
+    await savePromise?.catch(() => {});
 
     expect(screen.queryByText("저장 실패 · 다시 시도하세요")).not.toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
@@ -456,13 +532,14 @@ describe("DailyWorkReportScreen", () => {
 
     const input = screen.getByRole("textbox", { name: "작업 내역" });
     fireEvent.change(input, { target: { value: "저장 요청 내용" } });
-    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    const { promise: savePromise } = await startRegisteredSave();
     fireEvent.change(input, { target: { value: "저장 중 수정한 내용" } });
 
     await act(async () => { pending.reject(new Error("저장 실패")); });
+    await savePromise?.catch(() => {});
 
     expect(input).toHaveValue("저장 중 수정한 내용");
-    expect(screen.getByText("저장 필요")).toBeInTheDocument();
+    expect(screen.getByText("저장 대기 중")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     const dirtyValues = registerDirtyMock.mock.calls.map((args) => args[1]);
     expect(dirtyValues.slice(dirtyValues.indexOf(true) + 1)).not.toContain(false);
@@ -477,15 +554,16 @@ describe("DailyWorkReportScreen", () => {
 
     const input = screen.getByRole("textbox", { name: "작업 내역" });
     fireEvent.change(input, { target: { value: "저장 요청 내용" } });
-    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    const { promise: savePromise } = await startRegisteredSave();
     fireEvent.change(input, { target: { value: "저장 중 수정한 내용" } });
 
     await act(async () => { pending.resolve({ updated_at: "2026-08-04T02:30:00Z" }); });
+    await savePromise;
 
     expect(input).toHaveValue("저장 중 수정한 내용");
-    expect(screen.getByText("저장 필요")).toBeInTheDocument();
+    expect(screen.getByText("저장됨 · 11:30")).toBeInTheDocument();
     const dirtyValues = registerDirtyMock.mock.calls.map((args) => args[1]);
-    expect(dirtyValues.slice(dirtyValues.indexOf(true) + 1)).not.toContain(false);
+    expect(dirtyValues.slice(dirtyValues.indexOf(true) + 1)).toContain(false);
   });
 
   it("작업 내역에 불필요한 보조 문구와 예시를 표시하지 않는다", () => {
@@ -497,7 +575,7 @@ describe("DailyWorkReportScreen", () => {
     );
 
     const textarea = screen.getByRole("textbox", { name: "작업 내역" });
-    const footer = screen.getByRole("button", { name: "저장" }).parentElement;
+    const footer = textarea.closest("section")?.lastElementChild;
     const header = screen.getByRole("heading", { name: "일일 작업 일보" }).closest("header");
 
     expect(screen.queryByText("WORK DETAIL")).not.toBeInTheDocument();

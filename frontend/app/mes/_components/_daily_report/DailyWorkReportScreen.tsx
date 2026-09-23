@@ -4,12 +4,13 @@ import { useDesktopTabHome } from "../DesktopTabHome";
 import { CircleAlert, ClipboardList, FileText, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { getDepartmentFallbackColor, LEGACY_COLORS } from "@/lib/mes/color";
-import { useDailyWorkActivityQuery, useDailyWorkReportQuery, useDailyWorkReportsQuery, useSaveDailyWorkReport } from "@/lib/queries/useDailyWorkReportsQuery";
+import { useDailyWorkActivityQuery, useDailyWorkReportQuery, useDailyWorkReportsQuery, useDeleteDailyWorkReport, useSaveDailyWorkReport } from "@/lib/queries/useDailyWorkReportsQuery";
 import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import { DailyWorkActivity } from "./DailyWorkActivity";
 import { DailyWorkDatePicker } from "./DailyWorkDatePicker";
 import { DailyWorkReportEditor } from "./DailyWorkReportEditor";
 import { toKstDateKey } from "./dailyReportDate";
+import { resolveSelectedReportAuthorId } from "./dailyReportSelection";
 import type { Operator } from "../login/useCurrentOperator";
 import { EmptyState } from "../common/EmptyState";
 
@@ -94,14 +95,12 @@ function DailyWorkReportHeaderControls({
 export function DailyWorkReportScreen({
   employeeId,
   operator,
-  onDirtyChange,
   saveRef,
   confirmNavigation,
   onTopbarControlsChange,
 }: {
   employeeId: string | null | undefined;
   operator?: Operator | null;
-  onDirtyChange?: (dirty: boolean) => void;
   saveRef?: React.MutableRefObject<(() => Promise<void>) | null>;
   confirmNavigation?: (proceed: () => void) => void;
   onTopbarControlsChange?: (controls: ReactNode | null) => void;
@@ -109,6 +108,7 @@ export function DailyWorkReportScreen({
   const [workDate, setWorkDate] = useState(() => toKstDateKey());
   const [tab, setTab] = useState<ReportTab>("mine");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+  const preferredEmployeeIdRef = useRef<string | null>(null);
   const [isActivityDetailOpen, setIsActivityDetailOpen] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
@@ -123,9 +123,10 @@ export function DailyWorkReportScreen({
   const selectedReportQuery = useDailyWorkReportQuery(targetEmployeeId, workDate);
   const activityQuery = useDailyWorkActivityQuery(targetEmployeeId, workDate, { live: workDate === today });
   const saveMutation = useSaveDailyWorkReport();
+  const deleteMutation = useDeleteDailyWorkReport();
   useDesktopTabHome("daily-report", {
     isHome: tab === "mine" && !isActivityDetailOpen,
-    busy: saveMutation.isPending,
+    busy: saveMutation.isPending || deleteMutation.isPending,
     preservesDraft: tab === "mine",
     returnHome: () => { setTab("mine"); setSelectedEmployeeId(null); setIsActivityDetailOpen(false); },
   });
@@ -143,7 +144,20 @@ export function DailyWorkReportScreen({
     await localSaveRef.current?.();
   }, [editable, employeeId]);
 
-  useRegisterDirty("daily-work-report", dirty, save, () => setDirty(false));
+  useRegisterDirty("daily-work-report", dirty, save, () => setDirty(false), { mode: "auto-save", warnOnUnload: false });
+
+  useEffect(() => {
+    if (tab !== "all") return;
+    setSelectedEmployeeId((current) => {
+      const next = resolveSelectedReportAuthorId(
+        preferredEmployeeIdRef.current,
+        reportsQuery.data ?? [],
+        reportsQuery.isFetching ?? reportsQuery.isLoading,
+        reportsQuery.isError,
+      );
+      return next === current ? current : next;
+    });
+  }, [reportsQuery.data, reportsQuery.isError, reportsQuery.isFetching, reportsQuery.isLoading, tab]);
 
   useEffect(() => {
     if (saveRef) saveRef.current = save;
@@ -152,32 +166,37 @@ export function DailyWorkReportScreen({
     };
   }, [save, saveRef]);
 
-  const persist = useCallback(async (content: string): Promise<string> => {
+  const persist = useCallback(async (content: string): Promise<string | null> => {
     if (!employeeId) throw new Error("로그인한 작업자 정보가 없습니다.");
     const targetVersion = targetVersionRef.current;
     const contentVersion = contentVersionRef.current;
     setSaveError(null);
     try {
-      const savedReport = await saveMutation.mutateAsync({
-        employeeId,
-        workDate,
-        payload: { actorEmployeeId: employeeId, content },
-      });
+      const updatedAt = content.trim()
+        ? (await saveMutation.mutateAsync({
+          employeeId,
+          workDate,
+          payload: { actorEmployeeId: employeeId, content },
+        })).updated_at
+        : (await deleteMutation.mutateAsync({ employeeId, workDate, actorEmployeeId: employeeId }), null);
       if (targetVersion === targetVersionRef.current && contentVersion === contentVersionRef.current) setDirty(false);
-      return savedReport.updated_at;
+      return updatedAt;
     } catch (error) {
       if (targetVersion === targetVersionRef.current && contentVersion === contentVersionRef.current) setSaveError(error instanceof Error ? error.message : "일보를 저장하지 못했습니다.");
       throw error;
     }
-  }, [employeeId, saveMutation, workDate]);
+  }, [deleteMutation, employeeId, saveMutation, workDate]);
 
-  const requestChange = useCallback((proceed: () => void, message: string) => {
+  const requestChange = useCallback((proceed: () => void, _message: string) => {
     if (confirmNavigation) {
       confirmNavigation(proceed);
       return;
     }
-    if (dirty && !window.confirm(message)) return;
-    proceed();
+    if (!dirty) {
+      proceed();
+      return;
+    }
+    void localSaveRef.current?.().then(proceed).catch(() => {});
   }, [confirmNavigation, dirty]);
 
   const changeTab = useCallback((next: ReportTab) => {
@@ -292,6 +311,7 @@ export function DailyWorkReportScreen({
                       targetVersionRef.current += 1;
                       setDirty(false);
                       setSaveError(null);
+                      preferredEmployeeIdRef.current = entry.employee_id;
                       setSelectedEmployeeId(entry.employee_id);
                       setIsActivityDetailOpen(false);
                     }, "저장하지 않은 내용이 있습니다. 직원을 바꾸면 작성 중인 일보가 사라집니다.")} className="min-h-11 rounded-[12px] border px-3 text-left text-sm font-bold transition active:scale-[0.98]" style={{ color: selected ? LEGACY_COLORS.white : LEGACY_COLORS.text, borderColor: `color-mix(in srgb, ${departmentColor} ${selected ? 60 : 35}%, transparent)`, background: selected ? departmentColor : `color-mix(in srgb, ${departmentColor} 12%, transparent)` }}>
@@ -317,7 +337,7 @@ export function DailyWorkReportScreen({
               saving={saveMutation.isPending}
               saveError={saveError}
               onSave={persist}
-              onDirtyChange={(next) => { setDirty(next); onDirtyChange?.(next); }}
+              onDirtyChange={setDirty}
               onEdit={() => {
                 contentVersionRef.current += 1;
                 setSaveError(null);

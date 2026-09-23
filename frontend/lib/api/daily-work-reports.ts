@@ -1,4 +1,4 @@
-import { fetcher, putJson, toApiUrl } from "../api-core";
+import { deleteJson, fetcher, putJson, toApiUrl } from "../api-core";
 import type {
   DailyWorkActivity,
   DailyWorkReport,
@@ -22,6 +22,11 @@ export const dailyWorkReportsApi = {
     putJson<DailyWorkReport>(
       toApiUrl(`/api/daily-work-reports/${employeeId}/${workDate}`),
       { actor_employee_id: payload.actorEmployeeId, content: payload.content },
+    ),
+
+  delete: (employeeId: string, workDate: string, actorEmployeeId: string) =>
+    deleteJson<void>(
+      toApiUrl(`/api/daily-work-reports/${employeeId}/${workDate}?actor_employee_id=${encodeURIComponent(actorEmployeeId)}`),
     ),
 
   activity: (employeeId: string, workDate: string, opts?: { signal?: AbortSignal }) =>

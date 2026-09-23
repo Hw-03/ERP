@@ -60,3 +60,18 @@ export function useSaveDailyWorkReport() {
     },
   });
 }
+
+export function useDeleteDailyWorkReport() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ employeeId, workDate, actorEmployeeId }: {
+      employeeId: string;
+      workDate: string;
+      actorEmployeeId: string;
+    }) => dailyWorkReportsApi.delete(employeeId, workDate, actorEmployeeId),
+    onSuccess: (_result, { employeeId, workDate }) => {
+      queryClient.setQueryData(queryKeys.dailyWorkReports.detail(employeeId, workDate), null);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dailyWorkReports.list(workDate) });
+    },
+  });
+}
