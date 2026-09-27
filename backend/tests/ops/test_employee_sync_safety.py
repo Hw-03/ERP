@@ -30,6 +30,7 @@ RUNTIME_SCRIPTS = (
     "start-backend.ps1",
     "stop-backend.ps1",
     "start-frontend.ps1",
+    "check-frontend-runtime.ps1",
     "stop-frontend.ps1",
     "stop-servers.ps1",
     "open-watch.ps1",
@@ -413,6 +414,42 @@ def _run_sync(
     )
 
 
+@pytest.mark.parametrize("mode", ["-Apply", "-DryRun"])
+def test_frontend_preflight_failure_preserves_services_and_databases(tmp_path: Path, mode: str) -> None:
+    sync_path, environment, event_log, source, target = _prepare_data_sync_sandbox(tmp_path, {"FAKE_FRONTEND_PREFLIGHT_EXIT": "1"})
+    original = target.read_bytes()
+    result = _run_data_sync(sync_path, environment, mode)
+    assert result.returncode == 19, result.stdout + result.stderr
+    assert "SYNC_DATA_RESULT=FRONTEND_PREFLIGHT_FAILED" in result.stdout
+    assert "SYNC_FAILURE_PHASE=PRE_STOP" in result.stdout
+    assert target.read_bytes() == original
+    assert source.read_bytes() == b"employee-source"
+    assert not event_log.exists() or not event_log.read_text(encoding="utf-8-sig").strip()
+
+
+def test_frontend_runtime_probe_detects_missing_transitive_dependency(tmp_path: Path) -> None:
+    powershell = shutil.which("powershell.exe")
+    node_config = ROOT / "_attic/runtime/frontend-node-path.txt"
+    if powershell is None or not node_config.exists():
+        pytest.skip("Configured Windows Node runtime required")
+    node = node_config.read_text(encoding="utf-8-sig").strip()
+    runtime = tmp_path / "_attic/runtime"
+    _write(runtime / "frontend-node-path.txt", node)
+    cli = tmp_path / "frontend/node_modules/next/dist/bin/next"
+    _write(cli, "require('@next/env'); console.log('Next CLI ready');")
+    command = [powershell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+               str(ROOT / "scripts/dev/check-frontend-runtime.ps1"), "-RepoRoot", str(tmp_path)]
+    environment = os.environ.copy()
+    environment.pop("MES_RUNTIME_ROOT", None)
+    failed = subprocess.run(command, env=environment, capture_output=True, text=True)
+    assert failed.returncode == 1
+    assert "@next/env" in failed.stdout + failed.stderr
+    _write(tmp_path / "frontend/node_modules/@next/env/index.js", "module.exports = {};")
+    passed = subprocess.run(command, env=environment, capture_output=True, text=True)
+    assert passed.returncode == 0, passed.stdout + passed.stderr
+    assert "FRONTEND_RUNTIME_CHECK=PASS" in passed.stdout
+
+
 def _event_kinds(event_log: Path) -> list[str]:
     return [line.split(":", 1)[0] for line in event_log.read_text(encoding="utf-8-sig").splitlines()]
 
@@ -644,6 +681,7 @@ def _prepare_data_sync_sandbox(
     )
     _write(dev_root / "scripts" / "dev" / "checked-command.ps1", checked_command)
     for script_name, content in {
+        "check-frontend-runtime.ps1": 'exit ([int] $env:FAKE_FRONTEND_PREFLIGHT_EXIT)',
         "stop-backend.ps1": _fake_service_script("stop-backend", "FAKE_STOP_BACKEND_EXIT"),
         "stop-frontend.ps1": _fake_service_script("stop-frontend", "FAKE_STOP_FRONTEND_EXIT"),
         "start-backend.ps1": _fake_service_script("start-backend", "FAKE_START_BACKEND_EXIT"),
@@ -716,6 +754,7 @@ def _prepare_data_sync_sandbox(
             "FAKE_FRONTEND_HEALTH_EXIT": "0",
             "FAKE_BACKEND_HEALTH_MIN_TIMEOUT": "0",
             "FAKE_PORTS_FREE": "1",
+            "FAKE_FRONTEND_PREFLIGHT_EXIT": "0",
             "FAKE_TARGET_CHANGED_AFTER_BACKUP": "0",
             "FAKE_CANDIDATE_MISSING": "0",
             "FAKE_ROLLBACK_VALIDATOR_ROOT": str(rollback_validator_root),

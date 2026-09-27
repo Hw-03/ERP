@@ -63,6 +63,7 @@ def _snapshot_sqlite_dependents(
             snapshots.append((table_name, columns, primary_keys, rows))
         remaining.difference_update(children)
         parents.update(children)
+
     snapshots_by_name = {snapshot[0]: snapshot for snapshot in snapshots}
     pending = set(snapshots_by_name)
     ordered: list[tuple[str, list[str], list[str], list[tuple[object, ...]]]] = []

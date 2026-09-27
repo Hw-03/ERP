@@ -54,6 +54,7 @@ $runtimeScripts = @(
     "start-backend.ps1",
     "stop-backend.ps1",
     "start-frontend.ps1",
+    "check-frontend-runtime.ps1",
     "stop-frontend.ps1",
     "stop-servers.ps1",
     "open-watch.ps1",

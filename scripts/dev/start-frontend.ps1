@@ -53,6 +53,8 @@ if ($RuntimeTaskHost) {
     exit $hostExit
 }
 
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "check-frontend-runtime.ps1") -RepoRoot $Profile.RepoRoot
+if ($LASTEXITCODE -ne 0) { throw "Frontend runtime preflight failed; no service start requested." }
 Assert-RuntimeTaskConfigured -RepoRoot $Profile.RepoRoot -Service "frontend" | Out-Null
 $request = Write-RuntimeTaskLaunchRequest -Path $LaunchRequestPath -Service "frontend"
 Add-RuntimeEvent -Path $EventPath -Profile $Profile.Name -Service "frontend" `

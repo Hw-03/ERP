@@ -1734,7 +1734,7 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
 
     if (view === "requestWork") {
       return (
-        <div className="animate-desktop-navigation-enter">
+        <div className="animate-desktop-navigation-enter flex min-h-0 flex-1 flex-col">
         <RequestSection
             showList={false}
             onBack={() => navigateView(selectedRequest ? "requestDetail" : "requestList", selectedRequest?.request_id)}

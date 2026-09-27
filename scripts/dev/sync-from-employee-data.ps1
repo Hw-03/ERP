@@ -626,6 +626,14 @@ function Invoke-EmployeeDataSync {
     }
 
     New-Item -ItemType Directory -Force -Path $StageRuntimeRoot | Out-Null
+    $frontendCheck = Invoke-CheckedExternalCommand -FilePath "powershell.exe" `
+        -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $DevRoot "scripts\dev\check-frontend-runtime.ps1"), "-RepoRoot", $DevRoot)
+    Write-CheckedCommandResult -Label "frontend-runtime-preflight" -Result $frontendCheck
+    if (-not $frontendCheck.Success) {
+        Write-Host "SYNC_FAILURE_PHASE=PRE_STOP"
+        Write-Host "SYNC_DATA_RESULT=FRONTEND_PREFLIGHT_FAILED"
+        return 19
+    }
     Write-Host "[snapshot] 직원 DB online backup 생성 중..."
     $sourceSnapshot = Invoke-DatabaseBackup `
         -Database $EmployeeDb `
