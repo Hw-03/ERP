@@ -192,8 +192,6 @@ def upsert_daily_work_report(
     if work_date > datetime.now(KST).date():
         raise http_error(422, ErrorCode.BUSINESS_RULE, "미래 날짜의 일보는 작성할 수 없습니다.")
     content = payload.content.strip()
-    if not content:
-        raise http_error(422, ErrorCode.UNPROCESSABLE, "일보 내용을 입력해 주세요.")
     if len(content) > 5000:
         raise http_error(422, ErrorCode.UNPROCESSABLE, "일보 내용은 5,000자 이하여야 합니다.")
 

@@ -4,7 +4,7 @@ import { useDesktopTabHome } from "../DesktopTabHome";
 import { CircleAlert, ClipboardList, FileText, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { getDepartmentFallbackColor, LEGACY_COLORS } from "@/lib/mes/color";
-import { useDailyWorkActivityQuery, useDailyWorkReportQuery, useDailyWorkReportsQuery, useDeleteDailyWorkReport, useSaveDailyWorkReport } from "@/lib/queries/useDailyWorkReportsQuery";
+import { useDailyWorkActivityQuery, useDailyWorkReportQuery, useDailyWorkReportsQuery, useSaveDailyWorkReport } from "@/lib/queries/useDailyWorkReportsQuery";
 import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import { DailyWorkActivity } from "./DailyWorkActivity";
 import { DailyWorkDatePicker } from "./DailyWorkDatePicker";
@@ -123,10 +123,9 @@ export function DailyWorkReportScreen({
   const selectedReportQuery = useDailyWorkReportQuery(targetEmployeeId, workDate);
   const activityQuery = useDailyWorkActivityQuery(targetEmployeeId, workDate, { live: workDate === today });
   const saveMutation = useSaveDailyWorkReport();
-  const deleteMutation = useDeleteDailyWorkReport();
   useDesktopTabHome("daily-report", {
     isHome: tab === "mine" && !isActivityDetailOpen,
-    busy: saveMutation.isPending || deleteMutation.isPending,
+    busy: saveMutation.isPending,
     preservesDraft: tab === "mine",
     returnHome: () => { setTab("mine"); setSelectedEmployeeId(null); setIsActivityDetailOpen(false); },
   });
@@ -172,20 +171,18 @@ export function DailyWorkReportScreen({
     const contentVersion = contentVersionRef.current;
     setSaveError(null);
     try {
-      const updatedAt = content.trim()
-        ? (await saveMutation.mutateAsync({
-          employeeId,
-          workDate,
-          payload: { actorEmployeeId: employeeId, content },
-        })).updated_at
-        : (await deleteMutation.mutateAsync({ employeeId, workDate, actorEmployeeId: employeeId }), null);
+      const updatedAt = (await saveMutation.mutateAsync({
+        employeeId,
+        workDate,
+        payload: { actorEmployeeId: employeeId, content },
+      })).updated_at;
       if (targetVersion === targetVersionRef.current && contentVersion === contentVersionRef.current) setDirty(false);
       return updatedAt;
     } catch (error) {
       if (targetVersion === targetVersionRef.current && contentVersion === contentVersionRef.current) setSaveError(error instanceof Error ? error.message : "일보를 저장하지 못했습니다.");
       throw error;
     }
-  }, [deleteMutation, employeeId, saveMutation, workDate]);
+  }, [employeeId, saveMutation, workDate]);
 
   const requestChange = useCallback((proceed: () => void, _message: string) => {
     if (confirmNavigation) {

@@ -306,19 +306,20 @@ describe("DailyWorkReportScreen", () => {
     expect(screen.getByTestId("daily-work-report-result")).toBeInTheDocument();
   });
 
-  it("편집 내용을 전부 지우면 해당 날짜 일보를 삭제 요청한다", async () => {
+  it("기존 편집 내용을 전부 지우면 빈 내용으로 저장한다", async () => {
     queryState.report = { data: { employee_name: "김현우", department: "조립", content: "삭제할 내용" }, isError: false };
-    queryState.deleteMutation = { isPending: false, mutateAsync: vi.fn().mockResolvedValue(undefined) };
+    queryState.saveMutation = { isPending: false, mutateAsync: vi.fn().mockResolvedValue({ updated_at: "2026-08-04T02:30:00Z" }) };
     render(<DailyWorkReportScreen employeeId="employee-1" />);
 
     fireEvent.change(screen.getByRole("textbox", { name: "작업 내역" }), { target: { value: "" } });
     await flushRegisteredSave();
 
-    expect(queryState.deleteMutation.mutateAsync).toHaveBeenCalledWith({
+    expect(queryState.saveMutation.mutateAsync).toHaveBeenCalledWith({
       employeeId: "employee-1",
       workDate: toKstDateKey(),
-      actorEmployeeId: "employee-1",
+      payload: { actorEmployeeId: "employee-1", content: "" },
     });
+    expect(queryState.deleteMutation.mutateAsync).not.toHaveBeenCalled();
   });
 
   it("날짜 변경은 대기 중인 자동 저장이 끝날 때까지 대기하고 확인 팝업을 띄우지 않는다", async () => {

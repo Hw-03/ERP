@@ -122,7 +122,7 @@ def test_daily_work_reports_follow_production_line_and_employee_display_order(cl
     ]
 
 
-def test_daily_work_report_put_rejects_impersonation_inactive_and_invalid_content(client, db_session):
+def test_daily_work_report_put_rejects_impersonation_inactive_and_oversized_content(client, db_session):
     employee = _employee(db_session, name="본인")
     other = _employee(db_session, name="타인")
     inactive = _employee(db_session, name="비활성", active=False)
@@ -137,8 +137,8 @@ def test_daily_work_report_put_rejects_impersonation_inactive_and_invalid_conten
     assert impersonation.json()["detail"]["message"] == "본인 일보만 작성할 수 있습니다."
     assert inactive_response.status_code == 403
     assert inactive_response.json()["detail"]["message"] == "비활성 직원은 일보를 작성할 수 없습니다."
-    assert blank.status_code == 422
-    assert blank.json()["detail"]["message"] == "일보 내용을 입력해 주세요."
+    assert blank.status_code == 200
+    assert blank.json()["content"] == ""
     assert too_long.status_code == 422
     assert too_long.json()["detail"]["message"] == "일보 내용은 5,000자 이하여야 합니다."
     future = client.put(
@@ -146,6 +146,38 @@ def test_daily_work_report_put_rejects_impersonation_inactive_and_invalid_conten
         json={"actor_employee_id": str(employee.employee_id), "content": "미래"},
     )
     assert future.status_code == 422
+
+
+def test_daily_work_report_put_clears_existing_report_without_deleting_it(client, db_session):
+    employee = _employee(db_session, name="공백 저장")
+    db_session.commit()
+    assert _put(client, employee, "기존 내용").status_code == 200
+
+    cleared = _put(client, employee, "   ")
+
+    assert cleared.status_code == 200
+    assert cleared.json()["content"] == ""
+    detail = client.get(f"/api/daily-work-reports/{employee.employee_id}/{WORK_DATE}")
+    assert detail.json()["content"] == ""
+    reports = client.get("/api/daily-work-reports", params={"work_date": WORK_DATE}).json()
+    assert [entry["employee_id"] for entry in reports] == [str(employee.employee_id)]
+
+
+def test_daily_work_report_put_can_restore_blank_after_legacy_delete(client, db_session):
+    employee = _employee(db_session, name="빈 일보 복원")
+    db_session.commit()
+    assert _put(client, employee, "기존 내용").status_code == 200
+    deleted = client.delete(
+        f"/api/daily-work-reports/{employee.employee_id}/{WORK_DATE}",
+        params={"actor_employee_id": str(employee.employee_id)},
+    )
+    assert deleted.status_code == 204
+
+    blank = _put(client, employee, "")
+
+    assert blank.status_code == 200
+    assert blank.json()["content"] == ""
+    assert client.get(f"/api/daily-work-reports/{employee.employee_id}/{WORK_DATE}").json()["content"] == ""
 
 
 def test_daily_work_report_delete_removes_own_report_and_rejects_impersonation(client, db_session):
