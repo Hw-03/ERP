@@ -4,8 +4,35 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
+import pytest
 
 ADMIN_HEADERS = {"X-Admin-Pin": "0000"}
+
+
+@pytest.mark.parametrize("warehouse,department", [(4, 0), (0, 5), (4, 5), (0, 0)])
+def test_bom_tree_stock_breakdown_at_every_depth(
+    client, make_item, make_location, make_bom, warehouse, department,
+):
+    from app.models import DepartmentEnum
+
+    parent = make_item(process_type_code="AF", warehouse_qty=Decimal(warehouse))
+    child = make_item(process_type_code="AA", warehouse_qty=Decimal(warehouse))
+    leaf = make_item(process_type_code="PR", warehouse_qty=Decimal(warehouse))
+    make_bom(parent.item_id, child.item_id, Decimal("1"))
+    make_bom(child.item_id, leaf.item_id, Decimal("1"))
+    for item in (parent, child, leaf):
+        make_location(item.item_id, quantity=Decimal(department))
+        make_location(item.item_id, department=DepartmentEnum.HIGH_VOLTAGE, quantity=Decimal("2"))
+
+    response = client.get(f"/api/bom/{parent.item_id}/tree")
+    assert response.status_code == 200, response.text
+    node = response.json()
+    for _ in range(3):
+        assert node["warehouse_stock"] == warehouse
+        assert node["department_stock"] == department + 2
+        assert node["current_stock"] == warehouse + department + 2
+        if node["children"]:
+            node = node["children"][0]
 
 
 def test_bom_create_query_tree_and_where_used_smoke(client, make_item):
@@ -88,6 +115,12 @@ def test_bom_tree_current_stock_excludes_defective_locations(
 
     assert response.status_code == 200, response.text
     assert response.json()["children"][0]["current_stock"] == 6
+    child_stock = response.json()["children"][0]
+    assert child_stock["warehouse_stock"] == 4
+    assert child_stock["department_stock"] == 2
+    assert child_stock["warehouse_stock"] + child_stock["department_stock"] == 6
+    assert response.json()["warehouse_stock"] == 0
+    assert response.json()["department_stock"] == 0
 
 
 def test_bom_tree_exposes_additional_producible_quantity_from_available_stock(

@@ -436,6 +436,7 @@ type ModalBomTreeProps = {
   tree: BOMTreeNode;
   expandedItemIds: ReadonlySet<string>;
   onToggleItem: (itemId: string) => void;
+  showStockBreakdown?: boolean;
 };
 
 function hasSelectedRowText(row: HTMLElement): boolean {
@@ -450,12 +451,14 @@ function formatModalBomQuantity(quantity: number, unit: string): string {
   return `${formatQty(quantity, { maximumFractionDigits: 2, trimTrailingZeros: true })} ${unit}`;
 }
 
-function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem }: {
+function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem, showStockBreakdown = false }: {
   node: BOMTreeNode;
   depth: number;
   expandedItemIds: ReadonlySet<string>;
   onToggleItem: (itemId: string) => void;
+  showStockBreakdown?: boolean;
 }) {
+  const gridClass = showStockBreakdown ? "bom-capacity-stock-grid" : "bom-detail-modal-grid";
   const hasKids = node.children.length > 0;
   const open = expandedItemIds.has(node.item_id);
   const isCapacityIgnoredZeroStock = node.production_capacity_ignored === true && node.current_stock === 0;
@@ -496,9 +499,18 @@ function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem }: {
       <span className="text-center font-bold tabular-nums" style={{ color: LEGACY_COLORS.text }}>
         {formatModalBomQuantity(node.required_quantity, node.unit)}
       </span>
+      {showStockBreakdown && <>
+        {/* 요청한 보조 재고 수치는 기존 14px보다 1pt 작게 표시한다. */}
+        <span className="pr-3 text-right tabular-nums" style={{ color: LEGACY_COLORS.muted, fontSize: "calc(0.875rem - 1pt)" }}>
+          {node.warehouse_stock == null ? "—" : `${formatQty(node.warehouse_stock)} ${node.unit}`}
+        </span>
+        <span className="pr-3 text-right tabular-nums" style={{ color: LEGACY_COLORS.muted, fontSize: "calc(0.875rem - 1pt)" }}>
+          {node.department_stock == null ? "—" : `${formatQty(node.department_stock)} ${node.unit}`}
+        </span>
+      </>}
       <span
         className={`pr-3 text-right font-bold tabular-nums${isCapacityIgnoredZeroStock ? " line-through" : ""}`}
-        style={{ color: node.current_stock === 0 ? LEGACY_COLORS.red : LEGACY_COLORS.muted }}
+        style={{ color: node.current_stock === 0 ? LEGACY_COLORS.red : showStockBreakdown ? LEGACY_COLORS.text : LEGACY_COLORS.muted }}
       >
         {formatQty(node.current_stock)} {node.unit}
       </span>
@@ -521,7 +533,7 @@ function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem }: {
                 onToggleItem(node.item_id);
               }
             }}
-            className={`bom-modal-grid bom-detail-modal-grid min-h-[52px] w-full cursor-pointer border-b text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)] focus-visible:outline-offset-[-2px]${depthClass}`}
+            className={`bom-modal-grid ${gridClass} min-h-[52px] w-full cursor-pointer border-b text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)] focus-visible:outline-offset-[-2px]${depthClass}`}
             style={{ borderColor: LEGACY_COLORS.border, background }}
             aria-expanded={open}
           >
@@ -529,7 +541,7 @@ function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem }: {
           </div>
         ) : (
           <div
-            className={`bom-modal-grid bom-detail-modal-grid min-h-[52px] border-b text-sm${depthClass}`}
+            className={`bom-modal-grid ${gridClass} min-h-[52px] border-b text-sm${depthClass}`}
             style={{ borderColor: LEGACY_COLORS.border, background }}
           >
             {cells}
@@ -541,6 +553,7 @@ function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem }: {
           key={child.item_id}
           node={child}
           depth={depth + 1}
+          showStockBreakdown={showStockBreakdown}
           expandedItemIds={expandedItemIds}
           onToggleItem={onToggleItem}
         />
@@ -549,20 +562,20 @@ function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem }: {
   );
 }
 
-export function ModalBomTree({ tree, expandedItemIds, onToggleItem }: ModalBomTreeProps) {
+export function ModalBomTree({ tree, expandedItemIds, onToggleItem, showStockBreakdown = false }: ModalBomTreeProps) {
   return (
     <div
       data-testid="bom-modal-tree-scroll"
-      className="min-h-0 flex-1 overflow-y-scroll"
+      className={`min-h-0 flex-1 overflow-y-scroll${showStockBreakdown ? " overflow-x-auto" : ""}`}
     >
       <div
         data-testid="bom-modal-tree-table"
-        className="min-h-full overflow-clip rounded-[18px] border"
+        className={`min-h-full overflow-clip rounded-[18px] border${showStockBreakdown ? " min-w-[820px]" : ""}`}
         style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
       >
         <div
           data-testid="bom-modal-grid-header"
-          className="bom-modal-grid bom-detail-modal-grid sticky top-0 z-10 min-h-11 border-b text-xs font-bold"
+          className={`bom-modal-grid ${showStockBreakdown ? "bom-capacity-stock-grid text-sm" : "bom-detail-modal-grid text-xs"} sticky top-0 z-10 min-h-11 border-b font-bold`}
           style={{
             background: "var(--c-popup-bg)",
             borderColor: LEGACY_COLORS.border,
@@ -573,7 +586,11 @@ export function ModalBomTree({ tree, expandedItemIds, onToggleItem }: ModalBomTr
           <span className="px-3">구성품명</span>
           <span className="px-3">품목코드</span>
           <span className="text-center">소요량</span>
-          <span className="pr-3 text-right">현재 재고</span>
+          {showStockBreakdown && <>
+            <span className="pr-3 text-right">창고 재고</span>
+            <span className="pr-3 text-right">부서 재고</span>
+          </>}
+          <span className="pr-3 text-right">{showStockBreakdown ? "현재 총 재고" : "현재 재고"}</span>
         </div>
         <ul>
           {tree.children.map((child) => (
@@ -581,6 +598,7 @@ export function ModalBomTree({ tree, expandedItemIds, onToggleItem }: ModalBomTr
               key={child.item_id}
               node={child}
               depth={0}
+              showStockBreakdown={showStockBreakdown}
               expandedItemIds={expandedItemIds}
               onToggleItem={onToggleItem}
             />

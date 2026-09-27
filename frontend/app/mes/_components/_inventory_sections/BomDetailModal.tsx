@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { GitBranch } from "lucide-react";
+import Image from "next/image";
 import { formatQty } from "@/lib/mes/format";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
@@ -89,7 +90,7 @@ export function BomDetailModal({ itemId, open, onClose }: Props) {
               BOM 구성 보기
             </div>
             <p className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-              읽기 전용 · 구성품별 현재 재고
+              읽기 전용 · 구성품별 현재 총 재고
             </p>
           </div>
           {currentTree && <div className="flex min-w-0 flex-1 items-center gap-3 border-l pl-4" style={{ borderColor: LEGACY_COLORS.border }}>
@@ -156,10 +157,14 @@ export function BomDetailModal({ itemId, open, onClose }: Props) {
         </div>
         <div className="flex min-h-0 flex-1 flex-col px-6 py-4">
           {isTreeLoading && <div
-            className="flex flex-1 items-center justify-center rounded-[18px] border px-4 py-8 text-center text-sm"
+            role="status"
+            aria-busy="true"
+            aria-label="BOM 구성을 불러오는 중…"
+            className="flex flex-1 flex-col items-center justify-center gap-3 rounded-[18px] border px-4 py-8 text-center text-sm"
             style={{ color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
           >
-            불러오는 중…
+            <Image src="/images/dexray/history-empty.webp" alt="" width={540} height={360} className="h-32 w-auto object-contain" />
+            <span>BOM 구성을 불러오는 중…</span>
           </div>}
           {tree === false && <div className="flex flex-1 flex-col items-center justify-center gap-3">
             <div
@@ -179,7 +184,7 @@ export function BomDetailModal({ itemId, open, onClose }: Props) {
           </div>}
           {currentTree && (currentTree.children.length === 0 ? (
             <EmptyState compact illustrated className="flex-1 rounded-[18px] border border-[var(--c-border)] bg-[var(--c-s2)]" title="하위 품목이 없습니다." description="" />
-          ) : <ModalBomTree tree={currentTree} expandedItemIds={expandedItemIds} onToggleItem={toggleItem} />)}
+          ) : <ModalBomTree showStockBreakdown tree={currentTree} expandedItemIds={expandedItemIds} onToggleItem={toggleItem} />)}
         </div>
       </div>
     </div>,

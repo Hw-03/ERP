@@ -831,6 +831,11 @@
             "title": "Current Stock",
             "type": "integer"
           },
+          "department_stock": {
+            "default": 0,
+            "title": "Department Stock",
+            "type": "integer"
+          },
           "item_id": {
             "format": "uuid",
             "title": "Item Id",
@@ -874,6 +879,11 @@
           "unit": {
             "title": "Unit",
             "type": "string"
+          },
+          "warehouse_stock": {
+            "default": 0,
+            "title": "Warehouse Stock",
+            "type": "integer"
           }
         },
         "required": [

@@ -248,6 +248,7 @@ def get_bom_tree(
         depth=0,
         visited=set(),
         department_order=department_order,
+        stock_by_item=fig_by_id,
     )
     capacity_bom_cache = build_af_capacity_bom_cache(bom_cache, items_map)
     tree.additional_producible_quantity = compute_additional_producible_quantity(
@@ -359,9 +360,11 @@ def _build_tree_cached(
     depth: int,
     visited: set,
     department_order: Literal["desc"] | None = None,
+    stock_by_item: dict[uuid.UUID, stock_math.StockFigures] | None = None,
 ) -> BOMTreeNode:
     """메모리 dict 만 참조하는 순수 재귀 — DB 쿼리 0건."""
     current_stock = normal_stock_by_item.get(item.item_id, Decimal("0"))
+    figure = (stock_by_item or {}).get(item.item_id, stock_math.StockFigures())
 
     if item.item_id in visited or depth > 10:
         return BOMTreeNode(
@@ -372,6 +375,8 @@ def _build_tree_cached(
             unit=item.unit,
             required_quantity=required_quantity,
             current_stock=current_stock,
+            warehouse_stock=figure.warehouse_qty,
+            department_stock=figure.production_total,
             production_capacity_ignored=is_production_capacity_ignored(item.mes_code),
             children=[],
         )
@@ -397,6 +402,7 @@ def _build_tree_cached(
                 depth + 1,
                 visited,
                 department_order,
+                stock_by_item,
             )
         )
 
@@ -408,6 +414,8 @@ def _build_tree_cached(
         unit=item.unit,
         required_quantity=required_quantity,
         current_stock=current_stock,
+        warehouse_stock=figure.warehouse_qty,
+        department_stock=figure.production_total,
         production_capacity_ignored=is_production_capacity_ignored(item.mes_code),
         children=children,
     )

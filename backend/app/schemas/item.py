@@ -197,6 +197,8 @@ class BOMTreeNode(BaseModel):
     unit: str
     required_quantity: int
     current_stock: int = 0
+    warehouse_stock: int = 0
+    department_stock: int = 0
     additional_producible_quantity: Optional[int] = Field(
         None,
         exclude_if=lambda value: value is None,

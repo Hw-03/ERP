@@ -1180,6 +1180,11 @@
   grid-template-columns: 44px minmax(0, 3.2fr) minmax(120px, 1fr) 200px 112px;
 }
 
+.bom-capacity-stock-grid {
+  grid-template-columns: 44px minmax(0, 1fr) 150px 80px 190px 70px 112px;
+  min-width: 820px;
+}
+
 .bom-tree-depth {
   background: color-mix(in oklab, var(--c-bom-tree-depth-tone) var(--bom-tree-depth-mix), var(--c-s1));
 }

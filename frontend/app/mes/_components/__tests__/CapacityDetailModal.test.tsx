@@ -126,6 +126,8 @@ function makeBomTree(itemId: string, children = true): BOMTreeNode {
             unit: "EA",
             required_quantity: 1,
             current_stock: 3,
+            warehouse_stock: 1,
+            department_stock: 2,
             children: [
               {
                 item_id: `${itemId}-branch-2`,
@@ -211,6 +213,28 @@ describe("CapacityDetailModal 데스크톱 요약과 PF BOM 상세", () => {
     expect(within(summary).getByRole("button", { name: /DX3000.*2종/ })).toBeInTheDocument();
     expect(within(summary).getByText("DX3000 PF A", { exact: true })).toBeInTheDocument();
     expect(api.getBOMTree).not.toHaveBeenCalled();
+  });
+
+  it("BOM 요청 중 덱스레이와 로딩 안내를 표시한다", () => {
+    vi.mocked(api.getBOMTree).mockReturnValue(new Promise(() => {}));
+    renderModal();
+    openPfDetail("DX3000 PF A");
+    const status = screen.getByRole("status", { name: "BOM 구성을 불러오는 중…" });
+    expect(within(status).getByText("BOM 구성을 불러오는 중…")).toBeInTheDocument();
+    expect(status.querySelector('img[src*="history-empty.webp"]')).not.toBeNull();
+  });
+
+  it("BOM 재고를 창고·부서·총 재고 순서로 표시한다", async () => {
+    renderModal();
+    openPfDetail("DX3000 PF A");
+    const header = await screen.findByTestId("bom-modal-grid-header");
+    expect(Array.from(header.children).map((cell) => cell.textContent)).toEqual([
+      "", "구성품명", "품목코드", "소요량", "창고 재고", "부서 재고", "현재 총 재고",
+    ]);
+    const row = screen.getByText("pf-1 1단계 구성품").closest("li")!;
+    expect(within(row).getByText("1 EA", { selector: "span.pr-3" })).toHaveStyle({ fontSize: "calc(0.875rem - 1pt)" });
+    expect(within(row).getByText("2 EA")).toBeInTheDocument();
+    expect(within(row).getByText("3 EA")).toHaveClass("font-bold");
   });
 
   it("PF의 BOM 확인에서 해당 PF만 조회하고 뒤로가기로 요약표에 돌아온다", async () => {

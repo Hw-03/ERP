@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, GitBranch, X } from "lucide-react";
+import Image from "next/image";
 import type { ProductionCapacityPfVariant } from "@/lib/api/types/production";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
@@ -89,7 +90,7 @@ export function DesktopCapacityPfWorkspace({ variant, onBack, onClose }: Props) 
               BOM 구성 보기
             </div>
             <p className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-              읽기 전용 · 구성품별 현재 재고
+              읽기 전용 · 구성품별 현재 총 재고
             </p>
           </div>
         </div>
@@ -173,15 +174,20 @@ export function DesktopCapacityPfWorkspace({ variant, onBack, onClose }: Props) 
           </div>
         ) : !currentTree ? (
           <div
-            className="flex min-h-0 flex-1 items-center justify-center rounded-[18px] border px-4 py-8 text-center text-sm"
+            role="status"
+            aria-busy="true"
+            aria-label="BOM 구성을 불러오는 중…"
+            className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-[18px] border px-4 py-8 text-center text-sm"
             style={{ color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
           >
-            불러오는 중…
+            <Image src="/images/dexray/history-empty.webp" alt="" width={540} height={360} className="h-32 w-auto object-contain" />
+            <span>BOM 구성을 불러오는 중…</span>
           </div>
         ) : currentTree.children.length === 0 ? (
           <EmptyState compact illustrated className="min-h-0 flex-1 rounded-[18px] border border-[var(--c-border)] bg-[var(--c-s2)]" title="하위 품목이 없습니다." description="" />
         ) : (
           <ModalBomTree
+            showStockBreakdown
             tree={currentTree}
             expandedItemIds={expandedItemIds}
             onToggleItem={toggleItem}

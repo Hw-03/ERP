@@ -470,8 +470,10 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     expect(scrollHost).toHaveClass("overflow-y-scroll");
     expect(scrollHost).not.toHaveClass("rounded-[18px]", "border");
     expect(screen.getByTestId("bom-modal-tree-table")).toHaveClass("min-h-full", "overflow-clip", "rounded-[18px]", "border");
-    expect(screen.getByTestId("bom-modal-grid-header")).toHaveClass("bom-detail-modal-grid");
-    expect(screen.getByTestId("bom-modal-grid-header")).toHaveTextContent("현재 재고");
+    expect(screen.getByTestId("bom-modal-grid-header")).toHaveClass("bom-capacity-stock-grid", "text-sm");
+    expect(screen.getByTestId("bom-modal-grid-header")).toHaveTextContent("현재 총 재고");
+    expect(screen.getByTestId("bom-modal-grid-header")).toHaveTextContent("창고 재고");
+    expect(screen.getByTestId("bom-modal-grid-header")).toHaveTextContent("부서 재고");
     fireEvent.click(await screen.findByRole("button", { name: "모두 펼치기" }));
     await screen.findByText("깊이 8");
 
@@ -645,7 +647,8 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
     vi.spyOn(api, "getBOMTree").mockReturnValueOnce(request.promise);
     render(<BomDetailModal itemId="item-1" open onClose={() => {}} />);
 
-    await screen.findByText("불러오는 중…");
+    const loading = await screen.findByRole("status", { name: "BOM 구성을 불러오는 중…" });
+    expect(loading.querySelector('img[src*="history-empty.webp"]')).not.toBeNull();
     const close = screen.getByRole("button", { name: "닫기" });
     expect(close.parentElement).toHaveClass("ml-auto");
 
