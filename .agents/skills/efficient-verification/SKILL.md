@@ -7,7 +7,7 @@ description: Choose the right verification scope for DEXCOWIN MES work without w
 
 ## Goal
 
-Verify the real risk without turning every iteration into a full CI run. Use targeted checks while developing, then use the staged smart gate before commit or push. Reserve the full gate for verification infrastructure, broad integration risk, or an explicit request.
+Verify the real risk without turning every iteration into a full CI run. Choose checks from the current task's diff and reuse applicable results. Preview the staged smart plan before running a slow gate; its path-based escalation is a starting point for judgment.
 
 This skill complements `verification-before-completion`; it does not replace it.
 
@@ -27,29 +27,32 @@ This skill complements `verification-before-completion`; it does not replace it.
 3. Do not loop full verification.
    - Avoid rerunning `verify_local.ps1 -Mode frontend` after every small edit.
    - If a targeted test fails, fix that failure and rerun only that test first.
-   - Before commit or push, run the staged smart gate. Staged selection limits impact planning, while gate commands still read the current working tree; use a clean dedicated worktree when exact staged-snapshot isolation is required. Run the full gate only for verification infrastructure, broad integration risk, or an explicit request.
+   - Before commit or push, inspect the staged diff and reuse checks that still cover it. If verification is missing, preview the smart plan with `-Mode smart -ChangeSet staged -PlanOnly` before executing it.
+   - A path under `scripts/`, a new test, an unknown path, or several changed files does not by itself justify full verification. Read the changed behavior and its consumers. For a localized operation script, prefer its safety/regression tests and relevant syntax or static checks; for layout changes, prefer the affected component tests and browser flow.
+   - If the preview escalates broadly but targeted checks cover the actual risk, run those commands directly and record the reason. Do not run a full gate first merely to discover whether it was necessary.
+   - Use a full gate for an explicit request, changes to gate selection/execution or shared test setup that undermine targeted evidence, or demonstrated broad integration risk. For DB or migration changes, verify the affected backend area; include frontend gates only when its contract or behavior is affected. If impact cannot be bounded after reading the diff and consumers, broaden verification and explain the unresolved risk.
 
 4. When a full gate fails late, isolate the failing gate.
    - If lint/type/tests/build passed and only the final independent check failed, fix that check and rerun the failed command first.
    - Only rerun the full command when you need to claim the full command now passes.
 
 5. Before completion, commit, push, or PR, use `verification-before-completion`.
-   - Before commit or push, run `verify_local.ps1 -Mode smart -ChangeSet staged` and read the final exit code. Treat ignored changes as excluded from impact planning, not from the working tree used by the commands.
-   - If verification infrastructure changed or the user or plan explicitly requires the full gate, run `-Mode full`.
-   - If you intentionally use partial verification, say exactly which gate was not rerun.
+   - Before commit or push, run `git diff --cached --check`. Execute only missing checks for the selected change and read their exit codes; use the smart runner when its preview matches the actual risk.
+   - Gate commands read the working tree, even with staged impact planning. Account for ignored or unrelated changes when interpreting failures.
+   - Before a full gate, state the specific changed behavior that needs broad evidence. Report which checks passed or were reused and any material remaining gap. Do not claim full-suite success from targeted checks.
 
 ## Project Commands
 
-Use these defaults in `C:\ERP`:
+Preview the selected commit's verification plan in `C:\ERP`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1 -Mode smart -ChangeSet staged -PlanOnly
+```
+
+Execute the smart plan when its scope matches the actual diff:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1 -Mode smart -ChangeSet staged
-```
-
-Preview a smart decision without executing commands:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1 -Mode smart -PlanOnly
 ```
 
 Use legacy area-wide auto detection or a narrower explicit mode when needed:

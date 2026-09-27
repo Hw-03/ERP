@@ -89,8 +89,8 @@ For Codex plans, also include the recommended execution shape when useful: solo 
 - Never create or switch branches unless the user explicitly asks.
 - Commit and push only when the user explicitly asks.
 - When explicitly asked to commit and push, run the required local checks first to avoid GitHub CI failures, and unless told otherwise, commit and push only the changes made in the current session.
-- 커밋푸시는 현재 작업 파일만 명시적으로 stage하고 `git diff --cached --check`을 먼저 통과시킨다. 동일한 staged 범위가 이후 코드 변경 없이 이미 필요한 검증을 통과했다면 그 결과를 재사용한다. 그렇지 않을 때만 커밋 직전 `verify_local.ps1 -Mode smart -ChangeSet staged`를 한 번 실행한다.
-- 사용자가 CI 대기를 명시하지 않으면 push 성공을 커밋푸시 완료로 보고하고, GitHub 전체 CI는 링크와 시작 상태만 알린다. DB·마이그레이션·공통 설정·검증 인프라 변경은 smart 정책이 로컬 전체 게이트로 승격한다.
+- 커밋푸시는 현재 작업 파일만 명시적으로 stage하고 `git diff --cached --check`을 먼저 통과시킨다. 변경 파일·의존성·설정·검증 입력이 여전히 적용되는 기존 통과 결과는 재사용한다. 부족한 검증은 `efficient-verification`에 따라 smart 계획을 `-Mode smart -ChangeSet staged -PlanOnly`로 미리 확인하고 실제 diff와 영향받는 소비자를 읽어 선택한다. 계획의 범위가 적절하면 smart 게이트를 실행하고, 경로 분류가 과도하게 승격했으면 위험을 커버하는 직접 관련 검사만 실행하고 근거를 보고한다.
+- 사용자가 CI 대기를 명시하지 않으면 push 성공을 커밋푸시 완료로 보고하고, GitHub 전체 CI는 링크와 시작 상태만 알린다. 전체 로컬 게이트는 명시적 요청, 검증 실행·선택 구조나 공통 테스트 설정 변경, 또는 영향 범위를 한정할 수 없는 통합 위험에 사용한다. DB·마이그레이션은 관련 백엔드 검증을 수행하고 프론트 계약에 영향이 있을 때 프론트 검증을 추가한다.
 - **Required commit message format: `YYYY-MM-DD area: summary`**
   - **Always check the real date immediately before committing** using `date +%Y-%m-%d` (Bash) or `Get-Date -Format yyyy-MM-dd` (PowerShell). Do not reuse the date baked into session context; sessions can span midnight.
   - Commit subjects and bodies must be written in Korean, except for technical identifiers, paths, branch names, and commands.
@@ -144,15 +144,15 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev\stop-backend.ps1
 
 - If the backend shows 0 log lines, suspect a zombie; run stop then start.
 
-- Before commit/push, run:
+- Before choosing commit/push checks, preview the selected change:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1 -Mode smart -ChangeSet staged
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1 -Mode smart -ChangeSet staged -PlanOnly
 ```
 
   기본 `-Mode smart -ChangeSet auto` 는 staged 변경이 있으면 staged만, 없으면 전체 작업 트리를 영향 분석 대상으로 선택합니다. 명시한 `-ChangeSet staged`는 staged 변경이 없어도 working tree로 fallback하지 않습니다. 게이트 명령은 현재 working tree에서 실행되므로 ignored 변경이 결과에 간접 영향을 줄 수 있으며, 정확한 staged 스냅샷 검증은 깨끗한 전용 worktree에서 실행합니다. `-Mode auto` 는 변경 영역의 전체 게이트를 실행하는 기존 호환 모드입니다. 인프라·검증 구조·미분류 경로는 자동으로 풀 게이트로 승격하며, 풀 게이트를 강제하려면 `-Mode full`, 영역을 직접 지정하려면 `-Mode frontend|backend|docs`를 사용합니다.
 
-  구현 중에는 직접 관련 테스트만 반복합니다. 같은 세션에서 관련 영역 게이트가 이미 통과한 뒤 CI 실패를 재현·수정한 좁은 변경은 실패했던 테스트와 직접 영향받는 테스트만 다시 실행합니다. 인프라·검증 구조 변경, 아직 검증되지 않은 넓은 변경, 통합 경계 변경 또는 명시적 요청일 때만 `-Mode full`을 실행합니다. GitHub CI는 전체 테스트·커버리지·빌드·번들 검사를 계속 수행합니다.
+  구현과 커밋푸시 모두 실제 변경 위험에 필요한 검증만 선택합니다. `scripts/` 경로, 안전성 테스트 추가, 여러 파일 변경, 미분류 경로라는 이유만으로 전체 게이트를 실행하지 않습니다. smart의 자동 승격은 경로 기반 기본 계획이며, diff와 소비자를 확인해 영향이 국소적임을 입증할 수 있으면 직접 관련 테스트·정적 검사·브라우저 흐름으로 검증하고 근거를 남깁니다. 좁은 후속 수정은 직접 영향받는 검사만 다시 실행합니다. 전체 게이트 전에 전체 검증이 필요한 구체적인 변경 동작이나 미해결 위험을 한 줄로 설명합니다. GitHub CI의 전체 테스트·커버리지·빌드·번들 검사는 유지합니다.
 
 ## Shared AI Context and Session Handoff
 

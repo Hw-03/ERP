@@ -82,8 +82,8 @@ Start from Light or Medium. Recommend High or above only when the plan can state
 - Never create or switch branches unless the user explicitly asks.
 - Commit and push only when the user explicitly asks.
 - When explicitly asked to commit and push, run the required local checks first to avoid GitHub CI failures, and unless told otherwise, commit and push only the changes made in the current session.
-- For commit/push, explicitly stage only the current task files and run `git diff --cached --check` first. Reuse the required verification when the same staged scope already passed and no code changed afterward. Otherwise, run `verify_local.ps1 -Mode smart -ChangeSet staged` once immediately before committing.
-- Unless the user explicitly asks to wait for CI, treat a successful push as complete and report only the GitHub CI link and initial state. DB, migration, shared configuration, and verification-infrastructure changes remain locally full-gate eligible through the smart policy.
+- For commit/push, explicitly stage only the current task files and run `git diff --cached --check` first. Reuse passed checks while their covered files, dependencies, configuration, and inputs remain applicable. For missing verification, follow `efficient-verification`: preview with `-Mode smart -ChangeSet staged -PlanOnly`, inspect the diff and affected consumers, then run the smart plan if its scope fits or directly run targeted checks when path-based escalation is excessive. Report the reason.
+- Unless the user explicitly asks to wait for CI, treat a successful push as complete and report only the GitHub CI link and initial state. Reserve local full gates for explicit requests, changes to verification execution/selection or shared test setup, or integration risk that cannot be bounded. Verify DB and migration changes in the affected backend area; add frontend checks when its contract is affected.
 - **Required commit message format: `YYYY-MM-DD area: summary`**
   - **Always check the real date immediately before committing** using `date +%Y-%m-%d` (Bash) or `Get-Date -Format yyyy-MM-dd` (PowerShell). Do not reuse the date baked into session context — sessions can span midnight.
   - Commit subjects and bodies must be written in Korean, except for technical identifiers, paths, branch names, and commands.
@@ -137,15 +137,15 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev\stop-backend.ps1
 
 - If the backend shows 0 log lines, suspect a zombie — run stop then start.
 
-- Before commit/push, run:
+- Before choosing commit/push checks, preview the selected change:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1 -Mode smart -ChangeSet staged
+powershell -ExecutionPolicy Bypass -File .\scripts\dev\verify_local.ps1 -Mode smart -ChangeSet staged -PlanOnly
 ```
 
   기본 `-Mode smart -ChangeSet auto` 는 staged 변경이 있으면 staged만, 없으면 전체 작업 트리를 영향 분석 대상으로 선택합니다. 명시한 `-ChangeSet staged`는 staged 변경이 없어도 working tree로 fallback하지 않습니다. 게이트 명령은 현재 working tree에서 실행되므로 ignored 변경이 결과에 간접 영향을 줄 수 있으며, 정확한 staged 스냅샷 검증은 깨끗한 전용 worktree에서 실행합니다. `-Mode auto` 는 변경 영역의 전체 게이트를 실행하는 기존 호환 모드입니다. 인프라·검증 구조·미분류 경로는 자동으로 풀 게이트로 승격하며, 풀 게이트를 강제하려면 `-Mode full`, 영역을 직접 지정하려면 `-Mode frontend|backend|docs`를 사용합니다.
 
-  구현 중에는 직접 관련 테스트만 반복합니다. 같은 세션에서 관련 영역 게이트가 이미 통과한 뒤 CI 실패를 재현·수정한 좁은 변경은 실패했던 테스트와 직접 영향받는 테스트만 다시 실행합니다. 인프라·검증 구조 변경, 아직 검증되지 않은 넓은 변경, 통합 경계 변경 또는 명시적 요청일 때만 `-Mode full`을 실행합니다. GitHub CI는 전체 테스트·커버리지·빌드·번들 검사를 계속 수행합니다.
+  구현과 커밋푸시 모두 실제 변경 위험에 필요한 검증만 선택합니다. `scripts/` 경로, 안전성 테스트 추가, 여러 파일 변경, 미분류 경로라는 이유만으로 전체 게이트를 실행하지 않습니다. smart의 자동 승격은 경로 기반 기본 계획이며, diff와 소비자를 확인해 영향이 국소적임을 입증할 수 있으면 직접 관련 테스트·정적 검사·브라우저 흐름으로 검증하고 근거를 남깁니다. 좁은 후속 수정은 직접 영향받는 검사만 다시 실행합니다. 전체 게이트 전에 전체 검증이 필요한 구체적인 변경 동작이나 미해결 위험을 한 줄로 설명합니다. GitHub CI의 전체 테스트·커버리지·빌드·번들 검사는 유지합니다.
 
 ## Shared AI Context and Session Handoff
 

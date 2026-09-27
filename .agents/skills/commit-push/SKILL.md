@@ -17,6 +17,7 @@ Use this path by default when the user asks for "this session", "your work", "on
 4. Confirm the staged list with `git diff --cached --name-only`.
 5. Run a quick staged sanity check such as `git diff --cached --check`.
 6. Reuse already-run relevant verification when it is fresh and still applies.
+   If checks are missing, use `efficient-verification`: preview the staged smart plan, inspect the actual behavior and consumers, then run only the missing checks that cover the risk. Path-based full escalation alone is not a requirement to run every gate.
 7. If full-suite verification fails only in clearly unrelated unstaged areas, record that fact and continue unless the repository instructions absolutely forbid it.
 8. Commit with the repository-required message format.
 9. Verify the commit subject with `git log -1 --format=%s`.
@@ -29,6 +30,8 @@ Use this path by default when the user asks for "this session", "your work", "on
 - If a relevant targeted test fails, fix or report before committing.
 - If unrelated unstaged files fail tests, do not block the selected commit solely for that reason. Mention the failing file/test in the final response.
 - If verification has not been run at all for risky staged backend/frontend behavior, run the most relevant targeted tests before committing.
+- Before starting a full gate, name the concrete broad risk it covers. Reserve it for explicit requests, verification machinery/shared test setup changes, or unbounded integration risk. Local operation scripts, added safety tests, and layout changes normally need their directly affected checks.
+- Reuse successful checks only when the covered files, dependencies, configuration, and relevant runtime inputs remain applicable. After a narrow follow-up edit, rerun the affected checks rather than the entire previous gate.
 
 ## Workflow
 
