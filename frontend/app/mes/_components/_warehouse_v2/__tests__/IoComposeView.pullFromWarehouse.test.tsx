@@ -244,7 +244,7 @@ function previewBundle(itemId: string) {
   } as never;
 }
 
-function renderCompose(onDraftSaved = vi.fn(), restoreStep = 4, onStatusChange = vi.fn()) {
+function renderCompose(onDraftSaved = vi.fn(), restoreStep = 4, onStatusChange = vi.fn(), onNewWork = vi.fn()) {
   return render(
     <IoComposeView
       globalSearch=""
@@ -258,6 +258,7 @@ function renderCompose(onDraftSaved = vi.fn(), restoreStep = 4, onStatusChange =
       restoreStep={restoreStep as 3 | 4}
       onStatusChange={onStatusChange}
       onDraftSaved={onDraftSaved}
+      onNewWork={onNewWork}
     />,
   );
 }
@@ -280,6 +281,32 @@ beforeEach(() => {
 });
 
 describe("IoComposeView 부족 품목 가져오기", () => {
+  it("부족 품목 가져오기 새 작업은 이전 작업 history와 초안 복원을 분리한다", async () => {
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=compose&step=4&draftId=source-draft");
+    const onNewWork = vi.fn();
+    renderCompose(vi.fn(), 4, vi.fn(), onNewWork);
+    await screen.findByTestId("pull-cart-state");
+    const previous = window.history.state;
+    const push = vi.spyOn(window.history, "pushState");
+    fireEvent.click(screen.getByRole("button", { name: "부족 품목 가져오기" }));
+    await waitFor(() => expect(screen.getByTestId("pull-cart-state")).toHaveTextContent("warehouse_to_dept:"));
+    expect(window.history.state.ioComposition).not.toBe(previous.ioComposition);
+    expect(new URLSearchParams(window.location.search).get("draftId")).toBeNull();
+    expect(onNewWork).toHaveBeenCalledTimes(1);
+    expect(push).toHaveBeenCalledTimes(1);
+    await act(async () => { window.history.back(); await new Promise((resolve) => window.addEventListener("popstate", resolve, { once: true })); });
+    expect(new URLSearchParams(window.location.search).get("step")).toBe("1");
+    expect(screen.queryByTestId("pull-cart-state")).not.toBeInTheDocument();
+    act(() => {
+      window.history.replaceState(previous, "", "/mes?tab=warehouse&section=compose&step=4&draftId=source-draft");
+      window.dispatchEvent(new PopStateEvent("popstate", { state: previous }));
+    });
+    expect(new URLSearchParams(window.location.search).get("step")).toBe("1");
+    expect(new URLSearchParams(window.location.search).get("draftId")).toBeNull();
+    expect(screen.queryByTestId("pull-cart-state")).not.toBeInTheDocument();
+    expect(api.deleteDraft).not.toHaveBeenCalled();
+    push.mockRestore();
+  });
   it("캐시된 BOM 목록이 있어도 조회 오류가 확정되면 부족 품목 가져오기를 막는다", async () => {
     Object.assign(bomQuery, {
       data: [{ parent_item_id: "cached-bom-parent" }],

@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { IoComposeView } from "../IoComposeView";
 
 const routerPush = vi.fn();
+let navigationQuery = "tab=warehouse";
 const setAuditScreen = vi.hoisted(() => vi.fn());
 const sendClientEvent = vi.hoisted(() => vi.fn());
 const registerDirty = vi.hoisted(() => vi.fn());
@@ -20,7 +21,7 @@ vi.mock("@/lib/queries/useBomQuery", () => ({
 vi.mock("next/navigation", () => ({
   usePathname: () => "/mes",
   useRouter: () => ({ push: routerPush }),
-  useSearchParams: () => new URLSearchParams("tab=warehouse"),
+  useSearchParams: () => new URLSearchParams(navigationQuery),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -224,6 +225,7 @@ function deferred<T>() {
 }
 
 beforeEach(() => {
+  navigationQuery = "tab=warehouse";
   vi.clearAllMocks();
   vi.mocked(api.getAllBOM).mockResolvedValue([]);
   vi.mocked(api.getItems).mockResolvedValue([]);
@@ -255,6 +257,47 @@ beforeEach(() => {
 });
 
 describe("IoComposeView navigation chrome", () => {
+  it("원자재 카드의 방향 선택 다음 단계는 공급업체 선택이며 Back/Forward로 왕복한다", async () => {
+    window.history.replaceState(null, "", "/mes?tab=warehouse&step=1");
+    renderCompose([], { ...operator, warehouse_role: "primary" });
+    fireEvent.click(screen.getByRole("button", { name: /원자재 입출고/ }));
+    expect(new URLSearchParams(window.location.search).get("step")).toBe("6");
+    fireEvent.click(screen.getByRole("button", { name: "출고", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: /다음 단계로/ }));
+    expect(await screen.findByRole("button", { name: "기존 공급업체" })).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get("step")).toBe("2");
+    await act(async () => { window.history.back(); await new Promise((resolve) => window.addEventListener("popstate", resolve, { once: true })); });
+    expect(screen.getByRole("button", { name: "출고", exact: true })).toHaveAttribute("aria-pressed", "true");
+    expect(new URLSearchParams(window.location.search).get("step")).toBe("6");
+    await act(async () => { window.history.forward(); await new Promise((resolve) => window.addEventListener("popstate", resolve, { once: true })); });
+    expect(await screen.findByRole("button", { name: "기존 공급업체" })).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get("step")).toBe("2");
+  });
+  it("복원 작업에서 새 유형을 고르면 부모 복원 추적과 draft URL을 해제하고 새 단계 anchor를 쌓는다", async () => {
+    window.history.replaceState({ unrelated: "keep" }, "", "/mes?tab=warehouse&section=compose&step=5&draftId=old-draft");
+    const onNewWork = vi.fn();
+    render(
+      <IoComposeView globalSearch="" operator={{ ...operator, warehouse_role: "primary" }} employees={[]} items={[]} productModels={[]}
+        setItems={() => {}} onStatusChange={() => {}} onNewWork={onNewWork}
+        restoreStep={5} restoreDraft={{ batch_id: "old-draft", work_type: "process", sub_type: "produce", bundles: [] } as never}
+      />,
+    );
+    await screen.findByTestId("io-step-nav");
+    fireEvent.click(screen.getAllByTestId("io-step-nav-item")[0]);
+    await waitFor(() => expect(screen.queryByTestId("io-step-nav")).not.toBeInTheDocument());
+    const push = vi.spyOn(window.history, "pushState");
+    fireEvent.click(screen.getByRole("button", { name: /수량보정/ }));
+    await screen.findByTestId("io-step-nav");
+    expect(onNewWork).toHaveBeenCalledTimes(1);
+    expect(new URLSearchParams(window.location.search).get("draftId")).toBeNull();
+    expect(new URLSearchParams(window.location.search).get("step")).toBe("2");
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(api.deleteDraft).not.toHaveBeenCalled();
+    await act(async () => { window.history.back(); await new Promise((resolve) => window.addEventListener("popstate", resolve, { once: true })); });
+    await waitFor(() => expect(screen.queryByTestId("io-step-nav")).not.toBeInTheDocument());
+    expect(new URLSearchParams(window.location.search).get("step")).toBe("1");
+    push.mockRestore();
+  });
   it("복원한 원자재 입고에서 공급업체만 바꾸면 이탈 경고용 dirty 상태가 된다", async () => {
     render(
       <IoComposeView
@@ -876,7 +919,7 @@ describe("IoComposeView navigation chrome", () => {
     expect(await screen.findByText("공급업체 선택")).toBeInTheDocument();
     expect(api.preview).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: "기존 공급업체" }));
+    fireEvent.click(await screen.findByRole("button", { name: "기존 공급업체" }));
 
     await waitFor(() => expect(api.preview).toHaveBeenCalledWith(expect.objectContaining({
       work_type: "receive",
@@ -1064,6 +1107,39 @@ describe("IoComposeView navigation chrome", () => {
 
     expect(workTypeCards()).toHaveLength(2);
     expect(workTypeCards().every((button) => button.getAttribute("aria-pressed") === "false")).toBe(true);
+  });
+
+  it("품목 전환 URL이 허브로 바뀌면 popstate 없이도 작업 유형 화면을 복원한다", () => {
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=compose&step=1");
+    const view = renderCompose(conversionItems);
+    fireEvent.click(screen.getByTestId("warehouse-item-conversion-card"));
+    navigationQuery = "tab=warehouse&section=compose&step=1&wic=1";
+    view.rerender(<IoComposeView globalSearch="" operator={operator} employees={[]} items={conversionItems} setItems={() => {}} onStatusChange={() => {}} />);
+    expect(screen.getByTestId("item-conversion-source-search")).toBeInTheDocument();
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=compose&step=1");
+    navigationQuery = "tab=warehouse&section=compose&step=1";
+    view.rerender(<IoComposeView globalSearch="" operator={operator} employees={[]} items={conversionItems} setItems={() => {}} onStatusChange={() => {}} />);
+    expect(screen.getByTestId("warehouse-item-conversion-card")).toBeInTheDocument();
+  });
+
+  it("품목 전환 표식이 남은 허브에서도 실제 Back으로 돌아오고 Forward로 복귀한다", async () => {
+    window.history.replaceState({ __NA: true, wic: 1 }, "", "/mes?tab=warehouse&section=compose&step=1");
+    renderCompose(conversionItems);
+    fireEvent.click(screen.getByTestId("warehouse-item-conversion-card"));
+    expect(screen.getByTestId("item-conversion-source-search")).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get("wic")).toBe("1");
+    await act(async () => {
+      window.history.back();
+      await new Promise((resolve) => window.addEventListener("popstate", resolve, { once: true }));
+    });
+    expect(screen.getByTestId("warehouse-item-conversion-card")).toBeInTheDocument();
+    expect(screen.queryByTestId("item-conversion-source-search")).not.toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).has("wic")).toBe(false);
+    await act(async () => {
+      window.history.forward();
+      await new Promise((resolve) => window.addEventListener("popstate", resolve, { once: true }));
+    });
+    expect(screen.getByTestId("item-conversion-source-search")).toBeInTheDocument();
   });
 
   it("restores item conversion one step at a time from browser history", async () => {

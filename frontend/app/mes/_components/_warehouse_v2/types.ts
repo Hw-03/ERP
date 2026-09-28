@@ -66,6 +66,8 @@ export interface IoComposeViewProps {
   entryIntent?: IoEntryIntent | null;
   onStatusChange: (status: string) => void;
   onSubmitSuccess?: () => void;
+  /** 새 유형 선택 시 저장한 초안의 부모 복원 추적만 해제한다. */
+  onNewWork?: () => void;
   onItemConversionFocusChange?: (focused: boolean) => void;
   itemPickerFullscreen?: boolean;
   onItemPickerFullscreenChange?: (fullscreen: boolean) => void;

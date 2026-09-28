@@ -438,6 +438,12 @@ export function DesktopWarehouseView({
               onItemConversionFocusChange={setItemConversionFocused}
               itemPickerFullscreen={itemPickerFullscreen}
               onItemPickerFullscreenChange={onItemPickerFullscreenChange}
+              onNewWork={() => {
+                setRestoreIoDraft(null);
+                restoredUrlDraftRef.current = null;
+                setUrlDraftPending(false);
+                setUrlDraftRestoreError(null);
+              }}
               onDraftSaved={(batchId, step, persistInUrl) => {
                 if (persistInUrl === false) {
                   clearWarehouseDraftRestore(batchId, setRestoreIoDraft, restoredUrlDraftRef);

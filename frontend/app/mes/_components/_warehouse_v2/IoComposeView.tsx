@@ -24,7 +24,7 @@ import { useIoDraft } from "./useIoDraft";
 import { useIoPreview } from "./useIoPreview";
 import { useIoSubmit } from "./useIoSubmit";
 import { IO_STEP_LABELS, useIoWorkState, type IoStep } from "./useIoWorkState";
-import { useIoUrlSync } from "./useIoUrlSync";
+import { appHistoryState, useIoUrlSync } from "./useIoUrlSync";
 import { useIoPreselect } from "./useIoPreselect";
 import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import { setAuditScreen } from "@/lib/activity-audit-context";
@@ -86,17 +86,21 @@ function isItemConversionHistoryStep(value: unknown): value is ItemConversionHis
 }
 
 function pushItemConversionHistory(step: ItemConversionHistoryStep): void {
+  const url = new URL(window.location.href);
+  url.searchParams.set("wic", String(step));
   window.history.pushState(
-    { ...(window.history.state || {}), wic: step },
+    { ...appHistoryState(), wic: step },
     "",
-    window.location.href,
+    `${url.pathname}${url.search}${url.hash}`,
   );
 }
 
 function clearItemConversionHistoryState(): void {
-  const next = { ...(window.history.state || {}) };
+  const next = appHistoryState();
   delete next.wic;
-  window.history.replaceState(next, "", window.location.href);
+  const url = new URL(window.location.href);
+  url.searchParams.delete("wic");
+  window.history.replaceState(next, "", `${url.pathname}${url.search}${url.hash}`);
 }
 
 function scrollToElement(container: HTMLElement, target: HTMLElement, offset = AUTO_SCROLL_OFFSET) {
@@ -141,6 +145,7 @@ export function IoComposeView({
   itemPickerFullscreen = false,
   onItemPickerFullscreenChange,
   onDraftSaved,
+  onNewWork,
 }: IoComposeViewProps) {
   const revision = useRealtimeRevision();
   // 제출·임시저장·미리보기는 현재 로그인 작업자의 ID로만 수행한다.
@@ -254,7 +259,8 @@ export function IoComposeView({
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
-  const { pendingFinalStepRef, resetForHome } = useIoUrlSync({
+  const urlConversionStep = searchParams.get("wic");
+  const { beginWork, pendingFinalStepRef, resetForHome } = useIoUrlSync({
     steps: state.steps,
     synchronousHistory: true,
     step: state.step,
@@ -304,6 +310,25 @@ export function IoComposeView({
     return () => window.removeEventListener("popstate", handleItemConversionPop);
   }, [state]);
 
+  // 브라우저 셸이 URL만 복원하는 경우에도 화면을 복원한다. 지연된 URL snapshot은 무시한다.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.pathname !== pathname || url.searchParams.get("tab") !== "warehouse") return;
+    if (url.searchParams.get("section") && url.searchParams.get("section") !== "compose") return;
+    if (url.searchParams.get("wic") !== urlConversionStep) return;
+    const next = Number(urlConversionStep);
+    if (isItemConversionHistoryStep(next)) {
+      setItemConversionView("work");
+      setItemConversionHistoryStep(next);
+    } else if (itemConversionView !== "compose") {
+      setItemConversionView("compose");
+      setItemConversionHistoryStep(1);
+      state.goTo(1);
+    }
+    // state는 매 렌더마다 새 객체이므로 URL과 표시 모드 변경만 관찰한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, pathname, itemConversionView, urlConversionStep]);
+
   // entryIntent 1회 적용 — 빠른작업으로 진입 시 작업유형/방향/세부작업을 프리셋하고 Step3 으로 점프.
   useEffect(() => {
     if (!entryIntent || intentAppliedRef.current) return;
@@ -322,7 +347,7 @@ export function IoComposeView({
     if (authorizedEntryIntent.toDepartment) {
       state.setToDepartment(authorizedEntryIntent.toDepartment);
     }
-    state.goTo(authorizedEntryIntent.workType === "receive" ? 2 : 3);
+    beginWork(authorizedEntryIntent.workType === "receive" ? 2 : 3);
   // entryIntent는 마운트 시 1회만 적용 — deps 배열에 state 함수 넣으면 재실행되므로 의도적으로 생략.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entryIntent]);
@@ -592,14 +617,19 @@ export function IoComposeView({
   }
 
   function handleWorkTypeChange(next: IoWorkType) {
+    state.reset();
     state.setWorkType(next);
     setError(null);
     beginNewCompositionSlot();
-    state.goTo(next === "receive" ? 6 : 2);
+    beginWork(next === "receive" ? 6 : 2);
+    onNewWork?.();
   }
 
   function openItemConversion() {
     setError(null);
+    // 허브에 남은 이전 전환 표식을 제거해 Back의 목적지를 새 작업 유형 화면으로 만든다.
+    clearItemConversionHistoryState();
+    beginWork(1);
     pushItemConversionHistory(1);
     setItemConversionHistoryStep(1);
     setItemConversionView("work");
@@ -727,7 +757,8 @@ export function IoComposeView({
           beginNewCompositionSlot();
           state.setBundles(newBundles);
           setPullSelected(new Set());
-          state.goTo(4);
+          beginWork(4);
+          onNewWork?.();
           onStatusChange("부족 품목을 창고 반출 작업으로 가져왔습니다.");
         },
       );
@@ -899,8 +930,6 @@ export function IoComposeView({
   }
 
   function returnToWorkTypeStep() {
-    restoredDraftRef.current = null;
-    restoredNonceRef.current = null;
     state.goTo(1);
   }
 
@@ -918,6 +947,7 @@ export function IoComposeView({
       setError(null);
       setItemConversionView("compose");
       setItemConversionHistoryStep(1);
+      clearItemConversionHistoryState();
       resetForHome();
       state.reset();
     },

@@ -4,6 +4,40 @@ import { describe, expect, it, vi } from "vitest";
 import { DesktopWorkHubCard } from "../DesktopWorkHubCard";
 
 describe("DesktopWorkHubCard", () => {
+  it("enables wrapping IO guidance only when the IO appearance is requested", () => {
+    const { rerender } = render(
+      <DesktopWorkHubCard
+        dataTestId="hub-card"
+        icon={PackageCheck}
+        title="창고 입출고"
+        description="창고와 부서 간 재고를 이동합니다."
+        tone="var(--c-blue)"
+        appearance="io"
+        active
+        onClick={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("hub-card")).toHaveAttribute("data-appearance", "io");
+    expect(screen.getByTestId("hub-card")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("창고와 부서 간 재고를 이동합니다.")).not.toHaveClass("whitespace-nowrap");
+
+    rerender(
+      <DesktopWorkHubCard
+        dataTestId="hub-card"
+        icon={PackageCheck}
+        title="출하 관리"
+        description="요청 생성부터 준비 체크, 픽업 완료까지 이어서 처리합니다."
+        tone="var(--c-blue)"
+        onClick={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("hub-card")).not.toHaveAttribute("data-appearance");
+    expect(screen.getByText("출하 관리")).toHaveClass("text-[40px]");
+    expect(screen.getByText("요청 생성부터 준비 체크, 픽업 완료까지 이어서 처리합니다.")).toHaveClass("whitespace-nowrap", "text-xl");
+  });
+
   it("keeps one card structure for title, optional meta, and complete work guidance", () => {
     const onClick = vi.fn();
 

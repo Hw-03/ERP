@@ -1,10 +1,77 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent } from "@testing-library/react";
 import type { IoSubType, IoWorkType } from "@/lib/api";
 import { IoSubTypeStep, IoWorkTypeStep } from "../IoWorkTypeStep";
 
 describe("IoSubTypeStep", () => {
+  it("작업 선택 화면에서 다음 방향 카드의 원본 그림 두 장을 미리 요청한다", () => {
+    render(
+      <IoWorkTypeStep
+        workType="receive"
+        operator={{ warehouse_role: "primary" }}
+        onWorkTypeChange={vi.fn()}
+      />,
+    );
+
+    for (const direction of ["in", "out"]) {
+      expect(document.head.querySelector(
+        `link[rel="preload"][as="image"][href="/images/warehouse/dexray-stock-${direction}.webp"]`,
+      )).not.toBeNull();
+    }
+  });
+
+  it("창고 방향 그림을 최적화 대기 없이 원본 주소로 즉시 요청한다", () => {
+    render(
+      <IoSubTypeStep
+        workType="warehouse_io"
+        subType="warehouse_to_dept"
+        fromDepartment=""
+        toDepartment=""
+        deptIoDirection={null}
+        onSubTypeChange={vi.fn()}
+        onFromDepartmentChange={vi.fn()}
+        onToDepartmentChange={vi.fn()}
+        onDeptIoDirectionChange={vi.fn()}
+      />,
+    );
+
+    for (const [label, direction] of [["창고 → 부서", "out"], ["부서 → 창고", "in"]] as const) {
+      const image = screen.getByRole("button", { name: label }).querySelector("img");
+      expect(image).toHaveAttribute("src", `/images/warehouse/dexray-stock-${direction}.webp`);
+      expect(image).toHaveAttribute("loading", "eager");
+      expect(image).toHaveAttribute("fetchpriority", "high");
+      expect(image).not.toHaveAttribute("srcset");
+    }
+  });
+
+  it("수량보정 방향은 입고·출고 DEXRAY 그림을 제목 뒤에 표시한다", () => {
+    render(
+      <IoSubTypeStep
+        workType="warehouse_adjust"
+        subType="warehouse_adjust_in"
+        fromDepartment=""
+        toDepartment=""
+        deptIoDirection="in"
+        onSubTypeChange={vi.fn()}
+        onFromDepartmentChange={vi.fn()}
+        onToDepartmentChange={vi.fn()}
+        onDeptIoDirectionChange={vi.fn()}
+      />,
+    );
+
+    for (const [label, direction] of [["입고", "in"], ["출고", "out"]] as const) {
+      const card = screen.getByRole("button", { name: label });
+      const image = card.querySelector("img");
+      expect(image).not.toBeNull();
+      expect(image).toHaveAttribute("src", `/images/warehouse/dexray-stock-${direction}.webp`);
+      expect(image).toHaveAttribute("loading", "eager");
+      expect(image).toHaveAttribute("fetchpriority", "high");
+      expect(within(card).getByText(label).compareDocumentPosition(image!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    }
+    expect(screen.getByRole("button", { name: "입고" })).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("창고 정·부에게만 수량보정 입출고 작업 카드를 표시한다", () => {
     const { rerender } = render(
       <IoWorkTypeStep

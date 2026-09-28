@@ -12,6 +12,7 @@
  * 테스트에서는 in-memory fake 로 대체 가능.
  */
 import { useEffect, useMemo, useRef } from "react";
+import { makeClientRequestId } from "@/lib/uuid";
 import type { IoStep } from "./useIoWorkState";
 import { DEFAULT_IO_STEPS } from "./useIoWorkState";
 
@@ -44,6 +45,8 @@ export type UseIoUrlSyncArgs = {
 };
 
 export type UseIoUrlSyncApi = {
+  /** 새 작업의 1단계 anchor와 첫 단계를 상태 변경 전에 기록한다. */
+  beginWork: (target: IoStep) => void;
   /** Owner already wrote the home URL; do not add a duplicate step entry. */
   resetForHome: () => void;
   /**
@@ -54,11 +57,21 @@ export type UseIoUrlSyncApi = {
   pendingFinalStepRef: React.MutableRefObject<IoStep | null>;
 };
 
+const COMPOSITION_KEY = "ioComposition";
+
+/** Next의 patched history API가 URL 변경을 감지하도록 내부 표시는 넘기지 않는다. */
+export function appHistoryState(): Record<string, unknown> {
+  const state = { ...window.history.state } as Record<string, unknown>;
+  delete state.__NA;
+  delete state._N;
+  delete state.__PRIVATE_NEXTJS_INTERNALS_TREE;
+  return state;
+}
+
 export function useIoUrlSync(args: UseIoUrlSyncArgs): UseIoUrlSyncApi {
   const { step, steps = DEFAULT_IO_STEPS, goTo, canAdvance, router, searchParams, pathname, tabParam, suppressInitialSync = false, synchronousHistory = false } = args;
   function pushStep(href: string): void {
-    if (synchronousHistory) window.history.pushState({ ...window.history.state }, "", href);
-    else router.push(href, { scroll: false });
+    router.push(href, { scroll: false });
   }
 
   const urlStep = useMemo<IoStep>(() => {
@@ -72,9 +85,96 @@ export function useIoUrlSync(args: UseIoUrlSyncArgs): UseIoUrlSyncApi {
   const forceInitialStepPushRef = useRef(false);
   // step 을 2 단계 이상 점프할 때(예: 3 → 5) 중간 단계도 history 에 쌓기 위한 deferred target.
   const pendingFinalStepRef = useRef<IoStep | null>(null);
+  const compositionRef = useRef<string | null>(null);
+  compositionRef.current ??= makeClientRequestId();
+  const latestRef = useRef(args);
+  latestRef.current = args;
+
+  function writePcStep(target: IoStep, replace: boolean, clearDraft = false): void {
+    const url = new URL(window.location.href);
+    url.searchParams.set("step", String(target));
+    if (tabParam) {
+      url.searchParams.set("tab", tabParam);
+      url.searchParams.set("section", "compose");
+    }
+    if (clearDraft) url.searchParams.delete("draftId");
+    const data = { ...appHistoryState(), [COMPOSITION_KEY]: compositionRef.current };
+    const href = `${pathname}${url.search}${url.hash}`;
+    if (replace) window.history.replaceState(data, "", href);
+    else window.history.pushState(data, "", href);
+  }
+
+  function beginWork(target: IoStep): void {
+    pendingFinalStepRef.current = null;
+    suppressInitialSyncRef.current = false;
+    if (synchronousHistory) {
+      compositionRef.current = makeClientRequestId();
+      writePcStep(1, true, true);
+      if (target !== 1) writePcStep(target, false, true);
+    }
+    goTo(target);
+  }
+
+  // PC는 useSearchParams가 이전 snapshot을 유지해도 실제 traversal을 즉시 반영한다.
+  useEffect(() => {
+    if (!synchronousHistory) return;
+    function onPopState(): void {
+      const current = latestRef.current;
+      const url = new URL(window.location.href);
+      if (url.pathname !== current.pathname || current.tabParam && url.searchParams.get("tab") !== current.tabParam) return;
+      if (url.searchParams.get("section") && url.searchParams.get("section") !== "compose" || window.history.state?.wic) return;
+      const currentSteps = current.steps ?? DEFAULT_IO_STEPS;
+      const raw = Number(url.searchParams.get("step"));
+      const urlTarget = currentSteps.includes(raw as IoStep) ? raw as IoStep : 1;
+      const entryToken = window.history.state?.[COMPOSITION_KEY];
+      const oldComposition = entryToken !== compositionRef.current;
+      let target: IoStep = oldComposition ? 1 : urlTarget;
+      for (const stage of currentSteps.slice(0, currentSteps.indexOf(target))) {
+        if (!current.canAdvance[stage]) { target = stage; break; }
+      }
+      pendingFinalStepRef.current = null;
+      if (target !== raw || oldComposition) writePcStep(target, true, oldComposition);
+      // 같은 렌더 사이 Back→Forward의 앞선 setState도 마지막 목적지로 덮어쓴다.
+      current.goTo(target);
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+    // event는 latestRef를 읽어 빠른 연속 탐색에도 최신 작업의 도달 가능성을 검증한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [synchronousHistory, pathname, tabParam]);
+
+  useEffect(() => {
+    if (!synchronousHistory) return;
+    if (suppressInitialSyncRef.current) {
+      if (step === 1) return;
+      suppressInitialSyncRef.current = false;
+      writePcStep(1, true);
+      writePcStep(step, false);
+    } else if (skipNextPushRef.current) {
+      skipNextPushRef.current = false;
+      return;
+    } else {
+      const url = new URL(window.location.href);
+      if (tabParam && url.searchParams.get("tab") !== tabParam) return;
+      const raw = Number(url.searchParams.get("step"));
+      const liveStep = steps.includes(raw as IoStep) ? raw as IoStep : 1;
+      if (liveStep !== step) writePcStep(step, step === 1 && !canAdvance[1]);
+      else if (window.history.state?.[COMPOSITION_KEY] !== compositionRef.current) {
+        window.history.replaceState({ ...appHistoryState(), [COMPOSITION_KEY]: compositionRef.current }, "", window.location.href);
+      }
+    }
+    if (pendingFinalStepRef.current != null && pendingFinalStepRef.current !== step) {
+      const target = pendingFinalStepRef.current;
+      pendingFinalStepRef.current = null;
+      goTo(target);
+    }
+    // PC에서는 live URL만 읽는다. 지연된 Next snapshot으로 상태를 되감지 않는다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, synchronousHistory]);
 
   // state.step 변경 → URL push
   useEffect(() => {
+    if (synchronousHistory) return;
     if (suppressInitialSyncRef.current) {
       if (step === 1) return;
       suppressInitialSyncRef.current = false;
@@ -85,9 +185,7 @@ export function useIoUrlSync(args: UseIoUrlSyncArgs): UseIoUrlSyncApi {
       return;
     }
     const forceInitialStepPush = forceInitialStepPushRef.current;
-    const liveRaw = synchronousHistory ? Number(new URLSearchParams(window.location.search).get("step")) : urlStep;
-    const currentUrlStep = steps.includes(liveRaw as IoStep) ? liveRaw : 1;
-    if (!forceInitialStepPush && currentUrlStep === step) return;
+    if (!forceInitialStepPush && urlStep === step) return;
     const next = new URLSearchParams(
       typeof window !== "undefined" ? window.location.search : searchParams.toString(),
     );
@@ -101,6 +199,7 @@ export function useIoUrlSync(args: UseIoUrlSyncArgs): UseIoUrlSyncApi {
 
   // URL step 변경 (뒤로/앞으로) → state.goTo (도달 불가 step 은 clamp)
   useEffect(() => {
+    if (synchronousHistory) return;
     if (suppressInitialSyncRef.current) return;
     if (typeof window !== "undefined") {
       const liveRaw = Number(new URLSearchParams(window.location.search).get("step"));
@@ -141,7 +240,7 @@ export function useIoUrlSync(args: UseIoUrlSyncArgs): UseIoUrlSyncApi {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlStep]);
 
-  return { pendingFinalStepRef, resetForHome: () => {
+  return { beginWork, pendingFinalStepRef, resetForHome: () => {
     pendingFinalStepRef.current = null;
     skipNextPushRef.current = step !== 1;
     forceInitialStepPushRef.current = false;

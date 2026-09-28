@@ -1,11 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { ArrowDownToLine, ArrowUpFromLine, PackageCheck } from "lucide-react";
+import { preload } from "react-dom";
+import { PackageCheck } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { departmentDisplayColor, MES_DEPARTMENT_COLORS } from "@/lib/mes-department";
 import { DesktopWorkHubCard } from "../common/DesktopWorkHubCard";
+import styles from "../common/IoWorkCard.module.css";
 import type { IoSubType, IoWorkType, OperatorLike } from "./types";
 import { IO_SUB_TYPES, IO_WORK_TYPES, canSeeWorkType, deptVisibility, isExitWorkType, requiresDepartments, type DeptIoDirection } from "./ioWorkType";
 
@@ -21,6 +23,9 @@ interface WorkTypeProps {
  * Step 1 본문 — 큰 작업 유형 카드. WizardStepCard 안에 들어감.
  */
 export function IoWorkTypeStep({ selectedWorkType = null, operator, onWorkTypeChange, onItemConversion }: WorkTypeProps) {
+  // 선택 전 원본 WebP를 준비해 다음 단계의 그림 요청이 같은 캐시를 사용한다.
+  preload("/images/warehouse/dexray-stock-in.webp", { as: "image", fetchPriority: "high" });
+  preload("/images/warehouse/dexray-stock-out.webp", { as: "image", fetchPriority: "high" });
   const visibleWorkTypes = IO_WORK_TYPES.filter((row) => canSeeWorkType(row.id, operator));
   const canItemConversion = Boolean(
     onItemConversion && (operator?.department === "조립" || operator?.department === "출하"),
@@ -49,7 +54,7 @@ export function IoWorkTypeStep({ selectedWorkType = null, operator, onWorkTypeCh
             description={row.description}
             tone={cardAccent}
             active={active}
-            className="p-10"
+            appearance="io"
             size="large"
           />
         );
@@ -62,7 +67,7 @@ export function IoWorkTypeStep({ selectedWorkType = null, operator, onWorkTypeCh
           title="품목 전환"
           description="기존 품목 재고를 대상 품목 재고로 전환합니다."
           tone={LEGACY_COLORS.cyan}
-          className="p-10"
+          appearance="io"
           size="large"
         />
       )}
@@ -178,17 +183,17 @@ export function IoSubTypeStep({
                 onClick={() => onSubTypeChange(row.id)}
                 aria-pressed={active}
                 title={row.description}
-                className={`${isWarehouse ? "hover:shadow-md" : "standard-hover"} flex h-full min-h-[120px] flex-col items-center justify-center gap-3 rounded-[20px] border px-6 py-6 text-center transition-all`}
+                className={`${styles.selection} standard-hover no-btn-inset h-full min-h-[120px] border px-6 py-6 hover:shadow-md`}
                 style={{
-                  background: isWarehouse ? tint(tone, active ? 16 : 7) : active ? tint(tone, 14) : LEGACY_COLORS.s2,
-                  borderColor: active ? tone : isWarehouse ? tint(tone, 25) : LEGACY_COLORS.border,
+                  background: tint(tone, active ? 16 : 7),
+                  borderColor: active ? tone : tint(tone, 25),
                   borderWidth: active ? 2 : 1,
                   color: active ? tone : LEGACY_COLORS.text,
                 }}
               >
-                <span className="text-3xl font-black leading-tight">{row.label}</span>
+                <span className={`${styles.subTypeTitle} ${isWarehouse ? styles.warehouseTitle : ""} font-black`}>{row.label}</span>
                 {workType === "warehouse_io" && (
-                  <Image src={`/images/warehouse/dexray-stock-${row.id === "warehouse_to_dept" ? "out" : "in"}.webp`} alt="" width={840} height={560} sizes="220px" className="pointer-events-none h-auto max-h-[40%] w-[min(220px,65%)] object-contain" draggable={false} />
+                  <Image src={`/images/warehouse/dexray-stock-${row.id === "warehouse_to_dept" ? "out" : "in"}.webp`} alt="" width={840} height={560} unoptimized loading="eager" fetchPriority="high" sizes="(min-width: 1024px) 420px, 220px" className={styles.art} draggable={false} />
                 )}
               </button>
             );
@@ -282,14 +287,15 @@ function DeptGrid({
               aria-label={d}
               aria-pressed={active}
               onClick={() => onChange(d)}
-              className={`standard-hover border font-black transition-all ${
+              className={`${styles.selection} ${fill ? styles.department : ""} standard-hover no-btn-inset border font-black ${
                 fill
                   ? "h-full min-h-[96px] rounded-[18px] px-2 py-6 text-3xl"
                   : "min-h-[60px] rounded-[16px] px-2 py-4 text-base"
               }`}
               style={{
-                background: active ? tint(deptColor, 14) : LEGACY_COLORS.s2,
-                borderColor: active ? deptColor : LEGACY_COLORS.border,
+                background: tint(deptColor, active ? 16 : 7),
+                borderColor: active ? deptColor : tint(deptColor, 25),
+                borderWidth: active ? 2 : 1,
                 color: active ? deptColor : LEGACY_COLORS.muted2,
               }}
             >
@@ -315,50 +321,41 @@ export function DirectionCard({
   variant?: "process" | "warehouse_adjust";
   prefixLabel?: string;
 }) {
-  const Icon = dir === "in" ? ArrowDownToLine : ArrowUpFromLine;
   const activeColor = dir === "out" ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className="relative flex h-full min-h-[96px] items-center justify-center gap-3 rounded-[18px] border p-4 text-left transition-all hover:shadow-md sm:gap-5 sm:p-6"
+      className={`${styles.selection} ${styles.direction} h-full min-h-[96px] border p-4 hover:shadow-md sm:p-6`}
       style={{
-        background: variant === "process" ? tint(activeColor, active ? 16 : 7) : active ? tint(activeColor, 14) : LEGACY_COLORS.s2,
-        borderColor: active ? activeColor : variant === "process" ? tint(activeColor, 25) : LEGACY_COLORS.border,
+        background: tint(activeColor, active ? 16 : 7),
+        borderColor: active ? activeColor : tint(activeColor, 25),
         borderWidth: active ? 2 : 1,
         color: active ? activeColor : LEGACY_COLORS.text,
       }}
     >
-      {variant === "process" ? (
-        <Image
-          src={`/images/warehouse/dexray-stock-${dir}.webp`}
-          alt=""
-          width={840}
-          height={560}
-          sizes="(max-width: 767px) 28vw, 220px"
-          className="pointer-events-none absolute left-1/2 top-[calc(50%+20px)] h-auto max-h-[calc(50%-28px)] w-[min(220px,65%)] -translate-x-1/2 object-contain"
-          draggable={false}
-        />
-      ) : (
-        <Icon className="h-16 w-16 shrink-0" />
-      )}
-      {variant === "warehouse_adjust" ? (
-        <span className="text-4xl font-black">{dir === "in" ? "입고" : "출고"}</span>
-      ) : (
-        <div className="flex -translate-y-4 flex-col items-center gap-2 leading-tight">
-          {prefixLabel !== "" && (
-            <>
-              <span className="text-4xl font-black">{prefixLabel ?? (dir === "in" ? "생산" : "분해")}</span>
-              <span
-                className="h-[4px] w-28 rounded-full"
-                style={{ background: active ? activeColor : LEGACY_COLORS.text }}
-              />
-            </>
-          )}
-          <span className="text-4xl font-black">{dir === "in" ? "입고" : "출고"}</span>
-        </div>
-      )}
+      <div className={`${styles.directionTitle} font-black`}>
+        {variant === "process" && prefixLabel !== "" && (
+          <>
+            <span>{prefixLabel ?? (dir === "in" ? "생산" : "분해")}</span>
+            <span className={styles.separator} />
+          </>
+        )}
+        <span>{dir === "in" ? "입고" : "출고"}</span>
+      </div>
+      <Image
+        src={`/images/warehouse/dexray-stock-${dir}.webp`}
+        alt=""
+        width={840}
+        height={560}
+        unoptimized
+        loading="eager"
+        fetchPriority="high"
+        sizes="(min-width: 1024px) 420px, 220px"
+        className={styles.art}
+        draggable={false}
+      />
     </button>
   );
 }

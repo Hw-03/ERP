@@ -1,0 +1,178 @@
+.hub {
+  container-type: size;
+  padding: 24px;
+}
+
+.hubHeading {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.hubIcon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.hubTitle {
+  font-size: 40px;
+  word-break: keep-all;
+}
+
+.hubDescription {
+  font-size: 20px;
+  text-wrap: pretty;
+  word-break: keep-all;
+}
+
+.selection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-width: 0;
+  border-radius: 22px;
+  text-align: center;
+  transition: background 150ms, border-color 150ms, box-shadow 150ms, transform 150ms;
+}
+
+.direction {
+  position: relative;
+  flex-direction: row;
+  gap: 12px;
+  border-radius: 18px;
+  text-align: left;
+}
+
+.direction .directionTitle {
+  transform: translateY(-16px);
+}
+
+.direction .art {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 20px);
+  max-height: calc(50% - 28px);
+  transform: translateX(-50%);
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .direction {
+    gap: 20px;
+  }
+}
+
+.selection:focus-visible,
+.hub:focus-visible {
+  outline: 3px solid var(--c-blue);
+  outline-offset: 3px;
+}
+
+.directionTitle {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font-size: 36px;
+  line-height: 1.25;
+}
+
+.separator {
+  width: 112px;
+  height: 4px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.art {
+  pointer-events: none;
+  flex: 0 1 auto;
+  width: min(220px, 65%);
+  height: auto;
+  min-height: 0;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.subTypeTitle {
+  flex: 0 0 auto;
+  font-size: 30px;
+  line-height: 1.15;
+  word-break: keep-all;
+}
+
+@media (min-width: 1024px) {
+  .hub {
+    gap: clamp(12px, 7cqh, 28px);
+    padding: clamp(20px, 10cqh, 36px);
+  }
+
+  .hubIcon {
+    width: clamp(40px, min(4.4vw, 26cqh), 56px);
+    height: clamp(40px, min(4.4vw, 26cqh), 56px);
+  }
+
+  .selection {
+    container-type: size;
+    min-height: 0;
+    gap: clamp(12px, 3cqh, 28px);
+    padding: clamp(16px, 4cqh, 32px);
+  }
+
+  .direction {
+    flex-direction: column;
+    border-radius: 22px;
+    text-align: center;
+  }
+
+  .direction .directionTitle {
+    transform: none;
+  }
+
+  .directionTitle {
+    gap: clamp(8px, 2cqh, 16px);
+    font-size: clamp(42px, min(4.7vw, 14cqh), 64px);
+    line-height: 1.08;
+  }
+
+  .separator {
+    width: clamp(112px, 11vw, 160px);
+  }
+
+  .art {
+    width: min(100%, clamp(280px, min(28vw, 100cqh), 420px));
+  }
+
+  .direction .art {
+    position: static;
+    max-height: none;
+    transform: none;
+  }
+
+  .subTypeTitle.warehouseTitle {
+    font-size: clamp(42px, min(4.7vw, 14cqh), 64px);
+  }
+
+  .subTypeTitle {
+    font-size: clamp(36px, min(3.8vw, 18cqh), 52px);
+  }
+
+  .department {
+    font-size: clamp(28px, 3vw, 44px);
+    border-radius: 22px;
+  }
+
+  .selection:active {
+    transform: scale(0.99);
+  }
+}
+
+@media (min-width: 1024px) and (max-height: 760px) {
+  .hub {
+    gap: 12px;
+  }
+}

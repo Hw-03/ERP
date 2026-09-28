@@ -9,6 +9,7 @@ const currentComposeProps = vi.hoisted(() => ({
     itemPickerFullscreen?: boolean;
     onItemPickerFullscreenChange?: (fullscreen: boolean) => void;
     onDraftSaved?: (batchId: string, step: number, persistInUrl?: boolean) => void;
+    onNewWork?: () => void;
   },
 }));
 
@@ -397,6 +398,22 @@ describe("DesktopWarehouseView", () => {
     expect(params.get("section")).toBe("compose");
     expect(params.get("step")).toBe("4");
     expect(currentComposeProps.value?.restoreDraft).toBeNull();
+  });
+
+  it("새 작업은 부모 초안 복원 추적을 해제하며 같은 저장 초안을 다시 복원할 수 있다", async () => {
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=compose&step=4&draftId=saved-draft");
+    apiMocks.listStockRequestDrafts.mockResolvedValue([]);
+    apiMocks.listDrafts.mockResolvedValue([{ batch_id: "saved-draft" }]);
+    const { rerender } = render(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+    await waitFor(() => expect(currentComposeProps.value?.restoreDraft?.batch_id).toBe("saved-draft"));
+    act(() => {
+      window.history.replaceState(null, "", "/mes?tab=warehouse&section=compose&step=2");
+      currentComposeProps.value?.onNewWork?.();
+    });
+    expect(currentComposeProps.value?.restoreDraft).toBeNull();
+    window.history.replaceState(null, "", "/mes?tab=warehouse&section=compose&step=4&draftId=saved-draft");
+    rerender(<DesktopWarehouseView globalSearch="" onStatusChange={vi.fn()} />);
+    await waitFor(() => expect(currentComposeProps.value?.restoreDraft?.batch_id).toBe("saved-draft"));
   });
 
   it("늦게 끝난 A 전환은 현재 B draftId를 지우지 않는다", async () => {
