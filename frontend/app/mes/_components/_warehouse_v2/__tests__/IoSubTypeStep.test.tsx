@@ -182,7 +182,14 @@ describe("IoSubTypeStep", () => {
     expect(screen.queryByText("세부 작업")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "AS·연구 사용출고" })).not.toBeInTheDocument();
     expect(departmentGrid?.parentElement?.parentElement).toHaveClass("h-full");
-    expect(departmentGrid?.querySelector("img")).toBeNull();
+    for (const [label, asset] of [["AS", "as-service"], ["연구", "research-board"]] as const) {
+      const card = screen.getByRole("button", { name: label });
+      const image = card.querySelector("img");
+      expect(image).toHaveAttribute("src", `/images/warehouse/dexray-${asset}.webp`);
+      expect(image).toHaveAttribute("alt", "");
+      expect(card).toHaveAttribute("aria-pressed", "false");
+      expect(within(card).getByText(label).compareDocumentPosition(image!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    }
     screen.getByRole("button", { name: "AS" }).click();
     expect(onToDepartmentChange).toHaveBeenCalledWith("AS");
   });

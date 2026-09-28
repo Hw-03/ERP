@@ -116,6 +116,7 @@ export function IoSubTypeStep({
           value={toDepartment}
           onChange={onToDepartmentChange}
           options={["AS", "연구"]}
+          illustrated
           fill
         />
       </div>
@@ -252,6 +253,7 @@ export function IoSubTypeStep({
           value={toDepartment}
           onChange={onToDepartmentChange}
           options={subType === "internal_use_out" ? ["AS", "연구"] : undefined}
+          illustrated={subType === "internal_use_out"}
           fill
         />
       )}
@@ -266,6 +268,7 @@ function DeptGrid({
   onChange,
   options,
   fill = false,
+  illustrated = false,
 }: {
   label: string;
   value: string;
@@ -273,6 +276,7 @@ function DeptGrid({
   // supplier_return 같이 옵션 제한이 필요한 sub_type 에서 ["창고"] 등 단일 옵션 주입. 미지정시 PROD_DEPTS.
   options?: readonly string[];
   fill?: boolean;
+  illustrated?: boolean;
 }) {
   const items = options ?? PROD_DEPTS;
   // 제한 옵션은 실제 개수만큼 열을 사용해 빈 칸 없이 영역 전체를 채운다.
@@ -301,7 +305,7 @@ function DeptGrid({
               aria-label={d}
               aria-pressed={active}
               onClick={() => onChange(d)}
-              className={`${styles.selection} ${fill ? styles.department : ""} standard-hover no-btn-inset border font-black ${
+              className={`${styles.selection} ${fill ? styles.department : ""} ${illustrated ? "" : "standard-hover"} no-btn-inset border font-black ${
                 fill
                   ? "h-full min-h-[96px] rounded-[18px] px-2 py-6 text-3xl"
                   : "min-h-[60px] rounded-[16px] px-2 py-4 text-base"
@@ -313,7 +317,20 @@ function DeptGrid({
                 color: active ? deptColor : LEGACY_COLORS.muted2,
               }}
             >
-              {d}
+              <span className="shrink-0">{d}</span>
+              {illustrated && (d === "AS" || d === "연구") && (
+                <Image
+                  src={`/images/warehouse/dexray-${d === "AS" ? "as-service" : "research-board"}.webp`}
+                  alt=""
+                  width={1536}
+                  height={1024}
+                  unoptimized
+                  loading="eager"
+                  sizes="(min-width: 1024px) 420px, 220px"
+                  className={`${styles.art} hidden lg:block`}
+                  draggable={false}
+                />
+              )}
             </button>
           );
         })}
