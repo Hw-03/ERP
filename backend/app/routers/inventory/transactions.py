@@ -207,6 +207,7 @@ _TX_ROW_COLOR = {
     "MARK_DEFECTIVE":   "FBD9D7",
     "SUPPLIER_RETURN":  "F4C7C3",
     "INTERNAL_USE":     "FCE8B2",
+    "MATERIAL_OUT":     "F8D7DA",
 }
 
 
@@ -947,6 +948,7 @@ def export_transactions_xlsx(
         "TRANSFER_DEPT": "부서간 이동",
         "MARK_DEFECTIVE": "불량 등록", "SUPPLIER_RETURN": "공급업체 반품",
         "INTERNAL_USE": "사내 사용",
+        "MATERIAL_OUT": "원자재 출고",
     }
 
     columns = [

@@ -6,6 +6,7 @@ import {
   getTransactionLabel,
   getTransactionTone,
   transactionColor,
+  transactionIconName,
   type MesTone,
 } from "../mes-status";
 import { LEGACY_COLORS } from "../mes/color";
@@ -64,12 +65,12 @@ describe("inferTone", () => {
 });
 
 describe("TRANSACTION_META", () => {
-  it("api.ts TransactionType 14키 모두 정의", () => {
+  it("TransactionType 키 모두 정의", () => {
     const required = [
       "RECEIVE", "PRODUCE", "SHIP", "ADJUST", "BACKFLUSH",
       "DISASSEMBLE",
       "TRANSFER_TO_PROD", "TRANSFER_TO_WH", "TRANSFER_DEPT",
-      "MARK_DEFECTIVE", "UNMARK_DEFECTIVE", "DEFECT_SCRAP", "SUPPLIER_RETURN", "INTERNAL_USE",
+      "MARK_DEFECTIVE", "UNMARK_DEFECTIVE", "DEFECT_SCRAP", "SUPPLIER_RETURN", "INTERNAL_USE", "MATERIAL_OUT",
     ];
     for (const key of required) {
       const meta = TRANSACTION_META[key as keyof typeof TRANSACTION_META];
@@ -84,6 +85,13 @@ describe("TRANSACTION_META", () => {
     for (const meta of Object.values(TRANSACTION_META)) {
       expect(valid).toContain(meta.tone);
     }
+  });
+});
+
+describe("transactionIconName", () => {
+  it("원자재 입고와 출고는 반대 방향 화살표를 사용한다", () => {
+    expect(transactionIconName("RECEIVE")).toBe("ArrowDownToLine");
+    expect(transactionIconName("MATERIAL_OUT")).toBe("ArrowUpFromLine");
   });
 });
 
@@ -118,6 +126,7 @@ describe("transactionColor", () => {
     // history-rework-color-2026-05-15: DISASSEMBLE("재작업") 은 되돌림 성격이라 red 로 격상.
     expect(transactionColor("DISASSEMBLE")).toBe(LEGACY_COLORS.red);
     expect(transactionColor("INTERNAL_USE")).toBe(LEGACY_COLORS.red);
+    expect(transactionColor("MATERIAL_OUT")).toBe(LEGACY_COLORS.red);
   });
 
   it("불량 처리 — 격리/폐기/반품/재작업 red, 격리해제 green", () => {

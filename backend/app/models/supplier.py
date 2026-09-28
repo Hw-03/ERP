@@ -1,4 +1,4 @@
-"""원자재 입고 공급업체 마스터."""
+"""원자재 입출고 공급업체 마스터."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ __all__ = ["Supplier"]
 
 
 class Supplier(Base):
-    """입고 당시 이름 스냅샷의 기준이 되는 활성/숨김 공급업체."""
+    """입출고 당시 이름 스냅샷의 기준이 되는 활성/숨김 공급업체."""
 
     __tablename__ = "suppliers"
 

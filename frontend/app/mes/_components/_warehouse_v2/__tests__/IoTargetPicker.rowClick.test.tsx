@@ -507,7 +507,7 @@ describe("IoTargetPicker row click", () => {
 
     fireEvent.click(screen.getByText("Clickable Item").closest("tr")!);
 
-    expect(onAddItem).toHaveBeenCalledWith(expect.objectContaining({ item_id: "item-1" }), "manual");
+    expect(onAddItem).toHaveBeenCalledWith(expect.objectContaining({ item_id: "item-1" }), "direct_item");
   });
 
   it("BOM 확인 중에는 행 클릭과 추가 버튼으로 새 품목을 담지 못한다", () => {

@@ -112,7 +112,7 @@ app = FastAPI(
         {"name": "Departments", "description": "부서 마스터 관리."},
         {"name": "Dept Adjustment", "description": "부서 재고 조정."},
         {"name": "Inventory IO", "description": "입출고 업무 처리."},
-        {"name": "Suppliers", "description": "원자재 입고 공급업체 마스터."},
+        {"name": "Suppliers", "description": "원자재 입출고 공급업체 마스터."},
         {"name": "Shipping", "description": "출하 요청과 준비·완료 처리."},
         {"name": "Stock Requests", "description": "재고 요청과 결재 처리."},
         {"name": "Warehouse Map", "description": "창고 배치도 관리."},

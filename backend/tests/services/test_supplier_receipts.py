@@ -6,9 +6,11 @@ import uuid
 
 import pytest
 
-from app.models import Employee, IoBatch, Supplier
+from app.models import Employee, Inventory, IoBatch, Supplier, TransactionLog
 from app.schemas import IoSubmitRequest
 from app.services import io_actions, io_draft
+from app.services import io_preview, inventory_operation_cancellation
+from app.schemas.io import IoPreviewTarget
 
 
 def _requester(db_session) -> Employee:
@@ -165,3 +167,151 @@ def test_hidden_supplier_draft_cannot_be_submitted_until_supplier_is_changed(
             batch_id=draft["batch_id"],
             requester_employee_id=requester.employee_id,
         )
+
+
+def _outbound_payload(db_session, make_item, *, quantity=3):
+    requester = _requester(db_session)
+    item = make_item(name="사급 샘플 자재")
+    supplier = Supplier(name="샘플 수령 업체", normalized_name="샘플 수령 업체", is_active=True)
+    db_session.add(supplier)
+    inventory = db_session.query(Inventory).filter_by(item_id=item.item_id).one()
+    inventory.quantity = inventory.warehouse_qty = 10
+    db_session.flush()
+    payload = _receive_payload(requester, item.item_id, item.item_name)
+    payload.sub_type = "outbound_supplier"
+    payload.supplier_id = supplier.supplier_id
+    payload.notes = "샘플 발송"
+    payload.bundles[0].quantity = quantity
+    line = payload.bundles[0].lines[0]
+    line.direction = "out"
+    line.from_bucket = "warehouse"
+    line.to_bucket = "none"
+    line.quantity = quantity
+    db_session.commit()
+    return requester, item, supplier, payload
+
+
+def test_material_outbound_completes_and_records_supplier(db_session, make_item):
+    requester, item, supplier, payload = _outbound_payload(db_session, make_item)
+    result = io_actions.submit(db_session, payload)
+    inventory = db_session.query(Inventory).filter_by(item_id=item.item_id).one()
+    log = db_session.query(TransactionLog).filter_by(item_id=item.item_id).one()
+    assert result["batch"]["status"] == "completed"
+    assert not result["batch"]["requires_approval"]
+    assert result["batch"]["supplier_name_snapshot"] == supplier.name
+    assert result["batch"]["notes"] == "샘플 발송"
+    assert inventory.warehouse_qty == inventory.quantity == 7
+    assert log.transaction_type.value == "MATERIAL_OUT"
+    assert log.quantity_change == -3
+    assert log.supplier_name_snapshot == supplier.name
+
+
+@pytest.mark.parametrize("invalid", ["missing_supplier", "hidden_supplier", "missing_reason", "permission", "route", "combination", "bom_source", "extra_line"])
+def test_material_outbound_rejects_invalid_request(db_session, make_item, invalid):
+    requester, item, supplier, payload = _outbound_payload(db_session, make_item)
+    if invalid == "missing_supplier":
+        payload.supplier_id = None
+    elif invalid == "hidden_supplier":
+        supplier.is_active = False
+    elif invalid == "missing_reason":
+        payload.notes = "  "
+    elif invalid == "permission":
+        requester.warehouse_role = "none"
+    elif invalid == "route":
+        payload.bundles[0].lines[0].from_bucket = "none"
+    elif invalid == "bom_source":
+        payload.bundles[0].source_kind = "bom_parent"
+    elif invalid == "extra_line":
+        payload.bundles[0].lines.append(payload.bundles[0].lines[0].model_copy(deep=True))
+    else:
+        payload.work_type = "process"
+    db_session.flush()
+    with pytest.raises((ValueError, PermissionError)):
+        io_actions.submit(db_session, payload)
+    inventory = db_session.query(Inventory).filter_by(item_id=item.item_id).one()
+    assert inventory.warehouse_qty == 10
+    assert db_session.query(TransactionLog).filter_by(item_id=item.item_id).count() == 0
+
+
+def test_material_outbound_respects_reserved_stock(db_session, make_item):
+    _, item, _, payload = _outbound_payload(db_session, make_item, quantity=4)
+    inventory = db_session.query(Inventory).filter_by(item_id=item.item_id).one()
+    inventory.pending_quantity = 7
+    db_session.flush()
+    with pytest.raises(ValueError, match="재고 부족"):
+        io_actions.submit(db_session, payload)
+    assert inventory.warehouse_qty == 10
+
+
+def test_material_outbound_draft_requires_permission_and_restores(db_session, make_item):
+    requester, _, supplier, payload = _outbound_payload(db_session, make_item)
+    draft = io_draft.save_draft(db_session, payload)
+    assert draft["sub_type"] == "outbound_supplier"
+    assert draft["supplier_id"] == supplier.supplier_id
+    assert draft["notes"] == "샘플 발송"
+    requester.warehouse_role = "none"
+    db_session.flush()
+    payload.batch_id = draft["batch_id"]
+    with pytest.raises(PermissionError):
+        io_draft.save_draft(db_session, payload)
+
+
+def test_material_outbound_preview_is_single_item(db_session, make_item, make_bom):
+    _, item, _, _ = _outbound_payload(db_session, make_item)
+    child = make_item(name="자동 출고하지 않는 하위 자재")
+    make_bom(item.item_id, child.item_id, 2)
+    preview = io_preview.preview(db_session, work_type="receive", sub_type="outbound_supplier",
+                                targets=[IoPreviewTarget(item_id=item.item_id, quantity=3)])
+    assert not preview["requires_approval"]
+    assert len(preview["bundles"][0]["lines"]) == 1
+    line = preview["bundles"][0]["lines"][0]
+    assert (line["direction"], line["from_bucket"], line["to_bucket"]) == ("out", "warehouse", "none")
+
+
+def test_material_outbound_aggregates_duplicate_items(db_session, make_item):
+    _, item, _, payload = _outbound_payload(db_session, make_item, quantity=6)
+    second = payload.bundles[0].model_copy(deep=True)
+    second.bundle_id = uuid.uuid4()
+    second.lines[0].line_id = uuid.uuid4()
+    payload.bundles.append(second)
+    with pytest.raises(ValueError, match="재고 부족"):
+        io_actions.submit(db_session, payload)
+    inventory = db_session.query(Inventory).filter_by(item_id=item.item_id).one()
+    assert inventory.warehouse_qty == 10
+
+
+def test_material_outbound_cancellation_restores_stock(db_session, make_item):
+    requester, item, _, payload = _outbound_payload(db_session, make_item)
+    from app.models import SystemSetting
+    db_session.add(SystemSetting(setting_key="inventory_operation_cutover_at", setting_value="2026-01-01T00:00:00"))
+    db_session.commit()
+    io_actions.submit(db_session, payload)
+    log = db_session.query(TransactionLog).filter_by(item_id=item.item_id).one()
+    plan = inventory_operation_cancellation.preview_cancellation(db_session, log.operation_id)
+    assert plan.can_cancel, plan.blockers
+    inventory_operation_cancellation.cancel_operation(db_session, operation_id=log.operation_id,
+        canceller=requester, reason="샘플 출고 취소", plan_hash=plan.plan_hash)
+    inventory = db_session.query(Inventory).filter_by(item_id=item.item_id).one()
+    assert inventory.quantity == inventory.warehouse_qty == 10
+
+
+def test_material_outbound_duplicate_submission_is_idempotent(client, db_session, make_item):
+    _, item, _, payload = _outbound_payload(db_session, make_item)
+    payload.client_request_id = "material-outbound-retry"
+    first = client.post("/api/io/submit", json=payload.model_dump(mode="json"))
+    second = client.post("/api/io/submit", json=payload.model_dump(mode="json"))
+    assert first.status_code == second.status_code == 201
+    assert second.json()["batch"]["batch_id"] == first.json()["batch"]["batch_id"]
+    inventory = db_session.query(Inventory).filter_by(item_id=item.item_id).one()
+    assert inventory.quantity == inventory.warehouse_qty == 7
+    assert db_session.query(TransactionLog).filter_by(item_id=item.item_id).count() == 1
+
+
+def test_material_outbound_preview_rejects_unauthorized_requester(client, db_session, make_item):
+    requester, item, _, _ = _outbound_payload(db_session, make_item)
+    requester.warehouse_role = "none"
+    db_session.commit()
+    response = client.post("/api/io/preview", json={"requester_employee_id": str(requester.employee_id),
+        "work_type": "receive", "sub_type": "outbound_supplier",
+        "targets": [{"item_id": str(item.item_id), "quantity": 1}]})
+    assert response.status_code == 403

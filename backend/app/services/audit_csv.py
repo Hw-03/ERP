@@ -42,6 +42,7 @@ AUDIT_TX_TYPES: frozenset[TransactionTypeEnum] = frozenset({
     TransactionTypeEnum.MARK_DEFECTIVE,
     TransactionTypeEnum.DISASSEMBLE,
     TransactionTypeEnum.INTERNAL_USE,
+    TransactionTypeEnum.MATERIAL_OUT,
 })
 
 
@@ -58,6 +59,7 @@ TX_TYPE_LABEL_KO: dict[str, str] = {
     "MARK_DEFECTIVE": "불량 처리",
     "DISASSEMBLE": "분해",
     "INTERNAL_USE": "AS·연구 사용출고",
+    "MATERIAL_OUT": "원자재 출고",
 }
 
 

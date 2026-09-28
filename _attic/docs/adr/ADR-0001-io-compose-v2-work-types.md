@@ -2,6 +2,8 @@
 
 **상태**: Accepted (2026-05-29)
 
+**현행 보완 (2026-09-28)**: `receive`의 화면 명칭은 원자재 입출고이며 `receive_supplier` 입고와 `outbound_supplier` 사급·샘플 출고를 포함한다. 아래 작업 종류 수와 출하 해석은 당시 결정의 기록이다. 현행 품목·작업 구성은 코드와 `python _attic/backend-scripts/facts.py`로 확인한다.
+
 ## 맥락
 
 DEXCOWIN MES 의 V2 입출고 화면(`frontend/app/mes/_components/_warehouse_v2/IoComposeView.tsx`)은

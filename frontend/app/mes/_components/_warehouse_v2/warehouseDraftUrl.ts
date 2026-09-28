@@ -6,7 +6,7 @@ function replaceWarehouseUrl(url: URL): void {
 
 export function parseWarehouseStep(raw: string | null): IoStep | undefined {
   const step = Number(raw);
-  return step >= 1 && step <= 5 ? step as IoStep : undefined;
+  return step >= 1 && step <= 6 ? step as IoStep : undefined;
 }
 
 export function persistWarehouseDraftUrl(batchId: string, step: IoStep): void {

@@ -11,6 +11,7 @@ import { api, type IoBundle, type IoInternalUseBomMode, type IoLine, type IoSour
 import { WizardStepCard } from "./_atoms";
 import { IoWorkTypeStep, IoSubTypeStep } from "./IoWorkTypeStep";
 import { SupplierPickerStep } from "./SupplierPickerStep";
+import { MaterialDirectionStep } from "./MaterialDirectionStep";
 import { IoTargetPicker } from "./IoTargetPicker";
 import { IoBundleCart } from "./IoBundleCart";
 import { IoConfirmStep } from "./IoConfirmStep";
@@ -254,6 +255,7 @@ export function IoComposeView({
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const { pendingFinalStepRef, resetForHome } = useIoUrlSync({
+    steps: state.steps,
     synchronousHistory: true,
     step: state.step,
     goTo: state.goTo,
@@ -593,7 +595,7 @@ export function IoComposeView({
     state.setWorkType(next);
     setError(null);
     beginNewCompositionSlot();
-    state.goTo(2);
+    state.goTo(next === "receive" ? 6 : 2);
   }
 
   function openItemConversion() {
@@ -872,6 +874,7 @@ export function IoComposeView({
   useEffect(() => () => onItemPickerFullscreenChange?.(false), [onItemPickerFullscreenChange]);
 
   function stepTitle(stepId: IoStep) {
+    if (stepId === 6) return "입고·출고 선택";
     if (stepId === 3) return `${pickerDirectionLabel(state.subType)} 품목 선택`;
     return stepId === 1
       ? "작업 유형 선택"
@@ -889,6 +892,7 @@ export function IoComposeView({
   }
 
   function stepSummary(stepId: IoStep) {
+    if (stepId === 6) return state.materialDirectionSelected ? subTypeLabel(state.subType) : "";
     if (stepId === 2) return stepTwoSummary;
     if (stepId === 3) return `${state.bundles.length}개 묶음 · 라인 ${lineCount}개`;
     return `반영 ${includedCount}개 · 제외 ${excludedCount}개`;
@@ -921,10 +925,10 @@ export function IoComposeView({
 
   const workChrome = itemPickerFullscreen ? undefined : (
     <div className="iwc">
-      <nav className="iwp" data-testid="io-step-nav">
-        {([1, 2, 3, 4, 5] as IoStep[]).map((stepId) => {
+      <nav className="iwp" data-testid="io-step-nav" style={{ gridTemplateColumns: `repeat(${state.steps.length}, minmax(0, 1fr))` }}>
+        {state.steps.map((stepId) => {
           const active = stepId === step;
-          const done = stepId < step;
+          const done = state.steps.indexOf(stepId) < state.steps.indexOf(step);
           const summaryText =
             stepId === 1
               ? step > 1
@@ -933,7 +937,7 @@ export function IoComposeView({
               : done && stepId > 1
                 ? stepSummary(stepId)
                 : "";
-          if (stepId < step) {
+          if (done) {
             return (
               <button
                 key={stepId}
@@ -974,7 +978,7 @@ export function IoComposeView({
   // active wrapper height 동적 set — carbon bottom 이 컨테이너 bottom (= 사이드바 bottom) 과 정렬되도록.
   // Step 3+품목>0 시점에는 Step 4 wrapper 가 active.
   useLayoutEffect(() => {
-    const allSteps: IoStep[] = [1, 2, 3, 4, 5];
+    const allSteps = state.steps;
     const stepElements = { ...stepRefs.current };
 
     // step=3+bundles>0 시 Step 3 과 Step 4 둘 다 filled 처리 (사이즈 일관성).
@@ -1030,7 +1034,7 @@ export function IoComposeView({
         wrapperTopInContainer = STEP4_SCROLL_OFFSET;
       } else {
         // Step 2/3/5: 접힌 이전 단계 카드 아래부터 active 카드가 차도록 계산.
-        const prevStep: IoStep = (s - 1) as IoStep;
+        const prevStep = state.steps[state.steps.indexOf(s) - 1];
         const prevCollapsed = stepElements[prevStep];
         if (!prevCollapsed) continue;
         wrapperTopInContainer = AUTO_SCROLL_OFFSET + prevCollapsed.offsetHeight + GAP;
@@ -1048,7 +1052,7 @@ export function IoComposeView({
       step === 3 && state.bundles.length > 0
         ? stepElements[4]
         : step > 1
-          ? stepElements[(step - 1) as IoStep]
+          ? stepElements[state.steps[state.steps.indexOf(step) - 1]]
           : null;
     const extendStep: IoStep = step === 3 && state.bundles.length > 0 ? 4 : step;
     const extendWrapper = stepElements[extendStep];
@@ -1105,12 +1109,12 @@ export function IoComposeView({
         });
       } else {
         // step 2 이후 — 직전(step-1) 카드를 container top 보다 살짝 위로 정렬.
-        const targetEl = stepRefs.current[(step - 1) as IoStep];
+        const targetEl = stepRefs.current[state.steps[state.steps.indexOf(step) - 1]];
         if (targetEl) scrollToElement(container, targetEl);
       }
     }, 150);
     return () => clearTimeout(timer);
-  }, [step]);
+  }, [step, state.steps]);
 
   if (itemConversionView === "work") {
     return (
@@ -1175,6 +1179,21 @@ export function IoComposeView({
           />
         </WizardStepCard>
       </div>
+      )}
+
+      {step === 6 && (
+        <div ref={(el) => { stepRefs.current[6] = el; }} className="flex min-h-0 flex-1 flex-col">
+          <WizardStepCard n={2} title={stepTitle(6)} state="active" accent={accent} chrome={workChrome} chromeOnly fill>
+            <div className="flex h-full min-h-0 flex-col gap-5">
+              <div className="min-h-0 flex-1">
+                <MaterialDirectionStep selected={state.materialDirectionSelected ? state.subType : null} onSelect={handleSubTypeChange} />
+              </div>
+              <Button variant="primary" size="lg" onClick={state.goNext} disabled={!state.canAdvance[6]} className="w-full rounded-[18px] py-5 text-lg font-black">
+                {state.canAdvance[6] ? "다음 단계로 →" : "입고 또는 출고를 선택하세요"}
+              </Button>
+            </div>
+          </WizardStepCard>
+        </div>
       )}
 
       {step === 2 && (
@@ -1419,6 +1438,7 @@ export function IoComposeView({
             fill
           >
             <IoConfirmStep
+              supplierName={state.selectedSupplierName}
               workType={state.workType}
               subType={state.subType}
               bundles={state.bundles}

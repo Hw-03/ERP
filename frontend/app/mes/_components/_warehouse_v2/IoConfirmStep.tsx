@@ -40,6 +40,7 @@ import {
 } from "./internalUseBom";
 
 interface Props {
+  supplierName?: string | null;
   workType: IoWorkType;
   subType: IoSubType;
   bundles: IoBundle[];
@@ -166,6 +167,9 @@ function confirmCopy(
   if (subType === "receive_supplier") {
     return { title: `원자재 입고를 ${verb}`, tone: "normal", confirmLabel };
   }
+  if (subType === "outbound_supplier") {
+    return { title: `원자재 출고를 ${verb}`, tone: "danger", confirmLabel };
+  }
   return { title: needsApproval ? "제출하시겠습니까?" : "진행하시겠습니까?", tone: "normal", confirmLabel };
 }
 
@@ -191,6 +195,7 @@ function signFor(line: IoLine): { sign: "+" | "-" | null; color: string } {
 }
 
 export function IoConfirmStep({
+  supplierName,
   workType,
   subType,
   bundles,
@@ -252,7 +257,8 @@ export function IoConfirmStep({
       ? b.lines.some((line) => !bomParentLineIds.has(line.line_id))
       : b.lines.some((line) => line.included && !bomParentLineIds.has(line.line_id)),
   );
-  const memoRequired = requiresDepartmentApprovalMemo(workType, subType, bundles);
+  const materialOutbound = subType === "outbound_supplier";
+  const memoRequired = materialOutbound || requiresDepartmentApprovalMemo(workType, subType, bundles);
   const memoMissing = memoRequired && !notes.trim();
   const showMemoError = memoValidationAttempted && memoMissing;
   const allowsNoEffectCustomBomApproval =
@@ -268,7 +274,7 @@ export function IoConfirmStep({
     submitting || saving ||
     (effectIncludedLines.length === 0 && !allowsNoEffectCustomBomApproval) ||
     hasShortage || hasInvalidQuantity || missingInternalUseBomMode;
-  const saveDisabled = submitting || saving || bundles.length === 0;
+  const saveDisabled = submitting || saving || bundles.length === 0 || (materialOutbound && memoMissing);
   const accent = directionAccent(subType);
   const blockerText = hasShortage
     ? "재고 부족 라인이 있어 제출할 수 없습니다. Step 4에서 라인을 다시 확인하세요."
@@ -338,15 +344,16 @@ export function IoConfirmStep({
       {/* 항목 7-4 — 메모를 액션 푸터 밖(스크롤 영역 바로 아래 정적 요소)으로 분리해 버튼 위에 끼지 않게 한다.
           버튼 행은 Step4(IoBundleCart) 와 동일한 sticky 푸터로 통일 → 두 단계 버튼의 화면상 위치(네비바와의 간격)가 일치. */}
       <Field
-        label={memoRequired ? "메모 (필수)" : "메모 (선택)"}
+        label={materialOutbound ? "출고 사유 (필수)" : memoRequired ? "메모 (필수)" : "메모 (선택)"}
         value={notes}
         onChange={(value) => {
           if (value.trim()) setMemoValidationAttempted(false);
           onNotesChange(value);
         }}
-        placeholder={memoRequired ? "결재 사유를 입력하세요" : "작업 메모"}
+        placeholder={materialOutbound ? "사급·샘플 등 출고 사유를 입력하세요" : memoRequired ? "결재 사유를 입력하세요" : "작업 메모"}
         required={memoRequired}
         invalid={showMemoError}
+        errorMessage={materialOutbound ? "출고 사유를 입력하세요." : MEMO_REQUIRED_MESSAGE}
         inputRef={memoInputRef}
       />
 
@@ -388,7 +395,7 @@ export function IoConfirmStep({
             onClick={() => {
               if (memoMissing) {
                 setMemoValidationAttempted(true);
-                onValidationError?.(MEMO_REQUIRED_MESSAGE);
+                onValidationError?.(materialOutbound ? "출고 사유를 입력하세요." : MEMO_REQUIRED_MESSAGE);
                 memoInputRef.current?.focus();
                 return;
               }
@@ -429,6 +436,8 @@ export function IoConfirmStep({
       >
         <div className="text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
           {headerSummary}
+          {supplierName && <div className="mt-2">{materialOutbound ? "수령 업체" : "공급업체"}: {supplierName}</div>}
+          {materialOutbound && <div className="mt-2">출고 사유: {notes}</div>}
         </div>
       </ConfirmModal>
     </div>
@@ -786,6 +795,7 @@ function Field({
   placeholder,
   required = false,
   invalid = false,
+  errorMessage = MEMO_REQUIRED_MESSAGE,
   inputRef,
 }: {
   label: string;
@@ -794,6 +804,7 @@ function Field({
   placeholder: string;
   required?: boolean;
   invalid?: boolean;
+  errorMessage?: string;
   inputRef?: LegacyRef<HTMLInputElement>;
 }) {
   const errorId = "department-approval-memo-error";
@@ -807,7 +818,7 @@ function Field({
         id="department-approval-memo"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        placeholder={invalid ? MEMO_REQUIRED_MESSAGE : placeholder}
+        placeholder={invalid ? errorMessage : placeholder}
         required={required}
         aria-required={required}
         aria-invalid={invalid || undefined}
@@ -825,7 +836,7 @@ function Field({
       />
       {invalid && (
         <span id={errorId} className="sr-only">
-          {MEMO_REQUIRED_MESSAGE}
+          {errorMessage}
         </span>
       )}
     </label>

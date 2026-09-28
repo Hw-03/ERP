@@ -11,6 +11,7 @@ export function rowTint(type: string): string {
     case "PRODUCE":
       return "color-mix(in srgb, var(--c-green) 5%, transparent)";
     case "SHIP":
+    case "MATERIAL_OUT":
     case "BACKFLUSH":
     case "INTERNAL_USE":
       return "color-mix(in srgb, var(--c-red) 5%, transparent)";

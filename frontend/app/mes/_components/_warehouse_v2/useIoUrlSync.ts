@@ -13,6 +13,7 @@
  */
 import { useEffect, useMemo, useRef } from "react";
 import type { IoStep } from "./useIoWorkState";
+import { DEFAULT_IO_STEPS } from "./useIoWorkState";
 
 type Router = {
   push: (href: string, opts?: { scroll?: boolean }) => void;
@@ -25,6 +26,7 @@ type SearchParamsLike = {
 
 export type UseIoUrlSyncArgs = {
   step: IoStep;
+  steps?: IoStep[];
   goTo: (target: IoStep) => void;
   canAdvance: Record<IoStep, boolean>;
   router: Router;
@@ -53,7 +55,7 @@ export type UseIoUrlSyncApi = {
 };
 
 export function useIoUrlSync(args: UseIoUrlSyncArgs): UseIoUrlSyncApi {
-  const { step, goTo, canAdvance, router, searchParams, pathname, tabParam, suppressInitialSync = false, synchronousHistory = false } = args;
+  const { step, steps = DEFAULT_IO_STEPS, goTo, canAdvance, router, searchParams, pathname, tabParam, suppressInitialSync = false, synchronousHistory = false } = args;
   function pushStep(href: string): void {
     if (synchronousHistory) window.history.pushState({ ...window.history.state }, "", href);
     else router.push(href, { scroll: false });
@@ -61,8 +63,8 @@ export function useIoUrlSync(args: UseIoUrlSyncArgs): UseIoUrlSyncApi {
 
   const urlStep = useMemo<IoStep>(() => {
     const raw = Number(searchParams.get("step"));
-    return raw >= 1 && raw <= 5 ? (raw as IoStep) : 1;
-  }, [searchParams]);
+    return steps.includes(raw as IoStep) ? (raw as IoStep) : 1;
+  }, [searchParams, steps]);
 
   // URL→state 동기화 직후 state→URL effect 가 다시 push 하는 것을 1회 차단.
   const skipNextPushRef = useRef(false);
@@ -84,7 +86,7 @@ export function useIoUrlSync(args: UseIoUrlSyncArgs): UseIoUrlSyncApi {
     }
     const forceInitialStepPush = forceInitialStepPushRef.current;
     const liveRaw = synchronousHistory ? Number(new URLSearchParams(window.location.search).get("step")) : urlStep;
-    const currentUrlStep = liveRaw >= 1 && liveRaw <= 5 ? liveRaw : 1;
+    const currentUrlStep = steps.includes(liveRaw as IoStep) ? liveRaw : 1;
     if (!forceInitialStepPush && currentUrlStep === step) return;
     const next = new URLSearchParams(
       typeof window !== "undefined" ? window.location.search : searchParams.toString(),
@@ -102,7 +104,7 @@ export function useIoUrlSync(args: UseIoUrlSyncArgs): UseIoUrlSyncApi {
     if (suppressInitialSyncRef.current) return;
     if (typeof window !== "undefined") {
       const liveRaw = Number(new URLSearchParams(window.location.search).get("step"));
-      const liveUrlStep = liveRaw >= 1 && liveRaw <= 5 ? (liveRaw as IoStep) : 1;
+      const liveUrlStep = steps.includes(liveRaw as IoStep) ? (liveRaw as IoStep) : 1;
       // router.push 직후 useSearchParams가 이전 query를 한 렌더 더 노출할 수 있다.
       // 주소창보다 늦은 snapshot으로 사용자가 이미 진행한 state를 되감지 않는다.
       if (liveUrlStep !== urlStep) return;
@@ -117,9 +119,9 @@ export function useIoUrlSync(args: UseIoUrlSyncArgs): UseIoUrlSyncApi {
       return;
     }
     let target: IoStep = urlStep;
-    for (let s = 1; s < target; s += 1) {
-      if (!canAdvance[s as IoStep]) {
-        target = s as IoStep;
+    for (const s of steps.slice(0, steps.indexOf(target))) {
+      if (!canAdvance[s]) {
+        target = s;
         break;
       }
     }

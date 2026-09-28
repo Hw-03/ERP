@@ -147,6 +147,7 @@ def _warehouse_delta_from_legacy(log: TransactionLog) -> int | None:
         TransactionTypeEnum.TRANSFER_TO_PROD.value,
         TransactionTypeEnum.SUPPLIER_RETURN.value,
         TransactionTypeEnum.INTERNAL_USE.value,
+        TransactionTypeEnum.MATERIAL_OUT.value,
     }:
         return -quantity
     return None
@@ -190,7 +191,7 @@ def _counterpart(
     supplier_name = getattr(batch, "supplier_name_snapshot", None) if batch is not None else None
     if (
         batch is not None
-        and batch.sub_type == "receive_supplier"
+        and batch.sub_type in {"receive_supplier", "outbound_supplier"}
         and supplier_name
         and supplier_name.strip()
     ):

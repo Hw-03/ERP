@@ -83,6 +83,7 @@ export const TRANSACTION_META: Record<TransactionType, TransactionMeta> = {
   DEFECT_SCRAP: { label: _TX_LABEL.DEFECT_SCRAP, tone: "danger" },
   SUPPLIER_RETURN: { label: _TX_LABEL.SUPPLIER_RETURN, tone: "danger" },
   INTERNAL_USE: { label: _TX_LABEL.INTERNAL_USE, tone: "danger" },
+  MATERIAL_OUT: { label: _TX_LABEL.MATERIAL_OUT, tone: "danger" },
 };
 
 /**
@@ -107,7 +108,7 @@ export function getTransactionLabel(type: TransactionType | string): string {
  */
 export type TransactionIconName =
   | "ArrowDownToLine"   // RECEIVE
-  | "ArrowUpFromLine"   // SHIP
+  | "ArrowUpFromLine"   // SHIP / INTERNAL_USE / MATERIAL_OUT
   | "Sliders"           // ADJUST
   | "Hammer"            // PRODUCE
   | "Recycle"           // BACKFLUSH
@@ -146,6 +147,7 @@ export function transactionColor(type: TransactionType | string): string {
     case "DEFECT_SCRAP":
     case "SUPPLIER_RETURN":
     case "INTERNAL_USE":
+    case "MATERIAL_OUT":
       return LEGACY_COLORS.red;
     case "TRANSFER_TO_PROD":
     case "TRANSFER_TO_WH":
@@ -163,6 +165,7 @@ export function transactionIconName(type: TransactionType | string): Transaction
     case "RECEIVE":
       return "ArrowDownToLine";
     case "SHIP":
+    case "MATERIAL_OUT":
       return "ArrowUpFromLine";
     case "ADJUST":
       return "Sliders";

@@ -8,7 +8,10 @@ import {
 } from "./ioWorkType";
 import { hasUnselectedInternalUseBomMode } from "./internalUseBom";
 
-export type IoStep = 1 | 2 | 3 | 4 | 5;
+// 6은 원자재 방향 선택이다. 기존 URL의 2~5단계 의미를 보존한다.
+export type IoStep = 1 | 2 | 3 | 4 | 5 | 6;
+export const DEFAULT_IO_STEPS: IoStep[] = [1, 2, 3, 4, 5];
+const MATERIAL_IO_STEPS: IoStep[] = [1, 6, 2, 3, 4, 5];
 
 export const IO_STEP_LABELS: Record<IoStep, string> = {
   1: "작업 유형",
@@ -16,6 +19,7 @@ export const IO_STEP_LABELS: Record<IoStep, string> = {
   3: "대상 선택",
   4: "실제 반영",
   5: "제출 확인",
+  6: "입고·출고 선택",
 };
 
 type GetAvailable = (line: IoLine) => number | null;
@@ -34,6 +38,7 @@ export function useIoWorkState(
   const [workType, setWorkTypeBase] = useState<IoWorkType>(initialWorkType ?? "receive");
   const [hasSelectedWorkType, setHasSelectedWorkType] = useState(false);
   const [selectedSubType, setSelectedSubType] = useState<IoSubType>("receive_supplier");
+  const [materialDirectionSelected, setMaterialDirectionSelected] = useState(false);
   const [fromDepartment, setFromDepartment] = useState<string>(defaultDepartment);
   const [toDepartment, setToDepartment] = useState<string>(defaultDepartment);
   const [bundles, setBundlesBase] = useState<IoBundle[]>([]);
@@ -61,6 +66,7 @@ export function useIoWorkState(
     setWorkTypeBase(next);
     setHasSelectedWorkType(true);
     setSelectedSubType(DEFAULT_SUB_TYPE[next]);
+    setMaterialDirectionSelected(false);
     setToDepartment(next === "internal_use" ? "" : defaultDepartment);
     setDeptIoDirectionBase(null);
     setBundles([]);
@@ -71,6 +77,10 @@ export function useIoWorkState(
   }
 
   function setSubType(next: IoSubType) {
+    if (next === "receive_supplier" || next === "outbound_supplier") {
+      setMaterialDirectionSelected(true);
+      if (next !== selectedSubType) setBundles([]);
+    }
     setSelectedSubType(next);
     if (next === "warehouse_to_dept" || next === "dept_to_warehouse") {
       setDeptIoDirectionBase(next === "warehouse_to_dept" ? "out" : "in");
@@ -145,8 +155,9 @@ export function useIoWorkState(
         !hasInvalidQuantity &&
         !hasMissingInternalUseBomMode,
       5: true,
+      6: materialDirectionSelected,
     };
-  }, [hasSelectedWorkType, workType, deptIoDirection, toDepartment, selectedSupplierId, supplierSelectionReady, bundles.length, effectIncludedLines.length, hasShortage, hasInvalidQuantity, hasMissingInternalUseBomMode]);
+  }, [hasSelectedWorkType, materialDirectionSelected, workType, deptIoDirection, toDepartment, selectedSupplierId, supplierSelectionReady, bundles.length, effectIncludedLines.length, hasShortage, hasInvalidQuantity, hasMissingInternalUseBomMode]);
 
   function setSupplier(supplier: { supplier_id: string; name: string } | null) {
     setSelectedSupplierId(supplier?.supplier_id ?? null);
@@ -154,10 +165,10 @@ export function useIoWorkState(
   }
 
   function goNext() {
-    setStep((s) => (s < 5 ? ((s + 1) as IoStep) : s));
+    setStep((s) => steps[Math.min(steps.indexOf(s) + 1, steps.length - 1)]);
   }
   function goPrev() {
-    setStep((s) => (s > 1 ? ((s - 1) as IoStep) : s));
+    setStep((s) => steps[Math.max(steps.indexOf(s) - 1, 0)]);
   }
   function goTo(target: IoStep) {
     setStep(target);
@@ -192,9 +203,13 @@ export function useIoWorkState(
     setSupplier(null);
     setStep(1);
     setHasSelectedWorkType(false);
+    setMaterialDirectionSelected(false);
   }
 
+  const steps = workType === "receive" ? MATERIAL_IO_STEPS : DEFAULT_IO_STEPS;
   return {
+    steps,
+    materialDirectionSelected,
     workType,
     hasSelectedWorkType,
     subType,

@@ -110,6 +110,7 @@ NON_PRODUCTION_TX_TYPES: frozenset[TransactionTypeEnum] = frozenset({
     TransactionTypeEnum.DEFECT_SCRAP,
     TransactionTypeEnum.SUPPLIER_RETURN,
     TransactionTypeEnum.INTERNAL_USE,
+    TransactionTypeEnum.MATERIAL_OUT,
 })
 
 

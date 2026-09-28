@@ -144,6 +144,16 @@ describe("historyPresentation", () => {
     expect(getHistoryListOperationLabel(makeLog({ transaction_type: "UNMARK_DEFECTIVE" }))).toBe("불량 정상 복귀");
   });
 
+  it("원자재 출고와 취소에 수령 업체 흐름을 표시한다", () => {
+    const outbound = makeLog({ transaction_type: "MATERIAL_OUT", supplier_name_snapshot: "샘플 수령 업체", quantity_change: -3 });
+    const row = getHistoryRowPresentation(outbound);
+    expect(row.operation.label).toBe("원자재 출고");
+    expect(row.operation.hint).toBe("창고 → 샘플 수령 업체");
+    const reversed = getHistoryRowPresentation({ ...outbound, operation_kind: "CANCELLATION", quantity_change: 3 });
+    expect(reversed.operation.label).toBe("원자재 출고 취소");
+    expect(reversed.operation.hint).toBe("샘플 수령 업체 → 창고");
+  });
+
   it("[8.13-05][8.13-12] distinguishes supplier returns and their cancellations", () => {
     expect(getHistoryListOperationLabel(makeLog({ transaction_type: "SUPPLIER_RETURN" }))).toBe("반품");
     expect(getHistoryListOperationLabel(makeLog({

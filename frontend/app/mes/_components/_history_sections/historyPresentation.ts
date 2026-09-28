@@ -650,6 +650,7 @@ export function getHistoryListOperationLabel(
   }
   if (log.transaction_type === "UNMARK_DEFECTIVE") return "불량 정상 복귀";
   if (log.transaction_type === "SUPPLIER_RETURN") return "반품";
+  if (log.transaction_type === "MATERIAL_OUT") return "원자재 출고";
   if (log.reference_no?.startsWith("defect-disassemble:")) return "재작업";
 
   const phaseLabel = getShippingPhaseOperationLabel(log.shipping_phase);

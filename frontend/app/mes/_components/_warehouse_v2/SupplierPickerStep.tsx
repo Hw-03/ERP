@@ -24,7 +24,7 @@ function errorMessage(error: unknown): string {
 }
 
 /**
- * 원자재 입고의 공급업체 선택·관리 화면.
+ * 원자재 입출고의 공급업체 선택·관리 화면.
  * 목록과 관리 동작은 한 곳에 두고, 부모 화면은 desktop/mobile 배치만 결정한다.
  */
 export function SupplierPickerStep({
@@ -161,9 +161,7 @@ export function SupplierPickerStep({
     <section className={compact ? "flex min-h-full flex-col gap-3" : "flex h-full min-h-0 flex-col gap-4"} aria-label="공급업체 검색·선택">
       <div className="flex flex-wrap items-end gap-2">
         <label className="min-w-[180px] flex-1">
-          <span className="mb-1 block text-xs font-black tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>
-            공급업체 검색·선택
-          </span>
+          <span className="sr-only">공급업체 검색</span>
           <span className="relative block">
             <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: LEGACY_COLORS.muted2 }} />
             <input
@@ -222,7 +220,7 @@ export function SupplierPickerStep({
           <EmptyState
             illustrated
             title={canManage ? "등록된 공급업체가 없습니다." : "선택할 수 있는 활성 공급업체가 없습니다."}
-            description={canManage ? "위에서 새 업체를 추가하세요." : "원자재 입고에서 공급업체를 추가하세요."}
+            description={canManage ? "위에서 새 업체를 추가하세요." : "원자재 입출고에서 공급업체를 추가하세요."}
           />
         ) : (
           <ul className="space-y-2">
@@ -268,8 +266,8 @@ export function SupplierPickerStep({
           </ul>
         )}
       </div>
-      {!loading && !error && selectedSupplierId == null && (
-        <p className="text-sm font-bold" style={{ color: LEGACY_COLORS.red }}>{invalidSupplierName ? `${invalidSupplierName} 업체는 숨김 처리되었습니다. 활성 공급업체를 다시 선택하세요.` : "다음 단계로 진행하려면 활성 공급업체를 선택하세요."}</p>
+      {!loading && !error && selectedSupplierId == null && invalidSupplierName && (
+        <p className="text-sm font-bold" style={{ color: LEGACY_COLORS.red }}>{invalidSupplierName} 업체는 숨김 처리되었습니다. 활성 공급업체를 다시 선택하세요.</p>
       )}
     </section>
   );

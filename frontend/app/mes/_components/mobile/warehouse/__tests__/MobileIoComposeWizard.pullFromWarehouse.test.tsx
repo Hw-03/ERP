@@ -8,6 +8,7 @@ const state = vi.hoisted(() => ({
   subType: "produce",
   deptIoDirection: "in",
   fromDepartment: "조립",
+  steps: [1, 2, 3, 4, 5],
   toDepartment: "조립",
   bundles: [{
     bundle_id: "source-bundle",

@@ -34,6 +34,7 @@ from app.utils.search import build_normalized_search_filter
 
 # /transactions/summary 카테고리 — 프론트 historyShared.ts 의 scope 멤버와 일치.
 _SUMMARY_WAREHOUSE_TYPES = [
+    TransactionTypeEnum.MATERIAL_OUT,
     TransactionTypeEnum.RECEIVE,
     TransactionTypeEnum.TRANSFER_TO_PROD,
     TransactionTypeEnum.TRANSFER_TO_WH,
@@ -235,6 +236,7 @@ _SUBTYPE_OP: dict[str, str] = {
     "warehouse_adjust_in": "수량 조정",
     "warehouse_adjust_out": "수량 조정",
     "receive_supplier": "원자재 입고",
+    "outbound_supplier": "원자재 출고",
     "supplier_return": "공급사 반품",
     "defect_quarantine": "불량 처리",
     "internal_use_out": "사내 사용",
@@ -254,6 +256,7 @@ _TX_OP: dict[str, str] = {
     "MARK_DEFECTIVE": "불량 처리",
     "SUPPLIER_RETURN": "공급사 반품",
     "INTERNAL_USE": "사내 사용",
+    "MATERIAL_OUT": "원자재 출고",
 }
 
 # sub_type 이 있으면 라벨을 결정하는 키 집합 (tx 기반 라벨을 덮어쓴다)
@@ -364,6 +367,7 @@ def _operation_keys_filter(operation_keys: Optional[str]) -> Optional[ColumnElem
                 IoBatch.sub_type.in_(
                     [
                         "receive_supplier",
+                        "outbound_supplier",
                         "warehouse_to_dept",
                         "dept_to_warehouse",
                         "internal_use_out",
@@ -373,7 +377,7 @@ def _operation_keys_filter(operation_keys: Optional[str]) -> Optional[ColumnElem
                 ),
                 no_shipping_phase,
             ),
-            _plain_tx_clause("RECEIVE", "TRANSFER_TO_PROD", "TRANSFER_TO_WH", "INTERNAL_USE"),
+            _plain_tx_clause("RECEIVE", "MATERIAL_OUT", "TRANSFER_TO_PROD", "TRANSFER_TO_WH", "INTERNAL_USE"),
         ),
         "process": or_(
             and_(
@@ -505,6 +509,7 @@ def _history_list_operation_label_expr() -> ColumnElement[str]:
         else_="AS·연구 사용",
     )
     batch_label = case(
+        (IoBatch.sub_type == "outbound_supplier", "원자재 출고"),
         (
             and_(
                 TransactionLog.transaction_type == TransactionTypeEnum.RECEIVE,
@@ -558,6 +563,7 @@ def _history_list_operation_label_expr() -> ColumnElement[str]:
             "불량",
         ),
         (TransactionLog.transaction_type == TransactionTypeEnum.SHIP, "출하"),
+        (TransactionLog.transaction_type == TransactionTypeEnum.MATERIAL_OUT, "원자재 출고"),
         (TransactionLog.transaction_type == TransactionTypeEnum.INTERNAL_USE, internal_use_label),
         else_=TransactionLog.transaction_type,
     )

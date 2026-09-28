@@ -210,6 +210,8 @@ function _labelNoneBucket(
   switch (subType) {
     case "receive_supplier":
       return side === "from" ? supplierNameSnapshot?.trim() || "외부" : null;
+    case "outbound_supplier":
+      return side === "to" ? supplierNameSnapshot?.trim() || "공급업체" : null;
     case "supplier_return":
       return side === "to" ? "외부" : null;
     case "produce":
@@ -442,6 +444,7 @@ const _SUB_TYPE_OPERATION: Record<string, string> = {
   warehouse_adjust_in: "창고 수량 조정",
   warehouse_adjust_out: "창고 수량 조정",
   receive_supplier: _SUB_LABEL.receive_supplier,
+  outbound_supplier: _SUB_LABEL.outbound_supplier,
   supplier_return: _SUB_LABEL.supplier_return,
   defect_quarantine: "불량 격리",
   defect_restore: "정상 복귀",
@@ -469,6 +472,7 @@ const _DISPLAY_SUB_LABEL: Record<string, string> = {
   // sub_type
   produce: "부품 차감 + 완제품 입고",
   receive_supplier: "창고로 들어옴",
+  outbound_supplier: "공급업체로 나감",
   warehouse_to_dept: "창고에서 부서로 이동",
   dept_to_warehouse: "부서에서 창고로 이동",
   defect_quarantine: "격리",
@@ -493,6 +497,7 @@ const _DISPLAY_SUB_LABEL: Record<string, string> = {
   DEFECT_SCRAP: "폐기",
   SUPPLIER_RETURN: "불량 재고 공급사 반품",
   INTERNAL_USE: "창고에서 AS·연구 용도로 반출",
+  MATERIAL_OUT: "공급업체로 나감",
 };
 
 // ──────────────────────────────────────────────────────────────────
@@ -560,7 +565,7 @@ export function getHistoryDisplaySubLabel(
   batch?: IoBatch | null,
 ): string | undefined {
   const supplierName = log.supplier_name_snapshot?.trim();
-  if (log.transaction_type === "SUPPLIER_RETURN" && supplierName) {
+  if (log.transaction_type === "MATERIAL_OUT" || (log.transaction_type === "SUPPLIER_RETURN" && supplierName)) {
     return getHistoryFlowLabel(log, batch);
   }
   if (_internalUseReturnLine(log, batch)) {
@@ -592,6 +597,11 @@ export function getHistoryFlowLabel(
   batch?: IoBatch | null,
 ): string {
   const supplierName = log.supplier_name_snapshot?.trim();
+  if (log.transaction_type === "MATERIAL_OUT") {
+    const destination = supplierName || batch?.supplier_name_snapshot?.trim() || "공급업체";
+    const reversed = Boolean(log.reverses_log_id) || log.operation_kind === "CANCELLATION";
+    return reversed ? `${destination} → 창고` : `창고 → ${destination}`;
+  }
   if (log.transaction_type === "SUPPLIER_RETURN" && supplierName) {
     const quarantine = `${log.department?.trim() || "창고"} 불량 격리`;
     const reversed = Boolean(log.reverses_log_id) || log.operation_kind === "CANCELLATION";
@@ -827,6 +837,7 @@ export function getHistoryLineSignedQuantity(
       sign = ""; tone = "muted"; label = _withUnit(qty, unit);
       break;
     case "receive_supplier": setIncrease(); break;
+    case "outbound_supplier": setDecrease(); break;
     case "supplier_return":
     case "defect_quarantine":
     case "adjust_out": setDecrease(); break;
@@ -1031,7 +1042,7 @@ export function getHistoryMovementSummary(
     parts.push(_verbItemPart("이동", "info", included));
   } else if (sub === "receive_supplier" || tx === "RECEIVE") {
     parts.push(_verbItemPart("입고", "success", included));
-  } else if (tx === "SHIP") {
+  } else if (tx === "SHIP" || tx === "MATERIAL_OUT" || sub === "outbound_supplier") {
     parts.push(_verbItemPart("출고", "danger", included));
   } else if (sub === "supplier_return" || tx === "SUPPLIER_RETURN") {
     parts.push({ label: `반품 ${_distinctItemCount(included)}품목`, tone: "danger" });
@@ -1096,6 +1107,7 @@ const _SINGLE_OP: Record<string, { verb: string; tone: MovementTone; signed?: bo
   DEFECT_SCRAP: { verb: _TX_OPERATION.DEFECT_SCRAP, tone: "danger" },
   SUPPLIER_RETURN: { verb: _TX_LABEL.SUPPLIER_RETURN, tone: "danger" },
   INTERNAL_USE: { verb: "반출", tone: "danger" },
+  MATERIAL_OUT: { verb: "출고", tone: "danger" },
 };
 
 export function getSingleLogMovement(log: {

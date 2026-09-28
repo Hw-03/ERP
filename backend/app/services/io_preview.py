@@ -77,14 +77,43 @@ def validate_receive_requester(
     work_type: str,
     sub_type: str,
 ) -> None:
-    """창고 정·부 담당자만 공급처 원자재 입고를 사용할 수 있다."""
-    if sub_type != "receive_supplier":
+    """창고 정·부 담당자만 원자재 입출고를 사용할 수 있다."""
+    if work_type != "receive" and sub_type not in {"receive_supplier", "outbound_supplier"}:
         return
-    if work_type != "receive":
-        raise ValueError("원자재 입고 작업 유형과 세부 유형 조합이 올바르지 않습니다.")
+    if work_type != "receive" or sub_type not in {"receive_supplier", "outbound_supplier"}:
+        raise ValueError("원자재 입출고 작업 유형과 세부 유형 조합이 올바르지 않습니다.")
     warehouse_role = (requester.warehouse_role or "none").lower()
     if warehouse_role not in WAREHOUSE_MANAGER_ROLES:
-        raise PermissionError("창고 정·부 담당자만 원자재 입고를 할 수 있습니다.")
+        raise PermissionError("창고 정·부 담당자만 원자재 입출고를 할 수 있습니다.")
+
+
+def validate_material_outbound(
+    *,
+    work_type: str,
+    sub_type: str,
+    bundles: Iterable[object] = (),
+    notes: Optional[str] = None,
+    require_reason: bool = True,
+) -> None:
+    """정상 창고 재고의 단일 품목 출고만 허용해 위조 경로·자동 BOM 차감을 막는다."""
+    if sub_type != "outbound_supplier":
+        return
+    if work_type != "receive":
+        raise ValueError("원자재 출고 작업 유형이 올바르지 않습니다.")
+    if require_reason and not (notes or "").strip():
+        raise ValueError("원자재 출고에는 출고 사유를 입력해야 합니다.")
+    for bundle in bundles:
+        if getattr(bundle, "source_kind") != "direct_item":
+            raise ValueError("원자재 출고는 선택한 품목만 출고할 수 있습니다.")
+        lines = list(getattr(bundle, "lines"))
+        if len(lines) != 1 or getattr(lines[0], "item_id") != getattr(bundle, "source_item_id"):
+            raise ValueError("원자재 출고 품목 구성이 올바르지 않습니다.")
+        line = lines[0]
+        route = tuple(getattr(line, key) for key in (
+            "direction", "from_bucket", "from_department", "to_bucket", "to_department", "origin",
+        ))
+        if route != ("out", "warehouse", None, "none", None, "direct"):
+            raise ValueError("원자재 출고 재고 경로가 올바르지 않습니다.")
 
 
 def validate_internal_use_operation(
@@ -522,6 +551,8 @@ def _route_for_sub_type(
 ) -> tuple[str, str, Optional[str], str, Optional[str]]:
     if sub_type == "receive_supplier":
         return ("in", "none", None, "warehouse", None)
+    if sub_type == "outbound_supplier":
+        return ("out", "warehouse", None, "none", None)
     if sub_type == "warehouse_to_dept":
         return (
             "move",
@@ -1308,6 +1339,9 @@ def preview(
     from_department: Optional[str] = None,
     to_department: Optional[str] = None,
 ) -> dict:
+    validate_material_outbound(work_type=work_type, sub_type=sub_type, require_reason=False)
+    if sub_type == "outbound_supplier" and any(getattr(target, "source_kind", "direct_item") != "direct_item" for target in targets):
+        raise ValueError("원자재 출고는 선택한 품목만 출고할 수 있습니다.")
     validate_internal_use_operation(
         work_type=work_type,
         sub_type=sub_type,

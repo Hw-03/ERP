@@ -7,6 +7,7 @@ const wizardState = vi.hoisted(() => ({
   step: 5,
   workType: "warehouse_io",
   subType: "warehouse_to_dept",
+  get steps() { return this.workType === "receive" ? [1, 6, 2, 3, 4, 5] : [1, 2, 3, 4, 5]; },
   fromDepartment: null,
   toDepartment: "조립",
   bundles: [],

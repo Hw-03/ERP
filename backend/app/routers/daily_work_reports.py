@@ -75,6 +75,7 @@ _OPERATION_BY_TX = {
     TransactionTypeEnum.DEFECT_SCRAP: ("defect", "불량"),
     TransactionTypeEnum.SUPPLIER_RETURN: ("defect", "불량"),
     TransactionTypeEnum.INTERNAL_USE: ("warehouse", "창고"),
+    TransactionTypeEnum.MATERIAL_OUT: ("warehouse", "창고"),
     TransactionTypeEnum.PRODUCE: ("process", "공정"),
 }
 _OPERATION_ORDER = {"warehouse": 0, "process": 1, "defect": 2, "item_conversion": 3, "shipping": 4}

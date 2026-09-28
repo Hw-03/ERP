@@ -264,7 +264,7 @@ erDiagram
 ```
 
 - **IoBatch → IoBundle → IoLine**은 입출고 V2의 제출·전개·실제 반영 후보 라인 구조다. 제외된 `io_lines`도 감사 내역으로 남는다.
-- 원자재 입고 배치는 `suppliers`의 활성 업체를 참조하고 완료 시점의 업체명을 `supplier_name_snapshot`으로 보존한다. 이후 업체 이름 변경·숨김은 완료된 입고 이력과 F704-02 입/출고처를 바꾸지 않는다.
+- 원자재 입출고 배치는 `suppliers`의 활성 업체를 참조하고 완료 시점의 업체명을 `supplier_name_snapshot`으로 보존한다. 이후 업체 이름 변경·숨김은 완료된 입출고 이력과 F704-02 입/출고처를 바꾸지 않는다. 사급·샘플 출고는 `MATERIAL_OUT`으로 기록하며 기존 `notes`에 출고 사유를 저장한다.
 - 불량 반품 요청은 `stock_requests.supplier_id`로 활성 업체를 참조하며 요청·실행 시점의 이름을 `stock_requests.supplier_name_snapshot`과 `transaction_logs.supplier_name_snapshot`에 보존한다. 취소 로그는 원로그의 두 업체 필드를 복사하고, 이 정보는 F704-02에 사용하지 않는다.
 - `io_batches.stock_request_id`는 저장된 참조값이고 모델 FK가 아니다. 결재 요청의 실제 배치 연결은 `stock_requests.operation_batch_id` FK다.
 

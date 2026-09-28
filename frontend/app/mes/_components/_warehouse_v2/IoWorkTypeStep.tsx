@@ -302,16 +302,18 @@ function DeptGrid({
   );
 }
 
-function DirectionCard({
+export function DirectionCard({
   dir,
   active,
   onClick,
   variant = "process",
+  prefixLabel,
 }: {
   dir: DeptIoDirection;
   active: boolean;
   onClick: () => void;
   variant?: "process" | "warehouse_adjust";
+  prefixLabel?: string;
 }) {
   const Icon = dir === "in" ? ArrowDownToLine : ArrowUpFromLine;
   const activeColor = dir === "out" ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
@@ -319,6 +321,7 @@ function DirectionCard({
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={active}
       className="relative flex h-full min-h-[96px] items-center justify-center gap-3 rounded-[18px] border p-4 text-left transition-all hover:shadow-md sm:gap-5 sm:p-6"
       style={{
         background: variant === "process" ? tint(activeColor, active ? 16 : 7) : active ? tint(activeColor, 14) : LEGACY_COLORS.s2,
@@ -342,23 +345,18 @@ function DirectionCard({
       )}
       {variant === "warehouse_adjust" ? (
         <span className="text-4xl font-black">{dir === "in" ? "입고" : "출고"}</span>
-      ) : dir === "in" ? (
-        <div className="flex -translate-y-4 flex-col items-center gap-2 leading-tight">
-          <span className="text-4xl font-black">생산</span>
-          <span
-            className="h-[4px] w-28 rounded-full"
-            style={{ background: active ? activeColor : LEGACY_COLORS.text }}
-          />
-          <span className="text-4xl font-black">입고</span>
-        </div>
       ) : (
         <div className="flex -translate-y-4 flex-col items-center gap-2 leading-tight">
-          <span className="text-4xl font-black">분해</span>
-          <span
-            className="h-[4px] w-28 rounded-full"
-            style={{ background: active ? activeColor : LEGACY_COLORS.text }}
-          />
-          <span className="text-4xl font-black">출고</span>
+          {prefixLabel !== "" && (
+            <>
+              <span className="text-4xl font-black">{prefixLabel ?? (dir === "in" ? "생산" : "분해")}</span>
+              <span
+                className="h-[4px] w-28 rounded-full"
+                style={{ background: active ? activeColor : LEGACY_COLORS.text }}
+              />
+            </>
+          )}
+          <span className="text-4xl font-black">{dir === "in" ? "입고" : "출고"}</span>
         </div>
       )}
     </button>

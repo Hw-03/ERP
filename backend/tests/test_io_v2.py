@@ -4609,7 +4609,7 @@ def test_io_draft_save_stacks_new_slots(client, db_session, make_item):
     """batch_id 없이 저장하면 같은 (work_type, sub_type)라도 새 슬롯이 누적된다."""
     item_a = make_item(name="Draft A", warehouse_qty=Decimal("0"))
     item_b = make_item(name="Draft B", warehouse_qty=Decimal("0"))
-    requester = _make_employee(db_session)
+    requester = _make_employee(db_session, warehouse_role="primary")
     supplier = _make_active_supplier(db_session)
     db_session.commit()
 
@@ -4628,7 +4628,7 @@ def test_io_draft_save_stacks_new_slots(client, db_session, make_item):
 def test_io_draft_save_with_batch_id_updates_in_place(client, db_session, make_item):
     """batch_id를 실어 보내면 해당 draft만 갱신되고 슬롯 수는 늘지 않는다."""
     item = make_item(name="Draft Inplace", warehouse_qty=Decimal("0"))
-    requester = _make_employee(db_session)
+    requester = _make_employee(db_session, warehouse_role="primary")
     supplier = _make_active_supplier(db_session)
     db_session.commit()
 
@@ -4651,8 +4651,8 @@ def test_io_draft_save_with_batch_id_updates_in_place(client, db_session, make_i
 def test_io_draft_update_others_batch_forbidden(client, db_session, make_item):
     """타인의 draft batch_id로 갱신 시도 시 403."""
     item = make_item(name="Draft Owner", warehouse_qty=Decimal("0"))
-    owner = _make_employee(db_session, code="OWN1", name="Owner")
-    other = _make_employee(db_session, code="OTH1", name="Other")
+    owner = _make_employee(db_session, code="OWN1", name="Owner", warehouse_role="primary")
+    other = _make_employee(db_session, code="OTH1", name="Other", warehouse_role="deputy")
     supplier = _make_active_supplier(db_session)
     db_session.commit()
 
@@ -4668,7 +4668,7 @@ def test_io_draft_update_others_batch_forbidden(client, db_session, make_item):
 def test_io_draft_update_unknown_batch_unprocessable(client, db_session, make_item):
     """존재하지 않는 batch_id로 갱신 시도 시 422."""
     item = make_item(name="Draft Unknown", warehouse_qty=Decimal("0"))
-    requester = _make_employee(db_session)
+    requester = _make_employee(db_session, warehouse_role="primary")
     supplier = _make_active_supplier(db_session)
     db_session.commit()
 

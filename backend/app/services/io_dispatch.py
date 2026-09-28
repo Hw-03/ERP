@@ -53,6 +53,7 @@ from app.services.io_preview import (
     normalize_automatic_department_routes,
     validate_process_bom_parent_lines,
     validate_receive_requester,
+    validate_material_outbound,
     validate_saved_operation_sources,
     validate_internal_use_bundles,
     validate_internal_use_operation,
@@ -885,6 +886,8 @@ def _log_immediate(
             produced_by=operator_name,
             producer_employee_id=producer_employee_id,
             notes=batch.notes,
+            supplier_id=batch.supplier_id,
+            supplier_name_snapshot=batch.supplier_name_snapshot,
             operation_batch_id=batch.batch_id,
             operation_line_id=line.line_id,
             defect_quarantine_record_id=defect_quarantine_record_id,
@@ -1118,6 +1121,8 @@ def _apply_line(
 
     if batch.sub_type == INTERNAL_USE_SUB_TYPE and line.direction == "out":
         tx_type = TransactionTypeEnum.INTERNAL_USE
+    if batch.sub_type == "outbound_supplier":
+        tx_type = TransactionTypeEnum.MATERIAL_OUT
 
     quarantine_record = None
     if line.direction == "defective":
@@ -1218,6 +1223,7 @@ def _complete_without_inventory(batch: IoBatch) -> None:
 
 def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> dict:
     ensure_batch_is_mutable(batch)
+    validate_material_outbound(work_type=batch.work_type, sub_type=batch.sub_type, bundles=batch.bundles, notes=batch.notes)
     batch.sub_type = normalize_process_sub_type(
         work_type=batch.work_type,
         sub_type=batch.sub_type,

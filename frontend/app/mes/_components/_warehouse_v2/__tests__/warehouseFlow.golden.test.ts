@@ -127,7 +127,7 @@ const ALL_SUB_TYPES: IoSubType[] = [
 describe("ioWorkType 상수", () => {
   it("IO_WORK_TYPES id/label 고정 (defect 는 별도 '불량' 탭으로 분리되어 입출고 메뉴에서 제외)", () => {
     expect(IO_WORK_TYPES.map((r) => [r.id, r.label, r.description])).toEqual([
-      ["receive", "원자재 입고", "발주 품목을 창고에 입고합니다."],
+      ["receive", "원자재 입출고", "공급업체에서 원자재를 입고하거나, 사급·샘플용으로 출고합니다."],
       ["warehouse_io", "창고 입출고", "창고와 부서 간 재고를 이동합니다."],
       ["process", "부서 입출고", "부서 작업에 맞춰 재고를 처리합니다."],
       ["internal_use", "AS·연구 사용출고", "창고 재고를 AS·연구 용도로 반출합니다."],
@@ -140,7 +140,7 @@ describe("ioWorkType 상수", () => {
       Object.entries(IO_SUB_TYPES).map(([wt, rows]) => [wt, rows.map((r) => r.id)]),
     );
     expect(flat).toEqual({
-      receive: ["receive_supplier"],
+      receive: ["receive_supplier", "outbound_supplier"],
       warehouse_io: ["warehouse_to_dept", "dept_to_warehouse"],
       warehouse_adjust: ["warehouse_adjust_in", "warehouse_adjust_out"],
       process: ["produce", "disassemble", "adjust_in", "adjust_out"],
@@ -155,6 +155,7 @@ describe("ioWorkType 상수", () => {
       .map((r) => [r.id, r.label, r.description]);
     expect(labels).toEqual([
       ["receive_supplier", "원자재 입고", "선택 품목을 창고 재고로 증가"],
+      ["outbound_supplier", "원자재 출고", "선택 품목을 공급업체에 출고"],
       ["warehouse_to_dept", "창고 → 부서", "BOM 1단계 하위 품목 자동 포함"],
       ["dept_to_warehouse", "부서 → 창고", "반납할 하위 품목만 체크"],
       ["warehouse_adjust_in", "보정 입고", "창고 재고 수량 즉시 증가"],
@@ -835,6 +836,7 @@ describe("IO_STEP_LABELS", () => {
       3: "대상 선택",
       4: "실제 반영",
       5: "제출 확인",
+      6: "입고·출고 선택",
     });
   });
 });
@@ -872,7 +874,7 @@ describe("useIoWorkState 초기 상태", () => {
   it("작업 유형을 실제 선택하기 전에는 첫 단계를 진행할 수 없다", () => {
     const { result } = renderHook(() => useIoWorkState());
     expect(result.current.hasSelectedWorkType).toBe(false);
-    expect(result.current.canAdvance).toEqual({ 1: false, 2: false, 3: false, 4: false, 5: true });
+    expect(result.current.canAdvance).toEqual({ 1: false, 2: false, 3: false, 4: false, 5: true, 6: false });
   });
 });
 
@@ -1305,7 +1307,7 @@ describe("useIoWorkState canAdvance[3]/[4]", () => {
 // ──────────────────────────────────────────────────────────────────
 describe("useIoWorkState step/line 조작", () => {
   it("goNext/goPrev/goTo clamp", () => {
-    const { result } = renderHook(() => useIoWorkState());
+    const { result } = renderHook(() => useIoWorkState("warehouse_io"));
     act(() => result.current.goPrev()); // 1에서 더 못 내려감
     expect(result.current.step).toBe(1);
     act(() => result.current.goNext());

@@ -11,6 +11,7 @@ export type IoWorkType =
 
 export type IoSubType =
   | "receive_supplier"
+  | "outbound_supplier"
   | "warehouse_to_dept"
   | "dept_to_warehouse"
   | "produce"
@@ -108,7 +109,7 @@ export interface IoDraftPayload {
   requester_employee_id: string;
   work_type: IoWorkType;
   sub_type: IoSubType;
-  /** 원자재 입고(receive_supplier)에서만 사용하는 공급업체 ID. */
+  /** 원자재 입출고의 공급·수령 업체 ID. */
   supplier_id?: string | null;
   from_department?: Department | string | null;
   to_department?: Department | string | null;

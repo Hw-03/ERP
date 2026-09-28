@@ -118,9 +118,10 @@ def test_remark_hides_daily_development_notes():
 
 
 @pytest.mark.parametrize("delta", [1, -1])
-def test_supplier_receipt_snapshot_is_counterpart_for_receipt_and_reversal(delta: int):
-    """공급처 입고 배치의 정방향·취소 역방향 모두 저장된 업체명을 쓴다."""
-    batch = SimpleNamespace(sub_type="receive_supplier", supplier_name_snapshot="대성자재")
+@pytest.mark.parametrize("sub_type", ["receive_supplier", "outbound_supplier"])
+def test_supplier_receipt_snapshot_is_counterpart_for_receipt_and_reversal(delta: int, sub_type: str):
+    """원자재 입출고·취소 모두 저장된 업체명을 입출고처로 쓴다."""
+    batch = SimpleNamespace(sub_type=sub_type, supplier_name_snapshot="대성자재")
     line = SimpleNamespace(
         from_bucket="none",
         from_department=None,

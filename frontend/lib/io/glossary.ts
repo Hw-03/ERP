@@ -22,7 +22,7 @@ import type { TransactionType } from "@/lib/api/types/shared";
 // ──────────────────────────────────────────────────────────────────
 
 export const WORK_TYPE_LABEL: Record<IoWorkType, string> = {
-  receive: "원자재 입고",
+  receive: "원자재 입출고",
   warehouse_io: "창고 입출고",
   warehouse_adjust: "수량보정 입출고",
   process: "부서 입출고",
@@ -31,7 +31,7 @@ export const WORK_TYPE_LABEL: Record<IoWorkType, string> = {
 };
 
 export const WORK_TYPE_DESCRIPTION: Record<IoWorkType, string> = {
-  receive: "발주 품목을 창고에 입고합니다.",
+  receive: "공급업체에서 원자재를 입고하거나, 사급·샘플용으로 출고합니다.",
   warehouse_io: "창고와 부서 간 재고를 이동합니다.",
   warehouse_adjust: "창고 재고 수량을 즉시 보정합니다.",
   process: "부서 작업에 맞춰 재고를 처리합니다.",
@@ -44,9 +44,8 @@ export const WORK_TYPE_DESCRIPTION: Record<IoWorkType, string> = {
 // ──────────────────────────────────────────────────────────────────
 
 export const SUB_TYPE_LABEL: Record<IoSubType, string> = {
-  // receive_supplier 의 V2 sub-type 라벨은 work-type 라벨("원자재 입고") 과 일치시킨다.
-  // receive workType 에는 sub_type 이 1개뿐이므로 사용자가 보는 메인 단어가 통일된다.
   receive_supplier: "원자재 입고",
+  outbound_supplier: "원자재 출고",
   warehouse_to_dept: "창고 → 부서",
   dept_to_warehouse: "부서 → 창고",
   dept_transfer: "부서 → 부서",
@@ -65,6 +64,7 @@ export const SUB_TYPE_LABEL: Record<IoSubType, string> = {
 
 export const SUB_TYPE_DESCRIPTION: Record<IoSubType, string> = {
   receive_supplier: "선택 품목을 창고 재고로 증가",
+  outbound_supplier: "선택 품목을 공급업체에 출고",
   warehouse_to_dept: "BOM 1단계 하위 품목 자동 포함",
   dept_to_warehouse: "반납할 하위 품목만 체크",
   dept_transfer: "부서 간 직접 이동",
@@ -103,6 +103,7 @@ export const TRANSACTION_TYPE_LABEL: Record<TransactionType, string> = {
   DEFECT_SCRAP: "불량 폐기", // 직접 폐기 거래
   SUPPLIER_RETURN: "원자재 반품",
   INTERNAL_USE: "사용출고",
+  MATERIAL_OUT: "원자재 출고",
 };
 
 // ──────────────────────────────────────────────────────────────────

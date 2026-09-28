@@ -12,7 +12,7 @@ import {
   getHistoryDisplayLabel,
   getSingleLogMovement,
 } from "../../_history_sections/historyBatchInterpreter";
-import { MovementSummaryCell, buildGroups } from "../../_history_sections/historyTableHelpers";
+import { FlowBadge, MovementSummaryCell, buildGroups } from "../../_history_sections/historyTableHelpers";
 
 /**
  * 입출고 내역 모바일 카드 리스트.
@@ -110,19 +110,23 @@ export function MobileHistoryList({
               }}
             >
               <div className="flex items-center justify-between gap-2">
-                <span
-                  className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold"
-                  style={{
-                    background: `color-mix(in srgb, ${tcolor} 16%, transparent)`,
-                    color: LEGACY_COLORS.text,
-                  }}
-                >
+                {log.transaction_type === "RECEIVE" || log.transaction_type === "MATERIAL_OUT" ? (
+                  <FlowBadge type={log.transaction_type} label={getHistoryDisplayLabel(log)} color={tcolor} variant="panel" />
+                ) : (
                   <span
-                    className="h-1.5 w-1.5 shrink-0 rounded-full"
-                    style={{ background: tcolor }}
-                  />
-                  {getHistoryDisplayLabel(log)}
-                </span>
+                    className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold"
+                    style={{
+                      background: `color-mix(in srgb, ${tcolor} 16%, transparent)`,
+                      color: LEGACY_COLORS.text,
+                    }}
+                  >
+                    <span
+                      className="h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ background: tcolor }}
+                    />
+                    {getHistoryDisplayLabel(log)}
+                  </span>
+                )}
                 <span className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
                   {formatHistoryDate(log.requested_at ?? log.created_at)}
                 </span>
@@ -217,16 +221,20 @@ export function MobileHistoryList({
             }}
           >
             <div className="flex items-center justify-between gap-2">
-              <span
-                className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold"
-                style={{
-                  background: `color-mix(in srgb, ${tcolor} 16%, transparent)`,
-                  color: LEGACY_COLORS.text,
-                }}
-              >
-                <Layers className="h-3.5 w-3.5" style={{ color: tcolor }} />
-                {getHistoryDisplayLabel(first)}
-              </span>
+              {first.transaction_type === "RECEIVE" || first.transaction_type === "MATERIAL_OUT" ? (
+                <FlowBadge type={first.transaction_type} label={getHistoryDisplayLabel(first)} color={tcolor} variant="panel" />
+              ) : (
+                <span
+                  className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold"
+                  style={{
+                    background: `color-mix(in srgb, ${tcolor} 16%, transparent)`,
+                    color: LEGACY_COLORS.text,
+                  }}
+                >
+                  <Layers className="h-3.5 w-3.5" style={{ color: tcolor }} />
+                  {getHistoryDisplayLabel(first)}
+                </span>
+              )}
               <span className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
                 {formatHistoryDate(first.requested_at ?? first.created_at)}
               </span>

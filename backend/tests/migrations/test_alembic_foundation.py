@@ -56,6 +56,14 @@ def test_alembic_upgrade_keeps_application_logger_enabled(tmp_path, caplog):
         logger.setLevel(previous_level)
 
 
+def test_material_outbound_postgresql_enum_upgrade_sql():
+    """Existing PostgreSQL schemas must accept the new transaction value."""
+    output = io.StringIO()
+    config = _config("postgresql://localhost/unused", output_buffer=output)
+    command.upgrade(config, "20260922_0037:20260928_0038", sql=True)
+    assert "ALTER TYPE transaction_type_enum ADD VALUE IF NOT EXISTS 'MATERIAL_OUT'" in output.getvalue()
+
+
 def test_head_schema_removes_manual_pf_pin_table(tmp_path):
     """자동 기준 전환 뒤 최신 스키마에는 수동 PF 지정 테이블이 없다."""
     db_path = tmp_path / "without-pf-pins.db"
@@ -107,7 +115,7 @@ def test_empty_sqlite_upgrade_creates_current_schema_and_is_rerunnable(tmp_path)
         with engine.connect() as connection:
             assert connection.scalar(
                 sa.text("SELECT version_num FROM alembic_version")
-            ) == "20260922_0037"
+            ) == "20260928_0038"
             location_columns = {
                 column["name"]: column
                 for column in inspector.get_columns("inventory_locations")

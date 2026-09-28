@@ -51,7 +51,7 @@ export function canSeeWorkType(
   operator: { warehouse_role?: string | null; name?: string | null; department?: string | null } | null | undefined,
 ): boolean {
   if (workType === "receive" || workType === "warehouse_adjust") {
-    // 원자재 입고와 창고 수량보정은 창고 정/부만 허용한다.
+    // 원자재 입출고와 창고 수량보정은 창고 정/부만 허용한다.
     return operator?.warehouse_role === "primary" || operator?.warehouse_role === "deputy";
   }
   if (workType === "internal_use") {
@@ -73,7 +73,7 @@ export const IO_SUB_TYPES: Record<
   IoWorkType,
   Array<{ id: IoSubType; label: string; description: string }>
 > = {
-  receive: [_row("receive_supplier")],
+  receive: [_row("receive_supplier"), _row("outbound_supplier")],
   warehouse_io: [_row("warehouse_to_dept"), _row("dept_to_warehouse")],
   warehouse_adjust: [_row("warehouse_adjust_in"), _row("warehouse_adjust_out")],
   process: [_row("produce"), _row("disassemble"), _row("adjust_in"), _row("adjust_out")],
@@ -394,7 +394,7 @@ export function targetDepartmentOf(
   }
   // 부서 무관 작업
   if (
-    subType === "receive_supplier" ||
+    subType === "receive_supplier" || subType === "outbound_supplier" ||
     subType === "warehouse_adjust_in" ||
     subType === "warehouse_adjust_out"
   ) return null;
@@ -482,7 +482,7 @@ export function isWarehouseAdjustSubType(subType: IoSubType): boolean {
 export function singleItemSourceKind(
   subType: IoSubType,
 ): Extract<IoSourceKind, "direct_item" | "manual"> {
-  return isWarehouseAdjustSubType(subType) ? "direct_item" : "manual";
+  return isWarehouseAdjustSubType(subType) || subType === "receive_supplier" || subType === "outbound_supplier" ? "direct_item" : "manual";
 }
 
 /** 창고 수량보정은 상태에 남은 기본 부서를 API payload에 싣지 않는다. */
@@ -491,7 +491,7 @@ export function ioDepartmentPayload(
   fromDepartment: string,
   toDepartment: string,
 ): { fromDepartment: string | null; toDepartment: string | null } {
-  if (isAutoDepartmentRoute(subType) || isWarehouseAdjustSubType(subType)) {
+  if (isAutoDepartmentRoute(subType) || isWarehouseAdjustSubType(subType) || subType === "receive_supplier" || subType === "outbound_supplier") {
     return { fromDepartment: null, toDepartment: null };
   }
   return { fromDepartment, toDepartment };

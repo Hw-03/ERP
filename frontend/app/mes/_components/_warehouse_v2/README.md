@@ -12,7 +12,11 @@
 
 ## 단계별 UI
 
+원자재 입출고는 작업 유형 → 입고·출고 선택 → 공급업체 선택 → 품목 선택 → 수량 조정 → 최종 확인의 6단계입니다. 방향 단계의 내부 ID는 `6`이며 기존 `2`~`5`의 URL 의미는 유지합니다. 다른 작업은 기존 5단계입니다.
+
 - `IoWorkTypeStep.tsx`: 작업 유형 선택
+- `MaterialDirectionStep.tsx`: 기존 방향 카드를 재사용한 원자재 입고·출고 선택
+- `SupplierPickerStep.tsx`: 원자재 입출고 공급업체 검색·선택·관리
 - `IoTargetPicker.tsx`: 대상 품목 선택
 - `IoBundleCart.tsx`, `IoBundleCard.tsx`, `IoLineRow.tsx`: 선택된 품목 묶음과 수량 입력
 - `IoConfirmStep.tsx`: 제출 전 확인

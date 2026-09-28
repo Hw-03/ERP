@@ -34,6 +34,22 @@ function log(id: string, phase: string): TransactionLog {
 }
 
 describe("MobileHistoryList", () => {
+  it.each([false, true])("원자재 입출고의 반대 방향 화살표를 표시한다 (묶음: %s)", (grouped) => {
+    const entries: TransactionLog[] = ["RECEIVE", "MATERIAL_OUT"].flatMap((type) =>
+      Array.from({ length: grouped ? 2 : 1 }, (_, index) => ({
+        ...log(`${type}-${index}`, ""),
+        transaction_type: type as TransactionLog["transaction_type"],
+        reference_no: null,
+        operation_id: grouped ? `operation-${type}` : null,
+      })),
+    );
+    render(<MobileHistoryList loading={false} error={null} filteredLogs={entries}
+      selectedKey={null} onSelectLog={vi.fn()} onSelectBatch={vi.fn()} onRetry={vi.fn()}
+      canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} />);
+    expect(screen.getByText("원자재 입고").parentElement?.querySelector(".lucide-arrow-down-to-line")).toBeInTheDocument();
+    expect(screen.getByText("원자재 출고").parentElement?.querySelector(".lucide-arrow-up-from-line")).toBeInTheDocument();
+  });
+
   it("keeps a successful empty result visible after refresh failure", () => {
     const retry = vi.fn();
     render(<MobileHistoryList loading={false} error={null} refreshError="조회 실패"

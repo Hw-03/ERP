@@ -19,6 +19,8 @@ import { IconButton, PrimaryActionButton, StickyFooter, WizardProgress } from ".
 import { BarcodeScannerModal } from "../../BarcodeScannerModal";
 import { MobileWorkTypeStep, MobileSubTypeStep } from "./MobileWorkTypeStep";
 import { SupplierPickerStep } from "../../_warehouse_v2/SupplierPickerStep";
+import { MaterialDirectionStep } from "../../_warehouse_v2/MaterialDirectionStep";
+import { Button } from "@/lib/ui/Button";
 import { MobileSingleAdjustForm } from "./MobileSingleAdjustForm";
 import { IoTargetPicker } from "../../_warehouse_v2/IoTargetPicker";
 import { IoBundleCart } from "../../_warehouse_v2/IoBundleCart";
@@ -452,7 +454,7 @@ export function MobileIoComposeWizard({
     state.setWorkType(next);
     setError(null);
     beginNewCompositionSlot();
-    state.goTo(2);
+    state.goTo(next === "receive" ? 6 : 2);
   }
 
   async function saveCurrentDraft(persistInUrl = true): Promise<string | null> {
@@ -620,7 +622,7 @@ export function MobileIoComposeWizard({
   }, [onStepChange, step]);
 
   const stepTitle =
-    step === 1
+    step === 6 ? "입고·출고 선택" : step === 1
       ? "작업 유형 선택"
       : step === 2
       ? state.workType === "receive"
@@ -658,8 +660,8 @@ export function MobileIoComposeWizard({
             {stepTitle}
           </h2>
           <WizardProgress
-            steps={state.workType === "receive" ? [{ key: "1", label: "작업 유형" }, { key: "2", label: "공급업체" }, ...STEP_META.slice(2)] : STEP_META}
-            current={step - 1}
+            steps={state.workType === "receive" ? [{ key: "1", label: "작업 유형" }, { key: "6", label: "입고·출고" }, { key: "2", label: "공급업체" }, ...STEP_META.slice(2)] : STEP_META}
+            current={state.steps.indexOf(step)}
             currentLabel={state.workType === "receive" && step === 2 ? "공급업체" : undefined}
             variant="inline"
             className="flex-1"
@@ -688,6 +690,17 @@ export function MobileIoComposeWizard({
             operator={operator}
             onWorkTypeChange={handleWorkTypeChange}
           />
+        )}
+
+        {step === 6 && (
+          <div className="flex h-full min-h-0 flex-col gap-4">
+            <div className="min-h-0 flex-1">
+              <MaterialDirectionStep selected={state.materialDirectionSelected ? state.subType : null} onSelect={handleSubTypeChange} />
+            </div>
+            <Button variant="primary" size="lg" onClick={state.goNext} disabled={!state.canAdvance[6]} className="w-full">
+              {state.canAdvance[6] ? "다음 단계로 →" : "입고 또는 출고를 선택하세요"}
+            </Button>
+          </div>
         )}
 
         {step === 2 && (
@@ -907,6 +920,7 @@ export function MobileIoComposeWizard({
 
         {step === 5 && (
           <IoConfirmStep
+            supplierName={state.selectedSupplierName}
             workType={state.workType}
             subType={state.subType}
             bundles={state.bundles}

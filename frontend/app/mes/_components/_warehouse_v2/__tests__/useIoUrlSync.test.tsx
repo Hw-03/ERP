@@ -20,9 +20,31 @@ function makeSearchParams(query: string) {
   };
 }
 
-const ALL_TRUE: Record<IoStep, boolean> = { 1: true, 2: true, 3: true, 4: true, 5: true };
+const ALL_TRUE: Record<IoStep, boolean> = { 1: true, 2: true, 3: true, 4: true, 5: true, 6: true };
 
 describe("useIoUrlSync", () => {
+  it("원자재 URL의 기존 공급업체 단계 전에 방향 선택을 검증한다", () => {
+    window.history.replaceState(null, "", "/wh?step=2");
+    const goTo = vi.fn();
+    renderHook(() => useIoUrlSync({
+      step: 1, steps: [1, 6, 2, 3, 4, 5], goTo,
+      canAdvance: { ...ALL_TRUE, 6: false }, router: { push: vi.fn() },
+      searchParams: makeSearchParams("step=2"), pathname: "/wh",
+    }));
+    expect(goTo).toHaveBeenCalledWith(6);
+  });
+
+  it("원자재 방향 선택 URL을 기록하고 뒤로가기로 복원한다", () => {
+    window.history.replaceState(null, "", "/wh?step=6");
+    const goTo = vi.fn();
+    renderHook(() => useIoUrlSync({
+      step: 2, steps: [1, 6, 2, 3, 4, 5], goTo,
+      canAdvance: ALL_TRUE, router: { push: vi.fn() },
+      searchParams: makeSearchParams("step=6"), pathname: "/wh",
+    }));
+    expect(goTo).toHaveBeenCalledWith(6);
+  });
+
   it("PC 첫 화면 재마운트에서 이전 URL 스냅샷으로 step=1을 추가하지 않는다", () => {
     window.history.replaceState(null, "", "/mes?tab=warehouse");
     const historyPush = vi.spyOn(window.history, "pushState");

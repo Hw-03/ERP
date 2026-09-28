@@ -90,6 +90,11 @@ def save_draft(db: Session, payload) -> dict:
     덮어쓰기(이전 동작) 제거 — 같은 (work_type, sub_type) 라도 batch_id 가 없으면
     새 draft 가 쌓여 '작업 중' 탭에서 여러 작업을 이어서 진행할 수 있다.
     """
+    from app.services.io_preview import validate_receive_requester, validate_material_outbound
+
+    requester = _load_requester(db, payload.requester_employee_id)
+    validate_receive_requester(requester, work_type=payload.work_type, sub_type=payload.sub_type)
+    validate_material_outbound(work_type=payload.work_type, sub_type=payload.sub_type, bundles=payload.bundles, notes=payload.notes)
     payload.sub_type = normalize_process_sub_type(
         work_type=payload.work_type,
         sub_type=payload.sub_type,
@@ -106,7 +111,6 @@ def save_draft(db: Session, payload) -> dict:
         payload.from_department, payload.to_department = automatic_department_headers(
             payload.bundles
         )
-    requester = _load_requester(db, payload.requester_employee_id)
     validate_saved_operation_sources(
         work_type=payload.work_type,
         sub_type=payload.sub_type,

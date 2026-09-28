@@ -46,6 +46,7 @@ describe("glossary — 키 완전성", () => {
   it("모든 IoSubType 키가 SUB_TYPE_LABEL / SUB_TYPE_DESCRIPTION 에 있다", () => {
     const expected: IoSubType[] = [
       "receive_supplier",
+      "outbound_supplier",
       "warehouse_to_dept",
       "dept_to_warehouse",
       "dept_transfer",
@@ -73,6 +74,7 @@ describe("glossary — 키 완전성", () => {
       "RECEIVE",
       "PRODUCE",
       "SHIP",
+      "MATERIAL_OUT",
       "ADJUST",
       "BACKFLUSH",
       "DISASSEMBLE",

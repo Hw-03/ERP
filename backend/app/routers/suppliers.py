@@ -1,4 +1,4 @@
-"""원자재 입고 공급업체 마스터 API."""
+"""원자재 입출고 공급업체 마스터 API."""
 
 from __future__ import annotations
 
