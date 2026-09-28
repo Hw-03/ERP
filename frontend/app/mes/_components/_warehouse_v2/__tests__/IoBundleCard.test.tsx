@@ -85,6 +85,47 @@ function makeInternalUseBundle(
 const itemMap = new Map<string, Item>();
 
 describe("IoBundleCard", () => {
+  it("BOM 상위가 반영되면 하위 요약보다 상위의 실제 경로를 우선한다", () => {
+    const transferBundle: IoBundle = {
+      ...bundle,
+      lines: [
+        { ...parentLine, direction: "move", from_bucket: "production", from_department: "조립", to_bucket: "warehouse", to_department: null },
+        { ...childLine, direction: "move", from_bucket: "production", from_department: "튜브", to_bucket: "warehouse", to_department: null },
+      ],
+    };
+    render(<IoBundleCard bundle={transferBundle} subType="dept_to_warehouse" itemMap={itemMap} getAvailable={() => 10} onToggleLine={vi.fn()} onQuantityChange={vi.fn()} onRemoveLine={vi.fn()} onRemoveBundle={vi.fn()} />);
+    expect(screen.getByLabelText("이동 경로: 조립 → 창고")).toBeInTheDocument();
+    expect(screen.queryByText(/여러 위치/)).not.toBeInTheDocument();
+  });
+
+  it("요약용 BOM은 반영되는 경로만 중복 없이 집계한다", () => {
+    const transferLine = { ...childLine, direction: "move" as const, from_bucket: "warehouse" as const, from_department: null, to_bucket: "production" as const, to_department: "튜브" };
+    const summaryBundle: IoBundle = { ...bundle, lines: [
+      { ...parentLine, included: false }, transferLine,
+      { ...transferLine, line_id: "duplicate" },
+      { ...transferLine, line_id: "other", to_department: "고압" },
+      { ...transferLine, line_id: "excluded", to_department: "조립", included: false },
+      { ...transferLine, line_id: "exempt", to_department: "연구", bom_stock_exempt: true },
+    ] };
+    render(<IoBundleCard bundle={summaryBundle} subType="warehouse_to_dept" itemMap={itemMap} getAvailable={() => 10} onToggleLine={vi.fn()} onQuantityChange={vi.fn()} onRemoveLine={vi.fn()} onRemoveBundle={vi.fn()} />);
+    expect(screen.getByLabelText("이동 경로: 여러 위치 · 2개 경로")).toBeInTheDocument();
+  });
+
+  it("커스텀 BOM 헤더는 상위 대신 변환된 하위의 위치를 집계한다", () => {
+    const customBundle: IoBundle = { ...bundle, lines: [parentLine, {
+      ...childLine, direction: "out", from_bucket: "production", from_department: "튜브", to_bucket: "none", to_department: null, quantity: 3, edited: true,
+    }] };
+    render(<IoBundleCard bundle={customBundle} subType="produce" itemMap={itemMap} getAvailable={() => 10} onToggleLine={vi.fn()} onQuantityChange={vi.fn()} onRemoveLine={vi.fn()} onRemoveBundle={vi.fn()} />);
+    expect(screen.getByLabelText("입고 위치: 튜브")).toBeInTheDocument();
+    expect(screen.queryByLabelText("입고 위치: 조립")).not.toBeInTheDocument();
+  });
+
+  it("반영 없는 BOM은 실제 경로를 표시하지 않는다", () => {
+    render(<IoBundleCard bundle={{ ...bundle, lines: bundle.lines.map((line) => ({ ...line, included: false })) }} subType="warehouse_to_dept" itemMap={itemMap} getAvailable={() => 10} onToggleLine={vi.fn()} onQuantityChange={vi.fn()} onRemoveLine={vi.fn()} onRemoveBundle={vi.fn()} />);
+    expect(screen.getByLabelText("재고 위치: —")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/이동 경로:/)).not.toBeInTheDocument();
+  });
+
   it("커스텀 출고 BOM은 상위를 유지하고 하위를 선택 출고로 표시한다", () => {
     const customBundle = {
       ...bundle,
@@ -131,7 +172,8 @@ describe("IoBundleCard", () => {
       .find((element) => element.hasAttribute("aria-expanded"));
     if (!header) throw new Error("묶음 접기/펼치기 영역을 찾을 수 없습니다.");
     fireEvent.click(header);
-    expect(screen.getByText("선택 출고")).toBeInTheDocument();
+    expect(screen.getAllByLabelText("차감 위치: 조립")).toHaveLength(2);
+    expect(screen.queryByText("선택 출고")).not.toBeInTheDocument();
     expect(screen.getByText("44")).toBeInTheDocument();
   });
 
@@ -178,7 +220,8 @@ describe("IoBundleCard", () => {
       .find((element) => element.hasAttribute("aria-expanded"));
     if (!header) throw new Error("묶음 접기/펼치기 영역을 찾을 수 없습니다.");
     fireEvent.click(header);
-    expect(screen.getByText("선택 입고")).toBeInTheDocument();
+    expect(screen.getAllByLabelText("입고 위치: 조립")).toHaveLength(2);
+    expect(screen.queryByText("선택 입고")).not.toBeInTheDocument();
   });
 
   it("BOM 하위를 처음 변경하면 출고 낱개 처리 안내를 한 번만 확인시킨다", () => {
@@ -242,7 +285,7 @@ describe("IoBundleCard", () => {
       .find((element) => element.hasAttribute("aria-expanded"));
     if (!header) throw new Error("묶음 접기/펼치기 영역을 찾을 수 없습니다.");
     expect(header).toHaveClass("grid-cols-1");
-    expect(header).toHaveClass("lg:grid-cols-[minmax(0,1.6fr)_minmax(132px,auto)_minmax(80px,auto)_minmax(80px,auto)_44px]");
+    expect(header).toHaveClass("lg:grid-cols-[minmax(0,1.6fr)_minmax(112px,auto)_minmax(132px,auto)_minmax(80px,auto)_minmax(80px,auto)_44px]");
   });
 
   it("uses the shared accessible quantity stepper for the BOM parent quantity", () => {
@@ -316,7 +359,7 @@ describe("IoBundleCard", () => {
     const multiSourceBundle = {
       ...bundle,
       lines: [
-        parentLine,
+        { ...parentLine, included: false },
         {
           ...childLine,
           direction: "out" as const,
@@ -350,10 +393,10 @@ describe("IoBundleCard", () => {
       />,
     );
 
-    const sourceBadge = screen.getByLabelText("차감 위치: 2개 위치");
+    const sourceBadge = screen.getByLabelText("차감 위치: 여러 위치 · 2개 위치");
     expect(sourceBadge).toHaveClass("min-w-[112px]", "flex-col", "gap-0.5");
     expect(screen.getByText("차감 위치")).toHaveClass("text-xs", "tracking-[1.5px]");
-    const sourceContent = screen.getByText("2개 위치").parentElement;
+    const sourceContent = screen.getByText("여러 위치 · 2개 위치").parentElement;
     expect(sourceContent).toHaveClass(
       "inline-flex",
       "items-center",

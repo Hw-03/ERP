@@ -24,6 +24,8 @@
 - `IoConfirmStep.tsx`: 제출 전 확인
 - `IoSubmitModals.tsx`: 제출 결과와 확인 모달
 
+수량 조정 단계는 단품·BOM 하위 행과 BOM 상위 요약에 실제 재고 반영 위치를 표시합니다. 입고는 `입고 위치`, 출고는 `차감 위치`, 창고·부서 간 이동은 `이동 경로`, 창고 수량보정은 `조정 위치`로 표시합니다. `ioInventoryLocation.ts`는 실제 행의 버킷·부서와 커스텀 BOM의 변환된 반영 방향을 기준으로 위치를 판정하며, 반영되는 상위가 없으면 하위 위치를 집계합니다. `IoLocationBadge.tsx`가 공통 표시를 담당하고, `IoDeductionSourceBadge.tsx`는 최종 확인 화면의 기존 사용출고 표시를 유지합니다. 품목 아래에는 코드와 제외·재입고·재고 미반영 같은 예외 안내만 남깁니다.
+
 ## 백엔드 호출 흐름
 
 - `useIoPreview.ts`: BOM 전개 미리보기

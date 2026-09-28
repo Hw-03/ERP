@@ -10,7 +10,8 @@ import { formatQty } from "@/lib/mes/format";
 import { findInventoryLocation, locationAvailable, warehouseAvailable } from "@/lib/mes/inventory";
 import { PROCESS_TO_DEPT } from "@/lib/mes/process";
 import { ExpandableItemName } from "./ExpandableItemName";
-import { deductionSourceSummary, IoDeductionSourceBadge } from "./IoDeductionSourceBadge";
+import { IoLocationBadge } from "./IoLocationBadge";
+import { bundleInventoryLocation } from "./ioInventoryLocation";
 import { QuantityStepper } from "./QuantityStepper";
 import { IoRemoveButton } from "./IoRemoveButton";
 import { INTERNAL_USE_BOM_MODE_LABEL } from "./internalUseBom";
@@ -152,7 +153,7 @@ export function IoBundleCard({
     : bundle.lines;
   const isInternalUse = subType === "internal_use_out";
   const isInternalUseBom = isInternalUse && bundle.source_kind === "bom_parent";
-  const deductionSource = isInternalUse ? deductionSourceSummary(visibleLines) : null;
+  const location = bundleInventoryLocation(bundle, subType);
   const parentItem = bundle.source_item_id
     ? itemMap.get(bundle.source_item_id)
     : undefined;
@@ -216,7 +217,7 @@ export function IoBundleCard({
         className={`relative mb-3 grid grid-cols-1 gap-3 lg:items-center ${
           isInternalUse
             ? "lg:grid-cols-[minmax(0,1.6fr)_minmax(208px,auto)_minmax(112px,auto)_minmax(132px,auto)_minmax(80px,auto)_minmax(80px,auto)_44px]"
-            : "lg:grid-cols-[minmax(0,1.6fr)_minmax(132px,auto)_minmax(80px,auto)_minmax(80px,auto)_44px]"
+            : "lg:grid-cols-[minmax(0,1.6fr)_minmax(112px,auto)_minmax(132px,auto)_minmax(80px,auto)_minmax(80px,auto)_44px]"
         }`}
         onClick={() => { if (isCollapsible) setCollapsed((v) => !v); }}
         style={{
@@ -329,15 +330,9 @@ export function IoBundleCard({
             </div>
           </div>
         )}
-        {isInternalUse && (
-          deductionSource ? (
-            <IoDeductionSourceBadge sourceName={deductionSource} variant="field" />
-          ) : (
-            <span className="text-center text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-              차감 위치 확인
-            </span>
-          )
-        )}
+        <div className="flex justify-center">
+          <IoLocationBadge label={location?.label ?? "재고 위치"} value={location?.value ?? "—"} variant="field" />
+        </div>
         <div onClick={(e) => e.stopPropagation()} className="border-t pt-3 lg:self-center lg:border-t-0 lg:pt-0">
           {showBundleQtyStepper ? (
             <QuantityStepper

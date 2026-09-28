@@ -54,17 +54,19 @@ function makeLine(overrides: Partial<IoLine> = {}): IoLine {
 }
 
 describe("IoLineRow quantity", () => {
-  it.each(["receive_supplier", "outbound_supplier"] as const)("원자재 %s만 설명 칩과 부서 칩을 숨긴다", (subType) => {
+  it.each(["receive_supplier", "outbound_supplier"] as const)("원자재 %s는 코드와 실제 창고 위치만 표시한다", (subType) => {
     const props = {
-      line: makeLine({ mes_code: "6-HR-0001" }), isChild: false,
+      line: makeLine({
+        mes_code: "6-HR-0001",
+        direction: subType === "receive_supplier" ? "in" : "out",
+        from_bucket: subType === "receive_supplier" ? "none" : "warehouse",
+        to_bucket: subType === "receive_supplier" ? "warehouse" : "none",
+      }), isChild: false,
       item: { mes_code: "6-HR-0001", quantity: 5 } as Item,
       available: 5, onToggle: vi.fn(), onQuantityChange: vi.fn(), onRemove: vi.fn(),
     };
-    const view = render(<IoLineRow {...props} subType="warehouse_to_dept" />);
-    expect(screen.getByText("상위")).toBeInTheDocument();
-    expect(screen.getByText("재고 반영 포함")).toBeInTheDocument();
-    expect(screen.getByText("고압")).toBeInTheDocument();
-    view.rerender(<IoLineRow {...props} subType={subType} />);
+    render(<IoLineRow {...props} subType={subType} />);
+    expect(screen.getByLabelText(`${subType === "receive_supplier" ? "입고 위치" : "차감 위치"}: 창고`)).toBeInTheDocument();
     expect(screen.queryByText("직접 선택")).not.toBeInTheDocument();
     expect(screen.queryByText("상위")).not.toBeInTheDocument();
     expect(screen.queryByText("재고 반영 포함")).not.toBeInTheDocument();
@@ -253,7 +255,7 @@ describe("IoLineRow quantity", () => {
     expect(screen.getByText("가능 재고").parentElement).not.toHaveStyle({ opacity: "0.6" });
   });
 
-  it("원자재 행은 부서 칸 없이 수량과 재고를 정렬한다", () => {
+  it("원자재 행도 위치 칸을 포함해 수량과 재고를 정렬한다", () => {
     render(
       <IoLineRow
         line={makeLine({ origin: "manual" })}
@@ -271,7 +273,7 @@ describe("IoLineRow quantity", () => {
     expect(row).toHaveClass("lg:pr-[18px]");
     expect(row).toHaveStyle({
       gridTemplateColumns:
-        "32px minmax(0,1.6fr) auto minmax(80px,auto) minmax(80px,auto) 44px",
+        "32px minmax(0,1.6fr) minmax(112px,auto) auto minmax(80px,auto) minmax(80px,auto) 44px",
     });
     expect(screen.getByText("창고 수량").parentElement).toHaveClass("text-center");
     expect(screen.getByText("창고 수량").parentElement).not.toHaveClass("lg:text-right");
@@ -496,7 +498,7 @@ describe("IoLineRow quantity", () => {
     expect(onToggle).toHaveBeenCalledOnce();
   });
 
-  it("연구 사용출고 재고 미반영 행의 추가 설명은 유지한다", () => {
+  it("연구 사용출고 재고 미반영 행은 안내를 한 번만 표시한다", () => {
     render(
       <IoLineRow
         line={makeLine({
@@ -516,7 +518,9 @@ describe("IoLineRow quantity", () => {
       />,
     );
 
-    expect(screen.getByText("BOM 자동 처리 시 재고 미반영")).toBeInTheDocument();
+    expect(screen.getAllByText("BOM 재고 미반영")).toHaveLength(1);
+    expect(screen.queryByText("BOM 자동 처리 시 재고 미반영")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/차감 위치:/)).not.toBeInTheDocument();
     const quantity = screen.getByRole("textbox", { name: "수량" });
     expect(quantity).toHaveTextContent("2");
     expect(quantity).toHaveClass("h-11", "min-h-[44px]", "w-[72px]");
@@ -525,10 +529,10 @@ describe("IoLineRow quantity", () => {
     expect(screen.getAllByText("10")).toHaveLength(2);
   });
 
-  it("창고 입출고 행의 기존 보조 문구는 유지한다", () => {
+  it("창고 입출고 행은 경로를 위치 칸으로 옮기고 정상 보조 문구를 제거한다", () => {
     render(
       <IoLineRow
-        line={makeLine()}
+        line={makeLine({ direction: "move", from_bucket: "warehouse", to_bucket: "production", to_department: "튜브", origin: "manual" })}
         subType="warehouse_to_dept"
         isChild={false}
         available={10}
@@ -538,7 +542,47 @@ describe("IoLineRow quantity", () => {
       />,
     );
 
-    expect(screen.getByText("재고 반영 포함")).toBeInTheDocument();
+    expect(screen.getByLabelText("이동 경로: 창고 → 튜브")).toBeInTheDocument();
+    expect(screen.queryByTestId("io-line-route")).not.toBeInTheDocument();
+    expect(screen.queryByText("재고 반영 포함")).not.toBeInTheDocument();
+    expect(screen.queryByText("이 품목만")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["dept_to_warehouse", { direction: "move", from_bucket: "production", from_department: "튜브", to_bucket: "warehouse" }, "이동 경로: 튜브 → 창고"],
+    ["produce", { to_bucket: "production", to_department: "고압" }, "입고 위치: 고압"],
+    ["disassemble", { direction: "out", from_bucket: "production", from_department: "고압", to_bucket: "none" }, "차감 위치: 고압"],
+    ["warehouse_adjust_in", { direction: "adjust", to_bucket: "warehouse" }, "조정 위치: 창고"],
+    ["warehouse_adjust_out", { direction: "adjust", from_bucket: "warehouse", to_bucket: "none" }, "조정 위치: 창고"],
+  ] as const)("%s는 실제 반영 위치를 표시한다", (subType, overrides, label) => {
+    render(<IoLineRow line={makeLine(overrides)} subType={subType} isChild={false} available={10} onToggle={vi.fn()} onQuantityChange={vi.fn()} onRemove={vi.fn()} />);
+    expect(screen.getByLabelText(label)).toBeInTheDocument();
+  });
+
+  it("BOM 변환된 입고 효과의 위치를 표시한다", () => {
+    const line = makeLine({ direction: "out", from_bucket: "production", from_department: "튜브", to_bucket: "none", origin: "bom_auto" });
+    render(<IoLineRow line={line} inventoryEffect={{ ...line, direction: "in", from_bucket: "none", from_department: null, to_bucket: "production", to_department: "튜브" }} subType="produce" isChild available={10} onToggle={vi.fn()} onQuantityChange={vi.fn()} onRemove={vi.fn()} />);
+    expect(screen.getByLabelText("입고 위치: 튜브")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/차감 위치:/)).not.toBeInTheDocument();
+    expect(screen.getByText("실행 후").parentElement).toHaveTextContent("11");
+  });
+
+  it.each([
+    [{ included: false, exclusion_note: "회수 안 됨" }, undefined, "회수 안 됨"],
+    [{}, null, "변동 없음"],
+    [{ bom_stock_exempt: true, origin: "bom_auto" }, undefined, "BOM 재고 미반영"],
+  ] as const)("반영 없는 행은 예외 안내만 남기고 위치에 이동을 표시하지 않는다", (overrides, inventoryEffect, note) => {
+    render(<IoLineRow line={makeLine(overrides)} inventoryEffect={inventoryEffect} subType="disassemble" isChild available={10} onToggle={vi.fn()} onQuantityChange={vi.fn()} onRemove={vi.fn()} />);
+    expect(screen.getAllByText(note)).toHaveLength(1);
+    expect(screen.getByLabelText("재고 위치: —")).toBeInTheDocument();
+    expect(screen.getByText("실행 후").parentElement).toHaveTextContent("10");
+  });
+
+  it("부서 위치가 누락되어도 품목 분류로 추정하지 않는다", () => {
+    render(<IoLineRow line={makeLine({ to_bucket: "production", to_department: null, mes_code: "6-HR-0001" })} subType="produce" isChild={false} item={{ mes_code: "6-HR-0001", quantity: 5 } as Item} available={10} onToggle={vi.fn()} onQuantityChange={vi.fn()} onRemove={vi.fn()} />);
+    expect(screen.getByLabelText("입고 위치: 위치 확인 필요")).toBeInTheDocument();
+    expect(screen.queryByText("고압")).not.toBeInTheDocument();
+    expect(screen.queryByText("조립")).not.toBeInTheDocument();
   });
 
   it("locks an exempt automatic BOM child and shows its no-stock-effect state", () => {

@@ -5,20 +5,13 @@ import { Check, ChevronDown, ChevronRight, MinusCircle } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { getStockState } from "@/lib/mes/inventory";
-import { mesCodeDeptBadge } from "@/lib/mes/process";
-import { useDeptColorLookup } from "../DepartmentsContext";
 import type { IoLine, IoSubType, Item } from "./types";
-import {
-  automaticLineRouteLabel,
-  isBomForced,
-  isWarehouseAdjustSubType,
-  lineTagLabel,
-  type LineTagTone,
-} from "./ioWorkType";
+import { isWarehouseAdjustSubType } from "./ioWorkType";
 import { formatQty } from "@/lib/mes/format";
 import { BomSubExpander } from "./BomSubExpander";
 import { ExpandableItemName } from "./ExpandableItemName";
-import { deductionSourceName, IoDeductionSourceBadge } from "./IoDeductionSourceBadge";
+import { IoLocationBadge } from "./IoLocationBadge";
+import { lineInventoryLocation } from "./ioInventoryLocation";
 import { QuantityStepper } from "./QuantityStepper";
 import { IoRemoveButton } from "./IoRemoveButton";
 import { lineSelected } from "./internalUseBom";
@@ -39,16 +32,6 @@ interface Props {
   onQuantityChange: (quantity: number, shortage: number) => void;
   onRemove: () => void;
   editingDisabled?: boolean;
-}
-
-// originLabel 은 lineTagLabel 로 대체됨 (현장 친화 태그 + 입출고 부호 배지)
-
-function toneToColor(tone: LineTagTone): string {
-  if (tone === "green") return LEGACY_COLORS.green;
-  if (tone === "red") return LEGACY_COLORS.red;
-  if (tone === "blue") return LEGACY_COLORS.blue;
-  if (tone === "purple") return LEGACY_COLORS.purple;
-  return LEGACY_COLORS.muted2;
 }
 
 export function isOutgoing(line: IoLine) {
@@ -98,22 +81,14 @@ export function IoLineRow({
   onRemove,
   editingDisabled = false,
 }: Props) {
-  const getDeptColor = useDeptColorLookup();
   const [showChildren, setShowChildren] = useState(false);
   const isInternalUse = subType === "internal_use_out";
-  const isMaterialIo = subType === "receive_supplier" || subType === "outbound_supplier";
   const selectionColor = subType === "outbound_supplier" ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
   const hasInventoryEffectOverride = inventoryEffect !== undefined;
   const effectLine = inventoryEffect ?? line;
   const noInventoryEffect = hasInventoryEffectOverride && inventoryEffect === null;
   const selected = isInternalUse ? lineSelected(line) : line.included;
   const disabled = !line.included;
-  // process BOM 자동 하위는 포함 여부만 고정한다. 수량 조정은 부서 결재로 검증한다.
-  const bomCheckboxLocked =
-    isBomForced(subType) &&
-    line.origin === "bom_auto" &&
-    line.bom_expected != null &&
-    Number(line.bom_expected) > 0;
   const bomStockExempt = line.origin === "bom_auto" && line.bom_stock_exempt;
   const fixedInternalUseBomQuantity = isInternalUse && line.origin === "bom_auto";
   // 부서 BOM 자동 하위는 체크로 수량 0 제외와 수량 1 재포함을 전환한다.
@@ -134,12 +109,7 @@ export function IoLineRow({
       ? tint(LEGACY_COLORS.muted2, 8)
       : "transparent";
   const stock = item ? getStockState(Number(item.quantity), item.min_stock == null ? null : Number(item.min_stock)) : null;
-  const deptBadge = item ? mesCodeDeptBadge(item.mes_code, getDeptColor) : null;
-  const deductionSource =
-    isInternalUse &&
-    (line.from_bucket === "warehouse" || line.from_bucket === "production")
-      ? deductionSourceName(line)
-      : null;
+  const location = lineInventoryLocation(noInventoryEffect ? null : effectLine, subType);
   const isWarehouseAdjust = isWarehouseAdjustSubType(subType);
   const displayedCurrent = isWarehouseAdjust && item
     ? Number(item.warehouse_qty) || 0
@@ -149,11 +119,15 @@ export function IoLineRow({
     : bomStockExempt || noInventoryEffect
     ? displayedCurrent
     : expectedAfter(effectLine, displayedCurrent);
-  const tag = noInventoryEffect
-    ? { text: "변동 없음", tone: "muted" as const }
-    : lineTagLabel(effectLine, subType);
-  const routeLabel = noInventoryEffect ? null : automaticLineRouteLabel(subType, effectLine);
-  const tagColor = toneToColor(tag.tone);
+  const exceptionNote = bomStockExempt
+    ? "BOM 재고 미반영"
+    : isExcluded
+      ? line.exclusion_note || "이번 작업 제외"
+      : noInventoryEffect || Number(effectLine.quantity) <= 0
+        ? "변동 없음"
+        : isInternalUse && !selected && effectLine.direction === "in"
+          ? "소속 부서 재입고"
+          : null;
   const expectedColor =
     expected === null
       ? LEGACY_COLORS.muted2
@@ -184,7 +158,7 @@ export function IoLineRow({
       className={`flex flex-wrap items-center gap-x-3 gap-y-2 py-3 pr-4 lg:grid lg:gap-3 ${isChild ? "lg:pr-0" : "lg:pr-[18px]"}`}
       style={{
         gridTemplateColumns:
-          isMaterialIo ? "32px minmax(0,1.6fr) auto minmax(80px,auto) minmax(80px,auto) 44px" : "32px minmax(0,1.6fr) minmax(70px,auto) auto minmax(80px,auto) minmax(80px,auto) 44px",
+          "32px minmax(0,1.6fr) minmax(112px,auto) auto minmax(80px,auto) minmax(80px,auto) 44px",
         background: rowBackground,
         paddingLeft: isChild ? 32 : 16,
         borderLeft: isChild ? `3px solid ${tint(LEGACY_COLORS.muted2, 30)}` : "none",
@@ -239,46 +213,24 @@ export function IoLineRow({
         </div>
         <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
           <span className="truncate">{line.mes_code ?? "-"}</span>
-          {routeLabel && <span data-testid="io-line-route">{routeLabel}</span>}
-          {!isMaterialIo && <span
-            className="rounded-full px-2 py-0.5 text-[10px] font-bold"
-            style={{ background: tint(tagColor, 14), color: tagColor }}
-          >
-            {tag.text}
-          </span>}
-          {bomStockExempt && (
+          {exceptionNote && (
             <span
-              className="rounded-full px-2 py-0.5 text-[10px] font-bold"
-              style={{ background: tint(LEGACY_COLORS.purple, 14), color: LEGACY_COLORS.purple }}
+              className="rounded-full px-2 py-0.5 text-xs font-bold"
+              style={{
+                background: tint(bomStockExempt ? LEGACY_COLORS.purple : LEGACY_COLORS.muted2, 14),
+                color: bomStockExempt ? LEGACY_COLORS.purple : LEGACY_COLORS.muted2,
+              }}
             >
-              BOM 재고 미반영
-            </span>
-          )}
-          {!isMaterialIo && (bomStockExempt || (!isInternalUse && !bomCheckboxLocked)) && (
-            <span className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
-              {bomStockExempt
-                ? "BOM 자동 처리 시 재고 미반영"
-                : line.included
-                  ? "재고 반영 포함"
-                  : line.exclusion_note || "이번 작업 제외"}
+              {exceptionNote}
             </span>
           )}
         </div>
       </div>
 
-      {/* 3. AS·연구 사용출고는 분류 대신 실제 차감 위치를 강조 */}
-      {!isMaterialIo && (deductionSource ? (
-        <IoDeductionSourceBadge sourceName={deductionSource} variant="field" />
-      ) : deptBadge ? (
-        <span
-          className="justify-self-start rounded-full px-2 py-0.5 text-[10px] font-bold"
-          style={{ color: deptBadge.color, background: deptBadge.bg, opacity: isExcluded ? 0.6 : 1 }}
-        >
-          {deptBadge.label}
-        </span>
-      ) : (
-        <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2, opacity: isExcluded ? 0.6 : 1 }}>-</span>
-      ))}
+      {/* 3. 실제 재고 반영 위치. 모바일에서는 독립된 행으로 배치한다. */}
+      <div className="flex w-full justify-center lg:w-auto">
+        <IoLocationBadge label={location?.label ?? "재고 위치"} value={location?.value ?? "—"} variant="field" />
+      </div>
 
       {/* 4. 연구 BOM은 고정 수량, 나머지는 수량 stepper (모바일에선 한 줄 차지) */}
       {fixedInternalUseBomQuantity ? (
