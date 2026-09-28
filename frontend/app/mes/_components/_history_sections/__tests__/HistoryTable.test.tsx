@@ -665,7 +665,7 @@ describe("HistoryTable hierarchy", () => {
       "작업",
       "대상",
       "품목코드",
-      "재고 변동",
+      "수량 변동",
       "담당자",
     ]);
     const itemCodeHeader = screen.getByRole("columnheader", { name: "품목코드" });
@@ -1091,7 +1091,7 @@ describe("HistoryTable hierarchy", () => {
     );
 
     expect(screen.getByRole("table", { name: "입출고 내역 불러오는 중" })).toBeInTheDocument();
-    expect(screen.getByLabelText("재고 변동 계산 기준")).toBeInTheDocument();
+    expect(screen.getByLabelText("수량 변동 계산 기준")).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "작업" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "품목코드" })).toBeInTheDocument();
     const surface = screen.getByTestId("history-table-surface");
@@ -1108,8 +1108,8 @@ describe("HistoryTable hierarchy", () => {
     expect(screen.queryByTestId("history-table-scroll-area")).not.toBeInTheDocument();
     expect(screen.getByRole("table", { name: "입출고 내역 불러오는 중" }).parentElement).toBe(surface);
     expect(container.querySelectorAll("[data-history-loading-row='true']")).toHaveLength(8);
-    expect(screen.getByRole("columnheader", { name: "일시" })).toHaveClass("rounded-tl-[22px]");
-    expect(screen.getByRole("columnheader", { name: "담당자" })).toHaveClass("rounded-tr-[22px]");
+    expect(screen.getByRole("columnheader", { name: "일시" })).toHaveClass("rounded-tl-[24px]");
+    expect(screen.getByRole("columnheader", { name: "담당자" })).toHaveClass("rounded-tr-[24px]");
     expect(screen.getByRole("columnheader", { name: "일시" })).toHaveStyle({
       background: "var(--c-history-table-header)",
     });
@@ -1125,8 +1125,8 @@ describe("HistoryTable hierarchy", () => {
   it("keeps both sticky header corners aligned with the table surface", () => {
     renderTable([{ type: "solo", log: makeLog() }]);
 
-    expect(screen.getByRole("columnheader", { name: "일시" })).toHaveClass("sticky", "rounded-tl-[22px]");
-    expect(screen.getByRole("columnheader", { name: "담당자" })).toHaveClass("sticky", "rounded-tr-[22px]");
+    expect(screen.getByRole("columnheader", { name: "일시" })).toHaveClass("sticky", "rounded-tl-[24px]");
+    expect(screen.getByRole("columnheader", { name: "담당자" })).toHaveClass("sticky", "rounded-tr-[24px]");
     expect(screen.getByTestId("history-table-surface")).not.toHaveClass("overflow-y-auto");
     expect(screen.getByTestId("history-table-surface")).not.toHaveClass("overflow-hidden");
     expect(screen.queryByTestId("history-table-scroll-area")).not.toBeInTheDocument();

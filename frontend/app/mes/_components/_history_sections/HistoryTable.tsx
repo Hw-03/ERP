@@ -89,7 +89,7 @@ const COLUMNS: ColSpec[] = [
   { label: "대상" },
   { label: "품목코드", width: `${HISTORY_ITEM_CODE_WIDTH_PX}px`, align: "center", px: "px-0" },
   {
-    label: "재고 변동",
+    label: "수량 변동",
     help: "재고는 요청 시각 순서로 계산합니다.\n요청이 승인되면 과거 표시도 변경될 수 있습니다.",
     width: `${HISTORY_STOCK_SNAPSHOT_WIDTH_PX}px`,
     align: "center",
@@ -104,11 +104,11 @@ const HISTORY_TABLE_SURFACE_CLASS = "min-w-0 overflow-clip rounded-[24px]";
 function historyTableHeaderClass(column: (typeof COLUMNS)[number], index: number): string {
   const alignment = column.align === "center" ? "text-center" : column.align === "right" ? "text-right" : "text-left";
   return [
-    "sticky top-0 z-10 whitespace-nowrap border-b",
+    "sticky top-0 z-10 whitespace-nowrap border-y",
     column.px ?? "px-4",
     "py-3 text-xs font-bold",
-    index === 0 ? "rounded-tl-[22px]" : "",
-    index === COLUMNS.length - 1 ? "rounded-tr-[22px]" : "",
+    index === 0 ? "rounded-tl-[24px] border-l" : "",
+    index === COLUMNS.length - 1 ? "rounded-tr-[24px] border-r" : "",
     column.hidden ? "hidden sm:table-cell" : "",
     alignment,
   ].filter(Boolean).join(" ");
@@ -123,11 +123,11 @@ function HistoryTableCornerMask() {
     >
       <span
         className="h-6 w-6"
-        style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 23px, var(--c-bg) 24px)" }}
+        style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 23px, color-mix(in srgb, var(--c-border) 50%, transparent) 23px 24px, var(--c-bg) 24px)" }}
       />
       <span
         className="h-6 w-6"
-        style={{ background: "radial-gradient(circle at 0 100%, transparent 0 23px, var(--c-bg) 24px)" }}
+        style={{ background: "radial-gradient(circle at 0 100%, transparent 0 23px, color-mix(in srgb, var(--c-border) 50%, transparent) 23px 24px, var(--c-bg) 24px)" }}
       />
     </div>
   );
@@ -138,7 +138,7 @@ function HistoryColumnLabel({ column }: { column: ColSpec }) {
     <Tooltip
       content={<span className="block whitespace-pre text-left">{column.help}</span>}
       triggerTabIndex={0}
-      triggerAriaLabel="재고 변동 계산 기준"
+      triggerAriaLabel="수량 변동 계산 기준"
     >
       <span className="inline-flex items-center gap-1">
         {column.label}

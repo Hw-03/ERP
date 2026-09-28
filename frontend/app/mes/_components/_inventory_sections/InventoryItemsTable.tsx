@@ -131,11 +131,11 @@ export function InventoryItemsTable({
           >
             <span
               className="h-6 w-6"
-              style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 23px, var(--c-inventory-table-corner-backdrop) 24px)" }}
+              style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 23px, color-mix(in srgb, var(--c-border) 50%, transparent) 23px 24px, var(--c-inventory-table-corner-backdrop) 24px)" }}
             />
             <span
               className="h-6 w-6"
-              style={{ background: "radial-gradient(circle at 0 100%, transparent 0 23px, var(--c-inventory-table-corner-backdrop) 24px)" }}
+              style={{ background: "radial-gradient(circle at 0 100%, transparent 0 23px, color-mix(in srgb, var(--c-border) 50%, transparent) 23px 24px, var(--c-inventory-table-corner-backdrop) 24px)" }}
             />
           </div>
         )}
@@ -147,7 +147,7 @@ export function InventoryItemsTable({
                 <th
                   key={label}
                   scope="col"
-                  className={`border-b px-4 py-2.5 text-sm font-bold${columnIndex === 0 ? " rounded-tl-[24px]" : ""}${nowrap ? " whitespace-nowrap" : ""}${center ? " text-center" : " text-left"}${hidden ? " hidden sm:table-cell" : ""}`}
+                  className={`${compact ? "border-b" : "border-y"} px-4 py-2.5 text-sm font-bold${columnIndex === 0 ? ` rounded-tl-[24px]${compact ? "" : " border-l"}` : ""}${nowrap ? " whitespace-nowrap" : ""}${center ? " text-center" : " text-left"}${hidden ? " hidden sm:table-cell" : ""}`}
                   style={{
                     background: compact ? LEGACY_COLORS.s2 : "var(--c-inventory-table-header)",
                     borderColor: LEGACY_COLORS.border,
@@ -161,7 +161,7 @@ export function InventoryItemsTable({
               ))}
               <th
                 scope="col"
-                className={`border-b px-4 py-2.5 text-sm font-bold whitespace-nowrap ${compact ? "rounded-tr-[24px] text-center" : "text-right sm:text-center"}`}
+                className={`${compact ? "border-b" : "border-y"} px-4 py-2.5 text-sm font-bold whitespace-nowrap ${compact ? "rounded-tr-[24px] text-center" : "text-right sm:text-center"}`}
                 style={{ background: compact ? LEGACY_COLORS.s2 : "var(--c-inventory-table-header)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: compact ? "104px" : "160px" }}
               >
                 사용 가능 재고
@@ -169,7 +169,7 @@ export function InventoryItemsTable({
               {!compact && (
                 <th
                   scope="col"
-                  className="hidden rounded-tr-[24px] border-b px-4 py-2.5 text-sm font-bold whitespace-nowrap text-center sm:table-cell"
+                  className="hidden rounded-tr-[24px] border-y border-r px-4 py-2.5 text-sm font-bold whitespace-nowrap text-center sm:table-cell"
                   style={{ background: "var(--c-inventory-table-header)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: "160px" }}
                 >
                   안전재고

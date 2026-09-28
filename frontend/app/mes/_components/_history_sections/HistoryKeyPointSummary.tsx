@@ -107,11 +107,9 @@ export function HistoryKeyPointSummary({
               data-testid="history-participant-row"
               className="grid min-w-0 gap-2 sm:grid-cols-[4rem_minmax(0,1fr)_auto] sm:items-center"
             >
-              {participants.length > 1 ? (
-                <span className="font-bold">{participant.label}</span>
-              ) : (
-                <span aria-hidden="true" className="hidden sm:block" />
-              )}
+              <span className="font-bold">
+                {participants.length === 1 && (participant.label === "요청자" || participant.label === "담당자") ? "작업자" : participant.label}
+              </span>
               <div className="flex min-w-0 items-center gap-2">
                 <UserRound className="h-4 w-4 shrink-0" />
                 <span className="truncate font-bold" style={{ color: LEGACY_COLORS.text }}>

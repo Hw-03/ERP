@@ -110,7 +110,7 @@ describe("HistoryKeyPointSummary", () => {
     expect(within(block).queryByText(/목록은 요청 순서/)).not.toBeInTheDocument();
   });
 
-  it("aligns a single requester with multi-participant name and time columns without a redundant label", () => {
+  it("labels a single participant while keeping the name and time columns aligned", () => {
     render(
       <HistoryKeyPointSummary
         summary={summary({
@@ -124,7 +124,7 @@ describe("HistoryKeyPointSummary", () => {
     );
 
     expect(screen.getByText("준비 완료자 B")).toBeInTheDocument();
-    expect(screen.queryByText("담당자")).not.toBeInTheDocument();
+    expect(screen.getByText("작업자")).toBeInTheDocument();
     expect(screen.queryByText("요청자")).not.toBeInTheDocument();
     expect(screen.getByTestId("history-participant-row")).toHaveClass(
       "grid",
