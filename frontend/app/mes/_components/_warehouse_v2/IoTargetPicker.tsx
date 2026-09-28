@@ -299,6 +299,7 @@ export function IoTargetPicker({
   }, [fullscreen, onFullscreenChange]);
 
   const actionMode = getItemActionMode(subType);
+  const outbound = subType === "outbound_supplier" || subType === "warehouse_adjust_out";
   const activeFilters = filters ?? localFilters;
   const { department: dept, model, stage } = activeFilters;
   const keyword = search.trim().toLowerCase();
@@ -562,6 +563,7 @@ export function IoTargetPicker({
                 hasActiveFilter={hasActiveFilter}
                 clearFilters={clearFilters}
                 mode={actionMode}
+                outbound={outbound}
                 workType={workType}
                 subType={subType}
                 targetDepartment={targetDepartment}
@@ -622,8 +624,8 @@ export function IoTargetPicker({
           disabled={bundles.length === 0}
           className="standard-hover flex w-full items-center justify-between rounded-[12px] border px-4 py-3 text-sm font-black transition-all disabled:cursor-not-allowed disabled:opacity-60"
           style={{
-            background: bundles.length > 0 ? (subType === "outbound_supplier" ? LEGACY_COLORS.red : LEGACY_COLORS.blue) : LEGACY_COLORS.s2,
-            borderColor: bundles.length > 0 ? (subType === "outbound_supplier" ? LEGACY_COLORS.red : LEGACY_COLORS.blue) : LEGACY_COLORS.border,
+            background: bundles.length > 0 ? (outbound ? LEGACY_COLORS.red : LEGACY_COLORS.blue) : LEGACY_COLORS.s2,
+            borderColor: bundles.length > 0 ? (outbound ? LEGACY_COLORS.red : LEGACY_COLORS.blue) : LEGACY_COLORS.border,
             color: bundles.length > 0 ? "#fff" : LEGACY_COLORS.muted2,
           }}
         >
@@ -762,6 +764,7 @@ function ItemTable({
   hasActiveFilter,
   clearFilters,
   mode,
+  outbound,
   workType,
   subType,
   targetDepartment,
@@ -791,6 +794,7 @@ function ItemTable({
   hasActiveFilter: boolean;
   clearFilters: () => void;
   mode: ItemActionMode;
+  outbound: boolean;
   workType: IoWorkType;
   subType: IoSubType;
   targetDepartment?: string | null;
@@ -989,7 +993,7 @@ function ItemTable({
                 key={item.item_id}
                 isHighlight={isHighlight}
                 isSelected={isSelected}
-                outbound={subType === "outbound_supplier"}
+                outbound={outbound}
                 onClick={rowClickEnabled ? toggleSingleItem : undefined}
               >
                 <td className="max-w-0 w-full px-3 py-2" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
@@ -1139,11 +1143,11 @@ function ItemTable({
                           event.stopPropagation();
                           toggleSingleItem();
                         }}
-                        className={`flex items-center gap-1 rounded-[10px] px-2.5 py-1 text-[12px] font-black text-white disabled:opacity-50 ${workType === "receive" ? "h-6 w-[60px] shrink-0 justify-center" : ""}`}
-                        style={{ background: subType === "outbound_supplier" ? LEGACY_COLORS.red : isSingleSelected ? LEGACY_COLORS.green : LEGACY_COLORS.blueSolid }}
+                        className="flex h-6 w-[60px] shrink-0 items-center justify-center gap-1 rounded-[10px] px-2.5 py-1 text-[12px] font-black text-white disabled:opacity-50"
+                        style={{ background: isSingleSelected ? LEGACY_COLORS.green : outbound ? LEGACY_COLORS.red : LEGACY_COLORS.blueSolid }}
                         title="선택 — 선택 품목만 처리"
                       >
-                        {workType === "receive" ? (isSingleSelected ? <Check aria-hidden="true" className="h-3 w-3 shrink-0" /> : <Plus aria-hidden="true" className="h-3 w-3 shrink-0" />) : !isSingleSelected && <Plus aria-hidden="true" className="h-3 w-3" />}
+                        {isSingleSelected ? <Check aria-hidden="true" className="h-3 w-3 shrink-0" /> : <Plus aria-hidden="true" className="h-3 w-3 shrink-0" />}
                         선택
                       </button>
                     )}

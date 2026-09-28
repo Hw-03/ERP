@@ -127,11 +127,11 @@ const ALL_SUB_TYPES: IoSubType[] = [
 describe("ioWorkType 상수", () => {
   it("IO_WORK_TYPES id/label 고정 (defect 는 별도 '불량' 탭으로 분리되어 입출고 메뉴에서 제외)", () => {
     expect(IO_WORK_TYPES.map((r) => [r.id, r.label, r.description])).toEqual([
-      ["receive", "원자재 입출고", "공급업체에서 원자재를 입고하거나, 사급·샘플용으로 출고합니다."],
+      ["receive", "원자재 입출고", "원자재를 입고하거나 출고합니다."],
       ["warehouse_io", "창고 입출고", "창고와 부서 간 재고를 이동합니다."],
       ["process", "부서 입출고", "부서 작업에 맞춰 재고를 처리합니다."],
-      ["internal_use", "AS·연구 사용출고", "창고 재고를 AS·연구 용도로 반출합니다."],
-      ["warehouse_adjust", "수량보정 입출고", "창고 재고 수량을 즉시 보정합니다."],
+      ["internal_use", "AS·연구 사용출고", "창고·부서 재고를 AS·연구용으로 출고합니다."],
+      ["warehouse_adjust", "창고 수량 보정", "창고 재고 수량을 즉시 보정합니다."],
     ]);
   });
 

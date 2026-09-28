@@ -24,19 +24,19 @@ import type { TransactionType } from "@/lib/api/types/shared";
 export const WORK_TYPE_LABEL: Record<IoWorkType, string> = {
   receive: "원자재 입출고",
   warehouse_io: "창고 입출고",
-  warehouse_adjust: "수량보정 입출고",
+  warehouse_adjust: "창고 수량 보정",
   process: "부서 입출고",
   defect: "불량",
   internal_use: "AS·연구 사용출고",
 };
 
 export const WORK_TYPE_DESCRIPTION: Record<IoWorkType, string> = {
-  receive: "공급업체에서 원자재를 입고하거나, 사급·샘플용으로 출고합니다.",
+  receive: "원자재를 입고하거나 출고합니다.",
   warehouse_io: "창고와 부서 간 재고를 이동합니다.",
   warehouse_adjust: "창고 재고 수량을 즉시 보정합니다.",
   process: "부서 작업에 맞춰 재고를 처리합니다.",
   defect: "불량 재고를 격리 처리합니다.",
-  internal_use: "창고 재고를 AS·연구 용도로 반출합니다.",
+  internal_use: "창고·부서 재고를 AS·연구용으로 출고합니다.",
 };
 
 // ──────────────────────────────────────────────────────────────────

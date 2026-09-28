@@ -19,7 +19,11 @@ module.exports = (phase) => {
     devIndicators: false,
     // 기존 로컬·사내 IP의 개발 HMR만 허용하고 나머지 출처는 계속 차단한다.
     ...(phase === PHASE_DEVELOPMENT_SERVER
-      ? { allowedDevOrigins: ["127.0.0.1", "192.168.0.63"] }
+      ? {
+          allowedDevOrigins: ["127.0.0.1", "192.168.0.63"],
+          // 손상된 HMR 상태와 이전 코드를 재시작 후 복원하지 않도록 메모리 캐시만 사용한다.
+          experimental: { turbopackFileSystemCacheForDev: false },
+        }
       : {}),
     async rewrites() {
       return [

@@ -72,7 +72,7 @@ describe("IoSubTypeStep", () => {
     expect(screen.getByRole("button", { name: "입고" })).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("창고 정·부에게만 수량보정 입출고 작업 카드를 표시한다", () => {
+  it("창고 정·부에게만 창고 수량 보정 작업 카드를 표시한다", () => {
     const { rerender } = render(
       <IoWorkTypeStep
         workType="receive"
@@ -81,7 +81,7 @@ describe("IoSubTypeStep", () => {
       />,
     );
 
-    expect(screen.getByText("수량보정 입출고")).toBeInTheDocument();
+    expect(screen.getByText("창고 수량 보정")).toBeInTheDocument();
 
     rerender(
       <IoWorkTypeStep
@@ -90,7 +90,7 @@ describe("IoSubTypeStep", () => {
         onWorkTypeChange={vi.fn()}
       />,
     );
-    expect(screen.queryByText("수량보정 입출고")).not.toBeInTheDocument();
+    expect(screen.queryByText("창고 수량 보정")).not.toBeInTheDocument();
   });
 
   it("창고 수량보정은 부서 선택 없이 기존 입고·출고 방향 카드만 표시한다", () => {
@@ -160,7 +160,8 @@ describe("IoSubTypeStep", () => {
     expect(screen.queryByText("출발 부서")).not.toBeInTheDocument();
   });
 
-  it("internal use의 AS·연구 선택지를 사용 부서 영역 전체에 2열로 채운다", () => {
+  it("internal use는 중복 세부 작업 없이 AS·연구 선택지만 전체 높이에 채운다", () => {
+    const onToDepartmentChange = vi.fn();
     render(
       <IoSubTypeStep
         workType="internal_use"
@@ -170,7 +171,7 @@ describe("IoSubTypeStep", () => {
         deptIoDirection={null}
         onSubTypeChange={vi.fn()}
         onFromDepartmentChange={vi.fn()}
-        onToDepartmentChange={vi.fn()}
+        onToDepartmentChange={onToDepartmentChange}
         onDeptIoDirectionChange={vi.fn()}
       />,
     );
@@ -178,5 +179,11 @@ describe("IoSubTypeStep", () => {
     const departmentGrid = screen.getByRole("button", { name: "AS" }).parentElement;
     expect(departmentGrid).toHaveClass("grid-cols-2", "flex-1");
     expect(screen.getByRole("button", { name: "연구" }).parentElement).toBe(departmentGrid);
+    expect(screen.queryByText("세부 작업")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "AS·연구 사용출고" })).not.toBeInTheDocument();
+    expect(departmentGrid?.parentElement?.parentElement).toHaveClass("h-full");
+    expect(departmentGrid?.querySelector("img")).toBeNull();
+    screen.getByRole("button", { name: "AS" }).click();
+    expect(onToDepartmentChange).toHaveBeenCalledWith("AS");
   });
 });

@@ -157,7 +157,7 @@ describe("glossary — 캐노니컬 라벨 고정", () => {
     const inbound = "warehouse_adjust_in" as IoSubType;
     const outbound = "warehouse_adjust_out" as IoSubType;
 
-    expect(WORK_TYPE_LABEL[workType]).toBe("수량보정 입출고");
+    expect(WORK_TYPE_LABEL[workType]).toBe("창고 수량 보정");
     expect(SUB_TYPE_LABEL[inbound]).toBe("보정 입고");
     expect(SUB_TYPE_LABEL[outbound]).toBe("보정 출고");
   });

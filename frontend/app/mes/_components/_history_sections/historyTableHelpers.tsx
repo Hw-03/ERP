@@ -130,20 +130,20 @@ export function FlowBadge({
   compact?: boolean;
   accessibleLabel?: string;
   variant?: "table" | "panel";
-}) {
+}): ReactNode {
   const Icon = type ? TX_ICON[transactionIconName(type)] : null;
   const fullLabel = accessibleLabel ?? label;
   return (
     <span
       aria-label={accessibleLabel}
       title={fullLabel !== label ? fullLabel : undefined}
-      className={`inline-flex h-6 min-w-0 items-center justify-center gap-1 rounded-full px-3 text-xs font-bold leading-none ${
-        variant === "table" ? HISTORY_TABLE_OPERATION_PILL_CLASS : "max-w-full"
+      className={`inline-flex min-w-0 items-center gap-1 rounded-full px-3 text-xs font-bold ${
+        variant === "table" ? `h-6 justify-center leading-none ${HISTORY_TABLE_OPERATION_PILL_CLASS}` : "min-h-6 max-w-full py-1 leading-4"
       }`}
       style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, color }}
     >
       {Icon && <Icon className="h-3.5 w-3.5 shrink-0" />}
-      <span className="min-w-0 truncate">{label}</span>
+      <span className={variant === "table" ? "min-w-0 truncate" : "min-w-0 break-words"}>{label}</span>
     </span>
   );
 }
@@ -439,6 +439,7 @@ export function StockSnapshotContent({
   quantityWidth,
   loading = false,
   emptyLogLabel = "—",
+  variant = "table",
 }: {
   log?: TransactionLog | null;
   dense?: boolean;
@@ -447,7 +448,9 @@ export function StockSnapshotContent({
   loading?: boolean;
   /** 로그 자체가 없을 때 표기할 문구. 표는 기존 대시(—)를 유지한다. */
   emptyLogLabel?: string;
-}) {
+  /** 패널은 전후 수량과 증감을 분리하고 기본 표의 배치를 유지한다. */
+  variant?: "table" | "panel";
+}): ReactNode {
   if (loading) {
     return (
       <span aria-hidden="true" data-history-loading-stock className="mx-auto flex w-fit items-center leading-4">
@@ -461,14 +464,14 @@ export function StockSnapshotContent({
   }
   if (!log) {
     return (
-      <span className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>{emptyLogLabel}</span>
+      <span className={variant === "panel" ? "text-sm font-medium" : "text-xs font-semibold"} style={{ color: LEGACY_COLORS.muted2 }}>{emptyLogLabel}</span>
     );
   }
 
   const departmentCorrectionFlow = getDepartmentCorrectionStockFlow(log);
   if (departmentCorrectionFlow) {
     return (
-      <DepartmentCorrectionStockFlow flow={departmentCorrectionFlow} />
+      <DepartmentCorrectionStockFlow flow={departmentCorrectionFlow} variant={variant} />
     );
   }
 
@@ -476,7 +479,7 @@ export function StockSnapshotContent({
   if (snapshot.status === "unavailable") {
     const accessibleLabel = `요청 순 재고 계산 불가: ${snapshot.reason}`;
     return (
-      <span className="text-xs font-semibold" style={{ color: LEGACY_COLORS.yellow }}>
+      <span className={variant === "panel" ? "text-sm font-medium" : "text-xs font-semibold"} style={{ color: LEGACY_COLORS.yellow }}>
         <Tooltip content={snapshot.reason} multiline triggerTabIndex={0} triggerAriaLabel={accessibleLabel}>
           <span>계산 불가</span>
         </Tooltip>
@@ -485,7 +488,7 @@ export function StockSnapshotContent({
   }
   if (snapshot.status === "missing") {
     return (
-      <span className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>기록 없음</span>
+      <span className={variant === "panel" ? "text-sm font-medium" : "text-xs font-semibold"} style={{ color: LEGACY_COLORS.muted2 }}>기록 없음</span>
     );
   }
   const { warehouseBefore, warehouseAfter, departmentBefore, departmentAfter } = snapshot;
@@ -547,12 +550,12 @@ export function StockSnapshotContent({
   return (
     <div
       aria-label={snapshotLabel}
-      className={`mx-auto flex w-fit min-w-0 flex-col items-start ${dense ? "gap-0" : "gap-0.5"}`}
+      className={variant === "panel" ? "history-stock-panel" : `mx-auto flex w-fit min-w-0 flex-col items-start ${dense ? "gap-0" : "gap-0.5"}`}
     >
       {changedSnapshots.length === 0 ? (
-        <span aria-hidden="true" className="text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>변동 없음</span>
+        <span aria-hidden="true" className={variant === "panel" ? "text-sm font-medium" : "text-xs font-semibold"} style={{ color: LEGACY_COLORS.muted2 }}>변동 없음</span>
       ) : changedSnapshots.map((snapshot) => (
-        <StockSnapshotLine key={snapshot.label} label={snapshot.label} beforeText={snapshot.beforeText} afterText={snapshot.afterText} delta={snapshot.after - snapshot.before} beforeQuantityWidthPx={beforeQuantityWidthPx} afterQuantityWidthPx={STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH_PX} increased={snapshot.after > snapshot.before} decreased={snapshot.after < snapshot.before} cancelled={log.cancelled} />
+        <StockSnapshotLine key={snapshot.label} label={snapshot.label} beforeText={snapshot.beforeText} afterText={snapshot.afterText} delta={snapshot.after - snapshot.before} beforeQuantityWidthPx={beforeQuantityWidthPx} afterQuantityWidthPx={STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH_PX} increased={snapshot.after > snapshot.before} decreased={snapshot.after < snapshot.before} cancelled={log.cancelled} variant={variant} />
       ))}
     </div>
   );
@@ -593,7 +596,7 @@ function getDepartmentCorrectionStockFlow(log: TransactionLog): DepartmentCorrec
   };
 }
 
-function DepartmentCorrectionStockFlow({ flow }: { flow: DepartmentCorrectionStockFlow }) {
+function DepartmentCorrectionStockFlow({ flow, variant }: { flow: DepartmentCorrectionStockFlow; variant: "table" | "panel" }): ReactNode {
   const hasSnapshots = flow.sourceBefore != null && flow.targetAfter != null;
   const sourceBefore = hasSnapshots ? formatQty(flow.sourceBefore!) : null;
   const sourceDelta = formatStockDelta(flow.sourceDelta);
@@ -601,6 +604,21 @@ function DepartmentCorrectionStockFlow({ flow }: { flow: DepartmentCorrectionSto
   const label = hasSnapshots
     ? `${flow.sourceDepartment} ${sourceBefore} ${sourceDelta} → ${flow.targetDepartment} ${targetAfter}`
     : `${flow.sourceDepartment} ${sourceDelta} → ${flow.targetDepartment} ${targetAfter}`;
+
+  if (variant === "panel") {
+    return (
+      <span aria-label={`부서 위치 이동: ${label}`} className="history-stock-panel-line history-stock-panel-transfer">
+        <span className="history-stock-panel-location">{flow.sourceDepartment}</span>
+        <span className="history-stock-panel-source">
+          {sourceBefore && <span>{sourceBefore}</span>}
+          <strong style={{ color: LEGACY_COLORS.red }}>{sourceDelta}</strong>
+        </span>
+        <span aria-hidden="true" className="text-center" style={{ color: LEGACY_COLORS.muted2 }}>→</span>
+        <span className="history-stock-panel-location">{flow.targetDepartment}</span>
+        <strong style={{ color: LEGACY_COLORS.blue }}>{targetAfter}</strong>
+      </span>
+    );
+  }
 
   return (
     <span
@@ -650,6 +668,7 @@ function StockSnapshotLine({
   increased,
   decreased,
   cancelled,
+  variant,
 }: {
   label: string;
   beforeText: string;
@@ -660,9 +679,21 @@ function StockSnapshotLine({
   increased: boolean;
   decreased: boolean;
   cancelled: boolean;
-}) {
+  variant: "table" | "panel";
+}): ReactNode {
   const afterColor = increased ? LEGACY_COLORS.blue : decreased ? LEGACY_COLORS.red : LEGACY_COLORS.muted2;
   const deltaText = formatStockDelta(delta);
+  if (variant === "panel") {
+    return (
+      <span aria-label={`${label} ${beforeText} ${deltaText}→${afterText}`} className="history-stock-panel-line">
+        <span className="history-stock-panel-location">{label}</span>
+        <span>{beforeText}</span>
+        <strong style={{ color: afterColor }}>{deltaText}</strong>
+        <span aria-hidden="true" className="text-center">→</span>
+        <strong style={{ color: afterColor }}>{afterText}</strong>
+      </span>
+    );
+  }
   return (
     <span aria-label={`${label} ${beforeText} ${deltaText}→${afterText}`} className="inline-flex items-center whitespace-nowrap text-xs font-semibold leading-4">
       <span className="w-7 text-left" style={{ color: LEGACY_COLORS.muted }}>{label}</span>

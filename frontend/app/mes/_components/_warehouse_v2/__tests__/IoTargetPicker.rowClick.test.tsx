@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { IoBundle, Item } from "../types";
 import type { IoSubType, IoWorkType } from "@/lib/api";
 import { IoTargetPicker } from "../IoTargetPicker";
+import { LEGACY_COLORS } from "@/lib/mes/color";
 
 vi.mock("../useItemOrderDrag", () => ({
   useItemOrderDrag: () => ({
@@ -102,6 +103,18 @@ function makeBundle(
 }
 
 describe("IoTargetPicker row click", () => {
+  it.each([
+    { workType: "warehouse_adjust" as const, subType: "warehouse_adjust_out" as const, deptIoDirection: "out" as const },
+    { workType: "receive" as const, subType: "outbound_supplier" as const, deptIoDirection: null },
+  ])("출고 선택 버튼은 선택되면 초록색이고 다음 단계 버튼은 출고 색을 유지한다: $workType", (operation) => {
+    const props = { ...baseProps, ...operation, items: [makeItem({ warehouseQty: 10 })] };
+    const { rerender } = render(<IoTargetPicker {...props} />);
+    expect(screen.getByRole("button", { name: "선택" })).toHaveStyle({ background: LEGACY_COLORS.red });
+    rerender(<IoTargetPicker {...props} bundles={[makeBundle("direct_item")]} />);
+    expect(screen.getByRole("button", { name: "선택" })).toHaveStyle({ background: LEGACY_COLORS.green });
+    expect(screen.getByRole("button", { name: /수량 조정/ })).toHaveStyle({ background: LEGACY_COLORS.red });
+  });
+
   it.each([{ warehouseQty: 0 }, { warehouseQty: 3, pendingQty: 3 }])("원자재 출고는 가용 창고 재고가 없으면 버튼과 행 선택을 막는다: %o", (stock) => {
     const onAddItem = vi.fn();
     render(<IoTargetPicker {...baseProps} subType="outbound_supplier" items={[makeItem(stock)]} onAddItem={onAddItem} />);

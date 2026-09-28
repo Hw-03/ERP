@@ -23,3 +23,8 @@ test('development permits existing loopback and LAN addresses but blocks unrelat
 test('production configuration does not add development origins', () => {
   assert.equal(config(PHASE_PRODUCTION_BUILD).allowedDevOrigins, undefined);
 });
+
+test('development does not restore stale Turbopack HMR state from disk', () => {
+  assert.equal(config(PHASE_DEVELOPMENT_SERVER).experimental?.turbopackFileSystemCacheForDev, false);
+  assert.equal(config(PHASE_PRODUCTION_BUILD).experimental?.turbopackFileSystemCacheForDev, undefined);
+});

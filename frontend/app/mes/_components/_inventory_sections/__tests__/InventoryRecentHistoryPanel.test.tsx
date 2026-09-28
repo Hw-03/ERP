@@ -67,6 +67,14 @@ describe("InventoryRecentHistoryPanel", () => {
     testState.legacyQueryResult = { data: [], isLoading: false, isError: false, refetch: vi.fn() };
   });
 
+  it("취소된 원거래는 작업 취소 표시와 재고 수치를 함께 남긴다", () => {
+    testState.queryResult = { data: { items: [makeOperation({ effectiveStatus: "cancelled", matchingLines: [{ ...makeOperation().matchingLines[0], historyLog: makeLog({ cancelled: true }) }] })], nextCursor: null }, isLoading: false, isError: false, refetch: vi.fn() };
+    render(<InventoryRecentHistoryPanel item={makeItem()} />);
+    expect(screen.getByText("취소된 작업")).toBeInTheDocument();
+    expect(screen.getByLabelText("창고 15 +12→27").textContent).toBe("창고15+12→27");
+    expect(screen.getByText("조립 · 김작업")).toBeInTheDocument();
+  });
+
   it("이력 표와 같은 배지 분류로 창고 이동·불량·출하·취소를 표시한다", () => {
     testState.queryResult = {
       data: { items: [

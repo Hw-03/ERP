@@ -108,6 +108,20 @@ export function IoSubTypeStep({
   onToDepartmentChange,
   onDeptIoDirectionChange,
 }: SubTypeProps) {
+  if (workType === "internal_use") {
+    return (
+      <div className="h-full min-h-0">
+        <DeptGrid
+          label="사용 부서"
+          value={toDepartment}
+          onChange={onToDepartmentChange}
+          options={["AS", "연구"]}
+          fill
+        />
+      </div>
+    );
+  }
+
   if (workType === "warehouse_adjust") {
     return (
       <div className="flex h-full min-h-0 flex-col">

@@ -1293,6 +1293,8 @@ export function IoComposeView({
                         ? "공급업체를 선택하세요"
                         : state.workType === "warehouse_adjust"
                         ? "입고 또는 출고를 선택하세요"
+                        : state.workType === "internal_use"
+                        ? "사용 부서를 선택하세요"
                         : "세부 작업을 선택하세요"}
                   </Button>
                 </div>

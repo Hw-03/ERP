@@ -18,6 +18,7 @@ import {
   PeopleStatusCell,
   ReferenceBatchDetail,
   StockSnapshotCell,
+  StockSnapshotContent,
   TargetSummaryBlock,
   buildGroups,
   getAdditionalDistinctItemCount,
@@ -122,6 +123,47 @@ describe("getStockSnapshotQuantityWidth", () => {
     });
 
     expect(getStockSnapshotQuantityWidth([log])).toBe(24);
+  });
+});
+
+describe("StockSnapshotContent panel", () => {
+  it("패널과 표 모두 변경 전 수량·증감·화살표·변경 후 수량 순서를 유지한다", () => {
+    const log = makeLog({ warehouse_qty_before: 1_234_567, warehouse_qty_after: 1_234_559, department_qty_before: 0, department_qty_after: 0 });
+    const { rerender } = render(<StockSnapshotContent log={log} variant="panel" />);
+    expect(screen.getByLabelText("창고 1,234,567 −8→1,234,559").textContent).toBe("창고1,234,567−8→1,234,559");
+
+    rerender(<StockSnapshotContent log={log} />);
+    expect(screen.getByLabelText("창고 1,234,567 −8→1,234,559").textContent).toBe("창고1,234,567−8→1,234,559");
+  });
+
+  it("복수 위치의 증가와 감소를 각각 표시하고 취소된 수량도 읽을 수 있게 남긴다", () => {
+    const log = makeLog({ warehouse_qty_before: 100, warehouse_qty_after: 92, department_qty_before: 10, department_qty_after: 18, cancelled: true });
+    const { container } = render(<StockSnapshotContent log={log} variant="panel" />);
+    expect(screen.getByLabelText("창고 100 −8→92").textContent).toBe("창고100−8→92");
+    expect(screen.getByLabelText("조립 10 +8→18").textContent).toBe("조립10+8→18");
+    expect(container.querySelector("[data-history-after-stock]")).toBeNull();
+  });
+
+  it("정상 재고의 불량 전환은 정상 감소와 불량 증가를 각각 보존한다", () => {
+    render(<StockSnapshotContent variant="panel" log={makeLog({
+      transaction_type: "MARK_DEFECTIVE", quantity_before: 25, quantity_after: 25,
+      warehouse_qty_before: 0, warehouse_qty_after: 0, department_qty_before: 10, department_qty_after: 2,
+      inventory_effect: [{ scope: "location", department: "조립", status: "DEFECTIVE", delta: 8 }],
+    })} />);
+    expect(screen.getByLabelText("조립 10 −8→2")).toBeInTheDocument();
+    expect(screen.getByLabelText("불량 15 +8→23")).toBeInTheDocument();
+  });
+
+  it("부서 정정 이동의 출발 수량·감소·도착 부서와 실제 도착 재고를 유지한다", () => {
+    const log = makeLog({ transaction_type: "TRANSFER_DEPT", reference_no: "DEPT-CORRECTION-1", inventory_effect: [
+      { scope: "location", department: "긴 출발 부서 이름", status: "PRODUCTION", delta: -8, quantity_before: 1_234_567, quantity_after: 1_234_559 },
+      { scope: "location", department: "긴 도착 부서 이름", status: "PRODUCTION", delta: 8, quantity_before: 72, quantity_after: 80 },
+    ] });
+    const { rerender } = render(<StockSnapshotContent log={log} variant="panel" />);
+    const label = "부서 위치 이동: 긴 출발 부서 이름 1,234,567 −8 → 긴 도착 부서 이름 80";
+    expect(screen.getByLabelText(label)).toBeInTheDocument();
+    rerender(<StockSnapshotContent log={log} />);
+    expect(screen.getByLabelText(label)).toBeInTheDocument();
   });
 });
 

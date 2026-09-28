@@ -59,17 +59,20 @@ function RecentLine({
   context: string;
   effectiveAt: string;
   cancelled: boolean;
-}) {
+}): ReactNode {
   const color = log && isReworkOperation(log) ? LEGACY_COLORS.red : transactionColor(type);
   return (
     <li data-cancelled={cancelled || undefined}>
       <div className="inventory-recent-main">
         <FlowBadge type={type} label={label} color={color} variant="panel" />
-        <StockSnapshotContent log={log} emptyLogLabel="기록 없음" />
-      </div>
-      <div className="inventory-recent-meta">
-        <span>{context}</span>
         <time dateTime={effectiveAt}>{formatHistoryDate(effectiveAt)}</time>
+      </div>
+      <div className="inventory-recent-body">
+        <div className="inventory-recent-meta">
+          <span>{context}</span>
+          {cancelled && <span className="inventory-recent-cancelled">취소된 작업</span>}
+        </div>
+        <StockSnapshotContent log={log} emptyLogLabel="기록 없음" variant="panel" />
       </div>
     </li>
   );
