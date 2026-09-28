@@ -3052,6 +3052,7 @@ describe("DesktopShippingView", () => {
     expect(row).not.toHaveClass("hover:brightness-105");
     expect(row).not.toHaveClass("h-[136px]", "h-[168px]");
     expect(title).toHaveClass("truncate");
+    expect(title).toHaveClass("text-base");
     expect(title).not.toHaveClass("line-clamp-2", "min-h-10");
     expect(within(row).queryByTestId("shipping-request-board-quantity-request-board-layout")).not.toBeInTheDocument();
     expect(metadata).toHaveClass("grid", "grid-cols-[1.5fr_1fr_1fr_2fr]", "border-t", "pt-1.5");
@@ -3070,6 +3071,14 @@ describe("DesktopShippingView", () => {
     expect(metadata).toHaveTextContent("인보이스");
     expect(metadata).toHaveTextContent(longInvoice);
     expect(preparedRow).toHaveClass("h-[112px]");
+    for (const card of [row, preparedRow]) {
+      const header = card.firstElementChild as HTMLElement;
+      const code = within(card).getByTestId(`shipping-request-code-${card.dataset.shippingRequestId}`);
+      const status = within(card).getByText(card === row ? "준비 중" : "준비 완료");
+      expect(header).toContainElement(code);
+      expect(header).toContainElement(status);
+      expect(code.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
     expect(preparedMetadata).toHaveTextContent("김건호");
     expect(preparedMetadata).toHaveTextContent("3대");
     const missingInvoice = within(preparedMetadata).getByText("미입력");
@@ -4561,18 +4570,21 @@ describe("DesktopShippingView", () => {
     expect(vi.mocked(api.getShippingHistory).mock.calls.length).toBe(historyCallsBeforeSearchToggle);
   });
 
-  it("lays out history cards in two desktop columns with four-column information blocks", async () => {
+  it.each(["PICKED_UP", "CANCELLED"] as const)("lays out %s history cards with the PF code before status and no base PF", async (status) => {
     const finalPfName = "DX3000_60kV, 2mA_우루과이_Melmont S.A. [Black / 배터리 1EA]";
     const historyRequest = request({
       request_id: "history-card-layout",
-      status: "PICKED_UP",
+      status,
       request_quantity: 10,
+      final_pf_item_id: "pf-history-final",
       final_pf_item_name: finalPfName,
+      final_pf_mes_code: "3-PF-0046",
       requested_by_name: "김건호",
       invoice_number: "DEXCO-2026086-LONG-INVOICE",
       picked_up_at: "2026-06-26T01:00:00Z",
+      cancelled_at: "2026-06-26T01:00:00Z",
     });
-    navigationMock.search = "tab=shipping&shippingView=historyList&shippingHistoryStatus=PICKED_UP";
+    navigationMock.search = `tab=shipping&shippingView=historyList&shippingHistoryStatus=${status}`;
     vi.mocked(api.getShippingHistoryMonths).mockResolvedValue([{ year: 2026, month: 6, count: 1 }]);
     vi.mocked(api.getShippingHistory).mockResolvedValue({ requests: [historyRequest], next_cursor: null, has_more: false });
 
@@ -4589,15 +4601,64 @@ describe("DesktopShippingView", () => {
     expect(row).not.toHaveClass("hover:brightness-105");
     expect(row.parentElement).toHaveClass("grid", "xl:grid-cols-2", "gap-2", "p-2");
     expect(title).toHaveClass("truncate");
+    expect(title).toHaveClass("text-base");
     expect(title).not.toHaveClass("line-clamp-2");
     expect(metadata).toHaveClass("grid", "grid-cols-[1.5fr_1fr_1fr_2fr]", "gap-x-2");
     expect(metadata).not.toHaveClass("gap-x-5");
-    expect(within(row).getByText("기준 PF · Standard PF")).toBeInTheDocument();
-    expect(date).toHaveTextContent("출하 완료");
+    expect(within(row).queryByText(/기준 PF/)).not.toBeInTheDocument();
+    expect(within(row).queryByText("실제 출하품")).not.toBeInTheDocument();
+    expect(within(row).queryByTestId("shipping-request-base-code-history-card-layout")).not.toBeInTheDocument();
+    const code = within(row).getByTestId("shipping-request-code-history-card-layout");
+    const badge = within(row.firstElementChild as HTMLElement).getByText(status === "PICKED_UP" ? "픽업 완료" : "요청 취소");
+    expect(row.firstElementChild).toContainElement(code);
+    expect(row.firstElementChild).toContainElement(title);
+    expect(code).toHaveTextContent("3-PF-0046");
+    expect(code.compareDocumentPosition(badge) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(date).toHaveTextContent(status === "PICKED_UP" ? "출하 완료" : "요청 취소");
     expect(date).not.toHaveTextContent("Standard PF");
     expect(metadata).toHaveTextContent("김건호");
     expect(metadata).toHaveTextContent("10대");
     expect(metadata).toHaveTextContent("DEXCO-2026086-LONG-INVOICE");
+    fireEvent.click(row);
+    await waitFor(() => expect(navigationMock.push).toHaveBeenCalledWith(
+      expect.stringContaining("shippingView=historyWork"),
+      { scroll: false },
+    ));
+  });
+
+  it.each([
+    { finalId: "pf-custom", finalName: "Custom PF", status: "PICKED_UP" as const, showBase: true },
+    { finalId: "pf-custom", finalName: "Standard PF", status: "PICKED_UP" as const, showBase: true },
+    { finalId: "pf-1", finalName: "Custom PF", status: "PICKED_UP" as const, showBase: false },
+    { finalId: null, finalName: null, status: "CANCELLED" as const, showBase: false },
+  ])("shows base PF in history detail only for a different final ID ($finalId, $finalName, $status)", async ({ finalId, finalName, status, showBase }) => {
+    const historyRequest = request({
+      request_id: "history-base-pf",
+      status,
+      final_pf_item_id: finalId,
+      final_pf_item_name: finalName,
+      picked_up_at: "2026-06-26T01:00:00Z",
+      cancelled_at: "2026-06-26T01:00:00Z",
+    });
+    navigationMock.search = `tab=shipping&shippingView=historyWork&shippingRequestId=history-base-pf&shippingHistoryStatus=${status}`;
+    vi.mocked(api.getShippingRequest).mockResolvedValue(historyRequest);
+    vi.mocked(api.getShippingRequests).mockResolvedValue([]);
+    vi.mocked(api.getShippingHistory).mockResolvedValue({ requests: [historyRequest], next_cursor: null, has_more: false });
+
+    render(<DesktopShippingView onStatusChange={() => {}} />);
+
+    const detail = await screen.findByTestId("shipping-history-detail");
+    const metrics = await within(detail).findByTestId("shipping-history-metrics");
+    if (showBase) {
+      const base = within(metrics).getByTestId("shipping-history-base-pf");
+      expect(base).toHaveTextContent("기준 PF");
+      expect(base).toHaveTextContent("Standard PF");
+      expect(base).toHaveTextContent("PF-001");
+      expect(base.parentElement).toContainElement(within(metrics).getByText("최종 PF"));
+    } else {
+      expect(within(metrics).queryByTestId("shipping-history-base-pf")).not.toBeInTheDocument();
+      expect(within(metrics).queryByText("기준 PF")).not.toBeInTheDocument();
+    }
   });
 
   it("uses semantic history colors, a balanced title, and controlled month disclosure", async () => {

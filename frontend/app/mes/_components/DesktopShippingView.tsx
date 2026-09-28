@@ -2153,7 +2153,7 @@ function RequestDetailEntry({ request, onBack, onEdit, onDelete, onPrepareComple
         </div>
 
         {request.status === "PREPARED" && <div className="mt-3"><Notice tone={LEGACY_COLORS.cyan} title={SERIAL_NUMBERS_LABEL} body={serialNumberText(request.serial_numbers)} /></div>}
-        <div className="mt-3"><LineSummary request={request} contentSized /></div>
+        <div className="mt-3"><LineSummary request={request} contentSized emphasizeNonUnitQuantities /></div>
 
         <div data-testid="shipping-detail-actions" className={`mt-3 flex flex-col gap-3 rounded-[14px] border p-3 ${request.notes ? "md:flex-row md:items-stretch md:justify-between" : "items-end"}`} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
           {request.notes && <div data-testid="shipping-detail-request-memo" className="min-w-0 flex-1"><Notice tone={LEGACY_COLORS.cyan} title="요청 메모" body={request.notes} /></div>}
@@ -3700,10 +3700,20 @@ function HistorySection({ showList = true, rows, selected, emptyBody, refreshErr
             <RevisionHistory request={selected} />
             <div data-testid="shipping-history-metrics" className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_300px]">
               <Metric label="최종 PA" value={selected.final_pa_item_name ?? "-"} />
-              <Metric label="최종 PF" value={selected.final_pf_item_name ?? "-"} />
+              <div className="min-w-0 rounded-[14px] border px-4 py-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+                <div className="text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>최종 PF</div>
+                <div className="mt-1 truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{selected.final_pf_item_name ?? "-"}</div>
+                {selected.final_pf_item_id && selected.final_pf_item_id !== selected.base_pf_item_id && (
+                  <div data-testid="shipping-history-base-pf" className="mt-2 grid gap-1 border-t pt-2 text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+                    <div className="font-black">기준 PF</div>
+                    <div className="break-words">{selected.base_pf_item_name}</div>
+                    <SummaryCode code={selected.base_pf_mes_code ?? "-"} testId="shipping-history-base-pf-code" />
+                  </div>
+                )}
+              </div>
               <Metric label="입출고 로그" value={`${selected.transaction_count}건`} />
             </div>
-            <LineSummary request={selected} />
+            <LineSummary request={selected} emphasizeNonUnitQuantities />
             {selected.notes && <div data-testid="shipping-history-request-memo"><Notice tone={LEGACY_COLORS.cyan} title="요청 메모" body={selected.notes} /></div>}
             <TransactionLogList logs={selected.transactions} />
             <div className="grid gap-2">
@@ -4011,9 +4021,9 @@ function TransactionLogList({ title = "연결 입출고 로그", logs }: { title
     </div>
   );
 }
-type SummaryDisplayLine = { key: string; title: string; code: string; quantity: string; tone?: string };
+type SummaryDisplayLine = { key: string; title: string; code: string; quantity: string; tone?: string; quantityTone?: string };
 
-function LineSummary({ request, contentSized = false }: { request: ShippingRequest; contentSized?: boolean }) {
+function LineSummary({ request, contentSized = false, emphasizeNonUnitQuantities = false }: { request: ShippingRequest; contentSized?: boolean; emphasizeNonUnitQuantities?: boolean }) {
   const paLines = request.bom_lines.filter((line) => line.parent_stage === "PA" && line.included);
   const pfLines = request.bom_lines.filter((line) => line.parent_stage === "PF" && line.included);
   const formatLine = (line: ShippingRequest["bom_lines"][number]): SummaryDisplayLine => {
@@ -4022,6 +4032,7 @@ function LineSummary({ request, contentSized = false }: { request: ShippingReque
       title: line.item_name,
       code: line.mes_code ?? "코드 없음",
       quantity: formatBomQuantity(line.quantity, line.unit),
+      quantityTone: emphasizeNonUnitQuantities && line.quantity !== 1 ? LEGACY_COLORS.text : undefined,
     };
   };
   const companionLines = request.companion_lines.map((line) => ({
@@ -4029,9 +4040,10 @@ function LineSummary({ request, contentSized = false }: { request: ShippingReque
     title: line.item_name,
     code: line.mes_code ?? "코드 없음",
     quantity: `${line.quantity}${line.unit ? " " + line.unit : ""}`,
+    quantityTone: emphasizeNonUnitQuantities && line.quantity !== 1 ? LEGACY_COLORS.text : undefined,
   }));
   return (
-    <div data-testid="shipping-line-summary" className={`grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_300px] ${contentSized ? "" : "h-full min-h-0"}`}>
+    <div data-testid="shipping-line-summary" className={`grid gap-3 xl:grid-cols-[minmax(0,4fr)_minmax(0,4fr)_minmax(0,3fr)] ${contentSized ? "" : "h-full min-h-0"}`}>
       <SummaryList title="PA 구성품" lines={paLines.map(formatLine)} contentSized={contentSized} dataTestId="shipping-summary-list-pa" />
       <SummaryList title="PF 구성품" lines={pfLines.map(formatLine)} contentSized={contentSized} dataTestId="shipping-summary-list-pf" />
       <CompanionSummary lines={companionLines} contentSized={contentSized} />
@@ -4052,7 +4064,7 @@ function SummaryList({ title, lines, empty = "등록 없음", contentSized = fal
               <div className="truncate text-sm font-black" style={{ color: line.tone ?? LEGACY_COLORS.text }}>{line.title}</div>
               <div className="mt-0.5 flex min-w-0 items-center justify-between gap-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
                 <SummaryCode code={line.code} testId={`shipping-summary-code-${line.key}`} />
-                <span data-testid={`shipping-summary-quantity-${line.key}`} className="shrink-0 tabular-nums">{line.quantity}</span>
+                <span data-testid={`shipping-summary-quantity-${line.key}`} className={`shrink-0 tabular-nums ${line.quantityTone ? "font-black" : ""}`} style={{ color: line.quantityTone }}>{line.quantity}</span>
               </div>
             </div>
           ))
@@ -4194,7 +4206,6 @@ function RequestRow({ request, active, layout = "default", onClick }: { request:
     : "";
   const legacyDateLabel = request.status === "PICKED_UP" || request.status === "CANCELLED" ? dateLabel : `${dateLabel}:`;
   const structuredLayout = layout !== "default";
-  const showBasePf = layout === "historyList";
   const metadata = [
     { key: "date", label: dateLabel, value: formatDate(dateValue), tabular: true },
     { key: "requester", label: "요청자", value: request.requested_by_name ?? "요청자 없음", tabular: false },
@@ -4217,26 +4228,24 @@ function RequestRow({ request, active, layout = "default", onClick }: { request:
         color: LEGACY_COLORS.text,
       }}
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className={structuredLayout ? "flex min-h-9 items-center justify-between gap-2" : "flex items-start justify-between gap-2"}>
         <div className="min-w-0 flex-1">
-          <div className={structuredLayout ? "flex min-w-0 items-center gap-1.5 leading-5" : "truncate text-sm font-black"}>
-            {showBasePf && <span className="shrink-0 text-[11px] font-black" style={{ color: LEGACY_COLORS.blue }}>실제 출하품</span>}
-            <span className={structuredLayout ? "min-w-0 truncate text-sm font-black" : undefined} title={structuredLayout ? finalPfName : undefined}>{finalPfName}</span>
-          </div>
-          <div className={structuredLayout
-            ? "flex min-w-0 items-center gap-2 truncate text-xs font-bold leading-4"
-            : "flex min-w-0 items-center gap-1 truncate text-xs font-bold"} style={{ color: LEGACY_COLORS.muted2 }}>
-            <SummaryCode code={finalPfCode} testId={`shipping-request-code-${request.request_id}`} className={structuredLayout ? "shrink-0" : undefined} />
-            {showBasePf && (
-              <span className="flex min-w-0 items-center gap-1 truncate" title={`기준 PF · ${request.base_pf_item_name} · ${request.base_pf_mes_code ?? "-"}`}>
-                <span className="min-w-0 truncate">기준 PF · {request.base_pf_item_name}</span>
-                <SummaryCode code={request.base_pf_mes_code ?? "-"} testId={`shipping-request-base-code-${request.request_id}`} className="shrink-0" />
-              </span>
-            )}
-          </div>
+          {structuredLayout ? (
+            <span className="block min-w-0 truncate text-base font-black leading-6" title={finalPfName}>{finalPfName}</span>
+          ) : (
+            <>
+              <div className="truncate text-sm font-black">{finalPfName}</div>
+              <div className="flex min-w-0 items-center gap-1 truncate text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                <SummaryCode code={finalPfCode} testId={`shipping-request-code-${request.request_id}`} />
+              </div>
+            </>
+          )}
         </div>
         {structuredLayout ? (
-          <span className="shrink-0"><StatusBadge status={request.status} compact /></span>
+          <span className="flex shrink-0 items-center gap-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+            <SummaryCode code={finalPfCode} testId={`shipping-request-code-${request.request_id}`} className="shrink-0" />
+            <StatusBadge status={request.status} compact />
+          </span>
         ) : (
           <StatusBadge status={request.status} compact />
         )}
