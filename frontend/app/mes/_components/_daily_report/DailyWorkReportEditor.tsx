@@ -180,7 +180,7 @@ export function DailyWorkReportEditor({
           </div>
         </div>
         <p className={`mt-5 whitespace-pre-wrap rounded-[16px] border px-4 py-4 text-sm leading-7 ${fillAvailableHeight ? "lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1" : ""}`} style={{ color: initialContent ? LEGACY_COLORS.text : LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-          {loading ? <span role="status" aria-label="작업 내역 불러오는 중" className="block h-7 w-2/3 rounded motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s3 }} /> : initialContent || <><Image src="/images/dexray/daily-empty.webp" alt="" width={360} height={240} className="mx-auto hidden h-36 w-auto object-contain lg:block" />작성된 일보가 없습니다.</>}
+          {loading ? <span role="status" aria-label="작업 내역 불러오는 중" className="block h-7 w-2/3 rounded motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s3 }} /> : initialContent || <><Image src="/images/dexray/daily-empty-blue.webp" alt="" width={360} height={240} className="mx-auto hidden h-36 w-auto object-contain lg:block" />작성된 일보가 없습니다.</>}
         </p>
       </section>
     );
@@ -215,7 +215,7 @@ export function DailyWorkReportEditor({
         <div className="h-5 w-4/5 motion-safe:animate-pulse rounded" style={{ background: LEGACY_COLORS.s3 }} />
         <div className="mt-2 h-5 w-2/3 motion-safe:animate-pulse rounded" style={{ background: LEGACY_COLORS.s3 }} />
       </div> : <div className={`relative mt-4 flex min-h-44 flex-col ${fillAvailableHeight ? "lg:min-h-0 lg:flex-1" : ""}`}>
-      {!content.trim() && !focused && <div data-testid="daily-empty-mascot" aria-hidden="true" className="pointer-events-none absolute inset-0 hidden items-center justify-center lg:flex"><Image src="/images/dexray/daily-empty.webp" alt="" width={360} height={240} className="h-auto max-h-[80%] w-[min(240px,50%)] object-contain" /></div>}
+      {!content.trim() && !focused && <div data-testid="daily-empty-mascot" aria-hidden="true" className="pointer-events-none absolute inset-0 hidden items-center justify-center lg:flex"><Image src="/images/dexray/daily-empty-blue.webp" alt="" width={360} height={240} className="h-auto max-h-[80%] w-[min(240px,50%)] object-contain" /></div>}
       <textarea
         aria-label="작업 내역"
         onFocus={() => setFocused(true)}
