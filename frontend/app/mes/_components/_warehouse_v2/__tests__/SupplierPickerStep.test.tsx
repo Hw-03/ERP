@@ -51,6 +51,53 @@ describe("SupplierPickerStep", () => {
     api.updateSupplier.mockResolvedValue(supplier);
   });
 
+  it("영문 ABC 다음 한글 가나다 순으로 정렬하고 ㈜는 정렬에서만 제외한다", async () => {
+    api.listSuppliers.mockResolvedValue([
+      { ...supplier, supplier_id: "hong", name: "홍콩" },
+      { ...supplier, supplier_id: "kuga", name: "㈜쿠가" },
+      { ...supplier, supplier_id: "kontron", name: "KONTRON" },
+      { ...supplier, supplier_id: "cheon", name: "천우" },
+      { ...supplier, supplier_id: "cei", name: "CEI" },
+      { ...supplier, supplier_id: "gaon", name: "가온패드" },
+      { ...supplier, supplier_id: "bgt", name: "BGT" },
+    ]);
+    render(<SupplierPickerStep employeeId="warehouse-1" selectedSupplierId={null} onSelect={vi.fn()} variant="desktop" />);
+
+    await screen.findByRole("button", { name: "㈜쿠가", exact: true });
+    expect(screen.getAllByRole("listitem").map((row) => row.textContent)).toEqual([
+      "BGT", "CEI", "KONTRON", "가온패드", "천우", "㈜쿠가", "홍콩",
+    ]);
+  });
+
+  it("이름을 수정하면 공급처 순서를 다시 정렬한다", async () => {
+    api.listSuppliers.mockResolvedValue([
+      { ...supplier, name: "가온패드" },
+      { ...supplier, supplier_id: "cheon", name: "천우" },
+    ]);
+    api.updateSupplier.mockResolvedValue({ ...supplier, name: "홍콩" });
+    render(<SupplierPickerStep employeeId="warehouse-1" selectedSupplierId={null} onSelect={vi.fn()} variant="desktop" />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "가온패드 이름 수정" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "가온패드 이름 수정" }), { target: { value: "홍콩" } });
+    fireEvent.click(screen.getByRole("button", { name: "이름 저장" }));
+
+    await screen.findByRole("button", { name: "홍콩", exact: true });
+    expect(screen.getAllByRole("listitem").map((row) => row.textContent)).toEqual(["천우", "홍콩"]);
+  });
+
+  it("공급처를 추가하면 알맞은 정렬 위치에 표시한다", async () => {
+    api.listSuppliers.mockResolvedValue([{ ...supplier, name: "천우" }]);
+    api.createSupplier.mockResolvedValue({ ...supplier, supplier_id: "bgt", name: "BGT" });
+    render(<SupplierPickerStep employeeId="warehouse-1" selectedSupplierId={null} onSelect={vi.fn()} variant="mobile" />);
+
+    await screen.findByRole("button", { name: "천우", exact: true });
+    fireEvent.change(screen.getByPlaceholderText("업체명을 입력하세요"), { target: { value: "BGT" } });
+    fireEvent.click(screen.getByRole("button", { name: "추가하고 선택" }));
+
+    await screen.findByRole("button", { name: "BGT", exact: true });
+    expect(screen.getAllByRole("listitem").map((row) => row.textContent)).toEqual(["BGT", "천우"]);
+  });
+
   it("새 공급업체를 등록하면 즉시 선택한다", async () => {
     const onSelect = vi.fn();
     api.createSupplier.mockResolvedValue({ ...supplier, supplier_id: "supplier-2", name: "새 공급업체" });

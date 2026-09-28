@@ -24,6 +24,15 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "공급업체 정보를 처리하지 못했습니다. 다시 시도해 주세요.";
 }
 
+/** 표시명을 보존하면서 영문 우선·가나다 순으로 비교한다. */
+function compareSuppliers(left: Supplier, right: Supplier): number {
+  const leftName = left.name.trim().replace(/^㈜\s*/, "").normalize("NFKC");
+  const rightName = right.name.trim().replace(/^㈜\s*/, "").normalize("NFKC");
+  const groupOrder = Number(!/^[a-z]/i.test(leftName)) - Number(!/^[a-z]/i.test(rightName));
+  return groupOrder || leftName.localeCompare(rightName, "ko-KR", { sensitivity: "base", numeric: true })
+    || left.supplier_id.localeCompare(right.supplier_id);
+}
+
 /**
  * 원자재 입출고의 공급업체 선택·관리 화면.
  * 목록과 관리 동작은 한 곳에 두고, 부모 화면은 desktop/mobile 배치만 결정한다.
@@ -100,7 +109,7 @@ export function SupplierPickerStep({
     const activeOrManaged = suppliers.filter((supplier) => (
       (canManage && showInactive) || supplier.is_active
     ));
-    return activeOrManaged.filter((supplier) => matchesSearchText(supplier.name, search));
+    return activeOrManaged.filter((supplier) => matchesSearchText(supplier.name, search)).sort(compareSuppliers);
   }, [canManage, search, showInactive, suppliers]);
 
   const accent = outbound ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
