@@ -54,6 +54,24 @@ function makeLine(overrides: Partial<IoLine> = {}): IoLine {
 }
 
 describe("IoLineRow quantity", () => {
+  it.each(["receive_supplier", "outbound_supplier"] as const)("원자재 %s만 설명 칩과 부서 칩을 숨긴다", (subType) => {
+    const props = {
+      line: makeLine({ mes_code: "6-HR-0001" }), isChild: false,
+      item: { mes_code: "6-HR-0001", quantity: 5 } as Item,
+      available: 5, onToggle: vi.fn(), onQuantityChange: vi.fn(), onRemove: vi.fn(),
+    };
+    const view = render(<IoLineRow {...props} subType="warehouse_to_dept" />);
+    expect(screen.getByText("상위")).toBeInTheDocument();
+    expect(screen.getByText("재고 반영 포함")).toBeInTheDocument();
+    expect(screen.getByText("고압")).toBeInTheDocument();
+    view.rerender(<IoLineRow {...props} subType={subType} />);
+    expect(screen.queryByText("직접 선택")).not.toBeInTheDocument();
+    expect(screen.queryByText("상위")).not.toBeInTheDocument();
+    expect(screen.queryByText("재고 반영 포함")).not.toBeInTheDocument();
+    expect(screen.queryByText("고압")).not.toBeInTheDocument();
+    expect(screen.getByText("6-HR-0001")).toBeInTheDocument();
+    expect(screen.getByLabelText("수량")).toBeInTheDocument();
+  });
   it("calculates current and expected warehouse stock for adjustment in/out", () => {
     const inbound = makeLine({
       direction: "adjust",
@@ -235,7 +253,7 @@ describe("IoLineRow quantity", () => {
     expect(screen.getByText("가능 재고").parentElement).not.toHaveStyle({ opacity: "0.6" });
   });
 
-  it("aligns stock and remove controls to the BOM header desktop columns", () => {
+  it("원자재 행은 부서 칸 없이 수량과 재고를 정렬한다", () => {
     render(
       <IoLineRow
         line={makeLine({ origin: "manual" })}
@@ -253,7 +271,7 @@ describe("IoLineRow quantity", () => {
     expect(row).toHaveClass("lg:pr-[18px]");
     expect(row).toHaveStyle({
       gridTemplateColumns:
-        "32px minmax(0,1.6fr) minmax(70px,auto) auto minmax(80px,auto) minmax(80px,auto) 44px",
+        "32px minmax(0,1.6fr) auto minmax(80px,auto) minmax(80px,auto) 44px",
     });
     expect(screen.getByText("창고 수량").parentElement).toHaveClass("text-center");
     expect(screen.getByText("창고 수량").parentElement).not.toHaveClass("lg:text-right");
@@ -507,11 +525,11 @@ describe("IoLineRow quantity", () => {
     expect(screen.getAllByText("10")).toHaveLength(2);
   });
 
-  it("연구 사용출고가 아닌 행의 기존 보조 문구는 유지한다", () => {
+  it("창고 입출고 행의 기존 보조 문구는 유지한다", () => {
     render(
       <IoLineRow
         line={makeLine()}
-        subType="receive_supplier"
+        subType="warehouse_to_dept"
         isChild={false}
         available={10}
         onToggle={() => {}}

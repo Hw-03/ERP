@@ -10,6 +10,7 @@ export function WizardProgress({
   currentLabel,
   className,
   variant = "stacked",
+  accent = LEGACY_COLORS.blue,
 }: {
   steps: { key: string; label: string }[];
   current: number;
@@ -17,6 +18,7 @@ export function WizardProgress({
   currentLabel?: string;
   className?: string;
   variant?: "stacked" | "inline";
+  accent?: string;
 }) {
   const bars = (
     <div className="flex min-w-0 flex-1 items-center gap-1.5">
@@ -30,11 +32,11 @@ export function WizardProgress({
               state === "active" ? "h-[6px]" : "h-[4px]",
             )}
             style={{
-              background: state === "todo" ? LEGACY_COLORS.s3 : LEGACY_COLORS.blue,
+              background: state === "todo" ? LEGACY_COLORS.s3 : accent,
               opacity: state === "done" ? 0.9 : 1,
               boxShadow:
                 state === "active"
-                  ? `0 0 0 2px color-mix(in srgb, ${LEGACY_COLORS.blue} 24%, transparent)`
+                  ? `0 0 0 2px color-mix(in srgb, ${accent} 24%, transparent)`
                   : undefined,
             }}
           />

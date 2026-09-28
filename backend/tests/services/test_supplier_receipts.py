@@ -256,6 +256,23 @@ def test_material_outbound_draft_requires_permission_and_restores(db_session, ma
         io_draft.save_draft(db_session, payload)
 
 
+def test_material_outbound_draft_allows_empty_reason_without_stock_change(db_session, make_item):
+    """미완성 사유는 초안에서 허용하되 확정에서는 거부한다."""
+    _, item, _, payload = _outbound_payload(db_session, make_item)
+    payload.notes = ""
+    draft = io_draft.save_draft(db_session, payload)
+    payload.batch_id = draft["batch_id"]
+    payload.notes = "  "
+    updated = io_draft.save_draft(db_session, payload)
+    assert updated["batch_id"] == draft["batch_id"]
+    assert updated["status"] == "draft"
+    inventory = db_session.query(Inventory).filter_by(item_id=item.item_id).one()
+    assert inventory.quantity == inventory.warehouse_qty == 10
+    assert db_session.query(TransactionLog).filter_by(item_id=item.item_id).count() == 0
+    with pytest.raises(ValueError, match="사유"):
+        io_actions.submit(db_session, payload)
+
+
 def test_material_outbound_preview_is_single_item(db_session, make_item, make_bom):
     _, item, _, _ = _outbound_payload(db_session, make_item)
     child = make_item(name="자동 출고하지 않는 하위 자재")

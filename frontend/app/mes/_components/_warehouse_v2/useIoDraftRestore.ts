@@ -2,13 +2,13 @@
  * 임시저장(draft) 복원 effect 추출.
  *
  * IoComposeView 에 인라인되어 있던 draftToRestore → state 복원 useEffect 를
- * 그대로 옮긴 것. 부수효과·실행 시점·의존성 배열은 원본과 동일하다.
+ * 공통 입력과 URL 단계를 복원하고, 원자재 업체의 활성 상태를 다시 확인한다.
  *
  * 공유 ref(restoredDraftRef/autosaveBatchIdRef)는 autosave/submit 경로와
  * 공유되므로 IoComposeView 가 소유하고 주입한다.
  */
-import { useEffect, type MutableRefObject } from "react";
-import type { IoBatch, IoBundle, IoLine } from "@/lib/api";
+import { useEffect, useRef, type MutableRefObject } from "react";
+import { api, type IoBatch, type IoBundle, type IoLine } from "@/lib/api";
 import { deptIoDirectionOf, exclusionNoteFor } from "./ioWorkType";
 import type { useIoWorkState } from "./useIoWorkState";
 import type { IoStep } from "./useIoWorkState";
@@ -142,6 +142,7 @@ export function normalizeWarehouseIoDraftBundles(bundles: IoBundle[]): IoBundle[
 
 export function useIoDraftRestore(params: {
   draftToRestore: IoBatch | null | undefined;
+  employeeId?: string;
   /** '이어서 하기' 클릭마다 증가하는 토큰. 같은 draft(batch_id 불변)를 다시 골라도
    *  nonce 가 바뀌면 복원이 재발동한다. */
   restoreNonce?: number;
@@ -158,6 +159,7 @@ export function useIoDraftRestore(params: {
 }) {
   const {
     draftToRestore,
+    employeeId,
     restoreNonce,
     restoredDraftRef,
     restoredNonceRef,
@@ -169,6 +171,8 @@ export function useIoDraftRestore(params: {
     getAvailable,
     inventorySnapshot,
   } = params;
+  const latestStateRef = useRef(state);
+  latestStateRef.current = state;
 
   useEffect(() => {
     if (!draftToRestore) return;
@@ -200,8 +204,8 @@ export function useIoDraftRestore(params: {
     state.setReferenceNo(draftToRestore.reference_no || "");
     state.setNotes(draftToRestore.notes || "");
     state.setSupplier(
-      draftToRestore.supplier_id && draftToRestore.supplier_name_snapshot
-        ? { supplier_id: draftToRestore.supplier_id, name: draftToRestore.supplier_name_snapshot }
+      draftToRestore.supplier_id
+        ? { supplier_id: draftToRestore.supplier_id, name: draftToRestore.supplier_name_snapshot ?? "" }
         : null,
     );
     const restoredBundles = restoreInternalUseBundles(draftToRestore, getAvailable);
@@ -210,9 +214,7 @@ export function useIoDraftRestore(params: {
         ? normalizeWarehouseIoDraftBundles(restoredBundles)
         : restoredBundles,
     );
-    state.goTo(
-      draftToRestore.work_type === "receive" ? 2 : (restoreStep ?? 4),
-    );
+    state.goTo(restoreStep ?? 4);
     onStatusChange(
       draftToRestore.department_routes_normalized
         ? "품목코드 기준으로 부서 경로를 자동 갱신했습니다."
@@ -220,6 +222,33 @@ export function useIoDraftRestore(params: {
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftToRestore?.batch_id, restoreNonce, canRestore]);
+
+  // 업체 화면을 거치지 않는 복원도 활성 업체를 확인한다. URL 단계 변경으로 재복원하지 않는다.
+  useEffect(() => {
+    if (!canRestore || !draftToRestore || draftToRestore.work_type !== "receive") return;
+    let cancelled = false;
+    state.setSupplierSelectionReady(false);
+    const targetStep = restoreStep ?? 4;
+    void api.listSuppliers(employeeId ?? draftToRestore.requester_employee_id, true).then((suppliers) => {
+      if (cancelled || latestStateRef.current.selectedSupplierId !== (draftToRestore.supplier_id ?? null)) return;
+      const supplier = suppliers.find((row) => row.supplier_id === draftToRestore.supplier_id && row.is_active);
+      state.setSupplier(supplier ?? null);
+      state.setSupplierSelectionReady(true);
+      if (!supplier) {
+        state.goTo(2);
+        onStatusChange("활성 공급업체를 다시 선택하세요.");
+      } else if (latestStateRef.current.step === 2 || latestStateRef.current.step === targetStep) {
+        state.goTo(targetStep);
+      }
+    }).catch((error: unknown) => {
+      if (cancelled) return;
+      state.goTo(2);
+      onStatusChange(error instanceof Error ? error.message : "공급업체 정보를 확인하지 못했습니다.");
+    });
+    return () => { cancelled = true; };
+    // restoreStep/state는 URL·복원 렌더마다 바뀌어도 최초 복원 요청만 유지한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftToRestore?.batch_id, restoreNonce, canRestore, employeeId]);
 
   useEffect(() => {
     if (

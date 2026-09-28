@@ -187,7 +187,7 @@ export function IoBundleCart({
                 onClick={onAdvance}
                 disabled={!canAdvance || internalUseBomBusy}
                 className="flex flex-1 items-center justify-center gap-1.5 rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
-                style={{ background: LEGACY_COLORS.blueSolid }}
+                style={{ background: subType === "outbound_supplier" ? LEGACY_COLORS.red : LEGACY_COLORS.blueSolid }}
               >
                 <ClipboardCheck className="h-4 w-4" />
                 제출확인 →
@@ -199,7 +199,7 @@ export function IoBundleCart({
               onClick={onAdvance}
               disabled={!canAdvance || internalUseBomBusy}
               className="flex w-full items-center justify-center gap-1.5 rounded-[14px] px-6 py-3 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
-              style={{ background: LEGACY_COLORS.blueSolid }}
+              style={{ background: subType === "outbound_supplier" ? LEGACY_COLORS.red : LEGACY_COLORS.blueSolid }}
             >
               <ClipboardCheck className="h-4 w-4" />
               제출확인 →

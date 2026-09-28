@@ -102,6 +102,25 @@ function makeBundle(
 }
 
 describe("IoTargetPicker row click", () => {
+  it.each([{ warehouseQty: 0 }, { warehouseQty: 3, pendingQty: 3 }])("원자재 출고는 가용 창고 재고가 없으면 버튼과 행 선택을 막는다: %o", (stock) => {
+    const onAddItem = vi.fn();
+    render(<IoTargetPicker {...baseProps} subType="outbound_supplier" items={[makeItem(stock)]} onAddItem={onAddItem} />);
+    const row = screen.getByText("Clickable Item").closest("tr")!;
+    const button = within(row).getByRole("button", { name: "선택" });
+    expect(button).toBeDisabled();
+    fireEvent.click(row);
+    fireEvent.click(button);
+    expect(onAddItem).not.toHaveBeenCalled();
+  });
+
+  it("원자재 출고는 재고가 사라져도 선택 해제를 허용한다", () => {
+    const onRemoveBundles = vi.fn();
+    render(<IoTargetPicker {...baseProps} subType="outbound_supplier" bundles={[makeBundle("direct_item")]} onRemoveBundles={onRemoveBundles} />);
+    const button = screen.getByRole("button", { name: "선택" });
+    expect(button).toBeEnabled();
+    fireEvent.click(button);
+    expect(onRemoveBundles).toHaveBeenCalledWith(["bundle-direct_item"]);
+  });
   it.each([
     "warehouse_to_dept",
     "internal_use_out",

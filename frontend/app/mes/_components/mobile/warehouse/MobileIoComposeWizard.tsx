@@ -146,6 +146,8 @@ export function MobileIoComposeWizard({
   const itemAddBlocked = bomListQuery.isPending || bomListQuery.isError;
   const bomRevisionRef = useRef(revision);
   const state = useIoWorkState(defaultWorkType, operator?.department, getAvailable);
+  const materialOutbound = state.workType === "receive" && state.materialDirectionSelected && state.subType === "outbound_supplier";
+  const directionOutbound = materialOutbound || (["process", "warehouse_io", "warehouse_adjust"].includes(state.workType) && state.deptIoDirection === "out");
   const authorizedEntryIntent = entryIntent
     && IO_WORK_TYPES.some((row) => row.id === entryIntent.workType)
     && canSeeWorkType(entryIntent.workType, operator)
@@ -247,6 +249,7 @@ export function MobileIoComposeWizard({
 
   useIoDraftRestore({
     draftToRestore,
+    employeeId,
     restoreNonce,
     restoredDraftRef,
     restoredNonceRef,
@@ -664,6 +667,7 @@ export function MobileIoComposeWizard({
             current={state.steps.indexOf(step)}
             currentLabel={state.workType === "receive" && step === 2 ? "공급업체" : undefined}
             variant="inline"
+            accent={directionOutbound ? LEGACY_COLORS.red : undefined}
             className="flex-1"
           />
         </div>
@@ -697,7 +701,7 @@ export function MobileIoComposeWizard({
             <div className="min-h-0 flex-1">
               <MaterialDirectionStep selected={state.materialDirectionSelected ? state.subType : null} onSelect={handleSubTypeChange} />
             </div>
-            <Button variant="primary" size="lg" onClick={state.goNext} disabled={!state.canAdvance[6]} className="w-full">
+            <Button variant="primary" size="lg" onClick={state.goNext} disabled={!state.canAdvance[6]} style={materialOutbound ? { background: LEGACY_COLORS.red } : undefined} className="w-full">
               {state.canAdvance[6] ? "다음 단계로 →" : "입고 또는 출고를 선택하세요"}
             </Button>
           </div>
@@ -712,6 +716,7 @@ export function MobileIoComposeWizard({
               onSelect={state.setSupplier}
               onLoadStateChange={state.setSupplierSelectionReady}
               variant="mobile"
+              outbound={materialOutbound}
             />
           ) : (
             <MobileSubTypeStep
@@ -954,7 +959,7 @@ export function MobileIoComposeWizard({
                   : state.workType === "warehouse_adjust"
                 ? "입고 또는 출고를 선택하세요"
                 : "세부 작업을 선택하세요"}
-            intent={isExitWorkType(state.workType) ? "danger" : "primary"}
+            intent={isExitWorkType(state.workType) || directionOutbound ? "danger" : "primary"}
             disabled={!state.canAdvance[2]}
             onClick={() => {
               if (state.canAdvance[2]) state.goNext();

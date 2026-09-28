@@ -94,7 +94,7 @@ def save_draft(db: Session, payload) -> dict:
 
     requester = _load_requester(db, payload.requester_employee_id)
     validate_receive_requester(requester, work_type=payload.work_type, sub_type=payload.sub_type)
-    validate_material_outbound(work_type=payload.work_type, sub_type=payload.sub_type, bundles=payload.bundles, notes=payload.notes)
+    validate_material_outbound(work_type=payload.work_type, sub_type=payload.sub_type, bundles=payload.bundles, notes=payload.notes, require_reason=False)
     payload.sub_type = normalize_process_sub_type(
         work_type=payload.work_type,
         sub_type=payload.sub_type,

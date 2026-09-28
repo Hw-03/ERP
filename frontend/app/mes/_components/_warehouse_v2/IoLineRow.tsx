@@ -101,6 +101,8 @@ export function IoLineRow({
   const getDeptColor = useDeptColorLookup();
   const [showChildren, setShowChildren] = useState(false);
   const isInternalUse = subType === "internal_use_out";
+  const isMaterialIo = subType === "receive_supplier" || subType === "outbound_supplier";
+  const selectionColor = subType === "outbound_supplier" ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
   const hasInventoryEffectOverride = inventoryEffect !== undefined;
   const effectLine = inventoryEffect ?? line;
   const noInventoryEffect = hasInventoryEffectOverride && inventoryEffect === null;
@@ -182,7 +184,7 @@ export function IoLineRow({
       className={`flex flex-wrap items-center gap-x-3 gap-y-2 py-3 pr-4 lg:grid lg:gap-3 ${isChild ? "lg:pr-0" : "lg:pr-[18px]"}`}
       style={{
         gridTemplateColumns:
-          "32px minmax(0,1.6fr) minmax(70px,auto) auto minmax(80px,auto) minmax(80px,auto) 44px",
+          isMaterialIo ? "32px minmax(0,1.6fr) auto minmax(80px,auto) minmax(80px,auto) 44px" : "32px minmax(0,1.6fr) minmax(70px,auto) auto minmax(80px,auto) minmax(80px,auto) 44px",
         background: rowBackground,
         paddingLeft: isChild ? 32 : 16,
         borderLeft: isChild ? `3px solid ${tint(LEGACY_COLORS.muted2, 30)}` : "none",
@@ -196,8 +198,8 @@ export function IoLineRow({
         aria-label={bomStockExempt ? "BOM 재고 미반영 항목" : "재고 반영 변경"}
         className="flex h-6 w-6 items-center justify-center rounded-[6px] border transition-colors disabled:cursor-not-allowed"
         style={{
-          background: selected ? LEGACY_COLORS.blue : "transparent",
-          borderColor: selected ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+          background: selected ? selectionColor : "transparent",
+          borderColor: selected ? selectionColor : LEGACY_COLORS.border,
           color: selected ? LEGACY_COLORS.white : LEGACY_COLORS.muted2,
           opacity: isExcluded ? 0.6 : 1,
         }}
@@ -238,12 +240,12 @@ export function IoLineRow({
         <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
           <span className="truncate">{line.mes_code ?? "-"}</span>
           {routeLabel && <span data-testid="io-line-route">{routeLabel}</span>}
-          <span
+          {!isMaterialIo && <span
             className="rounded-full px-2 py-0.5 text-[10px] font-bold"
             style={{ background: tint(tagColor, 14), color: tagColor }}
           >
             {tag.text}
-          </span>
+          </span>}
           {bomStockExempt && (
             <span
               className="rounded-full px-2 py-0.5 text-[10px] font-bold"
@@ -252,7 +254,7 @@ export function IoLineRow({
               BOM 재고 미반영
             </span>
           )}
-          {(bomStockExempt || (!isInternalUse && !bomCheckboxLocked)) && (
+          {!isMaterialIo && (bomStockExempt || (!isInternalUse && !bomCheckboxLocked)) && (
             <span className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
               {bomStockExempt
                 ? "BOM 자동 처리 시 재고 미반영"
@@ -265,7 +267,7 @@ export function IoLineRow({
       </div>
 
       {/* 3. AS·연구 사용출고는 분류 대신 실제 차감 위치를 강조 */}
-      {deductionSource ? (
+      {!isMaterialIo && (deductionSource ? (
         <IoDeductionSourceBadge sourceName={deductionSource} variant="field" />
       ) : deptBadge ? (
         <span
@@ -276,7 +278,7 @@ export function IoLineRow({
         </span>
       ) : (
         <span className="text-[11px]" style={{ color: LEGACY_COLORS.muted2, opacity: isExcluded ? 0.6 : 1 }}>-</span>
-      )}
+      ))}
 
       {/* 4. 연구 BOM은 고정 수량, 나머지는 수량 stepper (모바일에선 한 줄 차지) */}
       {fixedInternalUseBomQuantity ? (

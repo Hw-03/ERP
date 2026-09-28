@@ -210,7 +210,8 @@ export function MobileSubTypeStep({
         <Label text="세부 작업" />
         <div className="grid flex-1 auto-rows-fr grid-cols-2 gap-2.5">
           {subRows.map((row) => {
-            const active = subType === row.id;
+            const active = subType === row.id && (workType !== "warehouse_io" || deptIoDirection != null);
+            const tone = workType === "warehouse_io" && row.id === "warehouse_to_dept" ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
             return (
               <button
                 key={row.id}
@@ -218,9 +219,9 @@ export function MobileSubTypeStep({
                 onClick={() => onSubTypeChange(row.id)}
                 className="flex min-h-[64px] flex-col items-center justify-center gap-0.5 rounded-[16px] border px-3 py-3 text-center transition-[transform] active:scale-95"
                 style={{
-                  background: active ? tint(LEGACY_COLORS.blue, 14) : LEGACY_COLORS.s2,
-                  borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-                  color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
+                  background: active ? tint(tone, 14) : LEGACY_COLORS.s2,
+                  borderColor: active ? tone : LEGACY_COLORS.border,
+                  color: active ? tone : LEGACY_COLORS.muted2,
                 }}
               >
                 <span className="text-xl font-black leading-tight">{row.label}</span>

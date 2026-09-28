@@ -17,6 +17,7 @@ type SupplierPickerStepProps = {
   onLoadStateChange?: (ready: boolean) => void;
   variant: "desktop" | "mobile";
   mode?: "manage" | "select";
+  outbound?: boolean;
 };
 
 function errorMessage(error: unknown): string {
@@ -35,10 +36,10 @@ export function SupplierPickerStep({
   onLoadStateChange,
   variant,
   mode = "manage",
+  outbound = false,
 }: SupplierPickerStepProps) {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [search, setSearch] = useState("");
-  const [newName, setNewName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [showInactive, setShowInactive] = useState(false);
@@ -51,7 +52,7 @@ export function SupplierPickerStep({
   const canManage = mode === "manage";
   const selectedSupplierLoadKey = canManage ? selectedSupplierId : null;
   const loadSuppliers = async (
-    includeInactive = canManage && (showInactive || selectedSupplierId != null),
+    includeInactive = canManage,
   ) => {
     const requestId = ++supplierLoadRequestRef.current;
     if (!employeeId) {
@@ -90,7 +91,7 @@ export function SupplierPickerStep({
   };
 
   useEffect(() => {
-    void loadSuppliers(canManage && (showInactive || selectedSupplierId != null));
+    void loadSuppliers(canManage);
     // employeeId/showInactive 변경 때만 새 목록을 조회한다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [employeeId, showInactive, selectedSupplierLoadKey, canManage]);
@@ -102,15 +103,21 @@ export function SupplierPickerStep({
     return activeOrManaged.filter((supplier) => matchesSearchText(supplier.name, search));
   }, [canManage, search, showInactive, suppliers]);
 
+  const accent = outbound ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
+  const candidateName = search.trim();
+  const matchingSupplier = suppliers.find((supplier) =>
+    supplier.name.normalize("NFKC").trim().toLowerCase() === candidateName.normalize("NFKC").toLowerCase(),
+  );
+
   async function addSupplier() {
-    const name = newName.trim();
-    if (!name || saving || !employeeId) return;
+    const name = candidateName;
+    if (!canManage || !name || matchingSupplier || loading || saving || !employeeId) return;
     setSaving(true);
     setError(null);
     try {
       const created = await api.createSupplier(employeeId, name);
       setSuppliers((previous) => [...previous, created]);
-      setNewName("");
+      setSearch("");
       setInvalidSupplierName(null);
       onSelect(created);
     } catch (nextError) {
@@ -144,11 +151,7 @@ export function SupplierPickerStep({
     try {
       const updated = await api.updateSupplier(supplier.supplier_id, employeeId, { is_active: isActive });
       if (!isActive && selectedSupplierId === supplier.supplier_id) onSelect(null);
-      if (isActive || showInactive) {
-        setSuppliers((previous) => previous.map((row) => row.supplier_id === updated.supplier_id ? updated : row));
-      } else {
-        setSuppliers((previous) => previous.filter((row) => row.supplier_id !== updated.supplier_id));
-      }
+      setSuppliers((previous) => previous.map((row) => row.supplier_id === updated.supplier_id ? updated : row));
     } catch (nextError) {
       setError(errorMessage(nextError));
     } finally {
@@ -173,6 +176,11 @@ export function SupplierPickerStep({
             />
           </span>
         </label>
+        {canManage && candidateName && !matchingSupplier && !loading && !error && (
+          <Button variant="primary" size="md" loading={saving} disabled={!employeeId} iconLeft={<Plus />} className="min-h-11 text-sm" style={{ background: outbound ? LEGACY_COLORS.red : LEGACY_COLORS.blueSolid }} onClick={() => void addSupplier()}>
+            추가하고 선택
+          </Button>
+        )}
         {canManage && (
           <Button
             variant="ghost"
@@ -186,25 +194,9 @@ export function SupplierPickerStep({
         )}
       </div>
 
-      {canManage && <form
-        className="flex flex-wrap gap-2 rounded-[16px] border p-3"
-        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-        onSubmit={(event) => { event.preventDefault(); void addSupplier(); }}
-      >
-        <label className="min-w-[180px] flex-1">
-          <span className="sr-only">새 공급업체 이름</span>
-          <input
-            value={newName}
-            onChange={(event) => setNewName(event.target.value)}
-            placeholder="새 공급업체 이름"
-            className="h-11 w-full rounded-[12px] border bg-transparent px-3 text-sm font-medium outline-none transition focus-visible:ring-2"
-            style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-          />
-        </label>
-        <Button variant="primary" size="md" loading={saving} disabled={!newName.trim() || !employeeId} iconLeft={<Plus />} className="min-h-11 text-sm" onClick={() => void addSupplier()}>
-          추가하고 선택
-        </Button>
-      </form>}
+      {canManage && matchingSupplier && !matchingSupplier.is_active && !showInactive && (
+        <p className="text-sm font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>같은 이름의 업체가 숨김 처리되어 있습니다. 숨김 업체 관리에서 복원하세요.</p>
+      )}
 
       {error && (
         <div role="alert" className="flex items-center justify-between gap-3 rounded-[12px] border px-3 py-2.5 text-sm font-bold" style={{ background: tint(LEGACY_COLORS.red, 10), borderColor: tint(LEGACY_COLORS.red, 35), color: LEGACY_COLORS.red }}>
@@ -219,8 +211,8 @@ export function SupplierPickerStep({
         ) : visibleSuppliers.length === 0 ? (
           <EmptyState
             illustrated
-            title={canManage ? "등록된 공급업체가 없습니다." : "선택할 수 있는 활성 공급업체가 없습니다."}
-            description={canManage ? "위에서 새 업체를 추가하세요." : "원자재 입출고에서 공급업체를 추가하세요."}
+            title={canManage && candidateName ? "일치하는 공급업체가 없습니다." : canManage ? "등록된 공급업체가 없습니다." : "선택할 수 있는 활성 공급업체가 없습니다."}
+            description={canManage ? matchingSupplier ? "숨김 업체 관리에서 업체를 확인하세요." : candidateName ? "추가하고 선택 버튼으로 등록하세요." : "업체명을 입력해 새 업체를 추가하세요." : "원자재 입출고에서 공급업체를 추가하세요."}
           />
         ) : (
           <ul className="space-y-2">
@@ -228,7 +220,7 @@ export function SupplierPickerStep({
               const selected = supplier.supplier_id === selectedSupplierId;
               const editing = editingId === supplier.supplier_id;
               return (
-                <li key={supplier.supplier_id} className="rounded-[12px] border p-2.5" style={{ background: selected ? tint(LEGACY_COLORS.blue, 10) : LEGACY_COLORS.s2, borderColor: selected ? LEGACY_COLORS.blue : LEGACY_COLORS.border }}>
+                <li key={supplier.supplier_id} className="rounded-[12px] border p-2.5" style={{ background: selected ? tint(accent, 10) : LEGACY_COLORS.s2, borderColor: selected ? accent : LEGACY_COLORS.border }}>
                   <div className="flex min-h-11 items-center gap-2">
                     {canManage && editing ? (
                       <input
@@ -241,7 +233,7 @@ export function SupplierPickerStep({
                       />
                     ) : (
                       <button type="button" onClick={() => { if (supplier.is_active) { setInvalidSupplierName(null); onSelect(supplier); } }} disabled={!supplier.is_active} className="min-h-11 min-w-0 flex-1 rounded-[10px] px-2 text-left text-sm font-black outline-none focus-visible:ring-2 disabled:cursor-not-allowed" style={{ color: supplier.is_active ? LEGACY_COLORS.text : LEGACY_COLORS.muted2 }}>
-                        <span className="flex items-center gap-2"><span className="truncate">{supplier.name}</span>{selected && <Check aria-label="선택됨" className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.blue }} />}{!supplier.is_active && <span className="rounded-full px-2 py-0.5 text-xs" style={{ background: tint(LEGACY_COLORS.muted2, 12) }}>숨김</span>}</span>
+                        <span className="flex items-center gap-2"><span className="truncate">{supplier.name}</span>{selected && <Check aria-label="선택됨" className="h-4 w-4 shrink-0" style={{ color: accent }} />}{!supplier.is_active && <span className="rounded-full px-2 py-0.5 text-xs" style={{ background: tint(LEGACY_COLORS.muted2, 12) }}>숨김</span>}</span>
                       </button>
                     )}
                     {canManage && editing ? (

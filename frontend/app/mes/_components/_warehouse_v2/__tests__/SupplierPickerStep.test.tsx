@@ -57,11 +57,26 @@ describe("SupplierPickerStep", () => {
     render(<SupplierPickerStep employeeId="warehouse-1" selectedSupplierId={null} onSelect={onSelect} variant="desktop" />);
 
     await screen.findByText("덕스윈상사");
-    fireEvent.change(screen.getByPlaceholderText("새 공급업체 이름"), { target: { value: "새 공급업체" } });
+    expect(screen.getAllByRole("textbox")).toHaveLength(1);
+    fireEvent.change(screen.getByPlaceholderText("업체명을 입력하세요"), { target: { value: "새 공급업체" } });
     fireEvent.click(screen.getByRole("button", { name: "추가하고 선택" }));
 
     await waitFor(() => expect(api.createSupplier).toHaveBeenCalledWith("warehouse-1", "새 공급업체"));
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ supplier_id: "supplier-2" }));
+  });
+
+  it("동일 이름은 추가하지 않고 숨김 업체는 관리 화면에서 복원하도록 안내한다", async () => {
+    api.listSuppliers.mockResolvedValue([supplier, { ...supplier, supplier_id: "hidden", name: "Hidden Ltd", is_active: false }]);
+    render(<SupplierPickerStep employeeId="warehouse-1" selectedSupplierId={null} onSelect={vi.fn()} variant="desktop" />);
+    await screen.findByText(supplier.name);
+    const input = screen.getByPlaceholderText("업체명을 입력하세요");
+    fireEvent.change(input, { target: { value: supplier.name } });
+    expect(screen.queryByRole("button", { name: "추가하고 선택" })).not.toBeInTheDocument();
+    fireEvent.change(input, { target: { value: "  Ｈｉｄｄｅｎ Ltd  " } });
+    expect(screen.queryByRole("button", { name: "추가하고 선택" })).not.toBeInTheDocument();
+    expect(screen.getByText(/숨김 업체 관리에서 복원/)).toBeInTheDocument();
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(api.createSupplier).not.toHaveBeenCalled();
   });
 
   it("선택된 공급업체를 숨기면 선택을 해제한다", async () => {
@@ -152,7 +167,7 @@ describe("SupplierPickerStep", () => {
     render(<SupplierPickerStep employeeId="warehouse-1" selectedSupplierId={null} onSelect={vi.fn()} variant="mobile" />);
 
     await screen.findByText("등록된 공급업체가 없습니다.");
-    expect(screen.getByText("위에서 새 업체를 추가하세요.")).toBeInTheDocument();
+    expect(screen.getByText("업체명을 입력해 새 업체를 추가하세요.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "숨김 업체 관리" }));
     fireEvent.click(await screen.findByRole("button", { name: "덕스윈상사 복원" }));
 
@@ -175,12 +190,10 @@ describe("SupplierPickerStep", () => {
   it("늦게 도착한 이전 목록 응답으로 최신 검색 상태를 덮어쓰지 않는다", async () => {
     const activeOnly = deferred<typeof supplier[]>();
     const includingInactive = deferred<typeof supplier[]>();
-    api.listSuppliers.mockImplementation((_employeeId: string, includeInactive: boolean) => (
-      includeInactive ? includingInactive.promise : activeOnly.promise
-    ));
+    api.listSuppliers.mockReturnValueOnce(activeOnly.promise).mockReturnValueOnce(includingInactive.promise);
     render(<SupplierPickerStep employeeId="warehouse-1" selectedSupplierId={null} onSelect={vi.fn()} variant="desktop" />);
 
-    await waitFor(() => expect(api.listSuppliers).toHaveBeenCalledWith("warehouse-1", false));
+    await waitFor(() => expect(api.listSuppliers).toHaveBeenCalledWith("warehouse-1", true));
     fireEvent.click(screen.getByRole("button", { name: "숨김 업체 관리" }));
     await act(async () => { includingInactive.resolve([{ ...supplier, name: "최신 목록 업체" }]); });
     await screen.findByRole("button", { name: "최신 목록 업체" });

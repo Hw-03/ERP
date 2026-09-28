@@ -373,6 +373,7 @@ export function IoComposeView({
 
   useIoDraftRestore({
     draftToRestore,
+    employeeId,
     restoreNonce,
     restoredDraftRef,
     restoredNonceRef,
@@ -868,7 +869,9 @@ export function IoComposeView({
     : 0;
   const lineCount = state.bundles.reduce((acc, b) => acc + b.lines.length, 0);
   const itemMap = useMemo(() => new Map(items.map((item) => [item.item_id, item])), [items]);
-  const accent = isExitWorkType(state.workType) ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
+  const materialOutbound = state.workType === "receive" && state.materialDirectionSelected && state.subType === "outbound_supplier";
+  const directionOutbound = materialOutbound || (["process", "warehouse_io", "warehouse_adjust"].includes(state.workType) && state.deptIoDirection === "out");
+  const accent = isExitWorkType(state.workType) || directionOutbound ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
   const stepWrapperClass = (n: IoStep) => `flex min-h-0 flex-1 flex-col${step > n ? " pt-[9px]" : ""}`;
   const workTypeInfo = IO_WORK_TYPES.find((row) => row.id === state.workType);
   const currentWorkTitle = workTypeInfo?.label ?? workTypeLabel(state.workType);
@@ -974,10 +977,11 @@ export function IoComposeView({
                 type="button"
                 onClick={stepId === 1 ? returnToWorkTypeStep : () => state.goTo(stepId)}
                 className="iwpb done"
+                style={directionOutbound ? { background: tint(accent, 10), borderColor: tint(accent, 36), color: accent } : undefined}
                 data-testid="io-step-nav-item"
               >
                 <span className="iwpl">{stepTitle(stepId)}</span>
-                {summaryText && <span className="iwps">{summaryText}</span>}
+                {summaryText && <span className="iwps" style={directionOutbound ? { color: accent } : undefined}>{summaryText}</span>}
               </button>
             );
           }
@@ -987,6 +991,7 @@ export function IoComposeView({
               type="button"
               disabled
               className={active ? "iwpb a" : "iwpb locked"}
+              style={active && directionOutbound ? { background: tint(accent, 12), borderColor: accent, color: accent } : undefined}
               data-testid="io-step-nav-item"
             >
               <span className="iwpl">{stepTitle(stepId)}</span>
@@ -1218,7 +1223,7 @@ export function IoComposeView({
               <div className="min-h-0 flex-1">
                 <MaterialDirectionStep selected={state.materialDirectionSelected ? state.subType : null} onSelect={handleSubTypeChange} />
               </div>
-              <Button variant="primary" size="lg" onClick={state.goNext} disabled={!state.canAdvance[6]} className="w-full rounded-[18px] py-5 text-lg font-black">
+              <Button variant="primary" size="lg" onClick={state.goNext} disabled={!state.canAdvance[6]} style={{ background: accent }} className="w-full rounded-[18px] py-5 text-lg font-black">
                 {state.canAdvance[6] ? "다음 단계로 →" : "입고 또는 출고를 선택하세요"}
               </Button>
             </div>
@@ -1252,6 +1257,7 @@ export function IoComposeView({
                       onSelect={state.setSupplier}
                       onLoadStateChange={state.setSupplierSelectionReady}
                       variant="desktop"
+                      outbound={materialOutbound}
                     />
                   ) : (
                     <IoSubTypeStep

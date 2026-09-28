@@ -65,6 +65,16 @@ function renderConfirmStep() {
   );
 }
 
+it("원자재 출고의 빈 사유는 저장을 허용하고 확정만 차단한다", () => {
+  const onSaveDraft = vi.fn();
+  render(<IoConfirmStep workType="receive" subType="outbound_supplier" bundles={[{ ...bundle, source_kind: "direct_item", lines: [{ ...parentLine, to_bucket: "none" }] }]} notes="" hasShortage={false} hasInvalidQuantity={false} submitting={false} saving={false} approvalKind="none" onNotesChange={vi.fn()} onSubmit={vi.fn()} onSaveDraft={onSaveDraft} />);
+  const save = screen.getByRole("button", { name: "저장" });
+  expect(save).toBeEnabled();
+  fireEvent.click(save);
+  expect(onSaveDraft).toHaveBeenCalledOnce();
+  expect(screen.getByRole("button", { name: /즉시 반영하기/ })).toBeDisabled();
+});
+
 function DepartmentSingleAdjustHarness({
   initialNotes = "",
   autoApprove = false,

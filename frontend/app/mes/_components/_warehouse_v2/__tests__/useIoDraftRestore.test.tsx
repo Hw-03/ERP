@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { IoBatch, IoSubType } from "@/lib/api";
 import {
   normalizeWarehouseIoDraftBundles,
@@ -8,6 +8,10 @@ import {
   useIoDraftRestore,
 } from "../useIoDraftRestore";
 import { useIoWorkState } from "../useIoWorkState";
+
+const supplierApi = vi.hoisted(() => ({ listSuppliers: vi.fn() }));
+vi.mock("@/lib/api", () => ({ api: supplierApi }));
+beforeEach(() => supplierApi.listSuppliers.mockResolvedValue([{ supplier_id: "supplier-1", name: "현재 업체", is_active: true }]));
 
 function makeDraft(subType: IoSubType): IoBatch {
   return {
@@ -214,14 +218,14 @@ function CanonicalProcessRestoreHarness() {
   return <span data-testid="canonical-restored-subtype">{state.subType}</span>;
 }
 
-function SupplierReceiptRestoreHarness() {
+function SupplierReceiptRestoreHarness({ restoreStep = 4, outbound = false }: { restoreStep?: 4 | 5; outbound?: boolean }) {
   const restoredDraftRef = useRef<string | null>(null);
   const restoredNonceRef = useRef<number | null>(null);
   const autosaveBatchIdRef = useRef<string | null>(null);
   const state = useIoWorkState();
   useIoDraftRestore({
     draftToRestore: {
-      ...makeDraft("receive_supplier"),
+      ...makeDraft(outbound ? "outbound_supplier" : "receive_supplier"),
       work_type: "receive",
       supplier_id: "supplier-1",
       supplier_name_snapshot: "숨김 예정 업체",
@@ -232,13 +236,26 @@ function SupplierReceiptRestoreHarness() {
     autosaveBatchIdRef,
     state,
     onStatusChange: vi.fn(),
+    restoreStep,
   });
   return <span data-testid="supplier-receipt-restore-step">{state.step}</span>;
 }
 
 describe("useIoDraftRestore", () => {
-  it("공급업체가 있는 원자재 입고 초안도 활성 여부 확인을 위해 2단계로 복원한다", async () => {
+  it("활성 공급업체를 확인한 뒤 원자재 입고 초안을 수량 조정 단계로 복원한다", async () => {
     render(<SupplierReceiptRestoreHarness />);
+    await waitFor(() => expect(screen.getByTestId("supplier-receipt-restore-step")).toHaveTextContent("4"));
+    expect(supplierApi.listSuppliers).toHaveBeenCalled();
+  });
+
+  it("원자재 출고 초안은 명시한 최종 확인 단계로 복원한다", async () => {
+    render(<SupplierReceiptRestoreHarness restoreStep={5} outbound />);
+    await waitFor(() => expect(screen.getByTestId("supplier-receipt-restore-step")).toHaveTextContent("5"));
+  });
+
+  it("숨김 업체를 가진 초안만 업체 선택 단계로 돌아간다", async () => {
+    supplierApi.listSuppliers.mockResolvedValue([{ supplier_id: "supplier-1", name: "숨김 업체", is_active: false }]);
+    render(<SupplierReceiptRestoreHarness outbound />);
     await waitFor(() => expect(screen.getByTestId("supplier-receipt-restore-step")).toHaveTextContent("2"));
   });
 

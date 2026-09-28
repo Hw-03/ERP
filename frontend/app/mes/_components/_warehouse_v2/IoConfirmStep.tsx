@@ -109,6 +109,7 @@ function directionAccent(subType: IoSubType): string {
     subType === "defect_restore" ||
     subType === "defect_process" ||
     subType === "warehouse_to_dept" ||
+    subType === "outbound_supplier" ||
     subType === "internal_use_out" ||
     subType === "disassemble" ||
     subType === "adjust_out"
@@ -273,8 +274,8 @@ export function IoConfirmStep({
   const submitDisabled =
     submitting || saving ||
     (effectIncludedLines.length === 0 && !allowsNoEffectCustomBomApproval) ||
-    hasShortage || hasInvalidQuantity || missingInternalUseBomMode;
-  const saveDisabled = submitting || saving || bundles.length === 0 || (materialOutbound && memoMissing);
+    hasShortage || hasInvalidQuantity || missingInternalUseBomMode || (materialOutbound && memoMissing);
+  const saveDisabled = submitting || saving || bundles.length === 0;
   const accent = directionAccent(subType);
   const blockerText = hasShortage
     ? "재고 부족 라인이 있어 제출할 수 없습니다. Step 4에서 라인을 다시 확인하세요."
@@ -474,7 +475,7 @@ function ConfirmBundleCard({
     return (
       <div
         className="flex min-h-[60px] items-center justify-between gap-4 rounded-[18px] px-5 py-3"
-        style={{ background: tint(LEGACY_COLORS.blue, 6) }}
+        style={{ background: tint(subType === "outbound_supplier" ? LEGACY_COLORS.red : LEGACY_COLORS.blue, 6) }}
       >
         <div className="min-w-0 flex-1">
           <div className="truncate text-base font-black" style={{ color: LEGACY_COLORS.text }}>
@@ -527,7 +528,7 @@ function ConfirmBundleCard({
   const isSingle = bundle.source_kind === "direct_item";
   const isCollapsible = !isSingle && visibleLines.length > 0;
 
-  const tone = LEGACY_COLORS.blue;
+  const tone = subType === "outbound_supplier" ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
   const childrenOnlyBom =
     showDeductionSource &&
     bundle.source_kind === "bom_parent" &&

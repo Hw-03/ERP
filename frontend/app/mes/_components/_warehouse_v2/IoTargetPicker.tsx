@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, GripVertical, Maximize2, Minimize2, Plus, RotateCcw, Save, Search, Settings2 } from "lucide-react";
+import { ArrowRight, Check, GripVertical, Maximize2, Minimize2, Plus, RotateCcw, Save, Search, Settings2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
 import { findInventoryLocation, locationAvailable, locationPending, warehouseAvailable, warehousePending } from "@/lib/mes/inventory";
 import { Tooltip } from "@/lib/ui";
@@ -621,8 +622,8 @@ export function IoTargetPicker({
           disabled={bundles.length === 0}
           className="standard-hover flex w-full items-center justify-between rounded-[12px] border px-4 py-3 text-sm font-black transition-all disabled:cursor-not-allowed disabled:opacity-60"
           style={{
-            background: bundles.length > 0 ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
-            borderColor: bundles.length > 0 ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+            background: bundles.length > 0 ? (subType === "outbound_supplier" ? LEGACY_COLORS.red : LEGACY_COLORS.blue) : LEGACY_COLORS.s2,
+            borderColor: bundles.length > 0 ? (subType === "outbound_supplier" ? LEGACY_COLORS.red : LEGACY_COLORS.blue) : LEGACY_COLORS.border,
             color: bundles.length > 0 ? "#fff" : LEGACY_COLORS.muted2,
           }}
         >
@@ -897,6 +898,7 @@ function ItemTable({
               subType === "warehouse_to_dept" ||
               subType === "internal_use_out" ||
               subType === "warehouse_adjust_out" ||
+              subType === "outbound_supplier" ||
               (subType === "defect_quarantine" && targetDepartment === "창고");
             const showsWarehouseAvailability = pendingQty > 0 && isWarehouseOutbound;
             const sourceDepartment = isAutoDepartmentRoute(subType)
@@ -969,7 +971,9 @@ function ItemTable({
                 />
               );
             };
-            const rowClickEnabled = mode === "single_only" && !busy && !addBlocked;
+            const materialStockBlocked = subType === "outbound_supplier" && warehouseAvailableQty <= 0;
+            const selectionBlocked = addBlocked || materialStockBlocked;
+            const rowClickEnabled = mode === "single_only" && !busy && !addBlocked && (isSingleSelected || !materialStockBlocked);
             const bomBundleIds = selectedBundles
               .filter((bundle) => bundle.source_kind === "bom_parent")
               .map((bundle) => bundle.bundle_id);
@@ -978,13 +982,14 @@ function ItemTable({
               .map((bundle) => bundle.bundle_id);
             const toggleSingleItem = () => {
               if (isSingleSelected) onRemove(singleBundleIds);
-              else if (!addBlocked) onAdd(item, singleItemSourceKind(subType));
+              else if (!selectionBlocked) onAdd(item, singleItemSourceKind(subType));
             };
             return (
               <HighlightableRow
                 key={item.item_id}
                 isHighlight={isHighlight}
                 isSelected={isSelected}
+                outbound={subType === "outbound_supplier"}
                 onClick={rowClickEnabled ? toggleSingleItem : undefined}
               >
                 <td className="max-w-0 w-full px-3 py-2" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
@@ -1129,16 +1134,16 @@ function ItemTable({
                       <button
                         type="button"
                         aria-pressed={isSingleSelected}
-                        disabled={busy || (!isSingleSelected && addBlocked)}
+                        disabled={busy || (!isSingleSelected && selectionBlocked)}
                         onClick={(event) => {
                           event.stopPropagation();
                           toggleSingleItem();
                         }}
-                        className="flex items-center gap-1 rounded-[10px] px-2.5 py-1 text-[12px] font-black text-white disabled:opacity-50"
-                        style={{ background: isSingleSelected ? LEGACY_COLORS.green : LEGACY_COLORS.blueSolid }}
+                        className={`flex items-center gap-1 rounded-[10px] px-2.5 py-1 text-[12px] font-black text-white disabled:opacity-50 ${workType === "receive" ? "h-6 w-[60px] shrink-0 justify-center" : ""}`}
+                        style={{ background: subType === "outbound_supplier" ? LEGACY_COLORS.red : isSingleSelected ? LEGACY_COLORS.green : LEGACY_COLORS.blueSolid }}
                         title="선택 — 선택 품목만 처리"
                       >
-                        {!isSingleSelected && <Plus aria-hidden="true" className="h-3 w-3" />}
+                        {workType === "receive" ? (isSingleSelected ? <Check aria-hidden="true" className="h-3 w-3 shrink-0" /> : <Plus aria-hidden="true" className="h-3 w-3 shrink-0" />) : !isSingleSelected && <Plus aria-hidden="true" className="h-3 w-3" />}
                         선택
                       </button>
                     )}
@@ -1311,11 +1316,13 @@ function FullscreenToggle({
 function HighlightableRow({
   isHighlight,
   isSelected,
+  outbound = false,
   onClick,
   children,
 }: {
   isHighlight: boolean;
   isSelected: boolean;
+  outbound?: boolean;
   onClick?: () => void;
   children: React.ReactNode;
 }) {
@@ -1346,7 +1353,7 @@ function HighlightableRow({
       onClick={onClick}
       data-selected={isSelected}
       className={`transition-colors duration-150 hover:bg-[var(--c-s4)]${onClick ? " cursor-pointer" : ""}${flash ? " animate-row-flash" : ""}`}
-      style={{ background: isSelected ? LEGACY_COLORS.successBg : undefined }}
+      style={{ background: isSelected ? (outbound ? tint(LEGACY_COLORS.red, 10) : LEGACY_COLORS.successBg) : undefined }}
     >
       {children}
     </tr>
