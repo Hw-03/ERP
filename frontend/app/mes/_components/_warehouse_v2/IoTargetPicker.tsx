@@ -113,12 +113,15 @@ function actionButtonStyle(
   isSelected: boolean,
   isDisabled: boolean,
   isPrimary: boolean,
+  outbound = false,
 ): React.CSSProperties {
   return {
     background: isSelected
       ? LEGACY_COLORS.green
       : isDisabled
         ? LEGACY_COLORS.s2
+        : outbound
+          ? LEGACY_COLORS.red
         : isPrimary
           ? LEGACY_COLORS.blue
           : LEGACY_COLORS.s2,
@@ -126,6 +129,8 @@ function actionButtonStyle(
       ? LEGACY_COLORS.green
       : isDisabled
         ? LEGACY_COLORS.border
+        : outbound
+          ? LEGACY_COLORS.red
         : isPrimary
           ? LEGACY_COLORS.blue
           : LEGACY_COLORS.border,
@@ -133,7 +138,7 @@ function actionButtonStyle(
       ? LEGACY_COLORS.white
       : isDisabled
         ? LEGACY_COLORS.muted2
-        : isPrimary
+        : isPrimary || outbound
           ? LEGACY_COLORS.white
           : LEGACY_COLORS.text,
   };
@@ -152,6 +157,7 @@ function ChoiceButtons({
   addBlocked = false,
   size = "compact",
   ariaPrefix,
+  outbound = false,
   onChoose,
 }: {
   bomSelected: boolean;
@@ -163,6 +169,7 @@ function ChoiceButtons({
   addBlocked?: boolean;
   size?: ChoiceSize;
   ariaPrefix?: string;
+  outbound?: boolean;
   onChoose: (mode: ChoiceMode) => void;
 }) {
   const isMobileSource = size === "mobile-source";
@@ -203,7 +210,7 @@ function ChoiceButtons({
               : isDesktopSource
                 ? "inline-flex h-8 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-[10px] border px-2 text-[12px] font-black disabled:opacity-50"
                 : "inline-flex items-center gap-1 whitespace-nowrap rounded-[10px] border px-2.5 py-1 text-[12px] font-black disabled:opacity-50"}
-            style={actionButtonStyle(selected, disabled, isBom)}
+            style={actionButtonStyle(selected, disabled, isBom, outbound)}
           >
             {label}
           </button>
@@ -299,7 +306,7 @@ export function IoTargetPicker({
   }, [fullscreen, onFullscreenChange]);
 
   const actionMode = getItemActionMode(subType);
-  const outbound = subType === "outbound_supplier" || subType === "warehouse_adjust_out";
+  const outbound = subType === "outbound_supplier" || subType === "warehouse_adjust_out" || subType === "internal_use_out";
   const activeFilters = filters ?? localFilters;
   const { department: dept, model, stage } = activeFilters;
   const keyword = search.trim().toLowerCase();
@@ -741,6 +748,7 @@ function InternalUseSourceControl({
   }
   return (
     <ChoiceButtons
+      outbound={variant === "desktop"}
       bomSelected={selectedMode === "bom"}
       singleSelected={selectedMode === "single"}
       hasBom={hasBom}

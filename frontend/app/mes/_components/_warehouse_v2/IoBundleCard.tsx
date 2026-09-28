@@ -333,7 +333,7 @@ export function IoBundleCard({
         <div className="flex justify-center">
           <IoLocationBadge label={location?.label ?? "재고 위치"} value={location?.value ?? "—"} variant="field" />
         </div>
-        <div onClick={(e) => e.stopPropagation()} className="border-t pt-3 lg:self-center lg:border-t-0 lg:pt-0">
+        <div onClick={(e) => e.stopPropagation()} className={`border-t pt-3 lg:self-center lg:border-t-0 lg:pt-0 ${subType === "internal_use_out" ? "lg:w-[276px]" : ""}`}>
           {showBundleQtyStepper ? (
             <QuantityStepper
               value={stepperQty}

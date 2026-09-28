@@ -286,7 +286,7 @@ describe("IoComposeView navigation chrome", () => {
     fireEvent.click(screen.getAllByTestId("io-step-nav-item")[0]);
     await waitFor(() => expect(screen.queryByTestId("io-step-nav")).not.toBeInTheDocument());
     const push = vi.spyOn(window.history, "pushState");
-    fireEvent.click(screen.getByRole("button", { name: /수량보정/ }));
+    fireEvent.click(screen.getByRole("button", { name: /창고 수량 보정/ }));
     await screen.findByTestId("io-step-nav");
     expect(onNewWork).toHaveBeenCalledTimes(1);
     expect(new URLSearchParams(window.location.search).get("draftId")).toBeNull();

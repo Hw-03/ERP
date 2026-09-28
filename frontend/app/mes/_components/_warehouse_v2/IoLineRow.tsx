@@ -267,7 +267,7 @@ export function IoLineRow({
           decrementDisabled={stepperDisabled}
           incrementDisabled={incrementDisabled}
           inputTitle={bomStockExempt ? "BOM 자동 처리에서는 재고에 반영하지 않는 품목" : undefined}
-          className="w-full lg:w-auto"
+          className={isInternalUse ? "w-full lg:w-[276px]" : "w-full lg:w-auto"}
         />
       )}
 

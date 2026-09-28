@@ -103,6 +103,11 @@ function makeBundle(
 }
 
 describe("IoTargetPicker row click", () => {
+  it("AS·연구 사용출고의 선택 버튼은 초록색이고 다음 단계는 빨강이다", () => {
+    render(<IoTargetPicker {...baseProps} workType="internal_use" subType="internal_use_out" items={[makeItem({ warehouseQty: 10 })]} bundles={[makeBundle("manual")]} />);
+    expect(screen.getByRole("button", { name: "창고 낱개" })).toHaveStyle({ background: LEGACY_COLORS.green });
+    expect(screen.getByRole("button", { name: /수량 조정/ })).toHaveStyle({ background: LEGACY_COLORS.red });
+  });
   it.each([
     { workType: "warehouse_adjust" as const, subType: "warehouse_adjust_out" as const, deptIoDirection: "out" as const },
     { workType: "receive" as const, subType: "outbound_supplier" as const, deptIoDirection: null },
@@ -447,6 +452,8 @@ describe("IoTargetPicker row click", () => {
     const bomButton = screen.getByRole("button", { name: "창고 BOM" });
     const singleButton = screen.getByRole("button", { name: "창고 낱개" });
     const choiceGroup = bomButton.parentElement?.parentElement;
+    expect(bomButton).toHaveStyle({ background: LEGACY_COLORS.red });
+    expect(singleButton).toHaveStyle({ background: LEGACY_COLORS.red });
     expect(choiceGroup).toHaveClass("w-24");
     expect(bomButton.parentElement).toHaveClass("min-w-0", "flex-1");
     expect(singleButton.parentElement).toHaveClass("min-w-0", "flex-1");

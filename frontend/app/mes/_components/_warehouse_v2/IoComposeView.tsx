@@ -870,7 +870,7 @@ export function IoComposeView({
   const lineCount = state.bundles.reduce((acc, b) => acc + b.lines.length, 0);
   const itemMap = useMemo(() => new Map(items.map((item) => [item.item_id, item])), [items]);
   const materialOutbound = state.workType === "receive" && state.materialDirectionSelected && state.subType === "outbound_supplier";
-  const directionOutbound = materialOutbound || (["process", "warehouse_io", "warehouse_adjust"].includes(state.workType) && state.deptIoDirection === "out");
+  const directionOutbound = materialOutbound || state.workType === "internal_use" || (["process", "warehouse_io", "warehouse_adjust"].includes(state.workType) && state.deptIoDirection === "out");
   const accent = isExitWorkType(state.workType) || directionOutbound ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
   const stepWrapperClass = (n: IoStep) => `flex min-h-0 flex-1 flex-col${step > n ? " pt-[9px]" : ""}`;
   const workTypeInfo = IO_WORK_TYPES.find((row) => row.id === state.workType);
