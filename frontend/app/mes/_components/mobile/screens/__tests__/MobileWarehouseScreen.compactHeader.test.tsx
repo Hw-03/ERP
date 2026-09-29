@@ -5,13 +5,18 @@ import { MobileWarehouseScreen } from "../MobileWarehouseScreen";
 const currentWizardProps = vi.hoisted(() => ({
   value: null as null | {
     onStepChange?: (step: number) => void;
+    onDirtyChange?: (dirty: boolean) => void;
     restoreDraft?: { batch_id: string } | null;
     restoreStep?: number;
     onDraftSaved?: (batchId: string, step: number, persistInUrl?: boolean) => void;
+    onStatusChange?: (status: string) => void;
   },
 }));
 
 const currentTabsProps = vi.hoisted(() => ({
+  loadingCounts: [] as string[],
+  unavailableCounts: [] as string[],
+  cartCount: 0,
   showAsResearchQueue: undefined as boolean | undefined,
   active: undefined as string | undefined,
 }));
@@ -56,11 +61,16 @@ vi.mock("../../../_warehouse_sections/WarehouseHeader", () => ({
 }));
 
 vi.mock("../../../_warehouse_sections/WarehouseSectionTabs", () => ({
-  WarehouseSectionTabs: ({ onChange, showAsResearchQueue, active }: { onChange: (next: string) => void; showAsResearchQueue?: boolean; active: string }) => {
+  WarehouseSectionTabs: ({ onChange, showAsResearchQueue, active, mobileInboxView, onMobileInboxOpen, loadingCounts = [], unavailableCounts = [], cartCount = 0 }: { onChange: (next: string) => void; showAsResearchQueue?: boolean; active: string; mobileInboxView?: boolean; onMobileInboxOpen?: () => void; loadingCounts?: string[]; unavailableCounts?: string[]; cartCount?: number }) => {
+    currentTabsProps.loadingCounts = loadingCounts;
+    currentTabsProps.unavailableCounts = unavailableCounts;
+    currentTabsProps.cartCount = cartCount;
     currentTabsProps.showAsResearchQueue = showAsResearchQueue;
     currentTabsProps.active = active;
+    if (mobileInboxView) return <button onClick={() => onChange("as-research-queue")}>AS approval</button>;
     return (
     <div data-testid="warehouse-section-tabs">
+      <button onClick={onMobileInboxOpen}>approval menu</button>
       <button type="button" onClick={() => onChange("compose")}>
         compose
       </button>
@@ -89,7 +99,7 @@ vi.mock("../../../_warehouse_sections/WarehouseDraftPanelTabs", () => ({
 }));
 
 vi.mock("../../warehouse/MobileDirtyLeaveSheet", () => ({
-  MobileDirtyLeaveSheet: () => null,
+  MobileDirtyLeaveSheet: ({ open, onCancel, onDiscard }: { open: boolean; onCancel: () => void; onDiscard: () => void }) => open ? <div role="dialog"><button onClick={onCancel}>stay</button><button onClick={onDiscard}>discard</button></div> : null,
 }));
 
 vi.mock("../../warehouse/MobileIoComposeWizard", () => ({
@@ -105,6 +115,70 @@ vi.mock("../../warehouse/MobileIoComposeWizard", () => ({
 }));
 
 describe("MobileWarehouseScreen compact step header", () => {
+  it("distinguishes first count failure, pending retry, and successful zero", async () => {
+    operatorState.value = { ...operatorState.value, employee_id: "count-retry" };
+    apiMocks.listStockRequestDrafts.mockRejectedValueOnce(new Error("count failed"));
+    apiMocks.listDrafts.mockResolvedValueOnce([]);
+    await act(async () => { render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />); });
+    expect(currentTabsProps.unavailableCounts).toContain("cart");
+    expect(currentTabsProps.loadingCounts).not.toContain("cart");
+    let resolveLegacy!: (rows: unknown[]) => void;
+    let resolveIo!: (rows: unknown[]) => void;
+    apiMocks.listStockRequestDrafts.mockReturnValueOnce(new Promise((resolve) => { resolveLegacy = resolve; }));
+    apiMocks.listDrafts.mockReturnValueOnce(new Promise((resolve) => { resolveIo = resolve; }));
+    act(() => currentWizardProps.value?.onStatusChange?.("retry"));
+    expect(currentTabsProps.unavailableCounts).not.toContain("cart");
+    expect(currentTabsProps.loadingCounts).toContain("cart");
+    await act(async () => { resolveLegacy([]); resolveIo([]); });
+    expect(currentTabsProps.loadingCounts).not.toContain("cart");
+    expect(currentTabsProps.unavailableCounts).not.toContain("cart");
+    expect(currentTabsProps.cartCount).toBe(0);
+  });
+  it("keeps the known combined draft count when one refresh request fails", async () => {
+    operatorState.value = { ...operatorState.value, employee_id: "count-preserve" };
+    apiMocks.listStockRequestDrafts.mockResolvedValueOnce([{}]);
+    apiMocks.listDrafts.mockResolvedValueOnce([{}, {}]);
+    await act(async () => { render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />); });
+    expect(currentTabsProps.cartCount).toBe(3);
+    apiMocks.listStockRequestDrafts.mockRejectedValueOnce(new Error("legacy failed"));
+    apiMocks.listDrafts.mockResolvedValueOnce([]);
+    await act(async () => { currentWizardProps.value?.onStatusChange?.("refresh"); });
+    expect(currentTabsProps.cartCount).toBe(3);
+    expect(currentTabsProps.unavailableCounts).not.toContain("cart");
+  });
+  it("does not reuse the previous operator's loaded counts for an unknown operator", async () => {
+    apiMocks.listStockRequestDrafts.mockResolvedValue([]);
+    apiMocks.listDrafts.mockResolvedValue([]);
+    let rerender!: ReturnType<typeof render>["rerender"];
+    await act(async () => { ({ rerender } = render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />)); });
+    expect(currentTabsProps.loadingCounts).not.toContain("cart");
+    operatorState.value = { ...operatorState.value, employee_id: "unknown-operator" };
+    apiMocks.listStockRequestDrafts.mockReturnValueOnce(new Promise(() => {}));
+    apiMocks.listDrafts.mockReturnValueOnce(new Promise(() => {}));
+    await act(async () => { rerender(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />); });
+    expect(currentTabsProps.loadingCounts).toContain("cart");
+  });
+  it("승인함 메뉴를 여는 동안 작성 화면을 보존하고 실제 승인함 선택에는 이탈 확인을 유지한다", async () => {
+    operatorState.value = { ...operatorState.value, as_research_approver: true };
+    await act(async () => { render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />); });
+    const wizard = screen.getByTestId("compose-wizard");
+    act(() => currentWizardProps.value?.onDirtyChange?.(true));
+    fireEvent.click(screen.getByRole("button", { name: "approval menu" }));
+    expect(wizard).toBeInTheDocument();
+    expect(wizard).not.toBeVisible();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "AS approval" }));
+    expect(screen.getByRole("dialog")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "stay" }));
+    fireEvent.click(screen.getByRole("button", { name: "compose" }));
+    expect(screen.getByTestId("compose-wizard")).toBe(wizard);
+    expect(wizard).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "approval menu" }));
+    fireEvent.click(screen.getByRole("button", { name: "AS approval" }));
+    fireEvent.click(screen.getByRole("button", { name: "discard" }));
+    expect(screen.getByTestId("draft-panels")).toHaveAttribute("data-section-tab", "as-research-queue");
+    expect(screen.queryByTestId("compose-wizard")).not.toBeInTheDocument();
+  });
   beforeEach(() => {
     window.history.replaceState({}, "", "/mes?tab=warehouse&section=compose");
     apiMocks.listStockRequestDrafts.mockReset();
@@ -137,7 +211,7 @@ describe("MobileWarehouseScreen compact step header", () => {
     render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />);
 
     await waitFor(() => expect(currentWizardProps.value?.restoreDraft?.batch_id).toBe("source-draft"));
-    act(() => currentWizardProps.value?.onDraftSaved?.("source-draft", 4, false));
+    await act(async () => { currentWizardProps.value?.onDraftSaved?.("source-draft", 4, false); });
 
     expect(new URLSearchParams(window.location.search).get("draftId")).toBeNull();
     expect(currentWizardProps.value?.restoreDraft).toBeNull();
@@ -153,17 +227,17 @@ describe("MobileWarehouseScreen compact step header", () => {
     expect(screen.queryByTestId("draft-panels")).not.toBeInTheDocument();
   });
 
-  it("권한 있는 AS·연구 승인 알림은 전용 대기열과 대상 요청을 연다", () => {
+  it("권한 있는 AS·연구 승인 알림은 전용 대기열과 대상 요청을 연다", async () => {
     operatorState.value = { ...operatorState.value, as_research_approver: true };
 
-    render(
+    await act(async () => { render(
       <MobileWarehouseScreen
         globalSearch=""
         onStatusChange={() => {}}
         notificationSection="as-research-queue"
         targetRequestId="as-request-1"
       />,
-    );
+    ); });
 
     expect(currentTabsProps.active).toBe("as-research-queue");
     expect(screen.getByTestId("draft-panels")).toHaveAttribute("data-section-tab", "as-research-queue");
