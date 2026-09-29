@@ -1,10 +1,11 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { IoSubType, IoWorkType } from "@/lib/api";
 import { MobileSubTypeStep } from "../MobileWorkTypeStep";
 
 describe("MobileSubTypeStep", () => {
-  it("창고 수량보정은 모바일에서도 부서 없이 44px 이상 입고·출고 카드만 표시한다", () => {
+  it("창고 수량보정은 부서 없이 입고·출고를 선택한다", () => {
+    const onDeptIoDirectionChange = vi.fn();
     render(
       <MobileSubTypeStep
         workType={"warehouse_adjust" as IoWorkType}
@@ -15,12 +16,14 @@ describe("MobileSubTypeStep", () => {
         onSubTypeChange={vi.fn()}
         onFromDepartmentChange={vi.fn()}
         onToDepartmentChange={vi.fn()}
-        onDeptIoDirectionChange={vi.fn()}
+        onDeptIoDirectionChange={onDeptIoDirectionChange}
       />,
     );
 
-    expect(screen.getByRole("button", { name: "입고" })).toHaveClass("min-h-[64px]");
-    expect(screen.getByRole("button", { name: "출고" })).toHaveClass("min-h-[64px]");
+    fireEvent.click(screen.getByRole("button", { name: "입고" }));
+    expect(onDeptIoDirectionChange).toHaveBeenLastCalledWith("in");
+    fireEvent.click(screen.getByRole("button", { name: "출고" }));
+    expect(onDeptIoDirectionChange).toHaveBeenLastCalledWith("out");
     expect(screen.queryByRole("button", { name: "조립" })).not.toBeInTheDocument();
   });
 
@@ -39,6 +42,7 @@ describe("MobileSubTypeStep", () => {
       />,
     );
 
+    expect(screen.getByText("세부 작업").parentElement).toHaveClass("flex-col");
     expect(screen.getByText("세부 작업").parentElement).toHaveClass("flex-1");
     expect(screen.getByRole("button", { name: /창고 → 부서/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /부서 → 창고/ })).toBeInTheDocument();
@@ -84,7 +88,8 @@ describe("MobileSubTypeStep", () => {
     expect(screen.getByRole("button", { name: "AS" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "연구" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "조립" })).not.toBeInTheDocument();
-    expect(screen.getByText("사용 부서").parentElement).toHaveClass("basis-[60%]");
+    expect(screen.getByText("사용 부서").parentElement).toHaveClass("flex-col");
+    expect(screen.getByText("사용 부서").parentElement).not.toHaveClass("basis-[60%]");
     expect(screen.getByRole("button", { name: "AS" }).parentElement).toHaveClass("grid-cols-2");
   });
 });

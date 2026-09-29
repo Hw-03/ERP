@@ -1,6 +1,8 @@
 "use client";
 
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { ArrowDownToLine, ArrowUpFromLine, ChevronRight } from "lucide-react";
+import presentation from "../mobilePresentation.module.css";
 import { tint } from "@/lib/mes/colorUtils";
 import { departmentDisplayColor, MES_DEPARTMENT_COLORS } from "@/lib/mes-department";
 import type { IoSubType, IoWorkType, OperatorLike } from "../../_warehouse_v2/types";
@@ -9,7 +11,6 @@ import {
   IO_WORK_TYPES,
   canSeeWorkType,
   deptVisibility,
-  isExitWorkType,
   requiresDepartments,
   type DeptIoDirection,
 } from "../../_warehouse_v2/ioWorkType";
@@ -34,44 +35,23 @@ export function MobileWorkTypeStep({
 }) {
   const visible = IO_WORK_TYPES.filter((row) => canSeeWorkType(row.id, operator));
   return (
-    // 항목 7 — 작업 유형 버튼이 남은 화면 높이를 세로로 균등 분할(버튼 수 무관 전폭 타일).
-    <div className="flex min-h-full flex-col gap-2.5">
+    <div className={`${presentation.surface} ${presentation.choiceList}`}>
       {visible.map((row) => {
         const Icon = row.icon;
         const active = selectedWorkType === row.id;
-        const accent = isExitWorkType(row.id) ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
-        // 활성 카드 텍스트: 연한 틴트 위 brand 색은 AA 미달 → text 색과 섞어 어둡게
-        const accentText = `color-mix(in srgb, ${accent} 42%, ${LEGACY_COLORS.text})`;
         return (
           <button
             key={row.id}
             type="button"
             aria-pressed={active}
             onClick={() => onWorkTypeChange(row.id)}
-            className="flex min-h-[96px] flex-1 items-center gap-6 rounded-[18px] border p-4 text-left transition-[transform] active:scale-[0.99]"
-            style={{
-              background: active ? tint(accent, 14) : LEGACY_COLORS.s2,
-              borderColor: active ? accent : LEGACY_COLORS.border,
-              borderWidth: active ? 2 : 1,
-              color: active ? accentText : LEGACY_COLORS.text,
-            }}
+            className={presentation.menuRow}
           >
-            <span
-              className="flex h-24 w-24 shrink-0 items-center justify-center rounded-[20px]"
-              style={{ background: active ? tint(accent, 20) : tint(accent, 10) }}
-            >
-              {/* 항목 3-6 — 입출고 아이콘에도 색(입고=blue/출고=red accent). 4-3 크기 확대. */}
-              <Icon className="h-12 w-12" style={{ color: active ? accentText : accent }} />
-            </span>
+            <span className={presentation.choiceIcon} style={{ color: row.id === "internal_use" ? LEGACY_COLORS.red : LEGACY_COLORS.blue }} aria-hidden="true"><Icon /></span>
             <span className="min-w-0 flex-1">
-              <span className="block text-3xl font-black leading-tight">{row.label}</span>
-              <span
-                className="mt-1 block text-lg font-semibold"
-                style={{ color: active ? accentText : LEGACY_COLORS.muted2 }}
-              >
-                {row.description}
-              </span>
+              <span className="block leading-snug">{row.label}</span>
             </span>
+            <ChevronRight className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} aria-hidden />
           </button>
         );
       })}
@@ -105,10 +85,9 @@ function DeptGrid({
 }) {
   const colsClass = options.length === 2 ? "grid-cols-2" : "grid-cols-3";
   return (
-    // 항목 4-4A — 섹션 높이를 채우도록 grid 를 flex-1 + auto-rows-fr 로(버튼 균등 확대).
     <div className={className}>
       <Label text={label} />
-      <div className={`grid flex-1 auto-rows-fr ${colsClass} gap-2`}>
+      <div className={`grid flex-1 ${colsClass} gap-2`}>
         {options.map((d) => {
           const active = d === value;
           const color = departmentDisplayColor(
@@ -122,7 +101,7 @@ function DeptGrid({
               aria-label={d}
               aria-pressed={active}
               onClick={() => onChange(d)}
-              className="min-h-[56px] rounded-[14px] border text-xl font-black transition-[transform] active:scale-95"
+              className="min-h-[64px] rounded-[12px] border text-lg font-bold transition-[transform] active:scale-95"
               style={{
                 background: active ? tint(color, 14) : LEGACY_COLORS.s2,
                 borderColor: active ? color : LEGACY_COLORS.border,
@@ -166,11 +145,10 @@ export function MobileSubTypeStep({
 }) {
   if (workType === "process" || workType === "warehouse_adjust") {
     return (
-      // 항목 7 — 부서/방향/입력방식 섹션이 화면 높이를 균등 분할(버튼은 과대 stretch 없이 중앙 정렬).
-      <div className="flex min-h-full flex-col gap-4">
+      <div className="flex flex-1 flex-col gap-3">
         <div className="flex flex-1 flex-col">
           <Label text="방향" />
-          <div className="grid flex-1 auto-rows-fr grid-cols-2 gap-3">
+          <div className={presentation.twoChoices}>
             {(["in", "out"] as DeptIoDirection[]).map((dir) => {
               const active = deptIoDirection === dir;
               const color = dir === "out" ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
@@ -179,7 +157,7 @@ export function MobileSubTypeStep({
                   key={dir}
                   type="button"
                   onClick={() => onDeptIoDirectionChange(dir)}
-                  className="min-h-[64px] rounded-[16px] border text-xl font-black transition-[transform] active:scale-95"
+                  className={presentation.directionChoice}
                   style={{
                     background: active ? tint(color, 14) : LEGACY_COLORS.s2,
                     borderColor: active ? color : LEGACY_COLORS.border,
@@ -187,6 +165,9 @@ export function MobileSubTypeStep({
                     color: active ? color : LEGACY_COLORS.text,
                   }}
                 >
+                  <span className={presentation.choiceIcon} style={{ color }} aria-hidden="true">
+                    {dir === "in" ? <ArrowDownToLine /> : <ArrowUpFromLine />}
+                  </span>
                   {dir === "in" ? "입고" : "출고"}
                 </button>
               );
@@ -204,11 +185,10 @@ export function MobileSubTypeStep({
     subType === "defect_quarantine" || subType === "supplier_return" ? LEGACY_COLORS.red : null;
 
   return (
-    // 항목 7 — 세부 작업/부서 섹션이 화면 높이를 균등 분할.
-    <div className="flex min-h-full flex-col gap-4">
-      <div className={showAnyDept ? "flex basis-[40%] flex-[4_1_0] flex-col" : "flex flex-1 flex-col"}>
+    <div className="flex flex-1 flex-col gap-3">
+      <div className="flex flex-1 flex-col">
         <Label text="세부 작업" />
-        <div className="grid flex-1 auto-rows-fr grid-cols-2 gap-2.5">
+        <div className={subRows.length === 2 ? presentation.twoChoices : "grid flex-1 grid-cols-2 gap-2"}>
           {subRows.map((row) => {
             const active = subType === row.id && (workType !== "warehouse_io" || deptIoDirection != null);
             const tone = workType === "warehouse_io" && row.id === "warehouse_to_dept" ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
@@ -217,20 +197,14 @@ export function MobileSubTypeStep({
                 key={row.id}
                 type="button"
                 onClick={() => onSubTypeChange(row.id)}
-                className="flex min-h-[64px] flex-col items-center justify-center gap-0.5 rounded-[16px] border px-3 py-3 text-center transition-[transform] active:scale-95"
+                className="flex min-h-[56px] items-center justify-center rounded-[14px] border px-3 py-3 text-center transition-[transform] active:scale-95"
                 style={{
                   background: active ? tint(tone, 14) : LEGACY_COLORS.s2,
                   borderColor: active ? tone : LEGACY_COLORS.border,
                   color: active ? tone : LEGACY_COLORS.muted2,
                 }}
               >
-                <span className="text-xl font-black leading-tight">{row.label}</span>
-                <span
-                  className="text-xs font-semibold leading-tight tracking-tight whitespace-nowrap"
-                  style={{ color: LEGACY_COLORS.muted2 }}
-                >
-                  {row.description}
-                </span>
+                <span className="text-xl font-bold leading-tight">{row.label}</span>
               </button>
             );
           })}
@@ -239,7 +213,7 @@ export function MobileSubTypeStep({
 
       {showAnyDept && dept.from && (
         <DeptGrid
-          className="flex basis-[60%] flex-[6_1_0] flex-col"
+          className="flex flex-1 flex-col"
           label={
             subType === "supplier_return"
               ? "반품할 부서 (불량 출처)"
@@ -253,7 +227,7 @@ export function MobileSubTypeStep({
       )}
       {showAnyDept && dept.to && (
         <DeptGrid
-          className="flex basis-[60%] flex-[6_1_0] flex-col"
+          className="flex flex-1 flex-col"
           label={
             subType === "warehouse_to_dept"
               ? "도착 부서"
