@@ -67,6 +67,10 @@ const scrollItems = [
   item("af-6", "Candidate 6", "AF", "3-AF-0006", 5),
 ];
 const requesterEmployeeId = "op-1";
+const largeCandidateItems = Array.from({ length: 100 }, (_, index) => {
+  const number = index + 1;
+  return item(`af-${number}`, `Candidate ${number}`, "AF", `3-AF-${String(number).padStart(4, "0")}`, number === 100 ? 0 : 5);
+});
 
 const result: ItemConversionResult = {
   request_id: null,
@@ -290,6 +294,77 @@ describe("ItemConversionView", () => {
     fireEvent.click(screen.getByTestId("item-conversion-source-option-pa-1"));
     expect(screen.getByTestId("item-conversion-source-option-pa-1")).toHaveTextContent("선택됨");
     expect(screen.queryByTestId("item-conversion-target-option-af-2")).not.toBeInTheDocument();
+  });
+
+  it("shows all eligible candidates beyond 80 in both lists", () => {
+    render(
+      <ItemConversionWorkView
+        items={[
+          ...largeCandidateItems,
+          item("pa-1", "Packaging", "PA", "3-PA-0001"),
+          item("aa-1", "Assembly", "AA", "3-AA-0001"),
+          item("pr-1", "Raw Part", "PR", "3-PR-0001"),
+          { ...item("deleted-af", "Deleted", "AF"), deleted_at: "2026-09-29T00:00:00Z" },
+        ]}
+        requesterEmployeeId={requesterEmployeeId}
+        onComplete={() => {}}
+      />,
+    );
+
+    const sourceList = screen.getByTestId("item-conversion-source-candidate-list");
+    expect(within(sourceList).getAllByRole("button")).toHaveLength(102);
+    expect(within(sourceList).getByTestId("item-conversion-source-option-af-81")).toBeInTheDocument();
+    expect(within(sourceList).getByTestId("item-conversion-source-option-af-100")).toHaveTextContent("0 EA");
+    expect(within(sourceList).getByTestId("item-conversion-source-option-pa-1")).toBeInTheDocument();
+    expect(within(sourceList).getByTestId("item-conversion-source-option-aa-1")).toBeInTheDocument();
+    expect(screen.queryByTestId("item-conversion-source-option-pr-1")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("item-conversion-source-option-deleted-af")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId("item-conversion-source-search"), { target: { value: "Candidate" } });
+    expect(within(sourceList).getAllByRole("button")).toHaveLength(100);
+    fireEvent.click(screen.getByTestId("item-conversion-source-option-af-1"));
+
+    const targetList = screen.getByTestId("item-conversion-target-candidate-list");
+    expect(within(targetList).getAllByRole("button")).toHaveLength(99);
+    expect(within(targetList).getByTestId("item-conversion-target-option-af-82")).toBeInTheDocument();
+    expect(within(targetList).getByTestId("item-conversion-target-option-af-100")).toBeInTheDocument();
+    expect(screen.queryByTestId("item-conversion-target-option-af-1")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("item-conversion-target-option-pa-1")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("item-conversion-target-option-aa-1")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("item-conversion-target-option-deleted-af")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("item-conversion-target-search"), { target: { value: "Candidate" } });
+    expect(within(targetList).getAllByRole("button")).toHaveLength(99);
+  });
+
+  it("keeps searched selections beyond 80 visible at the fourth row after clearing searches", () => {
+    vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockImplementation(function offsetTop() {
+      return Array.from(this.parentElement?.children ?? []).indexOf(this) * 72;
+    });
+    render(
+      <ItemConversionWorkView
+        items={largeCandidateItems}
+        requesterEmployeeId={requesterEmployeeId}
+        onComplete={() => {}}
+      />,
+    );
+
+    fireEvent.change(screen.getByTestId("item-conversion-source-search"), { target: { value: "3AF0090" } });
+    fireEvent.click(screen.getByTestId("item-conversion-source-option-af-90"));
+    expect(screen.getByTestId("item-conversion-source-search")).toHaveValue("");
+    expect(screen.getByTestId("item-conversion-source-option-af-90")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("item-conversion-source-option-af-90")).toHaveTextContent("선택됨");
+    expect(screen.getByTestId("item-conversion-source-candidate-list").scrollTop).toBe((89 - 3) * 72);
+
+    fireEvent.change(screen.getByTestId("item-conversion-target-search"), { target: { value: "3AF0100" } });
+    fireEvent.click(screen.getByTestId("item-conversion-target-option-af-100"));
+    expect(screen.getByTestId("item-conversion-target-search")).toHaveValue("");
+    expect(screen.getByTestId("item-conversion-target-option-af-100")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("item-conversion-target-option-af-100")).toHaveTextContent("선택됨");
+    expect(screen.getByTestId("item-conversion-target-candidate-list").scrollTop).toBe((98 - 3) * 72);
+
+    fireEvent.click(screen.getByTestId("item-conversion-source-option-af-1"));
+    expect(screen.getByTestId("item-conversion-target-option-af-100")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("item-conversion-selection-hint")).toHaveTextContent("대상 품목을 선택하세요");
   });
 
   it("clears searches and returns selected candidates to the fourth visible row", () => {

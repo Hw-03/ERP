@@ -144,8 +144,8 @@ export function ItemConversionWorkView({
           item.process_type_code === sourceItem.process_type_code,
       )
     : [];
-  const filteredSources = filterCandidates(candidates, sourceQuery).slice(0, 80);
-  const filteredTargets = filterCandidates(targetCandidates, targetQuery).slice(0, 80);
+  const filteredSources = filterCandidates(candidates, sourceQuery);
+  const filteredTargets = filterCandidates(targetCandidates, targetQuery);
   const currentStep = historyStep
     ? historyStep === 1 || preview
       ? historyStep
