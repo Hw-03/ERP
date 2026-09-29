@@ -8,6 +8,8 @@ import { formatQty } from "@/lib/mes/format";
 import { findInventoryLocation, locationAvailable, locationPending, warehouseAvailable, warehousePending } from "@/lib/mes/inventory";
 import { Tooltip } from "@/lib/ui";
 import { EmptyState } from "../common";
+import { SkeletonBlock, dataRevealClassName } from "../common/LoadingSkeleton";
+import { ReadFailure } from "../common/ReadState";
 import { useCurrentOperator } from "../login/useCurrentOperator";
 import {
   DEPT_OPTIONS,
@@ -56,6 +58,11 @@ import {
 } from "./ioWorkType";
 
 interface BaseProps {
+  mobilePresentation?: boolean;
+  loading?: boolean;
+  loadError?: string | null;
+  hasData?: boolean;
+  onRetry?: () => void;
   workType: IoWorkType;
   subType: IoSubType;
   deptIoDirection: DeptIoDirection | null;
@@ -244,6 +251,11 @@ function outboundLocationStatus(
 }
 
 export function IoTargetPicker({
+  mobilePresentation = false,
+  loading = false,
+  loadError = null,
+  hasData = true,
+  onRetry,
   workType,
   subType,
   deptIoDirection,
@@ -420,7 +432,7 @@ export function IoTargetPicker({
   }));
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
+    <div className="flex h-full min-h-0 flex-col gap-2 lg:gap-3">
       {/* 필터 + 순서 편집 토글 */}
       <div className="flex shrink-0 flex-col gap-2">
         {/* 항목 9 — 모바일은 필터 그리드를 전폭 한 줄로(순서 편집 버튼은 아래 행). 데스크톱(lg)은 기존 인라인. */}
@@ -447,13 +459,13 @@ export function IoTargetPicker({
             {/* 모바일: 검색을 아래 전체폭 줄로(드롭다운 폭 확보). 데스크톱(lg): 기존 4열 인라인. */}
             <label className="col-span-3 flex flex-col gap-0.5 lg:col-span-1">
               <span
-                className="text-[10px] font-bold uppercase tracking-[1.5px]"
+                className="sr-only lg:not-sr-only lg:text-[10px] lg:font-bold lg:uppercase lg:tracking-[1.5px]"
                 style={{ color: LEGACY_COLORS.muted2 }}
               >
                 검색
               </span>
               <div
-                className="flex items-center gap-1.5 rounded-[10px] border px-2 py-1.5"
+                className="flex items-center gap-1.5 rounded-[10px] border px-2 py-0 lg:py-1.5"
                 style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
               >
                 <Search className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
@@ -535,8 +547,10 @@ export function IoTargetPicker({
       </div>
 
       {/* 결과 영역 */}
+      {loadError && <ReadFailure message={loadError} refresh={hasData} onRetry={() => onRetry?.()} />}
       <div
-        className="relative min-h-0 flex-1"
+        className="relative min-h-0 flex-1 overflow-hidden rounded-[16px] border lg:overflow-visible lg:rounded-none lg:border-0"
+        style={{ borderColor: LEGACY_COLORS.border }}
       >
         <div
           ref={tableContainerRef}
@@ -560,6 +574,9 @@ export function IoTargetPicker({
               />
             ) : (
               <ItemTable
+                mobilePresentation={mobilePresentation}
+                loading={loading}
+                initialError={!hasData && !!loadError}
                 items={filteredItems}
                 displayLimit={displayLimit}
                 onShowMore={() => setDisplayLimit((prev) => prev + PAGE_SIZE)}
@@ -590,12 +607,12 @@ export function IoTargetPicker({
         </div>
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 z-20 rounded-[16px] border"
+          className="pointer-events-none absolute inset-0 z-20 hidden rounded-[16px] border lg:block"
           style={{ borderColor: LEGACY_COLORS.border }}
         />
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between"
+          className="pointer-events-none absolute inset-0 z-20 hidden flex-col justify-between lg:flex"
         >
           <div className="flex justify-between">
             <span
@@ -624,7 +641,7 @@ export function IoTargetPicker({
           항목 10 — 모바일은 sticky 로 하단 네비 위에 항상 고정(이중 스크롤에 묻히지 않게),
           데스크톱(lg)은 기존 정적 배치 그대로. */}
       {/* 항목 4-6 — 모바일 띠 배경/상단선 제거(버튼만 떠 보이게). 버튼 자체 솔리드색으로 가독성 확보. */}
-      <div className="sticky bottom-0 z-20 -mx-3 shrink-0 bg-[var(--c-bg)] px-4 pb-1 pt-2 lg:static lg:mx-0 lg:bg-transparent lg:p-0">
+      <div className="sticky bottom-0 z-20 -mx-3 shrink-0 bg-[var(--c-bg)] px-4 pb-0 pt-0 lg:static lg:mx-0 lg:bg-transparent lg:p-0">
         <button
           type="button"
           onClick={onAdvance}
@@ -762,6 +779,9 @@ function InternalUseSourceControl({
 }
 
 function ItemTable({
+  mobilePresentation = false,
+  loading = false,
+  initialError = false,
   items,
   displayLimit,
   onShowMore,
@@ -787,6 +807,9 @@ function ItemTable({
   fullscreen,
   onFullscreenChange,
 }: {
+  mobilePresentation?: boolean;
+  loading?: boolean;
+  initialError?: boolean;
   items: Item[];
   displayLimit: number;
   onShowMore: () => void;
@@ -887,7 +910,8 @@ function ItemTable({
             )}
           </tr>
         </thead>
-        <tbody>
+        <tbody role={loading ? "status" : undefined} aria-label={loading ? "품목 불러오는 중" : undefined} aria-busy={loading || undefined} className={mobilePresentation && !loading ? dataRevealClassName : undefined}>
+          {loading && [0, 1, 2, 3].map((row) => <tr key={`loading-${row}`} aria-hidden="true"><td colSpan={6} className="border-b border-[var(--c-border)] px-3 py-3"><div className="flex min-h-[48px] items-center gap-3"><div className="flex flex-1 flex-col gap-2"><SkeletonBlock className="h-4 w-2/3" /><SkeletonBlock className="h-3 w-1/2" /></div><SkeletonBlock className="h-8 w-20 rounded-[10px]" /></div></td></tr>)}
           {items.slice(0, displayLimit).map((item) => {
             const prodByDept = getProdByDept(item);
             const letter = deptOf(item.process_type_code);
@@ -1167,7 +1191,7 @@ function ItemTable({
         </tbody>
       </table>
 
-      {items.length === 0 && <EmptyState illustrated comfortable
+      {!loading && !initialError && items.length === 0 && <EmptyState illustrated comfortable
         variant={hasActiveFilter ? "filtered-out" : "no-data"}
         title={hasActiveFilter ? "필터에 맞는 품목 없음" : "조회할 품목 없음"}
         description={hasActiveFilter ? "필터를 해제하면 다시 표시됩니다." : "다른 키워드를 시도하세요."}
