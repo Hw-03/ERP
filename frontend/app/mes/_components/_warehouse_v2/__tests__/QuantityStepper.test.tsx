@@ -4,6 +4,49 @@ import { describe, expect, it, vi } from "vitest";
 import { QuantityStepper } from "../QuantityStepper";
 
 describe("QuantityStepper", () => {
+  it("화살표를 길게 누르면 반복 조정하고 손을 떼면 멈춘다", () => {
+    vi.useFakeTimers();
+    const onChange = vi.fn();
+    render(<QuantityStepper value={1} onChange={onChange} label="기준 수량" />);
+
+    const increase = screen.getByRole("button", { name: "기준 수량 1 증가" });
+    fireEvent.pointerDown(increase);
+    vi.advanceTimersByTime(510);
+    fireEvent.pointerUp(increase);
+    fireEvent.click(increase);
+    vi.advanceTimersByTime(200);
+
+    expect(onChange.mock.calls).toEqual([[2], [3], [4]]);
+    vi.useRealTimers();
+  });
+
+  it("통합 화살표는 1씩 조정하고 세 자리 수량을 직접 입력한다", () => {
+    const onChange = vi.fn();
+    render(<QuantityStepper value={123} onChange={onChange} label="기준 수량" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "기준 수량 1 증가" }));
+    fireEvent.click(screen.getByRole("button", { name: "기준 수량 1 감소" }));
+    fireEvent.change(screen.getByRole("spinbutton", { name: "기준 수량" }), {
+      target: { value: "999" },
+    });
+
+    expect(onChange.mock.calls).toEqual([[124], [122], [999]]);
+    expect(screen.getByRole("spinbutton", { name: "기준 수량" })).toHaveAttribute("inputmode", "numeric");
+  });
+
+  it("통합 화살표도 최소 수량과 편집 잠금을 지킨다", () => {
+    const onChange = vi.fn();
+    const { rerender } = render(<QuantityStepper value={0} onChange={onChange} />);
+    expect(screen.getByRole("button", { name: "수량 1 감소" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "수량 1 증가" })).toBeEnabled();
+
+    rerender(<QuantityStepper value={1} onChange={onChange} disabled />);
+    expect(screen.getByRole("button", { name: "수량 1 감소" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "수량 1 증가" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "수량 1 증가" }));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it("emits safe quantities from step buttons and input", () => {
     const onChange = vi.fn();
 

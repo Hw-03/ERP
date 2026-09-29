@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import type { ReactNode, Ref } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { QuantityInput } from "../common/QuantityInput";
@@ -44,6 +46,14 @@ export function QuantityStepper({
   const current = safeQuantity(Number(value), minimum);
   const minusDisabled = disabled || decrementDisabled || current <= minimum;
   const plusDisabled = disabled || incrementDisabled;
+  const repeatDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const repeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const suppressClickRef = useRef(false);
+
+  useEffect(() => () => {
+    if (repeatDelayRef.current) clearTimeout(repeatDelayRef.current);
+    if (repeatIntervalRef.current) clearInterval(repeatIntervalRef.current);
+  }, []);
 
   function changeBy(delta: number) {
     onChange(safeQuantity(current + delta, minimum));
@@ -55,8 +65,46 @@ export function QuantityStepper({
     onChange(safeQuantity(next, minimum));
   }
 
+  function stopRepeating() {
+    if (repeatDelayRef.current) clearTimeout(repeatDelayRef.current);
+    if (repeatIntervalRef.current) clearInterval(repeatIntervalRef.current);
+    repeatDelayRef.current = null;
+    repeatIntervalRef.current = null;
+  }
+
+  function startRepeating(delta: number, repeatDisabled: boolean) {
+    if (repeatDisabled) return;
+    stopRepeating();
+    suppressClickRef.current = false;
+    let repeatedValue = current;
+
+    const emitNext = () => {
+      const next = safeQuantity(repeatedValue + delta, minimum);
+      if (next === repeatedValue) {
+        stopRepeating();
+        return;
+      }
+      repeatedValue = next;
+      onChange(next);
+    };
+
+    repeatDelayRef.current = setTimeout(() => {
+      suppressClickRef.current = true;
+      emitNext();
+      repeatIntervalRef.current = setInterval(emitNext, 80);
+    }, 350);
+  }
+
+  function clickArrow(delta: number) {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
+    changeBy(delta);
+  }
+
   return (
-    <div className={`flex flex-col items-center gap-0.5 ${className}`}>
+    <div data-io-stepper className={`flex flex-col items-center gap-0.5 ${className}`}>
       <span
         className="text-xs font-bold uppercase tracking-[1.5px]"
         style={{ color: LEGACY_COLORS.muted2 }}
@@ -72,6 +120,7 @@ export function QuantityStepper({
         </StepButton>
         <QuantityInput
           aria-label={label}
+          inputMode={step === 1 ? "numeric" : "decimal"}
           min={minimum}
           step={step}
           value={current}
@@ -88,6 +137,36 @@ export function QuantityStepper({
         <StepButton tone={LEGACY_COLORS.green} disabled={plusDisabled} onClick={() => changeBy(10)}>
           +10
         </StepButton>
+        <div data-io-arrow-controls className="hidden">
+          <button
+            type="button"
+            aria-label={`${label} 1 증가`}
+            disabled={plusDisabled}
+            onPointerDown={() => startRepeating(1, plusDisabled)}
+            onPointerUp={stopRepeating}
+            onPointerCancel={stopRepeating}
+            onPointerLeave={stopRepeating}
+            onBlur={stopRepeating}
+            onClick={() => clickArrow(1)}
+            className="no-btn-inset"
+          >
+            <ChevronUp aria-hidden="true" className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            aria-label={`${label} 1 감소`}
+            disabled={minusDisabled}
+            onPointerDown={() => startRepeating(-1, minusDisabled)}
+            onPointerUp={stopRepeating}
+            onPointerCancel={stopRepeating}
+            onPointerLeave={stopRepeating}
+            onBlur={stopRepeating}
+            onClick={() => clickArrow(-1)}
+            className="no-btn-inset"
+          >
+            <ChevronDown aria-hidden="true" className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </div>
   );
