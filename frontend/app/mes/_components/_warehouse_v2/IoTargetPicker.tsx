@@ -312,11 +312,13 @@ export function IoTargetPicker({
   const keyword = search.trim().toLowerCase();
   const deptOptions = DEPT_OPTIONS;
 
-  // Step 2 에서 선택한 대상 부서 → PROD 부서 순서 기준 우선순위 맵.
+  // 자동 부서 작업은 로그인 부서, 그 외는 Step 2 대상 부서를 먼저 표시한다.
   // 같은 부서 내에서는 서버 정렬 유지 (stable sort).
   const deptPriorityByLetter = useMemo(
-    () => buildDeptPriorityByLetter(targetDepartment),
-    [targetDepartment],
+    () => buildDeptPriorityByLetter(
+      targetDepartment ?? (isAutoDepartmentRoute(subType) ? operator?.department : null),
+    ),
+    [targetDepartment, subType, operator?.department],
   );
 
   // 조립 부서 직원의 담당 모델 slot → priority(0=상위). 배열 순서가 곧 priority.
