@@ -47,7 +47,7 @@ export function WizardProgress({
 
   const stepLabel = (
     <span
-      className={clsx(TYPO.caption, "shrink-0 font-bold uppercase tracking-[1px]")}
+      className="sr-only"
       style={{ color: LEGACY_COLORS.muted2 }}
     >
       Step {current + 1} / {steps.length}
@@ -74,7 +74,7 @@ export function WizardProgress({
   return (
     <div className={clsx("flex flex-col gap-1.5", className)}>
       {bars}
-      <div className="flex items-center justify-end">{stepLabel}</div>
+      {stepLabel}
     </div>
   );
 }

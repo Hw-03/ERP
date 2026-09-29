@@ -1,0 +1,10 @@
+@media (max-width: 1023px) {
+  .gate { overflow-y: auto; }
+  .form { margin-top: max(112px, calc(32dvh - 40px)) !important; padding-bottom: 24px; }
+  .logoAbove { top: 34px; transform: scale(0.33) !important; transform-origin: center top !important; }
+  .card { padding: 24px 20px !important; }
+  .card input { min-height: 44px; margin-block: -10px; }
+  .card button[aria-label^="직원 목록"] { min-width: 44px; min-height: 44px; margin-block: -10px; margin-right: -12px; }
+  .card [role="option"] { min-height: 44px; }
+  .retry { display: inline-flex; align-items: center; min-height: 44px; }
+}

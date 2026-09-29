@@ -235,4 +235,36 @@ describe("MobileHistoryScreen real detail panels", () => {
     const cancel = screen.getByRole("button", { name: "이 내역 취소" });
     await waitFor(() => expect(cancel.closest("div.rounded-\\[20px\\]")).toBeInTheDocument());
   });
+
+  it("keeps a long component name, code, and quantity while navigating from the mobile batch detail and back", async () => {
+    const longName = "ComponentWithAVeryLongUnbrokenEnglishNameForMobileHistoryDetail";
+    testState.batch.bundles[0].lines[1].item_name = longName;
+    setHistoryLogs([
+      makeLog({ operation_batch_id: "batch-1" }),
+      makeLog({
+        log_id: "component",
+        item_id: "component-a",
+        item_name: longName,
+        mes_code: "R-001",
+        transaction_type: "BACKFLUSH",
+        quantity_change: -4,
+        operation_batch_id: "batch-1",
+        request_order_stock: { status: "available", reason: null, warehouse_qty_before: 10, warehouse_qty_after: 10, department_qty_before: 10, department_qty_after: 6 },
+        inventory_effect: [{ scope: "location", department: "조립", status: "PRODUCTION", delta: -4 }],
+      }),
+    ]);
+    renderScreen();
+    fireEvent.click(screen.getByText("완제품 A").closest("button")!);
+
+    const component = await screen.findByText(longName);
+    const line = component.closest("button")!;
+    expect(within(line).getByText("R-001")).toBeInTheDocument();
+    expect(within(line).getByLabelText("조립 10 −4→6")).toBeInTheDocument();
+    expect(within(line).queryByText("-4 EA")).not.toBeInTheDocument();
+    fireEvent.click(line);
+    expect(await screen.findByRole("button", { name: "← 뒤로" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "← 뒤로" }));
+    expect(await screen.findByText(longName)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "← 뒤로" })).not.toBeInTheDocument();
+  });
 });

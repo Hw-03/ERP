@@ -28,6 +28,7 @@ import {
 } from "./ioWorkType";
 import { formatQty } from "@/lib/mes/format";
 import { ConfirmModal, type ConfirmTone } from "@/lib/ui/ConfirmModal";
+import panelStyles from "../mobile/screens/mobileWarehousePanels.module.css";
 import {
   deductionSourceName,
   deductionSourceSummary,
@@ -55,6 +56,7 @@ interface Props {
   onValidationError?: (message: string) => void;
   onSubmit: () => void;
   onSaveDraft: () => void;
+  mobilePresentation?: boolean;
 }
 
 const APPROVAL_META: Record<
@@ -211,6 +213,7 @@ export function IoConfirmStep({
   onValidationError,
   onSubmit,
   onSaveDraft,
+  mobilePresentation = false,
 }: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [memoValidationAttempted, setMemoValidationAttempted] = useState(false);
@@ -359,7 +362,7 @@ export function IoConfirmStep({
       />
 
       {/* 액션 푸터 — Step4(IoBundleCart 126줄) 와 동일: 모바일 하단 sticky + 페이지 배경, PC(lg)는 정적·대형 그대로. */}
-      <div className="sticky bottom-0 z-20 -mx-3 mt-auto flex flex-col gap-2 bg-[var(--c-bg)] px-4 pb-1 pt-2 lg:static lg:mx-0 lg:gap-3 lg:bg-transparent lg:px-0 lg:pb-0 lg:pt-1">
+      <div className="sticky bottom-0 z-20 -mx-3 mt-auto flex flex-col gap-2 bg-[var(--c-bg)] px-4 pb-0 pt-2 lg:static lg:mx-0 lg:gap-3 lg:bg-transparent lg:px-0 lg:pb-0 lg:pt-1">
         {/* blocker */}
         {blockerText && (
           <div
@@ -413,6 +416,7 @@ export function IoConfirmStep({
       </div>
 
       <ConfirmModal
+        className={mobilePresentation ? panelStyles.touchScope : undefined}
         open={confirmOpen}
         title={copy.title}
         tone={copy.tone}

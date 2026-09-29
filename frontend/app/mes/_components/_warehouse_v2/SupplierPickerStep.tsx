@@ -8,6 +8,7 @@ import { tint } from "@/lib/mes/colorUtils";
 import { matchesSearchText } from "@/lib/searchText";
 import { Button } from "@/lib/ui/Button";
 import { EmptyState } from "../common/EmptyState";
+import { SkeletonBlock, dataRevealClassName } from "../common/LoadingSkeleton";
 
 type SupplierPickerStepProps = {
   employeeId: string;
@@ -57,6 +58,7 @@ export function SupplierPickerStep({
   const [error, setError] = useState<string | null>(null);
   const [invalidSupplierName, setInvalidSupplierName] = useState<string | null>(null);
   const supplierLoadRequestRef = useRef(0);
+  const loadedEmployeeRef = useRef<string | null>(null);
 
   const canManage = mode === "manage";
   const selectedSupplierLoadKey = canManage ? selectedSupplierId : null;
@@ -70,7 +72,7 @@ export function SupplierPickerStep({
       onLoadStateChange?.(false);
       return;
     }
-    const isInitialLoad = suppliers.length === 0;
+    const isInitialLoad = variant === "mobile" ? loadedEmployeeRef.current !== employeeId : suppliers.length === 0;
     if (isInitialLoad) {
       setLoading(true);
       onLoadStateChange?.(false);
@@ -83,6 +85,7 @@ export function SupplierPickerStep({
         ? null
         : loaded.find((supplier) => supplier.supplier_id === selectedSupplierId);
       setSuppliers(loaded);
+      loadedEmployeeRef.current = employeeId;
       if (selectedSupplierId != null && (!selectedSupplier || !selectedSupplier.is_active)) {
         setInvalidSupplierName(selectedSupplier?.name ?? "선택한");
         onSelect(null);
@@ -170,8 +173,8 @@ export function SupplierPickerStep({
 
   const compact = variant === "mobile";
   return (
-    <section className={compact ? "flex min-h-full flex-col gap-3" : "flex h-full min-h-0 flex-col gap-4"} aria-label="공급업체 검색·선택">
-      <div className="flex flex-wrap items-end gap-2">
+    <section className={compact ? "flex h-full min-h-[180px] flex-col gap-2" : "flex h-full min-h-0 flex-col gap-4"} aria-label="공급업체 검색·선택">
+      <div className={compact ? "flex shrink-0 flex-wrap items-end gap-2" : "flex flex-wrap items-end gap-2"}>
         <label className="min-w-[180px] flex-1">
           <span className="sr-only">공급업체 검색</span>
           <span className="relative block">
@@ -214,22 +217,26 @@ export function SupplierPickerStep({
         </div>
       )}
 
-      <div className={`flex min-h-0 flex-1 flex-col overflow-y-auto rounded-[16px] border p-2 ${compact ? "max-h-[360px]" : ""}`} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-        {loading ? (
-          <p className="p-3 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>공급업체 목록을 불러오는 중입니다.</p>
-        ) : visibleSuppliers.length === 0 ? (
+      <div className={compact ? "flex min-h-0 flex-1 flex-col overflow-y-auto rounded-[20px] border" : "flex min-h-0 flex-1 flex-col overflow-y-auto rounded-[16px] border p-2 "} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+        {loading || (variant === "mobile" && loadedEmployeeRef.current !== employeeId && !error) ? variant === "mobile" ? (
+          <div role="status" aria-label="공급업체 목록 불러오는 중" aria-busy="true">
+            <span className="sr-only">공급업체 목록 불러오는 중</span>
+            {[0, 1, 2, 3].map((row) => <div key={row} aria-hidden="true" className="flex min-h-[60px] items-center gap-3 border-b p-2" style={{ borderColor: LEGACY_COLORS.border }}><SkeletonBlock className="h-4 w-2/3" /><SkeletonBlock className="ml-auto h-5 w-5 rounded-full" /></div>)}
+          </div>
+        ) : <p className="p-3 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>공급업체 목록을 불러오는 중입니다.</p>
+        : variant === "mobile" && error && loadedEmployeeRef.current !== employeeId ? null : visibleSuppliers.length === 0 ? (
           <EmptyState
             illustrated
             title={canManage && candidateName ? "일치하는 공급업체가 없습니다." : canManage ? "등록된 공급업체가 없습니다." : "선택할 수 있는 활성 공급업체가 없습니다."}
             description={canManage ? matchingSupplier ? "숨김 업체 관리에서 업체를 확인하세요." : candidateName ? "추가하고 선택 버튼으로 등록하세요." : "업체명을 입력해 새 업체를 추가하세요." : "원자재 입출고에서 공급업체를 추가하세요."}
           />
         ) : (
-          <ul className="space-y-2">
+          <ul className={`${compact ? "divide-y divide-[var(--c-border)]" : "space-y-2"} ${variant === "mobile" ? dataRevealClassName : ""}`}>
             {visibleSuppliers.map((supplier) => {
               const selected = supplier.supplier_id === selectedSupplierId;
               const editing = editingId === supplier.supplier_id;
               return (
-                <li key={supplier.supplier_id} className="rounded-[12px] border p-2.5" style={{ background: selected ? tint(accent, 10) : LEGACY_COLORS.s2, borderColor: selected ? accent : LEGACY_COLORS.border }}>
+                <li key={supplier.supplier_id} className={compact ? "p-2" : "rounded-[12px] border p-2.5"} style={{ background: selected ? tint(accent, 10) : compact ? "transparent" : LEGACY_COLORS.s2, borderColor: selected ? accent : LEGACY_COLORS.border }}>
                   <div className="flex min-h-11 items-center gap-2">
                     {canManage && editing ? (
                       <input
@@ -242,7 +249,7 @@ export function SupplierPickerStep({
                       />
                     ) : (
                       <button type="button" onClick={() => { if (supplier.is_active) { setInvalidSupplierName(null); onSelect(supplier); } }} disabled={!supplier.is_active} className="min-h-11 min-w-0 flex-1 rounded-[10px] px-2 text-left text-sm font-black outline-none focus-visible:ring-2 disabled:cursor-not-allowed" style={{ color: supplier.is_active ? LEGACY_COLORS.text : LEGACY_COLORS.muted2 }}>
-                        <span className="flex items-center gap-2"><span className="truncate">{supplier.name}</span>{selected && <Check aria-label="선택됨" className="h-4 w-4 shrink-0" style={{ color: accent }} />}{!supplier.is_active && <span className="rounded-full px-2 py-0.5 text-xs" style={{ background: tint(LEGACY_COLORS.muted2, 12) }}>숨김</span>}</span>
+                        <span className="flex items-center gap-2"><span className={compact ? "[overflow-wrap:anywhere]" : "truncate"}>{supplier.name}</span>{selected && <Check aria-label="선택됨" className="h-4 w-4 shrink-0" style={{ color: accent }} />}{!supplier.is_active && <span className="rounded-full px-2 py-0.5 text-xs" style={{ background: tint(LEGACY_COLORS.muted2, 12) }}>숨김</span>}</span>
                       </button>
                     )}
                     {canManage && editing ? (

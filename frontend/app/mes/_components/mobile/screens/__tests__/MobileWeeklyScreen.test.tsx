@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MobileWeeklyScreen } from "../MobileWeeklyScreen";
 
@@ -55,6 +55,48 @@ describe("MobileWeeklyScreen", () => {
   beforeEach(() => {
     state.getWeeklyReport.mockReset();
     state.getWeeklyReport.mockReturnValue(new Promise(() => {}));
+  });
+
+  it("최초 조회 중에도 생산·공정·품목 영역을 유지한다", () => {
+    render(<MobileWeeklyScreen weekMon={new Date("2026-08-31T00:00:00+09:00")} />);
+    expect(screen.getByRole("status", { name: "주간보고 불러오는 중" })).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByText("생산 현황")).toBeInTheDocument();
+    expect(screen.getByText("공정별 변화")).toBeInTheDocument();
+    expect(screen.getByText("품목 상세")).toBeInTheDocument();
+    expect(screen.queryByText(/생산 실적이 없습니다/)).not.toBeInTheDocument();
+  });
+
+  it("새 주 조회 중에는 이전 주 수량을 숨기고 늦은 응답도 무시한다", async () => {
+    let resolveOld!: (value: unknown) => void;
+    state.getWeeklyReport.mockReturnValueOnce(new Promise((resolve) => { resolveOld = resolve; }));
+    const { rerender } = render(<MobileWeeklyScreen weekMon={new Date("2026-08-31T00:00:00+09:00")} />);
+    state.getWeeklyReport.mockResolvedValueOnce({ groups: [], summary: { total_produce_qty: 9 }, production_matrix: [] });
+    rerender(<MobileWeeklyScreen weekMon={new Date("2026-09-07T00:00:00+09:00")} />);
+    expect(await screen.findByText("전체 생산 9개")).toBeInTheDocument();
+    await act(async () => { resolveOld({ groups: [], summary: { total_produce_qty: 5 }, production_matrix: [] }); });
+    expect(screen.queryByText("전체 생산 5개")).not.toBeInTheDocument();
+    state.getWeeklyReport.mockReturnValueOnce(new Promise(() => {}));
+    rerender(<MobileWeeklyScreen weekMon={new Date("2026-09-14T00:00:00+09:00")} />);
+    expect(screen.queryByText("전체 생산 9개")).not.toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "주간보고 불러오는 중" })).toBeInTheDocument();
+  });
+
+  it("같은 주로 돌아온 재조회가 실패해도 기존 값과 재시도 중 본문을 유지한다", async () => {
+    state.getWeeklyReport.mockResolvedValueOnce({ groups: [], summary: { total_produce_qty: 7 }, production_matrix: [] });
+    const weekMon = new Date("2026-08-31T00:00:00+09:00");
+    const { rerender } = render(<MobileWeeklyScreen weekMon={weekMon} />);
+    expect(await screen.findByText("전체 생산 7개")).toBeInTheDocument();
+    state.getWeeklyReport.mockReturnValueOnce(new Promise(() => {}));
+    rerender(<MobileWeeklyScreen weekMon={new Date("2026-09-07T00:00:00+09:00")} />);
+    state.getWeeklyReport.mockRejectedValueOnce(new Error("refresh failed"));
+    rerender(<MobileWeeklyScreen weekMon={weekMon} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("주간보고 데이터를 불러오지 못했습니다.");
+    expect(screen.getByText("전체 생산 7개")).toBeInTheDocument();
+    state.getWeeklyReport.mockReturnValueOnce(new Promise(() => {}));
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(screen.getByText("전체 생산 7개")).toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: "주간보고 불러오는 중" })).not.toBeInTheDocument();
   });
 
   it("centers the week picker and returns to the More menu", () => {

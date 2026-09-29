@@ -11,17 +11,22 @@ import { getAutoRepresentative, groupAfByModel } from "@/lib/mes/capacity";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { DesktopCapacityPfWorkspace } from "./_capacity_sections/DesktopCapacityPfWorkspace";
+import { ReadLoading } from "./common/ReadState";
+import { LoadFailureCard } from "./common/LoadFailureCard";
+import { SkeletonBlock, dataRevealClassName } from "./common/LoadingSkeleton";
 
 const DESKTOP_PF_GRID =
-  "sm:grid-cols-[20px_120px_72px_minmax(0,1fr)_120px_84px_84px_84px]";
+  "lg:grid-cols-[20px_120px_72px_minmax(0,1fr)_120px_84px_84px_84px]";
 
 const DESKTOP_CAPACITY_GRID =
   "grid-cols-[20px_120px_72px_minmax(0,1fr)_120px_84px_84px_84px]";
 
+const MOBILE_CAPACITY_GRID = "grid grid-cols-3 items-center gap-1 px-2";
+
 const SHARED_HINT =
   "공용 자재가 겹치는 모델은 표시 수량을 모두 동시에 생산할 수 없으며, 한 모델에 사용하면 다른 모델의 생산 가능 수량이 줄어들 수 있습니다.";
 
-const DESKTOP_CAPACITY_MEDIA_QUERY = "(min-width: 640px)";
+const DESKTOP_CAPACITY_MEDIA_QUERY = "(min-width: 1024px)";
 const CAPACITY_DETAIL_HISTORY_KEY = "capacityDetailPfItemId";
 
 function getDesktopCapacitySnapshot(): boolean {
@@ -54,9 +59,15 @@ function useDesktopCapacityLayout(): boolean {
 export function CapacityDetailModal({
   capacityData,
   onClose,
+  loading = capacityData === null,
+  error = null,
+  onRetry,
 }: {
   capacityData: ProductionCapacity | null;
   onClose: () => void;
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
 }) {
   const af = capacityData?.af ?? null;
   const isDesktopCapacityLayout = useDesktopCapacityLayout();
@@ -130,7 +141,7 @@ export function CapacityDetailModal({
       onClick={onClose}
     >
       <div
-        className="flex h-[92vh] w-[calc(100vw-32px)] min-h-0 flex-col rounded-[24px] border sm:h-[84vh] sm:w-[calc(100vw-128px)]"
+        className="flex h-[92vh] w-[calc(100vw-32px)] min-h-0 flex-col rounded-[24px] border lg:h-[84vh] lg:w-[calc(100vw-128px)]"
         style={{
           background: "var(--c-popup-bg)",
           borderColor: LEGACY_COLORS.border,
@@ -141,18 +152,19 @@ export function CapacityDetailModal({
         {!isPfDetail && (
           <>
             {/* ── 헤더 ───────────────────────────────────────── */}
-            <div className="border-b px-4 py-3 sm:px-7 sm:py-4" style={{ borderColor: LEGACY_COLORS.border }}>
+            {isDesktopCapacityLayout ? (
+            <div className="border-b px-4 py-3 lg:px-7 lg:py-4" style={{ borderColor: LEGACY_COLORS.border }}>
               <div className="flex items-center gap-4">
-                <div className="grid min-w-0 flex-1 grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-3">
-                  <div className="flex min-w-0 items-center gap-1.5 text-xs leading-5 sm:text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+                <div className="grid min-w-0 flex-1 grid-cols-1 gap-x-4 gap-y-1 lg:grid-cols-3">
+                  <div className="flex min-w-0 items-center gap-1.5 text-xs leading-5 lg:text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
                     <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: LEGACY_COLORS.cyan }} />
                     <span><span className="font-bold" style={{ color: LEGACY_COLORS.cyan }}>출하 대기</span> — 박스 포장까지 완료되어 픽업을 기다리는 재고</span>
                   </div>
-                  <div className="flex min-w-0 items-center gap-1.5 text-xs leading-5 sm:text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+                  <div className="flex min-w-0 items-center gap-1.5 text-xs leading-5 lg:text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
                     <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: LEGACY_COLORS.blue }} />
                     <span><span className="font-bold" style={{ color: LEGACY_COLORS.blue }}>빠른 생산</span> — 테스트 완료 완제품과 포장 자재로 빠르게 포장 가능한 수량</span>
                   </div>
-                  <div className="flex min-w-0 items-center gap-1.5 text-xs leading-5 sm:text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+                  <div className="flex min-w-0 items-center gap-1.5 text-xs leading-5 lg:text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
                     <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: LEGACY_COLORS.purple }} />
                     <span><span className="font-bold" style={{ color: LEGACY_COLORS.purple }}>총생산</span> — 튜브부터 박스까지 사내 재고로 이론상 생산 가능한 총합</span>
                   </div>
@@ -169,12 +181,12 @@ export function CapacityDetailModal({
                   <X className="h-4 w-4" />
                 </button>
               </div>
-              <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-                <div className="shrink-0 text-lg font-black sm:text-2xl" style={{ color: LEGACY_COLORS.text }}>
+              <div className="mt-2 flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-4">
+                <div className="shrink-0 text-lg font-black lg:text-2xl" style={{ color: LEGACY_COLORS.text }}>
                   생산 가능수량
                 </div>
                 <div
-                  className="flex min-w-0 flex-1 items-center gap-2 rounded-[10px] border px-3 py-1.5 text-xs font-semibold sm:text-sm"
+                  className="flex min-w-0 flex-1 items-center gap-2 rounded-[10px] border px-3 py-1.5 text-xs font-semibold lg:text-sm"
                   style={{
                     background: LEGACY_COLORS.warningBg,
                     borderColor: `color-mix(in srgb, ${LEGACY_COLORS.yellow} 30%, transparent)`,
@@ -186,6 +198,24 @@ export function CapacityDetailModal({
                 </div>
               </div>
             </div>
+            ) : (
+              <div className="border-b px-4 py-3" style={{ borderColor: LEGACY_COLORS.border }}>
+                <div className="flex min-h-11 items-center gap-3">
+                  <div className="min-w-0 flex-1 text-lg font-semibold" style={{ color: LEGACY_COLORS.text }}>
+                    생산 가능수량
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="standard-hover flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
+                    style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2 }}
+                    aria-label="닫기"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
 
@@ -196,10 +226,14 @@ export function CapacityDetailModal({
             onClose={onClose}
           />
         ) : (
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-4 sm:px-7 sm:py-8">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-4 lg:px-7 lg:py-8">
             <div className="flex min-h-0 flex-1 flex-col">
-              {af ? (
-                <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable] sm:block sm:overflow-y-scroll">
+              {!isDesktopCapacityLayout && error && <div className="mb-3"><LoadFailureCard message={error} onRetry={onRetry} retryLabel="다시 시도" comfortable
+                prefix={capacityData ? "최신 정보를 불러오지 못했습니다. 기존 내용을 표시합니다" : "데이터를 불러오지 못했습니다"} /></div>}
+              {!isDesktopCapacityLayout && loading && !capacityData ? (
+                <ReadLoading label="생산 가능수량 불러오는 중" skeleton={<MobileCapacitySkeleton />} />
+              ) : af ? (
+                <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable] lg:block lg:overflow-y-scroll">
                   <AfCapacitySummary
                     af={af}
                     onOpenBom={isDesktopCapacityLayout
@@ -207,10 +241,10 @@ export function CapacityDetailModal({
                       : undefined}
                   />
                 </div>
-              ) : (
+              ) : !isDesktopCapacityLayout && error && !capacityData ? null : (
                 <div className="text-base" style={{ color: LEGACY_COLORS.muted2 }}>
                   {capacityData == null
-                    ? "데이터를 불러오는 중…"
+                    ? !isDesktopCapacityLayout && !loading ? "표시할 생산 가능수량이 없습니다." : "데이터를 불러오는 중…"
                     : "AF 기준 데이터가 없습니다. 백엔드 갱신 후 다시 확인해 주세요."}
                 </div>
               )}
@@ -220,6 +254,25 @@ export function CapacityDetailModal({
       </div>
     </div>
   );
+}
+
+/** Reserve the mobile summary's column header and collapsed model rows. */
+function MobileCapacitySkeleton() {
+  return <div className="rounded-[16px] border" style={{ borderColor: LEGACY_COLORS.border }}>
+    <div data-testid="capacity-mobile-columns" className={`${MOBILE_CAPACITY_GRID} sticky top-0 min-h-11 rounded-t-[16px] border-b text-xs font-medium`}
+      style={{ background: "var(--c-popup-bg)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+      <span className="text-center">출하대기</span><span className="text-center">빠른생산</span><span className="text-center">총생산</span>
+    </div>
+    {Array.from({ length: 3 }, (_, index) => <div key={index} className="border-t first:border-t-0" style={{ borderColor: LEGACY_COLORS.border }}>
+      <div className="flex min-h-11 items-center gap-2 px-2 py-2.5" style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)` }}>
+        <ChevronRight className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.blue }} /><SkeletonBlock className="h-4 w-24" />
+      </div>
+      <div className={`${MOBILE_CAPACITY_GRID} gap-y-2 border-t py-2`} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+        <div className="col-span-3 flex flex-col gap-1"><SkeletonBlock className="h-3 w-36" /><SkeletonBlock className="h-4 w-2/3" /></div>
+        {[0, 1, 2].map(column => <SkeletonBlock key={column} className="mx-auto h-6 w-12" />)}
+      </div>
+    </div>)}
+  </div>;
 }
 
 function AfCapacitySummary({
@@ -282,8 +335,17 @@ function AfCapacitySummary({
     <>
       {/* AF 목록 — 모바일: 카드 레이아웃 / 데스크톱: 테이블 */}
 
-      {/* 모바일 카드 레이아웃 (< 640px) */}
-      <div className="sm:hidden rounded-[16px] border" style={{ borderColor: LEGACY_COLORS.border }}>
+      {/* 모바일 카드 레이아웃 (< 1024px) */}
+      <div className={`lg:hidden rounded-[16px] border ${dataRevealClassName}`} style={{ borderColor: LEGACY_COLORS.border }}>
+        <div
+          data-testid="capacity-mobile-columns"
+          className={`${MOBILE_CAPACITY_GRID} sticky top-0 z-10 min-h-11 rounded-t-[16px] border-b text-xs font-medium`}
+          style={{ background: "var(--c-popup-bg)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}
+        >
+          <span className="text-center">출하대기</span>
+          <span className="text-center">빠른생산</span>
+          <span className="text-center">총생산</span>
+        </div>
         {grouped.length === 0 && (
           <div className="px-4 py-6 text-center text-base" style={{ color: LEGACY_COLORS.muted2 }}>
             조건에 맞는 AF 가 없습니다.
@@ -297,7 +359,8 @@ function AfCapacitySummary({
             {/* 모델 그룹 제목만 접기·펼치기 동작을 담당한다. */}
             <button
               type="button"
-              className="flex w-full items-center gap-2 px-4 py-2.5 text-left"
+              className="flex min-h-11 w-full items-center gap-2 px-2 py-2.5 text-left"
+              style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 8%, transparent)` }}
               onClick={() => toggleGroup(group.key)}
               aria-expanded={!groupCollapsed}
             >
@@ -306,58 +369,33 @@ function AfCapacitySummary({
                 ) : (
                   <ChevronDown className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
                 )}
-                <span className="text-base font-black" style={{ color: LEGACY_COLORS.blue }}>
+                <span className="text-base font-semibold" style={{ color: LEGACY_COLORS.text }}>
                   {group.label}{" "}
-                  <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                  <span className="text-xs font-medium" style={{ color: LEGACY_COLORS.muted2 }}>
                     · {group.items.length}종
                   </span>
                 </span>
             </button>
 
-            {autoRepresentative ? (
-              <div className="border-t px-4 py-2" style={{ borderColor: LEGACY_COLORS.border }}>
-                <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+            <div
+              data-testid="capacity-mobile-quantity-row"
+              className={`${MOBILE_CAPACITY_GRID} border-t py-2`}
+              style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+            >
+              {autoRepresentative ? <div className="col-span-3 min-w-0">
+                <div className="text-xs font-medium" style={{ color: LEGACY_COLORS.muted2 }}>
                   자동 기준 출하 완제품
                 </div>
-                <div className="mt-0.5 flex items-start gap-2">
-                  <span className="min-w-0 flex-1 break-words text-sm font-bold" style={{ color: LEGACY_COLORS.cyan }}>
+                <div className="mt-1">
+                  <span className="block [overflow-wrap:anywhere] text-sm font-medium leading-5" style={{ color: LEGACY_COLORS.text }}>
                     {autoRepresentative.pf_name || autoRepresentative.pf_code}
                   </span>
-                  <Badge color={LEGACY_COLORS.cyan}>자동 기준</Badge>
+                  <span className="mt-1 block break-all text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{autoRepresentative.pf_code}</span>
                 </div>
-              </div>
-            ) : (
-              <div className="border-t px-4 py-2 text-sm font-semibold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+              </div> : <div className="col-span-3 min-w-0 text-sm font-medium" style={{ color: LEGACY_COLORS.muted2 }}>
                 자동 기준 출하 완제품 없음
-              </div>
-            )}
-
-            <div className="grid grid-cols-3 divide-x border-t" style={{ borderColor: LEGACY_COLORS.border }}>
-              {autoRepresentative ? (
-                <>
-                  <div className="px-1.5 py-2">
-                    <QtyLabelCell label="출하 대기" value={autoRepresentative.ship_ready} color={LEGACY_COLORS.cyan} />
-                  </div>
-                  <div className="px-1.5 py-2">
-                    <QtyLabelCell label="빠른 생산" value={autoRepresentative.fast_production} color={LEGACY_COLORS.blue} />
-                  </div>
-                  <div className="px-1.5 py-2">
-                    <QtyLabelCell label="총생산" value={autoRepresentative.total_production} color={LEGACY_COLORS.purple} />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="px-1.5 py-2">
-                    <DashLabelCell label="출하 대기" />
-                  </div>
-                  <div className="px-1.5 py-2">
-                    <DashLabelCell label="빠른 생산" />
-                  </div>
-                  <div className="px-1.5 py-2">
-                    <DashLabelCell label="총생산" />
-                  </div>
-                </>
-              )}
+              </div>}
+              <MobileCapacityQuantities quantities={autoRepresentative} />
             </div>
             {/* AF 아이템 카드 */}
             {!groupCollapsed && group.items.map((it) => {
@@ -368,11 +406,13 @@ function AfCapacitySummary({
                 <div key={it.af_item_id} className="border-t" style={{ borderColor: LEGACY_COLORS.border }}>
                   <button
                     type="button"
+                    data-testid="capacity-mobile-quantity-row"
                     onClick={() => toggleExpand(it.af_item_id)}
-                    className={`w-full px-4 py-3 text-left transition-colors ${dimmed ? "" : "hover:brightness-110"}`}
+                    aria-expanded={expanded}
+                    className={`${MOBILE_CAPACITY_GRID} min-h-11 w-full py-2 text-left transition-colors ${dimmed ? "" : "hover:brightness-110"}`}
                     style={{ background: dimmed ? LEGACY_COLORS.s2 : undefined }}
                   >
-                    <div className="flex items-start gap-2">
+                    <div className="col-span-3 flex min-w-0 items-start gap-2">
                       {expanded ? (
                         <ChevronDown className="mt-0.5 h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
                       ) : (
@@ -380,7 +420,7 @@ function AfCapacitySummary({
                       )}
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
+                          <span className="break-words text-sm font-medium leading-5" style={{ color: LEGACY_COLORS.text }}>
                             {it.af_name}
                           </span>
                           {it.bom_status === "incomplete" && (
@@ -391,21 +431,17 @@ function AfCapacitySummary({
                           )}
                         </div>
                         {it.af_code && (
-                          <div className="truncate text-sm" style={{ color: LEGACY_COLORS.muted2 }}>
+                          <div className="mt-1 break-all text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                             {it.af_code}
                           </div>
                         )}
-                        <div className="mt-2 grid grid-cols-3 gap-1">
-                          <QtyLabelCell label="출하 대기" value={it.ship_ready} color={LEGACY_COLORS.cyan} />
-                          <QtyLabelCell label="빠른 생산" value={it.fast_production} color={LEGACY_COLORS.blue} />
-                          <QtyLabelCell label="총생산" value={it.total_production} color={LEGACY_COLORS.purple} />
-                        </div>
                       </div>
                     </div>
+                    <MobileCapacityQuantities quantities={it} />
                   </button>
                   {expanded && (
                     <div
-                      className="border-t px-4 py-3"
+                      className="border-t"
                       style={{
                         borderColor: LEGACY_COLORS.border,
                         background: `color-mix(in srgb, ${LEGACY_COLORS.text} 4%, transparent)`,
@@ -430,7 +466,7 @@ function AfCapacitySummary({
 
       <section
         aria-label="모델별 생산 가능수량"
-        className="hidden min-h-full overflow-clip rounded-[16px] border sm:block"
+        className="hidden min-h-full overflow-clip rounded-[16px] border lg:block"
         style={{ borderColor: LEGACY_COLORS.border }}
       >
         <div
@@ -548,9 +584,9 @@ function AfCapacitySummary({
                           {item.bom_status === "incomplete" && <Badge color={LEGACY_COLORS.yellow}>BOM 미등록</Badge>}
                           {item.bom_status !== "incomplete" && !item.has_pf_path && <Badge color={LEGACY_COLORS.muted2}>출하경로 없음</Badge>}
                         </span>
-                        {item.af_code && <span className="block text-sm sm:hidden" style={{ color: LEGACY_COLORS.muted2 }}>{item.af_code}</span>}
+                        {item.af_code && <span className="block text-sm lg:hidden" style={{ color: LEGACY_COLORS.muted2 }}>{item.af_code}</span>}
                       </span>
-                      <span className="hidden truncate text-center text-sm font-bold sm:block" style={{ color: LEGACY_COLORS.muted2 }}>
+                      <span className="hidden truncate text-center text-sm font-bold lg:block" style={{ color: LEGACY_COLORS.muted2 }}>
                         {item.af_code || "—"}
                       </span>
                       <QtyCell value={item.ship_ready} color={LEGACY_COLORS.cyan} />
@@ -560,7 +596,7 @@ function AfCapacitySummary({
 
                     {expanded && (
                       <div
-                        className="border-t px-4 py-3 sm:px-0 sm:py-0"
+                        className="border-t px-4 py-3 lg:px-0 lg:py-0"
                         style={{
                           borderColor: LEGACY_COLORS.border,
                           background: `color-mix(in srgb, ${LEGACY_COLORS.text} 4%, transparent)`,
@@ -586,23 +622,16 @@ function AfCapacitySummary({
   );
 }
 
-function QtyLabelCell({ label, value, color }: { label: string; value: number; color: string }) {
+/** 모든 모바일 행에서 같은 열 순서와 빈 수량 표시를 유지한다. */
+function MobileCapacityQuantities({ quantities }: {
+  quantities: Pick<ProductionCapacityPfVariant, "ship_ready" | "fast_production" | "total_production"> | null;
+}): ReactNode {
   return (
-    <div className="text-center">
-      <div className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>{label}</div>
-      <div className="text-base font-bold" style={{ color: value > 0 ? color : LEGACY_COLORS.muted2 }}>
-        {formatQty(value)}
-      </div>
-    </div>
-  );
-}
-
-function DashLabelCell({ label }: { label: string }) {
-  return (
-    <div className="text-center">
-      <div className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>{label}</div>
-      <div className="text-base font-bold" style={{ color: LEGACY_COLORS.muted2 }}>—</div>
-    </div>
+    <>
+      <QtyCell value={quantities?.ship_ready ?? null} color={LEGACY_COLORS.cyan} />
+      <QtyCell value={quantities?.fast_production ?? null} color={LEGACY_COLORS.blue} />
+      <QtyCell value={quantities?.total_production ?? null} color={LEGACY_COLORS.purple} />
+    </>
   );
 }
 
@@ -653,9 +682,30 @@ function PfVariants({
       </div>
     );
   }
+  if (showAutoRepresentativeBadge) {
+    return <div>
+      {variants.map((variant) => (
+        <div
+          key={variant.pf_item_id}
+          data-testid="capacity-mobile-quantity-row"
+          className={`${MOBILE_CAPACITY_GRID} border-t py-2 first:border-t-0`}
+          style={{ borderColor: LEGACY_COLORS.border }}
+        >
+          <div className="col-span-3 min-w-0">
+            <div className="text-sm leading-5 [overflow-wrap:anywhere]" style={{ color: LEGACY_COLORS.text }}>{variant.pf_name}</div>
+            {variant.pf_code && <div className="mt-1 break-all text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{variant.pf_code}</div>}
+            {autoRepresentative?.pf_item_id === variant.pf_item_id && autoRepresentative.af_item_id === variant.af_item_id && (
+              <span className="mt-1 inline-block rounded-full px-1.5 py-0.5 text-xs font-medium" style={{ color: LEGACY_COLORS.cyan, background: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 15%, transparent)` }}>자동 기준</span>
+            )}
+          </div>
+          <MobileCapacityQuantities quantities={variant} />
+        </div>
+      ))}
+    </div>;
+  }
   return (
     <div>
-      <div className="mb-1 text-sm font-bold sm:hidden" style={{ color: LEGACY_COLORS.muted2 }}>
+      <div className="mb-1 text-sm font-bold lg:hidden" style={{ color: LEGACY_COLORS.muted2 }}>
         출고처별 출하 준비 가능
       </div>
       {variants.map((v) => {
@@ -665,17 +715,17 @@ function PfVariants({
         return (
           <div
             key={v.pf_item_id}
-            className={`grid grid-cols-[minmax(0,1fr)_72px_72px_72px] ${DESKTOP_PF_GRID} items-center gap-2 border-t px-2 py-1.5 sm:gap-0 sm:px-4 sm:py-2.5`}
+            className={`grid grid-cols-3 ${DESKTOP_PF_GRID} items-center gap-2 border-t px-2 py-2.5 lg:gap-0 lg:px-4 lg:py-2.5`}
             style={{ borderColor: LEGACY_COLORS.border }}
           >
-            <div className="min-w-0 sm:hidden">
-              <div className="flex items-center gap-2">
-                <div className="min-w-0 flex-1">
-                  <div className="break-words text-sm leading-5" style={{ color: LEGACY_COLORS.text }}>
+            <div className="col-span-3 min-w-0 lg:hidden">
+              <div className="flex flex-col items-start gap-2">
+                <div className="w-full min-w-0">
+                  <div className="[overflow-wrap:anywhere] text-sm leading-5" style={{ color: LEGACY_COLORS.text }}>
                     {v.pf_name}
                     {v.pf_code && (
-                      <span className="ml-1.5" style={{ color: LEGACY_COLORS.muted2 }}>
-                        ({v.pf_code})
+                      <span className="mt-1 block break-all text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+                        {v.pf_code}
                       </span>
                     )}
                   </div>
@@ -683,7 +733,7 @@ function PfVariants({
                 <div className="flex shrink-0 items-center gap-1">
                   {showAutoRepresentativeBadge && isAutoRepresentative && (
                     <span
-                      className="rounded-full px-1.5 py-0.5 text-sm font-bold"
+                      className="rounded-full px-1.5 py-0.5 text-xs font-medium"
                       style={{
                         color: LEGACY_COLORS.cyan,
                         background: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 15%, transparent)`,
@@ -696,7 +746,7 @@ function PfVariants({
                     <button
                       type="button"
                       onClick={() => onOpenBom(v)}
-                      className="standard-hover hidden min-h-11 items-center rounded-[10px] border px-3 text-sm font-bold transition-[filter] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)] sm:inline-flex"
+                      className="standard-hover hidden min-h-11 items-center rounded-[10px] border px-3 text-sm font-bold transition-[filter] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)] lg:inline-flex"
                       style={{
                         background: LEGACY_COLORS.s2,
                         borderColor: LEGACY_COLORS.border,
@@ -710,7 +760,7 @@ function PfVariants({
                 </div>
               </div>
             </div>
-            <div className="col-span-4 hidden min-w-0 grid-cols-[minmax(0,1fr)_72px] items-center gap-2 pl-5 pr-8 sm:grid">
+            <div className="col-span-4 hidden min-w-0 grid-cols-[minmax(0,1fr)_72px] items-center gap-2 pl-5 pr-8 lg:grid">
               <div className="min-w-0 break-words text-sm leading-5" style={{ color: LEGACY_COLORS.text }}>
                 {v.pf_name}
               </div>
@@ -732,25 +782,28 @@ function PfVariants({
                 )}
               </span>
             </div>
-            <span className="hidden truncate text-center text-sm font-bold sm:block" style={{ color: LEGACY_COLORS.muted2 }}>
+            <span className="hidden truncate text-center text-sm font-bold lg:block" style={{ color: LEGACY_COLORS.muted2 }}>
               {v.pf_code || "—"}
             </span>
             <div
-              className="text-center text-base font-bold"
+              className="text-center text-base font-semibold lg:font-bold"
               style={{ color: v.ship_ready > 0 ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2 }}
             >
+              <span className="mb-1 block text-xs font-normal lg:hidden" style={{ color: LEGACY_COLORS.muted2 }}>출하 대기</span>
               {formatQty(v.ship_ready)}
             </div>
             <div
-              className="text-center text-base font-bold"
+              className="text-center text-base font-semibold lg:font-bold"
               style={{ color: v.fast_production > 0 ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2 }}
             >
+              <span className="mb-1 block text-xs font-normal lg:hidden" style={{ color: LEGACY_COLORS.muted2 }}>빠른 생산</span>
               {formatQty(v.fast_production)}
             </div>
             <div
-              className="text-center text-base font-bold"
+              className="text-center text-base font-semibold lg:font-bold"
               style={{ color: v.total_production > 0 ? LEGACY_COLORS.purple : LEGACY_COLORS.muted2 }}
             >
+              <span className="mb-1 block text-xs font-normal lg:hidden" style={{ color: LEGACY_COLORS.muted2 }}>총생산</span>
               {formatQty(v.total_production)}
             </div>
           </div>

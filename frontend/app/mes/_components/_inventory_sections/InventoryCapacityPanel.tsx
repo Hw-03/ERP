@@ -30,10 +30,12 @@ export function InventoryCapacityPanel({
   capacityData,
   onClick,
   loading = false,
+  mobile = false,
 }: {
   capacityData: ProductionCapacity | null | undefined;
   onClick?: () => void;
   loading?: boolean;
+  mobile?: boolean;
 }) {
   if (loading && !capacityData) return <InventoryCapacitySkeleton />;
   if (!capacityData) return null;
@@ -41,9 +43,9 @@ export function InventoryCapacityPanel({
 
   // AF 블록이 있으면 AF 기준 3수량을 우선 표시. 없으면 legacy(즉시/최대) fallback.
   return capacityData.af ? (
-    <AfPanel af={capacityData.af} interactive={interactive} onClick={onClick} />
+    <AfPanel af={capacityData.af} interactive={interactive} onClick={onClick} mobile={mobile} />
   ) : (
-    <LegacyPanel capacityData={capacityData} interactive={interactive} onClick={onClick} />
+    <LegacyPanel capacityData={capacityData} interactive={interactive} onClick={onClick} mobile={mobile} />
   );
 }
 
@@ -120,10 +122,12 @@ function AfPanel({
   af,
   interactive,
   onClick,
+  mobile,
 }: {
   af: ProductionCapacityAfBlock;
   interactive: boolean;
   onClick?: () => void;
+  mobile: boolean;
 }) {
   const accent = afAccent(af.status);
   const showStats =
@@ -144,8 +148,8 @@ function AfPanel({
   })();
 
   const baseStyle = {
-    background: `color-mix(in srgb, ${accent} 8%, transparent)`,
-    borderColor: `color-mix(in srgb, ${accent} 30%, transparent)`,
+    background: mobile ? LEGACY_COLORS.s2 : `color-mix(in srgb, ${accent} 8%, transparent)`,
+    borderColor: mobile ? LEGACY_COLORS.border : `color-mix(in srgb, ${accent} 30%, transparent)`,
   };
   const className =
     "flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 rounded-[14px] border px-3 py-3 text-left lg:gap-x-4 lg:px-5 lg:py-4" +
@@ -154,9 +158,9 @@ function AfPanel({
   const inner = (
     <>
       {/* ── 모바일 전용: 표 레이아웃 (항목 1 A안 — 헤더 줄 제거, 상태는 외부 토글 배지로 이동) ── */}
-      <div className="flex w-full flex-col gap-2 sm:hidden">
+      <div className={mobile ? "flex w-full flex-col gap-2" : "flex w-full flex-col gap-2 sm:hidden"}>
         {showStats ? (
-          <table className="w-full table-fixed text-right text-sm">
+          <table className={mobile ? "w-full table-fixed text-center text-sm" : "w-full table-fixed text-right text-sm"}>
             <thead>
               <tr>
                 <th className="pb-1 text-left text-xs font-bold">모델</th>
@@ -170,8 +174,8 @@ function AfPanel({
                 const autoRepresentative = getAutoRepresentative(g.key, af);
                 return (
                   <tr key={g.key}>
-                    <td className="max-w-0 py-0.5 pr-2 text-left font-bold" style={{ color: LEGACY_COLORS.text }}>
-                      <div className="truncate">{g.label}</div>
+                    <td className={mobile ? "max-w-0 py-2 pr-2 text-left font-medium" : "max-w-0 py-0.5 pr-2 text-left font-bold"} style={{ color: LEGACY_COLORS.text }}>
+                      <div className={mobile ? "break-words" : "truncate"}>{g.label}</div>
                       {!autoRepresentative && (
                         <div className="truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
                           출하 경로 없음
@@ -179,19 +183,19 @@ function AfPanel({
                       )}
                     </td>
                     <td
-                      className="py-0.5 font-black"
+                      className={mobile ? "py-2 font-semibold tabular-nums" : "py-0.5 font-black"}
                       style={{ color: autoRepresentative && autoRepresentative.ship_ready > 0 ? LEGACY_COLORS.cyan : LEGACY_COLORS.muted2 }}
                     >
                       {autoRepresentative ? formatQty(autoRepresentative.ship_ready) : "—"}
                     </td>
                     <td
-                      className="py-0.5 font-black"
+                      className={mobile ? "py-2 font-semibold tabular-nums" : "py-0.5 font-black"}
                       style={{ color: autoRepresentative && autoRepresentative.fast_production > 0 ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2 }}
                     >
                       {autoRepresentative ? formatQty(autoRepresentative.fast_production) : "—"}
                     </td>
                     <td
-                      className="py-0.5 font-bold"
+                      className={mobile ? "py-2 font-semibold tabular-nums" : "py-0.5 font-bold"}
                       style={{ color: autoRepresentative && autoRepresentative.total_production > 0 ? LEGACY_COLORS.purple : LEGACY_COLORS.muted2 }}
                     >
                       {autoRepresentative ? formatQty(autoRepresentative.total_production) : "—"}
@@ -211,12 +215,12 @@ function AfPanel({
       </div>
 
       {/* ── 데스크톱 전용: 원래 인라인 칩 ── */}
-      <Zap className="hidden h-5 w-5 shrink-0 sm:block" style={{ color: accent }} />
-      <span className="hidden shrink-0 text-base font-semibold sm:inline" style={{ color: accent }}>
+      <Zap className={mobile ? "hidden" : "hidden h-5 w-5 shrink-0 sm:block"} style={{ color: accent }} />
+      <span className={mobile ? "hidden" : "hidden shrink-0 text-base font-semibold sm:inline"} style={{ color: accent }}>
         {afHeading(af.status)}
       </span>
       {showStats ? (
-        <div className="hidden min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 sm:flex">
+        <div className={mobile ? "hidden" : "hidden min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 sm:flex"}>
           <ModelLegend />
           {groups.map((g) => (
             <ModelChip key={g.key} group={g} autoRepresentative={getAutoRepresentative(g.key, af)} />
@@ -224,7 +228,7 @@ function AfPanel({
         </div>
       ) : (
         subline && (
-          <span className="hidden text-base sm:inline" style={{ color: LEGACY_COLORS.muted2 }}>
+          <span className={mobile ? "hidden" : "hidden text-base sm:inline"} style={{ color: LEGACY_COLORS.muted2 }}>
             {subline}
           </span>
         )
@@ -327,10 +331,12 @@ function LegacyPanel({
   capacityData,
   interactive,
   onClick,
+  mobile,
 }: {
   capacityData: ProductionCapacity;
   interactive: boolean;
   onClick?: () => void;
+  mobile: boolean;
 }) {
   const status = resolveStatus(capacityData);
   const reps: ProductionCapacityItem[] = capacityData.representative_items ?? [];
@@ -344,8 +350,8 @@ function LegacyPanel({
         : LEGACY_COLORS.muted2;
 
   const baseStyle = {
-    background: `color-mix(in srgb, ${accent} 8%, transparent)`,
-    borderColor: `color-mix(in srgb, ${accent} 30%, transparent)`,
+    background: mobile ? LEGACY_COLORS.s2 : `color-mix(in srgb, ${accent} 8%, transparent)`,
+    borderColor: mobile ? LEGACY_COLORS.border : `color-mix(in srgb, ${accent} 30%, transparent)`,
   };
   const className =
     "flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 rounded-[14px] border px-3 py-3 text-left lg:gap-x-4 lg:px-5 lg:py-4" +

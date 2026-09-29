@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { Item } from "@/lib/api";
 import type { IoLine } from "@/lib/api/types/io";
@@ -183,7 +183,7 @@ describe("IoLineRow quantity", () => {
       />,
     );
 
-    expect(screen.getByText("창고 → 고압")).toBeInTheDocument();
+    expect(screen.getByLabelText("이동 경로: 창고 → 고압")).toHaveTextContent("창고 → 고압");
   });
 
   it("uses included for non-internal-use checkbox state even when the server sends selected", () => {
@@ -322,7 +322,7 @@ describe("IoLineRow quantity", () => {
     const sourceField = screen.getByLabelText("차감 위치: 고압");
     expect(sourceField).toHaveClass("min-w-[112px]", "flex-col", "gap-0.5");
     expect(screen.getByText("차감 위치")).toHaveClass("text-xs", "tracking-[1.5px]");
-    const sourceContent = screen.getByText("고압").parentElement;
+    const sourceContent = within(sourceField).getByText("고압").parentElement;
     expect(sourceContent).toHaveClass(
       "inline-flex",
       "items-center",

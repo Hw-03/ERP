@@ -101,7 +101,7 @@ export function MobileUserMenuSheet({
     <BottomSheet open={open} onClose={handleClose} ariaLabel="사용자 메뉴">
       {/* 사용자 정보 헤더 */}
       <div className="px-5 pb-3 pt-1">
-        <div className={`${TYPO.headline} font-black`} style={{ color: LEGACY_COLORS.text }}>
+        <div className="break-words text-lg font-semibold" style={{ color: LEGACY_COLORS.text }}>
           {operator.name}
         </div>
         <div className={`${TYPO.caption} mt-0.5`} style={{ color: LEGACY_COLORS.muted2 }}>
@@ -112,7 +112,7 @@ export function MobileUserMenuSheet({
           <div className="mt-2 flex flex-wrap gap-1.5">
             {warehouseLabel && (
               <span
-                className="rounded-full px-2.5 py-0.5 text-[11px] font-bold"
+                className="rounded-full px-2.5 py-1 text-xs font-semibold"
                 style={{
                   background: `color-mix(in srgb, ${LEGACY_COLORS.green} 18%, transparent)`,
                   color: LEGACY_COLORS.green,
@@ -123,7 +123,7 @@ export function MobileUserMenuSheet({
             )}
             {deptLabel && (
               <span
-                className="rounded-full px-2.5 py-0.5 text-[11px] font-bold"
+                className="rounded-full px-2.5 py-1 text-xs font-semibold"
                 style={{
                   background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 18%, transparent)`,
                   color: LEGACY_COLORS.blue,

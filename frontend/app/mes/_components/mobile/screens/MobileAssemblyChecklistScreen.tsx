@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { SkeletonBlock, dataRevealClassName } from "../../common/LoadingSkeleton";
+import { ReadFailure } from "../../common/ReadState";
 import {
   ArrowLeft,
   ChevronRight,
@@ -34,6 +36,7 @@ import {
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 import { BottomSheet } from "@/lib/ui/BottomSheet";
 import { TYPO } from "../tokens";
+import presentation from "../mobilePresentation.module.css";
 import { useAssemblyChecklistItemDrag, type UseAssemblyChecklistItemDragResult } from "./useAssemblyChecklistItemDrag";
 import { useAssemblyChecklistSectionDrag, type UseAssemblyChecklistSectionDragResult } from "./useAssemblyChecklistSectionDrag";
 
@@ -175,20 +178,20 @@ function Header({
   rightAction?: ReactNode;
 }) {
   return (
-    <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] items-center">
+    <div className="grid grid-cols-[2.75rem_minmax(0,1fr)_2.75rem] items-center gap-2">
       <button
         type="button"
         aria-label={backLabel}
         onClick={onBack}
-        className="flex h-10 w-10 items-center justify-center rounded-full border transition-[transform] active:scale-[0.94]"
+        className="flex h-11 w-11 items-center justify-center rounded-full border transition-[transform] active:scale-[0.94]"
         style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
       >
         <ArrowLeft className="h-5 w-5" />
       </button>
-      <h2 className="min-w-0 truncate text-center text-xl font-black" style={{ color: LEGACY_COLORS.text }}>
+      <h2 className="min-w-0 break-words text-center text-lg font-black leading-snug" style={{ color: LEGACY_COLORS.text }}>
         {title}
       </h2>
-      {rightAction ?? <span aria-hidden="true" className="h-10 w-10" />}
+      {rightAction ?? <span aria-hidden="true" className="h-11 w-11" />}
     </div>
   );
 }
@@ -205,17 +208,17 @@ function ProductCard({
       type="button"
       aria-label={`${checklist.model_name} 체크리스트 열기`}
       onClick={onClick}
-      className="flex flex-1 items-center gap-4 rounded-[18px] border p-4 text-left transition-[transform] active:scale-[0.99]"
+      className={presentation.menuRow}
       style={CARD_STYLE}
     >
       <span
-        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px]"
-        style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)` }}
+        className={presentation.choiceIcon}
+        aria-hidden="true"
       >
-        <ClipboardCheck className="h-6 w-6" style={{ color: LEGACY_COLORS.blue }} />
+        <ClipboardCheck />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-xl font-black" style={{ color: LEGACY_COLORS.text }}>
+        <span className="block whitespace-normal break-keep [overflow-wrap:anywhere]" style={{ color: LEGACY_COLORS.text }}>
           {checklist.model_name}
         </span>
       </span>
@@ -237,34 +240,31 @@ function BrowseDetail({
   onClearSection: (section: AssemblyChecklistSection) => void;
 }) {
   return (
-    <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pb-6 pt-3">
+    <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-4 [&>*]:shrink-0">
       <Header title={checklist.model_name} onBack={onBack} backLabel="제품 선택으로 돌아가기" />
 
       {checklist.sections.map((section) => {
         const hasCompletedItem = section.items.some((item) => completedItemKeys.has(checklistItemKey(item.item_id)));
         return (
-          <section key={section.section_id} className="rounded-[20px] border p-4" style={CARD_STYLE}>
+          <section key={section.section_id} className="rounded-[20px] border p-3" style={CARD_STYLE}>
             {section.title && (
               <h3 className={`${TYPO.overline} mb-3`} style={{ color: LEGACY_COLORS.muted2 }}>
                 {section.title}
               </h3>
             )}
-            <ol aria-label={`${section.title ?? checklist.model_name} 체크리스트`} className="flex list-none flex-col gap-2 p-0">
+            <ol aria-label={`${section.title ?? checklist.model_name} 체크리스트`} className="flex list-none flex-col p-0">
               {section.items.map((item, itemIndex) => {
                 const itemKey = checklistItemKey(item.item_id);
                 const isCompleted = completedItemKeys.has(itemKey);
                 return (
-                  <li key={item.item_id}>
+                  <li key={item.item_id} className="border-b last:border-b-0" style={{ borderColor: LEGACY_COLORS.border }}>
                     <button
                       type="button"
                       aria-pressed={isCompleted}
                       onClick={() => onToggle(itemKey)}
-                      className="no-btn-inset flex min-h-11 w-full gap-3 rounded-[14px] border px-3 py-3 text-left transition-colors"
+                      className="no-btn-inset flex min-h-11 w-full gap-3 rounded-[12px] px-2 py-3 text-left transition-colors"
                       style={{
                         background: isCompleted ? `color-mix(in srgb, ${LEGACY_COLORS.green} 10%, transparent)` : undefined,
-                        borderColor: isCompleted
-                          ? `color-mix(in srgb, ${LEGACY_COLORS.green} 45%, transparent)`
-                          : LEGACY_COLORS.border,
                       }}
                     >
                       <span
@@ -280,7 +280,7 @@ function BrowseDetail({
                       >
                         {itemIndex + 1}
                       </span>
-                      <span className={`${TYPO.body} whitespace-pre-line`} style={{ color: LEGACY_COLORS.text }}>
+                      <span className={`${TYPO.body} min-w-0 break-keep whitespace-pre-line [overflow-wrap:anywhere]`} style={{ color: LEGACY_COLORS.text }}>
                         {item.content}
                       </span>
                     </button>
@@ -418,7 +418,7 @@ function SectionEditorSheet({
             disabled={busy}
             onChange={(event) => onChange(event.target.value)}
             placeholder="예: 전원 ON"
-            className="min-h-11 rounded-[12px] border px-3 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-blue)] disabled:opacity-45"
+            className="min-h-11 rounded-[12px] border px-3 text-base font-medium outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-blue)] disabled:opacity-45"
             style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
           />
         </label>
@@ -475,7 +475,7 @@ function ItemEditorSheet({
             disabled={busy}
             rows={5}
             onChange={(event) => onChange(event.target.value)}
-            className={`${TYPO.body} min-h-28 w-full resize-y rounded-[12px] border px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-blue)] disabled:opacity-45`}
+            className="min-h-28 w-full resize-y rounded-[12px] border px-3 py-2 text-base font-medium outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-blue)] disabled:opacity-45"
             style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
           />
         </label>
@@ -634,7 +634,7 @@ function ManagedSection({
 }) {
   const label = sectionLabel(section);
   return (
-    <section className="rounded-[20px] border p-4" style={CARD_STYLE}>
+    <section className="rounded-[20px] border p-3" style={CARD_STYLE}>
       <div className="flex items-center justify-between gap-3">
         <h3 className={`${TYPO.title} min-w-0 flex-1`} style={{ color: LEGACY_COLORS.text }}>{label}</h3>
         <button
@@ -649,7 +649,7 @@ function ManagedSection({
       </div>
       <ol className="mt-3 list-none divide-y p-0" aria-label={`${label} 관리 항목`} style={{ borderColor: LEGACY_COLORS.border }}>
         {section.items.map((item, index) => (
-          <li key={item.item_id}>
+          <li key={item.item_id} className="border-b last:border-b-0" style={{ borderColor: LEGACY_COLORS.border }}>
             <div className="flex min-h-[52px] items-center">
               <button
                 type="button"
@@ -663,7 +663,7 @@ function ManagedSection({
                 >
                   {index + 1}
                 </span>
-                <span className={`${TYPO.body} min-w-0 flex-1 whitespace-pre-line`} style={{ color: LEGACY_COLORS.text }}>
+                <span className={`${TYPO.body} min-w-0 flex-1 break-keep whitespace-pre-line [overflow-wrap:anywhere]`} style={{ color: LEGACY_COLORS.text }}>
                   {item.content}
                 </span>
               </button>
@@ -787,7 +787,7 @@ function SortSection({
                 <GripVertical className="h-5 w-5" />
               </button>
               <span className="w-5 shrink-0 text-xs font-black" style={{ color: LEGACY_COLORS.muted2 }}>{index + 1}</span>
-              <span className={`${TYPO.body} min-w-0 flex-1 whitespace-pre-line`} style={{ color: LEGACY_COLORS.text }}>
+              <span className={`${TYPO.body} min-w-0 flex-1 break-keep whitespace-pre-line [overflow-wrap:anywhere]`} style={{ color: LEGACY_COLORS.text }}>
                 {item.content}
               </span>
               {isItemSaving && <span className={TYPO.caption} style={{ color: LEGACY_COLORS.blue }}>저장 중</span>}
@@ -1065,7 +1065,7 @@ function ManageDetail({
 
   return (
     <>
-      <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pb-6 pt-3">
+      <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-4 [&>*]:shrink-0">
         <Header title={checklist.model_name} onBack={onBack} backLabel="체크리스트 관리 목록으로 돌아가기" />
         {checklist.sections.length > 0 && (
           <div className="flex justify-end">
@@ -1221,6 +1221,14 @@ function ManageHome({
   onOpen,
   onAdd,
   pending,
+  modelsLoading,
+  modelsError,
+  checklistsLoading,
+  checklistsError,
+  modelsHasData,
+  checklistsHasData,
+  onRetryModels,
+  onRetryChecklists,
 }: {
   checklists: AssemblyChecklist[];
   models: ProductModel[];
@@ -1228,19 +1236,28 @@ function ManageHome({
   onOpen: (checklist: AssemblyChecklist) => void;
   onAdd: (model: ProductModel) => void;
   pending: boolean;
+  modelsLoading: boolean;
+  modelsError: boolean;
+  checklistsLoading: boolean;
+  checklistsError: boolean;
+  modelsHasData: boolean;
+  checklistsHasData: boolean;
+  onRetryModels: () => void;
+  onRetryChecklists: () => void;
 }) {
   const configuredSlots = new Set(checklists.map((checklist) => checklist.model_slot));
   const availableModels = models.filter((model) => model.model_name && !model.is_reserved && !configuredSlots.has(model.slot));
   return (
-    <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pb-6 pt-3">
+    <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pt-4">
       <Header title="체크리스트 관리" onBack={onBack} backLabel="체크리스트 선택으로 돌아가기" />
       <section className="rounded-[20px] border p-4" style={CARD_STYLE}>
         <h3 className={TYPO.title} style={{ color: LEGACY_COLORS.text }}>제품 추가</h3>
         <p className={`mt-1 ${TYPO.caption}`} style={{ color: LEGACY_COLORS.muted2 }}>
           기존 MES 모델만 체크리스트에 등록할 수 있습니다.
         </p>
-        <div className="mt-3 flex flex-col gap-2">
-          {availableModels.length === 0 ? (
+        <div className={`mt-3 flex flex-col gap-2 ${!modelsLoading && models.length > 0 ? dataRevealClassName : ""}`}>
+          {modelsError && <ReadFailure message="모델 목록을 불러오지 못했습니다." refresh={modelsHasData} onRetry={onRetryModels} />}
+          {modelsLoading ? <ChecklistSkeleton label="모델 목록 불러오는 중" compact /> : modelsError && !modelsHasData ? null : availableModels.length === 0 ? (
             <p className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>추가할 수 있는 모델이 없습니다.</p>
           ) : availableModels.map((model) => (
             <button
@@ -1249,7 +1266,7 @@ function ManageHome({
               aria-label={`${model.model_name} 체크리스트 추가`}
               onClick={() => onAdd(model)}
               disabled={pending}
-              className="flex min-h-11 items-center justify-between rounded-[12px] border px-3 py-2 text-left disabled:opacity-45"
+              className="flex min-h-11 items-center justify-between border-b py-2 text-left last:border-b-0 disabled:opacity-45"
               style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
             >
               <span className="text-sm font-black">{model.model_name}</span>
@@ -1260,14 +1277,16 @@ function ManageHome({
       </section>
       <section className="rounded-[20px] border p-4" style={CARD_STYLE}>
         <h3 className={TYPO.title} style={{ color: LEGACY_COLORS.text }}>등록된 제품</h3>
-        <div className="mt-3 flex flex-col gap-2">
+        <div className={`mt-3 flex flex-col gap-2 ${!checklistsLoading && checklists.length > 0 ? dataRevealClassName : ""}`}>
+          {checklistsError && <ReadFailure message="체크리스트를 불러오지 못했습니다." refresh={checklistsHasData} onRetry={onRetryChecklists} />}
+          {checklistsLoading && <ChecklistSkeleton label="체크리스트 불러오는 중" compact />}
           {checklists.map((checklist) => (
             <button
               key={checklist.checklist_id}
               type="button"
               aria-label={`${checklist.model_name} 관리`}
               onClick={() => onOpen(checklist)}
-              className="flex min-h-11 items-center justify-between rounded-[12px] border px-3 text-left"
+              className="flex min-h-11 items-center justify-between border-b py-2 text-left last:border-b-0"
               style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
             >
               <span className="text-sm font-black">{checklist.model_name}</span>
@@ -1287,8 +1306,10 @@ export function MobileAssemblyChecklistScreen({ onExit }: { onExit?: () => void 
   const [latestChecklist, setLatestChecklist] = useState<AssemblyChecklist | null>(null);
   const latestChecklistQueryRef = useRef<AssemblyChecklist[] | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const { data: checklists = [], isLoading, error } = useAssemblyChecklistsQuery();
-  const { data: models = [] } = useModelsQuery();
+  const { data: checklistData, isLoading, error, refetch } = useAssemblyChecklistsQuery();
+  const checklists = useMemo(() => checklistData ?? [], [checklistData]);
+  const modelsQuery = useModelsQuery();
+  const models = modelsQuery.data ?? [];
   const createChecklist = useCreateAssemblyChecklistMutation();
 
   useEffect(() => {
@@ -1382,6 +1403,14 @@ export function MobileAssemblyChecklistScreen({ onExit }: { onExit?: () => void 
           }}
           onAdd={(model) => void addChecklist(model)}
           pending={createChecklist.isPending}
+          modelsLoading={modelsQuery.isLoading && modelsQuery.data === undefined}
+          modelsError={Boolean(modelsQuery.error)}
+          checklistsLoading={isLoading && checklistData === undefined}
+          checklistsError={Boolean(error)}
+          modelsHasData={modelsQuery.data !== undefined}
+          checklistsHasData={checklistData !== undefined}
+          onRetryModels={() => void modelsQuery.refetch()}
+          onRetryChecklists={() => void refetch()}
         />
         <ErrorText message={errorMessage} />
       </>
@@ -1389,8 +1418,8 @@ export function MobileAssemblyChecklistScreen({ onExit }: { onExit?: () => void 
   }
 
   return (
-    <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pb-3 pt-3">
-      <section className="rounded-[20px] border p-4" style={CARD_STYLE}>
+    <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pt-4">
+      <section className="shrink-0 px-1 py-1">
         <div className="flex items-center gap-3">
           {onExit && (
             <button
@@ -1404,12 +1433,12 @@ export function MobileAssemblyChecklistScreen({ onExit }: { onExit?: () => void 
             </button>
           )}
           <span
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px]"
+            className="hidden"
             style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 20%, transparent)` }}
           >
             <ClipboardCheck className="h-6 w-6" style={{ color: LEGACY_COLORS.blue }} />
           </span>
-          <h2 className={`${TYPO.display} min-w-0 flex-1 truncate leading-tight`} style={{ color: LEGACY_COLORS.text }}>
+          <h2 className="min-w-0 flex-1 text-lg font-semibold leading-snug" style={{ color: LEGACY_COLORS.text }}>
             조립 체크리스트
           </h2>
           <button
@@ -1423,15 +1452,23 @@ export function MobileAssemblyChecklistScreen({ onExit }: { onExit?: () => void 
           </button>
         </div>
       </section>
-      {isLoading ? (
-        <p className={TYPO.body} style={{ color: LEGACY_COLORS.muted2 }}>체크리스트를 불러오는 중입니다.</p>
-      ) : error ? (
-        <p role="alert" className={TYPO.body} style={{ color: LEGACY_COLORS.red }}>체크리스트를 불러오지 못했습니다.</p>
-      ) : (
-        <div className="flex flex-1 flex-col gap-2">
+      {error && <ReadFailure message="체크리스트를 불러오지 못했습니다." refresh={checklistData !== undefined} onRetry={() => void refetch()} />}
+      {isLoading && checklistData === undefined ? <ChecklistSkeleton label="체크리스트 불러오는 중" /> : checklistData !== undefined && (
+        <div className={`${presentation.surface} ${presentation.choiceList} ${dataRevealClassName}`} style={CARD_STYLE}>
           {checklists.map((checklist) => <ProductCard key={checklist.checklist_id} checklist={checklist} onClick={() => openChecklist(checklist)} />)}
         </div>
       )}
     </div>
   );
+}
+
+/** 선택 목록과 관리 행의 크기를 유지하고 모델 이름은 응답 후에만 표시한다. */
+function ChecklistSkeleton({ label, compact = false }: { label: string; compact?: boolean }): ReactNode {
+  return <div role="status" aria-busy="true" aria-label={label} className={compact ? "flex flex-col gap-2" : `${presentation.surface} ${presentation.choiceList}`} style={compact ? undefined : CARD_STYLE}>
+    {[0, 1, 2].map((row) => <div key={row} aria-hidden="true" className={compact ? "flex min-h-11 items-center justify-between border-b py-2 last:border-b-0" : presentation.menuRow} style={CARD_STYLE}>
+      {!compact && <span className={presentation.choiceIcon}><ClipboardCheck /></span>}
+      <SkeletonBlock className="h-5 w-36" />
+      {compact && <SkeletonBlock className="h-4 w-8" />}
+    </div>)}
+  </div>;
 }

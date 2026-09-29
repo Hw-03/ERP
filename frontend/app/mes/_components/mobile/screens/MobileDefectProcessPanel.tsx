@@ -23,6 +23,7 @@ import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { IconButton, SectionCard, StickyFooter, Stepper } from "../primitives";
 import type { Supplier } from "@/lib/api";
 import { SupplierPickerStep } from "../../_warehouse_v2/SupplierPickerStep";
+import panelStyles from "./mobileWarehousePanels.module.css";
 
 type ProcessAction = "unquarantine" | "scrap" | "return" | "disassemble";
 
@@ -206,7 +207,7 @@ export function MobileDefectProcessPanel({
             mode="select"
           />
         </div>
-        <StickyFooter>
+        <StickyFooter embedded>
           <button
             type="button"
             disabled={busy || !supplierListReady || !selectedSupplier}
@@ -218,6 +219,7 @@ export function MobileDefectProcessPanel({
           </button>
         </StickyFooter>
         <ConfirmModal
+          className={panelStyles.touchScope}
           open={confirmOpen}
           title="반품 확인"
           tone="danger"
@@ -272,6 +274,7 @@ export function MobileDefectProcessPanel({
             BOM 재작업 트리
           </span>
           <DisassembleTree
+            mobilePresentation
             parentItemId={location.item_id}
             parentItemName={location.item_name}
             parentMesCode={location.mes_code ?? ""}
@@ -285,7 +288,7 @@ export function MobileDefectProcessPanel({
         {errorMsg && <InlineErrorNote>{errorMsg}</InlineErrorNote>}
         </div>
 
-        <StickyFooter>
+        <StickyFooter embedded>
           <button
             type="button"
             disabled={busy || !reworkReady}
@@ -301,6 +304,7 @@ export function MobileDefectProcessPanel({
         </StickyFooter>
 
         <ConfirmModal
+          className={panelStyles.touchScope}
           open={confirmOpen}
           title="재작업 확인"
           tone="danger"
@@ -385,7 +389,6 @@ export function MobileDefectProcessPanel({
         </span>
         <ActionRow
           label="정상 복귀"
-          desc="불량 해제 후 정상 재고로"
           color={LEGACY_COLORS.green}
           selected={action === "unquarantine"}
           onClick={() => setAction("unquarantine")}
@@ -393,7 +396,6 @@ export function MobileDefectProcessPanel({
         {location.has_bom && (
           <ActionRow
             label="재작업"
-            desc="즉시 BOM 재작업 처리"
             color={LEGACY_COLORS.yellow}
             selected={action === "disassemble"}
             onClick={() => setAction("disassemble")}
@@ -401,7 +403,6 @@ export function MobileDefectProcessPanel({
         )}
         <ActionRow
           label="전체 폐기"
-          desc="즉시 격리 재고 차감"
           color={LEGACY_COLORS.red}
           selected={action === "scrap"}
           onClick={() => setAction("scrap")}
@@ -409,7 +410,6 @@ export function MobileDefectProcessPanel({
         {isWarehouse && (
           <ActionRow
             label="반품"
-            desc="즉시 반품 처리"
             color={LEGACY_COLORS.muted2}
             selected={action === "return"}
             onClick={() => setAction("return")}
@@ -460,7 +460,7 @@ export function MobileDefectProcessPanel({
       </div>
 
       {/* 하단 액션 — 항상 보이도록 고정 */}
-      <StickyFooter>
+      <StickyFooter embedded>
         <button
           type="button"
           disabled={busy}
@@ -492,6 +492,7 @@ export function MobileDefectProcessPanel({
       </StickyFooter>
 
       <ConfirmModal
+        className={panelStyles.touchScope}
         open={confirmOpen}
         title={action === "unquarantine" ? "정상 복귀 확인" : action === "scrap" ? "폐기 확인" : "반품 확인"}
         tone="danger"
@@ -518,13 +519,11 @@ export function MobileDefectProcessPanel({
 
 function ActionRow({
   label,
-  desc,
   color,
   selected,
   onClick,
 }: {
   label: string;
-  desc: string;
   color: string;
   selected: boolean;
   onClick: () => void;
@@ -533,18 +532,15 @@ function ActionRow({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full flex-col gap-1 rounded-[16px] border px-4 py-3 text-left transition-[transform] active:scale-[0.99]"
+      className="flex min-h-12 w-full items-center rounded-[12px] border px-4 py-3 text-left transition-[transform] active:scale-[0.99]"
       style={{
         background: selected ? tint(color, 8) : LEGACY_COLORS.s2,
         borderColor: selected ? color : LEGACY_COLORS.border,
         borderWidth: 2,
       }}
     >
-      <span className={clsx(TYPO.body, "font-black")} style={{ color: selected ? color : LEGACY_COLORS.text }}>
+      <span className="text-base font-bold" style={{ color: selected ? color : LEGACY_COLORS.text }}>
         {label}
-      </span>
-      <span className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.muted }}>
-        {desc}
       </span>
     </button>
   );

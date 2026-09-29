@@ -22,6 +22,8 @@ import { SupplierPickerStep } from "../../_warehouse_v2/SupplierPickerStep";
 import { MaterialDirectionStep } from "../../_warehouse_v2/MaterialDirectionStep";
 import { Button } from "@/lib/ui/Button";
 import { MobileSingleAdjustForm } from "./MobileSingleAdjustForm";
+import panelStyles from "../screens/mobileWarehousePanels.module.css";
+import quantityStyles from "./MobileIoQuantityCart.module.css";
 import { IoTargetPicker } from "../../_warehouse_v2/IoTargetPicker";
 import { IoBundleCart } from "../../_warehouse_v2/IoBundleCart";
 import { IoConfirmStep } from "../../_warehouse_v2/IoConfirmStep";
@@ -116,7 +118,15 @@ export function MobileIoComposeWizard({
   flushDraftRef,
   onStepChange,
   onDraftSaved,
+  itemsLoading = false,
+  itemsLoadError = null,
+  itemsHasData = true,
+  onRetryItems,
 }: IoComposeViewProps & {
+  itemsLoading?: boolean;
+  itemsLoadError?: string | null;
+  itemsHasData?: boolean;
+  onRetryItems?: () => void;
   // 모바일 전용 — 섹션 탭 이탈 가드(D2)용. 데스크톱 IoComposeView 는 미사용.
   onDirtyChange?: (dirty: boolean) => void;
   flushDraftRef?: MutableRefObject<(() => Promise<void>) | null>;
@@ -642,22 +652,18 @@ export function MobileIoComposeWizard({
       : "최종 확인";
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col" style={{ background: LEGACY_COLORS.bg }}>
-      {/* 헤더: 뒤로 + 진행바. in-flow(non-scroll 첫 자식)라 셸 헤더 아래에 머물며 본문만
-          스크롤된다. (이전 fixed top-0 는 셸 헤더 DEXCOWIN MES 를 덮는 버그였음)
-          항목 6 — 페이지 배경과 같은 톤으로 두어 위 섹션 탭과 자연스럽게 이어지게(카드감 제거). */}
+    <div className={`flex h-full min-h-0 flex-1 flex-col ${panelStyles.touchScope} ${panelStyles.composeScope}`} style={{ background: LEGACY_COLORS.bg }}>
+      {/* 진행 안내는 본문 밖에 두어 스크롤 중에도 현재 단계를 유지한다. */}
       <div
-        className={`z-10 flex shrink-0 items-center gap-2 px-3 py-2 ${step === 5 ? "" : "border-b"}`}
-        style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}
+        className={`z-10 mx-3 flex min-h-10 shrink-0 items-center gap-2 rounded-[12px] border px-3 py-2 [@media(max-height:500px)]:py-1 ${step === 4 ? "mt-0" : "mt-2"}`}
+        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
       >
         {step > 1 ? (
           <IconButton icon={ArrowLeft} label="이전 단계" size="md" onClick={state.goPrev} />
-        ) : (
-          <div className="h-11 w-11 shrink-0" aria-hidden />
-        )}
+        ) : null}
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <h2
-            className="min-w-0 max-w-[132px] truncate text-sm font-black"
+            className="min-w-0 max-w-[160px] truncate text-[15px] font-semibold"
             style={{ color: LEGACY_COLORS.text }}
           >
             {stepTitle}
@@ -665,7 +671,6 @@ export function MobileIoComposeWizard({
           <WizardProgress
             steps={state.workType === "receive" ? [{ key: "1", label: "작업 유형" }, { key: "6", label: "입고·출고" }, { key: "2", label: "공급업체" }, ...STEP_META.slice(2)] : STEP_META}
             current={state.steps.indexOf(step)}
-            currentLabel={state.workType === "receive" && step === 2 ? "공급업체" : undefined}
             variant="inline"
             accent={directionOutbound ? LEGACY_COLORS.red : undefined}
             className="flex-1"
@@ -674,10 +679,10 @@ export function MobileIoComposeWizard({
       </div>
 
       {/* 본문: 현재 스텝만 스크롤. 항목 5-4·5-5 — 하단 pb 축소해 sticky 푸터를 네비바에 근접. */}
-      <div className="sg min-h-0 flex-1 overflow-y-auto px-3 pb-6">
+      <div className="scrollbar-hide flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-2">
         {error && (
           <div
-            className="mb-3 rounded-[12px] border px-4 py-3 text-sm font-bold"
+            className="mb-3 shrink-0 rounded-[12px] border px-4 py-3 text-sm font-bold"
             style={{
               background: tint(LEGACY_COLORS.red, 10),
               borderColor: tint(LEGACY_COLORS.red, 30),
@@ -697,11 +702,11 @@ export function MobileIoComposeWizard({
         )}
 
         {step === 6 && (
-          <div className="flex h-full min-h-0 flex-col gap-4">
-            <div className="min-h-0 flex-1">
-              <MaterialDirectionStep selected={state.materialDirectionSelected ? state.subType : null} onSelect={handleSubTypeChange} />
+          <div className="flex flex-[1_0_auto] flex-col gap-2">
+            <div className="flex flex-[1_0_auto] flex-col">
+              <MaterialDirectionStep selected={state.materialDirectionSelected ? state.subType : null} onSelect={handleSubTypeChange} mobilePresentation />
             </div>
-            <Button variant="primary" size="lg" onClick={state.goNext} disabled={!state.canAdvance[6]} style={materialOutbound ? { background: LEGACY_COLORS.red } : undefined} className="w-full">
+            <Button variant="primary" size="lg" onClick={state.goNext} disabled={!state.canAdvance[6]} style={materialOutbound ? { background: LEGACY_COLORS.red } : undefined} className="w-full shrink-0">
               {state.canAdvance[6] ? "다음 단계로 →" : "입고 또는 출고를 선택하세요"}
             </Button>
           </div>
@@ -709,6 +714,7 @@ export function MobileIoComposeWizard({
 
         {step === 2 && (
           state.workType === "receive" ? (
+            <div className="min-h-[180px] flex-1">
             <SupplierPickerStep
               employeeId={employeeId}
               selectedSupplierId={state.selectedSupplierId}
@@ -718,6 +724,7 @@ export function MobileIoComposeWizard({
               variant="mobile"
               outbound={materialOutbound}
             />
+            </div>
           ) : (
             <MobileSubTypeStep
               workType={state.workType}
@@ -757,6 +764,10 @@ export function MobileIoComposeWizard({
                 </div>
               )}
               <MobileSingleAdjustForm
+                itemsLoading={itemsLoading}
+                itemsLoadError={itemsLoadError}
+                itemsHasData={itemsHasData}
+                onRetryItems={onRetryItems}
               subType={state.subType}
               items={items}
               bundles={state.bundles}
@@ -807,7 +818,13 @@ export function MobileIoComposeWizard({
                   onClick={() => setScanOpen(true)}
                 />
               </div>
+              <div className="min-h-0 flex-1">
               <IoTargetPicker
+                mobilePresentation
+                loading={itemsLoading}
+                loadError={itemsLoadError}
+                hasData={itemsHasData}
+                onRetry={onRetryItems}
                 workType={state.workType}
                 subType={state.subType}
                 deptIoDirection={state.deptIoDirection}
@@ -838,10 +855,12 @@ export function MobileIoComposeWizard({
                 busy={previewing}
                 addBlocked={itemAddBlocked}
               />
+              </div>
             </>
           ))}
 
         {step === 4 && (
+          <div className={`min-h-[240px] flex-1 ${quantityStyles.cart}`}>
           <IoBundleCart
             bundles={state.bundles}
             subType={state.subType}
@@ -921,10 +940,13 @@ export function MobileIoComposeWizard({
               .map((line) => line.mes_code ?? line.item_name)}
             onSaveDraft={handleSaveDraft}
           />
+          </div>
         )}
 
         {step === 5 && (
+          <div className="min-h-[360px] flex-1">
           <IoConfirmStep
+            mobilePresentation
             supplierName={state.selectedSupplierName}
             workType={state.workType}
             subType={state.subType}
@@ -944,13 +966,14 @@ export function MobileIoComposeWizard({
             onSubmit={handleSubmit}
             onSaveDraft={handleSaveDraft}
           />
+          </div>
         )}
       </div>
 
       {/* 썸존 하단 액션 — Step 2 만 (1=자동advance, 3=picker 내부 advance,
           4=cart 내부버튼, 5=confirm 내부버튼). Step3 는 이중 하단바 방지로 제외. */}
       {step === 2 && (
-        <StickyFooter flat>
+        <StickyFooter flat compact embedded>
           <PrimaryActionButton
             label={state.canAdvance[2]
               ? "다음 단계로 →"

@@ -31,6 +31,14 @@ describe.each([WarehouseQueuePanel, DepartmentQueuePanel, AsResearchQueuePanel, 
     expect(screen.getByRole("status")).toHaveClass("flex-1", "rounded-[20px]");
     expect(screen.queryByTestId("warehouse-empty-work-area")).not.toBeInTheDocument();
   });
+  it("keeps mobile request cards in the list frame during first loading", () => {
+    query.data = undefined;
+    query.isLoading = true;
+    query.error = null;
+    render(<Panel mobilePresentation approverEmployeeId="e1" employeeId="e1" refreshNonce={0} onChanged={vi.fn()} />);
+    expect(screen.getByRole("status")).toHaveAttribute("data-mobile-skeleton", "requests");
+    expect(screen.getByRole("status")).not.toHaveClass("p-4");
+  });
   it("retains a successful empty result on refresh failure", () => {
     render(<Panel approverEmployeeId="e1" employeeId="e1" refreshNonce={0} onChanged={vi.fn()} />);
     expect(screen.getByRole("alert")).toHaveTextContent("기존 내용을 표시합니다");

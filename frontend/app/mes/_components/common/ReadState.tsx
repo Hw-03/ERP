@@ -7,12 +7,12 @@ import { LoadFailureCard } from "./LoadFailureCard";
 import { EmptyState } from "./EmptyState";
 
 /** 업무별 레이아웃은 유지하면서 조회 상태의 안내와 복구 동작만 공유한다. */
-export function ReadLoading({ label = "데이터를 불러오고 있습니다…", variant = "list" }: {
-  label?: string; variant?: "list" | "table" | "card";
+export function ReadLoading({ label = "데이터를 불러오고 있습니다…", variant = "list", skeleton }: {
+  label?: string; variant?: "list" | "table" | "card"; skeleton?: ReactNode;
 }) {
   return <div role="status" aria-busy="true" aria-label={label}>
     <span className="sr-only">{label}</span>
-    <div aria-hidden="true"><LoadingSkeleton variant={variant} /></div>
+    <div aria-hidden="true">{skeleton ?? <LoadingSkeleton variant={variant} />}</div>
   </div>;
 }
 

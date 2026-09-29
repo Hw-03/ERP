@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { InventoryKpiPanel } from "../InventoryKpiPanel";
 
@@ -10,6 +10,25 @@ const cards = [
 ];
 
 describe("InventoryKpiPanel 로딩 상태", () => {
+  it("모바일 요약에서도 같은 KPI 선택과 로딩 상태를 유지한다", () => {
+    const onChange = vi.fn();
+    const { rerender } = render(<InventoryKpiPanel cards={cards} activeKey="LOW" onChange={onChange} mobile />);
+
+    fireEvent.click(screen.getByRole("button", { name: /부족/ }));
+    expect(onChange).toHaveBeenCalledWith("LOW");
+    expect(screen.getByRole("button", { name: /부족/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("12")).toBeInTheDocument();
+
+    rerender(<InventoryKpiPanel cards={cards} activeKey="LOW" onChange={onChange} mobile loading />);
+    expect(screen.getAllByRole("status", { name: "집계 중" })).toHaveLength(4);
+    expect(screen.queryByText("12")).not.toBeInTheDocument();
+    expect(screen.queryByText("…")).not.toBeInTheDocument();
+    for (const status of screen.getAllByRole("status", { name: "집계 중" })) {
+      expect(status).toHaveAttribute("aria-busy", "true");
+      expect(status.querySelector('[aria-hidden="true"]')).toHaveClass("h-6", "motion-safe:animate-pulse");
+    }
+  });
+
   it("최초 재고 조회 중에는 0 대신 같은 자리의 카드 스켈레톤 4개를 표시한다", () => {
     render(
       <InventoryKpiPanel cards={cards} activeKey="ALL" onChange={vi.fn()} loading />,

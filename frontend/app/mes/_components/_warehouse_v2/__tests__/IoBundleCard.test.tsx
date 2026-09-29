@@ -396,7 +396,7 @@ describe("IoBundleCard", () => {
     const sourceBadge = screen.getByLabelText("차감 위치: 여러 위치 · 2개 위치");
     expect(sourceBadge).toHaveClass("min-w-[112px]", "flex-col", "gap-0.5");
     expect(screen.getByText("차감 위치")).toHaveClass("text-xs", "tracking-[1.5px]");
-    const sourceContent = screen.getByText("여러 위치 · 2개 위치").parentElement;
+    const sourceContent = within(sourceBadge).getByText("여러 위치 · 2개 위치").parentElement;
     expect(sourceContent).toHaveClass(
       "inline-flex",
       "items-center",

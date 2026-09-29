@@ -33,11 +33,12 @@ function sortReportsByDepartment<T extends { department: string }>(reports: T[])
   );
 }
 
-function Failure({ message }: { message: string }) {
+function Failure({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <p role="alert" className="flex items-center gap-2 rounded-[14px] border px-3 py-2.5 text-sm font-bold" style={{ color: LEGACY_COLORS.red, borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.errorBg }}>
       <CircleAlert className="h-4 w-4 shrink-0" />
       {message}
+      {onRetry && <button type="button" onClick={onRetry} className="ml-auto min-h-11 shrink-0 rounded-[10px] border px-3 text-sm font-bold" style={{ borderColor: LEGACY_COLORS.border }}>다시 시도</button>}
     </p>
   );
 }
@@ -60,6 +61,7 @@ function DailyWorkReportHeaderControls({
   tab,
   onTabChange,
   compact = false,
+  mobile = false,
 }: {
   workDate: string;
   today: string;
@@ -70,26 +72,28 @@ function DailyWorkReportHeaderControls({
   tab: ReportTab;
   onTabChange: (next: ReportTab) => void;
   compact?: boolean;
+  mobile?: boolean;
 }) {
-  return (
+  const controls = (
     <>
-      <DailyWorkDatePicker value={workDate} maxDate={today} onChange={onDateChange} />
-      <dl className={`flex flex-wrap items-center gap-2 ${compact ? "hidden 2xl:flex" : ""}`}>
-        <div className="flex min-h-11 items-center gap-2 rounded-[12px] border px-3" style={{ background: `color-mix(in srgb, ${departmentColor} 12%, transparent)`, borderColor: `color-mix(in srgb, ${departmentColor} 35%, transparent)` }}>
+      {mobile ? <div className="flex min-w-0 w-full justify-center"><DailyWorkDatePicker value={workDate} maxDate={today} onChange={onDateChange} mobile /></div> : <DailyWorkDatePicker value={workDate} maxDate={today} onChange={onDateChange} />}
+      <dl className={`flex flex-wrap items-center gap-2 ${compact ? "hidden 2xl:flex" : ""} ${mobile ? "order-3 justify-center pt-1" : ""}`}>
+        <div className={mobile ? "flex min-w-0 items-center gap-1.5" : "flex min-h-11 items-center gap-2 rounded-[12px] border px-3"} style={mobile ? { color: departmentColor } : { background: `color-mix(in srgb, ${departmentColor} 12%, transparent)`, borderColor: `color-mix(in srgb, ${departmentColor} 35%, transparent)` }}>
           <dt className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>부서</dt>
           <dd className="text-sm font-black" style={{ color: departmentColor }}>{department}</dd>
         </div>
-        <div className="flex min-h-11 items-center gap-2 rounded-[12px] border px-3" style={{ background: `color-mix(in srgb, ${departmentColor} 12%, transparent)`, borderColor: `color-mix(in srgb, ${departmentColor} 35%, transparent)` }}>
+        <div className={mobile ? "flex min-w-0 items-center gap-1.5" : "flex min-h-11 items-center gap-2 rounded-[12px] border px-3"} style={mobile ? { color: departmentColor } : { background: `color-mix(in srgb, ${departmentColor} 12%, transparent)`, borderColor: `color-mix(in srgb, ${departmentColor} 35%, transparent)` }}>
           <dt className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>작성자</dt>
           <dd className="text-sm font-black" style={{ color: departmentColor }}>{employeeName}</dd>
         </div>
       </dl>
-      <div className="ml-auto inline-flex shrink-0 rounded-[14px] p-1" role="tablist" aria-label="일보 보기" style={{ background: LEGACY_COLORS.s2 }}>
-        <button type="button" role="tab" aria-selected={tab === "mine"} onClick={() => onTabChange("mine")} className="flex min-h-10 items-center rounded-[10px] px-3.5 text-sm font-black transition" style={{ color: tab === "mine" ? LEGACY_COLORS.white : LEGACY_COLORS.muted2, background: tab === "mine" ? LEGACY_COLORS.blue : "transparent", boxShadow: tab === "mine" ? "var(--c-card-shadow)" : "none" }}><FileText className="mr-2 h-4 w-4" />내 일보</button>
-        <button type="button" role="tab" aria-selected={tab === "all"} onClick={() => onTabChange("all")} className="flex min-h-10 items-center rounded-[10px] px-3.5 text-sm font-black transition" style={{ color: tab === "all" ? LEGACY_COLORS.white : LEGACY_COLORS.muted2, background: tab === "all" ? LEGACY_COLORS.blue : "transparent", boxShadow: tab === "all" ? "var(--c-card-shadow)" : "none" }}><Users className="mr-2 h-4 w-4" />전체 일보</button>
+      <div className={mobile ? "order-2 flex w-full shrink-0 rounded-[14px] p-1" : "ml-auto inline-flex shrink-0 rounded-[14px] p-1"} role="tablist" aria-label="일보 보기" style={{ background: LEGACY_COLORS.s2 }}>
+        <button type="button" role="tab" aria-selected={tab === "mine"} onClick={() => onTabChange("mine")} className={`${mobile ? "flex min-h-11 flex-1 justify-center" : "flex min-h-10"} items-center rounded-[10px] px-3.5 text-sm font-black transition`} style={{ color: tab === "mine" ? LEGACY_COLORS.white : LEGACY_COLORS.muted2, background: tab === "mine" ? LEGACY_COLORS.blue : "transparent", boxShadow: tab === "mine" ? "var(--c-card-shadow)" : "none" }}><FileText className="mr-2 h-4 w-4" />내 일보</button>
+        <button type="button" role="tab" aria-selected={tab === "all"} onClick={() => onTabChange("all")} className={`${mobile ? "flex min-h-11 flex-1 justify-center" : "flex min-h-10"} items-center rounded-[10px] px-3.5 text-sm font-black transition`} style={{ color: tab === "all" ? LEGACY_COLORS.white : LEGACY_COLORS.muted2, background: tab === "all" ? LEGACY_COLORS.blue : "transparent", boxShadow: tab === "all" ? "var(--c-card-shadow)" : "none" }}><Users className="mr-2 h-4 w-4" />전체 일보</button>
       </div>
     </>
   );
+  return mobile ? <div className="flex w-full flex-col gap-2">{controls}</div> : controls;
 }
 
 export function DailyWorkReportScreen({
@@ -98,17 +102,21 @@ export function DailyWorkReportScreen({
   saveRef,
   confirmNavigation,
   onTopbarControlsChange,
+  mobile = false,
 }: {
   employeeId: string | null | undefined;
   operator?: Operator | null;
   saveRef?: React.MutableRefObject<(() => Promise<void>) | null>;
   confirmNavigation?: (proceed: () => void) => void;
   onTopbarControlsChange?: (controls: ReactNode | null) => void;
+  mobile?: boolean;
 }) {
   const [workDate, setWorkDate] = useState(() => toKstDateKey());
   const [tab, setTab] = useState<ReportTab>("mine");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const preferredEmployeeIdRef = useRef<string | null>(null);
+  const authorChipsRef = useRef<HTMLDivElement>(null);
+  const [authorSkeletonLayout, setAuthorSkeletonLayout] = useState<{ height: number; chips: { width: number; height: number }[] } | null>(null);
   const [isActivityDetailOpen, setIsActivityDetailOpen] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
@@ -211,14 +219,23 @@ export function DailyWorkReportScreen({
   const changeDate = useCallback((next: string) => {
     if (!next || next > today) return;
     requestChange(() => {
+      // 새 날짜의 이름을 표시하지 않고, 직전 목록의 실제 칩 크기와 줄 높이만 유지한다.
+      if (mobile && authorChipsRef.current && !reportsQuery.isPlaceholderData) {
+        const height = authorChipsRef.current.getBoundingClientRect().height;
+        const chips = Array.from(authorChipsRef.current.children).map((chip) => {
+          const bounds = chip.getBoundingClientRect();
+          return { width: bounds.width, height: bounds.height };
+        }).filter((chip) => chip.width > 0 && chip.height > 0);
+        if (height > 0 && chips.length > 0) setAuthorSkeletonLayout({ height, chips });
+      }
       targetVersionRef.current += 1;
       setDirty(false);
       setSaveError(null);
       setWorkDate(next);
-      setSelectedEmployeeId(null);
+      setSelectedEmployeeId(mobile ? preferredEmployeeIdRef.current : null);
       setIsActivityDetailOpen(false);
     }, "저장하지 않은 내용이 있습니다. 날짜를 바꾸면 작성 중인 일보가 사라집니다.");
-  }, [requestChange, today]);
+  }, [mobile, reportsQuery.isPlaceholderData, requestChange, today]);
 
   const topbarControls = useMemo(() => onTopbarControlsChange ? (
     <DailyWorkReportHeaderControls
@@ -262,17 +279,20 @@ export function DailyWorkReportScreen({
   const reportLoadFailed = tab === "mine" ? reportQuery.isError : selectedReportQuery.isError;
   const reportLoading = tab === "mine" ? reportQuery.isLoading : selectedReportQuery.isLoading;
   const initialContentLoading = Boolean(reportLoading || activityQuery.isLoading);
+  const authorsLoading = reportsQuery.isLoading || (mobile && reportsQuery.isFetching && reportsQuery.isPlaceholderData);
+  const keepAuthors = mobile && reportsQuery.data !== undefined && !reportsQuery.isPlaceholderData;
+  const keepActivity = mobile && activityQuery.data !== undefined;
 
   return (
-    <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-3 py-3 lg:flex lg:flex-col lg:overflow-hidden lg:px-0 lg:py-0 lg:pr-4">
-      <div className={`scrollbar-hide flex w-full flex-col gap-3 pb-6 lg:min-h-0 lg:flex-1 lg:pb-0 ${!isActivityDetailOpen ? "lg:overflow-hidden" : "lg:overflow-y-auto"}`}>
-        {!onTopbarControlsChange && <header className="rounded-[20px] border p-4 lg:shrink-0 lg:px-5 lg:py-2.5" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex min-h-11 items-center gap-3">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px]" style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>
+    <div className={mobile ? "min-h-0 min-w-0 flex-1 overflow-y-auto px-3 pt-3" : "min-h-0 min-w-0 flex-1 overflow-y-auto px-3 py-3 lg:flex lg:flex-col lg:overflow-hidden lg:px-0 lg:py-0 lg:pr-4"} style={mobile ? { background: LEGACY_COLORS.bg } : undefined}>
+      <div className={`scrollbar-hide flex w-full flex-col gap-3 ${mobile ? "" : "pb-6"} lg:min-h-0 lg:flex-1 lg:pb-0 ${!isActivityDetailOpen ? "lg:overflow-hidden" : "lg:overflow-y-auto"}`}>
+        {!onTopbarControlsChange && <header className={mobile ? "rounded-[20px] border p-3" : "rounded-[20px] border p-4 lg:shrink-0 lg:px-5 lg:py-2.5"} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+          <div className={mobile ? "flex flex-col items-center gap-2" : "flex flex-wrap items-center gap-3"}>
+            <div className={mobile ? "contents" : "flex min-h-11 items-center gap-3"}>
+              <span className={mobile ? "hidden" : "flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px]"} style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>
                 <ClipboardList className="h-5 w-5" />
               </span>
-              <h1 className="whitespace-nowrap text-xl font-black">일일 작업 일보</h1>
+              <h1 className={mobile ? "sr-only" : "whitespace-nowrap text-xl font-black"}>일일 작업 일보</h1>
             </div>
             <DailyWorkReportHeaderControls
               workDate={workDate}
@@ -283,23 +303,27 @@ export function DailyWorkReportScreen({
               departmentColor={headerDepartmentColor}
               tab={tab}
               onTabChange={changeTab}
+              mobile={mobile}
             />
           </div>
         </header>}
 
         {tab === "all" && (
-          <section className="rounded-[20px] border p-4 lg:shrink-0 lg:p-5" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+          <section className={mobile ? "rounded-[20px] border p-3" : "rounded-[20px] border p-4 lg:shrink-0 lg:p-5"} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-base font-black">작성한 직원</h2>
-                <p className="mt-1 text-sm font-medium" style={{ color: LEGACY_COLORS.muted2 }}>직원을 선택하면 해당 날짜의 일보와 MES 거래를 읽을 수 있습니다.</p>
+                {!mobile && <p className="mt-1 text-sm font-medium" style={{ color: LEGACY_COLORS.muted2 }}>직원을 선택하면 해당 날짜의 일보와 MES 거래를 읽을 수 있습니다.</p>}
               </div>
-              <span className="rounded-full px-2.5 py-1 text-xs font-black" style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>{reportsQuery.isLoading ? <span className="inline-block h-3 w-6 rounded motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s3 }} /> : reports.length}명</span>
+              <span className="rounded-full px-2.5 py-1 text-xs font-black" style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>{authorsLoading ? <span className={`inline-block h-3 w-6 rounded ${mobile ? "" : "motion-safe:animate-pulse"}`} style={{ background: LEGACY_COLORS.s3 }} /> : mobile && reportsQuery.isError && !keepAuthors ? "—" : reports.length}명</span>
             </div>
-            {reportsQuery.isError ? <div className="mt-4"><Failure message="작성자 목록을 불러오지 못했습니다." /></div> : (
-              <div data-testid="daily-work-report-author-chips" className="mt-4 flex flex-wrap gap-2 lg:max-h-36 lg:overflow-y-auto lg:pr-1">
-                {reportsQuery.isLoading && <div role="status" aria-label="작성자 목록 불러오는 중" className="h-11 w-40 rounded-[12px] motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s2 }} />}
-                {!reportsQuery.isLoading && reports.length === 0 && <p className="rounded-[14px] border px-3 py-3 text-sm font-medium" style={{ color: LEGACY_COLORS.muted2, borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>작성된 일보가 없습니다.</p>}
+            {reportsQuery.isError && <div className="mt-4"><Failure message="작성자 목록을 불러오지 못했습니다." onRetry={mobile ? () => void reportsQuery.refetch() : undefined} /></div>}
+            {(!reportsQuery.isError || keepAuthors) && (
+              <div ref={authorChipsRef} data-testid="daily-work-report-author-chips" className="mt-4 flex flex-wrap gap-2 lg:max-h-36 lg:overflow-y-auto lg:pr-1" style={{ minHeight: mobile && authorsLoading ? authorSkeletonLayout?.height : undefined }}>
+                {authorsLoading && (mobile ? <div role="status" aria-busy="true" aria-label="작성자 목록 불러오는 중" className="contents">
+                  {(authorSkeletonLayout?.chips ?? [{ width: 160, height: 44 }]).map((chip, index) => <span key={index} aria-hidden="true" className="max-w-full shrink-0 rounded-[12px]" style={{ ...chip, background: LEGACY_COLORS.s2 }} />)}
+                </div> : <div role="status" aria-busy="true" aria-label="작성자 목록 불러오는 중" className="h-11 w-40 rounded-[12px] motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s2 }} />)}
+                {!authorsLoading && (!reportsQuery.isError || keepAuthors) && reports.length === 0 && <p className="rounded-[14px] border px-3 py-3 text-sm font-medium" style={{ color: LEGACY_COLORS.muted2, borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>작성된 일보가 없습니다.</p>}
                 {reports.map((entry) => {
                   const selected = selectedEmployeeId === entry.employee_id;
                   const departmentColor = getDepartmentFallbackColor(entry.department);
@@ -322,9 +346,10 @@ export function DailyWorkReportScreen({
         )}
 
         {targetEmployeeId ? (
-          <div key={tab === "all" ? targetEmployeeId : "mine"} data-testid="daily-work-report-result" role={initialContentLoading ? "status" : undefined} aria-busy={initialContentLoading || undefined} aria-label={initialContentLoading ? "일일 작업 일보 불러오는 중" : undefined} className={`min-w-0 space-y-3 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:gap-3 lg:space-y-0 ${tab === "all" && selectedEmployeeId ? "animate-view-fade" : ""}`}>
-              {reportLoadFailed && <Failure message="일보를 불러오지 못했습니다." />}
-              {activityQuery.isError ? <Failure message="MES 거래를 불러오지 못했습니다." /> : <DailyWorkActivity activity={activityQuery.data} loading={activityQuery.isLoading} onDetailOpenChange={setIsActivityDetailOpen} />}
+          <div key={mobile ? editorResetKey : tab === "all" ? targetEmployeeId : "mine"} data-testid="daily-work-report-result" role={initialContentLoading ? "status" : undefined} aria-busy={initialContentLoading || undefined} aria-label={initialContentLoading ? "일일 작업 일보 불러오는 중" : undefined} className={`min-w-0 space-y-3 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:gap-3 lg:space-y-0 ${!mobile && tab === "all" && selectedEmployeeId ? "animate-view-fade" : ""}`}>
+              {reportLoadFailed && <Failure message="일보를 불러오지 못했습니다." onRetry={mobile ? () => void (tab === "mine" ? reportQuery.refetch() : selectedReportQuery.refetch()) : undefined} />}
+              {activityQuery.isError && <Failure message="MES 거래를 불러오지 못했습니다." onRetry={mobile ? () => void activityQuery.refetch() : undefined} />}
+              {(!activityQuery.isError || keepActivity) && <DailyWorkActivity activity={activityQuery.data} loading={activityQuery.isLoading} onDetailOpenChange={setIsActivityDetailOpen} mobile={mobile} />}
               <DailyWorkReportEditor
               loading={reportLoading}
               initialContent={report?.content ?? ""}
@@ -341,6 +366,7 @@ export function DailyWorkReportScreen({
               }}
               saveRef={editorSaveRef}
               fillAvailableHeight={!isActivityDetailOpen}
+              mobile={mobile}
               />
           </div>
         ) : tab === "all" ? <PanelPlaceholder title="작성한 직원을 선택하세요." /> : null}

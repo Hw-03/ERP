@@ -25,6 +25,7 @@ type Props = {
   onClearSelectedMonth: () => void;
   flatSurface?: boolean;
   disabled?: boolean;
+  mobile?: boolean;
 };
 
 export function HistoryFilterBar({
@@ -43,12 +44,13 @@ export function HistoryFilterBar({
   onClearSelectedMonth,
   flatSurface = false,
   disabled = false,
+  mobile = false,
 }: Props) {
   return (
-    <section className={flatSurface ? "card desktop-flat-surface" : "card"} style={{ paddingTop: 14, paddingBottom: 14 }}>
+    <section className={mobile ? "min-w-0" : flatSurface ? "card desktop-flat-surface" : "card"} style={mobile ? undefined : { paddingTop: 14, paddingBottom: 14 }}>
       <div className="flex flex-wrap items-center gap-2">
         <div
-          className="flex min-h-[44px] flex-1 items-center gap-2 rounded-[12px] border px-3 py-2 lg:min-h-0"
+          className={mobile ? "flex min-h-11 w-full items-center gap-2 rounded-[12px] border pl-3 pr-1" : "flex min-h-[44px] flex-1 items-center gap-2 rounded-[12px] border px-3 py-2 lg:min-h-0"}
           style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
         >
           <Search className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
@@ -57,11 +59,11 @@ export function HistoryFilterBar({
             onChange={(e) => setSearch(e.target.value)}
             placeholder="작업 · 품명 · 코드 · 담당자 · 메모"
             disabled={disabled}
-            className="h-11 flex-1 bg-transparent text-sm outline-none lg:h-auto"
+            className={mobile ? "h-11 min-w-0 flex-1 bg-transparent text-base outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-blue)]" : "h-11 flex-1 bg-transparent text-sm outline-none lg:h-auto"}
             style={{ color: LEGACY_COLORS.text }}
           />
           {search && (
-            <button onClick={() => setSearch("")} className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+            <button onClick={() => setSearch("")} className={mobile ? "flex h-11 w-11 shrink-0 items-center justify-center text-sm" : "text-xs"} style={{ color: LEGACY_COLORS.muted2 }} aria-label={mobile ? "검색어 지우기" : undefined}>
               ✕
             </button>
           )}
@@ -70,7 +72,7 @@ export function HistoryFilterBar({
         {/* 선택 날짜 칩 — 달력 접혀 있어도 항상 노출(활성 필터 정직 표기). */}
         {selectedDay && (
           <span
-            className="inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold"
+            className={mobile ? "inline-flex shrink-0 items-center gap-1 rounded-full border pl-2.5 text-xs font-medium" : "inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold"}
             style={{
               background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 12%, transparent)`,
               borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 35%, transparent)`,
@@ -78,14 +80,14 @@ export function HistoryFilterBar({
             }}
           >
             선택: {selectedDay}
-            <button type="button" aria-label="선택 날짜 해제" onClick={onClearSelectedDay} disabled={disabled}>
+            <button type="button" aria-label="선택 날짜 해제" onClick={onClearSelectedDay} disabled={disabled} className={mobile ? "flex h-11 w-11 items-center justify-center" : undefined}>
               <X className="h-3 w-3" />
             </button>
           </span>
         )}
         {selectedMonth && (
           <span
-            className="inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold"
+            className={mobile ? "inline-flex shrink-0 items-center gap-1 rounded-full border pl-2.5 text-xs font-medium" : "inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold"}
             style={{
               background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 12%, transparent)`,
               borderColor: `color-mix(in srgb, ${LEGACY_COLORS.blue} 35%, transparent)`,
@@ -93,14 +95,14 @@ export function HistoryFilterBar({
             }}
           >
             선택: {formatHistoryMonthLabel(selectedMonth)}
-            <button type="button" aria-label="선택 월 해제" onClick={onClearSelectedMonth} disabled={disabled}>
+            <button type="button" aria-label="선택 월 해제" onClick={onClearSelectedMonth} disabled={disabled} className={mobile ? "flex h-11 w-11 items-center justify-center" : undefined}>
               <X className="h-3 w-3" />
             </button>
           </span>
         )}
 
         {/* 기간 세그먼트 */}
-        <div className="flex shrink-0 overflow-hidden rounded-[12px] border" style={{ borderColor: LEGACY_COLORS.border }}>
+        <div className={mobile ? "flex min-w-0 flex-1 overflow-hidden rounded-[12px] border" : "flex shrink-0 overflow-hidden rounded-[12px] border"} style={{ borderColor: LEGACY_COLORS.border }}>
           {DATE_OPTIONS.map((opt) => {
             const active = !selectedDay && !selectedMonth && dateFilter === opt.value;
             return (
@@ -108,10 +110,10 @@ export function HistoryFilterBar({
                 key={opt.value}
                 onClick={() => setDateFilter(opt.value)}
                 disabled={disabled}
-                className="flex min-h-[44px] items-center justify-center px-3 py-2 text-xs font-bold transition-colors lg:min-h-0"
+                className={mobile ? "flex min-h-11 min-w-11 flex-1 items-center justify-center py-2 text-xs font-medium transition-colors" : "flex min-h-[44px] items-center justify-center px-3 py-2 text-xs font-bold transition-colors lg:min-h-0"}
                 style={{
-                  background: active ? `color-mix(in srgb, ${LEGACY_COLORS.purple} 20%, transparent)` : "transparent",
-                  color: active ? LEGACY_COLORS.purple : LEGACY_COLORS.muted2,
+                  background: active ? `color-mix(in srgb, ${mobile ? LEGACY_COLORS.blue : LEGACY_COLORS.purple} 20%, transparent)` : "transparent",
+                  color: active ? mobile ? LEGACY_COLORS.blue : LEGACY_COLORS.purple : LEGACY_COLORS.muted2,
                 }}
               >
                 {opt.label}
@@ -126,7 +128,7 @@ export function HistoryFilterBar({
           onClick={onToggleFilterPanel}
           disabled={disabled}
           aria-expanded={filterPanelOpen}
-          className="flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-[12px] border px-3 py-2 text-xs font-bold transition-colors lg:min-h-0"
+          className={mobile ? "flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-[12px] border px-2 text-xs" : "flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-[12px] border px-3 py-2 text-xs font-bold transition-colors lg:min-h-0"}
           style={{
             background: filterPanelOpen
               ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
@@ -136,7 +138,7 @@ export function HistoryFilterBar({
           }}
         >
           <Filter className="h-3.5 w-3.5" />
-          필터
+          <span className={mobile ? "sr-only" : undefined}>필터</span>
           {activeFilterCount > 0 && (
             <span
               className="ml-0.5 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-black"
@@ -146,7 +148,7 @@ export function HistoryFilterBar({
             </span>
           )}
           <ChevronDown
-            className="h-3.5 w-3.5 transition-transform"
+            className={mobile ? "hidden" : "h-3.5 w-3.5 transition-transform"}
             style={{ transform: filterPanelOpen ? "rotate(180deg)" : undefined }}
           />
         </button>
@@ -157,7 +159,7 @@ export function HistoryFilterBar({
           onClick={onToggleCalendar}
           disabled={disabled}
           aria-expanded={calendarOpen}
-          className="flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-[12px] border px-3 py-2 text-xs font-bold transition-colors lg:min-h-0"
+          className={mobile ? "flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-[12px] border px-2 text-xs" : "flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-[12px] border px-3 py-2 text-xs font-bold transition-colors lg:min-h-0"}
           style={{
             background: calendarOpen
               ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
@@ -167,9 +169,9 @@ export function HistoryFilterBar({
           }}
         >
           <CalendarDays className="h-3.5 w-3.5" />
-          달력
+          <span className={mobile ? "sr-only" : undefined}>달력</span>
           <ChevronDown
-            className="h-3.5 w-3.5 transition-transform"
+            className={mobile ? "hidden" : "h-3.5 w-3.5 transition-transform"}
             style={{ transform: calendarOpen ? "rotate(180deg)" : undefined }}
           />
         </button>

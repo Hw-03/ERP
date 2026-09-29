@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MobileDashboardScreen } from "../MobileDashboardScreen";
 
 const inventoryState = vi.hoisted(() => ({ loading: false, items: [{ item_id: "item-1", item_name: "테스트 품목", quantity: 10, warehouse_qty: 10, locations: [], model_slots: [] }] }));
@@ -66,7 +66,7 @@ vi.mock("../../../_inventory_sections/InventoryFilterBar", () => ({
 }));
 
 vi.mock("../../../_inventory_sections/InventoryItemsTable", () => ({
-  InventoryItemsTable: () => <div data-testid="inventory-table" />,
+  InventoryItemsTable: ({ loading }: { loading: boolean }) => <div data-testid="inventory-table" data-loading={loading} />,
 }));
 
 vi.mock("../../../_inventory_sections/InventoryDetailPanel", () => ({
@@ -74,6 +74,10 @@ vi.mock("../../../_inventory_sections/InventoryDetailPanel", () => ({
 }));
 
 describe("MobileDashboardScreen", () => {
+  beforeEach(() => {
+    inventoryState.loading = false;
+    inventoryState.items = [{ item_id: "item-1", item_name: "테스트 품목", quantity: 10, warehouse_qty: 10, locations: [], model_slots: [] }];
+  });
   it("최초 조회 중에는 KPI와 생산 가능 접이식 버튼 자리를 유지한다", () => {
     inventoryState.loading = true;
     inventoryState.items = [];
@@ -89,9 +93,29 @@ describe("MobileDashboardScreen", () => {
 
     expect(kpiProps).toHaveBeenLastCalledWith(expect.objectContaining({ loading: true }));
     expect(screen.getByRole("status", { name: "생산 가능 수량 불러오는 중" })).toBeInTheDocument();
+    const pendingHeader = screen.getByRole("button", { name: /생산 가능 현황/ });
+    expect(pendingHeader).toHaveClass("min-h-11", "rounded-[14px]");
+    expect(pendingHeader).toBeDisabled();
 
     inventoryState.loading = false;
     inventoryState.items = [{ item_id: "item-1", item_name: "테스트 품목", quantity: 10, warehouse_qty: 10, locations: [], model_slots: [] }];
+  });
+
+  it("캐시 복귀와 로컬 필터 변경은 준비된 목록을 강제 로딩하지 않는다", () => {
+    render(<MobileDashboardScreen globalSearch="" onStatusChange={() => {}} onGoToWarehouse={() => {}} />);
+    expect(screen.getByTestId("inventory-table")).toHaveAttribute("data-loading", "false");
+    fireEvent.click(screen.getByRole("button", { name: "필터 열기" }));
+    fireEvent.click(screen.getByRole("button", { name: "재고 위치 기준" }));
+    expect(screen.getByTestId("inventory-table")).toHaveAttribute("data-loading", "false");
+  });
+
+  it("생산 가능 최초 실패는 재시도할 수 있다", () => {
+    const retry = vi.fn();
+    render(<MobileDashboardScreen globalSearch="" onStatusChange={() => {}} onGoToWarehouse={() => {}}
+      capacityError="생산 가능 조회 실패" onCapacityRetry={retry} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("데이터를 불러오지 못했습니다");
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(retry).toHaveBeenCalledOnce();
   });
 
   it("does not repeat the total item count below search controls", () => {

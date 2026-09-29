@@ -41,6 +41,8 @@ import { MobileDirtyLeaveSheet } from "./warehouse/MobileDirtyLeaveSheet";
 import type { MobileMoreEntryId } from "./screens/MobileMoreScreen";
 import { isSidebarTabVisible } from "../tabAccess";
 import { MobileViewportFrame } from "./MobileViewportFrame";
+import presentation from "./mobilePresentation.module.css";
+import { DESKTOP_TAB_ICON_COLORS } from "../DesktopSidebar";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import type { NotificationNavigationTarget } from "../notifications/NotificationBell";
 
@@ -57,17 +59,17 @@ export type MobileTabId =
   | "assemblyChecklist"
   | "dailyReport";
 
-const TAB_META: Record<MobileTabId, { label: string; icon: LucideIcon }> = {
-  dashboard: { label: "대시보드", icon: Boxes },
-  warehouse: { label: "입출고", icon: Warehouse },
-  defect: { label: "불량", icon: AlertTriangle },
-  history: { label: "내역", icon: HistoryIcon },
-  more: { label: "더보기", icon: MoreHorizontal },
-  assemblyChecklist: { label: "체크리스트", icon: ClipboardCheck },
-  dailyReport: { label: "일일 작업 일보", icon: ClipboardCheck },
-  shipping: { label: "출하", icon: PackageCheck },
-  weekly: { label: "주간보고", icon: BarChart2 },
-  warehouseMap: { label: "창고지도", icon: MapPinned },
+const TAB_META: Record<MobileTabId, { label: string; icon: LucideIcon; color: string }> = {
+  dashboard: { label: "대시보드", icon: Boxes, color: DESKTOP_TAB_ICON_COLORS.dashboard },
+  warehouse: { label: "입출고", icon: Warehouse, color: DESKTOP_TAB_ICON_COLORS.warehouse },
+  defect: { label: "불량", icon: AlertTriangle, color: DESKTOP_TAB_ICON_COLORS.defect },
+  history: { label: "내역", icon: HistoryIcon, color: DESKTOP_TAB_ICON_COLORS.history },
+  more: { label: "더보기", icon: MoreHorizontal, color: LEGACY_COLORS.muted2 },
+  assemblyChecklist: { label: "체크리스트", icon: ClipboardCheck, color: LEGACY_COLORS.blue },
+  dailyReport: { label: "일일 작업 일보", icon: ClipboardCheck, color: DESKTOP_TAB_ICON_COLORS.dailyReport },
+  shipping: { label: "출하", icon: PackageCheck, color: DESKTOP_TAB_ICON_COLORS.shipping },
+  weekly: { label: "주간보고", icon: BarChart2, color: DESKTOP_TAB_ICON_COLORS.weekly },
+  warehouseMap: { label: "창고지도", icon: MapPinned, color: DESKTOP_TAB_ICON_COLORS.warehouseMap },
 };
 
 // 하단 탭바에 노출되는 5탭. 더보기는 전폭 화면(출하·주간보고·창고지도)으로 진입한다.
@@ -96,12 +98,14 @@ const VALID_TAB_IDS: MobileTabId[] = [
  */
 function NavButton({
   icon: Icon,
+  iconColor,
   label,
   active,
   badgeCount,
   onClick,
 }: {
   icon: LucideIcon;
+  iconColor: string;
   label: string;
   active: boolean;
   badgeCount?: number;
@@ -119,7 +123,7 @@ function NavButton({
         className="relative inline-flex h-9 w-10 items-center justify-center rounded-full transition-colors"
         style={{ background: "transparent" }}
       >
-        <Icon size={20} strokeWidth={2} color={active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2} />
+        <Icon size={20} strokeWidth={2} color={iconColor} />
         {badgeCount !== undefined && badgeCount > 0 && (
           <span
             aria-hidden="true"
@@ -183,6 +187,7 @@ export function MobileShell({
   const [warehouseNotificationTarget, setWarehouseNotificationTarget] = useState<NotificationNavigationTarget | null>(null);
   const [capacityData, setCapacityData] = useState<ProductionCapacity | null>(null);
   const [capacityLoading, setCapacityLoading] = useState(true);
+  const [capacityError, setCapacityError] = useState<string | null>(null);
   const capacityRequestRef = useRef(0);
   const [capacityModal, setCapacityModal] = useState(false);
   const [stockWarnings, setStockWarnings] = useState<{ low: number; zero: number } | null>(null);
@@ -323,12 +328,16 @@ export function MobileShell({
 
   const loadCapacity = useCallback(() => {
     const requestId = ++capacityRequestRef.current;
+    setCapacityLoading(true);
+    setCapacityError(null);
     void api
       .getProductionCapacity()
       .then((nextCapacity) => {
         if (requestId === capacityRequestRef.current) setCapacityData(nextCapacity);
       })
-      .catch(() => {})
+      .catch(() => {
+        if (requestId === capacityRequestRef.current) setCapacityError("생산 가능수량을 불러오지 못했습니다.");
+      })
       .finally(() => {
         if (requestId === capacityRequestRef.current) setCapacityLoading(false);
       });
@@ -391,6 +400,8 @@ export function MobileShell({
           onSummaryChange={setStockWarnings}
           capacityData={capacityData}
           capacityLoading={capacityLoading && !capacityData}
+          capacityError={capacityError}
+          onCapacityRetry={loadCapacity}
           onCapacityClick={() => setCapacityModal(true)}
           canReceive={canReceive}
         />
@@ -470,6 +481,7 @@ export function MobileShell({
     canReceive,
     capacityData,
     capacityLoading,
+    capacityError,
     weekMon,
     handleTabChange,
     loadCapacity,
@@ -497,7 +509,7 @@ export function MobileShell({
           }}
         />
 
-        <main className="relative flex-1 overflow-hidden flex" data-testid="screen-root">
+        <main className={`relative min-h-0 min-w-0 flex-1 overflow-hidden flex pt-3 ${activeTab === "weekly" || activeTab === "warehouseMap" ? "" : presentation.scope}`} data-testid="screen-root">
           <h1 className="sr-only">{TAB_META[activeTab].label} — DEXCOWIN MES</h1>
           {content}
         </main>
@@ -539,6 +551,7 @@ export function MobileShell({
                 <NavButton
                   key={tab}
                   icon={meta.icon}
+                  iconColor={meta.color}
                   label={meta.label}
                   active={tab === effectiveNavTab}
                   badgeCount={tab === "more" ? unreadNotifications : undefined}
@@ -550,9 +563,13 @@ export function MobileShell({
         </nav>
       </div>
 
+      <div className={`${presentation.scope} contents`}>
       {capacityModal && (
         <CapacityDetailModal
           capacityData={capacityData}
+          loading={capacityLoading}
+          error={capacityError}
+          onRetry={loadCapacity}
           onClose={() => setCapacityModal(false)}
         />
       )}
@@ -619,6 +636,7 @@ export function MobileShell({
         open={userMenuOpen}
         onClose={() => setUserMenuOpen(false)}
       />
+      </div>
     </MobileViewportFrame>
   );
 }

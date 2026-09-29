@@ -58,7 +58,7 @@ export function AsyncState({
   }
 
   if (loading) {
-    return <>{skeleton ?? <AsyncSkeletonRows />}</>;
+    return <div role="status" aria-busy="true" aria-label="데이터를 불러오는 중">{skeleton ?? <AsyncSkeletonRows />}</div>;
   }
 
   if (empty) {
@@ -74,7 +74,7 @@ export function AsyncSkeletonRows({ count = 4 }: { count?: number }) {
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
-          className="h-[68px] rounded-[20px] border animate-pulse"
+          className="h-[68px] rounded-[20px] border motion-safe:animate-pulse"
           style={{
             background: LEGACY_COLORS.s2,
             borderColor: LEGACY_COLORS.border,

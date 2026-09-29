@@ -45,6 +45,20 @@ const response = {
 };
 
 describe("DefectStatisticsView", () => {
+  it("keeps mobile statistics panel dimensions while the first result is pending", () => {
+    apiMocks.getStatistics.mockReturnValueOnce(new Promise(() => {}));
+    render(<DefectStatisticsView mobilePresentation departmentOptions={[]} modelOptions={[]} currentDepartment="조립" onBack={vi.fn()} />);
+    expect(screen.getByRole("status", { name: "불량 통계 불러오는 중" })).toHaveAttribute("aria-busy", "true");
+    expect(screen.getAllByTestId("statistics-panel-skeleton")).toHaveLength(4);
+  });
+  it("hides another period's values while the selected period is pending", async () => {
+    render(<DefectStatisticsView mobilePresentation departmentOptions={[]} modelOptions={[]} currentDepartment="조립" onBack={vi.fn()} />);
+    expect(await screen.findByText("3건")).toBeInTheDocument();
+    apiMocks.getStatistics.mockReturnValueOnce(new Promise(() => {}));
+    fireEvent.click(screen.getByRole("button", { name: "이전 기간" }));
+    expect(screen.queryByText("3건")).not.toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "불량 통계 불러오는 중" })).toBeInTheDocument();
+  });
   beforeEach(() => {
     apiMocks.getStatistics.mockReset().mockResolvedValue(response);
     vi.useFakeTimers({ shouldAdvanceTime: true });

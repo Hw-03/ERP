@@ -15,6 +15,10 @@ import type { Operator } from "../login/useCurrentOperator";
 import { HandoverComposeForm } from "./HandoverComposeForm";
 import { printHandover } from "./handoverPrint";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
+import panelStyles from "../mobile/screens/mobileWarehousePanels.module.css";
+import { ReadFailure } from "../common/ReadState";
+import { WarehouseLoadingWorkArea } from "./WarehouseLoadingWorkArea";
+import { dataRevealClassName } from "../common/LoadingSkeleton";
 
 type SubTab = "compose" | "mine" | "inbox";
 
@@ -30,12 +34,14 @@ export function HandoverSectionPanel({
   items,
   refreshNonce,
   onChanged,
+  mobilePresentation = false,
 }: {
   operator: Operator | null;
   operatorEmployeeId: string | undefined;
   items: Item[];
   refreshNonce: number;
   onChanged: () => void;
+  mobilePresentation?: boolean;
 }) {
   const canCompose = (operator?.department ?? "") === "튜브";
   // 인수 확인: 받는 부서(고압/진공) 소속만. 현장 물리 인수 행위이므로 결재권자는 제외.
@@ -47,6 +53,12 @@ export function HandoverSectionPanel({
   );
   const [mine, setMine] = useState<Handover[]>([]);
   const [inbox, setInbox] = useState<Handover[]>([]);
+  const [mineRead, setMineRead] = useState({ key: "", loaded: false, error: null as string | null });
+  const [inboxRead, setInboxRead] = useState({ key: "", loaded: false, error: null as string | null });
+  const mineReady = mineRead.key === operatorEmployeeId && mineRead.loaded;
+  const inboxReady = inboxRead.key === operatorEmployeeId && inboxRead.loaded;
+  const mineError = mineRead.key === operatorEmployeeId ? mineRead.error : null;
+  const inboxError = inboxRead.key === operatorEmployeeId ? inboxRead.error : null;
   const [localNonce, setLocalNonce] = useState(0);
   // 이어쓰기 대상 draft (null=신규 작성)
   const [editingDraft, setEditingDraft] = useState<Handover | null>(null);
@@ -62,12 +74,16 @@ export function HandoverSectionPanel({
   useEffect(() => {
     if (!operatorEmployeeId) return;
     let active = true;
+    setMineRead((prev) => ({ key: operatorEmployeeId, loaded: prev.key === operatorEmployeeId && prev.loaded, error: null }));
     api
       .listHandovers({ authorEmployeeId: operatorEmployeeId })
       .then((rows) => {
-        if (active) setMine(rows);
+        if (active) {
+          setMine(rows);
+          setMineRead({ key: operatorEmployeeId, loaded: true, error: null });
+        }
       })
-      .catch(() => {});
+      .catch((reason: unknown) => { if (active) setMineRead((prev) => ({ ...prev, error: reason instanceof Error ? reason.message : "인수인계를 불러오지 못했습니다." })); });
     return () => {
       active = false;
     };
@@ -76,12 +92,16 @@ export function HandoverSectionPanel({
   useEffect(() => {
     if (!operatorEmployeeId || !canReceive) return;
     let active = true;
+    setInboxRead((prev) => ({ key: operatorEmployeeId, loaded: prev.key === operatorEmployeeId && prev.loaded, error: null }));
     api
       .listHandoverInbox(operatorEmployeeId)
       .then((rows) => {
-        if (active) setInbox(rows);
+        if (active) {
+          setInbox(rows);
+          setInboxRead({ key: operatorEmployeeId, loaded: true, error: null });
+        }
       })
-      .catch(() => {});
+      .catch((reason: unknown) => { if (active) setInboxRead((prev) => ({ ...prev, error: reason instanceof Error ? reason.message : "인수 대기함을 불러오지 못했습니다." })); });
     return () => {
       active = false;
     };
@@ -91,9 +111,9 @@ export function HandoverSectionPanel({
     const t: { id: SubTab; label: string; count?: number }[] = [];
     if (canCompose) t.push({ id: "compose", label: "작성" });
     t.push({ id: "mine", label: "내 인수인계" });
-    if (canReceive) t.push({ id: "inbox", label: "인수 대기함", count: inbox.length });
+    if (canReceive) t.push({ id: "inbox", label: "인수 대기함", count: mobilePresentation && !inboxReady ? undefined : inbox.length });
     return t;
-  }, [canCompose, canReceive, inbox.length]);
+  }, [canCompose, canReceive, inbox.length, mobilePresentation, inboxReady]);
 
   async function confirmReceive() {
     if (!receiveTarget || !operatorEmployeeId) return;
@@ -162,8 +182,11 @@ export function HandoverSectionPanel({
         />
       )}
 
-      {subTab === "mine" && (
+      {mobilePresentation && subTab === "mine" && mineError && <ReadFailure message={mineError} refresh={mineReady} onRetry={reload} />}
+      {mobilePresentation && subTab === "mine" && !mineReady && !mineError && <WarehouseLoadingWorkArea mobilePresentation label="내 인수인계 불러오는 중" />}
+      {subTab === "mine" && (!mobilePresentation || mineReady) && (
         <HandoverCardList
+          mobilePresentation={mobilePresentation}
           docs={mine}
           emptyText="작성한 인수인계서가 없습니다."
           onPrint={printHandover}
@@ -191,8 +214,11 @@ export function HandoverSectionPanel({
         />
       )}
 
-      {subTab === "inbox" && canReceive && (
+      {mobilePresentation && subTab === "inbox" && inboxError && <ReadFailure message={inboxError} refresh={inboxReady} onRetry={reload} />}
+      {mobilePresentation && subTab === "inbox" && canReceive && !inboxReady && !inboxError && <WarehouseLoadingWorkArea mobilePresentation label="인수 대기함 불러오는 중" />}
+      {subTab === "inbox" && canReceive && (!mobilePresentation || inboxReady) && (
         <HandoverCardList
+          mobilePresentation={mobilePresentation}
           docs={inbox}
           emptyText="인수 대기 중인 인수인계서가 없습니다."
           onPrint={printHandover}
@@ -205,6 +231,7 @@ export function HandoverSectionPanel({
       )}
 
       <ConfirmModal
+        className={mobilePresentation ? panelStyles.touchScope : undefined}
         open={!!receiveTarget}
         title="인수 확인"
         confirmLabel="인수 확인"
@@ -244,6 +271,7 @@ export function HandoverSectionPanel({
 }
 
 function HandoverCardList({
+  mobilePresentation = false,
   docs,
   emptyText,
   onPrint,
@@ -251,6 +279,7 @@ function HandoverCardList({
   onEdit,
   onDelete,
 }: {
+  mobilePresentation?: boolean;
   docs: Handover[];
   emptyText: string;
   onPrint: (doc: Handover) => void;
@@ -264,7 +293,7 @@ function HandoverCardList({
     );
   }
   return (
-    <div className="flex flex-col gap-2">
+    <div className={`flex flex-col gap-2 ${mobilePresentation ? dataRevealClassName : ""}`}>
       {docs.map((doc) => {
         const st = STATUS_LABEL[doc.status] ?? STATUS_LABEL.draft;
         const totalQty = doc.lines.reduce((acc, l) => acc + l.quantity, 0);

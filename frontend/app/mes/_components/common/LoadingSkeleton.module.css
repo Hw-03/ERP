@@ -1,0 +1,16 @@
+@keyframes dataReveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.reveal {
+  animation: dataReveal 180ms ease-out;
+}
+
+.reveal :global(.mes-data-reveal) {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal { animation: none; }
+}

@@ -8,11 +8,13 @@ import { tint } from "@/lib/mes/colorUtils";
 import { EmptyState } from "../common";
 import { ReadFailure } from "../common/ReadState";
 import { WarehouseLoadingWorkArea } from "./WarehouseLoadingWorkArea";
+import { dataRevealClassName } from "../common/LoadingSkeleton";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { DraftCartItemRow } from "./DraftCartItemRow";
 import { IoDraftWorkCard } from "./IoDraftWorkCard";
 import { IoDraftWorkTable } from "./IoDraftWorkTable";
 import { WarehouseEmptyWorkArea } from "./WarehouseEmptyWorkArea";
+import panelStyles from "../mobile/screens/mobileWarehousePanels.module.css";
 import {
   useDeleteIoDraftMutation,
   useDeleteStockRequestDraftMutation,
@@ -117,8 +119,8 @@ export function DraftCartPanel({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
-      {loading && <WarehouseLoadingWorkArea label="요청 내역을 불러오고 있습니다…" />}
+    <div className={`flex ${layout === "mobile" ? "min-h-full [&_.dexray-empty-state]:min-h-0" : "min-h-0"} flex-1 flex-col gap-3 ${layout === "mobile" && data !== undefined ? dataRevealClassName : ""}`}>
+      {loading && <WarehouseLoadingWorkArea mobilePresentation={layout === "mobile"} label="요청 내역을 불러오고 있습니다…" />}
       {loadError && <ReadFailure message={loadError} refresh={data !== undefined} onRetry={() => void refetch()} />}
       {opError && (
         <div
@@ -174,6 +176,7 @@ export function DraftCartPanel({
       ))}
 
       <ConfirmModal
+        className={layout === "mobile" ? panelStyles.touchScope : undefined}
         open={deleteTarget !== null}
         title="작업 삭제"
         tone="danger"

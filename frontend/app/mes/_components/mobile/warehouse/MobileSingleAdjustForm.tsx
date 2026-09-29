@@ -10,6 +10,8 @@ import type { IoBundle, IoLine, IoSubType, Item } from "@/lib/api";
 import { InlineSearch, IconButton, Stepper, PrimaryActionButton } from "../primitives";
 import { TYPO } from "../tokens";
 import { matchesSearchText, normalizeSearchText } from "@/lib/searchText";
+import { ReadFailure, ReadLoading } from "../../common/ReadState";
+import { SkeletonBlock, dataRevealClassName } from "../../common/LoadingSkeleton";
 
 /**
  * 단품 입출고(adjust_in/out, warehouse_adjust_in/out) 전용 인라인 빠른 폼.
@@ -37,7 +39,15 @@ export function MobileSingleAdjustForm({
   busy,
   addBlocked = false,
   error,
+  itemsLoading = false,
+  itemsLoadError = null,
+  itemsHasData = true,
+  onRetryItems,
 }: {
+  itemsLoading?: boolean;
+  itemsLoadError?: string | null;
+  itemsHasData?: boolean;
+  onRetryItems?: () => void;
   subType: IoSubType;
   items: Item[];
   bundles: IoBundle[];
@@ -86,7 +96,7 @@ export function MobileSingleAdjustForm({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-h-full flex-col gap-3">
       {/* 검색 + 스캔 */}
       <div className="flex items-center gap-2">
         <div className="min-w-0 flex-1">
@@ -118,8 +128,10 @@ export function MobileSingleAdjustForm({
       )}
 
       {/* 검색 결과 */}
+      {itemsLoading && <ReadLoading label="품목 불러오는 중" skeleton={<div className="flex flex-col gap-1.5">{[0, 1, 2].map((row) => <div key={row} className="flex min-h-[72px] items-center gap-3 rounded-[16px] border border-[var(--c-border)] px-4 py-3"><div className="flex flex-1 flex-col gap-2"><SkeletonBlock className="h-4 w-2/3" /><SkeletonBlock className="h-3 w-1/2" /></div><SkeletonBlock className="h-5 w-5" /></div>)}</div>} />}
+      {itemsLoadError && <ReadFailure message={itemsLoadError} refresh={itemsHasData} onRetry={() => onRetryItems?.()} />}
       {results.length > 0 && (
-        <div className="flex max-h-[42vh] flex-col gap-1.5 overflow-y-auto">
+        <div className={`flex flex-col gap-1.5 ${dataRevealClassName}`}>
           {results.map((it) => (
             <button
               key={it.item_id}
@@ -132,7 +144,7 @@ export function MobileSingleAdjustForm({
               style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
             >
               <div className="min-w-0 flex-1">
-                <div className={clsx(TYPO.body, "truncate font-black")} style={{ color: LEGACY_COLORS.text }}>
+                <div className={clsx(TYPO.body, "[overflow-wrap:anywhere] font-semibold")} style={{ color: LEGACY_COLORS.text }}>
                   {it.item_name}
                 </div>
                 <div className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>
@@ -153,11 +165,10 @@ export function MobileSingleAdjustForm({
 
       {/* 담은 품목 */}
       <div
-        className="rounded-[20px] border p-4"
+        className="rounded-[14px] border p-3"
         style={{
           background: LEGACY_COLORS.s1,
           borderColor: LEGACY_COLORS.border,
-          boxShadow: "var(--c-card-shadow)",
         }}
       >
         <div className={clsx(TYPO.overline, "mb-2")} style={{ color: LEGACY_COLORS.muted2 }}>
@@ -184,7 +195,7 @@ export function MobileSingleAdjustForm({
                 <div key={b.bundle_id} className="flex flex-col gap-2">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      <div className={clsx(TYPO.body, "truncate font-black")} style={{ color: LEGACY_COLORS.text }}>
+                      <div className={clsx(TYPO.body, "[overflow-wrap:anywhere] font-semibold")} style={{ color: LEGACY_COLORS.text }}>
                         {b.title}
                       </div>
                       <div className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>
@@ -222,14 +233,14 @@ export function MobileSingleAdjustForm({
         <button
           type="button"
           onClick={onOpenPicker}
-          className="self-start text-sm font-black"
+          className="min-h-11 self-start text-sm font-bold"
           style={{ color: accent }}
         >
           BOM·품목 더 담기
         </button>
       )}
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="sticky bottom-0 mt-auto grid grid-cols-2 gap-2 bg-[var(--c-bg)] pt-2">
         <PrimaryActionButton
           label="작성 중 저장"
           intent="neutral"

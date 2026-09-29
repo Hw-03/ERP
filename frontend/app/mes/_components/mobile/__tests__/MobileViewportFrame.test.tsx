@@ -13,7 +13,7 @@ describe("MobileViewportFrame", () => {
     expect(MOBILE_FRAME_REFERENCE_HEIGHT).toBe(932);
   });
 
-  it("keeps the mobile app full-height and capped at the 430px reference width", () => {
+  it("preserves the phone and tablet frame widths", () => {
     const { container } = render(
       <MobileViewportFrame>
         <div>mobile content</div>

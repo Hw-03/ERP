@@ -38,7 +38,7 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename, compact
   const pendingQty = totalApprovalPending(item);
   const isCritical = qty <= 0 || (minStock > 0 && qty < minStock);
 
-  const DEFECT_RED = "#ef4444";
+  const DEFECT_RED = compact ? LEGACY_COLORS.red : "#ef4444";
   const total = Math.max(Number(item.quantity), 1);
   const wh = Number(item.warehouse_qty);
   const allLocs = (item.locations ?? []).filter((l) => Number(l.quantity) > 0);
@@ -49,7 +49,7 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename, compact
   let used = 0;
   if (wh > 0) {
     const pct = Math.min(100, (wh / total) * 100);
-    segments.push({ pct, color: "#3ac4b0", label: `창고 ${formatQty(wh)}` });
+    segments.push({ pct, color: compact ? LEGACY_COLORS.cyan : "#3ac4b0", label: `창고 ${formatQty(wh)}` });
     used += pct;
   }
   for (const loc of prodLocs) {
@@ -94,10 +94,10 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename, compact
   const StockIcon = stock.label === "품절" ? XCircle : stock.label === "부족" ? AlertTriangle : CheckCircle2;
   const handleSelect = () => onSelect(selected ? null : item);
   const stockBar = Number(item.quantity) === 0 ? (
-    <div className="mt-[20px] h-[6px] overflow-hidden rounded-full" style={{ background: DEFECT_RED }} title="품절" />
+    <div className={compact ? "mt-2 h-1 overflow-hidden rounded-full" : "mt-[20px] h-[6px] overflow-hidden rounded-full"} style={{ background: DEFECT_RED }} title="품절" />
   ) : (
     <div
-      className="mt-[20px] flex h-[6px] overflow-hidden rounded-full"
+      className={compact ? "mt-2 flex h-1 overflow-hidden rounded-full" : "mt-[20px] flex h-[6px] overflow-hidden rounded-full"}
       style={{ background: LEGACY_COLORS.s3 }}
       title={segments.map((s) => s.label).join(" / ")}
       role="img"
@@ -121,12 +121,14 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename, compact
     "aria-pressed": selected,
     onMouseEnter: () => setHovered(true),
     onMouseLeave: () => setHovered(false),
-    className: "group cursor-pointer transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]",
+    className: `group cursor-pointer transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]${compact ? " h-[98px]" : ""}`,
     style: {
       background: selected
-        ? tint(LEGACY_COLORS.blue, hovered ? 18 : 10)
+        ? compact
+          ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 9%, ${LEGACY_COLORS.s1})`
+          : tint(LEGACY_COLORS.blue, hovered ? 18 : 10)
         : hovered
-          ? LEGACY_COLORS.s4
+          ? compact ? LEGACY_COLORS.s2 : LEGACY_COLORS.s4
           : undefined,
       boxShadow: selected
         ? `inset 3px 0 0 ${LEGACY_COLORS.blue}`
@@ -138,9 +140,9 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename, compact
 
   return (
     <tr {...rowProps}>
-      <td className="border-b px-4 py-5 text-center align-middle whitespace-nowrap" style={{ borderColor: LEGACY_COLORS.border }}>
+      <td className={compact ? "border-b px-2 py-3 text-center align-middle whitespace-nowrap" : "border-b px-4 py-5 text-center align-middle whitespace-nowrap"} style={{ borderColor: LEGACY_COLORS.border }}>
         <span
-          className="inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-sm font-bold"
+          className={compact ? "inline-flex w-fit items-center gap-1 rounded-full px-2 py-1 text-xs font-medium" : "inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-sm font-bold"}
           style={{ color: stock.color, background: `color-mix(in srgb, ${stock.color} 12%, transparent)` }}
         >
           <StockIcon className="h-3.5 w-3.5" aria-hidden="true" />
@@ -166,8 +168,14 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename, compact
         ) : null}
         </td>
       )}
-        <td className="border-b px-4 py-5 align-middle" style={{ borderColor: LEGACY_COLORS.border }}>
-          <div className="font-semibold">{item.item_name}</div>
+        <td className={compact ? "border-b px-2 py-3 align-middle" : "border-b px-4 py-5 align-middle"} style={{ borderColor: LEGACY_COLORS.border }}>
+          {compact ? (
+            <div className="flex h-10 items-center">
+              <div className="line-clamp-2 min-w-0 whitespace-normal break-keep [overflow-wrap:anywhere] text-[15px] font-bold leading-5">{item.item_name}</div>
+            </div>
+          ) : (
+            <div className="font-semibold">{item.item_name}</div>
+          )}
           {stockBar}
         </td>
       {!compact && (
@@ -197,9 +205,9 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename, compact
         </>
       )}
       <td
-        className="border-b px-4 py-5 text-center align-middle whitespace-nowrap text-sm font-bold"
+        className={compact ? "border-b px-2 py-3 text-center align-middle whitespace-nowrap text-sm font-semibold tabular-nums" : "border-b px-4 py-5 text-center align-middle whitespace-nowrap text-sm font-bold"}
         data-testid="inventory-total-stock"
-        style={{ borderColor: LEGACY_COLORS.border, color: isCritical ? stock.color : LEGACY_COLORS.text, width: compact ? 104 : undefined }}
+        style={{ borderColor: LEGACY_COLORS.border, color: isCritical ? stock.color : LEGACY_COLORS.text, width: compact ? 72 : undefined }}
       >
         {formatQty(qty)}
       </td>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { SkeletonBlock, dataRevealClassName } from "../../common/LoadingSkeleton";
 import clsx from "clsx";
 import { ArrowLeft, X } from "lucide-react";
 import { warehouseMapApi, type WarehouseAngle, type WarehouseMap } from "@/lib/api/warehouse-map";
@@ -80,7 +81,7 @@ export function MobileWarehouseMapScreen({
 }) {
   const revision = useRealtimeRevision();
   const [map, setMap] = useState<WarehouseMap | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
 
@@ -211,14 +212,14 @@ export function MobileWarehouseMapScreen({
     >
       {/* 상단 바 — 뒤로 + 브레드크럼 + 검색 */}
       <div
-        className="flex shrink-0 items-center gap-3 border-b px-4 py-2"
+        className="flex shrink-0 items-center gap-2 border-b px-3 py-2"
         style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
       >
         <button
           type="button"
           onClick={back}
           aria-label="뒤로"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-opacity active:opacity-60"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-opacity active:opacity-60"
           style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
         >
           <ArrowLeft className="h-5 w-5" />
@@ -229,8 +230,8 @@ export function MobileWarehouseMapScreen({
             <span style={{ color: LEGACY_COLORS.muted2 }}> › {curAngle.label}</span>
           )}
         </div>
-        <div className="w-[280px] shrink-0">
-          <InlineSearch value={search} onChange={setSearch} placeholder="품목명·코드로 위치 찾기" />
+        <div className="w-[min(280px,42%)] min-w-0 shrink-0 [&_input]:text-base">
+          <InlineSearch value={search} onChange={setSearch} placeholder="품목명·코드로 위치 찾기" className="[&_button]:min-h-11 [&_button]:min-w-11 [&_input]:text-base" />
         </div>
       </div>
 
@@ -246,7 +247,9 @@ export function MobileWarehouseMapScreen({
         </div>
       )}
       {loading && !map ? (
-        <CenterNote>창고 지도를 불러오는 중…</CenterNote>
+        <div role="status" aria-busy="true" aria-label="창고 지도 불러오는 중" className="flex min-h-0 flex-1 overflow-x-auto p-4">
+          <div aria-hidden="true" className="flex min-h-0 min-w-full flex-1 rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}><SkeletonBlock className="h-full min-h-40 w-full" /></div>
+        </div>
       ) : error && !map ? (
         <CenterNote>
           {error}
@@ -260,11 +263,11 @@ export function MobileWarehouseMapScreen({
           </button>
         </CenterNote>
       ) : searching ? (
-        <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        <div className={`scrollbar-hide min-h-0 flex-1 overflow-y-auto px-4 pt-3 ${dataRevealClassName}`}>
           <SearchResults results={searchResults} angles={angles} onOpen={openHit} />
         </div>
       ) : stage === "front" && curAngle ? (
-        <div className="flex min-h-0 flex-1">
+        <div className={`flex min-h-0 flex-1 ${dataRevealClassName}`}>
           <div className="flex min-w-0 flex-1" style={{ minHeight: 0 }}>
             <FrontStage
               angle={curAngle}
@@ -277,7 +280,7 @@ export function MobileWarehouseMapScreen({
           {detailCell && (
             <div
               className="relative shrink-0 border-l"
-              style={{ width: 340, borderColor: LEGACY_COLORS.border, display: "flex", padding: 10 }}
+              style={{ width: "min(340px, 46%)", borderColor: LEGACY_COLORS.border, display: "flex", minWidth: 0, padding: "52px 8px 8px" }}
             >
               <WarehouseJariPanel
                 angle={curAngle}
@@ -290,7 +293,7 @@ export function MobileWarehouseMapScreen({
                 type="button"
                 onClick={closeDetail}
                 aria-label="상세 닫기"
-                className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full transition-opacity active:opacity-60"
+                className="absolute right-2 top-1 z-10 flex h-11 w-11 items-center justify-center rounded-full transition-opacity active:opacity-60"
                 style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2 }}
               >
                 <X className="h-4 w-4" />
@@ -299,7 +302,7 @@ export function MobileWarehouseMapScreen({
           )}
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1">
+        <div className={`flex min-h-0 flex-1 ${dataRevealClassName}`}>
           <FloorStage angles={angles} onAngleClick={openAngle} />
         </div>
       )}

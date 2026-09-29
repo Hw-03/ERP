@@ -61,6 +61,39 @@ afterEach(() => {
 });
 
 describe("useHistoryData", () => {
+  it("성공한 빈 캐시 재검증 실패는 최초 실패가 아닌 갱신 안내이고 재시도도 골격을 만들지 않는다", async () => {
+    const fetchSpy = vi.fn().mockResolvedValueOnce(makeResponse([]))
+      .mockResolvedValueOnce(makeResponse({ detail: "network failure" }, false))
+      .mockReturnValueOnce(new Promise<Response>(() => {}));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const client = makeClient({ gcTime: 5 * 60_000 });
+    const first = renderHook(() => useHistoryData(baseArgs), { wrapper: makeWrapper(client) });
+    await waitFor(() => expect(first.result.current.loading).toBe(false));
+    first.unmount();
+    await client.invalidateQueries({ queryKey: ["transactions"] });
+    const second = renderHook(() => useHistoryData(baseArgs), { wrapper: makeWrapper(client) });
+    expect(second.result.current.loading).toBe(false);
+    await waitFor(() => expect(second.result.current.refreshError).toContain("network failure"));
+    expect(second.result.current.error).toBeNull();
+    act(() => second.result.current.retry());
+    expect(second.result.current.loading).toBe(false);
+    expect(second.result.current.logs).toEqual([]);
+  });
+
+  it("이전에 조회한 조건으로 돌아오면 캐시 목록을 강제 골격 없이 즉시 사용한다", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValueOnce(makeResponse(page2))
+      .mockResolvedValueOnce(makeResponse([])) as unknown as typeof fetch;
+    const client = makeClient({ gcTime: 5 * 60_000 });
+    const { result, rerender } = renderHook(({ search }) => useHistoryData({ ...baseArgs, debouncedSearch: search }),
+      { initialProps: { search: "" }, wrapper: makeWrapper(client) });
+    await waitFor(() => expect(result.current.logs).toEqual(page2));
+    rerender({ search: "new" });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    rerender({ search: "" });
+    expect(result.current.loading).toBe(false);
+    expect(result.current.logs).toEqual(page2);
+    await act(async () => { await Promise.resolve(); });
+  });
   it("uses the shared selected-month range in the mobile list request", async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse([])));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
@@ -104,6 +137,7 @@ describe("useHistoryData", () => {
     expect(result2.current.loading).toBe(false);
     expect(result2.current.logs).toEqual(page1);
     expect(fetchSpy.mock.calls.length).toBe(callCountAfterFirstMount);
+    await act(async () => { await Promise.resolve(); });
   });
 
   it("cancels an in-flight same-key request before a realtime revision refresh", async () => {
@@ -308,14 +342,14 @@ describe("useHistoryData", () => {
     await client.invalidateQueries({ queryKey: ["transactions"] });
 
     const second = renderHook(() => useHistoryData(baseArgs), { wrapper: makeWrapper(client) });
-    await waitFor(() => expect(second.result.current.error).toContain("history unavailable"));
+    await waitFor(() => expect(second.result.current.refreshError).toContain("history unavailable"));
     expect(second.result.current.logs).toEqual(page1);
     expect(second.result.current.canLoadMore).toBe(true);
 
     act(() => second.result.current.retry());
 
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(3));
-    await waitFor(() => expect(second.result.current.error).toContain("history unavailable"));
+    await waitFor(() => expect(second.result.current.refreshError).toContain("history unavailable"));
     expect(second.result.current.logs).toEqual(page1);
     expect(second.result.current.canLoadMore).toBe(true);
   });
@@ -337,13 +371,13 @@ describe("useHistoryData", () => {
 
     await client.invalidateQueries({ queryKey: ["transactions"] });
     act(() => result.current.retry());
-    await waitFor(() => expect(result.current.error).toContain("history unavailable"));
+    await waitFor(() => expect(result.current.refreshError).toContain("history unavailable"));
     expect(result.current.logs).toHaveLength(140);
     expect(result.current.canLoadMore).toBe(false);
 
     act(() => result.current.retry());
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(4));
-    await waitFor(() => expect(result.current.error).toContain("history unavailable"));
+    await waitFor(() => expect(result.current.refreshError).toContain("history unavailable"));
     expect(result.current.logs).toHaveLength(140);
     expect(result.current.canLoadMore).toBe(false);
   });
@@ -452,7 +486,7 @@ describe("useHistoryData", () => {
     expect(result.current.logs).toHaveLength(140);
   });
 
-  it("hides and blocks load-more while the first page retry is loading", async () => {
+  it("keeps rows visible and blocks load-more while a first page retry is pending", async () => {
     const retryPage = deferred<Response>();
     const fetchSpy = vi
       .fn()
@@ -467,7 +501,7 @@ describe("useHistoryData", () => {
     await client.invalidateQueries({ queryKey: ["transactions"] });
 
     act(() => result.current.retry());
-    await waitFor(() => expect(result.current.loading).toBe(true));
+    expect(result.current.loading).toBe(false);
     expect(result.current.logs).toEqual(page1);
     expect(result.current.canLoadMore).toBe(false);
 

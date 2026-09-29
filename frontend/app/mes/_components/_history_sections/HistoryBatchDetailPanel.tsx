@@ -29,12 +29,14 @@ import {
   getHistoryMovementSummary,
   type LineSignTone,
 } from "./historyBatchInterpreter";
-import { formatHistoryDateTimeLong } from "./historyFormat";
+import { formatHistoryDate, formatHistoryDateTimeLong } from "./historyFormat";
 import {
   FlowBadge,
   InternalUseEffectBadge,
   MovementSummaryCell,
+  StockSnapshotContent,
 } from "./historyTableHelpers";
+import { getBomLineSnapshotLog } from "./BomBatchDetail";
 import { HistoryDetailMemo } from "./HistoryDetailPanel";
 import type { HistoryTableFocusTarget } from "./HistoryTable";
 import { buildHistoryDetailSummary } from "./historyDetailSummary";
@@ -47,6 +49,7 @@ import {
   useHistoryCancellationScopeLogs,
 } from "./HistoryCancelAction";
 import { getHistoryCancelScope, type HistoryCancelScope } from "./historyCancellation";
+import mobileStyles from "./HistoryMobileDetail.module.css";
 
 const SIGN_TONE_HEX: Record<LineSignTone, string> = {
   increase: LEGACY_COLORS.blue,
@@ -65,6 +68,7 @@ type Props = {
   onFocusLineInList?: (target: Omit<HistoryTableFocusTarget, "nonce">) => void;
   onSelectLog?: (log: TransactionLog) => void;
   variant?: "default" | "desktop";
+  mobilePresentation?: boolean;
   desktopCancellationOpen?: boolean;
   onDesktopCancellationOpenChange?: (open: boolean) => void;
 };
@@ -88,6 +92,7 @@ export function HistoryBatchDetailPanel({
   onFocusLineInList,
   onSelectLog,
   variant = "default",
+  mobilePresentation = false,
   desktopCancellationOpen = false,
   onDesktopCancellationOpenChange,
 }: Props) {
@@ -310,6 +315,7 @@ export function HistoryBatchDetailPanel({
             scopeStatus={isBatchCancelled ? "ready" : controller.scopeStatus}
             onRetryScope={controller.retryScope}
             onCancelClick={controller.openConfirmation}
+            mobilePresentation={mobilePresentation}
           />
           {isBatchCancelled && (
             <div
@@ -341,15 +347,15 @@ export function HistoryBatchDetailPanel({
 
           {batch && batch.bundles.length > 0 && (
             <div
-              className="rounded-[20px] border p-4"
-              style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+              className={mobilePresentation ? "space-y-3" : "rounded-[20px] border p-4"}
+              style={mobilePresentation ? undefined : { background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
             >
               <div
                 className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider"
                 style={{ color: LEGACY_COLORS.muted2 }}
               >
                 <GitBranch className="h-3.5 w-3.5" />
-                구성 라인
+                {mobilePresentation ? "재고 변화" : "구성 라인"}
               </div>
               <div className="flex flex-col gap-3">
                 {batch.bundles.map((bundle) => (
@@ -360,6 +366,7 @@ export function HistoryBatchDetailPanel({
                     logs={logs}
                     onLineClick={handleLineClick}
                     isLineClickable={(line) => logByItemId.has(line.item_id)}
+                    mobilePresentation={mobilePresentation}
                     framed
                   />
                 ))}
@@ -381,6 +388,7 @@ function HistoryBatchHero({
   scopeStatus,
   onRetryScope,
   onCancelClick,
+  mobilePresentation = false,
 }: {
   first: TransactionLog;
   logs: TransactionLog[];
@@ -390,6 +398,7 @@ function HistoryBatchHero({
   scopeStatus: HistoryCancelScopeStatus;
   onRetryScope: () => void;
   onCancelClick: () => void;
+  mobilePresentation?: boolean;
 }) {
   const displayType = getHistoryDisplayTransactionType(first, batch);
   const tcolor = transactionColor(displayType);
@@ -430,18 +439,39 @@ function HistoryBatchHero({
   return (
     <div className="rounded-[20px] border p-4 space-y-3" style={heroStyle}>
       {/* 1줄: 정체 + 변동요약 + work_type */}
-      <div className="flex flex-wrap items-center gap-2">
-        <FlowBadge
-          type={displayType}
-          label={getHistoryDisplayLabel(first, batch ?? undefined)}
-          color={tcolor}
-          variant="panel"
-        />
-        <MovementSummaryCell summary={summary} />
+      <div className={mobilePresentation ? mobileStyles.heroHeader : "flex flex-wrap items-center gap-2"}>
+        <div className={mobilePresentation ? "flex min-w-0 flex-wrap items-center gap-2" : "contents"}>
+          <FlowBadge
+            type={displayType}
+            label={getHistoryDisplayLabel(first, batch ?? undefined)}
+            color={tcolor}
+            variant="panel"
+          />
+          {!mobilePresentation && <MovementSummaryCell summary={summary} />}
+          {mobilePresentation && eps && (
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="rounded-full border px-2.5 py-0.5 font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>{eps.from}</span>
+              {eps.from !== eps.to && <>
+                <span style={{ color: LEGACY_COLORS.muted2 }}>→</span>
+                <span className="rounded-full border px-2.5 py-0.5 font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}>{eps.to}</span>
+              </>}
+            </div>
+          )}
+        </div>
+        {mobilePresentation && (
+          <dl className={mobileStyles.heroMetadata} style={{ color: LEGACY_COLORS.muted2 }}>
+            <div><dt>{actorLabel}</dt><dd style={{ color: LEGACY_COLORS.text }}>{reqName}</dd></div>
+            <div><dt>일시</dt><dd>
+              <time dateTime={first.requested_at ?? first.created_at} aria-label={formatHistoryDateTimeLong(first.requested_at ?? first.created_at)}>
+                {formatHistoryDate(first.requested_at ?? first.created_at)}
+              </time>
+            </dd></div>
+          </dl>
+        )}
       </div>
 
       {/* 2줄: 흐름 — endpoints 우선, from==to 면 단일 칩, 없으면 flow.secondary, 둘 다 없으면 미렌더 */}
-      {eps ? (
+      {!(mobilePresentation && eps) && (eps ? (
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span
             className="rounded-full border px-2.5 py-0.5 font-bold"
@@ -469,10 +499,10 @@ function HistoryBatchHero({
         <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
           작업 흐름 로딩…
         </div>
-      ) : null}
+      ) : null)}
 
       {/* 3줄: 라인 카운트 (batch 있을 때만) */}
-      {batch && (
+      {batch && !mobilePresentation && (
         <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
           총 {bundleCount}묶음 / {lineCount}라인
           {excluded > 0 && <span> · 제외 {excluded}개</span>}
@@ -481,14 +511,25 @@ function HistoryBatchHero({
           )}
         </div>
       )}
-      {!batch && !loading && (
+      {!batch && !loading && !mobilePresentation && (
         <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
           세부 거래 {logs.length}건
         </div>
       )}
 
       {/* 4줄: 메타 — 담당자 또는 요청자(시각) / 승인자(시각) */}
-      <div className="flex flex-col gap-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
+      {mobilePresentation && (excluded > 0 || shortage > 0) && (
+        <div className="flex flex-wrap gap-2 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+          {excluded > 0 && <span>제외 {excluded}개</span>}
+          {shortage > 0 && <span style={{ color: LEGACY_COLORS.red }}>부족 {shortage}</span>}
+        </div>
+      )}
+      {mobilePresentation ? approverName && (
+        <dl className={mobileStyles.metadata} style={{ color: LEGACY_COLORS.muted2 }}>
+          <dt>승인자</dt><dd style={{ color: LEGACY_COLORS.text }}>{approverName}</dd>
+          <dt>승인 일시</dt><dd style={{ color: LEGACY_COLORS.text }}>{formatHistoryDateTimeLong(first.approved_at ?? first.created_at)}</dd>
+        </dl>
+      ) : <div className="flex flex-col gap-1 text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
         <span>
           {actorLabel}{" "}
           <span className="font-semibold" style={{ color: LEGACY_COLORS.text }}>
@@ -507,7 +548,7 @@ function HistoryBatchHero({
           {formatHistoryDateTimeLong(first.approved_at ?? first.created_at)}
         </span>
         )}
-      </div>
+      </div>}
 
       {scopeStatus === "loading" && (
         <div className="text-[11px]" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -528,7 +569,7 @@ function HistoryBatchHero({
         <button
           type="button"
           onClick={onCancelClick}
-          className="mt-1 rounded-[10px] border px-3 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110"
+          className={`mt-1 rounded-[10px] border px-3 py-1.5 text-[12px] font-bold transition-colors hover:brightness-110${mobilePresentation ? " min-h-[44px] w-full" : ""}`}
           style={{
             borderColor: `color-mix(in srgb, ${LEGACY_COLORS.red} 40%, transparent)`,
             color: LEGACY_COLORS.red,
@@ -549,6 +590,7 @@ function BundleBlock({
   onLineClick,
   isLineClickable,
   framed = false,
+  mobilePresentation = false,
 }: {
   bundle: IoBundle;
   batch: IoBatch;
@@ -556,6 +598,7 @@ function BundleBlock({
   onLineClick: (line: IoLine) => void;
   isLineClickable: (line: IoLine) => boolean;
   framed?: boolean;
+  mobilePresentation?: boolean;
 }) {
   const isBomParent = bundle.source_kind === "bom_parent";
   const isInternalUseBom = batch.sub_type === "internal_use_out" && isBomParent;
@@ -586,7 +629,7 @@ function BundleBlock({
       style={{ borderColor: LEGACY_COLORS.border }}
     >
       <div
-        className="flex items-center gap-2 px-3 py-2"
+        className={mobilePresentation ? mobileStyles.bundleHeader : "flex items-center gap-2 px-3 py-2"}
         style={{
           background: framed
             ? "color-mix(in srgb, var(--c-blue) 5%, transparent)"
@@ -594,7 +637,7 @@ function BundleBlock({
         }}
       >
         <span
-          className="inline-flex min-w-[6.5rem] items-center justify-center gap-1 rounded-full px-3 py-1 text-xs font-bold tracking-wide"
+          className={mobilePresentation ? "inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium" : "inline-flex min-w-[6.5rem] items-center justify-center gap-1 rounded-full px-3 py-1 text-xs font-bold tracking-wide"}
           style={{
             background: isBomParent
               ? `color-mix(in srgb, ${LEGACY_COLORS.blue} 14%, transparent)`
@@ -616,14 +659,17 @@ function BundleBlock({
             {INTERNAL_USE_BOM_MODE_LABEL[bundle.internal_use_bom_mode]}
           </span>
         )}
-        <div className="min-w-0 flex-1">
-          <TruncatedText className="truncate text-xs font-bold" style={{ color: LEGACY_COLORS.text }}>
+        <div className={mobilePresentation ? mobileStyles.bundleTitle : "min-w-0 flex-1"}>
+          <TruncatedText className={mobilePresentation ? mobileStyles.name : "truncate text-xs font-bold"} style={{ color: LEGACY_COLORS.text }}>
             {bundle.title}
           </TruncatedText>
         </div>
-        <span className="whitespace-nowrap text-[11px] font-bold" style={{ color: headerQtyColor }}>
-          {headerQtyText}
-        </span>
+        {mobilePresentation ? parentLine && (
+          <div className={mobileStyles.stockChange}>
+            {parentNotExecuted ? <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{headerQtyText}</span>
+              : <StockSnapshotContent log={getBomLineSnapshotLog(parentLine, logs, batch)} variant="panel" />}
+          </div>
+        ) : <span className="whitespace-nowrap text-[11px] font-bold" style={{ color: headerQtyColor }}>{headerQtyText}</span>}
       </div>
 
       <div>
@@ -645,26 +691,31 @@ function BundleBlock({
               type="button"
               onClick={() => clickable && onLineClick(line)}
               disabled={!clickable}
-              className="flex w-full items-center gap-2 border-t px-3 py-1.5 text-left transition-colors disabled:cursor-default enabled:hover:brightness-125"
+              className={mobilePresentation ? `${mobileStyles.line} border-t text-left transition-colors disabled:cursor-default enabled:hover:brightness-125` : "flex w-full items-center gap-2 border-t px-3 py-1.5 text-left transition-colors disabled:cursor-default enabled:hover:brightness-125"}
               style={{
                 borderColor: LEGACY_COLORS.border,
                 background: "transparent",
               }}
             >
-              <span className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>└</span>
+              <span className={mobilePresentation ? mobileStyles.branch : "text-[10px]"} style={{ color: LEGACY_COLORS.muted2 }}>└</span>
               <div className="min-w-0 flex-1">
-                <TruncatedText className="truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>
+                <TruncatedText className={mobilePresentation ? mobileStyles.name : "truncate text-xs font-semibold"} style={{ color: LEGACY_COLORS.text }}>
                   {line.item_name}
                 </TruncatedText>
               </div>
-              {line.mes_code && (
+              {!mobilePresentation && line.mes_code && (
                 <span className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
                   {line.mes_code}
                 </span>
               )}
-              <span className="whitespace-nowrap text-[11px] font-bold" style={{ color: qtyColor }}>
-                {signed.label}
-              </span>
+              {mobilePresentation ? (
+                <div className={mobileStyles.lineMetadata}>
+                  {line.mes_code && <span className={mobileStyles.code} style={{ color: LEGACY_COLORS.muted2 }}>{line.mes_code}</span>}
+                  <div className={mobileStyles.stockChange}>
+                    <StockSnapshotContent log={getBomLineSnapshotLog(line, logs, batch)} variant="panel" />
+                  </div>
+                </div>
+              ) : <span className="whitespace-nowrap text-[11px] font-bold" style={{ color: qtyColor }}>{signed.label}</span>}
               {internalUseEffect
                 ? <InternalUseEffectBadge label={internalUseEffect} />
                 : <LineStatusBadge included={line.included} shortage={line.shortage} />}

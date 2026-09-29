@@ -66,6 +66,10 @@ export function useWarehouseData({ globalSearch, onStatusChange }: Args) {
     productModels: productModels ?? EMPTY_MODELS,
     loadFailure,
     loading: itemsQuery.isLoading || employeesQuery.isLoading,
+    itemsLoading: itemsQuery.data === undefined && itemsQuery.isLoading,
+    itemsHasData: itemsQuery.data !== undefined,
+    itemsLoadError: itemsQuery.error instanceof Error ? itemsQuery.error.message : itemsQuery.error ? "품목을 불러오지 못했습니다." : null,
+    retryItems: () => { void itemsQuery.refetch(); },
     setItems,
   };
 }

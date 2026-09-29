@@ -6,6 +6,10 @@ import { REQUEST_TYPE_LABEL } from "@/lib/io/glossary";
 import type { AppNotification } from "@/lib/api/types";
 import { formatKstDateTime } from "@/lib/mes-format";
 import { EmptyState } from "../common/EmptyState";
+import styles from "./NotificationPanel.module.css";
+import { ReadLoading } from "../common/ReadState";
+import { LoadFailureCard } from "../common/LoadFailureCard";
+import { SkeletonBlock, dataRevealClassName } from "../common/LoadingSkeleton";
 
 const TONE: Record<string, string> = {
   approval_request: LEGACY_COLORS.blue,
@@ -72,6 +76,11 @@ export function NotificationPanel({
   loginPopupEnabled,
   loginPopupUpdating = false,
   onToggleLoginPopup,
+  mobilePresentation = false,
+  loading = false,
+  error = null,
+  hasData = items.length > 0 || (!loading && !error),
+  onRetry,
 }: {
   items: AppNotification[];
   unread: number;
@@ -82,13 +91,18 @@ export function NotificationPanel({
   loginPopupEnabled?: boolean;
   loginPopupUpdating?: boolean;
   onToggleLoginPopup?: () => void;
+  mobilePresentation?: boolean;
+  loading?: boolean;
+  error?: string | null;
+  hasData?: boolean;
+  onRetry?: () => void;
 }) {
   const hasRead = items.some((n) => n.is_read);
 
   return (
     <div
       data-testid="notification-panel"
-      className="absolute right-0 top-full z-50 mt-2 w-[min(420px,calc(100vw-32px))] rounded-[20px] border p-2"
+      className={`absolute right-0 top-full z-50 mt-2 w-[min(420px,calc(100vw-32px))] rounded-[20px] border p-2${mobilePresentation ? ` ${styles.mobile}` : ""}`}
       style={{
         background: "var(--c-popup-bg)",
         borderColor: LEGACY_COLORS.border,
@@ -143,8 +157,15 @@ export function NotificationPanel({
         )}
       </div>
       <div className="my-1 border-t" style={{ borderColor: LEGACY_COLORS.border }} />
-      <div className="max-h-[440px] overflow-y-auto">
-        {items.length === 0 ? (
+      <div className={`max-h-[440px] overflow-y-auto${mobilePresentation && !loading && items.length > 0 ? ` ${dataRevealClassName}` : ""}`}>
+        {mobilePresentation && error && <LoadFailureCard message={error} onRetry={onRetry} retryLabel="다시 시도" comfortable
+          prefix={hasData ? "최신 정보를 불러오지 못했습니다. 기존 내용을 표시합니다" : "데이터를 불러오지 못했습니다"} />}
+        {mobilePresentation && loading ? <ReadLoading label="알림 목록 불러오는 중" skeleton={<div>
+          {[0, 1, 2].map(index => <div key={index} className="flex min-h-[76px] flex-col gap-2 rounded-[14px] px-3 py-3">
+            <div className="flex items-center justify-between gap-2"><SkeletonBlock className="h-4 w-1/2" /><SkeletonBlock className="h-3 w-16" /></div>
+            <SkeletonBlock className="h-4 w-4/5" />
+          </div>)}
+        </div>} /> : mobilePresentation && error && !hasData ? null : items.length === 0 ? (
           <EmptyState compact illustrated className="min-h-[200px]" title="알림이 없습니다." description="" />
         ) : (
           items.map((n) => {

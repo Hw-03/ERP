@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import mobileStyles from "./MobileLogin.module.css";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -175,13 +176,13 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className={`fixed inset-0 z-50 flex items-center justify-center ${mobileStyles.gate}`}
       style={{ background: "var(--c-bg)" }}
     >
       {/* 영구 로고 — phase 와 무관하게 항상 같은 element 로 렌더 (flicker 방지) */}
       {/* outer: 위치 이동 transform / inner: 인트로 fade+scale 애니메이션 (충돌 방지) */}
       <div
-        className="pointer-events-none absolute"
+        className={`pointer-events-none absolute${logoState === "above-card" ? ` ${mobileStyles.logoAbove}` : ""}`}
         style={{
           transform: logoState === "above-card"
             ? SHRINK_TRANSFORM
@@ -247,7 +248,7 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
       {/* 카드 — form 단계에만 등장 (rise 애니메이션) */}
       {phase === "form" && (
         <div
-          className="mes-card-anim w-full"
+          className={`mes-card-anim w-full ${mobileStyles.form}`}
           style={{
             animation: "mes-card-rise 0.6s ease both",
             // 카드만 top 정렬 + 고정 marginTop → 카드 height 가 변해도 카드 상단 위치 일정 (로고 겹침 방지)

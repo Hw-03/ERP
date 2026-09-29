@@ -72,7 +72,7 @@ describe("MobileMoreScreen", () => {
     expect(screen.getByText("Kim")).toBeInTheDocument();
   });
 
-  it("fills the available menu space with checklist, daily report, shipping, weekly, and warehouse-map entries in order", () => {
+  it("keeps compact menu entries in order with the existing actions", () => {
     const onChecklist = vi.fn();
     const onDailyReport = vi.fn();
     const onWeekly = vi.fn();
@@ -92,11 +92,10 @@ describe("MobileMoreScreen", () => {
       />,
     );
 
-    expect(screen.getByTestId("mobile-more-notification-target")).toHaveClass("h-16");
+    expect(screen.getByTestId("mobile-more-notification-target")).toHaveClass("h-11");
     const menuList = screen.getByTestId("mobile-more-menu-list");
     const menuButtons = within(menuList).getAllByRole("button");
 
-    expect(menuList).toHaveClass("flex-1");
     expect(menuButtons.map((button) => button.textContent)).toEqual([
       expect.stringContaining("체크리스트"),
       expect.stringContaining("일일 작업 일보"),
@@ -104,7 +103,6 @@ describe("MobileMoreScreen", () => {
       expect.stringContaining("주간보고"),
       expect.stringContaining("창고 지도"),
     ]);
-    menuButtons.forEach((button) => expect(button).toHaveClass("flex-1"));
 
     fireEvent.click(screen.getByRole("button", { name: /체크리스트/ }));
     fireEvent.click(screen.getByRole("button", { name: /일일 작업 일보/ }));
@@ -120,7 +118,7 @@ describe("MobileMoreScreen", () => {
     expect(onWarehouseMap).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps the common 32px visual gap above the frozen tab bar", () => {
+  it("leaves the bottom gap to the frozen tab bar", () => {
     render(
       <MobileMoreScreen
         operator={operator}
@@ -134,6 +132,7 @@ describe("MobileMoreScreen", () => {
       />,
     );
 
-    expect(screen.getByTestId("mobile-more-menu-list").parentElement).toHaveClass("pb-6");
+    expect(screen.getByTestId("mobile-more-menu-list").parentElement).not.toHaveClass("pt-3");
+    expect(screen.getByTestId("mobile-more-menu-list").parentElement).not.toHaveClass("pb-2");
   });
 });

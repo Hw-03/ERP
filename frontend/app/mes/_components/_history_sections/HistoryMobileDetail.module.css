@@ -1,0 +1,177 @@
+.detail {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.detail [class~="text-[10px]"],
+.detail [class~="text-[11px]"] {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.detail [class~="font-black"] {
+  font-weight: 700;
+}
+
+.detail [class~="uppercase"] {
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.detail [class~="p-4"] {
+  padding: 12px;
+}
+
+.detail button {
+  min-height: 44px;
+}
+
+.detail input,
+.detail textarea {
+  min-height: 44px;
+  font-size: 16px;
+}
+
+.detail [class~="inline-flex"][class~="whitespace-nowrap"] {
+  max-width: 100%;
+  flex-wrap: wrap;
+  white-space: normal;
+}
+
+.heroHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  gap: 8px;
+}
+
+.heroMetadata {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  margin: 0 0 0 auto;
+  text-align: right;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.heroMetadata > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  column-gap: 6px;
+}
+
+.heroMetadata dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.heroMetadata > div:first-child dd {
+  font-weight: 700;
+}
+
+.bundleHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+}
+
+.bundleTitle {
+  order: -1;
+  min-width: 0;
+  width: 100%;
+}
+
+.name {
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.line {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  align-items: start;
+  column-gap: 8px;
+  row-gap: 4px;
+  min-height: 44px;
+  width: 100%;
+  padding: 12px;
+}
+
+.branch {
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.code {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.lineMetadata {
+  grid-column: 2 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  justify-content: space-between;
+}
+
+.line > span:not(.branch) {
+  grid-column: 2 / -1;
+  justify-self: start;
+  font-size: 12px;
+}
+
+.metadata {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  column-gap: 12px;
+  row-gap: 6px;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.metadata dd {
+  min-width: 0;
+  margin: 0;
+  font-weight: 700;
+}
+
+.stockChange {
+  display: flex;
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 100%;
+  flex-direction: column;
+  align-items: flex-end;
+  margin-left: auto;
+  text-align: right;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.stockChange :global(.history-stock-panel-line) {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.stockChange :global(.history-stock-panel) {
+  align-items: flex-end;
+}
+
+.stockChange :global(.history-stock-panel-location) {
+  font-size: 14px;
+}

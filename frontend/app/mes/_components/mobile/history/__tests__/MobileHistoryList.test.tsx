@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { TransactionLog } from "@/lib/api";
 import { MobileHistoryList } from "../MobileHistoryList";
+import { getSingleLogMovement } from "../../../_history_sections/historyBatchInterpreter";
 
 function log(id: string, phase: string): TransactionLog {
   return {
@@ -34,6 +35,38 @@ function log(id: string, phase: string): TransactionLog {
 }
 
 describe("MobileHistoryList", () => {
+  it("캐시 재검증 실패는 기존 행을 유지하며 실패와 재시도를 표시한다", () => {
+    const retry = vi.fn();
+    const entry = { ...log("cached", ""), reference_no: null };
+    render(<MobileHistoryList loading={false} error="network failure" filteredLogs={[entry]}
+      selectedKey={null} onSelectLog={vi.fn()} onSelectBatch={vi.fn()} onRetry={retry}
+      canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} />);
+    expect(screen.getByText(entry.item_name)).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("기존 내용을 표시합니다");
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(retry).toHaveBeenCalledOnce();
+  });
+  it("단일 행은 증감 요약 없이 표시하고 전체 로그의 상세 이동을 유지한다", () => {
+    const entry = { ...log("solo", ""), reference_no: null };
+    const onSelectLog = vi.fn();
+    render(<MobileHistoryList loading={false} error={null} filteredLogs={[entry]}
+      selectedKey="log:solo" onSelectLog={onSelectLog} onSelectBatch={vi.fn()} onRetry={vi.fn()}
+      canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} />);
+
+    const row = screen.getByRole("button");
+    expect(screen.queryByText(getSingleLogMovement(entry).label)).not.toBeInTheDocument();
+    expect(row).toHaveTextContent(entry.item_name);
+    expect(row).toHaveTextContent("operator");
+    const actor = screen.getByText("operator");
+    expect(actor.parentElement).toHaveClass("ml-auto", "gap-2");
+    expect(actor.nextElementSibling).toHaveClass("shrink-0");
+    expect(row).toHaveClass("h-[98px]");
+    expect(screen.getByText(entry.item_name)).toHaveClass("line-clamp-2");
+    expect(row).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(row);
+    expect(onSelectLog).toHaveBeenCalledWith(entry);
+  });
+
   it.each([false, true])("원자재 입출고의 반대 방향 화살표를 표시한다 (묶음: %s)", (grouped) => {
     const entries: TransactionLog[] = ["RECEIVE", "MATERIAL_OUT"].flatMap((type) =>
       Array.from({ length: grouped ? 2 : 1 }, (_, index) => ({
@@ -83,6 +116,8 @@ describe("MobileHistoryList", () => {
 
     fireEvent.click(screen.getByRole("button"));
     expect(onSelectBatch).toHaveBeenCalledWith("operation-id", [first, second]);
+    expect(screen.getByText("operator").parentElement?.previousElementSibling?.firstElementChild).toHaveClass("h-6", "w-32");
+    expect(screen.queryByText(/묶음 2건/)).not.toBeInTheDocument();
   });
 
   it("selects only the original defect-mark log for a visual defect lifecycle group", () => {
@@ -125,6 +160,7 @@ describe("MobileHistoryList", () => {
     fireEvent.click(screen.getByRole("button"));
     expect(onSelectLog).toHaveBeenCalledWith(marked);
     expect(onSelectBatch).not.toHaveBeenCalled();
+    expect(screen.queryByText(getSingleLogMovement(processed).label)).not.toBeInTheDocument();
   });
 
   it("uses the phase-aware batch key when duplicate shipping reference numbers exist", () => {
@@ -204,7 +240,7 @@ describe("MobileHistoryList", () => {
       />,
     );
 
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("기존 내용을 표시합니다");
     expect(screen.getByText("Shipping item cached")).toBeInTheDocument();
   });
 

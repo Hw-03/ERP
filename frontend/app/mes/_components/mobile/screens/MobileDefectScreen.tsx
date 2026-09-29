@@ -4,6 +4,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { readCurrentOperator, type Operator } from "../../login/useCurrentOperator";
 import { useWarehouseData } from "../../_warehouse_hooks/useWarehouseData";
 import { DefectHubPanel } from "../../_defect_hub/DefectHubPanel";
+import panelStyles from "./mobileWarehousePanels.module.css";
 
 const NOOP = () => {};
 
@@ -45,11 +46,16 @@ function MobileDefectInner({
   operator: Operator;
   defectDeptFilter?: string | null;
 }) {
-  const { items, productModels } = useWarehouseData({ globalSearch: "", onStatusChange: NOOP });
+  const { items, productModels, itemsLoading, itemsLoadError, itemsHasData, retryItems } = useWarehouseData({ globalSearch: "", onStatusChange: NOOP });
 
   return (
-    <div className="h-full w-full overflow-y-auto px-3 pb-6 pt-3">
+    <div className={`scrollbar-hide h-full w-full overflow-y-auto px-3 ${panelStyles.touchScope}`}>
       <DefectHubPanel
+        itemsLoading={itemsLoading}
+        itemsLoadError={itemsLoadError}
+        itemsHasData={itemsHasData}
+        onRetryItems={retryItems}
+        mobilePresentation
         defectDeptFilter={defectDeptFilter}
         currentEmployee={{
           employee_id: operator.employee_id,

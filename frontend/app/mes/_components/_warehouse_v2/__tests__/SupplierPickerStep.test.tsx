@@ -45,6 +45,12 @@ function SnapshotNameHarness({ onSynced }: { onSynced: (nextName: string | null)
 }
 
 describe("SupplierPickerStep", () => {
+  it("keeps mobile supplier rows while initial data is pending", () => {
+    api.listSuppliers.mockReturnValueOnce(new Promise(() => {}));
+    render(<SupplierPickerStep variant="mobile" employeeId="warehouse-1" selectedSupplierId={null} onSelect={vi.fn()} />);
+    expect(screen.getByRole("status", { name: "공급업체 목록 불러오는 중" })).toHaveAttribute("aria-busy", "true");
+    expect(screen.queryByText("선택할 수 있는 활성 공급업체가 없습니다.")).not.toBeInTheDocument();
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     api.listSuppliers.mockResolvedValue([supplier]);

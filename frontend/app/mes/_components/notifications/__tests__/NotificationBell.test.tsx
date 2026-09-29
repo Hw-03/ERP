@@ -28,10 +28,14 @@ const state = vi.hoisted(() => ({
   setCurrentOperator: vi.fn(),
   updateCurrentOperatorPreferences: vi.fn(),
   getStoredBootId: vi.fn(() => "boot-1"),
+  queryLoading: false,
+  queryHasData: true,
+  queryError: null as Error | null,
+  refetch: vi.fn(),
 }));
 
 vi.mock("@/lib/queries/useNotificationsQuery", () => ({
-  useNotificationsQuery: () => ({ data: state.notifications }),
+  useNotificationsQuery: () => ({ data: state.queryHasData ? state.notifications : undefined, isLoading: state.queryLoading, error: state.queryError, refetch: state.refetch }),
   useMarkNotificationsReadMutation: () => ({ mutate: state.markRead }),
   useDeleteNotificationMutation: () => ({ mutate: state.deleteNotification }),
   useDeleteReadNotificationsMutation: () => ({ mutate: state.deleteRead }),
@@ -75,6 +79,10 @@ function notification(overrides: Partial<AppNotification> = {}): AppNotification
 
 describe("NotificationBell", () => {
   beforeEach(() => {
+    state.queryLoading = false;
+    state.queryHasData = true;
+    state.queryError = null;
+    state.refetch.mockClear();
     window.sessionStorage.clear();
     state.operator.loginPopupEnabled = true;
     state.notifications = {
@@ -98,6 +106,21 @@ describe("NotificationBell", () => {
 
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
     expect(window.sessionStorage.getItem("dexcowin_mes_login_popup_pending")).toBeNull();
+  });
+
+  it("모바일 알림 버튼이 패널에 최초 조회·실패·재시도를 전달한다", () => {
+    state.queryHasData = false;
+    state.queryLoading = true;
+    const { rerender } = render(<NotificationBell mobilePresentation loginDialogEnabled={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "알림" }));
+    expect(screen.getByRole("status", { name: "알림 목록 불러오는 중" })).toBeInTheDocument();
+    state.queryLoading = false;
+    state.queryError = new Error("offline");
+    rerender(<NotificationBell mobilePresentation loginDialogEnabled={false} />);
+    expect(screen.queryByRole("status", { name: "알림 목록 불러오는 중" })).not.toBeInTheDocument();
+    expect(screen.queryByText("알림이 없습니다.")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(state.refetch).toHaveBeenCalledOnce();
   });
 
   it("does not show the login dialog for a restored session without a pending marker", async () => {

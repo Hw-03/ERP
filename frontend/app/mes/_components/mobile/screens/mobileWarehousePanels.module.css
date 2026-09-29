@@ -13,6 +13,102 @@
   min-height: 44px;
 }
 
+.touchScope {
+  composes: scope from "../mobilePresentation.module.css";
+}
+
+.touchScope button {
+  min-width: 44px;
+}
+
+.touchScope input,
+.touchScope select,
+.touchScope textarea {
+  font-size: 16px !important;
+}
+
 .touchScope textarea {
   min-height: 56px;
+}
+
+.touchScope[role="dialog"] > div {
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.touchScope [data-testid="defect-picker-toolbar"] {
+  height: auto;
+  align-items: flex-start;
+}
+
+.touchScope [class*="text-[9px]"],
+.touchScope [class*="text-[10px]"],
+.touchScope [class*="text-[11px]"] {
+  font-size: 12px;
+  line-height: 1rem;
+}
+
+.touchScope [data-stock-request-id] {
+  padding: 12px;
+}
+
+.touchScope article[aria-label^="작업 카드:"] {
+  padding: 12px;
+}
+
+.touchScope article[aria-label^="작업 카드:"] :global(.text-base) {
+  font-size: 14px;
+  line-height: 1.25rem;
+}
+
+.touchScope article[aria-label^="작업 카드:"] :global(.text-lg) {
+  font-size: 16px;
+  line-height: 1.5rem;
+}
+
+.touchScope [data-stock-request-id] :global(.text-xl) {
+  font-size: 16px;
+  line-height: 1.5rem;
+}
+
+.touchScope [data-stock-request-id] :global(.text-base) {
+  font-size: 14px;
+  line-height: 1.25rem;
+}
+
+.touchScope [data-stock-request-id] input,
+.touchScope [data-stock-request-id] textarea {
+  font-size: 16px;
+}
+
+.composeScope :global(.rounded-\[18px\].p-4),
+.composeScope :global(.rounded-\[18px\].px-5) {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.composeScope :global(.min-h-\[160px\]) {
+  min-height: 96px;
+}
+
+.composeScope :global(.text-\[9px\]) {
+  letter-spacing: 0;
+}
+
+@media (max-height: 600px) {
+  div.defectCartBody {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .defectCartBody > [data-testid="mobile-defect-picker-pane"] {
+    flex: none;
+    height: 320px;
+  }
+
+  .defectCartBody > [data-testid="mobile-defect-cart-scroll"] {
+    max-height: none;
+    overflow: visible;
+  }
 }

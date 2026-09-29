@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ArrowDownToLine, ArrowUpFromLine, ChevronDown, ChevronUp, Equal, Layers } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, ChevronDown, ChevronUp, Equal, Layers, MapPin } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import type { IoBundle, IoInternalUseBomMode, IoLine, IoSubType, Item } from "./types";
@@ -207,6 +207,7 @@ export function IoBundleCard({
   }
   return (
     <article
+      data-io-bundle
       className="rounded-[18px] border-2 p-4"
       style={{
         background: tint(tone, 6),
@@ -214,6 +215,8 @@ export function IoBundleCard({
       }}
     >
       <div
+        data-io-bundle-header
+        data-io-internal-use={isInternalUse}
         className={`relative mb-3 grid grid-cols-1 gap-3 lg:items-center ${
           isInternalUse
             ? "lg:grid-cols-[minmax(0,1.6fr)_minmax(208px,auto)_minmax(112px,auto)_minmax(132px,auto)_minmax(80px,auto)_minmax(80px,auto)_44px]"
@@ -226,7 +229,7 @@ export function IoBundleCard({
         role={isCollapsible ? "button" : undefined}
         aria-expanded={isCollapsible ? !collapsed : undefined}
       >
-        <div className="min-w-0 pr-12 lg:pr-0">
+        <div data-io-identity className="min-w-0 pr-12 lg:pr-0">
           <div className="flex min-w-0 items-start gap-2 text-left">
             <Layers className="h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
             <ExpandableItemName
@@ -243,6 +246,7 @@ export function IoBundleCard({
               ))}
           </div>
           <div
+            data-io-bundle-meta
             className="mt-2 flex flex-wrap items-center gap-1.5 text-xs font-bold"
           >
             {bundleCode && (
@@ -257,7 +261,12 @@ export function IoBundleCard({
                 {bundleCode}
               </span>
             )}
+            <span data-io-inline-location className="hidden">
+              <MapPin aria-hidden="true" className="h-3 w-3 shrink-0" />
+              <span>{location?.value ?? "—"}</span>
+            </span>
             <span
+              data-io-bundle-summary
               className="rounded-full px-2 py-1"
               style={{
                 background: tint(LEGACY_COLORS.green, 14),
@@ -279,6 +288,7 @@ export function IoBundleCard({
             )}
             {compositionLabel && (
               <span
+                data-io-bundle-summary
                 className="rounded-full px-2 py-1"
                 style={{
                   background: tint(LEGACY_COLORS.blue, 12),
@@ -330,10 +340,10 @@ export function IoBundleCard({
             </div>
           </div>
         )}
-        <div className="flex justify-center">
+        <div data-io-location className="flex justify-center">
           <IoLocationBadge label={location?.label ?? "재고 위치"} value={location?.value ?? "—"} variant="field" />
         </div>
-        <div onClick={(e) => e.stopPropagation()} className={`border-t pt-3 lg:self-center lg:border-t-0 lg:pt-0 ${subType === "internal_use_out" ? "lg:w-[276px]" : ""}`}>
+        <div data-io-bundle-quantity onClick={(e) => e.stopPropagation()} className={`border-t pt-3 lg:self-center lg:border-t-0 lg:pt-0 ${subType === "internal_use_out" ? "lg:w-[276px]" : ""}`}>
           {showBundleQtyStepper ? (
             <QuantityStepper
               value={stepperQty}
@@ -354,6 +364,7 @@ export function IoBundleCard({
         </div>
         {isInternalUseBom && (
           <div
+            data-io-stock
             role="group"
             aria-label="상위 자재 재고"
             onClick={(event) => event.stopPropagation()}
@@ -396,7 +407,7 @@ export function IoBundleCard({
           </div>
         )}
         {!isInternalUseBom && directParentLine && (
-          <div className="grid grid-cols-2 border-t pt-3 lg:contents lg:border-t-0 lg:pt-0" style={{ borderColor: LEGACY_COLORS.border }}>
+          <div data-io-stock className="grid grid-cols-2 border-t pt-3 lg:contents lg:border-t-0 lg:pt-0" style={{ borderColor: LEGACY_COLORS.border }}>
             <div className="self-center text-center">
               <div
                 className="text-[9px] font-bold uppercase tracking-[1.5px]"

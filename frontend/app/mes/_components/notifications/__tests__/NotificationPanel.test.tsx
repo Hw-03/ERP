@@ -32,6 +32,33 @@ function makeNotification(overrides: Partial<AppNotification> = {}): AppNotifica
 }
 
 describe("NotificationPanel", () => {
+  it("최초 조회 중에도 제목·설정을 유지하며 빈 안내를 표시하지 않는다", () => {
+    render(<NotificationPanel mobilePresentation loading items={[]} unread={0} loginPopupEnabled onToggleLoginPopup={vi.fn()} {...emptyHandlers} />);
+    expect(screen.getByText(TEXT.title)).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: TEXT.loginPopup })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "알림 목록 불러오는 중" })).toHaveAttribute("aria-busy", "true");
+    expect(screen.queryByText("알림이 없습니다.")).not.toBeInTheDocument();
+  });
+
+  it("갱신 실패는 기존 알림과 함께 표시하고 재시도한다", () => {
+    const onRetry = vi.fn();
+    render(<NotificationPanel mobilePresentation error="알림 조회 실패" onRetry={onRetry} items={[makeNotification()]} unread={1} {...emptyHandlers} />);
+    expect(screen.getByText("approval needed")).toBeInTheDocument();
+    expect(screen.getByText(/알림 조회 실패/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(onRetry).toHaveBeenCalledOnce();
+  });
+
+  it("최초 실패를 빈 알림으로 표시하지 않는다", () => {
+    render(<NotificationPanel mobilePresentation error="알림 조회 실패" items={[]} unread={0} {...emptyHandlers} />);
+    expect(screen.queryByText("알림이 없습니다.")).not.toBeInTheDocument();
+    expect(screen.getByText(/알림 조회 실패/)).toBeInTheDocument();
+  });
+  it("성공한 빈 목록은 갱신 실패에도 유지한다", () => {
+    render(<NotificationPanel mobilePresentation hasData error="알림 조회 실패" items={[]} unread={0} {...emptyHandlers} />);
+    expect(screen.getByText("알림이 없습니다.")).toBeInTheDocument();
+    expect(screen.getByText(/기존 내용을 표시합니다/)).toBeInTheDocument();
+  });
   it("uses an opaque wider panel and shows the full KST timestamp", () => {
     render(
       <NotificationPanel

@@ -1,5 +1,6 @@
 "use client";
-import { ReadFailure, ReadLoading } from "../../common/ReadState";
+import { ReadFailure } from "../../common/ReadState";
+import { MobileIoRestoreSkeleton } from "../warehouse/MobileIoRestoreSkeleton";
 
 import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { api, type IoBatch, type Item, type StockRequest } from "@/lib/api";
@@ -29,7 +30,7 @@ const HANDOVER_RECEIVE_DEPTS = ["고압", "진공"];
 
 // 탭 전환 remount 사이 직전 카운트 보존 (세션 내 메모리 캐시) — DesktopWarehouseView 와 동일.
 const cartCountCache = new Map<string, number>();
-const warehouseQueueCountCache = { value: 0 };
+const warehouseQueueCountCache = { value: 0, loaded: false };
 const deptQueueCountCache = new Map<string, number>();
 const asResearchQueueCountCache = new Map<string, number>();
 
@@ -65,7 +66,7 @@ export function MobileWarehouseScreen({
   targetRequestId?: string | null;
 }) {
   const revision = useRealtimeRevision();
-  const { employees, items, productModels, loadFailure, setItems } = useWarehouseData({
+  const { employees, items, productModels, loadFailure, setItems, itemsLoading, itemsLoadError, itemsHasData, retryItems } = useWarehouseData({
     globalSearch,
     onStatusChange,
   });
@@ -92,6 +93,7 @@ export function MobileWarehouseScreen({
     ? undefined
     : parseWarehouseStep(new URLSearchParams(window.location.search).get("step"));
   const [sectionTab, setSectionTab] = useState<WarehouseSectionTab>(() => resolveNotificationSection(notificationSection));
+  const [inboxOpen, setInboxOpen] = useState(false);
   const [panelRefreshNonce, setPanelRefreshNonce] = useState(0);
   const [cartCount, setCartCount] = useState(() => {
     const eid = operator?.employee_id ?? "";
@@ -119,6 +121,12 @@ export function MobileWarehouseScreen({
   const showSectionTabs = !(sectionTab === "compose" && composeStep >= 2);
   const [sectionTabsMounted, setSectionTabsMounted] = useState(showSectionTabs);
   const [handoverInboxCount, setHandoverInboxCount] = useState(0);
+  const [loadedCounts, setLoadedCounts] = useState<WarehouseSectionTab[]>(() => {
+    const eid = operator?.employee_id ?? "";
+    return [cartCountCache.has(eid) ? "cart" : null, warehouseQueueCountCache.loaded ? "queue" : null, deptQueueCountCache.has(eid) ? "dept-queue" : null, asResearchQueueCountCache.has(eid) ? "as-research-queue" : null].filter((tab): tab is WarehouseSectionTab => tab !== null);
+  });
+  const countEmployeeRef = useRef(operator?.employee_id ?? employeeId);
+  const [failedCounts, setFailedCounts] = useState<WarehouseSectionTab[]>([]);
   // D2 — compose 작성 중(담은 묶음 있음) 다른 섹션 이탈 가드.
   const [composeDirty, setComposeDirty] = useState(false);
   const [pendingTab, setPendingTab] = useState<WarehouseSectionTab | null>(null);
@@ -151,11 +159,30 @@ export function MobileWarehouseScreen({
   const showHandover = (operator?.department ?? "") === "튜브" || canReceiveHandover;
 
   useEffect(() => {
+    if (countEmployeeRef.current === operatorEmployeeId) return;
+    countEmployeeRef.current = operatorEmployeeId;
+    setCartCount(cartCountCache.get(operatorEmployeeId) ?? 0);
+    setDeptQueueCount(deptQueueCountCache.get(operatorEmployeeId) ?? 0);
+    setAsResearchQueueCount(asResearchQueueCountCache.get(operatorEmployeeId) ?? 0);
+    setHandoverInboxCount(0);
+    setFailedCounts([]);
+    setLoadedCounts([
+      ...(cartCountCache.has(operatorEmployeeId) ? ["cart" as const] : []),
+      ...(warehouseQueueCountCache.loaded ? ["queue" as const] : []),
+      ...(deptQueueCountCache.has(operatorEmployeeId) ? ["dept-queue" as const] : []),
+      ...(asResearchQueueCountCache.has(operatorEmployeeId) ? ["as-research-queue" as const] : []),
+    ]);
+  }, [operatorEmployeeId]);
+
+  useEffect(() => {
     if (operator && employeeId === "") setEmployeeId(operator.employee_id);
   }, [operator, employeeId]);
 
   useEffect(() => {
-    if (notificationSection) setSectionTab(resolveNotificationSection(notificationSection));
+    if (notificationSection) {
+      setSectionTab(resolveNotificationSection(notificationSection));
+      setInboxOpen(false);
+    }
     // notificationSection 이 바뀔 때만 외부 알림 목적지를 적용한다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notificationSection]);
@@ -163,17 +190,23 @@ export function MobileWarehouseScreen({
   useEffect(() => {
     if (!operatorEmployeeId) return;
     let cancelled = false;
+    setFailedCounts((tabs) => tabs.filter((tab) => tab !== "cart"));
     const legacyDraftsPromise = api.listStockRequestDrafts(operatorEmployeeId);
     const ioDraftsPromise = api.listDrafts(operatorEmployeeId);
 
     void Promise.allSettled([legacyDraftsPromise, ioDraftsPromise])
       .then(([legacyResult, ioResult]) => {
         if (cancelled) return;
-        const legacyCount = legacyResult.status === "fulfilled" ? legacyResult.value.length : 0;
-        const ioCount = ioResult.status === "fulfilled" ? ioResult.value.length : 0;
+        if (legacyResult.status !== "fulfilled" || ioResult.status !== "fulfilled") {
+          setFailedCounts((tabs) => [...tabs.filter((tab) => tab !== "cart"), "cart"]);
+          return;
+        }
+        const legacyCount = legacyResult.value.length;
+        const ioCount = ioResult.value.length;
         const n = legacyCount + ioCount;
         setCartCount(n);
         cartCountCache.set(operatorEmployeeId, n);
+        setLoadedCounts((tabs) => tabs.includes("cart") ? tabs : [...tabs, "cart"]);
       });
 
     if (!urlDraftId || restoredUrlDraftRef.current === urlDraftId) {
@@ -214,6 +247,7 @@ export function MobileWarehouseScreen({
 
   useEffect(() => {
     if (!canSeeQueue) return;
+    setFailedCounts((tabs) => tabs.filter((tab) => tab !== "queue"));
     let active = true;
     api
       .countWarehouseQueue()
@@ -221,8 +255,10 @@ export function MobileWarehouseScreen({
         if (!active) return;
         setWarehouseQueueCount(count);
         warehouseQueueCountCache.value = count;
+        warehouseQueueCountCache.loaded = true;
+        setLoadedCounts((tabs) => tabs.includes("queue") ? tabs : [...tabs, "queue"]);
       })
-      .catch(() => {});
+      .catch(() => { if (active) setFailedCounts((tabs) => [...tabs.filter((tab) => tab !== "queue"), "queue"]); });
     return () => {
       active = false;
     };
@@ -230,6 +266,7 @@ export function MobileWarehouseScreen({
 
   useEffect(() => {
     if (!canSeeDeptQueue || !operatorEmployeeId) return;
+    setFailedCounts((tabs) => tabs.filter((tab) => tab !== "dept-queue"));
     let active = true;
     api
       .countDepartmentQueue(operatorEmployeeId)
@@ -237,8 +274,9 @@ export function MobileWarehouseScreen({
         if (!active) return;
         setDeptQueueCount(count);
         deptQueueCountCache.set(operatorEmployeeId, count);
+        setLoadedCounts((tabs) => tabs.includes("dept-queue") ? tabs : [...tabs, "dept-queue"]);
       })
-      .catch(() => {});
+      .catch(() => { if (active) setFailedCounts((tabs) => [...tabs.filter((tab) => tab !== "dept-queue"), "dept-queue"]); });
     return () => {
       active = false;
     };
@@ -246,26 +284,32 @@ export function MobileWarehouseScreen({
 
   useEffect(() => {
     if (!canSeeAsResearchQueue || !operatorEmployeeId) return;
+    setFailedCounts((tabs) => tabs.filter((tab) => tab !== "as-research-queue"));
     let active = true;
     api.countAsResearchQueue(operatorEmployeeId)
       .then(({ count }) => {
         if (!active) return;
         setAsResearchQueueCount(count);
         asResearchQueueCountCache.set(operatorEmployeeId, count);
+        setLoadedCounts((tabs) => tabs.includes("as-research-queue") ? tabs : [...tabs, "as-research-queue"]);
       })
-      .catch(() => {});
+      .catch(() => { if (active) setFailedCounts((tabs) => [...tabs.filter((tab) => tab !== "as-research-queue"), "as-research-queue"]); });
     return () => { active = false; };
   }, [canSeeAsResearchQueue, operatorEmployeeId, panelRefreshNonce, revision]);
 
   useEffect(() => {
     if (!canReceiveHandover || !operatorEmployeeId) return;
+    setFailedCounts((tabs) => tabs.filter((tab) => tab !== "handover"));
     let active = true;
     api
       .countHandoverInbox(operatorEmployeeId)
       .then(({ count }) => {
-        if (active) setHandoverInboxCount(count);
+        if (active) {
+          setHandoverInboxCount(count);
+          setLoadedCounts((tabs) => tabs.includes("handover") ? tabs : [...tabs, "handover"]);
+        }
       })
-      .catch(() => {});
+      .catch(() => { if (active) setFailedCounts((tabs) => [...tabs.filter((tab) => tab !== "handover"), "handover"]); });
     return () => {
       active = false;
     };
@@ -284,37 +328,53 @@ export function MobileWarehouseScreen({
       return;
     }
     setSectionTab(next);
+    setInboxOpen(false);
   }
+
+  const sectionTabsProps = {
+    unavailableCounts: failedCounts.filter((tab) => !loadedCounts.includes(tab)),
+    loadingCounts: (["cart", ...(canSeeQueue ? ["queue"] : []), ...(canSeeDeptQueue ? ["dept-queue"] : []), ...(canSeeAsResearchQueue ? ["as-research-queue"] : []), ...(canReceiveHandover ? ["handover"] : [])] as WarehouseSectionTab[]).filter((tab) => countEmployeeRef.current !== operatorEmployeeId || (!loadedCounts.includes(tab) && !failedCounts.includes(tab))),
+    mobilePresentation: true,
+    active: sectionTab,
+    onChange: handleSectionChange,
+    showQueue: canSeeQueue,
+    showDeptQueue: canSeeDeptQueue,
+    showAsResearchQueue: canSeeAsResearchQueue,
+    showHandover,
+    cartCount,
+    queueCount: warehouseQueueCount,
+    deptQueueCount,
+    asResearchQueueCount,
+    handoverInboxCount,
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="flex flex-col px-3 pt-3">
+      <div className="relative z-20 flex shrink-0 flex-col px-3">
         <WarehouseHeader loadFailure={loadFailure} />
         {sectionTabsMounted && (
           <div
             aria-hidden={!showSectionTabs}
             className={showSectionTabs ? "wt wo" : "wt wc"}
+            style={loadFailure ? undefined : { marginTop: 0 }}
           >
             <WarehouseSectionTabs
-              active={sectionTab}
-              onChange={handleSectionChange}
-              showQueue={canSeeQueue}
-              showDeptQueue={canSeeDeptQueue}
-              showAsResearchQueue={canSeeAsResearchQueue}
-              showHandover={showHandover}
-              cartCount={cartCount}
-              queueCount={warehouseQueueCount}
-              deptQueueCount={deptQueueCount}
-              asResearchQueueCount={asResearchQueueCount}
-              handoverInboxCount={handoverInboxCount}
+              {...sectionTabsProps}
+              mobileInboxOpen={inboxOpen}
+              onMobileInboxOpen={() => setInboxOpen(true)}
             />
           </div>
         )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-hidden">
+      {inboxOpen && (
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-2">
+          <WarehouseSectionTabs {...sectionTabsProps} mobileInboxView />
+        </div>
+      )}
+      <div hidden={inboxOpen} className={inboxOpen ? "hidden" : "min-h-0 flex-1 overflow-hidden"}>
         {sectionTab === "compose" ? urlDraftPending ? (
-          <ReadLoading label="저장한 작업을 불러오는 중입니다." />
+          <MobileIoRestoreSkeleton />
         ) : urlDraftRestoreError ? (
           <div className="h-full overflow-y-auto px-4 py-6">
             <ReadFailure
@@ -324,6 +384,10 @@ export function MobileWarehouseScreen({
           </div>
         ) : (
           <MobileIoComposeWizard
+            itemsLoading={itemsLoading}
+            itemsLoadError={itemsLoadError}
+            itemsHasData={itemsHasData}
+            onRetryItems={retryItems}
             globalSearch={globalSearch}
             operator={operator}
             employees={employees}
@@ -355,7 +419,7 @@ export function MobileWarehouseScreen({
             }}
           />
         ) : (
-          <div className={`h-full overflow-y-auto px-3 pb-6 ${panelStyles.touchScope}`}>
+          <div className={`h-full overflow-y-auto px-3 pt-2 ${panelStyles.touchScope}`}>
             <WarehouseDraftPanelTabs
               layout="mobile"
               sectionTab={sectionTab}
@@ -397,14 +461,14 @@ export function MobileWarehouseScreen({
           const next = pendingTab;
           setPendingTab(null);
           setComposeDirty(false);
-          if (next) setSectionTab(next);
+          if (next) { setSectionTab(next); setInboxOpen(false); }
         }}
         onDiscard={() => {
           // 항목 3-4 — 저장(flush) 없이 섹션 이동. compose 위저드는 언마운트되어 작성 내용이 폐기된다.
           const next = pendingTab;
           setPendingTab(null);
           setComposeDirty(false);
-          if (next) setSectionTab(next);
+          if (next) { setSectionTab(next); setInboxOpen(false); }
         }}
       />
     </div>

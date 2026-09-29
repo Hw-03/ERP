@@ -2,6 +2,18 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { InventoryItemsTable } from "../InventoryItemsTable";
 
+it("mobile loading keeps the sticky three-column table and 98px rows", () => {
+  render(<InventoryItemsTable compact error={null} loading filteredItems={[]} displayLimit={100}
+    setDisplayLimit={vi.fn()} selectedItem={null} onSelectItem={vi.fn()} activeFilterCount={0}
+    hasKpiFilter={false} onRetry={vi.fn()} onResetAllFilters={vi.fn()} />);
+  expect(screen.getAllByRole("columnheader")).toHaveLength(3);
+  expect(screen.getByRole("table")).toHaveAttribute("aria-busy", "true");
+  expect(screen.getByTestId("inventory-mobile-header-corners")).toBeInTheDocument();
+  const row = screen.getAllByTestId("inventory-skeleton-row")[0];
+  expect(row).toHaveClass("h-[98px]");
+  expect(row.querySelectorAll("td")).toHaveLength(3);
+});
+
 it("keeps real inventory columns and full-height rows while loading", () => {
   render(<InventoryItemsTable error={null} loading filteredItems={[]} displayLimit={100}
     setDisplayLimit={vi.fn()} selectedItem={null} onSelectItem={vi.fn()} activeFilterCount={0}

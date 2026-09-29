@@ -3,6 +3,19 @@ import { describe, expect, it } from "vitest";
 import { HistoryStatsBar } from "../HistoryStatsBar";
 
 describe("HistoryStatsBar", () => {
+  it("mobile filtered summary failure does not display unfiltered totals as current values", () => {
+    render(<HistoryStatsBar mobile baseline={{ total: 40, warehouseCount: 20, deptCount: 15, adjustCount: 5, departmentCounts: {} }}
+      currentSummary={null} currentCount={null} loading={false} periodLabel="이번달" hasListFilters />);
+    expect(screen.queryByText("20건")).not.toBeInTheDocument();
+    expect(screen.getAllByText("—건")).toHaveLength(4);
+    expect(screen.getByText(/전체/)).toHaveTextContent("40건");
+  });
+  it("mobile missing totals after a settled failure stop indicating loading", () => {
+    render(<HistoryStatsBar mobile baseline={null} currentCount={null} loading={false} periodLabel="이번달" hasListFilters={false} />);
+    expect(screen.queryAllByLabelText("집계 중")).toHaveLength(0);
+    expect(screen.getAllByText("—건")).toHaveLength(4);
+    expect(screen.queryByText("목록 조건")).not.toBeInTheDocument();
+  });
   it("keeps the unfiltered period heading while the totals are pending", () => {
     render(<HistoryStatsBar baseline={null} currentCount={null} loading loadingDisplay="skeleton" periodLabel="이번달" hasListFilters={false} />);
     expect(screen.queryByText("목록 조건")).not.toBeInTheDocument();

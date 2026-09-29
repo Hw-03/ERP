@@ -18,7 +18,8 @@ import { WeeklyDetailTable } from "../../_weekly_sections/WeeklyDetailTable";
 // 항목 4-13 — 모바일 생산현황을 PC 와 동일한 매트릭스 표로(frozen 컴포넌트 import 만, 수정 금지).
 import { WeeklyProductionMatrix } from "../../_weekly_sections/WeeklyProductionMatrix";
 import { BomSubExpander } from "../../_warehouse_v2/BomSubExpander";
-import { AsyncState } from "../primitives";
+import { ReadFailure, ReadLoading } from "../../common/ReadState";
+import { SkeletonBlock, dataRevealClassName } from "../../common/LoadingSkeleton";
 import { TYPO } from "../tokens";
 
 /**
@@ -57,25 +58,27 @@ export function MobileWeeklyScreen({
   onWeekChange?: (date: Date) => void;
   onExit?: () => void;
 }) {
-  const [data, setData] = useState<WeeklyReportResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [snapshot, setSnapshot] = useState<{ weekStart: string; data: WeeklyReportResponse } | null>(null);
+  const [failure, setFailure] = useState<{ weekStart: string; message: string } | null>(null);
   const [selectedCode, setSelectedCode] = useState("TF");
   const [selectedBomItem, setSelectedBomItem] = useState<WeeklyItemReport | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
 
   const weekStart = formatKstDate(weekMon);
   const weekEnd = formatKstDate(new Date(weekMon.getTime() + 6 * 86400000));
+  const data = snapshot?.weekStart === weekStart ? snapshot.data : null;
+  const error = failure?.weekStart === weekStart ? failure.message : null;
+  const initialLoading = !data && !error;
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
+    setFailure(null);
+    setSelectedBomItem(null);
     api
       .getWeeklyReport({ week_start: weekStart, week_end: weekEnd })
       .then((res) => {
         if (cancelled) return;
-        setData(res);
+        setSnapshot({ weekStart, data: res });
         // 응답에 현재 선택 코드가 없으면 첫 그룹으로 재조정(frozen 과 동일 fallback).
         setSelectedCode((prev) =>
           res.groups.length > 0 && !res.groups.find((g) => g.process_code === prev)
@@ -84,10 +87,7 @@ export function MobileWeeklyScreen({
         );
       })
       .catch(() => {
-        if (!cancelled) setError("주간보고 데이터를 불러오지 못했습니다.");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setFailure({ weekStart, message: "주간보고 데이터를 불러오지 못했습니다." });
       });
     return () => {
       cancelled = true;
@@ -112,7 +112,7 @@ export function MobileWeeklyScreen({
     <div className="flex min-h-0 min-w-0 flex-1 flex-col" style={{ background: LEGACY_COLORS.bg }}>
       {/* 항목 5-8 — min-w-0 로 flex 자식이 main(414) 폭으로 줄어들게(없으면 콘텐츠 min-content=490 으로 부풀어
           공정별 변화 카드 우측 '현재/±0'가 잘림). 공정 전환과 무관하게 폭 고정. */}
-      <div className="scrollbar-hide flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pb-6 pt-3">
+      <div className="scrollbar-hide flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pb-6">
         {onWeekChange && (
           <div
             className="sticky top-0 z-20 -mx-3 border-b px-3 py-2"
@@ -134,14 +134,12 @@ export function MobileWeeklyScreen({
             </div>
           </div>
         )}
-        <AsyncState
-          loading={loading && !data}
-          error={error}
-          onRetry={() => setReloadNonce((n) => n + 1)}
-        >
+        {error && <ReadFailure message={error} refresh={Boolean(data)} onRetry={() => setReloadNonce((n) => n + 1)} />}
+        {initialLoading && <ReadLoading label="주간보고 불러오는 중" skeleton={<WeeklySkeleton />} />}
+        {data && <div key={weekStart} className={`flex min-w-0 flex-col gap-3 ${dataRevealClassName}`}>
           {/* 1. 생산 현황 */}
-          <section className="rounded-[20px] border p-4" style={CARD_STYLE}>
-            <div className={clsx(TYPO.overline, "mb-2")} style={{ color: LEGACY_COLORS.muted2 }}>
+          <section className="rounded-[20px] border p-3" style={CARD_STYLE}>
+            <div className={clsx(TYPO.title, "mb-2")} style={{ color: LEGACY_COLORS.text }}>
               생산 현황
             </div>
             {!hasOverallProduction ? (
@@ -174,8 +172,8 @@ export function MobileWeeklyScreen({
           </section>
 
           {/* 2. 공정별 변화 — frozen WeeklyGroupCards(cols=1). 카드가 flex-1 이라 wrapper 에 min-h 부여. */}
-          <section className="rounded-[20px] border p-3" style={CARD_STYLE}>
-            <div className={clsx(TYPO.overline, "mb-2 px-1")} style={{ color: LEGACY_COLORS.muted2 }}>
+          <section className="min-w-0">
+            <div className={clsx(TYPO.title, "mb-2 px-1")} style={{ color: LEGACY_COLORS.text }}>
               공정별 변화
             </div>
             <div className="min-h-[300px]">
@@ -189,8 +187,8 @@ export function MobileWeeklyScreen({
           </section>
 
           {/* 3. 품목 상세 — frozen WeeklyDetailTable(내부 모바일 카드 리스트). */}
-          <section className="rounded-[20px] border p-3" style={CARD_STYLE}>
-            <div className={clsx(TYPO.overline, "mb-2 px-1")} style={{ color: LEGACY_COLORS.muted2 }}>
+          <section className="min-w-0">
+            <div className={clsx(TYPO.title, "mb-2 px-1")} style={{ color: LEGACY_COLORS.text }}>
               {selectedGroup ? `${selectedGroup.dept_name} 품목 상세` : "품목 상세"}
             </div>
             <WeeklyDetailTable
@@ -199,7 +197,7 @@ export function MobileWeeklyScreen({
               onItemSelect={setSelectedBomItem}
             />
           </section>
-        </AsyncState>
+        </div>}
       </div>
       <BottomSheet
         open={selectedBomItem !== null}
@@ -231,4 +229,29 @@ export function MobileWeeklyScreen({
       </BottomSheet>
     </div>
   );
+}
+
+/** 모바일 최종 보고의 세 영역을 예약하며 미조회 수치를 만들지 않는다. */
+function WeeklySkeleton(): React.ReactNode {
+  return <div className="flex min-w-0 flex-col gap-3">
+    <section className="rounded-[20px] border p-3" style={CARD_STYLE}>
+      <div className={clsx(TYPO.title, "mb-2")} style={{ color: LEGACY_COLORS.text }}>생산 현황</div>
+      <div className="mb-3 flex gap-1.5"><SkeletonBlock className="h-6 w-20 rounded-full" /><SkeletonBlock className="h-6 w-28 rounded-full" /><SkeletonBlock className="h-6 w-24 rounded-full" /></div>
+      <div className="overflow-x-auto rounded-[12px] border" style={{ borderColor: LEGACY_COLORS.border }}>
+        {[0, 1, 2].map((row) => <div key={row} className="grid min-w-[480px] grid-cols-8 gap-2 border-b p-2 last:border-b-0" style={{ borderColor: LEGACY_COLORS.border }}>{Array.from({ length: 8 }, (_, cell) => <SkeletonBlock key={cell} className="h-4 w-full" />)}</div>)}
+      </div>
+    </section>
+    <section className="min-w-0">
+      <div className={clsx(TYPO.title, "mb-2 px-1")} style={{ color: LEGACY_COLORS.text }}>공정별 변화</div>
+      <div inert className="min-h-[300px]"><WeeklyGroupCards groups={[]} selected="TF" onSelect={() => {}} cols={1} loading /></div>
+    </section>
+    <section className="min-w-0">
+      <div className={clsx(TYPO.title, "mb-2 px-1")} style={{ color: LEGACY_COLORS.text }}>품목 상세</div>
+      <div className="mb-1.5 flex flex-wrap gap-3 border-b pb-1.5 pt-2" style={{ borderColor: LEGACY_COLORS.border }}>{[0, 1, 2, 3].map((value) => <SkeletonBlock key={value} className="h-4 w-20" />)}</div>
+      <div className="flex flex-col gap-2">{[0, 1].map((row) => <div key={row} className="rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+        <div className="flex items-start justify-between gap-2"><div className="flex flex-1 flex-col gap-2"><SkeletonBlock className="h-4 w-3/4" /><SkeletonBlock className="h-3 w-1/2" /></div><SkeletonBlock className="h-5 w-12" /></div>
+        <div className="mt-2 grid grid-cols-6 gap-1 text-center text-[11px] font-bold">{["전주", "생산", "입고", "출고", "불량", "현재"].map((label) => <div key={label}><div style={{ color: LEGACY_COLORS.muted2 }}>{label}</div><SkeletonBlock className="h-4 w-7" /></div>)}</div>
+      </div>)}</div>
+    </section>
+  </div>;
 }

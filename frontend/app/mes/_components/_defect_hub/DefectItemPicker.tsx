@@ -6,6 +6,8 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
 import { EmptyState } from "../common";
+import { SkeletonBlock, dataRevealClassName } from "../common/LoadingSkeleton";
+import { ReadFailure } from "../common/ReadState";
 import { useCurrentOperator } from "../login/useCurrentOperator";
 import { DEPT_OPTIONS, PAGE_SIZE, matchesSearch } from "../_warehouse_steps/_constants";
 import { LabeledSelect } from "../_warehouse_v2/_atoms";
@@ -33,6 +35,10 @@ import { defectSourceStock } from "./defectCartValidation";
 const INITIAL_DISPLAY_LIMIT = PAGE_SIZE * 2;
 
 interface Props {
+  loading?: boolean;
+  loadError?: string | null;
+  hasData?: boolean;
+  onRetry?: () => void;
   items: Item[];
   productModels: ProductModel[];
   source: "warehouse" | "production";
@@ -40,6 +46,7 @@ interface Props {
   selectedIds: Set<string>;
   onAdd: (item: Item) => void;
   onRemove: (item: Item) => void;
+  mobilePresentation?: boolean;
 }
 
 /**
@@ -48,12 +55,17 @@ interface Props {
  * itemPickerShared 로 재사용하되, BOM/낱개 분기 없이 행마다 "추가" 1버튼.
  */
 export function DefectItemPicker({
+  loading = false,
+  loadError = null,
+  hasData = true,
+  onRetry,
   items,
   productModels,
   source,
   selectedIds,
   onAdd,
   onRemove,
+  mobilePresentation = false,
 }: Props) {
   const [dept, setDept] = useState("ALL");
   const [model, setModel] = useState("\uc804\uccb4");
@@ -165,7 +177,7 @@ export function DefectItemPicker({
             {/* 모바일: 검색을 아래 전체폭 줄로(드롭다운 폭 확보). 데스크톱(lg): 기존 4열 인라인. */}
             <label className={searchFieldClass}>
               <span
-                className="text-[10px] font-bold uppercase tracking-[1.5px]"
+                className={mobilePresentation ? "sr-only" : "text-[10px] font-bold uppercase tracking-[1.5px]"}
                 style={{ color: LEGACY_COLORS.muted2 }}
               >
                 검색
@@ -254,15 +266,20 @@ export function DefectItemPicker({
 
       {/* 결과 표 */}
       <div
-        ref={tableRef}
-        data-testid="defect-picker-table" className="flex min-h-0 flex-1 flex-col touch-pan-y overflow-y-auto overflow-x-auto overscroll-contain rounded-[16px] border"
+        ref={mobilePresentation ? undefined : tableRef}
+        data-testid="defect-picker-table" className={mobilePresentation ? "flex min-h-0 flex-1 flex-col overflow-hidden rounded-[16px] border" : "flex min-h-0 flex-1 flex-col touch-pan-y overflow-y-auto overflow-x-auto overscroll-contain rounded-[16px] border"}
         style={{
           background: LEGACY_COLORS.s2,
           borderColor: LEGACY_COLORS.border,
           WebkitOverflowScrolling: "touch",
         }}
       >
-        <div className="flex min-h-full min-w-full flex-col">
+        <div
+          ref={mobilePresentation ? tableRef : undefined}
+          data-testid={mobilePresentation ? "defect-picker-scroll" : undefined}
+          className={mobilePresentation ? "flex min-h-0 min-w-0 flex-1 flex-col touch-pan-y overflow-y-auto overflow-x-auto overscroll-contain" : "flex min-h-full min-w-full flex-col"}
+          style={mobilePresentation ? { WebkitOverflowScrolling: "touch" } : undefined}
+        >
         {editMode ? (
           <DefectEditOrderTable
             items={editItems}
@@ -304,7 +321,8 @@ export function DefectItemPicker({
               ))}
             </tr>
           </thead>
-          <tbody>
+          <tbody role={loading ? "status" : undefined} aria-label={loading ? "품목 불러오는 중" : undefined} aria-busy={loading || undefined} className={mobilePresentation && !loading ? dataRevealClassName : undefined}>
+            {loading && [0, 1, 2, 3].map((row) => <tr key={`loading-${row}`} aria-hidden="true"><td colSpan={5} className="border-b border-[var(--c-border)] px-3 py-3"><div className="flex min-h-[48px] items-center gap-3"><div className="flex flex-1 flex-col gap-2"><SkeletonBlock className="h-4 w-2/3" /><SkeletonBlock className="h-3 w-1/2" /></div><SkeletonBlock className="h-8 w-16 rounded-[10px]" /></div></td></tr>)}
             {filteredItems.slice(0, displayLimit).map((item) => {
               const impliedDeptName = itemDepartment(item);
               const stock = defectSourceStock(item, source);
@@ -377,7 +395,8 @@ export function DefectItemPicker({
           </tbody>
         </table>
 
-        {filteredItems.length === 0 && <EmptyState
+        {loadError && <ReadFailure message={loadError} refresh={hasData} onRetry={() => onRetry?.()} />}
+        {!loading && !(loadError && !hasData) && filteredItems.length === 0 && <EmptyState
           illustrated
           className="flex-1"
           variant={hasActiveFilter ? "filtered-out" : "no-data"}

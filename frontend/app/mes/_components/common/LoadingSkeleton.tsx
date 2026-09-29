@@ -2,6 +2,15 @@
 
 import { memo } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import motion from "./LoadingSkeleton.module.css";
+
+/** Apply once to the data region, without fading its persistent controls. */
+export const dataRevealClassName = motion.reveal;
+
+/** A decorative value placeholder; its owner supplies the final layout dimensions. */
+export function SkeletonBlock({ className = "" }: { className?: string }) {
+  return <span aria-hidden="true" className={`inline-block rounded motion-safe:animate-pulse ${className}`} style={{ background: LEGACY_COLORS.s3 }} />;
+}
 
 type Variant = "table" | "card" | "list";
 
@@ -64,7 +73,7 @@ function LoadingSkeletonImpl({ variant = "list", rows = 4, className = "" }: Pro
       {items.map((_, i) => (
         <div key={i} className="flex items-center gap-3">
           <div
-            className="h-7 w-7 shrink-0 animate-pulse rounded-full"
+            className="h-7 w-7 shrink-0 motion-safe:animate-pulse rounded-full"
             style={{ background: LEGACY_COLORS.s3 }}
           />
           <div className="flex-1 space-y-1.5">
@@ -82,7 +91,7 @@ export const LoadingSkeleton = memo(LoadingSkeletonImpl);
 function Bar({ w, h }: { w: string; h: number }) {
   return (
     <div
-      className="animate-pulse rounded"
+      className="motion-safe:animate-pulse rounded"
       style={{
         width: w === "full" ? "100%" : w,
         height: h,
