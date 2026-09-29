@@ -24,8 +24,11 @@ import { formatQty } from "@/lib/mes/format";
 import { DefectCategoryFilters } from "./DefectCategoryFilters";
 import type { DefectProcessStep } from "./DefectFilterBar";
 import { EmptyState } from "../common/EmptyState";
+import { SkeletonBlock, dataRevealClassName } from "../common/LoadingSkeleton";
+import { ReadFailure } from "../common/ReadState";
 
 interface Props {
+  mobilePresentation?: boolean;
   departmentOptions: string[];
   modelOptions: string[];
   currentDepartment: string;
@@ -94,6 +97,7 @@ export function DefectStatisticsView({
   modelOptions,
   currentDepartment,
   onBack,
+  mobilePresentation = false,
 }: Props) {
   const [period, setPeriod] = useDesktopQueryState<DefectStatisticsPeriodKind>("defect-statistics-period", "week");
   const [anchor, setAnchor] = useDesktopQueryState("defect-statistics-date", todayInKst);
@@ -101,7 +105,10 @@ export function DefectStatisticsView({
   const [selectedModels, setSelectedModels] = useDesktopQueryState<string[]>("defect-statistics-models", []);
   const [selectedProcessSteps, setSelectedProcessSteps] = useDesktopQueryState<DefectProcessStep[]>("defect-statistics-processes", []);
   const [historicalDepartments, setHistoricalDepartments] = useState<string[]>([]);
-  const [result, setResult] = useState<DefectStatisticsResponse | null>(null);
+  const [storedResult, setResult] = useState<DefectStatisticsResponse | null>(null);
+  const [resultKey, setResultKey] = useState<string | null>(null);
+  const resourceKey = JSON.stringify([period, anchor, selectedDepartments, selectedModels, selectedProcessSteps]);
+  const result = !mobilePresentation || resultKey === resourceKey ? storedResult : null;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryNonce, setRetryNonce] = useState(0);
@@ -119,6 +126,7 @@ export function DefectStatisticsView({
     }).then((next) => {
       if (active) {
         setResult(next);
+        setResultKey(resourceKey);
         setHistoricalDepartments((current) => Array.from(new Set([
           ...current,
           ...next.departments.map((entry) => entry.label),
@@ -133,7 +141,7 @@ export function DefectStatisticsView({
     return () => {
       active = false;
     };
-  }, [period, anchor, selectedDepartments, selectedModels, selectedProcessSteps, retryNonce]);
+  }, [period, anchor, selectedDepartments, selectedModels, selectedProcessSteps, retryNonce, resourceKey]);
 
   const kpis = useMemo(() => [
     { label: "불량 건수", value: result ? `${result.summary.record_count}건` : "-", tone: LEGACY_COLORS.red },
@@ -240,11 +248,18 @@ export function DefectStatisticsView({
         onResetCategoryFilters={resetCategories}
       />
 
-      {loading && !result ? (
+      {mobilePresentation && error && result && <ReadFailure message={error} refresh onRetry={() => setRetryNonce((value) => value + 1)} />}
+      {loading && !result ? mobilePresentation ? (
+        <div role="status" aria-label="불량 통계 불러오는 중" aria-busy="true" className="flex flex-col gap-3">
+          <span className="sr-only">불량 통계 불러오는 중</span>
+          <div aria-hidden="true" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{kpis.map((kpi) => <article key={kpi.label} className="rounded-[20px] border px-5 py-4" style={{ background: tint(kpi.tone, 7), borderColor: tint(kpi.tone, 25) }}><p className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{kpi.label}</p><SkeletonBlock className="mt-2 h-8 w-2/3" /></article>)}</div>
+          <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">{["기간별 불량 추이", "사유별 집계", "부서별 집계", "품목별 순위"].map((title) => <section key={title} data-testid="statistics-panel-skeleton" aria-hidden="true" className="h-[340px] rounded-[20px] border p-5" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}><h3 className="text-sm font-black">{title}</h3>{[0, 1, 2, 3].map((row) => <div key={row} className="mt-5 flex min-h-11 items-center gap-3"><SkeletonBlock className="h-4 w-2/3" /><SkeletonBlock className="ml-auto h-4 w-12" /></div>)}</section>)}</div>
+        </div>
+      ) : (
         <div className="flex min-h-[240px] items-center justify-center rounded-[20px] border text-sm font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
           불량 통계 불러오는 중...
         </div>
-      ) : error ? (
+      ) : error && (!mobilePresentation || !result) ? (
         <div className="flex min-h-[220px] flex-col items-center justify-center gap-3 rounded-[20px] border px-4 text-center" style={{ background: tint(LEGACY_COLORS.red, 5), borderColor: tint(LEGACY_COLORS.red, 28) }}>
           <p className="text-sm font-bold" style={{ color: LEGACY_COLORS.red }}>{error}</p>
           <button type="button" onClick={() => setRetryNonce((value) => value + 1)} className="standard-hover min-h-11 rounded-[12px] border px-4 text-sm font-black" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}>
@@ -252,7 +267,7 @@ export function DefectStatisticsView({
           </button>
         </div>
       ) : result ? (
-        <>
+        <div className={mobilePresentation ? `${dataRevealClassName} flex flex-col gap-3` : "contents"}>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {kpis.map((kpi) => (
               <article key={kpi.label} className="rounded-[20px] border px-5 py-4" style={{ background: tint(kpi.tone, 7), borderColor: tint(kpi.tone, 25) }}>
@@ -292,7 +307,7 @@ export function DefectStatisticsView({
             <BreakdownPanel title="부서별 집계" entries={result.departments} />
             <BreakdownPanel title="품목별 순위" entries={result.items} showCode />
           </div>
-        </>
+        </div>
       ) : null}
     </div>
   );
