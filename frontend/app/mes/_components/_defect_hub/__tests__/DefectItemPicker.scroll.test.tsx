@@ -40,6 +40,21 @@ function makeItem(index: number): Item {
 }
 
 describe("DefectItemPicker mobile scroll", () => {
+  it("모바일 검색 이름을 유지하고 둥근 외곽 안에서 결과만 스크롤한다", async () => {
+    render(<DefectItemPicker mobilePresentation items={[makeItem(1), makeItem(2)]} productModels={[]} source="warehouse" selectedIds={new Set()} onAdd={() => {}} onRemove={() => {}} />);
+    const input = screen.getByRole("textbox", { name: "검색" });
+    expect(screen.getByText("검색")).toHaveClass("sr-only");
+    const frame = screen.getByTestId("defect-picker-table");
+    const scroll = screen.getByTestId("defect-picker-scroll");
+    expect(frame).toHaveClass("overflow-hidden", "rounded-[16px]");
+    expect(scroll).toHaveClass("overflow-y-auto", "overscroll-contain");
+    expect(screen.getByRole("columnheader", { name: "품목명" }).closest("thead")).toHaveClass("sticky", "top-0");
+    scroll.scrollTop = 120;
+    fireEvent.change(input, { target: { value: "SOLO item 2" } });
+    await waitFor(() => expect(scroll.scrollTop).toBe(0));
+    expect(screen.queryByText("SOLO item 1")).not.toBeInTheDocument();
+  });
+
   it("keeps the department availability header while showing only the available quantity", () => {
     const item = {
       ...makeItem(1),
