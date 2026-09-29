@@ -140,7 +140,7 @@ describe("MobileIoComposeWizard Step 5 헤더", () => {
       );
 
       expect(screen.getByText(expectedTitle)).toBeInTheDocument();
-      if (workType === "receive") expect(screen.getByText("공급업체")).toBeInTheDocument();
+      if (workType === "receive") expect(screen.queryByText("공급업체")).not.toBeInTheDocument();
     } finally {
       wizardState.step = originalStep;
       wizardState.workType = originalWorkType;
@@ -189,7 +189,7 @@ describe("MobileIoComposeWizard Step 5 헤더", () => {
     }
   });
 
-  it("keeps 24px of content padding on the work-type step for the common tab-bar gap", () => {
+    it("leaves the tab bar to provide the bottom gap without duplicate body padding", () => {
     const originalStep = wizardState.step;
     wizardState.step = 1;
     try {
@@ -204,7 +204,7 @@ describe("MobileIoComposeWizard Step 5 헤더", () => {
       );
 
       const workTypeButton = screen.getByRole("button", { name: /부서 입출고/ });
-      expect(workTypeButton.parentElement?.parentElement).toHaveClass("pb-6");
+      expect(workTypeButton.parentElement?.parentElement).not.toHaveClass("pb-2");
       const workTypeButtons = screen.getAllByRole("button")
         .filter((button) => button.hasAttribute("aria-pressed"));
       expect(workTypeButtons.every((button) => button.getAttribute("aria-pressed") === "false")).toBe(true);

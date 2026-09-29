@@ -1,0 +1,299 @@
+/* 수량 조정에만 적용한다. 사용자가 요청한 한 행 밀도를 위해 빠른 조작은 28px로 축소한다. */
+.cart [data-io-cart-list] {
+  padding-right: 0;
+  border: 1px solid var(--c-border);
+  border-radius: 20px;
+  background: var(--c-s2);
+  overflow: auto;
+}
+
+.cart [data-io-cart] { gap: 0; }
+.cart [data-io-cart-actions] { padding-top: 4px; }
+
+.cart [data-io-line],
+.cart [data-io-bundle-header] {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 100px 56px 24px !important;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 4px;
+  row-gap: 2px;
+  padding: 10px 4px !important;
+  border-left: 0 !important;
+}
+
+.cart [data-io-line] {
+  border-bottom: 1px solid var(--c-border);
+}
+
+.cart [data-io-line] > button:first-child {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  align-self: center;
+  width: 24px;
+  min-width: 24px;
+  height: 28px;
+  min-height: 28px;
+}
+
+.cart [data-io-identity] {
+  display: contents;
+}
+
+.cart [data-io-identity] > div:first-child {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: end;
+  align-items: center;
+  min-height: 28px;
+  gap: 4px;
+}
+
+.cart [data-io-identity] > div { opacity: inherit; }
+
+.cart [data-io-identity] button {
+  min-width: 0;
+  min-height: 0;
+  font-size: 14px;
+  line-height: 18px;
+}
+
+.cart [data-io-identity] :global(.line-clamp-2) {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cart [data-io-location] {
+  display: none;
+}
+
+.cart [data-io-inline-location] {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+  color: var(--c-muted2);
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.cart [data-io-inline-location] > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cart [data-io-stepper],
+.cart [data-io-fixed-quantity],
+.cart [data-io-bundle-quantity] {
+  grid-column: 3;
+  grid-row: 1 / 3;
+  width: 100px;
+  padding: 0;
+  border: 0;
+}
+
+.cart [data-io-stepper] > span,
+.cart [data-io-fixed-quantity] > span {
+  font-size: 12px;
+  letter-spacing: 0;
+  line-height: 16px;
+}
+
+.cart [data-io-stepper] > div {
+  display: flex;
+  gap: 0;
+  width: 100px;
+  border: 1px solid var(--c-border-strong);
+  border-radius: 10px;
+  background: var(--c-s2);
+  overflow: hidden;
+}
+
+.cart [data-io-stepper] > div:focus-within {
+  border-color: var(--c-blue);
+  box-shadow: 0 0 0 2px var(--c-blue);
+  position: relative;
+  z-index: 1;
+}
+
+.cart [data-io-stepper] input:focus-visible { outline: none; }
+
+.cart [data-io-stepper] > div > button { display: none; }
+
+.cart [data-io-stepper] input {
+  width: 64px;
+  min-width: 0;
+  height: 56px;
+  min-height: 0;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 10px 0 0 10px;
+  background: transparent;
+  box-shadow: none;
+  appearance: textfield;
+}
+
+.cart [data-io-stepper] input::-webkit-inner-spin-button,
+.cart [data-io-stepper] input::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+.cart [data-io-arrow-controls] {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  border-left: 1px solid var(--c-border);
+}
+
+.cart [data-io-arrow-controls] > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 28px;
+  padding: 0;
+  color: var(--c-blue);
+}
+
+.cart [data-io-arrow-controls] > button + button { border-top: 1px solid var(--c-border); }
+.cart [data-io-arrow-controls] > button:active { background: var(--c-s3); }
+.cart [data-io-arrow-controls] > button:disabled { opacity: 0.35; }
+
+.cart [data-io-stock] {
+  grid-column: 4;
+  grid-row: 1 / 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 56px;
+  padding: 0;
+  border: 0;
+}
+
+.cart [data-io-stock] > div > div {
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.cart [data-io-stock] > div > div:first-child {
+  white-space: nowrap;
+}
+
+.cart [data-io-stock] :global(.tabular-nums) {
+  font-size: 14px;
+}
+
+.cart [data-io-line] > button:last-child,
+.cart [data-io-bundle-header] > button:last-child {
+  position: static;
+  grid-column: 5;
+  grid-row: 1 / 3;
+  min-width: 24px;
+  width: 24px;
+  min-height: 32px;
+  height: 32px;
+  background: transparent !important;
+}
+
+.cart [data-io-line] > button:last-child svg,
+.cart [data-io-bundle-header] > button:last-child svg {
+  width: 16px;
+  height: 16px;
+}
+
+.cart [data-io-bundle] {
+  margin-top: 0;
+  padding: 0 !important;
+  border: 0;
+  border-bottom: 1px solid var(--c-border);
+  border-radius: 0;
+  background: transparent !important;
+}
+
+.cart [data-io-bundle-header] {
+  margin-bottom: 0;
+  background: var(--c-s3);
+}
+
+/* 수량 입력과 삭제 외에는 헤더 전체가 접기/펼치기 클릭을 받는다. */
+.cart [data-io-bundle-header] > [data-io-identity] button,
+.cart [data-io-bundle-header] > [data-io-stock],
+.cart [data-io-bundle-quantity] { pointer-events: none; }
+
+.cart [data-io-bundle-quantity] input,
+.cart [data-io-bundle-quantity] button { pointer-events: auto; }
+
+.cart [data-io-bundle-header] > [data-io-identity] > div:first-child > svg:first-child {
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  height: 20px;
+  width: 24px;
+  transform: translateY(-50%);
+}
+
+.cart [data-io-bundle-header] > [data-io-identity] > div:first-child {
+  grid-column: 1 / 3;
+  padding-left: 28px;
+}
+
+.cart [data-io-bundle-meta],
+.cart [data-io-line-meta] {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-column: 2;
+  grid-row: 2;
+  align-self: start;
+  min-width: 0;
+  margin-top: 0;
+  gap: 2px 4px;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.cart [data-io-line-meta] > span:first-child,
+.cart [data-io-bundle-meta] > span:first-child { flex-shrink: 0; }
+
+.cart [data-io-line-meta] > span:nth-child(n+3),
+.cart [data-io-bundle-meta] > span:nth-child(n+3) { grid-column: 1 / -1; }
+
+.cart [data-io-bundle-header]:not([data-io-internal-use="true"]) [data-io-bundle-summary] {
+  display: none;
+}
+
+.cart [data-io-bundle-meta] > span {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent !important;
+}
+
+.cart [data-io-bundle-header] > [aria-label="BOM 차감 방식"] {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  min-width: 0;
+  margin-top: 6px;
+}
+
+.cart [data-io-bundle] > ul {
+  margin: 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+  border-radius: 0;
+  overflow: hidden;
+}
+
+.cart [data-io-bundle] li:last-child [data-io-line] {
+  border-bottom: 0;
+}
