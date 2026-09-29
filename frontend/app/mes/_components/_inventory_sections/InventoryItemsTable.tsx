@@ -5,7 +5,8 @@ import Image from "next/image";
 import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
-import { ReadEmpty, ReadFailure, ReadLoading } from "../common/ReadState";
+import { ReadEmpty, ReadFailure } from "../common/ReadState";
+import { SkeletonBlock, dataRevealClassName } from "../common/LoadingSkeleton";
 import { InventoryItemRow } from "./InventoryItemRow";
 import { useChunkedRender } from "../_hooks/useChunkedRender";
 
@@ -59,8 +60,8 @@ export function InventoryItemsTable({
   }, [loading, filteredItems.length, compact, error]);
   const headerColumns = compact
     ? [
-        { label: "상태", nowrap: true, width: "90px", center: true },
-        { label: "품목명", nowrap: false, minWidth: "140px" },
+        { label: "상태", nowrap: true, width: "72px", center: true },
+        { label: "품목명", nowrap: false, minWidth: "100px" },
       ]
     : [
         { label: "상태", nowrap: true, width: "90px", center: true },
@@ -78,13 +79,10 @@ export function InventoryItemsTable({
   // count가 늘어나 리렌더될 때마다 새 slice 참조가 리셋을 유발해 chunk가
   // 영원히 20개에서 멈춘다.
   const displayedItems = useMemo(() => filteredItems.slice(0, displayLimit), [filteredItems, displayLimit]);
-  const { visible: chunkedItems, sentinelRef, hasMore: hasMoreChunk } = useChunkedRender(displayedItems, 20);
+  const { visible: chunkedItems, sentinelRef, hasMore: hasMoreChunk } = useChunkedRender(displayedItems, 20, !compact || !loading);
 
   if (error) {
     return <ReadFailure message={error} onRetry={onRetry} />;
-  }
-  if (loading && compact) {
-    return <ReadLoading label="재고 데이터를 불러오는 중입니다..." variant={compact ? "list" : "table"} />;
   }
   if (!loading && filteredItems.length === 0) {
     return (
@@ -119,9 +117,16 @@ export function InventoryItemsTable({
           />
         </div>
       )}
+      {compact && (
+        // Cover the outer border too; an inset mask leaves vertical seams beside the sticky corners.
+        <div aria-hidden="true" data-testid="inventory-mobile-header-corners" className="pointer-events-none sticky top-[var(--mobile-inventory-header-top,54px)] z-20 -mb-5 flex h-5 justify-between">
+          <span className="h-5 w-5" style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 19px, var(--c-bg) 19px)" }} />
+          <span className="h-5 w-5" style={{ background: "radial-gradient(circle at 0 100%, transparent 0 19px, var(--c-bg) 19px)" }} />
+        </div>
+      )}
       <div
-        className={`${compact ? "overflow-x-auto border" : "overflow-clip"} rounded-[24px]`}
-        style={compact ? { borderColor: LEGACY_COLORS.border } : undefined}
+        className={compact ? "overflow-clip rounded-[20px] border" : "overflow-clip rounded-[24px]"}
+        style={compact ? { borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 } : undefined}
       >
         {!compact && (
           <div
@@ -139,17 +144,17 @@ export function InventoryItemsTable({
             />
           </div>
         )}
-        {loading && <span role="status" className="sr-only">재고 데이터를 불러오는 중입니다...</span>}
-        <table aria-busy={loading || undefined} className="min-w-full border-separate border-spacing-0 text-sm">
-          <thead className={`sticky ${compact ? "top-0" : "top-[71px]"} z-10`}>
+        {loading && <span role="status" aria-busy="true" className="sr-only">재고 데이터를 불러오는 중입니다...</span>}
+        <table aria-busy={loading || undefined} className={`${compact ? "w-full table-fixed" : "min-w-full"} border-separate border-spacing-0 text-sm`}>
+          <thead className={`sticky ${compact ? "top-[var(--mobile-inventory-header-top,54px)]" : "top-[71px]"} z-10`}>
             <tr>
               {headerColumns.map(({ label, nowrap, width, minWidth, center, hidden }, columnIndex) => (
                 <th
                   key={label}
                   scope="col"
-                  className={`${compact ? "border-b" : "border-y"} px-4 py-2.5 text-sm font-bold${columnIndex === 0 ? ` rounded-tl-[24px]${compact ? "" : " border-l"}` : ""}${nowrap ? " whitespace-nowrap" : ""}${center ? " text-center" : " text-left"}${hidden ? " hidden sm:table-cell" : ""}`}
+                  className={`${compact ? "border-b px-2 py-2.5 text-xs font-medium" : "border-y px-4 py-2.5 text-sm font-bold"}${columnIndex === 0 && !compact ? " rounded-tl-[24px] border-l" : ""}${nowrap ? " whitespace-nowrap" : ""}${center ? " text-center" : " text-left"}${hidden ? " hidden sm:table-cell" : ""}`}
                   style={{
-                    background: compact ? LEGACY_COLORS.s2 : "var(--c-inventory-table-header)",
+                    background: "var(--c-inventory-table-header)",
                     borderColor: LEGACY_COLORS.border,
                     color: LEGACY_COLORS.muted2,
                     width,
@@ -161,8 +166,8 @@ export function InventoryItemsTable({
               ))}
               <th
                 scope="col"
-                className={`${compact ? "border-b" : "border-y"} px-4 py-2.5 text-sm font-bold whitespace-nowrap ${compact ? "rounded-tr-[24px] text-center" : "text-right sm:text-center"}`}
-                style={{ background: compact ? LEGACY_COLORS.s2 : "var(--c-inventory-table-header)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: compact ? "104px" : "160px" }}
+                className={compact ? "border-b px-2 py-2.5 text-center text-xs font-medium whitespace-nowrap" : "border-y px-4 py-2.5 text-sm font-bold whitespace-nowrap text-right sm:text-center"}
+                style={{ background: "var(--c-inventory-table-header)", borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, width: compact ? "104px" : "160px" }}
               >
                 사용 가능 재고
               </th>
@@ -177,10 +182,17 @@ export function InventoryItemsTable({
               )}
             </tr>
           </thead>
-          <tbody className={loading ? undefined : "mes-data-reveal"}>
+          <tbody className={loading ? undefined : compact ? dataRevealClassName : "mes-data-reveal"}>
             {loading ? Array.from({ length: skeletonRowCount }, (_, index) => (
-              <tr key={index} data-testid="inventory-skeleton-row" aria-hidden="true">
-                {Array.from({ length: 7 }, (_, column) => (
+              <tr key={index} data-testid="inventory-skeleton-row" aria-hidden="true" className={compact ? "h-[98px]" : undefined}>
+                {compact ? <>
+                  <td className="border-b px-2 py-3 text-center align-middle" style={{ borderColor: LEGACY_COLORS.border }}><SkeletonBlock className="h-6 w-14 rounded-full" /></td>
+                  <td className="border-b px-2 py-3 align-middle" style={{ borderColor: LEGACY_COLORS.border }}>
+                    <div className="flex h-10 items-center"><SkeletonBlock className="h-5 w-2/3" /></div>
+                    <SkeletonBlock className="mt-2 block h-1 w-full rounded-full" />
+                  </td>
+                  <td className="border-b px-2 py-3 text-center align-middle" style={{ borderColor: LEGACY_COLORS.border }}><SkeletonBlock className="h-5 w-12" /></td>
+                </> : Array.from({ length: 7 }, (_, column) => (
                   <td key={column} className={`border-b ${column === 1 ? "px-1" : "px-4"} py-5 align-middle${column !== 0 && column !== 2 && column !== 5 ? " hidden sm:table-cell" : ""}`} style={{ borderColor: LEGACY_COLORS.border, width: column === 1 ? 60 : undefined }}>
                     {column === 2 ? <div className="motion-safe:animate-pulse">
                       <div className="h-5 w-2/3 rounded" style={{ background: LEGACY_COLORS.borderStrong }} />

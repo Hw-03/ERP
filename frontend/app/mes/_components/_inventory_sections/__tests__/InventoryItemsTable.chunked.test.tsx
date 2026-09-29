@@ -86,6 +86,29 @@ const baseProps = {
 };
 
 describe("InventoryItemsTable — chunked render", () => {
+  it("PC 목록은 탭 전환의 중복 페이드 억제 계약을 유지한다", () => {
+    const { container } = renderWithProviders(
+      <InventoryItemsTable {...baseProps} filteredItems={[makeItem(1)]} displayLimit={100} setDisplayLimit={() => {}} />,
+    );
+    expect(container.querySelector("tbody")).toHaveClass("mes-data-reveal");
+  });
+  it("모바일 로딩이 끝나면 동일한 품목 목록의 추가 행 감지를 시작한다", () => {
+    const items = Array.from({ length: 30 }, (_, index) => makeItem(index));
+    lastIntersectionCallback = null;
+    const { container, rerender } = renderWithProviders(
+      <InventoryItemsTable {...baseProps} compact loading filteredItems={items} displayLimit={100} setDisplayLimit={() => {}} />,
+    );
+    expect(lastIntersectionCallback).toBeNull();
+    rerender(
+      <DepartmentsProvider>
+        <InventoryItemsTable {...baseProps} compact filteredItems={items} displayLimit={100} setDisplayLimit={() => {}} />
+      </DepartmentsProvider>,
+    );
+    expect(lastIntersectionCallback).not.toBeNull();
+    act(() => fireIntersection());
+    expect(container.querySelectorAll("tbody tr")).toHaveLength(30);
+  });
+
   it("데스크톱에서는 바깥 작업영역 기준으로 검색창 아래 열 헤더를 고정한다", () => {
     const item = makeItem(1);
     const { container, rerender } = renderWithProviders(
@@ -126,14 +149,15 @@ describe("InventoryItemsTable — chunked render", () => {
     );
 
     const compactTable = container.querySelector("table");
-    expect(compactTable?.parentElement).toHaveClass("overflow-x-auto");
-    expect(compactTable?.parentElement).not.toHaveClass("overflow-clip");
+    expect(compactTable?.parentElement).not.toHaveClass("overflow-x-auto");
+    expect(compactTable?.parentElement).toHaveClass("overflow-clip");
     expect(compactTable?.parentElement).toHaveClass("border");
-    expect(container.querySelector("thead")).toHaveClass("top-0");
+    expect(container.querySelector("thead")).toHaveClass("top-[var(--mobile-inventory-header-top,54px)]");
     expect(container.querySelector('[data-testid="inventory-table-corner-mask"]')).not.toBeInTheDocument();
     const compactHeaders = Array.from(container.querySelectorAll("th"));
-    expect(compactHeaders[0]).toHaveClass("rounded-tl-[24px]");
-    expect(compactHeaders.at(-1)).toHaveClass("rounded-tr-[24px]");
+    expect(compactHeaders[0]).not.toHaveClass("rounded-tl-[24px]");
+    expect(compactHeaders.at(-1)).not.toHaveClass("rounded-tr-[24px]");
+    expect(container.querySelector('[data-testid="inventory-mobile-header-corners"]')).toBeInTheDocument();
   });
 
   it("displayLimit 100개 중 첫 chunk(20)만 초기 렌더", () => {

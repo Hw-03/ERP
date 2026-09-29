@@ -9,10 +9,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
  * - 반환된 `sentinelRef`를 리스트 끝(혹은 보이는 영역 근처)에 연결하면
  *   IntersectionObserver가 sentinel이 가시 영역에 들어올 때마다 +chunk 만큼 누적
  * - items 자체가 바뀌면(필터/정렬 등) 첫 chunk로 리셋
+ * - enabled는 로딩 화면이 끝난 뒤 감지 요소가 마운트되는 소비자에서 사용한다.
  *
  * 외부 라이브러리 의존성 없음. 1000+ 행 테이블에서 일괄 렌더 비용을 분산.
  */
-export function useChunkedRender<T>(items: T[], chunkSize = 50) {
+export function useChunkedRender<T>(items: T[], chunkSize = 50, enabled = true) {
   const [count, setCount] = useState(chunkSize);
   const sentinelRef = useRef<HTMLElement | null>(null);
 
@@ -23,6 +24,7 @@ export function useChunkedRender<T>(items: T[], chunkSize = 50) {
   }, [items, chunkSize]);
 
   useEffect(() => {
+    if (!enabled) return;
     const node = sentinelRef.current;
     if (!node) return;
     if (count >= items.length) return;
@@ -39,7 +41,7 @@ export function useChunkedRender<T>(items: T[], chunkSize = 50) {
     );
     io.observe(node);
     return () => io.disconnect();
-  }, [count, items.length, chunkSize]);
+  }, [count, items.length, chunkSize, enabled]);
 
   const visible = useMemo(() => items.slice(0, count), [items, count]);
   const hasMore = count < items.length;
