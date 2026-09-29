@@ -90,6 +90,8 @@ export function ConfirmModal({
       }
       if (e.key === "Enter" && onConfirm) {
         const target = e.target as HTMLElement | null;
+        // 버튼은 자체 Enter 클릭을 사용해야 취소가 확인으로 바뀌지 않는다.
+        if (target instanceof Element && target.closest("button")) return;
         // 다행 텍스트는 Enter 가 줄바꿈
         if (target?.tagName === "TEXTAREA") return;
         if (target instanceof HTMLElement && target.isContentEditable) return;

@@ -2,7 +2,7 @@
 import { useDesktopTabHome } from "./DesktopTabHome";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ShieldAlert, Trash2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { defectsApi } from "@/lib/api/defects";
 import type { DefectKpi, DefectLocation } from "@/lib/api/types/defects";
@@ -11,7 +11,6 @@ import { useWarehouseData } from "./_warehouse_hooks/useWarehouseData";
 import type { Operator } from "./login/useCurrentOperator";
 import { DefectKpiCards, type DefectKpiKind } from "./_defect_hub/DefectKpiCards";
 import { DefectHubEntry } from "./_defect_hub/DefectHubEntry";
-import { DesktopWorkHubCard } from "./common/DesktopWorkHubCard";
 import type { DefectHubCardId } from "./_defect_hub/defectHubCards";
 import { DefectFilterBar, type DefectScope } from "./_defect_hub/DefectFilterBar";
 import { DefectSearchInput } from "./_defect_hub/DefectSearchInput";
@@ -21,6 +20,7 @@ import { useDefectFilterPreferences } from "./_defect_hub/useDefectFilterPrefere
 import { filterDefectLocations } from "./_defect_hub/defectCategoryFilter";
 import { DefectDepartmentList } from "./_defect_hub/DefectDepartmentList";
 import { DefectCartFlow, type DefectCartMode } from "./_defect_hub/DefectCartFlow";
+import { DefectWorkChoice, type DefectWorkAction, type DefectSourceKind } from "./_defect_hub/DefectWorkChoice";
 import { DefectProcessPanel } from "./_defect_hub/DefectProcessPanel";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { ReadEmpty, ReadFailure, ReadLoading } from "./common/ReadState";
@@ -33,12 +33,29 @@ const PRODUCTION_LINES = new Set(["튜브", "고압", "진공", "튜닝", "조�
 /** 화면 모드 — hub가 진입점. list 외에는 좌측 목록을 덮는 전폭 작업 화면. */
 type ViewMode =
   | { kind: "hub" }
-  | { kind: "work-choice" }
+  | { kind: "work-choice"; action: DefectWorkAction | null; source: DefectSourceKind | null }
   | { kind: "list" }
   | { kind: "storage" }
   | { kind: "statistics" }
-  | { kind: "cart"; mode: DefectCartMode }
+  | { kind: "cart"; mode: DefectCartMode; action: DefectWorkAction; source: DefectSourceKind }
   | { kind: "process"; locations: DefectLocation[]; batch: boolean; restoreOnly?: boolean };
+
+type WorkHistoryState = { defect?: string; mode?: string; action?: string | null; directAction?: string | null; source?: string; step?: number } | null;
+
+/** 이전 출처 선택 이력은 통합 화면으로, 확정된 카트 이력은 품목 화면으로 복원한다. */
+function workViewFromHistory(state: WorkHistoryState): Extract<ViewMode, { kind: "work-choice" | "cart" }> | null {
+  if (state?.defect === "work-choice") {
+    const action = state.action === "add" || state.action === "scrap" || state.action === "rework" ? state.action : null;
+    const source = state.source === "warehouse" || state.source === "production" ? state.source : null;
+    return { kind: "work-choice", action, source };
+  }
+  if (state?.defect !== "cart" || (state.mode !== "add" && state.mode !== "scrap")) return null;
+  const action = state.mode === "add" ? "add" : state.directAction === "rework" ? "rework" : state.directAction === "scrap" ? "scrap" : null;
+  const valid = (state.step === 2 || (state.step === 3 && action === "rework"))
+    && action !== null && !(state.mode === "add" && state.directAction === "rework");
+  if (valid && action) return { kind: "cart", mode: state.mode, action, source: action === "rework" ? "production" : state.source === "warehouse" ? "warehouse" : "production" };
+  return { kind: "work-choice", action: action === "rework" ? null : action, source: null };
+}
 
 interface Props {
   operator: Operator | null;
@@ -267,13 +284,13 @@ function DefectViewInner({
   // 마운트 시 현재 엔트리에 defect state가 있으면 뷰 복원 (다른 탭에서 뒤로가기로 복귀하는 경우).
   // defect state가 없으면 hub로 replaceState — 항상 스택 바닥이 hub.
   useEffect(() => {
-    const cur = window.history.state as { defect?: string; mode?: string } | null;
-    if (cur?.defect === "storage") {
+    const cur = window.history.state as WorkHistoryState;
+    const workView = workViewFromHistory(cur);
+    if (workView) {
+      setView(workView);
+      if (workView.kind === "work-choice") window.history.replaceState({ defect: "work-choice", action: workView.action, source: workView.source }, "");
+    } else if (cur?.defect === "storage") {
       setView({ kind: "storage" });
-    } else if (cur?.defect === "work-choice") {
-      setView({ kind: "work-choice" });
-    } else if (cur?.defect === "cart" && (cur.mode === "add" || cur.mode === "scrap")) {
-      setView({ kind: "cart", mode: cur.mode });
     } else if (cur?.defect === "list") {
       setView({ kind: "list" });
     } else if (cur?.defect === "statistics") {
@@ -287,19 +304,19 @@ function DefectViewInner({
     }
 
     function onPop(e: PopStateEvent) {
-      const s = e.state as { defect?: string; mode?: string } | null;
-      if (!s?.defect || s.defect === "hub") {
+      const s = e.state as WorkHistoryState;
+      const nextWorkView = workViewFromHistory(s);
+      if (nextWorkView) {
+        setView(nextWorkView);
+        if (nextWorkView.kind === "work-choice") window.history.replaceState({ defect: "work-choice", action: nextWorkView.action, source: nextWorkView.source }, "");
+      } else if (!s?.defect || s.defect === "hub") {
         setView({ kind: "hub" });
       } else if (s.defect === "storage") {
         setView({ kind: "storage" });
-      } else if (s.defect === "work-choice") {
-        setView({ kind: "work-choice" });
       } else if (s.defect === "list") {
         setView({ kind: "list" });
       } else if (s.defect === "statistics") {
         setView({ kind: "statistics" });
-      } else if (s.defect === "cart" && (s.mode === "add" || s.mode === "scrap")) {
-        setView({ kind: "cart", mode: s.mode });
       } else {
         setView({ kind: "list" });
       }
@@ -312,7 +329,7 @@ function DefectViewInner({
   function handleHubSelect(id: DefectHubCardId) {
     if (id === "work") {
       window.history.pushState({ defect: "work-choice" }, "");
-      setView({ kind: "work-choice" });
+      setView({ kind: "work-choice", action: null, source: null });
     } else if (id === "list") {
       window.history.pushState({ defect: "list" }, "");
       setView({ kind: "list" });
@@ -325,9 +342,17 @@ function DefectViewInner({
     }
   }
 
-  function openCart(mode: DefectCartMode) {
-    window.history.pushState({ defect: "cart", mode }, "");
-    setView({ kind: "cart", mode });
+  function selectWork(action: DefectWorkAction): void {
+    const source = view.kind === "work-choice" && view.action === action ? view.source : null;
+    window.history.replaceState({ defect: "work-choice", action, source }, "");
+    setView({ kind: "work-choice", action, source });
+  }
+
+  function openCart(action: DefectWorkAction, source: DefectSourceKind): void {
+    const mode = action === "add" ? "add" : "scrap";
+    window.history.replaceState({ defect: "work-choice", action, source }, "");
+    window.history.pushState({ defect: "cart", mode, directAction: action === "rework" ? "rework" : "scrap", source, step: 2 }, "");
+    setView({ kind: "cart", mode, action, source });
   }
 
   function handleProcessed(message: string, returnToStorage = false) {
@@ -429,6 +454,8 @@ function DefectViewInner({
             {view.kind === "cart" && (
               <DefectCartFlow
                 mode={view.mode}
+                initialAction={view.action === "rework" ? "rework" : "scrap"}
+                initialSource={view.source}
                 items={items}
                 productModels={productModels}
                 currentEmployee={employee}
@@ -445,16 +472,7 @@ function DefectViewInner({
               />
             )}
             {view.kind === "work-choice" && (
-              <div className="flex min-h-0 flex-1 flex-col gap-4">
-                <div className="flex items-center gap-3">
-                  <button type="button" onClick={() => window.history.back()} className="standard-hover rounded-[10px] border px-3 py-1.5 text-sm font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}>← 이전</button>
-                  <div><h2 className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>불량 처리</h2><p className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>진행할 작업을 선택하세요.</p></div>
-                </div>
-                <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 md:grid-cols-2">
-                  <DesktopWorkHubCard icon={ShieldAlert} title="격리 등록" description="품목을 격리하고 불량·B급·구형으로 분류합니다." tone={LEGACY_COLORS.red} size="large" className="p-10" onClick={() => openCart("add")} />
-                  <DesktopWorkHubCard icon={Trash2} title="바로 처리" description="격리 없이 폐기 또는 재작업합니다." tone={LEGACY_COLORS.red} size="large" className="p-10" onClick={() => openCart("scrap")} />
-                </div>
-              </div>
+              <DefectWorkChoice action={view.action} source={view.source} onActionChange={selectWork} onProceed={openCart} onCancel={() => window.history.back()} />
             )}
             {view.kind === "process" && (
               <DefectProcessPanel

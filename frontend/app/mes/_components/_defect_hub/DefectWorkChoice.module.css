@@ -1,0 +1,31 @@
+.root { --section-label-height: 44px; --source-label-height: 52px; display: flex; min-height: 0; flex: 1; flex-direction: column; }
+.header { display: flex; min-height: 44px; flex-shrink: 0; align-items: center; gap: 12px; }
+.content { display: grid; min-height: 480px; flex: 1; grid-template-rows: minmax(0, 1fr) 0px; padding: 0 2px; transition: grid-template-rows 200ms ease; }
+.withSource { grid-template-rows: minmax(0, 1fr) calc((100% + var(--source-label-height) - var(--section-label-height)) / 2); }
+.back { display: flex; min-height: 44px; align-items: center; gap: 6px; padding: 0 12px; border: 1px solid var(--c-border); border-radius: 12px; background: var(--c-s2); color: var(--c-muted2); font-size: 14px; font-weight: 700; }
+.sectionLabel { display: flex; height: var(--section-label-height); flex-shrink: 0; align-items: center; color: var(--c-muted2); font-size: 16px; font-weight: 700; line-height: 20px; }
+.workSection { display: flex; min-height: 0; flex-direction: column; }
+.workGrid { display: grid; min-height: 0; flex: 1; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.sourceGrid { display: grid; min-height: 0; flex: 1; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.card { min-width: 0; border: 1px solid var(--c-border); border-radius: 22px; text-align: left; color: var(--c-text); transition: background 150ms ease, border-color 150ms ease, transform 150ms ease; }
+.card:active { transform: scale(.99); }
+.card:focus-visible, .back:focus-visible { outline: 2px solid var(--c-blue); outline-offset: 3px; }
+.card[aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--choice-tone); }
+.card:disabled { cursor: default; }
+.workCard { display: flex; min-height: 0; flex-direction: column; gap: 12px; padding: 24px; }
+.cardHeading { display: flex; align-items: center; gap: 16px; }
+.icon { display: flex; width: 48px; height: 48px; flex-shrink: 0; align-items: center; justify-content: center; border-radius: 15px; color: var(--choice-tone); background: color-mix(in srgb, var(--choice-tone) 10%, transparent); }
+.selectionMark { display: flex; flex-shrink: 0; margin-left: auto; color: var(--c-muted); }
+.card[aria-pressed="true"] .selectionMark { color: var(--choice-tone); }
+.cardTitle { color: var(--c-text); font-size: clamp(24px, 1.5vw, 28px); font-weight: 900; line-height: 1.2; }
+.description { margin-top: auto; color: var(--c-muted2); font-size: 14px; font-weight: 500; line-height: 1.6; }
+.sourceReveal { display: flex; min-height: 0; opacity: 0; transform: translateY(8px); visibility: hidden; pointer-events: none; transition: opacity 200ms ease, transform 200ms ease, visibility 200ms; }
+.expanded { opacity: 1; transform: translateY(0); visibility: visible; pointer-events: auto; }
+.sourceClip { display: flex; min-height: 0; flex: 1; overflow: hidden; }
+.sourceSection { display: flex; min-height: 0; flex: 1; flex-direction: column; }
+.sourceSection .sectionLabel { height: var(--source-label-height); }
+.sourceCard { display: flex; min-height: 0; flex-direction: column; gap: 16px; padding: 24px; }
+.leaving { animation: choiceExit 120ms ease-in forwards; pointer-events: none; }
+@keyframes choiceExit { to { opacity: 0; transform: translateY(-4px); } }
+@media (max-width: 1400px) { .content { min-height: 440px; } .workCard, .sourceCard { padding: 20px; } }
+@media (prefers-reduced-motion: reduce) { .content, .sourceReveal, .card { transition: none; } .sourceReveal { transform: none; } .leaving { animation: none; } }

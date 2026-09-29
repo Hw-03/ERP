@@ -1,10 +1,9 @@
 "use client";
 import { useDesktopWorkGuard } from "../DesktopTabHome";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { LucideIcon } from "lucide-react";
-import { ArrowLeft, Building2, ChevronRight, Copy, Trash2, Warehouse, Wrench } from "lucide-react";
+import { ArrowLeft, ChevronRight, Copy, Trash2 } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { defectsApi } from "@/lib/api/defects";
@@ -24,7 +23,7 @@ import { defectCartLineErrors } from "./defectCartValidation";
 
 type SourceKind = "warehouse" | "production";
 type DirectAction = "scrap" | "rework";
-type FlowStep = 1 | 2 | 3;
+type FlowStep = 2 | 3;
 
 type CartHistoryState = { defect?: string; mode?: DefectCartMode; step?: number; directAction?: DirectAction | null; source?: SourceKind } | null;
 
@@ -48,6 +47,8 @@ interface LineFailure {
 
 interface Props {
   mode: DefectCartMode;
+  initialAction?: DirectAction;
+  initialSource?: SourceKind;
   items: Item[];
   productModels: ProductModel[];
   currentEmployee: { employee_id: string; name: string; department: string };
@@ -65,6 +66,8 @@ function managementCategoryLabel(category: DefectManagementCategory): string {
 
 export function DefectCartFlow({
   mode,
+  initialAction = "scrap",
+  initialSource = "production",
   items,
   productModels,
   currentEmployee,
@@ -72,54 +75,49 @@ export function DefectCartFlow({
   onCancel,
 }: Props) {
   const queryClient = useQueryClient();
-  const [directAction, setDirectAction] = useState<DirectAction | null>(mode === "add" ? "scrap" : null);
-  const [source, setSource] = useState<SourceKind>("production");
-  const [step, setStep] = useState<FlowStep>(1);
+  const [directAction, setDirectAction] = useState<DirectAction>(mode === "add" ? "scrap" : initialAction);
+  const [source, setSource] = useState<SourceKind>(initialAction === "rework" ? "production" : initialSource);
+  const [step, setStep] = useState<FlowStep>(2);
   const [lines, setLines] = useState<CartLine[]>([]);
   const [requestIds, setRequestIds] = useState<Record<string, string>>({});
   const [batchRequestId, setBatchRequestId] = useState(() => makeClientRequestId());
   const [busy, setBusy] = useState(false);
   const [failures, setFailures] = useState<LineFailure[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  const headingRef = useRef<HTMLHeadingElement>(null);
   useDesktopWorkGuard("defect-cart", lines.length > 0, busy);
 
   useEffect(() => {
-    function restore(state: CartHistoryState) {
+    function restore(state: CartHistoryState, restoreBom: boolean): void {
       const validCart = state?.defect === "cart" && state.mode === mode;
-      const invalidAction = mode === "add"
-        ? state?.directAction !== undefined && state.directAction !== "scrap"
-        : state?.directAction === "rework" && state.step !== 2 && state.step !== 3;
-      const nextAction = invalidAction ? (mode === "add" ? "scrap" : null) : mode === "add" ? "scrap" : state?.directAction ?? null;
-      const nextSource = invalidAction ? "production" : state?.source === "warehouse" ? "warehouse" : "production";
-      const nextStep: FlowStep = mode === "add"
-        ? state?.step === 2 && !invalidAction ? 2 : 1
-        : nextAction === "rework"
-          ? 2
-          : nextAction === "scrap" && state?.step === 2 ? 2 : 1;
+      const nextAction = mode === "add" ? "scrap" : validCart && (state.directAction === "rework" || state.directAction === "scrap") ? state.directAction : initialAction;
+      const nextSource = nextAction === "rework" ? "production" : validCart && (state.source === "warehouse" || state.source === "production") ? state.source : initialSource;
+      const nextStep: FlowStep = restoreBom && nextAction === "rework" && state?.step === 3 ? 3 : 2;
       setDirectAction(nextAction);
       setSource(nextSource);
       setStep(nextStep);
-      if (nextStep === 1) setLines([]);
-      if (!validCart || invalidAction || state?.step !== nextStep || state?.directAction !== nextAction || state?.source !== nextSource) {
+      if (!validCart || state?.step !== nextStep || state?.directAction !== nextAction || state?.source !== nextSource) {
         window.history.replaceState({ ...(window.history.state ?? {}), defect: "cart", mode, step: nextStep, directAction: nextAction, source: nextSource }, "");
       }
     }
 
-    restore(window.history.state as CartHistoryState);
-    function onPop(e: PopStateEvent) {
+    setLines([]);
+    restore(window.history.state as CartHistoryState, false);
+    function onPop(e: PopStateEvent): void {
       const s = e.state as CartHistoryState;
       if (s?.defect !== "cart" || s.mode !== mode) {
-        setStep(1);
-        setLines([]);
-        setDirectAction(mode === "add" ? "scrap" : null);
-        setSource("production");
         return;
       }
-      restore(s);
+      setConfirmOpen(false);
+      setLeaveConfirmOpen(false);
+      restore(s, true);
     }
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [mode]);
+  }, [mode, initialAction, initialSource]);
+
+  useEffect(() => { headingRef.current?.focus(); }, [step]);
 
   const isDirect = mode === "scrap";
   const isRework = isDirect && directAction === "rework";
@@ -128,7 +126,7 @@ export function DefectCartFlow({
     if (isRework && source !== "production") setSource("production");
   }, [isRework, source]);
 
-  const title = mode === "add" ? "불량 격리" : directAction === "rework" ? "바로 재작업" : directAction === "scrap" ? "바로 폐기" : "바로 처리";
+  const title = mode === "add" ? "불량 격리" : directAction === "rework" ? "즉시 재작업" : directAction === "scrap" ? "즉시 폐기" : "즉시 처리";
   const submitLabel = mode === "add" ? "격리하기" : isRework ? "즉시 재작업" : "즉시 폐기";
   const pickerItems = isRework ? items.filter(isReworkCandidate) : items;
   const selectedIds = useMemo(() => new Set(lines.map((l) => l.item.item_id)), [lines]);
@@ -313,77 +311,22 @@ export function DefectCartFlow({
     setStep(nextStep);
   }
 
-  function selectSource(nextSource: SourceKind) {
-    window.history.replaceState({ ...(window.history.state ?? {}), defect: "cart", mode, step: 1, directAction, source: nextSource }, "");
-    setSource(nextSource);
-  }
-
-  function goBack() {
-    if (step > 1) {
+  function goBack(): void {
+    if (busy) return;
+    if (step === 3) {
       window.history.back();
       return;
     }
-    if (isDirect && directAction !== null) {
-      window.history.back();
+    if (lines.length > 0) {
+      setLeaveConfirmOpen(true);
       return;
     }
     onCancel();
   }
 
-  if (isDirect && directAction === null) {
-    return (
-      <div className="flex h-full min-h-0 flex-col gap-3">
-        <div className="flex items-start gap-3">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="standard-hover flex items-center gap-1 rounded-[10px] border px-3 py-1.5 text-sm font-bold transition-colors"
-            style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
-          >
-            <ArrowLeft className="h-4 w-4" />
-            이전
-          </button>
-          <div className="flex min-w-0 flex-col gap-0.5">
-            <h2 className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>바로 처리</h2>
-            <div className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-              ① 작업 선택 → ② 출처 선택 → ③ 품목 선택
-            </div>
-          </div>
-        </div>
-        <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
-          <ActionCard
-            icon={Trash2}
-            title="폐기"
-            desc="정상 재고를 격리 없이 바로 폐기합니다. 여러 품목을 한 번에 담을 수 있습니다."
-            tone={LEGACY_COLORS.red}
-            onClick={() => {
-              window.history.pushState({ defect: "cart", mode, step: 1, directAction: "scrap", source }, "");
-              setDirectAction("scrap");
-            }}
-          />
-          <ActionCard
-            icon={Wrench}
-            title="재작업"
-            desc="BOM 있는 품목을 한 개 선택해 하위 품목을 정상·격리·폐기로 나눕니다."
-            tone={LEGACY_COLORS.yellow}
-            onClick={() => {
-              setSource("production");
-              setDirectAction("rework");
-              pushStep(2, "rework", "production");
-            }}
-          />
-        </div>
-      </div>
-    );
-  }
-
   const flowSteps = isRework
     ? [{ number: 1, label: "작업 선택", active: false }, { number: 2, label: "품목 선택", active: step === 2 }, { number: 3, label: "BOM 확인", active: step === 3 }]
-    : [
-      ...(isDirect ? [{ number: 1, label: "작업 선택", active: false }] : []),
-      { number: isDirect ? 2 : 1, label: "출처 선택", active: step === 1 },
-      { number: isDirect ? 3 : 2, label: "품목 선택", active: step === 2 },
-    ];
+      : [{ number: 1, label: "작업·출처", active: false }, { number: 2, label: "품목 선택", active: step === 2 }];
   const stepIndicator = (
     <div data-testid="defect-flow-stepper" className="flex flex-wrap items-center justify-end gap-4 text-base font-black">
       {flowSteps.map((flowStep, idx) => {
@@ -420,47 +363,18 @@ export function DefectCartFlow({
           style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}
         >
           <ArrowLeft className="h-4 w-4" />
-          {step === 1 && !(isDirect && directAction !== null) ? "취소" : "이전"}
+          이전
         </button>
         <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-8 gap-y-1">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <h2 className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>{title}</h2>
+            <h2 ref={headingRef} tabIndex={-1} className="text-xl font-black outline-none" style={{ color: LEGACY_COLORS.text }}>{title}</h2>
+            <span className="rounded-full px-3 py-1 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}>{source === "warehouse" ? "창고 재고" : "부서 재고"}</span>
           </div>
           <div className="min-w-[320px] flex-1">
             {stepIndicator}
           </div>
         </div>
       </div>
-
-      {step === 1 && (
-        <div key="step1" className="animate-desktop-navigation-enter flex min-h-0 flex-1 flex-col gap-3">
-          <div className="flex min-h-0 flex-1 flex-col gap-2">
-            <div className="text-xs font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>출처 선택</div>
-            <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
-                {(["production", "warehouse"] as SourceKind[]).map((s) => {
-                  const active = source === s;
-                  const Icon = s === "warehouse" ? Warehouse : Building2;
-                  const label = s === "warehouse" ? "창고 재고" : "부서 재고";
-                  const desc = s === "warehouse" ? "창고 보관 중인 정상 재고에서 처리합니다" : "생산 부서에서 사용 중인 재고에서 처리합니다";
-                  return (
-                    <button key={s} type="button" aria-pressed={active} onClick={() => selectSource(s)} className="standard-hover flex h-full flex-col justify-between rounded-[22px] border p-7 text-left transition-all active:scale-[0.99]" style={{ background: active ? tint(LEGACY_COLORS.red, 7) : LEGACY_COLORS.s2, borderColor: active ? LEGACY_COLORS.red : LEGACY_COLORS.border, borderWidth: active ? 2 : 1 }}>
-                      <div className="flex items-center gap-4">
-                        <Icon className="h-9 w-9 shrink-0" style={{ color: active ? LEGACY_COLORS.red : LEGACY_COLORS.muted2 }} />
-                        <span className="text-3xl font-black" style={{ color: active ? LEGACY_COLORS.red : LEGACY_COLORS.text }}>{label}</span>
-                      </div>
-                      <span className="text-base font-bold" style={{ color: active ? LEGACY_COLORS.red : LEGACY_COLORS.muted2 }}>{desc}</span>
-                    </button>
-                  );
-                })}
-            </div>
-          </div>
-          <div className="flex shrink-0 justify-end">
-            <button type="button" onClick={() => pushStep(2)} className="flex items-center gap-1 rounded-[14px] px-6 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99]" style={{ background: LEGACY_COLORS.redSolid }}>
-              다음 →
-            </button>
-          </div>
-        </div>
-      )}
 
       {step === 2 && (
         <div key="step2" className="animate-desktop-navigation-enter flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
@@ -612,6 +526,9 @@ export function DefectCartFlow({
         </div>
       )}
 
+      <ConfirmModal open={leaveConfirmOpen} onClose={() => setLeaveConfirmOpen(false)} onConfirm={() => { setLeaveConfirmOpen(false); onCancel(); }} title="작업 선택으로 돌아갈까요?" confirmLabel="나가기" tone="danger">
+        담은 품목과 입력 내용이 사라집니다.
+      </ConfirmModal>
       <ConfirmModal open={confirmOpen} onClose={() => setConfirmOpen(false)} onConfirm={() => { setConfirmOpen(false); void handleSubmit(); }} tone={isScrap || isRework ? "danger" : "normal"} title={isRework ? "즉시 재작업 확인" : isScrap ? "즉시 폐기 확인" : "불량 격리 확인"} confirmLabel={submitLabel} busy={busy} busyLabel="처리 중..." wide={mode === "add"}>
         {isRework && (
           <p className="mb-3 text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
@@ -668,17 +585,5 @@ export function DefectCartFlow({
         )}
       </ConfirmModal>
     </div>
-  );
-}
-
-function ActionCard({ icon: Icon, title, desc, tone, onClick }: { icon: LucideIcon; title: string; desc: string; tone: string; onClick: () => void }) {
-  return (
-    <button type="button" onClick={onClick} className="standard-hover flex h-full min-h-0 flex-col justify-between gap-6 rounded-[22px] border p-10 text-left transition-all active:scale-[0.99]" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, borderWidth: 1, color: LEGACY_COLORS.text }}>
-      <div className="flex items-center gap-5">
-        <Icon className="h-10 w-10 shrink-0" style={{ color: tone }} />
-        <span className="text-4xl font-black leading-tight" style={{ color: tone }}>{title}</span>
-      </div>
-      <span className="text-xl font-bold leading-tight" style={{ color: LEGACY_COLORS.muted2 }}>{desc}</span>
-    </button>
   );
 }

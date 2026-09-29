@@ -23,12 +23,11 @@ test.describe("불량 — 격리 / 해제", () => {
     // ── 격리 ──────────────────────────────────────────────
     await workCard.click();
     await page.getByRole("button").filter({ hasText: "격리 등록", visible: true }).click();
-    // Step 1: 출처만 고른다. 전역 격리 부서 선택은 표시하지 않는다.
+    // 같은 화면에서 출처를 고르면 품목으로 바로 진행한다.
     await expect(page.getByRole("button", { name: /부서 재고/ }).filter({ visible: true })).toBeVisible();
     await expect(page.getByRole("button", { name: /창고 재고/ }).filter({ visible: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "조립", exact: true }).filter({ visible: true })).toHaveCount(0);
     await page.getByRole("button", { name: /창고 재고/ }).filter({ visible: true }).click();
-    await page.getByRole("button", { name: /다음/ }).click();
     // Step 2: 시드 원자재 행 "추가".
     await page
       .getByRole("row", { name: /E2E원자재튜브/ })

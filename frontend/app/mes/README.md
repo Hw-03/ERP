@@ -32,6 +32,13 @@
 도메인별 하위 Module은 `_warehouse_v2/`, `_warehouse_sections/`, `_inventory_sections/`,
 `_history_sections/`, `_defect_hub/`, `_admin_sections/`, `_weekly_sections/` 등에 나뉘어 있습니다.
 
+### 데스크톱 불량 처리 진입
+
+- `DefectWorkChoice`에서 격리 등록·즉시 폐기·즉시 재작업을 선택합니다. 최초에는 출처를 표시하지 않습니다.
+- 격리·폐기를 고르면 같은 화면에서 출처가 펼쳐지고, 부서·창고 재고를 클릭하면 별도 다음 버튼 없이 품목 화면으로 진행합니다.
+- 재작업은 부서 재고로 바로 진입하며, 품목 입력 후 기존 BOM 확인과 최종 확인 팝업을 유지합니다.
+- 품목 화면에서 이전으로 돌아갈 때 입력된 카트가 있으면 폐기 확인을 표시합니다. BOM에서 품목으로 돌아갈 때는 입력을 유지합니다.
+
 ## 리뷰 메모
 
 - 처음 볼 때는 `page.tsx` 다음에 `DesktopMesShell.tsx`를 보면 전체 화면 흐름을 잡기 쉽습니다.

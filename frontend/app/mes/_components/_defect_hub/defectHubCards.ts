@@ -18,7 +18,7 @@ export const DEFECT_HUB_CARDS: DefectHubCard[] = [
   {
     id: "work",
     label: "불량 처리",
-    description: "품목을 격리하거나 바로 폐기·재작업합니다.",
+    description: "품목을 격리하거나 즉시 폐기·재작업합니다.",
     icon: ShieldAlert,
     accentKey: "red",
   },
