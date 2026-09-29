@@ -129,6 +129,7 @@ export function useHistoryData({
     queryClient.getQueryData<TransactionLog[]>(queryKeys.transactions.list(pageParams(0))),
   );
   const [logs, setLogs] = useState<TransactionLog[]>(() => initialCached ?? []);
+  const [logsQueryKey, setLogsQueryKey] = useState(queryKey);
   const [loading, setLoading] = useState(() => initialCached === undefined);
   const loadingRef = useRef(initialCached === undefined);
   const [error, setError] = useState<string | null>(null);
@@ -159,7 +160,8 @@ export function useHistoryData({
     const isRefreshRetry = refreshRetryQueryKeyRef.current === queryKey;
     refreshRetryQueryKeyRef.current = null;
     const queryChanged = queryKeyRef.current !== queryKey;
-    if (queryChanged) hasSuccessfulLoadRef.current = false;
+    const cachedPage = queryClient.getQueryData<TransactionLog[]>(queryKeys.transactions.list(pageParams(0)));
+    if (queryChanged) hasSuccessfulLoadRef.current = cachedPage !== undefined;
     const revisionChanged = realtimeRevisionRef.current !== realtimeRevision;
     const shouldRefreshLoadedDepth = (revisionChanged || isRefreshRetry)
       && !queryChanged
@@ -185,9 +187,12 @@ export function useHistoryData({
     setLoadMoreError(null);
     if (!skipReset) {
       skipRef.current = 0;
-      setLogs([]);
-      setLastBatchSize(null);
-      setLoading(true);
+      setLogs(cachedPage ?? []);
+      setLogsQueryKey(queryKey);
+      setLastBatchSize(cachedPage?.length ?? null);
+      loadedPageCountRef.current = 1;
+      loadedTailLogIdRef.current = cachedPage?.at(-1)?.log_id ?? null;
+      setLoading(cachedPage === undefined);
     }
 
     void (async () => {
@@ -235,7 +240,7 @@ export function useHistoryData({
       .catch((caught: unknown) => {
         if (generationRef.current !== generation || queryKeyRef.current !== myKey) return;
         const message = historyLoadError(caught, "입출고 내역을 불러오지 못했습니다.");
-        if (shouldRefreshLoadedDepth) setRefreshError(message);
+        if (hasSuccessfulLoadRef.current) setRefreshError(message);
         else setError(message);
         loadingRef.current = false;
         setLoading(false);
@@ -248,7 +253,7 @@ export function useHistoryData({
     retryQueryKeyRef.current = queryKey;
     setError(null);
     loadingRef.current = true;
-    setLoading(true);
+    setLoading(!hasSuccessfulLoadRef.current);
     setRetryNonce((value) => value + 1);
   }, [queryKey]);
 
@@ -294,15 +299,25 @@ export function useHistoryData({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [operationKeys, dateFrom, dateTo, search, departmentParam, modelParam, queryKey, queryClient]);
 
-  const canLoadMore = !loading && getCanLoadMore({ loadedCount: logs.length, totalCount, lastBatchSize });
+  const queryChangedBeforeEffect = logsQueryKey !== queryKey;
+  const currentCachedPage = queryChangedBeforeEffect
+    ? queryClient.getQueryData<TransactionLog[]>(queryKeys.transactions.list(pageParams(0)))
+    : undefined;
+  const visibleLogs = queryChangedBeforeEffect ? currentCachedPage ?? [] : logs;
+  const visibleLoading = queryChangedBeforeEffect ? currentCachedPage === undefined : loading;
+  const canLoadMore = !visibleLoading && !loadingRef.current && getCanLoadMore({
+    loadedCount: visibleLogs.length,
+    totalCount,
+    lastBatchSize: queryChangedBeforeEffect ? currentCachedPage?.length ?? null : lastBatchSize,
+  });
 
   return {
-    logs,
+    logs: visibleLogs,
     setLogs,
-    loading,
-    error,
+    loading: visibleLoading,
+    error: queryChangedBeforeEffect ? null : error,
     retry,
-    refreshError,
+    refreshError: queryChangedBeforeEffect ? null : refreshError,
     retryRefresh,
     loadingMore,
     loadMoreError,
