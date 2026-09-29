@@ -64,10 +64,16 @@ vi.mock("../screens", () => ({
     onStatusChange,
     onGoToWarehouse,
     capacityData,
+    capacityLoading,
+    capacityError,
+    onCapacityRetry,
   }: {
     onStatusChange: (status: string) => void;
     onGoToWarehouse?: (item: unknown, intent?: unknown) => void;
     capacityData?: { immediate: number } | null;
+    capacityLoading?: boolean;
+    capacityError?: string | null;
+    onCapacityRetry?: () => void;
   }) => (
     <>
       <button type="button" onClick={() => onStatusChange("item added")}>
@@ -80,6 +86,9 @@ vi.mock("../screens", () => ({
         quick warehouse
       </button>
       <output data-testid="capacity-immediate">{capacityData?.immediate ?? "none"}</output>
+      <output data-testid="capacity-pending">{String(capacityLoading)}</output>
+      <output data-testid="capacity-error">{capacityError ?? "none"}</output>
+      <button type="button" onClick={onCapacityRetry}>retry capacity</button>
     </>
   ),
   MobileWarehouseScreen: ({
@@ -456,5 +465,17 @@ describe("MobileShell layout", () => {
     await vi.waitFor(() => {
       expect(screen.getByTestId("capacity-immediate")).toHaveTextContent("22");
     });
+  });
+
+  it("최초 생산 가능수량 실패를 종료하고 대시보드에서 재시도한다", async () => {
+    const { api } = await import("@/lib/api");
+    vi.mocked(api.getProductionCapacity).mockReset().mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce({ immediate: 9, maximum: 10, limiting_item: null, top_items: [] });
+    render(<MobileShell />);
+    await vi.waitFor(() => expect(screen.getByTestId("capacity-error")).toHaveTextContent("생산 가능수량을 불러오지 못했습니다."));
+    expect(screen.getByTestId("capacity-pending")).toHaveTextContent("false");
+    fireEvent.click(screen.getByRole("button", { name: "retry capacity" }));
+    await vi.waitFor(() => expect(screen.getByTestId("capacity-immediate")).toHaveTextContent("9"));
+    expect(screen.getByTestId("capacity-error")).toHaveTextContent("none");
   });
 });
