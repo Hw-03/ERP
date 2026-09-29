@@ -1,0 +1,23 @@
+.mobile {
+  composes: scope from "../mobile/mobilePresentation.module.css";
+  position: fixed;
+  inset: 88px 16px auto;
+  width: auto;
+  max-width: 398px;
+  max-height: calc(100dvh - 188px);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 768px) { .mobile { max-width: 688px; } }
+
+.mobile > :first-child { flex-shrink: 0; }
+.mobile > :last-child { min-height: 0; max-height: none; }
+.mobile button:not([role="switch"]) { min-height: 44px; min-width: 44px; }
+.mobile [role="switch"]::before { content: ""; position: absolute; inset: -10px 0; }
+.mobile [role="switch"] { margin-block: 10px; }
+.mobile [role="button"] { min-width: 0; min-height: 44px; padding-block: 12px; }
+.mobile [role="button"] > div { flex-wrap: wrap; }
+.mobile [role="button"] > div > span:last-child { width: 100%; margin-left: 0; }
+.mobile [role="button"] > span { font-size: 14px; overflow-wrap: anywhere; }
