@@ -51,9 +51,10 @@ interface DailyWorkDatePickerProps {
   value: string;
   maxDate: string;
   onChange: (value: string) => void;
+  mobile?: boolean;
 }
 
-export function DailyWorkDatePicker({ value, maxDate, onChange }: DailyWorkDatePickerProps) {
+export function DailyWorkDatePicker({ value, maxDate, onChange, mobile = false }: DailyWorkDatePickerProps) {
   const [open, setOpen] = useState(false);
   const [calMonth, setCalMonth] = useState(() => monthStart(parseDateKey(value)));
   const rootRef = useRef<HTMLDivElement>(null);
@@ -83,7 +84,7 @@ export function DailyWorkDatePicker({ value, maxDate, onChange }: DailyWorkDateP
   }, [open]);
 
   return (
-    <div className="flex items-center gap-2">
+    <div className={mobile ? "flex min-w-0 w-full items-center gap-1.5" : "flex items-center gap-2"}>
       <button
         type="button"
         aria-label="전일"
@@ -95,14 +96,14 @@ export function DailyWorkDatePicker({ value, maxDate, onChange }: DailyWorkDateP
         <ChevronLeft className="h-4 w-4" />
       </button>
 
-      <div ref={rootRef} className="relative">
+      <div ref={rootRef} className={mobile ? "relative min-w-0 flex-1" : "relative"}>
         <button
           type="button"
           aria-label="일보 날짜 선택"
           aria-haspopup="dialog"
           aria-expanded={open}
           onClick={() => setOpen((current) => !current)}
-          className="flex min-h-11 items-center gap-2 rounded-[12px] border px-3 text-sm font-black transition-colors hover:brightness-110"
+          className={mobile ? "flex min-h-11 w-full items-center justify-center gap-1.5 rounded-[12px] border px-2 text-sm font-black transition-colors hover:brightness-110" : "flex min-h-11 items-center gap-2 rounded-[12px] border px-3 text-sm font-black transition-colors hover:brightness-110"}
           style={{
             background: open ? tint(LEGACY_COLORS.blue, 10, LEGACY_COLORS.s2) : LEGACY_COLORS.s2,
             borderColor: open ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
@@ -110,7 +111,7 @@ export function DailyWorkDatePicker({ value, maxDate, onChange }: DailyWorkDateP
           }}
         >
           <CalendarDays className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
-          <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>작성일</span>
+          <span className={mobile ? "sr-only" : "text-xs"} style={{ color: LEGACY_COLORS.muted2 }}>작성일</span>
           <span className="whitespace-nowrap">{formatWorkDateLabel(value)}</span>
           <ChevronDown className="h-3.5 w-3.5 shrink-0 transition-transform" style={{ color: LEGACY_COLORS.muted, transform: open ? "rotate(180deg)" : "rotate(0deg)" }} />
         </button>

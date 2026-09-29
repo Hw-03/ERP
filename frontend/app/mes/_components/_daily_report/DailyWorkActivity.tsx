@@ -207,7 +207,7 @@ function DailyWorkActivityDetail({ group }: { group: DailyWorkActivityData["deta
   );
 }
 
-export function DailyWorkActivity({ activity, onDetailOpenChange, loading = false }: { activity?: DailyWorkActivityData; onDetailOpenChange?: (isOpen: boolean) => void; loading?: boolean }) {
+export function DailyWorkActivity({ activity, onDetailOpenChange, loading = false, mobile = false }: { activity?: DailyWorkActivityData; onDetailOpenChange?: (isOpen: boolean) => void; loading?: boolean; mobile?: boolean }) {
   const [openOperation, setOpenOperation] = useState<string | null>(null);
   useDesktopTabHome("daily-work-activity", {
     isHome: openOperation === null,
@@ -216,12 +216,12 @@ export function DailyWorkActivity({ activity, onDetailOpenChange, loading = fals
   });
 
   return (
-    <section className="rounded-[20px] border p-4 lg:shrink-0 lg:px-5 lg:py-4" aria-labelledby="daily-work-activity-title" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-      <div className="flex min-h-11 flex-wrap items-center gap-2 sm:flex-nowrap">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px]" style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>
+    <section className={mobile ? "rounded-[20px] border p-3" : "rounded-[20px] border p-4 lg:shrink-0 lg:px-5 lg:py-4"} aria-labelledby="daily-work-activity-title" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+      <div className={mobile ? "flex min-h-11 flex-wrap items-center gap-2" : "flex min-h-11 flex-wrap items-center gap-2 sm:flex-nowrap"}>
+        <span className={mobile ? "hidden" : "flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px]"} style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>
           <ClipboardList className="h-5 w-5" />
         </span>
-        <h2 id="daily-work-activity-title" className="shrink-0 whitespace-nowrap text-lg font-black">MES 작업 기록</h2>
+        <h2 id="daily-work-activity-title" className={mobile ? "w-full text-[15px] font-semibold" : "shrink-0 whitespace-nowrap text-lg font-black"}>MES 작업 기록</h2>
         {loading && <span data-testid="daily-report-activity-skeleton" aria-label="MES 작업 기록 불러오는 중" role="status" className="h-11 min-w-0 flex-1 motion-safe:animate-pulse rounded-[14px]" style={{ background: LEGACY_COLORS.s2 }} />}
         {activity?.summary.map((summary) => {
           const isOpen = openOperation === summary.operation_key;
@@ -235,13 +235,13 @@ export function DailyWorkActivity({ activity, onDetailOpenChange, loading = fals
                 onDetailOpenChange?.(next !== null);
               }}
               aria-label={`${summary.operation_label} 거래 상세 ${isOpen ? "접기" : "펼치기"}`}
-              className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-[14px] border px-3 text-left transition active:scale-[0.98]"
+              className={mobile ? "flex min-h-11 w-full flex-wrap items-center gap-1.5 rounded-[12px] border px-3 py-2 text-left" : "flex min-h-11 shrink-0 items-center gap-1.5 rounded-[14px] border px-3 text-left transition active:scale-[0.98]"}
               style={{ background: isOpen ? LEGACY_COLORS.s3 : LEGACY_COLORS.s2, borderColor: isOpen ? LEGACY_COLORS.blue : LEGACY_COLORS.border }}
             >
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px]" style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s1 }}><OperationIcon operationKey={summary.operation_key} /></span>
               <span className="whitespace-nowrap text-sm font-black">{summary.operation_label}</span>
               <span className="whitespace-nowrap text-sm font-black" style={{ color: LEGACY_COLORS.blue }}>{summary.work_count}건</span>
-              <span className="whitespace-nowrap text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{formatQuantities(summary.quantity_by_unit) || "수량 정보 없음"}</span>
+              <span className={mobile ? "min-w-0 text-xs [overflow-wrap:anywhere]" : "whitespace-nowrap text-xs font-bold"} style={{ color: LEGACY_COLORS.muted2 }}>{formatQuantities(summary.quantity_by_unit) || "수량 정보 없음"}</span>
               <ChevronRight className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-90" : ""}`} style={{ color: LEGACY_COLORS.blue }} />
             </button>
           );
@@ -254,8 +254,8 @@ export function DailyWorkActivity({ activity, onDetailOpenChange, loading = fals
       </div>
 
       {(loading || activity?.summary.length === 0) && (
-        <div className="mt-3 rounded-[14px] border px-3.5 py-3 text-sm font-medium" style={{ color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-          {loading ? <span aria-hidden="true" className="block h-5 w-2/3 rounded motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s3 }} /> : "완료된 MES 거래가 생기면 작업 종류와 수량이 이곳에 자동으로 나타납니다."}
+        <div className={mobile && !loading ? "mt-2 text-sm font-medium" : "mt-3 rounded-[14px] border px-3.5 py-3 text-sm font-medium"} style={mobile && !loading ? { color: LEGACY_COLORS.muted2 } : { color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+          {loading ? <span aria-hidden="true" className="block h-5 w-2/3 rounded motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s3 }} /> : mobile ? "작업 기록이 없습니다." : "완료된 MES 거래가 생기면 작업 종류와 수량이 이곳에 자동으로 나타납니다."}
         </div>
       )}
 
