@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, ChevronDown, ChevronRight, MinusCircle } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, MapPin, MinusCircle } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { getStockState } from "@/lib/mes/inventory";
@@ -152,6 +152,7 @@ export function IoLineRow({
   return (
     <div>
     <div
+      data-io-line
       // 모바일: flex-wrap 으로 줄바꿈(품목명 칸이 0폭 붕괴 → 세로글자 나던 문제 해소).
       // 데스크톱(lg): 기존 7열 그리드 유지(인라인 gridTemplateColumns 는 display:grid 일 때만 의미).
       // 바깥 행의 우측 18px은 카드 안쪽 기준선과 맞춘다. 카드 안의 BOM 자식은 이미 그 기준선 안에 있으므로 추가 여백을 두지 않는다.
@@ -184,6 +185,7 @@ export function IoLineRow({
 
       {/* 2. 품목명 + 코드 + 메타 (모바일에선 flex-1 로 한 줄 폭 확보) */}
       <div
+        data-io-identity
         className="min-w-0 flex-1 basis-[60%] lg:flex-none lg:basis-auto"
         style={{ opacity: isExcluded ? 0.6 : 1 }}
       >
@@ -211,8 +213,12 @@ export function IoLineRow({
             </button>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+        <div data-io-line-meta className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
           <span className="truncate">{line.mes_code ?? "-"}</span>
+          <span data-io-inline-location className="hidden">
+            <MapPin aria-hidden="true" className="h-3 w-3 shrink-0" />
+            <span>{location?.value ?? "—"}</span>
+          </span>
           {exceptionNote && (
             <span
               className="rounded-full px-2 py-0.5 text-xs font-bold"
@@ -228,13 +234,13 @@ export function IoLineRow({
       </div>
 
       {/* 3. 실제 재고 반영 위치. 모바일에서는 독립된 행으로 배치한다. */}
-      <div className="flex w-full justify-center lg:w-auto">
+      <div data-io-location className="flex w-full justify-center lg:w-auto">
         <IoLocationBadge label={location?.label ?? "재고 위치"} value={location?.value ?? "—"} variant="field" />
       </div>
 
       {/* 4. 연구 BOM은 고정 수량, 나머지는 수량 stepper (모바일에선 한 줄 차지) */}
       {fixedInternalUseBomQuantity ? (
-        <div className="flex w-full flex-col items-center gap-0.5 lg:w-[276px]">
+        <div data-io-fixed-quantity className="flex w-full flex-col items-center gap-0.5 lg:w-[276px]">
           <span
             className="text-xs font-bold uppercase tracking-[1.5px]"
             style={{ color: LEGACY_COLORS.muted2 }}
@@ -272,7 +278,7 @@ export function IoLineRow({
       )}
 
       {/* 항목 5-6 — 모바일만 가능재고+실행후를 가운데 정렬·간격 확보. lg:contents 로 데스크톱 7열 그리드 유지. */}
-      <div className="flex w-full items-start justify-center gap-10 lg:contents">
+      <div data-io-stock className="flex w-full items-start justify-center gap-10 lg:contents">
       {/* 5. 현재 재고 */}
       <div className="text-center">
         <div
