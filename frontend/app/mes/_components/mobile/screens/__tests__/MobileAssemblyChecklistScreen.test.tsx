@@ -1,10 +1,20 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MobileAssemblyChecklistScreen } from "../MobileAssemblyChecklistScreen";
+import presentation from "../../mobilePresentation.module.css";
 
 const ITEM_CONTENT = "손잡이 나사 고정 상태 양호 - 나사가 풀리지 않는지 확인";
 
 const state = vi.hoisted(() => ({
+  loading: false,
+  error: null as Error | null,
+  modelsLoading: false,
+  modelsError: null as Error | null,
+  checklistHasData: true,
+  modelsHasData: true,
+  modelsEmpty: false,
+  refetchChecklists: vi.fn(),
+  refetchModels: vi.fn(),
   checklists: [
     {
       checklist_id: "dx3000",
@@ -65,7 +75,7 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/queries/useAssemblyChecklistsQuery", () => ({
-  useAssemblyChecklistsQuery: () => ({ data: state.checklists, isLoading: false, error: null }),
+  useAssemblyChecklistsQuery: () => ({ data: state.loading || !state.checklistHasData ? undefined : state.checklists, isLoading: state.loading, error: state.error, refetch: state.refetchChecklists }),
   useCreateAssemblyChecklistMutation: () => ({ mutateAsync: state.createChecklist, isPending: false }),
   useCreateAssemblyChecklistSectionMutation: () => ({ mutateAsync: state.createSection, isPending: false }),
   useUpdateAssemblyChecklistSectionMutation: () => ({ mutateAsync: state.updateSection, isPending: false }),
@@ -79,7 +89,7 @@ vi.mock("@/lib/queries/useAssemblyChecklistsQuery", () => ({
 }));
 
 vi.mock("@/lib/queries/useModelsQuery", () => ({
-  useModelsQuery: () => ({ data: state.models }),
+  useModelsQuery: () => ({ data: state.modelsLoading || !state.modelsHasData ? undefined : state.modelsEmpty ? [] : state.models, isLoading: state.modelsLoading, error: state.modelsError, refetch: state.refetchModels }),
 }));
 
 function renderChecklistScreen() {
@@ -115,9 +125,74 @@ function preparePointer(handle: HTMLElement, target: Element, clientY = 30) {
 
 describe("MobileAssemblyChecklistScreen", () => {
   beforeEach(() => {
+    state.loading = false;
+    state.error = null;
+    state.modelsLoading = false;
+    state.modelsError = null;
+    state.checklistHasData = true;
+    state.modelsHasData = true;
+    state.modelsEmpty = false;
     Object.values(state).forEach((value) => {
       if (typeof value === "function" && "mockReset" in value) value.mockReset();
     });
+  });
+
+  it("최초 체크리스트와 관리 모델 조회를 빈 목록으로 표시하지 않는다", () => {
+    state.loading = true;
+    state.modelsLoading = true;
+    const view = renderChecklistScreen();
+    expect(screen.getByRole("status", { name: "체크리스트 불러오는 중" })).toBeInTheDocument();
+    state.loading = false;
+    view.rerender(<MobileAssemblyChecklistScreen />);
+    fireEvent.click(screen.getByRole("button", { name: "체크리스트 관리" }));
+    expect(screen.getByRole("status", { name: "모델 목록 불러오는 중" })).toBeInTheDocument();
+    expect(screen.queryByText("추가할 수 있는 모델이 없습니다.")).not.toBeInTheDocument();
+  });
+
+  it("재조회 실패에도 이미 받은 체크리스트 목록을 유지한다", () => {
+    state.error = new Error("refresh failed");
+    renderChecklistScreen();
+    expect(screen.getByRole("alert")).toHaveTextContent("체크리스트를 불러오지 못했습니다.");
+    expect(screen.getByRole("button", { name: "DX3000 체크리스트 열기" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(state.refetchChecklists).toHaveBeenCalledOnce();
+  });
+
+  it("선택 화면 최초 조회 실패를 화면 안에서 다시 시도한다", () => {
+    state.checklistHasData = false;
+    state.error = new Error("initial failed");
+    renderChecklistScreen();
+    expect(screen.queryByRole("status", { name: "체크리스트 불러오는 중" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(state.refetchChecklists).toHaveBeenCalledOnce();
+  });
+
+  it("관리 화면의 모델·체크리스트 오류는 각각 해당 조회만 다시 시도한다", () => {
+    state.error = new Error("refresh failed");
+    state.modelsError = new Error("initial failed");
+    state.modelsHasData = false;
+    renderChecklistScreen();
+    fireEvent.click(screen.getByRole("button", { name: "체크리스트 관리" }));
+    const modelsSection = screen.getByText("제품 추가").closest("section")!;
+    const checklistsSection = screen.getByText("등록된 제품").closest("section")!;
+    expect(screen.queryByText("추가할 수 있는 모델이 없습니다.")).not.toBeInTheDocument();
+    fireEvent.click(within(modelsSection).getByRole("button", { name: "다시 시도" }));
+    expect(state.refetchModels).toHaveBeenCalledOnce();
+    expect(state.refetchChecklists).not.toHaveBeenCalled();
+    fireEvent.click(within(checklistsSection).getByRole("button", { name: "다시 시도" }));
+    expect(state.refetchChecklists).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "DX3000 관리" })).toBeInTheDocument();
+  });
+
+  it("성공한 빈 모델 목록은 갱신 실패와 재시도에도 유지한다", () => {
+    state.modelsEmpty = true;
+    state.modelsError = new Error("refresh failed");
+    renderChecklistScreen();
+    fireEvent.click(screen.getByRole("button", { name: "체크리스트 관리" }));
+    expect(screen.getByText("추가할 수 있는 모델이 없습니다.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(state.refetchModels).toHaveBeenCalledOnce();
+    expect(screen.getByText("추가할 수 있는 모델이 없습니다.")).toBeInTheDocument();
   });
 
   it("체크리스트가 등록된 모델만 선택 화면에 표시한다", () => {
@@ -128,9 +203,10 @@ describe("MobileAssemblyChecklistScreen", () => {
     expect(dx3000Card).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "ADX6000FB 체크리스트 열기" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "ADX4000W 체크리스트 열기" })).not.toBeInTheDocument();
-    expect(dx3000Card.parentElement).toHaveClass("flex-1", "flex", "flex-col", "gap-2");
-    expect(dx3000Card).toHaveClass("flex-1");
-    expect(dx3000Card.parentElement?.parentElement).toHaveClass("pb-3");
+    expect(dx3000Card.parentElement).toHaveClass(presentation.choiceList);
+    expect(dx3000Card).toHaveClass(presentation.menuRow);
+    expect(dx3000Card.querySelector(`.${presentation.choiceIcon}`)).toBeInTheDocument();
+    expect(dx3000Card.parentElement?.parentElement).toHaveClass("px-4", "pt-4");
   });
 
   it("기존 체크 수행 화면은 완료 상태를 로컬에서 유지한다", () => {
