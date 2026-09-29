@@ -8,6 +8,7 @@ import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
 import { InlineErrorNote } from "./InlineErrorNote";
 import { QuantityInput } from "../common/QuantityInput";
+import { SkeletonBlock, dataRevealClassName } from "../common/LoadingSkeleton";
 
 export interface ChildDecision {
   item_id: string;
@@ -27,6 +28,7 @@ export interface ChildDecision {
 }
 
 interface DisassembleTreeProps {
+  mobilePresentation?: boolean;
   parentItemId: string;
   parentItemName: string;
   parentMesCode: string;
@@ -128,6 +130,7 @@ function cascadeNormalQty(children: ChildDecision[], parentNormalQty: number, pa
 }
 
 export function DisassembleTree({
+  mobilePresentation = false,
   parentItemId,
   parentItemName,
   parentMesCode,
@@ -138,6 +141,7 @@ export function DisassembleTree({
 }: DisassembleTreeProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [requestVersion, setRequestVersion] = useState(0);
   const [parentNormalQty, setParentNormalQty] = useState(parentQty);
 
   useEffect(() => {
@@ -165,7 +169,7 @@ export function DisassembleTree({
 
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parentItemId, parentQty]);
+  }, [parentItemId, parentQty, requestVersion]);
 
   function handleParentNormalChange(raw: number) {
     const next = clamp(raw, 0, parentQty);
@@ -174,13 +178,23 @@ export function DisassembleTree({
   }
 
   if (loading) {
+    if (mobilePresentation) return <div role="status" aria-busy="true" aria-label="BOM 하위 품목 불러오는 중" className="flex flex-col gap-2">
+      <span className="sr-only">BOM 하위 품목 불러오는 중</span>
+      <div className="rounded-[14px] border" style={{ borderColor: LEGACY_COLORS.red, background: tint(LEGACY_COLORS.red, 6) }}><div className="flex items-center gap-2 px-4 py-2.5"><Layers className="h-3.5 w-3.5" /><span className="text-sm font-black">{parentItemName}</span><span className="text-xs font-bold">{parentMesCode}</span></div><div aria-hidden="true" className="flex min-h-[56px] items-center gap-3 px-4 pb-3"><span className="text-xs font-black">하위 기본 정상</span><SkeletonBlock className="h-11 w-20 rounded-[10px]" /></div></div>
+      {[0, 1, 2].map((row) => <div key={row} aria-hidden="true" className="rounded-[14px] border border-[var(--c-border)] px-4 py-3"><div className="flex items-center gap-3"><SkeletonBlock className="h-4 w-2/3" /><SkeletonBlock className="ml-auto h-4 w-10" /></div><div className="mt-3 flex items-center gap-2"><SkeletonBlock className="h-11 w-20" /><SkeletonBlock className="h-11 w-20" /><SkeletonBlock className="h-11 w-20" /></div></div>)}
+    </div>;
     return (
       <div className="py-4 text-center text-xs font-bold" style={{ color: LEGACY_COLORS.muted }}>
         BOM 하위 품목 로딩 중...
       </div>
     );
   }
-  if (error) return <InlineErrorNote>{error}</InlineErrorNote>;
+  if (error) return mobilePresentation ? (
+    <div role="alert" className="flex flex-col gap-2">
+      <InlineErrorNote>{error}</InlineErrorNote>
+      <button type="button" onClick={() => setRequestVersion((version) => version + 1)} className="min-h-11 self-start rounded-[10px] border px-3 text-sm font-bold" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}>다시 시도</button>
+    </div>
+  ) : <InlineErrorNote>{error}</InlineErrorNote>;
 
   return (
     <div className="flex flex-col gap-2">
@@ -215,6 +229,7 @@ export function DisassembleTree({
         </div>
       </div>
 
+      <div className={mobilePresentation ? `${dataRevealClassName} flex flex-col gap-2` : "contents"}>
       {decisions.length === 0 ? (
         <div className="py-2 pl-5 text-xs font-bold" style={{ color: LEGACY_COLORS.muted }}>
           BOM 하위 품목이 없습니다.
@@ -230,6 +245,7 @@ export function DisassembleTree({
           />
         ))
       )}
+      </div>
     </div>
   );
 }

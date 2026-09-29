@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import presentation from "../mobile/mobilePresentation.module.css";
 import { defectsApi } from "@/lib/api/defects";
 import type { DefectKpi, DefectLocation } from "@/lib/api/types/defects";
 /** DefectHubPanel 이 필요한 최소 직원 필드 */
@@ -31,6 +32,8 @@ import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { ReadEmpty, ReadFailure, ReadLoading } from "../common/ReadState";
 import { matchesDefectSearch } from "./defectSearch";
 import { ShieldAlert, Trash2 } from "lucide-react";
+import { DefectListSkeleton } from "./DefectListSkeleton";
+import { dataRevealClassName } from "../common/LoadingSkeleton";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 const PRODUCTION_LINES = new Set(["튜브", "고압", "진공", "튜닝", "조립", "출하"]);
@@ -38,18 +41,28 @@ const EMPTY_ITEMS: Item[] = [];
 const EMPTY_MODELS: ProductModel[] = [];
 
 interface Props {
+  itemsLoading?: boolean;
+  itemsLoadError?: string | null;
+  itemsHasData?: boolean;
+  onRetryItems?: () => void;
   defectDeptFilter?: string | null;
   currentEmployee: DefectHubEmployee;
   // 격리 추가·바로 폐기(다품목 카트) 흐름용 — MobileDefectScreen 이 주입.
   items?: Item[];
   productModels?: ProductModel[];
+  mobilePresentation?: boolean;
 }
 
 export function DefectHubPanel({
+  itemsLoading = false,
+  itemsLoadError = null,
+  itemsHasData = true,
+  onRetryItems,
   defectDeptFilter,
   currentEmployee,
   items = EMPTY_ITEMS,
   productModels = EMPTY_MODELS,
+  mobilePresentation = false,
 }: Props) {
   const realtimeRevision = useRealtimeRevision();
   const [locations, setLocations] = useState<DefectLocation[]>([]);
@@ -383,6 +396,10 @@ export function DefectHubPanel({
   if (view === "cart") {
     return (
       <MobileDefectCartFlow
+        itemsLoading={itemsLoading}
+        itemsLoadError={itemsLoadError}
+        itemsHasData={itemsHasData}
+        onRetryItems={onRetryItems}
         mode={cartMode}
         items={items}
         productModels={productModels}
@@ -394,23 +411,36 @@ export function DefectHubPanel({
   }
 
   if (view === "work-choice") {
+    if (mobilePresentation) {
+      return (
+        <div className="flex min-h-full flex-col gap-3">
+          <button type="button" onClick={() => window.history.back()} className="min-h-11 self-start text-sm" style={{ color: LEGACY_COLORS.muted2 }}>← 작업 선택</button>
+          <h2 className="text-lg font-semibold">불량 처리</h2>
+          <div className={`${presentation.surface} ${presentation.choiceList}`}>
+            <button type="button" onClick={() => openCart("add")} className={presentation.menuRow}><span className={presentation.choiceIcon} style={{ color: LEGACY_COLORS.red }} aria-hidden="true"><ShieldAlert /></span><span>격리 등록</span></button>
+            <button type="button" onClick={() => openCart("scrap")} className={presentation.menuRow}><span className={presentation.choiceIcon} style={{ color: LEGACY_COLORS.red }} aria-hidden="true"><Trash2 /></span><span>바로 처리</span></button>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="flex min-h-full flex-col gap-3">
         <button type="button" onClick={() => window.history.back()} className="standard-hover self-start rounded-[10px] border px-3 py-1.5 text-xs font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}>← 작업 선택</button>
-        <div><h2 className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>불량 처리</h2><p className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>진행할 작업을 선택하세요.</p></div>
-        <button type="button" onClick={() => openCart("add")} className="flex min-h-[120px] flex-col justify-between rounded-[18px] border p-5 text-left" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}><ShieldAlert className="h-8 w-8" style={{ color: LEGACY_COLORS.red }} /><span className="text-lg font-black" style={{ color: LEGACY_COLORS.text }}>격리 등록</span><span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>품목을 격리하고 불량·B급·구형으로 분류합니다.</span></button>
-        <button type="button" onClick={() => openCart("scrap")} className="flex min-h-[120px] flex-col justify-between rounded-[18px] border p-5 text-left" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}><Trash2 className="h-8 w-8" style={{ color: LEGACY_COLORS.red }} /><span className="text-lg font-black" style={{ color: LEGACY_COLORS.text }}>바로 처리</span><span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>격리 없이 폐기 또는 재작업합니다.</span></button>
+        <div><h2 className={mobilePresentation ? "text-base font-bold" : "text-xl font-black"} style={{ color: LEGACY_COLORS.text }}>불량 처리</h2>{!mobilePresentation && <p className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>진행할 작업을 선택하세요.</p>}</div>
+        <button type="button" onClick={() => openCart("add")} className={mobilePresentation ? "flex min-h-16 items-center gap-3 rounded-[14px] border px-4 py-3 text-left" : "flex min-h-[120px] flex-col justify-between rounded-[18px] border p-5 text-left"} style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}><ShieldAlert className={mobilePresentation ? "h-5 w-5" : "h-8 w-8"} style={{ color: LEGACY_COLORS.red }} /><span className={mobilePresentation ? "text-base font-bold" : "text-lg font-black"} style={{ color: LEGACY_COLORS.text }}>격리 등록</span>{!mobilePresentation && <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>품목을 격리하고 불량·B급·구형으로 분류합니다.</span>}</button>
+        <button type="button" onClick={() => openCart("scrap")} className={mobilePresentation ? "flex min-h-16 items-center gap-3 rounded-[14px] border px-4 py-3 text-left" : "flex min-h-[120px] flex-col justify-between rounded-[18px] border p-5 text-left"} style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}><Trash2 className={mobilePresentation ? "h-5 w-5" : "h-8 w-8"} style={{ color: LEGACY_COLORS.red }} /><span className={mobilePresentation ? "text-base font-bold" : "text-lg font-black"} style={{ color: LEGACY_COLORS.text }}>바로 처리</span>{!mobilePresentation && <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>격리 없이 폐기 또는 재작업합니다.</span>}</button>
       </div>
     );
   }
 
   if (view === "storage") {
-    return <DefectStorageView locations={locations} items={items} productModels={productModels} currentEmployee={currentEmployee} loading={loading} loadError={error ?? refreshError} onRetry={() => setReloadNonce((value) => value + 1)} onBack={() => window.history.back()} onUpdated={(recordId, managementCategory) => setLocations((current) => current.map((location) => location.record_id === recordId ? { ...location, management_category: managementCategory } : location))} onMemoUpdated={(recordId, memo) => setLocations((current) => current.map((location) => location.record_id === recordId ? { ...location, reason_memo: memo } : location))} onRestore={handleRestore} />;
+    return <DefectStorageView mobilePresentation={mobilePresentation} hasData={hasLoadedRef.current} locations={locations} items={items} productModels={productModels} currentEmployee={currentEmployee} loading={loading} loadError={error ?? refreshError} onRetry={() => setReloadNonce((value) => value + 1)} onBack={() => window.history.back()} onUpdated={(recordId, managementCategory) => setLocations((current) => current.map((location) => location.record_id === recordId ? { ...location, management_category: managementCategory } : location))} onMemoUpdated={(recordId, memo) => setLocations((current) => current.map((location) => location.record_id === recordId ? { ...location, reason_memo: memo } : location))} onRestore={handleRestore} />;
   }
 
   if (view === "statistics") {
     return (
       <DefectStatisticsView
+        mobilePresentation={mobilePresentation}
         departmentOptions={departmentOptions}
         modelOptions={modelOptions}
         currentDepartment={currentEmployee.department}
@@ -423,10 +453,13 @@ export function DefectHubPanel({
   const listSection = (
     <>
       <DefectKpiCards
+        unavailable={mobilePresentation && !loading && !hasLoadedRef.current}
+        loading={mobilePresentation && loading}
         kpi={kpi}
         scopeLabel={scopeLabel}
         activeFilter={kpiFilter}
         onCardClick={handleKpiCardClick}
+        mobilePresentation={mobilePresentation}
       />
 
       <DefectFilterBar
@@ -502,11 +535,11 @@ export function DefectHubPanel({
         />
       )}
       {loading ? (
-        <ReadLoading label="불량 데이터 로딩 중..." />
+        <ReadLoading label="불량 데이터 로딩 중..." skeleton={mobilePresentation ? <DefectListSkeleton /> : undefined} />
       ) : error ? (
         <ReadFailure message={error} onRetry={() => setReloadNonce((value) => value + 1)} />
       ) : (
-        <>
+        <div className={mobilePresentation ? dataRevealClassName : "contents"}>
           <DefectDepartmentList
             emptyContent={<ReadEmpty hasSearch={!!search.trim()} hasFilters={locations.length > 0}
               title={!search.trim() && locations.length === 0 ? "격리된 불량 재고가 없습니다." : undefined}
@@ -520,19 +553,19 @@ export function DefectHubPanel({
             onMoveToStorage={setManagementLocation}
           />
           {managementLocation && <ManagementCategoryModal location={managementLocation} currentEmployee={currentEmployee} onClose={() => setManagementLocation(null)} onUpdated={(managementCategory) => { setLocations((current) => current.map((location) => location.record_id === managementLocation.record_id ? { ...location, management_category: managementCategory } : location)); setManagementLocation(null); }} />}
-        </>
+        </div>
       )}
     </>
   );
 
   return (
-    <div className="flex min-h-full flex-col gap-4">
+    <div className={mobilePresentation ? "flex min-h-full flex-col gap-3" : "flex min-h-full flex-col gap-4"}>
       {/* 항목 7-3 — 헤더("불량 처리 허브" 제목 + 우상단 이름·부서) 제거(불필요). */}
       {view === "hub" ? (
         /* 항목 2-5 — 첫 화면은 키오스크식 카드 4장(격리·폐기·목록·통계)만. PC(DesktopDefectView)
            처럼 "무엇을 할지 선택만" 하게 한다. KPI/필터/격리 목록은 카드 선택 후 list 화면에서만.
            (이전엔 카드 2장 + listSection 을 첫 화면에 함께 띄워 모바일이 혼잡했음.) */
-        <div className="flex min-h-0 flex-1 flex-col gap-3">
+        <div className={mobilePresentation ? `${presentation.surface} ${presentation.choiceList}` : "flex min-h-0 flex-1 flex-col gap-3"}>
           {DEFECT_HUB_CARDS.map((card) => {
             const Icon = card.icon;
             const accent = LEGACY_COLORS[card.accentKey];
@@ -541,26 +574,26 @@ export function DefectHubPanel({
                 key={card.id}
                 type="button"
                 onClick={() => handleHubSelect(card.id)}
-                className="flex min-h-[96px] flex-1 items-center gap-5 rounded-[18px] border p-4 text-left transition-[transform] active:scale-[0.99]"
-                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                className={mobilePresentation ? presentation.menuRow : "flex min-h-[96px] flex-1 items-center gap-5 rounded-[18px] border p-4 text-left transition-[transform] active:scale-[0.99]"}
+                style={{ background: mobilePresentation ? undefined : LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
               >
                 <span
-                  className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[16px]"
-                  style={{ background: `color-mix(in srgb, ${accent} 20%, transparent)` }}
+                  className={mobilePresentation ? presentation.choiceIcon : "flex h-16 w-16 shrink-0 items-center justify-center rounded-[16px]"}
+                  style={{ background: `color-mix(in srgb, ${accent} ${mobilePresentation ? 12 : 20}%, transparent)`, color: accent }}
                 >
                   <Icon
                     className="h-8 w-8"
-                    style={{ color: `color-mix(in srgb, ${accent} 42%, ${LEGACY_COLORS.text})` }}
+                    style={{ color: mobilePresentation ? accent : `color-mix(in srgb, ${accent} 42%, ${LEGACY_COLORS.text})` }}
                   />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-xl font-black leading-tight">{card.label}</span>
-                  <span
+                  <span className={mobilePresentation ? "block leading-snug" : "block text-xl font-black leading-tight"}>{card.label}</span>
+                  {!mobilePresentation && <span
                     className="block text-sm font-semibold"
                     style={{ color: LEGACY_COLORS.muted2 }}
                   >
                     {card.description}
-                  </span>
+                  </span>}
                 </span>
               </button>
             );

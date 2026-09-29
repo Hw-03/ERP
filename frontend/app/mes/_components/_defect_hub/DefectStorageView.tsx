@@ -19,6 +19,9 @@ import { LoadFailureCard } from "../common/LoadFailureCard";
 import { EmptyState } from "../common/EmptyState";
 import type { Item, ProductModel } from "../_warehouse_v2/types";
 import { DesktopPanelCloseButton } from "../DesktopRightPanel";
+import { SkeletonBlock, dataRevealClassName } from "../common/LoadingSkeleton";
+import { ReadLoading } from "../common/ReadState";
+import { DefectListSkeleton } from "./DefectListSkeleton";
 
 type StorageFilter = "ALL" | "B_GRADE" | "OBSOLETE";
 
@@ -42,7 +45,11 @@ export function DefectStorageView({
   loading = false,
   loadError = null,
   onRetry,
+  mobilePresentation = false,
+  hasData = locations.length > 0,
 }: {
+  mobilePresentation?: boolean;
+  hasData?: boolean;
   locations: DefectLocation[];
   currentEmployee: { employee_id: string; name: string; department: string };
   onBack: () => void;
@@ -93,20 +100,20 @@ export function DefectStorageView({
       <button type="button" onClick={onBack} className="standard-hover flex min-h-11 items-center gap-1 rounded-[10px] border px-3 text-sm font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2 }}><ArrowLeft className="h-4 w-4" />작업 선택</button>
       <div><h2 className="text-xl font-black" style={{ color: LEGACY_COLORS.text }}>B급·구형 자재</h2><p className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>양품 재고에서 제외한 자재를 보관 분류별로 관리합니다.</p></div>
     </header>
-    {loading && locations.length === 0 ? <div role="status" className="flex min-h-40 items-center justify-center gap-2 rounded-[14px] border px-6 py-8 text-sm font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}><LoaderCircle className="h-5 w-5 animate-spin" />B급·구형 자재를 불러오는 중...</div> : loadError && locations.length === 0 ? <LoadFailureCard prefix="B급·구형 보관 목록을 불러오지 못했습니다" message={loadError} retryLabel="다시 동기화" onRetry={onRetry} /> : <>
+    {!mobilePresentation && loading && locations.length === 0 ? <div role="status" className="flex min-h-40 items-center justify-center gap-2 rounded-[14px] border px-6 py-8 text-sm font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted }}><LoaderCircle className="h-5 w-5 animate-spin" />B급·구형 자재를 불러오는 중...</div> : !mobilePresentation && loadError && locations.length === 0 ? <LoadFailureCard prefix="B급·구형 보관 목록을 불러오지 못했습니다" message={loadError} retryLabel="다시 동기화" onRetry={onRetry} /> : <>
     <div className="grid gap-2 sm:grid-cols-3" role="group" aria-label="보관 분류 필터">
-      {(["ALL", "B_GRADE", "OBSOLETE"] as StorageFilter[]).map((value) => <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)} className="rounded-[14px] border px-4 py-3 text-left" style={{ background: filter === value ? tint(value === "B_GRADE" ? LEGACY_COLORS.purple : value === "OBSOLETE" ? LEGACY_COLORS.muted2 : LEGACY_COLORS.blue, 12) : LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}><span className="block text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{value === "ALL" ? "전체 보관" : categoryLabel[value]}</span><span className="mt-1 block text-2xl font-black" style={{ color: LEGACY_COLORS.muted2 }}>{counts[value]}건</span></button>)}
+      {(["ALL", "B_GRADE", "OBSOLETE"] as StorageFilter[]).map((value) => <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)} className="rounded-[14px] border px-4 py-3 text-left" style={{ background: filter === value ? tint(value === "B_GRADE" ? LEGACY_COLORS.purple : value === "OBSOLETE" ? LEGACY_COLORS.muted2 : LEGACY_COLORS.blue, 12) : LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}><span className="block text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{value === "ALL" ? "전체 보관" : categoryLabel[value]}</span><span className="mt-1 block text-2xl font-black" style={{ color: LEGACY_COLORS.muted2 }}>{mobilePresentation && loading && !hasData ? <SkeletonBlock className="h-8 w-14" /> : <span className={mobilePresentation ? dataRevealClassName : undefined}>{counts[value]}건</span>}</span></button>)}
     </div>
     <DefectFilterBar scope={scope} actorScope={actorScope} sort={sort} filterLocked={filterLocked} onScopeChange={setScope} onActorScopeChange={setActorScope} onSortChange={setSort} onFilterLockedChange={setFilterLocked} currentDept={currentEmployee.department} departments={departmentOptions} selectedDepartments={selectedDepartments} onDepartmentsChange={setSelectedDepartments} models={modelOptions} selectedModels={selectedModels} onModelsChange={setSelectedModels} selectedProcessSteps={selectedProcessSteps} onProcessStepsChange={setSelectedProcessSteps} onResetCategoryFilters={resetCategoryFilters} />
     <input aria-label="B급·구형 검색" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="품목명 · 품목 코드 · 사유 검색" className="min-h-11 rounded-[10px] border px-3 text-sm font-bold outline-none" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }} />
     {loadError && <LoadFailureCard prefix="최신 B급·구형 보관 목록을 동기화하지 못했습니다" message={loadError} retryLabel="다시 동기화" onRetry={onRetry} />}
-    {storage.length === 0 ? <EmptyState
+    {mobilePresentation && loading && !hasData ? <ReadLoading label="B급·구형 자재 불러오는 중" skeleton={<DefectListSkeleton />} /> : mobilePresentation && loadError && !hasData ? null : storage.length === 0 ? <EmptyState
       illustrated
       className="min-h-[260px] flex-1"
       variant={search.trim() ? "no-search-result" : "no-data"}
       title={search.trim() ? "검색 결과가 없습니다." : "보관 중인 B급·구형 자재가 없습니다."}
       description=""
-    /> : <DefectDepartmentList storageMode locations={storage} currentEmployee={currentEmployee} onProcess={onRestore} onMoveToStorage={setSelected} onMemoUpdated={onMemoUpdated} searchActive={search.trim().length > 0} />}
+    /> : <div className={mobilePresentation ? dataRevealClassName : "contents"}><DefectDepartmentList storageMode locations={storage} currentEmployee={currentEmployee} onProcess={onRestore} onMoveToStorage={setSelected} onMemoUpdated={onMemoUpdated} searchActive={search.trim().length > 0} /></div>}
     </>}
     {selected && <ManagementCategoryModal location={selected} currentEmployee={currentEmployee} onClose={() => setSelected(null)} onUpdated={(category) => { onUpdated(selected.record_id, category); setSelected(null); }} />}
   </div>;
