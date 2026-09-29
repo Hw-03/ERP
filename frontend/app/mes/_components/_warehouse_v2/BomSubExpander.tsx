@@ -11,6 +11,8 @@ import { formatQty } from "@/lib/mes/format";
 import { mesCodeDeptBadge, processTypeColor } from "@/lib/mes/process";
 import { useDeptColorLookup } from "../DepartmentsContext";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
+import { ReadFailure, ReadLoading } from "../common/ReadState";
+import { SkeletonBlock, dataRevealClassName } from "../common/LoadingSkeleton";
 
 const ROW_H = 34; // 일정한 행 높이(px) — 연결선이 정확히 이어지려면 고정
 const GUIDE_W = 22; // 가이드(레일/엘보) 컬럼 폭(px)
@@ -21,12 +23,12 @@ const RAIL = tint(LEGACY_COLORS.muted2, 30); // depth 무관 단일 중립 연�
 const RAIL_W = 1.5;
 
 /** 조상 컬럼: 세로선이 계속 이어지면 풀높이 라인, 아니면 빈 칸 */
-function Rail({ show, stretch = false }: { show: boolean; stretch?: boolean }) {
+function Rail({ show, stretch = false, mobile = false }: { show: boolean; stretch?: boolean; mobile?: boolean }) {
   return (
     <span
       data-testid={stretch ? "bom-modal-rail" : undefined}
       className={`relative shrink-0${stretch ? " self-stretch" : ""}`}
-      style={{ width: GUIDE_W, height: stretch ? undefined : ROW_H }}
+      style={{ width: mobile ? 12 : GUIDE_W, height: stretch ? undefined : ROW_H }}
     >
       {show && (
         <span
@@ -39,12 +41,12 @@ function Rail({ show, stretch = false }: { show: boolean; stretch?: boolean }) {
 }
 
 /** 현재 노드 엘보(├ 또는 └) */
-function Connector({ isLast, stretch = false }: { isLast: boolean; stretch?: boolean }) {
+function Connector({ isLast, stretch = false, mobile = false }: { isLast: boolean; stretch?: boolean; mobile?: boolean }) {
   return (
     <span
       data-testid={stretch ? "bom-modal-connector" : undefined}
       className={`relative shrink-0${stretch ? " self-stretch" : ""}`}
-      style={{ width: GUIDE_W, height: stretch ? undefined : ROW_H }}
+      style={{ width: mobile ? 12 : GUIDE_W, height: stretch ? undefined : ROW_H }}
     >
       {/* 세로: top → 중앙 (위로 연결) */}
       <span
@@ -74,6 +76,7 @@ function BomTreeItem({
   tapToExpandName = false,
   stock = false,
   modal = false,
+  mobilePresentation = false,
 }: {
   node: BOMTreeNode;
   rails: boolean[];
@@ -83,6 +86,7 @@ function BomTreeItem({
   tapToExpandName?: boolean;
   stock?: boolean;
   modal?: boolean;
+  mobilePresentation?: boolean;
 }) {
   const getDeptColor = useDeptColorLookup();
   const [open, setOpen] = useState(false);
@@ -99,7 +103,7 @@ function BomTreeItem({
       <span className="flex min-w-0 justify-start">
         {deptBadge && (
           <span
-            className="rounded-full px-2 py-0.5 text-[10px] font-bold leading-none"
+            className={mobilePresentation ? "rounded-full px-2 py-0.5 text-xs font-medium leading-none" : "rounded-full px-2 py-0.5 text-[10px] font-bold leading-none"}
             style={{ color: deptBadge.color, background: deptBadge.bg }}
           >
             {deptBadge.label}
@@ -109,7 +113,7 @@ function BomTreeItem({
 
       {/* 코드 — 보조 모노스페이스. 우정렬로 우변 기준선 고정 */}
       <span
-        className="min-w-0 truncate whitespace-nowrap text-right font-mono text-[11px] tracking-tight"
+        className={mobilePresentation ? "min-w-0 break-all font-mono text-xs" : "min-w-0 truncate whitespace-nowrap text-right font-mono text-[11px] tracking-tight"}
         style={{ color: tint(LEGACY_COLORS.muted2, 70) }}
         title={node.mes_code ?? undefined}
       >
@@ -117,12 +121,12 @@ function BomTreeItem({
       </span>
 
       {/* 소요량 — 실행후 자리(col4)에 가운데 정렬 강조. */}
-      <span
+      {!mobilePresentation && <span
         className="text-center text-xs tabular-nums leading-none"
-        style={{ gridColumn: "4", color: qty > 1 ? LEGACY_COLORS.text : LEGACY_COLORS.muted2, fontWeight: qty > 1 ? 800 : 600 }}
+        style={{ gridColumn: "4", color: qty > 1 ? LEGACY_COLORS.text : LEGACY_COLORS.muted2, fontWeight: mobilePresentation ? 600 : qty > 1 ? 800 : 600 }}
       >
         {formatBomQuantity(qty, node.unit)}
-      </span>
+      </span>}
       {stock && (
         <span
           className="text-xs font-bold tabular-nums"
@@ -138,27 +142,29 @@ function BomTreeItem({
     <li>
       <div
         data-testid={modal ? "bom-modal-row" : undefined}
-        className={`flex ${modal ? "w-full items-start rounded-[14px] border px-3" : tapToExpandName && nameExpanded ? "items-start" : "items-center"} transition-colors duration-150 hover:bg-[var(--c-s4)]`}
+        className={`flex ${modal ? "w-full items-start rounded-[14px] border px-3" : mobilePresentation ? "items-start border-b last:border-b-0 pr-3" : tapToExpandName && nameExpanded ? "items-start" : "items-center"} transition-colors duration-150 hover:bg-[var(--c-s4)]`}
         style={{
-          height: modal || tapToExpandName && nameExpanded ? undefined : ROW_H,
-          minHeight: ROW_H,
+          height: modal || mobilePresentation || tapToExpandName && nameExpanded ? undefined : ROW_H,
+          minHeight: mobilePresentation ? 44 : ROW_H,
+          ...(mobilePresentation ? { borderColor: LEGACY_COLORS.border } : {}),
           ...(modal ? { background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border } : {}),
         }}
       >
         {/* 가이드 레일 + 엘보 */}
-        {rails.map((show, i) => (
-          <Rail key={i} show={show} stretch={modal} />
+        {(mobilePresentation ? rails.slice(-3) : rails).map((show, i) => (
+          <Rail key={i} show={show} stretch={modal || mobilePresentation} mobile={mobilePresentation} />
         ))}
-        <Connector isLast={isLast} stretch={modal} />
+        <Connector isLast={isLast} stretch={modal || mobilePresentation} mobile={mobilePresentation} />
 
         {/* chevron(자식 보유) 또는 정렬용 spacer(잎) */}
         {hasKids ? (
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
-            className="flex h-5 w-5 shrink-0 items-center justify-center rounded hover:brightness-110"
+            className={mobilePresentation ? "flex h-11 w-11 shrink-0 items-center justify-center rounded hover:brightness-110" : "flex h-5 w-5 shrink-0 items-center justify-center rounded hover:brightness-110"}
             style={{ color: LEGACY_COLORS.muted2 }}
             aria-expanded={open}
+            aria-label={mobilePresentation ? `${node.item_name} ${open ? "접기" : "펼치기"}` : undefined}
             title={open ? "접기" : "펼치기"}
           >
             <ChevronRight
@@ -167,7 +173,7 @@ function BomTreeItem({
             />
           </button>
         ) : (
-          <span className="h-5 w-5 shrink-0" />
+          <span className={mobilePresentation ? "w-2 shrink-0" : "h-5 w-5 shrink-0"} />
         )}
 
         {modal ? (
@@ -209,6 +215,26 @@ function BomTreeItem({
                 현재 재고 {formatQty(node.current_stock)} {node.unit}
               </span>
             </span>
+          </div>
+        ) : mobilePresentation ? (
+          <div className="min-w-0 flex-1 py-2">
+            <div className="flex items-start gap-2">
+            {tapToExpandName ? (
+              <button
+                type="button"
+                disabled={stock}
+                onClick={() => setNameExpanded((current) => !current)}
+                className={`no-btn-inset flex min-h-11 min-w-0 flex-1 items-center text-left text-[15px] font-semibold leading-5 ${nameExpanded ? "[overflow-wrap:anywhere]" : "truncate"}`}
+                style={{ color: LEGACY_COLORS.text }}
+              >
+                <span className={nameExpanded ? "[overflow-wrap:anywhere]" : "truncate"}>{node.item_name}</span>
+              </button>
+            ) : (
+              <span className="min-w-0 flex-1 [overflow-wrap:anywhere] text-[15px] font-semibold leading-5" style={{ color: LEGACY_COLORS.text }}>{node.item_name}</span>
+            )}
+            <span className="shrink-0 pt-3 text-sm font-semibold tabular-nums" style={{ color: LEGACY_COLORS.text }}>{formatBomQuantity(qty, node.unit)}</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">{metaChildren}</div>
           </div>
         ) : (
         tapToExpandName && nameExpanded ? (
@@ -273,6 +299,7 @@ function BomTreeItem({
               tapToExpandName={tapToExpandName}
               stock={stock}
               modal={modal}
+              mobilePresentation={mobilePresentation}
             />
           ))}
         </ul>
@@ -374,11 +401,14 @@ interface Props {
   modal?: boolean;
   /** 주간보고 모바일 시트용 — 현재 재고·생산 가능 수량과 구성품 재고를 함께 표시한다. */
   mobileDetail?: boolean;
+  /** 표시만 변경하는 모바일 전용 옵션. 데스크톱과 기존 호출의 출력은 유지한다. */
+  mobilePresentation?: boolean;
 }
 
 export function useBomTree(itemId: string, open: boolean, departmentOrder?: "desc") {
   const revision = useRealtimeRevision();
   const [tree, setTree] = useState<BOMTreeNode | false | null>(null);
+  const [treeItemId, setTreeItemId] = useState<string | null>(null);
   const [error, setError] = useState(false);
   const [requestVersion, setRequestVersion] = useState(0);
   const loadedItemRef = useRef<string | null>(null);
@@ -390,7 +420,11 @@ export function useBomTree(itemId: string, open: boolean, departmentOrder?: "des
     if (!open || loadedRequestRef.current === requestKey) return;
     const refreshingCurrentItem = loadedItemRef.current === itemId;
     setError(false);
-    if (!refreshingCurrentItem) setTree(null);
+    if (!refreshingCurrentItem) {
+      loadedItemRef.current = null;
+      loadedRequestRef.current = null;
+      setTree(null);
+    }
     api
       .getBOMTree(itemId, departmentOrder ? { departmentOrder } : undefined)
       .then((nextTree) => {
@@ -398,12 +432,16 @@ export function useBomTree(itemId: string, open: boolean, departmentOrder?: "des
         loadedItemRef.current = itemId;
         loadedRequestRef.current = requestKey;
         setError(false);
+        setTreeItemId(itemId);
         setTree(nextTree);
       })
       .catch(() => {
         if (!active) return;
         setError(true);
-        if (!refreshingCurrentItem) setTree(false);
+        if (!refreshingCurrentItem) {
+          setTreeItemId(itemId);
+          setTree(false);
+        }
       });
     return () => {
       active = false;
@@ -411,11 +449,12 @@ export function useBomTree(itemId: string, open: boolean, departmentOrder?: "des
   }, [open, itemId, departmentOrder, requestVersion, revision]);
 
   return {
-    tree,
-    error,
+    tree: treeItemId === itemId ? tree : null,
+    error: treeItemId === itemId && error,
+    refreshError: error && tree && loadedItemRef.current === itemId ? "하위 구성을 갱신하지 못했습니다." : null,
     retry: () => {
       setError(false);
-      setTree(null);
+      if (loadedItemRef.current !== itemId) setTree(null);
       setRequestVersion((version) => version + 1);
     },
   };
@@ -437,6 +476,7 @@ type ModalBomTreeProps = {
   expandedItemIds: ReadonlySet<string>;
   onToggleItem: (itemId: string) => void;
   showStockBreakdown?: boolean;
+  mobilePresentation?: boolean;
 };
 
 function hasSelectedRowText(row: HTMLElement): boolean {
@@ -451,12 +491,13 @@ function formatModalBomQuantity(quantity: number, unit: string): string {
   return `${formatQty(quantity, { maximumFractionDigits: 2, trimTrailingZeros: true })} ${unit}`;
 }
 
-function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem, showStockBreakdown = false }: {
+function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem, showStockBreakdown = false, mobilePresentation = false }: {
   node: BOMTreeNode;
   depth: number;
   expandedItemIds: ReadonlySet<string>;
   onToggleItem: (itemId: string) => void;
   showStockBreakdown?: boolean;
+  mobilePresentation?: boolean;
 }) {
   const gridClass = showStockBreakdown ? "bom-capacity-stock-grid" : "bom-detail-modal-grid";
   const hasKids = node.children.length > 0;
@@ -520,7 +561,29 @@ function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem, showStock
   return (
     <>
       <li data-testid="bom-modal-row" data-depth={depth}>
-        {hasKids ? (
+        {mobilePresentation ? (
+          <div className="min-w-0 border-b py-3 pr-3" style={{ borderColor: LEGACY_COLORS.border, background, paddingLeft: 12 + Math.min(depth, 3) * 12 }}>
+            <div className="flex min-w-0 items-start gap-1">
+              {hasKids && <button
+                type="button"
+                onClick={() => onToggleItem(node.item_id)}
+                aria-expanded={open}
+                aria-label={`${node.item_name} ${open ? "접기" : "펼치기"}`}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
+                style={{ color: LEGACY_COLORS.muted2 }}
+              >
+                <ChevronRight className="h-4 w-4" style={{ transform: open ? "rotate(90deg)" : "none" }} />
+              </button>}
+              <div className="min-w-0 flex-1 py-2">
+                <div className="text-sm font-bold leading-snug [overflow-wrap:anywhere]" style={{ color: LEGACY_COLORS.text }}>{node.item_name}</div>
+                <div className="mt-1 break-all text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{node.mes_code}</div>
+              </div>
+            </div>
+            <dl className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+              <div><dt>현재 총 재고</dt><dd className={`mt-0.5 text-base font-semibold tabular-nums [overflow-wrap:anywhere]${isCapacityIgnoredZeroStock ? " line-through" : ""}`} style={{ color: node.current_stock === 0 ? LEGACY_COLORS.red : LEGACY_COLORS.text }}>{formatQty(node.current_stock)} {node.unit}</dd></div>
+            </dl>
+          </div>
+        ) : hasKids ? (
           <div
             role="button"
             tabIndex={0}
@@ -554,6 +617,7 @@ function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem, showStock
           node={child}
           depth={depth + 1}
           showStockBreakdown={showStockBreakdown}
+          mobilePresentation={mobilePresentation}
           expandedItemIds={expandedItemIds}
           onToggleItem={onToggleItem}
         />
@@ -562,18 +626,18 @@ function ModalBomTreeRow({ node, depth, expandedItemIds, onToggleItem, showStock
   );
 }
 
-export function ModalBomTree({ tree, expandedItemIds, onToggleItem, showStockBreakdown = false }: ModalBomTreeProps) {
+export function ModalBomTree({ tree, expandedItemIds, onToggleItem, showStockBreakdown = false, mobilePresentation = false }: ModalBomTreeProps) {
   return (
     <div
       data-testid="bom-modal-tree-scroll"
-      className={`min-h-0 flex-1 overflow-y-scroll${showStockBreakdown ? " overflow-x-auto" : ""}`}
+      className={mobilePresentation ? "min-h-0 min-w-0 flex-1 overflow-y-auto" : `min-h-0 flex-1 overflow-y-scroll${showStockBreakdown ? " overflow-x-auto" : ""}`}
     >
       <div
         data-testid="bom-modal-tree-table"
-        className={`min-h-full overflow-clip rounded-[18px] border${showStockBreakdown ? " min-w-[820px]" : ""}`}
+        className={mobilePresentation ? "min-h-full min-w-0 overflow-clip rounded-[14px] border" : `min-h-full overflow-clip rounded-[18px] border${showStockBreakdown ? " min-w-[820px]" : ""}`}
         style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
       >
-        <div
+        {!mobilePresentation && <div
           data-testid="bom-modal-grid-header"
           className={`bom-modal-grid ${showStockBreakdown ? "bom-capacity-stock-grid text-sm" : "bom-detail-modal-grid text-xs"} sticky top-0 z-10 min-h-11 border-b font-bold`}
           style={{
@@ -591,7 +655,7 @@ export function ModalBomTree({ tree, expandedItemIds, onToggleItem, showStockBre
             <span className="pr-3 text-right">부서 재고</span>
           </>}
           <span className="pr-3 text-right">{showStockBreakdown ? "현재 총 재고" : "현재 재고"}</span>
-        </div>
+        </div>}
         <ul>
           {tree.children.map((child) => (
             <ModalBomTreeRow
@@ -599,6 +663,7 @@ export function ModalBomTree({ tree, expandedItemIds, onToggleItem, showStockBre
               node={child}
               depth={0}
               showStockBreakdown={showStockBreakdown}
+              mobilePresentation={mobilePresentation}
               expandedItemIds={expandedItemIds}
               onToggleItem={onToggleItem}
             />
@@ -616,8 +681,9 @@ export function BomSubExpander({
   tapToExpandName = false,
   modal = false,
   mobileDetail = false,
+  mobilePresentation = false,
 }: Props) {
-  const { tree, retry } = useBomTree(itemId, open);
+  const { tree, retry, refreshError } = useBomTree(itemId, open);
 
   if (!open) return null;
 
@@ -638,13 +704,13 @@ export function BomSubExpander({
         style={{ borderColor: LEGACY_COLORS.border }}
       >
         <span
-          className="text-[11px] font-bold tracking-wide"
+          className={mobilePresentation ? "text-xs font-medium" : "text-[11px] font-bold tracking-wide"}
           style={{ color: LEGACY_COLORS.muted2 }}
         >
           하위 구성
         </span>
         <span
-          className="rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+          className={mobilePresentation ? "rounded-full px-1.5 py-0.5 text-xs font-medium" : "rounded-full px-1.5 py-0.5 text-[10px] font-bold"}
           style={{ color: LEGACY_COLORS.muted2, background: tint(LEGACY_COLORS.muted2, 12) }}
         >
           읽기 전용
@@ -682,7 +748,8 @@ export function BomSubExpander({
         </span>
       </div>}
 
-      {tree === null && (
+      {(mobileDetail || mobilePresentation) && refreshError && <ReadFailure message={refreshError} onRetry={retry} refresh />}
+      {tree === null && (mobileDetail || mobilePresentation) ? <ReadLoading label="BOM 구성 불러오는 중" skeleton={<MobileBomSkeleton />} /> : tree === null && (
         <div
           className={modal ? "rounded-[18px] border px-4 py-8 text-center text-sm" : "px-3 py-3 text-xs"}
           style={modal
@@ -772,7 +839,7 @@ export function BomSubExpander({
             </ul>
           </div>
         ) : (
-          <ul className="py-1">
+          <ul className={`py-1${mobileDetail || mobilePresentation ? ` ${dataRevealClassName}` : ""}`}>
             {tree.children.map((child, index) => <BomTreeItem
               key={child.item_id}
               node={child}
@@ -781,10 +848,22 @@ export function BomSubExpander({
               compact={compact}
               tapToExpandName={tapToExpandName}
               stock={mobileDetail}
+              mobilePresentation={mobilePresentation}
             />)}
           </ul>
         )}
       </>}
     </div>
   );
+}
+
+/** Preview only row geometry; no placeholder is presented as a real component. */
+export function MobileBomSkeleton() {
+  return <div className="py-1">
+    {Array.from({ length: 4 }, (_, index) => <div key={index} className="flex min-h-11 items-center gap-3 border-b px-3 py-2 last:border-b-0" style={{ borderColor: LEGACY_COLORS.border }}>
+      <SkeletonBlock className="h-4 w-4 shrink-0" />
+      <div className="flex min-w-0 flex-1 flex-col gap-1"><SkeletonBlock className="h-4 w-2/3" /><SkeletonBlock className="h-3 w-1/3" /></div>
+      <SkeletonBlock className="h-4 w-12 shrink-0" />
+    </div>)}
+  </div>;
 }
