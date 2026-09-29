@@ -86,6 +86,24 @@ describe("DailyWorkReportScreen", () => {
     registerDirtyMock.mockClear();
   });
 
+  it("모바일만 날짜 보조 라벨과 빈 기록 설명을 줄이고 날짜 이동을 유지한다", () => {
+    const props = { employeeId: "employee-1", operator: { employee_id: "employee-1", name: "김현우", department: "조립" } as never };
+    const { rerender } = render(<DailyWorkReportScreen {...props} />);
+    expect(screen.getByText("작성일")).not.toHaveClass("sr-only");
+    expect(screen.getByText("완료된 MES 거래가 생기면 작업 종류와 수량이 이곳에 자동으로 나타납니다.")).toBeInTheDocument();
+
+    rerender(<DailyWorkReportScreen {...props} mobile />);
+    expect(screen.getByText("작성일")).toHaveClass("sr-only");
+    expect(screen.getByText("작업 기록이 없습니다.")).toBeInTheDocument();
+    expect(screen.queryByText("완료된 MES 거래가 생기면 작업 종류와 수량이 이곳에 자동으로 나타납니다.")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "전일" })).toHaveClass("h-11", "w-11");
+    expect(screen.getByRole("button", { name: "다음 날" })).toHaveClass("h-11", "w-11");
+    fireEvent.click(screen.getByRole("button", { name: "전일" }));
+    expect(screen.getByRole("button", { name: "일보 날짜 선택" })).not.toHaveTextContent(formatWorkDateLabel(toKstDateKey()));
+    fireEvent.click(screen.getByRole("button", { name: "다음 날" }));
+    expect(screen.getByRole("button", { name: "일보 날짜 선택" })).toHaveTextContent(formatWorkDateLabel(toKstDateKey()));
+  });
+
   it("최초 조회 중에는 MES 기록과 편집기 형상을 유지하고 빈 편집기를 노출하지 않는다", () => {
     queryState.report.isLoading = true;
     queryState.activity = { data: null, isError: false, isLoading: true };

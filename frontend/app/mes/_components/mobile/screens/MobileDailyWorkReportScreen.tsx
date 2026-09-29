@@ -10,5 +10,5 @@ export function MobileDailyWorkReportScreen({
   operator: Operator | null;
   flushSaveRef: React.MutableRefObject<(() => Promise<void>) | null>;
 }) {
-  return <DailyWorkReportScreen employeeId={operator?.employee_id} operator={operator} saveRef={flushSaveRef} />;
+  return <DailyWorkReportScreen employeeId={operator?.employee_id} operator={operator} saveRef={flushSaveRef} mobile />;
 }
