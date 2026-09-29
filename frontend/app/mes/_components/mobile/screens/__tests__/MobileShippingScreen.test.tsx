@@ -114,6 +114,49 @@ afterEach(() => {
 });
 
 describe("MobileShippingScreen", () => {
+  it("출하 최초 조회는 준비의 접힌 구성품과 요청·이력 카드 구조를 유지한다", () => {
+    vi.mocked(api.getShippingRequests).mockReturnValue(new Promise(() => {}));
+    vi.mocked(api.getShippingHistory).mockReturnValue(new Promise(() => {}));
+    renderScreen();
+    expect(screen.getByTestId("mobile-shipping-prep-skeleton")).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "요청" }));
+    expect(screen.getByTestId("mobile-shipping-requests-skeleton")).toBeInTheDocument();
+    expect(screen.getAllByText("최종 PA")).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: "이력" }));
+    expect(screen.getByTestId("mobile-shipping-history-skeleton")).toBeInTheDocument();
+  });
+  it("구성품 그룹을 펼쳐 확인하고 접어도 체크 상태와 기존 작업 선택을 유지한다", async () => {
+    const existing = request().checklist_lines[0];
+    vi.mocked(api.getShippingRequests).mockResolvedValue([request({
+      checklist_lines: [
+        { ...existing, checked: true },
+        { ...existing, line_id: "check-pa", item_id: "pa-2", item_name: "긴 PA 구성품 이름", process_type_code: "PA", checked: false },
+      ],
+    })]);
+    renderScreen();
+
+    const label = await screen.findByText("R 구성품");
+    const summary = label.closest("summary")!;
+    const disclosure = summary.closest("details")!;
+    const checkbox = screen.getByLabelText("Cable Set 체크");
+    expect(disclosure).not.toHaveAttribute("open");
+    expect(checkbox).not.toBeVisible();
+
+    fireEvent.click(summary);
+    expect(disclosure).toHaveAttribute("open");
+    expect(checkbox).toBeVisible();
+    expect(checkbox).toBeChecked();
+    expect(screen.getByLabelText("긴 PA 구성품 이름 체크")).not.toBeVisible();
+
+    fireEvent.click(summary);
+    expect(disclosure).not.toHaveAttribute("open");
+    expect(checkbox).toBeChecked();
+    expect(screen.getByRole("button", { name: "준비" })).toBeInTheDocument();
+    expect(api.updateShippingChecklist).not.toHaveBeenCalled();
+    expect(api.clearShippingChecklist).not.toHaveBeenCalled();
+  });
+
   it("빈 준비 목록에서 새 요청이 즉시 표시되는 흐름을 안내한다", async () => {
     vi.mocked(api.getShippingRequests).mockResolvedValue([]);
 
@@ -403,7 +446,8 @@ describe("MobileShippingScreen", () => {
 
     renderScreen();
 
-    const checkbox = await screen.findByRole("checkbox", { name: /Prepared Cable/ });
+    fireEvent.click((await screen.findByText("R 구성품")).closest("summary")!);
+    const checkbox = screen.getByRole("checkbox", { name: /Prepared Cable/ });
     expect(checkbox).toBeDisabled();
     fireEvent.click(checkbox);
     fireEvent.click(screen.getByRole("button", { name: /전체 해제/ }));
@@ -425,7 +469,9 @@ describe("MobileShippingScreen", () => {
 
     renderScreen();
 
-    fireEvent.click(await screen.findByRole("checkbox", { name: /Cable Set/ }));
+    await screen.findByText("Failing PF");
+    screen.getAllByText("R 구성품").forEach((label) => fireEvent.click(label.closest("summary")!));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Cable Set/ }));
 
     expect(await screen.findByText("422 checklist rejected")).toBeInTheDocument();
     expect(screen.getByText("Failing PF")).toBeInTheDocument();

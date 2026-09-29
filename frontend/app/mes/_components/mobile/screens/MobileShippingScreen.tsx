@@ -1,5 +1,6 @@
 "use client";
 import { ReadEmpty, ReadFailure, ReadLoading } from "../../common/ReadState";
+import { SkeletonBlock, dataRevealClassName } from "../../common/LoadingSkeleton";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -119,10 +120,10 @@ export function MobileShippingScreen() {
   }
 
   const activeQuery = tab === "history" ? historyQuery : requestsQuery;
-  const loading = activeQuery.isLoading;
+  const loading = activeQuery.isLoading || (activeQuery.isFetching && activeQuery.isPlaceholderData);
   const queryError = tab === "history" ? historyQuery.error : requestsQuery.error;
   const error = queryError instanceof Error ? queryError.message : queryError ? "출하 데이터를 불러오지 못했습니다." : null;
-  const hasActiveData = activeQuery.data !== undefined;
+  const hasActiveData = activeQuery.data !== undefined && !activeQuery.isPlaceholderData;
   const initialError = hasActiveData ? null : error;
   const refreshError = hasActiveData ? error : null;
   const retryRefresh = () => {
@@ -130,14 +131,14 @@ export function MobileShippingScreen() {
   };
 
   return (
-    <div className="mw0 scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pb-6 pt-3">
-      <div className="rounded-[18px] border px-4 py-3" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+    <div className="mw0 scrollbar-hide flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pt-4">
+      <div className="px-1 py-1">
         <div className="flex items-center gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]" style={{ background: tint(LEGACY_COLORS.blue, 16), color: LEGACY_COLORS.blue }}>
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center" style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.blue }}>
             <Truck className="h-5 w-5" />
           </span>
           <span className="min-w-0">
-            <span className="block text-lg font-black leading-tight" style={{ color: LEGACY_COLORS.text }}>출하</span>
+            <span className="block text-lg font-semibold leading-tight" style={{ color: LEGACY_COLORS.text }}>출하</span>
             <span className="block text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
               생성·수정·완료 처리는 PC에서 진행합니다.
             </span>
@@ -151,7 +152,7 @@ export function MobileShippingScreen() {
         <TabButton active={tab === "history"} icon={History} label="이력" onClick={() => setTab("history")} />
       </div>
 
-      {loading && <ReadLoading label="출하 데이터를 불러오고 있습니다." />}
+      {loading && <ReadLoading label="출하 데이터를 불러오고 있습니다." skeleton={<ShippingSkeleton tab={tab} />} />}
       {initialError && <ReadFailure message={initialError} onRetry={retryRefresh} />}
       {refreshError && (
         <ReadFailure
@@ -162,7 +163,7 @@ export function MobileShippingScreen() {
       )}
 
       {!loading && !initialError && tab === "requests" && (
-        <div className="mw0 grid gap-2">
+        <div className={`mw0 grid gap-2 ${dataRevealClassName}`}>
           {activeRequests.length === 0 ? (
             <ReadEmpty title="출하 요청이 없습니다" description="PC에서 새 출하 요청을 만들 수 있습니다." />
           ) : (
@@ -172,7 +173,7 @@ export function MobileShippingScreen() {
       )}
 
       {!loading && !initialError && tab === "prep" && (
-        <div className="mw0 grid gap-2">
+        <div className={`mw0 grid gap-2 ${dataRevealClassName}`}>
           {prepRequests.length === 0 ? (
             <ReadEmpty title="준비 중인 출하가 없습니다" description="PC에서 새 출하 요청을 만들면 바로 표시됩니다." />
           ) : (
@@ -191,7 +192,7 @@ export function MobileShippingScreen() {
       )}
 
       {!loading && !initialError && tab === "history" && (
-        <div className="mw0 grid gap-2">
+        <div className={`mw0 grid gap-2 ${dataRevealClassName}`}>
           {history.length === 0 ? (
             <ReadEmpty title="출하 이력이 없습니다" description="픽업 완료된 출하가 아직 없습니다." />
           ) : (
@@ -201,6 +202,20 @@ export function MobileShippingScreen() {
       )}
     </div>
   );
+}
+
+/** 준비는 접힌 구성품 행, 요청·이력은 최종 PA/PF 정보 영역을 예약한다. */
+function ShippingSkeleton({ tab }: { tab: MobileShippingTab }): React.ReactNode {
+  return <div data-testid={`mobile-shipping-${tab}-skeleton`} className="mw0 grid gap-2">
+    {[0, 1].map((row) => <div key={row} className="mw0 oh rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+      <div className="flex items-start justify-between gap-3"><div className="flex min-w-0 flex-1 flex-col gap-2"><SkeletonBlock className="h-11 w-4/5" /><SkeletonBlock className="h-3 w-2/3" /></div><SkeletonBlock className="h-6 w-16 rounded-full" /></div>
+      {tab === "prep" ? <>
+        <div className="mt-3"><SkeletonBlock className="h-5 w-28" /></div>
+        <div className="mt-3 grid gap-1">{[0, 1].map((group) => <div key={group} className="flex min-h-11 items-center justify-between gap-2 border-t px-1 py-2" style={{ borderColor: LEGACY_COLORS.border }}><SkeletonBlock className="h-4 w-28" /><SkeletonBlock className="h-3 w-16" /><ChevronDown className="h-5 w-5 shrink-0" /></div>)}</div>
+        <div className="mt-3 flex min-h-11 items-center justify-center rounded-[12px] border" style={{ borderColor: LEGACY_COLORS.border }}><SkeletonBlock className="h-4 w-20" /></div>
+      </> : <div className="mt-3 grid grid-cols-2 gap-2">{["최종 PA", "최종 PF"].map((label) => <div key={label} className="mw0 border-t pt-2" style={{ borderColor: LEGACY_COLORS.border }}><div className="mb-1 text-xs font-medium" style={{ color: LEGACY_COLORS.muted2 }}>{label}</div><SkeletonBlock className="h-11 w-full" /></div>)}</div>}
+    </div>)}
+  </div>;
 }
 
 const REVISION_FIELD_LABEL: Record<string, string> = {
@@ -374,7 +389,7 @@ function PreparationRevisionNotice({ request }: { request: ShippingRequest }) {
               ? arrayChangeDetails(change, change.field === "bom_lines")
               : scalarChangeDetails(change);
             return (
-              <div key={change.field} className="rounded-[10px] px-2 py-2" style={{ background: LEGACY_COLORS.s2 }}>
+              <div key={change.field} className="border-t py-2 [overflow-wrap:anywhere]" style={{ borderColor: LEGACY_COLORS.border }}>
                 <div className="text-xs font-black" style={{ color: LEGACY_COLORS.text }}>
                   {REVISION_FIELD_LABEL[change.field] ?? change.field}
                 </div>
@@ -404,38 +419,57 @@ function MobilePrepCard({
   onClear: (req: ShippingRequest) => void;
 }) {
   const editable = request.status === "PREPARING";
+  const checklistGroups = new Map<string, ShippingRequest["checklist_lines"]>();
+  for (const line of request.checklist_lines) {
+    const code = line.process_type_code ?? "";
+    const lines = checklistGroups.get(code) ?? [];
+    lines.push(line);
+    checklistGroups.set(code, lines);
+  }
   return (
-    <div className="mw0 oh rounded-[18px] border p-3" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+    <div className="mw0 oh rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
       <CardHeader request={request} />
       <PreparationRevisionNotice request={request} />
       {error && <InlineState title="오류" body={error} tone={LEGACY_COLORS.red} compact />}
-      <div className="mt-3 rounded-[14px] border px-3 py-2 text-xs font-black" style={{ background: tint(LEGACY_COLORS.green, 12), borderColor: tint(LEGACY_COLORS.green, 36), color: LEGACY_COLORS.green }}>
+      <div className="mt-3 text-sm font-bold" style={{ color: LEGACY_COLORS.green }}>
         총 {request.request_quantity ?? 1}대 출하
       </div>
-      <div className="mt-3 grid gap-2">
+      <div className="mt-3 grid gap-1">
         {request.checklist_lines.length === 0 ? (
           <InlineState title="체크 항목 없음" body="PC에서 BOM을 확인하세요." compact />
         ) : (
-          request.checklist_lines.map((line) => (
-            <label
-              key={line.line_id}
-              className="mw0 oh flex min-h-[52px] items-center gap-3 rounded-[14px] border px-3 py-2"
-              style={{ background: LEGACY_COLORS.s2, borderColor: line.checked ? LEGACY_COLORS.green : LEGACY_COLORS.border }}
-            >
-              <input
-                type="checkbox"
-                aria-label={`${line.item_name} 체크`}
-                checked={line.checked}
-                disabled={!editable || pendingId !== null}
-                onChange={(event) => onCheck(request, line.item_id, event.target.checked)}
-                className="h-5 w-5"
-              />
-              <span className="min-w-0 flex-1">
-                <span className="ba block text-sm font-black leading-snug" style={{ color: LEGACY_COLORS.text }}>{line.item_name}</span>
-                <span className="block text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{line.mes_code ?? "-"} · {line.quantity}개</span>
-              </span>
-              {line.checked ? <CheckCircle2 className="h-5 w-5" style={{ color: LEGACY_COLORS.green }} /> : <XCircle className="h-5 w-5" style={{ color: LEGACY_COLORS.muted2 }} />}
-            </label>
+          Array.from(checklistGroups, ([code, lines]) => (
+            <details key={code} className="group border-t" style={{ borderColor: LEGACY_COLORS.border }}>
+              <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-1 py-2 text-sm font-bold focus-visible:rounded-[10px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)] [&::-webkit-details-marker]:hidden">
+                <span className="min-w-0 flex-1 break-words">{code ? `${code} 구성품` : "기타 구성품"}</span>
+                <span className="shrink-0 text-xs font-medium" style={{ color: LEGACY_COLORS.muted2 }}>항목 {lines.length}개</span>
+                <ChevronDown className="h-5 w-5 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
+              </summary>
+              <div className="grid gap-1 pb-2">
+                {lines.map((line) => (
+                  <label
+                    key={line.line_id}
+                    className="mw0 flex min-h-[52px] items-center gap-3 rounded-[12px] px-2 py-3"
+                    style={{ background: line.checked ? tint(LEGACY_COLORS.green, 8) : "transparent" }}
+                  >
+                    <input
+                      type="checkbox"
+                      aria-label={`${line.item_name} 체크`}
+                      checked={line.checked}
+                      disabled={!editable || pendingId !== null}
+                      onChange={(event) => onCheck(request, line.item_id, event.target.checked)}
+                      className="h-5 w-5"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="ba block break-words text-sm font-bold leading-snug" style={{ color: LEGACY_COLORS.text }}>{line.item_name}</span>
+                      <span className="mt-1 block break-all font-mono text-xs font-medium" style={{ color: LEGACY_COLORS.muted2 }}>{line.mes_code ?? "-"}</span>
+                    </span>
+                    <span className="shrink-0 text-sm font-bold tabular-nums" style={{ color: LEGACY_COLORS.text }}>{line.quantity}개</span>
+                    {line.checked ? <CheckCircle2 className="h-5 w-5" style={{ color: LEGACY_COLORS.green }} /> : <XCircle className="h-5 w-5" style={{ color: LEGACY_COLORS.muted2 }} />}
+                  </label>
+                ))}
+              </div>
+            </details>
           ))
         )}
       </div>
@@ -443,7 +477,7 @@ function MobilePrepCard({
         type="button"
         onClick={() => onClear(request)}
         disabled={!editable || pendingId !== null || request.checklist_lines.length === 0}
-        className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-[12px] border px-3 py-2 text-sm font-black disabled:opacity-45"
+        className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[12px] border px-3 py-2 text-sm font-bold disabled:opacity-45"
         style={{ background: tint(LEGACY_COLORS.yellow, 12), borderColor: tint(LEGACY_COLORS.yellow, 45), color: LEGACY_COLORS.yellow }}
       >
         <RotateCcw className="h-4 w-4" />
@@ -455,7 +489,7 @@ function MobilePrepCard({
 
 function MobileRequestCard({ request }: { request: ShippingRequest }) {
   return (
-    <div className="mw0 oh rounded-[18px] border p-3" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+    <div className="mw0 oh rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
       <CardHeader request={request} />
       <div className="mt-3 grid grid-cols-2 gap-2">
         <InfoPill label="최종 PA" value={request.final_pa_item_name ?? "-"} />
@@ -471,13 +505,13 @@ function CardHeader({ request }: { request: ShippingRequest }) {
       <div className="mw0 flex-1">
         <ExpandableItemName
           name={request.base_pf_item_name}
-          className="block text-base font-black leading-tight"
+          className="block min-h-11 text-[15px] font-semibold leading-snug"
           collapsedClassName="line-clamp-2 whitespace-normal"
           style={{ color: LEGACY_COLORS.text }}
         />
-        <div className="truncate text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{request.base_pf_mes_code ?? "-"} · {request.requested_by_name ?? "요청자 없음"}</div>
+        <div className="mt-1 break-words text-xs font-medium" style={{ color: LEGACY_COLORS.muted2 }}>{request.base_pf_mes_code ?? "-"} · {request.requested_by_name ?? "요청자 없음"}</div>
       </div>
-      <span className="shrink-0 rounded-full px-2 py-1 text-[11px] font-black" style={{ background: tint(STATUS_TONE[request.status], 20), color: STATUS_TONE[request.status] }}>
+      <span className="shrink-0 rounded-full px-2 py-1 text-xs font-bold" style={{ background: tint(STATUS_TONE[request.status], 12), color: STATUS_TONE[request.status] }}>
         {STATUS_LABEL[request.status]}
       </span>
     </div>
@@ -486,14 +520,14 @@ function CardHeader({ request }: { request: ShippingRequest }) {
 
 function InfoPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="mw0 rounded-[12px] border px-3 py-2" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-      <div className="text-[11px] font-black" style={{ color: LEGACY_COLORS.muted2 }}>{label}</div>
+    <div className="mw0 border-t pt-2" style={{ borderColor: LEGACY_COLORS.border }}>
+      <div className="mb-1 text-xs font-medium" style={{ color: LEGACY_COLORS.muted2 }}>{label}</div>
       {value === "-" ? (
         <div className="text-xs font-black" style={{ color: LEGACY_COLORS.text }}>{value}</div>
       ) : (
         <ExpandableItemName
           name={value}
-          className="block text-xs font-black leading-tight"
+          className="block min-h-11 text-sm font-semibold leading-snug"
           collapsedClassName="line-clamp-2 whitespace-normal"
           style={{ color: LEGACY_COLORS.text }}
         />
@@ -507,7 +541,7 @@ function TabButton({ active, icon: Icon, label, onClick }: { active: boolean; ic
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-[16px] border text-xs font-black"
+      className="flex min-h-11 items-center justify-center gap-2 rounded-[12px] border text-sm font-bold"
       style={{
         background: active ? tint(LEGACY_COLORS.blue, 18) : LEGACY_COLORS.s1,
         borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
