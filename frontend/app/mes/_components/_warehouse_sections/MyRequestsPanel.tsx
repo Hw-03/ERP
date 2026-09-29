@@ -7,6 +7,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { EmptyState } from "../common";
 import { ReadFailure } from "../common/ReadState";
 import { WarehouseLoadingWorkArea } from "./WarehouseLoadingWorkArea";
+import { dataRevealClassName } from "../common/LoadingSkeleton";
 import { WarehouseEmptyWorkArea } from "./WarehouseEmptyWorkArea";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { MyRequestRow } from "./MyRequestRow";
@@ -16,6 +17,7 @@ import {
   useRevertToDraftMutation,
 } from "@/lib/queries/useStockRequestsQuery";
 import { prioritizeTargetRequest } from "./prioritizeTargetRequest";
+import panelStyles from "../mobile/screens/mobileWarehousePanels.module.css";
 
 interface Props {
   targetRequestId?: string | null;
@@ -24,6 +26,7 @@ interface Props {
   onChanged: () => void;
   onContinueIoDraft?: (draft: IoBatch) => void;
   onEmptyStateChange?: (empty: boolean) => void;
+  mobilePresentation?: boolean;
 }
 
 interface BatchActionTarget {
@@ -32,7 +35,7 @@ interface BatchActionTarget {
   isAsResearchBatch: boolean;
 }
 
-export function MyRequestsPanel({ employeeId, refreshNonce, onChanged, onContinueIoDraft, targetRequestId, onEmptyStateChange }: Props) {
+export function MyRequestsPanel({ employeeId, refreshNonce, onChanged, onContinueIoDraft, targetRequestId, onEmptyStateChange, mobilePresentation = false }: Props) {
   const query = useMyStockRequestsQuery(employeeId ?? "");
   const { data: items = [], isLoading: loading, error: qError, refetch } = query;
   const cancelMutation = useCancelStockRequestMutation();
@@ -135,8 +138,8 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged, onContinu
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
-      {loading && <WarehouseLoadingWorkArea label="요청 내역을 불러오고 있습니다…" />}
+    <div className={`flex ${mobilePresentation ? "min-h-full [&_.dexray-empty-state]:min-h-0" : "min-h-0"} flex-1 flex-col gap-3 ${mobilePresentation && query.data !== undefined ? dataRevealClassName : ""}`}>
+      {loading && <WarehouseLoadingWorkArea mobilePresentation={mobilePresentation} label="요청 내역을 불러오고 있습니다…" />}
       {loadError && <ReadFailure message={loadError} refresh={query.data !== undefined} onRetry={() => void refetch()} />}
       {!loading && items.length === 0 && (query.data !== undefined || !loadError) && (
         <WarehouseEmptyWorkArea
@@ -176,6 +179,7 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged, onContinu
       })}
 
       <ConfirmModal
+        className={mobilePresentation ? panelStyles.touchScope : undefined}
         open={revertTarget !== null}
         title="요청 수정 — PIN 확인"
         tone="normal"
@@ -211,6 +215,7 @@ export function MyRequestsPanel({ employeeId, refreshNonce, onChanged, onContinu
       </ConfirmModal>
 
       <ConfirmModal
+        className={mobilePresentation ? panelStyles.touchScope : undefined}
         open={cancelTarget !== null}
         title="요청 취소 — PIN 확인"
         tone="danger"

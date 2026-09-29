@@ -6,6 +6,7 @@ import { ApiError } from "@/lib/api-core";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { ReadFailure } from "../common/ReadState";
 import { WarehouseLoadingWorkArea } from "./WarehouseLoadingWorkArea";
+import { dataRevealClassName } from "../common/LoadingSkeleton";
 import { WarehouseQueueRow } from "./WarehouseQueueRow";
 import {
   useApproveStockRequestAsResearchMutation,
@@ -16,6 +17,7 @@ import { prioritizeTargetRequest } from "./prioritizeTargetRequest";
 import { WarehouseEmptyWorkArea } from "./WarehouseEmptyWorkArea";
 
 interface Props {
+  mobilePresentation?: boolean;
   targetRequestId?: string | null;
   approverEmployeeId: string;
   refreshNonce: number;
@@ -24,7 +26,7 @@ interface Props {
 }
 
 /** AS·연구 사용출고의 부서 AR·AA 재고 승인 대기열. */
-export function AsResearchQueuePanel({ approverEmployeeId, refreshNonce, onChanged, onEmptyStateChange, targetRequestId }: Props) {
+export function AsResearchQueuePanel({ approverEmployeeId, refreshNonce, onChanged, onEmptyStateChange, targetRequestId, mobilePresentation = false }: Props) {
   const query = useAsResearchQueueQuery(approverEmployeeId);
   const { data: items = [], isLoading: loading, error: qError, refetch } = query;
   const approveMutation = useApproveStockRequestAsResearchMutation();
@@ -103,8 +105,8 @@ export function AsResearchQueuePanel({ approverEmployeeId, refreshNonce, onChang
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
-      {loading && <WarehouseLoadingWorkArea label="결재 요청을 불러오고 있습니다…" />}
+    <div className={`flex min-h-0 flex-1 flex-col gap-3 ${mobilePresentation && query.data !== undefined ? dataRevealClassName : ""}`}>
+      {loading && <WarehouseLoadingWorkArea mobilePresentation={mobilePresentation} label="결재 요청을 불러오고 있습니다…" />}
       {error && <ReadFailure message={error} refresh={query.data !== undefined} onRetry={() => void refetch()} />}
       {!loading && items.length === 0 && (query.data !== undefined || !error) && (
         <WarehouseEmptyWorkArea

@@ -7,12 +7,14 @@ import { PIN_LENGTH } from "@/lib/auth/constants";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { ReadFailure } from "../common/ReadState";
 import { WarehouseLoadingWorkArea } from "./WarehouseLoadingWorkArea";
+import { dataRevealClassName } from "../common/LoadingSkeleton";
 import { WarehouseQueueRow } from "./WarehouseQueueRow";
 import { useWarehouseQueueQuery, useApproveStockRequestMutation, useRejectStockRequestMutation } from "@/lib/queries/useStockRequestsQuery";
 import { prioritizeTargetRequest } from "./prioritizeTargetRequest";
 import { WarehouseEmptyWorkArea } from "./WarehouseEmptyWorkArea";
 
 interface Props {
+  mobilePresentation?: boolean;
   targetRequestId?: string | null;
   approverEmployeeId: string;
   refreshNonce: number;
@@ -20,7 +22,7 @@ interface Props {
   onEmptyStateChange?: (empty: boolean) => void;
 }
 
-export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChanged, onEmptyStateChange, targetRequestId }: Props) {
+export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChanged, onEmptyStateChange, targetRequestId, mobilePresentation = false }: Props) {
   const query = useWarehouseQueueQuery();
   const { data: items = [], isLoading: loading, error: qError, refetch } = query;
   const approveMutation = useApproveStockRequestMutation();
@@ -108,8 +110,8 @@ export function WarehouseQueuePanel({ approverEmployeeId, refreshNonce, onChange
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
-      {loading && <WarehouseLoadingWorkArea label="결재 요청을 불러오고 있습니다…" />}
+    <div className={`flex min-h-0 flex-1 flex-col gap-3 ${mobilePresentation && query.data !== undefined ? dataRevealClassName : ""}`}>
+      {loading && <WarehouseLoadingWorkArea mobilePresentation={mobilePresentation} label="결재 요청을 불러오고 있습니다…" />}
       {error && <ReadFailure message={error} refresh={query.data !== undefined} onRetry={() => void refetch()} />}
       {!loading && items.length === 0 && (query.data !== undefined || !error) && (
         <WarehouseEmptyWorkArea
