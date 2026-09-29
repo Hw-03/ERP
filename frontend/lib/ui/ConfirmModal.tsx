@@ -41,6 +41,8 @@ interface Props {
   confirmAccent?: string;
   confirmDisabled?: boolean;
   auditAction?: { key: string; label: string };
+  /** Portal에도 호출 화면의 표시 범위를 전달한다. 기본 화면은 유지한다. */
+  className?: string;
 }
 
 export function ConfirmModal({
@@ -61,6 +63,7 @@ export function ConfirmModal({
   confirmAccent,
   confirmDisabled = false,
   auditAction,
+  className,
 }: Props) {
   const closeWithAudit = useCallback(() => {
     if (!viewer) {
@@ -121,7 +124,7 @@ export function ConfirmModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[400] flex items-center justify-center px-4"
+      className={`fixed inset-0 z-[400] flex items-center justify-center px-4${className ? ` ${className}` : ""}`}
       style={{ background: "rgba(0,0,0,.55)" }}
       role="dialog"
       aria-modal="true"
