@@ -182,13 +182,15 @@ function LoginNotificationDialog({
 export function NotificationBell({
   onNavigate,
   loginDialogEnabled,
+  mobilePresentation = false,
 }: {
   onNavigate?: (target: NotificationNavigationTarget) => void;
   loginDialogEnabled: boolean;
+  mobilePresentation?: boolean;
 }) {
   const operator = useCurrentOperator();
   const employeeId = operator?.employee_id;
-  const { data } = useNotificationsQuery(employeeId);
+  const { data, isLoading, error, refetch } = useNotificationsQuery(employeeId);
   const markRead = useMarkNotificationsReadMutation();
   const deleteNotification = useDeleteNotificationMutation();
   const deleteRead = useDeleteReadNotificationsMutation();
@@ -300,6 +302,11 @@ export function NotificationBell({
       </button>
       {open && (
         <NotificationPanel
+          mobilePresentation={mobilePresentation}
+          loading={mobilePresentation && isLoading && data === undefined}
+          hasData={data !== undefined}
+          error={mobilePresentation && error ? "알림을 불러오지 못했습니다." : null}
+          onRetry={() => void refetch()}
           items={items}
           unread={unread}
           onItemClick={handleItemClick}
