@@ -16,6 +16,7 @@ import { normalizeSidebarMode } from "@/lib/sidebar-mode";
 import { markLoginNotificationPopupPending, setCurrentOperator, type Operator } from "./useCurrentOperator";
 import { useLoginEmployees } from "./useLoginEmployees";
 import { EmployeeCombobox } from "./EmployeeCombobox";
+import mobileStyles from "./MobileLogin.module.css";
 import { runLoginReadWithRetry, validateAppSession } from "./loginReadRetry";
 
 interface OperatorLoginCardProps {
@@ -132,7 +133,7 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
   return (
     <div className="mx-auto w-full" style={{ maxWidth: 440, padding: "0 16px" }}>
       <div
-        className="relative flex w-full flex-col rounded-[24px] border"
+        className={`relative flex w-full flex-col rounded-[24px] border ${mobileStyles.card}`}
         style={{
           background: "var(--c-s1)",
           borderColor: "var(--c-border)",
@@ -167,7 +168,7 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
           )}
           {employeeList.status === "error" && (
             <p className="mt-2 text-sm" role="alert" style={{ color: "var(--c-red)" }}>
-              직원 목록을 불러오지 못했습니다. <button type="button" onClick={employeeList.retry} className="underline">다시 시도</button>
+              직원 목록을 불러오지 못했습니다. <button type="button" onClick={employeeList.retry} className={`underline ${mobileStyles.retry}`}>다시 시도</button>
             </p>
           )}
         </div>
