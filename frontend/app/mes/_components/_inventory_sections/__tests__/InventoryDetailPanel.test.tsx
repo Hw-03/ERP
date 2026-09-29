@@ -7,6 +7,7 @@ import { DesktopRightPanel } from "../../DesktopRightPanel";
 import { SlidePanel } from "../../common/SlidePanel";
 import { BomSubExpander } from "../../_warehouse_v2/BomSubExpander";
 import { BomDetailModal } from "../BomDetailModal";
+import { BottomSheet } from "@/lib/ui/BottomSheet";
 
 const realtimeState = vi.hoisted(() => ({
   revision: 1 as number | null,
@@ -237,6 +238,46 @@ describe("InventoryDetailPanel desktop quick actions", () => {
 });
 
 describe("InventoryDetailPanel realtime reservations", () => {
+  it("모바일 예약 최초 조회는 실제 요청 행 자리에 골격을 표시한다", async () => {
+    const request = deferred<StockRequestReservationLine[]>();
+    vi.spyOn(api, "getItemReservations").mockReturnValueOnce(request.promise);
+    render(<InventoryDetailPanel item={{ ...makeItem(), pending_quantity: 5 } as Item} quickActionVariant="mobile" onGoToWarehouse={() => {}} />);
+    expect(screen.getByRole("status", { name: "승인 대기 요청을 불러오는 중" })).toHaveAttribute("aria-busy", "true");
+    expect(screen.getAllByTestId("reservation-skeleton-row")).toHaveLength(2);
+    await act(async () => request.resolve([]));
+    expect(screen.queryByRole("status", { name: "승인 대기 요청을 불러오는 중" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/승인 대기 요청 \(0건\)/)).not.toBeInTheDocument();
+  });
+
+  it("모바일 예약 재조회 실패는 기존 행과 재시도 안내를 함께 표시한다", async () => {
+    vi.spyOn(api, "getItemReservations")
+      .mockResolvedValueOnce([makeReservation("old", "기존 요청자")])
+      .mockRejectedValueOnce(new Error("network failure"))
+      .mockResolvedValueOnce([makeReservation("new", "새 요청자")]);
+    const item = { ...makeItem(), pending_quantity: 5 } as Item;
+    const { rerender } = render(<InventoryDetailPanel item={item} quickActionVariant="mobile" onGoToWarehouse={() => {}} />);
+    await screen.findByText("기존 요청자");
+    realtimeState.revision = 2;
+    rerender(<InventoryDetailPanel item={item} quickActionVariant="mobile" onGoToWarehouse={() => {}} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("기존 내용을 표시합니다");
+    expect(screen.getByText("기존 요청자")).toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: "승인 대기 요청을 불러오는 중" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    await screen.findByText("새 요청자");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("모바일 BOM 최초 조회는 이미지 대신 실제 이름·코드·재고 행 골격을 표시한다", async () => {
+    const request = deferred<BOMTreeNode>();
+    vi.spyOn(api, "getBOMTree").mockReturnValueOnce(request.promise);
+    render(<BomDetailModal itemId="item-1" open mobilePresentation onClose={() => {}} />);
+    const loading = await screen.findByRole("status", { name: "BOM 구성을 불러오는 중…" });
+    expect(loading.querySelector("img")).toBeNull();
+    expect(within(screen.getByTestId("bom-modal-header")).getByRole("status", { name: "품목 재고 정보를 불러오는 중" })).toBeInTheDocument();
+    expect(within(loading).getAllByTestId("bom-mobile-skeleton-row")).toHaveLength(4);
+    await act(async () => request.resolve(bomTree));
+    expect(screen.queryByRole("status", { name: "BOM 구성을 불러오는 중…" })).not.toBeInTheDocument();
+  });
   it("shows each reservation's actual warehouse, production, and defective source", async () => {
     vi.spyOn(api, "getItemReservations").mockResolvedValue([
       {
@@ -934,6 +975,125 @@ describe("InventoryDetailPanel desktop BOM viewer", () => {
 });
 
 describe("InventoryDetailPanel mobile BOM viewer", () => {
+  it("모바일 섹션은 8px 간격을 유지하고 과도한 내부 패딩을 적용하지 않는다", () => {
+    const { container } = render(<InventoryDetailPanel item={makeItem()} onGoToWarehouse={() => {}} quickActionVariant="mobile" />);
+    expect(container.firstElementChild).toHaveClass("flex", "flex-col", "gap-2");
+    expect(screen.getByText("수량 현황").closest("section")).not.toHaveClass("py-4");
+  });
+  it("keeps popup touch gestures from dismissing the containing detail sheet", async () => {
+    vi.spyOn(api, "getBOMTree").mockResolvedValue(bomTree);
+    const closeSheet = vi.fn();
+    render(
+      <BottomSheet open onClose={closeSheet} title="품목 상세">
+        <InventoryDetailPanel item={makeBomItem()} onGoToWarehouse={() => {}} quickActionVariant="mobile" />
+      </BottomSheet>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "하위 구성 보기" }));
+    const popup = await screen.findByRole("dialog", { name: "BOM 구성 보기" });
+    const rowName = await within(popup).findByText("구성품 A");
+    fireEvent.touchStart(rowName, { touches: [{ clientY: 100 }] });
+    fireEvent.touchMove(rowName, { touches: [{ clientY: 300 }] });
+    fireEvent.touchEnd(rowName, { changedTouches: [{ clientY: 300 }] });
+    expect(closeSheet).not.toHaveBeenCalled();
+    fireEvent.touchStart(rowName, { touches: [{ clientY: 100 }] });
+    fireEvent.touchMove(rowName, { touches: [{ clientY: 300 }] });
+    fireEvent.touchCancel(rowName, { changedTouches: [{ clientY: 300 }] });
+    expect(closeSheet).not.toHaveBeenCalled();
+    expect(popup).toBeInTheDocument();
+  });
+
+  it("opens a mobile popup with one existing-order query and keeps the containing sheet open on Escape", async () => {
+    const query = vi.spyOn(api, "getBOMTree").mockResolvedValue(bomTree);
+    const closeSheet = vi.fn();
+    render(
+      <BottomSheet open onClose={closeSheet} title="품목 상세">
+        <InventoryDetailPanel item={makeBomItem()} onGoToWarehouse={() => {}} quickActionVariant="mobile" />
+      </BottomSheet>,
+    );
+    const trigger = screen.getByRole("button", { name: "하위 구성 보기" });
+    expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
+    fireEvent.click(trigger);
+    const popup = await screen.findByRole("dialog", { name: "BOM 구성 보기" });
+    expect(await within(popup).findByText("구성품 A")).toBeInTheDocument();
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(query).toHaveBeenCalledWith("item-1", undefined);
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "BOM 구성 보기" })).not.toBeInTheDocument());
+    expect(closeSheet).not.toHaveBeenCalled();
+    expect(trigger).toHaveFocus();
+    expect(screen.getByRole("dialog", { name: "품목 상세" })).toBeInTheDocument();
+    fireEvent.click(trigger);
+    fireEvent.click(await screen.findByRole("button", { name: "닫기" }));
+    expect(trigger).toHaveFocus();
+    expect(query).toHaveBeenCalledTimes(1);
+    fireEvent.click(trigger);
+    fireEvent.click(await screen.findByRole("dialog", { name: "BOM 구성 보기" }));
+    expect(closeSheet).not.toHaveBeenCalled();
+    expect(trigger).toHaveFocus();
+  });
+
+  it("shows long names and stock values in the popup while every deep branch stays reachable", async () => {
+    const longName = "LongUnbrokenComponentName".repeat(8);
+    let branch = { ...bomTree.children[0], item_id: "popup-depth-8", item_name: longName };
+    for (let depth = 7; depth >= 0; depth -= 1) {
+      branch = { ...bomTree.children[0], item_id: `popup-depth-${depth}`, item_name: `팝업 구성품 ${depth}`, children: [branch] };
+    }
+    vi.spyOn(api, "getBOMTree").mockResolvedValue({ ...bomTree, children: [branch] });
+    render(<InventoryDetailPanel item={makeBomItem()} onGoToWarehouse={() => {}} quickActionVariant="mobile" />);
+    fireEvent.click(screen.getByRole("button", { name: "하위 구성 보기" }));
+    const popup = await screen.findByRole("dialog", { name: "BOM 구성 보기" });
+    await within(popup).findByText("팝업 구성품 0");
+    fireEvent.click(within(popup).getByRole("button", { name: "모두 펼치기" }));
+    expect(within(popup).getByText(longName)).toHaveClass("[overflow-wrap:anywhere]");
+    expect(within(popup).getAllByTestId("bom-modal-row")).toHaveLength(9);
+    expect(within(popup).getAllByText("현재 총 재고")).toHaveLength(9);
+    const firstRow = within(popup).getAllByTestId("bom-modal-row")[0];
+    expect(within(firstRow).queryByText("2 EA")).not.toBeInTheDocument();
+    expect(within(firstRow).getByText("10 EA")).toBeInTheDocument();
+    ["소요량", "창고 재고", "부서 재고"].forEach((label) =>
+      expect(within(popup).queryByText(label)).not.toBeInTheDocument(),
+    );
+    fireEvent.click(within(popup).getByRole("button", { name: "팝업 구성품 0 접기" }));
+    expect(within(popup).queryByText(longName)).not.toBeInTheDocument();
+  });
+
+  it("keeps every level reachable in a deep mobile tree", async () => {
+    let branch = { ...bomTree.children[0], item_id: "depth-8", item_name: "깊은 구성품 8" };
+    for (let depth = 7; depth >= 0; depth -= 1) {
+      branch = { ...bomTree.children[0], item_id: `depth-${depth}`, item_name: `깊은 구성품 ${depth}`, children: [branch] };
+    }
+    vi.spyOn(api, "getBOMTree").mockResolvedValue({ ...bomTree, children: [branch] });
+    render(<BomSubExpander itemId="item-1" open compact tapToExpandName mobilePresentation />);
+    for (let depth = 0; depth < 8; depth += 1) {
+      fireEvent.click(await screen.findByRole("button", { name: `깊은 구성품 ${depth} 펼치기` }));
+    }
+    expect(await screen.findByRole("button", { name: "깊은 구성품 8", exact: true })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "깊은 구성품 0 접기" }));
+    expect(screen.queryByText("깊은 구성품 8")).not.toBeInTheDocument();
+  });
+
+  it("preserves name and child expansion with the mobile presentation option", async () => {
+    const longName = "모바일에서 전체 이름을 펼쳐 확인할 수 있는 긴 구성품 이름";
+    const tree = {
+      ...bomTree,
+      children: [{
+        ...bomTree.children[0], item_name: longName,
+        children: [{ ...bomTree.children[0], item_id: "nested-child", item_name: "하위 구성품" }],
+      }],
+    };
+    vi.spyOn(api, "getBOMTree").mockResolvedValue(tree);
+    render(<BomSubExpander itemId="item-1" open compact tapToExpandName mobilePresentation />);
+
+    const name = await screen.findByRole("button", { name: longName });
+    expect(within(name).getByText(longName)).toHaveClass("truncate");
+    fireEvent.click(name);
+    expect(within(name).getByText(longName)).toHaveClass("[overflow-wrap:anywhere]");
+    fireEvent.click(screen.getByRole("button", { name: `${longName} 펼치기` }));
+    expect(screen.getByText("하위 구성품")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: `${longName} 접기` }));
+    expect(screen.queryByText("하위 구성품")).not.toBeInTheDocument();
+  });
+
   it("keeps the BOM parent header exclusive to the desktop modal", async () => {
     vi.spyOn(api, "getBOMTree").mockResolvedValue(bomTree);
     render(
