@@ -481,7 +481,8 @@ function BomLineRow({
   );
 }
 
-function getBomLineSnapshotLog(line: IoLine, logs: TransactionLog[], batch: IoBatch): TransactionLog | null {
+/** PC·모바일은 동일 라인 로그를 우선하고, 유일한 과거 품목 로그만 보완한다. */
+export function getBomLineSnapshotLog(line: IoLine, logs: TransactionLog[], batch: IoBatch): TransactionLog | null {
   const exactMatches = logs.filter((log) => log.operation_line_id === line.line_id);
   if (exactMatches.length === 1) return exactMatches[0];
 

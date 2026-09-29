@@ -192,6 +192,39 @@ beforeEach(() => {
 });
 
 describe("desktop history detail panels", () => {
+  it.each(["exact", "legacy", "other-line", "ambiguous"])("모바일 재고 변화는 PC BOM 로그 매칭 규칙을 공유한다: %s", (match) => {
+    const batch = makeBatch();
+    const line = batch.bundles[0].lines[1];
+    const log = makeLog({
+      item_id: line.item_id,
+      item_name: line.item_name,
+      operation_batch_id: batch.batch_id,
+      operation_line_id: match === "exact" ? line.line_id : match === "other-line" ? "different-line" : null,
+      transaction_type: "BACKFLUSH",
+      quantity_change: -4,
+      request_order_stock: { status: "available", reason: null, warehouse_qty_before: 10, warehouse_qty_after: 10, department_qty_before: 10, department_qty_after: 6 },
+      inventory_effect: [{ scope: "location", department: "조립", status: "PRODUCTION", delta: -4 }],
+    });
+    const logs = match === "ambiguous" ? [log, { ...log, log_id: "second-legacy" }] : [log];
+    vi.mocked(productionApi.getTransactions).mockReturnValue(new Promise(() => {}));
+    render(<HistoryBatchDetailPanel panelOpen mobilePresentation batchId={batch.batch_id} logs={logs}
+      batchCache={new Map([[batch.batch_id, batch]])} setBatchCache={() => {}} onBatchCancelled={() => {}} />);
+    const row = screen.getByText(line.item_name).closest("button")!;
+    const code = within(row).getByText(line.mes_code!);
+    expect(code.parentElement).toHaveTextContent(match === "exact" || match === "legacy" ? "조립" : "—");
+    if (match === "exact" || match === "legacy") {
+      expect(within(row).getByLabelText("조립 10 −4→6")).toBeInTheDocument();
+    } else {
+      expect(within(row).getByText("—")).toBeInTheDocument();
+      expect(within(row).queryByLabelText("조립 10 −4→6")).not.toBeInTheDocument();
+    }
+    expect(screen.getByText("재고 변화")).toBeInTheDocument();
+    expect(screen.queryByText(/총 .*묶음/)).not.toBeInTheDocument();
+    const metadata = screen.getByText("요청자").closest("dl")!;
+    expect(within(metadata).getByText("요청자 A")).toBeInTheDocument();
+    expect(within(metadata).getByText("일시")).toBeInTheDocument();
+  });
+
   it.each(["single", "batch"])("keeps actual processing stock after the %s detail scope loads without projection fields", async (kind) => {
     const batch = makeBatch();
     const selected = makeLog({
