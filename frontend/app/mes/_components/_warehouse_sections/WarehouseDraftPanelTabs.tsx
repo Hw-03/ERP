@@ -92,6 +92,7 @@ export function WarehouseDraftPanelTabs({
   if (sectionTab === "mine") {
     return (
         <MyRequestsPanel
+          mobilePresentation={layout === "mobile"}
           targetRequestId={targetRequestId}
         employeeId={employeeId || operatorEmployeeId || null}
         onEmptyStateChange={onEmptyStateChange}
@@ -108,6 +109,7 @@ export function WarehouseDraftPanelTabs({
   if (sectionTab === "queue" && canSeeQueue && operatorEmployeeId) {
     return (
         <WarehouseQueuePanel
+          mobilePresentation={layout === "mobile"}
           targetRequestId={targetRequestId}
         approverEmployeeId={operatorEmployeeId}
         refreshNonce={refreshNonce}
@@ -129,6 +131,7 @@ export function WarehouseDraftPanelTabs({
   if (sectionTab === "handover") {
     return (
       <HandoverSectionPanel
+        mobilePresentation={layout === "mobile"}
         operator={operator}
         operatorEmployeeId={operatorEmployeeId}
         items={items}
@@ -144,6 +147,7 @@ export function WarehouseDraftPanelTabs({
   if (sectionTab === "as-research-queue" && canSeeAsResearchQueue && operatorEmployeeId) {
     return (
       <AsResearchQueuePanel
+        mobilePresentation={layout === "mobile"}
         targetRequestId={targetRequestId}
         approverEmployeeId={operatorEmployeeId}
         refreshNonce={refreshNonce}
@@ -165,6 +169,7 @@ export function WarehouseDraftPanelTabs({
   if (sectionTab === "dept-queue" && canSeeDeptQueue && operatorEmployeeId) {
     return (
         <DepartmentQueuePanel
+          mobilePresentation={layout === "mobile"}
           targetRequestId={targetRequestId}
         approverEmployeeId={operatorEmployeeId}
         refreshNonce={refreshNonce}
