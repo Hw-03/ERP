@@ -37,6 +37,7 @@ const testState = vi.hoisted(() => ({
   getTransactionsSummary: vi.fn(),
   realtimeRevision: 1 as number | null,
   nextMonth: null as null | (() => void),
+  kpiRenders: [] as Array<{ periodLabel: string; currentCount: number | null; loading: boolean }>,
 }));
 
 vi.mock("@/lib/queries/realtime", async (importOriginal) => ({
@@ -87,14 +88,18 @@ vi.mock("../../../_history_sections/HistoryStatsBar", () => ({
   HistoryStatsBar: ({
     currentCount,
     loading,
+    periodLabel,
   }: {
     currentCount: number | null;
     loading: boolean;
-  }) => (
+    periodLabel: string;
+  }) => {
+    testState.kpiRenders.push({ periodLabel, currentCount, loading });
+    return (
     <output data-testid="history-kpi" data-loading={loading ? "yes" : "no"}>
       {currentCount ?? "null"}
     </output>
-  ),
+  ); },
 }));
 
 vi.mock("../../../_history_sections/HistoryFilterBar", () => ({
@@ -250,6 +255,7 @@ function renderScreen() {
 
 beforeEach(() => {
   testState.historyArgs.length = 0;
+  testState.kpiRenders.length = 0;
   testState.nextMonth = null;
   testState.getTransactionsSummary.mockReset();
   testState.realtimeRevision = 1;
@@ -268,6 +274,26 @@ beforeEach(() => {
 });
 
 describe("MobileHistoryScreen history data states", () => {
+  it("새 기간 첫 렌더부터 이전 기간 집계를 숨긴다", async () => {
+    testState.getTransactionsSummary.mockResolvedValue(makeSummary(12));
+    renderScreen();
+    await waitFor(() => expect(screen.getByTestId("history-kpi")).toHaveTextContent("12"));
+    testState.getTransactionsSummary.mockReturnValue(new Promise<TransactionSummary>(() => {}));
+    const countBeforeChange = testState.kpiRenders.length;
+    fireEvent.click(screen.getByRole("button", { name: "period week" }));
+    expect(testState.kpiRenders[countBeforeChange]).toMatchObject({ currentCount: null, loading: true });
+  });
+  it("집계 최초 실패는 종료된 조회로 안내하고 재시도로 복구한다", async () => {
+    testState.getTransactionsSummary.mockRejectedValue(new Error("network failure"));
+    renderScreen();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("집계를 불러오지 못했습니다");
+    expect(screen.getByTestId("history-kpi")).toHaveAttribute("data-loading", "no");
+    testState.getTransactionsSummary.mockResolvedValue(makeSummary(2));
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    await waitFor(() => expect(screen.getByTestId("history-kpi")).toHaveTextContent("2"));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
   it("applies two rapid next-month actions without losing either move", async () => {
     renderScreen();
     fireEvent.click(screen.getByRole("button", { name: "select August" }));

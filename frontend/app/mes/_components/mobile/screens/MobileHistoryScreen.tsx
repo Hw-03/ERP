@@ -19,13 +19,12 @@ import { useMonthlyCountsQuery } from "@/lib/queries/useTransactionsQuery";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 import { invalidateOperationalQueries, useRealtimeRevision } from "@/lib/queries/realtime";
 import { toDateKey, formatHistoryDate } from "../../_history_sections/historyFormat";
-import {
-  getHistoryActor,
-  getHistoryDisplayLabel,
-} from "../../_history_sections/historyBatchInterpreter";
 import { type HistorySelection } from "../../_history_sections/historyConstants";
 import { resolveHistoryDateRange, type SelectedHistoryMonth } from "../../_history_sections/historyQuery";
 import { MobileHistoryList } from "../history/MobileHistoryList";
+import { MobileScrollFrame } from "../primitives/MobileScrollFrame";
+import detailStyles from "../../_history_sections/HistoryMobileDetail.module.css";
+import { ReadFailure } from "../../common/ReadState";
 import {
   advanceHistoryLoadReconcileState,
   applyHistoryCancellation,
@@ -112,9 +111,21 @@ export function MobileHistoryScreen() {
 
   const [summary, setSummary] = useState<TransactionSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [summaryRetry, setSummaryRetry] = useState(0);
   const summaryKeyRef = useRef("");
   const summaryConditionsRef = useRef("");
   const summaryRef = useRef<TransactionSummary | null>(null);
+  const summaryConditionsKey = JSON.stringify([
+    opParam || null,
+    selectedDateRange.dateFrom ?? null,
+    selectedDateRange.dateTo ?? null,
+    debouncedSearch.trim() || null,
+    deptParam || null,
+    modelParam || null,
+  ]);
+  const summaryChanged = summaryConditionsRef.current !== summaryConditionsKey;
+  const currentSummary = summaryChanged ? null : summary;
 
   const historyData = useHistoryData({
     operations: opParam,
@@ -124,7 +135,7 @@ export function MobileHistoryScreen() {
     selectedMonth,
     department: deptParam,
     model: modelParam,
-    totalCount: summary?.total ?? null,
+    totalCount: currentSummary?.total ?? null,
     realtimeRevision,
   });
   const {
@@ -236,6 +247,7 @@ export function MobileHistoryScreen() {
     ]);
     const myKey = JSON.stringify([conditionsKey, realtimeRevision ?? null]);
     const background = summaryConditionsRef.current === conditionsKey && summaryRef.current !== null;
+    setSummaryError(null);
     summaryConditionsRef.current = conditionsKey;
     summaryKeyRef.current = myKey;
     if (!background) {
@@ -258,6 +270,7 @@ export function MobileHistoryScreen() {
       .catch((err) => {
         if ((err as Error)?.name === "AbortError") return;
         if (summaryKeyRef.current !== myKey) return;
+        setSummaryError("집계를 불러오지 못했습니다.");
         if (!background) {
           summaryRef.current = null;
           setSummary(null);
@@ -265,19 +278,26 @@ export function MobileHistoryScreen() {
         }
       });
     return () => ctrl.abort();
-  }, [debouncedSearch, deptParam, modelParam, opParam, realtimeRevision, selectedDateRange]);
+  }, [debouncedSearch, deptParam, modelParam, opParam, realtimeRevision, selectedDateRange, summaryRetry]);
 
   const [baselineSummary, setBaselineSummary] = useState<TransactionSummary | null>(null);
   const [baselineLoading, setBaselineLoading] = useState(false);
+  const [baselineError, setBaselineError] = useState<string | null>(null);
   const baselineKeyRef = useRef("");
   const baselineConditionsRef = useRef("");
   const baselineSummaryRef = useRef<TransactionSummary | null>(null);
+  const baselineConditionsKey = JSON.stringify([selectedDateRange.dateFrom ?? null, selectedDateRange.dateTo ?? null]);
+  const baselineChanged = baselineConditionsRef.current !== baselineConditionsKey;
+  const currentBaseline = baselineChanged ? null : baselineSummary;
+  const currentSummaryError = summaryChanged ? null : summaryError;
+  const currentBaselineError = baselineChanged ? null : baselineError;
 
   useEffect(() => {
     const { dateFrom, dateTo } = selectedDateRange;
     const conditionsKey = JSON.stringify([dateFrom ?? null, dateTo ?? null]);
     const myKey = JSON.stringify([conditionsKey, realtimeRevision ?? null]);
     const background = baselineConditionsRef.current === conditionsKey && baselineSummaryRef.current !== null;
+    setBaselineError(null);
     baselineConditionsRef.current = conditionsKey;
     baselineKeyRef.current = myKey;
     if (!background) {
@@ -297,6 +317,7 @@ export function MobileHistoryScreen() {
       .catch((err) => {
         if ((err as Error)?.name === "AbortError") return;
         if (baselineKeyRef.current !== myKey) return;
+        setBaselineError("집계를 불러오지 못했습니다.");
         if (!background) {
           baselineSummaryRef.current = null;
           setBaselineSummary(null);
@@ -304,7 +325,7 @@ export function MobileHistoryScreen() {
         }
       });
     return () => ctrl.abort();
-  }, [realtimeRevision, selectedDateRange]);
+  }, [realtimeRevision, selectedDateRange, summaryRetry]);
 
   useEffect(() => {
     const decision = advanceHistoryLoadReconcileState(loadReconcileRef.current, {
@@ -478,25 +499,27 @@ export function MobileHistoryScreen() {
       ? `${displaySelection.log.mes_code ?? "-"} · ${formatHistoryDate(
           displaySelection.log.created_at,
         )}`
-      : displaySelection?.kind === "batch"
-      ? `${getHistoryDisplayLabel(displaySelection.logs[0])} · ${formatHistoryDate(
-          displaySelection.logs[0].created_at,
-        )} · ${getHistoryActor(displaySelection.logs[0])}`
       : "";
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col" style={{ background: LEGACY_COLORS.bg }}>
-      <div className="scrollbar-hide min-h-0 min-w-0 flex-1 overflow-y-auto">
-        <div className="mhf flex flex-col gap-3 p-3 pb-6">
+      <MobileScrollFrame roundTop>
+        <div className="mhf flex flex-col gap-2 px-3">
           <HistoryStatsBar
-            baseline={baselineSummary}
-            currentSummary={summary}
-            currentCount={summary?.total ?? null}
-            loading={summaryLoading || baselineLoading}
+            mobile
+            baseline={currentBaseline}
+            currentSummary={currentSummary}
+            currentCount={currentSummary?.total ?? null}
+            loading={summaryChanged || baselineChanged || summaryLoading || baselineLoading}
+            hasListFilters={activeFilterCount > 0 || !!debouncedSearch.trim()}
             periodLabel={periodLabel}
           />
 
+          {(currentSummaryError || currentBaselineError) && <ReadFailure message={currentSummaryError ?? currentBaselineError!}
+            refresh={currentSummary !== null || currentBaseline !== null} onRetry={() => setSummaryRetry((value) => value + 1)} />}
+
           <HistoryFilterBar
+            mobile
             search={search}
             setSearch={setSearch}
             dateFilter={dateFilter}
@@ -516,7 +539,7 @@ export function MobileHistoryScreen() {
             <section className="card" style={{ paddingTop: 12, paddingBottom: 12 }}>
               <HistoryFilterPanel
                 open={filterPanelOpen}
-                departmentCounts={baselineSummary?.departmentCounts ?? {}}
+                departmentCounts={currentBaseline?.departmentCounts ?? {}}
                 selectedDepts={selectedDepts}
                 toggleDept={toggleDept}
                 clearDepts={() => setSelectedDepts([])}
@@ -576,11 +599,11 @@ export function MobileHistoryScreen() {
             onLoadMore={() => void loadMore()}
           />
         </div>
-      </div>
+      </MobileScrollFrame>
 
       <BottomSheet open={!!selection} onClose={closeSheet} ariaLabel={`${sheetTitle} 상세`}>
         {displaySelection && (
-          <div className="px-5">
+          <div className={`px-5 ${detailStyles.detail}`}>
             <div className="mb-3">
               {selectionStack.length > 0 && (
                 <button
@@ -592,15 +615,15 @@ export function MobileHistoryScreen() {
                   ← 뒤로
                 </button>
               )}
-              <div className="text-lg font-black leading-tight" style={{ color: LEGACY_COLORS.text }}>
+              <div className="break-words text-lg font-bold leading-snug" style={{ color: LEGACY_COLORS.text }}>
                 {sheetTitle}
               </div>
-              <div
-                className="mt-0.5 truncate text-xs font-semibold"
+              {sheetSubtitle && <div
+                className="mt-1 break-words text-xs leading-5"
                 style={{ color: LEGACY_COLORS.muted2 }}
               >
                 {sheetSubtitle}
-              </div>
+              </div>}
             </div>
 
             {displaySelection.kind === "log" && (
@@ -613,6 +636,7 @@ export function MobileHistoryScreen() {
             )}
             {displaySelection.kind === "batch" && (
               <HistoryBatchDetailPanel
+                mobilePresentation
                 panelOpen={!!selection}
                 batchId={displaySelection.batchId}
                 logs={displaySelection.logs}
