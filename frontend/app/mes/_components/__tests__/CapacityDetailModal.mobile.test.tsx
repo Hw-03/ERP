@@ -72,18 +72,24 @@ const capacityData = {
 
 function renderModal() {
   const result = render(<CapacityDetailModal capacityData={capacityData} onClose={() => {}} />);
-  const mobileList = result.container.querySelector(".sm\\:hidden");
+  const mobileList = result.container.querySelector("[data-testid='capacity-mobile-columns']")?.parentElement;
   if (!mobileList) throw new Error("모바일 생산 가능수량 목록을 찾을 수 없습니다.");
   return { ...result, mobileList };
 }
 
 describe("CapacityDetailModal 모바일 모델 요약", () => {
+  it("성공한 AF 없음 결과를 갱신 실패에도 유지한다", () => {
+    render(<CapacityDetailModal capacityData={{ ...capacityData, af: null }} loading={false} error="생산 가능 조회 실패" onClose={() => {}} />);
+    expect(screen.getByText("AF 기준 데이터가 없습니다. 백엔드 갱신 후 다시 확인해 주세요.")).toBeInTheDocument();
+    expect(screen.getByText(/기존 내용을 표시합니다/)).toBeInTheDocument();
+  });
   beforeEach(() => {
     vi.restoreAllMocks();
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 360 });
     Object.defineProperty(window, "matchMedia", {
       configurable: true,
       value: vi.fn((query: string): MediaQueryList => ({
-        matches: false,
+        matches: window.innerWidth >= Number(query.match(/min-width:\s*(\d+)px/)?.[1]),
         media: query,
         onchange: null,
         addEventListener: vi.fn(),
@@ -96,11 +102,44 @@ describe("CapacityDetailModal 모바일 모델 요약", () => {
     vi.spyOn(api, "getBOMTree").mockReturnValue(new Promise(() => {}));
   });
 
+  it("최초 조회에도 제목과 수량 3열을 유지한다", () => {
+    render(<CapacityDetailModal capacityData={null} loading onClose={() => {}} />);
+    expect(screen.getByText("생산 가능수량")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "닫기" })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "생산 가능수량 불러오는 중" })).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByTestId("capacity-mobile-columns")).toHaveClass("grid-cols-3");
+  });
+
+  it("최초 실패는 로딩을 종료하고 재시도할 수 있다", () => {
+    const onRetry = vi.fn();
+    render(<CapacityDetailModal capacityData={null} loading={false} error="생산 가능 조회 실패" onRetry={onRetry} onClose={() => {}} />);
+    expect(screen.queryByText("데이터를 불러오는 중…")).not.toBeInTheDocument();
+    expect(screen.getByText(/생산 가능 조회 실패/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(onRetry).toHaveBeenCalledOnce();
+  });
+
+  it("갱신 실패 후에도 기존 모델과 수량을 표시한다", () => {
+    render(<CapacityDetailModal capacityData={capacityData} loading={false} error="최신 조회 실패" onRetry={() => {}} onClose={() => {}} />);
+    expect(screen.getByText(/최신 조회 실패/)).toBeInTheDocument();
+    expect(screen.getByTestId("capacity-mobile-columns")).toBeInTheDocument();
+    expect(screen.getAllByText("410").length).toBeGreaterThan(0);
+  });
+
   it("375px 모바일에서는 데스크톱 BOM 작업공간과 BOM 요청을 만들지 않는다", () => {
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 375 });
     renderModal();
 
     expect(screen.queryByRole("region", { name: "PF별 생산 가능수량 및 BOM" })).not.toBeInTheDocument();
+    expect(api.getBOMTree).not.toHaveBeenCalled();
+  });
+
+  it("768px에서도 수량 설명 없이 모바일 목록을 유지한다", () => {
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 768 });
+    const { mobileList } = renderModal();
+    expect(mobileList).toHaveClass("lg:hidden");
+    expect(screen.queryByText(/공용 자재가 겹치는 모델은/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/박스 포장까지 완료되어/)).not.toBeInTheDocument();
     expect(api.getBOMTree).not.toHaveBeenCalled();
   });
 
@@ -128,6 +167,42 @@ describe("CapacityDetailModal 모바일 모델 요약", () => {
     fireEvent.click(mobile.getByRole("button", { name: /DX3000.*1종/ }));
     fireEvent.click(mobile.getAllByRole("button", { name: /DX3000 조립 완제품/ })[1]);
 
-    expect(mobile.getAllByText("자동 기준")).toHaveLength(2);
+    expect(mobile.getAllByText("자동 기준")).toHaveLength(1);
+  });
+
+  it("모바일 헤더에는 제목과 닫기만 표시한다", () => {
+    const onClose = vi.fn();
+    render(<CapacityDetailModal capacityData={capacityData} onClose={onClose} />);
+
+    expect(screen.getByText("생산 가능수량")).toBeInTheDocument();
+    expect(screen.queryByText("수량 기준")).not.toBeInTheDocument();
+    expect(screen.queryByText(/박스 포장까지 완료되어/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/공용 자재가 겹치는 모델은/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("수량 열 제목은 한 번만 표시하고 대표·AF·PF에 같은 열 순서로 수량을 유지한다", () => {
+    const { mobileList } = renderModal();
+    const mobile = within(mobileList);
+    const header = mobile.getByTestId("capacity-mobile-columns");
+    expect(header).toHaveClass("sticky", "top-0");
+    expect(within(header).queryByText("품목")).not.toBeInTheDocument();
+    expect(header).toHaveClass("grid-cols-3");
+    fireEvent.click(mobile.getByRole("button", { name: /DX3000.*1종/ }));
+    fireEvent.click(mobile.getAllByRole("button", { name: /DX3000 조립 완제품/ })[1]);
+    ["출하대기", "빠른생산", "총생산"].forEach((label) => expect(mobile.getAllByText(label)).toHaveLength(1));
+    const rows = mobile.getAllByTestId("capacity-mobile-quantity-row");
+    expect(rows).toHaveLength(4);
+    const populatedRows = rows.filter((row) => within(row).queryByText("410"));
+    expect(populatedRows).toHaveLength(3);
+    populatedRows.forEach((row) => {
+      expect(row.firstElementChild).toHaveClass("col-span-3");
+      expect(row).toHaveClass("grid-cols-3");
+      expect(within(row).getByText("410")).toBeInTheDocument();
+      expect(within(row).getByText("86")).toBeInTheDocument();
+      expect(within(row).getByText("598")).toBeInTheDocument();
+    });
+    expect(within(populatedRows[0]).getByText("3-PF-0002")).toBeInTheDocument();
   });
 });
