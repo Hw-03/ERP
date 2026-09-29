@@ -27,6 +27,8 @@ import { DefectManagementCategoryControl } from "../../_defect_hub/DefectManagem
 import { defectCartLineErrors } from "../../_defect_hub/defectCartValidation";
 import { queryKeys } from "@/lib/queries/keys";
 import { TYPO } from "../tokens";
+import panelStyles from "./mobileWarehousePanels.module.css";
+import presentation from "../mobilePresentation.module.css";
 import {
   IconButton,
   PrimaryActionButton,
@@ -84,6 +86,10 @@ function managementCategoryLabel(category: DefectManagementCategory): string {
  * 바로 처리는 먼저 폐기/재작업을 고르고, 폐기는 다품목, 재작업은 단일 품목으로 처리한다.
  */
 export function MobileDefectCartFlow({
+  itemsLoading = false,
+  itemsLoadError = null,
+  itemsHasData = true,
+  onRetryItems,
   mode,
   items,
   productModels,
@@ -91,6 +97,10 @@ export function MobileDefectCartFlow({
   onDone,
   onCancel,
 }: {
+  itemsLoading?: boolean;
+  itemsLoadError?: string | null;
+  itemsHasData?: boolean;
+  onRetryItems?: () => void;
   mode: DefectCartMode;
   items: Item[];
   productModels: ProductModel[];
@@ -367,11 +377,10 @@ export function MobileDefectCartFlow({
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="flex min-h-full flex-col gap-3">
+          <div className="flex min-h-full flex-col gap-2">
             <MobileActionCard
               icon={Trash2}
               title="폐기"
-              desc="정상 재고를 격리 없이 바로 폐기합니다. 여러 품목을 한 번에 담을 수 있습니다."
               tone={LEGACY_COLORS.red}
               onClick={() => {
                 window.history.pushState({ defect: "cart", mode, step: 1, directAction: "scrap", source }, "");
@@ -381,7 +390,6 @@ export function MobileDefectCartFlow({
             <MobileActionCard
               icon={Wrench}
               title="재작업"
-              desc="BOM 있는 품목 한 개를 하위 품목 정상·격리·폐기로 나눠 처리합니다."
               tone={LEGACY_COLORS.yellow}
             onClick={() => {
               setSource("production");
@@ -418,27 +426,25 @@ export function MobileDefectCartFlow({
       <div className="flex h-full min-h-0 flex-col">
         <div className="shrink-0 pb-3">{header}</div>
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="flex min-h-full flex-col gap-3 pb-3">
+          <div className="flex min-h-full flex-col gap-2">
             <span className={clsx(TYPO.caption, "font-black uppercase tracking-[1px]")} style={{ color: LEGACY_COLORS.muted2 }}>
               출처 선택
             </span>
             <MobileSourceCard
               icon={Building2}
               title="부서 재고"
-              description="생산 부서에서 사용 중인 정상 재고를 처리합니다."
               active={source === "production"}
               onClick={() => selectSource("production")}
             />
             <MobileSourceCard
               icon={Warehouse}
               title="창고 재고"
-              description="창고 보관 중인 정상 재고를 처리합니다."
               active={source === "warehouse"}
               onClick={() => selectSource("warehouse")}
             />
           </div>
         </div>
-        <StickyFooter flat compact>
+        <StickyFooter flat compact embedded>
           <PrimaryActionButton label="다음 →" intent="primary" onClick={() => pushStep(2)} />
         </StickyFooter>
       </div>
@@ -469,6 +475,7 @@ export function MobileDefectCartFlow({
             </SectionCard>
             <SectionCard title="BOM 재작업 트리" padding="sm">
               <DisassembleTree
+                mobilePresentation
                 parentItemId={selectedReworkLine.item.item_id}
                 parentItemName={selectedReworkLine.item.item_name}
                 parentMesCode={selectedReworkLine.item.mes_code ?? ""}
@@ -480,7 +487,7 @@ export function MobileDefectCartFlow({
             </SectionCard>
           </div>
         </div>
-        <StickyFooter flat compact>
+        <StickyFooter flat compact embedded>
           <div className={clsx(TYPO.caption, "mb-2 text-center font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
             격리·폐기를 입력하면 정상 수량이 자동으로 줄어듭니다.
           </div>
@@ -492,6 +499,7 @@ export function MobileDefectCartFlow({
           />
         </StickyFooter>
         <ConfirmModal
+          className={panelStyles.touchScope}
           open={confirmOpen}
           onClose={() => setConfirmOpen(false)}
           onConfirm={() => {
@@ -515,7 +523,7 @@ export function MobileDefectCartFlow({
                 className="rounded-[14px] border px-3 py-2.5"
                 style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
               >
-                <div className={clsx(TYPO.body, "truncate font-black")} style={{ color: LEGACY_COLORS.text }}>
+                <div className={clsx(TYPO.body, "[overflow-wrap:anywhere] font-semibold")} style={{ color: LEGACY_COLORS.text }}>
                   {line.item.item_name}
                 </div>
                 <div className={clsx(TYPO.caption, "mt-1 flex items-center gap-1.5 font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
@@ -534,12 +542,17 @@ export function MobileDefectCartFlow({
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="shrink-0 pb-3">{header}</div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden pb-3">
+      <div className={`flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto ${panelStyles.defectCartBody}`}>
         <div
           data-testid="mobile-defect-picker-pane"
-          className="min-h-[300px] flex-[1_1_300px] overflow-hidden"
+          className="min-h-[320px] flex-[1_0_320px] overflow-hidden"
         >
           <DefectItemPicker
+            loading={itemsLoading}
+            loadError={itemsLoadError}
+            hasData={itemsHasData}
+            onRetry={onRetryItems}
+            mobilePresentation
             items={pickerItems}
             productModels={productModels}
             source={source}
@@ -551,14 +564,15 @@ export function MobileDefectCartFlow({
 
         <div
           data-testid="mobile-defect-cart-scroll"
-          className="max-h-[min(26dvh,220px)] shrink-0 overflow-y-auto overscroll-contain"
+          className="shrink-0"
         >
-          <SectionCard title={isRework ? "재작업 품목" : `장바구니 ${lines.length}건`} padding={lines.length === 0 ? "md" : "sm"}>
-            {lines.length === 0 ? (
-              <div className={clsx(TYPO.body, "py-2 text-center font-bold")} style={{ color: LEGACY_COLORS.muted }}>
-                위에서 품목을 추가하세요.
-              </div>
-            ) : (
+          {lines.length === 0 ? (
+            <div data-testid="mobile-defect-empty-cart" className="flex min-h-14 flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-[14px] border px-3 py-2" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+              <span className={clsx(TYPO.body, "font-bold")} style={{ color: LEGACY_COLORS.text }}>{isRework ? "재작업 품목" : "장바구니 0건"}</span>
+              <span className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>위에서 품목을 추가하세요.</span>
+            </div>
+          ) : (
+          <SectionCard title={isRework ? "재작업 품목" : `장바구니 ${lines.length}건`} padding="sm">
               <div className="flex flex-col gap-2">
                 {lines.map((line, idx) => {
                   const fail = failures.find((f) => f.key === line.key);
@@ -566,7 +580,7 @@ export function MobileDefectCartFlow({
                   return (
                     <div
                       key={line.key}
-                      className="flex flex-col gap-2 rounded-[14px] border p-3"
+                      className="flex flex-col gap-3 border-t py-4"
                       style={{ background: LEGACY_COLORS.s1, borderColor: fail || validationErrors.length > 0 ? tint(LEGACY_COLORS.red, 30) : LEGACY_COLORS.border }}
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -574,7 +588,7 @@ export function MobileDefectCartFlow({
                           <div className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
                             {line.item.mes_code ?? "(코드 없음)"}
                           </div>
-                          <div className={clsx(TYPO.body, "truncate font-black")} style={{ color: LEGACY_COLORS.text }}>
+                          <div className={clsx(TYPO.body, "[overflow-wrap:anywhere] font-semibold")} style={{ color: LEGACY_COLORS.text }}>
                             {line.item.item_name}
                           </div>
                           <div className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
@@ -653,21 +667,21 @@ export function MobileDefectCartFlow({
                   );
                 })}
               </div>
-            )}
           </SectionCard>
+          )}
         </div>
       </div>
 
-      <StickyFooter flat compact>
+      <StickyFooter flat compact embedded>
         {failures.length > 0 ? (
           <div className={clsx(TYPO.caption, "mb-2 text-center font-bold")} style={{ color: LEGACY_COLORS.red }}>
             {failures.length}건 실패 — 남은 줄을 확인 후 다시 제출하세요.
           </div>
-        ) : (
+        ) : isRework ? (
           <div className={clsx(TYPO.caption, "mb-2 text-center font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
-            {isRework ? "정상·격리·폐기 합계가 처리 수량과 같아야 합니다." : "줄마다 수량·사유를 확인하세요."}
+            정상·격리·폐기 합계가 처리 수량과 같아야 합니다.
           </div>
-        )}
+        ) : null}
         <PrimaryActionButton
           label={isRework ? "BOM 확인 →" : busy ? "처리 중..." : `${submitLabel} (${lines.length}건)`}
           intent={isScrap || isRework ? "danger" : "primary"}
@@ -680,6 +694,7 @@ export function MobileDefectCartFlow({
       </StickyFooter>
 
       <ConfirmModal
+        className={panelStyles.touchScope}
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}
         onConfirm={() => {
@@ -706,7 +721,7 @@ export function MobileDefectCartFlow({
               style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
             >
               <div className="min-w-0">
-                <div className={clsx(TYPO.body, "truncate font-black")} style={{ color: LEGACY_COLORS.text }}>
+                <div className={clsx(TYPO.body, "[overflow-wrap:anywhere] font-semibold")} style={{ color: LEGACY_COLORS.text }}>
                   {line.item.item_name}
                 </div>
                 <div className={clsx(TYPO.caption, "mt-1 flex items-center gap-1.5 font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
@@ -728,23 +743,20 @@ export function MobileDefectCartFlow({
   );
 }
 
-function MobileActionCard({ icon: Icon, title, desc, tone, onClick }: { icon: LucideIcon; title: string; desc: string; tone: string; onClick: () => void }) {
+function MobileActionCard({ icon: Icon, title, tone, onClick }: { icon: LucideIcon; title: string; tone: string; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-[156px] flex-1 flex-col justify-between gap-4 rounded-[20px] border p-5 text-left transition-[filter,transform] hover:brightness-110 active:scale-[0.98]"
+      className="flex min-h-[88px] flex-[1_0_88px] items-center gap-3 rounded-[20px] border px-4 py-3 text-left transition-[filter,transform] hover:brightness-110 active:scale-[0.98]"
       style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, borderWidth: 1, color: LEGACY_COLORS.text }}
     >
       <div className="flex items-center gap-3">
-        <Icon className="h-8 w-8 shrink-0" style={{ color: tone }} />
-        <span className={clsx(TYPO.headline, "font-black")} style={{ color: tone }}>
+        <span className={presentation.choiceIcon} style={{ color: tone }} aria-hidden="true"><Icon /></span>
+        <span className="text-xl font-bold" style={{ color: LEGACY_COLORS.text }}>
           {title}
         </span>
       </div>
-      <span className={clsx(TYPO.body, "font-bold leading-relaxed")} style={{ color: LEGACY_COLORS.muted2 }}>
-        {desc}
-      </span>
     </button>
   );
 }
@@ -752,13 +764,11 @@ function MobileActionCard({ icon: Icon, title, desc, tone, onClick }: { icon: Lu
 function MobileSourceCard({
   icon: Icon,
   title,
-  description,
   active,
   onClick,
 }: {
   icon: LucideIcon;
   title: string;
-  description: string;
   active: boolean;
   onClick: () => void;
 }) {
@@ -767,7 +777,7 @@ function MobileSourceCard({
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className="flex min-h-[132px] flex-1 flex-col justify-between gap-3 rounded-[20px] border p-5 text-left transition-[filter,transform] hover:brightness-110 active:scale-[0.98]"
+      className="flex min-h-[88px] flex-[1_0_88px] items-center gap-3 rounded-[20px] border px-4 py-3 text-left transition-[filter,transform] hover:brightness-110 active:scale-[0.98]"
       style={{
         background: active ? tint(LEGACY_COLORS.red, 7) : LEGACY_COLORS.s2,
         borderColor: active ? LEGACY_COLORS.red : LEGACY_COLORS.border,
@@ -775,14 +785,11 @@ function MobileSourceCard({
       }}
     >
       <div className="flex items-center gap-3">
-        <Icon className="h-8 w-8 shrink-0" style={{ color: active ? LEGACY_COLORS.red : LEGACY_COLORS.muted2 }} />
-        <span className={clsx(TYPO.headline, "font-black")} style={{ color: active ? LEGACY_COLORS.red : LEGACY_COLORS.text }}>
+        <span className={presentation.choiceIcon} style={{ color: active ? LEGACY_COLORS.red : LEGACY_COLORS.blue }} aria-hidden="true"><Icon /></span>
+        <span className="text-xl font-bold" style={{ color: active ? LEGACY_COLORS.red : LEGACY_COLORS.text }}>
           {title}
         </span>
       </div>
-      <span className={clsx(TYPO.body, "font-bold leading-relaxed")} style={{ color: active ? LEGACY_COLORS.red : LEGACY_COLORS.muted2 }}>
-        {description}
-      </span>
     </button>
   );
 }

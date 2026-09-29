@@ -28,8 +28,8 @@ vi.mock("../../../_defect_hub/DisassembleTree", () => ({
 }));
 
 vi.mock("../../../_defect_hub/DefectItemPicker", () => ({
-  DefectItemPicker: ({ onAdd }: { onAdd?: (item: unknown) => void }) => (
-    <div data-testid="defect-item-picker">
+  DefectItemPicker: ({ onAdd, mobilePresentation }: { onAdd?: (item: unknown) => void; mobilePresentation?: boolean }) => (
+    <div data-testid="defect-item-picker" data-mobile-presentation={mobilePresentation}>
       <button
         type="button"
         onClick={() =>
@@ -128,6 +128,18 @@ beforeEach(() => {
 });
 
 describe("mobile defect compact headers", () => {
+  it("빈 카트를 간결하게 표시하고 품목 추가 뒤 수량과 사유를 유지한다", () => {
+    render(<MobileDefectCartFlow mode="add" items={[item]} productModels={[]} currentEmployee={employee} onDone={() => {}} onCancel={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: /다음/ }));
+    expect(screen.getByTestId("defect-item-picker")).toHaveAttribute("data-mobile-presentation", "true");
+    expect(screen.getByTestId("mobile-defect-empty-cart")).toHaveTextContent("장바구니 0건");
+    expect(screen.getByTestId("mobile-defect-empty-cart")).toHaveTextContent("위에서 품목을 추가하세요.");
+    fireEvent.click(screen.getByRole("button", { name: "mock add" }));
+    expect(screen.queryByTestId("mobile-defect-empty-cart")).not.toBeInTheDocument();
+    expect(screen.getByRole("spinbutton")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "사유 선택" })).toBeInTheDocument();
+  });
+
   it("keeps the direct action cards flush with the flow bottom for the common shell gap", () => {
     render(
       <MobileDefectCartFlow
@@ -337,8 +349,8 @@ describe("mobile defect compact headers", () => {
     fireEvent.click(screen.getByRole("button", { name: /다음|Next/ }));
     fireEvent.click(screen.getByRole("button", { name: "mock add" }));
 
-    expect(screen.getByTestId("mobile-defect-picker-pane")).toHaveClass("min-h-[300px]", "flex-[1_1_300px]");
-    expect(screen.getByTestId("mobile-defect-cart-scroll")).toHaveClass("max-h-[min(26dvh,220px)]", "overflow-y-auto");
+    expect(screen.getByTestId("mobile-defect-picker-pane")).toHaveClass("min-h-[320px]", "flex-[1_0_320px]");
+    expect(screen.getByTestId("mobile-defect-cart-scroll")).not.toHaveClass("overflow-y-auto");
   });
 
   it("[8.5-07] 모바일도 사유 카테고리와 메모가 모두 없으면 다음 진행을 막는다", () => {
