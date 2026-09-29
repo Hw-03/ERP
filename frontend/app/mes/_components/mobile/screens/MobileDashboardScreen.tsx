@@ -6,6 +6,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { ChevronDown, SlidersHorizontal, Zap } from "lucide-react";
 import { BottomSheet } from "@/lib/ui/BottomSheet";
 import { InlineSearch } from "../primitives";
+import { MobileScrollFrame } from "../primitives/MobileScrollFrame";
 import { InventoryKpiPanel, type KpiFilter } from "../../_inventory_sections/InventoryKpiPanel";
 import { InventoryCapacityPanel, capacityStatusBadge } from "../../_inventory_sections/InventoryCapacityPanel";
 import { InventoryFilters } from "../../_inventory_sections/InventoryFilterBar";
@@ -27,6 +28,8 @@ import {
 } from "../../_inventory_sections/inventoryFilter";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 import type { IoEntryIntent } from "../../_warehouse_v2/types";
+import { ReadFailure } from "../../common/ReadState";
+import { SkeletonBlock } from "../../common/LoadingSkeleton";
 
 const PAGE_SIZE = 100;
 
@@ -46,6 +49,8 @@ export function MobileDashboardScreen({
   onGoToWarehouse,
   capacityData,
   capacityLoading = false,
+  capacityError = null,
+  onCapacityRetry = () => {},
   onCapacityClick,
   onSummaryChange,
   canReceive,
@@ -57,6 +62,8 @@ export function MobileDashboardScreen({
   onSummaryChange?: (s: { low: number; zero: number }) => void;
   capacityData?: ProductionCapacity | null;
   capacityLoading?: boolean;
+  capacityError?: string | null;
+  onCapacityRetry?: () => void;
   onCapacityClick?: () => void;
   canReceive?: boolean;
 }) {
@@ -133,14 +140,6 @@ export function MobileDashboardScreen({
     setDisplayLimit(PAGE_SIZE);
   }, [filteredItems]);
 
-  // 필터 변경 시 짧은 스켈레톤(200ms) — 즉시 결과가 깜빡이는 인지부담 완화.
-  const [filterChanging, setFilterChanging] = useState(false);
-  useEffect(() => {
-    setFilterChanging(true);
-    const t = setTimeout(() => setFilterChanging(false), 200);
-    return () => clearTimeout(t);
-  }, [selectedDepts, departmentFilterBasis, selectedModels, selectedProcessSteps, showDisused, filterLogic, kpi]);
-
   if (selectedItem) lastSelectedItemRef.current = selectedItem;
   const displayItem = selectedItem ?? lastSelectedItemRef.current;
 
@@ -170,16 +169,28 @@ export function MobileDashboardScreen({
   }, [setSelectedDepts, setSelectedModels, setSelectedProcessSteps]);
 
   const capacityBadge = capacityStatusBadge(capacityData);
+  const searchControlsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const controls = searchControlsRef.current;
+    if (!controls) return;
+    // Include the normal 8px gap below the toolbar, even when the reset row grows it.
+    const updateHeaderTop = (): void => {
+      controls.parentElement?.style.setProperty("--mobile-inventory-header-top", `${controls.getBoundingClientRect().height + 8}px`);
+    };
+    updateHeaderTop();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(updateHeaderTop);
+    observer.observe(controls);
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <div
-        className="scrollbar-hide min-h-0 min-w-0 flex-1 overflow-y-auto"
-        style={{ background: LEGACY_COLORS.bg }}
-      >
-        <div className="flex flex-col gap-1 px-3 pb-6 pt-3">
-          <section className="flex flex-col gap-3">
+      <MobileScrollFrame>
+        <div className="flex flex-col gap-2 px-3">
+          <section className="flex flex-col gap-2">
             <InventoryKpiPanel
+              mobile
               cards={kpiCards}
               activeKey={kpi}
               loading={loading && items.length === 0}
@@ -188,35 +199,30 @@ export function MobileDashboardScreen({
                 else setKpi(key);
               }}
             />
-            {capacityLoading && !capacityData ? (
-              <div
-                className="flex min-h-[42px] w-full items-center justify-between gap-2 rounded-[12px] border px-3 py-2.5"
-                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-                role="status"
-                aria-label="생산 가능 수량 불러오는 중"
-              >
-                <div className="h-4 w-32 motion-safe:animate-pulse rounded" style={{ background: LEGACY_COLORS.s3 }} />
-                <div className="h-4 w-4 motion-safe:animate-pulse rounded" style={{ background: LEGACY_COLORS.s3 }} />
-              </div>
-            ) : capacityData ? (
+            {capacityLoading || capacityData ? (
               <div>
                 <button
                   type="button"
+                  disabled={!capacityData}
                   onClick={() => setCapacityOpen((o) => !o)}
                   aria-expanded={capacityOpen}
-                  className="flex w-full items-center justify-between gap-2 rounded-[12px] border px-3 py-2.5 text-left transition-[transform] active:scale-[0.99]"
+                  className="flex min-h-11 w-full items-center justify-between gap-2 rounded-[14px] border px-3 py-2.5 text-left transition-[transform] active:scale-[0.99]"
                   style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
                 >
                   <span
-                    className="flex min-w-0 items-center gap-2 text-sm font-black"
+                    className="flex min-w-0 flex-wrap items-center gap-2 text-sm font-semibold"
                     style={{ color: LEGACY_COLORS.text }}
                   >
                     <Zap className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.blue }} />
                     <span className="shrink-0">생산 가능 현황</span>
                     {/* 항목 1 — 상태는 펼친 패널 헤더 대신 토글 버튼 우측 배지로 노출 */}
-                    {capacityBadge && (
+                    {capacityLoading && !capacityData ? (
+                      <span role="status" aria-busy="true" aria-label="생산 가능 수량 불러오는 중" className="flex h-5 items-center">
+                        <SkeletonBlock className="h-5 w-16 rounded-full" />
+                      </span>
+                    ) : capacityBadge && (
                       <span
-                        className="truncate rounded-full px-2 py-0.5 text-[11px] font-bold"
+                        className="rounded-full px-2 py-0.5 text-xs font-medium"
                         style={{
                           background: `color-mix(in srgb, ${capacityBadge.color} 16%, transparent)`,
                           color: capacityBadge.color,
@@ -234,14 +240,15 @@ export function MobileDashboardScreen({
                     }}
                   />
                 </button>
-                {capacityOpen && (
+                {capacityError && <ReadFailure message={capacityError} onRetry={onCapacityRetry} refresh />}
+                {capacityOpen && capacityData && (
                   <div className="mt-2 flex flex-col gap-2">
                     {/* 항목 1 — 인라인 패널은 표만(클릭 X), 자세히 보기는 아래 전폭 버튼으로 분리 */}
-                    <InventoryCapacityPanel capacityData={capacityData} />
+                    <InventoryCapacityPanel capacityData={capacityData} mobile />
                     <button
                       type="button"
                       onClick={onCapacityClick}
-                      className="w-full rounded-[12px] border px-3 py-2.5 text-sm font-bold transition-[transform] active:scale-[0.99]"
+                      className="min-h-11 w-full rounded-[12px] border px-3 py-2.5 text-sm font-semibold transition-[transform] active:scale-[0.99]"
                       style={{
                         background: LEGACY_COLORS.s2,
                         borderColor: LEGACY_COLORS.border,
@@ -253,12 +260,13 @@ export function MobileDashboardScreen({
                   </div>
                 )}
               </div>
-            ) : null}
+            ) : capacityError ? <ReadFailure message={capacityError} onRetry={onCapacityRetry} /> : null}
           </section>
 
           {/* 검색/필터 영역은 배경 위 도구줄로 두고, 입력 컨트롤 자체만 테두리를 가진다. */}
           <div
-            className="sticky top-0 z-20 -mx-3 flex flex-col gap-2 px-3 py-1.5"
+            ref={searchControlsRef}
+            className="sticky top-0 z-20 -mx-3 flex flex-col gap-2 px-3"
             style={{ background: LEGACY_COLORS.bg }}
           >
             <div className="flex items-center gap-2">
@@ -268,29 +276,31 @@ export function MobileDashboardScreen({
                 placeholder="품명 · 코드 · 위치 · 공급처"
                 className="min-w-0 flex-1"
               />
-              <button
-                type="button"
-                onClick={() => setFiltersOpen((prev) => !prev)}
-                aria-label={filtersOpen ? "필터 닫기" : "필터 열기"}
-                aria-expanded={filtersOpen}
-                className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] border transition-[transform] active:scale-95"
-                style={{
-                  background: filtersOpen || isFiltered ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
-                  borderColor: LEGACY_COLORS.border,
-                  color: filtersOpen || isFiltered ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
-                }}
-              >
-                <SlidersHorizontal size={18} strokeWidth={2} />
-                {activeFilterCount > 0 && (
-                  <span
-                    className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold"
-                    style={{ background: LEGACY_COLORS.redSolid, color: LEGACY_COLORS.white }}
-                  >
-                    {activeFilterCount}
-                  </span>
-                )}
-              </button>
-              <InventoryFilterLogicToggle open={filtersOpen} logic={filterLogic} onLogicChange={setFilterLogic} />
+              <div className={`flex shrink-0 self-stretch items-center${filtersOpen ? " gap-2" : ""}`}>
+                <InventoryFilterLogicToggle open={filtersOpen} logic={filterLogic} onLogicChange={setFilterLogic} />
+                <button
+                  type="button"
+                  onClick={() => setFiltersOpen((prev) => !prev)}
+                  aria-label={filtersOpen ? "필터 닫기" : "필터 열기"}
+                  aria-expanded={filtersOpen}
+                  className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] border transition-[transform] active:scale-95"
+                  style={{
+                    background: filtersOpen || isFiltered ? LEGACY_COLORS.blue : LEGACY_COLORS.s2,
+                    borderColor: LEGACY_COLORS.border,
+                    color: filtersOpen || isFiltered ? LEGACY_COLORS.white : LEGACY_COLORS.muted,
+                  }}
+                >
+                  <SlidersHorizontal size={18} strokeWidth={2} />
+                  {activeFilterCount > 0 && (
+                    <span
+                      className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-semibold"
+                      style={{ background: LEGACY_COLORS.redSolid, color: LEGACY_COLORS.white }}
+                    >
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </button>
+              </div>
             </div>
             {isFiltered && (
               <div
@@ -300,13 +310,14 @@ export function MobileDashboardScreen({
                 <button
                   type="button"
                   onClick={resetAllFilters}
-                  className="rounded-full px-2 py-1 font-bold"
+                  className="min-h-11 rounded-full px-2 py-1 font-semibold"
                   style={{ color: LEGACY_COLORS.blue }}
                 >
                   필터 초기화
                 </button>
               </div>
             )}
+            <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-full h-2" style={{ background: LEGACY_COLORS.bg }} />
           </div>
           {/* 항목 2 — 필터 칩은 sticky 밖(일반 흐름)에 둬서 열려도 목록을 가리지 않고 아래로 밀어낸다.
               4-2 — 검색바와 함께 card 밖, 화면 배경 위에 배치. */}
@@ -338,7 +349,7 @@ export function MobileDashboardScreen({
             <InventoryItemsTable
               error={error}
               refreshError={refreshError}
-              loading={loading || filterChanging}
+              loading={loading}
               filteredItems={filteredItems}
               displayLimit={displayLimit}
               setDisplayLimit={setDisplayLimit}
@@ -354,7 +365,7 @@ export function MobileDashboardScreen({
             />
           </section>
         </div>
-      </div>
+      </MobileScrollFrame>
 
       <BottomSheet
         open={!!selectedItem}
@@ -362,19 +373,19 @@ export function MobileDashboardScreen({
         ariaLabel={displayItem ? `${displayItem.item_name} 상세` : "품목 상세"}
       >
         {displayItem && (
-          <div className="px-5">
+          <div className="px-4">
             <div className="mb-1 flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-lg font-black leading-tight" style={{ color: LEGACY_COLORS.text }}>
+                <div className="text-lg font-semibold leading-snug [overflow-wrap:anywhere]" style={{ color: LEGACY_COLORS.text }}>
                   {displayItem.item_name}
                 </div>
-                <div className="mt-0.5 truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+                <div className="mt-1 break-all text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                   {displayItem.legacy_part
                     ? `${displayItem.mes_code} · ${displayItem.legacy_part}`
                     : displayItem.mes_code ?? "-"}
                 </div>
               </div>
-              {headerBadge}
+              <div className="shrink-0 whitespace-nowrap">{headerBadge}</div>
             </div>
             <div className="mt-3">
               <InventoryDetailPanel
