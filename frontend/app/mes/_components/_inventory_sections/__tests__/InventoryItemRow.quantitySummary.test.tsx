@@ -250,7 +250,7 @@ describe("InventoryItemRow quantity summary", () => {
       "품목명",
       "사용 가능 재고",
     ]);
-    expect(screen.queryByText("3-TR-0001")).toBeNull();
+    expect(screen.queryByText("3-TR-0001")).not.toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "사용 가능 재고" })).toHaveClass("text-center");
     expect(screen.getByTestId("inventory-total-stock")).toHaveClass("text-center");
   });
