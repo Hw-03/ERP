@@ -56,6 +56,13 @@ beforeEach(() => {
 });
 
 describe("MobileWarehouseMapScreen realtime refresh", () => {
+  it("최초 지도 조회에는 검색과 지도 viewport를 유지한다", () => {
+    mocks.getMap.mockReturnValueOnce(new Promise(() => {}));
+    render(<MobileWarehouseMapScreen onExit={vi.fn()} />);
+    expect(screen.getByRole("status", { name: "창고 지도 불러오는 중" })).toHaveClass("overflow-x-auto");
+    expect(screen.getByPlaceholderText("품목명·코드로 위치 찾기")).toBeInTheDocument();
+    expect(screen.queryByTestId("mobile-map-floor")).not.toBeInTheDocument();
+  });
   it("keeps the current map visible after refresh failure and retries in place", async () => {
     const props = { onExit: vi.fn() };
     const { rerender } = render(<MobileWarehouseMapScreen {...props} />);
