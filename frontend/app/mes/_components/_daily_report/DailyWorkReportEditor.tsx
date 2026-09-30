@@ -113,7 +113,7 @@ export function DailyWorkReportEditor({
     setLocalSaveError(null);
     setSaveFailed(false);
     setSavingLocal(true);
-    const next = contentRef.current.trim();
+    const next = contentRef.current;
     const contentVersion = contentVersionRef.current;
     let promise: Promise<void>;
     promise = onSave(next)

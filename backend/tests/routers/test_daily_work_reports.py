@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
+import pytest
 from sqlalchemy.exc import IntegrityError
 
 from app.models import Employee, IoBatch, TransactionLog, TransactionTypeEnum
@@ -52,24 +53,28 @@ def _put(client, employee: Employee, content: str, *, actor_id: uuid.UUID | None
     )
 
 
-def test_daily_work_report_put_creates_trimmed_snapshot_and_retains_it_on_update(client, db_session):
+@pytest.mark.parametrize("content", ["  생산 등록 완료  ", "생산 등록 완료\n\n", " \n "])
+def test_daily_work_report_put_preserves_whitespace_and_snapshot_on_update(client, db_session, content):
     employee = _employee(db_session, name="김작성")
     db_session.commit()
 
-    created = _put(client, employee, "  생산 등록 완료  ")
+    created = _put(client, employee, content)
     assert created.status_code == 200, created.text
-    assert created.json()["content"] == "생산 등록 완료"
+    assert created.json()["content"] == content
+    loaded = client.get(f"/api/daily-work-reports/{employee.employee_id}/{WORK_DATE}")
+    assert loaded.status_code == 200
+    assert loaded.json()["content"] == content
     assert created.json()["employee_name"] == "김작성"
     assert created.json()["department"] == "조립"
 
     employee.name = "개명후"
     employee.department = "출하"
     db_session.commit()
-    updated = _put(client, employee, "수정 내용")
+    updated = _put(client, employee, content + "수정 내용 \n")
 
     assert updated.status_code == 200, updated.text
     assert updated.json()["report_id"] == created.json()["report_id"]
-    assert updated.json()["content"] == "수정 내용"
+    assert updated.json()["content"] == content + "수정 내용 \n"
     assert updated.json()["employee_name"] == "김작성"
     assert updated.json()["department"] == "조립"
 
@@ -138,7 +143,7 @@ def test_daily_work_report_put_rejects_impersonation_inactive_and_oversized_cont
     assert inactive_response.status_code == 403
     assert inactive_response.json()["detail"]["message"] == "비활성 직원은 일보를 작성할 수 없습니다."
     assert blank.status_code == 200
-    assert blank.json()["content"] == ""
+    assert blank.json()["content"] == "   "
     assert too_long.status_code == 422
     assert too_long.json()["detail"]["message"] == "일보 내용은 5,000자 이하여야 합니다."
     future = client.put(
@@ -153,7 +158,7 @@ def test_daily_work_report_put_clears_existing_report_without_deleting_it(client
     db_session.commit()
     assert _put(client, employee, "기존 내용").status_code == 200
 
-    cleared = _put(client, employee, "   ")
+    cleared = _put(client, employee, "")
 
     assert cleared.status_code == 200
     assert cleared.json()["content"] == ""
@@ -201,14 +206,16 @@ def test_daily_work_report_delete_removes_own_report_and_rejects_impersonation(c
     assert client.get("/api/daily-work-reports", params={"work_date": WORK_DATE}).json() == []
 
 
-def test_daily_work_report_content_limit_applies_after_trimming(client, db_session):
+def test_daily_work_report_content_limit_counts_whitespace(client, db_session):
     employee = _employee(db_session, name="공백검증")
     db_session.commit()
 
-    response = _put(client, employee, f"  {'x' * 5000}  ")
+    content = f"  {'x' * 4996}  "
+    response = _put(client, employee, content)
 
     assert response.status_code == 200, response.text
-    assert response.json()["content"] == "x" * 5000
+    assert response.json()["content"] == content
+    assert _put(client, employee, content + " ").status_code == 422
 
 
 def test_daily_activity_uses_kst_day_id_ownership_and_excludes_archived(client, db_session, make_item):

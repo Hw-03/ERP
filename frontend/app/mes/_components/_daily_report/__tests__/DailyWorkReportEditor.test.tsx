@@ -177,15 +177,17 @@ describe("DailyWorkReportEditor", () => {
     vi.useRealTimers();
   });
 
-  it("저장할 때 공백을 정리해도 저장됨 상태로 전환한다", async () => {
+  it.each(["  수정한 내용 ", "수정한 내용\n\n", " \n "])("자동 저장 후 공백과 줄바꿈을 유지한다: %j", async (content) => {
     vi.useFakeTimers();
-    render(<DailyWorkReportEditor initialContent="기존 내용" initialUpdatedAt="2026-08-04T02:30:00Z" editable saving={false} saveError={null} onSave={vi.fn().mockResolvedValue("2026-08-04T02:30:00Z")} />);
+    const onSave = vi.fn().mockResolvedValue("2026-08-04T02:30:00Z");
+    render(<DailyWorkReportEditor initialContent="기존 내용" initialUpdatedAt="2026-08-04T02:30:00Z" editable saving={false} saveError={null} onSave={onSave} />);
 
-    fireEvent.change(screen.getByRole("textbox", { name: "작업 내역" }), { target: { value: "수정한 내용 " } });
+    fireEvent.change(screen.getByRole("textbox", { name: "작업 내역" }), { target: { value: content } });
     await act(async () => { vi.advanceTimersByTime(1000); });
 
     expect(screen.getByText("저장됨 · 11:30")).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "작업 내역" })).toHaveValue("수정한 내용");
+    expect(onSave).toHaveBeenCalledWith(content);
+    expect(screen.getByRole("textbox", { name: "작업 내역" })).toHaveValue(content);
     expect(screen.queryByText("저장 대기 중")).not.toBeInTheDocument();
     vi.useRealTimers();
   });
