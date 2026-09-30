@@ -46,7 +46,7 @@ export function InventoryDetailLocations({
       <div className="space-y-2">
         {Number(item.warehouse_qty) > 0 && (
           <div
-            className={mobile ? "flex min-h-11 items-center gap-3 border-b py-2" : "flex items-center gap-3 rounded-[14px] border px-3 py-2.5"}
+            className={mobile ? "flex min-h-11 items-center gap-3 rounded-[14px] border px-3 py-2" : "flex items-center gap-3 rounded-[14px] border px-3 py-2.5"}
             style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
           >
             <div className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: LEGACY_COLORS.muted2 }} />
@@ -57,7 +57,7 @@ export function InventoryDetailLocations({
                 <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>실재고 {formatQty(item.warehouse_qty)} · 예약 {formatQty(warehousePendingQty)}</span>
               </div>
             ) : (
-              <span className="text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
+              <span className={mobile ? "min-w-11 rounded-[8px] px-2 py-1 text-center font-sans text-base font-medium" : "text-base font-bold"} style={{ color: LEGACY_COLORS.text, ...(mobile ? { background: LEGACY_COLORS.s3 } : {}) }}>
                 {formatQty(item.warehouse_qty)}
               </span>
             )}
@@ -70,7 +70,7 @@ export function InventoryDetailLocations({
             <div key={dept}>
               {prod && (
                 <div
-                  className={mobile ? "flex min-h-11 items-center gap-3 border-b py-2" : "flex items-center gap-3 rounded-[14px] border px-3 py-2.5"}
+                  className={mobile ? "flex min-h-11 items-center gap-3 rounded-[14px] border px-3 py-2" : "flex items-center gap-3 rounded-[14px] border px-3 py-2.5"}
                   style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
                 >
                   <div className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: getDeptColor(dept) }} />
@@ -81,7 +81,7 @@ export function InventoryDetailLocations({
                       <span className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>실재고 {formatQty(prod.quantity)} · 예약 {formatQty(locationPending(prod))}</span>
                     </div>
                   ) : (
-                    <span className="text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
+                    <span className={mobile ? "min-w-11 rounded-[8px] px-2 py-1 text-center font-sans text-base font-medium" : "text-base font-bold"} style={{ color: LEGACY_COLORS.text, ...(mobile ? { background: LEGACY_COLORS.s3 } : {}) }}>
                       {formatQty(prod.quantity)}
                     </span>
                   )}
@@ -91,7 +91,7 @@ export function InventoryDetailLocations({
                 <button
                   type="button"
                   onClick={() => router.push("/?tab=defect")}
-                  className="mt-1 flex w-full items-center gap-3 rounded-[14px] border px-3 py-2.5 text-left transition-opacity hover:opacity-80"
+                  className={`mt-1 flex w-full items-center gap-3 rounded-[14px] border px-3 py-2.5 text-left transition-opacity hover:opacity-80 ${mobile ? "min-h-11" : ""}`}
                   style={{ background: mobile ? LEGACY_COLORS.s1 : "color-mix(in srgb, #ef4444 10%, transparent)", borderColor: mobile ? LEGACY_COLORS.border : DEFECT_RED }}
                   aria-label={`${dept} 불량 ${formatQty(defective.quantity)} — 불량 탭으로 이동`}
                 >
@@ -105,7 +105,7 @@ export function InventoryDetailLocations({
                       <span className="text-xs" style={{ color: defectColor }}>실재고 {formatQty(defective.quantity)} · 예약 {formatQty(locationPending(defective))}</span>
                     </div>
                   ) : (
-                    <span className="text-base font-bold" style={{ color: defectColor }}>
+                    <span className={mobile ? "min-w-11 rounded-[8px] px-2 py-1 text-center font-sans text-base font-medium" : "text-base font-bold"} style={{ color: defectColor, ...(mobile ? { background: LEGACY_COLORS.s3 } : {}) }}>
                       {formatQty(defective.quantity)}
                     </span>
                   )}
