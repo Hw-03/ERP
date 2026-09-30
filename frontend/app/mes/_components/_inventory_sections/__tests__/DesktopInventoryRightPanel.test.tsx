@@ -60,6 +60,7 @@ describe("DesktopInventoryRightPanel", () => {
     expect(tablist.parentElement).toHaveClass("flex", "items-center", "gap-2", "mb-4");
     expect(tablist.parentElement).toContainElement(closeButton);
     expect(screen.getByText("상세 내용")).toBeInTheDocument();
+    expect(screen.getByTestId("desktop-right-panel-body")).toHaveClass("-mr-2.5", "pr-2.5");
 
     fireEvent.click(historyTab);
 

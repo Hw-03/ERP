@@ -58,6 +58,7 @@ export function DesktopRightPanel({
   onClose,
   fillAvailableWidth = false,
   tone = "default",
+  bodyScrollbarOutset = false,
   children,
 }: {
   title: string;
@@ -72,6 +73,7 @@ export function DesktopRightPanel({
   /** SlidePanel 내부의 사용 가능한 전체 폭을 사용할지 여부. */
   fillAvailableWidth?: boolean;
   tone?: "default" | "danger";
+  bodyScrollbarOutset?: boolean;
   children: React.ReactNode;
 }) {
   const [body, setBody] = useState<HTMLDivElement | null>(null);
@@ -122,7 +124,7 @@ export function DesktopRightPanel({
               {headerAction ?? (onClose && <DesktopPanelCloseButton onClick={onClose} />)}
             </div>
           </div>
-          <div ref={setBody} data-testid="desktop-right-panel-body" className="sg min-h-0 flex-1 overflow-y-auto">{children}</div>
+          <div ref={setBody} data-testid="desktop-right-panel-body" className={`sg min-h-0 flex-1 overflow-y-auto ${bodyScrollbarOutset ? "-mr-2.5 pr-2.5" : ""}`}>{children}</div>
           <div ref={setFooter} data-testid="desktop-right-panel-footer" className="max-h-[45%] shrink-0 overflow-y-auto empty:hidden pt-4" />
         </div>
       </DesktopRightPanelFooterContext.Provider>

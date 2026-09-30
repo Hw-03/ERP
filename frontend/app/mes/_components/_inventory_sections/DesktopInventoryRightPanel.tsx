@@ -80,6 +80,7 @@ export function DesktopInventoryRightPanel({
     >
       {displayItem && (
         <DesktopRightPanel
+          bodyScrollbarOutset
           title={displayItem.item_name}
           titleId={INVENTORY_DETAIL_TITLE_ID}
           subtitle={displayItem.legacy_part ? `${displayItem.mes_code} · ${displayItem.legacy_part}` : (displayItem.mes_code ?? undefined)}
