@@ -131,7 +131,7 @@ export function MobileShippingScreen() {
   };
 
   return (
-    <div className="mw0 scrollbar-hide flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pt-4">
+    <div className="mw0 scrollbar-hide flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4">
       <div className="px-1 py-1">
         <div className="flex items-center gap-3">
           <span className="flex h-5 w-5 shrink-0 items-center justify-center" style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.blue }}>
