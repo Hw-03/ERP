@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { ArrowLeft } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
@@ -20,10 +19,11 @@ import {
 import { InlineErrorNote } from "../../_defect_hub/InlineErrorNote";
 import { REASON_CATEGORIES } from "../../_defect_hub/reasonCategories";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
-import { IconButton, SectionCard, StickyFooter, Stepper } from "../primitives";
+import { SectionCard, StickyFooter, Stepper } from "../primitives";
 import type { Supplier } from "@/lib/api";
 import { SupplierPickerStep } from "../../_warehouse_v2/SupplierPickerStep";
 import panelStyles from "./mobileWarehousePanels.module.css";
+import { MobileDefectStepHeader } from "./MobileDefectStepHeader";
 
 type ProcessAction = "unquarantine" | "scrap" | "return" | "disassemble";
 
@@ -183,19 +183,12 @@ export function MobileDefectProcessPanel({
     return: LEGACY_COLORS.muted2,
   };
   const formatDate = (iso: string | null) => (iso ? iso.slice(0, 10) : "-");
+  const processSteps = action === "disassemble" ? ["처리 선택", "BOM 확인"] : action === "return" ? ["처리 선택", "공급업체 선택"] : ["처리 선택"];
 
   if (step === 3) {
     return (
       <div className="flex h-full min-h-0 flex-col gap-3">
-        <div className="flex shrink-0 items-center gap-2">
-          <IconButton icon={ArrowLeft} label="이전" size="md" onClick={() => setStep(1)} />
-          <div className="min-w-0">
-            <h2 className={clsx(TYPO.title, "font-black")} style={{ color: LEGACY_COLORS.text }}>반품 공급업체 선택</h2>
-            <p className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
-              {location.item_name} · {formatQty(boundedProcessQty)}개 · {location.department} 불량 격리
-            </p>
-          </div>
-        </div>
+        <MobileDefectStepHeader title="공급업체 선택" steps={processSteps} current={1} onBack={() => setStep(1)} />
         <div className="min-h-0 flex-1 overflow-y-auto">
           <SupplierPickerStep
             employeeId={currentEmployee.employee_id}
@@ -241,20 +234,7 @@ export function MobileDefectProcessPanel({
   if (step === 2) {
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <div className="flex shrink-0 items-center gap-2 pb-2">
-          <IconButton icon={ArrowLeft} label="이전" size="md" onClick={() => setStep(1)} />
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <h2 className={clsx(TYPO.title, "min-w-0 truncate font-black")} style={{ color: LEGACY_COLORS.text }}>
-              불량 처리
-            </h2>
-            <span
-              className={clsx(TYPO.caption, "ml-auto shrink-0 font-bold uppercase tracking-[1px]")}
-              style={{ color: LEGACY_COLORS.muted2 }}
-            >
-              STEP 2 / 2
-            </span>
-          </div>
-        </div>
+        <div className="shrink-0 pb-2"><MobileDefectStepHeader title="BOM 확인" steps={processSteps} current={1} onBack={() => setStep(1)} /></div>
 
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
         <SectionCard padding="sm">
@@ -328,19 +308,7 @@ export function MobileDefectProcessPanel({
   // ── Step 1: 액션 선택 + 사유 ─────────────────────────────────────────
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 items-center gap-2 pb-3">
-        <IconButton icon={ArrowLeft} label="목록" size="md" onClick={onCancel} />
-        <div className="min-w-0">
-          <h2 className={clsx(TYPO.headline, "font-black")} style={{ color: LEGACY_COLORS.text }}>
-            불량 처리
-          </h2>
-          {location.has_bom && (
-            <div className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
-              <span style={{ color: LEGACY_COLORS.yellow }}>① 처리 선택</span> → ② BOM 확인
-            </div>
-          )}
-        </div>
-      </div>
+      <div className="shrink-0 pb-3"><MobileDefectStepHeader title="처리 선택" steps={processSteps} current={0} onBack={onCancel} backLabel="목록" /></div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
       {/* 품목 정보 */}

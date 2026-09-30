@@ -171,11 +171,12 @@ describe("mobile defect compact headers", () => {
       />,
     );
 
-    expect(screen.queryByText("STEP 1 / 2")).not.toBeInTheDocument();
+    expect(screen.getByText("Step 1 / 3")).toBeInTheDocument();
 
     fireEvent.click(container.querySelectorAll("button")[1]);
 
-    expect(screen.getByText("STEP 1 / 2")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "출처 선택" })).toBeInTheDocument();
+    expect(screen.getByText("Step 2 / 3")).toBeInTheDocument();
   });
 
   it("opens rework directly at the item picker without a department source step", () => {
@@ -193,7 +194,7 @@ describe("mobile defect compact headers", () => {
     fireEvent.click(screen.getByRole("button", { name: /재작업/ }));
 
     expect(screen.getByTestId("defect-item-picker")).toBeInTheDocument();
-    expect(screen.getByText("STEP 2 / 3")).toBeInTheDocument();
+    expect(screen.getByText("Step 2 / 3")).toBeInTheDocument();
     expect(screen.queryByText("출처·격리 부서")).not.toBeInTheDocument();
   });
 
@@ -305,7 +306,8 @@ describe("mobile defect compact headers", () => {
     fireEvent.click(screen.getByRole("button", { name: /다음/ }));
     fireEvent(window, new PopStateEvent("popstate", { state: { defect: "cart", mode: "scrap", step: 1 } }));
 
-    expect(screen.getByRole("heading", { name: "바로 처리" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "작업 선택" })).toBeInTheDocument();
+    expect(screen.getByText("Step 1 / 3")).toBeInTheDocument();
   });
 
   it("restores a rework BOM history entry to the rework item picker when its cart line is unavailable", () => {
@@ -331,7 +333,15 @@ describe("mobile defect compact headers", () => {
     fireEvent.click(container.querySelectorAll("button")[6]);
     fireEvent.click(Array.from(container.querySelectorAll("button")).at(-1)!);
 
-    expect(screen.getByText("STEP 2 / 2")).toBeInTheDocument();
+    expect(screen.getByText("Step 2 / 2")).toBeInTheDocument();
+  });
+
+  it("BOM 단계가 없는 불량 처리는 한 단계만 표시한다", () => {
+    render(<MobileDefectProcessPanel location={{ ...location, has_bom: false }} currentEmployee={employee} onDone={() => {}} onCancel={() => {}} />);
+
+    expect(screen.getByRole("heading", { name: "처리 선택" })).toBeInTheDocument();
+    expect(screen.getByText("Step 1 / 1")).toBeInTheDocument();
+    expect(screen.queryByText("STEP 1 / 2")).not.toBeInTheDocument();
   });
 
   it("keeps the item picker usable after a cart item is added", () => {

@@ -276,6 +276,15 @@ describe("DefectHubPanel", () => {
     expect(cart).toHaveAttribute("data-default-source", "unset");
   });
 
+  it("모바일 작업 선택에는 공통 단계 헤더를 표시한다", async () => {
+    render(<DefectHubPanel currentEmployee={mockEmployee} mobilePresentation />);
+    fireEvent.click(screen.getByRole("button", { name: /불량 처리/ }));
+
+    expect(await screen.findByRole("heading", { name: "작업 선택" })).toBeInTheDocument();
+    expect(screen.getByText("Step 1 / 1")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "이전" })).toBeInTheDocument();
+  });
+
   it("모바일 격리 카트 취소는 허브 대신 작업 선택 history로 돌아간다", async () => {
     const backSpy = vi.spyOn(window.history, "back").mockImplementation(() => {
       window.dispatchEvent(new PopStateEvent("popstate", { state: { defect: "work-choice" } }));
