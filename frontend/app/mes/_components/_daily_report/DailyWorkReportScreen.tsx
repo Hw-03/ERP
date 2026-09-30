@@ -284,7 +284,7 @@ export function DailyWorkReportScreen({
   const keepActivity = mobile && activityQuery.data !== undefined;
 
   return (
-    <div className={mobile ? "min-h-0 min-w-0 flex-1 overflow-y-auto px-3 pt-3" : "min-h-0 min-w-0 flex-1 overflow-y-auto px-3 py-3 lg:flex lg:flex-col lg:overflow-hidden lg:px-0 lg:py-0 lg:pr-4"} style={mobile ? { background: LEGACY_COLORS.bg } : undefined}>
+    <div className={mobile ? "min-w-0" : "min-h-0 min-w-0 flex-1 overflow-y-auto px-3 py-3 lg:flex lg:flex-col lg:overflow-hidden lg:px-0 lg:py-0 lg:pr-4"} style={mobile ? { background: LEGACY_COLORS.bg } : undefined}>
       <div className={`scrollbar-hide flex w-full flex-col gap-3 ${mobile ? "" : "pb-6"} lg:min-h-0 lg:flex-1 lg:pb-0 ${!isActivityDetailOpen ? "lg:overflow-hidden" : "lg:overflow-y-auto"}`}>
         {!onTopbarControlsChange && <header className={mobile ? "rounded-[20px] border p-3" : "rounded-[20px] border p-4 lg:shrink-0 lg:px-5 lg:py-2.5"} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
           <div className={mobile ? "flex flex-col items-center gap-2" : "flex flex-wrap items-center gap-3"}>
