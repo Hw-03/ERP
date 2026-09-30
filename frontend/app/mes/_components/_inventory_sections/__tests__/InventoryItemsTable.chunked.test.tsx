@@ -92,6 +92,13 @@ describe("InventoryItemsTable — chunked render", () => {
     );
     expect(container.querySelector("tbody")).toHaveClass("mes-data-reveal");
   });
+  it("모바일 품목 행은 로딩 완료 직후 투명도 애니메이션 없이 표시한다", () => {
+    const { container } = renderWithProviders(
+      <InventoryItemsTable {...baseProps} compact filteredItems={[makeItem(1)]} displayLimit={100} setDisplayLimit={() => {}} />,
+    );
+    expect(container.querySelectorAll("tbody tr")).toHaveLength(1);
+    expect(container.querySelector("tbody")).not.toHaveAttribute("class");
+  });
   it("모바일 로딩이 끝나면 동일한 품목 목록의 추가 행 감지를 시작한다", () => {
     const items = Array.from({ length: 30 }, (_, index) => makeItem(index));
     lastIntersectionCallback = null;
