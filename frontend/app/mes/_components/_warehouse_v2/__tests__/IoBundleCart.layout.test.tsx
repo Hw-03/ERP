@@ -49,6 +49,53 @@ const item = {
 } as unknown as Item;
 
 describe("IoBundleCart layout", () => {
+  it.each(["receive_supplier", "warehouse_to_dept", "adjust_in", "internal_use_out", "warehouse_adjust_in"] as const)(
+    "%s 모바일 수량 목록은 카드 밖 레일과 고정 프레임을 사용한다",
+    (subType) => {
+    const { container } = render(
+      <IoBundleCart
+        mobilePresentation
+        bundles={[bundle]}
+        subType={subType}
+        itemMap={new Map([[item.item_id, item]])}
+        getAvailable={() => 10}
+        onToggleLine={vi.fn()}
+        onQuantityChange={vi.fn()}
+        onRemoveLine={vi.fn()}
+        onRemoveBundle={vi.fn()}
+        onAdvance={vi.fn()}
+        canAdvance
+      />,
+    );
+    expect(container.querySelector("[data-io-cart-shell]")).toHaveStyle({ background: "var(--c-s2)" });
+    const viewport = container.querySelector("[data-io-cart-list][data-keep-scroll]");
+    expect(viewport).toBeInTheDocument();
+    expect(viewport).not.toHaveStyle({ background: "var(--c-s2)" });
+    expect(container.querySelector("[data-io-cart-frame]")).toBeInTheDocument();
+    expect(container.querySelector("[data-io-cart-actions]")).toBeInTheDocument();
+    },
+  );
+
+  it("PC 수량 목록은 기존 스크롤 요소에 카드를 직접 배치한다", () => {
+    const { container } = render(
+      <IoBundleCart
+        bundles={[bundle]}
+        subType="warehouse_to_dept"
+        itemMap={new Map([[item.item_id, item]])}
+        getAvailable={() => 10}
+        onToggleLine={vi.fn()}
+        onQuantityChange={vi.fn()}
+        onRemoveLine={vi.fn()}
+        onRemoveBundle={vi.fn()}
+        onAdvance={vi.fn()}
+        canAdvance
+      />,
+    );
+
+    expect(container.querySelector("[data-io-cart-shell]")).not.toBeInTheDocument();
+    expect(container.querySelector("[data-io-cart-list] [data-io-line]")).toBeInTheDocument();
+  });
+
   it("removes the old summary helper copy and scrolls only the bundle list", () => {
     const { container } = render(
       <IoBundleCart
