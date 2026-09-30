@@ -206,7 +206,6 @@ describe("MobileAssemblyChecklistScreen", () => {
     expect(dx3000Card.parentElement).toHaveClass(presentation.choiceList);
     expect(dx3000Card).toHaveClass(presentation.menuRow);
     expect(dx3000Card.querySelector(`.${presentation.choiceIcon}`)).toBeInTheDocument();
-    expect(dx3000Card.parentElement?.parentElement).toHaveClass("px-4", "pt-4");
   });
 
   it("기존 체크 수행 화면은 완료 상태를 로컬에서 유지한다", () => {

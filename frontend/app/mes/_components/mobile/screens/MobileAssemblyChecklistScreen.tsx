@@ -240,7 +240,7 @@ function BrowseDetail({
   onClearSection: (section: AssemblyChecklistSection) => void;
 }) {
   return (
-    <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-4 [&>*]:shrink-0">
+    <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 [&>*]:shrink-0">
       <Header title={checklist.model_name} onBack={onBack} backLabel="제품 선택으로 돌아가기" />
 
       {checklist.sections.map((section) => {
@@ -1065,7 +1065,7 @@ function ManageDetail({
 
   return (
     <>
-      <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-4 [&>*]:shrink-0">
+      <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 [&>*]:shrink-0">
         <Header title={checklist.model_name} onBack={onBack} backLabel="체크리스트 관리 목록으로 돌아가기" />
         {checklist.sections.length > 0 && (
           <div className="flex justify-end">
@@ -1248,7 +1248,7 @@ function ManageHome({
   const configuredSlots = new Set(checklists.map((checklist) => checklist.model_slot));
   const availableModels = models.filter((model) => model.model_name && !model.is_reserved && !configuredSlots.has(model.slot));
   return (
-    <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pt-4">
+    <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4">
       <Header title="체크리스트 관리" onBack={onBack} backLabel="체크리스트 선택으로 돌아가기" />
       <section className="rounded-[20px] border p-4" style={CARD_STYLE}>
         <h3 className={TYPO.title} style={{ color: LEGACY_COLORS.text }}>제품 추가</h3>
@@ -1418,7 +1418,7 @@ export function MobileAssemblyChecklistScreen({ onExit }: { onExit?: () => void 
   }
 
   return (
-    <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pt-4">
+    <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4">
       <section className="shrink-0 px-1 py-1">
         <div className="flex items-center gap-3">
           {onExit && (
