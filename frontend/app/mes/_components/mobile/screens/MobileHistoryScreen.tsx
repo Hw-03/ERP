@@ -504,7 +504,7 @@ export function MobileHistoryScreen() {
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col" style={{ background: LEGACY_COLORS.bg }}>
       <MobileScrollFrame roundTop>
-        <div className="mhf flex flex-col gap-2 px-3">
+        <div className="mhf flex flex-col gap-2">
           <HistoryStatsBar
             mobile
             baseline={currentBaseline}
