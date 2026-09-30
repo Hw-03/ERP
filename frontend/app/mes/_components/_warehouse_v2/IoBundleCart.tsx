@@ -40,6 +40,7 @@ interface Props {
   pulling?: boolean;
   /** BOM 목록 미확인/실패 시 새 창고 반출 작업 전환을 막는다. */
   pullBlocked?: boolean;
+  mobilePresentation?: boolean;
 }
 
 export function IoBundleCart({
@@ -67,6 +68,7 @@ export function IoBundleCart({
   pullCount,
   pulling,
   pullBlocked,
+  mobilePresentation = false,
 }: Props) {
   const pullSelectedCount = pullSelected?.size ?? 0;
   const includedCount = bundles.flatMap((bundle) => bundle.lines).filter((line) => line.included).length;
@@ -78,6 +80,25 @@ export function IoBundleCart({
       : pullCount && pullCount > 0
         ? `부족 ${pullCount}개 전체 가져오기`
         : "부족 품목 가져오기";
+  const bundleCards = bundles.map((bundle) => (
+    <IoBundleCard
+      key={subType === "internal_use_out" && bundle.source_item_id ? bundle.source_item_id : bundle.bundle_id}
+      bundle={bundle}
+      subType={subType}
+      itemMap={itemMap}
+      getAvailable={getAvailable}
+      onToggleLine={(lineId) => onToggleLine(bundle.bundle_id, lineId)}
+      onQuantityChange={(lineId, quantity, shortage) => onQuantityChange(bundle.bundle_id, lineId, quantity, shortage)}
+      onBundleQuantityChange={onBundleQuantityChange ? (quantity) => onBundleQuantityChange(bundle.bundle_id, quantity) : undefined}
+      onInternalUseBomModeChange={onInternalUseBomModeChange ? (mode) => onInternalUseBomModeChange(bundle.bundle_id, mode) : undefined}
+      internalUseBomBusy={internalUseBomBusy}
+      onRemoveLine={(lineId) => onRemoveLine(bundle.bundle_id, lineId)}
+      onRemoveBundle={() => onRemoveBundle(bundle.bundle_id)}
+      pullEnabled={pullEnabled}
+      pullSelected={pullSelected}
+      onTogglePull={onTogglePull}
+    />
+  ));
 
   return (
     <div data-io-cart className="flex h-full min-h-0 flex-col gap-4">
@@ -88,46 +109,26 @@ export function IoBundleCart({
           title="아직 선택된 품목이 없습니다."
           description="이전 단계에서 대상을 다시 선택하세요."
         />
+      ) : mobilePresentation ? (
+        <div data-io-cart-shell className="relative min-h-0 flex-1 rounded-[20px]" style={{ background: LEGACY_COLORS.s2 }}>
+          <div data-keep-scroll data-io-cart-list className="sg absolute inset-y-0 left-0 -right-2.5 space-y-3 overflow-x-hidden overflow-y-auto [scrollbar-gutter:stable]" style={{ overscrollBehavior: "contain" }}>
+            {bundleCards}
+          </div>
+          <div data-io-cart-frame aria-hidden className="pointer-events-none absolute inset-0 z-20 rounded-[20px] border" style={{ borderColor: LEGACY_COLORS.border }} />
+          <div aria-hidden className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between">
+            <div className="flex justify-between">
+              <span className="h-5 w-5" style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 19px, var(--c-bg) 20px)" }} />
+              <span className="h-5 w-5" style={{ background: "radial-gradient(circle at 0 100%, transparent 0 19px, var(--c-bg) 20px)" }} />
+            </div>
+            <div className="flex justify-between">
+              <span className="h-5 w-5" style={{ background: "radial-gradient(circle at 100% 0, transparent 0 19px, var(--c-bg) 20px)" }} />
+              <span className="h-5 w-5" style={{ background: "radial-gradient(circle at 0 0, transparent 0 19px, var(--c-bg) 20px)" }} />
+              </div>
+          </div>
+        </div>
       ) : (
-        <div
-          data-keep-scroll
-          data-io-cart-list
-          className="sg min-h-0 flex-1 space-y-3 overflow-y-auto pr-1"
-          style={{ overscrollBehavior: "contain" }}
-        >
-          {bundles.map((bundle) => (
-            <IoBundleCard
-              key={
-                subType === "internal_use_out" && bundle.source_item_id
-                  ? bundle.source_item_id
-                  : bundle.bundle_id
-              }
-              bundle={bundle}
-              subType={subType}
-              itemMap={itemMap}
-              getAvailable={getAvailable}
-              onToggleLine={(lineId) => onToggleLine(bundle.bundle_id, lineId)}
-              onQuantityChange={(lineId, quantity, shortage) =>
-                onQuantityChange(bundle.bundle_id, lineId, quantity, shortage)
-              }
-              onBundleQuantityChange={
-                onBundleQuantityChange
-                  ? (quantity) => onBundleQuantityChange(bundle.bundle_id, quantity)
-                  : undefined
-              }
-              onInternalUseBomModeChange={
-                onInternalUseBomModeChange
-                  ? (mode) => onInternalUseBomModeChange(bundle.bundle_id, mode)
-                  : undefined
-              }
-              internalUseBomBusy={internalUseBomBusy}
-              onRemoveLine={(lineId) => onRemoveLine(bundle.bundle_id, lineId)}
-              onRemoveBundle={() => onRemoveBundle(bundle.bundle_id)}
-              pullEnabled={pullEnabled}
-              pullSelected={pullSelected}
-              onTogglePull={onTogglePull}
-            />
-          ))}
+        <div data-keep-scroll data-io-cart-list className="sg min-h-0 flex-1 space-y-3 overflow-y-auto pr-1" style={{ overscrollBehavior: "contain" }}>
+          {bundleCards}
         </div>
       )}
 

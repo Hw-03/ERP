@@ -6,7 +6,7 @@ import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { ReadEmpty, ReadFailure } from "../common/ReadState";
-import { SkeletonBlock, dataRevealClassName } from "../common/LoadingSkeleton";
+import { SkeletonBlock } from "../common/LoadingSkeleton";
 import { InventoryItemRow } from "./InventoryItemRow";
 import { useChunkedRender } from "../_hooks/useChunkedRender";
 
@@ -120,8 +120,9 @@ export function InventoryItemsTable({
       {compact && (
         // Cover the outer border too; an inset mask leaves vertical seams beside the sticky corners.
         <div aria-hidden="true" data-testid="inventory-mobile-header-corners" className="pointer-events-none sticky top-[var(--mobile-inventory-header-top,54px)] z-20 -mb-5 flex h-5 justify-between">
-          <span className="h-5 w-5" style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 19px, var(--c-bg) 19px)" }} />
-          <span className="h-5 w-5" style={{ background: "radial-gradient(circle at 0 100%, transparent 0 19px, var(--c-bg) 19px)" }} />
+          <span className="absolute inset-x-5 top-0 h-px" style={{ background: LEGACY_COLORS.border }} />
+          <span className="h-5 w-5" style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 19px, var(--c-border) 19px 20px, var(--c-bg) 20px)" }} />
+          <span className="h-5 w-5" style={{ background: "radial-gradient(circle at 0 100%, transparent 0 19px, var(--c-border) 19px 20px, var(--c-bg) 20px)" }} />
         </div>
       )}
       <div
@@ -182,7 +183,7 @@ export function InventoryItemsTable({
               )}
             </tr>
           </thead>
-          <tbody className={loading ? undefined : compact ? dataRevealClassName : "mes-data-reveal"}>
+          <tbody className={!loading && !compact ? "mes-data-reveal" : undefined}>
             {loading ? Array.from({ length: skeletonRowCount }, (_, index) => (
               <tr key={index} data-testid="inventory-skeleton-row" aria-hidden="true" className={compact ? "h-[98px]" : undefined}>
                 {compact ? <>

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import type { LucideIcon } from "lucide-react";
-import { ArrowLeft, Building2, Copy, Trash2, Warehouse, Wrench } from "lucide-react";
+import { Building2, Copy, Trash2, Warehouse, Wrench } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { defectsApi } from "@/lib/api/defects";
@@ -29,8 +29,8 @@ import { queryKeys } from "@/lib/queries/keys";
 import { TYPO } from "../tokens";
 import panelStyles from "./mobileWarehousePanels.module.css";
 import presentation from "../mobilePresentation.module.css";
+import { MobileDefectStepHeader } from "./MobileDefectStepHeader";
 import {
-  IconButton,
   PrimaryActionButton,
   SectionCard,
   StickyFooter,
@@ -363,19 +363,7 @@ export function MobileDefectCartFlow({
   if (isDirect && directAction === null) {
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <div className="shrink-0 pb-3">
-          <div className="flex items-center gap-2">
-            <IconButton icon={ArrowLeft} label="이전" size="md" onClick={onCancel} />
-            <div className="min-w-0">
-              <h2 className={clsx(TYPO.headline, "font-black")} style={{ color: LEGACY_COLORS.text }}>
-                바로 처리
-              </h2>
-              <div className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
-                폐기 또는 재작업을 먼저 선택하세요.
-              </div>
-            </div>
-          </div>
-        </div>
+        <div className="shrink-0 pb-3"><MobileDefectStepHeader title="작업 선택" context="바로 처리" steps={["작업 선택", "출처 선택", "품목 선택"]} current={0} onBack={onCancel} /></div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="flex min-h-full flex-col gap-2">
             <MobileActionCard
@@ -403,23 +391,9 @@ export function MobileDefectCartFlow({
     );
   }
 
-  const stepTotal = isRework ? 3 : 2;
-  const header = (
-    <div className="flex items-center gap-2">
-      <IconButton icon={ArrowLeft} label={step === 1 && !(isDirect && directAction !== null) ? "취소" : "이전"} size="md" onClick={goBack} />
-      <div className="flex min-w-0 flex-1 items-center gap-2">
-        <h2 className={clsx(TYPO.title, "min-w-0 truncate font-black")} style={{ color: LEGACY_COLORS.text }}>
-          {title}
-        </h2>
-        <span
-          className={clsx(TYPO.caption, "ml-auto shrink-0 font-bold uppercase tracking-[1px]")}
-          style={{ color: LEGACY_COLORS.muted2 }}
-        >
-          STEP {step} / {stepTotal}
-        </span>
-      </div>
-    </div>
-  );
+  const steps = isRework ? ["작업 선택", "품목 선택", "BOM 확인"] : isDirect ? ["작업 선택", "출처 선택", "품목 선택"] : ["출처 선택", "품목 선택"];
+  const current = isRework ? step - 1 : isDirect ? step : step - 1;
+  const header = <MobileDefectStepHeader title={steps[current]} context={title} steps={steps} current={current} onBack={goBack} backLabel={step === 1 && !isDirect ? "취소" : "이전"} />;
 
   if (step === 1) {
     return (
@@ -427,9 +401,6 @@ export function MobileDefectCartFlow({
         <div className="shrink-0 pb-3">{header}</div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="flex min-h-full flex-col gap-2">
-            <span className={clsx(TYPO.caption, "font-black uppercase tracking-[1px]")} style={{ color: LEGACY_COLORS.muted2 }}>
-              출처 선택
-            </span>
             <MobileSourceCard
               icon={Building2}
               title="부서 재고"

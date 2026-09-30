@@ -217,7 +217,8 @@ export function SupplierPickerStep({
         </div>
       )}
 
-      <div className={compact ? "flex min-h-0 flex-1 flex-col overflow-y-auto rounded-[20px] border" : "flex min-h-0 flex-1 flex-col overflow-y-auto rounded-[16px] border p-2 "} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+      <div data-supplier-scroll-shell={compact ? "" : undefined} className={compact ? "relative min-h-0 flex-1 rounded-[20px]" : "flex min-h-0 flex-1 flex-col overflow-y-auto rounded-[16px] border p-2 "} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+        <div data-supplier-scroll-viewport={compact ? "" : undefined} data-keep-scroll={compact ? true : undefined} className={compact ? "absolute inset-y-0 left-0 -right-2.5 overflow-x-hidden overflow-y-auto [scrollbar-gutter:stable]" : "contents"} style={compact ? { overscrollBehavior: "contain" } : undefined}>
         {loading || (variant === "mobile" && loadedEmployeeRef.current !== employeeId && !error) ? variant === "mobile" ? (
           <div role="status" aria-label="공급업체 목록 불러오는 중" aria-busy="true">
             <span className="sr-only">공급업체 목록 불러오는 중</span>
@@ -272,6 +273,22 @@ export function SupplierPickerStep({
               );
             })}
           </ul>
+        )}
+        </div>
+        {compact && (
+          <>
+            <div data-supplier-scroll-frame aria-hidden className="pointer-events-none absolute inset-0 z-20 rounded-[20px] border" style={{ borderColor: LEGACY_COLORS.border }} />
+            <div aria-hidden className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between">
+              <div className="flex justify-between">
+                <span className="h-5 w-5" style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 19px, var(--c-bg) 20px)" }} />
+                <span className="h-5 w-5" style={{ background: "radial-gradient(circle at 0 100%, transparent 0 19px, var(--c-bg) 20px)" }} />
+              </div>
+              <div className="flex justify-between">
+                <span className="h-5 w-5" style={{ background: "radial-gradient(circle at 100% 0, transparent 0 19px, var(--c-bg) 20px)" }} />
+                <span className="h-5 w-5" style={{ background: "radial-gradient(circle at 0 0, transparent 0 19px, var(--c-bg) 20px)" }} />
+              </div>
+            </div>
+          </>
         )}
       </div>
       {!loading && !error && selectedSupplierId == null && invalidSupplierName && (

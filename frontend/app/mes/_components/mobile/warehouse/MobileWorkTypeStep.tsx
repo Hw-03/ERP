@@ -1,7 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { ArrowDownToLine, ArrowUpFromLine, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import presentation from "../mobilePresentation.module.css";
 import { tint } from "@/lib/mes/colorUtils";
 import { departmentDisplayColor, MES_DEPARTMENT_COLORS } from "@/lib/mes-department";
@@ -59,37 +60,26 @@ export function MobileWorkTypeStep({
   );
 }
 
-function Label({ text }: { text: string }) {
-  return (
-    <div
-      className="mb-2 text-xs font-black uppercase tracking-[1.5px]"
-      style={{ color: LEGACY_COLORS.muted2 }}
-    >
-      {text}
-    </div>
-  );
-}
-
 function DeptGrid({
-  label,
   value,
   onChange,
   className = "flex flex-1 flex-col",
   options = PROD_DEPTS,
+  stacked = false,
 }: {
-  label: string;
   value: string;
   onChange: (v: string) => void;
   className?: string;
   options?: readonly string[];
+  stacked?: boolean;
 }) {
-  const colsClass = options.length === 2 ? "grid-cols-2" : "grid-cols-3";
+  const colsClass = stacked ? "grid-cols-1" : options.length === 2 ? "grid-cols-2" : "grid-cols-3";
   return (
     <div className={className}>
-      <Label text={label} />
       <div className={`grid flex-1 ${colsClass} gap-2`}>
         {options.map((d) => {
           const active = d === value;
+          const illustrated = d === "AS" || d === "연구";
           const color = departmentDisplayColor(
             MES_DEPARTMENT_COLORS[d as keyof typeof MES_DEPARTMENT_COLORS] ?? LEGACY_COLORS.purple,
             d,
@@ -101,14 +91,27 @@ function DeptGrid({
               aria-label={d}
               aria-pressed={active}
               onClick={() => onChange(d)}
-              className="min-h-[64px] rounded-[12px] border text-lg font-bold transition-[transform] active:scale-95"
+              className={`${illustrated ? presentation.illustratedChoice : ""} min-h-[64px] rounded-[12px] border text-lg font-bold transition-[transform] active:scale-95`}
               style={{
-                background: active ? tint(color, 14) : LEGACY_COLORS.s2,
-                borderColor: active ? color : LEGACY_COLORS.border,
+                background: illustrated ? tint(color, active ? 16 : 7) : active ? tint(color, 14) : LEGACY_COLORS.s2,
+                borderColor: active ? color : illustrated ? tint(color, 25) : LEGACY_COLORS.border,
+                borderWidth: illustrated ? (active ? 2 : 1) : undefined,
                 color: active ? color : LEGACY_COLORS.muted2,
               }}
             >
-              {d}
+              <span>{d}</span>
+              {illustrated && (
+                <Image
+                  src={`/images/warehouse/dexray-${d === "AS" ? "as-service" : "research-board"}.webp`}
+                  alt=""
+                  width={1536}
+                  height={1024}
+                  unoptimized
+                  loading="eager"
+                  className={presentation.choiceArt}
+                  draggable={false}
+                />
+              )}
             </button>
           );
         })}
@@ -143,11 +146,14 @@ export function MobileSubTypeStep({
   onToDepartmentChange: (v: string) => void;
   onDeptIoDirectionChange: (d: DeptIoDirection) => void;
 }) {
+  if (workType === "internal_use") {
+    return <DeptGrid value={toDepartment} onChange={onToDepartmentChange} options={["AS", "연구"]} stacked />;
+  }
+
   if (workType === "process" || workType === "warehouse_adjust") {
     return (
       <div className="flex flex-1 flex-col gap-3">
         <div className="flex flex-1 flex-col">
-          <Label text="방향" />
           <div className={presentation.twoChoices}>
             {(["in", "out"] as DeptIoDirection[]).map((dir) => {
               const active = deptIoDirection === dir;
@@ -157,18 +163,26 @@ export function MobileSubTypeStep({
                   key={dir}
                   type="button"
                   onClick={() => onDeptIoDirectionChange(dir)}
-                  className={presentation.directionChoice}
+                  className={`${presentation.directionChoice} ${presentation.illustratedChoice}`}
+                  aria-pressed={active}
                   style={{
-                    background: active ? tint(color, 14) : LEGACY_COLORS.s2,
-                    borderColor: active ? color : LEGACY_COLORS.border,
+                    background: tint(color, active ? 16 : 7),
+                    borderColor: active ? color : tint(color, 25),
                     borderWidth: active ? 2 : 1,
                     color: active ? color : LEGACY_COLORS.text,
                   }}
                 >
-                  <span className={presentation.choiceIcon} style={{ color }} aria-hidden="true">
-                    {dir === "in" ? <ArrowDownToLine /> : <ArrowUpFromLine />}
-                  </span>
-                  {dir === "in" ? "입고" : "출고"}
+                  <span>{dir === "in" ? "입고" : "출고"}</span>
+                  <Image
+                    src={`/images/warehouse/dexray-stock-${dir}.webp`}
+                    alt=""
+                    width={840}
+                    height={560}
+                    unoptimized
+                    loading="eager"
+                    className={presentation.choiceArt}
+                    draggable={false}
+                  />
                 </button>
               );
             })}
@@ -187,24 +201,37 @@ export function MobileSubTypeStep({
   return (
     <div className="flex flex-1 flex-col gap-3">
       <div className="flex flex-1 flex-col">
-        <Label text="세부 작업" />
         <div className={subRows.length === 2 ? presentation.twoChoices : "grid flex-1 grid-cols-2 gap-2"}>
           {subRows.map((row) => {
             const active = subType === row.id && (workType !== "warehouse_io" || deptIoDirection != null);
+            const illustrated = workType === "warehouse_io";
             const tone = workType === "warehouse_io" && row.id === "warehouse_to_dept" ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
             return (
               <button
                 key={row.id}
                 type="button"
                 onClick={() => onSubTypeChange(row.id)}
-                className="flex min-h-[56px] items-center justify-center rounded-[14px] border px-3 py-3 text-center transition-[transform] active:scale-95"
+                className={`${illustrated ? presentation.illustratedChoice : "flex items-center justify-center"} min-h-[56px] rounded-[14px] border px-3 py-3 text-center transition-[transform] active:scale-95`}
                 style={{
-                  background: active ? tint(tone, 14) : LEGACY_COLORS.s2,
-                  borderColor: active ? tone : LEGACY_COLORS.border,
-                  color: active ? tone : LEGACY_COLORS.muted2,
+                  background: illustrated ? tint(tone, active ? 16 : 7) : active ? tint(tone, 14) : LEGACY_COLORS.s2,
+                  borderColor: active ? tone : illustrated ? tint(tone, 25) : LEGACY_COLORS.border,
+                  borderWidth: illustrated ? (active ? 2 : 1) : undefined,
+                  color: active ? tone : illustrated ? LEGACY_COLORS.text : LEGACY_COLORS.muted2,
                 }}
               >
                 <span className="text-xl font-bold leading-tight">{row.label}</span>
+                {illustrated && (
+                  <Image
+                    src={`/images/warehouse/dexray-stock-${row.id === "warehouse_to_dept" ? "out" : "in"}.webp`}
+                    alt=""
+                    width={840}
+                    height={560}
+                    unoptimized
+                    loading="eager"
+                    className={presentation.choiceArt}
+                    draggable={false}
+                  />
+                )}
               </button>
             );
           })}
@@ -214,13 +241,6 @@ export function MobileSubTypeStep({
       {showAnyDept && dept.from && (
         <DeptGrid
           className="flex flex-1 flex-col"
-          label={
-            subType === "supplier_return"
-              ? "반품할 부서 (불량 출처)"
-              : subType === "defect_quarantine"
-              ? "불량 격리 부서"
-              : "출발 부서"
-          }
           value={fromDepartment}
           onChange={onFromDepartmentChange}
         />
@@ -228,16 +248,8 @@ export function MobileSubTypeStep({
       {showAnyDept && dept.to && (
         <DeptGrid
           className="flex flex-1 flex-col"
-          label={
-            subType === "warehouse_to_dept"
-              ? "도착 부서"
-              : subType === "internal_use_out"
-              ? "사용 부서"
-              : "대상 부서"
-          }
           value={toDepartment}
           onChange={onToDepartmentChange}
-          options={subType === "internal_use_out" ? ["AS", "연구"] : undefined}
         />
       )}
 

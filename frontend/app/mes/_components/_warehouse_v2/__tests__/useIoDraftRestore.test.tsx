@@ -554,9 +554,9 @@ describe("useIoDraftRestore", () => {
     await waitFor(() => expect(screen.getByTestId("restored-shortage")).toHaveTextContent("2"));
   });
 
-  it("restores single adjust drafts to the quantity adjustment step", async () => {
+  it.each(["adjust_in", "adjust_out"] as const)("restores %s drafts to the quantity adjustment step", async (subType) => {
     const goTo = vi.fn();
-    render(<Harness subType="adjust_out" goTo={goTo} />);
+    render(<Harness subType={subType} goTo={goTo} />);
 
     await waitFor(() => expect(goTo).toHaveBeenCalledWith(4));
   });

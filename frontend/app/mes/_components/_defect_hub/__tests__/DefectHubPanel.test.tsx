@@ -113,6 +113,16 @@ beforeEach(() => {
 });
 
 describe("DefectHubPanel", () => {
+  it("shows the collapsed filter and compact rows in the mobile list while keeping search visible", async () => {
+    render(<DefectHubPanel currentEmployee={mockEmployee} mobilePresentation />);
+    fireEvent.click(screen.getByText("격리 목록"));
+
+    expect(screen.getByRole("button", { name: "필터 펼치기" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("searchbox", { name: "불량 검색" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /전극\(70kV\).*격리 1건/ })).toHaveTextContent("7-TR-0001");
+    expect(screen.queryByRole("button", { name: "처리" })).not.toBeInTheDocument();
+  });
+
   it("preserves the dashboard model catalog order on mobile", async () => {
     const productModels = [{ slot: 3, model_name: "DX3000" }, { slot: 7, model_name: "COCOON" }, { slot: 4, model_name: "ADX4000W" }].map((model) => ({ ...model, symbol: null, is_reserved: false }));
     render(<DefectHubPanel currentEmployee={mockEmployee} productModels={productModels} />);
@@ -274,6 +284,15 @@ describe("DefectHubPanel", () => {
     const cart = await screen.findByTestId("cart-flow");
     expect(cart).toHaveTextContent("add");
     expect(cart).toHaveAttribute("data-default-source", "unset");
+  });
+
+  it("모바일 작업 선택에는 공통 단계 헤더를 표시한다", async () => {
+    render(<DefectHubPanel currentEmployee={mockEmployee} mobilePresentation />);
+    fireEvent.click(screen.getByRole("button", { name: /불량 처리/ }));
+
+    expect(await screen.findByRole("heading", { name: "작업 선택" })).toBeInTheDocument();
+    expect(screen.getByText("Step 1 / 1")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "이전" })).toBeInTheDocument();
   });
 
   it("모바일 격리 카트 취소는 허브 대신 작업 선택 history로 돌아간다", async () => {

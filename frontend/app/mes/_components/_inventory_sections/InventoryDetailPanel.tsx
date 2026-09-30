@@ -172,7 +172,7 @@ export function InventoryDetailPanel({
               <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                 사용 가능 재고
               </div>
-              <div className={mobile ? "mt-1 break-all text-2xl font-semibold tabular-nums" : "mt-1 text-xl font-black"} style={{ color: availableState.color }}>
+              <div className={mobile ? "mt-1 break-all font-sans text-xl font-medium leading-7" : "mt-1 text-xl font-black"} style={{ color: availableState.color }}>
                 {formatQty(availableQty)}
               </div>
             </div>
@@ -189,7 +189,7 @@ export function InventoryDetailPanel({
                 승인 대기 수량
               </div>
               <div
-                className={mobile ? "mt-1 break-all text-2xl font-semibold tabular-nums" : "mt-1 text-xl font-black"}
+                className={mobile ? "mt-1 break-all font-sans text-xl font-medium leading-7" : "mt-1 text-xl font-black"}
                 style={{ color: pendingQty > 0 ? LEGACY_COLORS.yellow : LEGACY_COLORS.text }}
               >
                 {formatQty(pendingQty)}
@@ -206,7 +206,7 @@ export function InventoryDetailPanel({
                 <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
                   불량 재고
                 </div>
-                <div className={mobile ? "mt-1 break-all text-2xl font-semibold tabular-nums" : "mt-1 text-xl font-black"} style={{ color: LEGACY_COLORS.red }}>
+                <div className={mobile ? "mt-1 break-all font-sans text-xl font-medium leading-7" : "mt-1 text-xl font-black"} style={{ color: LEGACY_COLORS.red }}>
                   {formatQty(defectiveQty)}
                 </div>
               </div>
@@ -328,7 +328,7 @@ export function InventoryDetailPanel({
             </div>
             {ioMenu && (
               <div className="flex flex-col gap-1.5">
-                {(ioMenu === "in" ? inboundChoices(canReceive) : outboundChoices).map((choice) => {
+                {(ioMenu === "in" ? inboundChoices(false) : outboundChoices).map((choice) => {
                   const accent = ioMenu === "out" ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
                   return (
                     <button

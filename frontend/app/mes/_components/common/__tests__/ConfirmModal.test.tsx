@@ -8,6 +8,11 @@ vi.mock("@/lib/client-events", () => audit);
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 
 describe("ConfirmModal", () => {
+  it("모바일 확인 팝업은 셸 안쪽 탭 바 폭을 사용하고 PC 폭을 유지한다", () => {
+    render(<ConfirmModal open title="작업 삭제" onClose={() => {}} onConfirm={() => {}} />);
+    expect(screen.getByRole("dialog").firstElementChild).toHaveClass("max-w-[406px]", "md:max-w-[696px]", "lg:max-w-[520px]");
+  });
+
   it("open=true 시 title 과 children 렌더", () => {
     render(
       <ConfirmModal
@@ -131,7 +136,7 @@ describe("ConfirmModal", () => {
     );
 
     const dialog = screen.getByRole("dialog");
-    expect(dialog.firstElementChild).toHaveClass("max-w-[640px]");
+    expect(dialog.firstElementChild).toHaveClass("lg:max-w-[640px]");
     expect(screen.queryByRole("button", { name: "취소" })).not.toBeInTheDocument();
 
     fireEvent.click(dialog);

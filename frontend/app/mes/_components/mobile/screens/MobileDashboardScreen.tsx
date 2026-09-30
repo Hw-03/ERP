@@ -187,7 +187,7 @@ export function MobileDashboardScreen({
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <MobileScrollFrame>
-        <div className="flex flex-col gap-2 px-3">
+        <div className="flex flex-col gap-2">
           <section className="flex flex-col gap-2">
             <InventoryKpiPanel
               mobile

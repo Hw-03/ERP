@@ -509,7 +509,7 @@ export function MobileShell({
           }}
         />
 
-        <main className={`relative min-h-0 min-w-0 flex-1 overflow-hidden flex pt-3 ${activeTab === "weekly" || activeTab === "warehouseMap" ? "" : presentation.scope}`} data-testid="screen-root">
+        <main className={`relative min-h-0 min-w-0 flex-1 overflow-hidden flex pt-5 ${activeTab === "weekly" || activeTab === "warehouseMap" ? "" : presentation.scope}`} data-testid="screen-root">
           <h1 className="sr-only">{TAB_META[activeTab].label} — DEXCOWIN MES</h1>
           {content}
         </main>

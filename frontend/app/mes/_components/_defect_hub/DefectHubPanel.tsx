@@ -24,6 +24,7 @@ import { DefectDepartmentList } from "./DefectDepartmentList";
 import { DefectProcessPanel } from "./DefectProcessPanel";
 import { MobileDefectProcessPanel } from "../mobile/screens/MobileDefectProcessPanel";
 import { MobileDefectCartFlow } from "../mobile/screens/MobileDefectCartFlow";
+import { MobileDefectStepHeader } from "../mobile/screens/MobileDefectStepHeader";
 import type { DefectCartMode } from "./DefectCartFlow";
 import type { Item, ProductModel } from "../_warehouse_v2/types";
 import { InlineErrorNote } from "./InlineErrorNote";
@@ -414,8 +415,7 @@ export function DefectHubPanel({
     if (mobilePresentation) {
       return (
         <div className="flex min-h-full flex-col gap-3">
-          <button type="button" onClick={() => window.history.back()} className="min-h-11 self-start text-sm" style={{ color: LEGACY_COLORS.muted2 }}>← 작업 선택</button>
-          <h2 className="text-lg font-semibold">불량 처리</h2>
+          <MobileDefectStepHeader title="작업 선택" steps={["작업 선택"]} current={0} onBack={() => window.history.back()} context="불량 처리" />
           <div className={`${presentation.surface} ${presentation.choiceList}`}>
             <button type="button" onClick={() => openCart("add")} className={presentation.menuRow}><span className={presentation.choiceIcon} style={{ color: LEGACY_COLORS.red }} aria-hidden="true"><ShieldAlert /></span><span>격리 등록</span></button>
             <button type="button" onClick={() => openCart("scrap")} className={presentation.menuRow}><span className={presentation.choiceIcon} style={{ color: LEGACY_COLORS.red }} aria-hidden="true"><Trash2 /></span><span>바로 처리</span></button>
@@ -463,6 +463,7 @@ export function DefectHubPanel({
       />
 
       <DefectFilterBar
+        mobilePresentation={mobilePresentation}
         scope={scope}
         actorScope={actorScope}
         sort={sort}
@@ -541,6 +542,7 @@ export function DefectHubPanel({
       ) : (
         <div className={mobilePresentation ? dataRevealClassName : "contents"}>
           <DefectDepartmentList
+            mobilePresentation={mobilePresentation}
             emptyContent={<ReadEmpty hasSearch={!!search.trim()} hasFilters={locations.length > 0}
               title={!search.trim() && locations.length === 0 ? "격리된 불량 재고가 없습니다." : undefined}
               onReset={() => { setSearch(""); setScope("all"); resetCategoryFilters(); setKpiFilter(null); }} />}

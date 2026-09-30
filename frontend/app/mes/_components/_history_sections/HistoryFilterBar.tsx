@@ -4,7 +4,7 @@ import { CalendarDays, ChevronDown, Filter, Search, X } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { DATE_OPTIONS, formatHistoryMonthLabel, type SelectedHistoryMonth } from "./historyQuery";
 
-// 3차 C8: 상단 컨트롤 한 줄 통합 — [검색][기간][필터][달력] + 선택날짜 칩.
+// 데스크톱은 [검색][기간][필터][달력], 모바일은 제어줄 아래 검색만 고정.
 // 거래 유형 칩 줄·"적용됨" 요약 줄은 폐기(거래 종류 = "필터" 패널 카드).
 // 필터 패널 3카드·달력 strip 은 이 줄 아래 전체폭으로 드롭(부모가 렌더).
 type Props = {
@@ -46,9 +46,7 @@ export function HistoryFilterBar({
   disabled = false,
   mobile = false,
 }: Props) {
-  return (
-    <section className={mobile ? "min-w-0" : flatSurface ? "card desktop-flat-surface" : "card"} style={mobile ? undefined : { paddingTop: 14, paddingBottom: 14 }}>
-      <div className="flex flex-wrap items-center gap-2">
+  const searchBar = (
         <div
           className={mobile ? "flex min-h-11 w-full items-center gap-2 rounded-[12px] border pl-3 pr-1" : "flex min-h-[44px] flex-1 items-center gap-2 rounded-[12px] border px-3 py-2 lg:min-h-0"}
           style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
@@ -68,7 +66,9 @@ export function HistoryFilterBar({
             </button>
           )}
         </div>
-
+  );
+  const controls = (
+    <>
         {/* 선택 날짜 칩 — 달력 접혀 있어도 항상 노출(활성 필터 정직 표기). */}
         {selectedDay && (
           <span
@@ -175,6 +175,26 @@ export function HistoryFilterBar({
             style={{ transform: calendarOpen ? "rotate(180deg)" : undefined }}
           />
         </button>
+    </>
+  );
+
+  if (mobile) {
+    return (
+      <>
+        <div className="flex min-w-0 flex-wrap items-center gap-2">{controls}</div>
+        <div className="sticky top-0 z-20" style={{ background: LEGACY_COLORS.bg }}>
+          {searchBar}
+          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-full h-2" style={{ background: LEGACY_COLORS.bg }} />
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <section className={flatSurface ? "card desktop-flat-surface" : "card"} style={{ paddingTop: 14, paddingBottom: 14 }}>
+      <div className="flex flex-wrap items-center gap-2">
+        {searchBar}
+        {controls}
       </div>
     </section>
   );

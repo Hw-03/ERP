@@ -51,6 +51,39 @@ describe("DefectDepartmentList", () => {
     apiMocks.getManagementCategoryHistory.mockResolvedValue([]);
   });
 
+  it("shows a compact mobile row for one record and reveals the existing actions on expand", () => {
+    const onProcess = vi.fn();
+    render(<DefectDepartmentList mobilePresentation locations={[makeLocation({ item_name: "길고 긴 고압 보드 조립품 이름" })]} onProcess={onProcess} />);
+
+    const row = screen.getByRole("button", { name: /길고 긴 고압 보드 조립품 이름.*격리 1건/ });
+    expect(row).toHaveAttribute("aria-expanded", "false");
+    expect(row).toHaveTextContent("AX-001");
+    expect(row).toHaveTextContent("2개");
+    expect(row).toHaveTextContent("26.07.01");
+    expect(screen.queryByRole("button", { name: "처리" })).not.toBeInTheDocument();
+
+    fireEvent.click(row);
+    expect(row).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(screen.getByRole("button", { name: "처리" }));
+    expect(onProcess).toHaveBeenCalledWith(expect.objectContaining({ record_id: "record-1" }));
+  });
+
+  it("shows a compact mobile row for grouped records and expands their batch actions", () => {
+    render(<DefectDepartmentList mobilePresentation locations={[
+      makeLocation({ record_id: "first", quantity: 2 }),
+      makeLocation({ record_id: "second", quantity: 3, defective_at: "2026-07-02T00:00:00Z" }),
+    ]} onProcess={vi.fn()} onBatchProcess={vi.fn()} />);
+
+    const row = screen.getByRole("button", { name: /AX-100.*격리 2건/ });
+    expect(row).toHaveTextContent("5개");
+    expect(row).toHaveTextContent("26.07.02");
+    expect(screen.queryByRole("button", { name: "여러 건 선택" })).not.toBeInTheDocument();
+    fireEvent.click(row);
+    expect(screen.getByRole("button", { name: "여러 건 선택" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "처리" })).toHaveLength(2);
+    expect(within(screen.getAllByRole("article", { name: "AX-100 격리 기록" })[0]).getByText("AX-100")).toBeInTheDocument();
+  });
+
   it("storage mode reuses memo actions and expands same-item records without the long-quarantine warning", () => {
     render(<DefectDepartmentList storageMode currentEmployee={currentEmployee} locations={[
       makeLocation({ record_id: "b-grade-1", defective_at: "2024-01-01T00:00:00Z", management_category: "B_GRADE" }),

@@ -1,6 +1,6 @@
+import Image from "next/image";
 import { DirectionCard } from "./IoWorkTypeStep";
 import type { IoSubType } from "./types";
-import { ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import presentation from "../mobile/mobilePresentation.module.css";
@@ -14,25 +14,39 @@ export function MaterialDirectionStep({ selected, onSelect, mobilePresentation =
     return (
       <div className={presentation.twoChoices}>
         {([
-          { subType: "receive_supplier", label: "입고", icon: ArrowDownToLine },
-          { subType: "outbound_supplier", label: "출고", icon: ArrowUpFromLine },
-        ] as const).map(({ subType, label, icon: Icon }) => (
-          <button
-            key={subType}
-            type="button"
-            aria-pressed={selected === subType}
-            onClick={() => onSelect(subType)}
-            className={presentation.directionChoice}
-            style={{
-              borderColor: selected === subType ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-              background: selected === subType ? tint(LEGACY_COLORS.blue, 10) : LEGACY_COLORS.s2,
-              color: selected === subType ? LEGACY_COLORS.blue : LEGACY_COLORS.text,
-            }}
-          >
-            <span className={presentation.choiceIcon} style={{ color: subType === "outbound_supplier" ? LEGACY_COLORS.red : LEGACY_COLORS.blue }} aria-hidden="true"><Icon /></span>
-            {label}
-          </button>
-        ))}
+          { subType: "receive_supplier", label: "입고", direction: "in" },
+          { subType: "outbound_supplier", label: "출고", direction: "out" },
+        ] as const).map(({ subType, label, direction }) => {
+          const active = selected === subType;
+          const color = direction === "out" ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
+          return (
+            <button
+              key={subType}
+              type="button"
+              aria-pressed={active}
+              onClick={() => onSelect(subType)}
+              className={`${presentation.directionChoice} ${presentation.illustratedChoice}`}
+              style={{
+                background: tint(color, active ? 16 : 7),
+                borderColor: active ? color : tint(color, 25),
+                borderWidth: active ? 2 : 1,
+                color: active ? color : LEGACY_COLORS.text,
+              }}
+            >
+              <span>{label}</span>
+              <Image
+                src={`/images/warehouse/dexray-stock-${direction}.webp`}
+                alt=""
+                width={840}
+                height={560}
+                unoptimized
+                loading="eager"
+                className={presentation.choiceArt}
+                draggable={false}
+              />
+            </button>
+          );
+        })}
       </div>
     );
   }

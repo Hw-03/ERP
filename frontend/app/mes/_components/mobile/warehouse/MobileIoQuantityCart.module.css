@@ -1,14 +1,8 @@
 /* 수량 조정에만 적용한다. 사용자가 요청한 한 행 밀도를 위해 빠른 조작은 28px로 축소한다. */
-.cart [data-io-cart-list] {
-  padding-right: 0;
-  border: 1px solid var(--c-border);
-  border-radius: 20px;
-  background: var(--c-s2);
-  overflow: auto;
-}
+.cart [data-io-cart-list] { padding-right: 0; }
 
-.cart [data-io-cart] { gap: 0; }
-.cart [data-io-cart-actions] { padding-top: 4px; }
+.cart [data-io-cart] { gap: 8px; }
+.cart [data-io-cart-actions] { padding-top: 0; }
 
 .cart [data-io-line],
 .cart [data-io-bundle-header] {
@@ -59,10 +53,12 @@
 }
 
 .cart [data-io-identity] :global(.line-clamp-2) {
-  display: block;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .cart [data-io-location] {
@@ -244,6 +240,10 @@
 
 .cart [data-io-bundle-header] > [data-io-identity] > div:first-child {
   grid-column: 1 / 3;
+  align-self: start;
+  align-items: flex-start;
+  height: 36px;
+  overflow: hidden;
   padding-left: 28px;
 }
 
@@ -263,6 +263,23 @@
 
 .cart [data-io-line-meta] > span:first-child,
 .cart [data-io-bundle-meta] > span:first-child { flex-shrink: 0; }
+
+.cart [data-io-bundle-header]:not([data-io-internal-use="true"]) [data-io-bundle-meta] {
+  align-self: end;
+  height: 36px;
+  overflow: hidden;
+}
+
+.cart [data-io-bundle-meta] > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cart [data-io-bundle-meta] [data-io-inline-location] {
+  justify-content: flex-start;
+  text-align: left;
+}
 
 .cart [data-io-line-meta] > span:nth-child(n+3),
 .cart [data-io-bundle-meta] > span:nth-child(n+3) { grid-column: 1 / -1; }

@@ -45,6 +45,16 @@ function SnapshotNameHarness({ onSynced }: { onSynced: (nextName: string | null)
 }
 
 describe("SupplierPickerStep", () => {
+  it("모바일 공급업체 목록은 카드 밖 레일과 고정 프레임을 가진다", async () => {
+    const { container } = render(<SupplierPickerStep variant="mobile" employeeId="warehouse-1" selectedSupplierId={null} onSelect={vi.fn()} />);
+    await screen.findByRole("button", { name: "덕스윈상사", exact: true });
+    expect(container.querySelector("[data-supplier-scroll-shell]")).toHaveStyle({ background: "var(--c-s1)" });
+    const viewport = container.querySelector("[data-supplier-scroll-viewport]");
+    expect(viewport).toHaveAttribute("data-keep-scroll");
+    expect(viewport).not.toHaveStyle({ background: "var(--c-s1)" });
+    expect(container.querySelector("[data-supplier-scroll-frame]")).toBeInTheDocument();
+  });
+
   it("keeps mobile supplier rows while initial data is pending", () => {
     api.listSuppliers.mockReturnValueOnce(new Promise(() => {}));
     render(<SupplierPickerStep variant="mobile" employeeId="warehouse-1" selectedSupplierId={null} onSelect={vi.fn()} />);

@@ -8,7 +8,7 @@ import { formatQty } from "@/lib/mes/format";
 import { findInventoryLocation, locationAvailable, locationPending, warehouseAvailable, warehousePending } from "@/lib/mes/inventory";
 import { Tooltip } from "@/lib/ui";
 import { EmptyState } from "../common";
-import { SkeletonBlock, dataRevealClassName } from "../common/LoadingSkeleton";
+import { SkeletonBlock } from "../common/LoadingSkeleton";
 import { ReadFailure } from "../common/ReadState";
 import { useCurrentOperator } from "../login/useCurrentOperator";
 import {
@@ -550,15 +550,12 @@ export function IoTargetPicker({
 
       {/* 결과 영역 */}
       {loadError && <ReadFailure message={loadError} refresh={hasData} onRetry={() => onRetry?.()} />}
-      <div
-        className="relative min-h-0 flex-1 overflow-hidden rounded-[16px] border lg:overflow-visible lg:rounded-none lg:border-0"
-        style={{ borderColor: LEGACY_COLORS.border }}
-      >
+      <div className="relative min-h-0 flex-1">
         <div
           ref={tableContainerRef}
           onScroll={handleTableScroll}
           data-keep-scroll
-          className="absolute inset-y-0 left-0 right-0 overflow-y-auto overflow-x-auto lg:-right-2.5 lg:[scrollbar-gutter:stable]"
+          className="absolute inset-y-0 left-0 -right-2.5 overflow-y-auto overflow-x-auto [scrollbar-gutter:stable]"
           style={{ overscrollBehavior: "contain" }}
         >
           <div
@@ -609,31 +606,31 @@ export function IoTargetPicker({
         </div>
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 z-20 hidden rounded-[16px] border lg:block"
+          className="pointer-events-none absolute inset-0 z-20 rounded-[16px] border"
           style={{ borderColor: LEGACY_COLORS.border }}
         />
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 z-20 hidden flex-col justify-between lg:flex"
+          className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between"
         >
           <div className="flex justify-between">
             <span
               className="h-4 w-4"
-              style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 15px, var(--c-s1) 16px)" }}
+              style={{ background: `radial-gradient(circle at 100% 100%, transparent 0 15px, var(${mobilePresentation ? "--c-bg" : "--c-s1"}) 16px)` }}
             />
             <span
               className="h-4 w-4"
-              style={{ background: "radial-gradient(circle at 0 100%, transparent 0 15px, var(--c-s1) 16px)" }}
+              style={{ background: `radial-gradient(circle at 0 100%, transparent 0 15px, var(${mobilePresentation ? "--c-bg" : "--c-s1"}) 16px)` }}
             />
           </div>
           <div className="flex justify-between">
             <span
               className="h-4 w-4"
-              style={{ background: "radial-gradient(circle at 100% 0, transparent 0 15px, var(--c-s1) 16px)" }}
+              style={{ background: `radial-gradient(circle at 100% 0, transparent 0 15px, var(${mobilePresentation ? "--c-bg" : "--c-s1"}) 16px)` }}
             />
             <span
               className="h-4 w-4"
-              style={{ background: "radial-gradient(circle at 0 0, transparent 0 15px, var(--c-s1) 16px)" }}
+              style={{ background: `radial-gradient(circle at 0 0, transparent 0 15px, var(${mobilePresentation ? "--c-bg" : "--c-s1"}) 16px)` }}
             />
           </div>
         </div>
@@ -912,7 +909,7 @@ function ItemTable({
             )}
           </tr>
         </thead>
-        <tbody role={loading ? "status" : undefined} aria-label={loading ? "품목 불러오는 중" : undefined} aria-busy={loading || undefined} className={mobilePresentation && !loading ? dataRevealClassName : undefined}>
+        <tbody role={loading ? "status" : undefined} aria-label={loading ? "품목 불러오는 중" : undefined} aria-busy={loading || undefined}>
           {loading && [0, 1, 2, 3].map((row) => <tr key={`loading-${row}`} aria-hidden="true"><td colSpan={6} className="border-b border-[var(--c-border)] px-3 py-3"><div className="flex min-h-[48px] items-center gap-3"><div className="flex flex-1 flex-col gap-2"><SkeletonBlock className="h-4 w-2/3" /><SkeletonBlock className="h-3 w-1/2" /></div><SkeletonBlock className="h-8 w-20 rounded-[10px]" /></div></td></tr>)}
           {items.slice(0, displayLimit).map((item) => {
             const prodByDept = getProdByDept(item);

@@ -106,6 +106,16 @@ afterEach(() => {
 });
 
 describe("InventoryDetailPanel desktop quick actions", () => {
+  it("keeps raw-material receiving on desktop but hides it from mobile detail", () => {
+    const { rerender } = render(<InventoryDetailPanel item={makeItem()} canReceive onGoToWarehouse={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "입고" }));
+    expect(screen.getByRole("button", { name: /원자재 수령/ })).toBeInTheDocument();
+
+    rerender(<InventoryDetailPanel item={makeItem()} canReceive quickActionVariant="mobile" onGoToWarehouse={() => {}} />);
+    expect(screen.queryByRole("button", { name: /원자재 수령/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /부서 입고/ })).toBeInTheDocument();
+  });
+
   it("uses directional buttons without outer group cards and keeps choices full-width", () => {
     render(
       <DesktopRightPanel title="테스트 항목">

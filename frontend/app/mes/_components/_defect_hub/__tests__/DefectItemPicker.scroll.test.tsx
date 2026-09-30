@@ -40,6 +40,11 @@ function makeItem(index: number): Item {
 }
 
 describe("DefectItemPicker mobile scroll", () => {
+  it("모바일 품목 선택 행은 로딩 완료 직후 투명도 애니메이션 없이 표시한다", () => {
+    const { container } = render(<DefectItemPicker mobilePresentation items={[makeItem(1)]} productModels={[]} source="warehouse" selectedIds={new Set()} onAdd={() => {}} onRemove={() => {}} />);
+    expect(container.querySelectorAll("tbody tr")).toHaveLength(1);
+    expect(container.querySelector("tbody")).not.toHaveAttribute("class");
+  });
   it("모바일 검색 이름을 유지하고 둥근 외곽 안에서 결과만 스크롤한다", async () => {
     render(<DefectItemPicker mobilePresentation items={[makeItem(1), makeItem(2)]} productModels={[]} source="warehouse" selectedIds={new Set()} onAdd={() => {}} onRemove={() => {}} />);
     const input = screen.getByRole("textbox", { name: "검색" });
