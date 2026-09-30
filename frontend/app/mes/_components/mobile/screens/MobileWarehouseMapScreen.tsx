@@ -205,6 +205,7 @@ export function MobileWarehouseMapScreen({
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
+        paddingTop: "calc(env(safe-area-inset-right, 0px) + 20px)",
         background: LEGACY_COLORS.bg,
         color: LEGACY_COLORS.text,
       }}
