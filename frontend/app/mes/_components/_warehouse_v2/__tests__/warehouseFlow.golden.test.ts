@@ -46,7 +46,6 @@ import {
   directionWord,
   deptVisibility,
   exclusionNoteFor,
-  usesMobileSingleAdjustForm,
 } from "../ioWorkType";
 import { useIoWorkState, IO_STEP_LABELS, type IoStep } from "../useIoWorkState";
 import {
@@ -562,7 +561,7 @@ describe("requiresDepartmentApprovalMemo", () => {
 });
 
 // ──────────────────────────────────────────────────────────────────
-// mergePreviewBundles / usesMobileSingleAdjustForm
+// mergePreviewBundles
 // ──────────────────────────────────────────────────────────────────
 describe("작성 화면 공통 선택 규칙", () => {
   const bom = makeBundle({
@@ -588,13 +587,6 @@ describe("작성 화면 공통 선택 규칙", () => {
       .toEqual([manual]);
   });
 
-  it("모바일 process 낱개는 기본 단품 폼을 쓰되 명시적 picker 전환 뒤에는 유지한다", () => {
-    expect(usesMobileSingleAdjustForm("process", "adjust_in")).toBe(true);
-    expect(usesMobileSingleAdjustForm("process", "adjust_out")).toBe(true);
-    expect(usesMobileSingleAdjustForm("process", "adjust_in", true)).toBe(false);
-    expect(usesMobileSingleAdjustForm("warehouse_adjust", "warehouse_adjust_in")).toBe(true);
-    expect(usesMobileSingleAdjustForm("warehouse_adjust", "warehouse_adjust_in", true)).toBe(true);
-  });
 });
 
 // ──────────────────────────────────────────────────────────────────

@@ -73,8 +73,9 @@ vi.mock("../../../_warehouse_v2/IoConfirmStep", () => ({
   ),
 }));
 vi.mock("../../../_warehouse_v2/IoBundleCart", () => ({
-  IoBundleCart: ({ bundles, onPullFromWarehouse, onQuantityChange, onSaveDraft, pulling, pullBlocked }: {
+  IoBundleCart: ({ bundles, onAdvance, onPullFromWarehouse, onQuantityChange, onSaveDraft, pulling, pullBlocked }: {
     bundles: { bundle_id: string; lines: { line_id: string; quantity?: number }[] }[];
+    onAdvance: () => void;
     onPullFromWarehouse: () => void;
     onQuantityChange: (bundleId: string, lineId: string, quantity: number, shortage: number) => void;
     onSaveDraft: () => void;
@@ -99,14 +100,16 @@ vi.mock("../../../_warehouse_v2/IoBundleCart", () => ({
       <button type="button" onClick={onPullFromWarehouse} disabled={pullBlocked}>부족 품목 가져오기</button>
       <button type="button" onClick={onPullFromWarehouse}>차단 우회 부족 품목 가져오기</button>
       <button type="button" onClick={onSaveDraft}>모바일 임시저장</button>
+      <button type="button" onClick={onAdvance}>수량 조정 완료</button>
     </>
   ),
 }));
 vi.mock("../../../_warehouse_v2/IoTargetPicker", () => ({
-  IoTargetPicker: ({ bundles, filters, onAddItem, onFiltersChange, search, onSearchChange }: {
+  IoTargetPicker: ({ bundles, filters, onAddItem, onAdvance, onFiltersChange, search, onSearchChange }: {
     bundles: { source_kind?: string }[];
     filters: { department: string; model: string; stage: string };
     onAddItem: (item: { item_id: string; item_name: string }, sourceKind: "direct_item", subType: "produce") => void;
+    onAdvance: () => void;
     onFiltersChange: (filters: { department: string; model: string; stage: string }) => void;
     search: string;
     onSearchChange: (search: string) => void;
@@ -117,6 +120,7 @@ vi.mock("../../../_warehouse_v2/IoTargetPicker", () => ({
       <button type="button" onClick={() => onAddItem({ item_id: "same-item", item_name: "BOM 품목" }, "direct_item", "produce")}>BOM 품목 추가</button>
       <button type="button" onClick={() => onFiltersChange({ department: "조립", model: "MODEL-1", stage: "DONE" })}>필터 적용</button>
       <button type="button" onClick={() => onSearchChange("검색어")}>검색 적용</button>
+      <button type="button" onClick={onAdvance}>품목 선택 완료</button>
     </>
   ),
 }));
@@ -189,7 +193,7 @@ describe("MobileIoComposeWizard 부족 품목 가져오기", () => {
     expect(screen.getByText("BOM 정보를 불러오지 못했습니다. 다시 시도해 주세요")).toBeInTheDocument();
   });
 
-  it("process 단품 폼에서 picker로 전환해 기존 낱개를 보존한 채 BOM을 추가한다", async () => {
+  it("부서 입출고 낱개도 picker에서 시작해 기존 낱개를 보존한 채 BOM을 추가한다", async () => {
     state.step = 3;
     state.workType = "process";
     state.subType = "adjust_in";
@@ -215,12 +219,8 @@ describe("MobileIoComposeWizard 부족 품목 가져오기", () => {
     });
     const view = renderWizard();
 
-    expect(screen.getByRole("button", { name: "증가" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /작성 중 저장/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /최종 검토/ })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "BOM·품목 더 담기" }));
-
     expect(screen.getByRole("button", { name: "BOM 품목 추가" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /최종 검토/ })).not.toBeInTheDocument();
     expect(screen.getByTestId("mobile-picker-bundle-kinds")).toHaveTextContent("manual");
     fireEvent.click(screen.getByRole("button", { name: "BOM 품목 추가" }));
     await waitFor(() => expect(previewTarget).toHaveBeenCalledWith(expect.objectContaining({ subType: "produce" })));
@@ -229,21 +229,77 @@ describe("MobileIoComposeWizard 부족 품목 가져오기", () => {
     expect(screen.getByTestId("mobile-picker-bundle-kinds")).toHaveTextContent("manual,bom_parent");
   });
 
-  it("warehouse_adjust는 기존 단품 폼을 유지하고 picker 전환을 노출하지 않는다", () => {
-    state.step = 3;
-    state.workType = "warehouse_adjust";
-    state.subType = "warehouse_adjust_in";
-    state.bundles = [];
+  it.each(["warehouse_adjust_in", "warehouse_adjust_out"])(
+    "%s은 PC와 같은 품목 선택기를 사용한다",
+    (subType) => {
+      state.step = 3;
+      state.workType = "warehouse_adjust";
+      state.subType = subType;
+      state.bundles = [];
 
-    renderWizard();
+      renderWizard();
 
-    expect(screen.getByRole("button", { name: /작성 중 저장/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /최종 검토/ })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "BOM·품목 더 담기" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "BOM 품목 추가" })).not.toBeInTheDocument();
-  });
+      expect(screen.getByTestId("mobile-picker-filter-state")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "BOM 품목 추가" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /작성 중 저장/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /최종 검토/ })).not.toBeInTheDocument();
+    },
+  );
 
-  it("process picker 전환은 새 세부작업을 시작하면 초기화한다", () => {
+  it.each(["adjust_in", "adjust_out"])(
+    "부서 %s 낱개도 품목 선택, 수량 조정, 최종 확인과 뒤로 가기를 따른다",
+    (subType) => {
+      state.step = 3;
+      state.workType = "process";
+      state.subType = subType;
+      state.deptIoDirection = subType === "adjust_in" ? "in" : "out";
+      state.bundles = [{ bundle_id: "single-bundle", source_kind: "manual", lines: [{ line_id: "single-line", item_id: "same-item", included: true, shortage: 0, quantity: 2 }] }];
+      state.canAdvance[4] = true;
+
+      const view = renderWizard();
+      expect(screen.getByTestId("mobile-picker-bundle-kinds")).toHaveTextContent("manual");
+      fireEvent.click(screen.getByRole("button", { name: "품목 선택 완료" }));
+      expect(state.goTo).toHaveBeenCalledWith(4);
+
+      state.step = 4;
+      view.rerender(<MobileIoComposeWizard globalSearch="" operator={operator} items={[]} setItems={vi.fn()} onStatusChange={vi.fn()} />);
+      expect(screen.getByTestId("mobile-pull-cart-state")).toHaveTextContent("single-bundle:2");
+      fireEvent.click(screen.getByRole("button", { name: "수량 조정 완료" }));
+      expect(state.goTo).toHaveBeenCalledWith(5);
+
+      state.step = 5;
+      view.rerender(<MobileIoComposeWizard globalSearch="" operator={operator} items={[]} setItems={vi.fn()} onStatusChange={vi.fn()} />);
+      expect(screen.getByRole("button", { name: "모바일 제출" })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "이전 단계" }));
+      expect(state.goPrev).toHaveBeenCalled();
+    },
+  );
+
+  it.each(["warehouse_adjust_in", "warehouse_adjust_out"])(
+    "%s의 품목 선택에서 수량 조정과 최종 확인으로 진행한다",
+    (subType) => {
+      state.step = 3;
+      state.workType = "warehouse_adjust";
+      state.subType = subType;
+      state.bundles = [{ bundle_id: "adjust-bundle", lines: [{ line_id: "adjust-line", item_id: "same-item", included: true, shortage: 0, quantity: 1 }] }];
+      state.canAdvance[4] = true;
+
+      const view = renderWizard();
+      fireEvent.click(screen.getByRole("button", { name: "품목 선택 완료" }));
+      expect(state.goTo).toHaveBeenCalledWith(4);
+
+      state.step = 4;
+      view.rerender(<MobileIoComposeWizard globalSearch="" operator={operator} items={[]} setItems={vi.fn()} onStatusChange={vi.fn()} />);
+      fireEvent.click(screen.getByRole("button", { name: "수량 조정 완료" }));
+      expect(state.goTo).toHaveBeenCalledWith(5);
+
+      state.step = 5;
+      view.rerender(<MobileIoComposeWizard globalSearch="" operator={operator} items={[]} setItems={vi.fn()} onStatusChange={vi.fn()} />);
+      expect(screen.getByRole("button", { name: "모바일 제출" })).toBeInTheDocument();
+    },
+  );
+
+  it("부서 입출고는 새 세부작업에서 선택기 필터를 초기화한다", () => {
     state.step = 3;
     state.workType = "process";
     state.subType = "adjust_in";
@@ -257,8 +313,8 @@ describe("MobileIoComposeWizard 부족 품목 가져오기", () => {
     }];
     const view = renderWizard();
 
-    fireEvent.click(screen.getByRole("button", { name: "BOM·품목 더 담기" }));
     expect(screen.getByRole("button", { name: "BOM 품목 추가" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "필터 적용" }));
 
     state.step = 2;
     view.rerender(<MobileIoComposeWizard globalSearch="" operator={operator} items={[]} setItems={vi.fn()} onStatusChange={vi.fn()} />);
@@ -266,7 +322,7 @@ describe("MobileIoComposeWizard 부족 품목 가져오기", () => {
 
     state.step = 3;
     view.rerender(<MobileIoComposeWizard globalSearch="" operator={operator} items={[]} setItems={vi.fn()} onStatusChange={vi.fn()} />);
-    expect(screen.getByRole("button", { name: /작성 중 저장/ })).toBeInTheDocument();
+    expect(screen.getByTestId("mobile-picker-filter-state")).toHaveTextContent("ALL|전체|ALL|");
   });
 
   it("저장 실패 시 원 작업을 유지하고 preview를 시작하지 않는다", async () => {

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "rea
 import { ArrowLeft, ScanLine } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
+import { WORK_TYPE_LABEL } from "@/lib/io/glossary";
 import {
   api,
   type IoBundle,
@@ -21,7 +22,6 @@ import { MobileWorkTypeStep, MobileSubTypeStep } from "./MobileWorkTypeStep";
 import { SupplierPickerStep } from "../../_warehouse_v2/SupplierPickerStep";
 import { MaterialDirectionStep } from "../../_warehouse_v2/MaterialDirectionStep";
 import { Button } from "@/lib/ui/Button";
-import { MobileSingleAdjustForm } from "./MobileSingleAdjustForm";
 import panelStyles from "../screens/mobileWarehousePanels.module.css";
 import quantityStyles from "./MobileIoQuantityCart.module.css";
 import { IoTargetPicker } from "../../_warehouse_v2/IoTargetPicker";
@@ -39,10 +39,8 @@ import {
   isSingleInlineSubType,
   mergePreviewBundles,
   pickerDirectionLabel,
-  singleItemSourceKind,
   subTypeLabel,
   targetDepartmentOf,
-  usesMobileSingleAdjustForm,
 } from "../../_warehouse_v2/ioWorkType";
 import {
   applyBundleQuantityChange,
@@ -194,7 +192,6 @@ export function MobileIoComposeWizard({
   // BOM 부모 품목으로 진입한 경우 자동 추가하지 않고 picker 에서 row 만 강조.
   const [highlightItemId, setHighlightItemId] = useState<string | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
-  const [processPickerMode, setProcessPickerMode] = useState(false);
   const previousAuditScreenRef = useRef<string | null>(null);
   const restoredDraftRef = useRef<string | null>(null);
   // 마지막으로 복원을 발동시킨 '이어서 하기' nonce — 같은 draft 재선택 재발동 판정용.
@@ -426,7 +423,6 @@ export function MobileIoComposeWizard({
   // (안 하면 다음 저장이 이전 draft 를 덮어써 손실.)
   function beginNewCompositionSlot() {
     bumpOperationGeneration();
-    setProcessPickerMode(false);
     autosaveBatchIdRef.current = null;
     // 새 작업 슬롯 — 복원 추적 해제. 같은 '이어서 작업' 재선택 시 재복원 보장.
     restoredDraftRef.current = null;
@@ -644,7 +640,7 @@ export function MobileIoComposeWizard({
         ? "입고·출고 방향 선택"
         : state.workType === "process" || state.workType === "warehouse_io"
           ? "세부 작업 선택"
-          : "세부 작업과 부서"
+          : "사용 부서 선택"
       : step === 3
       ? `${pickerDirectionLabel(state.subType)} 품목 선택`
       : step === 4
@@ -654,29 +650,31 @@ export function MobileIoComposeWizard({
   return (
     <div className={`flex h-full min-h-0 flex-1 flex-col ${panelStyles.touchScope} ${panelStyles.composeScope}`} style={{ background: LEGACY_COLORS.bg }}>
       {/* 진행 안내는 본문 밖에 두어 스크롤 중에도 현재 단계를 유지한다. */}
-      <div
-        className={`z-10 mx-3 flex min-h-10 shrink-0 items-center gap-2 rounded-[12px] border px-3 py-2 [@media(max-height:500px)]:py-1 ${step === 4 ? "mt-0" : "mt-2"}`}
-        style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
-      >
-        {step > 1 ? (
+      {step > 1 && (
+        <div
+          className="z-10 mx-3 flex min-h-10 shrink-0 items-center gap-2 rounded-[12px] border px-3 py-2 [@media(max-height:500px)]:py-1"
+          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
+        >
           <IconButton icon={ArrowLeft} label="이전 단계" size="md" onClick={state.goPrev} />
-        ) : null}
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <h2
-            className="min-w-0 max-w-[160px] truncate text-[15px] font-semibold"
-            style={{ color: LEGACY_COLORS.text }}
-          >
-            {stepTitle}
-          </h2>
-          <WizardProgress
-            steps={state.workType === "receive" ? [{ key: "1", label: "작업 유형" }, { key: "6", label: "입고·출고" }, { key: "2", label: "공급업체" }, ...STEP_META.slice(2)] : STEP_META}
-            current={state.steps.indexOf(step)}
-            variant="inline"
-            accent={directionOutbound ? LEGACY_COLORS.red : undefined}
-            className="flex-1"
-          />
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <div className="flex min-w-0 max-w-[160px] shrink flex-col leading-tight">
+              <span className="truncate text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+                {WORK_TYPE_LABEL[state.workType]}
+              </span>
+              <h2 className="truncate text-[15px] font-semibold" style={{ color: LEGACY_COLORS.text }}>
+                {stepTitle}
+              </h2>
+            </div>
+            <WizardProgress
+              steps={state.workType === "receive" ? [{ key: "1", label: "작업 유형" }, { key: "6", label: "입고·출고" }, { key: "2", label: "공급업체" }, ...STEP_META.slice(2)] : STEP_META}
+              current={state.steps.indexOf(step)}
+              variant="inline"
+              accent={directionOutbound ? LEGACY_COLORS.red : undefined}
+              className="flex-1"
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 본문: 현재 스텝만 스크롤. 항목 5-4·5-5 — 하단 pb 축소해 sticky 푸터를 네비바에 근접. */}
       <div className="scrollbar-hide flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-2">
@@ -745,57 +743,7 @@ export function MobileIoComposeWizard({
           )
         )}
 
-        {step === 3 &&
-          (usesMobileSingleAdjustForm(state.workType, state.subType, processPickerMode) ? (
-            <>
-              {bomListQuery.isPending && (
-                <p className="mb-3 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-                  BOM 확인 중입니다.
-                </p>
-              )}
-              {bomListQuery.isError && (
-                <div className="mb-3">
-                  <LoadFailureCard
-                    prefix=""
-                    message="BOM 정보를 불러오지 못했습니다. 다시 시도해 주세요"
-                    retryLabel="다시 시도"
-                    onRetry={() => { void bomListQuery.refetch(); }}
-                  />
-                </div>
-              )}
-              <MobileSingleAdjustForm
-                itemsLoading={itemsLoading}
-                itemsLoadError={itemsLoadError}
-                itemsHasData={itemsHasData}
-                onRetryItems={onRetryItems}
-              subType={state.subType}
-              items={items}
-              bundles={state.bundles}
-              search={search}
-              onSearchChange={setSearch}
-              onAddItem={(item) => addItem(item, singleItemSourceKind(state.subType))}
-              onBundleQuantityChange={(bundleId, qty) =>
-                state.setBundles((prev) =>
-                  applyBundleQuantityChange(prev, bundleId, qty, state.subType, getAvailable),
-                )
-              }
-              onRemoveBundle={(bundleId) =>
-                state.setBundles((prev) => prev.filter((b) => b.bundle_id !== bundleId))
-              }
-              getAvailable={getAvailable}
-              onScan={() => setScanOpen(true)}
-              onSaveDraft={() => {
-                void handleSaveDraft();
-              }}
-              saving={drafting}
-              onReview={() => state.goTo(5)}
-              onOpenPicker={state.workType === "process" ? () => setProcessPickerMode(true) : undefined}
-              busy={previewing}
-              addBlocked={itemAddBlocked}
-              error={error}
-            />
-            </>
-          ) : (
+        {step === 3 && (
             <>
               {bomListQuery.isPending && (
                 <p className="mb-3 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -857,11 +805,12 @@ export function MobileIoComposeWizard({
               />
               </div>
             </>
-          ))}
+          )}
 
         {step === 4 && (
           <div className={`min-h-[240px] flex-1 ${quantityStyles.cart}`}>
           <IoBundleCart
+            mobilePresentation
             bundles={state.bundles}
             subType={state.subType}
             itemMap={itemMap}
@@ -981,6 +930,8 @@ export function MobileIoComposeWizard({
                   ? "공급업체를 선택하세요"
                   : state.workType === "warehouse_adjust"
                 ? "입고 또는 출고를 선택하세요"
+                : state.workType === "internal_use"
+                ? "AS 또는 연구를 선택하세요"
                 : "세부 작업을 선택하세요"}
             intent={isExitWorkType(state.workType) || directionOutbound ? "danger" : "primary"}
             disabled={!state.canAdvance[2]}

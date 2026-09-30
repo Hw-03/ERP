@@ -454,24 +454,12 @@ export function getItemActionMode(subType: IoSubType): ItemActionMode {
   return "single_only";
 }
 
-/** 낱개 수량보정 계열 subtype 판정.
- * 모바일 인라인 폼 사용 여부는 workType까지 보는 usesMobileSingleAdjustForm에서 결정한다. */
+/** 낱개 수량보정 계열 subtype 판정. */
 export function isSingleInlineSubType(subType: IoSubType): boolean {
   return subType === "adjust_in"
     || subType === "adjust_out"
     || subType === "warehouse_adjust_in"
     || subType === "warehouse_adjust_out";
-}
-
-/** 모바일 낱개 빠른 폼은 process 와 창고 수량보정에 사용한다.
- * process 는 사용자가 BOM·품목 picker 로 전환한 뒤에는 해당 선택을 유지한다. */
-export function usesMobileSingleAdjustForm(
-  workType: IoWorkType,
-  subType: IoSubType,
-  processPickerMode = false,
-): boolean {
-  if (!isSingleInlineSubType(subType)) return false;
-  return workType === "warehouse_adjust" || (workType === "process" && !processPickerMode);
 }
 
 export function isWarehouseAdjustSubType(subType: IoSubType): boolean {

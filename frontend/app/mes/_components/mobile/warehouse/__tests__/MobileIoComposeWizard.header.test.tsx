@@ -98,6 +98,28 @@ beforeEach(() => {
 });
 
 describe("MobileIoComposeWizard Step 5 헤더", () => {
+  it("작업 유형 선택 단계에서는 진행 헤더 없이 유형 목록을 표시한다", () => {
+    const originalStep = wizardState.step;
+    wizardState.step = 1;
+    try {
+      render(
+        <MobileIoComposeWizard
+          globalSearch=""
+          operator={{ warehouse_role: "primary" }}
+          items={[]}
+          setItems={vi.fn()}
+          onStatusChange={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByRole("button", { name: "원자재 입출고" })).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "작업 유형 선택" })).not.toBeInTheDocument();
+      expect(screen.queryByText(/Step 1 \/ 6/)).not.toBeInTheDocument();
+    } finally {
+      wizardState.step = originalStep;
+    }
+  });
+
   it("8.25-04: 모바일도 창고 결재권자의 요청을 자동 승인으로 안내한다", () => {
     render(
       <MobileIoComposeWizard
@@ -118,9 +140,10 @@ describe("MobileIoComposeWizard Step 5 헤더", () => {
   });
 
   it.each([
-    ["원자재 입고", "receive", "receive_supplier", "공급업체 선택"],
+    ["원자재 입출고", "receive", "receive_supplier", "공급업체 선택"],
     ["창고 입출고", "warehouse_io", "warehouse_to_dept"],
     ["부서 입출고", "process", "produce"],
+    ["AS·연구 사용출고", "internal_use", "internal_use_out", "사용 부서 선택"],
   ])("%s의 2단계 헤더를 올바르게 표시한다", (_label, workType, subType, expectedTitle = "세부 작업 선택") => {
     const originalStep = wizardState.step;
     const originalWorkType = wizardState.workType;
@@ -140,6 +163,7 @@ describe("MobileIoComposeWizard Step 5 헤더", () => {
       );
 
       expect(screen.getByText(expectedTitle)).toBeInTheDocument();
+      expect(screen.getByText(_label)).toBeInTheDocument();
       if (workType === "receive") expect(screen.queryByText("공급업체")).not.toBeInTheDocument();
     } finally {
       wizardState.step = originalStep;
