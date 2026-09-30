@@ -209,7 +209,7 @@ describe.each(panels)("%s defect process panel realtime location updates", (_nam
 
     fireEvent.click(screen.getByRole("button", { name: /반품/ }));
     fireEvent.click(screen.getByRole("button", { name: "공급업체 선택 →" }));
-    expect(await screen.findByText("반품 공급업체 선택")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: _name === "mobile" ? "공급업체 선택" : "반품 공급업체 선택" })).toBeInTheDocument();
     expect(apiMocks.createStockRequest).not.toHaveBeenCalled();
 
     fireEvent.click(await screen.findByRole("button", { name: "HLP" }));
