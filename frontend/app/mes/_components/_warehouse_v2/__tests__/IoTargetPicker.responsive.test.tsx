@@ -52,6 +52,21 @@ const baseProps = {
 };
 
 describe("IoTargetPicker responsive layout", () => {
+  it("keeps the mobile scroll rail outside the rounded item list", () => {
+    const { container } = render(<IoTargetPicker {...baseProps} mobilePresentation />);
+    const viewport = container.querySelector<HTMLElement>("[data-keep-scroll]")!;
+    const surface = viewport.parentElement!;
+
+    expect(viewport).toHaveClass("-right-2.5", "[scrollbar-gutter:stable]");
+    expect(surface).not.toHaveClass("overflow-hidden");
+    expect(surface.querySelector('[aria-hidden="true"]')).not.toHaveClass("hidden");
+  });
+
+  it("모바일 품목 선택 행은 로딩 완료 직후 투명도 애니메이션 없이 표시한다", () => {
+    const { container } = render(<IoTargetPicker {...baseProps} mobilePresentation />);
+    expect(container.querySelectorAll("tbody tr")).toHaveLength(1);
+    expect(container.querySelector("tbody")).not.toHaveAttribute("class");
+  });
   it("places the desktop fullscreen toggle over the table header and lets Escape exit", () => {
     const onFullscreenChange = vi.fn();
     const { container, rerender } = render(
