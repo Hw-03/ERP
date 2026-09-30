@@ -6,7 +6,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
 import { EmptyState } from "../common";
-import { SkeletonBlock, dataRevealClassName } from "../common/LoadingSkeleton";
+import { SkeletonBlock } from "../common/LoadingSkeleton";
 import { ReadFailure } from "../common/ReadState";
 import { useCurrentOperator } from "../login/useCurrentOperator";
 import { DEPT_OPTIONS, PAGE_SIZE, matchesSearch } from "../_warehouse_steps/_constants";
@@ -321,7 +321,7 @@ export function DefectItemPicker({
               ))}
             </tr>
           </thead>
-          <tbody role={loading ? "status" : undefined} aria-label={loading ? "품목 불러오는 중" : undefined} aria-busy={loading || undefined} className={mobilePresentation && !loading ? dataRevealClassName : undefined}>
+          <tbody role={loading ? "status" : undefined} aria-label={loading ? "품목 불러오는 중" : undefined} aria-busy={loading || undefined}>
             {loading && [0, 1, 2, 3].map((row) => <tr key={`loading-${row}`} aria-hidden="true"><td colSpan={5} className="border-b border-[var(--c-border)] px-3 py-3"><div className="flex min-h-[48px] items-center gap-3"><div className="flex flex-1 flex-col gap-2"><SkeletonBlock className="h-4 w-2/3" /><SkeletonBlock className="h-3 w-1/2" /></div><SkeletonBlock className="h-8 w-16 rounded-[10px]" /></div></td></tr>)}
             {filteredItems.slice(0, displayLimit).map((item) => {
               const impliedDeptName = itemDepartment(item);
