@@ -24,6 +24,7 @@ interface CurrentEmployee {
 }
 
 interface Props {
+  mobilePresentation?: boolean;
   locations: DefectLocation[];
   onProcess: (location: DefectLocation) => void;
   onBatchProcess?: (locations: DefectLocation[]) => void;
@@ -70,6 +71,7 @@ const memoText = (value: string | null | undefined) => value ?? "";
 const historyMemoText = (value: string | null) => value && value.length > 0 ? value : "(빈 메모)";
 
 export function DefectDepartmentList({
+  mobilePresentation = false,
   locations,
   onProcess,
   onBatchProcess,
@@ -180,6 +182,7 @@ export function DefectDepartmentList({
                     : `${dept}:${records[0].item_id}`;
                   return (
                     <DefectItemGroup
+                      mobilePresentation={mobilePresentation}
                       key={itemKey}
                       department={dept}
                       records={records}
@@ -212,6 +215,7 @@ export function DefectDepartmentList({
 }
 
 function DefectItemGroup({
+  mobilePresentation,
   department,
   records,
   expanded,
@@ -228,6 +232,7 @@ function DefectItemGroup({
   onToggleBatchRecord,
   onBatchProcess,
 }: {
+  mobilePresentation: boolean;
   department: string;
   records: DefectLocation[];
   expanded: boolean;
@@ -244,6 +249,74 @@ function DefectItemGroup({
   onToggleBatchRecord: (recordId: string) => void;
   onBatchProcess: () => void;
 }) {
+  if (mobilePresentation) {
+    const latestRecord = findLatestRecord(records);
+    const totalQuantity = records.reduce((total, record) => total + Number(record.quantity), 0);
+    const fullDate = formatDateTime(latestRecord.defective_at);
+    const shortDate = fullDate === "기록 없음" ? fullDate : fullDate.slice(2, 10).replaceAll("-", ".");
+    const selectedCount = batchSelection?.size ?? 0;
+
+    return (
+      <>
+        <button
+          type="button"
+          data-testid="defect-mobile-item-summary"
+          aria-label={`${latestRecord.item_name} 격리 ${records.length}건`}
+          aria-expanded={expanded}
+          onClick={onToggle}
+          className="flex min-h-16 w-full items-center gap-2 px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--c-blue)]"
+          style={{ background: tint(getDepartmentFallbackColor(department), expanded ? 8 : 4) }}
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{latestRecord.item_name}</span>
+            <span className="block truncate text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{latestRecord.mes_code || "코드 없음"}</span>
+          </span>
+          <span className="w-12 shrink-0 text-right">
+            <span className="block text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>수량</span>
+            <span className="block text-sm font-black tabular-nums" style={{ color: LEGACY_COLORS.red }}>{formatQty(totalQuantity)}개</span>
+          </span>
+          <span className="w-[4.4rem] shrink-0 text-right">
+            <span className="block text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>최근</span>
+            <span className="block text-xs font-bold tabular-nums" style={{ color: LEGACY_COLORS.muted2 }}>{shortDate}</span>
+          </span>
+          <span className="w-8 shrink-0 text-right">
+            <span className="block text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>기록</span>
+            <span className="block text-xs font-bold tabular-nums" style={{ color: LEGACY_COLORS.muted2 }}>{records.length}건</span>
+          </span>
+          {expanded ? <ChevronUp className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} /> : <ChevronDown className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />}
+        </button>
+        {expanded && (
+          <>
+            {batchEnabled && records.length > 1 && (
+              <div className="grid grid-cols-2 gap-2 px-3 py-2">
+                <button type="button" onClick={batchSelection ? onCancelBatchSelection : onStartBatchSelection} className="min-h-11 rounded-[10px] border px-2 text-sm font-bold" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}>
+                  {batchSelection ? "선택 취소" : "여러 건 선택"}
+                </button>
+                <button type="button" onClick={onBatchProcess} disabled={selectedCount === 0} className="min-h-11 rounded-[10px] border px-2 text-sm font-bold disabled:opacity-45" style={{ borderColor: tint(LEGACY_COLORS.red, 40), color: LEGACY_COLORS.red }}>
+                  {selectedCount > 0 ? `선택 처리 ${selectedCount}건` : "선택 처리"}
+                </button>
+              </div>
+            )}
+            {records.map((record) => (
+              <DefectRecordRow
+                key={record.record_id}
+                location={record}
+                currentEmployee={currentEmployee}
+                onMemoUpdated={onMemoUpdated}
+                onMoveToStorage={onMoveToStorage}
+                storageMode={storageMode}
+                onProcess={onProcess}
+                selectionMode={batchSelection !== null && records.length > 1}
+                selected={batchSelection?.has(record.record_id) ?? false}
+                onToggleSelected={() => onToggleBatchRecord(record.record_id)}
+              />
+            ))}
+          </>
+        )}
+      </>
+    );
+  }
+
   if (records.length === 1) {
     return (
       <DefectRecordRow

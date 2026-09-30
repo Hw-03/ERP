@@ -463,6 +463,7 @@ export function DefectHubPanel({
       />
 
       <DefectFilterBar
+        mobilePresentation={mobilePresentation}
         scope={scope}
         actorScope={actorScope}
         sort={sort}
@@ -541,6 +542,7 @@ export function DefectHubPanel({
       ) : (
         <div className={mobilePresentation ? dataRevealClassName : "contents"}>
           <DefectDepartmentList
+            mobilePresentation={mobilePresentation}
             emptyContent={<ReadEmpty hasSearch={!!search.trim()} hasFilters={locations.length > 0}
               title={!search.trim() && locations.length === 0 ? "격리된 불량 재고가 없습니다." : undefined}
               onReset={() => { setSearch(""); setScope("all"); resetCategoryFilters(); setKpiFilter(null); }} />}

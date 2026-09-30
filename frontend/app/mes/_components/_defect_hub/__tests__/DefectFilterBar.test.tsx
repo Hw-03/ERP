@@ -15,6 +15,51 @@ describe("DefectFilterBar", () => {
     currentDept: "조립",
   };
 
+  it("starts mobile filters collapsed, summarizes selections, and preserves them when toggled", () => {
+    const onFilterLockedChange = vi.fn();
+    render(
+      <DefectFilterBar
+        {...baseProps}
+        mobilePresentation
+        actorScope="mine"
+        sort="oldest"
+        filterLocked
+        onFilterLockedChange={onFilterLockedChange}
+        selectedDepartments={["조립"]}
+        models={["SOLO"]}
+        selectedModels={["SOLO"]}
+        selectedProcessSteps={["F"]}
+      />,
+    );
+
+    const toggle = screen.getByRole("button", { name: "필터 펼치기" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveTextContent("조립");
+    expect(toggle).toHaveTextContent("SOLO");
+    expect(toggle).toHaveTextContent("공정완료");
+    expect(toggle).toHaveTextContent("내가 격리");
+    expect(screen.queryByRole("group", { name: "모델 구분" })).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(screen.getByRole("button", { name: "필터 접기" })).toHaveAttribute("aria-expanded", "true");
+    expect(within(screen.getByRole("group", { name: "모델 구분" })).getByRole("button", { name: "SOLO" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "필터 고정" })).toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "필터 접기" }));
+    expect(onFilterLockedChange).not.toHaveBeenCalled();
+  });
+
+  it("summarizes multiple mobile selections without listing every chip", () => {
+    render(<DefectFilterBar {...baseProps} mobilePresentation selectedDepartments={["튜브", "조립"]} selectedModels={[]} selectedProcessSteps={[]} />);
+    expect(screen.getByRole("button", { name: "필터 펼치기" })).toHaveTextContent("부서 튜브 외 1");
+  });
+
+  it("shows the all-filter state even when its settings are locked", () => {
+    render(<DefectFilterBar {...baseProps} mobilePresentation filterLocked selectedDepartments={[]} selectedModels={[]} selectedProcessSteps={[]} />);
+    const summary = screen.getByRole("button", { name: "필터 펼치기" });
+    expect(summary).toHaveTextContent("전체");
+    expect(summary).toHaveTextContent("필터 고정");
+  });
+
   it("renders category cards and exposes same-group OR selection callbacks", () => {
     const onDepartmentsChange = vi.fn();
     const onModelsChange = vi.fn();

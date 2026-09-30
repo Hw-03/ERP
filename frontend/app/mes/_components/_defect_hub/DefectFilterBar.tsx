@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { FilterChip } from "../common/FilterChip";
 import { DefectCategoryFilters } from "./DefectCategoryFilters";
@@ -10,6 +12,7 @@ export type DefectSort = "oldest" | "newest";
 export type DefectProcessStep = "R" | "A" | "F" | "UNCLASSIFIED" | "DISUSED";
 
 interface Props {
+  mobilePresentation?: boolean;
   /** @deprecated 기존 호출부 호환용. 새 목록 필터는 selectedDepartments를 사용한다. */
   scope: DefectScope;
   actorScope: DefectActorScope;
@@ -43,10 +46,19 @@ function legacyDepartments(scope: DefectScope, currentDept: string): string[] {
   return scope === "my" && currentDept ? [currentDept] : [];
 }
 
+const PROCESS_LABELS: Record<DefectProcessStep, string> = {
+  R: "원자재", A: "중간공정", F: "공정완료", UNCLASSIFIED: "미분류", DISUSED: "불용",
+};
+
+function shortSelection(values: readonly string[]): string {
+  return values.length > 1 ? `${values[0]} 외 ${values.length - 1}` : values[0];
+}
+
 /**
  * 불량 목록의 분류 필터 UI. 그룹 안 선택은 OR이며, 부서·모델·공정 그룹 간 AND 조합은 부모가 적용한다.
  */
 export function DefectFilterBar({
+  mobilePresentation = false,
   scope,
   actorScope,
   sort,
@@ -66,7 +78,19 @@ export function DefectFilterBar({
   onProcessStepsChange,
   onResetCategoryFilters,
 }: Props) {
+  const [expanded, setExpanded] = useState(false);
   const activeDepartments = [...(selectedDepartments ?? legacyDepartments(scope, currentDept))];
+  const activeConditions = [
+    activeDepartments.length ? `부서 ${shortSelection(activeDepartments)}` : null,
+    selectedModels?.length ? `모델 ${shortSelection(selectedModels)}` : null,
+    selectedProcessSteps.length ? `공정 ${shortSelection(selectedProcessSteps.map((step) => PROCESS_LABELS[step]))}` : null,
+    actorScope === "mine" ? "내가 격리" : null,
+  ].filter(Boolean);
+  const summary = [
+    ...(activeConditions.length ? activeConditions : ["전체"]),
+    sort === "oldest" ? "오래된 순" : "최신 순",
+    ...(filterLocked ? ["필터 고정"] : []),
+  ].join(" · ");
 
   function setDepartments(next: string[]): void {
     if (onDepartmentsChange) {
@@ -89,6 +113,21 @@ export function DefectFilterBar({
 
   return (
     <section aria-label="불량 목록 필터" className="flex flex-col gap-3">
+      {mobilePresentation && (
+        <button
+          type="button"
+          aria-label={expanded ? "필터 접기" : "필터 펼치기"}
+          aria-expanded={expanded}
+          onClick={() => setExpanded((value) => !value)}
+          className="flex min-h-11 w-full items-center gap-3 rounded-[16px] border px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-blue)]"
+          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+        >
+          <span className="shrink-0 text-sm font-black">필터</span>
+          <span className="min-w-0 flex-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{summary}</span>
+          {expanded ? <ChevronUp className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}
+        </button>
+      )}
+      {(!mobilePresentation || expanded) && <>
       <DefectCategoryFilters
         departments={departments}
         models={models}
@@ -116,6 +155,7 @@ export function DefectFilterBar({
           <span>필터 고정</span>
         </label>
       </div>
+      </>}
     </section>
   );
 }
