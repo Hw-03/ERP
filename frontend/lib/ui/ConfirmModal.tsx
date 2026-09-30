@@ -124,7 +124,7 @@ export function ConfirmModal({
 
   return createPortal(
     <div
-      className={`fixed inset-0 z-[400] flex items-center justify-center px-4${className ? ` ${className}` : ""}`}
+      className={`fixed inset-0 z-[400] flex items-center justify-center px-3 lg:px-4${className ? ` ${className}` : ""}`}
       style={{ background: "rgba(0,0,0,.55)" }}
       role="dialog"
       aria-modal="true"
@@ -133,7 +133,7 @@ export function ConfirmModal({
     >
       <div
         ref={panelRef}
-        className={`w-full rounded-[24px] border p-6 ${wide ? "max-w-[640px]" : "max-w-[520px]"}`}
+        className={`w-full max-w-[406px] rounded-[24px] border p-6 md:max-w-[696px] ${wide ? "lg:max-w-[640px]" : "lg:max-w-[520px]"}`}
         style={{
           background: LEGACY_COLORS.s1,
           borderColor: isCautionLike
