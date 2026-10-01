@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import presentation from "../mobile/mobilePresentation.module.css";
 import { defectsApi } from "@/lib/api/defects";
@@ -24,7 +24,7 @@ import { DefectDepartmentList } from "./DefectDepartmentList";
 import { DefectProcessPanel } from "./DefectProcessPanel";
 import { MobileDefectProcessPanel } from "../mobile/screens/MobileDefectProcessPanel";
 import { MobileDefectCartFlow } from "../mobile/screens/MobileDefectCartFlow";
-import { MobileDefectStepHeader } from "../mobile/screens/MobileDefectStepHeader";
+import { MobileDefectWorkChoice, type MobileDefectWorkAction, type MobileDefectSourceKind } from "../mobile/screens/MobileDefectWorkChoice";
 import type { DefectCartMode } from "./DefectCartFlow";
 import type { Item, ProductModel } from "../_warehouse_v2/types";
 import { InlineErrorNote } from "./InlineErrorNote";
@@ -40,6 +40,23 @@ const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 const PRODUCTION_LINES = new Set(["튜브", "고압", "진공", "튜닝", "조립", "출하"]);
 const EMPTY_ITEMS: Item[] = [];
 const EMPTY_MODELS: ProductModel[] = [];
+
+type WorkHistoryState = { defect?: string; recordId?: string; mode?: DefectCartMode; action?: string | null; directAction?: string | null; source?: string | null; step?: number } | null;
+
+/** 이전 출처 단계는 통합 선택으로, 확정된 작업은 품목 단계로 복원한다. */
+function workSelectionFromHistory(state: WorkHistoryState): { action: MobileDefectWorkAction | null; source: MobileDefectSourceKind | null; cart: boolean } {
+  const action = state?.defect === "cart"
+    ? state.mode === "add" ? "add" : state.directAction === "scrap" || state.directAction === "rework" ? state.directAction : null
+    : state?.action === "add" || state?.action === "scrap" || state?.action === "rework" ? state.action : null;
+  const validAction = !(state?.mode === "add" && state.directAction === "rework");
+  const cart = state?.defect === "cart" && action !== null && validAction
+    && (state.step === 2 || state.step === 3 || (state.step === 4 && action === "rework"));
+  return {
+    action: validAction ? action : null,
+    source: action === "rework" ? "production" : state?.source === "production" || state?.source === "warehouse" ? state.source : null,
+    cart,
+  };
+}
 
 interface Props {
   itemsLoading?: boolean;
@@ -74,6 +91,8 @@ export function DefectHubPanel({
   const requestGenerationRef = useRef(0);
 
   const [view, setView] = useState<"hub" | "work-choice" | "list" | "storage" | "process" | "cart" | "statistics">("hub");
+  const [workAction, setWorkAction] = useState<MobileDefectWorkAction | null>(null);
+  const [workSource, setWorkSource] = useState<MobileDefectSourceKind | null>(null);
   const isWarehouseEmployee = currentEmployee.warehouse_role === "primary"
     || currentEmployee.warehouse_role === "deputy";
   const defaultScope: DefectScope = defectDeptFilter
@@ -124,6 +143,9 @@ export function DefectHubPanel({
       .filter((location): location is DefectLocation => location !== undefined),
     [locations, processingLocations],
   );
+  const mobileProcessingRecordRef = useRef<string | null>(null);
+  mobileProcessingRecordRef.current = mobilePresentation && !processingBatch && !restoreOnlyProcess
+    ? activeProcessingLocations[0]?.record_id ?? null : null;
 
   useEffect(() => {
     if (view !== "process" || processingLocations.length === 0 || loading || activeProcessingLocations.length === processingLocations.length) return;
@@ -252,6 +274,7 @@ export function DefectHubPanel({
     setRestoreOnlyProcess(false);
     setProcessingLocations([location]);
     setProcessingBatch(false);
+    if (mobilePresentation) window.history.pushState({ defect: "process", recordId: location.record_id, step: 1 }, "");
     setView("process");
   }
 
@@ -279,6 +302,7 @@ export function DefectHubPanel({
     setProcessingBatch(false);
     setRestoreOnlyProcess(false);
     setView(returnToStorage ? "storage" : "list");
+    if (mobilePresentation && window.history.state?.defect === "process") window.history.back();
   }
 
   // 격리 추가·바로 폐기(다품목 카트) 완료/취소 → 허브 복귀.
@@ -294,8 +318,19 @@ export function DefectHubPanel({
   // 브라우저 history의 대상 state를 기준으로 허브·목록·통계 화면을 복원한다.
   useEffect(() => {
     function applyHistoryState(state: unknown): void {
-      const target = state as { defect?: string; mode?: DefectCartMode } | null;
-      if (target?.defect === "storage") {
+      const target = state as WorkHistoryState;
+      if (mobilePresentation && (target?.defect === "work-choice" || (target?.defect === "cart" && (target.mode === "add" || target.mode === "scrap")))) {
+        const selection = workSelectionFromHistory(target);
+        setWorkAction(selection.action);
+        setWorkSource(selection.source);
+        if (selection.cart) {
+          setCartMode(selection.action === "add" ? "add" : "scrap");
+          setView("cart");
+        } else {
+          setView("work-choice");
+          window.history.replaceState({ defect: "work-choice", action: selection.action, source: selection.source }, "");
+        }
+      } else if (target?.defect === "storage") {
         setView("storage");
       } else if (target?.defect === "work-choice") {
         setView("work-choice");
@@ -307,8 +342,12 @@ export function DefectHubPanel({
         setCartMode(target.mode);
         setView("cart");
       } else if (target?.defect === "process") {
-        setView("list");
-        window.history.replaceState({ defect: "list" }, "");
+        if (mobilePresentation && target.recordId && target.recordId === mobileProcessingRecordRef.current) {
+          setView("process");
+        } else {
+          setView("list");
+          window.history.replaceState({ defect: "list" }, "");
+        }
       } else {
         setView("hub");
       }
@@ -321,11 +360,13 @@ export function DefectHubPanel({
     const onPop = (event: PopStateEvent) => applyHistoryState(event.state);
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, []);
+  }, [mobilePresentation]);
 
   function handleHubSelect(id: DefectHubCardId) {
     if (id === "work") {
       window.history.pushState({ defect: "work-choice" }, "");
+      setWorkAction(null);
+      setWorkSource(null);
       setView("work-choice");
     } else if (id === "list") {
       window.history.pushState({ defect: "list" }, "");
@@ -348,6 +389,23 @@ export function DefectHubPanel({
 
   function openCart(mode: DefectCartMode) {
     window.history.pushState({ defect: "cart", mode }, "");
+    setCartMode(mode);
+    setView("cart");
+  }
+
+  function selectWork(action: MobileDefectWorkAction): void {
+    const source = workAction === action ? workSource : null;
+    window.history.replaceState({ defect: "work-choice", action, source }, "");
+    setWorkAction(action);
+    setWorkSource(source);
+  }
+
+  function openMobileCart(action: MobileDefectWorkAction, source: MobileDefectSourceKind): void {
+    const mode = action === "add" ? "add" : "scrap";
+    window.history.replaceState({ defect: "work-choice", action, source }, "");
+    window.history.pushState({ defect: "cart", mode, directAction: action === "rework" ? "rework" : "scrap", source, step: 2 }, "");
+    setWorkAction(action);
+    setWorkSource(source);
     setCartMode(mode);
     setView("cart");
   }
@@ -402,6 +460,8 @@ export function DefectHubPanel({
         itemsHasData={itemsHasData}
         onRetryItems={onRetryItems}
         mode={cartMode}
+        initialAction={mobilePresentation ? workAction === "rework" ? "rework" : "scrap" : undefined}
+        initialSource={mobilePresentation ? workSource ?? "production" : undefined}
         items={items}
         productModels={productModels}
         currentEmployee={currentEmployee}
@@ -414,13 +474,7 @@ export function DefectHubPanel({
   if (view === "work-choice") {
     if (mobilePresentation) {
       return (
-        <div className="flex min-h-full flex-col gap-3">
-          <MobileDefectStepHeader title="작업 선택" steps={["작업 선택"]} current={0} onBack={() => window.history.back()} context="불량 처리" />
-          <div className={`${presentation.surface} ${presentation.choiceList}`}>
-            <button type="button" onClick={() => openCart("add")} className={presentation.menuRow}><span className={presentation.choiceIcon} style={{ color: LEGACY_COLORS.red }} aria-hidden="true"><ShieldAlert /></span><span>격리 등록</span></button>
-            <button type="button" onClick={() => openCart("scrap")} className={presentation.menuRow}><span className={presentation.choiceIcon} style={{ color: LEGACY_COLORS.red }} aria-hidden="true"><Trash2 /></span><span>바로 처리</span></button>
-          </div>
-        </div>
+        <MobileDefectWorkChoice action={workAction} source={workSource} onActionChange={selectWork} onProceed={openMobileCart} onCancel={() => window.history.back()} />
       );
     }
     return (
@@ -567,7 +621,7 @@ export function DefectHubPanel({
         /* 항목 2-5 — 첫 화면은 키오스크식 카드 4장(격리·폐기·목록·통계)만. PC(DesktopDefectView)
            처럼 "무엇을 할지 선택만" 하게 한다. KPI/필터/격리 목록은 카드 선택 후 list 화면에서만.
            (이전엔 카드 2장 + listSection 을 첫 화면에 함께 띄워 모바일이 혼잡했음.) */
-        <div className={mobilePresentation ? `${presentation.surface} ${presentation.choiceList}` : "flex min-h-0 flex-1 flex-col gap-3"}>
+        <div className={mobilePresentation ? `${presentation.choiceList} ${presentation.separatedChoices}` : "flex min-h-0 flex-1 flex-col gap-3"}>
           {DEFECT_HUB_CARDS.map((card) => {
             const Icon = card.icon;
             const accent = LEGACY_COLORS[card.accentKey];
@@ -577,7 +631,7 @@ export function DefectHubPanel({
                 type="button"
                 onClick={() => handleHubSelect(card.id)}
                 className={mobilePresentation ? presentation.menuRow : "flex min-h-[96px] flex-1 items-center gap-5 rounded-[18px] border p-4 text-left transition-[transform] active:scale-[0.99]"}
-                style={{ background: mobilePresentation ? undefined : LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
+                style={{ "--choice-tone": accent, background: mobilePresentation ? undefined : LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text } as CSSProperties}
               >
                 <span
                   className={mobilePresentation ? presentation.choiceIcon : "flex h-16 w-16 shrink-0 items-center justify-center rounded-[16px]"}

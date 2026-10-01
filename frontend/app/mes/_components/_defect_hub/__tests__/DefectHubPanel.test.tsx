@@ -24,8 +24,8 @@ vi.mock("../../mobile/screens/MobileDefectProcessPanel", () => ({
 }));
 // 격리 추가·바로 처리 다품목 카트 모킹 — DOM 렌더만 검증
 vi.mock("../../mobile/screens/MobileDefectCartFlow", () => ({
-  MobileDefectCartFlow: ({ mode, defaultSource, onCancel }: { mode: string; defaultSource?: string; onCancel: () => void }) => (
-    <div data-testid="cart-flow" data-default-source={defaultSource ?? "unset"}>{mode}<button type="button" onClick={onCancel}>모바일 카트 취소</button></div>
+  MobileDefectCartFlow: ({ mode, defaultSource, initialAction, initialSource, onCancel }: { mode: string; defaultSource?: string; initialAction?: string; initialSource?: string; onCancel: () => void }) => (
+    <div data-testid="cart-flow" data-default-source={defaultSource ?? "unset"} data-initial-action={initialAction} data-initial-source={initialSource}>{mode}<button type="button" onClick={onCancel}>모바일 카트 취소</button></div>
   ),
 }));
 vi.mock("../DefectProcessPanel", () => ({
@@ -113,6 +113,99 @@ beforeEach(() => {
 });
 
 describe("DefectHubPanel", () => {
+  it.each([
+    ["격리 등록", "부서 재고", "add", "scrap", "production"],
+    ["격리 등록", "창고 재고", "add", "scrap", "warehouse"],
+    ["즉시 폐기", "부서 재고", "scrap", "scrap", "production"],
+    ["즉시 폐기", "창고 재고", "scrap", "scrap", "warehouse"],
+  ])("모바일 %s에서 %s를 고르면 품목 단계에 선택을 전달한다", async (work, source, mode, action, sourceKind) => {
+    render(<DefectHubPanel currentEmployee={mockEmployee} mobilePresentation />);
+    fireEvent.click(screen.getByRole("button", { name: "불량 처리" }));
+    expect(screen.queryByRole("button", { name: "부서 재고" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: work }));
+    expect(screen.getByText("Step 2 / 4")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: work })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("button", { name: /다음/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: source }));
+    expect(screen.getByTestId("mobile-defect-work-choice")).toHaveAttribute("aria-busy", "true");
+    fireEvent.animationEnd(screen.getByTestId("mobile-defect-work-choice"));
+    expect(screen.getByTestId("cart-flow")).toHaveTextContent(mode);
+    expect(screen.getByTestId("cart-flow")).toHaveAttribute("data-initial-action", action);
+    expect(screen.getByTestId("cart-flow")).toHaveAttribute("data-initial-source", sourceKind);
+    expect(window.history.state).toMatchObject({ defect: "cart", mode, directAction: action, source: sourceKind, step: 2 });
+    await act(async () => {});
+  });
+
+  it("모바일 즉시 재작업은 출처 화면 없이 부서 품목 단계로 간다", async () => {
+    render(<DefectHubPanel currentEmployee={mockEmployee} mobilePresentation />);
+    fireEvent.click(screen.getByRole("button", { name: "불량 처리" }));
+    fireEvent.click(screen.getByRole("button", { name: "즉시 재작업" }));
+    fireEvent.animationEnd(screen.getByTestId("mobile-defect-work-choice"));
+    expect(screen.getByTestId("cart-flow")).toHaveAttribute("data-initial-action", "rework");
+    expect(screen.getByTestId("cart-flow")).toHaveAttribute("data-initial-source", "production");
+    await act(async () => {});
+  });
+
+  it("모바일 뒤로가기는 작업과 출처 선택을 복원한다", async () => {
+    render(<DefectHubPanel currentEmployee={mockEmployee} mobilePresentation />);
+    act(() => window.dispatchEvent(new PopStateEvent("popstate", { state: { defect: "work-choice", action: "scrap", source: "warehouse" } })));
+    expect(screen.getByRole("button", { name: "즉시 폐기" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "창고 재고" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "격리 등록" }));
+    expect(screen.getByRole("button", { name: "창고 재고" })).toHaveAttribute("aria-pressed", "false");
+    expect(window.history.state).toMatchObject({ defect: "work-choice", action: "add", source: null });
+    await act(async () => {});
+  });
+
+  it.each([
+    { mode: "add", directAction: "scrap", step: 3 },
+    { mode: "scrap", directAction: "scrap", step: 3 },
+    { mode: "scrap", directAction: "rework", step: 4 },
+  ])("모바일 상세 단계 $mode/$directAction/$step 앞뒤 이동에서 작업 화면을 유지한다", async (state) => {
+    render(<DefectHubPanel currentEmployee={mockEmployee} mobilePresentation />);
+    act(() => window.dispatchEvent(new PopStateEvent("popstate", { state: { defect: "cart", source: "production", ...state } })));
+    expect(screen.getByTestId("cart-flow")).toHaveAttribute("data-initial-action", state.directAction);
+    expect(screen.queryByTestId("mobile-defect-work-choice")).not.toBeInTheDocument();
+    await act(async () => {});
+  });
+
+  it("이전 모바일 출처 history는 통합 선택 화면으로 복원한다", async () => {
+    window.history.replaceState({ defect: "cart", mode: "add", step: 1, source: "warehouse" }, "");
+    render(<DefectHubPanel currentEmployee={mockEmployee} mobilePresentation />);
+    expect(screen.getByRole("button", { name: "격리 등록" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "창고 재고" })).toBeInTheDocument();
+    expect(screen.queryByTestId("cart-flow")).not.toBeInTheDocument();
+    await act(async () => {});
+  });
+
+  it("모바일 이동 중 연속 탭과 중첩 애니메이션은 중복 이동하지 않는다", async () => {
+    render(<DefectHubPanel currentEmployee={mockEmployee} mobilePresentation />);
+    fireEvent.click(screen.getByRole("button", { name: "불량 처리" }));
+    fireEvent.click(screen.getByRole("button", { name: "격리 등록" }));
+    const source = screen.getByRole("button", { name: "부서 재고" });
+    const push = vi.spyOn(window.history, "pushState");
+    try {
+      fireEvent.click(source);
+      fireEvent.click(source);
+      fireEvent.animationEnd(source);
+      expect(screen.queryByTestId("cart-flow")).not.toBeInTheDocument();
+      fireEvent.animationEnd(screen.getByTestId("mobile-defect-work-choice"));
+      expect(push).toHaveBeenCalledTimes(1);
+      await act(async () => {});
+    } finally { push.mockRestore(); }
+  });
+
+  it("모바일 모션 축소 설정에서는 지연 없이 품목 화면을 연다", async () => {
+    const media = vi.spyOn(window, "matchMedia").mockReturnValue({ matches: true } as MediaQueryList);
+    try {
+      render(<DefectHubPanel currentEmployee={mockEmployee} mobilePresentation />);
+      fireEvent.click(screen.getByRole("button", { name: "불량 처리" }));
+      fireEvent.click(screen.getByRole("button", { name: "즉시 재작업" }));
+      expect(screen.getByTestId("cart-flow")).toHaveAttribute("data-initial-action", "rework");
+      await act(async () => {});
+    } finally { media.mockRestore(); }
+  });
+
   it("shows the collapsed filter and compact rows in the mobile list while keeping search visible", async () => {
     render(<DefectHubPanel currentEmployee={mockEmployee} mobilePresentation />);
     fireEvent.click(screen.getByText("격리 목록"));
@@ -121,6 +214,21 @@ describe("DefectHubPanel", () => {
     expect(screen.getByRole("searchbox", { name: "불량 검색" })).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: /전극\(70kV\).*격리 1건/ })).toHaveTextContent("7-TR-0001");
     expect(screen.queryByRole("button", { name: "처리" })).not.toBeInTheDocument();
+  });
+
+  it("모바일 격리 품목 행은 100px 높이에서 품명과 요약 정보를 읽기 쉽게 표시한다", async () => {
+    render(<DefectHubPanel currentEmployee={mockEmployee} mobilePresentation />);
+    openList();
+
+    const row = await screen.findByTestId("defect-mobile-item-summary");
+    expect(row).toHaveClass("h-[100px]");
+    expect(within(row).getByText("전극(70kV)")).toBeInTheDocument();
+    const name = within(row).getByText("전극(70kV)");
+    const code = within(row).getByText("7-TR-0001");
+    expect(code.parentElement).toBe(name.parentElement);
+    expect(within(row).getByText("수량")).toBeInTheDocument();
+    expect(within(row).getByText("최근")).toBeInTheDocument();
+    expect(within(row).getByText("기록")).toBeInTheDocument();
   });
 
   it("preserves the dashboard model catalog order on mobile", async () => {
@@ -290,8 +398,8 @@ describe("DefectHubPanel", () => {
     render(<DefectHubPanel currentEmployee={mockEmployee} mobilePresentation />);
     fireEvent.click(screen.getByRole("button", { name: /불량 처리/ }));
 
-    expect(await screen.findByRole("heading", { name: "작업 선택" })).toBeInTheDocument();
-    expect(screen.getByText("Step 1 / 1")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "작업 선택", level: 2 })).toBeInTheDocument();
+    expect(screen.getByText("Step 1 / 4")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "이전" })).toBeInTheDocument();
   });
 
@@ -377,6 +485,18 @@ describe("DefectHubPanel", () => {
     const panel = await screen.findByTestId("process-panel");
     expect(panel).toBeInTheDocument();
     expect(panel).toHaveTextContent("7-TR-0001");
+  });
+
+  it("모바일 재작업의 내부 history 이동은 처리 화면을 유지한다", async () => {
+    render(<DefectHubPanel currentEmployee={{ ...mockEmployee, department: "기타" }} mobilePresentation />);
+    openList();
+    fireEvent.click(await screen.findByRole("button", { name: "전극(70kV) 격리 1건" }));
+    fireEvent.click((await screen.findAllByText("처리"))[0]);
+    expect(await screen.findByTestId("process-panel")).toBeInTheDocument();
+    act(() => window.dispatchEvent(new PopStateEvent("popstate", { state: { defect: "process", recordId: "record-001", step: 2, mobileRework: { key: "record-001", nav: { path: [0] } } } })));
+    expect(screen.getByTestId("process-panel")).toBeInTheDocument();
+    act(() => window.dispatchEvent(new PopStateEvent("popstate", { state: { defect: "list" } })));
+    expect(screen.queryByTestId("process-panel")).not.toBeInTheDocument();
   });
 
   it("동일 품목의 선택 기록만 모바일 다건 처리 패널로 전달한다", async () => {
