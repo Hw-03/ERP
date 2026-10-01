@@ -7,6 +7,7 @@ import { EmptyState } from "../common";
 import type { IoBundle, IoInternalUseBomMode, IoLine, IoSubType, Item } from "./types";
 import { IoBundleCard } from "./IoBundleCard";
 import { hasUnselectedInternalUseBomMode } from "./internalUseBom";
+import scrollStyles from "../mobile/primitives/MobileScrollFrame.module.css";
 
 interface Props {
   bundles: IoBundle[];
@@ -111,7 +112,7 @@ export function IoBundleCart({
         />
       ) : mobilePresentation ? (
         <div data-io-cart-shell className="relative min-h-0 flex-1 rounded-[20px]" style={{ background: LEGACY_COLORS.s2 }}>
-          <div data-keep-scroll data-io-cart-list className="sg absolute inset-y-0 left-0 -right-2.5 space-y-3 overflow-x-hidden overflow-y-auto [scrollbar-gutter:stable]" style={{ overscrollBehavior: "contain" }}>
+          <div data-keep-scroll data-io-cart-list className={`${scrollStyles.viewport} space-y-3`} style={{ overscrollBehavior: "contain" }}>
             {bundleCards}
           </div>
           <div data-io-cart-frame aria-hidden className="pointer-events-none absolute inset-0 z-20 rounded-[20px] border" style={{ borderColor: LEGACY_COLORS.border }} />
