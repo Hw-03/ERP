@@ -36,8 +36,9 @@ import {
   MovementSummaryCell,
   StockSnapshotContent,
 } from "./historyTableHelpers";
-import { getBomLineSnapshotLog } from "./BomBatchDetail";
-import { HistoryDetailMemo } from "./HistoryDetailPanel";
+import { getBomLineSnapshotLog, getAdjustmentDisplayBundles } from "./BomBatchDetail";
+import { HistoryDetailMemo, HistoryDetailReason } from "./HistoryDetailPanel";
+import { HistoryMobileContext, HistoryMobileStockDetails, HistoryMobileLogStock } from "./HistoryMobileInformation";
 import type { HistoryTableFocusTarget } from "./HistoryTable";
 import { buildHistoryDetailSummary } from "./historyDetailSummary";
 import { HistoryKeyPointSummary } from "./HistoryKeyPointSummary";
@@ -76,6 +77,7 @@ type Props = {
 type FetchState =
   | { status: "loading" }
   | { status: "available"; batch: IoBatch }
+  | { status: "error" }
   | { status: "unavailable" };
 
 /**
@@ -108,6 +110,7 @@ export function HistoryBatchDetailPanel({
         : { status: "unavailable" },
   );
   const batchRevisionRef = useRef(realtimeRevision);
+  const [retryEpoch, setRetryEpoch] = useState(0);
 
   useLayoutEffect(() => {
     const revisionChanged = batchRevisionRef.current !== realtimeRevision;
@@ -142,14 +145,14 @@ export function HistoryBatchDetailPanel({
       .catch((err: unknown) => {
         if (cancelled || (err as Error)?.name === "AbortError") return;
         if (!background) {
-          setState({ status: "unavailable" });
+          setState({ status: "error" });
         }
       });
     return () => {
       cancelled = true;
       controller.abort();
     };
-  }, [operationBatchId, realtimeRevision]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [operationBatchId, realtimeRevision, retryEpoch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const first = logs[0];
   const cancelScope = getHistoryCancelScope(first);
@@ -224,9 +227,11 @@ export function HistoryBatchDetailPanel({
 
   const logByItemId = new Map<string, TransactionLog>();
   for (const l of logs) logByItemId.set(l.item_id, l);
+  const unmatchedLogs = mobilePresentation && batch ? logs.filter((log) => !batch.bundles.some((bundle) =>
+    bundle.lines.some((line) => getBomLineSnapshotLog(line, logs, batch)?.log_id === log.log_id))) : [];
 
   function handleLineClick(line: IoLine) {
-    const matched = logByItemId.get(line.item_id);
+    const matched = mobilePresentation && batch ? getBomLineSnapshotLog(line, logs, batch) : logByItemId.get(line.item_id);
     if (onFocusLineInList) {
       onFocusLineInList({
         groupKey: batchId,
@@ -317,6 +322,8 @@ export function HistoryBatchDetailPanel({
             onCancelClick={controller.openConfirmation}
             mobilePresentation={mobilePresentation}
           />
+          {mobilePresentation && <HistoryMobileContext summary={visibleSummary} omitCancelledStatus
+            omitParticipantNames={[batch?.requester_name ?? getHistoryActor(first), batch?.approver_name ?? first.approver_name ?? ""]} />}
           {isBatchCancelled && (
             <div
               className="rounded-[16px] border px-4 py-3 text-sm font-bold"
@@ -327,10 +334,11 @@ export function HistoryBatchDetailPanel({
               }}
             >
               <XCircle className="mr-1.5 inline h-4 w-4" />
-              취소된 거래
+              취소된 거래{first.cancel_reason && ` — ${first.cancel_reason}`}
             </div>
           )}
 
+          {mobilePresentation && <HistoryDetailReason log={first} />}
           <HistoryDetailMemo
             notes={first.notes}
             reasonMemo={first.reason_memo}
@@ -345,6 +353,12 @@ export function HistoryBatchDetailPanel({
             scopeCount={cancellationScopeStatus === "ready" ? cancellationLogs.length : undefined}
           />
 
+          {mobilePresentation && state.status === "loading" && <div role="status" className="text-sm" style={{color:LEGACY_COLORS.muted2}}>작업 구성 불러오는 중</div>}
+          {mobilePresentation && state.status === "error" && <div className="text-sm" style={{color:LEGACY_COLORS.muted2}}>
+            작업 구성을 불러오지 못했습니다.
+            <button type="button" className="ml-2 rounded-[12px] border px-3" style={{borderColor:LEGACY_COLORS.border,color:LEGACY_COLORS.blue}} onClick={() => setRetryEpoch((value) => value + 1)}>다시 시도</button>
+          </div>}
+          {mobilePresentation && (!batch || batch.bundles.length === 0) && <HistoryMobileStockDetails logs={logs} onSelectLog={(log) => onSelectLog?.(log)} />}
           {batch && batch.bundles.length > 0 && (
             <div
               className={mobilePresentation ? "space-y-3" : "rounded-[20px] border p-4"}
@@ -358,18 +372,19 @@ export function HistoryBatchDetailPanel({
                 {mobilePresentation ? "재고 변화" : "구성 라인"}
               </div>
               <div className="flex flex-col gap-3">
-                {batch.bundles.map((bundle) => (
+                {(mobilePresentation ? getAdjustmentDisplayBundles(batch) : batch.bundles).map((bundle) => (
                   <BundleBlock
                     key={bundle.bundle_id}
                     bundle={bundle}
                     batch={batch}
                     logs={logs}
                     onLineClick={handleLineClick}
-                    isLineClickable={(line) => logByItemId.has(line.item_id)}
+                    isLineClickable={(line) => mobilePresentation ? Boolean(getBomLineSnapshotLog(line, logs, batch)) : logByItemId.has(line.item_id)}
                     mobilePresentation={mobilePresentation}
                     framed
                   />
                 ))}
+                {unmatchedLogs.length > 0 && <HistoryMobileStockDetails logs={unmatchedLogs} batch={batch} onSelectLog={(log) => onSelectLog?.(log)} />}
               </div>
             </div>
           )}
@@ -603,7 +618,9 @@ function BundleBlock({
   const isBomParent = bundle.source_kind === "bom_parent";
   const isInternalUseBom = batch.sub_type === "internal_use_out" && isBomParent;
   const parentLine = getHistoryBomParentLine(bundle);
+  const parentLog = parentLine ? getBomLineSnapshotLog(parentLine, logs, batch) : null;
   const childLines = parentLine ? bundle.lines.filter((l) => l !== parentLine) : bundle.lines;
+  const compactSingleLine = mobilePresentation && !isBomParent && childLines.length === 1;
   const parentNotExecuted = !!parentLine && !parentLine.included;
   const headerSigned = parentLine && !parentNotExecuted
     ? getHistoryLineSignedQuantity(parentLine, batch, bundle, getHistoryLineExecutionLog(parentLine, logs))
@@ -628,14 +645,16 @@ function BundleBlock({
       className={framed ? "rounded-[16px] border" : "border-b last:border-b-0"}
       style={{ borderColor: LEGACY_COLORS.border }}
     >
-      <div
-        className={mobilePresentation ? mobileStyles.bundleHeader : "flex items-center gap-2 px-3 py-2"}
+      {!compactSingleLine && <div
+        className={mobilePresentation ? `${mobileStyles.bundleHeader} ${mobileStyles.compositionRow}` : "flex items-center gap-2 px-3 py-2"}
         style={{
           background: framed
             ? "color-mix(in srgb, var(--c-blue) 5%, transparent)"
             : `color-mix(in srgb, ${LEGACY_COLORS.blue} 5%, transparent)`,
         }}
       >
+        <div className={mobilePresentation ? mobileStyles.bundleIdentity : "contents"}>
+        <div className={mobilePresentation ? mobileStyles.itemMetadata : "contents"}>
         <span
           className={mobilePresentation ? "inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium" : "inline-flex min-w-[6.5rem] items-center justify-center gap-1 rounded-full px-3 py-1 text-xs font-bold tracking-wide"}
           style={{
@@ -659,18 +678,21 @@ function BundleBlock({
             {INTERNAL_USE_BOM_MODE_LABEL[bundle.internal_use_bom_mode]}
           </span>
         )}
-        <div className={mobilePresentation ? mobileStyles.bundleTitle : "min-w-0 flex-1"}>
-          <TruncatedText className={mobilePresentation ? mobileStyles.name : "truncate text-xs font-bold"} style={{ color: LEGACY_COLORS.text }}>
-            {bundle.title}
-          </TruncatedText>
+        {mobilePresentation && (parentLine?.mes_code || bundle.source_mes_code) && <span className={mobileStyles.code} style={{color:LEGACY_COLORS.muted2}}>{parentLine?.mes_code || bundle.source_mes_code}</span>}
         </div>
-        {mobilePresentation ? parentLine && (
+        <div className={mobilePresentation ? mobileStyles.bundleTitle : "min-w-0 flex-1"}>
+          {mobilePresentation && parentLine ? <button type="button" disabled={!parentLog} onClick={() => onLineClick(parentLine)} className="w-full text-left">
+            <span className={mobileStyles.name}>{bundle.title}</span>
+          </button> : <TruncatedText className={mobilePresentation ? mobileStyles.name : "truncate text-xs font-bold"} style={{ color: LEGACY_COLORS.text }}>{bundle.title}</TruncatedText>}
+        </div>
+        </div>
+        {mobilePresentation ? parentLine ? (
           <div className={mobileStyles.stockChange}>
             {parentNotExecuted ? <span className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{headerQtyText}</span>
-              : <StockSnapshotContent log={getBomLineSnapshotLog(parentLine, logs, batch)} variant="panel" />}
+              : parentLog ? <HistoryMobileLogStock log={parentLog} /> : <StockSnapshotContent log={null} variant="panel" />}
           </div>
-        ) : <span className="whitespace-nowrap text-[11px] font-bold" style={{ color: headerQtyColor }}>{headerQtyText}</span>}
-      </div>
+        ) : <span className="text-sm font-bold" style={{color:headerQtyColor}}>{headerQtyText}</span> : <span className="whitespace-nowrap text-[11px] font-bold" style={{ color: headerQtyColor }}>{headerQtyText}</span>}
+      </div>}
 
       <div>
         {childLines.filter((line) => isInternalUseBom || line.included).map((line) => {
@@ -685,23 +707,26 @@ function BundleBlock({
           const internalUseEffect = isInternalUseBom
             ? getInternalUseHistoryLineEffectLabel(line, batch)
             : null;
+          const snapshotLog = getBomLineSnapshotLog(line, logs, batch);
+          const LineContainer = mobilePresentation ? "div" : "button";
           return (
-            <button
+            <LineContainer
               key={line.line_id}
-              type="button"
-              onClick={() => clickable && onLineClick(line)}
-              disabled={!clickable}
-              className={mobilePresentation ? `${mobileStyles.line} border-t text-left transition-colors disabled:cursor-default enabled:hover:brightness-125` : "flex w-full items-center gap-2 border-t px-3 py-1.5 text-left transition-colors disabled:cursor-default enabled:hover:brightness-125"}
+              type={mobilePresentation ? undefined : "button"}
+              onClick={mobilePresentation ? undefined : () => clickable && onLineClick(line)}
+              disabled={mobilePresentation ? undefined : !clickable}
+              className={mobilePresentation ? `${mobileStyles.line} ${compactSingleLine ? mobileStyles.singleLine : "border-t"} text-left transition-colors disabled:cursor-default enabled:hover:brightness-125` : "flex w-full items-center gap-2 border-t px-3 py-1.5 text-left transition-colors disabled:cursor-default enabled:hover:brightness-125"}
               style={{
                 borderColor: LEGACY_COLORS.border,
                 background: "transparent",
               }}
             >
-              <span className={mobilePresentation ? mobileStyles.branch : "text-[10px]"} style={{ color: LEGACY_COLORS.muted2 }}>└</span>
+              {!compactSingleLine && <span className={mobilePresentation ? mobileStyles.branch : "text-[10px]"} style={{ color: LEGACY_COLORS.muted2 }}>└</span>}
               <div className="min-w-0 flex-1">
-                <TruncatedText className={mobilePresentation ? mobileStyles.name : "truncate text-xs font-semibold"} style={{ color: LEGACY_COLORS.text }}>
-                  {line.item_name}
-                </TruncatedText>
+                {mobilePresentation ? <button type="button" disabled={!clickable} onClick={() => onLineClick(line)} className="w-full text-left" aria-label={`${line.item_name} ${line.mes_code ?? ""} 상세`}>
+                  <span className={mobileStyles.name}>{line.item_name}</span>
+                  {line.mes_code && <span className={mobileStyles.itemMetadata} style={{color:LEGACY_COLORS.muted2}}><span className={mobileStyles.code}>{line.mes_code}</span></span>}
+                </button> : <TruncatedText className="truncate text-xs font-semibold" style={{ color: LEGACY_COLORS.text }}>{line.item_name}</TruncatedText>}
               </div>
               {!mobilePresentation && line.mes_code && (
                 <span className="text-[10px]" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -710,9 +735,10 @@ function BundleBlock({
               )}
               {mobilePresentation ? (
                 <div className={mobileStyles.lineMetadata}>
-                  {line.mes_code && <span className={mobileStyles.code} style={{ color: LEGACY_COLORS.muted2 }}>{line.mes_code}</span>}
                   <div className={mobileStyles.stockChange}>
-                    <StockSnapshotContent log={getBomLineSnapshotLog(line, logs, batch)} variant="panel" />
+                    {snapshotLog
+                      ? <HistoryMobileLogStock log={snapshotLog} />
+                      : <StockSnapshotContent log={null} variant="panel" />}
                   </div>
                 </div>
               ) : <span className="whitespace-nowrap text-[11px] font-bold" style={{ color: qtyColor }}>{signed.label}</span>}
@@ -722,6 +748,7 @@ function BundleBlock({
               {internalUseEffect && line.shortage > 0 && (
                 <LineStatusBadge included shortage={line.shortage} />
               )}
+              {mobilePresentation && line.approval_outcome === "rejected" && <span className="text-xs font-bold" style={{color:LEGACY_COLORS.red}}>반려 · 재고 미차감</span>}
               {!clickable && (!isInternalUseBom || line.included) && (
                 <span
                   className="inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold"
@@ -734,7 +761,7 @@ function BundleBlock({
                   목록 외
                 </span>
               )}
-            </button>
+            </LineContainer>
           );
         })}
       </div>

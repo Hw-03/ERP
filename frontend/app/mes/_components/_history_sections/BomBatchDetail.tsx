@@ -164,7 +164,7 @@ export function BomBatchDetail({ batchId, colSpan, cache, onCached, compact, hig
   );
 }
 
-function getAdjustmentDisplayBundles(batch: IoBatch): IoBundle[] {
+export function getAdjustmentDisplayBundles(batch: IoBatch): IoBundle[] {
   const bundles = getDisplayBundles(batch);
   const isLegacyAdjustmentIn = isManualOnlyProductionBatch(batch);
   const isCustomBomAdjustment = isCustomBomSingleAdjustmentBatch(batch);

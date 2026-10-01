@@ -28,6 +28,7 @@ import { toInventoryEffectRows } from "./historyInventoryEffect";
 import { getHistoryRowPresentation } from "./historyPresentation";
 import { buildHistoryDetailSummary } from "./historyDetailSummary";
 import { HistoryKeyPointSummary } from "./HistoryKeyPointSummary";
+import { HistoryMobileContext, HistoryMobileStockDetails } from "./HistoryMobileInformation";
 import {
   HistoryCancelAction,
   HistoryMobileCancelConfirmation,
@@ -45,6 +46,7 @@ type Props = {
   onSelectLog: (log: TransactionLog) => void;
   onLogUpdated: (updated: TransactionLog) => void;
   variant?: "default" | "desktop";
+  mobilePresentation?: boolean;
   desktopCancellationOpen?: boolean;
   onDesktopCancellationOpenChange?: (open: boolean) => void;
 };
@@ -62,6 +64,7 @@ export function HistoryDetailPanel({
   onSelectLog,
   onLogUpdated,
   variant = "default",
+  mobilePresentation = false,
   desktopCancellationOpen = false,
   onDesktopCancellationOpenChange,
 }: Props) {
@@ -306,7 +309,10 @@ export function HistoryDetailPanel({
       )}
 
       {variant !== "desktop" && (
-        <HistoryInventoryEffectPanel log={selected} />
+        mobilePresentation ? <>
+          <HistoryMobileContext summary={summary} omitCancelledStatus omitParticipantNames={[getHistoryActor(selected),selected.approver_name ?? ""]} />
+          <HistoryMobileStockDetails logs={[selected]} batch={batch} onSelectLog={onSelectLog} />
+        </> : <HistoryInventoryEffectPanel log={selected} />
       )}
 
       {variant === "desktop" ? (
@@ -615,7 +621,7 @@ function HistoryDetailMetaStrip({
  * HistoryBatchDetailPanel 에서도 재사용.
  */
 
-function HistoryDetailReason({ log }: { log: TransactionLog }) {
+export function HistoryDetailReason({ log }: { log: TransactionLog }) {
   const reason = log.reason_category?.trim();
   if (!reason) return null;
   return (
