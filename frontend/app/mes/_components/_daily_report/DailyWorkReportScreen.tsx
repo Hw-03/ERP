@@ -319,11 +319,11 @@ export function DailyWorkReportScreen({
             </div>
             {reportsQuery.isError && <div className="mt-4"><Failure message="작성자 목록을 불러오지 못했습니다." onRetry={mobile ? () => void reportsQuery.refetch() : undefined} /></div>}
             {(!reportsQuery.isError || keepAuthors) && (
-              <div ref={authorChipsRef} data-testid="daily-work-report-author-chips" className="mt-4 flex flex-wrap gap-2 lg:max-h-36 lg:overflow-y-auto lg:pr-1" style={{ minHeight: mobile && authorsLoading ? authorSkeletonLayout?.height : undefined }}>
+              <div ref={authorChipsRef} data-testid="daily-work-report-author-chips" className={`mt-4 gap-2 ${mobile ? "grid grid-cols-4" : "flex flex-wrap lg:max-h-36 lg:overflow-y-auto lg:pr-1"}`} style={{ minHeight: mobile && authorsLoading ? authorSkeletonLayout?.height : undefined }}>
                 {authorsLoading && (mobile ? <div role="status" aria-busy="true" aria-label="작성자 목록 불러오는 중" className="contents">
                   {(authorSkeletonLayout?.chips ?? [{ width: 160, height: 44 }]).map((chip, index) => <span key={index} aria-hidden="true" className="max-w-full shrink-0 rounded-[12px]" style={{ ...chip, background: LEGACY_COLORS.s2 }} />)}
                 </div> : <div role="status" aria-busy="true" aria-label="작성자 목록 불러오는 중" className="h-11 w-40 rounded-[12px] motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s2 }} />)}
-                {!authorsLoading && (!reportsQuery.isError || keepAuthors) && reports.length === 0 && <p className="rounded-[14px] border px-3 py-3 text-sm font-medium" style={{ color: LEGACY_COLORS.muted2, borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>작성된 일보가 없습니다.</p>}
+                {!authorsLoading && (!reportsQuery.isError || keepAuthors) && reports.length === 0 && <p className="col-span-full rounded-[14px] border px-3 py-3 text-sm font-medium" style={{ color: LEGACY_COLORS.muted2, borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>작성된 일보가 없습니다.</p>}
                 {reports.map((entry) => {
                   const selected = selectedEmployeeId === entry.employee_id;
                   const departmentColor = getDepartmentFallbackColor(entry.department);
@@ -335,8 +335,8 @@ export function DailyWorkReportScreen({
                       preferredEmployeeIdRef.current = entry.employee_id;
                       setSelectedEmployeeId(entry.employee_id);
                       setIsActivityDetailOpen(false);
-                    }, "저장하지 않은 내용이 있습니다. 직원을 바꾸면 작성 중인 일보가 사라집니다.")} className="min-h-11 rounded-[12px] border px-3 text-left text-sm font-bold transition active:scale-[0.98]" style={{ color: selected ? LEGACY_COLORS.white : LEGACY_COLORS.text, borderColor: `color-mix(in srgb, ${departmentColor} ${selected ? 60 : 35}%, transparent)`, background: selected ? departmentColor : `color-mix(in srgb, ${departmentColor} 12%, transparent)` }}>
-                      <span>{entry.employee_name}</span><span className="ml-1.5 text-xs font-medium" style={{ color: selected ? LEGACY_COLORS.white : departmentColor }}>{entry.department}</span>
+                    }, "저장하지 않은 내용이 있습니다. 직원을 바꾸면 작성 중인 일보가 사라집니다.")} className={`min-h-11 rounded-[12px] border text-sm font-bold transition active:scale-[0.98] ${mobile ? "flex min-w-0 flex-col items-center justify-center px-1 py-1.5 [overflow-wrap:anywhere]" : "px-3 text-left"}`} style={{ color: selected ? LEGACY_COLORS.white : LEGACY_COLORS.text, borderColor: `color-mix(in srgb, ${departmentColor} ${selected ? 60 : 35}%, transparent)`, background: selected ? departmentColor : `color-mix(in srgb, ${departmentColor} 12%, transparent)` }}>
+                      <span>{entry.employee_name}</span><span className={`${mobile ? "" : "ml-1.5"} text-xs font-medium`} style={{ color: selected ? LEGACY_COLORS.white : departmentColor }}>{entry.department}</span>
                     </button>
                   );
                 })}
