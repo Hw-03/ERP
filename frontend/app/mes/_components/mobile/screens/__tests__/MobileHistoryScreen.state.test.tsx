@@ -4,6 +4,8 @@ import { QueryClient } from "@tanstack/react-query";
 import type { TransactionLog } from "@/lib/api";
 import type { IoBatch } from "@/lib/api/types/io";
 import { queryKeys } from "@/lib/queries/keys";
+import { buildGroups } from "../../../_history_sections/historyTableHelpers";
+import type { TransactionDisplayGroup } from "@/lib/api/production";
 import { MobileHistoryScreen } from "../MobileHistoryScreen";
 
 const testState = vi.hoisted(() => ({
@@ -24,8 +26,17 @@ vi.mock("@tanstack/react-query", async () => {
   };
 });
 
-vi.mock("../../../_hooks/useHistoryData", () => ({
-  useHistoryData: () => testState.historyResult,
+vi.mock("../../../_hooks/useHistoryGroups", () => ({
+  useHistoryGroups: () => ({ ...testState.historyResult, groups: buildGroups(testState.historyResult!.logs).map((g) => ({
+        type: g.type, key: g.type === "solo" ? g.log.log_id : g.type === "operation" ? g.operationId : g.type === "op_batch" ? g.batchId : g.type === "batch" ? g.refKey : g.key,
+        logs: g.type === "solo" ? [g.log] : g.type === "defect_lifecycle" ? [g.parent, g.child] : g.logs,
+      })),
+      setGroups: (update: React.SetStateAction<TransactionDisplayGroup[]>) => {
+        const previous = testState.historyResult!.logs.map((log) => ({ type: "solo" as const, key: log.log_id, logs: [log] }));
+        const next = typeof update === "function" ? update(previous) : update;
+        testState.historyResult!.setLogs(next.flatMap((group) => group.logs));
+      },
+      refreshLoaded: vi.fn(), }),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -62,7 +73,9 @@ vi.mock("../../../_history_sections/HistoryFilterPanel", () => ({ HistoryFilterP
 vi.mock("../../../_history_sections/HistoryCalendarPanel", () => ({ HistoryCalendarPanel: () => null }));
 
 vi.mock("../../history/MobileHistoryList", () => ({
-  MobileHistoryList: ({ filteredLogs, selectedKey, onSelectLog, onSelectBatch }: any) => (
+  MobileHistoryList: ({ displayGroups, selectedKey, onSelectLog, onSelectBatch }: any) => {
+    const filteredLogs = displayGroups.flatMap((g: any) => g.type === "solo" ? [g.log] : g.type === "defect_lifecycle" ? [g.parent, g.child] : g.logs);
+    return (
     <div
       data-testid="mobile-history-list-state"
       data-selection={selectedKey ?? "none"}
@@ -74,6 +87,14 @@ vi.mock("../../history/MobileHistoryList", () => ({
       <button type="button" onClick={() => onSelectBatch("batch-1", filteredLogs)}>
         모바일 묶음 선택
       </button>
+      <button type="button" onClick={() => {
+        const group = displayGroups.find((value: any) => value.type === "defect_lifecycle");
+        if (group) onSelectBatch(group.key,[group.parent,group.child]);
+      }}>모바일 후속 묶음 선택</button>
+      <button type="button" onClick={() => {
+        const group = displayGroups.find((value: any) => value.type === "operation");
+        if (group) onSelectBatch(group.operationId,group.logs);
+      }}>모바일 작업 원장 선택</button>
       <button
         type="button"
         onClick={() => {
@@ -85,7 +106,7 @@ vi.mock("../../history/MobileHistoryList", () => ({
         모바일 참조 묶음 선택
       </button>
     </div>
-  ),
+  ); },
 }));
 
 vi.mock("../../../_history_sections/HistoryDetailPanel", () => ({
@@ -112,15 +133,18 @@ vi.mock("../../../_history_sections/HistoryBatchDetailPanel", () => ({
     batchCache,
     setBatchCache,
     onBatchCancelled,
+    onSelectLog,
     panelOpen,
   }: any) => (
     <div
       data-testid="mobile-batch-detail-state"
       data-panel-open={panelOpen ? "yes" : "no"}
       data-name={logs[0]?.item_name ?? ""}
+      data-log-ids={logs.map((log: TransactionLog) => log.log_id).join(",")}
       data-selection-cancelled={logs.every((log: TransactionLog) => log.cancelled) ? "yes" : "no"}
       data-cache-status={batchCache.get(batchId)?.status ?? "missing"}
     >
+      <button type="button" onClick={() => onSelectLog(logs[logs.length-1])}>모바일 묶음 드릴</button>
       <button
         type="button"
         onClick={() => setBatchCache(new Map([[batchId, testState.batch]]))}
@@ -230,6 +254,30 @@ beforeEach(() => {
 });
 
 describe("MobileHistoryScreen history state", () => {
+  it("회수 거래가 먼저 와도 작업 대표 품목을 PC처럼 선택하고 새 조회 후 유지한다", () => {
+    const child = makeLog({log_id:"child",item_id:"child",item_name:"회수 부품",operation_batch_id:null,operation_id:"rework-op",operation_role:"REWORK_CHILD_NORMAL",transaction_type:"RECEIVE"});
+    const parent = makeLog({log_id:"parent",item_id:"parent",item_name:"재작업 대상",operation_batch_id:null,operation_id:"rework-op",operation_role:"REWORK_PARENT_DEFECTIVE",transaction_type:"DISASSEMBLE"});
+    setHistoryResult([child,parent],false);
+    const {rerender} = render(<MobileHistoryScreen />);
+    fireEvent.click(screen.getByRole("button",{name:"모바일 작업 원장 선택"}));
+    expect(screen.getByTestId("mobile-batch-detail-state")).toHaveAttribute("data-name","재작업 대상");
+    setHistoryResult([child,parent],true);
+    rerender(<MobileHistoryScreen />);
+    setHistoryResult([{...child},{...parent,item_name:"최신 재작업 대상"}],false);
+    rerender(<MobileHistoryScreen />);
+    expect(screen.getByTestId("mobile-batch-detail-state")).toHaveAttribute("data-name","최신 재작업 대상");
+  });
+  it("묶음 거래를 열고 뒤로가면 후속 기록을 포함한 원래 묶음을 복원한다", () => {
+    const logs = [makeLog(),makeLog({log_id:"child",item_id:"child-item",item_name:"후속 품목"})];
+    setHistoryResult(logs,false);
+    render(<MobileHistoryScreen />);
+    fireEvent.click(screen.getByRole("button",{name:"모바일 묶음 선택"}));
+    expect(screen.getByTestId("mobile-batch-detail-state")).toHaveAttribute("data-log-ids","log-1,child");
+    fireEvent.click(screen.getByRole("button",{name:"모바일 묶음 드릴"}));
+    expect(screen.getByTestId("mobile-log-detail-state")).toHaveAttribute("data-name","후속 품목");
+    fireEvent.click(screen.getByRole("button",{name:"← 뒤로"}));
+    expect(screen.getByTestId("mobile-batch-detail-state")).toHaveAttribute("data-log-ids","log-1,child");
+  });
   it("does not query annual counts while the calendar is closed", () => {
     render(<MobileHistoryScreen />);
     expect(testState.monthlyQuery).toHaveBeenLastCalledWith(expect.any(Number), { enabled: false });

@@ -1,8 +1,21 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
+import { ioApi } from "@/lib/api/io";
+import type { IoBatch } from "@/lib/api/types/io";
 import { describe, expect, it, vi } from "vitest";
 import type { TransactionLog } from "@/lib/api";
-import { MobileHistoryList } from "../MobileHistoryList";
+import { MobileHistoryList as ActualMobileHistoryList } from "../MobileHistoryList";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { buildGroups } from "../../../_history_sections/historyTableHelpers";
 import { getSingleLogMovement } from "../../../_history_sections/historyBatchInterpreter";
+
+function MobileHistoryList({ filteredLogs, ...props }: Omit<Parameters<typeof ActualMobileHistoryList>[0], "displayGroups" | "batchCache" | "setBatchCache"> & { filteredLogs: TransactionLog[] }) {
+  const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
+  const [cache, setCache] = useState(new Map<string, IoBatch>());
+  return <QueryClientProvider client={client}>
+    <ActualMobileHistoryList {...props} displayGroups={buildGroups(filteredLogs)} batchCache={cache} setBatchCache={setCache} />
+  </QueryClientProvider>;
+}
 
 function log(id: string, phase: string): TransactionLog {
   return {
@@ -35,6 +48,76 @@ function log(id: string, phase: string): TransactionLog {
 }
 
 describe("MobileHistoryList", () => {
+  it("회수된 관전류 BD로 검색한 불량 재작업도 부모 품목과 작업 분류로 표시한다", () => {
+    const onSelectLog = vi.fn();
+    const onSelectBatch = vi.fn();
+    const parent = { ...log("parent", ""), transaction_type: "DISASSEMBLE", item_name: "ADX6000FB BODY RIGHT ASS'Y",
+      operation_id: "rework", operation_role: "REWORK_PARENT_DEFECTIVE", reference_no: "defect-disassemble:record" } as TransactionLog;
+    const child = { ...parent, log_id: "child", item_id: "child", item_name: "ADX6000 관전류 BD",
+      transaction_type: "RECEIVE", operation_role: "REWORK_CHILD_NORMAL" } as TransactionLog;
+    render(<MobileHistoryList loading={false} error={null} filteredLogs={[child, parent]}
+      selectedKey={null} onSelectLog={onSelectLog} onSelectBatch={onSelectBatch} onRetry={vi.fn()}
+      canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} />);
+    expect(screen.getByText("재작업")).toBeInTheDocument();
+    expect(screen.queryByText("원자재 입고")).not.toBeInTheDocument();
+    expect(screen.getByRole("button")).toHaveTextContent("ADX6000FB BODY RIGHT ASS'Y 외 1건");
+    fireEvent.click(screen.getByRole("button"));
+    expect(onSelectBatch).toHaveBeenCalledWith("rework", [parent, child]);
+    expect(onSelectLog).not.toHaveBeenCalled();
+  });
+
+  it("서버가 분리한 묶음 경계를 모바일에서 다시 합치지 않는다", () => {
+    const first = { ...log("first", ""), operation_id: "same-operation" };
+    const second = { ...log("second", ""), operation_id: "same-operation" };
+    render(<QueryClientProvider client={new QueryClient()}>
+      <ActualMobileHistoryList loading={false} error={null}
+        displayGroups={[{ type: "solo", log: first }, { type: "solo", log: second }]}
+        batchCache={new Map()} setBatchCache={vi.fn()} selectedKey={null}
+        onSelectLog={vi.fn()} onSelectBatch={vi.fn()} onRetry={vi.fn()}
+        canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} />
+    </QueryClientProvider>);
+    expect(screen.getAllByRole("button")).toHaveLength(2);
+  });
+
+  it("배치 조회 실패를 재시도하고 정확한 작업 분류로 복구한다", async () => {
+    const getBatch = vi.spyOn(ioApi, "getBatch").mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValue({ batch_id: "batch", work_type: "defect", sub_type: "add", bundles: [] } as unknown as IoBatch);
+    const entry = { ...log("batch-entry", ""), transaction_type: "MARK_DEFECTIVE", operation_batch_id: "batch" } as TransactionLog;
+    render(<MobileHistoryList loading={false} error={null} filteredLogs={[entry]}
+      selectedKey={null} onSelectLog={vi.fn()} onSelectBatch={vi.fn()} onRetry={vi.fn()}
+      canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} />);
+    expect(screen.getByText("작업 정보 확인 중")).toBeInTheDocument();
+    await screen.findByRole("alert");
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    await waitFor(() => expect(screen.getByText("불량")).toBeInTheDocument());
+    expect(getBatch).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    getBatch.mockRestore();
+  });
+
+  it("취소된 원 거래에는 취소 표시와 무효화 스타일을 적용하고 상세 진입을 유지한다", () => {
+    const entry = { ...log("cancelled", ""), transaction_type: "RECEIVE", reference_no: null, cancelled: true } as TransactionLog;
+    const onSelectLog = vi.fn();
+    render(<MobileHistoryList loading={false} error={null} filteredLogs={[entry]}
+      selectedKey={null} onSelectLog={onSelectLog} onSelectBatch={vi.fn()} onRetry={vi.fn()}
+      canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} />);
+    const row = screen.getByRole("button");
+    expect(row).toHaveAttribute("data-history-cancelled", "true");
+    expect(screen.getByText("취소됨")).toBeInTheDocument();
+    expect(screen.getByText(entry.item_name)).toHaveClass(/affected/);
+    fireEvent.click(row);
+    expect(onSelectLog).toHaveBeenCalledWith(entry);
+  });
+
+  it("취소를 수행한 기록은 원 거래와 구별되는 취소 작업으로 표시한다", () => {
+    const entry = { ...log("reversal", ""), reference_no: null, transaction_type: "RECEIVE", operation_kind: "CANCELLATION" } as TransactionLog;
+    render(<MobileHistoryList loading={false} error={null} filteredLogs={[entry]}
+      selectedKey={null} onSelectLog={vi.fn()} onSelectBatch={vi.fn()} onRetry={vi.fn()}
+      canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} />);
+    expect(screen.getByRole("button")).toHaveAttribute("data-history-cancellation", "true");
+    expect(screen.getByText("원자재 입고 취소")).toBeInTheDocument();
+    expect(screen.queryByText("취소됨")).not.toBeInTheDocument();
+  });
   it("캐시 재검증 실패는 기존 행을 유지하며 실패와 재시도를 표시한다", () => {
     const retry = vi.fn();
     const entry = { ...log("cached", ""), reference_no: null };
@@ -94,8 +177,9 @@ describe("MobileHistoryList", () => {
     expect(retry).toHaveBeenCalledOnce();
   });
 
-  it("opens a new-ledger operation group with its operation id", () => {
+  it("opens a complete new-ledger operation group with its operation id", () => {
     const onSelectBatch = vi.fn();
+    const onSelectLog = vi.fn();
     const first = { ...log("operation-1", ""), operation_id: "operation-id" };
     const second = { ...log("operation-2", ""), operation_id: "operation-id" };
 
@@ -105,7 +189,7 @@ describe("MobileHistoryList", () => {
         error={null}
         filteredLogs={[first, second]}
         selectedKey={null}
-        onSelectLog={vi.fn()}
+        onSelectLog={onSelectLog}
         onSelectBatch={onSelectBatch}
         onRetry={vi.fn()}
         canLoadMore={false}
@@ -116,11 +200,12 @@ describe("MobileHistoryList", () => {
 
     fireEvent.click(screen.getByRole("button"));
     expect(onSelectBatch).toHaveBeenCalledWith("operation-id", [first, second]);
+    expect(onSelectLog).not.toHaveBeenCalled();
     expect(screen.getByText("operator").parentElement?.previousElementSibling?.firstElementChild).toHaveClass("h-6", "w-32");
     expect(screen.queryByText(/묶음 2건/)).not.toBeInTheDocument();
   });
 
-  it("selects only the original defect-mark log for a visual defect lifecycle group", () => {
+  it("opens both the original defect mark and its followup in a lifecycle group", () => {
     const onSelectLog = vi.fn();
     const onSelectBatch = vi.fn();
     const marked = {
@@ -158,8 +243,8 @@ describe("MobileHistoryList", () => {
     );
 
     fireEvent.click(screen.getByRole("button"));
-    expect(onSelectLog).toHaveBeenCalledWith(marked);
-    expect(onSelectBatch).not.toHaveBeenCalled();
+    expect(onSelectLog).not.toHaveBeenCalled();
+    expect(onSelectBatch).toHaveBeenCalledWith(expect.any(String), [marked, processed]);
     expect(screen.queryByText(getSingleLogMovement(processed).label)).not.toBeInTheDocument();
   });
 

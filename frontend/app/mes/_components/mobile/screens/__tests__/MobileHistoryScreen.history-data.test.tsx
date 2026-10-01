@@ -3,6 +3,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TransactionLog } from "@/lib/api";
 import type { TransactionSummary } from "@/lib/api/production";
+import { buildGroups } from "../../../_history_sections/historyTableHelpers";
+import type { TransactionDisplayGroup } from "@/lib/api/production";
 import { MobileHistoryScreen } from "../MobileHistoryScreen";
 
 type HistoryHookArgs = {
@@ -23,7 +25,7 @@ type HistoryResult = {
 };
 
 type SummaryParams = {
-  transactionTypes?: string;
+  operationKeys?: string;
   dateFrom?: string;
   dateTo?: string;
   search?: string;
@@ -45,17 +47,22 @@ vi.mock("@/lib/queries/realtime", async (importOriginal) => ({
   useRealtimeRevision: () => testState.realtimeRevision,
 }));
 
-vi.mock("../../../_hooks/useHistoryData", () => ({
-  useHistoryData: (args: HistoryHookArgs) => {
+vi.mock("../../../_hooks/useHistoryGroups", () => ({
+  useHistoryGroups: (args: HistoryHookArgs) => {
     if (!testState.historyResult) throw new Error("history result is not configured");
     testState.historyArgs.push(args);
-    const totalCount = args.totalCount;
     return {
       ...testState.historyResult,
-      canLoadMore:
-        !testState.historyResult.loading &&
-        totalCount != null &&
-        testState.historyResult.logs.length < totalCount,
+      groups: buildGroups(testState.historyResult!.logs).map((g) => ({
+        type: g.type, key: g.type === "solo" ? g.log.log_id : g.type === "operation" ? g.operationId : g.type === "op_batch" ? g.batchId : g.type === "batch" ? g.refKey : g.key,
+        logs: g.type === "solo" ? [g.log] : g.type === "defect_lifecycle" ? [g.parent, g.child] : g.logs,
+      })),
+      setGroups: (update: React.SetStateAction<TransactionDisplayGroup[]>) => {
+        const previous = testState.historyResult!.logs.map((log) => ({ type: "solo" as const, key: log.log_id, logs: [log] }));
+        const next = typeof update === "function" ? update(previous) : update;
+        testState.historyResult!.setLogs(next.flatMap((group) => group.logs));
+      },
+      refreshLoaded: vi.fn(),
     };
   },
 }));
@@ -138,8 +145,9 @@ vi.mock("../../../_history_sections/HistoryFilterBar", () => ({
 }));
 
 vi.mock("../../../_history_sections/HistoryFilterPanel", () => ({
-  HistoryFilterPanel: ({ toggleDept }: { toggleDept: (department: string) => void }) => (
+  HistoryFilterPanel: ({ toggleDept, toggleOp }: { toggleDept: (department: string) => void; toggleOp: (key: string) => void }) => (
     <div>
+      <button type="button" onClick={() => toggleOp("defect_disassemble")}>rework operation</button>
       <button type="button" onClick={() => toggleDept("검사")}>
         inspection department
       </button>
@@ -183,17 +191,17 @@ vi.mock("../../../_history_sections/HistoryBatchDetailPanel", () => ({
 vi.mock("../../history/MobileHistoryList", () => ({
   MobileHistoryList: ({
     error,
-    filteredLogs,
+    displayGroups,
     onRetry,
     canLoadMore,
   }: {
     error: string | null;
-    filteredLogs: TransactionLog[];
+    displayGroups: Array<unknown>;
     onRetry: () => void;
     canLoadMore: boolean;
   }) => (
     <div data-testid="mobile-history-list" data-error={error ?? "none"}>
-      {error && filteredLogs.length === 0 ? (
+      {error && displayGroups.length === 0 ? (
         <button type="button" onClick={onRetry}>
           retry transactions
         </button>
@@ -220,7 +228,7 @@ function makeLogs(count: number): TransactionLog[] {
 }
 
 function isCurrentSummary(params: SummaryParams): boolean {
-  return Object.prototype.hasOwnProperty.call(params, "transactionTypes");
+  return Object.prototype.hasOwnProperty.call(params, "operationKeys");
 }
 
 function expectMobileSummaryRanges(dateFrom: string, dateTo: string): void {
@@ -274,6 +282,15 @@ beforeEach(() => {
 });
 
 describe("MobileHistoryScreen history data states", () => {
+  it("목록과 집계에 PC와 동일한 작업 분류 필터를 전달한다", async () => {
+    renderScreen();
+    fireEvent.click(screen.getByRole("button", { name: "filters" }));
+    fireEvent.click(screen.getByRole("button", { name: "rework operation" }));
+    await waitFor(() => expect(testState.getTransactionsSummary).toHaveBeenCalledWith(
+      expect.objectContaining({ operationKeys: "defect_disassemble" }), expect.anything(),
+    ));
+    expect(testState.historyArgs.at(-1)).toMatchObject({ operations: "defect_disassemble" });
+  });
   it("새 기간 첫 렌더부터 이전 기간 집계를 숨긴다", async () => {
     testState.getTransactionsSummary.mockResolvedValue(makeSummary(12));
     renderScreen();
@@ -530,12 +547,15 @@ describe("MobileHistoryScreen history data states", () => {
     { loaded: 100, total: 101, visible: true },
     { loaded: 200, total: 200, visible: false },
     { loaded: 200, total: 201, visible: true },
+    { loaded: 1, total: 999, visible: false },
+    { loaded: 2, total: 2, visible: true },
   ])(
-    "passes total=$total for $loaded loaded rows and sets load-more visibility to $visible",
+    "uses cursor visibility=$visible independently of summary total=$total",
     async ({ loaded, total, visible }) => {
       testState.historyResult = {
         ...testState.historyResult!,
         logs: makeLogs(loaded),
+        canLoadMore: visible,
       };
       testState.getTransactionsSummary.mockImplementation((params: SummaryParams) =>
         Promise.resolve(makeSummary(isCurrentSummary(params) ? total : 999)),
@@ -544,8 +564,9 @@ describe("MobileHistoryScreen history data states", () => {
       renderScreen();
 
       await waitFor(() =>
-        expect(testState.historyArgs.at(-1)?.totalCount).toBe(total),
+        expect(screen.getByTestId("history-kpi")).toHaveTextContent(String(total)),
       );
+      expect(testState.historyArgs.at(-1)).not.toHaveProperty("totalCount");
       expect(screen.queryByRole("button", { name: "더 보기" }) !== null).toBe(visible);
     },
   );

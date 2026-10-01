@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { TransactionLog } from "@/lib/api";
 import type { IoBatch } from "@/lib/api/types/io";
+import { buildGroups } from "../../../_history_sections/historyTableHelpers";
+import type { TransactionDisplayGroup } from "@/lib/api/production";
 import { MobileHistoryScreen } from "../MobileHistoryScreen";
 
 const testState = vi.hoisted(() => ({
@@ -10,8 +12,17 @@ const testState = vi.hoisted(() => ({
   batch: null as any,
 }));
 
-vi.mock("../../../_hooks/useHistoryData", () => ({
-  useHistoryData: () => testState.historyResult,
+vi.mock("../../../_hooks/useHistoryGroups", () => ({
+  useHistoryGroups: () => ({ ...testState.historyResult, groups: buildGroups(testState.historyResult!.logs).map((g) => ({
+        type: g.type, key: g.type === "solo" ? g.log.log_id : g.type === "operation" ? g.operationId : g.type === "op_batch" ? g.batchId : g.type === "batch" ? g.refKey : g.key,
+        logs: g.type === "solo" ? [g.log] : g.type === "defect_lifecycle" ? [g.parent, g.child] : g.logs,
+      })),
+      setGroups: (update: React.SetStateAction<TransactionDisplayGroup[]>) => {
+        const previous = testState.historyResult!.logs.map((log) => ({ type: "solo" as const, key: log.log_id, logs: [log] }));
+        const next = typeof update === "function" ? update(previous) : update;
+        testState.historyResult!.setLogs(next.flatMap((group) => group.logs));
+      },
+      refreshLoaded: vi.fn(), }),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -206,7 +217,7 @@ describe("MobileHistoryScreen real detail panels", () => {
     fireEvent.click(screen.getByText("완제품 A").closest("button")!);
 
     expect(await screen.findByText("처리 전")).toBeInTheDocument();
-    expect(screen.getByText("재고 영향")).toBeInTheDocument();
+    expect(screen.getByText("재고 변화")).toBeInTheDocument();
     const cancel = screen.getByRole("button", { name: "이 내역 취소" });
     expect(within(cancel.parentElement!).getByText("PF-001")).toBeInTheDocument();
   });
@@ -256,12 +267,12 @@ describe("MobileHistoryScreen real detail panels", () => {
     renderScreen();
     fireEvent.click(screen.getByText("완제품 A").closest("button")!);
 
-    const component = await screen.findByText(longName);
-    const line = component.closest("button")!;
+    const itemButton = await screen.findByRole("button", {name:`${longName} R-001 상세`,exact:true});
+    const line = itemButton.parentElement!.parentElement!;
     expect(within(line).getByText("R-001")).toBeInTheDocument();
     expect(within(line).getByLabelText("조립 10 −4→6")).toBeInTheDocument();
     expect(within(line).queryByText("-4 EA")).not.toBeInTheDocument();
-    fireEvent.click(line);
+    fireEvent.click(itemButton);
     expect(await screen.findByRole("button", { name: "← 뒤로" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "← 뒤로" }));
     expect(await screen.findByText(longName)).toBeInTheDocument();
