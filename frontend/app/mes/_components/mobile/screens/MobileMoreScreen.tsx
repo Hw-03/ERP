@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart2, ChevronRight, ClipboardCheck, ClipboardList, MapPinned, PackageCheck, type LucideIcon } from "lucide-react";
+import { BarChart2, ClipboardCheck, ClipboardList, MapPinned, PackageCheck, type LucideIcon } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { DESKTOP_TAB_ICON_COLORS } from "../../DesktopSidebar";
 import type { Operator } from "../../login/useCurrentOperator";
@@ -107,8 +107,7 @@ export function MobileMoreScreen({
       {entries.length > 0 && (
         <div
           data-testid="mobile-more-menu-list"
-          className={`${presentation.surface} ${presentation.choiceList}`}
-          style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
+          className={`${presentation.choiceList} ${presentation.separatedChoices}`}
         >
           {entries.map((entry) => (
             <MenuRow
@@ -154,7 +153,6 @@ function MenuRow({
       <span className="min-w-0 flex-1">
         <span className="block leading-snug">{label}</span>
       </span>
-      <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
     </button>
   );
 }
