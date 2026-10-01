@@ -556,7 +556,7 @@ export function MobileShell({
                   key={tab}
                   icon={meta.icon}
                   iconColor={meta.color}
-                  label={meta.label}
+                  label={tab === "more" && activeTab === "dailyReport" ? "작업 일보" : meta.label}
                   active={tab === effectiveNavTab}
                   badgeCount={tab === "more" ? unreadNotifications : undefined}
                   onClick={() => handleTabChange(tab)}
