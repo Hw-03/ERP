@@ -35,6 +35,8 @@ export const LEGACY_COLORS = {
   greenSolid: "var(--c-green-solid)",
   red: "var(--c-red)",
   redSolid: "var(--c-red-solid)",
+  stockBGrade: "var(--c-stock-b-grade)",
+  stockObsolete: "var(--c-stock-obsolete)",
   yellow: "var(--c-yellow)",
   yellowSolid: "var(--c-yellow-solid)",
   purple: "var(--c-purple)",

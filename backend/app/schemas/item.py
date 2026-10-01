@@ -111,11 +111,20 @@ class ItemResponse(BaseModel):
     updated_at: UtcDatetime
 
 
+class DefectiveStockBreakdown(BaseModel):
+    """격리 버킷의 실재고를 부서와 현재 관리 분류로 나눈다."""
+
+    department: str
+    management_category: Literal["DEFECT", "B_GRADE", "OBSOLETE"]
+    quantity: int
+
+
 class ItemWithInventory(ItemResponse):
     quantity: Optional[int] = 0
     warehouse_qty: int = 0
     production_total: int = 0
     defective_total: int = 0
+    defective_breakdown: List[DefectiveStockBreakdown] = Field(default_factory=list)
     pending_quantity: int = 0
     department_pending_quantity: int = 0
     available_quantity: int = 0

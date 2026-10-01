@@ -39,6 +39,71 @@ function makeItem(overrides: Partial<Item> = {}): Item {
 }
 
 describe("InventoryItemRow quantity summary", () => {
+  it("splits managed stock badges and gauge by category without changing department stock", () => {
+    const item = makeItem({
+      quantity: 25,
+      locations: [
+        { department: "튜브", status: "PRODUCTION", quantity: 8 },
+        { department: "튜브", status: "DEFECTIVE", quantity: 9 },
+        { department: "AS", status: "DEFECTIVE", quantity: 3 },
+      ],
+      defective_breakdown: [
+        { department: "튜브", management_category: "DEFECT", quantity: 2 },
+        { department: "튜브", management_category: "B_GRADE", quantity: 4 },
+        { department: "튜브", management_category: "OBSOLETE", quantity: 3 },
+        { department: "AS", management_category: "B_GRADE", quantity: 3 },
+      ],
+    } as Partial<Item>);
+    render(<table><tbody><InventoryItemRow item={item} selected={false} onSelect={() => {}} /></tbody></table>);
+    const summary = screen.getByTestId("inventory-dept-stock-summary");
+    const defect = within(summary).getByText("불량 2");
+    const bGrade = within(summary).getByText("B급 7");
+    const obsolete = within(summary).getByText("구형 3");
+    expect(within(summary).getByText("튜브 8")).toHaveStyle({ color: "var(--c-blue)" });
+    expect(defect.compareDocumentPosition(bGrade) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(bGrade.compareDocumentPosition(obsolete) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(bGrade).toHaveStyle({ color: "var(--c-stock-b-grade)" });
+    expect(obsolete).toHaveStyle({ color: "var(--c-stock-obsolete)" });
+    const gauge = screen.getByRole("img", { name: /재고 분포/ });
+    expect(gauge).toHaveAttribute("title", expect.stringContaining("튜브 [B급] 4"));
+    expect(gauge).toHaveAttribute("aria-label", expect.stringContaining("AS [B급] 3"));
+    const bGradeSegments = gauge.querySelectorAll('[data-stock-category="B_GRADE"]');
+    expect(bGradeSegments).toHaveLength(2);
+    expect(bGradeSegments[0]).toHaveStyle({ width: "16%", backgroundColor: "var(--c-stock-b-grade)" });
+    expect(gauge.querySelector('[data-stock-category="OBSOLETE"]')).toHaveStyle({ width: "12%", backgroundColor: "var(--c-stock-obsolete)" });
+    const patterns = ["DEFECT", "B_GRADE", "OBSOLETE"].map((category) => {
+      const segment = gauge.querySelector(`[data-stock-category="${category}"]`) as HTMLElement;
+      return segment.style.backgroundImage;
+    });
+    expect(patterns.every(Boolean)).toBe(true);
+    expect(new Set(patterns).size).toBe(3);
+    expect(summary.querySelector("[data-stock-category]")).toBeNull();
+  });
+
+  it("hides zero managed categories and does not turn B-grade stock into defects", () => {
+    const item = makeItem({
+      defective_breakdown: [
+        { department: "조립", management_category: "DEFECT", quantity: 0 },
+        { department: "조립", management_category: "B_GRADE", quantity: 2 },
+        { department: "조립", management_category: "OBSOLETE", quantity: 0 },
+      ],
+    } as Partial<Item>);
+    render(<table><tbody><InventoryItemRow item={item} selected={false} onSelect={() => {}} /></tbody></table>);
+    const summary = screen.getByTestId("inventory-dept-stock-summary");
+    expect(within(summary).getByText("B급 2")).toBeInTheDocument();
+    expect(within(summary).queryByText(/불량|구형/)).toBeNull();
+    expect(screen.getByRole("img", { name: /재고 분포/ })).not.toHaveAttribute("aria-label", expect.stringContaining("[불량]"));
+  });
+
+  it("keeps the table without a stock pattern legend", () => {
+    render(<InventoryItemsTable error={null} loading={false} filteredItems={[makeItem()]}
+      displayLimit={100} setDisplayLimit={() => {}} selectedItem={null} onSelectItem={() => {}}
+      activeFilterCount={0} hasKpiFilter={false} onRetry={() => {}} onResetAllFilters={() => {}} />);
+    expect(screen.queryByRole("group", { name: "재고 분포 범례" })).toBeNull();
+    expect(screen.queryByText("부서: 단색")).toBeNull();
+    expect(screen.getByRole("table")).toBeInTheDocument();
+  });
+
   it("shows warehouse, each production department, and defective total as stock chips while keeping the gauge", () => {
     render(
       <table>

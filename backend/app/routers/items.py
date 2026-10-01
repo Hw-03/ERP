@@ -8,11 +8,12 @@ from typing import Annotated, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Query as SAQuery, Session
 
 from app.database import get_db
 from app.dependencies.admin import require_admin_pin
-from app.models import BOM, DepartmentEnum, Inventory, InventoryLocation, Item, LocationStatusEnum
+from app.models import BOM, DefectQuarantineRecord, DepartmentEnum, Inventory, InventoryLocation, Item, LocationStatusEnum
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     BomCompletionUpdate,
@@ -24,6 +25,7 @@ from app.schemas import (
     ItemUpdate,
     ItemWithInventory,
 )
+from app.schemas.item import DefectiveStockBreakdown
 from app.utils.mes_code import (
     mes_code_to_model_slots,
     make_mes_code,
@@ -49,6 +51,47 @@ def _build_item_query(db: Session) -> SAQuery:
     return db.query(Item, Inventory).outerjoin(Inventory, Item.item_id == Inventory.item_id)
 
 
+def _bulk_defective_breakdown(
+    db: Session,
+    item_ids: list[uuid.UUID],
+    locations_by_item: dict[uuid.UUID, list[InventoryLocationResponse]],
+) -> dict[uuid.UUID, list[DefectiveStockBreakdown]]:
+    """남은 원장을 일괄 집계하고, 원장 없는 기존 위치만 불량으로 보완한다."""
+    if not item_ids:
+        return {}
+    record = DefectQuarantineRecord
+    category = func.coalesce(record.management_category, "DEFECT")
+    rows = (
+        db.query(record.item_id, record.department, category, func.sum(record.remaining_quantity))
+        .filter(record.item_id.in_(item_ids), record.remaining_quantity > 0)
+        .group_by(record.item_id, record.department, category)
+        .order_by(record.item_id, record.department, category)
+        .all()
+    )
+    result: dict[uuid.UUID, list[DefectiveStockBreakdown]] = {}
+    covered_cells: set[tuple[uuid.UUID, str]] = set()
+    for item_id, department, management_category, quantity in rows:
+        result.setdefault(item_id, []).append(DefectiveStockBreakdown(
+            department=department,
+            management_category=management_category,
+            quantity=quantity,
+        ))
+        covered_cells.add((item_id, department))
+    for item_id in item_ids:
+        for location in locations_by_item.get(item_id, []):
+            if (
+                location.status == LocationStatusEnum.DEFECTIVE
+                and location.quantity > 0
+                and (item_id, location.department) not in covered_cells
+            ):
+                result.setdefault(item_id, []).append(DefectiveStockBreakdown(
+                    department=location.department,
+                    management_category="DEFECT",
+                    quantity=location.quantity,
+                ))
+    return result
+
+
 def _to_item_with_inventory(
     db: Session,
     item: Item,
@@ -58,10 +101,12 @@ def _to_item_with_inventory(
     locations: Optional[list[InventoryLocationResponse]] = None,
     model_slots: Optional[list[int]] = None,
     has_bom: Optional[bool] = None,
+    defective_breakdown: Optional[list[DefectiveStockBreakdown]] = None,
 ) -> ItemWithInventory:
     """ItemWithInventory DTO 조립.
 
-    성능 모드 (Phase C bulk prefetch 용): 호출측이 figures / locations / model_slots 를
+    성능 모드 (Phase C bulk prefetch 용): 호출측이 figures / locations / model_slots /
+    has_bom / defective_breakdown을
     미리 채워 넣으면 DB 쿼리를 추가로 발생시키지 않는다. 인자를 생략하면 기존처럼
     단건 쿼리를 수행한다 (단건 상세 조회용).
     """
@@ -92,6 +137,11 @@ def _to_item_with_inventory(
             )
             for row in loc_rows
         ]
+
+    if defective_breakdown is None:
+        defective_breakdown = _bulk_defective_breakdown(
+            db, [item.item_id], {item.item_id: locations},
+        ).get(item.item_id, [])
 
     if has_bom is None:
         has_bom = db.query(BOM.bom_id).filter(BOM.parent_item_id == item.item_id).first() is not None
@@ -134,6 +184,7 @@ def _to_item_with_inventory(
         warehouse_qty=fig.warehouse_qty,
         production_total=fig.production_total,
         defective_total=fig.defective_total,
+        defective_breakdown=defective_breakdown,
         pending_quantity=fig.pending,
         department_pending_quantity=fig.department_pending,
         available_quantity=fig.available,
@@ -350,6 +401,8 @@ def list_items(
             )
         )
 
+    defective_by_item = _bulk_defective_breakdown(db, item_ids, locations_by_item)
+
     return [
         _to_item_with_inventory(
             db,
@@ -359,6 +412,7 @@ def list_items(
             locations=locations_by_item.get(item.item_id, []),
             model_slots=mes_code_to_model_slots(item.mes_code),
             has_bom=item.item_id in bom_parent_ids,
+            defective_breakdown=defective_by_item.get(item.item_id, []),
         )
         for item, inv in rows
     ]

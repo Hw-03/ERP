@@ -13,6 +13,7 @@ import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { useDeptColorLookup } from "../DepartmentsContext";
 import { DesktopRightPanelFooter } from "../DesktopRightPanel";
 import { InventoryDetailLocations } from "./InventoryDetailLocations";
+import { getManagedStockBreakdown, STOCK_CATEGORY_ORDER, STOCK_CATEGORY_STYLES } from "./inventoryManagedStock";
 import { BomDetailModal } from "./BomDetailModal";
 import { inboundChoices, outboundChoices, quickChoiceToIntent } from "../_warehouse_v2/ioWorkType";
 import type { IoEntryIntent } from "../_warehouse_v2/types";
@@ -67,12 +68,33 @@ export function InventoryDetailPanel({
   }, [item.item_id]);
   const pendingQty = totalApprovalPending(item);
   const availableQty = Number(item.available_quantity) || 0;
-  const defectiveQty = Number(item.defective_total) || 0;
+  const managedStock = getManagedStockBreakdown(item);
+  const managedTotals = STOCK_CATEGORY_ORDER.map((category) => {
+    const { label, color } = STOCK_CATEGORY_STYLES[category];
+    const sum = managedStock.filter((entry) => entry.management_category === category)
+      .reduce((total, entry) => total + Number(entry.quantity), 0);
+    return {
+      category,
+      label,
+      color: category === "DEFECT" ? LEGACY_COLORS.red : color,
+      quantity: category === "DEFECT" && item.defective_breakdown == null ? Number(item.defective_total ?? sum) : sum,
+    };
+  }).filter((entry) => entry.quantity > 0);
   const minStockRaw = item.min_stock == null ? 0 : Number(item.min_stock);
   const availableState = getStockState(availableQty, minStockRaw > 0 ? minStockRaw : null);
   const reservations = reservationsItemRef.current === item.item_id ? reservationRows : [];
   const currentReservationFailure = reservationFailure?.itemId === item.item_id ? reservationFailure : null;
   const reservationsLoading = pendingQty > 0 && reservationsItemRef.current !== item.item_id && !currentReservationFailure;
+  const managedCards = managedTotals.map(({ category, label, color, quantity }) => (
+    <div key={category}
+      className={mobile ? "min-w-0 rounded-[12px] px-2 py-1 text-center" : "min-w-0 rounded-[18px] border px-2 py-3 text-center"}
+      style={{ background: LEGACY_COLORS.s1, borderColor: mix(color, 40) }}>
+      <div className="whitespace-nowrap text-xs tracking-tight" style={{ color: LEGACY_COLORS.muted2 }}>{label} 재고</div>
+      <div className={mobile ? "mt-1 break-all font-sans text-xl font-medium leading-7" : "mt-1 break-all text-xl font-black"} style={{ color }}>
+        {formatQty(quantity)}
+      </div>
+    </div>
+  ));
 
   useEffect(() => {
     let cancelled = false;
@@ -164,12 +186,12 @@ export function InventoryDetailPanel({
           수량 현황
         </div>
         <div className="grid gap-3 text-base">
-          <div className={`grid ${defectiveQty > 0 ? "grid-cols-3" : "grid-cols-2"} gap-3`}>
+          <div className={`grid ${managedTotals.length === 1 ? "grid-cols-3" : "grid-cols-2"} gap-3`}>
             <div
-              className={mobile ? "min-w-0 rounded-[12px] px-2 py-1" : "rounded-[18px] border px-4 py-3"}
+              className={mobile ? "min-w-0 rounded-[12px] px-2 py-1 text-center" : "min-w-0 rounded-[18px] border px-2 py-3 text-center"}
               style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
             >
-              <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+              <div className="whitespace-nowrap text-xs tracking-tight" style={{ color: LEGACY_COLORS.muted2 }}>
                 사용 가능 재고
               </div>
               <div className={mobile ? "mt-1 break-all font-sans text-xl font-medium leading-7" : "mt-1 text-xl font-black"} style={{ color: availableState.color }}>
@@ -177,7 +199,7 @@ export function InventoryDetailPanel({
               </div>
             </div>
             <div
-              className={mobile ? "min-w-0 rounded-[12px] px-2 py-1" : "rounded-[18px] border px-4 py-3"}
+              className={mobile ? "min-w-0 rounded-[12px] px-2 py-1 text-center" : "min-w-0 rounded-[18px] border px-2 py-3 text-center"}
               style={{
                 background: LEGACY_COLORS.s1,
                 borderColor: pendingQty > 0
@@ -185,7 +207,7 @@ export function InventoryDetailPanel({
                   : LEGACY_COLORS.border,
               }}
             >
-              <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+              <div className="whitespace-nowrap text-xs tracking-tight" style={{ color: LEGACY_COLORS.muted2 }}>
                 승인 대기 수량
               </div>
               <div
@@ -195,23 +217,9 @@ export function InventoryDetailPanel({
                 {formatQty(pendingQty)}
               </div>
             </div>
-            {defectiveQty > 0 && (
-              <div
-                className={mobile ? "min-w-0 rounded-[12px] px-2 py-1" : "rounded-[18px] border px-4 py-3"}
-                style={{
-                  background: LEGACY_COLORS.s1,
-                  borderColor: mix(LEGACY_COLORS.red, 40),
-                }}
-              >
-                <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                  불량 재고
-                </div>
-                <div className={mobile ? "mt-1 break-all font-sans text-xl font-medium leading-7" : "mt-1 text-xl font-black"} style={{ color: LEGACY_COLORS.red }}>
-                  {formatQty(defectiveQty)}
-                </div>
-              </div>
-            )}
+            {managedTotals.length === 1 && managedCards}
           </div>
+          {managedTotals.length > 1 && <div className={`grid ${managedTotals.length === 3 ? "grid-cols-3" : "grid-cols-2"} gap-3`}>{managedCards}</div>}
           {item.supplier && (
             <div
               className={mobile ? "border-t pt-3" : "rounded-[18px] border px-4 py-3"}

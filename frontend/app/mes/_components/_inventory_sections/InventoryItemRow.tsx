@@ -4,12 +4,14 @@ import { memo, useState, type KeyboardEvent } from "react";
 import Image from "next/image";
 import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import type { Item } from "@/lib/api";
+import type { DefectManagementCategory } from "@/lib/api/types/defects";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { getStockState, totalApprovalPending } from "@/lib/mes/inventory";
 import { formatQty } from "@/lib/mes/format";
 import { ImageLightbox } from "@/lib/ui/ImageLightbox";
 import { useDeptColorLookup } from "../DepartmentsContext";
+import { getManagedStockBreakdown, STOCK_CATEGORY_ORDER, STOCK_CATEGORY_STYLES } from "./inventoryManagedStock";
 
 function safeAvailableQty(item: Item) {
   const n = Number(item.available_quantity);
@@ -38,14 +40,13 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename, compact
   const pendingQty = totalApprovalPending(item);
   const isCritical = qty <= 0 || (minStock > 0 && qty < minStock);
 
-  const DEFECT_RED = compact ? LEGACY_COLORS.red : "#ef4444";
+  const DEFECT_RED = compact ? LEGACY_COLORS.red : STOCK_CATEGORY_STYLES.DEFECT.color;
   const total = Math.max(Number(item.quantity), 1);
   const wh = Number(item.warehouse_qty);
   const allLocs = (item.locations ?? []).filter((l) => Number(l.quantity) > 0);
   const prodLocs = allLocs.filter((l) => l.status !== "DEFECTIVE");
-  const defectiveLocs = allLocs.filter((l) => l.status === "DEFECTIVE");
-  const defectiveQty = defectiveLocs.reduce((sum, loc) => sum + Number(loc.quantity), 0);
-  const segments: { pct: number; color: string; label: string }[] = [];
+  const managedStock = getManagedStockBreakdown(item);
+  const segments: { pct: number; color: string; label: string; category?: DefectManagementCategory }[] = [];
   let used = 0;
   if (wh > 0) {
     const pct = Math.min(100, (wh / total) * 100);
@@ -62,15 +63,19 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename, compact
     });
     used += pct;
   }
-  for (const loc of defectiveLocs) {
-    const pct = Math.min(100 - used, (Number(loc.quantity) / total) * 100);
-    if (pct <= 0) break;
-    segments.push({
-      pct,
-      color: DEFECT_RED,
-      label: `${loc.department} [불량] ${formatQty(loc.quantity)}`,
-    });
-    used += pct;
+  for (const category of STOCK_CATEGORY_ORDER) {
+    for (const entry of managedStock.filter((row) => row.management_category === category)) {
+      const pct = Math.min(100 - used, (Number(entry.quantity) / total) * 100);
+      if (pct <= 0) break;
+      const { label, color } = STOCK_CATEGORY_STYLES[category];
+      segments.push({
+        pct,
+        color: category === "DEFECT" ? DEFECT_RED : color,
+        label: `${entry.department} [${label}] ${formatQty(entry.quantity)}`,
+        category,
+      });
+      used += pct;
+    }
   }
 
   const prodQtyByDept = new Map<string, number>();
@@ -87,8 +92,13 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename, compact
   for (const [dept, quantity] of Array.from(prodQtyByDept)) {
     stockChips.push({ key: `dept-${dept}`, label: dept, quantity, color: getDeptColor(dept) });
   }
-  if (defectiveQty > 0) {
-    stockChips.push({ key: "defective", label: "불량", quantity: defectiveQty, color: DEFECT_RED });
+  for (const category of STOCK_CATEGORY_ORDER) {
+    const quantity = managedStock.filter((entry) => entry.management_category === category)
+      .reduce((sum, entry) => sum + Number(entry.quantity), 0);
+    if (quantity > 0) {
+      const { label, color } = STOCK_CATEGORY_STYLES[category];
+      stockChips.push({ key: category, label, quantity, color: category === "DEFECT" ? DEFECT_RED : color });
+    }
   }
 
   const StockIcon = stock.label === "품절" ? XCircle : stock.label === "부족" ? AlertTriangle : CheckCircle2;
@@ -104,7 +114,16 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename, compact
       aria-label={`재고 분포: ${segments.map((s) => `${s.label} ${s.pct.toFixed(0)}%`).join(", ")}`}
     >
       {segments.map((s, i) => (
-        <div key={i} className="h-full shrink-0" style={{ width: `${s.pct}%`, background: s.color }} />
+        <div key={i} data-stock-category={s.category} className="relative h-full shrink-0" style={{
+          width: `${s.pct}%`,
+          backgroundColor: s.color,
+          ...(s.category ? { color: s.color, ...STOCK_CATEGORY_STYLES[s.category].pattern } : {}),
+        }}>
+          {segments[i + 1] && segments[i + 1].color !== s.color && (
+            <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0"
+              style={{ width: "min(24px, 50%)", background: `linear-gradient(to right, transparent, ${segments[i + 1].color})` }} />
+          )}
+        </div>
       ))}
     </div>
   );

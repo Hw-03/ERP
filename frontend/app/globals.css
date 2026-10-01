@@ -49,6 +49,8 @@
     --c-green-solid: var(--c-green);
     --c-red: #d95a5a;
     --c-red-solid: var(--c-red);
+    --c-stock-b-grade: #b500aa;
+    --c-stock-obsolete: #171717;
     --c-yellow: #b98619;
     --c-yellow-solid: var(--c-yellow);
     --c-purple: #6f59e8;
@@ -138,6 +140,8 @@
     --c-green-solid: #2e6d58;
     --c-red: #c98588;
     --c-red-solid: #7f4248;
+    --c-stock-b-grade: #ff63ed;
+    --c-stock-obsolete: #f5f5f5;
     --c-yellow: #c4a466;
     --c-yellow-solid: #756038;
     --c-purple: #a18dbd;

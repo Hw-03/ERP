@@ -106,6 +106,39 @@ afterEach(() => {
 });
 
 describe("InventoryDetailPanel desktop quick actions", () => {
+  it("shows obsolete stock instead of a misleading defective total", () => {
+    render(<InventoryDetailPanel item={{ ...makeItem(), defective_total: 42,
+      defective_breakdown: [{ department: "조립", management_category: "OBSOLETE", quantity: 42 }],
+    } as Item} onGoToWarehouse={() => {}} />);
+    expect(screen.queryByText("불량 재고")).toBeNull();
+    const card = screen.getByText("구형 재고").parentElement!;
+    expect(within(card).getByText("42")).toHaveStyle({ color: LEGACY_COLORS.stockObsolete });
+    expect(card.parentElement).toHaveClass("grid-cols-3");
+  });
+
+  it("sums managed categories across departments and hides zero categories", () => {
+    render(<InventoryDetailPanel item={{ ...makeItem(), available_quantity: 371, defective_total: 10,
+      defective_breakdown: [
+        { department: "조립", management_category: "DEFECT", quantity: 0 },
+        { department: "조립", management_category: "B_GRADE", quantity: 3 },
+        { department: "AS", management_category: "B_GRADE", quantity: 2 },
+        { department: "조립", management_category: "OBSOLETE", quantity: 5 },
+      ],
+    } as Item} onGoToWarehouse={() => {}} />);
+    expect(screen.queryByText("불량 재고")).toBeNull();
+    expect(within(screen.getByText("B급 재고").parentElement!).getByText("5")).toHaveStyle({ color: LEGACY_COLORS.stockBGrade });
+    expect(within(screen.getByText("구형 재고").parentElement!).getByText("5")).toHaveStyle({ color: LEGACY_COLORS.stockObsolete });
+    expect(within(screen.getByText("사용 가능 재고").parentElement!).getByText("371")).toBeInTheDocument();
+    expect(screen.getByText("사용 가능 재고").parentElement?.parentElement).toHaveClass("grid-cols-2");
+  });
+
+  it("treats an empty new breakdown as authoritative", () => {
+    render(<InventoryDetailPanel item={{ ...makeItem(), defective_total: 42, defective_breakdown: [] } as Item} onGoToWarehouse={() => {}} />);
+    expect(screen.queryByText("불량 재고")).toBeNull();
+    expect(screen.queryByText("B급 재고")).toBeNull();
+    expect(screen.queryByText("구형 재고")).toBeNull();
+  });
+
   it("keeps raw-material receiving on desktop but hides it from mobile detail", () => {
     const { rerender } = render(<InventoryDetailPanel item={makeItem()} canReceive onGoToWarehouse={() => {}} />);
     fireEvent.click(screen.getByRole("button", { name: "입고" }));

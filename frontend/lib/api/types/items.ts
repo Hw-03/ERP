@@ -6,8 +6,15 @@
  */
 
 import type { Department, InventoryLocationRow } from "./shared";
+import type { DefectManagementCategory } from "./defects";
 
 export type BomUnmatchedStatus = "DISUSED" | "HOLD" | "DUPLICATE";
+
+export interface DefectiveStockBreakdown {
+  department: string;
+  management_category: DefectManagementCategory;
+  quantity: number;
+}
 
 export interface Item {
   item_id: string;
@@ -17,6 +24,7 @@ export interface Item {
   warehouse_qty: number;
   production_total: number;
   defective_total: number;
+  defective_breakdown?: DefectiveStockBreakdown[];
   pending_quantity: number;
   department_pending_quantity?: number;
   available_quantity: number;

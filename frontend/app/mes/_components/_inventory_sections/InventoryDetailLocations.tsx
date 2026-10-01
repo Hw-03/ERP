@@ -5,14 +5,13 @@ import type { Item } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { findInventoryLocation, locationAvailable, locationPending, warehouseAvailable, warehousePending } from "@/lib/mes/inventory";
-
-const DEFECT_RED = "#ef4444";
+import { getManagedStockBreakdown, STOCK_CATEGORY_ORDER, STOCK_CATEGORY_STYLES } from "./inventoryManagedStock";
 
 /**
  * Round-13 (#8) 추출 — InventoryDetailPanel 의 "위치별 재고" 섹션.
  *
  * 부모에서 `item.warehouse_qty > 0 || locations[*].quantity > 0` 조건 확인 후 렌더.
- * PR#3: DEFECTIVE 행 빨간색 추가. 부서별 정상 행 바로 다음에 인접 배치.
+ * 부서별 정상 행 다음에 불량·B급·구형을 각각 표시한다.
  */
 export function InventoryDetailLocations({
   item,
@@ -27,13 +26,13 @@ export function InventoryDetailLocations({
 
   // 부서 목록 (PRODUCTION + DEFECTIVE 모두 포함, quantity > 0)
   const locations = (item.locations ?? []).filter((l) => Number(l.quantity) > 0);
+  const managedStock = getManagedStockBreakdown(item);
   // 등장하는 부서 순서 유지 (PRODUCTION 기준 정렬)
   const depts = Array.from(
-    new Set(locations.map((l) => l.department))
+    new Set([...locations.map((l) => l.department), ...managedStock.map((entry) => entry.department)])
   );
   const warehousePendingQty = warehousePending(item);
   const warehouseAvailableQty = warehouseAvailable(item);
-  const defectColor = mobile ? LEGACY_COLORS.red : DEFECT_RED;
 
   return (
     <section
@@ -65,7 +64,8 @@ export function InventoryDetailLocations({
         )}
         {depts.map((dept) => {
           const prod = findInventoryLocation(item, dept, "PRODUCTION");
-          const defective = findInventoryLocation(item, dept, "DEFECTIVE");
+          const managedRows = STOCK_CATEGORY_ORDER.flatMap((category) => managedStock
+            .filter((entry) => entry.department === dept && entry.management_category === category));
           return (
             <div key={dept}>
               {prod && (
@@ -87,30 +87,37 @@ export function InventoryDetailLocations({
                   )}
                 </div>
               )}
-              {defective && (
-                <button
-                  type="button"
-                  onClick={() => router.push("/?tab=defect")}
-                  className={`mt-1 flex w-full items-center gap-3 rounded-[14px] border px-3 py-2.5 text-left transition-opacity hover:opacity-80 ${mobile ? "min-h-11" : ""}`}
-                  style={{ background: mobile ? LEGACY_COLORS.s1 : "color-mix(in srgb, #ef4444 10%, transparent)", borderColor: mobile ? LEGACY_COLORS.border : DEFECT_RED }}
-                  aria-label={`${dept} 불량 ${formatQty(defective.quantity)} — 불량 탭으로 이동`}
-                >
-                  <div className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: defectColor }} />
-                  <span className={mobile ? "min-w-0 flex-1 break-words text-sm font-medium" : "flex-1 text-base font-semibold"} style={{ color: defectColor }}>
-                    {dept} [불량]
-                  </span>
-                  {locationPending(defective) > 0 ? (
-                    <div className="flex flex-col items-end leading-tight">
-                      <span className="text-base font-bold" style={{ color: defectColor }}>출고 가능 {formatQty(locationAvailable(defective))}</span>
-                      <span className="text-xs" style={{ color: defectColor }}>실재고 {formatQty(defective.quantity)} · 예약 {formatQty(locationPending(defective))}</span>
-                    </div>
-                  ) : (
-                    <span className={mobile ? "min-w-11 rounded-[8px] px-2 py-1 text-center font-sans text-base font-medium" : "text-base font-bold"} style={{ color: defectColor, ...(mobile ? { background: LEGACY_COLORS.s3 } : {}) }}>
-                      {formatQty(defective.quantity)}
+              {managedRows.map((entry) => {
+                const { label, color } = STOCK_CATEGORY_STYLES[entry.management_category];
+                const stockColor = entry.management_category === "DEFECT" && mobile ? LEGACY_COLORS.red : color;
+                // 이전 API의 위치 예약만 유지한다. 새 집계에는 분류별 예약 정보가 없다.
+                const legacyLocation = item.defective_breakdown == null ? findInventoryLocation(item, dept, "DEFECTIVE") : undefined;
+                return (
+                  <button
+                    key={entry.management_category}
+                    type="button"
+                    onClick={() => router.push("/?tab=defect")}
+                    className={`mt-1 flex w-full items-center gap-3 rounded-[14px] border px-3 py-2.5 text-left transition-opacity hover:opacity-80 ${mobile ? "min-h-11" : ""}`}
+                    style={{ background: mobile ? LEGACY_COLORS.s1 : `color-mix(in srgb, ${stockColor} 10%, transparent)`, borderColor: mobile ? LEGACY_COLORS.border : stockColor }}
+                    aria-label={`${dept} ${label} ${formatQty(entry.quantity)} — 불량 탭으로 이동`}
+                  >
+                    <div className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: stockColor }} />
+                    <span className={mobile ? "min-w-0 flex-1 break-words text-sm font-medium" : "flex-1 text-base font-semibold"} style={{ color: stockColor }}>
+                      {dept} [{label}]
                     </span>
-                  )}
-                </button>
-              )}
+                    {locationPending(legacyLocation) > 0 ? (
+                      <div className="flex flex-col items-end leading-tight">
+                        <span className="text-base font-bold" style={{ color: stockColor }}>출고 가능 {formatQty(locationAvailable(legacyLocation))}</span>
+                        <span className="text-xs" style={{ color: stockColor }}>실재고 {formatQty(entry.quantity)} · 예약 {formatQty(locationPending(legacyLocation))}</span>
+                      </div>
+                    ) : (
+                      <span className={mobile ? "min-w-11 rounded-[8px] px-2 py-1 text-center font-sans text-base font-medium" : "text-base font-bold"} style={{ color: stockColor, ...(mobile ? { background: LEGACY_COLORS.s3 } : {}) }}>
+                        {formatQty(entry.quantity)}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           );
         })}

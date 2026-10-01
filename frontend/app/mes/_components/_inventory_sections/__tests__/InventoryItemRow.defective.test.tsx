@@ -90,7 +90,7 @@ describe("InventoryItemRow — DEFECTIVE 게이지 세그먼트", () => {
     const segments = gauge.querySelectorAll("div");
     // JSDOM 은 hex → rgb 로 변환함: #ef4444 = rgb(239, 68, 68)
     const redSegment = Array.from(segments).find((el) => {
-      const bg = (el as HTMLElement).style.background;
+      const bg = (el as HTMLElement).style.backgroundColor;
       return bg === "#ef4444" || bg === "rgb(239, 68, 68)";
     });
     expect(redSegment).toBeDefined();
@@ -118,7 +118,7 @@ describe("InventoryItemRow — DEFECTIVE 게이지 세그먼트", () => {
     expect(gauge.getAttribute("aria-label")).not.toContain("[불량]");
     const segments = gauge.querySelectorAll("div");
     const redSegment = Array.from(segments).find((el) => {
-      const bg = (el as HTMLElement).style.background;
+      const bg = (el as HTMLElement).style.backgroundColor;
       return bg === "#ef4444" || bg === "rgb(239, 68, 68)";
     });
     expect(redSegment).toBeUndefined();
