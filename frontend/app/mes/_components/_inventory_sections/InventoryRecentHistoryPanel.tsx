@@ -13,6 +13,7 @@ import { formatHistoryDate } from "../_history_sections/historyFormat";
 import { getHistoryListOperationLabel } from "../_history_sections/historyPresentation";
 import { FlowBadge, StockSnapshotContent } from "../_history_sections/historyTableHelpers";
 import { isReworkOperation } from "../_history_sections/transactionTaxonomy";
+import mobileStyles from "./InventoryRecentHistoryPanel.module.css";
 
 function appendCancellation(label: string, isCancellation: boolean): string {
   return isCancellation && !label.endsWith(" 취소") ? `${label} 취소` : label;
@@ -52,6 +53,7 @@ function RecentLine({
   context,
   effectiveAt,
   cancelled,
+  mobilePresentation = false,
 }: {
   type: TransactionType;
   label: string;
@@ -59,6 +61,7 @@ function RecentLine({
   context: string;
   effectiveAt: string;
   cancelled: boolean;
+  mobilePresentation?: boolean;
 }): ReactNode {
   const color = log && isReworkOperation(log) ? LEGACY_COLORS.red : transactionColor(type);
   return (
@@ -72,13 +75,13 @@ function RecentLine({
           <span>{context}</span>
           {cancelled && <span className="inventory-recent-cancelled">취소된 작업</span>}
         </div>
-        <StockSnapshotContent log={log} emptyLogLabel="기록 없음" variant="panel" />
+        <StockSnapshotContent log={log} emptyLogLabel="기록 없음" variant="panel" expandableUnavailableReason={mobilePresentation} />
       </div>
     </li>
   );
 }
 
-function OperationRows({ operations }: { operations: InventoryOperation[] }) {
+function OperationRows({ operations, mobilePresentation }: { operations: InventoryOperation[]; mobilePresentation: boolean }) {
   return (
     <ul className="inventory-recent">
       {operations.flatMap((operation) => operation.matchingLines.map((line) => {
@@ -86,6 +89,7 @@ function OperationRows({ operations }: { operations: InventoryOperation[] }) {
         return (
           <RecentLine
             key={`${operation.operationId}-${line.logId}`}
+            mobilePresentation={mobilePresentation}
             type={log?.transaction_type ?? line.transactionType}
             label={log ? getHistoryLabel(log) : getFallbackOperationLabel(operation)}
             log={log}
@@ -99,12 +103,13 @@ function OperationRows({ operations }: { operations: InventoryOperation[] }) {
   );
 }
 
-function LegacyRows({ logs }: { logs: TransactionLog[] }) {
+function LegacyRows({ logs, mobilePresentation }: { logs: TransactionLog[]; mobilePresentation: boolean }) {
   return (
     <ul className="inventory-recent">
       {logs.map((log) => (
         <RecentLine
           key={log.log_id}
+          mobilePresentation={mobilePresentation}
           type={log.transaction_type}
           label={getHistoryLabel(log)}
           log={log}
@@ -119,7 +124,7 @@ function LegacyRows({ logs }: { logs: TransactionLog[] }) {
   );
 }
 
-export function InventoryRecentHistoryPanel({ item }: { item: Item }) {
+export function InventoryRecentHistoryPanel({ item, mobilePresentation = false }: { item: Item; mobilePresentation?: boolean }) {
   const operationQuery = useInventoryOperationsQuery({ itemId: item.item_id, limit: 5 });
   const legacyQuery = useTransactionsQuery({ itemId: item.item_id, unlinkedOnly: true, limit: 5 });
   const operations = operationQuery.data?.items ?? [];
@@ -138,11 +143,11 @@ export function InventoryRecentHistoryPanel({ item }: { item: Item }) {
   } else {
     content = (
       <div className="inventory-recent-groups">
-        {operations.length > 0 && <OperationRows operations={operations.slice(0, 5)} />}
+        {operations.length > 0 && <OperationRows operations={operations.slice(0, 5)} mobilePresentation={mobilePresentation} />}
         {operations.length > 0 && legacyLogs.length > 0 && <hr className="inventory-recent-divider" />}
-        {legacyLogs.length > 0 && <LegacyRows logs={legacyLogs} />}
+        {legacyLogs.length > 0 && <LegacyRows logs={legacyLogs} mobilePresentation={mobilePresentation} />}
       </div>
     );
   }
-  return <div className="inventory-recent-panel">{content}</div>;
+  return <div className={`inventory-recent-panel${mobilePresentation ? ` ${mobileStyles.mobile}` : ""}`}>{content}</div>;
 }
