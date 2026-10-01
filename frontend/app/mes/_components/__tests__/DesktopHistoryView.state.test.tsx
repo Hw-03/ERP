@@ -33,8 +33,8 @@ vi.mock("@tanstack/react-query", async () => {
   };
 });
 
-vi.mock("../_hooks/useDesktopHistoryGroups", () => ({
-  useDesktopHistoryGroups: (args: any) => {
+vi.mock("../_hooks/useHistoryGroups", () => ({
+  useHistoryGroups: (args: any) => {
     testState.historyArgs = args;
     return testState.historyResult;
   },
