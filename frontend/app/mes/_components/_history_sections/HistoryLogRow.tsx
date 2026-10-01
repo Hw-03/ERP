@@ -7,9 +7,10 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { transactionColor } from "@/lib/mes-status";
 import { formatHistoryDate } from "./historyFormat";
-import { getHistoryListOperationLabel, getHistoryRowPresentation } from "./historyPresentation";
+import { getHistoryRowPresentation } from "./historyPresentation";
 import {
   FlowBadge,
+  getHistoryGroupSummary,
   HISTORY_CELL_TRANSITION,
   HISTORY_MAIN_CELL_CLASS,
   HISTORY_MAIN_ROW_CLASS,
@@ -45,8 +46,9 @@ function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, contro
   const presentation = separationHint
     ? { ...basePresentation, statusChips: [...basePresentation.statusChips, { label: separationHint, tone: "muted" as const }] }
     : basePresentation;
-  const badgeType = displayType ?? log.transaction_type;
-  const tcolor = isReworkOperation(log) ? LEGACY_COLORS.red : transactionColor(badgeType);
+  const groupSummary = getHistoryGroupSummary({ type: "solo", log });
+  const badgeType = displayType ?? groupSummary.displayType;
+  const tcolor = isReworkOperation(log) ? LEGACY_COLORS.red : transactionColor(badgeType ?? log.transaction_type);
 
   const rowBackground = selected
     ? tint(tcolor, hovered ? 18 : 10)
@@ -95,7 +97,7 @@ function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, contro
         </div>
       </td>
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${padX} text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
-        <FlowBadge type={badgeType} label={operationLabel ?? getHistoryListOperationLabel(log)} color={tcolor} />
+        <FlowBadge type={badgeType} label={operationLabel ?? groupSummary.label} color={tcolor} />
       </td>
       <td className={`${HISTORY_MAIN_CELL_CLASS} ${targetPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <TargetSummaryBlock

@@ -16,10 +16,10 @@ import {
   PeopleStatusCell,
   StockSnapshotCell,
   TargetSummaryBlock,
-  getAdditionalDistinctItemCount,
+  getHistoryGroupSummary,
   type LogGroup,
 } from "./historyTableHelpers";
-import { getHistoryListOperationLabel, getHistoryRowPresentation, type HistoryRowPresentation } from "./historyPresentation";
+import { getHistoryRowPresentation, type HistoryRowPresentation } from "./historyPresentation";
 
 type Props = {
   group: Extract<LogGroup, { type: "batch" }>;
@@ -35,9 +35,10 @@ export function ReworkBatchHeader({ group, expanded, onToggle, selected, onSelec
   const padX = compact ? "px-2" : "px-4";
   const targetPadX = compact ? "px-2" : "px-4";
   const statusPadX = "px-2";
-  const parentLog = group.logs.find((l) => l.transaction_type === "DISASSEMBLE") ?? group.logs[0];
-  const additionalItemCount = getAdditionalDistinctItemCount(group.logs, parentLog);
-  const operationLabel = getHistoryListOperationLabel(parentLog);
+  const groupSummary = getHistoryGroupSummary(group);
+  const parentLog = groupSummary.primaryLog;
+  const additionalItemCount = groupSummary.additionalItemCount;
+  const operationLabel = groupSummary.label;
   const cancelled = group.logs.some((log) => log.cancelled);
   const qty = Math.abs(parentLog.quantity_change);
   const unit = parentLog.item_unit?.trim();
