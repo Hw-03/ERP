@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { ChevronRight } from "lucide-react";
 import presentation from "../mobilePresentation.module.css";
 import { tint } from "@/lib/mes/colorUtils";
 import { departmentDisplayColor, MES_DEPARTMENT_COLORS } from "@/lib/mes-department";
@@ -36,7 +35,7 @@ export function MobileWorkTypeStep({
 }) {
   const visible = IO_WORK_TYPES.filter((row) => canSeeWorkType(row.id, operator));
   return (
-    <div className={`${presentation.surface} ${presentation.choiceList}`}>
+    <div className={`${presentation.choiceList} ${presentation.separatedChoices}`}>
       {visible.map((row) => {
         const Icon = row.icon;
         const active = selectedWorkType === row.id;
@@ -52,7 +51,6 @@ export function MobileWorkTypeStep({
             <span className="min-w-0 flex-1">
               <span className="block leading-snug">{row.label}</span>
             </span>
-            <ChevronRight className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} aria-hidden />
           </button>
         );
       })}
