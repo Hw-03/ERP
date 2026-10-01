@@ -210,6 +210,12 @@
   }
 
   /* 스크롤바 스타일 */
+  @media (hover: none), (pointer: coarse) {
+    * {
+      scrollbar-color: color-mix(in srgb, var(--c-blue) 64%, var(--c-s3)) transparent;
+    }
+  }
+
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
