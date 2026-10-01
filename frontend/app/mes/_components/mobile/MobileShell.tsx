@@ -219,6 +219,10 @@ export function MobileShell({
 
   const commitMobileTab = useCallback((target: MobileTabId) => {
     if (target !== activeTab) {
+      if (target === "defect") {
+        window.history.replaceState({ defect: "hub" }, "");
+        setDefectDeptFilter(null);
+      }
       sendClientEvent({
         event: "ui_nav",
         from: activeTab,
