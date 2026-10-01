@@ -440,6 +440,8 @@ export function StockSnapshotContent({
   loading = false,
   emptyLogLabel = "—",
   variant = "table",
+  expandableUnavailableReason = false,
+  showUnit = false,
 }: {
   log?: TransactionLog | null;
   dense?: boolean;
@@ -450,6 +452,9 @@ export function StockSnapshotContent({
   emptyLogLabel?: string;
   /** 패널은 전후 수량과 증감을 분리하고 기본 표의 배치를 유지한다. */
   variant?: "table" | "panel";
+  expandableUnavailableReason?: boolean;
+  /** 모바일 상세에서 단위를 별도 행 없이 수량 옆에 붙인다. */
+  showUnit?: boolean;
 }): ReactNode {
   if (loading) {
     return (
@@ -478,6 +483,9 @@ export function StockSnapshotContent({
   const snapshot = resolveStockSnapshot(log);
   if (snapshot.status === "unavailable") {
     const accessibleLabel = `요청 순 재고 계산 불가: ${snapshot.reason}`;
+    if (expandableUnavailableReason) {
+      return <details><summary aria-label={accessibleLabel}>계산 불가 · 사유 보기</summary><span>{snapshot.reason}</span></details>;
+    }
     return (
       <span className={variant === "panel" ? "text-sm font-medium" : "text-xs font-semibold"} style={{ color: LEGACY_COLORS.yellow }}>
         <Tooltip content={snapshot.reason} multiline triggerTabIndex={0} triggerAriaLabel={accessibleLabel}>
@@ -555,7 +563,7 @@ export function StockSnapshotContent({
       {changedSnapshots.length === 0 ? (
         <span aria-hidden="true" className={variant === "panel" ? "text-sm font-medium" : "text-xs font-semibold"} style={{ color: LEGACY_COLORS.muted2 }}>변동 없음</span>
       ) : changedSnapshots.map((snapshot) => (
-        <StockSnapshotLine key={snapshot.label} label={snapshot.label} beforeText={snapshot.beforeText} afterText={snapshot.afterText} delta={snapshot.after - snapshot.before} beforeQuantityWidthPx={beforeQuantityWidthPx} afterQuantityWidthPx={STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH_PX} increased={snapshot.after > snapshot.before} decreased={snapshot.after < snapshot.before} cancelled={log.cancelled} variant={variant} />
+        <StockSnapshotLine key={snapshot.label} label={snapshot.label} beforeText={snapshot.beforeText} afterText={snapshot.afterText} delta={snapshot.after - snapshot.before} beforeQuantityWidthPx={beforeQuantityWidthPx} afterQuantityWidthPx={STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH_PX} increased={snapshot.after > snapshot.before} decreased={snapshot.after < snapshot.before} cancelled={log.cancelled} variant={variant} unit={showUnit ? log.item_unit : undefined} />
       ))}
     </div>
   );
@@ -669,6 +677,7 @@ function StockSnapshotLine({
   decreased,
   cancelled,
   variant,
+  unit,
 }: {
   label: string;
   beforeText: string;
@@ -680,17 +689,18 @@ function StockSnapshotLine({
   decreased: boolean;
   cancelled: boolean;
   variant: "table" | "panel";
+  unit?: string;
 }): ReactNode {
   const afterColor = increased ? LEGACY_COLORS.blue : decreased ? LEGACY_COLORS.red : LEGACY_COLORS.muted2;
   const deltaText = formatStockDelta(delta);
   if (variant === "panel") {
     return (
-      <span aria-label={`${label} ${beforeText} ${deltaText}→${afterText}`} className="history-stock-panel-line">
+      <span aria-label={`${label} ${beforeText} ${deltaText}→${afterText}`} aria-description={unit ? `단위 ${unit}` : undefined} className="history-stock-panel-line">
         <span className="history-stock-panel-location">{label}</span>
         <span>{beforeText}</span>
         <strong style={{ color: afterColor }}>{deltaText}</strong>
         <span aria-hidden="true" className="text-center">→</span>
-        <strong style={{ color: afterColor }}>{afterText}</strong>
+        <strong style={{ color: afterColor }}>{afterText}{unit && <span className="ml-1 text-xs font-medium" style={{color:LEGACY_COLORS.muted2}}>{unit}</span>}</strong>
       </span>
     );
   }
