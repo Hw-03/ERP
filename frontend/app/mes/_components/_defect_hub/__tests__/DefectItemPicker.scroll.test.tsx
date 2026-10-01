@@ -40,19 +40,32 @@ function makeItem(index: number): Item {
 }
 
 describe("DefectItemPicker mobile scroll", () => {
+  it("모바일은 두 열에서 코드와 모든 재고 정보를 표시하며 선택 문구를 사용한다", () => {
+    const onRemove = vi.fn();
+    render(<DefectItemPicker mobilePresentation items={[makeItem(1)]} productModels={[]} source="warehouse" selectedIds={new Set(["item-1"])} onAdd={() => {}} onRemove={onRemove} />);
+    expect(screen.getAllByRole("columnheader")).toHaveLength(2);
+    const row = screen.getByTestId("defect-picker-row-item-1");
+    expect(within(row).getAllByRole("cell")).toHaveLength(2);
+    expect(row).toHaveTextContent("46-AA-0001");
+    expect(row).toHaveTextContent("보유 10 · 예약 0 · 가용 10");
+    fireEvent.click(within(row).getByRole("button", { name: "SOLO item 1 선택 해제" }));
+    expect(onRemove).toHaveBeenCalledWith(expect.objectContaining({ item_id: "item-1" }));
+  });
   it("모바일 품목 선택 행은 로딩 완료 직후 투명도 애니메이션 없이 표시한다", () => {
     const { container } = render(<DefectItemPicker mobilePresentation items={[makeItem(1)]} productModels={[]} source="warehouse" selectedIds={new Set()} onAdd={() => {}} onRemove={() => {}} />);
     expect(container.querySelectorAll("tbody tr")).toHaveLength(1);
     expect(container.querySelector("tbody")).not.toHaveAttribute("class");
   });
-  it("모바일 검색 이름을 유지하고 둥근 외곽 안에서 결과만 스크롤한다", async () => {
+  it("모바일 검색 이름을 유지하고 외곽 바깥쪽 스크롤바로 결과만 스크롤한다", async () => {
     render(<DefectItemPicker mobilePresentation items={[makeItem(1), makeItem(2)]} productModels={[]} source="warehouse" selectedIds={new Set()} onAdd={() => {}} onRemove={() => {}} />);
     const input = screen.getByRole("textbox", { name: "검색" });
     expect(screen.getByText("검색")).toHaveClass("sr-only");
     const frame = screen.getByTestId("defect-picker-table");
     const scroll = screen.getByTestId("defect-picker-scroll");
-    expect(frame).toHaveClass("overflow-hidden", "rounded-[16px]");
-    expect(scroll).toHaveClass("overflow-y-auto", "overscroll-contain");
+    expect(frame).toHaveClass("relative", "min-h-0", "flex-1");
+    expect(scroll).toHaveClass("overscroll-contain");
+    expect(scroll).toHaveStyle({ backgroundClip: "content-box" });
+    expect(screen.getByTestId("defect-picker-frame-outline")).toHaveClass("rounded-[16px]");
     expect(screen.getByRole("columnheader", { name: "품목명" }).closest("thead")).toHaveClass("sticky", "top-0");
     scroll.scrollTop = 120;
     fireEvent.change(input, { target: { value: "SOLO item 2" } });

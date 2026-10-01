@@ -31,6 +31,7 @@ import {
 } from "@/lib/queries/useMyItemOrderQuery";
 import { useItemOrderDrag, type UseItemOrderDragResult } from "../_warehouse_v2/useItemOrderDrag";
 import { defectSourceStock } from "./defectCartValidation";
+import scrollFrameStyles from "../mobile/primitives/MobileScrollFrame.module.css";
 
 const INITIAL_DISPLAY_LIMIT = PAGE_SIZE * 2;
 
@@ -162,11 +163,11 @@ export function DefectItemPicker({
     label: v,
   }));
 
-  const filterGridClass = "grid flex-1 grid-cols-3 items-end gap-2 lg:grid-cols-[1fr_1fr_1fr_2fr]";
-  const searchFieldClass = "col-span-3 flex flex-col gap-0.5 lg:col-span-1";
+  const filterGridClass = `grid min-w-0 flex-1 grid-cols-3 items-end gap-2 ${mobilePresentation ? "" : "lg:grid-cols-[1fr_1fr_1fr_2fr]"}`;
+  const searchFieldClass = `col-span-3 flex min-w-0 flex-col gap-0.5 ${mobilePresentation ? "" : "lg:col-span-1"}`;
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
+    <div className="flex h-full min-h-0 min-w-0 flex-col gap-3">
       {/* 필터 + 순서 편집 토글 */}
       <div className="flex shrink-0 flex-col gap-2">
         <div data-testid="defect-picker-toolbar" className="flex h-[50px] items-end justify-between gap-2">
@@ -191,13 +192,13 @@ export function DefectItemPicker({
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="품목명 · 품목 코드"
-                  className="flex-1 bg-transparent text-sm outline-none"
+                  className="min-w-0 flex-1 bg-transparent text-sm outline-none"
                   style={{ color: LEGACY_COLORS.text }}
                 />
               </div>
             </label>
           </div>
-          {operator?.employee_id && (
+          {!mobilePresentation && operator?.employee_id && (
             // 항목 4-10B — 순서 편집은 드래그 UX 라 모바일에서 숨김(PC 만 노출). 기능 코드는 보존.
             <div className="hidden h-[50px] shrink-0 items-center lg:flex">
               {editMode ? (
@@ -267,7 +268,7 @@ export function DefectItemPicker({
       {/* 결과 표 */}
       <div
         ref={mobilePresentation ? undefined : tableRef}
-        data-testid="defect-picker-table" className={mobilePresentation ? "flex min-h-0 flex-1 flex-col overflow-hidden rounded-[16px] border" : "flex min-h-0 flex-1 flex-col touch-pan-y overflow-y-auto overflow-x-auto overscroll-contain rounded-[16px] border"}
+        data-testid="defect-picker-table" className={mobilePresentation ? "relative min-h-0 flex-1" : "flex min-h-0 flex-1 flex-col touch-pan-y overflow-y-auto overflow-x-auto overscroll-contain rounded-[16px] border"}
         style={{
           background: LEGACY_COLORS.s2,
           borderColor: LEGACY_COLORS.border,
@@ -277,31 +278,31 @@ export function DefectItemPicker({
         <div
           ref={mobilePresentation ? tableRef : undefined}
           data-testid={mobilePresentation ? "defect-picker-scroll" : undefined}
-          className={mobilePresentation ? "flex min-h-0 min-w-0 flex-1 flex-col touch-pan-y overflow-y-auto overflow-x-auto overscroll-contain" : "flex min-h-full min-w-full flex-col"}
-          style={mobilePresentation ? { WebkitOverflowScrolling: "touch" } : undefined}
+          className={mobilePresentation ? `${scrollFrameStyles.viewport} flex min-w-0 flex-col touch-pan-y overscroll-contain` : "flex min-h-full min-w-full flex-col"}
+          style={mobilePresentation ? { WebkitOverflowScrolling: "touch", background: LEGACY_COLORS.s2, backgroundClip: "content-box" } : undefined}
         >
         {editMode ? (
           <DefectEditOrderTable
+            mobilePresentation={mobilePresentation}
             items={editItems}
             dragId={dragId}
             dropTargetId={dropTargetId}
             makeHandlers={makeHandlers}
           />
         ) : (<>
-        <table className="w-full border-collapse text-sm">
-          {/* 모바일(<sm): 숨긴 2열(품목코드/창고)을 0폭으로 접고 품목명열이 남는 폭 흡수 → '추가'가 행 우측 끝. */}
+        <table className={`w-full border-collapse text-sm ${mobilePresentation ? "table-fixed" : ""}`}>
           <colgroup>
-            <col className="w-full sm:w-[66%]" />
+            {mobilePresentation ? <><col /><col className="w-[100px]" /></> : <><col className="w-full sm:w-[66%]" />
             <col className="w-0 sm:w-[16%]" />
             <col className="w-0 sm:w-[8%]" />
-            <col className="w-auto sm:w-[10%]" />
+            <col className="w-auto sm:w-[10%]" /></>}
           </colgroup>
           <thead className="sticky top-0 z-10">
             <tr
               className="text-left text-[11px] font-bold uppercase tracking-[1.5px]"
               style={{ color: LEGACY_COLORS.muted2 }}
             >
-              {["품목명", "품목 코드", source === "warehouse" ? "창고 가용" : "부서 가용", "추가"].map((h, i) => (
+              {["품목명", "품목 코드", source === "warehouse" ? "창고 가용" : "부서 가용", mobilePresentation ? "선택" : "추가"].map((h, i) => !mobilePresentation || i === 0 || i === 3 ? (
                 <th
                   key={h}
                   className={
@@ -318,11 +319,11 @@ export function DefectItemPicker({
                 >
                   {h}
                 </th>
-              ))}
+              ) : null)}
             </tr>
           </thead>
           <tbody role={loading ? "status" : undefined} aria-label={loading ? "품목 불러오는 중" : undefined} aria-busy={loading || undefined}>
-            {loading && [0, 1, 2, 3].map((row) => <tr key={`loading-${row}`} aria-hidden="true"><td colSpan={5} className="border-b border-[var(--c-border)] px-3 py-3"><div className="flex min-h-[48px] items-center gap-3"><div className="flex flex-1 flex-col gap-2"><SkeletonBlock className="h-4 w-2/3" /><SkeletonBlock className="h-3 w-1/2" /></div><SkeletonBlock className="h-8 w-16 rounded-[10px]" /></div></td></tr>)}
+            {loading && [0, 1, 2, 3].map((row) => <tr key={`loading-${row}`} aria-hidden="true"><td colSpan={mobilePresentation ? 2 : 5} className="border-b border-[var(--c-border)] px-3 py-3"><div className="flex min-h-[48px] items-center gap-3"><div className="flex flex-1 flex-col gap-2"><SkeletonBlock className="h-4 w-2/3" /><SkeletonBlock className="h-3 w-1/2" /></div><SkeletonBlock className="h-8 w-16 rounded-[10px]" /></div></td></tr>)}
             {filteredItems.slice(0, displayLimit).map((item) => {
               const impliedDeptName = itemDepartment(item);
               const stock = defectSourceStock(item, source);
@@ -331,10 +332,11 @@ export function DefectItemPicker({
               return (
                 <tr key={item.item_id} data-testid={`defect-picker-row-${item.item_id}`} data-added={added ? "true" : "false"} className="transition-colors duration-150 hover:bg-[var(--c-s4)]" style={{ background: added ? tint(LEGACY_COLORS.blue, 7) : undefined }}>
                   <td className="px-3 py-2" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
-                    <span className="text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
+                    <span className={`text-base font-bold ${mobilePresentation ? "[overflow-wrap:anywhere]" : ""}`} style={{ color: LEGACY_COLORS.text }}>
                       {item.item_name}
                     </span>
-                    <div className="sm:hidden text-xs font-bold" style={{ color: impliedDeptName || source === "warehouse" ? LEGACY_COLORS.muted2 : LEGACY_COLORS.red }}>
+                    {mobilePresentation && <div className="text-xs [overflow-wrap:anywhere]" style={{ color: LEGACY_COLORS.muted2 }}>{item.mes_code}</div>}
+                    <div className={`${mobilePresentation ? "" : "sm:hidden"} text-xs font-bold [overflow-wrap:anywhere]`} style={{ color: impliedDeptName || source === "warehouse" ? LEGACY_COLORS.muted2 : LEGACY_COLORS.red }}>
                       {source === "warehouse"
                         ? `창고 · 보유 ${formatQty(stock.current)} · 예약 ${formatQty(stock.pending)} · 가용 ${formatQty(stock.available)}`
                         : impliedDeptName
@@ -342,7 +344,7 @@ export function DefectItemPicker({
                           : "부서 미지정 · 생산 출처에서 추가할 수 없습니다."}
                     </div>
                   </td>
-                  <td
+                  {!mobilePresentation && <><td
                     className="hidden px-3 py-2 text-center sm:table-cell"
                     style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
                   >
@@ -358,7 +360,7 @@ export function DefectItemPicker({
                     }}
                   >
                     {formatQty(stock.available)}
-                  </td>
+                  </td></>}
                   <td
                     className="whitespace-nowrap px-3 py-2 text-center"
                     style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
@@ -369,7 +371,7 @@ export function DefectItemPicker({
                       type="button"
                       onClick={() => added ? onRemove(item) : onAdd(item)}
                       disabled={!added && !canAdd}
-                      aria-label={added ? `${item.item_name} 장바구니에서 제거` : `${item.item_name} 장바구니에 추가`}
+                      aria-label={mobilePresentation ? `${item.item_name} ${added ? "선택 해제" : "선택"}` : added ? `${item.item_name} 장바구니에서 제거` : `${item.item_name} 장바구니에 추가`}
                       className={`standard-hover inline-flex items-center gap-1 rounded-[10px] border px-2.5 py-1 text-[12px] font-black transition-colors active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45 ${
                         added
                           ? "border-[var(--c-blue)] bg-[color-mix(in_srgb,var(--c-blue)_12%,transparent)] text-[var(--c-blue)]"
@@ -379,12 +381,12 @@ export function DefectItemPicker({
                       {added ? (
                         <>
                           <Check className="h-3 w-3" />
-                          담김
+                          {mobilePresentation ? "선택 해제" : "담김"}
                         </>
                       ) : (
                         <>
                           <Plus className="h-3 w-3" />
-                          추가
+                          {mobilePresentation ? "선택" : "추가"}
                         </>
                       )}
                     </button>
@@ -422,28 +424,45 @@ export function DefectItemPicker({
           </div>
         )}
         </>)}</div>
+        {mobilePresentation && (
+          <>
+            <div data-testid="defect-picker-frame-outline" aria-hidden className="pointer-events-none absolute inset-0 z-20 rounded-[16px] border" style={{ borderColor: LEGACY_COLORS.border }} />
+            <div aria-hidden className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between">
+              <div className="flex justify-between">
+                <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 15px, var(--c-bg) 16px)" }} />
+                <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 0 100%, transparent 0 15px, var(--c-bg) 16px)" }} />
+              </div>
+              <div className="flex justify-between">
+                <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 100% 0, transparent 0 15px, var(--c-bg) 16px)" }} />
+                <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 0 0, transparent 0 15px, var(--c-bg) 16px)" }} />
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
 }
 
 function DefectEditOrderTable({
+  mobilePresentation,
   items,
   dragId,
   dropTargetId,
   makeHandlers,
 }: {
+  mobilePresentation: boolean;
   items: Item[];
   dragId: string | null;
   dropTargetId: string | null;
   makeHandlers: UseItemOrderDragResult["makeHandlers"];
 }) {
   return (
-    <table className="w-full border-collapse text-sm">
+    <table className={`w-full border-collapse text-sm ${mobilePresentation ? "table-fixed" : ""}`}>
       <colgroup>
-        <col style={{ width: "4%" }} />
-        <col style={{ width: "66%" }} />
-        <col style={{ width: "30%" }} />
+        <col style={{ width: mobilePresentation ? 36 : "4%" }} />
+        <col style={{ width: mobilePresentation ? undefined : "66%" }} />
+        {!mobilePresentation && <col style={{ width: "30%" }} />}
       </colgroup>
       <thead className="sticky top-0 z-10">
         <tr
@@ -460,12 +479,7 @@ function DefectEditOrderTable({
           >
             품목명
           </th>
-          <th
-            className="px-3 py-2"
-            style={{ background: "var(--c-popup-bg)", borderBottom: `1px solid ${LEGACY_COLORS.border}` }}
-          >
-            품목 코드
-          </th>
+          {!mobilePresentation && <th className="px-3 py-2" style={{ background: "var(--c-popup-bg)", borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>품목 코드</th>}
         </tr>
       </thead>
       <tbody>
@@ -498,15 +512,16 @@ function DefectEditOrderTable({
                 />
               </td>
               <td className="px-3 py-2" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
-                <span className="text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
+                <span className={`text-base font-bold ${mobilePresentation ? "[overflow-wrap:anywhere]" : ""}`} style={{ color: LEGACY_COLORS.text }}>
                   {item.item_name}
                 </span>
+                {mobilePresentation && <div className="text-xs [overflow-wrap:anywhere]" style={{ color: LEGACY_COLORS.muted2 }}>{item.mes_code}</div>}
               </td>
-              <td className="px-3 py-2" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
+              {!mobilePresentation && <td className="px-3 py-2" style={{ borderBottom: `1px solid ${LEGACY_COLORS.border}` }}>
                 <span className="text-sm font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
                   {keepCodeOnOneLine(item.mes_code)}
                 </span>
-              </td>
+              </td>}
             </tr>
           );
         })}
