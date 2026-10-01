@@ -172,7 +172,7 @@ export function DailyWorkReportEditor({
 
   if (!editable) {
     return (
-      <section className={`${mobile ? "rounded-[20px] border p-3" : "rounded-[20px] border p-4 lg:p-5"} ${fillAvailableHeight ? "lg:flex lg:min-h-0 lg:flex-1 lg:flex-col" : ""}`} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+      <section className={`${mobile ? "flex flex-col rounded-[20px] border p-3" : "rounded-[20px] border p-4 lg:p-5"} ${fillAvailableHeight ? mobile ? "flex-1" : "lg:flex lg:min-h-0 lg:flex-1 lg:flex-col" : ""}`} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
         <div className="flex items-center gap-3">
           <span className={mobile ? "hidden" : "flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px]"} style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>
             <PencilLine className="h-5 w-5" />
@@ -181,7 +181,7 @@ export function DailyWorkReportEditor({
             <h2 className={mobile ? "text-[15px] font-semibold" : "text-lg font-black"}>작업 내역</h2>
           </div>
         </div>
-        <p className={`${mobile ? "mt-3 whitespace-pre-wrap [overflow-wrap:anywhere] text-sm leading-7" : "mt-5 whitespace-pre-wrap rounded-[16px] border px-4 py-4 text-sm leading-7"} ${fillAvailableHeight ? "lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1" : ""}`} style={{ color: initialContent ? LEGACY_COLORS.text : LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+        <p className={`${mobile ? "mt-3 min-h-32 flex-1 whitespace-pre-wrap rounded-[16px] border px-3 py-3.5 [overflow-wrap:anywhere] text-base leading-7" : "mt-5 whitespace-pre-wrap rounded-[16px] border px-4 py-4 text-sm leading-7"} ${fillAvailableHeight && !mobile ? "lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1" : ""}`} style={{ color: initialContent ? LEGACY_COLORS.text : LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
           {loading ? <span role="status" aria-label="작업 내역 불러오는 중" className="block h-7 w-2/3 rounded motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s3 }} /> : initialContent || <><Image src="/images/dexray/daily-empty-blue.webp" alt="" width={360} height={240} className="mx-auto hidden h-36 w-auto object-contain lg:block" />작성된 일보가 없습니다.</>}
         </p>
       </section>
@@ -199,7 +199,7 @@ export function DailyWorkReportEditor({
           : null;
 
   return (
-    <section aria-busy={loading || undefined} className={`${mobile ? "rounded-[20px] border p-3" : "rounded-[20px] border p-4 lg:p-5"} ${fillAvailableHeight ? "lg:flex lg:min-h-0 lg:flex-1 lg:flex-col" : ""}`} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+    <section aria-busy={loading || undefined} className={`${mobile ? "flex flex-col rounded-[20px] border p-3" : "rounded-[20px] border p-4 lg:p-5"} ${fillAvailableHeight ? mobile ? "flex-1" : "lg:flex lg:min-h-0 lg:flex-1 lg:flex-col" : ""}`} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
       <div className="flex shrink-0 items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className={mobile ? "hidden" : "flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px]"} style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>
@@ -213,10 +213,10 @@ export function DailyWorkReportEditor({
           {loading ? <span aria-label="글자 수 불러오는 중" className="inline-block h-3 w-4 motion-safe:animate-pulse rounded" style={{ background: LEGACY_COLORS.s3 }} /> : content.length.toLocaleString()} / 5,000
         </span>
       </div>
-      {loading ? <div data-testid="daily-report-editor-skeleton" role="status" aria-label="작업 내역 불러오는 중" className={`${mobile ? "mt-3 min-h-[max(240px,40dvh)]" : "mt-4 min-h-44"} w-full rounded-[16px] border px-4 py-3.5 ${fillAvailableHeight ? "lg:min-h-0 lg:flex-1" : ""}`} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+      {loading ? <div data-testid="daily-report-editor-skeleton" role="status" aria-label="작업 내역 불러오는 중" className={`${mobile ? "mt-3 min-h-[max(240px,40dvh)] flex-1" : "mt-4 min-h-44"} w-full rounded-[16px] border px-4 py-3.5 ${fillAvailableHeight ? "lg:min-h-0 lg:flex-1" : ""}`} style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
         <div className="h-5 w-4/5 motion-safe:animate-pulse rounded" style={{ background: LEGACY_COLORS.s3 }} />
         <div className="mt-2 h-5 w-2/3 motion-safe:animate-pulse rounded" style={{ background: LEGACY_COLORS.s3 }} />
-      </div> : <div className={`relative flex ${mobile ? "mt-3 min-h-[max(240px,40dvh)]" : "mt-4 min-h-44"} flex-col ${fillAvailableHeight ? "lg:min-h-0 lg:flex-1" : ""}`}>
+      </div> : <div className={`relative flex ${mobile ? "mt-3 min-h-[max(240px,40dvh)] flex-1" : "mt-4 min-h-44"} flex-col ${fillAvailableHeight ? "lg:min-h-0 lg:flex-1" : ""}`}>
       {!content.trim() && !focused && <div data-testid="daily-empty-mascot" aria-hidden="true" className="pointer-events-none absolute inset-0 hidden items-center justify-center lg:flex"><Image src="/images/dexray/daily-empty-blue.webp" alt="" width={360} height={240} className="h-auto max-h-[80%] w-[min(240px,50%)] object-contain" /></div>}
       <textarea
         aria-label="작업 내역"
