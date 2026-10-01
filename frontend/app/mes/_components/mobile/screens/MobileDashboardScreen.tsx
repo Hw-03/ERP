@@ -12,7 +12,7 @@ import { InventoryCapacityPanel, capacityStatusBadge } from "../../_inventory_se
 import { InventoryFilters } from "../../_inventory_sections/InventoryFilterBar";
 import { InventoryFilterLogicToggle } from "../../_inventory_sections/InventoryFilterToggleButton";
 import { InventoryItemsTable } from "../../_inventory_sections/InventoryItemsTable";
-import { InventoryDetailPanel } from "../../_inventory_sections/InventoryDetailPanel";
+import { MobileInventoryDetailContent } from "./MobileInventoryDetailContent";
 import { useInventoryData } from "../../_hooks/useInventoryData";
 import { useDesktopInventoryDerivations } from "../../_hooks/useDesktopInventoryDerivations";
 import { useItemImageManifest } from "../../_hooks/useItemImageManifest";
@@ -372,34 +372,18 @@ export function MobileDashboardScreen({
         onClose={() => setSelectedItem(null)}
         ariaLabel={displayItem ? `${displayItem.item_name} 상세` : "품목 상세"}
       >
-        {displayItem && (
-          <div className="px-4">
-            <div className="mb-1 flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-lg font-semibold leading-snug [overflow-wrap:anywhere]" style={{ color: LEGACY_COLORS.text }}>
-                  {displayItem.item_name}
-                </div>
-                <div className="mt-1 break-all text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
-                  {displayItem.legacy_part
-                    ? `${displayItem.mes_code} · ${displayItem.legacy_part}`
-                    : displayItem.mes_code ?? "-"}
-                </div>
-              </div>
-              <div className="shrink-0 whitespace-nowrap">{headerBadge}</div>
-            </div>
-            <div className="mt-3">
-              <InventoryDetailPanel
-                item={displayItem}
-                onGoToWarehouse={(item, intent) => {
-                  setSelectedItem(null);
-                  onGoToWarehouse(item, intent);
-                }}
-                canReceive={canReceive}
-                quickActionVariant="mobile"
-                imageFilename={displayItem.mes_code ? imageManifest?.[displayItem.mes_code] : undefined}
-              />
-            </div>
-          </div>
+        {selectedItem && displayItem && (
+          <MobileInventoryDetailContent
+            key={selectedItem.item_id}
+            item={displayItem}
+            headerBadge={headerBadge}
+            onGoToWarehouse={(item, intent) => {
+              setSelectedItem(null);
+              onGoToWarehouse(item, intent);
+            }}
+            canReceive={canReceive}
+            imageFilename={displayItem.mes_code ? imageManifest?.[displayItem.mes_code] : undefined}
+          />
         )}
       </BottomSheet>
     </div>
