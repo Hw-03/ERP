@@ -9,6 +9,6 @@ import type { TransactionLog } from "@/lib/api";
 // ──────────────────────────────────────────────────────────────────
 export type HistorySelection =
   | { kind: "log"; log: TransactionLog; allowCancellation?: boolean }
-  | { kind: "batch"; batchId: string; logs: TransactionLog[] };
+  | { kind: "batch"; batchId: string; logs: TransactionLog[]; groupType?: "operation" | "op_batch" | "batch" | "defect_lifecycle" };
 
 export const HISTORY_PAGE_SIZE = 100;

@@ -176,6 +176,13 @@ describe("applyHistoryCancellation", () => {
 });
 
 describe("reconcileHistorySelection", () => {
+  it("서로 다른 작업의 불량 후속 묶음도 원래 거래 전체와 종류를 보존한다", () => {
+    const parent = makeLog({log_id:"mark",operation_id:"op-mark",operation_batch_id:null});
+    const child = makeLog({log_id:"scrap",operation_id:"op-scrap",operation_batch_id:null});
+    const fresh = [{...parent,item_name:"최신"},child];
+    expect(reconcileHistorySelection({kind:"batch",batchId:"lifecycle",groupType:"defect_lifecycle",logs:[parent,child]},fresh))
+      .toEqual({kind:"batch",batchId:"lifecycle",groupType:"defect_lifecycle",logs:fresh});
+  });
   it("replaces a surviving selection with the fresh query object", () => {
     const oldLog = makeLog({ item_name: "이전 이름" });
     const freshLog = makeLog({ item_name: "최신 이름" });

@@ -169,10 +169,15 @@ export function reconcileHistorySelection(
     return fresh ? { ...selection, log: fresh } : null;
   }
 
-  const freshLogs = logs.filter((log) => getHistoryBatchSelectionKey(log) === selection.batchId);
-  if (freshLogs.length === 1) return { kind: "log", log: freshLogs[0] };
+  const lifecycleIds = selection.groupType === "defect_lifecycle" ? new Set(selection.logs.map((log) => log.log_id)) : null;
+  const freshLogs = logs.filter((log) => lifecycleIds ? lifecycleIds.has(log.log_id)
+    : selection.groupType === "operation" ? log.operation_id === selection.batchId
+    : getHistoryBatchSelectionKey(log) === selection.batchId);
+  // 모바일이 PC 기준으로 선택한 대표 품목을 조회 순서가 달라져도 유지한다.
+  if (selection.groupType) freshLogs.sort((a, b) => Number(b.log_id === selection.logs[0]?.log_id) - Number(a.log_id === selection.logs[0]?.log_id));
+  if (freshLogs.length === 1 && !selection.groupType) return { kind: "log", log: freshLogs[0] };
   return freshLogs.length > 0
-    ? { kind: "batch", batchId: selection.batchId, logs: freshLogs }
+    ? { ...selection, logs: freshLogs }
     : null;
 }
 
