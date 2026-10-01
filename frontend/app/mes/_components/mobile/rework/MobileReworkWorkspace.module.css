@@ -1,0 +1,62 @@
+.workspace { display: flex; flex-direction: column; gap: 8px; height: 100%; min-height: 0; min-width: 0; color: var(--c-text); }
+.frame { position: relative; flex: 1; min-height: 0; min-width: 0; }
+.content { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding-bottom: 1px; }
+.target { padding: 4px; }
+.targetHeading { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 12px; margin-bottom: 4px; }
+.targetHeading h3 { font-size: 14px; font-weight: 700; overflow-wrap: anywhere; line-height: 1.5; }
+.targetHeading > span { max-width: 100px; font-size: 12px; font-weight: 600; line-height: 1.75; text-align: right; overflow-wrap: anywhere; }
+.meta { display: flex; flex-wrap: wrap; gap: 2px 10px; min-width: 0; font-size: 12px; line-height: 1.5; color: var(--c-muted2); overflow-wrap: anywhere; }
+.meta > span { min-width: 0; }
+.allocation { padding: 0 4px 4px; }
+.allocation label { display: grid; grid-template-columns: minmax(0, 1fr) 64px auto; align-items: center; gap: 8px; font-size: 12px; color: var(--c-muted2); }
+.allocation label > span { overflow-wrap: anywhere; }
+.allocation label > span:first-child { font-weight: 600; color: var(--c-text); }
+.allocation input { width: 100%; min-width: 0; height: 44px; border: 1px solid var(--c-border); border-radius: 8px; background: var(--c-s1); color: var(--c-text); font-size: 16px; font-weight: 600; text-align: center; }
+.allocation p { margin-top: 4px; font-size: 12px; color: var(--c-muted2); }
+.search { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 44px; padding: 0 12px; border: 1px solid var(--c-border); border-radius: 12px; background: var(--c-s2); color: var(--c-muted2); }
+.search svg { flex-shrink: 0; }
+.search input { min-width: 0; width: 100%; min-height: 44px; background: transparent; border: 0; outline: 0; font-size: 16px; color: var(--c-text); }
+.search:focus-within { outline: 2px solid var(--c-blue); outline-offset: 1px; }
+.filters { display: flex; gap: 6px; }
+.filters button { display: flex; gap: 6px; justify-content: center; align-items: center; min-height: 44px; padding: 8px 14px; border: 1px solid var(--c-border); border-radius: 12px; color: var(--c-muted2); font-size: 12px; font-weight: 600; background: var(--c-s2); }
+.filters button[aria-pressed="true"] { color: var(--c-blue); border-color: color-mix(in srgb, var(--c-blue) 40%, var(--c-border)); background: color-mix(in srgb, var(--c-blue) 8%, var(--c-s1)); }
+.list { border: 1px solid var(--c-border); border-radius: 16px; background: var(--c-s1); overflow: hidden; }
+.row { --level-color: var(--c-muted2); display: flex; flex-direction: column; min-width: 0; padding: 12px 16px; gap: 8px; border-left: 3px solid color-mix(in srgb, var(--level-color) 55%, var(--c-border)); background: color-mix(in srgb, var(--level-color) 6%, var(--c-s1)); scroll-margin-top: 8px; }
+.row[data-level="1"] { --level-color: var(--c-cyan); }
+.row[data-level="2"] { --level-color: var(--c-purple); }
+.row[data-level="3"] { --level-color: var(--c-blue); }
+.hierarchy { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--c-muted2); font-size: 12px; }
+.hierarchy > span { flex-shrink: 0; padding: 3px 7px; border-radius: 6px; background: color-mix(in srgb, var(--level-color) 12%, var(--c-s1)); color: var(--c-text); }
+.hierarchy button { min-width: 0; min-height: 44px; text-align: left; overflow-wrap: anywhere; color: var(--c-blue); }
+.highlight { outline: 2px solid var(--c-blue); outline-offset: -2px; }
+.branchActions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; }
+.branchActions button { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; color: var(--c-blue); font-size: 12px; }
+.row + .row { border-top: 1px solid var(--c-border); }
+.rowMain { display: grid; grid-template-columns: minmax(0, 1fr) minmax(48px, auto); gap: 12px; align-items: start; }
+.rowMain > strong { min-width: 0; font-size: 14px; line-height: 1.5; font-weight: 700; overflow-wrap: anywhere; }
+.total { max-width: 110px; text-align: right; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.total b { font-size: 16px; font-weight: 700; }
+.total > span { color: var(--c-muted2); font-size: 12px; }
+.quantityFields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.quantityFields label { display: flex; flex-direction: column; gap: 4px; min-width: 0; color: var(--c-muted2); font-size: 12px; }
+.quantityFields input { width: 100%; min-width: 0; height: 44px; padding: 8px; border: 1px solid var(--c-border); border-radius: 8px; background: var(--c-s2); color: var(--c-text); font-size: 16px; font-weight: 600; text-align: center; }
+.workspace .memo { display: block; width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid var(--c-border); border-radius: 8px; background: var(--c-s2); color: var(--c-text); font-size: 16px; line-height: 22px; resize: none; overflow: hidden; }
+.memo::placeholder { color: var(--c-muted2); }
+.memo:disabled { opacity: .55; }
+.drillButton { display: flex; align-items: center; justify-content: flex-end; gap: 6px; min-height: 44px; min-width: 0; color: var(--c-blue); font-size: 12px; font-weight: 600; }
+.drillButton svg { flex-shrink: 0; }
+.splitSummary { display: flex; align-items: center; gap: 6px; min-height: 44px; font-size: 12px; color: var(--c-muted2); }
+.splitSummary svg { flex-shrink: 0; }
+.path { font-size: 12px; line-height: 1.6; color: var(--c-muted2); overflow-wrap: anywhere; }
+.skeleton { padding: 20px 16px; border-bottom: 1px solid var(--c-border); }
+.empty { padding: 32px 16px; text-align: center; border-radius: 16px; border: 1px solid var(--c-border); color: var(--c-muted2); font-size: 14px; background: var(--c-s1); }
+.empty button, .error button { display: block; min-height: 44px; margin: 8px auto 0; padding: 0 16px; color: var(--c-blue); font-weight: 600; }
+.error { color: var(--c-red); font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.footer { flex-shrink: 0; }
+.workspace button:disabled { opacity: .45; cursor: default; }
+.workspace button:focus-visible, .quantityFields input:focus-visible, .allocation input:focus-visible, .memo:focus-visible { outline: 2px solid var(--c-blue); outline-offset: 2px; }
+@media (max-width: 359px) {
+  .row { padding: 14px 12px; }
+  .rowMain { gap: 8px; }
+  .total { max-width: 85px; }
+}
