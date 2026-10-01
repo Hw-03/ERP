@@ -44,6 +44,23 @@ vi.mock("../DisassembleTree", () => ({
   validateDecisionTree: () => true,
 }));
 
+vi.mock("../../mobile/rework/MobileReworkWorkspace", () => ({
+  MobileReworkWorkspace: ({ parentQty, decisions, onChange, onConfirm, canSubmit }: {
+    parentQty: number;
+    decisions: unknown[];
+    onChange: (next: unknown[]) => void;
+    onConfirm: () => void;
+    canSubmit: boolean;
+  }) => (
+    <div data-testid="decision-tree">
+      <output data-testid="decision-parent-qty">{parentQty}</output>
+      <output data-testid="decision-count">{decisions.length}</output>
+      <button type="button" onClick={() => onChange([{ item_id: "child-1", qty: parentQty }])}>Add decision</button>
+      <button type="button" disabled={!canSubmit} onClick={onConfirm}>처리 결과 확인</button>
+    </div>
+  ),
+}));
+
 import { DefectProcessPanel } from "../DefectProcessPanel";
 import { MobileDefectProcessPanel } from "../../mobile/screens/MobileDefectProcessPanel";
 
@@ -152,8 +169,9 @@ describe.each(panels)("%s defect process panel realtime location updates", (_nam
 
     await waitFor(() => expect(screen.getByTestId("decision-parent-qty")).toHaveTextContent("8"));
     expect(screen.getByTestId("decision-count")).toHaveTextContent("0");
-    expect(screen.getByRole("button", { name: /최종 처리/ })).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: /최종 처리/ }));
+    const confirm = screen.getByRole("button", { name: _name === "mobile" ? "처리 결과 확인" : /최종 처리/ });
+    expect(confirm).toBeDisabled();
+    fireEvent.click(confirm);
     expect(apiMocks.createStockRequest).not.toHaveBeenCalled();
   });
 

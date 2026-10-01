@@ -11,7 +11,6 @@ import { stockRequestsApi } from "@/lib/api/stock-requests";
 import type { DefectLocation } from "@/lib/api/types/defects";
 import type { Department } from "@/lib/api/types/shared";
 import {
-  DisassembleTree,
   toServerDecision,
   validateDecisionTree,
   type ChildDecision,
@@ -24,6 +23,8 @@ import type { Supplier } from "@/lib/api";
 import { SupplierPickerStep } from "../../_warehouse_v2/SupplierPickerStep";
 import panelStyles from "./mobileWarehousePanels.module.css";
 import { MobileDefectStepHeader } from "./MobileDefectStepHeader";
+import { MobileReworkWorkspace } from "../rework/MobileReworkWorkspace";
+import type { MobileReworkMemory } from "../rework/useMobileReworkWorkspace";
 
 type ProcessAction = "unquarantine" | "scrap" | "return" | "disassemble";
 
@@ -62,7 +63,21 @@ export function MobileDefectProcessPanel({
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [supplierListReady, setSupplierListReady] = useState(false);
   const locationIdentityRef = useRef(location.record_id);
+  const reworkSessionRef = useRef<MobileReworkMemory | null>(null);
   const boundedProcessQty = Math.max(1, Math.min(maxQty, processQty));
+
+  useEffect(() => {
+    window.history.replaceState({ defect: "process", recordId: location.record_id, step: 1 }, "");
+    function onPop(event: PopStateEvent): void {
+      const state = event.state;
+      if (state?.defect !== "process" || state.recordId !== location.record_id) return;
+      setConfirmOpen(false);
+      if (state.step === 2) setAction("disassemble");
+      setStep(state.step === 2 ? 2 : 1);
+    }
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [location.record_id]);
 
   useEffect(() => {
     if (locationIdentityRef.current === location.record_id) return;
@@ -187,7 +202,7 @@ export function MobileDefectProcessPanel({
 
   if (step === 3) {
     return (
-      <div className="flex h-full min-h-0 flex-col gap-3">
+      <div className="flex h-full min-h-0 flex-col gap-2">
         <MobileDefectStepHeader title="공급업체 선택" steps={processSteps} current={1} onBack={() => setStep(1)} />
         <div className="min-h-0 flex-1 overflow-y-auto">
           <SupplierPickerStep
@@ -200,7 +215,7 @@ export function MobileDefectProcessPanel({
             mode="select"
           />
         </div>
-        <StickyFooter embedded>
+        <StickyFooter flat compact embedded className="!px-0 !pt-0">
           <button
             type="button"
             disabled={busy || !supplierListReady || !selectedSupplier}
@@ -234,54 +249,24 @@ export function MobileDefectProcessPanel({
   if (step === 2) {
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <div className="shrink-0 pb-2"><MobileDefectStepHeader title="BOM 확인" steps={processSteps} current={1} onBack={() => setStep(1)} /></div>
-
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-        <SectionCard padding="sm">
-          <div className="flex flex-col gap-1">
-            <span className={clsx(TYPO.body, "font-black")} style={{ color: LEGACY_COLORS.text }}>
-              {location.mes_code} {location.item_name}
-            </span>
-            <span className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
-              재작업 {formatQty(boundedProcessQty)} / 처리 가능 {formatQty(maxQty)}개
-              {category ? ` · ${category}` : ""}
-            </span>
-          </div>
-        </SectionCard>
-
-        <div className="flex flex-col gap-2">
-          <span className={clsx(TYPO.caption, "font-black uppercase tracking-[1px]")} style={{ color: LEGACY_COLORS.muted2 }}>
-            BOM 재작업 트리
-          </span>
-          <DisassembleTree
-            mobilePresentation
-            parentItemId={location.item_id}
-            parentItemName={location.item_name}
-            parentMesCode={location.mes_code ?? ""}
-            parentQty={boundedProcessQty}
-            parentDept={location.department}
-            decisions={decisions}
-            onChange={handleDecisionsChange}
-          />
-        </div>
-
-        {errorMsg && <InlineErrorNote>{errorMsg}</InlineErrorNote>}
-        </div>
-
-        <StickyFooter embedded>
-          <button
-            type="button"
-            disabled={busy || !reworkReady}
-            onClick={() => setConfirmOpen(true)}
-            className={clsx(
-              "w-full rounded-[16px] px-4 py-[14px] font-black text-white transition-[transform,opacity] active:scale-[0.98] disabled:opacity-40",
-              TYPO.body,
-            )}
-            style={{ background: LEGACY_COLORS.yellowSolid }}
-          >
-            {busy ? "처리 중..." : "최종 처리 →"}
-          </button>
-        </StickyFooter>
+        <MobileReworkWorkspace
+          sessionId={location.record_id}
+          parentItemId={location.item_id}
+          parentItemName={location.item_name}
+          parentMesCode={location.mes_code ?? ""}
+          parentQty={boundedProcessQty}
+          reason={[category, memo].filter(Boolean).join(" · ")}
+          decisions={decisions}
+          onChange={handleDecisionsChange}
+          sessionRef={reworkSessionRef}
+          steps={processSteps}
+          current={1}
+          onBack={() => window.history.back()}
+          onConfirm={() => setConfirmOpen(true)}
+          busy={busy}
+          canSubmit={reworkReady}
+          error={errorMsg}
+        />
 
         <ConfirmModal
           className={panelStyles.touchScope}
@@ -428,12 +413,13 @@ export function MobileDefectProcessPanel({
       </div>
 
       {/* 하단 액션 — 항상 보이도록 고정 */}
-      <StickyFooter embedded>
+      <StickyFooter flat compact embedded className="!px-0">
         <button
           type="button"
           disabled={busy}
           onClick={() => {
             if (action === "disassemble") {
+              window.history.pushState({ defect: "process", recordId: location.record_id, step: 2 }, "");
               setStep(2);
             } else if (action === "return") {
               setStep(3);
