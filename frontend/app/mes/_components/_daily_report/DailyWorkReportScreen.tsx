@@ -43,9 +43,9 @@ function Failure({ message, onRetry }: { message: string; onRetry?: () => void }
   );
 }
 
-function PanelPlaceholder({ title }: { title: string }) {
+function PanelPlaceholder({ title, mobile = false }: { title: string; mobile?: boolean }) {
   return (
-    <div className="flex min-h-[260px] rounded-[20px] border lg:flex-1" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+    <div className={`flex min-h-[260px] rounded-[20px] border ${mobile ? "flex-1" : "lg:flex-1"}`} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
       <EmptyState illustrated className="flex-1" title={title} description="" />
     </div>
   );
@@ -284,8 +284,8 @@ export function DailyWorkReportScreen({
   const keepActivity = mobile && activityQuery.data !== undefined;
 
   return (
-    <div className={mobile ? "min-w-0" : "min-h-0 min-w-0 flex-1 overflow-y-auto px-3 py-3 lg:flex lg:flex-col lg:overflow-hidden lg:px-0 lg:py-0 lg:pr-4"} style={mobile ? { background: LEGACY_COLORS.bg } : undefined}>
-      <div className={`scrollbar-hide flex w-full flex-col gap-3 ${mobile ? "" : "pb-6"} lg:min-h-0 lg:flex-1 lg:pb-0 ${!isActivityDetailOpen ? "lg:overflow-hidden" : "lg:overflow-y-auto"}`}>
+    <div className={mobile ? "flex min-h-full min-w-0 flex-col" : "min-h-0 min-w-0 flex-1 overflow-y-auto px-3 py-3 lg:flex lg:flex-col lg:overflow-hidden lg:px-0 lg:py-0 lg:pr-4"} style={mobile ? { background: LEGACY_COLORS.bg } : undefined}>
+      <div className={`scrollbar-hide flex w-full flex-col gap-3 ${mobile ? "flex-1" : "pb-6"} lg:min-h-0 lg:flex-1 lg:pb-0 ${!isActivityDetailOpen ? "lg:overflow-hidden" : "lg:overflow-y-auto"}`}>
         {!onTopbarControlsChange && <header className={mobile ? "rounded-[20px] border p-3" : "rounded-[20px] border p-4 lg:shrink-0 lg:px-5 lg:py-2.5"} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
           <div className={mobile ? "flex flex-col items-center gap-2" : "flex flex-wrap items-center gap-3"}>
             <div className={mobile ? "contents" : "flex min-h-11 items-center gap-3"}>
@@ -346,7 +346,7 @@ export function DailyWorkReportScreen({
         )}
 
         {targetEmployeeId ? (
-          <div key={mobile ? editorResetKey : tab === "all" ? targetEmployeeId : "mine"} data-testid="daily-work-report-result" role={initialContentLoading ? "status" : undefined} aria-busy={initialContentLoading || undefined} aria-label={initialContentLoading ? "일일 작업 일보 불러오는 중" : undefined} className={`min-w-0 space-y-3 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:gap-3 lg:space-y-0 ${!mobile && tab === "all" && selectedEmployeeId ? "animate-view-fade" : ""}`}>
+          <div key={mobile ? editorResetKey : tab === "all" ? targetEmployeeId : "mine"} data-testid="daily-work-report-result" role={initialContentLoading ? "status" : undefined} aria-busy={initialContentLoading || undefined} aria-label={initialContentLoading ? "일일 작업 일보 불러오는 중" : undefined} className={`min-w-0 ${mobile ? "flex flex-1 flex-col gap-3" : "space-y-3"} lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:gap-3 lg:space-y-0 ${!mobile && tab === "all" && selectedEmployeeId ? "animate-view-fade" : ""}`}>
               {reportLoadFailed && <Failure message="일보를 불러오지 못했습니다." onRetry={mobile ? () => void (tab === "mine" ? reportQuery.refetch() : selectedReportQuery.refetch()) : undefined} />}
               {activityQuery.isError && <Failure message="MES 거래를 불러오지 못했습니다." onRetry={mobile ? () => void activityQuery.refetch() : undefined} />}
               {(!activityQuery.isError || keepActivity) && <DailyWorkActivity activity={activityQuery.data} loading={activityQuery.isLoading} onDetailOpenChange={setIsActivityDetailOpen} mobile={mobile} />}
@@ -369,7 +369,7 @@ export function DailyWorkReportScreen({
               mobile={mobile}
               />
           </div>
-        ) : tab === "all" ? <PanelPlaceholder title="작성한 직원을 선택하세요." /> : null}
+        ) : tab === "all" ? <PanelPlaceholder title="작성한 직원을 선택하세요." mobile={mobile} /> : null}
       </div>
     </div>
   );
