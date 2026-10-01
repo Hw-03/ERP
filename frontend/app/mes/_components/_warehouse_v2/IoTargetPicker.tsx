@@ -10,6 +10,7 @@ import { Tooltip } from "@/lib/ui";
 import { EmptyState } from "../common";
 import { SkeletonBlock } from "../common/LoadingSkeleton";
 import { ReadFailure } from "../common/ReadState";
+import scrollStyles from "../mobile/primitives/MobileScrollFrame.module.css";
 import { useCurrentOperator } from "../login/useCurrentOperator";
 import {
   DEPT_OPTIONS,
@@ -553,7 +554,7 @@ export function IoTargetPicker({
           ref={tableContainerRef}
           onScroll={handleTableScroll}
           data-keep-scroll
-          className="absolute inset-y-0 left-0 -right-2.5 overflow-y-auto overflow-x-auto [scrollbar-gutter:stable]"
+          className={mobilePresentation ? scrollStyles.viewport : "absolute inset-y-0 left-0 -right-2.5 overflow-y-auto overflow-x-auto [scrollbar-gutter:stable]"}
           style={{ overscrollBehavior: "contain" }}
         >
           <div
