@@ -3,25 +3,27 @@
 import { Loader2 } from "lucide-react";
 import type { TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
-import { transactionColor } from "@/lib/mes-status";
+import type { IoBatch } from "@/lib/api/types/io";
+import { useHistoryBatchMetadata } from "../../_hooks/useHistoryBatchMetadata";
 import { ReadEmpty, ReadFailure } from "../../common/ReadState";
 import { dataRevealClassName } from "../../common/LoadingSkeleton";
 import { formatHistoryDate } from "../../_history_sections/historyFormat";
 import {
   getHistoryActor,
-  getHistoryDisplayLabel,
 } from "../../_history_sections/historyBatchInterpreter";
-import { FlowBadge, buildGroups } from "../../_history_sections/historyTableHelpers";
+import { FlowBadge, getHistoryGroupSummary, type LogGroup } from "../../_history_sections/historyTableHelpers";
+import styles from "./MobileHistoryList.module.css";
 
-function HistoryListHeader({ log }: { log: TransactionLog }) {
+function HistoryListHeader({ summary }: { summary: ReturnType<typeof getHistoryGroupSummary> }) {
+  const log = summary.primaryLog;
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="shrink-0">
-        <FlowBadge type={log.transaction_type} label={getHistoryDisplayLabel(log)} color={transactionColor(log.transaction_type)} />
+      <span className={`shrink-0 ${styles.affected} ${styles.badge}`}>
+        <FlowBadge type={summary.displayType} label={summary.label} color={summary.color} />
       </span>
       <div className="ml-auto flex min-w-0 items-center gap-2">
         <span className="min-w-0 truncate text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{getHistoryActor(log)}</span>
-        <span className="shrink-0 text-xs font-semibold" style={{ color: LEGACY_COLORS.muted2 }}>
+        <span className={`shrink-0 text-xs font-semibold ${styles.affected}`} style={{ color: LEGACY_COLORS.muted2 }}>
           {formatHistoryDate(log.requested_at ?? log.created_at)}
         </span>
       </div>
@@ -43,7 +45,11 @@ export function MobileHistoryList({
   onResetFilters,
   error,
   refreshError,
-  filteredLogs,
+  displayGroups,
+  batchCache,
+  setBatchCache,
+  cacheEpoch,
+  loadMoreError,
   selectedKey,
   onSelectLog,
   onSelectBatch,
@@ -59,7 +65,11 @@ export function MobileHistoryList({
   onResetFilters?: () => void;
   error: string | null;
   refreshError?: string | null;
-  filteredLogs: TransactionLog[];
+  displayGroups: LogGroup[];
+  batchCache: Map<string, IoBatch>;
+  setBatchCache: React.Dispatch<React.SetStateAction<Map<string, IoBatch>>>;
+  cacheEpoch?: number | null;
+  loadMoreError?: string | null;
   selectedKey: string | null;
   onSelectLog: (log: TransactionLog) => void;
   onSelectBatch: (batchId: string, logs: TransactionLog[]) => void;
@@ -69,7 +79,8 @@ export function MobileHistoryList({
   loadingMore: boolean;
   onLoadMore: () => void;
 }) {
-  if (loading && filteredLogs.length === 0) {
+  const metadata = useHistoryBatchMetadata(displayGroups, batchCache, setBatchCache, cacheEpoch);
+  if (loading && displayGroups.length === 0) {
     return (
       <div role="status" aria-busy="true" aria-label="입출고 내역을 불러오고 있습니다…"
         className="overflow-hidden rounded-[20px] border" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
@@ -91,7 +102,7 @@ export function MobileHistoryList({
       </div>
     );
   }
-  if (error && filteredLogs.length === 0) {
+  if (error && displayGroups.length === 0) {
     return (
       <div className="py-2">
         <ReadFailure
@@ -101,7 +112,7 @@ export function MobileHistoryList({
       </div>
     );
   }
-  if (filteredLogs.length === 0) {
+  if (displayGroups.length === 0) {
     return (
       <div className="py-10">
         {refreshError && <ReadFailure message={refreshError} onRetry={onRetryRefresh ?? onRetry} refresh />}
@@ -110,7 +121,7 @@ export function MobileHistoryList({
     );
   }
 
-  const groups = buildGroups(filteredLogs);
+  const groups = displayGroups;
 
   return (
     <div className="flex flex-col overflow-hidden rounded-[20px] border" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
@@ -122,95 +133,49 @@ export function MobileHistoryList({
         />
       )}
 
+      {metadata.failed && <ReadFailure message="작업 정보를 불러오지 못했습니다." onRetry={metadata.retry} refresh />}
       <div className={dataRevealClassName}>{groups.map((g) => {
-        if (g.type === "solo") {
-          const log = g.log;
-          const active = selectedKey === `log:${log.log_id}`;
-          return (
-            <button
-              key={log.log_id}
-              type="button"
-              onClick={() => onSelectLog(log)}
-              aria-pressed={active}
-              className="flex h-[98px] min-h-[98px] max-h-[98px] w-full shrink-0 flex-col justify-center overflow-hidden border-b px-4 py-3 text-left transition-colors"
-              style={{
-                background: active ? "color-mix(in srgb, var(--c-blue) 8%, var(--c-s1))" : undefined,
-                borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-              }}
-            >
-              <HistoryListHeader log={log} />
-              <div className="mt-2 flex h-10 shrink-0 items-center">
-                <span
-                  className="line-clamp-2 min-w-0 whitespace-normal break-keep [overflow-wrap:anywhere] text-[15px] font-bold leading-5"
-                  style={{ color: LEGACY_COLORS.text }}
-                >
-                  {log.item_name}
-                </span>
-              </div>
-            </button>
-          );
-        }
-
-        // batch | op_batch — 묶음 카드
-        if (g.type === "defect_lifecycle") {
-          const parent = g.parent;
-          const active = selectedKey === `log:${parent.log_id}`;
-          return (
-            <button
-              key={g.key}
-              type="button"
-              onClick={() => onSelectLog(parent)}
-              aria-pressed={active}
-              className="flex h-[98px] min-h-[98px] max-h-[98px] w-full shrink-0 flex-col justify-center overflow-hidden border-b px-4 py-3 text-left transition-colors"
-              style={{
-                background: active ? "color-mix(in srgb, var(--c-blue) 8%, var(--c-s1))" : undefined,
-                borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-              }}
-            >
-              <HistoryListHeader log={parent} />
-              <div className="mt-2 flex h-10 shrink-0 items-center">
-                <span className="line-clamp-2 min-w-0 whitespace-normal break-keep [overflow-wrap:anywhere] text-[15px] font-bold leading-5" style={{ color: LEGACY_COLORS.text }}>
-                  {parent.item_name}
-                </span>
-              </div>
-            </button>
-          );
-        }
-
-        const logs = g.logs;
-        const first = logs[0];
-        const key =
-          g.type === "operation"
-            ? g.operationId
-            : g.type === "op_batch"
-              ? g.batchId
-              : g.refKey;
-        const active = selectedKey === `batch:${key}`;
+        const summary = getHistoryGroupSummary(g, g.type === "op_batch" ? batchCache.get(g.batchId) : undefined);
+        const single = g.type === "solo";
+        const logs = g.type === "solo" ? [g.log] : g.type === "defect_lifecycle" ? [g.parent, g.child] : g.logs;
+        const cancelled = logs.some((log) => log.cancelled);
+        const cancellation = summary.primaryLog.operation_kind === "CANCELLATION";
+        const key = g.type === "solo" ? g.log.log_id : g.type === "defect_lifecycle" ? g.key
+          : g.type === "operation" ? g.operationId : g.type === "op_batch" ? g.batchId : g.refKey;
+        const active = single
+          ? selectedKey === `log:${summary.primaryLog.log_id}`
+          : selectedKey === `batch:${key}`;
         return (
           <button
             key={key}
             type="button"
-            onClick={() => onSelectBatch(key, logs)}
+            onClick={() => single ? onSelectLog(summary.primaryLog) : onSelectBatch(key,
+              g.type === "operation" ? [summary.primaryLog, ...logs.filter((log) => log.log_id !== summary.primaryLog.log_id)] : logs,
+            )}
             aria-pressed={active}
-            className="flex h-[98px] min-h-[98px] max-h-[98px] w-full shrink-0 flex-col justify-center overflow-hidden border-b px-4 py-3 text-left transition-colors"
+            data-history-cancelled={cancelled || undefined}
+            data-history-cancellation={cancellation || undefined}
+            className={`flex h-[98px] min-h-[98px] max-h-[98px] w-full shrink-0 flex-col justify-center overflow-hidden border-b px-4 py-3 text-left transition-colors ${cancelled ? styles.cancelled : ""} ${cancellation ? styles.cancellation : ""}`}
             style={{
-              background: active ? "color-mix(in srgb, var(--c-blue) 8%, var(--c-s1))" : undefined,
-              borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
+              background: active ? `color-mix(in srgb, ${summary.color} 8%, var(--c-s1))` : undefined,
+              borderColor: active ? summary.color : LEGACY_COLORS.border,
             }}
           >
-            <HistoryListHeader log={first} />
-            <div className="mt-2 flex h-10 shrink-0 items-center">
-              <span className="line-clamp-2 min-w-0 whitespace-normal break-keep [overflow-wrap:anywhere] text-[15px] font-bold leading-5" style={{ color: LEGACY_COLORS.text }}>
-                {first.item_name}
-                {logs.length > 1 && (
-                  <span style={{ color: LEGACY_COLORS.muted2 }}> 외 {logs.length - 1}건</span>
+            <HistoryListHeader summary={summary} />
+            <div className="mt-2 flex h-10 shrink-0 items-center gap-2">
+              <span className={`line-clamp-2 min-w-0 whitespace-normal break-keep [overflow-wrap:anywhere] text-[15px] font-bold leading-5 ${styles.affected}`} style={{ color: LEGACY_COLORS.text }}>
+                {summary.title}
+                {summary.additionalItemCount > 0 && (
+                  <span style={{ color: LEGACY_COLORS.muted2 }}> 외 {summary.additionalItemCount}건</span>
                 )}
               </span>
+              {cancelled && <span className={styles.cancelledLabel}>취소됨</span>}
             </div>
           </button>
         );
       })}</div>
 
+      {loadMoreError && <ReadFailure message={loadMoreError} onRetry={onLoadMore} refresh />}
       {canLoadMore && (
         <button
           type="button"

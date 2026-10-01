@@ -3,6 +3,60 @@
   overflow-wrap: anywhere;
 }
 
+.informationRow {
+  display: block;
+  min-height: 44px;
+  width: 100%;
+  color: var(--c-text);
+  text-align: left;
+}
+
+.compositionRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) fit-content(55%);
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.itemMetadata {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  margin-top: 2px;
+}
+
+.stockInformation {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.stockInformation :global(.history-stock-panel) {
+  margin-left: auto;
+  align-items: flex-end;
+}
+
+.stockInformation details {
+  min-width: 0;
+}
+
+.stockInformation summary {
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.effectRow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  font-size: 14px;
+}
+
 .detail [class~="text-[10px]"],
 .detail [class~="text-[11px]"] {
   font-size: 12px;
@@ -75,20 +129,22 @@
 }
 
 .bundleHeader {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
   padding: 12px;
 }
 
 .bundleTitle {
   order: -1;
   min-width: 0;
-  width: 100%;
+}
+
+.bundleIdentity {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .name {
+  display: block;
   overflow-wrap: anywhere;
   font-size: 14px;
   font-weight: 700;
@@ -97,8 +153,8 @@
 
 .line {
   display: grid;
-  grid-template-columns: 12px minmax(0, 1fr);
-  align-items: start;
+  grid-template-columns: 12px minmax(0, 1fr) fit-content(55%);
+  align-items: center;
   column-gap: 8px;
   row-gap: 4px;
   min-height: 44px;
@@ -107,8 +163,17 @@
 }
 
 .branch {
+  align-self: start;
   font-size: 12px;
   line-height: 20px;
+}
+
+.singleLine {
+  grid-template-columns: minmax(0, 1fr) fit-content(55%);
+}
+
+.singleLine .lineMetadata {
+  grid-column: 2;
 }
 
 .code {
@@ -119,19 +184,18 @@
 }
 
 .lineMetadata {
-  grid-column: 2 / -1;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
+  grid-column: 3;
   min-width: 0;
-  justify-content: space-between;
 }
 
 .line > span:not(.branch) {
   grid-column: 2 / -1;
   justify-self: start;
   font-size: 12px;
+}
+
+.singleLine > span {
+  grid-column: 1 / -1;
 }
 
 .metadata {
@@ -156,6 +220,7 @@
   max-width: 100%;
   flex-direction: column;
   align-items: flex-end;
+  align-self: center;
   margin-left: auto;
   text-align: right;
   gap: 4px;
@@ -174,4 +239,40 @@
 
 .stockChange :global(.history-stock-panel-location) {
   font-size: 14px;
+  white-space: normal;
+}
+
+@media (max-width: 360px) {
+  .bundleHeader.compositionRow,
+  .singleLine {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .line:not(.singleLine) {
+    grid-template-columns: 12px minmax(0, 1fr);
+  }
+
+  .lineMetadata {
+    grid-column: 2;
+  }
+
+  .singleLine .lineMetadata {
+    grid-column: 1;
+  }
+
+  .compositionRow > .stockChange,
+  .lineMetadata {
+    justify-self: end;
+    max-width: 100%;
+  }
+
+  .stockChange :global(.history-stock-panel-line) {
+    white-space: normal;
+  }
+}
+
+@media (max-width: 340px) {
+  .compositionRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

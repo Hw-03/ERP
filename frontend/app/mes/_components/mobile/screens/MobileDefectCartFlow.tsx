@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import type { LucideIcon } from "lucide-react";
@@ -10,12 +10,13 @@ import { tint } from "@/lib/mes/colorUtils";
 import { defectsApi } from "@/lib/api/defects";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
 import type { Item, ProductModel } from "../../_warehouse_v2/types";
+import { QuantityStepper } from "../../_warehouse_v2/QuantityStepper";
+import quantityCartStyles from "../warehouse/MobileIoQuantityCart.module.css";
 import { itemDepartment } from "../../_warehouse_v2/itemPickerShared";
 import type { DefectCartMode } from "../../_defect_hub/DefectCartFlow";
 import { DefectItemPicker } from "../../_defect_hub/DefectItemPicker";
 import { ReasonFormFields } from "../../_defect_hub/ReasonFormFields";
 import {
-  DisassembleTree,
   toServerDecision,
   validateDecisionTree,
   type ChildDecision,
@@ -24,22 +25,22 @@ import { ConfirmModal } from "@/lib/ui";
 import { makeClientRequestId } from "@/lib/uuid";
 import type { DefectManagementCategory } from "@/lib/api/types/defects";
 import { DefectManagementCategoryControl } from "../../_defect_hub/DefectManagementCategoryControl";
-import { defectCartLineErrors } from "../../_defect_hub/defectCartValidation";
+import { defectCartLineErrors, defectSourceStock } from "../../_defect_hub/defectCartValidation";
 import { queryKeys } from "@/lib/queries/keys";
 import { TYPO } from "../tokens";
 import panelStyles from "./mobileWarehousePanels.module.css";
 import presentation from "../mobilePresentation.module.css";
 import { MobileDefectStepHeader } from "./MobileDefectStepHeader";
+import { MobileReworkWorkspace } from "../rework/MobileReworkWorkspace";
+import type { MobileReworkMemory } from "../rework/useMobileReworkWorkspace";
 import {
   PrimaryActionButton,
-  SectionCard,
   StickyFooter,
-  Stepper,
 } from "../primitives";
 
 type SourceKind = "warehouse" | "production";
 type DirectAction = "scrap" | "rework";
-type FlowStep = 1 | 2 | 3;
+type FlowStep = 1 | 2 | 3 | 4;
 type CartHistoryState = { defect?: string; mode?: DefectCartMode; step?: number; directAction?: DirectAction | null; source?: SourceKind } | null;
 
 interface CartLine {
@@ -83,7 +84,8 @@ function managementCategoryLabel(category: DefectManagementCategory): string {
  * 불량 격리 / 바로 처리 — 모바일 전용 다품목 흐름.
  *
  * 데스크톱 DefectCartFlow 와 같은 업무 모델을 393px 세로 레이아웃으로 옮긴다.
- * 바로 처리는 먼저 폐기/재작업을 고르고, 폐기는 다품목, 재작업은 단일 품목으로 처리한다.
+ * 통합 선택에서 작업·출처를 받으면 품목 단계부터 시작한다.
+ * 폐기는 다품목, 재작업은 단일 BOM 품목으로 처리한다.
  */
 export function MobileDefectCartFlow({
   itemsLoading = false,
@@ -91,6 +93,8 @@ export function MobileDefectCartFlow({
   itemsHasData = true,
   onRetryItems,
   mode,
+  initialAction,
+  initialSource,
   items,
   productModels,
   currentEmployee,
@@ -102,6 +106,8 @@ export function MobileDefectCartFlow({
   itemsHasData?: boolean;
   onRetryItems?: () => void;
   mode: DefectCartMode;
+  initialAction?: DirectAction;
+  initialSource?: SourceKind;
   items: Item[];
   productModels: ProductModel[];
   currentEmployee: { employee_id: string; name: string; department: string };
@@ -109,33 +115,52 @@ export function MobileDefectCartFlow({
   onCancel: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [directAction, setDirectAction] = useState<DirectAction | null>(mode === "add" ? "scrap" : null);
-  const [source, setSource] = useState<SourceKind>("production");
-  const [step, setStep] = useState<FlowStep>(1);
+  const [directAction, setDirectAction] = useState<DirectAction | null>(mode === "add" ? "scrap" : initialAction ?? null);
+  const [source, setSource] = useState<SourceKind>(initialAction === "rework" ? "production" : initialSource ?? "production");
+  const [step, setStep] = useState<FlowStep>(initialAction ? 2 : 1);
   const [lines, setLines] = useState<CartLine[]>([]);
   const [requestIds, setRequestIds] = useState<Record<string, string>>({});
   const [batchRequestId, setBatchRequestId] = useState(() => makeClientRequestId());
   const [busy, setBusy] = useState(false);
   const [failures, setFailures] = useState<LineFailure[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const reworkSessionRef = useRef<MobileReworkMemory | null>(null);
 
   useEffect(() => {
-    function restore(state: CartHistoryState) {
+    if (bodyRef.current) bodyRef.current.scrollTop = 0;
+  }, [step]);
+
+  useEffect(() => {
+    function restore(state: CartHistoryState, preserveStep = false): void {
       const validCart = state?.defect === "cart" && state.mode === mode;
+      if (initialAction) {
+        const nextAction = mode === "add" ? "scrap" : validCart && (state.directAction === "scrap" || state.directAction === "rework") ? state.directAction : initialAction;
+        const nextSource = nextAction === "rework" ? "production" : validCart && (state.source === "warehouse" || state.source === "production") ? state.source : initialSource ?? "production";
+        setDirectAction(nextAction);
+        setSource(nextSource);
+        const nextStep = preserveStep && validCart && (state.step === 3 || state.step === 4 && nextAction === "rework") ? state.step : 2;
+        setStep(nextStep);
+        if (!validCart || state?.step !== nextStep || state.directAction !== nextAction || state.source !== nextSource) {
+          window.history.replaceState({ ...(window.history.state ?? {}), defect: "cart", mode, step: nextStep, directAction: nextAction, source: nextSource }, "");
+        }
+        return;
+      }
       const invalidAction = mode === "add"
         ? state?.directAction !== undefined && state.directAction !== "scrap"
-        : state?.directAction === "rework" && state.step !== 2 && state.step !== 3;
+        : state?.directAction === "rework" && state.step !== 2 && state.step !== 3 && state.step !== 4;
       const nextAction = invalidAction ? (mode === "add" ? "scrap" : null) : mode === "add" ? "scrap" : state?.directAction ?? null;
       const nextSource = invalidAction ? "production" : state?.source === "warehouse" ? "warehouse" : "production";
-      const nextStep: FlowStep = mode === "add"
-        ? state?.step === 2 && !invalidAction ? 2 : 1
+      const nextStep: FlowStep = preserveStep && !invalidAction && (state?.step === 3 || state?.step === 4 && nextAction === "rework")
+        ? state.step
+        : mode === "add"
+        ? state?.step !== 1 && validCart && !invalidAction ? 2 : 1
         : nextAction === "rework"
           ? 2
-          : nextAction === "scrap" && state?.step === 2 ? 2 : 1;
+          : nextAction === "scrap" && state?.step !== 1 && validCart ? 2 : 1;
       setDirectAction(nextAction);
       setSource(nextSource);
       setStep(nextStep);
-      if (nextStep === 1) setLines([]);
       if (!validCart || invalidAction || state?.step !== nextStep || state?.directAction !== nextAction || state?.source !== nextSource) {
         window.history.replaceState({ ...(window.history.state ?? {}), defect: "cart", mode, step: nextStep, directAction: nextAction, source: nextSource }, "");
       }
@@ -143,6 +168,7 @@ export function MobileDefectCartFlow({
 
     restore(window.history.state as CartHistoryState);
     function onPop(e: PopStateEvent) {
+      setConfirmOpen(false);
       const state = e.state as CartHistoryState;
       if (state?.defect !== "cart" || state.mode !== mode) {
         setStep(1);
@@ -151,11 +177,11 @@ export function MobileDefectCartFlow({
         setSource("production");
         return;
       }
-      restore(state);
+      restore(state, true);
     }
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [mode]);
+  }, [mode, initialAction, initialSource]);
 
   const isDirect = mode === "scrap";
   const isRework = isDirect && directAction === "rework";
@@ -243,6 +269,7 @@ export function MobileDefectCartFlow({
   function selectSource(nextSource: SourceKind) {
     window.history.replaceState({ ...(window.history.state ?? {}), defect: "cart", mode, step: 1, directAction, source: nextSource }, "");
     setSource(nextSource);
+    if (nextSource !== source) setLines([]);
   }
 
   const lineErrorsByKey = useMemo(
@@ -363,7 +390,7 @@ export function MobileDefectCartFlow({
   if (isDirect && directAction === null) {
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <div className="shrink-0 pb-3"><MobileDefectStepHeader title="작업 선택" context="바로 처리" steps={["작업 선택", "출처 선택", "품목 선택"]} current={0} onBack={onCancel} /></div>
+        <div className="shrink-0 pb-3"><MobileDefectStepHeader title="작업 선택" context="바로 처리" steps={["작업 선택", "출처 선택", "품목 선택", "수량 조정"]} current={0} onBack={onCancel} /></div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="flex min-h-full flex-col gap-2">
             <MobileActionCard
@@ -391,8 +418,8 @@ export function MobileDefectCartFlow({
     );
   }
 
-  const steps = isRework ? ["작업 선택", "품목 선택", "BOM 확인"] : isDirect ? ["작업 선택", "출처 선택", "품목 선택"] : ["출처 선택", "품목 선택"];
-  const current = isRework ? step - 1 : isDirect ? step : step - 1;
+  const steps = isRework ? ["작업 선택", "품목 선택", "수량 조정", "BOM 확인"] : ["작업 선택", "출처 선택", "품목 선택", "수량 조정"];
+  const current = isRework ? step - 1 : step;
   const header = <MobileDefectStepHeader title={steps[current]} context={title} steps={steps} current={current} onBack={goBack} backLabel={step === 1 && !isDirect ? "취소" : "이전"} />;
 
   if (step === 1) {
@@ -415,60 +442,36 @@ export function MobileDefectCartFlow({
             />
           </div>
         </div>
-        <StickyFooter flat compact embedded>
+        <StickyFooter flat compact embedded className="!px-0">
           <PrimaryActionButton label="다음 →" intent="primary" onClick={() => pushStep(2)} />
         </StickyFooter>
       </div>
     );
   }
 
-  if (step === 3 && isRework && selectedReworkLine) {
+  if (step === 4 && isRework && selectedReworkLine) {
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <div className="shrink-0 pb-3">{header}</div>
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="flex flex-col gap-3 pb-3">
-            <SectionCard padding="md">
-              <div className="flex flex-col gap-1">
-                <div className={clsx(TYPO.caption, "font-black")} style={{ color: LEGACY_COLORS.muted2 }}>품목</div>
-                <div className={clsx(TYPO.body, "font-black")} style={{ color: LEGACY_COLORS.text }}>
-                  {selectedReworkLine.item.mes_code} {selectedReworkLine.item.item_name}
-                </div>
-                <div className="flex items-center gap-4 pt-2">
-                  <span className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
-                    처리 수량 <b style={{ color: LEGACY_COLORS.blue }}>{selectedReworkLine.qty}</b>
-                  </span>
-                  <span className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
-                    사유 <b style={{ color: LEGACY_COLORS.text }}>{selectedReworkLine.category}</b>
-                  </span>
-                </div>
-              </div>
-            </SectionCard>
-            <SectionCard title="BOM 재작업 트리" padding="sm">
-              <DisassembleTree
-                mobilePresentation
-                parentItemId={selectedReworkLine.item.item_id}
-                parentItemName={selectedReworkLine.item.item_name}
-                parentMesCode={selectedReworkLine.item.mes_code ?? ""}
-                parentQty={selectedReworkLine.qty}
-                parentDept={source === "warehouse" ? "창고" : itemDepartment(selectedReworkLine.item) ?? "부서 미지정"}
-                decisions={selectedReworkLine.decisions}
-                onChange={(decisions) => updateLine(selectedReworkLine.key, { decisions })}
-              />
-            </SectionCard>
-          </div>
-        </div>
-        <StickyFooter flat compact embedded>
-          <div className={clsx(TYPO.caption, "mb-2 text-center font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
-            격리·폐기를 입력하면 정상 수량이 자동으로 줄어듭니다.
-          </div>
-          <PrimaryActionButton
-            label={busy ? "처리 중..." : `${submitLabel} (${lines.length}건)`}
-            intent="danger"
-            disabled={!allValid || busy}
-            onClick={() => setConfirmOpen(true)}
-          />
-        </StickyFooter>
+        <MobileReworkWorkspace
+          sessionId={selectedReworkLine.key}
+          parentItemId={selectedReworkLine.item.item_id}
+          parentItemName={selectedReworkLine.item.item_name}
+          parentMesCode={selectedReworkLine.item.mes_code ?? ""}
+          parentQty={selectedReworkLine.qty}
+          parentUnit={selectedReworkLine.item.unit ?? "EA"}
+          reason={[selectedReworkLine.category, selectedReworkLine.memo].filter(Boolean).join(" · ")}
+          decisions={selectedReworkLine.decisions}
+          onChange={(decisions) => updateLine(selectedReworkLine.key, { decisions })}
+          sessionRef={reworkSessionRef}
+          context={title}
+          steps={steps}
+          current={current}
+          onBack={goBack}
+          onConfirm={() => setConfirmOpen(true)}
+          busy={busy}
+          canSubmit={allValid}
+          error={failures.find((failure) => failure.key === selectedReworkLine.key)?.message}
+        />
         <ConfirmModal
           className={panelStyles.touchScope}
           open={confirmOpen}
@@ -509,15 +512,11 @@ export function MobileDefectCartFlow({
       </div>
     );
   }
-  return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <div className="shrink-0 pb-3">{header}</div>
-
-      <div className={`flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto ${panelStyles.defectCartBody}`}>
-        <div
-          data-testid="mobile-defect-picker-pane"
-          className="min-h-[320px] flex-[1_0_320px] overflow-hidden"
-        >
+  if (step === 2) {
+    return (
+      <div className="flex h-full min-h-0 min-w-0 flex-col">
+        <div className="shrink-0 pb-2">{header}</div>
+        <div ref={bodyRef} data-testid="mobile-defect-picker-pane" className="min-h-0 min-w-0 flex-1">
           <DefectItemPicker
             loading={itemsLoading}
             loadError={itemsLoadError}
@@ -532,61 +531,63 @@ export function MobileDefectCartFlow({
             onRemove={removeItemById}
           />
         </div>
+        <StickyFooter flat compact embedded className="!px-0">
+          <PrimaryActionButton label={`수량 조정 (${lines.length}건) →`} intent="primary" disabled={lines.length === 0 || busy} onClick={() => pushStep(3)} />
+        </StickyFooter>
+      </div>
+    );
+  }
+  return (
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="shrink-0 pb-2">{header}</div>
 
+      <div ref={bodyRef} className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
         <div
           data-testid="mobile-defect-cart-scroll"
           className="shrink-0"
         >
           {lines.length === 0 ? (
-            <div data-testid="mobile-defect-empty-cart" className="flex min-h-14 flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-[14px] border px-3 py-2" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
-              <span className={clsx(TYPO.body, "font-bold")} style={{ color: LEGACY_COLORS.text }}>{isRework ? "재작업 품목" : "장바구니 0건"}</span>
-              <span className={TYPO.caption} style={{ color: LEGACY_COLORS.muted2 }}>위에서 품목을 추가하세요.</span>
+            <div className="rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+              <p className={TYPO.body}>선택한 품목이 없습니다.</p>
+              <button type="button" className="mt-2 font-bold" style={{ color: LEGACY_COLORS.blue }} onClick={goBack}>품목 선택으로 돌아가기</button>
             </div>
           ) : (
-          <SectionCard title={isRework ? "재작업 품목" : `장바구니 ${lines.length}건`} padding="sm">
               <div className="flex flex-col gap-2">
                 {lines.map((line, idx) => {
                   const fail = failures.find((f) => f.key === line.key);
                   const validationErrors = lineErrorsByKey.get(line.key) ?? [];
+                  const stock = defectSourceStock(line.item, source);
                   return (
                     <div
                       key={line.key}
-                      className="flex flex-col gap-3 border-t py-4"
-                      style={{ background: LEGACY_COLORS.s1, borderColor: fail || validationErrors.length > 0 ? tint(LEGACY_COLORS.red, 30) : LEGACY_COLORS.border }}
+                      className={panelStyles.defectQuantityCard}
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
-                            {line.item.mes_code ?? "(코드 없음)"}
-                          </div>
-                          <div className={clsx(TYPO.body, "[overflow-wrap:anywhere] font-semibold")} style={{ color: LEGACY_COLORS.text }}>
+                      <div className={clsx(panelStyles.defectQuantityRow, quantityCartStyles.cart)}>
+                        <div className={panelStyles.defectQuantityIdentity}>
+                          <div className={clsx(TYPO.body, "[overflow-wrap:anywhere] font-bold")} style={{ color: LEGACY_COLORS.text }}>
                             {line.item.item_name}
                           </div>
-                          <div className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
-                            자동 부서 · {source === "warehouse" ? "창고" : itemDepartment(line.item) ?? "부서 미지정"}
+                          <div className={clsx(TYPO.caption, "mt-1 flex flex-wrap items-center gap-x-2 font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
+                            <span>{line.item.mes_code ?? "(코드 없음)"}</span>
+                            <span>{stock.locationLabel}</span>
                           </div>
+                        </div>
+                        <div className={panelStyles.defectQuantityInput}>
+                          <QuantityStepper value={line.qty} onChange={(n) => updateLine(line.key, { qty: n, decisions: [] })} min={1} disabled={busy} />
+                        </div>
+                        <div className={panelStyles.defectQuantityStock}>
+                          <div><span>가능 재고</span><b style={{ color: stock.available > 0 ? LEGACY_COLORS.green : LEGACY_COLORS.yellow }}>{stock.available.toLocaleString()}</b></div>
+                          <div><span>실행 후</span><b style={{ color: stock.available - line.qty < 0 ? LEGACY_COLORS.red : LEGACY_COLORS.green }}>{(stock.available - line.qty).toLocaleString()}</b></div>
                         </div>
                         <button
                           type="button"
                           onClick={() => removeLine(line.key)}
                           aria-label="삭제"
-                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
-                          style={{ color: LEGACY_COLORS.red, background: tint(LEGACY_COLORS.red, 10) }}
+                          className={clsx(panelStyles.defectQuantityDelete, "flex shrink-0 items-center justify-center rounded-[12px]")}
+                          style={{ color: LEGACY_COLORS.red }}
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
-                      </div>
-
-                      <div className="flex items-center justify-between gap-2">
-                        <span className={clsx(TYPO.caption, "font-black")} style={{ color: LEGACY_COLORS.muted2 }}>
-                          수량
-                        </span>
-                        <Stepper
-                          value={line.qty}
-                          onChange={(n) => updateLine(line.key, { qty: n, decisions: [] })}
-                          min={1}
-                          danger={isScrap || isRework}
-                        />
                       </div>
 
                       {idx < lines.length - 1 && (line.category || line.memo) && !isRework && (
@@ -601,6 +602,7 @@ export function MobileDefectCartFlow({
                       )}
 
                       <ReasonFormFields
+                        mobilePresentation
                         category={line.category}
                         memo={line.memo}
                         onCategoryChange={(c) => updateLine(line.key, { category: c })}
@@ -618,12 +620,6 @@ export function MobileDefectCartFlow({
                         </div>
                       )}
 
-                      {isRework && (
-                        <div className={clsx(TYPO.caption, "rounded-[10px] px-3 py-2 font-bold")} style={{ background: tint(LEGACY_COLORS.yellow, 10), color: LEGACY_COLORS.muted2 }}>
-                          다음 단계에서 BOM 하위 품목을 정상·격리·폐기로 크게 확인합니다.
-                        </div>
-                      )}
-
                       {fail && (
                         <div className={clsx(TYPO.caption, "font-bold")} style={{ color: LEGACY_COLORS.red }}>
                           실패: {fail.message}
@@ -638,27 +634,22 @@ export function MobileDefectCartFlow({
                   );
                 })}
               </div>
-          </SectionCard>
           )}
         </div>
       </div>
 
-      <StickyFooter flat compact embedded>
         {failures.length > 0 ? (
-          <div className={clsx(TYPO.caption, "mb-2 text-center font-bold")} style={{ color: LEGACY_COLORS.red }}>
+          <div className={clsx(TYPO.caption, "text-center font-bold")} style={{ color: LEGACY_COLORS.red }}>
             {failures.length}건 실패 — 남은 줄을 확인 후 다시 제출하세요.
           </div>
-        ) : isRework ? (
-          <div className={clsx(TYPO.caption, "mb-2 text-center font-bold")} style={{ color: LEGACY_COLORS.muted2 }}>
-            정상·격리·폐기 합계가 처리 수량과 같아야 합니다.
-          </div>
         ) : null}
+      <StickyFooter flat compact embedded className="!px-0">
         <PrimaryActionButton
           label={isRework ? "BOM 확인 →" : busy ? "처리 중..." : `${submitLabel} (${lines.length}건)`}
           intent={isScrap || isRework ? "danger" : "primary"}
           disabled={isRework ? !reworkLineReady || busy : !allValid || busy}
           onClick={() => {
-            if (isRework) pushStep(3);
+            if (isRework) pushStep(4);
             else setConfirmOpen(true);
           }}
         />

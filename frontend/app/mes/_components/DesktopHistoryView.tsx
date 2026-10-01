@@ -12,7 +12,7 @@ import { HistoryStatsBar } from "./_history_sections/HistoryStatsBar";
 import { HistoryTable } from "./_history_sections/HistoryTable";
 import type { HistoryTableFocusTarget } from "./_history_sections/HistoryTable";
 import { DesktopHistoryRightPanel } from "./_history_sections/DesktopHistoryRightPanel";
-import { useDesktopHistoryGroups } from "./_hooks/useDesktopHistoryGroups";
+import { useHistoryGroups } from "./_hooks/useHistoryGroups";
 import { useToggleSet } from "./_hooks/useToggleSet";
 import { useMonthlyCountsQuery, useTransactionReferenceSummariesQuery, useTransactionsSummaryQuery } from "@/lib/queries/useTransactionsQuery";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
@@ -169,7 +169,7 @@ export function DesktopHistoryView() {
     [referenceSummaryRows],
   );
 
-  const historyData = useDesktopHistoryGroups({
+  const historyData = useHistoryGroups({
     operations: opParam,
     dateFilter,
     debouncedSearch,

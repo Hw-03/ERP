@@ -12,8 +12,8 @@ vi.mock("@/lib/queries/useTransactionsQuery", () => ({
   useTransactionsSummaryQuery: () => ({ data: null, isLoading: false, refetch: vi.fn() }),
   useTransactionReferenceSummariesQuery: () => ({ data: [], isLoading: false }),
 }));
-vi.mock("../_hooks/useDesktopHistoryGroups", () => ({
-  useDesktopHistoryGroups: () => ({
+vi.mock("../_hooks/useHistoryGroups", () => ({
+  useHistoryGroups: () => ({
     groups: [], setGroups: vi.fn(), loading: false, error: null, retry: vi.fn(),
     loadingMore: false, loadMoreError: null, canLoadMore: false, loadMore: vi.fn(),
   }),

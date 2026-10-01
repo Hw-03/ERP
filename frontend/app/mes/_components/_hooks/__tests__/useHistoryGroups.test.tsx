@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { useDesktopHistoryGroups } from "../useDesktopHistoryGroups";
+import { useHistoryGroups } from "../useHistoryGroups";
 
 function makeResponse(body: unknown, ok = true): Response {
   return {
@@ -48,17 +48,17 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("useDesktopHistoryGroups", () => {
+describe("useHistoryGroups", () => {
   it.each([{ groups: [] }, { groups: [makeGroup(0)] }])("keeps cached data on a failed stale remount", async ({ groups }) => {
     globalThis.fetch = vi.fn().mockResolvedValue(makeResponse({ groups, next_cursor: null, has_more: false })) as unknown as typeof fetch;
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const wrapper = makeWrapper(client);
-    const first = renderHook(() => useDesktopHistoryGroups(baseArgs), { wrapper });
+    const first = renderHook(() => useHistoryGroups(baseArgs), { wrapper });
     await waitFor(() => expect(first.result.current.loading).toBe(false));
     first.unmount();
     await client.invalidateQueries();
     globalThis.fetch = vi.fn().mockRejectedValue(new Error("refresh offline")) as unknown as typeof fetch;
-    const next = renderHook(() => useDesktopHistoryGroups(baseArgs), { wrapper, reactStrictMode: true });
+    const next = renderHook(() => useHistoryGroups(baseArgs), { wrapper, reactStrictMode: true });
     expect(next.result.current.loading).toBe(false);
     expect(next.result.current.groups).toEqual(groups);
     await waitFor(() => expect(next.result.current.refreshError).toContain("API 연결에 실패했습니다"));
@@ -70,7 +70,7 @@ describe("useDesktopHistoryGroups", () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
     const { result } = renderHook(
-      () => useDesktopHistoryGroups({ ...baseArgs, selectedMonth: { year: 2026, month: 7 } }),
+      () => useHistoryGroups({ ...baseArgs, selectedMonth: { year: 2026, month: 7 } }),
       { wrapper: makeWrapper(client) },
     );
 
@@ -88,12 +88,12 @@ describe("useDesktopHistoryGroups", () => {
     });
     const wrapper = makeWrapper(client);
 
-    const firstMount = renderHook(() => useDesktopHistoryGroups(baseArgs), { wrapper });
+    const firstMount = renderHook(() => useHistoryGroups(baseArgs), { wrapper });
     await waitFor(() => expect(firstMount.result.current.loading).toBe(false));
     expect(firstMount.result.current.groups).toEqual(page.groups);
     firstMount.unmount();
 
-    const secondMount = renderHook(() => useDesktopHistoryGroups(baseArgs), { wrapper });
+    const secondMount = renderHook(() => useHistoryGroups(baseArgs), { wrapper });
 
     expect(secondMount.result.current.loading).toBe(false);
     expect(secondMount.result.current.groups).toEqual(page.groups);
@@ -118,7 +118,7 @@ describe("useDesktopHistoryGroups", () => {
       defaultOptions: { queries: { retry: false, staleTime: 30_000, gcTime: 30 * 60_000 } },
     });
     const { result, rerender } = renderHook(
-      ({ realtimeRevision }) => useDesktopHistoryGroups({ ...baseArgs, realtimeRevision }),
+      ({ realtimeRevision }) => useHistoryGroups({ ...baseArgs, realtimeRevision }),
       { initialProps: { realtimeRevision: 1 }, wrapper: makeWrapper(client) },
     );
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
@@ -145,7 +145,7 @@ describe("useDesktopHistoryGroups", () => {
 
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
     const { result, rerender } = renderHook(
-      ({ realtimeRevision }) => useDesktopHistoryGroups({ ...baseArgs, realtimeRevision }),
+      ({ realtimeRevision }) => useHistoryGroups({ ...baseArgs, realtimeRevision }),
       { initialProps: { realtimeRevision: 1 }, wrapper: makeWrapper(client) },
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
@@ -174,7 +174,7 @@ describe("useDesktopHistoryGroups", () => {
 
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
     const { result, rerender } = renderHook(
-      ({ realtimeRevision }) => useDesktopHistoryGroups({ ...baseArgs, realtimeRevision }),
+      ({ realtimeRevision }) => useHistoryGroups({ ...baseArgs, realtimeRevision }),
       { initialProps: { realtimeRevision: 1 }, wrapper: makeWrapper(client) },
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
@@ -226,7 +226,7 @@ describe("useDesktopHistoryGroups", () => {
       defaultOptions: { queries: { retry: false, staleTime: 30_000, gcTime: 0 } },
     });
     const { result, rerender } = renderHook(
-      ({ realtimeRevision }) => useDesktopHistoryGroups({ ...baseArgs, realtimeRevision }),
+      ({ realtimeRevision }) => useHistoryGroups({ ...baseArgs, realtimeRevision }),
       { initialProps: { realtimeRevision: 1 }, wrapper: makeWrapper(client) },
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
@@ -260,7 +260,7 @@ describe("useDesktopHistoryGroups", () => {
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
 
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-    const { result } = renderHook(() => useDesktopHistoryGroups(baseArgs), { wrapper: makeWrapper(client) });
+    const { result } = renderHook(() => useHistoryGroups(baseArgs), { wrapper: makeWrapper(client) });
     await waitFor(() => expect(result.current.loading).toBe(false));
     await act(async () => result.current.loadMore());
     expect(result.current.groups).toEqual([makeGroup(0), makeGroup(1)]);
@@ -286,7 +286,7 @@ describe("useDesktopHistoryGroups", () => {
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
 
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-    const { result } = renderHook(() => useDesktopHistoryGroups(baseArgs), { wrapper: makeWrapper(client) });
+    const { result } = renderHook(() => useHistoryGroups(baseArgs), { wrapper: makeWrapper(client) });
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.groups).toHaveLength(100);
@@ -309,7 +309,7 @@ describe("useDesktopHistoryGroups", () => {
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
 
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-    const { result } = renderHook(() => useDesktopHistoryGroups(baseArgs), { wrapper: makeWrapper(client) });
+    const { result } = renderHook(() => useHistoryGroups(baseArgs), { wrapper: makeWrapper(client) });
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     await act(async () => result.current.loadMore());
@@ -332,7 +332,7 @@ describe("useDesktopHistoryGroups", () => {
 
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
     const { result, rerender } = renderHook(
-      ({ department }) => useDesktopHistoryGroups({ ...baseArgs, department }),
+      ({ department }) => useHistoryGroups({ ...baseArgs, department }),
       { initialProps: { department: "" }, wrapper: makeWrapper(client) },
     );
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
@@ -358,7 +358,7 @@ describe("useDesktopHistoryGroups", () => {
 
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
     const { result, rerender } = renderHook(
-      ({ department, realtimeRevision }) => useDesktopHistoryGroups({ ...baseArgs, department, realtimeRevision }),
+      ({ department, realtimeRevision }) => useHistoryGroups({ ...baseArgs, department, realtimeRevision }),
       { initialProps: { department: "", realtimeRevision: 1 }, wrapper: makeWrapper(client) },
     );
     await waitFor(() => expect(result.current.loading).toBe(false));

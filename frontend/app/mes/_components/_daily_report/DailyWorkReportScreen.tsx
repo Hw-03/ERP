@@ -43,9 +43,9 @@ function Failure({ message, onRetry }: { message: string; onRetry?: () => void }
   );
 }
 
-function PanelPlaceholder({ title }: { title: string }) {
+function PanelPlaceholder({ title, mobile = false }: { title: string; mobile?: boolean }) {
   return (
-    <div className="flex min-h-[260px] rounded-[20px] border lg:flex-1" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
+    <div className={`flex min-h-[260px] rounded-[20px] border ${mobile ? "flex-1" : "lg:flex-1"}`} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
       <EmptyState illustrated className="flex-1" title={title} description="" />
     </div>
   );
@@ -284,8 +284,8 @@ export function DailyWorkReportScreen({
   const keepActivity = mobile && activityQuery.data !== undefined;
 
   return (
-    <div className={mobile ? "min-w-0" : "min-h-0 min-w-0 flex-1 overflow-y-auto px-3 py-3 lg:flex lg:flex-col lg:overflow-hidden lg:px-0 lg:py-0 lg:pr-4"} style={mobile ? { background: LEGACY_COLORS.bg } : undefined}>
-      <div className={`scrollbar-hide flex w-full flex-col gap-3 ${mobile ? "" : "pb-6"} lg:min-h-0 lg:flex-1 lg:pb-0 ${!isActivityDetailOpen ? "lg:overflow-hidden" : "lg:overflow-y-auto"}`}>
+    <div className={mobile ? "flex min-h-full min-w-0 flex-col" : "min-h-0 min-w-0 flex-1 overflow-y-auto px-3 py-3 lg:flex lg:flex-col lg:overflow-hidden lg:px-0 lg:py-0 lg:pr-4"} style={mobile ? { background: LEGACY_COLORS.bg } : undefined}>
+      <div className={`scrollbar-hide flex w-full flex-col gap-3 ${mobile ? "flex-1" : "pb-6"} lg:min-h-0 lg:flex-1 lg:pb-0 ${!isActivityDetailOpen ? "lg:overflow-hidden" : "lg:overflow-y-auto"}`}>
         {!onTopbarControlsChange && <header className={mobile ? "rounded-[20px] border p-3" : "rounded-[20px] border p-4 lg:shrink-0 lg:px-5 lg:py-2.5"} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
           <div className={mobile ? "flex flex-col items-center gap-2" : "flex flex-wrap items-center gap-3"}>
             <div className={mobile ? "contents" : "flex min-h-11 items-center gap-3"}>
@@ -319,11 +319,11 @@ export function DailyWorkReportScreen({
             </div>
             {reportsQuery.isError && <div className="mt-4"><Failure message="작성자 목록을 불러오지 못했습니다." onRetry={mobile ? () => void reportsQuery.refetch() : undefined} /></div>}
             {(!reportsQuery.isError || keepAuthors) && (
-              <div ref={authorChipsRef} data-testid="daily-work-report-author-chips" className="mt-4 flex flex-wrap gap-2 lg:max-h-36 lg:overflow-y-auto lg:pr-1" style={{ minHeight: mobile && authorsLoading ? authorSkeletonLayout?.height : undefined }}>
+              <div ref={authorChipsRef} data-testid="daily-work-report-author-chips" className={`mt-4 gap-2 ${mobile ? "grid grid-cols-4" : "flex flex-wrap lg:max-h-36 lg:overflow-y-auto lg:pr-1"}`} style={{ minHeight: mobile && authorsLoading ? authorSkeletonLayout?.height : undefined }}>
                 {authorsLoading && (mobile ? <div role="status" aria-busy="true" aria-label="작성자 목록 불러오는 중" className="contents">
                   {(authorSkeletonLayout?.chips ?? [{ width: 160, height: 44 }]).map((chip, index) => <span key={index} aria-hidden="true" className="max-w-full shrink-0 rounded-[12px]" style={{ ...chip, background: LEGACY_COLORS.s2 }} />)}
                 </div> : <div role="status" aria-busy="true" aria-label="작성자 목록 불러오는 중" className="h-11 w-40 rounded-[12px] motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s2 }} />)}
-                {!authorsLoading && (!reportsQuery.isError || keepAuthors) && reports.length === 0 && <p className="rounded-[14px] border px-3 py-3 text-sm font-medium" style={{ color: LEGACY_COLORS.muted2, borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>작성된 일보가 없습니다.</p>}
+                {!authorsLoading && (!reportsQuery.isError || keepAuthors) && reports.length === 0 && <p className="col-span-full rounded-[14px] border px-3 py-3 text-sm font-medium" style={{ color: LEGACY_COLORS.muted2, borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2 }}>작성된 일보가 없습니다.</p>}
                 {reports.map((entry) => {
                   const selected = selectedEmployeeId === entry.employee_id;
                   const departmentColor = getDepartmentFallbackColor(entry.department);
@@ -335,8 +335,8 @@ export function DailyWorkReportScreen({
                       preferredEmployeeIdRef.current = entry.employee_id;
                       setSelectedEmployeeId(entry.employee_id);
                       setIsActivityDetailOpen(false);
-                    }, "저장하지 않은 내용이 있습니다. 직원을 바꾸면 작성 중인 일보가 사라집니다.")} className="min-h-11 rounded-[12px] border px-3 text-left text-sm font-bold transition active:scale-[0.98]" style={{ color: selected ? LEGACY_COLORS.white : LEGACY_COLORS.text, borderColor: `color-mix(in srgb, ${departmentColor} ${selected ? 60 : 35}%, transparent)`, background: selected ? departmentColor : `color-mix(in srgb, ${departmentColor} 12%, transparent)` }}>
-                      <span>{entry.employee_name}</span><span className="ml-1.5 text-xs font-medium" style={{ color: selected ? LEGACY_COLORS.white : departmentColor }}>{entry.department}</span>
+                    }, "저장하지 않은 내용이 있습니다. 직원을 바꾸면 작성 중인 일보가 사라집니다.")} className={`min-h-11 rounded-[12px] border text-sm font-bold transition active:scale-[0.98] ${mobile ? "flex min-w-0 flex-col items-center justify-center px-1 py-1.5 [overflow-wrap:anywhere]" : "px-3 text-left"}`} style={{ color: selected ? LEGACY_COLORS.white : LEGACY_COLORS.text, borderColor: `color-mix(in srgb, ${departmentColor} ${selected ? 60 : 35}%, transparent)`, background: selected ? departmentColor : `color-mix(in srgb, ${departmentColor} 12%, transparent)` }}>
+                      <span>{entry.employee_name}</span><span className={`${mobile ? "" : "ml-1.5"} text-xs font-medium`} style={{ color: selected ? LEGACY_COLORS.white : departmentColor }}>{entry.department}</span>
                     </button>
                   );
                 })}
@@ -346,7 +346,7 @@ export function DailyWorkReportScreen({
         )}
 
         {targetEmployeeId ? (
-          <div key={mobile ? editorResetKey : tab === "all" ? targetEmployeeId : "mine"} data-testid="daily-work-report-result" role={initialContentLoading ? "status" : undefined} aria-busy={initialContentLoading || undefined} aria-label={initialContentLoading ? "일일 작업 일보 불러오는 중" : undefined} className={`min-w-0 space-y-3 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:gap-3 lg:space-y-0 ${!mobile && tab === "all" && selectedEmployeeId ? "animate-view-fade" : ""}`}>
+          <div key={mobile ? editorResetKey : tab === "all" ? targetEmployeeId : "mine"} data-testid="daily-work-report-result" role={initialContentLoading ? "status" : undefined} aria-busy={initialContentLoading || undefined} aria-label={initialContentLoading ? "일일 작업 일보 불러오는 중" : undefined} className={`min-w-0 ${mobile ? "flex flex-1 flex-col gap-3" : "space-y-3"} lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:gap-3 lg:space-y-0 ${!mobile && tab === "all" && selectedEmployeeId ? "animate-view-fade" : ""}`}>
               {reportLoadFailed && <Failure message="일보를 불러오지 못했습니다." onRetry={mobile ? () => void (tab === "mine" ? reportQuery.refetch() : selectedReportQuery.refetch()) : undefined} />}
               {activityQuery.isError && <Failure message="MES 거래를 불러오지 못했습니다." onRetry={mobile ? () => void activityQuery.refetch() : undefined} />}
               {(!activityQuery.isError || keepActivity) && <DailyWorkActivity activity={activityQuery.data} loading={activityQuery.isLoading} onDetailOpenChange={setIsActivityDetailOpen} mobile={mobile} />}
@@ -369,7 +369,7 @@ export function DailyWorkReportScreen({
               mobile={mobile}
               />
           </div>
-        ) : tab === "all" ? <PanelPlaceholder title="작성한 직원을 선택하세요." /> : null}
+        ) : tab === "all" ? <PanelPlaceholder title="작성한 직원을 선택하세요." mobile={mobile} /> : null}
       </div>
     </div>
   );

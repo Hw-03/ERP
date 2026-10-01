@@ -9,6 +9,7 @@ import { matchesSearchText } from "@/lib/searchText";
 import { Button } from "@/lib/ui/Button";
 import { EmptyState } from "../common/EmptyState";
 import { SkeletonBlock, dataRevealClassName } from "../common/LoadingSkeleton";
+import scrollStyles from "../mobile/primitives/MobileScrollFrame.module.css";
 
 type SupplierPickerStepProps = {
   employeeId: string;
@@ -218,7 +219,7 @@ export function SupplierPickerStep({
       )}
 
       <div data-supplier-scroll-shell={compact ? "" : undefined} className={compact ? "relative min-h-0 flex-1 rounded-[20px]" : "flex min-h-0 flex-1 flex-col overflow-y-auto rounded-[16px] border p-2 "} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-        <div data-supplier-scroll-viewport={compact ? "" : undefined} data-keep-scroll={compact ? true : undefined} className={compact ? "absolute inset-y-0 left-0 -right-2.5 overflow-x-hidden overflow-y-auto [scrollbar-gutter:stable]" : "contents"} style={compact ? { overscrollBehavior: "contain" } : undefined}>
+        <div data-supplier-scroll-viewport={compact ? "" : undefined} data-keep-scroll={compact ? true : undefined} className={compact ? scrollStyles.viewport : "contents"} style={compact ? { overscrollBehavior: "contain" } : undefined}>
         {loading || (variant === "mobile" && loadedEmployeeRef.current !== employeeId && !error) ? variant === "mobile" ? (
           <div role="status" aria-label="공급업체 목록 불러오는 중" aria-busy="true">
             <span className="sr-only">공급업체 목록 불러오는 중</span>

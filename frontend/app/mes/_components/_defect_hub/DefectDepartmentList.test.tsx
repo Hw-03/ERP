@@ -81,7 +81,51 @@ describe("DefectDepartmentList", () => {
     fireEvent.click(row);
     expect(screen.getByRole("button", { name: "여러 건 선택" })).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "처리" })).toHaveLength(2);
-    expect(within(screen.getAllByRole("article", { name: "AX-100 격리 기록" })[0]).getByText("AX-100")).toBeInTheDocument();
+    const records = screen.getAllByRole("article", { name: "AX-100 격리 기록" });
+    expect(records).toHaveLength(2);
+    expect(within(records[0]).queryByText("AX-100")).not.toBeInTheDocument();
+    expect(within(records[0]).queryByText("AX-001")).not.toBeInTheDocument();
+    expect(within(records[0]).getByText("격리 수량")).toBeInTheDocument();
+    expect(within(records[0]).getByText("김길호")).toBeInTheDocument();
+    expect(within(records[0]).getByText("dimension")).toBeInTheDocument();
+    expect(within(records[0]).getByText("left bracket scratched")).toBeInTheDocument();
+    expect(within(records[0]).getByRole("button", { name: "이력 보기" })).toBeInTheDocument();
+    expect(within(records[0]).getByRole("button", { name: "처리" })).toBeInTheDocument();
+  });
+
+  it("shows mobile record selection in the record header", () => {
+    render(<DefectDepartmentList mobilePresentation locations={[
+      makeLocation({ record_id: "first" }),
+      makeLocation({ record_id: "second", defective_at: "2026-07-02T00:00:00Z" }),
+    ]} onProcess={vi.fn()} onBatchProcess={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /AX-100.*격리 2건/ }));
+    fireEvent.click(screen.getByRole("button", { name: "여러 건 선택" }));
+
+    const first = screen.getAllByRole("article", { name: "AX-100 격리 기록" })[0];
+    const header = within(first).getByTestId("defect-mobile-record-header");
+    expect(within(header).getByRole("checkbox")).toBeInTheDocument();
+    expect(within(header).queryByText("선택")).not.toBeInTheDocument();
+    expect(within(header).getByText("격리 수량")).toBeInTheDocument();
+  });
+
+  it("keeps mobile storage records and their actions readable without repeating the item identity", () => {
+    const onMoveToStorage = vi.fn();
+    const onProcess = vi.fn();
+    render(<DefectDepartmentList mobilePresentation storageMode locations={[
+      makeLocation({ management_category: "B_GRADE", reason_category: "긴 격리 사유", reason_memo: "첫째 줄\n둘째 줄" }),
+    ]} onMoveToStorage={onMoveToStorage} onProcess={onProcess} currentEmployee={currentEmployee} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /AX-100.*격리 1건/ }));
+    const record = screen.getByRole("article", { name: "AX-100 격리 기록" });
+    expect(within(record).queryByText("AX-100")).not.toBeInTheDocument();
+    expect(within(record).getByText("B급")).toBeInTheDocument();
+    expect(within(record).getByText("긴 격리 사유")).toBeInTheDocument();
+    expect(within(record).getByText(/첫째 줄\s*둘째 줄/)).toBeInTheDocument();
+    fireEvent.click(within(record).getByRole("button", { name: "분류 변경" }));
+    fireEvent.click(within(record).getByRole("button", { name: "정상 복귀" }));
+    expect(onMoveToStorage).toHaveBeenCalledWith(expect.objectContaining({ record_id: "record-1" }));
+    expect(onProcess).toHaveBeenCalledWith(expect.objectContaining({ record_id: "record-1" }));
   });
 
   it("storage mode reuses memo actions and expands same-item records without the long-quarantine warning", () => {

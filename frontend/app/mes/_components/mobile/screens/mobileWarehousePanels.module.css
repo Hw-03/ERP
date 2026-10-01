@@ -96,19 +96,80 @@
   letter-spacing: 0;
 }
 
-@media (max-height: 600px) {
-  div.defectCartBody {
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
+.composeScope [data-io-confirm] { gap: 8px; }
+.composeScope [data-io-confirm-actions] {
+  padding-top: 0;
+  padding-left: 12px;
+  padding-right: 12px;
+}
 
-  .defectCartBody > [data-testid="mobile-defect-picker-pane"] {
-    flex: none;
-    height: 320px;
-  }
+.defectQuantityCard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--c-border);
+  border-radius: 20px;
+  background: var(--c-s1);
+}
 
-  .defectCartBody > [data-testid="mobile-defect-cart-scroll"] {
-    max-height: none;
-    overflow: visible;
+.defectQuantityRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 100px 56px 24px;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.defectQuantityIdentity {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.defectQuantityInput {
+  min-width: 0;
+}
+
+.defectQuantityStock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--c-muted2);
+  overflow-wrap: anywhere;
+}
+
+.defectQuantityStock > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.defectQuantityStock b {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.defectQuantityDelete {
+  /* 입출고 수량 행과 같은 밀도로 표시하는 삭제 조작. */
+  width: 24px;
+  min-width: 24px !important;
+  height: 32px;
+  min-height: 32px !important;
+}
+
+@media (max-width: 360px) {
+  .defectQuantityCard { padding: 12px; }
+  .defectQuantityIdentity {
+    grid-column: 1 / 4;
+  }
+  .defectQuantityInput { grid-column: 2; grid-row: 2; }
+  .defectQuantityStock { grid-column: 3; grid-row: 2; }
+  .defectQuantityDelete {
+    grid-column: 4;
+    grid-row: 1 / 3;
   }
 }

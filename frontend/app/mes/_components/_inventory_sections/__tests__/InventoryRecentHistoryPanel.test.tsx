@@ -179,4 +179,28 @@ describe("InventoryRecentHistoryPanel", () => {
     render(<InventoryRecentHistoryPanel item={makeItem()} />);
     expect(screen.getByText("최근 입출고 내역이 없습니다.")).toBeInTheDocument();
   });
+
+  it("모바일도 같은 품목·건수로 조회하고 계산 불가 사유는 펼칠 수 있다", () => {
+    const log = makeLog({ request_order_stock: { status: "unavailable", reason: "ambiguous_order", warehouse_qty_before: null, warehouse_qty_after: null, department_qty_before: null, department_qty_after: null } });
+    testState.queryResult.data.items = [makeOperation({ matchingLines: [{ ...makeOperation().matchingLines[0], historyLog: log }] })];
+    const { container } = render(<InventoryRecentHistoryPanel item={makeItem()} mobilePresentation />);
+    expect(testState.queryArgs).toEqual([{ itemId: "item-1", limit: 5 }]);
+    expect(testState.legacyQueryArgs).toEqual([{ itemId: "item-1", unlinkedOnly: true, limit: 5 }]);
+    expect(container.querySelector("details > summary")).toHaveTextContent("계산 불가 · 사유 보기");
+  });
+
+  it("모바일 로딩과 실패 후 재시도·빈 상태를 표시한다", () => {
+    testState.queryResult.isLoading = true;
+    const view = render(<InventoryRecentHistoryPanel item={makeItem()} mobilePresentation />);
+    expect(screen.queryByText("최근 입출고 내역이 없습니다.")).not.toBeInTheDocument();
+    testState.queryResult.isLoading = false;
+    testState.legacyQueryResult.isError = true;
+    view.rerender(<InventoryRecentHistoryPanel item={makeItem()} mobilePresentation />);
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(testState.queryResult.refetch).toHaveBeenCalledOnce();
+    expect(testState.legacyQueryResult.refetch).toHaveBeenCalledOnce();
+    testState.legacyQueryResult.isError = false;
+    view.rerender(<InventoryRecentHistoryPanel item={makeItem()} mobilePresentation />);
+    expect(screen.getByText("최근 입출고 내역이 없습니다.")).toBeInTheDocument();
+  });
 });

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { Item } from "../types";
 import { IoTargetPicker } from "../IoTargetPicker";
+import scrollStyles from "../../mobile/primitives/MobileScrollFrame.module.css";
 
 vi.mock("../useItemOrderDrag", () => ({
   useItemOrderDrag: () => ({
@@ -57,7 +58,8 @@ describe("IoTargetPicker responsive layout", () => {
     const viewport = container.querySelector<HTMLElement>("[data-keep-scroll]")!;
     const surface = viewport.parentElement!;
 
-    expect(viewport).toHaveClass("-right-2.5", "[scrollbar-gutter:stable]");
+    expect(viewport).toHaveClass(scrollStyles.viewport);
+    expect(viewport).not.toHaveClass("-right-2.5");
     expect(surface).not.toHaveClass("overflow-hidden");
     expect(surface.querySelector('[aria-hidden="true"]')).not.toHaveClass("hidden");
   });

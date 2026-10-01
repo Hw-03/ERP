@@ -342,6 +342,20 @@ describe("MobileShell layout", () => {
     expect(setAuditScreen).toHaveBeenLastCalledWith({ key: "mobile.warehouse", label: "입출고" });
   });
 
+  it.each([
+    { defect: "work-choice", action: "add", source: "warehouse" },
+    { defect: "cart", mode: "add", step: 2, source: "warehouse" },
+    { defect: "list" },
+  ])("다른 탭에서 불량으로 돌아오면 $defect 대신 첫 메뉴로 진입한다", (historyState) => {
+    render(<MobileShell />);
+    fireEvent.click(screen.getByRole("button", { name: "불량" }));
+    window.history.replaceState(historyState, "");
+    fireEvent.click(screen.getByRole("button", { name: "내역" }));
+    fireEvent.click(screen.getByRole("button", { name: "불량" }));
+    expect(window.history.state).toEqual({ defect: "hub" });
+    expect(screen.getByTestId("defect-screen-state")).toHaveTextContent("hub");
+  });
+
   it("returns an active defect tab to the hub and clears an in-progress cart history state", () => {
     render(<MobileShell />);
 

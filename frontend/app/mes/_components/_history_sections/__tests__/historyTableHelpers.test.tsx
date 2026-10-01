@@ -287,7 +287,7 @@ describe("HistoryTable server groups", () => {
       />,
     );
 
-    const help = screen.getByLabelText("재고 변동 계산 기준");
+    const help = screen.getByLabelText("수량 변동 계산 기준");
     fireEvent.focus(help);
     expect(await screen.findByRole("tooltip")).toHaveTextContent("요청 시각 순서로 계산");
     expect(screen.getByRole("tooltip")).toHaveTextContent("승인되면 과거 표시도 변경");
@@ -738,7 +738,7 @@ describe("history table helper rendering policies", () => {
     expect(itemCodeHeader.style.width).toBe("144px");
     expect(itemCodeHeader).not.toHaveAttribute("colspan");
     expect(screen.queryByRole("columnheader", { name: "흐름" })).not.toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "재고 변동" }).style.width).toBe("220px");
+    expect(screen.getByRole("columnheader", { name: "수량 변동" }).style.width).toBe("220px");
     const statusHeader = screen.getByRole("columnheader", { name: "담당자" });
     expect(statusHeader.style.width).toBe("132px");
     expect(statusHeader).toHaveClass("text-center");
@@ -844,7 +844,7 @@ describe("history table helper rendering policies", () => {
     expect(screen.getByRole("columnheader", { name: "작업" }).style.width).toBe("184px");
     expect(screen.queryByRole("columnheader", { name: "흐름" })).not.toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "품목코드" }).style.width).toBe("144px");
-    expect(screen.getByRole("columnheader", { name: "재고 변동" }).style.width).toBe("220px");
+    expect(screen.getByRole("columnheader", { name: "수량 변동" }).style.width).toBe("220px");
     const statusHeader = screen.getByRole("columnheader", { name: "담당자" });
     expect(statusHeader.style.width).toBe("132px");
     expect(statusHeader).toHaveClass("text-center");

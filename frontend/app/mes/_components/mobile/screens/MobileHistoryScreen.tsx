@@ -13,7 +13,7 @@ import { HistoryCalendarPanel } from "../../_history_sections/HistoryCalendarPan
 import { HistoryStatsBar } from "../../_history_sections/HistoryStatsBar";
 import { HistoryDetailPanel } from "../../_history_sections/HistoryDetailPanel";
 import { HistoryBatchDetailPanel } from "../../_history_sections/HistoryBatchDetailPanel";
-import { useHistoryData } from "../../_hooks/useHistoryData";
+import { useHistoryGroups } from "../../_hooks/useHistoryGroups";
 import { useToggleSet } from "../../_hooks/useToggleSet";
 import { useMonthlyCountsQuery } from "@/lib/queries/useTransactionsQuery";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
@@ -21,11 +21,14 @@ import { invalidateOperationalQueries, useRealtimeRevision } from "@/lib/queries
 import { toDateKey, formatHistoryDate } from "../../_history_sections/historyFormat";
 import { type HistorySelection } from "../../_history_sections/historyConstants";
 import { resolveHistoryDateRange, type SelectedHistoryMonth } from "../../_history_sections/historyQuery";
+import { getAdditionalDistinctItemCount, getHistoryGroupSummary, toHistoryLogGroups } from "../../_history_sections/historyTableHelpers";
+import { queryKeys } from "@/lib/queries/keys";
 import { MobileHistoryList } from "../history/MobileHistoryList";
 import { MobileScrollFrame } from "../primitives/MobileScrollFrame";
 import detailStyles from "../../_history_sections/HistoryMobileDetail.module.css";
 import { ReadFailure } from "../../common/ReadState";
 import {
+  mergeHistoryLogUpdate,
   advanceHistoryLoadReconcileState,
   applyHistoryCancellation,
   reconcileHistorySelection,
@@ -77,7 +80,16 @@ export function MobileHistoryScreen() {
 
   const [selection, setSelection] = useState<HistorySelection | null>(null);
   const [selectionStack, setSelectionStack] = useState<HistorySelection[]>([]);
-  const [batchCache, setBatchCache] = useState<Map<string, IoBatch>>(new Map());
+  const [batchCache, setBatchCacheState] = useState<Map<string, IoBatch>>(() => queryClient.getQueryData<Map<string, IoBatch>>(queryKeys.transactions.batchCache()) ?? new Map());
+
+  const batchCacheRef = useRef(batchCache);
+  batchCacheRef.current = batchCache;
+  const setBatchCache = useCallback((update: React.SetStateAction<Map<string, IoBatch>>) => {
+    const next = typeof update === "function" ? update(batchCacheRef.current) : update;
+    batchCacheRef.current = next;
+    queryClient.setQueryData(queryKeys.transactions.batchCache(), next);
+    setBatchCacheState(next);
+  }, [queryClient]);
 
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [calendarLogs, setCalendarLogs] = useState<TransactionLog[]>([]);
@@ -127,7 +139,7 @@ export function MobileHistoryScreen() {
   const summaryChanged = summaryConditionsRef.current !== summaryConditionsKey;
   const currentSummary = summaryChanged ? null : summary;
 
-  const historyData = useHistoryData({
+  const historyData = useHistoryGroups({
     operations: opParam,
     dateFilter,
     debouncedSearch,
@@ -135,21 +147,24 @@ export function MobileHistoryScreen() {
     selectedMonth,
     department: deptParam,
     model: modelParam,
-    totalCount: currentSummary?.total ?? null,
     realtimeRevision,
   });
   const {
-    logs,
-    setLogs,
+    groups: serverGroups,
+    setGroups,
     loading,
     error: historyError,
     retry,
     refreshError,
     retryRefresh,
     loadingMore,
+    loadMoreError,
     canLoadMore,
     loadMore,
+    refreshLoaded,
   } = historyData;
+  const logs = useMemo(() => serverGroups.flatMap((group) => group.logs), [serverGroups]);
+  const displayGroups = useMemo(() => toHistoryLogGroups(serverGroups), [serverGroups]);
   const loadReconcileRef = useRef<HistoryLoadReconcileState>({
     wasLoading: loading,
     loadingLogs: loading ? logs : null,
@@ -232,13 +247,13 @@ export function MobileHistoryScreen() {
   const todayKey = toDateKey(new Date().toISOString());
 
   useEffect(() => {
-    const transactionTypes = opParam || undefined;
+    const operationKeys = opParam || undefined;
     const { dateFrom, dateTo } = selectedDateRange;
     const searchParam = debouncedSearch.trim() || undefined;
     const department = deptParam || undefined;
     const model = modelParam || undefined;
     const conditionsKey = JSON.stringify([
-      transactionTypes ?? null,
+      operationKeys ?? null,
       dateFrom ?? null,
       dateTo ?? null,
       searchParam ?? null,
@@ -258,7 +273,7 @@ export function MobileHistoryScreen() {
     const ctrl = new AbortController();
     void productionApi
       .getTransactionsSummary(
-        { transactionTypes, dateFrom, dateTo, search: searchParam, department, model },
+        { operationKeys, dateFrom, dateTo, search: searchParam, department, model },
         { signal: ctrl.signal },
       )
       .then((s) => {
@@ -342,11 +357,12 @@ export function MobileHistoryScreen() {
   }, [historyError, loading, logs, selection]);
 
   function applyCancellationUpdate(updated: TransactionLog, batchId?: string | null) {
-    setLogs((currentLogs) => applyHistoryCancellation(
-      { logs: currentLogs, selection: null, batchCache: new Map() },
-      updated,
-      batchId,
-    ).logs);
+    setGroups((currentGroups) => currentGroups.map((group) => ({
+      ...group,
+      logs: applyHistoryCancellation(
+        { logs: group.logs, selection: null, batchCache: new Map() }, updated, batchId,
+      ).logs,
+    })));
     setSelection((currentSelection) => applyHistoryCancellation(
       { logs: [], selection: currentSelection, batchCache: new Map() },
       updated,
@@ -368,6 +384,7 @@ export function MobileHistoryScreen() {
       }),
     );
     void invalidateOperationalQueries(queryClient);
+    refreshLoaded();
   }
 
   function handleLogUpdated(updated: TransactionLog) {
@@ -375,7 +392,11 @@ export function MobileHistoryScreen() {
       applyCancellationUpdate(updated, updated.operation_batch_id);
       return;
     }
-    setLogs((prev) => prev.map((l) => (l.log_id === updated.log_id ? updated : l)));
+    setGroups((currentGroups) => currentGroups.map((group) => ({
+      ...group, logs: group.logs.map((log) => log.log_id === updated.log_id ? mergeHistoryLogUpdate(log, updated) : log),
+    })));
+    void queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
+    refreshLoaded();
     setSelection({ kind: "log", log: updated });
   }
 
@@ -391,11 +412,15 @@ export function MobileHistoryScreen() {
   }
 
   function handleSelectBatch(batchId: string, batchLogs: TransactionLog[]) {
+    const group = displayGroups.find((value) => value.type !== "solo" &&
+      (value.type === "operation" ? value.operationId : value.type === "op_batch" ? value.batchId : value.type === "batch" ? value.refKey : value.key) === batchId);
+    const primary = group ? getHistoryGroupSummary(group, group.type === "op_batch" ? batchCache.get(group.batchId) : undefined).primaryLog : batchLogs[0];
+    const selectedLogs = primary ? [primary, ...batchLogs.filter((log) => log.log_id !== primary.log_id)] : batchLogs;
     setSelectionStack([]);
     setSelection((c) =>
       c?.kind === "batch" && c.batchId === batchId
         ? null
-        : { kind: "batch", batchId, logs: batchLogs },
+        : { kind: "batch", batchId, logs: selectedLogs, groupType: group?.type === "solo" ? undefined : group?.type },
     );
   }
 
@@ -484,13 +509,16 @@ export function MobileHistoryScreen() {
       ? `batch:${selection.batchId}`
       : null;
 
+  const additionalItemCount = displaySelection?.kind === "batch"
+    ? getAdditionalDistinctItemCount(displaySelection.logs, displaySelection.logs[0] ?? null) : 0;
+
   const sheetTitle =
     displaySelection?.kind === "log"
       ? displaySelection.log.item_name
       : displaySelection?.kind === "batch"
       ? `${displaySelection.logs[0]?.item_name ?? "묶음"}${
-          displaySelection.logs.length > 1
-            ? ` 외 ${displaySelection.logs.length - 1}건`
+          additionalItemCount > 0
+            ? ` 외 ${additionalItemCount}건`
             : ""
         }`
       : "내역 상세";
@@ -499,7 +527,7 @@ export function MobileHistoryScreen() {
       ? `${displaySelection.log.mes_code ?? "-"} · ${formatHistoryDate(
           displaySelection.log.created_at,
         )}`
-      : "";
+      : displaySelection?.kind === "batch" ? displaySelection.logs[0]?.mes_code ?? "" : "";
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col" style={{ background: LEGACY_COLORS.bg }}>
@@ -588,7 +616,11 @@ export function MobileHistoryScreen() {
             }}
             error={historyError}
             refreshError={refreshError}
-            filteredLogs={logs}
+            displayGroups={displayGroups}
+            batchCache={batchCache}
+            setBatchCache={setBatchCache}
+            cacheEpoch={realtimeRevision}
+            loadMoreError={loadMoreError}
             selectedKey={selectedKey}
             onSelectLog={handleSelectLog}
             onSelectBatch={handleSelectBatch}
@@ -628,6 +660,7 @@ export function MobileHistoryScreen() {
 
             {displaySelection.kind === "log" && (
               <HistoryDetailPanel
+                mobilePresentation
                 panelOpen={!!selection}
                 selected={displaySelection.log}
                 onSelectLog={navigateToLog}

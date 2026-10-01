@@ -1,0 +1,60 @@
+.card {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 144px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 10px;
+  border: 1px solid var(--c-border);
+  border-radius: 20px;
+  background: var(--c-s1);
+  color: var(--c-text);
+  text-align: center;
+  transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+
+.card:active { transform: scale(.99); }
+.card:focus-visible { outline: 2px solid var(--c-blue); outline-offset: 2px; }
+.card[aria-pressed="true"] {
+  border-color: var(--choice-tone);
+  background: color-mix(in srgb, var(--choice-tone) 10%, var(--c-s1));
+}
+.card:disabled { cursor: default; }
+
+.icon {
+  display: flex;
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  color: var(--choice-tone);
+  background: color-mix(in srgb, var(--choice-tone) 12%, transparent);
+}
+
+.title { min-width: 0; font-size: 18px; font-weight: 700; line-height: 1.35; word-break: keep-all; }
+
+.root { display: flex; height: 100%; min-height: 260px; flex-direction: column; gap: 12px; }
+.root:has(.withSource) { min-height: 520px; }
+.content { display: grid; min-height: 260px; flex: 1; grid-template-rows: minmax(260px, 1fr) 0fr; transition: grid-template-rows 200ms ease; }
+.withSource { min-height: 444px; grid-template-rows: minmax(260px, 1fr) 1fr; }
+.workSection { display: flex; min-height: 0; flex-direction: column; }
+.sectionLabel { flex-shrink: 0; margin: 0; padding: 12px 0; color: var(--c-muted2); font-size: 14px; font-weight: 700; line-height: 20px; }
+.workGrid, .sourceGrid { display: grid; min-height: 144px; flex: 1; gap: 8px; }
+.workGrid { min-height: 232px; grid-template-columns: minmax(0, 1fr); grid-template-rows: repeat(3, minmax(72px, 1fr)); }
+.workGrid > .card { min-height: 72px; flex-direction: row; justify-content: flex-start; gap: 16px; padding: 8px 16px; text-align: left; }
+.sourceGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.sourceReveal { min-height: 0; overflow: hidden; opacity: 0; transform: translateY(8px); visibility: hidden; pointer-events: none; transition: opacity 200ms ease, transform 200ms ease, visibility 200ms; }
+.expanded { opacity: 1; transform: translateY(0); visibility: visible; pointer-events: auto; }
+.sourceSection { display: flex; height: 100%; min-height: 188px; flex-direction: column; }
+.leaving { animation: choiceExit 120ms ease-in forwards; pointer-events: none; }
+@keyframes choiceExit { to { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) {
+  .content, .sourceReveal, .card { transition: none; }
+  .sourceReveal { transform: none; }
+  .leaving { animation: none; }
+}

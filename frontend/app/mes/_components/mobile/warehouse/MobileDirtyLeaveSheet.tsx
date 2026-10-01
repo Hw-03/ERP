@@ -10,9 +10,7 @@ import { SheetHeader, PrimaryActionButton } from "../primitives";
 /**
  * 입출고 작성 중 다른 섹션으로 이탈할 때 확인 시트.
  *
- * 위저드의 묶음은 자동 임시저장되므로 손실은 없지만, 이동 직전 draft 를 flush 하고
- * 사용자에게 '내 요청'에서 이어서 진행할 수 있음을 알려 작성 중 화면을 실수로 떠나는
- * 것을 막는다.
+ * 이동 직전 draft 를 flush 하거나 폐기할지 선택하게 해 실수로 화면을 떠나는 것을 막는다.
  */
 export function MobileDirtyLeaveSheet({
   open,
@@ -42,12 +40,8 @@ export function MobileDirtyLeaveSheet({
 
   return (
     <BottomSheet open={open} onClose={handleCancel} ariaLabel="작성 중 이동 확인">
-      <SheetHeader title="작성 중인 입출고가 있어요" onClose={handleCancel} />
+      <SheetHeader title="작성 중인 입출고가 있어요" onClose={handleCancel} className="!items-center" />
       <div className="flex flex-col gap-3 px-5 pb-2">
-        <p className={clsx(TYPO.body, "font-semibold")} style={{ color: LEGACY_COLORS.muted }}>
-          임시저장하면 ‘내 요청’에서 이어서 진행할 수 있어요. 저장하지 않고 나가면 지금 작성 중인
-          내용은 사라져요.
-        </p>
         <PrimaryActionButton
           label={busy ? "저장 중…" : "임시저장하고 이동"}
           intent="primary"

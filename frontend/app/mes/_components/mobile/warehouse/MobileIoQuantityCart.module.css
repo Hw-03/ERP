@@ -2,7 +2,11 @@
 .cart [data-io-cart-list] { padding-right: 0; }
 
 .cart [data-io-cart] { gap: 8px; }
-.cart [data-io-cart-actions] { padding-top: 0; }
+.cart [data-io-cart-actions] {
+  padding-top: 0;
+  padding-left: 12px;
+  padding-right: 12px;
+}
 
 .cart [data-io-line],
 .cart [data-io-bundle-header] {
@@ -10,7 +14,7 @@
   grid-template-columns: 24px minmax(0, 1fr) 100px 56px 24px !important;
   grid-template-rows: auto auto;
   align-items: center;
-  column-gap: 4px;
+  column-gap: 6px;
   row-gap: 2px;
   padding: 10px 4px !important;
   border-left: 0 !important;

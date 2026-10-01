@@ -264,26 +264,19 @@ function DefectItemGroup({
           aria-label={`${latestRecord.item_name} 격리 ${records.length}건`}
           aria-expanded={expanded}
           onClick={onToggle}
-          className="flex min-h-16 w-full items-center gap-2 px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--c-blue)]"
+          className="flex h-[100px] w-full flex-col justify-center gap-1 px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--c-blue)]"
           style={{ background: tint(getDepartmentFallbackColor(department), expanded ? 8 : 4) }}
         >
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-black" style={{ color: LEGACY_COLORS.text }}>{latestRecord.item_name}</span>
-            <span className="block truncate text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{latestRecord.mes_code || "코드 없음"}</span>
+          <span className="relative flex w-full min-w-0 items-end justify-between gap-2">
+            <span className="line-clamp-3 min-w-0 flex-1 text-sm font-black leading-5" style={{ color: LEGACY_COLORS.text }}>{latestRecord.item_name}</span>
+            <span className="shrink-0 pr-5 text-right text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{latestRecord.mes_code || "코드 없음"}</span>
+            {expanded ? <ChevronUp className="absolute right-0 top-0 h-4 w-4" style={{ color: LEGACY_COLORS.muted2 }} /> : <ChevronDown className="absolute right-0 top-0 h-4 w-4" style={{ color: LEGACY_COLORS.muted2 }} />}
           </span>
-          <span className="w-12 shrink-0 text-right">
-            <span className="block text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>수량</span>
-            <span className="block text-sm font-black tabular-nums" style={{ color: LEGACY_COLORS.red }}>{formatQty(totalQuantity)}개</span>
+          <span className="flex w-full items-center justify-between gap-2 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
+            <span><span>수량</span> <span className="font-black tabular-nums" style={{ color: LEGACY_COLORS.red }}>{formatQty(totalQuantity)}개</span></span>
+            <span><span>최근</span> <span className="tabular-nums">{shortDate}</span></span>
+            <span><span>기록</span> <span className="tabular-nums">{records.length}건</span></span>
           </span>
-          <span className="w-[4.4rem] shrink-0 text-right">
-            <span className="block text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>최근</span>
-            <span className="block text-xs font-bold tabular-nums" style={{ color: LEGACY_COLORS.muted2 }}>{shortDate}</span>
-          </span>
-          <span className="w-8 shrink-0 text-right">
-            <span className="block text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>기록</span>
-            <span className="block text-xs font-bold tabular-nums" style={{ color: LEGACY_COLORS.muted2 }}>{records.length}건</span>
-          </span>
-          {expanded ? <ChevronUp className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} /> : <ChevronDown className="h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />}
         </button>
         {expanded && (
           <>
@@ -300,6 +293,7 @@ function DefectItemGroup({
             {records.map((record) => (
               <DefectRecordRow
                 key={record.record_id}
+                mobilePresentation
                 location={record}
                 currentEmployee={currentEmployee}
                 onMemoUpdated={onMemoUpdated}
@@ -417,6 +411,7 @@ function DefectItemGroup({
 
 function DefectRecordRow({
   location,
+  mobilePresentation = false,
   hideItemIdentity = false,
   currentEmployee,
   onMemoUpdated,
@@ -428,6 +423,7 @@ function DefectRecordRow({
   onToggleSelected,
 }: {
   location: DefectLocation;
+  mobilePresentation?: boolean;
   hideItemIdentity?: boolean;
   currentEmployee?: CurrentEmployee;
   onMemoUpdated?: (recordId: string, memo: string) => void;
@@ -475,6 +471,15 @@ function DefectRecordRow({
   const warn = isOverOneYear(location.defective_at);
   const quarantinedBy = quarantinedByName(location);
   const reasonCategory = location.reason_category?.trim();
+  const showStatusBadges = storageMode || (location.is_legacy && location.legacy_origin !== "reconstructed") || pendingQty > 0 || (!storageMode && warn);
+  const statusBadges = (
+    <>
+      {storageMode && <StatusBadge label={location.management_category === "OBSOLETE" ? "구형" : location.management_category === "B_GRADE" ? "B급" : "불량 격리"} color={location.management_category === "B_GRADE" ? LEGACY_COLORS.purple : location.management_category === "OBSOLETE" ? LEGACY_COLORS.muted2 : LEGACY_COLORS.red} />}
+      {location.is_legacy && location.legacy_origin !== "reconstructed" && <StatusBadge label="기존 합산" color={LEGACY_COLORS.muted2} />}
+      {pendingQty > 0 && <StatusBadge label={`처리 대기 ${formatQty(pendingQty)}개`} color={LEGACY_COLORS.yellow} />}
+      {!storageMode && warn && <StatusBadge label="1년 초과" color={LEGACY_COLORS.red} icon={<AlertTriangle className="h-3 w-3" />} />}
+    </>
+  );
 
   async function saveMemo() {
     if (!currentEmployee || editPin.length !== PIN_LENGTH) return;
@@ -536,45 +541,56 @@ function DefectRecordRow({
   return (
     <article
       aria-label={`${location.item_name} 격리 기록`}
-      className="px-4 py-4 transition-colors hover:bg-[var(--c-s3)] sm:px-5"
+      className={`${mobilePresentation ? "px-3 py-3" : "px-4 py-4 sm:px-5"} transition-colors hover:bg-[var(--c-s3)]`}
     >
       <div
         data-testid="defect-record-grid"
-        className={RECORD_GRID_CLASS}
+        className={mobilePresentation ? "flex min-w-0 flex-col gap-3" : RECORD_GRID_CLASS}
       >
-        <DefectItemIdentity
-          location={location}
-          hidden={hideItemIdentity}
-          selectionMode={selectionMode}
-          selected={selected}
-          selectionDisabled={selectionDisabledReason !== null}
-          selectionDisabledLabel={selectionDisabledReason ?? undefined}
-          onToggleSelected={onToggleSelected}
-        />
-
-        <QuantitySummary quantity={location.quantity} recordCount={1} testId="defect-remaining-quantity" />
-
-        <div
-          data-testid="defect-quarantine-summary"
-          className="flex min-w-0 flex-col justify-center border-t pt-3 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0"
-          style={{ borderColor: LEGACY_COLORS.border }}
-        >
-          <p className="break-words text-sm font-bold leading-5" style={{ color: LEGACY_COLORS.muted2 }}>{formatDateTime(location.defective_at)}</p>
-          <p className="mt-1 break-words text-base font-black leading-6" style={{ color: LEGACY_COLORS.text }}>{quarantinedBy}</p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {storageMode && <StatusBadge label={location.management_category === "OBSOLETE" ? "구형" : location.management_category === "B_GRADE" ? "B급" : "불량 격리"} color={location.management_category === "B_GRADE" ? LEGACY_COLORS.purple : location.management_category === "OBSOLETE" ? LEGACY_COLORS.muted2 : LEGACY_COLORS.red} />}
-            {location.is_legacy && location.legacy_origin !== "reconstructed" && (
-              <StatusBadge
-                label="기존 합산"
-                color={LEGACY_COLORS.muted2}
-              />
-            )}
-            {pendingQty > 0 && <StatusBadge label={`처리 대기 ${formatQty(pendingQty)}개`} color={LEGACY_COLORS.yellow} />}
-            {!storageMode && warn && <StatusBadge label="1년 초과" color={LEGACY_COLORS.red} icon={<AlertTriangle className="h-3 w-3" />} />}
+        {mobilePresentation ? (
+          <div className="min-w-0">
+            <div data-testid="defect-mobile-record-header" className="flex min-h-11 min-w-0 items-start gap-2">
+              {selectionMode && (
+                <label className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center has-[:disabled]:cursor-not-allowed">
+                  <input type="checkbox" aria-label={`${location.item_name} ${formatDateTime(location.defective_at)} ${selectionDisabledReason ? `${selectionDisabledReason} · 선택 불가` : "선택"}`} checked={selected} disabled={selectionDisabledReason !== null} onChange={onToggleSelected} className="h-5 w-5 accent-[var(--c-blue)]" />
+                </label>
+              )}
+              <div data-testid="defect-quarantine-summary" className="min-w-0 flex-1">
+                <p className="break-words text-xs font-bold leading-5" style={{ color: LEGACY_COLORS.muted2 }}>{formatDateTime(location.defective_at)}</p>
+                <p className="break-words text-sm font-black leading-5" style={{ color: LEGACY_COLORS.text }}>{quarantinedBy}</p>
+              </div>
+              <div data-testid="defect-remaining-quantity" className="shrink-0 text-right">
+                <p className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted }}>격리 수량</p>
+                <p className="text-xl font-black tabular-nums leading-6" style={{ color: LEGACY_COLORS.red }}>{formatQty(location.quantity)}개</p>
+              </div>
+            </div>
+            {showStatusBadges && <div className="mt-2 flex flex-wrap gap-1.5">{statusBadges}</div>}
           </div>
-        </div>
+        ) : (
+          <>
+            <DefectItemIdentity
+              location={location}
+              hidden={hideItemIdentity}
+              selectionMode={selectionMode}
+              selected={selected}
+              selectionDisabled={selectionDisabledReason !== null}
+              selectionDisabledLabel={selectionDisabledReason ?? undefined}
+              onToggleSelected={onToggleSelected}
+            />
+            <QuantitySummary quantity={location.quantity} recordCount={1} testId="defect-remaining-quantity" />
+            <div
+              data-testid="defect-quarantine-summary"
+              className="flex min-w-0 flex-col justify-center border-t pt-3 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0"
+              style={{ borderColor: LEGACY_COLORS.border }}
+            >
+              <p className="break-words text-sm font-bold leading-5" style={{ color: LEGACY_COLORS.muted2 }}>{formatDateTime(location.defective_at)}</p>
+              <p className="mt-1 break-words text-base font-black leading-6" style={{ color: LEGACY_COLORS.text }}>{quarantinedBy}</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">{statusBadges}</div>
+            </div>
+          </>
+        )}
 
-        <div className="min-w-0 border-t pt-3 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+        <div className="min-w-0 border-t pt-3 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0" style={mobilePresentation ? { borderColor: LEGACY_COLORS.border } : undefined}>
           <div data-testid="defect-reason-summary" className="flex min-w-0 items-baseline gap-2">
             <span className="shrink-0 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>격리 사유</span>
             <span
@@ -608,9 +624,9 @@ function DefectRecordRow({
             </div>
           )}
 
-          <div data-testid="defect-memo-actions" className="mt-2 flex flex-wrap items-center gap-2 lg:flex-nowrap">
+          <div data-testid="defect-memo-actions" className={mobilePresentation ? "mt-3 grid grid-cols-2 gap-2" : "mt-2 flex flex-wrap items-center gap-2 lg:flex-nowrap"}>
             {editing ? (
-              <>
+              <div className={mobilePresentation ? "col-span-2 flex flex-wrap items-center gap-2" : "contents"}>
                 <label className="flex shrink-0 items-center gap-2">
                   <span className="whitespace-nowrap text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>직원 PIN</span>
                   <input
@@ -633,16 +649,20 @@ function DefectRecordRow({
                 </label>
                 <SmallActionButton label={saving ? "저장 중" : "저장"} onClick={() => void saveMemo()} disabled={saving || editPin.length !== PIN_LENGTH} />
                 <SmallActionButton label="취소" onClick={() => { setDraftMemo(memo); setEditPin(""); setSaveError(null); setEditing(false); }} disabled={saving} />
-              </>
+              </div>
             ) : null}
             <SmallActionButton
               label={historyOpen ? "이력 닫기" : "이력 보기"}
               icon={<History className="h-3.5 w-3.5" />}
               onClick={() => void toggleHistory()}
-              uniformWidth={storageMode}
+              uniformWidth={storageMode && !mobilePresentation}
+              fullWidth={mobilePresentation}
             />
-            <div data-testid="defect-record-actions" className="ml-auto flex flex-wrap items-center justify-end gap-2">
-              {!editing && canEditMemo && (
+            {mobilePresentation && !editing && canEditMemo && (
+              <SmallActionButton label="메모 수정" icon={<Pencil className="h-3.5 w-3.5" />} onClick={() => { setDraftMemo(memo); setEditPin(""); setSaveError(null); setEditing(true); }} fullWidth />
+            )}
+            <div data-testid="defect-record-actions" className={mobilePresentation ? "col-span-2 grid grid-cols-2 gap-2" : "ml-auto flex flex-wrap items-center justify-end gap-2"}>
+              {!mobilePresentation && !editing && canEditMemo && (
                 <SmallActionButton label="메모 수정" icon={<Pencil className="h-3.5 w-3.5" />} onClick={() => { setDraftMemo(memo); setEditPin(""); setSaveError(null); setEditing(true); }} uniformWidth={storageMode} />
               )}
               {onMoveToStorage && (
@@ -651,7 +671,7 @@ function DefectRecordRow({
                   onClick={() => onMoveToStorage(location)}
                   disabled={location.is_legacy && location.legacy_origin === "aggregate"}
                   title={location.is_legacy && location.legacy_origin === "aggregate" ? "기존 합산 기록은 B급·구형으로 이동할 수 없습니다." : undefined}
-                  className={`standard-hover inline-flex min-h-11 items-center rounded-[10px] border px-3 text-xs font-black disabled:cursor-not-allowed disabled:opacity-45 ${storageMode ? "w-24 justify-center" : ""}`}
+                  className={`standard-hover inline-flex min-h-11 items-center rounded-[10px] border px-3 text-xs font-black disabled:cursor-not-allowed disabled:opacity-45 ${mobilePresentation ? "w-full justify-center" : storageMode ? "w-24 justify-center" : ""}`}
                   style={{ borderColor: tint(LEGACY_COLORS.purple, 32), background: tint(LEGACY_COLORS.purple, 8), color: LEGACY_COLORS.purple }}
                 >
                   {storageMode ? "분류 변경" : "B급·구형으로 이동"}
@@ -661,7 +681,7 @@ function DefectRecordRow({
                 type="button"
                 onClick={() => onProcess(location)}
                 disabled={availableQty <= 0}
-                className={`standard-hover min-h-11 shrink-0 rounded-[10px] border font-black transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${storageMode ? "w-24 justify-center px-3 text-xs" : "px-4 text-sm"}`}
+                className={`standard-hover min-h-11 shrink-0 rounded-[10px] border font-black transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${mobilePresentation ? `w-full px-3 text-sm ${onMoveToStorage ? "" : "col-span-2"}` : storageMode ? "w-24 justify-center px-3 text-xs" : "px-4 text-sm"}`}
                 style={{ background: tint(LEGACY_COLORS.red, 8), borderColor: tint(LEGACY_COLORS.red, 40), color: LEGACY_COLORS.red }}
               >
                 {storageMode ? "정상 복귀" : "처리"}
@@ -762,19 +782,21 @@ function SmallActionButton({
   icon,
   disabled = false,
   uniformWidth = false,
+  fullWidth = false,
 }: {
   label: string;
   onClick: () => void;
   icon?: ReactNode;
   disabled?: boolean;
   uniformWidth?: boolean;
+  fullWidth?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`standard-hover inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border px-3 text-xs font-black transition-colors disabled:opacity-50 ${uniformWidth ? "w-24 justify-center" : ""}`}
+      className={`standard-hover inline-flex min-h-11 items-center gap-1.5 rounded-[10px] border px-3 text-xs font-black transition-colors disabled:opacity-50 ${uniformWidth ? "w-24 justify-center" : ""} ${fullWidth ? "w-full justify-center" : ""}`}
       style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s2, color: LEGACY_COLORS.muted2 }}
     >
       {icon}{label}

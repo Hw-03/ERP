@@ -808,7 +808,7 @@ export function MobileIoComposeWizard({
           )}
 
         {step === 4 && (
-          <div className={`min-h-[240px] flex-1 ${quantityStyles.cart}`}>
+          <div className={`min-h-0 flex-1 ${quantityStyles.cart}`}>
           <IoBundleCart
             mobilePresentation
             bundles={state.bundles}
@@ -893,7 +893,7 @@ export function MobileIoComposeWizard({
         )}
 
         {step === 5 && (
-          <div className="min-h-[360px] flex-1">
+          <div className="min-h-0 flex-1">
           <IoConfirmStep
             mobilePresentation
             supplierName={state.selectedSupplierName}

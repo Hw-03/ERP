@@ -7,9 +7,26 @@ import { queryKeys } from "@/lib/queries/keys";
 import { STALE_TIME } from "@/lib/queries/client";
 import { HISTORY_PAGE_SIZE } from "../_history_sections/historyConstants";
 import { resolveHistoryDateRange } from "../_history_sections/historyQuery";
-import type { UseHistoryDataArgs } from "./useHistoryData";
+import type { SelectedHistoryMonth } from "../_history_sections/historyQuery";
 
-export interface UseDesktopHistoryGroupsResult {
+export interface UseHistoryGroupsArgs {
+  /** 거래 종류(필터 패널) operation_keys 쉼표 결합. "" = 미적용(전체). */
+  operations: string;
+  dateFilter: string;
+  /** 부모(DesktopHistoryView)에서 350ms debounce 후 set 한 값. 목록/달력이 같은 값을 공유. */
+  debouncedSearch: string;
+  /** 달력에서 선택한 날짜 (YYYY-MM-DD). 있으면 dateFilter 무시하고 그날만 fetch. */
+  selectedDateKey: string | null;
+  /** 달력에서 선택한 월(0-based). 있으면 period preset 대신 그 달 전체를 조회한다. */
+  selectedMonth?: SelectedHistoryMonth | null;
+  /** 필터 패널 — 부서 쉼표 결합(다중). "" = 전체. */
+  department: string;
+  /** 필터 패널 — 제품 모델명 쉼표 결합. "" / 미지정 = 미적용. */
+  model?: string;
+  realtimeRevision?: number | null;
+}
+
+export interface UseHistoryGroupsResult {
   groups: TransactionDisplayGroup[];
   setGroups: React.Dispatch<React.SetStateAction<TransactionDisplayGroup[]>>;
   loading: boolean;
@@ -28,8 +45,8 @@ function historyLoadError(error: unknown, fallback: string): string {
   return error instanceof Error && error.message.trim() ? error.message : fallback;
 }
 
-/** PC 목록 전용: 서버가 완결된 대표 묶음과 커서를 함께 반환한다. */
-export function useDesktopHistoryGroups({
+/** PC·모바일 공통: 서버가 완결된 대표 묶음과 커서를 함께 반환한다. */
+export function useHistoryGroups({
   operations,
   dateFilter,
   debouncedSearch,
@@ -38,7 +55,7 @@ export function useDesktopHistoryGroups({
   department,
   model = "",
   realtimeRevision,
-}: UseHistoryDataArgs): UseDesktopHistoryGroupsResult {
+}: UseHistoryGroupsArgs): UseHistoryGroupsResult {
   const queryClient = useQueryClient();
   const operationKeys = operations || undefined;
   const { dateFrom, dateTo } = resolveHistoryDateRange(dateFilter, selectedDateKey, selectedMonth);

@@ -1,6 +1,6 @@
 .viewport {
   position: absolute;
-  inset: 0 -10px 0 0;
+  inset: 0;
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-gutter: stable;
@@ -8,3 +8,17 @@
 }
 
 .viewport::-webkit-scrollbar { width: 10px; }
+
+/* Leave the content aligned while iOS paints its overlay scrollbar in the margin. */
+@media (hover: none), (pointer: coarse) {
+  .viewport {
+    right: -10px;
+    padding-right: 10px;
+    scrollbar-gutter: auto;
+  }
+}
+
+/* Only mouse-based previews need space for the non-overlay scrollbar. */
+@media (hover: hover) and (pointer: fine) {
+  .viewport { right: -10px; }
+}

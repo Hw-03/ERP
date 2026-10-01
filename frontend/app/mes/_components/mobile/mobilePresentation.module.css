@@ -59,6 +59,15 @@
   line-height: 1.35;
 }
 
+.separatedChoices { gap: 8px; }
+.separatedChoices > .menuRow {
+  border: 1px solid var(--c-border);
+  border-radius: 20px;
+  background: var(--c-s1);
+}
+.separatedChoices > .menuRow:active { background: var(--c-s3); }
+.separatedChoices > .menuRow[aria-pressed="true"] { background: color-mix(in srgb, var(--c-blue) 9%, var(--c-s1)); }
+
 .choiceIcon {
   display: flex;
   width: clamp(48px, 14vw, 60px);

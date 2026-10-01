@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { defectsApi } from "@/lib/api/defects";
 import type { DefectLocation } from "@/lib/api/types/defects";
-import { ManagementCategoryModal } from "../DefectStorageView";
+import { DefectStorageView, ManagementCategoryModal } from "../DefectStorageView";
 
 vi.mock("@/lib/api/defects", () => ({
   defectsApi: {
@@ -86,5 +86,31 @@ describe("ManagementCategoryModal", () => {
       });
     });
     expect(onUpdated).toHaveBeenCalledWith("OBSOLETE");
+  });
+});
+
+describe("모바일 B급·구형 목록", () => {
+  it("필터를 접어 시작하고 조건·정렬·분류 선택을 접은 뒤에도 유지한다", () => {
+    window.localStorage.clear();
+    render(<DefectStorageView mobilePresentation locations={[
+      { ...location, item_id: "item-1", mes_code: "6-AR-0001", quantity: 1, original_quantity: 1, pending_quantity: 0, defective_at: null },
+      { ...location, record_id: "record-2", item_id: "item-2", item_name: "튜브 구형 품목", department: "튜브", management_category: "OBSOLETE", quantity: 2, original_quantity: 2, pending_quantity: 0, defective_at: null },
+    ]} currentEmployee={{ employee_id: "employee-1", name: "Kim", department: "조립" }} onBack={() => {}} onRestore={() => {}} onUpdated={() => {}} />);
+    const classifications = screen.getByRole("group", { name: "보관 분류 필터" });
+    expect(classifications).toHaveClass("grid-cols-3");
+    expect(screen.getByRole("button", { name: "필터 펼치기" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("combobox", { name: "정렬" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
+    fireEvent.click(screen.getByRole("button", { name: "조립", exact: true }));
+    fireEvent.change(screen.getByRole("combobox", { name: "정렬" }), { target: { value: "oldest" } });
+    fireEvent.click(screen.getByRole("button", { name: "필터 접기" }));
+    expect(screen.getByRole("button", { name: "필터 펼치기" })).toHaveTextContent("부서 조립 · 오래된 순");
+    fireEvent.click(within(classifications).getByRole("button", { name: /B급/ }));
+    expect(within(classifications).getByRole("button", { name: /B급/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("textbox", { name: "B급·구형 검색" })).toBeInTheDocument();
+    expect(screen.getByText("ADX6000 구형 컬리메이터")).toBeInTheDocument();
+    expect(screen.queryByText("튜브 구형 품목")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "필터 펼치기" }));
+    expect(screen.getByRole("combobox", { name: "정렬" })).toHaveValue("oldest");
   });
 });

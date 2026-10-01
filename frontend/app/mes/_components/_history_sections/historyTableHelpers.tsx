@@ -20,7 +20,6 @@ import { transactionColor, transactionIconName } from "@/lib/mes-status";
 import {
   describeBatchFlow,
   getHistoryActor,
-  getHistoryDisplayLabel,
   getDisplayBundles,
   getHistoryDisplayTransactionType,
   getHistoryMovementSummary,
@@ -440,6 +439,8 @@ export function StockSnapshotContent({
   loading = false,
   emptyLogLabel = "—",
   variant = "table",
+  expandableUnavailableReason = false,
+  showUnit = false,
 }: {
   log?: TransactionLog | null;
   dense?: boolean;
@@ -450,6 +451,9 @@ export function StockSnapshotContent({
   emptyLogLabel?: string;
   /** 패널은 전후 수량과 증감을 분리하고 기본 표의 배치를 유지한다. */
   variant?: "table" | "panel";
+  expandableUnavailableReason?: boolean;
+  /** 모바일 상세에서 단위를 별도 행 없이 수량 옆에 붙인다. */
+  showUnit?: boolean;
 }): ReactNode {
   if (loading) {
     return (
@@ -478,6 +482,9 @@ export function StockSnapshotContent({
   const snapshot = resolveStockSnapshot(log);
   if (snapshot.status === "unavailable") {
     const accessibleLabel = `요청 순 재고 계산 불가: ${snapshot.reason}`;
+    if (expandableUnavailableReason) {
+      return <details><summary aria-label={accessibleLabel}>계산 불가 · 사유 보기</summary><span>{snapshot.reason}</span></details>;
+    }
     return (
       <span className={variant === "panel" ? "text-sm font-medium" : "text-xs font-semibold"} style={{ color: LEGACY_COLORS.yellow }}>
         <Tooltip content={snapshot.reason} multiline triggerTabIndex={0} triggerAriaLabel={accessibleLabel}>
@@ -555,7 +562,7 @@ export function StockSnapshotContent({
       {changedSnapshots.length === 0 ? (
         <span aria-hidden="true" className={variant === "panel" ? "text-sm font-medium" : "text-xs font-semibold"} style={{ color: LEGACY_COLORS.muted2 }}>변동 없음</span>
       ) : changedSnapshots.map((snapshot) => (
-        <StockSnapshotLine key={snapshot.label} label={snapshot.label} beforeText={snapshot.beforeText} afterText={snapshot.afterText} delta={snapshot.after - snapshot.before} beforeQuantityWidthPx={beforeQuantityWidthPx} afterQuantityWidthPx={STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH_PX} increased={snapshot.after > snapshot.before} decreased={snapshot.after < snapshot.before} cancelled={log.cancelled} variant={variant} />
+        <StockSnapshotLine key={snapshot.label} label={snapshot.label} beforeText={snapshot.beforeText} afterText={snapshot.afterText} delta={snapshot.after - snapshot.before} beforeQuantityWidthPx={beforeQuantityWidthPx} afterQuantityWidthPx={STOCK_SNAPSHOT_TYPICAL_QUANTITY_WIDTH_PX} increased={snapshot.after > snapshot.before} decreased={snapshot.after < snapshot.before} cancelled={log.cancelled} variant={variant} unit={showUnit ? log.item_unit : undefined} />
       ))}
     </div>
   );
@@ -669,6 +676,7 @@ function StockSnapshotLine({
   decreased,
   cancelled,
   variant,
+  unit,
 }: {
   label: string;
   beforeText: string;
@@ -680,17 +688,18 @@ function StockSnapshotLine({
   decreased: boolean;
   cancelled: boolean;
   variant: "table" | "panel";
+  unit?: string;
 }): ReactNode {
   const afterColor = increased ? LEGACY_COLORS.blue : decreased ? LEGACY_COLORS.red : LEGACY_COLORS.muted2;
   const deltaText = formatStockDelta(delta);
   if (variant === "panel") {
     return (
-      <span aria-label={`${label} ${beforeText} ${deltaText}→${afterText}`} className="history-stock-panel-line">
+      <span aria-label={`${label} ${beforeText} ${deltaText}→${afterText}`} aria-description={unit ? `단위 ${unit}` : undefined} className="history-stock-panel-line">
         <span className="history-stock-panel-location">{label}</span>
         <span>{beforeText}</span>
         <strong style={{ color: afterColor }}>{deltaText}</strong>
         <span aria-hidden="true" className="text-center">→</span>
-        <strong style={{ color: afterColor }}>{afterText}</strong>
+        <strong style={{ color: afterColor }}>{afterText}{unit && <span className="ml-1 text-xs font-medium" style={{color:LEGACY_COLORS.muted2}}>{unit}</span>}</strong>
       </span>
     );
   }
@@ -746,6 +755,95 @@ export type LogGroup = (
   | { type: "op_batch"; batchId: string; refNo: string | null; logs: TransactionLog[] }
   | { type: "defect_lifecycle"; key: string; parent: TransactionLog; child: TransactionLog }
 ) & { matchedLogIds?: string[] | null };
+
+/** 작업의 구성품 입고보다 사용자가 처리한 부모 품목을 대표로 선택한다. */
+function getOperationPrimaryLog(logs: TransactionLog[]): TransactionLog {
+  const pickupLog = logs.find((log) => log.transaction_type === "SHIP"
+    && log.shipping_phase === "PICKUP" && !isShippingCompanionNote(log.notes));
+  if (pickupLog) return pickupLog;
+  const operationLabel = logs.find((log) => log.operation_display_label)?.operation_display_label ?? "";
+  if (operationLabel.startsWith("disassemble")) {
+    const parent = logs.find((log) => log.transaction_type === "BACKFLUSH");
+    if (parent) return parent;
+  }
+  const produced = logs.filter((log) => log.transaction_type === "PRODUCE");
+  const consumed = logs.filter((log) => log.transaction_type === "BACKFLUSH");
+  if (logs.length > 1 && logs.every((log) => log.operation_role === "PRIMARY") && produced.length && consumed.length) {
+    return consumed.length < produced.length ? consumed[0] : produced[0];
+  }
+  for (const role of ["PRIMARY", "REWORK_PARENT_NORMAL", "REWORK_PARENT_DEFECTIVE", "PRODUCT_OUTPUT"]) {
+    const match = logs.find((log) => log.operation_role === role);
+    if (match) return match;
+  }
+  return logs[0];
+}
+
+export function getGroupPrimaryLog(group: LogGroup): TransactionLog {
+  if (group.type === "solo") return group.log;
+  if (group.type === "defect_lifecycle") return group.parent;
+  if (group.type === "operation") return getOperationPrimaryLog(group.logs);
+  return group.logs[0];
+}
+
+/** PC와 모바일 목록이 공유하는 대표 품목·작업 배지. 서버의 묶음 경계를 유지한다. */
+export function getHistoryGroupSummary(group: LogGroup, batch?: IoBatch | null): {
+  primaryLog: TransactionLog;
+  title: string;
+  additionalItemCount: number;
+  displayType: TransactionLog["transaction_type"] | null;
+  label: string;
+  color: string;
+  pending: boolean;
+} {
+  const first = getGroupPrimaryLog(group);
+  const logs = group.type === "solo" ? [group.log]
+    : group.type === "defect_lifecycle" ? [group.parent, group.child] : group.logs;
+  let representative = first;
+  let title = first.item_name;
+  let displayType: TransactionLog["transaction_type"] | null = first.transaction_type;
+  let label = getHistoryListOperationLabel(first);
+  let color = isReworkOperation(first) ? LEGACY_COLORS.red : transactionColor(displayType);
+  if (group.type === "operation") {
+    const operationLabel = logs.find((log) => log.operation_display_label)?.operation_display_label ?? "";
+    const hasProduce = logs.some((log) => log.transaction_type === "PRODUCE");
+    const hasBackflush = logs.some((log) => log.transaction_type === "BACKFLUSH");
+    if (operationLabel.startsWith("disassemble") && hasProduce && hasBackflush) {
+      displayType = "DISASSEMBLE";
+      label = "분해 출고";
+    } else if ((operationLabel.startsWith("produce") || operationLabel.startsWith("disassemble")) && hasProduce !== hasBackflush) {
+      displayType = "ADJUST";
+      label = "부서 입출고";
+    }
+    color = isReworkOperation(first) ? LEGACY_COLORS.red : transactionColor(displayType);
+  } else if (group.type === "op_batch") {
+    const rawType = (logs.find((log) => log.transaction_type !== "BACKFLUSH") ?? first).transaction_type;
+    displayType = batch ? getHistoryDisplayTransactionType({ transaction_type: rawType }, batch) : null;
+    label = batch ? getHistoryListOperationLabel(first, batch) : "작업 정보 확인 중";
+    color = batch ? (isReworkOperation(first, batch) ? LEGACY_COLORS.red : transactionColor(displayType!)) : LEGACY_COLORS.muted2;
+    const target = getOpBatchRepresentativeLog(logs, batch);
+    title = target?.item_name ?? (batch ? getDisplayBundles(batch)[0]?.title : undefined) ?? first.item_name;
+    representative = target ?? first;
+  } else if (group.type === "batch") {
+    if (group.refNo.startsWith("defect-disassemble:")) {
+      representative = logs.find((log) => log.transaction_type === "DISASSEMBLE") ?? first;
+      title = representative.item_name;
+      displayType = representative.transaction_type;
+      label = getHistoryListOperationLabel(representative);
+      color = LEGACY_COLORS.red;
+    } else {
+      const reference = getReferenceBatchPresentation(logs);
+      representative = logs.find((log) => log.log_id === reference.representativeLogId) ?? first;
+      title = reference.targetTitle;
+      displayType = (logs.find((log) => log.transaction_type !== "BACKFLUSH") ?? first).transaction_type;
+      color = isReworkOperation(first) ? LEGACY_COLORS.red : transactionColor(displayType);
+    }
+  }
+  const primaryLog = group.type === "batch" ? representative : first;
+  return { primaryLog, title,
+    additionalItemCount: getAdditionalDistinctItemCount(logs, representative), displayType, label,
+    color: primaryLog.operation_kind === "CANCELLATION" ? LEGACY_COLORS.red : color,
+    pending: group.type === "op_batch" && !batch };
+}
 
 /** 서버가 확정한 대표 묶음을 표 렌더링 모델로만 변환한다. 새 묶음을 만들거나 합치지 않는다. */
 export function toHistoryLogGroups(groups: TransactionDisplayGroup[]): LogGroup[] {
@@ -1096,10 +1194,11 @@ export function BatchHeader({
   const statusPadX = "px-2";
   const first = group.logs[0];
   const referencePresentation = getReferenceBatchPresentation(group.logs, referenceSummary);
-  const representativeLog = group.logs.find((log) => log.log_id === referencePresentation.representativeLogId) ?? first;
-  const additionalItemCount = getAdditionalDistinctItemCount(group.logs, representativeLog);
-  const primaryType = (group.logs.find((l) => l.transaction_type !== "BACKFLUSH") ?? first).transaction_type;
-  const flowColor = isReworkOperation(first) ? LEGACY_COLORS.red : transactionColor(primaryType);
+  const groupSummary = getHistoryGroupSummary(group);
+  const representativeLog = groupSummary.primaryLog;
+  const additionalItemCount = groupSummary.additionalItemCount;
+  const primaryType = groupSummary.displayType;
+  const flowColor = groupSummary.color;
   const summary = referenceSummary === null
     ? { parts: [{ label: referenceSummaryLoading ? "세부 확인 중" : "세부 —", tone: "muted" as const }] }
     : referencePresentation.movement;
@@ -1163,7 +1262,7 @@ export function BatchHeader({
         </div>
       </td>
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${padX} text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
-        <FlowBadge type={primaryType} label={getHistoryListOperationLabel(first)} color={flowColor} />
+        <FlowBadge type={primaryType} label={groupSummary.label} color={flowColor} />
       </td>
       <td className={`${HISTORY_MAIN_CELL_CLASS} ${targetPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <div className="flex min-w-0 items-center gap-1.5">
@@ -1610,18 +1709,11 @@ export function OpBatchHeader({
   const statusPadX = "px-2";
   const first = group.logs[0];
   const representativeLog = getOpBatchRepresentativeLog(group.logs, batch);
-  const displayBundles = batch ? getDisplayBundles(batch) : [];
-  const titleText = representativeLog?.item_name ?? displayBundles[0]?.title ?? first.item_name;
-  const additionalItemCount = getAdditionalDistinctItemCount(
-    group.logs,
-    displayBundles.length > 0 ? representativeLog ?? first : first,
-  );
-  const rawPrimaryType = (group.logs.find((l) => l.transaction_type !== "BACKFLUSH") ?? first).transaction_type;
-  const primaryType = getHistoryDisplayTransactionType({ transaction_type: rawPrimaryType }, batch);
+  const groupSummary = getHistoryGroupSummary(group, batch);
+  const additionalItemCount = groupSummary.additionalItemCount;
+  const primaryType = groupSummary.displayType;
   const basePresentation = getHistoryRowPresentation(first, batch ?? undefined);
-  const flowColor = batch
-    ? (isReworkOperation(first, batch) ? LEGACY_COLORS.red : transactionColor(primaryType))
-    : LEGACY_COLORS.muted2;
+  const flowColor = groupSummary.color;
   const cancelled = group.logs.some((log) => log.cancelled);
 
   const summary = getHistoryMovementSummary(first, batch, group.logs.length, group.logs);
@@ -1630,7 +1722,7 @@ export function OpBatchHeader({
     movement: summary,
     target: {
       ...basePresentation.target,
-      title: titleText,
+      title: groupSummary.title,
       code: representativeLog?.mes_code ?? basePresentation.target.code,
       meta: [],
     },
@@ -1678,7 +1770,7 @@ export function OpBatchHeader({
       </td>
       <td className={`whitespace-nowrap ${HISTORY_MAIN_CELL_CLASS} ${padX} text-center`} style={{ borderColor: LEGACY_COLORS.border, transition: HISTORY_CELL_TRANSITION }}>
         {batch ? (
-          <FlowBadge type={primaryType} label={getHistoryListOperationLabel(first, batch)} color={flowColor} compact={compact} />
+          <FlowBadge type={primaryType} label={groupSummary.label} color={flowColor} compact={compact} />
         ) : (
           <HistoryBatchMetadataPlaceholder widthClass={compact ? "w-20" : "w-32"} />
         )}

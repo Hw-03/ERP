@@ -1,0 +1,13 @@
+.mobile { min-height: min(360px, 50dvh); }
+.mobile :global(.inventory-recent-body) { flex-direction: column; align-items: stretch; gap: 8px; }
+.mobile :global(.inventory-recent-main) { flex-wrap: wrap; gap: 8px; }
+.mobile :global(.inventory-recent-main) > time { padding-top: 0; }
+.mobile :global(.inventory-recent-meta) { font-size: 14px; line-height: 20px; }
+.mobile :global(.history-stock-panel) { width: 100%; }
+.mobile :global(.history-stock-panel-line) { width: 100%; grid-template-columns: minmax(0, 1fr) auto auto 16px auto; }
+.mobile :global(.history-stock-panel-location) { max-width: none; }
+.mobile :global(.inventory-recent-empty) { min-height: min(360px, 50dvh); }
+.mobile details { color: var(--c-yellow); font-size: 14px; overflow-wrap: anywhere; }
+.mobile summary { display: flex; min-height: 44px; align-items: center; cursor: pointer; font-weight: 700; }
+.mobile details > span { display: block; padding-bottom: 8px; color: var(--c-muted2); }
+.mobile button { min-height: 44px; }

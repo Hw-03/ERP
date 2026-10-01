@@ -1,0 +1,29 @@
+.cancelled .affected {
+  opacity: .55;
+  text-decoration: line-through;
+  text-decoration-color: var(--c-muted2);
+}
+
+.cancelled .affected > span {
+  text-decoration: inherit;
+}
+
+.cancelledLabel {
+  flex-shrink: 0;
+  border-radius: 6px;
+  padding: 2px 6px;
+  color: var(--c-red);
+  background: color-mix(in srgb, var(--c-red) 12%, transparent);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+}
+
+.cancellation {
+  background: color-mix(in srgb, var(--c-red) 10%, var(--c-s1)) !important;
+}
+
+.cancellation .badge > span {
+  background: color-mix(in srgb, var(--c-red) 14%, transparent) !important;
+  color: var(--c-red) !important;
+}

@@ -192,6 +192,54 @@ beforeEach(() => {
 });
 
 describe("desktop history detail panels", () => {
+  it("모바일 구성 조회 실패에도 거래 재고를 유지하고 재시도한다", async () => {
+    const batch = makeBatch();
+    const selected = makeLog({operation_batch_id:batch.batch_id,operation_line_id:batch.bundles[0].lines[0].line_id});
+    vi.mocked(ioApi.getBatch).mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce(batch);
+    vi.mocked(productionApi.getTransactions).mockReturnValue(new Promise(() => {}));
+    render(<HistoryBatchDetailPanel panelOpen mobilePresentation batchId={batch.batch_id} logs={[selected]}
+      batchCache={new Map()} setBatchCache={() => {}} onBatchCancelled={() => {}} />);
+    expect(screen.getByText("작업 구성 불러오는 중")).toBeInTheDocument();
+    expect(screen.getByText("PF-001")).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", {name:"다시 시도"}));
+    expect(await screen.findByText("BOM")).toBeInTheDocument();
+    expect(ioApi.getBatch).toHaveBeenCalledTimes(2);
+  });
+  it("모바일 BOM은 자동차감 문구를 생략하고 반려 미차감 상태를 제공한다", () => {
+    const base = makeBatch();
+    const batch = makeBatch({bundles:[{...base.bundles[0],lines:base.bundles[0].lines.map((line,index) => index===1?{...line,approval_outcome:"rejected" as const}:line)}]});
+    vi.mocked(productionApi.getTransactions).mockReturnValue(new Promise(() => {}));
+    render(<HistoryBatchDetailPanel panelOpen mobilePresentation batchId={batch.batch_id} logs={[makeLog({operation_batch_id:batch.batch_id})]}
+      batchCache={new Map([[batch.batch_id,batch]])} setBatchCache={() => {}} onBatchCancelled={() => {}} />);
+    expect(screen.queryByText("자동차감")).not.toBeInTheDocument();
+    expect(screen.getByText("반려 · 재고 미차감")).toBeInTheDocument();
+  });
+  it("배치가 없는 불량 작업도 모바일 상세에서 모든 거래와 실제 위치별 재고를 표시한다", () => {
+    const selected = makeLog({transaction_type:"MARK_DEFECTIVE", operation_id:"defect-op", operation_batch_id:null,
+      inventory_effect:[{scope:"location",department:"튜브",status:"DEFECTIVE",delta:2,quantity_before:0,quantity_after:2}],reason_category:"금속"});
+    vi.mocked(productionApi.getTransactions).mockReturnValue(new Promise(() => {}));
+    render(<HistoryBatchDetailPanel panelOpen mobilePresentation batchId="defect-op" logs={[selected]}
+      batchCache={new Map()} setBatchCache={() => {}} onBatchCancelled={() => {}} />);
+    expect(screen.getByLabelText("불량 재고 0 +2→2 EA")).toBeInTheDocument();
+    expect(screen.getByText("금속")).toBeInTheDocument();
+    expect(screen.getByText("PF-001")).toBeInTheDocument();
+    expect(ioApi.getBatch).not.toHaveBeenCalled();
+  });
+  it.each([true, false])("단품 상세는 모바일에서 중복 묶음 헤더 없이 한 행으로 표시한다: %s", (mobilePresentation) => {
+    const base = makeBatch();
+    const line = { ...base.bundles[0].lines[0], origin: "manual" as const, has_children: false };
+    const batch = makeBatch({ bundles: [{ ...base.bundles[0], source_kind: "manual", lines: [line] }] });
+    const log = makeLog({ operation_batch_id: batch.batch_id, operation_line_id: line.line_id });
+    vi.mocked(productionApi.getTransactions).mockReturnValue(new Promise(() => {}));
+    render(<HistoryBatchDetailPanel panelOpen mobilePresentation={mobilePresentation} batchId={batch.batch_id} logs={[log]}
+      batchCache={new Map([[batch.batch_id, batch]])} setBatchCache={() => {}} onBatchCancelled={() => {}} />);
+    const row = screen.getByRole("button", { name: /완제품 A.*PF-001/ });
+    expect(within(mobilePresentation ? row.parentElement!.parentElement! : row).queryByText("└") !== null).toBe(!mobilePresentation);
+    expect(screen.queryByText("단품") !== null).toBe(!mobilePresentation);
+    expect(screen.queryAllByTestId("composition-truncated-text").filter((node) => node.textContent === line.item_name))
+      .toHaveLength(mobilePresentation ? 0 : 2);
+  });
+
   it.each(["exact", "legacy", "other-line", "ambiguous"])("모바일 재고 변화는 PC BOM 로그 매칭 규칙을 공유한다: %s", (match) => {
     const batch = makeBatch();
     const line = batch.bundles[0].lines[1];
@@ -209,18 +257,18 @@ describe("desktop history detail panels", () => {
     vi.mocked(productionApi.getTransactions).mockReturnValue(new Promise(() => {}));
     render(<HistoryBatchDetailPanel panelOpen mobilePresentation batchId={batch.batch_id} logs={logs}
       batchCache={new Map([[batch.batch_id, batch]])} setBatchCache={() => {}} onBatchCancelled={() => {}} />);
-    const row = screen.getByText(line.item_name).closest("button")!;
+    const row = screen.getByRole("button", { name: `${line.item_name} ${line.mes_code} 상세` }).parentElement!.parentElement!;
     const code = within(row).getByText(line.mes_code!);
-    expect(code.parentElement).toHaveTextContent(match === "exact" || match === "legacy" ? "조립" : "—");
+    expect(code.closest("button")).toHaveAccessibleName(`${line.item_name} ${line.mes_code} 상세`);
     if (match === "exact" || match === "legacy") {
       expect(within(row).getByLabelText("조립 10 −4→6")).toBeInTheDocument();
     } else {
       expect(within(row).getByText("—")).toBeInTheDocument();
       expect(within(row).queryByLabelText("조립 10 −4→6")).not.toBeInTheDocument();
     }
-    expect(screen.getByText("재고 변화")).toBeInTheDocument();
+    expect(screen.getAllByText("재고 변화").length).toBeGreaterThan(0);
     expect(screen.queryByText(/총 .*묶음/)).not.toBeInTheDocument();
-    const metadata = screen.getByText("요청자").closest("dl")!;
+    const metadata = screen.getAllByText("요청자")[0].closest("dl")!;
     expect(within(metadata).getByText("요청자 A")).toBeInTheDocument();
     expect(within(metadata).getByText("일시")).toBeInTheDocument();
   });

@@ -24,12 +24,13 @@ import {
   ReferenceBatchDetail,
   buildGroups,
   getAdditionalDistinctItemCount,
+  getGroupPrimaryLog,
+  getHistoryGroupSummary,
   getHistorySeparationHint,
   getStockSnapshotQuantityWidth,
   type LogGroup,
 } from "./historyTableHelpers";
 import { BomBatchDetail } from "./BomBatchDetail";
-import { isShippingCompanionNote } from "./historyBatchInterpreter";
 import { ReworkBatchHeader } from "./ReworkBatchHeader";
 import { ReworkBatchDetail } from "./ReworkBatchDetail";
 
@@ -214,39 +215,6 @@ export function HistoryTableSkeleton() {
 
 function historyGroupPanelId(groupKey: string): string {
   return `history-group-${encodeURIComponent(groupKey).replaceAll("%", "_")}`;
-}
-
-function getGroupPrimaryLog(group: LogGroup): TransactionLog {
-  if (group.type === "solo") return group.log;
-  if (group.type === "defect_lifecycle") return group.parent;
-  if (group.type === "operation") return getOperationPrimaryLog(group.logs);
-  return group.logs[0];
-}
-
-function getOperationPrimaryLog(logs: TransactionLog[]): TransactionLog {
-  const pickupLog = logs.find((log) => (
-    log.transaction_type === "SHIP"
-    && log.shipping_phase === "PICKUP"
-    && !isShippingCompanionNote(log.notes)
-  ));
-  if (pickupLog) return pickupLog;
-
-  const operationLabel = logs.find((log) => log.operation_display_label)?.operation_display_label ?? "";
-  if (operationLabel.startsWith("disassemble")) {
-    const disassemblyParent = logs.find((log) => log.transaction_type === "BACKFLUSH");
-    if (disassemblyParent) return disassemblyParent;
-  }
-  const produceLogs = logs.filter((log) => log.transaction_type === "PRODUCE");
-  const backflushLogs = logs.filter((log) => log.transaction_type === "BACKFLUSH");
-  const allPrimary = logs.length > 1 && logs.every((log) => log.operation_role === "PRIMARY");
-  if (allPrimary && produceLogs.length > 0 && backflushLogs.length > 0) {
-    return backflushLogs.length < produceLogs.length ? backflushLogs[0] : produceLogs[0];
-  }
-  for (const role of ["PRIMARY", "REWORK_PARENT_NORMAL", "REWORK_PARENT_DEFECTIVE", "PRODUCT_OUTPUT"]) {
-    const match = logs.find((log) => log.operation_role === role);
-    if (match) return match;
-  }
-  return logs[0];
 }
 
 export function HistoryTable({
@@ -595,11 +563,11 @@ export function HistoryTable({
                 }
 
                 if (group.type === "operation") {
-                  const primaryLog = getOperationPrimaryLog(group.logs);
+                  const groupSummary = getHistoryGroupSummary(group);
+                  const primaryLog = groupSummary.primaryLog;
                   const operationLabel = group.logs.find((log) => log.operation_display_label)?.operation_display_label ?? "";
                   const hasProduce = group.logs.some((log) => log.transaction_type === "PRODUCE");
                   const hasBackflush = group.logs.some((log) => log.transaction_type === "BACKFLUSH");
-                  const isDisassembly = operationLabel.startsWith("disassemble") && hasProduce && hasBackflush;
                   const isCustomBomSingleAdjustment = (operationLabel.startsWith("produce") || operationLabel.startsWith("disassemble"))
                     && hasProduce !== hasBackflush;
                   const childLogs = group.logs.filter((log) => log.log_id !== primaryLog.log_id);
@@ -623,9 +591,9 @@ export function HistoryTable({
                         controlsId={childLogs.length > 0 ? controlsId : undefined}
                         toggleLabel="작업 구성"
                         separationHint={separationHint}
-                        additionalItemCount={getAdditionalDistinctItemCount(group.logs, primaryLog)}
-                        displayType={isDisassembly ? "DISASSEMBLE" : isCustomBomSingleAdjustment ? "ADJUST" : undefined}
-                        operationLabel={isDisassembly ? "분해 출고" : isCustomBomSingleAdjustment ? "부서 입출고" : undefined}
+                        additionalItemCount={groupSummary.additionalItemCount}
+                        displayType={groupSummary.displayType ?? undefined}
+                        operationLabel={groupSummary.label}
                       />
                       {expanded && childLogs.length > 0 && (
                         <ReferenceBatchDetail
