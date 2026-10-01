@@ -96,6 +96,13 @@
   letter-spacing: 0;
 }
 
+.composeScope [data-io-confirm] { gap: 8px; }
+.composeScope [data-io-confirm-actions] {
+  padding-top: 0;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
 @media (max-height: 600px) {
   div.defectCartBody {
     overflow-y: auto;
