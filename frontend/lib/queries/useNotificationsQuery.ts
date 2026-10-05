@@ -3,7 +3,7 @@
 /**
  * 결재 알림 React Query 훅.
  *
- * 30초 폴링으로 안 읽은 알림을 가져온다(서버 알림 인프라는 폴링 기반).
+ * 서버 revision으로 동기화하며 30초 폴링과 화면 복귀 조회로 보완한다.
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -12,7 +12,7 @@ import type { NotificationMarkReadPayload } from "@/lib/api/types";
 import { STALE_TIME } from "./client";
 import { queryKeys } from "./keys";
 
-/** 내 알림 목록 + 안 읽음 수. 30초 폴링. */
+/** 내 알림 목록 + 안 읽음 수. 화면 복귀 시 fresh 캐시도 재확인한다. */
 export function useNotificationsQuery(employeeId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.notifications.list(employeeId ?? ""),
@@ -20,6 +20,8 @@ export function useNotificationsQuery(employeeId: string | undefined) {
     enabled: !!employeeId,
     staleTime: STALE_TIME.VOLATILE,
     refetchInterval: 30_000,
+    refetchOnWindowFocus: "always",
+    refetchOnReconnect: "always",
   });
 }
 
@@ -29,8 +31,13 @@ export function useMarkNotificationsReadMutation() {
   return useMutation({
     mutationFn: (payload: NotificationMarkReadPayload) =>
       notificationsApi.markNotificationsRead(payload),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: queryKeys.notifications.all }),
+    onSuccess: async (data, payload) => {
+      const queryKey = queryKeys.notifications.list(payload.recipient_employee_id);
+      // 저장 전에 시작한 조회가 성공 응답의 읽음 상태를 되돌리지 않게 한다.
+      await qc.cancelQueries({ queryKey, exact: true });
+      qc.setQueryData(queryKey, data);
+      await qc.invalidateQueries({ queryKey, exact: true });
+    },
   });
 }
 
