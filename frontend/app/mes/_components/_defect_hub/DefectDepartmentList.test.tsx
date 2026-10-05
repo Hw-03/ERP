@@ -347,6 +347,47 @@ describe("DefectDepartmentList", () => {
     expect(summary).toHaveAttribute("style", expect.stringContaining("8%, transparent"));
   });
 
+  it("toggles repeated-item records from the identity, quantity, date, and row background", () => {
+    render(<DefectDepartmentList locations={[
+      makeLocation({ record_id: "first", reason_memo: "first memo" }),
+      makeLocation({ record_id: "second", reason_memo: "second memo" }),
+    ]} onProcess={vi.fn()} />);
+
+    const summary = screen.getByTestId("defect-item-group-summary");
+    const targets = [
+      within(summary).getByText("AX-100"),
+      within(summary).getByText("4개"),
+      within(summary).getByText("최근 격리"),
+      summary,
+    ];
+    for (const target of targets) {
+      fireEvent.click(target);
+      expect(summary).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getByText("first memo")).toBeInTheDocument();
+      fireEvent.click(target);
+      expect(summary).toHaveAttribute("aria-expanded", "false");
+      expect(screen.queryByText("first memo")).not.toBeInTheDocument();
+    }
+  });
+
+  it("keeps expansion unchanged when batch actions are clicked", () => {
+    const onBatchProcess = vi.fn();
+    render(<DefectDepartmentList locations={[
+      makeLocation({ record_id: "first" }),
+      makeLocation({ record_id: "second" }),
+    ]} onProcess={vi.fn()} onBatchProcess={onBatchProcess} />);
+
+    const summary = screen.getByTestId("defect-item-group-summary");
+    fireEvent.click(screen.getByRole("button", { name: "여러 건 선택" }));
+    expect(summary).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(screen.getAllByRole("checkbox")[0]);
+    fireEvent.click(screen.getByRole("button", { name: "선택 처리 1건" }));
+    expect(onBatchProcess).toHaveBeenCalledOnce();
+    expect(summary).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(screen.getByRole("button", { name: "선택 취소" }));
+    expect(summary).toHaveAttribute("aria-expanded", "true");
+  });
+
   it("expands only the selected item summary and keeps child records actionable", () => {
     const onProcess = vi.fn();
     render(

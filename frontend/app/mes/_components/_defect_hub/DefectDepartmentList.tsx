@@ -333,7 +333,11 @@ function DefectItemGroup({
       <div
         data-testid="defect-item-group-summary"
         aria-expanded={expanded}
-        className="min-h-11 w-full px-4 py-4 text-left transition-colors hover:brightness-95 sm:px-5 lg:min-h-[156px]"
+        onClick={(event) => {
+          if ((event.target as HTMLElement).closest("button")) return;
+          onToggle();
+        }}
+        className="min-h-11 w-full cursor-pointer px-4 py-4 text-left transition-colors hover:brightness-95 sm:px-5 lg:min-h-[156px]"
         style={{ background: tint(getDepartmentFallbackColor(department), expanded ? 8 : 4) }}
       >
         <div className={RECORD_GRID_CLASS}>
