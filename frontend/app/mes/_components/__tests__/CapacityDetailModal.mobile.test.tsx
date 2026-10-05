@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
 import type { ProductionCapacity } from "@/lib/api/types/production";
@@ -147,7 +147,8 @@ describe("CapacityDetailModal 모바일 모델 요약", () => {
     const { mobileList } = renderModal();
     const mobile = within(mobileList);
 
-    expect(mobile.getByText("자동 기준 출하 완제품")).toBeInTheDocument();
+    expect(mobile.queryByText("자동 기준 출하 완제품")).not.toBeInTheDocument();
+    expect(screen.getByText(/모델마다 출하대기·빠른생산·총생산 수량의 합이 가장 큰/)).toBeInTheDocument();
     expect(mobile.getByText("DX3000_65kV, 1.7mA_USA_Vector 긴 기준 출하 완제품명")).toBeInTheDocument();
     expect(mobile.queryByRole("button", { name: "기준 PF 해제" })).not.toBeInTheDocument();
   });
@@ -170,7 +171,7 @@ describe("CapacityDetailModal 모바일 모델 요약", () => {
     expect(mobile.getAllByText("자동 기준")).toHaveLength(1);
   });
 
-  it("모바일 헤더에는 제목과 닫기만 표시한다", () => {
+  it("모바일 헤더에는 제목과 자동 기준 설명을 표시한다", () => {
     const onClose = vi.fn();
     render(<CapacityDetailModal capacityData={capacityData} onClose={onClose} />);
 
@@ -178,6 +179,7 @@ describe("CapacityDetailModal 모바일 모델 요약", () => {
     expect(screen.queryByText("수량 기준")).not.toBeInTheDocument();
     expect(screen.queryByText(/박스 포장까지 완료되어/)).not.toBeInTheDocument();
     expect(screen.queryByText(/공용 자재가 겹치는 모델은/)).not.toBeInTheDocument();
+    expect(screen.getByText(/각 수량은 해당 품목 기준이며/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "닫기" }));
     expect(onClose).toHaveBeenCalledOnce();
   });
@@ -204,5 +206,58 @@ describe("CapacityDetailModal 모바일 모델 요약", () => {
       expect(within(row).getByText("598")).toBeInTheDocument();
     });
     expect(within(populatedRows[0]).getByText("3-PF-0002")).toBeInTheDocument();
+  });
+
+  it("선택한 PF의 기존 모바일 BOM 창을 열고 Escape는 BOM 창만 닫는다", async () => {
+    const onClose = vi.fn();
+    const { container } = render(<CapacityDetailModal capacityData={capacityData} onClose={onClose} />);
+    const mobileList = container.querySelector("[data-testid='capacity-mobile-columns']")!.parentElement!;
+    const mobile = within(mobileList);
+    const modelButton = mobile.getByRole("button", { name: /DX3000.*1종/ });
+    fireEvent.click(modelButton);
+    const afButton = mobile.getAllByRole("button", { name: /DX3000 조립 완제품/ })[1];
+    fireEvent.click(afButton);
+    const scroller = mobileList.parentElement!;
+    scroller.scrollTop = 120;
+
+    const bomButton = mobile.getByRole("button", { name: /BOM 보기/ });
+    bomButton.focus();
+    fireEvent.click(bomButton);
+    const dialog = screen.getByRole("dialog", { name: "BOM 구성 보기" });
+    expect(within(dialog).getByRole("button", { name: "닫기" })).toHaveFocus();
+    expect(within(dialog).getByRole("button", { name: "모두 펼치기" })).toHaveClass("h-11");
+    await waitFor(() => expect(api.getBOMTree).toHaveBeenCalledWith("pf-dx3000", undefined));
+    expect(afButton).toHaveAttribute("aria-expanded", "true");
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(screen.queryByRole("dialog", { name: "BOM 구성 보기" })).not.toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(modelButton).toHaveAttribute("aria-expanded", "true");
+    expect(afButton).toHaveAttribute("aria-expanded", "true");
+    expect(scroller.scrollTop).toBe(120);
+    expect(bomButton).toHaveFocus();
+    fireEvent.click(mobile.getByRole("button", { name: /BOM 보기/ }));
+    fireEvent.click(screen.getByRole("dialog", { name: "BOM 구성 보기" }));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog", { name: "BOM 구성 보기" })).not.toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("BOM 조회 실패를 재시도하고 빈 구성을 표시한 뒤 닫아 목록을 유지한다", async () => {
+    vi.mocked(api.getBOMTree)
+      .mockRejectedValueOnce(new Error("조회 실패"))
+      .mockResolvedValueOnce({ item_id: "pf-dx3000", item_name: "DX3000 출하품", mes_code: "3-PF-0002", process_type_code: null, unit: "EA", required_quantity: 1, current_stock: 0, children: [] });
+    const { mobileList } = renderModal();
+    const mobile = within(mobileList);
+    fireEvent.click(mobile.getByRole("button", { name: /DX3000.*1종/ }));
+    fireEvent.click(mobile.getAllByRole("button", { name: /DX3000 조립 완제품/ })[1]);
+    fireEvent.click(mobile.getByRole("button", { name: /BOM 보기/ }));
+    const dialog = screen.getByRole("dialog", { name: "BOM 구성 보기" });
+    await within(dialog).findByText("하위 구성을 불러오지 못했습니다.");
+    fireEvent.click(within(dialog).getByRole("button", { name: "다시 시도" }));
+    await within(dialog).findByText("하위 품목이 없습니다.");
+    fireEvent.click(within(dialog).getByRole("button", { name: "닫기" }));
+    expect(mobile.getByRole("button", { name: /BOM 보기/ })).toBeInTheDocument();
   });
 });

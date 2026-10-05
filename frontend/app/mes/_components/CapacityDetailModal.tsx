@@ -11,6 +11,7 @@ import { getAutoRepresentative, groupAfByModel } from "@/lib/mes/capacity";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
 import { DesktopCapacityPfWorkspace } from "./_capacity_sections/DesktopCapacityPfWorkspace";
+import { BomDetailModal } from "./_inventory_sections/BomDetailModal";
 import { ReadLoading } from "./common/ReadState";
 import { LoadFailureCard } from "./common/LoadFailureCard";
 import { SkeletonBlock, dataRevealClassName } from "./common/LoadingSkeleton";
@@ -55,7 +56,7 @@ function useDesktopCapacityLayout(): boolean {
   );
 }
 
-/** 생산 가능수량 상세 모달 — 모바일 AF 카드와 데스크톱 PF·전체 BOM 작업공간. */
+/** 모바일 AF 목록·기존 BOM 창과 데스크톱 PF·전체 BOM 작업공간을 연결한다. */
 export function CapacityDetailModal({
   capacityData,
   onClose,
@@ -72,6 +73,7 @@ export function CapacityDetailModal({
   const af = capacityData?.af ?? null;
   const isDesktopCapacityLayout = useDesktopCapacityLayout();
   const [selectedPfItemId, setSelectedPfItemId] = useState<string | null>(null);
+  const [mobileBomItemId, setMobileBomItemId] = useState<string | null>(null);
   const selectedPf = useMemo(
     () => af?.pf_variants.find((variant) => variant.pf_item_id === selectedPfItemId) ?? null,
     [af, selectedPfItemId],
@@ -84,6 +86,7 @@ export function CapacityDetailModal({
   }, [isDesktopCapacityLayout, selectedPf, selectedPfItemId]);
 
   useEffect(() => {
+    if (mobileBomItemId) return;
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
@@ -92,7 +95,7 @@ export function CapacityDetailModal({
     };
     window.addEventListener("keydown", handleEscape, true);
     return () => window.removeEventListener("keydown", handleEscape, true);
-  }, [onClose]);
+  }, [mobileBomItemId, onClose]);
 
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
@@ -135,6 +138,7 @@ export function CapacityDetailModal({
   const isPfDetail = isDesktopCapacityLayout && selectedPf !== null;
 
   return (
+    <>
     <div
       className="fixed inset-0 z-[300] flex items-center justify-center p-4"
       style={{ background: LEGACY_COLORS.bg }}
@@ -214,6 +218,9 @@ export function CapacityDetailModal({
                     <X className="h-5 w-5" />
                   </button>
                 </div>
+                <p className="mt-1 text-xs leading-5" style={{ color: LEGACY_COLORS.muted2 }}>
+                  모델마다 출하대기·빠른생산·총생산 수량의 합이 가장 큰 출하 완제품을 자동 기준으로 표시합니다. 각 수량은 해당 품목 기준이며, 다른 출하품과 합산한 값이 아닙니다.
+                </p>
               </div>
             )}
           </>
@@ -238,7 +245,7 @@ export function CapacityDetailModal({
                     af={af}
                     onOpenBom={isDesktopCapacityLayout
                       ? openBom
-                      : undefined}
+                      : (variant) => setMobileBomItemId(variant.pf_item_id)}
                   />
                 </div>
               ) : !isDesktopCapacityLayout && error && !capacityData ? null : (
@@ -253,6 +260,13 @@ export function CapacityDetailModal({
         )}
       </div>
     </div>
+      <BomDetailModal
+        itemId={mobileBomItemId ?? ""}
+        open={mobileBomItemId !== null}
+        mobilePresentation
+        onClose={() => setMobileBomItemId(null)}
+      />
+    </>
   );
 }
 
@@ -382,16 +396,11 @@ function AfCapacitySummary({
               className={`${MOBILE_CAPACITY_GRID} border-t py-2`}
               style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}
             >
-              {autoRepresentative ? <div className="col-span-3 min-w-0">
-                <div className="text-xs font-medium" style={{ color: LEGACY_COLORS.muted2 }}>
-                  자동 기준 출하 완제품
-                </div>
-                <div className="mt-1">
-                  <span className="block [overflow-wrap:anywhere] text-sm font-medium leading-5" style={{ color: LEGACY_COLORS.text }}>
+              {autoRepresentative ? <div className="col-span-3 flex min-w-0 flex-wrap items-start gap-x-3 gap-y-1">
+                  <span className="min-w-0 flex-1 basis-[12rem] [overflow-wrap:anywhere] text-base font-medium leading-6" style={{ color: LEGACY_COLORS.text }}>
                     {autoRepresentative.pf_name || autoRepresentative.pf_code}
                   </span>
-                  <span className="mt-1 block break-all text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{autoRepresentative.pf_code}</span>
-                </div>
+                  <span className="ml-auto shrink-0 text-right text-xs leading-6" style={{ color: LEGACY_COLORS.muted2 }}>{autoRepresentative.pf_code}</span>
               </div> : <div className="col-span-3 min-w-0 text-sm font-medium" style={{ color: LEGACY_COLORS.muted2 }}>
                 자동 기준 출하 완제품 없음
               </div>}
@@ -418,9 +427,9 @@ function AfCapacitySummary({
                       ) : (
                         <ChevronRight className="mt-0.5 h-4 w-4 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />
                       )}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="break-words text-sm font-medium leading-5" style={{ color: LEGACY_COLORS.text }}>
+                      <div className="flex min-w-0 flex-1 flex-wrap items-start gap-x-3 gap-y-1">
+                        <div className="flex min-w-0 flex-1 basis-[12rem] flex-wrap items-center gap-1.5">
+                          <span className="[overflow-wrap:anywhere] text-base font-medium leading-6" style={{ color: LEGACY_COLORS.text }}>
                             {it.af_name}
                           </span>
                           {it.bom_status === "incomplete" && (
@@ -431,7 +440,7 @@ function AfCapacitySummary({
                           )}
                         </div>
                         {it.af_code && (
-                          <div className="mt-1 break-all text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+                          <div className="ml-auto shrink-0 text-right text-xs leading-6" style={{ color: LEGACY_COLORS.muted2 }}>
                             {it.af_code}
                           </div>
                         )}
@@ -691,12 +700,23 @@ function PfVariants({
           className={`${MOBILE_CAPACITY_GRID} border-t py-2 first:border-t-0`}
           style={{ borderColor: LEGACY_COLORS.border }}
         >
-          <div className="col-span-3 min-w-0">
-            <div className="text-sm leading-5 [overflow-wrap:anywhere]" style={{ color: LEGACY_COLORS.text }}>{variant.pf_name}</div>
-            {variant.pf_code && <div className="mt-1 break-all text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{variant.pf_code}</div>}
-            {autoRepresentative?.pf_item_id === variant.pf_item_id && autoRepresentative.af_item_id === variant.af_item_id && (
-              <span className="mt-1 inline-block rounded-full px-1.5 py-0.5 text-xs font-medium" style={{ color: LEGACY_COLORS.cyan, background: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 15%, transparent)` }}>자동 기준</span>
-            )}
+          <div className="col-span-3 flex min-w-0 flex-wrap items-start gap-x-3 gap-y-1">
+            <div className="min-w-0 flex-1 basis-[12rem]">
+              <div className="text-base font-medium leading-6 [overflow-wrap:anywhere]" style={{ color: LEGACY_COLORS.text }}>{variant.pf_name}</div>
+              {autoRepresentative?.pf_item_id === variant.pf_item_id && autoRepresentative.af_item_id === variant.af_item_id && (
+                <span className="mt-1 inline-block rounded-full px-1.5 py-0.5 text-xs font-medium" style={{ color: LEGACY_COLORS.cyan, background: `color-mix(in srgb, ${LEGACY_COLORS.cyan} 15%, transparent)` }}>자동 기준</span>
+              )}
+            </div>
+            <div className="ml-auto flex shrink-0 flex-col items-end gap-1">
+              {variant.pf_code && <div className="text-right text-xs leading-6" style={{ color: LEGACY_COLORS.muted2 }}>{variant.pf_code}</div>}
+              {onOpenBom && <button
+                type="button"
+                onClick={() => onOpenBom(variant)}
+                aria-label={`${variant.pf_name || variant.pf_code} BOM 보기`}
+                className="standard-hover min-h-11 rounded-[10px] border px-3 text-sm font-medium active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)]"
+                style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}
+              >BOM 보기</button>}
+            </div>
           </div>
           <MobileCapacityQuantities quantities={variant} />
         </div>

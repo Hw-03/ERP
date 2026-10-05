@@ -266,7 +266,7 @@ export function MobileDashboardScreen({
           {/* 검색/필터 영역은 배경 위 도구줄로 두고, 입력 컨트롤 자체만 테두리를 가진다. */}
           <div
             ref={searchControlsRef}
-            className="sticky top-0 z-20 -mx-3 flex flex-col gap-2 px-3"
+            className="sticky top-0 z-20 flex flex-col gap-2 px-3"
             style={{ background: LEGACY_COLORS.bg }}
           >
             <div className="flex items-center gap-2">
@@ -322,7 +322,7 @@ export function MobileDashboardScreen({
           {/* 항목 2 — 필터 칩은 sticky 밖(일반 흐름)에 둬서 열려도 목록을 가리지 않고 아래로 밀어낸다.
               4-2 — 검색바와 함께 card 밖, 화면 배경 위에 배치. */}
           {filtersOpen && (
-            <div className="-mx-3 px-3 pb-2.5">
+            <div className="px-3 pb-2.5">
               <InventoryFilters
                 open={filtersOpen}
                 selectedDepts={selectedDepts}
