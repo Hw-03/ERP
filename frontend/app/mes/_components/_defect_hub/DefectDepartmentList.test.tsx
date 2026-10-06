@@ -51,6 +51,32 @@ describe("DefectDepartmentList", () => {
     apiMocks.getManagementCategoryHistory.mockResolvedValue([]);
   });
 
+  it.each([false, true])("uses a full-row disclosure button without intercepting batch actions (storage: %s)", (storageMode) => {
+    const onBatchProcess = vi.fn();
+    render(<DefectDepartmentList storageMode={storageMode} locations={[
+      makeLocation({ record_id: "first" }),
+      makeLocation({ record_id: "second" }),
+    ]} onProcess={vi.fn()} onBatchProcess={onBatchProcess} />);
+
+    const summary = screen.getByTestId("defect-item-group-summary");
+    const toggle = within(summary).getByRole("button", { name: /AX-100.*격리 2건/ });
+    expect(toggle).toHaveClass("absolute", "inset-0");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(toggle);
+    expect(screen.getAllByRole("article", { name: "AX-100 격리 기록" })).toHaveLength(2);
+    fireEvent.click(toggle);
+    expect(screen.queryByRole("article", { name: "AX-100 격리 기록" })).not.toBeInTheDocument();
+
+    fireEvent.click(within(summary).getByRole("button", { name: "여러 건 선택" }));
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(screen.getAllByRole("checkbox")[0]);
+    fireEvent.click(within(summary).getByRole("button", { name: "선택 처리 1건" }));
+    expect(onBatchProcess).toHaveBeenCalledWith([expect.objectContaining({ record_id: "first" })]);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(within(summary).getByRole("button", { name: "선택 취소" }));
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+  });
+
   it("shows a compact mobile row for one record and reveals the existing actions on expand", () => {
     const onProcess = vi.fn();
     render(<DefectDepartmentList mobilePresentation locations={[makeLocation({ item_name: "길고 긴 고압 보드 조립품 이름" })]} onProcess={onProcess} />);
@@ -347,27 +373,20 @@ describe("DefectDepartmentList", () => {
     expect(summary).toHaveAttribute("style", expect.stringContaining("8%, transparent"));
   });
 
-  it("toggles repeated-item records from the identity, quantity, date, and row background", () => {
+  it("toggles repeated-item records with the disclosure button covering the row", () => {
     render(<DefectDepartmentList locations={[
       makeLocation({ record_id: "first", reason_memo: "first memo" }),
       makeLocation({ record_id: "second", reason_memo: "second memo" }),
     ]} onProcess={vi.fn()} />);
 
     const summary = screen.getByTestId("defect-item-group-summary");
-    const targets = [
-      within(summary).getByText("AX-100"),
-      within(summary).getByText("4개"),
-      within(summary).getByText("최근 격리"),
-      summary,
-    ];
-    for (const target of targets) {
-      fireEvent.click(target);
-      expect(summary).toHaveAttribute("aria-expanded", "true");
-      expect(screen.getByText("first memo")).toBeInTheDocument();
-      fireEvent.click(target);
-      expect(summary).toHaveAttribute("aria-expanded", "false");
-      expect(screen.queryByText("first memo")).not.toBeInTheDocument();
-    }
+    const target = within(summary).getByRole("button", { name: /AX-100.*격리 2건/ });
+    fireEvent.click(target);
+    expect(summary).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("first memo")).toBeInTheDocument();
+    fireEvent.click(target);
+    expect(summary).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("first memo")).not.toBeInTheDocument();
   });
 
   it("keeps expansion unchanged when batch actions are clicked", () => {

@@ -333,14 +333,17 @@ function DefectItemGroup({
       <div
         data-testid="defect-item-group-summary"
         aria-expanded={expanded}
-        onClick={(event) => {
-          if ((event.target as HTMLElement).closest("button")) return;
-          onToggle();
-        }}
-        className="min-h-11 w-full cursor-pointer px-4 py-4 text-left transition-colors hover:brightness-95 sm:px-5 lg:min-h-[156px]"
+        className="relative min-h-11 w-full px-4 py-4 text-left transition-colors hover:brightness-95 sm:px-5 lg:min-h-[156px]"
         style={{ background: tint(getDepartmentFallbackColor(department), expanded ? 8 : 4) }}
       >
-        <div className={RECORD_GRID_CLASS}>
+        <button
+          type="button"
+          aria-label={`${department} ${latestRecord.item_name} 격리 ${records.length}건`}
+          aria-expanded={expanded}
+          onClick={onToggle}
+          className="no-btn-inset absolute inset-0 h-full w-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--c-blue)]"
+        />
+        <div className={`pointer-events-none relative ${RECORD_GRID_CLASS}`}>
           <DefectItemIdentity location={latestRecord} />
           <QuantitySummary quantity={totalQuantity} recordCount={records.length} />
           <div
@@ -352,25 +355,21 @@ function DefectItemGroup({
             <p className="mt-1 break-words text-base font-black leading-6" style={{ color: LEGACY_COLORS.text }}>{quarantinedByName(latestRecord)}</p>
           </div>
           <div className="flex min-w-0 flex-col justify-center gap-2 border-t pt-3 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0" style={{ borderColor: LEGACY_COLORS.border }}>
-            <button
-              type="button"
-              aria-label={`${department} ${latestRecord.item_name} 격리 ${records.length}건`}
-              aria-expanded={expanded}
-              onClick={onToggle}
-              className="flex min-h-11 w-full items-center justify-between gap-3 rounded-[10px] px-2 text-left transition-colors hover:bg-[var(--c-s3)]"
+            <div
+              className="flex min-h-11 w-full items-center justify-between gap-3 rounded-[10px] px-2 text-left"
             >
               <span className="min-w-0">
                 <span className="block text-sm font-black" style={{ color: LEGACY_COLORS.text }}>격리 기록 {records.length}건</span>
                 <span className="mt-1 block text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>펼쳐서 개별 기록 확인</span>
               </span>
               {expanded ? <ChevronUp className="h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} /> : <ChevronDown className="h-5 w-5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />}
-            </button>
+            </div>
             {batchEnabled && (
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={batchSelection ? onCancelBatchSelection : onStartBatchSelection}
-                  className="standard-hover min-h-11 rounded-[10px] border px-3 text-sm font-black transition-colors"
+                  className="standard-hover pointer-events-auto min-h-11 rounded-[10px] border px-3 text-sm font-black transition-colors"
                   style={{
                     background: batchSelection ? tint(LEGACY_COLORS.muted2, 8) : tint(LEGACY_COLORS.blue, 8),
                     borderColor: batchSelection ? LEGACY_COLORS.border : tint(LEGACY_COLORS.blue, 40),
@@ -383,7 +382,7 @@ function DefectItemGroup({
                   type="button"
                   onClick={onBatchProcess}
                   disabled={selectedCount === 0}
-                  className="standard-hover min-h-11 rounded-[10px] border px-3 text-sm font-black transition-colors disabled:cursor-not-allowed disabled:opacity-45"
+                  className="standard-hover pointer-events-auto min-h-11 rounded-[10px] border px-3 text-sm font-black transition-colors disabled:cursor-not-allowed disabled:opacity-45"
                   style={{ background: tint(LEGACY_COLORS.red, 8), borderColor: tint(LEGACY_COLORS.red, 40), color: LEGACY_COLORS.red }}
                 >
                   {selectedCount > 0 ? `선택 처리 ${selectedCount}건` : "선택 처리"}
