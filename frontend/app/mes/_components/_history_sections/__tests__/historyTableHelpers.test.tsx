@@ -22,6 +22,7 @@ import {
   TargetSummaryBlock,
   buildGroups,
   getAdditionalDistinctItemCount,
+  getHistoryGroupSummary,
   getStockSnapshotQuantityWidth,
   toHistoryLogGroups,
 } from "../historyTableHelpers";
@@ -71,6 +72,35 @@ function makeLog(overrides: Partial<TransactionLog> = {}): TransactionLog {
     ...overrides,
   };
 }
+
+describe("getHistoryGroupSummary cancellation labels", () => {
+  it.each([
+    ["disassemble", ["BACKFLUSH", "PRODUCE"], "분해 출고"],
+    ["disassemble", ["BACKFLUSH"], "부서 입출고"],
+    ["disassemble", ["PRODUCE"], "부서 입출고"],
+    ["produce", ["PRODUCE"], "부서 입출고"],
+    ["produce", ["BACKFLUSH"], "부서 입출고"],
+    ["produce", ["PRODUCE", "BACKFLUSH"], "생산 입고"],
+  ] as const)("%s %s preserves cancellation after grouping", (operationLabel, types, label) => {
+    for (const cancellation of [false, true]) {
+      const logs = types.map((transactionType, index) => makeLog({
+        log_id: `log-${index}`,
+        transaction_type: transactionType,
+        operation_display_label: operationLabel,
+        operation_kind: cancellation ? "CANCELLATION" : "BUSINESS",
+      }));
+      const summary = getHistoryGroupSummary({ type: "operation", operationId: "operation-1", logs });
+      expect(summary.label).toBe(`${label}${cancellation ? " 취소" : ""}`);
+      if (cancellation) expect(summary.color).toBe(transactionColor("MARK_DEFECTIVE"));
+    }
+  });
+
+  it("already labelled solo and reference groups do not duplicate the suffix", () => {
+    const log = makeLog({ transaction_type: "TRANSFER_TO_WH", operation_kind: "CANCELLATION" });
+    expect(getHistoryGroupSummary({ type: "solo", log }).label).toBe("창고 입출고 취소");
+    expect(getHistoryGroupSummary({ type: "batch", refKey: "ref", refNo: "ref", logs: [log] }).label).toBe("창고 입출고 취소");
+  });
+});
 
 describe("getAdditionalDistinctItemCount", () => {
   it("대표 품목을 제외한 고유 품목만 세고 미변동 구성품도 포함한다", () => {

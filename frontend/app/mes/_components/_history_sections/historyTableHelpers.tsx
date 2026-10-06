@@ -839,6 +839,9 @@ export function getHistoryGroupSummary(group: LogGroup, batch?: IoBatch | null):
     }
   }
   const primaryLog = group.type === "batch" ? representative : first;
+  if (primaryLog.operation_kind === "CANCELLATION" && !label.endsWith(" 취소")) {
+    label = `${label} 취소`;
+  }
   return { primaryLog, title,
     additionalItemCount: getAdditionalDistinctItemCount(logs, representative), displayType, label,
     color: primaryLog.operation_kind === "CANCELLATION" ? LEGACY_COLORS.red : color,
