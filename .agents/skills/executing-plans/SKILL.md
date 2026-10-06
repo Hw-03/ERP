@@ -32,7 +32,7 @@ Load plan, review critically, execute all tasks, report when complete.
 
 For each task:
 1. Mark as in_progress
-2. Note the task's model tag `[GPT-6 Luna|GPT-6 Sol|GPT-6 Astra]`, supported `추천 추론 수준`, and parallel indicator `[병렬 가능|순차]`
+2. Note the task's model tag `[GPT-6 Luna|GPT-6.1 Sol|GPT-6 Astra]`, supported `추천 추론 수준`, and parallel indicator `[병렬 가능|순차]`
 3. If marked `[병렬 가능]` and team is active: Dispatch this task as an independent agent with the specified model
 4. If marked `[순차]`: Execute immediately in sequence
 5. Follow each step exactly (plan has bite-sized steps)

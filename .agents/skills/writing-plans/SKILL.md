@@ -65,7 +65,7 @@ Otherwise, recommend solo execution.
 
 Based on task content, select only one GPT-6 Codex model for the entire plan:
 - **GPT-6 Luna** — Narrow, clear, low-risk work such as file searches, text edits, simple documentation changes, and mechanical cleanup
-- **GPT-6 Sol** — Default for DEXCOWIN MES development: bug fixes, routers, API integrations, backend+frontend work, moderate refactors, and complex coding or agentic workflows
+- **GPT-6.1 Sol** — Default for DEXCOWIN MES development: bug fixes, routers, API integrations, backend+frontend work, moderate refactors, and complex coding or agentic workflows
 - **GPT-6 Astra** — The hardest end-to-end work: ambiguous requirements, high-risk security or data-integrity changes, broad architecture, and difficult multi-step integration across tools or modules
 
 ### Effort Level Assessment
@@ -75,7 +75,7 @@ Reasoning level is **model-dependent**. Use the exact Codex UI label and recomme
 | Recommended model | Selectable reasoning levels |
 |---|---|
 | **GPT-6 Luna** | `Light` · `Medium` · `High` · `Extra High` · `최대` |
-| **GPT-6 Sol** | `Light` · `Medium` · `High` · `Extra High` · `최대` · `울트라` |
+| **GPT-6.1 Sol** | `Light` · `Medium` · `High` · `Extra High` · `최대` · `울트라` |
 | **GPT-6 Astra** | `Light` · `Medium` · `High` · `Extra High` · `최대` · `울트라` |
 
 Pick the level by how much reasoning the work genuinely needs:
@@ -98,7 +98,7 @@ Write the assessment into the plan header (see below).
 ```markdown
 # [Feature Name] Implementation Plan
 
-> **추천 모델: [GPT-6 Luna|GPT-6 Sol|GPT-6 Astra]** — [One-line reason: complexity, file types affected, judgment required]
+> **추천 모델: [GPT-6 Luna|GPT-6.1 Sol|GPT-6 Astra]** — [One-line reason: complexity, file types affected, judgment required]
 > **추천 추론 수준: [Light|Medium|High|Extra High|최대|울트라]** — [One-line reason. Select exactly one level supported by the recommended model.]
 > **실행 방식: [단독 작업|하위 에이전트 병렬 작업]** — [Reason: independent workstreams or sequential dependencies]
 
@@ -122,7 +122,7 @@ Write the assessment into the plan header (see below).
 Each task includes a model tag and parallel-work indicator:
 
 ````markdown
-### Task N: [Component Name] `[GPT-6 Luna|GPT-6 Sol|GPT-6 Astra] [병렬 가능|순차]`
+### Task N: [Component Name] `[GPT-6 Luna|GPT-6.1 Sol|GPT-6 Astra] [병렬 가능|순차]`
 
 **추천 추론 수준: [Light|Medium|High|Extra High|최대|울트라]** — [Choose one level supported by this task's model.]
 
