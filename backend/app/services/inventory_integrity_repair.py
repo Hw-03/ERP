@@ -67,6 +67,14 @@ def _set_workflow_status(
     enum_type = enum_by_type.get(effect.subject_type)
     subject.status = enum_type(expected) if enum_type is not None else expected.lower()
 
+    if (
+        effect.subject_type == "ShippingRequest"
+        and expected == "CANCELLED"
+        and str((effect.after_state or {}).get("status")) == "PREPARING"
+    ):
+        # 정상 요청취소의 작업자·시각은 준비취소 원장이 아닌 요청 이벤트에 속한다.
+        return
+
     cancellation = db.get(InventoryOperation, effect.operation_id)
     if cancellation is None:
         raise InventoryIntegrityRepairError("취소 작업을 찾을 수 없어 복구할 수 없습니다.")

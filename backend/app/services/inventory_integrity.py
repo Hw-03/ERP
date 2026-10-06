@@ -27,6 +27,7 @@ from app.models import (
     LocationStatusEnum,
     ShippingAllocation,
     ShippingRequest,
+    ShippingRequestEvent,
     StockRequest,
     StockRequestLine,
     SystemSetting,
@@ -384,6 +385,25 @@ def expected_workflow_effect_status(
     """불변 효과를 유지하면서 현재 취소 정책의 최종 업무 상태로 해석한다."""
     expected = str((effect.after_state or {}).get("status") or "")
     operation = operation or db.get(InventoryOperation, effect.operation_id)
+    if effect.subject_type == "ShippingRequest" and operation is not None:
+        request = db.get(ShippingRequest, effect.subject_id)
+        if (
+            request is not None
+            and expected == "PREPARING"
+            and operation.domain == "shipping"
+            and operation.kind == InventoryOperationKindEnum.CANCELLATION
+            and operation.reverses_operation_id is not None
+            and request.cancelled_at is not None
+            and request.cancelled_at >= operation.created_at
+            and request.cancelled_by_employee_id is not None
+            and bool(request.cancelled_by_name)
+            and db.query(ShippingRequestEvent.event_id).filter(
+                ShippingRequestEvent.request_id == request.request_id,
+                ShippingRequestEvent.event_type == "CANCELLED",
+                ShippingRequestEvent.created_at >= request.cancelled_at,
+            ).first() is not None
+        ):
+            return "CANCELLED"
     if (
         effect.subject_type != "IoBatch"
         or operation is None
@@ -450,7 +470,7 @@ def _shipping_workflow_issues(db: Session) -> list[InventoryIntegrityIssue]:
                 for reversal, later in candidates
             )
         ]
-        states = {str((effect.after_state or {}).get("status") or "") for effect, _ in candidates}
+        states = {expected_workflow_effect_status(db, effect, operation=op) for effect, op in candidates}
         ambiguous = len(states) != 1 or "" in states
         effect, operation = min(candidates or history, key=lambda row: str(row[0].effect_id))
         expected = " / ".join(sorted(states)) if ambiguous else next(iter(states))
@@ -465,7 +485,11 @@ def _shipping_workflow_issues(db: Session) -> list[InventoryIntegrityIssue]:
             cause_ids=(operation.operation_id, effect.effect_id, subject_id),
             current_value=f"현재 상태 {current or '대상 없음'}",
             expected_value=f"최신 상태 {expected or '확정 불가'}",
-            repairable=not ambiguous and operation.kind == InventoryOperationKindEnum.CANCELLATION,
+            repairable=(
+                not ambiguous
+                and operation.kind == InventoryOperationKindEnum.CANCELLATION
+                and current != "CANCELLED"
+            ),
         ))
     return issues
 

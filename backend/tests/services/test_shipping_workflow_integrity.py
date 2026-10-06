@@ -10,6 +10,7 @@ from app.models import (
     InventoryOperation, InventoryOperationEffect, InventoryOperationEffectKindEnum,
     InventoryOperationKindEnum, InventoryOperationStatusEnum, ShippingRequest,
     ShippingAllocation, ShippingRequestStatusEnum,
+    ShippingRequestEvent, Employee,
 )
 from app.services.inventory_integrity import diagnose_inventory_integrity
 from app.services.inventory_integrity_repair import (
@@ -184,3 +185,92 @@ def test_latest_allocation_effect_ignores_reversed_cancellation_state(db_session
     ]
 
     assert issues == []
+
+
+def test_request_cancel_after_prepare_reversal_is_consistent(db_session, make_item):
+    from app.services.shipping import delete_request
+
+    request, _, _ = _history(db_session, make_item, ["PREPARED", "PREPARING"])
+    actor = Employee(employee_code="E900", name="취소자", role="직원", department="출하", is_active="true")
+    db_session.add(actor)
+    db_session.commit()
+    delete_request(db_session, request.request_id, actor)
+    db_session.commit()
+    assert request.status == ShippingRequestStatusEnum.CANCELLED
+    assert request.cancelled_at is not None
+    assert request.cancelled_by_employee_id == actor.employee_id
+    assert db_session.query(ShippingRequestEvent).filter_by(request_id=request.request_id, event_type="CANCELLED").count() == 1
+    assert _issues(db_session) == []
+
+
+def test_proven_request_cancel_status_can_be_repaired_without_changing_cancel_metadata(db_session, make_item):
+    from app.services.shipping import delete_request
+
+    request, _, _ = _history(db_session, make_item, ["PREPARED", "PREPARING"])
+    actor = Employee(employee_code="E902", name="cancel actor", role="worker", department="출하", is_active="true")
+    db_session.add(actor)
+    db_session.commit()
+    delete_request(db_session, request.request_id, actor)
+    db_session.commit()
+    cancellation_metadata = (request.cancelled_at, request.cancelled_by_employee_id, request.cancelled_by_name)
+    request.status = ShippingRequestStatusEnum.PREPARING
+    db_session.flush()
+    issue = _issues(db_session)[0]
+    assert issue.expected_value.endswith("CANCELLED")
+    assert issue.repairable is True
+    repair_inventory_integrity_issue(db_session, problem_id=issue.problem_id, approved_by="test", apply=True)
+    db_session.commit()
+    assert request.status == ShippingRequestStatusEnum.CANCELLED
+    assert (request.cancelled_at, request.cancelled_by_employee_id, request.cancelled_by_name) == cancellation_metadata
+
+
+@pytest.mark.parametrize("latest", ["PREPARED", "PICKED_UP"])
+def test_old_request_cancel_evidence_does_not_override_followup_business_state(db_session, make_item, latest):
+    request, _, _ = _history(db_session, make_item, ["PREPARED", "PREPARING", latest])
+    actor = Employee(employee_code="E903", name="cancel actor", role="worker", department="출하", is_active="true")
+    db_session.add(actor)
+    db_session.flush()
+    request.cancelled_at = datetime(2026, 9, 2)
+    request.cancelled_by_employee_id = actor.employee_id
+    request.cancelled_by_name = actor.name
+    db_session.add(ShippingRequestEvent(request_id=request.request_id, event_type="CANCELLED", created_at=datetime(2026, 9, 2)))
+    db_session.flush()
+    assert _issues(db_session) == []
+
+
+def test_unproven_request_cancel_remains_issue_without_reopening(db_session, make_item):
+    request, _, _ = _history(db_session, make_item, ["PREPARED", "PREPARING"])
+    request.status = ShippingRequestStatusEnum.CANCELLED
+    db_session.flush()
+    issues = _issues(db_session)
+    assert len(issues) == 1
+    assert issues[0].repairable is False
+    with pytest.raises(InventoryIntegrityRepairError):
+        repair_inventory_integrity_issue(db_session, problem_id=issues[0].problem_id, approved_by="test", apply=True)
+    assert request.status == ShippingRequestStatusEnum.CANCELLED
+
+
+@pytest.mark.parametrize("evidence", ["missing_event", "missing_time", "old_time", "missing_actor"])
+def test_stale_or_incomplete_request_cancel_evidence_stays_detectable(db_session, make_item, evidence):
+    request, _, _ = _history(db_session, make_item, ["PREPARED", "PREPARING"])
+    request.status = ShippingRequestStatusEnum.CANCELLED
+    actor = Employee(employee_code="E901", name="cancel actor", role="worker", department="출하", is_active="true")
+    db_session.add(actor)
+    db_session.flush()
+    request.cancelled_at = datetime(2026, 9, 2)
+    request.cancelled_by_employee_id = actor.employee_id
+    request.cancelled_by_name = "cancel actor"
+    if evidence == "missing_time":
+        request.cancelled_at = None
+    elif evidence == "old_time":
+        request.cancelled_at = datetime(2026, 8, 31)
+    elif evidence == "missing_actor":
+        request.cancelled_by_employee_id = None
+    if evidence != "missing_event":
+        db_session.add(ShippingRequestEvent(
+            request_id=request.request_id, event_type="CANCELLED", created_at=datetime(2026, 9, 2),
+        ))
+    db_session.flush()
+    issues = _issues(db_session)
+    assert len(issues) == 1
+    assert issues[0].repairable is False

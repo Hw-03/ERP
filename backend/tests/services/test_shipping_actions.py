@@ -483,10 +483,34 @@ def test_shipping_cancel_retry_cycles_preserve_stock_and_history(
     assert sum(log.quantity_change for log in logs) == -2
     assert len({log.operation_id for log in logs}) == 7
     from app.routers.shipping import _to_response
+
     response = _to_response(db_session, request)
     pickup_logs = [log for log in response.transactions if log.shipping_phase == "PICKUP"]
     assert sum(log.cancelled for log in pickup_logs) == 6
     assert sum(log.quantity_change for log in pickup_logs if not log.cancelled and log.quantity_change < 0) == -2
+
+
+def test_pickup_prepare_request_reverse_sequence_keeps_integrity_and_stock(
+    db_session, make_item, make_bom, make_location,
+):
+    from app.services.inventory_integrity import diagnose_inventory_integrity
+
+    request_id, _, pf_id, companion_id = _make_prepared_request(
+        db_session, make_item, make_bom, make_location,
+    )
+    actor = _prepared_actor(db_session, request_id)
+    before = [_location_qty(db_session, item_id, DepartmentEnum.SHIPPING) for item_id in (pf_id, companion_id)]
+    shipping_actions_svc.pickup_complete(db_session, request_id, actor=actor)
+    shipping_actions_svc.pickup_cancel(db_session, request_id, actor=actor)
+    assert [_location_qty(db_session, item_id, DepartmentEnum.SHIPPING) for item_id in (pf_id, companion_id)] == before
+    shipping_actions_svc.prepare_cancel(db_session, request_id, "요청 취소", actor=actor)
+    assert db_session.query(ShippingAllocation).filter_by(request_id=request_id, status="RESERVED").count() == 0
+    shipping_svc.delete_request(db_session, request_id, actor)
+    db_session.commit()
+    request = db_session.get(ShippingRequest, request_id)
+    assert request.status == ShippingRequestStatusEnum.CANCELLED
+    assert [_location_qty(db_session, item_id, DepartmentEnum.SHIPPING) for item_id in (pf_id, companion_id)] == before
+    assert diagnose_inventory_integrity(db_session).is_consistent
 
 
 def test_shipping_changed_companions_do_not_reuse_released_allocations(
