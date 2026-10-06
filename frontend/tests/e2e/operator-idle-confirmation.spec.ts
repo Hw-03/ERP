@@ -61,9 +61,14 @@ test("알림창 위에서 키보드와 포커스를 독점하고 확인 후 알�
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.clock.install();
   const name = await login(page);
-  await page.getByRole("button", { name: /^알림(?: \d+건)?$/ }).click();
   const notifications = page.getByRole("dialog", { name: "알림", exact: true });
-  await expect(notifications).toBeVisible();
+  // 로그인 알림이 자동으로 열리면 그대로 사용한다. 조회 응답과 수동 열기의 경합도 허용한다.
+  await expect(async () => {
+    if (!await notifications.isVisible()) {
+      await page.getByRole("button", { name: /^알림(?: \d+건)?$/ }).click({ timeout: 1_000 });
+    }
+    await expect(notifications).toBeVisible();
+  }).toPass({ timeout: 10_000 });
   await page.clock.fastForward(300_000);
   const confirmation = page.getByRole("dialog", { name: confirmationTitle });
   await expect(confirmation.getByRole("heading")).toBeFocused();

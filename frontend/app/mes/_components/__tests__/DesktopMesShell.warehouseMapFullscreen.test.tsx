@@ -34,7 +34,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/ui/dirty-guard", () => ({
   DirtyGuardProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
   useConfirmNavigation: () => (next: () => void) => next(),
-  useFlushDirtyEntries: () => async () => {},
+  useBeforeViewportSwitch: () => async () => {},
 }));
 
 vi.mock("@/lib/queries/useProductionQuery", () => ({

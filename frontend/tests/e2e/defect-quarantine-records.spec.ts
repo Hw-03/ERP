@@ -179,6 +179,8 @@ test.describe("불량 격리 건별 원장", () => {
 
     await firstRow.getByRole("button", { name: "처리", exact: true }).click();
     await page.getByRole("spinbutton").fill("2");
+    await expect(page.getByRole("button", { name: "정상 복귀 →" })).toBeDisabled();
+    await page.getByPlaceholder("예: 스크래치 다수 / 우측 끝단").fill("검사 완료 후 일부 정상 복귀");
     await page.getByRole("button", { name: "정상 복귀 →" }).click();
     await page.getByRole("dialog").getByRole("button", { name: "즉시 복귀", exact: true }).click();
     await expect(page.getByRole("button").filter({ hasText: "격리 목록", visible: true })).toBeVisible();
@@ -299,6 +301,8 @@ test.describe("불량 격리 건별 원장", () => {
     await expect(page.getByRole("button", { name: "전체 폐기", exact: true }).filter({ visible: true })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "반품", exact: true }).filter({ visible: true })).toHaveCount(0);
     await page.getByRole("spinbutton").filter({ visible: true }).fill("2");
+    await expect(page.getByRole("button", { name: "정상 복귀 →", exact: true }).filter({ visible: true })).toBeDisabled();
+    await page.getByPlaceholder("예: 스크래치 다수 / 우측 끝단").filter({ visible: true }).fill("B급 재검사 완료 후 일부 정상 복귀");
     await page.getByRole("button", { name: "정상 복귀 →", exact: true }).filter({ visible: true }).click();
     await page.getByRole("dialog").getByRole("button", { name: "즉시 복귀", exact: true }).click();
     await expect(page.getByRole("heading", { name: "B급·구형 자재" }).filter({ visible: true })).toBeVisible();

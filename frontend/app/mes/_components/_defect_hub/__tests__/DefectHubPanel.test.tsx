@@ -504,13 +504,13 @@ describe("DefectHubPanel", () => {
       mockLocations[0],
       { ...mockLocations[0], record_id: "record-003", quantity: 2, original_quantity: 2, available_quantity: 2 },
     ]);
-    render(<DefectHubPanel currentEmployee={{ ...mockEmployee, department: "기타" }} />);
+    render(<DefectHubPanel currentEmployee={{ ...mockEmployee, department: "기타" }} mobilePresentation />);
     openList();
 
+    fireEvent.click(await screen.findByRole("button", { name: "전극(70kV) 격리 2건" }));
     const selectMany = await screen.findByRole("button", { name: "여러 건 선택" });
     await act(async () => { fireEvent.click(selectMany); });
-    const checkboxes = (await screen.findAllByTestId("defect-child-selection"))
-      .map((container) => within(container).getByRole("checkbox"));
+    const checkboxes = await screen.findAllByRole("checkbox", { name: /전극\(70kV\).*선택/ });
     fireEvent.click(checkboxes[0]);
     fireEvent.click(checkboxes[1]);
     fireEvent.click(screen.getByRole("button", { name: "선택 처리 2건" }));
