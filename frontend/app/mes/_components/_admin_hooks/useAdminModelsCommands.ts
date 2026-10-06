@@ -14,6 +14,7 @@ import {
 export type UseAdminModelsCommandsArgs = {
   productModels: ProductModel[];
   setProductModels: (updater: (prev: ProductModel[]) => ProductModel[]) => void;
+  refreshEmployees: () => Promise<void>;
   onStatusChange: (msg: string) => void;
   onError: (msg: string) => void;
   adminPin: string;
@@ -32,6 +33,7 @@ export type UseAdminModelsCommandsState = {
 export function useAdminModelsCommands({
   productModels,
   setProductModels,
+  refreshEmployees,
   onStatusChange,
   onError,
   adminPin,
@@ -72,9 +74,15 @@ export function useAdminModelsCommands({
     deleteModelMutation.mutate(
       { slot, pin: adminPin },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
           setProductModels((prev) => prev.filter((m) => m.slot !== slot));
           onStatusChange(`'${model.model_name}' 모델을 삭제했습니다.`);
+          try {
+            await refreshEmployees();
+          } catch (error) {
+            const detail = error instanceof Error ? error.message : "알 수 없는 오류";
+            onError(`모델은 삭제했지만 직원 목록을 새로고침하지 못했습니다: ${detail}`);
+          }
         },
         onError: (err) => onError(err instanceof Error ? err.message : "삭제 실패"),
       },

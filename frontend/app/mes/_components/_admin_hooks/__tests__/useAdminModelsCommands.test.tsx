@@ -23,6 +23,7 @@ function wrapper({ children }: { children: ReactNode }) {
 const baseArgs = (over: Partial<Parameters<typeof useAdminModelsCommands>[0]> = {}) => ({
   productModels: [],
   setProductModels: vi.fn(),
+  refreshEmployees: vi.fn().mockResolvedValue(undefined),
   onStatusChange: vi.fn(),
   onError: vi.fn(),
   adminPin: "1234",
@@ -82,5 +83,47 @@ describe("useAdminModelsCommands", () => {
       ],
       pin: "1234",
     });
+  });
+
+  it("삭제 성공 뒤 직원 목록을 한 번 재조회하고 모델 삭제 성공을 알린다", async () => {
+    const args = baseArgs({ productModels: [{ slot: 7, model_name: "QA", symbol: "QA" } as any] });
+    const { result } = renderHook(() => useAdminModelsCommands(args), { wrapper });
+    vi.spyOn(window, "confirm").mockReturnValueOnce(true);
+
+    act(() => result.current.delete(7));
+    expect(deleteMutate).toHaveBeenCalledTimes(1);
+    await act(async () => { await deleteMutate.mock.calls[0]![1].onSuccess(); });
+
+    expect(args.setProductModels).toHaveBeenCalledTimes(1);
+    expect(args.refreshEmployees).toHaveBeenCalledTimes(1);
+    expect(args.onStatusChange).toHaveBeenCalledWith("'QA' 모델을 삭제했습니다.");
+  });
+
+  it("삭제 후 직원 재조회 실패는 삭제 성공과 별도 오류로 알린다", async () => {
+    const args = baseArgs({
+      productModels: [{ slot: 7, model_name: "QA", symbol: "QA" } as any],
+      refreshEmployees: vi.fn().mockRejectedValue(new Error("직원 API 오류")),
+    });
+    const { result } = renderHook(() => useAdminModelsCommands(args), { wrapper });
+    vi.spyOn(window, "confirm").mockReturnValueOnce(true);
+
+    act(() => result.current.delete(7));
+    await act(async () => { await deleteMutate.mock.calls[0]![1].onSuccess(); });
+
+    expect(args.onStatusChange).toHaveBeenCalledWith("'QA' 모델을 삭제했습니다.");
+    expect(args.onError).toHaveBeenCalledWith(expect.stringContaining("직원 API 오류"));
+  });
+
+  it("모델 삭제 실패 시 직원 목록을 재조회하지 않는다", () => {
+    const args = baseArgs({ productModels: [{ slot: 7, model_name: "QA", symbol: "QA" } as any] });
+    const { result } = renderHook(() => useAdminModelsCommands(args), { wrapper });
+    vi.spyOn(window, "confirm").mockReturnValueOnce(true);
+
+    act(() => result.current.delete(7));
+    act(() => deleteMutate.mock.calls[0]![1].onError(new Error("409")));
+
+    expect(args.refreshEmployees).not.toHaveBeenCalled();
+    expect(args.setProductModels).not.toHaveBeenCalled();
+    expect(args.onError).toHaveBeenCalledWith("409");
   });
 });

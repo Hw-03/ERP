@@ -13,6 +13,7 @@ export type { ModelEditForm } from "./useAdminModelsForm";
 export type UseAdminModelsArgs = {
   productModels: ProductModel[];
   setProductModels: (updater: (prev: ProductModel[]) => ProductModel[]) => void;
+  refreshEmployees: () => Promise<void>;
   onStatusChange: (msg: string) => void;
   onError: (msg: string) => void;
   adminPin: string;
@@ -41,6 +42,7 @@ export type AdminModelsState = {
 export function useAdminModels({
   productModels,
   setProductModels,
+  refreshEmployees,
   onStatusChange,
   onError,
   adminPin,
@@ -50,6 +52,7 @@ export function useAdminModels({
   const commands = useAdminModelsCommands({
     productModels,
     setProductModels,
+    refreshEmployees,
     onStatusChange,
     onError,
     adminPin,

@@ -24,6 +24,23 @@ const employee = (over: Partial<any> = {}): any => ({
 });
 
 describe("useAdminEmployeesForm", () => {
+  it("직원 재조회 결과에서 삭제 모델을 제거하고 남은 담당 모델 순서로 선택 폼을 갱신한다", async () => {
+    const original = employee({ assigned_model_slots: [3, 7, 1] });
+    const refreshed = employee({ assigned_model_slots: [3, 1] });
+    const { result, rerender } = renderHook(
+      ({ employees }) => useAdminEmployeesForm(employees),
+      { initialProps: { employees: [original] } },
+    );
+    act(() => result.current.setSelectedEmployee(original));
+    expect(result.current.editForm.assigned_model_slots).toEqual([3, 7, 1]);
+
+    rerender({ employees: [refreshed] });
+
+    expect(result.current.selectedEmployee).toBe(refreshed);
+    expect(result.current.editForm.assigned_model_slots).toEqual([3, 1]);
+    expect(result.current.dirty).toBe(false);
+  });
+
   it("loads hidden sidebar tabs into the edit form and marks changes dirty", async () => {
     const emp = employee();
     const { result } = renderHook(() => useAdminEmployeesForm([emp]));

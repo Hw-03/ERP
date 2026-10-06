@@ -45,6 +45,7 @@ export interface UseAdminBootstrapResult {
   loadData: () => Promise<void>;
   refreshAllBom: () => void;
   refreshItems: () => Promise<void>;
+  refreshEmployees: () => Promise<void>;
 }
 
 export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBootstrapResult {
@@ -57,6 +58,7 @@ export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBoots
   const [allBomRows, setAllBomRows] = useState<BOMDetailEntry[]>([]);
   const [departments, setDepartments] = useState<DepartmentMaster[]>([]);
   const itemsRequestId = useRef(0);
+  const employeesRequestId = useRef(0);
   const allBomRequestId = useRef(0);
 
   // models 만 React Query 로 분리 — enabled(unlocked) 로 게이트 보존.
@@ -67,13 +69,14 @@ export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBoots
 
   const loadData = useCallback(async () => {
     const requestId = ++itemsRequestId.current;
+    const employeeRequestId = ++employeesRequestId.current;
     const [nextItems, nextEmployees, nextDepts] = await Promise.all([
       api.getItems({ limit: 2000, search: globalSearch.trim() || undefined }),
       api.getEmployees({ activeOnly: false }),
       api.getDepartments(),
     ]);
     if (requestId === itemsRequestId.current) setItems(nextItems);
-    setEmployees(nextEmployees);
+    if (employeeRequestId === employeesRequestId.current) setEmployees(nextEmployees);
     setDepartments(nextDepts);
   }, [globalSearch]);
 
@@ -95,6 +98,12 @@ export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBoots
     const next = await api.getItems({ limit: 2000, search: globalSearch.trim() || undefined });
     if (requestId === itemsRequestId.current) setItems(next);
   }, [globalSearch]);
+
+  const refreshEmployees = useCallback(async (): Promise<void> => {
+    const requestId = ++employeesRequestId.current;
+    const next = await api.getEmployees({ activeOnly: false });
+    if (requestId === employeesRequestId.current) setEmployees(next);
+  }, []);
 
   // items/employees/departments 부트스트랩 — unlocked + globalSearch 변화 시
   useEffect(() => {
@@ -127,5 +136,6 @@ export function useAdminBootstrap(opts: UseAdminBootstrapOptions): UseAdminBoots
     loadData,
     refreshAllBom,
     refreshItems,
+    refreshEmployees,
   };
 }

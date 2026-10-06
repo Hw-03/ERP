@@ -63,6 +63,7 @@ export function DesktopAdminView({
     allBomRows,
     refreshAllBom,
     refreshItems,
+    refreshEmployees,
     loadData,
   } = useAdminBootstrap({
     unlocked,
@@ -129,6 +130,7 @@ export function DesktopAdminView({
               allBomRows={allBomRows}
               refreshAllBom={refreshAllBom}
               refreshItems={refreshItems}
+              refreshEmployees={refreshEmployees}
               pinForm={pinForm}
               setPinForm={setPinForm}
               isSaving={isSaving}

@@ -70,6 +70,44 @@ describe("useAdminBootstrap realtime refresh", () => {
     expect(mocks.getDepartments).toHaveBeenCalledTimes(1);
   });
 
+  it("명시적 직원 재조회는 전체 직원 API 결과로 공유 목록을 교체한다", async () => {
+    const original = [{ employee_id: "emp-1", assigned_model_slots: [3, 7, 1] }];
+    const refreshed = [{ employee_id: "emp-1", assigned_model_slots: [3, 1] }];
+    mocks.getEmployees.mockResolvedValueOnce(original).mockResolvedValueOnce(refreshed);
+    const onError = vi.fn();
+    const { result } = renderHook(
+      () => useAdminBootstrap({ unlocked: true, globalSearch: "", onError }),
+    );
+    await waitFor(() => expect(result.current.employees).toEqual(original));
+
+    await act(async () => { await result.current.refreshEmployees(); });
+
+    expect(mocks.getEmployees).toHaveBeenCalledTimes(2);
+    expect(mocks.getEmployees).toHaveBeenLastCalledWith({ activeOnly: false });
+    expect(result.current.employees).toEqual(refreshed);
+  });
+
+  it("삭제 후 재조회보다 늦게 끝난 초기 직원 응답은 최신 담당 모델을 되돌리지 않는다", async () => {
+    const older = deferred<unknown[]>();
+    const original = [{ employee_id: "emp-1", assigned_model_slots: [3, 7, 1] }];
+    const refreshed = [{ employee_id: "emp-1", assigned_model_slots: [3, 1] }];
+    mocks.getEmployees.mockReturnValueOnce(older.promise).mockResolvedValueOnce(refreshed);
+    const onError = vi.fn();
+    const { result } = renderHook(
+      () => useAdminBootstrap({ unlocked: true, globalSearch: "", onError }),
+    );
+    await waitFor(() => expect(mocks.getEmployees).toHaveBeenCalledTimes(1));
+
+    await act(async () => { await result.current.refreshEmployees(); });
+    expect(result.current.employees).toEqual(refreshed);
+
+    await act(async () => {
+      older.resolve(original);
+      await older.promise;
+    });
+    expect(result.current.employees).toEqual(refreshed);
+  });
+
   it("ignores an older item response that finishes after a newer revision response", async () => {
     const older = deferred<unknown[]>();
     const newer = deferred<unknown[]>();
