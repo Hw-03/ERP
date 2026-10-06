@@ -19,9 +19,48 @@ from app.schemas import (
 )
 from app.services._tx import commit_and_refresh, commit_only
 from app.services.reorder import reorder_by_display_order
-from app.utils.mes_code import refresh_symbol_cache
+from app.utils.mes_code import (
+    ModelSymbolAmbiguousError, ModelSymbolInvalidError, parse_model_symbol,
+    refresh_symbol_cache,
+)
 
 router = APIRouter()
+
+
+def _symbol_snapshot(db: Session) -> dict[str, int]:
+    return {
+        symbol: slot for slot, symbol in db.query(ProductSymbol.slot, ProductSymbol.symbol)
+        .filter(ProductSymbol.symbol.isnot(None)).all()
+    }
+
+
+def _item_prefixes(db: Session, *, unique: bool = False) -> list[str]:
+    """Use the generated code prefix that item API readers actually consume."""
+    prefixes = [
+        code.split("-", 1)[0]
+        for (code,) in db.query(Item.mes_code).all()
+        if code and "-" in code
+    ]
+    return sorted(set(prefixes)) if unique else prefixes
+
+
+def _validate_symbol(symbol: str) -> None:
+    if not symbol or "-" in symbol:
+        raise http_error(422, ErrorCode.UNPROCESSABLE, "모델 기호는 비어 있거나 '-'를 포함할 수 없습니다.")
+
+
+def _guard_existing_item_connections(db: Session, candidate: dict[str, int]) -> None:
+    """Reject a symbol edit that changes the meaning of an existing item prefix."""
+    current = _symbol_snapshot(db)
+    prefixes = _item_prefixes(db, unique=True)
+    for prefix in prefixes:
+        try:
+            before = parse_model_symbol(prefix, current)
+            after = parse_model_symbol(prefix, candidate)
+        except (ModelSymbolAmbiguousError, ModelSymbolInvalidError) as exc:
+            raise http_error(409, ErrorCode.CONFLICT, f"기존 품목의 모델 연결을 확인할 수 없습니다: {prefix}") from exc
+        if before != after:
+            raise http_error(409, ErrorCode.CONFLICT, f"기존 품목의 모델 연결이 바뀝니다: {prefix}")
 
 
 @router.get("", response_model=List[ProductModelResponse], summary="제품 모델 목록 (예약 제외)")
@@ -90,15 +129,21 @@ def create_model(
 
     # symbol 처리: 제공 안 하면 미사용 단일 문자 자동 배정
     symbol = payload.symbol
+    if symbol is not None:
+        _validate_symbol(symbol)
     if not symbol:
         for candidate in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789":
             if not db.query(ProductSymbol).filter(ProductSymbol.symbol == candidate).first():
                 symbol = candidate
                 break
+        if symbol is None:
+            raise http_error(400, ErrorCode.BAD_REQUEST, "자동 배정 가능한 모델 기호가 없습니다.")
     else:
         dup = db.query(ProductSymbol).filter(ProductSymbol.symbol == symbol).first()
         if dup:
             raise http_error(409, ErrorCode.CONFLICT, "같은 기호(symbol)의 모델이 이미 존재합니다.")
+
+    _guard_existing_item_connections(db, {**_symbol_snapshot(db), symbol: target.slot})
 
     target.symbol = symbol
     target.model_name = payload.model_name
@@ -135,6 +180,7 @@ def update_model(
         ps.model_name = payload.model_name
 
     if payload.symbol is not None:
+        _validate_symbol(payload.symbol)
         dup_sym = (
             db.query(ProductSymbol)
             .filter(ProductSymbol.symbol == payload.symbol, ProductSymbol.slot != slot)
@@ -142,6 +188,9 @@ def update_model(
         )
         if dup_sym:
             raise http_error(409, ErrorCode.CONFLICT, "같은 기호(symbol)의 모델이 이미 존재합니다.")
+        candidate = {symbol: existing_slot for symbol, existing_slot in _symbol_snapshot(db).items() if existing_slot != slot}
+        candidate[payload.symbol] = slot
+        _guard_existing_item_connections(db, candidate)
         ps.symbol = payload.symbol
 
     commit_and_refresh(db, ps)
@@ -171,22 +220,18 @@ def delete_model(
     if not ps:
         raise http_error(404, ErrorCode.NOT_FOUND, "모델을 찾을 수 없습니다.")
 
-    # 해당 slot을 사용하는 품목 확인 — mes_code prefix(첫 '-' 앞)에 symbol 글자 포함이면 사용 중.
-    # transactions._model_filter 와 동일한 substr/instr 패턴 (SQLite 운영 전제).
+    # 모든 기존 품목의 전체 prefix를 같은 슬롯 해석 규칙으로 확인한다.
     if ps.symbol:
-        from sqlalchemy import func as _f
-        sym = ps.symbol.replace("%", "\\%").replace("_", "\\_")
-        dash_pos = _f.instr(Item.mes_code, "-")
-        prefix_expr = _f.substr(Item.mes_code, 1, dash_pos - 1)
-        linked_items = (
-            db.query(Item)
-            .filter(
-                Item.mes_code.isnot(None),
-                dash_pos > 0,
-                prefix_expr.like(f"%{sym}%", escape="\\"),
-            )
-            .count()
-        )
+        snapshot = _symbol_snapshot(db)
+        linked_items = 0
+        for prefix in _item_prefixes(db):
+            if not prefix:
+                continue
+            try:
+                slots = parse_model_symbol(prefix, snapshot)
+            except (ModelSymbolAmbiguousError, ModelSymbolInvalidError) as exc:
+                raise http_error(409, ErrorCode.CONFLICT, "기존 품목의 모델 연결을 확인할 수 없습니다.") from exc
+            linked_items += slot in slots
         if linked_items > 0:
             raise http_error(
                 409,

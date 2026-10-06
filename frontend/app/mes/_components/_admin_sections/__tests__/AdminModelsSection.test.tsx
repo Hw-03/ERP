@@ -31,6 +31,27 @@ function findByClasses(container: HTMLElement, ...classes: string[]) {
 }
 
 describe("AdminModelsSection", () => {
+  it("API 모델 슬롯으로 여러 글자 기호의 연결 품목과 BOM 수를 집계한다", async () => {
+    const originalModels = context.productModels;
+    context.productModels = [{ slot: 7, symbol: "QA", model_name: "QA 모델", is_reserved: false }];
+    try {
+      render(
+        <DirtyGuardProvider>
+          <AdminModelsSection
+            items={[{ item_id: "item-qa", item_name: "QA 부품", mes_code: "QA-TR-0001", model_slots: [7] }]}
+            allBomRows={[{ parent_item_id: "item-qa", child_item_id: "child-1" }]}
+          />
+        </DirtyGuardProvider>,
+      );
+
+      await screen.findByText("QA 부품");
+      expect(screen.getByText("연결 품목 수").parentElement).toHaveTextContent("1");
+      expect(screen.getByText("연결 BOM 수").parentElement).toHaveTextContent("1");
+    } finally {
+      context.productModels = originalModels;
+    }
+  });
+
   it("keeps the narrow layout and uses a 2:8 list-detail split at xl", async () => {
     const { container } = render(
       <DirtyGuardProvider>

@@ -27,10 +27,12 @@ from app.schemas import (
 )
 from app.schemas.item import DefectiveStockBreakdown
 from app.utils.mes_code import (
+    ModelSymbolAmbiguousError,
+    ModelSymbolInvalidError,
     mes_code_to_model_slots,
     make_mes_code,
     next_serial_no,
-    slots_to_model_symbol,
+    parse_model_symbol,
 )
 from app.utils.search import build_normalized_search_filter
 from app.models import ProductSymbol
@@ -45,6 +47,35 @@ from app.services.reorder import reorder_by_display_order
 from app.repositories import item_repository, inventory_repository
 
 router = APIRouter()
+
+
+def _item_model_slots(mes_code: str | None) -> list[int]:
+    try:
+        return mes_code_to_model_slots(mes_code)
+    except (ModelSymbolAmbiguousError, ModelSymbolInvalidError) as exc:
+        raise http_error(409, ErrorCode.CONFLICT, str(exc)) from exc
+
+
+def _validated_model_symbol(db: Session, slots: list[int]) -> str:
+    if not slots or len(slots) != len(set(slots)):
+        raise http_error(422, ErrorCode.UNPROCESSABLE, "사용 제품(모델) 슬롯이 중복되거나 비어 있습니다.")
+    rows = db.query(ProductSymbol.slot, ProductSymbol.symbol).filter(ProductSymbol.symbol.isnot(None)).all()
+    mapping = {symbol: slot for slot, symbol in rows}
+    selected = [symbol for slot, symbol in rows if slot in slots]
+    if len(selected) != len(slots):
+        raise http_error(422, ErrorCode.UNPROCESSABLE, "등록되지 않은 사용 제품(모델) 슬롯이 있습니다.")
+    if any("-" in symbol for symbol in selected):
+        raise http_error(422, ErrorCode.UNPROCESSABLE, "'-'가 포함된 모델 기호로는 품목을 등록할 수 없습니다.")
+    prefix = "".join(sorted(selected))
+    if len(prefix) > Item.model_symbol.type.length:
+        raise http_error(422, ErrorCode.UNPROCESSABLE, "선택한 모델 기호 조합이 품목 코드의 저장 길이를 초과합니다.")
+    try:
+        parsed = parse_model_symbol(prefix, mapping)
+    except (ModelSymbolAmbiguousError, ModelSymbolInvalidError) as exc:
+        raise http_error(422, ErrorCode.UNPROCESSABLE, str(exc)) from exc
+    if parsed != sorted(slots):
+        raise http_error(422, ErrorCode.UNPROCESSABLE, "모델 기호와 선택 슬롯이 일치하지 않습니다.")
+    return prefix
 
 
 def _build_item_query(db: Session) -> SAQuery:
@@ -150,7 +181,7 @@ def _to_item_with_inventory(
         # 회사 규약: mes_code prefix(첫 '-' 앞 글자열) 가 모델을 결정.
         # 예: "8-AR-0307" → SOLO(slot 3), "78-PR-0042" → COCOON+SOLO(slot 2,3).
         # 별도 item_models 테이블 없이 코드만 보면 됨.
-        model_slots = mes_code_to_model_slots(item.mes_code)
+        model_slots = _item_model_slots(item.mes_code)
 
     return ItemWithInventory(
         item_id=item.item_id,
@@ -203,7 +234,7 @@ def create_item(
 ):
     pt = payload.process_type_code or None
     model_slots = payload.model_slots or []
-    model_sym = slots_to_model_symbol(model_slots) if model_slots else ""
+    model_sym = _validated_model_symbol(db, model_slots) if model_slots else ""
     sales_review_required = (
         payload.sales_review_required
         if payload.sales_review_required is not None
@@ -410,7 +441,7 @@ def list_items(
             inv,
             figures=figures_map.get(item.item_id),
             locations=locations_by_item.get(item.item_id, []),
-            model_slots=mes_code_to_model_slots(item.mes_code),
+            model_slots=_item_model_slots(item.mes_code),
             has_bom=item.item_id in bom_parent_ids,
             defective_breakdown=defective_by_item.get(item.item_id, []),
         )
@@ -643,7 +674,7 @@ def update_item(
     #   - 카테고리 변경 → 새 카테고리의 next_serial_no 부여 (번호 풀이 다르므로).
     new_pt = payload.process_type_code if payload.process_type_code is not None else item.process_type_code
     if payload.model_slots is not None:
-        new_model_sym = slots_to_model_symbol(payload.model_slots) or None
+        new_model_sym = _validated_model_symbol(db, payload.model_slots)
     else:
         new_model_sym = item.model_symbol
 

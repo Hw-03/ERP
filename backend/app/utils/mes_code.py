@@ -25,10 +25,18 @@ _slot_symbol_cache: dict[str, dict] | None = None
 _EMPTY_MAPS: dict[str, dict] = {"slot_to_symbol": {}, "symbol_to_slot": {}}
 
 
+class ModelSymbolAmbiguousError(ValueError):
+    """A prefix has more than one valid model-slot interpretation."""
+
+
+class ModelSymbolInvalidError(ValueError):
+    """A known model prefix cannot be consumed by the symbol snapshot."""
+
+
 def refresh_symbol_cache(db) -> None:
     """주어진 세션으로 캐시를 (재)적재. app startup + 모델 CRUD(create/update/delete_model)
     직후 호출 — 요청 핸들러의 세션(db)을 그대로 써서 새 커넥션을 열지 않는다.
-    reserved(symbol IS NULL) 행 제외. 회사 규약상 symbol 은 단일 문자.
+    reserved(symbol IS NULL) 행 제외.
     """
     global _slot_symbol_cache
     from app.models import ProductSymbol
@@ -73,16 +81,44 @@ def slots_to_model_symbol(slots: list[int]) -> str:
     return result
 
 
+def parse_model_symbol(prefix: str, symbol_to_slot: dict[str, int]) -> list[int]:
+    """Resolve a full canonical prefix only when exactly one symbol sequence fits."""
+    if not prefix or not symbol_to_slot:
+        return []
+    symbols = sorted(symbol_to_slot)
+    matches: list[list[int]] = []
+
+    def consume(offset: int, first: int, slots: list[int]) -> None:
+        if offset == len(prefix):
+            matches.append(slots)
+            return
+        for index in range(first, len(symbols)):
+            symbol = symbols[index]
+            if prefix.startswith(symbol, offset):
+                consume(offset + len(symbol), index + 1, [*slots, symbol_to_slot[symbol]])
+                if len(matches) > 1:
+                    return
+
+    consume(0, 0, [])
+    if len(matches) > 1:
+        raise ModelSymbolAmbiguousError(f"모델 기호의 해석이 모호합니다: {prefix}")
+    if matches:
+        return sorted(matches[0])
+    if not any(symbol in prefix for symbol in symbols):
+        return []  # 기존 미등록 기호만 있는 품목의 읽기 호환
+    raise ModelSymbolInvalidError(f"모델 기호를 해석할 수 없습니다: {prefix}")
+
+
 def mes_code_to_model_slots(mes_code: str | None) -> list[int]:
     """품목 코드 prefix(첫 '-' 앞 글자열) → 모델 slot 리스트.
 
-    회사 규약상 prefix 각 글자는 ProductSymbol.symbol 과 1:1 대응.
+    prefix는 ProductSymbol.symbol의 정렬된 고유 기호 연결이며 유일하게 분해되어야 한다.
     예: "8-AR-0307" → [3]  (SOLO)
         "78-PR-0042" → [2, 3]  (COCOON + SOLO)
         "34678-PR-0168" → [1, 2, 3, 4, 5]  (전체 공용)
 
     mes_code 가 None 이거나 '-' 가 없으면 [].
-    매칭 안 되는 글자는 무시. 결과는 slot 오름차순, 중복 제거.
+    기존 미등록 기호만 있는 코드는 []. 결과는 slot 오름차순.
     """
     if not mes_code:
         return []
@@ -90,9 +126,7 @@ def mes_code_to_model_slots(mes_code: str | None) -> list[int]:
     if dash <= 0:
         return []
     prefix = mes_code[:dash]
-    symbol_to_slot = _maps()["symbol_to_slot"]
-    slots = {symbol_to_slot[ch] for ch in prefix if ch in symbol_to_slot}
-    return sorted(slots)
+    return parse_model_symbol(prefix, _maps()["symbol_to_slot"])
 
 
 def make_mes_code(

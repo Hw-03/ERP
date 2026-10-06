@@ -87,6 +87,35 @@ describe("useAdminMasterItemsForm", () => {
     expect(result.current.dirty).toBe(false);
   });
 
+  it("API가 명시한 빈 모델 슬롯은 단일 문자 코드에서도 그대로 보존한다", () => {
+    const { result } = renderFormHook(baseArgs({ selectedItem: I({ mes_code: "3-TR-0001", model_slots: [] }) }));
+    expect(result.current.form.model_slots).toEqual([]);
+  });
+
+  it("모델 슬롯 필드가 없는 기존 응답은 단일 문자 코드에서 복원한다", () => {
+    const { result } = renderFormHook(baseArgs({ selectedItem: I({ mes_code: "3-TR-0001", model_slots: undefined }) }));
+    expect(result.current.form.model_slots).toEqual([1]);
+  });
+
+  it("여러 글자 모델의 API 슬롯을 복원하고 플래그만 수정해 같은 슬롯으로 저장·재열기한다", async () => {
+    const item = I({ mes_code: "QA-TR-0001", model_slots: [7] });
+    const updated = I({ ...item, bom_stock_exempt: true });
+    updateItemMock.mockResolvedValue(updated);
+    const args = baseArgs({ selectedItem: item });
+    const { result } = renderFormHook(args);
+
+    expect(result.current.form.model_slots).toEqual([7]);
+    act(() => result.current.setForm((form) => ({ ...form, bom_stock_exempt: true })));
+    await act(async () => { await result.current.save(); });
+
+    expect(updateItemMock).toHaveBeenCalledWith("1", expect.objectContaining({
+      model_slots: [7],
+      bom_stock_exempt: true,
+    }));
+    const reopened = renderFormHook(baseArgs({ selectedItem: updated }));
+    expect(reopened.result.current.form.model_slots).toEqual([7]);
+  });
+
   it("save는 공백 nullable 구매·재고 기준을 명시적 null로 보내고 텍스트를 정리한다", async () => {
     const updated = I({ item_name: "변경됨" });
     updateItemMock.mockResolvedValue(updated);

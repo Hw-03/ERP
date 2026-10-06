@@ -8,6 +8,7 @@ import pytest
 from sqlalchemy import text
 
 from app.models import Item, ProductSymbol
+from app.utils.mes_code import refresh_symbol_cache
 
 
 ADMIN_HEADERS = {"X-Admin-Pin": "0000"}
@@ -359,3 +360,98 @@ def test_create_zero_quantity_in_location_422(client, seed_symbol):
         initial_locations=[{"department": "고압", "quantity": 0}],
     )
     assert res.status_code == 422, res.text
+
+
+def test_multichar_model_survives_list_detail_and_flag_update(client, db_session):
+    db_session.add(ProductSymbol(slot=1, symbol="QF1", model_name="QA", is_reserved=False))
+    db_session.commit()
+    refresh_symbol_cache(db_session)
+    created = _create_item(client, initial_quantity=0)
+    assert created.status_code == 201, created.text
+    item_id = created.json()["item_id"]
+    assert created.json()["model_symbol"] == "QF1"
+    listed = client.get("/api/items")
+    detail = client.get(f"/api/items/{item_id}")
+    updated = client.put(
+        f"/api/items/{item_id}", headers=ADMIN_HEADERS,
+        json={"sales_review_required": True},
+    )
+    for response, body in [(listed, listed.json()[0]), (detail, detail.json()), (updated, updated.json())]:
+        assert response.status_code == 200, response.text
+        assert body["model_slots"] == [1]
+        assert body["model_symbol"] == "QF1"
+
+
+def test_item_write_rejects_duplicate_and_unregistered_model_slots(client, db_session):
+    db_session.add(ProductSymbol(slot=1, symbol="QF1", model_name="QA", is_reserved=False))
+    db_session.commit()
+    refresh_symbol_cache(db_session)
+    for slots in ([1, 1], [1, 99]):
+        response = _create_item(client, name=f"invalid-{slots}", model_slots=slots, initial_quantity=0)
+        assert response.status_code == 422, response.text
+
+
+def test_item_write_rejects_model_prefix_longer_than_storage_column(client, db_session):
+    db_session.add_all([
+        ProductSymbol(slot=index, symbol=letter * 5, model_name=f"MODEL-{letter}", is_reserved=False)
+        for index, letter in enumerate("ABCDE", start=1)
+    ])
+    db_session.commit()
+    refresh_symbol_cache(db_session)
+    created = _create_item(client, name="길이 내 모델", model_slots=[1, 2, 3, 4], initial_quantity=0)
+    assert created.status_code == 201, created.text
+    item_id = created.json()["item_id"]
+    assert _create_item(client, name="과한 모델", model_slots=[1, 2, 3, 4, 5], initial_quantity=0).status_code == 422
+    changed = client.put(f"/api/items/{item_id}", headers=ADMIN_HEADERS, json={"model_slots": [1, 2, 3, 4, 5]})
+    assert changed.status_code == 422, changed.text
+    assert _get_item(client, item_id).json()["model_slots"] == [1, 2, 3, 4]
+
+
+def test_ambiguous_model_prefix_is_409_on_read_and_422_on_write(client, db_session):
+    db_session.add_all([
+        ProductSymbol(slot=1, symbol="A", model_name="A", is_reserved=False),
+        ProductSymbol(slot=2, symbol="AB", model_name="AB", is_reserved=False),
+        ProductSymbol(slot=3, symbol="B", model_name="B", is_reserved=False),
+    ])
+    db_session.commit()
+    refresh_symbol_cache(db_session)
+    assert _create_item(client, name="모호한 쓰기", model_slots=[2], initial_quantity=0).status_code == 422
+    item = Item(item_name="기존 모호 코드", process_type_code="HR", model_symbol="AB", serial_no=1)
+    db_session.add(item)
+    db_session.commit()
+    assert client.get(f"/api/items/{item.item_id}").status_code == 409
+    assert client.get("/api/items").status_code == 409
+
+
+def test_ambiguous_model_selection_is_rejected_on_update(client, db_session):
+    db_session.add_all([
+        ProductSymbol(slot=1, symbol="A", model_name="A", is_reserved=False),
+        ProductSymbol(slot=2, symbol="AB", model_name="AB", is_reserved=False),
+        ProductSymbol(slot=3, symbol="B", model_name="B", is_reserved=False),
+    ])
+    db_session.commit()
+    refresh_symbol_cache(db_session)
+    created = _create_item(client, name="수정 전 유일", model_slots=[1], initial_quantity=0)
+    assert created.status_code == 201, created.text
+    response = client.put(f"/api/items/{created.json()['item_id']}", headers=ADMIN_HEADERS, json={"model_slots": [2]})
+    assert response.status_code == 422, response.text
+    assert client.get(f"/api/items/{created.json()['item_id']}").json()["model_slots"] == [1]
+
+
+def test_multichar_shared_item_survives_list_detail_and_flag_update(client, db_session):
+    db_session.add_all([
+        ProductSymbol(slot=1, symbol="QF1", model_name="QA", is_reserved=False),
+        ProductSymbol(slot=2, symbol="Z", model_name="Z", is_reserved=False),
+    ])
+    db_session.commit()
+    refresh_symbol_cache(db_session)
+    created = _create_item(client, name="다글자 공용", model_slots=[1, 2], initial_quantity=0)
+    assert created.status_code == 201, created.text
+    item_id = created.json()["item_id"]
+    listed = client.get("/api/items")
+    detail = client.get(f"/api/items/{item_id}")
+    updated = client.put(f"/api/items/{item_id}", headers=ADMIN_HEADERS, json={"bom_stock_exempt": True})
+    for response, body in [(listed, listed.json()[0]), (detail, detail.json()), (updated, updated.json())]:
+        assert response.status_code == 200, response.text
+        assert body["model_symbol"] == "QF1Z"
+        assert body["model_slots"] == [1, 2]

@@ -9,6 +9,7 @@ product_symbols 마스터(_PRODUCT_SYMBOL_ASSIGNED, 모델 "9" 포함)와 일치
 from app.models import ProductSymbol
 from app.utils import mes_code as mc
 from bootstrap.seed import _PRODUCT_SYMBOL_ASSIGNED
+import pytest
 
 
 def test_runtime_derivation_matches_master(db_session):
@@ -59,3 +60,23 @@ def test_loaded_cache_no_warning(db_session, monkeypatch):
     result = mc.slots_to_model_symbol([1])
     assert result == "3"
     assert warnings == []  # 정상 → 경고 없음
+
+
+def test_multichar_symbol_round_trip_and_ambiguous_prefix(db_session):
+    for slot, symbol in [(1, "QF1"), (2, "Z")]:
+        db_session.add(ProductSymbol(slot=slot, symbol=symbol, model_name=symbol, is_reserved=False))
+    db_session.commit()
+    mc.refresh_symbol_cache(db_session)
+    assert mc.mes_code_to_model_slots("QF1-HR-0001") == [1]
+    assert mc.mes_code_to_model_slots("QF1Z-HR-0001") == [1, 2]
+    assert mc.mes_code_to_model_slots("unknown-HR-0001") == []
+
+    db_session.add_all([
+        ProductSymbol(slot=3, symbol="A", model_name="A", is_reserved=False),
+        ProductSymbol(slot=4, symbol="AB", model_name="AB", is_reserved=False),
+        ProductSymbol(slot=5, symbol="B", model_name="B", is_reserved=False),
+    ])
+    db_session.commit()
+    mc.refresh_symbol_cache(db_session)
+    with pytest.raises(mc.ModelSymbolAmbiguousError):
+        mc.mes_code_to_model_slots("AB-HR-0001")

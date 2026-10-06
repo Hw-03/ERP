@@ -1,7 +1,7 @@
 """품목·BOM 도메인.
 
 품목-모델 매핑은 별도 테이블 없이 mes_code prefix (첫 '-' 앞 글자열) 에서
-유도한다 — 회사 규약상 각 글자가 ProductSymbol.symbol 과 1:1 대응이라
+유도한다 — ProductSymbol.symbol의 정렬된 고유 기호 연결을 유일하게 분해해
 이중 출처를 둘 이유가 없음. 헬퍼: app.utils.mes_code.mes_code_to_model_slots.
 """
 

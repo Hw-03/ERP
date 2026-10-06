@@ -82,7 +82,7 @@ export function itemToEditForm(item: Item): ItemEditForm {
     purchase_memo: item.purchase_memo ?? "",
     process_type_code: item.process_type_code ?? "TR",
     unit: item.unit ?? "EA",
-    model_slots: savedSlots.length > 0 ? savedSlots : inferModelSlots(mesCode),
+    model_slots: item.model_slots != null ? savedSlots : inferModelSlots(mesCode),
     bom_stock_exempt: item.bom_stock_exempt ?? false,
     sales_review_required: item.sales_review_required ?? false,
     mes_code: mesCode,
