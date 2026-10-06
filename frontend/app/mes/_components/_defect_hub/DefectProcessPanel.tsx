@@ -65,6 +65,7 @@ export function DefectProcessPanel({
   const [processQty, setProcessQty] = useState<number>(availableQty);
   const [category, setCategory] = useState("");
   const [memo, setMemo] = useState("");
+  const hasReason = Boolean(category.trim() || memo.trim());
   const [decisions, setDecisions] = useState<ChildDecision[]>([]);
   const [decisionParentQty, setDecisionParentQty] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -145,7 +146,7 @@ export function DefectProcessPanel({
   }
 
   async function handleSubmit() {
-    if (busy || (action === "disassemble" && !reworkReady) || (action === "return" && !selectedSupplier)) return;
+    if (busy || !hasReason || (action === "disassemble" && !reworkReady) || (action === "return" && !selectedSupplier)) return;
     setBusy(true);
     setErrorMsg(null);
     try {
@@ -510,7 +511,7 @@ export function DefectProcessPanel({
         {/* 작업 선택 */}
         <div className="flex flex-col gap-3">
           <span className="text-sm font-black" style={{ color: LEGACY_COLORS.muted2 }}>작업 선택</span>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className={`grid grid-cols-1 gap-3 ${restoreOnly ? "" : location.has_bom && isWarehouse ? "sm:grid-cols-2 xl:grid-cols-4" : location.has_bom || isWarehouse ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
             <ActionCard
               label="정상 복귀"
               desc="불량 해제 후 정상 재고로"
@@ -549,7 +550,7 @@ export function DefectProcessPanel({
         {/* 사유 카테고리 */}
         <div className="flex flex-col gap-2">
           <label className="text-sm font-black" style={{ color: LEGACY_COLORS.muted2 }}>
-            사유 카테고리 <span className="font-bold" style={{ color: LEGACY_COLORS.muted }}>(선택)</span>
+            사유 카테고리 <span className="font-bold" style={{ color: LEGACY_COLORS.muted }}>(메모와 둘 중 하나 필수)</span>
           </label>
           <select
             value={category}
@@ -571,7 +572,7 @@ export function DefectProcessPanel({
         {/* 메모 */}
         <div className="flex flex-col gap-2">
           <label className="text-sm font-black" style={{ color: LEGACY_COLORS.muted2 }}>
-            메모 <span className="font-bold" style={{ color: LEGACY_COLORS.muted }}>(선택)</span>
+            메모 <span className="font-bold" style={{ color: LEGACY_COLORS.muted }}>(사유 카테고리와 둘 중 하나 필수)</span>
           </label>
           <textarea
             value={memo}
@@ -595,7 +596,7 @@ export function DefectProcessPanel({
         {action === "disassemble" ? (
           <button
             type="button"
-            disabled={busy}
+            disabled={busy || !hasReason}
             onClick={() => setStep(2)}
             className="rounded-[16px] px-8 py-3 text-base font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
             style={{ background: LEGACY_COLORS.yellowSolid }}
@@ -605,7 +606,7 @@ export function DefectProcessPanel({
         ) : (
           <button
             type="button"
-            disabled={busy}
+            disabled={busy || !hasReason}
             onClick={() => action === "return" ? setStep(3) : setConfirmOpen(true)}
             className="rounded-[16px] px-8 py-3 text-base font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
             style={{ background: actionColor[action] }}

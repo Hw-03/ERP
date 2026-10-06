@@ -38,6 +38,25 @@ const location: DefectLocation = {
 };
 
 describe("DefectProcessPanel normal recovery", () => {
+  it.each(["", "   "])("사유가 %j이면 진행을 막고 카테고리나 메모 중 하나만 있어도 허용한다", (memo) => {
+    render(<DefectProcessPanel location={location} currentEmployee={{ employee_id: "emp-1", name: "Kim", department: "Assembly" }} onDone={() => {}} onCancel={() => {}} />);
+    const submit = screen.getByRole("button", { name: "정상 복귀 →" });
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: memo } });
+    fireEvent.click(submit);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(submit).toBeDisabled();
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "검사 완료" } });
+    expect(submit).toBeEnabled();
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "" } });
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: screen.getAllByRole("option")[1].getAttribute("value") } });
+    expect(submit).toBeEnabled();
+  });
+
+  it.each(["재작업", "반품"])("사유 없이 %s의 다음 단계로 넘어가지 않는다", (action) => {
+    render(<DefectProcessPanel location={{ ...location, has_bom: true, department: "창고" }} currentEmployee={{ employee_id: "emp-1", name: "Kim", department: "Assembly" }} onDone={() => {}} onCancel={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(`^${action}`) }));
+    expect(screen.getByRole("button", { name: action === "재작업" ? "다음 →" : "공급업체 선택 →" })).toBeDisabled();
+  });
   it("restoreOnly 모드에서는 정상 복귀 외의 처리 선택을 노출하지 않는다", () => {
     render(
       <DefectProcessPanel
@@ -65,6 +84,7 @@ describe("DefectProcessPanel normal recovery", () => {
       />,
     );
 
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "검사 완료" } });
     fireEvent.click(Array.from(container.querySelectorAll("button")).at(-1)!);
 
     expect(defectsApi.unquarantine).not.toHaveBeenCalled();

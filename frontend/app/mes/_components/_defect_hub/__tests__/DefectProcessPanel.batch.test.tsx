@@ -107,6 +107,7 @@ describe("DefectProcessPanel batch processing", () => {
     apiMocks.unquarantineBulk.mockRejectedValue(new ApiError("수량이 변경되었습니다", 422));
     render(<DefectProcessPanel locations={locations} currentEmployee={employee}
       onDone={onDone} onCancel={vi.fn()} onInvalidated={onInvalidated} />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "검사 완료" } });
     fireEvent.click(screen.getByRole("button", { name: "정상 복귀 →" }));
     fireEvent.click(await screen.findByRole("button", { name: "즉시 복귀" }));
     await waitFor(() => expect(onInvalidated).toHaveBeenCalledWith("수량이 변경되었습니다"));
@@ -137,6 +138,7 @@ describe("DefectProcessPanel batch processing", () => {
       />,
     );
 
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "폐기 사유" } });
     fireEvent.click(screen.getByRole("button", { name: /전체 폐기/ }));
     fireEvent.click(screen.getByRole("button", { name: "즉시 폐기 →" }));
     await screen.findByRole("dialog");
@@ -166,6 +168,7 @@ describe("DefectProcessPanel batch processing", () => {
     );
 
     expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "폐기 사유" } });
     fireEvent.click(screen.getByRole("button", { name: /전체 폐기/ }));
     fireEvent.click(screen.getByRole("button", { name: "즉시 폐기 →" }));
     await screen.findByRole("dialog");
@@ -189,6 +192,7 @@ describe("DefectProcessPanel batch processing", () => {
       />,
     );
 
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "재작업 사유" } });
     fireEvent.click(screen.getByRole("button", { name: /재작업/ }));
     fireEvent.click(screen.getByRole("button", { name: "다음 →" }));
     expect(screen.getByLabelText("재작업 합계")).toHaveTextContent("5");
