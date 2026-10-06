@@ -24,6 +24,7 @@ vi.mock("@/lib/api", () => ({ api: {
 } }));
 vi.mock("@/lib/api/warehouse-map", () => ({ warehouseMapApi: { getMap: state.getMap } }));
 vi.mock("../useCurrentOperator", () => ({
+  OPERATOR_CHANGE_EVENT: "dexcowin_operator_change",
   clearCurrentOperator: state.clearCurrentOperator,
   getStoredBootId: state.getStoredBootId,
   readCurrentOperator: state.readCurrentOperator,
@@ -54,6 +55,9 @@ describe("MesLoginGate stored session recovery", () => {
     state.readCurrentOperator.mockReturnValue(stored);
     state.getStoredBootId.mockReturnValue("boot-1");
     state.clearCurrentOperator.mockReset();
+    sessionStorage.setItem("dexcowin_mes_operator_activity", JSON.stringify({
+      employeeId: stored.employee_id, lastActivityAt: Date.now(), confirmationRequired: false,
+    }));
   });
   afterEach(() => vi.restoreAllMocks());
 

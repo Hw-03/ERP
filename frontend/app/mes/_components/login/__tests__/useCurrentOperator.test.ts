@@ -49,6 +49,23 @@ describe("useCurrentOperator storage", () => {
     expect(window.localStorage.getItem("dexcowin_mes_boot_id")).toBeNull();
   });
 
+  it("starts the idle clock on PIN login and preserves it on preference changes", () => {
+    setCurrentOperator(baseOperator, "boot-1");
+    const raw = window.sessionStorage.getItem("dexcowin_mes_operator_activity");
+    expect(raw).not.toBeNull();
+    expect(JSON.parse(raw!)).toMatchObject({ employeeId: "emp-1", confirmationRequired: false });
+
+    const pending = JSON.stringify({ employeeId: "emp-1", lastActivityAt: 1, confirmationRequired: true });
+    window.sessionStorage.setItem("dexcowin_mes_operator_activity", pending);
+    updateCurrentOperatorPreferences({ sidebar_mode: "expanded" });
+    setCurrentOperator({ ...baseOperator, theme: "dark" });
+    expect(window.sessionStorage.getItem("dexcowin_mes_operator_activity")).toBe(pending);
+
+    setCurrentOperator({ ...baseOperator, employee_id: "emp-2" });
+    expect(JSON.parse(window.sessionStorage.getItem("dexcowin_mes_operator_activity")!))
+      .toMatchObject({ employeeId: "emp-2", confirmationRequired: false });
+  });
+
   it("does not restore an operator after the tab session is cleared", () => {
     setCurrentOperator(baseOperator, "boot-1");
     window.sessionStorage.clear();
@@ -136,6 +153,7 @@ describe("useCurrentOperator storage", () => {
 
     expect(window.sessionStorage.getItem("dexcowin_mes_operator")).toBeNull();
     expect(window.sessionStorage.getItem("dexcowin_mes_boot_id")).toBeNull();
+    expect(window.sessionStorage.getItem("dexcowin_mes_operator_activity")).toBeNull();
     expect(window.localStorage.getItem("dexcowin_mes_operator")).toBeNull();
     expect(window.localStorage.getItem("dexcowin_mes_boot_id")).toBeNull();
     expect(consumeLoginNotificationPopupPending("emp-1")).toBe(false);

@@ -13,6 +13,7 @@ vi.mock("../OperatorLoginCard", () => ({
 }));
 
 vi.mock("../useCurrentOperator", () => ({
+  OPERATOR_CHANGE_EVENT: "dexcowin_operator_change",
   clearCurrentOperator: vi.fn(),
   getStoredBootId: vi.fn(),
   readCurrentOperator: () => null,

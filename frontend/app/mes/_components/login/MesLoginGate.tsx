@@ -11,6 +11,8 @@ import { queryKeys } from "@/lib/queries/keys";
 import { OperatorLoginCard } from "./OperatorLoginCard";
 import { clearCurrentOperator, getStoredBootId, readCurrentOperator } from "./useCurrentOperator";
 import { runLoginReadWithRetry, validateActiveEmployees, validateAppSession } from "./loginReadRetry";
+import { useIdleOperatorConfirmation } from "./useIdleOperatorConfirmation";
+import { OperatorConfirmationDialog } from "./OperatorConfirmationDialog";
 
 type GatePhase = "loading" | "intro" | "form" | "recovery" | "authed";
 type LogoState = "center" | "above-card";
@@ -51,6 +53,7 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
   const [isNarrow, setIsNarrow] = useState(false);
   const [recoveryAttempt, setRecoveryAttempt] = useState(0);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const idleConfirmation = useIdleOperatorConfirmation(phase === "authed");
 
   const clearTimers = () => {
     timersRef.current.forEach(clearTimeout);
@@ -172,7 +175,19 @@ export function MesLoginGate({ children }: MesLoginGateProps) {
   if (phase === "loading") return null;
 
   // 로그인 완료 → 메인 화면
-  if (phase === "authed") return <>{children}</>;
+  if (phase === "authed") return <>
+    {children}
+    {idleConfirmation.operator && <OperatorConfirmationDialog
+      operator={idleConfirmation.operator}
+      dialogRef={idleConfirmation.dialogRef}
+      mascotSrc="/images/login/dexray-operator-confirm.webp"
+      onContinue={idleConfirmation.continueAsOperator}
+      onSwitchAccount={() => {
+        clearCurrentOperator();
+        window.location.reload();
+      }}
+    />}
+  </>;
 
   return (
     <div

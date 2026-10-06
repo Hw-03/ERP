@@ -11,6 +11,7 @@ import { sendClientEvent } from "@/lib/client-events";
 import { clearAuditSession, startAuditSession } from "@/lib/activity-audit-context";
 import { getClientEventSource } from "@/lib/operator-log-context";
 import { normalizeSidebarMode, type SidebarMode } from "@/lib/sidebar-mode";
+import { OPERATOR_ACTIVITY_KEY, writeOperatorActivity } from "./operatorActivity";
 
 export interface Operator {
   employee_id: string;
@@ -43,7 +44,7 @@ const BOOT_KEY = "dexcowin_mes_boot_id";
 const LOGIN_NOTIFICATION_POPUP_PENDING_KEY = "dexcowin_mes_login_popup_pending";
 // 같은 탭에서 setCurrentOperator 가 호출되면 useCurrentOperator 구독자들을 깨우기 위한 이벤트.
 // storage 이벤트는 변경을 일으킨 탭에 발화하지 않으므로 별도 CustomEvent가 필요하다.
-const OPERATOR_CHANGE_EVENT = "dexcowin_operator_change";
+export const OPERATOR_CHANGE_EVENT = "dexcowin_operator_change";
 
 function clearLegacyPersistentOperator(): void {
   window.localStorage.removeItem(OPERATOR_KEY);
@@ -109,6 +110,10 @@ export function getStoredBootId(): string | null {
 
 export function setCurrentOperator(op: Operator, bootId?: string): void {
   if (typeof window === "undefined") return;
+  // PIN login supplies bootId; same-employee appearance updates do not.
+  if (bootId || readOperator()?.employee_id !== op.employee_id) {
+    writeOperatorActivity({ employeeId: op.employee_id, lastActivityAt: Date.now(), confirmationRequired: false });
+  }
   clearLegacyPersistentOperator();
   window.sessionStorage.setItem(OPERATOR_KEY, JSON.stringify(op));
   if (bootId) window.sessionStorage.setItem(BOOT_KEY, bootId);
@@ -136,6 +141,7 @@ export function clearCurrentOperator(): void {
   window.sessionStorage.removeItem(OPERATOR_KEY);
   window.sessionStorage.removeItem(BOOT_KEY);
   window.sessionStorage.removeItem(LOGIN_NOTIFICATION_POPUP_PENDING_KEY);
+  window.sessionStorage.removeItem(OPERATOR_ACTIVITY_KEY);
   clearLegacyPersistentOperator();
   window.dispatchEvent(new CustomEvent(OPERATOR_CHANGE_EVENT));
 }

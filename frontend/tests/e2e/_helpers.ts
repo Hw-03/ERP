@@ -5,6 +5,7 @@
  *   1) sessionStorage.dexcowin_mes_operator (employee_id·name 필수)
  *   2) sessionStorage.dexcowin_mes_boot_id == GET /api/app-session 의 boot_id
  *   3) employee_id ∈ GET /api/employees?active_only=true (실재 활성 직원)
+ *   4) 새 로그인처럼 비활동 기록 초기화 (기존 세션 확인 팝업과 구분)
  * → 런타임에 두 API 를 조회해 실재 직원 + 현재 boot_id 를 inject 한다.
  */
 import { expect, type Page } from "@playwright/test";
@@ -65,6 +66,9 @@ export async function loginAsOperator(
     ([o, bootId]) => {
       sessionStorage.setItem("dexcowin_mes_operator", JSON.stringify(o));
       sessionStorage.setItem("dexcowin_mes_boot_id", bootId as string);
+      sessionStorage.setItem("dexcowin_mes_operator_activity", JSON.stringify({
+        employeeId: o.employee_id, lastActivityAt: Date.now(), confirmationRequired: false,
+      }));
     },
     [op, session.boot_id] as [OperatorLike, string],
   );
