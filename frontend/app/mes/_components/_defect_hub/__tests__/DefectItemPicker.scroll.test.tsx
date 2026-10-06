@@ -131,11 +131,14 @@ describe("DefectItemPicker mobile scroll", () => {
         onRemove={() => {}}
       />,
     );
-    const table = screen.getByTestId("defect-picker-table");
+    const frame = screen.getByTestId("defect-picker-table");
+    const table = screen.getByTestId("defect-picker-scroll");
     const input = container.querySelector("input");
 
     expect(input).toBeTruthy();
-    expect(table).toHaveClass("min-h-0", "flex-1", "overflow-y-auto", "touch-pan-y", "overscroll-contain");
+    expect(frame).toHaveClass("relative", "min-h-0", "flex-1");
+    expect(table).toHaveClass("overflow-y-auto", "touch-pan-y", "overscroll-contain", "lg:-right-2.5", "lg:[scrollbar-gutter:stable]");
+    expect(screen.getByTestId("defect-picker-frame-outline")).toHaveClass("pointer-events-none", "absolute", "inset-0", "rounded-[16px]");
 
     table.scrollTop = 120;
     fireEvent.change(input as HTMLInputElement, { target: { value: "SOLO item 2" } });

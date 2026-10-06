@@ -200,12 +200,12 @@ export function DefectItemPicker({
           </div>
           {!mobilePresentation && operator?.employee_id && (
             // 항목 4-10B — 순서 편집은 드래그 UX 라 모바일에서 숨김(PC 만 노출). 기능 코드는 보존.
-            <div className="hidden h-[50px] shrink-0 items-center lg:flex">
+            <div className="hidden shrink-0 items-end lg:flex">
               {editMode ? (
                 <button
                   type="button"
                   onClick={cancelEditMode}
-                  className="standard-hover rounded-[10px] border px-2.5 py-1.5 text-[12px] font-bold transition-colors"
+                  className="standard-hover h-[34px] rounded-[10px] border px-2.5 py-1.5 text-[12px] font-bold transition-colors"
                   style={{
                     background: LEGACY_COLORS.s2,
                     borderColor: LEGACY_COLORS.border,
@@ -218,7 +218,7 @@ export function DefectItemPicker({
                 <button
                   type="button"
                   onClick={enterEditMode}
-                  className="standard-hover flex items-center gap-1 rounded-[10px] border px-2.5 py-1.5 text-[12px] font-bold transition-colors"
+                  className="standard-hover flex h-[34px] items-center gap-1 rounded-[10px] border px-2.5 py-1.5 text-[12px] font-bold transition-colors"
                   style={{
                     background: LEGACY_COLORS.s2,
                     borderColor: LEGACY_COLORS.border,
@@ -267,20 +267,15 @@ export function DefectItemPicker({
 
       {/* 결과 표 */}
       <div
-        ref={mobilePresentation ? undefined : tableRef}
-        data-testid="defect-picker-table" className={mobilePresentation ? "relative min-h-0 flex-1" : "flex min-h-0 flex-1 flex-col touch-pan-y overflow-y-auto overflow-x-auto overscroll-contain rounded-[16px] border"}
-        style={{
-          background: LEGACY_COLORS.s2,
-          borderColor: LEGACY_COLORS.border,
-          WebkitOverflowScrolling: "touch",
-        }}
+        data-testid="defect-picker-table" className="relative min-h-0 flex-1"
       >
         <div
-          ref={mobilePresentation ? tableRef : undefined}
-          data-testid={mobilePresentation ? "defect-picker-scroll" : undefined}
-          className={mobilePresentation ? `${scrollFrameStyles.viewport} flex min-w-0 flex-col touch-pan-y overscroll-contain` : "flex min-h-full min-w-full flex-col"}
-          style={mobilePresentation ? { WebkitOverflowScrolling: "touch", background: LEGACY_COLORS.s2, backgroundClip: "content-box" } : undefined}
+          ref={tableRef}
+          data-testid="defect-picker-scroll"
+          className={mobilePresentation ? `${scrollFrameStyles.viewport} flex min-w-0 flex-col touch-pan-y overscroll-contain` : "absolute inset-y-0 left-0 right-0 touch-pan-y overflow-y-auto overflow-x-auto overscroll-contain lg:-right-2.5 lg:[scrollbar-gutter:stable]"}
+          style={mobilePresentation ? { WebkitOverflowScrolling: "touch", background: LEGACY_COLORS.s2, backgroundClip: "content-box" } : { WebkitOverflowScrolling: "touch" }}
         >
+        <div className="flex min-h-full min-w-full flex-col" style={{ background: LEGACY_COLORS.s2 }}>
         {editMode ? (
           <DefectEditOrderTable
             mobilePresentation={mobilePresentation}
@@ -424,21 +419,20 @@ export function DefectItemPicker({
           </div>
         )}
         </>)}</div>
-        {mobilePresentation && (
+        </div>
           <>
             <div data-testid="defect-picker-frame-outline" aria-hidden className="pointer-events-none absolute inset-0 z-20 rounded-[16px] border" style={{ borderColor: LEGACY_COLORS.border }} />
             <div aria-hidden className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between">
               <div className="flex justify-between">
-                <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 15px, var(--c-bg) 16px)" }} />
-                <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 0 100%, transparent 0 15px, var(--c-bg) 16px)" }} />
+                <span className="h-4 w-4" style={{ background: `radial-gradient(circle at 100% 100%, transparent 0 15px, var(${mobilePresentation ? "--c-bg" : "--c-s1"}) 16px)` }} />
+                <span className="h-4 w-4" style={{ background: `radial-gradient(circle at 0 100%, transparent 0 15px, var(${mobilePresentation ? "--c-bg" : "--c-s1"}) 16px)` }} />
               </div>
               <div className="flex justify-between">
-                <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 100% 0, transparent 0 15px, var(--c-bg) 16px)" }} />
-                <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 0 0, transparent 0 15px, var(--c-bg) 16px)" }} />
+                <span className="h-4 w-4" style={{ background: `radial-gradient(circle at 100% 0, transparent 0 15px, var(${mobilePresentation ? "--c-bg" : "--c-s1"}) 16px)` }} />
+                <span className="h-4 w-4" style={{ background: `radial-gradient(circle at 0 0, transparent 0 15px, var(${mobilePresentation ? "--c-bg" : "--c-s1"}) 16px)` }} />
               </div>
             </div>
           </>
-        )}
       </div>
     </div>
   );
