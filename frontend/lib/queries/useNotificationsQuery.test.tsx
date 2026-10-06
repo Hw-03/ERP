@@ -61,6 +61,61 @@ afterEach(() => {
 });
 
 describe("알림 읽음 캐시", () => {
+  it.each([false, true])("전체 응답으로 오래된 미읽음 목록을 덮지 않는다 (모두 읽음=%s)", async (all) => {
+    const client = makeClient();
+    const unreadKey = queryKeys.notifications.unread(employeeId);
+    const older = { ...unread.items[0], notification_id: "older-notification" };
+    const filtered = { items: [...unread.items, older], unread_count: 2 };
+    client.setQueryData(unreadKey, filtered);
+    const otherKey = queryKeys.notifications.unread("employee-2");
+    client.setQueryData(otherKey, filtered);
+    const saved = { ...read, unread_count: all ? 0 : 1 };
+    const refresh = deferred<NotificationListResponse>();
+    vi.spyOn(notificationsApi, "listNotifications").mockReturnValue(refresh.promise);
+    vi.spyOn(notificationsApi, "markNotificationsRead").mockResolvedValue(saved);
+    const { result } = renderHook(() => ({
+      query: useNotificationsQuery(employeeId, { unreadOnly: true }),
+      mutation: useMarkNotificationsReadMutation(),
+    }), { wrapper: makeWrapper(client) });
+    expect(result.current.query.data).toEqual(filtered);
+
+    act(() => result.current.mutation.mutate({
+      recipient_employee_id: employeeId,
+      ...(all ? {} : { notification_ids: ["notification-1"] }),
+    }));
+
+    await waitFor(() => expect(client.getQueryData(unreadKey)).toEqual({
+      items: all ? [] : [older], unread_count: all ? 0 : 1,
+    }));
+    expect(client.getQueryData(key)).toEqual(saved);
+    expect(client.getQueryData(otherKey)).toEqual(filtered);
+    expect(client.getQueryState(otherKey)?.isInvalidated).toBe(false);
+    await act(async () => refresh.resolve({ items: all ? [] : [older], unread_count: saved.unread_count }));
+  });
+
+  it("필터 조회가 늦게 끝나도 읽음 성공 상태를 되돌리지 않는다", async () => {
+    const client = makeClient();
+    const unreadKey = queryKeys.notifications.unread(employeeId);
+    client.setQueryData(unreadKey, unread);
+    const staleRequest = deferred<NotificationListResponse>();
+    const refresh = deferred<NotificationListResponse>();
+    const list = vi.spyOn(notificationsApi, "listNotifications")
+      .mockReturnValueOnce(staleRequest.promise).mockReturnValue(refresh.promise);
+    vi.spyOn(notificationsApi, "markNotificationsRead").mockResolvedValue(read);
+    const { result } = renderHook(() => ({
+      query: useNotificationsQuery(employeeId, { unreadOnly: true }),
+      mutation: useMarkNotificationsReadMutation(),
+    }), { wrapper: makeWrapper(client) });
+    act(() => { void result.current.query.refetch(); });
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(1));
+    act(() => result.current.mutation.mutate({ recipient_employee_id: employeeId }));
+    await waitFor(() => expect(result.current.query.data).toEqual({ items: [], unread_count: 0 }));
+    await act(async () => staleRequest.resolve(unread));
+    expect(client.getQueryData(unreadKey)).toEqual({ items: [], unread_count: 0 });
+    await act(async () => refresh.resolve({ items: [], unread_count: 0 }));
+    await waitFor(() => expect(result.current.mutation.isSuccess).toBe(true));
+  });
+
   it.each([false, true])("재조회를 기다리지 않고 읽음 성공 응답을 반영한다 (모두 읽음=%s)", async (all) => {
     const client = makeClient();
     const otherKey = queryKeys.notifications.list("employee-2");
@@ -82,6 +137,7 @@ describe("알림 읽음 캐시", () => {
     expect(list).toHaveBeenCalledWith(employeeId);
     expect(client.getQueryState(otherKey)?.isInvalidated).toBe(false);
     expect(client.getQueryData(otherKey)).toEqual(unread);
+    await waitFor(() => expect(result.current.mutation.isSuccess).toBe(true));
     await act(async () => refresh.resolve(read));
     await waitFor(() => expect(result.current.mutation.isSuccess).toBe(true));
   });
@@ -142,6 +198,24 @@ describe("알림 읽음 캐시", () => {
 });
 
 describe("다른 기기에서 읽은 알림", () => {
+  it("닫힌 팝업의 미읽음 조회는 요청하지 않는다", async () => {
+    const list = vi.spyOn(notificationsApi, "listNotifications").mockResolvedValue(read);
+    const client = makeClient();
+    const { result } = renderHook(() => useNotificationsQuery(employeeId, { unreadOnly: true, enabled: false }), { wrapper: makeWrapper(client) });
+    expect(result.current.data).toBeUndefined();
+    expect(list).not.toHaveBeenCalled();
+  });
+
+  it("미읽음 조회는 서버 필터를 전달하고 전체 캐시를 유지한다", async () => {
+    const filtered = { items: [{ ...unread.items[0], notification_id: "old-unread" }], unread_count: 1 };
+    const list = vi.spyOn(notificationsApi, "listNotifications").mockResolvedValue(filtered);
+    const client = makeClient();
+    const { result } = renderHook(() => useNotificationsQuery(employeeId, { unreadOnly: true }), { wrapper: makeWrapper(client) });
+    await waitFor(() => expect(result.current.data).toEqual(filtered));
+    expect(list).toHaveBeenCalledWith(employeeId, true);
+    expect(client.getQueryData(key)).toEqual(unread);
+  });
+
   it("fresh 캐시도 화면 포커스 복귀 시 서버 상태로 갱신한다", async () => {
     focusManager.setFocused(false);
     const client = makeClient();

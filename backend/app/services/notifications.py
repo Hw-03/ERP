@@ -10,17 +10,19 @@
 from __future__ import annotations
 
 import uuid
-from typing import Iterable
+from typing import Iterable, Sequence
 
 from sqlalchemy.orm import Session
 
 from app.models import (
     Employee,
     HandoverDoc,
+    HandoverLine,
     HandoverStatusEnum,
     Notification,
     NotificationTypeEnum,
     StockRequest,
+    StockRequestLine,
     StockRequestStatusEnum,
 )
 from app.services.dept_hierarchy import can_approve_department
@@ -30,6 +32,7 @@ _PENDING_STATUSES = (
     StockRequestStatusEnum.SUBMITTED,
     StockRequestStatusEnum.RESERVED,
 )
+_SUMMARY_LINE_LIMIT = 3
 
 
 def _active_employees(db: Session) -> list[Employee]:
@@ -96,6 +99,19 @@ _REQUEST_TYPE_LABEL: dict[str, str] = {
 }
 
 
+def _item_summary(lines: Sequence[StockRequestLine | HandoverLine]) -> str:
+    """저장된 품목명·수량 스냅샷만으로 알림용 목록을 만든다."""
+    parts = [
+        f"{line.item_name_snapshot} {int(line.quantity or 0):,}개"
+        for line in lines[:_SUMMARY_LINE_LIMIT]
+    ]
+    if len(lines) > _SUMMARY_LINE_LIMIT:
+        parts.append(f"외 {len(lines) - _SUMMARY_LINE_LIMIT}건")
+    if len(lines) > 1:
+        parts.append(f"총 {sum(int(line.quantity or 0) for line in lines):,}개")
+    return " · ".join(parts)
+
+
 def _summary(request: StockRequest) -> str:
     rtype = getattr(request.request_type, "value", str(request.request_type))
     label = _REQUEST_TYPE_LABEL.get(rtype, rtype)
@@ -103,14 +119,7 @@ def _summary(request: StockRequest) -> str:
     if not lines:
         return f"{request.requester_name} · {label}"
 
-    representative_item = lines[0].item_name_snapshot
-    item_summary = (
-        f"{representative_item} 외 {len(lines) - 1}건"
-        if len(lines) > 1
-        else representative_item
-    )
-    total_quantity = sum(int(line.quantity or 0) for line in lines)
-    return f"{request.requester_name} · {label} · {item_summary} · 총 {total_quantity:,}개"
+    return f"{request.requester_name} · {label} · {_item_summary(lines)}"
 
 
 def _add(
@@ -223,7 +232,15 @@ def notify_handover_arrived(db: Session, doc: HandoverDoc) -> None:
     """인수인계 제출 → 받는 부서 인수 담당자에게 알림. 작성자 본인 제외. 세션 add 만."""
     if doc.status != HandoverStatusEnum.SUBMITTED:
         return
-    body = f"{doc.from_department}→{doc.to_department} · {doc.title}"
+    parts = [
+        doc.author_name,
+        "인수인계",
+        f"{doc.from_department}→{doc.to_department}",
+        doc.title,
+    ]
+    if doc.lines:
+        parts.append(_item_summary(list(doc.lines)))
+    body = " · ".join(parts)
     for emp in recipients_for_handover(db, doc.to_department):
         if emp.employee_id == doc.author_employee_id:
             continue

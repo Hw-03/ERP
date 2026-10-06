@@ -32,6 +32,13 @@ function makeNotification(overrides: Partial<AppNotification> = {}): AppNotifica
 }
 
 describe("NotificationPanel", () => {
+  it("모바일은 기존 배치에서 보완 본문을 표시한다", () => {
+    render(<NotificationPanel mobilePresentation items={[makeNotification({ body: "Kim · manual_adjustment · SR-OLD", display_body: "Kim · 수동 조정 · 게터 2개" })]} unread={1} {...emptyHandlers} />);
+    expect(screen.getByText("Kim · 수동 조정 · 게터 2개")).toBeInTheDocument();
+    expect(screen.queryByText("Kim · 수동 조정 · SR-OLD")).not.toBeInTheDocument();
+    expect(screen.getByTestId("notification-panel")).not.toHaveAttribute("role", "dialog");
+  });
+
   it("최초 조회 중에도 제목·설정을 유지하며 빈 안내를 표시하지 않는다", () => {
     render(<NotificationPanel mobilePresentation loading items={[]} unread={0} loginPopupEnabled onToggleLoginPopup={vi.fn()} {...emptyHandlers} />);
     expect(screen.getByText(TEXT.title)).toBeInTheDocument();

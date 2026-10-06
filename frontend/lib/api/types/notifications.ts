@@ -7,7 +7,8 @@
 export type NotificationType =
   | "approval_request"
   | "approval_approved"
-  | "approval_rejected";
+  | "approval_rejected"
+  | "handover_arrived";
 
 export interface AppNotification {
   notification_id: string;
@@ -15,6 +16,15 @@ export interface AppNotification {
   type: NotificationType;
   title: string;
   body: string | null;
+  /** 과거 본문 원문을 유지하면서 서버가 보완한 표시 내용. */
+  display_body?: string | null;
+  /** 검증된 요청 스냅샷으로 만든 입출고 내역 형식의 카드 요약. */
+  display_summary?: {
+    requester_name: string;
+    operation_label: string;
+    item_name: string;
+    additional_item_count: number;
+  } | null;
   target_tab: string | null;
   target_section: string | null;
   related_request_id: string | null;

@@ -41,6 +41,31 @@ def test_openapi_tag_metadata_matches_router_tags():
     assert "Variance" not in declared_tags
 
 
+def test_notifications_keep_optional_unread_filter_and_display_body_contract():
+    schema = app.openapi()
+    operation = schema["paths"]["/api/notifications"]["get"]
+    unread_filter = _query_parameter(operation, "unread_only")
+    notification = schema["components"]["schemas"]["NotificationResponse"]
+
+    assert unread_filter["required"] is False
+    assert unread_filter["schema"]["type"] == "boolean"
+    assert unread_filter["schema"]["default"] is False
+    assert "display_body" not in notification["required"]
+    assert notification["properties"]["display_body"]["anyOf"] == [
+        {"type": "string"}, {"type": "null"},
+    ]
+    assert "body" in notification["properties"]
+    assert "display_summary" not in notification["required"]
+    assert notification["properties"]["display_summary"]["anyOf"] == [
+        {"$ref": "#/components/schemas/NotificationDisplaySummary"}, {"type": "null"},
+    ]
+    summary = schema["components"]["schemas"]["NotificationDisplaySummary"]
+    assert set(summary["required"]) == {
+        "requester_name", "operation_label", "item_name", "additional_item_count",
+    }
+    assert summary["properties"]["additional_item_count"]["minimum"] == 0
+
+
 def test_legacy_integrity_operation_and_pin_query_parameters_are_deprecated():
     schema = app.openapi()
     integrity_get = schema["paths"]["/api/settings/integrity/inventory"]["get"]

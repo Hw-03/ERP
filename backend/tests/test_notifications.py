@@ -10,11 +10,18 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+import pytest
+from sqlalchemy import event
+
 from app.models import (
     DepartmentEnum,
     Employee,
     EmployeeLevelEnum,
+    IoBatch,
+    IoBundle,
     Notification,
+    NotificationTypeEnum,
+    RequestBucketEnum,
     StockRequest,
     StockRequestLine,
     StockRequestStatusEnum,
@@ -96,7 +103,7 @@ def test_internal_use_notification_summary_uses_korean_label():
     assert notif_svc._summary(request) == "AS requester · AS·연구 사용출고"
 
 
-def test_request_notification_summary_uses_representative_item_and_total_quantity():
+def test_request_notification_summary_lists_items_quantities_and_total():
     request = StockRequest(
         requester_name="김현우",
         request_type=StockRequestTypeEnum.WAREHOUSE_TO_DEPT,
@@ -106,7 +113,383 @@ def test_request_notification_summary_uses_representative_item_and_total_quantit
         StockRequestLine(item_name_snapshot="COCOON POWER BUTTON", quantity=3),
     ]
 
-    assert notif_svc._summary(request) == "김현우 · 창고 → 부서 · ADX4000W LVDS Cable 외 1건 · 총 5개"
+    assert notif_svc._summary(request) == (
+        "김현우 · 창고 → 부서 · ADX4000W LVDS Cable 2개 · COCOON POWER BUTTON 3개 · 총 5개"
+    )
+
+
+def test_request_notification_summary_limits_items_to_three():
+    request = StockRequest(requester_name="요청자", request_type=StockRequestTypeEnum.RAW_SHIP)
+    request.lines = [
+        StockRequestLine(item_name_snapshot=f"품목{i}", quantity=i)
+        for i in range(1, 6)
+    ]
+
+    assert notif_svc._summary(request) == (
+        "요청자 · 원자재 출고 · 품목1 1개 · 품목2 2개 · 품목3 3개 · 외 2건 · 총 15개"
+    )
+
+
+def test_request_notification_summary_single_line_has_no_total():
+    request = StockRequest(requester_name="요청자", request_type=StockRequestTypeEnum.RAW_SHIP)
+    request.lines = [StockRequestLine(item_name_snapshot="원본 품목명", quantity=1200)]
+
+    assert notif_svc._summary(request) == "요청자 · 원자재 출고 · 원본 품목명 1,200개"
+
+
+def _seed_notification_request(
+    db_session, requester, item, *, status=StockRequestStatusEnum.SUBMITTED,
+    request_code="SR-NOTIFY-1",
+):
+    request = StockRequest(
+        requester_employee_id=requester.employee_id,
+        requester_name=requester.name,
+        requester_department=requester.department,
+        request_type=StockRequestTypeEnum.WAREHOUSE_TO_DEPT,
+        status=status,
+        request_code=request_code,
+    )
+    request.lines = [StockRequestLine(
+        item_id=item.item_id,
+        item_name_snapshot="품목 원본",
+        quantity=7,
+        from_bucket=RequestBucketEnum.WAREHOUSE,
+        to_bucket=RequestBucketEnum.PRODUCTION,
+    )]
+    db_session.add(request)
+    db_session.flush()
+    return request
+
+
+@pytest.mark.parametrize("ntype", [
+    NotificationTypeEnum.APPROVAL_REQUEST,
+    NotificationTypeEnum.APPROVAL_APPROVED,
+    NotificationTypeEnum.APPROVAL_REJECTED,
+])
+@pytest.mark.parametrize("legacy_label", ["warehouse_to_dept", "창고 → 부서"])
+@pytest.mark.parametrize("use_code", [True, False])
+def test_legacy_notification_display_body_preserves_raw(
+    client, db_session, make_item, ntype, legacy_label, use_code
+):
+    item = make_item(name="현재 품목명", warehouse_qty=Decimal("10"))
+    employee = _make_employee(db_session, code="LEGACY", name="원 요청자")
+    request = _seed_notification_request(db_session, employee, item)
+    if not use_code:
+        request.request_code = None
+    raw = f"{request.requester_name} · {legacy_label} · {request.request_code or str(request.request_id)[:8]}"
+    note = Notification(
+        recipient_employee_id=employee.employee_id,
+        type=ntype.value,
+        title="과거 알림",
+        body=raw,
+        related_request_id=request.request_id,
+    )
+    db_session.add(note)
+    db_session.commit()
+
+    res = client.get(
+        f"/api/notifications?recipient_employee_id={employee.employee_id}",
+        headers=_actor_headers(employee),
+    )
+    assert res.status_code == 200, res.json()
+    assert res.json()["items"][0]["body"] == raw
+    assert res.json()["items"][0]["display_body"] == "원 요청자 · 창고 → 부서 · 품목 원본 7개"
+    assert res.json()["items"][0]["display_summary"] == {
+        "requester_name": "원 요청자",
+        "operation_label": "창고 입출고",
+        "item_name": "품목 원본",
+        "additional_item_count": 0,
+    }
+    db_session.expire_all()
+    assert db_session.query(Notification).filter_by(notification_id=note.notification_id).one().body == raw
+
+
+@pytest.mark.parametrize("case", [
+    "unlinked", "no_lines", "draft", "mismatch", "modified_modern", "handover", "unknown_type", "null_body",
+])
+def test_notification_display_body_falls_back_for_other_rows(client, db_session, make_item, case):
+    item = make_item(name="품목", warehouse_qty=Decimal("10"))
+    employee = _make_employee(db_session, code="FALLBACK", name="요청자")
+    request = _seed_notification_request(db_session, employee, item)
+    raw = f"{request.requester_name} · warehouse_to_dept · {request.request_code}"
+    if case == "unlinked":
+        related_request_id = None
+    else:
+        related_request_id = request.request_id
+    if case == "no_lines":
+        request.lines.clear()
+    if case == "draft":
+        request.status = StockRequestStatusEnum.DRAFT
+    if case == "mismatch":
+        raw += " · 추가 문구"
+    if case == "modified_modern":
+        raw = "요청자 · 창고 → 부서 · 품목 원본 7개 · 임의 수정"
+    if case == "null_body":
+        raw = None
+    ntype = {
+        "handover": NotificationTypeEnum.HANDOVER_ARRIVED.value,
+        "unknown_type": "future_type",
+    }.get(case, NotificationTypeEnum.APPROVAL_REQUEST.value)
+    note = Notification(
+        recipient_employee_id=employee.employee_id,
+        type=ntype,
+        title="알림",
+        body=raw,
+        related_request_id=related_request_id,
+    )
+    db_session.add(note)
+    db_session.commit()
+
+    res = client.get(
+        f"/api/notifications?recipient_employee_id={employee.employee_id}",
+        headers=_actor_headers(employee),
+    )
+    assert res.status_code == 200, res.json()
+    assert res.json()["items"][0]["body"] == raw
+    assert res.json()["items"][0]["display_body"] is None
+    assert res.json()["items"][0]["display_summary"] is None
+
+
+def test_current_notification_display_summary_prefers_present_bundle_source_and_distinct_items(
+    client, db_session, make_item
+):
+    first = make_item(name="현재 A", warehouse_qty=Decimal("10"))
+    source = make_item(name="현재 B", warehouse_qty=Decimal("10"))
+    third = make_item(name="현재 C", warehouse_qty=Decimal("10"))
+    employee = _make_employee(db_session, code="SUMMARY-BOM", name="작성자")
+    request = _seed_notification_request(db_session, employee, first)
+    request.lines[0].item_name_snapshot = "스냅샷 A"
+    for item, name, quantity in [(source, "스냅샷 B", 2), (source, "스냅샷 B", 3), (third, "스냅샷 C", 4)]:
+        request.lines.append(StockRequestLine(
+            item_id=item.item_id, item_name_snapshot=name, quantity=quantity,
+            from_bucket=RequestBucketEnum.WAREHOUSE, to_bucket=RequestBucketEnum.PRODUCTION,
+        ))
+    batch = IoBatch(
+        work_type="warehouse_io", sub_type="warehouse_to_dept", status="submitted",
+        requester_employee_id=employee.employee_id, requester_name=employee.name,
+        requester_department=employee.department,
+    )
+    batch.bundles = [IoBundle(
+        source_kind="direct_item", source_item_id=source.item_id,
+        title_snapshot="현재 B", quantity=5,
+    )]
+    db_session.add(batch)
+    db_session.flush()
+    request.operation_batch_id = batch.batch_id
+    raw = notif_svc._summary(request)
+    db_session.add(Notification(
+        recipient_employee_id=employee.employee_id, type="approval_request",
+        title="새 결재 요청", body=raw, related_request_id=request.request_id,
+    ))
+    db_session.commit()
+
+    res = client.get(
+        f"/api/notifications?recipient_employee_id={employee.employee_id}",
+        headers=_actor_headers(employee),
+    )
+    assert res.status_code == 200, res.json()
+    assert res.json()["items"][0]["display_body"] is None
+    assert res.json()["items"][0]["display_summary"] == {
+        "requester_name": "작성자", "operation_label": "창고 입출고",
+        "item_name": "스냅샷 B", "additional_item_count": 2,
+    }
+
+
+@pytest.mark.parametrize(("work_type", "sub_type", "to_department", "request_type", "expected"), [
+    ("receive", "receive_supplier", None, StockRequestTypeEnum.RAW_RECEIVE, "원자재 입고"),
+    ("receive", "outbound_supplier", None, StockRequestTypeEnum.RAW_SHIP, "원자재 출고"),
+    ("process", "produce", None, StockRequestTypeEnum.MANUAL_ADJUSTMENT, "부서 입출고"),
+    ("process", "disassemble", None, StockRequestTypeEnum.MANUAL_ADJUSTMENT, "부서 입출고"),
+    ("process", "produce", None, StockRequestTypeEnum.WAREHOUSE_TO_DEPT, "생산 입고"),
+    ("process", "disassemble", None, StockRequestTypeEnum.WAREHOUSE_TO_DEPT, "분해 출고"),
+    ("warehouse_adjust", "warehouse_adjust_out", None, StockRequestTypeEnum.MANUAL_ADJUSTMENT, "창고 수량 조정"),
+    ("defect", "defect_process", None, StockRequestTypeEnum.MARK_DEFECTIVE_WH, "불량"),
+    ("defect", "supplier_return", None, StockRequestTypeEnum.DEFECT_RETURN, "반품"),
+    ("defect", "defect_process", None, StockRequestTypeEnum.DEFECT_DISASSEMBLE, "재작업"),
+    ("internal_use", "internal_use_out", "AS", StockRequestTypeEnum.INTERNAL_USE, "AS 사용"),
+    ("internal_use", "internal_use_out", "연구", StockRequestTypeEnum.INTERNAL_USE, "연구소 사용"),
+])
+def test_notification_display_summary_uses_history_menu_label_from_batch(
+    client, db_session, make_item, work_type, sub_type, to_department, request_type, expected
+):
+    item = make_item(name="품목", warehouse_qty=Decimal("10"))
+    employee = _make_employee(db_session, code="SUMMARY-LABEL")
+    request = _seed_notification_request(db_session, employee, item)
+    request.request_type = request_type
+    batch = IoBatch(
+        work_type=work_type, sub_type=sub_type, to_department=to_department, status="submitted",
+        requester_employee_id=employee.employee_id, requester_name=employee.name,
+        requester_department=employee.department,
+    )
+    db_session.add(batch)
+    db_session.flush()
+    request.operation_batch_id = batch.batch_id
+    db_session.add(Notification(
+        recipient_employee_id=employee.employee_id, type="approval_request",
+        title="새 결재 요청", body=notif_svc._summary(request), related_request_id=request.request_id,
+    ))
+    db_session.commit()
+
+    res = client.get(
+        f"/api/notifications?recipient_employee_id={employee.employee_id}",
+        headers=_actor_headers(employee),
+    )
+    assert res.status_code == 200, res.json()
+    assert res.json()["items"][0]["display_summary"]["operation_label"] == expected
+
+
+def test_notification_display_summary_uses_request_line_destination_without_batch(
+    client, db_session, make_item
+):
+    item = make_item(name="품목", warehouse_qty=Decimal("10"))
+    employee = _make_employee(db_session, code="SUMMARY-NOBATCH")
+    request = _seed_notification_request(db_session, employee, item)
+    request.request_type = StockRequestTypeEnum.INTERNAL_USE
+    request.lines[0].to_department = "연구"
+    db_session.add(Notification(
+        recipient_employee_id=employee.employee_id, type="approval_request",
+        title="새 결재 요청", body=notif_svc._summary(request), related_request_id=request.request_id,
+    ))
+    db_session.commit()
+
+    res = client.get(
+        f"/api/notifications?recipient_employee_id={employee.employee_id}",
+        headers=_actor_headers(employee),
+    )
+    assert res.status_code == 200, res.json()
+    assert res.json()["items"][0]["display_summary"]["operation_label"] == "연구소 사용"
+
+
+def test_notification_display_summary_falls_back_when_bundle_source_is_not_in_request(
+    client, db_session, make_item
+):
+    item = make_item(name="실제 품목", warehouse_qty=Decimal("10"))
+    other = make_item(name="배치 외 품목", warehouse_qty=Decimal("10"))
+    employee = _make_employee(db_session, code="SUMMARY-SOURCE")
+    request = _seed_notification_request(db_session, employee, item)
+    batch = IoBatch(
+        work_type="warehouse_io", sub_type="warehouse_to_dept", status="submitted",
+        requester_employee_id=employee.employee_id, requester_name=employee.name,
+        requester_department=employee.department,
+    )
+    batch.bundles = [IoBundle(
+        source_kind="direct_item", source_item_id=other.item_id,
+        title_snapshot="배치 외 품목", quantity=1,
+    )]
+    db_session.add(batch)
+    db_session.flush()
+    request.operation_batch_id = batch.batch_id
+    db_session.add(Notification(
+        recipient_employee_id=employee.employee_id, type="approval_request",
+        title="새 결재 요청", body=notif_svc._summary(request), related_request_id=request.request_id,
+    ))
+    db_session.commit()
+
+    res = client.get(
+        f"/api/notifications?recipient_employee_id={employee.employee_id}",
+        headers=_actor_headers(employee),
+    )
+    assert res.status_code == 200, res.json()
+    assert res.json()["items"][0]["display_summary"]["item_name"] == "품목 원본"
+
+
+def test_notification_display_summary_fetches_related_requests_and_batches_in_bulk(
+    client, db_session, make_item
+):
+    item = make_item(name="품목", warehouse_qty=Decimal("10"))
+    employee = _make_employee(db_session, code="SUMMARY-BULK")
+    for index in range(3):
+        request = _seed_notification_request(
+            db_session, employee, item, request_code=f"SR-BULK-{index}",
+        )
+        batch = IoBatch(
+            work_type="warehouse_io", sub_type="warehouse_to_dept", status="submitted",
+            requester_employee_id=employee.employee_id, requester_name=employee.name,
+            requester_department=employee.department,
+        )
+        batch.bundles = [IoBundle(
+            source_kind="direct_item", source_item_id=item.item_id,
+            title_snapshot="품목", quantity=1,
+        )]
+        db_session.add(batch)
+        db_session.flush()
+        request.operation_batch_id = batch.batch_id
+        db_session.add(Notification(
+            recipient_employee_id=employee.employee_id, type="approval_request",
+            title="새 결재 요청", body=notif_svc._summary(request),
+            related_request_id=request.request_id,
+        ))
+    db_session.commit()
+
+    statements = []
+
+    def capture_select(_connection, _cursor, statement, _parameters, _context, _executemany):
+        if statement.lstrip().lower().startswith("select"):
+            statements.append(statement.lower())
+
+    connection = db_session.get_bind()
+    event.listen(connection, "before_cursor_execute", capture_select)
+    try:
+        res = client.get(
+            f"/api/notifications?recipient_employee_id={employee.employee_id}",
+            headers=_actor_headers(employee),
+        )
+    finally:
+        event.remove(connection, "before_cursor_execute", capture_select)
+    assert res.status_code == 200, res.json()
+    assert len(res.json()["items"]) == 3
+    for table in ("stock_requests", "stock_request_lines", "io_batches", "io_bundles"):
+        assert sum(f"from {table}" in statement for statement in statements) == 1
+
+
+def test_unread_only_filters_before_limit_and_retains_global_count(client, db_session):
+    employee = _make_employee(db_session, code="UNREAD")
+    db_session.add_all([
+        Notification(recipient_employee_id=employee.employee_id, type="approval_request", title=f"미읽음 {i}")
+        for i in range(60)
+    ])
+    db_session.flush()
+    db_session.add_all([
+        Notification(recipient_employee_id=employee.employee_id, type="approval_request", title=f"읽음 {i}", is_read=True)
+        for i in range(55)
+    ])
+    db_session.commit()
+
+    res = client.get(
+        f"/api/notifications?recipient_employee_id={employee.employee_id}&unread_only=true",
+        headers=_actor_headers(employee),
+    )
+    assert res.status_code == 200, res.json()
+    assert len(res.json()["items"]) == 50
+    assert all(row["title"].startswith("미읽음 ") for row in res.json()["items"])
+    assert res.json()["unread_count"] == 60
+
+
+def test_mark_read_returns_legacy_display_body_and_unfiltered_items(client, db_session, make_item):
+    item = make_item(name="품목", warehouse_qty=Decimal("10"))
+    employee = _make_employee(db_session, code="MARK-LEGACY", name="요청자")
+    request = _seed_notification_request(db_session, employee, item)
+    raw = f"요청자 · warehouse_to_dept · {request.request_code}"
+    note = Notification(
+        recipient_employee_id=employee.employee_id,
+        type="approval_request",
+        title="과거 알림",
+        body=raw,
+        related_request_id=request.request_id,
+    )
+    db_session.add(note)
+    db_session.commit()
+
+    res = client.post(
+        "/api/notifications/mark-read",
+        headers=_actor_headers(employee),
+        json={"recipient_employee_id": str(employee.employee_id)},
+    )
+    assert res.status_code == 200, res.json()
+    assert res.json()["unread_count"] == 0
+    assert len(res.json()["items"]) == 1
+    assert res.json()["items"][0]["is_read"] is True
+    assert res.json()["items"][0]["display_body"] == "요청자 · 창고 → 부서 · 품목 원본 7개"
 
 
 def _unread(client, emp) -> int:

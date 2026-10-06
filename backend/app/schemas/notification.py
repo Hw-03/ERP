@@ -8,6 +8,13 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.schemas.common import UtcDatetime
 
 
+class NotificationDisplaySummary(BaseModel):
+    requester_name: str
+    operation_label: str
+    item_name: str
+    additional_item_count: int = Field(..., ge=0)
+
+
 class NotificationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -16,6 +23,8 @@ class NotificationResponse(BaseModel):
     type: str
     title: str
     body: Optional[str] = None
+    display_body: Optional[str] = None
+    display_summary: Optional[NotificationDisplaySummary] = None
     target_tab: Optional[str] = None
     target_section: Optional[str] = None
     related_request_id: Optional[uuid.UUID] = None

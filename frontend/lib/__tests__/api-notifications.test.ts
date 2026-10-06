@@ -24,6 +24,18 @@ function headersOf(init: RequestInit): Headers {
 }
 
 describe("notificationsApi.listNotifications", () => {
+  it("안 읽음 조회 옵션을 전달하고 수신자 헤더를 유지한다", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({ items: [], unread_count: 2 })));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+
+    await notificationsApi.listNotifications("e-1", true);
+
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("unread_only=true");
+    expect(url).toContain("recipient_employee_id=e-1");
+    expect(headersOf(init).get("X-Actor-Employee-Id")).toBe("e-1");
+  });
+
   it("GET /api/notifications with recipient query and actor header", async () => {
     const fetchSpy = vi.fn(() =>
       Promise.resolve(makeResponse({ items: [], unread_count: 0 })),

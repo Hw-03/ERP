@@ -7015,6 +7015,35 @@
         "title": "MyItemOrderPut",
         "type": "object"
       },
+      "NotificationDisplaySummary": {
+        "properties": {
+          "additional_item_count": {
+            "minimum": 0.0,
+            "title": "Additional Item Count",
+            "type": "integer"
+          },
+          "item_name": {
+            "title": "Item Name",
+            "type": "string"
+          },
+          "operation_label": {
+            "title": "Operation Label",
+            "type": "string"
+          },
+          "requester_name": {
+            "title": "Requester Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "requester_name",
+          "operation_label",
+          "item_name",
+          "additional_item_count"
+        ],
+        "title": "NotificationDisplaySummary",
+        "type": "object"
+      },
       "NotificationListResponse": {
         "properties": {
           "items": {
@@ -7082,6 +7111,27 @@
             "format": "date-time",
             "title": "Created At",
             "type": "string"
+          },
+          "display_body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Body"
+          },
+          "display_summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NotificationDisplaySummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "is_read": {
             "title": "Is Read",
@@ -22072,6 +22122,16 @@
               "format": "uuid",
               "title": "Recipient Employee Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "unread_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Unread Only",
+              "type": "boolean"
             }
           },
           {

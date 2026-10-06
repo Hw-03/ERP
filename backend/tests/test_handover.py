@@ -419,6 +419,40 @@ def test_handover_create_notifies_receiving_dept(client, db_session, make_item):
     assert author.employee_id not in recipients      # 작성자 제외
     assert vac_member.employee_id not in recipients  # 타 부서 제외
     assert all(n.target_section == "handover" for n in notes)
+    assert [n.body for n in notes] == [
+        "튜브작성 · 인수인계 · 튜브→고압 · 튜브 인수인계서 · 8TF Notify 1개"
+    ]
+
+
+def test_handover_notification_lists_three_items_and_total(client, db_session, make_item):
+    items = [make_item(name=f"인계 품목{i}", warehouse_qty=Decimal("0")) for i in range(1, 5)]
+    for item in items:
+        _seed_production(db_session, item.item_id, "튜브", Decimal("5"))
+    author = _make_employee(db_session, code="TUBE-MULTI", name="작성자", department=DepartmentEnum.TUBE)
+    receiver = _make_employee(db_session, code="HP-MULTI", department=DepartmentEnum.HIGH_VOLTAGE)
+    db_session.commit()
+
+    res = client.post(
+        "/api/handovers",
+        json={
+            "author_employee_id": str(author.employee_id),
+            "to_department": "고압",
+            "title": "다품목 인계",
+            "process_content": "인계",
+            "product_name": "제품",
+            "analysis_text": "분석",
+            "lines": [
+                {"item_id": str(item.item_id), "quantity": index}
+                for index, item in enumerate(items, start=1)
+            ],
+        },
+    )
+    assert res.status_code == 201, res.json()
+    note = db_session.query(Notification).filter_by(recipient_employee_id=receiver.employee_id).one()
+    assert note.body == (
+        "작성자 · 인수인계 · 튜브→고압 · 다품목 인계 · "
+        "인계 품목1 1개 · 인계 품목2 2개 · 인계 품목3 3개 · 외 1건 · 총 10개"
+    )
 
 
 def test_handover_draft_save_resume_submit(client, db_session, make_item):

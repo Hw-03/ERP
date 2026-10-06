@@ -32,13 +32,18 @@ const state = vi.hoisted(() => ({
   queryHasData: true,
   queryError: null as Error | null,
   refetch: vi.fn(),
+  unreadNotifications: null as { items: AppNotification[]; unread_count: number } | null,
+  queryCalls: vi.fn(),
 }));
 
 vi.mock("@/lib/queries/useNotificationsQuery", () => ({
-  useNotificationsQuery: () => ({ data: state.queryHasData ? state.notifications : undefined, isLoading: state.queryLoading, error: state.queryError, refetch: state.refetch }),
-  useMarkNotificationsReadMutation: () => ({ mutate: state.markRead }),
-  useDeleteNotificationMutation: () => ({ mutate: state.deleteNotification }),
-  useDeleteReadNotificationsMutation: () => ({ mutate: state.deleteRead }),
+  useNotificationsQuery: (employeeId: string, options?: { unreadOnly?: boolean; enabled?: boolean }) => {
+    state.queryCalls(employeeId, options);
+    return { data: state.queryHasData ? (options?.unreadOnly ? state.unreadNotifications ?? state.notifications : state.notifications) : undefined, dataUpdatedAt: options?.unreadOnly && state.unreadNotifications ? 2 : 1, isLoading: state.queryLoading, error: state.queryError, refetch: state.refetch };
+  },
+  useMarkNotificationsReadMutation: () => ({ mutate: state.markRead, mutateAsync: state.markRead }),
+  useDeleteNotificationMutation: () => ({ mutate: state.deleteNotification, mutateAsync: state.deleteNotification }),
+  useDeleteReadNotificationsMutation: () => ({ mutate: state.deleteRead, mutateAsync: state.deleteRead }),
 }));
 
 vi.mock("@/lib/api/employees", () => ({
@@ -82,6 +87,8 @@ describe("NotificationBell", () => {
     state.queryLoading = false;
     state.queryHasData = true;
     state.queryError = null;
+    state.unreadNotifications = null;
+    state.queryCalls.mockClear();
     state.refetch.mockClear();
     window.sessionStorage.clear();
     state.operator.loginPopupEnabled = true;
@@ -89,9 +96,9 @@ describe("NotificationBell", () => {
       items: [notification(), notification({ notification_id: "n-2", title: "New handover" })],
       unread_count: 2,
     };
-    state.markRead.mockClear();
-    state.deleteNotification.mockClear();
-    state.deleteRead.mockClear();
+    state.markRead.mockReset().mockResolvedValue({});
+    state.deleteNotification.mockReset().mockResolvedValue({});
+    state.deleteRead.mockReset().mockResolvedValue({});
     state.setLoginPopup.mockReset();
     state.setLoginPopup.mockResolvedValue({});
     state.setCurrentOperator.mockClear();
@@ -105,6 +112,7 @@ describe("NotificationBell", () => {
     render(<NotificationBell loginDialogEnabled />);
 
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "안 읽음" })).toHaveAttribute("aria-selected", "true");
     expect(window.sessionStorage.getItem("dexcowin_mes_login_popup_pending")).toBeNull();
   });
 
@@ -226,7 +234,7 @@ describe("NotificationBell", () => {
       recipient_employee_id: "emp-1",
       notification_ids: ["n-1"],
     });
-    expect(onNavigate).toHaveBeenCalledWith({ tab: "warehouse", section: "queue", relatedRequestId: "request-1" });
+    await waitFor(() => expect(onNavigate).toHaveBeenCalledWith({ tab: "warehouse", section: "queue", relatedRequestId: "request-1" }));
   });
 
   it("marks every notification read from the login dialog", async () => {
@@ -238,18 +246,22 @@ describe("NotificationBell", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "\uBAA8\uB450 \uC77D\uC74C" }));
 
     expect(state.markRead).toHaveBeenCalledWith({ recipient_employee_id: "emp-1" });
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "안 읽음" })).toHaveAttribute("aria-selected", "true");
   });
 
-  it("opens the notification panel from the login dialog", async () => {
+  it("switches filters in the same dialog and manual reopening defaults to all", async () => {
     window.sessionStorage.setItem("dexcowin_mes_login_popup_pending", "emp-1");
 
     render(<NotificationBell loginDialogEnabled />);
 
     const dialog = await screen.findByRole("dialog");
-    fireEvent.click(within(dialog).getByRole("button", { name: "\uC54C\uB9BC \uBCF4\uAE30" }));
-
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("tab", { name: "전체" }));
+    expect(screen.getByRole("dialog")).toBe(dialog);
+    fireEvent.click(within(dialog).getByRole("tab", { name: "안 읽음" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "알림 닫기" }));
+    fireEvent.click(screen.getByRole("button", { name: "알림 2건" }));
+    expect(screen.getByRole("tab", { name: "전체" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("New handover")).toBeInTheDocument();
   });
 
@@ -268,7 +280,60 @@ describe("NotificationBell", () => {
       recipient_employee_id: "emp-1",
       notification_ids: ["n-1"],
     });
-    expect(onNavigate).toHaveBeenCalledWith({ tab: "history", section: "detail", relatedRequestId: null });
+    await waitFor(() => expect(onNavigate).toHaveBeenCalledWith({ tab: "history", section: "detail", relatedRequestId: null }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("fetches older unread items even when the recent all list contains only read items", async () => {
+    state.notifications = { items: [notification({ is_read: true })], unread_count: 1 };
+    state.unreadNotifications = { items: [notification({ notification_id: "older", title: "Older unread" })], unread_count: 1 };
+    window.sessionStorage.setItem("dexcowin_mes_login_popup_pending", "emp-1");
+    render(<NotificationBell loginDialogEnabled />);
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByText("Older unread")).toBeInTheDocument();
+    expect(screen.queryByText("Approval done")).not.toBeInTheDocument();
+    expect(state.queryCalls).toHaveBeenCalledWith("emp-1", { unreadOnly: true, enabled: true });
+  });
+
+  it("uses the freshest unread count when the filtered response reflects another device's read", () => {
+    render(<NotificationBell loginDialogEnabled={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "알림 2건" }));
+    state.unreadNotifications = { items: [], unread_count: 0 };
+    fireEvent.click(screen.getByRole("tab", { name: "안 읽음" }));
+    expect(screen.getByText("읽지 않은 알림 0건")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "모두 읽음" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "알림 닫기" }));
+    expect(screen.getByRole("button", { name: "알림", exact: true })).toBeInTheDocument();
+  });
+
+  it.each(["read", "all", "delete", "deleteRead", "setting"] as const)("keeps the dialog open and shows %s failure", async (action) => {
+    state.notifications.items[1].is_read = true;
+    const onNavigate = vi.fn();
+    state.notifications.items[0].target_tab = "warehouse";
+    if (action === "read" || action === "all") state.markRead.mockRejectedValueOnce(new Error("offline"));
+    if (action === "delete") state.deleteNotification.mockRejectedValueOnce(new Error("offline"));
+    if (action === "deleteRead") state.deleteRead.mockRejectedValueOnce(new Error("offline"));
+    if (action === "setting") state.setLoginPopup.mockRejectedValueOnce(new Error("offline"));
+    render(<NotificationBell onNavigate={onNavigate} loginDialogEnabled={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "알림 2건" }));
+    if (action === "read") fireEvent.click(screen.getByText("Approval done"));
+    if (action === "all") fireEvent.click(screen.getByRole("button", { name: "모두 읽음" }));
+    if (action === "delete") fireEvent.click(screen.getAllByRole("button", { name: "알림 삭제" })[0]);
+    if (action === "deleteRead") fireEvent.click(screen.getByRole("button", { name: "읽은 알림 삭제" }));
+    if (action === "setting") fireEvent.click(screen.getByRole("switch", { name: "로그인 팝업" }));
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(onNavigate).not.toHaveBeenCalled();
+    expect(state.updateCurrentOperatorPreferences).not.toHaveBeenCalled();
+  });
+
+  it("shows initial desktop query errors and retry inside the dialog", () => {
+    state.queryHasData = false;
+    state.queryError = new Error("offline");
+    render(<NotificationBell loginDialogEnabled={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "알림" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(state.refetch).toHaveBeenCalledOnce();
   });
 });

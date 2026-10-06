@@ -112,6 +112,7 @@ export const queryKeys = {
   notifications: {
     all: ["notifications"] as const,
     list: (employeeId: string) => ["notifications", "list", employeeId] as const,
+    unread: (employeeId: string) => ["notifications", "list", employeeId, "unread"] as const,
   },
   production: {
     all: ["production"] as const,

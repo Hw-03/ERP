@@ -79,6 +79,7 @@ export function NotificationPanel({
   mobilePresentation = false,
   loading = false,
   error = null,
+  actionError = null,
   hasData = items.length > 0 || (!loading && !error),
   onRetry,
 }: {
@@ -94,6 +95,7 @@ export function NotificationPanel({
   mobilePresentation?: boolean;
   loading?: boolean;
   error?: string | null;
+  actionError?: string | null;
   hasData?: boolean;
   onRetry?: () => void;
 }) {
@@ -158,6 +160,8 @@ export function NotificationPanel({
       </div>
       <div className="my-1 border-t" style={{ borderColor: LEGACY_COLORS.border }} />
       <div className={`max-h-[440px] overflow-y-auto${mobilePresentation && !loading && items.length > 0 ? ` ${dataRevealClassName}` : ""}`}>
+        {actionError && <div role="alert" className="mx-2 mb-2 rounded-[12px] px-3 py-2 text-sm font-bold"
+          style={{ color: LEGACY_COLORS.red, background: LEGACY_COLORS.errorBg }}>{actionError}</div>}
         {mobilePresentation && error && <LoadFailureCard message={error} onRetry={onRetry} retryLabel="다시 시도" comfortable
           prefix={hasData ? "최신 정보를 불러오지 못했습니다. 기존 내용을 표시합니다" : "데이터를 불러오지 못했습니다"} />}
         {mobilePresentation && loading ? <ReadLoading label="알림 목록 불러오는 중" skeleton={<div>
@@ -194,9 +198,9 @@ export function NotificationPanel({
                       {formatKstDateTime(n.created_at)}
                     </span>
                   </div>
-                  {n.body && (
+                  {(n.display_body ?? n.body) && (
                     <span className="text-xs" style={{ color: LEGACY_COLORS.muted }}>
-                      {humanizeBody(n.body)}
+                      {humanizeBody(n.display_body ?? n.body ?? "")}
                     </span>
                   )}
                 </div>

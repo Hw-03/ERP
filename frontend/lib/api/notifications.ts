@@ -30,10 +30,11 @@ async function requestWithActor<T>(
 }
 
 export const notificationsApi = {
-  listNotifications: (employeeId: string) =>
+  listNotifications: (employeeId: string, unreadOnly = false) =>
     requestWithActor<NotificationListResponse>(
       toApiUrl(
-        "/api/notifications?recipient_employee_id=" + encodeURIComponent(employeeId),
+        "/api/notifications?recipient_employee_id=" + encodeURIComponent(employeeId) +
+          (unreadOnly ? "&unread_only=true" : ""),
       ),
       employeeId,
     ),
