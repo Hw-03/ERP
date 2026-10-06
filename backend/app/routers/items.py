@@ -1,6 +1,6 @@
 """Items router for item master CRUD operations."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 import csv
 from io import StringIO
 import uuid
@@ -13,7 +13,12 @@ from sqlalchemy.orm import Query as SAQuery, Session
 
 from app.database import get_db
 from app.dependencies.admin import require_admin_pin
-from app.models import BOM, DefectQuarantineRecord, DepartmentEnum, Inventory, InventoryLocation, Item, LocationStatusEnum
+from app.models import (
+    BOM, DefectQuarantineRecord, DepartmentEnum, Employee, Inventory, InventoryLocation,
+    InventoryOperation, InventoryOperationKindEnum, InventoryOperationRoleEnum,
+    InventoryOperationStatusEnum, Item, LocationStatusEnum, TransactionLog,
+    TransactionTypeEnum,
+)
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
     BomCompletionUpdate,
@@ -39,6 +44,7 @@ from app.models import ProductSymbol
 from app.services import audit
 from app.services import inventory as inventory_svc
 from app.services import stock_availability, stock_math
+from app.services.audit_actor_session import get_verified_audit_actor_code
 from app.services.item_display_order import insert_item_at_process_end
 from app.services._tx import commit_and_refresh
 from app._evt import emit as _evt_emit
@@ -325,6 +331,48 @@ def create_item(
             status=LocationStatusEnum.PRODUCTION,
             quantity=ln.quantity,
         ))
+
+    if init_qty > 0:
+        actor_code = get_verified_audit_actor_code(request)
+        actor = db.query(Employee).filter(Employee.employee_code == actor_code).first() if actor_code else None
+        occurred_at = datetime.now(UTC).replace(tzinfo=None, microsecond=0)
+        operation = InventoryOperation(
+            kind=InventoryOperationKindEnum.BUSINESS,
+            domain="item", action="initial_stock", status=InventoryOperationStatusEnum.COMMITTED,
+            display_label="초기 재고 등록", actor_name=actor.name if actor else "관리자",
+            actor_employee_id=actor.employee_id if actor else None, effective_at=occurred_at,
+            created_at=occurred_at, contract_version=1,
+        )
+        db.add(operation)
+        db.flush()
+        destinations = [(None, warehouse)] if warehouse > 0 else []
+        destinations.extend((ln.department, ln.quantity) for ln in locs)
+        running = warehouse_running = department_running = 0
+        for index, (department, quantity) in enumerate(destinations):
+            effect = {"scope": "warehouse"} if department is None else {
+                "scope": "location", "department": department,
+                "status": LocationStatusEnum.PRODUCTION.value,
+            }
+            effect.update({"delta": quantity, "quantity_before": 0, "quantity_after": quantity})
+            warehouse_after = warehouse_running + quantity if department is None else warehouse_running
+            department_after = department_running + quantity if department is not None else department_running
+            db.add(TransactionLog(
+                item_id=item.item_id, transaction_type=TransactionTypeEnum.RECEIVE,
+                quantity_change=quantity, quantity_before=running, quantity_after=running + quantity,
+                warehouse_qty_before=warehouse_running,
+                warehouse_qty_after=warehouse_after,
+                department_qty_before=department_running,
+                department_qty_after=department_after,
+                department=department or DepartmentEnum.WAREHOUSE.value,
+                produced_by=operation.actor_name, producer_employee_id=operation.actor_employee_id,
+                notes="초기 재고 등록", reference_no=f"initial_stock:{item.item_id}",
+                inventory_effect=[effect], operation_id=operation.operation_id,
+                operation_role=InventoryOperationRoleEnum.PRIMARY,
+                created_at=occurred_at + timedelta(microseconds=index),
+            ))
+            running += quantity
+            warehouse_running = warehouse_after
+            department_running = department_after
 
     audit.record(
         db,

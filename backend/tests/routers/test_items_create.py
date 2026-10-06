@@ -3,11 +3,25 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from datetime import UTC, date, datetime, timedelta
+from http.cookies import SimpleCookie
+from zoneinfo import ZoneInfo
 
 import pytest
+from fastapi import Response
 from sqlalchemy import text
 
-from app.models import Item, ProductSymbol
+from app.models import (
+    Employee, Item, ProductSymbol, InventoryOperation, TransactionLog,
+    WeeklyInventorySnapshot,
+)
+from app.services.weekly_report_contract import classify_inventory_activity
+from app.services.weekly_report_contract import build_verified_weekly_report
+from app.services.f704_02_ledger import collect_entries
+from app.services.f705_02_production_log import collect_daily_quantities
+from app.services.inventory_operation_cancellation import preview_cancellation, cancel_operation
+from app.services.inventory_integrity import diagnose_inventory_integrity
+from app.services.audit_actor_session import AUDIT_ACTOR_COOKIE, set_audit_actor_cookie
 from app.utils.mes_code import refresh_symbol_cache
 
 
@@ -455,3 +469,169 @@ def test_multichar_shared_item_survives_list_detail_and_flag_update(client, db_s
         assert response.status_code == 200, response.text
         assert body["model_symbol"] == "QF1Z"
         assert body["model_slots"] == [1, 2]
+
+
+@pytest.mark.parametrize(("locations", "warehouse", "departments"), [
+    ([], 12, {}),
+    ([{"department": "고압", "quantity": 12}], 0, {"고압": 12}),
+    ([{"department": "고압", "quantity": 3}, {"department": "진공", "quantity": 4}], 5, {"고압": 3, "진공": 4}),
+])
+def test_initial_stock_has_one_operation_and_one_receive_per_destination(
+    client, db_session, seed_symbol, locations, warehouse, departments,
+):
+    created = _create_item(client, name=f"초기원장-{warehouse}-{len(locations)}", initial_quantity=12, initial_locations=locations)
+    assert created.status_code == 201, created.text
+    item_id = created.json()["item_id"]
+    logs = db_session.query(TransactionLog).filter_by(item_id=item_id).all()
+    assert len(logs) == (warehouse > 0) + len(departments)
+    operation = db_session.query(InventoryOperation).one()
+    assert {log.operation_id for log in logs} == {operation.operation_id}
+    assert (operation.domain, operation.action, operation.display_label, operation.actor_name) == (
+        "item", "initial_stock", "초기 재고 등록", "관리자",
+    )
+    assert all(log.created_at >= operation.effective_at and log.produced_by == operation.actor_name for log in logs)
+    assert len({log.created_at for log in logs}) == len(logs)
+    ordered = sorted(logs, key=lambda log: log.created_at)
+    warehouse_running = department_running = 0
+    for log in ordered:
+        assert (log.warehouse_qty_before, log.department_qty_before) == (warehouse_running, department_running)
+        if log.department == "창고":
+            warehouse_running += log.quantity_change
+        else:
+            department_running += log.quantity_change
+        assert (log.warehouse_qty_after, log.department_qty_after) == (warehouse_running, department_running)
+    history = client.get("/api/inventory/transactions", params={"item_id": item_id})
+    assert history.status_code == 200, history.text
+    rows = history.json()
+    assert len(rows) == len(logs)
+    assert all(row["request_order_stock"]["status"] == "available" for row in rows)
+    assert rows[0]["request_order_stock"]["warehouse_qty_after"] == warehouse
+    assert rows[0]["request_order_stock"]["department_qty_after"] == sum(departments.values())
+    assert all(log.transaction_type.value == "RECEIVE" and log.operation_role.value == "PRIMARY" for log in logs)
+    assert all(log.quantity_change == sum(effect["delta"] for effect in log.inventory_effect) for log in logs)
+    observed = {
+        (effect["scope"], effect.get("department")): effect["delta"]
+        for log in logs for effect in log.inventory_effect
+    }
+    expected = {("location", department): quantity for department, quantity in departments.items()}
+    if warehouse:
+        expected[("warehouse", None)] = warehouse
+    assert observed == expected
+    assert sum(classify_inventory_activity(log).receive_qty for log in logs) == 12
+    assert sum(classify_inventory_activity(log).produce_qty for log in logs) == 0
+    f704 = [entry for entry in collect_entries(db_session, db_session.query(InventoryOperation).one().effective_at.year)
+            if entry.item_code == created.json()["mes_code"]]
+    assert sum(entry.quantity for entry in f704) == warehouse
+    assert all(entry.counterpart == "초기 재고 등록" or entry.remark == "초기 재고 등록" for entry in f704)
+    body = _get_item(client, item_id).json()
+    assert body["warehouse_qty"] == warehouse
+    assert {row["department"]: row["quantity"] for row in body["locations"]} == departments
+    assert diagnose_inventory_integrity(db_session).is_consistent
+
+
+def test_initial_stock_uses_verified_audit_actor(client, db_session, seed_symbol):
+    actor = Employee(employee_code="QA-ADMIN", name="검증된 관리자", role="관리자", department="창고")
+    db_session.add(actor)
+    db_session.commit()
+    response = Response()
+    set_audit_actor_cookie(response, actor.employee_code)
+    cookie = SimpleCookie()
+    cookie.load(response.headers["set-cookie"])
+    client.cookies.set(AUDIT_ACTOR_COOKIE, cookie[AUDIT_ACTOR_COOKIE].value)
+
+    created = _create_item(client, name="작업자 증빙", initial_quantity=12)
+    assert created.status_code == 201, created.text
+    operation = db_session.query(InventoryOperation).one()
+    log = db_session.query(TransactionLog).one()
+    assert (operation.actor_name, operation.actor_employee_id) == (actor.name, actor.employee_id)
+    assert (log.produced_by, log.producer_employee_id) == (actor.name, actor.employee_id)
+    history = client.get("/api/inventory/transactions", params={"item_id": created.json()["item_id"]})
+    assert history.status_code == 200, history.text
+    assert history.json()[0]["executor_name"] == actor.name
+
+
+def test_zero_initial_stock_has_no_operation_or_log(client, db_session, seed_symbol):
+    created = _create_item(client, name="초기원장 없음", initial_quantity=0)
+    assert created.status_code == 201, created.text
+    assert db_session.query(InventoryOperation).count() == 0
+    assert db_session.query(TransactionLog).count() == 0
+
+
+def test_initial_stock_cancellation_restores_all_destinations(client, db_session, seed_symbol):
+    created = _create_item(client, name="초기 재고 취소", initial_quantity=12, initial_locations=[
+        {"department": "고압", "quantity": 3}, {"department": "진공", "quantity": 4},
+    ])
+    assert created.status_code == 201, created.text
+    operation = db_session.query(InventoryOperation).one()
+    assert collect_daily_quantities(db_session, operation.effective_at.year) == {}
+    actor = Employee(employee_code="E901", name="취소자", role="직원", department="창고", is_active="true")
+    db_session.add(actor)
+    db_session.commit()
+    plan = preview_cancellation(db_session, operation.operation_id)
+    assert plan.can_cancel, plan.blockers
+    cancel_operation(
+        db_session, operation_id=operation.operation_id, canceller=actor,
+        reason="초기 재고 취소", plan_hash=plan.plan_hash,
+    )
+    db_session.commit()
+    item_id = created.json()["item_id"]
+    body = _get_item(client, item_id).json()
+    assert body["quantity"] == 0
+    assert body["warehouse_qty"] == 0
+    assert body["production_total"] == 0
+
+
+def test_initial_stock_is_valid_weekly_receive_not_production(client, db_session, seed_symbol):
+    today = datetime.now(ZoneInfo("Asia/Seoul")).date()
+    week_start = today - timedelta(days=today.weekday())
+    db_session.add(WeeklyInventorySnapshot(
+        week_end=week_start - timedelta(days=1), as_of_utc=datetime.utcnow(),
+        capture_source="test", basis_version=2, item_count=0, total_quantity=0,
+        normal_total_quantity=0, defective_total_quantity=0,
+    ))
+    db_session.commit()
+    created = _create_item(client, name="주간 초기재고", process_type_code="PF", initial_quantity=12,
+                           initial_locations=[{"department": "고압", "quantity": 3}])
+    assert created.status_code == 201, created.text
+    report = build_verified_weekly_report(
+        db_session, week_start=week_start, week_end=week_start + timedelta(days=6), today=today,
+    )
+    assert report.validation.status == "verified", report.validation.failures
+    row = next(row for group in report.groups for row in group.items if row.item_id == created.json()["item_id"])
+    assert row.receive_qty == 12
+    assert row.produce_qty == 0
+
+
+def test_initial_stock_logs_stay_in_same_week_at_sunday_boundary(client, db_session, seed_symbol, monkeypatch):
+    from importlib import import_module
+
+    item_router = import_module("app.routers.items")
+    boundary = datetime(2026, 10, 4, 14, 59, 59, 999999, tzinfo=UTC)
+
+    class BoundaryDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return boundary if tz == UTC else boundary.astimezone(tz)
+
+    monkeypatch.setattr(item_router, "datetime", BoundaryDatetime)
+    db_session.add(WeeklyInventorySnapshot(
+        week_end=date(2026, 9, 27), as_of_utc=datetime.utcnow(),
+        capture_source="test", basis_version=2, item_count=0, total_quantity=0,
+        normal_total_quantity=0, defective_total_quantity=0,
+    ))
+    db_session.commit()
+    created = _create_item(client, name="주말 경계 초기재고", process_type_code="PF", initial_quantity=12,
+                           initial_locations=[{"department": "고압", "quantity": 3}, {"department": "진공", "quantity": 4}])
+    assert created.status_code == 201, created.text
+    operation = db_session.query(InventoryOperation).one()
+    logs = db_session.query(TransactionLog).filter_by(item_id=created.json()["item_id"]).all()
+    assert operation.effective_at == datetime(2026, 10, 4, 14, 59, 59)
+    assert len(logs) == 3
+    assert all(log.created_at.replace(tzinfo=UTC).astimezone(ZoneInfo("Asia/Seoul")).date() == date(2026, 10, 4)
+               for log in logs)
+    report = build_verified_weekly_report(
+        db_session, week_start=date(2026, 9, 28), week_end=date(2026, 10, 4), today=date(2026, 10, 4),
+    )
+    assert report.validation.status == "verified", report.validation.failures
+    row = next(row for group in report.groups for row in group.items if row.item_id == created.json()["item_id"])
+    assert row.receive_qty == 12

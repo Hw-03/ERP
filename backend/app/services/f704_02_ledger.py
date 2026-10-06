@@ -188,6 +188,8 @@ def _counterpart(
     delta: int,
 ) -> str:
     """실제 라인을 우선해 입/출고처를 정하고, 구형 로그는 보수적으로 표기한다."""
+    if (getattr(log, "reference_no", None) or "").startswith("initial_stock:"):
+        return "초기 재고 등록"
     supplier_name = getattr(batch, "supplier_name_snapshot", None) if batch is not None else None
     if (
         batch is not None
