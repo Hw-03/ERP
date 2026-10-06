@@ -25,13 +25,16 @@ from app.models import (
 
 from app.schemas.defect_statistics import (
     DefectStatisticsBreakdownEntry,
+    DefectStatisticsComparison,
     DefectStatisticsFilters,
     DefectStatisticsItemBreakdownEntry,
     DefectStatisticsPeriod,
     DefectStatisticsPeriodKind,
     DefectStatisticsResponse,
+    DefectStatisticsReportResponse,
     DefectStatisticsSummary,
     DefectStatisticsTimelineEntry,
+    DefectStatisticsTrendEntry,
 )
 
 
@@ -49,6 +52,8 @@ class _ResolvedFilters:
     process_steps: frozenset[str]
     include_unclassified_models: bool
     include_unclassified_process_steps: bool
+    reason: str | None
+    item_id: uuid.UUID | None
 
 
 @dataclass(frozen=True)
@@ -166,6 +171,8 @@ def _resolve_filters(db: Session, filters: DefectStatisticsFilters) -> _Resolved
         process_steps=process_steps,
         include_unclassified_models=include_unclassified_models,
         include_unclassified_process_steps=include_unclassified_process_steps,
+        reason=(filters.reason or "").strip() or None,
+        item_id=filters.item_id,
     )
 
 
@@ -177,6 +184,14 @@ def _matches_filters(
 
     if filters.departments and occurrence.department not in filters.departments:
         return False
+    if filters.item_id is not None and occurrence.item_id != filters.item_id:
+        return False
+    if filters.reason is not None:
+        requested_reason = filters.reason
+        if requested_reason.upper() == UNCLASSIFIED_FILTER_VALUE:
+            requested_reason = UNCLASSIFIED_LABEL
+        if occurrence.reason != requested_reason:
+            return False
     model_symbol = (occurrence.model_symbol or "").strip()
     if filters.model_symbols is not None or filters.include_unclassified_models:
         matches_model = bool(filters.model_symbols) and any(
@@ -276,7 +291,7 @@ def _load_quarantine_occurrences(
     start_utc: datetime,
     end_utc: datetime,
     filters: _ResolvedFilters,
-) -> tuple[list[_Occurrence], int]:
+) -> tuple[list[_Occurrence], list[datetime]]:
     """기간 내 격리 원장을 읽고 검증 가능한 legacy 발생만 복원한다."""
 
     reconstructed_parent_ids = {
@@ -315,7 +330,7 @@ def _load_quarantine_occurrences(
         .all()
     )
     occurrences: list[_Occurrence] = []
-    excluded_legacy_count = 0
+    excluded_legacy_times: list[datetime] = []
     for record, item, reconstruction, source_log in rows:
         if record.record_id in reconstructed_parent_ids:
             continue
@@ -326,10 +341,10 @@ def _load_quarantine_occurrences(
             reconstruction is not None
             and _is_verified_reconstructed_legacy_record(record, source_log)
         ):
-            excluded_legacy_count += 1
+            excluded_legacy_times.append(occurrence.occurred_at)
             continue
         occurrences.append(occurrence)
-    return occurrences, excluded_legacy_count
+    return occurrences, excluded_legacy_times
 
 
 def _occurrence_from_direct_log(
@@ -577,7 +592,7 @@ def get_defect_statistics(
     calculated_period = calculate_statistics_period(period, anchor)
     start_utc, end_utc = _kst_period_utc_bounds(calculated_period)
     resolved_filters = _resolve_filters(db, filters or DefectStatisticsFilters())
-    quarantine_occurrences, excluded_legacy_count = _load_quarantine_occurrences(
+    quarantine_occurrences, excluded_legacy_times = _load_quarantine_occurrences(
         db,
         start_utc=start_utc,
         end_utc=end_utc,
@@ -603,5 +618,200 @@ def get_defect_statistics(
         items=items,
         reasons=reasons,
         departments=departments,
-        excluded_legacy_count=excluded_legacy_count,
+        excluded_legacy_count=len(excluded_legacy_times),
+    )
+
+
+def _shift_period(
+    period: DefectStatisticsPeriod, offset: int,
+) -> DefectStatisticsPeriod:
+    """선택 달력 기간에서 지정한 수만큼 앞뒤 기간을 찾는다."""
+
+    if period.kind == "week":
+        anchor = period.start_date + timedelta(weeks=offset)
+    elif period.kind == "month":
+        month_index = period.start_date.year * 12 + period.start_date.month - 1 + offset
+        anchor = date(month_index // 12, month_index % 12 + 1, 1)
+    else:
+        anchor = date(period.start_date.year + offset, 1, 1)
+    return calculate_statistics_period(period.kind, anchor)
+
+
+def _utc_naive(value: datetime) -> datetime:
+    """서로 다른 입력 timezone과 DB의 UTC-naive 시각을 비교 가능하게 만든다."""
+
+    aware = value.replace(tzinfo=UTC) if value.tzinfo is None else value
+    return aware.astimezone(UTC).replace(tzinfo=None)
+
+
+def _comparison_cutoff(
+    current: DefectStatisticsPeriod,
+    previous: DefectStatisticsPeriod,
+    as_of: datetime,
+    is_partial: bool,
+) -> tuple[datetime, bool]:
+    """진행 기간은 직전 기간의 같은 달력 시점까지 맞추고 결손 날짜를 끝으로 보정한다."""
+
+    previous_end = datetime.combine(previous.end_date + timedelta(days=1), time.min, tzinfo=KST)
+    if not is_partial:
+        return previous_end, False
+    if current.kind == "week":
+        return as_of - timedelta(days=7), False
+    if current.kind == "month":
+        day = as_of.day
+        last_day = previous.end_date.day
+        if day > last_day:
+            return previous_end, True
+        return as_of.replace(year=previous.start_date.year, month=previous.start_date.month), False
+    try:
+        return as_of.replace(year=previous.start_date.year), False
+    except ValueError:
+        return datetime.combine(previous.start_date.replace(month=3, day=1), time.min, tzinfo=KST), True
+
+
+def _aggregate_occurrences(
+    occurrences: list[_Occurrence],
+) -> tuple[
+    DefectStatisticsSummary,
+    list[DefectStatisticsItemBreakdownEntry],
+    list[DefectStatisticsBreakdownEntry],
+    list[DefectStatisticsBreakdownEntry],
+]:
+    """선택·비교 기간이 공유하는 발생 요약을 만든다."""
+
+    items, reasons, departments = _build_breakdowns(occurrences)
+    return (
+        DefectStatisticsSummary(
+            record_count=len(occurrences),
+            quantity=sum(occurrence.quantity for occurrence in occurrences),
+            top_item=items[0] if items else None,
+            top_reason=reasons[0] if reasons else None,
+        ),
+        items,
+        reasons,
+        departments,
+    )
+
+
+def _change_pct(current: int, previous: int, adjusted: bool) -> float | None:
+    """보정 또는 0 기준은 백분율로 해석할 수 없으므로 비운다."""
+
+    return None if adjusted or previous == 0 else (current - previous) * 100 / previous
+
+
+def get_defect_statistics_report(
+    db: Session,
+    *,
+    period: DefectStatisticsPeriodKind,
+    anchor: date,
+    filters: DefectStatisticsFilters | None = None,
+    now: datetime | None = None,
+) -> DefectStatisticsReportResponse:
+    """한 관측 시각과 한 번의 원본 조회로 선택·직전·추세 발생 통계를 반환한다."""
+
+    current_time = now if now is not None else datetime.now(UTC)
+    if current_time.tzinfo is None:
+        current_time = current_time.replace(tzinfo=UTC)
+    as_of = current_time.astimezone(KST)
+    selected = calculate_statistics_period(period, anchor)
+    selected_start, selected_end = _kst_period_utc_bounds(selected)
+    as_of_utc = _utc_naive(as_of)
+    empty_summary, empty_items, empty_reasons, empty_departments = _aggregate_occurrences([])
+    if selected_start > as_of_utc:
+        return DefectStatisticsReportResponse(
+            period=selected, summary=empty_summary, timeline=[], items=empty_items,
+            reasons=empty_reasons, departments=empty_departments,
+            excluded_legacy_count=0, as_of=as_of, observed_until=None,
+            is_partial=False, comparison=None, trend=[],
+        )
+
+    is_partial = as_of_utc < selected_end
+    observed_until = as_of if is_partial else datetime.combine(
+        selected.end_date + timedelta(days=1), time.min, tzinfo=KST,
+    )
+    previous = _shift_period(selected, -1)
+    comparison_until, range_adjusted = _comparison_cutoff(
+        selected, previous, as_of, is_partial,
+    )
+    _, previous_end = _kst_period_utc_bounds(previous)
+    comparison_is_partial = _utc_naive(comparison_until) < previous_end
+    trend_periods = [_shift_period(selected, offset) for offset in range(-{"week": 7, "month": 5, "year": 2}[period], 1)]
+    lookback_start, _ = _kst_period_utc_bounds(trend_periods[0])
+    previous_start, _ = _kst_period_utc_bounds(previous)
+    resolved_filters = _resolve_filters(db, filters or DefectStatisticsFilters())
+    quarantine, excluded_times = _load_quarantine_occurrences(
+        db, start_utc=min(lookback_start, previous_start),
+        end_utc=_utc_naive(observed_until), filters=resolved_filters,
+    )
+    direct = _load_direct_occurrences(
+        db, start_utc=min(lookback_start, previous_start),
+        end_utc=_utc_naive(observed_until), filters=resolved_filters,
+    )
+    all_occurrences = quarantine + direct
+
+    def in_range(value: datetime, start: datetime, end: datetime) -> bool:
+        return start <= _utc_naive(value) < end
+
+    selected_occurrences = [
+        occurrence for occurrence in all_occurrences
+        if in_range(occurrence.occurred_at, selected_start, _utc_naive(observed_until))
+    ]
+    comparison_occurrences = [
+        occurrence for occurrence in all_occurrences
+        if in_range(occurrence.occurred_at, previous_start, _utc_naive(comparison_until))
+    ]
+    summary, items, reasons, departments = _aggregate_occurrences(selected_occurrences)
+    comparison_summary, comparison_items, comparison_reasons, comparison_departments = (
+        _aggregate_occurrences(comparison_occurrences)
+    )
+    selected_legacy_count = sum(
+        in_range(value, selected_start, _utc_naive(observed_until)) for value in excluded_times
+    )
+    comparison_legacy_count = sum(
+        in_range(value, previous_start, _utc_naive(comparison_until)) for value in excluded_times
+    )
+    last_observed_date = (observed_until - timedelta(microseconds=1)).date()
+    timeline = [
+        entry for entry in _build_timeline(selected, selected_occurrences)
+        if (date.fromisoformat(entry.bucket + "-01") if period == "year" else date.fromisoformat(entry.bucket))
+        <= last_observed_date
+    ]
+    trend: list[DefectStatisticsTrendEntry] = []
+    for trend_period in trend_periods:
+        trend_start, trend_end = _kst_period_utc_bounds(trend_period)
+        trend_until = min(trend_end, _utc_naive(observed_until))
+        occurrences = [
+            occurrence for occurrence in all_occurrences
+            if in_range(occurrence.occurred_at, trend_start, trend_until)
+        ]
+        trend.append(DefectStatisticsTrendEntry(
+            bucket=trend_period.start_date.isoformat() if period == "week" else (
+                f"{trend_period.start_date.year:04d}-{trend_period.start_date.month:02d}"
+                if period == "month" else str(trend_period.start_date.year)
+            ),
+            label=(f"{trend_period.start_date.month}/{trend_period.start_date.day}"
+                   if period == "week" else f"{trend_period.start_date.month}월"
+                   if period == "month" else str(trend_period.start_date.year)),
+            record_count=len(occurrences),
+            quantity=sum(occurrence.quantity for occurrence in occurrences),
+            start_date=trend_period.start_date, end_date=trend_period.end_date,
+            is_partial=trend_end > trend_until,
+        ))
+    return DefectStatisticsReportResponse(
+        period=selected, summary=summary, timeline=timeline, items=items,
+        reasons=reasons, departments=departments,
+        excluded_legacy_count=selected_legacy_count,
+        as_of=as_of, observed_until=observed_until, is_partial=is_partial,
+        comparison=DefectStatisticsComparison(
+            period=previous, observed_until=comparison_until,
+            is_partial=comparison_is_partial, range_adjusted=range_adjusted,
+            summary=comparison_summary, items=comparison_items,
+            reasons=comparison_reasons, departments=comparison_departments,
+            excluded_legacy_count=comparison_legacy_count,
+            quantity_delta=summary.quantity - comparison_summary.quantity,
+            quantity_change_pct=_change_pct(summary.quantity, comparison_summary.quantity, range_adjusted),
+            record_count_delta=summary.record_count - comparison_summary.record_count,
+            record_count_change_pct=_change_pct(summary.record_count, comparison_summary.record_count, range_adjusted),
+        ),
+        trend=trend,
     )

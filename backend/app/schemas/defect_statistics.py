@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -27,6 +27,8 @@ class DefectStatisticsFilters(BaseModel):
     departments: tuple[str, ...] = Field(default_factory=tuple)
     models: tuple[str, ...] = Field(default_factory=tuple)
     process_steps: tuple[str, ...] = Field(default_factory=tuple)
+    reason: str | None = None
+    item_id: uuid.UUID | None = None
 
 
 class DefectStatisticsBreakdownEntry(BaseModel):
@@ -73,3 +75,39 @@ class DefectStatisticsResponse(BaseModel):
     reasons: list[DefectStatisticsBreakdownEntry]
     departments: list[DefectStatisticsBreakdownEntry]
     excluded_legacy_count: int
+
+
+class DefectStatisticsComparison(BaseModel):
+    """직전 달력 기간의 동일 관측 범위와 선택 기간의 차이."""
+
+    period: DefectStatisticsPeriod
+    observed_until: datetime
+    is_partial: bool
+    range_adjusted: bool
+    summary: DefectStatisticsSummary
+    items: list[DefectStatisticsItemBreakdownEntry]
+    reasons: list[DefectStatisticsBreakdownEntry]
+    departments: list[DefectStatisticsBreakdownEntry]
+    excluded_legacy_count: int
+    quantity_delta: int
+    quantity_change_pct: float | None
+    record_count_delta: int
+    record_count_change_pct: float | None
+
+
+class DefectStatisticsTrendEntry(DefectStatisticsTimelineEntry):
+    """선택 기간을 끝으로 이어지는 한 달력 기간의 합계."""
+
+    start_date: date
+    end_date: date
+    is_partial: bool
+
+
+class DefectStatisticsReportResponse(DefectStatisticsResponse):
+    """기존 통계와 관측 시각·직전 기간·추세를 함께 반환한다."""
+
+    as_of: datetime
+    observed_until: datetime | None
+    is_partial: bool
+    comparison: DefectStatisticsComparison | None
+    trend: list[DefectStatisticsTrendEntry]

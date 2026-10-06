@@ -14,6 +14,8 @@ import type {
   DefectMemoUpdatePayload,
   DefectMemoUpdateResult,
   DefectStatisticsQuery,
+  DefectStatisticsReportQuery,
+  DefectStatisticsReportResponse,
   DefectStatisticsResponse,
   BulkUnquarantinePayload,
   BulkUnquarantineResult,
@@ -91,6 +93,17 @@ export const defectsApi = {
     query.process_steps.forEach((value) => params.append("process_step", value));
     return fetcher<DefectStatisticsResponse>(
       toApiUrl(`/api/defects/statistics?${params.toString()}`),
+    );
+  },
+  getStatisticsReport: (query: DefectStatisticsReportQuery): Promise<DefectStatisticsReportResponse> => {
+    const params = new URLSearchParams({ period: query.period, anchor: query.anchor });
+    query.departments.forEach((value) => params.append("department", value));
+    query.models.forEach((value) => params.append("model", value));
+    query.process_steps.forEach((value) => params.append("process_step", value));
+    if (query.reason) params.set("reason", query.reason);
+    if (query.item_id) params.set("item_id", query.item_id);
+    return fetcher<DefectStatisticsReportResponse>(
+      toApiUrl(`/api/defects/statistics/report?${params.toString()}`),
     );
   },
 };

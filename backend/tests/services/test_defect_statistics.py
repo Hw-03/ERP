@@ -22,10 +22,192 @@ from app.schemas.defect_statistics import DefectStatisticsFilters
 from app.services.defect_statistics import (
     calculate_statistics_period,
     get_defect_statistics,
+    get_defect_statistics_report,
 )
+from app.services import defect_statistics as statistics_service
 
 
 KST = ZoneInfo("Asia/Seoul")
+
+
+def test_report_current_month_compares_matching_elapsed_range_and_filters(db_session, make_item) -> None:
+    item = make_item(name="보고 품목", process_type_code="TR")
+    other = make_item(name="다른 품목", process_type_code="TR")
+    _add_record(db_session, item, quantity=3, at=_kst_naive(2026, 8, 15, 10), reason=" 외관 ")
+    _add_record(db_session, item, quantity=9, at=_kst_naive(2026, 8, 15, 11), reason="외관")
+    _add_record(db_session, item, quantity=5, at=_kst_naive(2026, 9, 15, 10), reason="외관")
+    _add_record(db_session, item, quantity=11, at=_kst_naive(2026, 9, 15, 11), reason="외관")
+    _add_record(db_session, other, quantity=7, at=_kst_naive(2026, 9, 1), reason="외관")
+    now = datetime(2026, 9, 15, 10, 30, tzinfo=KST)
+
+    report = get_defect_statistics_report(
+        db_session, period="month", anchor=date(2026, 9, 3), now=now,
+        filters=DefectStatisticsFilters(reason="외관", item_id=item.item_id),
+    )
+
+    assert report.as_of == now
+    assert report.observed_until == now
+    assert report.is_partial is True
+    assert report.summary.quantity == 5
+    assert report.summary.record_count == 1
+    assert report.summary.quantity == sum(entry.quantity for entry in report.timeline)
+    assert report.comparison.summary.quantity == 3
+    assert report.comparison.observed_until == datetime(2026, 8, 15, 10, 30, tzinfo=KST)
+    assert report.comparison.quantity_delta == 2
+    assert report.comparison.quantity_change_pct == pytest.approx(200 / 3)
+    assert report.trend[-1].quantity == 5
+    assert report.trend[-1].is_partial is True
+    assert len(report.trend) == 6
+    assert report.timeline[-1].bucket == "2026-09-15"
+
+
+def test_report_week_and_year_use_elapsed_previous_period(db_session, make_item) -> None:
+    item = make_item(name="경계 품목", process_type_code="TR")
+    for year, month, day, hour, quantity in [
+        (2025, 6, 10, 10, 2), (2025, 6, 10, 11, 50),
+        (2026, 6, 10, 10, 4), (2026, 6, 10, 11, 60),
+        (2026, 6, 3, 10, 3), (2026, 6, 3, 11, 70),
+    ]:
+        _add_record(db_session, item, quantity=quantity, at=_kst_naive(year, month, day, hour))
+    weekly = get_defect_statistics_report(
+        db_session, period="week", anchor=date(2026, 6, 10),
+        now=datetime(2026, 6, 10, 10, 30, tzinfo=KST),
+    )
+    annual = get_defect_statistics_report(
+        db_session, period="year", anchor=date(2026, 6, 10),
+        now=datetime(2026, 6, 10, 10, 30, tzinfo=KST),
+    )
+    assert weekly.summary.quantity == 4
+    assert weekly.comparison.summary.quantity == 3
+    assert weekly.comparison.observed_until == datetime(2026, 6, 3, 10, 30, tzinfo=KST)
+    assert weekly.timeline[-1].bucket == "2026-06-10"
+    assert weekly.trend[-1].is_partial is True
+    assert annual.summary.quantity == 77
+    assert annual.comparison.summary.quantity == 2
+    assert annual.comparison.observed_until == datetime(2025, 6, 10, 10, 30, tzinfo=KST)
+    assert annual.timeline[-1].bucket == "2026-06"
+    assert annual.trend[-1].is_partial is True
+
+
+def test_report_short_month_and_leap_day_adjust_comparison(db_session, make_item) -> None:
+    item = make_item(name="조정 품목")
+    _add_record(db_session, item, quantity=7, at=_kst_naive(2023, 2, 28, 23, 59))
+    _add_record(db_session, item, quantity=100, at=_kst_naive(2023, 3, 1))
+    _add_record(db_session, item, quantity=2, at=_kst_naive(2026, 2, 28, 12))
+    _add_record(db_session, item, quantity=3, at=_kst_naive(2025, 2, 28, 12))
+    march = get_defect_statistics_report(
+        db_session, period="month", anchor=date(2026, 3, 30),
+        now=datetime(2026, 3, 30, 12, tzinfo=KST),
+    )
+    leap = get_defect_statistics_report(
+        db_session, period="year", anchor=date(2024, 2, 29),
+        now=datetime(2024, 2, 29, 12, tzinfo=KST),
+    )
+    assert march.comparison.observed_until == datetime(2026, 3, 1, tzinfo=KST)
+    assert march.comparison.is_partial is False
+    assert march.comparison.range_adjusted is True
+    assert march.comparison.summary.quantity == 2
+    assert march.comparison.quantity_change_pct is None
+    assert leap.comparison.observed_until == datetime(2023, 3, 1, tzinfo=KST)
+    assert leap.comparison.range_adjusted is True
+    assert leap.comparison.summary.quantity == 7
+    assert leap.comparison.record_count_change_pct is None
+
+
+def test_report_closed_future_and_legacy_counts_are_period_local(db_session, make_item) -> None:
+    item = make_item(name="기간 품목")
+    _add_record(db_session, item, quantity=2, at=_kst_naive(2026, 8, 3))
+    _add_record(db_session, item, quantity=4, at=_kst_naive(2026, 9, 3))
+    _add_record(db_session, item, quantity=1, at=_kst_naive(2026, 8, 4), is_legacy=True)
+    _add_record(db_session, item, quantity=1, at=_kst_naive(2026, 9, 4), is_legacy=True)
+    _add_record(db_session, item, quantity=1, at=_kst_naive(2026, 7, 4), is_legacy=True)
+    now = datetime(2026, 10, 6, tzinfo=KST)
+    closed = get_defect_statistics_report(db_session, period="month", anchor=date(2026, 9, 3), now=now)
+    future = get_defect_statistics_report(db_session, period="month", anchor=date(2026, 11, 3), now=now)
+    assert closed.is_partial is False
+    assert closed.comparison.is_partial is False
+    assert closed.summary.quantity == 4
+    assert closed.comparison.summary.quantity == 2
+    assert closed.excluded_legacy_count == 1
+    assert closed.comparison.excluded_legacy_count == 1
+    assert future.summary.quantity == 0
+    assert future.observed_until is None
+    assert future.comparison is None
+    assert future.trend == []
+
+
+def test_report_unclassified_reason_and_direct_occurrence(db_session, make_item) -> None:
+    item = make_item(name="미분류 품목")
+    _add_record(db_session, item, quantity=2, at=_kst_naive(2026, 9, 3), reason=None)
+    _add_record(db_session, item, quantity=3, at=_kst_naive(2026, 9, 4), reason="  ")
+    operation = _add_operation(db_session, action="scrap_normal", at=_kst_naive(2026, 9, 5))
+    _add_log(db_session, item, operation, tx_type=TransactionTypeEnum.DEFECT_SCRAP,
+             role=InventoryOperationRoleEnum.PRIMARY, quantity=-4, reason=None)
+    report = get_defect_statistics_report(
+        db_session, period="week", anchor=date(2026, 9, 3),
+        now=datetime(2026, 9, 7, tzinfo=KST),
+        filters=DefectStatisticsFilters(reason="UNCLASSIFIED"),
+    )
+    assert report.summary.quantity == 9
+    assert report.summary.record_count == 3
+    assert report.reasons[0].label == "미분류"
+
+
+def test_report_loads_each_occurrence_source_once(monkeypatch, db_session, make_item) -> None:
+    item = make_item(name="단일 조회")
+    _add_record(db_session, item, quantity=2, at=_kst_naive(2026, 9, 2))
+    calls = {"quarantine": 0, "direct": 0}
+    quarantine_loader = statistics_service._load_quarantine_occurrences
+    direct_loader = statistics_service._load_direct_occurrences
+
+    def load_quarantine(*args, **kwargs):
+        calls["quarantine"] += 1
+        return quarantine_loader(*args, **kwargs)
+
+    def load_direct(*args, **kwargs):
+        calls["direct"] += 1
+        return direct_loader(*args, **kwargs)
+
+    monkeypatch.setattr(statistics_service, "_load_quarantine_occurrences", load_quarantine)
+    monkeypatch.setattr(statistics_service, "_load_direct_occurrences", load_direct)
+    report = get_defect_statistics_report(
+        db_session, period="month", anchor=date(2026, 9, 2),
+        now=datetime(2026, 10, 6, tzinfo=KST),
+    )
+    assert report.summary.quantity == 2
+    assert calls == {"quarantine": 1, "direct": 1}
+
+
+def test_report_zero_baseline_and_kst_midnight_cutoff(db_session, make_item) -> None:
+    item = make_item(name="자정 품목")
+    _add_record(db_session, item, quantity=4, at=_kst_naive(2026, 9, 30, 23, 59))
+    _add_record(db_session, item, quantity=6, at=_kst_naive(2026, 10, 1))
+    report = get_defect_statistics_report(
+        db_session, period="month", anchor=date(2026, 9, 15),
+        now=datetime(2026, 9, 30, 15, tzinfo=UTC),
+    )
+    assert report.as_of == datetime(2026, 10, 1, tzinfo=KST)
+    assert report.observed_until == datetime(2026, 10, 1, tzinfo=KST)
+    assert report.is_partial is False
+    assert report.summary.quantity == 4
+    assert report.comparison.summary.quantity == 0
+    assert report.comparison.quantity_delta == 4
+    assert report.comparison.quantity_change_pct is None
+    assert report.comparison.record_count_delta == 1
+    assert report.comparison.record_count_change_pct is None
+    assert report.timeline[-1].bucket == "2026-09-30"
+    old = get_defect_statistics(db_session, period="month", anchor=date(2026, 9, 15))
+    assert report.summary == old.summary
+    assert report.timeline == old.timeline
+
+
+def test_report_treats_naive_injected_clock_as_utc(db_session) -> None:
+    report = get_defect_statistics_report(
+        db_session, period="month", anchor=date(2026, 9, 1),
+        now=datetime(2026, 9, 30, 15),
+    )
+    assert report.as_of == datetime(2026, 10, 1, tzinfo=KST)
+    assert report.is_partial is False
 
 
 def test_disused_filter_preserves_total_and_intersects_process(db_session, make_item) -> None:

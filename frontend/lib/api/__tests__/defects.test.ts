@@ -28,3 +28,25 @@ describe("defectsApi management category", () => {
     );
   });
 });
+
+describe("defectsApi report statistics", () => {
+  it("encodes the report URL with repeated category filters and single drilldowns", () => {
+    defectsApi.getStatisticsReport({
+      period: "month", anchor: "2026-10-06",
+      departments: ["조립", "품질 관리"], models: ["DX 100", "SOLO"],
+      process_steps: ["A", "F"], reason: "조립/외관", item_id: "item #1",
+    });
+
+    const url = vi.mocked(fetcher).mock.calls.at(-1)?.[0] as string;
+    const [path, search] = url.split("?");
+    expect(path).toBe("/api/defects/statistics/report");
+    const params = new URLSearchParams(search);
+    expect(params.get("period")).toBe("month");
+    expect(params.get("anchor")).toBe("2026-10-06");
+    expect(params.getAll("department")).toEqual(["조립", "품질 관리"]);
+    expect(params.getAll("model")).toEqual(["DX 100", "SOLO"]);
+    expect(params.getAll("process_step")).toEqual(["A", "F"]);
+    expect(params.getAll("reason")).toEqual(["조립/외관"]);
+    expect(params.getAll("item_id")).toEqual(["item #1"]);
+  });
+});

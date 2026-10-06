@@ -51,8 +51,9 @@ from app.schemas.defect_statistics import (
     DefectStatisticsFilters,
     DefectStatisticsPeriodKind,
     DefectStatisticsResponse,
+    DefectStatisticsReportResponse,
 )
-from app.services.defect_statistics import get_defect_statistics
+from app.services.defect_statistics import get_defect_statistics, get_defect_statistics_report
 
 router = APIRouter()
 
@@ -550,6 +551,33 @@ def get_statistics(
             departments=tuple(department or ()),
             models=tuple(model or ()),
             process_steps=tuple(process_step or ()),
+        ),
+    )
+
+
+@router.get("/statistics/report", response_model=DefectStatisticsReportResponse)
+def get_statistics_report(
+    anchor: date = Query(...),
+    period: DefectStatisticsPeriodKind = Query("month"),
+    department: Optional[List[str]] = Query(None),
+    model: Optional[List[str]] = Query(None),
+    process_step: Optional[List[str]] = Query(None),
+    reason: str | None = Query(None),
+    item_id: uuid.UUID | None = Query(None),
+    db: Session = Depends(get_db),
+) -> DefectStatisticsReportResponse:
+    """KST 관측 범위·직전 기간·추세가 포함된 불량 발생 보고서를 반환한다."""
+
+    return get_defect_statistics_report(
+        db,
+        period=period,
+        anchor=anchor,
+        filters=DefectStatisticsFilters(
+            departments=tuple(department or ()),
+            models=tuple(model or ()),
+            process_steps=tuple(process_step or ()),
+            reason=reason,
+            item_id=item_id,
         ),
     )
 

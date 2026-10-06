@@ -2501,6 +2501,102 @@
         "title": "DefectStatisticsBreakdownEntry",
         "type": "object"
       },
+      "DefectStatisticsComparison": {
+        "description": "직전 달력 기간의 동일 관측 범위와 선택 기간의 차이.",
+        "properties": {
+          "departments": {
+            "items": {
+              "$ref": "#/components/schemas/DefectStatisticsBreakdownEntry"
+            },
+            "title": "Departments",
+            "type": "array"
+          },
+          "excluded_legacy_count": {
+            "title": "Excluded Legacy Count",
+            "type": "integer"
+          },
+          "is_partial": {
+            "title": "Is Partial",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DefectStatisticsItemBreakdownEntry"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "observed_until": {
+            "format": "date-time",
+            "title": "Observed Until",
+            "type": "string"
+          },
+          "period": {
+            "$ref": "#/components/schemas/DefectStatisticsPeriod"
+          },
+          "quantity_change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity Change Pct"
+          },
+          "quantity_delta": {
+            "title": "Quantity Delta",
+            "type": "integer"
+          },
+          "range_adjusted": {
+            "title": "Range Adjusted",
+            "type": "boolean"
+          },
+          "reasons": {
+            "items": {
+              "$ref": "#/components/schemas/DefectStatisticsBreakdownEntry"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "record_count_change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Record Count Change Pct"
+          },
+          "record_count_delta": {
+            "title": "Record Count Delta",
+            "type": "integer"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/DefectStatisticsSummary"
+          }
+        },
+        "required": [
+          "period",
+          "observed_until",
+          "is_partial",
+          "range_adjusted",
+          "summary",
+          "items",
+          "reasons",
+          "departments",
+          "excluded_legacy_count",
+          "quantity_delta",
+          "quantity_change_pct",
+          "record_count_delta",
+          "record_count_change_pct"
+        ],
+        "title": "DefectStatisticsComparison",
+        "type": "object"
+      },
       "DefectStatisticsItemBreakdownEntry": {
         "description": "품목별 분류값과 화면 표시에 필요한 품목 식별자.",
         "properties": {
@@ -2582,6 +2678,103 @@
           "end_date"
         ],
         "title": "DefectStatisticsPeriod",
+        "type": "object"
+      },
+      "DefectStatisticsReportResponse": {
+        "description": "기존 통계와 관측 시각·직전 기간·추세를 함께 반환한다.",
+        "properties": {
+          "as_of": {
+            "format": "date-time",
+            "title": "As Of",
+            "type": "string"
+          },
+          "comparison": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DefectStatisticsComparison"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "departments": {
+            "items": {
+              "$ref": "#/components/schemas/DefectStatisticsBreakdownEntry"
+            },
+            "title": "Departments",
+            "type": "array"
+          },
+          "excluded_legacy_count": {
+            "title": "Excluded Legacy Count",
+            "type": "integer"
+          },
+          "is_partial": {
+            "title": "Is Partial",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DefectStatisticsItemBreakdownEntry"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "observed_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed Until"
+          },
+          "period": {
+            "$ref": "#/components/schemas/DefectStatisticsPeriod"
+          },
+          "reasons": {
+            "items": {
+              "$ref": "#/components/schemas/DefectStatisticsBreakdownEntry"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/DefectStatisticsSummary"
+          },
+          "timeline": {
+            "items": {
+              "$ref": "#/components/schemas/DefectStatisticsTimelineEntry"
+            },
+            "title": "Timeline",
+            "type": "array"
+          },
+          "trend": {
+            "items": {
+              "$ref": "#/components/schemas/DefectStatisticsTrendEntry"
+            },
+            "title": "Trend",
+            "type": "array"
+          }
+        },
+        "required": [
+          "period",
+          "summary",
+          "timeline",
+          "items",
+          "reasons",
+          "departments",
+          "excluded_legacy_count",
+          "as_of",
+          "observed_until",
+          "is_partial",
+          "comparison",
+          "trend"
+        ],
+        "title": "DefectStatisticsReportResponse",
         "type": "object"
       },
       "DefectStatisticsResponse": {
@@ -2704,6 +2897,81 @@
           "quantity"
         ],
         "title": "DefectStatisticsTimelineEntry",
+        "type": "object"
+      },
+      "DefectStatisticsTrendEntry": {
+        "description": "선택 기간을 끝으로 이어지는 한 달력 기간의 합계.",
+        "properties": {
+          "bucket": {
+            "title": "Bucket",
+            "type": "string"
+          },
+          "end_date": {
+            "format": "date",
+            "title": "End Date",
+            "type": "string"
+          },
+          "is_partial": {
+            "title": "Is Partial",
+            "type": "boolean"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "record_count": {
+            "title": "Record Count",
+            "type": "integer"
+          },
+          "start_date": {
+            "format": "date",
+            "title": "Start Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "bucket",
+          "label",
+          "record_count",
+          "quantity",
+          "start_date",
+          "end_date",
+          "is_partial"
+        ],
+        "title": "DefectStatisticsTrendEntry",
+        "type": "object"
+      },
+      "DefectiveStockBreakdown": {
+        "description": "격리 버킷의 실재고를 부서와 현재 관리 분류로 나눈다.",
+        "properties": {
+          "department": {
+            "title": "Department",
+            "type": "string"
+          },
+          "management_category": {
+            "enum": [
+              "DEFECT",
+              "B_GRADE",
+              "OBSOLETE"
+            ],
+            "title": "Management Category",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "department",
+          "management_category",
+          "quantity"
+        ],
+        "title": "DefectiveStockBreakdown",
         "type": "object"
       },
       "DepartmentCreate": {
@@ -6529,6 +6797,13 @@
             "format": "date-time",
             "title": "Created At",
             "type": "string"
+          },
+          "defective_breakdown": {
+            "items": {
+              "$ref": "#/components/schemas/DefectiveStockBreakdown"
+            },
+            "title": "Defective Breakdown",
+            "type": "array"
           },
           "defective_total": {
             "default": 0,
@@ -16545,6 +16820,155 @@
           }
         },
         "summary": "Get Statistics",
+        "tags": [
+          "Defects"
+        ]
+      }
+    },
+    "/api/defects/statistics/report": {
+      "get": {
+        "description": "KST 관측 범위·직전 기간·추세가 포함된 불량 발생 보고서를 반환한다.",
+        "operationId": "get_statistics_report_api_defects_statistics_report_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "anchor",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "Anchor",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "period",
+            "required": false,
+            "schema": {
+              "default": "month",
+              "enum": [
+                "week",
+                "month",
+                "year"
+              ],
+              "title": "Period",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "department",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Department"
+            }
+          },
+          {
+            "in": "query",
+            "name": "model",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model"
+            }
+          },
+          {
+            "in": "query",
+            "name": "process_step",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Process Step"
+            }
+          },
+          {
+            "in": "query",
+            "name": "reason",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reason"
+            }
+          },
+          {
+            "in": "query",
+            "name": "item_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DefectStatisticsReportResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Statistics Report",
         "tags": [
           "Defects"
         ]

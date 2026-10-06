@@ -177,3 +177,38 @@ export interface DefectStatisticsQuery {
   models: string[];
   process_steps: string[];
 }
+
+export interface DefectStatisticsReportQuery extends DefectStatisticsQuery {
+  reason?: string;
+  item_id?: string;
+}
+
+export interface DefectStatisticsComparison {
+  period: DefectStatisticsResponse["period"];
+  observed_until: string;
+  is_partial: boolean;
+  range_adjusted: boolean;
+  summary: DefectStatisticsResponse["summary"];
+  items: DefectStatisticsItemBreakdown[];
+  reasons: DefectStatisticsBreakdown[];
+  departments: DefectStatisticsBreakdown[];
+  excluded_legacy_count: number;
+  quantity_delta: number;
+  quantity_change_pct: number | null;
+  record_count_delta: number;
+  record_count_change_pct: number | null;
+}
+
+export interface DefectStatisticsTrendEntry extends DefectStatisticsTimelineEntry {
+  start_date: string;
+  end_date: string;
+  is_partial: boolean;
+}
+
+export interface DefectStatisticsReportResponse extends DefectStatisticsResponse {
+  as_of: string;
+  observed_until: string | null;
+  is_partial: boolean;
+  comparison: DefectStatisticsComparison | null;
+  trend: DefectStatisticsTrendEntry[];
+}
