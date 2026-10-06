@@ -31,9 +31,11 @@ test("빈 검색 초기화와 없는 페이지 복구를 유지한다", async ({
   await page.goto("/mes?tab=dashboard");
   const filter = page.getByRole("textbox", { name: "자재 검색" });
   await filter.fill("일치하지않는검색어");
-  await expect(page.getByText("검색 결과가 없습니다", { exact: true })).toBeVisible();
+  await expect(page.getByText("현재 조건에 맞는 자재가 없습니다", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: new RegExp(readSeed().rawItem.item_name) })).toHaveCount(0);
   await page.getByRole("button", { name: "검색 지우기", exact: true }).click();
   await expect(filter).toHaveValue("");
+  await expect(page.getByRole("button", { name: new RegExp(readSeed().rawItem.item_name) }).first()).toBeVisible();
   await page.goto("/page-that-does-not-exist");
   await expect(page.getByRole("heading", { name: "페이지를 찾을 수 없습니다" })).toBeVisible();
   await page.getByRole("link", { name: "대시보드로" }).click();

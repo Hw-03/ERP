@@ -301,7 +301,8 @@ describe("DefectCartFlow", () => {
     expect(cartPane).toHaveClass("h-full", "min-h-0");
     expect(screen.getByTestId("defect-picker-toolbar")).toBeInTheDocument();
     expect(screen.getByTestId("defect-side-toolbar")).toHaveTextContent("재작업 품목");
-    expect(pickerTable).toHaveClass("flex-1", "overflow-y-auto");
+    expect(pickerTable).toHaveClass("relative", "min-h-0", "flex-1");
+    expect(within(pickerTable).getByTestId("defect-picker-scroll")).toHaveClass("overflow-y-auto", "lg:-right-2.5", "lg:[scrollbar-gutter:stable]");
     expect(cartPanel).toHaveClass("flex-1", "overflow-y-auto");
   });
   it("[8.7-05] 즉시 폐기 확인은 대상·수량·실제 부서를 강조하고 취소 시 요청 없이 닫힌다", async () => {

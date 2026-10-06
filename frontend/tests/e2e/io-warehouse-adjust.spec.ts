@@ -40,7 +40,7 @@ test.describe.serial("입출고 V2 — 창고 수량보정", () => {
     await gotoWarehouseCompose(page);
 
     const adjustCard = await visible(
-      page.getByRole("button", { name: /수량보정 입출고/ }),
+      page.getByRole("button", { name: /창고 수량 보정/ }),
     );
     const warehouseIoCard = await visible(
       page.getByRole("button", { name: /창고 입출고/ }),
@@ -74,7 +74,8 @@ test.describe.serial("입출고 V2 — 창고 수량보정", () => {
     ).toBeEnabled();
     await advanceToQuantityStep(page);
 
-    await expect(page.getByText("보정 입고", { exact: true }).filter({ visible: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /입고·출고 방향 선택 수량보정 · 입고/ })).toBeVisible();
+    await expect(page.getByText("창고", { exact: true }).filter({ visible: true })).toBeVisible();
     const before = await stockValue(page, "창고 수량");
     const after = await stockValue(page, "실행 후");
     expect(after - before).toBe(1);
@@ -108,13 +109,13 @@ test.describe.serial("입출고 V2 — 창고 수량보정", () => {
     await expect(page.getByText("창고 수량 조정", { exact: true }).first()).toBeVisible();
   });
 
-  test("모바일 보정 출고 → 압축 입력 → 즉시 완료", async ({ page }) => {
+  test("모바일 보정 출고 → 수량 조정 → 즉시 완료", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await loginAsOperator(page, { role: "warehouse" });
     await gotoWarehouseCompose(page);
 
     const adjustCard = await visible(
-      page.getByRole("button", { name: /수량보정 입출고/ }),
+      page.getByRole("button", { name: /창고 수량 보정/ }),
     );
     expect((await adjustCard.boundingBox())?.height).toBeGreaterThanOrEqual(44);
     await adjustCard.click();
@@ -125,18 +126,19 @@ test.describe.serial("입출고 V2 — 창고 수량보정", () => {
     await outbound.click();
     await clickNextStep(page);
 
-    const search = await visible(page.getByPlaceholder("품목명 또는 코드"));
+    const search = await visible(page.getByPlaceholder("품목명 · 품목 코드"));
     await search.fill("E2E원자재튜브");
     await addItemAndWaitForPreview(
       page,
-      await visible(page.getByRole("button", { name: /E2E원자재튜브/ })),
+      page.getByRole("row", { name: /E2E원자재튜브/ }).getByRole("button", { name: "선택", exact: true }),
     );
 
-    await expect(page.getByText("보정 출고 품목", { exact: true }).filter({ visible: true })).toBeVisible();
-    await expect(
-      page.getByText(/현재 창고 .*가용 .*보정 -1 .*예정/).filter({ visible: true }),
-    ).toBeVisible();
-    const review = await visible(page.getByRole("button", { name: /최종 검토/ }));
+    await advanceToQuantityStep(page);
+    await expect(page.getByText("창고", { exact: true }).filter({ visible: true })).toBeVisible();
+    const before = await stockValue(page, "창고 수량");
+    const after = await stockValue(page, "실행 후");
+    expect(after - before).toBe(-1);
+    const review = await visible(page.getByRole("button", { name: /제출확인/ }));
     expect((await review.boundingBox())?.height).toBeGreaterThanOrEqual(44);
     await review.click();
 

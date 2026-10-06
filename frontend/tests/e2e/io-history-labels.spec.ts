@@ -4,9 +4,7 @@
  * V2 작업 화면 / 입출고 내역 — 같은 도메인 단어가 같은 라벨로 보이는지.
  * 시드 없이 라벨 자체의 존재만 검증하므로 가장 먼저 활성화 가능(읽기 baseline).
  *
- * 라이브 UI 기준(2026-06-04 확인):
- *  - work type 은 3개(원자재 입고/창고 입출고/부서 입출고). "불량"은 별도 최상위 탭.
- *  - "원자재 입고"(receive)는 창고 정/부 직원에게만 노출 → 창고 역할로 로그인.
+ * "불량"은 별도 최상위 탭. 원자재 입출고와 창고 수량 보정은 창고 정/부 전용이다.
  */
 import { expect, test } from "@playwright/test";
 import { advanceToQuantityStep, clickNextStep, gotoWarehouseCompose, loginAsOperator, pickWorkType } from "./_helpers";
@@ -22,17 +20,19 @@ async function expectLabelAbsent(page: import("@playwright/test").Page, word: st
 
 test.describe("라벨 일관성 (glossary 단일 사전)", () => {
   test.beforeEach(async ({ page }) => {
-    // 창고 역할로 로그인해야 "원자재 입고" work type 까지 노출된다.
+    // 창고 역할로 로그인해야 원자재 입출고와 창고 수량 보정까지 노출된다.
     await loginAsOperator(page, { role: "warehouse" });
   });
 
-  test("V2 입출고 화면에 3 work type 라벨이 정확한 단어로 노출된다", async ({ page }) => {
+  test("V2 입출고 화면에 현재 작업 유형 라벨이 정확한 단어로 노출된다", async ({ page }) => {
     await page.goto("/mes");
     await page.getByRole("navigation").getByRole("button", { name: /입출고/ }).first().click();
 
-    await expect(page.getByRole("button", { name: /원자재 입고/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /원자재 입출고/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /창고 입출고/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /부서 입출고/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /창고 수량 보정/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /AS·연구 사용출고/ })).toBeVisible();
   });
 
   test("폐기된 라벨이 화면에 노출되지 않는다", async ({ page }) => {
@@ -118,7 +118,7 @@ test.describe("입출고 내역 PC 정보 위계", () => {
       "작업",
       "대상",
       "품목코드",
-      "재고 변동",
+      "수량 변동",
       "담당자",
     ]) {
       await expect(table.getByRole("columnheader", { name, exact: true })).toBeVisible();

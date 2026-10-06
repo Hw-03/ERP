@@ -137,7 +137,7 @@ test.describe("입출고 내역 — 요청 순 재고", () => {
     await expect(actualStock).not.toContainText("정상 부서");
     await expect(page.getByText("실제 처리 당시 재고", { exact: true })).toHaveCount(0);
 
-    const stockHelp = table.getByLabel("재고 변동 계산 기준");
+    const stockHelp = table.getByLabel("수량 변동 계산 기준");
     await stockHelp.hover();
     await expect(page.getByRole("tooltip")).toContainText("요청 시각 순서로 계산");
     await expect(page.getByRole("tooltip")).toContainText("승인되면 과거 표시도 변경");
