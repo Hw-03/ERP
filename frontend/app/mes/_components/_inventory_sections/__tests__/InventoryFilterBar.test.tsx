@@ -23,6 +23,12 @@ const baseProps = {
 };
 
 describe("InventoryFilters", () => {
+  it("모바일에서 초기화를 상단으로 옮겨도 데스크톱 기본 버튼은 유지한다", () => {
+    const { rerender } = render(<InventoryFilters {...baseProps} />);
+    expect(screen.getByRole("button", { name: "전체 초기화" })).toBeInTheDocument();
+    rerender(<InventoryFilters {...baseProps} showResetAll={false} />);
+    expect(screen.queryByRole("button", { name: "전체 초기화" })).not.toBeInTheDocument();
+  });
   it("omits the unclassified model filter", () => {
     render(<InventoryFilters {...baseProps} />);
     expect(screen.queryByRole("button", { name: "미분류" })).not.toBeInTheDocument();

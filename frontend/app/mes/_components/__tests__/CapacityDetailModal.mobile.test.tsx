@@ -148,7 +148,7 @@ describe("CapacityDetailModal 모바일 모델 요약", () => {
     const mobile = within(mobileList);
 
     expect(mobile.queryByText("자동 기준 출하 완제품")).not.toBeInTheDocument();
-    expect(screen.getByText(/모델마다 출하대기·빠른생산·총생산 수량의 합이 가장 큰/)).toBeInTheDocument();
+    expect(screen.queryByText(/모델마다 출하대기·빠른생산·총생산 수량의 합이 가장 큰/)).not.toBeInTheDocument();
     expect(mobile.getByText("DX3000_65kV, 1.7mA_USA_Vector 긴 기준 출하 완제품명")).toBeInTheDocument();
     expect(mobile.queryByRole("button", { name: "기준 PF 해제" })).not.toBeInTheDocument();
   });
@@ -171,7 +171,7 @@ describe("CapacityDetailModal 모바일 모델 요약", () => {
     expect(mobile.getAllByText("자동 기준")).toHaveLength(1);
   });
 
-  it("모바일 헤더에는 제목과 자동 기준 설명을 표시한다", () => {
+  it("모바일 헤더에는 설명 없이 제목을 표시한다", () => {
     const onClose = vi.fn();
     render(<CapacityDetailModal capacityData={capacityData} onClose={onClose} />);
 
@@ -179,7 +179,7 @@ describe("CapacityDetailModal 모바일 모델 요약", () => {
     expect(screen.queryByText("수량 기준")).not.toBeInTheDocument();
     expect(screen.queryByText(/박스 포장까지 완료되어/)).not.toBeInTheDocument();
     expect(screen.queryByText(/공용 자재가 겹치는 모델은/)).not.toBeInTheDocument();
-    expect(screen.getByText(/각 수량은 해당 품목 기준이며/)).toBeInTheDocument();
+    expect(screen.queryByText(/각 수량은 해당 품목 기준이며/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "닫기" }));
     expect(onClose).toHaveBeenCalledOnce();
   });

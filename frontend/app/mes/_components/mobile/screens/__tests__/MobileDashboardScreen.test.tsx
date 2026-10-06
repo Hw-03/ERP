@@ -48,19 +48,21 @@ vi.mock("../../../_inventory_sections/InventoryFilterBar", () => ({
     departmentFilterBasis,
     onDepartmentFilterBasisChange,
     onResetAll,
+    showResetAll = true,
   }: {
     departmentFilterBasis: "location" | "code";
     onDepartmentFilterBasisChange: (basis: "location" | "code") => void;
     onResetAll: () => void;
+    showResetAll?: boolean;
   }) => (
     <>
       <output data-testid="mobile-department-filter-basis">{departmentFilterBasis}</output>
       <button type="button" onClick={() => onDepartmentFilterBasisChange("location")}>
         재고 위치 기준
       </button>
-      <button type="button" onClick={onResetAll}>
+      {showResetAll && <button type="button" onClick={onResetAll}>
         전체 초기화
-      </button>
+      </button>}
     </>
   ),
 }));
@@ -146,8 +148,13 @@ describe("MobileDashboardScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "OR" }));
     expect(screen.getByRole("button", { name: "OR" })).toHaveAttribute("aria-pressed", "true");
 
-    fireEvent.click(screen.getByRole("button", { name: "전체 초기화" }));
+    const resetButton = screen.getByRole("button", { name: "전체 초기화" });
+    expect(screen.getAllByRole("button", { name: "전체 초기화" })).toHaveLength(1);
+    expect(resetButton.closest(".sticky")).not.toBeNull();
+    expect(resetButton).toBeEnabled();
+    fireEvent.click(resetButton);
     expect(screen.getByRole("button", { name: "AND" })).toHaveAttribute("aria-pressed", "true");
+    expect(resetButton).toBeDisabled();
   });
 
   it("기본 기준은 품목 코드이고 위치 기준 전환 후 전체 초기화하면 품목 코드로 돌아간다", () => {

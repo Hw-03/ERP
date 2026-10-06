@@ -217,11 +217,11 @@ export function DailyWorkActivity({ activity, onDetailOpenChange, loading = fals
 
   return (
     <section className={mobile ? "rounded-[20px] border p-3" : "rounded-[20px] border p-4 lg:shrink-0 lg:px-5 lg:py-4"} aria-labelledby="daily-work-activity-title" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-      <div className={mobile ? "flex min-h-11 flex-wrap items-center gap-2" : "flex min-h-11 flex-wrap items-center gap-2 sm:flex-nowrap"}>
+      <div className={mobile ? "flex flex-wrap items-center gap-2" : "flex min-h-11 flex-wrap items-center gap-2 sm:flex-nowrap"}>
         <span className={mobile ? "hidden" : "flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px]"} style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>
           <ClipboardList className="h-5 w-5" />
         </span>
-        <h2 id="daily-work-activity-title" className={mobile ? "w-full text-[15px] font-semibold" : "shrink-0 whitespace-nowrap text-lg font-black"}>MES 작업 기록</h2>
+        <h2 id="daily-work-activity-title" className={mobile ? "w-full text-center text-[15px] font-semibold" : "shrink-0 whitespace-nowrap text-lg font-black"}>MES 작업 기록</h2>
         {loading && <span data-testid="daily-report-activity-skeleton" aria-label="MES 작업 기록 불러오는 중" role="status" className="h-11 min-w-0 flex-1 motion-safe:animate-pulse rounded-[14px]" style={{ background: LEGACY_COLORS.s2 }} />}
         {activity?.summary.map((summary) => {
           const isOpen = openOperation === summary.operation_key;
@@ -254,7 +254,7 @@ export function DailyWorkActivity({ activity, onDetailOpenChange, loading = fals
       </div>
 
       {(loading || activity?.summary.length === 0) && (
-        <div className={mobile && !loading ? "mt-2 text-sm font-medium" : "mt-3 rounded-[14px] border px-3.5 py-3 text-sm font-medium"} style={mobile && !loading ? { color: LEGACY_COLORS.muted2 } : { color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+        <div className={mobile && !loading ? "mt-2 text-center text-sm font-medium" : "mt-3 rounded-[14px] border px-3.5 py-3 text-sm font-medium"} style={mobile && !loading ? { color: LEGACY_COLORS.muted2 } : { color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
           {loading ? <span aria-hidden="true" className="block h-5 w-2/3 rounded motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s3 }} /> : mobile ? "작업 기록이 없습니다." : "완료된 MES 거래가 생기면 작업 종류와 수량이 이곳에 자동으로 나타납니다."}
         </div>
       )}

@@ -33,6 +33,7 @@ type FiltersProps = {
   onClearProcessSteps: () => void;
   onResetAll: () => void;
   isAnyFilterActive: boolean;
+  showResetAll?: boolean;
 };
 
 export function InventoryFilters({
@@ -53,6 +54,7 @@ export function InventoryFilters({
   onClearProcessSteps,
   onResetAll,
   isAnyFilterActive,
+  showResetAll = true,
 }: FiltersProps) {
   if (!open) return null;
   return (
@@ -159,7 +161,7 @@ export function InventoryFilters({
           />
         </div>
       </div>
-      <button
+      {showResetAll && <button
         type="button"
         onClick={onResetAll}
         disabled={!isAnyFilterActive}
@@ -172,7 +174,7 @@ export function InventoryFilters({
       >
         <RotateCcw className="h-4 w-4" />
         전체 초기화
-      </button>
+      </button>}
     </div>
   );
 }

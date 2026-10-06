@@ -218,9 +218,6 @@ export function CapacityDetailModal({
                     <X className="h-5 w-5" />
                   </button>
                 </div>
-                <p className="mt-1 text-xs leading-5" style={{ color: LEGACY_COLORS.muted2 }}>
-                  모델마다 출하대기·빠른생산·총생산 수량의 합이 가장 큰 출하 완제품을 자동 기준으로 표시합니다. 각 수량은 해당 품목 기준이며, 다른 출하품과 합산한 값이 아닙니다.
-                </p>
               </div>
             )}
           </>
