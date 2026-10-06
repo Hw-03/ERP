@@ -9,7 +9,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { useShippingRequestsQuery } from "../useShippingQuery";
+import { useShippingHistoryMonthsQuery, useShippingHistoryPagesQuery, useShippingRequestsQuery } from "../useShippingQuery";
+import { queryKeys } from "../keys";
 
 function makeResponse(body: unknown, ok = true): Response {
   return {
@@ -84,5 +85,35 @@ describe("useShippingRequestsQuery", () => {
     expect(result2.current.isLoading).toBe(false);
     expect(result2.current.data).toEqual(sampleRequests);
     expect(fetchSpy.mock.calls.length).toBe(callCountAfterFirstMount);
+  });
+});
+
+describe("paginated shipping history queries", () => {
+  it("uses a distinct page cache and passes each cursor to the server", async () => {
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(makeResponse({ requests: [{ request_id: "first" }], next_cursor: "cursor-2", has_more: true }))
+      .mockResolvedValueOnce(makeResponse({ requests: [{ request_id: "second" }], next_cursor: null, has_more: false }));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const client = makeClient({ gcTime: 60_000 });
+    client.setQueryData(queryKeys.shipping.history(), [{ request_id: "legacy" }]);
+
+    const { result } = renderHook(() => useShippingHistoryPagesQuery({ status: "PICKED_UP", year: 2026, month: 7, q: "INV" }), { wrapper: makeWrapper(client) });
+    await waitFor(() => expect(result.current.data?.pages).toHaveLength(1));
+    expect(result.current.data?.pages[0].requests[0].request_id).toBe("first");
+    await result.current.fetchNextPage();
+    await waitFor(() => expect(result.current.data?.pages).toHaveLength(2));
+    expect(String(fetchSpy.mock.calls[0][0])).toContain("status=PICKED_UP");
+    expect(String(fetchSpy.mock.calls[0][0])).toContain("q=INV");
+    expect(String(fetchSpy.mock.calls[1][0])).toContain("cursor=cursor-2");
+    expect(client.getQueryData(queryKeys.shipping.history())).toEqual([{ request_id: "legacy" }]);
+  });
+
+  it("loads month counts independently by status", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(makeResponse([{ year: 2026, month: 7, count: 2 }]));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const client = makeClient();
+    const { result } = renderHook(() => useShippingHistoryMonthsQuery({ status: "CANCELLED" }), { wrapper: makeWrapper(client) });
+    await waitFor(() => expect(result.current.data?.[0].count).toBe(2));
+    expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/shipping/history/months?status=CANCELLED");
   });
 });

@@ -132,6 +132,12 @@ work type으로 취급하지 않는다.
 `MobileIoComposeWizard` 는 데스크탑 V2 의 컴포넌트/hook 을 그대로 재사용한다
 ([ADR-0003](adr/ADR-0003-mobile-reuses-desktop-v2.md)). 비즈니스 규칙 drift 0.
 
+모바일 출하는 `MobileShippingScreen`의 관리·이력 진입점에서 요청 작성·수정과
+준비 완료·픽업 완료 및 각 취소를 제공한다. 요청 작성은 PC와 같은 단계 순서이며,
+초안 정렬·전송·최종 품목 검증은 `frontend/lib/shipping/request-draft.ts`를 공유한다.
+준비 완료는 인보이스와 완제품 SN을 요구하고 준비 체크 완료율은 안내용이다.
+완료·취소 이력은 검색·월별 조회와 서버 커서의 다음 페이지를 사용한다.
+
 ## 화면 라벨 단일 소스
 
 `frontend/lib/io/glossary.ts` — work/sub/transaction/request type 라벨이 한 곳에.

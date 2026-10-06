@@ -19,6 +19,8 @@ export function InlineSearch({
   className,
   autoFocus = false,
   inputRef,
+  ariaLabel,
+  maxLength,
 }: {
   value: string;
   onChange: (next: string) => void;
@@ -26,6 +28,8 @@ export function InlineSearch({
   className?: string;
   autoFocus?: boolean;
   inputRef?: Ref<HTMLInputElement>;
+  ariaLabel?: string;
+  maxLength?: number;
 }) {
   const composingRef = useRef(false);
   const [draft, setDraft] = useState(value);
@@ -51,6 +55,8 @@ export function InlineSearch({
     >
       <Search size={16} color={LEGACY_COLORS.muted} strokeWidth={2} />
       <input
+        aria-label={ariaLabel}
+        maxLength={maxLength}
         autoFocus={autoFocus}
         ref={inputRef}
         value={draft}

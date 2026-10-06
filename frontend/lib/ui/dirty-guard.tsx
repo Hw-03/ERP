@@ -354,6 +354,22 @@ export function useFlushDirtyEntries(): () => Promise<void> {
   }, [ctx]);
 }
 
+/** 작성 위저드는 폐기를 확인하고, 저장 가능한 화면은 기존 전환 저장 계약을 유지한다. */
+export function useBeforeViewportSwitch(): () => Promise<void | boolean> {
+  const ctx = useContext(DirtyGuardContext);
+  const confirmNavigation = useConfirmNavigation();
+  const flush = useFlushDirtyEntries();
+  return useCallback(async () => {
+    const needsConfirmation = Array.from(ctx!.registryRef.current.values()).some(
+      (entry) => entry.dirty && entry.confirmOnly,
+    );
+    if (!needsConfirmation) return flush();
+    return new Promise<boolean>((resolve) => {
+      confirmNavigation(() => resolve(true), () => resolve(false));
+    });
+  }, [ctx, confirmNavigation, flush]);
+}
+
 export function useLocalDirtyGuard(
   dirty: boolean,
   save: () => Promise<void> | void,

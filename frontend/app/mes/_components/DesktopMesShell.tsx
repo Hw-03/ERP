@@ -45,7 +45,7 @@ import { useProductionCapacityQuery } from "@/lib/queries/useProductionQuery";
 import { sendClientEvent } from "@/lib/client-events";
 import { setAuditScreen } from "@/lib/activity-audit-context";
 import { CapacityDetailModal } from "./CapacityDetailModal";
-import { DirtyGuardProvider, useConfirmNavigation, useFlushDirtyEntries } from "@/lib/ui/dirty-guard";
+import { DirtyGuardProvider, useConfirmNavigation, useBeforeViewportSwitch } from "@/lib/ui/dirty-guard";
 import { canSeeWorkType } from "./_warehouse_v2/ioWorkType";
 import type { IoEntryIntent } from "./_warehouse_v2/types";
 import { HISTORY_PAGE_SIZE } from "./_history_sections/historyConstants";
@@ -77,7 +77,7 @@ const TAB_META: Record<DesktopTabId, { title: string; icon: ElementType }> = {
 export function DesktopMesShell({
   onBeforeViewportSwitchChange,
 }: {
-  onBeforeViewportSwitchChange?: (handler: (() => Promise<void>) | null) => void;
+  onBeforeViewportSwitchChange?: (handler: (() => Promise<void | boolean>) | null) => void;
 }) {
   return (
     <DirtyGuardProvider>
@@ -91,7 +91,7 @@ export function DesktopMesShell({
 function DesktopMesShellInner({
   onBeforeViewportSwitchChange,
 }: {
-  onBeforeViewportSwitchChange?: (handler: (() => Promise<void>) | null) => void;
+  onBeforeViewportSwitchChange?: (handler: (() => Promise<void | boolean>) | null) => void;
 }) {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -108,7 +108,7 @@ function DesktopMesShellInner({
     );
     return () => animation?.cancel();
   }, [returnSequence]);
-  const flushDirtyEntries = useFlushDirtyEntries();
+  const flushDirtyEntries = useBeforeViewportSwitch();
   const operator = useCurrentOperator();
   const { preferences, savePreferences } = useAppearancePreferences();
   const visibleTabs = useMemo(

@@ -31,14 +31,14 @@ function MesBody() {
   const [viewportSwitchError, setViewportSwitchError] = useState(false);
   const isDesktopRef = useRef<boolean | null>(null);
   const switchSequenceRef = useRef(0);
-  const beforeViewportSwitchRef = useRef<(() => Promise<void>) | null>(null);
+  const beforeViewportSwitchRef = useRef<(() => Promise<void | boolean>) | null>(null);
 
   useEffect(() => {
     window.addEventListener("keydown", blockBrowserSaveShortcut, true);
     return () => window.removeEventListener("keydown", blockBrowserSaveShortcut, true);
   }, []);
 
-  const registerBeforeViewportSwitch = useCallback((handler: (() => Promise<void>) | null) => {
+  const registerBeforeViewportSwitch = useCallback((handler: (() => Promise<void | boolean>) | null) => {
     beforeViewportSwitchRef.current = handler;
   }, []);
 
@@ -56,7 +56,7 @@ function MesBody() {
       setViewportSwitchError(false);
 
       try {
-        await beforeViewportSwitchRef.current?.();
+        if (await beforeViewportSwitchRef.current?.() === false) return;
       } catch {
         if (switchSequenceRef.current === sequence) {
           setViewportSwitchError(true);

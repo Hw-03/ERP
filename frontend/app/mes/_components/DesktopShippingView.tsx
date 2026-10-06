@@ -28,9 +28,7 @@ import { LoadFailureCard } from "./common/LoadFailureCard";
 import {
   api,
   type Item,
-  type ShippingBomLineInput,
   type ShippingBomMatchResponse,
-  type ShippingCompanionLineInput,
   type ShippingFinalizationMode,
   type ShippingHistoryMonth,
   type ShippingHistoryParams,
@@ -54,6 +52,18 @@ import type { Operator } from "./login/useCurrentOperator";
 import { QuantityStepper } from "./_warehouse_v2/QuantityStepper";
 import type { IoEntryIntent } from "./_warehouse_v2/types";
 import { matchesSearchText } from "@/lib/searchText";
+import {
+  buildShippingPayload,
+  isValidPositiveInt,
+  lineKey,
+  requestBomLines,
+  requestCompanionDraft,
+  sortShippingDraftLines,
+  toPositiveInt,
+  validateShippingFinalization,
+  type CompanionDraftLine,
+  type DraftLine,
+} from "@/lib/shipping/request-draft";
 
 type SectionTab = "request" | "history";
 type ViewMode = "hub" | "requestList" | "requestDetail" | "requestWork" | "prepList" | "prepWork" | "historyList" | "historyWork";
@@ -72,8 +82,6 @@ type RequestWizardPushEntry = {
   toStep: RequestWizardStep;
 };
 type RequestDraftLegacyAliases = { requestId: string; searches: Set<string> };
-type DraftLine = ShippingBomLineInput & { key: string; included: boolean; origin: "DEFAULT" | "CUSTOM" };
-type CompanionDraftLine = { key: string; item_id: string; quantity: number; unit: string };
 type PendingAction =
   | "load"
   | "save"
@@ -163,23 +171,9 @@ function txTone(type: string, cancelled: boolean) {
   return LEGACY_COLORS.blue;
 }
 
-function lineKey() {
-  return `line-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
 function toNumber(value: string | number) {
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? n : 1;
-}
-
-function toPositiveInt(value: string | number) {
-  const n = Math.floor(Number(value));
-  return Number.isFinite(n) && n >= 1 ? n : 1;
-}
-
-function isValidPositiveInt(value: string | number) {
-  const n = Number(value);
-  return Number.isInteger(n) && n >= 1;
 }
 
 function requestWizardStepFromParam(value: string | null): RequestWizardStep | null {
@@ -230,79 +224,6 @@ function kstYearMonth(value: string): { year: number; month: number } {
   };
 }
 
-const SHIPPING_BOM_DEPARTMENT_ORDER: Record<string, number> = { T: 0, H: 1, V: 2, N: 3, A: 4, P: 5 };
-const SHIPPING_BOM_STAGE_ORDER: Record<string, number> = { F: 0, A: 1, R: 2 };
-
-function compareShippingBomItems(left: Item | undefined, right: Item | undefined) {
-  const leftProcess = left?.process_type_code ?? "";
-  const rightProcess = right?.process_type_code ?? "";
-  const department = (SHIPPING_BOM_DEPARTMENT_ORDER[leftProcess[0]] ?? Object.keys(SHIPPING_BOM_DEPARTMENT_ORDER).length)
-    - (SHIPPING_BOM_DEPARTMENT_ORDER[rightProcess[0]] ?? Object.keys(SHIPPING_BOM_DEPARTMENT_ORDER).length);
-  if (department !== 0) return department;
-
-  const stage = (SHIPPING_BOM_STAGE_ORDER[leftProcess[1]] ?? Object.keys(SHIPPING_BOM_STAGE_ORDER).length)
-    - (SHIPPING_BOM_STAGE_ORDER[rightProcess[1]] ?? Object.keys(SHIPPING_BOM_STAGE_ORDER).length);
-  if (stage !== 0) return stage;
-
-  const leftSerial = left?.serial_no;
-  const rightSerial = right?.serial_no;
-  if (leftSerial === null || leftSerial === undefined) {
-    if (rightSerial !== null && rightSerial !== undefined) return 1;
-  } else if (rightSerial === null || rightSerial === undefined) {
-    return -1;
-  } else if (leftSerial !== rightSerial) {
-    return leftSerial - rightSerial;
-  }
-
-  const leftCode = left?.mes_code;
-  const rightCode = right?.mes_code;
-  if (!leftCode && rightCode) return 1;
-  if (leftCode && !rightCode) return -1;
-  if (leftCode && rightCode) {
-    const code = leftCode.localeCompare(rightCode);
-    if (code !== 0) return code;
-  }
-  return (left?.item_id ?? "").localeCompare(right?.item_id ?? "");
-}
-
-function sortShippingDraftLines(lines: DraftLine[], itemById: Map<string, Item>) {
-  return [...lines].sort((left, right) => {
-    const itemOrder = compareShippingBomItems(itemById.get(left.child_item_id), itemById.get(right.child_item_id));
-    if (itemOrder !== 0) return itemOrder;
-    return left.key.localeCompare(right.key);
-  });
-}
-
-function requestBomLines(req: ShippingRequest): DraftLine[] {
-  return req.bom_lines.map((line) => ({
-    key: line.line_id,
-    parent_stage: line.parent_stage,
-    child_item_id: line.child_item_id,
-    quantity: line.quantity,
-    unit: line.unit,
-    included: line.included,
-    origin: line.origin,
-  }));
-}
-
-function requestCompanionDraft(req: ShippingRequest): CompanionDraftLine[] {
-  return req.companion_lines.map((line) => ({
-    key: line.line_id ?? `companion-${line.item_id}`,
-    item_id: line.item_id,
-    quantity: line.quantity,
-    unit: line.unit,
-  }));
-}
-
-function companionPayload(lines: CompanionDraftLine[], itemById: Map<string, Item>): ShippingCompanionLineInput[] {
-  return lines
-    .filter((line) => line.item_id && Number(line.quantity) > 0)
-    .map((line) => ({
-      item_id: line.item_id,
-      quantity: toPositiveInt(line.quantity),
-      unit: line.unit || itemById.get(line.item_id)?.unit || "EA",
-    }));
-}
 
 export function DesktopShippingView({ onStatusChange, operator = null, onGoToWarehouse }: {
   onStatusChange: (status: string) => void;
@@ -1332,27 +1253,21 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
   }
 
   function draftPayload() {
-    return {
-      request_quantity: toPositiveInt(requestQuantity),
-      invoice_number: invoiceNumber.trim() || null,
-      requested_by_name: (editingId ? requestedBy.trim() : operator?.name?.trim() || requestedBy.trim()) || null,
-      custom_pa_name: customPaName.trim() || null,
-      custom_pf_name: customPfName.trim() || null,
-      notes: notes.trim() || null,
-      finalization_mode: finalizationMode,
-      reuse_pf_item_id: reusePfItemId,
-      companion_lines: companionPayload(companionDraft, itemById),
-      bom_lines: sortShippingDraftLines(draftLines, itemById)
-        .filter((line) => line.child_item_id && Number(line.quantity) > 0)
-        .map((line) => ({
-          parent_stage: line.parent_stage,
-          child_item_id: line.child_item_id,
-          quantity: Number(line.quantity),
-          unit: line.unit || itemById.get(line.child_item_id)?.unit || "EA",
-          included: line.included,
-          origin: line.origin,
-        })),
-    };
+    return buildShippingPayload({
+      requestQuantity,
+      invoiceNumber,
+      requestedBy,
+      operatorName: operator?.name,
+      isEditing: Boolean(editingId),
+      customPaName,
+      customPfName,
+      notes,
+      finalizationMode,
+      reusePfItemId,
+      companionDraft,
+      draftLines,
+      itemById,
+    });
   }
 
   async function saveRequest(generation = requestDraftGenerationRef.current) {
@@ -1440,30 +1355,20 @@ export function DesktopShippingView({ onStatusChange, operator = null, onGoToWar
       if (!isCurrentRequestDraftGeneration(generation)) return false;
       setMatchResult(result);
       setBomMatchStale(false);
-      const usesCandidateSelection = result.base_pf_matches !== undefined;
-      const resolvedMode = result.base_pf_matches ? "KEEP_BASE" : finalizationMode;
       if (result.base_pf_matches !== undefined) {
         setFinalizationMode((current) => result.base_pf_matches ? "KEEP_BASE" : current === "KEEP_BASE" ? "CREATE_NEW" : current);
         if (result.base_pf_matches) setReusePfItemId(null);
       }
-      const selectedCandidate = result.pf_candidates?.find((candidate) => candidate.pf_item_id === reusePfItemId);
-      if (usesCandidateSelection && !result.base_pf_matches && resolvedMode === "REUSE_CANDIDATE" && !selectedCandidate) {
-        const msg = "재사용할 기존 PF 후보를 다시 선택하세요.";
-        setError(msg);
-        onStatusChange(msg);
-        return false;
-      }
-      const missingPaName = usesCandidateSelection
-        ? !result.base_pf_matches && resolvedMode === "CREATE_NEW" && !customPaName.trim()
-        : result.requires_pa_name && !customPaName.trim();
-      const missingPfName = usesCandidateSelection
-        ? !result.base_pf_matches && resolvedMode === "CREATE_NEW" && !customPfName.trim()
-        : result.requires_pf_name && !customPfName.trim();
-      if (missingPaName || missingPfName) {
-        const required = [missingPaName ? "PA" : null, missingPfName ? "PF" : null].filter(Boolean).join("/");
-        const msg = `동일 BOM 후보를 기준으로 새 ${required} 이름을 입력해야 출하 요청할 수 있습니다.`;
-        setError(msg);
-        onStatusChange(msg);
+      const validation = validateShippingFinalization({
+        matchResult: result,
+        finalizationMode,
+        reusePfItemId,
+        customPaName,
+        customPfName,
+      });
+      if (validation.error) {
+        setError(validation.error);
+        onStatusChange(validation.error);
         return false;
       }
       return true;

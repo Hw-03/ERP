@@ -5,8 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import MesPage from "../../page";
 
 const shellState = vi.hoisted(() => ({
-  desktopFlush: vi.fn<() => Promise<void>>(),
-  mobileFlush: vi.fn<() => Promise<void>>(),
+  desktopFlush: vi.fn<() => Promise<void | boolean>>(),
+  mobileFlush: vi.fn<() => Promise<void | boolean>>(),
 }));
 
 vi.mock("../mobile/MobileShell", () => ({
@@ -155,6 +155,16 @@ describe("MesPage responsive shell", () => {
     ).toBeInTheDocument();
     expect(screen.getByTestId("desktop-shell")).toBeInTheDocument();
     expect(screen.queryByTestId("mobile-shell")).not.toBeInTheDocument();
+  });
+
+  it("keeps the current shell without a save error when the user cancels switching", async () => {
+    desktopMatches = false;
+    shellState.mobileFlush.mockResolvedValue(false);
+    render(<MesPage />);
+    await act(async () => setDesktopMatch(true));
+    expect(screen.getByTestId("mobile-shell")).toBeInTheDocument();
+    expect(screen.queryByTestId("desktop-shell")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("cancels a pending switch when the viewport crosses back before the flush finishes", async () => {

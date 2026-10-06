@@ -1,564 +1,128 @@
 "use client";
-import { ReadEmpty, ReadFailure, ReadLoading } from "../../common/ReadState";
-import { SkeletonBlock, dataRevealClassName } from "../../common/LoadingSkeleton";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, ChevronDown, ClipboardList, History, PackageCheck, RotateCcw, Truck, XCircle } from "lucide-react";
-import { api, type ShippingRequest, type ShippingRequestRevisionChange, type ShippingRequestStatus } from "@/lib/api";
-import { formatBomQuantity } from "@/lib/mes/bomFormat";
-import { LEGACY_COLORS } from "@/lib/mes/color";
-import { tint } from "@/lib/mes/colorUtils";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, ChevronRight, History, PackageCheck, Plus, Truck } from "lucide-react";
+import { api, type Item, type ShippingRequest } from "@/lib/api";
+import { LEGACY_COLORS as C } from "@/lib/mes/color";
 import { queryKeys } from "@/lib/queries/keys";
-import { useShippingHistoryQuery, useShippingRequestsQuery } from "@/lib/queries/useShippingQuery";
-import { ExpandableItemName } from "../../_warehouse_v2/ExpandableItemName";
+import { useShippingHistoryMonthsQuery, useShippingRequestsQuery } from "@/lib/queries/useShippingQuery";
+import type { Operator } from "../../login/useCurrentOperator";
+import type { IoEntryIntent } from "../../_warehouse_v2/types";
+import { PrimaryActionButton } from "../primitives";
+import { ShippingHeader, ShippingItemName, ShippingStatus } from "../shipping/ShippingPresentation";
+import presentation from "../mobilePresentation.module.css";
+import { MobileShippingRequestWizard } from "../shipping/MobileShippingRequestWizard";
+import { MobileShippingDetail } from "../shipping/MobileShippingDetail";
+import { MobileShippingHistory } from "../shipping/MobileShippingHistory";
+import { useShippingNavigation } from "../shipping/useShippingNavigation";
+import type { MobileShippingView, ShippingRoute } from "../shipping/shipping-route";
 
-type MobileShippingTab = "requests" | "prep" | "history";
-
-const RESUME_REFETCH_DEDUP_MS = 250;
-
-const STATUS_LABEL: Record<ShippingRequestStatus, string> = {
-  PREPARING: "준비 중",
-  PREPARED: "준비 완료",
-  PICKED_UP: "픽업 완료",
-  CANCELLED: "요청 취소",
-};
-
-const STATUS_TONE: Record<ShippingRequestStatus, string> = {
-  PREPARING: LEGACY_COLORS.green,
-  PREPARED: LEGACY_COLORS.yellow,
-  PICKED_UP: LEGACY_COLORS.purple,
-  CANCELLED: LEGACY_COLORS.red,
-};
-
-export function MobileShippingScreen() {
-  const [tab, setTab] = useState<MobileShippingTab>("prep");
-  const [mutationErrors, setMutationErrors] = useState<Record<string, string>>({});
-  const [pendingId, setPendingId] = useState<string | null>(null);
-  const queryClient = useQueryClient();
-  const requestsQuery = useShippingRequestsQuery(undefined, { live: true });
-  const historyQuery = useShippingHistoryQuery(tab === "history");
-  const requests = useMemo(() => requestsQuery.data ?? [], [requestsQuery.data]);
-  const history = historyQuery.data ?? [];
-  const refetchRequests = requestsQuery.refetch;
-  const lastResumeRefetchAtRef = useRef<number | null>(null);
-
-  const activeRequests = useMemo(
-    () => requests.filter((req) => req.status !== "PICKED_UP" && req.status !== "CANCELLED"),
-    [requests],
-  );
-  const prepRequests = useMemo(
-    () => requests.filter((req) => req.status === "PREPARING" || req.status === "PREPARED"),
-    [requests],
-  );
-
-  const refetchAfterResume = useCallback(() => {
-    if (document.visibilityState === "hidden") return;
-    const now = Date.now();
-    const lastRefetchAt = lastResumeRefetchAtRef.current;
-    if (lastRefetchAt !== null && now - lastRefetchAt < RESUME_REFETCH_DEDUP_MS) return;
-    lastResumeRefetchAtRef.current = now;
-    void refetchRequests({ cancelRefetch: false });
-  }, [refetchRequests]);
-
+export function MobileShippingScreen({ operator = null, onGoToWarehouse, onNavigateAway, onBusyChange }: {
+  operator?: Operator | null;
+  onGoToWarehouse?: (item: Item, intent?: IoEntryIntent) => void;
+  onNavigateAway?: (tab: string) => void;
+  onBusyChange?: (busy: boolean) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const { route, navigate } = useShippingNavigation(onNavigateAway, busy);
+  const busyCallbackRef = useRef(onBusyChange);
+  busyCallbackRef.current = onBusyChange;
+  const updateBusy = useCallback((next: boolean) => { setBusy(next); busyCallbackRef.current?.(next); }, []);
+  useEffect(() => () => { busyCallbackRef.current?.(false); }, []);
+  const client = useQueryClient();
+  const requests = useShippingRequestsQuery(undefined, { live: true });
+  const months = useShippingHistoryMonthsQuery(undefined, route.view === "hub");
+  const selectedQuery = useQuery({
+    queryKey: ["shipping", "detail", route.requestId],
+    queryFn: ({ signal }) => api.getShippingRequest(route.requestId!, { signal }),
+    enabled: Boolean(route.requestId),
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
+  });
+  const selected = selectedQuery.data ?? requests.data?.find((row) => row.request_id === route.requestId);
+  const lastResume = useRef<number | null>(null);
+  const refetchRequests = requests.refetch;
+  const refetchSelected = selectedQuery.refetch;
   useEffect(() => {
-    function handleVisibilityChange() {
-      if (document.visibilityState === "visible") refetchAfterResume();
-    }
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("focus", refetchAfterResume);
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("focus", refetchAfterResume);
+    const refresh = () => {
+      if (document.visibilityState === "hidden") return;
+      const now = Date.now();
+      if (lastResume.current !== null && now - lastResume.current < 250) return;
+      lastResume.current = now;
+      void refetchRequests({ cancelRefetch: false });
+      if (route.requestId) void refetchSelected({ cancelRefetch: false });
     };
-  }, [refetchAfterResume]);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [refetchRequests, refetchSelected, route.requestId]);
 
-  function upsert(next: ShippingRequest) {
-    queryClient.setQueryData<ShippingRequest[]>(queryKeys.shipping.requests(), (prev = []) => [
-      next,
-      ...prev.filter((row) => row.request_id !== next.request_id),
-    ]);
+  const upsert = useCallback((next: ShippingRequest) => {
+    void client.cancelQueries({ queryKey: ["shipping", "detail", next.request_id] });
+    void client.cancelQueries({ queryKey: queryKeys.shipping.requests() });
+    client.setQueryData(["shipping", "detail", next.request_id], next);
+    client.setQueryData<ShippingRequest[]>(queryKeys.shipping.requests(), (previous = []) => [next, ...previous.filter((row) => row.request_id !== next.request_id)]);
+    void client.invalidateQueries({ queryKey: ["shipping", "historyMonths"] });
+  }, [client]);
+  const open = (view: MobileShippingView, requestId: string | null = null, extra: Partial<ShippingRoute> = {}) => navigate({ ...route, view, requestId, step: 1, ...extra });
+  const managed = (requests.data ?? []).filter((row) => row.status === "PREPARING" || row.status === "PREPARED");
+  const initialLoading = requests.isPending || requests.isPlaceholderData && requests.isFetching;
+  const initialError = requests.error && (requests.data === undefined || requests.isPlaceholderData);
+
+  if (route.view === "historyList") return <MobileShippingHistory status={route.historyStatus} onStatusChange={(historyStatus) => open("historyList", null, { historyStatus })} onSelect={(request) => { upsert(request); open("historyWork", request.request_id); }} onBack={() => open("hub")} />;
+
+  if (route.requestId && !selected) return <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4" style={{ color: C.text }}>
+    <BackButton onClick={() => open(route.view === "historyWork" ? "historyList" : "requestList")} />
+    {selectedQuery.isError ? <div role="alert">{selectedQuery.error.message}<button type="button" className="block min-h-11 font-bold" onClick={() => void selectedQuery.refetch()}>다시 불러오기</button></div> : <p role="status">출하 요청을 불러오는 중입니다.</p>}
+  </div>;
+
+  if (route.view === "requestWork") {
+    return <MobileShippingRequestWizard key={route.requestId ?? "new"} operator={operator} request={selected ?? null} step={route.step} onBusyChange={updateBusy} onStepChange={(step) => navigate({ ...route, step }, { bypassGuard: true })} onCancel={() => open(route.requestId ? "requestDetail" : "requestList", route.requestId)} onSaved={(request) => {
+      updateBusy(false);
+      upsert(request);
+      navigate({ ...route, view: "requestDetail", requestId: request.request_id, step: 1 }, { replace: true, bypassGuard: true });
+    }} />;
   }
+  if (selected && (route.view === "requestDetail" || route.view === "historyWork")) return <MobileShippingDetail key={selected.request_id} request={selected} onRequestChange={(request) => {
+    upsert(request);
+    if (request.status === "PICKED_UP" && route.view !== "historyWork") navigate({ ...route, view: "historyWork", historyStatus: "PICKED_UP" }, { replace: true });
+  }} onEdit={() => open("requestWork", selected.request_id)} onBack={() => open(route.view === "historyWork" ? "historyList" : "requestList")} onDeleted={() => { void client.invalidateQueries({ queryKey: queryKeys.shipping.all }); open("requestList"); }} onPickupCancelled={(request) => { upsert(request); open("requestDetail", request.request_id); }} onGoToWarehouse={onGoToWarehouse} />;
 
-  async function updateChecklist(req: ShippingRequest, itemId: string, checked: boolean) {
-    if (req.status !== "PREPARING") return;
-    setPendingId(`${req.request_id}-${itemId}`);
-    setMutationErrors((current) => {
-      const { [req.request_id]: _cleared, ...remaining } = current;
-      return remaining;
-    });
-    try {
-      upsert(await api.updateShippingChecklist(req.request_id, { checks: [{ item_id: itemId, checked }] }));
-    } catch (err) {
-      setMutationErrors((current) => ({
-        ...current,
-        [req.request_id]: err instanceof Error ? err.message : "체크리스트 수정에 실패했습니다.",
-      }));
-    } finally {
-      setPendingId(null);
-    }
-  }
-
-  async function clearChecklist(req: ShippingRequest) {
-    if (req.status !== "PREPARING") return;
-    setPendingId(`${req.request_id}-clear`);
-    setMutationErrors((current) => {
-      const { [req.request_id]: _cleared, ...remaining } = current;
-      return remaining;
-    });
-    try {
-      upsert(await api.clearShippingChecklist(req.request_id));
-    } catch (err) {
-      setMutationErrors((current) => ({
-        ...current,
-        [req.request_id]: err instanceof Error ? err.message : "체크리스트 전체 해제에 실패했습니다.",
-      }));
-    } finally {
-      setPendingId(null);
-    }
-  }
-
-  const activeQuery = tab === "history" ? historyQuery : requestsQuery;
-  const loading = activeQuery.isLoading || (activeQuery.isFetching && activeQuery.isPlaceholderData);
-  const queryError = tab === "history" ? historyQuery.error : requestsQuery.error;
-  const error = queryError instanceof Error ? queryError.message : queryError ? "출하 데이터를 불러오지 못했습니다." : null;
-  const hasActiveData = activeQuery.data !== undefined && !activeQuery.isPlaceholderData;
-  const initialError = hasActiveData ? null : error;
-  const refreshError = hasActiveData ? error : null;
-  const retryRefresh = () => {
-    void activeQuery.refetch();
-  };
-
-  return (
-    <div className="mw0 scrollbar-hide flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4">
-      <div className="px-1 py-1">
-        <div className="flex items-center gap-3">
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center" style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.blue }}>
-            <Truck className="h-5 w-5" />
-          </span>
-          <span className="min-w-0">
-            <span className="block text-lg font-semibold leading-tight" style={{ color: LEGACY_COLORS.text }}>출하</span>
-            <span className="block text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-              생성·수정·완료 처리는 PC에서 진행합니다.
-            </span>
-          </span>
-        </div>
+  return <div className="flex min-h-0 flex-1 flex-col text-sm" style={{ color: C.text }}>
+    <ShippingHeader title={route.view === "hub" ? "출하" : "출하 관리"} onBack={route.view === "hub" ? undefined : () => open("hub")} backLabel="이전 화면" right={route.view === "hub" ? <Truck size={24} color={C.blue} className="mr-2" /> : undefined} />
+    {route.view !== "hub" && <div className="mx-3 mb-3 shrink-0"><PrimaryActionButton label="새 출하 요청 만들기" icon={Plus} onClick={() => open("requestWork")} /></div>}
+    <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pb-3">
+    {route.view === "hub" ? <>
+      <p className="px-1 text-sm" style={{ color: C.muted2 }}>요청 작성부터 준비와 픽업까지 진행합니다.</p>
+      <div className={`${presentation.choiceList} ${presentation.separatedChoices}`}>
+      <button type="button" onClick={() => open("requestList")} className={presentation.menuRow}><span className={presentation.choiceIcon}><PackageCheck /></span><span className="min-w-0 flex-1"><span className="block text-lg font-bold">출하 관리</span><span className="mt-1 block text-sm font-medium" style={{ color: C.muted2 }}>준비 중 · 준비 완료</span><span className="mt-2 block text-sm font-bold">{initialLoading || initialError ? "—" : managed.length}건</span></span><ChevronRight size={20} /></button>
+      <button type="button" onClick={() => open("historyList")} className={presentation.menuRow}><span className={presentation.choiceIcon} style={{ color: C.purple }}><History /></span><span className="min-w-0 flex-1"><span className="block text-lg font-bold">출하 이력</span><span className="mt-1 block text-sm font-medium" style={{ color: C.muted2 }}>픽업 완료 · 요청 취소</span><span className="mt-2 block text-sm font-bold">{months.data ? months.data.reduce((total, month) => total + month.count, 0) : "—"}건</span></span><ChevronRight size={20} /></button>
       </div>
-
-      <div className="mw0 grid grid-cols-3 gap-2">
-        <TabButton active={tab === "requests"} icon={ClipboardList} label="요청" onClick={() => setTab("requests")} />
-        <TabButton active={tab === "prep"} icon={PackageCheck} label="준비" onClick={() => setTab("prep")} />
-        <TabButton active={tab === "history"} icon={History} label="이력" onClick={() => setTab("history")} />
-      </div>
-
-      {loading && <ReadLoading label="출하 데이터를 불러오고 있습니다." skeleton={<ShippingSkeleton tab={tab} />} />}
-      {initialError && <ReadFailure message={initialError} onRetry={retryRefresh} />}
-      {refreshError && (
-        <ReadFailure
-          message={refreshError}
-          refresh
-          onRetry={retryRefresh}
-        />
-      )}
-
-      {!loading && !initialError && tab === "requests" && (
-        <div className={`mw0 grid gap-2 ${dataRevealClassName}`}>
-          {activeRequests.length === 0 ? (
-            <ReadEmpty title="출하 요청이 없습니다" description="PC에서 새 출하 요청을 만들 수 있습니다." />
-          ) : (
-            activeRequests.map((req) => <MobileRequestCard key={req.request_id} request={req} />)
-          )}
-        </div>
-      )}
-
-      {!loading && !initialError && tab === "prep" && (
-        <div className={`mw0 grid gap-2 ${dataRevealClassName}`}>
-          {prepRequests.length === 0 ? (
-            <ReadEmpty title="준비 중인 출하가 없습니다" description="PC에서 새 출하 요청을 만들면 바로 표시됩니다." />
-          ) : (
-            prepRequests.map((req) => (
-              <MobilePrepCard
-                key={req.request_id}
-                request={req}
-                pendingId={pendingId}
-                error={mutationErrors[req.request_id] ?? null}
-                onCheck={updateChecklist}
-                onClear={clearChecklist}
-              />
-            ))
-          )}
-        </div>
-      )}
-
-      {!loading && !initialError && tab === "history" && (
-        <div className={`mw0 grid gap-2 ${dataRevealClassName}`}>
-          {history.length === 0 ? (
-            <ReadEmpty title="출하 이력이 없습니다" description="픽업 완료된 출하가 아직 없습니다." />
-          ) : (
-            history.map((req) => <MobileRequestCard key={req.request_id} request={req} />)
-          )}
-        </div>
-      )}
+      {months.isError && <p role="alert">이력 건수를 불러오지 못했습니다.<button type="button" className="ml-2 min-h-11 font-bold" onClick={() => void months.refetch()}>다시 불러오기</button></p>}
+    </> : <>
+      {initialLoading ? <p role="status">출하 요청을 불러오는 중입니다.</p> : !initialError && (["PREPARING", "PREPARED"] as const).map((status) => {
+        const rows = managed.filter((row) => row.status === status);
+        const label = status === "PREPARING" ? "준비 중" : "준비 완료";
+        return <section key={status} className="space-y-3"><h2 className="text-base font-bold">{label} <span className="ml-1 text-sm font-medium" style={{ color: C.muted2 }}>{rows.length}</span></h2>{rows.length === 0 ? <p className="rounded-[20px] border p-4" style={{ borderColor: C.border, color: C.muted2 }}>{label}인 요청이 없습니다.</p> : rows.map((request) => <div key={request.request_id} className="rounded-[20px] border p-4" style={{ background: C.s1, borderColor: C.border }}>
+          <ShippingStatus status={request.status} />
+          <ShippingItemName name={request.final_pf_item_name ?? request.base_pf_item_name} className="mt-3 text-base font-bold" />
+          <div className="mt-2 flex items-center justify-between gap-3"><span className="min-w-0 break-all" style={{ color: C.muted2 }}>{request.final_pf_mes_code ?? request.base_pf_mes_code ?? "코드 없음"}</span><span className="shrink-0 whitespace-nowrap font-bold">{request.request_quantity}대</span></div>
+          <p className="mt-3 break-all">인보이스 {request.invoice_number || "미입력"}</p><p className="mt-1 break-all text-xs font-medium" style={{ color: C.muted2 }}>{request.requested_by_name || "요청자 미지정"} · {new Date(request.created_at).toLocaleString("ko-KR")}</p>
+          <button type="button" className="mt-3 flex min-h-11 w-full items-center justify-between border-t pt-2 font-bold" style={{ borderColor: C.border, color: C.blue }} onClick={() => { upsert(request); open("requestDetail", request.request_id); }}>요청 상세<ChevronRight size={20} /></button>
+        </div>)}</section>;
+      })}
+    </>}
+    {requests.isError && <div role="alert" className="rounded-2xl border p-4" style={{ color: C.red, borderColor: C.border }}>{!initialError && "최신 상태를 불러오지 못했습니다. "}{requests.error.message}<button type="button" className="block min-h-11 font-bold" onClick={() => void requests.refetch()}>다시 불러오기</button></div>}
     </div>
-  );
-}
-
-/** 준비는 접힌 구성품 행, 요청·이력은 최종 PA/PF 정보 영역을 예약한다. */
-function ShippingSkeleton({ tab }: { tab: MobileShippingTab }): React.ReactNode {
-  return <div data-testid={`mobile-shipping-${tab}-skeleton`} className="mw0 grid gap-2">
-    {[0, 1].map((row) => <div key={row} className="mw0 oh rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-      <div className="flex items-start justify-between gap-3"><div className="flex min-w-0 flex-1 flex-col gap-2"><SkeletonBlock className="h-11 w-4/5" /><SkeletonBlock className="h-3 w-2/3" /></div><SkeletonBlock className="h-6 w-16 rounded-full" /></div>
-      {tab === "prep" ? <>
-        <div className="mt-3"><SkeletonBlock className="h-5 w-28" /></div>
-        <div className="mt-3 grid gap-1">{[0, 1].map((group) => <div key={group} className="flex min-h-11 items-center justify-between gap-2 border-t px-1 py-2" style={{ borderColor: LEGACY_COLORS.border }}><SkeletonBlock className="h-4 w-28" /><SkeletonBlock className="h-3 w-16" /><ChevronDown className="h-5 w-5 shrink-0" /></div>)}</div>
-        <div className="mt-3 flex min-h-11 items-center justify-center rounded-[12px] border" style={{ borderColor: LEGACY_COLORS.border }}><SkeletonBlock className="h-4 w-20" /></div>
-      </> : <div className="mt-3 grid grid-cols-2 gap-2">{["최종 PA", "최종 PF"].map((label) => <div key={label} className="mw0 border-t pt-2" style={{ borderColor: LEGACY_COLORS.border }}><div className="mb-1 text-xs font-medium" style={{ color: LEGACY_COLORS.muted2 }}>{label}</div><SkeletonBlock className="h-11 w-full" /></div>)}</div>}
-    </div>)}
   </div>;
 }
 
-const REVISION_FIELD_LABEL: Record<string, string> = {
-  request_quantity: "출하 수량",
-  custom_pa_name: "PA 품목명",
-  custom_pf_name: "PF 품목명",
-  notes: "메모",
-  bom_lines: "BOM 구성",
-  companion_lines: "동반 출하품",
-};
-
-type RevisionSnapshotLine = {
-  parentStage: string | null;
-  itemId: string | null;
-  itemName: string | null;
-  mesCode: string | null;
-  quantity: number | null;
-  unit: string;
-  included?: boolean;
-};
-
-function formatKst(value: string): string {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(new Date(value));
-  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((row) => row.type === type)?.value ?? "--";
-  return `${part("year")}.${part("month")}.${part("day")} ${part("hour")}:${part("minute")} KST`;
-}
-
-function snapshotLines(value: unknown): RevisionSnapshotLine[] {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((raw) => {
-    if (!raw || typeof raw !== "object") return [];
-    const row = raw as Record<string, unknown>;
-    const rawItemId = row.child_item_id ?? row.item_id;
-    return [{
-      parentStage: typeof row.parent_stage === "string" ? row.parent_stage : null,
-      itemId: typeof rawItemId === "string" ? rawItemId : null,
-      itemName: typeof row.item_name === "string" ? row.item_name : null,
-      mesCode: typeof row.mes_code === "string" ? row.mes_code : null,
-      quantity: typeof row.quantity === "number" ? row.quantity : null,
-      unit: typeof row.unit === "string" && row.unit ? row.unit : "EA",
-      included: typeof row.included === "boolean" ? row.included : undefined,
-    }];
-  });
-}
-
-function snapshotKey(line: RevisionSnapshotLine, index: number): string {
-  return `${line.parentStage ?? "ITEM"}:${line.itemId ?? index}`;
-}
-
-function snapshotName(line: RevisionSnapshotLine): string {
-  const stage = line.parentStage ? `[${line.parentStage}] ` : "";
-  const name = line.itemName ?? line.mesCode ?? "이름 없음";
-  const code = line.mesCode && line.mesCode !== name ? ` (${line.mesCode})` : "";
-  return `${stage}${name}${code}`;
-}
-
-function snapshotDescription(line: RevisionSnapshotLine, compactQuantity = false): string {
-  const quantity = compactQuantity && line.quantity !== null
-    ? formatBomQuantity(line.quantity, line.unit)
-    : `${line.quantity ?? "-"} ${line.unit}`;
-  return `${snapshotName(line)} · ${quantity}`;
-}
-
-function arrayChangeDetails(change: ShippingRequestRevisionChange, compactQuantity = false): string[] {
-  const before = snapshotLines(change.before);
-  const after = snapshotLines(change.after);
-  const beforeByKey = new Map(before.map((line, index) => [snapshotKey(line, index), line]));
-  const afterByKey = new Map(after.map((line, index) => [snapshotKey(line, index), line]));
-  const keys = Array.from(beforeByKey.keys());
-  afterByKey.forEach((_line, key) => {
-    if (!beforeByKey.has(key)) keys.push(key);
-  });
-  const details: string[] = [];
-
-  for (const key of keys) {
-    const previous = beforeByKey.get(key);
-    const next = afterByKey.get(key);
-    if (!previous && next) {
-      details.push(`추가: ${snapshotDescription(next, compactQuantity)}`);
-    } else if (previous && !next) {
-      details.push(`삭제: ${snapshotDescription(previous, compactQuantity)}`);
-    } else if (previous && next) {
-      if (previous.quantity !== next.quantity) {
-        const previousQuantity = compactQuantity && previous.quantity !== null
-          ? formatBomQuantity(previous.quantity, previous.unit)
-          : `${previous.quantity ?? "-"}`;
-        const nextQuantity = compactQuantity && next.quantity !== null
-          ? formatBomQuantity(next.quantity, next.unit)
-          : `${next.quantity ?? "-"} ${next.unit}`;
-        details.push(`수량 변경: ${snapshotName(next)} · ${previousQuantity} → ${nextQuantity}`);
-      }
-      if (previous.included !== next.included && (previous.included !== undefined || next.included !== undefined)) {
-        const before = previous.included === undefined ? "미지정" : previous.included ? "포함" : "제외";
-        const after = next.included === undefined ? "미지정" : next.included ? "포함" : "제외";
-        details.push(`포함 상태 변경: ${snapshotName(next)} · ${before} → ${after}`);
-      }
-      const metadataChanged = previous.parentStage !== next.parentStage
-        || previous.itemName !== next.itemName
-        || previous.mesCode !== next.mesCode
-        || previous.unit !== next.unit;
-      if (metadataChanged) {
-        details.push(`변경: ${snapshotDescription(previous, compactQuantity)} → ${snapshotDescription(next, compactQuantity)}`);
-      }
-    }
-  }
-  return details.length > 0 ? details : ["구성 순서가 변경되었습니다."];
-}
-
-function scalarChangeDetails(change: ShippingRequestRevisionChange): string[] {
-  const display = (value: unknown) => value === null || value === undefined || value === "" ? "없음" : String(value);
-  if (change.field === "request_quantity") {
-    return [`${display(change.before)}대 → ${display(change.after)}대`];
-  }
-  return [`${display(change.before)} → ${display(change.after)}`];
-}
-
-function revisionSummary(changes: ShippingRequestRevisionChange[]): string {
-  const labels = changes
-    .flatMap((change) => REVISION_FIELD_LABEL[change.field] ? [REVISION_FIELD_LABEL[change.field]] : [])
-    .filter((label, index, all) => all.indexOf(label) === index);
-  return labels.length > 0 ? `${labels.join(" · ")} 수정` : "준비 정보가 수정되었습니다.";
-}
-
-function PreparationRevisionNotice({ request }: { request: ShippingRequest }) {
-  const [open, setOpen] = useState(false);
-  const revision = request.latest_preparation_revision;
-  if (request.status !== "PREPARING" || !revision?.affects_preparation) return null;
-  const summary = revisionSummary(revision.changes);
-
-  return (
-    <section
-      className="mt-3 rounded-[14px] border px-3 py-2"
-      style={{ background: tint(LEGACY_COLORS.yellow, 10), borderColor: tint(LEGACY_COLORS.yellow, 42) }}
-    >
-      <div className="flex flex-wrap items-center gap-2">
-        <span
-          className="rounded-full px-2 py-1 text-xs font-black"
-          style={{ background: tint(LEGACY_COLORS.yellow, 24), color: LEGACY_COLORS.yellow }}
-        >
-          수정됨
-        </span>
-        <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.text }}>
-          {revision.edited_by_name} · {formatKst(revision.created_at)}
-        </span>
-      </div>
-      <div className="mt-2 truncate text-xs font-bold" title={summary} style={{ color: LEGACY_COLORS.text }}>
-        {summary}
-      </div>
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-        className="mt-1 flex min-h-11 w-full items-center justify-between gap-2 rounded-[10px] px-2 text-left text-xs font-black"
-        style={{ color: LEGACY_COLORS.yellow }}
-      >
-        {open ? "변경 내용 접기" : "변경 내용 보기"}
-        <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-      {open && (
-        <div className="grid gap-2 border-t pt-2" style={{ borderColor: tint(LEGACY_COLORS.yellow, 35) }}>
-          {revision.changes.map((change) => {
-            const details = change.field === "bom_lines" || change.field === "companion_lines"
-              ? arrayChangeDetails(change, change.field === "bom_lines")
-              : scalarChangeDetails(change);
-            return (
-              <div key={change.field} className="border-t py-2 [overflow-wrap:anywhere]" style={{ borderColor: LEGACY_COLORS.border }}>
-                <div className="text-xs font-black" style={{ color: LEGACY_COLORS.text }}>
-                  {REVISION_FIELD_LABEL[change.field] ?? change.field}
-                </div>
-                <ul className="mt-1 grid gap-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-                  {details.map((detail) => <li key={detail}>{detail}</li>)}
-                </ul>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function MobilePrepCard({
-  request,
-  pendingId,
-  error,
-  onCheck,
-  onClear,
-}: {
-  request: ShippingRequest;
-  pendingId: string | null;
-  error: string | null;
-  onCheck: (req: ShippingRequest, itemId: string, checked: boolean) => void;
-  onClear: (req: ShippingRequest) => void;
-}) {
-  const editable = request.status === "PREPARING";
-  const checklistGroups = new Map<string, ShippingRequest["checklist_lines"]>();
-  for (const line of request.checklist_lines) {
-    const code = line.process_type_code ?? "";
-    const lines = checklistGroups.get(code) ?? [];
-    lines.push(line);
-    checklistGroups.set(code, lines);
-  }
-  return (
-    <div className="mw0 oh rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-      <CardHeader request={request} />
-      <PreparationRevisionNotice request={request} />
-      {error && <InlineState title="오류" body={error} tone={LEGACY_COLORS.red} compact />}
-      <div className="mt-3 text-sm font-bold" style={{ color: LEGACY_COLORS.green }}>
-        총 {request.request_quantity ?? 1}대 출하
-      </div>
-      <div className="mt-3 grid gap-1">
-        {request.checklist_lines.length === 0 ? (
-          <InlineState title="체크 항목 없음" body="PC에서 BOM을 확인하세요." compact />
-        ) : (
-          Array.from(checklistGroups, ([code, lines]) => (
-            <details key={code} className="group border-t" style={{ borderColor: LEGACY_COLORS.border }}>
-              <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-1 py-2 text-sm font-bold focus-visible:rounded-[10px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--c-blue)] [&::-webkit-details-marker]:hidden">
-                <span className="min-w-0 flex-1 break-words">{code ? `${code} 구성품` : "기타 구성품"}</span>
-                <span className="shrink-0 text-xs font-medium" style={{ color: LEGACY_COLORS.muted2 }}>항목 {lines.length}개</span>
-                <ChevronDown className="h-5 w-5 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
-              </summary>
-              <div className="grid gap-1 pb-2">
-                {lines.map((line) => (
-                  <label
-                    key={line.line_id}
-                    className="mw0 flex min-h-[52px] items-center gap-3 rounded-[12px] px-2 py-3"
-                    style={{ background: line.checked ? tint(LEGACY_COLORS.green, 8) : "transparent" }}
-                  >
-                    <input
-                      type="checkbox"
-                      aria-label={`${line.item_name} 체크`}
-                      checked={line.checked}
-                      disabled={!editable || pendingId !== null}
-                      onChange={(event) => onCheck(request, line.item_id, event.target.checked)}
-                      className="h-5 w-5"
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="ba block break-words text-sm font-bold leading-snug" style={{ color: LEGACY_COLORS.text }}>{line.item_name}</span>
-                      <span className="mt-1 block break-all font-mono text-xs font-medium" style={{ color: LEGACY_COLORS.muted2 }}>{line.mes_code ?? "-"}</span>
-                    </span>
-                    <span className="shrink-0 text-sm font-bold tabular-nums" style={{ color: LEGACY_COLORS.text }}>{line.quantity}개</span>
-                    {line.checked ? <CheckCircle2 className="h-5 w-5" style={{ color: LEGACY_COLORS.green }} /> : <XCircle className="h-5 w-5" style={{ color: LEGACY_COLORS.muted2 }} />}
-                  </label>
-                ))}
-              </div>
-            </details>
-          ))
-        )}
-      </div>
-      <button
-        type="button"
-        onClick={() => onClear(request)}
-        disabled={!editable || pendingId !== null || request.checklist_lines.length === 0}
-        className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[12px] border px-3 py-2 text-sm font-bold disabled:opacity-45"
-        style={{ background: tint(LEGACY_COLORS.yellow, 12), borderColor: tint(LEGACY_COLORS.yellow, 45), color: LEGACY_COLORS.yellow }}
-      >
-        <RotateCcw className="h-4 w-4" />
-        전체 해제
-      </button>
-    </div>
-  );
-}
-
-function MobileRequestCard({ request }: { request: ShippingRequest }) {
-  return (
-    <div className="mw0 oh rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-      <CardHeader request={request} />
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <InfoPill label="최종 PA" value={request.final_pa_item_name ?? "-"} />
-        <InfoPill label="최종 PF" value={request.final_pf_item_name ?? "-"} />
-      </div>
-    </div>
-  );
-}
-
-function CardHeader({ request }: { request: ShippingRequest }) {
-  return (
-    <div className="mw0 flex items-start justify-between gap-3">
-      <div className="mw0 flex-1">
-        <ExpandableItemName
-          name={request.base_pf_item_name}
-          className="block min-h-11 text-[15px] font-semibold leading-snug"
-          collapsedClassName="line-clamp-2 whitespace-normal"
-          style={{ color: LEGACY_COLORS.text }}
-        />
-        <div className="mt-1 break-words text-xs font-medium" style={{ color: LEGACY_COLORS.muted2 }}>{request.base_pf_mes_code ?? "-"} · {request.requested_by_name ?? "요청자 없음"}</div>
-      </div>
-      <span className="shrink-0 rounded-full px-2 py-1 text-xs font-bold" style={{ background: tint(STATUS_TONE[request.status], 12), color: STATUS_TONE[request.status] }}>
-        {STATUS_LABEL[request.status]}
-      </span>
-    </div>
-  );
-}
-
-function InfoPill({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="mw0 border-t pt-2" style={{ borderColor: LEGACY_COLORS.border }}>
-      <div className="mb-1 text-xs font-medium" style={{ color: LEGACY_COLORS.muted2 }}>{label}</div>
-      {value === "-" ? (
-        <div className="text-xs font-black" style={{ color: LEGACY_COLORS.text }}>{value}</div>
-      ) : (
-        <ExpandableItemName
-          name={value}
-          className="block min-h-11 text-sm font-semibold leading-snug"
-          collapsedClassName="line-clamp-2 whitespace-normal"
-          style={{ color: LEGACY_COLORS.text }}
-        />
-      )}
-    </div>
-  );
-}
-
-function TabButton({ active, icon: Icon, label, onClick }: { active: boolean; icon: typeof Truck; label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex min-h-11 items-center justify-center gap-2 rounded-[12px] border text-sm font-bold"
-      style={{
-        background: active ? tint(LEGACY_COLORS.blue, 18) : LEGACY_COLORS.s1,
-        borderColor: active ? LEGACY_COLORS.blue : LEGACY_COLORS.border,
-        color: active ? LEGACY_COLORS.blue : LEGACY_COLORS.muted2,
-      }}
-    >
-      <Icon className="h-4 w-4" />
-      {label}
-    </button>
-  );
-}
-
-function InlineState({ title, body, tone = LEGACY_COLORS.muted2, compact = false }: { title: string; body: string; tone?: string; compact?: boolean }) {
-  return (
-    <div className={`rounded-[16px] border text-center ${compact ? "px-3 py-4" : "px-4 py-8"}`} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-      <div className="text-sm font-black" style={{ color: tone }}>{title}</div>
-      <div className="mt-1 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>{body}</div>
-    </div>
-  );
+function BackButton({ onClick }: { onClick: () => void }) {
+  return <button type="button" aria-label="이전 화면" onClick={onClick} className="flex min-h-11 min-w-11 items-center justify-center rounded-xl" style={{ color: C.text }}><ArrowLeft size={20} /></button>;
 }

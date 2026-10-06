@@ -1,4 +1,4 @@
-import { act, render } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { useEffect } from "react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -6,6 +6,7 @@ import {
   DirtyGuardProvider,
   useFlushDirtyEntries,
   useRegisterDirty,
+  useBeforeViewportSwitch,
 } from "@/lib/ui/dirty-guard";
 
 function FlushProbe({
@@ -34,7 +35,27 @@ function RegisteredEntries({
   return null;
 }
 
+function SwitchProbe({ onReady }: { onReady: (handler: () => Promise<void | boolean>) => void }) {
+  const handler = useBeforeViewportSwitch();
+  useEffect(() => onReady(handler), [handler, onReady]);
+  return null;
+}
+
 describe("dirty guard viewport flush", () => {
+  it("asks before discarding a wizard and returns false when the user stays", async () => {
+    const save = vi.fn();
+    let handler: (() => Promise<void | boolean>) | undefined;
+    render(<DirtyGuardProvider><RegisteredEntries cleanSave={vi.fn()} dirtySave={save} confirmOnly /><SwitchProbe onReady={(next) => { handler = next; }} /></DirtyGuardProvider>);
+    let result: Promise<void | boolean> | undefined;
+    act(() => { result = handler?.(); });
+    fireEvent.click(screen.getByRole("button", { name: "계속 머무르기" }));
+    await expect(result).resolves.toBe(false);
+    expect(save).not.toHaveBeenCalled();
+    act(() => { result = handler?.(); });
+    fireEvent.click(screen.getByRole("button", { name: "나가기", exact: true }));
+    await expect(result).resolves.toBe(true);
+    expect(save).not.toHaveBeenCalled();
+  });
   it("saves only dirty entries before the shell changes", async () => {
     const cleanSave = vi.fn();
     const dirtySave = vi.fn().mockResolvedValue(undefined);

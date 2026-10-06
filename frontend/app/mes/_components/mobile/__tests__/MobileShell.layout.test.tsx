@@ -2,6 +2,8 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { useEffect, useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppNotification } from "@/lib/api/types";
+import { useRegisterDirty } from "@/lib/ui/dirty-guard";
+import { useShippingNavigation } from "../shipping/useShippingNavigation";
 
 const setAuditScreen = vi.hoisted(() => vi.fn());
 const flushWarehouseDraft = vi.hoisted(() => vi.fn(() => Promise.resolve()));
@@ -140,7 +142,12 @@ vi.mock("../screens", () => ({
     </>
   ),
   MobileWarehouseMapScreen: () => <div>map screen</div>,
-  MobileShippingScreen: () => <div>shipping screen</div>,
+  MobileShippingScreen: ({ operator, onGoToWarehouse, onBusyChange, onNavigateAway }: { operator?: { name: string }; onGoToWarehouse?: (item: unknown, intent: unknown) => void; onBusyChange?: (busy: boolean) => void; onNavigateAway?: (tab: string) => void }) => {
+    useShippingNavigation(onNavigateAway);
+    const [dirty, setDirty] = useState(false);
+    useRegisterDirty("shipping-test", dirty, () => {}, undefined, { mode: "confirm-only" });
+    return <><div>shipping screen</div><output data-testid="shipping-operator">{operator?.name}</output><button onClick={() => setDirty(true)}>mark shipping dirty</button><button onClick={() => onBusyChange?.(true)}>shipping saving</button><button onClick={() => onGoToWarehouse?.({ item_id: 101 }, { workType: "warehouse_io", warehouseAction: "warehouse_to_dept" })}>shipping warehouse</button></>;
+  },
   MobileAssemblyChecklistScreen: ({ onExit }: { onExit?: () => void }) => (
     <>
       <div>assembly checklist screen</div>
@@ -180,6 +187,113 @@ function deferred<T>() {
 }
 
 describe("MobileShell layout", () => {
+  it("출하 저장 중에는 탭과 viewport 이동을 실행하지 않는다", async () => {
+    window.history.replaceState({}, "", "/mes?tab=shipping");
+    let beforeSwitch: (() => Promise<void | boolean>) | null = null;
+    render(<MobileShell onBeforeViewportSwitchChange={(handler) => { beforeSwitch = handler; }} />);
+    fireEvent.click(screen.getByText("shipping saving"));
+    fireEvent.click(screen.getByRole("button", { name: "대시보드" }));
+    expect(screen.getByText("shipping screen")).toBeInTheDocument();
+    await expect(beforeSwitch!()).resolves.toBe(false);
+  });
+
+  it("작성 중 입출고에서 브라우저 이동도 기존 저장 확인을 거친다", async () => {
+    window.history.replaceState({}, "", "/mes?tab=warehouse");
+    render(<MobileShell />);
+    fireEvent.click(screen.getByText("mark warehouse dirty"));
+    await act(async () => {
+      window.history.replaceState({}, "", "/mes?tab=shipping");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    expect(screen.getByRole("dialog", { name: "작성 중 이동 확인" })).toBeInTheDocument();
+    expect(screen.getByText("warehouse screen")).toBeInTheDocument();
+    expect(window.location.search).toContain("tab=warehouse");
+    fireEvent.click(screen.getByRole("button", { name: "계속 작성" }));
+    expect(screen.getByText("warehouse screen")).toBeInTheDocument();
+    await act(async () => {
+      window.history.replaceState({}, "", "/mes?tab=shipping");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    fireEvent.click(screen.getByRole("button", { name: /저장.*이동/ }));
+    await screen.findByText("shipping screen");
+    expect(flushWarehouseDraft).toHaveBeenCalledTimes(1);
+  });
+
+  it("입출고 뒤로 가기 취소가 출하·창고의 앞뒤 이력을 보존한다", async () => {
+    window.history.replaceState({ mobileShippingIndex: 0 }, "", "/mes?tab=shipping");
+    render(<MobileShell />);
+    fireEvent.click(screen.getByText("shipping warehouse"));
+    fireEvent.click(screen.getByText("mark warehouse dirty"));
+    act(() => window.history.back());
+    fireEvent.click(await screen.findByRole("button", { name: "계속 작성" }));
+    expect(window.location.search).toContain("tab=warehouse");
+    act(() => window.history.back());
+    fireEvent.click(await screen.findByRole("button", { name: /저장.*이동/ }));
+    await screen.findByText("shipping screen");
+    act(() => window.history.forward());
+    await screen.findByText("warehouse screen");
+    expect(flushWarehouseDraft).toHaveBeenCalledTimes(1);
+  });
+
+  it("초기 /mes에서 입출고 이탈 취소·승인 후에도 기본 대시보드와 앞으로 가기를 보존한다", async () => {
+    window.history.replaceState({}, "", "/mes");
+    render(<MobileShell />);
+    expect(window.history.state.mobileShippingIndex).toBe(0);
+    expect(screen.getByText("dashboard screen")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "입출고" }));
+    const warehouseIndex = window.history.state.mobileShippingIndex;
+    expect(warehouseIndex).toBe(1);
+    fireEvent.click(screen.getByText("mark warehouse dirty"));
+    act(() => window.history.back());
+    fireEvent.click(await screen.findByRole("button", { name: "계속 작성" }));
+    expect(window.location.search).toBe("?tab=warehouse");
+    expect(window.history.state.mobileShippingIndex).toBe(warehouseIndex);
+    expect(screen.getByTestId("warehouse-mount")).toHaveTextContent("1");
+    expect(flushWarehouseDraft).not.toHaveBeenCalled();
+
+    act(() => window.history.back());
+    fireEvent.click(await screen.findByRole("button", { name: /저장.*이동/ }));
+    await screen.findByText("dashboard screen");
+    expect(window.location.pathname).toBe("/mes");
+    expect(window.location.search).toBe("");
+    expect(window.history.state.mobileShippingIndex).toBe(0);
+    expect(flushWarehouseDraft).toHaveBeenCalledTimes(1);
+
+    act(() => window.history.forward());
+    await screen.findByText("warehouse screen");
+    expect(window.location.search).toBe("?tab=warehouse");
+    expect(window.history.state.mobileShippingIndex).toBe(warehouseIndex);
+    expect(screen.getByTestId("warehouse-mount")).toHaveTextContent("2");
+    expect(screen.queryByRole("dialog", { name: "작성 중 이동 확인" })).not.toBeInTheDocument();
+  });
+
+  it("출하 초안에서 탭 이탈을 취소하면 URL과 화면을 유지한다", () => {
+    window.history.replaceState({}, "", "/mes?tab=shipping&shippingView=requestWork&shippingStep=3");
+    render(<MobileShell />);
+    expect(screen.getByTestId("shipping-operator")).toHaveTextContent("Kim");
+    fireEvent.click(screen.getByText("mark shipping dirty"));
+    fireEvent.click(screen.getByRole("button", { name: "대시보드" }));
+    fireEvent.click(screen.getByRole("button", { name: "계속 머무르기" }));
+    expect(screen.getByText("shipping screen")).toBeInTheDocument();
+    expect(window.location.search).toContain("shippingStep=3");
+    fireEvent.click(screen.getByRole("button", { name: "대시보드" }));
+    fireEvent.click(screen.getByRole("button", { name: "나가기", exact: true }));
+    expect(window.location.search).toContain("tab=dashboard");
+  });
+
+  it("출하 부족 재고를 창고 이동에 전달하고 브라우저 뒤로 출하로 복귀한다", async () => {
+    window.history.replaceState({}, "", "/mes?tab=shipping&shippingView=requestDetail&shippingRequestId=req-1");
+    render(<MobileShell />);
+    fireEvent.click(screen.getByText("shipping warehouse"));
+    expect(screen.getByTestId("warehouse-preselected")).toHaveTextContent("101");
+    expect(screen.getByTestId("warehouse-intent")).toHaveTextContent("warehouse_io");
+    await act(async () => {
+      window.history.replaceState({}, "", "/mes?tab=shipping&shippingView=requestDetail&shippingRequestId=req-1");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    expect(screen.getByText("shipping screen")).toBeInTheDocument();
+  });
   beforeEach(() => {
     window.history.pushState({}, "", "/mes");
     state.notifications = { items: [], unread_count: 0 };
@@ -352,7 +466,7 @@ describe("MobileShell layout", () => {
     window.history.replaceState(historyState, "");
     fireEvent.click(screen.getByRole("button", { name: "내역" }));
     fireEvent.click(screen.getByRole("button", { name: "불량" }));
-    expect(window.history.state).toEqual({ defect: "hub" });
+    expect(window.history.state).toEqual({ defect: "hub", mobileShippingIndex: expect.any(Number) });
     expect(screen.getByTestId("defect-screen-state")).toHaveTextContent("hub");
   });
 
@@ -363,7 +477,7 @@ describe("MobileShell layout", () => {
     window.history.replaceState({ defect: "cart", mode: "add", step: 2, source: "warehouse" }, "");
     fireEvent.click(screen.getByRole("button", { name: "불량" }));
 
-    expect(window.history.state).toEqual({ defect: "hub" });
+    expect(window.history.state).toEqual({ defect: "hub", mobileShippingIndex: expect.any(Number) });
     expect(screen.getByTestId("defect-screen-state")).toHaveTextContent("hub");
   });
 

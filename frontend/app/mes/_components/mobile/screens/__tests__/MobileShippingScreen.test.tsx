@@ -1,532 +1,158 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ReactNode } from "react";
-import type { ShippingRequest, ShippingRequestRevision } from "@/lib/api";
-import { queryKeys } from "@/lib/queries/keys";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ShippingRequest } from "@/lib/api";
+import { DirtyGuardProvider, useRegisterDirty } from "@/lib/ui/dirty-guard";
+import { useState } from "react";
 import { MobileShippingScreen } from "../MobileShippingScreen";
 
-vi.mock("@/lib/api", () => ({
-  api: {
-    getShippingRequests: vi.fn(),
-    getShippingHistory: vi.fn(),
-    updateShippingChecklist: vi.fn(),
-    clearShippingChecklist: vi.fn(),
+vi.mock("@/lib/api", () => ({ api: { getShippingRequests: vi.fn(), getShippingRequest: vi.fn(), getShippingHistoryMonths: vi.fn() } }));
+vi.mock("../../shipping/MobileShippingRequestWizard", () => ({
+  MobileShippingRequestWizard: ({ request, step, onStepChange, onCancel }: { request: ShippingRequest | null; step: number; onStepChange: (step: number) => void; onCancel: () => void }) => {
+    const [value, setValue] = useState("");
+    useRegisterDirty("test-wizard", Boolean(value), () => {}, undefined, { mode: "confirm-only" });
+    return <>{request && request.status !== "PREPARING" && <p role="alert">준비 중인 요청만 수정</p>}<p>작성 단계 {step}</p><input aria-label="초안" value={value} onChange={(event) => setValue(event.target.value)} /><button onClick={() => onStepChange(step + 1)}>다음 단계</button><button onClick={onCancel}>작성 나가기</button></>;
   },
+}));
+vi.mock("../../shipping/MobileShippingDetail", () => ({
+  MobileShippingDetail: ({ request, onEdit }: { request: ShippingRequest; onEdit: () => void }) => <><p>상세 {request.request_id}</p><button onClick={onEdit}>요청 수정</button></>,
+}));
+vi.mock("../../shipping/MobileShippingHistory", () => ({
+  MobileShippingHistory: ({ status }: { status: string }) => <p>이력 상태 {status}</p>,
 }));
 
 import { api } from "@/lib/api";
 
-function revision(overrides: Partial<ShippingRequestRevision> = {}): ShippingRequestRevision {
-  return {
-    revision_id: "rev-1",
-    request_id: "req-1",
-    edited_by_employee_id: "employee-1",
-    edited_by_name: "김출하",
-    summary: "출하 요청 수정: request_quantity, bom_lines",
-    affects_preparation: true,
-    changes: [],
-    created_at: "2026-07-24T09:30:00Z",
-    ...overrides,
-  };
-}
+const request = {
+  request_id: "req-1", status: "PREPARING", base_pf_item_name: "기준 PF", base_pf_mes_code: "PF-001",
+  final_pf_item_name: "최종 PF", final_pf_mes_code: "PF-002", request_quantity: 3,
+  invoice_number: "INV-1", requested_by_name: "작업자", created_at: "2026-10-06T00:00:00Z",
+} as ShippingRequest;
 
-function request(overrides: Partial<ShippingRequest> = {}): ShippingRequest {
-  return {
-    request_id: "req-1",
-    status: "PREPARING",
-    request_quantity: 3,
-    base_pf_item_id: "pf-1",
-    base_pf_item_name: "Standard PF",
-    base_pf_mes_code: "PF-001",
-    final_pa_item_id: null,
-    final_pa_item_name: null,
-    final_pf_item_id: null,
-    final_pf_item_name: null,
-    requested_by_name: "shipping",
-    custom_pa_name: null,
-    custom_pf_name: null,
-    notes: null,
-    invoice_number: null,
-    prepared_at: null,
-    picked_up_at: null,
-    cancelled_at: null,
-    cancelled_by_employee_id: null,
-    cancelled_by_name: null,
-    created_at: "2026-06-26T00:00:00Z",
-    updated_at: "2026-06-26T00:00:00Z",
-    bom_lines: [],
-    companion_lines: [],
-    checklist_lines: [
-      {
-        line_id: "check-1",
-        item_id: "acc-1",
-        item_name: "Cable Set",
-        mes_code: "R-001",
-        process_type_code: "R",
-        quantity: 2,
-        checked: false,
-      },
-    ],
-    events: [],
-    latest_preparation_revision: null,
-    transactions: [],
-    allocations: [],
-    transaction_count: 0,
-    stock_shortages: [],
-    ...overrides,
-  };
-}
-
-function renderScreen() {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false, gcTime: Infinity },
-      mutations: { retry: false },
-    },
-  });
-  const Wrapper = ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  );
-  return { queryClient, ...render(<MobileShippingScreen />, { wrapper: Wrapper }) };
-}
-
-async function flushQueries() {
-  await act(async () => {
-    await Promise.resolve();
-    await Promise.resolve();
-  });
+function renderScreen(onNavigateAway = vi.fn()) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+  return { client, ...render(<QueryClientProvider client={client}><DirtyGuardProvider><MobileShippingScreen onNavigateAway={onNavigateAway} /></DirtyGuardProvider></QueryClientProvider>) };
 }
 
 beforeEach(() => {
-  vi.mocked(api.getShippingRequests).mockReset().mockResolvedValue([request()]);
-  vi.mocked(api.getShippingHistory).mockReset().mockResolvedValue([]);
-  vi.mocked(api.updateShippingChecklist).mockReset().mockResolvedValue({
-    ...request(),
-    checklist_lines: [{ ...request().checklist_lines[0], checked: true }],
-  });
-  vi.mocked(api.clearShippingChecklist).mockReset().mockResolvedValue(request());
-});
-
-afterEach(() => {
-  vi.useRealTimers();
-  Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+  window.history.replaceState({}, "", "/mes?tab=shipping");
+  vi.mocked(api.getShippingRequests).mockReset().mockResolvedValue([request]);
+  vi.mocked(api.getShippingRequest).mockReset().mockResolvedValue(request);
+  vi.mocked(api.getShippingHistoryMonths).mockReset().mockResolvedValue([{ year: 2026, month: 10, count: 7 }]);
 });
 
 describe("MobileShippingScreen", () => {
-  it("출하 최초 조회는 준비의 접힌 구성품과 요청·이력 카드 구조를 유지한다", () => {
-    vi.mocked(api.getShippingRequests).mockReturnValue(new Promise(() => {}));
-    vi.mocked(api.getShippingHistory).mockReturnValue(new Promise(() => {}));
+  it("실제 건수의 관리·이력 허브와 최종 출하 PF를 표시한다", async () => {
     renderScreen();
-    expect(screen.getByTestId("mobile-shipping-prep-skeleton")).toBeInTheDocument();
-    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "요청" }));
-    expect(screen.getByTestId("mobile-shipping-requests-skeleton")).toBeInTheDocument();
-    expect(screen.getAllByText("최종 PA")).toHaveLength(2);
-    fireEvent.click(screen.getByRole("button", { name: "이력" }));
-    expect(screen.getByTestId("mobile-shipping-history-skeleton")).toBeInTheDocument();
-  });
-  it("구성품 그룹을 펼쳐 확인하고 접어도 체크 상태와 기존 작업 선택을 유지한다", async () => {
-    const existing = request().checklist_lines[0];
-    vi.mocked(api.getShippingRequests).mockResolvedValue([request({
-      checklist_lines: [
-        { ...existing, checked: true },
-        { ...existing, line_id: "check-pa", item_id: "pa-2", item_name: "긴 PA 구성품 이름", process_type_code: "PA", checked: false },
-      ],
-    })]);
-    renderScreen();
-
-    const label = await screen.findByText("R 구성품");
-    const summary = label.closest("summary")!;
-    const disclosure = summary.closest("details")!;
-    const checkbox = screen.getByLabelText("Cable Set 체크");
-    expect(disclosure).not.toHaveAttribute("open");
-    expect(checkbox).not.toBeVisible();
-
-    fireEvent.click(summary);
-    expect(disclosure).toHaveAttribute("open");
-    expect(checkbox).toBeVisible();
-    expect(checkbox).toBeChecked();
-    expect(screen.getByLabelText("긴 PA 구성품 이름 체크")).not.toBeVisible();
-
-    fireEvent.click(summary);
-    expect(disclosure).not.toHaveAttribute("open");
-    expect(checkbox).toBeChecked();
-    expect(screen.getByRole("button", { name: "준비" })).toBeInTheDocument();
-    expect(api.updateShippingChecklist).not.toHaveBeenCalled();
-    expect(api.clearShippingChecklist).not.toHaveBeenCalled();
+    const management = await screen.findByRole("button", { name: /출하 관리.*1건/ });
+    expect(await screen.findByRole("button", { name: /출하 이력.*7건/ })).toBeInTheDocument();
+    fireEvent.click(management);
+    expect(screen.getByRole("button", { name: "새 출하 요청 만들기" })).toBeInTheDocument();
+    expect(screen.getByText("최종 PF")).toBeInTheDocument();
+    expect(screen.queryByText("기준 PF")).not.toBeInTheDocument();
+    expect(window.location.search).toContain("shippingView=requestList");
+    fireEvent.click(screen.getByRole("button", { name: "요청 상세" }));
+    expect(await screen.findByText("상세 req-1")).toBeInTheDocument();
   });
 
-  it("빈 준비 목록에서 새 요청이 즉시 표시되는 흐름을 안내한다", async () => {
+  it("PC 편집 URL의 요청과 단계를 직접 연다", async () => {
+    window.history.replaceState({}, "", "/mes?tab=shipping&shippingView=requestWork&shippingRequestId=req-1&shippingStep=3");
+    renderScreen();
+    expect(await screen.findByText("작성 단계 3")).toBeInTheDocument();
+    expect(api.getShippingRequest).toHaveBeenCalledWith("req-1", expect.anything());
+  });
+
+  it("취소 이력 URL과 완료 상태의 수정 제한을 적용한다", async () => {
+    window.history.replaceState({}, "", "/mes?tab=shipping&shippingView=historyList&shippingHistoryStatus=CANCELLED");
+    const first = renderScreen();
+    expect(screen.getByText("이력 상태 CANCELLED")).toBeInTheDocument();
+    first.unmount();
+    vi.mocked(api.getShippingRequest).mockResolvedValue({ ...request, status: "PREPARED" });
     vi.mocked(api.getShippingRequests).mockResolvedValue([]);
-
+    window.history.replaceState({}, "", "/mes?tab=shipping&shippingView=requestWork&shippingRequestId=req-1");
     renderScreen();
-
-    expect(await screen.findByText("PC에서 새 출하 요청을 만들면 바로 표시됩니다.")).toBeInTheDocument();
-    expect(screen.queryByText("PC에서 요청을 준비 중으로 넘기면 표시됩니다.")).not.toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent("준비 중인 요청만 수정");
   });
 
-  it("공용 requests query로 최초 조회하고 마운트 중 30초마다만 폴링한다", async () => {
-    vi.useFakeTimers();
-    const { queryClient, unmount } = renderScreen();
+  it("단계 간 초안을 유지하고 작업 이탈은 확인한다", async () => {
+    window.history.replaceState({}, "", "/mes?tab=shipping&shippingView=requestWork");
+    renderScreen();
+    fireEvent.change(screen.getByLabelText("초안"), { target: { value: "작성 중" } });
+    fireEvent.click(screen.getByText("다음 단계"));
+    expect(screen.getByText("작성 단계 2")).toBeInTheDocument();
+    expect(screen.getByLabelText("초안")).toHaveValue("작성 중");
+    fireEvent.click(screen.getByText("작성 나가기"));
+    fireEvent.click(screen.getByRole("button", { name: "계속 머무르기" }));
+    expect(screen.getByLabelText("초안")).toHaveValue("작성 중");
+    fireEvent.click(screen.getByText("작성 나가기"));
+    fireEvent.click(screen.getByRole("button", { name: "나가기", exact: true }));
+    expect(await screen.findByRole("button", { name: "새 출하 요청 만들기" })).toBeInTheDocument();
+  });
 
-    await flushQueries();
-    expect(api.getShippingRequests).toHaveBeenCalledTimes(1);
-    expect(api.getShippingHistory).not.toHaveBeenCalled();
-    expect(queryClient.getQueryData(queryKeys.shipping.requests())).toEqual([request()]);
-
+  it("브라우저 단계 뒤로 가기는 입력을 유지한다", async () => {
+    window.history.replaceState({}, "", "/mes?tab=shipping&shippingView=requestWork&shippingStep=2");
+    renderScreen();
+    fireEvent.change(screen.getByLabelText("초안"), { target: { value: "입력 유지" } });
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(30_000);
+      window.history.replaceState({}, "", "/mes?tab=shipping&shippingView=requestWork&shippingStep=1");
+      window.dispatchEvent(new PopStateEvent("popstate"));
     });
-    expect(api.getShippingRequests).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("작성 단계 1")).toBeInTheDocument();
+    expect(screen.getByLabelText("초안")).toHaveValue("입력 유지");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
 
-    Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+  it("브라우저 탭 이탈 취소 시 URL과 초안을 복원한다", async () => {
+    window.history.replaceState({}, "", "/mes?tab=shipping&shippingView=requestWork");
+    const away = vi.fn();
+    renderScreen(away);
+    fireEvent.change(screen.getByLabelText("초안"), { target: { value: "유지" } });
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(30_000);
+      window.history.replaceState({}, "", "/mes?tab=dashboard");
+      window.dispatchEvent(new PopStateEvent("popstate"));
     });
-    expect(api.getShippingRequests).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByRole("button", { name: "계속 머무르기" }));
+    expect(window.location.search).toContain("tab=shipping");
+    expect(screen.getByLabelText("초안")).toHaveValue("유지");
+    expect(away).not.toHaveBeenCalled();
+  });
 
-    unmount();
+  it("실제 뒤로 가기 취소 후 다시 이동하고 앞으로 가기를 유지한다", async () => {
+    renderScreen();
+    fireEvent.click(await screen.findByRole("button", { name: /출하 관리.*1건/ }));
+    fireEvent.click(screen.getByRole("button", { name: "새 출하 요청 만들기" }));
+    fireEvent.change(screen.getByLabelText("초안"), { target: { value: "보존" } });
+    act(() => window.history.back());
+    fireEvent.click(await screen.findByRole("button", { name: "계속 머무르기" }));
+    expect(window.location.search).toContain("shippingView=requestWork");
+    expect(screen.getByLabelText("초안")).toHaveValue("보존");
+    act(() => window.history.back());
+    fireEvent.click(await screen.findByRole("button", { name: "나가기", exact: true }));
+    expect(await screen.findByRole("button", { name: "새 출하 요청 만들기" })).toBeInTheDocument();
+    act(() => window.history.forward());
+    expect(await screen.findByLabelText("초안")).toHaveValue("");
+  });
+
+  it("새로고침 실패 시 기존 목록을 보존하고 재시도한다", async () => {
+    window.history.replaceState({}, "", "/mes?tab=shipping&shippingView=requestList");
+    const { client } = renderScreen();
+    expect(await screen.findByText("최종 PF")).toBeInTheDocument();
+    vi.mocked(api.getShippingRequests).mockRejectedValueOnce(new Error("연결 실패"));
+    await act(async () => { await client.invalidateQueries({ queryKey: ["shipping", "requests"] }); });
+    expect(await screen.findByRole("alert")).toHaveTextContent("연결 실패");
+    expect(screen.getByText("최종 PF")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("다시 불러오기"));
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+  });
+
+  it("복귀 focus와 visibility 이벤트의 중복 조회를 합친다", async () => {
+    renderScreen();
+    await screen.findByRole("button", { name: /출하 관리.*1건/ });
+    vi.mocked(api.getShippingRequests).mockClear();
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(30_000);
+      window.dispatchEvent(new Event("focus"));
+      document.dispatchEvent(new Event("visibilitychange"));
     });
-    expect(api.getShippingRequests).toHaveBeenCalledTimes(2);
-  });
-
-  it("visibilitychange로 visible 복귀할 때만 즉시 다시 조회한다", async () => {
-    renderScreen();
-    expect(await screen.findByText("Standard PF")).toBeInTheDocument();
     expect(api.getShippingRequests).toHaveBeenCalledTimes(1);
-
-    Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
-    fireEvent(document, new Event("visibilitychange"));
-    await flushQueries();
-    expect(api.getShippingRequests).toHaveBeenCalledTimes(1);
-
-    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
-    fireEvent(document, new Event("visibilitychange"));
-    await flushQueries();
-    expect(api.getShippingRequests).toHaveBeenCalledTimes(2);
-  });
-
-  it("window focus만으로 즉시 다시 조회하고 unmount 뒤에는 조회하지 않는다", async () => {
-    let now = 10_000;
-    const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => now);
-    try {
-      const { unmount } = renderScreen();
-      expect(await screen.findByText("Standard PF")).toBeInTheDocument();
-
-      fireEvent.focus(window);
-      await flushQueries();
-      expect(api.getShippingRequests).toHaveBeenCalledTimes(2);
-
-      unmount();
-      now += 1_000;
-      fireEvent.focus(window);
-      fireEvent(document, new Event("visibilitychange"));
-      await flushQueries();
-      expect(api.getShippingRequests).toHaveBeenCalledTimes(2);
-    } finally {
-      nowSpy.mockRestore();
-    }
-  });
-
-  it("백그라운드 재조회 실패 시 기존 출하 목록과 재동기화 버튼을 함께 유지한다", async () => {
-    renderScreen();
-    expect(await screen.findByText("Standard PF")).toBeInTheDocument();
-
-    vi.mocked(api.getShippingRequests).mockRejectedValueOnce(new Error("refresh failed"));
-    fireEvent.focus(window);
-
-    expect(await screen.findByText("Standard PF")).toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: "다시 시도" })).toBeInTheDocument();
-
-    vi.mocked(api.getShippingRequests).mockResolvedValueOnce([
-      request({ base_pf_item_name: "Fresh PF" }),
-    ]);
-    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
-
-    expect(await screen.findByText("Fresh PF")).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByRole("button", { name: "다시 시도" })).not.toBeInTheDocument());
-  });
-
-  it("visible 전환과 focus가 연속 발생해도 한 번만 다시 조회한다", async () => {
-    vi.useFakeTimers();
-    renderScreen();
-    await flushQueries();
-    expect(api.getShippingRequests).toHaveBeenCalledTimes(1);
-
-    Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
-    fireEvent(document, new Event("visibilitychange"));
-    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
-    fireEvent(document, new Event("visibilitychange"));
-    fireEvent.focus(window);
-    await flushQueries();
-    expect(api.getShippingRequests).toHaveBeenCalledTimes(2);
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1_000);
-    });
-    fireEvent.focus(window);
-    await flushQueries();
-    expect(api.getShippingRequests).toHaveBeenCalledTimes(3);
-  });
-
-  it("PREPARING 카드에 최신 준비 revision을 계속 표시하고 구조화 변경을 펼친다", async () => {
-    vi.mocked(api.getShippingRequests).mockResolvedValue([
-      request({
-        latest_preparation_revision: revision({
-          changes: [
-            { field: "request_quantity", before: 2, after: 3 },
-            {
-              field: "bom_lines",
-              before: [
-                { parent_stage: "PA", child_item_id: "old-1", item_name: "기존 케이블", mes_code: "PR-001", quantity: 1, unit: "EA", included: true, origin: "CUSTOM" },
-              ],
-              after: [
-                { parent_stage: "PA", child_item_id: "old-1", item_name: "기존 케이블", mes_code: "PR-001", quantity: 2, unit: "EA", included: true, origin: "CUSTOM" },
-                { parent_stage: "PF", child_item_id: "new-1", item_name: "신규 브래킷", mes_code: "PR-002", quantity: 1, unit: "EA", included: true, origin: "CUSTOM" },
-              ],
-            },
-            {
-              field: "companion_lines",
-              before: [{ item_id: "box-1", item_name: "동반 박스", mes_code: "PR-BOX", quantity: 1, unit: "EA" }],
-              after: [],
-            },
-          ],
-        }),
-      }),
-    ]);
-
-    renderScreen();
-
-    expect(await screen.findByText("수정됨")).toBeInTheDocument();
-    expect(screen.getByText("김출하 · 2026.07.24 18:30 KST")).toBeInTheDocument();
-    expect(screen.getByText("출하 수량 · BOM 구성 · 동반 출하품 수정")).toBeInTheDocument();
-    expect(screen.queryByText("출하 요청 수정: request_quantity, bom_lines")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "변경 내용 보기" }));
-
-    expect(screen.getByText("출하 수량")).toBeInTheDocument();
-    expect(screen.getByText("2대 → 3대")).toBeInTheDocument();
-    expect(screen.getByText(/수량 변경.*\[PA\] 기존 케이블.*PR-001.*1EA → 2EA/)).toBeInTheDocument();
-    expect(screen.getByText(/추가.*\[PF\] 신규 브래킷.*PR-002.*1EA/)).toBeInTheDocument();
-    expect(screen.getByText(/삭제.*동반 박스.*PR-BOX.*1 EA/)).toBeInTheDocument();
-  });
-
-  it("revision 필드명을 중복 없이 사용자용 한 줄 summary로 표시한다", async () => {
-    vi.mocked(api.getShippingRequests).mockResolvedValue([
-      request({
-        latest_preparation_revision: revision({
-          changes: [
-            { field: "request_quantity", before: 1, after: 2 },
-            { field: "request_quantity", before: 2, after: 3 },
-            { field: "bom_lines", before: [], after: [] },
-          ],
-        }),
-      }),
-    ]);
-
-    renderScreen();
-
-    expect(await screen.findByText("출하 수량 · BOM 구성 수정")).toBeInTheDocument();
-  });
-
-  it("revision changes가 비어 있으면 안전한 한국어 summary를 표시한다", async () => {
-    vi.mocked(api.getShippingRequests).mockResolvedValue([
-      request({ latest_preparation_revision: revision({ changes: [] }) }),
-    ]);
-
-    renderScreen();
-
-    expect(await screen.findByText("준비 정보가 수정되었습니다.")).toBeInTheDocument();
-    expect(screen.queryByText("출하 요청 수정: request_quantity, bom_lines")).not.toBeInTheDocument();
-  });
-
-  it("BOM 수량과 포함 여부가 함께 바뀌면 두 변경을 모두 표시한다", async () => {
-    vi.mocked(api.getShippingRequests).mockResolvedValue([
-      request({
-        latest_preparation_revision: revision({
-          changes: [{
-            field: "bom_lines",
-            before: [
-              { parent_stage: "PA", child_item_id: "line-1", item_name: "케이블", mes_code: "PR-001", quantity: 1, unit: "EA", included: true },
-              { parent_stage: "PF", child_item_id: "line-2", item_name: "브래킷", mes_code: "PR-002", quantity: 1, unit: "EA", included: false },
-            ],
-            after: [
-              { parent_stage: "PA", child_item_id: "line-1", item_name: "케이블", mes_code: "PR-001", quantity: 2, unit: "EA", included: false },
-              { parent_stage: "PF", child_item_id: "line-2", item_name: "브래킷", mes_code: "PR-002", quantity: 1, unit: "EA", included: true },
-            ],
-          }],
-        }),
-      }),
-    ]);
-
-    renderScreen();
-    expect(await screen.findByText("수정됨")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "변경 내용 보기" }));
-
-    expect(screen.getByText(/수량 변경.*케이블.*1EA → 2EA/)).toBeInTheDocument();
-    expect(screen.getByText(/포함 상태 변경.*케이블.*포함 → 제외/)).toBeInTheDocument();
-    expect(screen.getByText(/포함 상태 변경.*브래킷.*제외 → 포함/)).toBeInTheDocument();
-    expect(screen.queryByText("구성 순서가 변경되었습니다.")).not.toBeInTheDocument();
-  });
-
-  it("invoice 또는 요청자만 바뀐 응답에는 수정됨을 표시하지 않는다", async () => {
-    vi.mocked(api.getShippingRequests).mockResolvedValue([
-      request({ invoice_number: "INV-001", requested_by_name: "변경 요청자", latest_preparation_revision: null }),
-    ]);
-
-    renderScreen();
-
-    expect(await screen.findByText("Standard PF")).toBeInTheDocument();
-    expect(screen.queryByText("수정됨")).not.toBeInTheDocument();
-  });
-
-  it("focus refetch 뒤 서버의 최신 품목과 수량 및 보존된 체크 상태를 반영한다", async () => {
-    vi.mocked(api.getShippingRequests)
-      .mockResolvedValueOnce([request()])
-      .mockResolvedValueOnce([
-        request({
-          request_quantity: 5,
-          checklist_lines: [
-            {
-              line_id: "check-2",
-              item_id: "acc-2",
-              item_name: "최신 구성품",
-              mes_code: "R-002",
-              process_type_code: "R",
-              quantity: 4,
-              checked: true,
-            },
-          ],
-        }),
-      ]);
-
-    renderScreen();
-    expect(await screen.findByText("Cable Set")).toBeInTheDocument();
-
-    fireEvent.focus(window);
-
-    expect(await screen.findByText("최신 구성품")).toBeInTheDocument();
-    expect(screen.getByText("총 5대 출하")).toBeInTheDocument();
-    expect(screen.getByLabelText("최신 구성품 체크")).toBeChecked();
-    expect(screen.queryByText("Cable Set")).not.toBeInTheDocument();
-  });
-
-  it("체크 토글과 전체 해제 응답을 공용 requests query 캐시에 반영한다", async () => {
-    const checked = {
-      ...request(),
-      checklist_lines: [{ ...request().checklist_lines[0], checked: true }],
-    };
-    vi.mocked(api.updateShippingChecklist).mockResolvedValue(checked);
-    vi.mocked(api.clearShippingChecklist).mockResolvedValue(request());
-    const { queryClient } = renderScreen();
-
-    const checkbox = await screen.findByLabelText("Cable Set 체크");
-    fireEvent.click(checkbox);
-
-    await waitFor(() => expect(checkbox).toBeChecked());
-    expect(queryClient.getQueryData<ShippingRequest[]>(queryKeys.shipping.requests())?.[0].checklist_lines[0].checked).toBe(true);
-
-    fireEvent.click(screen.getByRole("button", { name: /전체 해제/ }));
-
-    await waitFor(() => expect(checkbox).not.toBeChecked());
-    expect(api.clearShippingChecklist).toHaveBeenCalledWith("req-1");
-    expect(queryClient.getQueryData<ShippingRequest[]>(queryKeys.shipping.requests())?.[0].checklist_lines[0].checked).toBe(false);
-  });
-
-  it("PREPARED 요청의 체크리스트와 전체 해제는 읽기 전용이며 API를 호출하지 않는다", async () => {
-    vi.mocked(api.getShippingRequests).mockResolvedValue([
-      request({
-        status: "PREPARED",
-        checklist_lines: [{ ...request().checklist_lines[0], item_name: "Prepared Cable" }],
-      }),
-    ]);
-
-    renderScreen();
-
-    fireEvent.click((await screen.findByText("R 구성품")).closest("summary")!);
-    const checkbox = screen.getByRole("checkbox", { name: /Prepared Cable/ });
-    expect(checkbox).toBeDisabled();
-    fireEvent.click(checkbox);
-    fireEvent.click(screen.getByRole("button", { name: /전체 해제/ }));
-
-    expect(api.updateShippingChecklist).not.toHaveBeenCalled();
-    expect(api.clearShippingChecklist).not.toHaveBeenCalled();
-  });
-
-  it("한 PREPARING 카드의 체크리스트 오류는 해당 카드에만 표시하고 다른 카드를 유지한다", async () => {
-    vi.mocked(api.getShippingRequests).mockResolvedValue([
-      request({ request_id: "req-fail", base_pf_item_name: "Failing PF" }),
-      request({
-        request_id: "req-kept",
-        base_pf_item_name: "Kept PF",
-        checklist_lines: [{ ...request().checklist_lines[0], item_name: "Kept Cable" }],
-      }),
-    ]);
-    vi.mocked(api.updateShippingChecklist).mockRejectedValueOnce(new Error("422 checklist rejected"));
-
-    renderScreen();
-
-    await screen.findByText("Failing PF");
-    screen.getAllByText("R 구성품").forEach((label) => fireEvent.click(label.closest("summary")!));
-    fireEvent.click(screen.getByRole("checkbox", { name: /Cable Set/ }));
-
-    expect(await screen.findByText("422 checklist rejected")).toBeInTheDocument();
-    expect(screen.getByText("Failing PF")).toBeInTheDocument();
-    expect(screen.getByText("Kept PF")).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: /Kept Cable/ })).toBeInTheDocument();
-  });
-
-  it("CANCELLED는 요청과 준비 목록에서 제외하고 history page 호환 목록에는 표시한다", async () => {
-    const cancelled = request({ request_id: "cancelled-1", status: "CANCELLED", base_pf_item_name: "취소된 PF" });
-    vi.mocked(api.getShippingRequests).mockResolvedValue([cancelled, request()]);
-    vi.mocked(api.getShippingHistory).mockResolvedValue([cancelled]);
-
-    renderScreen();
-
-    expect(await screen.findByText("Standard PF")).toBeInTheDocument();
-    expect(screen.queryByText("취소된 PF")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "요청" }));
-    expect(screen.queryByText("취소된 PF")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "이력" }));
-    expect(await screen.findByText("취소된 PF")).toBeInTheDocument();
-    expect(api.getShippingHistory).toHaveBeenCalledTimes(1);
-  });
-
-  it("모바일에서는 조회와 체크만 제공하고 PC 전용 완료 액션은 숨긴다", async () => {
-    renderScreen();
-
-    expect(await screen.findByText("Standard PF")).toBeInTheDocument();
-    expect(screen.getByText("총 3대 출하")).toBeInTheDocument();
-    expect(screen.getByText(/생성·수정·완료 처리는 PC/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /준비 완료/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /픽업 완료/ })).not.toBeInTheDocument();
-  });
-
-  it("uses the expandable two-line item name pattern for long shipping names", async () => {
-    const longName = "ADX6000FB 80kV 5mA 러시아 납품용 긴 품목명 옵션 포함";
-    vi.mocked(api.getShippingRequests).mockResolvedValue([
-      request({
-        base_pf_item_name: longName,
-        final_pa_item_id: "pa-1",
-        final_pa_item_name: `${longName} 최종 PA`,
-        final_pf_item_id: "pf-1",
-        final_pf_item_name: `${longName} 최종 PF`,
-      }),
-    ]);
-
-    renderScreen();
-
-    const nameButton = await screen.findByRole("button", { name: longName });
-    expect(nameButton).toHaveClass("line-clamp-2");
-
-    fireEvent.click(nameButton);
-
-    expect(nameButton).toHaveClass("whitespace-normal");
-    expect(nameButton).toHaveClass("break-words");
   });
 });
