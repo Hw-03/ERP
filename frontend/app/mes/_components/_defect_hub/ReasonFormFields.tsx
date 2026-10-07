@@ -57,6 +57,7 @@ export function ReasonFormFields({
   const otherMissingMemo = Boolean(selected?.is_other && !memo.trim());
   const nameTaken = categories.some((entry) => entry.name.normalize("NFKC").trim().toLocaleLowerCase() === needle);
   const hiddenNameTaken = categories.some((entry) => !entry.is_active && entry.name.normalize("NFKC").trim().toLocaleLowerCase() === needle);
+  const canCreate = Boolean(search.trim() && !nameTaken);
 
   useEffect(() => {
     if (editingId) editingRef.current?.focus();
@@ -130,32 +131,45 @@ export function ReasonFormFields({
     {open && createPortal(<div className="fixed inset-0 z-[500] flex items-end justify-center bg-black/30 p-3 backdrop-blur-sm md:items-center"
       onClick={(event) => { if (event.target === event.currentTarget && !busy) setOpen(false); }}>
       <div ref={dialogRef} id={dialogId} role="dialog" aria-modal="true" aria-labelledby={`${dialogId}-title`}
-        className="flex h-[min(76dvh,600px)] w-full max-w-[560px] min-h-0 flex-col gap-3 rounded-[24px] border p-4 md:p-5"
+        className="flex h-[min(76dvh,600px)] w-full max-w-[430px] min-h-0 min-w-0 flex-col gap-3 rounded-[24px] border p-4 md:max-w-[560px] md:p-5"
         style={{ background: "var(--c-popup-bg)", borderColor: LEGACY_COLORS.border, boxShadow: "var(--c-popup-shadow)", paddingBottom: "max(16px, env(safe-area-inset-bottom))" }}>
         <div className="flex shrink-0 items-center justify-between gap-2">
           <h2 id={`${dialogId}-title`} className="text-lg font-black" style={{ color: LEGACY_COLORS.text }}>사유 카테고리</h2>
           <Button variant="ghost" className="min-h-11 min-w-11 !px-2" aria-label="사유 선택 닫기" disabled={busy} onClick={() => setOpen(false)}><X size={18} /></Button>
         </div>
-        <div className="relative shrink-0">
-          <Search size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" style={{ color: LEGACY_COLORS.muted2 }} />
-          <input ref={searchRef} type="search" aria-label="사유 검색" placeholder="사유명을 입력하세요"
-            value={search} onChange={(event) => setSearch(event.target.value)}
-            className="min-h-11 w-full rounded-[12px] border pl-10 pr-3 text-sm outline-none focus-visible:ring-2"
-            style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text, borderColor: LEGACY_COLORS.border }} />
-        </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          {search.trim() && !nameTaken && <Button iconLeft={<Plus size={16} />} loading={busy}
-            disabled={search.trim().length > 32 || query.isPending || query.isError}
-            className="min-h-11" onClick={() => void save({ name: search.trim() })}>추가하고 선택</Button>}
-          <Button variant="ghost" className="min-h-11" aria-pressed={showInactive} disabled={busy}
-            onClick={() => setShowInactive((value) => !value)}>{showInactive ? "숨김 사유 닫기" : "숨김 사유 관리"}</Button>
+        <div className="flex min-w-0 shrink-0 items-center gap-1 rounded-[12px] border pr-1 focus-within:ring-2"
+          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+          <div className="relative min-w-0 flex-1">
+            <Search size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" style={{ color: LEGACY_COLORS.muted2 }} />
+            <input ref={searchRef} type="search" aria-label="사유 검색" placeholder="사유명을 입력하세요"
+              value={search} onChange={(event) => setSearch(event.target.value)}
+              className="min-h-11 w-full min-w-0 rounded-[12px] bg-transparent pl-10 pr-2 text-sm outline-none"
+              style={{ color: LEGACY_COLORS.text }} />
+          </div>
+          <div className="flex shrink-0 items-center py-1">
+            <div aria-hidden={!canCreate} inert={!canCreate}
+              className={`overflow-hidden transition-[max-width,opacity,transform] duration-200 ease-out motion-reduce:transition-none ${canCreate ? "max-w-[48px] translate-x-0 opacity-100 md:max-w-[132px]" : "max-w-0 -translate-x-1 opacity-0"}`}>
+              <div className="pr-1">
+                <Button iconLeft={<Plus size={16} />} loading={busy}
+                  aria-label="추가하고 선택" title="추가하고 선택"
+                  disabled={!canCreate || search.trim().length > 32 || query.isPending || query.isError}
+                  className="min-h-11 min-w-11 whitespace-nowrap !px-2" onClick={() => void save({ name: search.trim() })}><span className="hidden md:inline">추가하고 선택</span></Button>
+              </div>
+            </div>
+            <Button variant="ghost" iconLeft={<Archive size={16} />} className="min-h-11 min-w-11 !px-2"
+              aria-label={showInactive ? "숨김 사유 닫기" : "숨김 사유 관리"} title={showInactive ? "숨김 사유 닫기" : "숨김 사유 관리"}
+              aria-pressed={showInactive} disabled={busy}
+              onClick={() => setShowInactive((value) => !value)}><span className="hidden md:inline">{showInactive ? "숨김 사유 닫기" : "숨김 사유 관리"}</span></Button>
+          </div>
         </div>
         {hiddenNameTaken && <p className="shrink-0 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>같은 이름의 사유가 숨김 상태입니다. 숨김 사유 관리에서 복원하세요.</p>}
         {error && <p role="alert" className="shrink-0 text-sm" style={{ color: LEGACY_COLORS.red }}>{error}</p>}
         {query.isError && <div role="alert" className="shrink-0 text-sm" style={{ color: LEGACY_COLORS.red }}>
           사유 목록을 불러오지 못했습니다. <Button variant="ghost" className="min-h-11" onClick={() => void query.refetch()}>다시 시도</Button>
         </div>}
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-[16px] border p-2" style={{ borderColor: LEGACY_COLORS.border }}>
+        <div className="relative min-h-0 flex-1">
+          <div className="absolute inset-y-0 left-0 right-0 overflow-y-auto overscroll-contain lg:-right-2.5 lg:[scrollbar-gutter:stable]">
+            <div className="min-h-full p-2">
           {query.isPending ? <p role="status" className="p-3 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>사유 목록 불러오는 중...</p>
             : visible.length === 0 ? <p className="p-3 text-sm" style={{ color: LEGACY_COLORS.muted2 }}>검색한 사유가 없습니다.</p>
               : visible.map((entry) => <div key={entry.category_id}
@@ -189,6 +203,19 @@ export function ReasonFormFields({
                   </>}
                 </>}
               </div>)}
+            </div>
+          </div>
+          <div aria-hidden className="pointer-events-none absolute inset-0 z-20 rounded-[16px] border" style={{ borderColor: LEGACY_COLORS.border }} />
+          <div aria-hidden className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between">
+            <div className="flex justify-between">
+              <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 15px, var(--c-popup-bg) 16px)" }} />
+              <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 0 100%, transparent 0 15px, var(--c-popup-bg) 16px)" }} />
+            </div>
+            <div className="flex justify-between">
+              <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 100% 0, transparent 0 15px, var(--c-popup-bg) 16px)" }} />
+              <span className="h-4 w-4" style={{ background: "radial-gradient(circle at 0 0, transparent 0 15px, var(--c-popup-bg) 16px)" }} />
+            </div>
+          </div>
         </div>
       </div>
     </div>, document.body)}
