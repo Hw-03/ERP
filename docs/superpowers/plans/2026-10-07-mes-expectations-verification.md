@@ -65,6 +65,12 @@ Node 검증기 16개 PASS의 JUnit·JSON 근거는 sources/verification에 보�
 
 추가 관찰: 정상 복귀 직후 기존 보관 화면의 `작업 선택`이 같은 보관 history entry에 머무는 경우가 있었다. 이번 변경 밖 `DefectHubPanel`의 기존 history back/replace 경로로, 해당 뒤로가기 조건은 PASS로 표시하지 않았으며 QA 기록에 남겼다. 통계 검수는 사이드바를 통해 다시 진입해 완료했다.
 
-## 적용 범위
+## 후속 CI 브라우저 테스트 수정
+
+첫 푸시 `8fb3118a`의 [CI](https://github.com/Hw-03/ERP/actions/runs/37573098582)는 백엔드·프론트·Windows 검사에 통과했으나 생산 BOM E2E 1건이 실패했다. `io-process-produce.spec.ts:63`의 카드 중앙 클릭이 사이드바를 펼친 1280/1366px 화면에서 수량 감소 버튼에 닿는 것을 재현했다. `IoBundleCard.tsx:229`의 펼침 헤더 안에 있는 수량 영역은 `:346`에서 클릭 전파를 막으므로, 카드가 닫힌 상태로 수량이 바뀌었다. 제품의 의도된 입력 동작을 유지하고 테스트의 클릭 대상을 품목 영역의 가장자리로 한정했다. `aria-expanded=true`와 자식 수량 2→3의 기존 assertion도 함께 검증한다.
+
+새 QA 실행 `ci-bom-20261007-a`는 커밋 소스·전용 DB·8031/3031을 사용했다. 기존 클릭은 폭/사이드바 8조합 중 2 FAIL/6 PASS, 수정 후 같은 8조합과 원래 생산 2개·이력 2개가 합계 12 PASS였다. 재시도는 0이며 실제 클릭·수량·위치와 화면을 기록했다. 변경 파일 ESLint와 원장 `--check`도 PASS. 초기 QA 시드 준비 오류와 본 테스트 결과는 구분했다. 관련 로그는 `ci-bom-width-diagnostic.log`, `ci-bom-green.log`, `ci-bom-lint.log`, QA 폴더 `results.md`에 보존한다. 앱 구현·DB 스키마 변경은 없다.
+
+## 적용 범위 및 보존
 
 원본 개발 DB에는 새 revision을 적용하지 않았고 직원 환경에 배포하지 않았다. 제거 전 DB·코드 백업과 명시적 마이그레이션이 실제 적용 시 필요하다. PostgreSQL 실제 연결 환경은 없어서 해당 통합 검사는 SKIP했으며 offline DDL과 보존 규칙을 별도 검증했다. 기존 수정 파일 3개 중 공유 preflight의 이전 변경은 보존해 이번 정책만 통합했고 `next-env.d.ts`는 최종 생성 작업 후 기존 바이트로 복원했다. 구현 검증 단계에서는 브랜치 변경·stage·커밋·푸시를 수행하지 않았다. 이후 사용자의 별도 커밋푸시 요청으로 main에서 기능별 커밋을 분리하며, 기존 preflight 변경과 `next-env.d.ts`는 제외한다. 기존 preflight 변경을 제외한 index 스냅샷에서도 보존 검사 46개가 PASS했다. 부분 스테이징을 충돌로 표시한 smart 계획은 그 사실을 기록하고 검증된 실제 diff와 소비자 기준으로 검사 결과를 재사용한다.
