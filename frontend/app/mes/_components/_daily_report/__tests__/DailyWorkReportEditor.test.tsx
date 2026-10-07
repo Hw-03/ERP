@@ -259,4 +259,14 @@ describe("DailyWorkReportEditor", () => {
     expect(readonlyContent).not.toHaveClass("lg:max-h-72");
     expect(readonlyContent.closest("section")).toHaveClass("lg:flex", "lg:min-h-0", "lg:flex-1", "lg:flex-col");
   });
+
+  it("모바일 높이 채움 모드의 입력과 로딩은 같은 남은 공간을 쓰고 긴 입력은 입력창 안에서 스크롤한다", () => {
+    const props = { initialContent: "긴 작업 내역 ".repeat(500), editable: true, saving: false, saveError: null, onSave: vi.fn().mockResolvedValue(null), mobile: true, fillAvailableHeight: true };
+    const { rerender } = render(<DailyWorkReportEditor {...props} />);
+    const editor = screen.getByRole("textbox", { name: "작업 내역" });
+    expect(editor).toHaveClass("min-h-0", "overflow-y-auto");
+    expect(editor.closest("section")).toHaveClass("min-h-0", "flex-1");
+    rerender(<DailyWorkReportEditor {...props} loading />);
+    expect(screen.getByTestId("daily-report-editor-skeleton")).toHaveClass("min-h-0", "flex-1");
+  });
 });

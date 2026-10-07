@@ -1,0 +1,33 @@
+.viewport {
+  min-height: 0;
+  min-width: 0;
+  flex: 1;
+  overflow-x: hidden;
+  overflow-y: hidden;
+}
+
+.scrollable {
+  overflow-y: auto;
+}
+
+.compactScreen {
+  height: 100%;
+  min-height: 0;
+}
+
+@media (max-height: 559px) {
+  .viewport {
+    overflow-y: auto;
+  }
+
+  .compactScreen {
+    height: auto;
+    min-height: 100%;
+  }
+
+  .compactField,
+  .compactInput,
+  .compactSkeleton {
+    min-height: 240px;
+  }
+}

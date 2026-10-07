@@ -86,6 +86,26 @@ describe("DailyWorkReportScreen", () => {
     registerDirtyMock.mockClear();
   });
 
+  it("모바일 내 일보는 활동을 펼칠 때만 스크롤 모드로 바꾸고 편집기를 유지한다", () => {
+    queryState.activity.data = {
+      work_date: "2026-08-03", employee_id: "employee-1", cancelled_count: 0,
+      summary: [{ operation_key: "warehouse", operation_label: "창고", work_count: 1, quantity_by_unit: { EA: 1 } }],
+      details: [],
+    };
+    const scrollModes: boolean[] = [];
+    render(<DailyWorkReportScreen employeeId="employee-1" mobile onMobileScrollModeChange={(value) => scrollModes.push(value)} />);
+    const editor = screen.getByRole("textbox", { name: "작업 내역" });
+    expect(scrollModes.at(-1)).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "MES 작업 기록 1건 펼치기" }));
+    expect(scrollModes.at(-1)).toBe(true);
+    expect(screen.getByRole("textbox", { name: "작업 내역" })).toBe(editor);
+    fireEvent.click(screen.getByRole("button", { name: "MES 작업 기록 1건 접기" }));
+    expect(scrollModes.at(-1)).toBe(false);
+    expect(screen.getByRole("textbox", { name: "작업 내역" })).toBe(editor);
+    fireEvent.click(screen.getByRole("tab", { name: "전체 일보" }));
+    expect(scrollModes.at(-1)).toBe(true);
+  });
+
   it("모바일만 날짜 보조 라벨과 빈 기록 설명을 줄이고 날짜 이동을 유지한다", () => {
     const props = { employeeId: "employee-1", operator: { employee_id: "employee-1", name: "김현우", department: "조립" } as never };
     const { rerender } = render(<DailyWorkReportScreen {...props} />);

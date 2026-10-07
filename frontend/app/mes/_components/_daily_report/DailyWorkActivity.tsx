@@ -209,21 +209,35 @@ function DailyWorkActivityDetail({ group }: { group: DailyWorkActivityData["deta
 
 export function DailyWorkActivity({ activity, onDetailOpenChange, loading = false, mobile = false }: { activity?: DailyWorkActivityData; onDetailOpenChange?: (isOpen: boolean) => void; loading?: boolean; mobile?: boolean }) {
   const [openOperation, setOpenOperation] = useState<string | null>(null);
+  const [mobileExpanded, setMobileExpanded] = useState(false);
+  const workCount = activity?.summary.reduce((total, summary) => total + summary.work_count, 0) ?? 0;
+  const cancelledCount = activity?.cancelled_count ?? 0;
+  const countLabel = workCount > 0 ? `${workCount}건${cancelledCount > 0 ? ` · 취소 ${cancelledCount}건` : ""}` : `취소 ${cancelledCount}건`;
   useDesktopTabHome("daily-work-activity", {
-    isHome: openOperation === null,
+    isHome: openOperation === null && (!mobile || !mobileExpanded),
     preservesDraft: true,
-    returnHome: () => { setOpenOperation(null); onDetailOpenChange?.(false); },
+    returnHome: () => { setOpenOperation(null); setMobileExpanded(false); onDetailOpenChange?.(false); },
   });
 
   return (
     <section className={mobile ? "rounded-[20px] border p-3" : "rounded-[20px] border p-4 lg:shrink-0 lg:px-5 lg:py-4"} aria-labelledby="daily-work-activity-title" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
-      <div className={mobile ? "flex flex-wrap items-center gap-2" : "flex min-h-11 flex-wrap items-center gap-2 sm:flex-nowrap"}>
+      <div className={mobile ? "flex min-h-11 flex-wrap items-center gap-2" : "flex min-h-11 flex-wrap items-center gap-2 sm:flex-nowrap"}>
         <span className={mobile ? "hidden" : "flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px]"} style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s2 }}>
           <ClipboardList className="h-5 w-5" />
         </span>
-        <h2 id="daily-work-activity-title" className={mobile ? "w-full text-center text-[15px] font-semibold" : "shrink-0 whitespace-nowrap text-lg font-black"}>MES 작업 기록</h2>
-        {loading && <span data-testid="daily-report-activity-skeleton" aria-label="MES 작업 기록 불러오는 중" role="status" className="h-11 min-w-0 flex-1 motion-safe:animate-pulse rounded-[14px]" style={{ background: LEGACY_COLORS.s2 }} />}
-        {activity?.summary.map((summary) => {
+        {mobile && !loading && (workCount > 0 || cancelledCount > 0) ? <button type="button" aria-label={`MES 작업 기록 ${countLabel} ${mobileExpanded ? "접기" : "펼치기"}`} aria-expanded={mobileExpanded} onClick={() => {
+          const next = !mobileExpanded;
+          setMobileExpanded(next);
+          if (!next) setOpenOperation(null);
+          onDetailOpenChange?.(next);
+        }} className="flex min-h-11 w-full items-center justify-between gap-2 rounded-[12px] px-2 text-left transition active:scale-[0.98]" style={{ background: LEGACY_COLORS.s2 }}>
+          <h2 id="daily-work-activity-title" className="text-[15px] font-semibold">MES 작업 기록</h2>
+          <span className="ml-auto text-sm font-black" style={{ color: LEGACY_COLORS.blue }}>{countLabel}</span>
+          <ChevronRight className={`h-4 w-4 shrink-0 transition-transform ${mobileExpanded ? "rotate-90" : ""}`} style={{ color: LEGACY_COLORS.blue }} />
+        </button> : <h2 id="daily-work-activity-title" className={mobile ? "text-[15px] font-semibold" : "shrink-0 whitespace-nowrap text-lg font-black"}>MES 작업 기록</h2>}
+        {loading && <span data-testid="daily-report-activity-skeleton" aria-label="MES 작업 기록 불러오는 중" role="status" className={`${mobile ? "h-8" : "h-11"} min-w-0 flex-1 motion-safe:animate-pulse rounded-[14px]`} style={{ background: LEGACY_COLORS.s2 }} />}
+        {mobile && !loading && workCount === 0 && cancelledCount === 0 && <span className="ml-auto text-sm font-medium" style={{ color: LEGACY_COLORS.muted2 }}>작업 기록이 없습니다.</span>}
+        {(!mobile || mobileExpanded) && activity?.summary.map((summary) => {
           const isOpen = openOperation === summary.operation_key;
           return (
             <button
@@ -232,7 +246,7 @@ export function DailyWorkActivity({ activity, onDetailOpenChange, loading = fals
               onClick={() => {
                 const next = isOpen ? null : summary.operation_key;
                 setOpenOperation(next);
-                onDetailOpenChange?.(next !== null);
+                onDetailOpenChange?.(mobile ? mobileExpanded : next !== null);
               }}
               aria-label={`${summary.operation_label} 거래 상세 ${isOpen ? "접기" : "펼치기"}`}
               className={mobile ? "flex min-h-11 w-full flex-wrap items-center gap-1.5 rounded-[12px] border px-3 py-2 text-left" : "flex min-h-11 shrink-0 items-center gap-1.5 rounded-[14px] border px-3 text-left transition active:scale-[0.98]"}
@@ -246,14 +260,14 @@ export function DailyWorkActivity({ activity, onDetailOpenChange, loading = fals
             </button>
           );
         })}
-        {activity && activity.cancelled_count > 0 && (
+        {activity && activity.cancelled_count > 0 && (!mobile || mobileExpanded) && (
           <span className="shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-black" style={{ color: LEGACY_COLORS.red, background: LEGACY_COLORS.errorBg }}>
             취소 {activity.cancelled_count}건
           </span>
         )}
       </div>
 
-      {(loading || activity?.summary.length === 0) && (
+      {!mobile && (loading || activity?.summary.length === 0) && (
         <div className={mobile && !loading ? "mt-2 text-center text-sm font-medium" : "mt-3 rounded-[14px] border px-3.5 py-3 text-sm font-medium"} style={mobile && !loading ? { color: LEGACY_COLORS.muted2 } : { color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
           {loading ? <span aria-hidden="true" className="block h-5 w-2/3 rounded motion-safe:animate-pulse" style={{ background: LEGACY_COLORS.s3 }} /> : mobile ? "작업 기록이 없습니다." : "완료된 MES 거래가 생기면 작업 종류와 수량이 이곳에 자동으로 나타납니다."}
         </div>

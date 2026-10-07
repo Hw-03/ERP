@@ -6,6 +6,38 @@ import { DirtyGuardProvider } from "@/lib/ui/dirty-guard";
 import { DesktopTabHomeProvider, useDesktopTabHomeController } from "../../DesktopTabHome";
 
 describe("DailyWorkActivity", () => {
+  it("모바일은 MES 건수를 먼저 보여 주고 펼칠 때 작업별 버튼과 상세를 열 수 있다", () => {
+    const onDetailOpenChange = vi.fn();
+    render(<DailyWorkActivity mobile activity={{
+      work_date: "2026-08-03", employee_id: "employee-1", cancelled_count: 0,
+      summary: [{ operation_key: "warehouse", operation_label: "창고", work_count: 2, quantity_by_unit: { EA: 2 } }],
+      details: [{ type: "solo", key: "log-1", logs: [] }],
+    } as never} onDetailOpenChange={onDetailOpenChange} />);
+
+    expect(screen.getByRole("button", { name: "MES 작업 기록 2건 펼치기" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "창고 거래 상세 펼치기" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "MES 작업 기록 2건 펼치기" }));
+    expect(onDetailOpenChange).toHaveBeenLastCalledWith(true);
+    fireEvent.click(screen.getByRole("button", { name: "창고 거래 상세 펼치기" }));
+    expect(screen.getByTestId("daily-work-activity-details")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "창고 거래 상세 접기" }));
+    expect(onDetailOpenChange).toHaveBeenLastCalledWith(true);
+    fireEvent.click(screen.getByRole("button", { name: "MES 작업 기록 2건 접기" }));
+    expect(screen.queryByTestId("daily-work-activity-details")).not.toBeInTheDocument();
+    expect(onDetailOpenChange).toHaveBeenLastCalledWith(false);
+  });
+  it("모바일에서 취소 기록만 있는 날에도 취소 건수를 표시하고 펼칠 수 있다", () => {
+    const onDetailOpenChange = vi.fn();
+    render(<DailyWorkActivity mobile activity={{
+      work_date: "2026-08-03", employee_id: "employee-1", cancelled_count: 1,
+      summary: [], details: [],
+    } as never} onDetailOpenChange={onDetailOpenChange} />);
+    expect(screen.getByRole("button", { name: "MES 작업 기록 취소 1건 펼치기" })).toBeInTheDocument();
+    expect(screen.queryByText("작업 기록이 없습니다.")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "MES 작업 기록 취소 1건 펼치기" }));
+    expect(screen.getAllByText("취소 1건")).toHaveLength(2);
+    expect(onDetailOpenChange).toHaveBeenLastCalledWith(true);
+  });
   it("같은 탭 복귀는 재마운트 없이 실제 거래 상세를 닫는다", () => {
     function ReturnButton() {
       const { requestHome } = useDesktopTabHomeController();
