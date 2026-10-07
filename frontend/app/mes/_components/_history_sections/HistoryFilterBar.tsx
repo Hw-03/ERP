@@ -184,7 +184,10 @@ export function HistoryFilterBar({
         <div className="flex min-w-0 flex-wrap items-center gap-2">{controls}</div>
         <div className="sticky top-0 z-20" style={{ background: LEGACY_COLORS.bg }}>
           {searchBar}
-          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-full h-2" style={{ background: LEGACY_COLORS.bg }} />
+          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-full h-2" style={{ background: LEGACY_COLORS.bg }}>
+            <span className="absolute left-0 top-full h-5 w-5" style={{ background: "radial-gradient(circle at 100% 100%, transparent 0 19px, var(--c-bg) 20px)" }} />
+            <span className="absolute right-0 top-full h-5 w-5" style={{ background: "radial-gradient(circle at 0 100%, transparent 0 19px, var(--c-bg) 20px)" }} />
+          </div>
         </div>
       </>
     );

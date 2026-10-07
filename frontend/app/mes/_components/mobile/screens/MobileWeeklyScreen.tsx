@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { ArrowLeft } from "lucide-react";
+import { MobilePageHeader } from "../primitives/MobilePageHeader";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatKstDate } from "@/lib/mes/date";
 import { api } from "@/lib/api";
@@ -13,10 +13,7 @@ import type {
 } from "@/lib/api/types/weekly";
 import { BottomSheet } from "@/lib/ui/BottomSheet";
 import { WeeklyWeekPicker } from "../../_weekly_sections/WeeklyWeekPicker";
-import { WeeklyGroupCards } from "../../_weekly_sections/WeeklyGroupCards";
-import { WeeklyDetailTable } from "../../_weekly_sections/WeeklyDetailTable";
-// 항목 4-13 — 모바일 생산현황을 PC 와 동일한 매트릭스 표로(frozen 컴포넌트 import 만, 수정 금지).
-import { WeeklyProductionMatrix } from "../../_weekly_sections/WeeklyProductionMatrix";
+import { MobileWeeklyDetails, MobileWeeklyGroupCards, MobileWeeklyProductionMatrix } from "../weekly/MobileWeeklyPresentation";
 import { BomSubExpander } from "../../_warehouse_v2/BomSubExpander";
 import { ReadFailure, ReadLoading } from "../../common/ReadState";
 import { SkeletonBlock, dataRevealClassName } from "../../common/LoadingSkeleton";
@@ -25,23 +22,20 @@ import { TYPO } from "../tokens";
 /**
  * 주간보고 모바일 전용 뷰.
  *
- * frozen(DesktopWeeklyReportView·_weekly_sections·weekly_report.py)은 수정하지
- * 않는다. 데이터 오케스트레이션(getWeeklyReport·selectedCode)은 데스크톱 뷰에서
- * 복제하고, 재사용 가능한 frozen 하위(WeeklyGroupCards·WeeklyDetailTable)는 import만
- * 한다. 가로 와이드 테이블 WeeklyProductionMatrix 만 모바일 카드로 대체.
+ * frozen 데스크톱 뷰와 주간 섹션은 수정하지 않는다. 데이터 조회와 선택 상태는
+ * 유지하고, 세 영역의 표시는 모바일 전용 컴포넌트에서 담당한다.
  *
  * weekMon 은 셸이 관리하고 헤더 WeeklyWeekPicker 로 바꾼다(props 시그니처 보존).
  */
 const CARD_STYLE = {
   background: LEGACY_COLORS.s1,
   borderColor: LEGACY_COLORS.border,
-  boxShadow: "var(--c-card-shadow)",
 } as const;
 
 function Kpi({ label, tone }: { label: string; tone?: string }) {
   return (
     <span
-      className={clsx(TYPO.caption, "rounded-full px-2.5 py-1 font-black")}
+      className={clsx(TYPO.caption, "rounded-full px-2.5 py-1 font-bold")}
       style={{ background: LEGACY_COLORS.s2, color: tone ?? LEGACY_COLORS.text }}
     >
       {label}
@@ -110,35 +104,16 @@ export function MobileWeeklyScreen({
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col" style={{ background: LEGACY_COLORS.bg }}>
-      {/* 항목 5-8 — min-w-0 로 flex 자식이 main(414) 폭으로 줄어들게(없으면 콘텐츠 min-content=490 으로 부풀어
-          공정별 변화 카드 우측 '현재/±0'가 잘림). 공정 전환과 무관하게 폭 고정. */}
-      <div className="scrollbar-hide flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pb-6">
-        {onWeekChange && (
-          <div
-            className="sticky top-0 z-20 -mx-3 border-b px-3 py-2"
-            style={{ background: LEGACY_COLORS.bg, borderColor: LEGACY_COLORS.border }}
-          >
-            <div data-testid="mobile-weekly-header" className="relative flex min-h-11 items-center justify-center">
-              {onExit && (
-                <button
-                  type="button"
-                  aria-label="더보기 메뉴로 돌아가기"
-                  onClick={onExit}
-                  className="absolute left-0 flex h-11 w-11 items-center justify-center rounded-full border transition-[transform] active:scale-[0.94]"
-                  style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-                >
-                  <ArrowLeft className="h-5 w-5" />
-                </button>
-              )}
-              <WeeklyWeekPicker weekMon={weekMon} onChange={onWeekChange} />
-            </div>
-          </div>
-        )}
+      <MobilePageHeader className="mx-3 mb-3" title="주간보고" onBack={onExit} backLabel="더보기 메뉴로 돌아가기" />
+      {onWeekChange && <div data-testid="mobile-weekly-header" className="mx-3 mb-3 min-h-11 shrink-0 [&>div]:grid [&>div]:w-full [&>div]:grid-cols-[44px_minmax(0,1fr)_44px] [&>div>button:nth-child(2)]:justify-center [&>div>div]:left-1/2 [&>div>div]:right-auto [&>div>div]:-translate-x-1/2"><WeeklyWeekPicker weekMon={weekMon} onChange={onWeekChange} /></div>}
+      {/* 하단 탭바의 8px 간격과 합쳐 마지막 카드 아래는 12px로 맞춘다. */}
+      <div data-testid="weekly-scroll-frame" className="mx-3 mb-1 flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-[20px]">
+      <div className="scrollbar-hide flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto">
         {error && <ReadFailure message={error} refresh={Boolean(data)} onRetry={() => setReloadNonce((n) => n + 1)} />}
         {initialLoading && <ReadLoading label="주간보고 불러오는 중" skeleton={<WeeklySkeleton />} />}
         {data && <div key={weekStart} className={`flex min-w-0 flex-col gap-3 ${dataRevealClassName}`}>
           {/* 1. 생산 현황 */}
-          <section className="rounded-[20px] border p-3" style={CARD_STYLE}>
+          <section className="rounded-[20px] border p-4" style={CARD_STYLE}>
             <div className={clsx(TYPO.title, "mb-2")} style={{ color: LEGACY_COLORS.text }}>
               생산 현황
             </div>
@@ -153,8 +128,7 @@ export function MobileWeeklyScreen({
                   {topModel && <Kpi label={`최다 ${topModel.model_label}`} tone={LEGACY_COLORS.blue} />}
                   <Kpi label={`생산부서 ${activeDepts}/${totalDepts}`} />
                 </div>
-                {/* 항목 4-13 — PC 와 동일 매트릭스 표(루트에 overflow-x-auto 있어 좁은 폭에서 가로 스크롤). */}
-                <WeeklyProductionMatrix rows={matrixRows} />
+                <MobileWeeklyProductionMatrix rows={matrixRows} />
               </>
             ) : (
               <div className="space-y-1">
@@ -171,33 +145,31 @@ export function MobileWeeklyScreen({
             )}
           </section>
 
-          {/* 2. 공정별 변화 — frozen WeeklyGroupCards(cols=1). 카드가 flex-1 이라 wrapper 에 min-h 부여. */}
           <section className="min-w-0">
             <div className={clsx(TYPO.title, "mb-2 px-1")} style={{ color: LEGACY_COLORS.text }}>
-              공정별 변화
+              공정 선택
             </div>
-            <div className="min-h-[300px]">
-              <WeeklyGroupCards
+            <div>
+              <MobileWeeklyGroupCards
                 groups={data?.groups ?? []}
                 selected={selectedCode}
                 onSelect={setSelectedCode}
-                cols={1}
               />
             </div>
           </section>
 
-          {/* 3. 품목 상세 — frozen WeeklyDetailTable(내부 모바일 카드 리스트). */}
           <section className="min-w-0">
             <div className={clsx(TYPO.title, "mb-2 px-1")} style={{ color: LEGACY_COLORS.text }}>
               {selectedGroup ? `${selectedGroup.dept_name} 품목 상세` : "품목 상세"}
             </div>
-            <WeeklyDetailTable
+            <MobileWeeklyDetails
               group={selectedGroup}
               stockBasis={stockBasis}
               onItemSelect={setSelectedBomItem}
             />
           </section>
         </div>}
+      </div>
       </div>
       <BottomSheet
         open={selectedBomItem !== null}
@@ -207,7 +179,7 @@ export function MobileWeeklyScreen({
         {selectedBomItem && (
           <div className="px-5">
             <div className="mb-3">
-              <p className="text-base font-black" style={{ color: LEGACY_COLORS.text }}>
+              <p className="text-base font-bold" style={{ color: LEGACY_COLORS.text }}>
                 {selectedBomItem.item_name}
               </p>
               <p className="mt-1 font-mono text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
@@ -234,23 +206,23 @@ export function MobileWeeklyScreen({
 /** 모바일 최종 보고의 세 영역을 예약하며 미조회 수치를 만들지 않는다. */
 function WeeklySkeleton(): React.ReactNode {
   return <div className="flex min-w-0 flex-col gap-3">
-    <section className="rounded-[20px] border p-3" style={CARD_STYLE}>
+    <section className="rounded-[20px] border p-4" style={CARD_STYLE}>
       <div className={clsx(TYPO.title, "mb-2")} style={{ color: LEGACY_COLORS.text }}>생산 현황</div>
       <div className="mb-3 flex gap-1.5"><SkeletonBlock className="h-6 w-20 rounded-full" /><SkeletonBlock className="h-6 w-28 rounded-full" /><SkeletonBlock className="h-6 w-24 rounded-full" /></div>
-      <div className="overflow-x-auto rounded-[12px] border" style={{ borderColor: LEGACY_COLORS.border }}>
-        {[0, 1, 2].map((row) => <div key={row} className="grid min-w-[480px] grid-cols-8 gap-2 border-b p-2 last:border-b-0" style={{ borderColor: LEGACY_COLORS.border }}>{Array.from({ length: 8 }, (_, cell) => <SkeletonBlock key={cell} className="h-4 w-full" />)}</div>)}
+      <div className="min-w-0">
+        {[0, 1, 2].map((row) => <div key={row} className="border-t py-3 first:border-t-0 first:pt-0 last:pb-0" style={{ borderColor: LEGACY_COLORS.border }}><SkeletonBlock className="h-5 w-28" /><div className="mt-3 grid grid-cols-3 gap-2">{Array.from({ length: 6 }, (_, cell) => <div key={cell} className="flex min-w-0 flex-col items-center gap-2 rounded-[12px] px-2 py-2" style={{ background: LEGACY_COLORS.s2 }}><SkeletonBlock className="h-5 w-10" /><SkeletonBlock className="h-6 w-8" /></div>)}</div></div>)}
       </div>
     </section>
     <section className="min-w-0">
-      <div className={clsx(TYPO.title, "mb-2 px-1")} style={{ color: LEGACY_COLORS.text }}>공정별 변화</div>
-      <div inert className="min-h-[300px]"><WeeklyGroupCards groups={[]} selected="TF" onSelect={() => {}} cols={1} loading /></div>
+      <div className={clsx(TYPO.title, "mb-2 px-1")} style={{ color: LEGACY_COLORS.text }}>공정 선택</div>
+      <div inert className="grid grid-cols-3 gap-2">{[0, 1, 2, 3, 4, 5].map((row) => <div key={row} className="flex min-h-16 flex-col items-center justify-center gap-1 rounded-[20px] border px-3 py-2" style={CARD_STYLE}><SkeletonBlock className="h-4 w-10" /><SkeletonBlock className="h-3 w-6" /></div>)}</div>
     </section>
     <section className="min-w-0">
       <div className={clsx(TYPO.title, "mb-2 px-1")} style={{ color: LEGACY_COLORS.text }}>품목 상세</div>
-      <div className="mb-1.5 flex flex-wrap gap-3 border-b pb-1.5 pt-2" style={{ borderColor: LEGACY_COLORS.border }}>{[0, 1, 2, 3].map((value) => <SkeletonBlock key={value} className="h-4 w-20" />)}</div>
-      <div className="flex flex-col gap-2">{[0, 1].map((row) => <div key={row} className="rounded-[14px] border p-3" style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>
+      <div className="mb-3 flex justify-between gap-2 rounded-[20px] border px-3 py-3" style={CARD_STYLE}>{[0, 1, 2].map((value) => <SkeletonBlock key={value} className="h-5 w-20" />)}</div>
+      <div className="flex flex-col gap-3">{[0, 1].map((row) => <div key={row} className="rounded-[20px] border p-4" style={CARD_STYLE}>
         <div className="flex items-start justify-between gap-2"><div className="flex flex-1 flex-col gap-2"><SkeletonBlock className="h-4 w-3/4" /><SkeletonBlock className="h-3 w-1/2" /></div><SkeletonBlock className="h-5 w-12" /></div>
-        <div className="mt-2 grid grid-cols-6 gap-1 text-center text-[11px] font-bold">{["전주", "생산", "입고", "출고", "불량", "현재"].map((label) => <div key={label}><div style={{ color: LEGACY_COLORS.muted2 }}>{label}</div><SkeletonBlock className="h-4 w-7" /></div>)}</div>
+        <div className="mt-3 grid grid-cols-3 gap-2 border-t pt-3" style={{ borderColor: LEGACY_COLORS.border }}>{["전주", "생산", "입고", "출고", "불량", "현재"].map((label) => <div key={label} className="flex min-w-0 flex-col items-center gap-1 rounded-[12px] px-2 py-2 text-xs leading-5" style={{ background: LEGACY_COLORS.s2 }}><div style={{ color: LEGACY_COLORS.muted2 }}>{label}</div><SkeletonBlock className="h-6 w-8" /></div>)}</div>
       </div>)}</div>
     </section>
   </div>;
