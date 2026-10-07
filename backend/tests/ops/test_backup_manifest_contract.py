@@ -10,7 +10,7 @@ import sqlite3
 import subprocess
 import sys
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
@@ -258,6 +258,8 @@ def test_sqlite_backup_publishes_manifest_last_with_exact_evidence(
     source = runtime_dir / "source.db"
     _create_head_db(source)
     _seed_valid_inventory(source)
+    with closing(sqlite3.connect(source)) as connection:
+        source_revision = connection.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     runtime_root = runtime_dir / "runtime"
     monkeypatch.setenv("MES_RUNTIME_ROOT", str(runtime_root))
     publication_order: list[Path] = []
@@ -289,7 +291,7 @@ def test_sqlite_backup_publishes_manifest_last_with_exact_evidence(
     }
     database = manifest["database"]
     assert database["engine"] == "sqlite"
-    assert database["alembic_revision"] == "20261007_0039"
+    assert database["alembic_revision"] == source_revision
     assert len(database["schema_fingerprint"]) == 64
     assert database["data_revision"]["revision"] >= 0
     assert len(database["snapshot_hash"]) == 64

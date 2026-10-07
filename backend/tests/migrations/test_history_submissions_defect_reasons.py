@@ -193,11 +193,12 @@ def test_submission_backfill_uses_only_explicit_batch_or_exact_quarantine_bulk_e
         assert logs["long-log"] is None
 
 
-def test_postgresql_offline_upgrade_adds_named_foreign_keys_without_table_recreation() -> None:
+@pytest.mark.parametrize("driver", ["psycopg", "psycopg2"])
+def test_postgresql_offline_upgrade_adds_named_foreign_keys_without_table_recreation(driver: str) -> None:
     output = io.StringIO()
     config = Config(str(BACKEND_DIR / "alembic.ini"), output_buffer=output)
     config.set_main_option("script_location", str(BACKEND_DIR / "alembic"))
-    config.set_main_option("sqlalchemy.url", "postgresql://localhost/unused")
+    config.set_main_option("sqlalchemy.url", f"postgresql+{driver}://localhost/unused")
     command.upgrade(config, f"{PREVIOUS_REVISION}:head", sql=True)
     sql = output.getvalue()
     assert "CREATE TABLE defect_reason_categories" in sql
@@ -268,8 +269,12 @@ def test_completed_revision_replay_rejects_partial_schema_drift(tmp_path: Path, 
         engine.dispose()
 
 
-def test_postgresql_snapshot_metadata_accepts_restored_legacy_names() -> None:
-    from sqlalchemy.dialects import postgresql
-    for table in ("defect_quarantine_records", "transaction_logs", "stock_requests", "io_batches"):
-        column = Base.metadata.tables[table].c.reason_category
-        assert isinstance(column.type.dialect_impl(postgresql.dialect()), sa.Text)
+@pytest.mark.parametrize("driver", ["psycopg", "psycopg2"])
+@pytest.mark.parametrize("table", ["defect_quarantine_records", "transaction_logs", "stock_requests", "io_batches"])
+def test_postgresql_snapshot_metadata_accepts_restored_legacy_names(driver: str, table: str) -> None:
+    """사유 스냅샷은 드라이버 내부 타입과 무관하게 길이 제한 없는 TEXT를 생성한다."""
+    from sqlalchemy.dialects.postgresql import psycopg, psycopg2
+
+    dialect = {"psycopg": psycopg.dialect, "psycopg2": psycopg2.dialect}[driver]()
+    column = Base.metadata.tables[table].c.reason_category
+    assert str(sa.schema.CreateColumn(column).compile(dialect=dialect)) == "reason_category TEXT"
