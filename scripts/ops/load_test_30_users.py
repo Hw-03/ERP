@@ -279,7 +279,6 @@ async def auto_seed_resources(base_url: str) -> tuple[Optional[str], Optional[st
                     "name": "부하테스트담당자",
                     "role": "조립/사원",
                     "department": "조립",
-                    "level": "staff",
                     "is_active": True,
                     "display_order": 999,
                 }

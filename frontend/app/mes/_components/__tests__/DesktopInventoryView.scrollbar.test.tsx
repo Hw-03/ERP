@@ -7,6 +7,10 @@ vi.mock("@/lib/queries/useModelsQuery", () => ({
   useModelsQuery: () => ({ data: [] }),
 }));
 
+vi.mock("@/lib/queries/useItemsQuery", () => ({
+  useItemQuery: () => ({ data: undefined, error: null, isFetching: false, refetch: vi.fn() }),
+}));
+
 vi.mock("../_hooks/useInventoryData", () => ({
   useInventoryData: () => ({
     items: [],

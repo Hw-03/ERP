@@ -1,0 +1,1968 @@
+{
+  "schemaVersion": 1,
+  "executionPolicy": "연결은 실행 통과가 아니다. 각 조건의 현재 실행 근거를 별도 등록하기 전에는 NOT_RUN이다.",
+  "tests": [
+    {
+      "id": "pin-guard",
+      "file": "backend/tests/routers/test_admin_pin_guards.py",
+      "selector": "test_employee_master_write_endpoints_require_admin_pin",
+      "sourceHash": "8e041f84246e41d959d88de51e6b4da69e3c7338e2f0c7db5419125b9870b0e2"
+    },
+    {
+      "id": "notification-once",
+      "file": "backend/tests/test_notifications.py",
+      "selector": "test_warehouse_request_notifies_approvers_excluding_requester",
+      "sourceHash": "0ad49229ecb0706a5466b1447b6be019eec94a7d9c058d554a0f5745d5a69f30"
+    },
+    {
+      "id": "origin-api",
+      "file": "backend/tests/test_defect_flow.py",
+      "selector": "test_occurrence_statistics_survives_category_changes_and_final_processing",
+      "sourceHash": "08ed12bf41d8382aff3a641f7672a4dc3ebe878b1b4abfcff6fa073723c68f2b"
+    },
+    {
+      "id": "origin-partial-api",
+      "file": "backend/tests/test_defect_flow.py",
+      "selector": "test_unquarantine_partially_updates_only_the_selected_record",
+      "sourceHash": "08ed12bf41d8382aff3a641f7672a4dc3ebe878b1b4abfcff6fa073723c68f2b"
+    },
+    {
+      "id": "origin-ui",
+      "file": "frontend/app/mes/_components/_defect_hub/DefectDepartmentList.test.tsx",
+      "selector": "잔량 원건 수를 세고 전량 처리한 원건만 빠져도 같은 품목 카드를 유지한다",
+      "sourceHash": "20ea1e518f72f8f8a108de667ed8b0d804508016aa9da0b04785377811adb804"
+    },
+    {
+      "id": "origin-category-group",
+      "file": "frontend/app/mes/_components/_defect_hub/DefectDepartmentList.test.tsx",
+      "selector": "보관 선택은 같은 부서·품목에서도 관리 분류를 따로 묶는다",
+      "sourceHash": "20ea1e518f72f8f8a108de667ed8b0d804508016aa9da0b04785377811adb804"
+    },
+    {
+      "id": "origin-unselectable",
+      "file": "frontend/app/mes/_components/_defect_hub/DefectDepartmentList.test.tsx",
+      "selector": "처리 대기와 출처 없는 합산 원건은 선택할 수 없고 복원 원건만 허용한다",
+      "sourceHash": "20ea1e518f72f8f8a108de667ed8b0d804508016aa9da0b04785377811adb804"
+    },
+    {
+      "id": "origin-pending-server",
+      "file": "backend/tests/test_defect_flow.py",
+      "selector": "test_bulk_unquarantine_rejects_reserved_record",
+      "sourceHash": "08ed12bf41d8382aff3a641f7672a4dc3ebe878b1b4abfcff6fa073723c68f2b"
+    },
+    {
+      "id": "origin-stale-server",
+      "file": "backend/tests/services/test_defect_actions.py",
+      "selector": "test_bulk_unquarantine_rejects_stale_or_missing_record",
+      "sourceHash": "60678f89ed9ffe7be05df8421ecd21a615838d0602a1c193d43258219c8b0f8e"
+    },
+    {
+      "id": "origin-storage-e2e",
+      "file": "frontend/tests/e2e/defect-quarantine-records.spec.ts",
+      "selector": "B급 등록·분류 변경·일부 정상 복귀는 보관 목록에 남는다",
+      "sourceHash": "4aed28716a0729585c45b2f2aed391daca7842d6bca96d79e3a4896136d33b09"
+    },
+    {
+      "id": "raw-ui",
+      "file": "frontend/app/mes/_components/_warehouse_v2/__tests__/IoTargetPicker.rowClick.test.tsx",
+      "selector": "원자재 입고는 canonical R 품목만 표시한다: %s",
+      "sourceHash": "e6b3aa40b36bd36c9a8b7ed3e9892bec06dd5f1e68a337c759a98f8d4feecb53"
+    },
+    {
+      "id": "raw-ui-stale",
+      "file": "frontend/app/mes/_components/_warehouse_v2/__tests__/IoTargetPicker.rowClick.test.tsx",
+      "selector": "이미 선택한 원자재가 유효하지 않으면 다음 진행을 차단한다: %s",
+      "sourceHash": "e6b3aa40b36bd36c9a8b7ed3e9892bec06dd5f1e68a337c759a98f8d4feecb53"
+    },
+    {
+      "id": "outbound-cancel",
+      "file": "backend/tests/test_transaction_cancel.py",
+      "selector": "test_cancel_internal_use_restores_warehouse_total",
+      "sourceHash": "f9dae3958d2cfcfb99206c60d0d0e2290f5da6ab1613105a359229514b272883"
+    },
+    {
+      "id": "inventory-roundtrip",
+      "file": "backend/tests/test_transaction_cancel.py",
+      "selector": "test_effect_helper_roundtrip",
+      "sourceHash": "f9dae3958d2cfcfb99206c60d0d0e2290f5da6ab1613105a359229514b272883"
+    },
+    {
+      "id": "cancel-once",
+      "file": "backend/tests/test_transaction_cancel.py",
+      "selector": "test_cancel_idempotent_double",
+      "sourceHash": "f9dae3958d2cfcfb99206c60d0d0e2290f5da6ab1613105a359229514b272883"
+    },
+    {
+      "id": "approval-ui",
+      "file": "frontend/app/mes/_components/_warehouse_sections/__tests__/ApprovalQueuePanel.stageRefresh.test.tsx",
+      "selector": "승인 단계 성공 후 해당 승인함 버튼과 대기 목록을 새로고침 없이 갱신한다: $path",
+      "sourceHash": "491c7c4581a142a221eaca44e81b56dea362e2fb7ede3c225c55a72578b2a9ac"
+    },
+    {
+      "id": "weekly-boundary",
+      "file": "backend/tests/routers/test_weekly_report.py",
+      "selector": "test_legacy_matrix_uses_kst_half_open_window_for_pf_pickups",
+      "sourceHash": "380f2c7578cd95de965c38cf09b138c6f44f7cb5d72b9e4c70aab50e6c6a70d2"
+    },
+    {
+      "id": "weekly-companion",
+      "file": "backend/tests/routers/test_weekly_report.py",
+      "selector": "test_legacy_matrix_counts_only_final_pf_pickup_completion",
+      "sourceHash": "380f2c7578cd95de965c38cf09b138c6f44f7cb5d72b9e4c70aab50e6c6a70d2"
+    },
+    {
+      "id": "weekly-closed",
+      "file": "backend/tests/routers/test_weekly_report.py",
+      "selector": "test_legacy_matrix_keeps_pf_pickup_cancelled_after_sunday_cutoff",
+      "sourceHash": "380f2c7578cd95de965c38cf09b138c6f44f7cb5d72b9e4c70aab50e6c6a70d2"
+    },
+    {
+      "id": "weekly-current-cancel",
+      "file": "backend/tests/routers/test_weekly_report.py",
+      "selector": "test_verified_week_excludes_same_week_original_and_cancellation_pair",
+      "sourceHash": "380f2c7578cd95de965c38cf09b138c6f44f7cb5d72b9e4c70aab50e6c6a70d2"
+    },
+    {
+      "id": "grade-contract",
+      "file": "backend/tests/migrations/test_remove_employee_level.py",
+      "selector": "test_current_employee_contract_has_no_grade",
+      "sourceHash": "a1b96b0f521858a35d3769d52aa6310a9c8248986f60c0d5da9ad55753a4deaf"
+    },
+    {
+      "id": "grade-migration",
+      "file": "backend/tests/migrations/test_remove_employee_level.py",
+      "selector": "test_remove_employee_level_preserves_rows_and_foreign_keys",
+      "sourceHash": "a1b96b0f521858a35d3769d52aa6310a9c8248986f60c0d5da9ad55753a4deaf"
+    },
+    {
+      "id": "grade-session",
+      "file": "frontend/app/mes/_components/login/__tests__/useCurrentOperator.test.ts",
+      "selector": "ignores grades in old sessions without granting approval roles",
+      "sourceHash": "f310c63c7dd9fa0bccef8fb67a245c869ab8442957b8d68cee590e2fa0de18ab"
+    },
+    {
+      "id": "grade-ui",
+      "file": "frontend/app/mes/_components/_warehouse_steps/__tests__/_constants.test.ts",
+      "selector": "detects department approvers only by independent department role",
+      "sourceHash": "bd973b503e4abf601103f5c31ce30ca26ce687ca5abca114425e7f62df4da413"
+    },
+    {
+      "id": "grade-self-approval",
+      "file": "backend/tests/services/test_sr_execution.py",
+      "selector": "test_finalize_legacy_admin_without_warehouse_role_waits",
+      "sourceHash": "b4d89de563768a21e9a9c0aab141005a0c0f33bd3c190596192647ed87b69ec4"
+    },
+    {
+      "id": "grade-export",
+      "file": "frontend/app/mes/_components/_admin_sections/__tests__/AdminExportSection.test.tsx",
+      "selector": "직원 CSV는 직급과 업무 역할을 유지하고 등급을 내보내지 않는다",
+      "sourceHash": "161bc3662372b15aee34a10372caa3f73d3e01d1a1b180654bf4e7c6aaf80161"
+    },
+    {
+      "id": "role-notification",
+      "file": "backend/tests/test_notifications.py",
+      "selector": "test_department_recipients_follow_can_approve_rule",
+      "sourceHash": "0ad49229ecb0706a5466b1447b6be019eec94a7d9c058d554a0f5745d5a69f30"
+    },
+    {
+      "id": "role-special-route",
+      "file": "backend/tests/test_notifications.py",
+      "selector": "test_as_research_request_notifies_only_active_special_approvers",
+      "sourceHash": "0ad49229ecb0706a5466b1447b6be019eec94a7d9c058d554a0f5745d5a69f30"
+    },
+    {
+      "id": "role-department",
+      "file": "backend/tests/test_dept_hierarchy.py",
+      "selector": "test_부서_정부는_비_생산_부서도_OK",
+      "sourceHash": "701eb9dc4bbc99901857d64c32447feef1f795a10596d6e17686b1fd046b9a7e"
+    },
+    {
+      "id": "role-warehouse",
+      "file": "backend/tests/test_dept_hierarchy.py",
+      "selector": "test_창고_정은_모든_부서_OK",
+      "sourceHash": "701eb9dc4bbc99901857d64c32447feef1f795a10596d6e17686b1fd046b9a7e"
+    },
+    {
+      "id": "stats-immutable",
+      "file": "backend/tests/services/test_defect_statistics.py",
+      "selector": "test_statistics_preserves_initial_category_and_quantity_after_changes",
+      "sourceHash": "ac5ca5d6f796ed3a2fb59dbedb530931fbfab1ba16f61a39ae8268742ef12245"
+    },
+    {
+      "id": "stats-period",
+      "file": "backend/tests/services/test_defect_statistics.py",
+      "selector": "test_report_categories_and_exclusions_follow_each_period_and_all_aggregates",
+      "sourceHash": "ac5ca5d6f796ed3a2fb59dbedb530931fbfab1ba16f61a39ae8268742ef12245"
+    },
+    {
+      "id": "stats-ui",
+      "file": "frontend/app/mes/_components/_defect_hub/__tests__/DefectStatisticsView.test.tsx",
+      "selector": "shows immutable initial categories and comparison without new filters (mobile %s)",
+      "sourceHash": "4908b53a714b553605b9ba4df237d5fbd5923e95e69a65089a4c9ee12b5918d4"
+    },
+    {
+      "id": "raw-server",
+      "file": "backend/tests/services/test_item_write_guards.py",
+      "selector": "test_stock_request_rechecks_stale_items_without_mutation",
+      "sourceHash": "a507c3f167eeb060b21afdc760de77f5fc15a134fe1e5467194917896b5f4d4a"
+    },
+    {
+      "id": "delete-server",
+      "file": "backend/tests/services/test_item_write_guards.py",
+      "selector": "test_deleted_item_blocks_new_inventory_effect",
+      "sourceHash": "a507c3f167eeb060b21afdc760de77f5fc15a134fe1e5467194917896b5f4d4a"
+    },
+    {
+      "id": "detail-open",
+      "file": "frontend/app/mes/_components/_hooks/__tests__/useInventoryViewState.test.tsx",
+      "selector": "검색어와 열린 선택 품목을 목록에 없어도 단건 조회로 복원한다",
+      "sourceHash": "b57ebdf95749cbe97c58fdde64e4aadfc4fa7a9e1830695521146f87c8e7423b"
+    },
+    {
+      "id": "detail-closed",
+      "file": "frontend/app/mes/_components/_hooks/__tests__/useInventoryViewState.test.tsx",
+      "selector": "닫기 후 새로고침에서도 검색과 선택을 유지한다",
+      "sourceHash": "b57ebdf95749cbe97c58fdde64e4aadfc4fa7a9e1830695521146f87c8e7423b"
+    },
+    {
+      "id": "detail-employee",
+      "file": "frontend/app/mes/_components/_hooks/__tests__/useInventoryViewState.test.tsx",
+      "selector": "직원을 바꾸면 이전 직원의 상세와 검색을 노출하지 않는다",
+      "sourceHash": "b57ebdf95749cbe97c58fdde64e4aadfc4fa7a9e1830695521146f87c8e7423b"
+    },
+    {
+      "id": "detail-boot",
+      "file": "frontend/app/mes/_components/_hooks/__tests__/useInventoryViewState.test.tsx",
+      "selector": "잘못된 저장값 또는 이전 boot는 복원하지 않는다: %s",
+      "sourceHash": "b57ebdf95749cbe97c58fdde64e4aadfc4fa7a9e1830695521146f87c8e7423b"
+    },
+    {
+      "id": "detail-surfaces",
+      "file": "frontend/tests/e2e/site-experience.spec.ts",
+      "selector": "전역 검색 없이 기존 품목 상세를 주소 변경 없이 연다",
+      "sourceHash": "1a695fed1069e521fb9d15508c2948905a85a65f1ed4dd225f266e80fd08366c"
+    },
+    {
+      "id": "login-gate",
+      "file": "frontend/app/mes/_components/login/__tests__/MesLoginGate.recovery.test.tsx",
+      "selector": "keeps stored operator and withholds application content when session recovery fails",
+      "sourceHash": "eed9da54dde510685a600d97016e0b19c702c55f6ab901d90f7882ed34ce7ab5"
+    },
+    {
+      "id": "detail-deleted",
+      "file": "frontend/app/mes/_components/_hooks/__tests__/useInventoryViewState.test.tsx",
+      "selector": "200의 deleted_at만 삭제로 확인하고 상세를 유지한다",
+      "sourceHash": "b57ebdf95749cbe97c58fdde64e4aadfc4fa7a9e1830695521146f87c8e7423b"
+    },
+    {
+      "id": "detail-errors",
+      "file": "frontend/app/mes/_components/_hooks/__tests__/useInventoryViewState.test.tsx",
+      "selector": "HTTP %s는 삭제로 단정하지 않는다",
+      "sourceHash": "b57ebdf95749cbe97c58fdde64e4aadfc4fa7a9e1830695521146f87c8e7423b"
+    },
+    {
+      "id": "detail-retry",
+      "file": "frontend/app/mes/_components/_hooks/__tests__/useInventoryViewState.test.tsx",
+      "selector": "갱신 실패 중 기존 상세를 유지하고 재시도 후 복구한다",
+      "sourceHash": "b57ebdf95749cbe97c58fdde64e4aadfc4fa7a9e1830695521146f87c8e7423b"
+    },
+    {
+      "id": "detail-stale",
+      "file": "frontend/app/mes/_components/_hooks/__tests__/useInventoryViewState.test.tsx",
+      "selector": "새 선택 이후 도착한 이전 상세 응답을 적용하지 않는다",
+      "sourceHash": "b57ebdf95749cbe97c58fdde64e4aadfc4fa7a9e1830695521146f87c8e7423b"
+    },
+    {
+      "id": "detail-write",
+      "file": "frontend/app/mes/_components/_inventory_sections/__tests__/InventoryDetailPanel.test.tsx",
+      "selector": "삭제된 품목의 %s 입출고 작업을 차단한다",
+      "sourceHash": "f98c081d8747e4265a59c335b1c5f4f72bb9dab7537f70491ce4a4caf3f5b3a4"
+    },
+    {
+      "id": "detail-write-error",
+      "file": "frontend/app/mes/_components/_inventory_sections/__tests__/InventoryDetailPanel.test.tsx",
+      "selector": "조회 확인 실패 중에는 기존 상세를 유지하되 작업을 차단한다",
+      "sourceHash": "f98c081d8747e4265a59c335b1c5f4f72bb9dab7537f70491ce4a4caf3f5b3a4"
+    },
+    {
+      "id": "detail-history-desktop",
+      "file": "frontend/app/mes/_components/_inventory_sections/__tests__/DesktopInventoryRightPanel.test.tsx",
+      "selector": "최근 내역을 보고 있어도 삭제 확인 안내를 유지한다",
+      "sourceHash": "4cb95856a1ec6b68db909355b0b747e0e3ad788e53bf9058e4d1412e9f48b679"
+    },
+    {
+      "id": "detail-history-mobile",
+      "file": "frontend/app/mes/_components/mobile/screens/__tests__/MobileInventoryDetailContent.test.tsx",
+      "selector": "최근 내역 탭에도 삭제 안내를 표시하고 내역을 유지한다",
+      "sourceHash": "c26cb549c8b88a76405262b6b8a839c919a15bc979bcd2c82b9d635cd042bb82"
+    },
+    {
+      "id": "detail-korean",
+      "file": "frontend/app/mes/_components/_inventory_sections/__tests__/InventoryRecentHistoryPanel.test.tsx",
+      "selector": "이력 표와 같은 배지 분류로 창고 이동·불량·출하·취소를 표시한다",
+      "sourceHash": "dcbdfc09616c64fe0739f56d29c0b3f130ec64086e61cc452072bd050a607a25"
+    },
+    {
+      "id": "history-warehouse",
+      "file": "backend/tests/routers/test_history_cancellation_policy.py",
+      "selector": "test_original_and_cancel_are_two_works_in_same_business_category",
+      "sourceHash": "e35eca0766d10c33ae8d21dff2b1e3d1da9774111375192c649b5199dad2495d"
+    },
+    {
+      "id": "history-period",
+      "file": "backend/tests/routers/test_history_cancellation_policy.py",
+      "selector": "test_cancel_in_next_month_uses_its_own_period_and_counts_once",
+      "sourceHash": "e35eca0766d10c33ae8d21dff2b1e3d1da9774111375192c649b5199dad2495d"
+    },
+    {
+      "id": "history-department",
+      "file": "backend/tests/routers/test_transactions_summary.py",
+      "selector": "test_summary_counts_each_new_operation_once_and_excludes_cancellation_from_adjustment",
+      "sourceHash": "9f15e3a32af5dba3cab32b5e7ded24b3087b250d76307c019b41311c24fedd98"
+    },
+    {
+      "id": "appearance-api",
+      "file": "backend/tests/routers/test_employee_appearance.py",
+      "selector": "test_appearance_get_and_pair_save",
+      "sourceHash": "f2caeb66659f0c3634824e15ae044971b125a9d1424db890a700cc013bea02ff"
+    },
+    {
+      "id": "appearance-api-failed",
+      "file": "backend/tests/routers/test_employee_appearance.py",
+      "selector": "test_invalid_appearance_pair_never_changes_either_field",
+      "sourceHash": "f2caeb66659f0c3634824e15ae044971b125a9d1424db890a700cc013bea02ff"
+    },
+    {
+      "id": "appearance-auto",
+      "file": "frontend/app/mes/_components/__tests__/useAppearancePreferences.test.tsx",
+      "selector": "fetches on same-employee saved events and ignores other employees and keys",
+      "sourceHash": "9b9ccc2401bcde68df777dca613cb9f155575df8f57a1d9c7e44524b939dc52b"
+    },
+    {
+      "id": "appearance-save",
+      "file": "frontend/app/mes/_components/__tests__/useAppearancePreferences.test.tsx",
+      "selector": "saves one atomic pair and broadcasts only a version, employee and event ID",
+      "sourceHash": "9b9ccc2401bcde68df777dca613cb9f155575df8f57a1d9c7e44524b939dc52b"
+    },
+    {
+      "id": "appearance-failed",
+      "file": "frontend/app/mes/_components/__tests__/useAppearancePreferences.test.tsx",
+      "selector": "leaves preferences and other tabs untouched when the save fails",
+      "sourceHash": "9b9ccc2401bcde68df777dca613cb9f155575df8f57a1d9c7e44524b939dc52b"
+    },
+    {
+      "id": "appearance-stale",
+      "file": "frontend/app/mes/_components/__tests__/useAppearancePreferences.test.tsx",
+      "selector": "discards stale employee reads after a switch and aborts their request",
+      "sourceHash": "9b9ccc2401bcde68df777dca613cb9f155575df8f57a1d9c7e44524b939dc52b"
+    },
+    {
+      "id": "appearance-stale-save",
+      "file": "frontend/app/mes/_components/__tests__/useAppearancePreferences.test.tsx",
+      "selector": "does not apply an older pending save over a newer saved pair",
+      "sourceHash": "9b9ccc2401bcde68df777dca613cb9f155575df8f57a1d9c7e44524b939dc52b"
+    },
+    {
+      "id": "appearance-auth",
+      "file": "frontend/app/mes/_components/__tests__/useAppearancePreferences.test.tsx",
+      "selector": "loads the authoritative pair and patches preferences without a login audit",
+      "sourceHash": "9b9ccc2401bcde68df777dca613cb9f155575df8f57a1d9c7e44524b939dc52b"
+    },
+    {
+      "id": "appearance-draft",
+      "file": "frontend/app/mes/_components/__tests__/AppearanceSettingsModal.test.tsx",
+      "selector": "synchronizes pristine fields while preserving a dirty choice and entered PIN",
+      "sourceHash": "82a2a624b21807dfd08d671ada8d0fe9da0e938d9bd2847c575f62abc3050db2"
+    },
+    {
+      "id": "asr-stage",
+      "file": "backend/tests/services/test_sr_approval.py",
+      "selector": "test_warehouse_approve_holds_when_department_pending",
+      "sourceHash": "1d94fc1a84aa9da7d1bcac063a194b92091cf45e7839a87ee18fa7c49ccf10cd"
+    },
+    {
+      "id": "asr-final",
+      "file": "backend/tests/services/test_sr_approval.py",
+      "selector": "test_department_approve_completes_after_warehouse",
+      "sourceHash": "1d94fc1a84aa9da7d1bcac063a194b92091cf45e7839a87ee18fa7c49ccf10cd"
+    },
+    {
+      "id": "receive-cancel",
+      "file": "backend/tests/services/test_inventory_operation_cancellation.py",
+      "selector": "test_cancel_creates_separate_reversal_operation_and_opposite_log",
+      "sourceHash": "1ad351c7bbcb042d439eb2c4c8090fba500a46665a457ff4f2fe7a388f496859"
+    },
+    {
+      "id": "defect-selection",
+      "file": "frontend/app/mes/_components/_defect_hub/DefectDepartmentList.test.tsx",
+      "selector": "selects only available records from one repeated-item group for batch processing",
+      "sourceHash": "20ea1e518f72f8f8a108de667ed8b0d804508016aa9da0b04785377811adb804"
+    },
+    {
+      "id": "defect-dept",
+      "file": "frontend/app/mes/_components/_defect_hub/DefectDepartmentList.test.tsx",
+      "selector": "does not merge matching item ids from different departments",
+      "sourceHash": "20ea1e518f72f8f8a108de667ed8b0d804508016aa9da0b04785377811adb804"
+    },
+    {
+      "id": "defect-reset",
+      "file": "frontend/app/mes/_components/_defect_hub/DefectDepartmentList.test.tsx",
+      "selector": "clears repeated-item selection when the filtered location set changes",
+      "sourceHash": "20ea1e518f72f8f8a108de667ed8b0d804508016aa9da0b04785377811adb804"
+    },
+    {
+      "id": "defect-server-group",
+      "file": "backend/tests/services/test_defect_actions.py",
+      "selector": "test_bulk_unquarantine_rejects_duplicate_or_mixed_lines_before_mutation",
+      "sourceHash": "60678f89ed9ffe7be05df8421ecd21a615838d0602a1c193d43258219c8b0f8e"
+    },
+    {
+      "id": "normalizer-original",
+      "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+      "selector": "원장 ID·기대·피드백·과거 관찰을 보존하고 분모를 원장에서 산출한다",
+      "sourceHash": "20dbf2c41fab7225c9dcb81b6907f8c499fbca345d2194a642280f9e282bee62"
+    },
+    {
+      "id": "normalizer-link",
+      "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+      "selector": "실제 selector의 assertion 조각과 파일 SHA를 연결한다",
+      "sourceHash": "20dbf2c41fab7225c9dcb81b6907f8c499fbca345d2194a642280f9e282bee62"
+    },
+    {
+      "id": "normalizer-invalid-link",
+      "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+      "selector": "누락 selector·주석뿐인 ID/assertion·다른 테스트의 assertion·변경된 SHA를 탐지한다",
+      "sourceHash": "20dbf2c41fab7225c9dcb81b6907f8c499fbca345d2194a642280f9e282bee62"
+    },
+    {
+      "id": "normalizer-partial",
+      "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+      "selector": "개별 조건 일부만 실행한 경우 케이스 전체 PASS를 만들지 않는다",
+      "sourceHash": "20dbf2c41fab7225c9dcb81b6907f8c499fbca345d2194a642280f9e282bee62"
+    },
+    {
+      "id": "normalizer-invalid-ids",
+      "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+      "selector": "알 수 없는 ID·중복 원장·중복 정책·누락 조건을 거부한다",
+      "sourceHash": "20dbf2c41fab7225c9dcb81b6907f8c499fbca345d2194a642280f9e282bee62"
+    },
+    {
+      "id": "role-change",
+      "file": "backend/tests/services/test_io_actions.py",
+      "selector": "test_department_role_grant_revoke_regrant_preserves_pending_and_executes_once",
+      "sourceHash": "1e0de74a67d816c3d654ddebc19b69d693b5e58765c72f7da6fdb8950183ea41"
+    },
+    {
+      "id": "raw-ui-active-only",
+      "file": "frontend/app/mes/_components/_warehouse_v2/__tests__/IoTargetPicker.rowClick.test.tsx",
+      "selector": "원자재 입고 목록은 활성 canonical R 품목만 보여주고 삭제 품목은 숨긴다",
+      "sourceHash": "e6b3aa40b36bd36c9a8b7ed3e9892bec06dd5f1e68a337c759a98f8d4feecb53"
+    },
+    {
+      "id": "cancel-reservations",
+      "file": "backend/tests/test_expectation_cancellation_reservations.py",
+      "selector": "test_warehouse_transfer_cancel_restores_both_cells_and_preserves_other_reservations",
+      "sourceHash": "2a574b0579b2536cfded62f0613be780c486a5fa3b1c0b535224e8b83d881d70"
+    },
+    {
+      "id": "normalizer-select",
+      "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+      "selector": "smoke·P0·ID 필터가 실제 selector만 선택하고 알 수 없는 ID·미연결 조건은 거부한다",
+      "sourceHash": "20dbf2c41fab7225c9dcb81b6907f8c499fbca345d2194a642280f9e282bee62"
+    },
+    {
+      "id": "detail-deleted-bom",
+      "file": "frontend/app/mes/_components/_inventory_sections/__tests__/InventoryDetailPanel.test.tsx",
+      "selector": "삭제 확인 후에도 %s 재고 정보와 읽기 전용 BOM을 유지한다",
+      "sourceHash": "f98c081d8747e4265a59c335b1c5f4f72bb9dab7537f70491ce4a4caf3f5b3a4"
+    },
+    {
+      "id": "grade-edit-ui",
+      "file": "frontend/app/mes/_components/_admin_sections/_employee_parts/__tests__/EmployeeDetailGrid.test.tsx",
+      "selector": "직원 편집 화면은 등급 control 없이 창고·부서 정·부와 AS·연구 역할을 독립적으로 유지한다",
+      "sourceHash": "fc2584b57e0b92a6df54a59fe6566d1ebfffe1cb4746dd5b2387951f73facd85"
+    },
+    {
+      "id": "department-recipient-once",
+      "file": "backend/tests/services/test_io_actions.py",
+      "selector": "test_internal_use_department_group_targets_batch_department_for_queue_notification_and_approval",
+      "sourceHash": "1e0de74a67d816c3d654ddebc19b69d693b5e58765c72f7da6fdb8950183ea41"
+    },
+    {
+      "id": "appearance-single-update",
+      "file": "backend/tests/routers/test_employee_appearance.py",
+      "selector": "test_pair_write_includes_both_fields_even_when_one_matches",
+      "sourceHash": "f2caeb66659f0c3634824e15ae044971b125a9d1424db890a700cc013bea02ff"
+    },
+    {
+      "id": "asr-batch-stage",
+      "file": "backend/tests/services/test_io_actions.py",
+      "selector": "test_internal_use_waits_for_all_decisions_then_executes_approved_lines_atomically",
+      "sourceHash": "1e0de74a67d816c3d654ddebc19b69d693b5e58765c72f7da6fdb8950183ea41"
+    }
+  ],
+  "assertions": [
+    {
+      "caseId": "8.2-07",
+      "conditionId": "pin-separate",
+      "bindings": [
+        {
+          "testId": "pin-guard",
+          "assertion": "assert client.post(\"/api/employees\", json=payload).status_code == 400"
+        }
+      ]
+    },
+    {
+      "caseId": "8.23-06",
+      "conditionId": "recipient-once",
+      "bindings": [
+        {
+          "testId": "department-recipient-once",
+          "assertion": "assert department_count.json() == {\"count\": 1}"
+        },
+        {
+          "testId": "department-recipient-once",
+          "assertion": "assert db_session.query(Notification).filter_by(\n        recipient_employee_id=department_approver.employee_id,\n        related_request_id=request.request_id,\n        target_section=\"dept-queue\",\n    ).count() == 1"
+        }
+      ]
+    },
+    {
+      "caseId": "8.11-07",
+      "conditionId": "classification-allowed",
+      "bindings": [
+        {
+          "testId": "origin-api",
+          "assertion": "assert changed.status_code == 200, changed.text"
+        },
+        {
+          "testId": "origin-storage-e2e",
+          "assertion": "await expect(record.getByText(\"3개\", { exact: true })).toBeVisible();"
+        },
+        {
+          "testId": "origin-storage-e2e",
+          "assertion": "expect(updated).toMatchObject({ management_category: \"OBSOLETE\" });"
+        }
+      ]
+    },
+    {
+      "caseId": "8.17-03",
+      "conditionId": "ui-raw-only",
+      "bindings": [
+        {
+          "testId": "raw-ui",
+          "assertion": "expect(screen.queryByText(\"Clickable Item\")).not.toBeInTheDocument();"
+        },
+        {
+          "testId": "raw-ui-active-only",
+          "assertion": "expect(screen.queryByText(\"Assembly item\")).not.toBeInTheDocument();"
+        }
+      ]
+    },
+    {
+      "caseId": "8.17-03",
+      "conditionId": "ui-deleted-excluded",
+      "bindings": [
+        {
+          "testId": "raw-ui-active-only",
+          "assertion": "expect(screen.queryByText(\"Deleted raw\")).not.toBeInTheDocument();"
+        }
+      ]
+    },
+    {
+      "caseId": "8.17-10",
+      "conditionId": "outbound-reversal",
+      "bindings": [
+        {
+          "testId": "outbound-cancel",
+          "assertion": "assert _cells(db_session, item.item_id)[:2] == (12, 12)"
+        }
+      ]
+    },
+    {
+      "caseId": "8.18-01",
+      "conditionId": "pending-untraceable-block",
+      "bindings": [
+        {
+          "testId": "origin-unselectable",
+          "assertion": "expect(choices[0]).toBeDisabled();"
+        },
+        {
+          "testId": "origin-unselectable",
+          "assertion": "expect(choices[1]).toBeDisabled();"
+        }
+      ]
+    },
+    {
+      "caseId": "8.18-01",
+      "conditionId": "server-stale-validation",
+      "bindings": [
+        {
+          "testId": "origin-pending-server",
+          "assertion": "assert response.status_code == 422"
+        },
+        {
+          "testId": "origin-stale-server",
+          "assertion": "with pytest.raises(ValueError, match=\"수량이 변경\"):"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ASR-01",
+      "conditionId": "immediate-ui-update",
+      "bindings": [
+        {
+          "testId": "approval-ui",
+          "assertion": "await waitFor(() => expect(screen.queryByRole(\"button\", { name: \"승인\", exact: true })).not.toBeInTheDocument());"
+        },
+        {
+          "testId": "approval-ui",
+          "assertion": "expect(screen.getByTestId(\"warehouse-empty-work-area\")).toBeVisible();"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ASR-06",
+      "conditionId": "immediate-ui-update",
+      "bindings": [
+        {
+          "testId": "approval-ui",
+          "assertion": "await waitFor(() => expect(screen.queryByRole(\"button\", { name: \"승인\", exact: true })).not.toBeInTheDocument());"
+        },
+        {
+          "testId": "approval-ui",
+          "assertion": "expect(screen.getByTestId(\"warehouse-empty-work-area\")).toBeVisible();"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-PF-02",
+      "conditionId": "kst-week-boundary",
+      "bindings": [
+        {
+          "testId": "weekly-boundary",
+          "assertion": "assert dx3000[\"pf_qty\"] == 10"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-PF-02",
+      "conditionId": "final-companion-distinct",
+      "bindings": [
+        {
+          "testId": "weekly-companion",
+          "assertion": "assert dx3000[\"pf_qty\"] == 3"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-PF-02",
+      "conditionId": "current-cancel-closed-preserved",
+      "bindings": [
+        {
+          "testId": "weekly-current-cancel",
+          "assertion": "assert row[\"out_qty\"] == 0"
+        },
+        {
+          "testId": "weekly-closed",
+          "assertion": "assert dx3000[\"pf_qty\"] == 4"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-DEFECT-02",
+      "conditionId": "full-origin-removed",
+      "bindings": [
+        {
+          "testId": "origin-ui",
+          "assertion": "expect(screen.getByRole(\"button\", { name: /^Assembly\\s*1건$/ })).toBeVisible();"
+        },
+        {
+          "testId": "origin-api",
+          "assertion": "assert db_session.get(DefectQuarantineRecord, record.record_id).remaining_quantity == 3 - processed_quantity"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-DEFECT-02",
+      "conditionId": "partial-origin-remains",
+      "bindings": [
+        {
+          "testId": "origin-ui",
+          "assertion": "expect(screen.getByTestId(\"defect-item-group-summary\")).toHaveTextContent(\"4개\");"
+        },
+        {
+          "testId": "origin-partial-api",
+          "assertion": "assert refreshed[selected[\"record_id\"]][\"quantity\"] == \"1\""
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-DEFECT-02",
+      "conditionId": "other-origin-card-remains",
+      "bindings": [
+        {
+          "testId": "origin-ui",
+          "assertion": "expect(screen.getByRole(\"article\", { name: \"AX-100 격리 기록\" })).toHaveTextContent(\"3개\");"
+        },
+        {
+          "testId": "origin-partial-api",
+          "assertion": "assert refreshed[untouched[\"record_id\"]][\"quantity\"] == \"3\""
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-DEFECT-02",
+      "conditionId": "origin-count-not-card-count",
+      "bindings": [
+        {
+          "testId": "origin-ui",
+          "assertion": "expect(screen.getAllByTestId(\"defect-item-group-summary\")).toHaveLength(1);"
+        },
+        {
+          "testId": "origin-ui",
+          "assertion": "expect(screen.getByRole(\"button\", { name: /^Assembly\\s*2건$/ })).toBeVisible();"
+        }
+      ]
+    },
+    {
+      "caseId": "8.6-03",
+      "conditionId": "remaining-arithmetic",
+      "bindings": [
+        {
+          "testId": "origin-api",
+          "assertion": "assert db_session.get(DefectQuarantineRecord, record.record_id).remaining_quantity == 3 - processed_quantity"
+        }
+      ]
+    },
+    {
+      "caseId": "8.6-03",
+      "conditionId": "full-origin-removed",
+      "bindings": [
+        {
+          "testId": "origin-ui",
+          "assertion": "expect(screen.getByRole(\"button\", { name: /^Assembly\\s*1건$/ })).toBeVisible();"
+        }
+      ]
+    },
+    {
+      "caseId": "8.6-03",
+      "conditionId": "partial-origin-remains",
+      "bindings": [
+        {
+          "testId": "origin-partial-api",
+          "assertion": "assert refreshed[selected[\"record_id\"]][\"quantity\"] == \"1\""
+        }
+      ]
+    },
+    {
+      "caseId": "8.6-03",
+      "conditionId": "other-origin-card-remains",
+      "bindings": [
+        {
+          "testId": "origin-ui",
+          "assertion": "expect(screen.getByRole(\"article\", { name: \"AX-100 격리 기록\" })).toHaveTextContent(\"3개\");"
+        }
+      ]
+    },
+    {
+      "caseId": "8.6-03",
+      "conditionId": "origin-count-not-card-count",
+      "bindings": [
+        {
+          "testId": "origin-ui",
+          "assertion": "expect(screen.getAllByTestId(\"defect-item-group-summary\")).toHaveLength(1);"
+        },
+        {
+          "testId": "origin-ui",
+          "assertion": "expect(screen.getByRole(\"button\", { name: /^Assembly\\s*2건$/ })).toBeVisible();"
+        }
+      ]
+    },
+    {
+      "caseId": "8.9-02",
+      "conditionId": "full-origin-removed",
+      "bindings": [
+        {
+          "testId": "origin-ui",
+          "assertion": "expect(screen.getByRole(\"button\", { name: /^Assembly\\s*1건$/ })).toBeVisible();"
+        }
+      ]
+    },
+    {
+      "caseId": "8.9-02",
+      "conditionId": "partial-origin-remains",
+      "bindings": [
+        {
+          "testId": "origin-partial-api",
+          "assertion": "assert refreshed[selected[\"record_id\"]][\"quantity\"] == \"1\""
+        }
+      ]
+    },
+    {
+      "caseId": "8.9-02",
+      "conditionId": "other-origin-card-remains",
+      "bindings": [
+        {
+          "testId": "origin-ui",
+          "assertion": "expect(screen.getByRole(\"article\", { name: \"AX-100 격리 기록\" })).toHaveTextContent(\"3개\");"
+        }
+      ]
+    },
+    {
+      "caseId": "8.9-02",
+      "conditionId": "origin-count-not-card-count",
+      "bindings": [
+        {
+          "testId": "origin-ui",
+          "assertion": "expect(screen.getAllByTestId(\"defect-item-group-summary\")).toHaveLength(1);"
+        },
+        {
+          "testId": "origin-ui",
+          "assertion": "expect(screen.getByRole(\"button\", { name: /^Assembly\\s*2건$/ })).toBeVisible();"
+        }
+      ]
+    },
+    {
+      "caseId": "8.2-07",
+      "conditionId": "no-grade-schema",
+      "bindings": [
+        {
+          "testId": "grade-contract",
+          "assertion": "assert \"level\" not in Employee.__table__.columns"
+        },
+        {
+          "testId": "grade-contract",
+          "assertion": "assert \"level\" not in schema.model_fields"
+        },
+        {
+          "testId": "grade-session",
+          "assertion": "expect(operator).not.toHaveProperty(\"level\");"
+        },
+        {
+          "testId": "grade-export",
+          "assertion": "expect(csv).not.toContain(\"등급\");"
+        },
+        {
+          "testId": "grade-edit-ui",
+          "assertion": "expect(screen.queryByText(/^(직원 |시스템 |권한 )?등급$/)).not.toBeInTheDocument();"
+        }
+      ]
+    },
+    {
+      "caseId": "8.2-07",
+      "conditionId": "no-grade-approval",
+      "bindings": [
+        {
+          "testId": "grade-ui",
+          "assertion": "expect(isDepartmentApprover(legacyOperator)).toBe(false);"
+        },
+        {
+          "testId": "grade-self-approval",
+          "assertion": "assert req.approved_by_employee_id is None"
+        }
+      ]
+    },
+    {
+      "caseId": "8.2-07",
+      "conditionId": "roles-preserved",
+      "bindings": [
+        {
+          "testId": "grade-migration",
+          "assertion": "assert db.execute(f\"SELECT {selection} FROM employees ORDER BY employee_id\").fetchall() == before"
+        },
+        {
+          "testId": "grade-session",
+          "assertion": "expect(operator?.warehouse_role).toBe(\"none\");"
+        }
+      ]
+    },
+    {
+      "caseId": "8.23-06",
+      "conditionId": "role-recipient",
+      "bindings": [
+        {
+          "testId": "role-notification",
+          "assertion": "assert line_codes == {\"DP\", \"WP\"}"
+        },
+        {
+          "testId": "department-recipient-once",
+          "assertion": "assert warehouse_count.json() == {\"count\": 0}"
+        }
+      ]
+    },
+    {
+      "caseId": "8.11-01",
+      "conditionId": "occurrence-period",
+      "bindings": [
+        {
+          "testId": "stats-period",
+          "assertion": "assert report.summary.quantity == 15"
+        },
+        {
+          "testId": "stats-period",
+          "assertion": "assert report.comparison.summary.quantity == 6"
+        }
+      ]
+    },
+    {
+      "caseId": "8.11-01",
+      "conditionId": "original-quantity",
+      "bindings": [
+        {
+          "testId": "stats-immutable",
+          "assertion": "assert before.summary.quantity == after.summary.quantity == 4"
+        }
+      ]
+    },
+    {
+      "caseId": "8.11-01",
+      "conditionId": "initial-category",
+      "bindings": [
+        {
+          "testId": "stats-immutable",
+          "assertion": "assert before.model_dump() == after.model_dump()"
+        }
+      ]
+    },
+    {
+      "caseId": "8.11-01",
+      "conditionId": "categories-distinct",
+      "bindings": [
+        {
+          "testId": "stats-period",
+          "assertion": "assert [entry.quantity for entry in report.categories] == [4, 5, 6]"
+        }
+      ]
+    },
+    {
+      "caseId": "8.11-01",
+      "conditionId": "no-double-count",
+      "bindings": [
+        {
+          "testId": "stats-immutable",
+          "assertion": "assert before.model_dump() == after.model_dump()"
+        }
+      ]
+    },
+    {
+      "caseId": "8.11-01",
+      "conditionId": "ui-categories",
+      "bindings": [
+        {
+          "testId": "stats-ui",
+          "assertion": "expect(rows.map((row) => row.textContent)).toEqual([\n      \"최초 분류발생 수량발생 건수이전 수량이전 건수\",\n      \"불량6개2건4개1건\", \"B급3개1건4개2건\", \"구형1개1건0개0건\",\n    ]);"
+        }
+      ]
+    },
+    {
+      "caseId": "8.11-07",
+      "conditionId": "initial-category",
+      "bindings": [
+        {
+          "testId": "stats-immutable",
+          "assertion": "assert before.model_dump() == after.model_dump()"
+        }
+      ]
+    },
+    {
+      "caseId": "8.11-07",
+      "conditionId": "initial-storage-categories",
+      "bindings": [
+        {
+          "testId": "stats-period",
+          "assertion": "assert [entry.quantity for entry in report.categories] == [4, 5, 6]"
+        }
+      ]
+    },
+    {
+      "caseId": "8.17-03",
+      "conditionId": "server-raw-only",
+      "bindings": [
+        {
+          "testId": "raw-server",
+          "assertion": "assert db_session.query(TransactionLog).count() == 0"
+        }
+      ]
+    },
+    {
+      "caseId": "8.17-03",
+      "conditionId": "server-deleted-final",
+      "bindings": [
+        {
+          "testId": "raw-server",
+          "assertion": "assert request.status == StockRequestStatusEnum.DRAFT"
+        },
+        {
+          "testId": "raw-server",
+          "assertion": "assert db_session.query(TransactionLog).count() == 0"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ITEM-01",
+      "conditionId": "search-restored",
+      "bindings": [
+        {
+          "testId": "detail-open",
+          "assertion": "expect(result.current.search).toBe(\"검색어\");"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ITEM-01",
+      "conditionId": "selection-restored",
+      "bindings": [
+        {
+          "testId": "detail-open",
+          "assertion": "expect(result.current.displayItem?.item_id).toBe(item.item_id);"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ITEM-01",
+      "conditionId": "open-restored",
+      "bindings": [
+        {
+          "testId": "detail-open",
+          "assertion": "expect(result.current.detailOpen).toBe(true);"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ITEM-01",
+      "conditionId": "closed-preserved",
+      "bindings": [
+        {
+          "testId": "detail-closed",
+          "assertion": "expect(next.result.current.detailOpen).toBe(false);"
+        },
+        {
+          "testId": "detail-closed",
+          "assertion": "expect(next.result.current.selectedItem?.item_id).toBe(item.item_id);"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ITEM-01",
+      "conditionId": "employee-boot-scope",
+      "bindings": [
+        {
+          "testId": "detail-employee",
+          "assertion": "expect(result.current.displayItem).toBeNull();"
+        },
+        {
+          "testId": "detail-boot",
+          "assertion": "expect(result.current.detailOpen).toBe(false);"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ITEM-01",
+      "conditionId": "desktop-mobile",
+      "bindings": [
+        {
+          "testId": "detail-surfaces",
+          "assertion": "await expect(page.getByRole(\"dialog\", { name: rawItem.item_name, exact: true })).toBeVisible();"
+        },
+        {
+          "testId": "detail-surfaces",
+          "assertion": "await expect(page.getByRole(\"dialog\", { name: `${rawItem.item_name} 상세`, exact: true })).toBeVisible();"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ITEM-01",
+      "conditionId": "login-access",
+      "bindings": [
+        {
+          "testId": "login-gate",
+          "assertion": "expect(screen.queryByText(\"Authenticated content\")).not.toBeInTheDocument();"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ITEM-02",
+      "conditionId": "korean-operation-label",
+      "bindings": [
+        {
+          "testId": "detail-korean",
+          "assertion": "expect(screen.getByText(\"창고 입출고 취소\")).toBeInTheDocument();"
+        },
+        {
+          "testId": "detail-korean",
+          "assertion": "expect(screen.queryByText(\"TRANSFER_TO_PROD\")).not.toBeInTheDocument();"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ITEM-02",
+      "conditionId": "deleted-keeps-detail",
+      "bindings": [
+        {
+          "testId": "detail-deleted",
+          "assertion": "expect(result.current.detailOpen).toBe(true);"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ITEM-02",
+      "conditionId": "deleted-notice",
+      "bindings": [
+        {
+          "testId": "detail-write",
+          "assertion": "expect(screen.getByText(\"삭제된 품목입니다. 입출고 작업을 할 수 없습니다.\")).toBeVisible();"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ITEM-02",
+      "conditionId": "ui-write-block",
+      "bindings": [
+        {
+          "testId": "detail-write",
+          "assertion": "expect(screen.getByRole(\"button\", { name: \"입고\", exact: true })).toBeDisabled();"
+        },
+        {
+          "testId": "detail-write",
+          "assertion": "expect(onGoToWarehouse).not.toHaveBeenCalled();"
+        },
+        {
+          "testId": "detail-write-error",
+          "assertion": "expect(screen.getByRole(\"button\", { name: \"입고\", exact: true })).toBeDisabled();"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ITEM-02",
+      "conditionId": "read-history-preserved",
+      "bindings": [
+        {
+          "testId": "detail-history-desktop",
+          "assertion": "expect(screen.getByText(\"최근 내역 패널\")).toBeVisible();"
+        },
+        {
+          "testId": "detail-history-mobile",
+          "assertion": "expect(screen.getByText(\"최근 거래 one\")).toBeVisible();"
+        },
+        {
+          "testId": "detail-deleted-bom",
+          "assertion": "expect(screen.getByText(\"사용 가능 재고\")).toBeVisible();"
+        },
+        {
+          "testId": "detail-deleted-bom",
+          "assertion": "expect(await screen.findByText(\"구성품 A\")).toBeVisible();"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ITEM-02",
+      "conditionId": "server-write-block",
+      "bindings": [
+        {
+          "testId": "delete-server",
+          "assertion": "assert inv.warehouse_qty == 10"
+        },
+        {
+          "testId": "raw-server",
+          "assertion": "assert db_session.query(TransactionLog).count() == 0"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ITEM-02",
+      "conditionId": "not-found-distinct",
+      "bindings": [
+        {
+          "testId": "detail-errors",
+          "assertion": "await waitFor(() => expect(result.current.detailStatus).toBe(expected));"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ITEM-02",
+      "conditionId": "access-distinct",
+      "bindings": [
+        {
+          "testId": "detail-errors",
+          "assertion": "await waitFor(() => expect(result.current.detailStatus).toBe(expected));"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ITEM-02",
+      "conditionId": "retry-distinct",
+      "bindings": [
+        {
+          "testId": "detail-retry",
+          "assertion": "expect(result.current.displayItem).toEqual(item);"
+        },
+        {
+          "testId": "detail-retry",
+          "assertion": "await waitFor(() => expect(result.current.detailStatus).toBe(\"active\"));"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ITEM-02",
+      "conditionId": "stale-response",
+      "bindings": [
+        {
+          "testId": "detail-stale",
+          "assertion": "expect(result.current.displayItem?.item_id).toBe(\"item-b\");"
+        }
+      ]
+    },
+    {
+      "caseId": "8.23-13",
+      "conditionId": "two-works",
+      "bindings": [
+        {
+          "testId": "history-department",
+          "assertion": "assert response.json() == {\n        \"total\": 2,\n        \"warehouse_count\": 0,\n        \"dept_count\": 2,\n        \"adjust_count\": 0,\n        \"department_counts\": {\"고압\": 2},\n    }"
+        }
+      ]
+    },
+    {
+      "caseId": "8.23-13",
+      "conditionId": "category-consistency",
+      "bindings": [
+        {
+          "testId": "history-department",
+          "assertion": "assert response.json() == {\n        \"total\": 2,\n        \"warehouse_count\": 0,\n        \"dept_count\": 2,\n        \"adjust_count\": 0,\n        \"department_counts\": {\"고압\": 2},\n    }"
+        }
+      ]
+    },
+    {
+      "caseId": "8.23-13",
+      "conditionId": "inventory-net-zero",
+      "bindings": [
+        {
+          "testId": "history-warehouse",
+          "assertion": "assert sum(log.quantity_change for log in db_session.query(TransactionLog)) == 0"
+        }
+      ]
+    },
+    {
+      "caseId": "8.23-13",
+      "conditionId": "own-period",
+      "bindings": [
+        {
+          "testId": "history-period",
+          "assertion": "assert september.json()[\"total\"] == 1"
+        },
+        {
+          "testId": "history-period",
+          "assertion": "assert october.json()[\"total\"] == 1"
+        }
+      ]
+    },
+    {
+      "caseId": "8.24-16",
+      "conditionId": "two-warehouse-works",
+      "bindings": [
+        {
+          "testId": "history-warehouse",
+          "assertion": "assert response.json() == {\n        \"total\": 2, \"warehouse_count\": 2, \"dept_count\": 0,\n        \"adjust_count\": adjust_count, \"department_counts\": {\"창고\": 2},\n    }"
+        }
+      ]
+    },
+    {
+      "caseId": "8.24-16",
+      "conditionId": "other-categories-preserved",
+      "bindings": [
+        {
+          "testId": "history-warehouse",
+          "assertion": "assert response.json() == {\n        \"total\": 2, \"warehouse_count\": 2, \"dept_count\": 0,\n        \"adjust_count\": adjust_count, \"department_counts\": {\"창고\": 2},\n    }"
+        }
+      ]
+    },
+    {
+      "caseId": "8.24-16",
+      "conditionId": "own-period",
+      "bindings": [
+        {
+          "testId": "history-period",
+          "assertion": "assert calendar.json()[\"2026-10\"] == 1"
+        }
+      ]
+    },
+    {
+      "caseId": "8.25-12",
+      "conditionId": "two-warehouse-works",
+      "bindings": [
+        {
+          "testId": "history-warehouse",
+          "assertion": "assert response.json() == {\n        \"total\": 2, \"warehouse_count\": 2, \"dept_count\": 0,\n        \"adjust_count\": adjust_count, \"department_counts\": {\"창고\": 2},\n    }"
+        }
+      ]
+    },
+    {
+      "caseId": "8.25-12",
+      "conditionId": "other-categories-preserved",
+      "bindings": [
+        {
+          "testId": "history-warehouse",
+          "assertion": "assert response.json() == {\n        \"total\": 2, \"warehouse_count\": 2, \"dept_count\": 0,\n        \"adjust_count\": adjust_count, \"department_counts\": {\"창고\": 2},\n    }"
+        }
+      ]
+    },
+    {
+      "caseId": "8.25-12",
+      "conditionId": "own-period",
+      "bindings": [
+        {
+          "testId": "history-period",
+          "assertion": "assert calendar.json()[\"2026-10\"] == 1"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-SETTINGS-03",
+      "conditionId": "atomic-pair",
+      "bindings": [
+        {
+          "testId": "appearance-api",
+          "assertion": "assert (employee.theme, employee.sidebar_mode) == (\"dark\", \"expanded\")"
+        },
+        {
+          "testId": "appearance-api-failed",
+          "assertion": "assert (employee.theme, employee.sidebar_mode) == (\"light\", \"hover\")"
+        },
+        {
+          "testId": "appearance-save",
+          "assertion": "expect(employeesApi.setEmployeeAppearance).toHaveBeenCalledWith(\"E1\", { theme: \"dark\", sidebar_mode: \"expanded\" });"
+        },
+        {
+          "testId": "appearance-single-update",
+          "assertion": "assert len(statements) == 1"
+        },
+        {
+          "testId": "appearance-single-update",
+          "assertion": "assert \"theme=\" in statements[0]"
+        },
+        {
+          "testId": "appearance-single-update",
+          "assertion": "assert \"sidebar_mode=\" in statements[0]"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-SETTINGS-03",
+      "conditionId": "same-employee-auto",
+      "bindings": [
+        {
+          "testId": "appearance-auto",
+          "assertion": "await waitFor(() => expect(result.current.preferences.theme).toBe(\"dark\"));"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-SETTINGS-03",
+      "conditionId": "other-employee-isolated",
+      "bindings": [
+        {
+          "testId": "appearance-auto",
+          "assertion": "expect(employeesApi.getEmployeeAppearance).toHaveBeenCalledTimes(1);"
+        },
+        {
+          "testId": "appearance-stale",
+          "assertion": "expect(readCurrentOperator()?.employee_id).toBe(\"E2\");"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-SETTINGS-03",
+      "conditionId": "failed-save-no-event",
+      "bindings": [
+        {
+          "testId": "appearance-failed",
+          "assertion": "expect(localStorage.getItem(savedKey)).toBeNull();"
+        },
+        {
+          "testId": "appearance-failed",
+          "assertion": "expect(result.current.preferences.theme).toBe(\"light\");"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-SETTINGS-03",
+      "conditionId": "old-fetch-save",
+      "bindings": [
+        {
+          "testId": "appearance-stale",
+          "assertion": "expect(signal?.aborted).toBe(true);"
+        },
+        {
+          "testId": "appearance-stale-save",
+          "assertion": "expect(result.current.preferences).toEqual({ theme: \"light\", sidebarMode: \"collapsed\" });"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-SETTINGS-03",
+      "conditionId": "session-auth-preserved",
+      "bindings": [
+        {
+          "testId": "appearance-auth",
+          "assertion": "expect(readCurrentOperator()).toMatchObject({ theme: \"dark\", sidebar_mode: \"expanded\", warehouse_role: \"none\" });"
+        },
+        {
+          "testId": "appearance-auth",
+          "assertion": "expect(sendClientEvent).not.toHaveBeenCalled();"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-SETTINGS-03",
+      "conditionId": "dirty-draft-preserved",
+      "bindings": [
+        {
+          "testId": "appearance-draft",
+          "assertion": "expect(screen.getByRole(\"button\", { name: \"다크 테마\" })).toHaveAttribute(\"aria-pressed\", \"true\");"
+        },
+        {
+          "testId": "appearance-draft",
+          "assertion": "expect(screen.getByLabelText(\"현재 PIN\")).toHaveValue(\"1234\");"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ASR-05",
+      "conditionId": "department-role-scope",
+      "bindings": [
+        {
+          "testId": "role-department",
+          "assertion": "assert can_approve_department(actor, dept) is True, (role, dept)"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ASR-05",
+      "conditionId": "warehouse-role-scope",
+      "bindings": [
+        {
+          "testId": "role-warehouse",
+          "assertion": "assert can_approve_department(actor, dept) is True"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ASR-05",
+      "conditionId": "as-research-route",
+      "bindings": [
+        {
+          "testId": "role-special-route",
+          "assertion": "assert notes[0].target_section == \"as-research-queue\""
+        }
+      ]
+    },
+    {
+      "caseId": "8.15-05",
+      "conditionId": "department-role-scope",
+      "bindings": [
+        {
+          "testId": "role-department",
+          "assertion": "assert can_approve_department(actor, dept) is True, (role, dept)"
+        }
+      ]
+    },
+    {
+      "caseId": "8.15-05",
+      "conditionId": "warehouse-role-scope",
+      "bindings": [
+        {
+          "testId": "role-warehouse",
+          "assertion": "assert can_approve_department(actor, dept) is True"
+        }
+      ]
+    },
+    {
+      "caseId": "8.15-05",
+      "conditionId": "as-research-route",
+      "bindings": [
+        {
+          "testId": "role-special-route",
+          "assertion": "assert notes[0].target_section == \"as-research-queue\""
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ASR-01",
+      "conditionId": "pending-reservation",
+      "bindings": [
+        {
+          "testId": "asr-stage",
+          "assertion": "assert out.status == StockRequestStatusEnum.RESERVED"
+        },
+        {
+          "testId": "asr-stage",
+          "assertion": "assert _inv(db_session, item.item_id).pending_quantity == D(\"3\")"
+        },
+        {
+          "testId": "asr-batch-stage",
+          "assertion": "assert batch.status == \"reserved\""
+        },
+        {
+          "testId": "asr-batch-stage",
+          "assertion": "assert department_location.pending_quantity == Decimal(\"1\")"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ASR-01",
+      "conditionId": "no-early-stock",
+      "bindings": [
+        {
+          "testId": "asr-stage",
+          "assertion": "assert _inv(db_session, item.item_id).warehouse_qty == D(\"10\")"
+        },
+        {
+          "testId": "asr-batch-stage",
+          "assertion": "assert department_location.quantity == Decimal(\"5\")"
+        },
+        {
+          "testId": "asr-batch-stage",
+          "assertion": "assert db_session.query(TransactionLog).count() == 0"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ASR-01",
+      "conditionId": "final-together",
+      "bindings": [
+        {
+          "testId": "asr-final",
+          "assertion": "assert out.status == StockRequestStatusEnum.COMPLETED"
+        },
+        {
+          "testId": "asr-final",
+          "assertion": "assert inv.warehouse_qty == D(\"7\")"
+        },
+        {
+          "testId": "asr-batch-stage",
+          "assertion": "assert batch.status == (\"completed\" if final_decision == \"approved\" else \"partially_completed\")"
+        },
+        {
+          "testId": "asr-batch-stage",
+          "assertion": "assert warehouse_request.status == StockRequestStatusEnum.COMPLETED"
+        },
+        {
+          "testId": "asr-batch-stage",
+          "assertion": "assert department_location.quantity == Decimal(\"4\" if final_decision == \"approved\" else \"5\")"
+        },
+        {
+          "testId": "asr-batch-stage",
+          "assertion": "assert db_session.query(TransactionLog).count() == (2 if final_decision == \"approved\" else 1)"
+        },
+        {
+          "testId": "asr-batch-stage",
+          "assertion": "assert department_location.pending_quantity == Decimal(\"0\")"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ASR-06",
+      "conditionId": "pending-reservation",
+      "bindings": [
+        {
+          "testId": "asr-stage",
+          "assertion": "assert out.status == StockRequestStatusEnum.RESERVED"
+        },
+        {
+          "testId": "asr-stage",
+          "assertion": "assert _inv(db_session, item.item_id).pending_quantity == D(\"3\")"
+        },
+        {
+          "testId": "asr-batch-stage",
+          "assertion": "assert batch.status == \"reserved\""
+        },
+        {
+          "testId": "asr-batch-stage",
+          "assertion": "assert department_location.pending_quantity == Decimal(\"1\")"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ASR-06",
+      "conditionId": "no-early-stock",
+      "bindings": [
+        {
+          "testId": "asr-stage",
+          "assertion": "assert _inv(db_session, item.item_id).warehouse_qty == D(\"10\")"
+        },
+        {
+          "testId": "asr-batch-stage",
+          "assertion": "assert department_location.quantity == Decimal(\"5\")"
+        },
+        {
+          "testId": "asr-batch-stage",
+          "assertion": "assert db_session.query(TransactionLog).count() == 0"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-ASR-06",
+      "conditionId": "final-together",
+      "bindings": [
+        {
+          "testId": "asr-final",
+          "assertion": "assert out.status == StockRequestStatusEnum.COMPLETED"
+        },
+        {
+          "testId": "asr-final",
+          "assertion": "assert inv.warehouse_qty == D(\"7\")"
+        },
+        {
+          "testId": "asr-batch-stage",
+          "assertion": "assert batch.status == (\"completed\" if final_decision == \"approved\" else \"partially_completed\")"
+        },
+        {
+          "testId": "asr-batch-stage",
+          "assertion": "assert warehouse_request.status == StockRequestStatusEnum.COMPLETED"
+        },
+        {
+          "testId": "asr-batch-stage",
+          "assertion": "assert department_location.quantity == Decimal(\"4\" if final_decision == \"approved\" else \"5\")"
+        },
+        {
+          "testId": "asr-batch-stage",
+          "assertion": "assert db_session.query(TransactionLog).count() == (2 if final_decision == \"approved\" else 1)"
+        },
+        {
+          "testId": "asr-batch-stage",
+          "assertion": "assert department_location.pending_quantity == Decimal(\"0\")"
+        }
+      ]
+    },
+    {
+      "caseId": "8.17-10",
+      "conditionId": "receive-reversal",
+      "bindings": [
+        {
+          "testId": "receive-cancel",
+          "assertion": "assert logs[1].quantity_change == Decimal(\"-7\")"
+        }
+      ]
+    },
+    {
+      "caseId": "8.17-10",
+      "conditionId": "original-preserved-once",
+      "bindings": [
+        {
+          "testId": "receive-cancel",
+          "assertion": "assert logs[0].cancelled is False"
+        },
+        {
+          "testId": "receive-cancel",
+          "assertion": "assert len(logs) == 2"
+        },
+        {
+          "testId": "cancel-once",
+          "assertion": "assert res2.status_code == 422"
+        }
+      ]
+    },
+    {
+      "caseId": "8.18-01",
+      "conditionId": "ui-grouping",
+      "bindings": [
+        {
+          "testId": "defect-dept",
+          "assertion": "expect(summaries).toHaveLength(2);"
+        },
+        {
+          "testId": "origin-category-group",
+          "assertion": "expect(screen.getAllByRole(\"checkbox\")).toHaveLength(2);"
+        }
+      ]
+    },
+    {
+      "caseId": "8.18-01",
+      "conditionId": "selection-reset",
+      "bindings": [
+        {
+          "testId": "defect-reset",
+          "assertion": "expect(screen.queryByRole(\"checkbox\")).not.toBeInTheDocument();"
+        }
+      ]
+    },
+    {
+      "caseId": "8.18-01",
+      "conditionId": "server-group-validation",
+      "bindings": [
+        {
+          "testId": "defect-server-group",
+          "assertion": "assert {record.remaining_quantity for record in records} == {Decimal(\"1\")}"
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-TEST-01",
+      "conditionId": "real-assertion-link",
+      "bindings": [
+        {
+          "testId": "normalizer-link",
+          "assertion": "assert.deepEqual(validateExpectations(model, () => source), []);"
+        },
+        {
+          "testId": "normalizer-invalid-link",
+          "assertion": "assert.ok(validateExpectations(normalizeExpectations(input), () => body).length > 0);"
+        }
+      ],
+      "execution": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/normalizer-execution.json",
+            "evidenceHash": "3da0089c59161afcb80bbf37f3092af811057e2162b73f7ad51e20b865c27af5"
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "PC-DELTA-TEST-01",
+      "conditionId": "individual-condition-proof",
+      "bindings": [
+        {
+          "testId": "normalizer-partial",
+          "assertion": "assert.equal(model.cases[1].currentVerification, \"PARTIAL\");"
+        }
+      ],
+      "execution": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/normalizer-execution.json",
+            "evidenceHash": "3da0089c59161afcb80bbf37f3092af811057e2162b73f7ad51e20b865c27af5"
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "PC-DELTA-TEST-01",
+      "conditionId": "historical-review-separate",
+      "bindings": [
+        {
+          "testId": "normalizer-original",
+          "assertion": "assert.equal(model.cases[0].userReview.note, \"keep me\");"
+        },
+        {
+          "testId": "normalizer-original",
+          "assertion": "assert.equal(model.cases[0].currentVerification, \"NOT_RUN\");"
+        }
+      ],
+      "execution": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/normalizer-execution.json",
+            "evidenceHash": "3da0089c59161afcb80bbf37f3092af811057e2162b73f7ad51e20b865c27af5"
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "PC-DELTA-TEST-02",
+      "conditionId": "dynamic-denominators",
+      "bindings": [
+        {
+          "testId": "normalizer-original",
+          "assertion": "assert.equal(model.metrics.CONTRACT.total, 1);"
+        },
+        {
+          "testId": "normalizer-original",
+          "assertion": "assert.equal(model.metrics.DELTA.total, 1);"
+        }
+      ],
+      "execution": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/normalizer-execution.json",
+            "evidenceHash": "3da0089c59161afcb80bbf37f3092af811057e2162b73f7ad51e20b865c27af5"
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "PC-DELTA-TEST-02",
+      "conditionId": "link-execution-distinct",
+      "bindings": [
+        {
+          "testId": "normalizer-link",
+          "assertion": "assert.equal(model.cases[1].currentVerification, \"NOT_RUN\");"
+        }
+      ],
+      "execution": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/normalizer-execution.json",
+            "evidenceHash": "3da0089c59161afcb80bbf37f3092af811057e2162b73f7ad51e20b865c27af5"
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "PC-DELTA-TEST-02",
+      "conditionId": "missing-duplicate-detected",
+      "bindings": [
+        {
+          "testId": "normalizer-invalid-ids",
+          "assertion": "assert.throws(() => normalizeExpectations(input));"
+        }
+      ],
+      "execution": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/normalizer-execution.json",
+            "evidenceHash": "3da0089c59161afcb80bbf37f3092af811057e2162b73f7ad51e20b865c27af5"
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "PC-DELTA-TEST-03",
+      "conditionId": "selected-run-not-global-pass",
+      "bindings": [
+        {
+          "testId": "normalizer-partial",
+          "assertion": "assert.ok(validateExpectations(model, read).some((error) => error.includes(\"partial\")));"
+        },
+        {
+          "testId": "normalizer-select",
+          "assertion": "assert.equal(selection.globalPass, false);"
+        }
+      ],
+      "execution": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/normalizer-execution.json",
+            "evidenceHash": "3da0089c59161afcb80bbf37f3092af811057e2162b73f7ad51e20b865c27af5"
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "8.19-09",
+      "conditionId": "grant-access",
+      "bindings": [
+        {
+          "testId": "role-change",
+          "assertion": "assert [row[\"request_id\"] for row in client.get(queue_url).json()] == [str(request_id)]"
+        },
+        {
+          "testId": "role-change",
+          "assertion": "assert approved.status_code == 200, approved.text"
+        }
+      ]
+    },
+    {
+      "caseId": "8.19-09",
+      "conditionId": "revoke-access",
+      "bindings": [
+        {
+          "testId": "role-change",
+          "assertion": "assert denied.status_code == 403, denied.text"
+        },
+        {
+          "testId": "role-change",
+          "assertion": "assert client.get(queue_url).json() == []"
+        }
+      ]
+    },
+    {
+      "caseId": "8.19-09",
+      "conditionId": "pending-preserved",
+      "bindings": [
+        {
+          "testId": "role-change",
+          "assertion": "assert stock_state() == initial"
+        },
+        {
+          "testId": "role-change",
+          "assertion": "assert db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id).count() == 0"
+        }
+      ]
+    },
+    {
+      "caseId": "8.19-09",
+      "conditionId": "regrant-once",
+      "bindings": [
+        {
+          "testId": "role-change",
+          "assertion": "assert stock_state() == (StockRequestStatusEnum.COMPLETED, Decimal(\"4\"), Decimal(\"0\"))"
+        },
+        {
+          "testId": "role-change",
+          "assertion": "assert {row.log_id for row in db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id)} == log_ids"
+        }
+      ]
+    },
+    {
+      "caseId": "8.24-16",
+      "conditionId": "inventory-reservations-restored",
+      "bindings": [
+        {
+          "testId": "cancel-reservations",
+          "assertion": "assert (inventory.warehouse_qty, location.quantity, inventory.quantity) == (Decimal(\"20\"), Decimal(\"4\"), Decimal(\"24\"))"
+        },
+        {
+          "testId": "cancel-reservations",
+          "assertion": "assert (inventory.pending_quantity, location.pending_quantity) == (Decimal(\"2\"), Decimal(\"1\"))"
+        },
+        {
+          "testId": "cancel-reservations",
+          "assertion": "assert db_session.get(StockRequest, other_request_id).status.value == \"reserved\""
+        }
+      ]
+    },
+    {
+      "caseId": "8.25-12",
+      "conditionId": "inventory-reservations-restored",
+      "bindings": [
+        {
+          "testId": "cancel-reservations",
+          "assertion": "assert (inventory.warehouse_qty, location.quantity, inventory.quantity) == (Decimal(\"20\"), Decimal(\"4\"), Decimal(\"24\"))"
+        },
+        {
+          "testId": "cancel-reservations",
+          "assertion": "assert (inventory.pending_quantity, location.pending_quantity) == (Decimal(\"2\"), Decimal(\"1\"))"
+        },
+        {
+          "testId": "cancel-reservations",
+          "assertion": "assert db_session.get(StockRequest, other_request_id).status.value == \"reserved\""
+        }
+      ]
+    },
+    {
+      "caseId": "PC-DELTA-TEST-03",
+      "conditionId": "filter-selects-intended",
+      "bindings": [
+        {
+          "testId": "normalizer-select",
+          "assertion": "assert.deepEqual(selection.caseIds, [\"PC-DELTA-ITEM-01\"]);"
+        },
+        {
+          "testId": "normalizer-select",
+          "assertion": "assert.throws(() => selectAssertions(model, { ids: [\"unknown\"] }), /unknown ID/);"
+        },
+        {
+          "testId": "normalizer-select",
+          "assertion": "assert.throws(() => selectAssertions(model, { ids: [\"8.1-01\"] }), /missing selector/);"
+        }
+      ],
+      "execution": {
+        "status": "PASS",
+        "evidence": [
+          {
+            "evidenceFile": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/normalizer-execution.json",
+            "evidenceHash": "3da0089c59161afcb80bbf37f3092af811057e2162b73f7ad51e20b865c27af5"
+          }
+        ]
+      }
+    }
+  ]
+}

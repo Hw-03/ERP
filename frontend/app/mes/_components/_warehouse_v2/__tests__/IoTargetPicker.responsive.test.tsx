@@ -26,7 +26,8 @@ function makeItem(): Item {
   return {
     item_id: "item-1",
     item_name: "히팅 싱크 + 방열팬 (신형)",
-    mes_code: "46-AA-0081",
+    mes_code: "46-AR-0081",
+    process_type_code: "AR",
     quantity: 0,
     warehouse_qty: 200,
     min_stock: null,

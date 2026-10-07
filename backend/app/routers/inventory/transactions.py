@@ -18,6 +18,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import String, and_, case, cast, func, literal, or_, select
 from sqlalchemy.orm import Session
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.database import get_db
 from app.models import (
@@ -240,6 +241,18 @@ def _verify_editor(
     return employee
 
 
+def _history_work_key() -> ColumnElement:
+    """원작업·취소를 독립적으로 세고 같은 작업의 여러 거래 행을 묶는다."""
+    return case(
+        (TransactionLog.operation_id.is_not(None), literal("operation:") + cast(TransactionLog.operation_id, String)),
+        (TransactionLog.operation_batch_id.is_not(None), literal("batch:") + cast(TransactionLog.operation_batch_id, String)),
+        (and_(TransactionLog.shipping_request_id.is_not(None), TransactionLog.transaction_type == TransactionTypeEnum.SHIP,
+              TransactionLog.reference_no.like("SHIP-%")),
+         literal("shipping:") + cast(TransactionLog.shipping_request_id, String) + literal(":") + TransactionLog.reference_no),
+        else_=literal("log:") + cast(TransactionLog.log_id, String),
+    )
+
+
 @router.get("/transactions/monthly-counts", summary="연도별 월별 거래 카운트")
 def monthly_counts(
     year: int = Query(..., ge=2020, le=2100),
@@ -258,20 +271,18 @@ def monthly_counts(
         month_start, _ = _kst_date_to_utc_naive_bounds(date(year, month, 1))
         month_end = year_end if month == 12 else _kst_date_to_utc_naive_bounds(date(year, month + 1, 1))[0]
         month_columns.append(
-            func.coalesce(
-                func.sum(
+            func.count(
+                func.distinct(
                     case(
                         (
                             and_(
                                 request_date_expr >= month_start,
                                 request_date_expr < month_end,
                             ),
-                            1,
+                            _history_work_key(),
                         ),
-                        else_=0,
                     )
                 ),
-                0,
             ).label(f"month_{month}")
     )
     counts = (
@@ -707,28 +718,7 @@ def get_transactions_summary(
 
     # 신규 원장은 operation_id, 레거시 묶음은 operation_batch_id를 한 작업으로 센다.
     # 취소 시 레거시 묶음이 원장 작업으로 편입되어도 원 작업 카운트가 흔들리지 않는다.
-    work_key = case(
-        (
-            TransactionLog.operation_id.is_not(None),
-            literal("operation:") + cast(TransactionLog.operation_id, String),
-        ),
-        (
-            TransactionLog.operation_batch_id.is_not(None),
-            literal("batch:") + cast(TransactionLog.operation_batch_id, String),
-        ),
-        (
-            and_(
-                TransactionLog.shipping_request_id.is_not(None),
-                TransactionLog.transaction_type == TransactionTypeEnum.SHIP,
-                TransactionLog.reference_no.like("SHIP-%"),
-            ),
-            literal("shipping:")
-            + cast(TransactionLog.shipping_request_id, String)
-            + literal(":")
-            + TransactionLog.reference_no,
-        ),
-        else_=literal("log:") + cast(TransactionLog.log_id, String),
-    )
+    work_key = _history_work_key()
     is_department_activity = or_(
         TransactionLog.transaction_type.in_(_SUMMARY_DEPT_TYPES),
         InventoryOperation.domain == "department_inventory",
@@ -747,10 +737,6 @@ def get_transactions_summary(
             IoBatch.batch_id.is_(None),
             IoBatch.sub_type.notin_(_DEPARTMENT_IO_SUBTYPES),
         ),
-        or_(
-            InventoryOperation.kind.is_(None),
-            InventoryOperation.kind != InventoryOperationKindEnum.CANCELLATION,
-        ),
     )
 
     # 한 번의 집계 쿼리로 4개 작업 카운트.
@@ -764,7 +750,9 @@ def get_transactions_summary(
                             TransactionLog.transaction_type.in_(_SUMMARY_WAREHOUSE_TYPES),
                             (
                                 (TransactionLog.transaction_type == TransactionTypeEnum.ADJUST)
-                                & IoBatch.sub_type.in_(_WAREHOUSE_ADJUST_SUBTYPES)
+                                & or_(IoBatch.sub_type.in_(_WAREHOUSE_ADJUST_SUBTYPES),
+                                       and_(InventoryOperation.domain == "inventory_io",
+                                            InventoryOperation.action.in_(_WAREHOUSE_ADJUST_SUBTYPES)))
                             ),
                         ),
                         work_key,

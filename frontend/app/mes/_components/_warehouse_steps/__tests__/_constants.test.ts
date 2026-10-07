@@ -21,8 +21,9 @@ describe("warehouse step permission helpers", () => {
     expect(isWarehouseStaff(operator())).toBe(false);
   });
 
-  it("detects department approvers by level or department role", () => {
-    expect(isDepartmentApprover(operator({ level: "admin" }))).toBe(true);
+  it("detects department approvers only by independent department role", () => {
+    const legacyOperator = { ...operator(), level: "admin" };
+    expect(isDepartmentApprover(legacyOperator)).toBe(false);
     expect(isDepartmentApprover(operator({ department_role: "primary" }))).toBe(true);
     expect(isDepartmentApprover(operator())).toBe(false);
   });

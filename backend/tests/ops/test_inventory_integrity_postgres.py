@@ -24,7 +24,6 @@ from app.models import (
     BoxSizeEnum,
     DepartmentEnum,
     Employee,
-    EmployeeLevelEnum,
     Inventory,
     InventoryLocation,
     InventoryOperation,
@@ -177,7 +176,6 @@ def _break_invariant(session: Session, item: Item, case_name: str) -> None:
             name="IC-17 PostgreSQL",
             role="검사",
             department=DepartmentEnum.ASSEMBLY.value,
-            level=EmployeeLevelEnum.STAFF,
             is_active=True,
         )
         session.add(employee)
@@ -210,7 +208,6 @@ def _break_invariant(session: Session, item: Item, case_name: str) -> None:
             name="IC-17 PostgreSQL",
             role="검사",
             department=DepartmentEnum.ASSEMBLY.value,
-            level=EmployeeLevelEnum.STAFF,
             is_active=True,
         )
         session.add(employee)

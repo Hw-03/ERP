@@ -20,7 +20,6 @@ const baseOperator: Operator = {
   name: "Tester",
   role: "조립/사원",
   department: "조립",
-  level: "staff",
   employee_code: "E1",
   warehouse_role: "none",
   department_role: "none",
@@ -47,6 +46,23 @@ describe("useCurrentOperator storage", () => {
     expect(window.sessionStorage.getItem("dexcowin_mes_operator")).not.toBeNull();
     expect(window.localStorage.getItem("dexcowin_mes_operator")).toBeNull();
     expect(window.localStorage.getItem("dexcowin_mes_boot_id")).toBeNull();
+  });
+
+  it("ignores grades in old sessions without granting approval roles", () => {
+    window.sessionStorage.setItem("dexcowin_mes_operator", JSON.stringify({ ...baseOperator, level: "admin" }));
+    const operator = readCurrentOperator();
+    expect(operator).not.toHaveProperty("level");
+    expect(operator?.warehouse_role).toBe("none");
+    expect(operator?.department_role).toBe("none");
+    expect(operator?.hidden_sidebar_tabs).toEqual(["weekly", "admin"]);
+  });
+
+  it("rejects preference patches for a previously logged-in employee", () => {
+    setCurrentOperator(baseOperator);
+    updateCurrentOperatorPreferences({ theme: "dark", sidebar_mode: "expanded" }, "different-employee");
+    expect(readCurrentOperator()?.theme).toBeNull();
+    updateCurrentOperatorPreferences({ theme: "dark", sidebar_mode: "expanded" }, baseOperator.employee_id);
+    expect(readCurrentOperator()).toMatchObject({ theme: "dark", sidebar_mode: "expanded" });
   });
 
   it("starts the idle clock on PIN login and preserves it on preference changes", () => {

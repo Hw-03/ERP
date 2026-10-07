@@ -14,6 +14,8 @@ import uuid
 from sqlalchemy import func, update as sa_update
 from sqlalchemy.orm import Session
 
+from app.services.item_write_validation import validate_active_items
+
 from app.models import (
     DepartmentEnum,
     Inventory,
@@ -83,6 +85,7 @@ def mark_defective(
     source: DefectSource,
 ) -> Inventory:
     """불량 등록. 총량 변동 없음 (위치만 이동)."""
+    validate_active_items(db, [item_id])
     kind = source.kind
     target_dept = source.target_dept
     source_dept = source.source_dept
@@ -159,6 +162,7 @@ def return_to_supplier(
     from_dept: DepartmentEnum,
 ) -> Inventory:
     """공급업체 반품: 부서별 DEFECTIVE 차감, 총량 감소."""
+    validate_active_items(db, [item_id])
     if qty <= 0:
         raise ValueError("반품 수량은 0보다 커야 합니다.")
     get_or_create_inventory(db, item_id)
@@ -205,6 +209,7 @@ def unmark_defective(
 
     defective_at NULL 로 초기화.
     """
+    validate_active_items(db, [item_id])
     if qty <= 0:
         raise ValueError("복귀 수량은 0보다 커야 합니다.")
 
@@ -254,6 +259,7 @@ def scrap_defective(
     reason: ReasonContext,
 ) -> Inventory:
     """불량 재고 폐기. DEFECTIVE 차감 + 총량 감소."""
+    validate_active_items(db, [item_id])
     if qty <= 0:
         raise ValueError("폐기 수량은 0보다 커야 합니다.")
 
@@ -300,6 +306,7 @@ def receive_defective(
     (receive_confirmed)와 대칭으로 DEFECTIVE 버킷에 신규 적재한다.
     defective_at 기록.
     """
+    validate_active_items(db, [item_id])
     if qty <= 0:
         raise ValueError("격리 수량은 0보다 커야 합니다.")
 
@@ -385,6 +392,7 @@ def scrap_normal(
     source.kind="warehouse" → warehouse_qty 차감.
     source.kind="production" → 해당 부서 PRODUCTION 차감.
     """
+    validate_active_items(db, [item_id])
     if qty <= 0:
         raise ValueError("폐기 수량은 0보다 커야 합니다.")
     if source.kind not in ("warehouse", "production"):
@@ -406,6 +414,7 @@ def return_to_supplier_from_normal(
     source.kind="warehouse" → warehouse_qty 차감.
     source.kind="production" → 해당 부서 PRODUCTION 차감.
     """
+    validate_active_items(db, [item_id])
     if qty <= 0:
         raise ValueError("반품 수량은 0보다 커야 합니다.")
     if source.kind not in ("warehouse", "production"):

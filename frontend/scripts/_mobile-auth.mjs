@@ -10,13 +10,12 @@
 const OPERATOR_KEY = "dexcowin_mes_operator";
 const BOOT_KEY = "dexcowin_mes_boot_id";
 
-/** 모든 탭 도달을 위해 창고 권한(primary>deputy) 우선, 그 다음 admin 레벨 */
+/** 평가 작업자는 창고 정/부, 부서 정/부 역할을 우선 선택한다. */
 function pickOperator(employees) {
   const active = employees.filter((e) => e.is_active !== false);
   const pool = active.length ? active : employees;
   const score = (e) =>
     (e.warehouse_role === "primary" ? 100 : e.warehouse_role === "deputy" ? 60 : 0) +
-    (e.level === "admin" ? 20 : e.level === "manager" ? 10 : 0) +
     (e.department_role !== "none" ? 5 : 0);
   return [...pool].sort((a, b) => score(b) - score(a))[0];
 }
@@ -26,7 +25,6 @@ function toOperator(e) {
     employee_id: e.employee_id,
     name: e.name,
     department: e.department,
-    level: e.level,
     employee_code: e.employee_code,
     warehouse_role: e.warehouse_role ?? "none",
     department_role: e.department_role ?? "none",

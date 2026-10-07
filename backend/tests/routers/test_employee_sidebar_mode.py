@@ -6,7 +6,7 @@ import uuid
 
 import pytest
 
-from app.models import Employee, EmployeeLevelEnum
+from app.models import Employee
 
 
 def _employee(db_session) -> Employee:
@@ -16,7 +16,6 @@ def _employee(db_session) -> Employee:
         name="사이드바 작업자",
         role="조립/사원",
         department="조립",
-        level=EmployeeLevelEnum.STAFF,
     )
     db_session.add(employee)
     db_session.commit()

@@ -42,6 +42,7 @@ from app.services import shipping_workflow_operations as workflow_ops
 from app.services.bom import bom_child_item_ordering
 from app.services.bom_stock_policy import should_skip_bom_inventory
 from app.services.inv_calc import _sync_total
+from app.services.item_write_validation import validate_active_items
 from app.utils.mes_code import make_mes_code, next_serial_no
 
 PREPARE_PHASE = "PREPARE"
@@ -79,6 +80,24 @@ def _get_item(db: Session, item_id: uuid.UUID) -> Item:
     if item is None:
         raise ShippingError("품목을 찾을 수 없습니다.")
     return item
+
+
+def _require_active_items(db: Session, item_ids: Iterable[uuid.UUID]) -> None:
+    """신규 출하 작업만 검증하며 과거 조회와 취소 경로는 허용한다."""
+    try:
+        validate_active_items(db, item_ids)
+    except ValueError as exc:
+        raise ShippingError(str(exc)) from exc
+
+
+def _validate_request_items(db: Session, req: ShippingRequest) -> None:
+    """재고 미반영 BOM을 제외한 현재 요청의 모든 작업 품목을 먼저 확인한다."""
+    ids = {req.base_pf_item_id, req.final_pa_item_id, req.final_pf_item_id}
+    ids.update(line.item_id for line in req.companion_lines)
+    ids.update(line.child_item_id for line in req.bom_lines if line.included and not should_skip_bom_inventory(
+        line.child_item, bom_generated=line.origin == "DEFAULT",
+    ))
+    _require_active_items(db, (item_id for item_id in ids if item_id is not None))
 
 
 def _record_event(db: Session, req: ShippingRequest, event_type: str, message: str | None = None) -> None:
@@ -526,6 +545,7 @@ def _sync_checklist(db: Session, req: ShippingRequest) -> None:
 def create_request(db: Session, payload: dict) -> ShippingRequest:
     invoice_number = _normalize_invoice_number(payload.get("invoice_number"))
     base_pf = _get_item(db, payload["base_pf_item_id"])
+    _require_active_items(db, [base_pf.item_id])
     if base_pf.process_type_code != "PF":
         raise ShippingError("기준 품목은 PF여야 합니다.")
     req = ShippingRequest(
@@ -547,6 +567,7 @@ def create_request(db: Session, payload: dict) -> ShippingRequest:
     db.refresh(req)
     _resolve_final_items(db, req)
     db.refresh(req)
+    _validate_request_items(db, req)
     _sync_checklist(db, req)
     _record_event(db, req, "REQUEST_CREATED", "출하 요청 생성 및 준비 시작")
     db.flush()
@@ -563,6 +584,7 @@ def update_request(
     req = _lock_request(db, request_id)
     if req.status != ShippingRequestStatusEnum.PREPARING:
         raise ShippingError("준비 중 상태에서만 출하 요청을 수정할 수 있습니다.")
+    _validate_request_items(db, req)
     before = _revision_snapshot(req)
     if "request_quantity" in payload:
         req.request_quantity = _payload_request_quantity(payload)
@@ -591,6 +613,7 @@ def update_request(
     db.refresh(req)
     _resolve_final_items(db, req)
     db.refresh(req)
+    _validate_request_items(db, req)
     if {"bom_lines", "finalization_mode", "reuse_pf_item_id"} & payload.keys():
         _sync_checklist(db, req)
     after = _revision_snapshot(req)
@@ -1431,6 +1454,7 @@ def _execute_component_change_core(
     if preview["source_shortage_quantity"] > 0:
         raise ShippingError("소스 품목 재고가 부족해 품목 전환을 할 수 없습니다.")
     applied_lines = [line for line in preview["lines"] if not line.get("bom_stock_exempt")]
+    _require_active_items(db, [source_pa_item_id, target_pa_item_id, *(line["item_id"] for line in applied_lines)])
     shortages = [line for line in applied_lines if line["shortage_quantity"] > 0]
     if shortages:
         names = ", ".join(f"{line['item_name']} {line['shortage_quantity']}" for line in shortages)
@@ -1829,6 +1853,7 @@ def prepare_complete(
         raise ShippingError("준비 완료 전에 인보이스 번호를 입력해야 합니다.")
     if req.status != ShippingRequestStatusEnum.PREPARING:
         raise ShippingError("준비 중 요청에서만 준비 완료할 수 있습니다.")
+    _validate_request_items(db, req)
     request_qty = _request_quantity(req)
     _final_pa, final_pf = _require_final_items(db, req)
     reference_no = f"SHIP-PREP-{req.request_id.hex[:8]}"
@@ -1976,6 +2001,7 @@ def pickup_complete(
         raise ShippingError("준비 완료 요청에서만 픽업 완료할 수 있습니다.")
     if req.final_pf_item is None:
         raise ShippingError("최종 PF가 생성되지 않았습니다.")
+    _validate_request_items(db, req)
     request_qty = _request_quantity(req)
     operation = operation_svc.create_business_operation(
         db,

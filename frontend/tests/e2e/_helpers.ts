@@ -14,7 +14,6 @@ export interface OperatorLike {
   employee_id: string;
   name: string;
   department: string;
-  level: string;
   employee_code: string;
   warehouse_role: string;
   department_role: string;
@@ -27,7 +26,6 @@ function toOperator(emp: any): OperatorLike {
     employee_id: emp.employee_id,
     name: emp.name,
     department: emp.department,
-    level: emp.level,
     employee_code: emp.employee_code,
     warehouse_role: emp.warehouse_role ?? "none",
     department_role: emp.department_role ?? "none",

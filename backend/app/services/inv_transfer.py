@@ -12,6 +12,8 @@ import uuid
 from sqlalchemy import func, update as sa_update
 from sqlalchemy.orm import Session
 
+from app.services.item_write_validation import validate_active_items
+
 from app.models import (
     DepartmentEnum,
     Inventory,
@@ -53,6 +55,7 @@ def receive_confirmed(
 
     bucket='production'이고 dept가 None이면 warehouse로 폴백.
     """
+    validate_active_items(db, [item_id])
     if qty <= 0:
         raise ValueError("입고 수량은 0보다 커야 합니다.")
     inv = _lock_inventory(db, item_id)
@@ -74,6 +77,7 @@ def transfer_to_production(
     dept: DepartmentEnum,
 ) -> Inventory:
     """창고 → 부서 PRODUCTION 이동. 총량 변동 없음."""
+    validate_active_items(db, [item_id])
     if qty <= 0:
         raise ValueError("이동 수량은 0보다 커야 합니다.")
     get_or_create_inventory(db, item_id)
@@ -122,6 +126,7 @@ def transfer_to_warehouse(
     dept: DepartmentEnum | str,
 ) -> Inventory:
     """부서 PRODUCTION → 창고 복귀. 총량 변동 없음."""
+    validate_active_items(db, [item_id])
     if qty <= 0:
         raise ValueError("이동 수량은 0보다 커야 합니다.")
     get_or_create_inventory(db, item_id)
@@ -174,6 +179,7 @@ def transfer_between_departments(
     to_dept: DepartmentEnum,
 ) -> Inventory:
     """부서간 PRODUCTION 이동."""
+    validate_active_items(db, [item_id])
     if qty <= 0:
         raise ValueError("이동 수량은 0보다 커야 합니다.")
     if from_dept == to_dept:
@@ -321,6 +327,7 @@ def consume_warehouse(
     Returns:
         (inventory, qty_before) — qty_before 는 차감 전 Inventory.quantity (총량).
     """
+    validate_active_items(db, [item_id])
     if qty <= 0:
         raise ValueError("차감 수량은 0보다 커야 합니다.")
 
@@ -367,6 +374,7 @@ def consume_from_department(
     shipping_owner_request_id: uuid.UUID | None = None,
 ) -> Inventory:
     """특정 부서 PRODUCTION에서 직접 차감 (출고/부서출고용). 총량 감소. 원자적 조건부 UPDATE."""
+    validate_active_items(db, [item_id])
     if qty <= 0:
         raise ValueError("차감 수량은 0보다 커야 합니다.")
     _require_location_available(

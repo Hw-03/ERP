@@ -99,7 +99,7 @@ export function AdminEmployeesSection() {
     for (const e of employees) {
       if (e.is_active) active += 1;
       else inactive += 1;
-      if (e.level === "admin" || e.warehouse_role !== "none") mgrOrWh += 1;
+      if (e.warehouse_role !== "none") mgrOrWh += 1;
     }
     return { active, inactive, mgrOrWh };
   }, [employees]);

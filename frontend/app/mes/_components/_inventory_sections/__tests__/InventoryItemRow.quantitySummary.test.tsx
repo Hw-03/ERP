@@ -1,4 +1,4 @@
-﻿import { render, screen, within } from "@testing-library/react";
+﻿import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { Item } from "@/lib/api";
 
@@ -39,6 +39,14 @@ function makeItem(overrides: Partial<Item> = {}): Item {
 }
 
 describe("InventoryItemRow quantity summary", () => {
+  it.each([false, true])("상세가 닫힌 선택 행을 다시 누르면 해당 품목을 연다 (compact=%s)", (compact) => {
+    const item = makeItem();
+    const onSelect = vi.fn();
+    render(<table><tbody><InventoryItemRow item={item} selected detailOpen={false} compact={compact} onSelect={onSelect} /></tbody></table>);
+    fireEvent.click(screen.getByRole("button", { name: /테스트 품목/ }));
+    expect(onSelect).toHaveBeenCalledWith(item);
+  });
+
   it("splits managed stock badges and gauge by category without changing department stock", () => {
     const item = makeItem({
       quantity: 25,

@@ -12,7 +12,6 @@ from app.models import (
     BOM,
     DepartmentEnum,
     Employee,
-    EmployeeLevelEnum,
     Inventory,
     InventoryOperation,
     InventoryOperationEffect,
@@ -162,7 +161,6 @@ def _shipping_actor(db_session) -> Employee:
         name="Shipping service actor",
         role="worker",
         department=DepartmentEnum.SALES.value,
-        level=EmployeeLevelEnum.STAFF,
         display_order=0,
         is_active=True,
     )

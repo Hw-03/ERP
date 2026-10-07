@@ -14,7 +14,7 @@ import subprocess
 import sys
 import uuid
 from contextlib import closing
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
@@ -47,6 +47,7 @@ class MigrationPolicy:
     allowed_tables: frozenset[str]
     validator_sql: str | None
     validator_expected: Any | None
+    removed_columns: dict[str, frozenset[str]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -94,6 +95,17 @@ def _policy_from_migration(path: Path) -> MigrationPolicy:
     allowed_tables = policy.get("allowed_tables", [])
     validator_sql = policy.get("validator_sql")
     validator_expected = policy.get("validator_expected")
+    removed_columns = policy.get("removed_columns", {})
+    if not isinstance(removed_columns, dict) or any(
+        not isinstance(table, str) or not isinstance(columns, list)
+        or not columns or not all(isinstance(column, str) and column for column in columns)
+        for table, columns in removed_columns.items()
+    ):
+        raise PreflightPolicyError(f"{path.name}: removed_columns must map tables to column lists")
+    if removed_columns and (kind != "data-preserving" or removed_columns != {"employees": ["level"]}):
+        raise PreflightPolicyError(f"{path.name}: only the preserving employee level removal is allowed")
+    if set(removed_columns).intersection(allowed_tables):
+        raise PreflightPolicyError(f"{path.name}: removed columns must not exempt their table")
     if kind not in VALID_POLICY_KINDS:
         raise PreflightPolicyError(f"{path.name}: invalid policy kind {kind!r}")
     if not isinstance(allowed_tables, list) or not all(
@@ -112,6 +124,7 @@ def _policy_from_migration(path: Path) -> MigrationPolicy:
         allowed_tables=frozenset(allowed_tables),
         validator_sql=validator_sql,
         validator_expected=validator_expected,
+        removed_columns={table: frozenset(columns) for table, columns in removed_columns.items()},
     )
 
 
@@ -269,11 +282,16 @@ def _snapshot_table(
     return TableSnapshot(columns=columns, row_count=row_count, digest=digest.hexdigest())
 
 
-def snapshot_existing_rows(database: Path) -> dict[str, TableSnapshot]:
+def snapshot_existing_rows(
+    database: Path, *, removed_columns: dict[str, frozenset[str]] | None = None,
+) -> dict[str, TableSnapshot]:
     """Fingerprint every employee-owned table before a candidate migration."""
     with sqlite3.connect(database) as connection:
         return {
-            table: _snapshot_table(connection, table, _table_columns(connection, table))
+            table: _snapshot_table(connection, table, tuple(
+                column for column in _table_columns(connection, table)
+                if column not in (removed_columns or {}).get(table, frozenset())
+            ))
             for table in _table_names(connection)
         }
 
@@ -282,8 +300,12 @@ def assert_existing_rows_unchanged(
     database: Path,
     before: dict[str, TableSnapshot],
     allowed_tables: frozenset[str],
+    *,
+    removed_columns: dict[str, frozenset[str]] | None = None,
 ) -> None:
     """Reject changed rows outside the explicit data-change allowance."""
+    if allowed_tables.intersection(removed_columns or {}):
+        raise PreflightDataError("column removal must preserve the remaining table projection")
     with sqlite3.connect(database) as connection:
         current_tables = set(_table_names(connection))
         for table, snapshot in before.items():
@@ -292,6 +314,10 @@ def assert_existing_rows_unchanged(
             if table not in current_tables:
                 raise PreflightDataError(f"{table}: existing table was removed")
             current_columns = _table_columns(connection, table)
+            if set(current_columns).intersection((removed_columns or {}).get(table, frozenset())):
+                raise PreflightDataError(f"{table}: declared column removal did not occur")
+            if table in (removed_columns or {}) and current_columns != snapshot.columns:
+                raise PreflightDataError(f"{table}: unexpected column change during removal")
             if not set(snapshot.columns).issubset(current_columns):
                 raise PreflightDataError(f"{table}: existing column was removed")
             current = _snapshot_table(connection, table, snapshot.columns)
@@ -352,7 +378,11 @@ def run_preflight(args: argparse.Namespace) -> Path:
     print("PREFLIGHT_STAGE=snapshot")
     snapshot = _copy_verified_snapshot(args.employee_db, args.runtime_root)
     print(f"PREFLIGHT_SNAPSHOT={snapshot}")
-    before = snapshot_existing_rows(snapshot)
+    removed_columns = {
+        table: frozenset().union(*(policy.removed_columns.get(table, frozenset()) for policy in policies))
+        for table in {table for policy in policies for table in policy.removed_columns}
+    }
+    before = snapshot_existing_rows(snapshot, removed_columns=removed_columns)
     environment = os.environ.copy()
     environment["DATABASE_URL"] = f"sqlite:///{snapshot.as_posix()}"
     environment["MES_RUNTIME_ROOT"] = str(args.runtime_root.resolve())
@@ -384,7 +414,7 @@ def run_preflight(args: argparse.Namespace) -> Path:
     )
     print("PREFLIGHT_STAGE=data-contract")
     allowed_tables = frozenset().union(*(policy.allowed_tables for policy in policies))
-    assert_existing_rows_unchanged(snapshot, before, allowed_tables)
+    assert_existing_rows_unchanged(snapshot, before, allowed_tables, removed_columns=removed_columns)
     assert_policy_validators(snapshot, policies)
     # A structural old-schema backup is only rollback evidence. Prove the
     # post-migration full-backup contract before stopping employee services.

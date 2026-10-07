@@ -1,11 +1,9 @@
 """직원·PIN schema."""
 
-from typing import List, Optional
+from typing import List, Literal, Optional
 import uuid
 
 from pydantic import BaseModel, ConfigDict, Field
-
-from app.models import EmployeeLevelEnum
 
 from app.schemas.common import UtcDatetime
 
@@ -32,7 +30,6 @@ class EmployeeCreate(BaseModel):
     role: str = Field(..., max_length=100)
     phone: Optional[str] = Field(None, max_length=30)
     department: str
-    level: EmployeeLevelEnum = EmployeeLevelEnum.STAFF
     warehouse_role: str = Field("none", description="창고 결재 역할 (none/primary/deputy)")
     department_role: str = Field("none", description="부서 결재 역할 (none/primary/deputy)")
     as_research_approver: bool = False
@@ -52,7 +49,6 @@ class EmployeeUpdate(BaseModel):
     role: Optional[str] = Field(None, max_length=100)
     phone: Optional[str] = Field(None, max_length=30)
     department: Optional[str] = None
-    level: Optional[EmployeeLevelEnum] = None
     warehouse_role: Optional[str] = Field(None, description="창고 결재 역할 (none/primary/deputy)")
     department_role: Optional[str] = Field(None, description="부서 결재 역할 (none/primary/deputy)")
     as_research_approver: Optional[bool] = None
@@ -76,7 +72,6 @@ class EmployeeResponse(BaseModel):
     role: str
     phone: Optional[str]
     department: str
-    level: EmployeeLevelEnum
     warehouse_role: str = "none"
     department_role: str = "none"
     as_research_approver: bool = False
@@ -107,3 +102,12 @@ class EmployeeThemeUpdate(BaseModel):
 
 class EmployeeSidebarModeUpdate(BaseModel):
     sidebar_mode: str = Field(..., max_length=10)
+
+
+class EmployeeAppearanceUpdate(BaseModel):
+    theme: Literal["light", "dark"]
+    sidebar_mode: Literal["hover", "collapsed", "expanded"]
+
+
+class EmployeeAppearanceResponse(EmployeeAppearanceUpdate):
+    employee_id: uuid.UUID

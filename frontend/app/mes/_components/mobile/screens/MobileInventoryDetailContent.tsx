@@ -8,11 +8,12 @@ import { InventoryRecentHistoryPanel } from "../../_inventory_sections/Inventory
 import styles from "./MobileInventoryDetailContent.module.css";
 
 /** 품목별로 마운트하여 닫기·품목 변경 후 상세 탭부터 시작한다. */
-export function MobileInventoryDetailContent({ item, headerBadge, onGoToWarehouse, canReceive, imageFilename }: {
+export function MobileInventoryDetailContent({ item, headerBadge, onGoToWarehouse, canReceive, imageFilename, actionsDisabled }: {
   item: Item;
   headerBadge: ReactNode;
   onGoToWarehouse: (item: Item, intent?: IoEntryIntent) => void;
   canReceive?: boolean;
+  actionsDisabled?: boolean;
   imageFilename?: string;
 }): JSX.Element {
   const [active, setActive] = useState<"detail" | "history">("detail");
@@ -52,8 +53,11 @@ export function MobileInventoryDetailContent({ item, headerBadge, onGoToWarehous
           ))}
         </div>
       </div>
+      {item.deleted_at && active === "history" && <p role="status" className="mb-3 text-sm font-bold" style={{ color: "var(--c-red)" }}>
+        삭제된 품목입니다. 입출고 작업을 할 수 없습니다.
+      </p>}
       <div id={`${id}-detail-panel`} role="tabpanel" aria-labelledby={`${id}-detail`} hidden={active !== "detail"}>
-        <InventoryDetailPanel item={item} onGoToWarehouse={onGoToWarehouse} canReceive={canReceive} quickActionVariant="mobile" imageFilename={imageFilename} />
+        <InventoryDetailPanel item={item} onGoToWarehouse={onGoToWarehouse} canReceive={canReceive} actionsDisabled={actionsDisabled} quickActionVariant="mobile" imageFilename={imageFilename} />
       </div>
       {historyVisited && <div id={`${id}-history-panel`} role="tabpanel" aria-labelledby={`${id}-history`} hidden={active !== "history"} className={styles.history}>
         <InventoryRecentHistoryPanel item={item} mobilePresentation />

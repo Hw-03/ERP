@@ -354,7 +354,6 @@ erDiagram
         string name
         enum role "admin | employee"
         string department
-        enum level "admin | manager | staff"
         string warehouse_role "primary | deputy | null"
         string department_role "primary | deputy | null"
         bool io_enabled
@@ -558,7 +557,7 @@ erDiagram
           <div class="rules-title">결재 흐름</div>
           <ul>
             <li>창고 결재 : <code>warehouse_role = primary | deputy</code> 인 사원만 가능.</li>
-            <li>부서 결재 : <code>department_role = primary | deputy</code> 또는 <code>level = admin</code>.</li>
+            <li>부서 결재 : <code>department_role = primary | deputy</code>는 소속 부서와 관계없이 창고 외 부서 요청을 결재한다. <code>warehouse_role = primary | deputy</code>는 창고를 포함한 모든 부서 요청을 결재한다.</li>
             <li>두 결재 모두 통과 → <code>COMPLETED</code>. (상태 흐름 : SUBMITTED → RESERVED → APPROVED → COMPLETED)</li>
           </ul>
         </div>

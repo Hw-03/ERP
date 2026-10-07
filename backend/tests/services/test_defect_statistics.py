@@ -5,8 +5,10 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import pytest
+from sqlalchemy import event
 
 from app.models import (
+    DefectQuarantineManagementCategoryRevision,
     DefectQuarantineRecord,
     DefectQuarantineReconstruction,
     InventoryOperation,
@@ -61,6 +63,55 @@ def test_reason_identity_survives_master_rename_and_hide(db_session, make_item, 
     legacy_filtered = get_defect_statistics(db_session, period="month", anchor=date(2026, 9, 3), filters=DefectStatisticsFilters(reason=original_name))
     assert legacy_filtered.summary.quantity == 4
     assert legacy_filtered.reasons[0].label == "변경 후"
+
+
+def test_reason_identity_report_preserves_initial_categories_and_exclusions(db_session, make_item) -> None:
+    from app.models import DefectReasonCategory
+
+    category = DefectReasonCategory(name="통합 과거 사유", normalized_name="통합 과거 사유", is_active=True, is_other=False)
+    db_session.add(category)
+    db_session.flush()
+    item = make_item()
+    for month, initial, quantity in [(8, "B_GRADE", 5), (9, "B_GRADE", 4), (9, "OBSOLETE", 3)]:
+        record = _add_record(db_session, item, quantity=quantity, at=_kst_naive(2026, month, 3),
+                             reason=category.name, management_category=initial)
+        record.reason_category_id = category.category_id
+        record.management_category = "DEFECT"
+        record.remaining_quantity = Decimal("0")
+    missing = _add_record(db_session, item, quantity=99, at=_kst_naive(2026, 9, 4), reason=category.name)
+    legacy = _add_record(db_session, item, quantity=88, at=_kst_naive(2026, 9, 4), reason=category.name, is_legacy=True)
+    missing.reason_category_id = legacy.reason_category_id = category.category_id
+    db_session.query(DefectQuarantineManagementCategoryRevision).filter(
+        DefectQuarantineManagementCategoryRevision.record_id == missing.record_id,
+    ).delete(synchronize_session=False)
+    operation = _add_operation(db_session, action="scrap_normal", at=_kst_naive(2026, 9, 5))
+    log = _add_log(db_session, item, operation, tx_type=TransactionTypeEnum.DEFECT_SCRAP,
+                   role=InventoryOperationRoleEnum.PRIMARY, quantity=-2, reason=category.name)
+    log.reason_category_id = category.category_id
+    _add_record(db_session, item, quantity=77, at=_kst_naive(2026, 9, 3), reason=category.name)
+    category.name = category.normalized_name = "통합 현재 사유"
+    category.is_active = False
+    db_session.flush()
+
+    for reason in (None, "통합 현재 사유", "통합 과거 사유"):
+        report = get_defect_statistics_report(
+            db_session, period="month", anchor=date(2026, 9, 3),
+            now=datetime(2026, 10, 1, tzinfo=KST),
+            filters=DefectStatisticsFilters(reason_category_id=category.category_id, reason=reason),
+        )
+        assert report.summary.quantity == 9
+        assert report.summary.record_count == 3
+        assert [entry.quantity for entry in report.categories] == [2, 4, 3]
+        assert report.excluded_category_count == report.excluded_legacy_count == 1
+        assert len(report.reasons) == 1
+        assert report.reasons[0].key == str(category.category_id)
+        assert report.reasons[0].label == "통합 현재 사유"
+        assert report.reasons[0].quantity == 9
+        assert report.comparison.summary.quantity == 5
+        assert [entry.quantity for entry in report.comparison.categories] == [0, 5, 0]
+        assert report.comparison.reasons[0].label == "통합 현재 사유"
+        assert report.trend[-1].quantity == 9
+    assert log.reason_category == missing.reason_category == legacy.reason_category == "통합 과거 사유"
 
 
 def test_report_current_month_compares_matching_elapsed_range_and_filters(db_session, make_item) -> None:
@@ -167,6 +218,8 @@ def test_report_closed_future_and_legacy_counts_are_period_local(db_session, mak
     assert future.observed_until is None
     assert future.comparison is None
     assert future.trend == []
+    assert [entry.quantity for entry in future.categories] == [0, 0, 0]
+    assert future.excluded_category_count == 0
 
 
 def test_report_unclassified_reason_and_direct_occurrence(db_session, make_item) -> None:
@@ -209,6 +262,32 @@ def test_report_loads_each_occurrence_source_once(monkeypatch, db_session, make_
     )
     assert report.summary.quantity == 2
     assert calls == {"quarantine": 1, "direct": 1}
+
+
+@pytest.mark.parametrize("record_count", [1, 25])
+def test_initial_category_history_is_loaded_in_one_bulk_query(db_session, make_item, record_count) -> None:
+    item = make_item(name="최초 분류 일괄 조회")
+    for _ in range(record_count):
+        _add_record(db_session, item, quantity=1, at=_kst_naive(2026, 9, 2),
+                    management_category="B_GRADE")
+    statements = []
+    connection = db_session.connection()
+
+    def capture_history_query(conn, cursor, statement, parameters, context, executemany):
+        if statement.lstrip().upper().startswith("SELECT") and "defect_quarantine_management_category_revisions" in statement:
+            statements.append(statement)
+
+    event.listen(connection, "before_cursor_execute", capture_history_query)
+    try:
+        report = get_defect_statistics_report(
+            db_session, period="month", anchor=date(2026, 9, 2),
+            now=datetime(2026, 10, 1, tzinfo=KST),
+        )
+    finally:
+        event.remove(connection, "before_cursor_execute", capture_history_query)
+    assert report.summary.record_count == record_count
+    assert report.categories[1].quantity == record_count
+    assert len(statements) == 1
 
 
 def test_report_zero_baseline_and_kst_midnight_cutoff(db_session, make_item) -> None:
@@ -287,29 +366,96 @@ def _add_record(
     )
     db_session.add(record)
     db_session.flush()
+    db_session.add(DefectQuarantineManagementCategoryRevision(
+        record_id=record.record_id, next_category=management_category,
+        edited_by_name="통계 테스트", edited_at=at, is_initial=True,
+    ))
+    db_session.flush()
     return record
 
 
-def test_statistics_excludes_current_b_grade_and_includes_record_after_defect_return(
-    db_session, make_item
+@pytest.mark.parametrize("initial", ["DEFECT", "B_GRADE", "OBSOLETE"])
+def test_statistics_preserves_initial_category_and_quantity_after_changes(
+    db_session, make_item, initial
 ) -> None:
-    item = make_item(name="B급 통계 제외", process_type_code="TR")
+    item = make_item(name="최초 분류 통계", process_type_code="TR")
     record = _add_record(
         db_session, item, quantity=4, at=_kst_naive(2026, 9, 2),
-        management_category="B_GRADE",
+        management_category=initial,
     )
 
-    excluded = get_defect_statistics(
+    before = get_defect_statistics(
         db_session, period="month", anchor=date(2026, 9, 10),
     )
-    record.management_category = "DEFECT"
+    record.management_category = "OBSOLETE" if initial != "OBSOLETE" else "DEFECT"
+    record.remaining_quantity = Decimal("0")
+    db_session.add(DefectQuarantineManagementCategoryRevision(
+        record_id=record.record_id, previous_category=initial,
+        next_category=record.management_category, edited_by_name="변경 작업자",
+        is_initial=False,
+    ))
     db_session.flush()
-    included = get_defect_statistics(
+    after = get_defect_statistics(
         db_session, period="month", anchor=date(2026, 9, 10),
     )
 
-    assert excluded.summary.quantity == 0
-    assert included.summary.quantity == 4
+    assert before.summary.quantity == after.summary.quantity == 4
+    assert before.model_dump() == after.model_dump()
+    assert [(entry.key, entry.quantity) for entry in after.categories] == [
+        (category, 4 if category == initial else 0)
+        for category in ("DEFECT", "B_GRADE", "OBSOLETE")
+    ]
+
+
+@pytest.mark.parametrize("history", [[], ["DEFECT", "DEFECT"], ["UNKNOWN"]])
+def test_statistics_excludes_ambiguous_initial_categories_without_current_fallback(
+    db_session, make_item, history,
+) -> None:
+    item = make_item(name="최초 분류 불명")
+    record = _add_record(db_session, item, quantity=7, at=_kst_naive(2026, 9, 2))
+    db_session.query(DefectQuarantineManagementCategoryRevision).filter_by(
+        record_id=record.record_id,
+    ).delete()
+    for category in history:
+        db_session.add(DefectQuarantineManagementCategoryRevision(
+            record_id=record.record_id, next_category=category,
+            edited_by_name="이력 작업자", is_initial=True,
+        ))
+    result = get_defect_statistics(db_session, period="month", anchor=date(2026, 9, 3))
+    assert result.summary.quantity == result.summary.record_count == 0
+    assert result.excluded_category_count == 1
+    assert result.excluded_legacy_count == 0
+    assert [entry.quantity for entry in result.categories] == [0, 0, 0]
+
+
+def test_report_categories_and_exclusions_follow_each_period_and_all_aggregates(
+    db_session, make_item,
+) -> None:
+    item = make_item(name="발생 분류 비교")
+    for month, quantities in [(8, [1, 2, 3]), (9, [4, 5, 6])]:
+        for category, quantity in zip(("DEFECT", "B_GRADE", "OBSOLETE"), quantities):
+            _add_record(db_session, item, quantity=quantity, at=_kst_naive(2026, month, 2),
+                        management_category=category)
+        missing = _add_record(db_session, item, quantity=99, at=_kst_naive(2026, month, 3))
+        legacy = _add_record(db_session, item, quantity=99, at=_kst_naive(2026, month, 4), is_legacy=True)
+        db_session.query(DefectQuarantineManagementCategoryRevision).filter(
+            DefectQuarantineManagementCategoryRevision.record_id.in_([missing.record_id, legacy.record_id]),
+        ).delete(synchronize_session=False)
+    report = get_defect_statistics_report(
+        db_session, period="month", anchor=date(2026, 9, 1),
+        now=datetime(2026, 10, 1, tzinfo=KST),
+    )
+    assert report.summary.quantity == 15
+    assert report.summary.record_count == 3
+    assert report.comparison.summary.quantity == 6
+    assert [entry.quantity for entry in report.categories] == [4, 5, 6]
+    assert [entry.quantity for entry in report.comparison.categories] == [1, 2, 3]
+    assert report.comparison.quantity_delta == 9
+    assert report.excluded_category_count == report.comparison.excluded_category_count == 1
+    assert report.excluded_legacy_count == report.comparison.excluded_legacy_count == 1
+    for entries in (report.items, report.reasons, report.departments, report.timeline):
+        assert sum(entry.quantity for entry in entries) == 15
+    assert report.trend[-1].quantity == 15
 
 
 def _add_operation(
@@ -730,6 +876,9 @@ def test_statistics_adds_only_unlinked_direct_scrap_and_rework_parent_once(
 
     assert result.summary.record_count == 3
     assert result.summary.quantity == 10
+    assert [(entry.key, entry.record_count, entry.quantity) for entry in result.categories] == [
+        ("DEFECT", 3, 10), ("B_GRADE", 0, 0), ("OBSOLETE", 0, 0),
+    ]
     assert {entry.label: entry.quantity for entry in result.items} == {
         "격리 발생": 5,
         "바로 폐기": 2,

@@ -9,7 +9,7 @@ import uuid
 
 import pytest
 
-from app.models import Employee, EmployeeLevelEnum
+from app.models import Employee
 from app.services.pin_auth import DEFAULT_PIN_HASH
 
 
@@ -24,7 +24,6 @@ def _make_employee(db_session, *, code: str = "EMP001") -> Employee:
         name="테스트직원",
         role="staff",
         department="기타",
-        level=EmployeeLevelEnum.STAFF,
         warehouse_role="none",
         department_role="none",
         display_order=0,

@@ -11,7 +11,6 @@ from sqlalchemy import func
 from app.models import (
     DepartmentEnum,
     Employee,
-    EmployeeLevelEnum,
     HandoverDoc,
     HandoverStatusEnum,
     Inventory,
@@ -46,7 +45,6 @@ def _make_employee(
         name=name,
         role=f"{department.value}/staff",
         department=department.value,
-        level=EmployeeLevelEnum.STAFF,
         warehouse_role=warehouse_role,
         department_role=department_role,
         display_order=0,

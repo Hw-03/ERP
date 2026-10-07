@@ -255,6 +255,21 @@ describe("AdminExportSection", () => {
     expect(await readBlobText(blob)).toContain('"품목 코드","품명","단위","현재고","안전재고","부서","공급처"');
   });
 
+  it("직원 CSV는 직급과 업무 역할을 유지하고 등급을 내보내지 않는다", async () => {
+    const { createObjectURL } = stubObjectUrl("blob:employees-csv");
+    state.getEmployees.mockResolvedValue([{ name: "Worker", department: "Assembly", role: "worker", warehouse_role: "deputy", is_active: true, level: "admin" }]);
+    render(<AdminExportSection />);
+    const dataExport = screen.getByRole("region", { name: "데이터 내보내기" });
+    fireEvent.click(within(dataExport).getByRole("button", { name: "직원" }));
+    fireEvent.click(within(dataExport).getByRole("button", { name: "직원 CSV 다운로드" }));
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalledOnce());
+    const csv = await readBlobText(createObjectURL.mock.calls[0]?.[0] as Blob);
+    expect(csv).toContain('"이름","부서","직급","창고 역할","활성"');
+    expect(csv).toContain('"Worker","Assembly","worker","deputy","Y"');
+    expect(csv).not.toContain("admin");
+    expect(csv).not.toContain("등급");
+  });
+
   it("품목과 입출고 CSV는 서버 최대 건수에 맞춰 모든 페이지를 조회한다", async () => {
     stubObjectUrl("blob:all-csv");
     const itemsPage = Array.from({ length: 2000 }, (_, index) => ({

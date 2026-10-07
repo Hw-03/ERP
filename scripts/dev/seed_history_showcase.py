@@ -24,7 +24,6 @@ from app.models import (
     DefectQuarantineRecord,
     DepartmentEnum,
     Employee,
-    EmployeeLevelEnum,
     Inventory,
     InventoryLocation,
     IoBatch,
@@ -112,13 +111,13 @@ def _active_admin(db) -> Employee:
         db.query(Employee)
         .filter(
             Employee.is_active.is_(True),
-            Employee.level == EmployeeLevelEnum.ADMIN,
+            Employee.warehouse_role.in_(("primary", "deputy")),
         )
         .order_by(Employee.display_order, Employee.employee_code)
         .first()
     )
     if actor is None:
-        raise RuntimeError("[HISTORY-DEMO] 활성 관리자 직원이 필요합니다.")
+        raise RuntimeError("[HISTORY-DEMO] 활성 창고 결재 담당 직원이 필요합니다.")
     return actor
 
 

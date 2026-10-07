@@ -355,13 +355,25 @@ export function IoTargetPicker({
       (item) =>
         // 김건호 피드백 1 — 삭제(소프트삭제) 품목은 입출고 품목 선택에 노출하지 않음.
         !item.deleted_at &&
+        (subType !== "receive_supplier" || item.process_type_code?.endsWith("R")) &&
         matchesDept(item, dept) &&
         matchesModel(item, selectedModelSlot) &&
         matchesStage(item, stage) &&
         matchesSearch(item, keyword),
     );
     return sortItemsForPicker(filtered, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank);
-  }, [items, dept, model, stage, keyword, productModels, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank]);
+  }, [items, subType, dept, model, stage, keyword, productModels, deptPriorityByLetter, assignedPriorityBySlot, employeeOrderRank]);
+
+  const hasInvalidSelection = bundles.some((bundle) => {
+    const selectedIds = [bundle.source_item_id, ...bundle.lines.filter((line) => line.included && !line.bom_stock_exempt).map((line) => line.item_id)];
+    return selectedIds.some((id) => {
+      if (!id) return false;
+      const item = items.find((candidate) => candidate.item_id === id);
+      // 검색으로 제한된 조회 목록에서 빠진 선택 품목은 미확인 상태다.
+      if (!item) return false;
+      return Boolean(item.deleted_at) || (subType === "receive_supplier" && !item.process_type_code?.endsWith("R"));
+    });
+  });
 
   // 빠른작업으로 진입한 강조 품목을 검색창에 미리 넣어 "검색된 상태"로 보여준다.
   // 정렬상 뒤쪽 품목으로 스크롤하려면 그 위 수백~900행을 먼저 그려야 해 1~2초+ 멈춤이 생기는데,
@@ -645,7 +657,7 @@ export function IoTargetPicker({
         <button
           type="button"
           onClick={onAdvance}
-          disabled={bundles.length === 0}
+          disabled={bundles.length === 0 || hasInvalidSelection}
           className="standard-hover flex w-full items-center justify-between rounded-[12px] border px-4 py-3 text-sm font-black transition-all disabled:cursor-not-allowed disabled:opacity-60"
           style={{
             background: bundles.length > 0 ? (outbound ? LEGACY_COLORS.red : LEGACY_COLORS.blue) : LEGACY_COLORS.s2,

@@ -7,6 +7,7 @@ import { DesktopPanelCloseButton, DesktopRightPanel } from "../DesktopRightPanel
 import { InventoryDetailPanel } from "./InventoryDetailPanel";
 import { InventoryRecentHistoryPanel } from "./InventoryRecentHistoryPanel";
 import type { IoEntryIntent } from "../_warehouse_v2/types";
+import { ReadFailure, ReadLoading } from "../common/ReadState";
 
 const INVENTORY_DETAIL_TITLE_ID = "desktop-inventory-detail-title";
 const INVENTORY_DETAIL_TAB_ID = "desktop-inventory-detail-tab";
@@ -19,11 +20,13 @@ type InventoryTab = (typeof INVENTORY_TABS)[number];
 /**
  * Round-13 (#9) 추출 — DesktopInventoryView 우측 슬라이딩 상세 패널.
  *
- * `selectedItem` 가 null 이어도 lastSelected 표시를 유지해야 하므로 `displayItem` 을 별도로 받음.
- * `onClose` — 패널 닫기(행 선택 해제). SlidePanel 의 ESC 처리와 카드 헤더의 닫기 버튼을 사용한다.
+ * 선택 품목과 열림을 분리하여 닫힌 상세의 선택도 복원한다.
+ * `displayItem` 은 조회 실패나 닫힘 애니메이션에도 마지막 상세 정보를 유지한다.
+ * `onClose` — 선택 ID를 유지하며 패널만 닫는다. ESC와 카드 헤더의 닫기 버튼을 사용한다.
  * (history 패널과 동일 패턴 — 기본 X 버튼은 숨긴다.)
  */
 export interface DesktopInventoryRightPanelProps {
+  open?: boolean;
   selectedItem: Item | null;
   displayItem: Item | null;
   headerBadge: React.ReactNode;
@@ -31,6 +34,10 @@ export interface DesktopInventoryRightPanelProps {
   onGoToWarehouse: (item: Item, intent?: IoEntryIntent) => void;
   canReceive?: boolean;
   imageFilename?: string;
+  detailLoading?: boolean;
+  detailError?: string | null;
+  onRetryDetail?: () => void;
+  actionsDisabled?: boolean;
 }
 
 export function DesktopInventoryRightPanel({
@@ -41,6 +48,11 @@ export function DesktopInventoryRightPanel({
   onGoToWarehouse,
   canReceive,
   imageFilename,
+  open = !!selectedItem,
+  detailLoading = false,
+  detailError,
+  onRetryDetail = () => {},
+  actionsDisabled = false,
 }: DesktopInventoryRightPanelProps) {
   const [activeTab, setActiveTab] = useState<InventoryTab>("detail");
   const detailTabRef = useRef<HTMLButtonElement>(null);
@@ -69,21 +81,21 @@ export function DesktopInventoryRightPanel({
 
   useEffect(() => {
     setActiveTab("detail");
-  }, [selectedItem?.item_id]);
+  }, [selectedItem?.item_id, open]);
 
   return (
     <SlidePanel
-      open={!!selectedItem}
+      open={open}
       onClose={onClose}
       hideCloseButton
       labelledBy={INVENTORY_DETAIL_TITLE_ID}
     >
-      {displayItem && (
+      {(displayItem || open) && (
         <DesktopRightPanel
           bodyScrollbarOutset
-          title={displayItem.item_name}
+          title={displayItem?.item_name ?? "품목 상세"}
           titleId={INVENTORY_DETAIL_TITLE_ID}
-          subtitle={displayItem.legacy_part ? `${displayItem.mes_code} · ${displayItem.legacy_part}` : (displayItem.mes_code ?? undefined)}
+          subtitle={displayItem?.legacy_part ? `${displayItem.mes_code} · ${displayItem.legacy_part}` : (displayItem?.mes_code ?? undefined)}
           subtitleBadge={headerBadge}
           topContent={
             <div className="mb-4 flex items-center gap-2">
@@ -134,16 +146,22 @@ export function DesktopInventoryRightPanel({
             </div>
           }
         >
+          {detailLoading && <ReadLoading label="품목 상세를 불러오는 중" variant="card" />}
+          {detailError && <ReadFailure message={detailError} onRetry={onRetryDetail} refresh={!!displayItem} />}
+          {displayItem?.deleted_at && activeTab === "history" && <p role="status" className="mb-3 text-sm font-bold" style={{ color: "var(--c-red)" }}>
+            삭제된 품목입니다. 입출고 작업을 할 수 없습니다.
+          </p>}
           {activeTab === "detail" ? (
             <div id={INVENTORY_DETAIL_PANEL_ID} role="tabpanel" aria-labelledby={INVENTORY_DETAIL_TAB_ID}>
-              <InventoryDetailPanel
+              {displayItem && <InventoryDetailPanel
                 item={displayItem}
                 onGoToWarehouse={onGoToWarehouse}
                 canReceive={canReceive}
                 imageFilename={imageFilename}
-              />
+                actionsDisabled={actionsDisabled}
+              />}
             </div>
-          ) : selectedItem?.item_id === displayItem.item_id ? (
+          ) : selectedItem && displayItem && selectedItem.item_id === displayItem.item_id ? (
             <div id={INVENTORY_HISTORY_PANEL_ID} role="tabpanel" aria-labelledby={INVENTORY_HISTORY_TAB_ID} className="flex h-full min-h-0 flex-col">
               <InventoryRecentHistoryPanel key={selectedItem.item_id} item={selectedItem} />
             </div>

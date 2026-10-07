@@ -134,12 +134,11 @@ async function buildCsvFor(
 
   if (scope === "employees") {
     const employees = await api.getEmployees({ activeOnly: !includeInactive });
-    const headers = ["이름", "부서", "직급", "등급", "창고 역할", "활성"];
+    const headers = ["이름", "부서", "직급", "창고 역할", "활성"];
     const rows = employees.map((employee) => [
       employee.name,
       employee.department,
       employee.role ?? "",
-      employee.level,
       employee.warehouse_role,
       employee.is_active ? "Y" : "N",
     ]);

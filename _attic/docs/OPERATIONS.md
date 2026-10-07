@@ -6,6 +6,12 @@
 
 ## 표준 실행 경로
 
+### 직원 등급 제거 마이그레이션
+
+`20261007_0039`는 직원 테이블의 `level`만 제거한다. 직원 ID·PIN·별도 결재 역할·화면 설정·담당 연결은 유지하고 등급을 역할로 변환하지 않는다. 기존 코드와 DB를 함께 보존한 백업을 준비하고, 먼저 복제본에서 보존 검사를 통과시킨 뒤 명시적으로 마이그레이션한다. 서버 시작은 마이그레이션을 실행하지 않는다.
+
+SQLite는 3.35 이상에서 테이블 재생성 없이 컬럼을 삭제한다. PostgreSQL은 컬럼과 다른 소비자가 없는 enum을 제거한다. 제거한 등급은 복원할 수 없으므로 revision downgrade 대신 제거 전 DB 백업과 그때의 코드를 함께 복원한다. 직원→개발 동기화 보존 검사도 직원 테이블을 제외하지 않고 `level`을 제외한 컬럼·행·연결의 동일성을 검사한다.
+
 - **표준은 `start.bat`**. 컨테이너 정의는 루트가 아닌 `docker/docker-compose.yml`에 있으며, 정규 운영 경로는 아니다.
 - `start.bat`와 운영 batch는 `scripts/dev/resolve-server-profile.ps1`로 현재 checkout의 profile을 결정한다. `C:\ERP`와 그 `.worktrees` 하위는 development (백엔드 8011 / 프론트엔드 3001), `C:\ERP-dev`는 employee (백엔드 8010 / 프론트엔드 3000)다.
 - 현재 profile과 URL은 다음 명령으로 확인한다.

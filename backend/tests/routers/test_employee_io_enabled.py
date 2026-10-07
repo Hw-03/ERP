@@ -20,7 +20,6 @@ from sqlalchemy import text
 from app.models import (
     Department,
     Employee,
-    EmployeeLevelEnum,
     StockRequest,
     StockRequestStatusEnum,
     StockRequestTypeEnum,
@@ -34,7 +33,6 @@ def _emp_payload(**overrides):
         "name": "홍길동",
         "role": "조립/사원",
         "department": "조립",
-        "level": "staff",
         "warehouse_role": "none",
         "department_role": "none",
         "display_order": 0,
@@ -53,6 +51,26 @@ def test_create_employee_defaults_io_enabled_true(db_session, client):
     assert resp.status_code == 201, resp.text
     data = resp.json()
     assert data["io_enabled"] is True
+    assert "level" not in data
+
+
+def test_legacy_grade_input_never_grants_approval_roles(db_session, client):
+    """Old clients can send a discarded grade without changing business authority."""
+    response = client.post("/api/employees", headers=ADMIN_HEADERS, json=_emp_payload(level="admin"))
+    assert response.status_code == 201, response.text
+    data = response.json()
+    assert "level" not in data
+    assert data["warehouse_role"] == "none"
+    assert data["department_role"] == "none"
+    assert data["as_research_approver"] is False
+    employee_id = data["employee_id"]
+    update = client.put(f"/api/employees/{employee_id}", headers=ADMIN_HEADERS, json={"level": "manager"})
+    assert update.status_code == 200, update.text
+    assert "level" not in update.json()
+    assert update.json()["warehouse_role"] == "none"
+    login = client.post(f"/api/employees/{employee_id}/verify-pin", json={"pin": "0000"})
+    assert login.status_code == 200, login.text
+    assert "level" not in login.json()
 
 
 def test_create_employee_explicit_io_enabled_false(db_session, client):
@@ -340,7 +358,6 @@ def test_backfill_employee_io_enabled_copies_department(db_session, client):
         name="개방직원",
         role="r",
         department="개방부서",
-        level=EmployeeLevelEnum.STAFF,
         display_order=0,
         is_active="true",
         io_enabled=True,
@@ -350,7 +367,6 @@ def test_backfill_employee_io_enabled_copies_department(db_session, client):
         name="폐쇄직원",
         role="r",
         department="폐쇄부서",
-        level=EmployeeLevelEnum.STAFF,
         display_order=1,
         is_active="true",
         io_enabled=True,
@@ -387,7 +403,6 @@ def test_repeated_migration_does_not_overwrite_saved_employee_io_enabled(
         name="keep io",
         role="r",
         department="NO_IO_DEPT",
-        level=EmployeeLevelEnum.STAFF,
         display_order=10,
         is_active="true",
         io_enabled=True,
@@ -417,7 +432,6 @@ def test_migration_preserves_existing_employee_login_popup_setting(
         name="popup once",
         role="r",
         department="조립",
-        level=EmployeeLevelEnum.STAFF,
         display_order=10,
         is_active="true",
         login_notification_popup_enabled=False,

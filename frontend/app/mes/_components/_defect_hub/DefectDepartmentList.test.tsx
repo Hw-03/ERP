@@ -51,6 +51,49 @@ describe("DefectDepartmentList", () => {
     apiMocks.getManagementCategoryHistory.mockResolvedValue([]);
   });
 
+  it("잔량 원건 수를 세고 전량 처리한 원건만 빠져도 같은 품목 카드를 유지한다", () => {
+    const first = makeLocation({ record_id: "first", quantity: 2 });
+    const second = makeLocation({ record_id: "second", quantity: 3 });
+    const props = { onProcess: vi.fn() };
+    const view = render(<DefectDepartmentList {...props} locations={[first, second]} />);
+    expect(screen.getByRole("button", { name: /^Assembly\s*2건$/ })).toBeVisible();
+    expect(screen.getAllByTestId("defect-item-group-summary")).toHaveLength(1);
+    view.rerender(<DefectDepartmentList {...props} locations={[{ ...first, quantity: 1 }, second]} />);
+    expect(screen.getByTestId("defect-item-group-summary")).toHaveTextContent("4개");
+    expect(screen.getByRole("button", { name: /^Assembly\s*2건$/ })).toBeVisible();
+    view.rerender(<DefectDepartmentList {...props} locations={[second]} />);
+    expect(screen.getByRole("article", { name: "AX-100 격리 기록" })).toBeVisible();
+    expect(screen.getByRole("article", { name: "AX-100 격리 기록" })).toHaveTextContent("3개");
+    expect(screen.getByRole("button", { name: /^Assembly\s*1건$/ })).toBeVisible();
+    view.rerender(<DefectDepartmentList {...props} locations={[]} />);
+    expect(screen.queryByRole("article", { name: "AX-100 격리 기록" })).not.toBeInTheDocument();
+  });
+
+  it("보관 선택은 같은 부서·품목에서도 관리 분류를 따로 묶는다", () => {
+    render(<DefectDepartmentList storageMode locations={[
+      makeLocation({ record_id: "b1", management_category: "B_GRADE" }),
+      makeLocation({ record_id: "b2", management_category: "B_GRADE" }),
+      makeLocation({ record_id: "o1", management_category: "OBSOLETE" }),
+      makeLocation({ record_id: "o2", management_category: "OBSOLETE" }),
+    ]} onProcess={vi.fn()} onBatchProcess={vi.fn()} />);
+    expect(screen.getAllByTestId("defect-item-group-summary")).toHaveLength(2);
+    fireEvent.click(screen.getAllByRole("button", { name: "여러 건 선택" })[0]);
+    expect(screen.getAllByRole("checkbox")).toHaveLength(2);
+  });
+
+  it("처리 대기와 출처 없는 합산 원건은 선택할 수 없고 복원 원건만 허용한다", () => {
+    render(<DefectDepartmentList locations={[
+      makeLocation({ record_id: "pending", pending_quantity: 1 }),
+      makeLocation({ record_id: "aggregate", is_legacy: true, legacy_origin: "aggregate" }),
+      makeLocation({ record_id: "reconstructed", is_legacy: true, legacy_origin: "reconstructed" }),
+    ]} onProcess={vi.fn()} onBatchProcess={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "여러 건 선택" }));
+    const choices = screen.getAllByRole("checkbox");
+    expect(choices[0]).toBeDisabled();
+    expect(choices[1]).toBeDisabled();
+    expect(choices[2]).toBeEnabled();
+  });
+
   it.each([false, true])("uses a full-row disclosure button without intercepting batch actions (storage: %s)", (storageMode) => {
     const onBatchProcess = vi.fn();
     render(<DefectDepartmentList storageMode={storageMode} locations={[
@@ -639,7 +682,7 @@ describe("DefectDepartmentList", () => {
     expect(screen.getByTestId("defect-reason-summary")).toHaveTextContent("격리 사유dimension");
     expect(screen.getByTestId("defect-reason-summary")).not.toHaveTextContent("수정 메모");
 
-    fireEvent.click(screen.getByRole("button", { name: "메모 수정" }));
+    fireEvent.click(await screen.findByRole("button", { name: "메모 수정" }));
     fireEvent.change(screen.getByRole("textbox", { name: "격리 메모" }), {
       target: { value: "실패 메모" },
     });

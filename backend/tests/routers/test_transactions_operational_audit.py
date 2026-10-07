@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 
-from app.models import DepartmentEnum, Employee, EmployeeLevelEnum
+from app.models import DepartmentEnum, Employee
 from app.services.pin_auth import DEFAULT_PIN_HASH
 
 
@@ -20,7 +20,6 @@ def _make_employee(
         name=name,
         role=f"{department.value}/staff",
         department=department,
-        level=EmployeeLevelEnum.STAFF,
         warehouse_role=warehouse_role,
         department_role=department_role,
         display_order=0,

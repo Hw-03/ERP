@@ -91,7 +91,9 @@ def save_draft(db: Session, payload) -> dict:
     새 draft 가 쌓여 '작업 중' 탭에서 여러 작업을 이어서 진행할 수 있다.
     """
     from app.services.io_preview import validate_receive_requester, validate_material_outbound
+    from app.services.item_write_validation import validate_io_items
 
+    validate_io_items(db, payload.bundles, sub_type=payload.sub_type)
     requester = _load_requester(db, payload.requester_employee_id)
     from app.services.defect_reason_categories import resolve_reason_category
     reason_category_id, reason_category, _ = resolve_reason_category(
@@ -106,6 +108,7 @@ def save_draft(db: Session, payload) -> dict:
         bundles=payload.bundles,
     )
     normalize_payload_bom_stock_exempt(db, payload)
+    validate_io_items(db, payload.bundles, sub_type=payload.sub_type)
     normalize_automatic_routes_with_bom_token_refresh(
         db,
         work_type=payload.work_type,

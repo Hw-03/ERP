@@ -27,7 +27,7 @@ describe("shared history group summary", () => {
 
   it.each([
     ["TRANSFER_TO_PROD", "창고 입출고"], ["PRODUCE", "생산 입고"],
-    ["MARK_DEFECTIVE", "불량"], ["SUPPLIER_RETURN", "반품"],
+    ["MARK_DEFECTIVE", "불량 격리"], ["SUPPLIER_RETURN", "반품"],
     ["INTERNAL_USE", "AS 사용"],
   ])("목록 분류 %s를 공통으로 사용한다", (type, label) => {
     const log = { ...entry("item", type, "PRIMARY"), reference_no: null, department: "AS" };

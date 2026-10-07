@@ -20,7 +20,6 @@ from app.models.employee import (
     Department,
     Employee,
     EmployeeAssignedModel,
-    EmployeeLevelEnum,
 )
 from app.models.inventory import (
     Inventory,
@@ -119,7 +118,6 @@ __all__ = [
     "Department",
     "Employee",
     "EmployeeAssignedModel",
-    "EmployeeLevelEnum",
     # item / BOM
     "Item",
     "BOM",

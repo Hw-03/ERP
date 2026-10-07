@@ -22,7 +22,6 @@ const state = vi.hoisted(() => ({
     employee_id: "emp-1",
     name: "Kim",
     department: "Assembly",
-    level: "staff",
     employee_code: "E1",
     warehouse_role: "none",
     department_role: "none",

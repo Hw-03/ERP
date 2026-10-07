@@ -275,7 +275,7 @@ describe("MobileHistoryScreen real detail panels", () => {
     await waitFor(() => expect(productionApi.getTransactions).toHaveBeenCalledWith(
       { operationId: "work-a", limit: 2000, skip: 0 }, expect.anything(),
     ));
-    expect(within(sheet).getByRole("button", { name: "이 내역 취소" })).toBeInTheDocument();
+    expect(await within(sheet).findByRole("button", { name: "이 내역 취소" })).toBeInTheDocument();
     fireEvent.click(within(sheet).getByRole("button", { name: "← 뒤로" }));
     expect(within(sheet).queryByRole("button", { name: "이 내역 취소" })).not.toBeInTheDocument();
   });

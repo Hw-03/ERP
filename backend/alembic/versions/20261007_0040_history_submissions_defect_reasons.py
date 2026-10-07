@@ -10,8 +10,8 @@ from alembic import context, op
 import sqlalchemy as sa
 
 
-revision: str = "20261007_0039"
-down_revision: str = "20260928_0038"
+revision: str = "20261007_0040"
+down_revision: str = "20261007_0039"
 branch_labels = None
 depends_on = None
 

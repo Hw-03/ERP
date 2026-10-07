@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import pytest
-from app.models import Department, DepartmentEnum, Employee, EmployeeLevelEnum
+from app.models import Department, DepartmentEnum, Employee
 from app.services import rate_limit
 from app.services.pin_auth import DEFAULT_PIN_HASH, hash_pin
 
@@ -18,7 +18,6 @@ def _make_employee(db, *, name="홍길동", code="E77", pin_hash=DEFAULT_PIN_HAS
         name=name,
         role="테스트/사원",
         department=DepartmentEnum.ASSEMBLY,
-        level=EmployeeLevelEnum.STAFF,
         display_order=77,
         is_active="true",
         pin_hash=pin_hash,

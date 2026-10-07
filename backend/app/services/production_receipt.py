@@ -275,6 +275,11 @@ def _execute_production_receipt(
     merged = _load_and_merge_requirements(db, payload, produced_item)
     tracked_requirements = _stock_tracked_requirements(db, merged)
     items_map, invs_map = _preload_components(db, tracked_requirements, produced_item.item_id)
+    from app.services.item_write_validation import validate_active_items
+    try:
+        validate_active_items(db, [produced_item.item_id, *items_map])
+    except ValueError as exc:
+        raise ProductionBadRequest(str(exc)) from exc
     _assert_no_shortage(db, tracked_requirements, items_map, invs_map)
 
     transaction_ids: List[uuid.UUID] = []

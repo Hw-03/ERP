@@ -103,6 +103,63 @@ function makeBundle(
 }
 
 describe("IoTargetPicker row click", () => {
+  it("검색 결과에 부모만 있어도 선택된 정상 BOM 자재로 진행할 수 있다", () => {
+    const onAdvance = vi.fn();
+    const bundle = makeBundle("bom_parent");
+    bundle.lines.push({ ...bundle.lines[0], line_id: "child-line", item_id: "child-1", item_name: "Bundle Child" });
+    render(<IoTargetPicker {...baseProps} workType="process" subType="produce" items={[makeItem()]} search="Clickable Item" bundles={[bundle]} onAdvance={onAdvance} />);
+    const next = screen.getByRole("button", { name: /수량 조정/ });
+    expect(next).toBeEnabled();
+    fireEvent.click(next);
+    expect(onAdvance).toHaveBeenCalledOnce();
+  });
+
+  it("검색을 바꿔 선택한 단품이 조회 목록에서 빠져도 진행할 수 있다", () => {
+    const onAdvance = vi.fn();
+    const props = { ...baseProps, bundles: [makeBundle("direct_item")], onAdvance };
+    const { rerender } = render(<IoTargetPicker {...props} />);
+    expect(screen.getByRole("button", { name: /수량 조정/ })).toBeEnabled();
+    rerender(<IoTargetPicker {...props} items={[]} search="Other item" />);
+    const next = screen.getByRole("button", { name: /수량 조정/ });
+    expect(next).toBeEnabled();
+    fireEvent.click(next);
+    expect(onAdvance).toHaveBeenCalledOnce();
+  });
+
+  it("검색 결과에서 실제 조회된 삭제 BOM 자식은 진행을 차단한다", () => {
+    const onAdvance = vi.fn();
+    const bundle = makeBundle("bom_parent");
+    bundle.lines.push({ ...bundle.lines[0], line_id: "child-line", item_id: "child-1", item_name: "Bundle Child" });
+    const deletedChild = { ...makeItem(), item_id: "child-1", item_name: "Bundle Child", deleted_at: "2026-10-07" } as Item;
+    render(<IoTargetPicker {...baseProps} workType="process" subType="produce" items={[makeItem(), deletedChild]} search="Clickable Item" bundles={[bundle]} onAdvance={onAdvance} />);
+    const next = screen.getByRole("button", { name: /수량 조정/ });
+    expect(next).toBeDisabled();
+    fireEvent.click(next);
+    expect(onAdvance).not.toHaveBeenCalled();
+  });
+
+  it.each(["TF", "TH", "", undefined])("원자재 입고는 canonical R 품목만 표시한다: %s", (code) => {
+    render(<IoTargetPicker {...baseProps} items={[{ ...makeItem(), process_type_code: code } as Item]} />);
+    expect(screen.queryByText("Clickable Item")).not.toBeInTheDocument();
+  });
+  it("원자재 입고 목록은 활성 canonical R 품목만 보여주고 삭제 품목은 숨긴다", () => {
+    const activeRaw = { ...makeItem(), item_id: "raw-active", item_name: "Active raw" };
+    const deletedRaw = { ...makeItem(), item_id: "raw-deleted", item_name: "Deleted raw", deleted_at: "2026-10-07" };
+    const nonRaw = { ...makeItem({ processTypeCode: "TA" }), item_id: "non-raw", item_name: "Assembly item" };
+    render(<IoTargetPicker {...baseProps} items={[activeRaw, deletedRaw, nonRaw] as Item[]} />);
+    expect(screen.getByText("Active raw")).toBeVisible();
+    expect(screen.queryByText("Deleted raw")).not.toBeInTheDocument();
+    expect(screen.queryByText("Assembly item")).not.toBeInTheDocument();
+  });
+  it.each(["non_raw", "deleted"])("이미 선택한 원자재가 유효하지 않으면 다음 진행을 차단한다: %s", (invalid) => {
+    const onAdvance = vi.fn();
+    const stale = invalid === "deleted" ? { ...makeItem(), deleted_at: "2026-10-07" } : makeItem({ processTypeCode: "TF" });
+    render(<IoTargetPicker {...baseProps} items={[stale as Item]} bundles={[makeBundle("direct_item")]} onAdvance={onAdvance} />);
+    const next = screen.getByRole("button", { name: /수량 조정/ });
+    expect(next).toBeDisabled();
+    fireEvent.click(next);
+    expect(onAdvance).not.toHaveBeenCalled();
+  });
   it("AS·연구 사용출고의 선택 버튼은 초록색이고 다음 단계는 빨강이다", () => {
     render(<IoTargetPicker {...baseProps} workType="internal_use" subType="internal_use_out" items={[makeItem({ warehouseQty: 10 })]} bundles={[makeBundle("manual")]} />);
     expect(screen.getByRole("button", { name: "창고 낱개" })).toHaveStyle({ background: LEGACY_COLORS.green });

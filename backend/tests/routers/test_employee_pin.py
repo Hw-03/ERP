@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import pytest
-from app.models import AdminAuditLog, DepartmentEnum, Employee, EmployeeLevelEnum
+from app.models import AdminAuditLog, DepartmentEnum, Employee
 from app.services.pin_auth import DEFAULT_PIN_HASH, hash_pin, verify_pin
 
 
@@ -16,7 +16,6 @@ def _make_employee(db, *, name="홍길동", code="E99", pin_hash=None, is_active
         name=name,
         role="테스트/사원",
         department=DepartmentEnum.ASSEMBLY,
-        level=EmployeeLevelEnum.STAFF,
         display_order=99,
         is_active=is_active,
         pin_hash=pin_hash,

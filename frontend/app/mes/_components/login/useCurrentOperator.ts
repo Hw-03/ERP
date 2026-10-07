@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState } from "react";
-import type { Department, DepartmentRole, EmployeeLevel, WarehouseRole } from "@/lib/api";
+import type { Department, DepartmentRole, WarehouseRole } from "@/lib/api";
 import { sendClientEvent } from "@/lib/client-events";
 import { clearAuditSession, startAuditSession } from "@/lib/activity-audit-context";
 import { getClientEventSource } from "@/lib/operator-log-context";
@@ -18,7 +18,6 @@ export interface Operator {
   name: string;
   role: string;
   department: Department;
-  level: EmployeeLevel;
   employee_code: string;
   /** 창고 결재 역할 — 기존 데이터 호환을 위해 누락 시 "none" 폴백. */
   warehouse_role: WarehouseRole;
@@ -80,7 +79,6 @@ function readOperator(): Operator | null {
       name: parsed.name,
       role: typeof parsed.role === "string" ? parsed.role : "",
       department: parsed.department as Department,
-      level: parsed.level as EmployeeLevel,
       employee_code: parsed.employee_code as string,
       warehouse_role: (wh === "primary" || wh === "deputy" ? wh : "none") as WarehouseRole,
       department_role: (dept === "primary" || dept === "deputy" ? dept : "none") as DepartmentRole,
@@ -124,12 +122,13 @@ export function setCurrentOperator(op: Operator, bootId?: string): void {
 
 /** Updates UI preferences without creating another login audit event. */
 export function updateCurrentOperatorPreferences(patch: {
+  theme?: "light" | "dark";
   sidebar_mode?: SidebarMode;
   loginPopupEnabled?: boolean;
-}): void {
+}, expectedEmployeeId?: string): void {
   if (typeof window === "undefined") return;
   const operator = readOperator();
-  if (!operator) return;
+  if (!operator || (expectedEmployeeId && operator.employee_id !== expectedEmployeeId)) return;
   window.sessionStorage.setItem(OPERATOR_KEY, JSON.stringify({ ...operator, ...patch }));
   window.dispatchEvent(new CustomEvent(OPERATOR_CHANGE_EVENT));
 }
@@ -164,11 +163,14 @@ export function useCurrentOperator(): Operator | null {
   useEffect(() => {
     setOperator(readOperator());
     const onChange = () => setOperator(readOperator());
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === OPERATOR_KEY && event.storageArea === window.sessionStorage) onChange();
+    };
     window.addEventListener(OPERATOR_CHANGE_EVENT, onChange);
-    window.addEventListener("storage", onChange);
+    window.addEventListener("storage", onStorage);
     return () => {
       window.removeEventListener(OPERATOR_CHANGE_EVENT, onChange);
-      window.removeEventListener("storage", onChange);
+      window.removeEventListener("storage", onStorage);
     };
   }, []);
 

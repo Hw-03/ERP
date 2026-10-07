@@ -31,6 +31,30 @@ function makeItem(): Item {
 }
 
 describe("DesktopInventoryRightPanel", () => {
+  it("복원 중에는 품목 객체가 없어도 상세창과 로딩 안내를 유지한다", () => {
+    render(<DesktopInventoryRightPanel open selectedItem={null} displayItem={null} headerBadge={null} onClose={vi.fn()} onGoToWarehouse={vi.fn()} detailLoading />);
+    expect(screen.getByRole("dialog", { name: "품목 상세" })).toBeVisible();
+    expect(screen.getByRole("status", { name: "품목 상세를 불러오는 중" })).toBeVisible();
+  });
+
+  it("조회 실패는 삭제 안내 없이 상세창에서 재시도한다", () => {
+    const retry = vi.fn();
+    render(<DesktopInventoryRightPanel open selectedItem={null} displayItem={null} headerBadge={null} onClose={vi.fn()} onGoToWarehouse={vi.fn()} detailError="품목을 찾을 수 없습니다." onRetryDetail={retry} />);
+    expect(screen.getByRole("dialog", { name: "품목 상세" })).toBeVisible();
+    expect(screen.getByRole("alert")).toHaveTextContent("품목을 찾을 수 없습니다.");
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(retry).toHaveBeenCalledOnce();
+    expect(screen.queryByText("삭제된 품목")).not.toBeInTheDocument();
+  });
+
+  it("최근 내역을 보고 있어도 삭제 확인 안내를 유지한다", () => {
+    const deletedItem = { ...makeItem(), deleted_at: "2026-10-07T00:00:00Z" };
+    render(<DesktopInventoryRightPanel selectedItem={deletedItem} displayItem={deletedItem} headerBadge={null} onClose={vi.fn()} onGoToWarehouse={vi.fn()} />);
+    fireEvent.click(screen.getByRole("tab", { name: "최근 내역" }));
+    expect(screen.getByText("삭제된 품목입니다. 입출고 작업을 할 수 없습니다.")).toBeVisible();
+    expect(screen.getByText("최근 내역 패널")).toBeVisible();
+  });
+
   it("기본 상세 정보를 보여주고 최근 내역 탭으로 전환한다", () => {
     const item = makeItem();
     render(

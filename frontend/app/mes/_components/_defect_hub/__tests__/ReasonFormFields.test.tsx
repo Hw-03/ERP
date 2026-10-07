@@ -95,9 +95,11 @@ describe("managed defect reasons", () => {
     fireEvent.click(await screen.findByRole("button", { name: "표면 균열", exact: true }));
     fireEvent.click(screen.getByRole("button", { name: "사유 카테고리 선택" }));
     fireEvent.click(screen.getByRole("button", { name: "표면 균열 이름 수정" }));
+    expect(screen.getByRole("textbox", { name: "표면 균열 이름 수정" })).toHaveFocus();
     fireEvent.change(screen.getByRole("textbox", { name: "표면 균열 이름 수정" }), { target: { value: "새 균열" } });
     fireEvent.click(screen.getByRole("button", { name: "이름 저장" }));
     expect(await screen.findByRole("button", { name: "새 균열", exact: true })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("searchbox")).toHaveFocus();
     fireEvent.click(screen.getByRole("button", { name: "새 균열 숨김" }));
     await waitFor(() => expect(screen.getByLabelText("선택 사유 번호")).toBeEmptyDOMElement());
   });

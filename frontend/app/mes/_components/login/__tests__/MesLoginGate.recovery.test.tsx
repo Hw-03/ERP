@@ -34,7 +34,7 @@ vi.mock("../OperatorLoginCard", () => ({ OperatorLoginCard: () => <div>Login for
 import { MesLoginGate } from "../MesLoginGate";
 
 const stored: Operator = {
-  employee_id: "emp-1", name: "김현우", role: "staff", department: "조립", level: "staff",
+  employee_id: "emp-1", name: "김현우", role: "staff", department: "조립",
   employee_code: "E1", warehouse_role: "none", department_role: "none", assigned_model_slots: [],
   io_enabled: true, hidden_sidebar_tabs: [], loginPopupEnabled: false,
 };

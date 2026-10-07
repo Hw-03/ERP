@@ -8,7 +8,6 @@ from app.models import (
     AdminAuditLog,
     DepartmentEnum,
     Employee,
-    EmployeeLevelEnum,
     TransactionEditLog,
     TransactionLog,
     TransactionTypeEnum,
@@ -23,7 +22,6 @@ def _metadata_case(db_session, make_item):
         name="메타 수정자",
         role="조립/대리",
         department=DepartmentEnum.ASSEMBLY,
-        level=EmployeeLevelEnum.STAFF,
         display_order=99,
         is_active="true",
     )

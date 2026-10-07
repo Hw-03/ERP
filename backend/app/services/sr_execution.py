@@ -675,6 +675,9 @@ def _execute_all_lines(
     is_approval: bool = False,
 ) -> None:
     lines = list(lines)
+    from app.services.item_write_validation import validate_active_items
+    validate_active_items(db, _request_inventory_item_ids(db, request, lines),
+                          raw_receive=request.request_type == StockRequestTypeEnum.RAW_RECEIVE)
     if request.request_type == StockRequestTypeEnum.DEFECT_RETURN:
         from app.services.supplier import validate_supplier_for_stock_request
 
@@ -910,8 +913,9 @@ def _finalize_submission(
     """
     lines = list(request.lines)
     requester_role = (requester.warehouse_role or "none").lower()
-    requester_level = getattr(getattr(requester, "level", None), "value", requester.level)
-    is_admin = requester_level == "admin"
+    from app.services.item_write_validation import validate_active_items
+    validate_active_items(db, _request_inventory_item_ids(db, request, lines),
+                          raw_receive=request.request_type == StockRequestTypeEnum.RAW_RECEIVE)
     can_self_approve_department = can_approve_department(
         requester,
         request.approval_department or request.requester_department,
@@ -947,7 +951,6 @@ def _finalize_submission(
 
     warehouse_ok = (
         (not request.requires_warehouse_approval)
-        or is_admin
         or requester_role in ("primary", "deputy")
     )
     dept_ok = (
@@ -966,7 +969,7 @@ def _finalize_submission(
         # 같은 사람이 요청자·승인자로 동시에 표시되는 혼란 방지.
         requester_self_approved = (
             request.requires_warehouse_approval
-            and (requester_role in ("primary", "deputy") or is_admin)
+            and requester_role in ("primary", "deputy")
         ) or (
             request.requires_department_approval
             and can_self_approve_department

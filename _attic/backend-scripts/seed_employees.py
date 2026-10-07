@@ -6,7 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "backend"))
 
 from app.database import SessionLocal
-from app.models import Employee, DepartmentEnum, EmployeeLevelEnum
+from app.models import Employee, DepartmentEnum
 
 REFERENCE_EMPLOYEES = [
     ("E04", "김건호",  "조립/과장",    "조립"),
@@ -50,15 +50,6 @@ CATEGORY_TO_DEPT = {
 }
 
 
-def role_to_level(role: str) -> EmployeeLevelEnum:
-    suffix = role.split("/")[-1] if "/" in role else role
-    if suffix in ("대표",):
-        return EmployeeLevelEnum.ADMIN
-    if suffix in ("부장", "과장", "책임"):
-        return EmployeeLevelEnum.MANAGER
-    return EmployeeLevelEnum.STAFF
-
-
 def main() -> None:
     db = SessionLocal()
     try:
@@ -73,7 +64,6 @@ def main() -> None:
                 name=name,
                 role=role,
                 department=CATEGORY_TO_DEPT[category],
-                level=role_to_level(role),
                 display_order=order,
                 is_active="true",
             ))

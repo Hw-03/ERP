@@ -8,7 +8,7 @@ import { sendClientEvent } from "@/lib/client-events";
 vi.mock("@/lib/client-events", () => ({ sendClientEvent: vi.fn() }));
 
 const operator: Operator = {
-  employee_id: "emp-1", name: "홍길동", role: "staff", department: "조립", level: "staff",
+  employee_id: "emp-1", name: "홍길동", role: "staff", department: "조립",
   employee_code: "E1", warehouse_role: "none", department_role: "none", as_research_approver: false,
   assigned_model_slots: [], io_enabled: true, hidden_sidebar_tabs: [], loginPopupEnabled: false,
 };

@@ -5,6 +5,10 @@ import { MobileDashboardScreen } from "../MobileDashboardScreen";
 const inventoryState = vi.hoisted(() => ({ loading: false, items: [{ item_id: "item-1", item_name: "테스트 품목", quantity: 10, warehouse_qty: 10, locations: [], model_slots: [] }] }));
 const kpiProps = vi.hoisted(() => vi.fn());
 
+vi.mock("@/lib/queries/useItemsQuery", () => ({
+  useItemQuery: () => ({ data: undefined, error: null, isFetching: false, refetch: vi.fn() }),
+}));
+
 vi.mock("../../../_hooks/useInventoryData", () => ({
   useInventoryData: () => ({
     items: inventoryState.items,

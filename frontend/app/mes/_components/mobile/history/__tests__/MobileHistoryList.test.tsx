@@ -120,7 +120,7 @@ describe("MobileHistoryList", () => {
     expect(screen.getByText("작업 정보 확인 중")).toBeInTheDocument();
     await screen.findByRole("alert");
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
-    await waitFor(() => expect(screen.getByText("불량")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("불량 격리")).toBeInTheDocument());
     expect(getBatch).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     getBatch.mockRestore();

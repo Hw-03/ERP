@@ -23,8 +23,8 @@ from bootstrap.legacy_profiles import sqlite_business_data_fingerprint
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
-REVISION = "20261007_0039"
-PREVIOUS_REVISION = "20260928_0038"
+REVISION = "20261007_0040"
+PREVIOUS_REVISION = "20261007_0039"
 DEFAULT_NAMES = (
     "외관 불량", "치수 불량", "기능 불량", "검사 통과", "누유", "이물질", "고압",
     "10A", "선광불량", "mA 불량", "KV 불량", "파형 불량", "기타",
@@ -57,7 +57,7 @@ def _seed_old_history(db: sqlite3.Connection) -> None:
     db.execute("PRAGMA foreign_keys=ON")
     db.execute("INSERT INTO process_types (code,prefix,suffix,stage_order) VALUES ('PF','P','F',1)")
     db.execute("INSERT INTO items (item_id,item_name,unit,model_symbol,process_type_code,serial_no) VALUES ('item','기존 품목','EA','9','PF',1)")
-    db.execute("INSERT INTO employees (employee_id,employee_code,name,role,department,level,display_order,is_active) VALUES ('actor','H-01','기존 작업자','worker','창고','STAFF',0,'true')")
+    db.execute("INSERT INTO employees (employee_id,employee_code,name,role,department,display_order,is_active) VALUES ('actor','H-01','기존 작업자','worker','창고',0,'true')")
     db.execute("INSERT INTO io_batches (batch_id,work_type,sub_type,status,requester_employee_id,requester_name,requester_department,requires_approval,notes) VALUES ('batch','receive','receive_supplier','cancelled','actor','기존 작업자','창고',0,'기존 메모')")
     db.execute("INSERT INTO io_bundles (bundle_id,batch_id,source_kind,source_item_id,title_snapshot,quantity,expanded_level) VALUES ('bundle','batch','item','item','기존 묶음',7,1)")
     db.execute("INSERT INTO io_lines (line_id,bundle_id,item_id,item_name_snapshot,unit,direction,from_bucket,to_bucket,quantity,bom_stock_exempt,included,selected,origin,edited,has_children_snapshot,shortage) VALUES ('io-line','bundle','item','기존 품목','EA','in','none','warehouse',7,0,1,1,'direct',0,0,0)")
@@ -90,7 +90,7 @@ def _upgrade_seeded(path: Path) -> dict[str, tuple[list[str], list[tuple]]]:
     command.upgrade(config, PREVIOUS_REVISION)
     with sqlite3.connect(path) as db:
         _seed_old_history(db)
-        tables = ("io_batches", "io_bundles", "io_lines", "stock_requests", "stock_request_lines", "transaction_logs", "transaction_edit_logs", "defect_quarantine_records", "defect_quarantine_memo_revisions", "defect_quarantine_reconstruction_allocations")
+        tables = ("employees", "io_batches", "io_bundles", "io_lines", "stock_requests", "stock_request_lines", "transaction_logs", "transaction_edit_logs", "defect_quarantine_records", "defect_quarantine_memo_revisions", "defect_quarantine_reconstruction_allocations")
         before = {
             table: ([row[1] for row in db.execute(f"PRAGMA table_info({table})")], db.execute(f"SELECT * FROM {table} ORDER BY 1").fetchall())
             for table in tables

@@ -90,3 +90,31 @@ def test_failed_rehearsal_leaves_original_unchanged(tmp_path: Path, monkeypatch:
     with pytest.raises(prepare.PreparationError, match="migration failed"):
         prepare.rehearse(root, database, tmp_path / "runtime")
     assert database.read_bytes() == original
+
+
+@pytest.mark.parametrize("corrupt", [False, True])
+def test_rehearsal_allows_only_declared_grade_removal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, corrupt: bool) -> None:
+    root, database = fixture_root(tmp_path)
+    migration = root / "backend/alembic/versions/new.py"
+    migration.write_text(migration.read_text(encoding="utf-8").replace(
+        "{'kind': 'schema-only'}", "{'kind': 'data-preserving', 'removed_columns': {'employees': ['level']}}"
+    ), encoding="utf-8")
+    with sqlite3.connect(database) as connection:
+        connection.execute("CREATE TABLE employees(id TEXT, name TEXT, level TEXT)")
+        connection.execute("INSERT INTO employees VALUES ('E1', 'Kim', 'ADMIN')")
+    original = database.read_bytes()
+
+    def migrate(root: Path, candidate: Path, runtime: Path) -> None:
+        with sqlite3.connect(candidate) as connection:
+            connection.execute("ALTER TABLE employees DROP COLUMN level")
+            if corrupt:
+                connection.execute("UPDATE employees SET name='Changed'")
+            connection.execute("UPDATE alembic_version SET version_num='new'")
+
+    monkeypatch.setattr(prepare, "migrate_and_verify", migrate)
+    if corrupt:
+        with pytest.raises(prepare.PreparationError, match="rows changed"):
+            prepare.rehearse(root, database, tmp_path / "runtime")
+    else:
+        prepare.rehearse(root, database, tmp_path / "runtime")
+    assert database.read_bytes() == original

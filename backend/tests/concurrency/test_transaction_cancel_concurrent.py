@@ -13,7 +13,6 @@ from app.models import (
     DefectQuarantineReconstructionAllocation,
     DepartmentEnum,
     Employee,
-    EmployeeLevelEnum,
     Inventory,
     InventoryLocation,
     IoBatch,
@@ -31,7 +30,6 @@ def _actor(session, suffix: str) -> Employee:
         name=f"취소자 {suffix}",
         role="worker",
         department=DepartmentEnum.ASSEMBLY.value,
-        level=EmployeeLevelEnum.STAFF,
         display_order=0,
         is_active=True,
     )

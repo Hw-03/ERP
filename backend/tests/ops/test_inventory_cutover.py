@@ -20,7 +20,6 @@ if str(ROOT) not in sys.path:
 from app.models import (  # noqa: E402
     Department,
     Employee,
-    EmployeeLevelEnum,
     Inventory,
     InventoryLocation,
     IoBatch,
@@ -169,7 +168,6 @@ def _employee(db_session, *, department: str) -> Employee:
         name="Cutover Operator",
         role="ops",
         department=department,
-        level=EmployeeLevelEnum.STAFF,
         warehouse_role="primary",
         department_role="primary",
         display_order=0,

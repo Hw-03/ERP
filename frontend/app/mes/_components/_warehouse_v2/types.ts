@@ -21,7 +21,6 @@ export interface OperatorLike {
   department: string;
   warehouse_role?: string;
   department_role?: string;
-  level?: string;
 }
 
 export type DeptIoDirection = "in" | "out";

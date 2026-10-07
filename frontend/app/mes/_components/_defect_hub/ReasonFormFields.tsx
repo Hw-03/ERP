@@ -40,6 +40,7 @@ export function ReasonFormFields({
   const [open, setOpen] = useState(false);
   const dialogId = useId();
   const searchRef = useRef<HTMLInputElement>(null);
+  const editingRef = useRef<HTMLInputElement>(null);
   const dialogRef = useFocusTrap<HTMLDivElement>(open, { initialFocusRef: searchRef });
   const [search, setSearch] = useState("");
   const [showInactive, setShowInactive] = useState(false);
@@ -56,6 +57,10 @@ export function ReasonFormFields({
   const otherMissingMemo = Boolean(selected?.is_other && !memo.trim());
   const nameTaken = categories.some((entry) => entry.name.normalize("NFKC").trim().toLocaleLowerCase() === needle);
   const hiddenNameTaken = categories.some((entry) => !entry.is_active && entry.name.normalize("NFKC").trim().toLocaleLowerCase() === needle);
+
+  useEffect(() => {
+    if (editingId) editingRef.current?.focus();
+  }, [editingId]);
 
   useEffect(() => {
     if (!open) return;
@@ -90,6 +95,7 @@ export function ReasonFormFields({
         [...previous.filter((entry) => entry.category_id !== saved.category_id), saved]);
       if (!id) { onCategoryChange(saved.name, saved.category_id); setOpen(false); }
       setEditingId(null);
+      if (id) searchRef.current?.focus();
       await queryClient.invalidateQueries({ queryKey: ["defect-reason-categories", employeeId] });
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "사유를 저장하지 못했습니다.");
@@ -156,12 +162,13 @@ export function ReasonFormFields({
                 className="mb-2 flex min-h-11 items-center gap-1 rounded-[12px] border p-2 last:mb-0 md:gap-2 md:p-2.5"
                 style={{ borderColor: LEGACY_COLORS.border, background: entry.category_id === selected?.category_id ? tint(LEGACY_COLORS.blue, 10) : LEGACY_COLORS.s2 }}>
                 {editingId === entry.category_id ? <>
-                  <input aria-label={`${entry.name} 이름 수정`} value={editingName} maxLength={32} disabled={busy}
+                  <input ref={editingRef} aria-label={`${entry.name} 이름 수정`} value={editingName} maxLength={32} disabled={busy}
                     onChange={(event) => setEditingName(event.target.value)} className="min-h-11 min-w-0 flex-1 rounded-[10px] border px-2 text-sm"
                     style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text, borderColor: LEGACY_COLORS.border }} />
                   <Button variant="secondary" className="min-h-11 min-w-11 !px-2" aria-label="이름 저장" disabled={busy || !editingName.trim()}
                     onClick={() => void save({ name: editingName.trim() }, entry.category_id)}><Check size={16} /></Button>
-                  <Button variant="ghost" className="min-h-11 min-w-11 !px-2" aria-label="이름 수정 취소" disabled={busy} onClick={() => setEditingId(null)}><X size={16} /></Button>
+                  <Button variant="ghost" className="min-h-11 min-w-11 !px-2" aria-label="이름 수정 취소" disabled={busy}
+                    onClick={() => { setEditingId(null); searchRef.current?.focus(); }}><X size={16} /></Button>
                 </> : <>
                   <button type="button" disabled={!entry.is_active || busy || query.isError} aria-pressed={entry.category_id === selected?.category_id}
                     onClick={() => { onCategoryChange(entry.name, entry.category_id); setOpen(false); }}
@@ -172,10 +179,10 @@ export function ReasonFormFields({
                     {entry.category_id === selected?.category_id && <Check size={16} className="shrink-0" style={{ color: LEGACY_COLORS.blue }} />}
                   </button>
                   {!entry.is_other && <>
-                    <Button variant="ghost" className="min-h-11 min-w-11 !px-2" aria-label={`${entry.name} 이름 수정`} disabled={busy}
+                    <Button variant="ghost" className="min-h-11 min-w-11 !px-2" aria-label={`${entry.name} 이름 수정`} title="이름 수정" disabled={busy}
                       onClick={() => { setEditingId(entry.category_id); setEditingName(entry.name); }}><Pencil size={16} /></Button>
                     <Button variant={entry.is_active ? "ghost" : "secondary"} className="min-h-11 min-w-11 !px-2"
-                      aria-label={`${entry.name} ${entry.is_active ? "숨김" : "복원"}`} disabled={busy}
+                      aria-label={`${entry.name} ${entry.is_active ? "숨김" : "복원"}`} title={entry.is_active ? "숨김" : "복원"} disabled={busy}
                       onClick={() => void save({ is_active: !entry.is_active }, entry.category_id)}>
                       {entry.is_active ? <Archive size={16} /> : <RotateCcw size={16} />}
                     </Button>

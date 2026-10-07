@@ -16,7 +16,6 @@ from app.models import (
     DefectQuarantineReconstructionAllocation,
     DepartmentEnum,
     Employee,
-    EmployeeLevelEnum,
     Inventory,
     InventoryLocation,
     LocationStatusEnum,
@@ -43,7 +42,6 @@ def _make_employee(
         name=name,
         role=f"{department.value}/staff",
         department=department,
-        level=EmployeeLevelEnum.STAFF,
         warehouse_role=warehouse_role,
         department_role=department_role,
         display_order=0,
@@ -131,6 +129,7 @@ def test_cancel_quarantine_restores_warehouse_and_defective(client, db_session, 
             "qty": 30,
             "source": "warehouse",
             "target_dept": DepartmentEnum.WAREHOUSE.value,
+            "reason_category": "외관 불량",
             "reason_memo": "표면 흠집",
             "actor_employee_id": str(actor.employee_id),
         },
@@ -206,7 +205,7 @@ def test_8_7_05_cancel_direct_scrap_restores_only_original_normal_stock(
         json={
             "requester_employee_id": str(actor.employee_id),
             "request_type": "scrap_normal",
-            "reason_category": "폐기",
+            "reason_category": "외관 불량",
             "reason_memo": "즉시 폐기 회귀",
             "lines": [
                 {
@@ -1528,14 +1527,16 @@ def test_cancel_non_self_non_approver_forbidden(client, db_session, make_item):
     other = _make_employee(db_session, code="OTH1", name="무권한타인")  # 역할 없음
     db_session.commit()
 
-    client.post(
+    created = client.post(
         "/api/defects/quarantine",
         json={
             "item_id": str(item.item_id), "qty": 10, "source": "warehouse",
             "target_dept": DepartmentEnum.WAREHOUSE.value, "reason_memo": "x",
+            "reason_category": "외관 불량",
             "actor_employee_id": str(requester.employee_id),
         },
     )
+    assert created.status_code == 200, created.text
     log = db_session.query(TransactionLog).filter(
         TransactionLog.transaction_type == TransactionTypeEnum.MARK_DEFECTIVE
     ).first()
@@ -1577,14 +1578,16 @@ def test_cancel_approver_can_cancel_others(client, db_session, make_item):
     approver = _make_employee(db_session, code="WH1", name="창고장", warehouse_role="primary")
     db_session.commit()
 
-    client.post(
+    created = client.post(
         "/api/defects/quarantine",
         json={
             "item_id": str(item.item_id), "qty": 10, "source": "warehouse",
             "target_dept": DepartmentEnum.WAREHOUSE.value, "reason_memo": "x",
+            "reason_category": "외관 불량",
             "actor_employee_id": str(requester.employee_id),
         },
     )
+    assert created.status_code == 200, created.text
     log = db_session.query(TransactionLog).filter(
         TransactionLog.transaction_type == TransactionTypeEnum.MARK_DEFECTIVE
     ).first()

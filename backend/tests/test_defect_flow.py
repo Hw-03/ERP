@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -24,7 +24,6 @@ from app.models import (
     DefectQuarantineRecord,
     DefectQuarantineReconstruction,
     Employee,
-    EmployeeLevelEnum,
     Inventory,
     InventoryLocation,
     LocationStatusEnum,
@@ -41,6 +40,7 @@ from app.models import (
 from app.services.pin_auth import DEFAULT_PIN_HASH, hash_pin
 from app.services import inventory as inventory_svc
 from app.services import defect_records as defect_records_svc
+from app.services.defect_statistics import get_defect_statistics
 
 
 # ---------------------------------------------------------------------------
@@ -55,6 +55,74 @@ def _registered_test_reason_categories(db_session):
     for name in ["외관불량", "치수불량", "기능불량", "검사통과", "재검사 통과", "재작업", "폐기", "assembly-category", "high-voltage-category", "tx-category", "R" * 32]:
         db_session.add(DefectReasonCategory(name=name, normalized_name=normalize_defect_reason_name(name), is_active=True, is_other=False))
     db_session.flush()
+
+
+@pytest.mark.parametrize("initial_category", ["DEFECT", "B_GRADE", "OBSOLETE"])
+@pytest.mark.parametrize("action", ["unquarantine", "defect_scrap", "defect_return"])
+@pytest.mark.parametrize("processed_quantity", [1, 3])
+def test_occurrence_statistics_survives_category_changes_and_final_processing(
+    db_session, client, make_item, initial_category, action, processed_quantity,
+):
+    """G03~G05: 실제 후속 처리로 잔량이 소진되어도 최초 발생량은 보존한다."""
+    item = make_item(name="발생량 보존", process_type_code="TR", warehouse_qty=Decimal("5"))
+    actor = _make_employee(db_session, code="OCCURRENCE", name="발생량 작업자")
+    supplier = _make_supplier(db_session) if action == "defect_return" else None
+    db_session.commit()
+    created = client.post("/api/defects/quarantine", json={
+        "item_id": str(item.item_id), "qty": 3, "source": "warehouse",
+        "target_dept": DepartmentEnum.WAREHOUSE.value, "reason_category": "외관 불량",
+        "management_category": initial_category, "actor_employee_id": str(actor.employee_id),
+    })
+    assert created.status_code == 200, created.text
+    record = db_session.query(DefectQuarantineRecord).filter_by(item_id=item.item_id).one()
+    from app.schemas.defect_statistics import DefectStatisticsFilters
+    params = dict(period="month", anchor=date(2020, 9, 1),
+                  filters=DefectStatisticsFilters(item_id=item.item_id))
+    record.quarantined_at = datetime(2020, 9, 2)
+    db_session.commit()
+    before = get_defect_statistics(db_session, **params).model_dump()
+    changed_category = "B_GRADE" if initial_category == "DEFECT" else "DEFECT"
+    changed = client.put(f"/api/defects/records/{record.record_id}/management-category", json={
+        "management_category": changed_category, "expected_management_category": initial_category,
+        "actor_employee_id": str(actor.employee_id), "pin": "0000",
+    })
+    assert changed.status_code == 200, changed.text
+    assert get_defect_statistics(db_session, **params).model_dump() == before
+    if changed_category != "DEFECT":
+        assert client.put(f"/api/defects/records/{record.record_id}/management-category", json={
+            "management_category": "DEFECT", "expected_management_category": changed_category,
+            "actor_employee_id": str(actor.employee_id), "pin": "0000",
+        }).status_code == 200
+    if action == "unquarantine":
+        processed = client.post("/api/defects/unquarantine", json={
+            "item_id": str(item.item_id), "record_id": str(record.record_id), "qty": processed_quantity,
+            "dept": DepartmentEnum.WAREHOUSE.value, "reason_category": "외관 불량", "reason_memo": "복귀 검증",
+            "actor_employee_id": str(actor.employee_id),
+        })
+        assert processed.status_code == 200, processed.text
+    else:
+        payload = {
+            "requester_employee_id": str(actor.employee_id), "request_type": action,
+            "reason_category": "외관 불량",
+            "lines": [{"item_id": str(item.item_id), "record_id": str(record.record_id),
+                       "quantity": processed_quantity, "from_bucket": "defective",
+                       "from_department": DepartmentEnum.WAREHOUSE.value, "to_bucket": "none"}],
+        }
+        if supplier is not None:
+            payload["supplier_id"] = str(supplier.supplier_id)
+        processed = client.post("/api/stock-requests", json=payload)
+        assert processed.status_code == 201, processed.text
+        assert processed.json()["status"] == "completed"
+    db_session.expire_all()
+    assert db_session.get(DefectQuarantineRecord, record.record_id).remaining_quantity == 3 - processed_quantity
+    assert get_defect_statistics(db_session, **params).model_dump() == before
+    assert before["summary"]["quantity"] == 3
+    assert before["summary"]["record_count"] == 1
+    assert [entry["quantity"] for entry in before["categories"]] == [
+        3 if category == initial_category else 0
+        for category in ("DEFECT", "B_GRADE", "OBSOLETE")
+    ]
+
 
 @pytest.mark.parametrize("request_type", ["defect_scrap", "defect_return", "defect_disassemble"])
 @pytest.mark.parametrize("fail_second", [False, True])
@@ -146,7 +214,6 @@ def _make_employee(
     department: DepartmentEnum = DepartmentEnum.ASSEMBLY,
     warehouse_role: str = "none",
     department_role: str = "none",
-    level: EmployeeLevelEnum = EmployeeLevelEnum.STAFF,
     pin: str = "0000",
 ) -> Employee:
     emp = Employee(
@@ -154,7 +221,6 @@ def _make_employee(
         name=name,
         role=f"{department.value}/사원",
         department=department.value if isinstance(department, DepartmentEnum) else department,
-        level=level,
         warehouse_role=warehouse_role,
         department_role=department_role,
         display_order=0,

@@ -12,7 +12,6 @@ from sqlalchemy import event
 from app.models import (
     DepartmentEnum,
     Employee,
-    EmployeeLevelEnum,
     InventoryLocation,
     LocationStatusEnum,
     Supplier,
@@ -20,6 +19,15 @@ from app.models import (
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "dev" / "seed_history_showcase.py"
+
+
+def test_showcase_actor_uses_assigned_warehouse_role(db_session):
+    module = _load_showcase_module()
+    unassigned = Employee(employee_code="FIRST", name="First", role="worker", department="assembly", display_order=0, is_active=True)
+    assigned = Employee(employee_code="SECOND", name="Second", role="worker", department="assembly", display_order=1, is_active=True, warehouse_role="deputy")
+    db_session.add_all([unassigned, assigned])
+    db_session.flush()
+    assert module._active_admin(db_session).employee_id == assigned.employee_id
 
 
 def _add_supplier(db_session, name: str = "이력 검증 공급업체") -> Supplier:
@@ -42,10 +50,10 @@ def test_showcase_dry_run_selects_real_workflow_candidates(db_session, make_item
 
     actor = Employee(
         employee_code="DEMO-ADMIN",
+        warehouse_role="primary",
         name="검증 관리자",
         role="관리자",
         department=DepartmentEnum.ASSEMBLY,
-        level=EmployeeLevelEnum.ADMIN,
         is_active=True,
     )
     db_session.add(actor)
@@ -84,10 +92,10 @@ def test_showcase_apply_rolls_back_everything_when_a_late_step_fails(db_session,
 
     actor = Employee(
         employee_code="DEMO-ADMIN",
+        warehouse_role="primary",
         name="검증 관리자",
         role="관리자",
         department=DepartmentEnum.ASSEMBLY,
-        level=EmployeeLevelEnum.ADMIN,
         is_active=True,
     )
     db_session.add(actor)
@@ -136,10 +144,10 @@ def test_showcase_apply_creates_searchable_real_inventory_history(db_session, ma
     module = _load_showcase_module()
     actor = Employee(
         employee_code="SHOWCASE-ADMIN",
+        warehouse_role="primary",
         name="이력 검증 관리자",
         role="관리자",
         department=DepartmentEnum.ASSEMBLY,
-        level=EmployeeLevelEnum.ADMIN,
         is_active=True,
     )
     db_session.add(actor)
@@ -225,10 +233,10 @@ def test_showcase_remove_restores_inventory_and_deletes_marked_records(db_sessio
     module = _load_showcase_module()
     actor = Employee(
         employee_code="REMOVE-SHOWCASE-ADMIN",
+        warehouse_role="primary",
         name="쇼케이스 정리 관리자",
         role="관리자",
         department=DepartmentEnum.ASSEMBLY,
-        level=EmployeeLevelEnum.ADMIN,
         is_active=True,
     )
     db_session.add(actor)

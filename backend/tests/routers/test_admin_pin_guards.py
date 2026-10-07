@@ -6,7 +6,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.models import BOM, Employee, EmployeeLevelEnum, ProductSymbol
+from app.models import BOM, Employee, ProductSymbol
 from app.utils.mes_code import refresh_symbol_cache
 
 ADMIN_HEADERS = {"X-Admin-Pin": "0000"}
@@ -31,7 +31,6 @@ def _employee(db_session):
         name="Guard Employee",
         role="worker",
         department="assembly",
-        level=EmployeeLevelEnum.STAFF,
         display_order=0,
         is_active="true",
         io_enabled=True,
@@ -87,7 +86,6 @@ def test_employee_master_write_endpoints_require_admin_pin(client, db_session):
         "name": "No Pin Employee",
         "role": "worker",
         "department": "assembly",
-        "level": "staff",
         "warehouse_role": "none",
         "department_role": "none",
         "display_order": 0,

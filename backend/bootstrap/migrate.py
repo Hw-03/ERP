@@ -133,7 +133,7 @@ _MIGRATION_DDL: list[str] = [
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
     )""",
     "CREATE INDEX IF NOT EXISTS ix_tel_original ON transaction_edit_logs(original_log_id)",
-    # 창고 결재 역할 — 직원 업무 역할(시스템 권한 level과 별개)
+    # 창고 결재 역할 — 독립적인 직원 업무 역할
     "ALTER TABLE employees ADD COLUMN warehouse_role VARCHAR(20) NOT NULL DEFAULT 'none'",
     # 부서 결재 역할 — 낱개 IO 작업 승인 권한 (warehouse_role 와 별개)
     "ALTER TABLE employees ADD COLUMN department_role VARCHAR(20) NOT NULL DEFAULT 'none'",

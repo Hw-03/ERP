@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.models import Employee, EmployeeLevelEnum
+from app.models import Employee
 from app.services.dept_hierarchy import (
     PRODUCTION_LINES,
     approvable_departments,
@@ -41,7 +41,6 @@ def _make_employee(
     department: str = "조립",
     department_role: str = "none",
     warehouse_role: str = "none",
-    level: EmployeeLevelEnum = EmployeeLevelEnum.STAFF,
 ) -> Employee:
     return Employee(
         employee_code="TEST",
@@ -50,7 +49,6 @@ def _make_employee(
         department=department,
         department_role=department_role,
         warehouse_role=warehouse_role,
-        level=level,
         is_active="true",
     )
 
@@ -91,7 +89,8 @@ class TestCanApproveDepartment:
 
     def test_admin_레벨_단독은_결재_불가(self):
         # G 결정: admin level은 결재 권한과 무관 — warehouse/dept role 없으면 거부
-        actor = _make_employee(level=EmployeeLevelEnum.ADMIN)
+        actor = _make_employee()
+        actor.level = "ADMIN"  # 이전 세션·호환 객체의 등급도 무시한다.
         for dept in ("진공", "영업", "창고"):
             assert can_approve_department(actor, dept) is False
 
@@ -114,7 +113,8 @@ class TestApprovableDepartments:
 
     def test_admin_레벨_단독은_빈_frozenset(self):
         # G 결정: admin level은 결재 권한과 무관 — warehouse/dept role 없으면 빈 셋
-        actor = _make_employee(level=EmployeeLevelEnum.ADMIN)
+        actor = _make_employee()
+        actor.level = "ADMIN"
         assert approvable_departments(actor) == frozenset()
 
     def test_부서_정부도_None(self):

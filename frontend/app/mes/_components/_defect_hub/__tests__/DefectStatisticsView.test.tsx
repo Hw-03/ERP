@@ -23,12 +23,24 @@ const report = {
   reasons: [group("외관", 5, 2), group("파손", 5, 2)],
   departments: [group("조립", 6, 2), group("품질", 4, 2)],
   excluded_legacy_count: 1,
+  excluded_category_count: 2,
+  categories: [
+    { key: "DEFECT", label: "불량", quantity: 6, record_count: 2 },
+    { key: "B_GRADE", label: "B급", quantity: 3, record_count: 1 },
+    { key: "OBSOLETE", label: "구형", quantity: 1, record_count: 1 },
+  ],
   comparison: {
     period: { kind: "month" as const, anchor: "2026-09-06", start_date: "2026-09-01", end_date: "2026-09-30" },
     observed_until: "2026-09-06T10:00:00+09:00", is_partial: true, range_adjusted: false,
     summary: { quantity: 8, record_count: 3, top_item: item("d", "이전품목", 4), top_reason: group("외관", 3) },
     items: [item("a", "A품목", 4), item("d", "이전품목", 4)],
     reasons: [group("외관", 3)], departments: [group("조립", 8)], excluded_legacy_count: 2,
+    excluded_category_count: 1,
+    categories: [
+      { key: "DEFECT", label: "불량", quantity: 4, record_count: 1 },
+      { key: "B_GRADE", label: "B급", quantity: 4, record_count: 2 },
+      { key: "OBSOLETE", label: "구형", quantity: 0, record_count: 0 },
+    ],
     quantity_delta: 2, quantity_change_pct: 25, record_count_delta: 1, record_count_change_pct: 33.3,
   },
 };
@@ -49,6 +61,20 @@ describe("DefectStatisticsView report", () => {
     window.sessionStorage.clear();
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date("2026-10-06T10:10:00+09:00"));
+  });
+
+  it.each([false, true])("shows immutable initial categories and comparison without new filters (mobile %s)", async (mobilePresentation) => {
+    render(<DefectStatisticsView {...props} mobilePresentation={mobilePresentation} />);
+    const categories = await screen.findByRole("table", { name: "최초 발생 분류별 집계" });
+    const rows = within(categories).getAllByRole("row");
+    expect(rows.map((row) => row.textContent)).toEqual([
+      "최초 분류발생 수량발생 건수이전 수량이전 건수",
+      "불량6개2건4개1건", "B급3개1건4개2건", "구형1개1건0개0건",
+    ]);
+    expect(screen.getByText(/원래 수량과 최초 발생 분류/)).toBeInTheDocument();
+    expect(screen.getByText(/최초 분류를 확인할 수 없는 기록.*현재 2건.*비교 기간 1건/)).toBeInTheDocument();
+    expect(screen.queryByText(/B급·구형 제외/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "B급" })).not.toBeInTheDocument();
   });
 
   it("opens this month and all categories with compact collapsed filters", async () => {
