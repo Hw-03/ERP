@@ -222,7 +222,7 @@ def test_inventory_day_flow_preserves_quantities_and_audit_trail(db_session, cli
         "source": "production",
         "source_dept": DepartmentEnum.HIGH_VOLTAGE.value,
         "target_dept": DepartmentEnum.HIGH_VOLTAGE.value,
-        "reason_category": "inspection fail",
+        "reason_category": "기능 불량",
         "reason_memo": "day flow quarantine",
         "actor_employee_id": str(worker.employee_id),
     })
@@ -238,12 +238,13 @@ def test_inventory_day_flow_preserves_quantities_and_audit_trail(db_session, cli
     assert _inv(db_session, item.item_id).quantity == D("100")
     mark_log = _latest_log(db_session, item.item_id, TransactionTypeEnum.MARK_DEFECTIVE)
     _assert_auditable(mark_log, worker, require_reference=False)
-    assert mark_log.reason_category == "inspection fail"
+    assert mark_log.reason_category == "기능 불량"
 
     defect_return = _stock_request(
         client,
         requester=worker,
         request_type="defect_return",
+        reason_category="기능 불량",
         supplier_id=str(supplier.supplier_id),
         requires_department_approval=True,
         lines=[{

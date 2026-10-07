@@ -80,6 +80,7 @@ def test_quarantine_rejects_forged_department_before_stock_change(
         "source": "production",
         "source_dept": DepartmentEnum.ASSEMBLY.value,
         "target_dept": DepartmentEnum.ASSEMBLY.value,
+        "reason_category": "기타",
         "reason_memo": "위조 부서",
         "actor_employee_id": str(employee.employee_id),
     })
@@ -89,6 +90,7 @@ def test_quarantine_rejects_forged_department_before_stock_change(
         "source": "warehouse",
         "source_dept": DepartmentEnum.VACUUM.value,
         "target_dept": DepartmentEnum.VACUUM.value,
+        "reason_category": "기타",
         "reason_memo": "창고 위조 부서",
         "actor_employee_id": str(employee.employee_id),
     })
@@ -109,6 +111,7 @@ def test_quarantine_warehouse_uses_warehouse_target_and_exact_retry_is_idempoten
         "qty": "2",
         "source": "warehouse",
         "target_dept": DepartmentEnum.WAREHOUSE.value,
+        "reason_category": "기타",
         "reason_memo": "창고 정상 격리",
         "actor_employee_id": str(employee.employee_id),
         "client_request_id": "auto-department-exact-retry",
@@ -139,6 +142,7 @@ def test_stock_request_exact_retry_survives_later_item_department_change(
         "requester_employee_id": str(employee.employee_id),
         "request_type": "scrap_normal",
         "reason_category": "기타",
+        "reason_memo": "품목 부서 변경 후 동일 요청 재시도",
         "client_request_id": "retry-after-process-change",
         "lines": [{
             "item_id": str(item.item_id),
@@ -186,6 +190,7 @@ def test_warehouse_normal_request_does_not_require_item_department_mapping(
         "requester_employee_id": str(employee.employee_id),
         "request_type": "scrap_normal",
         "reason_category": "기타",
+        "reason_memo": "창고 미매핑 품목 폐기",
         "lines": [{
             "item_id": str(item.item_id),
             "quantity": 1,
@@ -240,6 +245,7 @@ def test_stock_request_rejects_nonautomatic_normal_source_department(
         "requester_employee_id": str(employee.employee_id),
         "request_type": request_type,
         "reason_category": "기타",
+        "reason_memo": "자동 부서와 다른 출발 부서 검증",
         "lines": [{
             "item_id": str(item.item_id),
             "quantity": 1,
@@ -269,6 +275,7 @@ def test_stock_request_allows_each_production_line_its_own_item_department(
         "requester_employee_id": str(employee.employee_id),
         "request_type": "scrap_normal",
         "reason_category": "기타",
+        "reason_memo": "품목별 생산 부서 폐기",
         "lines": [
             {"item_id": str(tube.item_id), "quantity": 1, "from_bucket": "production", "from_department": DepartmentEnum.TUBE.value, "to_bucket": "none"},
             {"item_id": str(vacuum.item_id), "quantity": 1, "from_bucket": "production", "from_department": DepartmentEnum.VACUUM.value, "to_bucket": "none"},
@@ -373,6 +380,7 @@ def test_draft_submit_rejects_department_stale_after_item_process_change(
         "requester_employee_id": str(employee.employee_id),
         "request_type": "scrap_normal",
         "reason_category": "기타",
+        "reason_memo": "초안 이후 품목 부서 변경",
         "lines": [{
             "item_id": str(item.item_id),
             "quantity": 1,
