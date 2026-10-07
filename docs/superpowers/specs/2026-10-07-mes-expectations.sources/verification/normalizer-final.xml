@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+	<testcase name="동일한 테스트의 LF와 CRLF는 같은 소스 근거이며 코드 변경은 거부한다" time="0.023481" classname="test"/>
+	<testcase name="원장 ID·기대·피드백·과거 관찰을 보존하고 분모를 원장에서 산출한다" time="0.001584" classname="test"/>
+	<testcase name="범위 밖 원문은 문장별 미검토 조건으로 남기고 전부 실행돼도 PASS를 거부한다" time="0.001970" classname="test"/>
+	<testcase name="알 수 없는 ID·중복 원장·중복 정책·누락 조건을 거부한다" time="0.002129" classname="test"/>
+	<testcase name="실제 selector의 assertion 조각과 파일 SHA를 연결한다" time="0.001867" classname="test"/>
+	<testcase name="여러 개별 조건이 같은 selector를 참조해도 assertion은 각각 유지한다" time="0.002050" classname="test"/>
+	<testcase name="누락 selector·주석뿐인 ID/assertion·다른 테스트의 assertion·변경된 SHA를 탐지한다" time="0.005210" classname="test"/>
+	<testcase name="Python 예외 assertion은 실제 pytest.raises 본문으로 검증한다" time="0.001950" classname="test"/>
+	<testcase name="전체 테스트 선언이 여러 줄 fixture 문자열 안에 있으면 실행 근거로 인정하지 않는다" time="0.001680" classname="test"/>
+	<testcase name="종료된 테스트 다음의 미실행 helper assertion은 해당 selector의 근거가 아니다" time="0.003361" classname="test"/>
+	<testcase name="Python 테스트의 dedent 뒤 모듈 assertion은 해당 함수의 근거가 아니다" time="0.002199" classname="test"/>
+	<testcase name="Python decorator와 여러 줄 함수 서명은 유지하되 함수 밖 assertion은 제외한다" time="0.002496" classname="test"/>
+	<testcase name="smoke·P0·ID 필터가 실제 selector만 선택하고 알 수 없는 ID·미연결 조건은 거부한다" time="0.002483" classname="test"/>
+	<testcase name="개별 조건 일부만 실행한 경우 케이스 전체 PASS를 만들지 않는다" time="0.002841" classname="test"/>
+	<testcase name="개별 조건 누락·중복·registry 중복·근거 없는 실행 PASS를 탐지한다" time="0.002370" classname="test"/>
+	<testcase name="현재 PASS는 각 selector의 실행 결과 artifact와 SHA까지 일치해야 한다" time="0.003867" classname="test"/>
+	<!-- tests 16 -->
+	<!-- suites 0 -->
+	<!-- pass 16 -->
+	<!-- fail 0 -->
+	<!-- cancelled 0 -->
+	<!-- skipped 0 -->
+	<!-- todo 0 -->
+	<!-- duration_ms 277.0254 -->
+</testsuites>

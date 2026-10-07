@@ -8,3 +8,6 @@
 
 # Shell scripts: force LF (in case anyone commits one from Windows in the future).
 *.sh    text eol=lf
+
+# Audit originals and execution artifacts retain their exact evidence bytes.
+docs/superpowers/specs/2026-10-07-mes-expectations.sources/** -text

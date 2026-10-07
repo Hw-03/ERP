@@ -1,6 +1,6 @@
 ---
 name: mes-browser-regression
-description: Use when DEXCOWIN MES fixes need repeatable browser regression checks, especially model symbols, admin item editing, employee model deletion, shipping cancellation or initial stock reporting.
+description: Use when DEXCOWIN MES fixes need repeatable browser regression checks, especially employee roles, occurrence statistics, raw receipt, inventory detail restoration, cancellation counts or appearance synchronization.
 ---
 
 # DEXCOWIN MES 브라우저 회귀 검증
@@ -27,6 +27,10 @@ python .agents/skills/mes-browser-regression/scripts/qa_session.py start --run-i
 사용 가능한 브라우저 도구의 문서를 먼저 읽는다. `session.json`의 frontend URL에서 `/mes`를 열고 QA-ADMIN 계정의 로컬 기본 비밀번호 `0000`으로 로그인한다. 실제 UI 클릭·입력·저장·재열기를 수행한다. API·DB 확인은 보조 근거이며 UI 조작의 대체가 아니다.
 
 [시나리오](references/scenarios.md)에서 이번 변경에 해당하는 부분만 선택한다. 테스트 fixture는 QA 환경에만 만든다. 관련 자동 테스트 결과와 UI 관찰을 혼합하지 않는다.
+
+확정 기대값은 후속 원장 `docs/superpowers/specs/2026-10-07-mes-expectations.json`의 개별 검증 조건으로 확인한다. 연결 도구의 결과는 테스트 존재·검증 조건 연결 상태이며 실행 PASS가 아니다. 원본 사용자 보류를 승인으로 바꾸지 않는다. 신규 정책 시나리오를 검수할 때는 아래 참조의 정상 경로와 실패 경로를 각각 기록한다.
+
+같은 직원의 두 탭은 같은 브라우저 컨텍스트에서 열어야 한다. 다른 직원 격리 확인도 같은 컨텍스트의 별도 탭에서 로그인한다. 별도 브라우저 프로필을 사용해 storage 이벤트가 전달되지 않는 것을 직원 격리 증거로 삼지 않는다. 설정 저장 실패·역순 응답·조회 실패 같은 주입 시나리오는 격리 Playwright 테스트로 검증하고, 실제 UI 정상 경로 관찰과 구분한다.
 
 각 단계의 기대값, 실제값, 감사 ID와 **검증한 부분 범위**, URL, KST, 화면/다운로드/보조 근거를 실행 폴더의 `results.md`에 기록한다. 화면 증거는 도구가 지원하는 방식으로 저장한다. 결과는 `PASS`, `DIFFERENCE`, `BLOCKED`, `SKIP` 중 하나다. 관찰하지 않은 화면을 통과로 쓰지 않는다. 준비 취소 정합성만 확인한 `PC-DELTA-PF-03`은 F705 다운로드 전체 PASS가 아니다.
 

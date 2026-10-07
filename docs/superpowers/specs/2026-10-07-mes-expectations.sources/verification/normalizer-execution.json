@@ -1,0 +1,104 @@
+{
+  "command": "node --test --test-reporter=junit scripts/dev/normalize-mes-expectations.test.mjs",
+  "executedAt": "2026-10-07T04:37:34.666397+00:00",
+  "runnerOutput": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/verification/normalizer-final.xml",
+  "runnerOutputHash": "9e0cdd30e16be7ed3f50b5ae39dc65ecb8d8cae007ba23f44134af11ba8e30ea",
+  "results": [
+    {
+      "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+      "selector": "동일한 테스트의 LF와 CRLF는 같은 소스 근거이며 코드 변경은 거부한다",
+      "sourceHash": "20dbf2c41fab7225c9dcb81b6907f8c499fbca345d2194a642280f9e282bee62",
+      "status": "PASS"
+    },
+    {
+      "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+      "selector": "원장 ID·기대·피드백·과거 관찰을 보존하고 분모를 원장에서 산출한다",
+      "sourceHash": "20dbf2c41fab7225c9dcb81b6907f8c499fbca345d2194a642280f9e282bee62",
+      "status": "PASS"
+    },
+    {
+      "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+      "selector": "범위 밖 원문은 문장별 미검토 조건으로 남기고 전부 실행돼도 PASS를 거부한다",
+      "sourceHash": "20dbf2c41fab7225c9dcb81b6907f8c499fbca345d2194a642280f9e282bee62",
+      "status": "PASS"
+    },
+    {
+      "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+      "selector": "알 수 없는 ID·중복 원장·중복 정책·누락 조건을 거부한다",
+      "sourceHash": "20dbf2c41fab7225c9dcb81b6907f8c499fbca345d2194a642280f9e282bee62",
+      "status": "PASS"
+    },
+    {
+      "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+      "selector": "실제 selector의 assertion 조각과 파일 SHA를 연결한다",
+      "sourceHash": "20dbf2c41fab7225c9dcb81b6907f8c499fbca345d2194a642280f9e282bee62",
+      "status": "PASS"
+    },
+    {
+      "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+      "selector": "여러 개별 조건이 같은 selector를 참조해도 assertion은 각각 유지한다",
+      "sourceHash": "20dbf2c41fab7225c9dcb81b6907f8c499fbca345d2194a642280f9e282bee62",
+      "status": "PASS"
+    },
+    {
+      "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+      "selector": "누락 selector·주석뿐인 ID/assertion·다른 테스트의 assertion·변경된 SHA를 탐지한다",
+      "sourceHash": "20dbf2c41fab7225c9dcb81b6907f8c499fbca345d2194a642280f9e282bee62",
+      "status": "PASS"
+    },
+    {
+      "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+      "selector": "Python 예외 assertion은 실제 pytest.raises 본문으로 검증한다",
+      "sourceHash": "20dbf2c41fab7225c9dcb81b6907f8c499fbca345d2194a642280f9e282bee62",
+      "status": "PASS"
+    },
+    {
+      "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+      "selector": "전체 테스트 선언이 여러 줄 fixture 문자열 안에 있으면 실행 근거로 인정하지 않는다",
+      "sourceHash": "20dbf2c41fab7225c9dcb81b6907f8c499fbca345d2194a642280f9e282bee62",
+      "status": "PASS"
+    },
+    {
+      "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+      "selector": "종료된 테스트 다음의 미실행 helper assertion은 해당 selector의 근거가 아니다",
+      "sourceHash": "20dbf2c41fab7225c9dcb81b6907f8c499fbca345d2194a642280f9e282bee62",
+      "status": "PASS"
+    },
+    {
+      "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+      "selector": "Python 테스트의 dedent 뒤 모듈 assertion은 해당 함수의 근거가 아니다",
+      "sourceHash": "20dbf2c41fab7225c9dcb81b6907f8c499fbca345d2194a642280f9e282bee62",
+      "status": "PASS"
+    },
+    {
+      "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+      "selector": "Python decorator와 여러 줄 함수 서명은 유지하되 함수 밖 assertion은 제외한다",
+      "sourceHash": "20dbf2c41fab7225c9dcb81b6907f8c499fbca345d2194a642280f9e282bee62",
+      "status": "PASS"
+    },
+    {
+      "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+      "selector": "smoke·P0·ID 필터가 실제 selector만 선택하고 알 수 없는 ID·미연결 조건은 거부한다",
+      "sourceHash": "20dbf2c41fab7225c9dcb81b6907f8c499fbca345d2194a642280f9e282bee62",
+      "status": "PASS"
+    },
+    {
+      "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+      "selector": "개별 조건 일부만 실행한 경우 케이스 전체 PASS를 만들지 않는다",
+      "sourceHash": "20dbf2c41fab7225c9dcb81b6907f8c499fbca345d2194a642280f9e282bee62",
+      "status": "PASS"
+    },
+    {
+      "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+      "selector": "개별 조건 누락·중복·registry 중복·근거 없는 실행 PASS를 탐지한다",
+      "sourceHash": "20dbf2c41fab7225c9dcb81b6907f8c499fbca345d2194a642280f9e282bee62",
+      "status": "PASS"
+    },
+    {
+      "file": "scripts/dev/normalize-mes-expectations.test.mjs",
+      "selector": "현재 PASS는 각 selector의 실행 결과 artifact와 SHA까지 일치해야 한다",
+      "sourceHash": "20dbf2c41fab7225c9dcb81b6907f8c499fbca345d2194a642280f9e282bee62",
+      "status": "PASS"
+    }
+  ]
+}

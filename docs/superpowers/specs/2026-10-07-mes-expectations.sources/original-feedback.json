@@ -1,0 +1,1763 @@
+{
+  "schemaVersion": 3,
+  "auditRunId": "PC-REAUDIT-20260929-4ee96514",
+  "exportedAt": "2026-10-06T05:13:27.276Z",
+  "reviews": {
+    "8.1-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T00:06:11.058Z"
+    },
+    "8.1-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T00:06:26.044Z"
+    },
+    "8.1-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T00:28:00.100Z"
+    },
+    "8.1-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T01:51:30.066Z"
+    },
+    "8.1-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T01:51:50.161Z"
+    },
+    "8.1-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T01:52:13.782Z"
+    },
+    "8.2-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T01:52:18.335Z"
+    },
+    "8.2-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T01:52:23.934Z"
+    },
+    "8.2-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T01:52:40.477Z"
+    },
+    "8.2-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T01:54:12.791Z"
+    },
+    "8.2-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T01:55:19.729Z"
+    },
+    "8.2-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T01:55:33.369Z"
+    },
+    "8.2-07": {
+      "verdict": "hold",
+      "note": "기대 문구가 맞긴 한데, 애초에 시스템 관리자라는 개념 자체를 없애고 싶어\n괜히 헷갈리니까",
+      "updatedAt": "2026-09-21T01:58:51.843Z"
+    },
+    "8.2-08": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T01:59:11.676Z"
+    },
+    "8.3-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T01:59:31.716Z"
+    },
+    "8.3-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:04:00.551Z"
+    },
+    "8.3-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:04:05.755Z"
+    },
+    "8.3-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:04:13.594Z"
+    },
+    "8.3-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:04:26.729Z"
+    },
+    "8.3-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:04:33.327Z"
+    },
+    "8.4-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:04:44.349Z"
+    },
+    "8.4-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:04:54.248Z"
+    },
+    "8.4-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:05:02.843Z"
+    },
+    "8.4-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:05:17.905Z"
+    },
+    "8.4-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:05:30.674Z"
+    },
+    "8.4-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:06:05.139Z"
+    },
+    "8.4-07": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:06:12.231Z"
+    },
+    "8.5-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:06:24.119Z"
+    },
+    "8.5-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:06:30.713Z"
+    },
+    "8.5-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:06:37.920Z"
+    },
+    "8.5-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:06:50.392Z"
+    },
+    "8.5-07": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:06:53.878Z"
+    },
+    "8.5-08": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:06:57.681Z"
+    },
+    "8.5-09": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:07:03.636Z"
+    },
+    "8.5-10": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:07:27.650Z"
+    },
+    "8.5-11": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:07:31.482Z"
+    },
+    "8.6-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:07:34.793Z"
+    },
+    "8.6-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:07:38.920Z"
+    },
+    "8.6-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:07:42.162Z"
+    },
+    "8.6-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:07:44.520Z"
+    },
+    "8.6-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:07:50.175Z"
+    },
+    "8.6-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:07:53.004Z"
+    },
+    "8.6-07": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:07:56.455Z"
+    },
+    "8.6-08": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:08:00.188Z"
+    },
+    "8.6-09": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:08:05.011Z"
+    },
+    "8.6-10": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:08:10.978Z"
+    },
+    "8.7-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:08:18.050Z"
+    },
+    "8.7-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:08:31.284Z"
+    },
+    "8.7-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:08:58.715Z"
+    },
+    "8.7-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:24:23.334Z"
+    },
+    "8.7-07": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:24:29.554Z"
+    },
+    "8.7-09": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:24:53.106Z"
+    },
+    "8.7-10": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:24:55.609Z"
+    },
+    "8.8-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:24:59.039Z"
+    },
+    "8.8-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:25:01.913Z"
+    },
+    "8.8-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:25:04.801Z"
+    },
+    "8.8-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:25:07.452Z"
+    },
+    "8.8-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:25:10.848Z"
+    },
+    "8.8-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:25:13.062Z"
+    },
+    "8.8-07": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:25:15.113Z"
+    },
+    "8.8-08": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:25:16.983Z"
+    },
+    "8.8-09": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:25:35.962Z"
+    },
+    "8.9-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:25:42.107Z"
+    },
+    "8.9-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:25:51.078Z"
+    },
+    "8.9-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:25:55.791Z"
+    },
+    "8.9-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:26:00.250Z"
+    },
+    "8.9-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:26:16.512Z"
+    },
+    "8.9-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:26:23.159Z"
+    },
+    "8.9-07": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:26:34.616Z"
+    },
+    "8.9-08": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:27:09.735Z"
+    },
+    "8.10-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:27:22.531Z"
+    },
+    "8.10-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:41:01.526Z"
+    },
+    "8.10-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:41:04.051Z"
+    },
+    "8.10-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:41:07.224Z"
+    },
+    "8.10-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:41:12.789Z"
+    },
+    "8.10-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:41:19.045Z"
+    },
+    "8.10-07": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:41:21.583Z"
+    },
+    "8.10-08": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:41:24.885Z"
+    },
+    "8.11-01": {
+      "verdict": "hold",
+      "note": "B급과 구형 같은 비 양품에 대해서 어떻게 해야할진 보류",
+      "updatedAt": "2026-09-21T02:42:52.099Z"
+    },
+    "8.11-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:41:38.239Z"
+    },
+    "8.11-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:41:40.805Z"
+    },
+    "8.11-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:41:46.737Z"
+    },
+    "8.11-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:41:49.582Z"
+    },
+    "8.11-07": {
+      "verdict": "hold",
+      "note": "B급과 구형 같은 비 양품에 대해서 어떻게 해야할진 보류",
+      "updatedAt": "2026-09-21T02:42:48.387Z"
+    },
+    "8.11-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:42:55.433Z"
+    },
+    "8.12-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:43:04.500Z"
+    },
+    "8.12-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:43:07.599Z"
+    },
+    "8.12-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:43:10.126Z"
+    },
+    "8.12-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:43:12.167Z"
+    },
+    "8.12-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:43:15.867Z"
+    },
+    "8.12-07": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:43:20.561Z"
+    },
+    "8.12-08": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:43:23.956Z"
+    },
+    "8.12-09": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T02:43:28.554Z"
+    },
+    "8.12-10": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-21T07:52:52.544Z"
+    },
+    "8.12-11": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T01:46:39.080Z"
+    },
+    "8.12-12": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T01:46:44.147Z"
+    },
+    "8.12-13": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T01:47:00.750Z"
+    },
+    "8.12-15": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T01:47:25.891Z"
+    },
+    "8.12-16": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T01:47:31.856Z"
+    },
+    "8.13-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T01:47:38.768Z"
+    },
+    "8.13-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T01:47:46.386Z"
+    },
+    "8.13-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T01:47:49.248Z"
+    },
+    "8.13-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T01:47:58.892Z"
+    },
+    "8.13-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T01:48:12.205Z"
+    },
+    "8.13-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T01:49:13.024Z"
+    },
+    "8.13-07": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T01:49:15.122Z"
+    },
+    "8.13-08": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T01:49:17.062Z"
+    },
+    "8.13-09": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T01:49:21.459Z"
+    },
+    "8.13-10": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T01:49:31.680Z"
+    },
+    "8.13-11": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T01:49:35.840Z"
+    },
+    "8.13-12": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T01:49:47.917Z"
+    },
+    "8.13-13": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T01:49:58.344Z"
+    },
+    "8.14-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T02:16:16.861Z"
+    },
+    "8.14-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T02:16:20.762Z"
+    },
+    "8.14-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T02:16:38.222Z"
+    },
+    "8.14-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T02:16:41.839Z"
+    },
+    "8.14-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T02:16:46.441Z"
+    },
+    "8.14-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T02:16:51.779Z"
+    },
+    "8.14-07": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T02:17:02.417Z"
+    },
+    "8.14-08": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T02:17:13.369Z"
+    },
+    "8.15-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T02:17:17.632Z"
+    },
+    "8.15-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T02:17:23.835Z"
+    },
+    "8.15-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T02:17:29.667Z"
+    },
+    "8.15-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-22T02:17:51.959Z"
+    },
+    "8.15-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-23T01:44:19.085Z"
+    },
+    "8.15-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-23T01:44:42.666Z"
+    },
+    "8.15-07": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-23T01:44:46.974Z"
+    },
+    "8.15-08": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-23T01:44:51.201Z"
+    },
+    "8.15-09": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-23T01:44:54.018Z"
+    },
+    "8.15-10": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-23T01:44:57.168Z"
+    },
+    "8.16-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-23T01:44:59.274Z"
+    },
+    "8.16-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-23T01:45:02.864Z"
+    },
+    "8.16-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-23T01:45:06.977Z"
+    },
+    "8.16-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T02:52:41.696Z"
+    },
+    "8.16-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T02:52:47.855Z"
+    },
+    "8.16-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T02:52:52.925Z"
+    },
+    "8.16-07": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T02:53:08.213Z"
+    },
+    "8.16-10": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:09:49.215Z"
+    },
+    "8.16-11": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:09:52.366Z"
+    },
+    "8.16-12": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:09:56.022Z"
+    },
+    "8.16-13": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:09:59.625Z"
+    },
+    "8.16-14": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:10:03.088Z"
+    },
+    "8.17-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:10:09.507Z"
+    },
+    "8.17-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:10:29.462Z"
+    },
+    "8.17-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:10:50.362Z"
+    },
+    "8.17-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:11:02.847Z"
+    },
+    "8.17-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:14:15.349Z"
+    },
+    "8.17-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:14:26.593Z"
+    },
+    "8.17-07": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:14:30.094Z"
+    },
+    "8.17-08": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:14:35.001Z"
+    },
+    "8.17-10": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:14:47.669Z"
+    },
+    "8.18-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:14:55.909Z"
+    },
+    "8.18-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:15:18.976Z"
+    },
+    "8.18-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:17:30.455Z"
+    },
+    "8.18-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:17:34.622Z"
+    },
+    "8.18-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:17:54.338Z"
+    },
+    "8.18-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:18:06.269Z"
+    },
+    "8.18-07": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:18:22.741Z"
+    },
+    "8.19-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:18:34.566Z"
+    },
+    "8.19-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:18:43.020Z"
+    },
+    "8.19-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:19:04.060Z"
+    },
+    "8.19-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:19:16.691Z"
+    },
+    "8.19-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:20:05.894Z"
+    },
+    "8.19-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:20:23.735Z"
+    },
+    "8.19-07": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:20:42.223Z"
+    },
+    "8.19-08": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:20:52.963Z"
+    },
+    "8.19-09": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:21:07.942Z"
+    },
+    "8.19-10": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:21:27.052Z"
+    },
+    "8.19-11": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:21:31.495Z"
+    },
+    "8.19-12": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:21:45.450Z"
+    },
+    "8.19-13": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:21:59.065Z"
+    },
+    "8.19-14": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:25:40.461Z"
+    },
+    "8.19-15": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:25:55.257Z"
+    },
+    "8.19-17": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:26:24.086Z"
+    },
+    "8.19-18": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:27:05.222Z"
+    },
+    "8.19-19": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:27:32.031Z"
+    },
+    "8.19-20": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:28:06.543Z"
+    },
+    "8.19-21": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T03:28:57.622Z"
+    },
+    "8.19-22": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:32:02.661Z"
+    },
+    "8.19-23": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:33:26.905Z"
+    },
+    "8.19-24": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:33:37.712Z"
+    },
+    "8.19-25": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:33:59.416Z"
+    },
+    "8.19-26": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:34:12.669Z"
+    },
+    "8.20-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:34:24.858Z"
+    },
+    "8.20-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:43:22.000Z"
+    },
+    "8.20-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:47:29.709Z"
+    },
+    "8.20-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:47:37.439Z"
+    },
+    "8.20-07": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:47:44.821Z"
+    },
+    "8.20-08": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:48:05.515Z"
+    },
+    "8.20-09": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:48:08.426Z"
+    },
+    "8.20-10": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:48:11.929Z"
+    },
+    "8.20-11": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:48:19.834Z"
+    },
+    "8.20-12": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:48:39.302Z"
+    },
+    "8.21-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:48:48.813Z"
+    },
+    "8.21-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:50:09.708Z"
+    },
+    "8.21-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:50:15.048Z"
+    },
+    "8.21-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:50:21.548Z"
+    },
+    "8.21-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:50:30.274Z"
+    },
+    "8.21-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:50:35.143Z"
+    },
+    "8.21-07": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:50:39.654Z"
+    },
+    "8.21-08": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:50:47.196Z"
+    },
+    "8.21-09": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:52:49.212Z"
+    },
+    "8.21-10": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:54:49.508Z"
+    },
+    "8.21-11": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:55:07.632Z"
+    },
+    "8.22-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:55:29.028Z"
+    },
+    "8.22-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:55:31.189Z"
+    },
+    "8.22-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:55:38.531Z"
+    },
+    "8.22-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:55:41.675Z"
+    },
+    "8.22-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:55:48.067Z"
+    },
+    "8.22-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:57:23.504Z"
+    },
+    "8.22-07": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:57:25.824Z"
+    },
+    "8.22-08": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:57:29.488Z"
+    },
+    "8.22-09": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:57:31.459Z"
+    },
+    "8.22-10": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:57:33.081Z"
+    },
+    "8.22-11": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:57:35.051Z"
+    },
+    "8.22-12": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:57:39.256Z"
+    },
+    "8.23-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:57:44.824Z"
+    },
+    "8.23-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:57:53.267Z"
+    },
+    "8.23-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T04:58:01.355Z"
+    },
+    "8.23-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:04:00.440Z"
+    },
+    "8.23-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:04:09.359Z"
+    },
+    "8.23-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:04:18.584Z"
+    },
+    "8.23-07": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:04:22.001Z"
+    },
+    "8.23-08": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:04:28.447Z"
+    },
+    "8.23-09": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:04:33.484Z"
+    },
+    "8.23-10": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:04:42.506Z"
+    },
+    "8.23-11": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:04:58.461Z"
+    },
+    "8.23-12": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:05:00.714Z"
+    },
+    "8.23-13": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:05:02.026Z"
+    },
+    "8.24-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:05:09.654Z"
+    },
+    "8.24-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:05:13.906Z"
+    },
+    "8.24-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:05:21.903Z"
+    },
+    "8.24-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:05:27.005Z"
+    },
+    "8.24-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:05:33.099Z"
+    },
+    "8.24-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:05:58.095Z"
+    },
+    "8.24-07": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:08:20.602Z"
+    },
+    "8.24-08": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:13:41.538Z"
+    },
+    "8.24-09": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:13:46.338Z"
+    },
+    "8.24-10": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:13:51.102Z"
+    },
+    "8.24-11": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:14:21.742Z"
+    },
+    "8.24-12": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:14:46.144Z"
+    },
+    "8.24-13": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:14:50.861Z"
+    },
+    "8.24-14": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:14:56.952Z"
+    },
+    "8.24-15": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:15:23.436Z"
+    },
+    "8.24-16": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:15:33.589Z"
+    },
+    "8.25-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:15:35.627Z"
+    },
+    "8.25-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:15:39.923Z"
+    },
+    "8.25-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:15:44.364Z"
+    },
+    "8.25-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:15:47.849Z"
+    },
+    "8.25-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:15:50.778Z"
+    },
+    "8.25-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:15:53.775Z"
+    },
+    "8.25-07": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:15:56.431Z"
+    },
+    "8.25-08": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:16:02.335Z"
+    },
+    "8.25-09": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:16:11.133Z"
+    },
+    "8.25-10": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:16:23.816Z"
+    },
+    "8.25-11": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:16:33.207Z"
+    },
+    "8.25-12": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:16:43.592Z"
+    },
+    "PC-DELTA-TEST-01": {
+      "verdict": "hold",
+      "note": "내가 잘 몰는 부분이야",
+      "updatedAt": "2026-09-28T05:17:16.302Z"
+    },
+    "PC-DELTA-TEST-02": {
+      "verdict": "hold",
+      "note": "내가 잘 몰는 부분이야",
+      "updatedAt": "2026-09-28T05:17:19.034Z"
+    },
+    "PC-DELTA-TEST-03": {
+      "verdict": "hold",
+      "note": "내가 잘 몰는 부분이야",
+      "updatedAt": "2026-09-28T05:17:21.002Z"
+    },
+    "PC-DELTA-AUTH-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:17:44.274Z"
+    },
+    "PC-DELTA-AUTH-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:17:55.476Z"
+    },
+    "PC-DELTA-AUTH-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:18:04.379Z"
+    },
+    "PC-DELTA-ADMINSESSION-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:18:20.715Z"
+    },
+    "PC-DELTA-SHELL-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:18:25.894Z"
+    },
+    "PC-DELTA-SHELL-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:18:43.738Z"
+    },
+    "PC-DELTA-SETTINGS-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:19:17.211Z"
+    },
+    "PC-DELTA-SETTINGS-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:21:23.876Z"
+    },
+    "PC-DELTA-SETTINGS-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:21:34.099Z"
+    },
+    "PC-DELTA-SETTINGS-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:21:44.565Z"
+    },
+    "PC-DELTA-SETTINGS-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:21:59.271Z"
+    },
+    "PC-DELTA-NOTIFY-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:22:08.611Z"
+    },
+    "PC-DELTA-NOTIFY-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:22:17.571Z"
+    },
+    "PC-DELTA-NOTIFY-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:22:25.041Z"
+    },
+    "PC-DELTA-NOTIFY-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:22:31.762Z"
+    },
+    "PC-DELTA-NOTIFY-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:22:56.124Z"
+    },
+    "PC-DELTA-NOTIFY-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:23:20.421Z"
+    },
+    "PC-DELTA-STATE-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:23:33.259Z"
+    },
+    "PC-DELTA-CACHE-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:23:41.164Z"
+    },
+    "PC-DELTA-CACHE-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:24:13.397Z"
+    },
+    "PC-DELTA-DASHBOARD-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:24:21.332Z"
+    },
+    "PC-DELTA-DASHBOARD-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:24:37.491Z"
+    },
+    "PC-DELTA-DASHBOARD-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:25:47.444Z"
+    },
+    "PC-DELTA-DASHBOARD-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:37:12.696Z"
+    },
+    "PC-DELTA-ITEM-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:37:33.719Z"
+    },
+    "PC-DELTA-ITEM-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:37:40.853Z"
+    },
+    "PC-DELTA-ROUTE-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:37:54.754Z"
+    },
+    "PC-DELTA-IOORDER-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T05:38:15.276Z"
+    },
+    "PC-DELTA-ASR-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T23:41:56.359Z"
+    },
+    "PC-DELTA-ASR-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T23:42:07.105Z"
+    },
+    "PC-DELTA-ASR-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T23:48:30.622Z"
+    },
+    "PC-DELTA-ASR-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T23:48:35.640Z"
+    },
+    "PC-DELTA-ASR-05": {
+      "verdict": "hold",
+      "note": "뭐....어차피 부서 결제는 어느 부서든지 상관없이 결제 권한이 있는 사람이 하는거라 상관없지 않",
+      "updatedAt": "2026-09-28T23:49:44.551Z"
+    },
+    "PC-DELTA-ASR-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T23:50:32.011Z"
+    },
+    "PC-DELTA-SHIPPING-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-28T23:50:36.996Z"
+    },
+    "PC-DELTA-SHIPPING-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:12:05.077Z"
+    },
+    "PC-DELTA-SHIPPING-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:12:09.424Z"
+    },
+    "PC-DELTA-SHIPPING-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:28:25.668Z"
+    },
+    "PC-DELTA-SHIPPING-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:28:33.668Z"
+    },
+    "PC-DELTA-PF-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:28:36.764Z"
+    },
+    "PC-DELTA-PF-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:28:38.805Z"
+    },
+    "PC-DELTA-PF-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:28:42.616Z"
+    },
+    "PC-DELTA-WEEKLY-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:28:49.621Z"
+    },
+    "PC-DELTA-HISTORY-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:28:56.375Z"
+    },
+    "PC-DELTA-HISTORY-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:29:00.592Z"
+    },
+    "PC-DELTA-HISTORY-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:29:04.614Z"
+    },
+    "PC-DELTA-HISTORY-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:29:27.643Z"
+    },
+    "PC-DELTA-HISTORY-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:30:42.090Z"
+    },
+    "PC-DELTA-MAP-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:30:48.502Z"
+    },
+    "PC-DELTA-MAP-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:30:54.157Z"
+    },
+    "PC-DELTA-MAP-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:30:56.187Z"
+    },
+    "PC-DELTA-MAP-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:31:03.045Z"
+    },
+    "PC-DELTA-MAP-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:31:07.680Z"
+    },
+    "PC-DELTA-DEFECTORDER-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:31:21.882Z"
+    },
+    "PC-DELTA-DEFECT-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:31:37.525Z"
+    },
+    "PC-DELTA-DEFECT-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:31:50.882Z"
+    },
+    "PC-DELTA-ADMIN-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:32:02.268Z"
+    },
+    "PC-DELTA-ADMIN-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:32:05.599Z"
+    },
+    "PC-DELTA-ADMIN-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:32:11.971Z"
+    },
+    "PC-DELTA-ADMIN-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:32:20.930Z"
+    },
+    "PC-DELTA-ADMIN-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:32:25.007Z"
+    },
+    "PC-DELTA-ADMINAUDIT-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:32:40.970Z"
+    },
+    "PC-DELTA-SESSION-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:32:44.544Z"
+    },
+    "PC-DELTA-CONSOLE-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:32:48.537Z"
+    },
+    "PC-DELTA-DEFECT-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:32:56.512Z"
+    },
+    "PC-DELTA-DEFECT-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:33:01.174Z"
+    },
+    "8.19-16": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-09-29T00:33:19.142Z"
+    },
+    "8.5-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-10-01T06:30:22.165Z"
+    },
+    "8.5-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-10-01T06:30:30.699Z"
+    },
+    "8.7-03": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-10-01T06:30:34.555Z"
+    },
+    "8.7-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-10-01T06:30:55.112Z"
+    },
+    "8.7-08": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-10-01T06:30:59.366Z"
+    },
+    "8.12-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-10-01T07:17:29.515Z"
+    },
+    "8.12-14": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-10-01T07:17:35.635Z"
+    },
+    "8.16-08": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-10-01T07:17:41.845Z"
+    },
+    "8.16-09": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-10-01T07:17:55.189Z"
+    },
+    "8.17-09": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-10-01T07:18:10.926Z"
+    },
+    "8.20-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-10-01T07:18:16.679Z"
+    },
+    "8.20-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-10-01T07:18:20.589Z"
+    },
+    "PC-DELTA-SHELL-02": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-10-01T07:18:28.279Z"
+    },
+    "PC-DELTA-SHIPPING-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-10-01T07:18:34.095Z"
+    },
+    "PC-DELTA-MAP-02": {
+      "verdict": "hold",
+      "note": "지도는 아직 안써서 모르겠어. 보류가 맞아\n",
+      "updatedAt": "2026-10-01T07:18:50.900Z"
+    },
+    "PC-DELTA-SHIPPING-07": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-10-01T07:18:59.427Z"
+    },
+    "PC-DELTA-BOMUNMATCHED-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-10-01T07:19:05.770Z"
+    },
+    "PC-DELTA-SUPPLIER-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-10-01T07:19:09.752Z"
+    },
+    "PC-DELTA-MATERIAL-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-10-01T07:19:17.330Z"
+    },
+    "PC-DELTA-DEFECT-05": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-10-01T07:19:29.051Z"
+    },
+    "PC-DELTA-DEFECT-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-10-01T07:19:36.211Z"
+    },
+    "PC-DELTA-HISTORY-06": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-10-01T07:19:43.064Z"
+    },
+    "PC-DELTA-DAILY-01": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-10-01T07:19:55.320Z"
+    },
+    "PC-DELTA-SHELL-04": {
+      "verdict": "approved",
+      "note": "",
+      "updatedAt": "2026-10-01T07:19:59.733Z"
+    }
+  },
+  "completedRestorationId": "expectation-judgments-v1"
+}

@@ -1,0 +1,12 @@
+[
+  {
+    "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/original-audit.json",
+    "sha256": "0ac4ba2ec1a2b4a911a1c908fd22fb7835feb35ad3867395e77cbd60d4f17f7e",
+    "purpose": "원본 기술·직원 기대와 과거 관찰·판정 전체를 바이트 그대로 보존"
+  },
+  {
+    "path": "docs/superpowers/specs/2026-10-07-mes-expectations.sources/original-feedback.json",
+    "sha256": "7185b1cb6a267d44432608458b0b3ea6f55752c27b3de7252ef7d0df4d1dcf57",
+    "purpose": "원본 사용자 판정·의견·갱신 시각 전체를 바이트 그대로 보존"
+  }
+]
