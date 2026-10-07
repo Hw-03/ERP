@@ -516,7 +516,9 @@ def _persist_batch(
     submitted_at: Optional[datetime] = None,
 ) -> IoBatch:
     from app.services.io_preview import validate_receive_requester, validate_material_outbound
+    from app.services.item_write_validation import validate_io_items
 
+    validate_io_items(db, payload.bundles, sub_type=payload.sub_type)
     validate_receive_requester(requester, work_type=payload.work_type, sub_type=payload.sub_type)
     validate_material_outbound(work_type=payload.work_type, sub_type=payload.sub_type, bundles=payload.bundles, notes=payload.notes, require_reason=status != "draft")
     payload.sub_type = normalize_process_sub_type(
@@ -530,6 +532,7 @@ def _persist_batch(
         sub_type=payload.sub_type,
     )
     normalize_payload_bom_stock_exempt(db, payload)
+    validate_io_items(db, payload.bundles, sub_type=payload.sub_type)
     normalize_automatic_routes_with_bom_token_refresh(
         db,
         work_type=payload.work_type,

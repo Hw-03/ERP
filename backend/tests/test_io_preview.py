@@ -16,6 +16,26 @@ from app.services import io_preview as iop
 D = Decimal
 
 
+@pytest.mark.parametrize("code", ["TF", "TA"])
+def test_receive_supplier_rejects_non_raw_canonical_code(db_session, make_item, code):
+    item = make_item(process_type_code=code)
+    with pytest.raises(ValueError, match="원자재"):
+        iop.preview(db_session, work_type="receive", sub_type="receive_supplier",
+                    targets=[_target(item.item_id)])
+
+
+def test_preview_rejects_deleted_bom_inventory_child(db_session, make_item, make_bom):
+    from datetime import datetime
+    parent = make_item(process_type_code="TF")
+    child = make_item(process_type_code="TR")
+    make_bom(parent.item_id, child.item_id, D("1"))
+    child.deleted_at = datetime.utcnow()
+    db_session.flush()
+    with pytest.raises(ValueError, match="삭제"):
+        iop.preview(db_session, work_type="process", sub_type="produce",
+                    targets=[_target(parent.item_id, source_kind="bom_parent")])
+
+
 def _target(
     item_id,
     quantity="1",

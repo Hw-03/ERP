@@ -128,6 +128,9 @@ def _build_request_and_lines(
 
     inventory_svc 호출 / TransactionLog 생성은 절대 하지 않는다 (DRAFT 안전성 보장).
     """
+    from app.services.item_write_validation import validate_active_items
+    validate_active_items(db, (line.item_id for line in lines_input),
+                          raw_receive=request_type == StockRequestTypeEnum.RAW_RECEIVE)
     if requires_warehouse_approval_override is None:
         requires_approval = any(
             line_requires_approval(li.from_bucket, li.to_bucket) for li in lines_input
@@ -221,6 +224,9 @@ def create_request(
         request_type,
         allow_internal_use=allow_internal_use,
     )
+    from app.services.item_write_validation import validate_active_items
+    validate_active_items(db, (line.item_id for line in lines_input),
+                          raw_receive=request_type == StockRequestTypeEnum.RAW_RECEIVE)
     from app.services.supplier import validate_supplier_for_stock_request
 
     supplier = validate_supplier_for_stock_request(

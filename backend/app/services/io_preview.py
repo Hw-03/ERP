@@ -1340,6 +1340,9 @@ def preview(
     to_department: Optional[str] = None,
 ) -> dict:
     validate_material_outbound(work_type=work_type, sub_type=sub_type, require_reason=False)
+    from app.services.item_write_validation import validate_active_items
+    validate_active_items(db, (target.item_id for target in targets if target.item_id is not None),
+                          raw_receive=sub_type == "receive_supplier")
     if sub_type == "outbound_supplier" and any(getattr(target, "source_kind", "direct_item") != "direct_item" for target in targets):
         raise ValueError("원자재 출고는 선택한 품목만 출고할 수 있습니다.")
     validate_internal_use_operation(
@@ -1390,6 +1393,9 @@ def preview(
             sub_type=sub_type,
         )
         bundles.append(bundle)
+    validate_active_items(db, (line["item_id"] for bundle in bundles for line in bundle["lines"]
+                              if line["included"] and not line.get("bom_stock_exempt", False)),
+                          raw_receive=sub_type == "receive_supplier")
     return {
         "work_type": work_type,
         "sub_type": sub_type,

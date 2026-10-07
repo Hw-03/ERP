@@ -31,6 +31,90 @@ from app.services import shipping as shipping_svc
 from app.services.pin_auth import DEFAULT_PIN_HASH
 
 
+@pytest.mark.parametrize("invalid", ["non_raw", "deleted"])
+def test_forged_stock_exempt_flag_cannot_hide_invalid_incoming_item(
+    client, db_session, make_item, invalid,
+):
+    from datetime import datetime
+    active = make_item()
+    hidden = make_item()
+    requester = _make_employee(db_session, warehouse_role="primary")
+    supplier = _make_active_supplier(db_session)
+    db_session.commit()
+    preview = client.post("/api/io/preview", json={
+        "requester_employee_id": str(requester.employee_id), "work_type": "receive",
+        "sub_type": "receive_supplier", "targets": [{"item_id": str(active.item_id)}],
+    })
+    assert preview.status_code == 200, preview.text
+    bundles = preview.json()["bundles"]
+    bundles[0]["lines"][0].update(item_id=str(hidden.item_id), bom_stock_exempt=True)
+    if invalid == "deleted":
+        hidden.deleted_at = datetime.utcnow()
+    else:
+        hidden.process_type_code = "TF"
+    db_session.commit()
+    result = client.post("/api/io/submit", json={
+        "requester_employee_id": str(requester.employee_id), "work_type": "receive",
+        "sub_type": "receive_supplier", "supplier_id": str(supplier.supplier_id), "bundles": bundles,
+    })
+    assert result.status_code == 422, result.text
+    assert ("삭제" if invalid == "deleted" else "원자재") in result.text
+    assert db_session.query(IoBatch).count() == 0
+    assert db_session.query(TransactionLog).count() == 0
+
+
+@pytest.mark.parametrize("entry", ["preview", "draft", "submit", "draft_update", "draft_submit"])
+@pytest.mark.parametrize("invalid", ["non_raw", "deleted"])
+def test_receive_supplier_revalidates_all_items_before_any_write(
+    client, db_session, make_item, entry, invalid,
+):
+    from datetime import datetime
+    good = make_item(name="Active raw", process_type_code="TR")
+    stale = make_item(name="Stale raw", process_type_code="TR")
+    requester = _make_employee(db_session, warehouse_role="primary")
+    supplier = _make_active_supplier(db_session)
+    db_session.commit()
+    preview_payload = {
+        "requester_employee_id": str(requester.employee_id),
+        "work_type": "receive", "sub_type": "receive_supplier",
+        "targets": [{"item_id": str(item.item_id), "quantity": 2} for item in (good, stale)],
+    }
+    preview = client.post("/api/io/preview", json=preview_payload)
+    assert preview.status_code == 200, preview.text
+    payload = {key: preview_payload[key] for key in ("requester_employee_id", "work_type", "sub_type")}
+    payload.update(supplier_id=str(supplier.supplier_id), bundles=preview.json()["bundles"])
+    batch_id = None
+    if entry in {"draft_update", "draft_submit"}:
+        saved = client.put("/api/io/draft", json=payload)
+        assert saved.status_code == 200, saved.text
+        batch_id = saved.json()["batch_id"]
+        payload["batch_id"] = batch_id
+    if invalid == "deleted":
+        stale.deleted_at = datetime.utcnow()
+    else:
+        stale.process_type_code = "TF"
+    db_session.commit()
+    if entry == "preview":
+        result = client.post("/api/io/preview", json=preview_payload)
+    elif entry in {"draft", "draft_update"}:
+        result = client.put("/api/io/draft", json=payload)
+    elif entry == "draft_submit":
+        result = client.post(f"/api/io/draft/{batch_id}/submit",
+                             params={"requester_employee_id": str(requester.employee_id)})
+    else:
+        result = client.post("/api/io/submit", json=payload)
+    assert result.status_code == 422, result.text
+    assert ("삭제" if invalid == "deleted" else "원자재") in result.text
+    assert db_session.query(TransactionLog).count() == 0
+    assert db_session.query(StockRequest).count() == 0
+    assert db_session.query(IoBatch).count() == (1 if batch_id else 0)
+    assert db_session.query(Inventory).filter(Inventory.item_id == good.item_id).one().quantity == 0
+    if batch_id:
+        batch = db_session.get(IoBatch, uuid.UUID(batch_id))
+        assert batch.status == "draft"
+        assert len(batch.bundles) == 2
+
+
 def _make_employee(
     db_session,
     *,

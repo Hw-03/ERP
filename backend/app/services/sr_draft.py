@@ -57,6 +57,9 @@ def upsert_draft_request(
         allow_internal_use=False,
     )
     _validate_lines(request_type, lines_input, allow_empty=True)
+    from app.services.item_write_validation import validate_active_items
+    validate_active_items(db, (line.item_id for line in lines_input),
+                          raw_receive=request_type == StockRequestTypeEnum.RAW_RECEIVE)
     from app.services.supplier import validate_supplier_for_stock_request
 
     supplier = validate_supplier_for_stock_request(
@@ -217,6 +220,9 @@ def submit_draft_request(
         raise PermissionError("본인 장바구니만 제출할 수 있습니다.")
     if request.status != StockRequestStatusEnum.DRAFT:
         raise ValueError("장바구니(DRAFT) 상태가 아닙니다.")
+    from app.services.item_write_validation import validate_active_items
+    validate_active_items(db, (line.item_id for line in request.lines),
+                          raw_receive=request.request_type == StockRequestTypeEnum.RAW_RECEIVE)
 
     requester = (
         db.query(Employee)

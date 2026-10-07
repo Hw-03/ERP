@@ -788,6 +788,8 @@ def execute_batch_after_dept_approval(
     batch = db.query(IoBatch).filter(IoBatch.batch_id == batch_id).first()
     if batch is None:
         raise ValueError("작업 묶음을 찾을 수 없습니다.")
+    from app.services.item_write_validation import validate_io_items
+    validate_io_items(db, batch.bundles, sub_type=batch.sub_type)
     ensure_batch_is_mutable(batch)
     if not batch.stock_request_id:
         batch.stock_request_id = request.request_id
@@ -1176,6 +1178,8 @@ def _apply_line(
 
 
 def _submit_immediate(db: Session, *, requester: Employee, batch: IoBatch) -> None:
+    from app.services.item_write_validation import validate_io_items
+    validate_io_items(db, batch.bundles, sub_type=batch.sub_type)
     lines = _included_lines(batch)
     status_before = batch.status
     _validate_included_lines(db, lines)
@@ -1222,6 +1226,8 @@ def _complete_without_inventory(batch: IoBatch) -> None:
 
 
 def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> dict:
+    from app.services.item_write_validation import validate_io_items
+    validate_io_items(db, batch.bundles, sub_type=batch.sub_type)
     ensure_batch_is_mutable(batch)
     validate_material_outbound(work_type=batch.work_type, sub_type=batch.sub_type, bundles=batch.bundles, notes=batch.notes)
     batch.sub_type = normalize_process_sub_type(
@@ -1243,6 +1249,7 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
         bundles=batch.bundles,
     )
     normalize_batch_bom_stock_exempt(db, batch)
+    validate_io_items(db, batch.bundles, sub_type=batch.sub_type)
     _validate_process_bom_parent_lines(batch)
     _normalize_process_bom_auto_inclusion(batch)
     validate_internal_use_requester(

@@ -31,6 +31,8 @@ from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
+from app.services.item_write_validation import validate_active_items
+
 from app._evt import emit as _evt_emit
 from app.repositories import inventory_repository
 from app.models import (
@@ -141,6 +143,7 @@ def reserve(
 
     원자적 조건부 UPDATE를 사용 — SQLite/PostgreSQL 모두 check-then-act 경쟁 없음.
     """
+    validate_active_items(db, [item_id])
     if qty <= 0:
         raise ValueError("예약 수량은 0보다 커야 합니다.")
 
@@ -214,6 +217,7 @@ def reserve_location(
     status: LocationStatusEnum,
 ) -> InventoryLocation:
     """Reserve an existing department/status location with one conditional update."""
+    validate_active_items(db, [item_id])
     if qty <= 0:
         raise ValueError("예약 수량은 0보다 커야 합니다.")
 
@@ -327,6 +331,7 @@ def release_location(
 
 def consume_pending(db: Session, item_id: uuid.UUID, qty: Decimal) -> Inventory:
     """배치 confirm (OUT): warehouse_qty와 pending_quantity 동시 차감."""
+    validate_active_items(db, [item_id])
     if qty <= 0:
         raise ValueError("차감 수량은 0보다 커야 합니다.")
 
@@ -370,6 +375,7 @@ def adjust_warehouse(
         (inventory, qty_before, delta) — qty_before 는 조정 전 Inventory.quantity (총량),
         delta 는 warehouse_qty 변화량. 라우터가 TransactionLog 에 사용.
     """
+    validate_active_items(db, [item_id])
     if new_warehouse_qty < 0:
         _evt_emit(
             "neg_block",
