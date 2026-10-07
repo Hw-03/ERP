@@ -9,7 +9,6 @@ from pathlib import Path
 import pytest
 import sqlalchemy as sa
 from alembic import command
-from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
@@ -17,7 +16,7 @@ from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.schema import CreateTable
 
 from app.models import Base, InventoryLocation, Item
-from migration_type_compare import compare_migration_type
+from bootstrap.schema import schema_differences
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -115,7 +114,7 @@ def test_empty_sqlite_upgrade_creates_current_schema_and_is_rerunnable(tmp_path)
         with engine.connect() as connection:
             assert connection.scalar(
                 sa.text("SELECT version_num FROM alembic_version")
-            ) == "20260928_0038"
+            ) == "20261007_0039"
             location_columns = {
                 column["name"]: column
                 for column in inspector.get_columns("inventory_locations")
@@ -327,16 +326,8 @@ def test_baseline_schema_has_no_semantic_metadata_diff(tmp_path):
     engine = sa.create_engine(url)
     try:
         with engine.connect() as connection:
-            context = MigrationContext.configure(
-                connection,
-                opts={
-                    "compare_type": compare_migration_type,
-                    "include_object": lambda obj, name, type_, reflected, compare_to: (
-                        name not in {"alembic_version", "alembic_schema_state"}
-                    ),
-                },
-            )
-            assert compare_metadata(context, Base.metadata) == []
+            # SQLite inline FK의 옵션은 Alembic 반사가 누락하므로 PRAGMA까지 확인한다.
+            assert schema_differences(connection) == ()
     finally:
         engine.dispose()
 

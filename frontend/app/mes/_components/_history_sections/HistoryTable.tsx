@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { ChevronDown, CircleHelp } from "lucide-react";
 import { useDesktopTabHome } from "../DesktopTabHome";
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { TransactionLog } from "@/lib/api";
 import type { TransactionReferenceSummary } from "@/lib/api/production";
 import { ioApi } from "@/lib/api/io";
@@ -58,6 +58,7 @@ type Props = {
   /** 묶음 하위 행은 상세 조회만 허용하고 취소는 부모 행에 남긴다. */
   onSelectChildLog?: (log: TransactionLog) => void;
   onSelectBatch: (batchId: string, logs: TransactionLog[]) => void;
+  onSelectSubmission?: (group: Extract<LogGroup, { type: "submission" }>) => void;
   /** 부모(DesktopHistoryView)가 들고 있는 batchCache — 우측 패널과 공유. */
   batchCache: Map<string, IoBatch>;
   setBatchCache: React.Dispatch<React.SetStateAction<Map<string, IoBatch>>>;
@@ -70,6 +71,8 @@ type Props = {
   referenceSummaries?: Map<string, TransactionReferenceSummary>;
   referenceSummariesLoading?: boolean;
   collapseRequestNonce?: number;
+  /** 제출 작업을 같은 tbody의 행으로 이어 그린다. */
+  rowsOnly?: boolean;
 };
 
 type ColSpec = {
@@ -232,6 +235,7 @@ export function HistoryTable({
   onSelectLog,
   onSelectChildLog,
   onSelectBatch,
+  onSelectSubmission,
   batchCache,
   setBatchCache,
   cacheEpoch,
@@ -243,11 +247,13 @@ export function HistoryTable({
   referenceSummaries,
   referenceSummariesLoading = false,
   collapseRequestNonce = 0,
+  rowsOnly = false,
 }: Props) {
   const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null);
   const [collapsedSearchGroupKeys, setCollapsedSearchGroupKeys] = useState<Set<string>>(new Set());
   const [fetchGeneration, setFetchGeneration] = useState(0);
   const previousCollapseRequestRef = useRef(collapseRequestNonce);
+  const groups = useMemo(() => displayGroups ?? buildGroups(filteredLogs), [displayGroups, filteredLogs]);
 
   useEffect(() => {
     if (previousCollapseRequestRef.current === collapseRequestNonce) return;
@@ -260,7 +266,9 @@ export function HistoryTable({
   // 수동 chevron 으로 펼친 다른 묶음은 그대로 유지(이전 selection 만 추적).
   const prevSelectedBatchRef = useRef<string | null>(null);
   useEffect(() => {
-    const currentBatchId = selection?.kind === "batch" ? selection.batchId : null;
+    const currentBatchId = selection?.kind === "batch"
+      && groups.some((group) => group.type === "op_batch" && group.batchId === selection.batchId)
+      ? selection.batchId : null;
     const prevBatchId = prevSelectedBatchRef.current;
     prevSelectedBatchRef.current = currentBatchId;
     if (prevBatchId === currentBatchId) return;
@@ -269,7 +277,7 @@ export function HistoryTable({
     } else if (prevBatchId) {
       setExpandedGroupKey((prev) => (prev === prevBatchId ? null : prev));
     }
-  }, [selection]);
+  }, [selection, groups]);
 
   useEffect(() => {
     if (!focusTarget) return;
@@ -281,12 +289,12 @@ export function HistoryTable({
     return () => window.clearTimeout(handle);
   }, [focusTarget]);
 
-  const groups = useMemo(() => displayGroups ?? buildGroups(filteredLogs), [displayGroups, filteredLogs]);
   const searchGroupKeys = groups.flatMap((group) => {
     if (group.matchedLogIds == null || group.type === "solo") return [];
     return [group.type === "operation" ? group.operationId : group.type === "op_batch" ? group.batchId : group.type === "batch" ? group.refKey : group.key];
   });
-  useDesktopTabHome("history-expanded-row", {
+  const homeRegistrationId = useId();
+  useDesktopTabHome(`history-expanded-row:${homeRegistrationId}`, {
     isHome: expandedGroupKey === null && searchGroupKeys.every((key) => collapsedSearchGroupKeys.has(key)),
     returnHome: () => {
       setExpandedGroupKey(null);
@@ -435,7 +443,9 @@ export function HistoryTable({
   // 동시성 큐(VISIBLE_FETCH_CONCURRENCY)·dedup 은 enqueueBatchFetch 가 처리.
   useEffect(() => {
     for (const g of groups) {
-      if (g.type === "op_batch") enqueueBatchFetch(g.batchId);
+      for (const work of g.type === "submission" ? g.workGroups : [g]) {
+        if (work.type === "op_batch") enqueueBatchFetch(work.batchId);
+      }
     }
   }, [batchCache, enqueueBatchFetch, fetchGeneration, groups]);
 
@@ -493,6 +503,243 @@ export function HistoryTable({
   const selectedBatchId = selection?.kind === "batch" ? selection.batchId : undefined;
   const detailPanelOpen = selection !== null;
 
+  const rows = groups.map((group, index) => {
+    const rawSeparationHint = getHistorySeparationHint(
+      index > 0 ? getGroupPrimaryLog(groups[index - 1]) : null,
+      getGroupPrimaryLog(group),
+    );
+    const separationHint = rawSeparationHint === "다른 요청" || rawSeparationHint === "별도 시각"
+      ? null
+      : rawSeparationHint;
+    if (group.type === "solo") {
+      return (
+        <HistoryLogRow
+          key={group.log.log_id}
+          log={group.log}
+          selected={selectedLogId === group.log.log_id}
+          onSelect={group.allowCancellation === false ? onSelectChildLog ?? onSelectLog : onSelectLog}
+          separationHint={separationHint}
+        />
+      );
+    }
+
+    if (group.type === "submission") {
+      const summary = getHistoryGroupSummary(group, undefined, batchCache);
+      const expanded = isGroupExpanded(group.key, group.matchedLogIds);
+      const selected = selection?.kind === "submission" && selection.group.key === group.key;
+      const representative = { ...summary.primaryLog, cancelled: group.logs.every((log) => log.cancelled), operation_kind: null, operation_effective_status: null };
+      return <Fragment key={group.key}>
+        <HistoryLogRow log={representative} selected={selected}
+          onSelect={() => {
+            onSelectSubmission?.(group);
+            if (selected) collapseGroup(group.key, group.matchedLogIds);
+            else expandGroup(group.key, group.matchedLogIds);
+          }}
+          onToggle={() => toggleGroup(group.key, group.matchedLogIds)} expanded={expanded}
+          additionalItemCount={summary.additionalItemCount} operationLabel={summary.label}
+          targetHint="펼쳐서 개별 내역 확인"
+          stockSummary={`${group.workGroups.length}개 작업`} />
+        {expanded && <HistoryTable rowsOnly loading={false} displayGroups={group.workGroups} selection={selection}
+            onSelectLog={onSelectLog} onSelectChildLog={onSelectChildLog} onSelectBatch={onSelectBatch}
+            batchCache={batchCache} setBatchCache={setBatchCache} cacheEpoch={cacheEpoch}
+            canLoadMore={false} loadingMore={false} onLoadMore={onLoadMore} />}
+      </Fragment>;
+    }
+
+    if (group.type === "operation") {
+      const groupSummary = getHistoryGroupSummary(group);
+      const primaryLog = groupSummary.primaryLog;
+      const operationLabel = group.logs.find((log) => log.operation_display_label)?.operation_display_label ?? "";
+      const hasProduce = group.logs.some((log) => log.transaction_type === "PRODUCE");
+      const hasBackflush = group.logs.some((log) => log.transaction_type === "BACKFLUSH");
+      const isCustomBomSingleAdjustment = (operationLabel.startsWith("produce") || operationLabel.startsWith("disassemble"))
+        && hasProduce !== hasBackflush;
+      const childLogs = group.logs.filter((log) => log.log_id !== primaryLog.log_id);
+      const expanded = isGroupExpanded(group.operationId, group.matchedLogIds);
+      const controlsId = historyGroupPanelId(group.operationId);
+      const primarySelected = selectedLogId === primaryLog.log_id;
+      const selected = selectedLogId === primaryLog.log_id
+        || childLogs.some((log) => log.log_id === selectedLogId);
+      return (
+        <Fragment key={`operation-${group.operationId}`}>
+          <HistoryLogRow
+            log={primaryLog}
+            selected={selected}
+            onSelect={() => {
+              onSelectLog(primaryLog);
+              if (primarySelected) collapseGroup(group.operationId, group.matchedLogIds);
+              else expandGroup(group.operationId, group.matchedLogIds);
+            }}
+            expanded={expanded}
+            onToggle={childLogs.length > 0 ? () => toggleGroup(group.operationId, group.matchedLogIds) : undefined}
+            controlsId={childLogs.length > 0 ? controlsId : undefined}
+            toggleLabel="작업 구성"
+            separationHint={separationHint}
+            additionalItemCount={groupSummary.additionalItemCount}
+            displayType={groupSummary.displayType ?? undefined}
+            operationLabel={groupSummary.label}
+          />
+          {expanded && childLogs.length > 0 && (
+            <ReferenceBatchDetail
+              logs={childLogs}
+              highlightLogId={selectedLogId}
+              matchedLogIds={group.matchedLogIds}
+              onSelectLog={onSelectChildLog ?? onSelectLog}
+              controlsId={controlsId}
+              flat
+              singleAdjustment={isCustomBomSingleAdjustment}
+            />
+          )}
+        </Fragment>
+      );
+    }
+
+    if (group.type === "defect_lifecycle") {
+      const expanded = isGroupExpanded(group.key, group.matchedLogIds);
+      const controlsId = historyGroupPanelId(group.key);
+      const selected = selectedLogId === group.parent.log_id || selectedLogId === group.child.log_id;
+      return (
+        <Fragment key={group.key}>
+          <HistoryLogRow
+            log={group.parent}
+            selected={selected}
+            onSelect={onSelectLog}
+            expanded={expanded}
+            onToggle={() => toggleGroup(group.key, group.matchedLogIds)}
+            controlsId={controlsId}
+            separationHint={separationHint}
+            additionalItemCount={getAdditionalDistinctItemCount([group.parent, group.child], group.parent)}
+          />
+          {expanded && (
+            <ReferenceBatchDetail
+              logs={[group.child]}
+              highlightLogId={selectedLogId}
+              matchedLogIds={group.matchedLogIds}
+              onSelectLog={onSelectChildLog ?? onSelectLog}
+              controlsId={controlsId}
+            />
+          )}
+        </Fragment>
+      );
+    }
+
+    if (group.type === "op_batch") {
+      const expanded = isGroupExpanded(group.batchId, group.matchedLogIds);
+      const controlsId = historyGroupPanelId(group.batchId);
+      const batch = batchCache.get(group.batchId) ?? null;
+      const snapshotQuantityWidth = getStockSnapshotQuantityWidth(group.logs);
+      const isSelected = selectedBatchId === group.batchId;
+      const focusItemId = focusTarget?.groupKey === group.batchId ? focusTarget.itemId ?? null : null;
+      return (
+        <Fragment key={`op-${group.batchId}`}>
+          <OpBatchHeader
+            group={group}
+            expanded={expanded}
+            onToggle={() => toggleGroup(group.batchId, group.matchedLogIds)}
+            selected={isSelected}
+            onSelect={() => {
+              // 같은 묶음 재클릭 → 부모 selection 토글로 닫힘 + 펼침도 동시 접음.
+              onSelectBatch(group.batchId, group.logs);
+              if (isSelected) collapseGroup(group.batchId, group.matchedLogIds);
+              else expandGroup(group.batchId, group.matchedLogIds);
+            }}
+            batch={batch}
+            rowRef={opBatchRowRef}
+            controlsId={controlsId}
+            separationHint={separationHint}
+            snapshotQuantityWidth={snapshotQuantityWidth}
+          />
+          {expanded && (
+            <BomBatchDetail
+              batchId={group.batchId}
+              colSpan={HISTORY_TABLE_COLUMN_SPAN}
+              cache={batchCache}
+              onCached={handleCacheBatch}
+              logs={group.logs}
+              matchedLogIds={group.matchedLogIds}
+              snapshotQuantityWidth={snapshotQuantityWidth}
+              highlightItemId={focusItemId}
+              controlsId={controlsId}
+            />
+          )}
+        </Fragment>
+      );
+    }
+
+    // type === "batch" (reference_no 기준 레거시 그룹)
+    // 재작업(defect-disassemble) 배치 → 트리 뷰
+    const groupKey = group.refKey;
+    if (group.refNo.startsWith("defect-disassemble:")) {
+      const expanded = isGroupExpanded(groupKey, group.matchedLogIds);
+      const controlsId = historyGroupPanelId(groupKey);
+      const parentLog = group.logs.find((l) => l.transaction_type === "DISASSEMBLE") ?? group.logs[0];
+      const childLogs = group.logs.filter((l) => l.transaction_type !== "DISASSEMBLE");
+      const isSelected = selectedLogId === parentLog.log_id;
+      return (
+        <Fragment key={`ref-${groupKey}`}>
+          <ReworkBatchHeader
+            group={group}
+            expanded={expanded}
+            onToggle={() => toggleGroup(groupKey, group.matchedLogIds)}
+            selected={isSelected}
+            onSelect={() => {
+              onSelectLog(parentLog);
+              if (isSelected && expanded) collapseGroup(groupKey, group.matchedLogIds);
+              else expandGroup(groupKey, group.matchedLogIds);
+            }}
+            controlsId={controlsId}
+          />
+          {expanded && (
+            <ReworkBatchDetail
+              logs={childLogs}
+              parentItemId={parentLog.item_id}
+              colSpan={HISTORY_TABLE_COLUMN_SPAN}
+              controlsId={controlsId}
+              matchedLogIds={group.matchedLogIds}
+              cancelled={group.logs.some((log) => log.cancelled)}
+            />
+          )}
+        </Fragment>
+      );
+    }
+
+    // op_batch 가 아니라 IoBatch 가 없으므로 클릭 시 첫 로그 상세를 연다.
+    const expanded = isGroupExpanded(groupKey, group.matchedLogIds);
+    const controlsId = historyGroupPanelId(groupKey);
+    const isSelected = selectedLogId === group.logs[0]?.log_id;
+    const focusLogId = focusTarget?.groupKey === groupKey ? focusTarget.logId ?? null : null;
+    return (
+      <Fragment key={`ref-${groupKey}`}>
+        <BatchHeader
+          group={group}
+          expanded={expanded}
+          onToggle={() => toggleGroup(groupKey, group.matchedLogIds)}
+          selected={isSelected}
+          onSelect={() => {
+            onSelectLog(group.logs[0]);
+            if (isSelected && expanded) collapseGroup(groupKey, group.matchedLogIds);
+            else expandGroup(groupKey, group.matchedLogIds);
+          }}
+          controlsId={controlsId}
+          separationHint={separationHint}
+          referenceSummary={referenceSummaries?.get(group.refKey) ?? null}
+          referenceSummaryLoading={referenceSummariesLoading}
+        />
+        {expanded && (
+          <ReferenceBatchDetail
+            logs={group.logs}
+            highlightLogId={focusLogId}
+            matchedLogIds={group.matchedLogIds}
+            onSelectLog={onSelectChildLog ?? onSelectLog}
+            controlsId={controlsId}
+          />
+        )}
+      </Fragment>
+    );
+  });
+
+  if (rowsOnly) return <>{rows}</>;
+
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       {loading ? (
@@ -542,217 +789,7 @@ export function HistoryTable({
               </tr>
             </thead>
             <tbody className="mes-data-reveal">
-              {groups.map((group, index) => {
-                const rawSeparationHint = getHistorySeparationHint(
-                  index > 0 ? getGroupPrimaryLog(groups[index - 1]) : null,
-                  getGroupPrimaryLog(group),
-                );
-                const separationHint = rawSeparationHint === "다른 요청" || rawSeparationHint === "별도 시각"
-                  ? null
-                  : rawSeparationHint;
-                if (group.type === "solo") {
-                  return (
-                    <HistoryLogRow
-                      key={group.log.log_id}
-                      log={group.log}
-                      selected={selectedLogId === group.log.log_id}
-                      onSelect={onSelectLog}
-                      separationHint={separationHint}
-                    />
-                  );
-                }
-
-                if (group.type === "operation") {
-                  const groupSummary = getHistoryGroupSummary(group);
-                  const primaryLog = groupSummary.primaryLog;
-                  const operationLabel = group.logs.find((log) => log.operation_display_label)?.operation_display_label ?? "";
-                  const hasProduce = group.logs.some((log) => log.transaction_type === "PRODUCE");
-                  const hasBackflush = group.logs.some((log) => log.transaction_type === "BACKFLUSH");
-                  const isCustomBomSingleAdjustment = (operationLabel.startsWith("produce") || operationLabel.startsWith("disassemble"))
-                    && hasProduce !== hasBackflush;
-                  const childLogs = group.logs.filter((log) => log.log_id !== primaryLog.log_id);
-                  const expanded = isGroupExpanded(group.operationId, group.matchedLogIds);
-                  const controlsId = historyGroupPanelId(group.operationId);
-                  const primarySelected = selectedLogId === primaryLog.log_id;
-                  const selected = selectedLogId === primaryLog.log_id
-                    || childLogs.some((log) => log.log_id === selectedLogId);
-                  return (
-                    <Fragment key={`operation-${group.operationId}`}>
-                      <HistoryLogRow
-                        log={primaryLog}
-                        selected={selected}
-                        onSelect={() => {
-                          onSelectLog(primaryLog);
-                          if (primarySelected) collapseGroup(group.operationId, group.matchedLogIds);
-                          else expandGroup(group.operationId, group.matchedLogIds);
-                        }}
-                        expanded={expanded}
-                        onToggle={childLogs.length > 0 ? () => toggleGroup(group.operationId, group.matchedLogIds) : undefined}
-                        controlsId={childLogs.length > 0 ? controlsId : undefined}
-                        toggleLabel="작업 구성"
-                        separationHint={separationHint}
-                        additionalItemCount={groupSummary.additionalItemCount}
-                        displayType={groupSummary.displayType ?? undefined}
-                        operationLabel={groupSummary.label}
-                      />
-                      {expanded && childLogs.length > 0 && (
-                        <ReferenceBatchDetail
-                          logs={childLogs}
-                          highlightLogId={selectedLogId}
-                          matchedLogIds={group.matchedLogIds}
-                          onSelectLog={onSelectChildLog ?? onSelectLog}
-                          controlsId={controlsId}
-                          flat
-                          singleAdjustment={isCustomBomSingleAdjustment}
-                        />
-                      )}
-                    </Fragment>
-                  );
-                }
-
-                if (group.type === "defect_lifecycle") {
-                  const expanded = isGroupExpanded(group.key, group.matchedLogIds);
-                  const controlsId = historyGroupPanelId(group.key);
-                  const selected = selectedLogId === group.parent.log_id || selectedLogId === group.child.log_id;
-                  return (
-                    <Fragment key={group.key}>
-                      <HistoryLogRow
-                        log={group.parent}
-                        selected={selected}
-                        onSelect={onSelectLog}
-                        expanded={expanded}
-                        onToggle={() => toggleGroup(group.key, group.matchedLogIds)}
-                        controlsId={controlsId}
-                        separationHint={separationHint}
-                        additionalItemCount={getAdditionalDistinctItemCount([group.parent, group.child], group.parent)}
-                      />
-                      {expanded && (
-                        <ReferenceBatchDetail
-                          logs={[group.child]}
-                          highlightLogId={selectedLogId}
-                          matchedLogIds={group.matchedLogIds}
-                          onSelectLog={onSelectChildLog ?? onSelectLog}
-                          controlsId={controlsId}
-                        />
-                      )}
-                    </Fragment>
-                  );
-                }
-
-                if (group.type === "op_batch") {
-                  const expanded = isGroupExpanded(group.batchId, group.matchedLogIds);
-                  const controlsId = historyGroupPanelId(group.batchId);
-                  const batch = batchCache.get(group.batchId) ?? null;
-                  const snapshotQuantityWidth = getStockSnapshotQuantityWidth(group.logs);
-                  const isSelected = selectedBatchId === group.batchId;
-                  const focusItemId = focusTarget?.groupKey === group.batchId ? focusTarget.itemId ?? null : null;
-                  return (
-                    <Fragment key={`op-${group.batchId}`}>
-                      <OpBatchHeader
-                        group={group}
-                        expanded={expanded}
-                        onToggle={() => toggleGroup(group.batchId, group.matchedLogIds)}
-                        selected={isSelected}
-                        onSelect={() => {
-                          // 같은 묶음 재클릭 → 부모 selection 토글로 닫힘 + 펼침도 동시 접음.
-                          onSelectBatch(group.batchId, group.logs);
-                          if (isSelected) collapseGroup(group.batchId, group.matchedLogIds);
-                          else expandGroup(group.batchId, group.matchedLogIds);
-                        }}
-                        batch={batch}
-                        rowRef={opBatchRowRef}
-                        controlsId={controlsId}
-                        separationHint={separationHint}
-                        snapshotQuantityWidth={snapshotQuantityWidth}
-                      />
-                      {expanded && (
-                        <BomBatchDetail
-                          batchId={group.batchId}
-                          colSpan={HISTORY_TABLE_COLUMN_SPAN}
-                          cache={batchCache}
-                          onCached={handleCacheBatch}
-                          logs={group.logs}
-                          matchedLogIds={group.matchedLogIds}
-                          snapshotQuantityWidth={snapshotQuantityWidth}
-                          highlightItemId={focusItemId}
-                          controlsId={controlsId}
-                        />
-                      )}
-                    </Fragment>
-                  );
-                }
-
-                // type === "batch" (reference_no 기준 레거시 그룹)
-                // 재작업(defect-disassemble) 배치 → 트리 뷰
-                const groupKey = group.refKey;
-                if (group.refNo.startsWith("defect-disassemble:")) {
-                  const expanded = isGroupExpanded(groupKey, group.matchedLogIds);
-                  const controlsId = historyGroupPanelId(groupKey);
-                  const parentLog = group.logs.find((l) => l.transaction_type === "DISASSEMBLE") ?? group.logs[0];
-                  const childLogs = group.logs.filter((l) => l.transaction_type !== "DISASSEMBLE");
-                  const isSelected = selectedLogId === parentLog.log_id;
-                  return (
-                    <Fragment key={`ref-${groupKey}`}>
-                      <ReworkBatchHeader
-                        group={group}
-                        expanded={expanded}
-                        onToggle={() => toggleGroup(groupKey, group.matchedLogIds)}
-                        selected={isSelected}
-                        onSelect={() => {
-                          onSelectLog(parentLog);
-                          if (isSelected && expanded) collapseGroup(groupKey, group.matchedLogIds);
-                          else expandGroup(groupKey, group.matchedLogIds);
-                        }}
-                        controlsId={controlsId}
-                      />
-                      {expanded && (
-                        <ReworkBatchDetail
-                          logs={childLogs}
-                          parentItemId={parentLog.item_id}
-                          colSpan={HISTORY_TABLE_COLUMN_SPAN}
-                          controlsId={controlsId}
-                          matchedLogIds={group.matchedLogIds}
-                          cancelled={group.logs.some((log) => log.cancelled)}
-                        />
-                      )}
-                    </Fragment>
-                  );
-                }
-
-                // op_batch 가 아니라 IoBatch 가 없으므로 클릭 시 첫 로그 상세를 연다.
-                const expanded = isGroupExpanded(groupKey, group.matchedLogIds);
-                const controlsId = historyGroupPanelId(groupKey);
-                const isSelected = selectedLogId === group.logs[0]?.log_id;
-                const focusLogId = focusTarget?.groupKey === groupKey ? focusTarget.logId ?? null : null;
-                return (
-                  <Fragment key={`ref-${groupKey}`}>
-                    <BatchHeader
-                      group={group}
-                      expanded={expanded}
-                      onToggle={() => toggleGroup(groupKey, group.matchedLogIds)}
-                      selected={isSelected}
-                      onSelect={() => {
-                        onSelectLog(group.logs[0]);
-                        if (isSelected && expanded) collapseGroup(groupKey, group.matchedLogIds);
-                        else expandGroup(groupKey, group.matchedLogIds);
-                      }}
-                      controlsId={controlsId}
-                      separationHint={separationHint}
-                      referenceSummary={referenceSummaries?.get(group.refKey) ?? null}
-                      referenceSummaryLoading={referenceSummariesLoading}
-                    />
-                    {expanded && (
-                      <ReferenceBatchDetail
-                        logs={group.logs}
-                        highlightLogId={focusLogId}
-                        matchedLogIds={group.matchedLogIds}
-                        onSelectLog={onSelectChildLog ?? onSelectLog}
-                        controlsId={controlsId}
-                      />
-                    )}
-                  </Fragment>
-                );
-              })}
+              {rows}
             </tbody>
           </table>
         </div>

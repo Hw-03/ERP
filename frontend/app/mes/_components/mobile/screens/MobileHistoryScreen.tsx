@@ -21,7 +21,8 @@ import { invalidateOperationalQueries, useRealtimeRevision } from "@/lib/queries
 import { toDateKey, formatHistoryDate } from "../../_history_sections/historyFormat";
 import { type HistorySelection } from "../../_history_sections/historyConstants";
 import { resolveHistoryDateRange, type SelectedHistoryMonth } from "../../_history_sections/historyQuery";
-import { getAdditionalDistinctItemCount, getHistoryGroupSummary, toHistoryLogGroups } from "../../_history_sections/historyTableHelpers";
+import { getAdditionalDistinctItemCount, getHistoryGroupSummary, getHistoryWorkSelection, toHistoryLogGroups, type LogGroup } from "../../_history_sections/historyTableHelpers";
+import { HistorySubmissionDetail } from "../../_history_sections/HistorySubmissionDetail";
 import { queryKeys } from "@/lib/queries/keys";
 import { MobileHistoryList } from "../history/MobileHistoryList";
 import { MobileScrollFrame } from "../primitives/MobileScrollFrame";
@@ -32,6 +33,7 @@ import {
   advanceHistoryLoadReconcileState,
   applyHistoryCancellation,
   reconcileHistorySelection,
+  updateHistoryDisplayGroupLogs,
   type HistoryLoadReconcileState,
 } from "../../_history_sections/historyCancellation";
 
@@ -357,12 +359,9 @@ export function MobileHistoryScreen() {
   }, [historyError, loading, logs, selection]);
 
   function applyCancellationUpdate(updated: TransactionLog, batchId?: string | null) {
-    setGroups((currentGroups) => currentGroups.map((group) => ({
-      ...group,
-      logs: applyHistoryCancellation(
-        { logs: group.logs, selection: null, batchCache: new Map() }, updated, batchId,
-      ).logs,
-    })));
+    setGroups((currentGroups) => currentGroups.map((group) => updateHistoryDisplayGroupLogs(group, (logs) => applyHistoryCancellation(
+        { logs, selection: null, batchCache: new Map() }, updated, batchId,
+      ).logs)));
     setSelection((currentSelection) => applyHistoryCancellation(
       { logs: [], selection: currentSelection, batchCache: new Map() },
       updated,
@@ -412,7 +411,7 @@ export function MobileHistoryScreen() {
   }
 
   function handleSelectBatch(batchId: string, batchLogs: TransactionLog[]) {
-    const group = displayGroups.find((value) => value.type !== "solo" &&
+    const group = displayGroups.flatMap((value) => value.type === "submission" ? value.workGroups : [value]).find((value) => value.type !== "solo" &&
       (value.type === "operation" ? value.operationId : value.type === "op_batch" ? value.batchId : value.type === "batch" ? value.refKey : value.key) === batchId);
     const primary = group ? getHistoryGroupSummary(group, group.type === "op_batch" ? batchCache.get(group.batchId) : undefined).primaryLog : batchLogs[0];
     const selectedLogs = primary ? [primary, ...batchLogs.filter((log) => log.log_id !== primary.log_id)] : batchLogs;
@@ -420,11 +419,23 @@ export function MobileHistoryScreen() {
     setSelection((c) =>
       c?.kind === "batch" && c.batchId === batchId
         ? null
-        : { kind: "batch", batchId, logs: selectedLogs, groupType: group?.type === "solo" ? undefined : group?.type },
+        : group ? getHistoryWorkSelection(group) : { kind: "batch", batchId, logs: selectedLogs },
     );
   }
 
-  function navigateToLog(log: TransactionLog) {
+  function handleSelectSubmission(group: Extract<LogGroup, { type: "submission" }>) {
+    setSelectionStack([]);
+    setSelection((current) => current?.kind === "submission" && current.group.key === group.key ? null : { kind: "submission", group });
+  }
+
+  function navigateToWork(work: LogGroup) {
+    setSelection((current) => {
+      if (current) setSelectionStack((stack) => [...stack, current]);
+      return getHistoryWorkSelection(work);
+    });
+  }
+
+  function navigateToLog(log: TransactionLog, allowCancellation = true) {
     // 다른 날짜 거래로 이동하면 selectedDay 를 맞춰 리스트가 그 거래를 포함하게 한다
     // (데스크톱 동작 복제 — 393px 라 시트가 리스트를 덮어 scrollIntoView 는 생략).
     const logYmd = toDateKey(log.created_at);
@@ -436,7 +447,7 @@ export function MobileHistoryScreen() {
       if (cur && !(cur.kind === "log" && cur.log.log_id === log.log_id)) {
         setSelectionStack((s) => [...s, cur]);
       }
-      return { kind: "log", log };
+      return { kind: "log", log, allowCancellation };
     });
   }
 
@@ -507,6 +518,7 @@ export function MobileHistoryScreen() {
       ? `log:${selection.log.log_id}`
       : selection?.kind === "batch"
       ? `batch:${selection.batchId}`
+      : selection?.kind === "submission" ? `submission:${selection.group.key}`
       : null;
 
   const additionalItemCount = displaySelection?.kind === "batch"
@@ -521,7 +533,7 @@ export function MobileHistoryScreen() {
             ? ` 외 ${additionalItemCount}건`
             : ""
         }`
-      : "내역 상세";
+      : displaySelection?.kind === "submission" ? getHistoryGroupSummary(displaySelection.group, undefined, batchCache).title : "내역 상세";
   const sheetSubtitle =
     displaySelection?.kind === "log"
       ? `${displaySelection.log.mes_code ?? "-"} · ${formatHistoryDate(
@@ -624,6 +636,8 @@ export function MobileHistoryScreen() {
             selectedKey={selectedKey}
             onSelectLog={handleSelectLog}
             onSelectBatch={handleSelectBatch}
+            onSelectSubmission={handleSelectSubmission}
+            onSelectReadOnlyLog={(log) => navigateToLog(log, false)}
             onRetry={() => void retry()}
             onRetryRefresh={retryRefresh}
             canLoadMore={canLoadMore}
@@ -658,11 +672,13 @@ export function MobileHistoryScreen() {
               </div>}
             </div>
 
+            {displaySelection.kind === "submission" && <HistorySubmissionDetail group={displaySelection.group} batchCache={batchCache} onSelectWork={navigateToWork} />}
             {displaySelection.kind === "log" && (
               <HistoryDetailPanel
                 mobilePresentation
                 panelOpen={!!selection}
                 selected={displaySelection.log}
+                allowCancellation={displaySelection.allowCancellation}
                 onSelectLog={navigateToLog}
                 onLogUpdated={handleLogUpdated}
               />
@@ -673,9 +689,10 @@ export function MobileHistoryScreen() {
                 panelOpen={!!selection}
                 batchId={displaySelection.batchId}
                 logs={displaySelection.logs}
+                workOperationId={displaySelection.groupType === "operation" ? displaySelection.batchId : undefined}
                 batchCache={batchCache}
                 setBatchCache={setBatchCache}
-                onSelectLog={navigateToLog}
+                onSelectLog={(log) => navigateToLog(log, false)}
                 onBatchCancelled={handleBatchCancelled}
               />
             )}

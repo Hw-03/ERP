@@ -3,8 +3,9 @@
  * Phase 4 신규. Phase 2 백엔드 API 와 대응.
  */
 
-import { fetcher, postJson, putJson, toApiUrl } from "../api-core";
+import { fetcher, patchJson, postJson, putJson, toApiUrl } from "../api-core";
 import type {
+  DefectReasonCategory,
   DefectKpi,
   DefectListQuery,
   DefectLocation,
@@ -26,6 +27,14 @@ import type {
 } from "./types/defects";
 
 export const defectsApi = {
+  listReasonCategories: (employeeId: string, includeInactive = false): Promise<DefectReasonCategory[]> =>
+    fetcher<DefectReasonCategory[]>(toApiUrl(`/api/defects/reason-categories?requester_employee_id=${encodeURIComponent(employeeId)}&include_inactive=${includeInactive}`)),
+
+  createReasonCategory: (employeeId: string, name: string): Promise<DefectReasonCategory> =>
+    postJson<DefectReasonCategory>(toApiUrl("/api/defects/reason-categories"), { requester_employee_id: employeeId, name }),
+
+  updateReasonCategory: (employeeId: string, categoryId: string, changes: { name?: string; is_active?: boolean }): Promise<DefectReasonCategory> =>
+    patchJson<DefectReasonCategory>(toApiUrl(`/api/defects/reason-categories/${categoryId}`), { requester_employee_id: employeeId, ...changes }),
   /**
    * 남은 수량이 있는 건별 격리 기록 목록.
    * @param department 부서 필터 (없으면 전체)
@@ -101,6 +110,7 @@ export const defectsApi = {
     query.models.forEach((value) => params.append("model", value));
     query.process_steps.forEach((value) => params.append("process_step", value));
     if (query.reason) params.set("reason", query.reason);
+    if (query.reason_category_id) params.set("reason_category_id", query.reason_category_id);
     if (query.item_id) params.set("item_id", query.item_id);
     return fetcher<DefectStatisticsReportResponse>(
       toApiUrl(`/api/defects/statistics/report?${params.toString()}`),

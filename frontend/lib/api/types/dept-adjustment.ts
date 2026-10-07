@@ -27,6 +27,8 @@ export interface BomTemplateResponse {
 }
 
 export interface AdjLineInput {
+  reason_category_id?: string | null;
+  reason_category?: string | null;
   item_id: string;
   direction: AdjSubmitDirection;
   quantity: number;

@@ -78,6 +78,7 @@ class StockRequest(Base):
     request_id = Column(UUIDString, primary_key=True, default=uuid.uuid4)
     request_code = Column(String(40), unique=True, nullable=True, index=True)
     client_request_id = Column(String(64), unique=True, nullable=True, index=True)
+    submission_id = Column(UUIDString, nullable=True, index=True)
     requester_employee_id = Column(
         UUIDString,
         ForeignKey("employees.employee_id", ondelete="RESTRICT"),
@@ -137,7 +138,13 @@ class StockRequest(Base):
     completed_at = Column(DateTime, nullable=True)
     reference_no = Column(String(100), nullable=True)
     notes = Column(Text, nullable=True)
-    reason_category = Column(String(50), nullable=True)
+    reason_category = Column(String(50).with_variant(Text, "postgresql"), nullable=True)
+    reason_category_id = Column(
+        UUIDString,
+        ForeignKey("defect_reason_categories.category_id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
     reason_memo = Column(Text, nullable=True)
     operation_batch_id = Column(
         UUIDString,

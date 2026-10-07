@@ -30,6 +30,39 @@ from app.services import defect_statistics as statistics_service
 KST = ZoneInfo("Asia/Seoul")
 
 
+@pytest.mark.parametrize("original_name", ["변경 전", "긴사유" * 40, chr(0xFDFA) * 6])
+def test_reason_identity_survives_master_rename_and_hide(db_session, make_item, original_name: str) -> None:
+    from app.models import DefectReasonCategory
+    from app.models.defect_reason_category import normalize_defect_reason_name
+    category = DefectReasonCategory(name=original_name, normalized_name=normalize_defect_reason_name(original_name), is_active=False, is_other=False)
+    db_session.add(category)
+    db_session.flush()
+    item = make_item()
+    record = _add_record(db_session, item, quantity=4, at=_kst_naive(2026, 9, 3), reason=original_name)
+    record.reason_category_id = category.category_id
+    db_session.flush()
+    original = get_defect_statistics(db_session, period="month", anchor=date(2026, 9, 3), filters=DefectStatisticsFilters(reason_category_id=category.category_id))
+    assert original.summary.quantity == 4
+    assert original.reasons[0].label == original_name
+    category.name = "변경 후"
+    category.normalized_name = "변경 후"
+    category.is_active = False
+    newer = _add_record(db_session, item, quantity=3, at=_kst_naive(2026, 9, 4), reason="변경 후")
+    newer.reason_category_id = category.category_id
+    _add_record(db_session, item, quantity=10, at=_kst_naive(2026, 9, 4), reason="다른 사유")
+    db_session.flush()
+    result = get_defect_statistics(db_session, period="month", anchor=date(2026, 9, 3), filters=DefectStatisticsFilters(reason_category_id=category.category_id))
+    assert result.summary.quantity == 7
+    assert len(result.reasons) == 1
+    assert result.reasons[0].record_count == 2
+    assert result.reasons[0].key == str(category.category_id)
+    assert result.reasons[0].label == "변경 후"
+    assert record.reason_category == original_name
+    legacy_filtered = get_defect_statistics(db_session, period="month", anchor=date(2026, 9, 3), filters=DefectStatisticsFilters(reason=original_name))
+    assert legacy_filtered.summary.quantity == 4
+    assert legacy_filtered.reasons[0].label == "변경 후"
+
+
 def test_report_current_month_compares_matching_elapsed_range_and_filters(db_session, make_item) -> None:
     item = make_item(name="보고 품목", process_type_code="TR")
     other = make_item(name="다른 품목", process_type_code="TR")

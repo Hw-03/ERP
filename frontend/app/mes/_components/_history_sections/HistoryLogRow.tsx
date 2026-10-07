@@ -35,9 +35,11 @@ type Props = {
   additionalItemCount?: number;
   displayType?: TransactionLog["transaction_type"];
   operationLabel?: string;
+  stockSummary?: string;
+  targetHint?: string;
 };
 
-function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, controlsId, separationHint, toggleLabel, additionalItemCount, displayType, operationLabel }: Props) {
+function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, controlsId, separationHint, toggleLabel, additionalItemCount, displayType, operationLabel, stockSummary, targetHint }: Props) {
   const [hovered, setHovered] = useState(false);
   const padX = "px-4";
   const targetPadX = "px-4";
@@ -100,16 +102,21 @@ function HistoryLogRowImpl({ log, selected, onSelect, expanded, onToggle, contro
         <FlowBadge type={badgeType} label={operationLabel ?? groupSummary.label} color={tcolor} />
       </td>
       <td className={`${HISTORY_MAIN_CELL_CLASS} ${targetPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
-        <TargetSummaryBlock
-          presentation={presentation}
-          icon={<Package className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />}
-          additionalItemCount={additionalItemCount}
-        />
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <TargetSummaryBlock
+              presentation={presentation}
+              icon={<Package className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />}
+              additionalItemCount={additionalItemCount}
+            />
+          </div>
+          {targetHint && <span className="shrink-0 whitespace-nowrap text-xs" style={{ color: LEGACY_COLORS.muted }}>{targetHint}</span>}
+        </div>
       </td>
       <ItemCodeCell
         code={presentation.target.code}
       />
-      <StockSnapshotCell log={log} />
+      {stockSummary ? <td className={`${HISTORY_MAIN_CELL_CLASS} px-1 text-center text-xs font-semibold`} style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>{stockSummary}</td> : <StockSnapshotCell log={log} />}
       <td className={`${HISTORY_STATUS_CELL_CLASS} ${statusPadX}`} style={{ borderColor: LEGACY_COLORS.border }}>
         <PeopleStatusCell presentation={presentation} />
       </td>

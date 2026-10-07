@@ -9,6 +9,7 @@ import { stockRequestsApi } from "@/lib/api/stock-requests";
 import { itemsApi } from "@/lib/api/items";
 import type { Item } from "@/lib/api/types";
 import { ReasonFormFields } from "./ReasonFormFields";
+import { hasDefectReason } from "./defectCartValidation";
 import { InlineErrorNote } from "./InlineErrorNote";
 import { ConfirmModal } from "@/lib/ui";
 import { QuantityInput } from "../common/QuantityInput";
@@ -52,6 +53,7 @@ export function AddRDirectModal({
 
   const [qty, setQty] = useState<string>("");
   const [category, setCategory] = useState("");
+  const [categoryId, setCategoryId] = useState<string | null>(null);
   const [memo, setMemo] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +82,7 @@ export function AddRDirectModal({
     );
     setQty("");
     setCategory("");
+    setCategoryId(null);
     setMemo("");
     setError(null);
     setBusy(false);
@@ -139,7 +142,7 @@ export function AddRDirectModal({
   const canSubmit =
     !busy &&
     selected !== null &&
-    Boolean(category) &&
+    hasDefectReason(category, memo) &&
     qtyNum > 0 &&
     Number.isFinite(qtyNum) &&
     qtyNum <= available;
@@ -153,6 +156,7 @@ export function AddRDirectModal({
         requester_employee_id: currentEmployee.employee_id,
         request_type: "scrap_normal",
         reason_category: category,
+        reason_category_id: categoryId,
         reason_memo: memo || null,
         notes: memo || null,
         lines: [
@@ -408,9 +412,11 @@ export function AddRDirectModal({
 
         {/* 사유 폼 */}
         <ReasonFormFields
+          employeeId={currentEmployee.employee_id}
+          categoryId={categoryId}
           category={category}
           memo={memo}
-          onCategoryChange={setCategory}
+          onCategoryChange={(name, id) => { setCategory(name); setCategoryId(id ?? null); }}
           onMemoChange={setMemo}
           required
         />

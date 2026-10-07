@@ -16,7 +16,7 @@ function render(ui: ReactElement, client = new QueryClient({
 }
 
 vi.mock("@/lib/api/defects", () => ({
-  defectsApi: { quarantine: vi.fn(), quarantineBulk: vi.fn() },
+  defectsApi: { quarantine: vi.fn(), quarantineBulk: vi.fn(), listReasonCategories: vi.fn() },
 }));
 vi.mock("@/lib/api/stock-requests", () => ({
   stockRequestsApi: { createStockRequest: vi.fn() },
@@ -70,16 +70,21 @@ const fItem = makeItem({ item_id: "f-1", mes_code: "3-AF-0002", item_name: "완�
 const assemblyWithoutBom = makeItem({ item_id: "aa-no-bom", mes_code: "6-AA-0038", item_name: "BOM 없는 조립품" });
 const productModels: ProductModel[] = [];
 const employee = { employee_id: "emp-1", name: "테스터", department: "조립" };
-function selectReasonCategory(label = "기타") {
-  const categoryCombobox = screen.getAllByRole("combobox").find((el) =>
+async function selectReasonCategory(label = "외관 불량") {
+  const categoryButton = screen.getAllByRole("button", { name: "사유 카테고리 선택" }).find((el) =>
     el.textContent?.includes("카테고리 선택") || el.textContent?.includes(label),
   );
-  expect(categoryCombobox).toBeTruthy();
-  fireEvent.click(categoryCombobox as HTMLElement);
-  fireEvent.mouseDown(screen.getByRole("option", { name: label }));
+  expect(categoryButton).toBeTruthy();
+  fireEvent.click(categoryButton as HTMLElement);
+  fireEvent.click(await screen.findByRole("button", { name: label, exact: true }));
 }
 
-function enterReasonMemos(value = "회귀 테스트 사유") {
+async function enterReasonMemos(value = "회귀 테스트 사유") {
+  for (const button of screen.getAllByRole("button", { name: "사유 카테고리 선택" })) {
+    if (!button.textContent?.includes("카테고리 선택")) continue;
+    fireEvent.click(button);
+    fireEvent.click(await screen.findByRole("button", { name: "외관 불량", exact: true }));
+  }
   screen.getAllByPlaceholderText(/스크래치 다수/).forEach((field) => {
     fireEvent.change(field, { target: { value } });
   });
@@ -87,6 +92,10 @@ function enterReasonMemos(value = "회귀 테스트 사유") {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(defectsApi.listReasonCategories).mockResolvedValue([
+    { category_id: "surface-id", name: "외관 불량", is_active: true, is_other: false },
+    { category_id: "other-id", name: "기타", is_active: true, is_other: true },
+  ]);
   window.history.replaceState({}, "");
   vi.mocked(defectsApi.quarantine).mockResolvedValue(undefined);
   vi.mocked(defectsApi.quarantineBulk).mockResolvedValue(undefined as never);
@@ -100,11 +109,30 @@ beforeEach(() => {
 });
 
 describe("DefectCartFlow", () => {
-  it("품목에서 이전 확인을 취소하면 수량·사유를 유지한다", () => {
+  it("shares a submission ID and keeps it when a failed line is edited and retried", async () => {
+    vi.mocked(stockRequestsApi.createStockRequest).mockResolvedValueOnce({} as never).mockRejectedValueOnce(new Error("retry"));
+    render(<DefectCartFlow mode="scrap" items={[rItem, fItem]} productModels={[]} currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "원자재 장바구니에 추가" }));
+    fireEvent.click(screen.getByRole("button", { name: "완제품 장바구니에 추가" }));
+    await enterReasonMemos();
+    fireEvent.click(screen.getByRole("button", { name: /즉시 폐기 \(2건\)/ }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "즉시 폐기" }));
+    await waitFor(() => expect(stockRequestsApi.createStockRequest).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getAllByPlaceholderText(/스크래치 다수/)).toHaveLength(1));
+    const [first, failed] = vi.mocked(stockRequestsApi.createStockRequest).mock.calls.map(([payload]) => payload);
+    expect(failed.submission_id).toBe(first.submission_id);
+    expect(failed.reason_category_id).toBe("surface-id");
+    fireEvent.change(screen.getByPlaceholderText(/스크래치 다수/), { target: { value: "수정한 메모" } });
+    fireEvent.click(screen.getByRole("button", { name: /즉시 폐기 \(1건\)/ }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "즉시 폐기" }));
+    await waitFor(() => expect(stockRequestsApi.createStockRequest).toHaveBeenCalledTimes(3));
+    expect(vi.mocked(stockRequestsApi.createStockRequest).mock.calls[2][0]).toMatchObject({ submission_id: first.submission_id, client_request_id: failed.client_request_id, reason_category_id: "surface-id", reason_memo: "수정한 메모" });
+  });
+  it("품목에서 이전 확인을 취소하면 수량·사유를 유지한다", async () => {
     const onCancel = vi.fn();
     render(<DefectCartFlow mode="scrap" items={[rItem]} productModels={[]} currentEmployee={employee} onDone={vi.fn()} onCancel={onCancel} />);
     fireEvent.click(screen.getByRole("button", { name: /추가/ }));
-    enterReasonMemos("보존할 사유");
+    await enterReasonMemos("보존할 사유");
     fireEvent.click(screen.getByRole("button", { name: "이전" }));
     expect(screen.getByRole("dialog")).toHaveTextContent("입력 내용이 사라집니다.");
     fireEvent.click(screen.getByRole("button", { name: "취소" }));
@@ -119,7 +147,7 @@ describe("DefectCartFlow", () => {
   it("BOM에서 품목으로 돌아갔다 앞으로 가면 입력한 분류를 유지한다", async () => {
     render(<DefectCartFlow mode="scrap" initialAction="rework" items={[{ ...fItem, has_bom: true }]} productModels={[]} currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: /추가/ }));
-    enterReasonMemos("재작업 사유");
+    await enterReasonMemos("재작업 사유");
     fireEvent.click(screen.getByRole("button", { name: /BOM 확인/ }));
     await screen.findByText("하위 품목");
     fireEvent.change(screen.getByLabelText("하위 품목 격리 수량"), { target: { value: "1" } });
@@ -130,7 +158,7 @@ describe("DefectCartFlow", () => {
     expect(await screen.findByLabelText("하위 품목 격리 수량")).toHaveValue(1);
   });
 
-  it("불량 작성 단계는 공통 탭 진입 모션을 사용한다", () => {
+  it("불량 작성 단계는 공통 탭 진입 모션을 사용한다", async () => {
     const { container } = render(
       <DefectCartFlow
         mode="add"
@@ -145,11 +173,11 @@ describe("DefectCartFlow", () => {
     expect(container.querySelector(".animate-desktop-navigation-enter")).toHaveTextContent("왼쪽에서 품목을 추가하세요.");
   });
 
-  it.each(["add", "scrap"] as const)("%s 작성 입력은 복귀 확인 취소로 보존되고 폐기할 때만 닫힌다", (mode) => {
+  it.each(["add", "scrap"] as const)("%s 작성 입력은 복귀 확인 취소로 보존되고 폐기할 때만 닫힌다", async (mode) => {
     render(<DesktopHomeHarness><DefectCartFlow mode={mode} items={[rItem, fItem]} productModels={productModels}
       currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} /></DesktopHomeHarness>);
     fireEvent.click(screen.getByRole("button", { name: "원자재 장바구니에 추가" }));
-    enterReasonMemos("미저장 사유");
+    await enterReasonMemos("미저장 사유");
     fireEvent.click(screen.getByText("현재 메뉴 복귀"));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     fireEvent.click(screen.getByText("계속 머무르기"));
@@ -160,7 +188,7 @@ describe("DefectCartFlow", () => {
     expect(defectsApi.quarantineBulk).not.toHaveBeenCalled();
     expect(stockRequestsApi.createStockRequest).not.toHaveBeenCalled();
   });
-  it("scrap 모드에서 R과 비R 품목을 모두 보여준다", () => {
+  it("scrap 모드에서 R과 비R 품목을 모두 보여준다", async () => {
     render(
       <DefectCartFlow
         mode="scrap"
@@ -178,7 +206,7 @@ describe("DefectCartFlow", () => {
   });
 
 
-  it("이전 역할 기반 defaultSource가 전달되어도 생산 출처로 시작한다", () => {
+  it("이전 역할 기반 defaultSource가 전달되어도 생산 출처로 시작한다", async () => {
     const legacySource = { defaultSource: "warehouse" } as unknown as Record<string, never>;
     const productionOnly = { ...rItem, item_id: "production-only", item_name: "생산 전용", warehouse_qty: 0 };
     render(
@@ -214,7 +242,7 @@ describe("DefectCartFlow", () => {
 
     expect(screen.getAllByText("자동 부서 · 조립").length).toBeGreaterThan(0);
     expect(screen.getAllByText("자동 부서 · 튜브").length).toBeGreaterThan(0);
-    enterReasonMemos();
+    await enterReasonMemos();
 
     fireEvent.click(screen.getByRole("button", { name: /격리하기/ }));
     fireEvent.click(await screen.findByRole("button", { name: "격리하기" }));
@@ -229,7 +257,7 @@ describe("DefectCartFlow", () => {
     });
   });
 
-  it("바로 재작업은 출처 단계를 건너뛰고 품목 선택으로 연다", () => {
+  it("바로 재작업은 출처 단계를 건너뛰고 품목 선택으로 연다", async () => {
     render(
       <DefectCartFlow
         mode="scrap" initialAction="rework"
@@ -248,7 +276,7 @@ describe("DefectCartFlow", () => {
     expect(screen.getByTestId("defect-flow-stepper")).toHaveTextContent("1작업 선택2품목 선택3BOM 확인");
   });
 
-  it("품목을 추가하면 Check 기반 담김 상태와 선택 행 강조를 보여준다", () => {
+  it("품목을 추가하면 Check 기반 담김 상태와 선택 행 강조를 보여준다", async () => {
     render(
       <DefectCartFlow
         mode="add"
@@ -273,7 +301,7 @@ describe("DefectCartFlow", () => {
     expect(screen.getByText("장바구니 0건")).toBeInTheDocument();
   });
 
-  it("바로 재작업 Step 2에서 진행 표시와 좌우 툴바/카드 구조를 보여준다", () => {
+  it("바로 재작업 Step 2에서 진행 표시와 좌우 툴바/카드 구조를 보여준다", async () => {
     render(
       <DefectCartFlow
         mode="scrap" initialAction="rework"
@@ -319,7 +347,7 @@ describe("DefectCartFlow", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /추가/ }));
     fireEvent.change(screen.getByPlaceholderText(/예: 3/), { target: { value: "2" } });
-    selectReasonCategory();
+    await selectReasonCategory();
 
     fireEvent.click(screen.getByRole("button", { name: /즉시 폐기/ }));
 
@@ -375,7 +403,7 @@ describe("DefectCartFlow", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /추가/ }));
     fireEvent.click(screen.getByRole("button", { name: "B급" }));
-    selectReasonCategory();
+    await selectReasonCategory();
     fireEvent.click(screen.getByRole("button", { name: /격리하기/ }));
     fireEvent.click(await screen.findByRole("button", { name: "격리하기" }));
 
@@ -400,7 +428,7 @@ describe("DefectCartFlow", () => {
     const classifications = screen.getAllByRole("group", { name: "보관 분류" });
     fireEvent.click(within(classifications[0]).getByRole("button", { name: "B급" }));
     fireEvent.click(within(classifications[1]).getByRole("button", { name: "구형" }));
-    enterReasonMemos();
+    await enterReasonMemos();
     fireEvent.click(screen.getByRole("button", { name: /격리하기 \(2건\)/ }));
 
     const dialog = await screen.findByRole("dialog");
@@ -419,7 +447,7 @@ describe("DefectCartFlow", () => {
   });
 
 
-  it("바로 재작업 품목 선택에는 has_bom=true 품목만 보여준다", () => {
+  it("바로 재작업 품목 선택에는 has_bom=true 품목만 보여준다", async () => {
     render(
       <DefectCartFlow
         mode="scrap" initialAction="rework"
@@ -453,7 +481,7 @@ describe("DefectCartFlow", () => {
 
     expect(screen.queryByText("원자재")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /추가/ }));
-    selectReasonCategory();
+    await selectReasonCategory();
 
     fireEvent.click(screen.getByRole("button", { name: /BOM 확인/ }));
     await waitFor(() => expect(screen.getByTestId("defect-flow-stepper")).toHaveTextContent("BOM 확인"));
@@ -500,7 +528,7 @@ describe("DefectCartFlow", () => {
     expect(screen.getByText(expectedText)).toBeInTheDocument();
   });
 
-  it("새로고침 시 직렬화되지 않은 재작업 BOM 단계는 재작업 품목 선택으로 안전 복원한다", () => {
+  it("새로고침 시 직렬화되지 않은 재작업 BOM 단계는 재작업 품목 선택으로 안전 복원한다", async () => {
     window.history.replaceState({ defect: "cart", mode: "scrap", directAction: "rework", source: "production", step: 3 }, "");
     render(
       <DefectCartFlow mode="scrap" items={[{ ...fItem, has_bom: true }]} productModels={productModels} currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} />,
@@ -511,7 +539,7 @@ describe("DefectCartFlow", () => {
   });
 
 
-  it("[8.5-03][8.7-03][8.8-01][8.10-02] 부서 출처는 자동 부서의 보유·예약·가용 재고를 표시한다", () => {
+  it("[8.5-03][8.7-03][8.8-01][8.10-02] 부서 출처는 자동 부서의 보유·예약·가용 재고를 표시한다", async () => {
     const tubeItem = makeItem({
       item_id: "tube-stock",
       mes_code: "8-TR-0002",
@@ -535,7 +563,7 @@ describe("DefectCartFlow", () => {
     expect(row).not.toHaveTextContent("16");
   });
 
-  it("[8.5-03][8.7-03] 창고 출처는 창고의 보유·예약·가용 재고를 표시한다", () => {
+  it("[8.5-03][8.7-03] 창고 출처는 창고의 보유·예약·가용 재고를 표시한다", async () => {
     const warehouseItem = makeItem({
       item_id: "warehouse-stock",
       mes_code: "8-TR-0003",
@@ -557,7 +585,7 @@ describe("DefectCartFlow", () => {
     expect(row).toHaveTextContent("가용 7");
   });
 
-  it("[8.5-07] 사유 카테고리와 자유 메모가 모두 없으면 막고 메모만 있어도 허용한다", () => {
+  it("카테고리 미선택은 메모가 있어도 막고 기타는 메모도 요구한다", async () => {
     render(
       <DefectCartFlow mode="add" items={[rItem]} productModels={[]} currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} />,
     );
@@ -566,13 +594,17 @@ describe("DefectCartFlow", () => {
     const submit = screen.getByRole("button", { name: /격리하기/ });
 
     expect(submit).toBeDisabled();
-    expect(screen.getByText("사유 카테고리 또는 메모 중 하나를 입력하세요.")).toBeInTheDocument();
+    expect(screen.getByText("사유 카테고리를 선택하세요.")).toBeInTheDocument();
 
     fireEvent.change(screen.getByPlaceholderText(/스크래치 다수/), { target: { value: "메모만 입력" } });
+    expect(submit).toBeDisabled();
+    await selectReasonCategory("기타");
     expect(submit).toBeEnabled();
+    fireEvent.change(screen.getByPlaceholderText(/스크래치 다수/), { target: { value: " " } });
+    expect(submit).toBeDisabled();
   });
 
-  it("[8.10-05] 여러 행이 부족하면 모든 오류를 표시하고 확인창과 API 호출을 전부 차단한다", () => {
+  it("[8.10-05] 여러 행이 부족하면 모든 오류를 표시하고 확인창과 API 호출을 전부 차단한다", async () => {
     const tubeItem = makeItem({
       item_id: "short-tube",
       mes_code: "8-TR-1001",
@@ -593,7 +625,7 @@ describe("DefectCartFlow", () => {
     const quantities = screen.getAllByPlaceholderText(/예: 3/);
     fireEvent.change(quantities[0], { target: { value: "4" } });
     fireEvent.change(quantities[1], { target: { value: "3" } });
-    enterReasonMemos();
+    await enterReasonMemos();
 
     const submit = screen.getByRole("button", { name: /격리하기 \(2건\)/ });
     expect(submit).toBeDisabled();
@@ -611,7 +643,7 @@ describe("DefectCartFlow", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "원자재 장바구니에 추가" }));
     fireEvent.click(screen.getByRole("button", { name: "완제품 장바구니에 추가" }));
-    enterReasonMemos();
+    await enterReasonMemos();
     fireEvent.click(screen.getByRole("button", { name: /격리하기 \(2건\)/ }));
     fireEvent.click(await screen.findByRole("button", { name: "격리하기" }));
 
@@ -635,7 +667,7 @@ describe("DefectCartFlow", () => {
       queryClient,
     );
     fireEvent.click(screen.getByRole("button", { name: /추가/ }));
-    selectReasonCategory();
+    await selectReasonCategory();
     fireEvent.click(screen.getByRole("button", { name: /즉시 폐기 \(1건\)/ }));
     fireEvent.click(await screen.findByRole("button", { name: "즉시 폐기" }));
 

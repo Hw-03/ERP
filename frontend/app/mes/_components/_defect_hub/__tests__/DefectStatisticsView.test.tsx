@@ -35,6 +35,15 @@ const report = {
 const props = { departmentOptions: ["조립", "품질"], modelOptions: ["DX"], currentDepartment: "조립", onBack: vi.fn() };
 
 describe("DefectStatisticsView report", () => {
+  it("filters a managed reason by ID while showing its current name", async () => {
+    const id = "94b714e1-82d2-41a0-81bc-471d5030d052";
+    api.getStatisticsReport.mockResolvedValue({ ...report, reasons: [{ ...group(id, 10), label: "표면 균열" }] });
+    render(<DefectStatisticsView {...props} />);
+    await screen.findByText("10개");
+    fireEvent.click(screen.getByRole("button", { name: /사유 표면 균열/ }));
+    await waitFor(() => expect(api.getStatisticsReport).toHaveBeenLastCalledWith(expect.objectContaining({ reason_category_id: id, reason: undefined })));
+    expect(screen.getByRole("button", { name: "사유 표면 균열 ×" })).toBeInTheDocument();
+  });
   beforeEach(() => {
     api.getStatisticsReport.mockReset().mockResolvedValue(report);
     window.sessionStorage.clear();

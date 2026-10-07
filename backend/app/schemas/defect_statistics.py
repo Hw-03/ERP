@@ -28,6 +28,7 @@ class DefectStatisticsFilters(BaseModel):
     models: tuple[str, ...] = Field(default_factory=tuple)
     process_steps: tuple[str, ...] = Field(default_factory=tuple)
     reason: str | None = None
+    reason_category_id: uuid.UUID | None = None
     item_id: uuid.UUID | None = None
 
 

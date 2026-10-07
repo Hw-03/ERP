@@ -180,6 +180,39 @@ function panel(selection: any, batchCache = new Map<string, IoBatch>()) {
 }
 
 describe("DesktopHistoryRightPanel", () => {
+  it("제출 상세는 하위 레거시 배치 캐시로 제목과 사유 및 검색 결과를 표시한다", () => {
+    const component = makeLog({ log_id: "component", item_id: "component", item_name: "검색된 구성품" });
+    const primary = makeLog({ operation_batch_id: "batch-1", reason_category: "이전 사유", reason_memo: "이전 메모" });
+    const batch = makeDuplicateManualBatch();
+    batch.bundles = [batch.bundles[0]];
+    batch.bundles[0].title = primary.item_name;
+    const group = { type: "submission" as const, key: "submission:legacy", logs: [component, primary], workGroups: [
+      { type: "op_batch" as const, batchId: "batch-1", refNo: null, logs: [component, primary], matchedLogIds: [component.log_id] },
+    ] };
+    render(panel({ kind: "submission", group }, new Map([["batch-1", batch]])));
+    expect(screen.getByRole("heading", { name: primary.item_name })).toBeInTheDocument();
+    const card = screen.getByRole("button", { name: /이전 사유/ });
+    expect(card).toHaveTextContent("이전 메모");
+    expect(card).toHaveTextContent("검색 일치 · 검색된 구성품");
+    expect(screen.queryByText("작업 정보 확인 중")).not.toBeInTheDocument();
+  });
+  it("제출 요약에는 취소 액션이 없고 작업을 원래 상세로 연결한다", () => {
+    const first = makeLog({ operation_id: "work-1", operation_role: "PRIMARY" });
+    const second = makeLog({ log_id: "log-2", item_id: "item-2", item_name: "부품 B", operation_id: "work-2", operation_role: "PRIMARY" });
+    const group = { type: "submission" as const, key: "submission:id", logs: [first, second], workGroups: [
+      { type: "operation" as const, operationId: "work-1", logs: [first] },
+      { type: "operation" as const, operationId: "work-2", logs: [second] },
+    ] };
+    const onSelectWork = vi.fn();
+    render(<DesktopHistoryRightPanel selection={{ kind: "submission", group }} displaySelection={{ kind: "submission", group }}
+      batchCache={new Map()} setBatchCache={vi.fn()} onSelectLog={vi.fn()} onSelectWork={onSelectWork}
+      canGoBack={false} onBack={vi.fn()} onLogUpdated={vi.fn()} onBatchCancelled={vi.fn()}
+      onFocusLineInList={vi.fn()} onClose={vi.fn()} />);
+    expect(screen.queryByTestId("history-batch-detail-panel")).not.toBeInTheDocument();
+    expect(screen.queryByText("취소 화면 열기")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /부품 B/ }));
+    expect(onSelectWork).toHaveBeenCalledWith(group.workGroups[1]);
+  });
   beforeEach(() => {
     vi.clearAllMocks();
   });

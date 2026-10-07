@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { RDefectActionModal } from "../RDefectActionModal";
 import type { DefectLocation } from "@/lib/api/types/defects";
+vi.mock("../ReasonFormFields", async () => ({ ReasonFormFields: (await import("./reasonFormFieldsStub")).ReasonFormFieldsStub }));
 
 vi.mock("@/lib/api/defects", () => ({
   defectsApi: {
@@ -53,8 +54,7 @@ const defaultProps = {
 
 function selectReasonCategory(label: string) {
   const combobox = screen.getByRole("combobox");
-  fireEvent.click(combobox);
-  fireEvent.mouseDown(screen.getByRole("option", { name: label }));
+  fireEvent.change(combobox, { target: { value: label } });
 }
 
 beforeEach(() => {
@@ -166,6 +166,7 @@ describe("RDefectActionModal", () => {
     );
 
     selectReasonCategory("기타");
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "기타 상세 사유" } });
     fireEvent.click(screen.getByText("확인 →"));
 
     await waitFor(() => {

@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { TransactionLog } from "@/lib/api";
 import { MobileHistoryList as ActualMobileHistoryList } from "../MobileHistoryList";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { buildGroups } from "../../../_history_sections/historyTableHelpers";
+import { buildGroups, type LogGroup } from "../../../_history_sections/historyTableHelpers";
 import { getSingleLogMovement } from "../../../_history_sections/historyBatchInterpreter";
 
 function MobileHistoryList({ filteredLogs, ...props }: Omit<Parameters<typeof ActualMobileHistoryList>[0], "displayGroups" | "batchCache" | "setBatchCache"> & { filteredLogs: TransactionLog[] }) {
@@ -48,6 +48,37 @@ function log(id: string, phase: string): TransactionLog {
 }
 
 describe("MobileHistoryList", () => {
+  it("제출 부모의 대표 품목 수만 품목 단위로 표시한다", () => {
+    const first = { ...log("one", ""), transaction_type: "MARK_DEFECTIVE" } as TransactionLog;
+    const second = { ...log("two", ""), transaction_type: "MARK_DEFECTIVE" } as TransactionLog;
+    const group: LogGroup = { type: "submission", key: "submission:items", logs: [first, second],
+      workGroups: [{ type: "solo", log: first }, { type: "solo", log: second }] };
+    render(<QueryClientProvider client={new QueryClient()}><ActualMobileHistoryList loading={false} error={null}
+      displayGroups={[group]} batchCache={new Map()} setBatchCache={vi.fn()} selectedKey={null}
+      onSelectLog={vi.fn()} onSelectBatch={vi.fn()} onRetry={vi.fn()}
+      canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} /></QueryClientProvider>);
+    expect(screen.getByRole("button")).toHaveTextContent(`${first.item_name} 외 1품목`);
+  });
+  it("제출 안의 레거시 배치도 조회하여 작업 분류를 확정한다", async () => {
+    const getBatch = vi.spyOn(ioApi, "getBatch").mockResolvedValue({ batch_id: "nested-batch",
+      work_type: "process", sub_type: "disassemble", bundles: [] } as unknown as IoBatch);
+    const entry = { ...log("nested", ""), transaction_type: "BACKFLUSH", operation_batch_id: "nested-batch" } as TransactionLog;
+    const groups: LogGroup[] = [{ type: "submission", key: "submission:nested", logs: [entry],
+      workGroups: [{ type: "op_batch", batchId: "nested-batch", refNo: null, logs: [entry] }] }];
+    function SubmissionList() {
+      const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
+      const [cache, setCache] = useState(new Map<string, IoBatch>());
+      return <QueryClientProvider client={client}><ActualMobileHistoryList loading={false} error={null}
+        displayGroups={groups} batchCache={cache} setBatchCache={setCache} selectedKey={null}
+        onSelectLog={vi.fn()} onSelectBatch={vi.fn()} onRetry={vi.fn()}
+        canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} /></QueryClientProvider>;
+    }
+    render(<SubmissionList />);
+    await waitFor(() => expect(getBatch).toHaveBeenCalledWith("nested-batch", expect.objectContaining({ signal: expect.any(AbortSignal) })));
+    await waitFor(() => expect(screen.getByText("분해 출고")).toBeInTheDocument());
+    expect(screen.queryByText("작업 정보 확인 중")).not.toBeInTheDocument();
+    getBatch.mockRestore();
+  });
   it("회수된 관전류 BD로 검색한 불량 재작업도 부모 품목과 작업 분류로 표시한다", () => {
     const onSelectLog = vi.fn();
     const onSelectBatch = vi.fn();

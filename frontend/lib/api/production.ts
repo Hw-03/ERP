@@ -40,13 +40,14 @@ export interface TransactionReferenceSummary {
   unit: string | null;
 }
 
-export type TransactionDisplayGroupType = "solo" | "batch" | "op_batch" | "operation" | "defect_lifecycle";
+export type TransactionDisplayGroupType = "solo" | "batch" | "op_batch" | "operation" | "defect_lifecycle" | "submission";
 
 export interface TransactionDisplayGroup {
   type: TransactionDisplayGroupType;
   key: string;
   logs: TransactionLog[];
   matchedLogIds?: string[] | null;
+  workGroups?: TransactionDisplayGroup[];
 }
 
 export interface TransactionDisplayGroupPage {
@@ -55,8 +56,9 @@ export interface TransactionDisplayGroupPage {
   hasMore: boolean;
 }
 
-type TransactionDisplayGroupWire = Omit<TransactionDisplayGroup, "matchedLogIds"> & {
+type TransactionDisplayGroupWire = Omit<TransactionDisplayGroup, "matchedLogIds" | "workGroups"> & {
   matched_log_ids?: string[] | null;
+  work_groups?: TransactionDisplayGroupWire[];
 };
 
 type InventoryOperationLineWire = {
@@ -135,6 +137,10 @@ function mapWire<T>(wire: object): T {
       ? Number(value)
       : value,
   ])) as T;
+}
+
+function mapDisplayGroup(group: TransactionDisplayGroupWire): TransactionDisplayGroup {
+  return { ...mapWire<TransactionDisplayGroup>(group), workGroups: (group.work_groups ?? []).map(mapDisplayGroup) };
 }
 
 function apiQuery<T extends object>(path: string, params?: T): string {
@@ -299,7 +305,7 @@ export const productionApi = {
       opts?.signal,
     ).then((page) => ({
       ...mapWire<TransactionDisplayGroupPage>(page),
-      groups: page.groups.map((group) => mapWire<TransactionDisplayGroup>(group)),
+      groups: page.groups.map(mapDisplayGroup),
     }));
   },
 

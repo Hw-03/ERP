@@ -56,6 +56,8 @@ export interface StockRequestLine {
 }
 
 export interface StockRequest {
+  reason_category_id?: string | null;
+  submission_id?: string | null;
   request_id: string;
   request_code: string | null;
   requester_employee_id: string;
@@ -97,6 +99,8 @@ export interface StockRequest {
 }
 
 export interface StockRequestCreatePayload {
+  reason_category_id?: string | null;
+  submission_id?: string | null;
   requester_employee_id: string;
   request_type: StockRequestType;
   reference_no?: string | null;
@@ -117,6 +121,8 @@ export interface StockRequestCreatePayload {
 }
 
 export interface StockRequestDraftUpsertPayload {
+  reason_category_id?: string | null;
+  submission_id?: string | null;
   requester_employee_id: string;
   request_type: StockRequestType;
   reference_no?: string | null;

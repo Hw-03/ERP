@@ -12,6 +12,8 @@ import { HistoryBatchDetailPanel } from "./HistoryBatchDetailPanel";
 import type { HistorySelection } from "./historyConstants";
 import type { HistoryTableFocusTarget } from "./HistoryTable";
 import { getDisplayBundles } from "./historyBatchInterpreter";
+import { HistorySubmissionDetail } from "./HistorySubmissionDetail";
+import { getHistoryGroupSummary, type LogGroup } from "./historyTableHelpers";
 
 const HISTORY_DETAIL_TITLE_ID = "desktop-history-detail-title";
 
@@ -26,6 +28,7 @@ export interface DesktopHistoryRightPanelProps {
   batchCache: Map<string, IoBatch>;
   setBatchCache: React.Dispatch<React.SetStateAction<Map<string, IoBatch>>>;
   onSelectLog: (log: TransactionLog) => void;
+  onSelectWork?: (group: LogGroup) => void;
   /** 드릴(BOM 세부) 스택이 있으면 "← 뒤로" 노출. */
   canGoBack: boolean;
   onBack: () => void;
@@ -42,6 +45,7 @@ export function DesktopHistoryRightPanel({
   batchCache,
   setBatchCache,
   onSelectLog,
+  onSelectWork,
   canGoBack,
   onBack,
   onLogUpdated,
@@ -54,6 +58,7 @@ export function DesktopHistoryRightPanel({
     ? `log:${selection.log.log_id}`
     : selection?.kind === "batch"
       ? `batch:${selection.batchId}`
+      : selection?.kind === "submission" ? selection.group.key
       : "none";
 
   useLayoutEffect(() => {
@@ -101,6 +106,13 @@ export function DesktopHistoryRightPanel({
       labelledBy={HISTORY_DETAIL_TITLE_ID}
       contentClassName="pl-0"
     >
+      {displaySelection?.kind === "submission" && (
+        <DesktopRightPanel title={getHistoryGroupSummary(displaySelection.group, undefined, batchCache).title}
+          subtitle={`한 번에 제출한 ${displaySelection.group.workGroups.length}개 작업`}
+          titleId={HISTORY_DETAIL_TITLE_ID} backButton={backButtonNode} onClose={handleClose} fillAvailableWidth>
+          <HistorySubmissionDetail group={displaySelection.group} batchCache={batchCache} onSelectWork={(work) => onSelectWork?.(work)} />
+        </DesktopRightPanel>
+      )}
       {displaySelection?.kind === "log" && (
         <DesktopRightPanel
           title={desktopCancellationOpen ? "내역 취소" : displaySelection.log.item_name}
@@ -158,6 +170,7 @@ export function DesktopHistoryRightPanel({
               panelOpen={!!selection}
               batchId={displaySelection.batchId}
               logs={displaySelection.logs}
+              workOperationId={displaySelection.groupType === "operation" ? displaySelection.batchId : undefined}
               batchCache={batchCache}
               setBatchCache={setBatchCache}
               onBatchCancelled={onBatchCancelled}

@@ -15,7 +15,8 @@ export function useHistoryBatchMetadata(
   cacheEpoch?: number | null,
 ): { failed: boolean; retry: () => void } {
   const ids = useMemo(() => Array.from(new Set(groups.flatMap((group) =>
-    group.type === "op_batch" ? [group.batchId] : [],
+    (group.type === "submission" ? group.workGroups : [group])
+      .flatMap((work) => work.type === "op_batch" ? [work.batchId] : []),
   ))), [groups]);
   const applied = useRef(new Map<string, IoBatch>());
   const queries = useQueries({ queries: ids.map((id) => ({

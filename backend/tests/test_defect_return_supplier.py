@@ -50,7 +50,7 @@ def _quarantine(client, db_session, *, employee: Employee, item_id: uuid.UUID, q
             "qty": str(quantity),
             "source": "warehouse",
             "target_dept": DepartmentEnum.WAREHOUSE.value,
-            "reason_category": "외관불량",
+            "reason_category": "외관 불량",
             "actor_employee_id": str(employee.employee_id),
         },
     )
@@ -75,7 +75,7 @@ def _return_payload(
         "requester_employee_id": str(employee.employee_id),
         "request_type": "defect_return",
         "supplier_id": str(supplier_id) if supplier_id else None,
-        "reason_category": "외관불량",
+        "reason_category": "외관 불량",
         "lines": [
             {
                 "record_id": record_id,
@@ -173,6 +173,8 @@ def test_defect_return_requires_active_supplier_and_preserves_snapshot(
     ).one()
     assert reversal.supplier_id == supplier.supplier_id
     assert reversal.supplier_name_snapshot == "반품 당시 업체"
+    assert reversal.reason_category_id == log.reason_category_id
+    assert reversal.submission_id is None
 
 
 def test_hidden_supplier_and_non_return_supplier_id_are_rejected(

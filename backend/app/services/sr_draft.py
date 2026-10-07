@@ -42,8 +42,10 @@ def upsert_draft_request(
     reference_no: Optional[str],
     notes: Optional[str],
     reason_category: Optional[str] = None,
+    reason_category_id: Optional[uuid.UUID] = None,
     reason_memo: Optional[str] = None,
     supplier_id: uuid.UUID | None = None,
+    submission_id: Optional[uuid.UUID] = None,
 ) -> StockRequest:
     """직원 + request_type 기준 active draft 를 upsert.
 
@@ -57,6 +59,11 @@ def upsert_draft_request(
         allow_internal_use=False,
     )
     _validate_lines(request_type, lines_input, allow_empty=True)
+    from app.services.defect_reason_categories import resolve_reason_category
+    reason_category_id, reason_category, reason_memo = resolve_reason_category(
+        db, reason_category_id=reason_category_id, reason_category=reason_category,
+        reason_memo=reason_memo, required=False,
+    )
     from app.services.supplier import validate_supplier_for_stock_request
 
     supplier = validate_supplier_for_stock_request(
@@ -87,6 +94,9 @@ def upsert_draft_request(
         existing.reference_no = reference_no
         existing.notes = notes
         existing.reason_category = reason_category
+        existing.reason_category_id = reason_category_id
+        if submission_id is not None:
+            existing.submission_id = submission_id
         existing.reason_memo = reason_memo
         existing.supplier_id = supplier.supplier_id if supplier is not None else None
         existing.supplier_name_snapshot = supplier.name if supplier is not None else None
@@ -132,9 +142,11 @@ def upsert_draft_request(
         request_code=None,
         submitted_at=None,
         reason_category=reason_category,
+        reason_category_id=reason_category_id,
         reason_memo=reason_memo,
         supplier_id=supplier.supplier_id if supplier is not None else None,
         supplier_name_snapshot=supplier.name if supplier is not None else None,
+        submission_id=submission_id,
     )
 
 
@@ -241,6 +253,12 @@ def submit_draft_request(
         supplier_id=request.supplier_id,
     )
     request.supplier_name_snapshot = supplier.name if supplier is not None else None
+    from app.services.defect_reason_categories import resolve_reason_category, stock_request_requires_reason
+    if stock_request_requires_reason(request.request_type) or request.reason_category_id or request.reason_category:
+        request.reason_category_id, request.reason_category, request.reason_memo = resolve_reason_category(
+            db, reason_category_id=request.reason_category_id, reason_category=request.reason_category,
+            reason_memo=request.reason_memo, required=stock_request_requires_reason(request.request_type),
+        )
     db_lines = list(request.lines)
     if not db_lines:
         raise ValueError("요청 라인이 비어 있습니다.")

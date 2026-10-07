@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from typing import Generic, Optional, TypeVar
@@ -32,6 +32,8 @@ class DisplayGroupRecord:
     reason_memo: Optional[str]
     operation_kind: Optional[str]
     operation_effective_status: Optional[str]
+    submission_id: Optional[uuid.UUID] = None
+    reverses_log_id: Optional[uuid.UUID] = None
 
 
 GroupLog = TypeVar("GroupLog", TransactionLogResponse, DisplayGroupRecord)
@@ -43,6 +45,7 @@ class DisplayGroup(Generic[GroupLog]):
     type: str
     key: str
     logs: list[GroupLog]
+    work_groups: list[DisplayGroup[GroupLog]] = field(default_factory=list)
 
 
 def _reference_group_key(log: TransactionLogResponse | DisplayGroupRecord) -> str:
@@ -110,8 +113,13 @@ def _find_defect_lifecycle_pairs(
 
 def group_display_records(
     logs: list[GroupLog],
+    *,
+    include_submissions: bool = False,
+    _work_units: bool = False,
 ) -> list[DisplayGroup[GroupLog]]:
     """기존 입출고 이력과 동일한 논리 단위로 거래 상세를 묶는다."""
+    if include_submissions:
+        return _group_history_submissions(logs)
     operations: dict[uuid.UUID, list[GroupLog]] = {}
     op_batches: dict[uuid.UUID, list[GroupLog]] = {}
     reference_batches: dict[str, list[GroupLog]] = {}
@@ -128,16 +136,18 @@ def group_display_records(
     for log in logs:
         if log.operation_id:
             operations.setdefault(log.operation_id, []).append(log)
-        if log.operation_batch_id:
+        if log.operation_batch_id and (not _work_units or log.operation_id is None):
             op_batches.setdefault(log.operation_batch_id, []).append(log)
-        elif log.reference_no:
+        elif log.reference_no and (not _work_units or log.operation_id is None):
             reference_batches.setdefault(_reference_group_key(log), []).append(log)
 
     grouped_operation_batch_ids = {
         batch_id
         for batch_id, batch_logs in op_batches.items()
-        if any(log.operation_id is None for log in batch_logs)
+        if (all(log.operation_id is None for log in batch_logs) if _work_units else any(log.operation_id is None for log in batch_logs))
         or (
+            not _work_units
+            and
             len({log.operation_id for log in batch_logs if log.operation_id}) > 1
             and all(log.operation_kind == "BUSINESS" for log in batch_logs)
             and all(log.operation_effective_status == "active" for log in batch_logs)
@@ -149,7 +159,7 @@ def group_display_records(
     seen_operations: set[uuid.UUID] = set()
     seen_reference_batches: set[str] = set()
     for log in logs:
-        if log.operation_batch_id is not None and log.operation_batch_id in grouped_operation_batch_ids:
+        if log.operation_batch_id is not None and log.operation_batch_id in grouped_operation_batch_ids and (not _work_units or log.operation_id is None):
             batch_id = log.operation_batch_id
             if batch_id in seen_operation_batches:
                 continue
@@ -221,6 +231,31 @@ def group_display_records(
                     logs=[log],
                 )
             )
+    return groups
+
+
+def _group_history_submissions(logs: list[GroupLog]) -> list[DisplayGroup[GroupLog]]:
+    """제출 원본만 포장하고 자식은 실제 작업별 취소 단위를 보존한다."""
+    buckets: dict[str, list[GroupLog]] = {}
+    independent: list[GroupLog] = []
+    for log in logs:
+        original = log.operation_kind != "CANCELLATION" and not getattr(log, "reverses_log_id", None)
+        submission_id = getattr(log, "submission_id", None)
+        key = (f"submission:{submission_id}" if submission_id else
+               f"io-submission:{log.operation_batch_id}" if log.operation_batch_id else None)
+        if original and key:
+            buckets.setdefault(key, []).append(log)
+        else:
+            independent.append(log)
+    groups = group_display_records(independent, _work_units=True)
+    for key, originals in buckets.items():
+        work_groups = group_display_records(originals, _work_units=True)
+        if len(work_groups) > 1:
+            groups.append(DisplayGroup(type="submission", key=key, logs=originals, work_groups=work_groups))
+        else:
+            groups.extend(work_groups)
+    positions = {log.log_id: index for index, log in enumerate(logs)}
+    groups.sort(key=lambda group: min(positions[log.log_id] for log in group.logs))
     return groups
 
 

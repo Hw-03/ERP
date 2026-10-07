@@ -698,6 +698,7 @@ def _reverse_log(
         producer_employee_id=canceller.employee_id,
         notes=f"{original.notes or original.transaction_type.value} 취소: {reason}",
         reason_category=original.reason_category,
+        reason_category_id=original.reason_category_id,
         reason_memo=reason,
         operation_batch_id=original.operation_batch_id,
         operation_line_id=original.operation_line_id,

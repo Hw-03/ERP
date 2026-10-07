@@ -111,6 +111,40 @@
               }
             ],
             "title": "Reason"
+          },
+          "reason_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category"
+          },
+          "reason_category_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category Id"
+          },
+          "reason_memo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Memo"
           }
         },
         "required": [
@@ -1236,6 +1270,18 @@
             ],
             "title": "Reason Category"
           },
+          "reason_category_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category Id"
+          },
           "reason_memo": {
             "anyOf": [
               {
@@ -1303,6 +1349,18 @@
             "minItems": 1,
             "title": "Lines",
             "type": "array"
+          },
+          "submission_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submission Id"
           }
         },
         "required": [
@@ -1400,6 +1458,18 @@
             ],
             "title": "Reason Category"
           },
+          "reason_category_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category Id"
+          },
           "reason_memo": {
             "anyOf": [
               {
@@ -1410,6 +1480,18 @@
               }
             ],
             "title": "Reason Memo"
+          },
+          "submission_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submission Id"
           }
         },
         "required": [
@@ -2192,6 +2274,18 @@
               }
             ],
             "title": "Reason Category"
+          },
+          "reason_category_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category Id"
           },
           "reason_memo": {
             "anyOf": [
@@ -4923,6 +5017,29 @@
             ],
             "title": "Notes"
           },
+          "reason_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category"
+          },
+          "reason_category_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category Id"
+          },
           "reference_no": {
             "anyOf": [
               {
@@ -5228,6 +5345,29 @@
               }
             ],
             "title": "Notes"
+          },
+          "reason_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category"
+          },
+          "reason_category_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category Id"
           },
           "reference_no": {
             "anyOf": [
@@ -5835,6 +5975,29 @@
               }
             ],
             "title": "Notes"
+          },
+          "reason_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category"
+          },
+          "reason_category_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category Id"
           },
           "reference_no": {
             "anyOf": [
@@ -8086,6 +8249,18 @@
             ],
             "title": "Reason Category"
           },
+          "reason_category_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category Id"
+          },
           "reason_memo": {
             "anyOf": [
               {
@@ -8112,6 +8287,18 @@
             ],
             "title": "Source Dept"
           },
+          "submission_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submission Id"
+          },
           "target_dept": {
             "title": "Target Dept",
             "type": "string"
@@ -8125,6 +8312,102 @@
           "actor_employee_id"
         ],
         "title": "QuarantineRequest",
+        "type": "object"
+      },
+      "ReasonCategoryCreate": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "requester_employee_id": {
+            "format": "uuid",
+            "title": "Requester Employee Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "requester_employee_id",
+          "name"
+        ],
+        "title": "ReasonCategoryCreate",
+        "type": "object"
+      },
+      "ReasonCategoryResponse": {
+        "properties": {
+          "category_id": {
+            "format": "uuid",
+            "title": "Category Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "is_other": {
+            "title": "Is Other",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category_id",
+          "name",
+          "is_active",
+          "is_other",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ReasonCategoryResponse",
+        "type": "object"
+      },
+      "ReasonCategoryUpdate": {
+        "properties": {
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "requester_employee_id": {
+            "format": "uuid",
+            "title": "Requester Employee Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "requester_employee_id"
+        ],
+        "title": "ReasonCategoryUpdate",
         "type": "object"
       },
       "ReconcileResponse": {
@@ -10666,7 +10949,6 @@
           "reason_category": {
             "anyOf": [
               {
-                "maxLength": 32,
                 "type": "string"
               },
               {
@@ -10674,6 +10956,18 @@
               }
             ],
             "title": "Reason Category"
+          },
+          "reason_category_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category Id"
           },
           "reason_memo": {
             "anyOf": [
@@ -10705,6 +10999,18 @@
             "format": "uuid",
             "title": "Requester Employee Id",
             "type": "string"
+          },
+          "submission_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submission Id"
           },
           "supplier_id": {
             "anyOf": [
@@ -10751,7 +11057,6 @@
           "reason_category": {
             "anyOf": [
               {
-                "maxLength": 32,
                 "type": "string"
               },
               {
@@ -10759,6 +11064,18 @@
               }
             ],
             "title": "Reason Category"
+          },
+          "reason_category_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category Id"
           },
           "reason_memo": {
             "anyOf": [
@@ -10790,6 +11107,18 @@
             "format": "uuid",
             "title": "Requester Employee Id",
             "type": "string"
+          },
+          "submission_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submission Id"
           },
           "supplier_id": {
             "anyOf": [
@@ -11162,6 +11491,40 @@
             ],
             "title": "Operation Batch Id"
           },
+          "reason_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category"
+          },
+          "reason_category_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category Id"
+          },
+          "reason_memo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Memo"
+          },
           "reference_no": {
             "anyOf": [
               {
@@ -11279,6 +11642,18 @@
           },
           "status": {
             "$ref": "#/components/schemas/StockRequestStatusEnum"
+          },
+          "submission_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submission Id"
           },
           "submitted_at": {
             "anyOf": [
@@ -11577,10 +11952,18 @@
               "batch",
               "op_batch",
               "operation",
-              "defect_lifecycle"
+              "defect_lifecycle",
+              "submission"
             ],
             "title": "Type",
             "type": "string"
+          },
+          "work_groups": {
+            "items": {
+              "$ref": "#/components/schemas/TransactionDisplayGroupResponse"
+            },
+            "title": "Work Groups",
+            "type": "array"
           }
         },
         "required": [
@@ -12031,6 +12414,18 @@
             ],
             "title": "Reason Category"
           },
+          "reason_category_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category Id"
+          },
           "reason_memo": {
             "anyOf": [
               {
@@ -12120,6 +12515,18 @@
               }
             ],
             "title": "Shipping Phase"
+          },
+          "submission_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submission Id"
           },
           "supplier_id": {
             "anyOf": [
@@ -12408,6 +12815,18 @@
             ],
             "title": "Reason Category"
           },
+          "reason_category_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Category Id"
+          },
           "reason_memo": {
             "anyOf": [
               {
@@ -12430,6 +12849,18 @@
               }
             ],
             "title": "Record Id"
+          },
+          "submission_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submission Id"
           }
         },
         "required": [
@@ -16505,6 +16936,158 @@
         ]
       }
     },
+    "/api/defects/reason-categories": {
+      "get": {
+        "description": "관리 화면은 숨긴 사유까지 조회하며 일반 선택 목록은 활성 사유만 반환한다.",
+        "operationId": "list_reason_categories_api_defects_reason_categories_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "requester_employee_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Requester Employee Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_inactive",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Inactive",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReasonCategoryResponse"
+                  },
+                  "title": "Response List Reason Categories Api Defects Reason Categories Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Reason Categories",
+        "tags": [
+          "Defects"
+        ]
+      },
+      "post": {
+        "description": "중복 방지와 관리 감사 기록을 같은 트랜잭션에 저장한다.",
+        "operationId": "create_reason_category_api_defects_reason_categories_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonCategoryCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReasonCategoryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Reason Category",
+        "tags": [
+          "Defects"
+        ]
+      }
+    },
+    "/api/defects/reason-categories/{category_id}": {
+      "patch": {
+        "description": "기타 예약 항목을 보호하고 이름·숨김·복원만 변경한다.",
+        "operationId": "update_reason_category_api_defects_reason_categories__category_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "category_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Category Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonCategoryUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReasonCategoryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Reason Category",
+        "tags": [
+          "Defects"
+        ]
+      }
+    },
     "/api/defects/records/{record_id}/management-category": {
       "put": {
         "description": "PIN 확인 뒤, 처리 대기 없는 활성 격리 원장의 관리 분류만 변경한다.",
@@ -16795,6 +17378,39 @@
               ],
               "title": "Process Step"
             }
+          },
+          {
+            "in": "query",
+            "name": "reason",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reason"
+            }
+          },
+          {
+            "in": "query",
+            "name": "reason_category_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reason Category Id"
+            }
           }
         ],
         "responses": {
@@ -16930,6 +17546,23 @@
           },
           {
             "in": "query",
+            "name": "reason_category_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Reason Category Id"
+            }
+          },
+          {
+            "in": "query",
             "name": "item_id",
             "required": false,
             "schema": {
@@ -16976,7 +17609,6 @@
     },
     "/api/defects/unquarantine": {
       "post": {
-        "description": "정상 복귀 (즉시, 결재 없음). unmark_defective 래퍼.",
         "operationId": "unquarantine_api_defects_unquarantine_post",
         "requestBody": {
           "content": {

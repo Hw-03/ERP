@@ -26,9 +26,10 @@ import {
   applyHistoryCancellation,
   mergeHistoryLogUpdate,
   reconcileHistorySelection,
+  updateHistoryDisplayGroupLogs,
   type HistoryLoadReconcileState,
 } from "./_history_sections/historyCancellation";
-import { toHistoryLogGroups } from "./_history_sections/historyTableHelpers";
+import { getHistoryGroupSummary, getHistoryWorkSelection, toHistoryLogGroups, type LogGroup } from "./_history_sections/historyTableHelpers";
 
 const SEARCH_DEBOUNCE_MS = 350;
 
@@ -328,14 +329,11 @@ export function DesktopHistoryView() {
   }, [historyError, loading, logs, selection]);
 
   function applyCancellationUpdate(updated: TransactionLog, batchId?: string | null) {
-    setGroups((currentGroups) => currentGroups.map((group) => ({
-      ...group,
-      logs: applyHistoryCancellation(
-        { logs: group.logs, selection: null, batchCache: new Map() },
+    setGroups((currentGroups) => currentGroups.map((group) => updateHistoryDisplayGroupLogs(group, (logs) => applyHistoryCancellation(
+        { logs, selection: null, batchCache: new Map() },
         updated,
         batchId,
-      ).logs,
-    })));
+      ).logs)));
     setSelection((currentSelection) => applyHistoryCancellation(
       { logs: [], selection: currentSelection, batchCache: new Map() },
       updated,
@@ -395,14 +393,35 @@ export function DesktopHistoryView() {
   }
 
   function handleSelectBatch(batchId: string, logs: TransactionLog[]) {
+    const work = displayGroups.flatMap((group) => group.type === "submission" ? group.workGroups : [group]).find((group) =>
+      group.type === "op_batch" && group.batchId === batchId);
     // 같은 묶음 재클릭 → 우측 패널 닫기 (단일 행 토글과 일관). HistoryTable 에서
     // 펼침 상태도 collapseGroup 으로 동시에 닫음 (selection 닫힘과 BOM 접힘 동기화).
     const opening = !(selection?.kind === "batch" && selection.batchId === batchId);
     if (opening) pushHistoryStep();
     setSelectionStack([]);
     setSelection((c) =>
-      c?.kind === "batch" && c.batchId === batchId ? null : { kind: "batch", batchId, logs },
+      c?.kind === "batch" && c.batchId === batchId ? null : work ? getHistoryWorkSelection(work) : { kind: "batch", batchId, logs },
     );
+  }
+
+  function handleSelectSubmission(group: Extract<LogGroup, { type: "submission" }>) {
+    setSelectionStack([]);
+    setSelection((current) => current?.kind === "submission" && current.group.key === group.key ? null : { kind: "submission", group });
+  }
+
+  function navigateToWork(work: LogGroup) {
+    setSelection((current) => {
+      if (current) setSelectionStack((stack) => [...stack, current]);
+      const next = getHistoryWorkSelection(work);
+      // PC 표에서 입출고 배치만 배치 상세를 사용하고, 나머지 작업은 대표 행의 개별 상세를 연다.
+      if (next.kind === "batch" && work.type !== "op_batch") {
+        const log = work.type === "batch" && work.refNo.startsWith("defect-disassemble:")
+          ? getHistoryGroupSummary(work).primaryLog : next.logs[0];
+        return { kind: "log", log };
+      }
+      return next;
+    });
   }
 
   // 우측 패널 내부 드릴(BOM 세부 라인·이 품목 최근 거래) — 현재 선택을 스택에 쌓고 이동.
@@ -643,6 +662,7 @@ export function DesktopHistoryView() {
             onSelectLog={handleSelectLog}
             onSelectChildLog={handleSelectChildLog}
             onSelectBatch={handleSelectBatch}
+            onSelectSubmission={handleSelectSubmission}
             batchCache={batchCache}
             setBatchCache={setBatchCache}
             cacheEpoch={realtimeRevision}
@@ -680,6 +700,7 @@ export function DesktopHistoryView() {
         batchCache={batchCache}
         setBatchCache={setBatchCache}
         onSelectLog={navigateToLog}
+        onSelectWork={navigateToWork}
         canGoBack={selectionStack.length > 0}
         onBack={goBack}
         onLogUpdated={handleLogUpdated}

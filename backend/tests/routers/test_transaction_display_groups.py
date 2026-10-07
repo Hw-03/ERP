@@ -184,16 +184,64 @@ def test_display_groups_merge_multiple_operations_from_one_io_batch(client, db_s
     response = client.get("/api/inventory/transactions/display-groups")
 
     assert response.status_code == 200, response.text
-    if reversed_operation:
-        groups = response.json()["groups"]
-        assert len(groups) == 2
-        assert all(group["type"] == "operation" for group in groups)
-        assert {row["operation_effective_status"] for group in groups for row in group["logs"]} == {"active", "cancelled"}
-        return
     group = response.json()["groups"][0]
-    assert group["type"] == "op_batch"
-    assert group["key"] == str(batch.batch_id)
+    assert len(response.json()["groups"]) == 1
+    assert group["type"] == "submission"
+    assert group["key"] == f"io-submission:{batch.batch_id}"
+    assert {work["key"] for work in group["work_groups"]} == {str(operation.operation_id) for operation in operations}
+    assert all(work["type"] == "operation" for work in group["work_groups"])
+    if reversed_operation:
+        assert {row["operation_effective_status"] for row in group["logs"]} == {"active", "cancelled"}
     assert {row["log_id"] for row in group["logs"]} == {str(log.log_id) for log in logs}
+
+
+def test_submission_search_pages_complete_originals_and_keeps_cancellation_separate(client, db_session, make_item):
+    from uuid import uuid4
+    wanted = make_item(name="Submission search component")
+    sibling = make_item(name="Submission sibling")
+    base = datetime(2026, 9, 15)
+    expected_ids = []
+    for index in range(3):
+        submission_id = uuid4()
+        originals = []
+        for item in (wanted, sibling):
+            operation = InventoryOperation(kind="BUSINESS", domain="defect", action="mark", display_label="불량", actor_name="Tester", effective_at=base)
+            db_session.add(operation)
+            db_session.flush()
+            log = _add_log(db_session, item, created_at=base)
+            log.operation_id = operation.operation_id
+            log.submission_id = submission_id
+            originals.append(log)
+        expected_ids.extend(str(log.log_id) for log in originals)
+        cancellation = InventoryOperation(kind="CANCELLATION", domain="defect", action="cancel", display_label="불량 취소", actor_name="Tester", effective_at=base + timedelta(minutes=1), reverses_operation_id=originals[0].operation_id)
+        db_session.add(cancellation)
+        db_session.flush()
+        undo = _add_log(db_session, sibling, created_at=base + timedelta(minutes=1))
+        undo.operation_id = cancellation.operation_id
+        undo.submission_id = submission_id
+        undo.reverses_log_id = originals[0].log_id
+    db_session.commit()
+    params = {"search": "Submissionsearchcomponent", "limit": 1}
+    received = []
+    while True:
+        response = client.get("/api/inventory/transactions/display-groups", params=params)
+        assert response.status_code == 200, response.text
+        page = response.json()
+        assert len(page["groups"]) == 1
+        group = page["groups"][0]
+        assert group["type"] == "submission"
+        assert len(group["logs"]) == 2
+        assert len(group["matched_log_ids"]) == 1
+        assert len(group["work_groups"]) == 2
+        assert all(log["operation_kind"] == "BUSINESS" for log in group["logs"])
+        received.extend(log["log_id"] for log in group["logs"])
+        if not page["has_more"]:
+            break
+        params["cursor"] = page["next_cursor"]
+    assert sorted(received) == sorted(expected_ids)
+    all_groups = client.get("/api/inventory/transactions/display-groups").json()["groups"]
+    assert len(all_groups) == 6
+    assert sum(group["type"] == "submission" for group in all_groups) == 3
 
 
 @pytest.mark.parametrize("group_type", ["op_batch", "operation", "batch"])

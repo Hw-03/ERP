@@ -115,6 +115,8 @@ export interface IoDraftPayload {
   to_department?: Department | string | null;
   reference_no?: string | null;
   notes?: string | null;
+  reason_category_id?: string | null;
+  reason_category?: string | null;
   client_request_id?: string | null;
   // 이어 작업 중인 draft의 batch_id. 있으면 갱신, 없으면 새 슬롯 생성.
   batch_id?: string | null;
@@ -142,6 +144,8 @@ export interface IoBatch {
   shipping_request_id?: string | null;
   reference_no: string | null;
   notes: string | null;
+  reason_category_id?: string | null;
+  reason_category?: string | null;
   /** 레거시 배치는 null일 수 있다. */
   supplier_id?: string | null;
   /** 완료 시점 공급업체명 보존용 스냅샷. */

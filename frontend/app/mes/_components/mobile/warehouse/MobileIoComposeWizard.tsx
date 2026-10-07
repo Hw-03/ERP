@@ -27,6 +27,7 @@ import quantityStyles from "./MobileIoQuantityCart.module.css";
 import { IoTargetPicker } from "../../_warehouse_v2/IoTargetPicker";
 import { IoBundleCart } from "../../_warehouse_v2/IoBundleCart";
 import { IoConfirmStep } from "../../_warehouse_v2/IoConfirmStep";
+import { hasDefectReason } from "../../_defect_hub/defectCartValidation";
 import { IoSubmitModals, type IoSubmitResultState } from "../../_warehouse_v2/IoSubmitModals";
 import { StatusTargetNotice, useStatusTargetNotice } from "../../common/StatusTargetNotice";
 import {
@@ -182,6 +183,8 @@ export function MobileIoComposeWizard({
     state.deptIoDirection,
     state.fromDepartment,
     state.notes,
+    state.reasonCategory,
+    state.reasonCategoryId,
     state.referenceNo,
     state.step,
     state.subType,
@@ -208,6 +211,8 @@ export function MobileIoComposeWizard({
     toDepartment: state.toDepartment,
     referenceNo: state.referenceNo,
     notes: state.notes,
+    reasonCategory: state.reasonCategory,
+    reasonCategoryId: state.reasonCategoryId,
     supplierId: state.selectedSupplierId,
   });
   latestDraftFieldsRef.current = {
@@ -218,6 +223,8 @@ export function MobileIoComposeWizard({
     toDepartment: state.toDepartment,
     referenceNo: state.referenceNo,
     notes: state.notes,
+    reasonCategory: state.reasonCategory,
+    reasonCategoryId: state.reasonCategoryId,
     supplierId: state.selectedSupplierId,
   };
   const internalUsePreviewLock = useInternalUseBomPreviewLock();
@@ -482,6 +489,8 @@ export function MobileIoComposeWizard({
         ...ioDepartmentPayload(state.subType, state.fromDepartment, state.toDepartment),
         referenceNo: state.referenceNo,
         notes: state.notes,
+        reasonCategory: state.reasonCategory,
+        reasonCategoryId: state.reasonCategoryId,
         supplierId: state.selectedSupplierId,
         batchId: autosaveBatchIdRef.current,
         bundles,
@@ -547,6 +556,10 @@ export function MobileIoComposeWizard({
   }
 
   async function handleSubmit() {
+    if (state.subType === "defect_quarantine" && !hasDefectReason(state.reasonCategory, state.notes)) {
+      setError("사유를 선택하고, 기타 사유는 메모를 입력하세요.");
+      return;
+    }
     await run(() => runCompositionSubmit(
       employeeId,
       state.subType,
@@ -561,6 +574,8 @@ export function MobileIoComposeWizard({
         ...ioDepartmentPayload(state.subType, state.fromDepartment, state.toDepartment),
         referenceNo: state.referenceNo,
         notes: state.notes,
+        reasonCategory: state.reasonCategory,
+        reasonCategoryId: state.reasonCategoryId,
         supplierId: state.selectedSupplierId,
         bundles,
       }),
@@ -589,6 +604,8 @@ export function MobileIoComposeWizard({
           ...ioDepartmentPayload(fields.subType, fields.fromDepartment, fields.toDepartment),
           referenceNo: fields.referenceNo,
           notes: fields.notes,
+          reasonCategory: fields.reasonCategory,
+          reasonCategoryId: fields.reasonCategoryId,
           supplierId: fields.supplierId,
           batchId: autosaveBatchIdRef.current,
           bundles,
@@ -895,6 +912,10 @@ export function MobileIoComposeWizard({
         {step === 5 && (
           <div className="min-h-0 flex-1">
           <IoConfirmStep
+            employeeId={employeeId}
+            reasonCategory={state.reasonCategory}
+            reasonCategoryId={state.reasonCategoryId}
+            onReasonCategoryChange={state.setReasonCategory}
             mobilePresentation
             supplierName={state.selectedSupplierName}
             workType={state.workType}

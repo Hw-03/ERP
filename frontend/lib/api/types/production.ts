@@ -68,10 +68,12 @@ export interface TransactionLog {
   department: string | null;
   notes: string | null;
   reason_category?: string | null;
+  reason_category_id?: string | null;
   reason_memo?: string | null;
   supplier_id?: string | null;
   supplier_name_snapshot?: string | null;
   operation_batch_id: string | null;
+  submission_id?: string | null;
   operation_line_id?: string | null;
   operation_id?: string | null;
   operation_role?: string | null;

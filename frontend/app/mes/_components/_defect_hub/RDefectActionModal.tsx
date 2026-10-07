@@ -9,6 +9,7 @@ import { defectsApi } from "@/lib/api/defects";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
 import type { DefectLocation } from "@/lib/api/types/defects";
 import { ReasonFormFields } from "./ReasonFormFields";
+import { hasDefectReason } from "./defectCartValidation";
 import { InlineErrorNote } from "./InlineErrorNote";
 
 type RAction = "unquarantine" | "scrap" | "return";
@@ -47,6 +48,7 @@ export function RDefectActionModal({
 }: RDefectActionModalProps): ReactElement | null {
   const [action, setAction] = useState<RAction>("unquarantine");
   const [category, setCategory] = useState("");
+  const [categoryId, setCategoryId] = useState<string | null>(null);
   const [memo, setMemo] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,6 +66,7 @@ export function RDefectActionModal({
     if (open) {
       setAction("unquarantine");
       setCategory("");
+      setCategoryId(null);
       setMemo("");
       setError(null);
       setBusy(false);
@@ -82,7 +85,7 @@ export function RDefectActionModal({
 
   if (!open || !mounted) return null;
 
-  const canSubmit = Boolean(category) && !busy;
+  const canSubmit = hasDefectReason(category, memo) && !busy;
 
   async function handleSubmit() {
     if (!canSubmit) return;
@@ -97,6 +100,7 @@ export function RDefectActionModal({
           qty: Number(location.available_quantity),
           dept: location.department,
           reason_category: category,
+          reason_category_id: categoryId,
           reason_memo: memo,
           actor_employee_id: currentEmployee.employee_id,
         });
@@ -107,6 +111,7 @@ export function RDefectActionModal({
           requester_employee_id: currentEmployee.employee_id,
           request_type: requestType,
           reason_category: category,
+          reason_category_id: categoryId,
           reason_memo: memo || null,
           notes: memo || null,
           lines: [
@@ -221,9 +226,11 @@ export function RDefectActionModal({
 
         {/* 사유 폼 */}
         <ReasonFormFields
+          employeeId={currentEmployee.employee_id}
+          categoryId={categoryId}
           category={category}
           memo={memo}
-          onCategoryChange={setCategory}
+          onCategoryChange={(name, id) => { setCategory(name); setCategoryId(id ?? null); }}
           onMemoChange={setMemo}
           required
         />

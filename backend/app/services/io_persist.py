@@ -495,6 +495,8 @@ def _batch_to_payload(batch: IoBatch, db: Optional[Session] = None) -> dict:
         "shipping_request_id": batch.shipping_request_id,
         "reference_no": batch.reference_no,
         "notes": batch.notes,
+        "reason_category_id": batch.reason_category_id,
+        "reason_category": batch.reason_category,
         "created_at": batch.created_at,
         "updated_at": batch.updated_at,
         "submitted_at": batch.submitted_at,
@@ -518,6 +520,12 @@ def _persist_batch(
     from app.services.io_preview import validate_receive_requester, validate_material_outbound
 
     validate_receive_requester(requester, work_type=payload.work_type, sub_type=payload.sub_type)
+    from app.services.defect_reason_categories import resolve_reason_category, io_requires_reason
+    reason_category_id, reason_category, _ = resolve_reason_category(
+        db, reason_category_id=getattr(payload, "reason_category_id", None),
+        reason_category=getattr(payload, "reason_category", None), reason_memo=payload.notes,
+        required=status != "draft" and io_requires_reason(payload.bundles),
+    )
     validate_material_outbound(work_type=payload.work_type, sub_type=payload.sub_type, bundles=payload.bundles, notes=payload.notes, require_reason=status != "draft")
     payload.sub_type = normalize_process_sub_type(
         work_type=payload.work_type,
@@ -600,6 +608,8 @@ def _persist_batch(
         ),
         reference_no=payload.reference_no,
         notes=payload.notes,
+        reason_category_id=reason_category_id,
+        reason_category=reason_category,
         client_request_id=getattr(payload, "client_request_id", None),
         submitted_at=submitted_at,
         created_at=now,

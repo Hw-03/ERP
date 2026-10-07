@@ -43,6 +43,8 @@ export function useIoWorkState(
   const [toDepartment, setToDepartment] = useState<string>(defaultDepartment);
   const [bundles, setBundlesBase] = useState<IoBundle[]>([]);
   const [notes, setNotes] = useState("");
+  const [reasonCategory, setReasonCategoryName] = useState("");
+  const [reasonCategoryId, setReasonCategoryId] = useState<string | null>(null);
   const [referenceNo, setReferenceNo] = useState("");
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
   const [selectedSupplierName, setSelectedSupplierName] = useState<string | null>(null);
@@ -63,6 +65,7 @@ export function useIoWorkState(
   );
 
   function setWorkType(next: IoWorkType) {
+    setReasonCategory("", null);
     setWorkTypeBase(next);
     setHasSelectedWorkType(true);
     setSelectedSubType(DEFAULT_SUB_TYPE[next]);
@@ -77,6 +80,7 @@ export function useIoWorkState(
   }
 
   function setSubType(next: IoSubType) {
+    if (next !== selectedSubType) setReasonCategory("", null);
     if (next === "receive_supplier" || next === "outbound_supplier") {
       setMaterialDirectionSelected(true);
       if (next !== selectedSubType) setBundles([]);
@@ -199,11 +203,17 @@ export function useIoWorkState(
   function reset() {
     setBundles([]);
     setNotes("");
+    setReasonCategory("", null);
     setReferenceNo("");
     setSupplier(null);
     setStep(1);
     setHasSelectedWorkType(false);
     setMaterialDirectionSelected(false);
+  }
+
+  function setReasonCategory(name: string, categoryId?: string | null): void {
+    setReasonCategoryName(name);
+    setReasonCategoryId(categoryId ?? null);
   }
 
   const steps = workType === "receive" ? MATERIAL_IO_STEPS : DEFAULT_IO_STEPS;
@@ -217,6 +227,8 @@ export function useIoWorkState(
     toDepartment,
     bundles,
     notes,
+    reasonCategory,
+    reasonCategoryId,
     referenceNo,
     selectedSupplierId,
     selectedSupplierName,
@@ -235,6 +247,7 @@ export function useIoWorkState(
     setToDepartment,
     setBundles,
     setNotes,
+    setReasonCategory,
     setReferenceNo,
     setSupplier,
     setSupplierSelectionReady,

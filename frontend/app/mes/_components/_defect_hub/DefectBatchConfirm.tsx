@@ -7,9 +7,11 @@ import { tint } from "@/lib/mes/colorUtils";
 import { formatQty } from "@/lib/mes/format";
 import { defectsApi } from "@/lib/api/defects";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
+import { makeClientRequestId } from "@/lib/uuid";
 import type { Department } from "@/lib/api/types/shared";
 import type { DefectLocation } from "@/lib/api/types/defects";
 import { ReasonFormFields } from "./ReasonFormFields";
+import { hasDefectReason } from "./defectCartValidation";
 import { QuantityInput } from "../common/QuantityInput";
 
 export type BatchAction = "unquarantine" | "scrap" | "return";
@@ -22,6 +24,7 @@ const META: Record<BatchAction, { title: string; submit: string }> = {
 
 interface ReasonRow {
   category: string;
+  categoryId: string | null;
   memo: string;
   qty: string;
 }
@@ -54,8 +57,9 @@ export function DefectBatchConfirm({
 }: Props) {
   const meta = META[action];
   const [reasons, setReasons] = useState<Record<string, ReasonRow>>(() =>
-    Object.fromEntries(locations.map((l) => [keyOf(l), { category: "", memo: "", qty: String(l.available_quantity) }])),
+    Object.fromEntries(locations.map((l) => [keyOf(l), { category: "", categoryId: null, memo: "", qty: String(l.available_quantity) }])),
   );
+  const [submissionId] = useState(makeClientRequestId);
   const [busy, setBusy] = useState(false);
   const [failures, setFailures] = useState<RowFailure[]>([]);
 
@@ -64,7 +68,7 @@ export function DefectBatchConfirm({
       locations.length > 0 &&
       locations.every((l) => {
         const r = reasons[keyOf(l)];
-        if (!r?.category) return false;
+        if (!r || !hasDefectReason(r.category, r.memo)) return false;
         if (action === "unquarantine") {
           const n = Number(r.qty);
           return Number.isFinite(n) && n > 0 && n <= Number(l.available_quantity);
@@ -85,7 +89,7 @@ export function DefectBatchConfirm({
     setReasons((prev) => {
       const next = { ...prev };
       locations.slice(index + 1).forEach((l) => {
-        next[keyOf(l)] = { category: src.category, memo: src.memo, qty: prev[keyOf(l)]?.qty ?? String(l.available_quantity) };
+        next[keyOf(l)] = { category: src.category, categoryId: src.categoryId, memo: src.memo, qty: prev[keyOf(l)]?.qty ?? String(l.available_quantity) };
       });
       return next;
     });
@@ -101,7 +105,9 @@ export function DefectBatchConfirm({
         qty,
         dept: loc.department,
         reason_category: r.category,
+        reason_category_id: r.categoryId,
         reason_memo: r.memo,
+        submission_id: submissionId,
         actor_employee_id: currentEmployee.employee_id,
       });
       return;
@@ -110,7 +116,9 @@ export function DefectBatchConfirm({
       requester_employee_id: currentEmployee.employee_id,
       request_type: action === "scrap" ? "defect_scrap" : "defect_return",
       reason_category: r.category,
+      reason_category_id: r.categoryId,
       reason_memo: r.memo || null,
+      submission_id: submissionId,
       notes: r.memo || null,
       lines: [
         {
@@ -175,7 +183,7 @@ export function DefectBatchConfirm({
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1">
         {locations.map((loc, idx) => {
           const key = keyOf(loc);
-          const r = reasons[key] ?? { category: "", memo: "" };
+          const r = reasons[key] ?? { category: "", categoryId: null, memo: "", qty: String(loc.available_quantity) };
           const fail = failures.find((f) => f.key === key);
           return (
             <div
@@ -228,9 +236,11 @@ export function DefectBatchConfirm({
               </div>
 
               <ReasonFormFields
+                employeeId={currentEmployee.employee_id}
                 category={r.category}
+                categoryId={r.categoryId}
                 memo={r.memo}
-                onCategoryChange={(c) => setReason(key, { category: c })}
+                onCategoryChange={(name, id) => setReason(key, { category: name, categoryId: id ?? null })}
                 onMemoChange={(m) => setReason(key, { memo: m })}
                 required
               />

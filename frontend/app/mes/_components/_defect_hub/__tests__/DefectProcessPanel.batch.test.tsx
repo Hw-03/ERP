@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { DefectLocation } from "@/lib/api/types/defects";
 import { ApiError } from "@/lib/api-core";
+vi.mock("../ReasonFormFields", async () => ({ ReasonFormFields: (await import("./reasonFormFieldsStub")).ReasonFormFieldsStub }));
 
 const apiMocks = vi.hoisted(() => ({
   unquarantine: vi.fn(),
@@ -91,6 +92,7 @@ describe("DefectProcessPanel batch processing", () => {
     expect(apiMocks.unquarantineBulk).toHaveBeenCalledWith({
       actor_employee_id: "employee-1",
       reason_category: "기타",
+      reason_category_id: "reason-기타",
       reason_memo: "공통 메모",
       lines: [
         { record_id: "record-1", item_id: "item-1", department: "조립", quantity: 2 },
@@ -107,6 +109,7 @@ describe("DefectProcessPanel batch processing", () => {
     apiMocks.unquarantineBulk.mockRejectedValue(new ApiError("수량이 변경되었습니다", 422));
     render(<DefectProcessPanel locations={locations} currentEmployee={employee}
       onDone={onDone} onCancel={vi.fn()} onInvalidated={onInvalidated} />);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "외관 불량" } });
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "검사 완료" } });
     fireEvent.click(screen.getByRole("button", { name: "정상 복귀 →" }));
     fireEvent.click(await screen.findByRole("button", { name: "즉시 복귀" }));
@@ -138,6 +141,7 @@ describe("DefectProcessPanel batch processing", () => {
       />,
     );
 
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "외관 불량" } });
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "폐기 사유" } });
     fireEvent.click(screen.getByRole("button", { name: /전체 폐기/ }));
     fireEvent.click(screen.getByRole("button", { name: "즉시 폐기 →" }));
@@ -168,6 +172,7 @@ describe("DefectProcessPanel batch processing", () => {
     );
 
     expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "외관 불량" } });
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "폐기 사유" } });
     fireEvent.click(screen.getByRole("button", { name: /전체 폐기/ }));
     fireEvent.click(screen.getByRole("button", { name: "즉시 폐기 →" }));
@@ -192,6 +197,7 @@ describe("DefectProcessPanel batch processing", () => {
       />,
     );
 
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "외관 불량" } });
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "재작업 사유" } });
     fireEvent.click(screen.getByRole("button", { name: /재작업/ }));
     fireEvent.click(screen.getByRole("button", { name: "다음 →" }));

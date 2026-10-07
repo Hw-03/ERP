@@ -47,6 +47,15 @@ from app.services import defect_records as defect_records_svc
 # 픽스처 헬퍼
 # ---------------------------------------------------------------------------
 
+@pytest.fixture(autouse=True)
+def _registered_test_reason_categories(db_session):
+    """기존 흐름의 사유 문자열을 테스트용 활성 마스터로 명시적으로 등록한다."""
+    from app.models import DefectReasonCategory
+    from app.models.defect_reason_category import normalize_defect_reason_name
+    for name in ["외관불량", "치수불량", "기능불량", "검사통과", "재검사 통과", "재작업", "폐기", "assembly-category", "high-voltage-category", "tx-category", "R" * 32]:
+        db_session.add(DefectReasonCategory(name=name, normalized_name=normalize_defect_reason_name(name), is_active=True, is_other=False))
+    db_session.flush()
+
 @pytest.mark.parametrize("request_type", ["defect_scrap", "defect_return", "defect_disassemble"])
 @pytest.mark.parametrize("fail_second", [False, True])
 def test_bulk_immediate_processing_is_atomic_for_plain_employee(
@@ -62,6 +71,7 @@ def test_bulk_immediate_processing_is_atomic_for_plain_employee(
     db_session.commit()
     for qty in (1, 2, 3):
         response = client.post("/api/defects/quarantine", json={
+            "reason_category": "외관 불량",
             "item_id": str(item.item_id), "qty": qty, "source": "warehouse",
             "target_dept": DepartmentEnum.WAREHOUSE.value,
             "actor_employee_id": str(actor.employee_id),
@@ -256,6 +266,7 @@ def test_quarantine_operation_history_recovers_legacy_movement_quantity(
     db_session.commit()
 
     response = client.post("/api/defects/quarantine", json={
+        "reason_category": "외관 불량",
         "item_id": str(item.item_id),
         "qty": "3",
         "source": "warehouse",
@@ -281,14 +292,16 @@ def test_quarantine_operation_history_recovers_legacy_movement_quantity(
     ("reason_category", "reason_memo", "expected_status"),
     [
         (None, None, 422),
-        ("기타", None, 200),
-        (None, "자유 메모만 입력", 200),
+        ("기타", None, 422),
+        (None, "자유 메모만 입력", 422),
+        ("외관 불량", None, 200),
+        ("기타", "상세 원인", 200),
     ],
 )
-def test_quarantine_requires_reason_category_or_memo(
+def test_quarantine_requires_category_and_other_memo(
     db_session, client, make_item, reason_category, reason_memo, expected_status,
 ):
-    """[8.5-07] 카테고리와 메모가 모두 없을 때만 격리를 거부한다."""
+    """카테고리 필수이며 기타는 상세 메모도 필요하다."""
     item = make_item(name="REASON-REQUIRED", process_type_code="TR", warehouse_qty=Decimal("5"))
     actor = _make_employee(db_session, code=f"REASON-{expected_status}-{bool(reason_category)}", name="사유 작업자")
     db_session.commit()
@@ -324,16 +337,18 @@ def test_bulk_quarantine_rolls_back_every_line_when_one_item_is_short(
     before_logs = db_session.query(TransactionLog).count()
 
     response = client.post("/api/defects/quarantine/bulk", json={
+        "reason_category": "외관 불량",
         "actor_employee_id": str(actor.employee_id),
         "client_request_id": "bulk-quarantine-atomic-failure",
         "lines": [
             {
+                "reason_category": "외관 불량",
                 "item_id": str(enough.item_id), "qty": 2, "source": "warehouse",
                 "target_dept": DepartmentEnum.WAREHOUSE.value, "reason_memo": "복수 검증",
             },
             {
                 "item_id": str(short.item_id), "qty": 2, "source": "warehouse",
-                "target_dept": DepartmentEnum.WAREHOUSE.value, "reason_category": "기타",
+                "target_dept": DepartmentEnum.WAREHOUSE.value, "reason_category": "기타", "reason_memo": "복수 검증",
             },
         ],
     })
@@ -358,16 +373,18 @@ def test_bulk_quarantine_exact_retry_is_idempotent(db_session, client, make_item
     actor = _make_employee(db_session, code="BULK-QUARANTINE-RETRY", name="복수 재시도 작업자")
     db_session.commit()
     payload = {
+        "reason_category": "외관 불량",
         "actor_employee_id": str(actor.employee_id),
         "client_request_id": "bulk-quarantine-idempotent",
         "lines": [
             {
+                "reason_category": "외관 불량",
                 "item_id": str(first.item_id), "qty": 2, "source": "warehouse",
                 "target_dept": DepartmentEnum.WAREHOUSE.value, "reason_memo": "재시도 검증",
             },
             {
                 "item_id": str(second.item_id), "qty": 3, "source": "warehouse",
-                "target_dept": DepartmentEnum.WAREHOUSE.value, "reason_category": "기타",
+                "target_dept": DepartmentEnum.WAREHOUSE.value, "reason_category": "기타", "reason_memo": "복수 검증",
             },
         ],
     }
@@ -820,6 +837,7 @@ def test_unquarantine_partially_updates_only_the_selected_record(
         response = client.post(
             "/api/defects/quarantine",
             json={
+                "reason_category": "외관 불량",
                 "item_id": str(item.item_id),
                 "qty": qty,
                 "source": "warehouse",
@@ -895,6 +913,7 @@ def test_bulk_unquarantine_restores_selected_records_with_shared_reason(
         response = client.post(
             "/api/defects/quarantine",
             json={
+                "reason_category": "외관 불량",
                 "item_id": str(item.item_id),
                 "qty": qty,
                 "source": "warehouse",
@@ -976,6 +995,7 @@ def test_bulk_unquarantine_rejects_reserved_record(db_session, client, make_item
     quarantined = client.post(
         "/api/defects/quarantine",
         json={
+            "reason_category": "외관 불량",
             "item_id": str(item.item_id),
             "qty": "2",
             "source": "warehouse",
@@ -1011,6 +1031,7 @@ def test_bulk_unquarantine_rejects_reserved_record(db_session, client, make_item
 
     if action == "restore":
         response = client.post("/api/defects/unquarantine/bulk", json={
+            "reason_category": "외관 불량",
             "actor_employee_id": str(actor.employee_id),
             "lines": [{
                 "record_id": str(record.record_id),
@@ -1046,6 +1067,7 @@ def test_defect_disassemble_request_rejects_duplicate_source_record(
     quarantined = client.post(
         "/api/defects/quarantine",
         json={
+            "reason_category": "외관 불량",
             "item_id": str(item.item_id),
             "qty": "2",
             "source": "warehouse",
@@ -1070,6 +1092,7 @@ def test_defect_disassemble_request_rejects_duplicate_source_record(
     response = client.post(
         "/api/stock-requests",
         json={
+            "reason_category": "외관 불량",
             "requester_employee_id": str(actor.employee_id),
             "request_type": "defect_disassemble",
             "notes": "{}",
@@ -1095,6 +1118,7 @@ def test_defect_disassemble_request_rejects_mixed_source_items(
         quarantined = client.post(
             "/api/defects/quarantine",
             json={
+                "reason_category": "외관 불량",
                 "item_id": str(item.item_id),
                 "qty": "1",
                 "source": "warehouse",
@@ -1113,6 +1137,7 @@ def test_defect_disassemble_request_rejects_mixed_source_items(
     response = client.post(
         "/api/stock-requests",
         json={
+            "reason_category": "외관 불량",
             "requester_employee_id": str(actor.employee_id),
             "request_type": "defect_disassemble",
             "notes": "{}",
@@ -1153,6 +1178,7 @@ def test_multi_defect_request_rejects_duplicate_and_mixed_source_records(
         response = client.post(
             "/api/defects/quarantine",
             json={
+                "reason_category": "외관 불량",
                 "item_id": str(item.item_id),
                 "qty": "2",
                 "source": "warehouse",
@@ -1214,6 +1240,7 @@ def test_single_record_batch_request_requires_exact_quantity_and_record_id(
     quarantined = client.post(
         "/api/defects/quarantine",
         json={
+            "reason_category": "외관 불량",
             "item_id": str(item.item_id),
             "qty": "2",
             "source": "warehouse",
@@ -1238,6 +1265,7 @@ def test_single_record_batch_request_requires_exact_quantity_and_record_id(
     stale_response = client.post(
         "/api/stock-requests",
         json={
+            "reason_category": "외관 불량",
             "requester_employee_id": str(actor.employee_id),
             "request_type": "defect_scrap",
             "client_request_id": "defect-batch:single-stale",
@@ -1251,6 +1279,7 @@ def test_single_record_batch_request_requires_exact_quantity_and_record_id(
     missing_record_response = client.post(
         "/api/stock-requests",
         json={
+            "reason_category": "외관 불량",
             "requester_employee_id": str(actor.employee_id),
             "request_type": "defect_scrap",
             "client_request_id": "defect-batch:single-no-record",
@@ -1291,6 +1320,7 @@ def test_defect_disassemble_immediately_executes_multiple_source_records_once(
         quarantined = client.post(
             "/api/defects/quarantine",
             json={
+                "reason_category": "외관 불량",
                 "item_id": str(parent.item_id),
                 "qty": quantity,
                 "source": "warehouse",
@@ -1375,14 +1405,16 @@ def test_transaction_log_reason_category_uses_32_char_storage_limit():
     ("reason_category", "reason_memo", "expected_status"),
     [
         (None, None, 422),
-        ("기타", None, 201),
-        (None, "메모만 입력", 201),
+        ("기타", None, 422),
+        (None, "메모만 입력", 422),
+        ("외관 불량", None, 201),
+        ("기타", "상세 원인", 201),
     ],
 )
-def test_direct_defect_request_requires_category_or_memo(
+def test_direct_defect_request_requires_category_and_other_memo(
     db_session, client, make_item, reason_category, reason_memo, expected_status
 ):
-    """[8.5-07] 즉시 폐기 API도 사유가 모두 비어 있으면 거절한다."""
+    """즉시 폐기 제출도 카테고리와 기타 상세 메모 정책을 적용한다."""
     item = make_item(name="DIRECT-REASON", process_type_code="TR", warehouse_qty=Decimal("5"))
     requester = _make_employee(
         db_session,
@@ -1562,6 +1594,7 @@ def test_defect_scrap_via_stock_request(db_session, client, make_item):
 
     # DEFECT_SCRAP 제출 — 승인 없이 즉시 완료
     res = client.post("/api/stock-requests", json={
+        "reason_category": "외관 불량",
         "requester_employee_id": str(requester.employee_id),
         "request_type": "defect_scrap",
         "lines": [{
@@ -1606,6 +1639,7 @@ def test_defect_request_executes_selected_record_immediately(
         response = client.post(
             "/api/defects/quarantine",
             json={
+                "reason_category": "외관 불량",
                 "item_id": str(item.item_id),
                 "qty": qty,
                 "source": "warehouse",
@@ -1856,6 +1890,7 @@ def test_defect_disassemble_stale_bom_payload_returns_422_and_rolls_back(
     request_count_before = db_session.query(StockRequest).count()
 
     response = client.post("/api/stock-requests", json={
+        "reason_category": "외관 불량",
         "requester_employee_id": str(requester.employee_id),
         "request_type": "defect_disassemble",
         "notes": json.dumps({
@@ -1924,6 +1959,7 @@ def test_defect_return_via_stock_request(db_session, client, make_item):
 
     # DEFECT_RETURN 즉시 처리 (격리 재고에서 공급처 반품)
     res = client.post("/api/stock-requests", json={
+        "reason_category": "외관 불량",
         "requester_employee_id": str(requester.employee_id),
         "request_type": "defect_return",
         "supplier_id": str(supplier.supplier_id),
@@ -2029,6 +2065,7 @@ def test_kpi_counts_active_quarantine_records_and_record_age(
         response = client.post(
             "/api/defects/quarantine",
             json={
+                "reason_category": "외관 불량",
                 "item_id": str(item.item_id),
                 "qty": qty,
                 "source": "warehouse",
@@ -2444,6 +2481,7 @@ def test_defect_scrap_without_quarantine_rejected(db_session, client, make_item)
     db_session.commit()
 
     res = client.post("/api/stock-requests", json={
+        "reason_category": "외관 불량",
         "requester_employee_id": str(requester.employee_id),
         "request_type": "defect_scrap",
         "lines": [{
@@ -2478,6 +2516,7 @@ def test_defect_scrap_with_insufficient_quarantine_rejected(db_session, client, 
     })
 
     res = client.post("/api/stock-requests", json={
+        "reason_category": "외관 불량",
         "requester_employee_id": str(requester.employee_id),
         "request_type": "defect_scrap",
         "lines": [{
@@ -2611,12 +2650,14 @@ def test_quarantine_management_category_defaults_and_tracks_initial_revision(
     db_session.commit()
 
     b_grade = client.post("/api/defects/quarantine", json={
+        "reason_category": "외관 불량",
         "item_id": str(item.item_id), "qty": "2", "source": "warehouse",
         "target_dept": DepartmentEnum.WAREHOUSE.value,
         "reason_memo": "B급 격리", "management_category": "B_GRADE",
         "actor_employee_id": str(actor.employee_id),
     })
     default = client.post("/api/defects/quarantine", json={
+        "reason_category": "외관 불량",
         "item_id": str(item.item_id), "qty": "1", "source": "warehouse",
         "target_dept": DepartmentEnum.WAREHOUSE.value,
         "reason_memo": "기본 격리", "actor_employee_id": str(actor.employee_id),
@@ -2641,6 +2682,7 @@ def test_management_category_change_requires_pin_and_keeps_inventory_unchanged(
     actor = _make_employee(db_session, code="MCAT-2", name="변경 작업자")
     db_session.commit()
     assert client.post("/api/defects/quarantine", json={
+        "reason_category": "외관 불량",
         "item_id": str(item.item_id), "qty": "2", "source": "warehouse",
         "target_dept": DepartmentEnum.WAREHOUSE.value, "reason_memo": "변경 대상",
         "actor_employee_id": str(actor.employee_id),
@@ -2676,6 +2718,7 @@ def test_management_category_change_rejects_pending_record(db_session, client, m
     actor = _make_employee(db_session, code="MCAT-3", name="대기 작업자")
     db_session.commit()
     assert client.post("/api/defects/quarantine", json={
+        "reason_category": "외관 불량",
         "item_id": str(item.item_id), "qty": "2", "source": "warehouse",
         "target_dept": DepartmentEnum.WAREHOUSE.value, "reason_memo": "대기 변경",
         "actor_employee_id": str(actor.employee_id),
@@ -2745,6 +2788,7 @@ def test_b_grade_record_is_rejected_by_immediate_defect_action(
     supplier = _make_supplier(db_session) if request_type == "defect_return" else None
     db_session.commit()
     assert client.post("/api/defects/quarantine", json={
+        "reason_category": "외관 불량",
         "item_id": str(item.item_id), "qty": "2", "source": "warehouse",
         "target_dept": DepartmentEnum.WAREHOUSE.value, "reason_memo": "B급 원장",
         "management_category": "B_GRADE", "actor_employee_id": str(actor.employee_id),
@@ -2752,6 +2796,7 @@ def test_b_grade_record_is_rejected_by_immediate_defect_action(
     record = db_session.query(DefectQuarantineRecord).filter_by(current_memo="B급 원장").one()
 
     payload = {
+        "reason_category": "외관 불량",
         "requester_employee_id": str(actor.employee_id), "request_type": request_type,
         "lines": [{
             "record_id": str(record.record_id), "item_id": str(item.item_id), "quantity": "1",
@@ -2776,6 +2821,7 @@ def test_locations_defect_filter_does_not_turn_b_grade_record_into_fallback(
     actor = _make_employee(db_session, code="MCAT-FALLBACK", name="필터 작업자")
     db_session.commit()
     assert client.post("/api/defects/quarantine", json={
+        "reason_category": "외관 불량",
         "item_id": str(item.item_id), "qty": "1", "source": "warehouse",
         "target_dept": DepartmentEnum.WAREHOUSE.value, "reason_memo": "B급만 존재",
         "management_category": "B_GRADE", "actor_employee_id": str(actor.employee_id),
@@ -2793,6 +2839,7 @@ def test_quarantine_idempotency_uses_initial_management_category_after_change(
     actor = _make_employee(db_session, code="MCAT-IDEM", name="멱등 작업자")
     db_session.commit()
     payload = {
+        "reason_category": "외관 불량",
         "item_id": str(item.item_id), "qty": "2", "source": "warehouse",
         "target_dept": DepartmentEnum.WAREHOUSE.value, "reason_memo": "최초 B급",
         "management_category": "B_GRADE", "actor_employee_id": str(actor.employee_id),

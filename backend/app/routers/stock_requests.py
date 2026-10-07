@@ -183,8 +183,10 @@ def create_stock_request(payload: StockRequestCreate, db: Session = Depends(get_
                 notes=payload.notes,
                 client_request_id=payload.client_request_id,
                 reason_category=payload.reason_category,
+                reason_category_id=payload.reason_category_id,
                 reason_memo=payload.reason_memo,
                 supplier_id=payload.supplier_id,
+                submission_id=payload.submission_id,
             )
             return request
         except IntegrityError as exc:
@@ -511,8 +513,10 @@ def upsert_stock_request_draft(
             reference_no=payload.reference_no,
             notes=payload.notes,
             reason_category=payload.reason_category,
+            reason_category_id=payload.reason_category_id,
             reason_memo=payload.reason_memo,
             supplier_id=payload.supplier_id,
+            submission_id=payload.submission_id,
         )
     except ValueError as exc:
         db.rollback()

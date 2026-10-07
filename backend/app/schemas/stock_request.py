@@ -25,38 +25,42 @@ class StockRequestLineCreate(BaseModel):
 
 
 class StockRequestCreate(BaseModel):
+    submission_id: Optional[uuid.UUID] = None
     requester_employee_id: uuid.UUID
     request_type: StockRequestTypeEnum
     reference_no: Optional[str] = Field(None, max_length=100)
     notes: Optional[str] = None
     lines: List[StockRequestLineCreate] = Field(..., min_length=1)
     client_request_id: Optional[str] = Field(None, max_length=64)
-    reason_category: Optional[str] = Field(None, max_length=32)
+    reason_category: Optional[str] = None
+    reason_category_id: Optional[uuid.UUID] = None
     reason_memo: Optional[str] = None
     supplier_id: Optional[uuid.UUID] = None
 
     @model_validator(mode="after")
     def require_direct_defect_reason(self) -> "StockRequestCreate":
-        """즉시 불량 처리는 감사 가능한 사유 하나 이상을 요구한다."""
+        """즉시 불량 처리 제출은 카테고리 선택을 요구한다."""
         reason_required = {
             StockRequestTypeEnum.SCRAP_NORMAL,
             StockRequestTypeEnum.RETURN_NORMAL,
             StockRequestTypeEnum.REWORK_NORMAL,
         }
-        has_reason = bool((self.reason_category or "").strip() or (self.reason_memo or "").strip())
+        has_reason = bool(self.reason_category_id or (self.reason_category or "").strip())
         if self.request_type in reason_required and not has_reason:
-            raise ValueError("사유 카테고리 또는 메모 중 하나를 입력하세요.")
+            raise ValueError("사유 카테고리를 선택하세요.")
         return self
 
 
 class StockRequestDraftUpsert(BaseModel):
     """장바구니(DRAFT) upsert 페이로드. lines 는 빈 리스트 허용 — 저장 도중 단계."""
     requester_employee_id: uuid.UUID
+    submission_id: Optional[uuid.UUID] = None
     request_type: StockRequestTypeEnum
     reference_no: Optional[str] = Field(None, max_length=100)
     notes: Optional[str] = None
     lines: List[StockRequestLineCreate] = Field(default_factory=list)
-    reason_category: Optional[str] = Field(None, max_length=32)
+    reason_category: Optional[str] = None
+    reason_category_id: Optional[uuid.UUID] = None
     reason_memo: Optional[str] = None
     supplier_id: Optional[uuid.UUID] = None
 
@@ -96,6 +100,7 @@ class StockRequestResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     request_id: uuid.UUID
+    submission_id: Optional[uuid.UUID] = None
     request_code: Optional[str] = None
     requester_employee_id: uuid.UUID
     requester_name: str
@@ -128,6 +133,9 @@ class StockRequestResponse(BaseModel):
     operation_batch_id: Optional[uuid.UUID] = None
     supplier_id: Optional[uuid.UUID] = None
     supplier_name_snapshot: Optional[str] = None
+    reason_category_id: Optional[uuid.UUID] = None
+    reason_category: Optional[str] = None
+    reason_memo: Optional[str] = None
     created_at: UtcDatetime
     updated_at: UtcDatetime
     lines: List[StockRequestLineResponse] = []

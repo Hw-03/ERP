@@ -217,6 +217,9 @@ def seed_reference_data() -> dict[str, int]:
     }
     db = SessionLocal()
     try:
+        from app.services.defect_reason_categories import seed_default_reason_categories
+        counts["defect_reason_categories"] = seed_default_reason_categories(db)
+        db.commit()
         if db.query(Department).count() == 0:
             _DEPT_SEED = ["조립", "고압", "진공", "튜닝", "튜브", "AS", "연구", "영업", "출하", "기타"]
             for i, name in enumerate(_DEPT_SEED):

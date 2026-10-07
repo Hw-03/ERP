@@ -62,6 +62,13 @@ class IoBatch(Base):
     )
     reference_no = Column(String(100), nullable=True, index=True)
     notes = Column(Text, nullable=True)
+    reason_category = Column(String(100).with_variant(Text, "postgresql"), nullable=True)
+    reason_category_id = Column(
+        UUIDString,
+        ForeignKey("defect_reason_categories.category_id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
     client_request_id = Column(String(64), nullable=True, unique=True, index=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now(), index=True)
     updated_at = Column(

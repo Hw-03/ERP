@@ -31,6 +31,7 @@ import {
 import { isReworkOperation } from "./transactionTaxonomy";
 import { getHistoryListOperationLabel, getHistoryRowPresentation, getReferenceBatchLinePresentation, getReferenceBatchPresentation, getShippingPhaseFlowLabel, isDepartmentCorrectionLog } from "./historyPresentation";
 import { formatHistoryDate } from "./historyFormat";
+import type { HistorySelection } from "./historyConstants";
 
 const TX_ICON = {
   ArrowDownToLine, ArrowUpFromLine, Sliders, Hammer, Recycle, Trash2,
@@ -749,7 +750,8 @@ export function PeopleStatusCell({
   );
 }
 export type LogGroup = (
-  | { type: "solo"; log: TransactionLog }
+  | { type: "solo"; log: TransactionLog; allowCancellation?: boolean }
+  | { type: "submission"; key: string; logs: TransactionLog[]; workGroups: LogGroup[] }
   | { type: "operation"; operationId: string; logs: TransactionLog[] }
   | { type: "batch"; refKey: string; refNo: string; logs: TransactionLog[] }
   | { type: "op_batch"; batchId: string; refNo: string | null; logs: TransactionLog[] }
@@ -782,11 +784,12 @@ export function getGroupPrimaryLog(group: LogGroup): TransactionLog {
   if (group.type === "solo") return group.log;
   if (group.type === "defect_lifecycle") return group.parent;
   if (group.type === "operation") return getOperationPrimaryLog(group.logs);
+  if (group.type === "submission") return getGroupPrimaryLog(group.workGroups[0]);
   return group.logs[0];
 }
 
 /** PC와 모바일 목록이 공유하는 대표 품목·작업 배지. 서버의 묶음 경계를 유지한다. */
-export function getHistoryGroupSummary(group: LogGroup, batch?: IoBatch | null): {
+export function getHistoryGroupSummary(group: LogGroup, batch?: IoBatch | null, batchCache?: ReadonlyMap<string, IoBatch>): {
   primaryLog: TransactionLog;
   title: string;
   additionalItemCount: number;
@@ -796,6 +799,16 @@ export function getHistoryGroupSummary(group: LogGroup, batch?: IoBatch | null):
   pending: boolean;
 } {
   const first = getGroupPrimaryLog(group);
+  if (group.type === "submission") {
+    const summaries = group.workGroups.map((work) => getHistoryGroupSummary(work, work.type === "op_batch" ? batchCache?.get(work.batchId) : undefined));
+    const items = new Set(summaries.map((summary) => summary.primaryLog.item_id));
+    const labels = new Set(summaries.map((summary) => summary.label));
+    const label = summaries.every((summary) => summary.displayType === "MARK_DEFECTIVE")
+      ? "불량 격리" : labels.size === 1 ? summaries[0].label : "여러 작업";
+    return { ...summaries[0],
+      additionalItemCount: Math.max(0, items.size - 1),
+      label, pending: summaries.some((summary) => summary.pending) };
+  }
   const logs = group.type === "solo" ? [group.log]
     : group.type === "defect_lifecycle" ? [group.parent, group.child] : group.logs;
   let representative = first;
@@ -838,7 +851,10 @@ export function getHistoryGroupSummary(group: LogGroup, batch?: IoBatch | null):
       color = isReworkOperation(first) ? LEGACY_COLORS.red : transactionColor(displayType);
     }
   }
-  const primaryLog = group.type === "batch" ? representative : first;
+  const primaryLog = group.type === "batch" || group.type === "op_batch" ? representative : first;
+  if (displayType === "MARK_DEFECTIVE" && label === "불량" && primaryLog.operation_kind !== "CANCELLATION") {
+    label = "불량 격리";
+  }
   if (primaryLog.operation_kind === "CANCELLATION" && !label.endsWith(" 취소")) {
     label = `${label} 취소`;
   }
@@ -853,6 +869,12 @@ export function toHistoryLogGroups(groups: TransactionDisplayGroup[]): LogGroup[
   return groups.reduce<LogGroup[]>((result, group) => {
     const first = group.logs[0];
     if (!first) return result;
+    if (group.type === "submission") {
+      const works = toHistoryLogGroups((group.workGroups ?? []).filter((work) => work.type !== "submission"));
+      if (works.length) result.push({ type: "submission", key: group.key, logs: group.logs, workGroups: works, matchedLogIds: group.matchedLogIds });
+      else group.logs.forEach((log) => result.push({ type: "solo", log, allowCancellation: false }));
+      return result;
+    }
     if (group.type === "solo") {
       result.push({ type: "solo", log: first, matchedLogIds: group.matchedLogIds });
       return result;
@@ -882,9 +904,20 @@ export function toHistoryLogGroups(groups: TransactionDisplayGroup[]): LogGroup[
       return result;
     }
     const child = group.logs[1];
-    if (child) result.push({ type: "defect_lifecycle", key: group.key, parent: first, child, matchedLogIds: group.matchedLogIds });
+    if (group.type === "defect_lifecycle" && child) result.push({ type: "defect_lifecycle", key: group.key, parent: first, child, matchedLogIds: group.matchedLogIds });
+    else group.logs.forEach((log) => result.push({ type: "solo", log, allowCancellation: false }));
     return result;
   }, []);
+}
+
+/** 제출 요약에서 실제 작업 ID와 해당 작업의 로그만 기존 상세로 전달한다. */
+export function getHistoryWorkSelection(group: LogGroup): HistorySelection {
+  if (group.type === "submission") return { kind: "submission", group };
+  const primary = getGroupPrimaryLog(group);
+  if (group.type === "solo") return { kind: "log", log: primary, allowCancellation: group.allowCancellation };
+  const logs = group.type === "defect_lifecycle" ? [group.parent, group.child] : group.logs;
+  const batchId = group.type === "operation" ? group.operationId : group.type === "op_batch" ? group.batchId : group.type === "batch" ? group.refKey : group.key;
+  return { kind: "batch", batchId, logs: [primary, ...logs.filter((log) => log.log_id !== primary.log_id)], groupType: group.type };
 }
 
 function referenceGroupKey(log: TransactionLog): string {

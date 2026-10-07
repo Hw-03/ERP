@@ -63,6 +63,7 @@ type Props = {
   panelOpen: boolean;
   batchId: string;
   logs: TransactionLog[];
+  workOperationId?: string;
   batchCache: Map<string, IoBatch>;
   setBatchCache: React.Dispatch<React.SetStateAction<Map<string, IoBatch>>>;
   onBatchCancelled: (batchId: string, updated: TransactionLog) => void;
@@ -88,6 +89,7 @@ export function HistoryBatchDetailPanel({
   panelOpen,
   batchId,
   logs,
+  workOperationId,
   batchCache,
   setBatchCache,
   onBatchCancelled,
@@ -200,7 +202,16 @@ export function HistoryBatchDetailPanel({
     onBatchCancelled(batchId, updated);
   };
 
-  const batch = state.status === "available" ? state.batch : null;
+  const fullBatch = state.status === "available" ? state.batch : null;
+  const workLineIds = new Set(logs.map((log) => log.operation_line_id).filter(Boolean));
+  const workItemIds = new Set(logs.map((log) => log.item_id));
+  const batch = fullBatch && workOperationId ? {
+    ...fullBatch,
+    bundles: fullBatch.bundles.flatMap((bundle) => {
+      const selected = bundle.lines.some((line) => workLineIds.size ? workLineIds.has(line.line_id) : workItemIds.has(line.item_id));
+      return selected ? [{ ...bundle, lines: bundle.lines.filter((line) => !line.included || (workLineIds.size ? workLineIds.has(line.line_id) : workItemIds.has(line.item_id))) }] : [];
+    }),
+  } : fullBatch;
   const cancellationScopeStatus: HistoryCancelScopeStatus = canCancelAsBatch
     ? cancellationScope.status
     : "ready";

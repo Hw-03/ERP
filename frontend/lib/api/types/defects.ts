@@ -4,6 +4,7 @@
  */
 
 export interface DefectLocation {
+  reason_category_id?: string | null;
   record_id: string;
   item_id: string;
   item_name: string;
@@ -56,6 +57,8 @@ export interface DefectKpi {
 }
 
 export interface QuarantinePayload {
+  reason_category_id?: string | null;
+  submission_id?: string | null;
   item_id: string;
   qty: number;
   source: "warehouse" | "production";
@@ -69,6 +72,7 @@ export interface QuarantinePayload {
 }
 
 export interface BulkQuarantinePayload {
+  submission_id?: string | null;
   actor_employee_id: string;
   client_request_id?: string;
   lines: Array<Omit<QuarantinePayload, "actor_employee_id" | "client_request_id">>;
@@ -81,6 +85,8 @@ export interface BulkQuarantineResult {
 }
 
 export interface UnquarantinePayload {
+  reason_category_id?: string | null;
+  submission_id?: string | null;
   record_id: string;
   item_id: string;
   qty: number;
@@ -91,6 +97,8 @@ export interface UnquarantinePayload {
 }
 
 export interface BulkUnquarantinePayload {
+  reason_category_id?: string | null;
+  submission_id?: string | null;
   actor_employee_id: string;
   reason_category?: string | null;
   reason_memo?: string | null;
@@ -106,6 +114,13 @@ export interface BulkUnquarantineResult {
   processed_records: number;
   total_quantity: number;
   message: string;
+}
+
+export interface DefectReasonCategory {
+  category_id: string;
+  name: string;
+  is_active: boolean;
+  is_other: boolean;
 }
 
 export interface DefectMemoUpdatePayload {
@@ -179,6 +194,7 @@ export interface DefectStatisticsQuery {
 }
 
 export interface DefectStatisticsReportQuery extends DefectStatisticsQuery {
+  reason_category_id?: string;
   reason?: string;
   item_id?: string;
 }

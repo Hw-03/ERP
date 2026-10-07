@@ -15,6 +15,7 @@ import { MaterialDirectionStep } from "./MaterialDirectionStep";
 import { IoTargetPicker } from "./IoTargetPicker";
 import { IoBundleCart } from "./IoBundleCart";
 import { IoConfirmStep } from "./IoConfirmStep";
+import { hasDefectReason } from "../_defect_hub/defectCartValidation";
 import { IoSubmitModals, type IoSubmitResultState } from "./IoSubmitModals";
 import { IO_WORK_TYPES, approvalKind, canAutoApprove, canSeeWorkType, deptVisibility, directionWord, inventoryEffectLines, ioDepartmentPayload, isAutoDepartmentRoute, isExitWorkType, mergePreviewBundles, pickerDirectionLabel, requiresDepartments, subTypeLabel, targetDepartmentOf } from "./ioWorkType";
 import { applyBundleQuantityChange, applyLineQuantityChange, applyToggleLine } from "./bomSync";
@@ -213,6 +214,8 @@ export function IoComposeView({
     state.deptIoDirection,
     state.fromDepartment,
     state.notes,
+    state.reasonCategory,
+    state.reasonCategoryId,
     state.referenceNo,
     state.step,
     state.subType,
@@ -235,6 +238,8 @@ export function IoComposeView({
     toDepartment: state.toDepartment,
     referenceNo: state.referenceNo,
     notes: state.notes,
+    reasonCategory: state.reasonCategory,
+    reasonCategoryId: state.reasonCategoryId,
     supplierId: state.selectedSupplierId,
   });
   latestDraftFieldsRef.current = {
@@ -245,6 +250,8 @@ export function IoComposeView({
     toDepartment: state.toDepartment,
     referenceNo: state.referenceNo,
     notes: state.notes,
+    reasonCategory: state.reasonCategory,
+    reasonCategoryId: state.reasonCategoryId,
     supplierId: state.selectedSupplierId,
   };
   const internalUsePreviewLock = useInternalUseBomPreviewLock();
@@ -413,6 +420,8 @@ export function IoComposeView({
   }, [
     state.bundles,
     state.notes,
+    state.reasonCategory,
+    state.reasonCategoryId,
     state.referenceNo,
     state.fromDepartment,
     state.toDepartment,
@@ -530,6 +539,8 @@ export function IoComposeView({
         ...ioDepartmentPayload(state.subType, state.fromDepartment, state.toDepartment),
         referenceNo: state.referenceNo,
         notes: state.notes,
+        reasonCategory: state.reasonCategory,
+        reasonCategoryId: state.reasonCategoryId,
         supplierId: state.selectedSupplierId,
         batchId: autosaveBatchIdRef.current,
         bundles: currentBundles,
@@ -683,6 +694,8 @@ export function IoComposeView({
           ...ioDepartmentPayload(state.subType, state.fromDepartment, state.toDepartment),
           referenceNo: state.referenceNo,
           notes: state.notes,
+          reasonCategory: state.reasonCategory,
+          reasonCategoryId: state.reasonCategoryId,
           supplierId: state.selectedSupplierId,
           batchId: autosaveBatchIdRef.current,
           bundles,
@@ -769,6 +782,10 @@ export function IoComposeView({
   }
 
   async function handleSubmit() {
+    if (state.subType === "defect_quarantine" && !hasDefectReason(state.reasonCategory, state.notes)) {
+      setError("사유를 선택하고, 기타 사유는 메모를 입력하세요.");
+      return;
+    }
     await run(() => runCompositionSubmit(
       employeeId,
       state.subType,
@@ -783,6 +800,8 @@ export function IoComposeView({
         ...ioDepartmentPayload(state.subType, state.fromDepartment, state.toDepartment),
         referenceNo: state.referenceNo,
         notes: state.notes,
+        reasonCategory: state.reasonCategory,
+        reasonCategoryId: state.reasonCategoryId,
         supplierId: state.selectedSupplierId,
         bundles,
       }),
@@ -812,6 +831,8 @@ export function IoComposeView({
           ...ioDepartmentPayload(fields.subType, fields.fromDepartment, fields.toDepartment),
           referenceNo: fields.referenceNo,
           notes: fields.notes,
+          reasonCategory: fields.reasonCategory,
+          reasonCategoryId: fields.reasonCategoryId,
           supplierId: fields.supplierId,
           batchId: autosaveBatchIdRef.current,
           bundles,
@@ -1476,6 +1497,10 @@ export function IoComposeView({
             fill
           >
             <IoConfirmStep
+              employeeId={employeeId}
+              reasonCategory={state.reasonCategory}
+              reasonCategoryId={state.reasonCategoryId}
+              onReasonCategoryChange={state.setReasonCategory}
               supplierName={state.selectedSupplierName}
               workType={state.workType}
               subType={state.subType}

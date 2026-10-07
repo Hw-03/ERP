@@ -99,6 +99,7 @@ from app.models.weekly_inventory_snapshot import (
     WeeklyInventorySnapshot,
     WeeklyInventorySnapshotItem,
 )
+from app.models.defect_reason_category import DefectReasonCategory
 from app.models.defect import (
     DefectManagementCategoryEnum,
     DefectQuarantineManagementCategoryRevision,
@@ -194,6 +195,7 @@ __all__ = [
     "WeeklyInventorySnapshotItem",
     # defect quarantine records
     "DefectQuarantineRecord",
+    "DefectReasonCategory",
     "DefectQuarantineMemoRevision",
     "DefectManagementCategoryEnum",
     "DefectQuarantineManagementCategoryRevision",

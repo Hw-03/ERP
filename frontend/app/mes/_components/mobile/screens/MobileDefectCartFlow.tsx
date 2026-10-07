@@ -48,6 +48,7 @@ interface CartLine {
   item: Item;
   qty: number;
   category: string;
+  categoryId: string | null;
   memo: string;
   managementCategory: DefectManagementCategory;
   decisions: ChildDecision[];
@@ -121,6 +122,7 @@ export function MobileDefectCartFlow({
   const [lines, setLines] = useState<CartLine[]>([]);
   const [requestIds, setRequestIds] = useState<Record<string, string>>({});
   const [batchRequestId, setBatchRequestId] = useState(() => makeClientRequestId());
+  const submissionIdRef = useRef<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [failures, setFailures] = useState<LineFailure[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -173,6 +175,7 @@ export function MobileDefectCartFlow({
       if (state?.defect !== "cart" || state.mode !== mode) {
         setStep(1);
         setLines([]);
+        submissionIdRef.current = null;
         setDirectAction(mode === "add" ? "scrap" : null);
         setSource("production");
         return;
@@ -197,7 +200,7 @@ export function MobileDefectCartFlow({
   );
 
   function newLine(item: Item): CartLine {
-    return { key: `${item.item_id}-${Date.now()}`, item, qty: 1, category: "", memo: "", managementCategory: "DEFECT", decisions: [] };
+    return { key: `${item.item_id}-${Date.now()}`, item, qty: 1, category: "", categoryId: null, memo: "", managementCategory: "DEFECT", decisions: [] };
   }
 
   function addItem(item: Item) {
@@ -245,7 +248,7 @@ export function MobileDefectCartFlow({
     setLines((prev) => {
       const src = prev[index];
       if (!src) return prev;
-      return prev.map((l, i) => (i > index ? { ...l, category: src.category, memo: src.memo } : l));
+      return prev.map((l, i) => (i > index ? { ...l, category: src.category, categoryId: src.categoryId, memo: src.memo } : l));
     });
   }
 
@@ -298,6 +301,8 @@ export function MobileDefectCartFlow({
       source,
       ...(source === "production" ? { source_dept: productionDepartment!, target_dept: productionDepartment! } : { target_dept: "창고" }),
       reason_category: line.category || null,
+      reason_category_id: line.categoryId,
+      submission_id: submissionIdRef.current ?? batchRequestId,
       reason_memo: line.memo || null,
       actor_employee_id: currentEmployee.employee_id,
       client_request_id: requestId,
@@ -317,6 +322,8 @@ export function MobileDefectCartFlow({
       requester_employee_id: currentEmployee.employee_id,
       request_type: isRework ? "rework_normal" : "scrap_normal",
       reason_category: line.category || null,
+      reason_category_id: line.categoryId,
+      submission_id: submissionIdRef.current ?? batchRequestId,
       reason_memo: line.memo || null,
       notes: isRework
         ? JSON.stringify({ child_decisions: line.decisions.map(toServerDecision) })
@@ -336,6 +343,7 @@ export function MobileDefectCartFlow({
 
   async function handleSubmit() {
     if (!allValid || busy) return;
+    submissionIdRef.current ??= batchRequestId;
     setBusy(true);
     setFailures([]);
     if (mode === "add" && lines.length > 1) {
@@ -343,6 +351,7 @@ export function MobileDefectCartFlow({
         await defectsApi.quarantineBulk({
           actor_employee_id: currentEmployee.employee_id,
           client_request_id: batchRequestId,
+          submission_id: submissionIdRef.current,
           lines: lines.map((line) => {
             const { actor_employee_id: _actorEmployeeId, client_request_id: _clientRequestId, ...payload } = quarantinePayload(
               line,
@@ -602,10 +611,12 @@ export function MobileDefectCartFlow({
                       )}
 
                       <ReasonFormFields
+                        employeeId={currentEmployee.employee_id}
+                        categoryId={line.categoryId}
                         mobilePresentation
                         category={line.category}
                         memo={line.memo}
-                        onCategoryChange={(c) => updateLine(line.key, { category: c })}
+                        onCategoryChange={(name, id) => updateLine(line.key, { category: name, categoryId: id ?? null })}
                         onMemoChange={(m) => updateLine(line.key, { memo: m })}
                         requireAny
                       />

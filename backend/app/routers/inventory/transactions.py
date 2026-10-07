@@ -478,6 +478,7 @@ def list_transaction_display_groups(
         TransactionLog.log_id, TransactionLog.item_id, TransactionLog.transaction_type,
         TransactionLog.quantity_change, TransactionLog.created_at,
         TransactionLog.operation_id, TransactionLog.operation_batch_id,
+        TransactionLog.submission_id, TransactionLog.reverses_log_id,
         TransactionLog.reference_no, TransactionLog.shipping_phase,
         TransactionLog.produced_by, TransactionLog.department,
         TransactionLog.reason_category, TransactionLog.reason_memo,
@@ -501,6 +502,7 @@ def list_transaction_display_groups(
             quantity_change=row.quantity_change, created_at=row.created_at,
             requested_at=operation.effective_at if is_cancellation else row.request_order_at or row.created_at,
             operation_id=row.operation_id, operation_batch_id=row.operation_batch_id,
+            submission_id=row.submission_id, reverses_log_id=row.reverses_log_id,
             reference_no=row.reference_no, shipping_phase=row.shipping_phase,
             produced_by=row.produced_by,
             requester_name=operation.actor_name if is_cancellation else info.requester_name if info else None,
@@ -512,7 +514,7 @@ def list_transaction_display_groups(
                 "active" if operation else None
             ),
         ))
-    groups = group_display_records(records)
+    groups = group_display_records(records, include_submissions=True)
     if matched_log_ids is not None:
         groups = [group for group in groups if any(log.log_id in matched_log_ids for log in group.logs)]
     if cursor:
@@ -553,6 +555,16 @@ def list_transaction_display_groups(
                 [log.log_id for log in group.logs if log.log_id in matched_log_ids]
                 if matched_log_ids is not None else None
             ),
+            work_groups=[
+                TransactionDisplayGroupResponse(
+                    type=work.type, key=work.key, logs=[details[log.log_id] for log in work.logs],
+                    matched_log_ids=(
+                        [log.log_id for log in work.logs if log.log_id in matched_log_ids]
+                        if matched_log_ids is not None else None
+                    ),
+                )
+                for work in group.work_groups
+            ],
         )
         for group in selected_groups
     ]

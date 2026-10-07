@@ -34,7 +34,7 @@ vi.mock(
     }: {
       category: string;
       memo: string;
-      onCategoryChange: (c: string) => void;
+      onCategoryChange: (c: string, id?: string | null) => void;
       onMemoChange: (m: string) => void;
       required?: boolean;
     }) => (
@@ -42,7 +42,7 @@ vi.mock(
         <select
           data-testid="category-select"
           value={category}
-          onChange={(e) => onCategoryChange(e.target.value)}
+          onChange={(e) => onCategoryChange(e.target.value, `reason-${e.target.value}`)}
         >
           <option value="">-- 선택 --</option>
           <option value="기능 불량">기능 불량</option>

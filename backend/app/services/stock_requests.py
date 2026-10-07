@@ -120,9 +120,11 @@ def _build_request_and_lines(
     requires_as_research_approval: bool = False,
     approval_department: Optional[str] = None,
     reason_category: Optional[str] = None,
+    reason_category_id: Optional[uuid.UUID] = None,
     reason_memo: Optional[str] = None,
     supplier_id: uuid.UUID | None = None,
     supplier_name_snapshot: str | None = None,
+    submission_id: Optional[uuid.UUID] = None,
 ) -> StockRequest:
     """StockRequest + StockRequestLine row 생성. 호출자가 사전 검증 책임.
 
@@ -136,6 +138,7 @@ def _build_request_and_lines(
         requires_approval = requires_warehouse_approval_override
 
     request = StockRequest(
+        submission_id=submission_id or uuid.uuid4(),
         request_code=request_code,
         client_request_id=client_request_id,
         requester_employee_id=requester.employee_id,
@@ -155,6 +158,7 @@ def _build_request_and_lines(
         reference_no=reference_no,
         notes=notes,
         reason_category=reason_category,
+        reason_category_id=reason_category_id,
         reason_memo=reason_memo,
         supplier_id=supplier_id,
         supplier_name_snapshot=supplier_name_snapshot,
@@ -204,9 +208,11 @@ def create_request(
     approval_department: Optional[str] = None,
     defer_execution: bool = False,
     reason_category: Optional[str] = None,
+    reason_category_id: Optional[uuid.UUID] = None,
     reason_memo: Optional[str] = None,
     allow_internal_use: bool = False,
     supplier_id: uuid.UUID | None = None,
+    submission_id: Optional[uuid.UUID] = None,
 ) -> StockRequest:
     """요청 생성. 호출자가 db.commit() 책임.
 
@@ -222,6 +228,13 @@ def create_request(
         allow_internal_use=allow_internal_use,
     )
     from app.services.supplier import validate_supplier_for_stock_request
+    from app.services.defect_reason_categories import resolve_reason_category, stock_request_requires_reason
+
+    if stock_request_requires_reason(request_type) or reason_category_id or reason_category:
+        reason_category_id, reason_category, reason_memo = resolve_reason_category(
+            db, reason_category_id=reason_category_id, reason_category=reason_category,
+            reason_memo=reason_memo, required=stock_request_requires_reason(request_type),
+        )
 
     supplier = validate_supplier_for_stock_request(
         db,
@@ -301,11 +314,13 @@ def create_request(
         request_code=code,
         submitted_at=now,
         client_request_id=client_request_id,
+        submission_id=submission_id,
         requires_warehouse_approval_override=warehouse_override,
         requires_department_approval=requires_department_approval,
         requires_as_research_approval=requires_as_research_approval,
         approval_department=approval_department,
         reason_category=reason_category,
+        reason_category_id=reason_category_id,
         reason_memo=reason_memo,
         supplier_id=supplier.supplier_id if supplier is not None else None,
         supplier_name_snapshot=supplier.name if supplier is not None else None,
@@ -326,8 +341,12 @@ def create_manual_adjustment_request(
     lines_input: Sequence[LineInput],
     reference_no: Optional[str],
     notes: Optional[str],
+    reason_category_id: Optional[uuid.UUID] = None,
+    reason_category: Optional[str] = None,
+    reason_memo: Optional[str] = None,
     client_request_id: Optional[str] = None,
     approval_department: Optional[str] = None,
+    submission_id: Optional[uuid.UUID] = None,
 ) -> StockRequest:
     """낱개(manual/adjust) 라인 전용 부서 결재 요청.
 
@@ -349,6 +368,10 @@ def create_manual_adjustment_request(
         db,
         requester=requester,
         request_type=StockRequestTypeEnum.MANUAL_ADJUSTMENT,
+        submission_id=submission_id,
+        reason_category_id=reason_category_id,
+        reason_category=reason_category,
+        reason_memo=reason_memo,
         lines_input=lines_input,
         reference_no=reference_no,
         notes=notes,

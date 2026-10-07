@@ -117,6 +117,8 @@ vi.mock("../_history_sections/HistoryTable", () => ({
     selection,
     onSelectLog,
     onSelectBatch,
+    onSelectSubmission,
+    displayGroups,
     setBatchCache,
     onRetry,
     cacheEpoch,
@@ -124,6 +126,7 @@ vi.mock("../_history_sections/HistoryTable", () => ({
     <div
       data-testid="history-table-state"
       data-selection={selection?.kind ?? "none"}
+      data-selected-log={selection?.kind === "log" ? selection.log.log_id : ""}
       data-list-cancelled={filteredLogs.length > 0 && filteredLogs.every((log: TransactionLog) => log.cancelled) ? "yes" : "no"}
       data-cache-epoch={cacheEpoch ?? "null"}
     >
@@ -140,6 +143,7 @@ vi.mock("../_history_sections/HistoryTable", () => ({
         묶음 선택
       </button>
       <button type="button" onClick={onRetry}>목록 재시도</button>
+      {displayGroups?.[0]?.type === "submission" && <button type="button" onClick={() => onSelectSubmission(displayGroups[0])}>제출 선택</button>}
     </div>
   ),
 }));
@@ -151,6 +155,7 @@ vi.mock("../_history_sections/DesktopHistoryRightPanel", () => ({
     onBatchCancelled,
     onLogUpdated,
     onSelectLog,
+    onSelectWork,
     canGoBack,
     onBack,
   }: any) => (
@@ -167,6 +172,9 @@ vi.mock("../_history_sections/DesktopHistoryRightPanel", () => ({
       }
       data-cache-status={batchCache.get("batch-1")?.status ?? "missing"}
     >
+      {selection?.kind === "submission" && selection.group.workGroups.map((work: any, index: number) => (
+        <button key={index} type="button" onClick={() => onSelectWork(work)}>제출 작업 {index + 1}</button>
+      ))}
       {selection?.kind === "batch" && (
         <button
           type="button"
@@ -302,6 +310,26 @@ beforeEach(() => {
 });
 
 describe("DesktopHistoryView history state", () => {
+  it.each([["operation", false], ["operation", true], ["op_batch", false]] as const)("제출 카드 선택은 표 행과 같고 뒤로가면 제출로 돌아간다 (%s, cancelled: %s)", (type, cancelled) => {
+    const primary = makeLog({ log_id: "work-primary", operation_batch_id: null, operation_id: "work-op",
+      operation_role: "PRIMARY", transaction_type: "MARK_DEFECTIVE", cancelled });
+    const component = makeLog({ log_id: "work-component", item_id: "component", operation_batch_id: null,
+      operation_id: "work-op", operation_role: "COMPONENT_INPUT" });
+    const other = makeLog({ log_id: "other-work", operation_batch_id: null });
+    setHistoryResult([component, primary, other], false);
+    testState.historyResult.groups = [{ type: "submission", key: "submission:test", logs: [component, primary, other],
+      workGroups: [{ type, key: "work-op", logs: [component, primary] }, { type: "solo", key: "other", logs: [other] }] }];
+    render(<DesktopHistoryView />);
+    fireEvent.click(screen.getByRole("button", { name: "제출 선택" }));
+    fireEvent.click(screen.getByRole("button", { name: "제출 작업 1" }));
+    expect(screen.getByTestId("history-table-state")).toHaveAttribute("data-selection", type === "op_batch" ? "batch" : "log");
+    expect(screen.getByTestId("history-table-state")).toHaveAttribute("data-selected-log", type === "op_batch" ? "" : primary.log_id);
+    expect(screen.getByTestId("history-right-panel-state")).toHaveAttribute("data-name", type === "op_batch" ? "" : primary.item_name);
+    expect(screen.getByTestId("history-right-panel-state")).toHaveAttribute("data-selection-cancelled", cancelled ? "yes" : "no");
+    fireEvent.click(screen.getByRole("button", { name: "뒤로" }));
+    expect(screen.getByTestId("history-table-state")).toHaveAttribute("data-selection", "submission");
+  });
+
   it("enables monthly counts only while the calendar is open", async () => {
     render(<DesktopHistoryView />);
     expect(testState.monthlyQuery).toHaveBeenLastCalledWith(expect.any(Number), { enabled: false });

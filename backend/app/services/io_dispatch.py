@@ -523,6 +523,10 @@ def _submit_internal_use_approvals(
             lines_input=inputs,
             reference_no=batch.reference_no,
             notes=batch.notes,
+            reason_category_id=batch.reason_category_id,
+            submission_id=batch.batch_id,
+            reason_category=batch.reason_category,
+            reason_memo=batch.notes if batch.reason_category_id else None,
             requires_warehouse_approval_override=kind == "warehouse",
             requires_department_approval=kind == "department",
             requires_as_research_approval=kind == "as_research",
@@ -584,6 +588,10 @@ def _submit_approval(
         lines_input=inputs,
         reference_no=batch.reference_no,
         notes=batch.notes,
+        reason_category_id=batch.reason_category_id,
+        submission_id=batch.batch_id,
+        reason_category=batch.reason_category,
+        reason_memo=batch.notes if batch.reason_category_id else None,
         requires_department_approval=force_dept_approval,
         allow_internal_use=True,
     )
@@ -637,6 +645,10 @@ def _submit_dept_only_approval(
         lines_input=inputs,
         reference_no=batch.reference_no,
         notes=batch.notes,
+        reason_category_id=batch.reason_category_id,
+        submission_id=batch.batch_id,
+        reason_category=batch.reason_category,
+        reason_memo=batch.notes if batch.reason_category_id else None,
         approval_department=batch.to_department,
     )
     _link_stock_request(db, batch=batch, request=request, lines=request_lines)
@@ -886,9 +898,13 @@ def _log_immediate(
             produced_by=operator_name,
             producer_employee_id=producer_employee_id,
             notes=batch.notes,
+            reason_category_id=batch.reason_category_id,
+            reason_category=batch.reason_category,
+            reason_memo=batch.notes if batch.reason_category_id else None,
             supplier_id=batch.supplier_id,
             supplier_name_snapshot=batch.supplier_name_snapshot,
             operation_batch_id=batch.batch_id,
+            submission_id=batch.batch_id,
             operation_line_id=line.line_id,
             defect_quarantine_record_id=defect_quarantine_record_id,
             **stock_snapshot,
@@ -1135,7 +1151,8 @@ def _apply_line(
             quantity=qty,
             actor_employee_id=requester.employee_id,
             actor_name=requester.name,
-            reason_category=None,
+            reason_category=batch.reason_category,
+            reason_category_id=batch.reason_category_id,
             memo=batch.notes,
         )
 
@@ -1223,6 +1240,13 @@ def _complete_without_inventory(batch: IoBatch) -> None:
 
 def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> dict:
     ensure_batch_is_mutable(batch)
+    from app.services.defect_reason_categories import resolve_reason_category, io_requires_reason
+    batch.reason_category_id, batch.reason_category, reason_memo = resolve_reason_category(
+        db, reason_category_id=batch.reason_category_id, reason_category=batch.reason_category,
+        reason_memo=batch.notes, required=io_requires_reason(batch.bundles),
+    )
+    if io_requires_reason(batch.bundles):
+        batch.notes = reason_memo
     validate_material_outbound(work_type=batch.work_type, sub_type=batch.sub_type, bundles=batch.bundles, notes=batch.notes)
     batch.sub_type = normalize_process_sub_type(
         work_type=batch.work_type,

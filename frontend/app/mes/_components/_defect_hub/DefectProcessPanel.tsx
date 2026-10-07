@@ -13,7 +13,8 @@ import type { Department } from "@/lib/api/types/shared";
 import { DisassembleTree, toServerDecision, validateDecisionTree, type ChildDecision } from "./DisassembleTree";
 import { InlineErrorNote } from "./InlineErrorNote";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
-import { REASON_CATEGORIES } from "./reasonCategories";
+import { ReasonFormFields } from "./ReasonFormFields";
+import { hasDefectReason } from "./defectCartValidation";
 import { QuantityInput } from "../common/QuantityInput";
 import { makeClientRequestId } from "@/lib/uuid";
 import { ApiError } from "@/lib/api-core";
@@ -64,8 +65,9 @@ export function DefectProcessPanel({
   );
   const [processQty, setProcessQty] = useState<number>(availableQty);
   const [category, setCategory] = useState("");
+  const [categoryId, setCategoryId] = useState<string | null>(null);
   const [memo, setMemo] = useState("");
-  const hasReason = Boolean(category.trim() || memo.trim());
+  const hasReason = hasDefectReason(category, memo);
   const [decisions, setDecisions] = useState<ChildDecision[]>([]);
   const [decisionParentQty, setDecisionParentQty] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -101,6 +103,7 @@ export function DefectProcessPanel({
     setAction("unquarantine");
     setProcessQty(availableQty);
     setCategory("");
+    setCategoryId(null);
     setMemo("");
     setDecisions([]);
     setDecisionParentQty(null);
@@ -159,6 +162,7 @@ export function DefectProcessPanel({
           await defectsApi.unquarantineBulk({
             actor_employee_id: currentEmployee.employee_id,
             reason_category: category || null,
+            reason_category_id: categoryId,
             reason_memo: memo || null,
             lines: processingLocations.map((current) => ({
               record_id: current.record_id,
@@ -174,6 +178,7 @@ export function DefectProcessPanel({
             qty: boundedProcessQty,
             dept: location.department,
             reason_category: category || null,
+            reason_category_id: categoryId,
             reason_memo: memo || null,
             actor_employee_id: currentEmployee.employee_id,
           });
@@ -184,6 +189,7 @@ export function DefectProcessPanel({
           client_request_id: batchClientRequestId,
           request_type: "defect_scrap",
           reason_category: category || null,
+          reason_category_id: categoryId,
           reason_memo: memo || null,
           notes: memo || null,
           lines: processingLocations.map((current) => ({
@@ -202,6 +208,7 @@ export function DefectProcessPanel({
           request_type: "defect_return",
           supplier_id: selectedSupplier!.supplier_id,
           reason_category: category || null,
+          reason_category_id: categoryId,
           reason_memo: memo || null,
           notes: memo || null,
           lines: processingLocations.map((current) => ({
@@ -220,6 +227,7 @@ export function DefectProcessPanel({
           client_request_id: batchClientRequestId,
           request_type: "defect_disassemble",
           reason_category: category || null,
+          reason_category_id: categoryId,
           reason_memo: memo || null,
           notes: JSON.stringify({ child_decisions: childDecisions }),
           lines: processingLocations.map((current) => ({
@@ -547,46 +555,15 @@ export function DefectProcessPanel({
           </div>
         </div>
 
-        {/* 사유 카테고리 */}
-        <div className="flex flex-col gap-2">
-          <label className="text-sm font-black" style={{ color: LEGACY_COLORS.muted2 }}>
-            사유 카테고리 <span className="font-bold" style={{ color: LEGACY_COLORS.muted }}>(메모와 둘 중 하나 필수)</span>
-          </label>
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="w-full rounded-[12px] border px-4 py-3 text-base font-bold outline-none transition-colors"
-            style={{
-              background: LEGACY_COLORS.s2,
-              borderColor: LEGACY_COLORS.border,
-              color: category ? LEGACY_COLORS.text : LEGACY_COLORS.muted,
-            }}
-          >
-            <option value="">카테고리 선택</option>
-            {REASON_CATEGORIES.map((cat) => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* 메모 */}
-        <div className="flex flex-col gap-2">
-          <label className="text-sm font-black" style={{ color: LEGACY_COLORS.muted2 }}>
-            메모 <span className="font-bold" style={{ color: LEGACY_COLORS.muted }}>(사유 카테고리와 둘 중 하나 필수)</span>
-          </label>
-          <textarea
-            value={memo}
-            onChange={(e) => setMemo(e.target.value)}
-            placeholder="예: 스크래치 다수 / 우측 끝단"
-            rows={4}
-            className="w-full resize-none rounded-[12px] border px-4 py-3 text-base outline-none transition-colors"
-            style={{
-              background: LEGACY_COLORS.s2,
-              borderColor: LEGACY_COLORS.border,
-              color: LEGACY_COLORS.text,
-            }}
-          />
-        </div>
+        <ReasonFormFields
+          employeeId={currentEmployee.employee_id}
+          category={category}
+          categoryId={categoryId}
+          memo={memo}
+          onCategoryChange={(name, id) => { setCategory(name); setCategoryId(id ?? null); }}
+          onMemoChange={setMemo}
+          required
+        />
 
         {errorMsg && <InlineErrorNote>{errorMsg}</InlineErrorNote>}
       </div>

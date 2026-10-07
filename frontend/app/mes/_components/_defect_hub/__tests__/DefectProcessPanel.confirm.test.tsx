@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { DefectProcessPanel } from "../DefectProcessPanel";
 import type { DefectLocation } from "@/lib/api/types/defects";
 import { defectsApi } from "@/lib/api/defects";
+vi.mock("../ReasonFormFields", async () => ({ ReasonFormFields: (await import("./reasonFormFieldsStub")).ReasonFormFieldsStub }));
 
 vi.mock("../DisassembleTree", () => ({
   DisassembleTree: () => null,
@@ -38,7 +39,7 @@ const location: DefectLocation = {
 };
 
 describe("DefectProcessPanel normal recovery", () => {
-  it.each(["", "   "])("사유가 %j이면 진행을 막고 카테고리나 메모 중 하나만 있어도 허용한다", (memo) => {
+  it.each(["", "   "])("사유가 %j이면 진행을 막고 메모만으로 진행을 허용하지 않는다", (memo) => {
     render(<DefectProcessPanel location={location} currentEmployee={{ employee_id: "emp-1", name: "Kim", department: "Assembly" }} onDone={() => {}} onCancel={() => {}} />);
     const submit = screen.getByRole("button", { name: "정상 복귀 →" });
     fireEvent.change(screen.getByRole("textbox"), { target: { value: memo } });
@@ -46,7 +47,7 @@ describe("DefectProcessPanel normal recovery", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(submit).toBeDisabled();
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "검사 완료" } });
-    expect(submit).toBeEnabled();
+    expect(submit).toBeDisabled();
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "" } });
     fireEvent.change(screen.getByRole("combobox"), { target: { value: screen.getAllByRole("option")[1].getAttribute("value") } });
     expect(submit).toBeEnabled();
@@ -85,6 +86,7 @@ describe("DefectProcessPanel normal recovery", () => {
     );
 
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "검사 완료" } });
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "검사 통과" } });
     fireEvent.click(Array.from(container.querySelectorAll("button")).at(-1)!);
 
     expect(defectsApi.unquarantine).not.toHaveBeenCalled();

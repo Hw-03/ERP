@@ -1,10 +1,11 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { TransactionLog } from "@/lib/api";
 import type { IoBatch } from "@/lib/api/types/io";
+import { ioApi } from "@/lib/api/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { transactionColor } from "@/lib/mes-status";
@@ -86,6 +87,82 @@ function renderTable(groups: LogGroup[], batchCache = new Map<string, IoBatch>()
     <HistoryTable loading={false} displayGroups={groups} selection={null} onSelectLog={vi.fn()} onSelectBatch={vi.fn()} batchCache={batchCache} setBatchCache={vi.fn()} canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} collapseRequestNonce={collapseRequestNonce} />,
   );
 }
+
+it("제출 행을 누르면 같은 표에서 제목 반복 없이 작업 행이 바로 이어진다", () => {
+  const first = makeLog({ log_id: "flat-first", item_name: "첫 작업", transaction_type: "MARK_DEFECTIVE" });
+  const second = makeLog({ log_id: "flat-second", item_id: "ITEM-2", item_name: "둘째 작업", transaction_type: "MARK_DEFECTIVE" });
+  const submission: LogGroup = { type: "submission", key: "submission:flat", logs: [first, second], workGroups: [
+    { type: "solo", log: first }, { type: "solo", log: second },
+  ] };
+  const select = vi.fn();
+  const { container } = render(<HistoryTable loading={false} displayGroups={[submission]} selection={null}
+    onSelectSubmission={select} onSelectLog={vi.fn()} onSelectBatch={vi.fn()} batchCache={new Map()}
+    setBatchCache={vi.fn()} canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} />);
+  const parent = screen.getByText("첫 작업").closest("tr")!;
+  expect(screen.getByText("펼쳐서 개별 내역 확인").closest("td")).toBe(parent.children[2]);
+  fireEvent.click(parent);
+  expect(select).toHaveBeenCalledWith(submission);
+  expect(screen.getByRole("button", { name: "묶음 접기" })).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByText("둘째 작업")).toBeInTheDocument();
+  expect(screen.getAllByText("불량 격리")).toHaveLength(3);
+  expect(screen.getAllByText("펼쳐서 개별 내역 확인")).toHaveLength(1);
+  expect(container.querySelectorAll("table")).toHaveLength(1);
+  expect(container.querySelectorAll("thead")).toHaveLength(1);
+  expect(parent.nextElementSibling).toBe(screen.getAllByText("첫 작업")[1].closest("tr"));
+  expect(parent.nextElementSibling?.parentElement).toBe(parent.parentElement);
+  expect(parent.nextElementSibling?.nextElementSibling).toBe(screen.getByText("둘째 작업").closest("tr"));
+  fireEvent.click(screen.getByRole("button", { name: "묶음 접기" }));
+  expect(screen.queryByText("둘째 작업")).not.toBeInTheDocument();
+  expect(select).toHaveBeenCalledTimes(1);
+});
+
+it("화살표로 펼친 제출도 하나의 표를 쓰며 하위 배치를 선택해도 유지된다", () => {
+  const first = makeLog({ log_id: "flat-batch", operation_batch_id: "batch-1" });
+  const second = makeLog({ log_id: "flat-solo", item_id: "ITEM-2", item_name: "별도 작업" });
+  const submission: LogGroup = { type: "submission", key: "submission:batch-flat", logs: [first, second], workGroups: [
+    { type: "op_batch", batchId: "batch-1", refNo: null, logs: [first] }, { type: "solo", log: second },
+  ] };
+  const selectBatch = vi.fn();
+  function Harness() {
+    const [selection, setSelection] = useState<HistorySelection | null>(null);
+    return <HistoryTable loading={false} displayGroups={[submission]} selection={selection}
+      onSelectLog={vi.fn()} onSelectBatch={(batchId, logs) => {
+        selectBatch(batchId, logs);
+        setSelection({ kind: "batch", batchId, logs });
+      }}
+      batchCache={new Map([["batch-1", makeBatch()]])} setBatchCache={vi.fn()}
+      canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} />;
+  }
+  const { container } = render(<Harness />);
+  fireEvent.click(screen.getByRole("button", { name: "묶음 펼치기" }));
+  expect(container.querySelectorAll("table")).toHaveLength(1);
+  const work = screen.getAllByText("대표 품목")[1].closest("tr")!;
+  fireEvent.click(work);
+  expect(screen.getByText("별도 작업")).toBeInTheDocument();
+  expect(selectBatch).toHaveBeenCalledWith("batch-1", [first]);
+  expect(work.querySelector("button[aria-expanded]")).toHaveAttribute("aria-expanded", "true");
+});
+
+it("접힌 PC 제출의 하위 레거시 배치도 조회해 대표 품목과 분류를 표시한다", async () => {
+  const primary = makeLog({ operation_batch_id: "batch-1" });
+  const child = makeLog({ log_id: "component", item_id: "COMP-1", item_name: "BOM 구성품", transaction_type: "BACKFLUSH", operation_batch_id: "batch-1" });
+  const group: LogGroup = { type: "submission", key: "submission:legacy", logs: [child, primary], workGroups: [
+    { type: "op_batch", batchId: "batch-1", refNo: null, logs: [child, primary] },
+  ] };
+  const fetch = vi.spyOn(ioApi, "getBatch").mockResolvedValue(makeBatch());
+  function CachedTable() {
+    const [cache, setCache] = useState(new Map<string, IoBatch>());
+    return <HistoryTable loading={false} displayGroups={[group]} selection={null} onSelectLog={vi.fn()} onSelectBatch={vi.fn()}
+      batchCache={cache} setBatchCache={setCache} canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} />;
+  }
+  const { container } = render(<CachedTable />);
+  await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+  await screen.findByText(primary.item_name);
+  await screen.findByText("부서 입출고");
+  expect(screen.queryByText("작업 정보 확인 중")).not.toBeInTheDocument();
+  expect(container.querySelectorAll("table")).toHaveLength(1);
+  fetch.mockRestore();
+});
 
 function OperationSelectionHarness({ groups }: { groups: LogGroup[] }) {
   const [selection, setSelection] = useState<HistorySelection | null>(null);
@@ -362,6 +439,25 @@ describe("HistoryTable hierarchy", () => {
     expect(screen.getByText(child.item_name)).toBeInTheDocument();
     fireEvent.click(screen.getByText("내역 첫 화면"));
     expect(screen.queryByText(child.item_name)).not.toBeInTheDocument();
+  });
+
+  it("제출 작업이 홈에 있어도 탭 복귀는 부모 제출의 펼침을 접는다", () => {
+    const { child, primary, groups } = makeOperationGroup();
+    function HomeButton() {
+      const { requestHome } = useDesktopTabHomeController();
+      return <button onClick={() => requestHome()}>내역 첫 화면</button>;
+    }
+    const submission: LogGroup = { type: "submission", key: "submission:home", logs: [primary, child],
+      workGroups: groups };
+    const { container } = render(<DirtyGuardProvider><DesktopTabHomeProvider><HomeButton />
+      <HistoryTable loading={false} displayGroups={[submission]} selection={null} onSelectLog={vi.fn()} onSelectBatch={vi.fn()} batchCache={new Map()} setBatchCache={vi.fn()} canLoadMore={false} loadingMore={false} onLoadMore={vi.fn()} />
+    </DesktopTabHomeProvider></DirtyGuardProvider>);
+    fireEvent.click(screen.getByRole("button", { name: /펼치기/ }));
+    expect(container.querySelectorAll("table")).toHaveLength(1);
+    expect(screen.getAllByText(primary.item_name)).toHaveLength(2);
+    fireEvent.click(screen.getByText("내역 첫 화면"));
+    expect(container.querySelectorAll("table")).toHaveLength(1);
+    expect(screen.getAllByText(primary.item_name)).toHaveLength(1);
   });
 
   it("opens the matched BOM line inside a search-matched operation batch", () => {

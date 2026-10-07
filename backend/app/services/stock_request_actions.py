@@ -35,8 +35,10 @@ def create_request(
     notes: Optional[str],
     client_request_id: Optional[str] = None,
     reason_category: Optional[str] = None,
+    reason_category_id: Optional[uuid.UUID] = None,
     reason_memo: Optional[str] = None,
     supplier_id: uuid.UUID | None = None,
+    submission_id: Optional[uuid.UUID] = None,
 ) -> StockRequest:
     """요청·라인·점유·도착 알림을 한 번에 확정한다."""
     with transactional(db):
@@ -49,8 +51,10 @@ def create_request(
             notes=notes,
             client_request_id=client_request_id,
             reason_category=reason_category,
+            reason_category_id=reason_category_id,
             reason_memo=reason_memo,
             supplier_id=supplier_id,
+            submission_id=submission_id,
         )
         notification_svc.notify_request_arrived(db, request)
     return request

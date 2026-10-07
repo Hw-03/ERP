@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import calendar
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     DefectQuarantineRecord,
+    DefectReasonCategory,
     DefectQuarantineReconstruction,
     InventoryOperation,
     InventoryOperationKindEnum,
@@ -53,6 +54,7 @@ class _ResolvedFilters:
     include_unclassified_models: bool
     include_unclassified_process_steps: bool
     reason: str | None
+    reason_category_id: uuid.UUID | None
     item_id: uuid.UUID | None
 
 
@@ -70,6 +72,8 @@ class _Occurrence:
     reason: str
     quantity: int
     is_disused: bool
+    reason_category_id: uuid.UUID | None
+    reason_snapshot: str | None = None
 
 
 @dataclass
@@ -172,6 +176,7 @@ def _resolve_filters(db: Session, filters: DefectStatisticsFilters) -> _Resolved
         include_unclassified_models=include_unclassified_models,
         include_unclassified_process_steps=include_unclassified_process_steps,
         reason=(filters.reason or "").strip() or None,
+        reason_category_id=filters.reason_category_id,
         item_id=filters.item_id,
     )
 
@@ -186,11 +191,13 @@ def _matches_filters(
         return False
     if filters.item_id is not None and occurrence.item_id != filters.item_id:
         return False
+    if filters.reason_category_id is not None and occurrence.reason_category_id != filters.reason_category_id:
+        return False
     if filters.reason is not None:
         requested_reason = filters.reason
         if requested_reason.upper() == UNCLASSIFIED_FILTER_VALUE:
             requested_reason = UNCLASSIFIED_LABEL
-        if occurrence.reason != requested_reason:
+        if requested_reason not in {occurrence.reason, occurrence.reason_snapshot}:
             return False
     model_symbol = (occurrence.model_symbol or "").strip()
     if filters.model_symbols is not None or filters.include_unclassified_models:
@@ -234,6 +241,7 @@ def _occurrence_from_record(
         reason=(record.reason_category or UNCLASSIFIED_LABEL).strip() or UNCLASSIFIED_LABEL,
         quantity=abs(int(record.original_quantity)),
         is_disused=item.legacy_item_type == "불용",
+        reason_category_id=record.reason_category_id,
     )
 
 
@@ -293,6 +301,7 @@ def _load_quarantine_occurrences(
     filters: _ResolvedFilters,
 ) -> tuple[list[_Occurrence], list[datetime]]:
     """기간 내 격리 원장을 읽고 검증 가능한 legacy 발생만 복원한다."""
+    reason_names = dict(db.query(DefectReasonCategory.category_id, DefectReasonCategory.name).all())
 
     reconstructed_parent_ids = {
         parent_id
@@ -335,6 +344,7 @@ def _load_quarantine_occurrences(
         if record.record_id in reconstructed_parent_ids:
             continue
         occurrence = _occurrence_from_record(record, item)
+        occurrence = _with_current_reason_label(occurrence, reason_names)
         if not _matches_filters(occurrence, filters):
             continue
         if record.is_legacy and not (
@@ -365,7 +375,14 @@ def _occurrence_from_direct_log(
         reason=(log.reason_category or UNCLASSIFIED_LABEL).strip() or UNCLASSIFIED_LABEL,
         quantity=abs(int(log.quantity_change)),
         is_disused=item.legacy_item_type == "불용",
+        reason_category_id=log.reason_category_id,
     )
+
+
+def _with_current_reason_label(occurrence: _Occurrence, names: dict[uuid.UUID, str]) -> _Occurrence:
+    """마스터 표시명만 갱신하고 원장에 저장한 과거 문자열은 보존한다."""
+    label = names.get(occurrence.reason_category_id) if occurrence.reason_category_id else None
+    return replace(occurrence, reason=label, reason_snapshot=occurrence.reason) if label is not None else occurrence
 
 
 def _direct_log_dedupe_key(log: TransactionLog) -> tuple[str, ...]:
@@ -432,10 +449,11 @@ def _load_direct_occurrences(
         )
         .all()
     )
+    reason_names = dict(db.query(DefectReasonCategory.category_id, DefectReasonCategory.name).all())
     occurrences: list[_Occurrence] = []
     seen: set[tuple[str, ...]] = set()
     for log, operation, item in rows:
-        occurrence = _occurrence_from_direct_log(log, operation, item)
+        occurrence = _with_current_reason_label(_occurrence_from_direct_log(log, operation, item), reason_names)
         if not _matches_filters(occurrence, filters):
             continue
         dedupe_key = _direct_log_dedupe_key(log)
@@ -474,6 +492,7 @@ def _build_breakdowns(
     item_totals: dict[uuid.UUID, _Totals] = {}
     items_by_id: dict[uuid.UUID, _Occurrence] = {}
     reason_totals: dict[str, _Totals] = {}
+    reason_labels: dict[str, str] = {}
     department_totals: dict[str, _Totals] = {}
     for occurrence in occurrences:
         item_total = item_totals.setdefault(occurrence.item_id, _Totals())
@@ -481,7 +500,9 @@ def _build_breakdowns(
         item_total.quantity += occurrence.quantity
         items_by_id.setdefault(occurrence.item_id, occurrence)
 
-        reason_total = reason_totals.setdefault(occurrence.reason, _Totals())
+        reason_key = str(occurrence.reason_category_id) if occurrence.reason_category_id else occurrence.reason
+        reason_labels[reason_key] = occurrence.reason
+        reason_total = reason_totals.setdefault(reason_key, _Totals())
         reason_total.record_count += 1
         reason_total.quantity += occurrence.quantity
 
@@ -502,12 +523,12 @@ def _build_breakdowns(
     ]
     reasons = [
         DefectStatisticsBreakdownEntry(
-            key=label,
-            label=label,
+            key=key,
+            label=reason_labels[key],
             record_count=totals.record_count,
             quantity=totals.quantity,
         )
-        for label, totals in reason_totals.items()
+        for key, totals in reason_totals.items()
     ]
     departments = [
         DefectStatisticsBreakdownEntry(

@@ -29,6 +29,13 @@ from app.services import inventory_operations as operation_svc
 from app.services._tx import transactional
 from app.services.inv_transfer import department_for_item, lock_items_for_department_routing
 
+SUBMISSION_NAMESPACE = uuid.UUID("2242e165-5e07-5fd4-a138-47a031a7e46b")
+
+
+def new_submission_id(client_request_id: Optional[str] = None) -> uuid.UUID:
+    """구형 격리 재시도는 같은 제출 ID를 만들고 새 작업은 독립 ID를 만든다."""
+    return uuid.uuid5(SUBMISSION_NAMESPACE, client_request_id) if client_request_id else uuid.uuid4()
+
 
 @dataclass(frozen=True)
 class BulkUnquarantineLine:
@@ -53,6 +60,8 @@ class BulkQuarantineLine:
     reason_memo: Optional[str]
     client_request_id: Optional[str]
     management_category: str
+    reason_category_id: Optional[uuid.UUID] = None
+    submission_id: Optional[uuid.UUID] = None
 
 
 def quarantine_inventory(
@@ -68,9 +77,12 @@ def quarantine_inventory(
     reason_memo: Optional[str],
     client_request_id: Optional[str],
     management_category: str = "DEFECT",
+    reason_category_id: Optional[uuid.UUID] = None,
+    submission_id: Optional[uuid.UUID] = None,
 ) -> Inventory:
     """재고 격리와 원장 기록을 하나의 업무 트랜잭션으로 확정한다."""
     with transactional(db):
+        submission_id = submission_id or new_submission_id(client_request_id)
         item = lock_items_for_department_routing(db, [item_id]).get(item_id)
         if item is None:
             raise ValueError(f"품목을 찾을 수 없습니다: {item_id}")
@@ -130,6 +142,7 @@ def quarantine_inventory(
             actor_employee_id=actor.employee_id,
             actor_name=actor.name,
             reason_category=reason_category,
+            reason_category_id=reason_category_id,
             memo=reason_memo,
             management_category=management_category,
         )
@@ -145,6 +158,8 @@ def quarantine_inventory(
                 producer_employee_id=actor.employee_id,
                 notes=f"격리: {source} → {target_dept.value}",
                 reason_category=reason_category,
+                reason_category_id=reason_category_id,
+                submission_id=submission_id,
                 reason_memo=reason_memo or None,
                 client_request_id=client_request_id,
                 department=target_dept.value,
@@ -184,6 +199,7 @@ def quarantine_inventory_bulk(
         raise ValueError("같은 품목을 한 요청에 중복해 격리할 수 없습니다.")
 
     inventories: list[Inventory] = []
+    submission_id = uuid.uuid4()
     with transactional(db):
         for line in sorted(lines, key=lambda current: str(current.item_id)):
             inventories.append(
@@ -196,6 +212,8 @@ def quarantine_inventory_bulk(
                     source_dept=line.source_department,
                     actor=actor,
                     reason_category=line.reason_category,
+                    reason_category_id=line.reason_category_id,
+                    submission_id=line.submission_id or submission_id,
                     reason_memo=line.reason_memo,
                     client_request_id=line.client_request_id,
                     management_category=line.management_category,
@@ -214,8 +232,11 @@ def unquarantine_inventory(
     actor: Employee,
     reason_category: Optional[str],
     reason_memo: Optional[str],
+    reason_category_id: Optional[uuid.UUID] = None,
+    submission_id: Optional[uuid.UUID] = None,
 ) -> Inventory:
     """정상 복귀와 원장 기록을 하나의 업무 트랜잭션으로 확정한다."""
+    submission_id = submission_id or uuid.uuid4()
     with transactional(db):
         record = defect_records_svc.get_record_for_action(
             db,
@@ -266,6 +287,8 @@ def unquarantine_inventory(
                 producer_employee_id=actor.employee_id,
                 notes=f"정상 복귀: {dept.value}",
                 reason_category=reason_category,
+                reason_category_id=reason_category_id,
+                submission_id=submission_id,
                 reason_memo=reason_memo or None,
                 department=dept.value,
                 defect_quarantine_record_id=(record.record_id if record else None),
@@ -298,8 +321,11 @@ def unquarantine_inventory_bulk(
     actor: Employee,
     reason_category: Optional[str],
     reason_memo: Optional[str],
+    reason_category_id: Optional[uuid.UUID] = None,
+    submission_id: Optional[uuid.UUID] = None,
 ) -> None:
     """선택 기록을 모두 검증한 뒤 기존 단건 복귀 계약을 원자적으로 반복한다."""
+    submission_id = submission_id or uuid.uuid4()
     if not lines:
         raise ValueError("정상 복귀할 격리 기록이 비어 있습니다.")
 
@@ -342,5 +368,7 @@ def unquarantine_inventory_bulk(
                 dept=line.department,
                 actor=actor,
                 reason_category=reason_category,
+                reason_category_id=reason_category_id,
+                submission_id=submission_id,
                 reason_memo=reason_memo,
             )

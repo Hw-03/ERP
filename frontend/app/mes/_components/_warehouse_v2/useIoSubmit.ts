@@ -28,6 +28,8 @@ export function useIoSubmit() {
     toDepartment?: string | null;
     referenceNo?: string | null;
     notes?: string | null;
+    reasonCategoryId?: string | null;
+    reasonCategory?: string | null;
     supplierId?: string | null;
     bundles: IoBundle[];
   }) {
@@ -44,6 +46,10 @@ export function useIoSubmit() {
         to_department: payload.toDepartment || null,
         reference_no: payload.referenceNo || null,
         notes: payload.notes || null,
+        ...(payload.subType === "defect_quarantine" ? {
+          reason_category_id: payload.reasonCategoryId ?? null,
+          reason_category: payload.reasonCategory?.trim() || null,
+        } : {}),
         supplier_id: payload.supplierId ?? null,
         client_request_id: clientRequestIdRef.current,
         bundles: payload.bundles,

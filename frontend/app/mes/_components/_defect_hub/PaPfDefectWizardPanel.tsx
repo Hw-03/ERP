@@ -9,6 +9,7 @@ import type { DefectLocation } from "@/lib/api/types/defects";
 import type { Department } from "@/lib/api/types/shared";
 import { DisassembleTree, toServerDecision, validateDecisionTree, type ChildDecision } from "./DisassembleTree";
 import { ReasonFormFields } from "./ReasonFormFields";
+import { hasDefectReason } from "./defectCartValidation";
 import { InlineErrorNote } from "./InlineErrorNote";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { QuantityInput } from "../common/QuantityInput";
@@ -37,6 +38,7 @@ export function PaPfDefectWizardPanel({
   const [decisions, setDecisions] = useState<ChildDecision[]>([]);
   const [processQty, setProcessQty] = useState<number>(Number(location.available_quantity));
   const [category, setCategory] = useState("");
+  const [categoryId, setCategoryId] = useState<string | null>(null);
   const [memo, setMemo] = useState("");
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -48,6 +50,7 @@ export function PaPfDefectWizardPanel({
     setDecisions([]);
     setProcessQty(Number(location.available_quantity));
     setCategory("");
+    setCategoryId(null);
     setMemo("");
     setErrorMsg(null);
     setBusy(false);
@@ -60,7 +63,7 @@ export function PaPfDefectWizardPanel({
   }, [action]);
 
   const canSubmit =
-    category.trim() !== "" &&
+    hasDefectReason(category, memo) &&
     !busy &&
     (action !== "disassemble" || (decisions.length > 0 && validateDecisionTree(decisions)));
 
@@ -82,6 +85,7 @@ export function PaPfDefectWizardPanel({
           qty: processQty,
           dept: location.department,
           reason_category: category,
+          reason_category_id: categoryId,
           reason_memo: memo,
           actor_employee_id: currentEmployee.employee_id,
         });
@@ -90,6 +94,7 @@ export function PaPfDefectWizardPanel({
           requester_employee_id: currentEmployee.employee_id,
           request_type: "defect_scrap",
           reason_category: category,
+          reason_category_id: categoryId,
           reason_memo: memo || null,
           notes: memo || null,
           lines: [
@@ -110,6 +115,7 @@ export function PaPfDefectWizardPanel({
           requester_employee_id: currentEmployee.employee_id,
           request_type: "defect_disassemble",
           reason_category: category,
+          reason_category_id: categoryId,
           reason_memo: memo || null,
           notes: JSON.stringify({ child_decisions: childDecisions }),
           lines: [
@@ -236,9 +242,11 @@ export function PaPfDefectWizardPanel({
             사유 (본인)
           </div>
           <ReasonFormFields
+            employeeId={currentEmployee.employee_id}
+            categoryId={categoryId}
             category={category}
             memo={memo}
-            onCategoryChange={setCategory}
+            onCategoryChange={(name, id) => { setCategory(name); setCategoryId(id ?? null); }}
             onMemoChange={setMemo}
             required
           />

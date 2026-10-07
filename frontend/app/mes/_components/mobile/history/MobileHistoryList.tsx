@@ -53,6 +53,8 @@ export function MobileHistoryList({
   selectedKey,
   onSelectLog,
   onSelectBatch,
+  onSelectSubmission,
+  onSelectReadOnlyLog,
   onRetry,
   onRetryRefresh,
   canLoadMore,
@@ -73,6 +75,8 @@ export function MobileHistoryList({
   selectedKey: string | null;
   onSelectLog: (log: TransactionLog) => void;
   onSelectBatch: (batchId: string, logs: TransactionLog[]) => void;
+  onSelectSubmission?: (group: Extract<LogGroup, { type: "submission" }>) => void;
+  onSelectReadOnlyLog?: (log: TransactionLog) => void;
   onRetry: () => void;
   onRetryRefresh?: () => void;
   canLoadMore: boolean;
@@ -135,21 +139,22 @@ export function MobileHistoryList({
 
       {metadata.failed && <ReadFailure message="작업 정보를 불러오지 못했습니다." onRetry={metadata.retry} refresh />}
       <div className={dataRevealClassName}>{groups.map((g) => {
-        const summary = getHistoryGroupSummary(g, g.type === "op_batch" ? batchCache.get(g.batchId) : undefined);
+        const summary = getHistoryGroupSummary(g, g.type === "op_batch" ? batchCache.get(g.batchId) : undefined, batchCache);
         const single = g.type === "solo";
         const logs = g.type === "solo" ? [g.log] : g.type === "defect_lifecycle" ? [g.parent, g.child] : g.logs;
-        const cancelled = logs.some((log) => log.cancelled);
+        const cancelled = g.type === "submission" ? logs.every((log) => log.cancelled) : logs.some((log) => log.cancelled);
         const cancellation = summary.primaryLog.operation_kind === "CANCELLATION";
-        const key = g.type === "solo" ? g.log.log_id : g.type === "defect_lifecycle" ? g.key
+        const key = g.type === "solo" ? g.log.log_id : g.type === "defect_lifecycle" || g.type === "submission" ? g.key
           : g.type === "operation" ? g.operationId : g.type === "op_batch" ? g.batchId : g.refKey;
         const active = single
           ? selectedKey === `log:${summary.primaryLog.log_id}`
-          : selectedKey === `batch:${key}`;
+          : selectedKey === `${g.type === "submission" ? "submission" : "batch"}:${key}`;
         return (
           <button
             key={key}
             type="button"
-            onClick={() => single ? onSelectLog(summary.primaryLog) : onSelectBatch(key,
+            onClick={() => g.type === "submission" ? onSelectSubmission?.(g) : single ?
+              g.allowCancellation === false ? onSelectReadOnlyLog?.(summary.primaryLog) : onSelectLog(summary.primaryLog) : onSelectBatch(key,
               g.type === "operation" ? [summary.primaryLog, ...logs.filter((log) => log.log_id !== summary.primaryLog.log_id)] : logs,
             )}
             aria-pressed={active}
@@ -166,7 +171,7 @@ export function MobileHistoryList({
               <span className={`line-clamp-2 min-w-0 whitespace-normal break-keep [overflow-wrap:anywhere] text-[15px] font-bold leading-5 ${styles.affected}`} style={{ color: LEGACY_COLORS.text }}>
                 {summary.title}
                 {summary.additionalItemCount > 0 && (
-                  <span style={{ color: LEGACY_COLORS.muted2 }}> 외 {summary.additionalItemCount}건</span>
+                  <span style={{ color: LEGACY_COLORS.muted2 }}> 외 {summary.additionalItemCount}{g.type === "submission" ? "품목" : "건"}</span>
                 )}
               </span>
               {cancelled && <span className={styles.cancelledLabel}>취소됨</span>}

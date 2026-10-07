@@ -98,6 +98,20 @@ beforeEach(() => {
 });
 
 describe("MobileIoComposeWizard Step 5 헤더", () => {
+  it("모바일 불량격리의 최종 사유 ID·이름을 draft에 저장한 뒤 제출한다", async () => {
+    const reasonState = wizardState as typeof wizardState & { reasonCategory?: string; reasonCategoryId?: string };
+    const previous = { workType: wizardState.workType, subType: wizardState.subType, bundles: wizardState.bundles, notes: wizardState.notes };
+    Object.assign(reasonState, { workType: "defect", subType: "defect_quarantine", reasonCategory: "가공 이상", reasonCategoryId: "category-updated", notes: "편집 메모",
+      bundles: [{ bundle_id: "mobile-defect", source_kind: "manual", title: "불량 품목", quantity: 1, source_item_id: "item", source_mes_code: null, expanded_level: 1,
+        lines: [{ line_id: "line", item_id: "item", item_name: "불량 품목", quantity: 1, included: true, direction: "defective", from_bucket: "production", to_bucket: "defective", shortage: 0 }] }] });
+    try {
+      render(<MobileIoComposeWizard globalSearch="" operator={{ employee_id: "mobile-employee", name: "작업자", department: "조립", warehouse_role: "none" }} items={[]}
+        setItems={vi.fn()} onStatusChange={vi.fn()} restoreDraft={{ batch_id: "mobile-defect-draft" } as never} />);
+      fireEvent.click(screen.getByRole("button", { name: "모바일 제출" }));
+      await waitFor(() => expect(api.submitDraft).toHaveBeenCalledWith("mobile-defect-draft", "mobile-employee"));
+      expect(saveDraft).toHaveBeenCalledWith(expect.objectContaining({ reasonCategoryId: "category-updated", reasonCategory: "가공 이상", notes: "편집 메모", batchId: "mobile-defect-draft" }));
+    } finally { Object.assign(reasonState, previous); delete reasonState.reasonCategory; delete reasonState.reasonCategoryId; }
+  });
   it("작업 유형 선택 단계에서는 진행 헤더 없이 유형 목록을 표시한다", () => {
     const originalStep = wizardState.step;
     wizardState.step = 1;

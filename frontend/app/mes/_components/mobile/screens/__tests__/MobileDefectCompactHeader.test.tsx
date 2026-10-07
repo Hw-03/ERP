@@ -80,8 +80,8 @@ vi.mock("../../../_defect_hub/DefectItemPicker", () => ({
 }));
 
 vi.mock("../../../_defect_hub/ReasonFormFields", () => ({
-  ReasonFormFields: ({ memo, onCategoryChange, onMemoChange }: { memo: string; onCategoryChange: (category: string) => void; onMemoChange: (memo: string) => void }) => (
-    <><button type="button" onClick={() => onCategoryChange("기타")}>사유 선택</button><textarea aria-label="품목 메모" value={memo} onChange={(event) => onMemoChange(event.target.value)} /></>
+  ReasonFormFields: ({ memo, onCategoryChange, onMemoChange }: { memo: string; onCategoryChange: (category: string, id?: string) => void; onMemoChange: (memo: string) => void }) => (
+    <><button type="button" onClick={() => onCategoryChange("외관 불량", "surface-id")}>사유 선택</button><textarea aria-label="품목 메모" value={memo} onChange={(event) => onMemoChange(event.target.value)} /></>
   ),
 }));
 
@@ -210,6 +210,9 @@ describe("mobile defect compact headers", () => {
     await screen.findByText("실패: 재시도 필요");
     expect(screen.getByRole("spinbutton")).toHaveValue(4);
     const failedRequest = vi.mocked(stockRequestsApi.createStockRequest).mock.calls[1][0];
+    expect(failedRequest.reason_category_id).toBe("surface-id");
+    expect(failedRequest.submission_id).toBe(vi.mocked(stockRequestsApi.createStockRequest).mock.calls[0][0].submission_id);
+    expect(failedRequest.submission_id).toMatch(/^[0-9a-f-]{36}$/);
     fireEvent.click(screen.getByRole("button", { name: /즉시 폐기 \(1건\)/ }));
     fireEvent.click(screen.getByRole("button", { name: "즉시 폐기", exact: true }));
     await waitFor(() => expect(stockRequestsApi.createStockRequest).toHaveBeenCalledTimes(3));
@@ -456,6 +459,7 @@ describe("mobile defect compact headers", () => {
     );
 
     fireEvent.click(container.querySelectorAll("button")[6]);
+    fireEvent.click(screen.getByRole("button", { name: "사유 선택" }));
     fireEvent.click(Array.from(container.querySelectorAll("button")).at(-1)!);
 
     expect(screen.getByText("Step 2 / 2")).toBeInTheDocument();
@@ -498,7 +502,7 @@ describe("mobile defect compact headers", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /수량 조정 \(1건\)/ }));
     expect(screen.getByRole("button", { name: /격리하기 \(1건\)/ })).toBeDisabled();
-    expect(screen.getByText("사유 카테고리 또는 메모 중 하나를 입력하세요.")).toBeInTheDocument();
+    expect(screen.getByText("사유 카테고리를 선택하세요.")).toBeInTheDocument();
   });
 
   it("[8.10-05] 모바일 복수 품목 오류를 모두 표시하고 확인창과 API를 차단한다", () => {
@@ -554,6 +558,7 @@ describe("mobile defect compact headers", () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole("button", { name: "사유 선택" }));
     fireEvent.click(Array.from(container.querySelectorAll("button")).at(-1)!);
 
     expect(defectsApi.unquarantine).not.toHaveBeenCalled();
@@ -576,6 +581,7 @@ describe("mobile defect compact headers", () => {
     );
 
     fireEvent.click(container.querySelectorAll("button")[6]);
+    fireEvent.click(screen.getByRole("button", { name: "사유 선택" }));
     fireEvent.click(Array.from(container.querySelectorAll("button")).at(-1)!);
     fireEvent.click(screen.getByRole("button", { name: "set tree decision" }));
     fireEvent.click(Array.from(container.querySelectorAll("button")).at(-1)!);

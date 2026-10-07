@@ -1,6 +1,23 @@
 import type { TransactionLog } from "@/lib/api";
 import type { IoBatch } from "@/lib/api/types/io";
 import type { HistorySelection } from "./historyConstants";
+import type { LogGroup } from "./historyTableHelpers";
+import type { TransactionDisplayGroup } from "@/lib/api/production";
+
+/** 원본 flat 목록과 작업별 상세에 같은 갱신을 적용한다. */
+export function updateHistoryDisplayGroupLogs(group: TransactionDisplayGroup, update: (logs: TransactionLog[]) => TransactionLog[]): TransactionDisplayGroup {
+  return { ...group, logs: update(group.logs), workGroups: group.workGroups?.map((work) => updateHistoryDisplayGroupLogs(work, update)) };
+}
+
+function updateWorkGroupLogs(group: LogGroup, update: (logs: TransactionLog[]) => TransactionLog[]): LogGroup {
+  if (group.type === "solo") return { ...group, log: update([group.log])[0] };
+  if (group.type === "defect_lifecycle") {
+    const [parent, child] = update([group.parent, group.child]);
+    return { ...group, parent, child };
+  }
+  if (group.type === "submission") return { ...group, logs: update(group.logs), workGroups: group.workGroups.map((work) => updateWorkGroupLogs(work, update)) };
+  return { ...group, logs: update(group.logs) };
+}
 
 export type HistoryCancelScope = "single" | "batch";
 
@@ -126,7 +143,9 @@ export function applyHistoryCancellation(
       : log;
 
   let selection = state.selection;
-  if (selection?.kind === "log" && matchesCancellation(selection.log, target)) {
+  if (selection?.kind === "submission") {
+    selection = { ...selection, group: updateWorkGroupLogs(selection.group, (logs) => logs.map(patchLog)) as typeof selection.group };
+  } else if (selection?.kind === "log" && matchesCancellation(selection.log, target)) {
     selection = { ...selection, log: patchLog(selection.log) };
   } else if (
     selection?.kind === "batch"
@@ -139,7 +158,7 @@ export function applyHistoryCancellation(
   }
 
   let batchCache = state.batchCache;
-  const cancelledBatchId = target.kind === "operation_batch" ? target.batchId : updated.operation_batch_id;
+  const cancelledBatchId = target.kind === "operation_batch" ? target.batchId : null;
   if (cancelledBatchId) {
     const cached = state.batchCache.get(cancelledBatchId);
     if (cached) {
@@ -164,6 +183,11 @@ export function reconcileHistorySelection(
   logs: TransactionLog[],
 ): HistorySelection | null {
   if (!selection) return null;
+  if (selection.kind === "submission") {
+    const fresh = new Map(logs.map((log) => [log.log_id, log]));
+    if (!selection.group.logs.some((log) => fresh.has(log.log_id))) return null;
+    return { ...selection, group: updateWorkGroupLogs(selection.group, (originals) => originals.map((log) => fresh.get(log.log_id) ?? log)) as typeof selection.group };
+  }
   if (selection.kind === "log") {
     const fresh = logs.find((log) => log.log_id === selection.log.log_id);
     return fresh ? { ...selection, log: fresh } : null;

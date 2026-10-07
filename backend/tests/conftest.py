@@ -86,6 +86,8 @@ def _worker_db_engine() -> Generator[Engine, None, None]:
     from app.models import ProcessType
 
     with Session(engine) as seed_session:
+        from app.services.defect_reason_categories import seed_default_reason_categories
+        seed_default_reason_categories(seed_session)
         for code, prefix, suffix, order in _PROCESS_TYPE_SEED:
             seed_session.add(
                 ProcessType(code=code, prefix=prefix, suffix=suffix, stage_order=order)

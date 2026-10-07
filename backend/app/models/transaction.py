@@ -74,11 +74,17 @@ class TransactionLog(Base):
         index=True,
     )
     notes = Column(Text, nullable=True)
-    # 불량 처리 흐름 — 사유 카테고리(외관/치수/기능/검사통과/기타) + 자유 메모.
-    # 카테고리 enum 은 프론트 상수로만 정의, 백엔드는 자유 문자열로 받음.
-    reason_category = Column(String(32), nullable=True, index=True)
+    # 표시 문자열은 처리 시점의 스냅샷으로 보존한다.
+    reason_category = Column(String(32).with_variant(Text, "postgresql"), nullable=True, index=True)
+    reason_category_id = Column(
+        UUIDString,
+        ForeignKey("defect_reason_categories.category_id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
     reason_memo = Column(Text, nullable=True)
     client_request_id = Column(String(36), nullable=True, unique=True)
+    submission_id = Column(UUIDString, nullable=True, index=True)
     operation_batch_id = Column(
         UUIDString,
         ForeignKey("io_batches.batch_id", ondelete="SET NULL"),

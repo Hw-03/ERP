@@ -25,6 +25,7 @@ interface Props {
 
 const PERIOD_LABELS: Record<DefectStatisticsPeriodKind, string> = { week: "주간", month: "월간", year: "연간" };
 const PROCESS_LABELS: Record<DefectProcessStep, string> = { R: "원자재", A: "중간공정", F: "공정완료", UNCLASSIFIED: "미분류", DISUSED: "불용" };
+const REASON_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function todayInKst(): string {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
@@ -158,6 +159,7 @@ export function DefectStatisticsView({ departmentOptions, modelOptions, currentD
   const [selectedModels, setSelectedModels] = useStatisticsQueryState<string[]>("defect-statistics-models", [], mobilePresentation);
   const [selectedProcessSteps, setSelectedProcessSteps] = useStatisticsQueryState<DefectProcessStep[]>("defect-statistics-processes", [], mobilePresentation);
   const [reason, setReason] = useStatisticsQueryState<string | undefined>("defect-statistics-reason", undefined, mobilePresentation);
+  const [savedReasonLabel, setReasonLabel] = useStatisticsQueryState<string | undefined>("defect-statistics-reason-label", undefined, mobilePresentation);
   const [itemId, setItemId] = useStatisticsQueryState<string | undefined>("defect-statistics-item", undefined, mobilePresentation);
   const [itemLabel, setItemLabel] = useStatisticsQueryState<string | undefined>("defect-statistics-item-label", undefined, mobilePresentation);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -170,6 +172,7 @@ export function DefectStatisticsView({ departmentOptions, modelOptions, currentD
   const queryAnchor = periodIdentity(anchor, period) > periodIdentity(today, period) ? today : anchor;
   const key = JSON.stringify([period, queryAnchor, selectedDepartments, selectedModels, selectedProcessSteps, reason, itemId, retryNonce]);
   const result = stored?.key === key ? stored.value : null;
+  const reasonLabel = result?.reasons.find((entry) => entry.key === reason)?.label ?? savedReasonLabel ?? reason;
   const error = errorState?.key === key ? errorState.message : null;
   const nextDisabled = periodIdentity(shiftStatisticsAnchor(queryAnchor, period, 1), period) > periodIdentity(today, period);
   const categoryCount = selectedDepartments.length + selectedModels.length + selectedProcessSteps.length;
@@ -186,7 +189,9 @@ export function DefectStatisticsView({ departmentOptions, modelOptions, currentD
 
   useEffect(() => {
     let active = true;
-    void defectsApi.getStatisticsReport({ period, anchor: queryAnchor, departments: selectedDepartments, models: selectedModels, process_steps: selectedProcessSteps, reason, item_id: itemId }).then((value) => {
+    void defectsApi.getStatisticsReport({ period, anchor: queryAnchor, departments: selectedDepartments, models: selectedModels, process_steps: selectedProcessSteps,
+      reason: reason && REASON_ID_PATTERN.test(reason) ? undefined : reason,
+      reason_category_id: reason && REASON_ID_PATTERN.test(reason) ? reason : undefined, item_id: itemId }).then((value) => {
       if (!active) return;
       setErrorState(null);
       setStored({ key, value });
@@ -197,9 +202,13 @@ export function DefectStatisticsView({ departmentOptions, modelOptions, currentD
     return () => { active = false; };
   }, [key, period, queryAnchor, selectedDepartments, selectedModels, selectedProcessSteps, reason, itemId]);
 
-  function resetFilters(): void { setSelectedDepartments([]); setSelectedModels([]); setSelectedProcessSteps([]); setReason(undefined); setItemId(undefined); setItemLabel(undefined); }
+  function resetFilters(): void { setSelectedDepartments([]); setSelectedModels([]); setSelectedProcessSteps([]); setReason(undefined); setReasonLabel(undefined); setItemId(undefined); setItemLabel(undefined); }
   function refresh(): void { setRetryNonce((value) => value + 1); }
-  function selectReason(value: string): void { setReason((current) => current === value ? undefined : value); }
+  function selectReason(value: string): void {
+    const selected = reason === value ? undefined : value;
+    setReason(selected);
+    setReasonLabel(selected ? result?.reasons.find((entry) => entry.key === selected)?.label : undefined);
+  }
   function selectDepartment(value: string): void { setSelectedDepartments((current) => current.length === 1 && current[0] === value ? [] : [value]); }
   function selectItem(value: string): void {
     const selected = itemId === value ? undefined : value;
@@ -233,7 +242,7 @@ export function DefectStatisticsView({ departmentOptions, modelOptions, currentD
       {selectedDepartments.map((value) => <button key={value} type="button" onClick={() => setSelectedDepartments((current) => current.filter((entry) => entry !== value))} className="min-h-11 rounded-full px-3 text-xs font-bold focus-visible:ring-2" style={{ background: tint(LEGACY_COLORS.green, 12), color: LEGACY_COLORS.green }}>부서 {value} ×</button>)}
       {selectedModels.map((value) => <button key={value} type="button" onClick={() => setSelectedModels((current) => current.filter((entry) => entry !== value))} className="min-h-11 rounded-full px-3 text-xs font-bold focus-visible:ring-2" style={{ background: tint(LEGACY_COLORS.cyan, 12), color: LEGACY_COLORS.cyan }}>모델 {value} ×</button>)}
       {selectedProcessSteps.map((value) => <button key={value} type="button" onClick={() => setSelectedProcessSteps((current) => current.filter((entry) => entry !== value))} className="min-h-11 rounded-full px-3 text-xs font-bold focus-visible:ring-2" style={{ background: tint(LEGACY_COLORS.yellow, 12), color: LEGACY_COLORS.yellow }}>공정 {PROCESS_LABELS[value]} ×</button>)}
-      {reason && <button type="button" onClick={() => setReason(undefined)} className="min-h-11 rounded-full px-3 text-xs font-bold focus-visible:ring-2" style={{ background: tint(LEGACY_COLORS.blue, 12), color: LEGACY_COLORS.blue }}>사유 {reason} ×</button>}
+      {reason && <button type="button" onClick={() => { setReason(undefined); setReasonLabel(undefined); }} className="min-h-11 rounded-full px-3 text-xs font-bold focus-visible:ring-2" style={{ background: tint(LEGACY_COLORS.blue, 12), color: LEGACY_COLORS.blue }}>사유 {reasonLabel} ×</button>}
       {itemId && <button type="button" aria-label={`선택 품목 ${itemLabel ?? itemId} 해제`} onClick={() => { setItemId(undefined); setItemLabel(undefined); }} className="min-h-11 rounded-full px-3 text-xs font-bold focus-visible:ring-2" style={{ background: tint(LEGACY_COLORS.blue, 12), color: LEGACY_COLORS.blue }}>품목 {itemLabel ?? itemId} ×</button>}
       {(categoryCount > 0 || reason || itemId) && <button type="button" onClick={resetFilters} className="standard-hover min-h-11 rounded-[10px] px-2 text-sm font-bold focus-visible:ring-2" style={{ color: LEGACY_COLORS.blue }}>전체 초기화</button>}
       {result && !error && !futureResult && <p className="min-w-0 basis-full break-words text-sm font-medium lg:ml-auto lg:basis-auto lg:flex-1 lg:text-right" style={{ color: LEGACY_COLORS.muted2 }}>{result.is_partial ? "현재까지" : "선택 기간"} 불량 {formatQty(result.summary.quantity)}개({result.summary.record_count}건). 최다 등록 사유는 {topReasons.length ? `${topReasons.map((entry) => entry.label).join(" · ")}(${topReasons.length > 1 ? "각 " : ""}${formatQty(topReasonQty)}개, 전체 ${share(topReasonQty, result.summary.quantity)})` : "없습니다"}. {comparison ? comparison.quantity_delta === 0 ? "이전 비교 기간과 수량이 같습니다." : `이전 비교 기간보다 ${formatQty(Math.abs(comparison.quantity_delta))}개 ${comparison.quantity_delta > 0 ? "많습니다" : "적습니다"}.` : "비교할 이전 기간이 없습니다."}</p>}

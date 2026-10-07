@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { AddQuarantineModal } from "../AddQuarantineModal";
 import type { Item } from "@/lib/api/types";
+vi.mock("../ReasonFormFields", async () => ({ ReasonFormFields: (await import("./reasonFormFieldsStub")).ReasonFormFieldsStub }));
 
 // AddQuarantineModal 이 useMyItemOrderQuery(React Query)를 쓴다 → QueryClient 주입.
 function render(ui: ReactElement) {
@@ -75,8 +76,7 @@ function selectReasonCategory(label: string) {
     el.textContent?.includes("카테고리 선택") || el.textContent?.includes(label),
   );
   expect(categoryCombobox).toBeTruthy();
-  fireEvent.click(categoryCombobox as HTMLElement);
-  fireEvent.mouseDown(screen.getByRole("option", { name: label }));
+  fireEvent.change(categoryCombobox as HTMLElement, { target: { value: label } });
 }
 
 beforeEach(() => {
@@ -166,6 +166,7 @@ describe("AddQuarantineModal", () => {
           source_dept: undefined,
           target_dept: "조립",
           reason_category: "기능 불량",
+          reason_category_id: "reason-기능 불량",
           actor_employee_id: "emp-001",
         }),
       );
@@ -211,6 +212,7 @@ describe("AddQuarantineModal", () => {
     fireEvent.click(await screen.findByText("전극(70kV)"));
 
     selectReasonCategory("기타");
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "기타 상세 사유" } });
     fireEvent.change(screen.getByPlaceholderText("예: 3"), { target: { value: "1" } });
 
     fireEvent.click(screen.getByText(/격리하기/));

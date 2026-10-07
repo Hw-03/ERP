@@ -54,6 +54,8 @@ from app.schemas.defect_statistics import (
     DefectStatisticsReportResponse,
 )
 from app.services.defect_statistics import get_defect_statistics, get_defect_statistics_report
+from app.services.defect_reason_categories import resolve_reason_category
+from app.models.defect_reason_category import normalize_defect_reason_name
 
 router = APIRouter()
 
@@ -75,6 +77,7 @@ class DefectLocationItem(BaseModel):
     available_quantity: Decimal
     defective_at: Optional[datetime]
     reason_category: Optional[str]
+    reason_category_id: Optional[uuid.UUID] = None
     reason_memo: Optional[str]
     quarantined_by: Optional[str]
     quarantined_by_employee_id: Optional[uuid.UUID]
@@ -91,12 +94,14 @@ class DefectKpi(BaseModel):
 
 
 class QuarantineRequest(BaseModel):
+    submission_id: Optional[uuid.UUID] = None
     item_id: uuid.UUID
     qty: Decimal
     source: str                          # "warehouse" | "production"
     source_dept: Optional[str] = None
     target_dept: str
     reason_category: Optional[str] = None
+    reason_category_id: Optional[uuid.UUID] = None
     reason_memo: Optional[str] = None
     management_category: Literal["DEFECT", "B_GRADE", "OBSOLETE"] = "DEFECT"
     actor_employee_id: uuid.UUID
@@ -110,11 +115,13 @@ class BulkQuarantineLine(BaseModel):
     source_dept: Optional[str] = None
     target_dept: str
     reason_category: Optional[str] = None
+    reason_category_id: Optional[uuid.UUID] = None
     reason_memo: Optional[str] = None
     management_category: Literal["DEFECT", "B_GRADE", "OBSOLETE"] = "DEFECT"
 
 
 class BulkQuarantineRequest(BaseModel):
+    submission_id: Optional[uuid.UUID] = None
     actor_employee_id: uuid.UUID
     client_request_id: Optional[str] = Field(None, max_length=48)
     lines: List[BulkQuarantineLine] = Field(..., min_length=1, max_length=100)
@@ -127,11 +134,13 @@ class BulkQuarantineResult(BaseModel):
 
 
 class UnquarantineRequest(BaseModel):
+    submission_id: Optional[uuid.UUID] = None
     record_id: Optional[uuid.UUID] = None
     item_id: uuid.UUID
     qty: Decimal
     dept: str
     reason_category: Optional[str] = None
+    reason_category_id: Optional[uuid.UUID] = None
     reason_memo: Optional[str] = None
     actor_employee_id: uuid.UUID
 
@@ -150,8 +159,10 @@ class BulkUnquarantineLine(BaseModel):
 
 
 class BulkUnquarantineRequest(BaseModel):
+    submission_id: Optional[uuid.UUID] = None
     actor_employee_id: uuid.UUID
     reason_category: Optional[str] = None
+    reason_category_id: Optional[uuid.UUID] = None
     reason_memo: Optional[str] = None
     lines: List[BulkUnquarantineLine] = Field(..., min_length=1)
 
@@ -275,8 +286,9 @@ def _matches_quarantine_request(
         or log.item_id != payload.item_id
         or log.department != payload.target_dept
         or log.producer_employee_id != payload.actor_employee_id
-        or log.reason_category != payload.reason_category
-        or (log.reason_memo or "") != (payload.reason_memo or "")
+        or (log.reason_category_id != payload.reason_category_id if payload.reason_category_id is not None and log.reason_category_id is not None else normalize_defect_reason_name(log.reason_category or "") != normalize_defect_reason_name(payload.reason_category or ""))
+        or (log.reason_memo or "").strip() != (payload.reason_memo or "").strip()
+        or (payload.submission_id is not None and log.submission_id is not None and log.submission_id != payload.submission_id)
         or current_category != payload.management_category
     ):
         return False
@@ -313,15 +325,24 @@ def _find_client_request_log(db: Session, client_request_id: str) -> Optional[Tr
     )
 
 
-def _has_quarantine_reason(reason_category: Optional[str], reason_memo: Optional[str]) -> bool:
-    return bool((reason_category or "").strip() or (reason_memo or "").strip())
+def _resolve_request_reason(db: Session, payload: BaseModel) -> None:
+    """새 불량 작업의 활성 카테고리를 확인하고 표시명 스냅샷을 채운다."""
+    try:
+        payload.reason_category_id, payload.reason_category, payload.reason_memo = resolve_reason_category(
+            db, reason_category_id=payload.reason_category_id, reason_category=payload.reason_category,
+            reason_memo=payload.reason_memo,
+        )
+    except ValueError as exc:
+        raise http_error(422, ErrorCode.VALIDATION_ERROR, str(exc))
 
 
 def _bulk_quarantine_payloads(payload: BulkQuarantineRequest) -> list[QuarantineRequest]:
+    submission_id = payload.submission_id or _new_submission_id(payload.client_request_id)
     return [
         QuarantineRequest(
             **line.model_dump(),
             actor_employee_id=payload.actor_employee_id,
+            submission_id=submission_id,
             client_request_id=(
                 f"{payload.client_request_id}:{index}"
                 if payload.client_request_id
@@ -330,6 +351,11 @@ def _bulk_quarantine_payloads(payload: BulkQuarantineRequest) -> list[Quarantine
         )
         for index, line in enumerate(payload.lines)
     ]
+
+
+def _new_submission_id(client_request_id: str | None = None) -> uuid.UUID:
+    """구형 격리 재시도는 같은 제출 ID를 만들고 새 작업은 독립 ID를 만든다."""
+    return defect_actions_svc.new_submission_id(client_request_id)
 
 
 # ---------------------------------------------------------------------------
@@ -456,6 +482,7 @@ def list_defect_locations(
                 ),
                 defective_at=record.quarantined_at,
                 reason_category=record.reason_category,
+                reason_category_id=record.reason_category_id,
                 reason_memo=record.current_memo,
                 quarantined_by=record.quarantined_by_name,
                 quarantined_by_employee_id=record.quarantined_by_employee_id,
@@ -488,6 +515,7 @@ def list_defect_locations(
                 available_quantity=max(Decimal("0"), location.quantity - pending_quantity),
                 defective_at=location.defective_at,
                 reason_category=last_log.reason_category if last_log else None,
+                reason_category_id=last_log.reason_category_id if last_log else None,
                 reason_memo=last_log.reason_memo if last_log else None,
                 quarantined_by=last_log.produced_by if last_log else None,
                 quarantined_by_employee_id=(
@@ -540,6 +568,8 @@ def get_statistics(
     department: Optional[List[str]] = Query(None),
     model: Optional[List[str]] = Query(None),
     process_step: Optional[List[str]] = Query(None),
+    reason: str | None = Query(None),
+    reason_category_id: uuid.UUID | None = Query(None),
     db: Session = Depends(get_db),
 ):
     """KST 달력 기준 불량 발생 통계를 주간·월간·연간으로 반환한다."""
@@ -551,6 +581,8 @@ def get_statistics(
             departments=tuple(department or ()),
             models=tuple(model or ()),
             process_steps=tuple(process_step or ()),
+            reason=reason,
+            reason_category_id=reason_category_id,
         ),
     )
 
@@ -563,6 +595,7 @@ def get_statistics_report(
     model: Optional[List[str]] = Query(None),
     process_step: Optional[List[str]] = Query(None),
     reason: str | None = Query(None),
+    reason_category_id: uuid.UUID | None = Query(None),
     item_id: uuid.UUID | None = Query(None),
     db: Session = Depends(get_db),
 ) -> DefectStatisticsReportResponse:
@@ -577,6 +610,7 @@ def get_statistics_report(
             models=tuple(model or ()),
             process_steps=tuple(process_step or ()),
             reason=reason,
+            reason_category_id=reason_category_id,
             item_id=item_id,
         ),
     )
@@ -769,8 +803,7 @@ def update_management_category(
 @router.post("/quarantine", response_model=DefectActionResult)
 def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = Depends(get_db)):
     """격리 (즉시, 결재 없음). mark_defective 래퍼 + defective_at 채움."""
-    if not _has_quarantine_reason(payload.reason_category, payload.reason_memo):
-        raise http_error(422, ErrorCode.VALIDATION_ERROR, "사유 카테고리 또는 메모 중 하나를 입력하세요.")
+    payload.submission_id = payload.submission_id or _new_submission_id(payload.client_request_id)
     # 멱등성: 동일 키뿐 아니라 같은 격리 명령임이 확인될 때만 성공으로 재사용한다.
     if payload.client_request_id:
         existing = _find_client_request_log(db, payload.client_request_id)
@@ -779,6 +812,7 @@ def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = 
                 return DefectActionResult(item_id=payload.item_id, quantity=payload.qty, message="격리 완료")
             raise http_error(409, ErrorCode.CONFLICT, "이미 다른 요청에 사용된 요청 식별자입니다.")
 
+    _resolve_request_reason(db, payload)
     actor = db.query(Employee).filter(Employee.employee_id == payload.actor_employee_id).first()
     if actor is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
@@ -804,6 +838,8 @@ def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = 
             source_dept=source_dept,
             actor=actor,
             reason_category=payload.reason_category,
+            reason_category_id=payload.reason_category_id,
+            submission_id=payload.submission_id,
             reason_memo=payload.reason_memo,
             client_request_id=payload.client_request_id,
             management_category=payload.management_category,
@@ -843,8 +879,6 @@ def quarantine_bulk(
 ):
     """복수 격리를 한 트랜잭션으로 확정하며 같은 요청의 재시도를 멱등 처리한다."""
     line_payloads = _bulk_quarantine_payloads(payload)
-    if any(not _has_quarantine_reason(line.reason_category, line.reason_memo) for line in line_payloads):
-        raise http_error(422, ErrorCode.VALIDATION_ERROR, "모든 품목에 사유 카테고리 또는 메모 중 하나를 입력하세요.")
 
     actor = db.query(Employee).filter(Employee.employee_id == payload.actor_employee_id).first()
     if actor is None:
@@ -873,6 +907,7 @@ def quarantine_bulk(
     service_lines: list[defect_actions_svc.BulkQuarantineLine] = []
     try:
         for line in line_payloads:
+            _resolve_request_reason(db, line)
             service_lines.append(
                 defect_actions_svc.BulkQuarantineLine(
                     item_id=line.item_id,
@@ -881,6 +916,8 @@ def quarantine_bulk(
                     target_department=_dept_enum(line.target_dept),
                     source_department=_dept_enum(line.source_dept) if line.source_dept else None,
                     reason_category=line.reason_category,
+                    reason_category_id=line.reason_category_id,
+                    submission_id=line.submission_id,
                     reason_memo=line.reason_memo,
                     client_request_id=line.client_request_id,
                     management_category=line.management_category,
@@ -919,6 +956,8 @@ def quarantine_bulk(
 
 @router.post("/unquarantine", response_model=DefectActionResult)
 def unquarantine(payload: UnquarantineRequest, http_request: Request, db: Session = Depends(get_db)):
+    payload.submission_id = payload.submission_id or _new_submission_id()
+    _resolve_request_reason(db, payload)
     """정상 복귀 (즉시, 결재 없음). unmark_defective 래퍼."""
     actor = db.query(Employee).filter(Employee.employee_id == payload.actor_employee_id).first()
     if actor is None:
@@ -943,6 +982,8 @@ def unquarantine(payload: UnquarantineRequest, http_request: Request, db: Sessio
             dept=dept,
             actor=actor,
             reason_category=payload.reason_category,
+            reason_category_id=payload.reason_category_id,
+            submission_id=payload.submission_id,
             reason_memo=payload.reason_memo,
         )
     except ValueError as exc:
@@ -969,6 +1010,8 @@ def unquarantine_bulk(
     db: Session = Depends(get_db),
 ):
     """선택한 동일 품목·부서 격리 기록을 전부 정상 복귀한다."""
+    _resolve_request_reason(db, payload)
+    payload.submission_id = payload.submission_id or _new_submission_id()
     actor = db.query(Employee).filter(
         Employee.employee_id == payload.actor_employee_id
     ).first()
@@ -991,6 +1034,8 @@ def unquarantine_bulk(
             lines=lines,
             actor=actor,
             reason_category=payload.reason_category,
+            reason_category_id=payload.reason_category_id,
+            submission_id=payload.submission_id,
             reason_memo=payload.reason_memo,
         )
     except ValueError as exc:

@@ -69,6 +69,9 @@ class AdjLineInput(BaseModel):
     quantity: Decimal = Field(..., gt=0)
     department: str
     reason: Optional[str] = None
+    reason_category_id: Optional[uuid.UUID] = None
+    reason_category: Optional[str] = None
+    reason_memo: Optional[str] = None
     bom_expected: Optional[Decimal] = None
     bom_parent_item_id: Optional[uuid.UUID] = None
     bom_auto_token: Optional[str] = Field(None, pattern="^[0-9a-f]{64}$")
@@ -185,6 +188,9 @@ def submit_adjustment(
             quantity=ln.quantity,
             department=dept_enum,
             reason=ln.reason,
+            reason_category_id=ln.reason_category_id,
+            reason_category=ln.reason_category,
+            reason_memo=ln.reason_memo,
             bom_expected=ln.bom_expected,
             bom_parent_item_id=ln.bom_parent_item_id,
             bom_auto_token=ln.bom_auto_token,

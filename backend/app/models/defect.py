@@ -63,7 +63,13 @@ class DefectQuarantineRecord(Base):
         index=True,
     )
     quarantined_by_name = Column(String(100), nullable=True)
-    reason_category = Column(String(32), nullable=True)
+    reason_category = Column(String(32).with_variant(Text, "postgresql"), nullable=True)
+    reason_category_id = Column(
+        UUIDString,
+        ForeignKey("defect_reason_categories.category_id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
     current_memo = Column(Text, nullable=True)
     management_category = Column(
         String(16),

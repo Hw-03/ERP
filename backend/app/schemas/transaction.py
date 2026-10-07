@@ -103,10 +103,12 @@ class TransactionLogResponse(BaseModel):
     approved_at: Optional[UtcDatetime] = None
     notes: Optional[str]
     reason_category: Optional[str] = None
+    reason_category_id: Optional[uuid.UUID] = None
     reason_memo: Optional[str] = None
     supplier_id: Optional[uuid.UUID] = None
     supplier_name_snapshot: Optional[str] = None
     operation_batch_id: Optional[uuid.UUID] = None
+    submission_id: Optional[uuid.UUID] = None
     operation_line_id: Optional[uuid.UUID] = None
     operation_id: Optional[uuid.UUID] = None
     operation_role: Optional[str] = None
@@ -130,10 +132,11 @@ class TransactionLogResponse(BaseModel):
 class TransactionDisplayGroupResponse(BaseModel):
     """PC 입출고 내역 목록의 대표 행과 그에 속한 전체 거래 로그."""
 
-    type: Literal["solo", "batch", "op_batch", "operation", "defect_lifecycle"]
+    type: Literal["solo", "batch", "op_batch", "operation", "defect_lifecycle", "submission"]
     key: str
     logs: list[TransactionLogResponse]
     matched_log_ids: Optional[list[uuid.UUID]] = None
+    work_groups: list["TransactionDisplayGroupResponse"] = Field(default_factory=list)
 
 
 class TransactionDisplayGroupPageResponse(BaseModel):

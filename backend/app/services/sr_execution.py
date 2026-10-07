@@ -395,6 +395,8 @@ def _handle_defect_disassemble(
         db, item_id, qty, line.from_department,
         child_decisions,
         reason_category=reason_cat,
+        reason_category_id=request.reason_category_id,
+        submission_id=request.submission_id,
         reason_memo=reason_memo_val,
         actor=approver.name,
         actor_employee_id=approver.employee_id,
@@ -428,6 +430,8 @@ def _handle_rework_normal(
         source_dept,
         child_decisions,
         reason_category=request.reason_category or _DEFAULT_REASON_CATEGORY,
+        reason_category_id=request.reason_category_id,
+        submission_id=request.submission_id,
         reason_memo=request.reason_memo or "",
         actor=approver.name,
         actor_employee_id=approver.employee_id,
@@ -544,6 +548,7 @@ def _execute_line(
             actor_employee_id=approver.employee_id,
             actor_name=approver.name,
             reason_category=request.reason_category,
+            reason_category_id=request.reason_category_id,
             memo=request.reason_memo,
         )
 
@@ -632,10 +637,12 @@ def _execute_line(
             quantity_before=qty_before,
             quantity_after=qty_after,
             reference_no=request.request_code,
+            submission_id=request.submission_id,
             produced_by=producer_name,
             producer_employee_id=producer_employee_id,
             notes=note,
             reason_category=request.reason_category,
+            reason_category_id=request.reason_category_id,
             reason_memo=request.reason_memo,
             supplier_id=(
                 request.supplier_id

@@ -16,7 +16,8 @@ import {
   type ChildDecision,
 } from "../../_defect_hub/DisassembleTree";
 import { InlineErrorNote } from "../../_defect_hub/InlineErrorNote";
-import { REASON_CATEGORIES } from "../../_defect_hub/reasonCategories";
+import { ReasonFormFields } from "../../_defect_hub/ReasonFormFields";
+import { hasDefectReason } from "../../_defect_hub/defectCartValidation";
 import { ConfirmModal } from "@/lib/ui/ConfirmModal";
 import { SectionCard, StickyFooter, Stepper } from "../primitives";
 import type { Supplier } from "@/lib/api";
@@ -54,7 +55,9 @@ export function MobileDefectProcessPanel({
   const [action, setAction] = useState<ProcessAction>("unquarantine");
   const [processQty, setProcessQty] = useState<number>(maxQty);
   const [category, setCategory] = useState("");
+  const [categoryId, setCategoryId] = useState<string | null>(null);
   const [memo, setMemo] = useState("");
+  const hasReason = hasDefectReason(category, memo);
   const [decisions, setDecisions] = useState<ChildDecision[]>([]);
   const [decisionParentQty, setDecisionParentQty] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -86,6 +89,7 @@ export function MobileDefectProcessPanel({
     setAction("unquarantine");
     setProcessQty(Math.max(1, Number(location.available_quantity) || 1));
     setCategory("");
+    setCategoryId(null);
     setMemo("");
     setDecisions([]);
     setDecisionParentQty(null);
@@ -130,7 +134,7 @@ export function MobileDefectProcessPanel({
   }
 
   async function handleSubmit() {
-    if (busy || (action === "disassemble" && !reworkReady) || (action === "return" && !selectedSupplier)) return;
+    if (busy || !hasReason || (action === "disassemble" && !reworkReady) || (action === "return" && !selectedSupplier)) return;
     setBusy(true);
     setErrorMsg(null);
     try {
@@ -141,6 +145,7 @@ export function MobileDefectProcessPanel({
           qty: boundedProcessQty,
           dept: location.department,
           reason_category: category || null,
+          reason_category_id: categoryId,
           reason_memo: memo || null,
           actor_employee_id: currentEmployee.employee_id,
         });
@@ -150,6 +155,7 @@ export function MobileDefectProcessPanel({
           request_type: action === "scrap" ? "defect_scrap" : "defect_return",
           supplier_id: action === "return" ? selectedSupplier!.supplier_id : undefined,
           reason_category: category || null,
+          reason_category_id: categoryId,
           reason_memo: memo || null,
           notes: memo || null,
           lines: [
@@ -169,6 +175,7 @@ export function MobileDefectProcessPanel({
           requester_employee_id: currentEmployee.employee_id,
           request_type: "defect_disassemble",
           reason_category: category || null,
+          reason_category_id: categoryId,
           reason_memo: memo || null,
           notes: JSON.stringify({ child_decisions: childDecisions }),
           lines: [
@@ -264,7 +271,7 @@ export function MobileDefectProcessPanel({
           onBack={() => window.history.back()}
           onConfirm={() => setConfirmOpen(true)}
           busy={busy}
-          canSubmit={reworkReady}
+          canSubmit={hasReason && reworkReady}
           error={errorMsg}
         />
 
@@ -370,44 +377,16 @@ export function MobileDefectProcessPanel({
         )}
       </div>
 
-      {/* 사유 카테고리 */}
-      <div className="flex flex-col gap-1.5">
-        <label className={clsx(TYPO.caption, "font-black")} style={{ color: LEGACY_COLORS.muted2 }}>
-          사유 카테고리 <span style={{ color: LEGACY_COLORS.muted }}>(선택)</span>
-        </label>
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className={clsx("w-full rounded-[12px] border px-4 py-3 font-bold outline-none", TYPO.body)}
-          style={{
-            background: LEGACY_COLORS.s2,
-            borderColor: LEGACY_COLORS.border,
-            color: category ? LEGACY_COLORS.text : LEGACY_COLORS.muted,
-          }}
-        >
-          <option value="">카테고리 선택</option>
-          {REASON_CATEGORIES.map((cat) => (
-            <option key={cat} value={cat}>
-              {cat}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* 메모 */}
-      <div className="flex flex-col gap-1.5">
-        <label className={clsx(TYPO.caption, "font-black")} style={{ color: LEGACY_COLORS.muted2 }}>
-          메모 <span style={{ color: LEGACY_COLORS.muted }}>(선택)</span>
-        </label>
-        <textarea
-          value={memo}
-          onChange={(e) => setMemo(e.target.value)}
-          placeholder="예: 스크래치 다수 / 우측 끝단"
-          rows={3}
-          className={clsx("w-full resize-none rounded-[12px] border px-4 py-3 outline-none", TYPO.body)}
-          style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-        />
-      </div>
+      <ReasonFormFields
+        employeeId={currentEmployee.employee_id}
+        category={category}
+        categoryId={categoryId}
+        memo={memo}
+        onCategoryChange={(name, id) => { setCategory(name); setCategoryId(id ?? null); }}
+        onMemoChange={setMemo}
+        required
+        mobilePresentation
+      />
 
       {errorMsg && <InlineErrorNote>{errorMsg}</InlineErrorNote>}
       </div>
@@ -416,7 +395,7 @@ export function MobileDefectProcessPanel({
       <StickyFooter flat compact embedded className="!px-0">
         <button
           type="button"
-          disabled={busy}
+          disabled={busy || !hasReason}
           onClick={() => {
             if (action === "disassemble") {
               window.history.pushState({ defect: "process", recordId: location.record_id, step: 2 }, "");

@@ -38,7 +38,8 @@ export function defectSourceStock(item: Item, source: DefectSourceKind): DefectS
 }
 
 export function hasDefectReason(category: string, memo: string): boolean {
-  return category.trim().length > 0 || memo.trim().length > 0;
+  const name = category.trim();
+  return name.length > 0 && (name !== "기타" || memo.trim().length > 0);
 }
 
 export function defectCartLineErrors({
@@ -70,7 +71,7 @@ export function defectCartLineErrors({
     }
   }
   if (!hasDefectReason(category, memo)) {
-    errors.push("사유 카테고리 또는 메모 중 하나를 입력하세요.");
+    errors.push(category.trim() === "기타" ? "기타를 선택하면 메모를 입력하세요." : "사유 카테고리를 선택하세요.");
   }
   return errors;
 }

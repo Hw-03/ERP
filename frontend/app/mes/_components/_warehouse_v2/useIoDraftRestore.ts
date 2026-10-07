@@ -203,6 +203,7 @@ export function useIoDraftRestore(params: {
     state.setToDepartment(draftToRestore.to_department || state.toDepartment);
     state.setReferenceNo(draftToRestore.reference_no || "");
     state.setNotes(draftToRestore.notes || "");
+    state.setReasonCategory(draftToRestore.reason_category ?? "", draftToRestore.reason_category_id ?? null);
     state.setSupplier(
       draftToRestore.supplier_id
         ? { supplier_id: draftToRestore.supplier_id, name: draftToRestore.supplier_name_snapshot ?? "" }

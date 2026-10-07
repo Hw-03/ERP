@@ -28,6 +28,8 @@ import {
 } from "./ioWorkType";
 import { formatQty } from "@/lib/mes/format";
 import { ConfirmModal, type ConfirmTone } from "@/lib/ui/ConfirmModal";
+import { ReasonFormFields } from "../_defect_hub/ReasonFormFields";
+import { hasDefectReason } from "../_defect_hub/defectCartValidation";
 import panelStyles from "../mobile/screens/mobileWarehousePanels.module.css";
 import {
   deductionSourceName,
@@ -41,6 +43,10 @@ import {
 } from "./internalUseBom";
 
 interface Props {
+  employeeId?: string;
+  reasonCategory?: string;
+  reasonCategoryId?: string | null;
+  onReasonCategoryChange?: (name: string, categoryId?: string | null) => void;
   supplierName?: string | null;
   workType: IoWorkType;
   subType: IoSubType;
@@ -198,6 +204,10 @@ function signFor(line: IoLine): { sign: "+" | "-" | null; color: string } {
 }
 
 export function IoConfirmStep({
+  employeeId = "",
+  reasonCategory = "",
+  reasonCategoryId,
+  onReasonCategoryChange,
   supplierName,
   workType,
   subType,
@@ -262,6 +272,8 @@ export function IoConfirmStep({
       : b.lines.some((line) => line.included && !bomParentLineIds.has(line.line_id)),
   );
   const materialOutbound = subType === "outbound_supplier";
+  const defectQuarantine = subType === "defect_quarantine";
+  const defectReasonMissing = defectQuarantine && !hasDefectReason(reasonCategory, notes);
   const memoRequired = materialOutbound || requiresDepartmentApprovalMemo(workType, subType, bundles);
   const memoMissing = memoRequired && !notes.trim();
   const showMemoError = memoValidationAttempted && memoMissing;
@@ -277,7 +289,7 @@ export function IoConfirmStep({
   const submitDisabled =
     submitting || saving ||
     (effectIncludedLines.length === 0 && !allowsNoEffectCustomBomApproval) ||
-    hasShortage || hasInvalidQuantity || missingInternalUseBomMode || (materialOutbound && memoMissing);
+    hasShortage || hasInvalidQuantity || missingInternalUseBomMode || (materialOutbound && memoMissing) || defectReasonMissing;
   const saveDisabled = submitting || saving || bundles.length === 0;
   const accent = directionAccent(subType);
   const blockerText = hasShortage
@@ -329,6 +341,9 @@ export function IoConfirmStep({
 
       {/* 묶음 카드 목록 (1단 세로 스크롤) */}
       <div className="min-h-0 flex-1 overflow-y-auto space-y-4">
+        {defectQuarantine && <ReasonFormFields employeeId={employeeId} category={reasonCategory} categoryId={reasonCategoryId}
+          memo={notes} onCategoryChange={(name, id) => onReasonCategoryChange?.(name, id)} onMemoChange={onNotesChange}
+          mobilePresentation={mobilePresentation} required />}
         {displayBundles.map((bundle) => (
           <ConfirmBundleCard
             key={bundle.bundle_id}
@@ -347,7 +362,7 @@ export function IoConfirmStep({
 
       {/* 항목 7-4 — 메모를 액션 푸터 밖(스크롤 영역 바로 아래 정적 요소)으로 분리해 버튼 위에 끼지 않게 한다.
           버튼 행은 Step4(IoBundleCart) 와 동일한 sticky 푸터로 통일 → 두 단계 버튼의 화면상 위치(네비바와의 간격)가 일치. */}
-      <Field
+      {!defectQuarantine && <Field
         label={materialOutbound ? "출고 사유 (필수)" : memoRequired ? "메모 (필수)" : "메모 (선택)"}
         value={notes}
         onChange={(value) => {
@@ -359,7 +374,7 @@ export function IoConfirmStep({
         invalid={showMemoError}
         errorMessage={materialOutbound ? "출고 사유를 입력하세요." : MEMO_REQUIRED_MESSAGE}
         inputRef={memoInputRef}
-      />
+      />}
 
       {/* 액션 푸터 — Step4(IoBundleCart 126줄) 와 동일: 모바일 하단 sticky + 페이지 배경, PC(lg)는 정적·대형 그대로. */}
       <div data-io-confirm-actions className="sticky bottom-0 z-20 -mx-3 mt-auto flex flex-col gap-2 bg-[var(--c-bg)] px-4 pb-0 pt-2 lg:static lg:mx-0 lg:gap-3 lg:bg-transparent lg:px-0 lg:pb-0 lg:pt-1">
@@ -436,6 +451,10 @@ export function IoConfirmStep({
         onClose={() => setConfirmOpen(false)}
         onConfirm={() => {
           setConfirmOpen(false);
+          if (defectReasonMissing) {
+            onValidationError?.("사유를 선택하고, 기타 사유는 메모를 입력하세요.");
+            return;
+          }
           onSubmit();
         }}
       >

@@ -462,6 +462,9 @@ def test_apply_line_defective_mark(make_item, make_location, db_session):
                 "from_bucket": "production", "from_department": ASSEMBLY,
                 "to_bucket": "defective", "to_department": ASSEMBLY, "quantity": D("2")}],
     )
+    from app.models.defect_reason_category import defect_reason_category_id
+    batch.reason_category_id = defect_reason_category_id("외관 불량")
+    batch.reason_category = "외관 불량"
     svc._apply_line(db_session, batch=batch, line=_single_line(batch), requester=requester)
     db_session.flush()
 
@@ -469,6 +472,8 @@ def test_apply_line_defective_mark(make_item, make_location, db_session):
     assert _defective_qty(db_session, item.item_id) == D("2")
     log = db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id).one()
     assert log.transaction_type == TransactionTypeEnum.MARK_DEFECTIVE
+    assert log.reason_category_id == batch.reason_category_id
+    assert log.reason_category == "외관 불량"
     assert log.warehouse_qty_before == D("0")
     assert log.warehouse_qty_after == D("0")
     assert log.department_qty_before == D("5")
@@ -479,7 +484,40 @@ def test_apply_line_defective_mark(make_item, make_location, db_session):
         .one()
     )
     assert record.remaining_quantity == D("2")
+    assert record.reason_category_id == batch.reason_category_id
     assert log.defect_quarantine_record_id == record.record_id
+
+
+def test_pending_io_approval_retains_hidden_reason_snapshot(make_item, make_location, db_session):
+    from app.models import DefectReasonCategory
+    from app.models.defect_reason_category import defect_reason_category_id
+    item = make_item(name="사유 숨김 승인", process_type_code="AR")
+    make_location(item.item_id, department=ASSEMBLY, quantity=D("5"))
+    inv = db_session.query(Inventory).filter_by(item_id=item.item_id).one()
+    inv.quantity = D("5")
+    requester = _make_employee(db_session)
+    approver = _make_employee(db_session, code="REASON-APPROVER", department_role="primary")
+    batch = _build_batch(db_session, requester=requester, sub_type="defect_quarantine", to_department=ASSEMBLY.value, lines=[{"item_id": item.item_id, "direction": "defective", "from_bucket": "production", "from_department": ASSEMBLY.value, "to_bucket": "defective", "to_department": ASSEMBLY.value, "quantity": D("2"), "origin": "manual"}])
+    category = db_session.get(DefectReasonCategory, defect_reason_category_id("외관 불량"))
+    batch.reason_category_id = category.category_id
+    batch.reason_category = category.name
+    batch.notes = "저장한 상세 메모"
+    svc._submit_dept_only_approval(db_session, requester=requester, batch=batch)
+    db_session.flush()
+    request = db_session.query(StockRequest).one()
+    assert request.reason_category_id == category.category_id
+    assert request.submission_id == batch.batch_id
+    category.name = "바뀐 사유"
+    category.normalized_name = "바뀐 사유"
+    category.is_active = False
+    db_session.flush()
+    svc.execute_batch_after_dept_approval(db_session, request=request, approver=approver)
+    db_session.flush()
+    log = db_session.query(TransactionLog).one()
+    assert log.reason_category_id == category.category_id
+    assert log.reason_category == "외관 불량"
+    assert log.reason_memo == "저장한 상세 메모"
+    assert log.submission_id == batch.batch_id
 
 
 def test_apply_line_adjust_in_and_out(make_item, make_location, db_session):

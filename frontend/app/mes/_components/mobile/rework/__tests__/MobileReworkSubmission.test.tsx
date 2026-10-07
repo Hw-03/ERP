@@ -5,12 +5,14 @@ import { MobileDefectCartFlow } from "../../screens/MobileDefectCartFlow";
 import { MobileDefectProcessPanel } from "../../screens/MobileDefectProcessPanel";
 import { deptAdjustmentApi } from "@/lib/api/dept-adjustment";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
+import { defectsApi } from "@/lib/api/defects";
 import type { AdjLineTemplate } from "@/lib/api/types/dept-adjustment";
 import type { DefectLocation } from "@/lib/api/types/defects";
 import type { Item } from "../../../_warehouse_v2/types";
 
 vi.mock("@/lib/api/dept-adjustment", () => ({ deptAdjustmentApi: { getBomTemplate: vi.fn() } }));
 vi.mock("@/lib/api/stock-requests", () => ({ stockRequestsApi: { createStockRequest: vi.fn() } }));
+vi.mock("@/lib/api/defects", () => ({ defectsApi: { listReasonCategories: vi.fn() } }));
 beforeAll(() => vi.stubGlobal("ResizeObserver", class { observe = vi.fn(); disconnect = vi.fn(); }));
 afterAll(() => vi.unstubAllGlobals());
 vi.mock("../../../_defect_hub/DefectItemPicker", () => ({
@@ -25,6 +27,7 @@ function line(id: string, amount: number, hasChildren = false): AdjLineTemplate 
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(defectsApi.listReasonCategories).mockResolvedValue([{ category_id: "surface-id", name: "외관 불량", is_active: true, is_other: false }]);
   window.history.replaceState(null, "");
   vi.mocked(deptAdjustmentApi.getBomTemplate).mockImplementation(async (id) => ({ sub_type: "disassembly", lines: id === "target" ? [line("assembly", 3, true), line("repeat", 3)] : [line("repeat", 6)] }));
 });
@@ -41,9 +44,13 @@ describe("mobile rework submission", () => {
       fireEvent.click(screen.getByRole("button", { name: "수량 조정 (1건) →" }));
       fireEvent.change(screen.getByRole("spinbutton", { name: "수량" }), { target: { value: "3" } });
       fireEvent.change(screen.getByRole("textbox"), { target: { value: "외관 확인" } });
+      fireEvent.click(screen.getByRole("button", { name: "사유 카테고리 선택" }));
+      fireEvent.click(await screen.findByRole("button", { name: "외관 불량", exact: true }));
       fireEvent.click(screen.getByRole("button", { name: "BOM 확인 →" }));
     } else {
       fireEvent.click(screen.getByRole("button", { name: "재작업", exact: true }));
+      fireEvent.click(screen.getByRole("button", { name: "사유 카테고리 선택" }));
+      fireEvent.click(await screen.findByRole("button", { name: "외관 불량", exact: true }));
       fireEvent.click(screen.getByRole("button", { name: "다음 →" }));
     }
     const assembly = within(await screen.findByRole("group", { name: "조립품 처리" }));

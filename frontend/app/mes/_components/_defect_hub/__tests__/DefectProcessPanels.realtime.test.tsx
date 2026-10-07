@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ComponentType } from "react";
 import type { DefectLocation } from "@/lib/api/types/defects";
 import { REASON_CATEGORIES } from "../reasonCategories";
+vi.mock("../ReasonFormFields", async () => ({ ReasonFormFields: (await import("./reasonFormFieldsStub")).ReasonFormFieldsStub }));
 
 const apiMocks = vi.hoisted(() => ({
   unquarantine: vi.fn(),
@@ -144,6 +145,7 @@ describe.each(panels)("%s defect process panel realtime location updates", (_nam
   it("preserves the decision draft when realtime quantity changes but effective parent quantity does not", async () => {
     const props = { currentEmployee: employee, onDone: vi.fn(), onCancel: vi.fn() };
     const { container, rerender } = render(<Panel {...props} location={location} />);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "외관 불량" } });
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "재작업 사유" } });
     fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "4" } });
     const rework = screen.getByRole("button", { name: /재작업/ });
@@ -161,6 +163,7 @@ describe.each(panels)("%s defect process panel realtime location updates", (_nam
   it("invalidates the decision draft when realtime clamping changes the effective parent quantity", async () => {
     const props = { currentEmployee: employee, onDone: vi.fn(), onCancel: vi.fn() };
     const { container, rerender } = render(<Panel {...props} location={location} />);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "외관 불량" } });
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "재작업 사유" } });
     fireEvent.click(screen.getByRole("button", { name: /재작업/ }));
     fireEvent.click(Array.from(container.querySelectorAll("button")).at(-1)!);
@@ -206,6 +209,7 @@ describe.each(panels)("%s defect process panel realtime location updates", (_nam
     );
 
     expect(screen.getByRole("spinbutton")).toHaveValue(6);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "외관 불량" } });
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "폐기 사유" } });
     fireEvent.click(screen.getByRole("button", { name: /전체 폐기/ }));
     fireEvent.click(screen.getByRole("button", { name: "즉시 폐기 →" }));
@@ -227,6 +231,7 @@ describe.each(panels)("%s defect process panel realtime location updates", (_nam
   it("requires supplier selection before defect return and sends the supplier id", async () => {
     const props = { currentEmployee: employee, onDone: vi.fn(), onCancel: vi.fn() };
     render(<Panel {...props} location={{ ...location, department: "창고" }} />);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "외관 불량" } });
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "반품 사유" } });
 
     fireEvent.click(screen.getByRole("button", { name: /반품/ }));

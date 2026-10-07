@@ -93,6 +93,11 @@ def save_draft(db: Session, payload) -> dict:
     from app.services.io_preview import validate_receive_requester, validate_material_outbound
 
     requester = _load_requester(db, payload.requester_employee_id)
+    from app.services.defect_reason_categories import resolve_reason_category
+    reason_category_id, reason_category, _ = resolve_reason_category(
+        db, reason_category_id=getattr(payload, "reason_category_id", None),
+        reason_category=getattr(payload, "reason_category", None), reason_memo=payload.notes, required=False,
+    )
     validate_receive_requester(requester, work_type=payload.work_type, sub_type=payload.sub_type)
     validate_material_outbound(work_type=payload.work_type, sub_type=payload.sub_type, bundles=payload.bundles, notes=payload.notes, require_reason=False)
     payload.sub_type = normalize_process_sub_type(
@@ -179,6 +184,8 @@ def save_draft(db: Session, payload) -> dict:
         )
         batch.reference_no = payload.reference_no
         batch.notes = payload.notes
+        batch.reason_category_id = reason_category_id
+        batch.reason_category = reason_category
         batch.updated_at = datetime.utcnow()
         # cascade='all, delete-orphan' — 비우고 flush 해서 기존 자식을 INSERT 전에 DELETE.
         batch.bundles.clear()

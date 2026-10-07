@@ -86,6 +86,8 @@ class IoDraftUpsert(BaseModel):
     work_type: str
     sub_type: str
     supplier_id: Optional[uuid.UUID] = None
+    reason_category_id: Optional[uuid.UUID] = None
+    reason_category: Optional[str] = None
     from_department: Optional[str] = None
     to_department: Optional[str] = None
     reference_no: Optional[str] = Field(None, max_length=100)
@@ -137,6 +139,8 @@ class IoBatchResponse(BaseModel):
     requester_department: str
     supplier_id: Optional[uuid.UUID] = None
     supplier_name_snapshot: Optional[str] = None
+    reason_category_id: Optional[uuid.UUID] = None
+    reason_category: Optional[str] = None
     # 승인자(요청을 수락한 사람). stock_request 경로 → 그 request 의 approved_by. 직접 처리(stock_request 없음) → 요청자 자신.
     approver_employee_id: Optional[uuid.UUID] = None
     approver_name: Optional[str] = None

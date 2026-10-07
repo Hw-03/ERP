@@ -141,6 +141,10 @@ def test_normal_rework_records_one_operation_with_explicit_line_roles(
     make_location(parent.item_id, department=ASSEMBLY, quantity=D("1"))
     inv_svc.get_or_create_inventory(db_session, parent.item_id).quantity = D("1")
     _enable_operation_ledger(db_session)
+    import uuid
+    from app.models.defect_reason_category import defect_reason_category_id
+    submission_id = uuid.uuid4()
+    reason_category_id = defect_reason_category_id("외관 불량")
 
     result = svc.submit_normal_disassemble(
         db_session,
@@ -157,7 +161,9 @@ def test_normal_rework_records_one_operation_with_explicit_line_roles(
             },
             {"item_id": scrap.item_id, "qty": D("1"), "scrap_qty": D("1")},
         ],
-        reason_category="재작업",
+        reason_category="외관 불량",
+        reason_category_id=reason_category_id,
+        submission_id=submission_id,
         reason_memo="역할 검증",
         actor="작업자",
     )
@@ -170,6 +176,9 @@ def test_normal_rework_records_one_operation_with_explicit_line_roles(
         .all()
     )
     assert {log.operation_id for log in logs} == {operation.operation_id}
+    assert {log.submission_id for log in logs} == {submission_id}
+    assert {log.reason_category_id for log in logs} == {reason_category_id}
+    assert db_session.query(DefectQuarantineRecord).one().reason_category_id == reason_category_id
     assert [log.operation_role for log in logs] == [
         InventoryOperationRoleEnum.REWORK_PARENT_NORMAL,
         InventoryOperationRoleEnum.REWORK_CHILD_NORMAL,
@@ -733,7 +742,7 @@ def test_submit_disassembly_mixed(make_item, make_location, db_session):
     lines = [
         svc.AdjLine(item_id=target.item_id, direction="out",      quantity=D("1"), department=ASSEMBLY),
         svc.AdjLine(item_id=b.item_id,      direction="in",       quantity=D("2"), department=ASSEMBLY),
-        svc.AdjLine(item_id=c.item_id,      direction="defective", quantity=D("1"), department=ASSEMBLY),
+        svc.AdjLine(item_id=c.item_id,      direction="defective", quantity=D("1"), department=ASSEMBLY, reason_category="외관 불량"),
     ]
 
     log_ids = svc.submit_adjustment(

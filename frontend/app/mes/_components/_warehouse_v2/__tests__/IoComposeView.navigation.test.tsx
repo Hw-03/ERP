@@ -257,6 +257,17 @@ beforeEach(() => {
 });
 
 describe("IoComposeView navigation chrome", () => {
+  it("PC 일반 입출고는 별도 불량 탭 draft의 복원 제한을 유지한다", async () => {
+    const onStatusChange = vi.fn();
+    const bundles = [{ bundle_id: "defect-bundle", source_kind: "manual", title: "불량 품목", quantity: 1, source_item_id: "item", source_mes_code: null, expanded_level: 1,
+      lines: [{ line_id: "defect-line", item_id: "item", item_name: "불량 품목", quantity: 1, included: true, direction: "defective", from_bucket: "production", to_bucket: "defective", from_department: "조립", shortage: 0 }] }];
+    render(<IoComposeView globalSearch="" operator={operator} employees={[]} items={[]} productModels={[]} setItems={vi.fn()} onStatusChange={onStatusChange}
+      restoreStep={5} restoreDraft={{ batch_id: "defect-draft", work_type: "defect", sub_type: "defect_quarantine", reason_category_id: "category-old", reason_category: "스크래치", notes: "기존 메모", bundles } as never} />);
+    await waitFor(() => expect(onStatusChange).toHaveBeenCalledWith("권한이 없는 작업 유형의 임시저장은 불러올 수 없습니다."));
+    expect(screen.queryByTestId("confirm-submit")).not.toBeInTheDocument();
+    expect(api.saveDraft).not.toHaveBeenCalled();
+    expect(api.submitDraft).not.toHaveBeenCalled();
+  });
   it("원자재 카드의 방향 선택 다음 단계는 공급업체 선택이며 Back/Forward로 왕복한다", async () => {
     window.history.replaceState(null, "", "/mes?tab=warehouse&step=1");
     renderCompose([], { ...operator, warehouse_role: "primary" });

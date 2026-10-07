@@ -157,6 +157,16 @@ describe("productionApi", () => {
     });
   });
 
+  it("maps submission work groups without changing raw transaction fields", async () => {
+    const log = { log_id: "original", submission_id: "submit-1", reason_category_id: "category-1" };
+    globalThis.fetch = vi.fn(() => Promise.resolve(makeResponse({ groups: [{
+      type: "submission", key: "submission:submit-1", logs: [log], matched_log_ids: ["original"],
+      work_groups: [{ type: "operation", key: "work-1", logs: [log], matched_log_ids: ["original"] }],
+    }], next_cursor: null, has_more: false }))) as unknown as typeof fetch;
+    const page = await productionApi.getTransactionDisplayGroups();
+    expect(page.groups[0].workGroups?.[0]).toMatchObject({ type: "operation", key: "work-1", matchedLogIds: ["original"], logs: [log] });
+  });
+
   it("previews an inventory operation cancellation and maps numeric cells", async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({
       operation_id: "operation-1",

@@ -34,6 +34,7 @@ def create_record(
     actor_name: Optional[str],
     reason_category: Optional[str],
     memo: Optional[str],
+    reason_category_id: Optional[uuid.UUID] = None,
     management_category: str = DefectManagementCategoryEnum.DEFECT.value,
     quarantined_at: Optional[datetime] = None,
 ) -> DefectQuarantineRecord:
@@ -54,6 +55,7 @@ def create_record(
         quarantined_by_employee_id=actor_employee_id,
         quarantined_by_name=actor_name,
         reason_category=reason_category,
+        reason_category_id=reason_category_id,
         current_memo=memo,
         management_category=category,
         is_legacy=False,

@@ -44,6 +44,7 @@ from app.routers import (
     client_events,
     codes,
     defects,
+    reason_categories,
     departments,
     daily_work_reports,
     dept_adjustment,
@@ -320,6 +321,7 @@ app.include_router(stock_requests.router, prefix="/api/stock-requests", tags=["S
 app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
 app.include_router(handover.router, prefix="/api/handovers", tags=["Handover"])
 app.include_router(dept_adjustment.router, prefix="/api/dept-adjustment", tags=["Dept Adjustment"])
+app.include_router(reason_categories.router, prefix="/api/defects/reason-categories", tags=["Defects"])
 app.include_router(defects.router, prefix="/api/defects", tags=["Defects"])
 app.include_router(warehouse_map.router, prefix="/api/warehouse-map", tags=["Warehouse Map"])
 app.include_router(realtime.router, prefix="/api/realtime", tags=["System"])

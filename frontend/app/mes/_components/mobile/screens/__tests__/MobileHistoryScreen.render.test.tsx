@@ -1,10 +1,11 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { TransactionLog } from "@/lib/api";
 import type { IoBatch } from "@/lib/api/types/io";
 import { buildGroups } from "../../../_history_sections/historyTableHelpers";
 import type { TransactionDisplayGroup } from "@/lib/api/production";
+import { productionApi } from "@/lib/api/production";
 import { MobileHistoryScreen } from "../MobileHistoryScreen";
 
 const testState = vi.hoisted(() => ({
@@ -13,7 +14,7 @@ const testState = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../_hooks/useHistoryGroups", () => ({
-  useHistoryGroups: () => ({ ...testState.historyResult, groups: buildGroups(testState.historyResult!.logs).map((g) => ({
+  useHistoryGroups: () => ({ ...testState.historyResult, groups: testState.historyResult.groups ?? buildGroups(testState.historyResult!.logs).map((g) => ({
         type: g.type, key: g.type === "solo" ? g.log.log_id : g.type === "operation" ? g.operationId : g.type === "op_batch" ? g.batchId : g.type === "batch" ? g.refKey : g.key,
         logs: g.type === "solo" ? [g.log] : g.type === "defect_lifecycle" ? [g.parent, g.child] : g.logs,
       })),
@@ -43,6 +44,7 @@ vi.mock("@/lib/api/production", () => ({
   productionApi: {
     getTransactions: vi.fn(() => Promise.resolve(testState.historyResult.logs)),
     getTransactionsSummary: vi.fn(() => new Promise(() => {})),
+    previewInventoryOperationCancellation: vi.fn(() => Promise.resolve({ canCancel: true, blockers: [], cells: [], effects: [] })),
   },
 }));
 
@@ -207,11 +209,76 @@ function renderScreen() {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   testState.batch = makeBatch();
   setHistoryLogs([makeLog()]);
 });
 
 describe("MobileHistoryScreen real detail panels", () => {
+  it("원장 격리 제출 상세는 0인 앵커 순변동 대신 작업별 이동량과 단위를 표시한다", () => {
+    const first = makeLog({ operation_id: "quarantine-a", operation_role: "PRIMARY", transaction_type: "MARK_DEFECTIVE",
+      quantity_change: 0, transfer_qty: null, inventory_effect: [
+        { scope: "location", department: "튜브", status: "PRODUCTION", delta: -1 },
+        { scope: "location", department: "튜브", status: "DEFECTIVE", delta: 1 },
+      ] });
+    const second = makeLog({ log_id: "second", item_id: "second", item_name: "격리 원품목 B", operation_id: "quarantine-b",
+      operation_role: "PRIMARY", transaction_type: "MARK_DEFECTIVE", quantity_change: 0, transfer_qty: 2, item_unit: "m" });
+    setHistoryLogs([first, second]);
+    testState.historyResult.groups = [{ type: "submission", key: "submission:ledger", logs: [first, second], workGroups: [
+      { type: "operation", key: "quarantine-a", logs: [first] }, { type: "operation", key: "quarantine-b", logs: [second] },
+    ] }];
+    renderScreen();
+    fireEvent.click(screen.getByText(/완제품 A/).closest("button")!);
+    const sheet = screen.getByTestId("real-panel-sheet");
+    expect(within(sheet).getByRole("button", { name: /완제품 A/ })).toHaveTextContent("1 EA");
+    expect(within(sheet).getByRole("button", { name: /격리 원품목 B/ })).toHaveTextContent("2 m");
+    expect(within(sheet).queryByText("0 EA")).not.toBeInTheDocument();
+    expect(within(sheet).queryByRole("button", { name: "이 내역 취소" })).not.toBeInTheDocument();
+  });
+  it("모바일 제출의 검색 구성품을 사유와 함께 강조하고 기존 구성품 상세로 연결한다", async () => {
+    const first = makeLog({ operation_batch_id: "batch-1", reason_category: "접촉 불량", reason_memo: "핀 확인" });
+    const child = makeLog({ log_id: "component", item_id: "component-a", item_name: "부품 A", mes_code: "R-001",
+      operation_batch_id: "batch-1", transaction_type: "BACKFLUSH", quantity_change: -4 });
+    testState.batch.bundles[0].lines[1].item_name = child.item_name;
+    const second = makeLog({ log_id: "second", item_id: "second", item_name: "완제품 B", operation_id: "work-b", operation_role: "PRODUCT_OUTPUT" });
+    setHistoryLogs([child, first, second]);
+    testState.historyResult.groups = [{ type: "submission", key: "submission:match", logs: [child, first, second], matchedLogIds: [child.log_id], workGroups: [
+      { type: "op_batch", key: "batch-1", logs: [child, first], matchedLogIds: [child.log_id] },
+      { type: "operation", key: "work-b", logs: [second], matchedLogIds: [] },
+    ] }];
+    renderScreen();
+    await screen.findByText(/완제품 A/);
+    fireEvent.click(screen.getByText(/완제품 A/).closest("button")!);
+    const sheet = screen.getByTestId("real-panel-sheet");
+    const card = within(sheet).getByRole("button", { name: /접촉 불량/ });
+    expect(card).toHaveAttribute("data-history-search-match", "true");
+    expect(card).toHaveTextContent("핀 확인");
+    expect(card).toHaveTextContent("요청자 A");
+    expect(card).toHaveTextContent("검색 일치 · 부품 A (R-001)");
+    fireEvent.click(card);
+    const childDetail = await within(sheet).findByRole("button", { name: "부품 A R-001 상세", exact: true });
+    await act(async () => { fireEvent.click(childDetail); });
+    expect(within(sheet).queryByRole("button", { name: "이 내역 취소" })).not.toBeInTheDocument();
+  });
+  it("제출 요약에는 취소가 없고 작업 상세는 원 작업 ID를 조회한다", async () => {
+    const first = makeLog({ operation_id: "work-a", operation_role: "PRODUCT_OUTPUT" });
+    const second = makeLog({ log_id: "second", item_id: "second", item_name: "완제품 B", operation_id: "work-b", operation_role: "PRODUCT_OUTPUT" });
+    setHistoryLogs([first, second]);
+    testState.historyResult.groups = [{ type: "submission", key: "submission:id", logs: [first, second], workGroups: [
+      { type: "operation", key: "work-a", logs: [first] }, { type: "operation", key: "work-b", logs: [second] },
+    ] }];
+    renderScreen();
+    fireEvent.click(screen.getByText(/완제품 A/).closest("button")!);
+    const sheet = screen.getByTestId("real-panel-sheet");
+    expect(within(sheet).queryByRole("button", { name: "이 내역 취소" })).not.toBeInTheDocument();
+    fireEvent.click(within(sheet).getByRole("button", { name: /완제품 A/ }));
+    await waitFor(() => expect(productionApi.getTransactions).toHaveBeenCalledWith(
+      { operationId: "work-a", limit: 2000, skip: 0 }, expect.anything(),
+    ));
+    expect(within(sheet).getByRole("button", { name: "이 내역 취소" })).toBeInTheDocument();
+    fireEvent.click(within(sheet).getByRole("button", { name: "← 뒤로" }));
+    expect(within(sheet).queryByRole("button", { name: "이 내역 취소" })).not.toBeInTheDocument();
+  });
   it("keeps the existing single-log Hero, inventory effect, and Meta cancel placement", async () => {
     renderScreen();
     fireEvent.click(screen.getByText("완제품 A").closest("button")!);
@@ -274,6 +341,7 @@ describe("MobileHistoryScreen real detail panels", () => {
     expect(within(line).queryByText("-4 EA")).not.toBeInTheDocument();
     fireEvent.click(itemButton);
     expect(await screen.findByRole("button", { name: "← 뒤로" })).toBeInTheDocument();
+    expect(within(screen.getByTestId("real-panel-sheet")).queryByRole("button", { name: "이 내역 취소" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "← 뒤로" }));
     expect(await screen.findByText(longName)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "← 뒤로" })).not.toBeInTheDocument();

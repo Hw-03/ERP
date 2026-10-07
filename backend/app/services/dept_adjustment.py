@@ -50,6 +50,9 @@ class AdjLine:
     quantity: Decimal
     department: DepartmentEnum
     reason: Optional[str] = None
+    reason_category_id: Optional[uuid.UUID] = None
+    reason_category: Optional[str] = None
+    reason_memo: Optional[str] = None
     bom_expected: Optional[Decimal] = None
     bom_parent_item_id: Optional[uuid.UUID] = None
     bom_auto_token: Optional[str] = None
@@ -417,6 +420,11 @@ def _apply_adjustment(
             qty_before = (inv.quantity or Decimal("0")) - qty
 
         elif ln.direction == "defective":
+            from app.services.defect_reason_categories import resolve_reason_category
+            ln.reason_category_id, ln.reason_category, ln.reason_memo = resolve_reason_category(
+                db, reason_category_id=ln.reason_category_id, reason_category=ln.reason_category,
+                reason_memo=ln.reason_memo or reason_str,
+            )
             inv = inventory_svc.mark_defective(
                 db, ln.item_id, qty,
                 inventory_svc.DefectSource(
@@ -435,8 +443,9 @@ def _apply_adjustment(
                 quantity=qty,
                 actor_employee_id=producer_employee_id,
                 actor_name=operator_name,
-                reason_category=None,
-                memo=reason_str or None,
+                reason_category=ln.reason_category,
+                reason_category_id=ln.reason_category_id,
+                memo=ln.reason_memo,
             )
 
         if sub_type == DeptAdjSubTypeEnum.PRODUCTION:
@@ -464,6 +473,9 @@ def _apply_adjustment(
             produced_by=operator_name,
             producer_employee_id=producer_employee_id,
             notes=log_notes or None,
+            reason_category_id=ln.reason_category_id,
+            reason_category=ln.reason_category,
+            reason_memo=ln.reason_memo,
             department=dept_enum.value,
             defect_quarantine_record_id=(
                 quarantine_record.record_id if quarantine_record else None
@@ -716,6 +728,8 @@ def _submit_rework_disassemble(
     reason_category: str,
     reason_memo: str,
     actor: str,
+    reason_category_id: Optional[uuid.UUID] = None,
+    submission_id: Optional[uuid.UUID] = None,
     actor_employee_id: Optional[uuid.UUID] = None,
     defect_quarantine_record_id: Optional[uuid.UUID] = None,
     operation: Optional[InventoryOperation] = None,
@@ -771,6 +785,7 @@ def _submit_rework_disassemble(
     )
 
     batch_id = uuid.uuid4()
+    submission_id = submission_id or uuid.uuid4()
     batch_ref = f"defect-disassemble:{batch_id}"
     parent_dept_value = getattr(parent_dept, "value", parent_dept)
     reason = inventory_svc.ReasonContext(
@@ -820,6 +835,8 @@ def _submit_rework_disassemble(
         producer_employee_id=actor_employee_id,
         notes=parent_note,
         reason_category=reason_category,
+        reason_category_id=reason_category_id,
+        submission_id=submission_id,
         reason_memo=reason_memo,
         reference_no=batch_ref,
         department=parent_dept_value,
@@ -873,6 +890,8 @@ def _submit_rework_disassemble(
                 producer_employee_id=actor_employee_id,
                 notes="[rework:normal_child]",
                 reason_category=reason_category,
+                reason_category_id=reason_category_id,
+                submission_id=submission_id,
                 reason_memo=child_note or None,
                 reference_no=batch_ref,
                 department=child_dept_value,
@@ -906,6 +925,7 @@ def _submit_rework_disassemble(
                 actor_employee_id=actor_employee_id,
                 actor_name=actor,
                 reason_category=reason_category,
+                reason_category_id=reason_category_id,
                 memo=child_note or None,
             )
             log = operation_svc.attach_transaction(TransactionLog(
@@ -917,7 +937,9 @@ def _submit_rework_disassemble(
                 produced_by=actor,
                 producer_employee_id=actor_employee_id,
                 notes="[rework:defective_child]",
+                submission_id=submission_id,
                 reason_category=reason_category,
+                reason_category_id=reason_category_id,
                 reason_memo=child_note or None,
                 reference_no=batch_ref,
                 department=child_dept_value,
@@ -952,7 +974,9 @@ def _submit_rework_disassemble(
                 produced_by=actor,
                 producer_employee_id=actor_employee_id,
                 notes="[rework:scrap_child]",
+                submission_id=submission_id,
                 reason_category=reason_category,
+                reason_category_id=reason_category_id,
                 reason_memo=child_note or None,
                 reference_no=batch_ref,
                 department=child_dept_value,
@@ -1043,6 +1067,8 @@ def submit_defective_disassemble(
     reason_category: str,
     reason_memo: str,
     actor: str,
+    reason_category_id: Optional[uuid.UUID] = None,
+    submission_id: Optional[uuid.UUID] = None,
     actor_employee_id: Optional[uuid.UUID] = None,
     defect_quarantine_record_id: Optional[uuid.UUID] = None,
     operation: Optional[InventoryOperation] = None,
@@ -1055,6 +1081,8 @@ def submit_defective_disassemble(
         parent_dept,
         child_decisions,
         parent_source="defective",
+        submission_id=submission_id,
+        reason_category_id=reason_category_id,
         reason_category=reason_category,
         reason_memo=reason_memo,
         actor=actor,
@@ -1075,6 +1103,8 @@ def submit_normal_disassemble(
     reason_category: str,
     reason_memo: str,
     actor: str,
+    reason_category_id: Optional[uuid.UUID] = None,
+    submission_id: Optional[uuid.UUID] = None,
     actor_employee_id: Optional[uuid.UUID] = None,
     operation: Optional[InventoryOperation] = None,
 ) -> dict:
@@ -1092,6 +1122,8 @@ def submit_normal_disassemble(
         parent_dept,
         child_decisions,
         parent_source="normal",
+        submission_id=submission_id,
+        reason_category_id=reason_category_id,
         normal_source_kind=source_kind,
         reason_category=reason_category,
         reason_memo=reason_memo,

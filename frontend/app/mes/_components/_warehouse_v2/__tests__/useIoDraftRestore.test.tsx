@@ -62,6 +62,7 @@ function Harness({
     setToDepartment: vi.fn(),
     setReferenceNo: vi.fn(),
     setNotes: vi.fn(),
+    setReasonCategory: vi.fn(),
     setSupplier: vi.fn(),
     setBundles: vi.fn(),
     goTo,
@@ -143,6 +144,7 @@ function RestoreShortageHarness({
     setToDepartment: vi.fn(),
     setReferenceNo: vi.fn(),
     setNotes: vi.fn(),
+    setReasonCategory: vi.fn(),
     setSupplier: vi.fn(),
     setBundles,
     goTo: vi.fn(),
@@ -570,7 +572,7 @@ describe("useIoDraftRestore", () => {
       fromDepartment: "조립", toDepartment: "조립",
       setWorkType: vi.fn(), setSubType: vi.fn(), setDeptIoDirectionRaw: vi.fn(),
       setFromDepartment: vi.fn(), setToDepartment: vi.fn(), setReferenceNo: vi.fn(),
-      setNotes: vi.fn(), setSupplier: vi.fn(), setBundles: vi.fn(), goTo: vi.fn(),
+      setNotes: vi.fn(), setReasonCategory: vi.fn(), setSupplier: vi.fn(), setBundles: vi.fn(), goTo: vi.fn(),
     };
     function NormalizedHarness() {
       useIoDraftRestore({
