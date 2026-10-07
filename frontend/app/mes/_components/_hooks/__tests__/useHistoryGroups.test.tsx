@@ -31,6 +31,7 @@ function makeGroup(index: number) {
     type: "solo" as const,
     key: `solo:${index}`,
     logs: [{ log_id: `log-${index}`, created_at: "2026-07-15T00:00:00Z" }],
+    workGroups: [],
   };
 }
 

@@ -165,6 +165,7 @@ describe("productionApi", () => {
     }], next_cursor: null, has_more: false }))) as unknown as typeof fetch;
     const page = await productionApi.getTransactionDisplayGroups();
     expect(page.groups[0].workGroups?.[0]).toMatchObject({ type: "operation", key: "work-1", matchedLogIds: ["original"], logs: [log] });
+    expect(page.groups[0].workGroups?.[0].workGroups).toEqual([]);
   });
 
   it("previews an inventory operation cancellation and maps numeric cells", async () => {
