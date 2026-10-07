@@ -7,11 +7,14 @@ from typing import Annotated, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.database import get_db
 from app.models import DailyWorkReport, Employee, EmployeeAssignedModel, ProductSymbol, StockRequest
 from app.routers._errors import ErrorCode, http_error
 from app.schemas import (
+    EmployeeAppearanceResponse,
+    EmployeeAppearanceUpdate,
     EmployeeCreate,
     EmployeePinChangeRequest,
     EmployeePinResetRequest,
@@ -638,6 +641,39 @@ def update_employee_login_notification_popup(
     employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
     commit_and_refresh(db, employee)
     return _to_response(employee, _assigned_slots_for(db, employee.employee_id))
+
+@router.get("/{employee_id}/appearance", response_model=EmployeeAppearanceResponse)
+def get_employee_appearance(
+    employee_id: uuid.UUID, db: Session = Depends(get_db),
+) -> EmployeeAppearanceResponse:
+    """Return the latest appearance pair, normalizing unset preferences."""
+    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
+    if not employee:
+        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    return EmployeeAppearanceResponse(
+        employee_id=employee.employee_id,
+        theme="dark" if employee.theme == "dark" else "light",
+        sidebar_mode=employee.sidebar_mode if employee.sidebar_mode in SIDEBAR_MODES else "hover",
+    )
+
+
+@router.put("/{employee_id}/appearance", response_model=EmployeeAppearanceResponse)
+def update_employee_appearance(
+    employee_id: uuid.UUID, payload: EmployeeAppearanceUpdate, db: Session = Depends(get_db),
+) -> EmployeeAppearanceResponse:
+    """Commit both preferences together under the existing personal-setting policy."""
+    employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
+    if not employee:
+        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    employee.theme = payload.theme
+    employee.sidebar_mode = payload.sidebar_mode
+    # Include an unchanged field too: a concurrent writer must never split the pair.
+    flag_modified(employee, "theme")
+    flag_modified(employee, "sidebar_mode")
+    employee.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    commit_only(db)
+    return EmployeeAppearanceResponse(employee_id=employee.employee_id, **payload.model_dump())
+
 
 @router.put("/{employee_id}/theme", response_model=EmployeeResponse, status_code=status.HTTP_200_OK)
 def update_employee_theme(

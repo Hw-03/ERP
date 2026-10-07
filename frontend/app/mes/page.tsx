@@ -9,17 +9,20 @@ import { AdminSessionProvider } from "@/lib/auth/admin-session";
 import { QueryProvider } from "@/lib/queries/client";
 import { MesViewportSkeleton } from "./_components/MesViewportSkeleton";
 import { blockBrowserSaveShortcut } from "@/lib/mes/blockBrowserSaveShortcut";
+import { AppearancePreferencesProvider } from "./_components/useAppearancePreferences";
 
 export default function MesPage() {
   return (
     <AdminSessionProvider>
       <QueryProvider>
         <DepartmentsProvider>
-          <MesLoginGate>
-            <Suspense>
-              <MesBody />
-            </Suspense>
-          </MesLoginGate>
+          <AppearancePreferencesProvider>
+            <MesLoginGate>
+              <Suspense>
+                <MesBody />
+              </Suspense>
+            </MesLoginGate>
+          </AppearancePreferencesProvider>
         </DepartmentsProvider>
       </QueryProvider>
     </AdminSessionProvider>

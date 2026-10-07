@@ -38,6 +38,7 @@ function renderSettings(overrides: Partial<React.ComponentProps<typeof DesktopSe
 
 describe("DesktopSettingsView", () => {
   beforeEach(() => {
+    state.operator.employee_id = "emp-1";
     state.operator.loginPopupEnabled = true;
     state.changeMyPin.mockReset();
     state.changeMyPin.mockResolvedValue(undefined);
@@ -88,6 +89,34 @@ describe("DesktopSettingsView", () => {
     expect(screen.getByTestId("desktop-settings-view")).toBeInTheDocument();
   });
 
+  it("synchronizes pristine fields while preserving a dirty choice and entered PIN", () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    const { rerender } = render(<DesktopSettingsView preferences={initialPreferences} onSave={onSave} />);
+    fireEvent.click(screen.getByRole("button", { name: "다크 테마" }));
+    fireEvent.click(screen.getByRole("button", { name: "PIN 재설정" }));
+    fireEvent.change(screen.getByLabelText("현재 PIN"), { target: { value: "1234" } });
+    rerender(<DesktopSettingsView preferences={{ theme: "light", sidebarMode: "expanded" }} onSave={onSave} />);
+    expect(screen.getByRole("button", { name: "다크 테마" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "펼침 고정" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText("현재 PIN")).toHaveValue("1234");
+  });
+
+  it("clears PIN inputs on employee change and on cancel", () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    const { rerender } = render(<DesktopSettingsView preferences={initialPreferences} onSave={onSave} />);
+    fireEvent.click(screen.getByRole("button", { name: "PIN 재설정" }));
+    fireEvent.change(screen.getByLabelText("현재 PIN"), { target: { value: "1234" } });
+    state.operator.employee_id = "emp-2";
+    rerender(<DesktopSettingsView preferences={initialPreferences} onSave={onSave} />);
+    expect(screen.queryByRole("dialog", { name: "PIN 재설정" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "PIN 재설정" }));
+    expect(screen.getByLabelText("현재 PIN")).toHaveValue("");
+    fireEvent.change(screen.getByLabelText("현재 PIN"), { target: { value: "1234" } });
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    fireEvent.click(screen.getByRole("button", { name: "PIN 재설정" }));
+    expect(screen.getByLabelText("현재 PIN")).toHaveValue("");
+  });
+
   it("validates and submits a PIN change", async () => {
     renderSettings();
 
@@ -107,7 +136,7 @@ describe("DesktopSettingsView", () => {
     fireEvent.click(screen.getByRole("switch", { name: "로그인 시 읽지 않은 알림 팝업" }));
 
     await waitFor(() => expect(state.setLoginPopup).toHaveBeenCalledWith("emp-1", false));
-    expect(state.updateCurrentOperatorPreferences).toHaveBeenCalledWith({ loginPopupEnabled: false });
+    expect(state.updateCurrentOperatorPreferences).toHaveBeenCalledWith({ loginPopupEnabled: false }, "emp-1");
   });
 
   it("shows the admin PIN shortcut only when the employee can open admin", () => {

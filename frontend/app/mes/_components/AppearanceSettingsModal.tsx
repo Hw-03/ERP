@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ElementType, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ElementType, type ReactNode } from "react";
 import { useDesktopTabHome, useDesktopWorkGuard } from "./DesktopTabHome";
 import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import { BellRing, Check, KeyRound, Moon, PanelLeftClose, PanelLeftDashed, PanelLeftOpen, Settings2, Sun, X } from "lucide-react";
@@ -52,6 +52,10 @@ export function DesktopSettingsView({
 }) {
   const operator = useCurrentOperator();
   const [draft, setDraft] = useState(preferences);
+  const previousPreferences = useRef(preferences);
+  const previousEmployeeId = useRef(operator?.employee_id);
+  const employeeIdRef = useRef(operator?.employee_id);
+  employeeIdRef.current = operator?.employee_id;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pinExpanded, setPinExpanded] = useState(false);
@@ -94,11 +98,24 @@ export function DesktopSettingsView({
   }, [pinSaving, resetPinSettings]);
 
   useEffect(() => {
-    setDraft(preferences);
-    setError(null);
-    resetPinSettings();
-    setLoginPopupFeedback(null);
-  }, [preferences, resetPinSettings]);
+    const previous = previousPreferences.current;
+    if (previousEmployeeId.current !== operator?.employee_id) {
+      setDraft(preferences);
+      setError(null);
+      resetPinSettings();
+      setSaving(false);
+      setPinSaving(false);
+      setLoginPopupSaving(false);
+      setLoginPopupFeedback(null);
+    } else {
+      setDraft((current) => ({
+        theme: current.theme === previous.theme ? preferences.theme : current.theme,
+        sidebarMode: current.sidebarMode === previous.sidebarMode ? preferences.sidebarMode : current.sidebarMode,
+      }));
+    }
+    previousPreferences.current = preferences;
+    previousEmployeeId.current = operator?.employee_id;
+  }, [preferences, operator?.employee_id, resetPinSettings]);
 
   useEffect(() => {
     setLoginPopupEnabled(operator?.loginPopupEnabled ?? false);
@@ -113,15 +130,16 @@ export function DesktopSettingsView({
   }, [pinExpanded, closePinPopup]);
 
   const handleSave = async (propagateError = false) => {
+    const employeeId = operator?.employee_id;
     setSaving(true);
     setError(null);
     try {
       await onSave(draft);
     } catch (saveError) {
-      setError("설정을 저장하지 못했습니다. 다시 시도해 주세요.");
+      if (employeeIdRef.current === employeeId) setError("설정을 저장하지 못했습니다. 다시 시도해 주세요.");
       if (propagateError) throw saveError;
     } finally {
-      setSaving(false);
+      if (employeeIdRef.current === employeeId) setSaving(false);
     }
   };
 
@@ -148,18 +166,20 @@ export function DesktopSettingsView({
     setPinSaving(true);
     try {
       await api.changeMyPin(operator.employee_id, pinCurrent, pinNew);
+      if (employeeIdRef.current !== operator.employee_id) return;
       setPinCurrent("");
       setPinNew("");
       setPinConfirm("");
       setPinExpanded(false);
       setPinFeedback({ tone: "success", text: "PIN이 변경되었습니다." });
     } catch (pinError) {
+      if (employeeIdRef.current !== operator.employee_id) return;
       setPinFeedback({
         tone: "error",
         text: pinError instanceof Error ? pinError.message : "PIN 변경에 실패했습니다.",
       });
     } finally {
-      setPinSaving(false);
+      if (employeeIdRef.current === operator.employee_id) setPinSaving(false);
     }
   };
 
@@ -170,13 +190,14 @@ export function DesktopSettingsView({
     setLoginPopupFeedback(null);
     try {
       await employeesApi.setLoginPopup(operator.employee_id, nextEnabled);
-      updateCurrentOperatorPreferences({ loginPopupEnabled: nextEnabled });
+      if (employeeIdRef.current !== operator.employee_id) return;
+      updateCurrentOperatorPreferences({ loginPopupEnabled: nextEnabled }, operator.employee_id);
       setLoginPopupEnabled(nextEnabled);
       setLoginPopupFeedback({ tone: "success", text: "알림 팝업 설정을 저장했습니다." });
     } catch {
-      setLoginPopupFeedback({ tone: "error", text: "알림 팝업 설정을 저장하지 못했습니다." });
+      if (employeeIdRef.current === operator.employee_id) setLoginPopupFeedback({ tone: "error", text: "알림 팝업 설정을 저장하지 못했습니다." });
     } finally {
-      setLoginPopupSaving(false);
+      if (employeeIdRef.current === operator.employee_id) setLoginPopupSaving(false);
     }
   };
 

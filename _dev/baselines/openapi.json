@@ -3296,6 +3296,66 @@
         "title": "DeptAdjSubmitRequest",
         "type": "object"
       },
+      "EmployeeAppearanceResponse": {
+        "properties": {
+          "employee_id": {
+            "format": "uuid",
+            "title": "Employee Id",
+            "type": "string"
+          },
+          "sidebar_mode": {
+            "enum": [
+              "hover",
+              "collapsed",
+              "expanded"
+            ],
+            "title": "Sidebar Mode",
+            "type": "string"
+          },
+          "theme": {
+            "enum": [
+              "light",
+              "dark"
+            ],
+            "title": "Theme",
+            "type": "string"
+          }
+        },
+        "required": [
+          "theme",
+          "sidebar_mode",
+          "employee_id"
+        ],
+        "title": "EmployeeAppearanceResponse",
+        "type": "object"
+      },
+      "EmployeeAppearanceUpdate": {
+        "properties": {
+          "sidebar_mode": {
+            "enum": [
+              "hover",
+              "collapsed",
+              "expanded"
+            ],
+            "title": "Sidebar Mode",
+            "type": "string"
+          },
+          "theme": {
+            "enum": [
+              "light",
+              "dark"
+            ],
+            "title": "Theme",
+            "type": "string"
+          }
+        },
+        "required": [
+          "theme",
+          "sidebar_mode"
+        ],
+        "title": "EmployeeAppearanceUpdate",
+        "type": "object"
+      },
       "EmployeeCreate": {
         "properties": {
           "as_research_approver": {
@@ -17872,6 +17932,102 @@
           }
         },
         "summary": "Update Employee",
+        "tags": [
+          "Employees"
+        ]
+      }
+    },
+    "/api/employees/{employee_id}/appearance": {
+      "get": {
+        "description": "Return the latest appearance pair, normalizing unset preferences.",
+        "operationId": "get_employee_appearance_api_employees__employee_id__appearance_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "employee_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Employee Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmployeeAppearanceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Employee Appearance",
+        "tags": [
+          "Employees"
+        ]
+      },
+      "put": {
+        "description": "Commit both preferences together under the existing personal-setting policy.",
+        "operationId": "update_employee_appearance_api_employees__employee_id__appearance_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "employee_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Employee Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmployeeAppearanceUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmployeeAppearanceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Employee Appearance",
         "tags": [
           "Employees"
         ]

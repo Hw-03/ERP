@@ -1,6 +1,6 @@
 """직원·PIN schema."""
 
-from typing import List, Optional
+from typing import List, Literal, Optional
 import uuid
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -102,3 +102,12 @@ class EmployeeThemeUpdate(BaseModel):
 
 class EmployeeSidebarModeUpdate(BaseModel):
     sidebar_mode: str = Field(..., max_length=10)
+
+
+class EmployeeAppearanceUpdate(BaseModel):
+    theme: Literal["light", "dark"]
+    sidebar_mode: Literal["hover", "collapsed", "expanded"]
+
+
+class EmployeeAppearanceResponse(EmployeeAppearanceUpdate):
+    employee_id: uuid.UUID

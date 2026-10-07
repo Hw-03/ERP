@@ -11,8 +11,18 @@
 import { deleteJson, fetcher, postJson, putJson, toApiUrl } from "../api-core";
 import type { Department, DepartmentRole, Employee, SidebarMode, WarehouseRole } from "./types";
 
+export type EmployeeAppearance = {
+  employee_id: string;
+  theme: "light" | "dark";
+  sidebar_mode: SidebarMode;
+};
 
 export const employeesApi = {
+  getEmployeeAppearance: (employeeId: string, signal?: AbortSignal) =>
+    fetcher<EmployeeAppearance>(toApiUrl(`/api/employees/${employeeId}/appearance`), signal),
+
+  setEmployeeAppearance: (employeeId: string, appearance: Omit<EmployeeAppearance, "employee_id">) =>
+    putJson<EmployeeAppearance>(toApiUrl(`/api/employees/${employeeId}/appearance`), appearance),
   getEmployees: (params?: { department?: Department; activeOnly?: boolean }, signal?: AbortSignal) => {
     const query = new URLSearchParams();
     if (params?.department) query.set("department", params.department);
