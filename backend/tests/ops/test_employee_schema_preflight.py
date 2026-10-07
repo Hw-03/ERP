@@ -115,6 +115,71 @@ def test_preflight_rejects_model_code_changes_without_a_migration(tmp_path: Path
         )
 
 
+@pytest.mark.parametrize(
+    "change, dialect, allowed",
+    [
+        ("material", "sqlite", True),
+        ("material", "postgresql", False),
+        ("material", None, False),
+        ("other-value", "sqlite", False),
+        ("removed-value", "sqlite", False),
+        ("reordered", "sqlite", False),
+        ("guard-removed", "sqlite", False),
+        ("guard-changed-both", "sqlite", False),
+        ("extra-consumer", "sqlite", False),
+        ("extra-consumer-both", "sqlite", False),
+        ("other-code", "sqlite", False),
+        ("model-code", "sqlite", False),
+    ],
+)
+def test_preflight_limits_pg_enum_exception_to_sqlite_material_out(
+    tmp_path: Path, capsys, change: str, dialect: str | None, allowed: bool,
+) -> None:
+    module = _load_preflight_module()
+    source, target = tmp_path / "source", tmp_path / "target"
+    old = (
+        '_PG_TRANSACTION_TYPE_ENUM_VALUES: tuple[str, ...] = ("RECEIVE", "SHIP")\n'
+        'def _drop_dead_transaction_type_enum_values():\n'
+        '    if engine.dialect.name != "postgresql":\n'
+        '        return\n'
+        '    values = list(_PG_TRANSACTION_TYPE_ENUM_VALUES)\n'
+    )
+    new = old.replace('"SHIP")', '"SHIP", "MATERIAL_OUT")')
+    if change == "other-value":
+        new = new.replace("MATERIAL_OUT", "OTHER")
+    elif change == "removed-value":
+        new = new.replace('"RECEIVE", ', '')
+    elif change == "reordered":
+        new = new.replace('"RECEIVE", "SHIP"', '"SHIP", "RECEIVE"')
+    elif change in ("guard-removed", "guard-changed-both"):
+        guard = '    if engine.dialect.name != "postgresql":\n        return\n'
+        new = new.replace(guard, '')
+        if change == "guard-changed-both":
+            old = old.replace(guard, '')
+    elif change in ("extra-consumer", "extra-consumer-both"):
+        new += 'other = _PG_TRANSACTION_TYPE_ENUM_VALUES\n'
+        if change == "extra-consumer-both":
+            old += 'other = _PG_TRANSACTION_TYPE_ENUM_VALUES\n'
+    elif change == "other-code":
+        new += 'other = 1\n'
+    for root, content in ((source, new), (target, old)):
+        (root / "alembic" / "versions").mkdir(parents=True)
+        (root / "bootstrap").mkdir()
+        (root / "app" / "models").mkdir(parents=True)
+        (root / "bootstrap" / "migrate.py").write_text(content, encoding="utf-8")
+        model = '"""source docs"""\nvalue = 1\n' if root == source else '"""old docs"""\nvalue = 1\n'
+        if change == "model-code" and root == source:
+            model = model.replace("value = 1", "value = 2")
+        (root / "app" / "models" / "item.py").write_text(model, encoding="utf-8")
+    args = (source, target, source / "alembic" / "versions", target / "alembic" / "versions")
+    if allowed:
+        assert module.load_preflight_policies(*args, database_dialect=dialect) == ()
+        assert "SQLITE_PG_MATERIAL_OUT_ONLY" in capsys.readouterr().out
+    else:
+        with pytest.raises(module.PreflightPolicyError):
+            module.load_preflight_policies(*args, database_dialect=dialect)
+
+
 def test_data_change_policy_requires_a_query_validator(tmp_path: Path) -> None:
     module = _load_preflight_module()
     source = tmp_path / "source"
@@ -292,7 +357,7 @@ def test_preflight_checks_operations_only_on_snapshot(tmp_path, monkeypatch, fai
         "--operation-tool", str(tmp_path / "inventory_operation_admin.py"),
         "--backup-tool", str(tmp_path / "backup_db.py"),
     ])
-    monkeypatch.setattr(module, "load_preflight_policies", lambda *args: ())
+    monkeypatch.setattr(module, "load_preflight_policies", lambda *args, **kwargs: ())
     monkeypatch.setenv("MES_RUNTIME_ROOT", str(tmp_path / "forbidden-runtime"))
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("REQUIRE_POSTGRES", "1")

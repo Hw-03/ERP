@@ -202,8 +202,50 @@ def _is_model_python(relative_path: Path) -> bool:
     return len(parts) >= 3 and parts[0:2] == ("app", "models") and relative_path.suffix.casefold() == ".py"
 
 
-def assert_only_nonsemantic_schema_changes(source_backend: Path, target_backend: Path) -> None:
-    """Allow a no-migration preflight only when model Python semantics are unchanged."""
+def _is_sqlite_pg_material_out_only(source: Path, target: Path) -> bool:
+    """Accept the reviewed PG-only tuple append, proving its sole consumer stays guarded."""
+    name = "_PG_TRANSACTION_TYPE_ENUM_VALUES"
+    trees = [ast.parse(path.read_text(encoding="utf-8-sig"), type_comments=True) for path in (source, target)]
+    assignments = []
+    guard = ast.parse('if engine.dialect.name != "postgresql":\n    return').body[0]
+    for tree in trees:
+        declarations = [node for node in tree.body if isinstance(node, ast.AnnAssign)
+                        and isinstance(node.target, ast.Name) and node.target.id == name]
+        if len(declarations) != 1:
+            return False
+        functions = [node for node in tree.body if isinstance(node, ast.FunctionDef)
+                     and node.name == "_drop_dead_transaction_type_enum_values"]
+        if len(functions) != 1:
+            return False
+        function = functions[0]
+        body = function.body
+        if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) and isinstance(body[0].value.value, str):
+            body = body[1:]
+        if not body or ast.dump(body[0], include_attributes=False) != ast.dump(guard, include_attributes=False):
+            return False
+        references = [node for node in ast.walk(tree) if isinstance(node, ast.Name) and node.id == name]
+        consumer_references = [node for statement in body[1:] for node in ast.walk(statement)
+                               if isinstance(node, ast.Name) and node.id == name and isinstance(node.ctx, ast.Load)]
+        if len(references) != 2 or len(consumer_references) != 1:
+            return False
+        assignments.append(declarations[0])
+    try:
+        new, old = (ast.literal_eval(node.value) for node in assignments)
+    except (ValueError, TypeError):
+        return False
+    if not isinstance(old, tuple) or not all(isinstance(value, str) for value in old):
+        return False
+    if "MATERIAL_OUT" in old or new != old + ("MATERIAL_OUT",):
+        return False
+    assignments[0].value = assignments[1].value
+    return ast.dump(trees[0], include_attributes=False) == ast.dump(trees[1], include_attributes=False)
+
+
+def assert_only_nonsemantic_schema_changes(
+    source_backend: Path, target_backend: Path, *, database_dialect: str | None = None,
+) -> bool:
+    """Allow model docs or the reviewed SQLite-safe PG change; return whether PG was allowed."""
+    pg_exception = False
     source_files = _schema_sensitive_files(source_backend)
     target_files = _schema_sensitive_files(target_backend)
     if source_files.keys() != target_files.keys():
@@ -221,9 +263,14 @@ def assert_only_nonsemantic_schema_changes(source_backend: Path, target_backend:
             _python_ast_without_docstrings(source_path) == _python_ast_without_docstrings(target_path)
         ):
             continue
+        if database_dialect == "sqlite" and relative_path == Path("bootstrap/migrate.py"):
+            if _is_sqlite_pg_material_out_only(source_path, target_path):
+                pg_exception = True
+                continue
         raise PreflightPolicyError(
             f"schema change has no changed Alembic migration policy: {relative_path} changed semantically"
         )
+    return pg_exception
 
 
 def load_preflight_policies(
@@ -231,8 +278,10 @@ def load_preflight_policies(
     target_backend: Path,
     source_migrations: Path,
     target_migrations: Path,
+    *,
+    database_dialect: str | None = None,
 ) -> tuple[MigrationPolicy, ...]:
-    """Load migration contracts or prove that guarded changes are documentation-only."""
+    """Load migration contracts or prove guarded changes cannot affect the SQLite DB."""
     policies = load_changed_migration_policies(
         source_migrations,
         target_migrations,
@@ -240,8 +289,11 @@ def load_preflight_policies(
     )
     if policies:
         return policies
-    assert_only_nonsemantic_schema_changes(source_backend, target_backend)
-    print("PREFLIGHT_POLICY=NO_MIGRATION_DOCUMENTATION_ONLY")
+    pg_exception = assert_only_nonsemantic_schema_changes(
+        source_backend, target_backend, database_dialect=database_dialect,
+    )
+    reason = "SQLITE_PG_MATERIAL_OUT_ONLY" if pg_exception else "DOCUMENTATION_ONLY"
+    print(f"PREFLIGHT_POLICY=NO_MIGRATION_{reason}")
     return ()
 
 
@@ -369,11 +421,19 @@ def _run_checked(command: list[str], working_directory: Path, environment: dict[
 def run_preflight(args: argparse.Namespace) -> Path:
     """Migrate only an isolated backup and prove its declared data contract."""
     print("PREFLIGHT_STAGE=policy")
+    try:
+        with args.employee_db.open("rb") as database_file:
+            sqlite_database = database_file.read(16) == b"SQLite format 3\x00"
+    except OSError as exc:
+        raise PreflightPolicyError("cannot verify employee SQLite database") from exc
+    if not sqlite_database:
+        raise PreflightPolicyError("employee database is not SQLite")
     policies = load_preflight_policies(
         args.backend_dir,
         args.target_backend_dir,
         args.source_migrations,
         args.target_migrations,
+        database_dialect="sqlite",
     )
     print("PREFLIGHT_STAGE=snapshot")
     snapshot = _copy_verified_snapshot(args.employee_db, args.runtime_root)
