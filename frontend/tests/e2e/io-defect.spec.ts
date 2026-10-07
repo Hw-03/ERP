@@ -24,10 +24,10 @@ test.describe("불량 — 격리 / 해제", () => {
     await workCard.click();
     await page.getByRole("button").filter({ hasText: "격리 등록", visible: true }).click();
     // 같은 화면에서 출처를 고르면 품목으로 바로 진행한다.
-    await expect(page.getByRole("button", { name: /부서 재고/ }).filter({ visible: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: /창고 재고/ }).filter({ visible: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^부서 재고/ }).filter({ visible: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^창고 재고/ }).filter({ visible: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "조립", exact: true }).filter({ visible: true })).toHaveCount(0);
-    await page.getByRole("button", { name: /창고 재고/ }).filter({ visible: true }).click();
+    await page.getByRole("button", { name: /^창고 재고/ }).filter({ visible: true }).click();
     // Step 2: 시드 원자재 행 "추가".
     await page
       .getByRole("row", { name: /E2E원자재튜브/ })
@@ -35,14 +35,9 @@ test.describe("불량 — 격리 / 해제", () => {
       .click();
     // 장바구니: 수량 + 사유 카테고리
     await page.getByPlaceholder("예: 3").fill("5");
-    // 카테고리 셀렉트는 native <select> 가 아니라 커스텀 AppSelect(button + listbox).
-    // trigger 클릭 → 옵션 클릭으로 commit.
-    await page
-      .getByRole("combobox")
-      .filter({ hasText: "카테고리 선택" })
-      .first()
-      .click();
-    await page.getByRole("option", { name: "외관 불량" }).click();
+    // 사유 마스터 선택 다이얼로그에서 활성 카테고리를 선택한다.
+    await page.getByRole("button", { name: "사유 카테고리 선택", exact: true }).filter({ visible: true }).click();
+    await page.getByRole("dialog", { name: "사유 카테고리", exact: true }).getByRole("button", { name: "외관 불량", exact: true }).click();
     // 제출 → ConfirmModal → 확인
     await page.getByRole("button", { name: /격리하기 \(1건\)/ }).click();
     await page
@@ -63,14 +58,10 @@ test.describe("불량 — 격리 / 해제", () => {
     // ── 해제(정상 복귀) ───────────────────────────────────
     await page.getByRole("button", { name: "처리", exact: true }).filter({ visible: true }).first().click();
     await expect(page.getByRole("heading", { name: /불량 처리/ })).toBeVisible();
-    // 처리 흐름은 DefectProcessPanel 이며 카테고리 셀렉트가 여전히 native <select>.
-    // AppSelect 로 교체된 격리 흐름과는 다르므로 selectOption() 사용.
-    await page
-      .locator("select")
-      .filter({ hasText: "외관 불량" })
-      .first()
-      .selectOption("외관 불량");
-    // 정상 복귀는 ConfirmModal 없이 직접 제출.
+    await expect(page.getByRole("button", { name: "정상 복귀 →" })).toBeDisabled();
+    await page.getByRole("button", { name: "사유 카테고리 선택", exact: true }).filter({ visible: true }).click();
+    await page.getByRole("dialog", { name: "사유 카테고리", exact: true }).getByRole("button", { name: "검사 통과", exact: true }).click();
+    // 정상 복귀 제출 후 즉시 처리 확인창에서 확정한다.
     // 재설계 후 "정상 복귀" ActionCard 와 제출 버튼이 공존 → 화살표 포함 제출 버튼만 정확히 겨냥.
     await page.getByRole("button", { name: "정상 복귀 →" }).click();
     await page

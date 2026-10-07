@@ -84,14 +84,13 @@ async function cleanupItemRecords(
   for (const record of records.filter((entry) => entry.item_id === itemId)) {
     const available = Number(record.available_quantity ?? 0);
     if (available <= 0) continue;
-    await request.post("/api/defects/unquarantine", {
-      data: {
-        record_id: record.record_id,
-        item_id: itemId,
-        qty: available,
-        dept: department,
-        actor_employee_id: actorEmployeeId,
-      },
+    await postJson(request, "/api/defects/unquarantine", {
+      record_id: record.record_id,
+      item_id: itemId,
+      qty: available,
+      dept: department,
+      reason_category: "검사 통과",
+      actor_employee_id: actorEmployeeId,
     });
   }
 }
@@ -181,6 +180,9 @@ test.describe("불량 격리 건별 원장", () => {
     await page.getByRole("spinbutton").fill("2");
     await expect(page.getByRole("button", { name: "정상 복귀 →" })).toBeDisabled();
     await page.getByPlaceholder("예: 스크래치 다수 / 우측 끝단").fill("검사 완료 후 일부 정상 복귀");
+    await expect(page.getByRole("button", { name: "정상 복귀 →" })).toBeDisabled();
+    await page.getByRole("button", { name: "사유 카테고리 선택", exact: true }).click();
+    await page.getByRole("dialog", { name: "사유 카테고리", exact: true }).getByRole("button", { name: "검사 통과", exact: true }).click();
     await page.getByRole("button", { name: "정상 복귀 →" }).click();
     await page.getByRole("dialog").getByRole("button", { name: "즉시 복귀", exact: true }).click();
     await expect(page.getByRole("button").filter({ hasText: "격리 목록", visible: true })).toBeVisible();
@@ -303,6 +305,9 @@ test.describe("불량 격리 건별 원장", () => {
     await page.getByRole("spinbutton").filter({ visible: true }).fill("2");
     await expect(page.getByRole("button", { name: "정상 복귀 →", exact: true }).filter({ visible: true })).toBeDisabled();
     await page.getByPlaceholder("예: 스크래치 다수 / 우측 끝단").filter({ visible: true }).fill("B급 재검사 완료 후 일부 정상 복귀");
+    await expect(page.getByRole("button", { name: "정상 복귀 →", exact: true }).filter({ visible: true })).toBeDisabled();
+    await page.getByRole("button", { name: "사유 카테고리 선택", exact: true }).filter({ visible: true }).click();
+    await page.getByRole("dialog", { name: "사유 카테고리", exact: true }).getByRole("button", { name: "검사 통과", exact: true }).click();
     await page.getByRole("button", { name: "정상 복귀 →", exact: true }).filter({ visible: true }).click();
     await page.getByRole("dialog").getByRole("button", { name: "즉시 복귀", exact: true }).click();
     await expect(page.getByRole("heading", { name: "B급·구형 자재" }).filter({ visible: true })).toBeVisible();
