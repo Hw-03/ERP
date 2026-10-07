@@ -58,9 +58,10 @@ test.describe("입출고 V2 — 부서 입출고(생산)", () => {
       .click();
     await advanceToQuantityStep(page);
 
-    // 품목 확인 묶음 카드 펼치기 → 자식 라인 노출
-    // (76e4ffd2 — BOM 상위에 mes_code span 추가로 accessible name 사이에 코드가 끼어듦)
-    await page.getByRole("button", { name: /E2E조립튜브.*기준 수량/ }).click();
+    // 헤더 중앙은 화면 폭에 따라 수량 버튼에 닿으므로 품목 영역의 빈 가장자리를 누른다.
+    const bundleHeader = page.getByRole("button", { name: /E2E조립튜브.*기준 수량/ });
+    await bundleHeader.locator("[data-io-identity]").click({ position: { x: 4, y: 4 } });
+    await expect(bundleHeader).toHaveAttribute("aria-expanded", "true");
 
     const child = page.locator("li").filter({ has: page.getByText("E2E원자재튜브", { exact: true }) });
     await expect(child).toBeVisible();
