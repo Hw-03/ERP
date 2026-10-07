@@ -7,6 +7,7 @@ import type { Operator } from "../../login/useCurrentOperator";
 import { NotificationBell } from "../../notifications/NotificationBell";
 import type { NotificationNavigationTarget } from "../../notifications/NotificationBell";
 import presentation from "../mobilePresentation.module.css";
+import { MobilePageHeader } from "../primitives/MobilePageHeader";
 
 export type MobileMoreEntryId = "assemblyChecklist" | "dailyReport" | "weekly" | "shipping" | "warehouseMap";
 
@@ -77,33 +78,17 @@ export function MobileMoreScreen({
   const entries = visibleEntries.map((id) => ({ id, ...MORE_ENTRIES[id], onClick: handlers[id] }));
 
   return (
-    <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3">
-      <div
-        className="flex shrink-0 items-center gap-2 rounded-[20px] border p-2"
-        style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
-      >
-        {operator && (
-          <button
-            type="button"
-            onClick={onProfile}
-            className="min-h-[60px] min-w-0 flex-1 rounded-[14px] px-3 text-left active:scale-[0.99]"
-          >
-            <span className="block min-w-0">
-              <span className="block text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-                프로필
-              </span>
-              <span className="block break-words text-[15px] font-semibold leading-5">{operator.name}</span>
-            </span>
-          </button>
-        )}
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <MobilePageHeader className="mx-3" title={operator?.name ?? "더보기"} subtitle={operator ? "프로필" : undefined} onTitleClick={operator ? onProfile : undefined} right={
         <div
           data-testid="mobile-more-notification-target"
-          className="flex h-11 w-11 shrink-0 items-center justify-center [&>div>button]:h-11 [&>div>button]:w-11"
+          className="flex h-11 w-11 shrink-0 items-center justify-center [&>div>button]:h-11 [&>div>button]:w-11 [&>div>button>svg]:h-5 [&>div>button>svg]:w-5"
         >
           <NotificationBell onNavigate={onNotificationNavigate} loginDialogEnabled={false} mobilePresentation />
         </div>
-      </div>
+      } />
 
+      <div className="scrollbar-hide flex min-h-0 flex-1 flex-col overflow-y-auto px-3">
       {entries.length > 0 && (
         <div
           data-testid="mobile-more-menu-list"
@@ -120,6 +105,7 @@ export function MobileMoreScreen({
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }

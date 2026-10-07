@@ -2,7 +2,7 @@
 import { ReadFailure } from "../../common/ReadState";
 import { MobileIoRestoreSkeleton } from "../warehouse/MobileIoRestoreSkeleton";
 
-import { useEffect, useRef, useState, type MutableRefObject } from "react";
+import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import { api, type IoBatch, type Item, type StockRequest } from "@/lib/api";
 import { isDepartmentApprover } from "../../_warehouse_steps";
 import { useWarehouseData } from "../../_warehouse_hooks/useWarehouseData";
@@ -50,6 +50,7 @@ export function MobileWarehouseScreen({
   onSubmitSuccess,
   onComposeDirtyChange,
   flushDraftRef: externalFlushRef,
+  endEditingRef,
   notificationSection,
   targetRequestId,
 }: {
@@ -62,6 +63,8 @@ export function MobileWarehouseScreen({
   // 상위가 이탈 직전 draft flush 를 호출할 수 있게 ref 를 공유받는다.
   onComposeDirtyChange?: (dirty: boolean) => void;
   flushDraftRef?: MutableRefObject<(() => Promise<void>) | null>;
+  /** 탭 이동이 확정되면 이전 저장·복원 응답과 자동 복원 연결을 종료한다. */
+  endEditingRef?: MutableRefObject<(() => void) | null>;
   notificationSection?: string | null;
   targetRequestId?: string | null;
 }) {
@@ -133,6 +136,36 @@ export function MobileWarehouseScreen({
   // 항목 16 — flush ref 는 상위(MobileShell)가 내려주면 공유, 없으면 로컬 사용(섹션 가드 단독 동작 보장).
   const localFlushRef = useRef<(() => Promise<void>) | null>(null);
   const flushDraftRef = externalFlushRef ?? localFlushRef;
+  const mountedRef = useRef(false);
+  const editingGenerationRef = useRef(0);
+  const editingGeneration = editingGenerationRef.current;
+
+  const endEditing = useCallback((): void => {
+    editingGenerationRef.current += 1;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("tab") === "warehouse") {
+      for (const key of ["section", "step", "draftId"]) url.searchParams.delete(key);
+      window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    }
+    restoredUrlDraftRef.current = null;
+    setRestoreIoDraft(null);
+    setUrlDraftPending(false);
+    setUrlDraftRestoreError(null);
+    setRestoreNonce((value) => value + 1);
+    setComposeStep(1);
+    setComposeDirty(false);
+  }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    if (endEditingRef) endEditingRef.current = endEditing;
+    return () => {
+      mountedRef.current = false;
+      if (endEditingRef) endEditingRef.current = null;
+    };
+  }, [endEditing, endEditingRef]);
+
+  const isCurrentEditing = (): boolean => mountedRef.current && editingGenerationRef.current === editingGeneration;
 
   // 작성 중 여부를 상위로 보고 → 하단 네비 탭 이탈 가드에 사용.
   useEffect(() => {
@@ -190,6 +223,7 @@ export function MobileWarehouseScreen({
   useEffect(() => {
     if (!operatorEmployeeId) return;
     let cancelled = false;
+    const generation = editingGenerationRef.current;
     setFailedCounts((tabs) => tabs.filter((tab) => tab !== "cart"));
     const legacyDraftsPromise = api.listStockRequestDrafts(operatorEmployeeId);
     const ioDraftsPromise = api.listDrafts(operatorEmployeeId);
@@ -221,7 +255,7 @@ export function MobileWarehouseScreen({
     setUrlDraftRestoreError(null);
     void ioDraftsPromise
       .then((ioRows) => {
-        if (cancelled) return;
+        if (cancelled || generation !== editingGenerationRef.current) return;
         const matchingDraft = ioRows.find((draft) => draft.batch_id === urlDraftId);
         if (!matchingDraft) {
           setUrlDraftRestoreError("저장한 작업을 찾을 수 없습니다.");
@@ -235,7 +269,7 @@ export function MobileWarehouseScreen({
         setUrlDraftPending(false);
       })
       .catch(() => {
-        if (cancelled) return;
+        if (cancelled || generation !== editingGenerationRef.current) return;
         setUrlDraftRestoreError("저장한 작업을 불러오지 못했습니다.");
         setUrlDraftPending(false);
       });
@@ -327,6 +361,7 @@ export function MobileWarehouseScreen({
       setPendingTab(next);
       return;
     }
+    if (sectionTab === "compose" && next !== "compose") endEditing();
     setSectionTab(next);
     setInboxOpen(false);
   }
@@ -394,23 +429,26 @@ export function MobileWarehouseScreen({
             items={items}
             productModels={productModels}
             setItems={setItems}
-            preselectedItem={preselectedItem}
+            preselectedItem={editingGeneration === 0 ? preselectedItem : null}
             restoreDraft={restoreIoDraft}
             restoreNonce={restoreNonce}
             restoreStep={urlRestoreStep}
-            entryIntent={entryIntent}
-            onDirtyChange={setComposeDirty}
+            entryIntent={editingGeneration === 0 ? entryIntent : null}
+            onDirtyChange={(dirty) => { if (isCurrentEditing()) setComposeDirty(dirty); }}
             flushDraftRef={flushDraftRef}
-            onStepChange={setComposeStep}
+            onStepChange={(step) => { if (isCurrentEditing()) setComposeStep(step); }}
             onStatusChange={(status) => {
+              if (!isCurrentEditing()) return;
               onStatusChange(status);
               setPanelRefreshNonce((n) => n + 1);
             }}
             onSubmitSuccess={() => {
+              if (!isCurrentEditing()) return;
               setPanelRefreshNonce((n) => n + 1);
               onSubmitSuccess?.();
             }}
             onDraftSaved={(batchId, step, persistInUrl) => {
+              if (!isCurrentEditing()) return;
               if (persistInUrl === false) {
                 clearWarehouseDraftRestore(batchId, setRestoreIoDraft, restoredUrlDraftRef);
                 return;
@@ -456,15 +494,20 @@ export function MobileWarehouseScreen({
       <MobileDirtyLeaveSheet
         open={pendingTab !== null}
         onCancel={() => setPendingTab(null)}
-        onConfirm={() => {
-          flushDraftRef.current?.(); // 700ms 디바운스 창의 마지막 변경까지 즉시 저장
+        onConfirm={async () => {
+          try {
+            await flushDraftRef.current?.();
+          } catch {
+            return;
+          }
           const next = pendingTab;
+          endEditing();
           setPendingTab(null);
           setComposeDirty(false);
           if (next) { setSectionTab(next); setInboxOpen(false); }
         }}
         onDiscard={() => {
-          // 항목 3-4 — 저장(flush) 없이 섹션 이동. compose 위저드는 언마운트되어 작성 내용이 폐기된다.
+          endEditing();
           const next = pendingTab;
           setPendingTab(null);
           setComposeDirty(false);

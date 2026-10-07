@@ -10,6 +10,8 @@ const currentWizardProps = vi.hoisted(() => ({
     restoreStep?: number;
     onDraftSaved?: (batchId: string, step: number, persistInUrl?: boolean) => void;
     onStatusChange?: (status: string) => void;
+    preselectedItem?: unknown;
+    entryIntent?: unknown;
   },
 }));
 
@@ -99,7 +101,7 @@ vi.mock("../../../_warehouse_sections/WarehouseDraftPanelTabs", () => ({
 }));
 
 vi.mock("../../warehouse/MobileDirtyLeaveSheet", () => ({
-  MobileDirtyLeaveSheet: ({ open, onCancel, onDiscard }: { open: boolean; onCancel: () => void; onDiscard: () => void }) => open ? <div role="dialog"><button onClick={onCancel}>stay</button><button onClick={onDiscard}>discard</button></div> : null,
+  MobileDirtyLeaveSheet: ({ open, onCancel, onDiscard, onConfirm }: { open: boolean; onCancel: () => void; onDiscard: () => void; onConfirm: () => Promise<void> }) => open ? <div role="dialog"><button onClick={onCancel}>stay</button><button onClick={onDiscard}>discard</button><button onClick={() => void onConfirm()}>save and leave</button></div> : null,
 }));
 
 vi.mock("../../warehouse/MobileIoComposeWizard", () => ({
@@ -115,6 +117,50 @@ vi.mock("../../warehouse/MobileIoComposeWizard", () => ({
 }));
 
 describe("MobileWarehouseScreen compact step header", () => {
+  it("섹션 이동은 임시저장이 끝날 때까지 기다리고 실패하면 작성 위치를 유지한다", async () => {
+    let finish!: () => void;
+    const flushDraftRef = { current: vi.fn(() => new Promise<void>((resolve) => { finish = resolve; })) };
+    render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} flushDraftRef={flushDraftRef} />);
+    act(() => currentWizardProps.value?.onDirtyChange?.(true));
+    fireEvent.click(screen.getByText("cart"));
+    fireEvent.click(screen.getByText("save and leave"));
+    expect(screen.getByTestId("compose-wizard")).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await act(async () => finish());
+    expect(screen.getByTestId("draft-panels")).toHaveAttribute("data-section-tab", "cart");
+    fireEvent.click(screen.getByText("compose"));
+    act(() => currentWizardProps.value?.onDirtyChange?.(true));
+    flushDraftRef.current.mockRejectedValueOnce(new Error("save failed"));
+    fireEvent.click(screen.getByText("cart"));
+    await act(async () => fireEvent.click(screen.getByText("save and leave")));
+    expect(screen.getByTestId("compose-wizard")).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+  it("섹션 폐기는 복원 연결을 끊고 이전 저장 응답이 URL을 다시 바꾸지 못하게 한다", async () => {
+    render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />);
+    const oldProps = currentWizardProps.value!;
+    act(() => {
+      oldProps.onDraftSaved?.("old-draft", 3);
+      oldProps.onDirtyChange?.(true);
+    });
+    fireEvent.click(screen.getByText("cart"));
+    fireEvent.click(screen.getByText("discard"));
+    expect(window.location.search).toBe("?tab=warehouse");
+    act(() => oldProps.onDraftSaved?.("late-draft", 4));
+    expect(window.location.search).toBe("?tab=warehouse");
+    fireEvent.click(screen.getByText("compose"));
+    expect(currentWizardProps.value?.restoreDraft).toBeNull();
+    expect(currentWizardProps.value?.restoreStep).toBeUndefined();
+  });
+
+  it("언마운트된 입출고의 저장 응답은 현재 탭 URL을 변경하지 않는다", () => {
+    const view = render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} />);
+    const oldProps = currentWizardProps.value!;
+    view.unmount();
+    window.history.replaceState({}, "", "/mes?tab=history");
+    act(() => oldProps.onDraftSaved?.("late-draft", 4));
+    expect(window.location.search).toBe("?tab=history");
+  });
   it("distinguishes first count failure, pending retry, and successful zero", async () => {
     operatorState.value = { ...operatorState.value, employee_id: "count-retry" };
     apiMocks.listStockRequestDrafts.mockRejectedValueOnce(new Error("count failed"));
@@ -269,6 +315,19 @@ describe("MobileWarehouseScreen compact step header", () => {
     act(() => currentWizardProps.value?.onDraftSaved?.("draft-a", 4, false));
     expect(new URLSearchParams(window.location.search).get("draftId")).toBe("draft-b");
     expect(currentWizardProps.value?.restoreDraft?.batch_id).toBe("draft-b");
+  });
+
+  it("품목 연결로 시작한 작업도 내부 섹션 이탈 후 새 작성에 자동 적용하지 않는다", async () => {
+    const item = { item_id: "linked-item" } as never;
+    const intent = { workType: "warehouse" } as never;
+    render(<MobileWarehouseScreen globalSearch="" onStatusChange={() => {}} preselectedItem={item} entryIntent={intent} />);
+    expect(currentWizardProps.value?.preselectedItem).toBe(item);
+    await act(async () => currentWizardProps.value?.onDirtyChange?.(true));
+    fireEvent.click(screen.getByRole("button", { name: "cart" }));
+    fireEvent.click(screen.getByRole("button", { name: "discard" }));
+    fireEvent.click(screen.getByRole("button", { name: "compose" }));
+    expect(currentWizardProps.value?.preselectedItem).toBeNull();
+    expect(currentWizardProps.value?.entryIntent).toBeNull();
   });
 
   it("hides section tabs only while compose is past step 1", () => {

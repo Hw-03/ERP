@@ -7,6 +7,7 @@ import { useShippingNavigation } from "../shipping/useShippingNavigation";
 
 const setAuditScreen = vi.hoisted(() => vi.fn());
 const flushWarehouseDraft = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+const flushDailyReport = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 const warehouseMounts = vi.hoisted(() => ({ count: 0 }));
 const notificationNavigation = vi.hoisted(() => ({
   current: undefined as undefined | ((target: { tab: string; section: string | null; relatedRequestId: string | null }) => void),
@@ -135,18 +136,24 @@ vi.mock("../screens", () => ({
   },
   MobileDefectScreen: () => <div data-testid="defect-screen-state">{window.history.state?.defect ?? "none"}</div>,
   MobileHistoryScreen: () => <div>history screen</div>,
-  MobileWeeklyScreen: ({ onExit }: { onExit?: () => void }) => (
+  MobileDailyWorkReportScreen: ({ onExit, flushSaveRef }: { onExit?: () => void; flushSaveRef: { current: (() => Promise<void>) | null } }) => {
+    useEffect(() => { flushSaveRef.current = flushDailyReport; return () => { flushSaveRef.current = null; }; }, [flushSaveRef]);
+    return <><div>daily report screen</div><button onClick={onExit}>back from daily</button></>;
+  },
+  MobileWeeklyScreen: ({ onExit, weekMon, onWeekChange }: { onExit?: () => void; weekMon: Date; onWeekChange: (date: Date) => void }) => (
     <>
       <div>weekly screen</div>
+      <output data-testid="weekly-date">{weekMon.toISOString()}</output>
+      <button onClick={() => onWeekChange(new Date("2020-01-06"))}>old week</button>
       <button type="button" onClick={onExit}>back from weekly</button>
     </>
   ),
   MobileWarehouseMapScreen: () => <div>map screen</div>,
-  MobileShippingScreen: ({ operator, onGoToWarehouse, onBusyChange, onNavigateAway }: { operator?: { name: string }; onGoToWarehouse?: (item: unknown, intent: unknown) => void; onBusyChange?: (busy: boolean) => void; onNavigateAway?: (tab: string) => void }) => {
+  MobileShippingScreen: ({ operator, onGoToWarehouse, onBusyChange, onNavigateAway, onExit }: { operator?: { name: string }; onGoToWarehouse?: (item: unknown, intent: unknown) => void; onBusyChange?: (busy: boolean) => void; onNavigateAway?: (tab: string) => void; onExit?: () => void }) => {
     useShippingNavigation(onNavigateAway);
     const [dirty, setDirty] = useState(false);
     useRegisterDirty("shipping-test", dirty, () => {}, undefined, { mode: "confirm-only" });
-    return <><div>shipping screen</div><output data-testid="shipping-operator">{operator?.name}</output><button onClick={() => setDirty(true)}>mark shipping dirty</button><button onClick={() => onBusyChange?.(true)}>shipping saving</button><button onClick={() => onGoToWarehouse?.({ item_id: 101 }, { workType: "warehouse_io", warehouseAction: "warehouse_to_dept" })}>shipping warehouse</button></>;
+    return <><div>shipping screen</div><output data-testid="shipping-operator">{operator?.name}</output><button onClick={onExit}>back from shipping</button><button onClick={() => setDirty(true)}>mark shipping dirty</button><button onClick={() => onBusyChange?.(true)}>shipping saving</button><button onClick={() => onGoToWarehouse?.({ item_id: 101 }, { workType: "warehouse_io", warehouseAction: "warehouse_to_dept" })}>shipping warehouse</button></>;
   },
   MobileAssemblyChecklistScreen: ({ onExit }: { onExit?: () => void }) => (
     <>
@@ -156,11 +163,13 @@ vi.mock("../screens", () => ({
   ),
   MobileMoreScreen: ({
     onChecklist,
+    onShipping,
     onWeekly,
     visibleEntries,
     onNotificationNavigate,
   }: {
     onChecklist?: () => void;
+    onShipping?: () => void;
     onWeekly?: () => void;
     visibleEntries?: string[];
     onNotificationNavigate?: (target: { tab: string; section: string | null; relatedRequestId: string | null }) => void;
@@ -169,6 +178,7 @@ vi.mock("../screens", () => ({
     return <>
       <div data-testid="more-entry-order">{visibleEntries?.join(",")}</div>
       <button type="button" onClick={onChecklist}>open checklist</button>
+      <button type="button" onClick={onShipping}>open shipping</button>
       <button type="button" onClick={onWeekly}>open weekly</button>
       <button type="button" onClick={() => onNotificationNavigate?.({ tab: "warehouse", section: "as-research-queue", relatedRequestId: "as-request-1" })}>open AS notification</button>
     </>;
@@ -187,6 +197,91 @@ function deferred<T>() {
 }
 
 describe("MobileShell layout", () => {
+  it("일보 헤더 복귀는 저장 성공을 기다리고 실패하면 현재 화면을 유지한다", async () => {
+    window.history.replaceState({}, "", "/mes?tab=dailyReport");
+    const saving = deferred<void>();
+    flushDailyReport.mockReset().mockReturnValueOnce(saving.promise).mockRejectedValueOnce(new Error("save failed"));
+    render(<MobileShell />);
+    fireEvent.click(screen.getByText("back from daily"));
+    expect(screen.getByText("daily report screen")).toBeInTheDocument();
+    await act(async () => saving.resolve());
+    expect(window.location.search).toBe("?tab=more");
+    window.history.pushState({}, "", "/mes?tab=dailyReport");
+    await act(async () => window.dispatchEvent(new PopStateEvent("popstate")));
+    fireEvent.click(screen.getByText("back from daily"));
+    await act(async () => {});
+    expect(screen.getByText("daily report screen")).toBeInTheDocument();
+    expect(window.location.search).toBe("?tab=dailyReport");
+  });
+
+  it("출하 헤더 복귀도 기존 이탈 확인을 거쳐 더보기로 이동한다", async () => {
+    window.history.replaceState({}, "", "/mes?tab=shipping");
+    render(<MobileShell />);
+    fireEvent.click(screen.getByText("mark shipping dirty"));
+    fireEvent.click(screen.getByText("back from shipping"));
+    fireEvent.click(screen.getByRole("button", { name: "계속 머무르기" }));
+    expect(screen.getByText("shipping screen")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("back from shipping"));
+    fireEvent.click(screen.getByRole("button", { name: "나가기", exact: true }));
+    expect(window.location.search).toBe("?tab=more");
+  });
+  it("출하 상세를 떠나 일반 메뉴로 다시 들어오면 출하 허브 URL로 초기화한다", () => {
+    window.history.replaceState({}, "", "/mes?tab=shipping&shippingView=requestDetail&shippingRequestId=req-1");
+    render(<MobileShell />);
+    fireEvent.click(screen.getByRole("button", { name: "출하", exact: true }));
+    expect(window.location.search).toBe("?tab=more");
+    fireEvent.click(screen.getByText("open shipping"));
+    expect(window.location.search).toBe("?tab=shipping");
+  });
+
+  it("입출고 저장 없이 이탈한 뒤 일반 재진입은 이전 초안과 빠른 진입을 복원하지 않는다", () => {
+    render(<MobileShell />);
+    fireEvent.click(screen.getByText("quick warehouse"));
+    window.history.replaceState(window.history.state, "", "/mes?tab=warehouse&section=compose&step=4&draftId=draft-1");
+    fireEvent.click(screen.getByText("mark warehouse dirty"));
+    fireEvent.click(screen.getByRole("button", { name: "내역" }));
+    fireEvent.click(screen.getByText("저장 안 하고 나가기"));
+    expect(window.location.search).toBe("?tab=history");
+    expect(flushWarehouseDraft).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "입출고" }));
+    expect(window.location.search).toBe("?tab=warehouse");
+    expect(screen.getByTestId("warehouse-preselected")).toHaveTextContent("none");
+    expect(screen.getByTestId("warehouse-intent")).toHaveTextContent("none");
+  });
+
+  it("다른 업무로 이동할 때 불량 작업 이력 상태를 복사하지 않는다", () => {
+    window.history.replaceState({ defect: "cart", mode: "add", step: 3, mobileRework: { step: 2 } }, "", "/mes?tab=defect&defect_dept=Assembly");
+    render(<MobileShell />);
+    fireEvent.click(screen.getByRole("button", { name: "내역" }));
+    expect(window.location.search).toBe("?tab=history");
+    expect(window.history.state.defect).toBeUndefined();
+    expect(window.history.state.mobileRework).toBeUndefined();
+  });
+
+  it("주간보고 일반 재진입은 현재 주로 초기화한다", () => {
+    render(<MobileShell />);
+    fireEvent.click(screen.getByRole("button", { name: "더보기" }));
+    fireEvent.click(screen.getByText("open weekly"));
+    const initialWeek = screen.getByTestId("weekly-date").textContent;
+    fireEvent.click(screen.getByText("old week"));
+    fireEvent.click(screen.getByText("back from weekly"));
+    fireEvent.click(screen.getByText("open weekly"));
+    expect(screen.getByTestId("weekly-date").textContent).toBe(initialWeek);
+  });
+
+  it("일반 재진입 후에도 뒤로 가기는 이전 품목 대상 진입을 복원한다", async () => {
+    render(<MobileShell />);
+    fireEvent.click(screen.getByText("quick warehouse"));
+    fireEvent.click(screen.getByRole("button", { name: "대시보드" }));
+    fireEvent.click(screen.getByRole("button", { name: "입출고" }));
+    expect(screen.getByTestId("warehouse-preselected")).toHaveTextContent("none");
+    act(() => window.history.back());
+    await screen.findByText("dashboard screen");
+    act(() => window.history.back());
+    await screen.findByText("warehouse screen");
+    expect(screen.getByTestId("warehouse-preselected")).toHaveTextContent("101");
+    expect(screen.getByTestId("warehouse-intent")).toHaveTextContent("receive");
+  });
   it("출하 저장 중에는 탭과 viewport 이동을 실행하지 않는다", async () => {
     window.history.replaceState({}, "", "/mes?tab=shipping");
     let beforeSwitch: (() => Promise<void | boolean>) | null = null;

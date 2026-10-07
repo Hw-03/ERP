@@ -29,9 +29,9 @@ const request = {
   invoice_number: "INV-1", requested_by_name: "작업자", created_at: "2026-10-06T00:00:00Z",
 } as ShippingRequest;
 
-function renderScreen(onNavigateAway = vi.fn()) {
+function renderScreen(onNavigateAway = vi.fn(), onExit = vi.fn()) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
-  return { client, ...render(<QueryClientProvider client={client}><DirtyGuardProvider><MobileShippingScreen onNavigateAway={onNavigateAway} /></DirtyGuardProvider></QueryClientProvider>) };
+  return { client, ...render(<QueryClientProvider client={client}><DirtyGuardProvider><MobileShippingScreen onNavigateAway={onNavigateAway} onExit={onExit} /></DirtyGuardProvider></QueryClientProvider>) };
 }
 
 beforeEach(() => {
@@ -42,12 +42,32 @@ beforeEach(() => {
 });
 
 describe("MobileShippingScreen", () => {
+  it("직접 진입한 출하 첫 화면에서 더보기 복귀 콜백을 호출한다", async () => {
+    const onExit = vi.fn();
+    renderScreen(vi.fn(), onExit);
+    fireEvent.click(await screen.findByRole("button", { name: "더보기 메뉴로 돌아가기" }));
+    expect(onExit).toHaveBeenCalledOnce();
+  });
+  it("관리 진입 세 카드로 요청 작성과 상태별 목록을 분리한다", async () => {
+    vi.mocked(api.getShippingRequests).mockResolvedValue([request, { ...request, request_id: "req-2", status: "PREPARED", final_pf_item_name: "완료 PF" }]);
+    renderScreen();
+    fireEvent.click(await screen.findByRole("button", { name: /출하 관리.*2건/ }));
+    expect(screen.getByRole("button", { name: "출하 요청" })).toBeInTheDocument();
+    expect(screen.queryByText("최종 PF")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /준비 완료.*1건/ }));
+    expect(screen.getByText("완료 PF")).toBeInTheDocument();
+    expect(screen.queryByText("최종 PF")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "새 출하 요청 만들기" })).not.toBeInTheDocument();
+    expect(window.location.search).toContain("shippingManagementStatus=PREPARED");
+  });
   it("실제 건수의 관리·이력 허브와 최종 출하 PF를 표시한다", async () => {
     renderScreen();
     const management = await screen.findByRole("button", { name: /출하 관리.*1건/ });
     expect(await screen.findByRole("button", { name: /출하 이력.*7건/ })).toBeInTheDocument();
     fireEvent.click(management);
-    expect(screen.getByRole("button", { name: "새 출하 요청 만들기" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "출하 요청" })).toBeInTheDocument();
+    expect(screen.queryByText("요청 작성부터 준비와 픽업까지 진행합니다.")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /준비 중.*1건/ }));
     expect(screen.getByText("최종 PF")).toBeInTheDocument();
     expect(screen.queryByText("기준 PF")).not.toBeInTheDocument();
     expect(window.location.search).toContain("shippingView=requestList");
@@ -86,7 +106,7 @@ describe("MobileShippingScreen", () => {
     expect(screen.getByLabelText("초안")).toHaveValue("작성 중");
     fireEvent.click(screen.getByText("작성 나가기"));
     fireEvent.click(screen.getByRole("button", { name: "나가기", exact: true }));
-    expect(await screen.findByRole("button", { name: "새 출하 요청 만들기" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "출하 요청" })).toBeInTheDocument();
   });
 
   it("브라우저 단계 뒤로 가기는 입력을 유지한다", async () => {
@@ -120,7 +140,7 @@ describe("MobileShippingScreen", () => {
   it("실제 뒤로 가기 취소 후 다시 이동하고 앞으로 가기를 유지한다", async () => {
     renderScreen();
     fireEvent.click(await screen.findByRole("button", { name: /출하 관리.*1건/ }));
-    fireEvent.click(screen.getByRole("button", { name: "새 출하 요청 만들기" }));
+    fireEvent.click(screen.getByRole("button", { name: "출하 요청" }));
     fireEvent.change(screen.getByLabelText("초안"), { target: { value: "보존" } });
     act(() => window.history.back());
     fireEvent.click(await screen.findByRole("button", { name: "계속 머무르기" }));
@@ -128,13 +148,13 @@ describe("MobileShippingScreen", () => {
     expect(screen.getByLabelText("초안")).toHaveValue("보존");
     act(() => window.history.back());
     fireEvent.click(await screen.findByRole("button", { name: "나가기", exact: true }));
-    expect(await screen.findByRole("button", { name: "새 출하 요청 만들기" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "출하 요청" })).toBeInTheDocument();
     act(() => window.history.forward());
     expect(await screen.findByLabelText("초안")).toHaveValue("");
   });
 
   it("새로고침 실패 시 기존 목록을 보존하고 재시도한다", async () => {
-    window.history.replaceState({}, "", "/mes?tab=shipping&shippingView=requestList");
+    window.history.replaceState({}, "", "/mes?tab=shipping&shippingView=requestList&shippingManagementStatus=PREPARING");
     const { client } = renderScreen();
     expect(await screen.findByText("최종 PF")).toBeInTheDocument();
     vi.mocked(api.getShippingRequests).mockRejectedValueOnce(new Error("연결 실패"));

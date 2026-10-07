@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import type { ShippingHistoryStatus, ShippingRequest } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { InlineSearch, SegmentedControl } from "../primitives";
+import { MobileRoundedScrollArea } from "../primitives/MobileRoundedScrollArea";
 import { ShippingHeader, ShippingItemName, ShippingStatus } from "./ShippingPresentation";
 import { useShippingHistoryMonthsQuery, useShippingHistoryPagesQuery } from "@/lib/queries/useShippingQuery";
 
@@ -45,14 +46,14 @@ export function MobileShippingHistory({ status, onStatusChange, onSelect, onBack
   return <div className="flex min-h-0 flex-1 flex-col" style={{ background: LEGACY_COLORS.bg, color: LEGACY_COLORS.text }}>
     <ShippingHeader title="출하 이력" onBack={onBack} />
     <div className="mx-3 mb-3 grid shrink-0 gap-3">
-      <SegmentedControl tabs={[{ id: "PICKED_UP", label: "완료" }, { id: "CANCELLED", label: "취소" }]} active={status} onChange={onStatusChange} size="lg" />
+      <SegmentedControl tabs={[{ id: "PICKED_UP", label: "완료" }, { id: "CANCELLED", label: "취소" }]} active={status} onChange={onStatusChange} className="[&>button]:min-h-11 [&>button]:text-sm" />
       <InlineSearch value={search} onChange={(value) => setSearch(value.slice(0, 100))} placeholder="인보이스 또는 PF 검색" ariaLabel="인보이스 또는 PF 검색" maxLength={100} className="[&_input]:!text-base [&_button]:h-11 [&_button]:w-11" />
     </div>
-    <div className="scrollbar-hide min-h-0 flex-1 space-y-3 overflow-y-auto px-3 pb-3">
+    <MobileRoundedScrollArea className="[&>*]:shrink-0">
     {monthsQuery.isError && <div role="alert" className="rounded-[14px] p-3 text-sm" style={{ background: LEGACY_COLORS.errorBg, color: LEGACY_COLORS.red }}>이력 월별 목록을 불러오지 못했습니다. <button type="button" onClick={() => void monthsQuery.refetch()} className="min-h-11 font-bold">다시 시도</button></div>}
     {!isSearching && <div className="grid gap-3">{years.map((year) => <section key={year} className="overflow-hidden rounded-[20px] border" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}><button type="button" aria-expanded={openYear === year} onClick={() => { setOpenYear(openYear === year ? null : year); setOpenMonth(null); }} className="flex min-h-14 w-full items-center justify-between px-4 text-left text-base font-bold">{year}년 · {months.filter((row) => row.year === year).reduce((sum, row) => sum + row.count, 0)}건<ChevronDown size={20} className={openYear === year ? "rotate-180" : ""} /></button>{openYear === year && months.filter((row) => row.year === year).sort((a, b) => b.month - a.month).map((row) => { const key = `${row.year}-${row.month}`; return <div key={key} className="border-t" style={{ borderColor: LEGACY_COLORS.border }}><button type="button" aria-expanded={openMonth === key} onClick={() => setOpenMonth(openMonth === key ? null : key)} className="flex min-h-12 w-full items-center justify-between px-4 text-left text-sm font-bold" style={{ background: LEGACY_COLORS.s2 }}>{row.month}월 · {row.count}건<ChevronDown size={20} className={openMonth === key ? "rotate-180" : ""} /></button>{openMonth === key && <div className="px-4 pb-2">{renderRows()}</div>}</div>; })}</section>)}{monthsQuery.isLoading && <p role="status" className="py-8 text-center text-sm">이력을 불러오는 중입니다.</p>}{!monthsQuery.isLoading && years.length === 0 && !monthsQuery.isError && <p className="py-8 text-center text-sm">출하 이력이 없습니다.</p>}</div>}
     {isSearching && <section className="rounded-[20px] border p-4" style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}><h2 className="mb-2 text-base font-bold">검색 결과</h2>{renderRows()}</section>}
-    </div>
+    </MobileRoundedScrollArea>
   </div>;
 
   function renderRows() {

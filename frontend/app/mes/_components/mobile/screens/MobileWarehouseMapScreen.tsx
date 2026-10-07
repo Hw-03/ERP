@@ -9,7 +9,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { buildCellIndex, cellKey, rowLabel } from "../../_warehouse_map_sections/helpers";
 import { FloorStage, FrontStage } from "../../_warehouse_map_sections/WarehouseStages";
 import { WarehouseJariPanel } from "../../_warehouse_map_sections/WarehouseJariPanel";
-import { InlineSearch } from "../primitives";
+import { InlineSearch, IconButton } from "../primitives";
 import { TYPO } from "../tokens";
 import { matchesSearchText, normalizeSearchText } from "@/lib/searchText";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
@@ -213,19 +213,11 @@ export function MobileWarehouseMapScreen({
     >
       {/* 상단 바 — 뒤로 + 브레드크럼 + 검색 */}
       <div
-        className="flex shrink-0 items-center gap-2 border-b px-3 py-2"
+        className="flex min-h-[60px] shrink-0 items-center gap-2 border-b px-3 py-2"
         style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}
       >
-        <button
-          type="button"
-          onClick={back}
-          aria-label="뒤로"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-opacity active:opacity-60"
-          style={{ background: LEGACY_COLORS.s2, color: LEGACY_COLORS.text }}
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </button>
-        <div className={clsx(TYPO.body, "min-w-0 flex-1 truncate font-black")} style={{ color: LEGACY_COLORS.text }}>
+        <IconButton icon={ArrowLeft} onClick={back} label={!detailCell && stage === "floor" ? "더보기 메뉴로 돌아가기" : "뒤로"} />
+        <div className="min-w-0 flex-1 truncate text-lg font-bold" style={{ color: LEGACY_COLORS.text }}>
           창고 지도
           {curAngle && stage === "front" && (
             <span style={{ color: LEGACY_COLORS.muted2 }}> › {curAngle.label}</span>

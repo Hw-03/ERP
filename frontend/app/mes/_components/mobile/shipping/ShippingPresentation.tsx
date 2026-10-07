@@ -1,26 +1,22 @@
 "use client";
 
 import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import type { ShippingRequest } from "@/lib/api";
 import { LEGACY_COLORS as C } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
-import { IconButton, WizardProgress } from "../primitives";
+import { WizardProgress } from "../primitives";
+import { MobilePageHeader } from "../primitives/MobilePageHeader";
 
 /** 출하 화면의 제목과 진행 상태를 본문 스크롤 밖에서 유지한다. */
 export function ShippingHeader({ title, subtitle, onBack, backLabel = "뒤로", right, progress, disabled = false }: {
   title: string; subtitle?: string; onBack?: () => void; backLabel?: string;
   right?: ReactNode; progress?: { steps: readonly { key: string; label: string }[]; current: number }; disabled?: boolean;
 }) {
-  return <header className="mx-3 mb-3 flex shrink-0 items-center gap-2 rounded-[12px] border px-2 py-2 [@media(max-height:500px)]:py-1" style={{ background: C.s2, borderColor: C.border, color: C.text }}>
-    {onBack && <IconButton icon={ArrowLeft} label={backLabel} onClick={onBack} disabled={disabled} />}
-    <div className="min-w-0 flex-1">
-      {subtitle && <p className="truncate text-xs font-medium" style={{ color: C.muted2 }}>{subtitle}</p>}
-      <h1 className="text-lg font-bold leading-tight">{title}</h1>
-    </div>
+  return <MobilePageHeader className="mx-3 mb-3" title={title} subtitle={subtitle} onBack={onBack} backLabel={backLabel} disabled={disabled} right={<>
     {progress && <div className="w-[35%] min-w-20 shrink-0"><span className="mb-1 block text-right text-xs font-medium" style={{ color: C.muted2 }}>{progress.current + 1} / {progress.steps.length}</span><WizardProgress steps={[...progress.steps]} current={progress.current} variant="inline" /></div>}
     {right}
-  </header>;
+  </>} />;
 }
 
 /** 선택 동작과 품명 펼침을 분리해 중첩 버튼을 만들지 않는다. */

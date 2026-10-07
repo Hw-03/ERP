@@ -47,6 +47,7 @@ import { useRealtimeRevision } from "@/lib/queries/realtime";
 import type { NotificationNavigationTarget } from "../notifications/NotificationBell";
 import { DirtyGuardProvider, useBeforeViewportSwitch, useConfirmNavigation } from "@/lib/ui/dirty-guard";
 import { mobileHistoryState } from "./historyState";
+import { mobileTabLocation } from "./mobileNavigation";
 
 // 관리(admin)는 모바일에서 제외 — 관리 작업은 데스크톱(PC)에서 한다.
 export type MobileTabId =
@@ -60,6 +61,8 @@ export type MobileTabId =
   | "shipping"
   | "assemblyChecklist"
   | "dailyReport";
+
+type MobileTargetEntry = { item?: Item; intent?: IoEntryIntent; notification?: NotificationNavigationTarget };
 
 const TAB_META: Record<MobileTabId, { label: string; icon: LucideIcon; color: string }> = {
   dashboard: { label: "대시보드", icon: Boxes, color: DESKTOP_TAB_ICON_COLORS.dashboard },
@@ -207,6 +210,7 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
   const warehouseDirtyRef = useRef(warehouseDirty);
   warehouseDirtyRef.current = warehouseDirty;
   const warehouseFlushRef = useRef<(() => Promise<void>) | null>(null);
+  const warehouseEndEditingRef = useRef<(() => void) | null>(null);
   const dailyReportFlushRef = useRef<(() => Promise<void>) | null>(null);
   const shippingBusyRef = useRef(false);
   const pendingPopNavigationRef = useRef<(() => void) | null>(null);
@@ -237,12 +241,18 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
 
   const handleStatusChange = useCallback((_msg: string) => {}, []);
 
-  const commitMobileTab = useCallback((target: MobileTabId) => {
-    if (target !== activeTab) {
-      if (target === "defect") {
-        window.history.replaceState(mobileHistoryState({ defect: "hub" }, Number(window.history.state?.mobileShippingIndex ?? 0)), "");
-        setDefectDeptFilter(null);
+  const commitMobileTab = useCallback((target: MobileTabId, entry: "general" | "target" = "general", replace = false, targetEntry?: MobileTargetEntry) => {
+    if (activeTab === "warehouse") warehouseEndEditingRef.current?.();
+    if (entry === "general") {
+      if (target === "warehouse") {
+        setWarehousePreselected(null);
+        setWarehouseIntent(null);
+        setWarehouseNotificationTarget(null);
       }
+      if (target === "defect") setDefectDeptFilter(null);
+      if (target === "weekly") setWeekMon(getWeekStartMonday(new Date()));
+    }
+    if (target !== activeTab) {
       sendClientEvent({
         event: "ui_nav",
         from: activeTab,
@@ -253,28 +263,31 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
         source: "mobile",
       });
     }
+    const { url, state: historyState } = mobileTabLocation(window.location.href, target, Number(window.history.state?.mobileShippingIndex ?? 0) + (replace ? 0 : 1));
+    if (entry === "target" && targetEntry) historyState.mobileTargetEntry = targetEntry;
+    if (replace) window.history.replaceState(historyState, "", url);
+    else window.history.pushState(historyState, "", url);
     setActiveTab(target);
-    const url = new URL(window.location.href);
-    url.searchParams.set("tab", target);
-    const historyState = mobileHistoryState(window.history.state, Number(window.history.state?.mobileShippingIndex ?? 0) + 1);
-    window.history.pushState(historyState, "", `${url.pathname}${url.search}${url.hash}`);
     activeLocationRef.current = window.location.href;
     activeHistoryIndexRef.current = Number(historyState.mobileShippingIndex);
   }, [activeTab]);
 
-  const resetActiveMobileTab = useCallback((target: MobileTabId) => {
+  /** 명시적인 과거 진입 정보는 이력 이동에서만 복원한다. */
+  const acceptHistoryTab = useCallback((target: MobileTabId): void => {
+    const entry = window.history.state?.mobileTargetEntry as MobileTargetEntry | undefined;
     if (target === "warehouse") {
-      setWarehousePreselected(null);
-      setWarehouseIntent(null);
-      setWarehouseNotificationTarget(null);
-      window.history.replaceState(mobileHistoryState(null, Number(window.history.state?.mobileShippingIndex ?? 0)), "", `${window.location.pathname}?tab=warehouse`);
+      setWarehousePreselected(entry?.item ?? null);
+      setWarehouseIntent(entry?.intent ?? null);
+      setWarehouseNotificationTarget(entry?.notification ?? null);
     }
-    if (target === "defect") {
-      window.history.replaceState(mobileHistoryState({ defect: "hub" }, Number(window.history.state?.mobileShippingIndex ?? 0)), "");
-      setDefectDeptFilter(null);
-    }
-    setRefreshNonce((n) => n + 1);
+    if (target === "defect") setDefectDeptFilter(entry?.notification?.section ?? new URLSearchParams(window.location.search).get("defect_dept"));
+    setActiveTab(target);
   }, []);
+
+  const resetActiveMobileTab = useCallback((target: MobileTabId) => {
+    commitMobileTab(target, "general", true);
+    setRefreshNonce((n) => n + 1);
+  }, [commitMobileTab]);
 
   const canOpenMobileTab = useCallback((tab: MobileTabId) => {
     if (!operator) return true;
@@ -302,21 +315,27 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
     }
   }, [activeTab, canOpenMobileTab, commitMobileTab, fallbackTab, operator]);
 
-  const handleTabChange = useCallback((tab: MobileTabId, preserveWarehouseNotification = false) => {
+  const handleTabChange = useCallback((tab: MobileTabId, notification?: NotificationNavigationTarget) => {
     if (activeTab === "shipping" && shippingBusyRef.current) return;
     const target = canOpenMobileTab(tab) ? tab : fallbackTab;
     if (!canOpenMobileTab(target)) return;
     const navigate = () => {
-      if (target === "warehouse" && !preserveWarehouseNotification) setWarehouseNotificationTarget(null);
+      if (notification && target === "warehouse") {
+        setWarehousePreselected(null);
+        setWarehouseIntent(null);
+        setWarehouseNotificationTarget(notification);
+      }
+      if (notification && target === "defect") setDefectDeptFilter(notification.section);
       if (target === activeTab) {
-        if (target === "warehouse" && preserveWarehouseNotification) {
+        if (notification) {
+          commitMobileTab(target, "target", true, { notification });
           setRefreshNonce((n) => n + 1);
           return;
         }
         resetActiveMobileTab(target);
         return;
       }
-      commitMobileTab(target);
+      commitMobileTab(target, notification ? "target" : "general", false, notification ? { notification } : undefined);
     };
     if (activeTab === "dailyReport") {
       void (dailyReportFlushRef.current?.() ?? Promise.resolve()).then(navigate).catch(() => {});
@@ -324,6 +343,7 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
     }
     // 입출고 초안은 사용자가 이어서 작성할 수 있도록 기존 이동 확인 시트를 유지한다.
     if (activeTab === "warehouse" && warehouseDirty) {
+      setPendingWarehouseNotificationTarget(notification ?? null);
       setPendingNavTab(target);
       return;
     }
@@ -352,10 +372,11 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
       }
       const destination = { href: window.location.href, state: window.history.state };
       const proceed = () => {
+        if (activeTabRef.current === "warehouse") warehouseEndEditingRef.current?.();
         window.history.replaceState(destination.state, "", destination.href);
         activeLocationRef.current = destination.href;
         activeHistoryIndexRef.current = destination.state?.mobileShippingIndex ?? null;
-        setActiveTab(next);
+        acceptHistoryTab(next);
       };
       if (allowPopRef.current) { allowPopRef.current = false; proceed(); return; }
       if (activeTabRef.current === "dailyReport" || (activeTabRef.current === "warehouse" && warehouseDirtyRef.current)) {
@@ -383,10 +404,10 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [canOpenMobileTab]);
+  }, [acceptHistoryTab, canOpenMobileTab]);
 
   const handleNotificationNavigate = useCallback((targetInfo: NotificationNavigationTarget) => {
-    const { tab, section } = targetInfo;
+    const { tab } = targetInfo;
     if (!(VALID_TAB_IDS as string[]).includes(tab)) return;
     const target = tab as MobileTabId;
     if (!canOpenMobileTab(target)) return;
@@ -397,9 +418,7 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
       setPendingNavTab(target);
       return;
     }
-    if (target === "warehouse") setWarehouseNotificationTarget(targetInfo);
-    handleTabChange(target, target === "warehouse");
-    if (target === "defect" && section) setDefectDeptFilter(section);
+    handleTabChange(target, targetInfo);
   }, [canOpenMobileTab, handleTabChange]);
 
   const canReceive = canSeeWorkType("receive", operator) && canOpenMobileTab("warehouse");
@@ -411,7 +430,7 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
       setWarehouseNotificationTarget(null);
       setWarehousePreselected(item);
       setWarehouseIntent(intent ?? null);
-      commitMobileTab("warehouse");
+      commitMobileTab("warehouse", "target", false, { item, intent });
     });
   }, [canOpenMobileTab, commitMobileTab, confirmNavigation]);
 
@@ -509,6 +528,7 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
           onSubmitSuccess={loadCapacity}
           onComposeDirtyChange={setWarehouseDirty}
           flushDraftRef={warehouseFlushRef}
+          endEditingRef={warehouseEndEditingRef}
         />
       );
     }
@@ -536,13 +556,13 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
       );
     }
     if (activeTab === "shipping") {
-      return <MobileShippingScreen key={key} operator={operator} onBusyChange={(busy) => { shippingBusyRef.current = busy; }} onGoToWarehouse={handleGoToWarehouse} onNavigateAway={(tab) => setActiveTab(VALID_TAB_IDS.includes(tab as MobileTabId) ? tab as MobileTabId : "dashboard")} />;
+      return <MobileShippingScreen key={key} operator={operator} onExit={() => handleTabChange("more")} onBusyChange={(busy) => { shippingBusyRef.current = busy; }} onGoToWarehouse={handleGoToWarehouse} onNavigateAway={(tab) => acceptHistoryTab(VALID_TAB_IDS.includes(tab as MobileTabId) ? tab as MobileTabId : "dashboard")} />;
     }
     if (activeTab === "assemblyChecklist") {
       return <MobileAssemblyChecklistScreen key={key} onExit={() => handleTabChange("more")} />;
     }
     if (activeTab === "dailyReport") {
-      return <MobileDailyWorkReportScreen key={key} operator={operator} flushSaveRef={dailyReportFlushRef} />;
+      return <MobileDailyWorkReportScreen key={key} operator={operator} flushSaveRef={dailyReportFlushRef} onExit={() => handleTabChange("more")} />;
     }
     if (activeTab === "weekly") {
       return <MobileWeeklyScreen key={key} weekMon={weekMon} onWeekChange={setWeekMon} onExit={() => handleTabChange("more")} />;
@@ -559,6 +579,7 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
     return null;
   }, [
     activeTab,
+    acceptHistoryTab,
     refreshNonce,
     warehousePreselected,
     warehouseIntent,
@@ -701,16 +722,22 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
           }
           if (next) {
             const target = canOpenMobileTab(next) ? next : fallbackTab;
-            if (pendingNotification && target === "warehouse") {
-              setWarehouseNotificationTarget(pendingNotification);
+            if (pendingNotification) {
+              if (target === "warehouse") {
+                setWarehouseNotificationTarget(pendingNotification);
+                setWarehousePreselected(null);
+                setWarehouseIntent(null);
+              }
+              if (target === "defect") setDefectDeptFilter(pendingNotification.section);
+              commitMobileTab(target, "target", target === activeTab, { notification: pendingNotification });
               if (target === activeTab) setRefreshNonce((n) => n + 1);
-              else commitMobileTab(target);
             } else if (target === activeTab) resetActiveMobileTab(target);
             else commitMobileTab(target);
           }
         }}
         onDiscard={() => {
-          // 항목 3-4 — 저장(flush) 없이 이동. 위저드는 언마운트되어 작성 내용이 폐기된다.
+          // 추가 저장 없이 편집 세대를 종료하고 복원 연결만 해제한다.
+          if (activeTab === "warehouse") warehouseEndEditingRef.current?.();
           const next = pendingNavTab;
           const pendingNotification = pendingWarehouseNotificationTarget;
           setPendingNavTab(null);
@@ -724,10 +751,15 @@ function MobileShellInner({ onBeforeViewportSwitchChange }: {
           }
           if (next) {
             const target = canOpenMobileTab(next) ? next : fallbackTab;
-            if (pendingNotification && target === "warehouse") {
-              setWarehouseNotificationTarget(pendingNotification);
+            if (pendingNotification) {
+              if (target === "warehouse") {
+                setWarehouseNotificationTarget(pendingNotification);
+                setWarehousePreselected(null);
+                setWarehouseIntent(null);
+              }
+              if (target === "defect") setDefectDeptFilter(pendingNotification.section);
+              commitMobileTab(target, "target", target === activeTab, { notification: pendingNotification });
               if (target === activeTab) setRefreshNonce((n) => n + 1);
-              else commitMobileTab(target);
             } else if (target === activeTab) resetActiveMobileTab(target);
             else commitMobileTab(target);
           }

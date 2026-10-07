@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { SkeletonBlock, dataRevealClassName } from "../../common/LoadingSkeleton";
 import { ReadFailure } from "../../common/ReadState";
 import {
-  ArrowLeft,
   Check,
   ChevronRight,
   ClipboardCheck,
@@ -39,6 +38,9 @@ import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 import { BottomSheet } from "@/lib/ui/BottomSheet";
 import { TYPO } from "../tokens";
 import presentation from "../mobilePresentation.module.css";
+import { MobileRoundedScrollArea } from "../primitives/MobileRoundedScrollArea";
+import { MobilePageHeader } from "../primitives/MobilePageHeader";
+import { IconButton } from "../primitives/IconButton";
 import { useAssemblyChecklistItemDrag, type UseAssemblyChecklistItemDragResult } from "./useAssemblyChecklistItemDrag";
 import { useAssemblyChecklistSectionDrag, type UseAssemblyChecklistSectionDragResult } from "./useAssemblyChecklistSectionDrag";
 
@@ -179,23 +181,7 @@ function Header({
   backLabel: string;
   rightAction?: ReactNode;
 }) {
-  return (
-    <div className="grid grid-cols-[2.75rem_minmax(0,1fr)_2.75rem] items-center gap-2">
-      <button
-        type="button"
-        aria-label={backLabel}
-        onClick={onBack}
-        className="flex h-11 w-11 items-center justify-center rounded-full border transition-[transform] active:scale-[0.94]"
-        style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-      >
-        <ArrowLeft className="h-5 w-5" />
-      </button>
-      <h2 className="min-w-0 break-words text-center text-lg font-black leading-snug" style={{ color: LEGACY_COLORS.text }}>
-        {title}
-      </h2>
-      {rightAction ?? <span aria-hidden="true" className="h-11 w-11" />}
-    </div>
-  );
+  return <MobilePageHeader className="mx-3 mb-3" title={title} onBack={onBack} backLabel={backLabel} right={rightAction} />;
 }
 
 function ProductCard({
@@ -242,9 +228,9 @@ function BrowseDetail({
   onClearSection: (section: AssemblyChecklistSection) => void;
 }) {
   return (
-    <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 [&>*]:shrink-0">
+    <div className="flex min-h-0 flex-1 flex-col">
       <Header title={checklist.model_name} onBack={onBack} backLabel="제품 선택으로 돌아가기" />
-
+      <MobileRoundedScrollArea className="[&>*]:shrink-0">
       {checklist.sections.map((section) => {
         const hasCompletedItem = section.items.some((item) => completedItemKeys.has(checklistItemKey(item.item_id)));
         return (
@@ -310,6 +296,7 @@ function BrowseDetail({
           </section>
         );
       })}
+      </MobileRoundedScrollArea>
     </div>
   );
 }
@@ -1075,8 +1062,8 @@ function ManageDetail({
 
   return (
     <>
-      <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 [&>*]:shrink-0">
-        <Header title={checklist.model_name} onBack={onBack} backLabel="체크리스트 관리 목록으로 돌아가기" />
+      <Header title={checklist.model_name} onBack={onBack} backLabel="체크리스트 관리 목록으로 돌아가기" />
+      <MobileRoundedScrollArea className="[&>*]:shrink-0">
         {checklist.sections.length > 0 && (
           <div className="flex">
             <button
@@ -1159,7 +1146,7 @@ function ManageDetail({
             </button>
           </div>
         )}
-      </div>
+      </MobileRoundedScrollArea>
       <SectionEditorSheet
         open={sectionEditor !== null}
         section={editedSection}
@@ -1258,8 +1245,9 @@ function ManageHome({
   const configuredSlots = new Set(checklists.map((checklist) => checklist.model_slot));
   const availableModels = models.filter((model) => model.model_name && !model.is_reserved && !configuredSlots.has(model.slot));
   return (
-    <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4">
+    <div className="flex min-h-0 flex-1 flex-col">
       <Header title="체크리스트 관리" onBack={onBack} backLabel="체크리스트 선택으로 돌아가기" />
+      <MobileRoundedScrollArea>
       <section className="rounded-[20px] border p-4" style={CARD_STYLE}>
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px]" style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 12%, transparent)`, color: LEGACY_COLORS.blue }}>
@@ -1315,6 +1303,7 @@ function ManageHome({
           ))}
         </div>
       </section>
+      </MobileRoundedScrollArea>
     </div>
   );
 }
@@ -1438,46 +1427,16 @@ export function MobileAssemblyChecklistScreen({ onExit }: { onExit?: () => void 
   }
 
   return (
-    <div className="scrollbar-hide flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4">
-      <section className="shrink-0 px-1 py-1">
-        <div className="flex items-center gap-3">
-          {onExit && (
-            <button
-              type="button"
-              aria-label="더보기 메뉴로 돌아가기"
-              onClick={onExit}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-[transform] active:scale-[0.94]"
-              style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </button>
-          )}
-          <span
-            className="hidden"
-            style={{ background: `color-mix(in srgb, ${LEGACY_COLORS.blue} 20%, transparent)` }}
-          >
-            <ClipboardCheck className="h-6 w-6" style={{ color: LEGACY_COLORS.blue }} />
-          </span>
-          <h2 className="min-w-0 flex-1 text-lg font-semibold leading-snug" style={{ color: LEGACY_COLORS.text }}>
-            조립 체크리스트
-          </h2>
-          <button
-            type="button"
-            aria-label="체크리스트 관리"
-            onClick={() => setMode("manage")}
-            className="no-btn-inset flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border"
-            style={{ background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.blue }}
-          >
-            <Settings2 className="h-5 w-5" />
-          </button>
-        </div>
-      </section>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <MobilePageHeader className="mx-3 mb-3" title="조립 체크리스트" onBack={onExit} backLabel="더보기 메뉴로 돌아가기" right={<IconButton icon={Settings2} label="체크리스트 관리" onClick={() => setMode("manage")} color={LEGACY_COLORS.blue} />} />
+      <MobileRoundedScrollArea>
       {error && <ReadFailure message="체크리스트를 불러오지 못했습니다." refresh={checklistData !== undefined} onRetry={() => void refetch()} />}
       {isLoading && checklistData === undefined ? <ChecklistSkeleton label="체크리스트 불러오는 중" /> : checklistData !== undefined && (
         <div className={`${presentation.choiceList} ${presentation.separatedChoices} ${dataRevealClassName}`}>
           {checklists.map((checklist) => <ProductCard key={checklist.checklist_id} checklist={checklist} onClick={() => openChecklist(checklist)} />)}
         </div>
       )}
+      </MobileRoundedScrollArea>
     </div>
   );
 }
