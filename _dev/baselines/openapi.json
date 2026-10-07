@@ -2504,12 +2504,23 @@
       "DefectStatisticsComparison": {
         "description": "직전 달력 기간의 동일 관측 범위와 선택 기간의 차이.",
         "properties": {
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/DefectStatisticsBreakdownEntry"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
           "departments": {
             "items": {
               "$ref": "#/components/schemas/DefectStatisticsBreakdownEntry"
             },
             "title": "Departments",
             "type": "array"
+          },
+          "excluded_category_count": {
+            "title": "Excluded Category Count",
+            "type": "integer"
           },
           "excluded_legacy_count": {
             "title": "Excluded Legacy Count",
@@ -2588,7 +2599,9 @@
           "items",
           "reasons",
           "departments",
+          "categories",
           "excluded_legacy_count",
+          "excluded_category_count",
           "quantity_delta",
           "quantity_change_pct",
           "record_count_delta",
@@ -2688,6 +2701,13 @@
             "title": "As Of",
             "type": "string"
           },
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/DefectStatisticsBreakdownEntry"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
           "comparison": {
             "anyOf": [
               {
@@ -2704,6 +2724,10 @@
             },
             "title": "Departments",
             "type": "array"
+          },
+          "excluded_category_count": {
+            "title": "Excluded Category Count",
+            "type": "integer"
           },
           "excluded_legacy_count": {
             "title": "Excluded Legacy Count",
@@ -2767,7 +2791,9 @@
           "items",
           "reasons",
           "departments",
+          "categories",
           "excluded_legacy_count",
+          "excluded_category_count",
           "as_of",
           "observed_until",
           "is_partial",
@@ -2780,12 +2806,23 @@
       "DefectStatisticsResponse": {
         "description": "불량 통계 API가 그대로 반환할 수 있는 서비스 응답.",
         "properties": {
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/DefectStatisticsBreakdownEntry"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
           "departments": {
             "items": {
               "$ref": "#/components/schemas/DefectStatisticsBreakdownEntry"
             },
             "title": "Departments",
             "type": "array"
+          },
+          "excluded_category_count": {
+            "title": "Excluded Category Count",
+            "type": "integer"
           },
           "excluded_legacy_count": {
             "title": "Excluded Legacy Count",
@@ -2826,7 +2863,9 @@
           "items",
           "reasons",
           "departments",
-          "excluded_legacy_count"
+          "categories",
+          "excluded_legacy_count",
+          "excluded_category_count"
         ],
         "title": "DefectStatisticsResponse",
         "type": "object"

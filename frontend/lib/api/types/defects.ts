@@ -167,7 +167,9 @@ export interface DefectStatisticsResponse {
   items: DefectStatisticsItemBreakdown[];
   reasons: DefectStatisticsBreakdown[];
   departments: DefectStatisticsBreakdown[];
+  categories: DefectStatisticsBreakdown[];
   excluded_legacy_count: number;
+  excluded_category_count: number;
 }
 
 export interface DefectStatisticsQuery {
@@ -192,7 +194,9 @@ export interface DefectStatisticsComparison {
   items: DefectStatisticsItemBreakdown[];
   reasons: DefectStatisticsBreakdown[];
   departments: DefectStatisticsBreakdown[];
+  categories: DefectStatisticsBreakdown[];
   excluded_legacy_count: number;
+  excluded_category_count: number;
   quantity_delta: number;
   quantity_change_pct: number | null;
   record_count_delta: number;

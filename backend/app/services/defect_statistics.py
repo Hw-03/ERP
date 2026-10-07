@@ -12,6 +12,7 @@ from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app.models import (
+    DefectQuarantineManagementCategoryRevision,
     DefectQuarantineRecord,
     DefectQuarantineReconstruction,
     InventoryOperation,
@@ -41,6 +42,7 @@ from app.schemas.defect_statistics import (
 KST = ZoneInfo("Asia/Seoul")
 UNCLASSIFIED_LABEL = "미분류"
 UNCLASSIFIED_FILTER_VALUE = "UNCLASSIFIED"
+CATEGORY_LABELS = {"DEFECT": "불량", "B_GRADE": "B급", "OBSOLETE": "구형"}
 
 
 @dataclass(frozen=True)
@@ -70,6 +72,7 @@ class _Occurrence:
     reason: str
     quantity: int
     is_disused: bool
+    initial_category: str
 
 
 @dataclass
@@ -220,6 +223,7 @@ def _matches_filters(
 def _occurrence_from_record(
     record: DefectQuarantineRecord,
     item: Item,
+    initial_category: str,
 ) -> _Occurrence:
     """격리 기록 원본 수량을 수정되지 않는 발생 한 건으로 변환한다."""
 
@@ -234,6 +238,7 @@ def _occurrence_from_record(
         reason=(record.reason_category or UNCLASSIFIED_LABEL).strip() or UNCLASSIFIED_LABEL,
         quantity=abs(int(record.original_quantity)),
         is_disused=item.legacy_item_type == "불용",
+        initial_category=initial_category,
     )
 
 
@@ -291,8 +296,8 @@ def _load_quarantine_occurrences(
     start_utc: datetime,
     end_utc: datetime,
     filters: _ResolvedFilters,
-) -> tuple[list[_Occurrence], list[datetime]]:
-    """기간 내 격리 원장을 읽고 검증 가능한 legacy 발생만 복원한다."""
+) -> tuple[list[_Occurrence], list[datetime], list[datetime]]:
+    """최초 분류 이력을 한 번에 읽으며 불명 분류와 legacy 제외를 구분한다."""
 
     reconstructed_parent_ids = {
         parent_id
@@ -321,7 +326,6 @@ def _load_quarantine_occurrences(
         .filter(
             DefectQuarantineRecord.quarantined_at >= start_utc,
             DefectQuarantineRecord.quarantined_at < end_utc,
-            DefectQuarantineRecord.management_category == "DEFECT",
         )
         .order_by(
             DefectQuarantineRecord.quarantined_at,
@@ -329,12 +333,27 @@ def _load_quarantine_occurrences(
         )
         .all()
     )
+    initial_categories: dict[uuid.UUID, list[str]] = {}
+    if rows:
+        for record_id, category in db.query(
+            DefectQuarantineManagementCategoryRevision.record_id,
+            DefectQuarantineManagementCategoryRevision.next_category,
+        ).filter(
+            DefectQuarantineManagementCategoryRevision.record_id.in_(
+                [record.record_id for record, _, _, _ in rows]
+            ),
+            DefectQuarantineManagementCategoryRevision.is_initial.is_(True),
+        ).all():
+            initial_categories.setdefault(record_id, []).append(category)
     occurrences: list[_Occurrence] = []
     excluded_legacy_times: list[datetime] = []
+    excluded_category_times: list[datetime] = []
     for record, item, reconstruction, source_log in rows:
         if record.record_id in reconstructed_parent_ids:
             continue
-        occurrence = _occurrence_from_record(record, item)
+        categories = initial_categories.get(record.record_id, [])
+        initial_category = categories[0] if len(categories) == 1 else ""
+        occurrence = _occurrence_from_record(record, item, initial_category)
         if not _matches_filters(occurrence, filters):
             continue
         if record.is_legacy and not (
@@ -343,8 +362,11 @@ def _load_quarantine_occurrences(
         ):
             excluded_legacy_times.append(occurrence.occurred_at)
             continue
+        if initial_category not in CATEGORY_LABELS:
+            excluded_category_times.append(occurrence.occurred_at)
+            continue
         occurrences.append(occurrence)
-    return occurrences, excluded_legacy_times
+    return occurrences, excluded_legacy_times, excluded_category_times
 
 
 def _occurrence_from_direct_log(
@@ -365,6 +387,7 @@ def _occurrence_from_direct_log(
         reason=(log.reason_category or UNCLASSIFIED_LABEL).strip() or UNCLASSIFIED_LABEL,
         quantity=abs(int(log.quantity_change)),
         is_disused=item.legacy_item_type == "불용",
+        initial_category="DEFECT",
     )
 
 
@@ -444,6 +467,25 @@ def _load_direct_occurrences(
         seen.add(dedupe_key)
         occurrences.append(occurrence)
     return occurrences
+
+
+def _build_category_breakdown(
+    occurrences: list[_Occurrence],
+) -> list[DefectStatisticsBreakdownEntry]:
+    """최초 발생 분류를 고정 순서로 집계하며 발생 없는 분류도 반환한다."""
+
+    totals = {category: _Totals() for category in CATEGORY_LABELS}
+    for occurrence in occurrences:
+        total = totals[occurrence.initial_category]
+        total.record_count += 1
+        total.quantity += occurrence.quantity
+    return [
+        DefectStatisticsBreakdownEntry(
+            key=category, label=label,
+            record_count=totals[category].record_count, quantity=totals[category].quantity,
+        )
+        for category, label in CATEGORY_LABELS.items()
+    ]
 
 
 def _sort_breakdowns(
@@ -584,15 +626,16 @@ def get_defect_statistics(
 ) -> DefectStatisticsResponse:
     """KST 기간과 다중 필터에 맞는 불량 발생 통계를 반환한다.
 
-    격리 원장은 ``original_quantity``·``quarantined_at``을 정본으로 삼고 legacy는
-    제외 건수로 분리한다. 격리 미경유 direct 폐기·재작업만 operation metadata와
+    격리 원장은 ``original_quantity``·``quarantined_at``·유일한 최초 분류 이력을
+    정본으로 삼고 legacy와 최초 분류 불명 원건은 별도 제외한다.
+    격리 미경유 direct 폐기·재작업만 operation metadata와
     대표 TransactionLog로 추가하여 격리 후속 처리의 이중 집계를 막는다.
     """
 
     calculated_period = calculate_statistics_period(period, anchor)
     start_utc, end_utc = _kst_period_utc_bounds(calculated_period)
     resolved_filters = _resolve_filters(db, filters or DefectStatisticsFilters())
-    quarantine_occurrences, excluded_legacy_times = _load_quarantine_occurrences(
+    quarantine_occurrences, excluded_legacy_times, excluded_category_times = _load_quarantine_occurrences(
         db,
         start_utc=start_utc,
         end_utc=end_utc,
@@ -618,7 +661,9 @@ def get_defect_statistics(
         items=items,
         reasons=reasons,
         departments=departments,
+        categories=_build_category_breakdown(occurrences),
         excluded_legacy_count=len(excluded_legacy_times),
+        excluded_category_count=len(excluded_category_times),
     )
 
 
@@ -721,6 +766,7 @@ def get_defect_statistics_report(
         return DefectStatisticsReportResponse(
             period=selected, summary=empty_summary, timeline=[], items=empty_items,
             reasons=empty_reasons, departments=empty_departments,
+            categories=_build_category_breakdown([]), excluded_category_count=0,
             excluded_legacy_count=0, as_of=as_of, observed_until=None,
             is_partial=False, comparison=None, trend=[],
         )
@@ -739,7 +785,7 @@ def get_defect_statistics_report(
     lookback_start, _ = _kst_period_utc_bounds(trend_periods[0])
     previous_start, _ = _kst_period_utc_bounds(previous)
     resolved_filters = _resolve_filters(db, filters or DefectStatisticsFilters())
-    quarantine, excluded_times = _load_quarantine_occurrences(
+    quarantine, excluded_times, excluded_category_times = _load_quarantine_occurrences(
         db, start_utc=min(lookback_start, previous_start),
         end_utc=_utc_naive(observed_until), filters=resolved_filters,
     )
@@ -800,6 +846,11 @@ def get_defect_statistics_report(
     return DefectStatisticsReportResponse(
         period=selected, summary=summary, timeline=timeline, items=items,
         reasons=reasons, departments=departments,
+        categories=_build_category_breakdown(selected_occurrences),
+        excluded_category_count=sum(
+            in_range(value, selected_start, _utc_naive(observed_until))
+            for value in excluded_category_times
+        ),
         excluded_legacy_count=selected_legacy_count,
         as_of=as_of, observed_until=observed_until, is_partial=is_partial,
         comparison=DefectStatisticsComparison(
@@ -807,6 +858,11 @@ def get_defect_statistics_report(
             is_partial=comparison_is_partial, range_adjusted=range_adjusted,
             summary=comparison_summary, items=comparison_items,
             reasons=comparison_reasons, departments=comparison_departments,
+            categories=_build_category_breakdown(comparison_occurrences),
+            excluded_category_count=sum(
+                in_range(value, previous_start, _utc_naive(comparison_until))
+                for value in excluded_category_times
+            ),
             excluded_legacy_count=comparison_legacy_count,
             quantity_delta=summary.quantity - comparison_summary.quantity,
             quantity_change_pct=_change_pct(summary.quantity, comparison_summary.quantity, range_adjusted),

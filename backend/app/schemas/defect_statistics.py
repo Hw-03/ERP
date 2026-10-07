@@ -74,7 +74,9 @@ class DefectStatisticsResponse(BaseModel):
     items: list[DefectStatisticsItemBreakdownEntry]
     reasons: list[DefectStatisticsBreakdownEntry]
     departments: list[DefectStatisticsBreakdownEntry]
+    categories: list[DefectStatisticsBreakdownEntry]
     excluded_legacy_count: int
+    excluded_category_count: int
 
 
 class DefectStatisticsComparison(BaseModel):
@@ -88,7 +90,9 @@ class DefectStatisticsComparison(BaseModel):
     items: list[DefectStatisticsItemBreakdownEntry]
     reasons: list[DefectStatisticsBreakdownEntry]
     departments: list[DefectStatisticsBreakdownEntry]
+    categories: list[DefectStatisticsBreakdownEntry]
     excluded_legacy_count: int
+    excluded_category_count: int
     quantity_delta: int
     quantity_change_pct: float | None
     record_count_delta: int

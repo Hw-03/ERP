@@ -4,6 +4,13 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from app.routers import defects as defects_router
+from app.services.defect_records import create_record
+
+
+EMPTY_CATEGORIES = [
+    {"key": key, "label": label, "record_count": 0, "quantity": 0}
+    for key, label in (("DEFECT", "불량"), ("B_GRADE", "B급"), ("OBSOLETE", "구형"))
+]
 
 
 def test_statistics_route_passes_repeated_filters(monkeypatch, client):
@@ -29,6 +36,8 @@ def test_statistics_route_passes_repeated_filters(monkeypatch, client):
             "reasons": [],
             "departments": [],
             "excluded_legacy_count": 0,
+            "categories": EMPTY_CATEGORIES,
+            "excluded_category_count": 0,
         }
 
     monkeypatch.setattr(defects_router, "get_defect_statistics", fake_statistics)
@@ -51,6 +60,8 @@ def test_statistics_route_passes_repeated_filters(monkeypatch, client):
     assert captured["filters"].departments == ("조립", "진공")
     assert captured["filters"].models == ("DX3000",)
     assert captured["filters"].process_steps == ("A",)
+    assert response.json()["categories"] == EMPTY_CATEGORIES
+    assert response.json()["excluded_category_count"] == 0
 
 
 def test_report_route_defaults_month_and_passes_all_filters(monkeypatch, client):
@@ -63,6 +74,7 @@ def test_report_route_defaults_month_and_passes_all_filters(monkeypatch, client)
             "period": {"kind": period, "anchor": anchor, "start_date": date(2026, 9, 1), "end_date": date(2026, 9, 30)},
             "summary": {"record_count": 0, "quantity": 0},
             "timeline": [], "items": [], "reasons": [], "departments": [], "excluded_legacy_count": 0,
+            "categories": EMPTY_CATEGORIES, "excluded_category_count": 0,
             "as_of": datetime(2026, 9, 3, tzinfo=ZoneInfo("Asia/Seoul")),
             "observed_until": None, "is_partial": False, "comparison": None, "trend": [],
         }
@@ -81,3 +93,27 @@ def test_report_route_defaults_month_and_passes_all_filters(monkeypatch, client)
     assert captured["filters"].reason == "외관"
     assert str(captured["filters"].item_id) == item_id
     assert client.get("/api/defects/statistics/report").status_code == 422
+
+
+def test_both_statistics_routes_return_original_categories_and_quantities(db_session, client, make_item):
+    item = make_item(name="최초 분류 HTTP")
+    for category, quantity in [("DEFECT", 4), ("B_GRADE", 5), ("OBSOLETE", 6)]:
+        record = create_record(
+            db_session, item_id=item.item_id, department="조립", quantity=quantity,
+            actor_employee_id=None, actor_name="통계 작업자", reason_category="외관",
+            memo=None, management_category=category, quarantined_at=datetime(2020, 9, 2),
+        )
+        record.management_category = "OBSOLETE"
+        record.remaining_quantity = 0
+    db_session.commit()
+    for path in ("/api/defects/statistics", "/api/defects/statistics/report"):
+        response = client.get(path, params={"period": "month", "anchor": "2020-09-03"})
+        assert response.status_code == 200, response.text
+        result = response.json()
+        assert result["summary"]["quantity"] == 15
+        assert [(entry["key"], entry["quantity"]) for entry in result["categories"]] == [
+            ("DEFECT", 4), ("B_GRADE", 5), ("OBSOLETE", 6),
+        ]
+        assert result["excluded_category_count"] == 0
+        if path.endswith("/report"):
+            assert result["comparison"]["categories"] == EMPTY_CATEGORIES
