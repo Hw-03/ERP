@@ -25,12 +25,13 @@ function getMinStock(item: Item) {
 type Props = {
   item: Item;
   selected: boolean;
+  detailOpen?: boolean;
   onSelect: (item: Item | null) => void;
   imageFilename?: string;
   compact?: boolean;
 };
 
-function InventoryItemRowImpl({ item, selected, onSelect, imageFilename, compact }: Props) {
+function InventoryItemRowImpl({ item, selected, detailOpen = true, onSelect, imageFilename, compact }: Props) {
   const getDeptColor = useDeptColorLookup();
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -102,7 +103,7 @@ function InventoryItemRowImpl({ item, selected, onSelect, imageFilename, compact
   }
 
   const StockIcon = stock.label === "품절" ? XCircle : stock.label === "부족" ? AlertTriangle : CheckCircle2;
-  const handleSelect = () => onSelect(selected ? null : item);
+  const handleSelect = () => onSelect(selected && detailOpen ? null : item);
   const stockBar = Number(item.quantity) === 0 ? (
     <div className={compact ? "mt-2 h-1 overflow-hidden rounded-full" : "mt-[20px] h-[6px] overflow-hidden rounded-full"} style={{ background: DEFECT_RED }} title="품절" />
   ) : (

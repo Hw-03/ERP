@@ -21,11 +21,13 @@ export function useItemsQuery(params?: Parameters<typeof itemsApi.getItems>[0]) 
   });
 }
 
-export function useItemQuery(itemId: string | null | undefined) {
+export function useItemQuery(itemId: string | null | undefined, options?: { refetchOnMount?: "always" }) {
   return useQuery({
     queryKey: queryKeys.items.detail(itemId ?? ""),
-    queryFn: () => itemsApi.getItem(itemId as string),
+    queryFn: ({ signal }) => itemsApi.getItem(itemId as string, { signal }),
     enabled: !!itemId,
+    ...(options?.refetchOnMount === "always" ? { staleTime: 0 } : {}),
+    ...options,
   });
 }
 

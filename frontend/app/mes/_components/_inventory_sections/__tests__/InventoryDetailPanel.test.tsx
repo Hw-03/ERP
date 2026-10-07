@@ -106,6 +106,23 @@ afterEach(() => {
 });
 
 describe("InventoryDetailPanel desktop quick actions", () => {
+  it.each(["desktop", "mobile"] as const)("삭제된 품목의 %s 입출고 작업을 차단한다", (variant) => {
+    const onGoToWarehouse = vi.fn();
+    render(<InventoryDetailPanel item={{ ...makeItem(), deleted_at: "2026-10-07T00:00:00Z" }} onGoToWarehouse={onGoToWarehouse} quickActionVariant={variant} />);
+    expect(screen.getByRole("button", { name: "입고", exact: true })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "출고", exact: true })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "입고", exact: true }));
+    expect(screen.queryByTestId("quick-action-choices")).not.toBeInTheDocument();
+    expect(onGoToWarehouse).not.toHaveBeenCalled();
+    expect(screen.getByText("삭제된 품목입니다. 입출고 작업을 할 수 없습니다.")).toBeVisible();
+  });
+
+  it("조회 확인 실패 중에는 기존 상세를 유지하되 작업을 차단한다", () => {
+    render(<InventoryDetailPanel item={makeItem()} onGoToWarehouse={vi.fn()} actionsDisabled />);
+    expect(screen.getByRole("button", { name: "입고", exact: true })).toBeDisabled();
+    expect(screen.queryByText("삭제된 품목입니다. 입출고 작업을 할 수 없습니다.")).not.toBeInTheDocument();
+  });
+
   it("shows obsolete stock instead of a misleading defective total", () => {
     render(<InventoryDetailPanel item={{ ...makeItem(), defective_total: 42,
       defective_breakdown: [{ department: "조립", management_category: "OBSOLETE", quantity: 42 }],
@@ -396,6 +413,17 @@ describe("InventoryDetailPanel realtime reservations", () => {
 });
 
 describe("InventoryDetailPanel desktop BOM viewer", () => {
+  it.each(["desktop", "mobile"] as const)("삭제 확인 후에도 %s 재고 정보와 읽기 전용 BOM을 유지한다", async (variant) => {
+    vi.spyOn(api, "getBOMTree").mockResolvedValue(bomTree);
+    render(<InventoryDetailPanel item={{ ...makeBomItem(), deleted_at: "2026-10-07" }} quickActionVariant={variant} onGoToWarehouse={vi.fn()} />);
+    expect(screen.getByText("사용 가능 재고")).toBeVisible();
+    expect(screen.getByRole("button", { name: "입고", exact: true })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "하위 구성 보기" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "하위 구성 보기" }));
+    expect(await screen.findByText("구성품 A")).toBeVisible();
+    expect(api.getBOMTree).toHaveBeenCalledWith("item-1", variant === "desktop" ? { departmentOrder: "desc" } : undefined);
+  });
+
   it("opens a read-only BOM modal that shows the tree and current component stock", async () => {
     vi.spyOn(api, "getBOMTree").mockResolvedValue(bomTree);
     render(

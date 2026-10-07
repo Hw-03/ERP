@@ -20,6 +20,7 @@ type Props = {
   displayLimit: number;
   setDisplayLimit: (updater: (prev: number) => number) => void;
   selectedItem: Item | null;
+  detailOpen?: boolean;
   onSelectItem: (item: Item | null) => void;
   activeFilterCount: number;
   hasKpiFilter: boolean;
@@ -39,6 +40,7 @@ export function InventoryItemsTable({
   displayLimit,
   setDisplayLimit,
   selectedItem,
+  detailOpen = true,
   onSelectItem,
   activeFilterCount,
   hasKpiFilter,
@@ -209,6 +211,7 @@ export function InventoryItemsTable({
                 key={item.item_id}
                 item={item}
                 selected={selectedItem?.item_id === item.item_id}
+                detailOpen={detailOpen}
                 onSelect={onSelectItem}
                 imageFilename={item.mes_code ? imageManifest?.[item.mes_code] : undefined}
                 compact={compact}

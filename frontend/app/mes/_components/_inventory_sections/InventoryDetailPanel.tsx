@@ -37,6 +37,7 @@ type Props = {
   item: Item;
   onGoToWarehouse: (item: Item, intent?: IoEntryIntent) => void;
   canReceive?: boolean;
+  actionsDisabled?: boolean;
   imageFilename?: string;
   // 항목 3 — 모바일 빠른작업: 출고 빨강 + 서브옵션 전폭. 기본 desktop(현행 유지)이라 데스크톱 호출처 무변경.
   quickActionVariant?: "mobile" | "desktop";
@@ -46,10 +47,12 @@ export function InventoryDetailPanel({
   item,
   onGoToWarehouse,
   canReceive = false,
+  actionsDisabled = false,
   imageFilename,
   quickActionVariant = "desktop",
 }: Props) {
   const mobile = quickActionVariant === "mobile";
+  const writeBlocked = actionsDisabled || !!item.deleted_at;
   const QuickActionContainer = mobile ? Fragment : DesktopRightPanelFooter;
   const revision = useRealtimeRevision();
   const getDeptColor = useDeptColorLookup();
@@ -66,6 +69,9 @@ export function InventoryDetailPanel({
     setBomModalOpen(false);
     setIoMenu(null);
   }, [item.item_id]);
+  useEffect(() => {
+    if (writeBlocked) setIoMenu(null);
+  }, [writeBlocked]);
   const pendingQty = totalApprovalPending(item);
   const availableQty = Number(item.available_quantity) || 0;
   const managedStock = getManagedStockBreakdown(item);
@@ -308,6 +314,9 @@ export function InventoryDetailPanel({
       {/* 빠른 작업 */}
       <QuickActionContainer>
       <div>
+        {item.deleted_at && <p role="status" className="mb-3 text-sm font-bold" style={{ color: LEGACY_COLORS.red }}>
+          삭제된 품목입니다. 입출고 작업을 할 수 없습니다.
+        </p>}
         <div className="mb-2 text-xs font-bold uppercase tracking-[0.18em]" style={{ color: LEGACY_COLORS.muted2 }}>
           빠른 작업
         </div>
@@ -317,7 +326,8 @@ export function InventoryDetailPanel({
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setIoMenu((m) => (m === "in" ? null : "in"))}
+                disabled={writeBlocked}
+                onClick={() => { if (!writeBlocked) setIoMenu((m) => (m === "in" ? null : "in")); }}
                 aria-pressed={ioMenu === "in"}
                 className="min-h-11 w-full rounded-[14px] border px-4 py-3 text-sm font-semibold transition-opacity hover:opacity-90"
                 style={{ background: mix(LEGACY_COLORS.blue, ioMenu === "in" ? 14 : 7), color: LEGACY_COLORS.blue, borderColor: mix(LEGACY_COLORS.blue, 30), opacity: ioMenu === "out" ? 0.55 : 1 }}
@@ -326,7 +336,8 @@ export function InventoryDetailPanel({
               </button>
               <button
                 type="button"
-                onClick={() => setIoMenu((m) => (m === "out" ? null : "out"))}
+                disabled={writeBlocked}
+                onClick={() => { if (!writeBlocked) setIoMenu((m) => (m === "out" ? null : "out")); }}
                 aria-pressed={ioMenu === "out"}
                 className="min-h-11 w-full rounded-[14px] border px-4 py-3 text-sm font-semibold transition-opacity hover:opacity-90"
                 style={{ background: mix(LEGACY_COLORS.red, ioMenu === "out" ? 14 : 7), color: LEGACY_COLORS.red, borderColor: mix(LEGACY_COLORS.red, 30), opacity: ioMenu === "in" ? 0.55 : 1 }}
@@ -334,7 +345,7 @@ export function InventoryDetailPanel({
                 출고
               </button>
             </div>
-            {ioMenu && (
+            {ioMenu && !writeBlocked && (
               <div className="flex flex-col gap-1.5">
                 {(ioMenu === "in" ? inboundChoices(false) : outboundChoices).map((choice) => {
                   const accent = ioMenu === "out" ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
@@ -342,7 +353,9 @@ export function InventoryDetailPanel({
                     <button
                       key={choice.key}
                       type="button"
+                      disabled={writeBlocked}
                       onClick={() => {
+                        if (writeBlocked) return;
                         setIoMenu(null);
                         onGoToWarehouse(item, quickChoiceToIntent(choice.key));
                       }}
@@ -373,7 +386,8 @@ export function InventoryDetailPanel({
             <div key={direction} className="flex flex-col gap-1">
               <button
                 type="button"
-                onClick={() => setIoMenu((menu) => menu === direction ? null : direction)}
+                disabled={writeBlocked}
+                onClick={() => { if (!writeBlocked) setIoMenu((menu) => menu === direction ? null : direction); }}
                 className="w-full rounded-[18px] border px-4 py-3 text-sm font-bold transition-opacity hover:opacity-90"
                 style={{
                   background: mix(accent, 14),
@@ -383,7 +397,7 @@ export function InventoryDetailPanel({
               >
                 {label}
               </button>
-              {ioMenu === direction && <div
+              {ioMenu === direction && !writeBlocked && <div
                 data-testid="quick-action-choices"
                 className={`flex w-[calc(200%+0.5rem)] flex-col gap-2 rounded-[14px] border p-3${direction === "out" ? " -translate-x-[calc(50%+0.25rem)]" : ""}`}
                 style={{
@@ -394,7 +408,9 @@ export function InventoryDetailPanel({
                 {choices.map((choice) => <button
                   key={choice.key}
                   type="button"
+                  disabled={writeBlocked}
                   onClick={() => {
+                    if (writeBlocked) return;
                     setIoMenu(null);
                     onGoToWarehouse(item, quickChoiceToIntent(choice.key));
                   }}

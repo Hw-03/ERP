@@ -41,7 +41,8 @@ export const itemsApi = {
     return fetcher<Item[]>(toApiUrl(`/api/items?${query}`), opts?.signal);
   },
 
-  getItem: (itemId: string) => fetcher<Item>(toApiUrl(`/api/items/${itemId}`)),
+  getItem: (itemId: string, opts?: { signal?: AbortSignal }) =>
+    fetcher<Item>(toApiUrl(`/api/items/${itemId}`), opts?.signal),
 
   createItem: async (payload: {
     item_name: string;

@@ -13,6 +13,7 @@ import {
 import { InventoryItemsTable } from "./_inventory_sections/InventoryItemsTable";
 import { DesktopInventoryRightPanel } from "./_inventory_sections/DesktopInventoryRightPanel";
 import { useInventoryData } from "./_hooks/useInventoryData";
+import { useInventoryViewState } from "./_hooks/useInventoryViewState";
 import { useDesktopInventoryDerivations } from "./_hooks/useDesktopInventoryDerivations";
 import { useItemImageManifest } from "./_hooks/useItemImageManifest";
 import { useToggleSet } from "./_hooks/useToggleSet";
@@ -55,25 +56,17 @@ export function DesktopInventoryView({
   onCapacityClick?: () => void;
   canReceive?: boolean;
 }) {
-  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
-  useDesktopTabHome("inventory", { isHome: selectedItem === null, returnHome: () => setSelectedItem(null) });
   // R7-HOOK2: items/loading/error + loadItems 훅으로 분리
-  const onSelectedSync = useCallback(
-    (next: Item[]) =>
-      setSelectedItem((current) =>
-        current ? next.find((item) => item.item_id === current.item_id) ?? null : null,
-      ),
-    [],
-  );
   const { items, setItems, loading, error, refreshError, loadItems } = useInventoryData({
     globalSearch,
     onStatusChange,
-    onSelectedSync,
   });
+  const { search: localSearch, setSearch: setLocalSearch, selectedItem, displayItem, detailOpen, detailStatus, detailError,
+    actionsDisabled, selectItem, closeDetail, retryDetail } = useInventoryViewState(items);
+  useDesktopTabHome("inventory", { isHome: !detailOpen, returnHome: closeDetail });
   const imageManifest = useItemImageManifest();
   const productModels = useModelsQuery().data ?? EMPTY_MODELS;
   const [kpi, setKpi] = useState<KpiFilter>("ALL");
-  const [localSearch, setLocalSearch] = useState("");
   const [displayLimit, setDisplayLimit] = useState(DESKTOP_PAGE_SIZE);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterLogic, setFilterLogic] = useState<InventoryFilterLogic>(DEFAULT_INVENTORY_FILTER_LOGIC);
@@ -81,7 +74,6 @@ export function DesktopInventoryView({
   const [showDisused, setShowDisused] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const lastSelectedItemRef = useRef<Item | null>(null);
   const deferredLocalSearch = useDeferredValue(localSearch.trim().toLowerCase());
 
   // loadItems 본문은 useInventoryData 훅이 제공 (R7-HOOK2). 호출만 외부에서 가능.
@@ -131,9 +123,6 @@ export function DesktopInventoryView({
   useEffect(() => {
     setDisplayLimit(DESKTOP_PAGE_SIZE);
   }, [filteredItems]);
-
-  if (selectedItem) lastSelectedItemRef.current = selectedItem;
-  const displayItem = selectedItem ?? lastSelectedItemRef.current;
 
   const { isFiltered, activeFilterCount, kpiCards, headerBadge } = useDesktopInventoryDerivations({
     items,
@@ -239,7 +228,8 @@ export function DesktopInventoryView({
               displayLimit={displayLimit}
               setDisplayLimit={setDisplayLimit}
               selectedItem={selectedItem}
-              onSelectItem={setSelectedItem}
+              detailOpen={detailOpen}
+              onSelectItem={selectItem}
               activeFilterCount={activeFilterCount}
               hasKpiFilter={kpi !== "ALL"}
               hasSearch={!!localSearch.trim()}
@@ -268,12 +258,17 @@ export function DesktopInventoryView({
       </div>
 
       <DesktopInventoryRightPanel
+        open={detailOpen}
         selectedItem={selectedItem}
         displayItem={displayItem}
         headerBadge={headerBadge}
-        onClose={() => setSelectedItem(null)}
+        onClose={closeDetail}
         onGoToWarehouse={onGoToWarehouse}
         canReceive={canReceive}
+        detailLoading={detailOpen && detailStatus === "loading"}
+        detailError={detailError}
+        onRetryDetail={() => void retryDetail()}
+        actionsDisabled={actionsDisabled}
         imageFilename={displayItem?.mes_code ? imageManifest[displayItem.mes_code] : undefined}
       />
     </div>

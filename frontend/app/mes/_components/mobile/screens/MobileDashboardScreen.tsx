@@ -14,6 +14,7 @@ import { InventoryFilterLogicToggle } from "../../_inventory_sections/InventoryF
 import { InventoryItemsTable } from "../../_inventory_sections/InventoryItemsTable";
 import { MobileInventoryDetailContent } from "./MobileInventoryDetailContent";
 import { useInventoryData } from "../../_hooks/useInventoryData";
+import { useInventoryViewState } from "../../_hooks/useInventoryViewState";
 import { useDesktopInventoryDerivations } from "../../_hooks/useDesktopInventoryDerivations";
 import { useItemImageManifest } from "../../_hooks/useItemImageManifest";
 import { useToggleSet } from "../../_hooks/useToggleSet";
@@ -28,7 +29,7 @@ import {
 } from "../../_inventory_sections/inventoryFilter";
 import { useModelsQuery } from "@/lib/queries/useModelsQuery";
 import type { IoEntryIntent } from "../../_warehouse_v2/types";
-import { ReadFailure } from "../../common/ReadState";
+import { ReadFailure, ReadLoading } from "../../common/ReadState";
 import { SkeletonBlock } from "../../common/LoadingSkeleton";
 
 const PAGE_SIZE = 100;
@@ -67,23 +68,15 @@ export function MobileDashboardScreen({
   onCapacityClick?: () => void;
   canReceive?: boolean;
 }) {
-  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
-  const onSelectedSync = useCallback(
-    (next: Item[]) =>
-      setSelectedItem((current) =>
-        current ? next.find((item) => item.item_id === current.item_id) ?? null : null,
-      ),
-    [],
-  );
   const { items, loading, error, refreshError, loadItems } = useInventoryData({
     globalSearch,
     onStatusChange,
-    onSelectedSync,
   });
+  const { search: localSearch, setSearch: setLocalSearch, selectedItem, displayItem, detailOpen, detailStatus, detailError,
+    actionsDisabled, selectItem, closeDetail, retryDetail } = useInventoryViewState(items);
   const imageManifest = useItemImageManifest();
   const productModels = useModelsQuery().data ?? EMPTY_MODELS;
   const [kpi, setKpi] = useState<KpiFilter>("ALL");
-  const [localSearch, setLocalSearch] = useState("");
   const [displayLimit, setDisplayLimit] = useState(PAGE_SIZE);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterLogic, setFilterLogic] = useState<InventoryFilterLogic>(DEFAULT_INVENTORY_FILTER_LOGIC);
@@ -92,7 +85,6 @@ export function MobileDashboardScreen({
   // 생산 가능 현황은 첫 화면 면적을 크게 차지하므로 기본 접힘 — 품목 목록을 위로 끌어올린다(리뷰 §4.2).
   const [capacityOpen, setCapacityOpen] = useState(false);
 
-  const lastSelectedItemRef = useRef<Item | null>(null);
   const deferredLocalSearch = useDeferredValue(localSearch.trim().toLowerCase());
 
   const { selected: selectedDepts, toggle: toggleDept, setSelected: setSelectedDepts } =
@@ -140,9 +132,6 @@ export function MobileDashboardScreen({
     setDisplayLimit(PAGE_SIZE);
   }, [filteredItems]);
 
-  if (selectedItem) lastSelectedItemRef.current = selectedItem;
-  const displayItem = selectedItem ?? lastSelectedItemRef.current;
-
   const { isFiltered, activeFilterCount, kpiCards, headerBadge } = useDesktopInventoryDerivations({
     items,
     scopedItems,
@@ -167,7 +156,7 @@ export function MobileDashboardScreen({
     setLocalSearch("");
     setKpi("ALL");
     setFilterLogic(DEFAULT_INVENTORY_FILTER_LOGIC);
-  }, [setSelectedDepts, setSelectedModels, setSelectedProcessSteps]);
+  }, [setSelectedDepts, setSelectedModels, setSelectedProcessSteps, setLocalSearch]);
 
   const capacityBadge = capacityStatusBadge(capacityData);
   const searchControlsRef = useRef<HTMLDivElement>(null);
@@ -353,7 +342,8 @@ export function MobileDashboardScreen({
               displayLimit={displayLimit}
               setDisplayLimit={setDisplayLimit}
               selectedItem={selectedItem}
-              onSelectItem={setSelectedItem}
+              detailOpen={detailOpen}
+              onSelectItem={selectItem}
               activeFilterCount={activeFilterCount}
               hasKpiFilter={kpi !== "ALL"}
               hasSearch={!!localSearch.trim()}
@@ -367,20 +357,24 @@ export function MobileDashboardScreen({
       </MobileScrollFrame>
 
       <BottomSheet
-        open={!!selectedItem}
-        onClose={() => setSelectedItem(null)}
+        open={detailOpen}
+        onClose={closeDetail}
         ariaLabel={displayItem ? `${displayItem.item_name} 상세` : "품목 상세"}
       >
-        {selectedItem && displayItem && (
+        {detailOpen && detailStatus === "loading" && <ReadLoading label="품목 상세를 불러오는 중" variant="card" />}
+        {detailError && <ReadFailure message={detailError} onRetry={() => void retryDetail()} refresh={!!displayItem} />}
+        {detailOpen && displayItem && (
           <MobileInventoryDetailContent
-            key={selectedItem.item_id}
+            key={displayItem.item_id}
             item={displayItem}
             headerBadge={headerBadge}
             onGoToWarehouse={(item, intent) => {
-              setSelectedItem(null);
+              if (actionsDisabled || item.deleted_at) return;
+              closeDetail();
               onGoToWarehouse(item, intent);
             }}
             canReceive={canReceive}
+            actionsDisabled={actionsDisabled}
             imageFilename={displayItem.mes_code ? imageManifest?.[displayItem.mes_code] : undefined}
           />
         )}

@@ -16,6 +16,13 @@ vi.mock("../../../_inventory_sections/InventoryDetailPanel", () => ({
 const item = { item_id: "one", item_name: "테스트 품목", mes_code: "9-TR-0004" } as Item;
 beforeEach(() => historyRender.mockClear());
 
+it("최근 내역 탭에도 삭제 안내를 표시하고 내역을 유지한다", () => {
+  render(<MobileInventoryDetailContent item={{ ...item, deleted_at: "2026-10-07T00:00:00Z" }} headerBadge={null} onGoToWarehouse={vi.fn()} actionsDisabled />);
+  fireEvent.click(screen.getByRole("tab", { name: "최근 내역" }));
+  expect(screen.getByText("삭제된 품목입니다. 입출고 작업을 할 수 없습니다.")).toBeVisible();
+  expect(screen.getByText("최근 거래 one")).toBeVisible();
+});
+
 it("기본 상세는 조회하지 않고 최근 내역 탭에서만 모바일 조회를 마운트한다", () => {
   const navigate = vi.fn();
   render(<MobileInventoryDetailContent item={item} headerBadge={null} onGoToWarehouse={navigate} />);

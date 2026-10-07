@@ -103,6 +103,7 @@ describe("useItemQuery", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual(sample);
     expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/items/I7");
+    expect((fetchSpy.mock.calls[0] as unknown as [string, RequestInit])[1].signal).toBeInstanceOf(AbortSignal);
   });
 });
 
