@@ -22,7 +22,6 @@ if str(BACKEND_DIR) not in sys.path:
 from app.models import (
     DepartmentEnum,
     Employee,
-    EmployeeLevelEnum,
     Inventory,
     Item,
     RequestBucketEnum,
@@ -44,7 +43,6 @@ def _setup_reserved_request(make_session, suffix: str):
         name=f"요청자_{suffix}",
         role="조립/사원",
         department=DepartmentEnum.ASSEMBLY.value,
-        level=EmployeeLevelEnum.STAFF,
         is_active=True,
         display_order=0,
     )
@@ -53,7 +51,6 @@ def _setup_reserved_request(make_session, suffix: str):
         name=f"창고담당_{suffix}",
         role="조립/사원",
         department=DepartmentEnum.ASSEMBLY.value,
-        level=EmployeeLevelEnum.STAFF,
         is_active=True,
         warehouse_role="primary",
         pin_hash=DEFAULT_PIN_HASH,

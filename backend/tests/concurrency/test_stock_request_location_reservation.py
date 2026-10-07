@@ -6,7 +6,6 @@ from decimal import Decimal
 from app.models import (
     DepartmentEnum,
     Employee,
-    EmployeeLevelEnum,
     Inventory,
     InventoryLocation,
     Item,
@@ -137,7 +136,6 @@ def test_approve_cancel_race_leaves_no_location_reservation(make_session):
         name="requester",
         role="assembly/staff",
         department=ASSEMBLY,
-        level=EmployeeLevelEnum.STAFF,
         warehouse_role="none",
         department_role="none",
         display_order=0,
@@ -149,7 +147,6 @@ def test_approve_cancel_race_leaves_no_location_reservation(make_session):
         name="approver",
         role="warehouse/primary",
         department=DepartmentEnum.WAREHOUSE,
-        level=EmployeeLevelEnum.STAFF,
         warehouse_role="primary",
         department_role="none",
         display_order=0,

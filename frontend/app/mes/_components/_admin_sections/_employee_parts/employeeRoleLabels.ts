@@ -40,9 +40,3 @@ export const DEPARTMENT_ROLE_LABEL: Record<DepartmentRole, { label: string; hint
   primary: { label: "정", hint: "부서 주담당 결재", tone: LEGACY_COLORS.green },
   deputy: { label: "부", hint: "보조 결재 가능", tone: LEGACY_COLORS.purple },
 };
-
-export const LEVEL_LABEL: Record<string, { label: string; hint: string; tone: string }> = {
-  admin: { label: "관리자", hint: "전체 시스템 관리 권한", tone: LEGACY_COLORS.red },
-  manager: { label: "매니저", hint: "부서 운영·데이터 수정", tone: LEGACY_COLORS.purple },
-  staff: { label: "사원", hint: "기본 작업 권한", tone: LEGACY_COLORS.muted2 },
-};

@@ -304,7 +304,6 @@ def create_employee(
         role=payload.role,
         phone=payload.phone,
         department=payload.department,
-        level=payload.level,
         warehouse_role=role_value,
         department_role=dept_role_value,
         as_research_approver=bool(payload.as_research_approver),
@@ -385,8 +384,6 @@ def update_employee(
         employee.phone = payload.phone; changed.append("phone")
     if payload.department is not None and employee.department != payload.department:
         employee.department = payload.department; changed.append("department")
-    if payload.level is not None and employee.level != payload.level:
-        employee.level = payload.level; changed.append("level")
     if payload.warehouse_role is not None:
         new_role = payload.warehouse_role.lower()
         if new_role not in ("none", "primary", "deputy"):
@@ -705,7 +702,6 @@ def _to_response(
         role=employee.role,
         phone=employee.phone,
         department=employee.department,
-        level=employee.level,
         warehouse_role=(employee.warehouse_role or "none"),
         department_role=(employee.department_role or "none"),
         as_research_approver=bool(getattr(employee, "as_research_approver", False)),

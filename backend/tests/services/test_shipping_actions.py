@@ -11,7 +11,6 @@ from app.models import (
     BOM,
     DepartmentEnum,
     Employee,
-    EmployeeLevelEnum,
     Inventory,
     InventoryLocation,
     InventoryOperation,
@@ -55,7 +54,6 @@ def _active_shipping_actor(db_session) -> Employee:
         name="Shipping actions actor",
         role="worker",
         department=DepartmentEnum.SALES.value,
-        level=EmployeeLevelEnum.STAFF,
         display_order=0,
         is_active=True,
     )
@@ -103,7 +101,6 @@ def _spec_conversion_case(db_session, make_item, make_bom, make_location):
         name="품목 전환자",
         role="worker",
         department=DepartmentEnum.ASSEMBLY.value,
-        level=EmployeeLevelEnum.STAFF,
         display_order=0,
         is_active=True,
     )
@@ -1249,7 +1246,6 @@ def test_prepare_complete_rolls_back_inventory_logs_and_status_when_event_fails(
         name="Shipping atomic",
         role="worker",
         department=DepartmentEnum.ASSEMBLY.value,
-        level=EmployeeLevelEnum.STAFF,
         display_order=0,
         is_active=True,
     )

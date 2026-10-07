@@ -17,7 +17,6 @@ from app.database import Base
 from app.models import (
     DepartmentEnum,
     Employee,
-    EmployeeLevelEnum,
     Inventory,
     InventoryLocation,
     Item,
@@ -91,7 +90,6 @@ def _employee(session, *, code: str, department: DepartmentEnum, **roles) -> Emp
         name=code,
         role=f"{department.value}/사원",
         department=department,
-        level=EmployeeLevelEnum.STAFF,
         warehouse_role=roles.get("warehouse_role", "none"),
         department_role=roles.get("department_role", "none"),
         display_order=0,

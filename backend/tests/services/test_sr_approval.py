@@ -23,7 +23,6 @@ import pytest
 from app.models import (
     DepartmentEnum,
     Employee,
-    EmployeeLevelEnum,
     Inventory,
     InventoryLocation,
     IoBatch,
@@ -55,7 +54,6 @@ def _make_employee(
     department: DepartmentEnum = ASSEMBLY,
     warehouse_role: str = "none",
     department_role: str = "none",
-    level: EmployeeLevelEnum = EmployeeLevelEnum.STAFF,
     pin: str = "0000",
 ) -> Employee:
     emp = Employee(
@@ -63,7 +61,6 @@ def _make_employee(
         name=name,
         role=f"{department.value}/사원",
         department=department,
-        level=level,
         warehouse_role=warehouse_role,
         department_role=department_role,
         display_order=0,

@@ -10,7 +10,6 @@ import pytest
 from app.models import (
     DepartmentEnum,
     Employee,
-    EmployeeLevelEnum,
     Inventory,
     InventoryOperation,
     InventoryOperationEffect,
@@ -51,7 +50,6 @@ def _seed_cancelled_io_workflow(
         name="정합성 요청자",
         role="조립/staff",
         department=DepartmentEnum.ASSEMBLY,
-        level=EmployeeLevelEnum.STAFF,
         warehouse_role="none",
         department_role="none",
         display_order=0,
@@ -420,7 +418,6 @@ def _seed_historical_immediate_io_cancellation(db_session):
         name="즉시 취소 담당자",
         role="창고/staff",
         department=DepartmentEnum.WAREHOUSE,
-        level=EmployeeLevelEnum.STAFF,
         warehouse_role="primary",
         department_role="none",
         display_order=0,

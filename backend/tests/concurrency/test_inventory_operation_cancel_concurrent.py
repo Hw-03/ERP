@@ -10,7 +10,6 @@ import pytest
 
 from app.models import (
     Employee,
-    EmployeeLevelEnum,
     Inventory,
     InventoryOperation,
     InventoryOperationKindEnum,
@@ -36,7 +35,6 @@ def _setup(make_session) -> tuple[object, object]:
         name="동시 취소 관리자",
         role="창고/관리자",
         department="창고",
-        level=EmployeeLevelEnum.ADMIN,
         warehouse_role="primary",
         department_role="none",
         display_order=0,
@@ -170,7 +168,6 @@ def _setup_legacy(make_session) -> tuple[object, object]:
         name="동시 레거시 취소 관리자",
         role="창고/관리자",
         department="창고",
-        level=EmployeeLevelEnum.ADMIN,
         warehouse_role="primary",
         department_role="none",
         display_order=0,

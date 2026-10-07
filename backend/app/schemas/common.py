@@ -7,7 +7,6 @@ import uuid
 from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, WithJsonSchema
 
 from app.models import (
-    EmployeeLevelEnum,
     LocationStatusEnum,
     RequestBucketEnum,
     StockRequestStatusEnum,

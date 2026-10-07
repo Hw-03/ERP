@@ -72,7 +72,6 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
     role: "staff",
     phone: null,
     department: "조립",
-    level: "staff",
     warehouse_role: "none",
     department_role: "none",
     io_enabled: true,

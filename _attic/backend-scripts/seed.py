@@ -37,7 +37,6 @@ from app.models import (
     BOM,
     DepartmentEnum,
     Employee,
-    EmployeeLevelEnum,
     Inventory,
     InventoryLocation,
     Item,
@@ -159,14 +158,6 @@ def infer_legacy_process_type(file_type: str | None, part: str | None) -> str | 
     return None
 
 
-def infer_employee_level(role: str) -> EmployeeLevelEnum:
-    if "대표" in role:
-        return EmployeeLevelEnum.ADMIN
-    if any(keyword in role for keyword in ("부장", "과장", "책임")):
-        return EmployeeLevelEnum.MANAGER
-    return EmployeeLevelEnum.STAFF
-
-
 def extract_legacy_init_db() -> dict:
     if not LEGACY_HTML_PATH.exists():
         raise FileNotFoundError(f"Legacy HTML file not found: {LEGACY_HTML_PATH}")
@@ -227,7 +218,6 @@ def seed_employees(db, now) -> None:
             role=emp["role"],
             phone=None,
             department=emp["department"],
-            level=infer_employee_level(emp["role"]),
             display_order=order,
             is_active="true",
             created_at=now,
@@ -260,7 +250,6 @@ def seed_from_legacy_html() -> None:
                     role=role,
                     phone=None,
                     department=department,
-                    level=infer_employee_level(role),
                     display_order=order,
                     is_active="true",
                     created_at=now,

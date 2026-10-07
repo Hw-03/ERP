@@ -12,7 +12,6 @@ from sqlalchemy.orm import Query
 from app.models import (
     DepartmentEnum,
     Employee,
-    EmployeeLevelEnum,
     Inventory,
     InventoryLocation,
     LocationStatusEnum,
@@ -37,7 +36,6 @@ def _employee(db_session, *, department: DepartmentEnum = DepartmentEnum.ASSEMBL
         name="자동 부서 작업자",
         role=f"{department.value}/사원",
         department=department.value,
-        level=EmployeeLevelEnum.STAFF,
         warehouse_role="none",
         display_order=0,
         is_active="true",

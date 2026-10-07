@@ -16,7 +16,6 @@ from app.models import (
     DepartmentEnum,
     Employee,
     EmployeeAssignedModel,  # noqa: F401 — metadata registration
-    EmployeeLevelEnum,
     Item,
     ProcessType,
     ProductSymbol,
@@ -31,32 +30,32 @@ from app.services.pin_auth import DEFAULT_PIN_HASH
 # 시드 데이터 정의
 # ---------------------------------------------------------------------------
 _EMPLOYEE_SEED: list[tuple] = [
-    ("E04", "김건호", "조립/과장", DepartmentEnum.ASSEMBLY, EmployeeLevelEnum.MANAGER),
-    ("E01", "김민재", "조립/대리", DepartmentEnum.ASSEMBLY, EmployeeLevelEnum.STAFF),
-    ("E02", "김종숙", "조립/주임", DepartmentEnum.ASSEMBLY, EmployeeLevelEnum.STAFF),
-    ("E06", "김현우", "조립/사원", DepartmentEnum.ASSEMBLY, EmployeeLevelEnum.STAFF),
-    ("E05", "남재원", "조립/사원", DepartmentEnum.ASSEMBLY, EmployeeLevelEnum.STAFF),
-    ("E03", "이계숙", "조립/주임", DepartmentEnum.ASSEMBLY, EmployeeLevelEnum.STAFF),
-    ("E22", "이필욱", "조립/부장", DepartmentEnum.ASSEMBLY, EmployeeLevelEnum.MANAGER),
-    ("E07", "이형진", "조립/사원", DepartmentEnum.ASSEMBLY, EmployeeLevelEnum.STAFF),
-    ("E09", "김재현", "진공/사원", DepartmentEnum.VACUUM, EmployeeLevelEnum.STAFF),
-    ("E10", "이지훈", "진공/대리", DepartmentEnum.VACUUM, EmployeeLevelEnum.STAFF),
-    ("E08", "허동현", "진공/사원", DepartmentEnum.VACUUM, EmployeeLevelEnum.STAFF),
-    ("E11", "김지현", "고압/주임", DepartmentEnum.HIGH_VOLTAGE, EmployeeLevelEnum.STAFF),
-    ("E12", "민애경", "고압/주임", DepartmentEnum.HIGH_VOLTAGE, EmployeeLevelEnum.STAFF),
-    ("E13", "오세현", "튜닝/사원", DepartmentEnum.TUNING, EmployeeLevelEnum.STAFF),
-    ("E14", "이지현", "튜닝/사원", DepartmentEnum.TUNING, EmployeeLevelEnum.STAFF),
-    ("E15", "김도영", "튜브/주임", DepartmentEnum.TUBE, EmployeeLevelEnum.STAFF),
-    ("E21", "문종현", "AS/대리", DepartmentEnum.AS, EmployeeLevelEnum.STAFF),
-    ("E16", "이성민", "연구소/책임", DepartmentEnum.RESEARCH, EmployeeLevelEnum.MANAGER),
-    ("E17", "오성식", "연구소/주임", DepartmentEnum.RESEARCH, EmployeeLevelEnum.STAFF),
-    ("E18", "류승범", "기타/대표", DepartmentEnum.ETC, EmployeeLevelEnum.ADMIN),
-    ("E19", "최윤영", "기타/과장", DepartmentEnum.ETC, EmployeeLevelEnum.MANAGER),
-    ("E20", "박성현", "기타/부장", DepartmentEnum.ETC, EmployeeLevelEnum.MANAGER),
-    ("E23", "양승규", "영업/부장", DepartmentEnum.SALES, EmployeeLevelEnum.MANAGER),
-    ("E24", "김예진", "영업/대리", DepartmentEnum.SALES, EmployeeLevelEnum.STAFF),
-    ("E25", "심이리나", "영업/과장", DepartmentEnum.SALES, EmployeeLevelEnum.MANAGER),
-    ("E26", "드미트리", "영업/사원", DepartmentEnum.SALES, EmployeeLevelEnum.STAFF),
+    ("E04", "김건호", "조립/과장", DepartmentEnum.ASSEMBLY),
+    ("E01", "김민재", "조립/대리", DepartmentEnum.ASSEMBLY),
+    ("E02", "김종숙", "조립/주임", DepartmentEnum.ASSEMBLY),
+    ("E06", "김현우", "조립/사원", DepartmentEnum.ASSEMBLY),
+    ("E05", "남재원", "조립/사원", DepartmentEnum.ASSEMBLY),
+    ("E03", "이계숙", "조립/주임", DepartmentEnum.ASSEMBLY),
+    ("E22", "이필욱", "조립/부장", DepartmentEnum.ASSEMBLY),
+    ("E07", "이형진", "조립/사원", DepartmentEnum.ASSEMBLY),
+    ("E09", "김재현", "진공/사원", DepartmentEnum.VACUUM),
+    ("E10", "이지훈", "진공/대리", DepartmentEnum.VACUUM),
+    ("E08", "허동현", "진공/사원", DepartmentEnum.VACUUM),
+    ("E11", "김지현", "고압/주임", DepartmentEnum.HIGH_VOLTAGE),
+    ("E12", "민애경", "고압/주임", DepartmentEnum.HIGH_VOLTAGE),
+    ("E13", "오세현", "튜닝/사원", DepartmentEnum.TUNING),
+    ("E14", "이지현", "튜닝/사원", DepartmentEnum.TUNING),
+    ("E15", "김도영", "튜브/주임", DepartmentEnum.TUBE),
+    ("E21", "문종현", "AS/대리", DepartmentEnum.AS),
+    ("E16", "이성민", "연구소/책임", DepartmentEnum.RESEARCH),
+    ("E17", "오성식", "연구소/주임", DepartmentEnum.RESEARCH),
+    ("E18", "류승범", "기타/대표", DepartmentEnum.ETC),
+    ("E19", "최윤영", "기타/과장", DepartmentEnum.ETC),
+    ("E20", "박성현", "기타/부장", DepartmentEnum.ETC),
+    ("E23", "양승규", "영업/부장", DepartmentEnum.SALES),
+    ("E24", "김예진", "영업/대리", DepartmentEnum.SALES),
+    ("E25", "심이리나", "영업/과장", DepartmentEnum.SALES),
+    ("E26", "드미트리", "영업/사원", DepartmentEnum.SALES),
 ]
 
 _PRODUCT_SYMBOL_ASSIGNED: list[tuple] = [
@@ -225,14 +224,13 @@ def seed_reference_data() -> dict[str, int]:
             db.commit()
 
         if db.query(Employee).count() == 0:
-            for idx, (code, name, role, dept, level) in enumerate(_EMPLOYEE_SEED, start=1):
+            for idx, (code, name, role, dept) in enumerate(_EMPLOYEE_SEED, start=1):
                 db.add(
                     Employee(
                         employee_code=code,
                         name=name,
                         role=role,
                         department=dept,
-                        level=level,
                         display_order=idx,
                         is_active="true",
                         as_research_approver=code in {"E02", "E03"},

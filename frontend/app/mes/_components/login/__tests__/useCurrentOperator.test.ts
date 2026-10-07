@@ -20,7 +20,6 @@ const baseOperator: Operator = {
   name: "Tester",
   role: "조립/사원",
   department: "조립",
-  level: "staff",
   employee_code: "E1",
   warehouse_role: "none",
   department_role: "none",

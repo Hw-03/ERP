@@ -8,7 +8,6 @@ const state = vi.hoisted(() => ({
     name: "테스트 작업자",
     role: "작업자",
     department: "조립",
-    level: "사원",
     employee_code: "E001",
     warehouse_role: "none",
     department_role: "none",

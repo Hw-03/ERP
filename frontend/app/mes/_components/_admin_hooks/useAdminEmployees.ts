@@ -99,7 +99,6 @@ export function useAdminEmployees({
           role: form.editForm.role.trim(),
           phone: form.editForm.phone.trim() || undefined,
           department: form.editForm.department as Employee["department"],
-          level: form.editForm.level,
           warehouse_role: form.editForm.warehouse_role,
           department_role: form.editForm.department_role,
           as_research_approver: form.editForm.as_research_approver,

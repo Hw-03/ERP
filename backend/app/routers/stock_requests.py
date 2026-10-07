@@ -301,9 +301,9 @@ def list_department_queue(
 ):
     """부서 결재 정/부 승인 대기 목록.
 
-    노출 부서 범위 (그릴 합의 — docs/defect-handling-redesign.md):
-      - 부서 정/부: 생산 라인 6개(튜브/고압/진공/튜닝/조립/출하)
-      - 창고 정/부 / admin: 모든 부서
+    노출 부서 범위는 독립 역할에 따른다:
+      - 부서 정/부: 창고를 제외한 모든 부서
+      - 창고 정/부: 창고를 포함한 모든 부서
     """
     actor = (
         db.query(Employee).filter(Employee.employee_id == actor_employee_id).first()

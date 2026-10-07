@@ -19,7 +19,6 @@ if str(BACKEND_DIR) not in sys.path:
 from app.models import (
     DepartmentEnum,
     Employee,
-    EmployeeLevelEnum,
     Inventory,
     Item,
     RequestBucketEnum,
@@ -39,7 +38,6 @@ def _setup(make_session):
         name="제출테스트직원",
         role="조립/사원",
         department=DepartmentEnum.ASSEMBLY.value,
-        level=EmployeeLevelEnum.STAFF,
         is_active=True,
         display_order=0,
     )

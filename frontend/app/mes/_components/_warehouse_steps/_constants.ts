@@ -5,7 +5,7 @@ import {
   Workflow,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { Department, DepartmentRole, EmployeeLevel, Item, WarehouseRole } from "@/lib/api";
+import type { Department, DepartmentRole, Item, WarehouseRole } from "@/lib/api";
 import { matchesItemSearch } from "@/lib/itemSearch";
 
 // ───────────────────────────── Types ─────────────────────────────
@@ -23,7 +23,6 @@ type OperatorLike =
   | {
       warehouse_role: WarehouseRole;
       department_role?: DepartmentRole;
-      level?: EmployeeLevel;
       department: Department;
     }
   | null
@@ -97,7 +96,6 @@ export function isWarehouseStaff(op: OperatorLike): boolean {
 
 export function isDepartmentApprover(op: OperatorLike): boolean {
   if (!op) return false;
-  if (op.level === "admin") return true;
   return op.department_role === "primary" || op.department_role === "deputy";
 }
 

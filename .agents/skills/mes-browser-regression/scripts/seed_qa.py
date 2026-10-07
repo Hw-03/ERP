@@ -16,13 +16,13 @@ def main() -> None:
         raise ValueError("QA fixture path mismatch")
     sys.path.insert(0, str(backend))
     from app.database import SessionLocal
-    from app.models import Employee, EmployeeAssignedModel, EmployeeLevelEnum, SystemSetting, WeeklyInventorySnapshot
+    from app.models import Employee, EmployeeAssignedModel, SystemSetting, WeeklyInventorySnapshot
 
     with SessionLocal() as session:
         session.query(EmployeeAssignedModel).delete()
         session.query(Employee).delete()
-        for code, department, level in [("QA-ADMIN", "관리", EmployeeLevelEnum.ADMIN), ("QA-WH", "창고", EmployeeLevelEnum.STAFF), ("QA-ASM", "조립", EmployeeLevelEnum.STAFF)]:
-            session.add(Employee(employee_code=code, name=code, role="QA", department=department, level=level,
+        for code, department in [("QA-ADMIN", "관리"), ("QA-WH", "창고"), ("QA-ASM", "조립")]:
+            session.add(Employee(employee_code=code, name=code, role="QA", department=department,
                                  warehouse_role="primary" if code != "QA-ASM" else "none", department_role="primary"))
         session.merge(SystemSetting(setting_key="inventory_operation_cutover_at", setting_value="2000-01-01T00:00:00"))
         today = datetime.now(ZoneInfo("Asia/Seoul")).date()

@@ -9,7 +9,6 @@ const employee = (over: Partial<any> = {}): any => ({
   role: "사원",
   phone: null,
   department: "조립",
-  level: "staff",
   warehouse_role: "none",
   department_role: "none",
   as_research_approver: false,

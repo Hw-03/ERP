@@ -3,7 +3,7 @@
  * Round-10A (#2) 본문 이전.
  */
 
-import type { Department, DepartmentRole, EmployeeLevel, WarehouseRole } from "./shared";
+import type { Department, DepartmentRole, WarehouseRole } from "./shared";
 import type { SidebarMode } from "../../sidebar-mode";
 
 export type { SidebarMode } from "../../sidebar-mode";
@@ -15,7 +15,6 @@ export interface Employee {
   role: string;
   phone: string | null;
   department: Department;
-  level: EmployeeLevel;
   /** 창고 결재 역할 — 기본 "none". primary/deputy 만 창고 흐름 승인/반려 가능. */
   warehouse_role: WarehouseRole;
   /** 부서 결재 역할 — 낱개(manual/adjust) 입출고 작업 승인 권한. warehouse_role 와 별개. */

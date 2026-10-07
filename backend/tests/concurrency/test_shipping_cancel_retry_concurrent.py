@@ -6,7 +6,7 @@ from decimal import Decimal
 import pytest
 
 from app.models import (
-    DepartmentEnum, Employee, EmployeeLevelEnum, Inventory, InventoryLocation,
+    DepartmentEnum, Employee, Inventory, InventoryLocation,
     Item, LocationStatusEnum, ShippingAllocation, ShippingRequest,
     ShippingRequestEvent, ShippingRequestStatusEnum, SystemSetting, TransactionLog,
 )
@@ -18,7 +18,7 @@ def seed_request(make_session):
     with make_session() as db:
         actor = Employee(employee_code="SHIPPING-RACE", name="Shipping race",
                          role="worker", department=DepartmentEnum.SHIPPING.value,
-                         level=EmployeeLevelEnum.STAFF, display_order=0, is_active="true")
+                         display_order=0, is_active="true")
         pa = Item(item_name="Race PA", process_type_code="PA", unit="EA", model_symbol="9", serial_no=1)
         pf = Item(item_name="Race PF", process_type_code="PF", unit="EA", model_symbol="9", serial_no=2)
         db.add_all([actor, pa, pf, SystemSetting(setting_key="inventory_operation_cutover_at", setting_value="2026-01-01T00:00:00")])

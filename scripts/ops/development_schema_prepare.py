@@ -73,6 +73,17 @@ def run_checked(root: Path, runtime: Path, database: Path, arguments: list[str])
     return result.stdout
 
 
+def pending_removed_columns(root: Path, state: dict[str, object]) -> dict[str, frozenset[str]]:
+    """Use only the preserving policies on the inspected pending upgrade path."""
+    graph = ScriptDirectory(str(root / "backend" / "alembic"))
+    removed: dict[str, frozenset[str]] = {}
+    for revision in graph.iterate_revisions(str(state["head"]), str(state["revision"])):
+        policy = _policy_from_migration(Path(revision.path))
+        for table, columns in policy.removed_columns.items():
+            removed[table] = removed.get(table, frozenset()) | columns
+    return removed
+
+
 def migrate_and_verify(root: Path, database: Path, runtime: Path) -> None:
     """Use bootstrap and the same DB/inventory validators as data synchronization."""
     run_checked(root, runtime, database, ["bootstrap_db.py", "--migrate"])
@@ -83,13 +94,14 @@ def migrate_and_verify(root: Path, database: Path, runtime: Path) -> None:
 
 def rehearse(root: Path, database: Path, runtime: Path) -> Path:
     """Prove migration preserves all existing business values on an online snapshot."""
-    inspect_database(root, database)
+    state = inspect_database(root, database)
+    removed_columns = pending_removed_columns(root, state)
     snapshot = _copy_verified_snapshot(database, runtime)
     print(f"SYNC_DEV_PREP_SNAPSHOT={snapshot}")
-    before = snapshot_existing_rows(snapshot)
+    before = snapshot_existing_rows(snapshot, removed_columns=removed_columns)
     migrate_and_verify(root, snapshot, runtime)
     try:
-        assert_existing_rows_unchanged(snapshot, before, frozenset())
+        assert_existing_rows_unchanged(snapshot, before, frozenset(), removed_columns=removed_columns)
     except PreflightError as exc:
         raise PreparationError(str(exc)) from exc
     if inspect_database(root, snapshot)["needs_migration"]:
@@ -101,6 +113,8 @@ def rehearse(root: Path, database: Path, runtime: Path) -> Path:
 def apply_stopped(root: Path, database: Path, runtime: Path) -> None:
     """Caller owns service shutdown; revalidate fresh stopped data before migration."""
     assert_development_stopped()
+    state = inspect_database(root, database)
+    removed_columns = pending_removed_columns(root, state)
     # The structural backup is explicit old-schema evidence, never a full-head backup.
     output = run_checked(root, runtime, database, [str(root / "scripts/ops/backup_db.py"), "--sqlite", str(database), "--integrity-only"])
     match = re.search(r"(?m)^BACKUP_PATH=(.+)$", output)
@@ -113,9 +127,10 @@ def apply_stopped(root: Path, database: Path, runtime: Path) -> None:
     rehearse(root, database, runtime)
     before = snapshot_existing_rows(backup)
     assert_existing_rows_unchanged(database, before, frozenset())
+    projected_before = snapshot_existing_rows(backup, removed_columns=removed_columns)
     assert_development_stopped()
     migrate_and_verify(root, database, runtime)
-    assert_existing_rows_unchanged(database, before, frozenset())
+    assert_existing_rows_unchanged(database, projected_before, frozenset(), removed_columns=removed_columns)
     if inspect_database(root, database)["needs_migration"]:
         raise PreparationError("development migration did not reach head")
     print("SYNC_DEV_PREP_DATA_PRESERVED=PASS")

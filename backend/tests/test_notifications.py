@@ -16,7 +16,6 @@ from sqlalchemy import event
 from app.models import (
     DepartmentEnum,
     Employee,
-    EmployeeLevelEnum,
     IoBatch,
     IoBundle,
     Notification,
@@ -40,14 +39,12 @@ def _make_employee(
     warehouse_role: str = "none",
     department_role: str = "none",
     as_research_approver: bool = False,
-    level: EmployeeLevelEnum = EmployeeLevelEnum.STAFF,
 ) -> Employee:
     emp = Employee(
         employee_code=code,
         name=name,
         role=f"{department.value}/staff",
         department=department.value if isinstance(department, DepartmentEnum) else department,
-        level=level,
         warehouse_role=warehouse_role,
         department_role=department_role,
         as_research_approver=as_research_approver,
@@ -518,7 +515,7 @@ def test_warehouse_recipients_are_warehouse_roles(db_session):
 def test_department_recipients_follow_can_approve_rule(db_session):
     _make_employee(db_session, code="DP", department_role="primary")
     _make_employee(db_session, code="WP", warehouse_role="primary")
-    _make_employee(db_session, code="AD", level=EmployeeLevelEnum.ADMIN)
+    _make_employee(db_session, code="AD")
     _make_employee(db_session, code="PL")
     db_session.commit()
 

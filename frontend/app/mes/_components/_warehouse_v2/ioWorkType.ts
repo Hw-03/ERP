@@ -213,14 +213,13 @@ export function canAutoApprove(
   operator: {
     warehouse_role?: string | null;
     department_role?: string | null;
-    level?: string | null;
   } | null | undefined,
 ): boolean {
   if (kind === "none" || !operator) return false;
   const warehouseApprover =
     operator.warehouse_role === "primary" || operator.warehouse_role === "deputy";
   if (kind === "warehouse") {
-    return warehouseApprover || operator.level === "admin";
+    return warehouseApprover;
   }
   return warehouseApprover ||
     operator.department_role === "primary" ||

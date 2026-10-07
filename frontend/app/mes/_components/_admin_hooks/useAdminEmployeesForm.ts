@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { DepartmentRole, Employee, EmployeeLevel, WarehouseRole } from "@/lib/api";
+import type { DepartmentRole, Employee, WarehouseRole } from "@/lib/api";
 import { EMPTY_EMPLOYEE_FORM, type EmployeeAddForm } from "../_admin_sections/adminShared";
 import { normalizeEmployeePosition } from "../_admin_sections/_employee_parts/employeeRoleLabels";
 
@@ -18,7 +18,6 @@ export type EmployeeEditForm = {
   role: string;
   phone: string;
   department: string;
-  level: EmployeeLevel;
   warehouse_role: WarehouseRole;
   department_role: DepartmentRole;
   as_research_approver: boolean;
@@ -33,7 +32,6 @@ const EMPTY_EDIT_FORM: EmployeeEditForm = {
   role: "",
   phone: "",
   department: "조립",
-  level: "staff",
   warehouse_role: "none",
   department_role: "none",
   as_research_approver: false,
@@ -47,7 +45,6 @@ function toEditForm(emp: Employee): EmployeeEditForm {
     role: normalizeEmployeePosition(emp.role),
     phone: emp.phone ?? "",
     department: emp.department,
-    level: (emp.level ?? "staff") as EmployeeLevel,
     warehouse_role: (emp.warehouse_role ?? "none") as WarehouseRole,
     department_role: (emp.department_role ?? "none") as DepartmentRole,
     as_research_approver: emp.as_research_approver ?? false,
@@ -94,7 +91,6 @@ export function useAdminEmployeesForm(employees: Employee[]) {
     if (orig.role !== editForm.role) return true;
     if (orig.phone !== editForm.phone) return true;
     if (orig.department !== editForm.department) return true;
-    if (orig.level !== editForm.level) return true;
     if (orig.warehouse_role !== editForm.warehouse_role) return true;
     if (orig.department_role !== editForm.department_role) return true;
     if (orig.as_research_approver !== editForm.as_research_approver) return true;

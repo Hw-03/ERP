@@ -13,7 +13,6 @@ from app.models import (
     BoxSizeEnum,
     DepartmentEnum,
     Employee,
-    EmployeeLevelEnum,
     Inventory,
     InventoryLocation,
     InventoryOperation,
@@ -42,14 +41,12 @@ def _make_requester(
     warehouse_role: str = "primary",
     department_role: str = "none",
     as_research_approver: bool = False,
-    level: EmployeeLevelEnum = EmployeeLevelEnum.STAFF,
 ) -> Employee:
     requester = Employee(
         employee_code=f"IO-ACT-{uuid.uuid4().hex[:8]}",
         name="IO 원자성 작업자",
         role="창고/사원",
         department=department,
-        level=level,
         warehouse_role=warehouse_role,
         department_role=department_role,
         as_research_approver=as_research_approver,
@@ -132,6 +129,57 @@ def _use_department_source(payload: IoSubmitRequest, department: str) -> None:
         for line in bundle.lines:
             line.from_bucket = "production"
             line.from_department = department
+
+
+def test_department_role_grant_revoke_regrant_preserves_pending_and_executes_once(
+    db_session, client, make_item, make_location,
+):
+    """역할 편집은 대기·예약을 보존하며 서버는 매 요청의 현재 역할을 확인한다."""
+    item = make_item(name="role-change-pending", process_type_code="HF", warehouse_qty=Decimal("0"))
+    make_location(item.item_id, department=DepartmentEnum.HIGH_VOLTAGE, quantity=Decimal("5"))
+    requester = _make_requester(db_session, department=DepartmentEnum.AS, warehouse_role="none")
+    approver = _make_requester(db_session, department=DepartmentEnum.RESEARCH, warehouse_role="none")
+    payload = _internal_use_payload(requester, [item])
+    _use_department_source(payload, DepartmentEnum.HIGH_VOLTAGE.value)
+    submitted = actions.submit(db_session, payload)
+    request_id = submitted["stock_requests"][0]["stock_request_id"]
+    queue_url = f"/api/stock-requests/department-queue?actor_employee_id={approver.employee_id}"
+    action_url = f"/api/stock-requests/{request_id}/department-approve"
+    body = {"actor_employee_id": str(approver.employee_id), "pin": "0000"}
+
+    def change_role(role: str) -> None:
+        result = client.put(f"/api/employees/{approver.employee_id}", headers={"X-Admin-Pin": "0000"}, json={"department_role": role})
+        assert result.status_code == 200, result.text
+
+    def stock_state() -> tuple:
+        db_session.expire_all()
+        request = db_session.get(StockRequest, request_id)
+        location = db_session.query(InventoryLocation).filter(InventoryLocation.item_id == item.item_id).one()
+        return request.status, location.quantity, location.pending_quantity
+
+    initial = stock_state()
+    assert initial == (StockRequestStatusEnum.RESERVED, Decimal("5"), Decimal("1"))
+    assert client.get(queue_url).json() == []
+    change_role("primary")
+    assert [row["request_id"] for row in client.get(queue_url).json()] == [str(request_id)]
+    assert stock_state() == initial
+    change_role("none")
+    assert client.get(queue_url).json() == []
+    denied = client.post(action_url, json=body)
+    assert denied.status_code == 403, denied.text
+    assert stock_state() == initial
+    assert db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id).count() == 0
+    change_role("deputy")
+    assert [row["request_id"] for row in client.get(queue_url).json()] == [str(request_id)]
+    approved = client.post(action_url, json=body)
+    assert approved.status_code == 200, approved.text
+    assert stock_state() == (StockRequestStatusEnum.COMPLETED, Decimal("4"), Decimal("0"))
+    log_ids = {row.log_id for row in db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id)}
+    assert len(log_ids) == 1
+    repeated = client.post(action_url, json=body)
+    assert repeated.status_code == 422, repeated.text
+    assert stock_state() == (StockRequestStatusEnum.COMPLETED, Decimal("4"), Decimal("0"))
+    assert {row.log_id for row in db_session.query(TransactionLog).filter(TransactionLog.item_id == item.item_id)} == log_ids
 
 
 def _count_session_boundaries(db_session, monkeypatch):
@@ -374,8 +422,9 @@ def test_internal_use_warehouse_source_takes_priority_over_as_research_kind(
     assert request.requires_as_research_approval is False
 
 
+@pytest.mark.parametrize("final_decision", ["approved", "rejected"])
 def test_internal_use_waits_for_all_decisions_then_executes_approved_lines_atomically(
-    db_session, make_item, make_location, monkeypatch
+    db_session, make_item, make_location, monkeypatch, final_decision: str,
 ):
     warehouse_item = make_item(
         name="독립 창고 승인", process_type_code="AF", warehouse_qty=Decimal("5")
@@ -470,20 +519,29 @@ def test_internal_use_waits_for_all_decisions_then_executes_approved_lines_atomi
     monkeypatch.setattr(internal_use_approval, "_prelock_locations", track_location_prelock)
     monkeypatch.setattr(internal_use_approval, "release_reservation", track_reservation_release)
 
-    sr_approval.reject_request_department(
-        db_session,
-        department_request,
-        approver=department_approver,
-        pin="0000",
-        reason="부서 반려",
-    )
+    if final_decision == "approved":
+        sr_approval.approve_request_department(
+            db_session,
+            department_request,
+            approver=department_approver,
+            pin="0000",
+        )
+    else:
+        sr_approval.reject_request_department(
+            db_session,
+            department_request,
+            approver=department_approver,
+            pin="0000",
+            reason="부서 반려",
+        )
     assert lock_events[:3] == ["inventory", "location", "release"]
 
-    assert batch.status == "partially_completed"
+    assert batch.status == ("completed" if final_decision == "approved" else "partially_completed")
     assert warehouse_request.status == StockRequestStatusEnum.COMPLETED
-    assert department_request.status == StockRequestStatusEnum.REJECTED
-    assert department_location.quantity == Decimal("5")
+    assert department_request.status == (StockRequestStatusEnum.COMPLETED if final_decision == "approved" else StockRequestStatusEnum.REJECTED)
+    assert department_location.quantity == Decimal("4" if final_decision == "approved" else "5")
     assert department_location.pending_quantity == Decimal("0")
+    assert db_session.query(TransactionLog).count() == (2 if final_decision == "approved" else 1)
     assert (
         db_session.query(Inventory)
         .filter(Inventory.item_id == warehouse_item.item_id)
@@ -517,16 +575,16 @@ def test_internal_use_waits_for_all_decisions_then_executes_approved_lines_atomi
         == warehouse_approver.employee_id
     )
     assert summaries[("warehouse", None)]["approver_name"] == warehouse_approver.name
-    assert summaries[("production", "고압")]["status"] == "rejected"
+    assert summaries[("production", "고압")]["status"] == ("completed" if final_decision == "approved" else "rejected")
     assert summaries[("warehouse", None)]["approval_outcome"] == "approved"
-    assert summaries[("production", "고압")]["approval_outcome"] == "rejected"
+    assert summaries[("production", "고압")]["approval_outcome"] == final_decision
     line_outcomes = {
         line["item_id"]: (line["approval_kind"], line["approval_outcome"])
         for bundle in batch_payload["bundles"]
         for line in bundle["lines"]
     }
     assert line_outcomes[warehouse_item.item_id] == ("warehouse", "approved")
-    assert line_outcomes[department_item.item_id] == ("department", "rejected")
+    assert line_outcomes[department_item.item_id] == ("department", final_decision)
 
 
 def test_internal_use_ar_aa_falls_back_to_department_when_no_active_special_approver(
@@ -764,7 +822,6 @@ def test_as_research_queue_and_pin_approval_are_isolated_from_warehouse_role(
     admin_only = _make_requester(
         db_session,
         warehouse_role="none",
-        level=EmployeeLevelEnum.ADMIN,
     )
     payload = _internal_use_payload(requester, [item])
     _use_department_source(payload, DepartmentEnum.ASSEMBLY.value)

@@ -1,14 +1,19 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render as renderBase, screen, waitFor } from "@testing-library/react";
 import { Suspense, useState, type ReactNode } from "react";
 import { useDesktopTabHome } from "../DesktopTabHome";
 import { useRegisterDirty } from "@/lib/ui/dirty-guard";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DesktopMesShell } from "../DesktopMesShell";
+import { AppearancePreferencesProvider } from "../useAppearancePreferences";
 import type { DesktopTabId } from "../tabAccess";
 import { sendClientEvent } from "@/lib/client-events";
 
 const setAuditScreen = vi.hoisted(() => vi.fn());
+
+function render(ui: ReactNode) {
+  return renderBase(<AppearancePreferencesProvider>{ui}</AppearancePreferencesProvider>);
+}
 
 const routerPush = vi.hoisted(() => vi.fn());
 const routerReplace = vi.hoisted(() => vi.fn());

@@ -17,7 +17,6 @@ from openpyxl import load_workbook
 from app.models import (
     DepartmentEnum,
     Employee,
-    EmployeeLevelEnum,
     IoBatch,
     Item,
     StockRequest,
@@ -31,7 +30,7 @@ from app.models import (
 def _emp(db, code: str, name: str) -> Employee:
     e = Employee(
         employee_code=code, name=name, role="조립/staff",
-        department=DepartmentEnum.ASSEMBLY, level=EmployeeLevelEnum.STAFF,
+        department=DepartmentEnum.ASSEMBLY,
         display_order=0,
     )
     db.add(e)

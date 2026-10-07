@@ -1,6 +1,5 @@
 """직원·부서 도메인."""
 
-import enum
 import uuid
 from datetime import datetime
 
@@ -9,7 +8,6 @@ from sqlalchemy import (
     CheckConstraint,
     Column,
     DateTime,
-    Enum as SAEnum,
     ForeignKey,
     Index,
     Integer,
@@ -21,17 +19,10 @@ from sqlalchemy import (
 from app.models.base import Base, BoolAsString, UUIDString
 
 __all__ = [
-    "EmployeeLevelEnum",
     "Department",
     "Employee",
     "EmployeeAssignedModel",
 ]
-
-
-class EmployeeLevelEnum(str, enum.Enum):
-    ADMIN = "admin"
-    MANAGER = "manager"
-    STAFF = "staff"
 
 
 class Department(Base):
@@ -54,12 +45,7 @@ class Employee(Base):
     role = Column(String(100), nullable=False)
     phone = Column(String(30), nullable=True)
     department = Column(String(50), nullable=False, default="기타", index=True)
-    level = Column(
-        SAEnum(EmployeeLevelEnum, name="employee_level_enum", create_type=True),
-        nullable=False,
-        default=EmployeeLevelEnum.STAFF,
-    )
-    # 창고 결재 역할: "none" | "primary" | "deputy". 시스템 권한(level)과 별개의 업무 역할.
+    # 창고 결재 역할: "none" | "primary" | "deputy". 독립적인 업무 역할.
     # 소문자 문자열로 통일 (DB / API / 프론트 모두 동일).
     warehouse_role = Column(String(20), nullable=False, default="none", server_default="none")
     # 부서 결재 역할: 낱개(manual/adjust_in/adjust_out) IO 작업 승인 권한. warehouse_role 와 별개.

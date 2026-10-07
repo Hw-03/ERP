@@ -14,7 +14,6 @@ const operator = {
   employee_id: "emp-1",
   name: "Kim",
   department: "Assembly",
-  level: "staff",
   employee_code: "E1",
   warehouse_role: "primary",
   department_role: "none",

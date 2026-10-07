@@ -12,7 +12,6 @@ const employee: Employee = {
   role: "튜브/주임",
   phone: "010-1234-5678",
   department: "조립",
-  level: "staff",
   warehouse_role: "none",
   department_role: "none",
   as_research_approver: false,
@@ -30,7 +29,6 @@ const form: EmployeeEditForm = {
   role: "주임",
   phone: employee.phone ?? "",
   department: employee.department,
-  level: employee.level,
   warehouse_role: employee.warehouse_role,
   department_role: employee.department_role,
   as_research_approver: employee.as_research_approver,
@@ -43,6 +41,55 @@ const departments: DepartmentMaster[] = [
 ];
 
 describe("EmployeeDetailGrid", () => {
+  it("직원 편집 화면은 등급 control 없이 창고·부서 정·부와 AS·연구 역할을 독립적으로 유지한다", () => {
+    const selectedForm: EmployeeEditForm = {
+      ...form,
+      warehouse_role: "primary",
+      department_role: "deputy",
+      as_research_approver: true,
+    };
+    const setForm = vi.fn();
+    const { container } = render(
+      <EmployeeDetailGrid
+        employee={employee}
+        form={selectedForm}
+        setForm={setForm}
+        departments={departments}
+        productModels={[]}
+        onRequestPinReset={vi.fn()}
+        onToggle={vi.fn()}
+        onRequestDelete={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText(/^(직원 |시스템 |권한 )?등급$/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: /등급|level|ADMIN|MANAGER|STAFF/i })).not.toBeInTheDocument();
+    expect(container.querySelector('[name="level"], #emp-edit-level')).not.toBeInTheDocument();
+
+    const warehouseField = screen.getByText("창고 결재 역할").parentElement!;
+    const departmentField = screen.getByText("부서 결재 역할").parentElement!;
+    const warehouseSelect = within(warehouseField).getByRole("combobox");
+    const departmentSelect = within(departmentField).getByRole("combobox");
+    expect(warehouseSelect).toHaveTextContent("정");
+    expect(departmentSelect).toHaveTextContent("부");
+    expect(screen.getByRole("checkbox", { name: "AS·연구 승인 권한" })).toBeChecked();
+
+    fireEvent.click(warehouseSelect);
+    expect(screen.getByRole("option", { name: "없음", exact: true })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "정", exact: true })).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole("option", { name: "부", exact: true }));
+    expect(setForm.mock.calls[0][0](selectedForm)).toEqual({ ...selectedForm, warehouse_role: "deputy" });
+
+    fireEvent.click(departmentSelect);
+    expect(screen.getByRole("option", { name: "없음", exact: true })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "부", exact: true })).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole("option", { name: "정", exact: true }));
+    expect(setForm.mock.calls[1][0](selectedForm)).toEqual({ ...selectedForm, department_role: "primary" });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "AS·연구 승인 권한" }));
+    expect(setForm.mock.calls[2][0](selectedForm)).toEqual({ ...selectedForm, as_research_approver: false });
+  });
+
   it("기본 정보 카드에 직원 사번을 표시한다", () => {
     render(
       <EmployeeDetailGrid

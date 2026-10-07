@@ -9,7 +9,6 @@ import pytest
 from app.models import (
     DepartmentEnum,
     Employee,
-    EmployeeLevelEnum,
     HandoverDoc,
     HandoverLine,
     HandoverStatusEnum,
@@ -32,7 +31,6 @@ def _make_employee(
         name=f"{department.value} 작업자",
         role=f"{department.value}/사원",
         department=department,
-        level=EmployeeLevelEnum.STAFF,
         warehouse_role="none",
         department_role="none",
         display_order=0,

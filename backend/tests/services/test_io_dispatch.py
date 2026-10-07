@@ -19,7 +19,6 @@ from app.models import (
     DepartmentEnum,
     DefectQuarantineRecord,
     Employee,
-    EmployeeLevelEnum,
     Inventory,
     InventoryOperation,
     InventoryOperationEffect,
@@ -61,14 +60,12 @@ def _make_employee(
     department: DepartmentEnum = DepartmentEnum.ASSEMBLY,
     warehouse_role: str = "none",
     department_role: str = "none",
-    level: EmployeeLevelEnum = EmployeeLevelEnum.STAFF,
 ) -> Employee:
     employee = Employee(
         employee_code=code,
         name=name,
         role=f"{department.value}/staff",
         department=department,
-        level=level,
         warehouse_role=warehouse_role,
         department_role=department_role,
         display_order=0,
@@ -941,7 +938,6 @@ def test_submit_dept_only_admin_without_role_waits_for_approval(
     requester = _make_employee(
         db_session,
         code="DEPT-ADMIN-WAIT",
-        level=EmployeeLevelEnum.ADMIN,
     )
     batch = _build_batch(
         db_session,

@@ -235,11 +235,12 @@ describe("결재권자와 실제 재고 효과", () => {
 
   it("8.22-09, 8.25-04: 서버와 같은 역할 기준으로 창고·부서 자가 승인을 판정한다", () => {
     expect(canAutoApprove("warehouse", { warehouse_role: "primary" })).toBe(true);
-    expect(canAutoApprove("warehouse", { level: "admin", warehouse_role: "none" })).toBe(true);
+    const legacyOperator = { level: "admin", warehouse_role: "none", department_role: "none" };
+    expect(canAutoApprove("warehouse", legacyOperator)).toBe(false);
     expect(canAutoApprove("warehouse", { warehouse_role: "none" })).toBe(false);
     expect(canAutoApprove("department", { department_role: "deputy" })).toBe(true);
     expect(canAutoApprove("department", { warehouse_role: "primary" })).toBe(true);
-    expect(canAutoApprove("department", { level: "admin", warehouse_role: "none", department_role: "none" })).toBe(false);
+    expect(canAutoApprove("department", legacyOperator)).toBe(false);
   });
 
   it("8.22-07, 8.22-08: 커스텀 BOM은 상위 참고 품목을 빼고 선택한 하위만 효과로 센다", () => {

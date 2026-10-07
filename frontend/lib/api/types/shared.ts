@@ -44,7 +44,6 @@ export type Department =
   | "출하"
   | "기타";
 
-export type EmployeeLevel = "admin" | "manager" | "staff";
 
 export type WarehouseRole = "none" | "primary" | "deputy";
 

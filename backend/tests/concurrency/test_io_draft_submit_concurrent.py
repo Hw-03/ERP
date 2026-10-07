@@ -11,7 +11,6 @@ import pytest
 from app.models import (
     DepartmentEnum,
     Employee,
-    EmployeeLevelEnum,
     Inventory,
     IoBatch,
     IoBundle,
@@ -37,7 +36,6 @@ def _setup_draft(make_session):
         name="동시 제출자",
         role="창고/사원",
         department=DepartmentEnum.WAREHOUSE.value,
-        level=EmployeeLevelEnum.STAFF,
         warehouse_role="primary",
         is_active=True,
         display_order=0,
@@ -118,7 +116,6 @@ def _setup_reserved_revert_request(make_session):
         name="stale 요청자",
         role="조립/사원",
         department=DepartmentEnum.ASSEMBLY.value,
-        level=EmployeeLevelEnum.STAFF,
         is_active=True,
         display_order=0,
         pin_hash=DEFAULT_PIN_HASH,

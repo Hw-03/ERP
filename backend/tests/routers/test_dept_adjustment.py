@@ -7,7 +7,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import text
 
-from app.models import DepartmentEnum, Employee, EmployeeLevelEnum, LocationStatusEnum
+from app.models import DepartmentEnum, Employee, LocationStatusEnum
 from app.services.pin_auth import DEFAULT_PIN_HASH
 
 D = Decimal
@@ -20,7 +20,6 @@ def _make_operator(db_session, *, code: str = "DA01") -> Employee:
         name="부서조정담당",
         role=f"{ASSEMBLY.value}/staff",
         department=ASSEMBLY,
-        level=EmployeeLevelEnum.STAFF,
         display_order=0,
         is_active="true",
         pin_hash=DEFAULT_PIN_HASH,

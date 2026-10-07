@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState } from "react";
-import type { Department, DepartmentRole, EmployeeLevel, WarehouseRole } from "@/lib/api";
+import type { Department, DepartmentRole, WarehouseRole } from "@/lib/api";
 import { sendClientEvent } from "@/lib/client-events";
 import { clearAuditSession, startAuditSession } from "@/lib/activity-audit-context";
 import { getClientEventSource } from "@/lib/operator-log-context";
@@ -18,7 +18,6 @@ export interface Operator {
   name: string;
   role: string;
   department: Department;
-  level: EmployeeLevel;
   employee_code: string;
   /** 창고 결재 역할 — 기존 데이터 호환을 위해 누락 시 "none" 폴백. */
   warehouse_role: WarehouseRole;
@@ -80,7 +79,6 @@ function readOperator(): Operator | null {
       name: parsed.name,
       role: typeof parsed.role === "string" ? parsed.role : "",
       department: parsed.department as Department,
-      level: parsed.level as EmployeeLevel,
       employee_code: parsed.employee_code as string,
       warehouse_role: (wh === "primary" || wh === "deputy" ? wh : "none") as WarehouseRole,
       department_role: (dept === "primary" || dept === "deputy" ? dept : "none") as DepartmentRole,

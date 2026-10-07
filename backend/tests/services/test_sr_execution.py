@@ -25,7 +25,6 @@ from app.models import (
     DefectInventoryMovement,
     DefectQuarantineRecord,
     Employee,
-    EmployeeLevelEnum,
     Inventory,
     InventoryOperation,
     InventoryOperationEffect,
@@ -62,14 +61,12 @@ def _make_employee(
     name: str = "직원",
     warehouse_role: str = "none",
     department_role: str = "none",
-    level: EmployeeLevelEnum = EmployeeLevelEnum.STAFF,
 ) -> Employee:
     emp = Employee(
         employee_code=code,
         name=name,
         role="조립/사원",
         department=ASSEMBLY.value,
-        level=level,
         warehouse_role=warehouse_role,
         department_role=department_role,
         display_order=0,
@@ -1277,7 +1274,6 @@ def test_finalize_admin_does_not_self_approve_department_part(db_session, make_i
     requester = _make_employee(
         db_session,
         code="DUAL-ADMIN",
-        level=EmployeeLevelEnum.ADMIN,
     )
     request = _make_request(
         db_session,
@@ -1535,10 +1531,11 @@ def test_finalize_no_approval_required_completes(db_session, make_item, make_loc
     assert len(_logs(db_session, item.item_id)) == 1
 
 
-def test_finalize_admin_self_approves(db_session, make_item):
-    """admin 요청자 → 창고 승인 없이도 자가승인 COMPLETED + approved_by 기록."""
+def test_finalize_legacy_admin_without_warehouse_role_waits(db_session, make_item):
+    """A legacy grade must not grant an independent warehouse approval role."""
     item = make_item(name="FIN5", warehouse_qty=D("9"))
-    emp = _make_employee(db_session, warehouse_role="none", level=EmployeeLevelEnum.ADMIN)
+    emp = _make_employee(db_session, warehouse_role="none")
+    emp.level = "admin"  # Old in-memory session data carries no approval authority.
     req = _make_request(
         db_session, emp, request_type=StockRequestTypeEnum.WAREHOUSE_TO_DEPT,
         requires_warehouse_approval=True,
@@ -1552,9 +1549,9 @@ def test_finalize_admin_self_approves(db_session, make_item):
     svc._finalize_submission(db_session, request=req, requester=emp, now=datetime.utcnow())
     db_session.flush()
 
-    assert req.status == StockRequestStatusEnum.COMPLETED
-    assert req.approved_by_employee_id == emp.employee_id  # admin self-approved
-    assert _wh_qty(db_session, item.item_id) == D("6")
+    assert req.status == StockRequestStatusEnum.RESERVED
+    assert req.approved_by_employee_id is None
+    assert _wh_qty(db_session, item.item_id) == D("9")
 
 
 # ══════════════════════════ release_reservation ══════════════════════════

@@ -8,7 +8,6 @@ from decimal import Decimal
 from app.models import (
     DepartmentEnum,
     Employee,
-    EmployeeLevelEnum,
     IoBatch,
     IoBundle,
     IoLine,
@@ -30,7 +29,6 @@ def _employee(db_session) -> Employee:
         name="연결테스터",
         role="조립/사원",
         department=DepartmentEnum.ASSEMBLY,
-        level=EmployeeLevelEnum.STAFF,
         display_order=0,
         is_active="true",
         pin_hash=DEFAULT_PIN_HASH,

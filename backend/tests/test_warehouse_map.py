@@ -13,7 +13,6 @@ import pytest
 from app.models import (
     DepartmentEnum,
     Employee,
-    EmployeeLevelEnum,
     WarehouseBox,
     WarehouseBoxItem,
 )
@@ -35,7 +34,6 @@ def _seed_warehouse_manager(db_session):
             name="창고장",
             role="조립/창고장",
             department=DepartmentEnum.ASSEMBLY.value,
-            level=EmployeeLevelEnum.STAFF,
             warehouse_role="primary",
             department_role="none",
             display_order=0,
@@ -103,7 +101,7 @@ def test_create_angle_rejects_non_manager(client, db_session):
     db_session.add(
         Employee(
             employee_code="ST001", name="일반사원", role="조립/사원",
-            department=DepartmentEnum.ASSEMBLY.value, level=EmployeeLevelEnum.STAFF,
+            department=DepartmentEnum.ASSEMBLY.value,
             warehouse_role="none", department_role="none", display_order=0,
             is_active="true", pin_hash=DEFAULT_PIN_HASH,
         )

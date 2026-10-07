@@ -160,6 +160,37 @@ def test_data_preserving_snapshot_rejects_existing_row_changes(tmp_path: Path) -
         module.assert_existing_rows_unchanged(database, before, allowed_tables=frozenset())
 
 
+@pytest.mark.parametrize("extra_change", [None, "row", "column", "added-column"])
+def test_removed_employee_grade_checks_remaining_projection(tmp_path: Path, extra_change: str | None) -> None:
+    module = _load_preflight_module()
+    database = tmp_path / "grade.db"
+    with module.sqlite3.connect(database) as connection:
+        connection.execute("CREATE TABLE employees (employee_id TEXT PRIMARY KEY, level TEXT, name TEXT, warehouse_role TEXT)")
+        connection.execute("INSERT INTO employees VALUES ('E1', 'ADMIN', 'Kim', 'none')")
+    removed = {"employees": frozenset({"level"})}
+    before = module.snapshot_existing_rows(database, removed_columns=removed)
+    with module.sqlite3.connect(database) as connection:
+        connection.execute("ALTER TABLE employees DROP COLUMN level")
+        if extra_change == "row":
+            connection.execute("UPDATE employees SET warehouse_role='primary'")
+        elif extra_change == "column":
+            connection.execute("ALTER TABLE employees DROP COLUMN name")
+        elif extra_change == "added-column":
+            connection.execute("ALTER TABLE employees ADD COLUMN unexpected TEXT")
+    if extra_change:
+        with pytest.raises(module.PreflightDataError):
+            module.assert_existing_rows_unchanged(database, before, frozenset(), removed_columns=removed)
+    else:
+        module.assert_existing_rows_unchanged(database, before, frozenset(), removed_columns=removed)
+
+
+def test_grade_removal_policy_does_not_allow_employee_table_mutations() -> None:
+    module = _load_preflight_module()
+    policy = module._policy_from_migration(MIGRATIONS / "20261007_0039_remove_employee_level.py")
+    assert policy.allowed_tables == frozenset()
+    assert policy.removed_columns == {"employees": frozenset({"level"})}
+
+
 def test_data_change_policy_allows_only_declared_table_and_validator(tmp_path: Path) -> None:
     module = _load_preflight_module()
     database = tmp_path / "employee.db"

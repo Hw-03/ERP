@@ -9,7 +9,8 @@
  */
 
 import { deleteJson, fetcher, postJson, putJson, toApiUrl } from "../api-core";
-import type { Department, DepartmentRole, Employee, EmployeeLevel, SidebarMode, WarehouseRole } from "./types";
+import type { Department, DepartmentRole, Employee, SidebarMode, WarehouseRole } from "./types";
+
 
 export const employeesApi = {
   getEmployees: (params?: { department?: Department; activeOnly?: boolean }, signal?: AbortSignal) => {
@@ -25,7 +26,6 @@ export const employeesApi = {
     role: string;
     phone?: string;
     department: Department;
-    level?: EmployeeLevel;
     warehouse_role?: WarehouseRole;
     department_role?: DepartmentRole;
     as_research_approver?: boolean;
@@ -47,7 +47,6 @@ export const employeesApi = {
       role?: string;
       phone?: string;
       department?: Department;
-      level?: EmployeeLevel;
       warehouse_role?: WarehouseRole;
       department_role?: DepartmentRole;
       as_research_approver?: boolean;

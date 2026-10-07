@@ -1,9 +1,14 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render as renderBase, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DesktopMesShell } from "../DesktopMesShell";
+import { AppearancePreferencesProvider } from "../useAppearancePreferences";
 import { SIDEBAR_TAB_IDS } from "../tabAccess";
+
+function render(ui: ReactNode) {
+  return renderBase(<AppearancePreferencesProvider>{ui}</AppearancePreferencesProvider>);
+}
 
 const desktopTabIconColors = vi.hoisted(() => ({
   dashboard: "#fff",

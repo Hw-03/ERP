@@ -98,7 +98,6 @@ export function OperatorLoginCard({ onLogin }: OperatorLoginCardProps) {
         name: emp.name,
         role: emp.role,
         department: emp.department,
-        level: emp.level,
         employee_code: emp.employee_code,
         warehouse_role: emp.warehouse_role ?? "none",
         department_role: emp.department_role ?? "none",

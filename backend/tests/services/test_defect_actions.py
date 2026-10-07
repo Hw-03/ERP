@@ -8,7 +8,6 @@ import pytest
 from app.models import (
     DepartmentEnum,
     Employee,
-    EmployeeLevelEnum,
     DefectInventoryMovement,
     DefectQuarantineRecord,
     Inventory,
@@ -30,7 +29,6 @@ def _actor(db_session) -> Employee:
         name="불량 담당",
         role="조립/staff",
         department=DepartmentEnum.ASSEMBLY.value,
-        level=EmployeeLevelEnum.STAFF,
         display_order=0,
         is_active="true",
         pin_hash=DEFAULT_PIN_HASH,
