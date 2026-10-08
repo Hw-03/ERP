@@ -85,4 +85,28 @@ finally {
     Assert-Equal $probe.Count 91 "external readiness attempt count"
 }
 
+& {
+    # A host can observe supervisor loss just before another host records a planned stop.
+    # Re-read that state after the recovery delay; deployment must not be restarted.
+    $probe = [pscustomobject]@{ Reads = 0; Starts = 0; Sleeps = 0 }
+    function Repair-RuntimeTaskOrphans {}
+    function Read-RuntimeTaskLaunchRequest { return $null }
+    function Add-RuntimeEvent {}
+    function Get-RuntimeState {
+        $probe.Reads += 1
+        if ($probe.Reads -eq 1) { return [pscustomobject]@{ status = "running" } }
+        return [pscustomobject]@{ status = "stopped" }
+    }
+    function Test-RuntimeTaskSupervisorOwned { return $false }
+    function Start-Sleep { param([int] $Seconds); $probe.Sleeps += 1 }
+
+    $hostExit = Invoke-RuntimeTaskHost -Profile $developmentProfile -Service "backend" `
+        -Port 8031 -StatePath "unused-state" -EventPath "unused-events" `
+        -ControlPath "unused-control" -LaunchRequestPath "unused-launch" `
+        -StartAction { param($Request); $probe.Starts += 1 }
+    Assert-Equal $hostExit 0 "planned stop during the recovery delay"
+    Assert-Equal $probe.Starts 1 "planned stop must not restart the service"
+    Assert-Equal $probe.Sleeps 1 "planned stop must finish at the first recovery check"
+}
+
 Write-Output "runtime task control contracts passed"

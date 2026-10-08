@@ -390,6 +390,15 @@ function Invoke-RuntimeTaskHost {
                         -Event "runtime_task_host_retry_scheduled" `
                         -Details @{ taskHostPid = $PID; attempt = $retryAttempt; delaySeconds = 60 }
                     Start-Sleep -Seconds 60
+                    # A second host may have observed supervisor loss before a planned
+                    # stop finished. Never resurrect a service during deployment.
+                    $retryState = Get-RuntimeState -Path $StatePath
+                    if ($retryState -and $retryState.status -eq "stopped") {
+                        Add-RuntimeEvent -Path $EventPath -Profile $Profile.Name -Service $Service `
+                            -Event "runtime_task_host_exited" `
+                            -Details @{ taskHostPid = $PID; planned = $true }
+                        return 0
+                    }
                     try {
                         Repair-RuntimeTaskOrphans `
                             -Profile $Profile -Service $Service -Port $Port `
