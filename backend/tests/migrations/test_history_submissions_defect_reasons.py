@@ -23,7 +23,7 @@ from bootstrap.legacy_profiles import sqlite_business_data_fingerprint
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
-REVISION = "20261007_0040"
+REVISION = "20261008_0041"
 PREVIOUS_REVISION = "20261007_0039"
 DEFAULT_NAMES = (
     "외관 불량", "치수 불량", "기능 불량", "검사 통과", "누유", "이물질", "고압",
