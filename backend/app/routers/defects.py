@@ -70,6 +70,8 @@ class DefectLocationItem(BaseModel):
     item_id: uuid.UUID
     item_name: str
     mes_code: Optional[str]
+    process_type_code: Optional[str] = None
+    return_supplier_scope: Literal["warehouse", "tube"] = "warehouse"
     department: str
     quantity: Decimal
     original_quantity: Decimal
@@ -474,6 +476,8 @@ def list_defect_locations(
                 item_name=item.item_name,
                 mes_code=item.mes_code,
                 department=record.department,
+                process_type_code=item.process_type_code,
+                return_supplier_scope="tube" if record.department == "튜브" and item.process_type_code == "TR" else "warehouse",
                 quantity=record.remaining_quantity,
                 original_quantity=record.original_quantity,
                 pending_quantity=pending_quantity,
@@ -509,6 +513,7 @@ def list_defect_locations(
                 item_name=item.item_name,
                 mes_code=item.mes_code,
                 department=location.department,
+                process_type_code=item.process_type_code,
                 quantity=location.quantity,
                 original_quantity=location.quantity,
                 pending_quantity=pending_quantity,

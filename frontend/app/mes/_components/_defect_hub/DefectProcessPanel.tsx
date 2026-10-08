@@ -52,7 +52,10 @@ export function DefectProcessPanel({
   const location = processingLocations[0];
   if (!location) throw new Error("처리할 불량 격리 기록이 필요합니다.");
   const isBatch = batchMode || processingLocations.length > 1;
-  const isWarehouse = location.department === "창고";
+  const canReturn = processingLocations.every((current) => current.department === "창고" || current.department === "튜브");
+  const supplierScope = location.return_supplier_scope ?? "warehouse";
+  const mixedSupplierScopes = processingLocations.some((current) => (current.return_supplier_scope ?? "warehouse") !== supplierScope);
+  const mixedScopeMessage = "창고와 튜브 업체가 필요한 기록을 나누어 반품하세요.";
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [action, setAction] = useState<ProcessAction>("unquarantine");
@@ -132,6 +135,12 @@ export function DefectProcessPanel({
   }, [action]);
 
   useEffect(() => {
+    setSelectedSupplier(null);
+    setSupplierListReady(false);
+    setConfirmOpen(false);
+  }, [supplierScope, mixedSupplierScopes]);
+
+  useEffect(() => {
     if (decisionParentQty !== null && decisionParentQty !== boundedProcessQty) {
       setDecisions([]);
       setDecisionParentQty(null);
@@ -149,7 +158,7 @@ export function DefectProcessPanel({
   }
 
   async function handleSubmit() {
-    if (busy || !hasReason || (action === "disassemble" && !reworkReady) || (action === "return" && !selectedSupplier)) return;
+    if (busy || !hasReason || (action === "disassemble" && !reworkReady) || (action === "return" && (!canReturn || mixedSupplierScopes || !supplierListReady || !selectedSupplier || (selectedSupplier.scope ?? "warehouse") !== supplierScope))) return;
     setBusy(true);
     setErrorMsg(null);
     try {
@@ -276,7 +285,7 @@ export function DefectProcessPanel({
           </div>
         </div>
         <div className="min-h-0 flex-1">
-          <SupplierPickerStep
+          {mixedSupplierScopes ? <InlineErrorNote>{mixedScopeMessage}</InlineErrorNote> : <SupplierPickerStep
             employeeId={currentEmployee.employee_id}
             selectedSupplierId={selectedSupplier?.supplier_id ?? null}
             selectedSupplierName={selectedSupplier?.name ?? null}
@@ -284,12 +293,13 @@ export function DefectProcessPanel({
             onLoadStateChange={setSupplierListReady}
             variant="desktop"
             mode="select"
-          />
+            supplierScope={supplierScope}
+          />}
         </div>
         <div className="flex shrink-0 justify-end pt-1">
           <button
             type="button"
-            disabled={busy || !supplierListReady || !selectedSupplier}
+            disabled={busy || !canReturn || mixedSupplierScopes || !supplierListReady || !selectedSupplier}
             onClick={() => setConfirmOpen(true)}
             className="rounded-[16px] px-8 py-3 text-base font-black text-white disabled:opacity-40"
             style={{ background: LEGACY_COLORS.blueSolid }}
@@ -519,7 +529,7 @@ export function DefectProcessPanel({
         {/* 작업 선택 */}
         <div className="flex flex-col gap-3">
           <span className="text-sm font-black" style={{ color: LEGACY_COLORS.muted2 }}>작업 선택</span>
-          <div className={`grid grid-cols-1 gap-3 ${restoreOnly ? "" : location.has_bom && isWarehouse ? "sm:grid-cols-2 xl:grid-cols-4" : location.has_bom || isWarehouse ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+          <div className={`grid grid-cols-1 gap-3 ${restoreOnly ? "" : location.has_bom && canReturn ? "sm:grid-cols-2 xl:grid-cols-4" : location.has_bom || canReturn ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
             <ActionCard
               label="정상 복귀"
               desc="불량 해제 후 정상 재고로"
@@ -543,7 +553,7 @@ export function DefectProcessPanel({
               selected={action === "scrap"}
               onClick={() => setAction("scrap")}
             />}
-            {!restoreOnly && isWarehouse && (
+            {!restoreOnly && canReturn && (
               <ActionCard
                 label="반품"
                 desc="즉시 반품 처리"
@@ -565,6 +575,7 @@ export function DefectProcessPanel({
           required
         />
 
+        {action === "return" && mixedSupplierScopes && <InlineErrorNote>{mixedScopeMessage}</InlineErrorNote>}
         {errorMsg && <InlineErrorNote>{errorMsg}</InlineErrorNote>}
       </div>
 
@@ -583,7 +594,7 @@ export function DefectProcessPanel({
         ) : (
           <button
             type="button"
-            disabled={busy || !hasReason}
+            disabled={busy || !hasReason || (action === "return" && (!canReturn || mixedSupplierScopes))}
             onClick={() => action === "return" ? setStep(3) : setConfirmOpen(true)}
             className="rounded-[16px] px-8 py-3 text-base font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-40"
             style={{ background: actionColor[action] }}

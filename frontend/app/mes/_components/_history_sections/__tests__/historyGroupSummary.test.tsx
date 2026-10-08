@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { TransactionLog } from "@/lib/api";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { getHistoryGroupSummary } from "../historyTableHelpers";
+import { getHistoryListOperationLabel } from "../historyPresentation";
 
 function entry(id: string, type: string, role: string): TransactionLog {
   return {
@@ -12,6 +13,16 @@ function entry(id: string, type: string, role: string): TransactionLog {
 }
 
 describe("shared history group summary", () => {
+  it.each([
+    ["RECEIVE", "tube_receive_supplier", "튜브 원자재 입고"],
+    ["MATERIAL_OUT", "tube_outbound_supplier", "튜브 원자재 출고"],
+  ])("목록 %s는 전체 batch 조회 전에도 history_batch의 튜브 작업 라벨을 사용한다", (type, subType, label) => {
+    const log = { ...entry("TR 원자재", type, "PRIMARY"), reference_no: null, operation_display_label: null, history_batch: { work_type: "tube_material", sub_type: subType } };
+    expect(getHistoryListOperationLabel(log)).toBe(label);
+    expect(getHistoryGroupSummary({ type: "solo", log }).label).toBe(label);
+    expect(getHistoryGroupSummary({ type: "operation", operationId: "tube-op", logs: [log] }).label).toBe(label);
+    expect(getHistoryListOperationLabel({ ...log, operation_kind: "CANCELLATION" })).toBe(`${label} 취소`);
+  });
   it("불량 재작업 회수 거래가 먼저 와도 부모와 재작업 분류를 사용한다", () => {
     const child = entry("ADX6000 관전류 BD", "RECEIVE", "REWORK_CHILD_NORMAL");
     const parent = entry("ADX6000FB BODY RIGHT ASS'Y", "DISASSEMBLE", "REWORK_PARENT_DEFECTIVE");

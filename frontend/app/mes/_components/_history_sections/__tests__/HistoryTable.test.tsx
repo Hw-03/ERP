@@ -88,6 +88,17 @@ function renderTable(groups: LogGroup[], batchCache = new Map<string, IoBatch>()
   );
 }
 
+it.each([
+  ["RECEIVE", "tube_receive_supplier", "튜브 원자재 입고"],
+  ["MATERIAL_OUT", "tube_outbound_supplier", "튜브 원자재 출고"],
+] as const)("display-groups %s 대표 로그 투영을 변환한 실제 표에 튜브 라벨을 표시한다", (type, subType, label) => {
+  const log = makeLog({ transaction_type: type, operation_id: "tube-operation", operation_display_label: label, operation_role: "PRIMARY", department: "튜브", item_process_type_code: "TR", history_batch: { work_type: "tube_material", sub_type: subType }, inventory_effect: [{ scope: "location", department: "튜브", status: "PRODUCTION", delta: type === "RECEIVE" ? 1 : -1 }] });
+  const groups = historyHelpers.toHistoryLogGroups([{ type: "operation", key: "tube-operation", logs: [log] }]);
+  renderTable(groups);
+  expect(screen.getByText(label)).toBeInTheDocument();
+  expect(screen.queryByText(type === "RECEIVE" ? "원자재 입고" : "원자재 출고")).not.toBeInTheDocument();
+});
+
 it("제출 행을 누르면 같은 표에서 제목 반복 없이 작업 행이 바로 이어진다", () => {
   const first = makeLog({ log_id: "flat-first", item_name: "첫 작업", transaction_type: "MARK_DEFECTIVE" });
   const second = makeLog({ log_id: "flat-second", item_id: "ITEM-2", item_name: "둘째 작업", transaction_type: "MARK_DEFECTIVE" });

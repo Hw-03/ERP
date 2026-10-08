@@ -3,6 +3,7 @@ import type { ShippingTransactionLog } from "./shipping";
 
 export type IoWorkType =
   | "receive"
+  | "tube_material"
   | "warehouse_io"
   | "warehouse_adjust"
   | "process"
@@ -12,6 +13,8 @@ export type IoWorkType =
 export type IoSubType =
   | "receive_supplier"
   | "outbound_supplier"
+  | "tube_receive_supplier"
+  | "tube_outbound_supplier"
   | "warehouse_to_dept"
   | "dept_to_warehouse"
   | "produce"
@@ -160,10 +163,14 @@ export interface IoBatch {
   stock_requests?: IoStockRequestSummary[];
 }
 
+export type SupplierScope = "warehouse" | "tube";
+
 export interface Supplier {
   supplier_id: string;
   name: string;
   is_active: boolean;
+  /** 필드가 없는 기존 응답은 warehouse로 취급한다. */
+  scope?: SupplierScope;
   created_at: string;
   updated_at: string;
 }

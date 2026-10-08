@@ -14,6 +14,7 @@
  */
 import { useEffect, useRef } from "react";
 import type { Item, IoWorkType } from "@/lib/api";
+import { isValidTubeMaterialItem } from "./ioWorkType";
 
 export type UseIoPreselectArgs = {
   preselectedItem: Item | null | undefined;
@@ -55,14 +56,18 @@ export function useIoPreselect(args: UseIoPreselectArgs): void {
 
   useEffect(() => {
     if (!preselectedItem) return;
+    if (workType === "tube_material" && !isValidTubeMaterialItem(preselectedItem)) return;
     // BOM 부모 set 이 아직 로딩 안 됨 — 보류 (S1 race 대응)
-    if (!bomParentsLoaded) return;
+    if (!bomParentsLoaded && workType !== "tube_material") return;
     const handledKey = `${preselectedItem.item_id}__${workType}__${subType}__${fromDepartment ?? ""}__${toDepartment ?? ""}__${forceManual}`;
     if (handledRef.current === handledKey) return;
     // process workType + 방향 미선택이면 자동 추가 보류 (Step 2에서 방향 선택 후 다시 진입해야 함)
     if (workType === "process" && deptIoDirection == null) return;
     handledRef.current = handledKey;
-    if (forceManual) {
+    if (workType === "tube_material") {
+      setHighlightItemId(null);
+      void addItem(preselectedItem);
+    } else if (forceManual) {
       setHighlightItemId(null);
       void addItem(preselectedItem, "manual");
     } else if (bomParents.has(preselectedItem.item_id)) {

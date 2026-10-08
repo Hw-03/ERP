@@ -1019,9 +1019,9 @@ def _dept_for_line(line: IoLine, tx_type: TransactionTypeEnum) -> str | None:
             return None
         return v.value if hasattr(v, "value") else str(v)
 
-    if tx_type in (TransactionTypeEnum.PRODUCE, TransactionTypeEnum.INTERNAL_USE):
+    if tx_type in (TransactionTypeEnum.PRODUCE, TransactionTypeEnum.INTERNAL_USE, TransactionTypeEnum.RECEIVE):
         return _val(line.to_department)
-    if tx_type in (TransactionTypeEnum.BACKFLUSH, TransactionTypeEnum.SUPPLIER_RETURN):
+    if tx_type in (TransactionTypeEnum.BACKFLUSH, TransactionTypeEnum.SUPPLIER_RETURN, TransactionTypeEnum.MATERIAL_OUT):
         return _val(line.from_department)
     if tx_type == TransactionTypeEnum.TRANSFER_TO_PROD:
         return _val(line.to_department)
@@ -1068,7 +1068,7 @@ def _create_execution_operation(
         db,
         domain="inventory_io",
         action=batch.sub_type,
-        display_label=batch.sub_type,
+        display_label={"tube_receive_supplier": "튜브 원자재 입고", "tube_outbound_supplier": "튜브 원자재 출고"}.get(batch.sub_type, batch.sub_type),
         actor_name=actor.name,
         actor_employee_id=actor.employee_id,
         department=batch.requester_department,
@@ -1139,8 +1139,10 @@ def _apply_line(
 
     if batch.sub_type == INTERNAL_USE_SUB_TYPE and line.direction == "out":
         tx_type = TransactionTypeEnum.INTERNAL_USE
-    if batch.sub_type == "outbound_supplier":
+    if batch.sub_type in {"outbound_supplier", "tube_outbound_supplier"}:
         tx_type = TransactionTypeEnum.MATERIAL_OUT
+    if batch.sub_type == "tube_receive_supplier":
+        tx_type = TransactionTypeEnum.RECEIVE
 
     quarantine_record = None
     if line.direction == "defective":
@@ -1245,6 +1247,7 @@ def _complete_without_inventory(batch: IoBatch) -> None:
 def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> dict:
     from app.services.item_write_validation import validate_io_items
     validate_io_items(db, batch.bundles, sub_type=batch.sub_type)
+    validate_supplier_for_operation(db, work_type=batch.work_type, sub_type=batch.sub_type, supplier_id=batch.supplier_id)
     ensure_batch_is_mutable(batch)
     from app.services.defect_reason_categories import resolve_reason_category, io_requires_reason
     batch.reason_category_id, batch.reason_category, reason_memo = resolve_reason_category(
@@ -1261,6 +1264,7 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
     )
     validate_receive_requester(
         requester,
+        db=db,
         work_type=batch.work_type,
         sub_type=batch.sub_type,
     )
@@ -1430,6 +1434,7 @@ def submit(db: Session, payload) -> dict:
     requester = _load_requester(db, payload.requester_employee_id)
     validate_receive_requester(
         requester,
+        db=db,
         work_type=payload.work_type,
         sub_type=payload.sub_type,
     )
@@ -1459,6 +1464,7 @@ def submit_existing_draft(
     requester = _load_requester(db, requester_employee_id)
     validate_receive_requester(
         requester,
+        db=db,
         work_type=batch.work_type,
         sub_type=batch.sub_type,
     )

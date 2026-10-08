@@ -38,6 +38,7 @@ export const IO_WORK_TYPES: Array<{
   icon: LucideIcon;
 }> = [
   { id: "receive", label: WORK_TYPE_LABEL.receive, description: WORK_TYPE_DESCRIPTION.receive, icon: Boxes },
+  { id: "tube_material", label: WORK_TYPE_LABEL.tube_material, description: WORK_TYPE_DESCRIPTION.tube_material, icon: Boxes },
   { id: "warehouse_io", label: WORK_TYPE_LABEL.warehouse_io, description: WORK_TYPE_DESCRIPTION.warehouse_io, icon: ArrowLeftRight },
   { id: "process", label: WORK_TYPE_LABEL.process, description: WORK_TYPE_DESCRIPTION.process, icon: Wrench },
   { id: "internal_use", label: WORK_TYPE_LABEL.internal_use, description: WORK_TYPE_DESCRIPTION.internal_use, icon: PackageMinus },
@@ -50,6 +51,7 @@ export function canSeeWorkType(
   workType: IoWorkType,
   operator: { warehouse_role?: string | null; name?: string | null; department?: string | null } | null | undefined,
 ): boolean {
+  if (workType === "tube_material") return operator?.department === "튜브";
   if (workType === "receive" || workType === "warehouse_adjust") {
     // 원자재 입출고와 창고 수량보정은 창고 정/부만 허용한다.
     return operator?.warehouse_role === "primary" || operator?.warehouse_role === "deputy";
@@ -74,6 +76,7 @@ export const IO_SUB_TYPES: Record<
   Array<{ id: IoSubType; label: string; description: string }>
 > = {
   receive: [_row("receive_supplier"), _row("outbound_supplier")],
+  tube_material: [_row("tube_receive_supplier"), _row("tube_outbound_supplier")],
   warehouse_io: [_row("warehouse_to_dept"), _row("dept_to_warehouse")],
   warehouse_adjust: [_row("warehouse_adjust_in"), _row("warehouse_adjust_out")],
   process: [_row("produce"), _row("disassemble"), _row("adjust_in"), _row("adjust_out")],
@@ -88,6 +91,7 @@ export const IO_SUB_TYPES: Record<
 
 export const DEFAULT_SUB_TYPE: Record<IoWorkType, IoSubType> = {
   receive: "receive_supplier",
+  tube_material: "tube_receive_supplier",
   warehouse_io: "warehouse_to_dept",
   warehouse_adjust: "warehouse_adjust_in",
   process: "produce",
@@ -266,11 +270,13 @@ export function approvalKind(
   bundles: IoBundle[],
   fromDepartment?: string | null,
 ): ApprovalKind {
+  if (isTubeMaterialSubType(subType)) return "none";
   if (requiresApproval(subType)) {
     return "warehouse";
   }
   if (
     subType === "receive_supplier" ||
+    subType === "tube_receive_supplier" ||
     subType === "warehouse_adjust_in" ||
     subType === "warehouse_adjust_out"
   ) {
@@ -358,6 +364,7 @@ export function deptIoDirectionOf(subType: IoSubType): DeptIoDirection | null {
 
 // Step 3 picker 타이틀 접두. 창고 방향이 명확한 sub_type은 "창고 반출/반입", 그 외 "입고/출고".
 export function pickerDirectionLabel(subType: IoSubType): "입고" | "출고" | "창고 반출" | "창고 반입" | "사용출고" {
+  if (subType === "tube_receive_supplier") return "입고";
   if (subType === "internal_use_out") return "사용출고";
   if (subType === "warehouse_to_dept") return "창고 반출";
   if (subType === "dept_to_warehouse") return "창고 반입";
@@ -386,6 +393,7 @@ export function targetDepartmentOf(
   fromDepartment: string,
   toDepartment: string,
 ): string | null {
+  if (isTubeMaterialSubType(subType)) return "튜브";
   if (isAutoDepartmentRoute(subType)) return null;
   // 출발 부서가 대상인 작업
   if (subType === "dept_to_warehouse" || subType === "defect_quarantine" || subType === "supplier_return" || subType === "defect_restore" || subType === "defect_process") {
@@ -469,7 +477,7 @@ export function isWarehouseAdjustSubType(subType: IoSubType): boolean {
 export function singleItemSourceKind(
   subType: IoSubType,
 ): Extract<IoSourceKind, "direct_item" | "manual"> {
-  return isWarehouseAdjustSubType(subType) || subType === "receive_supplier" || subType === "outbound_supplier" ? "direct_item" : "manual";
+  return isWarehouseAdjustSubType(subType) || isTubeMaterialSubType(subType) || subType === "receive_supplier" || subType === "outbound_supplier" ? "direct_item" : "manual";
 }
 
 /** 창고 수량보정은 상태에 남은 기본 부서를 API payload에 싣지 않는다. */
@@ -478,10 +486,25 @@ export function ioDepartmentPayload(
   fromDepartment: string,
   toDepartment: string,
 ): { fromDepartment: string | null; toDepartment: string | null } {
-  if (isAutoDepartmentRoute(subType) || isWarehouseAdjustSubType(subType) || subType === "receive_supplier" || subType === "outbound_supplier") {
+  if (isAutoDepartmentRoute(subType) || isWarehouseAdjustSubType(subType) || isTubeMaterialSubType(subType) || subType === "receive_supplier" || subType === "outbound_supplier") {
     return { fromDepartment: null, toDepartment: null };
   }
   return { fromDepartment, toDepartment };
+}
+
+/** 원자재 UI를 공유하되 재고와 업체 범위는 작업 유형별로 구분한다. */
+export function isMaterialWorkType(workType: IoWorkType): boolean {
+  return workType === "receive" || workType === "tube_material";
+}
+
+/** 튜브 원자재는 BOM 없이 튜브 정상 재고에만 반영한다. */
+export function isTubeMaterialSubType(subType: IoSubType): boolean {
+  return subType === "tube_receive_supplier" || subType === "tube_outbound_supplier";
+}
+
+/** 선택·빠른 진입·복원에서 동일한 튜브 품목 제한을 적용한다. */
+export function isValidTubeMaterialItem(item: { process_type_code?: string | null; deleted_at?: string | null }): boolean {
+  return item.process_type_code === "TR" && !item.deleted_at;
 }
 
 /** 자동 부서 입출고의 실제 재고 반영 경로를 라인별로 표시한다. */

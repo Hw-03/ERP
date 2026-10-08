@@ -209,8 +209,10 @@ function _labelNoneBucket(
 ): string | null {
   switch (subType) {
     case "receive_supplier":
+    case "tube_receive_supplier":
       return side === "from" ? supplierNameSnapshot?.trim() || "외부" : null;
     case "outbound_supplier":
+    case "tube_outbound_supplier":
       return side === "to" ? supplierNameSnapshot?.trim() || "공급업체" : null;
     case "supplier_return":
       return side === "to" ? "외부" : null;
@@ -445,6 +447,8 @@ const _SUB_TYPE_OPERATION: Record<string, string> = {
   warehouse_adjust_out: "창고 수량 조정",
   receive_supplier: _SUB_LABEL.receive_supplier,
   outbound_supplier: _SUB_LABEL.outbound_supplier,
+  tube_receive_supplier: _SUB_LABEL.tube_receive_supplier,
+  tube_outbound_supplier: _SUB_LABEL.tube_outbound_supplier,
   supplier_return: _SUB_LABEL.supplier_return,
   defect_quarantine: "불량 격리",
   defect_restore: "정상 복귀",
@@ -473,6 +477,8 @@ const _DISPLAY_SUB_LABEL: Record<string, string> = {
   produce: "부품 차감 + 완제품 입고",
   receive_supplier: "창고로 들어옴",
   outbound_supplier: "공급업체로 나감",
+  tube_receive_supplier: "튜브로 들어옴",
+  tube_outbound_supplier: "튜브에서 공급업체로 나감",
   warehouse_to_dept: "창고에서 부서로 이동",
   dept_to_warehouse: "부서에서 창고로 이동",
   defect_quarantine: "격리",
@@ -837,7 +843,9 @@ export function getHistoryLineSignedQuantity(
       sign = ""; tone = "muted"; label = _withUnit(qty, unit);
       break;
     case "receive_supplier": setIncrease(); break;
+    case "tube_receive_supplier": setIncrease(); break;
     case "outbound_supplier": setDecrease(); break;
+    case "tube_outbound_supplier": setDecrease(); break;
     case "supplier_return":
     case "defect_quarantine":
     case "adjust_out": setDecrease(); break;
@@ -1040,9 +1048,9 @@ export function getHistoryMovementSummary(
   } else if (sub === "warehouse_to_dept" || sub === "dept_to_warehouse" || sub === "dept_transfer"
     || tx === "TRANSFER_TO_PROD" || tx === "TRANSFER_TO_WH" || tx === "TRANSFER_DEPT") {
     parts.push(_verbItemPart("이동", "info", included));
-  } else if (sub === "receive_supplier" || tx === "RECEIVE") {
+  } else if (sub === "receive_supplier" || sub === "tube_receive_supplier" || tx === "RECEIVE") {
     parts.push(_verbItemPart("입고", "success", included));
-  } else if (tx === "SHIP" || tx === "MATERIAL_OUT" || sub === "outbound_supplier") {
+  } else if (tx === "SHIP" || tx === "MATERIAL_OUT" || sub === "outbound_supplier" || sub === "tube_outbound_supplier") {
     parts.push(_verbItemPart("출고", "danger", included));
   } else if (sub === "supplier_return" || tx === "SUPPLIER_RETURN") {
     parts.push({ label: `반품 ${_distinctItemCount(included)}품목`, tone: "danger" });

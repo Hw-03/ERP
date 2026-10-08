@@ -45,6 +45,76 @@ function SnapshotNameHarness({ onSynced }: { onSynced: (nextName: string | null)
 }
 
 describe("SupplierPickerStep", () => {
+  it("튜브 범위로 조회하고 다른 범위의 선택을 해제한다", async () => {
+    const onSelect = vi.fn();
+    api.listSuppliers.mockResolvedValue([supplier, { ...supplier, supplier_id: "tube-1", name: "튜브 업체", scope: "tube" }]);
+    render(<SupplierPickerStep employeeId="tube-employee" supplierScope="tube" selectedSupplierId="supplier-1" onSelect={onSelect} variant="desktop" />);
+    await screen.findByRole("button", { name: "튜브 업체", exact: true });
+    expect(api.listSuppliers).toHaveBeenCalledWith("tube-employee", true, "tube");
+    expect(screen.queryByRole("button", { name: supplier.name, exact: true })).not.toBeInTheDocument();
+    expect(onSelect).toHaveBeenCalledWith(null);
+  });
+
+  it("범위 전환 후 도착한 이전 목록은 표시하지 않는다", async () => {
+    const oldList = deferred<typeof supplier[]>();
+    api.listSuppliers.mockReturnValueOnce(oldList.promise).mockResolvedValueOnce([{ ...supplier, name: "튜브 업체", scope: "tube" }]);
+    const props = { employeeId: "employee-1", selectedSupplierId: null, onSelect: vi.fn(), variant: "mobile" as const };
+    const { rerender } = render(<SupplierPickerStep {...props} />);
+    rerender(<SupplierPickerStep {...props} supplierScope="tube" />);
+    await screen.findByRole("button", { name: "튜브 업체", exact: true });
+    await act(async () => { oldList.resolve([supplier]); });
+    expect(screen.queryByRole("button", { name: supplier.name, exact: true })).not.toBeInTheDocument();
+  });
+
+  it("범위 전환 후 이전 범위의 업체 추가 결과를 선택하지 않는다", async () => {
+    const oldCreate = deferred<typeof supplier>();
+    const onSelect = vi.fn();
+    api.createSupplier.mockReturnValueOnce(oldCreate.promise);
+    api.listSuppliers.mockResolvedValueOnce([supplier]).mockResolvedValueOnce([{ ...supplier, name: "튜브 업체", scope: "tube" }]);
+    const props = { employeeId: "employee-1", selectedSupplierId: null, onSelect, variant: "desktop" as const };
+    const { rerender } = render(<SupplierPickerStep {...props} />);
+    await screen.findByText(supplier.name);
+    fireEvent.change(screen.getByPlaceholderText("업체명을 입력하세요"), { target: { value: "이전 범위 신규 업체" } });
+    fireEvent.click(screen.getByRole("button", { name: "추가하고 선택" }));
+    rerender(<SupplierPickerStep {...props} supplierScope="tube" />);
+    await screen.findByRole("button", { name: "튜브 업체", exact: true });
+    await act(async () => { oldCreate.resolve({ ...supplier, name: "이전 범위 신규 업체" }); });
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(screen.queryByText("이전 범위 신규 업체")).not.toBeInTheDocument();
+  });
+
+  it.each(["name", "active"])("범위 전환 후 이전 범위의 %s 수정 결과를 무시한다", async (operation) => {
+    const update = deferred<typeof supplier>();
+    const onSelect = vi.fn();
+    api.updateSupplier.mockReturnValueOnce(update.promise);
+    api.listSuppliers.mockResolvedValueOnce([supplier]).mockResolvedValueOnce([{ ...supplier, name: "튜브 업체", scope: "tube" }]);
+    const props = { employeeId: "employee-1", selectedSupplierId: null, onSelect, variant: "desktop" as const };
+    const { rerender } = render(<SupplierPickerStep {...props} />);
+    await screen.findByText(supplier.name);
+    if (operation === "name") {
+      fireEvent.click(screen.getByRole("button", { name: `${supplier.name} 이름 수정` }));
+      fireEvent.change(screen.getByRole("textbox", { name: `${supplier.name} 이름 수정` }), { target: { value: "이전 수정명" } });
+      fireEvent.click(screen.getByRole("button", { name: "이름 저장" }));
+    } else {
+      fireEvent.click(screen.getByRole("button", { name: `${supplier.name} 숨김` }));
+    }
+    rerender(<SupplierPickerStep {...props} supplierScope="tube" />);
+    await screen.findByRole("button", { name: "튜브 업체", exact: true });
+    await act(async () => { update.resolve({ ...supplier, name: "이전 수정명", is_active: false }); });
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "튜브 업체", exact: true })).toBeEnabled();
+  });
+
+  it("튜브 공급업체를 추가할 때 범위를 전달한다", async () => {
+    api.listSuppliers.mockResolvedValue([]);
+    api.createSupplier.mockResolvedValue({ ...supplier, scope: "tube" });
+    render(<SupplierPickerStep employeeId="tube-employee" supplierScope="tube" selectedSupplierId={null} onSelect={vi.fn()} variant="desktop" />);
+    await screen.findByText("등록된 공급업체가 없습니다.");
+    fireEvent.change(screen.getByPlaceholderText("업체명을 입력하세요"), { target: { value: supplier.name } });
+    fireEvent.click(screen.getByRole("button", { name: "추가하고 선택" }));
+    await waitFor(() => expect(api.createSupplier).toHaveBeenCalledWith("tube-employee", supplier.name, "tube"));
+  });
+
   it("모바일 공급업체 목록은 카드 밖 레일과 고정 프레임을 가진다", async () => {
     const { container } = render(<SupplierPickerStep variant="mobile" employeeId="warehouse-1" selectedSupplierId={null} onSelect={vi.fn()} />);
     await screen.findByRole("button", { name: "덕스윈상사", exact: true });
@@ -62,7 +132,7 @@ describe("SupplierPickerStep", () => {
     expect(screen.queryByText("선택할 수 있는 활성 공급업체가 없습니다.")).not.toBeInTheDocument();
   });
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     api.listSuppliers.mockResolvedValue([supplier]);
     api.updateSupplier.mockResolvedValue(supplier);
   });
@@ -124,7 +194,7 @@ describe("SupplierPickerStep", () => {
     fireEvent.change(screen.getByPlaceholderText("업체명을 입력하세요"), { target: { value: "새 공급업체" } });
     fireEvent.click(screen.getByRole("button", { name: "추가하고 선택" }));
 
-    await waitFor(() => expect(api.createSupplier).toHaveBeenCalledWith("warehouse-1", "새 공급업체"));
+    await waitFor(() => expect(api.createSupplier).toHaveBeenCalledWith("warehouse-1", "새 공급업체", "warehouse"));
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ supplier_id: "supplier-2" }));
   });
 
@@ -202,7 +272,7 @@ describe("SupplierPickerStep", () => {
     );
 
     await screen.findByRole("button", { name: "덕스윈상사" });
-    expect(api.listSuppliers).toHaveBeenCalledWith("employee-1", false);
+    expect(api.listSuppliers).toHaveBeenCalledWith("employee-1", false, "warehouse");
     expect(screen.queryByPlaceholderText("새 공급업체 이름")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "숨김 업체 관리" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "덕스윈상사 이름 수정" })).not.toBeInTheDocument();
@@ -246,7 +316,7 @@ describe("SupplierPickerStep", () => {
     expect(onSynced).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByRole("button", { name: "숨김 업체 관리" }));
-    await waitFor(() => expect(api.listSuppliers).toHaveBeenLastCalledWith("warehouse-1", true));
+    await waitFor(() => expect(api.listSuppliers).toHaveBeenLastCalledWith("warehouse-1", true, "warehouse"));
     expect(onSynced).toHaveBeenCalledTimes(1);
   });
 
@@ -256,7 +326,7 @@ describe("SupplierPickerStep", () => {
     api.listSuppliers.mockReturnValueOnce(activeOnly.promise).mockReturnValueOnce(includingInactive.promise);
     render(<SupplierPickerStep employeeId="warehouse-1" selectedSupplierId={null} onSelect={vi.fn()} variant="desktop" />);
 
-    await waitFor(() => expect(api.listSuppliers).toHaveBeenCalledWith("warehouse-1", true));
+    await waitFor(() => expect(api.listSuppliers).toHaveBeenCalledWith("warehouse-1", true, "warehouse"));
     fireEvent.click(screen.getByRole("button", { name: "숨김 업체 관리" }));
     await act(async () => { includingInactive.resolve([{ ...supplier, name: "최신 목록 업체" }]); });
     await screen.findByRole("button", { name: "최신 목록 업체" });
@@ -295,7 +365,7 @@ describe("SupplierPickerStep", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "다시 시도" }));
 
-    await waitFor(() => expect(api.listSuppliers).toHaveBeenLastCalledWith("warehouse-1", true));
+    await waitFor(() => expect(api.listSuppliers).toHaveBeenLastCalledWith("warehouse-1", true, "warehouse"));
     expect(onSelect).toHaveBeenCalledWith(null);
   });
 

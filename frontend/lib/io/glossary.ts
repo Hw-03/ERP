@@ -23,6 +23,7 @@ import type { TransactionType } from "@/lib/api/types/shared";
 
 export const WORK_TYPE_LABEL: Record<IoWorkType, string> = {
   receive: "원자재 입출고",
+  tube_material: "튜브 원자재 입출고",
   warehouse_io: "창고 입출고",
   warehouse_adjust: "창고 수량 보정",
   process: "부서 입출고",
@@ -32,6 +33,7 @@ export const WORK_TYPE_LABEL: Record<IoWorkType, string> = {
 
 export const WORK_TYPE_DESCRIPTION: Record<IoWorkType, string> = {
   receive: "원자재를 입고하거나 출고합니다.",
+  tube_material: "튜브 원자재를 업체와 입고하거나 출고합니다.",
   warehouse_io: "창고와 부서 간 재고를 이동합니다.",
   warehouse_adjust: "창고 재고 수량을 즉시 보정합니다.",
   process: "부서 작업에 맞춰 재고를 처리합니다.",
@@ -46,6 +48,8 @@ export const WORK_TYPE_DESCRIPTION: Record<IoWorkType, string> = {
 export const SUB_TYPE_LABEL: Record<IoSubType, string> = {
   receive_supplier: "원자재 입고",
   outbound_supplier: "원자재 출고",
+  tube_receive_supplier: "튜브 원자재 입고",
+  tube_outbound_supplier: "튜브 원자재 출고",
   warehouse_to_dept: "창고 → 부서",
   dept_to_warehouse: "부서 → 창고",
   dept_transfer: "부서 → 부서",
@@ -65,6 +69,8 @@ export const SUB_TYPE_LABEL: Record<IoSubType, string> = {
 export const SUB_TYPE_DESCRIPTION: Record<IoSubType, string> = {
   receive_supplier: "선택 품목을 창고 재고로 증가",
   outbound_supplier: "선택 품목을 공급업체에 출고",
+  tube_receive_supplier: "선택 품목을 튜브 정상 재고로 입고",
+  tube_outbound_supplier: "튜브 정상 재고를 공급업체에 출고",
   warehouse_to_dept: "BOM 1단계 하위 품목 자동 포함",
   dept_to_warehouse: "반납할 하위 품목만 체크",
   dept_transfer: "부서 간 직접 이동",

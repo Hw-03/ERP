@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Archive, Check, Pencil, Plus, RotateCcw, Search, X } from "lucide-react";
 import { api, type Supplier } from "@/lib/api";
+import type { SupplierScope } from "@/lib/api/types/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import { matchesSearchText } from "@/lib/searchText";
@@ -20,6 +21,7 @@ type SupplierPickerStepProps = {
   variant: "desktop" | "mobile";
   mode?: "manage" | "select";
   outbound?: boolean;
+  supplierScope?: SupplierScope;
 };
 
 function errorMessage(error: unknown): string {
@@ -48,6 +50,7 @@ export function SupplierPickerStep({
   variant,
   mode = "manage",
   outbound = false,
+  supplierScope = "warehouse",
 }: SupplierPickerStepProps) {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [search, setSearch] = useState("");
@@ -59,7 +62,20 @@ export function SupplierPickerStep({
   const [error, setError] = useState<string | null>(null);
   const [invalidSupplierName, setInvalidSupplierName] = useState<string | null>(null);
   const supplierLoadRequestRef = useRef(0);
-  const loadedEmployeeRef = useRef<string | null>(null);
+  const loadedContextRef = useRef<string | null>(null);
+  const mutationGenerationRef = useRef(0);
+  const supplierContext = `${employeeId}:${supplierScope}`;
+
+  useEffect(() => {
+    setSuppliers([]);
+    setSearch("");
+    setEditingId(null);
+    setEditingName("");
+    setShowInactive(false);
+    setSaving(false);
+    setInvalidSupplierName(null);
+    return () => { mutationGenerationRef.current += 1; };
+  }, [employeeId, supplierScope]);
 
   const canManage = mode === "manage";
   const selectedSupplierLoadKey = canManage ? selectedSupplierId : null;
@@ -73,20 +89,21 @@ export function SupplierPickerStep({
       onLoadStateChange?.(false);
       return;
     }
-    const isInitialLoad = variant === "mobile" ? loadedEmployeeRef.current !== employeeId : suppliers.length === 0;
+    const isInitialLoad = loadedContextRef.current !== supplierContext || (variant === "desktop" && suppliers.length === 0);
     if (isInitialLoad) {
       setLoading(true);
       onLoadStateChange?.(false);
     }
     setError(null);
     try {
-      const loaded = await api.listSuppliers(employeeId, includeInactive);
+      const response = await api.listSuppliers(employeeId, includeInactive, supplierScope);
       if (requestId !== supplierLoadRequestRef.current) return;
+      const loaded = response.filter((supplier) => (supplier.scope ?? "warehouse") === supplierScope);
       const selectedSupplier = selectedSupplierId == null
         ? null
         : loaded.find((supplier) => supplier.supplier_id === selectedSupplierId);
       setSuppliers(loaded);
-      loadedEmployeeRef.current = employeeId;
+      loadedContextRef.current = supplierContext;
       if (selectedSupplierId != null && (!selectedSupplier || !selectedSupplier.is_active)) {
         setInvalidSupplierName(selectedSupplier?.name ?? "선택한");
         onSelect(null);
@@ -105,9 +122,10 @@ export function SupplierPickerStep({
 
   useEffect(() => {
     void loadSuppliers(canManage);
-    // employeeId/showInactive 변경 때만 새 목록을 조회한다.
+    return () => { supplierLoadRequestRef.current += 1; };
+    // 직원·범위·표시 옵션 변경과 관리 모드의 선택 변경을 재검증한다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [employeeId, showInactive, selectedSupplierLoadKey, canManage]);
+  }, [employeeId, supplierScope, showInactive, selectedSupplierLoadKey, canManage]);
 
   const visibleSuppliers = useMemo(() => {
     const activeOrManaged = suppliers.filter((supplier) => (
@@ -127,16 +145,19 @@ export function SupplierPickerStep({
     if (!canManage || !name || matchingSupplier || loading || saving || !employeeId) return;
     setSaving(true);
     setError(null);
+    const generation = mutationGenerationRef.current;
     try {
-      const created = await api.createSupplier(employeeId, name);
+      const created = await api.createSupplier(employeeId, name, supplierScope);
+      if (generation !== mutationGenerationRef.current) return;
       setSuppliers((previous) => [...previous, created]);
       setSearch("");
       setInvalidSupplierName(null);
       onSelect(created);
     } catch (nextError) {
+      if (generation !== mutationGenerationRef.current) return;
       setError(errorMessage(nextError));
     } finally {
-      setSaving(false);
+      if (generation === mutationGenerationRef.current) setSaving(false);
     }
   }
 
@@ -145,15 +166,18 @@ export function SupplierPickerStep({
     if (!name || saving || !employeeId) return;
     setSaving(true);
     setError(null);
+    const generation = mutationGenerationRef.current;
     try {
       const updated = await api.updateSupplier(supplier.supplier_id, employeeId, { name });
+      if (generation !== mutationGenerationRef.current) return;
       setSuppliers((previous) => previous.map((row) => row.supplier_id === updated.supplier_id ? updated : row));
       if (selectedSupplierId === updated.supplier_id) onSelect(updated);
       setEditingId(null);
     } catch (nextError) {
+      if (generation !== mutationGenerationRef.current) return;
       setError(errorMessage(nextError));
     } finally {
-      setSaving(false);
+      if (generation === mutationGenerationRef.current) setSaving(false);
     }
   }
 
@@ -161,14 +185,17 @@ export function SupplierPickerStep({
     if (saving || !employeeId) return;
     setSaving(true);
     setError(null);
+    const generation = mutationGenerationRef.current;
     try {
       const updated = await api.updateSupplier(supplier.supplier_id, employeeId, { is_active: isActive });
+      if (generation !== mutationGenerationRef.current) return;
       if (!isActive && selectedSupplierId === supplier.supplier_id) onSelect(null);
       setSuppliers((previous) => previous.map((row) => row.supplier_id === updated.supplier_id ? updated : row));
     } catch (nextError) {
+      if (generation !== mutationGenerationRef.current) return;
       setError(errorMessage(nextError));
     } finally {
-      setSaving(false);
+      if (generation === mutationGenerationRef.current) setSaving(false);
     }
   }
 
@@ -220,13 +247,13 @@ export function SupplierPickerStep({
 
       <div data-supplier-scroll-shell={compact ? "" : undefined} className={compact ? "relative min-h-0 flex-1 rounded-[20px]" : "flex min-h-0 flex-1 flex-col overflow-y-auto rounded-[16px] border p-2 "} style={{ background: LEGACY_COLORS.s1, borderColor: LEGACY_COLORS.border }}>
         <div data-supplier-scroll-viewport={compact ? "" : undefined} data-keep-scroll={compact ? true : undefined} className={compact ? scrollStyles.viewport : "contents"} style={compact ? { overscrollBehavior: "contain" } : undefined}>
-        {loading || (variant === "mobile" && loadedEmployeeRef.current !== employeeId && !error) ? variant === "mobile" ? (
+        {loading || (loadedContextRef.current !== supplierContext && !error) ? variant === "mobile" ? (
           <div role="status" aria-label="공급업체 목록 불러오는 중" aria-busy="true">
             <span className="sr-only">공급업체 목록 불러오는 중</span>
             {[0, 1, 2, 3].map((row) => <div key={row} aria-hidden="true" className="flex min-h-[60px] items-center gap-3 border-b p-2" style={{ borderColor: LEGACY_COLORS.border }}><SkeletonBlock className="h-4 w-2/3" /><SkeletonBlock className="ml-auto h-5 w-5 rounded-full" /></div>)}
           </div>
         ) : <p className="p-3 text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>공급업체 목록을 불러오는 중입니다.</p>
-        : variant === "mobile" && error && loadedEmployeeRef.current !== employeeId ? null : visibleSuppliers.length === 0 ? (
+        : error && loadedContextRef.current !== supplierContext ? null : visibleSuppliers.length === 0 ? (
           <EmptyState
             illustrated
             title={canManage && candidateName ? "일치하는 공급업체가 없습니다." : canManage ? "등록된 공급업체가 없습니다." : "선택할 수 있는 활성 공급업체가 없습니다."}
@@ -293,7 +320,7 @@ export function SupplierPickerStep({
         )}
       </div>
       {!loading && !error && selectedSupplierId == null && invalidSupplierName && (
-        <p className="text-sm font-bold" style={{ color: LEGACY_COLORS.red }}>{invalidSupplierName} 업체는 숨김 처리되었습니다. 활성 공급업체를 다시 선택하세요.</p>
+        <p className="text-sm font-bold" style={{ color: LEGACY_COLORS.red }}>{invalidSupplierName} 업체를 이 목록에서 선택할 수 없습니다. 활성 공급업체를 다시 선택하세요.</p>
       )}
     </section>
   );

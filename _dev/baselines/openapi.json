@@ -2236,6 +2236,17 @@
             "title": "Pending Quantity",
             "type": "string"
           },
+          "process_type_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Process Type Code"
+          },
           "quantity": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Quantity",
@@ -2301,6 +2312,15 @@
           "record_id": {
             "format": "uuid",
             "title": "Record Id",
+            "type": "string"
+          },
+          "return_supplier_scope": {
+            "default": "warehouse",
+            "enum": [
+              "warehouse",
+              "tube"
+            ],
+            "title": "Return Supplier Scope",
             "type": "string"
           }
         },
@@ -11844,6 +11864,15 @@
             "format": "uuid",
             "title": "Requester Employee Id",
             "type": "string"
+          },
+          "scope": {
+            "default": "warehouse",
+            "enum": [
+              "warehouse",
+              "tube"
+            ],
+            "title": "Scope",
+            "type": "string"
           }
         },
         "required": [
@@ -11868,6 +11897,14 @@
             "title": "Name",
             "type": "string"
           },
+          "scope": {
+            "enum": [
+              "warehouse",
+              "tube"
+            ],
+            "title": "Scope",
+            "type": "string"
+          },
           "supplier_id": {
             "format": "uuid",
             "title": "Supplier Id",
@@ -11882,6 +11919,7 @@
         "required": [
           "supplier_id",
           "name",
+          "scope",
           "is_active",
           "created_at",
           "updated_at"
@@ -26396,6 +26434,20 @@
               "default": false,
               "title": "Include Inactive",
               "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "default": "warehouse",
+              "enum": [
+                "warehouse",
+                "tube"
+              ],
+              "title": "Scope",
+              "type": "string"
             }
           }
         ],

@@ -37,3 +37,7 @@ def validate_io_items(db: Session, bundles: Iterable, *, sub_type: str) -> None:
         item_ids.update(line.item_id for line in bundle.lines
                         if line.included and not getattr(line, "bom_stock_exempt", False))
     validate_active_items(db, item_ids, raw_receive=sub_type == "receive_supplier")
+    if sub_type in {"tube_receive_supplier", "tube_outbound_supplier"}:
+        for item_id in item_ids:
+            if db.get(Item, item_id).process_type_code != "TR":
+                raise ValueError("튜브 원자재 입출고는 TR 품목만 처리할 수 있습니다.")

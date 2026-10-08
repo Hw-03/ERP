@@ -558,6 +558,7 @@ def list_transaction_display_groups(
                 approved_at=info.approved_at if info else None,
                 operation=operation_info.operation if operation_info else None,
                 reversal=operation_info.reversal if operation_info else None,
+                history_batch=_history_batch_response(batch_map.get(log.operation_batch_id)),
             )
     page_groups = [
         TransactionDisplayGroupResponse(
@@ -720,6 +721,7 @@ def get_transactions_summary(
     # 취소 시 레거시 묶음이 원장 작업으로 편입되어도 원 작업 카운트가 흔들리지 않는다.
     work_key = _history_work_key()
     is_department_activity = or_(
+        IoBatch.work_type == "tube_material",
         TransactionLog.transaction_type.in_(_SUMMARY_DEPT_TYPES),
         InventoryOperation.domain == "department_inventory",
         and_(
@@ -747,7 +749,10 @@ def get_transactions_summary(
                 case(
                     (
                         or_(
-                            TransactionLog.transaction_type.in_(_SUMMARY_WAREHOUSE_TYPES),
+                            and_(
+                                TransactionLog.transaction_type.in_(_SUMMARY_WAREHOUSE_TYPES),
+                                func.coalesce(IoBatch.work_type, "") != "tube_material",
+                            ),
                             (
                                 (TransactionLog.transaction_type == TransactionTypeEnum.ADJUST)
                                 & or_(IoBatch.sub_type.in_(_WAREHOUSE_ADJUST_SUBTYPES),
@@ -1100,6 +1105,14 @@ def quantity_correct_transaction(
             422,
             ErrorCode.BUSINESS_RULE,
             f"수량 보정은 RECEIVE / SHIP 유형만 지원합니다 (현재: {log.transaction_type.value}).",
+        )
+
+    batch = db.get(IoBatch, log.operation_batch_id) if log.operation_batch_id else None
+    if batch is not None and batch.work_type == "tube_material":
+        raise http_error(
+            422,
+            ErrorCode.BUSINESS_RULE,
+            "튜브 원자재 입출고는 창고 수량 보정으로 변경할 수 없습니다. 작업 취소 후 다시 등록해 주세요.",
         )
 
     new_qty = payload.quantity_change

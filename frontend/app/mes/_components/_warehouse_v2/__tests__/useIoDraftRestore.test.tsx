@@ -9,7 +9,7 @@ import {
 } from "../useIoDraftRestore";
 import { useIoWorkState } from "../useIoWorkState";
 
-const supplierApi = vi.hoisted(() => ({ listSuppliers: vi.fn() }));
+const supplierApi = vi.hoisted(() => ({ listSuppliers: vi.fn(), getItem: vi.fn() }));
 vi.mock("@/lib/api", () => ({ api: supplierApi }));
 beforeEach(() => supplierApi.listSuppliers.mockResolvedValue([{ supplier_id: "supplier-1", name: "현재 업체", is_active: true }]));
 
@@ -220,7 +220,7 @@ function CanonicalProcessRestoreHarness() {
   return <span data-testid="canonical-restored-subtype">{state.subType}</span>;
 }
 
-function SupplierReceiptRestoreHarness({ restoreStep = 4, outbound = false }: { restoreStep?: 4 | 5; outbound?: boolean }) {
+function SupplierReceiptRestoreHarness({ restoreStep = 4, outbound = false, tube = false }: { restoreStep?: 4 | 5; outbound?: boolean; tube?: boolean }) {
   const restoredDraftRef = useRef<string | null>(null);
   const restoredNonceRef = useRef<number | null>(null);
   const autosaveBatchIdRef = useRef<string | null>(null);
@@ -228,7 +228,8 @@ function SupplierReceiptRestoreHarness({ restoreStep = 4, outbound = false }: { 
   useIoDraftRestore({
     draftToRestore: {
       ...makeDraft(outbound ? "outbound_supplier" : "receive_supplier"),
-      work_type: "receive",
+      work_type: tube ? "tube_material" : "receive",
+      ...(tube ? { sub_type: "tube_outbound_supplier" as const, bundles: [{ bundle_id: "tube-bundle", source_kind: "direct_item" as const, source_item_id: "tube-item", title: "튜브 원자재", quantity: 1, expanded_level: 0, lines: [] }] } : {}),
       supplier_id: "supplier-1",
       supplier_name_snapshot: "숨김 예정 업체",
     },
@@ -244,6 +245,25 @@ function SupplierReceiptRestoreHarness({ restoreStep = 4, outbound = false }: { 
 }
 
 describe("useIoDraftRestore", () => {
+  it("튜브 초안은 전용 업체와 TR 품목을 다시 확인해 복원한다", async () => {
+    supplierApi.listSuppliers.mockResolvedValue([{ supplier_id: "supplier-1", name: "튜브 업체", scope: "tube", is_active: true }]);
+    supplierApi.getItem.mockResolvedValue({ item_id: "tube-item", process_type_code: "TR", deleted_at: null });
+    render(<SupplierReceiptRestoreHarness tube restoreStep={5} />);
+    await waitFor(() => expect(supplierApi.getItem).toHaveBeenCalledWith("tube-item"));
+    expect(supplierApi.listSuppliers).toHaveBeenCalledWith("emp-1", true, "tube");
+    await waitFor(() => expect(screen.getByTestId("supplier-receipt-restore-step")).toHaveTextContent("5"));
+  });
+  it("튜브 초안의 품목이 TR에서 변경되면 대상 선택으로 돌아간다", async () => {
+    supplierApi.listSuppliers.mockResolvedValue([{ supplier_id: "supplier-1", name: "튜브 업체", scope: "tube", is_active: true }]);
+    supplierApi.getItem.mockResolvedValue({ item_id: "tube-item", process_type_code: "AR", deleted_at: null });
+    render(<SupplierReceiptRestoreHarness tube />);
+    await waitFor(() => expect(screen.getByTestId("supplier-receipt-restore-step")).toHaveTextContent("3"));
+  });
+  it("튜브 초안에 창고 업체가 들어 있으면 업체를 다시 선택한다", async () => {
+    supplierApi.getItem.mockResolvedValue({ item_id: "tube-item", process_type_code: "TR", deleted_at: null });
+    render(<SupplierReceiptRestoreHarness tube />);
+    await waitFor(() => expect(screen.getByTestId("supplier-receipt-restore-step")).toHaveTextContent("2"));
+  });
   it("활성 공급업체를 확인한 뒤 원자재 입고 초안을 수량 조정 단계로 복원한다", async () => {
     render(<SupplierReceiptRestoreHarness />);
     await waitFor(() => expect(screen.getByTestId("supplier-receipt-restore-step")).toHaveTextContent("4"));

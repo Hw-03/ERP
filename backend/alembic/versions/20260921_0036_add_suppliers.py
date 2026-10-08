@@ -186,7 +186,12 @@ def _assert_supplier_table_compatible(inspector: sa.Inspector) -> None:
         for index in inspector.get_indexes("suppliers")
         if index.get("unique") and index.get("column_names")
     }
-    if ("normalized_name",) not in unique_names | indexes:
+    scoped_unique = (
+        ("scope", "normalized_name") in unique_names | indexes
+        and "scope" in columns
+        and _compatible_column(columns["scope"], nullable=False, length=20)
+    )
+    if ("normalized_name",) not in unique_names | indexes and not scoped_unique:
         raise RuntimeError("suppliers.normalized_name unique constraint is missing; manual schema repair is required before upgrade")
 
 

@@ -83,7 +83,7 @@ export function IoLineRow({
 }: Props) {
   const [showChildren, setShowChildren] = useState(false);
   const isInternalUse = subType === "internal_use_out";
-  const selectionColor = subType === "outbound_supplier" ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
+  const selectionColor = (subType === "outbound_supplier" || subType === "tube_outbound_supplier") ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
   const hasInventoryEffectOverride = inventoryEffect !== undefined;
   const effectLine = inventoryEffect ?? line;
   const noInventoryEffect = hasInventoryEffectOverride && inventoryEffect === null;
@@ -285,8 +285,10 @@ export function IoLineRow({
           className="text-[9px] font-bold uppercase tracking-[1.5px]"
           style={{ color: LEGACY_COLORS.muted2 }}
         >
-          {isWarehouseAdjust || subType === "receive_supplier"
-            ? "창고 수량"
+          {subType === "tube_receive_supplier"
+            ? "튜브 수량"
+            : isWarehouseAdjust || subType === "receive_supplier"
+              ? "창고 수량"
             : isOutgoing(effectLine)
               ? "가능 재고"
               : "현재 재고"}

@@ -74,6 +74,7 @@ def upsert_draft_request(
         request_type=request_type,
         supplier_id=supplier_id,
         allow_missing_draft=True,
+        lines=lines_input,
     )
 
     existing = (
@@ -257,6 +258,7 @@ def submit_draft_request(
         db,
         request_type=request.request_type,
         supplier_id=request.supplier_id,
+        lines=request.lines,
     )
     request.supplier_name_snapshot = supplier.name if supplier is not None else None
     from app.services.defect_reason_categories import resolve_reason_category, stock_request_requires_reason

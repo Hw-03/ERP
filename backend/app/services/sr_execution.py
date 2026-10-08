@@ -685,6 +685,7 @@ def _execute_all_lines(
             db,
             request_type=request.request_type,
             supplier_id=request.supplier_id,
+            lines=lines,
         )
         request.supplier_name_snapshot = supplier.name
     rework_request = request.request_type in {

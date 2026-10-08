@@ -521,7 +521,7 @@ def _persist_batch(
     from app.services.item_write_validation import validate_io_items
 
     validate_io_items(db, payload.bundles, sub_type=payload.sub_type)
-    validate_receive_requester(requester, work_type=payload.work_type, sub_type=payload.sub_type)
+    validate_receive_requester(requester, work_type=payload.work_type, sub_type=payload.sub_type, db=db)
     from app.services.defect_reason_categories import resolve_reason_category, io_requires_reason
     reason_category_id, reason_category, _ = resolve_reason_category(
         db, reason_category_id=getattr(payload, "reason_category_id", None),

@@ -10,21 +10,24 @@ import type {
   IoSubmitResponse,
   IoWorkType,
   Supplier,
+  SupplierScope,
 } from "./types";
 
 export const ioApi = {
-  listSuppliers: (employeeId: string, includeInactive = false) => {
+  listSuppliers: (employeeId: string, includeInactive = false, scope: SupplierScope = "warehouse") => {
     const query = new URLSearchParams({
       requester_employee_id: employeeId,
       include_inactive: String(includeInactive),
+      scope,
     });
     return fetcher<Supplier[]>(toApiUrl(`/api/suppliers?${query.toString()}`));
   },
 
-  createSupplier: (employeeId: string, name: string) =>
+  createSupplier: (employeeId: string, name: string, scope: SupplierScope = "warehouse") =>
     postJson<Supplier>(toApiUrl("/api/suppliers"), {
       requester_employee_id: employeeId,
       name,
+      scope,
     }),
 
   updateSupplier: (

@@ -5,17 +5,20 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
 import presentation from "../mobile/mobilePresentation.module.css";
 
-export function MaterialDirectionStep({ selected, onSelect, mobilePresentation = false }: {
+export function MaterialDirectionStep({ selected, onSelect, mobilePresentation = false, tube = false }: {
   selected: IoSubType | null;
   onSelect: (subType: IoSubType) => void;
   mobilePresentation?: boolean;
+  tube?: boolean;
 }) {
+  const receive: IoSubType = tube ? "tube_receive_supplier" : "receive_supplier";
+  const outbound: IoSubType = tube ? "tube_outbound_supplier" : "outbound_supplier";
   if (mobilePresentation) {
     return (
       <div className={presentation.twoChoices}>
         {([
-          { subType: "receive_supplier", label: "입고", direction: "in" },
-          { subType: "outbound_supplier", label: "출고", direction: "out" },
+          { subType: receive, label: "입고", direction: "in" },
+          { subType: outbound, label: "출고", direction: "out" },
         ] as const).map(({ subType, label, direction }) => {
           const active = selected === subType;
           const color = direction === "out" ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
@@ -52,8 +55,8 @@ export function MaterialDirectionStep({ selected, onSelect, mobilePresentation =
   }
   return (
     <div className="grid h-full min-h-0 grid-cols-2 gap-4">
-      <DirectionCard dir="in" prefixLabel="" active={selected === "receive_supplier"} onClick={() => onSelect("receive_supplier")} />
-      <DirectionCard dir="out" prefixLabel="" active={selected === "outbound_supplier"} onClick={() => onSelect("outbound_supplier")} />
+      <DirectionCard dir="in" prefixLabel="" active={selected === receive} onClick={() => onSelect(receive)} />
+      <DirectionCard dir="out" prefixLabel="" active={selected === outbound} onClick={() => onSelect(outbound)} />
     </div>
   );
 }

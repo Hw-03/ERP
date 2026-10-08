@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     DepartmentEnum,
+    Department,
     Employee,
     Item,
     LocationStatusEnum,
@@ -38,6 +39,7 @@ from app.services.approval_rules import APPROVAL_SUB_TYPES, MANUAL_LINE_ORIGINS 
 
 
 WORK_TYPES = {
+    "tube_material",
     "receive",
     "warehouse_io",
     "warehouse_adjust",
@@ -59,6 +61,7 @@ WAREHOUSE_ADJUST_SUB_TYPES = frozenset(
     {"warehouse_adjust_in", "warehouse_adjust_out"}
 )
 WAREHOUSE_MANAGER_ROLES = frozenset({"primary", "deputy"})
+TUBE_MATERIAL_SUB_TYPES = frozenset({"tube_receive_supplier", "tube_outbound_supplier"})
 AUTOMATIC_DEPARTMENT_SUB_TYPES = frozenset(
     {
         "warehouse_to_dept",
@@ -76,8 +79,20 @@ def validate_receive_requester(
     *,
     work_type: str,
     sub_type: str,
+    db: Optional[Session] = None,
 ) -> None:
-    """창고 정·부 담당자만 원자재 입출고를 사용할 수 있다."""
+    """원자재 작업범위에 맞는 활성 튜브 직원 또는 창고 정·부 담당자를 검증한다."""
+    if work_type == "tube_material" or sub_type in TUBE_MATERIAL_SUB_TYPES:
+        if work_type != "tube_material" or sub_type not in TUBE_MATERIAL_SUB_TYPES:
+            raise ValueError("튜브 원자재 작업 유형과 세부 유형 조합이 올바르지 않습니다.")
+        if not bool(requester.is_active) or _enum_value(requester.department) != "튜브":
+            raise PermissionError("활성 튜브 직원만 튜브 원자재 입출고를 할 수 있습니다.")
+        if not bool(requester.io_enabled):
+            raise PermissionError("입출고 사용이 제한된 직원입니다.")
+        department = db.query(Department).filter(Department.name == "튜브").first() if db is not None else None
+        if department is not None and (not department.io_enabled or not department.is_active):
+            raise PermissionError("튜브 부서의 입출고 사용이 제한되어 있습니다.")
+        return
     if work_type != "receive" and sub_type not in {"receive_supplier", "outbound_supplier"}:
         return
     if work_type != "receive" or sub_type not in {"receive_supplier", "outbound_supplier"}:
@@ -95,7 +110,20 @@ def validate_material_outbound(
     notes: Optional[str] = None,
     require_reason: bool = True,
 ) -> None:
-    """정상 창고 재고의 단일 품목 출고만 허용해 위조 경로·자동 BOM 차감을 막는다."""
+    """원자재의 직접 품목과 고정 경로를 검증하고 출고 제출 사유를 요구한다."""
+    if work_type == "tube_material" or sub_type in TUBE_MATERIAL_SUB_TYPES:
+        if work_type != "tube_material" or sub_type not in TUBE_MATERIAL_SUB_TYPES:
+            raise ValueError("튜브 원자재 작업 유형과 세부 유형 조합이 올바르지 않습니다.")
+        if require_reason and sub_type == "tube_outbound_supplier" and not (notes or "").strip():
+            raise ValueError("튜브 원자재 출고에는 출고 사유를 입력해야 합니다.")
+        expected = (("in", "none", None, "production", "튜브", "direct") if sub_type == "tube_receive_supplier" else ("out", "production", "튜브", "none", None, "direct"))
+        for bundle in bundles:
+            lines = list(getattr(bundle, "lines"))
+            if getattr(bundle, "source_kind") != "direct_item" or len(lines) != 1 or getattr(lines[0], "item_id") != getattr(bundle, "source_item_id"):
+                raise ValueError("튜브 원자재 입출고는 선택한 품목만 처리할 수 있습니다.")
+            if tuple(getattr(lines[0], key) for key in ("direction", "from_bucket", "from_department", "to_bucket", "to_department", "origin")) != expected:
+                raise ValueError("튜브 원자재 재고 경로가 올바르지 않습니다.")
+        return
     if sub_type != "outbound_supplier":
         return
     if work_type != "receive":
@@ -549,6 +577,10 @@ def _route_for_sub_type(
     role: str = "component",
     source_location: str = "warehouse",
 ) -> tuple[str, str, Optional[str], str, Optional[str]]:
+    if sub_type == "tube_receive_supplier":
+        return ("in", "none", None, "production", "튜브")
+    if sub_type == "tube_outbound_supplier":
+        return ("out", "production", "튜브", "none", None)
     if sub_type == "receive_supplier":
         return ("in", "none", None, "warehouse", None)
     if sub_type == "outbound_supplier":
@@ -1343,6 +1375,12 @@ def preview(
     from app.services.item_write_validation import validate_active_items
     validate_active_items(db, (target.item_id for target in targets if target.item_id is not None),
                           raw_receive=sub_type == "receive_supplier")
+    if sub_type in TUBE_MATERIAL_SUB_TYPES:
+        for target in targets:
+            if getattr(target, "source_kind", "direct_item") != "direct_item":
+                raise ValueError("튜브 원자재 입출고는 선택한 품목만 처리할 수 있습니다.")
+            if _get_item(db, target.item_id).process_type_code != "TR":
+                raise ValueError("튜브 원자재 입출고는 TR 품목만 처리할 수 있습니다.")
     if sub_type == "outbound_supplier" and any(getattr(target, "source_kind", "direct_item") != "direct_item" for target in targets):
         raise ValueError("원자재 출고는 선택한 품목만 출고할 수 있습니다.")
     validate_internal_use_operation(

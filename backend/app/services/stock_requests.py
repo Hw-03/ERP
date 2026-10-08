@@ -246,6 +246,7 @@ def create_request(
         db,
         request_type=request_type,
         supplier_id=supplier_id,
+        lines=lines_input,
     )
 
     # 불량 등록·처리는 모두 요청자가 즉시 실행한다. 격리 처리도 한 부서의 기록만

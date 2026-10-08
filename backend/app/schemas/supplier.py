@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -19,6 +20,7 @@ def _clean_name(value: str) -> str:
 
 class SupplierCreate(BaseModel):
     requester_employee_id: uuid.UUID
+    scope: Literal["warehouse", "tube"] = "warehouse"
     name: str = Field(..., max_length=100)
 
     _validate_name = field_validator("name")(_clean_name)
@@ -37,6 +39,7 @@ class SupplierResponse(BaseModel):
 
     supplier_id: uuid.UUID
     name: str
+    scope: Literal["warehouse", "tube"]
     is_active: bool
     created_at: UtcDatetime
     updated_at: UtcDatetime

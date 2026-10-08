@@ -4,6 +4,7 @@
  */
 import type { TransactionType } from "@/lib/api/types/shared";
 import type { IoBatch } from "@/lib/api/types/io";
+import type { TransactionLog } from "@/lib/api/types/production";
 
 // ──────────────────────────────────────────────────────────────────
 // Scope 모델
@@ -105,9 +106,13 @@ export function isReworkOperation(
  * batch 가 없으면 거래 타입 기반 (ambiguous 는 그대로).
  */
 export function classifyHistoryScope(
-  log: { transaction_type: string; department?: string | null },
+  log: { transaction_type: string; department?: string | null; history_batch?: TransactionLog["history_batch"]; inventory_effect?: TransactionLog["inventory_effect"] },
   batch?: IoBatch | null,
 ): "warehouse_involved" | "department_internal" | "ambiguous" {
+  if (batch?.work_type === "tube_material" || log.history_batch?.work_type === "tube_material" || (
+    (log.transaction_type === "RECEIVE" || log.transaction_type === "MATERIAL_OUT") &&
+    log.inventory_effect?.some((cell) => cell.scope === "location" && cell.department === "튜브" && cell.status === "PRODUCTION")
+  )) return "department_internal";
   if (batch) {
     let touchesWarehouse = false;
     let onlyProduction = true;

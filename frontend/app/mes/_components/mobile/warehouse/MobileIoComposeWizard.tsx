@@ -31,10 +31,10 @@ import { hasDefectReason } from "../../_defect_hub/defectCartValidation";
 import { IoSubmitModals, type IoSubmitResultState } from "../../_warehouse_v2/IoSubmitModals";
 import { StatusTargetNotice, useStatusTargetNotice } from "../../common/StatusTargetNotice";
 import {
-  IO_WORK_TYPES,
+  IO_WORK_TYPES, IO_SUB_TYPES,
   approvalKind,
   canAutoApprove,
-  canSeeWorkType,
+  canSeeWorkType, isMaterialWorkType, isTubeMaterialSubType, isValidTubeMaterialItem,
   ioDepartmentPayload,
   isExitWorkType,
   isSingleInlineSubType,
@@ -152,20 +152,22 @@ export function MobileIoComposeWizard({
     [bomListQuery.data],
   );
   const bomParentsLoaded = bomListQuery.isSuccess;
-  const itemAddBlocked = bomListQuery.isPending || bomListQuery.isError;
   const bomRevisionRef = useRef(revision);
   const state = useIoWorkState(defaultWorkType, operator?.department, getAvailable);
-  const materialOutbound = state.workType === "receive" && state.materialDirectionSelected && state.subType === "outbound_supplier";
+  const itemAddBlocked = state.workType !== "tube_material" && (bomListQuery.isPending || bomListQuery.isError);
+  const materialOutbound = isMaterialWorkType(state.workType) && state.materialDirectionSelected && (state.subType === "outbound_supplier" || state.subType === "tube_outbound_supplier");
   const directionOutbound = materialOutbound || (["process", "warehouse_io", "warehouse_adjust"].includes(state.workType) && state.deptIoDirection === "out");
   const authorizedEntryIntent = entryIntent
     && IO_WORK_TYPES.some((row) => row.id === entryIntent.workType)
     && canSeeWorkType(entryIntent.workType, operator)
+    && (!entryIntent.subType || IO_SUB_TYPES[entryIntent.workType].some((row) => row.id === entryIntent.subType))
     ? entryIntent
     : null;
   const canRestoreDraft = Boolean(
     draftToRestore
       && IO_WORK_TYPES.some((row) => row.id === draftToRestore.work_type)
-      && canSeeWorkType(draftToRestore.work_type, operator),
+      && canSeeWorkType(draftToRestore.work_type, operator)
+      && IO_SUB_TYPES[draftToRestore.work_type].some((row) => row.id === draftToRestore.sub_type),
   );
   const [
     pullSelected,
@@ -243,7 +245,7 @@ export function MobileIoComposeWizard({
     } else if (authorizedEntryIntent.subType) {
       state.setSubType(authorizedEntryIntent.subType);
     }
-    state.goTo(authorizedEntryIntent.workType === "receive" ? 2 : 3);
+    state.goTo(isMaterialWorkType(authorizedEntryIntent.workType) ? 2 : 3);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entryIntent]);
 
@@ -324,6 +326,10 @@ export function MobileIoComposeWizard({
     }
     setError(null);
     const effectiveSubType = subTypeOverride ?? state.subType;
+    if (!canSeeWorkType(state.workType, operator)) return;
+    if (isTubeMaterialSubType(effectiveSubType) && !isValidTubeMaterialItem(item)) return;
+    if (isTubeMaterialSubType(effectiveSubType)) sourceKind = "direct_item";
+    const previewGeneration = operationRefs.generation.current;
     if (subTypeOverride && subTypeOverride !== state.subType) {
       state.setSubType(subTypeOverride);
     }
@@ -346,6 +352,7 @@ export function MobileIoComposeWizard({
           quantity: 1,
         },
       });
+      if (previewGeneration !== operationRefs.generation.current) return;
       const newBundles = response.bundles;
       state.setBundles((prev) =>
         mergePreviewBundles(prev, item.item_id, sourceKind, effectiveSubType, newBundles),
@@ -355,6 +362,7 @@ export function MobileIoComposeWizard({
       }
       onStatusChange(`${item.item_name} 작업 묶음 생성`);
     } catch (err) {
+      if (previewGeneration !== operationRefs.generation.current) return;
       setError(err instanceof Error ? err.message : "품목 전개에 실패했습니다.");
     }
   }
@@ -384,7 +392,7 @@ export function MobileIoComposeWizard({
   }
 
   useIoPreselect({
-    preselectedItem: entryIntent && !authorizedEntryIntent || state.workType === "receive" && !state.selectedSupplierId ? null : preselectedItem,
+    preselectedItem: entryIntent && !authorizedEntryIntent || isMaterialWorkType(state.workType) && !state.selectedSupplierId ? null : preselectedItem,
     bomParents,
     bomParentsLoaded,
     workType: state.workType,
@@ -470,7 +478,7 @@ export function MobileIoComposeWizard({
     state.setWorkType(next);
     setError(null);
     beginNewCompositionSlot();
-    state.goTo(next === "receive" ? 6 : 2);
+    state.goTo(isMaterialWorkType(next) ? 6 : 2);
   }
 
   async function saveCurrentDraft(persistInUrl = true): Promise<string | null> {
@@ -556,6 +564,24 @@ export function MobileIoComposeWizard({
   }
 
   async function handleSubmit() {
+    if (!canSeeWorkType(state.workType, operator)) return;
+    if (isMaterialWorkType(state.workType) && !state.canAdvance[2]) {
+      state.goTo(2);
+      setError("활성 공급업체를 다시 선택하세요.");
+      return;
+    }
+    if (state.workType === "tube_material" && state.bundles.some((bundle) => bundle.source_kind !== "direct_item" || [bundle.source_item_id, ...bundle.lines.filter((line) => line.included).map((line) => line.item_id)].some((id) => {
+      const item = items.find((row) => row.item_id === id);
+      return item != null && !isValidTubeMaterialItem(item);
+    }))) {
+      state.goTo(3);
+      setError("사용 가능한 튜브 원자재를 다시 선택하세요.");
+      return;
+    }
+    if (state.subType === "tube_outbound_supplier" && !state.notes.trim()) {
+      setError("출고 사유를 입력하세요.");
+      return;
+    }
     if (state.subType === "defect_quarantine" && !hasDefectReason(state.reasonCategory, state.notes)) {
       setError("사유를 선택하고, 기타 사유는 메모를 입력하세요.");
       return;
@@ -651,7 +677,7 @@ export function MobileIoComposeWizard({
     step === 6 ? "입고·출고 선택" : step === 1
       ? "작업 유형 선택"
       : step === 2
-      ? state.workType === "receive"
+      ? isMaterialWorkType(state.workType)
         ? "공급업체 선택"
         : state.workType === "warehouse_adjust"
         ? "입고·출고 방향 선택"
@@ -683,7 +709,7 @@ export function MobileIoComposeWizard({
               </h2>
             </div>
             <WizardProgress
-              steps={state.workType === "receive" ? [{ key: "1", label: "작업 유형" }, { key: "6", label: "입고·출고" }, { key: "2", label: "공급업체" }, ...STEP_META.slice(2)] : STEP_META}
+              steps={isMaterialWorkType(state.workType) ? [{ key: "1", label: "작업 유형" }, { key: "6", label: "입고·출고" }, { key: "2", label: "공급업체" }, ...STEP_META.slice(2)] : STEP_META}
               current={state.steps.indexOf(step)}
               variant="inline"
               accent={directionOutbound ? LEGACY_COLORS.red : undefined}
@@ -719,7 +745,7 @@ export function MobileIoComposeWizard({
         {step === 6 && (
           <div className="flex flex-[1_0_auto] flex-col gap-2">
             <div className="flex flex-[1_0_auto] flex-col">
-              <MaterialDirectionStep selected={state.materialDirectionSelected ? state.subType : null} onSelect={handleSubTypeChange} mobilePresentation />
+              <MaterialDirectionStep tube={state.workType === "tube_material"} selected={state.materialDirectionSelected ? state.subType : null} onSelect={handleSubTypeChange} mobilePresentation />
             </div>
             <Button variant="primary" size="lg" onClick={state.goNext} disabled={!state.canAdvance[6]} style={materialOutbound ? { background: LEGACY_COLORS.red } : undefined} className="w-full shrink-0">
               {state.canAdvance[6] ? "다음 단계로 →" : "입고 또는 출고를 선택하세요"}
@@ -728,9 +754,9 @@ export function MobileIoComposeWizard({
         )}
 
         {step === 2 && (
-          state.workType === "receive" ? (
+          isMaterialWorkType(state.workType) ? (
             <div className="min-h-[180px] flex-1">
-            <SupplierPickerStep
+            <SupplierPickerStep supplierScope={state.workType === "tube_material" ? "tube" : "warehouse"}
               employeeId={employeeId}
               selectedSupplierId={state.selectedSupplierId}
               selectedSupplierName={state.selectedSupplierName}
@@ -947,7 +973,7 @@ export function MobileIoComposeWizard({
           <PrimaryActionButton
             label={state.canAdvance[2]
               ? "다음 단계로 →"
-                : state.workType === "receive"
+                : isMaterialWorkType(state.workType)
                   ? "공급업체를 선택하세요"
                   : state.workType === "warehouse_adjust"
                 ? "입고 또는 출고를 선택하세요"

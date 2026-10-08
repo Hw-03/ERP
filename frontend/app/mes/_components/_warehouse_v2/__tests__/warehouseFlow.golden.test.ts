@@ -127,6 +127,7 @@ describe("ioWorkType 상수", () => {
   it("IO_WORK_TYPES id/label 고정 (defect 는 별도 '불량' 탭으로 분리되어 입출고 메뉴에서 제외)", () => {
     expect(IO_WORK_TYPES.map((r) => [r.id, r.label, r.description])).toEqual([
       ["receive", "원자재 입출고", "원자재를 입고하거나 출고합니다."],
+      ["tube_material", "튜브 원자재 입출고", "튜브 원자재를 업체와 입고하거나 출고합니다."],
       ["warehouse_io", "창고 입출고", "창고와 부서 간 재고를 이동합니다."],
       ["process", "부서 입출고", "부서 작업에 맞춰 재고를 처리합니다."],
       ["internal_use", "AS·연구 사용출고", "창고·부서 재고를 AS·연구용으로 출고합니다."],
@@ -140,6 +141,7 @@ describe("ioWorkType 상수", () => {
     );
     expect(flat).toEqual({
       receive: ["receive_supplier", "outbound_supplier"],
+      tube_material: ["tube_receive_supplier", "tube_outbound_supplier"],
       warehouse_io: ["warehouse_to_dept", "dept_to_warehouse"],
       warehouse_adjust: ["warehouse_adjust_in", "warehouse_adjust_out"],
       process: ["produce", "disassemble", "adjust_in", "adjust_out"],
@@ -155,6 +157,8 @@ describe("ioWorkType 상수", () => {
     expect(labels).toEqual([
       ["receive_supplier", "원자재 입고", "선택 품목을 창고 재고로 증가"],
       ["outbound_supplier", "원자재 출고", "선택 품목을 공급업체에 출고"],
+      ["tube_receive_supplier", "튜브 원자재 입고", "선택 품목을 튜브 정상 재고로 입고"],
+      ["tube_outbound_supplier", "튜브 원자재 출고", "튜브 정상 재고를 공급업체에 출고"],
       ["warehouse_to_dept", "창고 → 부서", "BOM 1단계 하위 품목 자동 포함"],
       ["dept_to_warehouse", "부서 → 창고", "반납할 하위 품목만 체크"],
       ["warehouse_adjust_in", "보정 입고", "창고 재고 수량 즉시 증가"],
@@ -174,6 +178,7 @@ describe("ioWorkType 상수", () => {
   it("DEFAULT_SUB_TYPE 고정", () => {
     expect(DEFAULT_SUB_TYPE).toEqual({
       receive: "receive_supplier",
+      tube_material: "tube_receive_supplier",
       warehouse_io: "warehouse_to_dept",
       warehouse_adjust: "warehouse_adjust_in",
       process: "produce",

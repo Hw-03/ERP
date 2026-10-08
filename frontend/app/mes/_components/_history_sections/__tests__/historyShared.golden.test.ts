@@ -987,6 +987,10 @@ describe("getHistoryLineStatusLabel", () => {
 // classifyHistoryScope
 // ──────────────────────────────────────────────────────────────────
 describe("classifyHistoryScope", () => {
+  it("튜브 원자재 batch는 외부와 이동해도 부서 작업으로 분류한다", () => {
+    const batch = makeBatch({ work_type: "tube_material", sub_type: "tube_receive_supplier", bundles: [makeBundle({ lines: [makeLine({ from_bucket: "none", to_bucket: "production", to_department: "튜브" })] })] });
+    expect(classifyHistoryScope({ transaction_type: "RECEIVE" }, batch)).toBe("department_internal");
+  });
   it("8.3-03 출하와 부서 출처 AS·연구 사용은 창고가 아니라 부서 작업 건수로 분류한다", () => {
     expect(isWarehouseInvolvedType("SHIP")).toBe(false);
     expect(isWarehouseInvolvedType("INTERNAL_USE")).toBe(false);
@@ -1503,6 +1507,7 @@ describe("OPERATION_OPTIONS", () => {
   it("uses the five parent work-type API keys", () => {
     expect(OPERATION_OPTIONS).toEqual([
       { value: "warehouse", label: "창고 입출고" },
+      { value: "tube_material", label: "튜브 원자재 입출고" },
       { value: "process", label: "부서 입출고" },
       { value: "defect", label: "불량" },
       { value: "item_conversion", label: "품목 전환" },

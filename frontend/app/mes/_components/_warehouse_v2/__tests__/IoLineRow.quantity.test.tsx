@@ -54,6 +54,13 @@ function makeLine(overrides: Partial<IoLine> = {}): IoLine {
 }
 
 describe("IoLineRow quantity", () => {
+  it("튜브 입고의 수량 조정은 튜브 재고 라벨과 수량을 표시한다", () => {
+    render(<IoLineRow line={makeLine({ to_bucket: "production", to_department: "튜브", quantity: 3 })} subType="tube_receive_supplier" isChild={false} available={7} item={{ quantity: 100, warehouse_qty: 80 } as Item} onToggle={vi.fn()} onQuantityChange={vi.fn()} onRemove={vi.fn()} />);
+    expect(screen.getByText("튜브 수량")).toBeInTheDocument();
+    expect(screen.queryByText("창고 수량")).not.toBeInTheDocument();
+    expect(screen.getByText("7")).toBeInTheDocument();
+    expect(screen.getByText("10")).toBeInTheDocument();
+  });
   it.each(["receive_supplier", "outbound_supplier"] as const)("원자재 %s는 코드와 실제 창고 위치만 표시한다", (subType) => {
     const props = {
       line: makeLine({

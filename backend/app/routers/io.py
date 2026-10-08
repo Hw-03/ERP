@@ -131,11 +131,11 @@ def execute_item_conversion(payload: ItemConversionExecuteRequest, db: Session =
 @router.post("/preview", response_model=IoPreviewResponse)
 def preview_io(payload: IoPreviewRequest, db: Session = Depends(get_db)):
     try:
-        if payload.sub_type == "outbound_supplier":
+        if payload.sub_type in {"outbound_supplier", "tube_receive_supplier", "tube_outbound_supplier"} or payload.work_type == "tube_material":
             if payload.requester_employee_id is None:
                 raise ValueError("원자재 출고 미리보기에는 requester_employee_id가 필요합니다.")
             requester = io_svc._load_requester(db, payload.requester_employee_id)
-            io_svc.validate_receive_requester(requester, work_type=payload.work_type, sub_type=payload.sub_type)
+            io_svc.validate_receive_requester(requester, work_type=payload.work_type, sub_type=payload.sub_type, db=db)
         if payload.work_type == "internal_use" or payload.sub_type == "internal_use_out":
             if payload.requester_employee_id is None:
                 raise ValueError("사내 사용 미리보기에는 requester_employee_id가 필요합니다.")

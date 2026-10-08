@@ -4,6 +4,9 @@
  */
 
 export interface DefectLocation {
+  /** 실제 격리 원건과 연결 품목으로 서버가 판정한다. 구 응답은 warehouse다. */
+  return_supplier_scope?: "warehouse" | "tube";
+  process_type_code?: string | null;
   reason_category_id?: string | null;
   record_id: string;
   item_id: string;

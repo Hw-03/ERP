@@ -7,8 +7,7 @@ import { LEGACY_COLORS } from "@/lib/mes/color";
 import type { SelectedHistoryMonth } from "./historyQuery";
 import {
   isAdjustmentLike,
-  isDepartmentInternalType,
-  isWarehouseInvolvedType,
+  classifyHistoryScope,
 } from "./transactionTaxonomy";
 
 type Props = {
@@ -219,14 +218,18 @@ export function HistoryCalendarStrip({
               const dayLogs = calendarDayMap.get(key) ?? [];
               const isToday = key === todayKey;
               const isSelected = key === selectedDay;
-              // KPI 와 일치 — isWarehouseInvolvedType / isDepartmentInternalType / isAdjustmentLike.
+              // KPI 와 일치 — 작업 투영과 실제 재고 위치를 포함한 공통 분류를 사용한다.
               let warehouseCount = 0;
               let deptCount = 0;
               let adjustCount = 0;
               for (const l of dayLogs) {
-                if (isWarehouseInvolvedType(l.transaction_type)) warehouseCount++;
-                if (isDepartmentInternalType(l.transaction_type)) deptCount++;
-                if (isAdjustmentLike(l)) adjustCount++;
+                if (isAdjustmentLike(l)) {
+                  adjustCount++;
+                  continue;
+                }
+                const scope = classifyHistoryScope(l);
+                if (scope === "warehouse_involved") warehouseCount++;
+                if (scope === "department_internal") deptCount++;
               }
               const otherCount = Math.max(dayLogs.length - warehouseCount - deptCount - adjustCount, 0);
               return (

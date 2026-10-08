@@ -9,7 +9,7 @@
  */
 import { useEffect, useRef, type MutableRefObject } from "react";
 import { api, type IoBatch, type IoBundle, type IoLine } from "@/lib/api";
-import { deptIoDirectionOf, exclusionNoteFor } from "./ioWorkType";
+import { deptIoDirectionOf, exclusionNoteFor, isMaterialWorkType, isValidTubeMaterialItem } from "./ioWorkType";
 import type { useIoWorkState } from "./useIoWorkState";
 import type { IoStep } from "./useIoWorkState";
 
@@ -226,23 +226,32 @@ export function useIoDraftRestore(params: {
 
   // 업체 화면을 거치지 않는 복원도 활성 업체를 확인한다. URL 단계 변경으로 재복원하지 않는다.
   useEffect(() => {
-    if (!canRestore || !draftToRestore || draftToRestore.work_type !== "receive") return;
+    if (!canRestore || !draftToRestore || !isMaterialWorkType(draftToRestore.work_type)) return;
     let cancelled = false;
     state.setSupplierSelectionReady(false);
     const targetStep = restoreStep ?? 4;
-    void api.listSuppliers(employeeId ?? draftToRestore.requester_employee_id, true).then((suppliers) => {
-      if (cancelled || latestStateRef.current.selectedSupplierId !== (draftToRestore.supplier_id ?? null)) return;
-      const supplier = suppliers.find((row) => row.supplier_id === draftToRestore.supplier_id && row.is_active);
+    const scope = draftToRestore.work_type === "tube_material" ? "tube" : "warehouse";
+    const itemIds = scope === "tube" ? [...new Set(draftToRestore.bundles.flatMap((bundle) => [bundle.source_item_id, ...bundle.lines.filter((line) => line.included).map((line) => line.item_id)]).filter((id): id is string => Boolean(id)))] : [];
+    void Promise.all([
+      api.listSuppliers(employeeId ?? draftToRestore.requester_employee_id, true, scope),
+      Promise.all(itemIds.map((id) => api.getItem(id))),
+    ]).then(([suppliers, restoredItems]) => {
+      if (cancelled || latestStateRef.current.workType !== draftToRestore.work_type || latestStateRef.current.selectedSupplierId !== (draftToRestore.supplier_id ?? null)) return;
+      const supplier = suppliers.find((row) => row.supplier_id === draftToRestore.supplier_id && row.is_active && (row.scope ?? "warehouse") === scope);
       state.setSupplier(supplier ?? null);
       state.setSupplierSelectionReady(true);
       if (!supplier) {
         state.goTo(2);
         onStatusChange("활성 공급업체를 다시 선택하세요.");
+      } else if (scope === "tube" && (restoredItems.some((item) => !isValidTubeMaterialItem(item)) || draftToRestore.bundles.some((bundle) => bundle.source_kind !== "direct_item"))) {
+        state.setBundles([]);
+        state.goTo(3);
+        onStatusChange("사용 가능한 튜브 원자재를 다시 선택하세요.");
       } else if (latestStateRef.current.step === 2 || latestStateRef.current.step === targetStep) {
         state.goTo(targetStep);
       }
     }).catch((error: unknown) => {
-      if (cancelled) return;
+      if (cancelled || latestStateRef.current.workType !== draftToRestore.work_type) return;
       state.goTo(2);
       onStatusChange(error instanceof Error ? error.message : "공급업체 정보를 확인하지 못했습니다.");
     });

@@ -30,6 +30,7 @@ describe("glossary — 키 완전성", () => {
   it("모든 IoWorkType 키가 WORK_TYPE_LABEL / WORK_TYPE_DESCRIPTION 에 있다", () => {
     const expected: IoWorkType[] = [
       "receive",
+      "tube_material",
       "warehouse_io",
       "warehouse_adjust",
       "process",
@@ -47,6 +48,8 @@ describe("glossary — 키 완전성", () => {
     const expected: IoSubType[] = [
       "receive_supplier",
       "outbound_supplier",
+      "tube_receive_supplier",
+      "tube_outbound_supplier",
       "warehouse_to_dept",
       "dept_to_warehouse",
       "dept_transfer",

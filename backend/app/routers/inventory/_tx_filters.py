@@ -130,6 +130,7 @@ def _department_label_expr() -> ColumnElement:
         func.nullif(func.trim(IoBatch.requester_department), ""),
     )
     return case(
+        (IoBatch.work_type == "tube_material", "튜브"),
         (
             and_(
                 TransactionLog.transaction_type == TransactionTypeEnum.ADJUST,
@@ -226,6 +227,8 @@ def _department_filter(department: Optional[str]) -> Optional[ColumnElement]:
 # 단일 출처: historyBatchInterpreter.ts:120-150 — 분기 시 구분/필터 불일치 재발
 # IoBatch.sub_type → 화면 표시 라벨 매핑 (프론트 _SUB_TYPE_OPERATION 동일)
 _SUBTYPE_OP: dict[str, str] = {
+    "tube_receive_supplier": "튜브 원자재 입고",
+    "tube_outbound_supplier": "튜브 원자재 출고",
     "produce": "생산 등록",
     "disassemble": "재작업",
     "warehouse_to_dept": "창고 반출",
@@ -362,6 +365,7 @@ def _operation_keys_filter(operation_keys: Optional[str]) -> Optional[ColumnElem
 
     no_shipping_phase = TransactionLog.shipping_phase.is_(None)
     key_clauses: dict[str, ColumnElement] = {
+        "tube_material": and_(IoBatch.work_type == "tube_material", IoBatch.sub_type.in_(["tube_receive_supplier", "tube_outbound_supplier"]), no_shipping_phase),
         "warehouse": or_(
             and_(
                 IoBatch.sub_type.in_(
@@ -509,6 +513,8 @@ def _history_list_operation_label_expr() -> ColumnElement[str]:
         else_="AS·연구 사용",
     )
     batch_label = case(
+        (IoBatch.sub_type == "tube_receive_supplier", "튜브 원자재 입고"),
+        (IoBatch.sub_type == "tube_outbound_supplier", "튜브 원자재 출고"),
         (IoBatch.sub_type == "outbound_supplier", "원자재 출고"),
         (
             and_(

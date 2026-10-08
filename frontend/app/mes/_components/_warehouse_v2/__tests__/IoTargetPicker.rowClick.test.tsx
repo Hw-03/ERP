@@ -103,6 +103,25 @@ function makeBundle(
 }
 
 describe("IoTargetPicker row click", () => {
+  it("튜브 원자재는 TR만 노출하고 다른 부서의 원자재를 제외한다", () => {
+    render(<IoTargetPicker {...baseProps} workType="tube_material" subType="tube_receive_supplier" items={[makeItem(), { ...makeItem({ processTypeCode: "AR" }), item_id: "ar", item_name: "조립 원자재" }]} />);
+    expect(screen.getByText("Clickable Item")).toBeInTheDocument();
+    expect(screen.queryByText("조립 원자재")).not.toBeInTheDocument();
+  });
+  it("튜브 출고는 창고 재고가 있어도 튜브 가용 재고 없으면 선택할 수 없다", () => {
+    const onAddItem = vi.fn();
+    render(<IoTargetPicker {...baseProps} workType="tube_material" subType="tube_outbound_supplier" items={[makeItem({ warehouseQty: 100 })]} onAddItem={onAddItem} />);
+    fireEvent.click(screen.getByText("Clickable Item"));
+    expect(onAddItem).not.toHaveBeenCalled();
+    expect(screen.getByText("튜브 · 출고 가능 0")).toBeInTheDocument();
+  });
+  it("튜브 출고는 튜브 PRODUCTION 가용 수량을 사용하고 direct_item을 전달한다", () => {
+    const onAddItem = vi.fn();
+    render(<IoTargetPicker {...baseProps} workType="tube_material" subType="tube_outbound_supplier" items={[makeItem({ locations: [{ department: "튜브", status: "PRODUCTION", quantity: 5, pending_quantity: 2, available_quantity: 3 }] })]} onAddItem={onAddItem} />);
+    expect(screen.getByText("튜브 · 출고 가능 3")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Clickable Item"));
+    expect(onAddItem).toHaveBeenCalledWith(expect.objectContaining({ item_id: "item-1" }), "direct_item");
+  });
   it("검색 결과에 부모만 있어도 선택된 정상 BOM 자재로 진행할 수 있다", () => {
     const onAdvance = vi.fn();
     const bundle = makeBundle("bom_parent");

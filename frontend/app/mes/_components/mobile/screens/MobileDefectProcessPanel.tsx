@@ -33,7 +33,7 @@ type ProcessAction = "unquarantine" | "scrap" | "return" | "disassemble";
  * 불량 통합 처리 — 모바일 전용.
  *
  * 데스크톱 DefectProcessPanel 의 동작/옵션(정상복귀·재작업·전체폐기·반품, 사유 선택,
- * has_bom 일 때만 재작업, 창고 부서만 반품, 재작업 시 BOM 재작업 step2)을 그대로 옮기되,
+ * has_bom 일 때만 재작업, 창고·튜브 부서 반품, 재작업 시 BOM 재작업 step2)을 그대로 옮기되,
  * 393px 레이아웃(세로 액션 카드·Stepper·인라인 하단 버튼)으로 재구성한다.
  * 데스크톱 컴포넌트는 건드리지 않는다(동명 분리 정책).
  */
@@ -48,7 +48,8 @@ export function MobileDefectProcessPanel({
   onDone: () => void;
   onCancel: () => void;
 }) {
-  const isWarehouse = location.department === "창고";
+  const canReturn = location.department === "창고" || location.department === "튜브";
+  const supplierScope = location.return_supplier_scope ?? "warehouse";
   const maxQty = Math.max(1, Number(location.available_quantity) || 1);
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -117,6 +118,12 @@ export function MobileDefectProcessPanel({
   }, [action]);
 
   useEffect(() => {
+    setSelectedSupplier(null);
+    setSupplierListReady(false);
+    setConfirmOpen(false);
+  }, [supplierScope]);
+
+  useEffect(() => {
     if (decisionParentQty !== null && decisionParentQty !== boundedProcessQty) {
       setDecisions([]);
       setDecisionParentQty(null);
@@ -134,7 +141,7 @@ export function MobileDefectProcessPanel({
   }
 
   async function handleSubmit() {
-    if (busy || !hasReason || (action === "disassemble" && !reworkReady) || (action === "return" && !selectedSupplier)) return;
+    if (busy || !hasReason || (action === "disassemble" && !reworkReady) || (action === "return" && (!canReturn || !supplierListReady || !selectedSupplier || (selectedSupplier.scope ?? "warehouse") !== supplierScope))) return;
     setBusy(true);
     setErrorMsg(null);
     try {
@@ -220,12 +227,13 @@ export function MobileDefectProcessPanel({
             onLoadStateChange={setSupplierListReady}
             variant="mobile"
             mode="select"
+            supplierScope={supplierScope}
           />
         </div>
         <StickyFooter flat compact embedded className="!px-0 !pt-0">
           <button
             type="button"
-            disabled={busy || !supplierListReady || !selectedSupplier}
+            disabled={busy || !canReturn || !supplierListReady || !selectedSupplier}
             onClick={() => setConfirmOpen(true)}
             className={clsx("w-full rounded-[16px] px-4 py-[14px] font-black text-white disabled:opacity-40", TYPO.body)}
             style={{ background: LEGACY_COLORS.blueSolid }}
@@ -367,7 +375,7 @@ export function MobileDefectProcessPanel({
           selected={action === "scrap"}
           onClick={() => setAction("scrap")}
         />
-        {isWarehouse && (
+        {canReturn && (
           <ActionRow
             label="반품"
             color={LEGACY_COLORS.muted2}
@@ -395,7 +403,7 @@ export function MobileDefectProcessPanel({
       <StickyFooter flat compact embedded className="!px-0">
         <button
           type="button"
-          disabled={busy || !hasReason}
+          disabled={busy || !hasReason || (action === "return" && !canReturn)}
           onClick={() => {
             if (action === "disassemble") {
               window.history.pushState({ defect: "process", recordId: location.record_id, step: 2 }, "");

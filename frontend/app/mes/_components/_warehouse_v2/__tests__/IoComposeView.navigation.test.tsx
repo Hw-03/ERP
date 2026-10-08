@@ -257,6 +257,18 @@ beforeEach(() => {
 });
 
 describe("IoComposeView navigation chrome", () => {
+  it("튜브 작업자는 전용 카드와 업체 scope를 사용하며 URL 방향 단계를 공유한다", async () => {
+    window.history.replaceState(null, "", "/mes?tab=warehouse&step=1");
+    vi.mocked(api.listSuppliers).mockResolvedValue([{ supplier_id: "tube-supplier", name: "튜브 업체", scope: "tube", is_active: true, created_at: "", updated_at: "" }]);
+    renderCompose([], { ...operator, department: "튜브" });
+    fireEvent.click(screen.getByRole("button", { name: /튜브 원자재 입출고/ }));
+    expect(new URLSearchParams(window.location.search).get("step")).toBe("6");
+    fireEvent.click(screen.getByRole("button", { name: "출고", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: /다음 단계로/ }));
+    expect(await screen.findByRole("button", { name: "튜브 업체" })).toBeInTheDocument();
+    expect(api.listSuppliers).toHaveBeenCalledWith("op-1", true, "tube");
+    expect(new URLSearchParams(window.location.search).get("step")).toBe("2");
+  });
   it("PC 일반 입출고는 별도 불량 탭 draft의 복원 제한을 유지한다", async () => {
     const onStatusChange = vi.fn();
     const bundles = [{ bundle_id: "defect-bundle", source_kind: "manual", title: "불량 품목", quantity: 1, source_item_id: "item", source_mes_code: null, expanded_level: 1,

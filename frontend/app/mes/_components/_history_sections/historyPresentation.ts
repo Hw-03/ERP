@@ -358,6 +358,7 @@ function getHistoryOperationPresentationLabel(
   log: TransactionLog,
   batch?: IoBatch | null,
 ): string {
+  if (log.history_batch?.work_type === "tube_material") return getHistoryListOperationLabel(log, batch);
   if (log.operation_kind === "CANCELLATION") return getHistoryListOperationLabel(log, batch);
   if (log.transaction_type === "SUPPLIER_RETURN") return getHistoryListOperationLabel(log, batch);
   if (batch && getHistoryDisplayTransactionType(log, batch) === "ADJUST") {
@@ -414,7 +415,7 @@ export function getHistoryRowPresentation(
   const movement = effectMovement ?? (batch
     ? getHistoryMovementSummary(log, batch)
     : { parts: [getSingleLogMovement(log)] });
-  const stock = getStockPresentation(log);
+  const stock = getStockPresentation(log, batch);
   const requester = getRequesterPresentation(log, batch);
   const rawApprover = (batch?.approver_name ?? log.approver_name ?? "").trim();
   const approver = rawApprover && rawApprover !== requester ? rawApprover : "";
@@ -559,17 +560,23 @@ function getInternalUseInventoryEffectFlow(
   return { label: `${from} → ${to}`, from, to };
 }
 
-function getStockPresentation(log: TransactionLog): HistoryStockPresentation | null {
+function getStockPresentation(log: TransactionLog, batch?: IoBatch | null): HistoryStockPresentation | null {
+  const tubeMaterialStock = (log.transaction_type === "RECEIVE" || log.transaction_type === "MATERIAL_OUT") && (
+    batch?.work_type === "tube_material" ||
+    log.history_batch?.work_type === "tube_material" ||
+    log.inventory_effect?.some((cell) => cell.scope === "location" && cell.department === "튜브" && cell.status === "PRODUCTION")
+  );
+  const tubeCell = tubeMaterialStock ? log.inventory_effect?.find((cell) => cell.scope === "location" && cell.department === "튜브" && cell.status === "PRODUCTION") : undefined;
   const hasWarehouseSnapshot = log.transaction_type === "INTERNAL_USE"
     && (log.warehouse_qty_before != null || log.warehouse_qty_after != null);
-  const before = hasWarehouseSnapshot ? log.warehouse_qty_before : log.quantity_before;
-  const after = hasWarehouseSnapshot ? log.warehouse_qty_after : log.quantity_after;
+  const before = tubeMaterialStock ? tubeCell?.quantity_before ?? log.department_qty_before ?? null : hasWarehouseSnapshot ? log.warehouse_qty_before : log.quantity_before;
+  const after = tubeMaterialStock ? tubeCell?.quantity_after ?? log.department_qty_after ?? null : hasWarehouseSnapshot ? log.warehouse_qty_after : log.quantity_after;
   if (before == null && after == null) return null;
 
   const unit = log.item_unit?.trim() ?? "";
   const suffix = unit ? ` ${unit}` : "";
   const afterLabel = after == null ? "-" : `${formatQty(after)}${suffix}`;
-  const scopeLabel = getStockScopeLabel(log);
+  const scopeLabel = tubeMaterialStock ? "튜브" : getStockScopeLabel(log);
 
   return {
     label: `${scopeLabel} ${afterLabel}`,
@@ -650,6 +657,9 @@ export function getHistoryListOperationLabel(
   }
   if (log.transaction_type === "UNMARK_DEFECTIVE") return "불량 정상 복귀";
   if (log.transaction_type === "SUPPLIER_RETURN") return "반품";
+  const subType = batch?.sub_type ?? log.history_batch?.sub_type;
+  if (subType === "tube_receive_supplier") return "튜브 원자재 입고";
+  if (subType === "tube_outbound_supplier") return "튜브 원자재 출고";
   if (log.transaction_type === "MATERIAL_OUT") return "원자재 출고";
   if (log.reference_no?.startsWith("defect-disassemble:")) return "재작업";
 

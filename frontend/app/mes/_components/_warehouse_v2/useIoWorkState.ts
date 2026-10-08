@@ -2,6 +2,8 @@ import { useMemo, useState, type SetStateAction } from "react";
 import type { IoBundle, IoLine, IoSubType, IoWorkType } from "./types";
 import {
   DEFAULT_SUB_TYPE,
+  isMaterialWorkType,
+  isTubeMaterialSubType,
   canonicalProcessSubType,
   processBomEffectLine,
   type DeptIoDirection,
@@ -81,7 +83,7 @@ export function useIoWorkState(
 
   function setSubType(next: IoSubType) {
     if (next !== selectedSubType) setReasonCategory("", null);
-    if (next === "receive_supplier" || next === "outbound_supplier") {
+    if (next === "receive_supplier" || next === "outbound_supplier" || isTubeMaterialSubType(next)) {
       setMaterialDirectionSelected(true);
       if (next !== selectedSubType) setBundles([]);
     }
@@ -149,11 +151,12 @@ export function useIoWorkState(
         ? deptIoDirection != null
         : workType === "internal_use"
           ? toDepartment === "AS" || toDepartment === "연구"
-          : workType === "receive"
+          : isMaterialWorkType(workType)
             ? selectedSupplierId != null && supplierSelectionReady
             : true,
       3: bundles.length > 0,
       4:
+        (workType !== "tube_material" || selectedSupplierId != null && supplierSelectionReady) &&
         effectIncludedLines.length > 0 &&
         !hasShortage &&
         !hasInvalidQuantity &&
@@ -216,7 +219,7 @@ export function useIoWorkState(
     setReasonCategoryId(categoryId ?? null);
   }
 
-  const steps = workType === "receive" ? MATERIAL_IO_STEPS : DEFAULT_IO_STEPS;
+  const steps = isMaterialWorkType(workType) ? MATERIAL_IO_STEPS : DEFAULT_IO_STEPS;
   return {
     steps,
     materialDirectionSelected,

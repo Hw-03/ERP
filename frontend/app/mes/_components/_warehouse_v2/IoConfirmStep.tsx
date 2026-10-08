@@ -117,7 +117,7 @@ function directionAccent(subType: IoSubType): string {
     subType === "defect_restore" ||
     subType === "defect_process" ||
     subType === "warehouse_to_dept" ||
-    subType === "outbound_supplier" ||
+    (subType === "outbound_supplier" || subType === "tube_outbound_supplier") ||
     subType === "internal_use_out" ||
     subType === "disassemble" ||
     subType === "adjust_out"
@@ -173,10 +173,10 @@ function confirmCopy(
   if (subType === "disassemble" || subType === "adjust_out") {
     return { title: `부서 출고를 ${verb}`, tone: "danger", confirmLabel };
   }
-  if (subType === "receive_supplier") {
+  if ((subType === "receive_supplier" || subType === "tube_receive_supplier")) {
     return { title: `원자재 입고를 ${verb}`, tone: "normal", confirmLabel };
   }
-  if (subType === "outbound_supplier") {
+  if ((subType === "outbound_supplier" || subType === "tube_outbound_supplier")) {
     return { title: `원자재 출고를 ${verb}`, tone: "danger", confirmLabel };
   }
   return { title: needsApproval ? "제출하시겠습니까?" : "진행하시겠습니까?", tone: "normal", confirmLabel };
@@ -271,7 +271,7 @@ export function IoConfirmStep({
       ? b.lines.some((line) => !bomParentLineIds.has(line.line_id))
       : b.lines.some((line) => line.included && !bomParentLineIds.has(line.line_id)),
   );
-  const materialOutbound = subType === "outbound_supplier";
+  const materialOutbound = (subType === "outbound_supplier" || subType === "tube_outbound_supplier");
   const defectQuarantine = subType === "defect_quarantine";
   const defectReasonMissing = defectQuarantine && !hasDefectReason(reasonCategory, notes);
   const memoRequired = materialOutbound || requiresDepartmentApprovalMemo(workType, subType, bundles);
@@ -498,7 +498,7 @@ function ConfirmBundleCard({
     return (
       <div
         className="flex min-h-[60px] items-center justify-between gap-4 rounded-[18px] px-5 py-3"
-        style={{ background: tint(subType === "outbound_supplier" ? LEGACY_COLORS.red : LEGACY_COLORS.blue, 6) }}
+        style={{ background: tint((subType === "outbound_supplier" || subType === "tube_outbound_supplier") ? LEGACY_COLORS.red : LEGACY_COLORS.blue, 6) }}
       >
         <div className="min-w-0 flex-1">
           <div className="truncate text-base font-black" style={{ color: LEGACY_COLORS.text }}>
@@ -551,7 +551,7 @@ function ConfirmBundleCard({
   const isSingle = bundle.source_kind === "direct_item";
   const isCollapsible = !isSingle && visibleLines.length > 0;
 
-  const tone = subType === "outbound_supplier" ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
+  const tone = (subType === "outbound_supplier" || subType === "tube_outbound_supplier") ? LEGACY_COLORS.red : LEGACY_COLORS.blue;
   const childrenOnlyBom =
     showDeductionSource &&
     bundle.source_kind === "bom_parent" &&

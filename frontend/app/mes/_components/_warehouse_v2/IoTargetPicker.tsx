@@ -53,6 +53,8 @@ import {
   deptIoSubType,
   getItemActionMode,
   isAutoDepartmentRoute,
+  isTubeMaterialSubType,
+  isValidTubeMaterialItem,
   singleItemSourceKind,
   type DeptIoDirection,
   type ItemActionMode,
@@ -241,6 +243,7 @@ function outboundLocationStatus(
   subType: IoSubType,
   targetDepartment?: string | null,
 ): "PRODUCTION" | "DEFECTIVE" | null {
+  if (subType === "tube_outbound_supplier") return "PRODUCTION";
   if (subType === "defect_quarantine" && targetDepartment === "창고") return null;
   if (["dept_to_warehouse", "disassemble", "adjust_out", "defect_quarantine"].includes(subType)) {
     return "PRODUCTION";
@@ -319,7 +322,7 @@ export function IoTargetPicker({
   }, [fullscreen, onFullscreenChange]);
 
   const actionMode = getItemActionMode(subType);
-  const outbound = subType === "outbound_supplier" || subType === "warehouse_adjust_out" || subType === "internal_use_out";
+  const outbound = subType === "outbound_supplier" || subType === "tube_outbound_supplier" || subType === "warehouse_adjust_out" || subType === "internal_use_out";
   const activeFilters = filters ?? localFilters;
   const { department: dept, model, stage } = activeFilters;
   const keyword = search.trim().toLowerCase();
@@ -355,6 +358,7 @@ export function IoTargetPicker({
       (item) =>
         // 김건호 피드백 1 — 삭제(소프트삭제) 품목은 입출고 품목 선택에 노출하지 않음.
         !item.deleted_at &&
+        (!isTubeMaterialSubType(subType) || isValidTubeMaterialItem(item)) &&
         (subType !== "receive_supplier" || item.process_type_code?.endsWith("R")) &&
         matchesDept(item, dept) &&
         matchesModel(item, selectedModelSlot) &&
@@ -371,7 +375,7 @@ export function IoTargetPicker({
       const item = items.find((candidate) => candidate.item_id === id);
       // 검색으로 제한된 조회 목록에서 빠진 선택 품목은 미확인 상태다.
       if (!item) return false;
-      return Boolean(item.deleted_at) || (subType === "receive_supplier" && !item.process_type_code?.endsWith("R"));
+      return Boolean(item.deleted_at) || (isTubeMaterialSubType(subType) && !isValidTubeMaterialItem(item)) || (subType === "receive_supplier" && !item.process_type_code?.endsWith("R"));
     });
   });
 
@@ -949,7 +953,7 @@ function ItemTable({
               subType === "outbound_supplier" ||
               (subType === "defect_quarantine" && targetDepartment === "창고");
             const showsWarehouseAvailability = pendingQty > 0 && isWarehouseOutbound;
-            const sourceDepartment = isAutoDepartmentRoute(subType)
+            const sourceDepartment = isTubeMaterialSubType(subType) ? "튜브" : isAutoDepartmentRoute(subType)
               ? impliedDeptName
               : targetDepartment;
             const sourceStatus = outboundLocationStatus(subType, sourceDepartment);
@@ -1019,7 +1023,7 @@ function ItemTable({
                 />
               );
             };
-            const materialStockBlocked = subType === "outbound_supplier" && warehouseAvailableQty <= 0;
+            const materialStockBlocked = (subType === "outbound_supplier" && warehouseAvailableQty <= 0) || (subType === "tube_outbound_supplier" && sourceAvailableQty <= 0);
             const selectionBlocked = addBlocked || materialStockBlocked;
             const rowClickEnabled = mode === "single_only" && !busy && !addBlocked && (isSingleSelected || !materialStockBlocked);
             const bomBundleIds = selectedBundles
@@ -1063,7 +1067,7 @@ function ItemTable({
                       className="mt-1 text-xs font-bold lg:hidden"
                       style={{ color: LEGACY_COLORS.muted2 }}
                     >
-                      출고 가능 {formatQty(isWarehouseOutbound ? warehouseAvailableQty : sourceAvailableQty)}
+                      {subType === "tube_outbound_supplier" ? "튜브 · " : ""}출고 가능 {formatQty(isWarehouseOutbound ? warehouseAvailableQty : sourceAvailableQty)}
                     </div>
                   )}
                 </td>

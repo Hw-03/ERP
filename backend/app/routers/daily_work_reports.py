@@ -45,6 +45,8 @@ PRODUCTION_DEPARTMENT_ORDER = {
 }
 
 _OPERATION_BY_SUBTYPE = {
+    "tube_receive_supplier": ("tube_material", "튜브 원자재"),
+    "tube_outbound_supplier": ("tube_material", "튜브 원자재"),
     "produce": ("process", "공정"),
     "disassemble": ("process", "공정"),
     "warehouse_to_dept": ("warehouse", "창고"),
@@ -78,7 +80,7 @@ _OPERATION_BY_TX = {
     TransactionTypeEnum.MATERIAL_OUT: ("warehouse", "창고"),
     TransactionTypeEnum.PRODUCE: ("process", "공정"),
 }
-_OPERATION_ORDER = {"warehouse": 0, "process": 1, "defect": 2, "item_conversion": 3, "shipping": 4}
+_OPERATION_ORDER = {"warehouse": 0, "tube_material": 1, "process": 2, "defect": 3, "item_conversion": 4, "shipping": 5}
 
 
 def _kst_day_bounds(work_date: date) -> tuple[datetime, datetime]:

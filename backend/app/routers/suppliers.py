@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import unicodedata
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.exc import IntegrityError
@@ -43,13 +44,23 @@ def _active_employee(db: Session, employee_id: uuid.UUID) -> Employee:
     return employee
 
 
+def _supplier_manager(db: Session, employee_id: uuid.UUID, scope: str) -> Employee:
+    """튜브 업체는 활성 튜브 직원, 창고 업체는 기존 정·부 담당자가 관리한다."""
+    if scope == "warehouse":
+        return _warehouse_manager(db, employee_id)
+    employee = _active_employee(db, employee_id)
+    if getattr(employee.department, "value", employee.department) != "튜브":
+        raise http_error(403, ErrorCode.FORBIDDEN, "활성 튜브 직원만 튜브 공급업체를 관리할 수 있습니다.")
+    return employee
+
+
 @router.get("", response_model=list[SupplierResponse])
-def list_suppliers(requester_employee_id: uuid.UUID = Query(...), include_inactive: bool = Query(False), db: Session = Depends(get_db)) -> list[Supplier]:
+def list_suppliers(requester_employee_id: uuid.UUID = Query(...), include_inactive: bool = Query(False), scope: Literal["warehouse", "tube"] = Query("warehouse"), db: Session = Depends(get_db)) -> list[Supplier]:
     if include_inactive:
-        _warehouse_manager(db, requester_employee_id)
+        _supplier_manager(db, requester_employee_id, scope)
     else:
         _active_employee(db, requester_employee_id)
-    query = db.query(Supplier)
+    query = db.query(Supplier).filter(Supplier.scope == scope)
     if not include_inactive:
         query = query.filter(Supplier.is_active.is_(True))
     return query.order_by(Supplier.name.asc(), Supplier.supplier_id.asc()).all()
@@ -57,11 +68,11 @@ def list_suppliers(requester_employee_id: uuid.UUID = Query(...), include_inacti
 
 @router.post("", response_model=SupplierResponse, status_code=status.HTTP_201_CREATED)
 def create_supplier(payload: SupplierCreate, request: Request, db: Session = Depends(get_db)) -> Supplier:
-    actor = _warehouse_manager(db, payload.requester_employee_id)
+    actor = _supplier_manager(db, payload.requester_employee_id, payload.scope)
     normalized_name = normalize_supplier_name(payload.name)
-    if db.query(Supplier.supplier_id).filter(Supplier.normalized_name == normalized_name).first():
+    if db.query(Supplier.supplier_id).filter(Supplier.scope == payload.scope, Supplier.normalized_name == normalized_name).first():
         raise http_error(409, ErrorCode.CONFLICT, "같은 이름의 공급업체가 이미 존재합니다.")
-    supplier = Supplier(name=payload.name, normalized_name=normalized_name, is_active=True)
+    supplier = Supplier(name=payload.name, normalized_name=normalized_name, scope=payload.scope, is_active=True)
     db.add(supplier)
     try:
         db.flush()
@@ -76,14 +87,14 @@ def create_supplier(payload: SupplierCreate, request: Request, db: Session = Dep
 
 @router.patch("/{supplier_id}", response_model=SupplierResponse)
 def update_supplier(supplier_id: uuid.UUID, payload: SupplierUpdate, request: Request, db: Session = Depends(get_db)) -> Supplier:
-    actor = _warehouse_manager(db, payload.requester_employee_id)
     supplier = db.get(Supplier, supplier_id)
     if supplier is None:
         raise http_error(404, ErrorCode.NOT_FOUND, "공급업체를 찾을 수 없습니다.")
+    actor = _supplier_manager(db, payload.requester_employee_id, supplier.scope)
     changes: list[str] = []
     if payload.name is not None:
         normalized_name = normalize_supplier_name(payload.name)
-        duplicate = db.query(Supplier.supplier_id).filter(Supplier.normalized_name == normalized_name, Supplier.supplier_id != supplier_id).first()
+        duplicate = db.query(Supplier.supplier_id).filter(Supplier.scope == supplier.scope, Supplier.normalized_name == normalized_name, Supplier.supplier_id != supplier_id).first()
         if duplicate is not None:
             raise http_error(409, ErrorCode.CONFLICT, "같은 이름의 공급업체가 이미 존재합니다.")
         if supplier.name != payload.name:

@@ -45,6 +45,29 @@ function makeLog(overrides: Partial<TransactionLog> = {}): TransactionLog {
   };
 }
 
+describe("튜브 입고 처리 후 기준 재고", () => {
+  it("튜브 출고는 전체 재고 대신 튜브 위치의 실행 후 수량을 표시한다", () => {
+    const row = getHistoryRowPresentation(makeLog({ transaction_type: "MATERIAL_OUT", quantity_change: -3, quantity_before: 110, quantity_after: 107, department: "튜브", inventory_effect: [{ scope: "location", department: "튜브", status: "PRODUCTION", delta: -3, quantity_before: 10, quantity_after: 7 }] }), makeBatch({ work_type: "tube_material", sub_type: "tube_outbound_supplier" }));
+    expect(row.stock).toMatchObject({ label: "튜브 7 EA", scopeLabel: "튜브", before: 10, after: 7 });
+  });
+  it("튜브 출고의 위치 셀이 없으면 부서 스냅샷을 사용한다", () => {
+    const row = getHistoryRowPresentation(makeLog({ transaction_type: "MATERIAL_OUT", quantity_after: 107, department_qty_before: 10, department_qty_after: 7, history_batch: { work_type: "tube_material", sub_type: "tube_outbound_supplier" } }));
+    expect(row.stock).toMatchObject({ label: "튜브 7 EA", before: 10, after: 7 });
+  });
+  it("입고 상세는 전체 재고 대신 튜브 PRODUCTION 셀의 스냅샷을 표시한다", () => {
+    const row = getHistoryRowPresentation(makeLog({ quantity_before: 102, quantity_after: 112, department: "튜브", inventory_effect: [{ scope: "location", department: "튜브", status: "PRODUCTION", delta: 10, quantity_before: 2, quantity_after: 12 }] }), makeBatch({ work_type: "tube_material", sub_type: "tube_receive_supplier" }));
+    expect(row.stock).toMatchObject({ label: "튜브 12 EA", scopeLabel: "튜브", before: 2, after: 12 });
+  });
+  it("batch 없이 실제 튜브 production 입고 기록도 위치 셀을 사용한다", () => {
+    const row = getHistoryRowPresentation(makeLog({ quantity_after: 112, department: "튜브", inventory_effect: [{ scope: "location", department: "튜브", status: "PRODUCTION", delta: 10, quantity_before: 2, quantity_after: 12 }] }));
+    expect(row.stock?.label).toBe("튜브 12 EA");
+  });
+  it("기존 원자재 창고 입고의 라벨과 수량은 유지한다", () => {
+    const row = getHistoryRowPresentation(makeLog({ quantity_after: 12, inventory_effect: [{ scope: "warehouse", delta: 10, quantity_before: 2, quantity_after: 12 }] }), makeBatch({ work_type: "receive", sub_type: "receive_supplier" }));
+    expect(row.stock).toMatchObject({ label: "창고 12 EA", scopeLabel: "창고", after: 12 });
+  });
+});
+
 function makeLine(overrides: Partial<IoLine> = {}): IoLine {
   return {
     line_id: "line-1",
