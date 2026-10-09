@@ -464,10 +464,10 @@ def _run_defects(db, plan: ShowcasePlan, marker: str) -> None:
     if scrap_record_id is None:
         raise RuntimeError("[HISTORY-DEMO] 폐기할 격리 기록을 만들지 못했습니다.")
     _run_stock_request(db, plan, marker, StockRequestTypeEnum.DEFECT_SCRAP, item, from_bucket=RequestBucketEnum.DEFECTIVE, to_bucket=RequestBucketEnum.NONE, from_department=assembly, record_id=scrap_record_id)
-    return_record_id = _run_io_line(db, plan, marker, "defect_quarantine_return", item, direction="defective", from_bucket="warehouse", to_bucket="defective", to_department=assembly)
+    return_record_id = _run_io_line(db, plan, marker, "defect_quarantine_return", item, direction="defective", from_bucket="warehouse", to_bucket="defective", to_department=DepartmentEnum.WAREHOUSE)
     if return_record_id is None:
         raise RuntimeError("[HISTORY-DEMO] 반품할 격리 기록을 만들지 못했습니다.")
-    _run_stock_request(db, plan, marker, StockRequestTypeEnum.DEFECT_RETURN, item, from_bucket=RequestBucketEnum.DEFECTIVE, to_bucket=RequestBucketEnum.NONE, from_department=assembly, record_id=return_record_id)
+    _run_stock_request(db, plan, marker, StockRequestTypeEnum.DEFECT_RETURN, item, from_bucket=RequestBucketEnum.DEFECTIVE, to_bucket=RequestBucketEnum.NONE, from_department=DepartmentEnum.WAREHOUSE, record_id=return_record_id)
     _run_stock_request(db, plan, marker, StockRequestTypeEnum.SCRAP_NORMAL, item, from_bucket=RequestBucketEnum.WAREHOUSE, to_bucket=RequestBucketEnum.NONE)
     _run_stock_request(db, plan, marker, StockRequestTypeEnum.RETURN_NORMAL, item, from_bucket=RequestBucketEnum.WAREHOUSE, to_bucket=RequestBucketEnum.NONE)
 

@@ -142,6 +142,19 @@ export function DesktopWarehouseView({
     (operator?.warehouse_role ?? "none") === "deputy";
   const canSeeDeptQueue = isDepartmentApprover(operator);
   const canSeeAsResearchQueue = operator?.as_research_approver === true;
+  // A focus refresh can revoke access while its approval section is already open.
+  useEffect(() => {
+    if (!((sectionTab === "queue" && !canSeeQueue)
+      || (sectionTab === "dept-queue" && !canSeeDeptQueue)
+      || (sectionTab === "as-research-queue" && !canSeeAsResearchQueue))) return;
+    setSectionTab("compose");
+    setTargetRequestId(null);
+    setWorkAreaEmpty(false);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("section");
+    url.searchParams.delete("stockRequestId");
+    window.history.replaceState({ ...window.history.state, warehouseSection: "compose" }, "", `${url.pathname}${url.search}${url.hash}`);
+  }, [sectionTab, canSeeQueue, canSeeDeptQueue, canSeeAsResearchQueue]);
   // 인수인계: 작성(튜브 부서원) 또는 인수 확인(받는 부서 소속)이면 탭 노출. 결재권자는 제외.
   const canReceiveHandover = HANDOVER_RECEIVE_DEPTS.includes(operator?.department ?? "");
   const showHandover = (operator?.department ?? "") === "튜브" || canReceiveHandover;
@@ -192,7 +205,7 @@ export function DesktopWarehouseView({
         finishCountLoading("cart");
       });
 
-    if (!urlDraftId || restoredUrlDraftRef.current === urlDraftId) {
+    if (sectionTab !== "compose" || !urlDraftId || restoredUrlDraftRef.current === urlDraftId) {
       setUrlDraftPending(false);
       setUrlDraftRestoreError(null);
       return () => {
@@ -227,7 +240,7 @@ export function DesktopWarehouseView({
     return () => {
       cancelled = true;
     };
-  }, [operatorEmployeeId, panelRefreshNonce, revision, urlDraftId, urlDraftRestoreNonce, finishCountLoading]);
+  }, [operatorEmployeeId, panelRefreshNonce, revision, sectionTab, urlDraftId, urlDraftRestoreNonce, finishCountLoading]);
 
   useEffect(() => {
     if (!canSeeQueue) return;

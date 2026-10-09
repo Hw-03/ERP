@@ -65,6 +65,13 @@ function managementCategoryLabel(category: DefectManagementCategory): string {
   return category === "B_GRADE" ? "B급" : category === "OBSOLETE" ? "구형" : "불량";
 }
 
+/** 실행 payload와 동일하게 분해한 가지는 하위 배분으로, 통째 처리한 가지는 자체 배분으로 표시한다. */
+function reworkFinalDecisions(decision: ChildDecision): ChildDecision[] {
+  return decision.nodeMode === "split" && decision.children?.length
+    ? decision.children.flatMap(reworkFinalDecisions)
+    : [decision];
+}
+
 export function DefectCartFlow({
   mode,
   initialAction = "scrap",
@@ -86,6 +93,7 @@ export function DefectCartFlow({
   const [busy, setBusy] = useState(false);
   const [failures, setFailures] = useState<LineFailure[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [reviewedRework, setReviewedRework] = useState<string | null>(null);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
   useDesktopWorkGuard("defect-cart", lines.length > 0, busy);
@@ -206,6 +214,8 @@ export function DefectCartFlow({
       if (!isRework) return true;
       return l.decisions.length > 0 && validateDecisionTree(l.decisions);
     });
+  const currentRework = JSON.stringify(lines.map((line) => ({ itemId: line.item.item_id, qty: line.qty, decisions: line.decisions })));
+  const reworkReviewChanged = isRework && confirmOpen && reviewedRework !== currentRework;
 
   function quarantinePayload(line: CartLine, requestId: string) {
     const qty = Number(line.qty);
@@ -259,7 +269,7 @@ export function DefectCartFlow({
   }
 
   async function handleSubmit() {
-    if (!allValid || busy) return;
+    if (!allValid || busy || reworkReviewChanged) return;
     submissionIdRef.current ??= batchRequestId;
     setBusy(true);
     setFailures([]);
@@ -526,9 +536,9 @@ export function DefectCartFlow({
 
           <div className="flex shrink-0 items-center justify-between gap-2 pt-1">
             <span className="text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
-              격리·폐기를 입력하면 정상 수량이 자동으로 줄어듭니다.
+              정상·격리·폐기 합계는 하위 품목의 소요 수량과 같아야 합니다.
             </span>
-            <button type="button" onClick={() => setConfirmOpen(true)} disabled={!allValid || busy} className="rounded-[14px] px-6 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50" style={{ background: LEGACY_COLORS.redSolid }}>
+            <button type="button" onClick={() => { setReviewedRework(currentRework); setConfirmOpen(true); }} disabled={!allValid || busy} className="rounded-[14px] px-6 py-2.5 text-sm font-black text-white transition-[transform,opacity] active:scale-[0.99] disabled:opacity-50" style={{ background: LEGACY_COLORS.redSolid }}>
               {busy ? "처리 중..." : `${submitLabel} (${lines.length}건) →`}
             </button>
           </div>
@@ -538,7 +548,8 @@ export function DefectCartFlow({
       <ConfirmModal open={leaveConfirmOpen} onClose={() => setLeaveConfirmOpen(false)} onConfirm={() => { setLeaveConfirmOpen(false); onCancel(); }} title="작업 선택으로 돌아갈까요?" confirmLabel="나가기" tone="danger">
         담은 품목과 입력 내용이 사라집니다.
       </ConfirmModal>
-      <ConfirmModal open={confirmOpen} onClose={() => setConfirmOpen(false)} onConfirm={() => { setConfirmOpen(false); void handleSubmit(); }} tone={isScrap || isRework ? "danger" : "normal"} title={isRework ? "즉시 재작업 확인" : isScrap ? "즉시 폐기 확인" : "불량 격리 확인"} confirmLabel={submitLabel} busy={busy} busyLabel="처리 중..." wide={mode === "add"}>
+      <ConfirmModal open={confirmOpen} onClose={() => setConfirmOpen(false)} onConfirm={() => { if (reworkReviewChanged) return; setConfirmOpen(false); void handleSubmit(); }} confirmDisabled={isRework && (!allValid || reworkReviewChanged)} tone={isScrap || isRework ? "danger" : "normal"} title={isRework ? "즉시 재작업 확인" : isScrap ? "즉시 폐기 확인" : "불량 격리 확인"} confirmLabel={submitLabel} busy={busy} busyLabel="처리 중..." wide={mode === "add"}>
+        {reworkReviewChanged && <p role="alert" style={{ color: LEGACY_COLORS.red }}>배분이 변경되었습니다. 취소 후 다시 확인하세요.</p>}
         {isRework && (
           <p className="mb-3 text-sm font-bold" style={{ color: LEGACY_COLORS.text }}>
             선택한 품목을 즉시 재작업하고 하위 품목을 정상·격리·폐기로 나눕니다.
@@ -588,6 +599,13 @@ export function DefectCartFlow({
                   <span aria-hidden="true">·</span>
                   <span>{source === "warehouse" ? "창고" : itemDepartment(line.item) ?? "부서 미지정"}</span>
                 </div>
+                {isRework && line.decisions.flatMap(reworkFinalDecisions).map((decision, index) => (
+                  <div key={`${decision.item_id}-${index}`} data-testid="defect-confirm-child" className="mt-3 border-t pt-2 text-sm" style={{ borderColor: LEGACY_COLORS.border }}>
+                    <div className="font-black">{decision.item_name}</div>
+                    <div className="text-xs" style={{ color: LEGACY_COLORS.muted2 }}>{decision.mes_code}</div>
+                    <div>정상 {decision.normal_qty} · 격리 {decision.defective_qty} · 폐기 {decision.scrap_qty}</div>
+                  </div>
+                ))}
               </div>
             ))}
           </div>

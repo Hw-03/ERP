@@ -482,18 +482,14 @@ def _submit_internal_use_approvals(
         is not None
     )
     grouped: dict[str, list[IoLine]] = {}
+    from app.services.approval_rules import internal_use_line_approval_kind
     for line in lines:
-        if line.direction == "out" and line.from_bucket == "warehouse":
-            kind = "warehouse"
-        elif (
-            line.direction == "out"
-            and line.from_bucket == "production"
-            and item_process_types.get(line.item_id) in {"AR", "AA"}
-            and active_special_approver_exists
-        ):
-            kind = "as_research"
-        else:
-            kind = "department"
+        kind = internal_use_line_approval_kind(
+            direction=line.direction,
+            from_bucket=line.from_bucket,
+            process_type_code=item_process_types.get(line.item_id),
+            active_special_approver_exists=active_special_approver_exists,
+        )
         grouped.setdefault(kind, []).append(line)
 
     requests: list[StockRequest] = []
@@ -1320,6 +1316,12 @@ def _execute_submission(db: Session, *, requester: Employee, batch: IoBatch) -> 
     custom_process_bom_bundle_ids = _custom_process_bom_bundle_ids(db, batch)
     custom_process_bom = bool(custom_process_bom_bundle_ids)
     included_lines = _included_lines(batch)
+    from app.services.department_work_policy import validate_active_department_cells
+    validate_active_department_cells(db, (
+        cell for line in included_lines for cell in (
+            (line.from_bucket, line.from_department), (line.to_bucket, line.to_department),
+        )
+    ))
     department_approval_required = (
         batch.work_type == "process"
         and (_has_manual_line(included_lines) or custom_process_bom)

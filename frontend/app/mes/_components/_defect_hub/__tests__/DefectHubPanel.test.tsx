@@ -454,9 +454,10 @@ describe("DefectHubPanel", () => {
 
   it("모바일 정상 복귀 완료 뒤 B급·구형 보관 목록으로 돌아오고 전용 상태를 해제한다", async () => {
     vi.mocked(defectsApi.listDefects).mockResolvedValue([{ ...mockLocations[0], management_category: "B_GRADE" }]);
-    render(<DefectHubPanel currentEmployee={{ ...mockEmployee, department: "기타" }} />);
+    render(<DefectHubPanel currentEmployee={{ ...mockEmployee, department: "기타" }} mobilePresentation />);
 
     fireEvent.click(screen.getByRole("button", { name: /B급·구형 자재/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "전극(70kV) 격리 1건" }));
     fireEvent.click(await screen.findByRole("button", { name: "정상 복귀" }));
     expect(await screen.findByText("정상 복귀 전용")).toBeInTheDocument();
 

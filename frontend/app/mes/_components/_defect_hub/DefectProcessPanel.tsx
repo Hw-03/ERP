@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { tint } from "@/lib/mes/colorUtils";
-import { formatQty } from "@/lib/mes/format";
+import { formatKstDateTime, formatQty } from "@/lib/mes/format";
 import { defectsApi } from "@/lib/api/defects";
 import { stockRequestsApi } from "@/lib/api/stock-requests";
 import type { DefectLocation } from "@/lib/api/types/defects";
@@ -82,6 +82,7 @@ export function DefectProcessPanel({
   const locationIdentity = processingLocations.map((current) => current.record_id).join(":");
   const locationIdentityRef = useRef(locationIdentity);
   const batchRequestIdsRef = useRef<Partial<Record<ProcessAction, string>>>({});
+  const returnRequestRef = useRef<{ fingerprint: string; id: string } | null>(null);
   const batchSnapshot = processingLocations.map((current) =>
     `${current.record_id}:${current.available_quantity}:${current.pending_quantity}`,
   ).join("|");
@@ -211,9 +212,13 @@ export function DefectProcessPanel({
           })),
         });
       } else if (action === "return") {
+        const fingerprint = JSON.stringify([locationIdentity, boundedProcessQty, selectedSupplier!.supplier_id, category, categoryId, memo]);
+        if (!isBatch && returnRequestRef.current?.fingerprint !== fingerprint) {
+          returnRequestRef.current = { fingerprint, id: `defect-return:${makeClientRequestId()}` };
+        }
         await stockRequestsApi.createStockRequest({
           requester_employee_id: currentEmployee.employee_id,
-          client_request_id: batchClientRequestId,
+          client_request_id: isBatch ? batchClientRequestId : returnRequestRef.current!.id,
           request_type: "defect_return",
           supplier_id: selectedSupplier!.supplier_id,
           reason_category: category || null,
@@ -263,6 +268,18 @@ export function DefectProcessPanel({
   }
 
   const formatDate = (iso: string | null) => (iso ? iso.slice(0, 10) : "-");
+  const selectedOrigins = isBatch ? (
+    <section aria-label="선택 원건 재확인" className="space-y-2 rounded-[16px] border p-3" style={{ borderColor: LEGACY_COLORS.border }}>
+      <p className="text-sm font-black">선택한 격리 기록 · 잔량 전체 처리</p>
+      {processingLocations.map((origin) => (
+        <article key={origin.record_id} data-record-id={origin.record_id} className="space-y-1 border-t pt-2 text-sm" style={{ borderColor: LEGACY_COLORS.border }}>
+          <p className="font-bold">{origin.item_name} · {origin.department} · 잔량 전체 {formatQty(Number(origin.available_quantity))}개</p>
+          <p>{origin.defective_at ? formatKstDateTime(/[zZ]|[+-]\d{2}:?\d{2}$/.test(origin.defective_at) ? origin.defective_at : `${origin.defective_at}Z`) : "기록 없음"} · {origin.quarantined_by || "기록 없음"}</p>
+          {origin.reason_memo && <p>격리 메모: {origin.reason_memo}</p>}
+        </article>
+      ))}
+    </section>
+  ) : null;
 
   if (step === 3) {
     return (
@@ -285,6 +302,7 @@ export function DefectProcessPanel({
           </div>
         </div>
         <div className="min-h-0 flex-1">
+          {selectedOrigins}
           {mixedSupplierScopes ? <InlineErrorNote>{mixedScopeMessage}</InlineErrorNote> : <SupplierPickerStep
             employeeId={currentEmployee.employee_id}
             selectedSupplierId={selectedSupplier?.supplier_id ?? null}
@@ -307,6 +325,7 @@ export function DefectProcessPanel({
             반품 확인
           </button>
         </div>
+        {errorMsg && <InlineErrorNote>{errorMsg}</InlineErrorNote>}
         <ConfirmModal
           open={confirmOpen}
           title="반품 확인"
@@ -317,6 +336,7 @@ export function DefectProcessPanel({
           onClose={() => setConfirmOpen(false)}
           onConfirm={() => { setConfirmOpen(false); void handleSubmit(); }}
         >
+          {selectedOrigins}
           <span style={{ color: LEGACY_COLORS.text }}>
             {location.item_name} × {boundedProcessQty}개{isBatch ? ` (${processingLocations.length}건)` : ""}를 {selectedSupplier?.name}에 반품합니다.
           </span>
@@ -402,6 +422,7 @@ export function DefectProcessPanel({
           </div>
 
           {/* BOM 트리 */}
+          {selectedOrigins}
           <div className="flex min-h-0 flex-1 flex-col gap-3">
             <span className="text-sm font-black uppercase tracking-[1.5px]" style={{ color: LEGACY_COLORS.muted2 }}>BOM 재작업 트리</span>
             <div className="min-h-0 flex-1 overflow-y-auto">
@@ -444,6 +465,7 @@ export function DefectProcessPanel({
           onClose={() => setConfirmOpen(false)}
           onConfirm={() => { setConfirmOpen(false); void handleSubmit(); }}
         >
+          {selectedOrigins}
           <span style={{ color: LEGACY_COLORS.text }}>{location.item_name} × {boundedProcessQty}개{isBatch ? ` (${processingLocations.length}건)` : ""}를 재작업합니다.</span>
         </ConfirmModal>
       </div>
@@ -505,6 +527,7 @@ export function DefectProcessPanel({
         </div>
 
         {/* 처리 수량 */}
+        {selectedOrigins}
         <div className="flex min-h-11 items-center gap-3">
           <span className="text-sm font-black" style={{ color: LEGACY_COLORS.muted2 }}>처리 수량</span>
           {isBatch ? (
@@ -527,6 +550,7 @@ export function DefectProcessPanel({
         </div>
 
         {/* 작업 선택 */}
+        {isBatch && <p className="text-sm font-bold" style={{ color: LEGACY_COLORS.muted2 }}>일괄 처리는 각 원건의 남은 수량 전체를 처리합니다. 일부 수량은 개별 처리에서 입력하세요.</p>}
         <div className="flex flex-col gap-3">
           <span className="text-sm font-black" style={{ color: LEGACY_COLORS.muted2 }}>작업 선택</span>
           <div className={`grid grid-cols-1 gap-3 ${restoreOnly ? "" : location.has_bom && canReturn ? "sm:grid-cols-2 xl:grid-cols-4" : location.has_bom || canReturn ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
@@ -614,6 +638,7 @@ export function DefectProcessPanel({
         onClose={() => setConfirmOpen(false)}
         onConfirm={() => { setConfirmOpen(false); void handleSubmit(); }}
       >
+        {selectedOrigins}
         <span style={{ color: LEGACY_COLORS.text }}>
           {action === "unquarantine"
             ? `${location.item_name} × ${boundedProcessQty}개${isBatch ? ` (${processingLocations.length}건)` : ""}를 정상 재고로 복귀합니다.`

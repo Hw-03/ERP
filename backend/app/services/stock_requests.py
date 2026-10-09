@@ -85,6 +85,7 @@ from app.services.sr_draft import (  # noqa: F401
 # re-export: sr_approval
 # ---------------------------------------------------------------------------
 from app.services.sr_approval import (  # noqa: F401
+    ConflictingApprovalError,
     FailedApprovalError,
     approve_request,
     approve_request_department,
@@ -294,6 +295,12 @@ def create_request(
                 raise ValueError("선택 격리 처리 요청에 중복된 기록이 있습니다.")
 
     _validate_lines(request_type, lines_input)
+    from app.services.department_work_policy import validate_active_department_cells
+    validate_active_department_cells(db, (
+        cell for line in lines_input for cell in (
+            (line.from_bucket, line.from_department), (line.to_bucket, line.to_department),
+        )
+    ))
     if sum(
         (
             bool(warehouse_override),

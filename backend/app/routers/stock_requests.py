@@ -777,6 +777,8 @@ def as_research_approve_stock_request(
         )
     except PermissionError as exc:
         raise http_error(403, ErrorCode.FORBIDDEN, str(exc))
+    except svc.ConflictingApprovalError as exc:
+        raise http_error(409, ErrorCode.CONFLICT, str(exc))
     except svc.FailedApprovalError as exc:
         raise http_error(409, ErrorCode.CONFLICT, f"승인 실패: {exc}")
     except ValueError as exc:

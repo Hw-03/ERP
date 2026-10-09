@@ -109,6 +109,57 @@ beforeEach(() => {
 });
 
 describe("DefectCartFlow", () => {
+  it("8.8-03 모든 하위 합계 오류와 입력을 보존하고 전체 재작업을 차단한다", async () => {
+    vi.mocked(deptAdjustmentApi.getBomTemplate).mockResolvedValue({ lines: [
+      { item_id: "child-1", item_name: "하위 하나", mes_code: "3-AR-0003", quantity: 2, has_children: false },
+      { item_id: "child-2", item_name: "하위 둘", mes_code: "3-TR-0004", quantity: 2, has_children: false },
+    ] });
+    render(<DefectCartFlow mode="scrap" initialAction="rework" items={[{ ...fItem, has_bom: true }]} productModels={[]} currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: /추가/ }));
+    await selectReasonCategory();
+    fireEvent.click(screen.getByRole("button", { name: /BOM 확인/ }));
+    await screen.findByLabelText("하위 하나 정상 수량");
+    fireEvent.change(screen.getByLabelText("하위 하나 정상 수량"), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText("하위 둘 정상 수량"), { target: { value: "3" } });
+    expect(screen.getByLabelText("하위 하나 정상 수량")).toHaveValue(1);
+    expect(screen.getByLabelText("하위 하나 격리 수량")).toHaveValue(0);
+    expect(screen.getByLabelText("하위 둘 정상 수량")).toHaveValue(3);
+    expect(screen.getAllByText("합계가 총 수량과 같아야 합니다.")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: /즉시 재작업 \(1건\)/ })).toBeDisabled();
+    expect(stockRequestsApi.createStockRequest).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText("하위 하나 격리 수량"), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText("하위 둘 정상 수량"), { target: { value: "2" } });
+    expect(screen.queryByText("합계가 총 수량과 같아야 합니다.")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /즉시 재작업 \(1건\)/ })).toBeEnabled();
+  });
+
+  it("PC-DELTA-DEFECT-04 최종확인은 모든 하위 배분을 보여주고 확인 뒤 변경은 실행하지 않는다", async () => {
+    vi.mocked(deptAdjustmentApi.getBomTemplate).mockResolvedValue({ lines: [
+      { item_id: "child-1", item_name: "하위 하나", mes_code: "3-AR-0003", quantity: 2, has_children: false },
+      { item_id: "child-2", item_name: "하위 둘", mes_code: "3-TR-0004", quantity: 3, has_children: false },
+    ] });
+    render(<DefectCartFlow mode="scrap" initialAction="rework" items={[{ ...fItem, has_bom: true }]} productModels={[]} currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: /추가/ }));
+    await selectReasonCategory();
+    fireEvent.click(screen.getByRole("button", { name: /BOM 확인/ }));
+    await screen.findByLabelText("하위 하나 정상 수량");
+    fireEvent.change(screen.getByLabelText("하위 하나 정상 수량"), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText("하위 하나 격리 수량"), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText("하위 둘 정상 수량"), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText("하위 둘 폐기 수량"), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: /즉시 재작업 \(1건\)/ }));
+    const dialog = await screen.findByRole("dialog", { name: "즉시 재작업 확인" });
+    const children = within(dialog).getAllByTestId("defect-confirm-child");
+    expect(children).toHaveLength(2);
+    expect(children[0]).toHaveTextContent("하위 하나3-AR-0003정상 1 · 격리 1 · 폐기 0");
+    expect(children[1]).toHaveTextContent("하위 둘3-TR-0004정상 1 · 격리 0 · 폐기 2");
+    fireEvent.change(screen.getByLabelText("하위 하나 정상 수량"), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("하위 하나 격리 수량"), { target: { value: "0" } });
+    expect(within(dialog).getByRole("button", { name: "즉시 재작업", exact: true })).toBeDisabled();
+    expect(dialog).toHaveTextContent("배분이 변경되었습니다. 취소 후 다시 확인하세요.");
+    expect(stockRequestsApi.createStockRequest).not.toHaveBeenCalled();
+  });
+
   it("shares a submission ID and keeps it when a failed line is edited and retried", async () => {
     vi.mocked(stockRequestsApi.createStockRequest).mockResolvedValueOnce({} as never).mockRejectedValueOnce(new Error("retry"));
     render(<DefectCartFlow mode="scrap" items={[rItem, fItem]} productModels={[]} currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} />);
@@ -488,6 +539,7 @@ describe("DefectCartFlow", () => {
     await screen.findByText("하위 품목");
 
     fireEvent.change(screen.getByLabelText("하위 품목 격리 수량"), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText("하위 품목 정상 수량"), { target: { value: "1" } });
     expect(screen.getByLabelText("하위 품목 정상 수량")).toHaveValue(1);
 
     fireEvent.click(screen.getByRole("button", { name: /즉시 재작업/ }));

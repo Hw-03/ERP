@@ -27,3 +27,16 @@ APPROVAL_SUB_TYPES: frozenset[str] = WAREHOUSE_APPROVAL_SUB_TYPES | frozenset(
 # 낱개 라인 origin — 1라인이라도 포함되면 부서 결재 정/부 승인이 필요.
 # 프론트 IoLine.origin / ioWorkType.MANUAL_ORIGINS 와 동기화.
 MANUAL_LINE_ORIGINS: frozenset[str] = frozenset({"manual", "adjust_in", "adjust_out"})
+
+
+def internal_use_line_approval_kind(
+    *, direction: str, from_bucket: str, process_type_code: str | None,
+    active_special_approver_exists: bool,
+) -> str:
+    """미리보기와 제출이 같은 사용출고 승인 정책을 표시·집행한다."""
+    if direction == "out" and from_bucket == "warehouse":
+        return "warehouse"
+    if (direction == "out" and from_bucket == "production"
+            and process_type_code in {"AR", "AA"} and active_special_approver_exists):
+        return "as_research"
+    return "department"

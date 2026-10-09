@@ -224,6 +224,16 @@ class DefectManagementCategoryRevisionItem(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+def _active_defect_actor(db: Session, employee_id: uuid.UUID) -> Employee:
+    """Direct defect writes use current active employees without requiring approval roles."""
+    actor = db.get(Employee, employee_id)
+    if actor is None:
+        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    if not bool(actor.is_active):
+        raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원입니다.")
+    return actor
+
+
 def _dept_enum(dept_str: str) -> DepartmentEnum:
     """문자열 → DepartmentEnum 변환. 실패 시 ValueError."""
     try:
@@ -808,6 +818,8 @@ def update_management_category(
 @router.post("/quarantine", response_model=DefectActionResult)
 def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = Depends(get_db)):
     """격리 (즉시, 결재 없음). mark_defective 래퍼 + defective_at 채움."""
+    actor = _active_defect_actor(db, payload.actor_employee_id)
+    set_actor(http_request, actor)
     payload.submission_id = payload.submission_id or _new_submission_id(payload.client_request_id)
     # 멱등성: 동일 키뿐 아니라 같은 격리 명령임이 확인될 때만 성공으로 재사용한다.
     if payload.client_request_id:
@@ -818,10 +830,6 @@ def quarantine(payload: QuarantineRequest, http_request: Request, db: Session = 
             raise http_error(409, ErrorCode.CONFLICT, "이미 다른 요청에 사용된 요청 식별자입니다.")
 
     _resolve_request_reason(db, payload)
-    actor = db.query(Employee).filter(Employee.employee_id == payload.actor_employee_id).first()
-    if actor is None:
-        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
-    set_actor(http_request, actor)
 
     item = item_repository.get(db, payload.item_id)
     if item is None:
@@ -885,9 +893,7 @@ def quarantine_bulk(
     """복수 격리를 한 트랜잭션으로 확정하며 같은 요청의 재시도를 멱등 처리한다."""
     line_payloads = _bulk_quarantine_payloads(payload)
 
-    actor = db.query(Employee).filter(Employee.employee_id == payload.actor_employee_id).first()
-    if actor is None:
-        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    actor = _active_defect_actor(db, payload.actor_employee_id)
     set_actor(http_request, actor)
 
     replayed = 0
@@ -964,9 +970,7 @@ def unquarantine(payload: UnquarantineRequest, http_request: Request, db: Sessio
     payload.submission_id = payload.submission_id or _new_submission_id()
     _resolve_request_reason(db, payload)
     """정상 복귀 (즉시, 결재 없음). unmark_defective 래퍼."""
-    actor = db.query(Employee).filter(Employee.employee_id == payload.actor_employee_id).first()
-    if actor is None:
-        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    actor = _active_defect_actor(db, payload.actor_employee_id)
     set_actor(http_request, actor)
 
     item = item_repository.get(db, payload.item_id)
@@ -1017,11 +1021,7 @@ def unquarantine_bulk(
     """선택한 동일 품목·부서 격리 기록을 전부 정상 복귀한다."""
     _resolve_request_reason(db, payload)
     payload.submission_id = payload.submission_id or _new_submission_id()
-    actor = db.query(Employee).filter(
-        Employee.employee_id == payload.actor_employee_id
-    ).first()
-    if actor is None:
-        raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
+    actor = _active_defect_actor(db, payload.actor_employee_id)
     set_actor(http_request, actor)
 
     try:

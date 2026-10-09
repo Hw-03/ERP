@@ -35,6 +35,9 @@ type ConversionShortageRow = {
   location: string;
   unit: string;
   current: number;
+  available: number;
+  required: number;
+  shortage: number;
 };
 
 const ALLOWED_PROCESS_TYPES = ["PA", "AF", "AA"];
@@ -91,6 +94,9 @@ function conversionShortageRows(preview: ItemConversionPreview): ConversionShort
       location: preview.source_department ?? "창고",
       unit: "EA",
       current: preview.source_current_quantity,
+      available: preview.source_available_quantity,
+      required: preview.quantity,
+      shortage: preview.source_shortage_quantity,
     });
   }
   preview.lines.forEach((line) => {
@@ -102,6 +108,9 @@ function conversionShortageRows(preview: ItemConversionPreview): ConversionShort
       location: line.department ?? "창고",
       unit: line.unit,
       current: line.current_quantity,
+      available: line.available_quantity,
+      required: Math.abs(line.total_delta),
+      shortage: line.shortage_quantity,
     });
   });
   return rows;
@@ -710,8 +719,9 @@ function ConversionShortageDetails({ rows }: { rows: ConversionShortageRow[] }) 
               <div className="ict truncate text-sm font-black">{row.itemName}</div>
               <div className="icm mt-0.5 text-xs font-bold">{row.mesCode ?? "-"}</div>
             </div>
-            <div className="ic-red shrink-0 text-sm font-black">
-              {row.location} 현재고 {formatQty(row.current, row.unit)}
+            <div className="ic-red shrink-0 text-right text-sm font-black">
+              <div>{row.location} 현재고 {formatQty(row.current, row.unit)}</div>
+              <div className="mt-0.5 text-xs">가용 {formatQty(row.available, row.unit)} · 필요 {formatQty(row.required, row.unit)} · 부족 {formatQty(row.shortage, row.unit)}</div>
             </div>
           </div>
         ))}

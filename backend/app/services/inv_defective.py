@@ -205,9 +205,9 @@ def unmark_defective(
     dept: DepartmentEnum,
     reason: ReasonContext,
 ) -> Inventory:
-    """불량 → 정상 복귀. 같은 부서 DEFECTIVE → PRODUCTION 이동. 총량 변동 없음.
+    """불량 → 정상 복귀. 창고는 warehouse_qty, 부서는 PRODUCTION으로 복귀한다.
 
-    defective_at NULL 로 초기화.
+    총량 변동 없이 defective_at NULL 로 초기화한다.
     """
     validate_active_items(db, [item_id])
     if qty <= 0:
@@ -215,7 +215,8 @@ def unmark_defective(
 
     get_or_create_inventory(db, item_id)
     defective_loc = _lock_location(db, item_id, dept, LocationStatusEnum.DEFECTIVE)
-    _lock_location(db, item_id, dept, LocationStatusEnum.PRODUCTION)
+    if dept != DepartmentEnum.WAREHOUSE:
+        _lock_location(db, item_id, dept, LocationStatusEnum.PRODUCTION)
     db.flush()
 
     result = db.execute(
@@ -236,14 +237,22 @@ def unmark_defective(
         cur = defective_loc.quantity if defective_loc else Decimal("0")
         raise ValueError(f"{dept.value} 불량 재고 부족 (현재 {cur}, 요청 {qty}).")
 
-    db.execute(
-        sa_update(InventoryLocation)
-        .where(InventoryLocation.item_id == item_id)
-        .where(InventoryLocation.department == dept)
-        .where(InventoryLocation.status == LocationStatusEnum.PRODUCTION)
-        .values(quantity=func.coalesce(InventoryLocation.quantity, 0) + qty)
-        .execution_options(synchronize_session=False)
-    )
+    if dept == DepartmentEnum.WAREHOUSE:
+        db.execute(
+            sa_update(Inventory)
+            .where(Inventory.item_id == item_id)
+            .values(warehouse_qty=func.coalesce(Inventory.warehouse_qty, 0) + qty)
+            .execution_options(synchronize_session=False)
+        )
+    else:
+        db.execute(
+            sa_update(InventoryLocation)
+            .where(InventoryLocation.item_id == item_id)
+            .where(InventoryLocation.department == dept)
+            .where(InventoryLocation.status == LocationStatusEnum.PRODUCTION)
+            .values(quantity=func.coalesce(InventoryLocation.quantity, 0) + qty)
+            .execution_options(synchronize_session=False)
+        )
     db.flush()
     db.expire_all()
     inv = inventory_repository.get(db, item_id)

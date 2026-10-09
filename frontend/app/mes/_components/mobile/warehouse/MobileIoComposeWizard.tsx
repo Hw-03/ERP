@@ -319,6 +319,7 @@ export function MobileIoComposeWizard({
     sourceKind: IoSourceKind = "direct_item",
     subTypeOverride?: IoSubType,
     sourceLocation?: IoSourceLocation,
+    quantity = 1,
   ) {
     if (itemAddBlocked) {
       setError("BOM 정보를 불러오지 못했습니다. 다시 시도해 주세요");
@@ -349,7 +350,7 @@ export function MobileIoComposeWizard({
           source_kind: sourceKind,
           source_location: effectiveSubType === "internal_use_out" ? sourceLocation : undefined,
           item_id: item.item_id,
-          quantity: 1,
+          quantity,
         },
       });
       if (previewGeneration !== operationRefs.generation.current) return;
@@ -401,7 +402,8 @@ export function MobileIoComposeWizard({
     toDepartment: state.toDepartment,
     deptIoDirection: state.deptIoDirection,
     forceManual: authorizedEntryIntent?.forceManualItem,
-    addItem,
+    quantity: authorizedEntryIntent?.quantity,
+    addItem: (item, sourceKind, quantity) => addItem(item, sourceKind, undefined, undefined, quantity),
     setHighlightItemId,
   });
 

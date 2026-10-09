@@ -188,8 +188,18 @@ jobs:
         run: npm run check:bundle-size
 
   e2e:
-    name: E2E (Playwright · 전용 DB)
+    name: E2E (Playwright · ${{ matrix.suite }} · 전용 DB)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: general
+            args: --grep-invert '(^|[ /])as-research-(ui-)?expectations[.]spec[.]ts( |$)'
+          - suite: asr-fallback
+            args: tests/e2e/as-research-expectations.spec.ts
+          - suite: asr-ui
+            args: tests/e2e/as-research-ui-expectations.spec.ts
     steps:
       - uses: actions/checkout@v4
 
@@ -219,9 +229,10 @@ jobs:
 
       # globalSetup 이 전용 mes_e2e.db 부트스트랩·시드·백엔드(8021) 기동, webServer 가 next dev(3100).
       # 실 backend/mes.db 는 CI 체크아웃에 없음(.gitignore) → 해시 가드 자동 생략.
+      # 마지막 AS·연구 역할 회수는 모든 미결 요청을 재분류하므로 두 파일은 각각 새 DB에서 실행.
       - name: Playwright E2E
         working-directory: frontend
-        run: npm run test:e2e
+        run: npm run test:e2e -- ${{ matrix.args }} --reporter=github,html
         env:
           NEXT_TELEMETRY_DISABLED: "1"
 
@@ -229,6 +240,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.suite }}
           path: frontend/playwright-report
           retention-days: 7

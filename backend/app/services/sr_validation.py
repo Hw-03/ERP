@@ -13,7 +13,6 @@ from app.models import (
     DepartmentEnum,
     Employee,
     InventoryLocation,
-    Item,
     LocationStatusEnum,
     RequestBucketEnum,
     StockRequestLine,
@@ -280,6 +279,14 @@ def validate_line_shape_for_request_type(
     if request_type not in _ALLOWED_SHAPES:
         # 새 request_type 이 추가됐는데 사양표에 없으면 명시적으로 거부 (안전 우선).
         raise ValueError(f"지원하지 않는 요청 유형: {request_type}")
+    if request_type in {StockRequestTypeEnum.DEFECT_RETURN, StockRequestTypeEnum.SUPPLIER_RETURN}:
+        # Tube returns retain their existing entry point. The supplier validator
+        # selects tube scope for actual TR records and warehouse scope otherwise.
+        allowed_departments = {DepartmentEnum.WAREHOUSE}
+        if request_type == StockRequestTypeEnum.DEFECT_RETURN:
+            allowed_departments.add(DepartmentEnum.TUBE)
+        if line.from_bucket != RequestBucketEnum.DEFECTIVE or line.from_department not in allowed_departments:
+            raise ValueError("공급업체 반품은 창고 또는 튜브 격리 재고만 처리할 수 있습니다.")
     if request_type == StockRequestTypeEnum.INTERNAL_USE:
         if line.to_bucket != RequestBucketEnum.NONE:
             raise ValueError("사용출고의 도착 버킷은 none만 허용합니다.")

@@ -207,7 +207,9 @@ async function submitComposition(
         : responseKind === "department"
           ? "부서 결재 요청 완료"
           : "창고 결재 요청 완료"
-      : "입출고 반영 완료";
+      : subType === "receive_supplier"
+        ? "창고 입고 완료"
+        : "입출고 반영 완료";
     if (draftIdRef.current === draftId) draftIdRef.current = null;
     return { response, title, submittedDraftId: draftId };
   } catch (error) {

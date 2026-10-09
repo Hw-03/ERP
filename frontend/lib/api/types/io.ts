@@ -63,6 +63,8 @@ export interface IoLine {
   shortage: number;
   exclusion_note: string | null;
   approval_outcome: "approved" | "rejected" | null;
+  /** 현재 서버 미리보기/저장 원건의 승인 판정. 구 응답은 없을 수 있다. */
+  approval_kind?: "warehouse" | "as_research" | "department" | "none" | null;
 }
 
 export interface IoBundle {

@@ -566,6 +566,19 @@ describe("IoComposeView navigation chrome", () => {
     });
   });
 
+  it.each([7, undefined])("출하 진입 수량 %s를 실제 preview 요청에 전달한다", async (quantity) => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={queryClient}><IoComposeView
+      globalSearch="" operator={operator} employees={[]} items={conversionItems}
+      setItems={() => {}} onStatusChange={() => {}} preselectedItem={conversionItems[0]}
+      entryIntent={{ workType: "warehouse_io", subType: "warehouse_to_dept", toDepartment: "출하", forceManualItem: true, quantity }}
+    /></QueryClientProvider>);
+    await waitFor(() => expect(api.preview).toHaveBeenCalledWith(expect.objectContaining({
+      sub_type: "warehouse_to_dept", to_department: null,
+      targets: [expect.objectContaining({ item_id: "af-1", source_kind: "manual", quantity: quantity ?? 1 })],
+    })));
+  });
+
   it("ignores a legacy linked shipping request intent", async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },

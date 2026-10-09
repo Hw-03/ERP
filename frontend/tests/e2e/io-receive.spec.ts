@@ -47,7 +47,7 @@ test.describe("입출고 V2 — 원자재 입고", () => {
     await page.getByRole("button", { name: "즉시 반영", exact: true }).click();
 
     // 종착: 즉시 반영 완료 (상태 대상 알림과 중복되므로 다이얼로그로 스코프)
-    const doneDialog = page.getByRole("dialog", { name: /입출고 반영 완료/ });
+    const doneDialog = page.getByRole("dialog", { name: "창고 입고 완료", exact: true });
     await expect(doneDialog).toBeVisible();
     await expect(doneDialog.getByText("입출고가 반영되었습니다.")).toBeVisible();
   });

@@ -756,7 +756,7 @@ def _execute_all_lines(
         db,
         domain="stock_request",
         action=request.request_type.value,
-        display_label=request.request_type.value,
+        display_label="반품" if request.request_type == StockRequestTypeEnum.DEFECT_RETURN else request.request_type.value,
         actor_name=approver.name,
         actor_employee_id=approver.employee_id,
         department=str(approver.department),

@@ -285,6 +285,12 @@ def submit_draft_request(
         for line in db_lines
     ]
     _validate_lines(request.request_type, line_inputs)
+    from app.services.department_work_policy import validate_active_department_cells
+    validate_active_department_cells(db, (
+        cell for line in line_inputs for cell in (
+            (line.from_bucket, line.from_department), (line.to_bucket, line.to_department),
+        )
+    ))
     _preflight_inventory_check(db, request.request_type, line_inputs)
     _preflight_defective_check(db, line_inputs)
 

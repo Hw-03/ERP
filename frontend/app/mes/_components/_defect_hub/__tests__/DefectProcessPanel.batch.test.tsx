@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { DefectLocation } from "@/lib/api/types/defects";
 import { ApiError } from "@/lib/api-core";
@@ -68,6 +68,34 @@ describe("DefectProcessPanel batch processing", () => {
     apiMocks.createStockRequest.mockReset().mockResolvedValue(undefined);
   });
 
+  it("reviews each selected origin's own timestamp, actor, memo and full remainder before confirming", async () => {
+    const selected = [
+      { ...locations[0], quarantined_by: "첫 격리자", reason_memo: "첫 기록 메모" },
+      { ...locations[1], defective_at: "2026-09-02T03:04:00Z", quarantined_by: "둘째 격리자", reason_memo: "둘째 기록 메모" },
+    ];
+    render(<DefectProcessPanel locations={selected} currentEmployee={employee} onDone={vi.fn()} onCancel={vi.fn()} />);
+    const origins = within(screen.getByRole("region", { name: "선택 원건 재확인" })).getAllByRole("article");
+    expect(origins).toHaveLength(2);
+    expect(origins[0]).toHaveAttribute("data-record-id", "record-1");
+    expect(origins[0]).toHaveTextContent("첫 격리자");
+    expect(origins[0]).toHaveTextContent("첫 기록 메모");
+    expect(origins[0]).toHaveTextContent("2026년 09월 01일 09시 00분");
+    expect(origins[0]).toHaveTextContent("잔량 전체 2개");
+    expect(origins[1]).toHaveAttribute("data-record-id", "record-2");
+    expect(origins[1]).toHaveTextContent("둘째 격리자");
+    expect(origins[1]).toHaveTextContent("둘째 기록 메모");
+    expect(origins[1]).toHaveTextContent("2026년 09월 02일 12시 04분");
+    expect(origins[1]).toHaveTextContent("잔량 전체 3개");
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "외관 불량" } });
+    fireEvent.click(screen.getByRole("button", { name: "정상 복귀 →" }));
+    const dialog = await screen.findByRole("dialog");
+    const confirmed = within(dialog).getByRole("region", { name: "선택 원건 재확인" });
+    expect(confirmed).toHaveTextContent("첫 기록 메모");
+    expect(confirmed).toHaveTextContent("둘째 기록 메모");
+    expect(within(confirmed).getAllByRole("article")).toHaveLength(2);
+    expect(apiMocks.unquarantineBulk).not.toHaveBeenCalled();
+  });
+
   it("restores every selected record with one atomic bulk request", async () => {
     const onDone = vi.fn();
     render(
@@ -81,6 +109,7 @@ describe("DefectProcessPanel batch processing", () => {
 
     expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
     expect(screen.getByText("선택한 격리 기록 2건")).toBeInTheDocument();
+    expect(screen.getByText("일괄 처리는 각 원건의 남은 수량 전체를 처리합니다. 일부 수량은 개별 처리에서 입력하세요.")).toBeVisible();
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "기타" } });
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "공통 메모" } });
     fireEvent.click(screen.getByRole("button", { name: "정상 복귀 →" }));

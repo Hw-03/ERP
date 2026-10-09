@@ -26,6 +26,7 @@ import panelStyles from "./mobileWarehousePanels.module.css";
 import { MobileDefectStepHeader } from "./MobileDefectStepHeader";
 import { MobileReworkWorkspace } from "../rework/MobileReworkWorkspace";
 import type { MobileReworkMemory } from "../rework/useMobileReworkWorkspace";
+import { makeClientRequestId } from "@/lib/uuid";
 
 type ProcessAction = "unquarantine" | "scrap" | "return" | "disassemble";
 
@@ -67,6 +68,7 @@ export function MobileDefectProcessPanel({
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [supplierListReady, setSupplierListReady] = useState(false);
   const locationIdentityRef = useRef(location.record_id);
+  const returnRequestRef = useRef<{ fingerprint: string; id: string } | null>(null);
   const reworkSessionRef = useRef<MobileReworkMemory | null>(null);
   const boundedProcessQty = Math.max(1, Math.min(maxQty, processQty));
 
@@ -157,8 +159,15 @@ export function MobileDefectProcessPanel({
           actor_employee_id: currentEmployee.employee_id,
         });
       } else if (action === "scrap" || action === "return") {
+        if (action === "return") {
+          const fingerprint = JSON.stringify([location.record_id, boundedProcessQty, selectedSupplier!.supplier_id, category, categoryId, memo]);
+          if (returnRequestRef.current?.fingerprint !== fingerprint) {
+            returnRequestRef.current = { fingerprint, id: `defect-return:${makeClientRequestId()}` };
+          }
+        }
         await stockRequestsApi.createStockRequest({
           requester_employee_id: currentEmployee.employee_id,
+          client_request_id: action === "return" ? returnRequestRef.current!.id : undefined,
           request_type: action === "scrap" ? "defect_scrap" : "defect_return",
           supplier_id: action === "return" ? selectedSupplier!.supplier_id : undefined,
           reason_category: category || null,
@@ -219,6 +228,7 @@ export function MobileDefectProcessPanel({
       <div className="flex h-full min-h-0 flex-col gap-2">
         <MobileDefectStepHeader title="공급업체 선택" steps={processSteps} current={1} onBack={() => setStep(1)} />
         <div className="min-h-0 flex-1 overflow-y-auto">
+          {errorMsg && <InlineErrorNote>{errorMsg}</InlineErrorNote>}
           <SupplierPickerStep
             employeeId={currentEmployee.employee_id}
             selectedSupplierId={selectedSupplier?.supplier_id ?? null}

@@ -25,6 +25,7 @@ import { DefectProcessPanel } from "./_defect_hub/DefectProcessPanel";
 import { useRealtimeRevision } from "@/lib/queries/realtime";
 import { ReadEmpty, ReadFailure, ReadLoading } from "./common/ReadState";
 import { matchesDefectSearch } from "./_defect_hub/defectSearch";
+import { makeClientRequestId } from "@/lib/uuid";
 
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
@@ -40,7 +41,7 @@ type ViewMode =
   | { kind: "cart"; mode: DefectCartMode; action: DefectWorkAction; source: DefectSourceKind }
   | { kind: "process"; locations: DefectLocation[]; batch: boolean; restoreOnly?: boolean };
 
-type WorkHistoryState = { defect?: string; mode?: string; action?: string | null; directAction?: string | null; source?: string; step?: number } | null;
+type WorkHistoryState = { defect?: string; mode?: string; action?: string | null; directAction?: string | null; source?: string; step?: number; storageEntry?: string; restoreOnly?: boolean; recordId?: string } | null;
 
 /** 이전 출처 선택 이력은 통합 화면으로, 확정된 카트 이력은 품목 화면으로 복원한다. */
 function workViewFromHistory(state: WorkHistoryState): Extract<ViewMode, { kind: "work-choice" | "cart" }> | null {
@@ -111,6 +112,8 @@ function DefectViewInner({
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const hasLoadedRef = useRef(false);
   const requestGenerationRef = useRef(0);
+  const restoreSessionRef = useRef<{ entry: string | undefined; location: DefectLocation } | null>(null);
+  const completedStorageEntryRef = useRef<string | null>(null);
 
   const defaultScope: DefectScope = defectDeptFilter
     ? "my"
@@ -288,7 +291,7 @@ function DefectViewInner({
     const workView = workViewFromHistory(cur);
     if (workView) {
       setView(workView);
-      if (workView.kind === "work-choice") window.history.replaceState({ defect: "work-choice", action: workView.action, source: workView.source }, "");
+      if (workView.kind === "work-choice") window.history.replaceState({ ...window.history.state, defect: "work-choice", action: workView.action, source: workView.source }, "");
     } else if (cur?.defect === "storage") {
       setView({ kind: "storage" });
     } else if (cur?.defect === "list") {
@@ -297,18 +300,29 @@ function DefectViewInner({
       setView({ kind: "statistics" });
     } else if (cur?.defect === "process") {
       // location 데이터 없이 복원 불가 — 목록으로
-      setView({ kind: "list" });
-      window.history.replaceState({ defect: "list" }, "");
+      const target = cur.restoreOnly ? "hub" : "list";
+      setView({ kind: target });
+      window.history.replaceState({ ...window.history.state, defect: target }, "");
     } else {
-      window.history.replaceState({ defect: "hub" }, "");
+      window.history.replaceState({ ...window.history.state, defect: "hub" }, "");
     }
 
     function onPop(e: PopStateEvent) {
+      // 다른 탭 이탈은 Shell의 확인 결과가 나올 때까지 현재 초안을 유지한다.
+      if (window.location.pathname === "/mes" && new URLSearchParams(window.location.search).get("tab") !== "defect") return;
       const s = e.state as WorkHistoryState;
+      const completedEntry = completedStorageEntryRef.current;
+      completedStorageEntryRef.current = null;
+      if ((completedEntry && (s?.defect !== "storage" || s.storageEntry !== completedEntry))
+        || (s?.defect === "storage" && !s.storageEntry)) {
+        window.history.replaceState({ ...window.history.state, defect: "hub" }, "");
+        setView({ kind: "hub" });
+        return;
+      }
       const nextWorkView = workViewFromHistory(s);
       if (nextWorkView) {
         setView(nextWorkView);
-        if (nextWorkView.kind === "work-choice") window.history.replaceState({ defect: "work-choice", action: nextWorkView.action, source: nextWorkView.source }, "");
+        if (nextWorkView.kind === "work-choice") window.history.replaceState({ ...window.history.state, defect: "work-choice", action: nextWorkView.action, source: nextWorkView.source }, "");
       } else if (!s?.defect || s.defect === "hub") {
         setView({ kind: "hub" });
       } else if (s.defect === "storage") {
@@ -317,6 +331,14 @@ function DefectViewInner({
         setView({ kind: "list" });
       } else if (s.defect === "statistics") {
         setView({ kind: "statistics" });
+      } else if (s.defect === "process" && s.restoreOnly) {
+        const session = restoreSessionRef.current;
+        if (session && s.recordId === session.location.record_id && s.storageEntry === session.entry) {
+          setView({ kind: "process", locations: [session.location], batch: false, restoreOnly: true });
+        } else {
+          window.history.replaceState({ ...window.history.state, defect: "hub" }, "");
+          setView({ kind: "hub" });
+        }
       } else {
         setView({ kind: "list" });
       }
@@ -328,49 +350,57 @@ function DefectViewInner({
 
   function handleHubSelect(id: DefectHubCardId) {
     if (id === "work") {
-      window.history.pushState({ defect: "work-choice" }, "");
+      window.history.pushState({ ...window.history.state, defect: "work-choice", action: null, source: null }, "");
       setView({ kind: "work-choice", action: null, source: null });
     } else if (id === "list") {
-      window.history.pushState({ defect: "list" }, "");
+      window.history.pushState({ ...window.history.state, defect: "list" }, "");
       setView({ kind: "list" });
     } else if (id === "storage") {
-      window.history.pushState({ defect: "storage" }, "");
+      window.history.pushState({ ...window.history.state, defect: "storage", storageEntry: makeClientRequestId() }, "");
       setView({ kind: "storage" });
     } else {
-      window.history.pushState({ defect: "statistics" }, "");
+      window.history.pushState({ ...window.history.state, defect: "statistics" }, "");
       setView({ kind: "statistics" });
     }
   }
 
   function selectWork(action: DefectWorkAction): void {
     const source = view.kind === "work-choice" && view.action === action ? view.source : null;
-    window.history.replaceState({ defect: "work-choice", action, source }, "");
+    window.history.replaceState({ ...window.history.state, defect: "work-choice", action, source }, "");
     setView({ kind: "work-choice", action, source });
   }
 
   function openCart(action: DefectWorkAction, source: DefectSourceKind): void {
     const mode = action === "add" ? "add" : "scrap";
-    window.history.replaceState({ defect: "work-choice", action, source }, "");
-    window.history.pushState({ defect: "cart", mode, directAction: action === "rework" ? "rework" : "scrap", source, step: 2 }, "");
+    window.history.replaceState({ ...window.history.state, defect: "work-choice", action, source }, "");
+    window.history.pushState({ ...window.history.state, defect: "cart", mode, directAction: action === "rework" ? "rework" : "scrap", source, step: 2 }, "");
     setView({ kind: "cart", mode, action, source });
   }
 
-  function handleProcessed(message: string, returnToStorage = false) {
-    const target = returnToStorage ? "storage" : "hub";
-    window.history.replaceState({ defect: target }, "");
-    setView(returnToStorage ? { kind: "storage" } : { kind: "hub" });
+  function handleProcessed(message: string, returnToStorage = false): void {
+    const state = window.history.state as WorkHistoryState;
+    const entry = returnToStorage && state?.defect === "process" && state.restoreOnly
+      && state.storageEntry === restoreSessionRef.current?.entry ? state.storageEntry : undefined;
+    restoreSessionRef.current = null;
+    // 완료한 폼을 Forward로 다시 열 수 없도록 먼저 무효화한다.
+    window.history.replaceState({ ...window.history.state, defect: "hub" }, "");
+    setView(entry ? { kind: "storage" } : { kind: "hub" });
     setReloadNonce((n) => n + 1);
     onStatusChange?.(message);
+    if (entry) {
+      completedStorageEntryRef.current = entry;
+      window.history.back();
+    }
   }
 
   function handleProcessRow(loc: DefectLocation) {
-    window.history.pushState({ defect: "process" }, "");
+    window.history.pushState({ ...window.history.state, defect: "process", restoreOnly: false }, "");
     setView({ kind: "process", locations: [loc], batch: false });
   }
 
   function handleBatchProcess(selectedLocations: DefectLocation[]) {
     if (selectedLocations.length === 0) return;
-    window.history.pushState({ defect: "process" }, "");
+    window.history.pushState({ ...window.history.state, defect: "process", restoreOnly: false }, "");
     setView({ kind: "process", locations: selectedLocations, batch: true });
   }
 
@@ -383,11 +413,22 @@ function DefectViewInner({
   const isFullWidthWork = view.kind !== "list" && view.kind !== "hub" && view.kind !== "storage";
 
   if (view.kind === "storage") {
-    return <div className="animate-desktop-navigation-enter flex min-h-0 min-w-0 flex-1 overflow-y-auto rounded-[28px] border p-4" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}><DefectStorageView locations={locations} items={items} productModels={productModels} currentEmployee={employee} loading={loading} loadError={error ?? refreshError} onRetry={() => setReloadNonce((value) => value + 1)} onBack={() => window.history.back()} onUpdated={(recordId, managementCategory) => setLocations((current) => current.map((location) => location.record_id === recordId ? { ...location, management_category: managementCategory } : location))} onMemoUpdated={handleMemoUpdated} onRestore={handleRestoreRow} /></div>;
+    return <div className="animate-desktop-navigation-enter flex min-h-0 min-w-0 flex-1 overflow-y-auto rounded-[28px] border p-4" style={{ borderColor: LEGACY_COLORS.border, background: LEGACY_COLORS.s1 }}><DefectStorageView locations={locations} items={items} productModels={productModels} currentEmployee={employee} loading={loading} loadError={error ?? refreshError} onRetry={() => setReloadNonce((value) => value + 1)} onBack={handleStorageBack} onUpdated={(recordId, managementCategory) => setLocations((current) => current.map((location) => location.record_id === recordId ? { ...location, management_category: managementCategory } : location))} onMemoUpdated={handleMemoUpdated} onRestore={handleRestoreRow} /></div>;
   }
 
-  function handleRestoreRow(loc: DefectLocation) {
-    window.history.pushState({ defect: "process" }, "");
+  /** 직접 진입에는 확인된 이전 허브가 없으므로 현재 기록을 허브로 바꾼다. */
+  function handleStorageBack(): void {
+    if (window.history.state?.storageEntry) window.history.back();
+    else {
+      window.history.replaceState({ ...window.history.state, defect: "hub" }, "");
+      setView({ kind: "hub" });
+    }
+  }
+
+  function handleRestoreRow(loc: DefectLocation): void {
+    const entry = window.history.state?.storageEntry as string | undefined;
+    restoreSessionRef.current = { entry, location: loc };
+    window.history.pushState({ ...window.history.state, defect: "process", restoreOnly: true, recordId: loc.record_id }, "");
     setView({ kind: "process", locations: [loc], batch: false, restoreOnly: true });
   }
 
@@ -484,7 +525,7 @@ function DefectViewInner({
                 onCancel={() => window.history.back()}
                 onDone={() => handleProcessed(view.restoreOnly ? "정상 복귀 완료" : "불량 처리 완료", view.restoreOnly)}
                 onInvalidated={(message) => {
-                  window.history.replaceState({ defect: "list" }, "");
+                  window.history.replaceState({ ...window.history.state, defect: "list" }, "");
                   setView({ kind: "list" });
                   setReloadNonce((value) => value + 1);
                   onStatusChange?.(`${message} 선택을 해제하고 목록을 갱신합니다.`);

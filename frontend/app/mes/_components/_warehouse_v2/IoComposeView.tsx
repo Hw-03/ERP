@@ -437,6 +437,7 @@ export function IoComposeView({
     sourceKind: IoSourceKind = "direct_item",
     subTypeOverride?: IoSubType,
     sourceLocation?: IoSourceLocation,
+    quantity = 1,
   ) {
     if (itemAddBlocked) {
       setError("BOM 정보를 불러오지 못했습니다. 다시 시도해 주세요");
@@ -467,7 +468,7 @@ export function IoComposeView({
         target: {
           source_kind: sourceKind,
           item_id: item.item_id,
-          quantity: 1,
+          quantity,
           source_location: effectiveSubType === "internal_use_out" ? sourceLocation : undefined,
         },
       });
@@ -495,7 +496,8 @@ export function IoComposeView({
     toDepartment: state.toDepartment,
     deptIoDirection: state.deptIoDirection,
     forceManual: authorizedEntryIntent?.forceManualItem,
-    addItem,
+    quantity: authorizedEntryIntent?.quantity,
+    addItem: (item, sourceKind, quantity) => addItem(item, sourceKind, undefined, undefined, quantity),
     setHighlightItemId,
   });
 

@@ -1434,6 +1434,22 @@ def preview(
     validate_active_items(db, (line["item_id"] for bundle in bundles for line in bundle["lines"]
                               if line["included"] and not line.get("bom_stock_exempt", False)),
                           raw_receive=sub_type == "receive_supplier")
+    if sub_type == INTERNAL_USE_SUB_TYPE:
+        from app.services.approval_rules import internal_use_line_approval_kind
+        lines = [line for bundle in bundles for line in bundle["lines"]]
+        process_types = {
+            item.item_id: item.process_type_code
+            for item in db.query(Item).filter(Item.item_id.in_({line["item_id"] for line in lines})).all()
+        }
+        active_special_approver_exists = db.query(Employee.employee_id).filter(
+            Employee.as_research_approver.is_(True), Employee.is_active == "true",
+        ).first() is not None
+        for line in lines:
+            line["approval_kind"] = internal_use_line_approval_kind(
+                direction=line["direction"], from_bucket=line["from_bucket"],
+                process_type_code=process_types.get(line["item_id"]),
+                active_special_approver_exists=active_special_approver_exists,
+            )
     return {
         "work_type": work_type,
         "sub_type": sub_type,

@@ -393,13 +393,32 @@ def test_quarantine_requires_category_and_other_memo(
 
 
 def test_bulk_quarantine_rolls_back_every_line_when_one_item_is_short(
-    db_session, client, make_item,
+    db_session, client, make_item, make_location,
 ):
     """[8.10-05] 복수 격리 중 한 품목이라도 실패하면 모든 위치와 원장을 원복한다."""
     enough = make_item(name="BULK-ENOUGH", process_type_code="TR", warehouse_qty=Decimal("5"))
     short = make_item(name="BULK-SHORT", process_type_code="TR", warehouse_qty=Decimal("1"))
+    other = make_item(name="BULK-UNSELECTED", process_type_code="VR", warehouse_qty=Decimal("7"))
+    make_location(other.item_id, department=DepartmentEnum.VACUUM, quantity=Decimal("3"))
     actor = _make_employee(db_session, code="BULK-QUARANTINE-FAIL", name="복수 격리 작업자")
+    db_session.add(SystemSetting(setting_key="inventory_operation_cutover_at", setting_value="2026-01-01T00:00:00"))
     db_session.commit()
+    seeded = client.post("/api/defects/quarantine", json={
+        "actor_employee_id": str(actor.employee_id), "item_id": str(other.item_id),
+        "qty": 1, "source": "warehouse", "target_dept": "창고", "reason_category": "외관 불량",
+    })
+    assert seeded.status_code == 200, seeded.text
+    db_session.commit()
+    tables = [model.__table__ for model in (
+        Inventory, InventoryLocation, DefectQuarantineRecord, DefectInventoryMovement, TransactionLog,
+        SystemSetting,
+    )]
+    tables.extend(Inventory.metadata.tables[name] for name in (
+        "inventory_operations", "inventory_operation_effects",
+    ))
+    before = {table.name: list(db_session.execute(table.select()).all()) for table in tables}
+    activity = Inventory.metadata.tables["activity_audit_logs"]
+    existing_activity = {row.audit_id: tuple(row) for row in db_session.execute(activity.select()).all()}
     before_logs = db_session.query(TransactionLog).count()
 
     response = client.post("/api/defects/quarantine/bulk", json={
@@ -421,6 +440,12 @@ def test_bulk_quarantine_rolls_back_every_line_when_one_item_is_short(
     assert response.status_code == 422, response.json()
 
     db_session.expire_all()
+    assert {table.name: list(db_session.execute(table.select()).all()) for table in tables} == before
+    activity_after = {row.audit_id: row for row in db_session.execute(activity.select()).all()}
+    assert {key: tuple(activity_after[key]) for key in existing_activity} == existing_activity
+    failure_audits = [row for key, row in activity_after.items() if key not in existing_activity]
+    assert len(failure_audits) == 1
+    assert failure_audits[0].outcome == "failed"
     inventories = {
         inventory.item_id: inventory
         for inventory in db_session.query(Inventory).filter(Inventory.item_id.in_([enough.item_id, short.item_id])).all()
@@ -1030,6 +1055,8 @@ def test_bulk_unquarantine_restores_selected_records_with_shared_reason(
     assert len(logs) == 2
     assert {log.reason_category for log in logs} == {"재검사 통과"}
     assert {log.reason_memo for log in logs} == {"선택 건 일괄 복귀"}
+    assert len({log.operation_id for log in logs}) == 1
+    assert all(log.operation_id is not None for log in logs)
     movements = (
         db_session.query(DefectInventoryMovement)
         .filter(DefectInventoryMovement.movement_type == "RESTORE")
@@ -1039,6 +1066,7 @@ def test_bulk_unquarantine_restores_selected_records_with_shared_reason(
         record.record_id for record in records
     }
     assert sum(-movement.quantity_delta for movement in movements) == Decimal("3")
+    assert {movement.operation_id for movement in movements} == {logs[0].operation_id}
 
 
 def test_bulk_unquarantine_rejects_empty_lines(db_session, client):

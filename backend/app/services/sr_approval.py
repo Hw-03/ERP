@@ -38,6 +38,10 @@ class FailedApprovalError(Exception):
     """승인 실행 실패. internal-use는 잠금 UoW, 일반 요청은 별도 UoW에 기록한다."""
 
 
+class ConflictingApprovalError(ValueError):
+    """이미 결정된 요청의 승인 재시도는 현재 상태와 충돌한다."""
+
+
 def _settle_internal_use_or_fail(
     db: Session,
     *,
@@ -458,8 +462,10 @@ def approve_request_as_research(
     batch, requests, request = internal_use_approval.locked_request(db, request)
     if not request.requires_as_research_approval:
         raise ValueError("AS·연구 결재가 필요하지 않은 요청입니다.")
-    if request.status not in (StockRequestStatusEnum.RESERVED, StockRequestStatusEnum.SUBMITTED):
-        raise ValueError(f"승인할 수 없는 상태입니다: {request.status.value}")
+    if request.as_research_approved_at is not None or request.status not in (
+        StockRequestStatusEnum.RESERVED, StockRequestStatusEnum.SUBMITTED,
+    ):
+        raise ConflictingApprovalError(f"이미 처리된 요청입니다: {request.status.value}")
     if request.as_research_approved_at is None:
         now = datetime.utcnow()
         request.as_research_approved_by_employee_id = approver.employee_id

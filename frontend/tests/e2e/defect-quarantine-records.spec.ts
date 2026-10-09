@@ -357,4 +357,129 @@ test.describe("불량 격리 건별 원장", () => {
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
     }
   });
+
+  for (const presentation of [
+    { label: "PC", viewport: { width: 1440, height: 900 } },
+    { label: "모바일", viewport: { width: 390, height: 844 } },
+  ]) {
+    for (const managementCategory of ["B_GRADE", "OBSOLETE"] as const) {
+      for (const restoreQty of [1, 5]) {
+        test(`정상 복귀 navigation ${presentation.label} ${managementCategory} ${restoreQty === 5 ? "전량" : "부분"}`, async ({ page }) => {
+          test.setTimeout(120_000);
+          const seed = readSeed();
+          await page.setViewportSize(presentation.viewport);
+          const operator = await loginAsOperator(page, { role: "warehouse" });
+          const item = seed.rawItem;
+          const memo = `storage-navigation-${presentation.label}-${managementCategory}-${restoreQty}`;
+          await postJson(page.request, "/api/defects/quarantine", {
+            item_id: item.item_id, qty: 5, source: "warehouse", target_dept: "창고",
+            reason_category: "외관 불량", reason_memo: memo,
+            management_category: managementCategory, actor_employee_id: operator.employee_id,
+          });
+          const listRecords = async (): Promise<Array<Record<string, unknown>>> => {
+            const response = await page.request.get("/api/defects/locations");
+            expect(response.ok()).toBeTruthy();
+            return response.json();
+          };
+          const storedRecord = (await listRecords()).find((record) => record.reason_memo === memo)!;
+          expect(storedRecord).toBeTruthy();
+          const warehouseProductionStock = async (): Promise<number> => {
+            const response = await page.request.get(`/api/inventory/locations/${item.item_id}`);
+            expect(response.ok()).toBeTruthy();
+            const locations = await response.json() as Array<{ department: string; status: string; quantity: string | number }>;
+            return Number(locations.find((location) => location.department === storedRecord.department && location.status === "PRODUCTION")?.quantity ?? 0);
+          };
+          const normalStock = async (): Promise<number> => {
+            const response = await page.request.get(`/api/items/${item.item_id}`);
+            expect(response.ok()).toBeTruthy();
+            return Number((await response.json()).warehouse_qty);
+          };
+          const transactionCount = async (): Promise<number> => {
+            const response = await page.request.get(`/api/inventory/transactions?item_id=${item.item_id}&transaction_type=UNMARK_DEFECTIVE&limit=1000`);
+            expect(response.ok()).toBeTruthy();
+            return (await response.json()).length;
+          };
+          const normalBefore = await normalStock();
+          const warehouseProductionBefore = await warehouseProductionStock();
+          const transactionsBefore = await transactionCount();
+          await page.goto("/mes?tab=defect");
+          const hubCard = page.getByRole("button").filter({ hasText: "B급·구형 자재", visible: true });
+          await expect(hubCard).toBeVisible({ timeout: 30_000 });
+          await hubCard.click();
+          const storageSearch = page.getByRole("textbox", { name: "B급·구형 검색" }).filter({ visible: true });
+          await expect(storageSearch).toBeVisible();
+          const storageState = await page.evaluate(() => history.state);
+          const storageLength = await page.evaluate(() => history.length);
+          expect(storageState.storageEntry).toEqual(expect.any(String));
+
+          const openRestore = async (): Promise<void> => {
+            const group = page.getByRole("button", { name: `${item.item_name} 격리 1건`, exact: true }).filter({ visible: true });
+            if (presentation.label === "모바일") await expect(group).toBeVisible();
+            if (await group.count() && await group.getAttribute("aria-expanded") !== "true") await group.click();
+            const row = page.getByRole("article", { name: `${item.item_name} 격리 기록` }).filter({ hasText: memo, visible: true });
+            await row.getByRole("button", { name: "정상 복귀", exact: true }).click();
+            await expect(page.getByRole("spinbutton").filter({ visible: true })).toHaveValue("5");
+            const processState = await page.evaluate(() => history.state);
+            expect(processState).toMatchObject({ defect: "process", restoreOnly: true, recordId: storedRecord.record_id, storageEntry: storageState.storageEntry });
+            for (const key of ["__NA", "__PRIVATE_NEXTJS_INTERNALS_TREE", "mobileShippingIndex", "mobileTargetEntry"]) {
+              if (key in storageState) expect(processState[key]).toEqual(storageState[key]);
+            }
+          };
+          const nativeMove = async (direction: "back" | "forward", target: "hub" | "storage"): Promise<void> => {
+            await page.evaluate((move) => history[move](), direction);
+            await expect.poll(() => page.evaluate(() => history.state?.defect)).toBe(target);
+          };
+
+          await openRestore();
+          expect(await page.evaluate(() => history.length)).toBe(storageLength + 1);
+          await nativeMove("back", "storage");
+          await expect(storageSearch).toBeVisible();
+          await openRestore();
+          await page.getByRole("button", { name: "목록", exact: true }).filter({ visible: true }).click();
+          await expect.poll(() => page.evaluate(() => history.state?.defect)).toBe("storage");
+          await openRestore();
+          await page.getByRole("spinbutton").filter({ visible: true }).fill(String(restoreQty));
+          await page.getByRole("button", { name: "사유 카테고리 선택", exact: true }).filter({ visible: true }).click();
+          await page.getByRole("dialog", { name: "사유 카테고리", exact: true }).getByRole("button", { name: "검사 통과", exact: true }).click();
+          await page.getByRole("button", { name: "정상 복귀 →", exact: true }).filter({ visible: true }).click();
+          await page.getByRole("dialog").getByRole("button", { name: "즉시 복귀", exact: true }).click();
+          await expect(storageSearch).toBeVisible();
+          await expect.poll(() => page.evaluate(() => history.state?.defect)).toBe("storage");
+          expect((await page.evaluate(() => history.state)).storageEntry).toBe(storageState.storageEntry);
+          await expect.poll(normalStock).toBe(normalBefore + restoreQty);
+          expect(await warehouseProductionStock()).toBe(warehouseProductionBefore);
+          await expect.poll(transactionCount).toBe(transactionsBefore + 1);
+          const remainingRecord = (await listRecords()).find((record) => record.record_id === storedRecord.record_id);
+          if (restoreQty === 5) {
+            expect(remainingRecord).toBeUndefined();
+            await expect(page.getByRole("article", { name: `${item.item_name} 격리 기록` }).filter({ hasText: memo, visible: true })).toHaveCount(0);
+          } else {
+            expect(Number(remainingRecord?.available_quantity)).toBe(5 - restoreQty);
+            const group = page.getByRole("button", { name: `${item.item_name} 격리 1건`, exact: true }).filter({ visible: true });
+            if (presentation.label === "모바일") await expect(group).toBeVisible();
+            if (await group.count() && await group.getAttribute("aria-expanded") !== "true") await group.click();
+            await expect(page.getByRole("article", { name: `${item.item_name} 격리 기록` }).filter({ hasText: memo, visible: true }).getByText(`${5 - restoreQty}개`, { exact: true })).toBeVisible();
+          }
+          const storageScreenshot = test.info().outputPath("restored-storage.png");
+          await page.screenshot({ path: storageScreenshot, fullPage: true });
+          await test.info().attach("restored-storage", { path: storageScreenshot, contentType: "image/png" });
+          await nativeMove("back", "hub");
+          await expect(page.getByRole("button").filter({ hasText: "격리 목록", visible: true })).toBeVisible();
+          await nativeMove("forward", "storage");
+          await page.getByRole("button", { name: "작업 선택", exact: true }).filter({ visible: true }).click();
+          await expect.poll(() => page.evaluate(() => history.state?.defect)).toBe("hub");
+          await nativeMove("forward", "storage");
+          await nativeMove("forward", "hub");
+          await expect(page.getByRole("spinbutton").filter({ visible: true })).toHaveCount(0);
+          expect(await transactionCount()).toBe(transactionsBefore + 1);
+          expect(await normalStock()).toBe(normalBefore + restoreQty);
+          expect(await warehouseProductionStock()).toBe(warehouseProductionBefore);
+          await test.info().attach("storage-navigation-evidence", {
+            body: JSON.stringify({ presentation: presentation.label, managementCategory, restoreQty, recordId: storedRecord.record_id, restoreDepartment: storedRecord.department, normalBefore, normalAfter: await normalStock(), warehouseProductionBefore, warehouseProductionAfter: await warehouseProductionStock(), transactionsBefore, transactionsAfter: await transactionCount(), storageEntry: storageState.storageEntry }),
+            contentType: "application/json",
+          });
+        });
+      }
+    }
+  }
 });
