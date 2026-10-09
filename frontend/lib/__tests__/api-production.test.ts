@@ -41,6 +41,16 @@ function inventoryOperationWire(overrides: Record<string, unknown> = {}) {
 }
 
 describe("productionApi", () => {
+  it("getTransactions forwards exact original log id and abort signal", async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(makeResponse([])));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const controller = new AbortController();
+    await productionApi.getTransactions({ logId: "original-log", includeArchived: true }, { signal: controller.signal });
+    const url = String(fetchSpy.mock.calls[0][0]);
+    expect(url).toContain("log_id=original-log");
+    expect(url).toContain("include_archived=true");
+    expect(fetchSpy.mock.calls[0][1].signal).toBe(controller.signal);
+  });
   it("productionReceipt POST /api/production/receipt", async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(makeResponse({})));
     globalThis.fetch = fetchSpy as unknown as typeof fetch;

@@ -519,7 +519,7 @@ describe("HistoryTable hierarchy", () => {
       department_qty_before: 4, department_qty_after: 5,
       inventory_effect: [
         { scope: "warehouse", delta: -1 },
-        { scope: "location", department, status: "PRODUCTION", delta: 1 },
+        { scope: "location", department, status: "PRODUCTION", delta: 1, quantity_before: 4, quantity_after: 5 },
         { scope: "location", department: "다른 부서", status: "DEFECTIVE", delta: -1 },
       ],
     });
@@ -537,7 +537,7 @@ describe("HistoryTable hierarchy", () => {
       ],
     });
     renderTable([{ type: "solo", log }]);
-    expect(screen.getByLabelText("재고 변동: 부서 4 +2→6")).toBeInTheDocument();
+    expect(screen.getByLabelText("재고 변동: 부서 합계 4 +2→6")).toBeInTheDocument();
   });
 
   it("opens the selected operation detail and child rows on the first primary-row click", () => {
@@ -659,7 +659,7 @@ describe("HistoryTable hierarchy", () => {
     expect(screen.queryByText("조립 22 −20 → 출하 22")).not.toBeInTheDocument();
   });
 
-  it("keeps the standard aggregate snapshot for a non-correction department transfer", () => {
+  it("shows both actual locations for a non-correction department transfer even when their total is unchanged", () => {
     const log = makeLog({
       transaction_type: "TRANSFER_DEPT",
       reference_no: "TRANSFER-20260910-01",
@@ -674,7 +674,7 @@ describe("HistoryTable hierarchy", () => {
     });
     renderTable([{ type: "solo", log }]);
 
-    expect(screen.getByLabelText("재고 변동 없음")).toHaveTextContent("변동 없음");
+    expect(screen.getByLabelText("재고 변동: 조립 20 −20→0, 출하 2 +20→22")).toBeInTheDocument();
     expect(screen.queryByLabelText(/^부서 위치 이동:/)).not.toBeInTheDocument();
   });
 
@@ -693,7 +693,7 @@ describe("HistoryTable hierarchy", () => {
     expect(screen.getAllByLabelText("부서 위치 이동: 조립 20 −20 → 출하 22")).toHaveLength(logs.length);
   });
 
-  it("combines the main department label with the request-order balance instead of the actual snapshot", () => {
+  it("labels request-order totals as aggregate when actual location values are missing", () => {
     const log = makeLog({
       department: "조립",
       warehouse_qty_before: 0, warehouse_qty_after: 0,
@@ -702,7 +702,7 @@ describe("HistoryTable hierarchy", () => {
       inventory_effect: [{ scope: "location", department: "조립", status: "PRODUCTION", delta: -44 }],
     });
     renderTable([{ type: "solo", log }]);
-    expect(screen.getByLabelText("재고 변동: 조립 44 −44→0")).toBeInTheDocument();
+    expect(screen.getByLabelText("재고 변동: 부서 합계 44 −44→0")).toBeInTheDocument();
     expect(screen.queryByText("94")).not.toBeInTheDocument();
   });
 
@@ -779,12 +779,12 @@ describe("HistoryTable hierarchy", () => {
     expect(itemCodeHeader).not.toHaveAttribute("colspan");
     expect(screen.queryByRole("columnheader", { name: "품목코드 · 수량" })).not.toBeInTheDocument();
     const row = screen.getByText("대표 품목").closest("tr")!;
-    const inventory = within(row).getByLabelText("재고 변동: 창고 0 +4→4, 조립 0 +7→7");
+    const inventory = within(row).getByLabelText("재고 변동: 창고 0 +4→4, 부서 합계 0 +7→7");
     const warehouseLine = within(inventory).getByLabelText("창고 0 +4→4");
     expect(warehouseLine).toBeInTheDocument();
     expect(within(warehouseLine).getByText("+4")).toHaveStyle({ width: "40px" });
     expect(within(warehouseLine).getByText("→")).toHaveAttribute("aria-hidden", "true");
-    expect(within(inventory).getByLabelText("조립 0 +7→7")).toBeInTheDocument();
+    expect(within(inventory).getByLabelText("부서 합계 0 +7→7")).toBeInTheDocument();
     expect(row).not.toHaveClass("opacity-60");
     expect(row).toHaveAttribute("data-history-cancelled", "true");
     expect(inventory.closest("td")).toBe(row.children[4]);
@@ -846,7 +846,7 @@ describe("HistoryTable hierarchy", () => {
     renderTable([{ type: "solo", log: returned }, { type: "solo", log: quarantined }]);
 
     expect(screen.getByLabelText("재고 변동: 불량 2 −1→1")).toBeInTheDocument();
-    expect(screen.getByLabelText("재고 변동: 튜브 5 −1→4, 불량 0 +1→1")).toBeInTheDocument();
+    expect(screen.getByLabelText("재고 변동: 부서 합계 5 −1→4, 불량 0 +1→1")).toBeInTheDocument();
   });
 
   it("renders operation and cancellation groups as separate expandable rows", () => {
@@ -906,6 +906,18 @@ describe("HistoryTable hierarchy", () => {
     expect(screen.getByText("원 작업 하위 자재").closest("tr")).toHaveAttribute("data-history-cancelled", "true");
   });
 
+  it.each(["DISASSEMBLE", "DEFECT_SCRAP"] as const)("재작업·폐기의 불량 재고 감소를 변동 없음으로 숨기지 않는다: %s", (transaction_type) => {
+    const log = makeLog({
+      transaction_type, quantity_change: -2, quantity_before: 8, quantity_after: 6,
+      warehouse_qty_before: 0, warehouse_qty_after: 0,
+      department_qty_before: 0, department_qty_after: 0,
+      inventory_effect: [{ scope: "location", department: "조립", status: "DEFECTIVE", delta: -2 }],
+    });
+    renderTable([{ type: "solo", log }]);
+    expect(screen.getByLabelText("재고 변동: 불량 8 −2→6")).toBeInTheDocument();
+    expect(screen.queryByLabelText("재고 변동 없음")).not.toBeInTheDocument();
+  });
+
   it("centers typical three-digit location changes on fixed baselines", () => {
     const log = makeLog({
       warehouse_qty_before: 472,
@@ -930,9 +942,9 @@ describe("HistoryTable hierarchy", () => {
 
     renderTable([{ type: "solo", log }, { type: "solo", log: shortLog }, { type: "solo", log: longAfterLog }]);
 
-    const departmentLine = screen.getByLabelText("조립 41 −21→20");
+    const departmentLine = screen.getByLabelText("부서 합계 41 −21→20");
     const noChangeMarker = screen.getByLabelText("재고 변동 없음");
-    const longDepartmentLine = screen.getByLabelText("조립 471 −16→455");
+    const longDepartmentLine = screen.getByLabelText("부서 합계 471 −16→455");
     const departmentLabel = departmentLine.children.item(0) as HTMLElement;
     const departmentBefore = departmentLine.children.item(1) as HTMLElement;
     const departmentDelta = departmentLine.children.item(2) as HTMLElement;
@@ -1062,8 +1074,8 @@ describe("HistoryTable hierarchy", () => {
     );
 
     const row = screen.getByText("대표 품목").closest("tr")!;
-    const inventory = within(row).getByLabelText("재고 변동: 조립 4 +1→5");
-    expect(within(inventory).getByLabelText("조립 4 +1→5")).toBeInTheDocument();
+    const inventory = within(row).getByLabelText("재고 변동: 부서 합계 4 +1→5");
+    expect(within(inventory).getByLabelText("부서 합계 4 +1→5")).toBeInTheDocument();
     expect(within(inventory).queryByLabelText(/^창고 /)).not.toBeInTheDocument();
   });
 
@@ -1096,7 +1108,7 @@ describe("HistoryTable hierarchy", () => {
 
     const row = screen.getByText("분해 대상 품목").closest("tr")!;
     expect(within(row).getByText("분해 출고")).toBeInTheDocument();
-    expect(within(row).getByLabelText("재고 변동: 조립 23 −1→22")).toBeInTheDocument();
+    expect(within(row).getByLabelText("재고 변동: 부서 합계 23 −1→22")).toBeInTheDocument();
   });
 
   it("uses the decreased BOM parent as the disassembly summary row", () => {
@@ -1133,7 +1145,7 @@ describe("HistoryTable hierarchy", () => {
 
     const row = screen.getByText("분해 대상 품목").closest("tr")!;
     expect(within(row).getByText("분해 출고")).toBeInTheDocument();
-    expect(within(row).getByLabelText("재고 변동: 조립 23 −1→22")).toBeInTheDocument();
+    expect(within(row).getByLabelText("재고 변동: 부서 합계 23 −1→22")).toBeInTheDocument();
   });
 
   it("does not reuse a component snapshot when a custom BOM parent was not executed", () => {
@@ -1189,7 +1201,7 @@ describe("HistoryTable hierarchy", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "묶음 펼치기" }));
     const bomRow = screen.getByText("BOM").closest("tr")!;
-    expect(within(bomRow).getByLabelText("재고 변동: 조립 0 +1→1")).toBeInTheDocument();
+    expect(within(bomRow).getByLabelText("재고 변동: 부서 합계 0 +1→1")).toBeInTheDocument();
   });
 
   it("keeps the final table geometry while the first page is loading", () => {

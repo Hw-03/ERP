@@ -184,6 +184,11 @@ export function HistoryKeyPointSummary({
             <Activity className="h-4 w-4" />
             재고 변화
           </div>
+          {impactStatus === "ready" && summary.warehouseUnchanged && (
+            <div className="px-4 pb-2 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>
+              창고 재고 변동 없음
+            </div>
+          )}
           {impactStatus === "loading" && (
             <div className="px-4 pb-3 text-xs font-bold" style={{ color: LEGACY_COLORS.muted2 }}>
               재고 변화 불러오는 중
@@ -268,8 +273,17 @@ export function HistoryKeyPointSummary({
                               </div>
                             )}
                           </div>
-                          <div className="shrink-0 text-sm font-black" style={{ color }}>
-                            {effect.deltaLabel}{effect.unit ? ` ${effect.unit}` : ""}
+                          <div
+                            className="shrink-0 text-sm font-black"
+                            style={{ color }}
+                            aria-label={effect.quantityBefore != null && effect.quantityAfter != null
+                              ? `${effect.label} ${formatQty(effect.quantityBefore)} ${effect.deltaLabel}→${formatQty(effect.quantityAfter)}${effect.unit ? ` ${effect.unit}` : ""}`
+                              : undefined}
+                          >
+                            {effect.quantityBefore != null && effect.quantityAfter != null
+                              ? <>{formatQty(effect.quantityBefore)} {effect.deltaLabel} → {formatQty(effect.quantityAfter)}</>
+                              : effect.deltaLabel}
+                            {effect.unit ? ` ${effect.unit}` : ""}
                           </div>
                         </>;
                       return (

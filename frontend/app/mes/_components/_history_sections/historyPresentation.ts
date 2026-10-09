@@ -146,6 +146,15 @@ function isComponentChangePhase(phase: string | null | undefined): boolean {
 
 function getComponentChangeLineLabel(log: TransactionLog): ReferenceBatchLinePresentation | null {
   const notes = log.notes?.trim() ?? "";
+  if (log.operation_kind === "CANCELLATION") {
+    if (Number(log.quantity_change) > 0) {
+      if (notes.includes("품목 전환 소스")) return { label: "기존품 회수 입고", tone: "success" };
+      if (notes.includes("품목 전환 추가 차감")) return { label: "추가 구성품 회수 입고", tone: "success" };
+    } else if (Number(log.quantity_change) < 0) {
+      if (notes.includes("품목 전환 회수 입고")) return { label: "회수품 차감", tone: "warning" };
+      if (notes.includes("품목 전환 대상")) return { label: "변경품 차감", tone: "warning" };
+    }
+  }
   if (notes.includes("품목 전환 소스")) return { label: "기존품 차감", tone: "warning" };
   if (notes.includes("품목 전환 추가 차감")) return { label: "추가 구성품 차감", tone: "warning" };
   if (notes.includes("품목 전환 회수 입고")) return { label: "회수 입고", tone: "success" };
@@ -208,6 +217,9 @@ export function getReferenceBatchLinePresentation(
     return { label: "출하 구성", tone: "muted" };
   }
   if (kind === "outbound") return { label: "출고품", tone: "danger" };
+  if (log.operation_role === "REWORK_CHILD_NORMAL") return { label: "정상 회수", tone: "success" };
+  if (log.operation_role === "REWORK_CHILD_DEFECTIVE") return { label: "불량 격리", tone: "warning" };
+  if (log.operation_role === "REWORK_CHILD_SCRAP") return { label: `폐기 ${formatQty(Math.abs(Number(log.quantity_change)))}${log.item_unit ? ` ${log.item_unit}` : ""}`, tone: "danger" };
   if (["TRANSFER_TO_PROD", "TRANSFER_TO_WH", "TRANSFER_DEPT"].includes(log.transaction_type)) {
     return { label: "이동 품목", tone: "muted" };
   }
@@ -628,9 +640,9 @@ function getStatusChips(
   const editCount = log.edit_count ?? 0;
   if (editCount > 0) chips.push({ label: `수정 ${editCount}`, tone: "warning" });
 
-  const memo = parseTransactionNotes(batch?.notes ?? log.notes, log.transaction_type).userMemo;
+  const memo = log.reason_memo?.trim() || parseTransactionNotes(batch?.notes ?? log.notes, log.transaction_type).userMemo;
   if (memo) chips.push({ label: "메모", tone: "primary", title: memo });
-  const defectReason = formatDefectReason(log);
+  const defectReason = log.reason_category?.trim();
   if (defectReason) chips.push({ label: "\uC0AC\uC720", tone: "warning", title: defectReason });
 
   if (stats && stats.shortageCount > 0) chips.push({ label: `부족 ${stats.shortageCount}`, tone: "danger" });
@@ -695,8 +707,9 @@ export function getHistoryListOperationLabel(
     case "ADJUST":
       return log.department === "창고" ? "창고 수량 조정" : "부서 입출고";
     case "MARK_DEFECTIVE":
-    case "DEFECT_SCRAP":
       return "불량";
+    case "DEFECT_SCRAP":
+      return "불량 폐기";
     case "SHIP":
       return "출하";
     case "INTERNAL_USE":

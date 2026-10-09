@@ -45,6 +45,9 @@ export interface TransactionLog {
   item_name: string;
   item_process_type_code: string | null;
   item_unit: string;
+  item_snapshot_preserved?: boolean;
+  current_item_name?: string | null;
+  current_mes_code?: string | null;
   transaction_type: TransactionType;
   quantity_change: number;
   quantity_before: number | null;

@@ -40,6 +40,69 @@ function makeLog(overrides: Partial<TransactionLog> = {}): TransactionLog {
   };
 }
 
+describe("rework warehouse evidence", () => {
+  it.each(["AS", "연구"])("labels the actual source stock for %s use", (destination) => {
+    const used = makeLog({
+      transaction_type: "INTERNAL_USE", department: destination, quantity_change: -1,
+      warehouse_qty_before: 10, warehouse_qty_after: 10,
+      department_qty_before: 7, department_qty_after: 6,
+      request_order_stock: { status: "available", reason: null, warehouse_qty_before: 10, warehouse_qty_after: 10, department_qty_before: 7, department_qty_after: 6 },
+      inventory_effect: [{ scope: "location", department: "튜브", status: "PRODUCTION", delta: -1, quantity_before: 7, quantity_after: 6 }],
+    });
+    expect(buildHistoryDetailSummary([used], null).actualStock).toMatchObject({ departmentName: "튜브", departmentBefore: 7, departmentAfter: 6 });
+  });
+
+  it("preserves the declared department for ordinary multi-location transfers", () => {
+    const transfer = makeLog({ transaction_type: "TRANSFER_TO_PROD", department: "조립",
+      department_qty_before: 7, department_qty_after: 8,
+      request_order_stock: { status: "available", reason: null, warehouse_qty_before: 10, warehouse_qty_after: 9, department_qty_before: 7, department_qty_after: 8 },
+      inventory_effect: [{ scope: "location", department: "튜브", delta: -1 }, { scope: "location", department: "조립", delta: 1 }],
+    });
+    expect(buildHistoryDetailSummary([transfer], null).actualStock?.departmentName).toBe("조립");
+  });
+
+  it.each([false, true])("keeps internal use ahead of its returned component in the detail, reversed=%s", (reversed) => {
+    const used = makeLog({ log_id: "used", item_id: "used-item", transaction_type: "INTERNAL_USE", department: "연구", quantity_change: -1,
+      inventory_effect: [{ scope: "location", department: "조립", status: "PRODUCTION", delta: -1 }] });
+    const returned = makeLog({ log_id: "returned", item_id: "returned-item", transaction_type: "PRODUCE", department: "조립", quantity_change: 2 });
+    const result = buildHistoryDetailSummary(reversed ? [used, returned] : [returned, used], makeBatch({ work_type: "internal_use", sub_type: "internal_use_out", to_department: "연구" }));
+    expect(result.target.itemId).toBe("used-item");
+    expect(result.operationLabel).toBe("연구소 반출");
+    expect(result.flow).toEqual({ label: "조립 → 연구", from: "조립", to: "연구" });
+  });
+
+  const parent = () => makeLog({
+    transaction_type: "DISASSEMBLE", operation_role: "REWORK_PARENT_NORMAL", quantity_change: -1,
+    reference_no: "defect-disassemble:normal-proof", warehouse_qty_before: 5, warehouse_qty_after: 5,
+    inventory_effect: [{ scope: "location", department: "조립", status: "PRODUCTION", delta: -1 }],
+  });
+  const child = () => makeLog({
+    log_id: "child", item_id: "child", transaction_type: "RECEIVE", operation_role: "REWORK_CHILD_NORMAL",
+    reference_no: "defect-disassemble:normal-proof", warehouse_qty_before: 9, warehouse_qty_after: 9,
+    inventory_effect: [{ scope: "location", department: "튜브", status: "PRODUCTION", delta: 1 }],
+  });
+
+  it("uses every stored warehouse snapshot and the actual normal source", () => {
+    const result = buildHistoryDetailSummary([parent(), child()], null);
+    expect(result.warehouseUnchanged).toBe(true);
+    expect(result.flow).toEqual({ label: "조립 재고 → 튜브 재고", from: "조립 재고", to: "튜브 재고" });
+  });
+
+  it.each([
+    { warehouse_qty_before: null },
+    { warehouse_qty_after: null },
+    { warehouse_qty_after: 10 },
+    { inventory_effect: [{ scope: "warehouse", delta: 1 }] },
+  ])("does not claim unchanged warehouse for missing or conflicting evidence %j", (patch) => {
+    const result = buildHistoryDetailSummary([parent(), { ...child(), ...patch }], null);
+    expect(result.warehouseUnchanged).toBe(false);
+  });
+
+  it("does not add the rework note to unrelated work", () => {
+    expect(buildHistoryDetailSummary([makeLog()], null).warehouseUnchanged).toBe(false);
+  });
+});
+
 function makeBatch(overrides: Partial<IoBatch> = {}): IoBatch {
   return {
     batch_id: "batch-1",
@@ -67,6 +130,34 @@ function makeBatch(overrides: Partial<IoBatch> = {}): IoBatch {
 }
 
 describe("buildHistoryDetailSummary", () => {
+  it("취소 상세는 원장의 정확한 작업명을 유지한다", () => {
+    const summary = buildHistoryDetailSummary([makeLog({
+      transaction_type: "INTERNAL_USE", department: "AS", operation_kind: "CANCELLATION",
+      operation_display_label: "AS 사용출고 취소", quantity_change: 2,
+      inventory_effect: [{ scope: "warehouse", delta: 2 }],
+    })], null);
+    expect(summary.operationLabel).toBe("AS 사용출고 취소");
+    expect(summary.flow).toEqual({ label: "AS → 창고", from: "AS", to: "창고" });
+  });
+
+  it("입고 배치 없는 역거래 상세도 원거래와 반대 방향을 표시한다", () => {
+    const summary = buildHistoryDetailSummary([makeLog({
+      transaction_type: "RECEIVE", operation_kind: "CANCELLATION", quantity_change: -2,
+      inventory_effect: [{ scope: "warehouse", delta: -2 }],
+    })], null);
+    expect(summary.flow).toEqual({ label: "창고 → 공급사", from: "창고", to: "공급사" });
+  });
+
+  it.each([
+    { operation_kind: "CANCELLATION", operation_effective_status: "cancellation", label: "취소 거래" },
+    { operation_kind: "BUSINESS", operation_effective_status: "cancelled", label: "취소됨" },
+    { operation_kind: "BUSINESS", operation_effective_status: "active", label: "완료" },
+  ] as const)("원거래와 역거래의 실제 상태를 구분한다 $operation_effective_status", ({ operation_kind, operation_effective_status, label }) => {
+    const summary = buildHistoryDetailSummary([makeLog({ operation_kind, operation_effective_status, cancelled: false, cancel_reason: "실제 사유" })], null);
+    expect(summary.status.label).toBe(label);
+    if (label !== "완료") expect(summary.status.reason).toBe("실제 사유");
+  });
+
   it("labels a mixed terminal batch as partially processed", () => {
     const summary = buildHistoryDetailSummary(
       [makeLog({ operation_batch_id: "batch-1" })],
@@ -154,6 +245,22 @@ describe("buildHistoryDetailSummary", () => {
     expect(summary.participants).toEqual([
       { label: "요청자", name: "김현우", at: "2026-07-10T01:00:00Z" },
       { label: "승인자", name: "관리자", at: "2026-07-10T01:05:00Z" },
+    ]);
+  });
+
+  it.each([
+    { work_type: "process" as const, sub_type: "produce" as const, label: "요청자 · 승인자" },
+    { work_type: "warehouse_io" as const, sub_type: "warehouse_to_dept" as const, label: "요청자" },
+  ])("$work_type 자동 승인 내역은 해당 업무의 역할 표시 계약을 보존한다", ({ work_type, sub_type, label }) => {
+    const summary = buildHistoryDetailSummary([makeLog({
+      requester_name: "직원 김", approver_name: "직원 김", produced_by: "직원 김",
+      approved_at: "2026-07-10T01:05:00Z",
+    })], makeBatch({
+      work_type, sub_type, requester_name: "직원 김", approver_name: "직원 김",
+    }));
+
+    expect(summary.participants).toEqual([
+      { label, name: "직원 김", at: "2026-07-10T01:05:00Z" },
     ]);
   });
 

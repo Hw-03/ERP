@@ -192,6 +192,81 @@ beforeEach(() => {
 });
 
 describe("desktop history detail panels", () => {
+  it.each(["desktop", "default"] as const)("%s 당시 품목과 현재 연결 품목을 구분한다", (variant) => {
+    render(<HistoryDetailPanel panelOpen variant={variant} allowCancellation={false} selected={makeLog({
+      item_snapshot_preserved: true, current_item_name: "현재 완제품 이름", current_mes_code: "현재-PF-002",
+    })} onSelectLog={vi.fn()} onLogUpdated={vi.fn()} />);
+    expect(screen.getByTestId("history-item-identity")).toHaveTextContent("거래 당시 품목: 완제품 A (PF-001)");
+    expect(screen.getByTestId("history-item-identity")).toHaveTextContent("현재 품목: 현재 완제품 이름 (현재-PF-002)");
+    expect(screen.queryByText(/당시 품목 정보가 보존되지 않아/)).not.toBeInTheDocument();
+  });
+  it("미보존 과거 기록은 현재 품목 표시임을 안내한다", () => {
+    render(<HistoryDetailPanel panelOpen allowCancellation={false} selected={makeLog({
+      item_snapshot_preserved: false, current_item_name: "완제품 A", current_mes_code: "PF-001",
+    })} onSelectLog={vi.fn()} onLogUpdated={vi.fn()} />);
+    expect(screen.getByTestId("history-item-identity")).toHaveTextContent("당시 품목 정보가 보존되지 않아 현재 품목 정보를 표시합니다.");
+    expect(screen.getByTestId("history-item-identity")).toHaveTextContent("현재 품목: 완제품 A (PF-001)");
+    expect(screen.getByTestId("history-item-identity")).not.toHaveTextContent("거래 당시 품목:");
+  });
+  it.each(["desktop", "default"] as const)("%s 역거래 상세의 정확한 작업명과 역방향을 유지한다", (variant) => {
+    render(<HistoryDetailPanel panelOpen variant={variant} allowCancellation={false} selected={makeLog({ transaction_type: "RECEIVE", operation_kind: "CANCELLATION", operation_display_label: "원자재 입고 취소", quantity_change: -2 })} onSelectLog={vi.fn()} onLogUpdated={vi.fn()} />);
+    expect(screen.getByText("원자재 입고 취소")).toBeInTheDocument();
+    if (variant === "default") {
+      expect(screen.queryByText("공급사 → 창고")).not.toBeInTheDocument();
+      expect(screen.getByText("창고")).toBeInTheDocument();
+      expect(screen.getByText("공급사")).toBeInTheDocument();
+    }
+  });
+  it.each(["desktop", "default"] as const)("%s 읽기전용 역거래에서 정확한 원작업으로 이동한다", async (variant) => {
+    const original = makeLog({ log_id: "original" });
+    const select = vi.fn();
+    vi.mocked(productionApi.getTransactions).mockResolvedValue([makeLog({ log_id: "unrelated" }), original]);
+    render(<HistoryDetailPanel panelOpen variant={variant} allowCancellation={false} selected={makeLog({ operation_kind: "CANCELLATION", reverses_log_id: "original" })} onSelectLog={select} onLogUpdated={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "원래 작업 보기", exact: true }));
+    await waitFor(() => expect(select).toHaveBeenCalledWith(original));
+    expect(productionApi.getTransactions).toHaveBeenCalledWith({ logId: "original", includeArchived: true }, { signal: expect.any(AbortSignal) });
+    expect(screen.queryByRole("button", { name: "이 내역 취소" })).not.toBeInTheDocument();
+  });
+
+  it("원거래에서 같은 역거래 원장의 정확한 취소작업만 선택한다", async () => {
+    const reverse = makeLog({ log_id: "reverse", operation_kind: "CANCELLATION", reverses_log_id: "output" });
+    const select = vi.fn();
+    vi.mocked(productionApi.getTransactions).mockResolvedValue([makeLog({ log_id: "other", reverses_log_id: "other-original" }), reverse]);
+    render(<HistoryDetailPanel panelOpen allowCancellation={false} selected={makeLog({ reversal_operation_id: "reverse-operation" })} onSelectLog={select} onLogUpdated={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "취소 작업 보기", exact: true }));
+    await waitFor(() => expect(select).toHaveBeenCalledWith(reverse));
+    expect(productionApi.getTransactions).toHaveBeenCalledWith({ operationId: "reverse-operation", includeArchived: true }, { signal: expect.any(AbortSignal) });
+  });
+
+  it.each(["missing", "failure"] as const)("연결조회 %s는 임의선택 없이 안내 후 재시도한다", async (mode) => {
+    const original = makeLog({ log_id: "original" });
+    const select = vi.fn();
+    if (mode === "failure") vi.mocked(productionApi.getTransactions).mockRejectedValueOnce(new Error("offline"));
+    else vi.mocked(productionApi.getTransactions).mockResolvedValueOnce([makeLog({ log_id: "unrelated" })]);
+    vi.mocked(productionApi.getTransactions).mockResolvedValueOnce([original]);
+    render(<HistoryDetailPanel panelOpen allowCancellation={false} selected={makeLog({ reverses_log_id: "original" })} onSelectLog={select} onLogUpdated={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "원래 작업 보기", exact: true }));
+    const retry = await screen.findByRole("button", { name: "연결 작업 다시 시도", exact: true });
+    expect(select).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent(mode === "failure" ? "연결 작업을 불러오지 못했습니다." : "연결 작업을 찾을 수 없습니다.");
+    fireEvent.click(retry);
+    await waitFor(() => expect(select).toHaveBeenCalledWith(original));
+  });
+
+  it.each(["close", "switch"] as const)("연결조회 중 %s 뒤 늦은 응답은 선택을 바꾸지 않는다", async (mode) => {
+    const pending = deferred<TransactionLog[]>();
+    vi.mocked(productionApi.getTransactions).mockReturnValue(pending.promise);
+    const select = vi.fn();
+    const selected = makeLog({ reverses_log_id: "original" });
+    const { rerender } = render(<HistoryDetailPanel panelOpen allowCancellation={false} selected={selected} onSelectLog={select} onLogUpdated={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "원래 작업 보기", exact: true }));
+    const signal = vi.mocked(productionApi.getTransactions).mock.calls[0][1]?.signal;
+    rerender(<HistoryDetailPanel panelOpen={mode !== "close"} allowCancellation={false} selected={mode === "switch" ? makeLog({ log_id: "next" }) : selected} onSelectLog={select} onLogUpdated={vi.fn()} />);
+    expect(signal?.aborted).toBe(true);
+    await act(async () => pending.resolve([makeLog({ log_id: "original" })]));
+    expect(select).not.toHaveBeenCalled();
+  });
+
   it("모바일 구성 조회 실패에도 거래 재고를 유지하고 재시도한다", async () => {
     const batch = makeBatch();
     const selected = makeLog({operation_batch_id:batch.batch_id,operation_line_id:batch.bundles[0].lines[0].line_id});
@@ -261,7 +336,7 @@ describe("desktop history detail panels", () => {
     const code = within(row).getByText(line.mes_code!);
     expect(code.closest("button")).toHaveAccessibleName(`${line.item_name} ${line.mes_code} 상세`);
     if (match === "exact" || match === "legacy") {
-      expect(within(row).getByLabelText("조립 10 −4→6")).toBeInTheDocument();
+      expect(within(row).getByLabelText("부서 합계 10 −4→6")).toBeInTheDocument();
     } else {
       expect(within(row).getByText("—")).toBeInTheDocument();
       expect(within(row).queryByLabelText("조립 10 −4→6")).not.toBeInTheDocument();

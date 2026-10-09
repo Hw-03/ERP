@@ -116,6 +116,31 @@ export function resolveStockSnapshot(log: TransactionLog): ResolvedStockSnapshot
   };
 }
 
+type NormalStockSnapshot = { label: string; before: number; after: number };
+
+/** 서버가 확정한 위치 수량만 사용하고, 위치 이력이 부족하면 합계임을 명시한다. */
+export function getNormalStockSnapshots(log: TransactionLog, snapshot: Extract<ResolvedStockSnapshot, { status: "available" }>): NormalStockSnapshot[] {
+  const effects = log.inventory_effect ?? [];
+  const warehouseEffect = effects.find((effect) => effect.scope === "warehouse"
+    && Number.isFinite(effect.quantity_before) && Number.isFinite(effect.quantity_after));
+  const locationEffects = effects.filter((effect) => effect.scope === "location"
+    && effect.status === "PRODUCTION" && Number(effect.delta) !== 0);
+  const locationSnapshots = locationEffects.flatMap((effect) => {
+    const department = effect.department?.trim();
+    const before = effect.quantity_before;
+    const after = effect.quantity_after;
+    return department && typeof before === "number" && typeof after === "number" && Number.isFinite(before) && Number.isFinite(after)
+      ? [{ label: department, before, after }]
+      : [];
+  });
+  return [
+    { label: "창고", before: warehouseEffect?.quantity_before ?? snapshot.warehouseBefore, after: warehouseEffect?.quantity_after ?? snapshot.warehouseAfter },
+    ...locationSnapshots,
+    ...(locationEffects.length > 0 && locationSnapshots.length === locationEffects.length ? []
+      : [{ label: "부서 합계", before: snapshot.departmentBefore, after: snapshot.departmentAfter }]),
+  ].filter((entry) => entry.before !== entry.after);
+}
+
 export function FlowBadge({
   type,
   label,
@@ -500,27 +525,10 @@ export function StockSnapshotContent({
     );
   }
   const { warehouseBefore, warehouseAfter, departmentBefore, departmentAfter } = snapshot;
-  const warehouseBeforeText = formatQty(warehouseBefore);
-  const warehouseAfterText = formatQty(warehouseAfter);
-  const departmentBeforeText = formatQty(departmentBefore);
-  const departmentAfterText = formatQty(departmentAfter);
-  const changedDepartments = new Set(
-    (log.inventory_effect ?? [])
-      .filter((effect) => effect.scope === "location" && effect.status === "PRODUCTION" && Number(effect.delta) !== 0)
-      .map((effect) => effect.department?.trim())
-      .filter((department): department is string => Boolean(department)),
-  );
-  // 정상 부서 재고의 합계이므로 여러 부서가 변한 로그를 한 부서로 단정하지 않는다.
-  const departmentLabel = changedDepartments.size === 1
-    ? Array.from(changedDepartments)[0]
-    : changedDepartments.size === 0 && log.department?.trim() && log.department.trim() !== "창고"
-      ? log.department.trim()
-      : "부서";
-  const normalSnapshots = [
-    { label: "창고", before: warehouseBefore, after: warehouseAfter, beforeText: warehouseBeforeText, afterText: warehouseAfterText },
-    { label: departmentLabel, before: departmentBefore, after: departmentAfter, beforeText: departmentBeforeText, afterText: departmentAfterText },
-  ].filter((stockSnapshot) => stockSnapshot.before !== stockSnapshot.after);
-  const showsDefectiveStock = ["MARK_DEFECTIVE", "UNMARK_DEFECTIVE", "SUPPLIER_RETURN"].includes(log.transaction_type);
+  const normalSnapshots = getNormalStockSnapshots(log, snapshot).map((entry) => ({
+    ...entry, beforeText: formatQty(entry.before), afterText: formatQty(entry.after),
+  }));
+  const showsDefectiveStock = ["MARK_DEFECTIVE", "UNMARK_DEFECTIVE", "SUPPLIER_RETURN", "DISASSEMBLE", "DEFECT_SCRAP"].includes(log.transaction_type);
   const defectiveDelta = showsDefectiveStock
     ? (log.inventory_effect ?? [])
       .filter((effect) => effect.status === "DEFECTIVE")
@@ -654,12 +662,7 @@ export function getStockSnapshotQuantityWidth(logs: TransactionLog[]): number | 
   const quantities = logs.flatMap((log) => {
     const snapshot = resolveStockSnapshot(log);
     if (snapshot.status !== "available") return [];
-    const warehouseChanged = snapshot.warehouseBefore !== snapshot.warehouseAfter;
-    const departmentChanged = snapshot.departmentBefore !== snapshot.departmentAfter;
-    return [
-      ...(warehouseChanged ? [snapshot.warehouseBefore, snapshot.warehouseAfter] : []),
-      ...(departmentChanged ? [snapshot.departmentBefore, snapshot.departmentAfter] : []),
-    ];
+    return getNormalStockSnapshots(log, snapshot).flatMap((entry) => [entry.before, entry.after]);
   });
   return quantities.length > 0
     ? Math.max(STOCK_SNAPSHOT_MIN_QUANTITY_WIDTH_PX, ...quantities.map((quantity) => formatQty(quantity).length * STOCK_SNAPSHOT_DIGIT_WIDTH_PX))
@@ -706,7 +709,7 @@ function StockSnapshotLine({
   }
   return (
     <span aria-label={`${label} ${beforeText} ${deltaText}→${afterText}`} className="inline-flex items-center whitespace-nowrap text-xs font-semibold leading-4">
-      <span className="w-7 text-left" style={{ color: LEGACY_COLORS.muted }}>{label}</span>
+      <span className={`w-7 text-left${label === "부서 합계" ? " whitespace-normal" : ""}`} style={{ color: LEGACY_COLORS.muted }}>{label}</span>
       <span className="text-right tabular-nums" style={{ color: LEGACY_COLORS.muted2, width: `${beforeQuantityWidthPx}px` }}>{beforeText}</span>
       <span data-history-after-stock={cancelled || undefined} className="shrink-0 text-left font-bold tabular-nums" style={{ color: afterColor, width: `${STOCK_SNAPSHOT_DELTA_WIDTH_PX}px` }}>{deltaText}</span>
       <span aria-hidden="true" data-history-after-stock={cancelled || undefined} className="shrink-0 text-center font-bold" style={{ color: afterColor, width: `${STOCK_SNAPSHOT_ARROW_WIDTH_PX}px` }}>→</span>
@@ -760,6 +763,10 @@ export type LogGroup = (
 
 /** 작업의 구성품 입고보다 사용자가 처리한 부모 품목을 대표로 선택한다. */
 function getOperationPrimaryLog(logs: TransactionLog[]): TransactionLog {
+  const conversionTarget = logs.find((log) => log.shipping_phase === "COMPONENT_CHANGE" && log.transaction_type === "PRODUCE");
+  if (conversionTarget) return conversionTarget;
+  const internalUse = logs.find((log) => log.transaction_type === "INTERNAL_USE");
+  if (internalUse) return internalUse;
   const pickupLog = logs.find((log) => log.transaction_type === "SHIP"
     && log.shipping_phase === "PICKUP" && !isShippingCompanionNote(log.notes));
   if (pickupLog) return pickupLog;

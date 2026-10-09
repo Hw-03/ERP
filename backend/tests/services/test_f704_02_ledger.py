@@ -6,12 +6,15 @@ import os
 import re
 import subprocess
 import zipfile
+from collections.abc import Callable
 from datetime import date, datetime
 from io import BytesIO
 from types import SimpleNamespace
+from typing import Any
 
 from openpyxl import load_workbook
 import pytest
+from sqlalchemy.orm import Session
 
 from app.models import Employee, IoBatch, TransactionLog, TransactionTypeEnum
 from app.services.f704_02_ledger import (
@@ -146,9 +149,9 @@ def test_legacy_receive_without_supplier_snapshot_keeps_external_receipt_fallbac
 
 
 def test_collect_and_render_supplier_receipt_reversal_uses_snapshot_counterpart(
-    db_session, make_item
-):
-    """취소 역거래도 실제 collect·render 경로에서 H열 업체명 스냅샷을 유지한다."""
+    db_session: Session, make_item: Callable[..., Any]
+) -> None:
+    """명시적인 정·역거래를 각 발생일에 보존하고 두 H열 모두 당시 업체명을 쓴다."""
     requester = Employee(
         employee_code="F704-SUPPLIER",
         name="F704 담당자",
@@ -168,6 +171,7 @@ def test_collect_and_render_supplier_receipt_reversal_uses_snapshot_counterpart(
         requester_name=requester.name,
         requester_department="창고",
         supplier_name_snapshot="취소 공급업체",
+        notes="원자재 입고 당시 메모",
         requires_approval=False,
     )
     db_session.add(batch)
@@ -200,12 +204,30 @@ def test_collect_and_render_supplier_receipt_reversal_uses_snapshot_counterpart(
     db_session.flush()
 
     entries = collect_entries(db_session, 2026)
-    worksheet = load_workbook(BytesIO(render_workbook(entries)), data_only=False)["양식"]
+    assert [entry.log_id for entry in entries] == [str(original.log_id), str(reversal.log_id)]
+    assert [entry.occurred_on for entry in entries] == [date(2026, 1, 2), date(2026, 1, 3)]
+    assert [entry.created_at.hour for entry in entries] == [9, 9]
+    assert [entry.quantity for entry in entries] == [4, 4]
+    assert [entry.direction for entry in entries] == ["입고", "출고"]
+    assert [entry.counterpart for entry in entries] == ["취소 공급업체", "취소 공급업체"]
+    assert original.quantity_change + reversal.quantity_change == 0
 
-    assert len(entries) == 1
-    assert entries[0].direction == "출고"
-    assert entries[0].counterpart == "취소 공급업체"
-    assert worksheet["H4"].value == "취소 공급업체"
+    workbook = load_workbook(BytesIO(render_workbook(entries)), data_only=False)
+    try:
+        worksheet = workbook["양식"]
+        for row, occurred_on, direction in [(4, date(2026, 1, 2), "입고"), (5, date(2026, 1, 3), "출고")]:
+            assert worksheet[f"A{row}"].value == row - 3
+            assert worksheet[f"B{row}"].value.date() == occurred_on
+            assert worksheet[f"D{row}"].value == item.mes_code
+            assert worksheet[f"E{row}"].value == item.item_name
+            assert worksheet[f"F{row}"].value == 4
+            assert worksheet[f"G{row}"].value == direction
+            assert worksheet[f"H{row}"].value == "취소 공급업체"
+            assert worksheet[f"I{row}"].value == requester.name
+            assert worksheet[f"K{row}"].value == "원자재 입고 당시 메모"
+        assert worksheet["E6"].value is None
+    finally:
+        workbook.close()
 
 
 def test_template_keeps_both_forms_but_has_no_ledger_values():

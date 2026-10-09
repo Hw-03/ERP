@@ -336,9 +336,14 @@ describe("historyPresentation", () => {
     expect(getHistoryListOperationLabel(log)).toBe(
       transactionType === "UNMARK_DEFECTIVE"
         ? "불량 정상 복귀"
-        : transactionType === "SUPPLIER_RETURN" ? "반품" : "불량",
+        : transactionType === "SUPPLIER_RETURN" ? "반품" : transactionType === "DEFECT_SCRAP" ? "불량 폐기" : "불량",
     );
     expect(getHistoryRowPresentation(log).operation.label).toBe(detailLabel);
+  });
+
+  it("8.7-08 정상 재고 즉시폐기는 불량 폐기로 구분하고 취소 방향을 보존한다", () => {
+    expect(getHistoryListOperationLabel(makeLog({ transaction_type: "DEFECT_SCRAP" }))).toBe("불량 폐기");
+    expect(getHistoryListOperationLabel(makeLog({ transaction_type: "DEFECT_SCRAP", operation_kind: "CANCELLATION" }))).toBe("불량 폐기 취소");
   });
 
   it("labels rework rows and their cancellation from the rework reference", () => {
@@ -612,6 +617,14 @@ describe("historyPresentation", () => {
     ).label).toBe("구성품 차감");
   });
 
+  it("8.8-07 재작업 하위 정상·격리·폐기 배분을 구분하고 재고 효과가 없는 폐기도 수량을 표시한다", () => {
+    expect(getReferenceBatchLinePresentation(makeLog({ operation_role: "REWORK_CHILD_NORMAL", quantity_change: 2 }), "batch")).toEqual({ label: "정상 회수", tone: "success" });
+    expect(getReferenceBatchLinePresentation(makeLog({ operation_role: "REWORK_CHILD_DEFECTIVE", transaction_type: "MARK_DEFECTIVE", quantity_change: 1 }), "batch")).toEqual({ label: "불량 격리", tone: "warning" });
+    const scrap = makeLog({ operation_role: "REWORK_CHILD_SCRAP", transaction_type: "DEFECT_SCRAP", quantity_change: -1, inventory_effect: [] });
+    expect(getReferenceBatchLinePresentation(scrap, "batch")).toEqual({ label: "폐기 1 EA", tone: "danger" });
+    expect(scrap.inventory_effect).toEqual([]);
+  });
+
   it("labels correction operation children as single-item inbound or outbound by direction", () => {
     expect(getReferenceBatchLinePresentation(
       makeLog({ transaction_type: "ADJUST", operation_role: "CORRECTION", quantity_change: 2 }),
@@ -769,7 +782,35 @@ describe("history immediate UX presentation policies", () => {
     expect(row.flow.label).toBe(expected);
   });
 });
+describe("defect reason field identity", () => {
+  it("8.6-09 8.10-04 8.13-07 과거 메모만 있는 불량 거래는 사유 칩을 만들지 않는다", () => {
+    for (const transaction_type of ["MARK_DEFECTIVE", "UNMARK_DEFECTIVE", "DEFECT_SCRAP", "SUPPLIER_RETURN"] as const) {
+      const row = getHistoryRowPresentation(makeLog({ transaction_type, notes: "직원이 쓴 메모",
+        reason_category: null, reason_memo: "직원이 쓴 메모" }));
+      expect(row.statusChips).toEqual([{ label: "메모", tone: "primary", title: "직원이 쓴 메모" }]);
+    }
+  });
+
+  it("8.6-09 사유 칩과 메모 칩은 각각 입력한 필드만 설명한다", () => {
+    const row = getHistoryRowPresentation(makeLog({ transaction_type: "MARK_DEFECTIVE", notes: "격리: warehouse → 창고",
+      reason_category: "외관 불량", reason_memo: "직원이 쓴 메모" }));
+    expect(row.statusChips.find(chip => chip.label === "사유")).toEqual({ label: "사유", tone: "warning", title: "외관 불량" });
+    expect(row.statusChips.find(chip => chip.label === "메모")).toEqual({ label: "메모", tone: "primary", title: "직원이 쓴 메모" });
+  });
+});
+
 describe("shipping phase history presentation", () => {
+  it.each([
+    ["품목 전환 소스 AF 사용: 기존품 x 1", 1, "기존품 회수 입고", "success"],
+    ["품목 전환 추가 차감: 추가품 x 2", 2, "추가 구성품 회수 입고", "success"],
+    ["품목 전환 회수 입고: 회수품 x 2", -2, "회수품 차감", "warning"],
+    ["품목 전환 대상 AF 입고: 변경품 x 1", -1, "변경품 차감", "warning"],
+  ] as const)("8.16-14 전환 취소 %s의 실제 증가·감소 방향과 작업명이 일치한다", (notes, quantity, label, tone) => {
+    const reversal = makeLog({ notes: `${notes} 취소: 원복`, quantity_change: quantity,
+      operation_kind: "CANCELLATION", reverses_log_id: "original", shipping_phase: "COMPONENT_CHANGE" });
+    expect(getReferenceBatchLinePresentation(reversal, "shipment")).toEqual({ label, tone });
+  });
+
   it("labels shipping component-change batches by phase", () => {
     const componentChange = getReferenceBatchPresentation([
       makeLog({

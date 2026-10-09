@@ -42,6 +42,7 @@ from app.schemas import (
     TransactionQuantityCorrectionResponse,
 )
 from app.services import transaction_actions as transaction_actions_svc
+from app.services.transaction_item_identity import transaction_item_identity
 from app.services import inventory_operation_cancellation as operation_cancellation_svc
 from app.services import legacy_inventory_operation_adoption as legacy_adoption_svc
 from app.services.transaction_display_groups import DisplayGroup, DisplayGroupRecord, group_display_records
@@ -51,6 +52,7 @@ from app.services.pin_auth import verify_pin
 from app.utils.search import build_normalized_search_filter
 from app._actor import set_actor
 from app.routers.inventory._tx_filters import (
+    LEGACY_DEFECT_REWORK_REFERENCE_PREFIX,
     _SUMMARY_WAREHOUSE_TYPES,
     _SUMMARY_DEPT_TYPES,
     _SUMMARY_ADJUST_TYPES,
@@ -69,6 +71,8 @@ from app.routers.inventory._tx_filters import (
     _to_log_response,
 )
 from app.repositories import item_repository, inventory_repository
+from app.services.inventory_effect_history import load_inventory_effect_quantities
+from app.services.inventory_operation_ownership import operation_requester_id
 
 
 router = APIRouter()
@@ -246,6 +250,11 @@ def _history_work_key() -> ColumnElement:
     return case(
         (TransactionLog.operation_id.is_not(None), literal("operation:") + cast(TransactionLog.operation_id, String)),
         (TransactionLog.operation_batch_id.is_not(None), literal("batch:") + cast(TransactionLog.operation_batch_id, String)),
+        (TransactionLog.reference_no.like(f"{LEGACY_DEFECT_REWORK_REFERENCE_PREFIX}%"),
+         literal("rework:") + TransactionLog.reference_no + case(
+             (TransactionLog.reverses_log_id.is_not(None), literal(":reverse")),
+             else_=literal(":original"),
+         )),
         (and_(TransactionLog.shipping_request_id.is_not(None), TransactionLog.transaction_type == TransactionTypeEnum.SHIP,
               TransactionLog.reference_no.like("SHIP-%")),
          literal("shipping:") + cast(TransactionLog.shipping_request_id, String) + literal(":") + TransactionLog.reference_no),
@@ -305,6 +314,7 @@ def monthly_counts(
 
 @router.get("/transactions", response_model=List[TransactionLogResponse])
 def list_transactions(
+    log_id: Optional[uuid.UUID] = Query(None),
     item_id: Optional[uuid.UUID] = Query(None),
     operation_id: Optional[uuid.UUID] = Query(None),
     operation_batch_id: Optional[uuid.UUID] = Query(None),
@@ -342,6 +352,9 @@ def list_transactions(
         .join(Item, TransactionLog.item_id == Item.item_id)
         .outerjoin(IoBatch, TransactionLog.operation_batch_id == IoBatch.batch_id)
     )
+
+    if log_id:
+        query = query.filter(TransactionLog.log_id == log_id)
 
     if item_id:
         query = query.filter(TransactionLog.item_id == item_id)
@@ -423,8 +436,11 @@ def list_transactions(
         {log.item_id for log, _, _ in rows},
         request_date_expr=requested_at_order,
     )
+    effect_quantities = load_inventory_effect_quantities(db, [log for log, _, _ in rows])
     for response in result:
         response.request_order_stock = request_order_stock.get(response.log_id)
+        if response.log_id in effect_quantities:
+            response.inventory_effect = effect_quantities[response.log_id]
     return result
 
 
@@ -546,6 +562,7 @@ def list_transaction_display_groups(
             db.query(TransactionLog, Item).join(Item, TransactionLog.item_id == Item.item_id)
             .filter(TransactionLog.log_id.in_(selected_ids)).all()
         )
+        effect_quantities = load_inventory_effect_quantities(db, [log for log, _ in detail_rows])
         requested_at_by_id = {row.log_id: row.request_order_at for row in rows if row.log_id in selected_ids}
         for log, item in detail_rows:
             info = stock_request_map.get(log.reference_no) or batch_map.get(log.operation_batch_id)
@@ -560,6 +577,8 @@ def list_transaction_display_groups(
                 reversal=operation_info.reversal if operation_info else None,
                 history_batch=_history_batch_response(batch_map.get(log.operation_batch_id)),
             )
+            if log.log_id in effect_quantities:
+                details[log.log_id].inventory_effect = effect_quantities[log.log_id]
     page_groups = [
         TransactionDisplayGroupResponse(
             type=group.type, key=group.key, logs=[details[log.log_id] for log in group.logs],
@@ -825,6 +844,8 @@ def export_transactions_csv(
         query = query.filter(TransactionLog.transaction_type == transaction_type)
     search_filter = build_normalized_search_filter(
         search,
+        TransactionLog.item_snapshot["item_name"].as_string(),
+        TransactionLog.item_snapshot["mes_code"].as_string(),
         Item.item_name,
         Item.mes_code,
         TransactionLog.reference_no,
@@ -863,9 +884,11 @@ def export_transactions_csv(
             "approver_name",
             "supplier_name",
             "notes",
+            "item_identity_basis", "current_item_name", "current_mes_code",
         ]
     )
     for log, item in rows:
+        identity = transaction_item_identity(log, item)
         info = sr_map.get(log.reference_no) if log.reference_no else None
         if info is None:
             info = batch_map.get(log.operation_batch_id)
@@ -875,9 +898,9 @@ def export_transactions_csv(
             [
                 log.created_at.isoformat(),
                 log.transaction_type.value,
-                item.mes_code or "",
-                item.item_name,
-                item.process_type_code or "",
+                identity["mes_code"] or "",
+                identity["item_name"],
+                identity["item_process_type_code"] or "",
                 float(log.quantity_change),
                 "" if log.quantity_before is None else float(log.quantity_before),
                 "" if log.quantity_after is None else float(log.quantity_after),
@@ -887,6 +910,8 @@ def export_transactions_csv(
                 approver or "",
                 log.supplier_name_snapshot or "",
                 log.notes or "",
+                "거래 당시" if identity["item_snapshot_preserved"] else "현재 품목 (당시 정보 미보존)",
+                identity["current_item_name"], identity["current_mes_code"] or "",
             ]
         )
 
@@ -922,6 +947,8 @@ def export_transactions_xlsx(
         query = query.filter(TransactionLog.transaction_type == transaction_type)
     search_filter = build_normalized_search_filter(
         search,
+        TransactionLog.item_snapshot["item_name"].as_string(),
+        TransactionLog.item_snapshot["mes_code"].as_string(),
         Item.item_name,
         Item.mes_code,
         TransactionLog.reference_no,
@@ -959,6 +986,7 @@ def export_transactions_xlsx(
     columns = [
         "일시", "유형", "품목 코드", "품목명", "공정코드",
         "수량변화", "이전재고", "이후재고", "참조번호", "담당자", "요청자", "승인자", "공급업체", "메모",
+        "품목 정보 기준", "현재 품목명", "현재 품목 코드",
     ]
     apply_header(ws, columns)
 
@@ -966,6 +994,7 @@ def export_transactions_xlsx(
     negative_font = Font(color="CC0000", bold=True)
 
     for log, item in rows:
+        identity = transaction_item_identity(log, item)
         tx_val = log.transaction_type.value
         info = sr_map.get(log.reference_no) if log.reference_no else None
         if info is None:
@@ -981,9 +1010,9 @@ def export_transactions_xlsx(
                 if tx_val == "INTERNAL_USE" and log.department == "연구"
                 else tx_label.get(tx_val, tx_val)
             ),
-            item.mes_code or "",
-            item.item_name,
-            item.process_type_code or "",
+            identity["mes_code"] or "",
+            identity["item_name"],
+            identity["item_process_type_code"] or "",
             float(log.quantity_change),
             float(log.quantity_before) if log.quantity_before is not None else "",
             float(log.quantity_after) if log.quantity_after is not None else "",
@@ -993,6 +1022,8 @@ def export_transactions_xlsx(
             approver or "",
             log.supplier_name_snapshot or "",
             log.notes or "",
+            "거래 당시" if identity["item_snapshot_preserved"] else "현재 품목 (당시 정보 미보존)",
+            identity["current_item_name"], identity["current_mes_code"] or "",
         ]
         ws.append(row_data)
 
@@ -1218,7 +1249,7 @@ def cancel_transaction(
 ):
     """거래 취소 — 내역 유지 + 재고 자동 롤백 + '취소됨' 표시.
 
-    권한: 배치 요청자 본인(배치가 없으면 producer_employee_id) 또는 결재 권한자.
+    권한: 배치·작업 요청자 본인(원장 연결이 없으면 처리자) 또는 결재 권한자.
     BOM 배치(PRODUCE+BACKFLUSH)는 operation_batch_id 단위로 일괄 취소.
     """
     log = db.query(TransactionLog).filter(TransactionLog.log_id == log_id).first()
@@ -1243,7 +1274,8 @@ def cancel_transaction(
     # 권한 체크: 본인(요청자) 또는 결재 권한자
     # 요청자 식별 — 히스토리 화면의 '요청자' 표기와 동일한 우선순위로 판정한다:
     #   1) operation_batch_id -> IoBatch.requester_employee_id
-    #   2) producer_employee_id (배치 요청자 정보가 없는 거래)
+    #   2) 작업 원장의 불변 StockRequest 연결 또는 작업 처리자
+    #   3) producer_employee_id (배치·원장 연결이 없는 거래)
     # 승인 거래의 producer_employee_id는 요청자가 아닌 승인 처리자일 수 있다.
     # produced_by is only a display snapshot and is not trusted for authorization.
     requester_eid: Optional[str] = None
@@ -1255,7 +1287,11 @@ def cancel_transaction(
         )
         if batch is not None and batch.requester_employee_id is not None:
             requester_eid = str(batch.requester_employee_id)
-    if requester_eid is None and log.producer_employee_id is not None:
+    if requester_eid is None and log.operation_id is not None:
+        operation = db.get(InventoryOperation, log.operation_id)
+        requester = operation_requester_id(db, operation) if operation is not None else None
+        requester_eid = str(requester) if requester is not None else None
+    if requester_eid is None and log.operation_id is None and log.producer_employee_id is not None:
         requester_eid = str(log.producer_employee_id)
     is_self = requester_eid == str(canceller.employee_id) if requester_eid is not None else False
     is_approver = (

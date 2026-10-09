@@ -66,6 +66,56 @@ function readBlobText(blob: Blob): Promise<string> {
 }
 
 describe("AdminExportSection", () => {
+  it("입출고 CSV는 당시 품목과 미보존 현재 품목 기준을 구분한다", async () => {
+    const { createObjectURL } = stubObjectUrl("blob:item-identity");
+    state.getTransactions.mockResolvedValue([
+      { created_at: new Date().toISOString(), item_name: "당시 이름", current_item_name: "현재 이름", current_mes_code: "3-HR-0001", item_snapshot_preserved: true },
+      { created_at: new Date().toISOString(), item_name: "과거 미보존", current_item_name: "과거 미보존", current_mes_code: "3-TR-0002", item_snapshot_preserved: false },
+    ].map((row) => ({ ...row, transaction_type: "RECEIVE", quantity_change: 1, item_unit: "EA", notes: "" })));
+    render(<AdminExportSection />);
+    const region = screen.getByRole("region", { name: "데이터 내보내기" });
+    fireEvent.click(within(region).getByRole("button", { name: "입출고", exact: true }));
+    fireEvent.click(within(region).getByRole("button", { name: "입출고 CSV 다운로드", exact: true }));
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalledTimes(1));
+    const csv = await readBlobText(createObjectURL.mock.calls[0][0] as Blob);
+    expect(csv).toContain('"품목 정보 기준","현재 품목명","현재 품목 코드"');
+    expect(csv).toContain('"거래 당시","현재 이름","3-HR-0001"');
+    expect(csv).toContain('"현재 품목 (당시 정보 미보존)","과거 미보존","3-TR-0002"');
+  });
+  it.each(["2026-08-02T15:05:00Z", "2026-08-03T14:55:00Z"])("오늘 기간은 KST 자정을 사용한다 %s", async (now) => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date(now));
+    render(<AdminExportSection />);
+    const region = screen.getByRole("region", { name: "데이터 내보내기" });
+    fireEvent.click(within(region).getByRole("button", { name: "입출고", exact: true }));
+    fireEvent.click(within(region).getByRole("button", { name: "오늘", exact: true }));
+    fireEvent.click(within(region).getByRole("button", { name: "Excel", exact: true }));
+    fireEvent.click(within(region).getByRole("button", { name: "입출고 Excel 다운로드", exact: true }));
+    await act(async () => { await Promise.resolve(); });
+    expect(state.getTransactionsExportUrl).toHaveBeenCalledWith({ start_date: "2026-08-03", end_date: "2026-08-03" });
+  });
+
+  it.each(["Z", ""])("CSV 오늘 필터는 UTC 원장의 KST 당일 양쪽 경계를 보존한다 zone=%s", async (zone) => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date("2026-08-03T01:00:00Z"));
+    const { createObjectURL } = stubObjectUrl("blob:kst-boundary");
+    state.getTransactions.mockResolvedValue([
+      { created_at: `2026-08-02T14:59:59${zone}`, notes: "전날 제외" },
+      { created_at: `2026-08-02T15:00:00${zone}`, notes: "당일 자정 포함" },
+      { created_at: `2026-08-03T14:59:59${zone}`, notes: "당일 마지막 포함" },
+      { created_at: `2026-08-03T15:00:00${zone}`, notes: "다음날 제외" },
+    ].map((row) => ({ ...row, transaction_type: "RECEIVE", item_name: "경계 검수품", quantity_change: 1, item_unit: "EA" })));
+    render(<AdminExportSection />);
+    const region = screen.getByRole("region", { name: "데이터 내보내기" });
+    fireEvent.click(within(region).getByRole("button", { name: "입출고", exact: true }));
+    fireEvent.click(within(region).getByRole("button", { name: "오늘", exact: true }));
+    fireEvent.click(within(region).getByRole("button", { name: "입출고 CSV 다운로드", exact: true }));
+    await act(async () => { await Promise.resolve(); });
+    vi.useRealTimers();
+    const csv = await readBlobText(createObjectURL.mock.calls[0][0] as Blob);
+    expect(csv).toContain("당일 자정 포함"); expect(csv).toContain("당일 마지막 포함");
+    expect(csv).not.toContain("전날 제외"); expect(csv).not.toContain("다음날 제외");
+    expect(csv.split("\n")).toHaveLength(3);
+  });
+
   beforeEach(() => {
     Object.values(state).forEach((mock) => mock.mockReset());
     state.getItems.mockResolvedValue([]);

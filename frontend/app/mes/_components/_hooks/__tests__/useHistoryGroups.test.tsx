@@ -50,7 +50,7 @@ afterEach(() => {
 });
 
 describe("useHistoryGroups", () => {
-  it.each([{ groups: [] }, { groups: [makeGroup(0)] }])("keeps cached data on a failed stale remount", async ({ groups }) => {
+  it.each([{ groups: [] }, { groups: [makeGroup(0)] }])("keeps cached data on a failed stale remount (case %#)", async ({ groups }) => {
     globalThis.fetch = vi.fn().mockResolvedValue(makeResponse({ groups, next_cursor: null, has_more: false })) as unknown as typeof fetch;
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const wrapper = makeWrapper(client);
@@ -299,6 +299,65 @@ describe("useHistoryGroups", () => {
     expect(result.current.canLoadMore).toBe(false);
     expect(String(fetchSpy.mock.calls[1][0])).toContain("cursor=cursor-100");
     expect(String(fetchSpy.mock.calls[1][0])).not.toContain("skip=");
+  });
+
+  it("빠른 추가 조회를 한 번만 보내며 검색·기간·부서·모델·작업 조건을 유지한다", async () => {
+    const pending = deferred<Response>();
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(makeResponse({ groups: [makeGroup(0)], next_cursor: "next-page", has_more: true }))
+      .mockReturnValueOnce(pending.promise);
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    const { result } = renderHook(() => useHistoryGroups({
+      ...baseArgs, operations: "process,defect", department: "조립,고압", model: "검수모델A",
+      debouncedSearch: "원자재 입고", selectedDateKey: "2026-10-06",
+    }), { wrapper: makeWrapper(client) });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    let first!: Promise<void>;
+    let second!: Promise<void>;
+    act(() => {
+      first = result.current.loadMore();
+      second = result.current.loadMore();
+    });
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
+    expect(result.current.groups).toEqual([makeGroup(0)]);
+    const query = new URL(String(fetchSpy.mock.calls[1][0]), "http://localhost").searchParams;
+    expect(Object.fromEntries(query)).toMatchObject({
+      cursor: "next-page", operation_keys: "process,defect", department: "조립,고압", model: "검수모델A",
+      search: "원자재 입고", date_from: "2026-10-06", date_to: "2026-10-06",
+    });
+    await act(async () => {
+      pending.resolve(makeResponse({ groups: [makeGroup(1)], next_cursor: null, has_more: false }));
+      await Promise.all([first, second]);
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(result.current.groups).toEqual([makeGroup(0), makeGroup(1)]);
+    expect(result.current.loadingMore).toBe(false);
+  });
+
+  it("필터 변경 뒤 이전 추가 조회가 도착해도 최신 목록에 붙이지 않는다", async () => {
+    const pending = deferred<Response>();
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(makeResponse({ groups: [makeGroup(0)], next_cursor: "old-next", has_more: true }))
+      .mockReturnValueOnce(pending.promise)
+      .mockResolvedValueOnce(makeResponse({ groups: [makeGroup(2)], next_cursor: null, has_more: false }));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    const { result, rerender } = renderHook(({ department }) => useHistoryGroups({ ...baseArgs, department }), {
+      initialProps: { department: "조립" }, wrapper: makeWrapper(client),
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    let load!: Promise<void>;
+    act(() => { load = result.current.loadMore(); });
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
+    rerender({ department: "고압" });
+    await waitFor(() => expect(result.current.groups).toEqual([makeGroup(2)]));
+    await act(async () => {
+      pending.resolve(makeResponse({ groups: [makeGroup(1)], next_cursor: null, has_more: false }));
+      await load;
+    });
+    expect(result.current.groups).toEqual([makeGroup(2)]);
+    expect(result.current.canLoadMore).toBe(false);
   });
 
   it("추가 조회 실패 뒤 같은 커서로 재시도하면서 이미 받은 대표 행을 보존한다", async () => {

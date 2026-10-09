@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { fetchBlob } from "@/lib/api-core";
 import { adminApi } from "@/lib/api/admin";
 import { LEGACY_COLORS } from "@/lib/mes/color";
+import { formatKstDate } from "@/lib/mes/date";
 import { Button } from "@/lib/ui/Button";
 import { FilterChip } from "../common/FilterChip";
 import { AdminActivityAuditControls } from "./AdminActivityAuditControls";
@@ -30,13 +31,12 @@ const SCOPE_LABEL: Record<DataScope, string> = {
 
 function presetRange(preset: RangePreset): { start: string; end: string } {
   const today = new Date();
-  const end = today.toISOString().slice(0, 10);
+  const end = formatKstDate(today);
   if (preset === "today") return { start: end, end };
 
   const days = preset === "7d" ? 7 : preset === "30d" ? 30 : 90;
-  const startDate = new Date(today);
-  startDate.setDate(today.getDate() - days);
-  return { start: startDate.toISOString().slice(0, 10), end };
+  const startDate = new Date(today.getTime() - days * 24 * 60 * 60 * 1000);
+  return { start: formatKstDate(startDate), end };
 }
 
 function csvEscape(value: unknown): string {
@@ -112,10 +112,12 @@ async function buildCsvFor(
 
   if (scope === "transactions") {
     const transactions = await fetchAllPages((skip, limit) => api.getTransactions({ skip, limit }));
-    const headers = ["거래일시", "구분", "품목명", "수량변화", "단위", "메모"];
+    const headers = ["거래일시", "구분", "품목명", "수량변화", "단위", "메모", "품목 정보 기준", "현재 품목명", "현재 품목 코드"];
     const rows = transactions
       .filter((transaction) => {
-        const date = (transaction.created_at ?? "").slice(0, 10);
+        const value = transaction.created_at ?? "";
+        const utc = new Date(/[zZ]|[+-]\d{2}:\d{2}$/.test(value) ? value : `${value}Z`);
+        const date = Number.isNaN(utc.getTime()) ? "" : formatKstDate(utc);
         return date >= range.start && date <= range.end;
       })
       .map((transaction) => [
@@ -125,6 +127,9 @@ async function buildCsvFor(
         transaction.quantity_change,
         transaction.item_unit,
         transaction.notes ?? "",
+        transaction.item_snapshot_preserved ? "거래 당시" : "현재 품목 (당시 정보 미보존)",
+        transaction.current_item_name ?? transaction.item_name,
+        transaction.current_mes_code ?? transaction.mes_code ?? "",
       ]);
     return {
       csv: [headers, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n"),

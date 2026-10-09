@@ -34,6 +34,8 @@ from app.schemas import RequestOrderStockResponse, TransactionLogResponse
 from app.services import inventory_operation_cancellation as cancellation_svc
 from app.services.pin_auth import verify_pin
 from app.services.request_order_stock import load_request_order_stock
+from app.services.inventory_effect_history import load_inventory_effect_quantities
+from app.services.inventory_operation_ownership import operation_requester_id
 
 
 router = APIRouter()
@@ -57,8 +59,8 @@ def _line_payload(
     return {
         "log_id": str(log.log_id),
         "item_id": str(log.item_id),
-        "item_name": item.item_name if item else None,
-        "mes_code": item.mes_code if item else None,
+        "item_name": history_log.item_name if history_log else item.item_name if item else None,
+        "mes_code": history_log.mes_code if history_log else item.mes_code if item else None,
         "transaction_type": log.transaction_type.value,
         "quantity_change": str(log.quantity_change),
         "quantity_before": (
@@ -94,6 +96,7 @@ def _history_log_map(
         db, {log.reference_no for log in logs if log.reference_no}
     )
     response_by_log_id: dict[uuid.UUID, TransactionLogResponse] = {}
+    effect_quantities = load_inventory_effect_quantities(db, logs)
     for log in logs:
         item = items.get(log.item_id)
         if item is None:
@@ -113,6 +116,8 @@ def _history_log_map(
             history_batch=_history_batch_response(batch_map.get(log.operation_batch_id)),
         )
         response.request_order_stock = request_order_stock.get(log.log_id)
+        if log.log_id in effect_quantities:
+            response.inventory_effect = effect_quantities[log.log_id]
         response_by_log_id[log.log_id] = response
     return response_by_log_id
 
@@ -404,7 +409,7 @@ def _verified_canceller(
         raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원은 작업을 취소할 수 없습니다.")
     if not verify_pin(employee.pin_hash, pin):
         raise http_error(403, ErrorCode.FORBIDDEN, "PIN이 올바르지 않습니다.")
-    is_self = operation.actor_employee_id == employee.employee_id
+    is_self = operation_requester_id(db, operation) == employee.employee_id
     is_approver = (
         (employee.warehouse_role or "none").lower() != "none"
         or (employee.department_role or "none").lower() != "none"

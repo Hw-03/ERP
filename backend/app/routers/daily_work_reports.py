@@ -3,20 +3,27 @@
 from __future__ import annotations
 
 import uuid
+import json
 from collections import defaultdict
 from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy import case, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import DailyWorkReport, Employee, IoBatch, Item, TransactionLog, TransactionTypeEnum
+from app.services.department_work_policy import validate_active_department_cells
 from app.routers._errors import ErrorCode, http_error
 from app.routers.inventory._tx_filters import (
+    _BatchInfo,
+    _OperationInfo,
+    _batch_name_map,
     _history_visibility_filter,
+    _operation_info_map,
+    _stock_request_info_map,
     _to_log_response,
     is_legacy_defect_rework_reference,
 )
@@ -25,10 +32,12 @@ from app.schemas import (
     DailyWorkActivitySummary,
     DailyWorkReportResponse,
     DailyWorkReportUpsertRequest,
+    TransactionHistoryBatchResponse,
 )
 from app.services._tx import commit_and_refresh
 from app.services.inventory_effect_history import load_inventory_effect_quantities
 from app.services.transaction_display_groups import build_display_groups
+from app.services import activity_audit
 
 
 router = APIRouter()
@@ -90,6 +99,24 @@ def _kst_day_bounds(work_date: date) -> tuple[datetime, datetime]:
     return start, end
 
 
+def _check_read_date(work_date: date) -> None:
+    """조회 경로도 화면과 같은 KST 오늘 경계를 적용한다."""
+    if work_date > datetime.now(KST).date():
+        raise http_error(422, ErrorCode.BUSINESS_RULE, "미래 날짜의 일보는 조회할 수 없습니다.")
+
+
+def _record_save_audit(db: Session, request: Request, employee: Employee, report: DailyWorkReport, before: str | None) -> None:
+    """본문 전후와 실제 작성자를 업무 저장과 같은 트랜잭션에 보존한다."""
+    db.flush()
+    activity_audit.record(
+        db, request=request,
+        source="mobile" if request.headers.get("X-MES-Audit-Source") == "mobile" else "desktop",
+        action_key="daily_work_report.save", action_label="일일보고 저장", outcome="success",
+        actor_employee_code=employee.employee_code, related_id=str(report.report_id),
+        target_summary=json.dumps({"work_date": report.work_date.isoformat(), "before": before, "after": report.content}, ensure_ascii=False),
+    )
+
+
 def _operation_for(log: TransactionLog, batch: IoBatch | None) -> tuple[str, str]:
     if batch is None and is_legacy_defect_rework_reference(log.reference_no):
         return "defect", "불량"
@@ -105,15 +132,27 @@ def _operation_for(log: TransactionLog, batch: IoBatch | None) -> tuple[str, str
 def _activity_summary(
     rows: list[tuple[TransactionLog, Item, IoBatch | None]],
     inventory_effects_by_log_id: dict[uuid.UUID, list[dict]] | None = None,
+    operation_info_by_id: dict[uuid.UUID, _OperationInfo] | None = None,
+    request_info_by_log_id: dict[uuid.UUID, _BatchInfo | None] | None = None,
 ):
     """취소 거래를 제외한 화면 표시 묶음 단위의 작업 건수와 수량을 계산한다."""
     inventory_effects_by_log_id = inventory_effects_by_log_id or {}
+    operation_info_by_id = operation_info_by_id or {}
+    request_info_by_log_id = request_info_by_log_id or {}
     responses = []
     for log, item, batch in rows:
+        operation_info = operation_info_by_id.get(log.operation_id)
+        request_info = request_info_by_log_id.get(log.log_id)
         response = _to_log_response(
             log,
             item,
-            requester_name=batch.requester_name if batch else None,
+            requester_name=request_info.requester_name if request_info else batch.requester_name if batch else None,
+            approver_name=request_info.approver_name if request_info else None,
+            requested_at=request_info.requested_at if request_info else None,
+            approved_at=request_info.approved_at if request_info else None,
+            operation=operation_info.operation if operation_info else None,
+            reversal=operation_info.reversal if operation_info else None,
+            history_batch=TransactionHistoryBatchResponse(work_type=batch.work_type, sub_type=batch.sub_type, to_department=batch.to_department) if batch else None,
         )
         enriched_effect = inventory_effects_by_log_id.get(log.log_id)
         if enriched_effect is not None:
@@ -123,7 +162,7 @@ def _activity_summary(
     row_by_log_id = {log.log_id: (log, batch) for log, _, batch in rows}
     aggregate: dict[str, dict[str, object]] = {}
     for group in details:
-        valid_logs = [log for log in group.logs if not row_by_log_id[log.log_id][0].cancelled]
+        valid_logs = [log for log in group.logs if not log.cancelled and log.operation_kind != "CANCELLATION"]
         if not valid_logs:
             continue
         source_log, source_batch = row_by_log_id[valid_logs[0].log_id]
@@ -154,6 +193,7 @@ def _activity_summary(
 @router.get("", response_model=list[DailyWorkReportResponse])
 def list_daily_work_reports(work_date: date, db: Session = Depends(get_db)):
     """선택한 날짜에 작성된 전 직원의 일지를 반환한다."""
+    _check_read_date(work_date)
     return (
         db.query(DailyWorkReport)
         .outerjoin(Employee, DailyWorkReport.employee_id == Employee.employee_id)
@@ -175,6 +215,7 @@ def list_daily_work_reports(work_date: date, db: Session = Depends(get_db)):
 @router.get("/{employee_id}/{work_date}", response_model=DailyWorkReportResponse | None)
 def get_daily_work_report(employee_id: uuid.UUID, work_date: date, db: Session = Depends(get_db)):
     """미작성 일자는 null로 반환해 클라이언트가 작성 상태를 구분하게 한다."""
+    _check_read_date(work_date)
     return (
         db.query(DailyWorkReport)
         .filter(DailyWorkReport.employee_id == employee_id, DailyWorkReport.work_date == work_date)
@@ -186,6 +227,7 @@ def get_daily_work_report(employee_id: uuid.UUID, work_date: date, db: Session =
 def upsert_daily_work_report(
     employee_id: uuid.UUID,
     work_date: date,
+    request: Request,
     payload: DailyWorkReportUpsertRequest,
     db: Session = Depends(get_db),
 ):
@@ -203,12 +245,17 @@ def upsert_daily_work_report(
         raise http_error(404, ErrorCode.NOT_FOUND, "직원을 찾을 수 없습니다.")
     if not employee.is_active:
         raise http_error(403, ErrorCode.FORBIDDEN, "비활성 직원은 일보를 작성할 수 없습니다.")
+    try:
+        validate_active_department_cells(db, [("production", employee.department)])
+    except ValueError as exc:
+        raise http_error(422, ErrorCode.BUSINESS_RULE, str(exc)) from exc
 
     report = (
         db.query(DailyWorkReport)
         .filter(DailyWorkReport.employee_id == employee_id, DailyWorkReport.work_date == work_date)
         .first()
     )
+    before_content = report.content if report else None
     if report:
         report.content = content
     else:
@@ -221,6 +268,7 @@ def upsert_daily_work_report(
         )
         db.add(report)
     try:
+        _record_save_audit(db, request, employee, report, before_content)
         commit_and_refresh(db, report)
     except IntegrityError:
         db.rollback()
@@ -231,7 +279,9 @@ def upsert_daily_work_report(
         )
         if report is None:
             raise
+        before_content = report.content
         report.content = content
+        _record_save_audit(db, request, employee, report, before_content)
         commit_and_refresh(db, report)
     return report
 
@@ -269,6 +319,7 @@ def delete_daily_work_report(
 @router.get("/{employee_id}/{work_date}/activity", response_model=DailyWorkActivityResponse)
 def get_daily_work_activity(employee_id: uuid.UUID, work_date: date, db: Session = Depends(get_db)):
     """직원 ID로 귀속되는 KST 하루의 재고 활동을 표시 단위로 반환한다."""
+    _check_read_date(work_date)
     start, end = _kst_day_bounds(work_date)
     rows = (
         db.query(TransactionLog, Item, IoBatch)
@@ -291,11 +342,23 @@ def get_daily_work_activity(employee_id: uuid.UUID, work_date: date, db: Session
         db,
         [log for log, _, _ in rows],
     )
-    summary, details = _activity_summary(rows, inventory_effects)
+    operation_info = _operation_info_map(db, {log.operation_id for log, _, _ in rows if log.operation_id})
+    batch_info = _batch_name_map(db, {log.operation_batch_id for log, _, _ in rows if log.operation_batch_id})
+    reference_info = _stock_request_info_map(db, {log.reference_no for log, _, _ in rows if log.reference_no})
+    request_info = {log.log_id: reference_info.get(log.reference_no) or batch_info.get(log.operation_batch_id) for log, _, _ in rows}
+    summary, details = _activity_summary(rows, inventory_effects, operation_info, request_info)
+    cancelled_work_keys: set[str] = set()
+    for group in details:
+        for log in group.logs:
+            # 원작업 날짜의 취소 상태를 보존하면서 같은 취소의 원행·역행을 한 번만 센다.
+            if log.operation_kind == "CANCELLATION":
+                cancelled_work_keys.add(f"operation:{log.operation_id}")
+            elif log.cancelled:
+                cancelled_work_keys.add(f"operation:{log.reversal_operation_id}" if log.reversal_operation_id else f"group:{group.key}")
     return DailyWorkActivityResponse(
         work_date=work_date,
         employee_id=employee_id,
         summary=summary,
-        cancelled_count=sum(1 for log, _, _ in rows if log.cancelled),
+        cancelled_count=len(cancelled_work_keys),
         details=details,
     )

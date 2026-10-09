@@ -259,7 +259,7 @@ export function HistoryDetailPanel({
   const isDesktopCancellationOpen = variant === "desktop" && desktopCancellationOpen;
 
   return (
-    <div className={variant === "desktop"
+    <div data-history-detail-log-id={selected.log_id} className={variant === "desktop"
       ? isDesktopCancellationOpen
         ? "flex h-full min-h-0 flex-1 flex-col"
         : "flex min-h-full min-h-0 flex-col gap-4"
@@ -299,6 +299,17 @@ export function HistoryDetailPanel({
 
       {!isDesktopCancellationOpen && (
         <>
+          {selected.item_snapshot_preserved !== undefined && (
+            <div data-testid="history-item-identity" className="rounded-[12px] border px-4 py-3 text-xs" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+              {selected.item_snapshot_preserved ? (
+                <p>거래 당시 품목: {selected.item_name} ({selected.mes_code ?? "-"})</p>
+              ) : (
+                <p>당시 품목 정보가 보존되지 않아 현재 품목 정보를 표시합니다.</p>
+              )}
+              <p>현재 품목: {selected.current_item_name ?? selected.item_name} ({selected.current_mes_code ?? selected.mes_code ?? "-"})</p>
+            </div>
+          )}
+          <HistoryRelatedWork panelOpen={panelOpen} log={selected} onSelectLog={onSelectLog} />
           <HistoryDetailReason log={selected} />
           <HistoryDetailMemo
             notes={selected.notes}
@@ -372,6 +383,59 @@ export function HistoryDetailPanel({
     </div>
   );
 }
+function HistoryRelatedWork({ panelOpen, log, onSelectLog }: {
+  panelOpen: boolean;
+  log: TransactionLog;
+  onSelectLog: (log: TransactionLog) => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const pending = useRef<AbortController | null>(null);
+  const originalId = log.reverses_log_id;
+  const reversalId = originalId ? null : log.reversal_operation_id;
+
+  useLayoutEffect(() => {
+    setLoading(false);
+    setError(null);
+    return () => { pending.current?.abort(); pending.current = null; };
+  }, [panelOpen, log.log_id, originalId, reversalId]);
+
+  if (!panelOpen || (!originalId && !reversalId)) return null;
+
+  const openRelatedWork = async (): Promise<void> => {
+    pending.current?.abort();
+    const controller = new AbortController();
+    pending.current = controller;
+    setLoading(true);
+    setError(null);
+    try {
+      const logs = await productionApi.getTransactions({
+        ...(originalId ? { logId: originalId } : { operationId: reversalId! }),
+        includeArchived: true,
+      }, { signal: controller.signal });
+      if (controller.signal.aborted) return;
+      const related = logs.find((candidate) => originalId
+        ? candidate.log_id === originalId
+        : candidate.reverses_log_id === log.log_id);
+      if (related) onSelectLog(related);
+      else setError("연결 작업을 찾을 수 없습니다.");
+    } catch (err: unknown) {
+      if (controller.signal.aborted || (err as Error)?.name === "AbortError") return;
+      setError("연결 작업을 불러오지 못했습니다.");
+    } finally {
+      if (!controller.signal.aborted) setLoading(false);
+    }
+  };
+
+  return <div className="space-y-2">
+    <button type="button" className="text-sm font-bold" disabled={loading} onClick={() => void openRelatedWork()}>
+      {originalId ? "원래 작업 보기" : "취소 작업 보기"}
+    </button>
+    {loading && <p role="status" className="text-sm">연결 작업 불러오는 중</p>}
+    {error && <div className="text-sm"><p role="alert">{error}</p><button type="button" className="font-bold" onClick={() => void openRelatedWork()}>연결 작업 다시 시도</button></div>}
+  </div>;
+}
+
 function HistoryDetailHero({
   log,
   flow,
@@ -386,6 +450,8 @@ function HistoryDetailHero({
   const tcolor = transactionColor(log.transaction_type);
   const batch = flow.status === "available" ? flow.batch : null;
   const presentation = getHistoryRowPresentation(log, batch ?? undefined);
+  const detailSummary = buildHistoryDetailSummary(logs, batch);
+  const detailFlow = detailSummary.flow;
   const movement = getHistoryMovementSummary(log, batch ?? undefined, logs.length, logs);
   const heroStyle = {
     background: `color-mix(in srgb, ${tcolor} 5%, ${LEGACY_COLORS.s2})`,
@@ -406,7 +472,7 @@ function HistoryDetailHero({
       <div className="flex flex-wrap items-center gap-2">
         <FlowBadge
           type={log.transaction_type}
-          label={presentation.operation.label}
+          label={detailSummary.operationLabel}
           color={tcolor}
           variant="panel"
         />
@@ -426,22 +492,22 @@ function HistoryDetailHero({
       </div>
 
       {/* 2줄: 흐름 — available + eps 있을 때만, loading 시 skeleton, unavailable 시 미렌더 */}
-      {presentation.flow.label && (
+      {detailFlow?.label && (
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span
             className="rounded-full border px-2.5 py-0.5 font-bold"
             style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
           >
-            {presentation.flow.from ?? presentation.flow.label}
+            {detailFlow.from ?? detailFlow.label}
           </span>
-          {presentation.flow.from && presentation.flow.to && presentation.flow.from !== presentation.flow.to && (
+          {detailFlow.from && detailFlow.to && detailFlow.from !== detailFlow.to && (
             <>
               <ArrowRight className="h-3.5 w-3.5" style={{ color: LEGACY_COLORS.muted2 }} />
               <span
                 className="rounded-full border px-2.5 py-0.5 font-bold"
                 style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.text }}
               >
-                {presentation.flow.to}
+                {detailFlow.to}
               </span>
             </>
           )}

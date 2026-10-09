@@ -13,6 +13,23 @@ function deferred<T>() {
 }
 
 describe("DailyWorkReportEditor", () => {
+  it.each([true, false])("above-fold 빈 일보 이미지를 eager로 읽어 Next LCP 경고를 막는다 editable=%s", (editable) => {
+    const { container } = render(<DailyWorkReportEditor initialContent="" editable={editable} saving={false} saveError={null} onSave={vi.fn()} />);
+    expect(container.querySelector('img[src*="daily-empty-blue"]')).toHaveAttribute("loading", "eager");
+  });
+
+  it("PC-DELTA-DAILY-01 실패 뒤 실제 재시도 버튼으로 최신 입력을 다시 저장한다", async () => {
+    const onSave = vi.fn().mockRejectedValueOnce(new Error("일시 저장 오류")).mockResolvedValueOnce("2026-08-04T02:30:00Z");
+    const saveRef = { current: null as (() => Promise<void>) | null };
+    render(<DailyWorkReportEditor initialContent="" editable saving={false} saveError={null} onSave={onSave} saveRef={saveRef} />);
+    fireEvent.change(screen.getByRole("textbox", { name: "작업 내역" }), { target: { value: "재시도할 최신 내용" } });
+    await act(async () => { await saveRef.current?.().catch(() => {}); });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "다시 시도", exact: true })); });
+    expect(onSave).toHaveBeenNthCalledWith(2, "재시도할 최신 내용");
+    expect(screen.getByText("저장됨 · 11:30")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "다시 시도", exact: true })).not.toBeInTheDocument();
+  });
+
   it("빈 입력의 안내 이미지는 포커스와 내용에 따라 숨긴다", () => {
     render(<DailyWorkReportEditor initialContent="" editable saving={false} saveError={null} onSave={vi.fn()} />);
     const input = screen.getByLabelText("작업 내역");

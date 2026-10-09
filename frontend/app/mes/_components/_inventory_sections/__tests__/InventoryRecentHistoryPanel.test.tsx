@@ -95,7 +95,9 @@ describe("InventoryRecentHistoryPanel", () => {
 
   it("한 작업 그룹의 모든 선택 품목 라인과 각 위치 재고 변동을 표시한다", () => {
     const first = makeLog({ log_id: "line-1", warehouse_qty_before: 15, warehouse_qty_after: 27 });
-    const second = makeLog({ log_id: "line-2", transaction_type: "TRANSFER_DEPT", warehouse_qty_before: 27, warehouse_qty_after: 27, department_qty_before: 4, department_qty_after: 9 });
+    const second = makeLog({ log_id: "line-2", transaction_type: "TRANSFER_DEPT", warehouse_qty_before: 27, warehouse_qty_after: 27, department_qty_before: 14, department_qty_after: 19,
+      inventory_effect: [{ scope: "location", department: "조립", status: "PRODUCTION", delta: 5, quantity_before: 4, quantity_after: 9 }],
+    });
     testState.queryResult = { data: { items: [makeOperation({ matchingLines: [
       { ...makeOperation().matchingLines[0], logId: first.log_id, historyLog: first },
       { ...makeOperation().matchingLines[0], logId: second.log_id, historyLog: second },
@@ -104,6 +106,7 @@ describe("InventoryRecentHistoryPanel", () => {
     expect(screen.getAllByRole("listitem")).toHaveLength(2);
     expect(screen.getByLabelText("재고 변동: 창고 15 +12→27")).toBeInTheDocument();
     expect(screen.getByLabelText("재고 변동: 조립 4 +5→9")).toBeInTheDocument();
+    expect(screen.queryByLabelText("재고 변동: 조립 14 +5→19")).not.toBeInTheDocument();
   });
 
   it("이력 로그의 배치 투영으로 분해 작업을 이력 표와 같은 메뉴명으로 표시한다", () => {
@@ -154,7 +157,9 @@ describe("InventoryRecentHistoryPanel", () => {
     const { container } = render(<InventoryRecentHistoryPanel item={makeItem()} />);
     expect(container.querySelector(".inventory-recent-divider")).not.toBeNull();
     expect(screen.getByText("부서 입출고")).toBeInTheDocument();
-    expect(screen.getByLabelText("재고 변동: 조립 60 −60→0")).toBeInTheDocument();
+    expect(screen.getByLabelText("재고 변동: 부서 합계 60 −60→0")).toBeInTheDocument();
+    expect(screen.queryByLabelText("재고 변동: 조립 60 −60→0")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
     expect(testState.legacyQueryArgs).toEqual([{ itemId: "item-1", unlinkedOnly: true, limit: 5 }]);
   });
 

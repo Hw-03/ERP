@@ -204,7 +204,10 @@ def test_operation_lines_embed_the_same_history_log_as_legacy_history(
     assert payload["matching_lines"][0]["history_log"] == history_log
     assert history_log["log_id"] == str(log.log_id)
     assert history_log["department"] == "창고"
-    assert history_log["inventory_effect"] == log.inventory_effect
+    assert history_log["inventory_effect"] == [
+        {"scope": "warehouse", "delta": 7, "quantity_before": 0, "quantity_after": 7}
+    ]
+    assert log.inventory_effect == [{"scope": "warehouse", "delta": 7}]
     assert history_log["history_batch"] == {
         "work_type": "process",
         "sub_type": "disassemble",

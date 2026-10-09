@@ -227,6 +227,7 @@ export const productionApi = {
 
   getTransactions: (
     params?: {
+      logId?: string;
       itemId?: string;
       transactionType?: TransactionType;
       transactionTypes?: string; // 쉼표 구분 복수값. 예: "RECEIVE,SHIP"

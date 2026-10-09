@@ -2,8 +2,8 @@ import type { TransactionLog } from "@/lib/api";
 import type { IoBatch } from "@/lib/api/types/io";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { formatQty } from "@/lib/mes/format";
-import { getHistoryRowPresentation, getReferenceBatchPresentation, getReferenceBatchLinePresentation } from "./historyPresentation";
-import { resolveStockSnapshot, StockSnapshotContent, getHistoryLogSignedQuantity } from "./historyTableHelpers";
+import { getHistoryRowPresentation, getReferenceBatchPresentation, getReferenceBatchLinePresentation, isDepartmentCorrectionLog } from "./historyPresentation";
+import { resolveStockSnapshot, StockSnapshotContent, getHistoryLogSignedQuantity, getNormalStockSnapshots } from "./historyTableHelpers";
 import { toInventoryEffectRows } from "./historyInventoryEffect";
 import { buildReworkItemSummaries } from "./reworkSummary";
 import { buildHistoryDetailSummary, type HistoryDetailSummary } from "./historyDetailSummary";
@@ -108,15 +108,31 @@ export function HistoryMobileLogStock({ log }: { log: TransactionLog }) {
   });
   const onlyActualChanges = showActual && normalUnchanged && !actualDiffers
     && !["MARK_DEFECTIVE", "UNMARK_DEFECTIVE", "SUPPLIER_RETURN"].includes(log.transaction_type);
+  // 요청순 합계는 실제 처리순 위치 스냅샷으로 대체할 수 없다.
+  // 실제 위치 효과는 아래 실제 처리 재고 영역에서 원본 그대로 보여준다.
+  const requestOrderLog = showActual && log.request_order_stock?.status === "available"
+    ? { ...log, inventory_effect: log.inventory_effect?.filter((effect) => effect.scope !== "warehouse"
+      && !(effect.scope === "location" && effect.status === "PRODUCTION")) }
+    : log;
+  const actualLog = { ...log, request_order_stock: undefined };
+  const actualSnapshot = resolveStockSnapshot(actualLog);
+  const displayedActual = actualDiffers && actualSnapshot.status === "available" && !isDepartmentCorrectionLog(log)
+    ? getNormalStockSnapshots(actualLog, actualSnapshot) : [];
+  const additionalEffects = effects.filter((effect) => {
+    if (effect.scope !== "warehouse" && !(effect.scope === "location" && effect.status === "PRODUCTION")) return true;
+    return !displayedActual.some((shown) => shown.label === (effect.scope === "warehouse" ? "창고" : effect.department)
+      && shown.before === effect.quantityBefore && shown.after === effect.quantityAfter
+      && shown.after - shown.before === effect.delta);
+  });
   return <div className="space-y-2">
     {!onlyActualChanges && <div className={styles.stockInformation}>
       {showActual && <span className="text-xs" style={{color:LEGACY_COLORS.muted2}}>요청 순 재고</span>}
-      <StockSnapshotContent log={log} variant="panel" expandableUnavailableReason showUnit />
+      <StockSnapshotContent log={requestOrderLog} variant="panel" expandableUnavailableReason showUnit />
     </div>}
     {showActual && <div className={onlyActualChanges ? "space-y-1" : "space-y-1 border-t pt-2"} style={{borderColor:LEGACY_COLORS.border}}>
       {!onlyActualChanges && <div className="text-xs" style={{color:LEGACY_COLORS.muted2}}>실제 처리 재고</div>}
-      {actualDiffers && <StockSnapshotContent log={{...log, request_order_stock: undefined}} variant="panel" showUnit />}
-      {effects.map((effect) => <div key={effect.key} className={styles.effectRow}
+      {actualDiffers && <StockSnapshotContent log={actualLog} variant="panel" showUnit />}
+      {additionalEffects.map((effect) => <div key={effect.key} className={styles.effectRow}
         aria-label={`${effect.label} ${effect.quantityBefore != null ? `${formatQty(effect.quantityBefore)} ` : ""}${effect.deltaLabel}${effect.quantityAfter != null ? `→${formatQty(effect.quantityAfter)}` : ""}${effect.unit ? ` ${effect.unit}` : ""}`}>
         <span style={{color:LEGACY_COLORS.muted2}}>{effect.label}</span>
         <span className="font-bold tabular-nums">

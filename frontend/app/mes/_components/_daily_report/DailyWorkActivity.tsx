@@ -1,13 +1,17 @@
 "use client";
 
 import { ArrowRight, ChevronRight, ClipboardList, Clock3, Factory, PackageCheck, RotateCcw, Truck, UserRound, Warehouse } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { TransactionLog } from "@/lib/api";
+import { productionApi } from "@/lib/api/production";
 import { useDesktopTabHome } from "../DesktopTabHome";
 import type { DailyWorkActivity as DailyWorkActivityData } from "@/lib/api/types/daily-work-reports";
 import { LEGACY_COLORS } from "@/lib/mes/color";
 import { TruncatedText } from "@/lib/ui/TruncatedText";
 import { formatHistoryDateTimeLong } from "../_history_sections/historyFormat";
 import { buildHistoryDetailSummary, type HistoryDetailSummaryTone } from "../_history_sections/historyDetailSummary";
+import { getHistoryListOperationLabel } from "../_history_sections/historyPresentation";
+import { HistoryDetailPanel } from "../_history_sections/HistoryDetailPanel";
 
 const STATUS_COLORS: Record<HistoryDetailSummaryTone, string> = {
   success: LEGACY_COLORS.green,
@@ -58,9 +62,16 @@ function StockChange({
 function operationKeyForGroup(group: DailyWorkActivityData["details"][number]): string {
   const log = group.logs[0];
   if (!log) return "process";
+  if (!log.history_batch && log.reference_no?.startsWith("defect-disassemble:")) return "defect";
   if (log.shipping_phase === "COMPONENT_CHANGE") return "item_conversion";
   if (log.shipping_phase === "PREPARE" || log.shipping_phase === "PICKUP") return "shipping";
-  if (["RECEIVE", "TRANSFER_TO_PROD", "TRANSFER_TO_WH", "INTERNAL_USE"].includes(log.transaction_type)) return "warehouse";
+  const subType = log.history_batch?.sub_type;
+  if (["tube_receive_supplier", "tube_outbound_supplier"].includes(subType ?? "")) return "tube_material";
+  if (["produce", "disassemble", "dept_transfer", "adjust_in", "adjust_out"].includes(subType ?? "")) return "process";
+  if (["warehouse_adjust_in", "warehouse_adjust_out", "warehouse_to_dept", "dept_to_warehouse", "receive_supplier", "internal_use_out"].includes(subType ?? "")) return "warehouse";
+  if (["supplier_return", "defect_quarantine", "defect_restore", "defect_process"].includes(subType ?? "")) return "defect";
+  if (log.transaction_type === "SHIP") return "shipping";
+  if (["RECEIVE", "TRANSFER_TO_PROD", "TRANSFER_TO_WH", "INTERNAL_USE", "MATERIAL_OUT"].includes(log.transaction_type)) return "warehouse";
   if (["MARK_DEFECTIVE", "UNMARK_DEFECTIVE", "DEFECT_SCRAP", "SUPPLIER_RETURN"].includes(log.transaction_type)) return "defect";
   return "process";
 }
@@ -72,6 +83,41 @@ function OperationIcon({ operationKey }: { operationKey: string }) {
   if (operationKey === "defect") return <RotateCcw className={className} />;
   if (operationKey === "item_conversion") return <PackageCheck className={className} />;
   return <Factory className={className} />;
+}
+
+/** 기존 이력 상세를 재사용하되 연결된 원행만 정확 조회하고 취소는 허용하지 않는다. */
+function DailyOriginalWork({ log }: { log: TransactionLog }) {
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<TransactionLog | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!open || !log.reverses_log_id) return;
+    const controller = new AbortController();
+    setSelected(null); setError(null); setLoadedFor(null);
+    void productionApi.getTransactions({ logId: log.reverses_log_id, includeArchived: true }, { signal: controller.signal }).then((logs) => {
+      if (controller.signal.aborted) return;
+      const original = logs.find((entry) => entry.log_id === log.reverses_log_id);
+      setSelected(original ?? null);
+      setError(original ? null : "원래 작업을 찾을 수 없습니다.");
+      setLoadedFor(log.log_id);
+    }).catch(() => {
+      if (controller.signal.aborted) return;
+      setError("원래 작업을 불러오지 못했습니다."); setLoadedFor(log.log_id);
+    });
+    return () => controller.abort();
+  }, [open, log.log_id, log.reverses_log_id, retry]);
+  if (!log.reverses_log_id) return null;
+  const ready = loadedFor === log.log_id;
+  return <div className="border-t px-4 py-3 lg:col-span-full" style={{ borderColor: LEGACY_COLORS.border }}>
+    <button type="button" aria-expanded={open} onClick={() => setOpen((value) => !value)} className="min-h-11 rounded-[10px] border px-3 text-sm font-bold" style={{ borderColor: LEGACY_COLORS.border }}>{open ? "원래 작업 접기" : "원래 작업 보기"}</button>
+    {open && <div className="mt-3" role="region" aria-label="원래 작업 상세">
+      {!ready && <p role="status">원래 작업을 불러오는 중입니다.</p>}
+      {ready && error && <div role="alert"><p>{error}</p><button type="button" onClick={() => setRetry((value) => value + 1)} className="min-h-11 px-3 text-sm font-bold">원래 작업 다시 시도</button></div>}
+      {ready && selected && <HistoryDetailPanel panelOpen selected={selected} allowCancellation={false} onSelectLog={setSelected} onLogUpdated={setSelected} />}
+    </div>}
+  </div>;
 }
 
 function DailyWorkActivityDetail({ group }: { group: DailyWorkActivityData["details"][number] }) {
@@ -92,6 +138,13 @@ function DailyWorkActivityDetail({ group }: { group: DailyWorkActivityData["deta
     ? "재고 이동"
     : "재고 반영";
   const statusColor = STATUS_COLORS[summary.status.tone];
+  const primary = group.logs[0];
+  const operationLabel = primary?.transaction_type === "ADJUST"
+    ? getHistoryListOperationLabel(primary)
+    : summary.operationLabel;
+  const approver = group.logs.find((log) => log.approver_name?.trim()
+    && log.operation_kind !== "CANCELLATION" && log.operation_effective_status !== "cancellation");
+  const notes = [...new Set(group.logs.map((log) => log.notes?.trim()).filter((note) => note && note !== summary.status.reason))];
 
   return (
     <article
@@ -110,7 +163,7 @@ function DailyWorkActivityDetail({ group }: { group: DailyWorkActivityData["deta
           <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs font-medium" style={{ color: LEGACY_COLORS.muted2 }}>
             {summary.target.mesCode && <span>{summary.target.mesCode}</span>}
             {summary.target.mesCode && <span aria-hidden="true">·</span>}
-            <span>{summary.operationLabel}</span>
+            <span>{operationLabel}</span>
             {group.logs.length > 1 && <><span aria-hidden="true">·</span><span>{group.logs.length}건</span></>}
           </div>
         </div>
@@ -126,8 +179,12 @@ function DailyWorkActivityDetail({ group }: { group: DailyWorkActivityData["deta
       <div data-testid="daily-work-activity-meta" className="flex flex-col justify-center gap-1.5 border-t px-4 py-3 text-xs lg:border-l lg:border-t-0" style={{ color: LEGACY_COLORS.muted2, borderColor: LEGACY_COLORS.border }}>
         <span className="flex min-w-0 items-center gap-1.5"><UserRound className="h-3.5 w-3.5 shrink-0" />{summary.requester.label} <strong style={{ color: LEGACY_COLORS.text }}>{summary.requester.name}</strong></span>
         <span className="flex min-w-0 items-center gap-1.5"><Clock3 className="h-3.5 w-3.5 shrink-0" />{formatHistoryDateTimeLong(summary.requester.at)}</span>
-        {(impacts.length === 0 || hasMultipleItems) && summary.flow && (
-          <span className="flex min-w-0 items-center gap-1.5 font-bold" style={{ color: LEGACY_COLORS.text }}>
+        {approver && <>
+          <span className="flex min-w-0 items-center gap-1.5"><UserRound className="h-3.5 w-3.5 shrink-0" />승인자 <strong style={{ color: LEGACY_COLORS.text }}>{approver.approver_name}</strong></span>
+          <span className="flex min-w-0 items-center gap-1.5"><Clock3 className="h-3.5 w-3.5 shrink-0" />{formatHistoryDateTimeLong(approver.approved_at ?? approver.created_at)}</span>
+        </>}
+        {(impacts.length === 0 || hasMultipleItems || group.logs.some((log) => log.operation_kind === "CANCELLATION")) && summary.flow && (
+          <span data-testid="daily-work-activity-direction" aria-label={summary.flow.label} className="flex min-w-0 items-center gap-1.5 font-bold" style={{ color: LEGACY_COLORS.text }}>
             {summary.flow.from && summary.flow.to && summary.flow.from !== summary.flow.to ? (
               <>{summary.flow.from}<ArrowRight className="h-3.5 w-3.5 shrink-0" style={{ color: LEGACY_COLORS.muted2 }} />{summary.flow.to}</>
             ) : summary.flow.label}
@@ -198,11 +255,17 @@ function DailyWorkActivityDetail({ group }: { group: DailyWorkActivityData["deta
         </div>
       )}
 
+      {notes.length > 0 && (
+        <div className="border-t px-3.5 py-2 text-xs lg:col-span-full" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.muted2 }}>
+          <strong>메모</strong><span className="ml-2 whitespace-pre-wrap">{notes.join(" · ")}</span>
+        </div>
+      )}
       {summary.status.reason && (
         <div className="border-t px-3.5 py-2 text-xs lg:col-span-full" style={{ borderColor: LEGACY_COLORS.border, color: LEGACY_COLORS.red }}>
           <strong>취소 사유</strong><span className="ml-2">{summary.status.reason}</span>
         </div>
       )}
+      {group.logs[0] && <DailyOriginalWork log={group.logs[0]} />}
     </article>
   );
 }
@@ -212,6 +275,13 @@ export function DailyWorkActivity({ activity, onDetailOpenChange, loading = fals
   const [mobileExpanded, setMobileExpanded] = useState(false);
   const workCount = activity?.summary.reduce((total, summary) => total + summary.work_count, 0) ?? 0;
   const cancelledCount = activity?.cancelled_count ?? 0;
+  const summaries = [...(activity?.summary ?? [])];
+  const labels: Record<string, string> = { warehouse: "창고", tube_material: "튜브 원자재", process: "공정", defect: "불량", shipping: "출하", item_conversion: "구성품 전환" };
+  for (const group of activity?.details ?? []) {
+    if (group.logs.length === 0) continue;
+    const key = operationKeyForGroup(group);
+    if (!summaries.some((summary) => summary.operation_key === key)) summaries.push({ operation_key: key, operation_label: labels[key], work_count: 0, quantity_by_unit: {} });
+  }
   const countLabel = workCount > 0 ? `${workCount}건${cancelledCount > 0 ? ` · 취소 ${cancelledCount}건` : ""}` : `취소 ${cancelledCount}건`;
   useDesktopTabHome("daily-work-activity", {
     isHome: openOperation === null && (!mobile || !mobileExpanded),
@@ -237,7 +307,7 @@ export function DailyWorkActivity({ activity, onDetailOpenChange, loading = fals
         </button> : <h2 id="daily-work-activity-title" className={mobile ? "text-[15px] font-semibold" : "shrink-0 whitespace-nowrap text-lg font-black"}>MES 작업 기록</h2>}
         {loading && <span data-testid="daily-report-activity-skeleton" aria-label="MES 작업 기록 불러오는 중" role="status" className={`${mobile ? "h-8" : "h-11"} min-w-0 flex-1 motion-safe:animate-pulse rounded-[14px]`} style={{ background: LEGACY_COLORS.s2 }} />}
         {mobile && !loading && workCount === 0 && cancelledCount === 0 && <span className="ml-auto text-sm font-medium" style={{ color: LEGACY_COLORS.muted2 }}>작업 기록이 없습니다.</span>}
-        {(!mobile || mobileExpanded) && activity?.summary.map((summary) => {
+        {(!mobile || mobileExpanded) && summaries.map((summary) => {
           const isOpen = openOperation === summary.operation_key;
           return (
             <button
@@ -255,7 +325,7 @@ export function DailyWorkActivity({ activity, onDetailOpenChange, loading = fals
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px]" style={{ color: LEGACY_COLORS.blue, background: LEGACY_COLORS.s1 }}><OperationIcon operationKey={summary.operation_key} /></span>
               <span className="whitespace-nowrap text-sm font-black">{summary.operation_label}</span>
               <span className="whitespace-nowrap text-sm font-black" style={{ color: LEGACY_COLORS.blue }}>{summary.work_count}건</span>
-              <span className={mobile ? "min-w-0 text-xs [overflow-wrap:anywhere]" : "whitespace-nowrap text-xs font-bold"} style={{ color: LEGACY_COLORS.muted2 }}>{formatQuantities(summary.quantity_by_unit) || "수량 정보 없음"}</span>
+              <span className={mobile ? "min-w-0 text-xs [overflow-wrap:anywhere]" : "whitespace-nowrap text-xs font-bold"} style={{ color: LEGACY_COLORS.muted2 }}>{formatQuantities(summary.quantity_by_unit) || (summary.work_count === 0 ? "취소 기록" : "수량 정보 없음")}</span>
               <ChevronRight className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-90" : ""}`} style={{ color: LEGACY_COLORS.blue }} />
             </button>
           );
@@ -266,6 +336,9 @@ export function DailyWorkActivity({ activity, onDetailOpenChange, loading = fals
           </span>
         )}
       </div>
+
+      {activity && !loading && (!mobile || mobileExpanded) && <p className="mt-2 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>수량은 취소된 작업을 제외한 완료 작업 합계입니다.</p>}
+      {activity && !loading && (!mobile || mobileExpanded) && <p className="mt-1 text-xs" style={{ color: LEGACY_COLORS.muted2 }}>일보 작성 여부와 관계없이 해당 직원의 MES 작업을 표시합니다.</p>}
 
       {!mobile && (loading || activity?.summary.length === 0) && (
         <div className={mobile && !loading ? "mt-2 text-center text-sm font-medium" : "mt-3 rounded-[14px] border px-3.5 py-3 text-sm font-medium"} style={mobile && !loading ? { color: LEGACY_COLORS.muted2 } : { color: LEGACY_COLORS.muted2, background: LEGACY_COLORS.s2, borderColor: LEGACY_COLORS.border }}>

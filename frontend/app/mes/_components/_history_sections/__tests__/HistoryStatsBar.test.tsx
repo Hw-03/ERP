@@ -3,11 +3,13 @@ import { describe, expect, it } from "vitest";
 import { HistoryStatsBar } from "../HistoryStatsBar";
 
 describe("HistoryStatsBar", () => {
-  it("mobile filtered summary failure does not display unfiltered totals as current values", () => {
-    render(<HistoryStatsBar mobile baseline={{ total: 40, warehouseCount: 20, deptCount: 15, adjustCount: 5, departmentCounts: {} }}
+  it.each([false, true])("filtered summary failure does not display unfiltered totals as current values (mobile: %s)", (mobile) => {
+    render(<HistoryStatsBar mobile={mobile} baseline={{ total: 40, warehouseCount: 20, deptCount: 15, adjustCount: 5, departmentCounts: {} }}
       currentSummary={null} currentCount={null} loading={false} periodLabel="이번달" hasListFilters />);
     expect(screen.queryByText("20건")).not.toBeInTheDocument();
-    expect(screen.getAllByText("—건")).toHaveLength(4);
+    expect(screen.queryByText("15건")).not.toBeInTheDocument();
+    expect(screen.queryByText("5건")).not.toBeInTheDocument();
+    expect(screen.getAllByText(mobile ? "—건" : "…건")).toHaveLength(4);
     expect(screen.getByText(/전체/)).toHaveTextContent("40건");
   });
   it("mobile missing totals after a settled failure stop indicating loading", () => {

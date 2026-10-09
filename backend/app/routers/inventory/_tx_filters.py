@@ -29,6 +29,7 @@ from app.models import (
     TransactionTypeEnum,
 )
 from app.schemas import TransactionHistoryBatchResponse, TransactionLogResponse
+from app.services.transaction_item_identity import transaction_item_identity
 from app.utils.search import build_normalized_search_filter
 
 
@@ -476,10 +477,19 @@ def _apply_common_filters(
 
 
 def _history_search_filter(search: Optional[str]) -> Optional[ColumnElement[bool]]:
-    """목록과 묶음 내 검색 일치 여부에 동일한 정규화 조건을 사용한다."""
+    """목록·상세 작업명을 같은 모집단으로 검색하고 페이지 분할 전 적용한다."""
+    operation_label = (
+        select(InventoryOperation.display_label)
+        .where(InventoryOperation.operation_id == TransactionLog.operation_id)
+        .correlate(TransactionLog)
+        .scalar_subquery()
+    )
     return build_normalized_search_filter(
         search,
         _history_list_operation_label_expr(),
+        operation_label,
+        TransactionLog.item_snapshot["item_name"].as_string(),
+        TransactionLog.item_snapshot["mes_code"].as_string(),
         Item.item_name,
         Item.mes_code,
         TransactionLog.reference_no,
@@ -779,6 +789,9 @@ def _stock_request_info_map(
             StockRequest.department_approved_by_employee_id,
             StockRequest.department_approved_at,
             StockRequest.submitted_at,
+            StockRequest.as_research_approved_by_name,
+            StockRequest.as_research_approved_by_employee_id,
+            StockRequest.as_research_approved_at,
             StockRequest.created_at,
         )
         .filter(StockRequest.request_code.in_(reference_nos))
@@ -796,6 +809,9 @@ def _stock_request_info_map(
         ):
             approver_name = row.department_approved_by_name
             approved_at = row.department_approved_at
+        elif row.as_research_approved_by_employee_id:
+            approver_name = row.as_research_approved_by_name
+            approved_at = row.as_research_approved_at
         out[row.request_code] = _BatchInfo(
             row.requester_name,
             approver_name,
@@ -852,10 +868,7 @@ def _to_log_response(
     return TransactionLogResponse(
         log_id=log.log_id,
         item_id=log.item_id,
-        mes_code=item.mes_code,
-        item_name=item.item_name,
-        item_process_type_code=item.process_type_code,
-        item_unit=item.unit,
+        **transaction_item_identity(log, item),
         transaction_type=log.transaction_type,
         quantity_change=log.quantity_change,
         quantity_before=log.quantity_before,

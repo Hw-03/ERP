@@ -41,7 +41,7 @@ export function HistoryStatsBar({
   hasListFilters,
   mobile = false,
 }: HistoryStatsBarProps) {
-  const filtered = mobile && currentSummary === null ? null : currentSummary ?? baseline;
+  const filtered = currentSummary === null ? null : currentSummary ?? baseline;
   const countDisplay = mobile ? "skeleton" : loadingDisplay;
   const countsMatch = (hasListFilters === false && (loading || (mobile && currentCount == null)))
     || (currentCount != null && baseline?.total != null && currentCount === baseline.total);

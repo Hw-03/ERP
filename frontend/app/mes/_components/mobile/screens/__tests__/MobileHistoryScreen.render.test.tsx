@@ -337,7 +337,7 @@ describe("MobileHistoryScreen real detail panels", () => {
     const itemButton = await screen.findByRole("button", {name:`${longName} R-001 상세`,exact:true});
     const line = itemButton.parentElement!.parentElement!;
     expect(within(line).getByText("R-001")).toBeInTheDocument();
-    expect(within(line).getByLabelText("조립 10 −4→6")).toBeInTheDocument();
+    expect(within(line).getByLabelText("부서 합계 10 −4→6")).toBeInTheDocument();
     expect(within(line).queryByText("-4 EA")).not.toBeInTheDocument();
     fireEvent.click(itemButton);
     expect(await screen.findByRole("button", { name: "← 뒤로" })).toBeInTheDocument();

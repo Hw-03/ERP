@@ -75,6 +75,47 @@ function makeLog(overrides: Partial<TransactionLog> = {}): TransactionLog {
 
 describe("getHistoryGroupSummary cancellation labels", () => {
   it.each([
+    [false, false], [false, true], [true, false], [true, true],
+  ])("전환 회수품보다 대상품을 대표로 유지한다: cancellation=%s, reversed=%s", (cancellation, reversed) => {
+    const multiplier = cancellation ? -1 : 1;
+    const base: Partial<TransactionLog> = {
+      shipping_phase: "COMPONENT_CHANGE",
+      operation_kind: cancellation ? "CANCELLATION" : "BUSINESS",
+      operation_role: "PRODUCT_OUTPUT",
+      operation_display_label: "품목 전환",
+    };
+    // The API orders the later recovery RECEIVE before the target PRODUCE; both retain PRODUCT_OUTPUT on cancellation.
+    const recovered = makeLog({ ...base, log_id: "recovered", item_id: "RECOVERED", item_name: "회수품", transaction_type: "RECEIVE", quantity_change: 2 * multiplier, created_at: "2026-07-02T01:00:05Z" });
+    const target = makeLog({ ...base, log_id: "target", item_id: "TARGET", item_name: "전환 대상", transaction_type: "PRODUCE", quantity_change: multiplier, created_at: "2026-07-02T01:00:04Z" });
+    const inputs = ["added-b", "added-a", "source"].map((id) => makeLog({ ...base, log_id: id, item_id: id, transaction_type: "BACKFLUSH", quantity_change: -multiplier, operation_role: "COMPONENT_INPUT" }));
+    const logs = [recovered, target, ...inputs].map((log) => ({ ...log, reverses_log_id: cancellation ? `original-${log.log_id}` : null }));
+    const summary = getHistoryGroupSummary({ type: "operation", operationId: "conversion", logs: reversed ? logs.toReversed() : logs });
+
+    expect(summary.primaryLog.log_id).toBe("target");
+    expect(summary.title).toBe("전환 대상");
+    expect(summary.additionalItemCount).toBe(4);
+    expect(summary.primaryLog.quantity_change).toBe(multiplier);
+    expect(summary.label).toBe(cancellation ? "품목 전환 취소" : "품목 전환");
+  });
+
+  it.each([false, true])("비전환 작업의 기존 역할 우선 대표를 유지한다: cancellation=%s", (cancellation) => {
+    const base: Partial<TransactionLog> = { operation_role: "PRODUCT_OUTPUT", operation_kind: cancellation ? "CANCELLATION" : "BUSINESS" };
+    const first = makeLog({ ...base, log_id: "first-output", transaction_type: "RECEIVE" });
+    const produced = makeLog({ ...base, log_id: "produced", transaction_type: "PRODUCE" });
+
+    expect(getHistoryGroupSummary({ type: "operation", operationId: "non-conversion", logs: [first, produced] }).primaryLog).toBe(first);
+  });
+
+  it.each([false, true])("keeps research use as representative before returned components, reversed=%s", (reversed) => {
+    const used = makeLog({ log_id: "used", transaction_type: "INTERNAL_USE", department: "연구", operation_role: "PRIMARY" });
+    const returned = makeLog({ log_id: "returned", transaction_type: "PRODUCE", department: "조립", quantity_change: 2, operation_role: "PRIMARY" });
+    const summary = getHistoryGroupSummary({ type: "operation", operationId: "internal-use", logs: reversed ? [used, returned] : [returned, used] });
+    expect(summary.primaryLog.log_id).toBe("used");
+    expect(summary.label).toBe("연구소 사용");
+    expect(summary.displayType).toBe("INTERNAL_USE");
+  });
+
+  it.each([
     ["disassemble", ["BACKFLUSH", "PRODUCE"], "분해 출고"],
     ["disassemble", ["BACKFLUSH"], "부서 입출고"],
     ["disassemble", ["PRODUCE"], "부서 입출고"],
@@ -124,6 +165,13 @@ describe("getAdditionalDistinctItemCount", () => {
 });
 
 describe("getStockSnapshotQuantityWidth", () => {
+  it("실제 위치의 수량 폭에는 표시하지 않는 다른 부서 합계를 넣지 않는다", () => {
+    expect(getStockSnapshotQuantityWidth([makeLog({
+      warehouse_qty_before: 5, warehouse_qty_after: 4,
+      department_qty_before: 9_999_999, department_qty_after: 10_000_000,
+      inventory_effect: [{ scope: "location", department: "튜브", status: "PRODUCTION", delta: 1, quantity_before: 7, quantity_after: 8 }],
+    })])).toBe(24);
+  });
   it("숨긴 미변동 재고의 큰 수량은 묶음 수량 폭에 포함하지 않는다", () => {
     expect(getStockSnapshotQuantityWidth([
       makeLog({
@@ -157,6 +205,68 @@ describe("getStockSnapshotQuantityWidth", () => {
 });
 
 describe("StockSnapshotContent panel", () => {
+  it.each(["table", "panel"] as const)("%s에서 다른 부서 재고를 더하지 않고 실제 튜브 7→8을 표시한다", (variant) => {
+    render(<StockSnapshotContent variant={variant} log={makeLog({
+      transaction_type: "TRANSFER_TO_PROD", department: "튜브",
+      warehouse_qty_before: 20, warehouse_qty_after: 19,
+      department_qty_before: 14, department_qty_after: 15,
+      inventory_effect: [
+        { scope: "warehouse", delta: -1, quantity_before: 20, quantity_after: 19 },
+        { scope: "location", department: "튜브", status: "PRODUCTION", delta: 1, quantity_before: 7, quantity_after: 8 },
+      ],
+    })} />);
+    expect(screen.getByLabelText("튜브 7 +1→8")).toBeInTheDocument();
+    expect(screen.getByLabelText("창고 20 −1→19")).toBeInTheDocument();
+    expect(screen.queryByLabelText("튜브 14 +1→15")).not.toBeInTheDocument();
+  });
+
+  it.each(["PRODUCE", "TRANSFER_TO_WH", "UNMARK_DEFECTIVE"] as const)("%s와 취소도 실제 위치 전후 수량을 유지한다", (transactionType) => {
+    render(<StockSnapshotContent log={makeLog({
+      transaction_type: transactionType, cancelled: true, operation_kind: "CANCELLATION", department: "튜브",
+      warehouse_qty_before: 0, warehouse_qty_after: 0,
+      department_qty_before: 15, department_qty_after: 14,
+      inventory_effect: [{ scope: "location", department: "튜브", status: "PRODUCTION", delta: -1, quantity_before: 8, quantity_after: 7 }],
+    })} />);
+    expect(screen.getByLabelText("튜브 8 −1→7")).toBeInTheDocument();
+    expect(screen.queryByLabelText("튜브 15 −1→14")).not.toBeInTheDocument();
+  });
+
+  it("요청순 합계와 실제 위치가 다르면 확정된 위치별 전후 수량을 표시한다", () => {
+    render(<StockSnapshotContent log={makeLog({
+      warehouse_qty_before: 0, warehouse_qty_after: 0, department_qty_before: 14, department_qty_after: 15,
+      request_order_stock: { status: "available", reason: null, warehouse_qty_before: 0, warehouse_qty_after: 0, department_qty_before: 20, department_qty_after: 21 },
+      inventory_effect: [{ scope: "location", department: "튜브", status: "PRODUCTION", delta: 1, quantity_before: 7, quantity_after: 8 }],
+    })} />);
+    expect(screen.getByLabelText("튜브 7 +1→8")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/20.*21/)).not.toBeInTheDocument();
+  });
+
+  it("부서 총합이 같아도 실제로 움직인 두 위치는 각각 표시한다", () => {
+    render(<StockSnapshotContent log={makeLog({
+      warehouse_qty_before: 0, warehouse_qty_after: 0, department_qty_before: 10, department_qty_after: 10,
+      inventory_effect: [
+        { scope: "location", department: "튜브", status: "PRODUCTION", delta: 1, quantity_before: 7, quantity_after: 8 },
+        { scope: "location", department: "조립", status: "PRODUCTION", delta: -1, quantity_before: 3, quantity_after: 2 },
+      ],
+    })} />);
+    expect(screen.getByLabelText("튜브 7 +1→8")).toBeInTheDocument();
+    expect(screen.getByLabelText("조립 3 −1→2")).toBeInTheDocument();
+    expect(screen.queryByLabelText("재고 변동 없음")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    { scope: "location", department: "튜브", status: "PRODUCTION", delta: 1 },
+    { scope: "location", department: "튜브", status: "PRODUCTION", delta: 1, quantity_before: 7 },
+    { scope: "location", department: "튜브", status: "PRODUCTION", delta: 1, quantity_before: Number.NaN, quantity_after: 8 },
+  ])("위치별 전후가 없는 delta %o는 부서 합계라고 명시하고 위치값을 추정하지 않는다", (effect) => {
+    render(<StockSnapshotContent log={makeLog({
+      department: "튜브", warehouse_qty_before: 0, warehouse_qty_after: 0,
+      department_qty_before: 14, department_qty_after: 15, inventory_effect: [effect],
+    })} />);
+    expect(screen.getByLabelText("부서 합계 14 +1→15")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/튜브.*14.*15/)).not.toBeInTheDocument();
+  });
+
   it("패널과 표 모두 변경 전 수량·증감·화살표·변경 후 수량 순서를 유지한다", () => {
     const log = makeLog({ warehouse_qty_before: 1_234_567, warehouse_qty_after: 1_234_559, department_qty_before: 0, department_qty_after: 0 });
     const { rerender } = render(<StockSnapshotContent log={log} variant="panel" />);
@@ -170,7 +280,7 @@ describe("StockSnapshotContent panel", () => {
     const log = makeLog({ warehouse_qty_before: 100, warehouse_qty_after: 92, department_qty_before: 10, department_qty_after: 18, cancelled: true });
     const { container } = render(<StockSnapshotContent log={log} variant="panel" />);
     expect(screen.getByLabelText("창고 100 −8→92").textContent).toBe("창고100−8→92");
-    expect(screen.getByLabelText("조립 10 +8→18").textContent).toBe("조립10+8→18");
+    expect(screen.getByLabelText("부서 합계 10 +8→18").textContent).toBe("부서 합계10+8→18");
     expect(container.querySelector("[data-history-after-stock]")).toBeNull();
   });
 
@@ -180,7 +290,7 @@ describe("StockSnapshotContent panel", () => {
       warehouse_qty_before: 0, warehouse_qty_after: 0, department_qty_before: 10, department_qty_after: 2,
       inventory_effect: [{ scope: "location", department: "조립", status: "DEFECTIVE", delta: 8 }],
     })} />);
-    expect(screen.getByLabelText("조립 10 −8→2")).toBeInTheDocument();
+    expect(screen.getByLabelText("부서 합계 10 −8→2")).toBeInTheDocument();
     expect(screen.getByLabelText("불량 15 +8→23")).toBeInTheDocument();
   });
 

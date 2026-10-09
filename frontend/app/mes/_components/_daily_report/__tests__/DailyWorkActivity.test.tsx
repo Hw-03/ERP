@@ -6,6 +6,84 @@ import { DirtyGuardProvider } from "@/lib/ui/dirty-guard";
 import { DesktopTabHomeProvider, useDesktopTabHomeController } from "../../DesktopTabHome";
 
 describe("DailyWorkActivity", () => {
+  const classificationCases = [false, true].flatMap((mobile) => [
+    { mobile, subType: "tube_receive_supplier", workType: "tube_material", transactionType: "RECEIVE", operationKey: "tube_material", operationLabel: "튜브 원자재", referenceNo: null },
+    { mobile, subType: "tube_outbound_supplier", workType: "tube_material", transactionType: "MATERIAL_OUT", operationKey: "tube_material", operationLabel: "튜브 원자재", referenceNo: null },
+    { mobile, subType: "outbound_supplier", workType: "receive", transactionType: "MATERIAL_OUT", operationKey: "warehouse", operationLabel: "창고", referenceNo: null },
+    { mobile, subType: null, workType: null, transactionType: "DISASSEMBLE", operationKey: "defect", operationLabel: "불량", referenceNo: "defect-disassemble:review" },
+    { mobile, subType: null, workType: null, transactionType: "SHIP", operationKey: "shipping", operationLabel: "출하", referenceNo: null },
+    { mobile, subType: "receive_supplier", workType: "receive", transactionType: "RECEIVE", shippingPhase: "COMPONENT_CHANGE", operationKey: "item_conversion", operationLabel: "구성품 전환", referenceNo: null },
+    { mobile, subType: "receive_supplier", workType: "receive", transactionType: "RECEIVE", shippingPhase: "PREPARE", operationKey: "shipping", operationLabel: "출하", referenceNo: null },
+    { mobile, subType: "produce", workType: "process", transactionType: "RECEIVE", operationKey: "process", operationLabel: "공정", referenceNo: null },
+  ]);
+  it.each(classificationCases)("서버 작업 분류의 버튼에서 실제 상세를 연다 $transactionType/$subType/$operationKey mobile=$mobile", ({ mobile, subType, workType, transactionType, operationKey, operationLabel, referenceNo, shippingPhase }) => {
+    render(<DailyWorkActivity mobile={mobile} activity={{
+      work_date: "2026-08-03", employee_id: "employee-1", cancelled_count: 0,
+      summary: [{ operation_key: operationKey, operation_label: operationLabel, work_count: 1, quantity_by_unit: { EA: 2 } }],
+      details: [{ type: "solo", key: "grouped-1", logs: [{
+        log_id: "grouped-1", item_id: "item-1", item_name: "분류 검수품", item_unit: "EA",
+        transaction_type: transactionType, quantity_change: transactionType === "RECEIVE" ? 2 : -2,
+        shipping_phase: shippingPhase,
+        reference_no: referenceNo, created_at: "2026-08-03T01:00:00Z", cancelled: false,
+        history_batch: subType ? { work_type: workType, sub_type: subType } : null,
+      }] }],
+    } as never} />);
+    if (mobile) fireEvent.click(screen.getByRole("button", { name: "MES 작업 기록 1건 펼치기" }));
+    expect(screen.getAllByRole("button", { name: /거래 상세 펼치기/ })).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: `${operationLabel} 거래 상세 펼치기` }));
+    expect(screen.getByTestId("daily-work-activity-card")).toHaveTextContent("분류 검수품");
+    expect(screen.queryByText("취소 기록")).not.toBeInTheDocument();
+  });
+
+  it("모바일은 이전 날짜 작업의 취소만 있는 실제 응답도 펼쳐 원래 작업에 접근한다", () => {
+    render(<DailyWorkActivity mobile activity={{
+      work_date: "2026-08-03", employee_id: "employee-1", cancelled_count: 1, summary: [],
+      details: [{ type: "solo", key: "next-day-reversal", logs: [{
+        log_id: "next-day-reversal", item_id: "item-1", item_name: "이전 날짜 취소품", item_unit: "EA",
+        transaction_type: "RECEIVE", quantity_change: -2, created_at: "2026-08-03T01:00:00Z",
+        cancelled: false, operation_kind: "CANCELLATION", operation_effective_status: "cancellation",
+        reverses_log_id: "previous-day-original", operation_display_label: "원자재 입고 취소",
+        inventory_effect: [{ scope: "warehouse", delta: -2, quantity_before: 8, quantity_after: 6 }],
+      }] }],
+    } as never} />);
+    expect(screen.queryByText("작업 기록이 없습니다.")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "MES 작업 기록 취소 1건 펼치기" }));
+    fireEvent.click(screen.getByRole("button", { name: "창고 거래 상세 펼치기" }));
+    expect(screen.getByTestId("daily-work-activity-card")).toHaveTextContent("이전 날짜 취소품");
+    expect(screen.getByRole("button", { name: "원래 작업 보기" })).toBeInTheDocument();
+  });
+
+  it("8.20-11 창고 조정 상세는 서버 batch 문맥과 같은 창고 묶음에 표시한다", () => {
+    render(<DailyWorkActivity activity={{
+      work_date: "2026-08-03", employee_id: "employee-1", cancelled_count: 0,
+      summary: [{ operation_key: "warehouse", operation_label: "창고", work_count: 1, quantity_by_unit: { EA: 2 } }],
+      details: [{ type: "solo", key: "adjust-1", logs: [{ log_id: "adjust-1", item_id: "item-1", item_name: "창고 조정 검수품", item_unit: "EA", transaction_type: "ADJUST", quantity_change: 2, created_at: "2026-08-03T01:00:00Z", history_batch: { work_type: "warehouse_adjust", sub_type: "warehouse_adjust_in" } }] }],
+    } as never} />);
+    fireEvent.click(screen.getByRole("button", { name: "창고 거래 상세 펼치기" }));
+    expect(screen.getByTestId("daily-work-activity-card")).toHaveTextContent("창고 조정 검수품");
+  });
+
+  it.each([false, true])("8.20-07 취소만 남은 작업의 실제 상세에 접근하고 완료 수량 기준을 알린다 mobile=%s", (mobile) => {
+    render(<DailyWorkActivity mobile={mobile} activity={{
+      work_date: "2026-08-03", employee_id: "employee-1", cancelled_count: 1, summary: [],
+      details: [{ type: "solo", key: "cancel-1", logs: [{
+        log_id: "cancel-1", item_id: "item-1", item_name: "취소 검수품", item_unit: "EA", transaction_type: "RECEIVE",
+        quantity_change: -2, quantity_before: 8, quantity_after: 6, warehouse_qty_before: 8, warehouse_qty_after: 6,
+        department: "창고", created_at: "2026-08-03T01:00:00Z", actor_employee_name: "취소자",
+        operation_kind: "CANCELLATION", operation_effective_status: "cancellation", operation_display_label: "원자재 입고 취소",
+        notes: "취소 사유", inventory_effect: [{ scope: "warehouse", delta: -2, quantity_before: 8, quantity_after: 6 }],
+      }] }],
+    } as never} />);
+    if (mobile) fireEvent.click(screen.getByRole("button", { name: "MES 작업 기록 취소 1건 펼치기" }));
+    expect(screen.getByText("수량은 취소된 작업을 제외한 완료 작업 합계입니다.")).toBeInTheDocument();
+    expect(screen.getByText("일보 작성 여부와 관계없이 해당 직원의 MES 작업을 표시합니다.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "창고 거래 상세 펼치기" }));
+    expect(screen.getByTestId("daily-work-activity-card")).toHaveTextContent("취소 검수품");
+    expect(screen.getByTestId("daily-work-activity-status")).toHaveTextContent("취소");
+    expect(screen.getByTestId("daily-work-activity-stock-flow")).toHaveTextContent("8 EA → 6 EA");
+    expect(screen.getByTestId("daily-work-activity-direction")).toHaveAttribute("aria-label", "창고 → 공급사");
+  });
+
   it("모바일은 MES 건수를 먼저 보여 주고 펼칠 때 작업별 버튼과 상세를 열 수 있다", () => {
     const onDetailOpenChange = vi.fn();
     render(<DailyWorkActivity mobile activity={{
