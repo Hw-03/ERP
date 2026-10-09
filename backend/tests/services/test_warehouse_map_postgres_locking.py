@@ -11,11 +11,19 @@ from types import SimpleNamespace
 import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.engine import make_url
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
 
-from app.models import WarehouseBox, WarehouseBoxItem
+from app.models import (
+    Employee,
+    Item,
+    ProcessType,
+    ShippingAllocation,
+    ShippingRequest,
+    WarehouseBoxItem,
+)
 from app.routers.warehouse_map import boxes as boxes_router
 from app.schemas import WarehouseBoxMove
 from app.services import warehouse_map as warehouse_map_service
@@ -205,11 +213,15 @@ def test_postgres_concurrent_admin_moves_serialize_target_capacity_and_stack_ord
     monkeypatch,
 ):
     """주의: TEST_POSTGRES_URL에는 폐기 가능한 전용 PostgreSQL 테스트 DB만 지정한다."""
-    engine = create_engine(TEST_POSTGRES_URL, poolclass=NullPool)
+    schema_name = f"test_r1_lock_{uuid.uuid4().hex}"
+    # Commit expires ORM rows; every replacement connection must retain this schema.
+    schema_url = make_url(TEST_POSTGRES_URL).update_query_dict(
+        {"options": f"-csearch_path={schema_name}"}, append=False,
+    )
+    engine = create_engine(schema_url, poolclass=NullPool)
     if engine.dialect.name != "postgresql":
         pytest.fail("TEST_POSTGRES_URL must point to a dedicated PostgreSQL test database")
 
-    schema_name = f"test_r1_lock_{uuid.uuid4().hex}"
     quoted_schema = f'"{schema_name}"'
     item_a = uuid.uuid4()
     item_b = uuid.uuid4()
@@ -404,6 +416,7 @@ def test_postgres_concurrent_admin_moves_serialize_target_capacity_and_stack_ord
         session_b.execute(text("SET LOCAL lock_timeout = '100ms'"))
         assert boxes_router.move_box(str(box_b), target, None, session_b)["box_id"] == str(box_b)
 
+        assert session_b.execute(text("SELECT current_schema()")).scalar_one() == schema_name
         session_b.execute(text(f"SET LOCAL search_path TO {quoted_schema}"))
         target_rows = session_b.execute(
             text(
@@ -432,11 +445,14 @@ def test_postgres_concurrent_admin_moves_serialize_target_capacity_and_stack_ord
 )
 def test_postgres_outbound_blocks_actual_admin_move_until_commit(monkeypatch):
     """실제 출고와 관리자 이동이 같은 재고/박스 잠금 계약을 공유한다."""
-    engine = create_engine(TEST_POSTGRES_URL, poolclass=NullPool)
+    schema_name = f"test_r1_outbound_lock_{uuid.uuid4().hex}"
+    schema_url = make_url(TEST_POSTGRES_URL).update_query_dict(
+        {"options": f"-csearch_path={schema_name}"}, append=False,
+    )
+    engine = create_engine(schema_url, poolclass=NullPool)
     if engine.dialect.name != "postgresql":
         pytest.fail("TEST_POSTGRES_URL must point to a dedicated PostgreSQL test database")
 
-    schema_name = f"test_r1_outbound_lock_{uuid.uuid4().hex}"
     quoted_schema = f'"{schema_name}"'
     item_id = uuid.uuid4()
     inventory_id = uuid.uuid4()
@@ -457,6 +473,24 @@ def test_postgres_outbound_blocks_actual_admin_move_until_commit(monkeypatch):
             setup.execute(text(f"CREATE SCHEMA {quoted_schema}"))
             schema_created = True
             setup.execute(text(f"SET LOCAL search_path TO {quoted_schema}"))
+            # The real outbound boundary validates the item and reads shipping reservations.
+            Item.metadata.create_all(
+                setup,
+                tables=[
+                    ProcessType.__table__,
+                    Item.__table__,
+                    Employee.__table__,
+                    ShippingRequest.__table__,
+                    ShippingAllocation.__table__,
+                ],
+            )
+            setup.execute(ProcessType.__table__.insert().values(
+                code="TR", prefix="T", suffix="R", stage_order=0,
+            ))
+            setup.execute(Item.__table__.insert().values(
+                item_id=item_id, item_name="R1 outbound locking", unit="EA",
+                model_symbol="9", process_type_code="TR", serial_no=1,
+            ))
             setup.execute(
                 text(
                     """
@@ -642,6 +676,7 @@ def test_postgres_outbound_blocks_actual_admin_move_until_commit(monkeypatch):
         session_b.execute(text("SET LOCAL lock_timeout = '100ms'"))
         assert boxes_router.move_box(str(box_id), target, None, session_b)["box_id"] == str(box_id)
 
+        assert session_b.execute(text("SELECT current_schema()")).scalar_one() == schema_name
         session_b.execute(text(f"SET LOCAL search_path TO {quoted_schema}"))
         final = session_b.execute(
             text(

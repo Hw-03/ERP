@@ -338,7 +338,7 @@ def snapshot_existing_rows(
     database: Path, *, removed_columns: dict[str, frozenset[str]] | None = None,
 ) -> dict[str, TableSnapshot]:
     """Fingerprint every employee-owned table before a candidate migration."""
-    with sqlite3.connect(database) as connection:
+    with closing(sqlite3.connect(database)) as connection:
         return {
             table: _snapshot_table(connection, table, tuple(
                 column for column in _table_columns(connection, table)
@@ -358,7 +358,7 @@ def assert_existing_rows_unchanged(
     """Reject changed rows outside the explicit data-change allowance."""
     if allowed_tables.intersection(removed_columns or {}):
         raise PreflightDataError("column removal must preserve the remaining table projection")
-    with sqlite3.connect(database) as connection:
+    with closing(sqlite3.connect(database)) as connection:
         current_tables = set(_table_names(connection))
         for table, snapshot in before.items():
             if table in allowed_tables:
@@ -379,7 +379,7 @@ def assert_existing_rows_unchanged(
 
 def assert_policy_validators(database: Path, policies: Iterable[MigrationPolicy]) -> None:
     """Run each declared data-change query against the migrated snapshot."""
-    with sqlite3.connect(database) as connection:
+    with closing(sqlite3.connect(database)) as connection:
         for policy in policies:
             if policy.validator_sql is None:
                 continue
@@ -399,7 +399,7 @@ def _copy_verified_snapshot(source: Path, runtime_root: Path) -> Path:
     snapshot = snapshot_dir / f"mes_preflight_{datetime.now():%Y%m%d_%H%M%S}_{uuid.uuid4().hex}.db"
     with closing(sqlite3.connect(source.resolve().as_uri() + "?mode=ro", uri=True)) as source_connection, closing(sqlite3.connect(snapshot)) as destination_connection:
         source_connection.backup(destination_connection)
-    with sqlite3.connect(snapshot) as connection:
+    with closing(sqlite3.connect(snapshot)) as connection:
         integrity = connection.execute("PRAGMA integrity_check").fetchone()
     if integrity != ("ok",):
         raise PreflightError(f"snapshot integrity check failed: {integrity}")

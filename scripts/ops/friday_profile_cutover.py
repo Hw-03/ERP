@@ -83,19 +83,30 @@ class CutoverAdmissionError(RuntimeError):
     """The one-shot cutover evidence does not prove every required boundary."""
 
 
+def _io_path(path: Path) -> Path:
+    """Use extended Windows transport without resolving aliases before validation."""
+    if os.name != "nt":
+        return path
+    absolute = os.path.abspath(path)
+    if absolute.startswith("\\\\?\\"):
+        return Path(absolute)
+    return Path("\\\\?\\UNC\\" + absolute[2:] if absolute.startswith("\\\\") else "\\\\?\\" + absolute)
+
+
 def _physical(path: Path, *, require_file: bool = False) -> Path:
     """Resolve a local path and reject aliases across every existing ancestor."""
 
     absolute = path.expanduser().absolute()
     for entry in (absolute, *absolute.parents):
-        if not entry.exists():
+        checked = _io_path(entry)
+        if not checked.exists():
             continue
-        if entry.is_symlink() or (
-            hasattr(entry, "is_junction") and entry.is_junction()
+        if checked.is_symlink() or (
+            hasattr(checked, "is_junction") and checked.is_junction()
         ):
             raise CutoverAdmissionError(f"linked paths are not allowed: {entry}")
     resolved = absolute.resolve()
-    if require_file and not resolved.is_file():
+    if require_file and not _io_path(resolved).is_file():
         raise CutoverAdmissionError(f"required file is missing: {resolved}")
     return resolved
 
@@ -120,7 +131,7 @@ def validator_bundle_sha256(code_root: Path) -> str:
     missing = [
         str(path)
         for path in anchors
-        if not path.is_file() or path.stat().st_size <= 0
+        if not _io_path(path).is_file() or _io_path(path).stat().st_size <= 0
     ]
     if missing:
         raise CutoverAdmissionError(
@@ -129,17 +140,19 @@ def validator_bundle_sha256(code_root: Path) -> str:
     files = set(anchors)
     for relative in VALIDATOR_TREES:
         tree = root / relative
-        if not tree.is_dir():
+        tree_io = _io_path(tree)
+        if not tree_io.is_dir():
             raise CutoverAdmissionError(f"validator tree is missing: {tree}")
-        files.update(path for path in tree.rglob("*.py") if "__pycache__" not in path.parts)
+        files.update(tree / path.relative_to(tree_io) for path in tree_io.rglob("*.py") if "__pycache__" not in path.parts)
     digest = hashlib.sha256()
     for path in sorted(files, key=lambda candidate: candidate.relative_to(root).as_posix()):
         physical = _physical(path, require_file=True)
         relative = physical.relative_to(root).as_posix().encode("utf-8")
         digest.update(len(relative).to_bytes(4, "big"))
         digest.update(relative)
-        digest.update(path.stat().st_size.to_bytes(8, "big"))
-        with path.open("rb") as stream:
+        file_io = _io_path(physical)
+        digest.update(file_io.stat().st_size.to_bytes(8, "big"))
+        with file_io.open("rb") as stream:
             for block in iter(lambda: stream.read(1024 * 1024), b""):
                 digest.update(block)
     return digest.hexdigest()

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 from pathlib import Path
 import sys
 
@@ -26,6 +27,51 @@ def _write(path: Path, value: str) -> None:
     path.write_text(value, encoding="utf-8")
 
 
+@pytest.mark.parametrize("returncode", [0, 1])
+def test_owner_pid_scan_uses_native_bytes_and_preserves_unknown_on_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, returncode: int) -> None:
+    """Windows headings may use a native code page even under PYTHONUTF8=1."""
+    module = _module()
+    output = "활성 연결".encode("cp949") + (
+        b"\r\n  TCP  0.0.0.0:8010  0.0.0.0:0  LISTENING  4132\r\n"
+        b"  TCP  [::]:8010  [::]:0  LISTENING  4132\r\n"
+        b"  TCP  [::]:3000  [::]:0  LISTENING  8876\r\n"
+        b"  TCP  127.0.0.1:8010  127.0.0.1:50000  ESTABLISHED  1234\r\n"
+        b"  TCP  0.0.0.0:9000  0.0.0.0:0  LISTENING  9001\r\n"
+    )
+
+    def netstat(command: list[str], **kwargs: object) -> module.subprocess.CompletedProcess[bytes]:
+        assert command == ["netstat", "-ano", "-p", "tcp"]
+        assert kwargs.get("capture_output") is True and not kwargs.get("text", False)
+        return module.subprocess.CompletedProcess(command, returncode, stdout=output, stderr=b"")
+
+    monkeypatch.setattr(module.subprocess, "run", netstat)
+    profile = module.RuntimeProfile(tmp_path, 8010, 3000, "http://127.0.0.1:3000")
+    expected = {8010: ["UNKNOWN"], 3000: ["UNKNOWN"]} if returncode else {8010: ["4132"], 3000: ["8876"]}
+    assert module._owner_pids(profile) == expected
+
+
+def test_source_snapshot_excludes_only_e2e_generated_paths_and_full_artifacts_keep_them(tmp_path: Path) -> None:
+    """E2E runtime churn must not invalidate source, while exact artifact hashes retain it."""
+    module = _module()
+    frontend = tmp_path / "frontend"
+    generated = (".e2e-backend.pid", ".e2e-realdb-hash", ".e2e-seed.json")
+    for name in generated:
+        _write(frontend / "tests/e2e" / name, "first runtime")
+    _write(frontend / "tests/e2e/global-setup.ts", "first source")
+    _write(frontend / "tests/e2e/.e2e-options.json", "source options")
+    _write(frontend / "docs/.e2e-seed.json", "same basename elsewhere")
+    source = module.files(frontend, source=True)
+    assert set(source) == {"tests/e2e/global-setup.ts", "tests/e2e/.e2e-options.json", "docs/.e2e-seed.json"}
+    artifact = module.files(frontend)
+    assert all("tests/e2e/" + name in artifact for name in generated)
+    for name in generated:
+        _write(frontend / "tests/e2e" / name, "second runtime")
+    assert module.files(frontend, source=True) == source
+    assert module.files(frontend) != artifact
+    _write(frontend / "tests/e2e/global-setup.ts", "changed source")
+    assert module.files(frontend, source=True) != source
+
+
 def _source(tmp_path: Path) -> Path:
     frontend = tmp_path / "source" / "frontend"
     _write(frontend / "package.json", json.dumps({"name": "fixture", "engines": {"node": ">=20 <21"}, "dependencies": {"next": "16.3.4", "react": "19.2.8", "react-dom": "19.2.8"}}))
@@ -36,6 +82,47 @@ def _source(tmp_path: Path) -> Path:
     _write(frontend / ".next" / "cache", "development cache")
     _write(frontend / "next-env.d.ts", "generated development paths")
     return frontend
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows CopyFile2 MAX_PATH regression")
+def test_snapshot_copy_preserves_real_files_beyond_windows_max_path(tmp_path: Path) -> None:
+    module = _module()
+    source = tmp_path / "source"
+    relative = "node_modules/@tanstack/react-query/build/codemods/src/v5/keep-previous-data/utils/already-has-placeholder-data-property.cjs"
+    _write(source / relative, "actual dependency bytes")
+    destination = tmp_path / ("release-" + "a" * 32) / ("failed-code.pending-" + "b" * 32) / "frontend"
+    assert len(str(destination / relative)) > 260
+    manifest = module.files(source)
+    module._copy_files(source, destination, manifest)
+    assert module.files(destination) == manifest
+    assert module._copy_io_path(destination / relative).read_bytes() == (source / relative).read_bytes()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows path spellings")
+def test_copy_io_path_keeps_unc_and_already_extended_paths() -> None:
+    module = _module()
+    assert str(module._copy_io_path(Path(r"\\server\share\folder"))) == r"\\?\UNC\server\share\folder"
+    assert str(module._copy_io_path(Path(r"\\?\C:\folder"))) == r"\\?\C:\folder"
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows restore MAX_PATH regression")
+def test_preserved_recovery_file_restores_long_source_and_target_atomically(tmp_path: Path) -> None:
+    module = _module()
+    import hashlib
+
+    nested = "/".join(["long-relative-component"] * 9)
+    source = tmp_path / "preserved" / nested / "service.py"
+    target = tmp_path / "employee" / nested / "service.py"
+    staging = tmp_path / "journal"
+    staging.mkdir()
+    _write(module._copy_io_path(source), "preserved generation")
+    _write(module._copy_io_path(target), "failed generation")
+    digest = hashlib.sha256(b"preserved generation").hexdigest()
+    assert len(str(source)) > 260 and len(str(target)) > 260
+    module._copy_recovery_file(source, target, digest, staging)
+    assert module._copy_io_path(target).read_bytes() == b"preserved generation"
+    assert module._copy_io_path(source).read_bytes() == b"preserved generation"
+    assert list(staging.iterdir()) == []
 
 
 def _fake_toolchain(tmp_path: Path) -> Path:
@@ -113,7 +200,8 @@ def test_install_and_rollback_restore_old_code_dependencies_build_and_node_setti
     _write(employee / "frontend" / ".next-prod" / "BUILD_ID", "old build")
     _write(employee / "frontend" / ".env.local", "EMPLOYEE_FIXTURE=preserve")
     _write(employee / "scripts" / "dev" / "start-frontend.ps1", "old runtime")
-    _write(employee / "_attic" / "runtime" / "frontend-node-path.txt", "old-node.exe")
+    old_node = _fake_toolchain(employee / "_attic/runtime/old")
+    _write(employee / "_attic" / "runtime" / "frontend-node-path.txt", str(old_node))
     record = module.install(release, source, node, employee)
     assert (employee / "frontend" / ".next-prod" / "BUILD_ID").read_text() == "built-id"
     assert (employee / "frontend" / ".env.local").read_text() == "EMPLOYEE_FIXTURE=preserve"
@@ -123,7 +211,7 @@ def test_install_and_rollback_restore_old_code_dependencies_build_and_node_setti
     assert (employee / "frontend" / "node_modules" / "old.txt").read_text() == "old dependency"
     assert (employee / "frontend" / ".next-prod" / "BUILD_ID").read_text() == "old build"
     assert (employee / "scripts" / "dev" / "start-frontend.ps1").read_text() == "old runtime"
-    assert (employee / "_attic" / "runtime" / "frontend-node-path.txt").read_text() == "old-node.exe"
+    assert (employee / "_attic" / "runtime" / "frontend-node-path.txt").read_text() == str(old_node)
 
 
 def test_wrong_node_is_rejected_before_any_install(tmp_path, monkeypatch):
@@ -221,9 +309,36 @@ def test_missing_node_backup_cannot_accept_new_node_setting(tmp_path, monkeypatc
     source, node, release, _ = _prepare(module, tmp_path, monkeypatch)
     employee = tmp_path / "employee"
     _write(employee / "frontend" / "package.json", "old package")
-    _write(employee / "_attic/runtime/frontend-node-path.txt", "old-node")
+    old_node = _fake_toolchain(employee / "_attic/runtime/old")
+    _write(employee / "_attic/runtime/frontend-node-path.txt", str(old_node))
     record = module.install(release, source, node, employee)
     (record.parent / "old-node-path.txt").unlink()
     with pytest.raises(module.ReleaseError, match="Node setting"):
         module.rollback(record, employee)
     assert json.loads(record.read_text())["phase"] != "ROLLED_BACK"
+
+
+def test_rollback_restores_pinned_node_bytes(tmp_path, monkeypatch):
+    module = _module()
+    source, node, prepared, _ = _prepare(module, tmp_path, monkeypatch)
+    employee = tmp_path / "employee"
+    old_node = _fake_toolchain(employee / "_attic/runtime/old")
+    _write(employee / "frontend/package.json", "old package")
+    _write(employee / "_attic/runtime/frontend-node-path.txt", str(old_node))
+    original = module.files(old_node.parent)
+    record = module.install(prepared, source, node, employee)
+    _write(old_node, "damaged after install")
+    module.rollback(record, employee)
+    assert module.files(old_node.parent) == original
+
+
+def test_missing_previous_node_blocks_install_before_any_employee_write(tmp_path, monkeypatch):
+    module = _module()
+    source, node, prepared, _ = _prepare(module, tmp_path, monkeypatch)
+    employee = tmp_path / "employee"
+    _write(employee / "frontend/package.json", "old package")
+    _write(employee / "_attic/runtime/frontend-node-path.txt", str(employee / "missing/node.exe"))
+    before = module.files(employee)
+    with pytest.raises(module.ReleaseError, match="Previous Node"):
+        module.install(prepared, source, node, employee)
+    assert module.files(employee) == before

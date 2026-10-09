@@ -22,6 +22,7 @@ import uuid
 
 SOURCE_EXCLUDED_DIRS = frozenset({"node_modules", ".next", ".next-prod", ".git", ".venv", "__pycache__", "_archive", "_backup", "logs", "data", "coverage", "test-results", ".pytest_cache", ".ruff_cache"})
 SOURCE_EXCLUDED_FILES = frozenset({"next-env.d.ts", "tsconfig.tsbuildinfo", ".npmrc"})
+SOURCE_EXCLUDED_PATHS = frozenset({"tests/e2e/.e2e-backend.pid", "tests/e2e/.e2e-realdb-hash", "tests/e2e/.e2e-seed.json"})
 BUILD_ENV = {"BACKEND_INTERNAL_URL": "http://localhost:8010", "NEXT_PUBLIC_API_URL": "", "NEXT_PUBLIC_MES_ENV": "employee", "NEXT_TELEMETRY_DISABLED": "1"}
 PACKAGES = ("next", "react", "react-dom")
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -54,7 +55,8 @@ def _physical(path: Path) -> Path:
     """Reject junctions even when the link is the supplied root or its ancestor."""
     absolute = path.absolute()
     for current in (absolute, *absolute.parents):
-        if current.is_symlink() or (hasattr(current, "is_junction") and current.is_junction()):
+        checked = _copy_io_path(current)
+        if checked.is_symlink() or (hasattr(checked, "is_junction") and checked.is_junction()):
             raise ReleaseError(f"Linked deployment path is not allowed: {current}")
     return absolute
 
@@ -67,7 +69,8 @@ def _inside(path: Path, root: Path) -> Path:
         raise ReleaseError(f"Path is outside its expected root: {path}")
     current = absolute
     while current != root.absolute():
-        if current.is_symlink() or (hasattr(current, "is_junction") and current.is_junction()):
+        checked = _copy_io_path(current)
+        if checked.is_symlink() or (hasattr(checked, "is_junction") and checked.is_junction()):
             raise ReleaseError(f"Linked deployment path is not allowed: {current}")
         if current.parent == current:
             raise ReleaseError("Deployment path has no expected parent")
@@ -83,7 +86,7 @@ def _excluded(name: str) -> bool:
 
 def files(root: Path, *, source: bool = False) -> dict[str, str]:
     """Hash copied bytes, rejecting links and omitting only local source artifacts."""
-    root = _physical(root)
+    root = _copy_io_path(_physical(root))
     result: dict[str, str] = {}
     if not root.is_dir():
         raise ReleaseError(f"Required directory is missing: {root}")
@@ -93,7 +96,8 @@ def files(root: Path, *, source: bool = False) -> dict[str, str]:
             for entry in entries:
                 directory = entry.is_dir(follow_symlinks=False)
                 if source and ((directory and entry.name in SOURCE_EXCLUDED_DIRS) or
-                               (not directory and _excluded(entry.name))):
+                               (not directory and (_excluded(entry.name) or
+                                Path(entry.path).relative_to(root).as_posix() in SOURCE_EXCLUDED_PATHS))):
                     continue
                 # DirEntry reuses enumeration metadata on Windows. Reject all
                 # reparse points without resolving every ancestor per package file.
@@ -150,13 +154,23 @@ def run_command(argv: list[str], cwd: Path, environment: dict[str, str], log: Pa
         raise ReleaseError(f"Command exited {result.returncode}; see {log}")
 
 
+def _copy_io_path(path: Path) -> Path:
+    """Use Windows extended paths only after normal containment/link validation."""
+    if os.name != "nt":
+        return path
+    absolute = str(path.absolute())
+    if absolute.startswith("\\\\?\\"):
+        return Path(absolute)
+    return Path("\\\\?\\UNC\\" + absolute[2:] if absolute.startswith("\\\\") else "\\\\?\\" + absolute)
+
+
 def _copy_files(source: Path, destination: Path, manifest: dict[str, str]) -> None:
     _physical(destination)
-    destination.mkdir(parents=True, exist_ok=True)
+    _copy_io_path(destination).mkdir(parents=True, exist_ok=True)
     for relative in manifest:
-        target = _inside(destination / relative, destination)
+        target = _copy_io_path(_inside(destination / relative, destination))
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(_inside(source / relative, source), target)
+        shutil.copy2(_copy_io_path(_inside(source / relative, source)), target)
         if hashlib.sha256(target.read_bytes()).hexdigest() != manifest[relative]:
             raise ReleaseError(f"Deployment copy verification failed: {relative}")
 
@@ -261,11 +275,24 @@ def assert_no_pending(employee: Path) -> None:
             raise ReleaseError(f"Previous deployment needs recovery: {record}")
 
 
+def _previous_node(employee: Path) -> dict | None:
+    """Bind the old executable and npm bytes before any installation mutation."""
+    config = _inside(employee / "_attic/runtime/frontend-node-path.txt", employee)
+    if not config.is_file():
+        return None
+    node = Path(config.read_text(encoding="utf-8-sig").strip())
+    if not node.is_absolute() or not _physical(node).is_file():
+        raise ReleaseError("Previous Node setting must identify an existing absolute executable")
+    # A shared external runtime may be verified, but recovery must never overwrite it.
+    return {"path": str(node), "files": files(node.parent)}
+
+
 def install_preflight(release: Path, source: Path, node: Path, employee: Path, required_files: list[str]) -> dict:
     """Check all install prerequisites without creating files in the employee tree."""
     receipt = verify(release, source, node)
     employee = _physical(employee)
     files(employee / "frontend")
+    _previous_node(employee)
     assert_no_pending(employee)
     for relative in required_files:
         path = _inside(source.parent / relative, source.parent)
@@ -311,6 +338,12 @@ def install(release: Path, source: Path, node: Path, employee: Path) -> Path:
             shutil.copy2(config, recovery / "old-node-path.txt")
             if config.read_bytes() != (recovery / "old-node-path.txt").read_bytes():
                 raise ReleaseError("Previous Node setting backup copy verification failed")
+            previous_node = _previous_node(employee)
+            _copy_files(Path(previous_node["path"]).parent, recovery / "old-node", previous_node["files"])
+            if _previous_node(employee) != previous_node:
+                raise ReleaseError("Previous Node toolchain changed during backup")
+            journal["old_node"] = previous_node
+            _json(record, journal)
         for name in ("scripts", "backend"):
             old = employee / name
             journal["code_backups"][name] = {}
@@ -327,21 +360,21 @@ def install(release: Path, source: Path, node: Path, employee: Path) -> Path:
                 journal["root_files"][name] = digest
         journal["old_frontend"] = files(employee / "frontend")
         incoming = recovery / "incoming-frontend"
-        shutil.copytree(release / "frontend", incoming)
+        shutil.copytree(_copy_io_path(_physical(release / "frontend")), _copy_io_path(_inside(incoming, employee)))
         # Operational configuration belongs to the employee installation, never to dev.
         for old in (employee / "frontend").iterdir():
             _inside(old, employee)
             if old.name.startswith(".env") and old.is_file():
                 shutil.copy2(old, incoming / old.name)
             elif old.name in {"logs", "_archive"} and old.is_dir():
-                shutil.copytree(old, incoming / old.name, dirs_exist_ok=True)
+                shutil.copytree(_copy_io_path(_physical(old)), _copy_io_path(_inside(incoming / old.name, employee)), dirs_exist_ok=True)
         tool_directory = runtime / "tools" / ("node-" + receipt["toolchain"]["version"] + "-" + _digest(receipt["toolchain"])[:12])
         _inside(tool_directory, employee)
         if tool_directory.exists():
             if files(tool_directory) != receipt["toolchain"]["files"]:
                 raise ReleaseError("Existing pinned employee Node toolchain is inconsistent")
         else:
-            shutil.copytree(node.parent, tool_directory)
+            shutil.copytree(_copy_io_path(_physical(node.parent)), _copy_io_path(_inside(tool_directory, employee)))
         if files(tool_directory) != receipt["toolchain"]["files"]:
             raise ReleaseError("Employee Node toolchain copy failed verification")
         journal["phase"] = "BACKED_UP"
@@ -405,8 +438,8 @@ def install_code(source: Path, record: Path, employee: Path, source_record: Path
             for relative in set(journal["code_backups"][name]) - set(expected[name]):
                 old = _inside(target / relative, target)
                 quarantine = _inside(record.parent / "superseded-code" / name / relative, record.parent)
-                quarantine.parent.mkdir(parents=True, exist_ok=True)
-                old.rename(quarantine)
+                _copy_io_path(quarantine).parent.mkdir(parents=True, exist_ok=True)
+                _copy_io_path(old).rename(_copy_io_path(quarantine))
             _copy_files(source / name, target, expected[name])
         old_roots = journal.get("root_files", {})
         for name in ("start.bat", "watch.bat", "stop.bat", "status.bat"):
@@ -490,32 +523,75 @@ def rollback(
             "receipt": str(recovery_receipt.resolve()), "sha256": recovery_sha256.lower(),
         }
         _json(record, journal)
+    _restore_previous_code(record, employee, journal)
+    journal["phase"] = "ROLLED_BACK"
+    _json(record, journal)
+
+
+def _copy_recovery_file(source: Path, target: Path, digest: str, staging: Path) -> None:
+    """Publish one verified old file atomically, leaving interrupted staging outside code."""
+    from scripts.ops.durable_file import durable_replace
+
+    pending = _inside(staging / ("recovery-copy.pending-" + uuid.uuid4().hex), staging)
+    pending_io = _copy_io_path(pending)
+    shutil.copy2(_copy_io_path(_physical(source)), pending_io)
+    with pending_io.open("r+b") as copied:
+        if hashlib.file_digest(copied, "sha256").hexdigest() != digest:
+            raise ReleaseError("Previous code copy is corrupt")
+        copied.flush()
+        os.fsync(copied.fileno())
+    _copy_io_path(_physical(target)).parent.mkdir(parents=True, exist_ok=True)
+    # durable_replace already converts its normal paths for MoveFileExW.
+    durable_replace(pending, target)
+
+
+def _restore_previous_code(record: Path, employee: Path, journal: dict, *, preserve: bool = False) -> None:
+    """Restore saved code; joint recovery preserves originals for explicit retries."""
     recovery = record.parent
     previous = recovery / "old-frontend"
     if previous.is_dir():
+        staged = recovery / ("restore-frontend.pending-" + uuid.uuid4().hex)
+        if preserve:
+            _copy_files(previous, staged, journal["old_frontend"])
         if (employee / "frontend").exists():
             (employee / "frontend").rename(recovery / ("failed-frontend-" + uuid.uuid4().hex))
-        previous.rename(employee / "frontend")
+        if preserve:
+            staged.rename(employee / "frontend")
+        else:
+            previous.rename(employee / "frontend")
     if "old_frontend" in journal and files(employee / "frontend") != journal["old_frontend"]:
         raise ReleaseError("Previous frontend restoration failed verification")
-    for name, manifest in journal.get("code_backups", {}).items():
+    for name, manifest in sorted(journal.get("code_backups", {}).items()):
         target = _inside(employee / name, employee)
         current = files(target, source=True) if target.is_dir() else {}
-        for relative in set(current) - set(manifest):
+        for relative in sorted(set(current) - set(manifest)):
             _inside(target / relative, target).unlink()
-        _copy_files(recovery / ("old-" + name), target, manifest)
+        if preserve:
+            for relative, digest in sorted(manifest.items()):
+                _copy_recovery_file(
+                    _inside(recovery / ("old-" + name) / relative, recovery / ("old-" + name)),
+                    _inside(target / relative, target), digest, recovery,
+                )
+        else:
+            _copy_files(recovery / ("old-" + name), target, manifest)
         if files(target, source=True) != manifest:
             raise ReleaseError(f"Previous {name} restoration failed verification")
-    for name, digest in journal.get("root_files", {}).items():
+    for name, digest in sorted(journal.get("root_files", {}).items()):
         if digest is None:
             _inside(employee / name, employee).unlink(missing_ok=True)
         else:
-            _copy_files(recovery, employee, {name: digest})
+            if preserve:
+                _copy_recovery_file(_inside(recovery / name, recovery), _inside(employee / name, employee), digest, recovery)
+            else:
+                _copy_files(recovery, employee, {name: digest})
     config = _inside(employee / "_attic/runtime/frontend-node-path.txt", employee)
     if journal["config_existed"] and (recovery / "old-node-path.txt").is_file():
         if hashlib.sha256((recovery / "old-node-path.txt").read_bytes()).hexdigest() != journal["config_hash"]:
             raise ReleaseError("Previous Node setting backup is corrupt")
-        shutil.copy2(recovery / "old-node-path.txt", config)
+        if preserve:
+            _copy_recovery_file(recovery / "old-node-path.txt", config, journal["config_hash"], recovery)
+        else:
+            shutil.copy2(recovery / "old-node-path.txt", config)
         if config.read_bytes() != (recovery / "old-node-path.txt").read_bytes():
             raise ReleaseError("Previous Node setting restoration failed verification")
     elif not journal["config_existed"]:
@@ -524,8 +600,21 @@ def rollback(
         not config.is_file() or hashlib.sha256(config.read_bytes()).hexdigest() != journal["config_hash"]
     ):
         raise ReleaseError("Previous Node setting restoration failed verification")
-    journal["phase"] = "ROLLED_BACK"
-    _json(record, journal)
+    old_node = journal.get("old_node")
+    if old_node is not None:
+        if files(recovery / "old-node") != old_node["files"]:
+            raise ReleaseError("Previous Node toolchain backup is corrupt")
+        target = _physical(Path(old_node["path"])).parent
+        if target.is_relative_to((employee / "_attic/runtime").resolve()):
+            _inside(target, employee / "_attic/runtime")
+            current = files(target) if target.exists() else {}
+            for relative in sorted(set(current) - set(old_node["files"])):
+                _inside(target / relative, target).unlink()
+            for relative, digest in sorted(old_node["files"].items()):
+                _copy_recovery_file(_inside(recovery / "old-node" / relative, recovery / "old-node"),
+                                    _inside(target / relative, target), digest, recovery)
+        if files(target) != old_node["files"]:
+            raise ReleaseError("Previous shared Node toolchain changed; refusing an external runtime write")
 
 
 def mark(record: Path, employee: Path, phase: str) -> None:
@@ -537,7 +626,11 @@ def mark(record: Path, employee: Path, phase: str) -> None:
     expected = "INSTALLED" if phase == "MIGRATING" else "MIGRATING"
     if journal["phase"] != expected:
         raise ReleaseError(f"Cannot advance release from {journal['phase']} to {phase}")
-    if journal.get("code_install_started") or journal.get("code_installed"):
+    if journal.get("recovery_admission"):
+        if phase != "CONFIRMED":
+            raise ReleaseError("Recovery admission already crossed the migration boundary")
+        _normal_activation_database(record, employee.resolve())
+    elif journal.get("code_install_started") or journal.get("code_installed"):
         if phase == "MIGRATING" or not journal.get("friday_cutover"):
             raise ReleaseError("Full code installation requires the verified Friday transition")
         from scripts.ops.friday_profile_cutover import verify_admission
@@ -556,13 +649,13 @@ def mark(record: Path, employee: Path, phase: str) -> None:
     _json(record, journal)
 
 
-def _require_employee_runtime(employee: Path) -> RuntimeProfile:
+def _require_employee_runtime(employee: Path, *, installed_code: bool = True) -> RuntimeProfile:
     """Resolve and verify the fixed public employee profile and installed code root."""
 
     employee = _physical(employee).resolve()
     if employee != _physical(EMPLOYEE_RUNTIME_ROOT).resolve():
         raise ReleaseError("Friday activation requires the canonical employee profile root")
-    if _physical(PROJECT_ROOT).resolve() != employee:
+    if installed_code and _physical(PROJECT_ROOT).resolve() != employee:
         raise ReleaseError("Friday activation must run from the installed employee code root")
     resolver = _inside(employee / "scripts/dev/resolve-server-profile.ps1", employee)
     if not resolver.is_file():
@@ -817,14 +910,13 @@ def _ports_closed(profile: RuntimeProfile) -> bool:
 
 
 def _owner_pids(profile: RuntimeProfile) -> dict[int, list[str]]:
-    """Report listening owner PIDs without requiring elevated privileges."""
+    """Parse ASCII listener fields without decoding native Windows headings."""
 
     ports = {profile.frontend_port, profile.backend_port}
     owners = {port: [] for port in ports}
     result = subprocess.run(
         ["netstat", "-ano", "-p", "tcp"],
         capture_output=True,
-        text=True,
         check=False,
         timeout=10,
         creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
@@ -833,14 +925,16 @@ def _owner_pids(profile: RuntimeProfile) -> dict[int, list[str]]:
         return {port: ["UNKNOWN"] for port in ports}
     for line in result.stdout.splitlines():
         fields = line.split()
-        if len(fields) < 5 or fields[0].upper() != "TCP" or fields[-2].upper() != "LISTENING":
+        if len(fields) < 5 or fields[0].upper() != b"TCP" or fields[-2].upper() != b"LISTENING":
             continue
         try:
-            port = int(fields[1].rsplit(":", 1)[1])
+            port = int(fields[1].rsplit(b":", 1)[1])
         except (IndexError, ValueError):
             continue
-        if port in owners and fields[-1] not in owners[port]:
-            owners[port].append(fields[-1])
+        if port in owners:
+            pid = fields[-1].decode("ascii")
+            if pid not in owners[port]:
+                owners[port].append(pid)
     return {port: pids for port, pids in owners.items() if pids}
 
 
@@ -905,6 +999,46 @@ def activate_friday(record: Path, employee: Path) -> None:
     _release_writer_fence(fence)
 
 
+def _normal_activation_database(record: Path, employee: Path) -> Path:
+    """Bind normal activation to its admitted installed code and migration evidence."""
+    from scripts.ops import employee_release_recovery as recovery
+
+    journal = json.loads(record.read_text(encoding="utf-8"))
+    binding = journal.get("recovery_admission")
+    if not isinstance(binding, dict):
+        raise ReleaseError("Normal activation requires recovery admission")
+    _, admission = recovery._admission(record, employee, binding.get("sha256", ""))
+    if (record.parent / "recovery.json").exists():
+        raise ReleaseError("An attempted recovery cannot be activated")
+    if recovery._code_state(employee) != admission["incoming_code"]:
+        raise ReleaseError("Installed normal release code changed before activation")
+    return _inside(employee / "backend/mes.db", employee)
+
+
+def activate(record: Path, employee: Path) -> None:
+    """Hold the normal release writer fence through start, health and confirmation."""
+    from scripts.ops import employee_release_recovery as recovery
+
+    employee = _physical(employee).resolve()
+    record = _inside(record, employee / "_attic/runtime/frontend-releases")
+    profile = _require_employee_runtime(employee)
+    with recovery._claim(record, resume=False):
+        database = _normal_activation_database(record, employee)
+        _require_employee_database_binding(employee, database)
+        fence = _acquire_writer_fence(database)
+        try:
+            _stop_until_ports_closed(employee, profile)
+            _start_backend(employee)
+            _start_frontend(employee)
+            _verify_activation_http(profile)
+            mark(record, employee, "CONFIRMED")
+        except BaseException:
+            _stop_until_ports_closed(employee, profile)
+            _release_writer_fence(fence)
+            raise
+        _release_writer_fence(fence)
+
+
 def _confirm_from_cli(record: Path, employee: Path) -> None:
     """Keep Friday-bound confirmation behind the activation writer fence."""
 
@@ -913,6 +1047,8 @@ def _confirm_from_cli(record: Path, employee: Path) -> None:
     journal = json.loads(bound_record.read_text(encoding="utf-8"))
     if isinstance(journal.get("friday_cutover"), dict):
         raise ReleaseError("Friday-bound confirmation requires activate-friday")
+    if isinstance(journal.get("recovery_admission"), dict):
+        raise ReleaseError("Recovery-bound confirmation requires activate")
     mark(bound_record, employee, "CONFIRMED")
 
 
@@ -920,7 +1056,7 @@ def main() -> int:
     from scripts.ops.friday_profile_cutover import CutoverAdmissionError
 
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("prepare", "verify", "install", "install-code", "begin-friday-cutover", "activate-friday", "rollback", "migrating", "confirm", "check-pending", "snapshot-code", "verify-code", "install-preflight"))
+    parser.add_argument("command", choices=("prepare", "verify", "install", "install-code", "begin-friday-cutover", "activate-friday", "activate", "rollback", "migrating", "confirm", "check-pending", "snapshot-code", "verify-code", "install-preflight"))
     parser.add_argument("--source", type=Path)
     parser.add_argument("--runtime", type=Path)
     parser.add_argument("--node", type=Path)
@@ -952,6 +1088,9 @@ def main() -> int:
         elif args.command == "activate-friday":
             activate_friday(args.record, args.employee_root)
             print("FRIDAY_ACTIVATION_RESULT=CONFIRMED")
+        elif args.command == "activate":
+            activate(args.record, args.employee_root)
+            print("EMPLOYEE_ACTIVATION_RESULT=CONFIRMED")
         elif args.command == "install-preflight":
             install_preflight(args.release, args.source, args.node, args.employee_root, args.required_file)
         elif args.command == "rollback":

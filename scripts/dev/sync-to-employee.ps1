@@ -115,7 +115,8 @@ function Restart-EmployeeServices {
 
 function Invoke-FrontendRelease {
     param([string] $Command, [string[]] $Arguments = @())
-    return Invoke-CheckedExternalCommand -FilePath 'py.exe' -ArgumentList (@($FrontendReleaseTool, $Command) + $Arguments)
+    $tool = if ($Command -eq 'activate') { Join-Path $EmpRoot 'scripts\ops\employee_frontend_release.py' } else { $FrontendReleaseTool }
+    return Invoke-CheckedExternalCommand -FilePath 'py.exe' -ArgumentList (@($tool, $Command) + $Arguments)
 }
 
 function Restore-EmployeePreMigration {
@@ -143,7 +144,7 @@ function Write-RecoveryInstructions {
     Write-Host "[$FailedStage] 서버를 재기동하지 않습니다. DB를 자동 복원하지 않았습니다."
     Write-Host "[$FailedStage] 검증된 백업: $ValidatedBackupPath"
     Write-Host "[$FailedStage] 검토 후 다음 명령으로 수동 복원하세요:"
-    Write-Host "  py `"$EmpRoot\scripts\ops\restore_db.py`" --sqlite `"$ValidatedBackupPath`" --target `"$EmpDb`" --structural-rollback"
+    Write-Host "  py `"$($script:EmployeeRecoveryTool)`" recover --record `"$($script:FrontendRollbackRecord)`" --employee-root `"$EmpRoot`" --admission-sha256 $($script:EmployeeRecoveryAdmissionSha256)"
 }
 
 function Get-SyncFileSha256 {
@@ -599,12 +600,21 @@ if (-not $codeCheck.Success) {
     exit 9
 }
 Write-Host "[migrate] 실행 중..."
-$migrationBoundary = Invoke-FrontendRelease -Command 'migrating' -Arguments @('--record', $script:FrontendRollbackRecord, '--employee-root', $EmpRoot)
-if (-not $migrationBoundary.Success) {
+$recoveryTool = Join-Path $EmpRoot 'scripts\ops\employee_release_recovery.py'
+$migrationBoundary = Invoke-CheckedExternalCommand -FilePath 'py.exe' -ArgumentList @(
+    $recoveryTool, 'begin', '--record', $script:FrontendRollbackRecord, '--employee-root', $EmpRoot, '--backup', $backupPath
+)
+Write-CheckedCommandResult -Label 'migration-admission' -Result $migrationBoundary
+$admissionOutput = $migrationBoundary.Output -join [Environment]::NewLine
+$admissionHashMatch = [regex]::Match($admissionOutput, '(?m)^EMPLOYEE_RECOVERY_ADMISSION_SHA256=(?<hash>[0-9a-f]{64})\s*$')
+$recoveryToolMatch = [regex]::Match($admissionOutput, '(?m)^EMPLOYEE_RECOVERY_TOOL=(?<path>.+?)\s*$')
+if (-not $migrationBoundary.Success -or -not $admissionHashMatch.Success -or -not $recoveryToolMatch.Success) {
     Write-CheckedCommandResult -Label 'migration-boundary' -Result $migrationBoundary
     Restore-EmployeePreMigration
     exit 5
 }
+$script:EmployeeRecoveryAdmissionSha256 = $admissionHashMatch.Groups['hash'].Value
+$script:EmployeeRecoveryTool = $recoveryToolMatch.Groups['path'].Value.Trim()
 $migrateResult = Invoke-CheckedExternalCommand `
     -FilePath "py.exe" `
     -ArgumentList @("bootstrap_db.py", "--migrate") `
@@ -696,58 +706,20 @@ $snapshotRegistrationResult = Invoke-CheckedExternalCommand `
     )
 Write-CheckedCommandResult -Label "snapshot-task" -Result $snapshotRegistrationResult
 if (-not $snapshotRegistrationResult.Success) {
-    Write-Host "[snapshot-task] 주간 재고 스냅샷 예약 작업 등록 또는 검증에 실패했습니다. 직원 서비스를 재기동하고 동기화를 실패로 종료합니다."
-    $restartAfterSnapshotTaskFailure = Restart-EmployeeServices
-    if (-not $restartAfterSnapshotTaskFailure.Success) {
-        Write-Host "[snapshot-task] 직원 서비스 재기동도 실패했습니다. backend=$($restartAfterSnapshotTaskFailure.Backend.Success) frontend=$($restartAfterSnapshotTaskFailure.Frontend.Success)"
-    }
+    Write-Host "[snapshot-task] 주간 재고 스냅샷 예약 작업 등록 또는 검증에 실패했습니다. 직원 서비스는 정지 상태를 유지합니다."
+    Write-RecoveryInstructions -FailedStage 'snapshot-task' -ValidatedBackupPath $backupPath
     exit 10
 }
 Write-Host "[post-verify] 완료"
 
 # ---------------------------------------------------------------
-# 8) 서버 시작
+# 8) 쓰기 잠금 아래 서버 시작·헬스체크·확정
 # ---------------------------------------------------------------
 Write-Host "[start] 직원 서버 재기동 중..."
-$startResult = Restart-EmployeeServices
-if (-not $startResult.Success) {
-    Write-Host "[start] 실패: backend=$($startResult.Backend.Success) frontend=$($startResult.Frontend.Success)"
-    exit 6
-}
-
-# ---------------------------------------------------------------
-# 9) 헬스체크
-# ---------------------------------------------------------------
-Write-Host "[health] 백엔드(8010) 확인 중..."
-$backendOk = $false
-# Readiness includes inventory integrity work; do not queue retries every second.
-for ($i = 0; $i -lt 6; $i++) {
-    Start-Sleep -Milliseconds 500
-    try {
-        $resp = Invoke-WebRequest -Uri "http://127.0.0.1:8010/health/ready" -TimeoutSec 10 -UseBasicParsing -ErrorAction Stop
-        if ($resp.StatusCode -eq 200) { $backendOk = $true; break }
-    }
-    catch {}
-}
-
-Write-Host "[health] 프론트(3000) 확인 중..."
-$frontendOk = $false
-for ($i = 0; $i -lt 240; $i++) {
-    Start-Sleep -Milliseconds 500
-    try {
-        $resp = Invoke-WebRequest -Uri "http://127.0.0.1:3000/mes" -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
-        if ($resp.StatusCode -eq 200) { $frontendOk = $true; break }
-    }
-    catch {}
-}
-
-if (-not $backendOk -or -not $frontendOk) {
-    Write-Host "[health] 실패 - backend=$backendOk frontend=$frontendOk"
-    exit 6
-}
-$confirmRelease = Invoke-FrontendRelease -Command 'confirm' -Arguments @('--record', $script:FrontendRollbackRecord, '--employee-root', $EmpRoot)
-if (-not $confirmRelease.Success) {
-    Write-CheckedCommandResult -Label 'confirm-release' -Result $confirmRelease
+$activation = Invoke-FrontendRelease -Command 'activate' -Arguments @('--record', $script:FrontendRollbackRecord, '--employee-root', $EmpRoot)
+Write-CheckedCommandResult -Label 'activate-release' -Result $activation
+if (-not $activation.Success) {
+    Write-RecoveryInstructions -FailedStage 'activate' -ValidatedBackupPath $backupPath
     exit 6
 }
 

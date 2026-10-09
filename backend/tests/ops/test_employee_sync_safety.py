@@ -184,6 +184,13 @@ def _fake_frontend_release_tool() -> str:
             print('SYNC_CODE_MANIFEST=' + str(Path(sys.argv[sys.argv.index('--runtime') + 1]) / 'code.json'))
         elif command == 'verify-code':
             raise SystemExit(int(os.environ.get('FAKE_CODE_VERIFY_EXIT', '0')))
+        elif command == 'activate':
+            with Path(os.environ['SYNC_EVENT_LOG']).open('a', encoding='utf-8') as output:
+                output.write('start-backend\\nstart-frontend\\n')
+                if int(os.environ.get('FAKE_START_BACKEND_EXIT', '0')) or int(os.environ.get('FAKE_START_FRONTEND_EXIT', '0')):
+                    output.write('stop-frontend\\nstop-backend\\n')
+                    raise SystemExit(6)
+                output.write('frontend-confirm\\n')
         """
     )
 
@@ -264,6 +271,14 @@ def _prepare_sync_sandbox(tmp_path: Path, overrides: dict[str, str]) -> tuple[Pa
     for service_root in (dev_root, emp_root):
         for script_name, content in service_scripts.items():
             _write(service_root / "scripts" / "dev" / script_name, content)
+        _write(service_root / 'scripts/ops/employee_frontend_release.py', _fake_frontend_release_tool())
+        _write(service_root / 'scripts/ops/employee_release_recovery.py', _fake_python_tool(
+            'migration-boundary', 'FAKE_RECOVERY_ADMISSION_EXIT', """
+            import sys
+            record = Path(sys.argv[sys.argv.index('--record') + 1])
+            print('EMPLOYEE_RECOVERY_ADMISSION_SHA256=' + 'a' * 64)
+            print('EMPLOYEE_RECOVERY_TOOL=' + str(record.parent / 'recovery-tool/scripts/ops/employee_release_recovery.py'))
+            """))
 
     backup_body = """
     backup_path = Path(os.environ["FAKE_EMP_BACKUP_PATH"]).resolve()
@@ -1726,8 +1741,9 @@ def test_employee_sync_post_verify_failure_keeps_services_stopped_and_prints_rec
     assert "start-backend" not in events
     assert "start-frontend" not in events
     assert "verify-inventory" not in events
-    assert "restore_db.py" in output
-    assert "--structural-rollback" in output
+    assert "employee_release_recovery.py" in output
+    assert "recover --record" in output
+    assert "--admission-sha256" in output
 
 
 def test_employee_sync_success_uses_migrate_then_read_only_head_check(tmp_path: Path) -> None:
@@ -1795,7 +1811,7 @@ def test_employee_sync_runtime_task_validation_failure_stops_before_server_shutd
     assert "backup" not in events
 
 
-def test_employee_sync_snapshot_registration_failure_restarts_services_and_fails(
+def test_employee_sync_snapshot_registration_failure_keeps_services_stopped(
     tmp_path: Path,
 ) -> None:
     sync_path, environment, event_log = _prepare_sync_sandbox(
@@ -1806,7 +1822,9 @@ def test_employee_sync_snapshot_registration_failure_restarts_services_and_fails
     events = _event_kinds(event_log)
 
     assert result.returncode == 10, result.stdout + result.stderr
-    assert events[-3:] == ["snapshot-register", "start-backend", "start-frontend"]
+    assert events[-1] == "snapshot-register"
+    assert "start-backend" not in events
+    assert "start-frontend" not in events
     assert "주간 재고 스냅샷 예약 작업" in result.stdout
 
 
@@ -1825,7 +1843,7 @@ def test_employee_sync_migrate_failure_keeps_services_stopped_and_prints_recover
     assert "start-backend" not in events
     assert "start-frontend" not in events
     assert str(environment["FAKE_EMP_BACKUP_PATH"]) in output
-    assert "restore_db.py" in output
+    assert "employee_release_recovery.py" in output
 
 
 def test_employee_sync_schema_check_failure_keeps_services_stopped_and_prints_recovery(tmp_path: Path) -> None:
@@ -1844,7 +1862,7 @@ def test_employee_sync_schema_check_failure_keeps_services_stopped_and_prints_re
     assert "start-backend" not in events
     assert "start-frontend" not in events
     assert str(environment["FAKE_EMP_BACKUP_PATH"]) in output
-    assert "restore_db.py" in output
+    assert "employee_release_recovery.py" in output
 
 
 def test_employee_sync_ignores_failed_count_text_when_migrate_exit_is_zero(tmp_path: Path) -> None:
@@ -1876,7 +1894,7 @@ def test_employee_sync_operation_diagnosis_failure_keeps_legacy_mode_and_service
     assert "activate-operation-integrity" not in events
     assert "start-backend" not in events
     assert "기존 동작" in output
-    assert "restore_db.py" in output
+    assert "employee_release_recovery.py" in output
 
 
 def test_employee_sync_operation_activation_failure_does_not_start_services(
